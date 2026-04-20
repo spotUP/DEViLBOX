@@ -426,6 +426,45 @@ export const FX_PRESETS: FxPreset[] = [
       { category: 'wasm', type: 'Aelapse', enabled: true, wet: 60, parameters: { delayActive: 1, delayDryWet: 0.5, delaySeconds: 0.375, delayFeedback: 0.55, delayCutLow: 200, delayCutHi: 4000, delaySaturation: 0.3, delayDrift: 0.2, delayMode: 0, springsActive: 1, springsDryWet: 0.4, springsWidth: 0.7, springsLength: 0.6, springsDecay: 0.5, springsDamp: 0.4, springsShape: 0.5, springsTone: 0.5, springsScatter: 0.3, springsChaos: 0.2 } },
     ] },
 
+  // ═══ DUB — MAD PROFESSOR (MVerb-tuned PCM-70 voicing) ═══
+  { name: 'Mad Professor Studio', description: 'Classic PCM-70 dub plate — long dark tail, bass stays dry', tags: ['Dub', 'Dub Reverb', 'Reverb'], gainCompensationDb: -2.4,
+    effects: [
+      { category: 'wasm', type: 'MadProfessorPlate', enabled: true, wet: 45, parameters: { decay: 0.85, damping: 0.75, density: 0.80, predelay: 0.18, size: 0.70, hpfHz: 200, lpfHz: 5000 } },
+    ] },
+  { name: 'Mad Professor Cathedral', description: 'Gigantic dub cathedral — 7-second tail, warm shimmer-free top', tags: ['Dub', 'Dub Reverb', 'Reverb', 'Space'], gainCompensationDb: -4.2,
+    effects: [
+      { category: 'wasm', type: 'MadProfessorPlate', enabled: true, wet: 55, parameters: { decay: 0.95, damping: 0.65, density: 0.90, predelay: 0.30, size: 0.90, hpfHz: 180, lpfHz: 4500 } },
+    ] },
+  { name: 'Mad Professor + Tape', description: 'Dub plate fed by tape echo — full Scientist wash', tags: ['Dub', 'Dub Echo', 'Dub Reverb', 'Delay'], gainCompensationDb: -3.1,
+    effects: [
+      { category: 'tonejs', type: 'RETapeEcho', enabled: true, wet: 40, parameters: { mode: 3, repeatRate: 0.5, intensity: 0.55, echoVolume: 0.8, wow: 0.15, flutter: 0.1, dirt: 0.1, inputBleed: 0.05, loopAmount: 0, playheadFilter: 1 } },
+      { category: 'wasm', type: 'MadProfessorPlate', enabled: true, wet: 35, parameters: { decay: 0.80, damping: 0.78, density: 0.75, predelay: 0.20, size: 0.65, hpfHz: 220, lpfHz: 5200 } },
+    ] },
+
+  // ═══ DUB — DATTORRO (metallic plate, PCM-70-ish) ═══
+  { name: 'Dattorro Tubby', description: 'Short bright plate — tight dub stabs, King Tubby-style', tags: ['Dub', 'Dub Reverb', 'Reverb'], gainCompensationDb: -1.8,
+    effects: [
+      { category: 'wasm', type: 'DattorroPlate', enabled: true, wet: 35, parameters: { predelay: 0.08, preFilter: 0.55, inputDiffusion: 0.72, decayDiffusion: 0.45, decay: 0.70, damping: 0.25 } },
+    ] },
+  { name: 'Dattorro Infinite', description: 'Near-infinite tail — drone / pad sustainer', tags: ['Dub', 'Dub Reverb', 'Reverb', 'Space', 'Creative'], gainCompensationDb: -5.4,
+    effects: [
+      { category: 'wasm', type: 'DattorroPlate', enabled: true, wet: 60, parameters: { predelay: 0.20, preFilter: 0.80, inputDiffusion: 0.85, decayDiffusion: 0.65, decay: 0.98, damping: 0.20 } },
+    ] },
+  { name: 'Dattorro Steel', description: 'Metallic resonant plate — Scientist 70s signature', tags: ['Dub', 'Dub Reverb', 'Reverb'], gainCompensationDb: -2.9,
+    effects: [
+      { category: 'wasm', type: 'DattorroPlate', enabled: true, wet: 45, parameters: { predelay: 0.12, preFilter: 0.60, inputDiffusion: 0.78, decayDiffusion: 0.55, decay: 0.88, damping: 0.15 } },
+    ] },
+  { name: 'Dattorro + King Tubby', description: 'Dub filter screaming into metallic plate — live-dub throw', tags: ['Dub', 'Dub Filter', 'Dub Reverb', 'Reverb', 'Creative'], gainCompensationDb: -1.2,
+    effects: [
+      { category: 'tonejs', type: 'DubFilter', enabled: true, wet: 100, parameters: { cutoff: 40, resonance: 30, gain: 1.2 } },
+      { category: 'wasm', type: 'DattorroPlate', enabled: true, wet: 50, parameters: { predelay: 0.10, preFilter: 0.65, inputDiffusion: 0.80, decayDiffusion: 0.60, decay: 0.90, damping: 0.20 } },
+    ] },
+  { name: 'Dattorro + Tape Wash', description: 'Tape echo feeding the Dattorro tank — full dub throw', tags: ['Dub', 'Dub Echo', 'Dub Reverb', 'Delay'], gainCompensationDb: -3.6,
+    effects: [
+      { category: 'tonejs', type: 'SpaceEcho', enabled: true, wet: 35, parameters: { mode: 4, rate: 375, intensity: 0.55, echoVolume: 0.8, reverbVolume: 0.15, bpmSync: 1, syncDivision: '1/4' } },
+      { category: 'wasm', type: 'DattorroPlate', enabled: true, wet: 40, parameters: { predelay: 0.15, preFilter: 0.70, inputDiffusion: 0.78, decayDiffusion: 0.55, decay: 0.85, damping: 0.25 } },
+    ] },
+
   // ═══ CHANNEL-ORIENTED ═══
   { name: 'Acid Bass', description: 'Filter + distortion for TB-303', tags: ['Bass', 'Grit'], gainCompensationDb: 0.3,
     effects: [

@@ -11,9 +11,19 @@ import { useModalClose } from '@hooks/useDialogKeyboard';
 import { EffectParameterEditor } from './EffectParameterEditor';
 import { AVAILABLE_EFFECTS, getEffectsByGroup, type AvailableEffect } from '@constants/unifiedEffects';
 import { getDefaultEffectParameters } from '@engine/InstrumentFactory';
+import { CHANNEL_FX_PRESETS, getPresetsByTag, type ChannelFxPreset, type FxPreset, type FxTag } from '@constants/fxPresets';
 import type { EffectConfig, AudioEffectType as EffectType } from '@typedefs/instrument';
+import { ChevronDown } from 'lucide-react';
 
 const MAX_INSERT_EFFECTS = 4;
+
+// Preset filter tags surfaced in the channel-insert picker. The `Dub`
+// family is first-class here since per-channel dub sends are one of the
+// common use-cases (bass channel → no reverb; lead channel → plate).
+const PRESET_FILTER_TAGS: FxTag[] = [
+  'Dub', 'Dub Echo', 'Dub Reverb', 'Dub Filter', 'Dub Mod',
+  'Reverb', 'Delay', 'Modulation', 'Creative', 'Space', 'Lo-Fi',
+];
 
 interface ChannelInsertEffectsModalProps {
   isOpen: boolean;
@@ -34,6 +44,20 @@ export const ChannelInsertEffectsModal: React.FC<ChannelInsertEffectsModalProps>
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [showBrowser, setShowBrowser] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [showPresetMenu, setShowPresetMenu] = useState(false);
+  const [presetTagFilter, setPresetTagFilter] = useState<FxTag | null>(null);
+  // Close preset menu on outside click.
+  const presetMenuRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!showPresetMenu) return;
+    const onDown = (e: MouseEvent) => {
+      if (presetMenuRef.current && !presetMenuRef.current.contains(e.target as Node)) {
+        setShowPresetMenu(false);
+      }
+    };
+    document.addEventListener('mousedown', onDown);
+    return () => document.removeEventListener('mousedown', onDown);
+  }, [showPresetMenu]);
 
   const effectsRef = useRef(insertEffects);
   useEffect(() => { effectsRef.current = insertEffects; }, [insertEffects]);
@@ -90,6 +114,31 @@ export const ChannelInsertEffectsModal: React.FC<ChannelInsertEffectsModalProps>
     setSelectedIndex(insertEffects.length); // select the newly added effect
   }, [channelIndex, insertEffects.length, addChannelInsertEffect]);
 
+  const removeChannelInsertEffectFn = useMixerStore(s => s.removeChannelInsertEffect);
+  const handleLoadPreset = useCallback((preset: FxPreset | ChannelFxPreset) => {
+    // Clear existing inserts, then apply preset (capped at the per-channel limit).
+    const current = effectsRef.current;
+    for (let i = current.length - 1; i >= 0; i--) {
+      removeChannelInsertEffectFn(channelIndex, i);
+    }
+    const slice = preset.effects.slice(0, MAX_INSERT_EFFECTS);
+    for (const fx of slice) {
+      addChannelInsertEffect(channelIndex, {
+        ...fx,
+        id: `channel-fx-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+      } as EffectConfig);
+    }
+    setShowPresetMenu(false);
+    setShowBrowser(false);
+    setSelectedIndex(0);
+  }, [channelIndex, addChannelInsertEffect, removeChannelInsertEffectFn]);
+
+  // Filter preset list by tag + by the effects being available (no neural
+  // models sneaking into the channel insert bus).
+  const presetsForMenu = presetTagFilter
+    ? getPresetsByTag(presetTagFilter)
+    : CHANNEL_FX_PRESETS;
+
   // Filter available effects by search
   const groupedEffects = getEffectsByGroup();
   const filteredGroups: Record<string, AvailableEffect[]> = {};
@@ -115,6 +164,66 @@ export const ChannelInsertEffectsModal: React.FC<ChannelInsertEffectsModalProps>
             Channel {channelIndex + 1} — Insert Effects
           </span>
           <div className="flex items-center gap-2">
+            {/* Preset selector — surfaces the same FX_PRESETS that Master /
+                Instrument panels use, so a "Dub Chamber" chain or a new
+                MadProfessor/Dattorro preset can land on any channel in one
+                click. Capped at MAX_INSERT_EFFECTS effects (4 today). */}
+            <div className="relative" ref={presetMenuRef}>
+              <button
+                onClick={() => setShowPresetMenu(v => !v)}
+                className="flex items-center gap-1 px-2 py-0.5 text-[11px] font-mono rounded border border-border-primary text-text-muted hover:text-text-primary hover:border-accent-primary/40 transition-colors"
+                title="Load a factory preset chain to this channel"
+              >
+                Presets <ChevronDown size={12} />
+              </button>
+              {showPresetMenu && (
+                <div className="absolute right-0 top-[120%] z-20 w-72 max-h-[60vh] overflow-y-auto bg-surface-primary border border-border-primary rounded shadow-2xl">
+                  <div className="flex flex-wrap gap-1 p-2 border-b border-border-primary">
+                    <button
+                      onClick={() => setPresetTagFilter(null)}
+                      className={`px-1.5 py-0.5 text-[9px] font-mono rounded border ${
+                        presetTagFilter === null
+                          ? 'bg-accent-primary/20 text-accent-primary border-accent-primary/40'
+                          : 'text-text-muted border-border-primary hover:text-text-primary'
+                      }`}
+                    >
+                      ALL
+                    </button>
+                    {PRESET_FILTER_TAGS.map(tag => (
+                      <button
+                        key={tag}
+                        onClick={() => setPresetTagFilter(tag)}
+                        className={`px-1.5 py-0.5 text-[9px] font-mono rounded border ${
+                          presetTagFilter === tag
+                            ? 'bg-accent-primary/20 text-accent-primary border-accent-primary/40'
+                            : 'text-text-muted border-border-primary hover:text-text-primary'
+                        }`}
+                      >
+                        {tag}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="py-1">
+                    {presetsForMenu.map(preset => (
+                      <button
+                        key={preset.name}
+                        onClick={() => handleLoadPreset(preset)}
+                        className="w-full text-left px-3 py-1.5 text-xs hover:bg-surface-secondary transition-colors"
+                        title={preset.description}
+                      >
+                        <div className="font-medium text-text-primary">{preset.name}</div>
+                        <div className="text-[10px] text-text-muted truncate">{preset.description}</div>
+                      </button>
+                    ))}
+                    {presetsForMenu.length === 0 && (
+                      <div className="px-3 py-4 text-center text-text-muted text-[11px]">
+                        No presets with this tag.
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
             <span className="text-[10px] text-text-muted">
               {insertEffects.length}/{MAX_INSERT_EFFECTS}
             </span>
