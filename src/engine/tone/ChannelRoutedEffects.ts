@@ -112,6 +112,14 @@ export class ChannelRoutedEffectsManager {
   private channelDubSendValues: number[] = new Array(MAX_DUB_CHANNELS).fill(0);
   /** Active state — true when the worklet is rendering this channel into its dub output. */
   private channelDubActive: boolean[] = new Array(MAX_DUB_CHANNELS).fill(false);
+  /**
+   * Channels whose activation was deferred because no isolation engine was
+   * available at setChannelDubSend time. rebuildDubConnections picks these up
+   * once an engine becomes available, so a dub send set before the song
+   * started still wires up on engine attach. Retries are idempotent —
+   * successful activation removes the entry.
+   */
+  private channelDubPendingActivation: Set<number> = new Set();
 
   constructor(masterEffectsInput: Tone.Gain) {
     this.masterEffectsInput = masterEffectsInput;
@@ -332,9 +340,15 @@ export class ChannelRoutedEffectsManager {
     const gain = this.channelDubGains[channelIndex];
     if (!gain) return;
     const engine = await getActiveIsolationEngine();
-    if (!engine?.isAvailable()) return;
+    if (!engine?.isAvailable()) {
+      this.channelDubPendingActivation.add(channelIndex);
+      return;
+    }
     const worklet = engine.getWorkletNode();
-    if (!worklet) return;
+    if (!worklet) {
+      this.channelDubPendingActivation.add(channelIndex);
+      return;
+    }
 
     // Dual-convention envelope: LibOpenMPT worklet switches on `cmd`, UADE /
     // Hively / Furnace worklets switch on `type`. Send both so a single
@@ -347,6 +361,7 @@ export class ChannelRoutedEffectsManager {
       return;
     }
     this.channelDubActive[channelIndex] = true;
+    this.channelDubPendingActivation.delete(channelIndex);
 
     // Register with DubBus so echoThrow can find the tap.
     try {
@@ -387,6 +402,11 @@ export class ChannelRoutedEffectsManager {
     if (!engine?.isAvailable()) return;
     const worklet = engine.getWorkletNode();
     if (!worklet) return;
+
+    // Engine is now available — drain the pending-activation set. Channels
+    // whose sends are still non-zero will be re-activated below; those that
+    // have since been turned off naturally fall out via the continue guard.
+    this.channelDubPendingActivation.clear();
 
     for (let ch = 0; ch < MAX_DUB_CHANNELS; ch++) {
       if (this.channelDubSendValues[ch] <= 0) continue;
