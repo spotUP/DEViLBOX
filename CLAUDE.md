@@ -30,6 +30,58 @@ DEViLBOX is hosted on **Hetzner** at `devilbox.uprough.net`.
 
 ---
 
+## CRITICAL: Every Bug Fix Ships With a Regression Test
+
+**!!! IF YOU FIXED IT, LOCK IT DOWN !!!**
+
+When you fix a bug, you MUST add a test that would have failed before your
+fix and passes after. The point isn't proving the fix — it's making sure the
+same bug can never silently come back.
+
+**Rules:**
+
+- **Extract testable pure functions.** If the bug is inside a big component
+  or handler, extract the faulty logic into a small pure function (see
+  `src/lib/hvsc/normalizeHVSCDownload.ts` for a textbook example — a 20-line
+  helper pulled out of a 900-line React component and unit-tested in
+  isolation). Don't test through the whole UI when a helper will do.
+- **Wire new test files into `test:ci`.** Add the path to the `test:ci` and
+  `test:all` scripts in `package.json`. Tests that aren't in `test:ci`
+  don't run in pre-push or on CI — they're just decoration.
+- **Name tests after the bug.** A test's description should read like a
+  user-reported symptom: "appends `.sid` when the extension is missing",
+  "rejects buffers shorter than 4 bytes", not "does the right thing".
+- **Mock the minimum.** Use `vi.stubGlobal`, small fake AudioBuffer / rAF
+  polyfills (see `src/lib/export/__tests__/trimLeadingSilence.test.ts`) —
+  never pull in the full engine to test parser or store logic.
+- **Cover both the bug case and the round-trip.** For a fix "X was
+  rejected when it should be accepted", add one test asserting X is now
+  accepted AND one asserting that invalid input is still rejected.
+  Otherwise the next over-eager fix could swing too far the other way.
+- **If the bug was a routing decision** (one branch claimed a file the
+  wrong way), add a static contract test that documents the intended
+  ordering. Pattern: `src/engine/__tests__/exportTap.contract.test.ts`.
+
+**Verify the test catches the regression:** before committing, temporarily
+revert the fix and run the new test — it MUST fail. If it passes on the
+broken code, the test isn't covering the bug.
+
+**Existing canonical test files to mirror:**
+
+| Pattern | Example |
+| --- | --- |
+| Pure-function unit test with minimal mocks | `src/lib/hvsc/__tests__/normalizeHVSCDownload.test.ts` |
+| AudioBuffer / rAF polyfill | `src/lib/export/__tests__/trimLeadingSilence.test.ts` |
+| Store round-trip with fake-indexeddb | `src/hooks/__tests__/useProjectPersistence.test.ts` |
+| Event record/replay pairing | `src/engine/dub/__tests__/DubRecorder.test.ts` |
+| Static source contract check (grep-based) | `src/engine/__tests__/exportTap.contract.test.ts` |
+| Format detection ratchet (locks known debt) | `src/lib/import/__tests__/FormatRegistry.detection.test.ts` |
+
+After adding a test, run `npm run test:ci` locally — expect the count to go
+up. If it didn't, your test file isn't wired into the CI glob yet.
+
+---
+
 ## CRITICAL: Never Guess or Assume
 
 **!!! ALWAYS CHECK THE FACTS — GO BY THE FACTS !!!**
