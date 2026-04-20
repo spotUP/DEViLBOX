@@ -118,6 +118,8 @@ export const DubDeckStrip: React.FC = () => {
   const busEnabled = useDrumPadStore(s => s.dubBus.enabled);
   const setDubBus = useDrumPadStore(s => s.setDubBus);
   const dubBusSettings = useDrumPadStore(s => s.dubBus);
+  const dubBusStash = useDrumPadStore(s => s.dubBusStash);
+  const swapDubBusStash = useDrumPadStore(s => s.swapDubBusStash);
 
   const channels = useMixerStore(s => s.channels);
   const setChannelDubSend = useMixerStore(s => s.setChannelDubSend);
@@ -458,6 +460,24 @@ export const DubDeckStrip: React.FC = () => {
           <option value="madProfessor">Mad Professor</option>
           <option value="gatedFlanger">Gated Flanger</option>
         </select>
+        {/* A/B compare — swaps live settings with the snapshot captured
+            the last time a character preset was loaded. Disabled until
+            the first preset load. Like a hardware desk compare button. */}
+        <button
+          className={
+            'px-2 py-0.5 rounded border transition-colors text-[10px] font-mono ' +
+            (dubBusStash
+              ? 'bg-dark-bgTertiary border-dark-border text-text-primary hover:bg-dark-bgHover'
+              : 'bg-dark-bgTertiary border-dark-border text-text-muted opacity-50 cursor-not-allowed')
+          }
+          onClick={() => swapDubBusStash()}
+          disabled={!busEnabled || !dubBusStash}
+          title={dubBusStash
+            ? `A/B — swap with stash (${dubBusStash.characterPreset})`
+            : 'A/B — load a character preset first to enable compare'}
+        >
+          A/B
+        </button>
         <button
           className={
             'px-2 py-0.5 rounded border transition-colors ' +
