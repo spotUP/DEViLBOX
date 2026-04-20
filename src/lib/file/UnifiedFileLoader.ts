@@ -528,7 +528,6 @@ export async function loadFile(
 ): Promise<FileLoadResult> {
   suppressFormatChecks(); // never show format dialogs during file load
   const filename = file.name.toLowerCase();
-  console.log(`[loadFile] enter "${file.name}" (lower="${filename}") companions=${options.companionFiles?.size ?? 0}`);
 
   try {
     // === V2M FILES — handle before isSongFormat check ===
@@ -554,9 +553,7 @@ export async function loadFile(
     }
 
     // === SONG FORMATS (replace project) ===
-    const songFormatCheck = isSongFormat(filename);
-    console.log(`[loadFile] isSongFormat("${filename}") = ${songFormatCheck}`);
-    if (songFormatCheck) {
+    if (isSongFormat(filename)) {
       // TD-3 pattern files need replace/append choice from user
       if ((filename.endsWith('.sqs') || filename.endsWith('.seq')) && options.replacePatterns === undefined) {
         const { useUIStore } = await import('@stores/useUIStore');
@@ -601,7 +598,6 @@ export async function loadFile(
       return await loadAudioSample(file);
     }
 
-    console.warn(`[loadFile] FALLTHROUGH — no branch matched "${file.name}" (isSongFormat was false)`);
     return { success: false, error: `Unsupported file format: ${file.name}` };
 
   } catch (error) {
@@ -1289,13 +1285,10 @@ async function loadSongFile(file: File, options: FileLoadOptions, preReadBuffer?
   //  clearing instruments/patterns during the async gap.)
 
   // === All other tracker/module formats → show import dialog ===
-  const supported = isSupportedModule(filename);
-  console.log(`[loadSongFile] fall-through check: isSupportedModule("${filename}") = ${supported}`);
-  if (supported) {
+  if (isSupportedModule(filename)) {
     return { success: 'pending-import', file };
   }
 
-  console.warn(`[loadSongFile] UNSUPPORTED song format: "${file.name}" (lower="${filename}")`);
   return { success: false, error: `Unsupported song format: ${file.name}` };
 }
 
