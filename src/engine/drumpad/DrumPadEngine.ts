@@ -12,6 +12,7 @@ import { createEffectChain } from '../factories/EffectFactory';
 import type { DJMixerEngine } from '../dj/DJMixerEngine';
 import type { DeckId } from '../dj/DeckEngine';
 import { DubBus } from '../dub/DubBus';
+import { setDubBusForRouter } from '../dub/DubRouter';
 import { getToneEngine } from '../ToneEngine';
 import { getNativeAudioNode } from '../../utils/audio-context';
 
@@ -86,6 +87,15 @@ export class DrumPadEngine {
 
     // Dub bus lives in its own class now — see src/engine/dub/DubBus.ts.
     this.dubBus = new DubBus(this.context, this.masterGain);
+
+    // Register with the DubRouter so ANY view (tracker, DJ, drumpad) can
+    // fire dub moves the moment the engine exists, without waiting for a
+    // specific UI to mount. Previously only DubDeckStrip (a tracker-view
+    // child) registered the bus — pressing the DJ view's DUB tab or a
+    // drumpad dub-action pad from any other view logged "no bus
+    // registered — … ignored (tracker view not mounted?)" and silently
+    // dropped the move. 2026-04-20 fix.
+    setDubBusForRouter(this.dubBus);
   }
 
   /**
@@ -793,6 +803,7 @@ export class DrumPadEngine {
     this.voices.clear();
     // Tear down the dub bus — this disconnects + disposes all bus nodes,
     // detaches from any mixer, and cancels all in-flight timers/releasers.
+    try { setDubBusForRouter(null); } catch { /* ok */ }
     try { this.dubBus.dispose(); } catch { /* ok */ }
     this.masterGain.disconnect();
     this.outputs.forEach(output => output.disconnect());
