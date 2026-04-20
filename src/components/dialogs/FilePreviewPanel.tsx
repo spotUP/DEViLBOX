@@ -802,36 +802,23 @@ export const OnlinePanel: React.FC<OnlinePanelProps> = ({ isOpen, onLoadTrackerM
     try {
       let buffer: ArrayBuffer;
       let companions: Map<string, ArrayBuffer> | undefined;
-      // Normalize filename. HVSC search results sometimes come back without
-      // the `.sid` extension (e.g. "Blasting Speaker" for the file
-      // "Blasting_Speaker.sid"). Without `.sid`, `isSongFormat` returns
-      // false and the whole load rejects before any parser runs. HVSC only
-      // hosts C64 SID files, so always guarantee the extension.
       let filename = item.filename;
 
       if (item.source === 'hvsc') {
         // HVSC SID files are single-file — no companions.
+        let raw: ArrayBuffer;
         try {
-          buffer = await downloadHVSCFile(item.key);
+          raw = await downloadHVSCFile(item.key);
         } catch (fetchErr) {
           throw new Error(`HVSC download failed: ${(fetchErr as Error).message}`);
         }
-        // Verify magic bytes — if HVSC ever hands us non-SID data (server
-        // glitch, wrong path) refuse before `.sid` dispatch could route it
-        // to the SidMon1 fallback and produce garbled playback.
-        if (buffer.byteLength < 4) {
-          throw new Error(`HVSC returned ${buffer.byteLength} bytes — not a valid SID`);
-        }
-        const head = new Uint8Array(buffer, 0, 4);
-        const magic = String.fromCharCode(head[0], head[1], head[2], head[3]);
-        if (magic !== 'PSID' && magic !== 'RSID') {
-          throw new Error(`HVSC returned "${magic}" magic — expected PSID/RSID, won't route to SidMon`);
-        }
-        // Ensure `.sid` extension. Basename-only normalisation — preserve
-        // any path separators the server may have prefixed.
-        if (!/\.sid$/i.test(filename)) {
-          filename = `${filename}.sid`;
-        }
+        // Guarantee `.sid` suffix + verify PSID/RSID magic. Pure helper
+        // that throws with a clear message on non-SID bytes so we never
+        // route accidental garbage to the SidMon 1 fallback.
+        const { normalizeHVSCDownload } = await import('@/lib/hvsc/normalizeHVSCDownload');
+        const normalized = normalizeHVSCDownload(raw, filename);
+        buffer = normalized.buffer;
+        filename = normalized.filename;
       } else {
         // Modland: fetch main file, then look for every companion flavour
         // UADE supports (TFMX smpl., Jason Page smp., MFP smp., Richard
