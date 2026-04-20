@@ -96,6 +96,56 @@ describe('ui-smoke — flow 01: load + play a real MOD', () => {
   );
 });
 
+describe('ui-smoke — flow 07: DJ deck audio (end-to-end via pre-render pipeline)', () => {
+  it.runIf(!!client)(
+    'switch → DJ, load deck A (triggers pre-render), play, measure sustained audio',
+    async () => {
+      const c = client!;
+      try { await c.call('stop'); } catch { /* ok */ }
+      await sleep(200);
+      await c.call('clear_console_errors');
+
+      await c.call('dj_vj_action', { action: 'switchView', args: { view: 'dj' } });
+      await sleep(400);
+
+      const payload = loadFixtureBase64(FIXTURE_MOD);
+      // Pre-render pipeline takes a few seconds for the first render —
+      // larger than other flows' load budget. Includes WAV render +
+      // analysis.
+      await c.call('dj_vj_action', {
+        action: 'loadDeck',
+        args: { side: 'A', filename: payload.filename, data: payload.data },
+      });
+      await sleep(400);
+
+      await c.call('dj_vj_action', { action: 'setCrossfader', args: { value: 0 } });
+      await c.call('dj_vj_action', { action: 'playDeck', args: { side: 'A' } });
+      await sleep(700);
+
+      const level = await c.call<{ rmsAvg?: number; peakMax?: number; silent?: boolean }>(
+        'get_audio_level', { durationMs: 800 },
+      );
+      const diag = `level=${JSON.stringify(level)}`;
+      expect(level.silent, `DJ deck silent — pre-render / play-back path broken. ${diag}`).not.toBe(true);
+      expect((level.rmsAvg ?? 0), `DJ RMS at 0, expected >0.01. ${diag}`).toBeGreaterThan(0.01);
+
+      try { await c.call('dj_vj_action', { action: 'stopDeck', args: { side: 'A' } }); } catch { /* ok */ }
+      await c.call('dj_vj_action', { action: 'switchView', args: { view: 'tracker' } });
+      await sleep(200);
+
+      const errors = await c.call<{ entries?: Array<{ level: string; message: string }> }>('get_console_errors');
+      const critical = (errors.entries ?? []).filter(
+        (e) =>
+          e.level === 'error' &&
+          !/favicon|devtools|WebSocket closed/i.test(e.message),
+      );
+      expect(critical, `critical errors in DJ flow: ${JSON.stringify(critical)}`).toEqual([]);
+    },
+    // Larger timeout — pre-render adds seconds to load time.
+    120000,
+  );
+});
+
 describe('ui-smoke — flow 08: oscilloscope store flushes on stop', () => {
   it.runIf(!!client)(
     'per-channel scope data is cleared when playback stops (no stale ring pollution)',
