@@ -139,22 +139,28 @@ const soakActions: Record<string, SoakActionFn> = {
       bytes[i] = binaryStr.charCodeAt(i);
     }
 
-    const { parseModuleToSong } = await import('../lib/import/parseModuleToSong');
-    const file = new File([bytes.buffer], filename, { type: 'application/octet-stream' });
-    const song = await parseModuleToSong(file);
-    if (!song) throw new Error(`Failed to parse file: ${filename}`);
-
     const { getDJEngine } = await import('../engine/dj/DJEngine');
     const engine = getDJEngine();
-    const bpm = song.initialBPM || 125;
-    await engine.loadToDeck(side, song, filename, bpm);
 
-    // Update store with track info
+    // Go through the full DJ pre-render pipeline so the deck ends up in
+    // AUDIO playback mode with a WAV loaded — the deck's tracker replayer
+    // is muted by design (DeckEngine.ts:257), so without pre-rendering
+    // the deck would stay silent. Delegates to DJPipeline for render +
+    // analysis, same path the real UI uses on drag-and-drop.
+    const { loadUADEToDeck } = await import('../engine/dj/DJUADEPrerender');
+    const ab = bytes.buffer as ArrayBuffer;
+    await loadUADEToDeck(
+      engine,
+      side,
+      ab,
+      filename,
+      /* renderIfMissing */ true,
+    );
+
+    // Best-effort store sync so downstream track-lookups see the filename.
     useDJStore.getState().setDeckState(side, {
       fileName: filename,
       trackName: filename,
-      detectedBPM: bpm,
-      effectiveBPM: bpm,
     });
 
     return { ok: true, side, filename };
