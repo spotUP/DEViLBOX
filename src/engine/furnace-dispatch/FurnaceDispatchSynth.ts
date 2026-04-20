@@ -237,7 +237,8 @@ export class FurnaceDispatchSynth implements DevilboxSynth {
   private platformType: number;
   private activeNotes: Map<number, number> = new Map(); // midiNote -> channel
   private _releaseTimeouts: Map<number, ReturnType<typeof setTimeout>> = new Map(); // chan -> pending release timeout
-  private _volumeOffsetDb = 0; // Volume normalization offset in dB
+  // Volume normalization is handled per-chip by the worklet's POST_AMP table
+  // (matching upstream Furnace 1:1). No JS-side offset on the shared gain node.
   private furnaceInstrumentIndex = 0; // Which Furnace instrument slot this synth uses
   private _nativeGain: GainNode | null = null; // Shared native GainNode for audio routing
   private _instrumentUploadPromise: Promise<void> | null = null; // Pending instrument upload
@@ -418,16 +419,12 @@ export class FurnaceDispatchSynth implements DevilboxSynth {
   }
 
   /**
-   * Set volume normalization offset in dB.
-   * Applied to the native GainNode in the audio path.
+   * No-op on FurnaceDispatchSynth: volume normalization lives in the worklet's
+   * POST_AMP table (per-chip, matches upstream). Applying a per-instrument
+   * offset to the shared gain node caused "last writer wins" + POST_AMP
+   * double-compensation, producing up to +37 dB of spurious gain.
    */
-  public setVolumeOffset(db: number): void {
-    this._volumeOffsetDb = db;
-    if (this._nativeGain) {
-      const nativeGain = this._nativeGain;
-      nativeGain.gain.value = Math.pow(10, db / 20);
-    }
-  }
+  public setVolumeOffset(_db: number): void { /* intentionally ignored */ }
 
   private async initialize(): Promise<void> {
     try {
@@ -441,23 +438,22 @@ export class FurnaceDispatchSynth implements DevilboxSynth {
       await this.engine.createChip(this.platformType, engineSampleRate);
       await this.engine.waitForChipCreated(this.platformType);
 
-      // Connect worklet output through a shared native GainNode.
-      // The worklet lives in the engine's true native AudioContext.
-      // Audio routing: worklet → sharedGain → (routed by ToneEngine to synthBus)
-      // → masterEffectsInput → [master fx] → masterChannel → destination.
-      // Multiple FurnaceDispatchSynths share one chip/worklet, so only one
-      // audio route should exist (managed by the engine).
+      // Worklet → sharedGain → synthBus is routed ONCE by ToneEngine.routeNativeEngineOutput
+      // (deduped per engineKey). `this.output` is kept as a silent stub so the DevilboxSynth
+      // shape stays consistent with other synths — but it is intentionally NOT fed from
+      // sharedGain. Connecting sharedGain → this.output per synth duplicated the signal
+      // N times (once per instrument), causing multi-chip .fur songs to clip ~NxPOST_AMP.
+      // Per-channel effects use the worklet's isolation slots, not per-instrument chains.
+      //
+      // NOTE: `_volumeOffsetDb` from the registry is designed for per-instrument synths
+      // that each own their audio output. It MUST NOT be applied to sharedGain — that
+      // node is shared across every instrument on this engine, so "last writer wins"
+      // produces nondeterministic gain, and the worklet's per-chip POST_AMP already
+      // handles loudness normalization (matching upstream Furnace 1:1). Stacking both
+      // caused +7 dB residual clipping on Genesis and +37 dB MMC5 catastrophes.
       const sharedGain = this.engine.getOrCreateSharedGain();
       if (sharedGain) {
         this._nativeGain = sharedGain;
-        // Apply volume normalization (last writer wins — acceptable since
-        // all instruments share the same chip output)
-        if (this._volumeOffsetDb !== 0) {
-          sharedGain.gain.value = Math.pow(10, this._volumeOffsetDb / 20);
-        }
-        // Route audio through this.output so consumers (tester, effect chains) can tap it.
-        // ToneEngine also routes sharedGain → synthBus directly — both paths coexist.
-        sharedGain.connect(this.output);
       }
 
       // Set up default instrument for this platform
@@ -475,7 +471,14 @@ export class FurnaceDispatchSynth implements DevilboxSynth {
       oscStore.setChipInfo(channelNames.length, this.platformType, channelNames);
 
       this.engine.onOscData((channels) => {
-        useOscilloscopeStore.getState().updateChannelData(channels);
+        // Empty array is the engine's signal that the worklet sequencer
+        // stopped and the scope should go flat — use clear() so the
+        // `isActive` flag drops along with the data.
+        if (channels.length === 0) {
+          useOscilloscopeStore.getState().clear();
+        } else {
+          useOscilloscopeStore.getState().updateChannelData(channels);
+        }
       });
 
       console.log('[FurnaceDispatchSynth] Ready, platform:', this.platformType);
