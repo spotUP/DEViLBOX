@@ -1,0 +1,59 @@
+#!/usr/bin/env bash
+# DEViLBOX pre-commit hook — runs the same gate CI uses, locally, before
+# anything hits main.
+#
+# Activated by `npm install` (postinstall sets core.hooksPath) or manually
+# via `npm run setup:hooks`. Bypass in emergencies with `git commit
+# --no-verify` — but that's the same escape hatch CI doesn't have, so
+# don't make a habit of it.
+#
+# What runs:
+#   1. `npm run type-check`  — tsc -b --force
+#   2. `npm run test:ci`     — fast vitest suite (≈10 s)
+#
+# Lint is deliberately NOT run here — too slow for a pre-commit gate.
+
+set -euo pipefail
+
+# Skip on rebase / merge / cherry-pick so the hook doesn't fire on every
+# intermediate commit of a multi-step replay.
+if [ -f .git/MERGE_HEAD ] || [ -f .git/CHERRY_PICK_HEAD ] || [ -d .git/rebase-merge ] || [ -d .git/rebase-apply ]; then
+  exit 0
+fi
+
+# Skip when there are no staged changes to source code. Commit-only changes
+# to non-source files (markdown-only, fixture-only, etc.) still run the
+# gate — the overhead is modest and catches accidental committing of
+# generated files.
+if ! git diff --cached --quiet -- . 2>/dev/null; then
+  : # normal path: proceed with checks
+else
+  # No staged changes at all (empty commit or amend with nothing)
+  exit 0
+fi
+
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+cd "$REPO_ROOT"
+
+# Colours (gracefully degrade for plain terminals).
+if [ -t 2 ]; then
+  RED=$'\033[31m'; GRN=$'\033[32m'; YLW=$'\033[33m'; RST=$'\033[0m'
+else
+  RED=''; GRN=''; YLW=''; RST=''
+fi
+
+echo "${YLW}[pre-commit] type-check…${RST}" >&2
+if ! npm run --silent type-check; then
+  echo "${RED}[pre-commit] type-check failed — commit aborted.${RST}" >&2
+  echo "${RED}  Fix the errors above, or bypass with 'git commit --no-verify'.${RST}" >&2
+  exit 1
+fi
+
+echo "${YLW}[pre-commit] test:ci…${RST}" >&2
+if ! npm run --silent test:ci; then
+  echo "${RED}[pre-commit] test:ci failed — commit aborted.${RST}" >&2
+  echo "${RED}  Fix the failures above, or bypass with 'git commit --no-verify'.${RST}" >&2
+  exit 1
+fi
+
+echo "${GRN}[pre-commit] ok${RST}" >&2
