@@ -8,8 +8,15 @@
 import { create } from 'zustand';
 import { subscribeWithSelector } from 'zustand/middleware';
 import { immer } from 'zustand/middleware/immer';
+import { enableMapSet } from 'immer';
 import type { SeratoCuePoint, SeratoLoop, SeratoBeatMarker } from '@/lib/serato/seratoMetadata';
 import type { BeatGridData } from '@/engine/dj/DJAudioCache';
+
+// Immer needs MapSet support to draft `Set<number>` fields (fxTargetChannels).
+// Calling at module load is idempotent — main.tsx calls it too, but tests
+// bypass the app bootstrap so this import-time call is the store's own
+// guarantee that Set drafts work even in isolated unit-test contexts.
+enableMapSet();
 
 // Native hot cue (compatible shape with Serato, but user-created)
 export interface HotCue {
@@ -103,6 +110,19 @@ export interface DeckState {
   // Channel mutes (bitmask: bit N = channel N+1 enabled)
   channelMask: number;
 
+  // Per-channel FX targeting — which channels of the loaded tracker song
+  // receive DUB moves / EQ / filter sweeps when `channelModeUI === 'fx'`.
+  // Empty set means "all channels" (no targeting active — today's behaviour).
+  // Non-empty set lets DJs throw an echo on just the drums (ch 1-2) while
+  // the bassline (ch 3) keeps playing dry.
+  fxTargetChannels: Set<number>;
+
+  // Click-mode for the scope + channel-toggle widgets.
+  //   'mute' → click toggles channelMask (today's behaviour)
+  //   'fx'   → click toggles fxTargetChannels
+  // Shift+click keeps its solo semantic in both modes.
+  channelModeUI: 'mute' | 'fx';
+
   // Scratch
   scratchActive: boolean;
   scratchVelocity: number;  // current scratch velocity for UI feedback (turntable, pattern scroll)
@@ -149,7 +169,9 @@ export type CrossfaderCurve = 'linear' | 'cut' | 'smooth';
 // DEFAULT DECK STATE
 // ============================================================================
 
-const defaultDeckState: DeckState = {
+// Factory — avoids sharing reference-typed fields (fxTargetChannels Set,
+// hotCues array) across deck slots and across resets.
+const makeDefaultDeckState = (): DeckState => ({
   fileName: null,
   trackName: '',
   trackAuthor: '',
@@ -192,6 +214,8 @@ const defaultDeckState: DeckState = {
   slipSongPos: 0,
   slipPattPos: 0,
   channelMask: 0xFFFF, // All channels enabled (16 bits)
+  fxTargetChannels: new Set<number>(),
+  channelModeUI: 'mute',
 
   // Scratch
   scratchActive: false,
@@ -228,7 +252,7 @@ const defaultDeckState: DeckState = {
   mood: null,
   energy: 0.5,
   danceability: 0.5,
-};
+});
 
 // ============================================================================
 // STORE
@@ -323,6 +347,14 @@ interface DJActions {
   setDeckKeyLock: (deck: DeckId, enabled: boolean) => void;
   toggleDeckChannel: (deck: DeckId, channel: number) => void;
   setAllDeckChannels: (deck: DeckId, enabled: boolean) => void;
+  /** Toggle channel membership in the per-deck FX target set. */
+  toggleFxTarget: (deck: DeckId, channel: number) => void;
+  /** Replace the FX target set for a deck (pass [] to clear). */
+  setFxTarget: (deck: DeckId, channels: number[]) => void;
+  /** Clear the FX target set (back to "all channels" semantic). */
+  clearFxTarget: (deck: DeckId) => void;
+  /** Switch scope-click between mute-mask and fx-target-mask. */
+  setChannelMode: (deck: DeckId, mode: 'mute' | 'fx') => void;
   resetDeck: (deck: DeckId) => void;
 
   // Scratch
@@ -365,9 +397,9 @@ export const useDJStore = create<DJStore>()(
     jogWheelSensitivity: 1.0, // default 1.0x
 
     decks: {
-      A: { ...defaultDeckState },
-      B: { ...defaultDeckState },
-      C: { ...defaultDeckState },
+      A: makeDefaultDeckState(),
+      B: makeDefaultDeckState(),
+      C: makeDefaultDeckState(),
     },
 
     cueMode: 'none' as CueMode,
@@ -610,9 +642,31 @@ export const useDJStore = create<DJStore>()(
         state.decks[deck].channelMask = enabled ? 0xFFFF : 0;
       }),
 
+    toggleFxTarget: (deck, channel) =>
+      set((state) => {
+        const s = state.decks[deck].fxTargetChannels;
+        if (s.has(channel)) s.delete(channel);
+        else s.add(channel);
+      }),
+
+    setFxTarget: (deck, channels) =>
+      set((state) => {
+        state.decks[deck].fxTargetChannels = new Set(channels);
+      }),
+
+    clearFxTarget: (deck) =>
+      set((state) => {
+        state.decks[deck].fxTargetChannels = new Set();
+      }),
+
+    setChannelMode: (deck, mode) =>
+      set((state) => {
+        state.decks[deck].channelModeUI = mode;
+      }),
+
     resetDeck: (deck) =>
       set((state) => {
-        state.decks[deck] = { ...defaultDeckState };
+        state.decks[deck] = makeDefaultDeckState();
       }),
 
     setDeckScratchActive: (deck, active) =>
