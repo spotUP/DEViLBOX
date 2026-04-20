@@ -20,6 +20,7 @@ export const reverseEcho: DubMove = {
   execute({ bus, params }) {
     const durationSec = params.durationSec ?? this.defaults.durationSec;
     const amount = params.amount ?? this.defaults.amount;
+    console.log(`[reverseEcho] fired durationSec=${durationSec} amount=${amount}`);
     void bus.reverseEcho(durationSec, amount);
     return null;
   },
