@@ -608,6 +608,11 @@ export async function exportLiveCaptureToMp3(
 /**
  * Shared orchestration: estimate duration, start the replayer from bar 1,
  * real-time capture into an AudioBuffer. Caller picks the encoding.
+ *
+ * The captured buffer is trimmed of leading silence before return — the
+ * replayer's async play() path means audio typically doesn't flow for
+ * 50–300 ms after the tap connects, and we don't want that dead air in
+ * exported files. See `trimLeadingSilence` for the threshold / cap.
  */
 async function captureLiveSong(options: {
   durationSec?: number;
@@ -644,10 +649,61 @@ async function captureLiveSong(options: {
   void replayer.play();
 
   try {
-    return await captureAudioLiveToBuffer(durationSec, { onProgress, unmuteAll });
+    // Extend capture by 1 s so the leading-silence trim has headroom
+    // without shortening the user's actual song content.
+    const buffer = await captureAudioLiveToBuffer(durationSec + 1, { onProgress, unmuteAll });
+    return trimLeadingSilence(buffer);
   } finally {
     try { replayer.stop(); } catch { /* ok */ }
   }
+}
+
+/**
+ * Strip leading silence from an AudioBuffer. Finds the first sample where
+ * either channel exceeds `thresholdDb` (default −60 dB ≈ 0.001 amplitude)
+ * and returns a new buffer starting `preRollSec` before that sample.
+ *
+ * Bounded by `maxTrimSec`: if nothing above the threshold appears within
+ * that window, the buffer is returned untouched (defensive — a deliberately
+ * quiet intro shouldn't be eaten). Default 2 s cap comfortably covers
+ * replayer startup latency while preserving short intros.
+ */
+export function trimLeadingSilence(
+  buffer: AudioBuffer,
+  options: { thresholdDb?: number; maxTrimSec?: number; preRollSec?: number } = {},
+): AudioBuffer {
+  const thresholdDb = options.thresholdDb ?? -60;
+  const maxTrimSec = options.maxTrimSec ?? 2;
+  const preRollSec = options.preRollSec ?? 0.01;
+
+  const threshold = Math.pow(10, thresholdDb / 20);
+  const sr = buffer.sampleRate;
+  const maxTrimSamples = Math.floor(maxTrimSec * sr);
+  const preRollSamples = Math.floor(preRollSec * sr);
+
+  const L = buffer.getChannelData(0);
+  const R = buffer.numberOfChannels > 1 ? buffer.getChannelData(1) : L;
+  const scanEnd = Math.min(L.length, maxTrimSamples);
+
+  let firstAudio = -1;
+  for (let i = 0; i < scanEnd; i++) {
+    if (Math.abs(L[i]) > threshold || Math.abs(R[i]) > threshold) {
+      firstAudio = i;
+      break;
+    }
+  }
+  if (firstAudio < 0) return buffer; // all silence in the scan window — leave alone
+  const trimFrom = Math.max(0, firstAudio - preRollSamples);
+  if (trimFrom === 0) return buffer;
+
+  const newLength = buffer.length - trimFrom;
+  // Fresh AudioBuffer via OfflineAudioContext — no audio playback side effects.
+  const ctx = new OfflineAudioContext(buffer.numberOfChannels, newLength, sr);
+  const out = ctx.createBuffer(buffer.numberOfChannels, newLength, sr);
+  for (let ch = 0; ch < buffer.numberOfChannels; ch++) {
+    out.getChannelData(ch).set(buffer.getChannelData(ch).subarray(trimFrom));
+  }
+  return out;
 }
 
 function maybeDownload(blob: Blob, filename: string | undefined, ext: 'wav' | 'mp3'): void {
