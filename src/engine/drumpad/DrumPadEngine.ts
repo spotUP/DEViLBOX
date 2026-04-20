@@ -13,6 +13,7 @@ import type { DJMixerEngine } from '../dj/DJMixerEngine';
 import type { DeckId } from '../dj/DeckEngine';
 import { DubBus } from '../dub/DubBus';
 import { getToneEngine } from '../ToneEngine';
+import { getNativeAudioNode } from '../../utils/audio-context';
 
 
 interface VoiceState {
@@ -116,9 +117,17 @@ export class DrumPadEngine {
   detachDJMixer(): void {
     this.dubBus.detachDJMixer();
     // Restore default output routing so pads still make sound when the DJ
-    // view isn't active. Caller that owns the destination (DJSamplerPanel)
-    // should reroute explicitly after detaching if needed.
-    try { this.rerouteOutput(this.context.destination); } catch { /* ok */ }
+    // view isn't active. Prefer ToneEngine's `masterEffectsInput` so drum
+    // pads + dub bus keep flowing through the export tap (matches the
+    // default path in useMIDIPadRouting/getOrCreateEngine). Falls back to
+    // ctx.destination if Tone isn't ready.
+    try {
+      const tone = getToneEngine();
+      const native = getNativeAudioNode(tone.masterEffectsInput);
+      this.rerouteOutput(native ?? this.context.destination);
+    } catch {
+      try { this.rerouteOutput(this.context.destination); } catch { /* ok */ }
+    }
   }
 
   // ─── Dub Action API — thin delegators to DubBus ───────────────────────────
