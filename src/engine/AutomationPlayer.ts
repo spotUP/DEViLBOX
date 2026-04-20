@@ -13,6 +13,7 @@ import { isDevilboxSynth } from '@typedefs/synth';
 import type { TrackerCell, Pattern } from '@typedefs';
 import { interpolateAutomationValue } from '@typedefs/automation';
 import type { AutomationCurve } from '@typedefs/automation';
+import { routeParameterToEngine } from '@/midi/performance/parameterRouter';
 
 interface AutomationData {
   [patternId: string]: {
@@ -167,6 +168,25 @@ export class AutomationPlayer {
         }
       } catch (error) {
         console.error(`Failed to apply mixer automation for ${parameter}:`, error);
+      }
+      return;
+    }
+
+    // ── Dub bus targets (task #35) — routed through the same dispatcher
+    //    MIDI CC + knob writes use (routeDubParameter in parameterRouter).
+    //    Covers every dub.* move trigger/hold and bus continuous param:
+    //    dub.echoThrow, dub.echoWet, dub.hpfCutoff, dub.enabled, … — any
+    //    string that DEFAULT_CC_MAPPINGS can target, an automation curve
+    //    can target. Trigger moves fire on upward 0.5-crossing (router
+    //    handles edge detection); continuous params transform 0-1 per
+    //    DUB_BUS_PARAMS. No per-channel handling here — fractional
+    //    channelId addressing uses `dub.<move>.ch<N>` in the parameter
+    //    string itself (also router-parsed).
+    if (parameter.startsWith('dub.')) {
+      try {
+        routeParameterToEngine(parameter, value);
+      } catch (error) {
+        console.error(`Failed to apply dub automation for ${parameter}:`, error);
       }
       return;
     }
