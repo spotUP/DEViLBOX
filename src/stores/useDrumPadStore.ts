@@ -94,6 +94,17 @@ interface DrumPadStore extends DrumPadState {
   dubBus: DubBusSettings;
   setDubBus: (patch: Partial<DubBusSettings>) => void;
   setPadDubSend: (padId: number, value: number) => void;
+
+  /**
+   * A/B compare stash. Holds the dub-bus settings from the moment the user
+   * most recently loaded a character preset — so they can flip between the
+   * preset and whatever they had dialled in before. Runtime-only; not
+   * serialized with the project (matches hardware desk A/B buttons that
+   * reset on power cycle). null until the first preset load.
+   */
+  dubBusStash: DubBusSettings | null;
+  /** Swap the live dub-bus with the stash. No-op if stash is null. */
+  swapDubBusStash: () => void;
   /** Apply the "Sound System" one-click: enables bus + sets dubSend=0.4 on
    *  every non-empty pad in the current bank. */
   applySoundSystemToBank: () => void;
@@ -169,6 +180,7 @@ export const useDrumPadStore = create<DrumPadStore>((set, get) => ({
   // Dub Bus state — starts disabled; turning it on via the UI (or
   // applySoundSystemToBank) activates the shared SpringReverb + SpaceEcho.
   dubBus: { ...DEFAULT_DUB_BUS },
+  dubBusStash: null,
 
   // Bank state
   currentBank: 'A' as PadBank,
@@ -506,7 +518,15 @@ export const useDrumPadStore = create<DrumPadStore>((set, get) => ({
     // truth. Flip `characterPreset` back to 'custom' after so subsequent
     // user edits don't loop through this branch.
     let effective: Partial<DubBusSettings> = patch;
-    if (typeof patch.characterPreset === 'string' && patch.characterPreset !== 'custom') {
+    // A/B compare stash — capture the PRE-preset settings whenever a
+    // preset is loaded (including a switch between two different presets).
+    // Lets the user flip back to what they had before loading the preset.
+    // Stash is NOT captured on plain field edits (no characterPreset in the
+    // patch) so dragging a knob doesn't overwrite the stash with each frame.
+    const prevSettings = get().dubBus;
+    const isLoadingPreset = typeof patch.characterPreset === 'string'
+      && patch.characterPreset !== prevSettings.characterPreset;
+    if (patch.characterPreset && typeof patch.characterPreset === 'string' && patch.characterPreset !== 'custom') {
       const preset = DUB_CHARACTER_PRESETS[patch.characterPreset];
       if (preset) {
         // Preset overrides first, then the patch (so any explicit fields in
@@ -530,7 +550,10 @@ export const useDrumPadStore = create<DrumPadStore>((set, get) => ({
         effective = { ...patch, characterPreset: 'custom' };
       }
     }
-    set((state) => ({ dubBus: { ...state.dubBus, ...effective } }));
+    set((state) => ({
+      dubBus: { ...state.dubBus, ...effective },
+      ...(isLoadingPreset ? { dubBusStash: { ...prevSettings } } : {}),
+    }));
     get().saveToStorage();
     // Auto-apply sound system when bus flips OFF → ON and the current bank
     // has no pad-level dubSend configured yet. Skips if any pad already has
@@ -551,6 +574,13 @@ export const useDrumPadStore = create<DrumPadStore>((set, get) => ({
   setPadDubSend: (padId: number, value: number) => {
     const v = Math.max(0, Math.min(1, value));
     get().updatePad(padId, { dubSend: v });
+  },
+
+  swapDubBusStash: () => {
+    const { dubBus, dubBusStash } = get();
+    if (!dubBusStash) return;
+    set({ dubBus: dubBusStash, dubBusStash: { ...dubBus } });
+    get().saveToStorage();
   },
 
   applySoundSystemToBank: () => {
