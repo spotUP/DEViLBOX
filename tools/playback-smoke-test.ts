@@ -10,7 +10,9 @@
  *
  * Loads representative songs across all format families DEViLBOX supports,
  * plays each for a few seconds, and runs a multi-tier verification:
- *   Tier 1: Audio — non-silent (RMS > threshold), no console errors
+ *   Tier 1: Audio — non-silent (RMS > threshold), no console errors,
+ *                   peakMax < 4.0 (unambiguous clipping fails the test;
+ *                   peaks 1.5–4.0 report as WARN for visibility)
  *   Tier 2: Instruments — correct synthType, named instruments exist
  *   Tier 3: Export round-trip — native export + reimport for PC formats
  *   Tier 4: Special formats — MIDI, V2M, and other edge-case formats
@@ -118,6 +120,8 @@ interface TestVerification {
   // Tier 1: Audio (existing)
   audioPass: boolean;
   rmsAvg: number;
+  peakMax?: number;       // 2026-04-20: distortion/clipping gate
+  peakStatus?: 'ok' | 'warn' | 'clip';  // ok <1.5, warn 1.5-4, clip >=4
   // Tier 2: Instruments
   instrumentCount: number;
   instrumentPass: boolean;
@@ -735,9 +739,9 @@ async function runTest(client: MCPBridgeClient, test: TestCase): Promise<TestRes
 
     // 7. Measure — retry up to 3 times with increasing wait. Some WASM engines
     //    (UADE, TFMX, SID) take a moment to start producing audio after play().
-    let level = { rmsAvg: 0, rmsMax: 0, isSilent: true };
+    let level = { rmsAvg: 0, rmsMax: 0, peakMax: 0, isSilent: true };
     for (let attempt = 0; attempt < 3; attempt++) {
-      level = await client.call<{ rmsAvg: number; rmsMax: number; isSilent: boolean }>(
+      level = await client.call<{ rmsAvg: number; rmsMax: number; peakMax: number; isSilent: boolean }>(
         'get_audio_level',
         { durationMs: 1500 },
       );
@@ -773,6 +777,25 @@ async function runTest(client: MCPBridgeClient, test: TestCase): Promise<TestRes
     const audibleByOurThreshold = (level.rmsAvg ?? 0) >= SILENCE_THRESHOLD_RMS
       || (level.rmsMax ?? 0) >= SILENCE_THRESHOLD_RMS * 4;
     verification.audioPass = audibleByOurThreshold || !!test.allowSilent;
+
+    // ── Distortion / clipping gate (2026-04-20) ────────────────────────────
+    // User reports: random Furnace songs peak past unity and distort audibly.
+    // Normal audio peaks at ≤1.0; up to ~2.0 is a reasonable pre-limiter
+    // overshoot across chiptune engines. >=4.0 is unambiguous clipping — a
+    // gain-staging bug in the engine or master chain that the user WILL hear.
+    //
+    // Tiered verdict:
+    //   ok   — peakMax < 1.5  (clean)
+    //   warn — peakMax 1.5-4  (elevated; flag in report, don't fail)
+    //   clip — peakMax >= 4.0 (hard fail)
+    //
+    // The ui-smoke flow 06 uses the same thresholds for Furnace-only; this
+    // extends the same gate to every format in the smoke harness.
+    const peakMax = level.peakMax ?? 0;
+    verification.peakMax = peakMax;
+    verification.peakStatus = peakMax >= 4 ? 'clip'
+      : peakMax >= 1.5 ? 'warn'
+      : 'ok';
 
     try {
       const insts = await client.call<any>('get_instruments_list');
@@ -955,6 +978,18 @@ async function runTest(client: MCPBridgeClient, test: TestCase): Promise<TestRes
         rmsAvg: level.rmsAvg, rmsMax: level.rmsMax,
         errorCount: critical.length, verification,
         reason: `editorMode mismatch (expected ${test.expectedEditorMode}, got ${songInfo.editorMode})`,
+        durationMs,
+      };
+    }
+    // Distortion gate — unambiguous clipping (peak ≥ 4.0) is a hard fail.
+    // `allowSilent` tests often produce no audio at all, so peakMax is 0 —
+    // the guard only fires when the test is also producing audio.
+    if (verification.peakStatus === 'clip' && audibleByOurThreshold) {
+      return {
+        name: test.name, family: test.family, status: 'fail',
+        rmsAvg: level.rmsAvg, rmsMax: level.rmsMax,
+        errorCount: critical.length, verification,
+        reason: `clipping (peakMax=${peakMax.toFixed(3)}, threshold=4.0) — engine is outputting above unity, audibly distorting`,
         durationMs,
       };
     }
@@ -1203,6 +1238,9 @@ async function main(): Promise<void> {
       if (v?.exportTested) extras.push(v.exportPass ? 'export=ok' : 'export=FAIL');
       if (v?.paramCoverage !== undefined) extras.push(`params=${v.paramCoverage}%`);
       if (v?.lockstepTested) extras.push(v.lockstepPass ? 'lockstep=ok' : 'lockstep=FAIL');
+      // Only surface the peak when it's elevated — keeps the happy-path
+      // output compact while making distortion immediately visible.
+      if (v?.peakStatus === 'warn') extras.push(`peak=${v.peakMax!.toFixed(2)}(WARN)`);
       const extraStr = extras.length > 0 ? ` [${extras.join(', ')}]` : '';
       console.log(`+ pass (rms ${rms}, ${dt})${extraStr}`);
     } else if (result!.status === 'skip') {
@@ -1223,6 +1261,12 @@ async function main(): Promise<void> {
   const withV = results.filter(r => r.verification);
   const audioPass = withV.filter(r => r.verification!.audioPass).length;
   const audioTotal = withV.length;
+
+  // Distortion / peak-level summary (2026-04-20). Tracks the class of
+  // gain-staging bug where an engine or the master chain emits audio
+  // above unity, audibly distorting regardless of the user's volume.
+  const peakWarn = withV.filter(r => r.verification!.peakStatus === 'warn');
+  const peakClip = withV.filter(r => r.verification!.peakStatus === 'clip');
 
   const instTested = withV.filter(r => r.verification!.instrumentCount > 0 || !r.verification!.instrumentPass);
   const instPass = withV.filter(r => r.verification!.instrumentPass).length;
@@ -1265,6 +1309,17 @@ async function main(): Promise<void> {
   console.log('== Summary ========================');
   console.log(`  Audio:        ${audioPass}/${audioTotal} pass`);
   console.log(`  Instruments:  ${instPass}/${withV.length} pass${instNoInst > 0 ? `  (${instNoInst} engine-driven, no instruments expected)` : ''}`);
+  if (peakWarn.length > 0 || peakClip.length > 0) {
+    console.log(`  Peak level:   ${peakClip.length} clipping (>=4.0), ${peakWarn.length} elevated (1.5-4.0)`);
+    for (const r of peakClip) {
+      const p = r.verification!.peakMax!.toFixed(2);
+      console.log(`                  CLIP  ${p}  ${r.name}`);
+    }
+    for (const r of peakWarn) {
+      const p = r.verification!.peakMax!.toFixed(2);
+      console.log(`                  warn  ${p}  ${r.name}`);
+    }
+  }
   if (exportTested.length > 0) {
     console.log(`  Export:       ${exportPass}/${exportTested.length} pass    (PC formats only)`);
   }
