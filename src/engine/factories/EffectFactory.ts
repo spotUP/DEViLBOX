@@ -15,6 +15,7 @@ import { BiPhaseEffect } from '../effects/BiPhaseEffect';
 import { DubFilterEffect } from '../effects/DubFilterEffect';
 import { MoogFilterEffect, MoogFilterModel, MoogFilterMode } from '../effects/MoogFilterEffect';
 import { MVerbEffect } from '../effects/MVerbEffect';
+import { MadProfessorPlateEffect } from '../effects/MadProfessorPlateEffect';
 import { LeslieEffect } from '../effects/LeslieEffect';
 import { SpringReverbEffect } from '../effects/SpringReverbEffect';
 import { VinylNoiseEffect } from '../effects/VinylNoiseEffect';
@@ -43,6 +44,7 @@ export function getDefaultEffectWet(type: string): number {
     case 'Freeverb':
     case 'JCReverb':
     case 'MVerb':
+    case 'MadProfessorPlate':
     case 'SpringReverb':
     case 'ShimmerReverb':
       return 50;
@@ -134,6 +136,8 @@ switch (type) {
     return { cutoff: 1000, resonance: 10, drive: 1.0, model: 0, filterMode: 0 };
   case 'MVerb':
     return { damping: 0.5, density: 0.5, bandwidth: 0.5, decay: 0.7, predelay: 0.0, size: 0.8, gain: 1.0, mix: 0.4, earlyMix: 0.5 };
+  case 'MadProfessorPlate':
+    return { decay: 0.85, damping: 0.75, density: 0.80, predelay: 0.18, size: 0.70, hpfHz: 200, lpfHz: 5000 };
   case 'Leslie':
     return { speed: 0.0, hornRate: 6.8, drumRate: 5.9, hornDepth: 0.7, drumDepth: 0.5, doppler: 0.5, width: 0.8, acceleration: 0.5 };
   case 'SpringReverb':
@@ -636,6 +640,19 @@ export async function createEffect(
         gain: Number(p.gain),
         mix: Number(p.mix),
         earlyMix: Number(p.earlyMix),
+        wet: wetValue,
+      });
+      break;
+
+    case 'MadProfessorPlate':
+      node = new MadProfessorPlateEffect({
+        decay: Number(p.decay),
+        damping: Number(p.damping),
+        density: Number(p.density),
+        predelay: Number(p.predelay),
+        size: Number(p.size),
+        hpfHz: Number(p.hpfHz),
+        lpfHz: Number(p.lpfHz),
         wet: wetValue,
       });
       break;
