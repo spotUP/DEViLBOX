@@ -96,6 +96,41 @@ describe('ui-smoke — flow 01: load + play a real MOD', () => {
   );
 });
 
+describe('ui-smoke — flow 03: MOD decode exposes patterns + instruments', () => {
+  it.runIf(!!client)(
+    'loaded MOD has at least one instrument and a non-empty pattern',
+    async () => {
+      const c = client!;
+      try { await c.call('stop'); } catch { /* ok */ }
+      await sleep(200);
+      await c.call('clear_console_errors');
+
+      const payload = loadFixtureBase64(FIXTURE_MOD);
+      await c.call('load_file', { filename: payload.filename, data: payload.data });
+      await sleep(500);
+
+      // Instruments list must come back populated — guards against the
+      // "parser decoded the header but lost the sample table" class of bug.
+      const instruments = await c.call<unknown[]>('get_instruments_list');
+      expect(Array.isArray(instruments), `instruments was ${typeof instruments}`).toBe(true);
+      expect((instruments as unknown[]).length).toBeGreaterThan(0);
+
+      // Pattern 0 must exist and have rows — guards against empty-pattern
+      // regressions in MODParser.
+      const p0 = await c.call<{ numRows?: number; rows?: unknown[] }>('get_pattern', { patternIndex: 0 });
+      const rowCount = p0.numRows ?? (p0.rows?.length ?? 0);
+      expect(rowCount, `pattern 0 rows: ${JSON.stringify(p0).slice(0, 200)}`).toBeGreaterThan(0);
+
+      const errors = await c.call<{ entries?: Array<{ level: string; message: string }> }>('get_console_errors');
+      const critical = (errors.entries ?? []).filter(
+        (e) => e.level === 'error' && !/favicon|devtools|WebSocket closed/i.test(e.message),
+      );
+      expect(critical, `critical errors: ${JSON.stringify(critical)}`).toEqual([]);
+    },
+    FLOW_TIMEOUT_MS,
+  );
+});
+
 describe('ui-smoke — flow 02: view-switch cycle', () => {
   it.runIf(!!client)(
     'cycles tracker → DJ → VJ → tracker without throwing errors',
