@@ -329,81 +329,130 @@ function concatenateAudioBuffers(
  *   const wav = await capture;
  *   stop();
  */
+interface CaptureOptions {
+  onProgress?: (percent: number) => void;
+  /**
+   * Temporarily unmute every tracker channel before capturing, then
+   * restore the original state. Use when the user wants a "full render"
+   * that ignores their current mute/solo for export only.
+   */
+  unmuteAll?: boolean;
+}
+
 export function captureAudioLive(
   durationSec: number,
-  onProgress?: (percent: number) => void,
+  onProgressOrOptions?: ((percent: number) => void) | CaptureOptions,
 ): Promise<Blob> {
+  const opts: CaptureOptions = typeof onProgressOrOptions === 'function'
+    ? { onProgress: onProgressOrOptions }
+    : (onProgressOrOptions ?? {});
+  const { onProgress, unmuteAll } = opts;
+
   return new Promise((resolve, reject) => {
     import('@/engine/ToneEngine').then(({ getToneEngine }) => {
       import('@/utils/audio-context').then(({ getNativeAudioNode }) => {
-        const toneCtx = Tone.getContext();
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const ctx: AudioContext = (toneCtx as any).rawContext ?? (toneCtx as any)._context ?? toneCtx;
+        import('@/stores/useMixerStore').then(({ useMixerStore }) => {
+          const toneCtx = Tone.getContext();
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const ctx: AudioContext = (toneCtx as any).rawContext ?? (toneCtx as any)._context ?? toneCtx;
 
-        const sampleRate = ctx.sampleRate;
-        const totalSamples = Math.ceil(durationSec * sampleRate);
-        const BUFFER_SIZE = 4096;
+          const sampleRate = ctx.sampleRate;
+          const totalSamples = Math.ceil(durationSec * sampleRate);
+          const BUFFER_SIZE = 4096;
 
-        const bufL = new Float32Array(totalSamples);
-        const bufR = new Float32Array(totalSamples);
-        let captured = 0;
-        let done = false;
+          const bufL = new Float32Array(totalSamples);
+          const bufR = new Float32Array(totalSamples);
+          let captured = 0;
+          let done = false;
 
-        const processor = ctx.createScriptProcessor(BUFFER_SIZE, 2, 2);
+          const processor = ctx.createScriptProcessor(BUFFER_SIZE, 2, 2);
 
-        function finish() {
-          if (done) return;
-          done = true;
-          try { processor.disconnect(); } catch { /* ignore */ }
+          // Snapshot mute/solo state if we're about to override for a full render.
+          let restoreMuteState: (() => void) | null = null;
+          if (unmuteAll) {
+            const mix = useMixerStore.getState();
+            const snapshot = mix.channels.map((c) => ({ muted: c.muted, soloed: c.soloed }));
+            const hadSoloing = mix.isSoloing;
+            snapshot.forEach((_s, i) => {
+              if (mix.channels[i].muted) mix.setChannelMute(i, false);
+              if (mix.channels[i].soloed) mix.setChannelSolo(i, false);
+            });
+            restoreMuteState = () => {
+              const m = useMixerStore.getState();
+              snapshot.forEach((s, i) => {
+                if (m.channels[i].muted !== s.muted) m.setChannelMute(i, s.muted);
+                if (m.channels[i].soloed !== s.soloed) m.setChannelSolo(i, s.soloed);
+              });
+              // `isSoloing` is derived from the solo flags — setChannelSolo
+              // re-syncs it.
+              void hadSoloing;
+            };
+          }
+
+          function finish() {
+            if (done) return;
+            done = true;
+            try { processor.disconnect(); } catch { /* ignore */ }
+            try {
+              const toneEngine = getToneEngine();
+              // Disconnect from whichever tap we connected to. `blepInput`
+              // is post master FX and pre master volume — the canonical
+              // export point.
+              const mn = getNativeAudioNode(toneEngine.blepInput);
+              mn?.disconnect(processor);
+            } catch { /* ignore */ }
+            restoreMuteState?.();
+
+            const audioBuffer = ctx.createBuffer(2, captured, sampleRate);
+            audioBuffer.getChannelData(0).set(bufL.subarray(0, captured));
+            audioBuffer.getChannelData(1).set(bufR.subarray(0, captured));
+            resolve(audioBufferToWav(audioBuffer));
+          }
+
+          processor.onaudioprocess = (event: AudioProcessingEvent) => {
+            if (done) return;
+            const inputL = event.inputBuffer.getChannelData(0);
+            const inputR = event.inputBuffer.numberOfChannels > 1
+              ? event.inputBuffer.getChannelData(1)
+              : inputL;
+
+            const count = Math.min(inputL.length, totalSamples - captured);
+            bufL.set(inputL.subarray(0, count), captured);
+            bufR.set(inputR.subarray(0, count), captured);
+            captured += count;
+
+            onProgress?.(Math.min(99, (captured / totalSamples) * 100));
+
+            if (captured >= totalSamples) finish();
+          };
+
           try {
             const toneEngine = getToneEngine();
-            const mn = getNativeAudioNode(toneEngine.masterEffectsInput);
-            mn?.disconnect(processor);
-          } catch { /* ignore */ }
+            // Tap at `blepInput` — post-master-FX, pre-master-volume. This
+            // captures everything the user hears colorized (reverb, EQ,
+            // limiter chain) without baking in their current volume knob
+            // so the exported WAV is normalized.
+            const tap = getNativeAudioNode(toneEngine.blepInput);
+            if (!tap) throw new Error('Could not find blepInput native node for capture tap');
 
-          const audioBuffer = ctx.createBuffer(2, captured, sampleRate);
-          audioBuffer.getChannelData(0).set(bufL.subarray(0, captured));
-          audioBuffer.getChannelData(1).set(bufR.subarray(0, captured));
-          resolve(audioBufferToWav(audioBuffer));
-        }
+            // Silent gain sink — ScriptProcessor requires an output but we
+            // don't want to double-route audio to the speaker.
+            const silentGain = ctx.createGain();
+            silentGain.gain.value = 0;
+            silentGain.connect(ctx.destination);
 
-        processor.onaudioprocess = (event: AudioProcessingEvent) => {
-          if (done) return;
-          const inputL = event.inputBuffer.getChannelData(0);
-          const inputR = event.inputBuffer.numberOfChannels > 1
-            ? event.inputBuffer.getChannelData(1)
-            : inputL;
+            tap.connect(processor);
+            processor.connect(silentGain);
 
-          const count = Math.min(inputL.length, totalSamples - captured);
-          bufL.set(inputL.subarray(0, count), captured);
-          bufR.set(inputR.subarray(0, count), captured);
-          captured += count;
-
-          onProgress?.(Math.min(99, (captured / totalSamples) * 100));
-
-          if (captured >= totalSamples) finish();
-        };
-
-        try {
-          const toneEngine = getToneEngine();
-          const masterNode = getNativeAudioNode(toneEngine.masterEffectsInput);
-          if (!masterNode) throw new Error('Could not find masterEffectsInput native node');
-
-          // Silent gain sink — ScriptProcessor requires an output but we don't
-          // want to double-route audio to the speaker.
-          const silentGain = ctx.createGain();
-          silentGain.gain.value = 0;
-          silentGain.connect(ctx.destination);
-
-          masterNode.connect(processor);
-          processor.connect(silentGain);
-
-          // Watchdog: resolve early if caller-supplied duration elapses without
-          // reaching totalSamples (e.g., song ended with silence padding).
-          setTimeout(finish, durationSec * 1000 + 500);
-        } catch (err) {
-          reject(err instanceof Error ? err : new Error(String(err)));
-        }
+            // Watchdog: resolve early if caller-supplied duration elapses
+            // without reaching totalSamples (e.g., song ended with silence
+            // padding).
+            setTimeout(finish, durationSec * 1000 + 500);
+          } catch (err) {
+            restoreMuteState?.();
+            reject(err instanceof Error ? err : new Error(String(err)));
+          }
+        });
       });
     });
   });
@@ -637,6 +686,98 @@ export async function exportAllStems(
   }
 
   return results;
+}
+
+// ==========================================================================
+// LIVE CAPTURE EXPORT — the canonical "what you hear" export path
+// ==========================================================================
+
+/**
+ * Exports the full song to WAV by capturing the live audio graph from
+ * `blepInput` (post master-FX, pre master-volume). This is the
+ * authoritative export path for accurate "sounds exactly like what you
+ * hear" results because it includes:
+ *   - Every synth DEViLBOX supports (TB303, DB303, DubSiren, Furnace, UADE,
+ *     Hively, libopenmpt, etc.) — because they're all already wired into
+ *     the running engine graph
+ *   - Every per-instrument effect in the user's instrument configs
+ *   - Every per-channel insert effect in useMixerStore
+ *   - Every master FX from useAudioStore.masterEffects
+ *   - Stereo separation + per-channel panning
+ *   - Live tempo / speed / groove / swing settings
+ *   - Every in-song tracker effect (pitch slides, arpeggios, vibrato,
+ *     speed changes, pattern jumps, etc.) because the real replayer
+ *     is executing
+ *
+ * Runs in real time — a 3-minute song takes 3 minutes to capture.
+ *
+ * `options.unmuteAll = true` temporarily unmutes every channel for the
+ * duration of the capture (mute/solo state restored after), useful for
+ * a "full mix" export even if the user is currently soloing one channel.
+ */
+export async function exportLiveCaptureToWav(
+  options: {
+    durationSec?: number;
+    unmuteAll?: boolean;
+    onProgress?: (progress: number) => void;
+    filename?: string;
+  } = {},
+): Promise<Blob> {
+  const { onProgress, unmuteAll, filename } = options;
+
+  // Estimate duration if not provided. Transport + patterns give us a
+  // rough song length; +2 s tail covers reverb / delay tails.
+  let durationSec = options.durationSec;
+  if (!durationSec || durationSec <= 0) {
+    const { useTransportStore } = await import('@/stores/useTransportStore');
+    const { useTrackerStore } = await import('@/stores/useTrackerStore');
+    const t = useTransportStore.getState();
+    const tr = useTrackerStore.getState();
+    const bpm = t.bpm || 125;
+    const speed = t.speed || 6;
+    const secPerRow = (speed * 60) / (bpm * 24);
+    let totalRows = 0;
+    for (const patIdx of tr.patternOrder) {
+      const pat = tr.patterns[patIdx];
+      totalRows += pat ? (pat.channels[0]?.rows?.length ?? 64) : 64;
+    }
+    durationSec = Math.max(5, totalRows * secPerRow + 2);
+  }
+
+  // Start playback from the beginning on the live engine.
+  const { getTrackerReplayer } = await import('@/engine/TrackerReplayer');
+  const replayer = getTrackerReplayer();
+  try { replayer.stop(false); } catch { /* not playing */ }
+  // `seekTo(0)` isn't on TrackerReplayer's public surface in a uniform
+  // way across engines; use transport store instead. For engines that
+  // need a full reload, `play()` handles it internally.
+  try {
+    const { useTransportStore } = await import('@/stores/useTransportStore');
+    useTransportStore.getState().setCurrentRow(0);
+    useTransportStore.getState().setCurrentPattern(0);
+  } catch { /* store not ready */ }
+  // Kick off playback async; the capture tap already listens.
+  void replayer.play();
+
+  try {
+    const blob = await captureAudioLive(durationSec, { onProgress, unmuteAll });
+
+    // Trigger download if filename given.
+    if (filename) {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename.endsWith('.wav') ? filename : `${filename}.wav`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
+
+    return blob;
+  } finally {
+    try { replayer.stop(); } catch { /* ok */ }
+  }
 }
 
 /**
