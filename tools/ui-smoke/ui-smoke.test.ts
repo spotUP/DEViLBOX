@@ -96,6 +96,38 @@ describe('ui-smoke — flow 01: load + play a real MOD', () => {
   );
 });
 
+describe('ui-smoke — flow 08: oscilloscope store flushes on stop', () => {
+  it.runIf(!!client)(
+    'per-channel scope data is cleared when playback stops (no stale ring pollution)',
+    async () => {
+      const c = client!;
+      try { await c.call('stop'); } catch { /* ok */ }
+      await sleep(200);
+
+      const payload = loadFixtureBase64(FIXTURE_MOD);
+      await c.call('load_file', { filename: payload.filename, data: payload.data });
+      await sleep(400);
+      await c.call('play');
+      await sleep(800);
+
+      const during = await c.call<{ isActive?: boolean; hasData?: boolean }>('get_oscilloscope_info');
+      expect(during.isActive, `during play: ${JSON.stringify(during)}`).toBe(true);
+      expect(during.hasData,  `during play: ${JSON.stringify(during)}`).toBe(true);
+
+      await c.call('stop');
+      await sleep(500);
+
+      // Stale ring data must be flushed on stop — without this the
+      // visualizer keeps redrawing the last captured samples, producing
+      // phantom spikes at render-block boundaries on all channels.
+      const afterStop = await c.call<{ isActive?: boolean; hasData?: boolean }>('get_oscilloscope_info');
+      expect(afterStop.isActive, `500 ms after stop: ${JSON.stringify(afterStop)}`).toBe(false);
+      expect(afterStop.hasData,  `500 ms after stop: ${JSON.stringify(afterStop)}`).toBe(false);
+    },
+    FLOW_TIMEOUT_MS,
+  );
+});
+
 describe('ui-smoke — flow 06: Furnace playback stays within gain limits', () => {
   // Upstream Furnace demo used by tools/furnace-audit/lockstep.test.ts.
   // Small, deterministic, inside the committed submodule.

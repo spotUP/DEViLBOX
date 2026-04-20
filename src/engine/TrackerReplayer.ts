@@ -30,6 +30,7 @@ import { setCellInPattern } from '@/stores/tracker/patternEditActions';
 import { useAutomationStore } from '@/stores/useAutomationStore';
 import { useCursorStore } from '@/stores/useCursorStore';
 import { useWasmPositionStore } from '@/stores/useWasmPositionStore';
+import { useOscilloscopeStore } from '@/stores/useOscilloscopeStore';
 import { unlockIOSAudio } from '@utils/ios-audio-unlock';
 import { ft2NoteToPeriod, ft2Period2Hz, ft2GetSampleC4Rate } from './effects/FT2Tables';
 // HivelyEngine used via dynamic import
@@ -2567,6 +2568,15 @@ export class TrackerReplayer {
     try {
       const engine = getToneEngine();
       engine.clearChannelTriggerLevels();
+    } catch { /* ignored */ }
+
+    // Flush the per-channel oscilloscope store so stale ring-buffer samples
+    // stop redrawing in the visualizer after stop. ~60 engines write to this
+    // store via updateChannelData; only 4 call .clear() themselves (UADE,
+    // Hively, libopenmpt, Furnace-dispatch). Centralising here covers the
+    // rest.
+    try {
+      useOscilloscopeStore.getState().clear();
     } catch { /* ignored */ }
 
     // Keep position — don't reset songPos/pattPos so playback resumes where it stopped
