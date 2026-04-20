@@ -77,29 +77,43 @@ describe('DubBus.backwardReverb — FLAT-move diagnostic contract', () => {
 });
 
 describe('DubBus.reverseEcho — FLAT-move diagnostic contract', () => {
-  const body = extractAsyncMethod('reverseEcho');
+  // The `reverseEcho` wrapper delegates to the private
+  // `_snapshotReverseRing` helper (added 2026-04-20 for the first-fire
+  // retry). Timeout / snapshot-received / empty-ring logs live in the
+  // helper's `_snapshotReverseRingOnce` method — the diag test covers
+  // BOTH so either method being edited in isolation still catches a
+  // dropped log.
+  const wrapperBody = extractAsyncMethod('reverseEcho');
+  // Match the DECLARATIONS (not call sites — `_snapshotReverseRing` and
+  // `_snapshotReverseRingOnce` both appear as call sites too).
+  const helperIdx = SOURCE.indexOf('private async _snapshotReverseRingOnce');
+  const helperBody = helperIdx >= 0 ? SOURCE.slice(helperIdx, helperIdx + 3000) : '';
+  const retryIdx = SOURCE.indexOf('private async _snapshotReverseRing(');
+  const retryBody = retryIdx >= 0 ? SOURCE.slice(retryIdx, retryIdx + 1500) : '';
 
   it('logs the bus-disabled early-return', () => {
-    expect(body).toMatch(/reverseEcho ignored — bus disabled/);
+    expect(wrapperBody).toMatch(/reverseEcho ignored — bus disabled/);
   });
 
   it('logs the capture-node-missing early-return', () => {
-    expect(body).toMatch(/reverseEcho ignored — capture node missing/);
+    expect(wrapperBody).toMatch(/reverseEcho ignored — capture node missing/);
   });
 
   it('logs entry with the requested duration + amount', () => {
-    expect(body).toMatch(/reverseEcho ▶ captureDur=/);
+    expect(wrapperBody).toMatch(/reverseEcho ▶ captureDur=/);
   });
 
   it('logs the worklet-reply timeout', () => {
-    expect(body).toMatch(/reverseEcho timeout — worklet did not reply/);
+    expect(helperBody, 'timeout log moved into _snapshotReverseRingOnce').toMatch(/reverseEcho timeout — worklet did not reply/);
   });
 
   it('logs the snapshot frame count on receipt', () => {
-    expect(body).toMatch(/reverseEcho snapshot received — frames=\$\{frames\}/);
+    expect(helperBody, '"snapshot received" log moved into _snapshotReverseRingOnce').toMatch(/reverseEcho snapshot received — frames=\$\{frames\}/);
   });
 
-  it('warns on empty-ring-buffer (frames=0) path', () => {
-    expect(body).toMatch(/reverseEcho abort — empty ring buffer/);
+  it('warns on empty-ring-buffer path — after retries are exhausted', () => {
+    // Empty-ring now returns false and `_snapshotReverseRing` retries up to
+    // N attempts. After the budget is spent, a single summary warn fires.
+    expect(retryBody, 'expected ring-empty-after-retries warn in helper').toMatch(/reverseEcho abort — ring still empty/);
   });
 });
