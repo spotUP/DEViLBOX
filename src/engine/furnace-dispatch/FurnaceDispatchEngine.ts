@@ -1275,6 +1275,14 @@ export class FurnaceDispatchEngine implements IsolationCapableEngine {
         }
         break;
 
+      case 'oscilloscopeClear':
+        // Worklet signals the sequencer stopped and the scope store should
+        // be wiped. Forwards to subscribers so FurnaceDispatchSynth (and
+        // any other listener) can clear the scope store.
+        this.latestOscData = [];
+        for (const cb of this.oscCallbacks) cb([]);
+        break;
+
       case 'error':
         console.error('[FurnaceDispatch] Worklet error:', data.message);
         if (this._wasmReadyReject) {
