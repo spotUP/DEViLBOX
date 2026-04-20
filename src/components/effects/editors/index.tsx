@@ -26,7 +26,7 @@ import type { VisualEffectEditorProps } from './shared';
 // Import all editors
 import { DistortionEditor, ReverbEditor, DelayEditor, ChorusEditor, PhaserEditor, TremoloEditor, VibratoEditor } from './BasicEffectEditors';
 import { AutoFilterEditor, CompressorEditor, EQ3Editor, FilterEditor, DubFilterEditor, SidechainCompressorEditor, MoogFilterEditor } from './FilterEffectEditors';
-import { BiPhaseEditor, TapeSaturationEditor, VinylNoiseEditor, MVerbEditor, LeslieEditor, SpringReverbEditor, KissOfShameEditor } from './VintageEffectEditors';
+import { BiPhaseEditor, TapeSaturationEditor, VinylNoiseEditor, MVerbEditor, MadProfessorPlateEditor, DattorroPlateEditor, LeslieEditor, SpringReverbEditor, KissOfShameEditor } from './VintageEffectEditors';
 import { AelapseEditor } from './AelapseEditor';
 import { SpaceyDelayerEditor, RETapeEchoEditor, SpaceEchoEditor, ToneArmEditor, TumultEditor } from './DelayVariantEditors';
 import { AutoPannerEditor, AutoWahEditor, BitCrusherEditor, ChebyshevEditor, FrequencyShifterEditor, PitchShiftEditor, JCReverbEditor, StereoWidenerEditor } from './SpecializedEffectEditors';
@@ -67,7 +67,7 @@ import {
 // Re-export all editors
 export { DistortionEditor, ReverbEditor, DelayEditor, ChorusEditor, PhaserEditor, TremoloEditor, VibratoEditor } from './BasicEffectEditors';
 export { AutoFilterEditor, CompressorEditor, EQ3Editor, FilterEditor, DubFilterEditor, SidechainCompressorEditor, MoogFilterEditor } from './FilterEffectEditors';
-export { BiPhaseEditor, TapeSaturationEditor, VinylNoiseEditor, MVerbEditor, LeslieEditor, SpringReverbEditor, KissOfShameEditor } from './VintageEffectEditors';
+export { BiPhaseEditor, TapeSaturationEditor, VinylNoiseEditor, MVerbEditor, MadProfessorPlateEditor, DattorroPlateEditor, LeslieEditor, SpringReverbEditor, KissOfShameEditor } from './VintageEffectEditors';
 export { SpaceyDelayerEditor, RETapeEchoEditor, SpaceEchoEditor, ToneArmEditor, TumultEditor } from './DelayVariantEditors';
 export { AutoPannerEditor, AutoWahEditor, BitCrusherEditor, ChebyshevEditor, FrequencyShifterEditor, PitchShiftEditor, JCReverbEditor, StereoWidenerEditor } from './SpecializedEffectEditors';
 export { VocoderEditor, AutoTuneEditor } from './VoiceEffectEditors';
@@ -115,6 +115,8 @@ const EFFECT_EDITORS: Record<string, React.FC<VisualEffectEditorProps>> = {
   Vocoder: VocoderEditor,
   AutoTune: AutoTuneEditor,
   MVerb: MVerbEditor,
+  MadProfessorPlate: MadProfessorPlateEditor,
+  DattorroPlate: DattorroPlateEditor,
   Leslie: LeslieEditor,
   SpringReverb: SpringReverbEditor,
   Aelapse: AelapseEditor,
@@ -273,6 +275,8 @@ export const ENCLOSURE_COLORS: Record<string, { bg: string; bgEnd: string; accen
   Vocoder:             { bg: '#1a0a22', bgEnd: '#100618', accent: '#a855f7', border: '#2a1430' },
   AutoTune:            { bg: '#220a18', bgEnd: '#180614', accent: '#ec4899', border: '#321428' },
   MVerb:               { bg: '#140a22', bgEnd: '#0c061a', accent: '#7c3aed', border: '#201432' },
+  MadProfessorPlate:   { bg: '#1a1405', bgEnd: '#120e02', accent: '#e0a800', border: '#2a2010' },
+  DattorroPlate:       { bg: '#081a14', bgEnd: '#04120a', accent: '#10b981', border: '#0a2a1e' },
   Leslie:              { bg: '#201408', bgEnd: '#180e04', accent: '#f97316', border: '#301e0a' },
   SpringReverb:        { bg: '#081a0a', bgEnd: '#041204', accent: '#059669', border: '#0a2a0e' },
   // ── WASM effects — Dynamics ──
@@ -424,6 +428,8 @@ export const VisualEffectEditorWrapper: React.FC<VisualEffectEditorWrapperProps>
     TapeDelay: <Clock size={18} className="text-text-primary" />,
     MoogFilter: <Sliders size={18} className="text-text-primary" />,
     MVerb: <Waves size={18} className="text-text-primary" />,
+    MadProfessorPlate: <Waves size={18} className="text-text-primary" />,
+    DattorroPlate: <Waves size={18} className="text-text-primary" />,
     Leslie: <Radio size={18} className="text-text-primary" />,
     SpringReverb: <Waves size={18} className="text-text-primary" />,
     // WAM 2.0 effects

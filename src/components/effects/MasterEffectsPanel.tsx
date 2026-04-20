@@ -31,11 +31,13 @@ import { AVAILABLE_EFFECTS, type AvailableEffect } from '@constants/unifiedEffec
 import { GUITARML_MODEL_REGISTRY } from '@constants/guitarMLRegistry';
 import { getDefaultEffectParameters } from '@engine/InstrumentFactory';
 import { getDefaultEffectWet } from '@engine/factories/EffectFactory';
+import { effectiveBassLock } from '@engine/dj/bassLockDefaults';
 import { VisualEffectEditorWrapper, ENCLOSURE_COLORS, DEFAULT_ENCLOSURE } from './VisualEffectEditors';
 
 interface SortableVisualEffectProps {
   effect: EffectConfig;
   onToggle: () => void;
+  onBassLockToggle: () => void;
   onRemove: () => void;
   onUpdateParameter: (key: string, value: number | string) => void;
   onUpdateParameters?: (params: Record<string, number | string>) => void;
@@ -46,7 +48,7 @@ interface SortableVisualEffectProps {
   isolationSupported: boolean;
 }
 
-function SortableVisualEffect({ effect, onToggle, onRemove, onUpdateParameter, onUpdateParameters, onWetChange, onChannelSelect, numChannels, isolationSupported }: SortableVisualEffectProps) {
+function SortableVisualEffect({ effect, onToggle, onBassLockToggle, onRemove, onUpdateParameter, onUpdateParameters, onWetChange, onChannelSelect, numChannels, isolationSupported }: SortableVisualEffectProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: effect.id,
   });
@@ -114,6 +116,26 @@ function SortableVisualEffect({ effect, onToggle, onRemove, onUpdateParameter, o
           <path d="M18.36 6.64a9 9 0 1 1-12.73 0" />
           <line x1="12" y1="2" x2="12" y2="12" />
         </svg>
+      </button>
+
+      {/* Bass-lock toggle — 150 Hz crossover protects the bassline from
+          being smeared by reverb / delay / phaser. Visible on hover. */}
+      <button
+        onClick={onBassLockToggle}
+        className="absolute top-2 right-[72px] z-10 px-1.5 py-0.5 rounded text-[9px] font-mono font-bold opacity-0 group-hover:opacity-100
+                 transition-opacity hover:bg-white/10"
+        style={{
+          color: effectiveBassLock(effect.type, effect.bassLock) ? '#f59e0b' : 'rgba(255,255,255,0.25)',
+          border: '1px solid currentColor',
+          lineHeight: 1,
+        }}
+        title={
+          effectiveBassLock(effect.type, effect.bassLock)
+            ? 'Bass-Lock ON — low end bypasses this effect (150 Hz crossover)'
+            : 'Bass-Lock OFF — effect processes full spectrum'
+        }
+      >
+        BL
       </button>
 
       {/* Visual pedal enclosure */}
@@ -404,6 +426,16 @@ export const MasterEffectsPanel = forwardRef<MasterEffectsPanelHandle, MasterEff
     }
   }, [updateMasterEffect]);
 
+  const handleBassLockToggle = useCallback((effectId: string) => {
+    const effect = masterEffectsRef.current.find((fx) => fx.id === effectId);
+    if (effect) {
+      // First click flips to explicit opposite of current effective state;
+      // after that each click toggles. undefined → use per-type default.
+      const current = effectiveBassLock(effect.type, effect.bassLock);
+      updateMasterEffect(effectId, { bassLock: !current });
+    }
+  }, [updateMasterEffect]);
+
   const handleRemove = useCallback((effectId: string) => {
     removeMasterEffect(effectId);
     setActivePresetName(null);
@@ -681,6 +713,7 @@ export const MasterEffectsPanel = forwardRef<MasterEffectsPanelHandle, MasterEff
                   key={effect.id}
                   effect={effect}
                   onToggle={() => handleToggle(effect.id)}
+                  onBassLockToggle={() => handleBassLockToggle(effect.id)}
                   onRemove={() => handleRemove(effect.id)}
                   onUpdateParameter={(key, value) => handleUpdateParameter(effect.id, key, value)}
                   onUpdateParameters={(params) => handleUpdateParameters(effect.id, params)}
