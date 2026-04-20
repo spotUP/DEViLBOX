@@ -1075,10 +1075,8 @@ function App() {
             onLoadTrackerModule={async (buffer: ArrayBuffer, filename: string, companionFiles?: Map<string, ArrayBuffer>) => {
               setShowFileBrowser(false);
               try {
-                console.log(`[loadTrackerModule] start: ${filename} (${buffer.byteLength} bytes, ${companionFiles?.size ?? 0} companions)`);
                 const file = new File([buffer], filename);
                 const result = await loadFile(file, { requireConfirmation: false, companionFiles });
-                console.log(`[loadTrackerModule] loadFile → ${JSON.stringify({ success: result.success, error: (result as any).error })}`);
                 if (result.success === 'pending-import') {
                   // Auto-import without showing dialog — use parseModuleToSong
                   // which correctly routes UADE/TFMX formats with companion files
@@ -1086,9 +1084,7 @@ function App() {
                   sfc();
                   try {
                   const { parseModuleToSong } = await import('@lib/import/parseModuleToSong');
-                  console.log(`[loadTrackerModule] parseModuleToSong starting…`);
                   const song = await parseModuleToSong(file, 0, undefined, undefined, companionFiles);
-                  console.log(`[loadTrackerModule] parseModuleToSong ok: format=${song.format}, patterns=${song.patterns.length}, instruments=${song.instruments.length}`);
                   const { useTrackerStore: ts } = await import('./stores/useTrackerStore');
                   const { useInstrumentStore: is } = await import('./stores/useInstrumentStore');
                   const { useTransportStore: trs } = await import('./stores/useTransportStore');
