@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useTrackerStore, useInstrumentStore, useProjectStore, useTransportStore, notify , useFormatStore } from '@stores';
-import { exportLiveCaptureToWav, exportUADEAsWav, getUADEInstrument } from './audioExport';
+import { exportLiveCaptureToWav, exportLiveCaptureToMp3, exportUADEAsWav, getUADEInstrument } from './audioExport';
 
 type AudioExportScope = 'pattern' | 'song';
+type AudioExportFormat = 'wav' | 'mp3';
 
 interface AudioExportPanelProps {
   handlerRef: React.MutableRefObject<(() => Promise<false | void>) | null>;
@@ -31,6 +32,8 @@ export const AudioExportPanel: React.FC<AudioExportPanelProps> = ({
   const { metadata } = useProjectStore();
   const { bpm } = useTransportStore();
   const [audioExportScope, setAudioExportScope] = useState<AudioExportScope>(initialScope || 'pattern');
+  // Output format — WAV (lossless, big) or MP3 (lossy, small, good for chat).
+  const [format, setFormat] = useState<AudioExportFormat>('wav');
   // Option: unmute every channel during export so the WAV contains the
   // whole mix even if the user is currently soloing one channel.
   const [unmuteAll, setUnmuteAll] = useState<boolean>(true);
@@ -42,8 +45,10 @@ export const AudioExportPanel: React.FC<AudioExportPanelProps> = ({
   // always reads the freshest values without re-registering.
   const unmuteAllRef = useRef(unmuteAll);
   const rawRenderRef = useRef(rawRender);
+  const formatRef = useRef(format);
   useEffect(() => { unmuteAllRef.current = unmuteAll; }, [unmuteAll]);
   useEffect(() => { rawRenderRef.current = rawRender; }, [rawRender]);
+  useEffect(() => { formatRef.current = format; }, [format]);
 
   useEffect(() => {
     if (initialScope) setAudioExportScope(initialScope);
@@ -66,11 +71,13 @@ export const AudioExportPanel: React.FC<AudioExportPanelProps> = ({
     try {
       const baseName = metadata.name || 'song';
       const uadeInst = getUADEInstrument(instruments);
-
-      // Shift-export → raw module render bypassing the live graph. Useful
-      // when the user wants the file "as shipped" without their mix.
       const rawMode = rawRenderRef.current;
+      const fmt = formatRef.current;
+      const ext = fmt;
 
+      // Shift-export → raw module render bypassing the live graph. UADE
+      // only emits WAV; MP3-re-encoding the raw render would defeat the
+      // "as shipped" promise, so raw mode forces WAV regardless of toggle.
       if (rawMode && uadeInst?.uade?.fileData) {
         await exportUADEAsWav(
           uadeInst.uade.fileData,
@@ -97,6 +104,8 @@ export const AudioExportPanel: React.FC<AudioExportPanelProps> = ({
         return;
       }
 
+      const exportFn = fmt === 'mp3' ? exportLiveCaptureToMp3 : exportLiveCaptureToWav;
+
       // Default path — live capture. Handles every song type uniformly.
       if (audioExportScope === 'pattern') {
         const pattern = patterns[selectedPatternIndex];
@@ -107,19 +116,19 @@ export const AudioExportPanel: React.FC<AudioExportPanelProps> = ({
         // Pattern-scope duration: rows × secondsPerRow + 2 s tail.
         const secondsPerRow = (60 / bpm) * 0.25;
         const durationSec = pattern.length * secondsPerRow + 2;
-        await exportLiveCaptureToWav({
+        await exportFn({
           durationSec,
           unmuteAll: unmuteAllRef.current,
-          filename: `${pattern.name || 'pattern'}.wav`,
-          onProgress: (p) => setRenderProgress(p),
+          filename: `${pattern.name || 'pattern'}.${ext}`,
+          onProgress: (p: number) => setRenderProgress(p),
         });
       } else {
         // Full song — let the helper estimate duration from transport +
         // patterns.
-        await exportLiveCaptureToWav({
+        await exportFn({
           unmuteAll: unmuteAllRef.current,
-          filename: `${baseName}.wav`,
-          onProgress: (p) => setRenderProgress(p),
+          filename: `${baseName}.${ext}`,
+          onProgress: (p: number) => setRenderProgress(p),
         });
       }
     } finally {
@@ -131,7 +140,7 @@ export const AudioExportPanel: React.FC<AudioExportPanelProps> = ({
   return (
     <div className="bg-dark-bgSecondary border border-dark-border rounded-lg p-4 mb-4">
       <h3 className="text-sm font-mono font-bold text-accent-primary mb-3">
-        Audio Export (WAV)
+        Audio Export ({format.toUpperCase()})
       </h3>
       <div className="space-y-3">
         {/* Export scope toggle */}
@@ -161,6 +170,36 @@ export const AudioExportPanel: React.FC<AudioExportPanelProps> = ({
             `}
           >
             Full Song ({patterns.length} patterns)
+          </button>
+        </div>
+
+        {/* Format toggle — WAV vs MP3 */}
+        <div className="flex gap-2">
+          <button
+            onClick={() => setFormat('wav')}
+            disabled={isRendering}
+            className={`
+              flex-1 px-3 py-2 rounded-lg text-sm font-mono transition-all
+              ${format === 'wav'
+                ? 'bg-accent-primary text-text-inverse'
+                : 'bg-dark-bg text-text-secondary hover:bg-dark-bgHover border border-dark-border'
+              }
+            `}
+          >
+            WAV (lossless)
+          </button>
+          <button
+            onClick={() => setFormat('mp3')}
+            disabled={isRendering}
+            className={`
+              flex-1 px-3 py-2 rounded-lg text-sm font-mono transition-all
+              ${format === 'mp3'
+                ? 'bg-accent-primary text-text-inverse'
+                : 'bg-dark-bg text-text-secondary hover:bg-dark-bgHover border border-dark-border'
+              }
+            `}
+          >
+            MP3 (192 kbps)
           </button>
         </div>
 
@@ -208,9 +247,11 @@ export const AudioExportPanel: React.FC<AudioExportPanelProps> = ({
         </div>
 
         <div className="text-sm font-mono text-text-secondary space-y-1">
-          <div>Format: <span className="text-accent-primary">WAV (16-bit, 44.1kHz)</span></div>
+          <div>Format: <span className="text-accent-primary">
+            {format === 'mp3' ? 'MP3 (192 kbps, 44.1 kHz)' : 'WAV (16-bit, 44.1 kHz)'}
+          </span></div>
           <div>Method: <span className="text-accent-primary">
-            {rawRender ? 'Raw UADE offline' : 'Live capture (real-time)'}
+            {rawRender ? 'Raw UADE offline (always WAV)' : 'Live capture (real-time)'}
           </span></div>
           <div>BPM: <span className="text-accent-primary">{bpm}</span></div>
           {audioExportScope === 'song' ? (

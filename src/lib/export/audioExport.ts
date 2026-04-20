@@ -5,6 +5,7 @@
  */
 
 import * as Tone from 'tone';
+import { Mp3Encoder } from '@breezystack/lamejs';
 import type { Pattern } from '@typedefs';
 import type { InstrumentConfig } from '@typedefs/instrument';
 import { UADEEngine } from '@/engine/uade/UADEEngine';
@@ -271,6 +272,40 @@ export function audioBufferToWav(buffer: AudioBuffer): Blob {
   return new Blob([arrayBuffer], { type: 'audio/wav' });
 }
 
+/**
+ * Encode an AudioBuffer to an MP3 Blob using lamejs. Default bitrate 192
+ * kbps is a good quality/size tradeoff — bump to 320 for archival, or drop
+ * to 128 for small chat-friendly files. Stereo is handled via interleaved
+ * left/right Int16 granules; mono pipes a single channel through the encoder.
+ */
+export function audioBufferToMp3(buffer: AudioBuffer, kbps = 192): Blob {
+  const numChannels = Math.min(buffer.numberOfChannels, 2);
+  const encoder = new Mp3Encoder(numChannels, buffer.sampleRate, kbps);
+  const left = floatTo16Bit(buffer.getChannelData(0));
+  const right = numChannels === 2 ? floatTo16Bit(buffer.getChannelData(1)) : undefined;
+
+  const BLOCK = 1152; // one MPEG audio frame
+  const chunks: Uint8Array[] = [];
+  for (let i = 0; i < left.length; i += BLOCK) {
+    const l = left.subarray(i, i + BLOCK);
+    const r = right ? right.subarray(i, i + BLOCK) : undefined;
+    const enc = encoder.encodeBuffer(l, r);
+    if (enc.length > 0) chunks.push(enc);
+  }
+  const tail = encoder.flush();
+  if (tail.length > 0) chunks.push(tail);
+  return new Blob(chunks as unknown as BlobPart[], { type: 'audio/mpeg' });
+}
+
+function floatTo16Bit(f: Float32Array): Int16Array {
+  const out = new Int16Array(f.length);
+  for (let i = 0; i < f.length; i++) {
+    const s = Math.max(-1, Math.min(1, f[i]));
+    out[i] = s < 0 ? s * 0x8000 : s * 0x7fff;
+  }
+  return out;
+}
+
 function writeString(view: DataView, offset: number, str: string): void {
   for (let i = 0; i < str.length; i++) {
     view.setUint8(offset + i, str.charCodeAt(i));
@@ -343,6 +378,19 @@ export function captureAudioLive(
   durationSec: number,
   onProgressOrOptions?: ((percent: number) => void) | CaptureOptions,
 ): Promise<Blob> {
+  return captureAudioLiveToBuffer(durationSec, onProgressOrOptions)
+    .then((buffer) => audioBufferToWav(buffer));
+}
+
+/**
+ * Same as `captureAudioLive` but returns the raw `AudioBuffer` instead of a
+ * WAV-encoded Blob. Used by the MP3 encoder and any path that wants to
+ * post-process the capture before writing it to disk.
+ */
+export function captureAudioLiveToBuffer(
+  durationSec: number,
+  onProgressOrOptions?: ((percent: number) => void) | CaptureOptions,
+): Promise<AudioBuffer> {
   const opts: CaptureOptions = typeof onProgressOrOptions === 'function'
     ? { onProgress: onProgressOrOptions }
     : (onProgressOrOptions ?? {});
@@ -406,7 +454,7 @@ export function captureAudioLive(
             const audioBuffer = ctx.createBuffer(2, captured, sampleRate);
             audioBuffer.getChannelData(0).set(bufL.subarray(0, captured));
             audioBuffer.getChannelData(1).set(bufR.subarray(0, captured));
-            resolve(audioBufferToWav(audioBuffer));
+            resolve(audioBuffer);
           }
 
           processor.onaudioprocess = (event: AudioProcessingEvent) => {
@@ -723,10 +771,42 @@ export async function exportLiveCaptureToWav(
     filename?: string;
   } = {},
 ): Promise<Blob> {
-  const { onProgress, unmuteAll, filename } = options;
+  const buffer = await captureLiveSong(options);
+  const blob = audioBufferToWav(buffer);
+  maybeDownload(blob, options.filename, 'wav');
+  return blob;
+}
 
-  // Estimate duration if not provided. Transport + patterns give us a
-  // rough song length; +2 s tail covers reverb / delay tails.
+/**
+ * Live-capture sibling of `exportLiveCaptureToWav` that emits MP3 instead
+ * of WAV. `kbps` defaults to 192 — pass 320 for archival or 128 for smaller.
+ */
+export async function exportLiveCaptureToMp3(
+  options: {
+    durationSec?: number;
+    unmuteAll?: boolean;
+    onProgress?: (progress: number) => void;
+    filename?: string;
+    kbps?: number;
+  } = {},
+): Promise<Blob> {
+  const buffer = await captureLiveSong(options);
+  const blob = audioBufferToMp3(buffer, options.kbps ?? 192);
+  maybeDownload(blob, options.filename, 'mp3');
+  return blob;
+}
+
+/**
+ * Shared orchestration: estimate duration, start the replayer from bar 1,
+ * real-time capture into an AudioBuffer. Caller picks the encoding.
+ */
+async function captureLiveSong(options: {
+  durationSec?: number;
+  unmuteAll?: boolean;
+  onProgress?: (progress: number) => void;
+}): Promise<AudioBuffer> {
+  const { onProgress, unmuteAll } = options;
+
   let durationSec = options.durationSec;
   if (!durationSec || durationSec <= 0) {
     const { useTransportStore } = await import('@/stores/useTransportStore');
@@ -744,40 +824,33 @@ export async function exportLiveCaptureToWav(
     durationSec = Math.max(5, totalRows * secPerRow + 2);
   }
 
-  // Start playback from the beginning on the live engine.
   const { getTrackerReplayer } = await import('@/engine/TrackerReplayer');
   const replayer = getTrackerReplayer();
   try { replayer.stop(false); } catch { /* not playing */ }
-  // `seekTo(0)` isn't on TrackerReplayer's public surface in a uniform
-  // way across engines; use transport store instead. For engines that
-  // need a full reload, `play()` handles it internally.
   try {
     const { useTransportStore } = await import('@/stores/useTransportStore');
     useTransportStore.getState().setCurrentRow(0);
     useTransportStore.getState().setCurrentPattern(0);
   } catch { /* store not ready */ }
-  // Kick off playback async; the capture tap already listens.
   void replayer.play();
 
   try {
-    const blob = await captureAudioLive(durationSec, { onProgress, unmuteAll });
-
-    // Trigger download if filename given.
-    if (filename) {
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = filename.endsWith('.wav') ? filename : `${filename}.wav`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-    }
-
-    return blob;
+    return await captureAudioLiveToBuffer(durationSec, { onProgress, unmuteAll });
   } finally {
     try { replayer.stop(); } catch { /* ok */ }
   }
+}
+
+function maybeDownload(blob: Blob, filename: string | undefined, ext: 'wav' | 'mp3'): void {
+  if (!filename) return;
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename.endsWith(`.${ext}`) ? filename : `${filename}.${ext}`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
 }
 
 /**
