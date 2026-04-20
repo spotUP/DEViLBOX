@@ -2426,11 +2426,15 @@ export class DubBus {
    * a high-Q lowpass at the target frequency, creating a resonant drone
    * bass. Hold move; release fades over 200 ms.
    *
-   * Peak is clamped to 0.6 because the Q=18 lowpass resonates +10-15 dB
-   * at the cutoff — with an unclamped `level=0.9` default the old path
-   * pushed the bus past unity (measured 1.001 in the 2026-04-20 untested-FX
-   * sweep). 0.6 leaves ~4 dB headroom for the resonance peak so the bus
-   * never goes above full scale even at the loudest point of the saw.
+   * Chain: osc → filt (Q=18 LPF) → env → softClip → return_
+   *
+   * The Q=18 lowpass rings on the saw's fundamental, producing a resonant
+   * bass note. Level-clamping env.gain alone wasn't enough — the filter's
+   * ringing transients are not strictly proportional to env.gain (2026-04-20
+   * sweep: 0.35→0.30 reduction only moved peak 1.003→1.002). A tanh-curve
+   * waveshaper after env hard-limits individual samples to ±0.7 regardless
+   * of how loud the filter rings, so oscBass can never push the bus past
+   * unity even when summed with a loud song underneath.
    */
   startOscBass(freq = 55, level = 0.45): () => void {
     if (!this.enabled) return () => {};
@@ -2445,14 +2449,25 @@ export class DubBus {
     filt.Q.value = 18;  // self-oscillation territory
     const env = ctx.createGain();
     env.gain.value = 0;
+    // Hard soft-clip stage — tanh curve that caps the branch output near
+    // ±0.4 regardless of how loud the Q=18 filter's resonance rings.
+    // Provides headroom for summation with the song without cutting off
+    // the resonant character. Localized to this branch so it only
+    // affects oscBass's contribution; the song's own dynamics pass
+    // through the rest of the bus untouched.
+    const softClip = ctx.createWaveShaper();
+    const clipCurve = new Float32Array(2049);
+    for (let i = 0; i < clipCurve.length; i++) {
+      const x = (i / (clipCurve.length - 1)) * 2 - 1;  // -1..1
+      clipCurve[i] = 0.4 * Math.tanh(x * 2.5);
+    }
+    softClip.curve = clipCurve;
+    softClip.oversample = '2x';
     osc.connect(filt);
     filt.connect(env);
-    env.connect(this.return_);
-    // Headroom clamp — Q=18 lowpass gain at resonance can push the output
-    // past unity. Original 0.6 measured peak 1.048, 0.35 measured 1.003
-    // (Skope "world class dub" — baseline ~0.58, oscBass Δ 0.42). 0.30
-    // leaves a ~6 dB safety margin so peaks stay <0.95 on typical songs.
-    const peak = Math.max(0, Math.min(0.30, level));
+    env.connect(softClip);
+    softClip.connect(this.return_);
+    const peak = Math.max(0, Math.min(0.6, level));
     env.gain.setValueAtTime(0, now);
     env.gain.linearRampToValueAtTime(peak, now + 0.08);
     osc.start(now);
@@ -2464,7 +2479,7 @@ export class DubBus {
         env.gain.linearRampToValueAtTime(0, release + 0.2);
       } catch { /* ok */ }
       setTimeout(() => {
-        try { osc.stop(); osc.disconnect(); filt.disconnect(); env.disconnect(); } catch { /* ok */ }
+        try { osc.stop(); osc.disconnect(); filt.disconnect(); env.disconnect(); softClip.disconnect(); } catch { /* ok */ }
       }, 300);
     };
   }

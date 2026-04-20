@@ -1,15 +1,18 @@
 /**
- * Regression test for the `startOscBass` headroom clamp.
+ * Regression test for the `startOscBass` headroom controls.
  *
- * 2026-04-20 untested-FX sweep caught `oscBass` peaking at 1.001 — past
- * unity on a bus that should stay within ±1. Root cause: `level=0.9`
- * default into a Q=18 self-oscillating lowpass, which resonates 10–15 dB
- * above the raw saw's amplitude. Fix clamped the envelope peak at 0.6 so
- * there's always ~4 dB of headroom for the resonance.
+ * 2026-04-20 untested-FX sweep caught `oscBass` peaking above unity
+ * repeatedly. Root cause: `level=0.9` default into a Q=18 self-oscillating
+ * lowpass, whose ringing doesn't scale linearly with post-filter gain
+ * (tightening the clamp 0.35→0.30 only moved peak 1.003→1.002).
  *
- * The test doesn't spin up a real AudioContext — it re-imports the clamp
- * expression by reading the source so any future change to `Math.min(0.6,
- * level)` lights this up.
+ * Two-part fix: level clamp stays ≤ 0.6 for the initial envelope scaling,
+ * AND a WaveShaper soft-clip (tanh, ceiling ~0.4) sits after env.gain so
+ * the branch output can never push the bus past unity regardless of how
+ * loud the filter rings.
+ *
+ * The test reads DubBus.ts as text (no AudioContext) so future edits that
+ * drop either guard light this up.
  */
 
 import { describe, it, expect } from 'vitest';
@@ -52,5 +55,22 @@ describe('startOscBass — headroom clamp', () => {
     // The comment block directly above / inside the method should
     // mention resonance or headroom — both together would be ideal.
     expect(body.toLowerCase()).toMatch(/resonance|headroom|unity/);
+  });
+
+  it('installs a soft-clip waveshaper after env.gain so filter ringing cannot push past unity', () => {
+    // env.gain clamp alone isn't sufficient — the Q=18 biquad's transient
+    // ringing doesn't scale linearly with post-filter gain. A WaveShaper
+    // at the branch output hard-limits individual samples regardless of
+    // how loud the filter rings.
+    expect(body, 'startOscBass should construct a WaveShaper').toMatch(/createWaveShaper/);
+    // And it must be wired into the signal path (env → softClip → return_).
+    expect(body, 'soft-clip must be wired between env and return_').toMatch(/env\.connect\(softClip\)/);
+    expect(body, 'soft-clip output must feed return_').toMatch(/softClip\.connect\(this\.return_\)/);
+    // Sanity — the curve must actually squash above ~0.5. Match a tanh-
+    // style formula with a ceiling constant ≤ 0.5 as scalar on Math.tanh.
+    const curveMatch = body.match(/=\s*(0\.\d+)\s*\*\s*Math\.tanh/);
+    expect(curveMatch, 'curve should be `ceiling * Math.tanh(...)` shape').not.toBeNull();
+    const ceiling = Number(curveMatch![1]);
+    expect(ceiling, 'soft-clip ceiling must be ≤ 0.5 for headroom').toBeLessThanOrEqual(0.5);
   });
 });
