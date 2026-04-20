@@ -54,6 +54,7 @@ export const transportTapeStop: DubMove = {
     // spring) alongside the digital transport time-stretch. Without this
     // the transport slowdown sounds purely mathematical — tape character
     // comes from the bus wet chain, not the libopenmpt resampler.
+    console.log(`[transportTapeStop] fired downSec=${downSec} holdSec=${holdSec} floor=${floorFactor}`);
     bus.tapeStop(downSec, holdSec);
     // Sweep the master-insert LPF down to 400 Hz over the stop — hides
     // LibOpenMPT's resampler aliasing ("bit crush") during extreme

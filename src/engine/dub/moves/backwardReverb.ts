@@ -20,6 +20,7 @@ export const backwardReverb: DubMove = {
 
   execute({ bus, params }) {
     const durationSec = params.durationSec ?? this.defaults.durationSec;
+    console.log(`[backwardReverb] fired durationSec=${durationSec}`);
     void bus.backwardReverb(durationSec);
     return null;
   },
