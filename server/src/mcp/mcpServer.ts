@@ -2247,7 +2247,7 @@ export function createMcpServer(): McpServer {
 
   server.tool(
     'dj_vj_action',
-    'Execute a DJ/VJ soak-test action in the browser (dev-only). Actions: switchView, loadDeck, playDeck, stopDeck, setCrossfader, setEQ, setFilter, setDeckVolume, nextVjPreset.',
+    'Execute a DJ/VJ soak-test action in the browser (dev-only). Actions: switchView, loadDeck, playDeck, stopDeck, setCrossfader, setEQ, setFilter, setDeckVolume, startScratch, setScratchVelocity, stopScratch, nextVjPreset.',
     {
       action: z.string().describe('Action name (e.g. "switchView", "loadDeck", "playDeck")'),
       args: z.record(z.string(), z.any()).optional().describe('Action arguments'),
