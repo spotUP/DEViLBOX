@@ -404,6 +404,26 @@ export async function setDubBusSettings(params: Record<string, unknown>): Promis
   return { ok: true };
 }
 
+/**
+ * Drive a parameter through the same routing pipeline that the automation
+ * system + MIDI CC handlers use. Intended for ui-smoke / integration tests
+ * that need to verify a param (e.g. `dub.echoWet`, `tb303.filter.cutoff`)
+ * actually reaches its destination without needing to construct a full
+ * automation curve or synthesize MIDI messages.
+ *
+ * @param param - Parameter name (see PARAMETER_ROUTES + DUB_BUS_PARAMS).
+ * @param value - Normalized 0..1 value.
+ */
+export async function routeParameter(params: Record<string, unknown>): Promise<Record<string, unknown>> {
+  const param = String(params.param ?? '');
+  const value = Number(params.value ?? 0);
+  if (!param) return { error: 'param is required' };
+  if (!Number.isFinite(value)) return { error: 'value must be a finite number' };
+  const { routeParameterToEngine } = await import('../../midi/performance/parameterRouter');
+  routeParameterToEngine(param, Math.max(0, Math.min(1, value)));
+  return { ok: true, param, value };
+}
+
 // Held dub-move disposers, keyed by monotonic handle string. Returned to MCP
 // callers so hold-kind moves can be released via releaseDubMove without
 // DOM pointerup events. Trigger-kind moves return heldHandle: null.
