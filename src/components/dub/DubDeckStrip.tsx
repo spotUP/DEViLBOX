@@ -21,7 +21,7 @@ import { useTrackerStore } from '@/stores/useTrackerStore';
 import { useUIStore } from '@/stores/useUIStore';
 import { useTransportStore } from '@/stores/useTransportStore';
 import { bpmSyncedEchoRate, getActiveBpm } from '@/engine/dub/DubActions';
-import { setDubBusForRouter, subscribeDubRouter, fire as fireDub } from '@/engine/dub/DubRouter';
+import { subscribeDubRouter, fire as fireDub } from '@/engine/dub/DubRouter';
 import { startDubRecorder } from '@/engine/dub/DubRecorder';
 import { dubLanePlayer } from '@/engine/dub/DubLanePlayer';
 import { ensureDrumPadEngine } from '@hooks/drumpad/useMIDIPadRouting';
@@ -203,7 +203,12 @@ export const DubDeckStrip: React.FC = () => {
   useEffect(() => {
     const engine = ensureDrumPadEngine();
     const bus = engine.getDubBus();
-    setDubBusForRouter(bus);
+    // NOTE: DubRouter registration now happens inside DrumPadEngine's
+    // constructor so every view — tracker, DJ, drumpad, VJ — can fire
+    // dub moves without coupling to a specific UI mount. We intentionally
+    // do NOT call setDubBusForRouter(null) on unmount: that would break
+    // the DJ DUB tab + drumpad dub pads + MIDI dub routing the instant
+    // the user left the tracker view. The engine owns the lifecycle.
     try {
       const mgr = getChannelRoutedEffectsManager(getToneEngine().masterEffectsInput);
       mgr.setupDubBusWiring(bus.inputNode);
@@ -217,7 +222,6 @@ export const DubDeckStrip: React.FC = () => {
       useMixerStore.getState().setChannelDubSend(ch, amt);
     });
     return () => {
-      setDubBusForRouter(null);
       bus.setChannelActivationCallback(null);
     };
   }, []);
