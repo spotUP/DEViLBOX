@@ -228,6 +228,13 @@ export const AVAILABLE_EFFECTS: AvailableEffect[] = [
   },
   {
     category: 'wasm',
+    type: 'MadProfessorPlate',
+    label: 'Mad Professor Plate',
+    group: 'Reverb & Delay',
+    description: 'MVerb with Mad Professor PCM-70 dub voicing — HPF before + LPF after + long dark tail, for echo-drenched dubs that stay out of the bassline (WASM)',
+  },
+  {
+    category: 'wasm',
     type: 'Leslie',
     label: 'Leslie Speaker',
     group: 'Modulation',
