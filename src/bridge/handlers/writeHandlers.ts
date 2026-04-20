@@ -404,14 +404,34 @@ export async function setDubBusSettings(params: Record<string, unknown>): Promis
   return { ok: true };
 }
 
+// Held dub-move disposers, keyed by monotonic handle string. Returned to MCP
+// callers so hold-kind moves can be released via releaseDubMove without
+// DOM pointerup events. Trigger-kind moves return heldHandle: null.
+const _dubHeld = new Map<string, { dispose(): void }>();
+let _dubHeldCounter = 0;
+
 export async function fireDubMove(params: Record<string, unknown>): Promise<Record<string, unknown>> {
   const { fire } = await import('../../engine/dub/DubRouter');
   const moveId = params.moveId as string;
   const channelId = params.channelId as number | undefined;
   const source = (params.source as 'live' | 'lane' | undefined) ?? 'live';
   const moveParams = (params.params as Record<string, number> | undefined) ?? {};
-  fire(moveId, channelId, moveParams, source);
-  return { ok: true };
+  const disposer = fire(moveId, channelId, moveParams, source);
+  if (!disposer) return { ok: true, fired: true, heldHandle: null };
+  _dubHeldCounter += 1;
+  const handle = `dh${_dubHeldCounter}`;
+  _dubHeld.set(handle, disposer);
+  return { ok: true, fired: true, heldHandle: handle };
+}
+
+export function releaseDubMove(params: Record<string, unknown>): Record<string, unknown> {
+  const handle = params.heldHandle as string | undefined;
+  if (!handle) return { ok: false, error: 'heldHandle required' };
+  const entry = _dubHeld.get(handle);
+  if (!entry) return { ok: false, error: 'unknown handle' };
+  _dubHeld.delete(handle);
+  try { entry.dispose(); } catch { /* ok */ }
+  return { ok: true, released: true };
 }
 
 export function muteAllChannels(): Record<string, unknown> {
