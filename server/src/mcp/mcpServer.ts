@@ -624,9 +624,9 @@ export function createMcpServer(): McpServer {
 
   server.tool(
     'fire_dub_move',
-    'Fire a dub move by id (currently: echoThrow). Equivalent to pressing the keyboard shortcut or dub pad.',
+    'Fire a dub move by id through DubRouter. Returns heldHandle for hold-kind moves (pass to release_dub_move to stop). Trigger-kind moves return heldHandle:null. Requires bus enabled (see set_dub_bus_enabled). Processors need channel sends > 0 to be audible. Valid moveIds: echoThrow, dubStab, filterDrop, dubSiren, springSlam, channelMute, channelThrow, delayTimeThrow, tapeWobble, masterDrop, snareCrack, tapeStop, backwardReverb, toast, transportTapeStop, tubbyScream, stereoDoubler, reverseEcho, sonarPing, radioRiser, subSwell, oscBass, echoBuildUp, delayPreset380, delayPresetDotted, crushBass, subHarmonic.',
     {
-      moveId: z.string().describe('Move id (e.g. "echoThrow")'),
+      moveId: z.string().describe('Move id (e.g. "echoThrow", "tubbyScream")'),
       channelId: z.number().int().optional().describe('Tracker channel index when the move is channel-scoped'),
       params: z.record(z.number()).optional().describe('Override move defaults (e.g. throwBeats)'),
       source: z.enum(['live', 'lane']).optional().describe('Source for telemetry (default "live")'),
@@ -830,6 +830,15 @@ export function createMcpServer(): McpServer {
     'Execute any named command from the keyboard command registry (e.g., "selectAll", "transposeUp", "toggleRecordMode")',
     { command: z.string().describe('Command name') },
     (p) => call('execute_command', p),
+  );
+
+  server.tool(
+    'release_dub_move',
+    'Release a held dub move by its heldHandle (returned from fire_dub_move for hold-kind moves). Trigger-kind moves return null heldHandle and don\'t need releasing.',
+    {
+      heldHandle: z.string().describe('Handle returned from fire_dub_move'),
+    },
+    (p) => call('release_dub_move', p),
   );
 
   // ═══════════════════════════════════════════════════════════════════════════════
