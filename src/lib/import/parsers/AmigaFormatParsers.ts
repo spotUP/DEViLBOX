@@ -586,7 +586,11 @@ export async function tryRouteFormat(
   if (matchesExt(filename, ['sid'])) {
     // First check if it's C64 SID (PSID/RSID magic at offset 0)
     const { isSIDFormat, parseSIDFile } = await import('@lib/import/formats/SIDParser');
-    if (isSIDFormat(buffer)) {
+    const isC64 = isSIDFormat(buffer);
+    const head = new Uint8Array(buffer).slice(0, 4);
+    const magic = String.fromCharCode(head[0] || 0, head[1] || 0, head[2] || 0, head[3] || 0);
+    console.log(`[AmigaFormatParsers/.sid] ${originalFileName} magic="${magic}" isC64SID=${isC64}`);
+    if (isC64) {
       // It's a C64 SID - use dedicated C64SIDEngine (never fall back to UADE)
       return parseSIDFile(buffer, originalFileName);
     }
