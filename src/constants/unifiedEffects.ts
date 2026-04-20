@@ -235,6 +235,13 @@ export const AVAILABLE_EFFECTS: AvailableEffect[] = [
   },
   {
     category: 'wasm',
+    type: 'DattorroPlate',
+    label: 'Dattorro Plate',
+    group: 'Reverb & Delay',
+    description: 'Jon Dattorro 1997 plate reverb — metallic, "infinite" at high decay, PCM-70-ish character (el-visio/dattorro-verb port, MIT)',
+  },
+  {
+    category: 'wasm',
     type: 'Leslie',
     label: 'Leslie Speaker',
     group: 'Modulation',
