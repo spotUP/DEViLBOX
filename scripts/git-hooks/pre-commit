@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+# DEViLBOX pre-commit — fast gate (~10 s).
+#
+# Runs `npm run test:ci` only. Type-check lives in pre-push because it
+# takes ~40 s on this project (tsc composite build) and commits tend to
+# happen in tight loops during active work.
+#
+# Activated by `npm install` (postinstall sets core.hooksPath) or
+# manually via `npm run setup:hooks`. Bypass in emergencies with
+# `git commit --no-verify`.
+
+set -euo pipefail
+
+# Skip on rebase / merge / cherry-pick.
+if [ -f .git/MERGE_HEAD ] || [ -f .git/CHERRY_PICK_HEAD ] \
+   || [ -d .git/rebase-merge ] || [ -d .git/rebase-apply ]; then
+  exit 0
+fi
+
+# Nothing staged → nothing to check.
+if git diff --cached --quiet -- . 2>/dev/null; then
+  exit 0
+fi
+
+cd "$(git rev-parse --show-toplevel)"
+
+if [ -t 2 ]; then
+  RED=$'\033[31m'; GRN=$'\033[32m'; YLW=$'\033[33m'; RST=$'\033[0m'
+else
+  RED=''; GRN=''; YLW=''; RST=''
+fi
+
+echo "${YLW}[pre-commit] test:ci…${RST}" >&2
+if ! npm run --silent test:ci; then
+  echo "${RED}[pre-commit] test:ci failed — commit aborted.${RST}" >&2
+  echo "${RED}  Fix the failures above, or bypass with 'git commit --no-verify'.${RST}" >&2
+  exit 1
+fi
+
+echo "${GRN}[pre-commit] ok${RST}" >&2

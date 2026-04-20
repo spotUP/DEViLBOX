@@ -1,0 +1,65 @@
+#!/usr/bin/env bash
+# DEViLBOX pre-push — full gate (~50 s).
+#
+# Push to `main` triggers Hetzner deploy + GitHub Actions. Block here
+# before the slow remote path fails.
+#
+# Runs in parallel where safe:
+#   - `npm run type-check`    (tsc -b --force)  ~40 s   ◂ dominant
+#   - `npm run test:ci`       (fast vitest)     ~10 s
+#   - `npm run test:compliance` (tracker fx)    ~5 s
+#
+# Bypass in emergencies with `git push --no-verify`. Don't make a habit
+# of it — this is the same gate CI runs.
+
+set -euo pipefail
+
+cd "$(git rev-parse --show-toplevel)"
+
+if [ -t 2 ]; then
+  RED=$'\033[31m'; GRN=$'\033[32m'; YLW=$'\033[33m'; RST=$'\033[0m'
+else
+  RED=''; GRN=''; YLW=''; RST=''
+fi
+
+echo "${YLW}[pre-push] type-check + test:ci + test:compliance in parallel…${RST}" >&2
+
+# Log files per job so mixed output from parallel runs doesn't interleave.
+TMP="$(mktemp -d)"
+trap 'rm -rf "$TMP"' EXIT
+
+(npm run --silent type-check       > "$TMP/type.log"   2>&1; echo $? > "$TMP/type.exit")   &
+PID_TYPE=$!
+(npm run --silent test:ci          > "$TMP/ci.log"     2>&1; echo $? > "$TMP/ci.exit")     &
+PID_CI=$!
+(npm run --silent test:compliance  > "$TMP/comp.log"   2>&1; echo $? > "$TMP/comp.exit")   &
+PID_COMP=$!
+
+wait $PID_TYPE $PID_CI $PID_COMP || true
+
+TYPE_EXIT=$(cat "$TMP/type.exit" 2>/dev/null || echo 1)
+CI_EXIT=$(cat "$TMP/ci.exit"     2>/dev/null || echo 1)
+COMP_EXIT=$(cat "$TMP/comp.exit" 2>/dev/null || echo 1)
+
+failed=0
+report() {
+  local name=$1 exit_code=$2 log=$3
+  if [ "$exit_code" != "0" ]; then
+    echo "${RED}[pre-push] $name failed (exit $exit_code):${RST}" >&2
+    cat "$log" >&2
+    failed=1
+  else
+    echo "${GRN}[pre-push] $name ok${RST}" >&2
+  fi
+}
+
+report "type-check"      "$TYPE_EXIT" "$TMP/type.log"
+report "test:ci"         "$CI_EXIT"   "$TMP/ci.log"
+report "test:compliance" "$COMP_EXIT" "$TMP/comp.log"
+
+if [ "$failed" = "1" ]; then
+  echo "${RED}[pre-push] blocked — fix the failures above or push with --no-verify.${RST}" >&2
+  exit 1
+fi
+
+echo "${GRN}[pre-push] all checks passed${RST}" >&2
