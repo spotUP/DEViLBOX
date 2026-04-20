@@ -19,7 +19,9 @@ import { useHistoryStore } from '../../stores/useHistoryStore';
 import { useProjectStore } from '../../stores/useProjectStore';
 import { useOscilloscopeStore } from '../../stores/useOscilloscopeStore';
 import { useDJStore } from '../../stores/useDJStore';
+import { useDrumPadStore } from '../../stores/useDrumPadStore';
 import { getDJEngineIfActive } from '../../engine/dj/DJEngine';
+import { getDrumPadEngine } from '../../hooks/drumpad/useMIDIPadRouting';
 import { useSynthErrorStore } from '../../stores/useSynthErrorStore';
 import { useMIDIStore } from '../../stores/useMIDIStore';
 import { getGlobalRegistry } from '../../hooks/useGlobalKeyboardHandler';
@@ -615,22 +617,11 @@ export function getAudioState(): Record<string, unknown> {
 // worklet). Returns null fields when the bus hasn't been created yet.
 
 export function getDubBusState(): Record<string, unknown> {
-  // Avoid dynamic imports — the file is hot on the critical read path. The
-  // stores are already imported at the top of the file.
   // DrumPadEngine owns the DubBus; it may not exist yet if the user never
   // mounted tracker/drumpad/DJ view.
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const routingMod = require('../../hooks/drumpad/useMIDIPadRouting') as {
-    getDrumPadEngine: () => import('../../engine/drumpad/DrumPadEngine').DrumPadEngine | null;
-  };
-  const dpEngine = routingMod.getDrumPadEngine();
+  const dpEngine = getDrumPadEngine();
   const bus = dpEngine?.getDubBus() ?? null;
-
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const drumPadMod = require('../../stores/useDrumPadStore') as {
-    useDrumPadStore: { getState: () => { dubBus: Record<string, unknown> } };
-  };
-  const storeSettings = drumPadMod.useDrumPadStore.getState().dubBus;
+  const storeSettings = useDrumPadStore.getState().dubBus;
 
   // Dub-send values from the mixer store (what the user has dialed).
   const mixer = useMixerStore.getState();
