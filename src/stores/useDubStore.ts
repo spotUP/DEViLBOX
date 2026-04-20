@@ -29,11 +29,45 @@ interface DubStore {
   lastCapturedAt: number | null;
   markCaptured: () => void;
 
-  /** Full-Screen Dub Mode toggle. When true, DubFullScreenMode renders over
-   *  the tracker view with gig-sized buttons, big KILL, and context-aware
-   *  keyboard bindings (no note entry in this mode). Tab toggles. */
-  fullScreen: boolean;
-  setFullScreen: (v: boolean) => void;
+  /** DubDeckStrip body collapse. Default collapsed so the bottom strip
+   *  is a thin header (Bus ON/OFF + expand chevron) — expand reveals
+   *  TONE/GLOBAL/per-channel rows + lane timeline. Keeps the pattern
+   *  editor from being pushed off-screen on compact layouts. */
+  stripCollapsed: boolean;
+  setStripCollapsed: (v: boolean) => void;
+  toggleStripCollapsed: () => void;
+
+  /** Ghost Bus — parallel -36 dB bleed from every visible channel into
+   *  the dub bus so muted channels still "whisper" through the wet return.
+   *  Research-quoted "masking-tape on the bottom of the fader" crosstalk
+   *  simulation. When toggled on, DubDeckStrip auto-seeds every channel's
+   *  dubSend to 0.015 (remembering the prior value) so the bleed is
+   *  effectively always-on regardless of mute state. Off restores prior. */
+  ghostBus: boolean;
+  setGhostBus: (v: boolean) => void;
+
+  /** Chorus-on-master finisher — stereo chorus on the whole output for
+   *  a smooth trippy polish. Research-quoted "chorus on the finished
+   *  track" Mad Professor-adjacent move. */
+  masterChorus: boolean;
+  setMasterChorus: (v: boolean) => void;
+
+  /** Club Simulator — convolution reverb IR as a master insert so the
+   *  producer can audition "how does this mix sound in a venue?" */
+  clubSim: boolean;
+  setClubSim: (v: boolean) => void;
+
+  /** Reverb→Delay chain order. When true, the bus runs spring→echo
+   *  instead of the default echo→spring. Produces the "whole room
+   *  repeated" dub geometry. Live-switchable. */
+  reverseChainOrder: boolean;
+  setReverseChainOrder: (v: boolean) => void;
+
+  /** JA Press — vinyl-degradation level 0-10. 0 = factory-new pressing,
+   *  10 = gutter-scraped Jamaican 7-inch: heavy surface noise, pops,
+   *  wow/flutter, HF roll-off, sub rumble, L/R drift. Master-insert. */
+  vinylLevel: number;
+  setVinylLevel: (v: number) => void;
 }
 
 export const useDubStore = create<DubStore>((set) => ({
@@ -43,8 +77,24 @@ export const useDubStore = create<DubStore>((set) => ({
   lastCapturedAt: null,
   markCaptured: () => set({ lastCapturedAt: performance.now() }),
 
-  fullScreen: false,
-  setFullScreen: (v) => set({ fullScreen: v }),
+  stripCollapsed: true,
+  setStripCollapsed: (v) => set({ stripCollapsed: v }),
+  toggleStripCollapsed: () => set((s) => ({ stripCollapsed: !s.stripCollapsed })),
+
+  ghostBus: false,
+  setGhostBus: (v) => set({ ghostBus: v }),
+
+  masterChorus: false,
+  setMasterChorus: (v) => set({ masterChorus: v }),
+
+  clubSim: false,
+  setClubSim: (v) => set({ clubSim: v }),
+
+  reverseChainOrder: false,
+  setReverseChainOrder: (v) => set({ reverseChainOrder: v }),
+
+  vinylLevel: 0,
+  setVinylLevel: (v) => set({ vinylLevel: Math.max(0, Math.min(10, v)) }),
 }));
 
 /**

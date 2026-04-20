@@ -60,7 +60,11 @@ export const useAudioStore = create<AudioStore>()(
     masterMuted: false,
     sampleBusGain: 0,
     synthBusGain: 0,
-    autoGain: true,
+    // Default OFF — the proportional ±12 dB bus-balancing drives chiptune
+    // formats (YM2612, SN76489, Genesis) into clipping distortion because
+    // they already peak near 0 dBFS. Users can opt in via the mixer when
+    // they're mixing sample-heavy material alongside synths.
+    autoGain: false,
     analyserNode: null,
     fftNode: null,
     toneEngineInstance: null,

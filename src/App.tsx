@@ -727,11 +727,17 @@ function App() {
   // Check if a filename is a supported tracker/module format (lazy-loaded)
   // Load song file after confirmation (uses unified file loader)
   const loadSongFile = useCallback(async (file: File) => {
-    const result = await loadFile(file, { requireConfirmation: false });
-    if (result.success === true) {
-      notify.success(result.message);
-    } else if (result.success === false) {
-      void showAlert({ title: 'Load Failed', message: result.error || `Could not load ${file.name}` });
+    try {
+      const result = await loadFile(file, { requireConfirmation: false });
+      if (result.success === true) {
+        notify.success(result.message);
+      } else if (result.success === false) {
+        void showAlert({ title: 'Load Failed', message: result.error || `Could not load ${file.name}` });
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error('[App.loadSongFile] load threw:', err);
+      void showAlert({ title: 'Load Failed', message: `${file.name}: ${msg}` });
     }
   }, []);
 
@@ -779,14 +785,20 @@ function App() {
       useUIStore.getState().setPendingCompanionFiles([]);
     }
 
-    const result = await loadFile(file, { requireConfirmation: true, companionFiles });
+    try {
+      const result = await loadFile(file, { requireConfirmation: true, companionFiles });
 
-    if (result.success === 'pending-confirmation' || result.success === 'pending-import') {
-      useUIStore.getState().setPendingModuleFile(result.file);
-    } else if (result.success === true) {
-      notify.success(result.message);
-    } else if (result.success === false) {
-      void showAlert({ title: 'Load Failed', message: result.error || `Could not load ${file.name}` });
+      if (result.success === 'pending-confirmation' || result.success === 'pending-import') {
+        useUIStore.getState().setPendingModuleFile(result.file);
+      } else if (result.success === true) {
+        notify.success(result.message);
+      } else if (result.success === false) {
+        void showAlert({ title: 'Load Failed', message: result.error || `Could not load ${file.name}` });
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error('[App.handleFileDrop] load threw:', err);
+      void showAlert({ title: 'Load Failed', message: `${file.name}: ${msg}` });
     }
   }, []);
 

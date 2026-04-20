@@ -15,7 +15,7 @@ const beatsToMs = (bpm: number, beats: number) =>
 export const dubStab: DubMove = {
   id: 'dubStab',
   kind: 'trigger',
-  defaults: { stabBeats: 0.125, feedbackBoost: 0.25 },
+  defaults: { stabBeats: 0.25, feedbackBoost: 0.4 },
 
   execute({ bus, channelId, params, bpm }) {
     if (channelId === undefined) return null;
