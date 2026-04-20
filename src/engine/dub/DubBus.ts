@@ -2595,9 +2595,17 @@ export class DubBus {
    * then delay = whole room repeated" — delay AFTER reverb captures the
    * reverberant space and echoes THAT, producing a distinct geometry from
    * the conventional delay-into-reverb which just adds reverb to echoed
-   * taps. Live-switchable: disconnect the two series links, swap them,
-   * reconnect. No crossfade; the 40 ms gap during swap is acceptable
-   * (dub moves tolerate transients).
+   * taps.
+   *
+   * Live-switchable: mute → disconnect → reconnect → unmute. The brief
+   * window between `Tone.disconnect` and `Tone.connect` can have BOTH
+   * routings momentarily live on the audio thread (topology changes
+   * settle at the next processing quantum, ~3 ms at 44.1 kHz) — with
+   * high echo feedback + high spring Q that's enough to spark audible
+   * self-oscillation before the new topology takes over. Muting the
+   * return gain to 0 across the splice eliminates the feedback path
+   * entirely. 20 ms ramp each way = a ~60 ms dip in the wet bus, which
+   * dub moves tolerate.
    */
   private _reverseChainOrder = false;
   setReverseChainOrder(on: boolean): void {
@@ -2606,33 +2614,61 @@ export class DubBus {
     const echoIn = (this.echo as unknown as { input: Tone.InputNode }).input;
     const echoOut = (this.echo as unknown as { output: Tone.ToneAudioNode }).output;
     const springOut = (this.spring as unknown as { output: Tone.ToneAudioNode }).output;
+
+    // Snapshot the current wet-return level so we can restore after the splice.
+    const ctx = this.context;
+    const priorGain = this.return_.gain.value;
+    const RAMP_SEC = 0.02;        // 20 ms ramp down / up
+    const SWAP_DELAY_MS = RAMP_SEC * 1000 + 5;
+
+    // Ramp return to 0 FIRST — guarantees the audio thread is silent
+    // when the disconnect/connect dance happens a moment later.
     try {
-      if (on) {
-        // Normal → Reverse: was tapeSat→echo→spring→sidechain.
-        // Want tapeSat→spring→echo→sidechain.
-        Tone.disconnect(this.tapeSatBypass, echoIn);
-        Tone.disconnect(this.tapeStackMix, echoIn);
-        Tone.disconnect(echoOut, springIn);
-        Tone.disconnect(springOut, this.sidechain as unknown as Tone.InputNode);
-        Tone.connect(this.tapeSatBypass, springIn);
-        Tone.connect(this.tapeStackMix, springIn);
-        Tone.connect(springOut, echoIn);
-        Tone.connect(echoOut, this.sidechain as unknown as Tone.InputNode);
-      } else {
-        // Reverse → Normal: the mirror operation.
-        Tone.disconnect(this.tapeSatBypass, springIn);
-        Tone.disconnect(this.tapeStackMix, springIn);
-        Tone.disconnect(springOut, echoIn);
-        Tone.disconnect(echoOut, this.sidechain as unknown as Tone.InputNode);
-        Tone.connect(this.tapeSatBypass, echoIn);
-        Tone.connect(this.tapeStackMix, echoIn);
-        Tone.connect(echoOut, springIn);
-        Tone.connect(springOut, this.sidechain as unknown as Tone.InputNode);
+      const now = ctx.currentTime;
+      this.return_.gain.cancelScheduledValues(now);
+      this.return_.gain.setValueAtTime(priorGain, now);
+      this.return_.gain.linearRampToValueAtTime(0, now + RAMP_SEC);
+    } catch { /* ok */ }
+
+    // Defer the topology change until after the mute has landed. Any
+    // self-oscillation transients now die into a zero-gain output.
+    setTimeout(() => {
+      try {
+        if (on) {
+          // Normal → Reverse: was tapeSat→echo→spring→sidechain.
+          // Want tapeSat→spring→echo→sidechain.
+          Tone.disconnect(this.tapeSatBypass, echoIn);
+          Tone.disconnect(this.tapeStackMix, echoIn);
+          Tone.disconnect(echoOut, springIn);
+          Tone.disconnect(springOut, this.sidechain as unknown as Tone.InputNode);
+          Tone.connect(this.tapeSatBypass, springIn);
+          Tone.connect(this.tapeStackMix, springIn);
+          Tone.connect(springOut, echoIn);
+          Tone.connect(echoOut, this.sidechain as unknown as Tone.InputNode);
+        } else {
+          // Reverse → Normal: the mirror operation.
+          Tone.disconnect(this.tapeSatBypass, springIn);
+          Tone.disconnect(this.tapeStackMix, springIn);
+          Tone.disconnect(springOut, echoIn);
+          Tone.disconnect(echoOut, this.sidechain as unknown as Tone.InputNode);
+          Tone.connect(this.tapeSatBypass, echoIn);
+          Tone.connect(this.tapeStackMix, echoIn);
+          Tone.connect(echoOut, springIn);
+          Tone.connect(springOut, this.sidechain as unknown as Tone.InputNode);
+        }
+        this._reverseChainOrder = on;
+      } catch (err) {
+        console.warn('[DubBus] setReverseChainOrder swap failed:', err);
       }
-      this._reverseChainOrder = on;
-    } catch (err) {
-      console.warn('[DubBus] setReverseChainOrder swap failed:', err);
-    }
+      // Ramp back to prior level regardless of swap success — if the
+      // splice threw we'd rather hear the old topology than dead air.
+      try {
+        const now2 = ctx.currentTime;
+        this.return_.gain.cancelScheduledValues(now2);
+        this.return_.gain.setValueAtTime(0, now2);
+        this.return_.gain.linearRampToValueAtTime(priorGain, now2 + RAMP_SEC);
+      } catch { /* ok */ }
+    }, SWAP_DELAY_MS);
   }
 
   /**
