@@ -230,6 +230,37 @@ export const DubBusPanel: React.FC = () => {
             onChange={(v) => patch({ sidechainAmount: v })}
             format={(v) => `${Math.round(v * 100)}%`}
           />
+          {/* G13: sidechain source selector. 'bus' = self-compression
+              (classic pumping dub); 'channel' = a specific tracker channel
+              triggers the duck, so a kick on ch1 can pump the dub return
+              even when it isn't in the bus mix. */}
+          <Choice
+            label="SC source"
+            value={dubBus.sidechainSource}
+            options={[
+              { value: 'bus', label: 'Bus (self)' },
+              { value: 'channel', label: 'Channel…' },
+            ] as const}
+            onChange={(v) => patch({ sidechainSource: v })}
+          />
+          {dubBus.sidechainSource === 'channel' && (
+            <label className="flex items-center gap-3 text-[11px] font-mono text-text-secondary">
+              <span className="w-24 shrink-0">SC channel</span>
+              <input
+                type="number"
+                min={1}
+                max={32}
+                value={dubBus.sidechainChannelIndex + 1}
+                onChange={(e) => {
+                  const n = parseInt(e.target.value, 10);
+                  if (Number.isFinite(n)) {
+                    patch({ sidechainChannelIndex: Math.max(0, Math.min(31, n - 1)) });
+                  }
+                }}
+                className="flex-1 bg-dark-bgTertiary border border-dark-borderLight rounded text-text-primary px-2 py-0.5 text-[11px] font-mono"
+              />
+            </label>
+          )}
 
           {/* ── Dub Action settings — how much dub-throw/hold/mute pads inject ── */}
           <div className="h-px bg-dark-borderLight my-1" />
