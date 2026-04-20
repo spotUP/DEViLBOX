@@ -14,12 +14,18 @@ import type { DubMove } from './_types';
 export const subHarmonic: DubMove = {
   id: 'subHarmonic',
   kind: 'hold',
-  defaults: { freq: 55, threshold: 0.06, level: 0.7 },
+  // Threshold lowered 0.06 → 0.035 and level 0.7 → 0.85 after the
+  // 2026-04-20 sweep showed the move produced no audible contribution on
+  // the reference test song (kicks peaked around 0.05 — right on the edge
+  // of the old threshold). New values trigger on every visible transient
+  // and the sub pulse is loud enough to read clearly against the mix.
+  defaults: { freq: 55, threshold: 0.035, level: 0.85 },
 
   execute({ bus, params }) {
     const freq = params.freq ?? this.defaults.freq;
     const threshold = params.threshold ?? this.defaults.threshold;
     const level = params.level ?? this.defaults.level;
+    console.log(`[subHarmonic] fired freq=${freq} threshold=${threshold} level=${level}`);
     const release = bus.startSubHarmonic(freq, threshold, level);
     return { dispose: release };
   },
