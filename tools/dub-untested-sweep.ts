@@ -325,6 +325,34 @@ async function main() {
   // Reset channel send.
   await call('set_channel_dub_send', { channel: 0, amount: 0 }).catch(() => {});
 
+  // ── Tail-leak check ───────────────────────────────────────────────────────
+  // Catches held moves whose disposer doesn't kill their internal loop /
+  // oscillator (e.g. rAF-driven transient-followers, feedback-fed delays
+  // that never silence). Every released move should have stopped emitting
+  // sound by now; stopping the song too means ANY remaining audio is a
+  // leak, not the song.
+  console.log('');
+  console.log('─── tail-leak check ──────────────────────────────');
+  console.log('[sweep] stopping song + waiting 15 s for all tails to land…');
+  try { await call('stop'); } catch { /* ok */ }
+  await sleep(15_000);
+  const tail15 = await call('get_audio_level', { durationMs: 1000 });
+  console.log(`  t=15s  rms=${fmt(tail15?.rmsAvg)} peak=${fmt(tail15?.peakMax)} silent=${tail15?.isSilent}`);
+  console.log('[sweep] waiting another 15 s…');
+  await sleep(15_000);
+  const tail30 = await call('get_audio_level', { durationMs: 1000 });
+  console.log(`  t=30s  rms=${fmt(tail30?.rmsAvg)} peak=${fmt(tail30?.peakMax)} silent=${tail30?.isSilent}`);
+  // Anything above -60 dBFS RMS at t+30s is a leaked move. Reverb tails
+  // from springSlam / backwardReverb are ≤ 2 s; feedback-delays like
+  // delayTimeThrow are ≤ 4 s. Nothing legitimate should persist 30 s.
+  const LEAK_RMS_THRESHOLD = 0.001;  // ~-60 dBFS
+  const leaked = (tail30?.rmsAvg ?? 0) > LEAK_RMS_THRESHOLD;
+  if (leaked) {
+    console.log(`  LEAK — audio still audible 30s after stop (rms=${tail30?.rmsAvg?.toFixed(6)}) — some held move didn't dispose cleanly`);
+  } else {
+    console.log('  ✓ no tail leak — bus fell silent within 30s of song stop');
+  }
+
   // ── Summary ───────────────────────────────────────────────────────────────
   const DELTA_THRESHOLD = 0.015;
   const ABS_PEAK_CLIP = 0.98;
@@ -345,6 +373,7 @@ async function main() {
   console.log(`  FLAT        : ${flat.length}/${rows.length}  (no detectable change vs baseline)`);
   console.log(`  CLIP        : ${clip.length}/${rows.length}  (peak ≥ ${ABS_PEAK_CLIP})`);
   console.log(`  ! errored   : ${errored.length}/${rows.length}`);
+  console.log(`  LEAK        : ${leaked ? 'YES — post-stop audio still audible at t+30s' : 'no'}`);
   console.log('');
   if (flat.length > 0) {
     console.log(`  flat moves  : ${flat.map((r) => r.short).join(', ')}`);
