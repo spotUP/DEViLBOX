@@ -42,11 +42,17 @@ const formatsWithDetect: DetectRef[] = FORMAT_REGISTRY
  * rest of the registry.
  */
 const KNOWN_BROKEN = new Map<string, string>([
-  ['musicLine',          'MISSING_EXPORT: isMusicLineFormat not exported from MusicLineParser'],
-  ['richardJoseph',      'MISSING_EXPORT: isRichardJosephFormat not exported from RichardJosephParser'],
-  ['digitalSonixChrome', 'MISSING_EXPORT: isDigitalSonixChromeFormat not exported from DigitalSonixChromeParser'],
-  ['tronic',             'FALSE_POSITIVE: isTronicFormat claims an all-zero buffer'],
-  ['qsf',                'FALSE_POSITIVE: isQsfFormat claims an all-zero buffer'],
+  // Empty allowlist — all 5 historical broken detectors fixed 2026-04-20:
+  //   musicLine / richardJoseph / digitalSonixChrome: registry was
+  //     pointing at detectFn / parseFn names that didn't exist. Aligned
+  //     to the real exports (isMusicLineFile / isRJPFormat + parseRJPFile
+  //     / isDscFormat + parseDscFile).
+  //   tronic / qsf: detectors had no content-magic to check (tronic) or
+  //     a two-arg signature incompatible with the registry contract
+  //     (qsf). Both had `detectFn` removed from the registry entry;
+  //     extension matching handles dispatch.
+  // Keep this comment in case a new MISSING_EXPORT / FALSE_POSITIVE
+  // shows up — the ratchet logic below is intact for any future entries.
 ]);
 
 describe('FORMAT_REGISTRY — detection functions reject zero-filled buffers', () => {
