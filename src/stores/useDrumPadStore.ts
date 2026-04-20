@@ -14,7 +14,7 @@ import type {
 } from '../types/drumpad';
 import { createEmptyProgram, createEmptyPad, getBankPads, MPK_SLOT_COUNT, mpkSlotId, mpkSlotName } from '../types/drumpad';
 import type { DubBusSettings } from '../types/dub';
-import { DEFAULT_DUB_BUS } from '../types/dub';
+import { DEFAULT_DUB_BUS, DUB_CHARACTER_PRESETS } from '../types/dub';
 
 /** Build the 8 default MPK-linked program slots. */
 function buildMpkSlots(): Map<string, ReturnType<typeof createEmptyProgram>> {
@@ -123,7 +123,7 @@ const DEFAULT_PREFERENCES: DrumPadState['preferences'] = {
 };
 
 // Bump this when factory presets or stored schema changes — discards stale data
-const DRUMPAD_SCHEMA_VERSION = 27;
+const DRUMPAD_SCHEMA_VERSION = 28;
 const DRUMPAD_SCHEMA_KEY = 'devilbox_drumpad_schema';
 
 // Set when schema migration clears old data — prevents IndexedDB from overwriting factory presets
@@ -483,7 +483,27 @@ export const useDrumPadStore = create<DrumPadStore>((set, get) => ({
   // hook and pushes changes to the live DrumPadEngine.
   setDubBus: (patch: Partial<DubBusSettings>) => {
     const prior = get().dubBus.enabled;
-    set((state) => ({ dubBus: { ...state.dubBus, ...patch } }));
+    // Character-preset selection must rewrite the store's dub-bus fields to
+    // the preset's overrides — otherwise the store keeps factory values and
+    // the mirror effect (engine.setDubBusSettings on every render) re-writes
+    // those factory values back to the bus on the next tick, silently
+    // clobbering the preset. Apply the preset here so the store IS the
+    // truth. Flip `characterPreset` back to 'custom' after so subsequent
+    // user edits don't loop through this branch.
+    let effective: Partial<DubBusSettings> = patch;
+    if (typeof patch.characterPreset === 'string' && patch.characterPreset !== 'custom') {
+      const preset = DUB_CHARACTER_PRESETS[patch.characterPreset];
+      if (preset) {
+        // Preset overrides first, then the patch (so any explicit fields in
+        // the patch still win — caller can override a preset value in the
+        // same call), then preserve the preset name so the UI dropdown keeps
+        // showing which engineer is active. Knob onChange handlers in the
+        // UI pass `characterPreset: 'custom'` when the user manually tweaks
+        // a field, flipping us to Custom.
+        effective = { ...preset.overrides, ...patch };
+      }
+    }
+    set((state) => ({ dubBus: { ...state.dubBus, ...effective } }));
     get().saveToStorage();
     // Auto-apply sound system when bus flips OFF → ON and the current bank
     // has no pad-level dubSend configured yet. Skips if any pad already has

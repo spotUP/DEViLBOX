@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-04-19T16:43:23.354Z
+ * Generated: 2026-04-19T18:50:12.258Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,9 +19,9 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.5769';
-export const BUILD_NUMBER = '5769';
-export const BUILD_HASH = '273ba91e4';
+export const BUILD_VERSION = '1.0.5802';
+export const BUILD_NUMBER = '5802';
+export const BUILD_HASH = 'bc5eecac4';
 export const BUILD_DATE = '2026-04-19';
 
 // Full version (patch IS the build number, so no need to append)
@@ -30,9 +30,141 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.5769',
+    version: '1.0.5802',
     date: '2026-04-19',
     changes: [
+      {
+        type: 'fix',
+        "description": "Ensure DrumPadEngine exists on tracker-view mount"
+      },
+      {
+        type: 'fix',
+        "description": "More distinct click-flash + fire setFlashedChannel on click"
+      },
+      {
+        type: 'improvement',
+        "description": "Re-apply SidMon1Replayer migration"
+      },
+      {
+        type: 'fix',
+        "description": "Replace 'selected channel' highlight with click-flash feedback"
+      },
+      {
+        type: 'feature',
+        "description": "DJ-only 180 Hz HPF on deck taps (always kick-dodge for DJ)"
+      },
+      {
+        type: 'improvement',
+        "description": "Tweak(dub): lower default HPF cutoff 180 → 40 Hz"
+      },
+      {
+        type: 'fix',
+        "description": "Auto-apply default dubSend on tracker channels when bus enables"
+      },
+      {
+        type: 'feature',
+        "description": "Bind W to Echo Throw on the selected tracker channel"
+      },
+      {
+        type: 'feature',
+        "description": "DubDeckStrip + DubLaneTimeline rendered in TrackerView"
+      },
+      {
+        type: 'improvement',
+        "description": "Revert(engine): back out SidMon1Replayer migration, silence regression"
+      },
+      {
+        type: 'feature',
+        "description": "DubLanePlayer + wire into transport setCurrentRow"
+      },
+      {
+        type: 'feature',
+        "description": "DubRecorder + useTrackerStore.setPatternDubLane action"
+      },
+      {
+        type: 'improvement',
+        "description": "Rename DubEvent.beat → row (tracker-native)"
+      },
+      {
+        type: 'feature',
+        "description": "DubRouter — single fire() entry for all dub moves"
+      },
+      {
+        type: 'feature',
+        "description": "Echo Throw move — first tracker-dub move"
+      },
+      {
+        type: 'improvement',
+        "description": "Extract WASMSingletonBase, migrate 6 reference engines"
+      },
+      {
+        type: 'feature',
+        "description": "Tracker channel dubSend tap + DubBus openChannelTap/modulateFeedback"
+      },
+      {
+        type: 'feature',
+        "description": "UseDubStore — armed flag + rAF-batched write helper"
+      },
+      {
+        type: 'improvement',
+        "description": "Chore(persistence): bump SCHEMA_VERSION 19→20 for Pattern.dubLane"
+      },
+      {
+        type: 'feature',
+        "description": "Optional dubLane field on Pattern"
+      },
+      {
+        type: 'feature',
+        "description": "Add DubEvent, DubLane, QuantizeMode types for Phase 1"
+      },
+      {
+        type: 'improvement',
+        "description": "Chore: regenerate changelog"
+      },
+      {
+        type: 'improvement',
+        "description": "Chore(dj): remove SID playlist auto-repair — was spamming console for days"
+      },
+      {
+        type: 'fix',
+        "description": "Loading a sample clears any prior synth config"
+      },
+      {
+        type: 'feature',
+        "description": "Drag-and-drop audio files directly onto pads"
+      },
+      {
+        type: 'fix',
+        "description": "One friendly warn per broken instrument, not two stack-traces"
+      },
+      {
+        type: 'fix',
+        "description": "Cap bridge reconnect attempts at 5"
+      },
+      {
+        type: 'improvement',
+        "description": "Chore(dev): default local API port 3001 → 3011"
+      },
+      {
+        type: 'feature',
+        "description": "Auto-apply sound system on first bus enable"
+      },
+      {
+        type: 'fix',
+        "description": "Abort mini-drain when a new synth-pad tap attaches"
+      },
+      {
+        type: 'fix',
+        "description": "Scale mini-drain window to echo rate so buffer fully flushes"
+      },
+      {
+        type: 'fix',
+        "description": "Mini-drain bus when last synth-pad tap detaches"
+      },
+      {
+        type: 'fix',
+        "description": "Fade out synth-pad dub-bus tap on release so tails can decay"
+      },
       {
         type: 'feature',
         "description": "Route synth pads through the dub bus via pad.dubSend"
@@ -71,10 +203,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       },
       {
         type: 'improvement',
-        "description": "Chore: regenerate changelog"
-      },
-      {
-        type: 'improvement',
         "description": "Chore: ignore .superpowers/ and drop tracked scheduler lockfile"
       },
       {
@@ -100,144 +228,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'feature',
         "description": "Master volume ceiling 1.5 → 2.0, tighter limiter (-0.3 dBFS, hard knee)"
-      },
-      {
-        type: 'improvement',
-        "description": "Chore(settings): remove half-wired customBannerImage feature"
-      },
-      {
-        type: 'improvement',
-        "description": "Chore(drumpad): remove dead ConfirmDialog component"
-      }
-    ]
-  },
-  {
-    version: '2026-04-18',
-    date: '2026-04-18',
-    changes: [
-      {
-        type: 'fix',
-        "description": "Auto DJ never picks a hard 'cut' transition mid-set"
-      },
-      {
-        type: 'fix',
-        "description": "Master bus defaults to -6 dB so pads don't eat the DJ mix"
-      },
-      {
-        type: 'fix',
-        "description": "Persisted cue device is restored to the cue engine on DJ view mount"
-      },
-      {
-        type: 'fix',
-        "description": "Drop deckTapAmount 1.0 → 0.6 on the main dub kits"
-      },
-      {
-        type: 'feature',
-        "description": "Modland preview routes to the cue bus (headphones only)"
-      },
-      {
-        type: 'feature',
-        "description": "Add \"Analyze track\" to the playlist row context menu"
-      },
-      {
-        type: 'feature',
-        "description": "Modland preview plays via UADE directly — no render wait"
-      },
-      {
-        type: 'feature',
-        "description": "Rebuild One-Shots Live Bank B for reggae/dub gigs"
-      },
-      {
-        type: 'feature',
-        "description": "Persist loudness + auto-gain manual loads"
-      },
-      {
-        type: 'fix',
-        "description": "Dub bus sits under the mix — sirens/echoes no longer clobber decks"
-      },
-      {
-        type: 'fix',
-        "description": "Dub effects release crisply — mini-drain on last pad release"
-      },
-      {
-        type: 'fix',
-        "description": "Kill the dub-bus pink-noise floor that was producing white noise"
-      },
-      {
-        type: 'feature',
-        "description": "Animate pad buttons on external triggers (MIDI/keyboard)"
-      },
-      {
-        type: 'fix',
-        "description": "Drum-pad controller triggers pads in every view"
-      },
-      {
-        type: 'fix',
-        "description": "ESC triggers djPanic in every non-tracker view"
-      },
-      {
-        type: 'fix',
-        "description": "Dub panic actually zeros echo feedback + emergency kill hook"
-      },
-      {
-        type: 'fix',
-        "description": "30s auto-release watchdog for stuck dub actions"
-      },
-      {
-        type: 'fix',
-        "description": "DjPanic directly calls dubPanic + resets store"
-      },
-      {
-        type: 'fix',
-        "description": "Crossfader no longer stalls at 0 for a full bar mid-transition"
-      },
-      {
-        type: 'feature',
-        "description": "Eight sound-system / dub flavour presets"
-      },
-      {
-        type: 'improvement',
-        "description": "Wrap tag filter pills instead of sideways scroll"
-      },
-      {
-        type: 'feature',
-        "description": "Beef up the deck-overview playhead so it's easy to spot"
-      },
-      {
-        type: 'feature',
-        "description": "Add dub sub-category tag filters"
-      },
-      {
-        type: 'improvement',
-        "description": "Swap ⋯ dropdown icon for a hamburger (≡)"
-      },
-      {
-        type: 'fix',
-        "description": "Analyzer 404 auto-fix no longer poisons downstream work"
-      },
-      {
-        type: 'feature',
-        "description": "\"Retry failed analyses\" menu option"
-      },
-      {
-        type: 'fix',
-        "description": "Stop spamming 404s for .nt companions on plain MODs"
-      },
-      {
-        type: 'fix',
-        "description": "Compact format badge — Protracker→MOD etc"
-      },
-      {
-        type: 'fix',
-        "description": "Round BPM in list rows so decimals don't overflow"
-      },
-      {
-        type: 'fix',
-        "description": "Harden analyzePlaylist against mid-run playlist edits + hangs"
-      },
-      {
-        type: 'fix',
-        "description": "Route SIDs through local pipeline, not server UADE"
       }
     ]
   }

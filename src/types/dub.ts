@@ -115,7 +115,7 @@ export interface DubBusSettings {
 
   // Engineer character preset — applies a curated snapshot of every
   // coloring param when selected. 'custom' = user-edited, don't overwrite.
-  characterPreset: 'custom' | 'tubby' | 'scientist' | 'perry' | 'madProfessor';
+  characterPreset: 'custom' | 'tubby' | 'scientist' | 'perry' | 'madProfessor' | 'gatedFlanger';
 
   // ─── Altec-style stepped HPF (Tubby "Big Knob") ─────────────────────────
   // When true, the bus snaps hpfCutoff to the nearest of 11 discrete Altec
@@ -136,10 +136,13 @@ export interface DubBusSettings {
   sweepFeedback: number; // 0-0.85, how "resonant" the comb gets
 
   // ─── Tape saturation mode ──────────────────────────────────────────────
-  // 'single': one WaveShaper (current default).
-  // 'stack':  3 parallel WaveShapers with different drives + uncorrelated
-  //           wow, modeling Perry's 4-track-bounce tape-stacking at 7.5ips.
-  tapeSatMode: 'single' | 'stack';
+  // 'single':     one WaveShaper (current default). 30 ips-adjacent.
+  // 'stack':      3 parallel WaveShapers with different drives + uncorrelated
+  //               wow, modeling Perry's 4-track-bounce tape-stacking at 7.5ips.
+  // 'tape15ips':  heavier drive + rolled-off treble curve, mimicking slower
+  //               tape speed (half of 30 ips). Research-quoted as the dub
+  //               engineer's trick for "heavier/dirtier bottom."
+  tapeSatMode: 'single' | 'stack' | 'tape15ips';
 }
 
 export const DEFAULT_DUB_BUS: DubBusSettings = {
@@ -154,7 +157,7 @@ export const DEFAULT_DUB_BUS: DubBusSettings = {
   // the dry mix, which is where real dub records actually mix (the tail
   // supports, never dominates). User can push it back up via the Dub
   // Bus panel return knob if they want.
-  returnGain: 0.55,
+  returnGain: 0.85,
   // HPF default is 40 Hz — effectively off. Dub Bus is used across drumpad,
   // tracker, and DJ views, but only the DJ view benefits from rolling bass
   // off the send (deck kick + echo = mud). Drumpad + tracker mix per
@@ -167,7 +170,7 @@ export const DEFAULT_DUB_BUS: DubBusSettings = {
   echoIntensity: 0.62,   // was 0.55 — 4-5 repeats before decay
   echoWet: 0.7,          // was 0.5 — the echo is the CONTENT of the bus, push it forward
   echoRateMs: 300,
-  sidechainAmount: 0.4,
+  sidechainAmount: 0.15,
   deckTapAmount: 0.75,   // gig-fix: was 1.0 — tap is ALREADY hitting a
                          // bus with echo+spring+feedback; full deck into
                          // it stacks on top of the dry mix and overloads
@@ -187,8 +190,13 @@ export const DEFAULT_DUB_BUS: DubBusSettings = {
   // some inherent dub character, mid scoop off (engaged per preset),
   // neutral stereo width. User picks a CHARACTER to load the full voicing.
   bassShelfGainDb:  3,
-  bassShelfFreqHz:  90,
-  bassShelfQ:       0.9,
+  // 200 Hz shelf covers the useful bass range across all sources: chip tunes
+  // (sub at 30-80 Hz), Amiga MODs (fundamentals 80-250 Hz), XM/IT and native
+  // synths (full range). A lowshelf at 200 Hz with gentle Q lifts everything
+  // below uniformly — an 18 dB boost lands clearly on Amiga bass + chip bass
+  // + modern synth bass alike.
+  bassShelfFreqHz:  200,
+  bassShelfQ:       0.5,
   midScoopGainDb:   0,
   midScoopFreqHz:   700,
   midScoopQ:        1.4,
@@ -250,87 +258,115 @@ export const DUB_CHARACTER_PRESETS: Record<Exclude<DubBusSettings['characterPres
     label: 'King Tubby',
     description: 'Dark, noisy, loose-spring. Stepped filter + tape-echo feedback. Narrow stereo. Light bus compression.',
     overrides: {
+      returnGain:     0.75,  // heavy bus presence — Tubby is LOUD
       hpfCutoff:      100,
       hpfStepped:     true,   // the "Big Knob" rhythmic staccato sweeps
-      bassShelfGainDb: 6, bassShelfFreqHz: 90,  bassShelfQ: 0.9,
+      bassShelfGainDb: 9, bassShelfFreqHz: 85,  bassShelfQ: 0.9,  // chest-punch bass lift
       midScoopGainDb:  0,
-      echoIntensity:  0.55,
+      echoIntensity:  0.65,   // more repeats — Tubby's signature multi-tap
       echoRateMs:     300,
-      echoWet:        0.7,
-      springWet:      0.55,
+      echoWet:        0.80,
+      springWet:      0.60,
       sidechainAmount: 0.3,
-      stereoWidth:    0.5,  // narrow — 4-track console + loose spring
+      stereoWidth:    0.45,  // narrow — 4-track console + loose spring
       sweepAmount:    0,      // no flanger; Tubby's "sweep" was filter, not comb
       tapeSatMode:   'single',
     },
     springsLength: 0.35, springsDamp: 0.55, springsChaos: 0.20, springsScatter: 0.60, springsTone: 0.55,
-    tapeSatDrive:  0.40,
+    tapeSatDrive:  0.55,
   },
   scientist: {
     label: 'Scientist',
     description: 'Bright, dry, precise. Plate not spring. ZERO bus compression. Extreme mid-scoop on drops.',
     overrides: {
+      returnGain:     0.65,
       hpfCutoff:       80,
       hpfStepped:      false,
-      bassShelfGainDb: 3,
-      midScoopGainDb: -6, midScoopFreqHz: 700, midScoopQ: 1.4,  // the signature Scientist scoop
-      echoIntensity:  0.45,
+      bassShelfGainDb: 1,     // drier low end vs Tubby
+      midScoopGainDb: -10, midScoopFreqHz: 700, midScoopQ: 1.6,  // deeper signature scoop
+      echoIntensity:  0.35,   // drier — Scientist's hallmark precision
       echoRateMs:     280,
-      echoWet:        0.6,
-      springWet:      0.45,   // plate decays faster than spring; less wet
-      sidechainAmount: 0.6,   // more pumping to compensate for no bus comp
-      stereoWidth:    1.2,
+      echoWet:        0.55,
+      springWet:      0.40,   // plate decays faster than spring; less wet
+      sidechainAmount: 0.7,   // more pumping to compensate for no bus comp
+      stereoWidth:    1.4,
       sweepAmount:    0,
       tapeSatMode:   'single',
     },
-    springsLength: 0.55, springsDamp: 0.25, springsChaos: 0.40, springsScatter: 0.40, springsTone: 0.65,
-    tapeSatDrive:  0.30,
+    springsLength: 0.55, springsDamp: 0.25, springsChaos: 0.40, springsScatter: 0.40, springsTone: 0.70,
+    tapeSatDrive:  0.20,
   },
   perry: {
     label: 'Lee "Scratch" Perry',
     description: 'Stacked tape saturation. Near-mono. Kickable spring with high chaos. Dark shelf, subtractive air. Phaser-like comb sweep on parallel send.',
     overrides: {
+      returnGain:     0.90,  // crushed, dominant bus
       hpfCutoff:       40,
       hpfStepped:      false,
       bassShelfGainDb: 2, bassShelfFreqHz: 80, bassShelfQ: 0.5,
-      midScoopGainDb: -2, midScoopFreqHz: 800,
-      echoIntensity:  0.75,   // 0.75 → ~4 audible repeats (near-feedback)
+      midScoopGainDb: -4, midScoopFreqHz: 800,
+      echoIntensity:  0.85,   // near self-oscillation — Perry's runaway repeats
       echoRateMs:     380,
-      echoWet:        0.8,
-      springWet:      0.70,
+      echoWet:        0.92,
+      springWet:      0.75,
       sidechainAmount: 0.4,
-      stereoWidth:    0.3,  // near-mono — Perry's defining texture
+      stereoWidth:    0.25,  // near-mono — Perry's defining texture
       // Perry had actual phasers (Mutron Bi-Phase, Eventide, MXR Phase 90)
       // on guitars and vocals. We approximate the family of motion effects
       // with the sweep — a parallel short-delay comb filter with LFO.
-      sweepAmount:    0.35,
+      sweepAmount:    0.50,
       sweepRateHz:    0.15,   // slow, Space Echo wow territory
-      sweepDepthMs:   6,
-      sweepFeedback:  0.72,
+      sweepDepthMs:   7,
+      sweepFeedback:  0.78,
       tapeSatMode:    'stack', // 3 parallel tape paths ≈ 4-track bouncing
     },
-    springsLength: 0.65, springsDamp: 0.10, springsChaos: 0.80, springsScatter: 0.80, springsTone: 0.40,
-    tapeSatDrive:  0.55,   // per-path drive; stack provides total character
+    springsLength: 0.65, springsDamp: 0.10, springsChaos: 0.85, springsScatter: 0.85, springsTone: 0.35,
+    tapeSatDrive:  0.70,   // per-path drive; stack provides total character
+  },
+  gatedFlanger: {
+    label: 'Gated Flanger',
+    description: 'Gated-reverb + heavy liquid-sweep combo. Snappy reverb tail chopped short, aggressive flanger on returns. The "80s dub" voicing that sits between classic and modern.',
+    overrides: {
+      returnGain:     0.80,
+      hpfCutoff:      60,
+      hpfStepped:     false,
+      bassShelfGainDb: 2, bassShelfFreqHz: 90,
+      midScoopGainDb:  0,
+      echoIntensity:  0.55,
+      echoRateMs:     250,
+      echoWet:        0.7,
+      springWet:      0.35,   // gated — short
+      sidechainAmount: 0.5,
+      stereoWidth:    1.3,
+      sweepAmount:    0.65,   // heavy flanger on returns
+      sweepRateHz:    0.4,
+      sweepDepthMs:   7,
+      sweepFeedback:  0.80,
+      tapeSatMode:   'single',
+    },
+    springsLength: 0.25, springsDamp: 0.85, springsChaos: 0.15, springsScatter: 0.30, springsTone: 0.60,
+    tapeSatDrive:  0.35,
   },
   madProfessor: {
     label: 'Mad Professor',
     description: 'Hi-fi clarity. Low shelf + high shelf air. Wide ping-pong stereo. Lush long springs.',
     overrides: {
+      returnGain:     0.70,
       hpfCutoff:       35,
       hpfStepped:      false,
-      bassShelfGainDb: 3, bassShelfFreqHz: 70, bassShelfQ: 0.7,
+      bassShelfGainDb: 5, bassShelfFreqHz: 70, bassShelfQ: 0.7,  // deeper rumble lift
       midScoopGainDb:  0,
-      echoIntensity:  0.40,   // cleaner, fewer repeats
+      echoIntensity:  0.38,   // cleaner, fewer repeats
       echoRateMs:     360,
       echoWet:        0.55,
-      springWet:      0.55,
+      springWet:      0.68,   // lusher long springs
       sidechainAmount: 0.5,
-      stereoWidth:    1.6,  // wide — Ariwa signature
+      stereoWidth:    1.9,    // ultra-wide Ariwa ping-pong
       sweepAmount:    0,
       tapeSatMode:   'single',
     },
-    springsLength: 0.50, springsDamp: 0.50, springsChaos: 0.10, springsScatter: 0.50, springsTone: 0.60,
-    tapeSatDrive:  0.15,   // pristine
+    springsLength: 0.55, springsDamp: 0.45, springsChaos: 0.10, springsScatter: 0.55, springsTone: 0.65,
+    tapeSatDrive:  0.12,   // pristine
   },
 };
 

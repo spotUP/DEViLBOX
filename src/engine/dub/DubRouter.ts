@@ -27,6 +27,17 @@ import { tapeStop } from './moves/tapeStop';
 import { backwardReverb } from './moves/backwardReverb';
 import { toast } from './moves/toast';
 import { transportTapeStop } from './moves/transportTapeStop';
+import { tubbyScream } from './moves/tubbyScream';
+import { stereoDoubler } from './moves/stereoDoubler';
+import { reverseEcho } from './moves/reverseEcho';
+import { sonarPing } from './moves/sonarPing';
+import { radioRiser } from './moves/radioRiser';
+import { subSwell } from './moves/subSwell';
+import { oscBass } from './moves/oscBass';
+import { echoBuildUp } from './moves/echoBuildUp';
+import { delayPreset380, delayPresetDotted } from './moves/delayPreset';
+import { crushBass } from './moves/crushBass';
+import { subHarmonic } from './moves/subHarmonic';
 import type { DubMove, DubMoveContext } from './moves/_types';
 import type { DubBus } from './DubBus';
 import { useTransportStore } from '@/stores/useTransportStore';
@@ -76,6 +87,18 @@ const MOVES: Record<string, DubMove> = {
   backwardReverb,
   toast,
   transportTapeStop,
+  tubbyScream,
+  stereoDoubler,
+  reverseEcho,
+  sonarPing,
+  radioRiser,
+  subSwell,
+  oscBass,
+  echoBuildUp,
+  delayPreset380,
+  delayPresetDotted,
+  crushBass,
+  subHarmonic,
 };
 
 /**
