@@ -1,12 +1,16 @@
 /**
  * DeckFXPads - Performance pads for one DJ deck
  *
- * Two pages, toggled by header tabs:
+ * Three pages, toggled by header tabs:
  *   FX Pads (2×4): HPF sweep, LPF sweep, Filter reset, Echo out, Kill Lo/Mid/Hi, Brake
  *   Beat Jump (2×4): ◄◄16, ◄◄4, ◄◄1, ◄1 | ►1, ►►1, ►►4, ►►16
+ *   Dub Sends (2×4): springSlam, filterDrop, dubSiren, reverseEcho, tapeWobble,
+ *                    echoThrow, delayTimeThrow, masterDrop
  *
- * FX pads are momentary (hold) or toggle. Beat jump pads are instant.
- * When quantize is active, FX effects snap to the next beat/bar boundary.
+ * FX / dub-hold pads are momentary (hold) or toggle. Beat jump pads +
+ * dub-trigger pads are instant. When quantize is active, FX effects snap
+ * to the next beat/bar boundary; dub moves fire immediately (DubRouter
+ * manages its own grid alignment via the caller-provided source='live').
  */
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
@@ -22,12 +26,13 @@ import {
   type EQBand,
 } from '@/engine/dj/DJQuantizedFX';
 import { beatJump } from '@/engine/dj/DJBeatJump';
+import { fire as fireDubMove } from '@/engine/dub/DubRouter';
 
 interface DeckFXPadsProps {
   deckId: 'A' | 'B' | 'C';
 }
 
-type PadPage = 'fx' | 'jump';
+type PadPage = 'fx' | 'jump' | 'dub';
 
 interface PadDef {
   id: string;
@@ -48,6 +53,34 @@ const FX_PADS: PadDef[] = [
   { id: 'kill-hi', label: 'KILL', sublabel: 'HI', color: 'cyan', activeColor: 'red', mode: 'momentary' },
   { id: 'brake', label: 'BRK', sublabel: '⏎', color: 'rose', activeColor: 'rose', mode: 'momentary' },
 ];
+
+// Dub-send pads — fire dub moves straight onto the bus from the deck,
+// without having to open the drumpad view or drop a dub-kit pattern.
+// Mix of oneshot triggers (springSlam, delayTimeThrow, masterDrop) and
+// hold-style processors (filterDrop, dubSiren, reverseEcho, tapeWobble,
+// echoThrow). Hold pads use `momentary` so they release on pointer-up.
+const DUB_PADS: PadDef[] = [
+  { id: 'dub-slam',     label: 'SLAM',  sublabel: 'spring',  color: 'amber',  activeColor: 'red',    mode: 'instant' },
+  { id: 'dub-drop',     label: 'DROP',  sublabel: 'filter',  color: 'cyan',   activeColor: 'cyan',   mode: 'momentary' },
+  { id: 'dub-siren',    label: 'SIREN', sublabel: 'fb loop', color: 'rose',   activeColor: 'rose',   mode: 'momentary' },
+  { id: 'dub-reverse',  label: 'RVRS',  sublabel: 'echo',    color: 'violet', activeColor: 'violet', mode: 'momentary' },
+  { id: 'dub-wobble',   label: 'WOBL',  sublabel: 'tape',    color: 'orange', activeColor: 'orange', mode: 'momentary' },
+  { id: 'dub-throw',    label: 'ECHO',  sublabel: 'throw',   color: 'sky',    activeColor: 'sky',    mode: 'momentary' },
+  { id: 'dub-time',     label: 'TIME',  sublabel: 'throw',   color: 'blue',   activeColor: 'blue',   mode: 'instant' },
+  { id: 'dub-master',   label: 'MSTR',  sublabel: 'drop',    color: 'rose',   activeColor: 'red',    mode: 'momentary' },
+];
+
+// pad.id → (moveId, trigger-or-hold). Hold moves dispose on pad release.
+const DUB_PAD_MAP: Record<string, string> = {
+  'dub-slam':    'springSlam',
+  'dub-drop':    'filterDrop',
+  'dub-siren':   'dubSiren',
+  'dub-reverse': 'reverseEcho',
+  'dub-wobble':  'tapeWobble',
+  'dub-throw':   'echoThrow',
+  'dub-time':    'delayTimeThrow',
+  'dub-master':  'masterDrop',
+};
 
 const JUMP_PADS: PadDef[] = [
   { id: 'jump-back-16', label: '◄◄', sublabel: '16', color: 'indigo', activeColor: 'indigo', mode: 'instant' },
@@ -218,7 +251,30 @@ export const DeckFXPads: React.FC<DeckFXPadsProps> = ({ deckId }) => {
     }
   }, [deckId, cancelPad]);
 
+  const activateDubPad = useCallback((padId: string, mode: 'momentary' | 'instant') => {
+    const moveId = DUB_PAD_MAP[padId];
+    if (!moveId) return;
+    const disposer = fireDubMove(moveId, undefined, {}, 'live');
+    setActivePads((prev) => new Set(prev).add(padId));
+    if (mode === 'instant') {
+      // Trigger-kind move — dispose immediately since there's no hold semantics,
+      // and clear the visual flash after ~120 ms so the button reads as a tap.
+      if (disposer) try { disposer.dispose(); } catch { /* ok */ }
+      flashTimerRef.current = setTimeout(() => setActivePads((prev) => {
+        const n = new Set(prev); n.delete(padId); return n;
+      }), 120);
+    } else if (disposer) {
+      // Hold — keep the disposer so pointerup can dispose cleanly.
+      cancelRefs.current.set(padId, () => { try { disposer.dispose(); } catch { /* ok */ } });
+    }
+  }, []);
+
   const handlePadDown = useCallback((pad: PadDef) => {
+    // Dub pads are in DUB_PAD_MAP regardless of mode (instant or momentary).
+    if (pad.id in DUB_PAD_MAP) {
+      activateDubPad(pad.id, pad.mode === 'instant' ? 'instant' : 'momentary');
+      return;
+    }
     if (pad.mode === 'instant') {
       // Beat jump pads
       const beats = BEAT_JUMPS[pad.id];
@@ -229,11 +285,14 @@ export const DeckFXPads: React.FC<DeckFXPadsProps> = ({ deckId }) => {
     } else {
       activateFXPad(pad.id);
     }
-  }, [deckId, activateFXPad]);
+  }, [deckId, activateFXPad, activateDubPad]);
 
   const handlePadUp = useCallback((pad: PadDef) => {
     if (pad.mode === 'momentary') {
-      if (pad.id === 'hpf-sweep' || pad.id === 'lpf-sweep') {
+      if (pad.id in DUB_PAD_MAP) {
+        // Dub hold-kind — dispose the returned handle.
+        cancelPad(pad.id);
+      } else if (pad.id === 'hpf-sweep' || pad.id === 'lpf-sweep') {
         cancelPad(pad.id);
         filterReset(deckId);
       } else if (pad.id === 'kill-low' || pad.id === 'kill-mid' || pad.id === 'kill-hi') {
@@ -255,7 +314,7 @@ export const DeckFXPads: React.FC<DeckFXPadsProps> = ({ deckId }) => {
     return activePads.has(padId);
   };
 
-  const pads = page === 'fx' ? FX_PADS : JUMP_PADS;
+  const pads = page === 'fx' ? FX_PADS : page === 'jump' ? JUMP_PADS : DUB_PADS;
 
   return (
     <div className="flex flex-col gap-1">
@@ -280,6 +339,17 @@ export const DeckFXPads: React.FC<DeckFXPadsProps> = ({ deckId }) => {
           }`}
         >
           BEAT JUMP
+        </button>
+        <button
+          onClick={() => setPage('dub')}
+          className={`px-2 py-0.5 rounded text-[8px] font-bold transition-colors ${
+            page === 'dub'
+              ? 'bg-amber-600/30 text-amber-300 border border-amber-500/40'
+              : 'bg-dark-bgTertiary text-text-muted border border-dark-border hover:text-text-secondary'
+          }`}
+          title="Dub bus sends — fire a dub move straight onto the bus"
+        >
+          DUB
         </button>
         {page === 'jump' && hasBeatGrid && (
           <span className="text-[7px] text-green-400 ml-auto">● GRID</span>
