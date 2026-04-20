@@ -474,6 +474,86 @@ describe('ui-smoke — flow 06: Furnace playback stays within gain limits', () =
   );
 });
 
+describe('ui-smoke — flow 09: dub bus silences cleanly after stop + disable', () => {
+  // Regression test for the 2026-04-20 user report: after a dub session
+  // a rhythmic "bom bom bom" soft-kick pattern kept playing even after
+  // the song stopped. Page reload was the only way to silence it.
+  //
+  // Root cause (measured): the dub bus echo + spring feedback rings out
+  // whatever signal was last in flight — moves that inject transient
+  // pulses (subHarmonic, snareCrack, springSlam) seed the echo, then
+  // echo feedback at ~0.6-0.7 decays over ~20 s on its own. That's the
+  // bus doing its job, BUT the user needs a reliable way to silence it
+  // on demand. `set_dub_bus_enabled(false)` is the contract — disabling
+  // the bus MUST silence all residual audio within a couple of seconds.
+  //
+  // This flow fires every held move, releases, stops the song, disables
+  // the bus, waits 5 s and asserts silence. If the disable path leaves
+  // any node producing audio, this test fails loudly.
+  //
+  // Note: the ui-smoke fixture (mortimer-twang MOD) is thin-sounding on
+  // purpose for fast CI — bass-heavy moves won't be very audible here,
+  // but the echo/spring tails are what we're testing, not per-move peak.
+  const HELD_MOVES = [
+    'filterDrop', 'dubSiren', 'tapeWobble', 'masterDrop',
+    'tubbyScream', 'stereoDoubler', 'oscBass', 'crushBass',
+    'subHarmonic', 'echoThrow', 'dubStab', 'echoBuildUp',
+    'channelMute', 'channelThrow', 'radioRiser',
+  ];
+
+  it.runIf(!!client)(
+    'stop + disable dub bus silences the bus within 5 s (no lingering bom-bom)',
+    async () => {
+      const c = client!;
+      try { await c.call('stop'); } catch { /* ok */ }
+      await sleep(200);
+      await c.call('clear_console_errors');
+
+      const payload = loadFixtureBase64(FIXTURE_MOD);
+      await c.call('load_file', { filename: payload.filename, data: payload.data });
+      await sleep(400);
+      await c.call('play');
+      await sleep(800);
+
+      await c.call('set_dub_bus_enabled', { enabled: true });
+      await c.call('set_channel_dub_send', { channel: 0, amount: 0.6 });
+
+      // Fire + release each move quickly. Brief holds — we care that
+      // disposers + bus disable cleanly kill everything, not about peaks.
+      for (const moveId of HELD_MOVES) {
+        try {
+          const r = await c.call<{ heldHandle?: string }>('fire_dub_move', { moveId, channelId: 0 });
+          await sleep(150);
+          if (r?.heldHandle) {
+            await c.call('release_dub_move', { heldHandle: r.heldHandle });
+          }
+          await sleep(80);
+        } catch { /* move not registered — skip */ }
+      }
+
+      // Stop the song AND disable the bus — this is what a user does
+      // when they want the session silent ("stop + hit KILL").
+      try { await c.call('stop'); } catch { /* ok */ }
+      await c.call('set_dub_bus_enabled', { enabled: false });
+      await sleep(5_000);
+
+      const level = await c.call<{
+        rmsAvg?: number; rmsMax?: number; peakMax?: number; silent?: boolean;
+      }>('get_audio_level', { durationMs: 1000 });
+
+      const rmsAvg = level.rmsAvg ?? 0;
+      const peakMax = level.peakMax ?? 0;
+      const diag = `level=${JSON.stringify(level)}`;
+
+      // -60 dBFS RMS threshold. Deep silence measures ~1e-5; a lingering
+      // echo tail (even quiet) sits above 1e-3.
+      expect(rmsAvg, `rms leak: ${diag}`).toBeLessThan(0.001);
+      expect(peakMax, `peak leak: ${diag}`).toBeLessThan(0.01);
+    },
+    FLOW_TIMEOUT_MS,
+  );
+});
+
 describe('ui-smoke — flow 05: dub bus enable → fire move → disable', () => {
   it.runIf(!!client)(
     'dub bus can be toggled and a dub move fires without unhandled rejections',
