@@ -231,6 +231,44 @@ const soakActions: Record<string, SoakActionFn> = {
   },
 
   /**
+   * Enter scratch mode on a deck. Equivalent to a jog-wheel touch —
+   * cancels any in-progress decay and marks the deck as actively scratching.
+   * Soak-test harness uses this to drive the scratch path from the UI smoke
+   * flow without an actual jog wheel gesture.
+   */
+  async startScratch(args) {
+    const side = args.side as 'A' | 'B' | 'C';
+    const actions = await getDJActions();
+    actions.startScratch(side);
+    return { ok: true, side };
+  },
+
+  /**
+   * Update scratch velocity mid-scratch. Signed float, 1.0 = normal forward
+   * speed; positive = forward, negative = backward. Clamped to [-4, 4]
+   * inside DeckEngine.
+   */
+  async setScratchVelocity(args) {
+    const side = args.side as 'A' | 'B' | 'C';
+    const velocity = args.velocity as number;
+    const actions = await getDJActions();
+    actions.setScratchVelocity(side, velocity);
+    return { ok: true, side, velocity };
+  },
+
+  /**
+   * Exit scratch mode — smoothly decays pitch/tempo back to rest over
+   * `decayMs` (default 200). Mirrors jog-wheel release in DeckTurntable.
+   */
+  async stopScratch(args) {
+    const side = args.side as 'A' | 'B' | 'C';
+    const decayMs = typeof args.decayMs === 'number' ? args.decayMs : 200;
+    const actions = await getDJActions();
+    actions.stopScratch(side, decayMs);
+    return { ok: true, side, decayMs };
+  },
+
+  /**
    * Advance to the next VJ preset. Dispatches a custom event that the VJView
    * listens for, since the VJ canvas uses imperative refs.
    */
