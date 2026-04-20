@@ -36,6 +36,7 @@ export type AudioEffectType =
   | 'MoogFilter'       // 6 analog-modeled Moog ladder filters (WASM)
   | 'MVerb'            // MVerb plate reverb (WASM, GPL v3)
   | 'MadProfessorPlate' // MVerb tuned to Mad Professor PCM-70 dub voicing (WASM)
+  | 'DattorroPlate'    // Jon Dattorro 1997 plate reverb (MIT, el-visio/dattorro-verb port)
   | 'Leslie'           // Leslie rotary speaker (WASM)
   | 'SpringReverb'     // Spring reverb with drip (WASM)
   | 'VinylNoise'       // Vinyl crackle & hiss synthesizer
