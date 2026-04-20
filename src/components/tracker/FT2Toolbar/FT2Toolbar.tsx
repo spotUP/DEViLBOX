@@ -795,7 +795,9 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
       }} onLoadTrackerModule={async (buffer: ArrayBuffer, filename: string, companionFiles?: Map<string, ArrayBuffer>) => {
         const { loadFile } = await import('@lib/file/UnifiedFileLoader');
         const file = new File([buffer], filename);
+        console.log(`[FT2Toolbar.onLoadTrackerModule] filename="${filename}" bytes=${buffer.byteLength} companions=${companionFiles?.size ?? 0}`);
         const result = await loadFile(file, { companionFiles });
+        console.log(`[FT2Toolbar.onLoadTrackerModule] loadFile → success=${String(result.success)} error=${(result as any).error ?? '(none)'}`);
         if (result.success === 'pending-import') {
           setPendingFile(result.file);
           // Surface companion files from the Online panel download into the
