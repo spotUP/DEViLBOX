@@ -96,6 +96,69 @@ describe('ui-smoke — flow 01: load + play a real MOD', () => {
   );
 });
 
+describe('ui-smoke — flow 05: dub bus enable → fire move → disable', () => {
+  it.runIf(!!client)(
+    'dub bus can be toggled and a dub move fires without unhandled rejections',
+    async () => {
+      const c = client!;
+      try { await c.call('stop'); } catch { /* ok */ }
+      await sleep(200);
+      await c.call('clear_console_errors');
+
+      const payload = loadFixtureBase64(FIXTURE_MOD);
+      await c.call('load_file', { filename: payload.filename, data: payload.data });
+      await sleep(300);
+
+      const trace: string[] = [];
+      const step = async (label: string, fn: () => Promise<unknown>): Promise<unknown> => {
+        try {
+          const r = await fn();
+          trace.push(`${label}: ok`);
+          return r;
+        } catch (e) {
+          trace.push(`${label}: THROW ${(e as Error).message}`);
+          throw new Error(`step "${label}" failed: ${(e as Error).message}\nTrace:\n${trace.join('\n')}`);
+        }
+      };
+
+      const before = await step('get_dub_bus_state (before)', () => c.call('get_dub_bus_state'));
+      expect(before).toBeDefined();
+
+      await step('set_dub_bus_enabled(true)', () => c.call('set_dub_bus_enabled', { enabled: true }));
+      await sleep(150);
+      await step('fire_dub_move', () => c.call('fire_dub_move', { moveId: 'echoThrow', channelId: 0 }));
+      await sleep(400);
+
+      const during = await step('get_dub_bus_state (during)', () => c.call('get_dub_bus_state')) as { hasBus?: boolean };
+      expect(during.hasBus, `hasBus during: ${JSON.stringify(during)}\nTrace:\n${trace.join('\n')}`).toBe(true);
+
+      await step('set_dub_bus_enabled(false)', () => c.call('set_dub_bus_enabled', { enabled: false }));
+      await sleep(100);
+
+      // Surface any unhandled rejections captured by the dev-mode probe at
+      // src/main.tsx:104-147 — the distinctive `[unhandledrejection]` prefix
+      // carries type / name / reason and a full stack (synthetic if the
+      // rejection reason wasn't an Error).
+      const errors = await c.call<{ entries?: Array<{ level: string; message: string }> }>('get_console_errors');
+      const entries = errors.entries ?? [];
+      const rejections = entries.filter((e) => /\[unhandledrejection\]/.test(e.message));
+      const otherCritical = entries.filter(
+        (e) =>
+          e.level === 'error' &&
+          !/favicon|devtools|WebSocket closed|\[unhandledrejection\]/i.test(e.message),
+      );
+      const diag = rejections.length
+        ? `captured ${rejections.length} unhandled rejection(s):\n${rejections.map((r) => r.message).join('\n---\n')}`
+        : otherCritical.length
+          ? `other critical errors: ${JSON.stringify(otherCritical)}`
+          : '';
+      expect(rejections.length, diag).toBe(0);
+      expect(otherCritical, diag).toEqual([]);
+    },
+    FLOW_TIMEOUT_MS,
+  );
+});
+
 describe('ui-smoke — flow 04: reload the same MOD twice (state cleanup)', () => {
   it.runIf(!!client)(
     'loads, plays, stops, reloads, plays again — no crash, no leak, still audible',
