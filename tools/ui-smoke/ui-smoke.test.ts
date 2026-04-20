@@ -34,13 +34,15 @@ const FLOW_TIMEOUT_MS = 60000;
 
 // Browser selection
 //   DEVILBOX_LAUNCH_BROWSER=true  → this process launches headless Chromium
-//     at module load. Good for CI — no human needed.
-//   (unset / false)               → assume the dev's own browser tab is
-//     already connected. Good for local work — we don't fight the user's
-//     session for the single browser slot the MCP relay supports.
+//     at module load. You MUST close any open DEViLBOX tab first, otherwise
+//     the user's tab and the headless one fight for the MCP relay's single
+//     browser slot and ping-pong via auto-reconnect.
+//   (default)                     → attach to whatever browser is already
+//     registered with the relay. Your visible tab drives the tests. You'll
+//     see the song load + play + stop in your UI — that's intended.
 //
-// If the env var is set and dev server isn't up, browser launch still
-// succeeds but `tryConnect` times out cleanly below.
+// CI integration: set DEVILBOX_LAUNCH_BROWSER=true in the workflow step.
+// No user tab is open in CI, so ping-pong can't happen.
 const shouldLaunchBrowser = process.env.DEVILBOX_LAUNCH_BROWSER === 'true';
 
 let browser: BrowserHandle | null = null;
@@ -200,6 +202,85 @@ describe('ui-smoke — flow 07: DJ deck + crossfader sweep (both decks audible)'
     // Full sweep with sleeps budget ~6 s + render.
     120000,
   );
+});
+
+// Scaffolding kept in place, entire suite skipped until Furnace's gain /
+// silent-regression state stabilises. Loading 9 .fur fixtures in a row
+// currently contaminates flow 06's state (they share the Furnace
+// engine). Per-flow page-reload isolation (headless mode owning the
+// relay) will remove the interference — flip `describe.skip` → `describe`
+// once that lands and Furnace is fixed.
+describe.skip('ui-smoke — flow 11: Furnace per-chip silent-regression sweep', () => {
+  // Tiny upstream demos per chip family. Only asserts "not silent" — the
+  // SidMon1 regression class (engine silently outputs nothing) fires
+  // this test loudly. Peak / gain-staging is covered by flow 06.
+  const DEMO_ROOT = resolve(
+    dirname(fileURLToPath(import.meta.url)),
+    '../../third-party/furnace-master/demos',
+  );
+
+  // Currently-silent chips, locked via ratchet. Surfaced 2026-04-20 by
+  // this test itself alongside user confirmation ("furnace is broken atm").
+  // Tracked in memory/project_furnace_overunity_distortion.md — related
+  // gain-staging bug touches the same chip dispatch paths. When a chip
+  // starts producing audio again, remove it from this set and the test
+  // ratchets in the gain; regress a previously-audible chip and it fails.
+  const KNOWN_SILENT = new Set<string>([
+    'C64',
+    'NES',
+    'GameBoy',
+    'OPL',
+    'PC-Engine',
+    'Genesis',
+    'Lynx',
+  ]);
+
+  const fixtures: Array<{ chip: string; rel: string }> = [
+    { chip: 'AY-3-8910', rel: 'ay8910/remark_music.fur' },
+    { chip: 'C64',       rel: 'c64/Hellcharger.fur' },
+    { chip: 'NES',       rel: 'nes/Sky Sanctuary Zone.fur' },
+    { chip: 'GameBoy',   rel: 'gameboy/GB_WaitForMe.fur' },
+    { chip: 'OPL',       rel: 'opl/One_Sided_Love_Again.fur' },
+    { chip: 'PC-Engine', rel: 'pce/continuity_error.fur' },
+    { chip: 'SN76489',   rel: 'sn7/Last Frecuency System.fur' },
+    { chip: 'Genesis',   rel: 'genesis/eternallydoomedtogroove.fur' },
+    { chip: 'Lynx',      rel: 'lynx/chippylotus.fur' },
+  ];
+
+  for (const { chip, rel } of fixtures) {
+    const path = resolve(DEMO_ROOT, rel);
+    const available = (() => { try { readFileSync(path); return true; } catch { return false; } })();
+    const skipReason = KNOWN_SILENT.has(chip) ? '[KNOWN SILENT — ratcheted]' : '';
+    const label = skipReason
+      ? `${chip} produces audio ${skipReason}`
+      : `${chip} produces audio (not silent)`;
+    const runner = (skipReason ? it.skip : it).runIf(!!client && available);
+    runner(
+      label,
+      async () => {
+        const c = client!;
+        try { await c.call('stop'); } catch { /* ok */ }
+        await sleep(150);
+        const bytes = readFileSync(path);
+        await c.call('load_file', {
+          filename: rel.split('/').pop()!,
+          data: bytes.toString('base64'),
+        });
+        await sleep(400);
+        await c.call('play');
+        await sleep(800);
+        const level = await c.call<{ rmsAvg?: number; peakMax?: number; silent?: boolean }>(
+          'get_audio_level', { durationMs: 600 },
+        );
+        const diag = `${chip} level=${JSON.stringify(level)}`;
+        expect(level.silent, diag).not.toBe(true);
+        expect((level.rmsAvg ?? 0) + (level.peakMax ?? 0), diag).toBeGreaterThan(0.001);
+        try { await c.call('stop'); } catch { /* ok */ }
+        await sleep(150);
+      },
+      45000,
+    );
+  }
 });
 
 describe('ui-smoke — flow 08: oscilloscope store flushes on stop', () => {
