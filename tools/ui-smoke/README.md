@@ -5,33 +5,38 @@ connect to the existing MCP WebSocket bridge at `ws://localhost:4003/mcp`
 (same transport the full `tools/playback-smoke-test.ts` uses) and drive
 real app flows.
 
-## Two ways to run
+## Two ways to run — pick one based on whether you have a DEViLBOX tab open
 
-### Local dev — use your open browser tab
+### Your tab is open (default)
 
 ```bash
 # Shell 1:
 npm run dev
-# Open http://localhost:5173 in a browser, click once to unlock AudioContext.
+# Open http://localhost:5173, click once to unlock AudioContext.
 
 # Shell 2:
 npm run test:ui-smoke
 ```
 
-### Headless / CI — auto-launch Chromium
+Your visible tab drives the tests. You'll see the song load / play / stop
+in your UI — that's by design (no other browser to use).
+
+### Your tab is closed — auto-launches headless Chromium
 
 ```bash
 # Shell 1:
 npm run dev
+# DO NOT open http://localhost:5173 in your own browser — close any such tab.
 
 # Shell 2:
 DEVILBOX_LAUNCH_BROWSER=true npm run test:ui-smoke
 ```
 
-The MCP relay only supports **one connected browser** at a time — a new
-browser kicks the old one off, then they ping-pong via auto-reconnect. So
-if you're launching headless locally, close your own tab first. CI is
-fine (no competing tab).
+## Why the ceremony
+
+The MCP relay on port 4003 supports **exactly one** connected browser. A
+new registration kicks the old one off; both have auto-reconnect logic, so
+if two are open they ping-pong. CI is fine (no user tab exists there).
 
 Extra env knobs:
 
