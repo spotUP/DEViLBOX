@@ -273,6 +273,17 @@ export class DubBus {
   // Wiring tracking so enable/disable can splice in + out cleanly.
   private masterInsertHead!: AudioNode;   // where the incoming source should connect
   private masterInsertTail!: AudioNode;   // what connects onward to the master destination
+  /**
+   * G15: envelope gain between the insert's output and the destination.
+   * Sits at `masterInsertTail → masterInsertEnvelope → dest`. Ramped to 0
+   * before rewiring and back to 1 after, so the abrupt chain swap happens
+   * during silence instead of mid-buffer (audible as a click/thump in the
+   * old flow). Ramp is ~10 ms; total mute window including settle is
+   * MASTER_INSERT_MUTE_MS. Stays at 1 during steady-state.
+   */
+  private masterInsertEnvelope!: GainNode;
+  /** Pending rewire timer (so concurrent enable-disable-enable cancels cleanly). */
+  private masterInsertPending: ReturnType<typeof setTimeout> | null = null;
   private masterInsertSource: AudioNode | null = null;
   private masterInsertDest: AudioNode | null = null;
   private masterInsertActive = false;
@@ -530,7 +541,14 @@ export class DubBus {
     this.vinylDirect = this.context.createGain();
     this.vinylDirect.gain.value = 1;
     this.masterInsertHead = this.masterBassShelf;
-    this.masterInsertTail = this.vinylSum;
+    // G15: insert the envelope gain between vinylSum (chain tail) and the
+    // destination that wireMasterInsert will connect to. Steady-state gain
+    // is 1 (full passthrough); ramped to 0 around (dis)connection events
+    // so the chain swap happens during silence instead of mid-buffer.
+    this.masterInsertEnvelope = this.context.createGain();
+    this.masterInsertEnvelope.gain.value = 1;
+    this.vinylSum.connect(this.masterInsertEnvelope);
+    this.masterInsertTail = this.masterInsertEnvelope;
 
     // Liquid sweep — parallel comb-filter branch. See class-level docstring.
     // The LFO runs continuously (can't stop + restart an OscillatorNode),
@@ -1587,7 +1605,26 @@ export class DubBus {
         this.masterInsertDest === dest) {
       return;
     }
+    // Cancel any in-flight rewire timer — rapid enable/disable cycles
+    // would otherwise race (pending rewire fires after we've already
+    // moved on). Safe to call when no timer is pending.
+    if (this.masterInsertPending !== null) {
+      clearTimeout(this.masterInsertPending);
+      this.masterInsertPending = null;
+    }
     if (this.masterInsertActive) this.unwireMasterInsert();
+    // G15: mute the insert envelope BEFORE touching the audio graph so
+    // the source→dest disconnect + new-chain connect happens while the
+    // insert path is silent. Then ramp the envelope back up to 1 over
+    // ~10 ms. Imperfect (the direct source→dest cut still happens
+    // inside the mute window; caller sees a brief silence) but avoids
+    // the mid-buffer click the old hard rewire produced.
+    const now = this.context.currentTime;
+    const FADE_SEC = 0.01;
+    try {
+      this.masterInsertEnvelope.gain.cancelScheduledValues(now);
+      this.masterInsertEnvelope.gain.setValueAtTime(0, now);
+    } catch { /* ok */ }
     try { source.disconnect(dest); } catch { /* ok */ }
     try {
       source.connect(this.masterInsertHead);
@@ -1601,9 +1638,14 @@ export class DubBus {
       this.masterInsertActive = true;
       // Re-run setSettings so the master-side gain writes pick up masterActive=true.
       this.setSettings({});
+      // Ramp envelope back to 1 — insert fades in smoothly.
+      try {
+        this.masterInsertEnvelope.gain.linearRampToValueAtTime(1, now + FADE_SEC);
+      } catch { /* ok */ }
     } catch (err) {
       console.warn('[DubBus] wireMasterInsert failed, restoring passthrough:', err);
       try { source.connect(dest); } catch { /* ok */ }
+      try { this.masterInsertEnvelope.gain.setValueAtTime(1, this.context.currentTime); } catch { /* ok */ }
       this.masterInsertActive = false;
     }
   }
@@ -1614,15 +1656,37 @@ export class DubBus {
       this.masterInsertActive = false;
       return;
     }
-    try { this.masterInsertSource.disconnect(this.masterInsertHead); } catch { /* ok */ }
-    try { this.masterInsertTail.disconnect(this.masterInsertDest); } catch { /* ok */ }
-    try { this.vinylDirect.disconnect(this.masterInsertDest); } catch { /* ok */ }
-    try { this.masterInsertSource.connect(this.masterInsertDest); } catch { /* ok */ }
+    // G15: ramp the insert envelope down to 0 first. After the ramp
+    // completes, disconnect the insert chain and restore the direct
+    // source→dest passthrough. Scheduling the swap inside a setTimeout
+    // (after the ramp) means the hard reconnect happens while the
+    // insert's contribution is already silent — no click from the
+    // insert dropping out, only the direct-path pop-in to contend with.
+    const now = this.context.currentTime;
+    const FADE_SEC = 0.01;
+    const source = this.masterInsertSource;
+    const dest = this.masterInsertDest;
+    try {
+      this.masterInsertEnvelope.gain.cancelScheduledValues(now);
+      this.masterInsertEnvelope.gain.setValueAtTime(this.masterInsertEnvelope.gain.value, now);
+      this.masterInsertEnvelope.gain.linearRampToValueAtTime(0, now + FADE_SEC);
+    } catch { /* ok */ }
+    // Mark inactive immediately so setSettings (if called during the
+    // pending-disconnect window) doesn't keep writing master-side gains
+    // into a chain that's on its way out.
+    this.masterInsertActive = false;
     this.masterInsertSource = null;
     this.masterInsertDest = null;
-    this.masterInsertActive = false;
+    this.masterInsertPending = setTimeout(() => {
+      this.masterInsertPending = null;
+      try { source.disconnect(this.masterInsertHead); } catch { /* ok */ }
+      try { this.masterInsertTail.disconnect(dest); } catch { /* ok */ }
+      try { this.vinylDirect.disconnect(dest); } catch { /* ok */ }
+      try { source.connect(dest); } catch { /* ok */ }
+      // Restore envelope to 1 so the next wire starts from a known state.
+      try { this.masterInsertEnvelope.gain.setValueAtTime(1, this.context.currentTime); } catch { /* ok */ }
+    }, (FADE_SEC * 1000) + 5);
     // Reset master-side gains to neutral so even a dangling reference is silent.
-    const now = this.context.currentTime;
     try { this.masterBassShelf.gain.setTargetAtTime(0, now, 0.02); } catch { /* ok */ }
     try { this.masterMidScoop.gain.setTargetAtTime(0, now, 0.02); } catch { /* ok */ }
     try {
