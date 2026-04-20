@@ -152,6 +152,7 @@ import {
   runSynthTests,
   exportWav,
   exportMp3,
+  exportStems,
   exportPatternText,
   exportMidi,
   exportMod,
@@ -389,6 +390,7 @@ const handlers: Record<string, Handler> = {
   // ─── Export Tools ───────────────────────────────────────────────────────
   export_wav: exportWav,
   export_mp3: exportMp3,
+  export_stems: exportStems,
   export_pattern_text: exportPatternText,
   export_midi: exportMidi,
   export_mod: exportMod,

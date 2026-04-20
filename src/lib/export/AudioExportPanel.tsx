@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useTrackerStore, useInstrumentStore, useProjectStore, useTransportStore, notify , useFormatStore } from '@stores';
-import { exportLiveCaptureToWav, exportLiveCaptureToMp3, exportUADEAsWav, getUADEInstrument } from './audioExport';
+import { exportLiveCaptureToWav, exportLiveCaptureToMp3, exportUADEAsWav, getUADEInstrument, downloadLiveCaptureStems } from './audioExport';
 
 type AudioExportScope = 'pattern' | 'song';
 type AudioExportFormat = 'wav' | 'mp3';
@@ -53,6 +53,41 @@ export const AudioExportPanel: React.FC<AudioExportPanelProps> = ({
   useEffect(() => {
     if (initialScope) setAudioExportScope(initialScope);
   }, [initialScope]);
+
+  // ─── Stem export state (N × song duration wall-clock) ─────────────────
+  const [stemProgress, setStemProgress] = useState<{
+    active: boolean;
+    channelIndex: number;
+    totalChannels: number;
+    stemPercent: number;
+  } | null>(null);
+
+  const refPattern = patterns[selectedPatternIndex] ?? patterns[0];
+  const numChannels = refPattern?.channels.length ?? 0;
+  // Rough wall-clock estimate per stem: song duration. Cheap multiplier for UI.
+  const estSongSeconds = audioExportScope === 'song'
+    ? patterns.reduce((sum, p) => sum + p.length, 0) * (60 / bpm) * 0.25 + 2
+    : (refPattern?.length ?? 64) * (60 / bpm) * 0.25 + 2;
+
+  const runStemExport = async () => {
+    if (stemProgress?.active || isRendering) return;
+    setStemProgress({ active: true, channelIndex: 0, totalChannels: numChannels, stemPercent: 0 });
+    try {
+      const baseName = metadata.name || 'song';
+      await downloadLiveCaptureStems(baseName, {
+        format: formatRef.current,
+        onProgress: (ch, total, percent) => {
+          setStemProgress({ active: true, channelIndex: ch, totalChannels: total, stemPercent: Math.round(percent) });
+        },
+      });
+      notify.success(`Exported ${numChannels} stems`);
+    } catch (err) {
+      console.error('[StemExport] failed:', err);
+      notify.error(`Stem export failed: ${(err as Error).message}`);
+    } finally {
+      setStemProgress(null);
+    }
+  };
 
   // Register export handler (assigned during render — always has fresh closure).
   //
@@ -276,6 +311,41 @@ export const AudioExportPanel: React.FC<AudioExportPanelProps> = ({
             </div>
           </div>
         )}
+
+        {/* Stem export — one file per channel, live-solo capture */}
+        <div className="pt-3 mt-3 border-t border-dark-border">
+          <div className="text-xs font-mono text-text-secondary mb-2">
+            Per-channel stems — one {format.toUpperCase()} per channel, captured live (solo-per-stem).
+            {' '}Real-time: ~{Math.ceil((estSongSeconds * numChannels) / 60)} min for {numChannels} channels.
+          </div>
+          <button
+            onClick={runStemExport}
+            disabled={isRendering || stemProgress?.active || numChannels === 0}
+            className={`
+              w-full px-3 py-2 rounded-lg text-sm font-mono transition-all
+              ${stemProgress?.active
+                ? 'bg-dark-bg text-text-muted border border-dark-border cursor-wait'
+                : 'bg-dark-bg text-text-primary hover:bg-dark-bgHover border border-dark-border'
+              }
+            `}
+          >
+            {stemProgress?.active
+              ? `Stem ${stemProgress.channelIndex + 1}/${stemProgress.totalChannels}: ${stemProgress.stemPercent}%`
+              : `Export Stems (${numChannels} × ${format.toUpperCase()})`}
+          </button>
+          {stemProgress?.active && (
+            <div className="w-full bg-dark-border rounded-full h-2 mt-2">
+              <div
+                className="bg-accent-primary h-2 rounded-full transition-all duration-200"
+                style={{
+                  width: `${Math.min(100,
+                    ((stemProgress.channelIndex + stemProgress.stemPercent / 100) / Math.max(1, stemProgress.totalChannels)) * 100
+                  )}%`,
+                }}
+              />
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

@@ -662,3 +662,112 @@ function maybeDownload(blob: Blob, filename: string | undefined, ext: 'wav' | 'm
   URL.revokeObjectURL(url);
 }
 
+// ==========================================================================
+// STEM EXPORT — one file per channel via live-solo capture
+// ==========================================================================
+
+export interface StemResult {
+  channelIndex: number;
+  channelName: string;
+  blob: Blob;
+  format: 'wav' | 'mp3';
+}
+
+/**
+ * Export every channel as its own file by running a live capture for each,
+ * with only that channel unmuted. Correct for every format (tracker MODs,
+ * UADE, Furnace, Hively, libopenmpt, SID, Tone.js synths) because it uses
+ * the same `blepInput` tap as the main export — including master FX and
+ * the dub bus.
+ *
+ * Real-time cost is N × song duration (one full pass per channel). A
+ * 4-channel 2-minute song takes ~8 minutes. A 16-channel 3-minute song
+ * takes ~48 minutes. The UI caller should show per-stem progress and
+ * make this opt-in, not accidental.
+ *
+ * Mute / solo state is snapshotted before and restored after, so firing
+ * this in the middle of a mix session doesn't silently wreck the user's
+ * setup even on error paths.
+ */
+export async function exportLiveCaptureStems(options: {
+  durationSec?: number;
+  format?: 'wav' | 'mp3';
+  kbps?: number;
+  /** (stemIndex, totalStems, percentOfCurrentStem) */
+  onProgress?: (stemIndex: number, totalStems: number, stemPercent: number) => void;
+} = {}): Promise<StemResult[]> {
+  const format = options.format ?? 'wav';
+  const kbps = options.kbps ?? 192;
+
+  const { useTrackerStore } = await import('@/stores/useTrackerStore');
+  const tr = useTrackerStore.getState();
+  // Use the currently-selected pattern for the channel layout / names.
+  // Every pattern in a song shares the same channel count, so this is
+  // sufficient even when we later render the full song.
+  const refPattern =
+    tr.patterns[tr.currentPatternIndex] ??
+    tr.patterns[tr.patternOrder[0] ?? 0] ??
+    tr.patterns[0];
+  const numChannels = refPattern?.channels.length ?? 0;
+  if (numChannels === 0) throw new Error('No channels found to export as stems');
+
+  const { useMixerStore } = await import('@/stores/useMixerStore');
+  // Snapshot EVERYTHING we might touch so a crash mid-loop can't leave
+  // the user staring at a silently-soloed channel they didn't pick.
+  const mix0 = useMixerStore.getState();
+  const snapshot = mix0.channels.map((c) => ({ muted: c.muted, soloed: c.soloed }));
+
+  const results: StemResult[] = [];
+  try {
+    for (let ch = 0; ch < numChannels; ch++) {
+      // Clear every solo, then solo only this channel. The mixer's
+      // `isSoloing` flag flips automatically and propagates to the
+      // TrackerReplayer mute mask so WASM engines honour it too.
+      const m = useMixerStore.getState();
+      for (let i = 0; i < m.channels.length; i++) {
+        if (m.channels[i].soloed && i !== ch) m.setChannelSolo(i, false);
+        if (m.channels[i].muted) m.setChannelMute(i, false);
+      }
+      if (!useMixerStore.getState().channels[ch]?.soloed) {
+        m.setChannelSolo(ch, true);
+      }
+
+      const buffer = await captureLiveSong({
+        durationSec: options.durationSec,
+        onProgress: (p) => options.onProgress?.(ch, numChannels, p),
+      });
+      const blob = format === 'mp3'
+        ? audioBufferToMp3(buffer, kbps)
+        : audioBufferToWav(buffer);
+      const channelName = refPattern.channels[ch]?.name || `Channel ${ch + 1}`;
+      results.push({ channelIndex: ch, channelName, blob, format });
+    }
+  } finally {
+    // Restore mute/solo EXACTLY. setChannelSolo also re-derives `isSoloing`.
+    const m = useMixerStore.getState();
+    for (let i = 0; i < snapshot.length; i++) {
+      const s = snapshot[i];
+      if (m.channels[i].soloed !== s.soloed) m.setChannelSolo(i, s.soloed);
+      if (m.channels[i].muted !== s.muted) m.setChannelMute(i, s.muted);
+    }
+  }
+  return results;
+}
+
+/**
+ * Convenience wrapper: export stems AND trigger a download for each one,
+ * named `<baseName>_<channelNum>_<channelName>.<ext>`.
+ */
+export async function downloadLiveCaptureStems(
+  baseName: string,
+  options: Parameters<typeof exportLiveCaptureStems>[0] = {},
+): Promise<StemResult[]> {
+  const stems = await exportLiveCaptureStems(options);
+  for (const stem of stems) {
+    const safeName = stem.channelName.replace(/[^a-zA-Z0-9]+/g, '_').replace(/^_|_$/g, '');
+    const idx = String(stem.channelIndex + 1).padStart(2, '0');
+    maybeDownload(stem.blob, `${baseName}_${idx}_${safeName}`, stem.format);
+  }
+  return stems;
+}
+
