@@ -13,7 +13,7 @@ import type { DubMove } from './_types';
 export const stereoDoubler: DubMove = {
   id: 'stereoDoubler',
   kind: 'hold',
-  defaults: { delayMs: 20, feedback: 0.3, wet: 0.6 },
+  defaults: { delayMs: 25, feedback: 0.55, wet: 0.9 },
 
   execute({ bus, params }) {
     const delayMs = params.delayMs ?? this.defaults.delayMs;

@@ -2092,9 +2092,10 @@ export class DubBus {
    * landing as a pre-downbeat flourish rather than a long swell.
    */
   async reverseEcho(durationSec = 0.4, amount = 1.0): Promise<void> {
-    if (!this.enabled) return;
+    if (!this.enabled) { console.warn('[DubBus] reverseEcho ignored — bus disabled'); return; }
     const node = await this._ensureReverseCapture();
-    if (!node) return;
+    if (!node) { console.warn('[DubBus] reverseEcho ignored — capture node missing'); return; }
+    console.log(`[DubBus] reverseEcho ▶ captureDur=${durationSec}s amount=${amount}`);
     await new Promise<void>((resolve) => {
       const timeout = setTimeout(() => {
         node.port.removeEventListener('message', handler);
@@ -2440,7 +2441,11 @@ export class DubBus {
    * widening trick quoted by Dan D.N.A. in the Dub Scrolls.
    */
   startStereoDoubler(delayMs = 20, feedback = 0.3, wet = 0.6): () => void {
-    if (!this.enabled) return () => {};
+    if (!this.enabled) {
+      console.warn('[DubBus] startStereoDoubler ignored — bus disabled');
+      return () => {};
+    }
+    console.log(`[DubBus] stereoDoubler ▶ delay=${delayMs}ms fb=${feedback.toFixed(2)} wet=${wet.toFixed(2)}`);
     const ctx = this.context;
     const now = ctx.currentTime;
     const splitter = ctx.createChannelSplitter(2);
