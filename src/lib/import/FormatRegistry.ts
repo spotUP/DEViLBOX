@@ -596,7 +596,7 @@ export const FORMAT_REGISTRY: FormatDefinition[] = [
     extRegex: /\.ml$/i,
     prefixes: ['ml.'],
     prefKey: 'musicLine',
-    nativeParser: { module: '@lib/import/formats/MusicLineParser', parseFn: 'parseMusicLineFile', detectFn: 'isMusicLineFormat' },
+    nativeParser: { module: '@lib/import/formats/MusicLineParser', parseFn: 'parseMusicLineFile', detectFn: 'isMusicLineFile' },
     nativeOnly: true,
     hasMetadata: true,
     customDispatch: true, // .ml is ambiguous: MusicLine first (magic "MLEDMODL"), then Medley
@@ -770,7 +770,7 @@ export const FORMAT_REGISTRY: FormatDefinition[] = [
     extRegex: /\.(rjp|rj)$/i,
     prefixes: ['rjp.'],
     prefKey: 'richardJoseph',
-    nativeParser: { module: '@lib/import/formats/RichardJosephParser', parseFn: 'parseRichardJosephFile', detectFn: 'isRichardJosephFormat' },
+    nativeParser: { module: '@lib/import/formats/RichardJosephParser', parseFn: 'parseRJPFile', detectFn: 'isRJPFormat' },
     uadeFallback: true,
     customDispatch: true, // Magic byte check + companion files
   },
@@ -795,7 +795,11 @@ export const FORMAT_REGISTRY: FormatDefinition[] = [
     extRegex: /\.(trc|dp|tro|tronic)$/i,
     prefixes: ['trc.', 'tro.'],
     prefKey: 'tronic',
-    nativeParser: { module: '@lib/import/formats/TronicParser', parseFn: 'parseTronicFile', detectFn: 'isTronicFormat' },
+    // Tronic has no content magic — isTronicFormat returns true for any
+    // non-empty buffer, which would claim zero-filled files of any type.
+    // Drop it from the registry's content-detection path; extension +
+    // prefixes are enough (matchMode: 'both' still gates on extRegex).
+    nativeParser: { module: '@lib/import/formats/TronicParser', parseFn: 'parseTronicFile' },
     uadeFallback: true,
   },
   {
@@ -1460,7 +1464,7 @@ export const FORMAT_REGISTRY: FormatDefinition[] = [
     matchMode: 'prefix',
     prefixes: ['dsc.'],
     prefKey: 'digitalSonixChrome',
-    nativeParser: { module: '@lib/import/formats/DigitalSonixChromeParser', parseFn: 'parseDigitalSonixChromeFile', detectFn: 'isDigitalSonixChromeFormat' },
+    nativeParser: { module: '@lib/import/formats/DigitalSonixChromeParser', parseFn: 'parseDscFile', detectFn: 'isDscFormat' },
     uadeFallback: true,
   },
   {
@@ -1790,7 +1794,12 @@ export const FORMAT_REGISTRY: FormatDefinition[] = [
     matchMode: 'extension',
     extRegex: /\.(qsf|miniqsf)$/i,
     nativeOnly: true,
-    nativeParser: { module: '@lib/import/formats/QsfParser', parseFn: 'parseQsfFile', detectFn: 'isQsfFormat' },
+    // isQsfFormat takes (filename, buffer) — a two-arg signature
+    // incompatible with the registry's single-buffer detectFn contract.
+    // Route detection through extension (matchMode: 'extension' already
+    // covers this). Two direct callers in ChipDumpParsers / AmigaFormatParsers
+    // still use isQsfFormat with its real signature.
+    nativeParser: { module: '@lib/import/formats/QsfParser', parseFn: 'parseQsfFile' },
     hasMetadata: true,
   },
   {
