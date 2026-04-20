@@ -1963,9 +1963,15 @@ export async function runRegressionSuite(params: Record<string, unknown>): Promi
  */
 interface CaptureEntry {
   status: 'capturing' | 'done' | 'error';
-  blob?: Blob;
+  /** Raw capture. Encoded to WAV/MP3 at poll time so the same capture can
+   *  be returned in either format without re-running playback. */
+  audioBuffer?: AudioBuffer;
   error?: string;
   startedAt: number;
+  /** Format the capture was started with — used when a poll omits `format`. */
+  format?: 'wav' | 'mp3';
+  /** MP3 bitrate in kbps. Only consulted when encoding MP3. */
+  kbps?: number;
 }
 const _liveCaptures: Map<string, CaptureEntry> =
   (window as any).__devilboxLiveCaptures ??
@@ -1974,6 +1980,13 @@ const _liveCaptures: Map<string, CaptureEntry> =
 /** Export current pattern or song to WAV, returning base64-encoded WAV data */
 export async function exportWav(params: Record<string, unknown>): Promise<Record<string, unknown>> {
   try {
+    // ── Format selection: 'wav' (default) or 'mp3' ───────────────────────────
+    const rawFormat = (params.format as string | undefined)?.toLowerCase();
+    const format: 'wav' | 'mp3' = rawFormat === 'mp3' ? 'mp3' : 'wav';
+    const kbps = typeof params.kbps === 'number' ? params.kbps : 192;
+    const audioKey = format === 'mp3' ? 'mp3Base64' : 'wavBase64';
+    const audioMime = format === 'mp3' ? 'audio/mpeg' : 'audio/wav';
+
     // ── Phase 2 fast-path: poll an in-progress live capture ──────────────────
     // Triggered by patternIndex=-1 (works with existing MCP schema) or captureId param.
     // Captures are stored on window.__devilboxLiveCaptures (survives HMR).
@@ -1993,7 +2006,7 @@ export async function exportWav(params: Record<string, unknown>): Promise<Record
         }
       }
       if (!entry || !foundId) {
-        return { error: 'No pending capture found. Start one with export_wav(scope:"song") first.' };
+        return { error: 'No pending capture found. Start one with export_wav/export_mp3(scope:"song") first.' };
       }
       if (entry.status === 'capturing') {
         const elapsed = ((Date.now() - entry.startedAt) / 1000).toFixed(1);
@@ -2003,8 +2016,17 @@ export async function exportWav(params: Record<string, unknown>): Promise<Record
         _liveCaptures.delete(foundId);
         return { error: entry.error ?? 'Capture failed' };
       }
-      // Done — encode and return
-      const doneBlob = entry.blob!;
+      // Done — encode to the requested format (poll's `format` wins; else fall
+      // back to whichever format the capture was originally started with).
+      const pollFormat: 'wav' | 'mp3' = rawFormat
+        ? (rawFormat === 'mp3' ? 'mp3' : 'wav')
+        : (entry.format ?? 'wav');
+      const pollKey = pollFormat === 'mp3' ? 'mp3Base64' : 'wavBase64';
+      const { audioBufferToWav, audioBufferToMp3 } = await import('../../lib/export/audioExport');
+      const doneBuffer = entry.audioBuffer!;
+      const doneBlob = pollFormat === 'mp3'
+        ? audioBufferToMp3(doneBuffer, entry.kbps ?? kbps)
+        : audioBufferToWav(doneBuffer);
       _liveCaptures.delete(foundId);
       const doneArrBuf = await doneBlob.arrayBuffer();
       const doneBytes = new Uint8Array(doneArrBuf);
@@ -2018,9 +2040,11 @@ export async function exportWav(params: Record<string, unknown>): Promise<Record
         status: 'done',
         method: 'live-capture',
         scope: 'song',
-        durationSec: +((doneArrBuf.byteLength - 44) / (44100 * 4)).toFixed(2),
+        format: pollFormat,
+        mimeType: pollFormat === 'mp3' ? 'audio/mpeg' : 'audio/wav',
+        durationSec: +(doneBuffer.length / doneBuffer.sampleRate).toFixed(2),
         sizeBytes: doneArrBuf.byteLength,
-        wavBase64: doneB64,
+        [pollKey]: doneB64,
       };
     }
 
@@ -2034,10 +2058,25 @@ export async function exportWav(params: Record<string, unknown>): Promise<Record
     const {
       getUADEInstrument,
       renderUADEToWav,
-      captureAudioLive,
+      captureAudioLiveToBuffer,
       renderPatternToAudio,
       audioBufferToWav,
+      audioBufferToMp3,
     } = await import('../../lib/export/audioExport');
+
+    // WAV Blob → AudioBuffer (UADE renders directly to WAV, decode for MP3).
+    async function wavBlobToAudioBuffer(wavBlob: Blob): Promise<AudioBuffer> {
+      const arr = await wavBlob.arrayBuffer();
+      const toneCtx = (await import('tone')).getContext();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const ctx: AudioContext = (toneCtx as any).rawContext ?? (toneCtx as any)._context ?? toneCtx;
+      return await ctx.decodeAudioData(arr.slice(0));
+    }
+
+    // Encode a buffer to the user-requested format (WAV or MP3).
+    function encode(buffer: AudioBuffer): Blob {
+      return format === 'mp3' ? audioBufferToMp3(buffer, kbps) : audioBufferToWav(buffer);
+    }
 
     // ── Determine the active format ──────────────────────────────────────────
     // Synth types that can render offline WITHOUT pre-loading audio buffers.
@@ -2104,19 +2143,26 @@ export async function exportWav(params: Record<string, unknown>): Promise<Record
     // ── 1. UADE path: accurate offline render ────────────────────────────────
     const uadeInst = getUADEInstrument(instruments);
     if (uadeInst?.uade?.fileData) {
-      const blob = await renderUADEToWav(
+      const wavBlob = await renderUADEToWav(
         uadeInst.uade.fileData,
         uadeInst.uade.filename ?? 'module',
       );
-      const arrayBuf = await blob.arrayBuffer();
-      const base64 = await blobToBase64(blob);
+      // UADE writes WAV directly. For MP3 we decode and re-encode.
+      const outBlob = format === 'mp3'
+        ? audioBufferToMp3(await wavBlobToAudioBuffer(wavBlob), kbps)
+        : wavBlob;
+      const arrayBuf = await outBlob.arrayBuffer();
+      const base64 = await blobToBase64(outBlob);
+      const wavDuration = +((arrayBuf.byteLength - 44) / (44100 * 4)).toFixed(2);
       return {
         ok: true,
         method: 'uade-offline',
         scope: 'song',
+        format,
+        mimeType: audioMime,
         sizeBytes: arrayBuf.byteLength,
-        durationSec: +((arrayBuf.byteLength - 44) / (44100 * 4)).toFixed(2),
-        wavBase64: base64,
+        ...(format === 'wav' ? { durationSec: wavDuration } : {}),
+        [audioKey]: base64,
       };
     }
 
@@ -2128,18 +2174,20 @@ export async function exportWav(params: Record<string, unknown>): Promise<Record
         const pattern = tracker.patterns[idx];
         if (!pattern) return { error: `Pattern ${idx} not found` };
         const audioBuffer = await renderPatternToAudio(pattern, instruments, bpm);
-        const wavBlob = audioBufferToWav(audioBuffer);
-        const base64 = await blobToBase64(wavBlob);
-        const arrayBuf = await wavBlob.arrayBuffer();
+        const outBlob = encode(audioBuffer);
+        const base64 = await blobToBase64(outBlob);
+        const arrayBuf = await outBlob.arrayBuffer();
         return {
           ok: true,
           method: 'tone-offline',
           scope: 'pattern',
+          format,
+          mimeType: audioMime,
           patternIndex: idx,
           sampleRate: audioBuffer.sampleRate,
           durationSec: +(audioBuffer.length / audioBuffer.sampleRate).toFixed(2),
           sizeBytes: arrayBuf.byteLength,
-          wavBase64: base64,
+          [audioKey]: base64,
         };
       }
       // Song: render patterns in order
@@ -2162,18 +2210,20 @@ export async function exportWav(params: Record<string, unknown>): Promise<Record
         }
         off += buf.length;
       }
-      const wavBlob = audioBufferToWav(combined);
-      const base64 = await blobToBase64(wavBlob);
-      const arrayBuf = await wavBlob.arrayBuffer();
+      const outBlob = encode(combined);
+      const base64 = await blobToBase64(outBlob);
+      const arrayBuf = await outBlob.arrayBuffer();
       return {
         ok: true,
         method: 'tone-offline',
         scope: 'song',
+        format,
+        mimeType: audioMime,
         patterns: sequence.length,
         sampleRate,
         durationSec: +(totalLength / sampleRate).toFixed(2),
         sizeBytes: arrayBuf.byteLength,
-        wavBase64: base64,
+        [audioKey]: base64,
       };
     }
 
@@ -2189,14 +2239,20 @@ export async function exportWav(params: Record<string, unknown>): Promise<Record
     const durationSec = Math.min(rawDurationSec, maxDurationSec);
 
     const captureId = crypto.randomUUID();
-    const entry: CaptureEntry = { status: 'capturing', startedAt: Date.now() };
+    const entry: CaptureEntry = {
+      status: 'capturing',
+      startedAt: Date.now(),
+      format,
+      kbps,
+    };
     _liveCaptures.set(captureId, entry);
 
-    // Fire-and-forget: capture runs in background
-    captureAudioLive(durationSec)
-      .then(blob => {
+    // Fire-and-forget: capture runs in background. We store the raw AudioBuffer
+    // so the poll step can encode to WAV or MP3 on demand.
+    captureAudioLiveToBuffer(durationSec)
+      .then(audioBuffer => {
         entry.status = 'done';
-        entry.blob = blob;
+        entry.audioBuffer = audioBuffer;
       })
       .catch(err => {
         entry.status = 'error';
@@ -2207,18 +2263,30 @@ export async function exportWav(params: Record<string, unknown>): Promise<Record
     await seekTo({ position: 0 });
     await play({});
 
+    const pollTool = format === 'mp3' ? 'export_mp3' : 'export_wav';
     return {
       ok: true,
       captureId,
       status: 'capturing',
       method: 'live-capture',
       scope: 'song',
+      format,
+      mimeType: audioMime,
       estimatedDurationSec: +durationSec.toFixed(2),
-      instructions: `Poll with export_wav(captureId: "${captureId}") until status is "done"`,
+      instructions: `Poll with ${pollTool}(captureId: "${captureId}") until status is "done"`,
     };
   } catch (e) {
     return { error: `exportWav failed: ${(e as Error).message}` };
   }
+}
+
+/**
+ * MP3 sibling of `exportWav`. Thin wrapper that sets `format: 'mp3'` and
+ * forwards to the shared exportWav handler. Accepts an optional `kbps` param
+ * (default 192; common values 128/192/320).
+ */
+export async function exportMp3(params: Record<string, unknown>): Promise<Record<string, unknown>> {
+  return exportWav({ ...params, format: 'mp3' });
 }
 
 /** Export pattern as formatted text */
