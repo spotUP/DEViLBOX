@@ -30,6 +30,7 @@ import { getToneEngine } from '@/engine/ToneEngine';
 import { getNativeAudioNode } from '@utils/audio-context';
 import { Fader } from '@components/controls/Fader';
 import { DubLaneTimeline } from './DubLaneTimeline';
+import { AutoDubPanel } from './AutoDubPanel';
 
 // ─── Per-channel ops ────────────────────────────────────────────────────────
 // Each channel strip shows these 4 buttons alongside the hold-toggle + send
@@ -529,6 +530,7 @@ export const DubDeckStrip: React.FC = () => {
         >
           A/B
         </button>
+        <AutoDubPanel busEnabled={busEnabled} />
         <button
           className={
             'px-2 py-0.5 rounded border transition-colors ' +

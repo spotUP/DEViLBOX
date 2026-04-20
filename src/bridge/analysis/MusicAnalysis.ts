@@ -307,6 +307,60 @@ export function classifyChannel(channelIndex: number, notes: number[], totalRows
   return result;
 }
 
+/**
+ * Classify every channel of a pattern in one pass. Post-processes
+ * `classifyChannel`'s output with percussion heuristics — the base routine
+ * has no 'percussion' branch, so we detect it from channel name (/noi|drum|
+ * perc|hat|kick|snare|clap/) or statistical density (many short-interval
+ * notes on few unique pitches = drum-like).
+ *
+ * Memoized by Pattern identity (WeakMap). Tracker store edits through immer
+ * produce new Pattern objects, so the cache auto-invalidates on edit.
+ */
+const _patternCache = new WeakMap<Pattern, ChannelAnalysis[]>();
+
+export function classifyPattern(pattern: Pattern): ChannelAnalysis[] {
+  const cached = _patternCache.get(pattern);
+  if (cached) return cached;
+
+  const numRows = pattern.channels[0]?.rows.length || 0;
+  const result: ChannelAnalysis[] = pattern.channels.map((ch, i) => {
+    const notes: number[] = [];
+    for (const cell of ch.rows) {
+      if (cell && cell.note >= 1 && cell.note <= 96) notes.push(cell.note);
+    }
+    const analysis = classifyChannel(i, notes, numRows);
+    if (analysis.role === 'empty') return analysis;
+    if (isPercussionChannel(ch, analysis)) {
+      analysis.role = 'percussion';
+    }
+    return analysis;
+  });
+
+  _patternCache.set(pattern, result);
+  return result;
+}
+
+const PERCUSSION_NAME_RE = /noi|noise|drum|perc|kit|hat|kick|snare|clap|cymbal|tom|ride/i;
+
+function isPercussionChannel(
+  ch: { name?: string; shortName?: string; channelMeta?: { hardwareName?: string } },
+  analysis: ChannelAnalysis,
+): boolean {
+  if (ch.name && PERCUSSION_NAME_RE.test(ch.name)) return true;
+  if (ch.shortName && PERCUSSION_NAME_RE.test(ch.shortName)) return true;
+  if (ch.channelMeta?.hardwareName && PERCUSSION_NAME_RE.test(ch.channelMeta.hardwareName)) return true;
+  // Statistical: many notes, tightly spaced pitches, few unique pitches —
+  // looks like a drum pattern (kick/snare/hat rotating on one-two pitches).
+  if (analysis.density >= 0.4
+      && analysis.avgInterval <= 2.5
+      && analysis.uniqueNotes <= 3
+      && analysis.noteCount >= 4) {
+    return true;
+  }
+  return false;
+}
+
 // ─── Chord Progression Detection ─────────────────────────────────────────────
 
 export function detectChordProgression(
