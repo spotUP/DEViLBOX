@@ -474,6 +474,64 @@ describe('ui-smoke — flow 06: Furnace playback stays within gain limits', () =
   );
 });
 
+describe('ui-smoke — flow 10: dub automation routing end-to-end', () => {
+  // Regression test for the automation-lane → dub routing (task #35).
+  // The AutomationPlayer forwards every `dub.*` curve write to
+  // routeParameterToEngine, which is the same code path MIDI CCs use.
+  // Flow 10 exercises that shared pipeline via the new `route_parameter`
+  // MCP handler so a break anywhere in: automation → router → DUB_BUS_PARAMS
+  // transform → useDrumPadStore.setDubBus → DubBus surfaces in CI.
+
+  it.runIf(!!client)(
+    'routeParameterToEngine drives dub.* bus params end-to-end',
+    async () => {
+      const c = client!;
+      try { await c.call('stop'); } catch { /* ok */ }
+      await sleep(200);
+      await c.call('clear_console_errors');
+
+      // Need a live dub bus — engine creates it lazily on first getDubBus()
+      // but we force activation by enabling it, which wires the drumpad
+      // engine + bus into the audio graph.
+      await c.call('set_dub_bus_enabled', { enabled: true });
+      await sleep(150);
+
+      // Baseline: read the current bus settings BEFORE driving the param.
+      const before = await c.call<{ storeSettings?: { echoWet?: number; echoIntensity?: number } }>('get_dub_bus_state');
+      const echoWetBefore = before.storeSettings?.echoWet ?? 0;
+
+      // Drive the param through the automation router. Value 0.85 should
+      // land directly in storeSettings.echoWet (no transform) — DUB_BUS_PARAMS
+      // doesn't transform echoWet.
+      await c.call('route_parameter', { param: 'dub.echoWet', value: 0.85 });
+      await sleep(120);  // setDubBus is async via dynamic-import chain
+
+      const after = await c.call<{ storeSettings?: { echoWet?: number } }>('get_dub_bus_state');
+      const echoWetAfter = after.storeSettings?.echoWet ?? 0;
+
+      expect(
+        Math.abs(echoWetAfter - 0.85),
+        `echoWet after route = ${echoWetAfter}, expected ~0.85 (before was ${echoWetBefore})`,
+      ).toBeLessThan(0.01);
+
+      // Transform round-trip: echoRateMs should receive 0..1 → 40..1000 ms.
+      // Feed 0.5 and expect a value close to 520 ms (40 + 0.5 * 960).
+      await c.call('route_parameter', { param: 'dub.echoRateMs', value: 0.5 });
+      await sleep(120);
+
+      const afterRate = await c.call<{ storeSettings?: { echoRateMs?: number } }>('get_dub_bus_state');
+      const rate = afterRate.storeSettings?.echoRateMs ?? 0;
+      expect(rate, `echoRateMs for value=0.5 should be ~520 ms (40 + 0.5*960)`).toBeGreaterThan(500);
+      expect(rate, `echoRateMs should be < 540`).toBeLessThan(540);
+
+      // Cleanup — disable bus so the echoWet change doesn't leak into
+      // follow-up flows.
+      await c.call('set_dub_bus_enabled', { enabled: false });
+    },
+    FLOW_TIMEOUT_MS,
+  );
+});
+
 describe('ui-smoke — flow 09: dub bus silences cleanly after stop + disable', () => {
   // Regression test for the 2026-04-20 user report: after a dub session
   // a rhythmic "bom bom bom" soft-kick pattern kept playing even after
