@@ -126,9 +126,11 @@ export function useImportDialog(
   // ── File select handler ────────────────────────────────────────────────────
   const handleFileSelect = useCallback(async (file: File, overrideCompanions?: File[]) => {
     if (!isSupportedModule(file.name)) {
+      console.warn(`[useImportDialog.handleFileSelect] REJECTED "${file.name}" — isSupportedModule returned false`);
       setError(`Unsupported file format.`);
       return;
     }
+    console.log(`[useImportDialog.handleFileSelect] accepted "${file.name}"`);
 
     const companions = overrideCompanions ?? companionFilesRef.current;
     setActiveCompanions(companions);
