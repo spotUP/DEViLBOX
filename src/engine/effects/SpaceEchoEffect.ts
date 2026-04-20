@@ -6,8 +6,9 @@ export interface SpaceEchoOptions {
   intensity?: number;   // Feedback (0-1.2)
   echoVolume?: number;  // 0-1
   reverbVolume?: number;// 0-1
-  bass?: number;        // EQ (-20 to +20)
-  treble?: number;      // EQ (-20 to +20)
+  bass?: number;        // EQ low band (-20 to +20)
+  mid?: number;         // EQ mid band (-20 to +20) — the "tape degrade" character
+  treble?: number;      // EQ high band (-20 to +20)
   wow?: number;         // Wow/Flutter amount (0-1)
   wet?: number;         // 0-1
 }
@@ -60,13 +61,21 @@ export class SpaceEchoEffect extends Tone.ToneAudioNode {
     super();
 
     this._options = {
-      mode: options.mode ?? 4, 
+      mode: options.mode ?? 4,
       rate: options.rate ?? 300,
       intensity: options.intensity ?? 0.5,
       echoVolume: options.echoVolume ?? 0.8,
       reverbVolume: options.reverbVolume ?? 0.3,
-      bass: options.bass ?? 0,
-      treble: options.treble ?? 0,
+      // Analog-tape feedback-loop EQ — gentle per-pass attenuation on
+      // extremes (lows rumble, highs "tape-age"), mid neutral so the
+      // tail decays at the natural feedback rate (~-4 dB/pass at
+      // intensity 0.62, reaching -60 dB in ~15 passes ≈ 4.5 s). Earlier
+      // values (bass -4, mid +5, treble -7) made mid content GAIN 1 dB
+      // per pass → runaway oscillation; +2 gave a 9 s mid-tail. These
+      // defaults produce a clean decay with analog-tape color.
+      bass: options.bass ?? -2,
+      mid: options.mid ?? 0,
+      treble: options.treble ?? -3,
       wow: options.wow ?? 0.15,
       wet: options.wet ?? 1,
     };
@@ -95,10 +104,10 @@ export class SpaceEchoEffect extends Tone.ToneAudioNode {
     this.saturation = new Tone.Distortion(0.1);
     this.eq = new Tone.EQ3({
       low: this._options.bass,
-      mid: 0,
+      mid: this._options.mid,
       high: this._options.treble,
       lowFrequency: 200,
-      highFrequency: 2500
+      highFrequency: 2500,
     });
 
     // 4. Modulation

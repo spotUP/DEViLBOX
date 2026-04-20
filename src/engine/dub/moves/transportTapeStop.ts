@@ -49,14 +49,24 @@ export const transportTapeStop: DubMove = {
     const holdSec = params.holdSec ?? this.defaults.holdSec;
     const floorFactor = Math.max(0.05, params.floorFactor ?? this.defaults.floorFactor);
 
-    // Best-effort: check if LibOpenMPT is the active engine. If not, fall
-    // back to the bus-only tapeStop so the user always gets some effect.
+    // Stack the bus-only tape stop on top of the transport slowdown so the
+    // tail gets analog tape coloration (LPF closing + echo-rate ramp +
+    // spring) alongside the digital transport time-stretch. Without this
+    // the transport slowdown sounds purely mathematical — tape character
+    // comes from the bus wet chain, not the libopenmpt resampler.
+    bus.tapeStop(downSec, holdSec);
+    // Sweep the master-insert LPF down to 400 Hz over the stop — hides
+    // LibOpenMPT's resampler aliasing ("bit crush") during extreme
+    // slowdown by rolling off the highs that carry the artifacts.
+    bus.sweepMasterLpf(400, downSec, holdSec + 0.1);
+
+    // Best-effort: check if LibOpenMPT is the active engine. If not, the
+    // bus-only tapeStop above is the whole effect.
     void (async () => {
       const mod = await import('@/engine/libopenmpt/LibopenmptEngine');
       const isLib = mod.LibopenmptEngine.hasInstance() && mod.LibopenmptEngine.getInstance().isAvailable();
       if (!isLib) {
-        console.warn('[transportTapeStop] only implemented for LibOpenMPT — using bus-only tapeStop');
-        bus.tapeStop(downSec, holdSec);
+        console.warn('[transportTapeStop] only implemented for LibOpenMPT — bus-only tapeStop carries the effect');
         return;
       }
       const timers = new Set<ReturnType<typeof setTimeout>>();
