@@ -2132,6 +2132,16 @@ export function createMcpServer(): McpServer {
   );
 
   server.tool(
+    'export_stems',
+    'Render every channel as its own audio file via live-solo capture (one channel unmuted per pass). Returns an array of `{channelIndex, channelName, format, mimeType, sizeBytes, wavBase64|mp3Base64}` — one entry per channel. Correct for every format (WASM synths, master FX, dub bus all included) but real-time cost is N × song duration: a 16-channel 3-minute song takes ~48 minutes. Use sparingly; this does not return until every stem is captured.',
+    {
+      format: z.enum(['wav', 'mp3']).optional().describe('Output format (default "wav"). "mp3" uses 192 kbps by default.'),
+      kbps: z.number().optional().describe('MP3 bitrate in kbps (default 192). Only used when format="mp3".'),
+    },
+    (p) => call('export_stems', p),
+  );
+
+  server.tool(
     'export_pattern_text',
     'Export a pattern as formatted text (tracker ASCII view or CSV). Useful for analysis, documentation, or piping to other tools.',
     {
