@@ -2067,12 +2067,14 @@ export class DubBus {
    * Stacks cleanly — multiple simultaneous reverses don't collide.
    */
   async backwardReverb(durationSec = 0.8): Promise<void> {
-    if (!this.enabled) return;
+    if (!this.enabled) { console.warn('[DubBus] backwardReverb ignored — bus disabled'); return; }
     const node = await this._ensureReverseCapture();
-    if (!node) return;
+    if (!node) { console.warn('[DubBus] backwardReverb ignored — capture node missing'); return; }
+    console.log(`[DubBus] backwardReverb ▶ captureDur=${durationSec}s`);
 
     await new Promise<void>((resolve) => {
       const timeout = setTimeout(() => {
+        console.warn('[DubBus] backwardReverb timeout — worklet did not reply within 1s');
         node.port.removeEventListener('message', handler);
         resolve();
       }, 1000);
@@ -2089,7 +2091,12 @@ export class DubBus {
           const srcLeft = msg.left as Float32Array;
           const srcRight = msg.right as Float32Array;
           const frames = Number(msg.frames) || srcLeft.length;
-          if (!frames) { resolve(); return; }
+          console.log(`[DubBus] backwardReverb snapshot received — frames=${frames}`);
+          if (!frames) {
+            console.warn('[DubBus] backwardReverb abort — empty ring buffer (no audio reached bus.input yet)');
+            resolve();
+            return;
+          }
           const left = new Float32Array(new ArrayBuffer(frames * 4));
           const right = new Float32Array(new ArrayBuffer(frames * 4));
           left.set(srcLeft);
@@ -2179,6 +2186,7 @@ export class DubBus {
     console.log(`[DubBus] reverseEcho ▶ captureDur=${durationSec}s amount=${amount}`);
     await new Promise<void>((resolve) => {
       const timeout = setTimeout(() => {
+        console.warn('[DubBus] reverseEcho timeout — worklet did not reply within 1s');
         node.port.removeEventListener('message', handler);
         resolve();
       }, 1000);
@@ -2191,7 +2199,12 @@ export class DubBus {
           const srcLeft = msg.left as Float32Array;
           const srcRight = msg.right as Float32Array;
           const frames = Number(msg.frames) || srcLeft.length;
-          if (!frames) { resolve(); return; }
+          console.log(`[DubBus] reverseEcho snapshot received — frames=${frames}`);
+          if (!frames) {
+            console.warn('[DubBus] reverseEcho abort — empty ring buffer (no audio reached bus.input yet)');
+            resolve();
+            return;
+          }
           const left = new Float32Array(new ArrayBuffer(frames * 4));
           const right = new Float32Array(new ArrayBuffer(frames * 4));
           left.set(srcLeft);
