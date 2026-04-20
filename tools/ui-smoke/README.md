@@ -5,7 +5,9 @@ connect to the existing MCP WebSocket bridge at `ws://localhost:4003/mcp`
 (same transport the full `tools/playback-smoke-test.ts` uses) and drive
 real app flows.
 
-## Run
+## Two ways to run
+
+### Local dev — use your open browser tab
 
 ```bash
 # Shell 1:
@@ -16,10 +18,30 @@ npm run dev
 npm run test:ui-smoke
 ```
 
-If the dev server is not up when the suite starts, every flow **skips with
-a clear message** — it never fails on a laptop that hasn't booted the app
-yet. That's intentional: these tests are gated on real infrastructure, so
-they run locally / nightly, not in the push-gated CI suite.
+### Headless / CI — auto-launch Chromium
+
+```bash
+# Shell 1:
+npm run dev
+
+# Shell 2:
+DEVILBOX_LAUNCH_BROWSER=true npm run test:ui-smoke
+```
+
+The MCP relay only supports **one connected browser** at a time — a new
+browser kicks the old one off, then they ping-pong via auto-reconnect. So
+if you're launching headless locally, close your own tab first. CI is
+fine (no competing tab).
+
+Extra env knobs:
+
+- `DEVILBOX_HEADLESS=false` — launch visible Chromium (watch the flow)
+- `DEVILBOX_SLOWMO=250` — slow each interaction by 250 ms
+- `DEVILBOX_URL=http://localhost:5174` — custom dev server URL
+
+If the bridge is unreachable when the suite starts, every flow **skips
+with a clear message** — it never fails on a laptop that hasn't booted
+the app yet.
 
 ## Current flows
 

@@ -25,24 +25,62 @@ import { readFileSync } from 'fs';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { tryConnect, sleep } from './_client';
+import { launchBrowser, type BrowserHandle } from './browser';
 
 const FIXTURE_DIR = resolve(dirname(fileURLToPath(import.meta.url)), '../../src/__tests__/fixtures');
 const FIXTURE_MOD = resolve(FIXTURE_DIR, 'mortimer-twang-2118bytes.mod');
 
 const FLOW_TIMEOUT_MS = 60000;
 
-// Top-level await so `it.runIf` sees the connection result at collect time.
-// Without this the flows skip even when the bridge is reachable.
-const client = await tryConnect();
-if (!client) {
-  console.warn(
-    '[ui-smoke] MCP bridge at ws://localhost:4003/mcp is unreachable — skipping.\n' +
-    '  Start the app with `npm run dev` and open http://localhost:5173 in a browser.',
-  );
+// Browser selection
+//   DEVILBOX_LAUNCH_BROWSER=true  → this process launches headless Chromium
+//     at module load. Good for CI — no human needed.
+//   (unset / false)               → assume the dev's own browser tab is
+//     already connected. Good for local work — we don't fight the user's
+//     session for the single browser slot the MCP relay supports.
+//
+// If the env var is set and dev server isn't up, browser launch still
+// succeeds but `tryConnect` times out cleanly below.
+const shouldLaunchBrowser = process.env.DEVILBOX_LAUNCH_BROWSER === 'true';
+
+let browser: BrowserHandle | null = null;
+let client: Awaited<ReturnType<typeof tryConnect>> = null;
+try {
+  if (shouldLaunchBrowser) {
+    browser = await launchBrowser();
+  }
+  client = await tryConnect();
+  // Poll the relay — it answers with `"No browser connected"` until the
+  // tab finishes registering its WebSocket. Wait up to 8 s.
+  if (client) {
+    const deadline = Date.now() + 8000;
+    while (Date.now() < deadline) {
+      try {
+        await client.call('get_audio_context_info');
+        break; // browser is registered and answering
+      } catch (e) {
+        if (/No browser connected/i.test((e as Error).message)) {
+          await new Promise((r) => setTimeout(r, 250));
+          continue;
+        }
+        break; // other error — let the flow surface it
+      }
+    }
+  }
+  if (!client) {
+    console.warn(
+      '[ui-smoke] MCP bridge unreachable — flows will skip.\n' +
+      '  Run `npm run dev` + open http://localhost:5173 in a browser,\n' +
+      '  or set DEVILBOX_LAUNCH_BROWSER=true to auto-launch headless Chromium.',
+    );
+  }
+} catch (e) {
+  console.warn(`[ui-smoke] Browser launch failed — flows will skip: ${(e as Error).message}`);
 }
 
-afterAll(() => {
+afterAll(async () => {
   client?.close();
+  if (browser) await browser.close();
 });
 
 function loadFixtureBase64(path: string): { filename: string; data: string } {
