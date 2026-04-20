@@ -151,6 +151,7 @@ import {
   runRegressionSuite,
   runSynthTests,
   exportWav,
+  exportMp3,
   exportPatternText,
   exportMidi,
   exportMod,
@@ -387,6 +388,7 @@ const handlers: Record<string, Handler> = {
 
   // ─── Export Tools ───────────────────────────────────────────────────────
   export_wav: exportWav,
+  export_mp3: exportMp3,
   export_pattern_text: exportPatternText,
   export_midi: exportMidi,
   export_mod: exportMod,
