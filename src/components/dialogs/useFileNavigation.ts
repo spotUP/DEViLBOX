@@ -45,7 +45,7 @@ import { getSupportedMIDIExtensions } from '@/lib/import/MIDIImporter';
 
 // Build comprehensive accept string for file inputs (400+ supported formats)
 export const ACCEPTED_FILE_FORMATS = [
-  '.json', '.dbx', '.dvbx', '.dbox', '.xml',
+  '.json', '.dbx', '.dbox', '.xml',
   ...getSupportedExtensions(),
   ...getSupportedMIDIExtensions()
 ].join(',');
@@ -520,7 +520,7 @@ export function useFileNavigation({
             {
               description: 'All Supported Files',
               accept: {
-                'application/octet-stream': ['.dbx', '.dvbx', '.dbox', '.mod', '.xm', '.it', '.s3m', '.fur', '.mptm', '.dmf', '.ftm', '.sqs', '.seq', '.mid', '.midi', '.xrns'],
+                'application/octet-stream': ['.dbx', '.dbox', '.mod', '.xm', '.it', '.s3m', '.fur', '.mptm', '.dmf', '.ftm', '.sqs', '.seq', '.mid', '.midi', '.xrns'],
               },
             },
           ],

@@ -616,7 +616,6 @@ export async function loadFile(
 function isSongFormat(filename: string): boolean {
   return (
     filename.endsWith('.dbx') ||
-    filename.endsWith('.dvbx') ||
     filename.endsWith('.mid') ||
     filename.endsWith('.midi') ||
     filename.endsWith('.sqs') ||
@@ -837,8 +836,8 @@ async function loadSongFile(file: File, options: FileLoadOptions, preReadBuffer?
     engine.disposeAllInstruments();
   }
 
-  // === .dbx/.dvbx - DEViLBOX project ===
-  if (filename.endsWith('.dbx') || filename.endsWith('.dvbx')) {
+  // === .dbx - DEViLBOX project ===
+  if (filename.endsWith('.dbx')) {
     const { decompressProject } = await import('@/lib/projectCompression');
     const buffer = await file.arrayBuffer();
     const text = decompressProject(buffer);

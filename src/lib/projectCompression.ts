@@ -1,5 +1,5 @@
 /**
- * Project file compression for .dbx/.dvbx files.
+ * Project file compression for .dbx files.
  *
  * Binary container format:
  *   [4 bytes] Magic: "DVBZ" (0x44 0x56 0x42 0x5A)

@@ -123,7 +123,7 @@ export function useNavBar() {
     try {
       const blob = serializeProjectToBlob();
       const safeName = (projectName || 'project').replace(/[^a-z0-9_\-. ]/gi, '_');
-      const filename = `${safeName}.dvbx`;
+      const filename = `${safeName}.dbx`;
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
