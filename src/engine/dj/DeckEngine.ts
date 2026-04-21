@@ -18,6 +18,8 @@ import { snapPositionToBeat, snapLoopLength, phaseAlign } from './DJAutoSync';
 import { getQuantizeMode } from './DJQuantizedFX';
 import { DeckScratchBuffer } from './DeckScratchBuffer';
 import { DeckAudioPlayer, type AudioFileInfo } from './DeckAudioPlayer';
+import { DeckKeyLock } from './DeckKeyLock';
+import { computeKeyLockShift } from './computeKeyLockShift';
 import { TurntablePhysics } from '@/engine/turntable/TurntablePhysics';
 import { clearPatternGuard } from '../keyboard/commands/djScratch';
 
@@ -57,6 +59,15 @@ export class DeckEngine {
   readonly audioPlayer: DeckAudioPlayer;
   readonly physics: TurntablePhysics;
   private _playbackMode: PlaybackMode = 'audio';
+  /** Key lock (master tempo): when true, the pitch fader changes tempo only;
+   *  sample pitch and synth detune stay at their original values. Tracker path
+   *  uses replayer's native pitch/tempo split. WAV path uses the SoundTouch
+   *  insert (see `keyLock` below). */
+  private keyLockEnabled = false;
+  /** SoundTouch-backed pitch-shift insert, sits between audioPlayer and
+   *  deckGain on the WAV-playback path. Bypassed by default; engaged only
+   *  when keyLockEnabled is true. Zero added latency when bypassed. */
+  private keyLock: DeckKeyLock;
 
   // Audio chain nodes
   private deckGain: Tone.Gain;
@@ -274,8 +285,17 @@ export class DeckEngine {
     this.replayer = new TrackerReplayer(this.deckGain);
     this.replayer.setMuted(true); // Silent by default in DJ mode
 
+    // Key-lock insert for the audio-player (WAV) path:
+    //   audioPlayer → keyLock → deckGain
+    // Bypassed by default; engaged when setKeyLock(true) is called on an
+    // audio-mode deck. The tracker path bypasses it entirely since the
+    // replayer has native pitch/tempo decoupling.
+    this.keyLock = new DeckKeyLock();
+    this.keyLock.output.connect(this.deckGain);
+
     // Create AudioPlayer for audio file playback (MP3/WAV/FLAC etc.)
-    this.audioPlayer = new DeckAudioPlayer(this.deckGain);
+    // Output threads through keyLock.input (bypass wire if key-lock is off).
+    this.audioPlayer = new DeckAudioPlayer(this.keyLock.input);
 
     // Per-deck turntable physics (one instance shared by all views)
     this.physics = new TurntablePhysics();
@@ -539,19 +559,32 @@ export class DeckEngine {
     this.restMultiplier = multiplier;                // Always track — scratch/pattern restore target
     this._currentPitchSemitones = semitones;
 
+    // KEY LOCK: when on, pitch/detune are pinned to neutral so the audible
+    // pitch stays at the track's original key. Tempo still follows the fader.
+    //   - Tracker path: native via replayer.setPitchMultiplier(1.0) + setDetuneCents(0)
+    //   - Audio (WAV) path: SoundTouch insert applies -semitones compensation
+    //     via computeKeyLockShift(), cancelling playbackRate's pitch shift.
+    const pitchMultiplier = this.keyLockEnabled ? 1.0 : multiplier;
+    const detuneCents      = this.keyLockEnabled ? 0   : semitones * 100;
+
     if (this._playbackMode === 'audio') {
       this.audioPlayer.setPlaybackRate(multiplier);
+      // Tell SoundTouch how much to cancel — zero when key-lock is off (bypassed),
+      // -semitones when on (so playbackRate's pitch shift is nulled out).
+      const { pitchCompensate } = computeKeyLockShift(semitones, this.keyLockEnabled);
+      this.keyLock.setPitchSemiTones(pitchCompensate);
       // Ensure tracker is reset to normal speed if it's still somehow running
       this.replayer.setTempoMultiplier(1.0);
       this.replayer.setPitchMultiplier(1.0);
       this.replayer.setDetuneCents(0);
     } else {
       // Per-deck isolation: only touches this replayer's state, not ToneEngine globals
-      this.replayer.setTempoMultiplier(multiplier);   // Changes scheduler speed
-      this.replayer.setPitchMultiplier(multiplier);    // Changes sample playback rates
-      this.replayer.setDetuneCents(semitones * 100);   // Changes synth pitch
+      this.replayer.setTempoMultiplier(multiplier);     // Changes scheduler speed (always follows fader)
+      this.replayer.setPitchMultiplier(pitchMultiplier); // Changes sample playback rates (pinned by key-lock)
+      this.replayer.setDetuneCents(detuneCents);         // Changes synth pitch (pinned by key-lock)
       // Ensure audio player is reset
       this.audioPlayer.setPlaybackRate(1.0);
+      this.keyLock.setPitchSemiTones(0);
     }
   }
 
@@ -560,9 +593,25 @@ export class DeckEngine {
     this.replayer.setNudge(offset, ticks);
   }
 
-  /** Key lock removed — was causing echo artifacts from granular delay buffer. */
-  setKeyLock(_enabled: boolean): void { /* no-op */ }
-  getKeyLock(): boolean { return false; }
+  /**
+   * Enable/disable key lock (master tempo).
+   * When enabled, the pitch fader changes TEMPO only — sample pitch and synth
+   * detune stay at their original values. Applied via two different routes:
+   *   - Tracker path: replayer's native pitch/tempo split (no WASM needed).
+   *   - Audio (WAV) path: SoundTouch insert compensates for playbackRate's
+   *     pitch shift.
+   * Re-applies the current pitch so the change takes effect without having
+   * to jiggle the fader.
+   */
+  setKeyLock(enabled: boolean): void {
+    if (this.keyLockEnabled === enabled) return;
+    this.keyLockEnabled = enabled;
+    // The SoundTouch insert only matters on the audio (WAV) path. When
+    // bypassed it's a zero-latency direct wire.
+    this.keyLock.setActive(enabled && this._playbackMode === 'audio');
+    this.setPitch(this._currentPitchSemitones);
+  }
+  getKeyLock(): boolean { return this.keyLockEnabled; }
 
   // ==========================================================================
   // SCRATCH
