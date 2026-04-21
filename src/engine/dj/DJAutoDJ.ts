@@ -34,6 +34,42 @@ type TransitionType = 'crossfade' | 'cut' | 'echo-out' | 'filter-build' | 'bass-
 
 const POLL_INTERVAL_MS = 500;
 const PRELOAD_LEAD_TIME_SEC = 60;
+
+// ── Pattern-aware transition deferral tuning ─────────────────────────────
+// Exported so tests can drive the scaling logic without instantiating the
+// full Auto-DJ state machine (which needs DJ engine + deck state + store).
+
+/** Absolute ceiling on deferrals. Even a 64-bar transition can't defer
+ *  more than this many polls. Prevents a broken chord detector from
+ *  stalling the mix indefinitely. */
+export const HARD_MAX_PATTERN_DEFERS = 5;
+/** Fraction of the transition duration we're willing to spend deferring.
+ *  0.15 = at most 15% of the fade. Short fades get proportionally fewer
+ *  deferrals so the cap doesn't eat the whole transition window. */
+export const PATTERN_DEFER_BUDGET_RATIO = 0.15;
+/** Transitions shorter than this never defer — no spare poll cycles. */
+export const MIN_TRANSITION_FOR_DEFER_SEC = 2;
+
+/**
+ * Deferral cap scaled with transition duration. 500 ms poll interval.
+ * Pure — unit-testable without any runtime state.
+ *
+ * Examples (at 500ms polls, 15% budget, hard cap 5):
+ *   1s fade → 0 defers (below MIN_TRANSITION_FOR_DEFER_SEC, but this
+ *            function returns 0 regardless — caller's short-fade
+ *            guard is the first line of defence)
+ *   2s      → floor(2 * 0.15 / 0.5)  = 0
+ *   4s      → floor(4 * 0.15 / 0.5)  = 1
+ *   10s     → floor(10 * 0.15 / 0.5) = 3
+ *   20s     → min(5, floor(6)) = 5   (hard-capped)
+ */
+export function computeMaxPatternDefers(transitionDurationSec: number): number {
+  const pollSec = POLL_INTERVAL_MS / 1000;
+  const budget = Math.floor(
+    transitionDurationSec * PATTERN_DEFER_BUDGET_RATIO / pollSec,
+  );
+  return Math.min(HARD_MAX_PATTERN_DEFERS, Math.max(0, budget));
+}
 const MAX_SKIP_ATTEMPTS = 50;
 const MAX_CONSECUTIVE_NETWORK_FAILURES = 3;
 const MAX_PRELOAD_RETRIES = 10;  // Stop auto-DJ after this many consecutive preload failures
@@ -78,12 +114,13 @@ class DJAutoDJ {
    * Pattern-aware deferral counter. When a chord change is imminent on
    * the outgoing track, `triggerTransition` is deferred by one poll tick
    * (~500 ms) so the crossfade lands past the chord resolution instead
-   * of splitting it. After `MAX_PATTERN_DEFERS` deferrals (~2.5 s, half
-   * the shortest transition duration) we fire anyway — a never-resolving
-   * chord change must not stall the Auto-DJ. Reset on transition fire.
+   * of splitting it. Maximum defers is proportional to the transition
+   * duration (see `maxPatternDefers()`) so short transitions don't get
+   * eaten by deferrals — if the whole fade is only 2 s long, we can't
+   * spend 2.5 s deferring. Reset on transition fire.
    */
   private patternDeferCount = 0;
-  private static readonly MAX_PATTERN_DEFERS = 5;
+  // Exported tuning constants live at module scope — see top of file.
   private lastCrossfaderValue = -1;
   private crossfaderStuckCount = 0;
   // Watchdog for stuck transitions. Max possible legit duration is 32 bars
@@ -461,11 +498,12 @@ class DJAutoDJ {
           // Smart Cuts opt-in for transition TYPE). If a chord change
           // is imminent on the outgoing track we'd rather let it
           // resolve, then crossfade into the incoming. One-poll defer
-          // (~500 ms) at a time; hard cap so a genuinely chord-heavy
-          // ending can't stall the mix.
-          if (this.shouldDeferForPatternData()) {
+          // (~500 ms) at a time; cap proportional to transitionDuration
+          // so short fades don't get stalled by the defer budget.
+          if (this.shouldDeferForPatternData(transitionDuration)) {
+            const maxDefers = this.maxPatternDefers(transitionDuration);
             console.log(
-              `[AutoDJ] Deferring transition: chord change imminent on outgoing (defer ${this.patternDeferCount + 1}/${DJAutoDJ.MAX_PATTERN_DEFERS})`,
+              `[AutoDJ] Deferring transition: chord change imminent on outgoing (defer ${this.patternDeferCount + 1}/${maxDefers}, fade=${transitionDuration.toFixed(1)}s)`,
             );
             this.patternDeferCount += 1;
             break;
@@ -702,21 +740,31 @@ class DJAutoDJ {
 
   /**
    * Pattern-aware deferral predicate. Returns true when the outgoing
-   * deck's loaded song has a chord change inside the next bar from
-   * the current row — in that window, a hard crossfade splits the
-   * chord transition and sounds broken. One poll's defer (~500 ms)
-   * moves the fire onto the resolved bar.
+   * deck's loaded song has a chord change inside the next 8 rows
+   * (half a bar at typical tracker speed) from the current row — in
+   * that tight window, a hard crossfade splits the chord transition
+   * and sounds broken. One poll's defer (~500 ms) moves the fire
+   * onto the resolved bar.
    *
    * Applies even when `autoDJSmartCuts` is OFF — this is a timing
    * refinement, not a transition-type change, so it doesn't run
    * afoul of the 2026-04-18 gig-fix rule against auto hard cuts.
    *
-   * Hard cap: after `MAX_PATTERN_DEFERS` consecutive deferrals we
-   * return false regardless — a never-resolving chord progression
-   * or a broken chord detector must NEVER be able to stall the mix.
+   * Early-outs that prevent deferral-stalls:
+   * 1. `transitionDuration < MIN_TRANSITION_FOR_DEFER_SEC` — short
+   *    fades can't afford ANY defer; firing on time beats firing
+   *    musically.
+   * 2. `patternDeferCount >= maxPatternDefers(transitionDuration)` —
+   *    proportional cap (15% of fade duration) so a 10s fade burns
+   *    at most ~1.5s on deferrals, a 2s fade burns none.
+   * 3. `HARD_MAX_PATTERN_DEFERS` absolute ceiling regardless of
+   *    transition length — a broken chord detector cannot stall the
+   *    mix beyond 5 polls (~2.5s).
    */
-  private shouldDeferForPatternData(): boolean {
-    if (this.patternDeferCount >= DJAutoDJ.MAX_PATTERN_DEFERS) return false;
+  private shouldDeferForPatternData(transitionDurationSec: number): boolean {
+    if (transitionDurationSec < MIN_TRANSITION_FOR_DEFER_SEC) return false;
+    const maxDefers = computeMaxPatternDefers(transitionDurationSec);
+    if (this.patternDeferCount >= maxDefers) return false;
     try {
       const deck = getDJEngine().getDeck(this.activeDeck);
       const song = deck.getLoadedSong();
@@ -727,11 +775,20 @@ class DJAutoDJ {
         song,
         patternIndex,
         currentRow: state.pattPos,
-        windowRows: 16,
+        // Tight half-bar window — only catches TRULY imminent changes
+        // (the one the crossfade would split). Wider windows produced
+        // too many deferrals in dense tracker progressions where chord
+        // changes happen every couple of bars anyway.
+        windowRows: 8,
       });
     } catch {
       return false;
     }
+  }
+
+  /** Thin wrapper exposing the scaling helper for in-class callers. */
+  private maxPatternDefers(transitionDurationSec: number): number {
+    return computeMaxPatternDefers(transitionDurationSec);
   }
 
   // ── Private: Transition ──────────────────────────────────────────────────
