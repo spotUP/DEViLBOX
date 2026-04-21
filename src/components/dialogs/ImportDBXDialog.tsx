@@ -42,11 +42,13 @@ export const ImportDBXDialog: React.FC<ImportDBXDialogProps> = ({
     setPreview(null);
     setError(null);
 
-    file.text().then(text => {
+    file.arrayBuffer().then(buffer => {
       try {
+        const { decompressProject } = require('@/lib/projectCompression');
+        const text = decompressProject(buffer);
         const data = JSON.parse(text);
         setPreview({
-          name:            data.metadata?.name        || file.name.replace(/\.dbx$/i, ''),
+          name:            data.metadata?.name        || file.name.replace(/\.(dbx|dvbx)$/i, ''),
           author:          data.metadata?.author      || '',
           description:     data.metadata?.description || '',
           bpm:             typeof data.bpm === 'number' ? data.bpm : 120,
