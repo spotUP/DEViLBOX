@@ -454,6 +454,7 @@ export const AVAILABLE_EFFECTS: AvailableEffect[] = [
   { category: 'wasm', type: 'EQ12Band', label: '12-Band EQ', group: 'EQ & Filter', description: '12-band equalizer' },
   { category: 'wasm', type: 'GEQ31', label: '31-Band Graphic EQ', group: 'EQ & Filter', description: '31-band graphic equalizer' },
   { category: 'wasm', type: 'DynamicEQ', label: 'Dynamic EQ', group: 'EQ & Filter', description: 'Frequency-selective dynamic EQ' },
+  { category: 'wasm', type: 'ResonanceTamer', label: 'Resonance Tamer', group: 'EQ & Filter', description: 'Auto-clear fighting frequencies — Soothe-style master insert' },
   { category: 'wasm', type: 'Kuiza', label: 'Kuiza EQ', group: 'EQ & Filter', description: 'Smooth parametric EQ' },
   { category: 'wasm', type: 'ZamEQ2', label: 'ZAM EQ2', group: 'EQ & Filter', description: 'Stereo parametric EQ' },
   { category: 'wasm', type: 'BassEnhancer', label: 'Bass Enhancer', group: 'EQ & Filter', description: 'Sub-harmonic bass enhancement' },

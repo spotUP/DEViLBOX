@@ -267,6 +267,75 @@ export const DynamicEQEditor: React.FC<VisualEffectEditorProps> = ({ effect, onU
 };
 
 // ============================================================================
+// RESONANCE TAMER (Soothe-style automatic resonance suppressor)
+// ============================================================================
+
+export const ResonanceTamerEditor: React.FC<VisualEffectEditorProps> = ({ effect, onUpdateParameter, onUpdateWet }) => {
+  const { pre, post } = useEffectAnalyser(effect.id, 'fft');
+  const amount = getParam(effect, 'amount', 0.35);
+  const charStr = typeof effect.parameters.character === 'string'
+    ? effect.parameters.character
+    : 'transparent';
+
+  return (
+    <div className="space-y-4">
+      <EffectSpectrum pre={pre} post={post} color="#8b5cf6" height={80} />
+      <Section>
+        <SectionHeader size="lg" color="#8b5cf6" title="Resonance Tamer" />
+        <p className="text-[11px] text-text-muted mb-3">
+          Auto-clears fighting frequencies on the master. Add, turn up Amount, done.
+        </p>
+        <div className="flex justify-around items-end">
+          <Knob
+            value={amount}
+            min={0}
+            max={1}
+            onChange={(v) => onUpdateParameter('amount', v)}
+            label="Amount"
+            color="#8b5cf6"
+            formatValue={(v) => `${Math.round(v * 100)}%`}
+          />
+          <Knob
+            value={effect.wet}
+            min={0}
+            max={100}
+            onChange={onUpdateWet}
+            label="Mix"
+            color="#6b7280"
+            formatValue={(v) => `${Math.round(v)}%`}
+          />
+        </div>
+      </Section>
+      <Section>
+        <SectionHeader size="lg" color="#a78bfa" title="Character" />
+        <div className="flex gap-2">
+          {(['transparent', 'warm', 'bright'] as const).map((c) => (
+            <button
+              key={c}
+              onClick={() => onUpdateParameter('character', c)}
+              className={`
+                flex-1 px-3 py-2 rounded text-xs font-mono uppercase transition-all
+                ${charStr === c
+                  ? 'bg-accent-primary/20 text-accent-primary border border-accent-primary'
+                  : 'bg-dark-bgTertiary text-text-muted border border-dark-borderLight hover:text-text-secondary'
+                }
+              `}
+              title={
+                c === 'transparent' ? 'Narrow notches, fast release, minimal artifact' :
+                c === 'warm' ? 'Wider notches, slower release, more aggressive at 2–5 kHz' :
+                'Only notch above 3 kHz — tames sibilance and harsh highs'
+              }
+            >
+              {c}
+            </button>
+          ))}
+        </div>
+      </Section>
+    </div>
+  );
+};
+
+// ============================================================================
 // KUIZA (4-band EQ)
 // ============================================================================
 
