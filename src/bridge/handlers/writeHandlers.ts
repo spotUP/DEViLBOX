@@ -137,6 +137,22 @@ export function clearChannel(params: Record<string, unknown>): Record<string, un
   return { ok: true };
 }
 
+/**
+ * Auto-name channels — runs the ChannelNaming classifier (instruments +
+ * note statistics) and renames generically-named channels (Channel 1/2/3
+ * / CHN / blank) to inferred labels (Drums / Bass / Lead / Hi-Hat / etc.).
+ * Skips channels the user has renamed. Returns the number of renames
+ * applied; zero means nothing needed re-labeling.
+ *
+ * Use when exploring an imported MOD/S3M/IT — after `play_file` or
+ * `load_modland`, call `auto_name_channels` to see what each channel is
+ * likely playing without hunting through the pattern editor.
+ */
+export function autoNameChannels(_params: Record<string, unknown>): Record<string, unknown> {
+  const count = useTrackerStore.getState().autoNameChannels();
+  return { ok: true, renamed: count };
+}
+
 // ─── Pattern Management ────────────────────────────────────────────────────────
 
 export function addPattern(params: Record<string, unknown>): Record<string, unknown> {
