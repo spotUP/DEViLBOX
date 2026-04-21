@@ -16,6 +16,8 @@ import { useTransportStore } from '@/stores/useTransportStore';
 import { useProjectStore } from '@/stores/useProjectStore';
 import { useAutomationStore } from '@/stores/useAutomationStore';
 import { useAudioStore } from '@/stores/useAudioStore';
+import { useDubStore } from '@/stores/useDubStore';
+import { useDrumPadStore } from '@/stores/useDrumPadStore';
 import { useEditorStore } from '@/stores/useEditorStore';
 import { useUIStore } from '@/stores/useUIStore';
 import { getToneEngine } from '@/engine/ToneEngine';
@@ -856,6 +858,28 @@ async function loadSongFile(file: File, options: FileLoadOptions, preReadBuffer?
     if (songData.masterEffects) useAudioStore.getState().setMasterEffects(songData.masterEffects);
 
     loadPatterns(patterns);
+
+    // Restore automation curves, dub bus voicing, and Auto Dub state.
+    // The export side writes all three (exporters.ts: automationCurves,
+    // dubBus, autoDub); without these calls a reload would silently drop
+    // user-drawn curves, the character preset, and the autonomous
+    // performer's persona / intensity / blacklist.
+    if (Array.isArray(songData.automationCurves) && songData.automationCurves.length > 0) {
+      useAutomationStore.getState().loadCurves(songData.automationCurves);
+    }
+    if (songData.dubBus && typeof songData.dubBus === 'object') {
+      // setDubBus shallow-merges over defaults so older .dbx files missing
+      // newer fields still load cleanly.
+      useDrumPadStore.getState().setDubBus(songData.dubBus);
+    }
+    if (songData.autoDub && typeof songData.autoDub === 'object') {
+      const ad = songData.autoDub;
+      const dub = useDubStore.getState();
+      if (typeof ad.enabled === 'boolean')   dub.setAutoDubEnabled(ad.enabled);
+      if (typeof ad.intensity === 'number')  dub.setAutoDubIntensity(ad.intensity);
+      if (typeof ad.persona === 'string')    dub.setAutoDubPersona(ad.persona);
+      if (Array.isArray(ad.moveBlacklist))   dub.setAutoDubMoveBlacklist(ad.moveBlacklist);
+    }
 
     // Restore pattern order: prefer numeric patternOrder, fall back to sequence (pattern IDs)
     if (songData.patternOrder && Array.isArray(songData.patternOrder) && songData.patternOrder.length > 0) {
