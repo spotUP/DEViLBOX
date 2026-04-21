@@ -65,6 +65,24 @@ export class DeckEngine {
   private filterLPF: Tone.Filter;
   readonly channelGain: Tone.Gain;
 
+  /**
+   * Per-channel FX chains — one entry per channel routed through the
+   * deck's EQ/filter via a side-tap. Set/updated by enableChannelFX;
+   * cleared by disableChannelFX.
+   *
+   * Layout: tap.output → eq3 → hpf → lpf → channelGain
+   *
+   * The original channel is pulled from the main mix via
+   * `replayer.setChannelFxRouted(ch, true)` so the two paths don't
+   * double-sum.
+   */
+  private channelFXChains: Map<number, {
+    tap: { output: GainNode; dispose(): void };
+    eq3: Tone.EQ3;
+    hpf: Tone.Filter;
+    lpf: Tone.Filter;
+  }> = new Map();
+
   // Meter for VU display
   readonly meter: Tone.Meter;
 
@@ -1245,6 +1263,11 @@ export class DeckEngine {
       // noise without perceived lag); preset jumps pass a longer ramp for a
       // proper audible crossfade.
       this.eq3[band].rampTo(clamped, rampSec);
+      // Mirror into any active per-channel chains so targeted channels
+      // sweep alongside the deck knob.
+      for (const chain of this.channelFXChains.values()) {
+        chain.eq3[band].rampTo(clamped, rampSec);
+      }
     }
   }
 
@@ -1252,6 +1275,9 @@ export class DeckEngine {
     this.eqKillState[band] = kill;
     // Ramp over 3ms to avoid digital click/pop on instant kill toggle
     this.eq3[band].rampTo(kill ? -Infinity : this.eqValues[band], 0.003);
+    for (const chain of this.channelFXChains.values()) {
+      chain.eq3[band].rampTo(kill ? -Infinity : this.eqValues[band], 0.003);
+    }
   }
 
   getEQKill(band: 'low' | 'mid' | 'high'): boolean {
@@ -1272,19 +1298,24 @@ export class DeckEngine {
 
     const RAMP = 0.03; // 30ms ramp for smooth sweeps
 
+    let lpfTarget: number;
+    let hpfTarget: number;
     if (this.filterPosition >= 0) {
       // LPF active: sweep 20kHz → 100Hz as position goes 0 → 1
-      const lpfFreq = 20000 * Math.pow(100 / 20000, this.filterPosition);
-      this.filterLPF.frequency.rampTo(lpfFreq, RAMP);
-      // HPF fully open
-      this.filterHPF.frequency.rampTo(20, RAMP);
+      lpfTarget = 20000 * Math.pow(100 / 20000, this.filterPosition);
+      hpfTarget = 20;
     } else {
       // HPF active: sweep 20Hz → 10kHz as position goes 0 → -1
       const amount = -this.filterPosition; // 0..1
-      const hpfFreq = 20 * Math.pow(10000 / 20, amount);
-      this.filterHPF.frequency.rampTo(hpfFreq, RAMP);
-      // LPF fully open
-      this.filterLPF.frequency.rampTo(20000, RAMP);
+      hpfTarget = 20 * Math.pow(10000 / 20, amount);
+      lpfTarget = 20000;
+    }
+    this.filterLPF.frequency.rampTo(lpfTarget, RAMP);
+    this.filterHPF.frequency.rampTo(hpfTarget, RAMP);
+    // Mirror sweeps into active per-channel chains.
+    for (const chain of this.channelFXChains.values()) {
+      chain.lpf.frequency.rampTo(lpfTarget, RAMP);
+      chain.hpf.frequency.rampTo(hpfTarget, RAMP);
     }
   }
 
@@ -1292,6 +1323,10 @@ export class DeckEngine {
     this.filterResonance = Math.max(0.5, Math.min(15, q));
     this.filterHPF.Q.rampTo(this.filterResonance, 0.05);
     this.filterLPF.Q.rampTo(this.filterResonance, 0.05);
+    for (const chain of this.channelFXChains.values()) {
+      chain.hpf.Q.rampTo(this.filterResonance, 0.05);
+      chain.lpf.Q.rampTo(this.filterResonance, 0.05);
+    }
   }
 
   /** Current filter position: -1 (HPF fully closed) … 0 (bypass) … +1 (LPF fully closed). */
@@ -1469,6 +1504,117 @@ export class DeckEngine {
     return this.replayer.openChannelTap(channelIndex);
   }
 
+  // ==========================================================================
+  // PER-CHANNEL FX ROUTING (fxTargetChannels audio layer)
+  // ==========================================================================
+
+  /**
+   * Route a set of channels through their own EQ+HPF+LPF chain instead
+   * of the deck's main chain. Targeted channels are pulled from the main
+   * mix (via `replayer.setChannelFxRouted(ch, true)`) and re-enter via
+   * `channelGain` after the per-channel chain, so the deck's volume /
+   * crossfade / analyser stages still apply.
+   *
+   * Calling with a different set of channels grows/shrinks the active
+   * chains incrementally — re-enabling an already-routed channel is a
+   * no-op. Audio-file mode no-ops (the channel tap API returns null).
+   *
+   * Trade-off: per-channel chains tap ch.gainNode directly, bypassing
+   * the deck's `deckGain` (auto-gain / trim). For fx-target use cases
+   * this is acceptable — the deck trim is close to unity most of the
+   * time. Fixing it later = add a per-channel trim mirror updated in
+   * setTrimGain.
+   */
+  enableChannelFX(channels: number[]): void {
+    if (this._playbackMode !== 'tracker') return;
+    const wanted = new Set(channels);
+    // Tear down chains for channels no longer in the wanted set.
+    for (const [ch, chain] of this.channelFXChains) {
+      if (!wanted.has(ch)) this._disposeChannelFXChain(ch, chain);
+    }
+    // Open new chains.
+    for (const ch of wanted) {
+      if (this.channelFXChains.has(ch)) continue;
+      const tap = this.replayer.openChannelTap(ch);
+      if (!tap) continue;
+
+      const eq3 = new Tone.EQ3({
+        low: this.eqKillState.low ? -Infinity : this.eqValues.low,
+        mid: this.eqKillState.mid ? -Infinity : this.eqValues.mid,
+        high: this.eqKillState.high ? -Infinity : this.eqValues.high,
+      });
+      const hpfFreq = this.filterHPF.frequency.value;
+      const lpfFreq = this.filterLPF.frequency.value;
+      const hpf = new Tone.Filter({
+        type: 'highpass',
+        frequency: hpfFreq,
+        Q: this.filterResonance,
+        rolloff: -24,
+      });
+      const lpf = new Tone.Filter({
+        type: 'lowpass',
+        frequency: lpfFreq,
+        Q: this.filterResonance,
+        rolloff: -24,
+      });
+
+      // Wire tap.output (native GainNode) into Tone.js EQ3. `connect` on
+      // a native GainNode accepts native destinations; getNativeAudioNode
+      // unwraps EQ3's input.
+      try {
+        const eqIn = getNativeAudioNode(eq3 as unknown as Record<string, unknown>);
+        if (eqIn) tap.output.connect(eqIn);
+        else {
+          // Fallback: Tone-to-Tone wiring would require wrapping the tap
+          // in Tone.Gain. If we can't unwrap EQ3, bail and tear down.
+          try { tap.dispose(); } catch { /* ok */ }
+          try { eq3.dispose(); hpf.dispose(); lpf.dispose(); } catch { /* ok */ }
+          continue;
+        }
+        eq3.connect(hpf);
+        hpf.connect(lpf);
+        lpf.connect(this.channelGain);
+      } catch (e) {
+        console.warn(`[DeckEngine] enableChannelFX(${ch}) connect failed:`, e);
+        try { tap.dispose(); } catch { /* ok */ }
+        try { eq3.dispose(); hpf.dispose(); lpf.dispose(); } catch { /* ok */ }
+        continue;
+      }
+
+      // Pull the channel from the main mix.
+      this.replayer.setChannelFxRouted(ch, true);
+      this.channelFXChains.set(ch, { tap, eq3, hpf, lpf });
+    }
+  }
+
+  /** Tear down all active per-channel FX chains and restore those channels to the main mix. */
+  disableChannelFX(): void {
+    for (const [ch, chain] of this.channelFXChains) {
+      this._disposeChannelFXChain(ch, chain);
+    }
+    this.channelFXChains.clear();
+  }
+
+  private _disposeChannelFXChain(
+    ch: number,
+    chain: { tap: { dispose(): void }; eq3: Tone.EQ3; hpf: Tone.Filter; lpf: Tone.Filter },
+  ): void {
+    // Un-route before disposing audio nodes so there's no "click" — the
+    // replayer ramps fxRouteGain back to 1 over 10 ms and the tap still
+    // carries audio for those 10 ms.
+    try { this.replayer.setChannelFxRouted(ch, false); } catch { /* ok */ }
+    try { chain.tap.dispose(); } catch { /* ok */ }
+    try { chain.eq3.dispose(); } catch { /* ok */ }
+    try { chain.hpf.dispose(); } catch { /* ok */ }
+    try { chain.lpf.dispose(); } catch { /* ok */ }
+    this.channelFXChains.delete(ch);
+  }
+
+  /** True when at least one channel is actively FX-routed. */
+  hasChannelFX(): boolean {
+    return this.channelFXChains.size > 0;
+  }
+
   /** Get FFT data (1024 bins, dB values -100 to 0) */
   getFFT(): Float32Array {
     return this.fftAnalyser.getValue() as Float32Array;
@@ -1511,6 +1657,10 @@ export class DeckEngine {
     // fire on disposed audio nodes.
     for (const t of this._stopScratchTimeouts) clearTimeout(t);
     this._stopScratchTimeouts.clear();
+    // Tear down any per-channel FX chains before disposing the replayer
+    // (chain disposal calls replayer.setChannelFxRouted which needs the
+    // replayer still alive).
+    this.disableChannelFX();
     this.replayer.dispose();
     this.audioPlayer.dispose();
     this.fftAnalyser.dispose();

@@ -130,6 +130,16 @@ export const DJDeck: React.FC<DJDeckProps> = ({ deckId }) => {
             try { tap.dispose(); } catch { /* ok */ }
           }
         }
+
+        // Per-channel EQ/filter routing. enableChannelFX is incremental
+        // (grows/shrinks internally based on the wanted set), disable
+        // tears down all chains. Called on every change so the set
+        // stays in sync with the UI.
+        if (wanted.size > 0) {
+          deck.enableChannelFX([...wanted]);
+        } else {
+          deck.disableChannelFX();
+        }
       } catch { /* bus not ready yet — retry on next change */ }
     };
 
@@ -158,6 +168,14 @@ export const DJDeck: React.FC<DJDeckProps> = ({ deckId }) => {
         try { src.dispose(); } catch { /* ok */ }
       }
       openTaps.clear();
+      // Tear down the per-channel FX chain too — the deck may keep
+      // playing in the background if the DJ view un-mounts (e.g. user
+      // switches views mid-set) and we don't want dangling FX chains.
+      try {
+        void import('@/engine/dj/DJEngine').then(({ getDJEngine: getEng }) => {
+          try { getEng().getDeck(deckId).disableChannelFX(); } catch { /* ok */ }
+        });
+      } catch { /* ok */ }
     };
   }, [deckId]);
 
