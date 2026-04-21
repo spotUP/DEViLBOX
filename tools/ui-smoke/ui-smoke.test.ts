@@ -90,6 +90,23 @@ function loadFixtureBase64(path: string): { filename: string; data: string } {
   return { filename: path.split('/').pop()!, data: bytes.toString('base64') };
 }
 
+/** Fetch a module from the Modland mirror (Express proxy at :3011). Returns
+ *  null on any failure — the caller skips the flow rather than failing a
+ *  legitimate CI run when the upstream archive is unreachable. */
+async function loadModlandModuleAsBase64(path: string): Promise<{ filename: string; data: string } | null> {
+  try {
+    const url = `http://localhost:3011/api/modland/download?path=${encodeURIComponent(path)}`;
+    const resp = await fetch(url);
+    if (!resp.ok) return null;
+    const buf = Buffer.from(await resp.arrayBuffer());
+    if (buf.length < 1084) return null;  // MOD header is 1084 bytes
+    const filename = path.split('/').pop()!;
+    return { filename, data: buf.toString('base64') };
+  } catch {
+    return null;
+  }
+}
+
 describe('ui-smoke — flow 01: load + play a real MOD', () => {
   it.runIf(!!client)(
     'loads the committed fixture, plays audibly, and stays error-free',
@@ -865,6 +882,88 @@ describe('ui-smoke — flow 02: view-switch cycle', () => {
           !/WebSocket closed/i.test(e.message),
       );
       expect(critical, `critical errors during view switches: ${JSON.stringify(critical)}`).toEqual([]);
+    },
+    FLOW_TIMEOUT_MS,
+  );
+});
+
+describe('ui-smoke — flow 13: role classification on a real dub song', () => {
+  // Regression test for the 2026-04-21 Auto-Dub role-detection overhaul
+  // (classifySongRoles + SampleSpectrum offline FFT + ChannelAudioClassifier
+  // runtime tap). The committed `mortimer-twang` fixture is too thin to
+  // exercise the full pipeline — its samples are short vocal snippets, so
+  // no channel ever classifies as `bass` or `percussion` and a full
+  // regression of the role path can't land on it.
+  //
+  // This flow pulls world-class-dub.mod from Modland (via Express's /api/
+  // modland/download proxy which has server-side caching), loads it, waits
+  // for Auto-Name Channels + classifySongRoles to settle, then asks the
+  // bridge for the merged role table. On a loaded dub MOD we expect at
+  // least ONE channel to be classified as `percussion` (the kit samples
+  // always do) — if SampleSpectrum regresses to returning 'empty' for
+  // short-burst samples, this test fails loudly.
+  //
+  // Skip gracefully when Modland is unreachable — local dev without
+  // internet, or CI in a sandboxed network, shouldn't red the suite.
+  const MODLAND_PATH = 'pub/modules/Protracker/Skope/world class dub.mod';
+
+  it.runIf(!!client)(
+    'Modland world-class-dub.mod → at least one percussion role detected',
+    async () => {
+      const c = client!;
+      const payload = await loadModlandModuleAsBase64(MODLAND_PATH);
+      if (!payload) {
+        console.warn(`[ui-smoke flow 13] Modland unreachable (${MODLAND_PATH}) — skipping role-classification check`);
+        return;
+      }
+
+      try { await c.call('stop'); } catch { /* ok */ }
+      await sleep(200);
+      await c.call('clear_console_errors');
+
+      await c.call('load_file', { filename: payload.filename, data: payload.data });
+      // Auto-Name Channels fires via setTimeout(0) after loadPatterns; give
+      // it AND the synchronous SampleSpectrum FFT pass a comfortable margin.
+      await sleep(1500);
+
+      const info = await c.call<{ numChannels?: number; numPatterns?: number }>('get_song_info');
+      expect(info.numChannels, 'world-class-dub is a 4-channel MOD').toBe(4);
+      expect((info.numPatterns ?? 0), 'must parse multiple patterns').toBeGreaterThan(4);
+
+      const result = await c.call<{
+        patternsLoaded?: boolean;
+        roles?: string[];
+        offline?: string[];
+        names?: Array<string | null>;
+      }>('get_channel_roles');
+
+      expect(result.patternsLoaded, 'patterns must be in the store').toBe(true);
+      const roles = result.roles ?? [];
+      const offline = result.offline ?? [];
+      const diag = `roles=${JSON.stringify(roles)} offline=${JSON.stringify(offline)} names=${JSON.stringify(result.names)}`;
+
+      // Core regression: Auto-Name + classifySongRoles + SampleSpectrum
+      // together must surface at least one non-empty role. Pre-fix this
+      // was `[empty, empty, pad, empty]`.
+      const nonEmpty = roles.filter((r) => r && r !== 'empty');
+      expect(nonEmpty.length, `expected ≥ 2 non-empty roles: ${diag}`).toBeGreaterThanOrEqual(2);
+
+      // SampleSpectrum specifically: drum-kit channels must classify as
+      // percussion once offline FFT has run. If this drops to 0, it means
+      // the sample-spectrum confidence bump regressed below 0.8 or the
+      // centroid fix was undone.
+      const percCount = roles.filter((r) => r === 'percussion').length;
+      expect(percCount, `expected ≥ 1 percussion channel: ${diag}`).toBeGreaterThanOrEqual(1);
+
+      // Console should stay clean — bridge + SampleSpectrum path must not
+      // throw on a real MOD with 23 instruments of varied sample quality.
+      const errs = await c.call<{ entries?: Array<{ level: string; message: string }> }>('get_console_errors');
+      const critical = (errs.entries ?? []).filter(
+        (e) => e.level === 'error' && !/favicon|devtools|MIDI/i.test(e.message),
+      );
+      expect(critical, `load must not surface critical errors: ${JSON.stringify(critical)}`).toEqual([]);
+
+      try { await c.call('stop'); } catch { /* ok */ }
     },
     FLOW_TIMEOUT_MS,
   );
