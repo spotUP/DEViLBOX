@@ -18,6 +18,7 @@ import { classifyChannel, PERCUSSION_NAME_RE, type ChannelAnalysis, type Channel
 import { categorizeSample } from '@/lib/import/maxForLiveImport';
 import { DRUM_SYNTHS } from '@/midi/performance/lightGuide';
 import { analyzeEnvelopeShape } from '@/lib/import/EnvelopeConverter';
+import { analyzeSampleForClassification } from './SampleSpectrum';
 
 // ─── Public types ────────────────────────────────────────────────────────────
 
@@ -102,7 +103,8 @@ const SAMPLE_CATEGORY_MAP: Record<SampleCategory, { role: ChannelRole; subrole?:
 };
 
 /** Classify a single instrument by inspecting its config. Priority order:
- *  explicit drumMachine.drumType > DRUM_SYNTHS set > sample filename >
+ *  explicit drumMachine.drumType > DRUM_SYNTHS set > sample filename (with
+ *  categorize hit) > SAMPLE SPECTRUM (data:audio/wav PCM analysis) >
  *  instrument name regex > envelope shape. Higher-confidence signals win. */
 export function classifyInstrument(inst: InstrumentConfig | null | undefined): InstrumentClassification {
   if (!inst) return { role: 'empty', confidence: 0 };
@@ -134,7 +136,19 @@ export function classifyInstrument(inst: InstrumentConfig | null | undefined): I
     }
   }
 
-  // 4. Instrument name regex. Check drums first (most common + overlaps).
+  // 4. Sample spectrum — read the raw PCM out of data:audio/wav;base64 URLs
+  //    and classify by FFT features (centroid / flatness / envelope). Handles
+  //    MODs whose instrument-name slots hold greeting-scroller text + Amiga
+  //    bass encoded in octave 3 (both defeat the note-stats + name paths).
+  //    Skipped when no URL or the URL isn't a WAV data URL.
+  if (sampleUrl && typeof sampleUrl === 'string' && sampleUrl.length > 0) {
+    const spec = analyzeSampleForClassification(sampleUrl);
+    if (spec && spec.role !== 'empty' && spec.confidence >= 0.5) {
+      return { role: spec.role, subrole: spec.subrole, confidence: spec.confidence };
+    }
+  }
+
+  // 5. Instrument name regex. Check drums first (most common + overlaps).
   const nm = inst.name ?? '';
   if (nm) {
     if (PERCUSSION_NAME_RE.test(nm)) {
@@ -152,7 +166,7 @@ export function classifyInstrument(inst: InstrumentConfig | null | undefined): I
     if (CHORD_NAME_RE.test(nm)) return { role: 'chord',                    confidence: 0.6 };
   }
 
-  // 5. Envelope shape hint (low confidence — only disambiguates).
+  // 6. Envelope shape hint (low confidence — only disambiguates).
   const env = inst.metadata?.originalEnvelope;
   if (env) {
     const shape = analyzeEnvelopeShape(env);
