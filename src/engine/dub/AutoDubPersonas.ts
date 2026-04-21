@@ -35,6 +35,10 @@ export interface AutoDubPersona {
   /** Per-move param overrides applied at fire time. Merged OVER the move's
    *  defaults but UNDER caller-supplied params. */
   paramOverrides?: Record<string, Record<string, number>>;
+  /** Move that best represents this persona when auditioning — fired once
+   *  on click of the audition button so the user can hear the character
+   *  without enabling Auto Dub. */
+  signatureMove: string;
 }
 
 export const AUTO_DUB_PERSONAS: Record<AutoDubPersonaId, AutoDubPersona> = {
@@ -45,6 +49,7 @@ export const AUTO_DUB_PERSONAS: Record<AutoDubPersonaId, AutoDubPersona> = {
     suggestedCharacterPreset: null,
     intensityDefault: 0.5,
     weights: {},
+    signatureMove: 'echoThrow',
   },
 
   tubby: {
@@ -67,6 +72,7 @@ export const AUTO_DUB_PERSONAS: Record<AutoDubPersonaId, AutoDubPersona> = {
       echoBuildUp:    0.8,
     },
     variance: 0.0,
+    signatureMove: 'echoThrow',
   },
 
   scientist: {
@@ -90,6 +96,7 @@ export const AUTO_DUB_PERSONAS: Record<AutoDubPersonaId, AutoDubPersona> = {
       echoBuildUp: { feedback: 0.85 },
     },
     variance: 0.05,
+    signatureMove: 'echoBuildUp',
   },
 
   perry: {
@@ -111,6 +118,7 @@ export const AUTO_DUB_PERSONAS: Record<AutoDubPersonaId, AutoDubPersona> = {
       filterDrop:     0.8,
     },
     variance: 0.35,
+    signatureMove: 'reverseEcho',
   },
 
   madProfessor: {
@@ -135,6 +143,7 @@ export const AUTO_DUB_PERSONAS: Record<AutoDubPersonaId, AutoDubPersona> = {
       echoThrow: { throwBeats: 6, feedbackBoost: 0.1 },
     },
     variance: 0.05,
+    signatureMove: 'stereoDoubler',
   },
 
   jammy: {
@@ -155,6 +164,7 @@ export const AUTO_DUB_PERSONAS: Record<AutoDubPersonaId, AutoDubPersona> = {
       reverseEcho: 0.3,
     },
     variance: 0.0,
+    signatureMove: 'tapeStop',
   },
 };
 
