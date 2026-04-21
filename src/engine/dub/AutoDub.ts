@@ -24,6 +24,12 @@ import { useInstrumentStore } from '@/stores/useInstrumentStore';
 import { useOscilloscopeStore } from '@/stores/useOscilloscopeStore';
 import { type ChannelRole } from '@/bridge/analysis/MusicAnalysis';
 import { classifySongRoles, isGenericChannelName } from '@/bridge/analysis/ChannelNaming';
+import {
+  updateChannelClassifierFromTap,
+  getAllRuntimeChannelRoles,
+  mergeOfflineAndRuntimeRoles,
+  resetRuntimeChannelClassifier,
+} from '@/bridge/analysis/ChannelAudioClassifier';
 import type { Pattern } from '@/types/tracker';
 import type { InstrumentConfig } from '@/types/instrument/defaults';
 
@@ -551,18 +557,36 @@ function detectTransientsFromOscilloscope(): number[] {
   }
 }
 
+/** Feed the live tap into the runtime channel classifier (ChannelAudio-
+ *  Classifier). Same data source as `detectTransientsFromOscilloscope` but
+ *  accumulates samples into a ring buffer for spectral classification. */
+function updateRuntimeClassifierFromOscilloscope(): void {
+  try {
+    const osc = useOscilloscopeStore.getState();
+    const data = osc.channelData;
+    if (!Array.isArray(data) || data.length === 0) return;
+    updateChannelClassifierFromTap(data);
+  } catch { /* classifier must never throw into the tick loop */ }
+}
+
 /** Resolve the currently-playing pattern's channel roles + the pattern
  *  itself (used by the look-ahead / density helpers) + the channel-name
  *  array (for user-rename boost). Returns a neutral bundle when no song
  *  is loaded — callers fall through to the Phase-1 behaviour.
  *
- *  Roles come from `classifySongRoles` (richest pattern per channel) rather
- *  than `classifyPattern(currentPattern)`: libopenmpt-driven MODs routinely
- *  leave `currentPatternIndex` on a nearly-empty intro pattern during
- *  playback, which used to collapse the role table to all-`empty` and
- *  skip every role-targeted rule (channelMute / echoThrow / snareCrack).
- *  Pattern/currentRow/names still come from the CURRENT pattern because
- *  look-ahead and the rename boost need the live playhead. */
+ *  Roles come from a three-stage pipeline:
+ *    1. `classifySongRoles` — offline: picks the richest pattern per channel
+ *       and classifies via note-stats + instrument metadata + sample FFT.
+ *       Handles the 2026-04-21 bug where libopenmpt-driven MODs left
+ *       currentPatternIndex on a near-empty intro, collapsing every role
+ *       to `empty`.
+ *    2. `getAllRuntimeChannelRoles` — runtime: reads the live audio tap
+ *       from useOscilloscopeStore (which the WASM per-channel isolation
+ *       already feeds) and classifies by sustained spectral features.
+ *    3. `mergeOfflineAndRuntimeRoles` — promotes offline=`empty|pad`
+ *       channels to `bass|percussion|lead` when runtime strongly disagrees.
+ *       Keeps strong offline roles intact so runtime doesn't override a
+ *       correctly-detected bass/perc with a transient misread. */
 function getCurrentPatternBundle(): {
   roles: ChannelRole[];
   pattern: Pattern | null;
@@ -585,8 +609,12 @@ function getCurrentPatternBundle(): {
       if (inst && typeof inst.id === 'number') lookup.set(inst.id, inst);
     }
 
+    const offlineRoles = classifySongRoles(patterns, lookup);
+    const runtimeHints = getAllRuntimeChannelRoles(offlineRoles.length);
+    const mergedRoles = mergeOfflineAndRuntimeRoles(offlineRoles, runtimeHints);
+
     return {
-      roles: classifySongRoles(patterns, lookup),
+      roles: mergedRoles,
       pattern,
       names: pattern.channels.map(c => c.name ?? null),
       currentRow: transport.currentRow ?? 0,
@@ -618,11 +646,18 @@ function tickImpl(): void {
     _wetFiredThisBar = 0;
   }
 
+  // Feed the live tap into the runtime spectral classifier BEFORE the
+  // bundle is resolved — the bundle reads the classifier's current roles
+  // and merges them with the offline analysis. Cheap: one FFT pass per
+  // non-empty channel, capped at 4× per second by the tick cadence.
+  updateRuntimeClassifierFromOscilloscope();
+
   const persona = getPersona(dub.autoDubPersona);
   const bundle = getCurrentPatternBundle();
   const roles = bundle.roles;
   const channelCount = roles.length > 0 ? roles.length : getChannelCount();
   const transientChannels = detectTransientsFromOscilloscope();
+
   // Density window: roughly a bar of notes at standard tracker speed.
   // Matches the look-ahead window so the two signals agree on what "the
   // upcoming passage" means.
@@ -672,6 +707,10 @@ export function startAutoDub(): void {
   _wetFiredThisBar = 0;
   _moveLastFiredBar.clear();
   _rollingPeaks.length = 0;
+  // Drop any runtime role votes from a previous session / previous song so
+  // stale classifications don't bleed into a fresh bundle. The classifier
+  // needs ~2 s of live audio to refill before it starts voting again.
+  resetRuntimeChannelClassifier();
   _timer = setInterval(tickImpl, TICK_MS);
 }
 
