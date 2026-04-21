@@ -65,8 +65,17 @@ const pendingHolds = new Map<string, {
  */
 export function startDubRecorder(): () => void {
   const unsubFire = subscribeDubRouter((fireEvent) => {
-    if (fireEvent.source !== 'live') return;   // don't re-record lane playback
-    if (!useDubStore.getState().armed) return;
+    if (fireEvent.source !== 'live') {
+      // Lane-replayed fire — skip (would loop forever if we re-captured it)
+      return;
+    }
+    if (!useDubStore.getState().armed) {
+      // Recorder not armed. Log once per fire so the user can see Auto Dub
+      // is firing but capture is off. Noisy in prod — keep only while
+      // diagnosing the "nothing appears in pattern editor" report.
+      console.log(`[DubRecorder] skip (not armed) — ${fireEvent.moveId} ch${fireEvent.channelId ?? 'G'}`);
+      return;
+    }
 
     const eventId = uuid();
     const event: DubEvent = {
@@ -105,19 +114,39 @@ export function startDubRecorder(): () => void {
       // through to curve/lane-only if missing.
       const moveKind = DUB_MOVE_KINDS?.[fireEvent.moveId];
       const cellRow = Math.floor(fireEvent.row);
-      if (
+      const canWriteCell =
         fireEvent.channelId !== undefined
         && moveKind === 'trigger'
         && cellRow >= 0 && cellRow < pattern.length
-        && fireEvent.channelId >= 0 && fireEvent.channelId < pattern.channels.length
-      ) {
-        const encoded = encodeDubEffect(fireEvent.moveId, fireEvent.channelId);
+        && fireEvent.channelId >= 0 && fireEvent.channelId < pattern.channels.length;
+      if (canWriteCell) {
+        const chId = fireEvent.channelId as number; // canWriteCell proved != undefined
+        const encoded = encodeDubEffect(fireEvent.moveId, chId);
         if (encoded) {
-          tracker.setCell(fireEvent.channelId, cellRow, {
+          console.log(
+            `[DubRecorder] cell ← ${fireEvent.moveId} ch${chId} row${cellRow} `
+            + `(effTyp=${encoded.effTyp} eff=0x${encoded.eff.toString(16).padStart(2, '0')} `
+            + `patIdx=${patternIdx})`,
+          );
+          tracker.setCell(chId, cellRow, {
             effTyp: encoded.effTyp,
             eff: encoded.eff,
           });
+        } else {
+          console.warn(`[DubRecorder] encodeDubEffect returned null for ${fireEvent.moveId}`);
         }
+      } else {
+        // Log why we skipped — this is the critical diagnostic.
+        const reasons: string[] = [];
+        if (fireEvent.channelId === undefined) reasons.push('no channelId (global move)');
+        if (moveKind !== 'trigger') reasons.push(`kind=${moveKind ?? 'undefined'}`);
+        if (cellRow < 0 || cellRow >= pattern.length) reasons.push(`row ${cellRow} out of 0..${pattern.length}`);
+        if (fireEvent.channelId !== undefined && (fireEvent.channelId < 0 || fireEvent.channelId >= pattern.channels.length)) {
+          reasons.push(`ch ${fireEvent.channelId} out of 0..${pattern.channels.length}`);
+        }
+        console.log(
+          `[DubRecorder] skip-cell ${fireEvent.moveId} ch${fireEvent.channelId ?? 'G'} row${cellRow} — ${reasons.join(', ')}`,
+        );
       }
 
       // Global moves (no channel) and hold-kind moves (any channel) → write
