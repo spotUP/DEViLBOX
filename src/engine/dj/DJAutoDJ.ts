@@ -23,6 +23,8 @@ import {
 } from './DJQuantizedFX';
 import { loadPlaylistTrackToDeck } from './DJTrackLoader';
 import { keyCompatibility } from './DJKeyUtils';
+import { detectDrumBreakTail, isChordChangeImminent } from './smartCuts';
+import type { TrackerSong } from '@/engine/TrackerReplayer';
 
 // ── Transition Types ────────────────────────────────────────────────────────
 
@@ -721,8 +723,31 @@ class DJAutoDJ {
     const outState = store.decks[this.activeDeck];
     const inState = store.decks[this.idleDeck];
 
+    // Smart Cuts — when enabled, pass loaded song data so selectTransitionType
+    // can override with evidence-based decisions (drum-break tail cut,
+    // chord-change defer, harmonic bass-swap). The store flag is
+    // `autoDJSmartCuts` (defaults false). We only fetch songs for tracker-
+    // format decks; audio-file decks return null from getLoadedSong.
+    let outSong: TrackerSong | null = null;
+    let inSong: TrackerSong | null = null;
+    if (store.autoDJSmartCuts) {
+      try {
+        outSong = getDJEngine().getDeck(this.activeDeck).getLoadedSong();
+        inSong = getDJEngine().getDeck(this.idleDeck).getLoadedSong();
+      } catch { /* engine not ready — fall through without pattern data */ }
+    }
+
     // Smart transition type selection (still informs WHICH transition)
-    const transType = this.selectTransitionType(outState, inState);
+    const transType = this.selectTransitionType(outState, inState, {
+      smartCuts: store.autoDJSmartCuts,
+      outSong,
+      inSong,
+      // Outgoing pattern index (via patternOrder lookup) + row — used by
+      // the chord-change-imminent predicate. Falls back to -1 ("scan the
+      // last pattern") when songPos is out of range or song is null.
+      outPatternIndex: outSong ? (outSong.songPositions[outState.songPos] ?? -1) : -1,
+      outRow: outState.pattPos,
+    });
 
     // Transition duration is driven by the caller's userBars (either the
     // user-configured autoDJTransitionBars or SKIP_TRANSITION_BARS). Cut is
@@ -782,12 +807,61 @@ class DJAutoDJ {
 
   /**
    * Intelligently select transition type based on track characteristics.
+   *
+   * When `smartCuts` is true, pattern-data analysis can override the
+   * default decision:
+   *   - Drum-break tail on outgoing → force 'cut' (opt-in only — bypasses
+   *     the 2026-04-18 gig-fix that bans random cuts, since this cut is
+   *     evidence-based, not probabilistic)
+   *   - Perfect/energy-boost key compat + high energy → deterministic
+   *     'bass-swap' instead of the 30% random roll used by the default
+   *     path (harmonic bass-swap is always right when keys agree)
    */
-  private selectTransitionType(outgoing: { effectiveBPM: number; energy?: number; musicalKey?: string | null }, incoming: { effectiveBPM: number; energy?: number; musicalKey?: string | null }): TransitionType {
+  private selectTransitionType(
+    outgoing: { effectiveBPM: number; energy?: number; musicalKey?: string | null },
+    incoming: { effectiveBPM: number; energy?: number; musicalKey?: string | null },
+    smartCtx?: {
+      smartCuts: boolean;
+      outSong: TrackerSong | null;
+      inSong: TrackerSong | null;
+      outPatternIndex: number;
+      outRow: number;
+    },
+  ): TransitionType {
     const bpmDiff = Math.abs((outgoing.effectiveBPM || 125) - (incoming.effectiveBPM || 125));
     const outEnergy = outgoing.energy ?? 0.5;
     const inEnergy = incoming.energy ?? 0.5;
     const keyCompat = keyCompatibility(outgoing.musicalKey, incoming.musicalKey);
+
+    // Smart Cuts — opt-in pattern-data override. Highest priority so drum-
+    // break cuts win over every probabilistic path below.
+    if (smartCtx?.smartCuts) {
+      if (detectDrumBreakTail({ song: smartCtx.outSong })) {
+        // Chord-change avoidance: hard cuts sound broken across a chord
+        // change. If one's imminent on the outgoing pattern, fall through
+        // to crossfade (natural harmonic cover) instead.
+        const chordImminent = isChordChangeImminent({
+          song: smartCtx.outSong,
+          patternIndex: smartCtx.outPatternIndex,
+          currentRow: smartCtx.outRow,
+          windowRows: 16,
+        });
+        if (chordImminent) {
+          console.log('[AutoDJ] Smart Cuts: drum-break tail but chord change imminent → crossfade');
+          return 'crossfade';
+        }
+        console.log('[AutoDJ] Smart Cuts: drum-break tail detected → cut');
+        return 'cut';
+      }
+      // Harmonic bass-swap — when keys agree AND energy is high, bass-swap
+      // always sounds better than a plain crossfade. Remove the probabilistic
+      // gate that the default path uses (Math.random < 0.3).
+      if (bpmDiff < 4 && outEnergy > 0.6
+          && (keyCompat === 'perfect' || keyCompat === 'energy-boost')) {
+        console.log('[AutoDJ] Smart Cuts: harmonic bass-swap (keys compatible)');
+        return 'bass-swap';
+      }
+    }
 
     // Gig-fix (2026-04-18): NEVER auto-select a hard 'cut' transition.
     // Previously the high-energy + close-BPM branch rolled a ~30-50%

@@ -299,6 +299,19 @@ interface DJState {
   autoDJTransitionBars: number;
   autoDJShuffle: boolean;
   autoDJWithFilter: boolean;
+  /**
+   * Smart Cuts — pattern-data-aware transition overrides for Auto DJ.
+   * Off by default (respects the 2026-04-18 gig-fix rule against
+   * random hard cuts). When true, Auto DJ's selectTransitionType can:
+   *   - force a hard cut when the outgoing track's tail is a drum break
+   *   - defer to crossfade when a chord change is imminent
+   *   - make harmonic bass-swap deterministic (vs 30% random roll) for
+   *     key-compatible high-energy pairs
+   * Requires both decks loaded with tracker-format songs — audio-file
+   * decks return null from DeckEngine.getLoadedSong() and the
+   * overrides fall through to the default path.
+   */
+  autoDJSmartCuts: boolean;
 }
 
 interface DJActions {
@@ -376,7 +389,7 @@ interface DJActions {
   setAutoDJEnabled: (enabled: boolean) => void;
   setAutoDJStatus: (status: AutoDJStatus) => void;
   setAutoDJTrackIndices: (current: number, next: number) => void;
-  setAutoDJConfig: (config: Partial<{ transitionBars: number; shuffle: boolean; withFilter: boolean }>) => void;
+  setAutoDJConfig: (config: Partial<{ transitionBars: number; shuffle: boolean; withFilter: boolean; smartCuts: boolean }>) => void;
 }
 
 type DJStore = DJState & DJActions;
@@ -421,6 +434,7 @@ export const useDJStore = create<DJStore>()(
     autoDJTransitionBars: 8,
     autoDJShuffle: false,
     autoDJWithFilter: true,
+    autoDJSmartCuts: false,
 
     // ========================================================================
     // ACTIONS
@@ -745,6 +759,7 @@ export const useDJStore = create<DJStore>()(
         if (config.transitionBars !== undefined) state.autoDJTransitionBars = config.transitionBars;
         if (config.shuffle !== undefined) state.autoDJShuffle = config.shuffle;
         if (config.withFilter !== undefined) state.autoDJWithFilter = config.withFilter;
+        if (config.smartCuts !== undefined) state.autoDJSmartCuts = config.smartCuts;
       }),
   })))
 );
