@@ -265,5 +265,11 @@ export function fireFromEffectCommand(
   const blacklist = useDubStore.getState().autoDubMoveBlacklist ?? [];
   if (blacklist.includes(decoded.moveId)) return null;
   const channelId = decoded.channelId ?? fallbackChannelId;
-  return fire(decoded.moveId, channelId, {}, 'live');
+  // source='lane' — this fire originates from pattern data (a Zxx cell on
+  // replay), NOT from live user input. DubRecorder filters on source and
+  // ignores lane fires, which is essential: without this guard, replaying
+  // a cell would trigger DubRecorder, which would write another cell at
+  // the same row, which would fire again, and so on — infinite capture
+  // loop. Matches DubLanePlayer's source='lane' semantics.
+  return fire(decoded.moveId, channelId, {}, 'lane');
 }

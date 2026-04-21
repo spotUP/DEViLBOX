@@ -21,6 +21,8 @@ import { subscribeDubRouter, subscribeDubRelease } from './DubRouter';
 import { useDubStore, scheduleDubStoreSync } from '@/stores/useDubStore';
 import { useTrackerStore } from '@/stores/useTrackerStore';
 import type { DubEvent } from '@/types/dub';
+import { DUB_MOVE_TABLE, DUB_EFFECT_PERCHANNEL } from './moveTable';
+import { DUB_MOVE_KINDS } from '@/midi/performance/parameterRouter';
 
 function uuid(): string {
   return Math.random().toString(36).slice(2) + Date.now().toString(36);
@@ -63,6 +65,36 @@ export function startDubRecorder(): () => void {
 
       tracker.setPatternDubLane(patternIdx, { ...existing, events });
       useDubStore.getState().markCaptured();
+
+      // Also write a Zxx effect-command cell for per-channel TRIGGER moves
+      // so they're visible inline in the pattern editor, not just in the
+      // dub-lane timeline. Conditions:
+      //   - Move has a channel (per-channel, fits effTyp 37 encoding)
+      //   - Kind is 'trigger' (holds need duration which a single cell
+      //     can't express — those stay in dubLane / will land on a
+      //     Global FX automation curve in a future pass)
+      //   - Move index < 16 (high-nibble encoding)
+      //   - Target row is in range
+      //   - Channel exists in the pattern
+      // DUB_MOVE_KINDS occasionally unresolved under test-env module
+      // initialization (circular-import adjacent): guard with `?? ''` so a
+      // missing kind falls through to dubLane-only without crashing.
+      const moveKind = DUB_MOVE_KINDS?.[fireEvent.moveId];
+      const moveIdx = DUB_MOVE_TABLE.indexOf(fireEvent.moveId);
+      const cellRow = Math.floor(fireEvent.row);
+      if (
+        fireEvent.channelId !== undefined
+        && moveKind === 'trigger'
+        && moveIdx >= 0 && moveIdx < 16
+        && cellRow >= 0 && cellRow < pattern.length
+        && fireEvent.channelId >= 0 && fireEvent.channelId < pattern.channels.length
+      ) {
+        const eff = ((moveIdx & 0x0f) << 4) | (fireEvent.channelId & 0x0f);
+        tracker.setCell(fireEvent.channelId, cellRow, {
+          effTyp: DUB_EFFECT_PERCHANNEL,
+          eff,
+        });
+      }
 
       // Record the pairing so a later release can stamp durationRows on
       // this exact event. We don't know here whether the move is trigger-
