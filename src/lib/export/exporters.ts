@@ -9,6 +9,9 @@ import type { ProjectMetadata } from '@typedefs/project';
 import { APP_VERSION } from '@constants/version';
 import type { AutomationCurve } from '@typedefs/automation';
 import { useFormatStore } from '@stores/useFormatStore';
+import type { DubBusSettings } from '@/types/dub';
+import { useDubStore, type AutoDubPersonaId } from '@/stores/useDubStore';
+import { useDrumPadStore } from '@/stores/useDrumPadStore';
 
 // ── Binary FileData field names in useFormatStore ──
 // These are all the ArrayBuffer/Uint8Array fields that carry native engine data.
@@ -171,6 +174,23 @@ export interface SongExport {
   nativeEngineData?: Record<string, string>; // Base64-encoded binary FileData for native WASM engines
   nativeEngineMeta?: Record<string, unknown>; // JSON-serializable native engine metadata
   replacedInstruments?: number[]; // Instrument IDs replaced with synths for hybrid playback
+
+  /** Dub bus tuning — character preset (Tubby/Scientist/…), echo/spring/
+   *  tape-sat params, HPF, EQ, stereo width. Without this block a saved
+   *  .dbx would reload with DEFAULT_DUB_BUS and lose every sound-design
+   *  tweak the user made. Partial so older .dbx files missing newer fields
+   *  still load — loader spreads over DEFAULT_DUB_BUS. */
+  dubBus?: Partial<DubBusSettings>;
+
+  /** Auto Dub state — enabled flag, persona, intensity, per-session
+   *  move blacklist. Written on export, restored on import so a saved
+   *  performance keeps its autonomous-performer context. */
+  autoDub?: {
+    enabled: boolean;
+    persona: AutoDubPersonaId;
+    intensity: number;
+    moveBlacklist: string[];
+  };
 }
 
 export interface SFXExport {
@@ -254,6 +274,28 @@ export function exportSong(
         }
       } catch { /* replayer not initialized */ }
       return {};
+    })(),
+    // Dub bus tuning snapshot — character preset + all 30+ coloring params.
+    // Captures whatever the user has tuned so reload restores every knob.
+    ...(() => {
+      try {
+        const dubBus = useDrumPadStore.getState().dubBus;
+        return dubBus ? { dubBus } : {};
+      } catch { return {}; }
+    })(),
+    // Auto Dub state — enabled, persona, intensity, move blacklist.
+    ...(() => {
+      try {
+        const s = useDubStore.getState();
+        return {
+          autoDub: {
+            enabled: s.autoDubEnabled,
+            persona: s.autoDubPersona,
+            intensity: s.autoDubIntensity,
+            moveBlacklist: s.autoDubMoveBlacklist ?? [],
+          },
+        };
+      } catch { return {}; }
     })(),
   };
 
