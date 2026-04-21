@@ -55,7 +55,7 @@ import {
 
 // Zynthian-ported EQ, modulation, reverb, delay, stereo, creative editors
 import {
-  ParametricEQEditor, EQ5BandEditor, ZamEQ2Editor, PhonoFilterEditor, DynamicEQEditor, KuizaEditor,
+  ParametricEQEditor, EQ5BandEditor, ZamEQ2Editor, PhonoFilterEditor, DynamicEQEditor, ResonanceTamerEditor, KuizaEditor,
   FlangerEditor, JunoChorusEditor, MultiChorusEditor, CalfPhaserEditor, PulsatorEditor, RingModEditor,
   DragonflyHallEditor, DragonflyPlateEditor, DragonflyRoomEditor, EarlyReflectionsEditor, RoomyEditor,
   ReverseDelayEditor, VintageDelayEditor, ArtisticDelayEditor, SlapbackDelayEditor, ZamDelayEditor, DellaEditor,
@@ -169,6 +169,7 @@ const EFFECT_EDITORS: Record<string, React.FC<VisualEffectEditorProps>> = {
   ZamEQ2: ZamEQ2Editor,
   PhonoFilter: PhonoFilterEditor,
   DynamicEQ: DynamicEQEditor,
+  ResonanceTamer: ResonanceTamerEditor,
   Kuiza: KuizaEditor,
   // Zynthian-ported modulation effects
   Flanger: FlangerEditor,
