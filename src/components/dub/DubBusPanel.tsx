@@ -288,6 +288,125 @@ export const DubBusPanel: React.FC = () => {
             </label>
           )}
 
+          {/* ── Engineer character preset — curated snapshot of coloring ── */}
+          <div className="h-px bg-dark-borderLight my-1" />
+          <div className="text-[10px] font-mono uppercase tracking-wider text-text-muted">
+            Engineer voicing
+          </div>
+          <Choice
+            label="Character"
+            value={dubBus.characterPreset}
+            options={[
+              { value: 'custom',       label: 'Custom (manual)' },
+              { value: 'tubby',        label: 'King Tubby (weight)' },
+              { value: 'scientist',    label: 'Scientist (hollow)' },
+              { value: 'perry',        label: 'Lee Perry (wild)' },
+              { value: 'madProfessor', label: 'Mad Professor (wide)' },
+              { value: 'gatedFlanger', label: 'Gated Flanger (80s)' },
+            ] as const}
+            onChange={(v) => patch({ characterPreset: v })}
+          />
+
+          {/* ── Sound coloring — bass shelf + mid scoop + stereo width ── */}
+          <div className="h-px bg-dark-borderLight my-1" />
+          <div className="text-[10px] font-mono uppercase tracking-wider text-text-muted">
+            Sound coloring
+          </div>
+          <Slider
+            label="Bass shelf"
+            value={dubBus.bassShelfGainDb}
+            min={-6}
+            max={12}
+            step={0.5}
+            onChange={(v) => patch({ bassShelfGainDb: v })}
+            format={(v) => `${v >= 0 ? '+' : ''}${v.toFixed(1)} dB`}
+          />
+          <Slider
+            label="Mid scoop"
+            value={dubBus.midScoopGainDb}
+            min={-12}
+            max={3}
+            step={0.5}
+            onChange={(v) => patch({ midScoopGainDb: v })}
+            format={(v) => `${v >= 0 ? '+' : ''}${v.toFixed(1)} dB`}
+          />
+          <Slider
+            label="Stereo width"
+            value={dubBus.stereoWidth}
+            min={0}
+            max={2}
+            step={0.05}
+            onChange={(v) => patch({ stereoWidth: v })}
+            format={(v) => v === 0 ? 'mono' : v === 1 ? 'stereo' : `${v.toFixed(2)}×`}
+          />
+          <Choice
+            label="Tape sat mode"
+            value={dubBus.tapeSatMode}
+            options={[
+              { value: 'single',    label: 'Single (30 ips)' },
+              { value: 'stack',     label: 'Stack (Perry 4-track)' },
+              { value: 'tape15ips', label: 'Tape 15 ips (heavier)' },
+            ] as const}
+            onChange={(v) => patch({ tapeSatMode: v })}
+          />
+          <label className="flex items-center gap-3 text-[11px] font-mono text-text-secondary">
+            <span className="w-24 shrink-0">HPF stepped</span>
+            <input
+              type="checkbox"
+              checked={dubBus.hpfStepped}
+              onChange={(e) => patch({ hpfStepped: e.target.checked })}
+              className="accent-accent-primary"
+            />
+            <span className="text-[10px] text-text-muted">
+              {dubBus.hpfStepped ? 'Altec "Big Knob" — snaps to 11 positions' : 'continuous sweep'}
+            </span>
+          </label>
+
+          {/* ── Liquid sweep — parallel short-delay comb filter (flanger) ── */}
+          <div className="h-px bg-dark-borderLight my-1" />
+          <div className="text-[10px] font-mono uppercase tracking-wider text-text-muted">
+            Liquid sweep (flanger)
+          </div>
+          <Slider
+            label="Sweep amount"
+            value={dubBus.sweepAmount}
+            min={0}
+            max={1}
+            step={0.01}
+            onChange={(v) => patch({ sweepAmount: v })}
+            format={(v) => v === 0 ? 'off' : `${Math.round(v * 100)}%`}
+          />
+          <Slider
+            label="Sweep rate"
+            value={dubBus.sweepRateHz}
+            min={0.05}
+            max={5}
+            step={0.05}
+            onChange={(v) => patch({ sweepRateHz: v })}
+            format={(v) => `${v.toFixed(2)} Hz`}
+            disabled={dubBus.sweepAmount === 0}
+          />
+          <Slider
+            label="Sweep depth"
+            value={dubBus.sweepDepthMs}
+            min={0.5}
+            max={10}
+            step={0.1}
+            onChange={(v) => patch({ sweepDepthMs: v })}
+            format={(v) => `${v.toFixed(1)} ms`}
+            disabled={dubBus.sweepAmount === 0}
+          />
+          <Slider
+            label="Sweep feedback"
+            value={dubBus.sweepFeedback}
+            min={0}
+            max={0.85}
+            step={0.01}
+            onChange={(v) => patch({ sweepFeedback: v })}
+            format={(v) => `${Math.round(v * 100)}%`}
+            disabled={dubBus.sweepAmount === 0}
+          />
+
           {/* ── Dub Action settings — how much dub-throw/hold/mute pads inject ── */}
           <div className="h-px bg-dark-borderLight my-1" />
           <div className="text-[10px] font-mono uppercase tracking-wider text-text-muted">
