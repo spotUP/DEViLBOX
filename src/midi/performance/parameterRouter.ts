@@ -71,7 +71,7 @@ type ParameterRoute = ConfigRoute | VSTBridgeRoute | EffectRoute | ChannelFilter
  * suffix (0-indexed) gets parsed into a channelId. Global moves use the
  * plain `dub.<moveId>` form.
  */
-const DUB_MOVE_KINDS: Record<string, 'trigger' | 'hold'> = {
+export const DUB_MOVE_KINDS: Record<string, 'trigger' | 'hold'> = {
   // ── Phase 1 moves (original set) ──
   echoThrow:         'trigger',
   dubStab:           'trigger',
@@ -134,7 +134,7 @@ function parseDubMoveParam(param: string): { moveId: string; channelId?: number 
   return { moveId };
 }
 
-function routeDubParameter(param: string, value: number): void {
+function routeDubParameter(param: string, value: number, source: 'live' | 'lane' = 'live'): void {
   // 1. Continuous bus settings
   const busDef = DUB_BUS_PARAMS[param];
   if (busDef) {
@@ -163,7 +163,10 @@ function routeDubParameter(param: string, value: number): void {
     return;
   }
 
-  // 4. Moves — trigger on upward cross, release holds on downward cross
+  // 4. Moves — trigger on upward cross, release holds on downward cross.
+  // `source` propagates through to DubRouter.fire so automation-curve-
+  // triggered moves are tagged 'lane' (DubRecorder ignores lane fires and
+  // won't re-capture them into a feedback loop).
   const parsed = parseDubMoveParam(param);
   if (!parsed) return;
   const { moveId, channelId } = parsed;
@@ -177,7 +180,7 @@ function routeDubParameter(param: string, value: number): void {
   if (kind === 'trigger') {
     if (!wasPressed && isPressed) {
       void import('../../engine/dub/DubRouter').then(({ fire }) => {
-        fire(moveId, channelId, {}, 'live');
+        fire(moveId, channelId, {}, source);
       });
     }
     return;
@@ -186,7 +189,7 @@ function routeDubParameter(param: string, value: number): void {
   // hold semantics
   if (!wasPressed && isPressed) {
     void import('../../engine/dub/DubRouter').then(({ fire }) => {
-      const disp = fire(moveId, channelId, {}, 'live');
+      const disp = fire(moveId, channelId, {}, source);
       if (disp) dubHoldDisposers.set(param, disp);
     });
   } else if (wasPressed && !isPressed) {
@@ -634,6 +637,7 @@ export function routeParameterToEngine(
   param: MappableParameter | string,
   normalizedValue: number,
   instrumentId?: number,
+  source: 'live' | 'lane' = 'live',
 ): void {
   // Push to live subscribers first so DOM knobs can update on every CC
   // without waiting for React re-render. Harmless if no subscriber.
@@ -647,9 +651,10 @@ export function routeParameterToEngine(
 
   // Dub Studio parameters — triggers/holds for moves, plus continuous bus
   // settings. Handled before the PARAMETER_ROUTES lookup so `dub.*` never
-  // falls into the synth-fallback path.
+  // falls into the synth-fallback path. `source` propagates so automation-
+  // curve-triggered dub moves are tagged 'lane' (DubRecorder ignores).
   if (param.startsWith('dub.')) {
-    routeDubParameter(param, normalizedValue);
+    routeDubParameter(param, normalizedValue, source);
     return;
   }
 
