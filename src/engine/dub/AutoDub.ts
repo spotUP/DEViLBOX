@@ -197,6 +197,13 @@ const RULES: Rule[] = [
     baseWeight: 0.12, wet: true },
 ];
 
+/** Unique move IDs Auto Dub can fire. Deduplicated from RULES — several
+ *  moves appear in multiple rules (e.g. echoThrow on bar 3 + transient).
+ *  Exported so the UI can render a blacklist checkbox per move. */
+export const AUTO_DUB_RULE_MOVES: readonly string[] = Array.from(
+  new Set(RULES.map(r => r.moveId))
+).sort();
+
 export interface AutoDubTickCtx {
   bar: number;
   barPos: number;

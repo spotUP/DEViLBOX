@@ -11,10 +11,10 @@
  * voicing. Users with hand-tuned voicing leave it alone.
  */
 
-import React, { useCallback, useEffect } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useDubStore, type AutoDubPersonaId } from '@/stores/useDubStore';
 import { useDrumPadStore } from '@/stores/useDrumPadStore';
-import { startAutoDub, stopAutoDub, isAutoDubRunning } from '@/engine/dub/AutoDub';
+import { startAutoDub, stopAutoDub, isAutoDubRunning, AUTO_DUB_RULE_MOVES } from '@/engine/dub/AutoDub';
 import { getPersona, AUTO_DUB_PERSONAS } from '@/engine/dub/AutoDubPersonas';
 import { fire as fireDub } from '@/engine/dub/DubRouter';
 
@@ -30,7 +30,31 @@ export const AutoDubPanel: React.FC<AutoDubPanelProps> = ({ busEnabled }) => {
   const setIntensity = useDubStore(s => s.setAutoDubIntensity);
   const persona = useDubStore(s => s.autoDubPersona);
   const setPersona = useDubStore(s => s.setAutoDubPersona);
+  const blacklist = useDubStore(s => s.autoDubMoveBlacklist);
+  const setBlacklist = useDubStore(s => s.setAutoDubMoveBlacklist);
   const setDubBus = useDrumPadStore(s => s.setDubBus);
+
+  const [blacklistOpen, setBlacklistOpen] = useState(false);
+  const blacklistRef = useRef<HTMLDivElement | null>(null);
+
+  // Click outside to close the blacklist popover.
+  useEffect(() => {
+    if (!blacklistOpen) return;
+    const onDown = (e: MouseEvent) => {
+      if (blacklistRef.current && !blacklistRef.current.contains(e.target as Node)) {
+        setBlacklistOpen(false);
+      }
+    };
+    window.addEventListener('mousedown', onDown);
+    return () => window.removeEventListener('mousedown', onDown);
+  }, [blacklistOpen]);
+
+  const toggleMove = useCallback((moveId: string, allowed: boolean) => {
+    const current = new Set(blacklist);
+    if (allowed) current.delete(moveId);
+    else current.add(moveId);
+    setBlacklist(Array.from(current));
+  }, [blacklist, setBlacklist]);
 
   // Keep the runtime engine in sync with the store flag. Runs on every
   // toggle change so the panic-off path (engine disposes held moves) fires
@@ -140,6 +164,64 @@ export const AutoDubPanel: React.FC<AutoDubPanelProps> = ({ busEnabled }) => {
       >
         ▶
       </button>
+
+      {/* Move blacklist — per-session allow/deny list. Unchecking a move
+          adds it to autoDubMoveBlacklist so the rule engine skips it. */}
+      <div className="relative" ref={blacklistRef}>
+        <button
+          type="button"
+          className={
+            'px-1.5 py-0.5 rounded border text-[10px] font-mono transition-colors disabled:opacity-50 ' +
+            (blacklist.length > 0
+              ? 'bg-accent-warning/20 border-accent-warning text-accent-warning'
+              : 'bg-dark-bgTertiary border-dark-border text-text-muted hover:text-accent-highlight hover:border-accent-highlight')
+          }
+          onClick={() => setBlacklistOpen(v => !v)}
+          disabled={disabled}
+          title={blacklist.length > 0
+            ? `${blacklist.length} move${blacklist.length === 1 ? '' : 's'} blacklisted — click to edit`
+            : 'Move blacklist — exclude specific moves per session'}
+        >
+          ⚙
+        </button>
+        {blacklistOpen && (
+          <div className="absolute top-full left-0 mt-1 z-[99990] w-48 max-h-80 overflow-y-auto bg-dark-bgSecondary border border-dark-border rounded-md shadow-lg p-2 font-mono text-[10px]">
+            <div className="flex items-center justify-between mb-1.5 pb-1 border-b border-dark-border">
+              <span className="text-text-secondary font-bold">MOVES</span>
+              <button
+                type="button"
+                className="text-text-muted hover:text-accent-highlight text-[9px]"
+                onClick={() => setBlacklist([])}
+                disabled={blacklist.length === 0}
+                title="Re-enable every move"
+              >
+                reset
+              </button>
+            </div>
+            <div className="flex flex-col gap-0.5">
+              {AUTO_DUB_RULE_MOVES.map(moveId => {
+                const allowed = !blacklist.includes(moveId);
+                return (
+                  <label
+                    key={moveId}
+                    className="flex items-center gap-1.5 px-1 py-0.5 rounded hover:bg-dark-bgHover cursor-pointer"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={allowed}
+                      onChange={(e) => toggleMove(moveId, e.target.checked)}
+                      className="accent-accent-highlight"
+                    />
+                    <span className={allowed ? 'text-text-primary' : 'text-text-muted line-through'}>
+                      {moveId}
+                    </span>
+                  </label>
+                );
+              })}
+            </div>
+          </div>
+        )}
+      </div>
 
 
       <div className="flex items-center gap-1">
