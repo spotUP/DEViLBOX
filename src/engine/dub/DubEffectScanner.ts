@@ -17,9 +17,10 @@
 
 import { fireFromEffectCommand } from './DubRouter';
 import { useTrackerStore } from '@/stores/useTrackerStore';
+import { DUB_EFFECT_GLOBAL, DUB_EFFECT_PARAM_STEP } from './moveTable';
 
-const DUB_EFFECT_MIN = 33;
-const DUB_EFFECT_MAX = 35;
+const DUB_EFFECT_MIN = DUB_EFFECT_GLOBAL;        // 36
+const DUB_EFFECT_MAX = DUB_EFFECT_PARAM_STEP;    // 38
 
 let _lastRowFired = -1;
 

@@ -50,25 +50,44 @@ export const DUB_MOVE_TABLE: readonly string[] = [
 export const DUB_MOVE_TABLE_VERSION = 27;
 
 /**
- * Decode an effect-command byte. `effTyp 33` = global move: eff high nibble
- * is move index 0-15; low nibble is a variant slot reserved for future args
- * (always 0 today). `effTyp 34` = per-channel: eff high nibble is move index,
- * low nibble is target channel 0-15.
+ * Dub effect-command slots. Picked at 36-38 to sit BEYOND the existing
+ * 0-35 XM/IT effect-type range (documented as "XM effect type" in
+ * `TrackerCell`) so no existing importer ever produces them and no
+ * replayer dispatches on them. Moving here from the earlier 33-35
+ * range prevents a serious collision: OpenMPTConverter already emits
+ * `effTyp: 33` for `CMD_XFINEPORTAUPDOWN`, which our scanner was
+ * misinterpreting as a dub-move trigger — fine-porta commands fired
+ * arbitrary dub moves on every playback, producing pattern-level
+ * distortion on any imported MOD/XM/IT song with fine porta.
  *
- * Returns null when the move index is out of range — caller falls through to
- * a no-op rather than firing garbage.
+ *  - `DUB_EFFECT_GLOBAL` (36)    — `eff` high nibble = move index 0-15
+ *  - `DUB_EFFECT_PERCHANNEL` (37) — high nibble = move, low nibble = target channel 0-15
+ *  - `DUB_EFFECT_PARAM_STEP` (38) — high nibble = param index, low nibble = 0-15 step
+ */
+export const DUB_EFFECT_GLOBAL     = 36;
+export const DUB_EFFECT_PERCHANNEL = 37;
+export const DUB_EFFECT_PARAM_STEP = 38;
+
+/**
+ * Decode an effect-command byte. `DUB_EFFECT_GLOBAL` = global move: eff
+ * high nibble is move index 0-15; low nibble is a variant slot reserved
+ * for future args (always 0 today). `DUB_EFFECT_PERCHANNEL` = per-channel:
+ * eff high nibble is move index, low nibble is target channel 0-15.
+ *
+ * Returns null when the effTyp isn't a dub slot or the move index is out
+ * of range — caller falls through to a no-op rather than firing garbage.
  */
 export function decodeDubEffect(effTyp: number, eff: number): {
   moveId: string;
   channelId?: number;
 } | null {
+  if (effTyp !== DUB_EFFECT_GLOBAL && effTyp !== DUB_EFFECT_PERCHANNEL) return null;
   const moveIdx = (eff >> 4) & 0x0f;
   if (moveIdx >= DUB_MOVE_TABLE.length) return null;
   const moveId = DUB_MOVE_TABLE[moveIdx];
-  if (effTyp === 34) {
+  if (effTyp === DUB_EFFECT_PERCHANNEL) {
     return { moveId, channelId: eff & 0x0f };
   }
-  // effTyp === 33 (global) or fallback
   return { moveId };
 }
 
