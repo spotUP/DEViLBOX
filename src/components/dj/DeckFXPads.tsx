@@ -34,7 +34,7 @@ interface DeckFXPadsProps {
   deckId: 'A' | 'B' | 'C';
 }
 
-type PadPage = 'fx' | 'jump' | 'dub' | 'dub2';
+type PadPage = 'fx' | 'jump' | 'dub' | 'dub2' | 'dub3' | 'dub4';
 
 interface PadDef {
   id: string;
@@ -82,12 +82,7 @@ const DUB_PAD_MAP: Record<string, string> = {
   'dub-throw':   'echoThrow',
   'dub-time':    'delayTimeThrow',
   'dub-master':  'masterDrop',
-  // Dub 2 page (added 2026-04-21) — second set of 8 moves for deep
-  // live-throw coverage. Moves that didn't make the main page are
-  // still reachable via drumpad kits / keyboard bindings / MIDI CC:
-  //   stereoDoubler, sonarPing, radioRiser, subSwell, subHarmonic,
-  //   delayPreset380, delayPresetDotted, toast, channelMute,
-  //   channelThrow, transportTapeStop
+  // Dub 2 page — stabs + reverse/tape + bass textures.
   'dub2-stab':    'dubStab',
   'dub2-crack':   'snareCrack',
   'dub2-back':    'backwardReverb',
@@ -96,6 +91,22 @@ const DUB_PAD_MAP: Record<string, string> = {
   'dub2-crush':   'crushBass',
   'dub2-build':   'echoBuildUp',
   'dub2-tape':    'tapeStop',
+  // Dub 3 page — ambient / atmospheric / preset-driven moves.
+  'dub3-wide':    'stereoDoubler',
+  'dub3-ping':    'sonarPing',
+  'dub3-radio':   'radioRiser',
+  'dub3-sub':     'subSwell',
+  'dub3-subh':    'subHarmonic',
+  'dub3-p380':    'delayPreset380',
+  'dub3-pdot':    'delayPresetDotted',
+  'dub3-toast':   'toast',
+  // Dub 4 page — channel + transport edge-case moves. Kept on their
+  // own page because they have preconditions (channel index /
+  // disrupts playback) that aren't obvious from a generic "live
+  // throw" button — the page label + sublabels flag them.
+  'dub4-mute':    'channelMute',
+  'dub4-cthrow':  'channelThrow',
+  'dub4-txstop':  'transportTapeStop',
 };
 
 // Second-page dub pads — stabs + reverse/tape moves + bass textures.
@@ -109,6 +120,33 @@ const DUB2_PADS: PadDef[] = [
   { id: 'dub2-crush',  label: 'CRSH',  sublabel: 'bits',     color: 'gray',   activeColor: 'orange', mode: 'momentary' },
   { id: 'dub2-build',  label: 'BILD',  sublabel: 'echo',     color: 'sky',    activeColor: 'sky',    mode: 'instant' },
   { id: 'dub2-tape',   label: 'TAPE',  sublabel: 'stop',     color: 'teal',   activeColor: 'red',    mode: 'instant' },
+];
+
+// Dub 3 — atmospheric / preset / mic moves. stereoDoubler widens,
+// sonarPing + radioRiser are builds, subSwell + subHarmonic deliver
+// low-end drones, the two delay presets snap canonical timings (Tubby
+// 380 ms, Perry dotted-eighth), TOAST taps the DJ mic through the bus.
+const DUB3_PADS: PadDef[] = [
+  { id: 'dub3-wide',  label: 'WIDE',  sublabel: 'doubler', color: 'teal',   activeColor: 'teal',   mode: 'momentary' },
+  { id: 'dub3-ping',  label: 'PING',  sublabel: 'sonar',   color: 'cyan',   activeColor: 'cyan',   mode: 'instant' },
+  { id: 'dub3-radio', label: 'RADIO', sublabel: 'riser',   color: 'amber',  activeColor: 'amber',  mode: 'instant' },
+  { id: 'dub3-sub',   label: 'SUB',   sublabel: 'swell',   color: 'orange', activeColor: 'orange', mode: 'instant' },
+  { id: 'dub3-subh',  label: 'SUBH',  sublabel: 'harmonic', color: 'indigo', activeColor: 'indigo', mode: 'momentary' },
+  { id: 'dub3-p380',  label: '380',   sublabel: 'tubby',   color: 'blue',   activeColor: 'blue',   mode: 'instant' },
+  { id: 'dub3-pdot',  label: 'DOT',   sublabel: '1/8d',    color: 'blue',   activeColor: 'blue',   mode: 'instant' },
+  { id: 'dub3-toast', label: 'TOST',  sublabel: 'mic',     color: 'rose',   activeColor: 'red',    mode: 'momentary' },
+];
+
+// Dub 4 — channel + transport edge cases. Only 3 pads here (the grid
+// auto-flows). These moves all have preconditions the main DUB pages
+// can't convey cleanly:
+//   MUTE / CTHRW target channel 0 implicitly (no channel picker yet
+//     on the deck — audible effect depends on what's on ch 0)
+//   STOP!  disrupts playback itself (not just the bus tail)
+const DUB4_PADS: PadDef[] = [
+  { id: 'dub4-mute',   label: 'MUTE',  sublabel: 'ch 0',    color: 'gray',   activeColor: 'red',    mode: 'momentary' },
+  { id: 'dub4-cthrow', label: 'CTHRW', sublabel: 'ch 0',    color: 'violet', activeColor: 'violet', mode: 'instant' },
+  { id: 'dub4-txstop', label: 'STOP!', sublabel: 'transport', color: 'rose', activeColor: 'red',    mode: 'instant' },
 ];
 
 const JUMP_PADS: PadDef[] = [
@@ -385,7 +423,9 @@ export const DeckFXPads: React.FC<DeckFXPadsProps> = ({ deckId }) => {
     page === 'fx'   ? FX_PADS   :
     page === 'jump' ? JUMP_PADS :
     page === 'dub'  ? DUB_PADS  :
-                      DUB2_PADS;
+    page === 'dub2' ? DUB2_PADS :
+    page === 'dub3' ? DUB3_PADS :
+                      DUB4_PADS;
 
   return (
     <div className="flex flex-col gap-1">
@@ -440,6 +480,28 @@ export const DeckFXPads: React.FC<DeckFXPadsProps> = ({ deckId }) => {
           }
         >
           DUB 2{fxTargetCount > 0 ? ` ·${fxTargetCount}ch` : ''}
+        </button>
+        <button
+          onClick={() => setPage('dub3')}
+          className={`px-2 py-0.5 rounded text-[8px] font-bold transition-colors ${
+            page === 'dub3'
+              ? 'bg-amber-600/30 text-amber-300 border border-amber-500/40'
+              : 'bg-dark-bgTertiary text-text-muted border border-dark-border hover:text-text-secondary'
+          }`}
+          title="Dub bus sends page 3 — atmospheric (wide, ping, riser, sub, presets, mic)"
+        >
+          DUB 3
+        </button>
+        <button
+          onClick={() => setPage('dub4')}
+          className={`px-2 py-0.5 rounded text-[8px] font-bold transition-colors ${
+            page === 'dub4'
+              ? 'bg-amber-600/30 text-amber-300 border border-amber-500/40'
+              : 'bg-dark-bgTertiary text-text-muted border border-dark-border hover:text-text-secondary'
+          }`}
+          title="Dub bus sends page 4 — channel + transport edge cases"
+        >
+          DUB 4
         </button>
         {page === 'jump' && hasBeatGrid && (
           <span className="text-[7px] text-green-400 ml-auto">● GRID</span>

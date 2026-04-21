@@ -322,6 +322,24 @@ export const DubBusPanel: React.FC = () => {
             format={(v) => `${v >= 0 ? '+' : ''}${v.toFixed(1)} dB`}
           />
           <Slider
+            label="Bass shelf Hz"
+            value={dubBus.bassShelfFreqHz}
+            min={40}
+            max={300}
+            step={5}
+            onChange={(v) => patch({ bassShelfFreqHz: v })}
+            format={(v) => `${Math.round(v)} Hz`}
+          />
+          <Slider
+            label="Bass shelf Q"
+            value={dubBus.bassShelfQ}
+            min={0.3}
+            max={2}
+            step={0.05}
+            onChange={(v) => patch({ bassShelfQ: v })}
+            format={(v) => v.toFixed(2)}
+          />
+          <Slider
             label="Mid scoop"
             value={dubBus.midScoopGainDb}
             min={-12}
@@ -329,6 +347,24 @@ export const DubBusPanel: React.FC = () => {
             step={0.5}
             onChange={(v) => patch({ midScoopGainDb: v })}
             format={(v) => `${v >= 0 ? '+' : ''}${v.toFixed(1)} dB`}
+          />
+          <Slider
+            label="Mid scoop Hz"
+            value={dubBus.midScoopFreqHz}
+            min={300}
+            max={2500}
+            step={10}
+            onChange={(v) => patch({ midScoopFreqHz: v })}
+            format={(v) => `${Math.round(v)} Hz`}
+          />
+          <Slider
+            label="Mid scoop Q"
+            value={dubBus.midScoopQ}
+            min={0.3}
+            max={4}
+            step={0.05}
+            onChange={(v) => patch({ midScoopQ: v })}
+            format={(v) => v.toFixed(2)}
           />
           <Slider
             label="Stereo width"
