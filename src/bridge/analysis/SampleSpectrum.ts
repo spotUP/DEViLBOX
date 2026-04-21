@@ -244,12 +244,25 @@ function averageMagnitudeSpectrum(pcm: Float32Array, fftSize: number, start: num
   return mag;
 }
 
-/** Spectral centroid (Hz) = Σ(bin_k * mag_k) / Σ mag_k. */
+/** Spectral centroid (Hz) = Σ(bin_k * mag_k²) / Σ mag_k². Uses power (mag²)
+ *  and a relative noise-floor threshold: bins below `peak * 0.01` are
+ *  treated as silence. Without the threshold, at high sample rates the
+ *  thousands of near-silent upper bins drag the centroid toward the middle
+ *  of the audio range (110 Hz sine at 48 kHz otherwise reads as centroid
+ *  ≈ 670 Hz — looks like a lead even though the actual peak is at 117 Hz). */
 function spectralCentroid(mag: Float32Array, binHz: number): number {
+  if (mag.length === 0) return 0;
+  let peak = 0;
+  for (let i = 1; i < mag.length; i++) if (mag[i] > peak) peak = mag[i];
+  if (peak === 0) return 0;
+  const floor = peak * 0.01;
   let num = 0, den = 0;
   for (let i = 1; i < mag.length; i++) {   // skip DC
-    num += i * binHz * mag[i];
-    den += mag[i];
+    const m = mag[i];
+    if (m < floor) continue;
+    const p = m * m;
+    num += i * binHz * p;
+    den += p;
   }
   return den > 0 ? num / den : 0;
 }
