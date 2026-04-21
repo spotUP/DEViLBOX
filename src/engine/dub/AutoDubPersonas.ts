@@ -39,6 +39,18 @@ export interface AutoDubPersona {
    *  on click of the audition button so the user can hear the character
    *  without enabling Auto Dub. */
   signatureMove: string;
+  /**
+   * Note-density bias. Range -1..+1, default 0 (neutral).
+   *   > 0 → persona fires MORE during dense passages (Scientist's builds
+   *     come alive when notes are piling up)
+   *   < 0 → persona fires MORE during sparse passages (Jammy's downbeat
+   *     hits land best when the pattern breathes)
+   *   = 0 → density has no effect (Tubby, Perry, Custom)
+   * Effect is clamped to a 0.25× … 1.75× weight multiplier so extremes
+   * don't zero-out or bloom any rule to dominance. See computeDensityByRole
+   * + the density-mult logic in chooseMove.
+   */
+  densityBias?: number;
 }
 
 export const AUTO_DUB_PERSONAS: Record<AutoDubPersonaId, AutoDubPersona> = {
@@ -97,6 +109,10 @@ export const AUTO_DUB_PERSONAS: Record<AutoDubPersonaId, AutoDubPersona> = {
     },
     variance: 0.05,
     signatureMove: 'echoBuildUp',
+    // Scientist's sprawl belongs on dense passages — builds, delay swells,
+    // and mid-scoop drops sound weak over a sparse pattern and epic over
+    // a busy one.
+    densityBias: 0.5,
   },
 
   perry: {
@@ -165,6 +181,10 @@ export const AUTO_DUB_PERSONAS: Record<AutoDubPersonaId, AutoDubPersona> = {
     },
     variance: 0.0,
     signatureMove: 'tapeStop',
+    // Jammy's minimalism lands best on sparse passages — a downbeat
+    // tapeStop in a busy bar disappears, but in a breathy one it punches
+    // through.
+    densityBias: -0.6,
   },
 };
 

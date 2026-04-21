@@ -22,6 +22,8 @@ import { useMixerStore } from '@/stores/useMixerStore';
 import { useTrackerStore } from '@/stores/useTrackerStore';
 import { useOscilloscopeStore } from '@/stores/useOscilloscopeStore';
 import { classifyPattern, type ChannelRole } from '@/bridge/analysis/MusicAnalysis';
+import { isGenericChannelName } from '@/bridge/analysis/ChannelNaming';
+import type { Pattern } from '@/types/tracker';
 
 const TICK_MS = 250;
 const HARD_FIRES_PER_BAR_CAP = 3;
@@ -89,6 +91,86 @@ export function hasTransientForRole(ctx: AutoDubTickCtx, role: ChannelRole): boo
     if (ctx.roles[idx] === role) return true;
   }
   return false;
+}
+
+/**
+ * Is there any note event on channel `ch` within the next `windowRows`
+ * rows of `pattern`, starting from `fromRow` (inclusive)? Used by the
+ * Auto-Dub look-ahead so echoThrow.chN / channelMute.chN don't fire on
+ * a channel that has nothing to say over the move's effective window.
+ *
+ * Returns false for out-of-range channel / missing pattern. Wraps past
+ * the pattern end is intentionally NOT supported — a move that lands
+ * in the final few rows simply gets a tighter window, not visibility
+ * into the next pattern (which might be a drum break with totally
+ * different content).
+ */
+export function channelHasNoteInWindow(
+  pattern: Pattern | null,
+  fromRow: number,
+  ch: number,
+  windowRows: number,
+): boolean {
+  if (!pattern || !Array.isArray(pattern.channels)) return false;
+  const channel = pattern.channels[ch];
+  if (!channel || !Array.isArray(channel.rows)) return false;
+  const start = Math.max(0, fromRow);
+  const end = Math.min(channel.rows.length, start + windowRows);
+  for (let r = start; r < end; r++) {
+    const cell = channel.rows[r];
+    if (cell && cell.note >= 1 && cell.note <= 96) return true;
+  }
+  return false;
+}
+
+/**
+ * Count active notes per role over the next `windowRows` rows, normalised
+ * to 0..1 where 0 = no notes on that role, 1 = every row of every
+ * channel-of-that-role fires. Personas with `densityBias > 0` favour
+ * dense passages; `< 0` favour sparse ones.
+ *
+ * Normalization caps density at 0.75 before dividing so a single very
+ * busy channel can saturate without needing every channel to hit every
+ * row — otherwise reasonable tracker songs max out around 0.1-0.2.
+ */
+export function computeDensityByRole(
+  pattern: Pattern | null,
+  fromRow: number,
+  roles: readonly ChannelRole[],
+  windowRows: number,
+): Map<ChannelRole, number> {
+  const out = new Map<ChannelRole, number>();
+  if (!pattern || !Array.isArray(pattern.channels) || roles.length === 0) return out;
+  const start = Math.max(0, fromRow);
+  const end = Math.min(pattern.channels[0]?.rows.length ?? 0, start + windowRows);
+  const span = end - start;
+  if (span <= 0) return out;
+
+  const counts = new Map<ChannelRole, { notes: number; channels: number }>();
+  for (let ch = 0; ch < Math.min(roles.length, pattern.channels.length); ch++) {
+    const role = roles[ch];
+    if (role === 'empty') continue;
+    const channel = pattern.channels[ch];
+    if (!channel) continue;
+    let notes = 0;
+    for (let r = start; r < end; r++) {
+      const cell = channel.rows[r];
+      if (cell && cell.note >= 1 && cell.note <= 96) notes += 1;
+    }
+    const bucket = counts.get(role) ?? { notes: 0, channels: 0 };
+    bucket.notes += notes;
+    bucket.channels += 1;
+    counts.set(role, bucket);
+  }
+
+  const CAP = 0.75;
+  for (const [role, { notes, channels }] of counts) {
+    if (channels === 0) continue;
+    const maxPossible = span * channels * CAP;
+    const density = Math.max(0, Math.min(1, notes / maxPossible));
+    out.set(role, density);
+  }
+  return out;
 }
 
 /** Rule = "when this condition holds, consider firing `moveId` with weight
@@ -225,6 +307,20 @@ export interface AutoDubTickCtx {
   /** Indices of channels that had a transient spike detected this tick.
    *  Empty when no oscilloscope data is flowing (Phase 1/2 fallback). */
   transientChannels: readonly number[];
+  /** Currently-playing pattern (null if no song loaded). Used by the
+   *  look-ahead / density / upcoming-note helpers below. */
+  currentPattern: Pattern | null;
+  /** Row within the current pattern, 0-based. */
+  currentRow: number;
+  /** Per-channel names as they appear in the tracker store — usually
+   *  auto-named ("Drums", "Bass") or user-renamed. Used to boost
+   *  selection of channels the user explicitly cared about. Empty
+   *  array = no name data (fall through to uniform selection). */
+  channelNames: readonly (string | null | undefined)[];
+  /** Per-role "note density" estimate for the current + next few bars,
+   *  normalised 0..1. Higher = more notes per row. Personas use this to
+   *  bias rule firing toward dense (Scientist) or sparse (Jammy) passages. */
+  densityByRole: ReadonlyMap<ChannelRole, number>;
 }
 
 export interface AutoDubChoice {
@@ -255,7 +351,22 @@ export function chooseMove(ctx: AutoDubTickCtx, rng: () => number): AutoDubChoic
   if (budget === 0) return null;
   if (ctx.movesFiredThisBar >= budget) return null;
 
-  const rollProb = ctx.intensity * 0.3;
+  // Density bias on the per-tick fire roll. Scientist fires MORE during
+  // dense passages, Jammy fires LESS — so the rate gate itself has to
+  // move, not just the weighted pick. Using max-density across roles
+  // gives a single "how busy is the song right now" scalar.
+  //   mult = 1 + bias * (maxDensity - 0.5) * 1.5, clamped to [0.25, 1.75]
+  // so extremes can't zero out or double firing rate. Neutral personas
+  // (bias=0) leave the rollProb untouched.
+  let maxDensity = 0;
+  for (const d of ctx.densityByRole.values()) {
+    if (d > maxDensity) maxDensity = d;
+  }
+  const rollBias = ctx.persona.densityBias ?? 0;
+  const rollDensityMult = rollBias !== 0
+    ? Math.max(0.25, Math.min(1.75, 1 + rollBias * (maxDensity - 0.5) * 1.5))
+    : 1;
+  const rollProb = ctx.intensity * 0.3 * rollDensityMult;
   if (rng() > rollProb) return null;
 
   const variance = ctx.persona.variance ?? 0;
@@ -305,7 +416,44 @@ export function chooseMove(ctx: AutoDubTickCtx, rng: () => number): AutoDubChoic
     const persWeight = ctx.persona.weights[rule.moveId] ?? 1.0;
     if (persWeight <= 0) continue;
 
-    const weight = rule.baseWeight * ctx.intensity * persWeight * cooldownDecay;
+    // Look-ahead: if this rule targets a specific role and the chosen
+    // window (≈ 1 bar of notes at standard tracker speed, ~16 rows) has
+    // NO notes on ANY candidate channel, skip the rule. Firing
+    // echoThrow.chN when channel N is silent for the next 16 rows is
+    // wasted — there's nothing to echo. Falls through silently when
+    // `currentPattern` is null (no song loaded → Phase 1 behaviour).
+    if (rule.channelRole && matchingChannels.length > 0 && ctx.currentPattern) {
+      const LOOK_AHEAD_ROWS = 16;
+      const liveCandidates = matchingChannels.filter(
+        ch => channelHasNoteInWindow(ctx.currentPattern, ctx.currentRow, ch, LOOK_AHEAD_ROWS),
+      );
+      if (liveCandidates.length === 0) continue;
+      matchingChannels = liveCandidates;
+    }
+
+    // Density bias: personas with densityBias != 0 steer rule firing
+    // toward dense (Scientist) or sparse (Jammy) passages. For role-
+    // targeted rules, use the role's density; for global rules, use the
+    // max role density (approximates "how busy is the song right now").
+    let densityMult = 1;
+    const densityBias = ctx.persona.densityBias ?? 0;
+    if (densityBias !== 0 && ctx.densityByRole.size > 0) {
+      let density = 0;
+      if (rule.channelRole && rule.channelRole !== 'any') {
+        density = ctx.densityByRole.get(rule.channelRole) ?? 0;
+      } else {
+        for (const d of ctx.densityByRole.values()) {
+          if (d > density) density = d;
+        }
+      }
+      // density in [0, 1]; bias in [-1, +1]. Offset from 0.5 so a neutral
+      // passage (0.5) leaves weight unchanged. Clamp to [0.25, 1.75] so
+      // extremes don't zero-out or bloom a rule to dominance.
+      const mult = 1 + densityBias * (density - 0.5) * 1.5;
+      densityMult = Math.max(0.25, Math.min(1.75, mult));
+    }
+
+    const weight = rule.baseWeight * ctx.intensity * persWeight * cooldownDecay * densityMult;
     if (weight <= 0) continue;
 
     eligible.push({ rule, weight, matchingChannels });
@@ -324,7 +472,27 @@ export function chooseMove(ctx: AutoDubTickCtx, rng: () => number): AutoDubChoic
   let channelId: number | undefined;
   if (picked.rule.channelRole) {
     if (picked.matchingChannels.length > 0) {
-      channelId = picked.matchingChannels[Math.floor(rng() * picked.matchingChannels.length)];
+      // User-rename boost: if the user explicitly renamed a candidate
+      // channel (name is non-generic — not "Channel N" / "CH N"), weight
+      // it 1.5× higher when picking the target. That respects "I cared
+      // enough about this channel to name it — dub moves should prefer
+      // it over the auto-named defaults." Auto-names like "Kick" /
+      // "Bass" / "Lead" are still generic enough that they don't
+      // trigger this boost (they match the output of suggestChannelName
+      // which comes from the classifier, not from user intent).
+      const hasNames = ctx.channelNames.length > 0;
+      const weights = picked.matchingChannels.map((ch) => {
+        if (!hasNames) return 1;
+        const name = ctx.channelNames[ch] ?? null;
+        return isGenericChannelName(name) ? 1 : 1.5;
+      });
+      const total = weights.reduce((s, w) => s + w, 0);
+      let roll = rng() * total;
+      channelId = picked.matchingChannels[picked.matchingChannels.length - 1];
+      for (let i = 0; i < picked.matchingChannels.length; i++) {
+        if (roll < weights[i]) { channelId = picked.matchingChannels[i]; break; }
+        roll -= weights[i];
+      }
     }
   }
 
@@ -381,20 +549,33 @@ function detectTransientsFromOscilloscope(): number[] {
   }
 }
 
-/** Resolve the currently-playing pattern's channel roles. Returns an empty
- *  array if no song is loaded, the pattern is out of range, or the store
- *  isn't ready — callers fall through to the Phase-1 random-channel path. */
-function getCurrentPatternRoles(): ChannelRole[] {
+/** Resolve the currently-playing pattern's channel roles + the pattern
+ *  itself (used by the look-ahead / density helpers) + the channel-name
+ *  array (for user-rename boost). Returns a neutral bundle when no song
+ *  is loaded — callers fall through to the Phase-1 behaviour. */
+function getCurrentPatternBundle(): {
+  roles: ChannelRole[];
+  pattern: Pattern | null;
+  names: (string | null | undefined)[];
+  currentRow: number;
+} {
+  const empty = { roles: [] as ChannelRole[], pattern: null, names: [], currentRow: 0 };
   try {
     const tracker = useTrackerStore.getState();
     const patterns = tracker.patterns;
-    if (!Array.isArray(patterns) || patterns.length === 0) return [];
-    const idx = useTransportStore.getState().currentPatternIndex ?? 0;
+    if (!Array.isArray(patterns) || patterns.length === 0) return empty;
+    const transport = useTransportStore.getState();
+    const idx = transport.currentPatternIndex ?? 0;
     const pattern = patterns[Math.max(0, Math.min(idx, patterns.length - 1))];
-    if (!pattern || !pattern.channels?.length) return [];
-    return classifyPattern(pattern).map(a => a.role);
+    if (!pattern || !pattern.channels?.length) return empty;
+    return {
+      roles: classifyPattern(pattern).map(a => a.role),
+      pattern,
+      names: pattern.channels.map(c => c.name ?? null),
+      currentRow: transport.currentRow ?? 0,
+    };
   } catch {
-    return [];
+    return empty;
   }
 }
 
@@ -421,9 +602,14 @@ function tickImpl(): void {
   }
 
   const persona = getPersona(dub.autoDubPersona);
-  const roles = getCurrentPatternRoles();
+  const bundle = getCurrentPatternBundle();
+  const roles = bundle.roles;
   const channelCount = roles.length > 0 ? roles.length : getChannelCount();
   const transientChannels = detectTransientsFromOscilloscope();
+  // Density window: roughly a bar of notes at standard tracker speed.
+  // Matches the look-ahead window so the two signals agree on what "the
+  // upcoming passage" means.
+  const densityByRole = computeDensityByRole(bundle.pattern, bundle.currentRow, roles, 16);
 
   const choice = chooseMove({
     bar, barPos, isNewBar,
@@ -436,6 +622,10 @@ function tickImpl(): void {
     channelCount,
     roles,
     transientChannels,
+    currentPattern: bundle.pattern,
+    currentRow: bundle.currentRow,
+    channelNames: bundle.names,
+    densityByRole,
   }, _rng);
 
   if (!choice) return;
