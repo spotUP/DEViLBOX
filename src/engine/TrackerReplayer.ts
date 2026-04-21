@@ -2194,6 +2194,21 @@ export class TrackerReplayer {
         const numPat = this.song.patterns.length || 1;
         const ok = await osl.createNewModule(1 /* XM */, this.song.numChannels || 4, numPat);
         if (ok) {
+          // Resize each pattern to match the actual song pattern lengths.
+          // createNewModule defaults to 64 rows per pattern; without this,
+          // an 8-row .dbx song would play 56 rows of silence before looping.
+          for (let i = 0; i < this.song.patterns.length; i++) {
+            const rows = this.song.patterns[i]?.length ?? 64;
+            if (rows !== 64) {
+              await osl.resizePattern(i, rows);
+            }
+          }
+          // Set up the order list to match the song's pattern order.
+          // createNewModule sets order = [0, 1, 2, ...] but the song may
+          // have a different arrangement (e.g. [0, 1, 0, 2]).
+          for (let i = 0; i < this.song.songPositions.length; i++) {
+            await osl.setOrderPattern(i, this.song.songPositions[i]);
+          }
           const data = await osl.saveModule('xm');
           if (data && gen === this._playGeneration) {
             this.song.libopenmptFileData = data;
