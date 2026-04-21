@@ -816,22 +816,119 @@ export function renderSpecialParameters(
     // SUPERSAW
     case 'SuperSaw': {
       const ssConfig = instrument.superSaw || DEFAULT_SUPERSAW;
+      const sub = ssConfig.sub ?? { enabled: false, octave: -1 as -1 | -2, waveform: 'sine' as 'sine' | 'square', level: 50 };
+      const pwm = ssConfig.pwm ?? { enabled: false, width: 50, modRate: 0.5, modDepth: 0 };
+      const pEnv = ssConfig.pitchEnvelope ?? { enabled: false, amount: 0, attack: 0, decay: 100 };
       return (
         <section className="bg-[#1a1a1a] rounded-xl p-4 border border-dark-border">
           <SectionHeader color="#f43f5e" title="SuperSaw" />
           <div className="grid grid-cols-2 gap-3 mb-4">
-            <Knob value={ssConfig.voices} min={3} max={9} onChange={(v) => onChange({ superSaw: { ...ssConfig, voices: v } })} label="Voices" color="#f43f5e" formatValue={(v) => Math.round(v).toString()} />
+            <Knob value={ssConfig.voices} min={3} max={9} step={1} onChange={(v) => onChange({ superSaw: { ...ssConfig, voices: Math.round(v) } })} label="Voices" color="#f43f5e" formatValue={(v) => Math.round(v).toString()} />
             <Knob value={ssConfig.detune} min={0} max={100} onChange={(v) => onChange({ superSaw: { ...ssConfig, detune: v } })} label="Detune" color="#f43f5e" formatValue={(v) => `${Math.round(v)}`} />
             <Knob value={ssConfig.mix} min={0} max={100} onChange={(v) => onChange({ superSaw: { ...ssConfig, mix: v } })} label="Mix" color="#f43f5e" formatValue={(v) => `${Math.round(v)}%`} />
             <Knob value={ssConfig.stereoSpread} min={0} max={100} onChange={(v) => onChange({ superSaw: { ...ssConfig, stereoSpread: v } })} label="Width" color="#f43f5e" formatValue={(v) => `${Math.round(v)}%`} />
+            <Knob value={ssConfig.analogDrift ?? 0} min={0} max={100} onChange={(v) => onChange({ superSaw: { ...ssConfig, analogDrift: v } })} label="Drift" color="#f43f5e" formatValue={(v) => `${Math.round(v)}%`} />
           </div>
-          <div className="pt-3 border-t border-dark-borderLight">
-            <p className="text-xs text-text-muted mb-2">FILTER</p>
+
+          <div className="pt-3 border-t border-dark-borderLight mb-3">
+            <p className="text-[10px] font-mono text-text-muted mb-2">SPREAD / PHASE</p>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <p className="text-[9px] text-text-muted mb-1">Spread Curve</p>
+                <CustomSelect
+                  value={ssConfig.spreadCurve ?? 'linear'}
+                  onChange={(v) => onChange({ superSaw: { ...ssConfig, spreadCurve: v as NonNullable<typeof ssConfig.spreadCurve> } })}
+                  className="bg-dark-bgTertiary text-text-primary text-xs px-2 py-1 rounded border border-dark-borderLight w-full"
+                  options={[{ value: 'linear', label: 'Linear' }, { value: 'exponential', label: 'Exp' }, { value: 'random', label: 'Random' }]}
+                />
+              </div>
+              <div>
+                <p className="text-[9px] text-text-muted mb-1">Phase Mode</p>
+                <CustomSelect
+                  value={ssConfig.phaseMode ?? 'free'}
+                  onChange={(v) => onChange({ superSaw: { ...ssConfig, phaseMode: v as NonNullable<typeof ssConfig.phaseMode> } })}
+                  className="bg-dark-bgTertiary text-text-primary text-xs px-2 py-1 rounded border border-dark-borderLight w-full"
+                  options={[{ value: 'free', label: 'Free' }, { value: 'reset', label: 'Reset' }, { value: 'random', label: 'Random' }]}
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="pt-3 border-t border-dark-borderLight mb-3">
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-[10px] font-mono text-text-muted">SUB OSC</p>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" checked={sub.enabled} onChange={(e) => onChange({ superSaw: { ...ssConfig, sub: { ...sub, enabled: e.target.checked } } })} className="w-3 h-3 rounded bg-dark-bgHover border-dark-borderLight" />
+                <span className="text-[9px] text-text-secondary">ENABLE</span>
+              </label>
+            </div>
+            {sub.enabled && (
+              <div className="grid grid-cols-3 gap-2 items-end">
+                <div>
+                  <p className="text-[9px] text-text-muted mb-1">Octave</p>
+                  <CustomSelect
+                    value={String(sub.octave)}
+                    onChange={(v) => onChange({ superSaw: { ...ssConfig, sub: { ...sub, octave: Number(v) as -1 | -2 } } })}
+                    className="bg-dark-bgTertiary text-text-primary text-xs px-2 py-1 rounded border border-dark-borderLight w-full"
+                    options={[{ value: '-1', label: '-1' }, { value: '-2', label: '-2' }]}
+                  />
+                </div>
+                <div>
+                  <p className="text-[9px] text-text-muted mb-1">Wave</p>
+                  <CustomSelect
+                    value={sub.waveform}
+                    onChange={(v) => onChange({ superSaw: { ...ssConfig, sub: { ...sub, waveform: v as 'sine' | 'square' } } })}
+                    className="bg-dark-bgTertiary text-text-primary text-xs px-2 py-1 rounded border border-dark-borderLight w-full"
+                    options={[{ value: 'sine', label: 'Sine' }, { value: 'square', label: 'Square' }]}
+                  />
+                </div>
+                <Knob value={sub.level} min={0} max={100} onChange={(v) => onChange({ superSaw: { ...ssConfig, sub: { ...sub, level: v } } })} label="Level" color="#f43f5e" formatValue={(v) => `${Math.round(v)}%`} />
+              </div>
+            )}
+          </div>
+
+          <div className="pt-3 border-t border-dark-borderLight mb-3">
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-[10px] font-mono text-text-muted">PWM</p>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" checked={pwm.enabled} onChange={(e) => onChange({ superSaw: { ...ssConfig, pwm: { ...pwm, enabled: e.target.checked } } })} className="w-3 h-3 rounded bg-dark-bgHover border-dark-borderLight" />
+                <span className="text-[9px] text-text-secondary">ENABLE</span>
+              </label>
+            </div>
+            {pwm.enabled && (
+              <div className="grid grid-cols-3 gap-2">
+                <Knob value={pwm.width} min={10} max={90} onChange={(v) => onChange({ superSaw: { ...ssConfig, pwm: { ...pwm, width: v } } })} label="Width" color="#f43f5e" formatValue={(v) => `${Math.round(v)}%`} />
+                <Knob value={pwm.modRate} min={0} max={10} onChange={(v) => onChange({ superSaw: { ...ssConfig, pwm: { ...pwm, modRate: v } } })} label="Rate" color="#f43f5e" formatValue={(v) => `${v.toFixed(2)}Hz`} />
+                <Knob value={pwm.modDepth} min={0} max={100} onChange={(v) => onChange({ superSaw: { ...ssConfig, pwm: { ...pwm, modDepth: v } } })} label="Depth" color="#f43f5e" formatValue={(v) => `${Math.round(v)}%`} />
+              </div>
+            )}
+          </div>
+
+          <div className="pt-3 border-t border-dark-borderLight mb-3">
+            <p className="text-[10px] font-mono text-text-muted mb-2">FILTER</p>
             <div className="grid grid-cols-2 gap-3">
               <Knob value={ssConfig.filter.cutoff} min={20} max={20000} onChange={(v) => onChange({ superSaw: { ...ssConfig, filter: { ...ssConfig.filter, cutoff: v } } })} label="Cutoff" color="#f43f5e" formatValue={(v) => v >= 1000 ? `${(v / 1000).toFixed(1)}k` : `${Math.round(v)}`} />
               <Knob value={ssConfig.filter.resonance} min={0} max={100} onChange={(v) => onChange({ superSaw: { ...ssConfig, filter: { ...ssConfig.filter, resonance: v } } })} label="Reso" color="#f43f5e" formatValue={(v) => `${Math.round(v)}%`} />
               <Knob value={ssConfig.filter.envelopeAmount} min={-100} max={100} onChange={(v) => onChange({ superSaw: { ...ssConfig, filter: { ...ssConfig.filter, envelopeAmount: v } } })} label="Env Amt" color="#f43f5e" bipolar formatValue={(v) => `${Math.round(v)}%`} />
+              <Knob value={ssConfig.filter.keyTracking ?? 0} min={0} max={100} onChange={(v) => onChange({ superSaw: { ...ssConfig, filter: { ...ssConfig.filter, keyTracking: v } } })} label="Key Trk" color="#f43f5e" formatValue={(v) => `${Math.round(v)}%`} />
             </div>
+          </div>
+
+          <div className="pt-3 border-t border-dark-borderLight">
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-[10px] font-mono text-text-muted">PITCH ENV</p>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" checked={pEnv.enabled} onChange={(e) => onChange({ superSaw: { ...ssConfig, pitchEnvelope: { ...pEnv, enabled: e.target.checked } } })} className="w-3 h-3 rounded bg-dark-bgHover border-dark-borderLight" />
+                <span className="text-[9px] text-text-secondary">ENABLE</span>
+              </label>
+            </div>
+            {pEnv.enabled && (
+              <div className="grid grid-cols-3 gap-2">
+                <Knob value={pEnv.amount} min={-24} max={24} onChange={(v) => onChange({ superSaw: { ...ssConfig, pitchEnvelope: { ...pEnv, amount: v } } })} label="Amount" color="#f43f5e" bipolar formatValue={(v) => `${v > 0 ? '+' : ''}${Math.round(v)}st`} />
+                <Knob value={pEnv.attack} min={0} max={2000} onChange={(v) => onChange({ superSaw: { ...ssConfig, pitchEnvelope: { ...pEnv, attack: v } } })} label="Attack" color="#f43f5e" formatValue={(v) => `${Math.round(v)}ms`} />
+                <Knob value={pEnv.decay} min={0} max={2000} onChange={(v) => onChange({ superSaw: { ...ssConfig, pitchEnvelope: { ...pEnv, decay: v } } })} label="Decay" color="#f43f5e" formatValue={(v) => `${Math.round(v)}ms`} />
+              </div>
+            )}
           </div>
         </section>
       );

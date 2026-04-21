@@ -219,6 +219,11 @@ export class SpaceEchoEffect extends Tone.ToneAudioNode {
     this.eq.low.value = val;
   }
 
+  setMid(val: number) {
+    this._options.mid = val;
+    this.eq.mid.value = val;
+  }
+
   setTreble(val: number) {
     this._options.treble = val;
     this.eq.high.value = val;

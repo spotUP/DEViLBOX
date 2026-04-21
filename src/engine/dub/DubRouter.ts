@@ -41,7 +41,10 @@ import { subHarmonic } from './moves/subHarmonic';
 import type { DubMove, DubMoveContext } from './moves/_types';
 import type { DubBus } from './DubBus';
 import { useTransportStore } from '@/stores/useTransportStore';
+import { useDubStore } from '@/stores/useDubStore';
 import { getTrackerReplayer } from '@/engine/TrackerReplayer';
+import { decodeDubEffect, decodeDubParamStep } from './moveTable';
+import { routeParameterToEngine } from '@/midi/performance/parameterRouter';
 import * as Tone from 'tone';
 
 /**
@@ -227,4 +230,40 @@ export function fire(
     },
   };
   return wrapped;
+}
+
+/**
+ * Fire a dub move from a tracker effect-command cell. `effTyp` must be
+ * 33 (global move), 34 (per-channel move), or 35 (param step). Decodes
+ * `eff` via `decodeDubEffect` / `decodeDubParamStep`, honours the user's
+ * `autoDubMoveBlacklist`, and forwards to the normal `fire()` path.
+ *
+ * Returns the same disposer `fire()` returns (null for one-shots / param
+ * steps). The caller — tick-0 effect processor — doesn't need to hold the
+ * disposer; hold-duration encoding inside cells is a future extension.
+ */
+export function fireFromEffectCommand(
+  effTyp: number,
+  eff: number,
+  fallbackChannelId?: number,
+): { dispose(): void } | null {
+  if (effTyp === 35) {
+    const step = decodeDubParamStep(eff);
+    if (!step) return null;
+    try {
+      routeParameterToEngine(step.paramKey, step.value);
+    } catch (err) {
+      console.warn('[DubRouter] param-step route failed:', err);
+    }
+    return null;
+  }
+  if (effTyp !== 33 && effTyp !== 34) return null;
+  const decoded = decodeDubEffect(effTyp, eff);
+  if (!decoded) return null;
+  // Blacklist respected — a blacklisted move in a saved .dbx still
+  // shouldn't play. User can un-blacklist via the ⚙ popover to re-enable.
+  const blacklist = useDubStore.getState().autoDubMoveBlacklist ?? [];
+  if (blacklist.includes(decoded.moveId)) return null;
+  const channelId = decoded.channelId ?? fallbackChannelId;
+  return fire(decoded.moveId, channelId, {}, 'live');
 }
