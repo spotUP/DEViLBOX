@@ -1829,6 +1829,22 @@ export class FurnaceDispatchEngine implements IsolationCapableEngine {
     this.workletNode.port.postMessage({ type: 'setTuning', tuning, platformType });
   }
 
+  /**
+   * Send per-song mix volumes to the worklet (masterVol, systemVol, systemPan).
+   * Matches upstream Furnace: vol = systemVol[chip] * postAmp * masterVol.
+   */
+  sendMixVolumes(nativeData: import('@/types/tracker').FurnaceNativeData): void {
+    if (!this.workletNode) return;
+    this.workletNode.port.postMessage({
+      type: 'setMixVolumes',
+      masterVol: nativeData.masterVol ?? 1.0,
+      chipIds: nativeData.chipIds,
+      systemVol: nativeData.systemVol ?? [],
+      systemPan: nativeData.systemPan ?? [],
+      systemPanFR: nativeData.systemPanFR ?? [],
+    });
+  }
+
   reset(platformType?: number): void {
     if (!this.workletNode) return;
     this.workletNode.port.postMessage({ type: 'reset', platformType });
@@ -2211,6 +2227,11 @@ export class FurnaceDispatchEngine implements IsolationCapableEngine {
       }
 
       // ── 6. Upload song data to the WASM sequencer ──────────────────────
+      // Send mix volumes to worklet BEFORE sequencer starts.
+      // Matches upstream Furnace: vol = systemVol[chip] * postAmp * masterVol
+      const nativeData = opts.song.furnaceNative;
+      this.sendMixVolumes(nativeData);
+
       const { uploadFurnaceToSequencer } = await import('@/lib/export/FurnaceSequencerSerializer');
       if (!opts.isStillCurrent()) return { started: false };
       await uploadFurnaceToSequencer(opts.song.furnaceNative, opts.song.furnaceActiveSubsong ?? 0);

@@ -89,6 +89,78 @@ describe('Export capture tap — routing contract', () => {
     });
   });
 
+  describe('FurnaceDispatch worklet POST_AMP enum correctness', () => {
+    const worklet = readFileSync(resolve(ROOT, '../public/furnace-dispatch/FurnaceDispatch.worklet.js'), 'utf8');
+    const auditRef = readFileSync(resolve(ROOT, '../tools/furnace-audit/render-devilbox.ts'), 'utf8');
+
+    // Extract POST_AMP tables from both files
+    function extractPostAmpEntries(src: string): Map<number, number> {
+      const match = src.match(/(?:const )?POST_AMP[^{]*\{([^}]+)\}/);
+      expect(match, 'POST_AMP table must exist').not.toBeNull();
+      const entries = new Map<number, number>();
+      for (const line of (match?.[1] ?? '').split('\n')) {
+        const m = line.match(/^\s*(\d+)\s*:\s*([\d.]+)/);
+        if (m) entries.set(Number(m[1]), Number(m[2]));
+      }
+      return entries;
+    }
+
+    it('has correct enum IDs for OPLL(28), FDS(29), MMC5(30), POKEY(41)', () => {
+      const entries = extractPostAmpEntries(worklet);
+      // These were previously off-by-one (29, 30, 31, 42)
+      expect(entries.get(28)).toBe(1.5);  // OPLL
+      expect(entries.get(29)).toBe(2.0);  // FDS
+      expect(entries.get(30)).toBe(64.0); // MMC5
+      expect(entries.get(41)).toBe(2.0);  // POKEY
+      // Old wrong entries must NOT exist
+      expect(entries.has(31)).toBe(false); // was incorrectly labeled MMC5→N163
+      expect(entries.has(42)).toBe(false); // was incorrectly labeled POKEY→RF5C68
+    });
+
+    it('matches the audit reference POST_AMP table exactly', () => {
+      const workletEntries = extractPostAmpEntries(worklet);
+      const auditEntries = extractPostAmpEntries(auditRef);
+      for (const [key, val] of auditEntries) {
+        expect(workletEntries.get(key), `POST_AMP[${key}] mismatch`).toBe(val);
+      }
+      for (const [key, val] of workletEntries) {
+        expect(auditEntries.get(key), `worklet has extra POST_AMP[${key}]=${val}`).toBe(val);
+      }
+    });
+
+    it('uses ?? (not ||) for POST_AMP fallback so 0.0 is valid', () => {
+      expect(worklet).toMatch(/POST_AMP\[.*\]\s*\?\?/);
+      expect(worklet).not.toMatch(/POST_AMP\[.*\]\s*\|\|/);
+    });
+  });
+
+  describe('FurnaceDispatch worklet mix volume support', () => {
+    const worklet = readFileSync(resolve(ROOT, '../public/furnace-dispatch/FurnaceDispatch.worklet.js'), 'utf8');
+
+    it('handles setMixVolumes message with masterVol, systemVol, systemPan', () => {
+      expect(worklet).toMatch(/case\s+'setMixVolumes'/);
+      expect(worklet).toMatch(/this\.masterVol/);
+      expect(worklet).toMatch(/this\.chipVolL/);
+      expect(worklet).toMatch(/this\.chipVolR/);
+    });
+
+    it('clamps main output to ±1.0 (upstream clampSamples)', () => {
+      expect(worklet).toMatch(/outputL\[i\]\s*>\s*1\.0/);
+      expect(worklet).toMatch(/outputR\[i\]\s*<\s*-1\.0/);
+    });
+  });
+
+  describe('FurnaceNativeData includes mix volume fields', () => {
+    const parser = read('lib/import/formats/FurnaceSongParser.ts');
+
+    it('buildFurnaceNativeData passes masterVol, systemVol, systemPan, systemPanFR', () => {
+      expect(parser).toMatch(/masterVol:\s*module\.masterVol/);
+      expect(parser).toMatch(/systemVol:\s*module\.systemVol/);
+      expect(parser).toMatch(/systemPan:\s*module\.systemPan/);
+      expect(parser).toMatch(/systemPanFR:\s*module\.systemPanFR/);
+    });
+  });
+
   describe('DrumPadEngine routing', () => {
     const drumpad = read('engine/drumpad/DrumPadEngine.ts');
     const routing = read('hooks/drumpad/useMIDIPadRouting.ts');
