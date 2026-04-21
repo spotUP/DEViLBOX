@@ -341,7 +341,7 @@ export function classifyPattern(pattern: Pattern): ChannelAnalysis[] {
   return result;
 }
 
-const PERCUSSION_NAME_RE = /noi|noise|drum|perc|kit|hat|kick|snare|clap|cymbal|tom|ride/i;
+export const PERCUSSION_NAME_RE = /noi|noise|drum|perc|kit|hat|kick|snare|clap|cymbal|tom|ride/i;
 
 function isPercussionChannel(
   ch: { name?: string; shortName?: string; channelMeta?: { hardwareName?: string } },

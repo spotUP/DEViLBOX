@@ -24,8 +24,14 @@ import { useOscilloscopeStore } from '@/stores/useOscilloscopeStore';
 import { classifyPattern, type ChannelRole } from '@/bridge/analysis/MusicAnalysis';
 
 const TICK_MS = 250;
-const HARD_FIRES_PER_BAR_CAP = 4;
-const COOLDOWN_BARS = 4;
+const HARD_FIRES_PER_BAR_CAP = 3;
+const COOLDOWN_BARS = 6;
+/** Cap on wet moves (echo/reverb-contributing) per bar, regardless of total
+ *  budget. Without this cap, bar-phase echoThrow + transient-echoThrow +
+ *  springSlam + echoBuildUp + reverseEcho all stack into a reverb mush
+ *  (2026-04-21 feedback). Dry moves (tapeStop, filterDrop, channelMute,
+ *  etc.) are unaffected. */
+const WET_FIRES_PER_BAR_CAP = 1;
 /** Rolling peak window for transient detection — last N ticks (~N * 250ms). */
 const TRANSIENT_WINDOW = 8;
 /** A channel's peak must exceed `RATIO * rollingAvg` to count as a transient. */
@@ -96,13 +102,18 @@ interface Rule {
   baseWeight: number;
   /** For hold-kind moves: how many bars to hold before auto-release. Default 1. */
   holdBars?: number;
+  /** True when the move contributes wet tail (echo/reverb/delay feedback).
+   *  Counts against `WET_FIRES_PER_BAR_CAP` so multiple wet moves don't
+   *  stack into a reverb mush. Dry moves (mute, tapeStop, filter)
+   *  keep firing normally. */
+  wet?: boolean;
 }
 
 const RULES: Rule[] = [
   // Bar 3 of 4 — echo throw on percussion (the signature Tubby move).
   { moveId: 'echoThrow', channelRole: 'percussion',
     condition: (c) => c.isNewBar && c.bar % 4 === 3,
-    baseWeight: 0.35 },
+    baseWeight: 0.35, wet: true },
   // Phrase end (bar 7 of 8) — tape stop and filter drop stack here.
   { moveId: 'tapeStop',
     condition: (c) => c.isNewBar && c.bar % 8 === 7,
@@ -117,7 +128,7 @@ const RULES: Rule[] = [
   // Offbeat snare crack (mid-bar "&" between beats).
   { moveId: 'snareCrack', channelRole: 'percussion',
     condition: (c) => c.barPos >= 0.375 && c.barPos < 0.5,
-    baseWeight: 0.20 },
+    baseWeight: 0.20, wet: true },
   // Every other bar — mute the bass (hold 1 bar).
   { moveId: 'channelMute', channelRole: 'bass',
     condition: (c) => c.isNewBar && c.bar % 2 === 1,
@@ -125,11 +136,11 @@ const RULES: Rule[] = [
   // Mid-bar spring slam.
   { moveId: 'springSlam',
     condition: (c) => c.barPos >= 0.45 && c.barPos < 0.55,
-    baseWeight: 0.15 },
+    baseWeight: 0.15, wet: true },
   // Bar 2 of 4 — echo build-up leading into next bar.
   { moveId: 'echoBuildUp',
     condition: (c) => c.isNewBar && c.bar % 4 === 2,
-    baseWeight: 0.25, holdBars: 2 },
+    baseWeight: 0.25, holdBars: 2, wet: true },
   // High-intensity siren on bar 1 of 4.
   { moveId: 'dubSiren',
     condition: (c) => c.intensity > 0.6 && c.isNewBar && c.bar % 4 === 1,
@@ -137,23 +148,19 @@ const RULES: Rule[] = [
   // Reverse echo — Perry territory.
   { moveId: 'reverseEcho',
     condition: (c) => c.barPos > 0.75 && c.bar % 4 === 3,
-    baseWeight: 0.10 },
+    baseWeight: 0.10, wet: true },
   // Backward reverb — every 8 bars late.
   { moveId: 'backwardReverb',
     condition: (c) => c.barPos > 0.8 && c.bar % 8 === 6,
-    baseWeight: 0.10 },
-  // Crush bass — Jammy's digital punch.
-  { moveId: 'crushBass',
-    condition: (c) => c.isNewBar && c.bar % 4 === 1,
-    baseWeight: 0.15, holdBars: 2 },
+    baseWeight: 0.10, wet: true },
   // Tubby scream — rising through bar 2 of 4.
   { moveId: 'tubbyScream',
     condition: (c) => c.barPos > 0.7 && c.bar % 4 === 2,
-    baseWeight: 0.10 },
+    baseWeight: 0.10, wet: true },
   // Sonar ping — narrow window mid-bar.
   { moveId: 'sonarPing',
     condition: (c) => c.barPos >= 0.6 && c.barPos < 0.65,
-    baseWeight: 0.10 },
+    baseWeight: 0.10, wet: true },
   // Sub swell — deep, slow, every 8 bars.
   { moveId: 'subSwell',
     condition: (c) => c.isNewBar && c.bar % 8 === 3,
@@ -165,28 +172,29 @@ const RULES: Rule[] = [
   // Channel throw — Perry offbeat.
   { moveId: 'channelThrow', channelRole: 'any',
     condition: (c) => c.barPos > 0.625 && c.barPos < 0.75 && c.bar % 2 === 0,
-    baseWeight: 0.15 },
+    baseWeight: 0.15, wet: true },
   // Sub harmonic — Jammy downbeat anchor.
   { moveId: 'subHarmonic',
     condition: (c) => c.isNewBar && c.bar % 4 === 0,
     baseWeight: 0.10, holdBars: 2 },
 
   // ─── Phase 3: transient-reactive rules ──────────────────────────────────
-  // Fire an echo throw on the ACTUAL snare hit rather than guessing from
-  // bar phase. Fires when any percussion-role channel shows a transient
-  // peak spike this tick. Higher base weight so it wins the roulette
-  // over the bar-phase echoThrow rule when both are eligible.
+  // Fire on the ACTUAL hit rather than guessing from bar phase. Base weights
+  // are kept deliberately low (2026-04-21) because transients fire on every
+  // kick/snare — at higher weights the echoThrow dominated every bar and
+  // the result felt spammy rather than musical. Also wet-tagged so they
+  // respect the per-bar wet cap.
   { moveId: 'echoThrow', channelRole: 'percussion',
     condition: (c) => hasTransientForRole(c, 'percussion'),
-    baseWeight: 0.60 },
+    baseWeight: 0.25, wet: true },
   // Snare crack on a fresh transient — additive pop on top of the hit.
   { moveId: 'snareCrack', channelRole: 'percussion',
     condition: (c) => hasTransientForRole(c, 'percussion') && c.barPos > 0.25,
-    baseWeight: 0.30 },
+    baseWeight: 0.12, wet: true },
   // Perry-style sonar ping on a lead transient.
   { moveId: 'sonarPing',
     condition: (c) => hasTransientForRole(c, 'lead'),
-    baseWeight: 0.25 },
+    baseWeight: 0.12, wet: true },
 ];
 
 export interface AutoDubTickCtx {
@@ -199,6 +207,9 @@ export interface AutoDubTickCtx {
   persona: AutoDubPersona;
   blacklist: Set<string>;
   movesFiredThisBar: number;
+  /** Subset of movesFiredThisBar that fired wet-tagged rules. Capped by
+   *  `WET_FIRES_PER_BAR_CAP`. */
+  wetFiredThisBar: number;
   moveLastFiredBar: ReadonlyMap<string, number>;
   channelCount: number;
   /** Per-channel role, parallel to channel indices (0..channelCount-1).
@@ -214,6 +225,9 @@ export interface AutoDubChoice {
   channelId: number | undefined;
   params: Record<string, number>;
   holdBars: number;
+  /** True when the chosen rule was wet-tagged. Caller uses this to
+   *  increment its per-bar wet-fires counter. */
+  wet: boolean;
 }
 
 /**
@@ -221,20 +235,33 @@ export interface AutoDubChoice {
  * move and which one. Tests drive this directly for determinism.
  */
 export function chooseMove(ctx: AutoDubTickCtx, rng: () => number): AutoDubChoice | null {
+  // Density tuning (2026-04-21 feedback — Auto Dub was chaotic + reverb-heavy):
+  // - Budget: ceil(intensity * 2) → 0 at 0, 1 at 0<=intensity<=0.5, 2 at 1.0.
+  //   Old formula (1 + floor(intensity * 3)) always fired ≥1 move/bar even at
+  //   low intensity, compounding into density.
+  // - Roll probability halved (0.6 → 0.3) so fewer ticks pass the gate.
+  // - Wet cap: separate per-bar budget for reverb-contributing moves so
+  //   echoThrow + springSlam + echoBuildUp don't stack into a reverb mush.
   const personaCap = ctx.persona.budgetCap;
-  const intensityBudget = 1 + Math.floor(ctx.intensity * 3);
+  const intensityBudget = Math.ceil(ctx.intensity * 2);
   const budget = Math.min(personaCap ?? intensityBudget, HARD_FIRES_PER_BAR_CAP);
+  if (budget === 0) return null;
   if (ctx.movesFiredThisBar >= budget) return null;
 
-  const rollProb = ctx.intensity * 0.6;
+  const rollProb = ctx.intensity * 0.3;
   if (rng() > rollProb) return null;
 
   const variance = ctx.persona.variance ?? 0;
   const hasRoles = ctx.roles.length > 0;
+  const wetBudgetExhausted = ctx.wetFiredThisBar >= WET_FIRES_PER_BAR_CAP;
   const eligible: Array<{ rule: Rule; weight: number; matchingChannels: readonly number[] }> = [];
 
   for (const rule of RULES) {
     if (ctx.blacklist.has(rule.moveId)) continue;
+    // Per-bar wet cap: once a wet move has fired this bar, skip every
+    // other wet rule until the next bar. Dry moves (tapeStop, filterDrop,
+    // channelMute, subSwell, etc.) stay eligible.
+    if (rule.wet && wetBudgetExhausted) continue;
 
     const condOk = rule.condition(ctx) || (variance > 0 && rng() < variance * 0.1);
     if (!condOk) continue;
@@ -302,6 +329,7 @@ export function chooseMove(ctx: AutoDubTickCtx, rng: () => number): AutoDubChoic
     channelId,
     params,
     holdBars: picked.rule.holdBars ?? 1,
+    wet: picked.rule.wet === true,
   };
 }
 
@@ -316,6 +344,7 @@ let _timer: ReturnType<typeof setInterval> | null = null;
 let _enableTimeMs = 0;
 let _lastBar = -1;
 let _movesFiredThisBar = 0;
+let _wetFiredThisBar = 0;
 const _heldDisposers = new Set<{ dispose(): void }>();
 const _moveLastFiredBar = new Map<string, number>();
 let _rng: () => number = Math.random;
@@ -381,6 +410,7 @@ function tickImpl(): void {
   if (isNewBar) {
     _lastBar = bar;
     _movesFiredThisBar = 0;
+    _wetFiredThisBar = 0;
   }
 
   const persona = getPersona(dub.autoDubPersona);
@@ -394,6 +424,7 @@ function tickImpl(): void {
     persona,
     blacklist: new Set(dub.autoDubMoveBlacklist),
     movesFiredThisBar: _movesFiredThisBar,
+    wetFiredThisBar: _wetFiredThisBar,
     moveLastFiredBar: _moveLastFiredBar,
     channelCount,
     roles,
@@ -404,6 +435,7 @@ function tickImpl(): void {
 
   const disposer = fire(choice.moveId, choice.channelId, choice.params, 'live');
   _movesFiredThisBar += 1;
+  if (choice.wet) _wetFiredThisBar += 1;
   _moveLastFiredBar.set(choice.moveId, bar);
 
   if (disposer) {
@@ -423,6 +455,7 @@ export function startAutoDub(): void {
   _enableTimeMs = performance.now();
   _lastBar = -1;
   _movesFiredThisBar = 0;
+  _wetFiredThisBar = 0;
   _moveLastFiredBar.clear();
   _rollingPeaks.length = 0;
   _timer = setInterval(tickImpl, TICK_MS);
@@ -454,6 +487,7 @@ export function _resetAutoDubStateForTest(): void {
   stopAutoDub();
   _moveLastFiredBar.clear();
   _movesFiredThisBar = 0;
+  _wetFiredThisBar = 0;
   _lastBar = -1;
   _rollingPeaks.length = 0;
   _rng = Math.random;

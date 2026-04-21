@@ -49,11 +49,13 @@ const GM_DRUM_MAP: Record<number, { color: NKSLightGuideColor; name: string }> =
   81: { color: NKSLightGuideColor.ORANGE, name: 'Open Triangle' },
 };
 
-// Drum-type synths that should use drum color scheme
-const DRUM_SYNTHS: Set<string> = new Set([
+// Drum-type synths that should use drum color scheme. Exported so
+// ChannelNaming + any future classifier can share one source of truth.
+export const DRUM_SYNTHS: Set<string> = new Set([
   'DrumMachine', 'BuzzKick', 'BuzzKickXP', 'BuzzTrilok',
   'MembraneSynth', 'MetalSynth', 'NoiseSynth',
   'BuzzDynamite6', 'BuzzFreqBomb',
+  'Geonkick', 'TR808', 'TR909',
 ]);
 
 // Single-sound drum synths and their primary color

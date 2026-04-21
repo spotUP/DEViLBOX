@@ -30,6 +30,7 @@ function baseCtx(overrides: Partial<AutoDubTickCtx> = {}): AutoDubTickCtx {
     persona: getPersona('custom'),
     blacklist: new Set(),
     movesFiredThisBar: 0,
+    wetFiredThisBar: 0,
     moveLastFiredBar: new Map(),
     channelCount: 8,
     roles: [],
@@ -75,6 +76,65 @@ describe('AutoDub chooseMove', () => {
       rng,
     );
     expect(result).toBeNull();
+  });
+
+  it('wet-budget: skips wet rules after a wet move already fired this bar', () => {
+    // With wetFiredThisBar=1 (cap is 1), every wet rule is skipped. Only
+    // dry rules (tapeStop, filterDrop, channelMute, etc.) can fire.
+    // Run many rolls and assert no wet-tagged move is chosen.
+    const rng = seededRng(4000);
+    const wetMoves = new Set([
+      'echoThrow', 'snareCrack', 'springSlam', 'echoBuildUp',
+      'reverseEcho', 'backwardReverb', 'tubbyScream', 'sonarPing',
+      'channelThrow',
+    ]);
+    let drySeen = 0;
+    for (let i = 0; i < 500; i++) {
+      // Use bar 7 isNewBar (both wet + dry rules eligible) with wet exhausted.
+      const result = chooseMove(baseCtx({
+        bar: 7, barPos: 0.0, isNewBar: true, intensity: 1,
+        movesFiredThisBar: 1,
+        wetFiredThisBar: 1,
+      }), rng);
+      if (result) {
+        expect(wetMoves.has(result.moveId)).toBe(false);
+        drySeen += 1;
+      }
+    }
+    expect(drySeen).toBeGreaterThan(0);
+  });
+
+  it('never fires oscBass or crushBass (the BASS/CRUSH pads are manual-only)', () => {
+    // Contract — both moves are generators that stomp on the mix (self-
+    // oscillating LPF drone / 3-bit quantize saw drone). They're useful as
+    // manual performance pads but catastrophic when auto-fired. Walking the
+    // whole rule table with a permissive ctx and asserting no pick returns
+    // either moveId locks this behaviour.
+    const rng = seededRng(6000);
+    const forbidden = new Set(['oscBass', 'crushBass']);
+    for (let i = 0; i < 2000; i++) {
+      // Vary bar/barPos to hit every rule's condition window.
+      const bar = i % 16;
+      const barPos = (i % 32) / 32;
+      const result = chooseMove(baseCtx({
+        bar, barPos, isNewBar: (i % 4) === 0,
+        intensity: 1, movesFiredThisBar: 0, wetFiredThisBar: 0,
+      }), rng);
+      if (result) expect(forbidden.has(result.moveId)).toBe(false);
+    }
+  });
+
+  it('wet flag is set on choice when a wet rule wins the roulette', () => {
+    const rng = seededRng(5000);
+    // intensity 1 at isNewBar bar 3 → echoThrow (wet) is most likely pick.
+    for (let i = 0; i < 100; i++) {
+      const result = chooseMove(baseCtx({ intensity: 1 }), rng);
+      if (result?.moveId === 'echoThrow') {
+        expect(result.wet).toBe(true);
+        return;
+      }
+    }
+    expect.fail('echoThrow never rolled in 100 tries — adjust seed');
   });
 
   it('produces a well-formed choice when conditions + budget allow', () => {
