@@ -217,8 +217,8 @@ export class DeckEngine {
       this._rawDeckGainParam = (nativeGain as GainNode).gain;
     }
     this.eq3 = new Tone.EQ3({ low: 0, mid: 0, high: 0 });
-    this.filterHPF = new Tone.Filter({ type: 'highpass', frequency: 20, Q: 1, rolloff: -24 });
-    this.filterLPF = new Tone.Filter({ type: 'lowpass', frequency: 20000, Q: 1, rolloff: -24 });
+    this.filterHPF = new Tone.Filter({ type: 'highpass', frequency: 20, Q: 1, rolloff: -12 });
+    this.filterLPF = new Tone.Filter({ type: 'lowpass', frequency: 20000, Q: 1, rolloff: -12 });
     this.channelGain = new Tone.Gain(1);
     this.meter = new Tone.Meter({ smoothing: 0.8 });
     this.waveformAnalyser = new Tone.Analyser('waveform', 256);
@@ -1485,12 +1485,12 @@ export class DeckEngine {
     let hpfTarget: number;
     if (this.filterPosition >= 0) {
       // LPF active: sweep 20kHz → 100Hz as position goes 0 → 1
-      lpfTarget = 20000 * Math.pow(100 / 20000, this.filterPosition);
+      lpfTarget = Math.max(80, 20000 * Math.pow(100 / 20000, this.filterPosition));
       hpfTarget = 20;
     } else {
       // HPF active: sweep 20Hz → 10kHz as position goes 0 → -1
       const amount = -this.filterPosition; // 0..1
-      hpfTarget = 20 * Math.pow(10000 / 20, amount);
+      hpfTarget = Math.min(18000, 20 * Math.pow(10000 / 20, amount));
       lpfTarget = 20000;
     }
     this.filterLPF.frequency.rampTo(lpfTarget, RAMP);
@@ -1503,7 +1503,7 @@ export class DeckEngine {
   }
 
   setFilterResonance(q: number): void {
-    this.filterResonance = Math.max(0.5, Math.min(15, q));
+    this.filterResonance = Math.max(0.5, Math.min(10, q));
     this.filterHPF.Q.rampTo(this.filterResonance, 0.05);
     this.filterLPF.Q.rampTo(this.filterResonance, 0.05);
     for (const chain of this.channelFXChains.values()) {
@@ -1742,13 +1742,13 @@ export class DeckEngine {
         type: 'highpass',
         frequency: hpfFreq,
         Q: this.filterResonance,
-        rolloff: -24,
+        rolloff: -12,
       });
       const lpf = new Tone.Filter({
         type: 'lowpass',
         frequency: lpfFreq,
         Q: this.filterResonance,
-        rolloff: -24,
+        rolloff: -12,
       });
 
       // Wire tap.output (native GainNode) into Tone.js EQ3. `connect` on

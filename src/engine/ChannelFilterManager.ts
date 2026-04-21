@@ -36,8 +36,8 @@ class ChannelFilterManager {
     let cf = this.filters.get(channelIndex);
     if (!cf) {
       cf = {
-        hpf: new Tone.Filter({ type: 'highpass', frequency: 20, Q: 1, rolloff: -24 }),
-        lpf: new Tone.Filter({ type: 'lowpass', frequency: 20000, Q: 1, rolloff: -24 }),
+        hpf: new Tone.Filter({ type: 'highpass', frequency: 20, Q: 1, rolloff: -12 }),
+        lpf: new Tone.Filter({ type: 'lowpass', frequency: 20000, Q: 1, rolloff: -12 }),
         position: 0,
         resonance: 1,
       };
@@ -79,13 +79,13 @@ class ChannelFilterManager {
 
     if (cf.position >= 0) {
       // LPF active: sweep 20kHz → 100Hz as position goes 0 → 1
-      const lpfFreq = 20000 * Math.pow(100 / 20000, cf.position);
+      const lpfFreq = Math.max(80, 20000 * Math.pow(100 / 20000, cf.position));
       cf.lpf.frequency.rampTo(lpfFreq, RAMP_TIME);
       cf.hpf.frequency.rampTo(20, RAMP_TIME);
     } else {
       // HPF active: sweep 20Hz → 10kHz as position goes 0 → -1
       const amount = -cf.position;
-      const hpfFreq = 20 * Math.pow(10000 / 20, amount);
+      const hpfFreq = Math.min(18000, 20 * Math.pow(10000 / 20, amount));
       cf.hpf.frequency.rampTo(hpfFreq, RAMP_TIME);
       cf.lpf.frequency.rampTo(20000, RAMP_TIME);
     }
@@ -97,7 +97,7 @@ class ChannelFilterManager {
    */
   setResonance(channelIndex: number, resonance01: number): void {
     const cf = this.getOrCreate(channelIndex);
-    cf.resonance = 0.5 + resonance01 * 14.5; // 0-1 → 0.5-15
+    cf.resonance = 0.5 + resonance01 * 9.5; // 0-1 → 0.5-10 (capped to prevent biquad instability)
     cf.hpf.Q.rampTo(cf.resonance, 0.05);
     cf.lpf.Q.rampTo(cf.resonance, 0.05);
   }
