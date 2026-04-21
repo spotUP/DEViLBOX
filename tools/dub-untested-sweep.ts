@@ -22,6 +22,14 @@ const MODLAND_API = 'http://localhost:3011/api/modland';
 // from Modland before running the sweep. Otherwise the sweep uses whatever
 // song is already loaded + playing in the browser.
 const MODLAND_QUERY = process.env.MODLAND_QUERY;
+// Optional: `DUB_PLATE_STAGE=madprofessor` (or `dattorro`) engages the
+// dub-bus plate-stage insert before running the sweep, so the full
+// 27-move pass can be tested with each plate character active.
+const DUB_PLATE_STAGE = process.env.DUB_PLATE_STAGE as
+  | 'madprofessor' | 'dattorro' | 'off' | undefined;
+const DUB_PLATE_MIX = process.env.DUB_PLATE_MIX
+  ? parseFloat(process.env.DUB_PLATE_MIX)
+  : 0.5;
 
 // `holdMs` overrides the default 1.5 s hold window for ramp-up moves whose
 // peak arrives late (tapeWobble, radioRiser, subSwell): measuring at 1.5 s
@@ -193,6 +201,18 @@ async function main() {
   await call('set_dub_bus_enabled', { enabled: true });
   await call('set_channel_dub_send', { channel: 0, amount: 0.6 });
 
+  // Optional plate-stage insert — exercises the 27 moves with a WASM
+  // plate processing the bus post-stage. Catches regressions where a
+  // move's audio path trips over the plate's send gain or the post-
+  // stereoMerge branch. Reset to 'off' at teardown.
+  if (DUB_PLATE_STAGE && DUB_PLATE_STAGE !== 'off') {
+    console.log(`[sweep] engaging plateStage=${DUB_PLATE_STAGE} mix=${DUB_PLATE_MIX}`);
+    await call('set_dub_bus_settings', {
+      settings: { plateStage: DUB_PLATE_STAGE, plateStageMix: DUB_PLATE_MIX },
+    });
+    await sleep(2000);  // WASM worklet boot
+  }
+
   const rows: Row[] = [];
 
   // Single fire-and-measure pass against one channel. Returns measurement +
@@ -322,19 +342,27 @@ async function main() {
     rows.push(row);
   }
 
-  // Reset channel send.
+  // Reset channel send + tear down any plate-stage insert.
   await call('set_channel_dub_send', { channel: 0, amount: 0 }).catch(() => {});
+  if (DUB_PLATE_STAGE && DUB_PLATE_STAGE !== 'off') {
+    await call('set_dub_bus_settings', { settings: { plateStage: 'off' } }).catch(() => {});
+  }
 
   // ── Tail-leak check ───────────────────────────────────────────────────────
   // Catches held moves whose disposer doesn't kill their internal loop /
   // oscillator (e.g. rAF-driven transient-followers, feedback-fed delays
   // that never silence). Every released move should have stopped emitting
-  // sound by now; stopping the song too means ANY remaining audio is a
-  // leak, not the song.
+  // sound by now; stopping the song AND disabling the bus too means ANY
+  // remaining audio is a leaked move, not the song / echo / spring tail.
+  //
+  // The bus MUST be disabled — zeroing the channel send alone doesn't
+  // stop echo+spring feedback decay or the plate-stage tail, so the leak
+  // check would false-positive on legitimate tail.
   console.log('');
   console.log('─── tail-leak check ──────────────────────────────');
-  console.log('[sweep] stopping song + waiting 15 s for all tails to land…');
+  console.log('[sweep] stopping song + disabling bus + waiting 15 s…');
   try { await call('stop'); } catch { /* ok */ }
+  await call('set_dub_bus_enabled', { enabled: false }).catch(() => {});
   await sleep(15_000);
   const tail15 = await call('get_audio_level', { durationMs: 1000 });
   console.log(`  t=15s  rms=${fmt(tail15?.rmsAvg)} peak=${fmt(tail15?.peakMax)} silent=${tail15?.isSilent}`);
