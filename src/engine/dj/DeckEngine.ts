@@ -119,6 +119,12 @@ export class DeckEngine {
   private _isScratchActive = false;   // true while jog wheel is physically held
   /** Whether jog wheel scratch is currently active (hand on record). */
   get isScratchActive(): boolean { return this._isScratchActive; }
+  /** Captured at startScratch() — true if the deck was playing before the
+   *  scratch began. Consumed by _switchToForward + stopScratch to decide
+   *  whether to resume() the player on release. Scratching a STOPPED deck
+   *  should go silent on release, not auto-start playback (2026-04-21
+   *  user report). */
+  private _wasPlayingAtScratchStart = false;
   private backwardPauseTimeoutId: ReturnType<typeof setTimeout> | null = null;
   private decayRafId: number | null = null;
   /* Timeouts scheduled by stopScratch (hardReset + phase-align). Tracked so
@@ -693,6 +699,13 @@ export class DeckEngine {
   startScratch(): void {
     if (this._isScratchActive) return;
     this._isScratchActive = true;
+    // Snapshot the play-state before scratch so release can restore it
+    // correctly. Scratching a stopped deck must NOT auto-start playback
+    // on release — _switchToForward otherwise calls resume() whenever
+    // the scratch ends on a forward sweep.
+    this._wasPlayingAtScratchStart = this._playbackMode === 'audio'
+      ? this.audioPlayer.isCurrentlyPlaying()
+      : this.replayer.isPlaying?.() ?? false;
     // Cancel any in-progress restore animation so scratch takes full control
     if (this.decayRafId !== null) {
       cancelAnimationFrame(this.decayRafId);
@@ -1022,7 +1035,10 @@ export class DeckEngine {
       this.audioPlayer.seek(targetMs / 1000);
       this.audioPlayer.setPlaybackRate(fwdRate);
       this._rampDeckGain(1, 0.002);
-      if (!this.audioPlayer.isCurrentlyPlaying()) {
+      // Only auto-resume if the deck was playing before scratch started.
+      // Scratching a paused/stopped deck should go silent on release, not
+      // start playback. (2026-04-21 user report.)
+      if (this._wasPlayingAtScratchStart && !this.audioPlayer.isCurrentlyPlaying()) {
         this.audioPlayer.resume();
       }
     } else {
@@ -1045,7 +1061,11 @@ export class DeckEngine {
       } else {
         this.replayer.seekTo(this.backwardStartSongPos, this.backwardStartPattPos);
       }
-      this.replayer.resume();
+      // Same gate for replayer mode — don't auto-start playback on a
+      // scratch release if the deck was paused before scratch.
+      if (this._wasPlayingAtScratchStart) {
+        this.replayer.resume();
+      }
       this._rampDeckGain(1, 0.002);
       this.replayer.setPitchMultiplier(fwdRate);
       this.replayer.setTempoMultiplier(fwdRate);
