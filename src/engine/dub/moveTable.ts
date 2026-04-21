@@ -60,35 +60,83 @@ export const DUB_MOVE_TABLE_VERSION = 27;
  * arbitrary dub moves on every playback, producing pattern-level
  * distortion on any imported MOD/XM/IT song with fine porta.
  *
- *  - `DUB_EFFECT_GLOBAL` (36)    — `eff` high nibble = move index 0-15
- *  - `DUB_EFFECT_PERCHANNEL` (37) — high nibble = move, low nibble = target channel 0-15
- *  - `DUB_EFFECT_PARAM_STEP` (38) — high nibble = param index, low nibble = 0-15 step
+ *  - `DUB_EFFECT_GLOBAL` (36)       — base slot, high nibble = move index 0-15
+ *  - `DUB_EFFECT_PERCHANNEL` (37)   — base slot, high nibble = move 0-15, low nibble = target channel 0-15
+ *  - `DUB_EFFECT_PARAM_STEP` (38)   — high nibble = param index, low nibble = 0-15 step
+ *  - `DUB_EFFECT_GLOBAL_X` (39)     — extended slot, high nibble = (move index - 16), covers moves 16-31
+ *  - `DUB_EFFECT_PERCHANNEL_X` (40) — extended per-channel, high nibble = (move - 16), low nibble = channel 0-15
+ *
+ * Why two slot pairs: a single effTyp encodes 16 moves (4-bit nibble).
+ * DUB_MOVE_TABLE has 27 append-only entries, so the _X slots keep moves
+ * 16+ addressable inline. Future moves 32+ would need slots 41/42.
  */
-export const DUB_EFFECT_GLOBAL     = 36;
-export const DUB_EFFECT_PERCHANNEL = 37;
-export const DUB_EFFECT_PARAM_STEP = 38;
+export const DUB_EFFECT_GLOBAL       = 36;
+export const DUB_EFFECT_PERCHANNEL   = 37;
+export const DUB_EFFECT_PARAM_STEP   = 38;
+export const DUB_EFFECT_GLOBAL_X     = 39;
+export const DUB_EFFECT_PERCHANNEL_X = 40;
+
+/** True when effTyp is any of the four dub move-trigger slots (not the param-step slot). */
+export function isDubMoveEffectSlot(effTyp: number): boolean {
+  return effTyp === DUB_EFFECT_GLOBAL
+      || effTyp === DUB_EFFECT_PERCHANNEL
+      || effTyp === DUB_EFFECT_GLOBAL_X
+      || effTyp === DUB_EFFECT_PERCHANNEL_X;
+}
 
 /**
- * Decode an effect-command byte. `DUB_EFFECT_GLOBAL` = global move: eff
- * high nibble is move index 0-15; low nibble is a variant slot reserved
- * for future args (always 0 today). `DUB_EFFECT_PERCHANNEL` = per-channel:
- * eff high nibble is move index, low nibble is target channel 0-15.
+ * Decode an effect-command byte into a move trigger. Handles all four
+ * move-trigger slots (36/37/39/40); returns null for the param-step slot
+ * (38 — decode via `decodeDubParamStep` instead) or any non-dub effTyp.
  *
- * Returns null when the effTyp isn't a dub slot or the move index is out
- * of range — caller falls through to a no-op rather than firing garbage.
+ * Base slots encode moves 0-15; _X slots add 16 to the nibble so moves
+ * 16-31 are reachable. Out-of-range indices return null so the caller
+ * falls through to a no-op rather than firing garbage.
  */
 export function decodeDubEffect(effTyp: number, eff: number): {
   moveId: string;
   channelId?: number;
 } | null {
-  if (effTyp !== DUB_EFFECT_GLOBAL && effTyp !== DUB_EFFECT_PERCHANNEL) return null;
-  const moveIdx = (eff >> 4) & 0x0f;
+  const nibble = (eff >> 4) & 0x0f;
+  let moveIdx: number;
+  let perChannel: boolean;
+  switch (effTyp) {
+    case DUB_EFFECT_GLOBAL:       moveIdx = nibble;       perChannel = false; break;
+    case DUB_EFFECT_PERCHANNEL:   moveIdx = nibble;       perChannel = true;  break;
+    case DUB_EFFECT_GLOBAL_X:     moveIdx = nibble + 16;  perChannel = false; break;
+    case DUB_EFFECT_PERCHANNEL_X: moveIdx = nibble + 16;  perChannel = true;  break;
+    default: return null;
+  }
   if (moveIdx >= DUB_MOVE_TABLE.length) return null;
   const moveId = DUB_MOVE_TABLE[moveIdx];
-  if (effTyp === DUB_EFFECT_PERCHANNEL) {
-    return { moveId, channelId: eff & 0x0f };
+  return perChannel ? { moveId, channelId: eff & 0x0f } : { moveId };
+}
+
+/**
+ * Inverse of decodeDubEffect. Picks the correct base or _X slot for the
+ * move's table index. Returns null if the move isn't in DUB_MOVE_TABLE,
+ * its index ≥ 32 (would need future slots 41/42), or channelId is out
+ * of range. DubRecorder uses this to stamp Zxx cells inline.
+ */
+export function encodeDubEffect(
+  moveId: string,
+  channelId?: number,
+): { effTyp: number; eff: number } | null {
+  const moveIdx = DUB_MOVE_TABLE.indexOf(moveId);
+  if (moveIdx < 0 || moveIdx >= 32) return null;
+  const isExtended = moveIdx >= 16;
+  const nibble = moveIdx & 0x0f;
+  if (channelId !== undefined) {
+    if (channelId < 0 || channelId > 15) return null;
+    return {
+      effTyp: isExtended ? DUB_EFFECT_PERCHANNEL_X : DUB_EFFECT_PERCHANNEL,
+      eff: (nibble << 4) | (channelId & 0x0f),
+    };
   }
-  return { moveId };
+  return {
+    effTyp: isExtended ? DUB_EFFECT_GLOBAL_X : DUB_EFFECT_GLOBAL,
+    eff: nibble << 4,
+  };
 }
 
 /**
