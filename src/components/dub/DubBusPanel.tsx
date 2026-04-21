@@ -196,6 +196,32 @@ export const DubBusPanel: React.FC = () => {
             onChange={(v) => patch({ echoWet: v })}
             format={(v) => `${Math.round(v * 100)}%`}
           />
+          <div className="h-px bg-dark-borderLight my-1" />
+          {/* Plate-stage insert — optional post-processing plate reverb
+              fed from stereoMerge. Adds a colored tail on top of the
+              spring+echo chain; doesn't replace either. Pairs with the
+              corresponding Master FX preset for max character. */}
+          <Choice
+            label="Plate stage"
+            value={dubBus.plateStage}
+            options={[
+              { value: 'off',          label: 'Off' },
+              { value: 'madprofessor', label: 'Mad Professor (PCM-70)' },
+              { value: 'dattorro',     label: 'Dattorro (metallic plate)' },
+            ] as const}
+            onChange={(v) => patch({ plateStage: v })}
+          />
+          <Slider
+            label="Plate mix"
+            value={dubBus.plateStageMix}
+            min={0}
+            max={1}
+            step={0.01}
+            onChange={(v) => patch({ plateStageMix: v })}
+            format={(v) => `${Math.round(v * 100)}%`}
+            disabled={dubBus.plateStage === 'off'}
+          />
+          <div className="h-px bg-dark-borderLight my-1" />
           <Choice
             label="Echo sync"
             value={dubBus.echoSyncDivision}
