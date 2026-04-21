@@ -224,11 +224,12 @@ export async function parseFurnaceFile(buffer: ArrayBuffer, _fileName: string, s
   } catch (err) {
     // DefleMask (.dmf) files can only be parsed by the WASM engine (which has
     // Furnace's full DMF import). The TS fallback only handles .fur format.
+    // NOTE: .fur files are ALSO zlib-compressed (0x78), so we must check the
+    // actual DMF magic bytes (.DefleMask = 0x2E 0x44 0x65), not just zlib.
     const bytes = new Uint8Array(buffer);
-    const isZlib = bytes[0] === 0x78;
-    const isDefleMask = (bytes[0] === 0x2E && bytes[1] === 0x44 && bytes[2] === 0x65) || isZlib;
+    const isDMFMagic = bytes[0] === 0x2E && bytes[1] === 0x44 && bytes[2] === 0x65;
     const errMsg = err instanceof Error ? err.message : String(err);
-    if (isDefleMask) {
+    if (isDMFMagic) {
       throw new Error(`DefleMask import requires Furnace WASM engine (WASM error: ${errMsg})`);
     }
     console.warn('[FurnaceToSong] WASM parser failed, falling back to TS parser:', errMsg);
