@@ -1492,6 +1492,16 @@ export class DeckEngine {
   }
 
   /**
+   * Read-only access to the deck's currently loaded tracker song.
+   * Returns null in audio-file mode or when no song is loaded.
+   * Used by Auto-DJ Smart Cuts for pattern-data transition decisions.
+   */
+  getLoadedSong(): TrackerSong | null {
+    if (this._playbackMode !== 'tracker') return null;
+    return this.replayer.getSong();
+  }
+
+  /**
    * Open a per-channel side-tap on the loaded tracker song. The returned
    * GainNode carries a copy of that channel's audio in parallel with the
    * main mix — the deck's master output is unchanged.

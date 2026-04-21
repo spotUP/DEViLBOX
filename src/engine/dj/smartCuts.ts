@@ -14,7 +14,7 @@
  */
 
 import type { Pattern } from '@/types/tracker';
-import { classifyPattern } from '@/bridge/analysis/MusicAnalysis';
+import { classifyPattern, detectChordChangeRows } from '@/bridge/analysis/MusicAnalysis';
 
 export interface DrumBreakInput {
   /** The outgoing deck's full song. Null if deck isn't tracker-format. */
@@ -72,4 +72,57 @@ export function detectDrumBreakTail(input: DrumBreakInput): boolean {
   }
 
   return percActive >= 4 && percActive >= nonPercActive * 3;
+}
+
+// ─── Chord-change avoidance ──────────────────────────────────────────────────
+
+export interface ChordChangeImminentInput {
+  /** The outgoing deck's full song. Null if deck isn't tracker-format. */
+  song: { patterns: Pattern[] } | null | undefined;
+  /** Current pattern index being played (songPos → patternOrder lookup).
+   *  Callers can pass -1 to scan the last pattern (tail analysis). */
+  patternIndex: number;
+  /** Current row within the current pattern. */
+  currentRow: number;
+  /** How many rows ahead to scan for a chord change (typically 1 bar
+   *  worth of rows: 16 for a 16-row-per-bar song at rowsPerBeat=4). */
+  windowRows?: number;
+  /** Rows-per-beat for chord-change sampling (default 4 — matches the
+   *  detectChordProgression default). */
+  rowsPerBeat?: number;
+}
+
+/**
+ * Return true if a chord change will occur within the next `windowRows`
+ * rows on the outgoing song. Used by Auto-DJ Smart Cuts to DEFER a hard
+ * cut when the outgoing track is mid-turnaround — crossfading through a
+ * chord change sounds smooth; cutting across one sounds broken.
+ *
+ * Returns false for missing / out-of-range inputs — callers fall through
+ * to the default (non-avoidance) transition path.
+ */
+export function isChordChangeImminent(input: ChordChangeImminentInput): boolean {
+  const { song } = input;
+  if (!song || !Array.isArray(song.patterns) || song.patterns.length === 0) {
+    return false;
+  }
+
+  const patternCount = song.patterns.length;
+  const patternIndex = input.patternIndex < 0
+    ? patternCount - 1
+    : Math.min(input.patternIndex, patternCount - 1);
+  const pattern = song.patterns[patternIndex];
+  if (!pattern || !Array.isArray(pattern.channels) || pattern.channels.length === 0) {
+    return false;
+  }
+
+  const windowRows = input.windowRows ?? 16;
+  const rowsPerBeat = input.rowsPerBeat ?? 4;
+  const currentRow = Math.max(0, input.currentRow);
+
+  const changes = detectChordChangeRows(pattern, rowsPerBeat);
+  for (const { row } of changes) {
+    if (row > currentRow && row <= currentRow + windowRows) return true;
+  }
+  return false;
 }
