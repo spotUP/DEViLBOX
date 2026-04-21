@@ -48,10 +48,10 @@ export class DubFilterEffect extends Tone.ToneAudioNode {
     // 1. Filter Stage
     // Use -24dB/oct for a steep "Tubby" cut
     this.filter = new Tone.Filter({
-      frequency: this._options.cutoff,
+      frequency: Math.max(20, Math.min(18000, this._options.cutoff)),
       type: 'highpass',
-      rolloff: -24,
-      Q: (this._options.resonance / 100) * 20
+      rolloff: -12,
+      Q: Math.min(10, (this._options.resonance / 100) * 20)
     });
 
     // 2. Drive Stage
@@ -82,12 +82,12 @@ export class DubFilterEffect extends Tone.ToneAudioNode {
 
   setCutoff(val: number) {
     this._options.cutoff = val;
-    this.filter.frequency.rampTo(val, 0.05); 
+    this.filter.frequency.rampTo(Math.max(20, Math.min(18000, val)), 0.05); 
   }
 
   setResonance(val: number) {
     this._options.resonance = val;
-    const q = (val / 100) * 20;
+    const q = Math.min(10, (val / 100) * 20);
     this.filter.Q.rampTo(q, 0.1);
   }
 
