@@ -235,14 +235,20 @@ describe('ui-smoke — flow 08: scratch audio continuity', () => {
 
       // Single deck is enough — scratch state is per-deck. Same fixture
       // flow 07 uses (cached → instant load).
+      //
+      // NB: single-deck cold load is SLOWER than flow 07's both-decks
+      // parallel path — the pre-render pipeline serialises the first
+      // decode and the mixer needs an extra tick to settle once only
+      // one side is producing audio. Empirically, baseline RMS is
+      // unreliable before ~2 s of total wait (measured 2026-04-21).
       const payload = loadFixtureBase64(FIXTURE_MOD);
       await c.call('dj_vj_action', {
         action: 'loadDeck',
         args: { side: 'A', filename: payload.filename, data: payload.data },
       });
-      await sleep(400);
+      await sleep(800);  // was 400 — pre-render needs longer on cold single-deck
       await c.call('dj_vj_action', { action: 'playDeck', args: { side: 'A' } });
-      await sleep(600); // let playback reach steady RMS
+      await sleep(1200);  // was 600 — first buffer settles in ~1 s after playDeck
 
       // Baseline: pre-scratch RMS must be non-silent. If this fails the
       // whole scratch assertion is meaningless (fixture or load broke).
