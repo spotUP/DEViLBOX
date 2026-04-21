@@ -22,7 +22,7 @@ interface GlobalDragDropHandlerProps {
 // All supported file extensions — module formats from ModuleLoader + app-specific
 const SUPPORTED_EXTENSIONS = new Set([
   // DEViLBOX projects
-  '.dbx',
+  '.dbx', '.dvbx',
   // DEViLBOX instruments
   '.dbi',
   // SunVox patches and projects

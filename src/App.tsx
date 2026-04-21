@@ -764,8 +764,8 @@ function App() {
       return;
     }
 
-    // .dbx project files get a preview dialog showing song info before replacing
-    if (/\.dbx$/i.test(file.name)) {
+    // .dbx/.dvbx project files get a preview dialog showing song info before replacing
+    if (/\.(dbx|dvbx)$/i.test(file.name)) {
       setPendingSongFile(file);
       return;
     }

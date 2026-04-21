@@ -18,24 +18,30 @@ export const NanoExportDialog: React.FC<NanoExportDialogProps> = ({ onClose }) =
     return NanoExporter.export(instruments, patterns, patternOrder, bpm, speed);
   }, [instruments, patterns, patternOrder, bpm, speed]);
 
+  const compressedData = useMemo(() => {
+    return NanoExporter.exportCompressed(instruments, patterns, patternOrder, bpm, speed);
+  }, [instruments, patterns, patternOrder, bpm, speed]);
+
   const base64Data = useMemo(() => {
-    // Convert Uint8Array to Base64
     let binary = '';
-    const bytes = new Uint8Array(binaryData);
+    const bytes = new Uint8Array(compressedData);
     const len = bytes.byteLength;
     for (let i = 0; i < len; i++) {
       binary += String.fromCharCode(bytes[i]);
     }
     return window.btoa(binary);
-  }, [binaryData]);
+  }, [compressedData]);
 
   const stats = useMemo(() => {
+    const ratio = binaryData.length > 0 ? ((1 - compressedData.length / binaryData.length) * 100).toFixed(0) : '0';
     return {
-      bytes: binaryData.length,
-      kb: (binaryData.length / 1024).toFixed(2),
+      rawBytes: binaryData.length,
+      compressedBytes: compressedData.length,
+      kb: (compressedData.length / 1024).toFixed(2),
+      ratio,
       instr: instruments.length
     };
-  }, [binaryData, instruments]);
+  }, [binaryData, compressedData, instruments]);
 
   useModalClose({ isOpen: true, onClose });
 
@@ -46,7 +52,7 @@ export const NanoExportDialog: React.FC<NanoExportDialogProps> = ({ onClose }) =
   };
 
   const handleDownload = () => {
-    const blob = new Blob([new Uint8Array(binaryData)], { type: 'application/octet-stream' });
+    const blob = new Blob([new Uint8Array(compressedData)], { type: 'application/octet-stream' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
@@ -81,16 +87,16 @@ export const NanoExportDialog: React.FC<NanoExportDialogProps> = ({ onClose }) =
           {/* Info Cards */}
           <div className="grid grid-cols-3 gap-4">
             <div className="bg-black/40 border border-dark-border p-3 rounded-lg text-center">
-              <div className="text-[10px] text-text-muted uppercase font-bold mb-1">Total Size</div>
-              <div className="text-lg font-mono text-text-primary">{stats.bytes} <span className="text-xs text-text-muted">bytes</span></div>
+              <div className="text-[10px] text-text-muted uppercase font-bold mb-1">LZMA Size</div>
+              <div className="text-lg font-mono text-text-primary">{stats.compressedBytes} <span className="text-xs text-text-muted">bytes</span></div>
             </div>
             <div className="bg-black/40 border border-dark-border p-3 rounded-lg text-center">
-              <div className="text-[10px] text-text-muted uppercase font-bold mb-1">Kilobytes</div>
-              <div className="text-lg font-mono text-text-primary">{stats.kb} <span className="text-xs text-text-muted">KB</span></div>
+              <div className="text-[10px] text-text-muted uppercase font-bold mb-1">Raw / Ratio</div>
+              <div className="text-lg font-mono text-text-primary">{stats.rawBytes}B <span className="text-xs text-accent-success">−{stats.ratio}%</span></div>
             </div>
             <div className="bg-black/40 border border-dark-border p-3 rounded-lg text-center">
               <div className="text-[10px] text-text-muted uppercase font-bold mb-1">Target</div>
-              <div className="text-lg font-mono text-green-500">4K OK</div>
+              <div className={`text-lg font-mono ${stats.compressedBytes <= 4096 ? 'text-green-500' : 'text-amber-400'}`}>{stats.kb} KB</div>
             </div>
           </div>
 

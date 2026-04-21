@@ -106,7 +106,9 @@ async function captureExport(pattern: unknown): Promise<Record<string, unknown>>
     {}, // options
   );
   expect(captured.blob, 'saveAs should have been called with a Blob').toBeTruthy();
-  const text = await captured.blob!.text();
+  const { decompressProject } = await import('@/lib/projectCompression');
+  const buffer = await captured.blob!.arrayBuffer();
+  const text = decompressProject(buffer);
   return JSON.parse(text);
 }
 

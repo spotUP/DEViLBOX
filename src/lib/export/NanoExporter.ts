@@ -6,6 +6,13 @@
  * - Only exports instruments and patterns actually used
  * - Bit-masking for pattern cells (don't store what you don't use)
  * - 0-255 normalized parameters for synths
+ * - Optional LZMA compression on top of bit-packed binary
+ *
+ * Compressed format (version 2):
+ *   [4 bytes] Magic: 0xDB 0x58 0x4E 0x21 ("DBXN!")
+ *   [1 byte]  Version: 2 (indicates LZMA compressed)
+ *   [4 bytes] Uncompressed payload size (little-endian uint32)
+ *   [N bytes] LZMA-compressed payload (the raw v1 data minus header)
  */
 
 import type { InstrumentConfig } from '@/types/instrument';
@@ -20,7 +27,7 @@ const SYNTH_TYPE_TO_ID: Record<string, number> = {
 
 export class NanoExporter {
   /**
-   * Export the current project to a highly compressed binary string (Base64)
+   * Export the current project to a highly compressed binary (Base64)
    */
   public static export(
     instruments: InstrumentConfig[],
@@ -108,6 +115,62 @@ export class NanoExporter {
     });
 
     return new Uint8Array(buffer);
+  }
+
+  /**
+   * Export with LZMA compression on top of the bit-packed binary.
+   * Version 2 format: same magic + version 2 + uncompressed size + LZMA payload.
+   * @param level LZMA compression level 1-9 (default 7, max ratio at 9)
+   */
+  public static exportCompressed(
+    instruments: InstrumentConfig[],
+    patterns: Pattern[],
+    patternOrder: number[],
+    bpm: number,
+    speed: number,
+    level: number = 7
+  ): Uint8Array {
+    const raw = this.export(instruments, patterns, patternOrder, bpm, speed);
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const LZMA = require('lzma/src/lzma_worker.js').LZMA;
+    const compressed: number[] = LZMA.compress(raw, Math.min(9, Math.max(1, level)));
+
+    // Build v2 container: magic(4) + version(1) + uncompressed_size(4) + LZMA data
+    const result = new Uint8Array(9 + compressed.length);
+    result[0] = 0xDB; result[1] = 0x58; result[2] = 0x4E; result[3] = 0x21;
+    result[4] = 2; // version 2 = LZMA
+    const view = new DataView(result.buffer);
+    view.setUint32(5, raw.length, true);
+    for (let i = 0; i < compressed.length; i++) {
+      result[9 + i] = compressed[i] & 0xFF;
+    }
+    return result;
+  }
+
+  /**
+   * Decompress a version-2 LZMA-compressed Nano export back to the raw v1 binary.
+   * Useful for testing round-trips.
+   */
+  public static decompress(data: Uint8Array): Uint8Array {
+    if (data.length < 9 || data[0] !== 0xDB || data[1] !== 0x58 ||
+        data[2] !== 0x4E || data[3] !== 0x21) {
+      throw new Error('Invalid Nano binary: bad magic');
+    }
+    if (data[4] === 1) return data; // v1 uncompressed — return as-is
+    if (data[4] !== 2) throw new Error(`Unsupported Nano version: ${data[4]}`);
+
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const LZMA = require('lzma/src/lzma_worker.js').LZMA;
+    const lzmaPayload = Array.from(data.subarray(9));
+    const decompressed = LZMA.decompress(lzmaPayload);
+
+    // LZMA decompress may return string or byte array — normalize to Uint8Array
+    if (typeof decompressed === 'string') {
+      const encoder = new TextEncoder();
+      return encoder.encode(decompressed);
+    }
+    if (decompressed instanceof Uint8Array) return decompressed;
+    return new Uint8Array(decompressed.map((b: number) => b & 0xFF));
   }
 
   private static getUsedInstrumentIds(patterns: Pattern[], order: number[]): Set<number> {

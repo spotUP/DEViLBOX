@@ -14,6 +14,7 @@ import type { AutomationCurve } from '@typedefs/automation';
 import type { EffectConfig } from '@typedefs/instrument';
 import { needsMigration, migrateProject } from '@/lib/migration';
 import { getOriginalModuleDataForExport, getNativeEngineDataForExport, getNativeEngineMetaForExport, restoreNativeEngineData } from '@/lib/export/exporters';
+import { compressProject } from '@/lib/projectCompression';
 
 
 const AUTO_SAVE_INTERVAL = 300000; // 5 minutes
@@ -573,13 +574,14 @@ export async function clearSavedProject(): Promise<void> {
 }
 
 /**
- * Serialize the current project to a JSON Blob suitable for file download.
- * This is the same data that saveProjectToStorage() writes to IndexedDB.
+ * Serialize the current project to a compressed binary Blob (DVBZ format).
+ * Falls back cleanly — old versions can't read it, but new code reads both.
  */
 export function serializeProjectToBlob(): Blob {
   const savedProject = buildSavedProject();
-  const json = JSON.stringify(savedProject, null, 2);
-  return new Blob([json], { type: 'application/json' });
+  const json = JSON.stringify(savedProject);
+  const compressed = compressProject(json);
+  return new Blob([compressed], { type: 'application/octet-stream' });
 }
 
 /**

@@ -45,7 +45,7 @@ import { getSupportedMIDIExtensions } from '@/lib/import/MIDIImporter';
 
 // Build comprehensive accept string for file inputs (400+ supported formats)
 export const ACCEPTED_FILE_FORMATS = [
-  '.json', '.dbx', '.dbox', '.xml',
+  '.json', '.dbx', '.dvbx', '.dbox', '.xml',
   ...getSupportedExtensions(),
   ...getSupportedMIDIExtensions()
 ].join(',');
@@ -520,7 +520,7 @@ export function useFileNavigation({
             {
               description: 'All Supported Files',
               accept: {
-                'application/octet-stream': ['.dbx', '.dbox', '.mod', '.xm', '.it', '.s3m', '.fur', '.mptm', '.dmf', '.ftm', '.sqs', '.seq', '.mid', '.midi', '.xrns'],
+                'application/octet-stream': ['.dbx', '.dvbx', '.dbox', '.mod', '.xm', '.it', '.s3m', '.fur', '.mptm', '.dmf', '.ftm', '.sqs', '.seq', '.mid', '.midi', '.xrns'],
               },
             },
           ],
@@ -697,6 +697,10 @@ export function useFileNavigation({
       const data = currentProjectData();
       const filename = saveFilename.endsWith('.dbx') ? saveFilename : `${saveFilename}.dbx`;
 
+      // Compress project data using DVBZ format
+      const { compressProject } = await import('@/lib/projectCompression');
+      const compressed = compressProject(JSON.stringify(data));
+
       if (fileSource === 'cloud' && isAuthenticated()) {
         await saveCloudFile(filename, data, 'songs');
         loadFiles();
@@ -707,22 +711,18 @@ export function useFileNavigation({
       if (hasElectronFS() && window.electron?.fs) {
         const targetPath = electronDirectory || currentPath;
         const fullPath = `${targetPath}/${filename}`;
-        const jsonData = JSON.stringify(data, null, 2);
-        const buffer = new TextEncoder().encode(jsonData);
-        await window.electron.fs.writeFile(fullPath, buffer);
+        await window.electron.fs.writeFile(fullPath, compressed);
       } else if (hasServerFS) {
         const targetPath = currentPath ? `${currentPath}/${filename}` : `songs/${filename}`;
-        const jsonData = JSON.stringify(data, null, 2);
-        const buffer = new TextEncoder().encode(jsonData);
-        await writeServerFile(targetPath, buffer);
+        await writeServerFile(targetPath, compressed);
       } else {
         const dirHandle = getCurrentDirectory();
         if (dirHandle) {
-          await createFile(filename, JSON.stringify(data, null, 2), dirHandle);
+          await createFile(filename, compressed, dirHandle);
         } else {
           const handle = await pickSaveLocation(filename);
           if (handle) {
-            await writeFile(handle, JSON.stringify(data, null, 2));
+            await writeFile(handle, compressed);
           }
         }
       }
