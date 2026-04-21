@@ -501,9 +501,13 @@ export const DeckFXPads: React.FC<DeckFXPadsProps> = ({ deckId }) => {
               ? 'bg-amber-600/30 text-amber-300 border border-amber-500/40'
               : 'bg-dark-bgTertiary text-text-muted border border-dark-border hover:text-text-secondary'
           }`}
-          title="Dub bus sends page 3 — atmospheric (wide, ping, riser, sub, presets, mic)"
+          title={
+            fxTargetCount > 0
+              ? `Dub bus sends page 3 — targeting ${fxTargetCount} channel${fxTargetCount > 1 ? 's' : ''}`
+              : 'Dub bus sends page 3 — atmospheric (wide, ping, riser, sub, presets, mic)'
+          }
         >
-          DUB 3
+          DUB 3{fxTargetCount > 0 ? ` ·${fxTargetCount}ch` : ''}
         </button>
         <button
           onClick={() => setPage('dub4')}
@@ -512,9 +516,13 @@ export const DeckFXPads: React.FC<DeckFXPadsProps> = ({ deckId }) => {
               ? 'bg-amber-600/30 text-amber-300 border border-amber-500/40'
               : 'bg-dark-bgTertiary text-text-muted border border-dark-border hover:text-text-secondary'
           }`}
-          title="Dub bus sends page 4 — channel + transport edge cases"
+          title={
+            fxTargetCount > 0
+              ? `Dub bus sends page 4 — targeting ${fxTargetCount} channel${fxTargetCount > 1 ? 's' : ''}`
+              : 'Dub bus sends page 4 — channel + transport edge cases'
+          }
         >
-          DUB 4
+          DUB 4{fxTargetCount > 0 ? ` ·${fxTargetCount}ch` : ''}
         </button>
         {page === 'jump' && hasBeatGrid && (
           <span className="text-[7px] text-green-400 ml-auto">● GRID</span>
