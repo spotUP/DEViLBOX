@@ -377,6 +377,16 @@ export class DubBus {
   // wrapping in Tone.Gain would add an unnecessary node without buying
   // anything (all the methods we use are native AudioParam APIs).
   private channelTaps: Map<number, GainNode> = new Map();
+
+  // Deck-scoped per-channel taps — DJ view registers these via
+  // registerDeckChannelTap(deckId, ch, sourceGain) so two decks with a
+  // channel 3 don't collide. Each entry holds the source disposer (for
+  // teardown) and the bus-side modulation gain (what openChannelTap
+  // ramps to execute DUB moves).
+  //
+  // Wiring: sourceGain → busGain → deckHpf → input. busGain starts at
+  // 0 so idle taps cost nothing audibly.
+  private deckChannelTaps: Map<string, { busGain: GainNode; disposeSource: () => void }> = new Map();
   private attachedMixer: DJMixerEngine | null = null;
   // Track mixer→tap connections so we can cleanly detach if the mixer changes.
   private mixerTapConnections: Array<{ nativeFrom: AudioNode; to: GainNode }> = [];
@@ -1840,6 +1850,55 @@ export class DubBus {
     this.channelTaps.delete(channelId);
   }
 
+  // ─── DJ deck per-channel taps ──────────────────────────────────────────
+  //
+  // Caller provides `sourceGain` — a GainNode the DJ deck returned from
+  // DeckEngine.openChannelTap() that carries one channel's audio. Bus
+  // creates a busGain at 0 (idle silent) and connects
+  //   sourceGain → busGain → deckHpf → input.
+  // openChannelTap(..., ctx: { deckId }) ramps busGain up for the
+  // duration of the move and back to 0 on release.
+  //
+  // Keyed by `${deckId}:${ch}` so two decks can own the same channel
+  // index without aliasing the tracker-view `channelTaps` map.
+
+  registerDeckChannelTap(deckId: DeckId, channelIndex: number, sourceGain: GainNode): void {
+    const key = `${deckId}:${channelIndex}`;
+    // Re-registration: tear down the previous entry first. Common on song
+    // reload or when the FX-target set changes membership.
+    const existing = this.deckChannelTaps.get(key);
+    if (existing) {
+      try { existing.disposeSource(); } catch { /* ok */ }
+      try { existing.busGain.disconnect(); } catch { /* ok */ }
+      this.deckChannelTaps.delete(key);
+    }
+
+    const busGain = this.context.createGain();
+    busGain.gain.value = 0; // idle silent until a move opens the tap
+    try {
+      sourceGain.connect(busGain);
+      busGain.connect(this.deckHpf);
+    } catch (e) {
+      console.warn(`[DubBus] registerDeckChannelTap(${key}) connect failed:`, e);
+      try { busGain.disconnect(); } catch { /* ok */ }
+      return;
+    }
+
+    const disposeSource = () => {
+      try { sourceGain.disconnect(busGain); } catch { /* ok */ }
+    };
+    this.deckChannelTaps.set(key, { busGain, disposeSource });
+  }
+
+  unregisterDeckChannelTap(deckId: DeckId, channelIndex: number): void {
+    const key = `${deckId}:${channelIndex}`;
+    const entry = this.deckChannelTaps.get(key);
+    if (!entry) return;
+    try { entry.disposeSource(); } catch { /* ok */ }
+    try { entry.busGain.disconnect(); } catch { /* ok */ }
+    this.deckChannelTaps.delete(key);
+  }
+
   // Activation callback — set by DubDeckStrip on mount. Lets openChannelTap
   // lazy-activate a channel's dub send when the user fires a move on a
   // channel whose fader is at 0 (no tap registered yet). Without this, the
@@ -1864,9 +1923,42 @@ export class DubBus {
    * via activation callback so the worklet spins up its dub slot, then on
    * release drive it back to the prior value.
    */
-  openChannelTap(channelId: number, amount: number, attackSec = 0.005): () => void {
+  openChannelTap(
+    channelId: number,
+    amount: number,
+    attackSec = 0.005,
+    ctx?: { deckId?: DeckId },
+  ): () => void {
     if (!this.enabled) return () => {};
     const clamped = Math.min(1, Math.max(0, amount));
+
+    // DJ deck routing takes precedence when a deckId is present. Deck
+    // taps are pre-registered by the DJ store→engine bridge on
+    // fxTargetChannels change (no cold path — no DJ fader controlling
+    // a baseline send). If the tap isn't registered yet, silently
+    // return a no-op so the move's release still runs without
+    // errors — the user simply won't hear any contribution from this
+    // channel for this fire.
+    if (ctx?.deckId) {
+      const key = `${ctx.deckId}:${channelId}`;
+      const entry = this.deckChannelTaps.get(key);
+      if (entry) {
+        const gain = entry.busGain.gain;
+        const baseline = 0; // DJ deck taps rest at 0 (no UI fader baseline)
+        const now = this.context.currentTime;
+        gain.cancelScheduledValues(now);
+        gain.setValueAtTime(gain.value, now);
+        gain.linearRampToValueAtTime(clamped, now + attackSec);
+        return () => {
+          const release = this.context.currentTime;
+          gain.cancelScheduledValues(release);
+          gain.setValueAtTime(gain.value, release);
+          gain.linearRampToValueAtTime(baseline, release + 0.08);
+        };
+      }
+      return () => {};
+    }
+
     const tap = this.channelTaps.get(channelId);
 
     if (tap) {
@@ -3205,6 +3297,14 @@ export class DubBus {
     // Channel taps are owned by ChannelEffectsManager — just clear our registry.
     // The actual Tone.Gain nodes are disposed by ChannelEffectsManager.disposeAll().
     this.channelTaps.clear();
+    // Deck-channel taps are OWNED by the bus (we created the busGain).
+    // Tear down every entry: disconnect the source side, disconnect the
+    // bus gain, clear the map.
+    for (const entry of this.deckChannelTaps.values()) {
+      try { entry.disposeSource(); } catch { /* ok */ }
+      try { entry.busGain.disconnect(); } catch { /* ok */ }
+    }
+    this.deckChannelTaps.clear();
     // Cancel any in-flight dub action releasers + pending throw timers before
     // tearing nodes down — otherwise late-firing timers try to cancelScheduledValues
     // on disposed AudioParams and spam the console with errors.

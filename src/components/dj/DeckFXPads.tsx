@@ -306,7 +306,10 @@ export const DeckFXPads: React.FC<DeckFXPadsProps> = ({ deckId }) => {
     if (fxTargets.size > 0) {
       const disposers: Array<{ dispose(): void } | null> = [];
       for (const ch of fxTargets) {
-        disposers.push(fireDubMove(moveId, ch, {}, 'live'));
+        // deckId → opts so the move reaches DubBus.openChannelTap via the
+        // deck-channel-tap routing (per-deck taps registered by the
+        // store→engine bridge).
+        disposers.push(fireDubMove(moveId, ch, {}, 'live', { deckId }));
       }
       disposer = {
         dispose: () => {

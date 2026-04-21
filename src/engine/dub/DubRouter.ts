@@ -174,6 +174,7 @@ export function fire(
   channelId: number | undefined,
   params: Record<string, number> = {},
   source: 'live' | 'lane' = 'live',
+  opts?: { deckId?: import('../dj/DeckEngine').DeckId },
 ): { dispose(): void } | null {
   const move = MOVES[moveId];
   if (!move) {
@@ -189,7 +190,7 @@ export function fire(
   const bpm = useTransportStore.getState().bpm || 120;
   const row = currentRow();
 
-  const ctx: DubMoveContext = { bus: _bus, channelId, params: merged, bpm, source };
+  const ctx: DubMoveContext = { bus: _bus, channelId, deckId: opts?.deckId, params: merged, bpm, source };
   const disposer = move.execute(ctx);
 
   const invocationId = nextInvocationId();
