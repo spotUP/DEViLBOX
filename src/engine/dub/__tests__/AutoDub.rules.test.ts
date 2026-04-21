@@ -7,9 +7,14 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { chooseMove, detectTransients, hasTransientForRole, type AutoDubTickCtx } from '../AutoDub';
+import {
+  chooseMove, detectTransients, hasTransientForRole,
+  channelHasNoteInWindow, computeDensityByRole,
+  type AutoDubTickCtx,
+} from '../AutoDub';
 import { getPersona } from '../AutoDubPersonas';
 import type { ChannelRole } from '@/bridge/analysis/MusicAnalysis';
+import type { Pattern, ChannelData, TrackerCell } from '@/types/tracker';
 
 /** Deterministic linear-congruential RNG. xorshift would be nicer but this
  *  is plenty for "roll the same sequence twice in a test." */
@@ -35,6 +40,14 @@ function baseCtx(overrides: Partial<AutoDubTickCtx> = {}): AutoDubTickCtx {
     channelCount: 8,
     roles: [],
     transientChannels: [],
+    // Defaults for the look-ahead / density / rename-boost fields added
+    // 2026-04-21 — `null` pattern disables look-ahead, empty density map
+    // disables bias, empty name array disables boost. Existing tests thus
+    // exercise the Phase-1 behaviour by default.
+    currentPattern: null,
+    currentRow: 0,
+    channelNames: [],
+    densityByRole: new Map(),
     ...overrides,
   };
 }
@@ -442,5 +455,254 @@ describe('transient-triggered rules', () => {
     const withTransient = countWithTransient(true);
     const without = countWithTransient(false);
     expect(withTransient).toBeGreaterThan(without);
+  });
+});
+
+// ── Look-ahead / density / rename-boost helpers (2026-04-21) ────────────────
+
+function emptyCell(): TrackerCell {
+  return { note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 };
+}
+function noteCell(n: number): TrackerCell {
+  return { note: n, instrument: 1, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 };
+}
+function makeChannel(name: string, length: number, notes: Record<number, number>): ChannelData {
+  const rows: TrackerCell[] = Array.from({ length }, () => emptyCell());
+  for (const [rowStr, note] of Object.entries(notes)) {
+    const row = parseInt(rowStr, 10);
+    if (row >= 0 && row < length) rows[row] = noteCell(note);
+  }
+  return {
+    id: name, name, rows, muted: false, solo: false, collapsed: false,
+    volume: 100, pan: 0, instrumentId: 1, color: null,
+  };
+}
+function makePattern(channels: ChannelData[]): Pattern {
+  return { id: 'p0', name: 'p', length: channels[0]?.rows.length ?? 64, channels };
+}
+
+describe('channelHasNoteInWindow', () => {
+  it('returns false for null pattern / missing channel / out-of-range index', () => {
+    expect(channelHasNoteInWindow(null, 0, 0, 16)).toBe(false);
+    const p = makePattern([makeChannel('ch0', 64, { 0: 24 })]);
+    expect(channelHasNoteInWindow(p, 0, 99, 16)).toBe(false);
+  });
+  it('returns true when any note lands inside the window', () => {
+    const p = makePattern([makeChannel('ch0', 64, { 5: 24 })]);
+    expect(channelHasNoteInWindow(p, 0, 0, 16)).toBe(true);
+    // Exact window boundary: note at row 15 included when windowRows=16.
+    const p2 = makePattern([makeChannel('ch0', 64, { 15: 24 })]);
+    expect(channelHasNoteInWindow(p2, 0, 0, 16)).toBe(true);
+    // Past window: note at row 16 NOT included.
+    const p3 = makePattern([makeChannel('ch0', 64, { 16: 24 })]);
+    expect(channelHasNoteInWindow(p3, 0, 0, 16)).toBe(false);
+  });
+  it('returns false for a silent window (no notes in range)', () => {
+    const p = makePattern([makeChannel('ch0', 64, { 40: 24 })]);
+    expect(channelHasNoteInWindow(p, 0, 0, 16)).toBe(false);
+  });
+});
+
+describe('computeDensityByRole', () => {
+  it('returns an empty map when pattern is null or roles empty', () => {
+    expect(computeDensityByRole(null, 0, ['percussion'], 16).size).toBe(0);
+    const p = makePattern([makeChannel('ch0', 64, { 0: 24 })]);
+    expect(computeDensityByRole(p, 0, [], 16).size).toBe(0);
+  });
+  it('reports higher density for a busier role', () => {
+    // Percussion fires every row; bass only twice.
+    const drums = makeChannel('d', 64, Object.fromEntries(
+      Array.from({ length: 16 }, (_, i) => [i, 24]),
+    ));
+    const bass = makeChannel('b', 64, { 0: 13, 8: 13 });
+    const p = makePattern([drums, bass]);
+    const d = computeDensityByRole(p, 0, ['percussion', 'bass'], 16);
+    const perc = d.get('percussion') ?? 0;
+    const bassDen = d.get('bass') ?? 0;
+    expect(perc).toBeGreaterThan(bassDen);
+    // Percussion should be nearly saturated (close to 1.0).
+    expect(perc).toBeGreaterThan(0.8);
+    expect(bassDen).toBeLessThan(0.3);
+  });
+  it('respects the look-ahead window — only notes inside range count', () => {
+    const drums = makeChannel('d', 64, { 0: 24, 32: 24, 48: 24 });
+    const p = makePattern([drums]);
+    // Window covers rows 0..15 → sees only the row-0 note.
+    const d1 = computeDensityByRole(p, 0, ['percussion'], 16);
+    // Window covers rows 30..45 → sees the row-32 note.
+    const d2 = computeDensityByRole(p, 30, ['percussion'], 16);
+    expect(d1.get('percussion')).toBeGreaterThan(0);
+    expect(d2.get('percussion')).toBeGreaterThan(0);
+    // Window covers rows 16..31 → no notes in range.
+    const d3 = computeDensityByRole(p, 16, ['percussion'], 16);
+    expect(d3.get('percussion')).toBeCloseTo(0, 5);
+  });
+});
+
+describe('chooseMove — look-ahead skips silent target channels', () => {
+  it('does not fire per-channel move on a silent channel when look-ahead is possible', () => {
+    // Channel 0 = percussion, silent for the next 16 rows. Channel 1 =
+    // percussion, notes every 2 rows. Fire should pick ch 1, never ch 0.
+    const silent = makeChannel('ch0', 64, { 60: 24 }); // note only at tail
+    const busy = makeChannel('ch1', 64, Object.fromEntries(
+      Array.from({ length: 8 }, (_, i) => [i * 2, 24]),
+    ));
+    const pattern = makePattern([silent, busy]);
+    const rng = seededRng(7070);
+    let pickedSilent = 0;
+    let pickedBusy = 0;
+    for (let i = 0; i < 200; i++) {
+      const result = chooseMove(baseCtx({
+        bar: 3, barPos: 0.0, isNewBar: true, intensity: 1,
+        channelCount: 2, roles: ['percussion', 'percussion'],
+        currentPattern: pattern, currentRow: 0,
+      }), rng);
+      if (result?.channelId === 0) pickedSilent += 1;
+      if (result?.channelId === 1) pickedBusy += 1;
+    }
+    expect(pickedSilent).toBe(0);
+    expect(pickedBusy).toBeGreaterThan(0);
+  });
+  it('falls through to Phase-1 (all candidates) when currentPattern is null', () => {
+    // No pattern → look-ahead disabled → both channels eligible.
+    const rng = seededRng(8080);
+    let pickedSilent = 0;
+    let pickedBusy = 0;
+    for (let i = 0; i < 200; i++) {
+      const result = chooseMove(baseCtx({
+        bar: 3, barPos: 0.0, isNewBar: true, intensity: 1,
+        channelCount: 2, roles: ['percussion', 'percussion'],
+        currentPattern: null,
+      }), rng);
+      if (result?.channelId === 0) pickedSilent += 1;
+      if (result?.channelId === 1) pickedBusy += 1;
+    }
+    expect(pickedSilent + pickedBusy).toBeGreaterThan(0);
+    expect(pickedSilent).toBeGreaterThan(0); // no longer skipped
+  });
+});
+
+describe('chooseMove — user-rename target boost', () => {
+  it('prefers a channel with a user-edited name over an auto-named sibling', () => {
+    // Two percussion channels, same look-ahead status. Channel 0 = generic
+    // name "Channel 1", channel 1 = user-edited "Snare Solo". Expect
+    // roughly ~60% pick rate on ch 1 (1.5 / 2.5 ≈ 0.6) vs ~40% on ch 0.
+    const busy = makeChannel('busy', 64, Object.fromEntries(
+      Array.from({ length: 16 }, (_, i) => [i, 24]),
+    ));
+    const pattern = makePattern([
+      { ...busy, id: 'ch0', name: 'Channel 1' },
+      { ...busy, id: 'ch1', name: 'Snare Solo' },
+    ]);
+    const rng = seededRng(9090);
+    let pickedGeneric = 0;
+    let pickedUser = 0;
+    for (let i = 0; i < 300; i++) {
+      const result = chooseMove(baseCtx({
+        bar: 3, barPos: 0.0, isNewBar: true, intensity: 1,
+        channelCount: 2, roles: ['percussion', 'percussion'],
+        currentPattern: pattern, currentRow: 0,
+        channelNames: ['Channel 1', 'Snare Solo'],
+      }), rng);
+      if (result?.channelId === 0) pickedGeneric += 1;
+      if (result?.channelId === 1) pickedUser += 1;
+    }
+    expect(pickedUser).toBeGreaterThan(pickedGeneric);
+  });
+});
+
+describe('chooseMove — density bias', () => {
+  it('Scientist persona (+density) fires more during dense passages', () => {
+    // Build two fixtures: one dense, one sparse. Count firings of a global
+    // rule (e.g. echoBuildUp, which is Scientist's signature) across 500
+    // ticks with each.
+    const denseDrums = makeChannel('d', 64, Object.fromEntries(
+      Array.from({ length: 16 }, (_, i) => [i, 24]),
+    ));
+    const sparseDrums = makeChannel('d', 64, { 0: 24, 8: 24 });
+    const densePattern = makePattern([denseDrums]);
+    const sparsePattern = makePattern([sparseDrums]);
+    function countFires(pattern: Pattern): number {
+      const rng = seededRng(1234);
+      let n = 0;
+      for (let i = 0; i < 500; i++) {
+        // bar 2 of 4 → echoBuildUp is eligible. Scientist weights it 1.8×.
+        const density = computeDensityByRole(pattern, 0, ['percussion'], 16);
+        const result = chooseMove(baseCtx({
+          bar: 2, barPos: 0.0, isNewBar: true, intensity: 0.8,
+          persona: getPersona('scientist'),
+          channelCount: 1, roles: ['percussion'],
+          currentPattern: pattern, currentRow: 0,
+          densityByRole: density,
+        }), rng);
+        if (result?.moveId === 'echoBuildUp') n += 1;
+      }
+      return n;
+    }
+    const denseFires = countFires(densePattern);
+    const sparseFires = countFires(sparsePattern);
+    // Density bias of +0.5 scales rule weight ~1-1.75× for dense vs
+    // ~0.25-1× for sparse. Allow a small margin for rule competition.
+    expect(denseFires).toBeGreaterThan(sparseFires);
+  });
+  it('Jammy persona (-density) fires more during sparse passages', () => {
+    const denseDrums = makeChannel('d', 64, Object.fromEntries(
+      Array.from({ length: 16 }, (_, i) => [i, 24]),
+    ));
+    const sparseDrums = makeChannel('d', 64, { 0: 24, 8: 24 });
+    const densePattern = makePattern([denseDrums]);
+    const sparsePattern = makePattern([sparseDrums]);
+    function countFires(pattern: Pattern): number {
+      const rng = seededRng(2222);
+      let n = 0;
+      for (let i = 0; i < 500; i++) {
+        // bar 8 of 8 → tapeStop eligible; Jammy's signature move.
+        const density = computeDensityByRole(pattern, 0, ['percussion'], 16);
+        const result = chooseMove(baseCtx({
+          bar: 7, barPos: 0.0, isNewBar: true, intensity: 0.8,
+          persona: getPersona('jammy'),
+          channelCount: 1, roles: ['percussion'],
+          currentPattern: pattern, currentRow: 0,
+          densityByRole: density,
+        }), rng);
+        if (result?.moveId === 'tapeStop') n += 1;
+      }
+      return n;
+    }
+    const denseFires = countFires(densePattern);
+    const sparseFires = countFires(sparsePattern);
+    expect(sparseFires).toBeGreaterThan(denseFires);
+  });
+  it('neutral persona (densityBias=0) is unaffected by density', () => {
+    // Tubby has no densityBias — dense vs sparse should produce similar
+    // fire counts (allow ±20% variance for RNG).
+    const denseDrums = makeChannel('d', 64, Object.fromEntries(
+      Array.from({ length: 16 }, (_, i) => [i, 24]),
+    ));
+    const sparseDrums = makeChannel('d', 64, { 0: 24, 8: 24 });
+    const densePattern = makePattern([denseDrums]);
+    const sparsePattern = makePattern([sparseDrums]);
+    function countFires(pattern: Pattern): number {
+      const rng = seededRng(333);
+      let n = 0;
+      for (let i = 0; i < 300; i++) {
+        const density = computeDensityByRole(pattern, 0, ['percussion'], 16);
+        const result = chooseMove(baseCtx({
+          bar: 3, barPos: 0.0, isNewBar: true, intensity: 0.8,
+          persona: getPersona('tubby'),
+          channelCount: 1, roles: ['percussion'],
+          currentPattern: pattern, currentRow: 0,
+          densityByRole: density,
+        }), rng);
+        if (result?.moveId === 'echoThrow') n += 1;
+      }
+      return n;
+    }
+    const denseFires = countFires(densePattern);
+    const sparseFires = countFires(sparsePattern);
+    const ratio = denseFires > sparseFires
+      ? sparseFires / Math.max(1, denseFires)
+      : denseFires / Math.max(1, sparseFires);
+    expect(ratio).toBeGreaterThan(0.6); // within ~40% of each other
   });
 });
