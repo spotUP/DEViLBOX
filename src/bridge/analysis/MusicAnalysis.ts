@@ -392,6 +392,47 @@ export function detectChordProgression(
   return chords;
 }
 
+/**
+ * Row-indexed variant of detectChordProgression. For a single pattern,
+ * returns every row where the harmony CHANGES relative to the prior
+ * sampled row — i.e. the musical "turnaround" moments where a cut or
+ * phrase-boundary transition should land (or avoid).
+ *
+ * Rows that don't contain chord-defining notes (silence, percussion-only
+ * rows) are skipped rather than counted as "no chord" — so a silent row
+ * between two identical chords doesn't falsely register as a change.
+ *
+ * Scans every `rowsPerBeat` rows (default 4, matching detectChordProgression).
+ * Used by Auto-DJ Smart Cuts to avoid firing a hard cut in the middle
+ * of a chord transition.
+ */
+export function detectChordChangeRows(
+  pattern: Pattern,
+  rowsPerBeat: number = 4,
+): Array<{ row: number; chord: string }> {
+  const changes: Array<{ row: number; chord: string }> = [];
+  const numRows = pattern.channels[0]?.rows.length || 0;
+  let lastChord: string | null = null;
+
+  for (let row = 0; row < numRows; row += rowsPerBeat) {
+    const pcs: number[] = [];
+    for (const channel of pattern.channels) {
+      const cell = channel.rows[row];
+      if (cell && cell.note >= 1 && cell.note <= 96) {
+        pcs.push(pitchClass(cell.note));
+      }
+    }
+    const chord = detectChord(pcs);
+    if (!chord) continue;
+    if (lastChord === null || chord !== lastChord) {
+      changes.push({ row, chord });
+      lastChord = chord;
+    }
+  }
+
+  return changes;
+}
+
 // ─── Note Distribution ──────────────────────────────────────────────────────
 
 export function getNoteDistribution(notes: number[]): Record<string, number> {
