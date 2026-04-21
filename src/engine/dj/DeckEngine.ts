@@ -484,7 +484,85 @@ export class DeckEngine {
     this.patternScratchActive = false;
     this.patternScratchDir = 1;
 
-    return this.audioPlayer.loadAudioFile(buffer, filename, precomputedPeaks);
+    const info = await this.audioPlayer.loadAudioFile(buffer, filename, precomputedPeaks);
+    // Fire-and-forget prime so the scratch ring buffer has content even
+    // before the user presses play. Mirrors a real turntable: a loaded
+    // record is scratch-audible regardless of motor state.
+    void this._primeScratchBuffer();
+    return info;
+  }
+
+  /**
+   * Fill the scratch ring buffer with the first ~150 ms of the loaded
+   * audio so scratching a loaded-but-never-played deck is audible.
+   *
+   * Mechanism:
+   *   1. Force channelGain to 0 (output silent — user hears nothing).
+   *   2. Resume the audio player at position 0 — audio flows through
+   *      `keyLock → deckGain → filter → captureNode`. The captureNode
+   *      is wired INLINE (wireIntoChain) and writes every incoming
+   *      frame to the ring buffer regardless of whether downstream is
+   *      audible.
+   *   3. After ~150 ms (ring buffer is 2048 frames ≈ 46 ms at 44.1 kHz,
+   *      so 150 ms is 3× safety margin), pause the player and seek it
+   *      back to 0 so the next user-triggered play starts cleanly.
+   *   4. Restore channelGain.
+   *
+   * Guarded against: ongoing playback (priming would disrupt it), prior
+   * in-flight priming (Dup call races), and scratch-buffer not yet ready
+   * (async init may not have finished by the time loadAudioFile resolves —
+   * in that case we briefly poll up to 500 ms before giving up).
+   *
+   * Fire-and-forget from callers — errors are swallowed so a prime
+   * failure never bubbles into the load path.
+   */
+  private _primingScratchBuffer = false;
+  private async _primeScratchBuffer(): Promise<void> {
+    if (this._primingScratchBuffer) return;
+    if (this._playbackMode !== 'audio') return;
+    if (this.audioPlayer.isCurrentlyPlaying()) return;
+
+    this._primingScratchBuffer = true;
+    try {
+      // Wait up to 500 ms for the scratch buffer worklet to initialise.
+      for (let t = 0; !this.scratchBufferReady && t < 10; t++) {
+        await new Promise(r => setTimeout(r, 50));
+      }
+      if (!this.scratchBufferReady) return;
+
+      // Another play() may have landed while we were waiting; re-check.
+      if (this.audioPlayer.isCurrentlyPlaying()) return;
+
+      const ctx = Tone.getContext().rawContext as AudioContext;
+      const now = ctx.currentTime;
+      const gainParam = (this.channelGain.gain as unknown as { _param: AudioParam })._param
+        ?? this.channelGain.gain;
+      const prevValue = gainParam.value;
+
+      // Silence the output for the priming window so the user hears nothing.
+      gainParam.cancelScheduledValues(now);
+      gainParam.setValueAtTime(0, now);
+
+      try {
+        this.audioPlayer.seek(0);
+        this.audioPlayer.resume();
+        // Give the capture worklet time to fill the ring buffer. Ring is
+        // 2048 frames ≈ 46 ms @ 44.1 kHz; 150 ms is 3× safety margin to
+        // survive scheduler jitter and the Tone.Player's 10 ms fadeIn.
+        await new Promise(r => setTimeout(r, 150));
+      } finally {
+        // Always pause + seek-back + restore gain, even if resume() threw.
+        try { this.audioPlayer.pause(); } catch { /* ok */ }
+        this.audioPlayer.seek(0);
+        const restoreAt = (Tone.getContext().rawContext as AudioContext).currentTime;
+        gainParam.cancelScheduledValues(restoreAt);
+        gainParam.setValueAtTime(prevValue, restoreAt);
+      }
+    } catch {
+      // Swallow — priming is a nice-to-have; a failure shouldn't block load.
+    } finally {
+      this._primingScratchBuffer = false;
+    }
   }
 
   get playbackMode(): PlaybackMode {
