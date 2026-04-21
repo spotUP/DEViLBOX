@@ -421,6 +421,24 @@ export async function setDubBusSettings(params: Record<string, unknown>): Promis
 }
 
 /**
+ * Drive Auto Dub — enable/disable the autonomous performer and pick a persona
+ * + intensity. Used by ui-smoke flow 11 to regression-lock the feature shipped
+ * in commit 209640420 (2026-04-21). See AutoDubPanel.tsx for the UI path.
+ *
+ * Does NOT auto-apply the persona's bus character preset — that's the explicit
+ * ♫ button's job. Callers who want the full persona voicing should also call
+ * `set_dub_bus_settings` with `characterPreset: '<persona>'`.
+ */
+export async function setAutoDubConfig(params: Record<string, unknown>): Promise<Record<string, unknown>> {
+  const { useDubStore } = await import('../../stores/useDubStore');
+  const s = useDubStore.getState();
+  if (typeof params.enabled === 'boolean') s.setAutoDubEnabled(params.enabled);
+  if (typeof params.persona === 'string') s.setAutoDubPersona(params.persona as Parameters<typeof s.setAutoDubPersona>[0]);
+  if (typeof params.intensity === 'number') s.setAutoDubIntensity(params.intensity);
+  return { ok: true };
+}
+
+/**
  * Drive a parameter through the same routing pipeline that the automation
  * system + MIDI CC handlers use. Intended for ui-smoke / integration tests
  * that need to verify a param (e.g. `dub.echoWet`, `tb303.filter.cutoff`)
