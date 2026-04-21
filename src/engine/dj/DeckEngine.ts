@@ -700,9 +700,9 @@ export class DeckEngine {
     if (this._isScratchActive) return;
     this._isScratchActive = true;
     // Snapshot the play-state before scratch so release can restore it
-    // correctly. Scratching a stopped deck must NOT auto-start playback
-    // on release — _switchToForward otherwise calls resume() whenever
-    // the scratch ends on a forward sweep.
+    // correctly. If the deck was stopped, scratch still produces sound
+    // (the player is started below) but stopScratch must pause it again
+    // on release so we don't leave a stopped deck playing.
     this._wasPlayingAtScratchStart = this._playbackMode === 'audio'
       ? this.audioPlayer.isCurrentlyPlaying()
       : this.replayer.isPlaying?.() ?? false;
@@ -720,6 +720,21 @@ export class DeckEngine {
       this.slipGhostPosition = this.audioPlayer.getPosition();
       this.slipGhostStartTime = performance.now();
       this.slipGhostRate = this.audioPlayer.getPlaybackRate();
+    }
+
+    // If the deck is stopped, start it so the scratch gesture has an
+    // audio source to drive. Matches real-turntable behavior: the record
+    // makes sound when you push it even if the motor is off. Playback is
+    // paused again on release by stopScratch's hardReset when
+    // `_wasPlayingAtScratchStart` is false.
+    if (!this._wasPlayingAtScratchStart) {
+      if (this._playbackMode === 'audio') {
+        if (!this.audioPlayer.isCurrentlyPlaying()) {
+          try { this.audioPlayer.resume(); } catch { /* ok — audio not ready */ }
+        }
+      } else {
+        try { this.replayer.resume(); } catch { /* ok */ }
+      }
     }
   }
 
@@ -903,6 +918,18 @@ export class DeckEngine {
         this.replayer.setPitchMultiplier(this.restMultiplier);
         this.replayer.setTempoMultiplier(this.restMultiplier);
       }
+      // If the deck was stopped before this scratch gesture started, pause
+      // it again now that the decay has settled. startScratch resumed the
+      // player so the scratch produced sound; without this pause, releasing
+      // would leave the deck playing, which is not the behavior a user
+      // expects on a stopped turntable (2026-04-21 user report).
+      if (!this._wasPlayingAtScratchStart) {
+        if (this._playbackMode === 'audio') {
+          try { this.audioPlayer.pause(); } catch { /* ok */ }
+        } else {
+          try { this.replayer.pause(); } catch { /* ok */ }
+        }
+      }
     };
     const resetTimer = setTimeout(() => {
       this._stopScratchTimeouts.delete(resetTimer);
@@ -1035,10 +1062,7 @@ export class DeckEngine {
       this.audioPlayer.seek(targetMs / 1000);
       this.audioPlayer.setPlaybackRate(fwdRate);
       this._rampDeckGain(1, 0.002);
-      // Only auto-resume if the deck was playing before scratch started.
-      // Scratching a paused/stopped deck should go silent on release, not
-      // start playback. (2026-04-21 user report.)
-      if (this._wasPlayingAtScratchStart && !this.audioPlayer.isCurrentlyPlaying()) {
+      if (!this.audioPlayer.isCurrentlyPlaying()) {
         this.audioPlayer.resume();
       }
     } else {
@@ -1061,11 +1085,7 @@ export class DeckEngine {
       } else {
         this.replayer.seekTo(this.backwardStartSongPos, this.backwardStartPattPos);
       }
-      // Same gate for replayer mode — don't auto-start playback on a
-      // scratch release if the deck was paused before scratch.
-      if (this._wasPlayingAtScratchStart) {
-        this.replayer.resume();
-      }
+      this.replayer.resume();
       this._rampDeckGain(1, 0.002);
       this.replayer.setPitchMultiplier(fwdRate);
       this.replayer.setTempoMultiplier(fwdRate);
