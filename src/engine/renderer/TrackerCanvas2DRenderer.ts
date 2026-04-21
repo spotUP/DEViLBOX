@@ -60,6 +60,14 @@ const HEX1: string[] = Array.from({ length: 16 }, (_, i) => i.toString(16).toUpp
 
 function hex2(v: number): string { return HEX[v & 0xff] ?? '00'; }
 
+// Effect type → display char (matches TrackerGLRenderer's EFFECT_CHARS)
+const EFFECT_CHARS_2D: string[] = new Array(39);
+for (let i = 0; i < 10; i++) EFFECT_CHARS_2D[i] = i.toString();
+for (let i = 10; i < 36; i++) EFFECT_CHARS_2D[i] = String.fromCharCode(55 + i);
+EFFECT_CHARS_2D[36] = 'Z';  // DUB_EFFECT_GLOBAL
+EFFECT_CHARS_2D[37] = 'Z';  // DUB_EFFECT_PERCHANNEL
+EFFECT_CHARS_2D[38] = 'Z';  // DUB_EFFECT_PARAM_STEP
+
 // ─────────────────────────────────────────────────────────────────────────────
 
 export class TrackerCanvas2DRenderer {
@@ -303,7 +311,7 @@ export class TrackerCanvas2DRenderer {
           const eff  = cell?.effTyp ?? 0;
           const effp = cell?.eff    ?? 0;
           ctx.fillStyle = isPlayRow ? '#ffffff' : eff === 0 && effp === 0 ? theme.textMuted : theme.textEffect;
-          const effStr = eff === 0 && effp === 0 ? '···' : `${hex2(eff)[1]}${hex2(effp)}`;
+          const effStr = eff === 0 && effp === 0 ? '···' : `${EFFECT_CHARS_2D[eff] ?? '?'}${hex2(effp)}`;
           ctx.fillText(effStr, effBaseX, y);
         }
       }

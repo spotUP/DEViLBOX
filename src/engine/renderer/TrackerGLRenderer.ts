@@ -147,10 +147,13 @@ function getNoteTable(displayOffset: number): string[] {
 
 const COL_GAP = 4; // Gap between columns in data-driven mode
 
-// Effect type char lookup (0-35 → '0'-'9','A'-'Z')
-const EFFECT_CHARS: string[] = new Array(36);
+// Effect type char lookup (0-35 → '0'-'9','A'-'Z', 36-38 → dub 'Z')
+const EFFECT_CHARS: string[] = new Array(39);
 for (let i = 0; i < 10; i++) EFFECT_CHARS[i] = i.toString();
 for (let i = 10; i < 36; i++) EFFECT_CHARS[i] = String.fromCharCode(55 + i);
+EFFECT_CHARS[36] = 'Z';  // DUB_EFFECT_GLOBAL
+EFFECT_CHARS[37] = 'Z';  // DUB_EFFECT_PERCHANNEL
+EFFECT_CHARS[38] = 'Z';  // DUB_EFFECT_PARAM_STEP
 
 // Pre-parsed probability colors
 const PROB_COLORS: [number, number, number, number][] = [
