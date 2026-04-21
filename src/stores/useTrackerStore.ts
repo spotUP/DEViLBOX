@@ -18,6 +18,8 @@ import { idGenerator } from '../utils/idGenerator';
 import { DEFAULT_PATTERN_LENGTH, DEFAULT_NUM_CHANNELS, MAX_PATTERN_LENGTH, MAX_CHANNELS, MIN_CHANNELS, MIN_PATTERN_LENGTH } from '../constants/trackerConstants';
 import { checkFormatViolation, getActiveFormatLimits, isViolationConfirmed } from '@/lib/formatCompatibility';
 import { SYSTEM_PRESETS, DivChanType } from '../constants/systemPresets';
+import { autoNameChannels as computeAutoNames } from '@/bridge/analysis/ChannelNaming';
+import { useInstrumentStore } from './useInstrumentStore';
 import { isSynthCompatibleWithChannel, getChannelBadge, getSynthBadge } from '../constants/channelTypeCompat';
 import { useHistoryStore } from './useHistoryStore';
 // Late-bound access to the sibling stores that used to form an import cycle
@@ -299,6 +301,10 @@ interface TrackerStore {
   setChannelRows: (channelIndex: number, rows: TrackerCell[]) => void;
   reorderChannel: (fromIndex: number, toIndex: number) => void;
   updateChannelName: (channelIndex: number, name: string) => void;
+  /** Run the ChannelNaming classifier across the current song + instrument
+   *  lookup, apply every proposed rename via `updateChannelName`, return the
+   *  number of channels actually renamed (for UI toast feedback). */
+  autoNameChannels: () => number;
   applySystemPreset: (presetId: string) => void;
   applyAmigaSongSettings: (presetId: string) => void;
   setChannelRecordGroup: (channelIndex: number, group: 0 | 1 | 2) => void;
@@ -1678,6 +1684,29 @@ export const useTrackerStore = create<TrackerStore>()(
         });
       }),
 
+    autoNameChannels: () => {
+      const patterns = get().patterns;
+      const instruments = useInstrumentStore.getState().instruments;
+      const lookup = new Map<number, import('@/types/instrument/defaults').InstrumentConfig>();
+      for (const inst of instruments) {
+        if (inst && typeof inst.id === 'number') lookup.set(inst.id, inst);
+      }
+      const renames = computeAutoNames(patterns, lookup);
+      if (renames.length === 0) return 0;
+      // Apply renames via set(). Applying names directly across every
+      // pattern matches updateChannelName's global-rename semantics.
+      set((state) => {
+        for (const rn of renames) {
+          for (const pattern of state.patterns) {
+            if (rn.index >= 0 && rn.index < pattern.channels.length) {
+              pattern.channels[rn.index].name = rn.newName;
+            }
+          }
+        }
+      });
+      return renames.length;
+    },
+
     applySystemPreset: (presetId) =>
       set((state) => {
         const preset = SYSTEM_PRESETS.find((p) => p.id === presetId);
@@ -1855,6 +1884,19 @@ export const useTrackerStore = create<TrackerStore>()(
       // Reset mixer mute/solo AFTER set() completes to avoid nested setState
       if (patterns.length > 0) {
         useMixerStore.getState().resetMuteState();
+        // Auto-name channels after the import chain settles. Fires on
+        // every loadPatterns call but is safely idempotent — the helper
+        // skips channels whose name isn't generic, so user renames and
+        // format-native names (Furnace hardware labels, etc.) are
+        // untouched. setTimeout(0) lets loadInstruments() in the same
+        // sync chain complete first so instrument signals are available.
+        setTimeout(() => {
+          try {
+            get().autoNameChannels();
+          } catch (err) {
+            console.warn('[TrackerStore] autoNameChannels failed:', err);
+          }
+        }, 0);
       }
     },
 
