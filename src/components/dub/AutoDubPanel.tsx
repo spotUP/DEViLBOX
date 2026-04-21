@@ -171,10 +171,10 @@ export const AutoDubPanel: React.FC<AutoDubPanelProps> = ({ busEnabled }) => {
         <button
           type="button"
           className={
-            'px-1.5 py-0.5 rounded border text-[10px] font-mono transition-colors disabled:opacity-50 ' +
+            'px-2 py-1 rounded border text-[11px] font-mono font-bold transition-colors disabled:opacity-50 whitespace-nowrap ' +
             (blacklist.length > 0
               ? 'bg-accent-warning/20 border-accent-warning text-accent-warning'
-              : 'bg-dark-bgTertiary border-dark-border text-text-muted hover:text-accent-highlight hover:border-accent-highlight')
+              : 'bg-dark-bgTertiary border-dark-border text-text-primary hover:text-accent-highlight hover:border-accent-highlight')
           }
           onClick={() => setBlacklistOpen(v => !v)}
           disabled={disabled}
@@ -182,7 +182,11 @@ export const AutoDubPanel: React.FC<AutoDubPanelProps> = ({ busEnabled }) => {
             ? `${blacklist.length} move${blacklist.length === 1 ? '' : 's'} blacklisted — click to edit`
             : 'Move blacklist — exclude specific moves per session'}
         >
-          ⚙
+          {(() => {
+            const total = AUTO_DUB_RULE_MOVES.length;
+            const active = total - blacklist.filter(m => AUTO_DUB_RULE_MOVES.includes(m)).length;
+            return `MOVES ${active}/${total}`;
+          })()}
         </button>
         {blacklistOpen && (
           <div className="absolute top-full left-0 mt-1 z-[99990] w-48 max-h-80 overflow-y-auto bg-dark-bgSecondary border border-dark-border rounded-md shadow-lg p-2 font-mono text-[10px]">
