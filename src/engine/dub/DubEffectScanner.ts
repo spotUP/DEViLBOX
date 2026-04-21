@@ -17,10 +17,10 @@
 
 import { fireFromEffectCommand } from './DubRouter';
 import { useTrackerStore } from '@/stores/useTrackerStore';
-import { DUB_EFFECT_GLOBAL, DUB_EFFECT_PARAM_STEP } from './moveTable';
+import { DUB_EFFECT_GLOBAL, DUB_EFFECT_PERCHANNEL_X } from './moveTable';
 
-const DUB_EFFECT_MIN = DUB_EFFECT_GLOBAL;        // 36
-const DUB_EFFECT_MAX = DUB_EFFECT_PARAM_STEP;    // 38
+const DUB_EFFECT_MIN = DUB_EFFECT_GLOBAL;          // 36
+const DUB_EFFECT_MAX = DUB_EFFECT_PERCHANNEL_X;    // 40 (covers 36-40: base moves, param step, extended moves)
 
 let _lastRowFired = -1;
 
