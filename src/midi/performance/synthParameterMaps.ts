@@ -9,6 +9,7 @@ import type { NKSParameter, NKSPage, NKS2PDI, NKS2Parameter, NKS2PerformanceSect
 import { NKSParameterType, NKSSection } from './types';
 import type { SynthType } from '@typedefs/instrument';
 import { UADE_PARAMETER_MAP } from './uadeParameterMaps';
+import { DUB_MOVE_TABLE } from '@/engine/dub/moveTable';
 import {
   TR808_NKS_PARAMETERS, TR909_NKS_PARAMETERS,
   MAMECMI_NKS_PARAMETERS, MAME_PCM_NKS_PARAMETERS,
@@ -1390,7 +1391,7 @@ export const GLOBAL_NKS_PARAMETERS: NKSParameter[] = [
 // All values are 0..1 normalized; parameterRouter scales to real units
 // (echoRateMs 40-1000 ms, hpfCutoff 20-1000 Hz, etc.).
 // ============================================================================
-export const DUB_NKS_PARAMETERS: NKSParameter[] = [
+const DUB_CONTINUOUS_PARAMS: NKSParameter[] = [
   { id: 'dub.echoWet',         name: 'Dub Echo Wet',      section: NKSSection.EFFECTS, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.7,  unit: '%', formatString: '%.0f%%', page: 0, index: 0, isAutomatable: true, accessibilityName: 'Dub bus echo wet level' },
   { id: 'dub.echoIntensity',   name: 'Dub Echo Fb',       section: NKSSection.EFFECTS, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.62, unit: '%', formatString: '%.0f%%', page: 0, index: 1, isAutomatable: true, accessibilityName: 'Dub bus echo feedback/intensity' },
   { id: 'dub.echoRateMs',      name: 'Dub Echo Rate',     section: NKSSection.EFFECTS, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.27, unit: 'ms', formatString: '%.2f', page: 0, index: 2, isAutomatable: true, accessibilityName: 'Dub bus echo time 40-1000 ms' },
@@ -1398,6 +1399,37 @@ export const DUB_NKS_PARAMETERS: NKSParameter[] = [
   { id: 'dub.returnGain',      name: 'Dub Return Gain',   section: NKSSection.EFFECTS, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.85, unit: '%', formatString: '%.0f%%', page: 0, index: 4, isAutomatable: true, accessibilityName: 'Dub bus master return level' },
   { id: 'dub.hpfCutoff',       name: 'Dub HPF',           section: NKSSection.EFFECTS, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.02, unit: 'Hz', formatString: '%.2f', page: 0, index: 5, isAutomatable: true, accessibilityName: 'Dub bus input HPF 20-1000 Hz' },
   { id: 'dub.sidechainAmount', name: 'Dub Sidechain',     section: NKSSection.EFFECTS, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.15, unit: '%', formatString: '%.0f%%', page: 0, index: 6, isAutomatable: true, accessibilityName: 'Dub bus return ducking amount' },
+];
+
+/** Turn a camelCase moveId into a human-readable "Dub Tape Stop" label. */
+function formatDubMoveName(moveId: string): string {
+  const spaced = moveId.replace(/([A-Z])/g, ' $1').trim();
+  return `Dub ${spaced.charAt(0).toUpperCase()}${spaced.slice(1)}`;
+}
+
+/** Build a BOOLEAN NKS param for every move in DUB_MOVE_TABLE so the full
+ *  27-move roster is visible in the parameter picker / Global FX lane.
+ *  moveTable.ts has no imports of its own, so the static import is
+ *  circular-init-safe. */
+function buildDubMoveParams(): NKSParameter[] {
+  return DUB_MOVE_TABLE.map((moveId, idx) => ({
+    id: `dub.${moveId}`,
+    name: formatDubMoveName(moveId),
+    section: NKSSection.EFFECTS,
+    type: NKSParameterType.BOOLEAN,
+    min: 0,
+    max: 1,
+    defaultValue: 0,
+    page: 0,
+    index: 100 + idx,
+    isAutomatable: true,
+    accessibilityName: `Dub move: ${moveId}`,
+  }));
+}
+
+export const DUB_NKS_PARAMETERS: NKSParameter[] = [
+  ...DUB_CONTINUOUS_PARAMS,
+  ...buildDubMoveParams(),
 ];
 
 // ============================================================================
