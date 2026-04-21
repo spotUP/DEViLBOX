@@ -74,6 +74,16 @@ class DJAutoDJ {
   private lastPreloadFailTime = 0;
   // Transition resilience — timeout + crossfader guard
   private transitionStartTime = 0;
+  /**
+   * Pattern-aware deferral counter. When a chord change is imminent on
+   * the outgoing track, `triggerTransition` is deferred by one poll tick
+   * (~500 ms) so the crossfade lands past the chord resolution instead
+   * of splitting it. After `MAX_PATTERN_DEFERS` deferrals (~2.5 s, half
+   * the shortest transition duration) we fire anyway — a never-resolving
+   * chord change must not stall the Auto-DJ. Reset on transition fire.
+   */
+  private patternDeferCount = 0;
+  private static readonly MAX_PATTERN_DEFERS = 5;
   private lastCrossfaderValue = -1;
   private crossfaderStuckCount = 0;
   // Watchdog for stuck transitions. Max possible legit duration is 32 bars
@@ -447,6 +457,20 @@ class DJAutoDJ {
           console.log(`[AutoDJ transition-pending] timeLeft=${timeRemaining.toFixed(1)}s, transitionDur=${transitionDuration.toFixed(1)}s, preloadedDeck=${this.preloadedDeck}`);
         }
         if (timeRemaining <= transitionDuration) {
+          // Pattern-aware deferral (default on — independent of the
+          // Smart Cuts opt-in for transition TYPE). If a chord change
+          // is imminent on the outgoing track we'd rather let it
+          // resolve, then crossfade into the incoming. One-poll defer
+          // (~500 ms) at a time; hard cap so a genuinely chord-heavy
+          // ending can't stall the mix.
+          if (this.shouldDeferForPatternData()) {
+            console.log(
+              `[AutoDJ] Deferring transition: chord change imminent on outgoing (defer ${this.patternDeferCount + 1}/${DJAutoDJ.MAX_PATTERN_DEFERS})`,
+            );
+            this.patternDeferCount += 1;
+            break;
+          }
+          this.patternDeferCount = 0;
           console.log(`[AutoDJ] Triggering transition: timeLeft=${timeRemaining.toFixed(1)}s <= transitionDur=${transitionDuration.toFixed(1)}s`);
           this.triggerTransition(store.autoDJTransitionBars);
         }
@@ -673,6 +697,40 @@ class DJAutoDJ {
       useDJStore.getState().setAutoDJStatus('preload-failed');
     } finally {
       this.preloading = false;
+    }
+  }
+
+  /**
+   * Pattern-aware deferral predicate. Returns true when the outgoing
+   * deck's loaded song has a chord change inside the next bar from
+   * the current row — in that window, a hard crossfade splits the
+   * chord transition and sounds broken. One poll's defer (~500 ms)
+   * moves the fire onto the resolved bar.
+   *
+   * Applies even when `autoDJSmartCuts` is OFF — this is a timing
+   * refinement, not a transition-type change, so it doesn't run
+   * afoul of the 2026-04-18 gig-fix rule against auto hard cuts.
+   *
+   * Hard cap: after `MAX_PATTERN_DEFERS` consecutive deferrals we
+   * return false regardless — a never-resolving chord progression
+   * or a broken chord detector must NEVER be able to stall the mix.
+   */
+  private shouldDeferForPatternData(): boolean {
+    if (this.patternDeferCount >= DJAutoDJ.MAX_PATTERN_DEFERS) return false;
+    try {
+      const deck = getDJEngine().getDeck(this.activeDeck);
+      const song = deck.getLoadedSong();
+      if (!song || !Array.isArray(song.patterns) || song.patterns.length === 0) return false;
+      const state = useDJStore.getState().decks[this.activeDeck];
+      const patternIndex = song.songPositions[state.songPos] ?? -1;
+      return isChordChangeImminent({
+        song,
+        patternIndex,
+        currentRow: state.pattPos,
+        windowRows: 16,
+      });
+    } catch {
+      return false;
     }
   }
 
