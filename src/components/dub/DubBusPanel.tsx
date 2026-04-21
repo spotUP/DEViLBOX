@@ -61,6 +61,34 @@ const Choice = <V extends string>({ label, value, options, onChange }: {
   </label>
 );
 
+/**
+ * Collapsible section — click the header to toggle visibility. Keeps the
+ * 32-control panel scannable: common controls (enable, return, spring,
+ * echo, plate) stay expanded at the top while the power-user groups
+ * (voicing, coloring, sweep, dub actions) collapse by default.
+ */
+const Section: React.FC<{
+  title: string;
+  defaultOpen?: boolean;
+  children: React.ReactNode;
+}> = ({ title, defaultOpen = false, children }) => {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <>
+      <div className="h-px bg-dark-borderLight my-1" />
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="flex items-center gap-2 text-[10px] font-mono uppercase tracking-wider text-text-muted hover:text-text-secondary transition-colors text-left"
+      >
+        <span className="inline-block w-3 text-center">{open ? '▾' : '▸'}</span>
+        {title}
+      </button>
+      {open && <>{children}</>}
+    </>
+  );
+};
+
 export const DubBusPanel: React.FC = () => {
   const dubBus = useDrumPadStore((s) => s.dubBus);
   const setDubBus = useDrumPadStore((s) => s.setDubBus);
@@ -289,10 +317,7 @@ export const DubBusPanel: React.FC = () => {
           )}
 
           {/* ── Engineer character preset — curated snapshot of coloring ── */}
-          <div className="h-px bg-dark-borderLight my-1" />
-          <div className="text-[10px] font-mono uppercase tracking-wider text-text-muted">
-            Engineer voicing
-          </div>
+          <Section title="Engineer voicing">
           <Choice
             label="Character"
             value={dubBus.characterPreset}
@@ -306,12 +331,10 @@ export const DubBusPanel: React.FC = () => {
             ] as const}
             onChange={(v) => patch({ characterPreset: v })}
           />
+          </Section>
 
           {/* ── Sound coloring — bass shelf + mid scoop + stereo width ── */}
-          <div className="h-px bg-dark-borderLight my-1" />
-          <div className="text-[10px] font-mono uppercase tracking-wider text-text-muted">
-            Sound coloring
-          </div>
+          <Section title="Sound coloring">
           <Slider
             label="Bass shelf"
             value={dubBus.bassShelfGainDb}
@@ -397,12 +420,10 @@ export const DubBusPanel: React.FC = () => {
               {dubBus.hpfStepped ? 'Altec "Big Knob" — snaps to 11 positions' : 'continuous sweep'}
             </span>
           </label>
+          </Section>
 
           {/* ── Liquid sweep — parallel short-delay comb filter (flanger) ── */}
-          <div className="h-px bg-dark-borderLight my-1" />
-          <div className="text-[10px] font-mono uppercase tracking-wider text-text-muted">
-            Liquid sweep (flanger)
-          </div>
+          <Section title="Liquid sweep (flanger)">
           <Slider
             label="Sweep amount"
             value={dubBus.sweepAmount}
@@ -442,12 +463,10 @@ export const DubBusPanel: React.FC = () => {
             format={(v) => `${Math.round(v * 100)}%`}
             disabled={dubBus.sweepAmount === 0}
           />
+          </Section>
 
           {/* ── Dub Action settings — how much dub-throw/hold/mute pads inject ── */}
-          <div className="h-px bg-dark-borderLight my-1" />
-          <div className="text-[10px] font-mono uppercase tracking-wider text-text-muted">
-            Dub actions (deck taps)
-          </div>
+          <Section title="Dub actions (deck taps)">
           <Slider
             label="Deck tap amount"
             value={dubBus.deckTapAmount}
@@ -496,6 +515,7 @@ export const DubBusPanel: React.FC = () => {
             onChange={(v) => patch({ filterDropHz: v })}
             format={(v) => `${Math.round(v)} Hz`}
           />
+          </Section>
         </div>
       )}
     </div>
