@@ -8,7 +8,7 @@ import { useMemo } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { useTrackerStore, useInstrumentStore } from '@stores';
 import { useFormatStore } from '@/stores/useFormatStore';
-import { getNKSParametersForSynth, MIXER_NKS_PARAMETERS, GLOBAL_NKS_PARAMETERS } from '@/midi/performance/synthParameterMaps';
+import { getNKSParametersForSynth, MIXER_NKS_PARAMETERS, GLOBAL_NKS_PARAMETERS, DUB_NKS_PARAMETERS } from '@/midi/performance/synthParameterMaps';
 import { NKSSection } from '@/midi/performance/types';
 import type { NKSParameter } from '@/midi/performance/types';
 import type { SynthType } from '@typedefs/instrument';
@@ -166,11 +166,15 @@ export function getAutomatableParamsForChannel(
     params = nksToAutomatable(nksParams);
   }
 
-  // Always append mixer + global params (work at the ToneEngine layer)
+  // Always append mixer + global + dub params (work at the ToneEngine /
+  // DubBus layer, independent of the channel's synth). Dub params are
+  // bus-wide but are exposed per-channel as an interim — dedicated
+  // global-lane UI is a follow-up.
   const mixerParams = nksToAutomatable(MIXER_NKS_PARAMETERS);
   const globalParams = nksToAutomatable(GLOBAL_NKS_PARAMETERS);
+  const dubParams = nksToAutomatable(DUB_NKS_PARAMETERS);
   const existingKeys = new Set(params.map(p => p.key));
-  for (const p of [...mixerParams, ...globalParams]) {
+  for (const p of [...mixerParams, ...globalParams, ...dubParams]) {
     if (!existingKeys.has(p.key)) params.push(p);
   }
 
@@ -227,11 +231,12 @@ export function useChannelAutomationParams(channelIndex: number): {
       params = nksToAutomatable(nksParams);
     }
 
-    // Always append mixer + global params
+    // Always append mixer + global + dub params (bus-wide dub tuning).
     const mixerParams = nksToAutomatable(MIXER_NKS_PARAMETERS);
     const globalParams = nksToAutomatable(GLOBAL_NKS_PARAMETERS);
+    const dubParams = nksToAutomatable(DUB_NKS_PARAMETERS);
     const existingKeys = new Set(params.map(p => p.key));
-    for (const p of [...mixerParams, ...globalParams]) {
+    for (const p of [...mixerParams, ...globalParams, ...dubParams]) {
       if (!existingKeys.has(p.key)) params.push(p);
     }
 
