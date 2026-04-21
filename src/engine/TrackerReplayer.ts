@@ -188,6 +188,17 @@ export interface ChannelState {
   gainNode: Tone.Gain;
   panNode: Tone.Panner;
   muteGain: Tone.Gain;              // Dedicated mute/solo gain (always 0 or 1)
+  /**
+   * Dedicated "FX-route" gain, placed AFTER muteGain in the chain. Drops
+   * to 0 when DeckEngine routes this channel through a per-channel FX
+   * chain (enableChannelFX) — the channel stays audible via the tap
+   * (which reads from `gainNode`, upstream of this node) but is removed
+   * from the deck's main mix so the two paths don't double-sum.
+   *
+   * Independent from `muteGain` so DJ-side fx-target routing doesn't
+   * collide with the user's explicit channel-mute mask.
+   */
+  fxRouteGain: Tone.Gain;
 
   // Instrument reference
   instrument: InstrumentConfig | null;
@@ -1687,6 +1698,7 @@ export class TrackerReplayer {
       try { ch.gainNode.dispose(); } catch { /* ignored */ }
       try { ch.panNode.dispose(); } catch { /* ignored */ }
       try { ch.muteGain.dispose(); } catch { /* ignored */ }
+      try { ch.fxRouteGain.dispose(); } catch { /* ignored */ }
     }
 
     // Recreate master routing chain if AudioContext changed (e.g. iOS audio unlock,
@@ -1831,9 +1843,14 @@ export class TrackerReplayer {
     const panNode = new Tone.Panner(panValue);
     const gainNode = new Tone.Gain(1);
     const muteGain = new Tone.Gain(1); // Dedicated mute/solo gain
+    // fxRouteGain: independent of muteGain. Stays at 1 for the main
+    // mix; DeckEngine ramps to 0 when routing the channel through a
+    // per-channel FX chain (enableChannelFX).
+    const fxRouteGain = new Tone.Gain(1);
     gainNode.connect(panNode);
     panNode.connect(muteGain);
-    muteGain.connect(this.masterGain);
+    muteGain.connect(fxRouteGain);
+    fxRouteGain.connect(this.masterGain);
 
     // Pre-allocate player pool and connect to gain node
     const playerPool: Tone.Player[] = [];
@@ -1886,6 +1903,7 @@ export class TrackerReplayer {
       gainNode,
       panNode,
       muteGain,
+      fxRouteGain,
       instrument: null,
       _muteState: false,
     };
@@ -3697,6 +3715,34 @@ export class TrackerReplayer {
   }
 
   /**
+   * Pull a channel out of the main mix (or restore it). Uses the
+   * dedicated `fxRouteGain` node — independent of the user's mute mask
+   * — so DeckEngine's per-channel FX routing doesn't fight with
+   * explicit channel-mute state.
+   *
+   * Ramp is short (~10 ms) so toggling during playback doesn't click.
+   *
+   * No-op when `channelIndex` is out of range.
+   */
+  setChannelFxRouted(channelIndex: number, routed: boolean): void {
+    if (channelIndex < 0 || channelIndex >= this.channels.length) return;
+    const ch = this.channels[channelIndex];
+    if (!ch?.fxRouteGain) return;
+    const target = routed ? 0 : 1;
+    try {
+      // Tone.Gain exposes AudioParam via `.gain` — ramp cleanly.
+      const g = ch.fxRouteGain.gain;
+      const now = Tone.getContext().currentTime;
+      (g as unknown as { cancelScheduledValues(t: number): void }).cancelScheduledValues(now);
+      (g as unknown as { setValueAtTime(v: number, t: number): void }).setValueAtTime((g as unknown as { value: number }).value, now);
+      (g as unknown as { linearRampToValueAtTime(v: number, t: number): void }).linearRampToValueAtTime(target, now + 0.01);
+    } catch {
+      // Fallback — direct value write if AudioParam API isn't available.
+      try { (ch.fxRouteGain.gain as unknown as { value: number }).value = target; } catch { /* ok */ }
+    }
+  }
+
+  /**
    * Open a side-tap on a single channel. Returns a native GainNode
    * carrying a copy of that channel's audio (taken just after the
    * channel's internal `gainNode` so it sees the final mixed level
@@ -3806,6 +3852,7 @@ export class TrackerReplayer {
       ch.gainNode.dispose();
       ch.panNode.dispose();
       ch.muteGain.dispose();
+      ch.fxRouteGain.dispose();
     }
     // Clear buffer cache
     this.bufferCache.clear();
