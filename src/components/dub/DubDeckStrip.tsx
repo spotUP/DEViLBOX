@@ -184,30 +184,17 @@ export const DubDeckStrip: React.FC = () => {
   }, [busEnabled, releaseAllHeld]);
   useEffect(() => releaseAllHeld, [releaseAllHeld]);
 
-  // Auto-layout for bus-enabled state. Fires on every busEnabled transition
-  // PLUS once on mount (deferred) when the bus is already enabled from a
-  // persisted session, so reloading the page with dub deck on still routes
-  // straight into editor-fullscreen. The earlier mount-suppression was
-  // guarding against a brief DJ/VJ flash during layout reflow; deferring to
-  // the next rAF (after the initial paint settles) sidesteps that without
-  // losing the auto-fullscreen.
+  // Bus enable auto-expands the strip (enabling dub = showing the deck) but
+  // no longer touches editor-fullscreen directly. Fullscreen follows the
+  // strip-expanded state via the effect below, which means the user can also
+  // get fullscreen by clicking DUB DECK without arming the bus.
   const prevBusEnabledRef = useRef<boolean | null>(null);
   useEffect(() => {
     const isInitialMount = prevBusEnabledRef.current === null;
     const changed = prevBusEnabledRef.current !== busEnabled;
     prevBusEnabledRef.current = busEnabled;
     if (!changed) return;
-
-    const apply = () => {
-      if (busEnabled) {
-        setStripCollapsed(false);
-        useUIStore.getState().setEditorFullscreen(true);
-      } else {
-        setStripCollapsed(true);
-        useUIStore.getState().setEditorFullscreen(false);
-      }
-    };
-
+    const apply = () => setStripCollapsed(!busEnabled);
     if (isInitialMount) {
       // Defer one frame so initial layout paints first — avoids the
       // transient DJ/VJ view-switch flicker we saw when firing synchronously.
@@ -216,6 +203,25 @@ export const DubDeckStrip: React.FC = () => {
     }
     apply();
   }, [busEnabled, setStripCollapsed]);
+
+  // Editor-fullscreen follows the strip-expanded state. Opening the Dub Deck
+  // (DUB DECK ▾) drops the editor into fullscreen mode so the performer has
+  // room to pattern + dub at once; collapsing it (DUB DECK ▸) restores the
+  // normal split layout. Runs on mount too so a persisted-expanded session
+  // reloads straight into fullscreen.
+  const prevStripCollapsedRef = useRef<boolean | null>(null);
+  useEffect(() => {
+    const isInitialMount = prevStripCollapsedRef.current === null;
+    const changed = prevStripCollapsedRef.current !== stripCollapsed;
+    prevStripCollapsedRef.current = stripCollapsed;
+    if (!changed) return;
+    const apply = () => useUIStore.getState().setEditorFullscreen(!stripCollapsed);
+    if (isInitialMount) {
+      const handle = requestAnimationFrame(apply);
+      return () => cancelAnimationFrame(handle);
+    }
+    apply();
+  }, [stripCollapsed]);
 
   useEffect(() => {
     const engine = ensureDrumPadEngine();
@@ -555,10 +561,10 @@ export const DubDeckStrip: React.FC = () => {
               : 'bg-dark-bgTertiary border-dark-border text-text-muted hover:text-text-primary')
           }
           onClick={() => setGhostBus(!ghostBus)}
-          title={ghostBus ? 'Ghost Bus ON — every channel bleeds through the dub return at -36 dB, even when muted in main' : 'Ghost Bus — parallel -36 dB bleed so muted channels stay faintly audible through the dub return'}
+          title={ghostBus ? 'Bus Bleed ON — every channel bleeds through the dub return at -36 dB, even when muted in main' : 'Bus Bleed — parallel -36 dB bleed so muted channels stay faintly audible through the dub return'}
           disabled={!busEnabled}
         >
-          GHOST {ghostBus ? 'ON' : 'OFF'}
+          BLEED {ghostBus ? 'ON' : 'OFF'}
         </button>
         <button
           className={
