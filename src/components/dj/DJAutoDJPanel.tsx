@@ -48,6 +48,7 @@ export const DJAutoDJPanel: React.FC<DJAutoDJPanelProps> = ({ onClose }) => {
   const transitionBars = useDJStore((s) => s.autoDJTransitionBars);
   const shuffle = useDJStore((s) => s.autoDJShuffle);
   const withFilter = useDJStore((s) => s.autoDJWithFilter);
+  const smartCuts = useDJStore((s) => s.autoDJSmartCuts);
   const setConfig = useDJStore((s) => s.setAutoDJConfig);
 
   const activePlaylistId = useDJPlaylistStore((s) => s.activePlaylistId);
@@ -411,6 +412,22 @@ export const DJAutoDJPanel: React.FC<DJAutoDJPanelProps> = ({ onClose }) => {
           title="HPF sweep on outgoing track"
         >
           <SlidersHorizontal size={12} />
+        </button>
+
+        {/* Smart Cuts — pattern-data-driven cut on drum-break tails.
+            Strictly opt-in per 2026-04-18 gig-fix rule against random cuts. */}
+        <button
+          onClick={() => setConfig({ smartCuts: !smartCuts })}
+          className={`px-1.5 py-1 rounded border transition-all text-[9px] font-mono font-bold ${
+            smartCuts
+              ? 'border-fuchsia-500 bg-fuchsia-900/20 text-fuchsia-400'
+              : 'border-dark-borderLight bg-dark-bgTertiary text-text-tertiary hover:text-text-secondary'
+          }`}
+          title={smartCuts
+            ? 'Smart Cuts ON — drum-break tails trigger a hard cut instead of crossfade. Tracker tracks only.'
+            : 'Smart Cuts OFF — always use blended transitions. Click to enable pattern-data-driven cuts on drum-break tails.'}
+        >
+          CUT
         </button>
       </div>
 

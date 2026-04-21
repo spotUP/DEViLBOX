@@ -23,6 +23,7 @@ import {
 } from './DJQuantizedFX';
 import { loadPlaylistTrackToDeck } from './DJTrackLoader';
 import { keyCompatibility } from './DJKeyUtils';
+import { detectDrumBreakTail } from './smartCuts';
 
 // ── Transition Types ────────────────────────────────────────────────────────
 
@@ -788,6 +789,22 @@ class DJAutoDJ {
     const outEnergy = outgoing.energy ?? 0.5;
     const inEnergy = incoming.energy ?? 0.5;
     const keyCompat = keyCompatibility(outgoing.musicalKey, incoming.musicalKey);
+
+    // Smart Cuts (Phase 4) — opt-in pattern-data override. When enabled,
+    // peek the outgoing deck's song for a drum-break tail and use a hard
+    // cut on the break boundary. Gated behind the flag because the
+    // 2026-04-18 gig-fix explicitly forbids random cuts; the classifier
+    // must be confident (drum-break tail present) before overriding.
+    if (useDJStore.getState().autoDJSmartCuts) {
+      try {
+        const outDeck = getDJEngine().getDeck(this.activeDeck);
+        const song = outDeck?.replayer?.getSong?.();
+        if (song && detectDrumBreakTail({ song })) {
+          console.log('[AutoDJ] smart-cut: outgoing tail is a drum break — selecting cut');
+          return 'cut';
+        }
+      } catch { /* engine not ready or not tracker-format */ }
+    }
 
     // Gig-fix (2026-04-18): NEVER auto-select a hard 'cut' transition.
     // Previously the high-energy + close-BPM branch rolled a ~30-50%
