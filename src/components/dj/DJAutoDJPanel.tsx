@@ -6,7 +6,7 @@
  */
 
 import React, { useCallback, useRef, useState } from 'react';
-import { SkipForward, Shuffle, SlidersHorizontal, Zap, Pause, Play } from 'lucide-react';
+import { SkipForward, Shuffle, SlidersHorizontal, Scissors, Zap, Pause, Play } from 'lucide-react';
 import { useDJStore, type AutoDJStatus } from '@/stores/useDJStore';
 import { useDJPlaylistStore } from '@/stores/useDJPlaylistStore';
 import { useUIStore } from '@/stores/useUIStore';
@@ -48,6 +48,7 @@ export const DJAutoDJPanel: React.FC<DJAutoDJPanelProps> = ({ onClose }) => {
   const transitionBars = useDJStore((s) => s.autoDJTransitionBars);
   const shuffle = useDJStore((s) => s.autoDJShuffle);
   const withFilter = useDJStore((s) => s.autoDJWithFilter);
+  const smartCuts = useDJStore((s) => s.autoDJSmartCuts);
   const setConfig = useDJStore((s) => s.setAutoDJConfig);
 
   const activePlaylistId = useDJPlaylistStore((s) => s.activePlaylistId);
@@ -411,6 +412,28 @@ export const DJAutoDJPanel: React.FC<DJAutoDJPanelProps> = ({ onClose }) => {
           title="HPF sweep on outgoing track"
         >
           <SlidersHorizontal size={12} />
+        </button>
+
+        {/* Smart Cuts — pattern-data-aware transitions (opt-in).
+            Enables drum-break hard-cut + chord-change-aware crossfade
+            fallback + deterministic harmonic bass-swap. Only effective
+            when both decks carry tracker-format songs (MOD/XM/IT/etc);
+            audio-file decks fall through to the default transition
+            picker. Off by default per the 2026-04-18 gig-fix rule. */}
+        <button
+          onClick={() => setConfig({ smartCuts: !smartCuts })}
+          className={`p-1.5 rounded border transition-all ${
+            smartCuts
+              ? 'border-violet-500 bg-violet-900/20 text-violet-400'
+              : 'border-dark-borderLight bg-dark-bgTertiary text-text-tertiary hover:text-text-secondary'
+          }`}
+          title={
+            smartCuts
+              ? 'Smart Cuts ON — drum-break cuts + chord-aware fades + harmonic bass-swap'
+              : 'Smart Cuts OFF — click to enable pattern-data-driven transitions (tracker songs only)'
+          }
+        >
+          <Scissors size={12} />
         </button>
       </div>
 
