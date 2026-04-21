@@ -220,6 +220,21 @@ export function createMcpServer(): McpServer {
   );
 
   server.tool(
+    'auto_name_channels',
+    'Run the channel-name classifier on the currently-loaded song. Inspects ' +
+    'instruments (drumType, DRUM_SYNTHS, sample filename, envelope shape) + ' +
+    'note statistics and relabels generically-named channels (Channel 1/2/3, ' +
+    'CHN, blank) with inferred labels: Drums / Kick / Snare / Hi-Hat / Bass / ' +
+    'Sub Bass / Lead / Chords / Arp / Pad. Skips channels the user has ' +
+    'renamed. Returns { renamed: number } — zero means no channels needed ' +
+    're-labeling (either they already had good names or there were no generic ' +
+    'ones). Fires automatically on every song load, but call directly after ' +
+    'edits (new instruments, pattern changes) to refresh.',
+    {},
+    (p) => call('auto_name_channels', p),
+  );
+
+  server.tool(
     'fill_range',
     'Fill a range of rows in a channel with a repeating cell pattern (every N rows)',
     {
@@ -1851,6 +1866,7 @@ export function createMcpServer(): McpServer {
           { tool: 'clear_cell', description: 'Clear a cell' },
           { tool: 'clear_pattern', description: 'Clear an entire pattern' },
           { tool: 'clear_channel', description: 'Clear a channel in a pattern' },
+          { tool: 'auto_name_channels', description: 'Infer channel labels (Drums/Bass/Lead/...) from instruments + notes; skips user renames' },
           { tool: 'fill_range', description: 'Fill a range with values' },
           { tool: 'write_note_sequence', description: 'Write a note sequence string' },
           { tool: 'add_pattern', description: 'Add a new empty pattern' },

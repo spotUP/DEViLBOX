@@ -56,6 +56,7 @@ import {
   clearCell,
   clearPattern,
   clearChannel,
+  autoNameChannels,
   addPattern,
   duplicatePattern,
   resizePattern,
@@ -229,6 +230,7 @@ const handlers: Record<string, Handler> = {
   clear_cell: clearCell,
   clear_pattern: clearPattern,
   clear_channel: clearChannel,
+  auto_name_channels: autoNameChannels,
   fill_range: fillRange,
   write_note_sequence: writeNoteSequence,
 

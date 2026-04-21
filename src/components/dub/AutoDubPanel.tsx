@@ -2,12 +2,13 @@
  * AutoDubPanel — header controls for autonomous dub performance.
  *
  * Renders inline in DubDeckStrip's header row: a toggle, a persona picker,
- * and an intensity slider. All off-by-default.
+ * an "apply persona voicing" button, and an intensity slider. All
+ * off-by-default.
  *
- * On persona change the matching VOICE character preset is auto-applied
- * (e.g. picking Tubby also loads the Tubby EQ/spring/echo voicing). Users
- * who want Auto Dub behaviour WITHOUT touching their hand-tuned bus pick
- * the Custom persona.
+ * Persona pick changes move-bias weights + snaps intensity, but does NOT
+ * clobber the bus VOICE character preset. Users who want the full persona
+ * experience click the ♫ button to also load the persona's EQ/spring/echo
+ * voicing. Users with hand-tuned voicing leave it alone.
  */
 
 import React, { useCallback, useEffect } from 'react';
@@ -55,12 +56,19 @@ export const AutoDubPanel: React.FC<AutoDubPanelProps> = ({ busEnabled }) => {
     setPersona(id);
     const p = getPersona(id);
     // Snap intensity to persona default on first pick so a fresh "Tubby"
-    // feels like Tubby without the user having to find the right number.
+    // feels like Tubby's budget without the user having to find the right
+    // number. Bus VOICE is NOT auto-applied — hand-tuned voicings were
+    // being silently clobbered. Use the ♫ button to load the persona's
+    // voicing explicitly.
     setIntensity(p.intensityDefault);
+  }, [setPersona, setIntensity]);
+
+  const applyPersonaVoice = useCallback(() => {
+    const p = getPersona(persona);
     if (p.suggestedCharacterPreset) {
       setDubBus({ characterPreset: p.suggestedCharacterPreset });
     }
-  }, [setPersona, setIntensity, setDubBus]);
+  }, [persona, setDubBus]);
 
   const disabled = !busEnabled;
   const controlsDisabled = disabled || !enabled;
@@ -99,6 +107,18 @@ export const AutoDubPanel: React.FC<AutoDubPanelProps> = ({ busEnabled }) => {
           <option key={o.id} value={o.id}>{o.label}</option>
         ))}
       </select>
+
+      {getPersona(persona).suggestedCharacterPreset && (
+        <button
+          type="button"
+          className="px-1.5 py-0.5 rounded border bg-dark-bgTertiary border-dark-border text-text-muted hover:text-accent-highlight hover:border-accent-highlight text-[10px] font-mono transition-colors disabled:opacity-50"
+          onClick={applyPersonaVoice}
+          disabled={controlsDisabled}
+          title={`Load ${getPersona(persona).label}'s bus voicing (EQ, spring, echo, tape saturator) — overwrites current VOICE`}
+        >
+          ♫
+        </button>
+      )}
 
       <div className="flex items-center gap-1">
         <span className="text-text-muted text-[10px]">INT</span>

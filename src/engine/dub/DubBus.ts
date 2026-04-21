@@ -2878,13 +2878,24 @@ export class DubBus {
     const bp = ctx.createBiquadFilter();
     bp.type = 'bandpass';
     bp.frequency.value = Math.max(100, centerHz);
-    bp.Q.value = 3.5;  // broader resonance = easier self-oscillation across frequencies
+    // Q=2.2 gives the metallic scream character without driving the filter
+    // into numerical instability during connect+ramp. Q>=3 on a bandpass
+    // inside a loop-gain>1 feedback path triggers Chromium's
+    // "BiquadFilterNode: state is bad" coefficient-blowup detection on
+    // every fire (poles sit too close to the unit circle).
+    bp.Q.value = 2.2;
     // Cap at 2.5 — at spring dry/wet 0.55, the tap's output passes through
     // the spring at ~0.45× (dry only, since fb doesn't excite wet), so the
     // tap must exceed ~2.2 to build up self-oscillation from the noise seed.
     const fbAmt = Math.max(0, Math.min(2.5, feedbackAmount));
+    // Hold the feedback at 0 for 30 ms after connect so the bandpass has
+    // at least a few render quanta of clean signal to reach steady state
+    // before the loop closes at gain > 1. Without this hold, the filter
+    // state blows up in the first ~3 ms of the fire and Chromium resets
+    // it to zero (audible click + warning).
     tap.gain.setValueAtTime(0, now);
-    tap.gain.linearRampToValueAtTime(fbAmt, now + 0.2);
+    tap.gain.setValueAtTime(0, now + 0.03);
+    tap.gain.linearRampToValueAtTime(fbAmt, now + 0.23);
     // Crank spring wet to 1.0 for the duration of SCREAM so the loop runs
     // through 100% wet spring (where the resonant ringing lives). Prior
     // value restored on dispose.
