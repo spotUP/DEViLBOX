@@ -41,6 +41,11 @@ import type {
   WobbleBassConfig,
   BuzzmachineConfig,
   DubSirenConfig,
+  OscBassConfig,
+  CrushBassConfig,
+  SonarPingConfig,
+  RadioRiserConfig,
+  SubSwellConfig,
   SynareConfig,
   SpaceLaserConfig,
   SamConfig,
@@ -242,6 +247,12 @@ export interface InstrumentConfig {
   wobbleBass?: WobbleBassConfig;
   // Dub Siren
   dubSiren?: DubSirenConfig;
+  // Dub-derived standalone synths (extracted from DubBus)
+  oscBass?: OscBassConfig;
+  crushBass?: CrushBassConfig;
+  sonarPing?: SonarPingConfig;
+  radioRiser?: RadioRiserConfig;
+  subSwell?: SubSwellConfig;
   // Space Laser
   spaceLaser?: SpaceLaserConfig;
   v2?: V2Config;
@@ -1410,6 +1421,44 @@ export const DEFAULT_DUB_SIREN: DubSirenConfig = {
     decay: 1.5,
     wet: 0.1,
   },
+};
+
+/** Dub-derived standalone synths extracted from DubBus. Defaults mirror
+ *  the original `bus.startXxx(...)` default args so the extracted synth
+ *  sounds identical to the dub-bus version out of the box. */
+export const DEFAULT_OSC_BASS: OscBassConfig = {
+  level: 0.45,
+  resonance: 18,
+  attackMs: 80,
+  releaseMs: 200,
+};
+
+export const DEFAULT_CRUSH_BASS: CrushBassConfig = {
+  level: 0.55,
+  bits: 3,
+  attackMs: 60,
+  releaseMs: 200,
+  lpHz: 2000,
+};
+
+export const DEFAULT_SONAR_PING: SonarPingConfig = {
+  level: 0.8,
+  durationMs: 140,
+  decayRatio: 0.35,
+};
+
+export const DEFAULT_RADIO_RISER: RadioRiserConfig = {
+  level: 0.7,
+  startHz: 200,
+  endHz: 5000,
+  sweepSec: 1.2,
+  bandwidth: 6,
+};
+
+export const DEFAULT_SUB_SWELL: SubSwellConfig = {
+  level: 0.8,
+  durationMs: 400,
+  pitchOctaves: 0,
 };
 
 export const DEFAULT_SPACE_LASER: SpaceLaserConfig = {

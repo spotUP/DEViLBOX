@@ -28,8 +28,12 @@ import { ES5503Synth } from '../../es5503/ES5503Synth';
 import { DrumKitSynth } from '../../DrumKitSynth';
 import { WavetableSynth } from '../../WavetableSynth';
 import {
+  OscBassSynth, CrushBassSynth, SonarPingSynth, RadioRiserSynth, SubSwellSynth,
+} from '../../dub/DubDerivedSynths';
+import {
   DEFAULT_DUB_SIREN, DEFAULT_SPACE_LASER, DEFAULT_SAM, DEFAULT_DECTALK, DEFAULT_SYNARE,
   DEFAULT_DRUMKIT,
+  DEFAULT_OSC_BASS, DEFAULT_CRUSH_BASS, DEFAULT_SONAR_PING, DEFAULT_RADIO_RISER, DEFAULT_SUB_SWELL,
 } from '@/types/instrument';
 
 const VOLUME_OFFSETS: Record<string, number> = {
@@ -39,6 +43,7 @@ const VOLUME_OFFSETS: Record<string, number> = {
   DrumKit: 0, Wavetable: 5, SuperSaw: 9, PolySynth: 8, Organ: 3,
   DrumMachine: 18, ChipSynth: 5, PWMSynth: 9, StringMachine: 11,
   FormantSynth: 9, WobbleBass: 13, ChiptuneModule: -6,
+  OscBass: 6, CrushBass: 6, SonarPing: 4, RadioRiser: 6, SubSwell: 6,
 };
 
 function getNormalizedVolume(synthType: string, configVolume: number | undefined): number {
@@ -379,9 +384,91 @@ const specialDescs: SynthDescriptor[] = [
   },
 ];
 
+// ── Dub-derived standalone synths ────────────────────────────────────────────
+// Extracted from DubBus.startXxx(...) so these voices are pickable as
+// normal instruments on any channel, routed through that channel's
+// insert-effect chain. Same DSP as the dub-bus versions, different output.
+
+const dubDerivedDescs: SynthDescriptor[] = [
+  {
+    id: 'OscBass',
+    name: 'Osc Bass',
+    category: 'native',
+    loadMode: 'lazy',
+    volumeOffsetDb: 6,
+    create: (config) => {
+      const synth = new OscBassSynth(config.oscBass || DEFAULT_OSC_BASS);
+      synth.volume.value = Tone.dbToGain(getNormalizedVolume('OscBass', config.volume));
+      return synth as unknown as Tone.ToneAudioNode;
+    },
+    onTriggerRelease: (synth, _note, time) => {
+      (synth as any).triggerRelease(_note, time);
+      return true;
+    },
+  },
+  {
+    id: 'CrushBass',
+    name: 'Crush Bass',
+    category: 'native',
+    loadMode: 'lazy',
+    volumeOffsetDb: 6,
+    create: (config) => {
+      const synth = new CrushBassSynth(config.crushBass || DEFAULT_CRUSH_BASS);
+      synth.volume.value = Tone.dbToGain(getNormalizedVolume('CrushBass', config.volume));
+      return synth as unknown as Tone.ToneAudioNode;
+    },
+    onTriggerRelease: (synth, _note, time) => {
+      (synth as any).triggerRelease(_note, time);
+      return true;
+    },
+  },
+  {
+    id: 'SonarPing',
+    name: 'Sonar Ping',
+    category: 'native',
+    loadMode: 'lazy',
+    volumeOffsetDb: 4,
+    create: (config) => {
+      const synth = new SonarPingSynth(config.sonarPing || DEFAULT_SONAR_PING);
+      synth.volume.value = Tone.dbToGain(getNormalizedVolume('SonarPing', config.volume));
+      return synth as unknown as Tone.ToneAudioNode;
+    },
+    // Trigger-only voice: no meaningful release, but we still answer
+    // true so the note-off path doesn't fall through to a default.
+    onTriggerRelease: () => true,
+  },
+  {
+    id: 'RadioRiser',
+    name: 'Radio Riser',
+    category: 'native',
+    loadMode: 'lazy',
+    volumeOffsetDb: 6,
+    create: (config) => {
+      const synth = new RadioRiserSynth(config.radioRiser || DEFAULT_RADIO_RISER);
+      synth.volume.value = Tone.dbToGain(getNormalizedVolume('RadioRiser', config.volume));
+      return synth as unknown as Tone.ToneAudioNode;
+    },
+    onTriggerRelease: () => true,
+  },
+  {
+    id: 'SubSwell',
+    name: 'Sub Swell',
+    category: 'native',
+    loadMode: 'lazy',
+    volumeOffsetDb: 6,
+    create: (config) => {
+      const synth = new SubSwellSynth(config.subSwell || DEFAULT_SUB_SWELL);
+      synth.volume.value = Tone.dbToGain(getNormalizedVolume('SubSwell', config.volume));
+      return synth as unknown as Tone.ToneAudioNode;
+    },
+    onTriggerRelease: () => true,
+  },
+];
+
 // ── Register all ─────────────────────────────────────────────────────────────
 
 SynthRegistry.register(speechAndSpecialDescs);
 SynthRegistry.register(juceWasmDescs);
 SynthRegistry.register(mameComplexDescs);
 SynthRegistry.register(specialDescs);
+SynthRegistry.register(dubDerivedDescs);

@@ -168,6 +168,11 @@ export type SynthType =
   | 'CEM3394'          // Curtis Electromusic analog synth voice (Prophet VS, Matrix-6, ESQ-1)
   | 'SCSP'             // Sega Saturn SCSP (YMF292-F) 32-voice sound processor
   | 'DubSiren'         // Dub Siren (Osc + LFO + Delay)
+  | 'OscBass'          // Self-oscillating LPF bass (extracted from dub bus)
+  | 'CrushBass'        // Bit-crushed sawtooth bass drone (extracted from dub bus)
+  | 'SonarPing'        // Sine burst for sonar/ping gestures (extracted from dub bus)
+  | 'RadioRiser'       // Bandpass-swept pink noise riser (extracted from dub bus)
+  | 'SubSwell'         // One-octave-down sine sub swell (extracted from dub bus)
   | 'SpaceLaser'       // Space Laser (FM + Pitch Sweep)
   | 'OpenWurli'        // Wurlitzer 200A Electric Piano (Physical Model)
   | 'OPL3'             // Nuked OPL3 (YMF262) 18-channel FM
