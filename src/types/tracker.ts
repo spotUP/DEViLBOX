@@ -44,7 +44,7 @@ export type VolumeValue = number; // 0x00-0xFF (XM volume column)
  * XM-Compatible Effect Type
  * 0-35 = FastTracker II effect types
  */
-export type EffectType = number; // 0-35 (XM effect type)
+export type EffectType = number; // 0-35 (XM effect type) + 36-38 (DEViLBOX dub extension: 36=global move, 37=per-channel move, 38=param step)
 
 /**
  * XM-Compatible Effect Parameter

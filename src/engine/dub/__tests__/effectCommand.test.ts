@@ -49,27 +49,35 @@ describe('DUB_MOVE_TABLE (ratchet + append-only)', () => {
 });
 
 describe('decodeDubEffect', () => {
-  it('effTyp 33 — global move, eff high nibble is move index', () => {
-    expect(decodeDubEffect(33, 0x00)).toEqual({ moveId: 'echoThrow' });
-    expect(decodeDubEffect(33, 0x10)).toEqual({ moveId: 'dubStab' });
-    expect(decodeDubEffect(33, 0x50)).toEqual({ moveId: 'channelMute' });
+  it('effTyp 36 — global move, eff high nibble is move index', () => {
+    expect(decodeDubEffect(36, 0x00)).toEqual({ moveId: 'echoThrow' });
+    expect(decodeDubEffect(36, 0x10)).toEqual({ moveId: 'dubStab' });
+    expect(decodeDubEffect(36, 0x50)).toEqual({ moveId: 'channelMute' });
   });
 
-  it('effTyp 34 — per-channel, eff low nibble is target channel', () => {
-    expect(decodeDubEffect(34, 0x02)).toEqual({ moveId: 'echoThrow', channelId: 2 });
-    expect(decodeDubEffect(34, 0x57)).toEqual({ moveId: 'channelMute', channelId: 7 });
+  it('effTyp 37 — per-channel, eff low nibble is target channel', () => {
+    expect(decodeDubEffect(37, 0x02)).toEqual({ moveId: 'echoThrow', channelId: 2 });
+    expect(decodeDubEffect(37, 0x57)).toEqual({ moveId: 'channelMute', channelId: 7 });
   });
 
-  it('returns null when move index exceeds table bounds', () => {
-    // High nibble 0xF = 15; table has entries 0..26 (so 0..15 via high
-    // nibble covers 0-15 only). A hypothetical eff=0xF0 maps to move #15
-    // (tubbyScream) which IS valid — so test an index that would overflow
-    // if we ever prune the table below 16 entries. For now, simulate by
-    // mocking: the only out-of-range case today is if someone manually
-    // writes effTyp=33, eff=0xF0 with a pruned table, which never happens.
-    // Instead, verify effTyp values outside 33/34 don't decode as moves.
-    expect(decodeDubEffect(33, 0x00)).not.toBeNull();
-    expect(decodeDubEffect(34, 0x00)).not.toBeNull();
+  it('effTyp 33/34/35 are NOT dub slots (fine-porta collision regression)', () => {
+    // OpenMPTConverter emits effTyp: 33 for CMD_XFINEPORTAUPDOWN. A fine-
+    // porta cell with eff=0x50 (porta amount 0x50) must NOT be interpreted
+    // as a channelMute (move index 5). Decoder returns null for these.
+    expect(decodeDubEffect(33, 0x50)).toBeNull();
+    expect(decodeDubEffect(34, 0x50)).toBeNull();
+    expect(decodeDubEffect(35, 0x50)).toBeNull();
+  });
+
+  it('effTyp 36/37 decode cleanly, non-dub effTyp returns null', () => {
+    // Valid slots always decode.
+    expect(decodeDubEffect(36, 0x00)).not.toBeNull();
+    expect(decodeDubEffect(37, 0x00)).not.toBeNull();
+    // Everything else is null — including the old 33-35 range which
+    // OpenMPT uses for CMD_XFINEPORTAUPDOWN.
+    expect(decodeDubEffect(0, 0x00)).toBeNull();
+    expect(decodeDubEffect(32, 0xFF)).toBeNull();
+    expect(decodeDubEffect(33, 0x00)).toBeNull();
   });
 });
 
@@ -149,40 +157,42 @@ describe('fireFromEffectCommand — router dispatch', () => {
     setDubBusForRouter(null);
   });
 
-  it('effTyp 33 eff=0x50 fires channelMute globally', () => {
-    fireFromEffectCommand(33, 0x50);
+  it('effTyp 36 eff=0x50 fires channelMute globally', () => {
+    fireFromEffectCommand(36, 0x50);
     expect(fires.map(f => f.moveId)).toContain('channelMute');
     const mute = fires.find(f => f.moveId === 'channelMute');
     expect(mute?.channelId).toBeUndefined();
   });
 
-  it('effTyp 34 eff=0x23 fires filterDrop on channel 3', () => {
-    // 0x23 → move index 2 (filterDrop), channel 3. filterDrop is in our
-    // stubBus with a working `filterDrop` method so it reaches subscribers.
-    fireFromEffectCommand(34, 0x23);
+  it('effTyp 37 eff=0x23 fires filterDrop on channel 3', () => {
+    fireFromEffectCommand(37, 0x23);
     const hit = fires.find(f => f.moveId === 'filterDrop');
     expect(hit?.channelId).toBe(3);
   });
 
   it('blacklist honored — blacklisted moves do not fire', () => {
     useDubStore.getState().setAutoDubMoveBlacklist(['echoThrow']);
-    fireFromEffectCommand(33, 0x00);  // Would be echoThrow
+    fireFromEffectCommand(36, 0x00);  // Would be echoThrow
     expect(fires.find(f => f.moveId === 'echoThrow')).toBeUndefined();
   });
 
-  it('non-dub effTyp values are ignored', () => {
+  it('non-dub effTyp values are ignored (including OpenMPT 33 fine-porta)', () => {
+    // CRITICAL regression guard — effTyp 33 is used by OpenMPTConverter for
+    // CMD_XFINEPORTAUPDOWN. If fire-from-effect accepts 33 as a dub slot
+    // again, every fine-porta cell in an imported MOD will trigger random
+    // dub moves on playback, producing distortion (the bug fixed by
+    // moving dub slots from 33-35 to 36-38).
+    fireFromEffectCommand(33, 0x50);
+    fireFromEffectCommand(34, 0x50);
+    fireFromEffectCommand(35, 0x50);
     fireFromEffectCommand(10, 0x00);
     fireFromEffectCommand(0, 0x00);
     fireFromEffectCommand(32, 0xFF);
     expect(fires).toHaveLength(0);
   });
 
-  it('fallbackChannelId fills in when decode returns no channel (effTyp 33)', () => {
-    // effTyp 33 = global move — decode returns { moveId } (no channelId).
-    // The scanner passes the current channel index as fallback so a "Z05"
-    // (channelMute) typed into channel 7 still mutes channel 7 without the
-    // user having to remember to use effTyp 34 for per-channel syntax.
-    fireFromEffectCommand(33, 0x50, 7);
+  it('fallbackChannelId fills in when decode returns no channel (effTyp 36)', () => {
+    fireFromEffectCommand(36, 0x50, 7);
     const mute = fires.find(f => f.moveId === 'channelMute');
     expect(mute?.channelId).toBe(7);
   });
