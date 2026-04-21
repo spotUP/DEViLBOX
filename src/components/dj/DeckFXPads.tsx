@@ -215,6 +215,19 @@ export const DeckFXPads: React.FC<DeckFXPadsProps> = ({ deckId }) => {
   // ("DUB ·Nch") and each dub pad (small chip in the corner when targeting
   // is armed).
   const fxTargetCount = useDJStore((s) => s.decks[deckId].fxTargetChannels.size);
+  // Sorted list of targeted channel indices for the DUB 4 pad sublabels.
+  // Uses the same fxTargetChannels set the rest of the DUB pads already
+  // respect — no separate picker needed; users arm channels via the
+  // existing DeckChannelToggles in FX mode.
+  const fxTargets = useDJStore((s) => s.decks[deckId].fxTargetChannels);
+  const fxTargetLabel = React.useMemo(() => {
+    if (fxTargets.size === 0) return null;
+    const arr = Array.from(fxTargets).sort((a, b) => a - b).map(c => c + 1);
+    // "1 2 3" if 3+ channels, "1+2" for 2, "ch 3" for 1.
+    if (arr.length === 1) return `ch ${arr[0]}`;
+    if (arr.length === 2) return `${arr[0]}+${arr[1]}`;
+    return arr.join(' ');
+  }, [fxTargets]);
 
   const killState: Record<string, boolean> = {
     'kill-low': killLow,
@@ -553,13 +566,24 @@ export const DeckFXPads: React.FC<DeckFXPadsProps> = ({ deckId }) => {
                 />
               )}
               <span className="relative text-[9px] font-bold">{pad.label}</span>
-              {pad.sublabel && <span className="relative text-[7px] opacity-60">{pad.sublabel}</span>}
+              {/* DUB 4 pads (channelMute + channelThrow) replace their
+                  static "ch 0" sublabel with the currently-armed fx
+                  target channels. When nothing is armed, the static
+                  placeholder stays so the user knows to arm a channel. */}
+              {pad.sublabel && (
+                <span className="relative text-[7px] opacity-60">
+                  {page === 'dub4' && (pad.id === 'dub4-mute' || pad.id === 'dub4-cthrow') && fxTargetLabel
+                    ? fxTargetLabel
+                    : pad.sublabel}
+                </span>
+              )}
               {/*
-                Channel-target chip: shown only on DUB pads when fx targeting
-                is armed. Communicates that pressing this pad will fire the
-                move once per selected channel rather than whole-deck.
+                Channel-target chip: shown on every DUB page when fx
+                targeting is armed. Communicates that pressing this pad
+                will fire the move once per selected channel rather than
+                whole-deck. Covers DUB 1/2/3/4.
               */}
-              {(page === 'dub' || page === 'dub2') && fxTargetCount > 0 && (
+              {(page === 'dub' || page === 'dub2' || page === 'dub3' || page === 'dub4') && fxTargetCount > 0 && (
                 <span
                   className="absolute top-0.5 right-0.5 rounded-sm px-1 font-mono font-bold pointer-events-none"
                   style={{
