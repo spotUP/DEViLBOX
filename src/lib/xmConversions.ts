@@ -239,6 +239,11 @@ export function xmEffectToString(effTyp: number, eff: number): string {
     return `~${ch}${(eff & 0xF).toString(16).toUpperCase()}`;
   }
 
+  // Dub effect commands (36/37/38) → display as Zxx
+  if (effTyp >= 36 && effTyp <= 38) {
+    return `Z${HEX_BYTE[eff] ?? '00'}`;
+  }
+
   const typeChar = EFFECT_CHAR_MAP[effTyp] ?? '0';
   return `${typeChar}${HEX_BYTE[eff] ?? '00'}`;
 }
