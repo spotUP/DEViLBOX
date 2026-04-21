@@ -216,20 +216,20 @@ function computeBPM(sub: FurnaceSubsong): number {
 
 export async function parseFurnaceFile(buffer: ArrayBuffer, _fileName: string, subsong = 0): Promise<TrackerSong> {
   console.log(`[FurnaceToSong] parseFurnaceFile: "${_fileName}", ${buffer.byteLength} bytes, subsong=${subsong}`);
+
+  // Detect DefleMask: by extension OR by decompressing zlib and checking magic
+  const isDefleMask = /\.dmf$/i.test(_fileName) || isDMFFile(buffer);
+
   // Try WASM parser first, fall back to TS parser
   try {
     const result = await parseFurnaceFileWasm(buffer, _fileName, subsong);
     console.log(`[FurnaceToSong] WASM success: ${result.patterns.length} patterns, ${result.instruments.length} instruments`);
     return result;
   } catch (err) {
+    const errMsg = err instanceof Error ? err.message : String(err);
     // DefleMask (.dmf) files can only be parsed by the WASM engine (which has
     // Furnace's full DMF import). The TS fallback only handles .fur format.
-    // NOTE: .fur files are ALSO zlib-compressed (0x78), so we must check the
-    // actual DMF magic bytes (.DefleMask = 0x2E 0x44 0x65), not just zlib.
-    const bytes = new Uint8Array(buffer);
-    const isDMFMagic = bytes[0] === 0x2E && bytes[1] === 0x44 && bytes[2] === 0x65;
-    const errMsg = err instanceof Error ? err.message : String(err);
-    if (isDMFMagic) {
+    if (isDefleMask) {
       throw new Error(`DefleMask import requires Furnace WASM engine (WASM error: ${errMsg})`);
     }
     console.warn('[FurnaceToSong] WASM parser failed, falling back to TS parser:', errMsg);
@@ -244,6 +244,28 @@ export async function parseFurnaceFile(buffer: ArrayBuffer, _fileName: string, s
   }
 }
 
+/** Check if a buffer is a DefleMask file (zlib-compressed with .DefleMask magic inside) */
+function isDMFFile(buffer: ArrayBuffer): boolean {
+  const bytes = new Uint8Array(buffer);
+  // Uncompressed DMF: starts with ".DefleMask" (0x2E 0x44 0x65)
+  if (bytes[0] === 0x2E && bytes[1] === 0x44 && bytes[2] === 0x65) return true;
+  // Zlib-compressed DMF: decompress and check magic
+  if (bytes.length > 2 && bytes[0] === 0x78 &&
+      (bytes[1] === 0x9c || bytes[1] === 0x01 || bytes[1] === 0xDA)) {
+    try {
+      const pako = require('pako');
+      let decompressed: Uint8Array;
+      try {
+        decompressed = pako.inflate(bytes);
+      } catch {
+        decompressed = pako.inflateRaw(bytes.subarray(2));
+      }
+      return decompressed[0] === 0x2E && decompressed[1] === 0x44 && decompressed[2] === 0x65;
+    } catch { return false; }
+  }
+  return false;
+}
+
 /**
  * Parse using the FurnaceFileOps WASM module (byte-identical to Furnace CLI).
  */
@@ -256,11 +278,19 @@ async function parseFurnaceFileWasm(buffer: ArrayBuffer, _fileName: string, subs
 
   // Pre-decompress zlib (e.g. DefleMask DMF) before passing to WASM.
   // The WASM's internal zlib aborts on files with corrupted adler32 checksums.
+  // Try full zlib inflate first; fall back to raw deflate (skip 2-byte header)
+  // for files with bad checksums.
   let wasmBuffer = buffer;
   const hdr = new Uint8Array(buffer, 0, 2);
   if (hdr[0] === 0x78 && (hdr[1] === 0x9c || hdr[1] === 0x01 || hdr[1] === 0xDA)) {
     const pako = await import('pako');
-    const inflated = pako.inflateRaw(new Uint8Array(buffer).slice(2));
+    let inflated: Uint8Array;
+    try {
+      inflated = pako.inflate(new Uint8Array(buffer));
+    } catch {
+      // Corrupted adler32 checksum — skip zlib header and use raw deflate
+      inflated = pako.inflateRaw(new Uint8Array(buffer).subarray(2));
+    }
     wasmBuffer = inflated.buffer.byteLength === inflated.byteLength
       ? inflated.buffer as ArrayBuffer
       : inflated.buffer.slice(inflated.byteOffset, inflated.byteOffset + inflated.byteLength) as ArrayBuffer;
