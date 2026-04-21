@@ -355,6 +355,7 @@ async function parseFurnaceFileWasm(buffer: ArrayBuffer, _fileName: string, subs
     const { FurnaceDispatchEngine } = await import('@engine/furnace-dispatch/FurnaceDispatchEngine');
     if (FurnaceDispatchEngine.getInstance().isInitialized) {
       const { uploadFurnaceToSequencer } = await import('@/lib/export/FurnaceSequencerSerializer');
+      FurnaceDispatchEngine.getInstance().sendMixVolumes(loaded.nativeData);
       await uploadFurnaceToSequencer(loaded.nativeData, subsong);
       console.log('[FurnaceToSong] WASM-parsed song uploaded to WASM sequencer');
     }
@@ -487,6 +488,7 @@ async function parseFurnaceFileTS(buffer: ArrayBuffer, _fileName: string, subson
       const { FurnaceDispatchEngine } = await import('@engine/furnace-dispatch/FurnaceDispatchEngine');
       if (FurnaceDispatchEngine.getInstance().isInitialized) {
         const { uploadFurnaceToSequencer } = await import('@/lib/export/FurnaceSequencerSerializer');
+        FurnaceDispatchEngine.getInstance().sendMixVolumes(result.furnaceNative);
         await uploadFurnaceToSequencer(result.furnaceNative, subsong);
         console.log('[FurnaceToSong] Song uploaded to WASM sequencer (TS fallback)');
       }

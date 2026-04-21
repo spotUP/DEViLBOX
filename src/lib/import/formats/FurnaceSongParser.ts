@@ -3040,6 +3040,10 @@ export function buildFurnaceNativeData(module: FurnaceModule): FurnaceNativeData
     grooves: module.grooves.length > 0 ? module.grooves : undefined,
     chipFlags: module.chipFlags?.slice(0, module.systemLen),
     tuning: module.tuning !== 440.0 ? module.tuning : undefined,
+    masterVol: module.masterVol,
+    systemVol: module.systemVol.length > 0 ? module.systemVol : undefined,
+    systemPan: module.systemPan.length > 0 ? module.systemPan : undefined,
+    systemPanFR: module.systemPanFR.length > 0 ? module.systemPanFR : undefined,
   };
 }
 
