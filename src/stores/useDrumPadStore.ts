@@ -734,7 +734,12 @@ export const useDrumPadStore = create<DrumPadStore>((set, get) => ({
           busLevels: state.busLevels || {},
           // Merge saved dub-bus with defaults so fields added to the schema
           // since the user last saved get sensible values rather than `undefined`.
-          dubBus: { ...DEFAULT_DUB_BUS, ...(state.dubBus || {}) },
+          // Force `enabled: false` on load — the bus on/off is a performance-
+          // time toggle, not a user setting. Persisting it meant every
+          // startup reloaded with the bus on if the user had ever clicked
+          // it. Tuning (character preset, echo/spring params, HPF, etc.)
+          // still restores normally.
+          dubBus: { ...DEFAULT_DUB_BUS, ...(state.dubBus || {}), enabled: false },
         });
 
         if (process.env.NODE_ENV === 'development') {
