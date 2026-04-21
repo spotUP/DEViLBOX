@@ -43,7 +43,7 @@ import type { DubBus } from './DubBus';
 import { useTransportStore } from '@/stores/useTransportStore';
 import { useDubStore } from '@/stores/useDubStore';
 import { getTrackerReplayer } from '@/engine/TrackerReplayer';
-import { decodeDubEffect, decodeDubParamStep, DUB_EFFECT_GLOBAL, DUB_EFFECT_PERCHANNEL, DUB_EFFECT_PARAM_STEP } from './moveTable';
+import { decodeDubEffect, decodeDubParamStep, DUB_EFFECT_PARAM_STEP, isDubMoveEffectSlot } from './moveTable';
 import { routeParameterToEngine } from '@/midi/performance/parameterRouter';
 import * as Tone from 'tone';
 
@@ -257,7 +257,7 @@ export function fireFromEffectCommand(
     }
     return null;
   }
-  if (effTyp !== DUB_EFFECT_GLOBAL && effTyp !== DUB_EFFECT_PERCHANNEL) return null;
+  if (!isDubMoveEffectSlot(effTyp)) return null;
   const decoded = decodeDubEffect(effTyp, eff);
   if (!decoded) return null;
   // Blacklist respected — a blacklisted move in a saved .dbx still

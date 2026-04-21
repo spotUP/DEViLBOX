@@ -36,6 +36,10 @@ function makeMockBus() {
       log('setSirenFeedback', amt, ramp);
       return () => log('sirenRelease');
     }),
+    startSiren: vi.fn(() => {
+      log('startSiren');
+      return () => log('sirenRelease');
+    }),
     startTapeWobble: vi.fn((depth: number, rate: number) => {
       log('startTapeWobble', depth, rate);
       return () => log('wobbleRelease');
@@ -45,6 +49,8 @@ function makeMockBus() {
       log('throwEchoTime', target, down, hold, up)),
     backwardReverb: vi.fn(async (dur: number) => log('backwardReverb', dur)),
     tapeStop: vi.fn((down: number, hold: number) => log('tapeStop', down, hold)),
+    sweepMasterLpf: vi.fn((hz: number, down: number, hold: number) =>
+      log('sweepMasterLpf', hz, down, hold)),
     soloChannelTap: vi.fn((ch: number) => {
       log('soloChannelTap', ch);
       return () => log('soloRelease', ch);

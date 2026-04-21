@@ -20,18 +20,44 @@
 import { subscribeDubRouter, subscribeDubRelease } from './DubRouter';
 import { useDubStore, scheduleDubStoreSync } from '@/stores/useDubStore';
 import { useTrackerStore } from '@/stores/useTrackerStore';
+import { useAutomationStore } from '@/stores/useAutomationStore';
 import type { DubEvent } from '@/types/dub';
-import { DUB_MOVE_TABLE, DUB_EFFECT_PERCHANNEL } from './moveTable';
+import { encodeDubEffect } from './moveTable';
 import { DUB_MOVE_KINDS } from '@/midi/performance/parameterRouter';
 
 function uuid(): string {
   return Math.random().toString(36).slice(2) + Date.now().toString(36);
 }
 
-/** Invocation → { eventId, patternIdx, fireRow } for pending-release pairing.
- *  Patterns can change between fire and release if the user jumps patterns
- *  mid-hold, so we remember which pattern owns the event. */
-const pendingHolds = new Map<string, { eventId: string; patternIdx: number; fireRow: number }>();
+/** Width of the 0→1→0 spike written to a curve for trigger-kind moves.
+ *  AutomationPlayer's upward-edge detection then re-fires the move once
+ *  per pass on replay. Small so the spike doesn't bleed into the next row. */
+const TRIGGER_SPIKE_WIDTH_ROWS = 0.05;
+
+function paramKeyForMove(moveId: string, channelId?: number): string {
+  return channelId === undefined ? `dub.${moveId}` : `dub.${moveId}.ch${channelId}`;
+}
+
+/** Look up (or lazily create) the global-lane curve for a move's paramKey
+ *  on this pattern. Global FX lane = channelIndex=-1 sentinel; addGlobalCurve
+ *  wraps that so we don't need to know the sentinel here. */
+function ensureGlobalCurve(patternId: string, paramKey: string): string {
+  const store = useAutomationStore.getState();
+  const existing = store.getGlobalCurves(patternId).find(c => c.parameter === paramKey);
+  if (existing) return existing.id;
+  return store.addGlobalCurve(patternId, paramKey as import('@/types/automation').AutomationParameter);
+}
+
+/** Invocation → pending-release bookkeeping. `curveId` is present when the
+ *  fire also wrote an automation-curve point; the release handler uses it
+ *  to stamp a fall-point so the lane replays the release correctly. */
+const pendingHolds = new Map<string, {
+  eventId: string;
+  patternIdx: number;
+  fireRow: number;
+  curveId?: string;
+  patternId?: string;
+}>();
 
 /**
  * Start the recorder. Subscribes to DubRouter fires + releases for the
@@ -69,42 +95,66 @@ export function startDubRecorder(): () => void {
       // Also write a Zxx effect-command cell for per-channel TRIGGER moves
       // so they're visible inline in the pattern editor, not just in the
       // dub-lane timeline. Conditions:
-      //   - Move has a channel (per-channel, fits effTyp 37 encoding)
+      //   - Move has a channel (per-channel slot encoding)
       //   - Kind is 'trigger' (holds need duration which a single cell
-      //     can't express — those stay in dubLane / will land on a
-      //     Global FX automation curve in a future pass)
-      //   - Move index < 16 (high-nibble encoding)
-      //   - Target row is in range
-      //   - Channel exists in the pattern
+      //     can't express — those go to an automation curve below)
+      //   - Move is encodable (index < 32; encode picks base/_X slot)
+      //   - Target row + channel in range
       // DUB_MOVE_KINDS occasionally unresolved under test-env module
-      // initialization (circular-import adjacent): guard with `?? ''` so a
-      // missing kind falls through to dubLane-only without crashing.
+      // initialization (circular-import adjacent): optional-chain falls
+      // through to curve/lane-only if missing.
       const moveKind = DUB_MOVE_KINDS?.[fireEvent.moveId];
-      const moveIdx = DUB_MOVE_TABLE.indexOf(fireEvent.moveId);
       const cellRow = Math.floor(fireEvent.row);
       if (
         fireEvent.channelId !== undefined
         && moveKind === 'trigger'
-        && moveIdx >= 0 && moveIdx < 16
         && cellRow >= 0 && cellRow < pattern.length
         && fireEvent.channelId >= 0 && fireEvent.channelId < pattern.channels.length
       ) {
-        const eff = ((moveIdx & 0x0f) << 4) | (fireEvent.channelId & 0x0f);
-        tracker.setCell(fireEvent.channelId, cellRow, {
-          effTyp: DUB_EFFECT_PERCHANNEL,
-          eff,
-        });
+        const encoded = encodeDubEffect(fireEvent.moveId, fireEvent.channelId);
+        if (encoded) {
+          tracker.setCell(fireEvent.channelId, cellRow, {
+            effTyp: encoded.effTyp,
+            eff: encoded.eff,
+          });
+        }
       }
 
-      // Record the pairing so a later release can stamp durationRows on
-      // this exact event. We don't know here whether the move is trigger-
-      // or hold-kind — if no release ever arrives (trigger), the entry
-      // just sits in the map until the next `startDubRecorder` lifecycle
-      // prunes it. Bounded by live-move count so no real leak.
+      // Global moves (no channel) and hold-kind moves (any channel) → write
+      // to an automation curve on the Global FX lane. A single cell can't
+      // represent a hold's duration; global moves don't fit a channel
+      // column. Curves are the canonical home for both.
+      //
+      // Encoding:
+      //   - trigger (global): spike 0→1 at fireRow, fall to 0 a hair later.
+      //     AutomationPlayer's upward-edge detection re-fires the move on
+      //     replay via routeParameterToEngine → DubRouter.fire.
+      //   - hold (global or per-channel): rise to 1 at fireRow; the release
+      //     handler writes the fall-to-0 at releaseRow. Edge detection
+      //     triggers fire on rise and release on fall.
+      const needsCurve = moveKind !== undefined
+        && (fireEvent.channelId === undefined || moveKind === 'hold');
+      let curveId: string | undefined;
+      if (needsCurve && moveKind) {
+        const paramKey = paramKeyForMove(fireEvent.moveId, fireEvent.channelId);
+        curveId = ensureGlobalCurve(pattern.id, paramKey);
+        const autoStore = useAutomationStore.getState();
+        autoStore.addPoint(curveId, fireEvent.row, 1);
+        if (moveKind === 'trigger') {
+          autoStore.addPoint(curveId, fireEvent.row + TRIGGER_SPIKE_WIDTH_ROWS, 0);
+        }
+      }
+
+      // Record the pairing so a later release stamps durationRows on this
+      // event and a fall-point on the curve. If no release arrives
+      // (trigger), the entry sits until the next startDubRecorder lifecycle
+      // prunes it — bounded by live-move count so no real leak.
       pendingHolds.set(fireEvent.invocationId, {
         eventId,
         patternIdx,
         fireRow: fireEvent.row,
+        curveId,
+        patternId: pattern.id,
       });
     });
   });
@@ -132,6 +182,13 @@ export function startDubRecorder(): () => void {
       const events = existing.events.slice();
       events[idx] = updated;
       tracker.setPatternDubLane(pending.patternIdx, { ...existing, events });
+
+      // Hold/global curves get a fall-to-0 at the release row. On replay,
+      // AutomationPlayer sees the downward crossing and calls the move's
+      // release path (routeParameterToEngine → disposer).
+      if (pending.curveId) {
+        useAutomationStore.getState().addPoint(pending.curveId, releaseEvent.row, 0);
+      }
     });
   });
 
