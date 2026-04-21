@@ -12,6 +12,7 @@ import { useFormatStore } from '@stores/useFormatStore';
 import type { DubBusSettings } from '@/types/dub';
 import { useDubStore, type AutoDubPersonaId } from '@/stores/useDubStore';
 import { useDrumPadStore } from '@/stores/useDrumPadStore';
+import { compressProject, decompressProject } from '@/lib/projectCompression';
 
 // ── Binary FileData field names in useFormatStore ──
 // These are all the ArrayBuffer/Uint8Array fields that carry native engine data.
@@ -303,7 +304,8 @@ export function exportSong(
     ? JSON.stringify(songData, null, 2)
     : JSON.stringify(songData);
 
-  const blob = new Blob([json], { type: 'application/json' });
+  const compressed = compressProject(json);
+  const blob = new Blob([compressed], { type: 'application/octet-stream' });
   const filename = `${sanitizeFilename(metadata.name)}.dbx`;
 
   saveAs(blob, filename);
@@ -362,11 +364,12 @@ export function exportInstrument(
 }
 
 /**
- * Import Song from JSON
+ * Import Song from file (supports both DVBZ compressed and raw JSON)
  */
 export async function importSong(file: File): Promise<SongExport | null> {
   try {
-    const text = await file.text();
+    const buffer = await file.arrayBuffer();
+    const text = decompressProject(buffer);
     const data = JSON.parse(text) as SongExport;
 
     if (data.format !== 'devilbox-song') {
