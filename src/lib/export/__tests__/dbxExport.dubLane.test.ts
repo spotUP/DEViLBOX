@@ -180,3 +180,69 @@ describe('exportSong — Pattern.dubLane round-trip through .dbx JSON', () => {
     expect(patterns.map((p) => p.id)).toEqual(['pat-0']);
   });
 });
+
+// ─── Auto Dub + DubBus snapshot round-trip ─────────────────────────────────
+
+describe('exportSong — Auto Dub state + DubBusSettings .dbx round-trip', () => {
+  beforeEach(() => {
+    captured.blob = null;
+    captured.filename = null;
+  });
+
+  it('autoDub block captures enabled/persona/intensity/blacklist from useDubStore', async () => {
+    const { useDubStore } = await import('@/stores/useDubStore');
+    const s = useDubStore.getState();
+    s.setAutoDubEnabled(true);
+    s.setAutoDubPersona('perry');
+    s.setAutoDubIntensity(0.73);
+    s.setAutoDubMoveBlacklist(['tubbyScream', 'reverseEcho']);
+
+    const data = await captureExport(makePattern(false));
+    const autoDub = data.autoDub as { enabled: boolean; persona: string; intensity: number; moveBlacklist: string[] };
+    expect(autoDub).toBeDefined();
+    expect(autoDub.enabled).toBe(true);
+    expect(autoDub.persona).toBe('perry');
+    expect(autoDub.intensity).toBeCloseTo(0.73, 5);
+    expect(autoDub.moveBlacklist).toEqual(['tubbyScream', 'reverseEcho']);
+
+    // Reset for other tests
+    s.setAutoDubEnabled(false);
+    s.setAutoDubPersona('custom');
+    s.setAutoDubIntensity(0.5);
+    s.setAutoDubMoveBlacklist([]);
+  });
+
+  it('dubBus block captures characterPreset + coloring params from useDrumPadStore', async () => {
+    const { useDrumPadStore } = await import('@/stores/useDrumPadStore');
+    useDrumPadStore.getState().setDubBus({
+      characterPreset: 'scientist',
+      returnGain: 0.42,
+      echoIntensity: 0.77,
+      stereoWidth: 1.55,
+    });
+
+    const data = await captureExport(makePattern(false));
+    const dubBus = data.dubBus as Record<string, unknown>;
+    expect(dubBus).toBeDefined();
+    expect(dubBus.characterPreset).toBe('scientist');
+    expect(dubBus.returnGain).toBeCloseTo(0.42, 5);
+    expect(dubBus.echoIntensity).toBeCloseTo(0.77, 5);
+    expect(dubBus.stereoWidth).toBeCloseTo(1.55, 5);
+  });
+
+  it('JSON round-trip preserves every autoDub + dubBus field via JSON.parse', async () => {
+    // End-to-end integrity — serialize → parse → assert. Guards against a
+    // future refactor that Proxies the stores in a way JSON.stringify drops.
+    const { useDubStore } = await import('@/stores/useDubStore');
+    const { useDrumPadStore } = await import('@/stores/useDrumPadStore');
+    useDubStore.getState().setAutoDubPersona('jammy');
+    useDubStore.getState().setAutoDubIntensity(0.35);
+    useDrumPadStore.getState().setDubBus({ characterPreset: 'madProfessor' });
+
+    const data = await captureExport(makePattern(false));
+    const parsed = JSON.parse(JSON.stringify(data));
+    expect(parsed.autoDub.persona).toBe('jammy');
+    expect(parsed.autoDub.intensity).toBeCloseTo(0.35, 5);
+    expect(parsed.dubBus.characterPreset).toBe('madProfessor');
+  });
+});

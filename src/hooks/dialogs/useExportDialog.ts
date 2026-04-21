@@ -533,6 +533,29 @@ export function useExportDialog({ isOpen }: UseExportDialogOptions) {
             }
 
             if (data.masterEffects && data.masterEffects.length > 0) setMasterEffects(data.masterEffects);
+
+            // Restore dub bus tuning (character preset + 30+ coloring params).
+            // Spread over whatever's currently in the store so older .dbx
+            // files missing newer fields inherit current defaults — shape
+            // evolves as dub coloring params land.
+            if (data.dubBus) {
+              const { useDrumPadStore } = await import('@/stores/useDrumPadStore');
+              useDrumPadStore.getState().setDubBus(data.dubBus);
+            }
+
+            // Restore Auto Dub state (enabled, persona, intensity, blacklist).
+            // Uses individual setters rather than a bulk replace so the
+            // engine's useEffect in AutoDubPanel re-fires on the enabled
+            // flag and starts/stops the tick loop appropriately.
+            if (data.autoDub) {
+              const { useDubStore } = await import('@/stores/useDubStore');
+              const s = useDubStore.getState();
+              s.setAutoDubPersona(data.autoDub.persona);
+              s.setAutoDubIntensity(data.autoDub.intensity);
+              s.setAutoDubMoveBlacklist(data.autoDub.moveBlacklist ?? []);
+              s.setAutoDubEnabled(data.autoDub.enabled);
+            }
+
             notify.success(`Song "${data.metadata.name}" imported!`);
           }
           break;
