@@ -79,6 +79,10 @@ interface FurnaceFileOpsAPI {
   fur_get_speed_len(subsong: number): number;
   fur_get_dispatch_compat_flags(): number;
   fur_get_dispatch_compat_flags_size(): number;
+  fur_get_master_vol(): number;
+  fur_get_system_vol(idx: number): number;
+  fur_get_system_pan(idx: number): number;
+  fur_get_system_pan_fr(idx: number): number;
 }
 
 function getAPI(m: WasmModule): FurnaceFileOpsAPI {
@@ -121,6 +125,10 @@ function getAPI(m: WasmModule): FurnaceFileOpsAPI {
     fur_get_speed_len: m.cwrap('fur_get_speed_len', 'number', ['number']),
     fur_get_dispatch_compat_flags: m.cwrap('fur_get_dispatch_compat_flags', 'number', []),
     fur_get_dispatch_compat_flags_size: m.cwrap('fur_get_dispatch_compat_flags_size', 'number', []),
+    fur_get_master_vol: m.cwrap('fur_get_master_vol', 'number', []),
+    fur_get_system_vol: m.cwrap('fur_get_system_vol', 'number', ['number']),
+    fur_get_system_pan: m.cwrap('fur_get_system_pan', 'number', ['number']),
+    fur_get_system_pan_fr: m.cwrap('fur_get_system_pan_fr', 'number', ['number']),
   };
 }
 
@@ -416,6 +424,17 @@ export async function loadFurFileWasm(buffer: ArrayBuffer): Promise<{
     linearPitch: packedFlagsExt & 0x3,
   };
 
+  // Extract mix volumes (matching upstream Furnace playback.cpp nextBuf)
+  const masterVol = api.fur_get_master_vol();
+  const systemVol: number[] = [];
+  const systemPan: number[] = [];
+  const systemPanFR: number[] = [];
+  for (let i = 0; i < systemLen; i++) {
+    systemVol.push(api.fur_get_system_vol(i));
+    systemPan.push(api.fur_get_system_pan(i));
+    systemPanFR.push(api.fur_get_system_pan_fr(i));
+  }
+
   const nativeData: FurnaceNativeData = {
     subsongs,
     activeSubsong: 0,
@@ -424,6 +443,10 @@ export async function loadFurFileWasm(buffer: ArrayBuffer): Promise<{
     compatFlags,
     tuning: tuning !== 440.0 ? tuning : undefined,
     grooves: grooves.length > 0 ? grooves : undefined,
+    masterVol,
+    systemVol: systemVol.length > 0 ? systemVol : undefined,
+    systemPan: systemPan.length > 0 ? systemPan : undefined,
+    systemPanFR: systemPanFR.length > 0 ? systemPanFR : undefined,
   };
 
   return {
