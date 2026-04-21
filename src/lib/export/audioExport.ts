@@ -259,11 +259,38 @@ export function audioBufferToWav(buffer: AudioBuffer): Blob {
     channelData.push(buffer.getChannelData(i));
   }
 
+  // Peak-normalize if the captured signal would otherwise clip.
+  // DEViLBOX's master chain is user-configurable — `masterChannel` is just
+  // volume/pan, no default limiter — so a hot mix can legitimately deliver
+  // peaks above ±1.0 into `blepInput` where the export tap sits. The old
+  // code did `Math.max(-1, Math.min(1, x))` which hard-clipped the tops off
+  // every wave crest (reported as "distorted audio" on 2026-04-21).
+  //
+  // Strategy: find the absolute peak across the whole buffer; if > 1.0 scale
+  // the entire buffer uniformly so the loudest sample lands at -0.3 dBFS.
+  // This is shape-preserving (relative dynamics between channels + samples
+  // are untouched) and only engages when needed — well-mixed songs within
+  // 0 dBFS roundtrip bit-exact.
+  let peak = 0;
+  for (let ch = 0; ch < numChannels; ch++) {
+    const data = channelData[ch];
+    for (let i = 0; i < samples; i++) {
+      const a = Math.abs(data[i]);
+      if (a > peak) peak = a;
+    }
+  }
+  // -0.3 dBFS ceiling matches the master limiter DEViLBOX ships with in
+  // the default project preset, so over-range captures land at the same
+  // peak level a properly-limited mix would.
+  const CEILING = 0.9661;
+  const scale = peak > 1.0 ? (CEILING / peak) : 1.0;
+
   let offset = 44;
   for (let i = 0; i < samples; i++) {
     for (let ch = 0; ch < numChannels; ch++) {
-      const sample = Math.max(-1, Math.min(1, channelData[ch][i]));
-      const intSample = sample < 0 ? sample * 0x8000 : sample * 0x7fff;
+      const scaled = channelData[ch][i] * scale;
+      const clamped = scaled < -1 ? -1 : (scaled > 1 ? 1 : scaled);
+      const intSample = clamped < 0 ? clamped * 0x8000 : clamped * 0x7fff;
       view.setInt16(offset, intSample, true);
       offset += 2;
     }
@@ -281,8 +308,20 @@ export function audioBufferToWav(buffer: AudioBuffer): Blob {
 export function audioBufferToMp3(buffer: AudioBuffer, kbps = 192): Blob {
   const numChannels = Math.min(buffer.numberOfChannels, 2);
   const encoder = new Mp3Encoder(numChannels, buffer.sampleRate, kbps);
-  const left = floatTo16Bit(buffer.getChannelData(0));
-  const right = numChannels === 2 ? floatTo16Bit(buffer.getChannelData(1)) : undefined;
+  // Match the WAV writer's peak-normalize strategy so hot mixes don't
+  // flat-top-clip before reaching the MP3 encoder. See audioBufferToWav
+  // for rationale.
+  const ls = buffer.getChannelData(0);
+  const rs = numChannels === 2 ? buffer.getChannelData(1) : null;
+  let peak = 0;
+  for (let i = 0; i < ls.length; i++) {
+    const a = Math.abs(ls[i]); if (a > peak) peak = a;
+    if (rs) { const b = Math.abs(rs[i]); if (b > peak) peak = b; }
+  }
+  const CEILING = 0.9661; // -0.3 dBFS
+  const scale = peak > 1.0 ? (CEILING / peak) : 1.0;
+  const left = floatTo16BitScaled(ls, scale);
+  const right = rs ? floatTo16BitScaled(rs, scale) : undefined;
 
   const BLOCK = 1152; // one MPEG audio frame
   const chunks: Uint8Array[] = [];
@@ -297,10 +336,11 @@ export function audioBufferToMp3(buffer: AudioBuffer, kbps = 192): Blob {
   return new Blob(chunks as unknown as BlobPart[], { type: 'audio/mpeg' });
 }
 
-function floatTo16Bit(f: Float32Array): Int16Array {
+function floatTo16BitScaled(f: Float32Array, scale: number): Int16Array {
   const out = new Int16Array(f.length);
   for (let i = 0; i < f.length; i++) {
-    const s = Math.max(-1, Math.min(1, f[i]));
+    const v = f[i] * scale;
+    const s = v < -1 ? -1 : (v > 1 ? 1 : v);
     out[i] = s < 0 ? s * 0x8000 : s * 0x7fff;
   }
   return out;

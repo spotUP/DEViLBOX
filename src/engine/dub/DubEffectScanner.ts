@@ -17,10 +17,13 @@
 
 import { fireFromEffectCommand } from './DubRouter';
 import { useTrackerStore } from '@/stores/useTrackerStore';
-import { DUB_EFFECT_GLOBAL, DUB_EFFECT_PARAM_STEP } from './moveTable';
+import { DUB_EFFECT_GLOBAL, DUB_EFFECT_PERCHANNEL_X } from './moveTable';
 
-const DUB_EFFECT_MIN = DUB_EFFECT_GLOBAL;        // 36
-const DUB_EFFECT_MAX = DUB_EFFECT_PARAM_STEP;    // 38
+// Range covers 36-40: global / per-channel / param-step / global-ext /
+// per-channel-ext. `moveTable.ts` owns the exact slot values and the
+// split between base (0-15) and extended (16-31) move indices.
+const DUB_EFFECT_MIN = DUB_EFFECT_GLOBAL;          // 36
+const DUB_EFFECT_MAX = DUB_EFFECT_PERCHANNEL_X;    // 40
 
 let _lastRowFired = -1;
 

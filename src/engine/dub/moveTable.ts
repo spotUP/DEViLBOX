@@ -50,7 +50,7 @@ export const DUB_MOVE_TABLE: readonly string[] = [
 export const DUB_MOVE_TABLE_VERSION = 27;
 
 /**
- * Dub effect-command slots. Picked at 36-38 to sit BEYOND the existing
+ * Dub effect-command slots. Picked at 36-40 to sit BEYOND the existing
  * 0-35 XM/IT effect-type range (documented as "XM effect type" in
  * `TrackerCell`) so no existing importer ever produces them and no
  * replayer dispatches on them. Moving here from the earlier 33-35
@@ -60,35 +60,83 @@ export const DUB_MOVE_TABLE_VERSION = 27;
  * arbitrary dub moves on every playback, producing pattern-level
  * distortion on any imported MOD/XM/IT song with fine porta.
  *
- *  - `DUB_EFFECT_GLOBAL` (36)    — `eff` high nibble = move index 0-15
- *  - `DUB_EFFECT_PERCHANNEL` (37) — high nibble = move, low nibble = target channel 0-15
- *  - `DUB_EFFECT_PARAM_STEP` (38) — high nibble = param index, low nibble = 0-15 step
+ * The `eff` byte is 8 bits (0x00-0xFF). We split: high nibble is the
+ * move index (0-15) and low nibble is context (target channel for
+ * per-channel, reserved for global). That's only 16 addressable moves
+ * per slot, but `DUB_MOVE_TABLE` is 27+ entries. Two slot-pairs cover
+ * the split:
+ *
+ *   - `DUB_EFFECT_GLOBAL` (36)      — global, moves 0-15
+ *   - `DUB_EFFECT_PERCHANNEL` (37)  — per-channel, moves 0-15
+ *   - `DUB_EFFECT_PARAM_STEP` (38)  — param step 0-15
+ *   - `DUB_EFFECT_GLOBAL_X` (39)    — global, moves 16-31 (offset +16)
+ *   - `DUB_EFFECT_PERCHANNEL_X` (40) — per-channel, moves 16-31
+ *
+ * Encoder logic: pick slot = (moveIdx < 16 ? base : extended), then
+ * encode (moveIdx & 0x0f) in the high nibble.
  */
-export const DUB_EFFECT_GLOBAL     = 36;
-export const DUB_EFFECT_PERCHANNEL = 37;
-export const DUB_EFFECT_PARAM_STEP = 38;
+export const DUB_EFFECT_GLOBAL       = 36;
+export const DUB_EFFECT_PERCHANNEL   = 37;
+export const DUB_EFFECT_PARAM_STEP   = 38;
+export const DUB_EFFECT_GLOBAL_X     = 39;
+export const DUB_EFFECT_PERCHANNEL_X = 40;
+
+/** True when effTyp is one of the four move-encoding slots (not param step). */
+export function isDubMoveEffectSlot(effTyp: number): boolean {
+  return effTyp === DUB_EFFECT_GLOBAL
+      || effTyp === DUB_EFFECT_PERCHANNEL
+      || effTyp === DUB_EFFECT_GLOBAL_X
+      || effTyp === DUB_EFFECT_PERCHANNEL_X;
+}
 
 /**
- * Decode an effect-command byte. `DUB_EFFECT_GLOBAL` = global move: eff
- * high nibble is move index 0-15; low nibble is a variant slot reserved
- * for future args (always 0 today). `DUB_EFFECT_PERCHANNEL` = per-channel:
- * eff high nibble is move index, low nibble is target channel 0-15.
- *
- * Returns null when the effTyp isn't a dub slot or the move index is out
- * of range — caller falls through to a no-op rather than firing garbage.
+ * Decode an effect-command byte into a move + optional channel. Handles
+ * both base (0-15) and extended (16-31) slot ranges. Returns null when
+ * effTyp isn't a dub slot or the move index overflows the current table.
  */
 export function decodeDubEffect(effTyp: number, eff: number): {
   moveId: string;
   channelId?: number;
 } | null {
-  if (effTyp !== DUB_EFFECT_GLOBAL && effTyp !== DUB_EFFECT_PERCHANNEL) return null;
-  const moveIdx = (eff >> 4) & 0x0f;
+  const nibble = (eff >> 4) & 0x0f;
+  let moveIdx: number;
+  let perChannel: boolean;
+  switch (effTyp) {
+    case DUB_EFFECT_GLOBAL:       moveIdx = nibble;       perChannel = false; break;
+    case DUB_EFFECT_PERCHANNEL:   moveIdx = nibble;       perChannel = true;  break;
+    case DUB_EFFECT_GLOBAL_X:     moveIdx = nibble + 16;  perChannel = false; break;
+    case DUB_EFFECT_PERCHANNEL_X: moveIdx = nibble + 16;  perChannel = true;  break;
+    default: return null;
+  }
   if (moveIdx >= DUB_MOVE_TABLE.length) return null;
   const moveId = DUB_MOVE_TABLE[moveIdx];
-  if (effTyp === DUB_EFFECT_PERCHANNEL) {
-    return { moveId, channelId: eff & 0x0f };
+  return perChannel ? { moveId, channelId: eff & 0x0f } : { moveId };
+}
+
+/**
+ * Encode a move + optional channel into an (effTyp, eff) pair. Returns
+ * null when the move isn't in the table. Mirror of decodeDubEffect so
+ * DubRecorder can write cells without re-implementing the split.
+ */
+export function encodeDubEffect(moveId: string, channelId?: number): {
+  effTyp: number;
+  eff: number;
+} | null {
+  const moveIdx = DUB_MOVE_TABLE.indexOf(moveId);
+  if (moveIdx < 0 || moveIdx >= 32) return null;  // 32-move cap per encoding
+  const isExtended = moveIdx >= 16;
+  const nibble = moveIdx & 0x0f;
+  if (channelId !== undefined) {
+    if (channelId < 0 || channelId > 15) return null;  // 4-bit channel cap
+    return {
+      effTyp: isExtended ? DUB_EFFECT_PERCHANNEL_X : DUB_EFFECT_PERCHANNEL,
+      eff: (nibble << 4) | channelId,
+    };
   }
-  return { moveId };
+  return {
+    effTyp: isExtended ? DUB_EFFECT_GLOBAL_X : DUB_EFFECT_GLOBAL,
+    eff: nibble << 4,
+  };
 }
 
 /**

@@ -31,7 +31,11 @@ export const AudioExportPanel: React.FC<AudioExportPanelProps> = ({
   const { instruments } = useInstrumentStore();
   const { metadata } = useProjectStore();
   const { bpm } = useTransportStore();
-  const [audioExportScope, setAudioExportScope] = useState<AudioExportScope>(initialScope || 'pattern');
+  // Default to full-song export — users overwhelmingly want the whole track,
+  // not the single pattern they happen to be editing. Caller can still pass
+  // `initialScope='pattern'` when they specifically mean pattern scope (e.g.
+  // SFX export contexts).
+  const [audioExportScope, setAudioExportScope] = useState<AudioExportScope>(initialScope || 'song');
   // Output format — WAV (lossless, big) or MP3 (lossy, small, good for chat).
   const [format, setFormat] = useState<AudioExportFormat>('wav');
   // Option: unmute every channel during export so the WAV contains the
