@@ -21,14 +21,18 @@ export const echoThrow: DubMove = {
   kind: 'trigger',
   defaults: { throwBeats: 0.5, feedbackBoost: 0.15 },
 
-  execute({ bus, channelId, params, bpm }) {
+  execute({ bus, channelId, deckId, params, bpm }) {
     if (channelId === undefined) return null;
 
     const throwBeats = params.throwBeats ?? this.defaults.throwBeats;
     const feedbackBoost = params.feedbackBoost ?? this.defaults.feedbackBoost;
     const holdMs = beatsToMs(bpm, throwBeats);
 
-    const close = bus.openChannelTap(channelId, 1.0, 0.005);
+    // Keep the 3-arg form when no deckId — this preserves the tracker-
+    // view call shape that existing move tests assert against.
+    const close = deckId
+      ? bus.openChannelTap(channelId, 1.0, 0.005, { deckId })
+      : bus.openChannelTap(channelId, 1.0, 0.005);
     bus.modulateFeedback(feedbackBoost, holdMs);
 
     const timer = setTimeout(() => close(), holdMs);

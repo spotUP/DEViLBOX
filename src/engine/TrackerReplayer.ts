@@ -3691,6 +3691,58 @@ export class TrackerReplayer {
     return result;
   }
 
+  /** Number of tracker channels in the currently loaded song. */
+  getChannelCount(): number {
+    return this.channels.length;
+  }
+
+  /**
+   * Open a side-tap on a single channel. Returns a native GainNode
+   * carrying a copy of that channel's audio (taken just after the
+   * channel's internal `gainNode` so it sees the final mixed level
+   * but not the master output stage). The tap runs in parallel with
+   * the main mix — taking it does NOT remove the channel from the
+   * deck's output.
+   *
+   * Returns null when `channelIndex` is out of range (no channel
+   * loaded at that slot yet, e.g. before a song is loaded or past
+   * `numChannels`).
+   *
+   * Dispose is idempotent; callers can release early even if the
+   * replayer is later reset.
+   */
+  openChannelTap(channelIndex: number): { output: GainNode; dispose(): void } | null {
+    if (channelIndex < 0 || channelIndex >= this.channels.length) return null;
+    const ch = this.channels[channelIndex];
+    if (!ch?.gainNode) return null;
+
+    const ctx = Tone.getContext().rawContext as AudioContext | undefined;
+    if (!ctx) return null;
+
+    const tap = ctx.createGain();
+    tap.gain.value = 1;
+    try {
+      // Connect the channel's Tone.Gain to the native tap — Tone's
+      // `connect` accepts native nodes as destinations.
+      (ch.gainNode as unknown as { connect(dst: AudioNode): void }).connect(tap);
+    } catch {
+      try { tap.disconnect(); } catch { /* ok */ }
+      return null;
+    }
+
+    let disposed = false;
+    const dispose = () => {
+      if (disposed) return;
+      disposed = true;
+      try {
+        (ch.gainNode as unknown as { disconnect(dst: AudioNode): void }).disconnect(tap);
+      } catch { /* channel may have been disposed */ }
+      try { tap.disconnect(); } catch { /* ok */ }
+    };
+
+    return { output: tap, dispose };
+  }
+
   /** Update Furnace speed alternation for live subsong switching (no song reload needed). */
   setSpeed2(value: number | null): void {
     this.speed2 = value;

@@ -79,6 +79,88 @@ export const DJDeck: React.FC<DJDeckProps> = ({ deckId }) => {
     return unsubscribe;
   }, [deckId]);
 
+  // ── fx-target channels → deck channel taps on the dub bus ──────────
+  //
+  // When the DJ picks channels in FX mode, we eagerly open a
+  // per-channel tap on the deck's replayer and register it with the
+  // dub bus. This avoids first-fire latency — by the time the DJ
+  // presses a DUB pad the tap is already live. When the set shrinks
+  // or empties, we dispose the tap + unregister from the bus.
+  //
+  // The bus itself lives inside DrumPadEngine (global singleton); we
+  // reach it through a dynamic import so this file doesn't acquire a
+  // hard dep on the dub subsystem.
+  useEffect(() => {
+    // live map of ch → source disposer
+    const openTaps = new Map<number, { dispose(): void }>();
+    let disposed = false;
+
+    const syncTaps = async () => {
+      if (disposed) return;
+      try {
+        const [{ getDJEngine: getEng }, dubModule] = await Promise.all([
+          import('@/engine/dj/DJEngine'),
+          import('@/hooks/drumpad/useMIDIPadRouting'),
+        ]);
+        const bus = dubModule.getDrumPadEngine()?.getDubBus();
+        const deck = getEng().getDeck(deckId);
+        if (!bus || !deck) return;
+
+        const wanted = useDJStore.getState().decks[deckId].fxTargetChannels;
+
+        // Close taps no longer in the wanted set.
+        for (const [ch, src] of openTaps) {
+          if (!wanted.has(ch)) {
+            try { bus.unregisterDeckChannelTap(deckId, ch); } catch { /* ok */ }
+            try { src.dispose(); } catch { /* ok */ }
+            openTaps.delete(ch);
+          }
+        }
+
+        // Open taps newly in the set.
+        for (const ch of wanted) {
+          if (openTaps.has(ch)) continue;
+          const tap = deck.openChannelTap(ch);
+          if (!tap) continue; // audio mode or out-of-range
+          try {
+            bus.registerDeckChannelTap(deckId, ch, tap.output);
+            openTaps.set(ch, tap);
+          } catch (e) {
+            console.warn(`[DJDeck] registerDeckChannelTap(${deckId}:${ch}) failed:`, e);
+            try { tap.dispose(); } catch { /* ok */ }
+          }
+        }
+      } catch { /* bus not ready yet — retry on next change */ }
+    };
+
+    // Subscribe to fxTargetChannels changes. Set identity changes on
+    // every immer write so reference equality is enough.
+    let prev = useDJStore.getState().decks[deckId].fxTargetChannels;
+    void syncTaps();
+    const unsubscribe = useDJStore.subscribe((state) => {
+      const next = state.decks[deckId].fxTargetChannels;
+      if (next !== prev) {
+        prev = next;
+        void syncTaps();
+      }
+    });
+
+    return () => {
+      disposed = true;
+      unsubscribe();
+      // Tear down everything we opened.
+      for (const [ch, src] of openTaps) {
+        try {
+          void import('@/hooks/drumpad/useMIDIPadRouting').then(m => {
+            m.getDrumPadEngine()?.getDubBus()?.unregisterDeckChannelTap(deckId, ch);
+          });
+        } catch { /* ok */ }
+        try { src.dispose(); } catch { /* ok */ }
+      }
+      openTaps.clear();
+    };
+  }, [deckId]);
+
   // Wire replayer callbacks to store
   useEffect(() => {
     try {
