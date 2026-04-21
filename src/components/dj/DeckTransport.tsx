@@ -5,7 +5,7 @@
  */
 
 import React, { useCallback, useState } from 'react';
-import { Play, Pause, Disc3, Link } from 'lucide-react';
+import { Play, Pause, Disc3, Link, Lock } from 'lucide-react';
 import { useDJStore } from '@/stores/useDJStore';
 import { getQuantizeMode, setQuantizeMode, type QuantizeMode } from '@/engine/dj/DJQuantizedFX';
 import * as DJActions from '@/engine/dj/DJActions';
@@ -17,6 +17,7 @@ interface DeckTransportProps {
 export const DeckTransport: React.FC<DeckTransportProps> = ({ deckId }) => {
   const isPlaying = useDJStore((s) => s.decks[deckId].isPlaying);
   const cuePoint = useDJStore((s) => s.decks[deckId].cuePoint);
+  const keyLockEnabled = useDJStore((s) => s.decks[deckId].keyLockEnabled);
   const pendingAction = useDJStore((s) => s.decks[deckId].pendingAction);
   const otherDeckId = deckId === 'A' ? 'B' : 'A';
   const thisBPM = useDJStore((s) => s.decks[deckId].effectiveBPM);
@@ -41,6 +42,10 @@ export const DeckTransport: React.FC<DeckTransportProps> = ({ deckId }) => {
   const handleCue = useCallback(() => {
     DJActions.cueDeck(deckId, cuePoint);
   }, [deckId, cuePoint]);
+
+  const handleKeyLock = useCallback(() => {
+    DJActions.setDeckKeyLock(deckId, !keyLockEnabled);
+  }, [deckId, keyLockEnabled]);
 
   const handleQuantizeCycle = useCallback(() => {
     const modes: QuantizeMode[] = ['off', 'beat', 'bar'];
@@ -134,6 +139,24 @@ export const DeckTransport: React.FC<DeckTransportProps> = ({ deckId }) => {
         {qMode === 'off' ? 'Q' : qMode === 'beat' ? 'Q:BT' : 'Q:BR'}
       </button>
 
+      {/* Key Lock (master tempo) — pitch fader drives tempo only when ON */}
+      <button
+        onClick={handleKeyLock}
+        className={`
+          flex items-center justify-center w-10 h-10 rounded-lg
+          border border-dark-border
+          active:translate-y-[1px]
+          transition-all duration-100
+          ${
+            keyLockEnabled
+              ? 'bg-amber-600/30 text-amber-300 border-amber-500/40'
+              : 'bg-dark-bgTertiary text-text-muted hover:bg-dark-bgHover hover:text-text-secondary'
+          }
+        `}
+        title={keyLockEnabled ? 'Key Lock ON — pitch slider changes tempo only' : 'Key Lock OFF — pitch and tempo coupled'}
+      >
+        <Lock size={14} />
+      </button>
     </div>
   );
 };

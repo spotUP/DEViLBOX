@@ -10,6 +10,7 @@ import { useTrackerStore, useCursorStore, useTransportStore, useThemeStore, useI
 import { useWasmPositionStore } from '@stores/useWasmPositionStore';
 import { channelLayout } from './channelLayout';
 import { AutomationLanes } from './AutomationLanes';
+import { GlobalAutomationLane } from './GlobalAutomationLane';
 import { AutomationParameterPicker } from '../automation/AutomationParameterPicker';
 import { MacroLanes } from './MacroLanes';
 import { useUIStore } from '@stores/useUIStore';
@@ -2981,6 +2982,19 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
           >
             <div style={{ width: totalChannelsWidth, height: 1 }} />
           </div>
+
+          {/* Global automation lane — pattern-level curves for bus-wide dub
+              params (dub.echoWet etc.) and song-level globals (BPM, master
+              vol). Sits above the channel headers; hidden when automation
+              lanes are globally hidden or in format mode. */}
+          {showAutomationLanes && !hideAutoLanesProp && !isFormatMode && pattern && (
+            <GlobalAutomationLane
+              patternId={pattern.id}
+              patternLength={pattern.length}
+              rowHeight={rowHeight}
+              compact={true}
+            />
+          )}
 
           {isFormatMode && formatColumns && formatChannels ? (
             <div className="flex-shrink-0 bg-dark-bgTertiary border-b border-dark-border z-20">
