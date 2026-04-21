@@ -21,6 +21,7 @@ import { subscribeDubRouter, subscribeDubRelease } from './DubRouter';
 import { useDubStore, scheduleDubStoreSync } from '@/stores/useDubStore';
 import { useTrackerStore } from '@/stores/useTrackerStore';
 import { useAutomationStore } from '@/stores/useAutomationStore';
+import { useUIStore } from '@/stores/useUIStore';
 import type { DubEvent } from '@/types/dub';
 import { encodeDubEffect } from './moveTable';
 import { DUB_MOVE_KINDS } from '@/midi/performance/parameterRouter';
@@ -171,6 +172,10 @@ export function startDubRecorder(): () => void {
         autoStore.addPoint(curveId, fireEvent.row, 1);
         if (moveKind === 'trigger') {
           autoStore.addPoint(curveId, fireEvent.row + TRIGGER_SPIKE_WIDTH_ROWS, 0);
+        }
+        // Auto-show automation lanes so recorded curves are immediately visible
+        if (!useUIStore.getState().showAutomationLanes) {
+          useUIStore.getState().toggleAutomationLanes();
         }
       }
 
