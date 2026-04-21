@@ -78,6 +78,17 @@ describe('Export capture tap — routing contract', () => {
     });
   });
 
+  describe('Furnace worklet multi-chip gain staging', () => {
+    it('attenuates per-chip output by 1/chipCount to prevent summing overload', () => {
+      const worklet = readFileSync(resolve(ROOT, '../public/FurnaceChips.worklet.js'), 'utf8');
+      // Each chip must be scaled by chipGain (1/chipCount) before summing
+      expect(worklet).toMatch(/chipGain\s*=.*1\.0\s*\/\s*chipCount/);
+      // The summing loop must multiply by chipGain
+      expect(worklet).toMatch(/lView\[i\]\s*\*\s*chipGain/);
+      expect(worklet).toMatch(/rView\[i\]\s*\*\s*chipGain/);
+    });
+  });
+
   describe('DrumPadEngine routing', () => {
     const drumpad = read('engine/drumpad/DrumPadEngine.ts');
     const routing = read('hooks/drumpad/useMIDIPadRouting.ts');

@@ -237,7 +237,12 @@ class FurnaceChipsProcessor extends AudioWorkletProcessor {
     left.fill(0);
     right.fill(0);
 
-    // Render all active chips
+    // Render all active chips and sum with proper gain staging.
+    // Each chip outputs ±1.0 (16-bit / 32768 in FurnaceDispatchWrapper.cpp).
+    // Without attenuation, N chips peak at ±N.0 — e.g., 5 chips = ±5.0,
+    // causing catastrophic clipping at the DAC and destroyed exports.
+    const chipCount = this.activeChips.size;
+    const chipGain = chipCount > 1 ? 1.0 / chipCount : 1.0;
     for (const chipType of this.activeChips) {
       this.furnaceModule._furnace_chip_render(chipType, this.leftBufferPtr, this.rightBufferPtr, length);
 
@@ -255,8 +260,8 @@ class FurnaceChipsProcessor extends AudioWorkletProcessor {
       }
 
       for (let i = 0; i < length; i++) {
-        left[i] += this.lView[i];
-        right[i] += this.rView[i];
+        left[i] += this.lView[i] * chipGain;
+        right[i] += this.rView[i] * chipGain;
       }
     }
 
