@@ -1,11 +1,13 @@
 /**
  * DeckFXPads - Performance pads for one DJ deck
  *
- * Three pages, toggled by header tabs:
+ * Four pages, toggled by header tabs:
  *   FX Pads (2×4): HPF sweep, LPF sweep, Filter reset, Echo out, Kill Lo/Mid/Hi, Brake
  *   Beat Jump (2×4): ◄◄16, ◄◄4, ◄◄1, ◄1 | ►1, ►►1, ►►4, ►►16
- *   Dub Sends (2×4): springSlam, filterDrop, dubSiren, reverseEcho, tapeWobble,
- *                    echoThrow, delayTimeThrow, masterDrop
+ *   Dub 1 (2×4): springSlam, filterDrop, dubSiren, reverseEcho, tapeWobble,
+ *                echoThrow, delayTimeThrow, masterDrop
+ *   Dub 2 (2×4): dubStab, snareCrack, backwardReverb, tubbyScream,
+ *                oscBass, crushBass, echoBuildUp, tapeStop
  *
  * FX / dub-hold pads are momentary (hold) or toggle. Beat jump pads +
  * dub-trigger pads are instant. When quantize is active, FX effects snap
@@ -32,7 +34,7 @@ interface DeckFXPadsProps {
   deckId: 'A' | 'B' | 'C';
 }
 
-type PadPage = 'fx' | 'jump' | 'dub';
+type PadPage = 'fx' | 'jump' | 'dub' | 'dub2';
 
 interface PadDef {
   id: string;
@@ -80,7 +82,34 @@ const DUB_PAD_MAP: Record<string, string> = {
   'dub-throw':   'echoThrow',
   'dub-time':    'delayTimeThrow',
   'dub-master':  'masterDrop',
+  // Dub 2 page (added 2026-04-21) — second set of 8 moves for deep
+  // live-throw coverage. Moves that didn't make the main page are
+  // still reachable via drumpad kits / keyboard bindings / MIDI CC:
+  //   stereoDoubler, sonarPing, radioRiser, subSwell, subHarmonic,
+  //   delayPreset380, delayPresetDotted, toast, channelMute,
+  //   channelThrow, transportTapeStop
+  'dub2-stab':    'dubStab',
+  'dub2-crack':   'snareCrack',
+  'dub2-back':    'backwardReverb',
+  'dub2-scream':  'tubbyScream',
+  'dub2-bass':    'oscBass',
+  'dub2-crush':   'crushBass',
+  'dub2-build':   'echoBuildUp',
+  'dub2-tape':    'tapeStop',
 };
+
+// Second-page dub pads — stabs + reverse/tape moves + bass textures.
+// Complements DUB_PADS (throw/hold moves) with hits and drones.
+const DUB2_PADS: PadDef[] = [
+  { id: 'dub2-stab',   label: 'STAB',  sublabel: 'dub',      color: 'amber',  activeColor: 'red',    mode: 'instant' },
+  { id: 'dub2-crack',  label: 'CRACK', sublabel: 'snare',    color: 'rose',   activeColor: 'rose',   mode: 'instant' },
+  { id: 'dub2-back',   label: 'BACK',  sublabel: 'reverb',   color: 'violet', activeColor: 'violet', mode: 'instant' },
+  { id: 'dub2-scream', label: 'SCRM',  sublabel: 'tubby',    color: 'cyan',   activeColor: 'red',    mode: 'momentary' },
+  { id: 'dub2-bass',   label: 'BASS',  sublabel: 'drone',    color: 'orange', activeColor: 'orange', mode: 'momentary' },
+  { id: 'dub2-crush',  label: 'CRSH',  sublabel: 'bits',     color: 'gray',   activeColor: 'orange', mode: 'momentary' },
+  { id: 'dub2-build',  label: 'BILD',  sublabel: 'echo',     color: 'sky',    activeColor: 'sky',    mode: 'instant' },
+  { id: 'dub2-tape',   label: 'TAPE',  sublabel: 'stop',     color: 'teal',   activeColor: 'red',    mode: 'instant' },
+];
 
 const JUMP_PADS: PadDef[] = [
   { id: 'jump-back-16', label: '◄◄', sublabel: '16', color: 'indigo', activeColor: 'indigo', mode: 'instant' },
@@ -314,7 +343,11 @@ export const DeckFXPads: React.FC<DeckFXPadsProps> = ({ deckId }) => {
     return activePads.has(padId);
   };
 
-  const pads = page === 'fx' ? FX_PADS : page === 'jump' ? JUMP_PADS : DUB_PADS;
+  const pads =
+    page === 'fx'   ? FX_PADS   :
+    page === 'jump' ? JUMP_PADS :
+    page === 'dub'  ? DUB_PADS  :
+                      DUB2_PADS;
 
   return (
     <div className="flex flex-col gap-1">
@@ -347,9 +380,20 @@ export const DeckFXPads: React.FC<DeckFXPadsProps> = ({ deckId }) => {
               ? 'bg-amber-600/30 text-amber-300 border border-amber-500/40'
               : 'bg-dark-bgTertiary text-text-muted border border-dark-border hover:text-text-secondary'
           }`}
-          title="Dub bus sends — fire a dub move straight onto the bus"
+          title="Dub bus sends — throws, holds, drops, wobble, echo, siren"
         >
           DUB
+        </button>
+        <button
+          onClick={() => setPage('dub2')}
+          className={`px-2 py-0.5 rounded text-[8px] font-bold transition-colors ${
+            page === 'dub2'
+              ? 'bg-amber-600/30 text-amber-300 border border-amber-500/40'
+              : 'bg-dark-bgTertiary text-text-muted border border-dark-border hover:text-text-secondary'
+          }`}
+          title="Dub bus sends page 2 — stabs, reverse/tape, bass drones"
+        >
+          DUB 2
         </button>
         {page === 'jump' && hasBeatGrid && (
           <span className="text-[7px] text-green-400 ml-auto">● GRID</span>
