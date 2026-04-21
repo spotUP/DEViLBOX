@@ -259,11 +259,35 @@ export function audioBufferToWav(buffer: AudioBuffer): Blob {
     channelData.push(buffer.getChannelData(i));
   }
 
+  // Peak-normalize if the captured signal would otherwise clip.
+  // DEViLBOX's master chain is user-configurable — `masterChannel` is just
+  // volume/pan, no default limiter — so a hot mix can legitimately deliver
+  // peaks above ±1.0 into `blepInput` where the export tap sits. The old
+  // code did `Math.max(-1, Math.min(1, x))` which hard-clipped the tops off
+  // every wave crest (reported as "distorted audio" on 2026-04-21).
+  //
+  // Strategy: find the absolute peak across the whole buffer; if > 1.0 scale
+  // the entire buffer uniformly so the loudest sample lands at -0.3 dBFS.
+  // This is shape-preserving (relative dynamics between channels + samples
+  // are untouched) and only engages when needed — well-mixed songs within
+  // 0 dBFS roundtrip bit-exact.
+  let peak = 0;
+  for (let ch = 0; ch < numChannels; ch++) {
+    const data = channelData[ch];
+    for (let i = 0; i < samples; i++) {
+      const a = Math.abs(data[i]);
+      if (a > peak) peak = a;
+    }
+  }
+  const CEILING = 0.9661; // -0.3 dBFS
+  const scale = peak > 1.0 ? (CEILING / peak) : 1.0;
+
   let offset = 44;
   for (let i = 0; i < samples; i++) {
     for (let ch = 0; ch < numChannels; ch++) {
-      const sample = Math.max(-1, Math.min(1, channelData[ch][i]));
-      const intSample = sample < 0 ? sample * 0x8000 : sample * 0x7fff;
+      const scaled = channelData[ch][i] * scale;
+      const clamped = scaled < -1 ? -1 : (scaled > 1 ? 1 : scaled);
+      const intSample = clamped < 0 ? clamped * 0x8000 : clamped * 0x7fff;
       view.setInt16(offset, intSample, true);
       offset += 2;
     }
