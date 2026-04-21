@@ -3,6 +3,15 @@ import type { DubSirenConfig } from '@/types/instrument';
 import type { DevilboxSynth } from '@/types/synth';
 import { getDevilboxAudioContext, getNativeAudioNode, audioNow, noteToFrequency } from '@/utils/audio-context';
 
+// Safe frequency range for BiquadFilterNode — prevents unstable coefficients
+// that produce NaN/Infinity and poison the entire downstream audio graph.
+const MIN_FILTER_FREQ = 20;
+const MAX_FILTER_FREQ = 18000;
+
+function clampFilterFreq(hz: number): number {
+  return Math.max(MIN_FILTER_FREQ, Math.min(MAX_FILTER_FREQ, hz));
+}
+
 // Default config values for defensive initialization
 const DEFAULT_CONFIG: DubSirenConfig = {
   oscillator: { type: 'sine', frequency: 440 },
@@ -54,10 +63,14 @@ export class DubSirenSynth implements DevilboxSynth {
       wet: cfg.delay.enabled ? cfg.delay.wet : 0
     });
 
+    // Cap rolloff at -12 (single biquad). Steeper rolloffs (-24, -48, -96)
+    // cascade multiple BiquadFilterNodes which diverge under fast automation
+    // ("state is bad" error) and poison the entire downstream audio graph.
+    const safeRolloff = Math.max(-12, cfg.filter.rolloff) as Tone.FilterRollOff;
     this.filter = new Tone.Filter({
-      frequency: cfg.filter.frequency,
+      frequency: clampFilterFreq(cfg.filter.frequency),
       type: cfg.filter.type,
-      rolloff: cfg.filter.rolloff,
+      rolloff: safeRolloff,
       Q: 1
     });
 
@@ -143,7 +156,7 @@ export class DubSirenSynth implements DevilboxSynth {
 
     this.setFilterFreq(config.filter.frequency);
     this.filter.type = config.filter.type;
-    this.filter.rolloff = config.filter.rolloff;
+    this.filter.rolloff = Math.max(-12, config.filter.rolloff) as Tone.FilterRollOff;
 
     this.reverb.decay = config.reverb.decay;
     this.reverb.wet.rampTo(config.reverb.enabled ? config.reverb.wet : 0, 0.1);
@@ -272,7 +285,7 @@ export class DubSirenSynth implements DevilboxSynth {
   }
 
   setFilterFreq(hz: number) {
-    this.filter.frequency.rampTo(hz, 0.1);
+    this.filter.frequency.rampTo(clampFilterFreq(hz), 0.1);
   }
 
   dispose(): void {
