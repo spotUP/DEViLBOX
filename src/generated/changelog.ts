@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-04-19T18:50:12.258Z
+ * Generated: 2026-04-21T13:19:25.543Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,10 +19,10 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.5802';
-export const BUILD_NUMBER = '5802';
-export const BUILD_HASH = 'bc5eecac4';
-export const BUILD_DATE = '2026-04-19';
+export const BUILD_VERSION = '1.0.6005';
+export const BUILD_NUMBER = '6005';
+export const BUILD_HASH = '74ec3c310';
+export const BUILD_DATE = '2026-04-21';
 
 // Full version (patch IS the build number, so no need to append)
 export const FULL_VERSION = BUILD_VERSION;
@@ -30,204 +30,206 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.5802',
-    date: '2026-04-19',
+    version: '1.0.6005',
+    date: '2026-04-21',
+    changes: [
+      {
+        type: 'feature',
+        "description": "Extended Zxx encoding + global/hold → automation curves + 27-move picker"
+      },
+      {
+        type: 'feature',
+        "description": "SoundTouch WASM key-lock + dub fullscreen + export peak-limit"
+      },
+      {
+        type: 'feature',
+        "description": "Any-instrument promotion — bass/perc below dominance threshold"
+      },
+      {
+        type: 'feature',
+        "description": "DubRecorder writes Zxx cells inline + source=lane replay guard"
+      },
+      {
+        type: 'improvement',
+        "description": "Test(ui-smoke): flow 13 — role classification from real Modland dub MOD"
+      },
+      {
+        type: 'improvement',
+        "description": "Global FX lane chapter section + Zxx 36/37/38 correction"
+      },
+      {
+        type: 'feature',
+        "description": "Global FX lane — pattern-editor row above channels"
+      },
+      {
+        type: 'feature',
+        "description": "Runtime channel-tap role classifier — Phase 1"
+      },
+      {
+        type: 'feature',
+        "description": "Global (pattern-level) automation lane engine support"
+      },
+      {
+        type: 'fix',
+        "description": "Chore(dj): DUB 3/4 tab Nch suffix + scratch-action regression tests"
+      },
+      {
+        type: 'feature',
+        "description": "Expose dub.* as picker params — draw curves, edit, save"
+      },
+      {
+        type: 'fix',
+        "description": "Move Zxx effect commands off effTyp 33 — fine-porta collision"
+      },
+      {
+        type: 'feature',
+        "description": "Spectral sample classifier — instrument role from raw PCM"
+      },
+      {
+        type: 'fix',
+        "description": "Dub bus always starts off, even after persisted state"
+      },
+      {
+        type: 'improvement',
+        "description": "Dub Bus, Auto Dub & Auto-Name Channels chapter"
+      },
+      {
+        type: 'improvement',
+        "description": "Tune(dj): Auto-DJ deferral — proportional cap, short-fade skip, tighter chord window"
+      },
+      {
+        type: 'feature',
+        "description": "Zxx dub effect commands — inline dub moves in tracker cells"
+      },
+      {
+        type: 'feature',
+        "description": "Save Auto Dub + DubBusSettings so dubs survive reload"
+      },
+      {
+        type: 'feature',
+        "description": "Pattern-data awareness — look-ahead, density bias, rename boost, break deferral"
+      },
+      {
+        type: 'feature',
+        "description": "Per-session move blacklist"
+      },
+      {
+        type: 'feature',
+        "description": "Smart Cuts UI toggle in DJAutoDJPanel"
+      },
+      {
+        type: 'feature',
+        "description": "DubBusPanel — collapsible power-user section groups"
+      },
+      {
+        type: 'feature',
+        "description": "Smart Cuts wired end-to-end — drum-break cut, harmonic bass-swap, chord-change defer"
+      },
+      {
+        type: 'improvement',
+        "description": "Test(ui-smoke): flow 12 — Auto Dub CI regression lock"
+      },
+      {
+        type: 'feature',
+        "description": "DUB 4 reflects armed fx-target channels in pad sublabels"
+      },
+      {
+        type: 'feature',
+        "description": "Persona audition button — hear the character without enabling"
+      },
+      {
+        type: 'fix',
+        "description": "AutoDub polish — biquad stability + voice preset separation"
+      },
+      {
+        type: 'feature',
+        "description": "Auto-Name Channels + Auto Dub tuning fixes"
+      },
+      {
+        type: 'feature',
+        "description": "Full UI coverage — all 27 moves + all bus settings"
+      },
+      {
+        type: 'feature',
+        "description": "Per-channel EQ + filter via fxRouteGain + Tone.js chains"
+      },
+      {
+        type: 'feature',
+        "description": "Per-deck channel taps — audio layer for fxTargetChannels"
+      },
+      {
+        type: 'feature',
+        "description": "Per-channel FX targeting — MUTE/FX mode on scopes, per-channel DUB pads"
+      },
+      {
+        type: 'feature',
+        "description": "DUB 2 tab — 8 more dub moves on the deck FX pads"
+      },
+      {
+        type: 'feature',
+        "description": "Expose all ~12 bus-panel settings that were engine-only"
+      },
+      {
+        type: 'fix',
+        "description": "Test(sweep): DUB_PLATE_STAGE env + fix leak-check bus-disable gap"
+      },
+      {
+        type: 'improvement',
+        "description": "Test(dub): source-contract lockdown for plate-stage wiring invariants"
+      },
+      {
+        type: 'feature',
+        "description": "Expose plate-stage in DubBusPanel + engage from drumpad kits"
+      },
+      {
+        type: 'feature',
+        "description": "Auto Dub — autonomous performer with 5 persona voicings"
+      },
+      {
+        type: 'feature',
+        "description": "Optional plate-stage insert — Mad Professor / Dattorro on the bus"
+      },
+      {
+        type: 'improvement',
+        "description": "Test(ui-smoke): flow 10 — dub automation routing end-to-end"
+      },
+      {
+        type: 'improvement',
+        "description": "Test(dub): CC sweep — every dub.* move verified end-to-end via routeParameterToEngine"
+      },
+      {
+        type: 'fix',
+        "description": "Register DubBus with router at engine creation (not per-view)"
+      },
+      {
+        type: 'feature',
+        "description": "Test(dub): lock bassLock preset round-trip through addMasterEffectConfig"
+      }
+    ]
+  },
+  {
+    version: '2026-04-20',
+    date: '2026-04-20',
     changes: [
       {
         type: 'fix',
-        "description": "Ensure DrumPadEngine exists on tracker-view mount"
-      },
-      {
-        type: 'fix',
-        "description": "More distinct click-flash + fire setFlashedChannel on click"
-      },
-      {
-        type: 'improvement',
-        "description": "Re-apply SidMon1Replayer migration"
-      },
-      {
-        type: 'fix',
-        "description": "Replace 'selected channel' highlight with click-flash feedback"
+        "description": "ReverseEcho first-fire race — pre-warm capture + retry on empty ring"
       },
       {
         type: 'feature',
-        "description": "DJ-only 180 Hz HPF on deck taps (always kick-dodge for DJ)"
-      },
-      {
-        type: 'improvement',
-        "description": "Tweak(dub): lower default HPF cutoff 180 → 40 Hz"
-      },
-      {
-        type: 'fix',
-        "description": "Auto-apply default dubSend on tracker channels when bus enables"
+        "description": "Route dub.* curves through the shared dispatcher (#35)"
       },
       {
         type: 'feature',
-        "description": "Bind W to Echo Throw on the selected tracker channel"
+        "description": "Default CC routes for all 27 dub moves + bus params (#37)"
       },
       {
         type: 'feature',
-        "description": "DubDeckStrip + DubLaneTimeline rendered in TrackerView"
-      },
-      {
-        type: 'improvement',
-        "description": "Revert(engine): back out SidMon1Replayer migration, silence regression"
+        "description": "DUB tab on deck FX pads — 8 dub-move sends per deck"
       },
       {
         type: 'feature',
-        "description": "DubLanePlayer + wire into transport setCurrentRow"
-      },
-      {
-        type: 'feature',
-        "description": "DubRecorder + useTrackerStore.setPatternDubLane action"
-      },
-      {
-        type: 'improvement',
-        "description": "Rename DubEvent.beat → row (tracker-native)"
-      },
-      {
-        type: 'feature',
-        "description": "DubRouter — single fire() entry for all dub moves"
-      },
-      {
-        type: 'feature',
-        "description": "Echo Throw move — first tracker-dub move"
-      },
-      {
-        type: 'improvement',
-        "description": "Extract WASMSingletonBase, migrate 6 reference engines"
-      },
-      {
-        type: 'feature',
-        "description": "Tracker channel dubSend tap + DubBus openChannelTap/modulateFeedback"
-      },
-      {
-        type: 'feature',
-        "description": "UseDubStore — armed flag + rAF-batched write helper"
-      },
-      {
-        type: 'improvement',
-        "description": "Chore(persistence): bump SCHEMA_VERSION 19→20 for Pattern.dubLane"
-      },
-      {
-        type: 'feature',
-        "description": "Optional dubLane field on Pattern"
-      },
-      {
-        type: 'feature',
-        "description": "Add DubEvent, DubLane, QuantizeMode types for Phase 1"
-      },
-      {
-        type: 'improvement',
-        "description": "Chore: regenerate changelog"
-      },
-      {
-        type: 'improvement',
-        "description": "Chore(dj): remove SID playlist auto-repair — was spamming console for days"
-      },
-      {
-        type: 'fix',
-        "description": "Loading a sample clears any prior synth config"
-      },
-      {
-        type: 'feature',
-        "description": "Drag-and-drop audio files directly onto pads"
-      },
-      {
-        type: 'fix',
-        "description": "One friendly warn per broken instrument, not two stack-traces"
-      },
-      {
-        type: 'fix',
-        "description": "Cap bridge reconnect attempts at 5"
-      },
-      {
-        type: 'improvement',
-        "description": "Chore(dev): default local API port 3001 → 3011"
-      },
-      {
-        type: 'feature',
-        "description": "Auto-apply sound system on first bus enable"
-      },
-      {
-        type: 'fix',
-        "description": "Abort mini-drain when a new synth-pad tap attaches"
-      },
-      {
-        type: 'fix',
-        "description": "Scale mini-drain window to echo rate so buffer fully flushes"
-      },
-      {
-        type: 'fix',
-        "description": "Mini-drain bus when last synth-pad tap detaches"
-      },
-      {
-        type: 'fix',
-        "description": "Fade out synth-pad dub-bus tap on release so tails can decay"
-      },
-      {
-        type: 'feature',
-        "description": "Route synth pads through the dub bus via pad.dubSend"
-      },
-      {
-        type: 'fix',
-        "description": "Close DubBusPanel on click outside / Esc"
-      },
-      {
-        type: 'improvement',
-        "description": "Drop transition re-exports, migrate importers to @/types/dub"
-      },
-      {
-        type: 'improvement',
-        "description": "Move DubBusPanel to src/components/dub/"
-      },
-      {
-        type: 'improvement',
-        "description": "Extract DubBus from DrumPadEngine"
-      },
-      {
-        type: 'feature',
-        "description": "Test(dub): add pure-function regression floor for DubActions"
-      },
-      {
-        type: 'improvement',
-        "description": "Move DubActions to src/engine/dub/"
-      },
-      {
-        type: 'improvement',
-        "description": "Move DubSirenSynth to src/engine/dub/"
-      },
-      {
-        type: 'improvement',
-        "description": "Extract dub types to src/types/dub.ts"
-      },
-      {
-        type: 'improvement',
-        "description": "Chore: ignore .superpowers/ and drop tracked scheduler lockfile"
-      },
-      {
-        type: 'feature',
-        "description": "PAD master knob + Kill FX button in the manager header"
-      },
-      {
-        type: 'feature',
-        "description": "Mark tracks as played across view switches"
-      },
-      {
-        type: 'feature',
-        "description": "Auto DJ warns when playlist has missing analysis data"
-      },
-      {
-        type: 'fix',
-        "description": "Route XM/IT/S3M/modern-MOD analysis through the local pipeline"
-      },
-      {
-        type: 'feature',
-        "description": "Rewrite auto-gain — target -6 dB RMS, +9 dB fallback, no peak clamp"
-      },
-      {
-        type: 'feature',
-        "description": "Master volume ceiling 1.5 → 2.0, tighter limiter (-0.3 dBFS, hard knee)"
+        "description": "2 new dub kits tuned for Mad Professor + Dattorro plates"
       }
     ]
   }
