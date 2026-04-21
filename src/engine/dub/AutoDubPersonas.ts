@@ -140,13 +140,12 @@ export const AUTO_DUB_PERSONAS: Record<AutoDubPersonaId, AutoDubPersona> = {
   jammy: {
     id: 'jammy',
     label: 'Prince Jammy',
-    description: 'Minimalist digital. One move per bar, precise downbeats, crushBass + tapeStop phrase edges.',
+    description: 'Minimalist digital. One move per bar, precise downbeats, tapeStop phrase edges.',
     suggestedCharacterPreset: 'gatedFlanger',
     intensityDefault: 0.35,
     budgetCap: 1,
     weights: {
       tapeStop:    1.8,
-      crushBass:   1.6,
       filterDrop:  1.2,
       channelMute: 1.4,
       subHarmonic: 1.2,
