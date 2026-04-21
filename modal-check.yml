@@ -1,0 +1,28 @@
+- generic [ref=e4]:
+  - generic [ref=e6]:
+    - navigation [ref=e7]:
+      - generic [ref=e8]:
+        - heading "DEViLBOX" [level=1] [ref=e9]
+        - generic "bc5eecac4 • 2026-04-19" [ref=e10]: 1.0.5802
+        - button "Desktop App" [ref=e11] [cursor=pointer]
+        - button "Tips" [ref=e16] [cursor=pointer]
+        - button "Tour" [ref=e20] [cursor=pointer]
+      - generic [ref=e24]:
+        - button "Tracker ▾" [ref=e25] [cursor=pointer]
+        - button "Settings" [ref=e27] [cursor=pointer]
+        - button "Collab" [ref=e32] [cursor=pointer]
+        - button "Sign In" [ref=e40] [cursor=pointer]
+    - generic [ref=e45]:
+      - button "Untitled*" [ref=e4696] [cursor=pointer]:
+        - generic [ref=e48]: Untitled*
+      - button "New project tab" [ref=e49] [cursor=pointer]:
+        - img [ref=e50]
+  - main [ref=e51]:
+    - generic [ref=e52]:
+      - generic [ref=e56]:
+        - generic [ref=e58]
+        - generic [ref=e145]
+        - generic [ref=e187]
+      - generic [ref=e442]:
+        - generic [ref=e443]
+        - generic [ref=e456]: Audio Active

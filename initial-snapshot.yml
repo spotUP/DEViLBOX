@@ -1,0 +1,340 @@
+- generic [ref=e4]:
+  - generic [ref=e6]:
+    - navigation [ref=e7]:
+      - generic [ref=e8]:
+        - heading "DEViLBOX" [level=1] [ref=e9]
+        - generic "bc5eecac4 • 2026-04-19" [ref=e10]: 1.0.5802
+        - button "Desktop App" [ref=e11] [cursor=pointer]:
+          - img [ref=e12]
+          - generic [ref=e15]: Desktop App
+        - button "Tips" [ref=e16] [cursor=pointer]:
+          - img [ref=e17]
+          - generic [ref=e19]: Tips
+        - button "Tour" [ref=e20] [cursor=pointer]:
+          - img [ref=e21]
+          - generic [ref=e23]: Tour
+      - generic [ref=e24]:
+        - button "Tracker ▾" [ref=e25] [cursor=pointer]:
+          - generic "Switch view" [ref=e26]: Tracker ▾
+        - button "Settings" [ref=e27] [cursor=pointer]:
+          - img [ref=e28]
+          - generic [ref=e31]: Settings
+        - button "Collab" [ref=e32] [cursor=pointer]:
+          - img [ref=e33]
+          - generic [ref=e38]: Collab
+        - button "Sign In" [ref=e40] [cursor=pointer]:
+          - img [ref=e41]
+          - generic [ref=e44]: Sign In
+    - generic [ref=e45]:
+      - button "Untitled" [ref=e47] [cursor=pointer]:
+        - generic [ref=e48]: Untitled
+      - button "New project tab" [ref=e49] [cursor=pointer]:
+        - img [ref=e50]
+  - main [ref=e51]:
+    - generic [ref=e52]:
+      - generic [ref=e56]:
+        - generic [ref=e58]:
+          - generic [ref=e61]:
+            - generic [ref=e63]:
+              - generic [ref=e64]: "Position:"
+              - generic [ref=e65]: "000"
+              - generic [ref=e66]:
+                - button "▲" [ref=e67] [cursor=pointer]:
+                  - generic [ref=e68]: ▲
+                - button "▼" [ref=e69] [cursor=pointer]:
+                  - generic [ref=e70]: ▼
+            - generic [ref=e72]:
+              - generic [ref=e73]: "Pattern:"
+              - generic [ref=e74]: "000"
+              - generic [ref=e75]:
+                - button "▲" [ref=e76] [cursor=pointer]:
+                  - generic [ref=e77]: ▲
+                - button "▼" [ref=e78] [cursor=pointer]:
+                  - generic [ref=e79]: ▼
+            - generic "Right-click for presets" [ref=e81]:
+              - generic [ref=e82]: "Length:"
+              - generic [ref=e83]: "064"
+              - generic [ref=e84]:
+                - button "▲" [ref=e85] [cursor=pointer]:
+                  - generic [ref=e86]: ▲
+                - button "▼" [ref=e87] [cursor=pointer]:
+                  - generic [ref=e88]: ▼
+            - generic [ref=e90]:
+              - generic [ref=e91]: "Edit Step:"
+              - generic [ref=e92]: "001"
+              - generic [ref=e93]:
+                - button "▲" [ref=e94] [cursor=pointer]:
+                  - generic [ref=e95]: ▲
+                - button "▼" [ref=e96] [cursor=pointer]:
+                  - generic [ref=e97]: ▼
+            - generic [ref=e99]:
+              - generic [ref=e100]: "Speed:"
+              - generic [ref=e101]: "006"
+              - generic [ref=e102]:
+                - button "▲" [ref=e103] [cursor=pointer]:
+                  - generic [ref=e104]: ▲
+                - button "▼" [ref=e105] [cursor=pointer]:
+                  - generic [ref=e106]: ▼
+            - generic [ref=e108]:
+              - generic [ref=e109]: "BPM:"
+              - generic [ref=e110]: "125"
+              - generic [ref=e111]:
+                - button "▲" [ref=e112] [cursor=pointer]:
+                  - generic [ref=e113]: ▲
+                - button "▼" [ref=e114] [cursor=pointer]:
+                  - generic [ref=e115]: ▼
+            - generic [ref=e117]:
+              - generic [ref=e118]: "Song Len:"
+              - generic [ref=e119]: "001"
+              - generic [ref=e120]:
+                - button "▲" [ref=e121] [cursor=pointer]:
+                  - generic [ref=e122]: ▲
+                - button "▼" [ref=e123] [cursor=pointer]:
+                  - generic [ref=e124]: ▼
+          - generic [ref=e125]:
+            - button [ref=e126] [cursor=pointer]:
+              - img [ref=e127]
+            - button "Play Song" [ref=e128] [cursor=pointer]
+            - button "Play Pattern" [ref=e129] [cursor=pointer]
+            - button "Load" [ref=e130] [cursor=pointer]
+            - button "Save" [ref=e131] [cursor=pointer]
+            - button "Undo" [disabled] [ref=e132]
+            - button "Redo" [disabled] [ref=e133]
+            - button "MIDI" [ref=e135] [cursor=pointer]:
+              - img [ref=e137]
+              - generic [ref=e141]: MIDI
+            - button "Hardware" [ref=e142] [cursor=pointer]
+        - generic [ref=e145]:
+          - generic [ref=e146]:
+            - 'slider "Volume: 0 dB" [ref=e147] [cursor=pointer]': "0"
+            - generic [ref=e148]:
+              - img [ref=e149]
+              - button "SELECT HARDWARE... ▾" [ref=e152] [cursor=pointer]
+            - button "Toggle Fullscreen (F11)" [ref=e153] [cursor=pointer]:
+              - img [ref=e154]
+            - button "Tracker ▾" [ref=e159] [cursor=pointer]:
+              - generic [ref=e160]: Tracker ▾
+            - button "Master FX" [ref=e161] [cursor=pointer]
+            - button "Edit" [ref=e162] [cursor=pointer]:
+              - img [ref=e163]
+              - generic [ref=e165]: Edit
+            - button "Automation" [ref=e166] [cursor=pointer]:
+              - img [ref=e167]
+              - generic [ref=e169]: Automation
+            - button "Cleanup" [ref=e170] [cursor=pointer]:
+              - img [ref=e171]
+              - generic [ref=e174]: Cleanup
+            - button "Find" [ref=e175] [cursor=pointer]
+            - button "REC" [ref=e176] [cursor=pointer]: REC
+            - button "Mute" [ref=e178] [cursor=pointer]
+            - button "Groove" [ref=e179] [cursor=pointer]
+            - generic [ref=e181]: ALL RIGHT
+          - 'generic "Performance: HIGH | Avg FPS: 120 | Current: 120" [ref=e458]':
+            - generic [ref=e184]: "120"
+            - generic [ref=e185]: FPS
+        - generic [ref=e187]:
+          - generic [ref=e188]:
+            - generic [ref=e189]: SEQ
+            - button "00 00" [ref=e191] [cursor=pointer]:
+              - generic [ref=e192]: "00"
+              - generic [ref=e193]: "00"
+            - button "+" [ref=e194] [cursor=pointer]
+          - generic [ref=e195]:
+            - generic [ref=e196]:
+              - generic [ref=e200]:
+                - generic [ref=e201]: ROW
+                - generic [ref=e203]:
+                  - generic [ref=e204]:
+                    - generic [ref=e205]:
+                      - generic [ref=e206]: "01"
+                      - 'textbox "Click to rename channel (Short: 1)" [ref=e207]':
+                        - /placeholder: CH1
+                        - text: Channel 1
+                    - generic [ref=e208]:
+                      - button [ref=e209] [cursor=pointer]:
+                        - img [ref=e210]
+                      - button "Channel Color" [ref=e214] [cursor=pointer]:
+                        - img [ref=e215]
+                      - button "Mute" [ref=e221] [cursor=pointer]:
+                        - img [ref=e222]
+                      - button "Solo" [ref=e226] [cursor=pointer]:
+                        - img [ref=e227]
+                      - button "Collapse Channel" [ref=e229] [cursor=pointer]:
+                        - img [ref=e230]
+                  - generic [ref=e232]:
+                    - generic [ref=e233]:
+                      - generic [ref=e234]: "02"
+                      - 'textbox "Click to rename channel (Short: 2)" [ref=e235]':
+                        - /placeholder: CH2
+                        - text: Channel 2
+                    - generic [ref=e236]:
+                      - button [ref=e237] [cursor=pointer]:
+                        - img [ref=e238]
+                      - button "Channel Color" [ref=e242] [cursor=pointer]:
+                        - img [ref=e243]
+                      - button "Mute" [ref=e249] [cursor=pointer]:
+                        - img [ref=e250]
+                      - button "Solo" [ref=e254] [cursor=pointer]:
+                        - img [ref=e255]
+                      - button "Collapse Channel" [ref=e257] [cursor=pointer]:
+                        - img [ref=e258]
+                  - generic [ref=e260]:
+                    - generic [ref=e261]:
+                      - generic [ref=e262]: "03"
+                      - 'textbox "Click to rename channel (Short: 3)" [ref=e263]':
+                        - /placeholder: CH3
+                        - text: Channel 3
+                    - generic [ref=e264]:
+                      - button [ref=e265] [cursor=pointer]:
+                        - img [ref=e266]
+                      - button "Channel Color" [ref=e270] [cursor=pointer]:
+                        - img [ref=e271]
+                      - button "Mute" [ref=e277] [cursor=pointer]:
+                        - img [ref=e278]
+                      - button "Solo" [ref=e282] [cursor=pointer]:
+                        - img [ref=e283]
+                      - button "Collapse Channel" [ref=e285] [cursor=pointer]:
+                        - img [ref=e286]
+                  - generic [ref=e288]:
+                    - generic [ref=e289]:
+                      - generic [ref=e290]: "04"
+                      - 'textbox "Click to rename channel (Short: 4)" [ref=e291]':
+                        - /placeholder: CH4
+                        - text: Channel 4
+                    - generic [ref=e292]:
+                      - button [ref=e293] [cursor=pointer]:
+                        - img [ref=e294]
+                      - button "Channel Color" [ref=e298] [cursor=pointer]:
+                        - img [ref=e299]
+                      - button "Mute" [ref=e305] [cursor=pointer]:
+                        - img [ref=e306]
+                      - button "Solo" [ref=e310] [cursor=pointer]:
+                        - img [ref=e311]
+                      - button "Collapse Channel" [ref=e313] [cursor=pointer]:
+                        - img [ref=e314]
+                  - button "Add Channel" [ref=e316] [cursor=pointer]:
+                    - img [ref=e317]
+              - button "Fullscreen editor" [ref=e321] [cursor=pointer]:
+                - img [ref=e322]
+            - generic [ref=e327]:
+              - generic "Edit step — rows to advance after entering a note" [ref=e328]:
+                - generic [ref=e329]: Step
+                - generic [ref=e330]:
+                  - button [ref=e331] [cursor=pointer]:
+                    - img [ref=e332]
+                  - generic [ref=e334]: "1"
+                  - button [ref=e335] [cursor=pointer]:
+                    - img [ref=e336]
+              - generic "Base octave for note input" [ref=e339]:
+                - generic [ref=e340]: Oct
+                - generic [ref=e341]:
+                  - button [ref=e342] [cursor=pointer]:
+                    - img [ref=e343]
+                  - generic [ref=e345]: "4"
+                  - button [ref=e346] [cursor=pointer]:
+                    - img [ref=e347]
+              - generic [ref=e350]:
+                - generic [ref=e351]: Cols
+                - button "Not" [ref=e352] [cursor=pointer]
+                - button "Ins" [ref=e353] [cursor=pointer]
+                - button "Vol" [ref=e354] [cursor=pointer]
+                - button "Fx1" [ref=e355] [cursor=pointer]
+                - button "Fx2" [ref=e356] [cursor=pointer]
+                - button "Prb" [ref=e357] [cursor=pointer]
+              - generic [ref=e359]:
+                - button "Paste ▾" [ref=e360] [cursor=pointer]
+                - generic "Paste mask — toggle columns affected by paste" [ref=e361]:
+                  - button "N" [ref=e362] [cursor=pointer]
+                  - button "I" [ref=e363] [cursor=pointer]
+                  - button "V" [ref=e364] [cursor=pointer]
+                  - button "E" [ref=e365] [cursor=pointer]
+                  - button "E2" [ref=e366] [cursor=pointer]
+            - generic [ref=e368]:
+              - button "DUB DECK ▸" [ref=e369] [cursor=pointer]
+              - button "Bus ON" [ref=e370] [cursor=pointer]
+              - button "● REC off" [ref=e371] [cursor=pointer]
+              - generic [ref=e372]: VOICE
+              - combobox "Engineer character preset — loads EQ curve + spring + echo + tape saturator values tuned to that engineer's signature. See research at thoughts/shared/research/2026-04-20_dub-sound-coloring.md" [ref=e373]:
+                - option "Custom" [selected]
+                - option "King Tubby"
+                - option "Scientist"
+                - option "Lee Perry"
+                - option "Mad Professor"
+                - option "Gated Flanger"
+              - button "A/B" [disabled] [ref=e374]
+              - generic [ref=e375]:
+                - button "AUTO DUB OFF" [ref=e376] [cursor=pointer]
+                - combobox "Flat weights, no bias. User-tuned." [disabled] [ref=e377]:
+                  - option "Custom" [selected]
+                  - option "King Tubby"
+                  - option "Scientist"
+                  - option "Lee \"Scratch\" Perry"
+                  - option "Mad Professor"
+                  - option "Prince Jammy"
+                - generic [ref=e378]:
+                  - generic [ref=e379]: INT
+                  - 'slider "Intensity: 50% — scales roll probability, per-bar move budget, and wet params together" [disabled] [ref=e380] [cursor=pointer]': "0.5"
+                  - generic [ref=e381]: "50"
+              - button "GHOST OFF" [ref=e382] [cursor=pointer]
+              - button "CHORUS" [ref=e383] [cursor=pointer]
+              - button "CLUB" [ref=e384] [cursor=pointer]
+              - button "DLY→VRB" [ref=e385] [cursor=pointer]
+              - generic [ref=e386]:
+                - generic [ref=e387]: JA
+                - 'slider "JA Press: 0.0 / 10 — vinyl wear (surface noise, clicks, wow/flutter, HF roll-off, rumble, L/R drift). 0 = factory new, 10 = gutter-scraped Jamaican 7-inch." [ref=e388] [cursor=pointer]': "0"
+                - generic [ref=e389]: "0.0"
+              - generic [ref=e390]: 0 events on this pattern
+              - button "KILL" [ref=e391] [cursor=pointer]
+          - generic "Click to jump to row" [ref=e393] [cursor=pointer]:
+            - img "Pattern density minimap" [ref=e394]
+          - generic [ref=e397]:
+            - generic [ref=e398]: Pitch
+            - generic "Double-click or right-click to reset" [ref=e399] [cursor=pointer]: "0.0"
+            - generic [ref=e400]:
+              - generic:
+                - generic:
+                  - generic: "+16"
+                - generic:
+                  - generic: "+8"
+                - generic:
+                  - generic: "+4"
+                - generic:
+                  - generic: "0"
+                - generic:
+                  - generic: "-4"
+                - generic:
+                  - generic: "-8"
+                - generic:
+                  - generic: "-16"
+          - button "Hide Instruments" [ref=e403] [cursor=pointer]:
+            - img [ref=e404]
+          - generic [ref=e408]:
+            - generic [ref=e410]:
+              - button "ADD" [ref=e411] [cursor=pointer]:
+                - img [ref=e412]
+                - generic [ref=e413]: ADD
+              - button "PRESET" [ref=e414] [cursor=pointer]:
+                - img [ref=e415]
+                - generic [ref=e417]: PRESET
+              - button "SAMPLE" [ref=e418] [cursor=pointer]:
+                - img [ref=e419]
+                - generic [ref=e423]: SAMPLE
+              - button "EDIT" [ref=e424] [cursor=pointer]:
+                - img [ref=e425]
+                - generic [ref=e428]: EDIT
+              - button "SVX" [ref=e429] [cursor=pointer]:
+                - img [ref=e430]
+                - generic [ref=e433]: SVX
+              - button "CHIP" [ref=e434] [cursor=pointer]:
+                - img [ref=e435]
+                - generic [ref=e438]: CHIP
+            - generic [ref=e440]: 0 instruments
+      - generic [ref=e442]:
+        - generic [ref=e443]:
+          - generic [ref=e444]: Row 00/63
+          - generic [ref=e446]: Ch 1
+          - generic [ref=e448]: note
+          - generic [ref=e450]: Oct 4
+          - 'generic "Overwrite mode: new data replaces existing" [ref=e452]': "Mode: OVR"
+          - generic [ref=e454]: EDIT
+        - generic [ref=e456]: Audio Active

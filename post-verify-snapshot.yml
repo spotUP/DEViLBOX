@@ -1,0 +1,12 @@
+- generic [ref=e4]:
+  - generic [ref=e6]:
+    - navigation [ref=e7]:
+      - generic [ref=e8]
+      - generic [ref=e24]
+    - generic [ref=e45]:
+      - button "Untitled" [ref=e47] [cursor=pointer]
+      - button "New project tab" [ref=e49] [cursor=pointer]
+  - main [ref=e51]:
+    - generic [ref=e52]:
+      - generic [ref=e56]
+      - generic [ref=e442]
