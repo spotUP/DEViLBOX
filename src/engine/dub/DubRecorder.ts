@@ -150,20 +150,11 @@ export function startDubRecorder(): () => void {
         );
       }
 
-      // Global moves (no channel) and hold-kind moves (any channel) → write
-      // to an automation curve on the Global FX lane. A single cell can't
-      // represent a hold's duration; global moves don't fit a channel
-      // column. Curves are the canonical home for both.
-      //
-      // Encoding:
-      //   - trigger (global): spike 0→1 at fireRow, fall to 0 a hair later.
-      //     AutomationPlayer's upward-edge detection re-fires the move on
-      //     replay via routeParameterToEngine → DubRouter.fire.
-      //   - hold (global or per-channel): rise to 1 at fireRow; the release
-      //     handler writes the fall-to-0 at releaseRow. Edge detection
-      //     triggers fire on rise and release on fall.
-      const needsCurve = moveKind !== undefined
-        && (fireEvent.channelId === undefined || moveKind === 'hold');
+      // Write automation curve for ALL move types so automation lanes
+      // show a visual representation of dub activity. Previously only
+      // global and hold moves created curves; per-channel triggers were
+      // cell-only and invisible in the automation lanes overlay.
+      const needsCurve = moveKind !== undefined;
       let curveId: string | undefined;
       if (needsCurve && moveKind) {
         const paramKey = paramKeyForMove(fireEvent.moveId, fireEvent.channelId);
