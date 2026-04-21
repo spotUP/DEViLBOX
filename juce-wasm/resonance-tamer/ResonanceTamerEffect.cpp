@@ -66,21 +66,38 @@ public:
         avgMag_.assign(NUM_BINS, 1e-6f);
         // Per-bin smoothed gain-reduction state (0 dB = 1.0 = no cut).
         binGain_.assign(NUM_BINS, 1.0f);
-        spectrumRe_.resize(NUM_BINS * 2);   // kiss_fftr complex: [re,im,re,im,...]
-        spectrumIm_.resize(NUM_BINS * 2);
-        fftIn_.resize(FFT_SIZE);
-        fftOutR_.resize(NUM_BINS);
-        fftOutI_.resize(NUM_BINS);
-        ifftOut_.resize(FFT_SIZE);
+        // Pre-allocate every scratch buffer once. Allocating inside the
+        // audio callback (`std::vector` constructors in processFrame) was
+        // the stutter cause: ~240 allocations per second on the real-time
+        // thread trigger scheduler hiccups audible as rhythmic dropouts.
+        midSpecBuf_.resize(NUM_BINS);
+        lrSpecBuf_.resize(NUM_BINS);
+        magBuf_.resize(NUM_BINS);
+        targetGainBuf_.resize(NUM_BINS);
+        smoothedGainBuf_.resize(NUM_BINS);
         synthWin_.resize(FFT_SIZE);
+        ifftOut_.resize(FFT_SIZE);
         processed_.resize(FFT_SIZE);
+        // Pre-size per-block I/O buffers to WASMEffectBase's documented
+        // max block (DEFAULT_BLOCK_SIZE * 4 = 512). Avoids any runtime
+        // resize on the real-time audio thread.
+        const size_t MAX_BLOCK = static_cast<size_t>(DEFAULT_BLOCK_SIZE * 4);
+        midIn_.resize(MAX_BLOCK);
+        procL_.resize(MAX_BLOCK);
+        procR_.resize(MAX_BLOCK);
+        midDrain_.resize(MAX_BLOCK);
 
-        const float* hann = STFT::window();
-        // Synthesis window = analysis window (perfect Hann OLA at hop 1024 → scale 0.5).
-        // The extra 1/FFT_SIZE compensates kiss_fftr's unnormalised inverse.
+        // Synthesis window: rectangular (value = 1/FFT_SIZE for kiss_fftr's
+        // un-normalised inverse). The analysis side is Hann (applied in
+        // STFT::pullFrame); using Hann on synthesis too means the combined
+        // window is Hann², which at 50% overlap sums to a varying value
+        // between ~0.125 and ~1.0 and introduces a ~47 Hz amplitude
+        // modulation audible as rhythmic stuttering. Hann-analysis +
+        // rectangular-synthesis is the standard perfect-reconstruction
+        // pairing at 50% overlap and the stutter goes away.
         const float synthScale = 1.0f / static_cast<float>(FFT_SIZE);
         for (size_t i = 0; i < FFT_SIZE; ++i) {
-            synthWin_[i] = hann[i] * synthScale;
+            synthWin_[i] = synthScale;
         }
 
         for (int i = 0; i < PARAM_COUNT; ++i) params_[i] = PARAM_DEFS[i];
@@ -122,8 +139,8 @@ public:
         // while applying the computed gain to each channel independently.
         // This matches what Soothe does: detect on summed, process on each.
 
-        // Mix to mid for the analysis side only.
-        midIn_.resize(numSamples);
+        // Mix to mid for the analysis side only. midIn_ is pre-sized to
+        // MAX_BLOCK; we only touch the first `numSamples` entries.
         for (int i = 0; i < numSamples; ++i) {
             midIn_[i] = 0.5f * (inL[i] + inR[i]);
         }
@@ -149,14 +166,11 @@ public:
             processFrame(midFrame, lFrame, rFrame);
         }
 
-        // Pop the processed frames out.
-        procL_.resize(numSamples);
-        procR_.resize(numSamples);
+        // Pop the processed frames out. All three buffers pre-sized in ctor.
         leftSTFT_.pop(procL_.data(), numSamples);
         rightSTFT_.pop(procR_.data(), numSamples);
         // Drain the mid STFT so it stays aligned with L/R (we don't use
         // its output, but its ring buffer must advance).
-        midDrain_.resize(numSamples);
         analysisSTFT_.pop(midDrain_.data(), numSamples);
 
         // Dry/wet mix.
@@ -192,20 +206,23 @@ private:
     STFT leftSTFT_;
     STFT rightSTFT_;
 
-    std::vector<float>         avgMag_;     // per-bin long-time EMA (NUM_BINS)
-    std::vector<float>         binGain_;    // per-bin smoothed gain (NUM_BINS)
-    std::vector<kiss_fft_cpx>  spectrumRe_; // scratch complex spectrum
-    std::vector<kiss_fft_cpx>  spectrumIm_;
-    std::vector<float>         fftIn_;
-    std::vector<float>         fftOutR_;
-    std::vector<float>         fftOutI_;
-    std::vector<float>         ifftOut_;
-    std::vector<float>         synthWin_;
-    std::vector<float>         processed_;
-    std::vector<float>         midIn_;
-    std::vector<float>         procL_;
-    std::vector<float>         procR_;
-    std::vector<float>         midDrain_;
+    // All buffers pre-allocated in the constructor / initialize() so the
+    // audio callback never triggers heap allocation. Vectors that vary
+    // with numSamples (blockwise) are sized to MAX_BLOCK once and reused.
+    std::vector<float>         avgMag_;          // per-bin long-time EMA (NUM_BINS)
+    std::vector<float>         binGain_;         // per-bin smoothed gain (NUM_BINS)
+    std::vector<kiss_fft_cpx>  midSpecBuf_;      // analysis FFT output
+    std::vector<kiss_fft_cpx>  lrSpecBuf_;       // L/R per-bin scaled FFT
+    std::vector<float>         magBuf_;          // per-bin instant magnitude
+    std::vector<float>         targetGainBuf_;   // per-bin target gain before smoothing
+    std::vector<float>         smoothedGainBuf_; // after 3/5-tap box filter
+    std::vector<float>         ifftOut_;         // IFFT time-domain output
+    std::vector<float>         synthWin_;        // 1/FFT_SIZE scalar table
+    std::vector<float>         processed_;       // synthesis-windowed frame → commit
+    std::vector<float>         midIn_;           // per-block stereo-to-mid buffer
+    std::vector<float>         procL_;           // per-block L output pop
+    std::vector<float>         procR_;           // per-block R output pop
+    std::vector<float>         midDrain_;        // per-block mid drain (discarded)
 
     float params_[PARAM_COUNT];
     float avgAlpha_     = 0.01f;
@@ -213,60 +230,48 @@ private:
     float releaseAlpha_ = 0.03f;
 
     void processFrame(const float* midFrame, const float* lFrame, const float* rFrame) {
-        // 1) Analysis FFT on the mid frame to get detection spectrum.
-        // kiss_fftr expects already-windowed real input; midFrame is
-        // pre-windowed by STFT::pullFrame (multiplied by Hann).
-        std::vector<kiss_fft_cpx> midSpec(NUM_BINS);
-        kiss_fftr(fftCfg_, midFrame, midSpec.data());
+        // 1) Analysis FFT on the mid frame (already Hann-windowed by pullFrame).
+        kiss_fftr(fftCfg_, midFrame, midSpecBuf_.data());
 
         // 2) Compute magnitudes and update per-bin long-time average.
-        std::vector<float> mag(NUM_BINS);
         for (size_t i = 0; i < NUM_BINS; ++i) {
-            const float re = midSpec[i].r;
-            const float im = midSpec[i].i;
-            mag[i] = std::sqrt(re * re + im * im);
-            avgMag_[i] = avgMag_[i] + avgAlpha_ * (mag[i] - avgMag_[i]);
+            const float re = midSpecBuf_[i].r;
+            const float im = midSpecBuf_[i].i;
+            magBuf_[i] = std::sqrt(re * re + im * im);
+            avgMag_[i] = avgMag_[i] + avgAlpha_ * (magBuf_[i] - avgMag_[i]);
         }
 
         // 3) Compute per-bin target gain reduction.
         const float amount = params_[PARAM_AMOUNT];
-        // Threshold mapping: Amount=0 → 12 dB above average triggers (never);
-        //                    Amount=1 → 0 dB above average triggers (any
-        //                                bin sticking out at all).
+        // Amount=0 → threshold 12 dB above avg (never triggers);
+        // Amount=1 → threshold 0 dB above avg (any peak triggers).
         const float thresholdRatio = std::pow(10.0f, (12.0f * (1.0f - amount)) / 20.0f);
-        // Max cut in dB: Amount=0 → 0 dB (no cut),
-        //                Amount=1 → 12 dB (aggressive).
+        // Amount=0 → 0 dB max cut; Amount=1 → 12 dB.
         const float maxCutDb = 12.0f * amount;
         const float minGain  = std::pow(10.0f, -maxCutDb / 20.0f);
 
-        // Character: Warm widens the smoothing; Bright gates low freqs.
         const int character = static_cast<int>(params_[PARAM_CHARACTER] * 2.999f); // 0..2
-        const float sampleRate = static_cast<float>(sampleRate_);
-        const float hzPerBin = sampleRate / static_cast<float>(FFT_SIZE);
-        const int brightMinBin = (character == 2) // Bright: only above 3 kHz
+        const float hzPerBin = static_cast<float>(sampleRate_) / static_cast<float>(FFT_SIZE);
+        const int brightMinBin = (character == 2)
             ? static_cast<int>(3000.0f / hzPerBin)
             : 0;
-        const int smoothWidth = (character == 1) ? 5 : 3; // Warm: wider smoothing
+        const int smoothWidth = (character == 1) ? 5 : 3;
 
-        std::vector<float> targetGain(NUM_BINS, 1.0f);
-        for (size_t i = 1; i < NUM_BINS - 1; ++i) {  // skip DC and Nyquist
-            if (static_cast<int>(i) < brightMinBin) {
-                targetGain[i] = 1.0f;
-                continue;
-            }
+        // Reset target buffer to unity; the loop below only writes the
+        // bins that should be cut. (No std::fill allocation — `assign`
+        // would reallocate if capacity shrank; we want the in-place fill.)
+        for (size_t i = 0; i < NUM_BINS; ++i) targetGainBuf_[i] = 1.0f;
+        for (size_t i = 1; i < NUM_BINS - 1; ++i) {
+            if (static_cast<int>(i) < brightMinBin) continue;
             const float floor = avgMag_[i] * thresholdRatio;
-            if (mag[i] > floor && avgMag_[i] > 1e-5f) {
-                // Gain reduction proportional to how much it sticks out,
-                // clamped to minGain. Using inverse ratio so slight peaks
-                // get gentle cuts and big spikes get harder cuts.
-                const float excessRatio = mag[i] / floor;  // >= 1
+            if (magBuf_[i] > floor && avgMag_[i] > 1e-5f) {
+                const float excessRatio = magBuf_[i] / floor;
                 const float gain = 1.0f / (1.0f + (excessRatio - 1.0f) * 0.5f);
-                targetGain[i] = std::max(gain, minGain);
+                targetGainBuf_[i] = std::max(gain, minGain);
             }
         }
 
-        // 4) Smooth target gain across adjacent bins (box filter).
-        std::vector<float> smoothed(NUM_BINS, 1.0f);
+        // 4) Smooth across adjacent bins.
         const int half = smoothWidth / 2;
         for (size_t i = 0; i < NUM_BINS; ++i) {
             float sum = 0.0f;
@@ -274,37 +279,34 @@ private:
             for (int d = -half; d <= half; ++d) {
                 const int idx = static_cast<int>(i) + d;
                 if (idx < 0 || idx >= static_cast<int>(NUM_BINS)) continue;
-                sum += targetGain[idx];
+                sum += targetGainBuf_[idx];
                 ++count;
             }
-            smoothed[i] = (count > 0) ? (sum / count) : 1.0f;
+            smoothedGainBuf_[i] = (count > 0) ? (sum / count) : 1.0f;
         }
 
-        // 5) Per-bin attack/release envelope — move binGain_ toward target.
+        // 5) Per-bin attack/release envelope.
         for (size_t i = 0; i < NUM_BINS; ++i) {
-            const float target = smoothed[i];
+            const float target = smoothedGainBuf_[i];
             const float alpha = (target < binGain_[i]) ? attackAlpha_ : releaseAlpha_;
             binGain_[i] += alpha * (target - binGain_[i]);
         }
 
-        // 6) Apply gains to L and R independently (frame-by-frame),
-        //    then IFFT and synthesis-window + OLA.
+        // 6) Apply gains to L and R independently → IFFT + OLA commit.
         applyGainAndSynth(lFrame, &leftSTFT_);
         applyGainAndSynth(rFrame, &rightSTFT_);
     }
 
     void applyGainAndSynth(const float* frame, STFT* outSTFT) {
-        std::vector<kiss_fft_cpx> spec(NUM_BINS);
-        kiss_fftr(fftCfg_, frame, spec.data());
-
+        kiss_fftr(fftCfg_, frame, lrSpecBuf_.data());
         for (size_t i = 0; i < NUM_BINS; ++i) {
-            spec[i].r *= binGain_[i];
-            spec[i].i *= binGain_[i];
+            lrSpecBuf_[i].r *= binGain_[i];
+            lrSpecBuf_[i].i *= binGain_[i];
         }
-
-        kiss_fftri(ifftCfg_, spec.data(), ifftOut_.data());
-
-        // Synthesis-window the IFFT output (Hann · 1/N) before OLA.
+        kiss_fftri(ifftCfg_, lrSpecBuf_.data(), ifftOut_.data());
+        // Synthesis-window: 1/FFT_SIZE scalar (rectangular; Hann is already
+        // applied on analysis — double-Hann caused ~47 Hz amplitude
+        // modulation earlier, see synthWin_ init).
         for (size_t i = 0; i < FFT_SIZE; ++i) {
             processed_[i] = ifftOut_[i] * synthWin_[i];
         }

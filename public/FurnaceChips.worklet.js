@@ -260,6 +260,19 @@ class FurnaceChipsProcessor extends AudioWorkletProcessor {
       }
     }
 
+    // Scale output when multiple chips are summed to prevent clipping.
+    // Each chip's output is normalized to [-1, 1], so N chips summed raw
+    // can produce peaks of [-N, N].  Dividing by N keeps the output within
+    // [-1, 1] in the worst case.
+    const chipCount = this.activeChips.size;
+    if (chipCount > 1) {
+      const scale = 1.0 / chipCount;
+      for (let i = 0; i < length; i++) {
+        left[i] *= scale;
+        right[i] *= scale;
+      }
+    }
+
     return true;
   }
 }

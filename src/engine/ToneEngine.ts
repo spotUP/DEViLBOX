@@ -163,8 +163,8 @@ export class ToneEngine {
   private static itFilterWorkletPromise: Promise<void> | null = null; // Promise for ITFilter loading
 
   // Master routing chain (AmigaFilter bypassed — players have their own):
-  // - Tracker instruments → masterInput → masterEffectsInput → [master fx?] → blepInput → [BLEP?] → masterChannel → destination
-  // - DevilboxSynths → synthBus ────────→ masterEffectsInput → [master fx?] → blepInput → [BLEP?] → masterChannel → destination
+  // - Tracker instruments → masterInput → masterEffectsInput → [master fx?] → blepInput → [BLEP?] → safetyLimiter → masterChannel → destination
+  // - DevilboxSynths → synthBus ────────→ masterEffectsInput → [master fx?] → blepInput → [BLEP?] → safetyLimiter → masterChannel → destination
   public masterInput: Tone.Gain; // Where tracker instruments connect
   public synthBus: Tone.Gain; // Bypass bus for DevilboxSynths
   private synthBusMeter: Tone.Meter; // Level meter on synthBus for WASM engine metering
@@ -172,6 +172,7 @@ export class ToneEngine {
   private pitchResamplerNode: AudioWorkletNode | null = null; // Pitch resampler for WASM engines
   public masterEffectsInput: Tone.Gain; // Merge point for master effects (both paths feed in here)
   public blepInput: Tone.Gain; // BLEP insertion point — isolates BLEP routing from effects chain rebuilds
+  private safetyLimiter: Tone.Compressor; // Brickwall safety limiter — prevents DAC clipping
   public masterChannel: Tone.Channel; // Final output with volume/pan
   public analyser: Tone.Analyser;
   // FFT for frequency visualization
@@ -381,9 +382,22 @@ export class ToneEngine {
     // Master effects merge point — both tracker and synth audio meet here
     this.masterEffectsInput = new Tone.Gain(1);
 
-    // BLEP insertion point — sits between effects chain end and masterChannel.
+    // BLEP insertion point — sits between effects chain end and safetyLimiter.
     // This node is never disconnected by rebuildMasterEffects, so BLEP routing stays stable.
     this.blepInput = new Tone.Gain(1);
+
+    // Safety limiter — transparent brickwall that only engages when peaks
+    // approach 0 dBFS.  Without this, hot mixes clip at the DAC/screen-recorder
+    // and exported WAVs hard-clip.  The compressor is configured as a near-
+    // infinite-ratio limiter with a hard knee so it's inaudible on well-mixed
+    // material and only catches transient peaks.
+    this.safetyLimiter = new Tone.Compressor({
+      threshold: -3,   // start limiting 3 dB below 0 dBFS
+      ratio: 20,       // near-brickwall
+      attack: 0.001,   // 1 ms — catch fast transients
+      release: 0.05,   // 50 ms — fast release to stay transparent
+      knee: 1,         // 1 dB soft knee — smoother onset
+    });
 
     // Register sidechain resolver so wireMasterSidechain can access channel outputs
     // without a circular dynamic import (this module imports MasterEffectsChain)
@@ -393,12 +407,13 @@ export class ToneEngine {
       () => this.blepInput,
     );
 
-    // Default routing (clean passthrough — no limiter, no filter):
-    //   masterInput → masterEffectsInput → blepInput → masterChannel
-    //   synthBus ──→ masterEffectsInput → blepInput → masterChannel
+    // Default routing:
+    //   masterInput → masterEffectsInput → blepInput → safetyLimiter → masterChannel
+    //   synthBus ──→ masterEffectsInput → blepInput → safetyLimiter → masterChannel
     this.masterInput.connect(this.masterEffectsInput);
     this.masterEffectsInput.connect(this.blepInput);
-    this.blepInput.connect(this.masterChannel);
+    this.blepInput.connect(this.safetyLimiter);
+    this.safetyLimiter.connect(this.masterChannel);
 
     // Synth bus bypasses AmigaFilter for native synths (DB303, Vital, etc.)
     this.synthBus = new Tone.Gain(1);
@@ -830,19 +845,19 @@ export class ToneEngine {
 
   /**
    * Reconnect the BLEP audio chain based on current settings.
-   * Routes through: blepInput → [BLEP worklet?] → masterChannel
+   * Routes through: blepInput → [BLEP worklet?] → safetyLimiter → masterChannel
    * The blepInput node is never touched by rebuildMasterEffects, so this is stable.
    */
   private reconnectBlepChain(): void {
-    // Disconnect blepInput → masterChannel (and any native worklet connections)
+    // Disconnect blepInput → safetyLimiter (and any native worklet connections)
     try {
-      this.blepInput.disconnect(this.masterChannel);
+      this.blepInput.disconnect(this.safetyLimiter);
     } catch {
       // Ignore if not connected
     }
 
-    // Reconnect with or without BLEP
-    this.blepManager.connect(this.blepInput, this.masterChannel);
+    // Reconnect with or without BLEP — destination is safetyLimiter (not masterChannel)
+    this.blepManager.connect(this.blepInput, this.safetyLimiter);
   }
 
   /**

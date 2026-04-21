@@ -80,4 +80,58 @@ describe('Export capture tap — routing contract', () => {
       expect(drumpad).toMatch(/new DubBus\([^)]*this\.masterGain[^)]*\)/);
     });
   });
+
+  describe('Master bus safety limiter', () => {
+    const engine = read('engine/ToneEngine.ts');
+
+    it('has a safetyLimiter between blepInput and masterChannel', () => {
+      // Audio must pass through a compressor/limiter before reaching the
+      // masterChannel (DAC). Without this, peaks > 0 dBFS clip at the DAC
+      // and distort screen recordings / live output.
+      expect(engine).toMatch(/safetyLimiter.*Compressor/);
+      expect(engine).toMatch(/blepInput\.connect\(this\.safetyLimiter\)/);
+      expect(engine).toMatch(/safetyLimiter\.connect\(this\.masterChannel\)/);
+    });
+
+    it('blepInput no longer connects directly to masterChannel', () => {
+      // The old direct connection bypassed the limiter. Any remaining
+      // blepInput → masterChannel link would double-route audio.
+      expect(engine).not.toMatch(/blepInput\.connect\(this\.masterChannel\)/);
+    });
+
+    it('BLEP chain routes through safetyLimiter, not masterChannel', () => {
+      // reconnectBlepChain must use safetyLimiter as the BLEP destination
+      // so the limiter stays in the signal path even when BLEP is active.
+      expect(engine).toMatch(/blepInput\.disconnect\(this\.safetyLimiter\)/);
+      expect(engine).toMatch(/blepManager\.connect\(this\.blepInput,\s*this\.safetyLimiter\)/);
+    });
+  });
+
+  describe('Export peak normalization', () => {
+    const exportSrc = read('lib/export/audioExport.ts');
+
+    it('normalizes peaks above 1.0 instead of hard-clipping', () => {
+      // The old code did Math.max(-1, Math.min(1, x)) which hard-clipped
+      // every sample — extremely distorted output. The fix scales the entire
+      // buffer uniformly so peaks land at -0.3 dBFS.
+      expect(exportSrc).toMatch(/peak\s*>\s*1\.0/);
+      expect(exportSrc).toMatch(/CEILING\s*\/\s*peak/);
+    });
+
+    it('does not hard-clip raw samples', () => {
+      // Ensure we're not doing Math.max(-1, Math.min(1, channelData[ch][i]))
+      // on the raw (unscaled) channel data. That was the bug.
+      expect(exportSrc).not.toMatch(/Math\.max\(-1,\s*Math\.min\(1,\s*channelData/);
+    });
+  });
+
+  describe('Furnace worklet multi-chip scaling', () => {
+    const worklet = readFileSync(resolve(ROOT, '../../public/FurnaceChips.worklet.js'), 'utf8');
+
+    it('scales output when multiple chips are active', () => {
+      // Without scaling, N active chips produce peaks of [-N, N].
+      expect(worklet).toMatch(/chipCount.*activeChips\.size/);
+      expect(worklet).toMatch(/1\.0\s*\/\s*chipCount/);
+    });
+  });
 });

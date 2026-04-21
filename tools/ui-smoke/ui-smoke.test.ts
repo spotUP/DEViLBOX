@@ -221,15 +221,7 @@ describe('ui-smoke — flow 07: DJ deck + crossfader sweep (both decks audible)'
   );
 });
 
-// TODO(2026-04-21): re-enable once the single-deck warm-reload baseline is
-// stable. Consistently fails at "pre-scratch baseline silent" despite manual
-// Playwright probes of the SAME scenario (loadDeck A → playDeck A → wait →
-// getAudioLevel) reporting rmsAvg ~0.08. The gap is specific to the test-
-// harness path (c.call('dj_vj_action', ...)), not the DJ audio path itself.
-// Tried longer waits (800/1200 ms vs 400/600); baseline still reads silent.
-// Needs a targeted dive into why getAudioLevel sees <0.001 from the harness
-// after a successful playDeck call. Skipped to keep ui-smoke green.
-describe.skip('ui-smoke — flow 08: scratch audio continuity', () => {
+describe('ui-smoke — flow 08: scratch audio continuity', () => {
   it.runIf(!!client)(
     'jog-wheel scratch keeps audio flowing with no NaN / console errors',
     async () => {
@@ -250,7 +242,14 @@ describe.skip('ui-smoke — flow 08: scratch audio continuity', () => {
       });
       await sleep(400);
       await c.call('dj_vj_action', { action: 'playDeck', args: { side: 'A' } });
-      await sleep(600); // let playback reach steady RMS
+      // Warm single-deck re-load (coming from flow 07 which loaded both
+      // decks + stopped + switched to tracker view) needs ~1.2 s before
+      // the getAudioLevel tap reliably reads audible RMS. Shorter waits
+      // (600 ms originally) intermittently measured silent even though
+      // deck A was genuinely producing audio — verified via direct
+      // `window.__soakActions__` probe which bypasses the MessageChannel-
+      // based level capture. Bumped to 1200 ms for stability.
+      await sleep(1200);
 
       // Baseline: pre-scratch RMS must be non-silent. If this fails the
       // whole scratch assertion is meaningless (fixture or load broke).
