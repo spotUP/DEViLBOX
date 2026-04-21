@@ -8,11 +8,19 @@
  */
 
 import type { DubBus } from '../DubBus';
+import type { DeckId } from '../../dj/DeckEngine';
 
 export interface DubMoveContext {
   bus: DubBus;
   /** Target tracker channel (0-based). Undefined for global moves. */
   channelId?: number;
+  /**
+   * Originating DJ deck, when the fire came from a DJ-context pad / MIDI
+   * route. Used by moves that call `bus.openChannelTap(ch, amt, atk, {
+   * deckId })` to route through the deck-scoped tap instead of the
+   * tracker-view global channel tap. Undefined for tracker-view moves.
+   */
+  deckId?: DeckId;
   /** Merged params — move defaults overridden by anything the caller passed. */
   params: Record<string, number>;
   /** Current transport BPM — used to convert beat-based params (throwBeats) to ms. */

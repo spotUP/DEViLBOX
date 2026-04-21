@@ -1447,6 +1447,28 @@ export class DeckEngine {
     return this.replayer.getChannelWaveforms(maxChannels);
   }
 
+  /**
+   * Number of tracker channels in the loaded song. Returns 0 in audio
+   * playback mode (no tracker song → no channels).
+   */
+  getChannelCount(): number {
+    if (this._playbackMode !== 'tracker') return 0;
+    return this.replayer.getChannelCount();
+  }
+
+  /**
+   * Open a per-channel side-tap on the loaded tracker song. The returned
+   * GainNode carries a copy of that channel's audio in parallel with the
+   * main mix — the deck's master output is unchanged.
+   *
+   * Returns null in audio mode (no channel concept) or when the channel
+   * index is out of range. Callers must call dispose() when done.
+   */
+  openChannelTap(channelIndex: number): { output: GainNode; dispose(): void } | null {
+    if (this._playbackMode !== 'tracker') return null;
+    return this.replayer.openChannelTap(channelIndex);
+  }
+
   /** Get FFT data (1024 bins, dB values -100 to 0) */
   getFFT(): Float32Array {
     return this.fftAnalyser.getValue() as Float32Array;

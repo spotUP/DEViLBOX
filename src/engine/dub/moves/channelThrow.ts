@@ -16,14 +16,16 @@ export const channelThrow: DubMove = {
   kind: 'trigger',
   defaults: { throwBeats: 4.0, feedbackBoost: 0.30 },
 
-  execute({ bus, channelId, params, bpm }) {
+  execute({ bus, channelId, deckId, params, bpm }) {
     if (channelId === undefined) return null;
 
     const throwBeats = params.throwBeats ?? this.defaults.throwBeats;
     const feedbackBoost = params.feedbackBoost ?? this.defaults.feedbackBoost;
     const holdMs = beatsToMs(bpm, throwBeats);
 
-    const close = bus.openChannelTap(channelId, 1.0, 0.010);
+    const close = deckId
+      ? bus.openChannelTap(channelId, 1.0, 0.010, { deckId })
+      : bus.openChannelTap(channelId, 1.0, 0.010);
     bus.modulateFeedback(feedbackBoost, holdMs + 600);
 
     const timer = setTimeout(() => close(), holdMs);
