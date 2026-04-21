@@ -337,6 +337,7 @@ interface DJActions {
   setDeckEQ: (deck: DeckId, band: 'low' | 'mid' | 'high', dB: number) => void;
   setDeckEQKill: (deck: DeckId, band: 'low' | 'mid' | 'high', kill: boolean) => void;
   setDeckFilter: (deck: DeckId, position: number) => void;
+  setDeckFilterResonance: (deck: DeckId, q: number) => void;
   setDeckVolume: (deck: DeckId, volume: number) => void;
   setDeckTrimGain: (deck: DeckId, trimDb: number) => void;
   setDeckAutoGain: (deck: DeckId, enabled: boolean) => void;
@@ -554,6 +555,11 @@ export const useDJStore = create<DJStore>()(
     setDeckFilter: (deck, position) =>
       set((state) => {
         state.decks[deck].filterPosition = Math.max(-1, Math.min(1, position));
+      }),
+
+    setDeckFilterResonance: (deck, q) =>
+      set((state) => {
+        state.decks[deck].filterResonance = Math.max(0.5, Math.min(15, q));
       }),
 
     setDeckVolume: (deck, volume) =>

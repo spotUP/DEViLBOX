@@ -317,6 +317,7 @@ export const SpaceEchoEditor: React.FC<VisualEffectEditorProps> = ({
   const echoVolume = getParam(effect, 'echoVolume', 0.8);
   const reverbVolume = getParam(effect, 'reverbVolume', 0.3);
   const bass = getParam(effect, 'bass', 0);
+  const mid = getParam(effect, 'mid', 0);
   const treble = getParam(effect, 'treble', 0);
   const synced = isEffectBpmSynced(effect.parameters);
   const { pre, post } = useEffectAnalyser(effect.id, 'waveform');
@@ -392,6 +393,16 @@ export const SpaceEchoEditor: React.FC<VisualEffectEditorProps> = ({
             max={20}
             onChange={(v) => onUpdateParameter('bass', v)}
             label="Bass"
+            color="#818cf8"
+            bipolar
+            formatValue={(v) => `${v > 0 ? '+' : ''}${Math.round(v)}dB`}
+          />
+          <Knob
+            value={mid}
+            min={-20}
+            max={20}
+            onChange={(v) => onUpdateParameter('mid', v)}
+            label="Mid"
             color="#818cf8"
             bipolar
             formatValue={(v) => `${v > 0 ? '+' : ''}${Math.round(v)}dB`}

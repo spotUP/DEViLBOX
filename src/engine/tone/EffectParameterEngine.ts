@@ -256,6 +256,7 @@ export function applyEffectParametersDiff(
         if ('echoVolume' in changed) node.setEchoVolume(Number(changed.echoVolume));
         if ('reverbVolume' in changed) node.setReverbVolume(Number(changed.reverbVolume));
         if ('bass' in changed) node.setBass(Number(changed.bass));
+        if ('mid' in changed) node.setMid(Number(changed.mid));
         if ('treble' in changed) node.setTreble(Number(changed.treble));
       }
       break;
