@@ -474,6 +474,103 @@ describe('ui-smoke — flow 06: Furnace playback stays within gain limits', () =
   );
 });
 
+describe('ui-smoke — flow 12: Auto Dub runs clean (no biquad blowup, no stuck state)', () => {
+  // Regression test for 2026-04-21 browser verify.
+  //
+  // Pre-fix: every `tubbyScream` fire triggered
+  // `BiquadFilterNode: state is bad, probably due to unstable filter caused by
+  // fast parameter automation` within ~3 ms — Q=3.5 bandpass in a loop-gain>1
+  // feedback path crossed the unit-circle on first tick and Chromium reset
+  // filter state (audible click risk).
+  //
+  // Post-fix (DubBus.ts::startTubbyScream): Q 3.5 → 2.2 + feedback gain
+  // held at 0 for 30 ms after connect. Verified 6 fires / 0 warnings via
+  // Playwright.
+  //
+  // Flow 11 locks the fix in CI: enable Auto Dub + Tubby, play a song for
+  // long enough that tubbyScream fires at least once (biased toward Tubby
+  // by persona weights), then assert no BiquadFilterNode warnings AND no
+  // `[DubRouter] unknown moveId` / `no bus registered` noise AND that the
+  // engine reports isRunning=true while on, isRunning=false after toggle.
+
+  it.runIf(!!client)(
+    'engine starts, fires moves without warnings, stops cleanly',
+    async () => {
+      const c = client!;
+      try { await c.call('stop'); } catch { /* ok */ }
+      await sleep(200);
+      await c.call('clear_console_errors');
+
+      // Load the committed MOD fixture — enough pattern depth for the
+      // Auto Dub tick loop to fire bar-phase moves across a few bars.
+      const payload = loadFixtureBase64(FIXTURE_MOD);
+      await c.call('load_file', { filename: payload.filename, data: payload.data });
+      await sleep(400);
+
+      // Activate dub bus FIRST — the AutoDubPanel useEffect gates
+      // `startAutoDub()` on busEnabled, so enabling the toggle without the
+      // bus is a no-op.
+      await c.call('set_dub_bus_enabled', { enabled: true });
+      await sleep(100);
+
+      // Apply Tubby bus voicing explicitly (since 2026-04-21 persona pick
+      // no longer auto-applies voice — see AutoDubPanel.contract.test.ts).
+      // Without this, moves still fire but not the Tubby-flavored ones.
+      await c.call('set_dub_bus_settings', { settings: { characterPreset: 'tubby' } });
+      await sleep(100);
+
+      // Enable Auto Dub with Tubby persona + high-ish intensity so moves
+      // fire densely enough that a 10 s window surely sees a tubbyScream.
+      await c.call('set_auto_dub_config', { enabled: true, persona: 'tubby', intensity: 0.75 });
+      await sleep(150);
+
+      const stateOn = await c.call<{ enabled?: boolean; persona?: string; isRunning?: boolean }>('get_auto_dub_state');
+      expect(stateOn.enabled, 'autoDubEnabled should be true').toBe(true);
+      expect(stateOn.persona, 'persona should stick as tubby').toBe('tubby');
+      expect(stateOn.isRunning, 'tick loop should be live when enabled+busEnabled').toBe(true);
+
+      // Play + run the tick loop through at least 4 bars at 125 BPM (~7.6 s).
+      await c.call('play');
+      await sleep(10_000);
+
+      // --- Error surface checks ---
+      const errs = await c.call<{ entries?: Array<{ level: string; message: string }> }>('get_console_errors');
+      const entries = errs.entries ?? [];
+
+      // (1) No BiquadFilterNode instability. This was 100% correlated with
+      //     every tubbyScream fire pre-fix. Post-fix expected count: 0.
+      const biquad = entries.filter((e) => /BiquadFilterNode: state is bad/.test(e.message));
+      expect(biquad.length, `tubbyScream must NOT reinstate biquad instability: ${JSON.stringify(biquad.slice(0, 3))}`).toBe(0);
+
+      // (2) No "unknown moveId" / "no bus registered" from DubRouter — those
+      //     fire if a move name is wrong or the bus dropped out mid-tick.
+      const routerNoise = entries.filter((e) =>
+        /\[DubRouter\].*(unknown moveId|no bus registered)/.test(e.message),
+      );
+      expect(routerNoise, `DubRouter should stay quiet: ${JSON.stringify(routerNoise.slice(0, 3))}`).toEqual([]);
+
+      // (3) No critical errors (ignore favicon / devtools noise).
+      const critical = entries.filter(
+        (e) => e.level === 'error' && !/favicon|devtools/i.test(e.message),
+      );
+      expect(critical, `critical errors: ${JSON.stringify(critical)}`).toEqual([]);
+
+      // --- Toggle-off + drain ---
+      await c.call('set_auto_dub_config', { enabled: false });
+      await sleep(1500);  // mini-drain is 1.1 s; give 400 ms margin
+
+      const stateOff = await c.call<{ enabled?: boolean; isRunning?: boolean }>('get_auto_dub_state');
+      expect(stateOff.enabled, 'toggle-off flips store').toBe(false);
+      expect(stateOff.isRunning, 'tick loop disposes on toggle-off').toBe(false);
+
+      // Cleanup so follow-up flows start from neutral state.
+      await c.call('stop');
+      await c.call('set_dub_bus_enabled', { enabled: false });
+    },
+    FLOW_TIMEOUT_MS,
+  );
+});
+
 describe('ui-smoke — flow 10: dub automation routing end-to-end', () => {
   // Regression test for the automation-lane → dub routing (task #35).
   // The AutomationPlayer forwards every `dub.*` curve write to

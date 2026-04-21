@@ -644,6 +644,21 @@ export function getDubBusState(): Record<string, unknown> {
   };
 }
 
+// ─── Auto Dub — autonomous dub-move performer (2026-04-21) ───────────────────
+
+export async function getAutoDubState(): Promise<Record<string, unknown>> {
+  const { useDubStore } = await import('../../stores/useDubStore');
+  const { isAutoDubRunning } = await import('../../engine/dub/AutoDub');
+  const s = useDubStore.getState();
+  return {
+    enabled: s.autoDubEnabled,
+    persona: s.autoDubPersona,
+    intensity: s.autoDubIntensity,
+    moveBlacklist: s.autoDubMoveBlacklist,
+    isRunning: isAutoDubRunning(),
+  };
+}
+
 // ─── Synth Errors ──────────────────────────────────────────────────────────────
 
 export function getSynthErrors(): Record<string, unknown> {

@@ -657,6 +657,24 @@ export function createMcpServer(): McpServer {
   );
 
   server.tool(
+    'set_auto_dub_config',
+    'Drive the Auto Dub autonomous performer (toggle, persona, intensity). Does NOT auto-apply the persona bus voicing — call set_dub_bus_settings { characterPreset: "<persona>" } separately if full persona voice is wanted.',
+    {
+      enabled: z.boolean().optional().describe('Turn Auto Dub on/off'),
+      persona: z.enum(['custom', 'tubby', 'scientist', 'perry', 'madProfessor', 'jammy']).optional().describe('Persona id (weight bias + intensityDefault)'),
+      intensity: z.number().min(0).max(1).optional().describe('0..1 move-budget / roll-probability scalar'),
+    },
+    (p) => call('set_auto_dub_config', p),
+  );
+
+  server.tool(
+    'get_auto_dub_state',
+    'Return Auto Dub state: enabled, persona, intensity, moveBlacklist, isRunning (true when the 250 ms tick loop is live).',
+    {},
+    () => call('get_auto_dub_state'),
+  );
+
+  server.tool(
     'mute_all_channels',
     'Mute all channels',
     {},
