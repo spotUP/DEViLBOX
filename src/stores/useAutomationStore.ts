@@ -121,6 +121,14 @@ interface AutomationStore {
   loadCurves: (curves: AutomationCurve[]) => void;
   getCurves: () => AutomationCurve[];
 
+  // Global (pattern-level, not tied to a channel — channelIndex sentinel = -1).
+  // Used for bus-wide dub params and song-level global.* params. The curve
+  // payload is identical to a normal AutomationCurve so serialization and
+  // the edit tools work unchanged; AutomationPlayer dispatches these via
+  // routeParameterToEngine instead of through an instrumentId lookup.
+  addGlobalCurve: (patternId: string, parameter: AutomationParameter) => string;
+  getGlobalCurves: (patternId: string) => AutomationCurve[];
+
   // Channel lane UI state
   setActiveParameter: (channelIndex: number, parameter: AutomationParameter) => void;
   getActiveParameter: (channelIndex: number) => AutomationParameter;
@@ -223,7 +231,10 @@ export const useAutomationStore = create<AutomationStore>()(
     addCurve: (patternId, channelIndex, parameter) => {
       // Check if this parameter can be baked into native effects on export.
       // Inline check mirrors getEffectMapping logic from AutomationBaker.
-      const limits = getActiveFormatLimits();
+      // Global curves (channelIndex === -1) are bus-wide / song-level; they
+      // have no native-effect-command equivalent and only live inside .dbx,
+      // so the bake check is meaningless for them — skip it.
+      const limits = channelIndex === -1 ? null : getActiveFormatLimits();
       if (limits) {
         const canBake = canBakeParameter(parameter, limits);
         if (!canBake && !isViolationConfirmed('automation')) {
@@ -379,6 +390,20 @@ export const useAutomationStore = create<AutomationStore>()(
     getCurvesForPattern: (patternId, channelIndex) => {
       return get().curves.filter(
         (c) => c.patternId === patternId && c.channelIndex === channelIndex
+      );
+    },
+
+    addGlobalCurve: (patternId, parameter) => {
+      // Re-uses the normal addCurve path with channelIndex=-1 sentinel so
+      // every downstream feature (bake-check, point ops, serialization,
+      // copy/paste) works unchanged. AutomationPlayer and UI filter on
+      // channelIndex === -1 when they need the "global lane" view.
+      return get().addCurve(patternId, -1, parameter);
+    },
+
+    getGlobalCurves: (patternId) => {
+      return get().curves.filter(
+        (c) => c.patternId === patternId && c.channelIndex === -1
       );
     },
 

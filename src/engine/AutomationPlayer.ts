@@ -417,6 +417,26 @@ export class AutomationPlayer {
         }
       }
     });
+
+    // Global curves — pattern-level automation not tied to any channel
+    // (channelIndex = -1 sentinel). Used for bus-wide dub params
+    // (dub.echoWet, dub.hpfCutoff, etc.), global.bpm, global.masterVolume.
+    // Dispatched through routeParameterToEngine so dub.*/mixer.*/global.*
+    // keys each reach their correct engine layer without needing an
+    // instrumentId (the per-channel path above requires one).
+    const globalCurves = this.automationData[this.currentPattern.id]?.[-1];
+    if (globalCurves) {
+      for (const parameter of Object.keys(globalCurves)) {
+        const curveValue = this.getCurveValue(this.currentPattern.id, -1, parameter, row);
+        if (curveValue !== null) {
+          try {
+            routeParameterToEngine(parameter, curveValue);
+          } catch (err) {
+            console.warn('[AutomationPlayer] global route failed for', parameter, err);
+          }
+        }
+      }
+    }
   }
 
   /**
