@@ -533,7 +533,7 @@ export const DJ_PAD_PRESETS: DJPreset[] = [
   {
     id: 'mad-professor-desk',
     name: 'Mad Professor Mix Desk',
-    description: 'Long dark PCM-70 dub plate — heavy echo into a wide cathedral tail. Pair with "Mad Professor Cathedral" or "Mad Professor Studio" in Master FX.',
+    description: 'Long dark PCM-70 dub plate on the bus itself — heavy echo into a wide cathedral tail. Engages plateStage=madprofessor at 0.45 mix so the PCM-70 color is audible without needing a Master-FX preset too.',
     create: () => buildFullDubKit('D-15', 'Mad Professor Desk'),
     onApply: (store) => store.setDubBus({
       enabled: true,
@@ -550,12 +550,14 @@ export const DJ_PAD_PRESETS: DJPreset[] = [
       sirenFeedback: 0.85,
       filterDropHz: 180,
       throwQuantize: 'offbeat',
+      plateStage: 'madprofessor',
+      plateStageMix: 0.45,
     }),
   },
   {
     id: 'dattorro-chamber',
     name: 'Dattorro Plate Lab',
-    description: 'Metallic, resonant plate with bright short echo — Scientist-70s tank. Pair with "Dattorro Steel" or "Dattorro Infinite" in Master FX.',
+    description: 'Metallic, resonant plate on the bus — Scientist-70s tank. Engages plateStage=dattorro at 0.45 mix so the metallic character is audible without a Master-FX preset.',
     create: () => buildFullDubKit('D-16', 'Dattorro Plate Lab'),
     onApply: (store) => store.setDubBus({
       enabled: true,
@@ -572,6 +574,8 @@ export const DJ_PAD_PRESETS: DJPreset[] = [
       sirenFeedback: 0.80,
       filterDropHz: 220,
       throwQuantize: '1/8',
+      plateStage: 'dattorro',
+      plateStageMix: 0.45,
     }),
   },
 ];
