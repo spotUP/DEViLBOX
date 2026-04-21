@@ -891,6 +891,44 @@ export class DeckEngine {
     // Slip mode: snap back to ghost position
     this.slipSnapBack();
 
+    // Deck was stopped before scratch started → release immediately, no
+    // decay and no backward→forward transition. Both of those paths would
+    // leave the deck audibly playing forward for the decay window (~250 ms)
+    // before hardReset's pause() lands, producing a "moves forward by
+    // itself" burst on release (2026-04-21 user report).
+    if (!this._wasPlayingAtScratchStart) {
+      // Cancel any in-progress decay
+      if (this.decayRafId !== null) {
+        cancelAnimationFrame(this.decayRafId);
+        this.decayRafId = null;
+      }
+      // Kill scratch buffer output + reset the backward-pause timer
+      if (this.backwardPauseTimeoutId !== null) {
+        clearTimeout(this.backwardPauseTimeoutId);
+        this.backwardPauseTimeoutId = null;
+      }
+      if (this.scratchBufferReady && this.scratchBuffer) {
+        const now = Tone.getContext().rawContext.currentTime;
+        this.scratchBuffer.playbackGain.gain.cancelScheduledValues(now);
+        this.scratchBuffer.playbackGain.gain.setValueAtTime(0, now);
+        this.scratchBuffer.silenceAndStop();
+      }
+      // Pause the player directly — no decay back to restMultiplier.
+      if (this._playbackMode === 'audio') {
+        try { this.audioPlayer.pause(); } catch { /* ok */ }
+        // Reset rate so a subsequent play() starts at 1x, not at scratch rate.
+        this.audioPlayer.setPlaybackRate(this.restMultiplier);
+      } else {
+        try { this.replayer.pause(); } catch { /* ok */ }
+        this.replayer.setPitchMultiplier(this.restMultiplier);
+        this.replayer.setTempoMultiplier(this.restMultiplier);
+      }
+      // Hard-set gain back to 1.0 — the channel is gated by play-state now.
+      this._setDeckGain(1);
+      this.scratchDirection = 1;
+      return;
+    }
+
     if (this.scratchDirection === -1) {
       // End backward scratch (synchronous), then decay to rest
       this._switchToForward(1);
@@ -911,24 +949,14 @@ export class DeckEngine {
       // Hard-set deckGain to exactly 1.0 via raw native AudioParam
       this._setDeckGain(1);
       // Force playback rate to restMultiplier — prevents rate drift from
-      // incomplete _decayToRest animations or stale physics velocities
+      // incomplete _decayToRest animations or stale physics velocities.
+      // Only reached when `_wasPlayingAtScratchStart` was true (the
+      // stopped-deck path returns early above and doesn't schedule hardReset).
       if (this._playbackMode === 'audio') {
         this.audioPlayer.setPlaybackRate(this.restMultiplier);
       } else {
         this.replayer.setPitchMultiplier(this.restMultiplier);
         this.replayer.setTempoMultiplier(this.restMultiplier);
-      }
-      // If the deck was stopped before this scratch gesture started, pause
-      // it again now that the decay has settled. startScratch resumed the
-      // player so the scratch produced sound; without this pause, releasing
-      // would leave the deck playing, which is not the behavior a user
-      // expects on a stopped turntable (2026-04-21 user report).
-      if (!this._wasPlayingAtScratchStart) {
-        if (this._playbackMode === 'audio') {
-          try { this.audioPlayer.pause(); } catch { /* ok */ }
-        } else {
-          try { this.replayer.pause(); } catch { /* ok */ }
-        }
       }
     };
     const resetTimer = setTimeout(() => {
