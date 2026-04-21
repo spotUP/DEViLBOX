@@ -700,9 +700,12 @@ export class DeckEngine {
     if (this._isScratchActive) return;
     this._isScratchActive = true;
     // Snapshot the play-state before scratch so release can restore it
-    // correctly. If the deck was stopped, scratch still produces sound
-    // (the player is started below) but stopScratch must pause it again
-    // on release so we don't leave a stopped deck playing.
+    // correctly. If the deck was stopped, we intentionally DO NOT resume
+    // the audio source (would trigger a motor-stop forward burst on
+    // release via _switchToForward). Backward scratch on a stopped deck
+    // still produces sound from the scratch ring buffer if it has
+    // captured audio from a prior play session. Forward scratch on a
+    // never-played deck is silent — no audio source to drive.
     this._wasPlayingAtScratchStart = this._playbackMode === 'audio'
       ? this.audioPlayer.isCurrentlyPlaying()
       : this.replayer.isPlaying?.() ?? false;
@@ -720,21 +723,6 @@ export class DeckEngine {
       this.slipGhostPosition = this.audioPlayer.getPosition();
       this.slipGhostStartTime = performance.now();
       this.slipGhostRate = this.audioPlayer.getPlaybackRate();
-    }
-
-    // If the deck is stopped, start it so the scratch gesture has an
-    // audio source to drive. Matches real-turntable behavior: the record
-    // makes sound when you push it even if the motor is off. Playback is
-    // paused again on release by stopScratch's hardReset when
-    // `_wasPlayingAtScratchStart` is false.
-    if (!this._wasPlayingAtScratchStart) {
-      if (this._playbackMode === 'audio') {
-        if (!this.audioPlayer.isCurrentlyPlaying()) {
-          try { this.audioPlayer.resume(); } catch { /* ok — audio not ready */ }
-        }
-      } else {
-        try { this.replayer.resume(); } catch { /* ok */ }
-      }
     }
   }
 
