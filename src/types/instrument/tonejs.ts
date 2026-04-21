@@ -912,3 +912,43 @@ export interface DX7Config {
   program?: number;           // 0-31 (voice within bank)
   vcedPreset?: string;        // VCED preset name from dx7presets.ts
 }
+
+/**
+ * Dub-derived standalone synth configs — the DSP was originally embedded
+ * inside DubBus; these configs drive the extracted standalone classes so
+ * the same voices are pickable as normal instruments on any channel.
+ */
+export interface OscBassConfig {
+  level: number;      // 0..1 — peak post-envelope gain (self-osc clamps internally)
+  resonance: number;  // filter Q (self-osc territory: 8..25, default 18)
+  attackMs: number;   // envelope attack in ms (default 80)
+  releaseMs: number;  // envelope release in ms (default 200)
+}
+
+export interface CrushBassConfig {
+  level: number;      // 0..1 — peak post-envelope gain
+  bits: number;       // 1..8 — bit depth for crush (default 3)
+  attackMs: number;   // envelope attack in ms (default 60)
+  releaseMs: number;  // envelope release in ms (default 200)
+  lpHz: number;       // post-crush lowpass cutoff (default 2000)
+}
+
+export interface SonarPingConfig {
+  level: number;      // 0..1
+  durationMs: number; // ping envelope length (default 140)
+  decayRatio: number; // 0..1 — exponential decay shape (default 0.35)
+}
+
+export interface RadioRiserConfig {
+  level: number;      // 0..1
+  startHz: number;    // default 200
+  endHz: number;      // default 5000
+  sweepSec: number;   // default 1.2
+  bandwidth: number;  // bandpass Q (default 6)
+}
+
+export interface SubSwellConfig {
+  level: number;      // 0..1
+  durationMs: number; // default 400
+  pitchOctaves: number; // octaves below the played note (default 0 — play as-is)
+}

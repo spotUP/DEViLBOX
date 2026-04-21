@@ -56,13 +56,15 @@ SynthRegistry.registerLazy(
   () => import('./harmonicsynth').then(() => {}),
 );
 
-// ── Misc synths (speech, JUCE WASM, special) ─────────────────────────────────
+// ── Misc synths (speech, JUCE WASM, special, dub-derived) ────────────────────
 SynthRegistry.registerLazy(
   [
     'DubSiren', 'SpaceLaser', 'V2', 'V2Speech', 'Sam', 'DECtalk', 'Synare',
     'CZ101', 'CEM3394', 'SCSP',
     'MAMEVFX', 'VFX', 'D50', 'MAMEDOC', 'MAMERSA', 'MAMESWP30',
     'DrumKit', 'Wavetable', 'ChiptuneModule',
+    // Dub-derived standalone synths (extracted from DubBus)
+    'OscBass', 'CrushBass', 'SonarPing', 'RadioRiser', 'SubSwell',
   ],
   () => import('./misc').then(() => {}),
 );
