@@ -293,17 +293,27 @@ describe('AutoDub chooseMove', () => {
     expect(found).toBeGreaterThan(0);
   });
 
-  it('skips role-targeted rule when no channels match the required role', () => {
-    // Roles list has no bass. channelMute (bass) should never fire.
+  it('falls back to any non-empty channel when no role match (rather than silently skipping)', () => {
+    // Roles list has no bass. channelMute (bass) used to be skipped
+    // entirely — but then on songs without a clear bass role no bass-
+    // targeted rule ever fires and the pattern editor sees zero Zxx
+    // cells. New behaviour: when classification returns roles but none
+    // match the rule's want, pick from ANY non-empty channel.
     const roles: ChannelRole[] = ['percussion', 'percussion', 'lead', 'empty'];
     const rng = seededRng(2003);
+    let sawBassTargeted = false;
     for (let i = 0; i < 500; i++) {
       const result = chooseMove(baseCtx({
         bar: 1, barPos: 0.0, isNewBar: true, intensity: 1,
         channelCount: roles.length, roles,
       }), rng);
-      expect(result?.moveId).not.toBe('channelMute');
+      if (result?.moveId === 'channelMute') {
+        sawBassTargeted = true;
+        // Must have landed on a non-empty channel (0, 1, or 2 — not 3).
+        expect([0, 1, 2]).toContain(result.channelId);
+      }
     }
+    expect(sawBassTargeted).toBe(true);
   });
 
   it("'any' role skips empty channels but picks from everything else", () => {

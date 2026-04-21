@@ -402,15 +402,31 @@ export function chooseMove(ctx: AutoDubTickCtx, rng: () => number): AutoDubChoic
       if (hasRoles) {
         const want = rule.channelRole;
         const matches: number[] = [];
+        const nonEmpty: number[] = [];
         for (let i = 0; i < ctx.roles.length; i++) {
           const r = ctx.roles[i];
           if (r === 'empty') continue;
+          nonEmpty.push(i);
           if (want === 'any' || r === want) matches.push(i);
         }
-        if (matches.length === 0) continue;
-        matchingChannels = matches;
+        if (matches.length > 0) {
+          matchingChannels = matches;
+        } else if (nonEmpty.length > 0) {
+          // Classifier returned roles but none match this rule's want
+          // (e.g. rule wants 'percussion' but nobody was classified as
+          // percussion — common on MOD songs with sparse pattern 0 or
+          // purely melodic material). Fall back to any non-empty channel
+          // rather than silently dropping the rule — otherwise bass /
+          // percussion-targeted rules would never fire on songs without
+          // strong role signatures and the pattern editor would see zero
+          // Zxx cells from Auto Dub.
+          matchingChannels = nonEmpty;
+        } else {
+          // Every channel is empty — nothing to fire at.
+          continue;
+        }
       } else if (ctx.channelCount > 0) {
-        // No classification — any channel is fair game
+        // No classification — any channel is fair game.
         matchingChannels = ALL_CHANNELS.slice(0, ctx.channelCount);
       }
     }
