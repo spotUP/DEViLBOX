@@ -1256,6 +1256,31 @@ const wasmEffects: EffectDescriptor[] = [
     ],
   },
   {
+    id: 'ResonanceTamer', name: 'Resonance Tamer', category: 'wasm', group: 'EQ & Filter',
+    loadMode: 'eager',
+    create: async (c: EffectConfig) => {
+      const { ResonanceTamerEffect } = await import('@engine/effects/ResonanceTamerEffect');
+      const p = c.parameters;
+      const character = (p.character === 'warm' || p.character === 'bright' || p.character === 'transparent')
+        ? p.character
+        : 'transparent';
+      return new ResonanceTamerEffect({
+        amount: Number(p.amount ?? 0.35),
+        character,
+        mix: Number(p.mix ?? 1),
+        wet: c.wet / 100,
+      });
+    },
+    getDefaultParameters: () => ({ amount: 0.35, character: 'transparent', mix: 1 }),
+    presets: [
+      { name: 'Gentle',     params: { amount: 0.25, character: 'transparent' } },
+      { name: 'Balanced',   params: { amount: 0.45, character: 'transparent' } },
+      { name: 'Warm Tame',  params: { amount: 0.55, character: 'warm' } },
+      { name: 'De-Harsh',   params: { amount: 0.50, character: 'bright' } },
+      { name: 'Aggressive', params: { amount: 0.85, character: 'transparent' } },
+    ],
+  },
+  {
     id: 'HaasEnhancer', name: 'Haas Stereo Enhancer', category: 'wasm', group: 'Stereo & Spatial',
     loadMode: 'eager',
     create: async (c: EffectConfig) => {
