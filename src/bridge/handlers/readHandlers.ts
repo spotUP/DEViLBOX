@@ -659,6 +659,50 @@ export async function getAutoDubState(): Promise<Record<string, unknown>> {
   };
 }
 
+/**
+ * Report the currently-resolved channel role table + channel names that
+ * Auto-Dub's rule engine targets. Merges the three-stage pipeline that
+ * lives behind AutoDub:
+ *   1. classifySongRoles (offline, richest pattern per channel)
+ *   2. getAllRuntimeChannelRoles (runtime, live-tap FFT votes)
+ *   3. mergeOfflineAndRuntimeRoles (promotion policy)
+ *
+ * Used by ui-smoke to assert role-targeted moves can land on a real
+ * loaded song — the on-disk Mortimer Twang fixture has almost no bass,
+ * so a Modland-loaded dub track is what actually exercises the full
+ * pipeline end-to-end.
+ */
+export async function getChannelRoles(): Promise<Record<string, unknown>> {
+  const { useTrackerStore } = await import('../../stores/useTrackerStore');
+  const { useInstrumentStore } = await import('../../stores/useInstrumentStore');
+  const { classifySongRoles } = await import('../analysis/ChannelNaming');
+  const { getAllRuntimeChannelRoles, mergeOfflineAndRuntimeRoles } = await import('../analysis/ChannelAudioClassifier');
+  const tracker = useTrackerStore.getState();
+  const patterns = tracker.patterns;
+  if (!Array.isArray(patterns) || patterns.length === 0) {
+    return { patternsLoaded: false, roles: [], names: [], offline: [], runtime: [] };
+  }
+  const insts = useInstrumentStore.getState().instruments;
+  const lookup = new Map();
+  for (const inst of insts) {
+    if (inst && typeof inst.id === 'number') lookup.set(inst.id, inst);
+  }
+  const offline = classifySongRoles(patterns, lookup);
+  const runtime = getAllRuntimeChannelRoles(offline.length);
+  const merged = mergeOfflineAndRuntimeRoles(offline, runtime);
+
+  const schema = patterns[0];
+  const names = schema?.channels?.map((c) => c.name ?? null) ?? [];
+  return {
+    patternsLoaded: true,
+    channelCount: offline.length,
+    roles: merged,
+    offline,
+    runtime: runtime.map((h) => h ? { role: h.role, confidence: h.confidence, support: h.support } : null),
+    names,
+  };
+}
+
 // ─── Synth Errors ──────────────────────────────────────────────────────────────
 
 export function getSynthErrors(): Record<string, unknown> {
