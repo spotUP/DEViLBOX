@@ -5,7 +5,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { detectDrumBreakTail } from '../smartCuts';
+import { detectDrumBreakTail, isChordChangeImminent } from '../smartCuts';
 import type { Pattern, ChannelData, TrackerCell } from '@/types/tracker';
 
 function emptyCell(): TrackerCell {
@@ -113,5 +113,110 @@ describe('detectDrumBreakTail', () => {
     expect(detectDrumBreakTail({ song: { patterns: [boring, breakPattern] } })).toBe(true);
     // Explicit index override also works
     expect(detectDrumBreakTail({ song: { patterns: [boring, breakPattern] }, patternIndex: 0 })).toBe(false);
+  });
+});
+
+// ── isChordChangeImminent ───────────────────────────────────────────────────
+//
+// Chord changes are detected by scanning every `rowsPerBeat` rows (default 4)
+// for the pitch-class set sounding on that row. When the chord changes
+// relative to the prior sampled row, it's a turnaround — fire a crossfade
+// not a hard cut, or the incoming track clashes with the outgoing harmony.
+//
+// Fixtures here use three channels with major-triad pitch classes so
+// detectChord() returns stable chord names: C-E-G (C major, note 13/17/20,
+// pitch classes 0/4/7) vs G-B-D (G major, pc 7/11/2) vs F-A-C (F major,
+// pc 5/9/0). Note numbers: C-1=13, D-1=15, E-1=17, F-1=18, G-1=20, A-1=22,
+// B-1=24 (MOD/XM numbering — C-1 is note 13).
+
+describe('isChordChangeImminent', () => {
+  const C_NOTES = [13, 17, 20]; // C-E-G
+  const G_NOTES = [20, 24, 27]; // G-B-D (D-2 = 27)
+  const F_NOTES = [18, 22, 25]; // F-A-C (C-2 = 25)
+
+  function chordPattern(progression: number[][]): Pattern {
+    // One row every 4 rows holds the chord, rest silent.
+    const length = progression.length * 4;
+    const channels: ChannelData[] = [0, 1, 2].map((i) => {
+      const rows: TrackerCell[] = Array.from({ length }, () => emptyCell());
+      for (let p = 0; p < progression.length; p++) {
+        const noteIdx = progression[p][i];
+        if (noteIdx !== undefined) rows[p * 4] = noteCell(noteIdx);
+      }
+      return {
+        id: `ch${i}`, name: `ch${i}`, rows,
+        muted: false, solo: false, collapsed: false,
+        volume: 100, pan: 0, instrumentId: 1, color: null,
+      };
+    });
+    return { id: 'p0', name: 'chords', length, channels };
+  }
+
+  it('returns false for null song / empty patterns', () => {
+    expect(isChordChangeImminent({ song: null, patternIndex: 0, currentRow: 0 })).toBe(false);
+    expect(isChordChangeImminent({ song: undefined, patternIndex: 0, currentRow: 0 })).toBe(false);
+    expect(isChordChangeImminent({ song: { patterns: [] }, patternIndex: 0, currentRow: 0 })).toBe(false);
+  });
+
+  it('returns true when a chord change is in the scan window', () => {
+    // C → G → F progression at rows 0, 4, 8. With currentRow=0 and
+    // windowRows=16, rows 4 and 8 are inside the window → change.
+    const pattern = chordPattern([C_NOTES, G_NOTES, F_NOTES]);
+    expect(
+      isChordChangeImminent({
+        song: { patterns: [pattern] },
+        patternIndex: 0,
+        currentRow: 0,
+        windowRows: 16,
+      }),
+    ).toBe(true);
+  });
+
+  it('returns false when the window contains only the same chord', () => {
+    // All three sampled rows play C — no change.
+    const pattern = chordPattern([C_NOTES, C_NOTES, C_NOTES]);
+    expect(
+      isChordChangeImminent({
+        song: { patterns: [pattern] },
+        patternIndex: 0,
+        currentRow: 0,
+        windowRows: 16,
+      }),
+    ).toBe(false);
+  });
+
+  it('respects the window size — chord change past the window is ignored', () => {
+    // C at row 0, G at row 8. currentRow=0 + windowRows=4 excludes row 8.
+    const pattern = chordPattern([C_NOTES, C_NOTES, G_NOTES]); // rows 0, 4, 8
+    expect(
+      isChordChangeImminent({
+        song: { patterns: [pattern] },
+        patternIndex: 0,
+        currentRow: 0,
+        windowRows: 4,
+      }),
+    ).toBe(false);
+    // Widen to 8 and it catches the row-8 change.
+    expect(
+      isChordChangeImminent({
+        song: { patterns: [pattern] },
+        patternIndex: 0,
+        currentRow: 0,
+        windowRows: 8,
+      }),
+    ).toBe(true);
+  });
+
+  it('patternIndex=-1 scans the last pattern', () => {
+    const plain = chordPattern([C_NOTES, C_NOTES, C_NOTES]);
+    const turnaround = chordPattern([C_NOTES, G_NOTES, F_NOTES]);
+    expect(
+      isChordChangeImminent({
+        song: { patterns: [plain, turnaround] },
+        patternIndex: -1,
+        currentRow: 0,
+        windowRows: 16,
+      }),
+    ).toBe(true);
   });
 });
