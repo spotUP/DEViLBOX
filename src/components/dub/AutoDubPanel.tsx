@@ -16,6 +16,7 @@ import { useDubStore, type AutoDubPersonaId } from '@/stores/useDubStore';
 import { useDrumPadStore } from '@/stores/useDrumPadStore';
 import { startAutoDub, stopAutoDub, isAutoDubRunning } from '@/engine/dub/AutoDub';
 import { getPersona, AUTO_DUB_PERSONAS } from '@/engine/dub/AutoDubPersonas';
+import { fire as fireDub } from '@/engine/dub/DubRouter';
 
 interface AutoDubPanelProps {
   /** Disabled when the dub bus itself is off. */
@@ -70,6 +71,16 @@ export const AutoDubPanel: React.FC<AutoDubPanelProps> = ({ busEnabled }) => {
     }
   }, [persona, setDubBus]);
 
+  // Fire the persona's signature move once so the user hears the character
+  // without enabling Auto Dub. Uses the move's registered defaults + the
+  // persona's paramOverrides (e.g. Scientist's 4-beat echoThrow, Mad Prof's
+  // 6-beat echoThrow). channelId undefined → global-target moves.
+  const auditionPersona = useCallback(() => {
+    const p = getPersona(persona);
+    const params = p.paramOverrides?.[p.signatureMove] ?? {};
+    fireDub(p.signatureMove, undefined, params, 'live');
+  }, [persona]);
+
   const disabled = !busEnabled;
   const controlsDisabled = disabled || !enabled;
 
@@ -119,6 +130,17 @@ export const AutoDubPanel: React.FC<AutoDubPanelProps> = ({ busEnabled }) => {
           ♫
         </button>
       )}
+
+      <button
+        type="button"
+        className="px-1.5 py-0.5 rounded border bg-dark-bgTertiary border-dark-border text-text-muted hover:text-accent-highlight hover:border-accent-highlight text-[10px] font-mono transition-colors disabled:opacity-50"
+        onClick={auditionPersona}
+        disabled={disabled}
+        title={`Audition ${getPersona(persona).label} — fire one ${getPersona(persona).signatureMove} so you can hear the persona without enabling Auto Dub`}
+      >
+        ▶
+      </button>
+
 
       <div className="flex items-center gap-1">
         <span className="text-text-muted text-[10px]">INT</span>
