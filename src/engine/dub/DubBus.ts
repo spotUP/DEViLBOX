@@ -3152,7 +3152,7 @@ export class DubBus {
     try {
       f.cancelScheduledValues(now);
       f.setValueAtTime(f.value, now);
-      f.exponentialRampToValueAtTime(Math.max(80, targetHz), now + downSec);
+      f.exponentialRampToValueAtTime(Math.max(100, targetHz), now + downSec);
     } catch { /* ok */ }
     const restore = setTimeout(() => {
       this.throwTimers.delete(restore);
@@ -3176,7 +3176,7 @@ export class DubBus {
       const f = this.lpf.frequency;
       f.cancelScheduledValues(now);
       f.setValueAtTime(f.value, now);
-      f.exponentialRampToValueAtTime(80, now + downSec);
+      f.exponentialRampToValueAtTime(100, now + downSec);
       // Echo rate ramp up — stepped calls so setRate's internal ramps stack
       const steps = 8;
       for (let i = 1; i <= steps; i++) {

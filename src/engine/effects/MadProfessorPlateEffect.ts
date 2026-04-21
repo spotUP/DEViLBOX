@@ -67,7 +67,7 @@ export class MadProfessorPlateEffect extends Tone.ToneAudioNode {
     // Pre-HPF: keep sub-bass out of the reverb entirely. Classic dub trick
     // — the bassline should hit dry so it stays tight, while the echoes
     // and percussion get drenched.
-    this.preHpf = new Tone.Filter({ type: 'highpass', frequency: this._options.hpfHz, rolloff: -24 });
+    this.preHpf = new Tone.Filter({ type: 'highpass', frequency: this._options.hpfHz, rolloff: -12 });
 
     // Post-LPF: cut the plate's high-frequency shimmer. PCM-70 had a
     // warmer top end than most digital plates; a gentle 5 kHz rolloff
