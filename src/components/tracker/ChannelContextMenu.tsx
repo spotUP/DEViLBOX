@@ -35,6 +35,7 @@ import { useLiveModeStore } from '@stores/useLiveModeStore';
 import { useTrackerStore } from '@stores/useTrackerStore';
 import { useAutomationStore } from '@stores/useAutomationStore';
 import { useInstrumentStore } from '@stores/useInstrumentStore';
+import { useMixerStore } from '@stores/useMixerStore';
 import { useUIStore } from '@stores/useUIStore';
 import { GENERATORS, type GeneratorType } from '@utils/patternGenerators';
 import type { ChannelData } from '@typedefs/tracker';
@@ -123,6 +124,8 @@ export const ChannelContextMenu: React.FC<ChannelContextMenuProps> = ({
   const { updateInstrument } = useInstrumentStore(useShallow((s) => ({
     updateInstrument: s.updateInstrument,
   })));
+  const dubSend = useMixerStore(useShallow((s) => s.channels[channelIndex]?.dubSend ?? 0));
+  const setChannelDubSend = useMixerStore((s) => s.setChannelDubSend);
 
   const handleApplyChannelFxPreset = useCallback((presetName: string) => {
     const preset = MASTER_FX_PRESETS.find(p => p.name === presetName);
@@ -366,6 +369,19 @@ export const ChannelContextMenu: React.FC<ChannelContextMenuProps> = ({
           icon: <Headphones size={14} />,
           checked: channel.solo,
           onClick: () => toggleChannelSolo(channelIndex),
+        },
+        // Dub Send — route into shared DubBus (live)
+        {
+          id: 'dub-send',
+          label: `Dub Send (${Math.round(dubSend * 100)}%)`,
+          icon: <Waves size={14} />,
+          submenu: [
+            { id: 'dub-off',  label: 'Off',  checked: dubSend === 0, onClick: () => setChannelDubSend(channelIndex, 0) },
+            { id: 'dub-25',   label: '25%',  checked: Math.abs(dubSend - 0.25) < 0.01, onClick: () => setChannelDubSend(channelIndex, 0.25) },
+            { id: 'dub-50',   label: '50%',  checked: Math.abs(dubSend - 0.5)  < 0.01, onClick: () => setChannelDubSend(channelIndex, 0.5) },
+            { id: 'dub-75',   label: '75%',  checked: Math.abs(dubSend - 0.75) < 0.01, onClick: () => setChannelDubSend(channelIndex, 0.75) },
+            { id: 'dub-100',  label: 'Full', checked: dubSend >= 0.99, onClick: () => setChannelDubSend(channelIndex, 1) },
+          ],
         },
         // Kill (instant silence)
         {
@@ -710,6 +726,19 @@ export const ChannelContextMenu: React.FC<ChannelContextMenuProps> = ({
         checked: channel.solo,
         onClick: () => toggleChannelSolo(channelIndex),
       },
+      // Dub Send submenu — routes this channel into the shared DubBus
+      {
+        id: 'dub-send',
+        label: `Dub Send (${Math.round(dubSend * 100)}%)`,
+        icon: <Waves size={14} />,
+        submenu: [
+          { id: 'dub-off',  label: 'Off',    checked: dubSend === 0,    onClick: () => setChannelDubSend(channelIndex, 0) },
+          { id: 'dub-25',   label: '25%',    checked: Math.abs(dubSend - 0.25) < 0.01, onClick: () => setChannelDubSend(channelIndex, 0.25) },
+          { id: 'dub-50',   label: '50%',    checked: Math.abs(dubSend - 0.5)  < 0.01, onClick: () => setChannelDubSend(channelIndex, 0.5) },
+          { id: 'dub-75',   label: '75%',    checked: Math.abs(dubSend - 0.75) < 0.01, onClick: () => setChannelDubSend(channelIndex, 0.75) },
+          { id: 'dub-100',  label: 'Full',   checked: dubSend >= 0.99,  onClick: () => setChannelDubSend(channelIndex, 1) },
+        ],
+      },
       // Color submenu
       {
         id: 'color',
@@ -794,6 +823,8 @@ export const ChannelContextMenu: React.FC<ChannelContextMenuProps> = ({
     handleApplyChannelFxPreset,
     automationParams,
     registerParamMenuItems,
+    dubSend,
+    setChannelDubSend,
   ]);
 
   // Apply status-message wrapping to the whole menu tree

@@ -20,10 +20,12 @@ import { useDubStore } from '@/stores/useDubStore';
 import { useTransportStore } from '@/stores/useTransportStore';
 import { useMixerStore } from '@/stores/useMixerStore';
 import { useTrackerStore } from '@/stores/useTrackerStore';
+import { useInstrumentStore } from '@/stores/useInstrumentStore';
 import { useOscilloscopeStore } from '@/stores/useOscilloscopeStore';
-import { classifyPattern, type ChannelRole } from '@/bridge/analysis/MusicAnalysis';
-import { isGenericChannelName } from '@/bridge/analysis/ChannelNaming';
+import { type ChannelRole } from '@/bridge/analysis/MusicAnalysis';
+import { classifySongRoles, isGenericChannelName } from '@/bridge/analysis/ChannelNaming';
 import type { Pattern } from '@/types/tracker';
+import type { InstrumentConfig } from '@/types/instrument/defaults';
 
 const TICK_MS = 250;
 const HARD_FIRES_PER_BAR_CAP = 3;
@@ -552,7 +554,15 @@ function detectTransientsFromOscilloscope(): number[] {
 /** Resolve the currently-playing pattern's channel roles + the pattern
  *  itself (used by the look-ahead / density helpers) + the channel-name
  *  array (for user-rename boost). Returns a neutral bundle when no song
- *  is loaded — callers fall through to the Phase-1 behaviour. */
+ *  is loaded — callers fall through to the Phase-1 behaviour.
+ *
+ *  Roles come from `classifySongRoles` (richest pattern per channel) rather
+ *  than `classifyPattern(currentPattern)`: libopenmpt-driven MODs routinely
+ *  leave `currentPatternIndex` on a nearly-empty intro pattern during
+ *  playback, which used to collapse the role table to all-`empty` and
+ *  skip every role-targeted rule (channelMute / echoThrow / snareCrack).
+ *  Pattern/currentRow/names still come from the CURRENT pattern because
+ *  look-ahead and the rename boost need the live playhead. */
 function getCurrentPatternBundle(): {
   roles: ChannelRole[];
   pattern: Pattern | null;
@@ -568,8 +578,15 @@ function getCurrentPatternBundle(): {
     const idx = transport.currentPatternIndex ?? 0;
     const pattern = patterns[Math.max(0, Math.min(idx, patterns.length - 1))];
     if (!pattern || !pattern.channels?.length) return empty;
+
+    const insts = useInstrumentStore.getState().instruments;
+    const lookup = new Map<number, InstrumentConfig>();
+    for (const inst of insts) {
+      if (inst && typeof inst.id === 'number') lookup.set(inst.id, inst);
+    }
+
     return {
-      roles: classifyPattern(pattern).map(a => a.role),
+      roles: classifySongRoles(patterns, lookup),
       pattern,
       names: pattern.channels.map(c => c.name ?? null),
       currentRow: transport.currentRow ?? 0,

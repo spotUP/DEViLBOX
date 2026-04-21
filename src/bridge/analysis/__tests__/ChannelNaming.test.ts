@@ -12,6 +12,7 @@ import {
   isGenericChannelName,
   classifyInstrument,
   classifyChannelWithInstruments,
+  classifySongRoles,
   suggestChannelName,
   autoNameChannels,
   getChannelInstruments,
@@ -345,5 +346,105 @@ describe('autoNameChannels', () => {
     const renames = autoNameChannels([p0, p1], lookup);
     expect(renames.length).toBe(1);
     expect(renames[0].newName).toBe('Drums');
+  });
+});
+
+// ── classifySongRoles ───────────────────────────────────────────────────────
+
+/**
+ * Regression tests for the 2026-04-21 Auto-Dub role-classification bug.
+ *
+ * Symptom (world-class-dub.mod): Auto-Dub ran with Tubby + 0.75 intensity
+ * for 30 s and only fired `subHarmonic` + `reverseEcho` (both non-role-
+ * targeted). `channelMute` / `echoThrow` / `snareCrack` never fired.
+ *
+ * Root cause: `AutoDub.getCurrentPatternBundle()` classified the pattern
+ * at `transport.currentPatternIndex`, which for libopenmpt-driven MODs
+ * stays at 0 during playback. Pattern 0 in this song has a single note
+ * on one channel — the rest of the channels were note-empty in the
+ * current pattern, so `classifyPattern` returned `empty` for them and
+ * every role-targeted rule was skipped.
+ *
+ * Fix: `classifySongRoles` picks the richest pattern PER CHANNEL (same
+ * logic `autoNameChannels` uses) and classifies once per song. Roles
+ * become stable regardless of playback position.
+ *
+ * If you revert the AutoDub or ChannelNaming change, the first test here
+ * will fail because an empty pattern 0 will win the lookup.
+ */
+describe('classifySongRoles (regression: song-wide role classification)', () => {
+  it('picks roles from the richest pattern per channel, not pattern[0]', () => {
+    // Mimics world-class-dub.mod: pattern 0 is nearly empty; the real
+    // content lives in a later pattern.
+    const emptyCh0 = makeChannel('', 16, {});   // pattern 0 ch 0: no notes
+    const emptyCh1 = makeChannel('', 16, {});
+    const sparseCh2 = makeChannel('', 16, { 0: { note: 39, instrument: 1 } }); // pattern 0 ch 2: 1 note
+    const emptyCh3 = makeChannel('', 16, {});
+    const p0 = makePattern([emptyCh0, emptyCh1, sparseCh2, emptyCh3]);
+
+    // Pattern 1 has real content on every channel:
+    //   ch 0: 4 bass-octave notes       → 'bass'
+    //   ch 1: dense single pitch        → 'percussion' (via stats fallback)
+    //   ch 2: spread pitches            → 'lead' / 'pad' (anything non-empty)
+    //   ch 3: 4 notes, labeled "Kick"   → 'percussion'
+    const bassCh = makeChannel('', 16, {
+      0: { note: 13, instrument: 2 }, 4: { note: 13, instrument: 2 },
+      8: { note: 14, instrument: 2 }, 12: { note: 13, instrument: 2 },
+    });
+    const hatCh = makeChannel('', 16, {
+      0: { note: 50, instrument: 3 }, 2: { note: 50, instrument: 3 },
+      4: { note: 50, instrument: 3 }, 6: { note: 50, instrument: 3 },
+      8: { note: 50, instrument: 3 }, 10: { note: 50, instrument: 3 },
+      12: { note: 50, instrument: 3 }, 14: { note: 50, instrument: 3 },
+    });
+    const melodyCh = makeChannel('', 16, {
+      0: { note: 48, instrument: 4 }, 4: { note: 52, instrument: 4 },
+      8: { note: 55, instrument: 4 }, 12: { note: 60, instrument: 4 },
+    });
+    const kickCh = makeChannel('Kick', 16, {
+      0: { note: 24, instrument: 5 }, 4: { note: 24, instrument: 5 },
+      8: { note: 24, instrument: 5 }, 12: { note: 24, instrument: 5 },
+    });
+    const p1 = makePattern([bassCh, hatCh, melodyCh, kickCh]);
+
+    const lookup = new Map<number, InstrumentConfig>();
+    lookup.set(2, makeInstrument({ id: 2, name: 'Bass synth' }));
+    lookup.set(3, makeInstrument({ id: 3, name: 'Hat' }));
+    lookup.set(4, makeInstrument({ id: 4, name: 'Lead melody' }));
+    lookup.set(5, makeInstrument({ id: 5, name: 'Kick drum', synthType: 'TR808' }));
+
+    const roles = classifySongRoles([p0, p1], lookup);
+    expect(roles).toHaveLength(4);
+
+    // The bug's signature: every channel would have been 'empty' because
+    // pattern 0 was nearly empty. The fix makes at least ONE role non-empty.
+    expect(roles.filter(r => r !== 'empty').length).toBeGreaterThanOrEqual(3);
+
+    // And specifically: the kick channel — classifiable via statistical
+    // percussion AND via instrument drumType — must end up 'percussion'.
+    expect(roles[3]).toBe('percussion');
+  });
+
+  it('returns empty array for a song with no patterns', () => {
+    expect(classifySongRoles([], new Map())).toEqual([]);
+  });
+
+  it('returns empty array when the schema pattern has no channels', () => {
+    const empty = { id: 'p', name: '', length: 0, channels: [] } as Pattern;
+    expect(classifySongRoles([empty], new Map())).toEqual([]);
+  });
+
+  it('is memoized by patterns array identity (same call twice returns same instance)', () => {
+    const ch = makeChannel('', 16, {
+      0: { note: 24, instrument: 1 }, 4: { note: 24, instrument: 1 },
+      8: { note: 24, instrument: 1 }, 12: { note: 24, instrument: 1 },
+    });
+    const p = makePattern([ch]);
+    const lookup = new Map<number, InstrumentConfig>();
+    lookup.set(1, makeInstrument({ id: 1, name: 'Kick', synthType: 'TR808' }));
+    const arr = [p];
+    const a = classifySongRoles(arr, lookup);
+    const b = classifySongRoles(arr, lookup);
+    expect(a).toBe(b);
   });
 });

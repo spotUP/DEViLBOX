@@ -364,6 +364,19 @@ export function setDeckFilter(deckId: DeckId, position: number): void {
   } catch { /* engine not ready */ }
 }
 
+/**
+ * Set filter resonance/Q: 0.5 (gentle) to 15 (screaming).
+ * Applied to both HPF and LPF simultaneously so resonance is consistent
+ * regardless of which side of the sweep the filter is on.
+ */
+export function setDeckFilterResonance(deckId: DeckId, q: number): void {
+  const clamped = Math.max(0.5, Math.min(15, q));
+  useDJStore.getState().setDeckFilterResonance(deckId, clamped);
+  try {
+    getDJEngine().getDeck(deckId).setFilterResonance(clamped);
+  } catch { /* engine not ready */ }
+}
+
 // ============================================================================
 // VOLUME
 // ============================================================================

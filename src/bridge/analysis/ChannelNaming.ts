@@ -280,6 +280,68 @@ export function suggestChannelName(analysis: EnhancedChannelAnalysis): string | 
   }
 }
 
+// ─── Song-wide role classification ──────────────────────────────────────────
+
+/** Cached by `patterns` array identity. Tracker store edits go through immer
+ *  and produce a fresh `patterns` array, so the cache invalidates on any edit.
+ *  `instruments` identity is ignored — instrument renames are rare and roles
+ *  are only loosely tied to instrument metadata. */
+const _songRolesCache = new WeakMap<Pattern[], EnhancedChannelAnalysis[]>();
+
+/**
+ * Classify every channel of a song by picking the pattern where that channel
+ * has the most notes and running `classifyChannelWithInstruments` on it.
+ *
+ * Use this when you need STABLE song-wide roles (auto-dub rule targeting,
+ * auto-DJ bass-swap gating, analysis) — classifying the currently-playing
+ * pattern alone risks hitting a sparse intro and returning `empty` for every
+ * channel that isn't yet active. For per-pattern visualization,
+ * `classifyPattern` in MusicAnalysis is the right call.
+ */
+export function classifySongChannels(
+  patterns: Pattern[],
+  instruments: Map<number, InstrumentConfig>,
+): EnhancedChannelAnalysis[] {
+  const cached = _songRolesCache.get(patterns);
+  if (cached) return cached;
+
+  if (patterns.length === 0) return [];
+  const schema = patterns[0];
+  if (!schema || !Array.isArray(schema.channels)) return [];
+
+  const analyses: EnhancedChannelAnalysis[] = schema.channels.map((_, idx) => {
+    let best: { pat: Pattern; noteCount: number } | null = null;
+    for (const pat of patterns) {
+      const ch = pat.channels?.[idx];
+      if (!ch) continue;
+      let n = 0;
+      for (const cell of ch.rows) if (cell && cell.note >= 1 && cell.note <= 96) n++;
+      if (!best || n > best.noteCount) best = { pat, noteCount: n };
+    }
+    const pat = best ? best.pat : schema;
+    return classifyChannelWithInstruments(pat.channels[idx], idx, instruments);
+  });
+
+  _songRolesCache.set(patterns, analyses);
+  return analyses;
+}
+
+const _songRolesProjectionCache = new WeakMap<Pattern[], ChannelRole[]>();
+
+/** Convenience: song-wide roles only (no subrole/density). Cached alongside
+ *  `classifySongChannels` so repeated calls (AutoDub ticks 4× per second)
+ *  return the same array instance and don't re-project on every tick. */
+export function classifySongRoles(
+  patterns: Pattern[],
+  instruments: Map<number, InstrumentConfig>,
+): ChannelRole[] {
+  const cached = _songRolesProjectionCache.get(patterns);
+  if (cached) return cached;
+  const roles = classifySongChannels(patterns, instruments).map(a => a.role);
+  _songRolesProjectionCache.set(patterns, roles);
+  return roles;
+}
+
 // ─── Full-song rename proposal ──────────────────────────────────────────────
 
 /** Walk every channel of the first pattern (names are global per the store's
@@ -293,25 +355,12 @@ export function autoNameChannels(
   if (patterns.length === 0) return [];
   // Use the first pattern as the channel schema (channel count/name identity
   // stays consistent across patterns per the store's global rename behaviour).
-  // But we classify by the FIRST pattern that has data for that channel —
-  // empty initial patterns would otherwise mislabel everything as empty.
   const schema = patterns[0];
   if (!schema || !Array.isArray(schema.channels)) return [];
 
-  // Classify using each channel's richest pattern (most notes → best signal).
-  // Falls back to the schema pattern if all are equally empty.
-  const analyses: EnhancedChannelAnalysis[] = schema.channels.map((_, idx) => {
-    let best: { pat: Pattern; noteCount: number } | null = null;
-    for (const pat of patterns) {
-      const ch = pat.channels?.[idx];
-      if (!ch) continue;
-      let n = 0;
-      for (const cell of ch.rows) if (cell && cell.note >= 1 && cell.note <= 96) n++;
-      if (!best || n > best.noteCount) best = { pat, noteCount: n };
-    }
-    const pat = best ? best.pat : schema;
-    return classifyChannelWithInstruments(pat.channels[idx], idx, instruments);
-  });
+  // Share the richest-per-channel classification with classifySongChannels so
+  // auto-naming and role-targeted auto-dub agree on every channel's role.
+  const analyses = classifySongChannels(patterns, instruments);
 
   // First pass: build proposals (only for channels with generic current names).
   const proposals: Array<{ index: number; oldName: string; proposed: string | null }> = [];

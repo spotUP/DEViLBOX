@@ -320,6 +320,14 @@ export const useTransportStore = create<TransportStore>()(
             const { dubLanePlayer } = require('../engine/dub/DubLanePlayer');
             dubLanePlayer.onTick(row);
           } catch { /* player not yet loaded — ignore on first boot */ }
+          // Dub effect-command cells (effTyp 33/34/35) — inline equivalent
+          // of dubLane events, scanned per row so users who type "Z00" into
+          // a cell hear the move fire. Lane events run first (above), then
+          // effect commands, so their interleaving is deterministic.
+          try {
+            const { scanDubEffectsForRow } = require('../engine/dub/DubEffectScanner');
+            scanDubEffectsForRow(row);
+          } catch { /* scanner not loaded — ignore on first boot */ }
         }
 
         // Follow playback: sync cursor to playback row
