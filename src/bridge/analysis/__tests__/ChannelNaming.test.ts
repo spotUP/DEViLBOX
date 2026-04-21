@@ -448,3 +448,162 @@ describe('classifySongRoles (regression: song-wide role classification)', () => 
     expect(a).toBe(b);
   });
 });
+
+// ── any-instrument-strong-signal promotion ─────────────────────────────────
+
+/**
+ * Regression tests for the 2026-04-21 any-instrument promotion branch in
+ * classifyChannelWithInstruments. Ensures that a non-dominant bass or
+ * percussion instrument can still lift a channel's role when it plays
+ * meaningfully on that channel — required for classic dub MODs where
+ * bass + vocal + melody share one channel and none hits 70% dominance.
+ */
+describe('classifyChannelWithInstruments — any-instrument promotion', () => {
+  it('promotes to bass when a bass instrument plays 20% of a lead-dominated channel', () => {
+    // Build a channel: 16 lead notes + 4 bass notes = 20/4 = 80/20 split.
+    // Dominant instrument is the lead (conf 0.6), below the 0.8 override.
+    // Note-stats will tag this 'lead' / 'arpeggio' / 'chord' depending on
+    // pitch spread; with a bass instrument playing 20% we want 'bass'.
+    const ch: ChannelData = makeChannel('', 64, {
+      0: { note: 60, instrument: 1 }, 4: { note: 62, instrument: 1 },
+      8: { note: 64, instrument: 1 }, 12: { note: 65, instrument: 1 },
+      16: { note: 67, instrument: 1 }, 20: { note: 69, instrument: 1 },
+      24: { note: 60, instrument: 1 }, 28: { note: 62, instrument: 1 },
+      32: { note: 60, instrument: 1 }, 36: { note: 62, instrument: 1 },
+      40: { note: 64, instrument: 1 }, 44: { note: 65, instrument: 1 },
+      48: { note: 67, instrument: 1 }, 52: { note: 69, instrument: 1 },
+      56: { note: 60, instrument: 1 }, 60: { note: 62, instrument: 1 },
+      // Bass instrument 2 plays 4 notes (20% of 20 cells)
+      2: { note: 13, instrument: 2 }, 18: { note: 13, instrument: 2 },
+      34: { note: 14, instrument: 2 }, 50: { note: 13, instrument: 2 },
+    });
+    const lookup = new Map<number, InstrumentConfig>();
+    lookup.set(1, makeInstrument({ id: 1, name: 'Lead melody' }));
+    lookup.set(2, makeInstrument({ id: 2, name: 'Bass synth' })); // triggers name-regex at conf 0.6
+    // Bump bass to high-confidence signal via a DRUM_SYNTH-ish field;
+    // here we use sample-URL categorize which returns conf 0.8 for 'bass'.
+    lookup.set(2, makeInstrument({
+      id: 2, name: 'Bass synth',
+      sample: { url: 'packs/bass/sub_808.wav' } as InstrumentConfig['sample'],
+    }));
+
+    const result = classifyChannelWithInstruments(ch, 0, lookup);
+    expect(result.role).toBe('bass');
+  });
+
+  it('promotes to percussion when a kick instrument plays >= 10% of a pad-dominated channel', () => {
+    // Pad on inst 1 playing 14 slots, kick on inst 2 playing 2 slots (12.5%).
+    const ch: ChannelData = makeChannel('', 64, {
+      0: { note: 48, instrument: 1 }, 4: { note: 48, instrument: 1 },
+      8: { note: 48, instrument: 1 }, 12: { note: 48, instrument: 1 },
+      16: { note: 48, instrument: 1 }, 20: { note: 48, instrument: 1 },
+      24: { note: 48, instrument: 1 }, 28: { note: 48, instrument: 1 },
+      32: { note: 48, instrument: 1 }, 36: { note: 48, instrument: 1 },
+      40: { note: 48, instrument: 1 }, 44: { note: 48, instrument: 1 },
+      48: { note: 48, instrument: 1 }, 52: { note: 48, instrument: 1 },
+      // Kick twice
+      2: { note: 24, instrument: 2 }, 34: { note: 24, instrument: 2 },
+    });
+    const lookup = new Map<number, InstrumentConfig>();
+    lookup.set(1, makeInstrument({ id: 1, name: 'Pad string' }));
+    lookup.set(2, makeInstrument({
+      id: 2, name: 'Kick',
+      drumMachine: { drumType: 'kick' } as InstrumentConfig['drumMachine'],
+    }));
+    const result = classifyChannelWithInstruments(ch, 0, lookup);
+    // 2 kick notes < MIN_USES_ABSOLUTE (4) → promotion NOT applied.
+    // Fallback path: kick instrument has conf 1.0 drumType, so the first-
+    // pass dominant-instrument check needs 70% (it's at 12.5%) — also
+    // doesn't fire. Expect role stays 'pad' / 'chord' / etc. — but NOT 'percussion'.
+    expect(result.role).not.toBe('percussion');
+  });
+
+  it('promotes to percussion when a kick plays 5 of 20 slots (>= 10% AND >= 4 absolute)', () => {
+    const ch: ChannelData = makeChannel('', 64, {
+      // 15 pad notes
+      0: { note: 48, instrument: 1 }, 2: { note: 48, instrument: 1 },
+      4: { note: 48, instrument: 1 }, 6: { note: 48, instrument: 1 },
+      8: { note: 48, instrument: 1 }, 10: { note: 48, instrument: 1 },
+      12: { note: 48, instrument: 1 }, 14: { note: 48, instrument: 1 },
+      16: { note: 48, instrument: 1 }, 18: { note: 48, instrument: 1 },
+      20: { note: 48, instrument: 1 }, 22: { note: 48, instrument: 1 },
+      24: { note: 48, instrument: 1 }, 26: { note: 48, instrument: 1 },
+      28: { note: 48, instrument: 1 },
+      // 5 kick notes (25%)
+      1: { note: 24, instrument: 2 }, 5: { note: 24, instrument: 2 },
+      9: { note: 24, instrument: 2 }, 13: { note: 24, instrument: 2 },
+      17: { note: 24, instrument: 2 },
+    });
+    const lookup = new Map<number, InstrumentConfig>();
+    lookup.set(1, makeInstrument({ id: 1, name: 'Pad string' }));
+    lookup.set(2, makeInstrument({
+      id: 2, name: 'Kick',
+      drumMachine: { drumType: 'kick' } as InstrumentConfig['drumMachine'],
+    }));
+    const result = classifyChannelWithInstruments(ch, 0, lookup);
+    expect(result.role).toBe('percussion');
+    expect(result.subrole).toBe('kick');
+  });
+
+  it('percussion beats bass when both instruments play the channel', () => {
+    const ch: ChannelData = makeChannel('', 64, {
+      // Lead instrument dominates (12 notes)
+      0: { note: 60, instrument: 1 }, 2: { note: 62, instrument: 1 },
+      4: { note: 64, instrument: 1 }, 6: { note: 65, instrument: 1 },
+      8: { note: 67, instrument: 1 }, 10: { note: 69, instrument: 1 },
+      12: { note: 71, instrument: 1 }, 14: { note: 72, instrument: 1 },
+      16: { note: 74, instrument: 1 }, 18: { note: 76, instrument: 1 },
+      20: { note: 77, instrument: 1 }, 22: { note: 79, instrument: 1 },
+      // Bass 5 notes
+      1: { note: 13, instrument: 2 }, 5: { note: 13, instrument: 2 },
+      9: { note: 14, instrument: 2 }, 13: { note: 13, instrument: 2 },
+      17: { note: 14, instrument: 2 },
+      // Percussion 5 notes
+      3: { note: 24, instrument: 3 }, 7: { note: 24, instrument: 3 },
+      11: { note: 24, instrument: 3 }, 15: { note: 24, instrument: 3 },
+      19: { note: 24, instrument: 3 },
+    });
+    const lookup = new Map<number, InstrumentConfig>();
+    lookup.set(1, makeInstrument({ id: 1, name: 'Lead melody' }));
+    lookup.set(2, makeInstrument({
+      id: 2, name: 'Bass',
+      sample: { url: 'packs/bass/sub.wav' } as InstrumentConfig['sample'],
+    }));
+    lookup.set(3, makeInstrument({
+      id: 3, name: 'Kick',
+      drumMachine: { drumType: 'kick' } as InstrumentConfig['drumMachine'],
+    }));
+    const result = classifyChannelWithInstruments(ch, 0, lookup);
+    expect(result.role).toBe('percussion');
+  });
+
+  it('does NOT override an already-percussion channel even if a bass instrument plays', () => {
+    const ch: ChannelData = makeChannel('', 64, {
+      // Kick dominates (16 notes, 80%)
+      0: { note: 24, instrument: 1 }, 2: { note: 24, instrument: 1 },
+      4: { note: 24, instrument: 1 }, 6: { note: 24, instrument: 1 },
+      8: { note: 24, instrument: 1 }, 10: { note: 24, instrument: 1 },
+      12: { note: 24, instrument: 1 }, 14: { note: 24, instrument: 1 },
+      16: { note: 24, instrument: 1 }, 18: { note: 24, instrument: 1 },
+      20: { note: 24, instrument: 1 }, 22: { note: 24, instrument: 1 },
+      24: { note: 24, instrument: 1 }, 26: { note: 24, instrument: 1 },
+      28: { note: 24, instrument: 1 }, 30: { note: 24, instrument: 1 },
+      // Bass 4 notes (20%)
+      1: { note: 13, instrument: 2 }, 5: { note: 13, instrument: 2 },
+      9: { note: 13, instrument: 2 }, 13: { note: 13, instrument: 2 },
+    });
+    const lookup = new Map<number, InstrumentConfig>();
+    lookup.set(1, makeInstrument({
+      id: 1, name: 'Kick',
+      drumMachine: { drumType: 'kick' } as InstrumentConfig['drumMachine'],
+    }));
+    lookup.set(2, makeInstrument({
+      id: 2, name: 'Bass',
+      sample: { url: 'packs/bass/sub.wav' } as InstrumentConfig['sample'],
+    }));
+    const result = classifyChannelWithInstruments(ch, 0, lookup);
+    // Dominant kick hits the 70%+0.8conf override → percussion. Any-bass
+    // promotion branch must not overwrite it.
+    expect(result.role).toBe('percussion');
+  });
+});

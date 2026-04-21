@@ -259,6 +259,64 @@ export function classifyChannelWithInstruments(
     }
   }
 
+  // Any-instrument-strong-signal promotion — fixes the 2026-04-21 world-
+  // class-dub gap where the bass samples (inst 20+21) spectrum-classify
+  // as bass/sub at conf 0.85 but are only 15-30% of any single channel.
+  // Dub / electronic tracks routinely share a MOD channel between sub,
+  // bass stab, vocal chop, and filter sweep, so no one instrument hits
+  // the 70% dominance threshold, and the channel falls through to
+  // note-stats which tags the bassline as 'pad' (octave too high for the
+  // classifyChannel bass rule).
+  //
+  // Scan ALL instruments used on this channel: if any clearly IS
+  // percussion or bass (confidence >= 0.8, i.e. matches drumType /
+  // DRUM_SYNTHS / sample-URL / SampleSpectrum), lift the channel role —
+  // even when that instrument isn't the dominant one. Percussion outranks
+  // bass when both are present. Requires the instrument to play at least
+  // MIN_USES_ABSOLUTE cells AND MIN_USES_FRACTION of the channel, so a
+  // one-shot fill-in doesn't hijack a melodic channel.
+  //
+  // Only promotes FROM weak note-stats roles (empty / pad / lead / chord).
+  // Already-percussion or already-bass channels are left alone — if
+  // note-stats or dominant-instrument already picked a strong role, we
+  // trust it.
+  const MIN_USES_ABSOLUTE = 4;
+  const MIN_USES_FRACTION = 0.10;
+  const minUses = Math.max(MIN_USES_ABSOLUTE, totalCells * MIN_USES_FRACTION);
+
+  // Percussion promotion is UNCONDITIONAL (except when already percussion):
+  // drums carry the most specific dub-move targeting (echoThrow.chN,
+  // snareCrack.chN) and note-stats can FALSELY tag a mixed pad+kick
+  // channel as 'bass' via the avgOctave<=3 fallback — we want 'percussion'
+  // to win over that.
+  if (enhanced.role !== 'percussion') {
+    for (const [id, count] of sorted) {
+      if (count < minUses) break;
+      const cls = classifyInstrument(lookup.get(id));
+      if (cls.role === 'percussion' && cls.confidence >= 0.8) {
+        enhanced.role = 'percussion';
+        enhanced.subrole = cls.subrole;
+        break;
+      }
+    }
+  }
+
+  // Bass promotion is conservative: only lifts weak note-stats roles
+  // (empty / pad / lead / chord / arpeggio). Does NOT override an already-
+  // percussion channel (just checked), nor already-bass (nothing to do).
+  const BASS_PROMOTABLE_FROM: readonly ChannelRole[] = ['empty', 'pad', 'lead', 'chord', 'arpeggio'];
+  if (BASS_PROMOTABLE_FROM.includes(enhanced.role)) {
+    for (const [id, count] of sorted) {
+      if (count < minUses) break;
+      const cls = classifyInstrument(lookup.get(id));
+      if (cls.role === 'bass' && cls.confidence >= 0.8) {
+        enhanced.role = 'bass';
+        if (cls.subrole) enhanced.subrole = cls.subrole;
+        break;
+      }
+    }
+  }
+
   // Sub-bass tag — only avgOctave < 1 (i.e., octave-0 notes, C-0 through B-0)
   // qualifies. Notes at octave 1 are normal "Bass" territory in tracker music.
   if (enhanced.role === 'bass' && noteAnalysis.avgOctave < 1) {
