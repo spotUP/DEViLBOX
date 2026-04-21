@@ -307,6 +307,40 @@ float fur_get_tuning() {
 }
 
 /**
+ * Get master volume (float, default 1.0; old format default 2.0).
+ */
+float fur_get_master_vol() {
+  return g_engine.song.masterVol;
+}
+
+/**
+ * Get per-system volume (float, 0.0-1.0+).
+ * idx = system slot index (0-based).
+ */
+float fur_get_system_vol(int idx) {
+  if (idx < 0 || idx >= g_engine.song.systemLen) return 1.0f;
+  return g_engine.song.systemVol[idx];
+}
+
+/**
+ * Get per-system panning (float, -1.0..+1.0, 0=center).
+ * idx = system slot index.
+ */
+float fur_get_system_pan(int idx) {
+  if (idx < 0 || idx >= g_engine.song.systemLen) return 0.0f;
+  return g_engine.song.systemPan[idx];
+}
+
+/**
+ * Get per-system front/rear panning (float, -1.0..+1.0, 0=center).
+ * idx = system slot index.
+ */
+float fur_get_system_pan_fr(int idx) {
+  if (idx < 0 || idx >= g_engine.song.systemLen) return 0.0f;
+  return g_engine.song.systemPanFR[idx];
+}
+
+/**
  * Get compat flags pre-packed into the WASM sequencer's bitmask format.
  * which=0: flags (uint32 bitmask), which=1: flagsExt (uint32 packed multi-bit),
  * which=2: pitchSlideSpeed (int)
