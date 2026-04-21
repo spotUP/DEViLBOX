@@ -561,6 +561,10 @@ export interface FurnaceNativeData {
   grooves?: Array<{ len: number; val: number[] }>;  // Groove patterns for 09xx effect
   chipFlags?: string[];  // Per-chip flag strings (key=value\n format) for clock/model selection
   tuning?: number;  // A-4 tuning in Hz (default 440.0)
+  masterVol?: number;  // Song master volume (default 1.0; old format default 2.0)
+  systemVol?: number[];  // Per-chip volume (0-1, default 1.0 each)
+  systemPan?: number[];  // Per-chip L/R pan (-1..+1, default 0.0 center)
+  systemPanFR?: number[];  // Per-chip front/rear pan (-1..+1, default 0.0)
 }
 
 export interface FurnaceSubsong {

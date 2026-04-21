@@ -13,36 +13,37 @@
  */
 
 // Per-platform getPostAmp() — matches upstream Furnace exactly.
-// Default is 1.0. Keys are DivSystem enum values (matching FurnaceDispatchWrapper.cpp).
+// Default is 1.0. Keys are DivSystem enum values from sysDef.h.
+// Verified against tools/furnace-audit/render-devilbox.ts reference.
 const POST_AMP = {
-  4: 1.5,   // SMS
-  5: 1.5,   // SMS_OPLL
-  83: 1.5,  // T6W28
-  29: 1.5,  // OPLL
-  48: 1.5,  // VRC7
-  59: 1.5,  // OPLL_DRUMS
-  8: 2.0,   // NES
-  106: 2.0, // 5E01
-  2: 2.0,   // GENESIS
-  3: 2.0,   // GENESIS_EXT
-  20: 2.0,  // YM2612
-  52: 2.0,  // YM2612_EXT
-  80: 2.0,  // YM2612_DUALPCM
-  81: 2.0,  // YM2612_DUALPCM_EXT
-  89: 2.0,  // YM2612_CSM
-  42: 2.0,  // POKEY
-  30: 2.0,  // FDS
-  11: 3.0,  // C64_6581 (reSIDfp)
-  12: 3.0,  // C64_8580 (reSIDfp)
-  98: 3.0,  // C140
-  99: 3.0,  // C219
-  74: 3.0,  // MSM6295
-  65: 4.0,  // X1_010
-  76: 4.0,  // YMZ280B
-  62: 4.0,  // VERA
-  47: 6.0,  // VBOY
-  31: 64.0, // MMC5
-  21: 0.5,  // TIA
+  4: 1.5,   // DIV_SYSTEM_SMS
+  5: 1.5,   // DIV_SYSTEM_SMS_OPLL
+  83: 1.5,  // DIV_SYSTEM_T6W28
+  28: 1.5,  // DIV_SYSTEM_OPLL
+  48: 1.5,  // DIV_SYSTEM_VRC7
+  59: 1.5,  // DIV_SYSTEM_OPLL_DRUMS
+  8: 2.0,   // DIV_SYSTEM_NES
+  106: 2.0, // DIV_SYSTEM_5E01
+  2: 2.0,   // DIV_SYSTEM_GENESIS
+  3: 2.0,   // DIV_SYSTEM_GENESIS_EXT
+  20: 2.0,  // DIV_SYSTEM_YM2612
+  52: 2.0,  // DIV_SYSTEM_YM2612_EXT
+  80: 2.0,  // DIV_SYSTEM_YM2612_DUALPCM
+  81: 2.0,  // DIV_SYSTEM_YM2612_DUALPCM_EXT
+  89: 2.0,  // DIV_SYSTEM_YM2612_CSM
+  41: 2.0,  // DIV_SYSTEM_POKEY
+  29: 2.0,  // DIV_SYSTEM_FDS
+  11: 3.0,  // DIV_SYSTEM_C64_6581 (reSIDfp)
+  12: 3.0,  // DIV_SYSTEM_C64_8580 (reSIDfp)
+  98: 3.0,  // DIV_SYSTEM_C140
+  99: 3.0,  // DIV_SYSTEM_C219
+  74: 3.0,  // DIV_SYSTEM_MSM6295
+  65: 4.0,  // DIV_SYSTEM_X1_010
+  76: 4.0,  // DIV_SYSTEM_YMZ280B
+  62: 4.0,  // DIV_SYSTEM_VERA
+  47: 6.0,  // DIV_SYSTEM_VBOY
+  30: 64.0, // DIV_SYSTEM_MMC5
+  21: 0.5,  // DIV_SYSTEM_TIA
 };
 
 class FurnaceDispatchProcessor extends AudioWorkletProcessor {
@@ -98,6 +99,12 @@ class FurnaceDispatchProcessor extends AudioWorkletProcessor {
     // channel is only included in the dub render loop when enabled. Must
     // match MAX_DUB_CHANNELS and DUB_OUTPUT_BASE in ChannelRoutedEffects.ts.
     this.dubChannelEnabled = new Array(32).fill(false);
+
+    // Per-song mix volumes (matching upstream Furnace playback.cpp nextBuf).
+    // Keyed by platformType to avoid chip-Map insertion-order issues.
+    this.masterVol = 1.0;
+    this.chipVolL = {};  // { [platformType]: volL }
+    this.chipVolR = {};  // { [platformType]: volR }
 
     // Exported WASM functions (cwrap'd)
     this.wasm = null;
@@ -388,6 +395,32 @@ class FurnaceDispatchProcessor extends AudioWorkletProcessor {
               this.wasm.setTuning(chip.handle, data.tuning);
             }
           }
+        }
+        break;
+      }
+
+      case 'setMixVolumes': {
+        // Pre-compute per-chip L/R volumes from masterVol, systemVol[], systemPan[].
+        // Matches upstream Furnace playback.cpp nextBuf() formula:
+        //   vol = systemVol[chip] * postAmp * masterVol
+        //   L *= min(1, 1 - pan) * min(1, 1 + panFR)
+        //   R *= min(1, 1 + pan) * min(1, 1 + panFR)
+        this.masterVol = data.masterVol ?? 1.0;
+        this.chipVolL = {};
+        this.chipVolR = {};
+        const chipIds = data.chipIds || [];
+        const sysVols = data.systemVol || [];
+        const sysPans = data.systemPan || [];
+        const sysPanFRs = data.systemPanFR || [];
+        for (let i = 0; i < chipIds.length; i++) {
+          const pType = chipIds[i];
+          const sysVol = sysVols[i] ?? 1.0;
+          const postAmp = POST_AMP[pType] ?? 1.0;
+          const baseVol = sysVol * postAmp * this.masterVol;
+          const pan = sysPans[i] ?? 0.0;
+          const panFR = sysPanFRs[i] ?? 0.0;
+          this.chipVolL[pType] = baseVol * Math.min(1.0, 1.0 - pan) * Math.min(1.0, 1.0 + panFR);
+          this.chipVolR[pType] = baseVol * Math.min(1.0, 1.0 + pan) * Math.min(1.0, 1.0 + panFR);
         }
         break;
       }
@@ -1154,10 +1187,11 @@ class FurnaceDispatchProcessor extends AudioWorkletProcessor {
 
           this.wasm.render(chip.handle, this.outputPtrL, this.outputPtrR, numSamples);
           this.updateBufferViews();
-          const amp = POST_AMP[chip.platformType] || 1.0;
+          const volL = this.chipVolL[chip.platformType] ?? (POST_AMP[chip.platformType] ?? 1.0);
+          const volR = this.chipVolR[chip.platformType] ?? (POST_AMP[chip.platformType] ?? 1.0);
           for (let i = 0; i < numSamples; i++) {
-            outputL[i] += this.outputBufferL[i] * amp;
-            outputR[i] += this.outputBufferR[i] * amp;
+            outputL[i] += this.outputBufferL[i] * volL;
+            outputR[i] += this.outputBufferR[i] * volR;
           }
 
           // Restore mutes after main render
@@ -1215,10 +1249,11 @@ class FurnaceDispatchProcessor extends AudioWorkletProcessor {
             }
             this.wasm.render(targetChip.handle, this.outputPtrL, this.outputPtrR, numSamples);
             this.updateBufferViews();
-            const amp = POST_AMP[targetChip.platformType] || 1.0;
+            const dubVolL = this.chipVolL[targetChip.platformType] ?? (POST_AMP[targetChip.platformType] ?? 1.0);
+            const dubVolR = this.chipVolR[targetChip.platformType] ?? (POST_AMP[targetChip.platformType] ?? 1.0);
             for (let i = 0; i < numSamples; i++) {
-              slotL[i] = this.outputBufferL[i] * amp;
-              slotR[i] = this.outputBufferR[i] * amp;
+              slotL[i] = this.outputBufferL[i] * dubVolL;
+              slotR[i] = this.outputBufferR[i] * dubVolR;
             }
             // Restore all channels on this chip to unmuted
             for (let ch = 0; ch < targetChip.numChannels; ch++) {
@@ -1257,10 +1292,11 @@ class FurnaceDispatchProcessor extends AudioWorkletProcessor {
 
               this.wasm.render(chip.handle, this.outputPtrL, this.outputPtrR, numSamples);
               this.updateBufferViews();
-              const amp = POST_AMP[chip.platformType] || 1.0;
+              const isoVolL = this.chipVolL[chip.platformType] ?? (POST_AMP[chip.platformType] ?? 1.0);
+              const isoVolR = this.chipVolR[chip.platformType] ?? (POST_AMP[chip.platformType] ?? 1.0);
               for (let i = 0; i < numSamples; i++) {
-                slotL[i] += this.outputBufferL[i] * amp;
-                slotR[i] += this.outputBufferR[i] * amp;
+                slotL[i] += this.outputBufferL[i] * isoVolL;
+                slotR[i] += this.outputBufferR[i] * isoVolR;
               }
 
               // Restore all channels to unmuted after isolation render
@@ -1274,6 +1310,13 @@ class FurnaceDispatchProcessor extends AudioWorkletProcessor {
         }
       }
 
+      // Clamp main output to ±1.0 (matches upstream Furnace clampSamples)
+      for (let i = 0; i < numSamples; i++) {
+        if (outputL[i] > 1.0) outputL[i] = 1.0;
+        else if (outputL[i] < -1.0) outputL[i] = -1.0;
+        if (outputR[i] > 1.0) outputR[i] = 1.0;
+        else if (outputR[i] < -1.0) outputR[i] = -1.0;
+      }
 
     } catch (e) {
       if (!this._errorReported) {
