@@ -184,21 +184,37 @@ export const DubDeckStrip: React.FC = () => {
   }, [busEnabled, releaseAllHeld]);
   useEffect(() => releaseAllHeld, [releaseAllHeld]);
 
-  // Auto-layout when bus toggles ON↔OFF (transitions only; never on mount
-  // — firing on mount cycled view-switching code when the bus was persisted
-  // as enabled from a prior session, briefly showing DJ/VJ views as the
-  // layout re-flowed). Fire only when the user actively flips the bus.
-  const prevBusEnabledRef = useRef(busEnabled);
+  // Auto-layout for bus-enabled state. Fires on every busEnabled transition
+  // PLUS once on mount (deferred) when the bus is already enabled from a
+  // persisted session, so reloading the page with dub deck on still routes
+  // straight into editor-fullscreen. The earlier mount-suppression was
+  // guarding against a brief DJ/VJ flash during layout reflow; deferring to
+  // the next rAF (after the initial paint settles) sidesteps that without
+  // losing the auto-fullscreen.
+  const prevBusEnabledRef = useRef<boolean | null>(null);
   useEffect(() => {
-    if (prevBusEnabledRef.current === busEnabled) return;
+    const isInitialMount = prevBusEnabledRef.current === null;
+    const changed = prevBusEnabledRef.current !== busEnabled;
     prevBusEnabledRef.current = busEnabled;
-    if (busEnabled) {
-      setStripCollapsed(false);
-      useUIStore.getState().setEditorFullscreen(true);
-    } else {
-      setStripCollapsed(true);
-      useUIStore.getState().setEditorFullscreen(false);
+    if (!changed) return;
+
+    const apply = () => {
+      if (busEnabled) {
+        setStripCollapsed(false);
+        useUIStore.getState().setEditorFullscreen(true);
+      } else {
+        setStripCollapsed(true);
+        useUIStore.getState().setEditorFullscreen(false);
+      }
+    };
+
+    if (isInitialMount) {
+      // Defer one frame so initial layout paints first — avoids the
+      // transient DJ/VJ view-switch flicker we saw when firing synchronously.
+      const handle = requestAnimationFrame(apply);
+      return () => cancelAnimationFrame(handle);
     }
+    apply();
   }, [busEnabled, setStripCollapsed]);
 
   useEffect(() => {

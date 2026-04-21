@@ -206,6 +206,22 @@ export function useChannelAutomationParams(channelIndex: number): {
   const editorMode = useFormatStore((s) => s.editorMode);
 
   return useMemo(() => {
+    // Global lane sentinel — show only bus-wide + song-level params.
+    // channelIndex = -1 is the "global" pseudo-channel used by the top-of-
+    // pattern-editor Global Lane row. No instrument lookup; the picker
+    // only surfaces things that make sense at pattern / bus level.
+    if (channelIndex === -1) {
+      const dubParams = nksToAutomatable(DUB_NKS_PARAMETERS);
+      const globalParams = nksToAutomatable(GLOBAL_NKS_PARAMETERS);
+      const params = [...globalParams, ...dubParams];
+      return {
+        params,
+        groups: groupParamsBySection(params),
+        synthType: null,
+        instrumentName: 'Global',
+      };
+    }
+
     if (!instrumentInfo)
       return { params: [], groups: [], synthType: null, instrumentName: null };
 

@@ -647,9 +647,9 @@ export const useDJStore = create<DJStore>()(
         state.decks[deck].slipEnabled = enabled;
       }),
 
-    setDeckKeyLock: (_deck, _enabled) =>
-      set(() => {
-        // Key lock removed — PitchShift caused echo artifacts
+    setDeckKeyLock: (deck, enabled) =>
+      set((state) => {
+        state.decks[deck].keyLockEnabled = enabled;
       }),
 
     toggleDeckChannel: (deck, channel) =>
