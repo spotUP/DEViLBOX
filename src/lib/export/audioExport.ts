@@ -262,7 +262,7 @@ export function audioBufferToWav(buffer: AudioBuffer): Blob {
   // Peak-normalize if the captured signal would otherwise clip.
   // DEViLBOX's master chain is user-configurable — `masterChannel` is just
   // volume/pan, no default limiter — so a hot mix can legitimately deliver
-  // peaks above ±1.0 into `blepInput` where the export tap sits. The old
+  // peaks above ±1.0 into the pre-limiter chain. The old
   // code did `Math.max(-1, Math.min(1, x))` which hard-clipped the tops off
   // every wave crest (reported as "distorted audio" on 2026-04-21).
   //
@@ -281,6 +281,8 @@ export function audioBufferToWav(buffer: AudioBuffer): Blob {
   }
   const CEILING = 0.9661; // -0.3 dBFS
   const scale = peak > 1.0 ? (CEILING / peak) : 1.0;
+  const peakDb = peak > 0 ? 20 * Math.log10(peak) : -Infinity;
+  console.warn(`[audioExport] ⚠️ PEAK LEVEL: ${peak.toFixed(4)} (${peakDb.toFixed(1)} dBFS) | scale: ${scale.toFixed(6)} | samples: ${samples}`);
 
   let offset = 44;
   for (let i = 0; i < samples; i++) {
@@ -432,10 +434,8 @@ export function captureAudioLiveToBuffer(
             try { processor.disconnect(); } catch { /* ignore */ }
             try {
               const toneEngine = getToneEngine();
-              // Disconnect from whichever tap we connected to. `blepInput`
-              // is post master FX and pre master volume — the canonical
-              // export point.
-              const mn = getNativeAudioNode(toneEngine.blepInput);
+              // Disconnect from the export tap (post-limiter, pre-master-volume)
+              const mn = getNativeAudioNode(toneEngine.exportTap);
               mn?.disconnect(processor);
             } catch { /* ignore */ }
             restoreMuteState?.();
@@ -453,6 +453,17 @@ export function captureAudioLiveToBuffer(
               ? event.inputBuffer.getChannelData(1)
               : inputL;
 
+            // Peak diagnostics — log every ~2 seconds to see how hot the signal is
+            if (captured % (sampleRate * 2) < BUFFER_SIZE) {
+              let blockPeak = 0;
+              for (let j = 0; j < inputL.length; j++) {
+                const a = Math.max(Math.abs(inputL[j]), Math.abs(inputR[j]));
+                if (a > blockPeak) blockPeak = a;
+              }
+              const bpDb = blockPeak > 0 ? 20 * Math.log10(blockPeak) : -Infinity;
+              console.warn(`[audioExport] capture block peak: ${blockPeak.toFixed(4)} (${bpDb.toFixed(1)} dBFS) at sample ${captured}`);
+            }
+
             const count = Math.min(inputL.length, totalSamples - captured);
             bufL.set(inputL.subarray(0, count), captured);
             bufR.set(inputR.subarray(0, count), captured);
@@ -465,12 +476,13 @@ export function captureAudioLiveToBuffer(
 
           try {
             const toneEngine = getToneEngine();
-            // Tap at `blepInput` — post-master-FX, pre-master-volume. This
-            // captures everything the user hears colorized (reverb, EQ,
-            // limiter chain) without baking in their current volume knob
-            // so the exported WAV is normalized.
-            const tap = getNativeAudioNode(toneEngine.blepInput);
-            if (!tap) throw new Error('Could not find blepInput native node for capture tap');
+            // Tap at `exportTap` — post-safety-limiter, pre-master-volume.
+            // The limiter prevents channel-summing overloads (16 channels at
+            // 0 dB can peak at ±16.0 = +24 dBFS) from destroying the export.
+            // This captures what the user hears through speakers, minus their
+            // current master volume knob, so the WAV is normalized.
+            const tap = getNativeAudioNode(toneEngine.exportTap);
+            if (!tap) throw new Error('Could not find exportTap native node for capture tap');
 
             // Silent gain sink — ScriptProcessor requires an output but we
             // don't want to double-route audio to the speaker.
@@ -575,7 +587,7 @@ export async function exportUADEAsWav(
 
 /**
  * Exports the full song to WAV by capturing the live audio graph from
- * `blepInput` (post master-FX, pre master-volume). This is the
+ * `exportTap` (post safety-limiter, pre master-volume). This is the
  * authoritative export path for accurate "sounds exactly like what you
  * hear" results because it includes:
  *   - Every synth DEViLBOX supports (TB303, DB303, DubSiren, Furnace, UADE,
@@ -757,7 +769,7 @@ export interface StemResult {
  * Export every channel as its own file by running a live capture for each,
  * with only that channel unmuted. Correct for every format (tracker MODs,
  * UADE, Furnace, Hively, libopenmpt, SID, Tone.js synths) because it uses
- * the same `blepInput` tap as the main export — including master FX and
+ * the same `exportTap` tap as the main export — including master FX and
  * the dub bus.
  *
  * Real-time cost is N × song duration (one full pass per channel). A
