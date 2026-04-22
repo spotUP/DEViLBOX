@@ -324,11 +324,12 @@ export const useDJPlaylistStore = create<DJPlaylistState>()(
           }
         } catch { /* audio store not available */ }
 
+        const fullTrack = ensureTrackId(track);
         set((state) => {
           pushUndo(state);
           const p = state.playlists.find((pl) => pl.id === playlistId);
           if (p) {
-            p.tracks.push(ensureTrackId(track));
+            p.tracks.push(fullTrack);
             p.updatedAt = Date.now();
             if (!p.masterEffects && masterFxSnapshot) {
               p.masterEffects = masterFxSnapshot;
@@ -336,6 +337,11 @@ export const useDJPlaylistStore = create<DJPlaylistState>()(
           }
         });
         syncPlaylists();
+
+        // Auto-queue stem separation in background
+        import('@/engine/dj/DJStemPreloader').then(({ queueTrackForStemSeparation }) => {
+          void queueTrackForStemSeparation(fullTrack as PlaylistTrack);
+        }).catch(() => { /* stem preloader not available */ });
       },
 
       addTracks: (playlistId: string, tracks: Array<Omit<PlaylistTrack, 'id'> & { id?: string }>, opts?: { skipDuplicates?: boolean }) => {
@@ -348,20 +354,21 @@ export const useDJPlaylistStore = create<DJPlaylistState>()(
           }
         } catch { /* audio store not available */ }
 
+        const addedTracks: PlaylistTrack[] = [];
         set((state) => {
           pushUndo(state);
           const p = state.playlists.find((pl) => pl.id === playlistId);
           if (!p) return;
 
-          let added = 0;
           let skipped = 0;
           for (const track of tracks) {
             if (opts?.skipDuplicates) {
               const isDuplicate = p.tracks.some((t) => t.fileName === track.fileName);
               if (isDuplicate) { skipped++; continue; }
             }
-            p.tracks.push(ensureTrackId(track));
-            added++;
+            const full = ensureTrackId(track);
+            p.tracks.push(full);
+            addedTracks.push(full as PlaylistTrack);
           }
           p.updatedAt = Date.now();
           if (!p.masterEffects && masterFxSnapshot) {
@@ -369,18 +376,26 @@ export const useDJPlaylistStore = create<DJPlaylistState>()(
           }
 
           if (skipped > 0) {
-            // Import notify lazily to avoid circular deps
             import('@/stores/useNotificationStore').then(({ notify }) => {
               notify.warning(`Skipped ${skipped} duplicate track${skipped > 1 ? 's' : ''}`);
             });
           }
-          if (added > 0) {
+          if (addedTracks.length > 0) {
             import('@/stores/useNotificationStore').then(({ notify }) => {
-              notify.success(`Added ${added} track${added > 1 ? 's' : ''}`);
+              notify.success(`Added ${addedTracks.length} track${addedTracks.length > 1 ? 's' : ''}`);
             });
           }
         });
         syncPlaylists();
+
+        // Auto-queue stem separation for all added tracks
+        if (addedTracks.length > 0) {
+          import('@/engine/dj/DJStemPreloader').then(({ queueTrackForStemSeparation }) => {
+            for (const t of addedTracks) {
+              void queueTrackForStemSeparation(t);
+            }
+          }).catch(() => { /* stem preloader not available */ });
+        }
       },
 
       removeTrack: (playlistId: string, index: number) => {
