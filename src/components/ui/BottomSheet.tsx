@@ -35,6 +35,7 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
   const sheetRef = useRef<HTMLDivElement>(null);
   const dragStartY = useRef(0);
   const dragStartHeight = useRef(0);
+  const previouslyFocusedRef = useRef<HTMLElement | null>(null);
 
   // Calculate height based on snap point
   const snapHeight = snapPoints[currentSnapIndex] * window.innerHeight;
@@ -121,6 +122,62 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
       };
     }
   }, [isOpen]);
+
+  // Focus management: save focus, auto-focus sheet, restore on close
+  useEffect(() => {
+    if (!isOpen) return;
+    previouslyFocusedRef.current = document.activeElement as HTMLElement;
+
+    requestAnimationFrame(() => {
+      if (!sheetRef.current) return;
+      const FOCUSABLE = 'a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])';
+      const firstFocusable = sheetRef.current.querySelector<HTMLElement>(FOCUSABLE);
+      if (firstFocusable) firstFocusable.focus();
+      else sheetRef.current.focus();
+    });
+
+    return () => {
+      const prev = previouslyFocusedRef.current;
+      if (prev && typeof prev.focus === 'function') {
+        requestAnimationFrame(() => prev.focus());
+      }
+    };
+  }, [isOpen]);
+
+  // Keyboard: Escape to close, Tab trap
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && dismissible) {
+        e.preventDefault();
+        onClose();
+        return;
+      }
+
+      if (e.key === 'Tab' && sheetRef.current) {
+        const FOCUSABLE = 'a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])';
+        const focusable = Array.from(sheetRef.current.querySelectorAll<HTMLElement>(FOCUSABLE));
+        if (focusable.length === 0) return;
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+        if (e.shiftKey) {
+          if (document.activeElement === first || !sheetRef.current.contains(document.activeElement)) {
+            e.preventDefault();
+            last.focus();
+          }
+        } else {
+          if (document.activeElement === last || !sheetRef.current.contains(document.activeElement)) {
+            e.preventDefault();
+            first.focus();
+          }
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKey);
+    return () => window.removeEventListener('keydown', handleKey);
+  }, [isOpen, dismissible, onClose]);
 
   if (!isOpen) return null;
 

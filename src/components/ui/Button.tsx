@@ -30,7 +30,7 @@ export const Button: React.FC<ButtonProps> = ({
   ...props
 }) => {
   // Base classes for all buttons
-  const baseClasses = 'inline-flex items-center justify-center gap-2 font-medium transition-colors focus:outline-none';
+  const baseClasses = 'inline-flex items-center justify-center gap-2 font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary focus-visible:ring-offset-1 focus-visible:ring-offset-dark-bg';
 
   // Variant classes
   const variantClasses: Record<string, string> = {

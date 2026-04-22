@@ -147,14 +147,40 @@ interface UseModalCloseOptions {
   onClose: () => void;
   enableEnter?: boolean; // Default: true
   enableEscape?: boolean; // Default: true
+  /** Ref to the modal container element — enables Tab focus trapping + auto-focus */
+  containerRef?: React.RefObject<HTMLElement | null>;
 }
+
+const FOCUSABLE_SELECTOR = 'a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])';
 
 export function useModalClose({
   isOpen,
   onClose,
   enableEnter = true,
   enableEscape = true,
+  containerRef,
 }: UseModalCloseOptions) {
+  const previouslyFocusedRef = useRef<HTMLElement | null>(null);
+
+  // Auto-focus first focusable element on open, restore on close
+  useEffect(() => {
+    if (!isOpen || !containerRef?.current) return;
+    previouslyFocusedRef.current = document.activeElement as HTMLElement;
+
+    requestAnimationFrame(() => {
+      if (!containerRef.current) return;
+      const first = containerRef.current.querySelector<HTMLElement>(FOCUSABLE_SELECTOR);
+      if (first) first.focus();
+    });
+
+    return () => {
+      const prev = previouslyFocusedRef.current;
+      if (prev && typeof prev.focus === 'function') {
+        requestAnimationFrame(() => prev.focus());
+      }
+    };
+  }, [isOpen, containerRef]);
+
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
     if (!isOpen) return;
 
@@ -163,6 +189,26 @@ export function useModalClose({
     const isSelect = target.tagName === 'SELECT';
     const isButton = target.tagName === 'BUTTON';
     const isInput = target.tagName === 'INPUT';
+
+    // Tab focus trapping
+    if (e.key === 'Tab' && containerRef?.current) {
+      const focusable = Array.from(containerRef.current.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR));
+      if (focusable.length === 0) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (e.shiftKey) {
+        if (document.activeElement === first || !containerRef.current.contains(document.activeElement)) {
+          e.preventDefault();
+          last.focus();
+        }
+      } else {
+        if (document.activeElement === last || !containerRef.current.contains(document.activeElement)) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
+      return;
+    }
 
     // Escape to close
     if (enableEscape && e.key === 'Escape') {
@@ -189,7 +235,7 @@ export function useModalClose({
       e.stopPropagation();
       onClose();
     }
-  }, [isOpen, onClose, enableEnter, enableEscape]);
+  }, [isOpen, onClose, enableEnter, enableEscape, containerRef]);
 
   useEffect(() => {
     if (!isOpen) return;
