@@ -165,6 +165,7 @@ export interface DeckState {
   stemMode: boolean;                // true = stem playback active (vs full mix)
   stemMutes: Record<string, boolean>;  // per-stem mute state
   stemDubSends: Record<string, boolean>;  // per-stem dub bus send toggles
+  stemSeparationProgress: number | null;  // null = idle, 0-1 = separation in progress
 }
 
 export type DeckId = 'A' | 'B' | 'C';
@@ -266,6 +267,7 @@ const makeDefaultDeckState = (): DeckState => ({
   stemMode: false,
   stemMutes: {},
   stemDubSends: {},
+  stemSeparationProgress: null,
 });
 
 // ============================================================================

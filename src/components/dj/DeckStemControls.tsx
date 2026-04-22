@@ -1,13 +1,13 @@
 /**
  * DeckStemControls — Per-stem mute/unmute + dub send buttons for DJ decks.
  *
- * Shows when stems are available (after Demucs separation).
- * Each stem gets a colored pill button — click to toggle mute.
- * In stem mode, each stem also gets a DUB send toggle that routes
- * the stem's audio into the dub effects chain (echo, spring, etc.).
+ * Three states:
+ * 1. Track loaded, no stems → show "✂ STEMS" button to trigger separation
+ * 2. Separation in progress → show progress bar
+ * 3. Stems available → show stem mute + dub send controls
  */
 
-import React, { useCallback } from 'react';
+import React, { useCallback, useState } from 'react';
 import { useDJStore } from '@/stores/useDJStore';
 import * as DJActions from '@/engine/dj/DJActions';
 
@@ -34,11 +34,32 @@ const STEM_LABELS: Record<string, string> = {
 };
 
 export const DeckStemControls: React.FC<DeckStemControlsProps> = ({ deckId }) => {
+  const fileName = useDJStore((s) => s.decks[deckId].fileName);
+  const playbackMode = useDJStore((s) => s.decks[deckId].playbackMode);
   const stemsAvailable = useDJStore((s) => s.decks[deckId].stemsAvailable);
   const stemMode = useDJStore((s) => s.decks[deckId].stemMode);
   const stemNames = useDJStore((s) => s.decks[deckId].stemNames);
   const stemMutes = useDJStore((s) => s.decks[deckId].stemMutes);
   const stemDubSends = useDJStore((s) => s.decks[deckId].stemDubSends);
+  const stemSeparationProgress = useDJStore((s) => s.decks[deckId].stemSeparationProgress);
+
+  // Check if any other deck is currently separating (Demucs is single-flight)
+  const anyDeckSeparating = useDJStore((s) =>
+    Object.values(s.decks).some((d) => d.stemSeparationProgress !== null)
+  );
+
+  const [error, setError] = useState<string | null>(null);
+
+  const handleSeparate = useCallback(async () => {
+    setError(null);
+    try {
+      await DJActions.separateStems(deckId);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Stem separation failed';
+      setError(msg);
+      setTimeout(() => setError(null), 5000);
+    }
+  }, [deckId]);
 
   const handleToggleStemMode = useCallback(() => {
     DJActions.setStemMode(deckId, !stemMode);
@@ -56,8 +77,64 @@ export const DeckStemControls: React.FC<DeckStemControlsProps> = ({ deckId }) =>
     DJActions.toggleStemDubSend(deckId, stemName);
   }, [deckId]);
 
-  if (!stemsAvailable || stemNames.length === 0) return null;
+  // No track loaded — hide entirely
+  if (!fileName) return null;
 
+  // ── Separation in progress ───────────────────────────────────────────────
+  if (stemSeparationProgress !== null) {
+    const pct = Math.round(stemSeparationProgress * 100);
+    return (
+      <div className="flex items-center gap-2 px-1 py-0.5">
+        <div className="flex-1 h-3 bg-dark-bgTertiary rounded-full overflow-hidden border border-dark-borderLight">
+          <div
+            className="h-full bg-accent-highlight transition-all duration-300"
+            style={{ width: `${pct}%` }}
+          />
+        </div>
+        <span className="text-[9px] font-mono text-accent-highlight whitespace-nowrap">
+          {pct < 10 ? 'Loading model…' : `Separating ${pct}%`}
+        </span>
+      </div>
+    );
+  }
+
+  // ── Error display ────────────────────────────────────────────────────────
+  if (error) {
+    return (
+      <div className="flex items-center gap-1 px-1 py-0.5">
+        <span className="text-[9px] font-mono text-accent-error truncate">{error}</span>
+      </div>
+    );
+  }
+
+  // ── No stems yet — show "Separate" button ────────────────────────────────
+  if (!stemsAvailable) {
+    // Only show for audio playback mode (tracker mode hasn't rendered yet)
+    if (playbackMode !== 'audio') return null;
+
+    const isBusy = anyDeckSeparating;
+    return (
+      <div className="flex items-center gap-1 px-1 py-0.5">
+        <button
+          onClick={handleSeparate}
+          disabled={isBusy}
+          title={isBusy ? 'Separation in progress on another deck' : 'Separate track into stems (drums, bass, vocals, other)'}
+          className={`
+            px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wide
+            border transition-colors duration-100 cursor-pointer select-none outline-none
+            ${isBusy
+              ? 'bg-dark-bgTertiary border-dark-borderLight text-text-muted opacity-50 cursor-not-allowed'
+              : 'bg-accent-highlight/10 border-accent-highlight/50 text-accent-highlight hover:bg-accent-highlight/20 hover:border-accent-highlight'
+            }
+          `}
+        >
+          ✂ STEMS
+        </button>
+      </div>
+    );
+  }
+
+  // ── Stems available — show mute + dub controls ───────────────────────────
   return (
     <div className="flex flex-col gap-0.5 px-1 py-0.5">
       {/* Row 1: Stem mode toggle + per-stem mute buttons */}

@@ -1023,3 +1023,84 @@ export function toggleStemDubSend(deckId: DeckId, stemName: string): void {
   const newSends = { ...state.decks[deckId].stemDubSends, [stemName]: !current };
   state.setDeckState(deckId, { stemDubSends: newSends });
 }
+
+/**
+ * Run Demucs stem separation on the currently loaded deck audio.
+ * Works with all formats — audio files have stereo AudioBuffer directly,
+ * tracker formats are pre-rendered to stereo WAV by the pipeline.
+ */
+export async function separateStems(deckId: DeckId): Promise<void> {
+  const store = useDJStore.getState();
+  const fileName = store.decks[deckId].fileName;
+  if (!fileName) throw new Error('No track loaded on deck ' + deckId);
+
+  const deck = getDJEngine().getDeck(deckId);
+  const audioBuffer = deck.audioPlayer.getAudioBuffer();
+  if (!audioBuffer) throw new Error('Audio not decoded yet — wait for track to finish loading');
+
+  // Duration guard — very long tracks consume excessive memory
+  if (audioBuffer.duration > 600) {
+    throw new Error(`Track too long for stem separation (${Math.round(audioBuffer.duration / 60)} min, max 10 min)`);
+  }
+
+  const left = audioBuffer.getChannelData(0);
+  const right = audioBuffer.numberOfChannels >= 2 ? audioBuffer.getChannelData(1) : left;
+  const sampleRate = audioBuffer.sampleRate;
+
+  // Capture filename for stale-result guard
+  const startFileName = fileName;
+  store.setDeckState(deckId, { stemSeparationProgress: 0 });
+
+  try {
+    const { DemucsEngine } = await import('@/engine/demucs/DemucsEngine');
+    const { hashFile } = await import('@/engine/dj/DJAudioCache');
+    const demucs = DemucsEngine.getInstance();
+
+    // Check cache first
+    const fileBytes = deck.audioPlayer.getOriginalFileBytes();
+    let fileHash: string | undefined;
+    if (fileBytes) {
+      fileHash = await hashFile(fileBytes);
+      const cached = await demucs.loadCachedStems(fileHash);
+      if (cached) {
+        if (useDJStore.getState().decks[deckId].fileName !== startFileName) {
+          useDJStore.getState().setDeckState(deckId, { stemSeparationProgress: null });
+          return;
+        }
+        await deck.loadStems(cached, sampleRate);
+        useDJStore.getState().setDeckState(deckId, { stemSeparationProgress: null });
+        console.log(`[DJActions] Loaded cached stems for ${fileName}`);
+        return;
+      }
+    }
+
+    // Download/init model
+    await demucs.ensureModel('4s', (p) => {
+      useDJStore.getState().setDeckState(deckId, { stemSeparationProgress: p * 0.1 });
+    });
+
+    // Run separation
+    const stems = await demucs.separate(left, right, sampleRate, (p) => {
+      useDJStore.getState().setDeckState(deckId, { stemSeparationProgress: 0.1 + p * 0.9 });
+    });
+
+    // Cache for next time
+    if (fileHash) {
+      void demucs.cacheStemResult(fileHash, stems, sampleRate).catch(() => {});
+    }
+
+    // Stale-result guard — user may have loaded a different track
+    if (useDJStore.getState().decks[deckId].fileName !== startFileName) {
+      console.log(`[DJActions] Discarding stale stems for ${fileName} — deck moved on`);
+      useDJStore.getState().setDeckState(deckId, { stemSeparationProgress: null });
+      return;
+    }
+
+    await deck.loadStems(stems, sampleRate);
+    useDJStore.getState().setDeckState(deckId, { stemSeparationProgress: null });
+    console.log(`[DJActions] Stems separated for ${fileName}`);
+  } catch (err) {
+    useDJStore.getState().setDeckState(deckId, { stemSeparationProgress: null });
+    throw err;
+  }
+}
