@@ -212,7 +212,31 @@ export class DJEngine {
       ...(song ? { totalPositions: song.songLength, songPos: 0, pattPos: 0 } : {}),
     });
 
+    // Auto-load cached stems if available (fire-and-forget)
+    void this.tryAutoLoadStems(id, deck, buffer).catch(() => {});
+
     return info;
+  }
+
+  /**
+   * If stems for this file are already cached in IndexedDB,
+   * auto-load them onto the deck (no progress bar, instant).
+   */
+  private async tryAutoLoadStems(deckId: DeckId, deck: DeckEngine, fileBuffer: ArrayBuffer): Promise<void> {
+    const { hashFile } = await import('@/engine/dj/DJAudioCache');
+    const { DemucsEngine } = await import('@/engine/demucs/DemucsEngine');
+    const hash = await hashFile(fileBuffer);
+    const demucs = DemucsEngine.getInstance();
+    const hasCached = await demucs.hasCachedStems(hash);
+    if (!hasCached) return;
+
+    const stems = await demucs.loadCachedStems(hash);
+    if (!stems) return;
+
+    const audioBuffer = deck.audioPlayer.getAudioBuffer();
+    const sampleRate = audioBuffer?.sampleRate ?? 44100;
+    await deck.loadStems(stems, sampleRate);
+    console.log(`[DJEngine] Auto-loaded cached stems for deck ${deckId}`);
   }
 
   // ==========================================================================
