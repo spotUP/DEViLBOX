@@ -75,8 +75,15 @@ export const StemSeparatorPanel: React.FC<StemSeparatorPanelProps> = ({
   const {
     isBusy, progress, progressMessage, error,
     stemNames, hasStems,
-    separate, getStemBuffer, getAllStemBuffers, canSeparate, cleanup,
+    separate, getStemBuffer, getAllStemBuffers, canSeparate, restoreFromCache, cleanup,
   } = hook;
+
+  // Auto-restore stems from module-level cache on mount/buffer change
+  useEffect(() => {
+    if (!hasStems && audioBuffer && !isBusy) {
+      restoreFromCache(audioBuffer);
+    }
+  }, [audioBuffer, hasStems, isBusy, restoreFromCache]);
 
   // Preview playback
   const previewPlayerRef = useRef<Tone.Player | null>(null);

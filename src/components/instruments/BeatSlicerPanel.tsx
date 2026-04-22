@@ -9,7 +9,7 @@
  * - Export slices to new instruments
  */
 
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import {
   Zap, Grid3X3, MousePointer2, Play, Trash2,
   Download, RefreshCw, ChevronDown, ChevronUp, X, Loader2
@@ -56,6 +56,15 @@ export const BeatSlicerPanel: React.FC<BeatSlicerPanelProps> = ({
 
   // Stem separation for drum isolation
   const stemHook = useStemSeparation();
+
+  // Auto-restore stems from cache on mount/buffer change
+  useEffect(() => {
+    if (!stemHook.hasStems && audioBuffer && !stemHook.isBusy) {
+      const restored = stemHook.restoreFromCache(audioBuffer);
+      if (restored) setIsolateDrums(true);
+    }
+  }, [audioBuffer, stemHook.hasStems, stemHook.isBusy, stemHook.restoreFromCache, stemHook]);
+
   const drumsBuffer = isolateDrums && stemHook.hasStems
     ? stemHook.getStemBuffer('drums')
     : null;
