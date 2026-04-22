@@ -162,5 +162,32 @@ describe('BiquadFilterNode stability — no cascaded filters in automated paths'
       expect(src).toMatch(/feedbackShelfComp/);
       expect(src).toMatch(/feedbackShelfComp\.gain\.setTargetAtTime\(-safeBassGain/);
     });
+
+    it('clears wobble handles in dubPanic()', () => {
+      // Zombie setIntervals modulate echo rate after panic if not cleared
+      expect(src).toMatch(/wobbleHandles.*clearInterval|clearInterval.*\n.*wobbleHandles\.clear/s);
+    });
+  });
+
+  describe('SpaceEchoEffect', () => {
+    const src = read('engine/effects/SpaceEchoEffect.ts');
+
+    it('clamps setIntensity feedback to <= 0.95', () => {
+      // Unclamped intensity > 1.0 causes runaway echo feedback
+      expect(src).toMatch(/Math\.min\(0\.95,\s*amount\)/);
+    });
+  });
+
+  describe('DubSirenSynth', () => {
+    const src = read('engine/dub/DubSirenSynth.ts');
+
+    it('clamps delay feedback to <= 0.95', () => {
+      expect(src).toMatch(/Math\.min\(0\.95,\s*feedback\)/);
+    });
+
+    it('clamps LFO rate to safe range', () => {
+      expect(src).toMatch(/Math\.max\(0\.01/);
+      expect(src).toMatch(/Math\.min\(40,\s*hz\)/);
+    });
   });
 });

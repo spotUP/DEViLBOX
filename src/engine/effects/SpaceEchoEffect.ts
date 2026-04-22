@@ -183,8 +183,9 @@ export class SpaceEchoEffect extends Tone.ToneAudioNode {
   }
 
   setIntensity(amount: number) {
-    this._options.intensity = amount;
-    this.feedbackGain.gain.rampTo(amount, 0.1);
+    const clamped = Math.max(0, Math.min(0.95, amount));
+    this._options.intensity = clamped;
+    this.feedbackGain.gain.rampTo(clamped, 0.1);
   }
 
   /**
@@ -196,10 +197,11 @@ export class SpaceEchoEffect extends Tone.ToneAudioNode {
    * setIntensity(0) had already been called.
    */
   setIntensityInstant(amount: number) {
-    this._options.intensity = amount;
+    const clamped = Math.max(0, Math.min(0.95, amount));
+    this._options.intensity = clamped;
     const t = this.feedbackGain.context.currentTime;
     this.feedbackGain.gain.cancelScheduledValues(t);
-    this.feedbackGain.gain.setValueAtTime(amount, t);
+    this.feedbackGain.gain.setValueAtTime(clamped, t);
   }
 
   setEchoVolume(vol: number) {
