@@ -18,6 +18,7 @@ import { snapPositionToBeat, snapLoopLength, phaseAlign } from './DJAutoSync';
 import { getQuantizeMode } from './DJQuantizedFX';
 import { DeckScratchBuffer } from './DeckScratchBuffer';
 import { DeckAudioPlayer, type AudioFileInfo } from './DeckAudioPlayer';
+import { DeckStemPlayer } from './DeckStemPlayer';
 import { DeckKeyLock } from './DeckKeyLock';
 import { computeKeyLockShift } from './computeKeyLockShift';
 import { TurntablePhysics } from '@/engine/turntable/TurntablePhysics';
@@ -57,8 +58,10 @@ export class DeckEngine {
   readonly id: DeckId;
   readonly replayer: TrackerReplayer;
   readonly audioPlayer: DeckAudioPlayer;
+  readonly stemPlayer: DeckStemPlayer;
   readonly physics: TurntablePhysics;
   private _playbackMode: PlaybackMode = 'audio';
+  private _stemMode = false; // When true, stem player drives audio output
   /** Key lock (master tempo): when true, the pitch fader changes tempo only;
    *  sample pitch and synth detune stay at their original values. Tracker path
    *  uses replayer's native pitch/tempo split. WAV path uses the SoundTouch
@@ -303,6 +306,10 @@ export class DeckEngine {
     // Output threads through keyLock.input (bypass wire if key-lock is off).
     this.audioPlayer = new DeckAudioPlayer(this.keyLock.input);
 
+    // Create StemPlayer for multi-stem playback (same output point).
+    // Starts muted — only audible when stem mode is explicitly enabled.
+    this.stemPlayer = new DeckStemPlayer(this.keyLock.input);
+
     // Per-deck turntable physics (one instance shared by all views)
     this.physics = new TurntablePhysics();
 
@@ -478,6 +485,12 @@ export class DeckEngine {
     // Stop any current playback
     this.replayer.stop();
     this.audioPlayer.stop();
+    // Reset stem state from previous track
+    if (this._stemMode) {
+      this.stemPlayer.stop();
+      this.stemPlayer.disable();
+      this._stemMode = false;
+    }
     this._playbackMode = 'audio';
 
     // Clear pattern-scratch state from previous track (see loadSong).
@@ -571,10 +584,12 @@ export class DeckEngine {
 
   async play(): Promise<void> {
     if (this._playbackMode === 'audio') {
-      console.log(`[DeckEngine] play() in audio mode`);
-      await this.audioPlayer.play();
-      // DON'T start replayer if there's no song loaded (we skipped tracker mode)
-      // The replayer is only for tracker mode playback
+      console.log(`[DeckEngine] play() in audio mode (stem=${this._stemMode})`);
+      if (this._stemMode) {
+        this.stemPlayer.play();
+      } else {
+        await this.audioPlayer.play();
+      }
     } else if (this._playbackMode === 'tracker') {
       console.log(`[DeckEngine] play() in tracker mode`);
       await this.replayer.play();
@@ -585,7 +600,11 @@ export class DeckEngine {
 
   pause(): void {
     if (this._playbackMode === 'audio') {
-      this.audioPlayer.pause();
+      if (this._stemMode) {
+        this.stemPlayer.pause();
+      } else {
+        this.audioPlayer.pause();
+      }
     } else if (this._playbackMode === 'tracker') {
       this.replayer.pause();
     }
@@ -593,7 +612,11 @@ export class DeckEngine {
 
   async resume(): Promise<void> {
     if (this._playbackMode === 'audio') {
-      await this.audioPlayer.play();
+      if (this._stemMode) {
+        this.stemPlayer.play();
+      } else {
+        await this.audioPlayer.play();
+      }
     } else if (this._playbackMode === 'tracker') {
       this.replayer.resume();
     }
@@ -601,7 +624,11 @@ export class DeckEngine {
 
   stop(): void {
     if (this._playbackMode === 'audio') {
-      this.audioPlayer.stop();
+      if (this._stemMode) {
+        this.stemPlayer.stop();
+      } else {
+        this.audioPlayer.stop();
+      }
     } else if (this._playbackMode === 'tracker') {
       this.replayer.stop();
     }
@@ -609,7 +636,9 @@ export class DeckEngine {
 
   isPlaying(): boolean {
     if (this._playbackMode === 'audio') {
-      return this.audioPlayer.isCurrentlyPlaying();
+      return this._stemMode
+        ? this.stemPlayer.isPlaying()
+        : this.audioPlayer.isCurrentlyPlaying();
     }
     return this.replayer.isPlaying();
   }
@@ -621,7 +650,11 @@ export class DeckEngine {
   cue(songPos: number, pattPos: number = 0): void {
     if (this._playbackMode === 'audio') {
       // In audio mode, songPos is treated as seconds
-      this.audioPlayer.seek(songPos);
+      if (this._stemMode) {
+        this.stemPlayer.seek(songPos);
+      } else {
+        this.audioPlayer.seek(songPos);
+      }
     } else {
       this.replayer.jumpToPosition(songPos, pattPos);
     }
@@ -653,6 +686,9 @@ export class DeckEngine {
 
     if (this._playbackMode === 'audio') {
       this.audioPlayer.setPlaybackRate(multiplier);
+      // Keep stem player rate in sync even when not active,
+      // so mode switching preserves pitch.
+      this.stemPlayer.setPlaybackRate(multiplier);
       // Tell SoundTouch how much to cancel — zero when key-lock is off (bypassed),
       // -semitones when on (so playbackRate's pitch shift is nulled out).
       const { pitchCompensate } = computeKeyLockShift(semitones, this.keyLockEnabled);
@@ -1068,7 +1104,7 @@ export class DeckEngine {
     this.backwardStartSongPos   = this.replayer.getSongPos();
     this.backwardStartPattPos   = this.replayer.getPattPos();
     this.backwardStartElapsedMs = this._playbackMode === 'audio'
-      ? this.audioPlayer.getPosition() * 1000
+      ? (this._stemMode ? this.stemPlayer.getPosition() : this.audioPlayer.getPosition()) * 1000
       : this.replayer.getElapsedMs();
     // Reset backward displacement tracking
     this.backwardDisplacementMs = 0;
@@ -1468,6 +1504,88 @@ export class DeckEngine {
   }
 
   // ==========================================================================
+  // STEM PLAYBACK
+  // ==========================================================================
+
+  /**
+   * Load separated stems for playback.
+   * Does NOT enable stem mode — call setStemMode(true) explicitly.
+   */
+  async loadStems(result: import('../demucs/types').StemResult, sampleRate: number): Promise<void> {
+    const stemNames = await this.stemPlayer.loadStems(result, sampleRate);
+    useDJStore.getState().setDeckState(this.id, {
+      stemsAvailable: true,
+      stemNames,
+      stemMutes: Object.fromEntries(stemNames.map(n => [n, false])),
+    });
+    console.log(`[DeckEngine ${this.id}] Stems loaded: ${stemNames.join(', ')}`);
+  }
+
+  /**
+   * Toggle stem playback mode.
+   * When enabled: mutes audioPlayer, enables stemPlayer at current position.
+   * When disabled: mutes stemPlayer, resumes audioPlayer at current position.
+   */
+  setStemMode(enabled: boolean): void {
+    if (enabled === this._stemMode) return;
+    if (enabled && !this.stemPlayer.isLoaded()) {
+      console.warn(`[DeckEngine ${this.id}] Cannot enable stem mode — no stems loaded`);
+      return;
+    }
+    if (this._playbackMode !== 'audio') {
+      console.warn(`[DeckEngine ${this.id}] Stem mode only works in audio playback mode`);
+      return;
+    }
+
+    const wasPlaying = this.audioPlayer.isCurrentlyPlaying() || this.stemPlayer.isPlaying();
+    const position = enabled
+      ? this.audioPlayer.getPosition()
+      : this.stemPlayer.getPosition();
+    const rate = enabled
+      ? this.audioPlayer.getPlaybackRate()
+      : this.stemPlayer.getPlaybackRate();
+
+    this._stemMode = enabled;
+
+    if (enabled) {
+      // Transfer state from audioPlayer to stemPlayer
+      this.audioPlayer.pause();
+      this.stemPlayer.setPlaybackRate(rate);
+      this.stemPlayer.enable();
+      // Sync loop region
+      const loopIn = this.audioPlayer.getLoopIn();
+      const loopOut = this.audioPlayer.getLoopOut();
+      this.stemPlayer.setLoopRegion(loopIn, loopOut);
+      if (wasPlaying) {
+        this.stemPlayer.play(position);
+      } else {
+        this.stemPlayer.seek(position);
+      }
+    } else {
+      // Transfer state from stemPlayer to audioPlayer
+      this.stemPlayer.pause();
+      this.stemPlayer.disable();
+      this.audioPlayer.seek(position);
+      if (wasPlaying) {
+        void this.audioPlayer.play();
+      }
+    }
+
+    useDJStore.getState().setDeckState(this.id, { stemMode: enabled });
+  }
+
+  /** Whether stem playback is currently active. */
+  isStemMode(): boolean { return this._stemMode; }
+
+  /** Mute/unmute an individual stem. */
+  setStemMute(stemName: string, muted: boolean): void {
+    this.stemPlayer.setStemMute(stemName, muted);
+    const currentMutes = { ...useDJStore.getState().decks[this.id].stemMutes };
+    currentMutes[stemName] = muted;
+    useDJStore.getState().setDeckState(this.id, { stemMutes: currentMutes });
+  }
+
+  // ==========================================================================
   // FILTER (single knob: -1 = HPF, 0 = off, +1 = LPF)
   // ==========================================================================
 
@@ -1856,6 +1974,7 @@ export class DeckEngine {
     this.disableChannelFX();
     this.replayer.dispose();
     this.audioPlayer.dispose();
+    this.stemPlayer.dispose();
     this.fftAnalyser.dispose();
     this.waveformAnalyser.dispose();
     this.meter.dispose();
