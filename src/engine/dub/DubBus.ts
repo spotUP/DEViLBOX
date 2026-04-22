@@ -1379,6 +1379,10 @@ export class DubBus {
     }
 
     // 3. Kill siren feedback + reset LPF to open + neutralize bass shelf comp.
+    //    Also clear any tape wobble intervals — otherwise they keep modulating
+    //    echo rate from zombie setIntervals after panic.
+    for (const h of this.wobbleHandles) clearInterval(h);
+    this.wobbleHandles.clear();
     try {
       this.feedback.gain.cancelScheduledValues(now);
       this.feedback.gain.setValueAtTime(0, now);

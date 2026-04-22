@@ -726,7 +726,7 @@ export const DubDeckStrip: React.FC = () => {
                   onPointerLeave={isHold ? () => holdEnd(m.moveId) : undefined}
                   onPointerCancel={isHold ? () => holdEnd(m.moveId) : undefined}
                   title={m.title + (isHold ? ' (press-and-hold)' : '') + (!anySend ? ' — RAISE A CHANNEL SEND TO HEAR' : '')}
-                  disabled={!busEnabled}
+                  disabled={disabled}
                 >
                   {m.label}
                 </button>
