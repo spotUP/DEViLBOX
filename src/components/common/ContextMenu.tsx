@@ -1,6 +1,13 @@
 /**
  * ContextMenu - Reusable context menu component with submenus
  * Supports right-click and dropdown button usage
+ *
+ * Keyboard navigation:
+ * - Up/Down arrow: move highlight between items
+ * - Enter/Space: activate highlighted item
+ * - Right arrow: open submenu
+ * - Left arrow / Escape: close submenu or menu
+ * - Type-ahead: jump to first item matching typed characters
  */
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
@@ -38,6 +45,15 @@ interface ContextMenuProps {
   minWidth?: number;
   /** Custom z-index (default: 100) */
   zIndex?: number;
+  /** If true, auto-focus first item on mount (used for keyboard-opened menus) */
+  autoFocus?: boolean;
+}
+
+/** Filter items to only actionable (non-divider, non-disabled) items */
+function getActionableItems(items: MenuItemType[]): MenuItem[] {
+  return items.filter(
+    (item): item is MenuItem => item.type !== 'divider' && !(item as MenuItem).disabled,
+  );
 }
 
 export const ContextMenu: React.FC<ContextMenuProps> = ({
@@ -47,6 +63,7 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
   className = '',
   minWidth,
   zIndex = 100,
+  autoFocus = true,
 }) => {
   const menuRef = useRef<HTMLDivElement>(null);
   const [adjustedPosition, setAdjustedPosition] = useState(position);
@@ -54,6 +71,19 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
   const [activeSubmenu, setActiveSubmenu] = useState<string | null>(null);
   const [submenuPosition, setSubmenuPosition] = useState<{ x: number; y: number } | null>(null);
   const submenuTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const [highlightedIndex, setHighlightedIndex] = useState(-1);
+  const typeAheadRef = useRef('');
+  const typeAheadTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  const actionableItems = getActionableItems(items);
+
+  // Auto-focus the menu container on mount for keyboard capture
+  useEffect(() => {
+    if (!position || !autoFocus) return;
+    requestAnimationFrame(() => {
+      menuRef.current?.focus();
+    });
+  }, [position, autoFocus]);
 
   // Adjust position to stay within viewport
   useEffect(() => {
@@ -97,21 +127,125 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
   // Close on outside click
   useClickOutside(menuRef, onClose);
 
-  // Close on escape
-  useEffect(() => {
-    const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
+  // Keyboard navigation handler
+  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+    switch (e.key) {
+      case 'Escape':
+        e.preventDefault();
+        e.stopPropagation();
         onClose();
+        break;
+
+      case 'ArrowDown': {
+        e.preventDefault();
+        e.stopPropagation();
+        setHighlightedIndex(prev => {
+          const next = prev + 1;
+          return next >= actionableItems.length ? 0 : next;
+        });
+        break;
       }
-    };
 
-    document.addEventListener('keydown', handleEscape);
+      case 'ArrowUp': {
+        e.preventDefault();
+        e.stopPropagation();
+        setHighlightedIndex(prev => {
+          const next = prev - 1;
+          return next < 0 ? actionableItems.length - 1 : next;
+        });
+        break;
+      }
 
+      case 'ArrowRight': {
+        // Open submenu if highlighted item has one
+        const item = actionableItems[highlightedIndex];
+        if (item?.submenu?.length) {
+          e.preventDefault();
+          e.stopPropagation();
+          const itemEl = menuRef.current?.querySelector(
+            `[data-menu-id="${item.id}"]`,
+          ) as HTMLElement | null;
+          if (itemEl) handleSubmenuEnter(item.id, itemEl);
+        }
+        break;
+      }
+
+      case 'ArrowLeft':
+        // Close submenu (parent handles this via portal)
+        if (activeSubmenu) {
+          e.preventDefault();
+          e.stopPropagation();
+          setActiveSubmenu(null);
+          setSubmenuPosition(null);
+        }
+        break;
+
+      case 'Enter':
+      case ' ': {
+        e.preventDefault();
+        e.stopPropagation();
+        const item = actionableItems[highlightedIndex];
+        if (item) {
+          if (item.submenu?.length) {
+            const itemEl = menuRef.current?.querySelector(
+              `[data-menu-id="${item.id}"]`,
+            ) as HTMLElement | null;
+            if (itemEl) handleSubmenuEnter(item.id, itemEl);
+          } else {
+            item.onClick?.();
+            onClose();
+          }
+        }
+        break;
+      }
+
+      case 'Home': {
+        e.preventDefault();
+        if (actionableItems.length > 0) setHighlightedIndex(0);
+        break;
+      }
+
+      case 'End': {
+        e.preventDefault();
+        if (actionableItems.length > 0) setHighlightedIndex(actionableItems.length - 1);
+        break;
+      }
+
+      default: {
+        // Type-ahead: single printable character jumps to matching item
+        if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
+          e.preventDefault();
+          if (typeAheadTimerRef.current) clearTimeout(typeAheadTimerRef.current);
+          typeAheadRef.current += e.key.toLowerCase();
+          typeAheadTimerRef.current = setTimeout(() => { typeAheadRef.current = ''; }, 500);
+
+          const search = typeAheadRef.current;
+          const matchIndex = actionableItems.findIndex(
+            item => item.label.toLowerCase().startsWith(search),
+          );
+          if (matchIndex !== -1) setHighlightedIndex(matchIndex);
+        }
+        break;
+      }
+    }
+  }, [onClose, actionableItems, highlightedIndex, activeSubmenu]);
+
+  // Scroll highlighted item into view
+  useEffect(() => {
+    if (highlightedIndex < 0 || !menuRef.current) return;
+    const item = actionableItems[highlightedIndex];
+    if (!item) return;
+    const el = menuRef.current.querySelector(`[data-menu-id="${item.id}"]`);
+    el?.scrollIntoView({ block: 'nearest' });
+  }, [highlightedIndex, actionableItems]);
+
+  // Clean up type-ahead timer
+  useEffect(() => {
     return () => {
-      document.removeEventListener('keydown', handleEscape);
+      if (typeAheadTimerRef.current) clearTimeout(typeAheadTimerRef.current);
       if (submenuTimerRef.current) clearTimeout(submenuTimerRef.current);
     };
-  }, [onClose]);
+  }, []);
 
   const handleSubmenuEnter = useCallback((itemId: string, element: HTMLElement) => {
     if (submenuTimerRef.current) {
@@ -149,13 +283,19 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
 
   if (!position) return null;
 
+  // Map from item id → index in actionableItems for highlight matching
+  const highlightedItemId = actionableItems[highlightedIndex]?.id;
+
   return createPortal(
     <div
       ref={menuRef}
       data-context-menu
+      role="menu"
+      tabIndex={-1}
       className={`
         fixed min-w-[180px] w-max max-w-[calc(100vw-20px)] py-1 text-xs font-mono whitespace-nowrap
         bg-dark-bgTertiary border border-dark-border rounded-lg shadow-xl
+        focus:outline-none
         ${className}
       `}
       style={{
@@ -168,6 +308,7 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
         // Prevent wheel from leaking through to the pattern editor below
         overscrollBehavior: 'contain',
       }}
+      onKeyDown={handleKeyDown}
       onMouseEnter={handleMouseEnterSubmenu}
       // Stop wheel propagation so scrolling inside the menu doesn't scroll the pattern
       onWheelCapture={(e) => e.stopPropagation()}
@@ -184,20 +325,25 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
               <div
                 key={`divider-${index}`}
                 className="h-px bg-dark-border my-1 mx-2"
+                role="separator"
               />
             );
           }
 
           const hasSubmenu = item.submenu && item.submenu.length > 0;
+          const isHighlighted = item.id === highlightedItemId;
 
           return (
             <div
               key={item.id}
+              data-menu-id={item.id}
+              role="menuitem"
+              aria-disabled={item.disabled || undefined}
               className={`
                 flex items-center gap-2 px-3 py-1.5 cursor-pointer transition-colors whitespace-nowrap
                 ${item.disabled ? 'opacity-50 cursor-not-allowed' : 'hover:bg-dark-bgHover'}
                 ${item.danger ? 'text-accent-error hover:bg-accent-error/10' : 'text-text-secondary'}
-                ${activeSubmenu === item.id ? 'bg-dark-bgHover' : ''}
+                ${activeSubmenu === item.id || isHighlighted ? 'bg-dark-bgHover' : ''}
                 ${item.className || ''}
               `}
               onClick={() => {
@@ -207,6 +353,10 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
                 onClose();
               }}
               onMouseEnter={(e) => {
+                // Sync highlight with mouse hover
+                const idx = actionableItems.findIndex(ai => ai.id === item.id);
+                if (idx !== -1) setHighlightedIndex(idx);
+
                 if (hasSubmenu) {
                   handleSubmenuEnter(item.id, e.currentTarget);
                 } else {
