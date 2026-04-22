@@ -149,6 +149,21 @@ describe('SIDDubSynths class shape', () => {
   });
 });
 
+describe('SIDDubSynths uses playTestNote (not jamNoteOn)', () => {
+  it('triggers notes via playTestNote which works without a loaded song', async () => {
+    const fs = await import('fs');
+    const source = fs.readFileSync('src/engine/dub/SIDDubSynths.ts', 'utf-8');
+
+    // Must use playTestNote/releaseTestNote (direct note init)
+    expect(source).toContain('.playTestNote(');
+    expect(source).toContain('.releaseTestNote(');
+
+    // Must NOT use jamNoteOn/jamNoteOff (requires playroutine tick)
+    expect(source).not.toContain('.jamNoteOn(');
+    expect(source).not.toContain('.jamNoteOff(');
+  });
+});
+
 describe('DubBus SID mode contract', () => {
   it('DubBus exports enableSIDMode and disableSIDMode methods', async () => {
     // Static source contract: grep for the method signatures
