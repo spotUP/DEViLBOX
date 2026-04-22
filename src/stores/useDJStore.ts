@@ -328,6 +328,8 @@ interface DJState {
    * overrides fall through to the default path.
    */
   autoDJSmartCuts: boolean;
+  /** Pre-separate stems for upcoming playlist tracks in the background */
+  stemPreSeparation: boolean;
 }
 
 interface DJActions {
@@ -406,7 +408,7 @@ interface DJActions {
   setAutoDJEnabled: (enabled: boolean) => void;
   setAutoDJStatus: (status: AutoDJStatus) => void;
   setAutoDJTrackIndices: (current: number, next: number) => void;
-  setAutoDJConfig: (config: Partial<{ transitionBars: number; shuffle: boolean; withFilter: boolean; smartCuts: boolean }>) => void;
+  setAutoDJConfig: (config: Partial<{ transitionBars: number; shuffle: boolean; withFilter: boolean; smartCuts: boolean; stemPreSeparation: boolean }>) => void;
 }
 
 type DJStore = DJState & DJActions;
@@ -452,6 +454,7 @@ export const useDJStore = create<DJStore>()(
     autoDJShuffle: false,
     autoDJWithFilter: true,
     autoDJSmartCuts: false,
+    stemPreSeparation: false,
 
     // ========================================================================
     // ACTIONS
@@ -782,6 +785,7 @@ export const useDJStore = create<DJStore>()(
         if (config.shuffle !== undefined) state.autoDJShuffle = config.shuffle;
         if (config.withFilter !== undefined) state.autoDJWithFilter = config.withFilter;
         if (config.smartCuts !== undefined) state.autoDJSmartCuts = config.smartCuts;
+        if (config.stemPreSeparation !== undefined) state.stemPreSeparation = config.stemPreSeparation;
       }),
   })))
 );

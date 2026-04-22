@@ -1028,6 +1028,9 @@ export function toggleStemDubSend(deckId: DeckId, stemName: string): void {
  * Run Demucs stem separation on the currently loaded deck audio.
  * Works with all formats — audio files have stereo AudioBuffer directly,
  * tracker formats are pre-rendered to stereo WAV by the pipeline.
+ *
+ * Routes through DJStemQueue for priority scheduling — manual requests
+ * take priority over background pre-separation jobs.
  */
 export async function separateStems(deckId: DeckId): Promise<void> {
   const store = useDJStore.getState();
@@ -1047,47 +1050,31 @@ export async function separateStems(deckId: DeckId): Promise<void> {
   const right = audioBuffer.numberOfChannels >= 2 ? audioBuffer.getChannelData(1) : left;
   const sampleRate = audioBuffer.sampleRate;
 
+  // Hash the file for cache keying
+  const { hashFile } = await import('@/engine/dj/DJAudioCache');
+  const fileBytes = deck.audioPlayer.getOriginalFileBytes();
+  if (!fileBytes) throw new Error('No file bytes available for hashing');
+  const fileHash = await hashFile(fileBytes);
+
   // Capture filename for stale-result guard
   const startFileName = fileName;
   store.setDeckState(deckId, { stemSeparationProgress: 0 });
 
   try {
-    const { DemucsEngine } = await import('@/engine/demucs/DemucsEngine');
-    const { hashFile } = await import('@/engine/dj/DJAudioCache');
-    const demucs = DemucsEngine.getInstance();
+    const { enqueueStemJob } = await import('@/engine/dj/DJStemQueue');
 
-    // Check cache first
-    const fileBytes = deck.audioPlayer.getOriginalFileBytes();
-    let fileHash: string | undefined;
-    if (fileBytes) {
-      fileHash = await hashFile(fileBytes);
-      const cached = await demucs.loadCachedStems(fileHash);
-      if (cached) {
-        if (useDJStore.getState().decks[deckId].fileName !== startFileName) {
-          useDJStore.getState().setDeckState(deckId, { stemSeparationProgress: null });
-          return;
-        }
-        await deck.loadStems(cached, sampleRate);
-        useDJStore.getState().setDeckState(deckId, { stemSeparationProgress: null });
-        console.log(`[DJActions] Loaded cached stems for ${fileName}`);
-        return;
-      }
-    }
-
-    // Download/init model
-    await demucs.ensureModel('4s', (p) => {
-      useDJStore.getState().setDeckState(deckId, { stemSeparationProgress: p * 0.1 });
+    const result = await enqueueStemJob({
+      priority: 'manual',
+      fileHash,
+      fileName,
+      left,
+      right,
+      sampleRate,
+      deckId,
+      onProgress: (p) => {
+        useDJStore.getState().setDeckState(deckId, { stemSeparationProgress: p });
+      },
     });
-
-    // Run separation
-    const stems = await demucs.separate(left, right, sampleRate, (p) => {
-      useDJStore.getState().setDeckState(deckId, { stemSeparationProgress: 0.1 + p * 0.9 });
-    });
-
-    // Cache for next time
-    if (fileHash) {
-      void demucs.cacheStemResult(fileHash, stems, sampleRate).catch(() => {});
-    }
 
     // Stale-result guard — user may have loaded a different track
     if (useDJStore.getState().decks[deckId].fileName !== startFileName) {
@@ -1096,9 +1083,11 @@ export async function separateStems(deckId: DeckId): Promise<void> {
       return;
     }
 
-    await deck.loadStems(stems, sampleRate);
+    if (result) {
+      await deck.loadStems(result, sampleRate);
+      console.log(`[DJActions] Stems separated for ${fileName}`);
+    }
     useDJStore.getState().setDeckState(deckId, { stemSeparationProgress: null });
-    console.log(`[DJActions] Stems separated for ${fileName}`);
   } catch (err) {
     useDJStore.getState().setDeckState(deckId, { stemSeparationProgress: null });
     throw err;
