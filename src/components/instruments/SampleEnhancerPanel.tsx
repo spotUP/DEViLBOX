@@ -158,6 +158,8 @@ export const SampleEnhancerPanel: React.FC<SampleEnhancerPanelProps> = ({
   isLoading: parentLoading
 }) => {
   const [isProcessing, setIsProcessing] = useState(false);
+  const [processStage, setProcessStage] = useState<string>('');
+  const [processProgress, setProcessProgress] = useState(0);
   const [beforeBuffer, setBeforeBuffer] = useState<AudioBuffer | null>(null);
   const [afterBuffer, setAfterBuffer] = useState<AudioBuffer | null>(null);
   const overlayRef = useRef<HTMLCanvasElement>(null);
@@ -197,6 +199,8 @@ export const SampleEnhancerPanel: React.FC<SampleEnhancerPanelProps> = ({
     if (!audioBuffer) return;
     
     setIsProcessing(true);
+    setProcessProgress(0);
+    setProcessStage(type === 'neural' ? 'Loading AI model...' : `Applying ${type}...`);
     // Snapshot the current buffer as "before" for overlay comparison
     setBeforeBuffer(audioBuffer);
     setAfterBuffer(null);
@@ -204,29 +208,46 @@ export const SampleEnhancerPanel: React.FC<SampleEnhancerPanelProps> = ({
       await new Promise(r => setTimeout(r, 50));
       let result: ProcessedResult;
 
+      if (type === 'neural') {
+        setProcessProgress(0.15);
+        setProcessStage('Loading AI model...');
+      } else {
+        setProcessProgress(0.3);
+      }
+
       switch (type) {
         case 'exciter':
+          setProcessStage('Applying spectral exciter...');
           result = await applySpectralExciter(audioBuffer, { drive, mix, frequency: freq });
           break;
         case 'denoise':
+          setProcessStage('Removing noise...');
           result = await applyDenoise(audioBuffer, denoiseThresh);
           break;
         case 'stereo':
+          setProcessStage('Widening stereo...');
           result = await applyPseudoStereo(audioBuffer, stereoWidth);
           break;
         case 'punch':
+          setProcessStage('Sharpening transients...');
           result = await applyTransientSharpening(audioBuffer, punchAmount);
           break;
         case 'neural':
+          setProcessStage('Running AI inference...');
+          setProcessProgress(0.4);
           result = await runNeuralEnhancement(audioBuffer, { modelType: 'resurrect', strength: 1.0 });
+          setProcessProgress(0.95);
           break;
         case 'normalize':
+          setProcessStage('Normalizing levels...');
           result = await applyNormalization(audioBuffer);
           break;
         case 'trim':
+          setProcessStage('Trimming silence...');
           result = await applyTrimSilence(audioBuffer);
           break;
         case 'reverse':
+          setProcessStage('Reversing...');
           result = await applyReverse(audioBuffer);
           break;
         default:
@@ -234,6 +255,8 @@ export const SampleEnhancerPanel: React.FC<SampleEnhancerPanelProps> = ({
       }
       
       // Store the result buffer for overlay display before replacing
+      setProcessProgress(1.0);
+      setProcessStage('Done');
       setAfterBuffer(result.buffer);
       onBufferProcessed(result);
       notify.success(`Sample processed: ${type.toUpperCase()}`);
@@ -242,6 +265,8 @@ export const SampleEnhancerPanel: React.FC<SampleEnhancerPanelProps> = ({
       notify.error('Processing failed');
     } finally {
       setIsProcessing(false);
+      setProcessProgress(0);
+      setProcessStage('');
     }
   }, [audioBuffer, drive, mix, freq, denoiseThresh, stereoWidth, punchAmount, onBufferProcessed]);
 
@@ -254,12 +279,28 @@ export const SampleEnhancerPanel: React.FC<SampleEnhancerPanelProps> = ({
           ENHANCEMENT ENGINE
         </h4>
         {isProcessing && (
-          <div className="flex items-center gap-2 text-[10px] text-accent-primary animate-pulse">
+          <div className="flex items-center gap-2 text-[10px] text-accent-primary">
             <RefreshCw size={10} className="animate-spin" />
-            PROCESSING...
+            <span className="text-text-secondary">{processStage}</span>
           </div>
         )}
       </div>
+
+      {/* Progress bar */}
+      {isProcessing && (
+        <div className="px-4 pb-1">
+          <div className="h-1.5 bg-dark-bgTertiary rounded-full overflow-hidden">
+            <div
+              className="h-full bg-accent-primary rounded-full transition-all duration-500 ease-out"
+              style={{ width: `${Math.round(processProgress * 100)}%` }}
+            />
+          </div>
+          <div className="flex justify-between text-[9px] font-mono mt-0.5">
+            <span className="text-text-muted">{processStage}</span>
+            <span className="text-accent-primary">{Math.round(processProgress * 100)}%</span>
+          </div>
+        </div>
+      )}
 
       {/* Before/After Waveform Overlay */}
       <div className="px-4 pt-3" ref={containerRef}>
