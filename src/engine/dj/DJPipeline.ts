@@ -23,6 +23,8 @@ import type { DeckId } from './DeckEngine';
 import { getDJEngineIfActive } from './DJEngine';
 import type { BeatGridData } from './DJAudioCache';
 import { autoMatchOnLoad } from './DJAutoSync';
+import { DemucsEngine } from '@engine/demucs/DemucsEngine';
+import type { StemResult } from '@engine/demucs/types';
 
 // ── Auto-gain ────────────────────────────────────────────────────────────────
 
@@ -83,6 +85,7 @@ export interface PipelineResult {
   duration: number;
   sampleRate: number;
   waveformPeaks: Float32Array;
+  stems?: StemResult;
   analysis: {
     bpm: number;
     bpmConfidence: number;
@@ -213,6 +216,9 @@ export function disposeDJPipeline(): void {
 export class DJPipeline {
   private renderWorker: Worker | null = null;
   private analysisWorker: Worker | null = null;
+
+  /** When true, stem separation runs after analysis (opt-in) */
+  private stemSeparationEnabled = false;
 
   private queue: QueueEntry[] = [];
   private processing = false;
@@ -439,6 +445,20 @@ export class DJPipeline {
       pcmRight,
       sampleRate,
     });
+  }
+
+  /**
+   * Enable or disable automatic stem separation in the pipeline.
+   * When enabled, tracks are separated into stems (drums, bass, other, vocals)
+   * after analysis completes. Results are cached in IndexedDB.
+   */
+  setStemSeparation(enabled: boolean): void {
+    this.stemSeparationEnabled = enabled;
+    console.log(`[DJPipeline] Stem separation ${enabled ? 'enabled' : 'disabled'}`);
+  }
+
+  get isStemSeparationEnabled(): boolean {
+    return this.stemSeparationEnabled;
   }
 
   /**
@@ -914,6 +934,39 @@ export class DJPipeline {
       // Analysis failure is non-fatal — the audio is still usable
     }
 
+    // ── Stem separation phase (opt-in, non-blocking) ────────────────────
+    let stems: StemResult | undefined;
+    if (this.stemSeparationEnabled) {
+      try {
+        const fileHash = await hashFile(task.fileBuffer);
+        const demucs = DemucsEngine.getInstance();
+
+        // Check cache first
+        const cached = await demucs.loadCachedStems(fileHash);
+        if (cached) {
+          stems = cached;
+          console.log(`[DJPipeline] Loaded cached stems for ${task.filename}`);
+        } else {
+          this.updateDeckAnalysisState(task.id, 'separating', task.deckId);
+          await demucs.ensureModel('4s', (p, msg) => {
+            this.emitTaskProgress(task.id, 80 + p * 5);
+            console.log(`[DJPipeline] Demucs model: ${msg}`);
+          });
+
+          stems = await demucs.separate(left, right, sampleRate, (p) => {
+            this.emitTaskProgress(task.id, 85 + p * 15);
+          });
+
+          // Cache stems for next time
+          await demucs.cacheStemResult(fileHash, stems, sampleRate);
+          console.log(`[DJPipeline] Stems separated for ${task.filename}`);
+        }
+      } catch (err) {
+        console.warn(`[DJPipeline] Stem separation failed for ${task.filename}:`, err);
+        // Non-fatal — deck works without stems
+      }
+    }
+
     // ── Update deck state ────────────────────────────────────────────────
     if (task.deckId) {
       const currentState = useDJStore.getState().decks[task.deckId];
@@ -944,7 +997,7 @@ export class DJPipeline {
       `(BPM: ${analysis?.bpm?.toFixed(1) ?? '?'}, Key: ${analysis?.musicalKey ?? '?'})`,
     );
 
-    return { wavData, duration, sampleRate, waveformPeaks, analysis };
+    return { wavData, duration, sampleRate, waveformPeaks, stems, analysis };
   }
 
   // ── Worker Communication ─────────────────────────────────────────────────
@@ -1023,7 +1076,7 @@ export class DJPipeline {
 
   private updateDeckAnalysisState(
     _taskId: string,
-    state: 'rendering' | 'analyzing',
+    state: 'rendering' | 'analyzing' | 'separating',
     deckId?: DeckId | null,
   ): void {
     // Use the provided deckId directly (task has already been shifted from queue)
