@@ -30,13 +30,25 @@ const CH_ONESHOT = 2;
 
 // Instrument indices (1-based; index 0 is unused in GT)
 const INST = {
-  SIREN: 1,       // Pulse wave — police siren sweep
-  PING: 2,        // Triangle — sharp sonar ping
-  SNARE: 3,       // Noise — snare crack burst
-  OSC_BASS: 4,    // Sawtooth — resonant bass drone
-  CRUSH_BASS: 5,  // Pulse (narrow) — gritty bass
-  SUB_SWELL: 6,   // Triangle — slow sub-bass swell
-  RISER: 7,       // Noise — filter-sweep riser
+  // ── Sirens (ch 0) ──
+  SIREN: 1,             // Pulse wave — classic police siren sweep
+  SIREN_SAW: 8,         // Sawtooth — aggressive buzzing siren
+  SIREN_TRI: 9,         // Triangle — mellow, smooth siren
+  SIREN_WARBLE: 10,     // Pulse with fast modulation feel
+  // ── One-shots (ch 2) ──
+  PING: 2,              // Triangle — sharp sonar ping
+  SNARE: 3,             // Noise — snare crack burst
+  SUB_SWELL: 6,         // Triangle — slow sub-bass swell
+  RISER: 7,             // Noise — filter-sweep riser
+  LASER: 11,            // Sawtooth — fast-decay laser zap
+  HIHAT: 12,            // Noise — short hi-hat tick
+  CLAP: 13,             // Noise — medium-decay clap burst
+  BELL: 14,             // Triangle — metallic bell ping (longer decay)
+  // ── Bass (ch 1) ──
+  OSC_BASS: 4,          // Sawtooth — resonant bass drone
+  CRUSH_BASS: 5,        // Pulse (narrow) — gritty bass
+  SUB_BASS: 15,         // Triangle — pure sub, no harmonics
+  STAB: 16,             // Pulse — short staccato stab
 } as const;
 
 /**
@@ -47,15 +59,51 @@ const INST = {
  *   Decay/Release: 0=6ms  1=24ms 2=48ms  …  9=750ms  A=1.5s   B=2.4s   F=24s
  */
 const INSTRUMENTS: Record<number, [number, number, number]> = {
-  //                   firstwave       AD                  SR
-  [INST.SIREN]:      [PULSE_GATE,  adsr(0, 0),   adsr(15, 0)],   // Instant atk, full sustain
-  [INST.PING]:       [TRI_GATE,    adsr(0, 9),   adsr(0, 0)],    // Instant atk, 750ms decay
-  [INST.SNARE]:      [NOISE_GATE,  adsr(0, 5),   adsr(0, 0)],    // Instant atk, 168ms decay
-  [INST.OSC_BASS]:   [SAW_GATE,    adsr(0, 0),   adsr(15, 0)],   // Instant atk, full sustain
-  [INST.CRUSH_BASS]: [PULSE_GATE,  adsr(0, 4),   adsr(10, 0)],   // Instant atk, 114ms decay, medium sustain
-  [INST.SUB_SWELL]:  [TRI_GATE,    adsr(9, 0),   adsr(15, 6)],   // 250ms atk, full sustain, 204ms release
-  [INST.RISER]:      [NOISE_GATE,  adsr(11, 0),  adsr(15, 9)],   // 800ms atk, 750ms release
+  //                          firstwave       AD                  SR
+  // ── Sirens ──
+  [INST.SIREN]:            [PULSE_GATE,  adsr(0, 0),   adsr(15, 0)],   // Instant atk, full sustain
+  [INST.SIREN_SAW]:        [SAW_GATE,    adsr(0, 0),   adsr(15, 0)],   // Saw siren — buzzy, aggressive
+  [INST.SIREN_TRI]:        [TRI_GATE,    adsr(0, 0),   adsr(15, 0)],   // Tri siren — mellow, flute-like
+  [INST.SIREN_WARBLE]:     [PULSE_GATE,  adsr(0, 2),   adsr(12, 0)],   // Rapid re-trigger feel (16ms decay, S=12)
+  // ── One-shots ──
+  [INST.PING]:             [TRI_GATE,    adsr(0, 9),   adsr(0, 0)],    // 750ms decay — sonar ping
+  [INST.SNARE]:            [NOISE_GATE,  adsr(0, 5),   adsr(0, 0)],    // 168ms decay — snare crack
+  [INST.SUB_SWELL]:        [TRI_GATE,    adsr(9, 0),   adsr(15, 6)],   // 250ms atk, 204ms release — slow swell
+  [INST.RISER]:            [NOISE_GATE,  adsr(11, 0),  adsr(15, 9)],   // 800ms atk, 750ms release — noise riser
+  [INST.LASER]:            [SAW_GATE,    adsr(0, 3),   adsr(0, 0)],    // 72ms decay — fast laser zap
+  [INST.HIHAT]:            [NOISE_GATE,  adsr(0, 2),   adsr(0, 0)],    // 48ms decay — tight hi-hat
+  [INST.CLAP]:             [NOISE_GATE,  adsr(0, 7),   adsr(0, 0)],    // 315ms decay — clap/rimshot
+  [INST.BELL]:             [TRI_GATE,    adsr(0, 11),  adsr(0, 0)],    // 2.4s decay — metallic bell ring
+  // ── Bass ──
+  [INST.OSC_BASS]:         [SAW_GATE,    adsr(0, 0),   adsr(15, 0)],   // Full sustain — saw bass drone
+  [INST.CRUSH_BASS]:       [PULSE_GATE,  adsr(0, 4),   adsr(10, 0)],   // 114ms decay, S=10 — gritty pulse bass
+  [INST.SUB_BASS]:         [TRI_GATE,    adsr(0, 0),   adsr(15, 2)],   // Full sustain, 48ms release — pure sub
+  [INST.STAB]:             [PULSE_GATE,  adsr(0, 6),   adsr(0, 0)],    // 204ms decay — short staccato stab
 };
+
+// ── Siren presets ─────────────────────────────────────────────────────────────
+// Each preset defines: instrument, base note, sweep range, and sweep rate.
+// Selected via setSirenPreset() — auto-dub and UI can cycle through these.
+
+export interface SIDSirenPreset {
+  id: string;
+  name: string;
+  inst: number;
+  baseNote: number;   // MIDI-ish (0x60=low, 0x80=mid, 0xA0=high)
+  range: number;      // Sweep range in semitones
+  rateHz: number;     // Sweep speed
+}
+
+export const SID_SIREN_PRESETS: SIDSirenPreset[] = [
+  { id: 'classic',    name: 'Classic Pulse',      inst: INST.SIREN,        baseNote: 0x80, range: 24, rateHz: 1.2 },
+  { id: 'saw-buzz',   name: 'Saw Buzz',           inst: INST.SIREN_SAW,    baseNote: 0x78, range: 20, rateHz: 1.5 },
+  { id: 'mellow-tri', name: 'Mellow Triangle',    inst: INST.SIREN_TRI,    baseNote: 0x88, range: 30, rateHz: 0.8 },
+  { id: 'fast-warble',name: 'Fast Warble',        inst: INST.SIREN_WARBLE, baseNote: 0x80, range: 16, rateHz: 3.0 },
+  { id: 'deep-pulse', name: 'Deep Pulse',         inst: INST.SIREN,        baseNote: 0x68, range: 12, rateHz: 0.6 },
+  { id: 'screamer',   name: 'Screamer',           inst: INST.SIREN_SAW,    baseNote: 0x90, range: 36, rateHz: 2.5 },
+  { id: 'slow-tri',   name: 'Slow Triangle Sweep',inst: INST.SIREN_TRI,    baseNote: 0x70, range: 40, rateHz: 0.3 },
+  { id: 'stutter',    name: 'Stutter Pulse',      inst: INST.SIREN_WARBLE, baseNote: 0x88, range: 8,  rateHz: 6.0 },
+];
 
 export class SIDDubSynths {
   private engine: GTUltraEngine | null = null;
@@ -65,6 +113,7 @@ export class SIDDubSynths {
   private _disposed = false;
   private _sirenInterval: ReturnType<typeof setInterval> | null = null;
   private _sirenPhase = 0;
+  private _sirenPreset: SIDSirenPreset = SID_SIREN_PRESETS[0];
   /** Exposed so DubBus can connect to its input. */
   private _outputGain: GainNode | null = null;
 
@@ -139,29 +188,52 @@ export class SIDDubSynths {
     }
   }
 
-  // ── Siren: Sweeping pulse wave ────────────────────────────────────────
+  // ── Siren preset selection ─────────────────────────────────────────
+  /** Set the active siren preset by ID. */
+  setSirenPreset(presetId: string): void {
+    const preset = SID_SIREN_PRESETS.find(p => p.id === presetId);
+    if (preset) this._sirenPreset = preset;
+  }
+
+  /** Get the current siren preset ID. */
+  get sirenPresetId(): string {
+    return this._sirenPreset.id;
+  }
+
+  /** Get all available siren presets. */
+  static get sirenPresets(): readonly SIDSirenPreset[] {
+    return SID_SIREN_PRESETS;
+  }
+
+  // ── Siren: Sweeping waveform ─────────────────────────────────────────
   /**
-   * Start a classic dub siren — SID pulse wave sweeping through a note range.
-   * The stepped frequency is MORE authentic than a smooth sweep (real C64
-   * demos sweep the frequency register in discrete steps).
+   * Start a dub siren using the active preset. The stepped frequency is
+   * MORE authentic than a smooth sweep (real C64 demos sweep the frequency
+   * register in discrete steps).
    *
    * @returns Dispose function that stops the siren.
    */
-  startSiren(baseNote = 0x80, range = 24, rateHz = 1.2): () => void {
+  startSiren(baseNote?: number, range?: number, rateHz?: number): () => void {
     const engine = this.engine;
     if (!engine) return () => {};
 
+    const p = this._sirenPreset;
+    const bn = baseNote ?? p.baseNote;
+    const rn = range ?? p.range;
+    const rate = rateHz ?? p.rateHz;
+    const inst = p.inst;
+
     this._sirenPhase = 0;
-    const step = (rateHz * 2 * Math.PI) / 20; // 20 Hz update → smooth-ish steps
+    const step = (rate * 2 * Math.PI) / 20; // 20 Hz update → smooth-ish steps
 
     // Trigger the first note immediately
-    engine.jamNoteOn(CH_SIREN, baseNote, INST.SIREN);
+    engine.jamNoteOn(CH_SIREN, bn, inst);
 
     this._sirenInterval = setInterval(() => {
-      const offset = Math.sin(this._sirenPhase) * range;
-      const note = Math.round(baseNote + offset);
+      const offset = Math.sin(this._sirenPhase) * rn;
+      const note = Math.round(bn + offset);
       const clamped = Math.max(0x60, Math.min(0xBC, note));
-      engine.jamNoteOn(CH_SIREN, clamped, INST.SIREN);
+      engine.jamNoteOn(CH_SIREN, clamped, inst);
       this._sirenPhase += step;
     }, 50);
 
@@ -220,6 +292,54 @@ export class SIDDubSynths {
     if (!engine) return;
     engine.jamNoteOn(CH_ONESHOT, 0x80, INST.RISER);
     setTimeout(() => engine.jamNoteOff(CH_ONESHOT), durationMs);
+  }
+
+  // ── Laser Zap: Fast sawtooth burst ────────────────────────────────────
+  fireLaser(note = 0xA0, durationMs = 150): void {
+    const engine = this.engine;
+    if (!engine) return;
+    engine.jamNoteOn(CH_ONESHOT, note, INST.LASER);
+    setTimeout(() => engine.jamNoteOff(CH_ONESHOT), durationMs);
+  }
+
+  // ── Hi-Hat: Tight noise tick ──────────────────────────────────────────
+  fireHiHat(durationMs = 80): void {
+    const engine = this.engine;
+    if (!engine) return;
+    engine.jamNoteOn(CH_ONESHOT, 0x80, INST.HIHAT);
+    setTimeout(() => engine.jamNoteOff(CH_ONESHOT), durationMs);
+  }
+
+  // ── Clap: Medium noise burst ──────────────────────────────────────────
+  fireClap(durationMs = 350): void {
+    const engine = this.engine;
+    if (!engine) return;
+    engine.jamNoteOn(CH_ONESHOT, 0x80, INST.CLAP);
+    setTimeout(() => engine.jamNoteOff(CH_ONESHOT), durationMs);
+  }
+
+  // ── Bell: Long triangle ring ──────────────────────────────────────────
+  fireBell(note = 0x90, durationMs = 2500): void {
+    const engine = this.engine;
+    if (!engine) return;
+    engine.jamNoteOn(CH_ONESHOT, note, INST.BELL);
+    setTimeout(() => engine.jamNoteOff(CH_ONESHOT), durationMs);
+  }
+
+  // ── Sub Bass: Pure triangle sub ───────────────────────────────────────
+  startSubBass(note = 0x50): () => void {
+    const engine = this.engine;
+    if (!engine) return () => {};
+    engine.jamNoteOn(CH_BASS, note, INST.SUB_BASS);
+    return () => engine.jamNoteOff(CH_BASS);
+  }
+
+  // ── Stab: Short pulse staccato ────────────────────────────────────────
+  fireStab(note = 0x70, durationMs = 250): void {
+    const engine = this.engine;
+    if (!engine) return;
+    engine.jamNoteOn(CH_BASS, note, INST.STAB);
+    setTimeout(() => engine.jamNoteOff(CH_BASS), durationMs);
   }
 
   // ── Lifecycle ─────────────────────────────────────────────────────────
