@@ -12,13 +12,14 @@
  */
 
 import React, { useState, useRef, useCallback, useEffect } from 'react';
-import { X, Volume2, FileAudio, AlertCircle } from 'lucide-react';
+import { X, Volume2, FileAudio, AlertCircle, Layers, Loader2 } from 'lucide-react';
 import { CustomSelect } from '@components/common/CustomSelect';
 import { Button } from '@components/ui/Button';
 import { useInstrumentStore } from '@/stores/useInstrumentStore';
 import type { InstrumentConfig } from '@/types/instrument';
 import type { IFF8SVXResult } from '@lib/audio/IFF8SVXParser';
 import { useModalClose } from '@hooks/useDialogKeyboard';
+import { useStemSeparation } from '@/hooks/useStemSeparation';
 
 const IS_IFF = /\.(iff|8svx)$/i;
 const IS_SUPPORTED = /\.(wav|mp3|ogg|flac|aiff?|m4a|iff|8svx)$/i;
@@ -86,6 +87,10 @@ export const ImportAudioDialog: React.FC<ImportAudioDialogProps> = ({
   const [loopEnd, setLoopEnd]         = useState(0);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Stem separation
+  const [extractStems, setExtractStems] = useState(false);
+  const stemHook = useStemSeparation();
 
   const handleFileSelect = useCallback(async (file: File) => {
     if (!IS_SUPPORTED.test(file.name)) {
@@ -272,6 +277,82 @@ export const ImportAudioDialog: React.FC<ImportAudioDialogProps> = ({
     }
   }, [audioFile, preview, parsed8SVX, rootNote, loopType, loopStart, loopEnd, onClose]);
 
+  /** Import audio as separated stems — creates one instrument per stem */
+  const handleImportAsStems = useCallback(async () => {
+    if (!audioFile || !preview) return;
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      // Decode the audio file to an AudioBuffer for stem separation
+      const arrayBuf = await audioFile.arrayBuffer();
+      const audioCtx = new OfflineAudioContext(2, 1, 44100);
+      const audioBuffer = await audioCtx.decodeAudioData(arrayBuf.slice(0));
+
+      // Run stem separation
+      await stemHook.separate(audioBuffer);
+
+      // Wait for results (separation is async inside the hook)
+      // The hook updates state — we need to get stems from it after completion
+      // Since separate() awaits internally, stemHook state is updated after this point
+      const stems = stemHook.getAllStemBuffers();
+
+      if (stems.size === 0) {
+        setError('Stem separation produced no results');
+        return;
+      }
+
+      const { addInstrument } = useInstrumentStore.getState();
+      const { bufferToDataUrl } = await import('@/utils/audio/SampleProcessing');
+
+      for (const [stemName, buffer] of stems) {
+        const dataUrl = await bufferToDataUrl(buffer);
+        const capitalizedStem = stemName.charAt(0).toUpperCase() + stemName.slice(1);
+
+        const instrument: InstrumentConfig = {
+          id: 0,
+          name: `${preview.name} - ${capitalizedStem}`,
+          type: 'sample',
+          synthType: 'Sampler',
+          effects: [],
+          volume: 0,
+          pan: 0,
+          sample: {
+            url: dataUrl,
+            baseNote: rootNote,
+            detune: 0,
+            loop: false,
+            loopType: 'off',
+            loopStart: 0,
+            loopEnd: 0,
+            sampleRate: buffer.sampleRate,
+            reverse: false,
+            playbackRate: 1.0,
+          },
+          parameters: {
+            sampleUrl: dataUrl,
+            sampleInfo: {
+              name: `${preview.name} - ${stemName}`,
+              duration: buffer.duration,
+              size: Math.round(((dataUrl.split(',')[1] || '').length * 3) / 4),
+              sampleRate: buffer.sampleRate,
+              channels: buffer.numberOfChannels,
+            },
+          },
+        } as InstrumentConfig;
+
+        addInstrument(instrument);
+      }
+
+      stemHook.cleanup();
+      onClose();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to import as stems');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [audioFile, preview, rootNote, onClose, stemHook]);
+
   const handleClose = useCallback(() => {
     setPreview(null);
     setAudioFile(null);
@@ -280,8 +361,10 @@ export const ImportAudioDialog: React.FC<ImportAudioDialogProps> = ({
     setLoopType('off');
     setLoopStart(0);
     setLoopEnd(0);
+    setExtractStems(false);
+    stemHook.cleanup();
     onClose();
-  }, [onClose]);
+  }, [onClose, stemHook]);
 
   if (!isOpen) return null;
 
@@ -436,16 +519,68 @@ export const ImportAudioDialog: React.FC<ImportAudioDialogProps> = ({
             )}
           </div>
 
+          {/* Stem extraction option (not for IFF/8SVX) */}
+          {preview && !parsed8SVX && (
+            <div className="bg-dark-bg rounded-lg p-4 space-y-2">
+              <label className="flex items-center gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={extractStems}
+                  onChange={(e) => setExtractStems(e.target.checked)}
+                  className="w-4 h-4 rounded border-dark-borderLight accent-accent-primary"
+                  disabled={isLoading || stemHook.isBusy}
+                />
+                <div>
+                  <div className="flex items-center gap-1.5">
+                    <Layers size={14} className="text-pink-400" />
+                    <p className="text-sm text-text-primary font-medium">Extract as stems</p>
+                  </div>
+                  <p className="text-xs text-text-muted mt-0.5">
+                    AI-separate into drums, bass, vocals &amp; other — creates one instrument per stem
+                  </p>
+                </div>
+              </label>
+
+              {/* Stem separation progress */}
+              {stemHook.isBusy && (
+                <div className="space-y-1 pt-1">
+                  <div className="flex items-center gap-2">
+                    <Loader2 size={12} className="animate-spin text-accent-primary" />
+                    <span className="text-[10px] font-mono text-text-secondary">
+                      {stemHook.progressMessage || 'Processing...'}
+                    </span>
+                    <span className="text-[10px] font-mono text-text-muted ml-auto">
+                      {Math.round(stemHook.progress * 100)}%
+                    </span>
+                  </div>
+                  <div className="h-1.5 bg-dark-bgSecondary rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-accent-primary rounded-full transition-all duration-300"
+                      style={{ width: `${Math.round(stemHook.progress * 100)}%` }}
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
           <p className="text-xs text-text-muted">
-            The sample will be added as a new Sampler instrument. Use the instrument editor to adjust loop points, volume envelope, and other parameters after import.
+            {extractStems
+              ? 'Each stem will be added as a separate Sampler instrument. First use may download the AI model (~40 MB).'
+              : 'The sample will be added as a new Sampler instrument. Use the instrument editor to adjust loop points, volume envelope, and other parameters after import.'}
           </p>
         </div>
 
         {/* Footer */}
         <div className="flex justify-end gap-2 px-4 py-3 border-t border-dark-border flex-shrink-0">
           <Button variant="ghost" size="sm" onClick={handleClose}>Cancel</Button>
-          <Button variant="primary" size="sm" onClick={handleImport} disabled={!audioFile || isLoading}>
-            Add to Instruments
+          <Button
+            variant="primary"
+            size="sm"
+            onClick={extractStems ? handleImportAsStems : handleImport}
+            disabled={!audioFile || isLoading || stemHook.isBusy}
+          >
+            {extractStems ? 'Extract Stems' : 'Add to Instruments'}
           </Button>
         </div>
       </div>

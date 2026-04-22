@@ -83,6 +83,8 @@ export interface SampleEditorState {
   setShowAmigaPal: (v: boolean) => void;
   showSpectrumFilter: boolean;
   setShowSpectrumFilter: (v: boolean) => void;
+  showStemSeparator: boolean;
+  setShowStemSeparator: (v: boolean) => void;
 
   // Playback
   isPlaying: boolean;
@@ -225,6 +227,7 @@ export function useSampleEditorState(opts: UseSampleEditorStateOptions): SampleE
   const [showBeatSync, setShowBeatSync] = useState(false);
   const [showAmigaPal, setShowAmigaPal] = useState(false);
   const [showSpectrumFilter, setShowSpectrumFilter] = useState(false);
+  const [showStemSeparator, setShowStemSeparator] = useState(false);
 
   // ─── Playback ────────────────────────────────────────────────────
   const [isPlaying, setIsPlaying] = useState(false);
@@ -430,6 +433,7 @@ export function useSampleEditorState(opts: UseSampleEditorStateOptions): SampleE
     showBeatSync, setShowBeatSync,
     showAmigaPal, setShowAmigaPal,
     showSpectrumFilter, setShowSpectrumFilter,
+    showStemSeparator, setShowStemSeparator,
     isPlaying, setIsPlaying,
     playbackPosition, setPlaybackPosition,
     isLoading, setIsLoading,
