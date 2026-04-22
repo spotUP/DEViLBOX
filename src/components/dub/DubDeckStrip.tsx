@@ -81,7 +81,7 @@ const GLOBAL_MOVES: Array<GlobalMove> = [
 // Map color tokens to button class fragments. Keeps Tailwind's JIT happy —
 // we can't build class names dynamically with string concatenation.
 const colorClasses = (token: string, active: boolean) => {
-  const base = 'px-1.5 py-0.5 rounded border text-[9px] font-bold transition-all duration-150 ';
+  const base = 'px-2.5 py-1 rounded border text-xs font-bold transition-all duration-150 ';
   switch (token) {
     case 'accent-primary':      return base + (active ? 'bg-accent-primary text-text-inverse border-accent-primary shadow-[0_0_6px_var(--color-accent-primary)]' : 'bg-dark-bgTertiary border-dark-border text-text-muted hover:border-accent-primary hover:text-accent-primary');
     case 'accent-primary/70':   return base + (active ? 'bg-accent-primary/70 text-text-inverse border-accent-primary/70' : 'bg-dark-bgTertiary border-dark-border text-text-muted hover:border-accent-primary/70 hover:text-accent-primary');
@@ -482,11 +482,11 @@ export const DubDeckStrip: React.FC = () => {
   }, []);
 
   return (
-    <div className="flex flex-col gap-1 px-2 py-1 bg-dark-bgSecondary border-t border-dark-border font-mono">
+    <div className="flex flex-col gap-1.5 px-2 py-1.5 bg-dark-bgSecondary border-t border-dark-border font-mono">
       {/* Header row */}
-      <div className="flex items-center gap-2 text-[10px]">
+      <div className="flex items-center gap-2 text-xs">
         <button
-          className="px-2 py-0.5 rounded border border-dark-borderLight text-text-secondary hover:text-text-primary hover:border-accent-primary transition-colors"
+          className="px-2.5 py-1 rounded border border-dark-borderLight text-text-secondary hover:text-text-primary hover:border-accent-primary transition-colors"
           onClick={toggleStripCollapsed}
           title={stripCollapsed ? 'Expand Dub Deck (tone / globals / per-channel / lane)' : 'Collapse Dub Deck — keep only the header'}
         >
@@ -494,7 +494,7 @@ export const DubDeckStrip: React.FC = () => {
         </button>
         <button
           className={
-            'px-2 py-0.5 rounded border transition-colors ' +
+            'px-2.5 py-1 rounded border transition-colors ' +
             (busEnabled
               ? 'bg-accent-primary/10 border-accent-primary text-accent-primary'
               : 'bg-dark-bgTertiary border-dark-border text-text-muted hover:text-text-primary')
@@ -506,7 +506,7 @@ export const DubDeckStrip: React.FC = () => {
         </button>
         <button
           className={
-            'px-2 py-0.5 rounded border transition-colors ' +
+            'px-2.5 py-1 rounded border transition-colors ' +
             (armed
               ? `bg-accent-error/20 border-accent-error text-accent-error ${capturedRecently ? 'animate-pulse' : ''}`
               : 'bg-dark-bgTertiary border-dark-border text-text-muted hover:text-text-primary')
@@ -521,7 +521,7 @@ export const DubDeckStrip: React.FC = () => {
             curated snapshot of EQ + spring + echo + saturator values. */}
         <span className="text-text-muted ml-2">VOICE</span>
         <select
-          className="bg-dark-bgTertiary border border-dark-border rounded px-1 py-0.5 text-text-primary text-[10px] font-mono focus:ring-1 focus:ring-accent-primary"
+          className="bg-dark-bgTertiary border border-dark-border rounded px-1.5 py-1 text-text-primary text-xs font-mono focus:ring-1 focus:ring-accent-primary"
           value={dubBusSettings.characterPreset}
           onChange={(e) => setDubBus({ characterPreset: e.target.value as typeof dubBusSettings.characterPreset })}
           title="Engineer character preset — loads EQ curve + spring + echo + tape saturator values tuned to that engineer's signature. See research at thoughts/shared/research/2026-04-20_dub-sound-coloring.md"
@@ -539,7 +539,7 @@ export const DubDeckStrip: React.FC = () => {
             the first preset load. Like a hardware desk compare button. */}
         <button
           className={
-            'px-2 py-0.5 rounded border transition-colors text-[10px] font-mono ' +
+            'px-2.5 py-1 rounded border transition-colors ' +
             (dubBusStash
               ? 'bg-dark-bgTertiary border-dark-border text-text-primary hover:bg-dark-bgHover'
               : 'bg-dark-bgTertiary border-dark-border text-text-muted opacity-50 cursor-not-allowed')
@@ -555,7 +555,7 @@ export const DubDeckStrip: React.FC = () => {
         <AutoDubPanel busEnabled={busEnabled} />
         <button
           className={
-            'px-2 py-0.5 rounded border transition-colors ' +
+            'px-2.5 py-1 rounded border transition-colors ' +
             (ghostBus
               ? 'bg-accent-highlight/20 border-accent-highlight text-accent-highlight'
               : 'bg-dark-bgTertiary border-dark-border text-text-muted hover:text-text-primary')
@@ -568,7 +568,7 @@ export const DubDeckStrip: React.FC = () => {
         </button>
         <button
           className={
-            'px-2 py-0.5 rounded border transition-colors ' +
+            'px-2.5 py-1 rounded border transition-colors ' +
             (masterChorus
               ? 'bg-accent-secondary/20 border-accent-secondary text-accent-secondary'
               : 'bg-dark-bgTertiary border-dark-border text-text-muted hover:text-text-primary')
@@ -581,7 +581,7 @@ export const DubDeckStrip: React.FC = () => {
         </button>
         <button
           className={
-            'px-2 py-0.5 rounded border transition-colors ' +
+            'px-2.5 py-1 rounded border transition-colors ' +
             (clubSim
               ? 'bg-accent-warning/20 border-accent-warning text-accent-warning'
               : 'bg-dark-bgTertiary border-dark-border text-text-muted hover:text-text-primary')
@@ -594,7 +594,7 @@ export const DubDeckStrip: React.FC = () => {
         </button>
         <button
           className={
-            'px-2 py-0.5 rounded border transition-colors ' +
+            'px-2.5 py-1 rounded border transition-colors ' +
             (reverseChainOrder
               ? 'bg-accent-secondary/20 border-accent-secondary text-accent-secondary'
               : 'bg-dark-bgTertiary border-dark-border text-text-muted hover:text-text-primary')
@@ -605,24 +605,24 @@ export const DubDeckStrip: React.FC = () => {
         >
           {reverseChainOrder ? 'VRB→DLY' : 'DLY→VRB'}
         </button>
-        <div className="flex items-center gap-1">
-          <span className="text-text-muted text-[10px]">JA</span>
+        <div className="flex items-center gap-1.5">
+          <span className="text-text-muted text-xs">JA</span>
           <input
             type="range" min={0} max={10} step={0.5}
             value={vinylLevel}
             onChange={(e) => setVinylLevel(Number(e.target.value))}
-            className="w-16 accent-accent-warning"
+            className="w-20 accent-accent-warning"
             disabled={!busEnabled}
             title={`JA Press: ${vinylLevel.toFixed(1)} / 10 — vinyl wear (surface noise, clicks, wow/flutter, HF roll-off, rumble, L/R drift). 0 = factory new, 10 = gutter-scraped Jamaican 7-inch.`}
           />
-          <span className="w-6 text-text-secondary text-[10px]">{vinylLevel.toFixed(1)}</span>
+          <span className="w-8 text-text-secondary text-xs">{vinylLevel.toFixed(1)}</span>
         </div>
         <span className="flex-1" />
         <span className="text-text-muted">
           {pattern?.dubLane?.events.length ?? 0} events on this pattern
         </span>
         <button
-          className="px-2 py-0.5 rounded bg-accent-error text-text-inverse font-semibold hover:bg-accent-error/80"
+          className="px-2.5 py-1 rounded bg-accent-error text-text-inverse font-semibold hover:bg-accent-error/80"
           onClick={() => window.dispatchEvent(new Event('dub-panic'))}
           title="Drain the bus + disarm recording"
         >
@@ -636,53 +636,53 @@ export const DubDeckStrip: React.FC = () => {
           Kept as full-width bands above the channel strips so the layout
           below reads like a real mixing desk: master up top, channels as
           vertical columns underneath. */}
-      <div className="flex flex-col gap-1 pb-1 border-b border-dark-border">
+      <div className="flex flex-col gap-1.5 pb-1.5 border-b border-dark-border">
         {/* Tone row — bass shelf + mid scoop + stereo width */}
-        <div className="flex items-center gap-2 text-[9px] text-text-muted">
-          <span className="w-14 shrink-0">TONE ▸</span>
-          <div className="flex items-center gap-1">
+        <div className="flex items-center gap-2 text-xs text-text-muted">
+          <span className="w-16 shrink-0">TONE ▸</span>
+          <div className="flex items-center gap-1.5">
             <span>BASS</span>
             <input
               type="range" min={-12} max={12} step={0.5}
               value={dubBusSettings.bassShelfGainDb}
               onChange={(e) => setDubBus({ bassShelfGainDb: Number(e.target.value), characterPreset: 'custom' })}
-              className="w-16 accent-accent-primary"
+              className="w-20 accent-accent-primary"
               disabled={!busEnabled}
               title={`Bass shelf at ${dubBusSettings.bassShelfFreqHz}Hz · ${dubBusSettings.bassShelfGainDb > 0 ? '+' : ''}${dubBusSettings.bassShelfGainDb.toFixed(1)} dB · classic Tubby bass lift`}
             />
-            <span className="w-10 text-text-secondary">{dubBusSettings.bassShelfGainDb > 0 ? '+' : ''}{dubBusSettings.bassShelfGainDb.toFixed(1)}dB</span>
+            <span className="w-12 text-text-secondary">{dubBusSettings.bassShelfGainDb > 0 ? '+' : ''}{dubBusSettings.bassShelfGainDb.toFixed(1)}dB</span>
           </div>
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1.5">
             <span>MID</span>
             <input
               type="range" min={-12} max={6} step={0.5}
               value={dubBusSettings.midScoopGainDb}
               onChange={(e) => setDubBus({ midScoopGainDb: Number(e.target.value), characterPreset: 'custom' })}
-              className="w-16 accent-accent-secondary"
+              className="w-20 accent-accent-secondary"
               disabled={!busEnabled}
               title={`Mid peaking at ${dubBusSettings.midScoopFreqHz}Hz · ${dubBusSettings.midScoopGainDb > 0 ? '+' : ''}${dubBusSettings.midScoopGainDb.toFixed(1)} dB · the Scientist mid-scoop`}
             />
-            <span className="w-10 text-text-secondary">{dubBusSettings.midScoopGainDb > 0 ? '+' : ''}{dubBusSettings.midScoopGainDb.toFixed(1)}dB</span>
+            <span className="w-12 text-text-secondary">{dubBusSettings.midScoopGainDb > 0 ? '+' : ''}{dubBusSettings.midScoopGainDb.toFixed(1)}dB</span>
           </div>
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1.5">
             <span>WIDTH</span>
             <input
               type="range" min={0} max={2} step={0.05}
               value={dubBusSettings.stereoWidth}
               onChange={(e) => setDubBus({ stereoWidth: Number(e.target.value), characterPreset: 'custom' })}
-              className="w-16 accent-accent-highlight"
+              className="w-20 accent-accent-highlight"
               disabled={!busEnabled}
               title={`Stereo width ${dubBusSettings.stereoWidth.toFixed(2)}× · 0 = mono (Perry), 1 = neutral, 2 = wide (Mad Professor)`}
             />
-            <span className="w-10 text-text-secondary">{dubBusSettings.stereoWidth.toFixed(2)}×</span>
+            <span className="w-12 text-text-secondary">{dubBusSettings.stereoWidth.toFixed(2)}×</span>
           </div>
           <span className="flex-1" />
         </div>
 
         {/* Generators — self-generating moves (no channel send needed) */}
-        <div className="flex items-center gap-1 text-[9px]">
-          <span className="text-text-muted w-14 shrink-0" title="Instruments (self-generating — no channel send needed)">INSTR ▸</span>
-          <div className="flex gap-1 flex-wrap">
+        <div className="flex items-center gap-1.5 text-xs">
+          <span className="text-text-muted w-16 shrink-0" title="Instruments (self-generating — no channel send needed)">INSTR ▸</span>
+          <div className="flex gap-1.5 flex-wrap">
             {GLOBAL_MOVES.filter(m => m.category === 'gen').map((m) => {
               const key = `${m.moveId}:g`;
               const active = heldMoves.has(key);
@@ -708,9 +708,9 @@ export const DubDeckStrip: React.FC = () => {
 
         {/* Processors — modify bus content, need channel send > 0 to be
             audible. Dimmed when no channel is sending. */}
-        <div className="flex items-center gap-1 text-[9px]">
-          <span className="text-text-muted w-14 shrink-0" title="Processors (need channel send > 0 to hear)">PROC ▸</span>
-          <div className="flex gap-1 flex-wrap">
+        <div className="flex items-center gap-1.5 text-xs">
+          <span className="text-text-muted w-16 shrink-0" title="Processors (need channel send > 0 to hear)">PROC ▸</span>
+          <div className="flex gap-1.5 flex-wrap">
             {GLOBAL_MOVES.filter(m => m.category === 'proc').map((m) => {
               const key = `${m.moveId}:g`;
               const active = heldMoves.has(key);
@@ -734,7 +734,7 @@ export const DubDeckStrip: React.FC = () => {
             })}
           </div>
           {!anySend && busEnabled && (
-            <span className="text-text-muted text-[9px] italic">raise a CH send to hear processors</span>
+            <span className="text-text-muted text-xs italic">raise a CH send to hear processors</span>
           )}
         </div>
       </div>
@@ -743,7 +743,7 @@ export const DubDeckStrip: React.FC = () => {
           vertical column: label → op buttons stacked → HOLD → vertical
           fader → send % readout. Horizontal scroll if the pattern has
           more channels than fit. */}
-      <div className="flex items-end gap-1.5 overflow-x-auto pt-1">
+      <div className="flex items-end gap-2 overflow-x-auto pt-1.5">
         {Array.from({ length: visibleChannelCount }, (_, i) => {
           const ch = channels[i];
           const dubSend = ch?.dubSend ?? 0;
@@ -754,7 +754,7 @@ export const DubDeckStrip: React.FC = () => {
             <div
               key={i}
               className={
-                'flex flex-col items-center gap-1 px-1.5 py-1 rounded border min-w-[52px] shrink-0 transition-colors ' +
+                'flex flex-col items-center gap-1.5 px-2 py-1.5 rounded border min-w-[64px] shrink-0 transition-colors ' +
                 (isHeld
                   ? 'bg-accent-primary/10 border-accent-primary'
                   : hasDubSend
@@ -763,7 +763,7 @@ export const DubDeckStrip: React.FC = () => {
               }
             >
               <span
-                className="text-[9px] font-bold text-text-secondary leading-none truncate max-w-[48px]"
+                className="text-xs font-bold text-text-secondary leading-none truncate max-w-[56px]"
                 title={`Ch ${i + 1}${ch ? ' · ' + ch.name : ''}`}
               >
                 CH {i + 1}
@@ -790,7 +790,7 @@ export const DubDeckStrip: React.FC = () => {
               })}
               <button
                 className={
-                  'px-1.5 py-0.5 rounded border w-full text-[9px] font-bold transition-all duration-150 ' +
+                  'px-2 py-1 rounded border w-full text-xs font-bold transition-all duration-150 ' +
                   (isHeld
                     ? 'bg-accent-primary border-accent-primary text-text-inverse shadow-[0_0_8px_var(--color-accent-primary)]'
                     : isFlashed
@@ -815,7 +815,7 @@ export const DubDeckStrip: React.FC = () => {
                 doubleClickValue={1}
                 paramKey={`dub.channelSend.ch${i}`}
               />
-              <span className="text-[9px] font-mono text-text-secondary leading-none">
+              <span className="text-xs font-mono text-text-secondary leading-none">
                 {Math.round(dubSend * 100)}%
               </span>
             </div>
