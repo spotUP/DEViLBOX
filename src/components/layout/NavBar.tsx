@@ -19,6 +19,7 @@ import { useTourStore } from '@stores/useTourStore';
 import { useProjectStore } from '@stores/useProjectStore';
 import { useTabsStore } from '@stores/useTabsStore';
 import { CustomSelect } from '@components/common/CustomSelect';
+import { ServerStatusBadges } from './ServerStatusBadges';
 
 const NavBarComponent: React.FC = () => {
   const n = useNavBar();
@@ -106,6 +107,7 @@ const NavBarComponent: React.FC = () => {
           >
             1.0.{BUILD_NUMBER}
           </span>
+          <ServerStatusBadges />
           {!isElectron() && (
             <Button
               variant="primary"
