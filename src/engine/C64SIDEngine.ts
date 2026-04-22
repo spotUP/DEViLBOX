@@ -393,9 +393,10 @@ export class C64SIDEngine {
   /**
    * Connect a parallel dub bus send. SID audio feeds both the synthBus
    * (for master FX / main output) AND the dub bus input (for echo/spring).
-   * amount=0 effectively mutes the send without disconnecting.
+   * The send starts at gain=0 (silent) — echo throws ramp it up.
+   * This is a WET SEND: audio entering the dub bus goes through echo+reverb.
    */
-  connectDubSend(dubBusInput: AudioNode, amount = 0.4): void {
+  connectDubSend(dubBusInput: AudioNode, amount = 0): void {
     if (!this.gainNode) return;
     // Tear down existing send if present
     this.disconnectDubSend();
