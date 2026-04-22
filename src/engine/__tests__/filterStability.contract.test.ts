@@ -154,5 +154,13 @@ describe('BiquadFilterNode stability — no cascaded filters in automated paths'
       // signal growth → NaN → permanent audio death
       expect(src).toMatch(/Math\.max\(-12,\s*Math\.min\(12,\s*merged\.bassShelfGainDb\)\)/);
     });
+
+    it('has a compensating low-shelf CUT in the feedback path', () => {
+      // Without this, bass shelf boost inside the feedback loop creates a
+      // stable full-amplitude bass drone: each iteration boosts bass →
+      // saturator clips to 1.0 → feedback sends back → boost again
+      expect(src).toMatch(/feedbackShelfComp/);
+      expect(src).toMatch(/feedbackShelfComp\.gain\.setTargetAtTime\(-safeBassGain/);
+    });
   });
 });
