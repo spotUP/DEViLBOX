@@ -53,6 +53,7 @@ describe('SIDDubSynths class shape', () => {
   it('has all required trigger methods', async () => {
     const { SIDDubSynths } = await import('../SIDDubSynths');
     const synths = new SIDDubSynths();
+    // Original methods
     expect(typeof synths.startSiren).toBe('function');
     expect(typeof synths.firePing).toBe('function');
     expect(typeof synths.fireSnare).toBe('function');
@@ -61,6 +62,16 @@ describe('SIDDubSynths class shape', () => {
     expect(typeof synths.fireSubSwell).toBe('function');
     expect(typeof synths.fireRadioRiser).toBe('function');
     expect(typeof synths.dispose).toBe('function');
+    // New SID-specific methods
+    expect(typeof synths.fireLaser).toBe('function');
+    expect(typeof synths.fireHiHat).toBe('function');
+    expect(typeof synths.fireClap).toBe('function');
+    expect(typeof synths.fireBell).toBe('function');
+    expect(typeof synths.startSubBass).toBe('function');
+    expect(typeof synths.fireStab).toBe('function');
+    // Siren preset selection
+    expect(typeof synths.setSirenPreset).toBe('function');
+    expect(typeof synths.sirenPresetId).toBe('string');
   });
 
   it('trigger methods return noop functions when engine is not ready', async () => {
@@ -84,6 +95,50 @@ describe('SIDDubSynths class shape', () => {
     expect(() => synths.fireSnare()).not.toThrow();
     expect(() => synths.fireSubSwell()).not.toThrow();
     expect(() => synths.fireRadioRiser()).not.toThrow();
+    expect(() => synths.fireLaser()).not.toThrow();
+    expect(() => synths.fireHiHat()).not.toThrow();
+    expect(() => synths.fireClap()).not.toThrow();
+    expect(() => synths.fireBell()).not.toThrow();
+    expect(() => synths.fireStab()).not.toThrow();
+
+    // New hold-style bass
+    const subDispose = synths.startSubBass();
+    expect(typeof subDispose).toBe('function');
+    subDispose();
+  });
+
+  it('siren preset selection works', async () => {
+    const { SIDDubSynths, SID_SIREN_PRESETS } = await import('../SIDDubSynths');
+    const synths = new SIDDubSynths();
+
+    // Defaults to first preset
+    expect(synths.sirenPresetId).toBe(SID_SIREN_PRESETS[0].id);
+
+    // Can switch presets
+    synths.setSirenPreset('saw-buzz');
+    expect(synths.sirenPresetId).toBe('saw-buzz');
+
+    // Invalid preset ID is ignored
+    synths.setSirenPreset('nonexistent');
+    expect(synths.sirenPresetId).toBe('saw-buzz');
+  });
+
+  it('has at least 6 siren presets with valid fields', async () => {
+    const { SID_SIREN_PRESETS } = await import('../SIDDubSynths');
+    expect(SID_SIREN_PRESETS.length).toBeGreaterThanOrEqual(6);
+    for (const p of SID_SIREN_PRESETS) {
+      expect(p.id).toBeTruthy();
+      expect(p.name).toBeTruthy();
+      expect(p.inst).toBeGreaterThanOrEqual(1);
+      expect(p.baseNote).toBeGreaterThanOrEqual(0x50);
+      expect(p.baseNote).toBeLessThanOrEqual(0xBC);
+      expect(p.range).toBeGreaterThan(0);
+      expect(p.rateHz).toBeGreaterThan(0);
+    }
+
+    // IDs are unique
+    const ids = SID_SIREN_PRESETS.map(p => p.id);
+    expect(new Set(ids).size).toBe(ids.length);
   });
 
   it('dispose is safe to call multiple times', async () => {
