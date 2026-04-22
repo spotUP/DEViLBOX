@@ -45,6 +45,7 @@ export class JSSIDEngine {
   private asidEnabled = false;
   private webusbEnabled = false;
   private blobUrl: string | null = null;
+  private voiceMask = 0x1FF; // bitmask: bit N=1 → voice N enabled (all on)
 
   constructor(sidData: Uint8Array, config: JSSIDConfig = {}) {
     this.sidData = sidData;
@@ -328,12 +329,14 @@ export class JSSIDEngine {
    * Mute/unmute a voice — jsSID uses a bitmask via enableVoices(mask)
    * where bit N=1 means voice N is enabled (up to 9 voices for 3SID)
    */
-  setVoiceMask(_voice: number, muted: boolean): void {
-    if (this.jsSID?.enableVoices) {
-      // enableVoices expects a bitmask where 1 = enabled
-      // We don't have a getter, so we track externally
-      this.jsSID.enableVoices(muted ? 0 : 0x1FF);
+  setVoiceMask(voice: number, muted: boolean): void {
+    if (!this.jsSID?.enableVoices) return;
+    if (muted) {
+      this.voiceMask &= ~(1 << voice);
+    } else {
+      this.voiceMask |= (1 << voice);
     }
+    this.jsSID.enableVoices(this.voiceMask);
   }
 
   /**
