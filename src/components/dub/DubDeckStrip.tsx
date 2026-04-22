@@ -643,7 +643,7 @@ export const DubDeckStrip: React.FC = () => {
           <div className="flex items-center gap-1">
             <span>BASS</span>
             <input
-              type="range" min={-18} max={18} step={0.5}
+              type="range" min={-12} max={12} step={0.5}
               value={dubBusSettings.bassShelfGainDb}
               onChange={(e) => setDubBus({ bassShelfGainDb: Number(e.target.value), characterPreset: 'custom' })}
               className="w-16 accent-accent-primary"

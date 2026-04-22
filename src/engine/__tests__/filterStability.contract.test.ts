@@ -148,5 +148,11 @@ describe('BiquadFilterNode stability — no cascaded filters in automated paths'
     it('clamps filterDrop floor to >= 40 Hz', () => {
       expect(src).toMatch(/Math\.max\(40,\s*targetHz\)/);
     });
+
+    it('clamps bassShelfGainDb to ±12 dB (shelf is inside feedback loop)', () => {
+      // +18 dB bass boost inside the echo feedback loop causes exponential
+      // signal growth → NaN → permanent audio death
+      expect(src).toMatch(/Math\.max\(-12,\s*Math\.min\(12,\s*merged\.bassShelfGainDb\)\)/);
+    });
   });
 });
