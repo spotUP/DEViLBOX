@@ -3,7 +3,7 @@
  * Connects to useAudioStore for master effects management
  */
 
-import React, { useState, useCallback, useImperativeHandle, forwardRef, useRef, useEffect } from 'react';
+import React, { useState, useCallback, useImperativeHandle, forwardRef, useRef, useEffect, useMemo } from 'react';
 import {
   DndContext,
   closestCenter,
@@ -218,7 +218,6 @@ export const MasterEffectsPanel = forwardRef<MasterEffectsPanelHandle, MasterEff
   const [showPresetMenu, setShowPresetMenu] = useState(false);
   const [showSaveDialog, setShowSaveDialog] = useState(false);
   const [presetName, setPresetName] = useState('');
-  const [activePresetName, setActivePresetName] = useState<string | null>(null);
 
   useImperativeHandle(ref, () => ({
     toggleAddMenu: () => setShowAddMenu(prev => !prev),
@@ -330,7 +329,6 @@ export const MasterEffectsPanel = forwardRef<MasterEffectsPanelHandle, MasterEff
       id: `master-fx-${Date.now()}-${index}`,
     }));
     setMasterEffects(effects, preset.gainCompensationDb);
-    setActivePresetName(preset.name);
     setShowPresetMenu(false);
   }, [setMasterEffects]);
 
@@ -341,14 +339,12 @@ export const MasterEffectsPanel = forwardRef<MasterEffectsPanelHandle, MasterEff
       id: `master-fx-${Date.now()}-${index}`,
     }));
     setMasterEffects(effects, 0);
-    setActivePresetName(preset.name);
     setShowPresetMenu(false);
   }, [setMasterEffects]);
 
   // Clear all effects
   const handleClearEffects = useCallback(() => {
     setMasterEffects([], 0);
-    setActivePresetName(null);
     setShowPresetMenu(false);
   }, [setMasterEffects]);
 
@@ -360,6 +356,26 @@ export const MasterEffectsPanel = forwardRef<MasterEffectsPanelHandle, MasterEff
   }, [getUserPresets, syncPresetsToServer]);
 
   const userPresets = getUserPresets();
+
+  // Derive activePresetName from the current effects chain via fingerprinting
+  // (survives reloads, manual edits, cloud sync — matches DJFxQuickPresets pattern)
+  const activePresetName = useMemo(() => {
+    if (masterEffects.length === 0) return null;
+    const fingerprint = (effects: Array<{ type: string; enabled?: boolean; parameters?: Record<string, number | string> }>): string =>
+      effects.map(fx => {
+        const params = fx.parameters ?? {};
+        const sortedParams = Object.keys(params).sort().map(k => `${k}=${params[k]}`).join(',');
+        return `${fx.type}|${fx.enabled !== false ? 1 : 0}|${sortedParams}`;
+      }).join('~');
+    const current = fingerprint(masterEffects);
+    for (const p of MASTER_FX_PRESETS) {
+      if (fingerprint(p.effects) === current) return p.name;
+    }
+    for (const p of userPresets) {
+      if (fingerprint(p.effects) === current) return p.name;
+    }
+    return null;
+  }, [masterEffects, userPresets]);
 
   // Group factory presets by category, sorted alphabetically
   const presetsByCategory = MASTER_FX_PRESETS.reduce((acc, preset) => {
@@ -415,7 +431,6 @@ export const MasterEffectsPanel = forwardRef<MasterEffectsPanelHandle, MasterEff
       neuralModelIndex: availableEffect.neuralModelIndex,
       neuralModelName: availableEffect.category === 'neural' ? availableEffect.label : undefined,
     });
-    setActivePresetName(null);
     setShowAddMenu(false);
   };
 
@@ -438,7 +453,6 @@ export const MasterEffectsPanel = forwardRef<MasterEffectsPanelHandle, MasterEff
 
   const handleRemove = useCallback((effectId: string) => {
     removeMasterEffect(effectId);
-    setActivePresetName(null);
   }, [removeMasterEffect]);
 
   const handleWetChange = useCallback((effectId: string, wet: number) => {
@@ -515,7 +529,7 @@ export const MasterEffectsPanel = forwardRef<MasterEffectsPanelHandle, MasterEff
                 onClick={() => setShowPresetMenu(!showPresetMenu)}
                 className={`px-3 py-1 text-xs font-medium rounded flex items-center gap-1 border transition-colors truncate max-w-[180px]
                   ${activePresetName
-                    ? 'border-green-600/60 bg-green-950/30 text-green-400'
+                    ? 'border-accent-success/60 bg-accent-success/10 text-accent-success'
                     : 'bg-dark-bg text-text-primary hover:bg-dark-bgHover border-dark-border'
                   }`}
               >
