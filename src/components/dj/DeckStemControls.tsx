@@ -1,9 +1,10 @@
 /**
- * DeckStemControls — Per-stem mute/unmute buttons for DJ decks.
+ * DeckStemControls — Per-stem mute/unmute + dub send buttons for DJ decks.
  *
  * Shows when stems are available (after Demucs separation).
  * Each stem gets a colored pill button — click to toggle mute.
- * Also includes a master stem mode toggle.
+ * In stem mode, each stem also gets a DUB send toggle that routes
+ * the stem's audio into the dub effects chain (echo, spring, etc.).
  */
 
 import React, { useCallback } from 'react';
@@ -37,6 +38,7 @@ export const DeckStemControls: React.FC<DeckStemControlsProps> = ({ deckId }) =>
   const stemMode = useDJStore((s) => s.decks[deckId].stemMode);
   const stemNames = useDJStore((s) => s.decks[deckId].stemNames);
   const stemMutes = useDJStore((s) => s.decks[deckId].stemMutes);
+  const stemDubSends = useDJStore((s) => s.decks[deckId].stemDubSends);
 
   const handleToggleStemMode = useCallback(() => {
     DJActions.setStemMode(deckId, !stemMode);
@@ -50,52 +52,92 @@ export const DeckStemControls: React.FC<DeckStemControlsProps> = ({ deckId }) =>
     DJActions.toggleStemMute(deckId, stemName);
   }, [deckId, stemMode]);
 
+  const handleDubToggle = useCallback((stemName: string) => {
+    DJActions.toggleStemDubSend(deckId, stemName);
+  }, [deckId]);
+
   if (!stemsAvailable || stemNames.length === 0) return null;
 
   return (
-    <div className="flex gap-1 px-1 py-0.5 items-center">
-      {/* Stem mode toggle */}
-      <button
-        onClick={handleToggleStemMode}
-        title={stemMode ? 'Switch to full mix' : 'Switch to stem playback'}
-        className={`
-          px-1.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wide
-          border transition-colors duration-100 cursor-pointer select-none outline-none
-          ${stemMode
-            ? 'bg-accent-highlight/20 border-accent-highlight text-accent-highlight'
-            : 'bg-dark-bgTertiary border-dark-borderLight text-text-muted hover:text-text-primary hover:border-text-muted'
-          }
-        `}
-      >
-        STEM
-      </button>
+    <div className="flex flex-col gap-0.5 px-1 py-0.5">
+      {/* Row 1: Stem mode toggle + per-stem mute buttons */}
+      <div className="flex gap-1 items-center">
+        <button
+          onClick={handleToggleStemMode}
+          title={stemMode ? 'Switch to full mix' : 'Switch to stem playback'}
+          className={`
+            px-1.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wide
+            border transition-colors duration-100 cursor-pointer select-none outline-none
+            ${stemMode
+              ? 'bg-accent-highlight/20 border-accent-highlight text-accent-highlight'
+              : 'bg-dark-bgTertiary border-dark-borderLight text-text-muted hover:text-text-primary hover:border-text-muted'
+            }
+          `}
+        >
+          STEM
+        </button>
 
-      {/* Per-stem mute buttons — only shown when stem mode is active */}
-      {stemMode && stemNames.map((name) => {
-        const isMuted = stemMutes[name] ?? false;
-        const color = STEM_COLORS[name] ?? '#888';
-        const label = STEM_LABELS[name] ?? name.substring(0, 3).toUpperCase();
+        {/* Per-stem mute buttons — only shown when stem mode is active */}
+        {stemMode && stemNames.map((name) => {
+          const isMuted = stemMutes[name] ?? false;
+          const color = STEM_COLORS[name] ?? '#888';
+          const label = STEM_LABELS[name] ?? name.substring(0, 3).toUpperCase();
 
-        return (
-          <button
-            key={name}
-            onClick={() => handleStemToggle(name)}
-            title={`${isMuted ? 'Unmute' : 'Mute'} ${name}`}
-            className={`
-              px-1.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wide
-              border transition-colors duration-100 cursor-pointer select-none outline-none
-            `}
-            style={{
-              backgroundColor: isMuted ? 'transparent' : `${color}22`,
-              borderColor: isMuted ? 'var(--dark-borderLight, #555)' : color,
-              color: isMuted ? 'var(--text-muted, #888)' : color,
-              textDecoration: isMuted ? 'line-through' : 'none',
-            }}
-          >
-            {label}
-          </button>
-        );
-      })}
+          return (
+            <button
+              key={name}
+              onClick={() => handleStemToggle(name)}
+              title={`${isMuted ? 'Unmute' : 'Mute'} ${name}`}
+              className={`
+                px-1.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wide
+                border transition-colors duration-100 cursor-pointer select-none outline-none
+              `}
+              style={{
+                backgroundColor: isMuted ? 'transparent' : `${color}22`,
+                borderColor: isMuted ? 'var(--dark-borderLight, #555)' : color,
+                color: isMuted ? 'var(--text-muted, #888)' : color,
+                textDecoration: isMuted ? 'line-through' : 'none',
+              }}
+            >
+              {label}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Row 2: Per-stem DUB send toggles — only shown in stem mode */}
+      {stemMode && (
+        <div className="flex gap-1 items-center">
+          <span className="px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wide text-text-muted select-none">
+            DUB
+          </span>
+          {stemNames.map((name) => {
+            const isDubSend = stemDubSends[name] ?? false;
+            const color = STEM_COLORS[name] ?? '#888';
+            const label = STEM_LABELS[name] ?? name.substring(0, 3).toUpperCase();
+
+            return (
+              <button
+                key={`dub-${name}`}
+                onClick={() => handleDubToggle(name)}
+                title={`${isDubSend ? 'Remove' : 'Send'} ${name} to dub effects`}
+                className={`
+                  px-1.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wide
+                  border transition-colors duration-100 cursor-pointer select-none outline-none
+                `}
+                style={{
+                  backgroundColor: isDubSend ? `${color}33` : 'transparent',
+                  borderColor: isDubSend ? color : 'var(--dark-borderLight, #555)',
+                  color: isDubSend ? color : 'var(--text-muted, #888)',
+                  boxShadow: isDubSend ? `0 0 6px ${color}44` : 'none',
+                }}
+              >
+                {label}
+              </button>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 };

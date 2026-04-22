@@ -1015,3 +1015,11 @@ export function setStemMute(deckId: DeckId, stemName: string, muted: boolean): v
     getDJEngine().getDeck(deckId).setStemMute(stemName, muted);
   } catch { /* engine not ready */ }
 }
+
+/** Toggle dub bus send for an individual stem. */
+export function toggleStemDubSend(deckId: DeckId, stemName: string): void {
+  const state = useDJStore.getState();
+  const current = state.decks[deckId].stemDubSends[stemName] ?? false;
+  const newSends = { ...state.decks[deckId].stemDubSends, [stemName]: !current };
+  state.setDeckState(deckId, { stemDubSends: newSends });
+}

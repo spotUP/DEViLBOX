@@ -1935,6 +1935,65 @@ export class DubBus {
     this.deckChannelTaps.delete(key);
   }
 
+  // ─── DJ deck per-stem taps (continuous send) ─────────────────────────────
+  //
+  // Unlike channel taps (move-activated, busGain starts at 0), stem taps are
+  // continuous sends: busGain starts at STEM_DUB_SEND_GAIN so the stem audio
+  // immediately feeds the dub effects chain (echo, spring, etc.). This mirrors
+  // how hardware dub mixers route individual channels to effect sends.
+  //
+  // Keyed by `${deckId}:stem:${stemName}` in the same deckChannelTaps map.
+
+  private static readonly STEM_DUB_SEND_GAIN = 0.7;
+
+  registerDeckStemTap(deckId: DeckId, stemName: string, sourceGain: GainNode): void {
+    const key = `${deckId}:stem:${stemName}`;
+    const existing = this.deckChannelTaps.get(key);
+    if (existing) {
+      try { existing.disposeSource(); } catch { /* ok */ }
+      try { existing.busGain.disconnect(); } catch { /* ok */ }
+      this.deckChannelTaps.delete(key);
+    }
+
+    const busGain = this.context.createGain();
+    busGain.gain.value = DubBus.STEM_DUB_SEND_GAIN;
+    try {
+      sourceGain.connect(busGain);
+      busGain.connect(this.deckHpf);
+    } catch (e) {
+      console.warn(`[DubBus] registerDeckStemTap(${key}) connect failed:`, e);
+      try { busGain.disconnect(); } catch { /* ok */ }
+      return;
+    }
+
+    const disposeSource = () => {
+      try { sourceGain.disconnect(busGain); } catch { /* ok */ }
+    };
+    this.deckChannelTaps.set(key, { busGain, disposeSource });
+    console.log(`[DubBus] stem tap registered: ${key} (gain=${DubBus.STEM_DUB_SEND_GAIN})`);
+  }
+
+  unregisterDeckStemTap(deckId: DeckId, stemName: string): void {
+    const key = `${deckId}:stem:${stemName}`;
+    const entry = this.deckChannelTaps.get(key);
+    if (!entry) return;
+    try { entry.disposeSource(); } catch { /* ok */ }
+    try { entry.busGain.disconnect(); } catch { /* ok */ }
+    this.deckChannelTaps.delete(key);
+    console.log(`[DubBus] stem tap unregistered: ${key}`);
+  }
+
+  /** Remove all stem taps for a deck (e.g. on track change). */
+  unregisterAllDeckStemTaps(deckId: DeckId): void {
+    const prefix = `${deckId}:stem:`;
+    for (const [key, entry] of this.deckChannelTaps) {
+      if (!key.startsWith(prefix)) continue;
+      try { entry.disposeSource(); } catch { /* ok */ }
+      try { entry.busGain.disconnect(); } catch { /* ok */ }
+      this.deckChannelTaps.delete(key);
+    }
+  }
+
   // Activation callback — set by DubDeckStrip on mount. Lets openChannelTap
   // lazy-activate a channel's dub send when the user fires a move on a
   // channel whose fader is at 0 (no tap registered yet). Without this, the
