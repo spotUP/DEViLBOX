@@ -67,10 +67,19 @@ export const AutoDubPanel: React.FC<AutoDubPanelProps> = ({ busEnabled }) => {
         // Warn if format lacks per-channel isolation (echo throws won't target individual channels)
         const isSID = hasSidData || ['sidfactory2', 'cheesecutter', 'goattracker'].includes(editorMode);
         if (isSID) {
-          useNotificationStore.getState().addNotification({
-            type: 'info',
-            message: 'SID mode: mutes work per-voice, echo throws apply to full mix',
-          });
+          // Check if per-voice taps are available (jsSID with external AudioContext)
+          import('@hooks/drumpad/useMIDIPadRouting').then(({ getDrumPadEngine }) => {
+            const dpEngine = getDrumPadEngine();
+            const dubBus = dpEngine?.getDubBus?.();
+            // If per-voice taps exist (channelTaps has entries 0-2), per-channel echo throws work
+            const hasVoiceTaps = dubBus && [0, 1, 2].some(i => (dubBus as any).channelTaps?.has(i));
+            useNotificationStore.getState().addNotification({
+              type: 'info',
+              message: hasVoiceTaps
+                ? 'SID mode: per-voice echo throws active (jsSID engine)'
+                : 'SID mode: mutes work per-voice, echo throws apply to full mix',
+            });
+          }).catch(() => {});
         } else if (!supportsChannelIsolation(editorMode)) {
           useNotificationStore.getState().addNotification({
             type: 'warning',

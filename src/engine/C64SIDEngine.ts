@@ -194,7 +194,12 @@ export class C64SIDEngine {
     }
     
     // Initialize the engine with the loaded module
-    await this.engine!.init(engineModule);
+    // jsSID gets the shared AudioContext for per-voice output routing
+    if (engineType === 'jssid') {
+      await (this.engine as JSSIDEngine).init(engineModule, audioContext);
+    } else {
+      await this.engine!.init(engineModule);
+    }
     
     console.log('[C64SIDEngine] Engine initialized:', engineType);
   }
@@ -420,6 +425,31 @@ export class C64SIDEngine {
       try { this.gainNode.disconnect(this.dubSendGain); } catch { /* ok */ }
     }
     this.dubSendGain = null;
+  }
+
+  /** Get the dub send GainNode (for DubBus to boost during echo throws). */
+  getDubSendGain(): GainNode | null {
+    return this.dubSendGain;
+  }
+
+  /**
+   * Get per-voice output GainNodes (for per-channel dub echo throws).
+   * Only available when using jsSID backend with external AudioContext.
+   * Returns 3 GainNodes [voice0, voice1, voice2] or null if unavailable.
+   */
+  getVoiceOutputs(): GainNode[] | null {
+    if (this.engineType === 'jssid' && this.engine) {
+      return (this.engine as JSSIDEngine).getVoiceOutputs();
+    }
+    return null;
+  }
+
+  /** Whether per-voice output routing is available. */
+  hasPerVoiceOutput(): boolean {
+    if (this.engineType === 'jssid' && this.engine) {
+      return (this.engine as JSSIDEngine).hasPerVoiceOutput();
+    }
+    return false;
   }
 
   /**

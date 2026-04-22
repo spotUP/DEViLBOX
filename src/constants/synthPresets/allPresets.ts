@@ -22,6 +22,7 @@ import { WAVETABLE_PRESETS } from './wavetable';
 import { OIDOS_PRESETS } from './oidos';
 import { TUNEFISH_PRESETS } from './tunefish';
 import { WAVESABRE_SLAUGHTER_PRESETS, WAVESABRE_FALCON_PRESETS } from './wavesabre';
+import { GTULTRA_PRESETS } from './gtultra';
 
 export function getPresetsForSynthType(synthType: SynthType): SynthPreset[] {
   switch (synthType) {
@@ -69,6 +70,8 @@ export function getPresetsForSynthType(synthType: SynthType): SynthPreset[] {
       return TUNEFISH_PRESETS;
     case 'WaveSabreSynth':
       return [...WAVESABRE_SLAUGHTER_PRESETS, ...WAVESABRE_FALCON_PRESETS];
+    case 'GTUltraSynth':
+      return GTULTRA_PRESETS;
     default:
       return [];
   }
@@ -98,4 +101,5 @@ export const ALL_PRESETS: Record<string, SynthPreset[]> = {
   TunefishSynth: TUNEFISH_PRESETS,
   WaveSabreSlaughter: WAVESABRE_SLAUGHTER_PRESETS,
   WaveSabreFalcon: WAVESABRE_FALCON_PRESETS,
+  GTUltraSynth: GTULTRA_PRESETS,
 };

@@ -1168,6 +1168,17 @@ export async function startNativeEngines(
             const dubBus = dpEngine.getDubBus?.();
             if (dubBus) {
               void dubBus.enableSIDMode();
+              // Register the dub send gain so full-mix echo throws work
+              const sendGain = c64SidEngine.getDubSendGain();
+              if (sendGain) {
+                dubBus.registerSidDubSend(sendGain, 0.4);
+              }
+              // Register per-voice taps if available (jsSID with external AudioContext)
+              const voiceOutputs = c64SidEngine.getVoiceOutputs();
+              if (voiceOutputs) {
+                dubBus.registerSidVoiceTaps(voiceOutputs);
+                console.log('[NativeEngineRouting] Per-voice SID dub taps registered');
+              }
             }
           }
         } catch (e) {

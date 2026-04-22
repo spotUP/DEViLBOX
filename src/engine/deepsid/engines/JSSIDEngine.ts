@@ -46,6 +46,10 @@ export class JSSIDEngine {
   private webusbEnabled = false;
   private blobUrl: string | null = null;
   private voiceMask = 0x1FF; // bitmask: bit N=1 → voice N enabled (all on)
+  // Per-voice output nodes — populated when initialized with external AudioContext
+  private _voiceGains: GainNode[] | null = null;
+  private _splitter: ChannelSplitterNode | null = null;
+  private _externalCtx: AudioContext | null = null;
 
   constructor(sidData: Uint8Array, config: JSSIDConfig = {}) {
     this.sidData = sidData;
@@ -55,7 +59,8 @@ export class JSSIDEngine {
   /**
    * Initialize the engine
    */
-  async init(module: any): Promise<void> {
+  async init(module: any, externalCtx?: AudioContext): Promise<void> {
+    this._externalCtx = externalCtx ?? null;
     const settings = useSettingsStore.getState();
     const hwMode = settings.sidHardwareMode;
 
@@ -90,12 +95,19 @@ export class JSSIDEngine {
     }
     
     // Create jsSID instance — 4th param enables WebUSB mode in jsSID
+    // 5th param: external AudioContext for per-voice output routing
     this.jsSID = new module.jsSID(
       this.config.bufferSize || 16384,
       0.0005,
       this.asidEnabled,
-      this.webusbEnabled
+      this.webusbEnabled,
+      externalCtx || null
     );
+
+    // Set up per-voice routing if using external AudioContext
+    if (externalCtx && this.jsSID.hasPerVoiceOutput?.()) {
+      this._setupPerVoiceRouting(externalCtx);
+    }
 
     // Load SID data
     await this.loadSIDData();
@@ -201,14 +213,36 @@ export class JSSIDEngine {
   /**
    * Start playback — jsSID manages its own AudioContext and ScriptProcessor.
    * Volume is controlled via jsSID.setvolume() since it uses a separate AudioContext.
+   * When initialized with externalCtx, the ScriptProcessor is connected to
+   * outputNode instead of audioContext.destination.
    */
-  async play(_audioContext: AudioContext, _outputNode?: AudioNode): Promise<void> {
+  async play(_audioContext: AudioContext, outputNode?: AudioNode): Promise<void> {
     if (this.playing) return;
     if (!this.jsSID) throw new Error('jsSID not initialized');
 
     this.jsSID.start(this.subsong);
+
+    // If using external AudioContext, route ScriptProcessor to the provided output node
+    if (this._externalCtx && outputNode) {
+      const scriptNode = this.jsSID.getScriptNode?.();
+      if (scriptNode) {
+        try { scriptNode.disconnect(); } catch { /* ok */ }
+        if (this._splitter && this._voiceGains) {
+          // 4-channel ScriptProcessor → splitter → ch0 to output, ch1-3 to voice gains
+          scriptNode.connect(this._splitter);
+          this._splitter.connect(outputNode, 0); // ch0 = mix → main output
+          for (let i = 0; i < 3; i++) {
+            this._splitter.connect(this._voiceGains[i], i + 1); // ch1-3 → voice taps
+          }
+        } else {
+          scriptNode.connect(outputNode);
+        }
+      }
+    }
+
     this.playing = true;
-    console.log('[jsSID] Playback started, subsong:', this.subsong);
+    console.log('[jsSID] Playback started, subsong:', this.subsong,
+      this._voiceGains ? '(per-voice routing active)' : '');
   }
 
   /**
@@ -219,6 +253,38 @@ export class JSSIDEngine {
     if (this.jsSID?.setvolume) {
       this.jsSID.setvolume(Math.max(0, Math.min(1, vol)));
     }
+  }
+
+  /**
+   * Set up per-voice audio routing from jsSID's 4-channel ScriptProcessor.
+   * Splits channels 1-3 into individual GainNodes for dub bus echo throws.
+   */
+  private _setupPerVoiceRouting(ctx: AudioContext): void {
+    // 4-channel splitter: ch0=mix, ch1=voice0, ch2=voice1, ch3=voice2
+    this._splitter = ctx.createChannelSplitter(4);
+    this._voiceGains = [];
+    for (let i = 0; i < 3; i++) {
+      const gain = ctx.createGain();
+      gain.gain.value = 1;
+      // Connect splitter output (i+1) to the corresponding voice GainNode
+      // Connection happens in play() after scriptNode is connected
+      this._voiceGains.push(gain);
+    }
+    console.log('[jsSID] Per-voice routing set up (3 voice tap nodes)');
+  }
+
+  /**
+   * Get per-voice GainNodes for dub bus echo throw routing.
+   * Returns null if not initialized with external AudioContext.
+   * Each node outputs one SID voice's pre-filter audio.
+   */
+  getVoiceOutputs(): GainNode[] | null {
+    return this._voiceGains;
+  }
+
+  /** Whether per-voice output is available. */
+  hasPerVoiceOutput(): boolean {
+    return this._voiceGains !== null && this._voiceGains.length === 3;
   }
 
   /**
