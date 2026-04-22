@@ -528,10 +528,10 @@ export const DUB_ACTION_HANDLERS: Record<DubActionId, DubActionHandler> = {
 
   // ── FX — bus-only actions (don't need a deck source). ──
   dub_siren: {
-    label: 'Siren (feedback ramp)',
+    label: 'Siren',
     group: 'FX',
     kind: 'hold',
-    engage: (engine, s) => engine.setSirenFeedback(s.sirenFeedback, 0.08),
+    engage: (engine) => engine.startSiren(),
   },
   dub_filter_drop: {
     label: 'Filter Drop',
