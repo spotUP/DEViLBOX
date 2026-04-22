@@ -6,7 +6,7 @@
  */
 
 import React, { useCallback, useRef, useState } from 'react';
-import { SkipForward, Shuffle, SlidersHorizontal, Scissors, Zap, Pause, Play } from 'lucide-react';
+import { SkipForward, Shuffle, SlidersHorizontal, Scissors, Zap, Pause, Play, Layers } from 'lucide-react';
 import { useDJStore, type AutoDJStatus } from '@/stores/useDJStore';
 import { useDJPlaylistStore } from '@/stores/useDJPlaylistStore';
 import { useUIStore } from '@/stores/useUIStore';
@@ -49,6 +49,7 @@ export const DJAutoDJPanel: React.FC<DJAutoDJPanelProps> = ({ onClose }) => {
   const shuffle = useDJStore((s) => s.autoDJShuffle);
   const withFilter = useDJStore((s) => s.autoDJWithFilter);
   const smartCuts = useDJStore((s) => s.autoDJSmartCuts);
+  const stemPreSep = useDJStore((s) => s.stemPreSeparation);
   const setConfig = useDJStore((s) => s.setAutoDJConfig);
 
   const activePlaylistId = useDJPlaylistStore((s) => s.activePlaylistId);
@@ -434,6 +435,28 @@ export const DJAutoDJPanel: React.FC<DJAutoDJPanelProps> = ({ onClose }) => {
           }
         >
           <Scissors size={12} />
+        </button>
+        {/* Pre-separate stems for upcoming tracks */}
+        <button
+          onClick={() => {
+            const next = !stemPreSep;
+            setConfig({ stemPreSeparation: next });
+            import('@/engine/dj/DJStemPreloader').then(({ setStemPreSeparation }) => {
+              setStemPreSeparation(next);
+            });
+          }}
+          className={`p-1.5 rounded border transition-all ${
+            stemPreSep
+              ? 'border-emerald-500 bg-emerald-900/20 text-emerald-400'
+              : 'border-dark-borderLight bg-dark-bgTertiary text-text-tertiary hover:text-text-secondary'
+          }`}
+          title={
+            stemPreSep
+              ? 'Stem Pre-separation ON — upcoming tracks will be separated in the background'
+              : 'Stem Pre-separation OFF — click to pre-separate stems for upcoming playlist tracks'
+          }
+        >
+          <Layers size={12} />
         </button>
       </div>
 
