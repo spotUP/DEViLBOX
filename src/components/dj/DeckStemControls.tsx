@@ -45,7 +45,7 @@ export const DeckStemControls: React.FC<DeckStemControlsProps> = ({ deckId }) =>
 
   // Check if any other deck is currently separating (Demucs is single-flight)
   const anyDeckSeparating = useDJStore((s) =>
-    Object.values(s.decks).some((d) => d.stemSeparationProgress !== null)
+    Object.values(s.decks).some((d) => d.stemSeparationProgress != null && d.stemSeparationProgress >= 0)
   );
 
   const [error, setError] = useState<string | null>(null);
@@ -81,7 +81,7 @@ export const DeckStemControls: React.FC<DeckStemControlsProps> = ({ deckId }) =>
   if (!fileName) return null;
 
   // ── Separation in progress ───────────────────────────────────────────────
-  if (stemSeparationProgress !== null) {
+  if (stemSeparationProgress != null && stemSeparationProgress >= 0) {
     const pct = Math.round(stemSeparationProgress * 100);
     return (
       <div className="flex items-center gap-2 px-1 py-0.5">
