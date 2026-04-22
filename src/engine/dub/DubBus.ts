@@ -85,6 +85,12 @@ function makePinkNoiseBuffer(ctx: AudioContext, durationSec: number): AudioBuffe
   return buffer;
 }
 
+// ── Singleton accessor for synchronous DubBus access ────────────────────────
+// The mixer store needs synchronous access to route SID voice dub sends
+// without async import chains. Set by DubBus constructor, cleared by dispose.
+let _activeDubBus: DubBus | null = null;
+export function getActiveDubBus(): DubBus | null { return _activeDubBus; }
+
 export class DubBus {
   // ─── Shared Dub Bus — Vintage King Tubby / Scientist chain ─────────────────
   // Sources fanning into `input`:
@@ -507,6 +513,7 @@ export class DubBus {
   constructor(context: AudioContext, master: AudioNode) {
     this.context = context;
     this.master = master;
+    _activeDubBus = this;
     // Build the shared Dub Bus: input → HPF → Spring → Echo → Sidechain → return → master
     // The return gain is gated by enabled — when disabled, return.gain = 0
     // so sends have zero effect (no audible bus output, but graph stays wired).
@@ -1085,6 +1092,23 @@ export class DubBus {
       this.channelTaps.set(i, tapGain);
     }
     console.log(`[DubBus] Registered ${voiceOutputs.length} per-voice SID taps`);
+  }
+
+  /**
+   * Set the dub send level for a SID voice (channel 0-2).
+   * Called by the mixer store when the user moves channel dub send sliders.
+   * Returns true if the channel was handled (SID mode + tap exists).
+   */
+  setSidVoiceDubSend(voiceIndex: number, amount: number): boolean {
+    if (!this._sidMode) return false;
+    const tap = this.channelTaps.get(voiceIndex);
+    if (!tap) return false;
+    const clamped = Math.max(0, Math.min(1, amount));
+    const now = this.context.currentTime;
+    tap.gain.cancelScheduledValues(now);
+    tap.gain.setValueAtTime(tap.gain.value, now);
+    tap.gain.linearRampToValueAtTime(clamped, now + 0.02);
+    return true;
   }
 
   /**
@@ -3597,6 +3621,7 @@ export class DubBus {
   /** Dispose and release all bus resources. */
   dispose(): void {
     this._disposed = true;
+    if (_activeDubBus === this) _activeDubBus = null;
     // Detach from any mixer the bus was pulling deck taps from.
     this.detachDJMixer();
     for (const tap of this.deckTaps.values()) {

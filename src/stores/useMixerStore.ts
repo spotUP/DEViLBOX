@@ -876,6 +876,18 @@ export const useMixerStore = create<MixerStore>()(
         if (ch < 0 || ch >= state.channels.length) return;
         state.channels[ch].dubSend = clamped;
       });
+
+      // SID mode: route to per-voice taps on the dub bus directly.
+      // Worklet-based isolation doesn't exist for SID — voice taps are
+      // registered as channelTaps on DubBus and controlled here.
+      try {
+        const { getActiveDubBus } = require('../engine/dub/DubBus');
+        const dubBus = getActiveDubBus();
+        if (dubBus?.setSidVoiceDubSend(ch, clamped)) {
+          return; // handled by SID per-voice tap
+        }
+      } catch { /* not in SID mode or dub bus not ready */ }
+
       try {
         getChannelRoutedEffectsManager()?.setChannelDubSend(ch, clamped);
       } catch (e) {
