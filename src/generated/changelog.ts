@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-04-22T13:33:58.349Z
+ * Generated: 2026-04-22T21:46:16.279Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,9 +19,9 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.6049';
-export const BUILD_NUMBER = '6049';
-export const BUILD_HASH = '93851dfeb';
+export const BUILD_VERSION = '1.0.6070';
+export const BUILD_NUMBER = '6070';
+export const BUILD_HASH = '6013a2be1';
 export const BUILD_DATE = '2026-04-22';
 
 // Full version (patch IS the build number, so no need to append)
@@ -30,9 +30,93 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.6049',
+    version: '1.0.6070',
     date: '2026-04-22',
     changes: [
+      {
+        type: 'feature',
+        "description": "Swappable DubBus echo engine + RE-201/AnotherDelay master FX presets"
+      },
+      {
+        type: 'feature',
+        "description": "Add dub/sound system presets to all reverb and echo effects"
+      },
+      {
+        type: 'feature',
+        "description": "Proper dub/sound system presets for RE-201 and AnotherDelay"
+      },
+      {
+        type: 'feature',
+        "description": "Port RE-201 Space Echo and AnotherDelay to WASM"
+      },
+      {
+        type: 'improvement',
+        "description": "Keyboard navigation UX overhaul: menus, focus rings, focus traps, dynamic shortcuts"
+      },
+      {
+        type: 'feature',
+        "description": "Add UI labeling rule to CLAUDE.md — never abbreviate labels"
+      },
+      {
+        type: 'improvement',
+        "description": "Use full readable words for DJ FX pad labels instead of abbreviations"
+      },
+      {
+        type: 'improvement',
+        "description": "Route DJ FX pads through DubBus WASM effects instead of naive Web Audio"
+      },
+      {
+        type: 'fix',
+        "description": "Siren pad fires actual synth instead of silent feedback ramp"
+      },
+      {
+        type: 'improvement',
+        "description": "Color-tinted backgrounds for FX pads, stem controls, and drum pads"
+      },
+      {
+        type: 'improvement',
+        "description": "Make stem controls and FX pads look like proper buttons"
+      },
+      {
+        type: 'improvement',
+        "description": "Increase text sizes across all dub components + add hover info bar"
+      },
+      {
+        type: 'improvement',
+        "description": "Increase dub strip button and text sizes for readability"
+      },
+      {
+        type: 'feature',
+        "description": "Loop all songs by default in DJ view"
+      },
+      {
+        type: 'feature',
+        "description": "Playlist-level stem separation — auto-queue on add + bulk separate"
+      },
+      {
+        type: 'feature',
+        "description": "Add server status badges to app header"
+      },
+      {
+        type: 'feature',
+        "description": "Add preview/apply/discard flow to sample enhancer"
+      },
+      {
+        type: 'feature',
+        "description": "Add progress bar to sample enhancer panel"
+      },
+      {
+        type: 'feature',
+        "description": "Add 4-stem / 6-stem model selector for Demucs separation"
+      },
+      {
+        type: 'fix',
+        "description": "Scope port cleanup to DEViLBOX-owned processes only"
+      },
+      {
+        type: 'improvement',
+        "description": "Stream Auto Dub — autonomous dub effects for DJ audio decks"
+      },
       {
         type: 'improvement',
         "description": "DJ stem mixer UI + per-stem waveform visualization"
@@ -154,90 +238,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'fix',
         "description": "Correct POST_AMP enum IDs + apply masterVol/systemVol/systemPan"
-      },
-      {
-        type: 'fix',
-        "description": "Scale multi-chip output by 1/chipCount — root cause of distortion"
-      },
-      {
-        type: 'fix',
-        "description": "Add safety limiter to master bus — prevents catastrophic clipping"
-      },
-      {
-        type: 'feature',
-        "description": "Prime scratch ring buffer at deck load — scratch-audible before play"
-      },
-      {
-        type: 'fix',
-        "description": "Scratch on stopped deck — Option C (no audio-source resume)"
-      },
-      {
-        type: 'fix',
-        "description": "Scratching stopped deck — release pauses immediately, no forward burst"
-      },
-      {
-        type: 'fix',
-        "description": "Scratch on stopped deck — correct behavior (scratch sounds, release pauses)"
-      },
-      {
-        type: 'improvement',
-        "description": "Rename(dub): \"GHOST\" bus-bleed toggle → \"BLEED\" to avoid ghost-pattern collision"
-      },
-      {
-        type: 'fix',
-        "description": "Move blacklist button is now actually findable"
-      },
-      {
-        type: 'fix',
-        "description": "Scratching a stopped deck no longer starts playback on release"
-      },
-      {
-        type: 'improvement',
-        "description": "Diag(dub-recorder): log cell-write decisions to trace missing Zxx cells"
-      },
-      {
-        type: 'fix',
-        "description": "Fall back to any non-empty channel when role match empty"
-      },
-      {
-        type: 'feature',
-        "description": "Resonance Tamer — auto-clear fighting frequencies on master"
-      },
-      {
-        type: 'fix',
-        "description": "Restore automationCurves + dubBus + autoDub on .dbx import"
-      },
-      {
-        type: 'improvement',
-        "description": "Test(ui-smoke): skip flow 08 until warm-reload baseline is root-caused"
-      },
-      {
-        type: 'feature',
-        "description": "Extract 5 dub voices as standalone synths in the registry"
-      },
-      {
-        type: 'feature',
-        "description": "Extended Zxx encoding + global/hold → automation curves + 27-move picker"
-      },
-      {
-        type: 'feature',
-        "description": "SoundTouch WASM key-lock + dub fullscreen + export peak-limit"
-      },
-      {
-        type: 'feature',
-        "description": "Any-instrument promotion — bass/perc below dominance threshold"
-      },
-      {
-        type: 'feature',
-        "description": "DubRecorder writes Zxx cells inline + source=lane replay guard"
-      },
-      {
-        type: 'improvement',
-        "description": "Test(ui-smoke): flow 13 — role classification from real Modland dub MOD"
-      },
-      {
-        type: 'improvement',
-        "description": "Global FX lane chapter section + Zxx 36/37/38 correction"
       }
     ]
   }

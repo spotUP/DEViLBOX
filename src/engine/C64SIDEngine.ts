@@ -376,6 +376,50 @@ export class C64SIDEngine {
     if (!this.gainNode) return;
     try { this.gainNode.disconnect(); } catch { /* already disconnected */ }
     this.gainNode.connect(destination);
+    // Re-attach dub send if it was connected
+    if (this.dubSendGain) {
+      try { this.gainNode.connect(this.dubSendGain); } catch { /* ok */ }
+    }
+  }
+
+  // ── Dub bus send ─────────────────────────────────────────────────────
+  private dubSendGain: GainNode | null = null;
+
+  /**
+   * Connect a parallel dub bus send. SID audio feeds both the synthBus
+   * (for master FX / main output) AND the dub bus input (for echo/spring).
+   * amount=0 effectively mutes the send without disconnecting.
+   */
+  connectDubSend(dubBusInput: AudioNode, amount = 0.4): void {
+    if (!this.gainNode) return;
+    // Tear down existing send if present
+    this.disconnectDubSend();
+    const ctx = this.gainNode.context;
+    this.dubSendGain = ctx.createGain();
+    this.dubSendGain.gain.value = amount;
+    this.gainNode.connect(this.dubSendGain);
+    this.dubSendGain.connect(dubBusInput);
+  }
+
+  /** Set the dub send level (0-1). */
+  setDubSendAmount(amount: number): void {
+    if (!this.dubSendGain) return;
+    const now = this.dubSendGain.context.currentTime;
+    this.dubSendGain.gain.cancelScheduledValues(now);
+    this.dubSendGain.gain.setTargetAtTime(
+      Math.max(0, Math.min(1, amount)), now, 0.02,
+    );
+  }
+
+  /** Disconnect the dub bus send. */
+  disconnectDubSend(): void {
+    if (!this.dubSendGain) return;
+    try { this.dubSendGain.disconnect(); } catch { /* ok */ }
+    // Disconnect the specific connection from gainNode to dubSendGain
+    if (this.gainNode) {
+      try { this.gainNode.disconnect(this.dubSendGain); } catch { /* ok */ }
+    }
+    this.dubSendGain = null;
   }
 
   /**
@@ -584,6 +628,7 @@ export class C64SIDEngine {
    * Cleanup
    */
   dispose(): void {
+    this.disconnectDubSend();
     if (this.engine) {
       this.engine.dispose();
       this.engine = null;
