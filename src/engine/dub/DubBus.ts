@@ -24,7 +24,8 @@ import {
   PARAM_SPRINGS_SCATTER,
   PARAM_SPRINGS_TONE,
 } from '../effects/AelapseEffect';
-import { SpaceEchoEffect } from '../effects/SpaceEchoEffect';
+import type { DubEchoEngine } from './DubEchoEngine';
+import { createDubEchoEngine } from './DubEchoEngine';
 import { VinylNoiseEffect } from '../effects/VinylNoiseEffect';
 import { ToneArmEffect } from '../effects/ToneArmEffect';
 import { MadProfessorPlateEffect } from '../effects/MadProfessorPlateEffect';
@@ -199,6 +200,60 @@ export class DubBus {
   }
 
   /**
+   * Hot-swap the echo engine without dropping audio. Ramps the return gain
+   * to 0 for 20 ms, disconnects old engine, creates new one, reconnects,
+   * then ramps back up. The brief silence window masks the graph splice.
+   */
+  private _swapEchoEngine(settings: DubBusSettings): void {
+    const newType = settings.echoEngine;
+    if (newType === this._currentEchoEngine) return;
+    console.log(`[DubBus] Swapping echo engine: ${this._currentEchoEngine} → ${newType}`);
+    const ctx = this.context;
+    const RAMP_SEC = 0.02;
+
+    // Ramp return to 0 during splice
+    try {
+      const now = ctx.currentTime;
+      this.return_.gain.cancelScheduledValues(now);
+      this.return_.gain.setValueAtTime(this.return_.gain.value, now);
+      this.return_.gain.linearRampToValueAtTime(0, now + RAMP_SEC);
+    } catch { /* ok */ }
+
+    // Schedule the swap after the ramp completes
+    setTimeout(() => {
+      try {
+        // Disconnect old echo from graph
+        try { this.tapeSatBypass.disconnect(this.echo.input as unknown as AudioNode); } catch { /* ok */ }
+        try { this.tapeStackMix.disconnect(this.echo.input as unknown as AudioNode); } catch { /* ok */ }
+        try { this.echo.output.disconnect(); } catch { /* ok */ }
+        try { this.echo.dispose(); } catch { /* ok */ }
+
+        // Create new engine
+        this.echo = createDubEchoEngine(newType, settings);
+        this._currentEchoEngine = newType;
+
+        // Reconnect into graph
+        Tone.connect(this.tapeSatBypass, this.echo.input as unknown as Tone.InputNode);
+        Tone.connect(this.tapeStackMix, this.echo.input as unknown as Tone.InputNode);
+        this.echo.connect(this.spring);
+        // Rebuild feedback path
+        Tone.connect(this.echo.output, this.feedback as unknown as Tone.InputNode);
+
+        // Ramp return back up
+        const now = ctx.currentTime;
+        this.return_.gain.cancelScheduledValues(now);
+        this.return_.gain.setValueAtTime(0, now);
+        this.return_.gain.linearRampToValueAtTime(
+          this.enabled ? settings.returnGain : 0,
+          now + RAMP_SEC,
+        );
+      } catch (err) {
+        console.error('[DubBus] Echo engine swap failed:', err);
+      }
+    }, RAMP_SEC * 1000 + 5);
+  }
+
+  /**
    * Swap the optional plate-stage insert. `stage` = 'off' tears down the
    * current plate (if any); 'madprofessor' or 'dattorro' builds a new
    * plate and wires it in parallel from stereoMerge back to the return.
@@ -282,7 +337,8 @@ export class DubBus {
    */
   getSidechainInput(): AudioNode { return this.sidechain; }
 
-  private echo: SpaceEchoEffect;
+  private echo: DubEchoEngine;
+  private _currentEchoEngine: DubBusSettings['echoEngine'] = DEFAULT_DUB_BUS.echoEngine;
   private sidechain: DynamicsCompressorNode;  // fast (pumping)
   private glue: DynamicsCompressorNode;       // slow (dubplate glue)
   private lpf: BiquadFilterNode;      // sweep-able LPF on return
@@ -748,17 +804,7 @@ export class DubBus {
                              // through fully processed audio.
     });
 
-    this.echo = new SpaceEchoEffect({
-      mode: 4,                              // tape heads + built-in spring
-      rate: this.settings.echoRateMs,
-      intensity: this.settings.echoIntensity,
-      echoVolume: 0.7,
-      reverbVolume: 0.3,
-      bass: 2,                              // gentle warmth
-      treble: -2,                           // tame fizz on the tail
-      wow: 0.35,                            // seasick tape flutter — Perry dial
-      wet: this.settings.echoWet,
-    });
+    this.echo = createDubEchoEngine(this.settings.echoEngine, this.settings);
 
     // Sidechain pumping — fast: catches transients, makes the tail breathe
     // under the drums. Not a true kick-keyed sidechain (would need per-pad
@@ -891,14 +937,13 @@ export class DubBus {
     // Both saturator paths feed the echo via their gating gains — single
     // path through tapeSatBypass (gain=1 in single mode), stack path through
     // tapeStackMix (gain=1 in stack mode). Only one is audible at a time.
-    Tone.connect(this.tapeSatBypass, this.echo as unknown as Tone.InputNode);
-    Tone.connect(this.tapeStackMix, this.echo as unknown as Tone.InputNode);
+    Tone.connect(this.tapeSatBypass, this.echo.input as unknown as Tone.InputNode);
+    Tone.connect(this.tapeStackMix, this.echo.input as unknown as Tone.InputNode);
     this.echo.connect(this.spring);
     // Feedback regen: tap echo output (before spring) back into input.
     // Pre-spring means the siren rings without flooding the spring with
     // runaway self-oscillation.
-    const echoOut = (this.echo as unknown as { output: Tone.ToneAudioNode }).output;
-    Tone.connect(echoOut, this.feedback as unknown as Tone.InputNode);
+    Tone.connect(this.echo.output, this.feedback as unknown as Tone.InputNode);
     this.feedback.connect(this.feedbackShelfComp);
     this.feedbackShelfComp.connect(this.input);
     // Post-spring output chain with coloring inserts (mid scoop + M/S width).
@@ -1589,6 +1634,12 @@ export class DubBus {
     this.return_.gain.setTargetAtTime(
       this.enabled ? merged.returnGain : 0, now, 0.02,
     );
+    // ── Echo engine swap ──────────────────────────────────────────────────
+    // When echoEngine changes (character preset or manual selection), tear
+    // down the old effect and install the new one in the same graph position.
+    if (settings.echoEngine && settings.echoEngine !== this._currentEchoEngine) {
+      this._swapEchoEngine(merged);
+    }
     // Suppress echo/spring writes while panic is draining the delay lines.
     // The drain restore timer applies the user's settings at the end of the
     // 2 s window. Without this guard, mirror-effect writes during drain
@@ -2549,7 +2600,7 @@ export class DubBus {
           // Route directly into echo input rather than bus input so the
           // signal gets the 3-head tape-echo treatment without the HPF +
           // bassShelf + tapeSat pre-chain coloring the reverse further.
-          const echoIn = (this.echo as unknown as { input: Tone.InputNode }).input;
+          const echoIn = this.echo.input as unknown as Tone.InputNode;
           Tone.connect(envG, echoIn);
           const now = this.context.currentTime;
           const dur = frames / this.context.sampleRate;
@@ -2610,7 +2661,7 @@ export class DubBus {
       const toEcho = ctx.createGain();
       toEcho.gain.value = 1.0;
       env.connect(toEcho);
-      const echoIn = (this.echo as unknown as { input: Tone.InputNode }).input;
+      const echoIn = this.echo.input as unknown as Tone.InputNode;
       Tone.connect(toEcho, echoIn);
       const toReturn = ctx.createGain();
       toReturn.gain.value = 0.6;
@@ -3071,8 +3122,8 @@ export class DubBus {
   setReverseChainOrder(on: boolean): void {
     if (on === this._reverseChainOrder) return;
     const springIn = this.spring.input as unknown as Tone.InputNode;
-    const echoIn = (this.echo as unknown as { input: Tone.InputNode }).input;
-    const echoOut = (this.echo as unknown as { output: Tone.ToneAudioNode }).output;
+    const echoIn = this.echo.input as unknown as Tone.InputNode;
+    const echoOut = this.echo.output as unknown as Tone.ToneAudioNode;
     const springOut = (this.spring as unknown as { output: Tone.ToneAudioNode }).output;
 
     const ctx = this.context;

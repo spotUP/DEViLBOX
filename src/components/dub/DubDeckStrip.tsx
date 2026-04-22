@@ -535,6 +535,19 @@ export const DubDeckStrip: React.FC = () => {
           <option value="madProfessor">Mad Professor</option>
           <option value="gatedFlanger">Gated Flanger</option>
         </select>
+        <span className="text-text-muted ml-2">ECHO</span>
+        <select
+          className="bg-dark-bgTertiary border border-dark-border rounded px-1.5 py-1 text-text-primary text-xs font-mono focus:ring-1 focus:ring-accent-primary"
+          value={dubBusSettings.echoEngine}
+          onChange={(e) => setDubBus({ echoEngine: e.target.value as typeof dubBusSettings.echoEngine })}
+          title="Echo engine — swaps the delay effect in the dub bus chain"
+          disabled={!busEnabled}
+        >
+          <option value="spaceEcho">Space Echo</option>
+          <option value="re201">RE-201 Tape</option>
+          <option value="anotherDelay">AnotherDelay</option>
+          <option value="reTapeEcho">BBD Echo</option>
+        </select>
         {/* A/B compare — swaps live settings with the snapshot captured
             the last time a character preset was loaded. Disabled until
             the first preset load. Like a hardware desk compare button. */}
