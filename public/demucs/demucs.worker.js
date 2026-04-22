@@ -74,6 +74,15 @@ onmessage = async function (e) {
       const N = left.length;
       const stemNames = numTargets === 6 ? STEM_NAMES_6S : STEM_NAMES_4S;
 
+      // Estimate total chunks for progress tracking
+      // Demucs splits audio into overlapping chunks of CHUNK_SIZE with CHUNK_STRIDE step
+      const CHUNK_SIZE = 343980;
+      const CHUNK_STRIDE = Math.round(CHUNK_SIZE * 0.75); // 257985
+      _totalChunks = N <= CHUNK_SIZE ? 1 : Math.ceil((N - CHUNK_SIZE) / CHUNK_STRIDE) + 1;
+      _currentChunk = 0;
+      _stageInChunk = 0;
+      _separationActive = true;
+
       // Allocate input buffers
       const leftPtr = allocateFloat32(wasmModule, left);
       const rightPtr = allocateFloat32(wasmModule, right);
@@ -122,8 +131,10 @@ onmessage = async function (e) {
         transferable.push(stem.left.buffer, stem.right.buffer);
       }
 
+      _separationActive = false;
       postMessage({ type: 'complete', id, stems }, transferable);
     } catch (err) {
+      _separationActive = false;
       postMessage({ type: 'error', id: msg.id, error: 'Separation failed: ' + err.message });
     }
     return;
@@ -140,6 +151,34 @@ onmessage = async function (e) {
 // We intercept these by overriding the worker's postMessage temporarily
 // But since the WASM EM_JS directly calls postMessage, we re-route them here.
 const _origPostMessage = postMessage;
+
+// ── Log-derived progress tracking ──────────────────────────────────────────
+// The WASM emits structured log messages during processing. We parse them to
+// derive fine-grained progress since native PROGRESS_UPDATE messages are sparse.
+//
+// Each chunk goes through ~33 logged stages:
+//   normalized(2) → encoder 0-3 interleaved(8) → upsampled(2) →
+//   crosstransformer 0-4 interleaved(10) → downsampled(2) →
+//   decoder 0-3 interleaved(8) → Mask+istft(1)
+const STAGES_PER_CHUNK = 33;
+let _totalChunks = 1;
+let _currentChunk = 0;
+let _stageInChunk = 0;
+let _separationActive = false;
+
+function emitDerivedProgress(stage) {
+  if (!_separationActive || _totalChunks <= 0) return;
+  const chunkFrac = Math.min(_stageInChunk / STAGES_PER_CHUNK, 1);
+  const overall = (_currentChunk + chunkFrac) / _totalChunks;
+  const clamped = Math.min(Math.max(overall, 0), 1);
+  _origPostMessage({
+    type: 'progress',
+    id: '_current',
+    progress: clamped,
+    message: stage || '',
+  });
+}
+
 // eslint-disable-next-line no-global-assign
 postMessage = function (msg, transfer) {
   // Intercept WASM bridge messages and re-format
@@ -152,7 +191,34 @@ postMessage = function (msg, transfer) {
     return;
   }
   if (msg && msg.msg === 'WASM_LOG') {
-    _origPostMessage({ type: 'log', message: msg.data });
+    const text = msg.data;
+    _origPostMessage({ type: 'log', message: text });
+
+    // Parse log messages for fine-grained progress during separation
+    if (_separationActive) {
+      if (text.includes('apply model w/ split')) {
+        // New chunk start — extract chunk info
+        if (_currentChunk > 0 || _stageInChunk > 0) {
+          _currentChunk++;
+        }
+        _stageInChunk = 0;
+        emitDerivedProgress('Processing chunk ' + (_currentChunk + 1) + '/' + _totalChunks);
+      } else if (
+        text.includes('encoder ') || text.includes('decoder ') ||
+        text.includes('normalized') || text.includes('upsampled') ||
+        text.includes('downsampled') || text.includes('crosstransformer') ||
+        text.includes('Mask') || text.includes('embedding')
+      ) {
+        _stageInChunk++;
+        // Build a short user-facing label
+        let label = 'Processing...';
+        if (text.includes('encoder')) label = 'Encoding...';
+        else if (text.includes('crosstransformer')) label = 'Transformer...';
+        else if (text.includes('decoder')) label = 'Decoding...';
+        else if (text.includes('Mask')) label = 'Finalizing chunk...';
+        emitDerivedProgress(label);
+      }
+    }
     return;
   }
   // Pass through our own protocol messages
