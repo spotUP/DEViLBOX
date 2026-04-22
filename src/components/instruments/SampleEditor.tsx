@@ -23,11 +23,12 @@ import {
   Scissors, Copy, ClipboardPaste, Crop, VolumeX, Volume2, Volume1,
   Undo2, Redo2, Eye, Download,
   ArrowLeft, ArrowRight, Maximize2, FlipHorizontal,
-  Activity, Waves, Clock, Filter, Mic, CircleDot, ChevronDown, X
+  Activity, Waves, Clock, Filter, Mic, CircleDot, ChevronDown, X, Layers
 } from 'lucide-react';
 import { WavetableEditor } from './editors/WavetableEditor';
 import { Button } from '@components/ui/Button';
 import { CustomSelect } from '@components/common/CustomSelect';
+import { StemSeparatorPanel } from '@components/common/StemSeparatorPanel';
 import { useInstrumentStore, useTrackerStore } from '../../stores';
 import { scan9xxOffsets } from '@/lib/analysis/scan9xxOffsets';
 import type { InstrumentConfig, DeepPartial } from '../../types/instrument';
@@ -269,6 +270,8 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
     setShowAmigaPal,
     showSpectrumFilter,
     setShowSpectrumFilter,
+    showStemSeparator,
+    setShowStemSeparator,
     isPlaying,
     setIsPlaying,
     isLoading,
@@ -1329,6 +1332,73 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
     [instrument.id, instrument.parameters, sampleInfo, updateInstrument, setAudioBuffer],
   );
 
+  // ─── Stem separation handlers ────────────────────────────────────
+  const handleStemReplace = useCallback(
+    async (stemName: string, buffer: AudioBuffer) => {
+      const dataUrl = await bufferToDataUrl(buffer);
+      handleBufferProcessed({ buffer, dataUrl }, `Stem_${stemName}`);
+      // Also update sample.url for engine consistency
+      if (instrument.sample) {
+        updateInstrument(instrument.id, {
+          sample: { ...instrument.sample, url: dataUrl, audioBuffer: undefined },
+        });
+      }
+    },
+    [handleBufferProcessed, instrument.id, instrument.sample, updateInstrument],
+  );
+
+  const handleStemExtract = useCallback(
+    async (stemName: string, buffer: AudioBuffer) => {
+      const { addInstrument } = await import('../../stores/useInstrumentStore').then(m => m.useInstrumentStore.getState());
+      const dataUrl = await bufferToDataUrl(buffer);
+      const baseName = sampleInfo?.name || instrument.name || 'Sample';
+      const newInst = {
+        id: 0, // addInstrument will assign a real ID
+        name: `${baseName} - ${stemName.charAt(0).toUpperCase() + stemName.slice(1)}`,
+        type: 'sample' as const,
+        synthType: 'Sampler' as const,
+        effects: [],
+        volume: 0,
+        pan: 0,
+        sample: {
+          url: dataUrl,
+          baseNote: instrument.sample?.baseNote || 'C3',
+          detune: 0,
+          loop: false,
+          loopType: 'off' as const,
+          loopStart: 0,
+          loopEnd: 0,
+          sampleRate: buffer.sampleRate,
+          reverse: false,
+          playbackRate: 1.0,
+        },
+        parameters: {
+          sampleUrl: dataUrl,
+          sampleInfo: {
+            name: `${baseName} - ${stemName}`,
+            duration: buffer.duration,
+            size: Math.round(((dataUrl.split(',')[1] || '').length * 3) / 4),
+            sampleRate: buffer.sampleRate,
+            channels: buffer.numberOfChannels,
+          },
+        },
+      };
+      addInstrument(newInst as InstrumentConfig);
+      const { notify } = await import('../../stores');
+      notify.success(`Extracted ${stemName} as new instrument`);
+    },
+    [instrument, sampleInfo],
+  );
+
+  const handleStemExtractAll = useCallback(
+    async (stems: Map<string, AudioBuffer>) => {
+      for (const [stemName, buffer] of stems) {
+        await handleStemExtract(stemName, buffer);
+      }
+    },
+    [handleStemExtract],
+  );
+
   // ─── Format helpers ──────────────────────────────────────────────
   const formatDuration = (sec: number) => {
     const m = Math.floor(sec / 60);
@@ -1415,6 +1485,18 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
                 To MIDI
               </button>
               <button
+                onClick={() => setShowStemSeparator(!showStemSeparator)}
+                className={
+                  'flex items-center gap-1 px-2 py-1 rounded text-[10px] font-bold uppercase transition-colors ' +
+                  (showStemSeparator
+                    ? 'bg-pink-500 text-text-primary'
+                    : 'bg-pink-500/10 text-pink-400 border border-pink-500/30 hover:bg-pink-500/20')
+                }
+              >
+                <Layers size={11} />
+                Stems
+              </button>
+              <button
                 onClick={() => setShowEnhancer(!showEnhancer)}
                 className={
                   'flex items-center gap-1 px-2 py-1 rounded text-[10px] font-bold uppercase transition-colors ' +
@@ -1468,6 +1550,17 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
           selectedSliceId={selectedSliceId}
           onSliceSelect={setSelectedSliceId}
           onClose={() => setShowBeatSlicer(false)}
+        />
+      )}
+
+      {/* ─── Stem Separator Panel ────────────────────────────────── */}
+      {showStemSeparator && audioBuffer && (
+        <StemSeparatorPanel
+          audioBuffer={audioBuffer}
+          onReplace={handleStemReplace}
+          onExtract={handleStemExtract}
+          onExtractAll={handleStemExtractAll}
+          onClose={() => setShowStemSeparator(false)}
         />
       )}
 
