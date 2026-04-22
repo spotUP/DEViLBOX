@@ -5,7 +5,7 @@
  */
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Folder, FileAudio, ArrowLeft, Globe, Search, Loader2, Download, AlertCircle } from 'lucide-react';
+import { Folder, FileAudio, ArrowLeft, Globe, Search, Loader2, Download, AlertCircle, Play, Square } from 'lucide-react';
 import { CustomSelect } from '@components/common/CustomSelect';
 import {
   searchModland,
@@ -708,6 +708,7 @@ export const OnlinePanel: React.FC<OnlinePanelProps> = ({ isOpen, onLoadTrackerM
   const [source, setSource] = useState<SearchSource>('all');
   const [format, setFormat] = useState('');
   const [results, setResults] = useState<OnlineResult[]>([]);
+  const [previewingKey, setPreviewingKey] = useState<string | null>(null);
   const [formats, setFormats] = useState<ModlandFormat[]>([]);
   const [status, setStatus] = useState<ModlandStatus | null>(null);
   const [loading, setLoading] = useState(false);
@@ -795,56 +796,51 @@ export const OnlinePanel: React.FC<OnlinePanelProps> = ({ isOpen, onLoadTrackerM
     doSearch(query, format, source, offset + ONLINE_LIMIT, true);
   }, [query, format, source, offset, doSearch]);
 
+  /** Download an item and return {buffer, filename, companions}. Shared by
+   *  handleLoad (load+close) and handlePreview (load+play, keep dialog open). */
+  const downloadItem = useCallback(async (item: OnlineResult) => {
+    let buffer: ArrayBuffer;
+    let companions: Map<string, ArrayBuffer> | undefined;
+    let filename = item.filename;
+
+    if (item.source === 'hvsc') {
+      let raw: ArrayBuffer;
+      try {
+        raw = await downloadHVSCFile(item.key);
+      } catch (fetchErr) {
+        throw new Error(`HVSC download failed: ${(fetchErr as Error).message}`);
+      }
+      const { normalizeHVSCDownload } = await import('@/lib/hvsc/normalizeHVSCDownload');
+      const normalized = normalizeHVSCDownload(raw, filename);
+      buffer = normalized.buffer;
+      filename = normalized.filename;
+    } else {
+      try {
+        buffer = await downloadModlandFile(item.key);
+      } catch (fetchErr) {
+        throw new Error(`Modland download failed: ${(fetchErr as Error).message}`);
+      }
+
+      const [uadeCompanions, tfmx] = await Promise.all([
+        downloadUADECompanions(item.key, buffer).catch(() => []),
+        downloadTFMXCompanion(item.key).catch(() => null),
+      ]);
+      const all = [...uadeCompanions];
+      if (tfmx) all.push(tfmx);
+      if (all.length > 0) {
+        companions = new Map(all.map((c) => [c.filename, c.buffer]));
+      }
+    }
+
+    return { buffer, filename, companions };
+  }, []);
+
   const handleLoad = useCallback(async (item: OnlineResult) => {
     if (!onLoadTrackerModule) return;
     setDownloading(prev => new Set(prev).add(item.key));
     setError(null);
     try {
-      let buffer: ArrayBuffer;
-      let companions: Map<string, ArrayBuffer> | undefined;
-      let filename = item.filename;
-
-      if (item.source === 'hvsc') {
-        // HVSC SID files are single-file — no companions.
-        let raw: ArrayBuffer;
-        try {
-          raw = await downloadHVSCFile(item.key);
-        } catch (fetchErr) {
-          throw new Error(`HVSC download failed: ${(fetchErr as Error).message}`);
-        }
-        // Guarantee `.sid` suffix + verify PSID/RSID magic. Pure helper
-        // that throws with a clear message on non-SID bytes so we never
-        // route accidental garbage to the SidMon 1 fallback.
-        const { normalizeHVSCDownload } = await import('@/lib/hvsc/normalizeHVSCDownload');
-        const normalized = normalizeHVSCDownload(raw, filename);
-        buffer = normalized.buffer;
-        filename = normalized.filename;
-      } else {
-        // Modland: fetch main file, then look for every companion flavour
-        // UADE supports (TFMX smpl., Jason Page smp., MFP smp., Richard
-        // Joseph .ins, Startrekker AM .nt, Sonix .ss/.instr). Main file
-        // first so `downloadUADECompanions` can magic-byte-gate the
-        // Startrekker .nt probe without a blind 404 per MOD.
-        try {
-          buffer = await downloadModlandFile(item.key);
-        } catch (fetchErr) {
-          throw new Error(`Modland download failed: ${(fetchErr as Error).message}`);
-        }
-
-        // Parallel: broad UADE companion sweep + TFMX mdat/smpl pair.
-        // `downloadUADECompanions` doesn't handle mdat./smpl. (different
-        // basename transform), so we keep the dedicated TFMX call.
-        const [uadeCompanions, tfmx] = await Promise.all([
-          downloadUADECompanions(item.key, buffer).catch(() => []),
-          downloadTFMXCompanion(item.key).catch(() => null),
-        ]);
-        const all = [...uadeCompanions];
-        if (tfmx) all.push(tfmx);
-        if (all.length > 0) {
-          companions = new Map(all.map((c) => [c.filename, c.buffer]));
-        }
-      }
-
+      const { buffer, filename, companions } = await downloadItem(item);
       await onLoadTrackerModule(buffer, filename, companions);
       onClose();
     } catch (err) {
@@ -852,7 +848,33 @@ export const OnlinePanel: React.FC<OnlinePanelProps> = ({ isOpen, onLoadTrackerM
     } finally {
       setDownloading(prev => { const s = new Set(prev); s.delete(item.key); return s; });
     }
-  }, [onLoadTrackerModule, onClose]);
+  }, [onLoadTrackerModule, onClose, downloadItem]);
+
+  const handlePreview = useCallback(async (item: OnlineResult) => {
+    if (!onLoadTrackerModule) return;
+    // Toggle off — stop playback if already previewing this item
+    if (previewingKey === item.key) {
+      const { useTransportStore } = await import('@/stores/useTransportStore');
+      useTransportStore.getState().stop();
+      setPreviewingKey(null);
+      return;
+    }
+    setDownloading(prev => new Set(prev).add(item.key));
+    setPreviewingKey(item.key);
+    setError(null);
+    try {
+      const { buffer, filename, companions } = await downloadItem(item);
+      await onLoadTrackerModule(buffer, filename, companions);
+      // Auto-play after loading
+      const { useTransportStore } = await import('@/stores/useTransportStore');
+      await useTransportStore.getState().play();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to preview');
+      setPreviewingKey(null);
+    } finally {
+      setDownloading(prev => { const s = new Set(prev); s.delete(item.key); return s; });
+    }
+  }, [onLoadTrackerModule, downloadItem, previewingKey]);
 
   const handleRate = useCallback(async (item: OnlineResult, star: number) => {
     if (!isLoggedIn) { setShowAuthModal(true); return; }
@@ -964,19 +986,32 @@ export const OnlinePanel: React.FC<OnlinePanelProps> = ({ isOpen, onLoadTrackerM
                     );
                   })()}
 
-                  {downloading.has(item.key) ? (
+                  {downloading.has(item.key) && previewingKey !== item.key ? (
                     <Loader2 size={14} className="animate-spin text-accent-primary flex-shrink-0" />
                   ) : (
-                    <button
-                      onClick={() => handleLoad(item)}
-                      className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded
-                                 bg-accent-primary/10 text-accent-primary border border-accent-primary/30
-                                 hover:bg-accent-primary/20 hover:text-accent-highlight transition-colors
-                                 opacity-0 group-hover:opacity-100 flex-shrink-0"
-                    >
-                      <Download size={12} />
-                      Load
-                    </button>
+                    <>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handlePreview(item); }}
+                        className={`p-1 rounded transition-all flex-shrink-0 ${
+                          previewingKey === item.key
+                            ? 'text-accent-success bg-accent-success/15 hover:bg-accent-success/25 opacity-100'
+                            : 'text-text-muted hover:text-text-primary opacity-0 group-hover:opacity-100'
+                        }`}
+                        title={previewingKey === item.key ? 'Stop preview' : 'Preview'}
+                      >
+                        {previewingKey === item.key ? <Square size={12} /> : <Play size={12} />}
+                      </button>
+                      <button
+                        onClick={() => handleLoad(item)}
+                        className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded
+                                   bg-accent-primary/10 text-accent-primary border border-accent-primary/30
+                                   hover:bg-accent-primary/20 hover:text-accent-highlight transition-colors
+                                   opacity-0 group-hover:opacity-100 flex-shrink-0"
+                      >
+                        <Download size={12} />
+                        Load
+                      </button>
+                    </>
                   )}
                 </div>
               ))}
