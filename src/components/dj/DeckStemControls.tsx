@@ -211,7 +211,7 @@ export const DeckStemControls: React.FC<DeckStemControlsProps> = ({ deckId }) =>
             style={{ width: `${pct}%` }}
           />
         </div>
-        <span className="text-[9px] font-mono text-accent-highlight whitespace-nowrap">
+        <span className="text-xs font-mono text-accent-highlight whitespace-nowrap">
           {pct < 10 ? 'Loading model…' : `${pct}%`}
         </span>
       </div>
@@ -221,7 +221,7 @@ export const DeckStemControls: React.FC<DeckStemControlsProps> = ({ deckId }) =>
   if (error) {
     return (
       <div className="flex items-center gap-1 px-1 py-0.5">
-        <span className="text-[9px] font-mono text-accent-error truncate">{error}</span>
+        <span className="text-xs font-mono text-accent-error truncate">{error}</span>
       </div>
     );
   }
@@ -237,7 +237,7 @@ export const DeckStemControls: React.FC<DeckStemControlsProps> = ({ deckId }) =>
           disabled={isBusy}
           title={isBusy ? 'Separation in progress on another deck' : 'Separate track into stems (drums, bass, vocals, other)'}
           className={`
-            px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wide
+            px-3 py-1 rounded-full text-xs font-black uppercase tracking-wide
             border transition-colors duration-100 cursor-pointer select-none outline-none
             ${isBusy
               ? 'bg-dark-bgTertiary border-dark-borderLight text-text-muted opacity-50 cursor-not-allowed'
@@ -253,14 +253,14 @@ export const DeckStemControls: React.FC<DeckStemControlsProps> = ({ deckId }) =>
 
   // ── Stems available — full mixer strip ───────────────────────────────────
   return (
-    <div className="flex flex-col gap-0.5 px-1 py-0.5">
+    <div className="flex flex-col gap-1 px-1 py-1">
       {/* Row 1: STEM toggle + per-stem channel strips */}
-      <div className="flex gap-1 items-end">
+      <div className="flex gap-1.5 items-end">
         <button
           onClick={handleToggleStemMode}
           title={stemMode ? 'Switch to full mix' : 'Switch to stem playback'}
           className={`
-            px-1.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wide
+            px-2 py-1 rounded-full text-xs font-black uppercase tracking-wide
             border transition-colors duration-100 cursor-pointer select-none outline-none self-start
             ${stemMode
               ? 'bg-accent-highlight/20 border-accent-highlight text-accent-highlight'
@@ -281,10 +281,10 @@ export const DeckStemControls: React.FC<DeckStemControlsProps> = ({ deckId }) =>
           const label = STEM_LABELS[name] ?? name.substring(0, 3).toUpperCase();
 
           return (
-            <div key={name} className="flex flex-col items-center gap-0.5" style={{ minWidth: 28 }}>
+            <div key={name} className="flex flex-col items-center gap-1" style={{ minWidth: 36 }}>
               {/* Stem label */}
               <span
-                className="text-[8px] font-black uppercase tracking-wide select-none"
+                className="text-[10px] font-black uppercase tracking-wide select-none"
                 style={{ color }}
               >
                 {label}
@@ -299,15 +299,15 @@ export const DeckStemControls: React.FC<DeckStemControlsProps> = ({ deckId }) =>
               />
 
               {/* M / S buttons row */}
-              <div className="flex gap-px">
+              <div className="flex gap-0.5">
                 <button
                   onClick={() => handleStemToggle(name)}
                   title={`${isMuted ? 'Unmute' : 'Mute'} ${name}`}
-                  className="w-3.5 h-3.5 rounded text-[7px] font-black flex items-center justify-center select-none"
+                  className="w-5 h-5 rounded text-[9px] font-black flex items-center justify-center select-none"
                   style={{
-                    backgroundColor: isMuted ? `${color}44` : 'transparent',
+                    backgroundColor: isMuted ? `${color}44` : `${color}15`,
                     color: isMuted ? color : 'var(--text-muted, #888)',
-                    border: `1px solid ${isMuted ? color : 'var(--dark-borderLight, #555)'}`,
+                    border: `1px solid ${isMuted ? color : `${color}55`}`,
                   }}
                 >
                   M
@@ -315,11 +315,11 @@ export const DeckStemControls: React.FC<DeckStemControlsProps> = ({ deckId }) =>
                 <button
                   onClick={() => handleSoloToggle(name)}
                   title={`${isSolo ? 'Un-solo' : 'Solo'} ${name}`}
-                  className="w-3.5 h-3.5 rounded text-[7px] font-black flex items-center justify-center select-none"
+                  className="w-5 h-5 rounded text-[9px] font-black flex items-center justify-center select-none"
                   style={{
-                    backgroundColor: isSolo ? '#fbbf2444' : 'transparent',
+                    backgroundColor: isSolo ? '#fbbf2444' : `${color}15`,
                     color: isSolo ? '#fbbf24' : 'var(--text-muted, #888)',
-                    border: `1px solid ${isSolo ? '#fbbf24' : 'var(--dark-borderLight, #555)'}`,
+                    border: `1px solid ${isSolo ? '#fbbf24' : `${color}55`}`,
                   }}
                 >
                   S
@@ -330,11 +330,11 @@ export const DeckStemControls: React.FC<DeckStemControlsProps> = ({ deckId }) =>
               <button
                 onClick={() => handleDubToggle(name)}
                 title={`${isDubSend ? 'Remove' : 'Send'} ${name} to dub bus`}
-                className="w-full h-3 rounded text-[6px] font-black flex items-center justify-center select-none uppercase"
+                className="w-full h-4 rounded text-[8px] font-black flex items-center justify-center select-none uppercase"
                 style={{
-                  backgroundColor: isDubSend ? `${color}33` : 'transparent',
+                  backgroundColor: isDubSend ? `${color}33` : `${color}15`,
                   color: isDubSend ? color : 'var(--text-muted, #888)',
-                  border: `1px solid ${isDubSend ? color : 'var(--dark-borderLight, #555)'}`,
+                  border: `1px solid ${isDubSend ? color : `${color}55`}`,
                   boxShadow: isDubSend ? `0 0 4px ${color}44` : 'none',
                 }}
               >
@@ -343,16 +343,16 @@ export const DeckStemControls: React.FC<DeckStemControlsProps> = ({ deckId }) =>
 
               {/* Dub ops: M T E ✦ — shown when dub send is active */}
               {isDubSend && (
-                <div className="flex gap-px flex-wrap justify-center">
+                <div className="flex gap-0.5 flex-wrap justify-center">
                   {STEM_DUB_OPS.map((op) => (
                     <button
                       key={op.moveId}
                       title={op.title}
-                      className="w-3 h-3 rounded text-[6px] font-bold flex items-center justify-center select-none cursor-pointer"
+                      className="w-5 h-5 rounded text-[9px] font-bold flex items-center justify-center select-none cursor-pointer hover:brightness-125"
                       style={{
-                        backgroundColor: `${color}22`,
+                        backgroundColor: `${color}25`,
                         color,
-                        border: `1px solid ${color}44`,
+                        border: `1px solid ${color}66`,
                       }}
                       onPointerDown={() => handleDubOp(name, op.moveId, op.kind, true)}
                       onPointerUp={() => op.kind === 'hold' && handleDubOp(name, op.moveId, op.kind, false)}
