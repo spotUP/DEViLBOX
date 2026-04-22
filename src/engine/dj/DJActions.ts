@@ -988,3 +988,30 @@ export function resumeAutoDJ(): void {
 export async function playAutoDJFromIndex(index: number): Promise<void> {
   await getAutoDJ().playFromIndex(index);
 }
+
+// ============================================================================
+// STEM PLAYBACK
+// ============================================================================
+
+/** Toggle stem playback mode for a deck. */
+export function setStemMode(deckId: DeckId, enabled: boolean): void {
+  try {
+    getDJEngine().getDeck(deckId).setStemMode(enabled);
+  } catch { /* engine not ready */ }
+}
+
+/** Toggle mute on an individual stem. */
+export function toggleStemMute(deckId: DeckId, stemName: string): void {
+  try {
+    const deck = getDJEngine().getDeck(deckId);
+    const current = deck.stemPlayer.isStemMuted(stemName);
+    deck.setStemMute(stemName, !current);
+  } catch { /* engine not ready */ }
+}
+
+/** Set mute state on an individual stem. */
+export function setStemMute(deckId: DeckId, stemName: string, muted: boolean): void {
+  try {
+    getDJEngine().getDeck(deckId).setStemMute(stemName, muted);
+  } catch { /* engine not ready */ }
+}

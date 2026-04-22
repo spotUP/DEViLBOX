@@ -158,6 +158,12 @@ export interface DeckState {
   mood: string | null;              // e.g. "Energetic", "Chill"
   energy: number;                   // 0-1 (low → high energy)
   danceability: number;             // 0-1
+
+  // Stem separation
+  stemsAvailable: boolean;          // stems loaded and ready for playback
+  stemNames: string[];              // e.g. ['drums', 'bass', 'vocals', 'other']
+  stemMode: boolean;                // true = stem playback active (vs full mix)
+  stemMutes: Record<string, boolean>;  // per-stem mute state
 }
 
 export type DeckId = 'A' | 'B' | 'C';
@@ -252,6 +258,12 @@ const makeDefaultDeckState = (): DeckState => ({
   mood: null,
   energy: 0.5,
   danceability: 0.5,
+
+  // Stems
+  stemsAvailable: false,
+  stemNames: [],
+  stemMode: false,
+  stemMutes: {},
 });
 
 // ============================================================================
