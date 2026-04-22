@@ -279,6 +279,12 @@ export class DemucsEngine {
       result.set(chunk, offset);
       offset += chunk.length;
     }
+
+    // Sanity check: model files are 40MB+ — reject tiny responses (CDN HTML fallbacks)
+    if (received < 1_000_000) {
+      throw new Error(`Downloaded file too small (${received} bytes) — likely not a model file`);
+    }
+
     return result.buffer;
   }
 
@@ -390,9 +396,9 @@ export class DemucsEngine {
   }
 
   /**
-   * Load cached stems for a given file hash
+   * Load cached stems for a given file hash, optionally matching a specific model
    */
-  async loadCachedStems(hash: string): Promise<StemResult | null> {
+  async loadCachedStems(hash: string, requiredModel?: DemucsModelType): Promise<StemResult | null> {
     try {
       const db = await this.openStemDB();
       return new Promise((resolve) => {
@@ -401,6 +407,8 @@ export class DemucsEngine {
         req.onsuccess = () => {
           const entry = req.result as CachedStems | undefined;
           if (!entry) { resolve(null); return; }
+          // If a specific model is required, reject mismatches
+          if (requiredModel && entry.model !== requiredModel) { resolve(null); return; }
 
           const result: StemResult = {};
           for (const [name, buffer] of Object.entries(entry.stems)) {
@@ -424,20 +432,25 @@ export class DemucsEngine {
   }
 
   /**
-   * Check if stems are cached for a given file hash
+   * Check if stems are cached for a given file hash, optionally for a specific model
    */
-  async hasCachedStems(hash: string): Promise<boolean> {
-    try {
-      const db = await this.openStemDB();
-      return new Promise((resolve) => {
-        const tx = db.transaction(STEM_STORE, 'readonly');
-        const req = tx.objectStore(STEM_STORE).count(hash);
-        req.onsuccess = () => resolve(req.result > 0);
-        req.onerror = () => resolve(false);
-      });
-    } catch {
-      return false;
+  async hasCachedStems(hash: string, requiredModel?: DemucsModelType): Promise<boolean> {
+    if (!requiredModel) {
+      try {
+        const db = await this.openStemDB();
+        return new Promise((resolve) => {
+          const tx = db.transaction(STEM_STORE, 'readonly');
+          const req = tx.objectStore(STEM_STORE).count(hash);
+          req.onsuccess = () => resolve(req.result > 0);
+          req.onerror = () => resolve(false);
+        });
+      } catch {
+        return false;
+      }
     }
+    // Model-specific check: load entry and compare model field
+    const entry = await this.loadCachedStems(hash, requiredModel);
+    return entry !== null;
   }
 
   /**

@@ -9,7 +9,7 @@
  * Shows model download progress, separation progress, and per-stem action buttons.
  */
 
-import React, { useCallback, useRef, useEffect } from 'react';
+import React, { useCallback, useRef, useEffect, useState } from 'react';
 import { Play, Square, Replace, Download, Loader2, AlertCircle, Layers, X } from 'lucide-react';
 import { Button } from '@components/ui/Button';
 import { useStemSeparation } from '@/hooks/useStemSeparation';
@@ -78,6 +78,9 @@ export const StemSeparatorPanel: React.FC<StemSeparatorPanelProps> = ({
     separate, getStemBuffer, getAllStemBuffers, canSeparate, restoreFromCache, cleanup,
   } = hook;
 
+  // Local model selection — defaults to prop, user can toggle
+  const [selectedModel, setSelectedModel] = useState<DemucsModelType>(model);
+
   // Auto-restore stems from module-level cache on mount/buffer change
   useEffect(() => {
     if (!hasStems && audioBuffer && !isBusy) {
@@ -107,8 +110,8 @@ export const StemSeparatorPanel: React.FC<StemSeparatorPanelProps> = ({
 
   const handleSeparate = useCallback(() => {
     if (!audioBuffer || isBusy) return;
-    separate(audioBuffer, model);
-  }, [audioBuffer, isBusy, separate, model]);
+    separate(audioBuffer, selectedModel);
+  }, [audioBuffer, isBusy, separate, selectedModel]);
 
   const handlePreview = useCallback((stemName: string) => {
     // Stop current preview
@@ -195,6 +198,24 @@ export const StemSeparatorPanel: React.FC<StemSeparatorPanelProps> = ({
           </span>
         </div>
         <div className="flex items-center gap-1">
+          {/* Model selector — 4s or 6s */}
+          {!hasStems && !isBusy && (
+            <button
+              onClick={() => setSelectedModel(selectedModel === '4s' ? '6s' : '4s')}
+              className={`px-1.5 py-1 rounded border text-[9px] font-bold font-mono tracking-wider transition-all ${
+                selectedModel === '6s'
+                  ? 'border-amber-500 bg-amber-900/20 text-amber-400'
+                  : 'border-dark-borderLight bg-dark-bgTertiary text-text-tertiary hover:text-text-secondary'
+              }`}
+              title={
+                selectedModel === '6s'
+                  ? '6-Stem: drums, bass, vocals, guitar, piano, other (~120MB model)'
+                  : '4-Stem: drums, bass, vocals, other (~80MB model)'
+              }
+            >
+              {selectedModel === '6s' ? '6S' : '4S'}
+            </button>
+          )}
           {!hasStems && !isBusy && (
             <Button
               variant="primary"
