@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
-import { Sparkles, Zap, Wand2, RefreshCw, Eraser, MoveHorizontal, Hammer, Volume2, Scissors, RotateCcw } from 'lucide-react';
+import { Sparkles, Zap, Wand2, RefreshCw, Eraser, MoveHorizontal, Hammer, Volume2, Scissors, RotateCcw, Play, Square, Check, Undo2 } from 'lucide-react';
 import { 
   applySpectralExciter, 
   applyDenoise, 
@@ -14,6 +14,7 @@ import { runNeuralEnhancement } from '../../utils/audio/NeuralEnhancerWorker';
 import { Knob } from '../controls/Knob';
 import { Button } from '../ui/Button';
 import { notify } from '../../stores/useNotificationStore';
+import * as Tone from 'tone';
 
 // Waveform overlay colors
 const WAVE_BG = '#0f0c0c';
@@ -162,8 +163,14 @@ export const SampleEnhancerPanel: React.FC<SampleEnhancerPanelProps> = ({
   const [processProgress, setProcessProgress] = useState(0);
   const [beforeBuffer, setBeforeBuffer] = useState<AudioBuffer | null>(null);
   const [afterBuffer, setAfterBuffer] = useState<AudioBuffer | null>(null);
+  /** Pending result waiting for user approval */
+  const [pendingResult, setPendingResult] = useState<ProcessedResult | null>(null);
   const overlayRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  // Preview playback
+  const previewPlayerRef = useRef<Tone.Player | null>(null);
+  const [previewingWhat, setPreviewingWhat] = useState<'before' | 'after' | null>(null);
 
   // Redraw helper
   const redrawOverlay = useCallback(() => {
@@ -254,12 +261,12 @@ export const SampleEnhancerPanel: React.FC<SampleEnhancerPanelProps> = ({
           return;
       }
       
-      // Store the result buffer for overlay display before replacing
+      // Store the result for preview — don't apply yet, let user decide
       setProcessProgress(1.0);
-      setProcessStage('Done');
+      setProcessStage('Done — preview and apply');
       setAfterBuffer(result.buffer);
-      onBufferProcessed(result);
-      notify.success(`Sample processed: ${type.toUpperCase()}`);
+      setPendingResult(result);
+      notify.success(`${type.toUpperCase()} ready — preview and apply below`);
     } catch (err) {
       console.error('Processing failed:', err);
       notify.error('Processing failed');
@@ -268,7 +275,61 @@ export const SampleEnhancerPanel: React.FC<SampleEnhancerPanelProps> = ({
       setProcessProgress(0);
       setProcessStage('');
     }
-  }, [audioBuffer, drive, mix, freq, denoiseThresh, stereoWidth, punchAmount, onBufferProcessed]);
+  }, [audioBuffer, drive, mix, freq, denoiseThresh, stereoWidth, punchAmount]);
+
+  // ── Preview playback ────────────────────────────────────────────────
+  const stopPreview = useCallback(() => {
+    if (previewPlayerRef.current) {
+      previewPlayerRef.current.stop();
+      previewPlayerRef.current.dispose();
+      previewPlayerRef.current = null;
+    }
+    setPreviewingWhat(null);
+  }, []);
+
+  const handlePreview = useCallback((which: 'before' | 'after') => {
+    // If already playing this one, toggle off
+    if (previewPlayerRef.current && previewingWhat === which) {
+      stopPreview();
+      return;
+    }
+    // Stop any current preview first
+    stopPreview();
+    const buf = which === 'before' ? beforeBuffer : afterBuffer;
+    if (!buf) return;
+
+    const toneBuffer = new Tone.ToneAudioBuffer(buf);
+    const player = new Tone.Player(toneBuffer).toDestination();
+    player.onstop = () => {
+      setPreviewingWhat(null);
+      previewPlayerRef.current = null;
+    };
+    player.start();
+    previewPlayerRef.current = player;
+    setPreviewingWhat(which);
+  }, [stopPreview, beforeBuffer, afterBuffer, previewingWhat]);
+
+  // Cleanup preview on unmount
+  useEffect(() => () => { stopPreview(); }, [stopPreview]);
+
+  // ── Apply / Discard ─────────────────────────────────────────────────
+  const handleApply = useCallback(() => {
+    if (!pendingResult) return;
+    stopPreview();
+    onBufferProcessed(pendingResult);
+    notify.success('Enhancement applied');
+    setPendingResult(null);
+    setBeforeBuffer(null);
+    setAfterBuffer(null);
+  }, [pendingResult, onBufferProcessed, stopPreview]);
+
+  const handleDiscard = useCallback(() => {
+    stopPreview();
+    setPendingResult(null);
+    setAfterBuffer(null);
+    setBeforeBuffer(null);
+    notify.warning('Enhancement discarded');
+  }, [stopPreview]);
 
   return (
     <div className="bg-dark-bgSecondary border border-dark-border rounded-lg overflow-hidden mb-4">
@@ -312,6 +373,61 @@ export const SampleEnhancerPanel: React.FC<SampleEnhancerPanelProps> = ({
         </div>
       </div>
 
+      {/* Preview / Apply / Discard controls — shown when result is pending */}
+      {pendingResult && !isProcessing && (
+        <div className="px-4 pt-2 flex items-center gap-2">
+          {/* Preview Before */}
+          <button
+            onClick={() => handlePreview('before')}
+            className={`flex items-center gap-1 px-2 py-1 rounded border text-[10px] font-mono transition-all ${
+              previewingWhat === 'before'
+                ? 'border-violet-500 bg-violet-900/20 text-violet-400'
+                : 'border-dark-borderLight bg-dark-bgTertiary text-text-tertiary hover:text-text-secondary'
+            }`}
+            title="Preview original"
+          >
+            {previewingWhat === 'before' ? <Square size={10} /> : <Play size={10} />}
+            Before
+          </button>
+
+          {/* Preview After */}
+          <button
+            onClick={() => handlePreview('after')}
+            className={`flex items-center gap-1 px-2 py-1 rounded border text-[10px] font-mono transition-all ${
+              previewingWhat === 'after'
+                ? 'border-emerald-500 bg-emerald-900/20 text-emerald-400'
+                : 'border-dark-borderLight bg-dark-bgTertiary text-text-tertiary hover:text-text-secondary'
+            }`}
+            title="Preview enhanced"
+          >
+            {previewingWhat === 'after' ? <Square size={10} /> : <Play size={10} />}
+            Enhanced
+          </button>
+
+          <div className="flex-1" />
+
+          {/* Discard */}
+          <button
+            onClick={handleDiscard}
+            className="flex items-center gap-1 px-2 py-1 rounded border border-red-800 bg-red-900/10 text-red-400 hover:bg-red-900/30 text-[10px] font-mono transition-all"
+            title="Discard — keep original"
+          >
+            <Undo2 size={10} />
+            Discard
+          </button>
+
+          {/* Apply */}
+          <button
+            onClick={handleApply}
+            className="flex items-center gap-1 px-2.5 py-1 rounded border border-emerald-600 bg-emerald-900/20 text-emerald-400 hover:bg-emerald-900/40 text-[10px] font-mono font-bold transition-all"
+            title="Apply — replace sample with enhanced version"
+          >
+            <Check size={10} />
+            Apply
+          </button>
+        </div>
+      )}
+
       {/* Tier 1: Neural Super-Res — shown first so it's always visible */}
       <div className="px-4 pt-3">
         <div className="flex items-center gap-4 p-3 bg-violet-500/5 border border-violet-500/20 rounded-lg">
@@ -323,7 +439,7 @@ export const SampleEnhancerPanel: React.FC<SampleEnhancerPanelProps> = ({
             Deep Learning — hallucinate missing high frequencies &amp; remove 8-bit noise.
           </p>
           <div className="shrink-0">
-            <Button variant="ft2" size="sm" onClick={() => handleProcess('neural')} disabled={isProcessing || parentLoading} icon={<Sparkles size={12} />}>
+            <Button variant="ft2" size="sm" onClick={() => handleProcess('neural')} disabled={isProcessing || parentLoading || !!pendingResult} icon={<Sparkles size={12} />}>
               AI Resurrect
             </Button>
           </div>
@@ -344,7 +460,7 @@ export const SampleEnhancerPanel: React.FC<SampleEnhancerPanelProps> = ({
               <Knob label="FREQ" value={freq} min={2000} max={10000} unit="Hz" onChange={setFreq} size="sm" color="var(--color-accent-secondary)" />
               <Knob label="MIX" value={mix} min={0} max={100} unit="%" onChange={setMix} size="sm" color="#10b981" />
             </div>
-            <Button variant="primary" size="sm" fullWidth onClick={() => handleProcess('exciter')} disabled={isProcessing || parentLoading} icon={<Wand2 size={12} />}>
+            <Button variant="primary" size="sm" fullWidth onClick={() => handleProcess('exciter')} disabled={isProcessing || parentLoading || !!pendingResult} icon={<Wand2 size={12} />}>
               Apply Exciter
             </Button>
           </div>
@@ -356,7 +472,7 @@ export const SampleEnhancerPanel: React.FC<SampleEnhancerPanelProps> = ({
               <span className="text-[10px] font-bold text-text-muted uppercase tracking-wider">Quantization Denoise</span>
             </div>
             <Knob label="THRESH" value={denoiseThresh} min={-100} max={-20} unit="dB" onChange={setDenoiseThresh} size="sm" color="var(--color-synth-modulation)" />
-            <Button variant="default" size="sm" fullWidth onClick={() => handleProcess('denoise')} disabled={isProcessing || parentLoading} icon={<Eraser size={12} />}>
+            <Button variant="default" size="sm" fullWidth onClick={() => handleProcess('denoise')} disabled={isProcessing || parentLoading || !!pendingResult} icon={<Eraser size={12} />}>
               Clean 8-bit Noise
             </Button>
           </div>
@@ -371,7 +487,7 @@ export const SampleEnhancerPanel: React.FC<SampleEnhancerPanelProps> = ({
               <span className="text-[10px] font-bold text-text-muted uppercase tracking-wider">Transient Punch</span>
             </div>
             <Knob label="PUNCH" value={punchAmount} min={0} max={100} onChange={setPunchAmount} size="sm" color="var(--color-accent)" />
-            <Button variant="default" size="sm" fullWidth onClick={() => handleProcess('punch')} disabled={isProcessing || parentLoading} icon={<Hammer size={12} />}>
+            <Button variant="default" size="sm" fullWidth onClick={() => handleProcess('punch')} disabled={isProcessing || parentLoading || !!pendingResult} icon={<Hammer size={12} />}>
               Sharpen Attacks
             </Button>
           </div>
@@ -383,7 +499,7 @@ export const SampleEnhancerPanel: React.FC<SampleEnhancerPanelProps> = ({
               <span className="text-[10px] font-bold text-text-muted uppercase tracking-wider">Pseudo Stereo</span>
             </div>
             <Knob label="WIDTH" value={stereoWidth} min={0} max={100} onChange={setStereoWidth} size="sm" color="var(--color-synth-pan)" />
-            <Button variant="default" size="sm" fullWidth onClick={() => handleProcess('stereo')} disabled={isProcessing || parentLoading} icon={<MoveHorizontal size={12} />}>
+            <Button variant="default" size="sm" fullWidth onClick={() => handleProcess('stereo')} disabled={isProcessing || parentLoading || !!pendingResult} icon={<MoveHorizontal size={12} />}>
               Make Stereo
             </Button>
           </div>
@@ -398,13 +514,13 @@ export const SampleEnhancerPanel: React.FC<SampleEnhancerPanelProps> = ({
             </div>
             
             <div className="grid grid-cols-1 gap-2">
-              <Button variant="default" size="sm" fullWidth onClick={() => handleProcess('normalize')} disabled={isProcessing || parentLoading} icon={<Volume2 size={12} />}>
+              <Button variant="default" size="sm" fullWidth onClick={() => handleProcess('normalize')} disabled={isProcessing || parentLoading || !!pendingResult} icon={<Volume2 size={12} />}>
                 Normalize (0dB Peak)
               </Button>
-              <Button variant="default" size="sm" fullWidth onClick={() => handleProcess('trim')} disabled={isProcessing || parentLoading} icon={<Scissors size={12} />}>
+              <Button variant="default" size="sm" fullWidth onClick={() => handleProcess('trim')} disabled={isProcessing || parentLoading || !!pendingResult} icon={<Scissors size={12} />}>
                 Trim Silence
               </Button>
-              <Button variant="default" size="sm" fullWidth onClick={() => handleProcess('reverse')} disabled={isProcessing || parentLoading} icon={<RotateCcw size={12} />}>
+              <Button variant="default" size="sm" fullWidth onClick={() => handleProcess('reverse')} disabled={isProcessing || parentLoading || !!pendingResult} icon={<RotateCcw size={12} />}>
                 Destructive Reverse
               </Button>
             </div>
