@@ -269,3 +269,26 @@ sonic-arranger-wasm/test_sa.c
 
 # Test songs (deployed separately to Hetzner)
 public/data/songs/test-songs/
+
+# Debug/snapshot YAML artifacts (state captures for troubleshooting)
+after-fix.yml
+before-load.yml
+check-refs.yml
+current.yml
+fresh.yml
+initial-snapshot.yml
+mid-play.yml
+modal-check.yml
+post-load-snapshot.yml
+post-reload.yml
+post-verify-snapshot.yml
+pre-play-verify.yml
+re-check.yml
+reload-state.yml
+verify-start.yml
+
+# Claude scheduled tasks lock
+.claude/scheduled_tasks.lock
+
+# Demucs third-party source (built separately)
+third-party/demucs.cpp-main/

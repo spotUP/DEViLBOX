@@ -110,12 +110,28 @@ export class ResonanceTamerEffect extends Tone.ToneAudioNode {
     this.dryGain.gain.value = 1 - v;
   }
 
-  setParam(param: string, value: number): void {
+  // Preset-apply + automation both route through `setParam`. `value` is
+  // typed as number for numeric params, but `character` is a string enum
+  // in preset JSON and in the store. Accept either form at runtime.
+  setParam(param: string, value: number | string): void {
     switch (param) {
-      case 'amount':    this.setAmount(value); break;
-      case 'mix':       this.setMix(value); break;
-      case 'character': this.setCharacter(FLOAT_TO_CHARACTER(value)); break;
-      case 'wet':       this.wet = value; break;
+      case 'amount':
+        this.setAmount(typeof value === 'number' ? value : Number(value));
+        break;
+      case 'mix':
+        this.setMix(typeof value === 'number' ? value : Number(value));
+        break;
+      case 'character':
+        if (value === 'transparent' || value === 'warm' || value === 'bright') {
+          this.setCharacter(value);
+        } else if (typeof value === 'number') {
+          // Numeric path (MIDI automation): 0..1 → discrete enum.
+          this.setCharacter(FLOAT_TO_CHARACTER(value));
+        }
+        break;
+      case 'wet':
+        this.wet = typeof value === 'number' ? value : Number(value);
+        break;
     }
   }
 
