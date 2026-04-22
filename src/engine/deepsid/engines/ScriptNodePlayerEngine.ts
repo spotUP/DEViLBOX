@@ -53,6 +53,7 @@ export class ScriptNodePlayerEngine {
   private playing = false;
   private subsong = 0;
   private numSubsongs = 1;
+  private voiceMask = 0x1FF; // bitmask: bit N=1 → voice N enabled
   private _originalOnaudioprocess: ((e: AudioProcessingEvent) => void) | null = null;
 
   constructor(
@@ -440,10 +441,18 @@ export class ScriptNodePlayerEngine {
   }
 
   /**
-   * Mute/unmute a voice
+   * Mute/unmute a voice — tinyrsid adapter has enableVoices(mask)
    */
-  setVoiceMask(_voice: number, _muted: boolean): void {
-    // Voice muting is backend-specific, not easily accessible through ScriptNodePlayer
+  setVoiceMask(voice: number, muted: boolean): void {
+    if (muted) {
+      this.voiceMask &= ~(1 << voice);
+    } else {
+      this.voiceMask |= (1 << voice);
+    }
+    // tinyrsid backend exposes enableVoices on its adapter
+    if (this.adapter?.enableVoices) {
+      this.adapter.enableVoices(this.voiceMask);
+    }
   }
 
   /**
