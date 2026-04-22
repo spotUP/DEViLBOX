@@ -446,7 +446,7 @@ export const DeckFXPads: React.FC<DeckFXPadsProps> = ({ deckId }) => {
       <div className="flex items-center gap-1">
         <button
           onClick={() => setPage('fx')}
-          className={`px-2 py-0.5 rounded text-[8px] font-bold transition-colors ${
+          className={`px-2.5 py-1 rounded text-xs font-bold transition-colors ${
             page === 'fx'
               ? 'bg-violet-600/30 text-violet-300 border border-violet-500/40'
               : 'bg-dark-bgTertiary text-text-muted border border-dark-border hover:text-text-secondary'
@@ -456,7 +456,7 @@ export const DeckFXPads: React.FC<DeckFXPadsProps> = ({ deckId }) => {
         </button>
         <button
           onClick={() => setPage('jump')}
-          className={`px-2 py-0.5 rounded text-[8px] font-bold transition-colors ${
+          className={`px-2.5 py-1 rounded text-xs font-bold transition-colors ${
             page === 'jump'
               ? 'bg-sky-600/30 text-sky-300 border border-sky-500/40'
               : 'bg-dark-bgTertiary text-text-muted border border-dark-border hover:text-text-secondary'
@@ -466,7 +466,7 @@ export const DeckFXPads: React.FC<DeckFXPadsProps> = ({ deckId }) => {
         </button>
         <button
           onClick={() => setPage('dub')}
-          className={`px-2 py-0.5 rounded text-[8px] font-bold transition-colors ${
+          className={`px-2.5 py-1 rounded text-xs font-bold transition-colors ${
             page === 'dub'
               ? 'bg-amber-600/30 text-amber-300 border border-amber-500/40'
               : 'bg-dark-bgTertiary text-text-muted border border-dark-border hover:text-text-secondary'
@@ -481,7 +481,7 @@ export const DeckFXPads: React.FC<DeckFXPadsProps> = ({ deckId }) => {
         </button>
         <button
           onClick={() => setPage('dub2')}
-          className={`px-2 py-0.5 rounded text-[8px] font-bold transition-colors ${
+          className={`px-2.5 py-1 rounded text-xs font-bold transition-colors ${
             page === 'dub2'
               ? 'bg-amber-600/30 text-amber-300 border border-amber-500/40'
               : 'bg-dark-bgTertiary text-text-muted border border-dark-border hover:text-text-secondary'
@@ -496,7 +496,7 @@ export const DeckFXPads: React.FC<DeckFXPadsProps> = ({ deckId }) => {
         </button>
         <button
           onClick={() => setPage('dub3')}
-          className={`px-2 py-0.5 rounded text-[8px] font-bold transition-colors ${
+          className={`px-2.5 py-1 rounded text-xs font-bold transition-colors ${
             page === 'dub3'
               ? 'bg-amber-600/30 text-amber-300 border border-amber-500/40'
               : 'bg-dark-bgTertiary text-text-muted border border-dark-border hover:text-text-secondary'
@@ -511,7 +511,7 @@ export const DeckFXPads: React.FC<DeckFXPadsProps> = ({ deckId }) => {
         </button>
         <button
           onClick={() => setPage('dub4')}
-          className={`px-2 py-0.5 rounded text-[8px] font-bold transition-colors ${
+          className={`px-2.5 py-1 rounded text-xs font-bold transition-colors ${
             page === 'dub4'
               ? 'bg-amber-600/30 text-amber-300 border border-amber-500/40'
               : 'bg-dark-bgTertiary text-text-muted border border-dark-border hover:text-text-secondary'
@@ -525,7 +525,7 @@ export const DeckFXPads: React.FC<DeckFXPadsProps> = ({ deckId }) => {
           DUB 4{fxTargetCount > 0 ? ` ·${fxTargetCount}ch` : ''}
         </button>
         {page === 'jump' && hasBeatGrid && (
-          <span className="text-[7px] text-green-400 ml-auto">● GRID</span>
+          <span className="text-[9px] text-green-400 ml-auto">● GRID</span>
         )}
       </div>
 
@@ -544,7 +544,7 @@ export const DeckFXPads: React.FC<DeckFXPadsProps> = ({ deckId }) => {
               onPointerLeave={() => (pad.mode === 'momentary') && handlePadUp(pad)}
               className="relative flex flex-col items-center justify-center rounded-md select-none touch-none overflow-hidden transform-gpu will-change-transform"
               style={{
-                height: 40,
+                height: 48,
                 transition: pressed ? 'transform 50ms' : 'transform 120ms ease-out',
                 transform: pressed ? 'scale(0.92)' : 'scale(1)',
                 backgroundColor: active ? colors.bg : 'var(--color-dark-bgHover)',
@@ -573,13 +573,13 @@ export const DeckFXPads: React.FC<DeckFXPadsProps> = ({ deckId }) => {
                   }}
                 />
               )}
-              <span className="relative text-[9px] font-bold">{pad.label}</span>
+              <span className="relative text-[11px] font-bold">{pad.label}</span>
               {/* DUB 4 pads (channelMute + channelThrow) replace their
                   static "ch 0" sublabel with the currently-armed fx
                   target channels. When nothing is armed, the static
                   placeholder stays so the user knows to arm a channel. */}
               {pad.sublabel && (
-                <span className="relative text-[7px] opacity-60">
+                <span className="relative text-[9px] opacity-60">
                   {page === 'dub4' && (pad.id === 'dub4-mute' || pad.id === 'dub4-cthrow') && fxTargetLabel
                     ? fxTargetLabel
                     : pad.sublabel}
