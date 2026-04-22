@@ -111,16 +111,16 @@ export interface PipelineResult {
 // ── WAV Encoder ──────────────────────────────────────────────────────────────
 
 /**
- * Encode stereo Float32 PCM → mono 16-bit WAV ArrayBuffer.
- * We downmix for DJ use because beat/key analysis is mono-friendly and
- * halving the storage footprint matters for IndexedDB cache size.
+ * Encode stereo Float32 PCM → stereo 16-bit WAV ArrayBuffer.
+ * Stereo output preserves spatial information for hard-panned tracker content
+ * and is required for accurate Demucs stem separation.
  */
 function encodePCMToWAV(
   left: Float32Array,
   right: Float32Array,
   sampleRate: number,
 ): ArrayBuffer {
-  const numChannels = 1; // Mono downmix
+  const numChannels = 2; // Stereo — preserves spatial info for stem separation
   const bitsPerSample = 16;
   const numSamples = left.length;
   const dataSize = numSamples * numChannels * (bitsPerSample / 8);
@@ -147,15 +147,15 @@ function encodePCMToWAV(
   writeString(view, 36, 'data');
   view.setUint32(40, dataSize, true);
 
-  /* Proper L+R downmix — the old implementation silently dropped the right
-   * channel. For UADE this was harmless (centre-panned mix) but for any
-   * hard-panned tracker content it lost half the audio. */
+  // Interleaved stereo: L0 R0 L1 R1 ...
   const hasRight = right !== left && right.length === left.length;
   let offset = 44;
   for (let i = 0; i < numSamples; i++) {
-    const mixed = hasRight ? (left[i] + right[i]) * 0.5 : left[i];
-    const s = Math.max(-1, Math.min(1, mixed));
-    view.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
+    const sL = Math.max(-1, Math.min(1, left[i]));
+    view.setInt16(offset, sL < 0 ? sL * 0x8000 : sL * 0x7FFF, true);
+    offset += 2;
+    const sR = hasRight ? Math.max(-1, Math.min(1, right[i])) : sL;
+    view.setInt16(offset, sR < 0 ? sR * 0x8000 : sR * 0x7FFF, true);
     offset += 2;
   }
 

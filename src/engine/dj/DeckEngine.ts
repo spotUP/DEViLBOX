@@ -498,6 +498,7 @@ export class DeckEngine {
       stemMode: false,
       stemMutes: {},
       stemDubSends: {},
+      stemSeparationProgress: null,
     });
     this._playbackMode = 'audio';
 
