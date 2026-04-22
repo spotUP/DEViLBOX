@@ -12,7 +12,7 @@
 import React, { useState, useCallback, useMemo } from 'react';
 import {
   Zap, Grid3X3, MousePointer2, Play, Trash2,
-  Download, RefreshCw, ChevronDown, ChevronUp, X
+  Download, RefreshCw, ChevronDown, ChevronUp, X, Loader2
 } from 'lucide-react';
 import { CustomSelect } from '@components/common/CustomSelect';
 import { useInstrumentStore, notify } from '../../stores';
@@ -24,6 +24,7 @@ import { BeatSliceAnalyzer, removeSlice, extractSliceAudio } from '../../lib/aud
 import { getToneEngine } from '../../engine/ToneEngine';
 import { useDrumPadStore } from '../../stores/useDrumPadStore';
 import type { SampleData } from '../../types/drumpad';
+import { useStemSeparation } from '@/hooks/useStemSeparation';
 
 interface BeatSlicerPanelProps {
   instrument: InstrumentConfig;
@@ -51,16 +52,25 @@ export const BeatSlicerPanel: React.FC<BeatSlicerPanelProps> = ({
   const [isExporting, setIsExporting] = useState(false);
   const [isExportingKit, setIsExportingKit] = useState(false);
   const [isExportingPads, setIsExportingPads] = useState(false);
+  const [isolateDrums, setIsolateDrums] = useState(false);
+
+  // Stem separation for drum isolation
+  const stemHook = useStemSeparation();
+  const drumsBuffer = isolateDrums && stemHook.hasStems
+    ? stemHook.getStemBuffer('drums')
+    : null;
+  // Use drums buffer if available, otherwise original
+  const effectiveBuffer = drumsBuffer || audioBuffer;
 
   // Get slices and config from instrument or use defaults
   const slices = instrument.sample?.slices || [];
   const config: BeatSliceConfig = instrument.sample?.sliceConfig || DEFAULT_BEAT_SLICE_CONFIG;
 
-  // Analyzer instance
+  // Analyzer instance — uses drums-only buffer if isolation is active
   const analyzer = useMemo(() => {
-    if (!audioBuffer) return null;
-    return new BeatSliceAnalyzer(audioBuffer);
-  }, [audioBuffer]);
+    if (!effectiveBuffer) return null;
+    return new BeatSliceAnalyzer(effectiveBuffer);
+  }, [effectiveBuffer]);
 
   // Update config helper
   const setConfig = useCallback((updates: Partial<BeatSliceConfig>) => {
@@ -76,7 +86,7 @@ export const BeatSlicerPanel: React.FC<BeatSlicerPanelProps> = ({
 
   // Detect slices based on current mode and config
   const handleDetectSlices = useCallback(async () => {
-    if (!analyzer || !audioBuffer) {
+    if (!analyzer || !effectiveBuffer) {
       notify.error('No audio loaded');
       return;
     }
@@ -97,7 +107,7 @@ export const BeatSlicerPanel: React.FC<BeatSlicerPanelProps> = ({
     } finally {
       setIsAnalyzing(false);
     }
-  }, [analyzer, audioBuffer, config, bpm, setSlices]);
+  }, [analyzer, effectiveBuffer, config, bpm, setSlices]);
 
   // Clear all slices
   const handleClearSlices = useCallback(() => {
@@ -220,6 +230,25 @@ export const BeatSlicerPanel: React.FC<BeatSlicerPanelProps> = ({
     }
   }, [slices, audioBuffer, instrument.name]);
 
+  // Toggle drum isolation — triggers stem separation if not yet done
+  const handleToggleDrumIsolation = useCallback(async () => {
+    if (isolateDrums) {
+      setIsolateDrums(false);
+      return;
+    }
+    if (!audioBuffer || !stemHook.canSeparate(audioBuffer)) {
+      notify.error('Sample too short for drum isolation (need 2s+)');
+      return;
+    }
+    if (stemHook.hasStems) {
+      setIsolateDrums(true);
+      return;
+    }
+    // Run separation
+    await stemHook.separate(audioBuffer);
+    setIsolateDrums(true);
+  }, [isolateDrums, audioBuffer, stemHook]);
+
   // Format time display
   const formatTime = (seconds: number): string => {
     return seconds.toFixed(3) + 's';
@@ -261,6 +290,27 @@ export const BeatSlicerPanel: React.FC<BeatSlicerPanelProps> = ({
           {slices.length > 0 && (
             <span className="text-ft2-textDim text-[10px]">({slices.length} slices)</span>
           )}
+          {/* Drum isolation toggle */}
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              handleToggleDrumIsolation();
+            }}
+            disabled={stemHook.isBusy}
+            className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase transition-colors ml-1 ${
+              isolateDrums && stemHook.hasStems
+                ? 'bg-orange-500 text-white'
+                : stemHook.isBusy
+                  ? 'bg-orange-500/10 text-orange-400/50 cursor-wait'
+                  : 'bg-orange-500/10 text-orange-400 border border-orange-500/30 hover:bg-orange-500/20'
+            }`}
+            title={isolateDrums ? 'Using drums-only audio for slicing' : 'Isolate drums using AI before slicing'}
+          >
+            {stemHook.isBusy ? (
+              <Loader2 size={10} className="animate-spin" />
+            ) : null}
+            {stemHook.isBusy ? `${Math.round(stemHook.progress * 100)}%` : 'Drums Only'}
+          </button>
         </div>
         <div className="flex items-center gap-2">
           {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
