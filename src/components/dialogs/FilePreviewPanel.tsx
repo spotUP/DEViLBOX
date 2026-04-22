@@ -721,12 +721,25 @@ export const OnlinePanel: React.FC<OnlinePanelProps> = ({ isOpen, onLoadTrackerM
   const isLoggedIn = useAuthStore(s => !!s.token);
   const searchRef = useRef<HTMLInputElement>(null);
   const searchTimer = useRef<ReturnType<typeof setTimeout>>(null);
+  const previewEngineRef = useRef<{
+    mode: 'uade' | 'openmpt' | 'sid';
+    stop: () => void;
+  } | null>(null);
 
   useEffect(() => {
     if (!isOpen) return;
     getModlandStatus().then(setStatus).catch(() => {});
     getModlandFormats().then(fmts => setFormats(fmts.sort((a, b) => a.format.localeCompare(b.format)))).catch(() => {});
     setTimeout(() => searchRef.current?.focus(), 100);
+  }, [isOpen]);
+
+  // Stop preview when dialog closes
+  useEffect(() => {
+    if (!isOpen && previewEngineRef.current) {
+      try { previewEngineRef.current.stop(); } catch { /* ok */ }
+      previewEngineRef.current = null;
+      setPreviewingKey(null);
+    }
   }, [isOpen]);
 
   const doSearch = useCallback(async (q: string, fmt: string, src: SearchSource, newOffset: number, append: boolean) => {
@@ -835,8 +848,22 @@ export const OnlinePanel: React.FC<OnlinePanelProps> = ({ isOpen, onLoadTrackerM
     return { buffer, filename, companions };
   }, []);
 
+  // ── Direct audio preview (no tracker load) ─────────────────────────────
+  // previewEngineRef (declared with other refs above) tracks the active
+  // preview engine so stopPreview can tear it down.
+
+  const stopPreview = useCallback(() => {
+    const engine = previewEngineRef.current;
+    if (engine) {
+      try { engine.stop(); } catch { /* ok */ }
+      previewEngineRef.current = null;
+    }
+    setPreviewingKey(null);
+  }, []);
+
   const handleLoad = useCallback(async (item: OnlineResult) => {
     if (!onLoadTrackerModule) return;
+    stopPreview(); // stop any active preview before loading into tracker
     setDownloading(prev => new Set(prev).add(item.key));
     setError(null);
     try {
@@ -848,33 +875,88 @@ export const OnlinePanel: React.FC<OnlinePanelProps> = ({ isOpen, onLoadTrackerM
     } finally {
       setDownloading(prev => { const s = new Set(prev); s.delete(item.key); return s; });
     }
-  }, [onLoadTrackerModule, onClose, downloadItem]);
+  }, [onLoadTrackerModule, onClose, downloadItem, stopPreview]);
 
   const handlePreview = useCallback(async (item: OnlineResult) => {
-    if (!onLoadTrackerModule) return;
-    // Toggle off — stop playback if already previewing this item
-    if (previewingKey === item.key) {
-      const { useTransportStore } = await import('@/stores/useTransportStore');
-      useTransportStore.getState().stop();
-      setPreviewingKey(null);
-      return;
-    }
-    setDownloading(prev => new Set(prev).add(item.key));
+    // Toggle off if already previewing this item
+    if (previewingKey === item.key) { stopPreview(); return; }
+    stopPreview();
     setPreviewingKey(item.key);
+    setDownloading(prev => new Set(prev).add(item.key));
     setError(null);
     try {
       const { buffer, filename, companions } = await downloadItem(item);
-      await onLoadTrackerModule(buffer, filename, companions);
-      // Auto-play after loading
-      const { useTransportStore } = await import('@/stores/useTransportStore');
-      await useTransportStore.getState().play();
+
+      // SID files → C64SIDEngine direct playback
+      if (item.source === 'hvsc' || /\.sid$/i.test(filename)) {
+        const { C64SIDEngine } = await import('@/engine/C64SIDEngine');
+        const { getDevilboxAudioContext } = await import('@/utils/audio-context');
+        const ctx = getDevilboxAudioContext();
+        const sid = new C64SIDEngine(new Uint8Array(buffer));
+        await sid.init(ctx, ctx.destination);
+        await sid.play();
+        previewEngineRef.current = {
+          mode: 'sid',
+          stop: () => {
+            sid.stop();
+            sid.getOutputNode()?.disconnect();
+          },
+        };
+        return;
+      }
+
+      // UADE-family Amiga formats → UADEEngine direct playback
+      const { isUADEFormat } = await import('@/lib/import/formats/UADEParser');
+      if (isUADEFormat(filename)) {
+        const { UADEEngine } = await import('@engine/uade/UADEEngine');
+        const { getDevilboxAudioContext } = await import('@/utils/audio-context');
+        const uade = UADEEngine.getInstance();
+        await uade.ready();
+        if (companions) {
+          for (const [name, buf] of companions) {
+            await uade.addCompanionFile(name, buf);
+          }
+        }
+        uade.stop();
+        await uade.load(buffer, filename);
+        const ctx = getDevilboxAudioContext();
+        try { uade.output.connect(ctx.destination); } catch { /* already connected */ }
+        uade.play();
+        previewEngineRef.current = {
+          mode: 'uade',
+          stop: () => {
+            uade.stop();
+            try { uade.output.disconnect(ctx.destination); } catch { /* ok */ }
+          },
+        };
+        return;
+      }
+
+      // Everything else (MOD/XM/IT/S3M/etc.) → LibopenmptEngine direct playback
+      const { LibopenmptEngine } = await import('@/engine/libopenmpt/LibopenmptEngine');
+      const { getDevilboxAudioContext } = await import('@/utils/audio-context');
+      const openmpt = LibopenmptEngine.getInstance();
+      await openmpt.ready();
+      openmpt.stop();
+      await openmpt.loadTune(buffer);
+      const ctx = getDevilboxAudioContext();
+      try { openmpt.output.disconnect(); } catch { /* nothing connected */ }
+      openmpt.output.connect(ctx.destination);
+      openmpt.play();
+      previewEngineRef.current = {
+        mode: 'openmpt',
+        stop: () => {
+          openmpt.stop();
+          try { openmpt.output.disconnect(ctx.destination); } catch { /* ok */ }
+        },
+      };
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to preview');
       setPreviewingKey(null);
     } finally {
       setDownloading(prev => { const s = new Set(prev); s.delete(item.key); return s; });
     }
-  }, [onLoadTrackerModule, downloadItem, previewingKey]);
+  }, [previewingKey, stopPreview, downloadItem]);
 
   const handleRate = useCallback(async (item: OnlineResult, star: number) => {
     if (!isLoggedIn) { setShowAuthModal(true); return; }
@@ -992,14 +1074,14 @@ export const OnlinePanel: React.FC<OnlinePanelProps> = ({ isOpen, onLoadTrackerM
                     <>
                       <button
                         onClick={(e) => { e.stopPropagation(); handlePreview(item); }}
-                        className={`p-1 rounded transition-all flex-shrink-0 ${
+                        className={`p-1.5 rounded transition-all flex-shrink-0 ${
                           previewingKey === item.key
                             ? 'text-accent-success bg-accent-success/15 hover:bg-accent-success/25 opacity-100'
-                            : 'text-text-muted hover:text-text-primary opacity-0 group-hover:opacity-100'
+                            : 'text-accent-primary bg-accent-primary/10 hover:bg-accent-primary/20 opacity-0 group-hover:opacity-100'
                         }`}
                         title={previewingKey === item.key ? 'Stop preview' : 'Preview'}
                       >
-                        {previewingKey === item.key ? <Square size={12} /> : <Play size={12} />}
+                        {previewingKey === item.key ? <Square size={14} /> : <Play size={14} />}
                       </button>
                       <button
                         onClick={() => handleLoad(item)}
