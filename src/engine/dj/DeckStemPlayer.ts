@@ -75,7 +75,7 @@ export class DeckStemPlayer {
       // Create Tone.Player with the buffer
       const toneBuffer = new Tone.ToneAudioBuffer(audioBuffer);
       const player = new Tone.Player({
-        loop: false,
+        loop: true,
         autostart: false,
       });
       player.buffer = toneBuffer;
@@ -363,7 +363,10 @@ export class DeckStemPlayer {
         player.loopStart = loopIn;
         player.loopEnd = loopOut;
       } else {
-        player.loop = false;
+        // Restore whole-track loop
+        player.loop = true;
+        player.loopStart = 0;
+        player.loopEnd = 0;
       }
     }
   }

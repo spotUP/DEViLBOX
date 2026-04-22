@@ -47,7 +47,7 @@ export class DeckAudioPlayer {
 
   constructor(outputNode: Tone.ToneAudioNode) {
     this.player = new Tone.Player({
-      loop: false,
+      loop: true,
       autostart: false,
     });
     this.player.connect(outputNode);
@@ -442,7 +442,10 @@ export class DeckAudioPlayer {
       // Safety net: rAF fallback catches edge cases (rate changes near boundary)
       this.startLoopCheck();
     } else {
-      this.player.loop = false;
+      // Restore whole-track loop (no custom region)
+      this.player.loop = true;
+      this.player.loopStart = 0;
+      this.player.loopEnd = 0;
       this.stopLoopCheck();
     }
   }
