@@ -118,11 +118,15 @@ const wasmEffects: EffectDescriptor[] = [
       echoVolume: 0.8, reverbVolume: 0.3, inputLevel: 1,
     }),
     presets: [
-      { name: 'Classic Echo', params: { delayMode: 3, repeatRate: 0.5, intensity: 0.5, echoVolume: 0.8, reverbVolume: 0 } },
-      { name: 'Head 1+2 Reverb', params: { delayMode: 8, repeatRate: 0.4, intensity: 0.6, echoVolume: 0.7, reverbVolume: 0.4 } },
-      { name: 'Spring Only', params: { delayMode: 0, reverbVolume: 0.6 } },
-      { name: 'Dub Echo', params: { delayMode: 7, repeatRate: 0.3, intensity: 0.7, echoVolume: 0.9, reverbVolume: 0.5, bass: 0.7, treble: 0.3 } },
-      { name: 'Runaway Feedback', params: { delayMode: 5, repeatRate: 0.6, intensity: 0.85, echoVolume: 0.9, reverbVolume: 0.3 } },
+      // Authentic dub/sound system presets — RE-201 is THE classic dub echo
+      { name: 'King Tubby Wash', params: { delayMode: 7, repeatRate: 0.25, intensity: 0.72, echoVolume: 0.9, reverbVolume: 0.55, bass: 0.8, treble: 0.25, inputLevel: 1.2 } },
+      { name: 'Scientist Precision', params: { delayMode: 4, repeatRate: 0.45, intensity: 0.55, echoVolume: 0.75, reverbVolume: 0.3, bass: 0.6, treble: 0.5 } },
+      { name: 'Lee Perry Madness', params: { delayMode: 10, repeatRate: 0.35, intensity: 0.82, echoVolume: 0.95, reverbVolume: 0.7, bass: 0.75, treble: 0.4, inputLevel: 1.8 } },
+      { name: 'Sound System Drop', params: { delayMode: 1, repeatRate: 0.15, intensity: 0.78, echoVolume: 0.85, reverbVolume: 0.2, bass: 0.9, treble: 0.15 } },
+      { name: 'Spring Tank Splash', params: { delayMode: 0, reverbVolume: 0.8, bass: 0.5, treble: 0.6 } },
+      { name: 'Steppers Rhythm', params: { delayMode: 4, repeatRate: 0.55, intensity: 0.5, echoVolume: 0.7, reverbVolume: 0.15, bass: 0.55, treble: 0.45 } },
+      { name: 'Roots Dub Deep', params: { delayMode: 7, repeatRate: 0.2, intensity: 0.68, echoVolume: 0.85, reverbVolume: 0.65, bass: 0.85, treble: 0.2, inputLevel: 1.1 } },
+      { name: 'Runaway Feedback', params: { delayMode: 5, repeatRate: 0.4, intensity: 0.88, echoVolume: 0.95, reverbVolume: 0.35, bass: 0.7, treble: 0.3, inputLevel: 1.5 } },
     ],
   },
   {
@@ -155,11 +159,15 @@ const wasmEffects: EffectDescriptor[] = [
       reverbEnabled: 1, roomSize: 0.5, damping: 0.5, width: 1,
     }),
     presets: [
-      { name: 'Clean Delay', params: { delayTime: 375, feedback: 0.4, flutterDepth: 0, wowDepth: 0, reverbEnabled: 0 } },
-      { name: 'Tape Wobble', params: { delayTime: 300, feedback: 0.5, flutterFreq: 4, flutterDepth: 0.05, wowFreq: 0.3, wowDepth: 0.02 } },
-      { name: 'Dark Tape', params: { delayTime: 400, feedback: 0.6, lowpass: 3000, highpass: 200, flutterDepth: 0.03, wowDepth: 0.01 } },
-      { name: 'Dub Echo', params: { delayTime: 500, feedback: 0.7, lowpass: 4000, highpass: 150, reverbEnabled: 1, roomSize: 0.6 } },
-      { name: 'Short Slap', params: { delayTime: 80, feedback: 0.2, reverbEnabled: 0 } },
+      // Jamaican dub/sound system tape delay presets
+      { name: 'Channel One Studio', params: { delayTime: 375, feedback: 0.6, gain: 1.2, lowpass: 3500, highpass: 120, flutterFreq: 3.5, flutterDepth: 0.02, wowFreq: 0.25, wowDepth: 0.01, reverbEnabled: 1, roomSize: 0.45, damping: 0.55, width: 0.8 } },
+      { name: 'Dub Plate Special', params: { delayTime: 500, feedback: 0.75, gain: 1.5, lowpass: 2800, highpass: 180, flutterFreq: 2.5, flutterDepth: 0.04, wowFreq: 0.2, wowDepth: 0.015, reverbEnabled: 1, roomSize: 0.65, damping: 0.4, width: 1 } },
+      { name: 'Version Excursion', params: { delayTime: 666, feedback: 0.72, gain: 1.3, lowpass: 3200, highpass: 100, flutterFreq: 3, flutterDepth: 0.03, wowFreq: 0.15, wowDepth: 0.02, reverbEnabled: 1, roomSize: 0.75, damping: 0.35, width: 1 } },
+      { name: 'Dance Hall Slap', params: { delayTime: 180, feedback: 0.45, gain: 1.1, lowpass: 5000, highpass: 80, flutterDepth: 0.01, wowDepth: 0, reverbEnabled: 0 } },
+      { name: 'Sufferer Echo', params: { delayTime: 750, feedback: 0.78, gain: 1.4, lowpass: 2200, highpass: 200, flutterFreq: 2, flutterDepth: 0.05, wowFreq: 0.12, wowDepth: 0.025, reverbEnabled: 1, roomSize: 0.8, damping: 0.3, width: 1 } },
+      { name: 'Roots Tape Wobble', params: { delayTime: 440, feedback: 0.58, gain: 1.2, lowpass: 3000, highpass: 150, flutterFreq: 4.5, flutterDepth: 0.06, wowFreq: 0.35, wowDepth: 0.03, reverbEnabled: 1, roomSize: 0.5, damping: 0.5, width: 0.9 } },
+      { name: 'Sound System Siren', params: { delayTime: 333, feedback: 0.65, gain: 1.6, lowpass: 4500, highpass: 250, flutterDepth: 0.02, wowDepth: 0.01, reverbEnabled: 1, roomSize: 0.55, damping: 0.45, width: 0.7 } },
+      { name: 'Midnight Dub', params: { delayTime: 600, feedback: 0.7, gain: 1.3, lowpass: 1800, highpass: 250, flutterFreq: 2, flutterDepth: 0.04, wowFreq: 0.1, wowDepth: 0.02, reverbEnabled: 1, roomSize: 0.7, damping: 0.25, width: 1 } },
     ],
   },
   {
