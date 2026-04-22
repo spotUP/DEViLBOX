@@ -114,6 +114,8 @@ const MASTER_FX_GROUPS: Array<{ category: string; presets: typeof FX_PRESETS }> 
 })();
 import { DJTrackEditModal } from './DJTrackEditModal';
 import { DJModlandBrowser } from './DJModlandBrowser';
+import { getStemStatus, subscribeStemStatus, type StemJobStatus } from '@/engine/dj/DJStemQueue';
+import { hashFile, getCachedAudioByFilename } from '@/engine/dj/DJAudioCache';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -458,6 +460,63 @@ const TrackScrubber: React.FC<PlayingDeckInfo> = React.memo(({ deckId, playbackM
 });
 TrackScrubber.displayName = 'TrackScrubber';
 
+// ── Stem status per track ────────────────────────────────────────────────────
+
+// Cache filename → fileHash so we don't recompute on every render.
+const _fileHashCache = new Map<string, string>();
+const _hashPending = new Set<string>();
+
+async function resolveFileHash(fileName: string): Promise<string | null> {
+  if (_fileHashCache.has(fileName)) return _fileHashCache.get(fileName)!;
+  if (_hashPending.has(fileName)) return null;
+  _hashPending.add(fileName);
+  try {
+    const cached = await getCachedAudioByFilename(fileName);
+    if (!cached || cached.audioData.byteLength === 0) return null;
+    const hash = await hashFile(cached.audioData);
+    _fileHashCache.set(fileName, hash);
+    return hash;
+  } catch {
+    return null;
+  } finally {
+    _hashPending.delete(fileName);
+  }
+}
+
+/** Reactive stem status for a playlist track. Returns null while hash is resolving. */
+function useStemStatus(fileName: string): StemJobStatus | 'unknown' | null {
+  const [hash, setHash] = useState<string | null>(_fileHashCache.get(fileName) ?? null);
+
+  useEffect(() => {
+    if (_fileHashCache.has(fileName)) {
+      setHash(_fileHashCache.get(fileName)!);
+      return;
+    }
+    let cancelled = false;
+    resolveFileHash(fileName).then((h) => {
+      if (!cancelled && h) setHash(h);
+    });
+    return () => { cancelled = true; };
+  }, [fileName]);
+
+  // Subscribe to stem status changes
+  return useSyncExternalStore(
+    useCallback((cb) => subscribeStemStatus(cb), []),
+    useCallback(() => {
+      if (!hash) return null;
+      return getStemStatus(hash) ?? 'unknown';
+    }, [hash]),
+    useCallback(() => null, []),
+  );
+}
+
+const STEM_STATUS_BADGE: Record<string, { label: string; color: string; title: string }> = {
+  cached:     { label: '✂', color: 'text-accent-success',  title: 'Stems ready' },
+  separating: { label: '⚙', color: 'text-accent-warning animate-spin-slow', title: 'Separating stems…' },
+  queued:     { label: '⏳', color: 'text-text-muted',      title: 'Queued for separation' },
+  failed:     { label: '✗', color: 'text-accent-error',     title: 'Stem separation failed' },
+};
+
 // ── Sortable Track Row (enhanced for modal) ──────────────────────────────────
 
 interface ModalTrackRowProps {
@@ -524,6 +583,7 @@ const ModalTrackRow: React.FC<ModalTrackRowProps> = React.memo(({
   const deckRenderProgress = useDeckRenderingProgress(track.fileName);
   const deckIsRendering = deckRenderProgress !== null;
   const isPreRendering = useIsPreRendering(track.fileName);
+  const stemStatus = useStemStatus(track.fileName);
   // Any source of "this row is busy rendering/loading" — merged so the bar
   // doesn't flicker between the deck's rendering → loading → playing states.
   const isRendering = isReRendering || deckIsRendering || isPreRendering;
@@ -646,6 +706,18 @@ const ModalTrackRow: React.FC<ModalTrackRowProps> = React.memo(({
               style={{ width: `${track.energy * 100}%` }}
             />
           </div>
+        ) : null}
+      </span>
+
+      {/* Stem status badge */}
+      <span className="shrink-0 w-8 text-center">
+        {stemStatus && stemStatus !== 'unknown' && STEM_STATUS_BADGE[stemStatus] ? (
+          <span
+            className={`text-[16px] ${STEM_STATUS_BADGE[stemStatus].color}`}
+            title={STEM_STATUS_BADGE[stemStatus].title}
+          >
+            {STEM_STATUS_BADGE[stemStatus].label}
+          </span>
         ) : null}
       </span>
 
@@ -1364,6 +1436,29 @@ const DJPlaylistModalContent: React.FC<{ onClose: () => void }> = ({ onClose }) 
     } finally {
       precachingRef.current = false;
       setPrecacheProgress(null);
+    }
+  }, [activePlaylistId]);
+
+  // ── Batch stem separation ───────────────────────────────────────────────
+  const [stemSepProgress, setStemSepProgress] = useState<{ queued: number } | null>(null);
+
+  const handleSeparateAllStems = useCallback(async () => {
+    if (!activePlaylistId) return;
+    setStemSepProgress({ queued: 0 });
+    try {
+      const { queuePlaylistForStemSeparation } = await import('@/engine/dj/DJStemPreloader');
+      const queued = await queuePlaylistForStemSeparation(activePlaylistId);
+      if (queued > 0) {
+        const { notify } = await import('@/stores/useNotificationStore');
+        notify.success(`Queued ${queued} tracks for stem separation`);
+      } else {
+        const { notify } = await import('@/stores/useNotificationStore');
+        notify.warning('All tracks already have stems or are not yet cached');
+      }
+    } catch (err) {
+      console.warn('[DJPlaylistModal] Stem separation failed:', err);
+    } finally {
+      setStemSepProgress(null);
     }
   }, [activePlaylistId]);
 
@@ -2710,6 +2805,13 @@ const DJPlaylistModalContent: React.FC<{ onClose: () => void }> = ({ onClose }) 
         onClick: handlePrecache,
       });
     }
+    maintenanceItems.push({
+      id: 'separate-stems',
+      label: 'Separate all stems',
+      icon: <span className="text-[12px]">✂</span>,
+      onClick: handleSeparateAllStems,
+      disabled: !!stemSepProgress,
+    });
     if (badTrackCount > 0) {
       maintenanceItems.push({
         id: 'retest',
@@ -2763,6 +2865,7 @@ const DJPlaylistModalContent: React.FC<{ onClose: () => void }> = ({ onClose }) 
     clonePlaylist, handleExportJSON, handleExportM3U, handleCloudSave,
     handleToggleVisibility, handleAnalyzeAll, handleRetryFailed, handlePrecache,
     handleRetestBadTracks, handleClearPlayed, handleDeletePlaylist,
+    handleSeparateAllStems, stemSepProgress,
   ]);
 
   // ── Hidden file inputs ────────────────────────────────────────────────────
@@ -3397,6 +3500,16 @@ const DJPlaylistModalContent: React.FC<{ onClose: () => void }> = ({ onClose }) 
                     <Button variant="ghost" size="sm" onClick={handlePrecache}>
                       Cache ({uncachedCount})
                     </Button>
+                  )}
+
+                  {/* Stem separation button */}
+                  {!stemSepProgress && (
+                    <Button variant="ghost" size="sm" onClick={handleSeparateAllStems} title="Separate stems for all cached tracks">
+                      ✂ Stems
+                    </Button>
+                  )}
+                  {stemSepProgress && (
+                    <span className="text-[10px] text-accent-primary animate-pulse">Queueing stems…</span>
                   )}
 
                   {/* Bad tracks */}
