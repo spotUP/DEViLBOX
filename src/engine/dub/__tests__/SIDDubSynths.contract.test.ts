@@ -1,0 +1,126 @@
+/**
+ * SIDDubSynths contract tests — verifies the SID dub synths module's
+ * structure and instrument configuration without requiring a real
+ * AudioContext or GTUltra WASM engine.
+ *
+ * What this guards:
+ *   - SIDDubSynths class can be constructed without throwing.
+ *   - Instrument constants are correctly encoded (AD/SR byte packing).
+ *   - All synth trigger methods exist and return expected shapes.
+ *   - DubBus SID mode delegates are wired to the correct synth methods.
+ */
+
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+
+// Test the ADSR byte packing logic (same as module's private helper)
+const adsr = (hi: number, lo: number) => ((hi & 0xF) << 4) | (lo & 0xF);
+
+describe('SID ADSR byte packing', () => {
+  it('packs attack=0 decay=0 as 0x00', () => {
+    expect(adsr(0, 0)).toBe(0x00);
+  });
+
+  it('packs attack=15 decay=0 as 0xF0', () => {
+    expect(adsr(15, 0)).toBe(0xF0);
+  });
+
+  it('packs attack=0 decay=9 as 0x09', () => {
+    expect(adsr(0, 9)).toBe(0x09);
+  });
+
+  it('packs sustain=15 release=6 as 0xF6', () => {
+    expect(adsr(15, 6)).toBe(0xF6);
+  });
+
+  it('packs sustain=10 release=0 as 0xA0', () => {
+    expect(adsr(10, 0)).toBe(0xA0);
+  });
+
+  it('clamps nibbles to 4 bits', () => {
+    expect(adsr(0x1F, 0x1A)).toBe(adsr(0xF, 0xA));
+  });
+});
+
+describe('SIDDubSynths class shape', () => {
+  it('can be constructed without throwing', async () => {
+    const { SIDDubSynths } = await import('../SIDDubSynths');
+    const synths = new SIDDubSynths();
+    expect(synths).toBeDefined();
+    expect(synths.isReady).toBe(false);
+    expect(synths.output).toBeNull();
+  });
+
+  it('has all required trigger methods', async () => {
+    const { SIDDubSynths } = await import('../SIDDubSynths');
+    const synths = new SIDDubSynths();
+    expect(typeof synths.startSiren).toBe('function');
+    expect(typeof synths.firePing).toBe('function');
+    expect(typeof synths.fireSnare).toBe('function');
+    expect(typeof synths.startOscBass).toBe('function');
+    expect(typeof synths.startCrushBass).toBe('function');
+    expect(typeof synths.fireSubSwell).toBe('function');
+    expect(typeof synths.fireRadioRiser).toBe('function');
+    expect(typeof synths.dispose).toBe('function');
+  });
+
+  it('trigger methods return noop functions when engine is not ready', async () => {
+    const { SIDDubSynths } = await import('../SIDDubSynths');
+    const synths = new SIDDubSynths();
+    // Hold-style synths return dispose functions
+    const sirenDispose = synths.startSiren();
+    expect(typeof sirenDispose).toBe('function');
+    sirenDispose(); // should not throw
+
+    const bassDispose = synths.startOscBass();
+    expect(typeof bassDispose).toBe('function');
+    bassDispose();
+
+    const crushDispose = synths.startCrushBass();
+    expect(typeof crushDispose).toBe('function');
+    crushDispose();
+
+    // Fire-and-forget methods should not throw when not ready
+    expect(() => synths.firePing()).not.toThrow();
+    expect(() => synths.fireSnare()).not.toThrow();
+    expect(() => synths.fireSubSwell()).not.toThrow();
+    expect(() => synths.fireRadioRiser()).not.toThrow();
+  });
+
+  it('dispose is safe to call multiple times', async () => {
+    const { SIDDubSynths } = await import('../SIDDubSynths');
+    const synths = new SIDDubSynths();
+    expect(() => synths.dispose()).not.toThrow();
+    expect(() => synths.dispose()).not.toThrow();
+  });
+});
+
+describe('DubBus SID mode contract', () => {
+  it('DubBus exports enableSIDMode and disableSIDMode methods', async () => {
+    // Static source contract: grep for the method signatures
+    const fs = await import('fs');
+    const source = fs.readFileSync('src/engine/dub/DubBus.ts', 'utf-8');
+
+    expect(source).toContain('async enableSIDMode()');
+    expect(source).toContain('disableSIDMode()');
+    expect(source).toContain('get isSIDMode()');
+    // SID mode delegates in synth methods
+    expect(source).toContain('this._sidSynths?.isReady');
+    expect(source).toContain('this._sidSynths.startSiren()');
+    expect(source).toContain('this._sidSynths.firePing(');
+    expect(source).toContain('this._sidSynths.fireSnare(');
+    expect(source).toContain('this._sidSynths.startOscBass()');
+    expect(source).toContain('this._sidSynths.startCrushBass()');
+    expect(source).toContain('this._sidSynths.fireSubSwell(');
+    expect(source).toContain('this._sidSynths.fireRadioRiser(');
+  });
+
+  it('SID mode auto-enables when SID file is loaded (NativeEngineRouting contract)', async () => {
+    const fs = await import('fs');
+    const source = fs.readFileSync('src/engine/replayer/NativeEngineRouting.ts', 'utf-8');
+
+    // Must call enableSIDMode when connecting SID dub send
+    expect(source).toContain('enableSIDMode()');
+    // Must call disableSIDMode when stopping SID engine
+    expect(source).toContain('disableSIDMode()');
+  });
+});

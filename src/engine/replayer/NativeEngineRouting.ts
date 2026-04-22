@@ -1164,6 +1164,11 @@ export async function startNativeEngines(
             const dubInput = dpEngine.getDubBusInput();
             c64SidEngine.connectDubSend(dubInput, 0.4);
             console.log('[NativeEngineRouting] SID dub bus send connected (amount=0.4)');
+            // Enable SID mode on the dub bus so dub synths use real SID chip
+            const dubBus = dpEngine.getDubBus?.();
+            if (dubBus) {
+              void dubBus.enableSIDMode();
+            }
           }
         } catch (e) {
           console.warn('[NativeEngineRouting] SID dub bus send skipped:', e);
@@ -1469,6 +1474,13 @@ export function stopNativeEngines(
     try {
       c64SidEngine.stop();
       c64SidEngine.dispose();
+      // Disable SID mode on the dub bus when SID engine stops
+      try {
+        import('@hooks/drumpad/useMIDIPadRouting').then(({ getDrumPadEngine }) => {
+          const dpEngine = getDrumPadEngine();
+          dpEngine?.getDubBus?.()?.disableSIDMode();
+        }).catch(() => {});
+      } catch { /* ok */ }
     } catch (err) {
       console.warn('[NativeEngineRouting] Error stopping C64SIDEngine:', err);
     }

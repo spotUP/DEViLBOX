@@ -14,6 +14,9 @@ import { useDrumPadStore } from '@/stores/useDrumPadStore';
 import { startAutoDub, stopAutoDub, isAutoDubRunning, AUTO_DUB_RULE_MOVES } from '@/engine/dub/AutoDub';
 import { getPersona, AUTO_DUB_PERSONAS } from '@/engine/dub/AutoDubPersonas';
 import { fire as fireDub } from '@/engine/dub/DubRouter';
+import { useFormatStore } from '@/stores/useFormatStore';
+import { supportsChannelIsolation } from '@engine/tone/ChannelRoutedEffects';
+import { useNotificationStore } from '@/stores/useNotificationStore';
 
 interface AutoDubPanelProps {
   busEnabled: boolean;
@@ -29,6 +32,8 @@ export const AutoDubPanel: React.FC<AutoDubPanelProps> = ({ busEnabled }) => {
   const blacklist = useDubStore(s => s.autoDubMoveBlacklist);
   const setBlacklist = useDubStore(s => s.setAutoDubMoveBlacklist);
   const setDubBus = useDrumPadStore(s => s.setDubBus);
+  const editorMode = useFormatStore(s => s.editorMode);
+  const hasSidData = useFormatStore(s => s.c64SidFileData !== null);
 
   const [open, setOpen] = useState(false);
   const [pos, setPos] = useState({ top: 0, left: 0 });
@@ -57,11 +62,26 @@ export const AutoDubPanel: React.FC<AutoDubPanelProps> = ({ busEnabled }) => {
   // Keep runtime engine in sync with store flag
   useEffect(() => {
     if (enabled && busEnabled) {
-      if (!isAutoDubRunning()) startAutoDub();
+      if (!isAutoDubRunning()) {
+        startAutoDub();
+        // Warn if format lacks per-channel isolation (echo throws won't target individual channels)
+        const isSID = hasSidData || ['sidfactory2', 'cheesecutter', 'goattracker'].includes(editorMode);
+        if (isSID) {
+          useNotificationStore.getState().addNotification({
+            type: 'info',
+            message: 'SID mode: mutes work per-voice, echo throws apply to full mix',
+          });
+        } else if (!supportsChannelIsolation(editorMode)) {
+          useNotificationStore.getState().addNotification({
+            type: 'warning',
+            message: `Auto Dub: "${editorMode}" has no per-channel isolation — echo throws apply to the full mix`,
+          });
+        }
+      }
     } else {
       if (isAutoDubRunning()) stopAutoDub();
     }
-  }, [enabled, busEnabled]);
+  }, [enabled, busEnabled, editorMode, hasSidData]);
 
   // Panic event halts Auto Dub
   useEffect(() => {
