@@ -144,7 +144,7 @@ export interface DeckState {
   seratoKey: string | null;
 
   // Analysis state (populated by DJPipeline background analysis)
-  analysisState: 'none' | 'pending' | 'rendering' | 'analyzing' | 'ready';
+  analysisState: 'none' | 'pending' | 'rendering' | 'analyzing' | 'separating' | 'ready';
   analysisProgress: number; // 0-100
   beatGrid: BeatGridData | null;
   musicalKey: string | null;
