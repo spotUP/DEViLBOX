@@ -305,6 +305,7 @@ export const PadButton: React.FC<PadButtonProps> = ({
       data-sample-drop-zone
       className={`
         relative rounded-lg select-none overflow-hidden cursor-pointer outline-none
+        focus-visible:ring-2 focus-visible:ring-accent-primary focus-visible:ring-offset-1 focus-visible:ring-offset-dark-bg
         ${!isLoaded ? 'opacity-40' : ''}
         ${isPressed && isLoaded ? 'scale-95' : 'scale-100'}
         ${isSelected ? 'ring-2 ring-accent-primary ring-offset-2 ring-offset-dark-bg' : ''}
