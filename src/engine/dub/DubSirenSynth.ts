@@ -261,7 +261,7 @@ export class DubSirenSynth implements DevilboxSynth {
   }
 
   setLFORate(hz: number) {
-    this.lfo.frequency.rampTo(hz, 0.1);
+    this.lfo.frequency.rampTo(Math.max(0.01, Math.min(40, hz)), 0.1);
   }
 
   setLFODepth(depth: number) {
@@ -277,7 +277,7 @@ export class DubSirenSynth implements DevilboxSynth {
   }
 
   setDelayFeedback(feedback: number) {
-    this.delay.feedback.rampTo(feedback, 0.1);
+    this.delay.feedback.rampTo(Math.max(0, Math.min(0.95, feedback)), 0.1);
   }
 
   setDelayMix(wet: number) {
