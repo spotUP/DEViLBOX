@@ -79,7 +79,7 @@ const Section: React.FC<{
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="flex items-center gap-2 text-[10px] font-mono uppercase tracking-wider text-text-muted hover:text-text-secondary transition-colors text-left"
+        className="flex items-center gap-2 text-xs font-mono uppercase tracking-wider text-text-muted hover:text-text-secondary transition-colors text-left"
       >
         <span className="inline-block w-3 text-center">{open ? '▾' : '▸'}</span>
         {title}
@@ -124,7 +124,7 @@ export const DubBusPanel: React.FC = () => {
       <button
         onClick={() => setOpen((v) => !v)}
         title="Dub Bus — shared send FX for all pads"
-        className={`px-2 py-1 text-[10px] font-mono flex items-center gap-1 rounded border transition-colors ${
+        className={`px-2.5 py-1 text-xs font-mono flex items-center gap-1 rounded border transition-colors ${
           dubBus.enabled
             ? 'bg-accent-primary/10 border-accent-primary text-accent-primary'
             : 'bg-dark-surface border-dark-border text-text-muted hover:text-text-primary'
@@ -154,19 +154,19 @@ export const DubBusPanel: React.FC = () => {
                 onClick={() => {
                   window.dispatchEvent(new Event('dub-panic'));
                 }}
-                className="px-2 py-0.5 text-[10px] font-mono bg-accent-error/10 border border-accent-error/50 text-accent-error rounded hover:bg-accent-error/20"
+                className="px-2.5 py-1 text-xs font-mono bg-accent-error/10 border border-accent-error/50 text-accent-error rounded hover:bg-accent-error/20"
                 title="Kill the dub bus — drains echo + spring, resets taps, disables bus"
               >
                 KILL
               </button>
               <button
                 onClick={() => applySoundSystemToBank()}
-                className="px-2 py-0.5 text-[10px] font-mono bg-accent-primary/10 border border-accent-primary/50 text-accent-primary rounded hover:bg-accent-primary/20"
+                className="px-2.5 py-1 text-xs font-mono bg-accent-primary/10 border border-accent-primary/50 text-accent-primary rounded hover:bg-accent-primary/20"
                 title="Enable bus + set send=40% on every non-empty pad in this bank (kicks get 20%)"
               >
                 Apply Sound System
               </button>
-              <label className="flex items-center gap-1 text-[10px] font-mono text-text-secondary cursor-pointer">
+              <label className="flex items-center gap-1 text-xs font-mono text-text-secondary cursor-pointer">
                 <input
                   type="checkbox"
                   checked={dubBus.enabled}
@@ -416,7 +416,7 @@ export const DubBusPanel: React.FC = () => {
               onChange={(e) => patch({ hpfStepped: e.target.checked })}
               className="accent-accent-primary"
             />
-            <span className="text-[10px] text-text-muted">
+            <span className="text-xs text-text-muted">
               {dubBus.hpfStepped ? 'Altec "Big Knob" — snaps to 11 positions' : 'continuous sweep'}
             </span>
           </label>

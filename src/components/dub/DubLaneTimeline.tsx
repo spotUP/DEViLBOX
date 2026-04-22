@@ -299,7 +299,7 @@ export const DubLaneTimeline: React.FC = () => {
         />
 
         {!lane || lane.events.length === 0 ? (
-          <div className="absolute inset-0 flex items-center justify-center pointer-events-none text-[9px] font-mono text-text-muted">
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none text-xs font-mono text-text-muted">
             Dub lane empty — arm REC and perform · right-click here when you have events
           </div>
         ) : null}
@@ -314,7 +314,7 @@ export const DubLaneTimeline: React.FC = () => {
         >
           {menuEvent ? (
             <>
-              <div className="px-3 py-1 text-text-muted text-[10px] border-b border-dark-border">
+              <div className="px-3 py-1 text-text-muted text-xs border-b border-dark-border">
                 {menuEvent.moveId}{menuEvent.channelId !== undefined ? ` · ch ${menuEvent.channelId + 1}` : ''} · row {menuEvent.row.toFixed(1)}
               </div>
               <button
@@ -325,12 +325,12 @@ export const DubLaneTimeline: React.FC = () => {
               </button>
               {menuEvent.channelId !== undefined && channelCount > 1 && (
                 <div className="px-3 py-1 border-t border-dark-border">
-                  <div className="text-text-muted text-[10px] mb-1">Clone to channel…</div>
-                  <div className="flex gap-1 flex-wrap">
+                  <div className="text-text-muted text-xs mb-1">Clone to channel…</div>
+                  <div className="flex gap-1.5 flex-wrap">
                     {Array.from({ length: channelCount }, (_, i) => i).filter(i => i !== menuEvent.channelId).map(i => (
                       <button
                         key={i}
-                        className="px-1.5 py-0.5 rounded bg-dark-bgTertiary border border-dark-border text-text-secondary text-[9px] hover:border-accent-primary hover:text-accent-primary"
+                        className="px-2 py-1 rounded bg-dark-bgTertiary border border-dark-border text-text-secondary text-xs hover:border-accent-primary hover:text-accent-primary"
                         onClick={() => { cloneToChannel(menuEvent.id, i); setContextMenu(null); }}
                       >
                         {i + 1}
@@ -348,7 +348,7 @@ export const DubLaneTimeline: React.FC = () => {
             </>
           ) : (
             <>
-              <div className="px-3 py-1 text-text-muted text-[10px] border-b border-dark-border">
+              <div className="px-3 py-1 text-text-muted text-xs border-b border-dark-border">
                 Dub lane · {lane?.events.length ?? 0} events
               </div>
               <button

@@ -131,6 +131,7 @@ export const DubDeckStrip: React.FC = () => {
 
   // Click-flash per channel (kept for visual feedback on Echo Throw fire).
   const [flashedChannel, setFlashedChannel] = useState<number | null>(null);
+  const [hoverHint, setHoverHint] = useState<string | null>(null);
   useEffect(() => {
     if (flashedChannel === null) return;
     const t = setTimeout(() => setFlashedChannel(null), 400);
@@ -632,6 +633,13 @@ export const DubDeckStrip: React.FC = () => {
 
       {!stripCollapsed && (
       <>
+      {/* Hover info bar — shows description of hovered button */}
+      {hoverHint && (
+        <div className="px-3 py-1 bg-dark-bg border border-dark-borderLight rounded text-xs text-text-secondary font-mono truncate">
+          {hoverHint}
+        </div>
+      )}
+
       {/* Master section — TONE EQ + global generators + global processors.
           Kept as full-width bands above the channel strips so the layout
           below reads like a real mixing desk: master up top, channels as
@@ -694,8 +702,9 @@ export const DubDeckStrip: React.FC = () => {
                   onClick={isHold ? undefined : () => fireTrigger(m.moveId)}
                   onPointerDown={isHold ? () => holdStart(m.moveId) : undefined}
                   onPointerUp={isHold ? () => holdEnd(m.moveId) : undefined}
-                  onPointerLeave={isHold ? () => holdEnd(m.moveId) : undefined}
+                  onPointerLeave={isHold ? () => { holdEnd(m.moveId); setHoverHint(null); } : () => setHoverHint(null)}
                   onPointerCancel={isHold ? () => holdEnd(m.moveId) : undefined}
+                  onMouseEnter={() => setHoverHint(`${m.label} — ${m.title}`)}
                   title={m.title + (isHold ? ' (press-and-hold)' : '')}
                   disabled={!busEnabled}
                 >
@@ -723,8 +732,9 @@ export const DubDeckStrip: React.FC = () => {
                   onClick={isHold ? undefined : () => fireTrigger(m.moveId)}
                   onPointerDown={isHold ? () => holdStart(m.moveId) : undefined}
                   onPointerUp={isHold ? () => holdEnd(m.moveId) : undefined}
-                  onPointerLeave={isHold ? () => holdEnd(m.moveId) : undefined}
+                  onPointerLeave={isHold ? () => { holdEnd(m.moveId); setHoverHint(null); } : () => setHoverHint(null)}
                   onPointerCancel={isHold ? () => holdEnd(m.moveId) : undefined}
+                  onMouseEnter={() => setHoverHint(`${m.label} — ${m.title}`)}
                   title={m.title + (isHold ? ' (press-and-hold)' : '') + (!anySend ? ' — RAISE A CHANNEL SEND TO HEAR' : '')}
                   disabled={disabled}
                 >
@@ -779,8 +789,9 @@ export const DubDeckStrip: React.FC = () => {
                     onClick={isHold ? undefined : () => fireTrigger(op.moveId, i)}
                     onPointerDown={isHold ? () => holdStart(op.moveId, i) : undefined}
                     onPointerUp={isHold ? () => holdEnd(op.moveId, i) : undefined}
-                    onPointerLeave={isHold ? () => holdEnd(op.moveId, i) : undefined}
+                    onPointerLeave={isHold ? () => { holdEnd(op.moveId, i); setHoverHint(null); } : () => setHoverHint(null)}
                     onPointerCancel={isHold ? () => holdEnd(op.moveId, i) : undefined}
+                    onMouseEnter={() => setHoverHint(`Ch ${i + 1} · ${op.label} — ${op.title}`)}
                     title={`Ch ${i + 1} · ${op.title}${isHold ? ' (press-and-hold)' : ''}`}
                     disabled={!busEnabled}
                   >

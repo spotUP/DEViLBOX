@@ -153,7 +153,7 @@ export const AutoDubPanel: React.FC<AutoDubPanelProps> = ({ busEnabled }) => {
 
           {/* Persona selector */}
           <div className="flex items-center gap-2 mb-2">
-            <span className="text-text-muted text-[10px] w-14 shrink-0">Persona</span>
+            <span className="text-text-muted text-xs w-16 shrink-0">Persona</span>
             <select
               className="flex-1 bg-dark-bgTertiary border border-dark-border rounded px-2 py-1 text-text-primary text-[11px] focus:ring-1 focus:ring-accent-highlight disabled:opacity-50"
               value={persona}
@@ -180,7 +180,7 @@ export const AutoDubPanel: React.FC<AutoDubPanelProps> = ({ busEnabled }) => {
 
           {/* Intensity slider */}
           <div className="flex items-center gap-2 mb-3">
-            <span className="text-text-muted text-[10px] w-14 shrink-0">Intensity</span>
+            <span className="text-text-muted text-xs w-16 shrink-0">Intensity</span>
             <input
               type="range" min={0} max={1} step={0.01}
               value={intensity}
@@ -189,18 +189,18 @@ export const AutoDubPanel: React.FC<AutoDubPanelProps> = ({ busEnabled }) => {
               disabled={controlsDisabled}
               title={`${(intensity * 100).toFixed(0)}%`}
             />
-            <span className="w-8 text-right text-text-secondary text-[10px]">{(intensity * 100).toFixed(0)}%</span>
+            <span className="w-8 text-right text-text-secondary text-xs">{(intensity * 100).toFixed(0)}%</span>
           </div>
 
           {/* Move blacklist */}
           <div className="border-t border-dark-border pt-2">
             <div className="flex items-center justify-between mb-1.5">
-              <span className="text-text-secondary font-bold text-[10px]">
+              <span className="text-text-secondary font-bold text-xs">
                 MOVES {activeCount}/{AUTO_DUB_RULE_MOVES.length}
               </span>
               <button
                 type="button"
-                className="text-text-muted hover:text-accent-highlight text-[9px]"
+                className="text-text-muted hover:text-accent-highlight text-xs"
                 onClick={() => setBlacklist([])}
                 disabled={blacklist.length === 0}
               >
@@ -213,7 +213,7 @@ export const AutoDubPanel: React.FC<AutoDubPanelProps> = ({ busEnabled }) => {
                 return (
                   <label
                     key={moveId}
-                    className="flex items-center gap-1.5 px-1 py-0.5 rounded hover:bg-dark-bgHover cursor-pointer"
+                    className="flex items-center gap-1.5 px-1.5 py-1 rounded hover:bg-dark-bgHover cursor-pointer"
                   >
                     <input
                       type="checkbox"
@@ -221,7 +221,7 @@ export const AutoDubPanel: React.FC<AutoDubPanelProps> = ({ busEnabled }) => {
                       onChange={(e) => toggleMove(moveId, e.target.checked)}
                       className="accent-accent-highlight"
                     />
-                    <span className={`text-[10px] ${allowed ? 'text-text-primary' : 'text-text-muted line-through'}`}>
+                    <span className={`text-xs ${allowed ? 'text-text-primary' : 'text-text-muted line-through'}`}>
                       {moveId}
                     </span>
                   </label>
