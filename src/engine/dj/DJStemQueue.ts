@@ -143,18 +143,19 @@ async function processQueue(): Promise<void> {
     const { DemucsEngine } = await import('@/engine/demucs/DemucsEngine');
     const demucs = DemucsEngine.getInstance();
 
-    // Check cache first (cheap metadata check)
-    const isCached = await demucs.hasCachedStems(job.fileHash);
-    if (isCached) {
+    // Read user's preferred model from DJ store
+    const preferredModel = (await import('@/stores/useDJStore')).useDJStore.getState().stemModel ?? '4s';
+
+    // Check cache first — model-aware so switching 4s↔6s triggers re-separation
+    const cached = await demucs.loadCachedStems(job.fileHash, preferredModel);
+    if (cached) {
       setStatus(job.fileHash, 'cached');
-      // Load from cache for the caller
-      const cached = await demucs.loadCachedStems(job.fileHash);
       job.resolve(cached);
       return;
     }
 
-    // Ensure model
-    await demucs.ensureModel('4s', (p, msg) => {
+    // Ensure model is loaded (may download weights on first use)
+    await demucs.ensureModel(preferredModel, (p, msg) => {
       job.onProgress?.(p * 0.1, msg);
     });
 
