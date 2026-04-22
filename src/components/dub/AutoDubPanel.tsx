@@ -1,14 +1,10 @@
 /**
- * AutoDubPanel — header controls for autonomous dub performance.
+ * AutoDubPanel — toggle button + portal dropdown for autonomous dub performance.
  *
- * Renders inline in DubDeckStrip's header row: a toggle, a persona picker,
- * an "apply persona voicing" button, and an intensity slider. All
- * off-by-default.
- *
- * Persona pick changes move-bias weights + snaps intensity, but does NOT
- * clobber the bus VOICE character preset. Users who want the full persona
- * experience click the ♫ button to also load the persona's EQ/spring/echo
- * voicing. Users with hand-tuned voicing leave it alone.
+ * Renders a single "Auto Dub" button inline. Clicking it opens a dropdown
+ * (via createPortal) containing: ON/OFF toggle, persona picker, voicing apply,
+ * audition, move blacklist, and intensity slider. Matches the Auto DJ dropdown
+ * pattern in DJView.
  */
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
@@ -20,7 +16,6 @@ import { getPersona, AUTO_DUB_PERSONAS } from '@/engine/dub/AutoDubPersonas';
 import { fire as fireDub } from '@/engine/dub/DubRouter';
 
 interface AutoDubPanelProps {
-  /** Disabled when the dub bus itself is off. */
   busEnabled: boolean;
 }
 
@@ -35,25 +30,22 @@ export const AutoDubPanel: React.FC<AutoDubPanelProps> = ({ busEnabled }) => {
   const setBlacklist = useDubStore(s => s.setAutoDubMoveBlacklist);
   const setDubBus = useDrumPadStore(s => s.setDubBus);
 
-  const [blacklistOpen, setBlacklistOpen] = useState(false);
-  const [dropdownPos, setDropdownPos] = useState<{ top: number; left: number } | null>(null);
-  const blacklistBtnRef = useRef<HTMLButtonElement | null>(null);
-  const blacklistDropRef = useRef<HTMLDivElement | null>(null);
+  const [open, setOpen] = useState(false);
+  const [pos, setPos] = useState({ top: 0, left: 0 });
+  const btnRef = useRef<HTMLButtonElement | null>(null);
+  const dropRef = useRef<HTMLDivElement | null>(null);
 
-  // Click outside to close the blacklist popover (button OR portal dropdown).
+  // Click outside closes dropdown
   useEffect(() => {
-    if (!blacklistOpen) return;
+    if (!open) return;
     const onDown = (e: MouseEvent) => {
       const t = e.target as Node;
-      if (
-        blacklistBtnRef.current?.contains(t) ||
-        blacklistDropRef.current?.contains(t)
-      ) return;
-      setBlacklistOpen(false);
+      if (btnRef.current?.contains(t) || dropRef.current?.contains(t)) return;
+      setOpen(false);
     };
     window.addEventListener('mousedown', onDown);
     return () => window.removeEventListener('mousedown', onDown);
-  }, [blacklistOpen]);
+  }, [open]);
 
   const toggleMove = useCallback((moveId: string, allowed: boolean) => {
     const current = new Set(blacklist);
@@ -62,9 +54,7 @@ export const AutoDubPanel: React.FC<AutoDubPanelProps> = ({ busEnabled }) => {
     setBlacklist(Array.from(current));
   }, [blacklist, setBlacklist]);
 
-  // Keep the runtime engine in sync with the store flag. Runs on every
-  // toggle change so the panic-off path (engine disposes held moves) fires
-  // when the user flips Auto Dub off.
+  // Keep runtime engine in sync with store flag
   useEffect(() => {
     if (enabled && busEnabled) {
       if (!isAutoDubRunning()) startAutoDub();
@@ -73,7 +63,7 @@ export const AutoDubPanel: React.FC<AutoDubPanelProps> = ({ busEnabled }) => {
     }
   }, [enabled, busEnabled]);
 
-  // Panic event (KILL button + MCP) also halts Auto Dub.
+  // Panic event halts Auto Dub
   useEffect(() => {
     const onPanic = () => {
       if (isAutoDubRunning()) stopAutoDub();
@@ -85,13 +75,7 @@ export const AutoDubPanel: React.FC<AutoDubPanelProps> = ({ busEnabled }) => {
 
   const handlePersonaChange = useCallback((id: AutoDubPersonaId) => {
     setPersona(id);
-    const p = getPersona(id);
-    // Snap intensity to persona default on first pick so a fresh "Tubby"
-    // feels like Tubby's budget without the user having to find the right
-    // number. Bus VOICE is NOT auto-applied — hand-tuned voicings were
-    // being silently clobbered. Use the ♫ button to load the persona's
-    // voicing explicitly.
-    setIntensity(p.intensityDefault);
+    setIntensity(getPersona(id).intensityDefault);
   }, [setPersona, setIntensity]);
 
   const applyPersonaVoice = useCallback(() => {
@@ -101,125 +85,129 @@ export const AutoDubPanel: React.FC<AutoDubPanelProps> = ({ busEnabled }) => {
     }
   }, [persona, setDubBus]);
 
-  // Fire the persona's signature move once so the user hears the character
-  // without enabling Auto Dub. Uses the move's registered defaults + the
-  // persona's paramOverrides (e.g. Scientist's 4-beat echoThrow, Mad Prof's
-  // 6-beat echoThrow). channelId undefined → global-target moves.
   const auditionPersona = useCallback(() => {
+    if (!busEnabled) setDubBus({ enabled: true });
     const p = getPersona(persona);
-    const params = p.paramOverrides?.[p.signatureMove] ?? {};
-    fireDub(p.signatureMove, undefined, params, 'live');
-  }, [persona]);
+    fireDub(p.signatureMove, undefined, p.paramOverrides?.[p.signatureMove] ?? {}, 'live');
+  }, [persona, busEnabled, setDubBus]);
 
-  const disabled = !busEnabled;
-  const controlsDisabled = disabled || !enabled;
+  const handleToggle = useCallback(() => {
+    if (!enabled && !busEnabled) setDubBus({ enabled: true });
+    setEnabled(!enabled);
+  }, [enabled, busEnabled, setEnabled, setDubBus]);
 
-  const personaOptions: Array<{ id: AutoDubPersonaId; label: string }> = (
-    Object.values(AUTO_DUB_PERSONAS).map(p => ({ id: p.id, label: p.label }))
-  );
+  const controlsDisabled = !enabled;
+  const personaOptions = Object.values(AUTO_DUB_PERSONAS).map(p => ({ id: p.id, label: p.label }));
+  const activeCount = AUTO_DUB_RULE_MOVES.length - blacklist.filter(m => AUTO_DUB_RULE_MOVES.includes(m)).length;
 
   return (
-    <div className="flex items-center gap-1.5 pl-2 border-l border-dark-border">
+    <>
       <button
+        ref={btnRef}
         type="button"
-        className={
-          'px-2 py-0.5 rounded border transition-colors text-[10px] font-mono ' +
-          (enabled
-            ? 'bg-accent-highlight/20 border-accent-highlight text-accent-highlight'
-            : 'bg-dark-bgTertiary border-dark-border text-text-muted hover:text-text-primary')
-        }
-        onClick={() => setEnabled(!enabled)}
-        disabled={disabled}
-        title={enabled
-          ? 'Auto Dub ON — autonomous performer firing moves through the router'
-          : 'Auto Dub OFF — click to enable. Strictly opt-in.'}
-      >
-        AUTO DUB {enabled ? 'ON' : 'OFF'}
-      </button>
-
-      <select
-        className="bg-dark-bgTertiary border border-dark-border rounded px-1 py-0.5 text-text-primary text-[10px] font-mono focus:ring-1 focus:ring-accent-highlight disabled:opacity-50"
-        value={persona}
-        onChange={(e) => handlePersonaChange(e.target.value as AutoDubPersonaId)}
-        disabled={controlsDisabled}
-        title={getPersona(persona).description}
-      >
-        {personaOptions.map(o => (
-          <option key={o.id} value={o.id}>{o.label}</option>
-        ))}
-      </select>
-
-      {getPersona(persona).suggestedCharacterPreset && (
-        <button
-          type="button"
-          className="px-1.5 py-0.5 rounded border bg-dark-bgTertiary border-dark-border text-text-muted hover:text-accent-highlight hover:border-accent-highlight text-[10px] font-mono transition-colors disabled:opacity-50"
-          onClick={applyPersonaVoice}
-          disabled={controlsDisabled}
-          title={`Load ${getPersona(persona).label}'s bus voicing (EQ, spring, echo, tape saturator) — overwrites current VOICE`}
-        >
-          ♫
-        </button>
-      )}
-
-      <button
-        type="button"
-        className="px-1.5 py-0.5 rounded border bg-dark-bgTertiary border-dark-border text-text-muted hover:text-accent-highlight hover:border-accent-highlight text-[10px] font-mono transition-colors disabled:opacity-50"
-        onClick={auditionPersona}
-        disabled={disabled}
-        title={`Audition ${getPersona(persona).label} — fire one ${getPersona(persona).signatureMove} so you can hear the persona without enabling Auto Dub`}
-      >
-        ▶
-      </button>
-
-      {/* Move blacklist — per-session allow/deny list. Unchecking a move
-          adds it to autoDubMoveBlacklist so the rule engine skips it. */}
-      <div className="relative">
-        <button
-          ref={blacklistBtnRef}
-          type="button"
-          className={
-            'px-2 py-1 rounded border text-[11px] font-mono font-bold transition-colors disabled:opacity-50 whitespace-nowrap ' +
-            (blacklist.length > 0
-              ? 'bg-accent-warning/20 border-accent-warning text-accent-warning'
-              : 'bg-dark-bgTertiary border-dark-border text-text-primary hover:text-accent-highlight hover:border-accent-highlight')
+        className={`px-3 py-1.5 rounded-md text-xs font-mono border transition-all ${
+          open || enabled
+            ? 'border-accent-highlight bg-accent-highlight/20 text-accent-highlight'
+            : 'border-dark-borderLight bg-dark-bgTertiary text-text-secondary hover:bg-dark-bgHover hover:text-text-primary'
+        }`}
+        onClick={() => {
+          if (!open && btnRef.current) {
+            const r = btnRef.current.getBoundingClientRect();
+            setPos({ top: r.bottom + 4, left: r.left });
           }
-          onClick={() => {
-            if (!blacklistOpen && blacklistBtnRef.current) {
-              const r = blacklistBtnRef.current.getBoundingClientRect();
-              setDropdownPos({ top: r.bottom + 4, left: r.left });
-            }
-            setBlacklistOpen(v => !v);
-          }}
-          disabled={disabled}
-          title={blacklist.length > 0
-            ? `${blacklist.length} move${blacklist.length === 1 ? '' : 's'} blacklisted — click to edit`
-            : 'Move blacklist — exclude specific moves per session'}
+          setOpen(v => !v);
+        }}
+        title="Auto Dub — autonomous dub performer"
+      >
+        Auto Dub{enabled ? ' ON' : ''}
+      </button>
+
+      {open && createPortal(
+        <div
+          ref={dropRef}
+          className="fixed z-[99989] w-72 bg-dark-bgSecondary border border-dark-border rounded-lg shadow-xl p-3 font-mono text-[11px]"
+          style={{ top: pos.top, left: pos.left }}
         >
-          {(() => {
-            const total = AUTO_DUB_RULE_MOVES.length;
-            const active = total - blacklist.filter(m => AUTO_DUB_RULE_MOVES.includes(m)).length;
-            return `MOVES ${active}/${total}`;
-          })()}
-        </button>
-        {blacklistOpen && dropdownPos && createPortal(
-          <div
-            ref={blacklistDropRef}
-            className="fixed w-48 max-h-80 overflow-y-auto bg-dark-bgSecondary border border-dark-border rounded-md shadow-lg p-2 font-mono text-[10px]"
-            style={{ top: dropdownPos.top, left: dropdownPos.left, zIndex: 99990 }}
-          >
-            <div className="flex items-center justify-between mb-1.5 pb-1 border-b border-dark-border">
-              <span className="text-text-secondary font-bold">MOVES</span>
+          {/* Header: ON/OFF + Audition */}
+          <div className="flex items-center gap-2 mb-3">
+            <button
+              type="button"
+              className={`flex-1 px-3 py-1.5 rounded-md border text-xs font-bold transition-colors ${
+                enabled
+                  ? 'bg-accent-highlight/20 border-accent-highlight text-accent-highlight'
+                  : 'bg-dark-bgTertiary border-dark-border text-text-primary hover:text-accent-highlight hover:border-accent-highlight'
+              }`}
+              onClick={handleToggle}
+            >
+              {enabled ? '● AUTO DUB ON' : '○ AUTO DUB OFF'}
+            </button>
+            <button
+              type="button"
+              className="px-2 py-1.5 rounded-md border bg-dark-bgTertiary border-dark-border text-text-muted hover:text-accent-highlight hover:border-accent-highlight transition-colors"
+              onClick={auditionPersona}
+              title={`Audition ${getPersona(persona).label}`}
+            >
+              ▶
+            </button>
+          </div>
+
+          {/* Persona selector */}
+          <div className="flex items-center gap-2 mb-2">
+            <span className="text-text-muted text-[10px] w-14 shrink-0">Persona</span>
+            <select
+              className="flex-1 bg-dark-bgTertiary border border-dark-border rounded px-2 py-1 text-text-primary text-[11px] focus:ring-1 focus:ring-accent-highlight disabled:opacity-50"
+              value={persona}
+              onChange={(e) => handlePersonaChange(e.target.value as AutoDubPersonaId)}
+              disabled={controlsDisabled}
+              title={getPersona(persona).description}
+            >
+              {personaOptions.map(o => (
+                <option key={o.id} value={o.id}>{o.label}</option>
+              ))}
+            </select>
+            {getPersona(persona).suggestedCharacterPreset && (
+              <button
+                type="button"
+                className="px-2 py-1 rounded border bg-dark-bgTertiary border-dark-border text-text-muted hover:text-accent-highlight hover:border-accent-highlight transition-colors disabled:opacity-50"
+                onClick={applyPersonaVoice}
+                disabled={controlsDisabled}
+                title={`Load ${getPersona(persona).label}'s bus voicing`}
+              >
+                ♫
+              </button>
+            )}
+          </div>
+
+          {/* Intensity slider */}
+          <div className="flex items-center gap-2 mb-3">
+            <span className="text-text-muted text-[10px] w-14 shrink-0">Intensity</span>
+            <input
+              type="range" min={0} max={1} step={0.01}
+              value={intensity}
+              onChange={(e) => setIntensity(Number(e.target.value))}
+              className="flex-1 accent-accent-highlight disabled:opacity-50"
+              disabled={controlsDisabled}
+              title={`${(intensity * 100).toFixed(0)}%`}
+            />
+            <span className="w-8 text-right text-text-secondary text-[10px]">{(intensity * 100).toFixed(0)}%</span>
+          </div>
+
+          {/* Move blacklist */}
+          <div className="border-t border-dark-border pt-2">
+            <div className="flex items-center justify-between mb-1.5">
+              <span className="text-text-secondary font-bold text-[10px]">
+                MOVES {activeCount}/{AUTO_DUB_RULE_MOVES.length}
+              </span>
               <button
                 type="button"
                 className="text-text-muted hover:text-accent-highlight text-[9px]"
                 onClick={() => setBlacklist([])}
                 disabled={blacklist.length === 0}
-                title="Re-enable every move"
               >
                 reset
               </button>
             </div>
-            <div className="flex flex-col gap-0.5">
+            <div className="flex flex-col gap-0.5 max-h-48 overflow-y-auto">
               {AUTO_DUB_RULE_MOVES.map(moveId => {
                 const allowed = !blacklist.includes(moveId);
                 return (
@@ -233,31 +221,17 @@ export const AutoDubPanel: React.FC<AutoDubPanelProps> = ({ busEnabled }) => {
                       onChange={(e) => toggleMove(moveId, e.target.checked)}
                       className="accent-accent-highlight"
                     />
-                    <span className={allowed ? 'text-text-primary' : 'text-text-muted line-through'}>
+                    <span className={`text-[10px] ${allowed ? 'text-text-primary' : 'text-text-muted line-through'}`}>
                       {moveId}
                     </span>
                   </label>
                 );
               })}
             </div>
-          </div>,
-          document.body
-        )}
-      </div>
-
-
-      <div className="flex items-center gap-1">
-        <span className="text-text-muted text-[10px]">INT</span>
-        <input
-          type="range" min={0} max={1} step={0.01}
-          value={intensity}
-          onChange={(e) => setIntensity(Number(e.target.value))}
-          className="w-16 accent-accent-highlight disabled:opacity-50"
-          disabled={controlsDisabled}
-          title={`Intensity: ${(intensity * 100).toFixed(0)}% — scales roll probability, per-bar move budget, and wet params together`}
-        />
-        <span className="w-6 text-text-secondary text-[10px]">{(intensity * 100).toFixed(0)}</span>
-      </div>
-    </div>
+          </div>
+        </div>,
+        document.body
+      )}
+    </>
   );
 };
