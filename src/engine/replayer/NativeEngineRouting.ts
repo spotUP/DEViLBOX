@@ -1153,17 +1153,17 @@ export async function startNativeEngines(
         }
       }
 
-      // Connect SID/SF2 output to the dub bus so echo/spring/dub moves
-      // apply to SID playback. SID is monolithic stereo (no per-channel
-      // separation), so we tap the entire mix at a send level of 0.4.
+      // Connect SID output to the dub bus as a WET SEND. The send starts
+      // at gain=0 (silent) — only echo throws and channel dub-send sliders
+      // ramp it up. SID's dry signal stays connected to master via gainNode.
       if (c64SidEngine) {
         try {
           const { getDrumPadEngine } = await import('@hooks/drumpad/useMIDIPadRouting');
           const dpEngine = getDrumPadEngine();
           if (dpEngine) {
             const dubInput = dpEngine.getDubBusInput();
-            c64SidEngine.connectDubSend(dubInput, 0.4);
-            console.log('[NativeEngineRouting] SID dub bus send connected (amount=0.4)');
+            c64SidEngine.connectDubSend(dubInput, 0); // silent at rest
+            console.log('[NativeEngineRouting] SID dub bus send connected (baseline=0, wet only)');
             // Enable SID mode on the dub bus so dub synths use real SID chip
             const dubBus = dpEngine.getDubBus?.();
             if (dubBus) {
@@ -1171,7 +1171,7 @@ export async function startNativeEngines(
               // Register the dub send gain so full-mix echo throws work
               const sendGain = c64SidEngine.getDubSendGain();
               if (sendGain) {
-                dubBus.registerSidDubSend(sendGain, 0.4);
+                dubBus.registerSidDubSend(sendGain, 0); // baseline=0
               }
               // Register per-voice taps if available (jsSID with external AudioContext)
               const voiceOutputs = c64SidEngine.getVoiceOutputs();
