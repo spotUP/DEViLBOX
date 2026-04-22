@@ -68,6 +68,8 @@ import { TransientDesignerEffect } from '../effects/TransientDesignerEffect';
 import { BassEnhancerEffect } from '../effects/BassEnhancerEffect';
 import { ExpanderEffect } from '../effects/ExpanderEffect';
 import { SwedishChainsawEffect } from '../effects/SwedishChainsawEffect';
+import { RE201Effect } from '../effects/RE201Effect';
+import { AnotherDelayEffect } from '../effects/AnotherDelayEffect';
 
 export const EFFECT_RAMP_TIME = 0.02;
 
@@ -245,6 +247,37 @@ export function applyEffectParametersDiff(
         if ('inputBleed' in changed) node.setInputBleed(Number(changed.inputBleed));
         if ('loopAmount' in changed) node.setLoopAmount(Number(changed.loopAmount));
         if ('playheadFilter' in changed) node.setPlayheadFilter(Number(changed.playheadFilter));
+      }
+      break;
+
+    case 'RE201':
+      if (node instanceof RE201Effect) {
+        if ('bass' in changed) node.setBass(Number(changed.bass));
+        if ('treble' in changed) node.setTreble(Number(changed.treble));
+        if ('delayMode' in changed) node.setDelayMode(Number(changed.delayMode));
+        if ('repeatRate' in changed) node.setRepeatRate(Number(changed.repeatRate));
+        if ('intensity' in changed) node.setIntensity(Number(changed.intensity));
+        if ('echoVolume' in changed) node.setEchoVolume(Number(changed.echoVolume));
+        if ('reverbVolume' in changed) node.setReverbVolume(Number(changed.reverbVolume));
+        if ('inputLevel' in changed) node.setInputLevel(Number(changed.inputLevel));
+      }
+      break;
+
+    case 'AnotherDelay':
+      if (node instanceof AnotherDelayEffect) {
+        if ('delayTime' in changed) node.setDelayTime(Number(changed.delayTime));
+        if ('feedback' in changed) node.setFeedback(Number(changed.feedback));
+        if ('gain' in changed) node.setGain(Number(changed.gain));
+        if ('lowpass' in changed) node.setLowpass(Number(changed.lowpass));
+        if ('highpass' in changed) node.setHighpass(Number(changed.highpass));
+        if ('flutterFreq' in changed) node.setFlutterFreq(Number(changed.flutterFreq));
+        if ('flutterDepth' in changed) node.setFlutterDepth(Number(changed.flutterDepth));
+        if ('wowFreq' in changed) node.setWowFreq(Number(changed.wowFreq));
+        if ('wowDepth' in changed) node.setWowDepth(Number(changed.wowDepth));
+        if ('reverbEnabled' in changed) node.setReverbEnabled(Number(changed.reverbEnabled) > 0);
+        if ('roomSize' in changed) node.setRoomSize(Number(changed.roomSize));
+        if ('damping' in changed) node.setDamping(Number(changed.damping));
+        if ('width' in changed) node.setWidth(Number(changed.width));
       }
       break;
 
@@ -1254,6 +1287,16 @@ export function applyBpmSyncedParam(
       case 'BiPhase':
         if (paramKey === 'rateA' && node instanceof BiPhaseEffect) {
           node.setRateA(value);
+        }
+        break;
+      case 'RE201':
+        if (paramKey === 'repeatRate' && node instanceof RE201Effect) {
+          node.setRepeatRate(value);
+        }
+        break;
+      case 'AnotherDelay':
+        if (paramKey === 'delayTime' && node instanceof AnotherDelayEffect) {
+          node.setDelayTime(value);
         }
         break;
       case 'AmbientDelay':

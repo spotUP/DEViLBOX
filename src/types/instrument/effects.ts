@@ -46,6 +46,8 @@ export type AudioEffectType =
   | 'Aelapse'         // Ælapse tape delay + spring reverb (WASM, smiarx/aelapse port)
   | 'SwedishChainsaw' // Boss HM-2 + JCM800 tonestack (WASM, Barabas5532 port)
   | 'TapeDelay'       // RE-201/Echoplex tape delay (AudioWorklet, cyrusasfa port)
+  | 'RE201'           // Roland RE-201 Space Echo full model (WASM, je3928 port)
+  | 'AnotherDelay'    // Tape delay with wow/flutter/saturation/reverb (WASM, dllim port)
   // *Wave / ambient effects
   | 'ShimmerReverb'   // Shimmer reverb with pitch-shifted feedback (WASM)
   | 'GranularFreeze'  // Live-capture granular freeze effect (WASM)
