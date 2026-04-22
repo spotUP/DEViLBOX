@@ -339,6 +339,8 @@ interface DJState {
   /** Enable auto-dub for streamed audio decks — fires dub moves timed to
    *  the beat grid, using stem roles (drums/bass/vocals/other) for targeting. */
   streamAutoDub: boolean;
+  /** Demucs model: '4s' = drums/bass/vocals/other, '6s' = + guitar/piano */
+  stemModel: '4s' | '6s';
 }
 
 interface DJActions {
@@ -417,7 +419,7 @@ interface DJActions {
   setAutoDJEnabled: (enabled: boolean) => void;
   setAutoDJStatus: (status: AutoDJStatus) => void;
   setAutoDJTrackIndices: (current: number, next: number) => void;
-  setAutoDJConfig: (config: Partial<{ transitionBars: number; shuffle: boolean; withFilter: boolean; smartCuts: boolean; stemPreSeparation: boolean; streamAutoDub: boolean }>) => void;
+  setAutoDJConfig: (config: Partial<{ transitionBars: number; shuffle: boolean; withFilter: boolean; smartCuts: boolean; stemPreSeparation: boolean; streamAutoDub: boolean; stemModel: '4s' | '6s' }>) => void;
 }
 
 type DJStore = DJState & DJActions;
@@ -465,6 +467,7 @@ export const useDJStore = create<DJStore>()(
     autoDJSmartCuts: false,
     stemPreSeparation: false,
     streamAutoDub: false,
+    stemModel: '4s' as const,
 
     // ========================================================================
     // ACTIONS
@@ -797,6 +800,7 @@ export const useDJStore = create<DJStore>()(
         if (config.smartCuts !== undefined) state.autoDJSmartCuts = config.smartCuts;
         if (config.stemPreSeparation !== undefined) state.stemPreSeparation = config.stemPreSeparation;
         if (config.streamAutoDub !== undefined) state.streamAutoDub = config.streamAutoDub;
+        if (config.stemModel !== undefined) state.stemModel = config.stemModel;
       }),
   })))
 );

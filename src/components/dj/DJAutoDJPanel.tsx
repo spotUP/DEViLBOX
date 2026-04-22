@@ -50,6 +50,7 @@ export const DJAutoDJPanel: React.FC<DJAutoDJPanelProps> = ({ onClose }) => {
   const withFilter = useDJStore((s) => s.autoDJWithFilter);
   const smartCuts = useDJStore((s) => s.autoDJSmartCuts);
   const stemPreSep = useDJStore((s) => s.stemPreSeparation);
+  const stemModel = useDJStore((s) => s.stemModel);
   const streamAutoDub = useDJStore((s) => s.streamAutoDub);
   const setConfig = useDJStore((s) => s.setAutoDJConfig);
 
@@ -459,7 +460,22 @@ export const DJAutoDJPanel: React.FC<DJAutoDJPanelProps> = ({ onClose }) => {
         >
           <Layers size={12} />
         </button>
-        {/* Stream Auto Dub — fire dub moves timed to beat grid */}
+        {/* Stem model selector — 4s (drums/bass/vocals/other) or 6s (+ guitar/piano) */}
+        <button
+          onClick={() => setConfig({ stemModel: stemModel === '4s' ? '6s' : '4s' })}
+          className={`px-1.5 py-1 rounded border transition-all text-[9px] font-bold tracking-wider ${
+            stemModel === '6s'
+              ? 'border-amber-500 bg-amber-900/20 text-amber-400'
+              : 'border-dark-borderLight bg-dark-bgTertiary text-text-tertiary hover:text-text-secondary'
+          }`}
+          title={
+            stemModel === '6s'
+              ? '6-Stem mode — drums, bass, vocals, guitar, piano, other (~120MB model)'
+              : '4-Stem mode — drums, bass, vocals, other (~80MB model). Click for 6-stem.'
+          }
+        >
+          {stemModel === '6s' ? '6S' : '4S'}
+        </button>
         <button
           onClick={() => {
             const next = !streamAutoDub;
