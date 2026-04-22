@@ -1152,6 +1152,23 @@ export async function startNativeEngines(
           console.log(`[NativeEngineRouting] Applied ${song.c64MemPatches.length} post-init RAM patch(es)`);
         }
       }
+
+      // Connect SID/SF2 output to the dub bus so echo/spring/dub moves
+      // apply to SID playback. SID is monolithic stereo (no per-channel
+      // separation), so we tap the entire mix at a send level of 0.4.
+      if (c64SidEngine) {
+        try {
+          const { getDrumPadEngine } = await import('@hooks/drumpad/useMIDIPadRouting');
+          const dpEngine = getDrumPadEngine();
+          if (dpEngine) {
+            const dubInput = dpEngine.getDubBusInput();
+            c64SidEngine.connectDubSend(dubInput, 0.4);
+            console.log('[NativeEngineRouting] SID dub bus send connected (amount=0.4)');
+          }
+        } catch (e) {
+          console.warn('[NativeEngineRouting] SID dub bus send skipped:', e);
+        }
+      }
     } catch (err) {
       console.error('[NativeEngineRouting] Failed to start C64SIDEngine:', err);
     }
