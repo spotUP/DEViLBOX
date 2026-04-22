@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-04-22T13:08:52.164Z
+ * Generated: 2026-04-22T13:33:58.349Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,9 +19,9 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.6048';
-export const BUILD_NUMBER = '6048';
-export const BUILD_HASH = '2806c02b1';
+export const BUILD_VERSION = '1.0.6049';
+export const BUILD_NUMBER = '6049';
+export const BUILD_HASH = '93851dfeb';
 export const BUILD_DATE = '2026-04-22';
 
 // Full version (patch IS the build number, so no need to append)
@@ -30,9 +30,13 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.6048',
+    version: '1.0.6049',
     date: '2026-04-22',
     changes: [
+      {
+        type: 'improvement',
+        "description": "DJ stem mixer UI + per-stem waveform visualization"
+      },
       {
         type: 'feature',
         "description": "Add stem separation priority queue, pre-separation, and auto-load"
@@ -234,10 +238,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'improvement',
         "description": "Global FX lane chapter section + Zxx 36/37/38 correction"
-      },
-      {
-        type: 'feature',
-        "description": "Global FX lane — pattern-editor row above channels"
       }
     ]
   }

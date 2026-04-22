@@ -95,6 +95,9 @@ export async function togglePlay(
               deck.replayer.setPitchMultiplier(1.0);
             }
             useDJStore.getState().setDeckPlaying(deckId, false);
+            import('@/engine/dub/StreamAutoDub').then(({ stopStreamAutoDub }) => {
+              stopStreamAutoDub(deckId);
+            });
             resolve();
           }
 
@@ -141,6 +144,9 @@ export async function togglePlay(
     } else {
       // Instant pause
       store.setDeckPlaying(deckId, false);
+      import('@/engine/dub/StreamAutoDub').then(({ stopStreamAutoDub }) => {
+        stopStreamAutoDub(deckId);
+      });
       try {
         getDJEngine().getDeck(deckId).pause();
       } catch { /* engine not ready */ }
@@ -166,6 +172,12 @@ export async function togglePlay(
       s.setDeckPlaying(deckId, true);
       try {
         await getDJEngine().getDeck(deckId).play();
+        // Start stream auto-dub if enabled
+        if (useDJStore.getState().streamAutoDub) {
+          import('@/engine/dub/StreamAutoDub').then(({ startStreamAutoDub }) => {
+            startStreamAutoDub(deckId);
+          });
+        }
       } catch {
         useDJStore.getState().setDeckPlaying(deckId, false);
       }
@@ -188,6 +200,9 @@ export async function togglePlay(
  */
 export function stopDeck(deckId: DeckId): void {
   useDJStore.getState().setDeckPlaying(deckId, false);
+  import('@/engine/dub/StreamAutoDub').then(({ stopStreamAutoDub }) => {
+    stopStreamAutoDub(deckId);
+  });
   try {
     getDJEngine().getDeck(deckId).stop();
   } catch { /* engine not ready */ }
