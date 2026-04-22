@@ -53,6 +53,9 @@ const wasmEffects: EffectDescriptor[] = [
       { name: 'Concert Hall', params: { decay: 0.8, size: 0.9, mix: 0.35, earlyMix: 0.4, bandwidth: 0.7 } },
       { name: 'Infinite Wash', params: { decay: 0.99, size: 1.0, mix: 0.5, damping: 0.2, density: 0.8 } },
       { name: 'Plate', params: { decay: 0.5, size: 0.5, mix: 0.3, density: 0.8, bandwidth: 0.9, earlyMix: 0.3 } },
+      { name: 'King Tubby Studio', params: { decay: 0.65, size: 0.6, mix: 0.4, earlyMix: 0.55, bandwidth: 0.5, density: 0.7, damping: 0.55, predelay: 0.02 } },
+      { name: 'Sound System Hall', params: { decay: 0.85, size: 0.95, mix: 0.45, earlyMix: 0.3, bandwidth: 0.4, density: 0.9, damping: 0.6, predelay: 0.05 } },
+      { name: 'Dub Plate Room', params: { decay: 0.45, size: 0.4, mix: 0.35, earlyMix: 0.6, bandwidth: 0.45, density: 0.75, damping: 0.65 } },
     ],
   },
   {
@@ -92,6 +95,9 @@ const wasmEffects: EffectDescriptor[] = [
       { name: 'Vintage Spring', params: { decay: 0.5, damping: 0.6, tension: 0.4, drip: 0.7, diffusion: 0.5 } },
       { name: 'Surf', params: { decay: 0.8, damping: 0.2, tension: 0.7, drip: 0.9, mix: 0.5, diffusion: 0.8 } },
       { name: 'Dark Spring', params: { decay: 0.7, damping: 0.8, tension: 0.3, drip: 0.3, mix: 0.3, diffusion: 0.6 } },
+      { name: 'Studio One Tank', params: { decay: 0.65, damping: 0.5, tension: 0.45, drip: 0.8, mix: 0.45, diffusion: 0.65 } },
+      { name: 'Dub Splash', params: { decay: 0.75, damping: 0.35, tension: 0.55, drip: 0.95, mix: 0.5, diffusion: 0.75 } },
+      { name: 'Sound System Spring', params: { decay: 0.85, damping: 0.25, tension: 0.6, drip: 0.85, mix: 0.55, diffusion: 0.8 } },
     ],
   },
   {
@@ -211,6 +217,9 @@ const wasmEffects: EffectDescriptor[] = [
       { name: 'Tape Echo', params: { delayActive: 100, springsActive: 0, delayDryWet: 50, delayTime: 40, delayFeedback: 55, delaySaturation: 40, delayDrift: 25 } },
       { name: 'Spring Wash', params: { delayActive: 0, springsActive: 100, springsDryWet: 60, springsLength: 70, springsDecay: 60, springsDamp: 20 } },
       { name: 'Both', params: { delayActive: 100, springsActive: 100, delayDryWet: 30, delayTime: 25, delayFeedback: 35, springsDryWet: 35, springsLength: 50, springsDecay: 40 } },
+      { name: 'King Tubby Tape & Springs', params: { delayActive: 100, springsActive: 100, delayDryWet: 55, delayTime: 35, delayFeedback: 65, delaySaturation: 50, delayDrift: 20, delayCutHi: 60, springsDryWet: 50, springsLength: 65, springsDecay: 55, springsDamp: 25, springsShape: 40 } },
+      { name: 'Roots Dub Wash', params: { delayActive: 100, springsActive: 100, delayDryWet: 45, delayTime: 45, delayFeedback: 70, delaySaturation: 35, delayDrift: 30, delayCutHi: 55, springsDryWet: 60, springsLength: 75, springsDecay: 65, springsDamp: 15, springsChaos: 15 } },
+      { name: 'Sound System Stack', params: { delayActive: 100, springsActive: 100, delayDryWet: 60, delayTime: 30, delayFeedback: 60, delaySaturation: 55, delayDrift: 10, springsDryWet: 45, springsLength: 55, springsDecay: 50, springsDamp: 30, springsWidth: 100 } },
     ],
   },
   {
@@ -236,6 +245,7 @@ const wasmEffects: EffectDescriptor[] = [
       { name: 'Ethereal', params: { decay: 85, shimmer: 70, pitch: 12, size: 90, modRate: 20, modDepth: 30 } },
       { name: 'Angelic', params: { decay: 95, shimmer: 90, pitch: 24, damping: 30, size: 100, predelay: 60 } },
       { name: 'Dark Shimmer', params: { decay: 80, shimmer: 40, pitch: 7, damping: 80, size: 60, modRate: 10 } },
+      { name: 'Dub Shimmer', params: { decay: 75, shimmer: 25, pitch: 12, damping: 65, size: 80, predelay: 30, modRate: 15, modDepth: 20 } },
     ],
   },
   {
