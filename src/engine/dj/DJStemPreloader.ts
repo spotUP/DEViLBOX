@@ -5,6 +5,9 @@
  * for the next N upcoming tracks. When Auto DJ advances, newly upcoming
  * tracks are enqueued automatically.
  *
+ * Also exports `queueTrackForStemSeparation` for on-demand separation when
+ * tracks are added to a playlist.
+ *
  * Requires:
  *  - Playlist tracks to have been pre-rendered (cached audio in IndexedDB)
  *  - Auto DJ enabled OR manual "Pre-separate Stems" toggle
@@ -120,6 +123,14 @@ async function queueUpcoming(): Promise<void> {
   }
 }
 
+/**
+ * Queue a single track for stem separation if it has cached audio and
+ * isn't already separated. Can be called externally (e.g. on playlist add).
+ */
+export async function queueTrackForStemSeparation(track: PlaylistTrack): Promise<void> {
+  return queueTrackIfNeeded(track);
+}
+
 async function queueTrackIfNeeded(track: PlaylistTrack): Promise<void> {
   // Skip bad tracks
   if (track.isBad) return;
@@ -179,4 +190,25 @@ async function queueTrackIfNeeded(track: PlaylistTrack): Promise<void> {
   }).catch((err) => {
     console.warn(`[StemPreloader] Separation failed for ${track.fileName}:`, err);
   });
+}
+
+/**
+ * Queue all tracks in a playlist for stem separation.
+ * Skips tracks that are already cached/queued/separating.
+ */
+export async function queuePlaylistForStemSeparation(playlistId: string): Promise<number> {
+  const state = useDJPlaylistStore.getState();
+  const playlist = state.playlists.find((p) => p.id === playlistId);
+  if (!playlist) return 0;
+
+  let queued = 0;
+  for (const track of playlist.tracks) {
+    try {
+      await queueTrackIfNeeded(track);
+      queued++;
+    } catch {
+      // Skip failures silently
+    }
+  }
+  return queued;
 }
