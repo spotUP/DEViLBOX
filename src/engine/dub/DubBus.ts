@@ -122,6 +122,12 @@ export class DubBus {
   // King Tubby bass shelf — resonant low-shelf at ~90 Hz for the dub
   // "weight." Sits after the HPF so it doesn't amplify sub-rumble.
   private bassShelf: BiquadFilterNode;
+  // Compensating low-shelf cut in the feedback path — mirrors bassShelf
+  // boost as a cut so the round-trip bass gain stays at 0 dB. Without
+  // this, bass content inside the feedback loop gets amplified every
+  // iteration (shelf boost → saturator clips to 1.0 → feedback sends
+  // back → shelf boosts again → stable full-amplitude bass drone).
+  private feedbackShelfComp: BiquadFilterNode;
   // Scientist mid-scoop — peaking cut around 700 Hz. Sits on the return
   // side (post-comp) so it shapes the already-echoed/sprung signal.
   private midScoop: BiquadFilterNode;
@@ -823,6 +829,16 @@ export class DubBus {
     this.feedback = this.context.createGain();
     this.feedback.gain.value = 0;
 
+    // Compensating low-shelf in the feedback return path. Mirrors the
+    // forward-path bassShelf gain as a negative value so bass frequencies
+    // see 0 dB net gain per feedback iteration. Updated alongside
+    // bassShelf in _applySettings().
+    this.feedbackShelfComp = this.context.createBiquadFilter();
+    this.feedbackShelfComp.type = 'lowshelf';
+    this.feedbackShelfComp.frequency.value = this.settings.bassShelfFreqHz;
+    this.feedbackShelfComp.Q.value = this.settings.bassShelfQ;
+    this.feedbackShelfComp.gain.value = -Math.max(-12, Math.min(12, this.settings.bassShelfGainDb));
+
     // Pink noise floor — ~-55 dBFS continuous noise that you don't notice
     // during normal play, but becomes audible during mute-and-dub drops as
     // the "tape hiss" texture of vintage dub records. Two-second loop buffer
@@ -845,7 +861,12 @@ export class DubBus {
     // Wire the vintage Tubby/Scientist chain (with coloring stages inserted):
     //   input → HPF → BassShelf → TapeSat → Echo → Spring
     //                                        │
-    //                                 feedback ← echoOut
+    //                          feedbackShelfComp ← feedback ← echoOut
+    //
+    //   The feedbackShelfComp mirrors bassShelf's gain as a CUT so the
+    //   round-trip bass gain through the feedback loop stays at 0 dB.
+    //   Without it, +12 dB bass boost × 0.5 feedback = 2× per iteration
+    //   → stable full-amplitude bass drone.
     //
     //   Spring.output → Sidechain → Glue → MidScoop → LPF → StereoMS → return → master
     this.input.connect(this.hpf);
@@ -878,7 +899,8 @@ export class DubBus {
     // runaway self-oscillation.
     const echoOut = (this.echo as unknown as { output: Tone.ToneAudioNode }).output;
     Tone.connect(echoOut, this.feedback as unknown as Tone.InputNode);
-    this.feedback.connect(this.input);
+    this.feedback.connect(this.feedbackShelfComp);
+    this.feedbackShelfComp.connect(this.input);
     // Post-spring output chain with coloring inserts (mid scoop + M/S width).
     const springOut = (this.spring as unknown as { output: Tone.ToneAudioNode }).output;
     Tone.connect(springOut, this.sidechain as unknown as Tone.InputNode);
@@ -1356,10 +1378,12 @@ export class DubBus {
       } catch { /* ok */ }
     }
 
-    // 3. Kill siren feedback + reset LPF to open.
+    // 3. Kill siren feedback + reset LPF to open + neutralize bass shelf comp.
     try {
       this.feedback.gain.cancelScheduledValues(now);
       this.feedback.gain.setValueAtTime(0, now);
+      this.feedbackShelfComp.gain.cancelScheduledValues(now);
+      this.feedbackShelfComp.gain.setValueAtTime(0, now);
       this.lpf.frequency.cancelScheduledValues(now);
       this.lpf.frequency.setValueAtTime(20000, now);
     } catch { /* ok */ }
@@ -1588,6 +1612,10 @@ export class DubBus {
     this.bassShelf.frequency.setTargetAtTime(merged.bassShelfFreqHz, now, 0.02);
     this.bassShelf.Q.setTargetAtTime(merged.bassShelfQ, now, 0.02);
     this.bassShelf.gain.setTargetAtTime(safeBassGain, now, 0.02);
+    // Mirror compensating cut in feedback path — negated gain, same freq/Q
+    this.feedbackShelfComp.frequency.setTargetAtTime(merged.bassShelfFreqHz, now, 0.02);
+    this.feedbackShelfComp.Q.setTargetAtTime(merged.bassShelfQ, now, 0.02);
+    this.feedbackShelfComp.gain.setTargetAtTime(-safeBassGain, now, 0.02);
     this.midScoop.frequency.setTargetAtTime(merged.midScoopFreqHz, now, 0.02);
     this.midScoop.Q.setTargetAtTime(merged.midScoopQ, now, 0.02);
     this.midScoop.gain.setTargetAtTime(merged.midScoopGainDb, now, 0.02);
