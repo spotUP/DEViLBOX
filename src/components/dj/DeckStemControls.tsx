@@ -92,7 +92,7 @@ export const DeckStemControls: React.FC<DeckStemControlsProps> = ({ deckId }) =>
           />
         </div>
         <span className="text-[9px] font-mono text-accent-highlight whitespace-nowrap">
-          {pct < 10 ? 'Loading model…' : `Separating ${pct}%`}
+          {pct < 10 ? 'Loading model…' : `${pct}%`}
         </span>
       </div>
     );
