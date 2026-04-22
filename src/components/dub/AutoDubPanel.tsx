@@ -12,6 +12,7 @@
  */
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useDubStore, type AutoDubPersonaId } from '@/stores/useDubStore';
 import { useDrumPadStore } from '@/stores/useDrumPadStore';
 import { startAutoDub, stopAutoDub, isAutoDubRunning, AUTO_DUB_RULE_MOVES } from '@/engine/dub/AutoDub';
@@ -35,15 +36,20 @@ export const AutoDubPanel: React.FC<AutoDubPanelProps> = ({ busEnabled }) => {
   const setDubBus = useDrumPadStore(s => s.setDubBus);
 
   const [blacklistOpen, setBlacklistOpen] = useState(false);
-  const blacklistRef = useRef<HTMLDivElement | null>(null);
+  const [dropdownPos, setDropdownPos] = useState<{ top: number; left: number } | null>(null);
+  const blacklistBtnRef = useRef<HTMLButtonElement | null>(null);
+  const blacklistDropRef = useRef<HTMLDivElement | null>(null);
 
-  // Click outside to close the blacklist popover.
+  // Click outside to close the blacklist popover (button OR portal dropdown).
   useEffect(() => {
     if (!blacklistOpen) return;
     const onDown = (e: MouseEvent) => {
-      if (blacklistRef.current && !blacklistRef.current.contains(e.target as Node)) {
-        setBlacklistOpen(false);
-      }
+      const t = e.target as Node;
+      if (
+        blacklistBtnRef.current?.contains(t) ||
+        blacklistDropRef.current?.contains(t)
+      ) return;
+      setBlacklistOpen(false);
     };
     window.addEventListener('mousedown', onDown);
     return () => window.removeEventListener('mousedown', onDown);
@@ -167,8 +173,9 @@ export const AutoDubPanel: React.FC<AutoDubPanelProps> = ({ busEnabled }) => {
 
       {/* Move blacklist — per-session allow/deny list. Unchecking a move
           adds it to autoDubMoveBlacklist so the rule engine skips it. */}
-      <div className="relative" ref={blacklistRef}>
+      <div className="relative">
         <button
+          ref={blacklistBtnRef}
           type="button"
           className={
             'px-2 py-1 rounded border text-[11px] font-mono font-bold transition-colors disabled:opacity-50 whitespace-nowrap ' +
@@ -176,7 +183,13 @@ export const AutoDubPanel: React.FC<AutoDubPanelProps> = ({ busEnabled }) => {
               ? 'bg-accent-warning/20 border-accent-warning text-accent-warning'
               : 'bg-dark-bgTertiary border-dark-border text-text-primary hover:text-accent-highlight hover:border-accent-highlight')
           }
-          onClick={() => setBlacklistOpen(v => !v)}
+          onClick={() => {
+            if (!blacklistOpen && blacklistBtnRef.current) {
+              const r = blacklistBtnRef.current.getBoundingClientRect();
+              setDropdownPos({ top: r.bottom + 4, left: r.left });
+            }
+            setBlacklistOpen(v => !v);
+          }}
           disabled={disabled}
           title={blacklist.length > 0
             ? `${blacklist.length} move${blacklist.length === 1 ? '' : 's'} blacklisted — click to edit`
@@ -188,8 +201,12 @@ export const AutoDubPanel: React.FC<AutoDubPanelProps> = ({ busEnabled }) => {
             return `MOVES ${active}/${total}`;
           })()}
         </button>
-        {blacklistOpen && (
-          <div className="absolute top-full left-0 mt-1 z-[99990] w-48 max-h-80 overflow-y-auto bg-dark-bgSecondary border border-dark-border rounded-md shadow-lg p-2 font-mono text-[10px]">
+        {blacklistOpen && dropdownPos && createPortal(
+          <div
+            ref={blacklistDropRef}
+            className="fixed w-48 max-h-80 overflow-y-auto bg-dark-bgSecondary border border-dark-border rounded-md shadow-lg p-2 font-mono text-[10px]"
+            style={{ top: dropdownPos.top, left: dropdownPos.left, zIndex: 99990 }}
+          >
             <div className="flex items-center justify-between mb-1.5 pb-1 border-b border-dark-border">
               <span className="text-text-secondary font-bold">MOVES</span>
               <button
@@ -223,7 +240,8 @@ export const AutoDubPanel: React.FC<AutoDubPanelProps> = ({ busEnabled }) => {
                 );
               })}
             </div>
-          </div>
+          </div>,
+          document.body
         )}
       </div>
 
