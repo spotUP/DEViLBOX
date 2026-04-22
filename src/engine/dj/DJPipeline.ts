@@ -986,6 +986,16 @@ export class DJPipeline {
             });
           }
         }
+
+        // Load separated stems into the deck engine (non-blocking).
+        if (stems && Object.keys(stems).length > 0) {
+          const djEngine = getDJEngineIfActive();
+          if (djEngine) {
+            void djEngine.getDeck(task.deckId).loadStems(stems, sampleRate).catch(err => {
+              console.warn(`[DJPipeline] Stem loading failed for ${task.filename}:`, err);
+            });
+          }
+        }
       } else {
         console.log(`[DJPipeline] Skipping stale state update: ${task.filename} no longer on deck ${task.deckId}`);
       }

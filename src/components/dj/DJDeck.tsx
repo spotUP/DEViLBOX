@@ -29,6 +29,7 @@ import { DeckScopes } from './DeckScopes';
 import { DeckScratch } from './DeckScratch';
 import { DeckFXPads } from './DeckFXPads';
 import { DeckQuickEQ } from './DeckQuickEQ';
+import { DeckStemControls } from './DeckStemControls';
 import { DeckCuePoints } from './DeckCuePoints';
 import { DeckBeatGrid } from './DeckBeatGrid';
 // DeckAudioWaveform moved to full-width strip in DJView
@@ -410,6 +411,9 @@ export const DJDeck: React.FC<DJDeckProps> = ({ deckId }) => {
 
       {/* Quick EQ presets */}
       <DeckQuickEQ deckId={deckId} />
+
+      {/* Stem controls (visible when stems available) */}
+      <DeckStemControls deckId={deckId} />
 
       {/* Performance FX Pads */}
       <DeckFXPads deckId={deckId} />
