@@ -34,11 +34,18 @@ if [ ! -d "dist" ] || [ ! -f "dist/index.html" ]; then
   exit 1
 fi
 
-# Kill anything on port 5173
+# Kill only DEViLBOX-owned processes on port 5173
 PIDS=$(lsof -ti tcp:5173 2>/dev/null || true)
 if [ -n "$PIDS" ]; then
-  echo -e "${YELLOW}[gig]${RESET} Killing existing process on port 5173"
-  echo "$PIDS" | xargs kill -9 2>/dev/null || true
+  for PID in $PIDS; do
+    CWD=$(lsof -p "$PID" 2>/dev/null | awk '$4=="cwd"{print $NF; exit}')
+    if [ -n "$CWD" ] && [[ "$CWD" == "$SCRIPT_DIR"* ]]; then
+      echo -e "${YELLOW}[gig]${RESET} Killing DEViLBOX process on port 5173 (PID: $PID)"
+      kill -9 "$PID" 2>/dev/null || true
+    else
+      echo -e "${YELLOW}[gig]${RESET} Skipping non-DEViLBOX process on port 5173 (PID: $PID, cwd: ${CWD:-unknown})"
+    fi
+  done
   sleep 0.3
 fi
 
