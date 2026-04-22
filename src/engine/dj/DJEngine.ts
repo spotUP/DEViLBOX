@@ -236,6 +236,9 @@ export class DJEngine {
     const audioBuffer = deck.audioPlayer.getAudioBuffer();
     const sampleRate = audioBuffer?.sampleRate ?? 44100;
     await deck.loadStems(stems, sampleRate);
+    // Compute per-stem waveform peaks for visualization
+    const stemPeaks = deck.stemPlayer.computeStemPeaks();
+    useDJStore.getState().setDeckState(deckId, { stemWaveformPeaks: stemPeaks });
     console.log(`[DJEngine] Auto-loaded cached stems for deck ${deckId}`);
   }
 
