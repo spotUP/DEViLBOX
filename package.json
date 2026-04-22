@@ -21,7 +21,7 @@
     "start": "npm run dev",
     "prebuild": "node -e \"const fs=require('fs');['public/dist','dist'].forEach(d=>{try{fs.rmSync(d,{recursive:true,force:true})}catch{}})\" && node scripts/generate-changelog.cjs && node scripts/generate-file-manifest.js",
     "predev": "node scripts/generate-changelog.cjs && node scripts/generate-file-manifest.js",
-    "dev": "pkill -f 'node.*vite' 2>/dev/null || true && npm run asbuild && vitest run && vite",
+    "dev": "node scripts/kill-own-vite.cjs && npm run asbuild && vitest run && vite",
     "dev:fullstack": "./dev.sh",
     "dev:persistent": "./dev-persistent.sh",
     "build": "npm run asbuild && npm run type-check && vite build",

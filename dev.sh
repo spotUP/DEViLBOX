@@ -34,16 +34,23 @@ ok()   { echo -e "${GREEN}[dev]${RESET} $*"; }
 warn() { echo -e "${YELLOW}[dev]${RESET} $*"; }
 err()  { echo -e "${RED}[dev]${RESET} $*"; }
 
-# ── Kill anything already on our ports ────────────────────────────────────────
+# ── Kill only DEViLBOX-owned processes on our ports ───────────────────────────
+# Checks each PID's working directory — only kills if it's under this project.
 kill_port() {
   local port=$1
-  local pids
+  local pids pid cwd
   pids=$(lsof -ti tcp:"$port" 2>/dev/null || true)
-  if [ -n "$pids" ]; then
-    warn "Killing existing process(es) on port $port (PID: $pids)"
-    echo "$pids" | xargs kill -9 2>/dev/null || true
-    sleep 0.3
-  fi
+  if [ -z "$pids" ]; then return; fi
+  for pid in $pids; do
+    cwd=$(lsof -p "$pid" 2>/dev/null | awk '$4=="cwd"{print $NF; exit}')
+    if [ -n "$cwd" ] && [[ "$cwd" == "$SCRIPT_DIR"* ]]; then
+      warn "Killing DEViLBOX process on port $port (PID: $pid, cwd: $cwd)"
+      kill -9 "$pid" 2>/dev/null || true
+    else
+      warn "Skipping non-DEViLBOX process on port $port (PID: $pid, cwd: ${cwd:-unknown})"
+    fi
+  done
+  sleep 0.3
 }
 
 log "Clearing ports $BACKEND_PORT, $COLLAB_PORT, $MCP_PORT, $FORMAT_PORT and $FRONTEND_PORT..."
