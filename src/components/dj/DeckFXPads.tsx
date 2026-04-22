@@ -46,14 +46,14 @@ interface PadDef {
 }
 
 const FX_PADS: PadDef[] = [
-  { id: 'hpf-sweep', label: 'HPF', sublabel: '▲', color: 'violet', activeColor: 'violet', mode: 'momentary' },
-  { id: 'lpf-sweep', label: 'LPF', sublabel: '▼', color: 'blue', activeColor: 'blue', mode: 'momentary' },
-  { id: 'filter-reset', label: 'FLT', sublabel: 'RST', color: 'gray', activeColor: 'green', mode: 'momentary' },
-  { id: 'echo-out', label: 'ECHO', sublabel: 'OUT', color: 'amber', activeColor: 'red', mode: 'toggle' },
-  { id: 'kill-low', label: 'KILL', sublabel: 'LO', color: 'orange', activeColor: 'red', mode: 'momentary' },
-  { id: 'kill-mid', label: 'KILL', sublabel: 'MID', color: 'gray', activeColor: 'red', mode: 'momentary' },
-  { id: 'kill-hi', label: 'KILL', sublabel: 'HI', color: 'cyan', activeColor: 'red', mode: 'momentary' },
-  { id: 'brake', label: 'BRK', sublabel: '⏎', color: 'rose', activeColor: 'rose', mode: 'momentary' },
+  { id: 'hpf-sweep', label: 'High Pass', sublabel: '▲', color: 'violet', activeColor: 'violet', mode: 'momentary' },
+  { id: 'lpf-sweep', label: 'Low Pass', sublabel: '▼', color: 'blue', activeColor: 'blue', mode: 'momentary' },
+  { id: 'filter-reset', label: 'Filter', sublabel: 'reset', color: 'gray', activeColor: 'green', mode: 'momentary' },
+  { id: 'echo-out', label: 'Echo', sublabel: 'out', color: 'amber', activeColor: 'red', mode: 'toggle' },
+  { id: 'kill-low', label: 'Kill', sublabel: 'low', color: 'orange', activeColor: 'red', mode: 'momentary' },
+  { id: 'kill-mid', label: 'Kill', sublabel: 'mid', color: 'gray', activeColor: 'red', mode: 'momentary' },
+  { id: 'kill-hi', label: 'Kill', sublabel: 'high', color: 'cyan', activeColor: 'red', mode: 'momentary' },
+  { id: 'brake', label: 'Brake', sublabel: '⏎', color: 'rose', activeColor: 'rose', mode: 'momentary' },
 ];
 
 // Dub-send pads — fire dub moves straight onto the bus from the deck,
@@ -62,14 +62,14 @@ const FX_PADS: PadDef[] = [
 // hold-style processors (filterDrop, dubSiren, reverseEcho, tapeWobble,
 // echoThrow). Hold pads use `momentary` so they release on pointer-up.
 const DUB_PADS: PadDef[] = [
-  { id: 'dub-slam',     label: 'SLAM',  sublabel: 'spring',  color: 'amber',  activeColor: 'red',    mode: 'instant' },
-  { id: 'dub-drop',     label: 'DROP',  sublabel: 'filter',  color: 'cyan',   activeColor: 'cyan',   mode: 'momentary' },
-  { id: 'dub-siren',    label: 'SIREN', sublabel: 'fb loop', color: 'rose',   activeColor: 'rose',   mode: 'momentary' },
-  { id: 'dub-reverse',  label: 'RVRS',  sublabel: 'echo',    color: 'violet', activeColor: 'violet', mode: 'momentary' },
-  { id: 'dub-wobble',   label: 'WOBL',  sublabel: 'tape',    color: 'orange', activeColor: 'orange', mode: 'momentary' },
-  { id: 'dub-throw',    label: 'ECHO',  sublabel: 'throw',   color: 'sky',    activeColor: 'sky',    mode: 'momentary' },
-  { id: 'dub-time',     label: 'TIME',  sublabel: 'throw',   color: 'blue',   activeColor: 'blue',   mode: 'instant' },
-  { id: 'dub-master',   label: 'MSTR',  sublabel: 'drop',    color: 'rose',   activeColor: 'red',    mode: 'momentary' },
+  { id: 'dub-slam',     label: 'Spring',  sublabel: 'slam',    color: 'amber',  activeColor: 'red',    mode: 'instant' },
+  { id: 'dub-drop',     label: 'Filter',  sublabel: 'drop',    color: 'cyan',   activeColor: 'cyan',   mode: 'momentary' },
+  { id: 'dub-siren',    label: 'Siren',   sublabel: 'fb loop', color: 'rose',   activeColor: 'rose',   mode: 'momentary' },
+  { id: 'dub-reverse',  label: 'Reverse', sublabel: 'echo',    color: 'violet', activeColor: 'violet', mode: 'momentary' },
+  { id: 'dub-wobble',   label: 'Wobble',  sublabel: 'tape',    color: 'orange', activeColor: 'orange', mode: 'momentary' },
+  { id: 'dub-throw',    label: 'Echo',    sublabel: 'throw',   color: 'sky',    activeColor: 'sky',    mode: 'momentary' },
+  { id: 'dub-time',     label: 'Delay',   sublabel: 'throw',   color: 'blue',   activeColor: 'blue',   mode: 'instant' },
+  { id: 'dub-master',   label: 'Master',  sublabel: 'drop',    color: 'rose',   activeColor: 'red',    mode: 'momentary' },
 ];
 
 // pad.id → (moveId, trigger-or-hold). Hold moves dispose on pad release.
@@ -112,14 +112,14 @@ const DUB_PAD_MAP: Record<string, string> = {
 // Second-page dub pads — stabs + reverse/tape moves + bass textures.
 // Complements DUB_PADS (throw/hold moves) with hits and drones.
 const DUB2_PADS: PadDef[] = [
-  { id: 'dub2-stab',   label: 'STAB',  sublabel: 'dub',      color: 'amber',  activeColor: 'red',    mode: 'instant' },
-  { id: 'dub2-crack',  label: 'CRACK', sublabel: 'snare',    color: 'rose',   activeColor: 'rose',   mode: 'instant' },
-  { id: 'dub2-back',   label: 'BACK',  sublabel: 'reverb',   color: 'violet', activeColor: 'violet', mode: 'instant' },
-  { id: 'dub2-scream', label: 'SCRM',  sublabel: 'tubby',    color: 'cyan',   activeColor: 'red',    mode: 'momentary' },
-  { id: 'dub2-bass',   label: 'BASS',  sublabel: 'drone',    color: 'orange', activeColor: 'orange', mode: 'momentary' },
-  { id: 'dub2-crush',  label: 'CRSH',  sublabel: 'bits',     color: 'gray',   activeColor: 'orange', mode: 'momentary' },
-  { id: 'dub2-build',  label: 'BILD',  sublabel: 'echo',     color: 'sky',    activeColor: 'sky',    mode: 'instant' },
-  { id: 'dub2-tape',   label: 'TAPE',  sublabel: 'stop',     color: 'teal',   activeColor: 'red',    mode: 'instant' },
+  { id: 'dub2-stab',   label: 'Stab',    sublabel: 'dub',      color: 'amber',  activeColor: 'red',    mode: 'instant' },
+  { id: 'dub2-crack',  label: 'Crack',   sublabel: 'snare',    color: 'rose',   activeColor: 'rose',   mode: 'instant' },
+  { id: 'dub2-back',   label: 'Backward', sublabel: 'reverb',  color: 'violet', activeColor: 'violet', mode: 'instant' },
+  { id: 'dub2-scream', label: 'Scream',  sublabel: 'tubby',    color: 'cyan',   activeColor: 'red',    mode: 'momentary' },
+  { id: 'dub2-bass',   label: 'Bass',    sublabel: 'drone',    color: 'orange', activeColor: 'orange', mode: 'momentary' },
+  { id: 'dub2-crush',  label: 'Crush',   sublabel: 'bits',     color: 'gray',   activeColor: 'orange', mode: 'momentary' },
+  { id: 'dub2-build',  label: 'Build',   sublabel: 'echo',     color: 'sky',    activeColor: 'sky',    mode: 'instant' },
+  { id: 'dub2-tape',   label: 'Tape',    sublabel: 'stop',     color: 'teal',   activeColor: 'red',    mode: 'instant' },
 ];
 
 // Dub 3 — atmospheric / preset / mic moves. stereoDoubler widens,
@@ -127,14 +127,14 @@ const DUB2_PADS: PadDef[] = [
 // low-end drones, the two delay presets snap canonical timings (Tubby
 // 380 ms, Perry dotted-eighth), TOAST taps the DJ mic through the bus.
 const DUB3_PADS: PadDef[] = [
-  { id: 'dub3-wide',  label: 'WIDE',  sublabel: 'doubler', color: 'teal',   activeColor: 'teal',   mode: 'momentary' },
-  { id: 'dub3-ping',  label: 'PING',  sublabel: 'sonar',   color: 'cyan',   activeColor: 'cyan',   mode: 'instant' },
-  { id: 'dub3-radio', label: 'RADIO', sublabel: 'riser',   color: 'amber',  activeColor: 'amber',  mode: 'instant' },
-  { id: 'dub3-sub',   label: 'SUB',   sublabel: 'swell',   color: 'orange', activeColor: 'orange', mode: 'instant' },
-  { id: 'dub3-subh',  label: 'SUBH',  sublabel: 'harmonic', color: 'indigo', activeColor: 'indigo', mode: 'momentary' },
-  { id: 'dub3-p380',  label: '380',   sublabel: 'tubby',   color: 'blue',   activeColor: 'blue',   mode: 'instant' },
-  { id: 'dub3-pdot',  label: 'DOT',   sublabel: '1/8d',    color: 'blue',   activeColor: 'blue',   mode: 'instant' },
-  { id: 'dub3-toast', label: 'TOST',  sublabel: 'mic',     color: 'rose',   activeColor: 'red',    mode: 'momentary' },
+  { id: 'dub3-wide',  label: 'Stereo',  sublabel: 'doubler', color: 'teal',   activeColor: 'teal',   mode: 'momentary' },
+  { id: 'dub3-ping',  label: 'Sonar',   sublabel: 'ping',    color: 'cyan',   activeColor: 'cyan',   mode: 'instant' },
+  { id: 'dub3-radio', label: 'Radio',   sublabel: 'riser',   color: 'amber',  activeColor: 'amber',  mode: 'instant' },
+  { id: 'dub3-sub',   label: 'Sub',     sublabel: 'swell',   color: 'orange', activeColor: 'orange', mode: 'instant' },
+  { id: 'dub3-subh',  label: 'Sub',     sublabel: 'harmonic', color: 'indigo', activeColor: 'indigo', mode: 'momentary' },
+  { id: 'dub3-p380',  label: '380ms',   sublabel: 'tubby',   color: 'blue',   activeColor: 'blue',   mode: 'instant' },
+  { id: 'dub3-pdot',  label: 'Dotted',  sublabel: '1/8d',    color: 'blue',   activeColor: 'blue',   mode: 'instant' },
+  { id: 'dub3-toast', label: 'Toast',   sublabel: 'mic',     color: 'rose',   activeColor: 'red',    mode: 'momentary' },
 ];
 
 // Dub 4 — channel + transport edge cases. Only 3 pads here (the grid
@@ -144,9 +144,9 @@ const DUB3_PADS: PadDef[] = [
 //     on the deck — audible effect depends on what's on ch 0)
 //   STOP!  disrupts playback itself (not just the bus tail)
 const DUB4_PADS: PadDef[] = [
-  { id: 'dub4-mute',   label: 'MUTE',  sublabel: 'ch 0',    color: 'gray',   activeColor: 'red',    mode: 'momentary' },
-  { id: 'dub4-cthrow', label: 'CTHRW', sublabel: 'ch 0',    color: 'violet', activeColor: 'violet', mode: 'instant' },
-  { id: 'dub4-txstop', label: 'STOP!', sublabel: 'transport', color: 'rose', activeColor: 'red',    mode: 'instant' },
+  { id: 'dub4-mute',   label: 'Mute',     sublabel: 'ch 0',      color: 'gray',   activeColor: 'red',    mode: 'momentary' },
+  { id: 'dub4-cthrow', label: 'Channel',  sublabel: 'throw',     color: 'violet', activeColor: 'violet', mode: 'instant' },
+  { id: 'dub4-txstop', label: 'Stop',     sublabel: 'transport', color: 'rose',   activeColor: 'red',    mode: 'instant' },
 ];
 
 const JUMP_PADS: PadDef[] = [
