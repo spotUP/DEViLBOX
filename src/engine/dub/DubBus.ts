@@ -492,6 +492,10 @@ export class DubBus {
   private _warnedNoMixer = false;
   private _disposed = false;
 
+  // SID mode — when active, dub synths use real SID chip emulation (GTUltra)
+  private _sidSynths: import('./SIDDubSynths').SIDDubSynths | null = null;
+  private _sidMode = false;
+
   private readonly context: AudioContext;
   private readonly master: AudioNode;
 
@@ -1001,6 +1005,50 @@ export class DubBus {
   /** Whether the bus is currently enabled (return gain > 0). */
   get isEnabled(): boolean { return this.enabled; }
 
+  /** Whether SID dub synths are active (real SID chip emulation). */
+  get isSIDMode(): boolean { return this._sidMode; }
+
+  /**
+   * Enable SID mode — dub synths use real SID chip emulation via GTUltra WASM.
+   * Lazy-loads the engine on first call. The SID output is routed through the
+   * dub bus echo/spring chain for authentic dub processing.
+   */
+  async enableSIDMode(): Promise<void> {
+    if (this._sidMode) return;
+    this._sidMode = true;
+
+    try {
+      const { SIDDubSynths } = await import('./SIDDubSynths');
+      if (!this._sidSynths) {
+        this._sidSynths = new SIDDubSynths();
+      }
+      await this._sidSynths.init(this.context);
+      // Route SID synth output into the dub bus input chain
+      const output = this._sidSynths.output;
+      if (output) {
+        try { output.connect(this.input); } catch { /* already connected */ }
+      }
+      console.log('[DubBus] SID mode enabled — dub synths use real SID chip emulation');
+    } catch (err) {
+      console.warn('[DubBus] SID mode init failed, falling back to WebAudio:', err);
+      this._sidMode = false;
+    }
+  }
+
+  /** Disable SID mode — revert to WebAudio Tone.js dub synths. */
+  disableSIDMode(): void {
+    if (!this._sidMode) return;
+    this._sidMode = false;
+    if (this._sidSynths) {
+      const output = this._sidSynths.output;
+      if (output) {
+        try { output.disconnect(this.input); } catch { /* ok */ }
+      }
+      // Don't dispose — keep the engine warm for quick re-enable
+    }
+    console.log('[DubBus] SID mode disabled — dub synths use WebAudio');
+  }
+
   /**
    * Attach a DJ mixer so dub-action pads can pull deck audio into the bus.
    * Connects each deck's pre-crossfader tap into this bus's deck-tap gain
@@ -1285,6 +1333,10 @@ export class DubBus {
 
   startSiren(): () => void {
     if (!this.enabled) return () => {};
+    // SID mode: use real SID chip siren
+    if (this._sidMode && this._sidSynths?.isReady) {
+      return this._sidSynths.startSiren();
+    }
     let released = false;
     let release: (() => void) | null = null;
     void this._ensureSirenSynth().then((synth) => {
@@ -2643,6 +2695,11 @@ export class DubBus {
    */
   firePing(freq = 1000, durationMs = 140, level = 0.8): void {
     if (!this.enabled) return;
+    // SID mode: triangle ping
+    if (this._sidMode && this._sidSynths?.isReady) {
+      this._sidSynths.firePing(undefined, durationMs);
+      return;
+    }
     try {
       const ctx = this.context;
       const now = ctx.currentTime;
@@ -2684,6 +2741,11 @@ export class DubBus {
    */
   fireRadioRiser(startHz = 200, endHz = 5000, sweepSec = 1.2, level = 0.7): void {
     if (!this.enabled) return;
+    // SID mode: noise riser
+    if (this._sidMode && this._sidSynths?.isReady) {
+      this._sidSynths.fireRadioRiser(sweepSec * 1000);
+      return;
+    }
     try {
       const ctx = this.context;
       const sr = ctx.sampleRate;
@@ -2737,6 +2799,11 @@ export class DubBus {
    */
   fireSubSwell(freq = 55, durationMs = 400, level = 0.8): void {
     if (!this.enabled) return;
+    // SID mode: triangle sub swell
+    if (this._sidMode && this._sidSynths?.isReady) {
+      this._sidSynths.fireSubSwell(undefined, durationMs);
+      return;
+    }
     try {
       const ctx = this.context;
       const now = ctx.currentTime;
@@ -2834,6 +2901,10 @@ export class DubBus {
    */
   startCrushBass(freq = 55, bits = 3, level = 0.55): () => void {
     if (!this.enabled) return () => {};
+    // SID mode: narrow pulse bass
+    if (this._sidMode && this._sidSynths?.isReady) {
+      return this._sidSynths.startCrushBass();
+    }
     const ctx = this.context;
     const now = ctx.currentTime;
     const osc = ctx.createOscillator();
@@ -2897,6 +2968,10 @@ export class DubBus {
    */
   startOscBass(freq = 55, level = 0.45): () => void {
     if (!this.enabled) return () => {};
+    // SID mode: sawtooth bass
+    if (this._sidMode && this._sidSynths?.isReady) {
+      return this._sidSynths.startOscBass();
+    }
     const ctx = this.context;
     const now = ctx.currentTime;
     const osc = ctx.createOscillator();
@@ -3373,6 +3448,11 @@ export class DubBus {
    */
   fireNoiseBurst(durationMs = 80, level = 1.0): void {
     if (!this.enabled) return;
+    // SID mode: noise burst
+    if (this._sidMode && this._sidSynths?.isReady) {
+      this._sidSynths.fireSnare(durationMs);
+      return;
+    }
     try {
       const ctx = this.context;
       const sr = ctx.sampleRate;
@@ -3491,5 +3571,10 @@ export class DubBus {
     try { this.spring.dispose(); } catch { /* ok */ }
     try { this.echo.dispose(); } catch { /* ok */ }
     this._teardownPlateStage();
+    // SID dub synths
+    if (this._sidSynths) {
+      this._sidSynths.dispose();
+      this._sidSynths = null;
+    }
   }
 }
