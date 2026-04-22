@@ -124,6 +124,20 @@ export const AVAILABLE_EFFECTS: AvailableEffect[] = [
     group: 'Reverb & Delay',
     description: 'Roland RE-150/201 tape echo with wow, flutter, and tape saturation (WASM)',
   },
+  {
+    category: 'tonejs',
+    type: 'RE201',
+    label: 'RE-201 Space Echo',
+    group: 'Reverb & Delay',
+    description: 'Full Roland RE-201 model: tone stack, tape magnetisation, 3-head delay, waveguide spring reverb (WASM)',
+  },
+  {
+    category: 'tonejs',
+    type: 'AnotherDelay',
+    label: 'Another Delay',
+    group: 'Reverb & Delay',
+    description: 'Tape delay with wow/flutter, atan saturation, and Schroeder reverb (WASM)',
+  },
 
   // ===== MODULATION (Tone.js) =====
   {

@@ -11,6 +11,8 @@ import { NeuralEffectWrapper } from '../effects/NeuralEffectWrapper';
 import { SpaceEchoEffect } from '../effects/SpaceEchoEffect';
 import { SpaceyDelayerEffect } from '../effects/SpaceyDelayerEffect';
 import { RETapeEchoEffect } from '../effects/RETapeEchoEffect';
+import { RE201Effect } from '../effects/RE201Effect';
+import { AnotherDelayEffect } from '../effects/AnotherDelayEffect';
 import { BiPhaseEffect } from '../effects/BiPhaseEffect';
 import { DubFilterEffect } from '../effects/DubFilterEffect';
 import { MoogFilterEffect, MoogFilterModel, MoogFilterMode } from '../effects/MoogFilterEffect';
@@ -37,6 +39,8 @@ export function getDefaultEffectWet(type: string): number {
     case 'SpaceEcho':
     case 'SpaceyDelayer':
     case 'RETapeEcho':
+    case 'RE201':
+    case 'AnotherDelay':
     case 'AmbientDelay':
       return 35;
 
@@ -130,6 +134,10 @@ switch (type) {
     return { firstTap: 250, tapSize: 150, feedback: 40, multiTap: 1, tapeFilter: 0 };
   case 'RETapeEcho':
     return { mode: 3, repeatRate: 0.5, intensity: 0.5, echoVolume: 0.8, wow: 0, flutter: 0, dirt: 0, inputBleed: 0, loopAmount: 0, playheadFilter: 1 };
+  case 'RE201':
+    return { bass: 0.5, treble: 0.5, delayMode: 7, repeatRate: 0.5, intensity: 0.5, echoVolume: 0.8, reverbVolume: 0.3, inputLevel: 1 };
+  case 'AnotherDelay':
+    return { delayTime: 300, feedback: 0.3, gain: 1, lowpass: 12000, highpass: 80, flutterFreq: 3.5, flutterDepth: 0, wowFreq: 0.5, wowDepth: 0, reverbEnabled: 1, roomSize: 0.5, damping: 0.5, width: 1 };
   case 'BiPhase':
     return { rateA: 0.5, depthA: 0.6, rateB: 4.0, depthB: 0.4, feedback: 0.3, routing: 0 };
   case 'DubFilter':
@@ -585,6 +593,39 @@ export async function createEffect(
       });
       break;
 
+    case 'RE201':
+      node = new RE201Effect({
+        bass: Number(p.bass) || 0.5,
+        treble: Number(p.treble) || 0.5,
+        delayMode: p.delayMode != null ? Number(p.delayMode) : 7,
+        repeatRate: Number(p.repeatRate) || 0.5,
+        intensity: Number(p.intensity) || 0.5,
+        echoVolume: Number(p.echoVolume) || 0.8,
+        reverbVolume: Number(p.reverbVolume) || 0.3,
+        inputLevel: Number(p.inputLevel) || 1,
+        wet: wetValue,
+      });
+      break;
+
+    case 'AnotherDelay':
+      node = new AnotherDelayEffect({
+        delayTime: Number(p.delayTime) || 300,
+        feedback: Number(p.feedback) || 0.3,
+        gain: Number(p.gain) || 1,
+        lowpass: Number(p.lowpass) || 12000,
+        highpass: Number(p.highpass) || 80,
+        flutterFreq: Number(p.flutterFreq) || 3.5,
+        flutterDepth: Number(p.flutterDepth) || 0,
+        wowFreq: Number(p.wowFreq) || 0.5,
+        wowDepth: Number(p.wowDepth) || 0,
+        reverbEnabled: p.reverbEnabled != null ? Number(p.reverbEnabled) > 0 : true,
+        roomSize: Number(p.roomSize) || 0.5,
+        damping: Number(p.damping) || 0.5,
+        width: p.width != null ? Number(p.width) : 1,
+        wet: wetValue,
+      });
+      break;
+
     case 'BiPhase':
       node = new BiPhaseEffect({
         rateA: Number(p.rateA) || 0.5,
@@ -858,6 +899,12 @@ export async function createEffect(
             break;
           case 'RETapeEcho':
             if (entry.param === 'repeatRate' && node instanceof RETapeEchoEffect) node.setRepeatRate(value);
+            break;
+          case 'RE201':
+            if (entry.param === 'repeatRate' && node instanceof RE201Effect) node.setRepeatRate(value);
+            break;
+          case 'AnotherDelay':
+            if (entry.param === 'delayTime' && node instanceof AnotherDelayEffect) node.setDelayTime(value);
             break;
           case 'Chorus':
             if (entry.param === 'frequency' && node instanceof Tone.Chorus) node.frequency.value = value;

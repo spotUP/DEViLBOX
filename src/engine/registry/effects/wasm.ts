@@ -95,6 +95,74 @@ const wasmEffects: EffectDescriptor[] = [
     ],
   },
   {
+    id: 'RE201', name: 'RE-201 Space Echo', category: 'wasm', group: 'Reverb & Delay',
+    loadMode: 'eager',
+    description: 'Full Roland RE-201 model: VA tone stack, tape magnetisation, 3-head tape delay, waveguide spring reverb. Port of je3928/RE201models (GPL-3.0).',
+    create: async (c: EffectConfig) => {
+      const { RE201Effect } = await import('@engine/effects/RE201Effect');
+      const p = c.parameters;
+      return new RE201Effect({
+        bass: Number(p.bass) || 0.5,
+        treble: Number(p.treble) || 0.5,
+        delayMode: p.delayMode != null ? Number(p.delayMode) : 7,
+        repeatRate: Number(p.repeatRate) || 0.5,
+        intensity: Number(p.intensity) || 0.5,
+        echoVolume: Number(p.echoVolume) || 0.8,
+        reverbVolume: Number(p.reverbVolume) || 0.3,
+        inputLevel: Number(p.inputLevel) || 1,
+        wet: c.wet / 100,
+      });
+    },
+    getDefaultParameters: () => ({
+      bass: 0.5, treble: 0.5, delayMode: 7, repeatRate: 0.5, intensity: 0.5,
+      echoVolume: 0.8, reverbVolume: 0.3, inputLevel: 1,
+    }),
+    presets: [
+      { name: 'Classic Echo', params: { delayMode: 3, repeatRate: 0.5, intensity: 0.5, echoVolume: 0.8, reverbVolume: 0 } },
+      { name: 'Head 1+2 Reverb', params: { delayMode: 8, repeatRate: 0.4, intensity: 0.6, echoVolume: 0.7, reverbVolume: 0.4 } },
+      { name: 'Spring Only', params: { delayMode: 0, reverbVolume: 0.6 } },
+      { name: 'Dub Echo', params: { delayMode: 7, repeatRate: 0.3, intensity: 0.7, echoVolume: 0.9, reverbVolume: 0.5, bass: 0.7, treble: 0.3 } },
+      { name: 'Runaway Feedback', params: { delayMode: 5, repeatRate: 0.6, intensity: 0.85, echoVolume: 0.9, reverbVolume: 0.3 } },
+    ],
+  },
+  {
+    id: 'AnotherDelay', name: 'Another Delay', category: 'wasm', group: 'Reverb & Delay',
+    loadMode: 'eager',
+    description: 'Tape delay with wow/flutter, atan saturation, LP/HP filtering, and Schroeder reverb. Port of dllim/anotherdelay (MIT).',
+    create: async (c: EffectConfig) => {
+      const { AnotherDelayEffect } = await import('@engine/effects/AnotherDelayEffect');
+      const p = c.parameters;
+      return new AnotherDelayEffect({
+        delayTime: Number(p.delayTime) || 300,
+        feedback: Number(p.feedback) || 0.3,
+        gain: Number(p.gain) || 1,
+        lowpass: Number(p.lowpass) || 12000,
+        highpass: Number(p.highpass) || 80,
+        flutterFreq: Number(p.flutterFreq) || 3.5,
+        flutterDepth: Number(p.flutterDepth) || 0,
+        wowFreq: Number(p.wowFreq) || 0.5,
+        wowDepth: Number(p.wowDepth) || 0,
+        reverbEnabled: p.reverbEnabled != null ? Number(p.reverbEnabled) > 0 : true,
+        roomSize: Number(p.roomSize) || 0.5,
+        damping: Number(p.damping) || 0.5,
+        width: p.width != null ? Number(p.width) : 1,
+        wet: c.wet / 100,
+      });
+    },
+    getDefaultParameters: () => ({
+      delayTime: 300, feedback: 0.3, gain: 1, lowpass: 12000, highpass: 80,
+      flutterFreq: 3.5, flutterDepth: 0, wowFreq: 0.5, wowDepth: 0,
+      reverbEnabled: 1, roomSize: 0.5, damping: 0.5, width: 1,
+    }),
+    presets: [
+      { name: 'Clean Delay', params: { delayTime: 375, feedback: 0.4, flutterDepth: 0, wowDepth: 0, reverbEnabled: 0 } },
+      { name: 'Tape Wobble', params: { delayTime: 300, feedback: 0.5, flutterFreq: 4, flutterDepth: 0.05, wowFreq: 0.3, wowDepth: 0.02 } },
+      { name: 'Dark Tape', params: { delayTime: 400, feedback: 0.6, lowpass: 3000, highpass: 200, flutterDepth: 0.03, wowDepth: 0.01 } },
+      { name: 'Dub Echo', params: { delayTime: 500, feedback: 0.7, lowpass: 4000, highpass: 150, reverbEnabled: 1, roomSize: 0.6 } },
+      { name: 'Short Slap', params: { delayTime: 80, feedback: 0.2, reverbEnabled: 0 } },
+    ],
+  },
+  {
     id: 'Aelapse', name: 'Ælapse Tape+Springs', category: 'wasm', group: 'Reverb & Delay',
     loadMode: 'eager',
     description: 'Tape delay chained into a 4-spring reverb tank. Port of smiarx/aelapse. Hardware UI runs the real JUCE editor in WASM with a WebGL2 springs-shader overlay.',
