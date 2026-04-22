@@ -7,6 +7,7 @@
  *  - Model download + separation progress tracking
  *  - Lazy conversion of StemData Float32Arrays to AudioBuffers
  *  - Memory cleanup (release raw Float32Arrays after conversion)
+ *  - Module-level memory cache so stems survive component unmount/remount
  */
 
 import { useState, useCallback, useRef } from 'react';
@@ -15,6 +16,39 @@ import { DemucsEngine } from '@/engine/demucs/DemucsEngine';
 
 // Minimum sample duration (seconds) for useful stem separation
 const MIN_DURATION_S = 2.0;
+
+// ── Module-level cache ─────────────────────────────────────────────────────
+// Survives component unmount/remount. Keyed by AudioBuffer fingerprint.
+// Limited to 4 entries (most recent) to avoid unbounded memory growth.
+const MAX_CACHE_ENTRIES = 4;
+
+interface CachedStemEntry {
+  stems: StemResult;
+  stemNames: string[];
+  sampleRate: number;
+  buffers: Map<string, AudioBuffer>;
+}
+
+const _stemCache = new Map<string, CachedStemEntry>();
+
+/** Quick fingerprint from AudioBuffer content (length + sampleRate + first 16 samples) */
+function bufferFingerprint(buf: AudioBuffer): string {
+  const ch0 = buf.getChannelData(0);
+  const samples = [];
+  // Sample 16 evenly-spaced points for collision resistance
+  const step = Math.max(1, Math.floor(ch0.length / 16));
+  for (let i = 0; i < 16 && i * step < ch0.length; i++) {
+    samples.push(ch0[i * step].toFixed(6));
+  }
+  return `${buf.length}_${buf.sampleRate}_${buf.numberOfChannels}_${samples.join(',')}`;
+}
+
+function evictOldest(): void {
+  if (_stemCache.size >= MAX_CACHE_ENTRIES) {
+    const oldest = _stemCache.keys().next().value;
+    if (oldest !== undefined) _stemCache.delete(oldest);
+  }
+}
 
 export interface StemSeparationState {
   /** Whether the engine is currently downloading the model or separating */
@@ -40,6 +74,8 @@ export interface UseStemSeparationReturn extends StemSeparationState {
   getAllStemBuffers: () => Map<string, AudioBuffer>;
   /** Whether the given AudioBuffer is suitable for stem separation */
   canSeparate: (buffer: AudioBuffer | null) => boolean;
+  /** Try to restore stems from module-level cache (survives unmount) */
+  restoreFromCache: (buffer: AudioBuffer | null) => boolean;
   /** Release all stem data and reset state */
   cleanup: () => void;
 }
@@ -67,13 +103,39 @@ export function useStemSeparation(): UseStemSeparationReturn {
   const stemBuffersRef = useRef<Map<string, AudioBuffer>>(new Map());
   // Sample rate from the source buffer
   const sampleRateRef = useRef(44100);
+  // Fingerprint of the last separated buffer (for cache lookup)
+  const fingerprintRef = useRef<string | null>(null);
 
   const canSeparate = useCallback((buffer: AudioBuffer | null): boolean => {
     if (!buffer) return false;
     return buffer.duration >= MIN_DURATION_S;
   }, []);
 
+  /** Try to restore stems from module-level cache for the given buffer */
+  const restoreFromCache = useCallback((buffer: AudioBuffer | null): boolean => {
+    if (!buffer) return false;
+    const fp = bufferFingerprint(buffer);
+    const cached = _stemCache.get(fp);
+    if (!cached) return false;
+
+    rawStemsRef.current = cached.stems;
+    stemBuffersRef.current = new Map(cached.buffers);
+    sampleRateRef.current = cached.sampleRate;
+    fingerprintRef.current = fp;
+    setStemNames(cached.stemNames);
+    setHasStems(true);
+    setProgress(1);
+    setProgressMessage('Restored from cache');
+    setError(null);
+    return true;
+  }, []);
+
   const cleanup = useCallback(() => {
+    // Remove from module cache too
+    if (fingerprintRef.current) {
+      _stemCache.delete(fingerprintRef.current);
+      fingerprintRef.current = null;
+    }
     rawStemsRef.current = null;
     stemBuffersRef.current = new Map();
     setStemNames([]);
@@ -90,6 +152,11 @@ export function useStemSeparation(): UseStemSeparationReturn {
       setError(`Sample too short (${buffer.duration.toFixed(1)}s). Need at least ${MIN_DURATION_S}s for stem separation.`);
       return;
     }
+
+    const fp = bufferFingerprint(buffer);
+
+    // Check module-level cache first — instant restore
+    if (restoreFromCache(buffer)) return;
 
     // Reset state
     setError(null);
@@ -132,13 +199,23 @@ export function useStemSeparation(): UseStemSeparationReturn {
       setHasStems(true);
       setProgress(1);
       setProgressMessage('Separation complete');
+      fingerprintRef.current = fp;
+
+      // Store in module-level cache for persistence across unmount/remount
+      evictOldest();
+      _stemCache.set(fp, {
+        stems: result,
+        stemNames: names,
+        sampleRate: buffer.sampleRate,
+        buffers: new Map(),
+      });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Stem separation failed');
       setHasStems(false);
     } finally {
       setIsBusy(false);
     }
-  }, [isBusy, canSeparate]);
+  }, [isBusy, canSeparate, restoreFromCache]);
 
   const getStemBuffer = useCallback((stemName: string): AudioBuffer | null => {
     // Check cache first
@@ -151,6 +228,13 @@ export function useStemSeparation(): UseStemSeparationReturn {
 
     const buf = stemDataToAudioBuffer(raw[stemName], sampleRateRef.current);
     stemBuffersRef.current.set(stemName, buf);
+
+    // Also store in module cache for persistence
+    if (fingerprintRef.current) {
+      const entry = _stemCache.get(fingerprintRef.current);
+      if (entry) entry.buffers.set(stemName, buf);
+    }
+
     return buf;
   }, []);
 
@@ -180,6 +264,7 @@ export function useStemSeparation(): UseStemSeparationReturn {
     getStemBuffer,
     getAllStemBuffers,
     canSeparate,
+    restoreFromCache,
     cleanup,
   };
 }
