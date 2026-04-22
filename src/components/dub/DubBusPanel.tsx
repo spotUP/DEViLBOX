@@ -197,6 +197,17 @@ export const DubBusPanel: React.FC = () => {
             format={(v) => `${Math.round(v)} Hz`}
           />
           <div className="h-px bg-dark-borderLight my-1" />
+          <Choice
+            label="Echo engine"
+            value={dubBus.echoEngine}
+            options={[
+              { value: 'spaceEcho',    label: 'Space Echo (classic)' },
+              { value: 're201',        label: 'RE-201 (tape + spring)' },
+              { value: 'anotherDelay', label: 'AnotherDelay (wow/flutter)' },
+              { value: 'reTapeEcho',   label: 'BBD Tape Echo' },
+            ] as const}
+            onChange={(v) => patch({ echoEngine: v })}
+          />
           <Slider
             label="Spring wet"
             value={dubBus.springWet}
