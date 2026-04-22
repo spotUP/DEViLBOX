@@ -21,4 +21,5 @@ export { WAVETABLE_PRESETS } from './wavetable';
 export { OIDOS_PRESETS } from './oidos';
 export { TUNEFISH_PRESETS } from './tunefish';
 export { WAVESABRE_SLAUGHTER_PRESETS, WAVESABRE_FALCON_PRESETS } from './wavesabre';
+export { GTULTRA_PRESETS } from './gtultra';
 export { getPresetsForSynthType, ALL_PRESETS } from './allPresets';

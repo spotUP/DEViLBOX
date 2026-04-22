@@ -495,6 +495,11 @@ export class DubBus {
   // SID mode — when active, dub synths use real SID chip emulation (GTUltra)
   private _sidSynths: import('./SIDDubSynths').SIDDubSynths | null = null;
   private _sidMode = false;
+  // SID echo throw: reference to the C64SIDEngine's dubSendGain node.
+  // When an echo throw fires in SID mode, we boost this gain temporarily
+  // (full-mix throw — authentic dub technique since SID is monolithic).
+  private _sidDubSendGain: GainNode | null = null;
+  private _sidDubSendBaseline = 0.4;
 
   private readonly context: AudioContext;
   private readonly master: AudioNode;
@@ -1046,7 +1051,55 @@ export class DubBus {
       }
       // Don't dispose — keep the engine warm for quick re-enable
     }
+    this._sidDubSendGain = null;
     console.log('[DubBus] SID mode disabled — dub synths use WebAudio');
+  }
+
+  /**
+   * Register the C64SIDEngine's dubSendGain so echo throws can boost it.
+   * Called by NativeEngineRouting after connectDubSend().
+   */
+  registerSidDubSend(gain: GainNode, baseline: number): void {
+    this._sidDubSendGain = gain;
+    this._sidDubSendBaseline = baseline;
+  }
+
+  /**
+   * Register per-voice SID output GainNodes as channel taps.
+   * Each voice output connects to the dub bus input so echo throws
+   * can independently boost individual SID voices into the echo.
+   * The tap gains start at 0 (silent) — echo throws ramp them up.
+   */
+  registerSidVoiceTaps(voiceOutputs: GainNode[]): void {
+    for (let i = 0; i < voiceOutputs.length; i++) {
+      const tapGain = this.context.createGain();
+      tapGain.gain.value = 0; // silent until echo throw opens the tap
+      try {
+        voiceOutputs[i].connect(tapGain);
+        tapGain.connect(this.input);
+      } catch (e) {
+        console.warn(`[DubBus] Failed to connect SID voice ${i} tap:`, e);
+        continue;
+      }
+      // Register as a standard channel tap so openChannelTap() works
+      this.channelTaps.set(i, tapGain);
+    }
+    console.log(`[DubBus] Registered ${voiceOutputs.length} per-voice SID taps`);
+  }
+
+  /**
+   * Unregister the SID dub send (called when SID engine stops).
+   */
+  unregisterSidDubSend(): void {
+    this._sidDubSendGain = null;
+    // Clean up per-voice taps
+    for (let i = 0; i < 3; i++) {
+      const tap = this.channelTaps.get(i);
+      if (tap) {
+        try { tap.disconnect(); } catch { /* ok */ }
+        this.channelTaps.delete(i);
+      }
+    }
   }
 
   /**
@@ -2170,6 +2223,25 @@ export class DubBus {
         tap.gain.cancelScheduledValues(release);
         tap.gain.setValueAtTime(tap.gain.value, release);
         tap.gain.linearRampToValueAtTime(baseline, release + 0.08);
+      };
+    }
+
+    // SID mode — no per-channel worklet taps exist. Instead, boost the
+    // global SID dub send gain (full-mix throw). This is the authentic dub
+    // technique: SID's 3 voices are like instruments on one channel strip,
+    // and the engineer pushes the strip's aux send for the throw.
+    if (this._sidMode && this._sidDubSendGain) {
+      const gain = this._sidDubSendGain.gain;
+      const baseline = this._sidDubSendBaseline;
+      const now = this.context.currentTime;
+      gain.cancelScheduledValues(now);
+      gain.setValueAtTime(gain.value, now);
+      gain.linearRampToValueAtTime(clamped, now + attackSec);
+      return () => {
+        const release = this.context.currentTime;
+        gain.cancelScheduledValues(release);
+        gain.setValueAtTime(gain.value, release);
+        gain.linearRampToValueAtTime(baseline, release + 0.08);
       };
     }
 

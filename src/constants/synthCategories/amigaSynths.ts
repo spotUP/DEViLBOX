@@ -109,6 +109,15 @@ export const amigaSynthEntries: Record<string, SynthInfo> = {
     icon: 'Disc',
     color: 'text-amber-300',
   },
+  SidMon2Synth: {
+    type: 'SidMon2Synth',
+    name: 'SidMon 2.0',
+    shortName: 'SidMon2',
+    description: 'SidMon 2.0 advanced SID-style synthesis with ADSR, vibrato, portamento, and 8-step arpeggio table',
+    bestFor: ['Amiga chiptune', 'Wavetable', 'SID-like'],
+    icon: 'Disc',
+    color: 'text-amber-400',
+  },
   OctaMEDSynth: {
     type: 'OctaMEDSynth',
     name: 'OctaMED SynthInstr',
