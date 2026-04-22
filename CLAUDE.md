@@ -114,6 +114,19 @@ This runs `tsc -b --force` which catches errors that `npx tsc --noEmit` misses:
 
 ---
 
+## CRITICAL: UI Labeling Rules
+
+**!!! NEVER ABBREVIATE OR SHORTEN UI LABELS !!!**
+
+- **ALWAYS use full, readable words** in button labels, pad names, tab titles, menu items, and any user-facing text.
+- **NEVER use cryptic abbreviations** like `HPF`, `LPF`, `FLT RST`, `BRK`, `RVRS`, `WOBL`, `MSTR`, `SCRM`, `CRSH`, `BILD`, `TOST`, `CTHRW`.
+- **Use proper English words**: `High Pass`, `Low Pass`, `Filter Reset`, `Brake`, `Reverse`, `Wobble`, `Master`, `Scream`, `Crush`, `Build`, `Toast`, `Channel Throw`.
+- Short words that are already clear are fine (e.g., `Echo`, `Stab`, `Bass`, `Sub`, `Mute`).
+- The sublabel (secondary text) can use shorter descriptive words since the primary label carries the meaning.
+- This applies to ALL UI text: DJ pads, dub pads, drum pads, buttons, tabs, menus, tooltips.
+
+---
+
 ## CRITICAL: UI Architecture Rules
 
 **!!! SINGLE SOURCE OF TRUTH — NO DUPLICATED CODE !!!**
