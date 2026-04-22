@@ -76,6 +76,8 @@ export const SYNCABLE_EFFECT_PARAMS: Record<string, { param: string; unit: 'seco
   SpaceEcho:      [{ param: 'rate', unit: 'ms' }],
   SpaceyDelayer:  [{ param: 'firstTap', unit: 'ms' }],
   RETapeEcho:     [{ param: 'repeatRate', unit: 'normalized' }],
+  RE201:          [{ param: 'repeatRate', unit: 'normalized' }],
+  AnotherDelay:   [{ param: 'delayTime', unit: 'ms' }],
   Chorus:         [{ param: 'frequency', unit: 'hz' }],
   BiPhase:        [{ param: 'rateA', unit: 'hz' }],
   VintageDelay:   [{ param: 'time', unit: 'ms' }],
