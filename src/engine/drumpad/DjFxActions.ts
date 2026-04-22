@@ -21,6 +21,8 @@ import { beatJump, triggerHotCue } from '../dj/DJBeatJump';
 import { togglePlay, cueDeck, setDeckLineLoop, clearDeckLineLoop, setDeckPitch, setDeckChannelMuteMask, getDeckChannelMuteMask, setDeckSlipEnabled, setDeckKeyLock } from '../dj/DJActions';
 import { syncBPMToOther } from '../dj/DJAutoSync';
 import type { DeckId } from '../dj/DeckEngine';
+import type { DubBusSettings } from '../../types/dub';
+import { getDrumPadEngine } from '../../hooks/drumpad/useMIDIPadRouting';
 
 // ─── Types ────────────────────────────────────────────────────────
 
@@ -128,6 +130,83 @@ function cleanupFx(id: DjFxActionId): void {
     try { node.disconnect(); } catch { /* */ }
   }
   activeFx.delete(id);
+}
+
+// ─── DubBus-routed FX helpers ──────────────────────────────────────
+// Echo, reverb, and flanger pads route through the real DubBus (SpaceEcho
+// WASM + Aelapse spring reverb WASM) instead of creating naive standalone
+// Web Audio delay lines. This gives every pad the authentic Jamaican dub
+// sound — tape saturation, wow/flutter, spring tank, sidechain pump.
+
+interface DubBusFxState {
+  savedSettings: DubBusSettings;
+  tapReleaser: (() => void) | null;
+  wasEnabled: boolean;
+}
+
+const dubBusFxStates = new Map<DjFxActionId, DubBusFxState>();
+
+/**
+ * Engage a dub-bus-routed FX: save current settings, push the pad's
+ * personality, enable the bus if needed, and open the active deck tap.
+ */
+function engageDubBusFx(
+  id: DjFxActionId,
+  overrides: Partial<DubBusSettings>,
+): boolean {
+  const engine = getDrumPadEngine();
+  if (!engine) {
+    console.warn(`[DjFx:${id}] no DrumPadEngine — cannot route through DubBus`);
+    return false;
+  }
+  const bus = engine.getDubBus();
+  const saved = engine.getDubBusSettings();
+  const wasEnabled = bus.isEnabled;
+
+  // Enable the bus if it wasn't (user may not have it on)
+  if (!wasEnabled) {
+    engine.setDubBusSettings({ enabled: true });
+  }
+
+  // Push the pad's echo/reverb/flanger personality
+  engine.setDubBusSettings(overrides);
+
+  // Open the active deck's tap so audio flows into the bus
+  const deckId = getActiveDeckId();
+  const tapReleaser = bus.openDeckTap(deckId, 1.0, 0.005, 0.3);
+
+  dubBusFxStates.set(id, { savedSettings: saved, tapReleaser, wasEnabled });
+  return true;
+}
+
+/**
+ * Disengage a dub-bus-routed FX: close the deck tap and restore the
+ * user's prior settings. The bus's built-in mini-drain handles the
+ * echo/spring tail naturally.
+ */
+function disengageDubBusFx(id: DjFxActionId): void {
+  const state = dubBusFxStates.get(id);
+  if (!state) return;
+  dubBusFxStates.delete(id);
+
+  // Close the deck tap — the DubBus mini-drain handles tail decay
+  if (state.tapReleaser) state.tapReleaser();
+
+  const engine = getDrumPadEngine();
+  if (!engine) return;
+
+  // Restore the user's prior settings
+  engine.setDubBusSettings(state.savedSettings);
+
+  // If the bus wasn't enabled before, disable it after a tail window
+  if (!state.wasEnabled) {
+    setTimeout(() => {
+      // Only disable if no other dub-bus FX are active
+      if (dubBusFxStates.size === 0) {
+        try { engine.setDubBusSettings({ enabled: false }); } catch { /* ok */ }
+      }
+    }, 3000);
+  }
 }
 
 // ─── Stutter Effects ──────────────────────────────────────────────
@@ -254,61 +333,18 @@ function createDubEcho(): DjFxAction {
     category: 'delay',
     mode: 'momentary',
     engage() {
-      cleanupFx(this.id);
-      const ctx = getCtx();
-      const delayTime = bpmToMs(getBpm(), '1/4') / 1000;
-
-      const delay = ctx.createDelay(4);
-      delay.delayTime.value = delayTime;
-
-      const feedback = ctx.createGain();
-      feedback.gain.value = 0.65;
-
-      const filter = ctx.createBiquadFilter();
-      filter.type = 'lowpass';
-      filter.frequency.value = 2000;
-
-      const wetGain = ctx.createGain();
-      wetGain.gain.value = 0.7;
-
-      // Feedback loop: delay → filter → feedback → delay
-      delay.connect(filter);
-      filter.connect(feedback);
-      feedback.connect(delay);
-      delay.connect(wetGain);
-      wetGain.connect(ctx.destination);
-
-      // Tap the master output into the delay
-      const tap = ctx.createGain();
-      tap.gain.value = 1;
-      tap.connect(delay);
-
-      // Connect Tone.js master to our tap
-      const masterNode = getMasterOutputNode();
-      if (masterNode) {
-        masterNode.connect(tap);
-      }
-
-      activeFx.set(this.id, {
-        nodes: [delay, feedback, filter, wetGain, tap],
-        cleanup: () => {
-          try { masterNode?.disconnect(tap); } catch { /* */ }
-        },
+      const delayMs = bpmToMs(getBpm(), '1/4');
+      engageDubBusFx(this.id, {
+        echoIntensity: 0.65,
+        echoWet: 0.75,
+        echoRateMs: delayMs,
+        echoSyncDivision: '1/4',
+        springWet: 0.45,
+        returnGain: 0.85,
       });
     },
     disengage() {
-      // Fade out the echo tail
-      const state = activeFx.get(this.id);
-      if (state) {
-        const fb = state.nodes[1] as GainNode;
-        const wet = state.nodes[3] as GainNode;
-        const ctx = getCtx();
-        fb.gain.setTargetAtTime(0, ctx.currentTime, 0.1);
-        wet.gain.setTargetAtTime(0, ctx.currentTime, 0.3);
-        state.timer = setTimeout(() => cleanupFx(this.id), 2000);
-        // Prevent double cleanup
-        activeFx.set(this.id, { ...state });
-      }
+      disengageDubBusFx(this.id);
     },
   };
 }
@@ -320,64 +356,18 @@ function createTapeEcho(): DjFxAction {
     category: 'delay',
     mode: 'momentary',
     engage() {
-      cleanupFx(this.id);
-      const ctx = getCtx();
-      const delayTime = bpmToMs(getBpm(), '1/8d') / 1000;
-
-      const delay = ctx.createDelay(4);
-      delay.delayTime.value = delayTime;
-
-      const feedback = ctx.createGain();
-      feedback.gain.value = 0.55;
-
-      const lpf = ctx.createBiquadFilter();
-      lpf.type = 'lowpass';
-      lpf.frequency.value = 3000;
-
-      const hpf = ctx.createBiquadFilter();
-      hpf.type = 'highpass';
-      hpf.frequency.value = 200;
-
-      const wetGain = ctx.createGain();
-      wetGain.gain.value = 0.6;
-
-      const saturation = ctx.createWaveShaper();
-      const curve = new Float32Array(256);
-      for (let i = 0; i < 256; i++) {
-        const x = (i / 128) - 1;
-        curve[i] = (Math.PI + 3) * x / (Math.PI + 3 * Math.abs(x));
-      }
-      saturation.curve = curve;
-
-      delay.connect(hpf);
-      hpf.connect(lpf);
-      lpf.connect(saturation);
-      saturation.connect(feedback);
-      feedback.connect(delay);
-      delay.connect(wetGain);
-      wetGain.connect(ctx.destination);
-
-      const tap = ctx.createGain();
-      tap.gain.value = 1;
-      tap.connect(delay);
-
-      const masterNode = getMasterOutputNode();
-      if (masterNode) masterNode.connect(tap);
-
-      activeFx.set(this.id, {
-        nodes: [delay, feedback, lpf, hpf, saturation, wetGain, tap],
-        cleanup: () => { try { masterNode?.disconnect(tap); } catch { /* */ } },
+      const delayMs = bpmToMs(getBpm(), '1/8d');
+      engageDubBusFx(this.id, {
+        echoIntensity: 0.55,
+        echoWet: 0.65,
+        echoRateMs: delayMs,
+        echoSyncDivision: '1/8D',
+        springWet: 0.35,
+        returnGain: 0.80,
       });
     },
     disengage() {
-      const state = activeFx.get(this.id);
-      if (state) {
-        const fb = state.nodes[1] as GainNode;
-        const ctx = getCtx();
-        fb.gain.setTargetAtTime(0, ctx.currentTime, 0.15);
-        state.timer = setTimeout(() => cleanupFx(this.id), 2500);
-        activeFx.set(this.id, { ...state });
-      }
+      disengageDubBusFx(this.id);
     },
   };
 }
@@ -389,58 +379,20 @@ function createPingPong(): DjFxAction {
     category: 'delay',
     mode: 'momentary',
     engage() {
-      cleanupFx(this.id);
-      const ctx = getCtx();
-      const delayTime = bpmToMs(getBpm(), '1/8') / 1000;
-
-      const delayL = ctx.createDelay(4);
-      const delayR = ctx.createDelay(4);
-      delayL.delayTime.value = delayTime;
-      delayR.delayTime.value = delayTime;
-
-      const fbL = ctx.createGain();
-      const fbR = ctx.createGain();
-      fbL.gain.value = 0.5;
-      fbR.gain.value = 0.5;
-
-      const merger = ctx.createChannelMerger(2);
-      const wetGain = ctx.createGain();
-      wetGain.gain.value = 0.6;
-
-      // Cross-feedback: L→R→L
-      delayL.connect(fbL);
-      fbL.connect(delayR);
-      delayR.connect(fbR);
-      fbR.connect(delayL);
-
-      delayL.connect(merger, 0, 0);
-      delayR.connect(merger, 0, 1);
-      merger.connect(wetGain);
-      wetGain.connect(ctx.destination);
-
-      const tap = ctx.createGain();
-      tap.gain.value = 1;
-      tap.connect(delayL);
-
-      const masterNode = getMasterOutputNode();
-      if (masterNode) masterNode.connect(tap);
-
-      activeFx.set(this.id, {
-        nodes: [delayL, delayR, fbL, fbR, merger, wetGain, tap],
-        cleanup: () => { try { masterNode?.disconnect(tap); } catch { /* */ } },
+      const delayMs = bpmToMs(getBpm(), '1/8');
+      engageDubBusFx(this.id, {
+        echoIntensity: 0.50,
+        echoWet: 0.70,
+        echoRateMs: delayMs,
+        echoSyncDivision: '1/8',
+        springWet: 0.30,
+        returnGain: 0.80,
+        // M/S width for stereo spread — the "ping-pong" character
+        stereoWidth: 1.8,
       });
     },
     disengage() {
-      const state = activeFx.get(this.id);
-      if (state) {
-        const fbL = state.nodes[2] as GainNode;
-        const fbR = state.nodes[3] as GainNode;
-        const ctx = getCtx();
-        fbL.gain.setTargetAtTime(0, ctx.currentTime, 0.1);
-        fbR.gain.setTargetAtTime(0, ctx.currentTime, 0.1);
-        state.timer = setTimeout(() => cleanupFx(this.id), 2000);
-        activeFx.set(this.id, { ...state });
-      }
+      disengageDubBusFx(this.id);
     },
   };
 }
@@ -576,48 +528,15 @@ function createReverbWash(): DjFxAction {
     category: 'reverb',
     mode: 'momentary',
     engage() {
-      cleanupFx(this.id);
-      const ctx = getCtx();
-
-      // Create convolver with synthetic impulse response
-      const convolver = ctx.createConvolver();
-      const irLength = ctx.sampleRate * 3; // 3 second reverb
-      const ir = ctx.createBuffer(2, irLength, ctx.sampleRate);
-      for (let ch = 0; ch < 2; ch++) {
-        const data = ir.getChannelData(ch);
-        for (let i = 0; i < irLength; i++) {
-          data[i] = (Math.random() * 2 - 1) * Math.exp(-3 * i / irLength);
-        }
-      }
-      convolver.buffer = ir;
-
-      const wetGain = ctx.createGain();
-      wetGain.gain.value = 0.7;
-
-      convolver.connect(wetGain);
-      wetGain.connect(ctx.destination);
-
-      const tap = ctx.createGain();
-      tap.gain.value = 1;
-      tap.connect(convolver);
-
-      const masterNode = getMasterOutputNode();
-      if (masterNode) masterNode.connect(tap);
-
-      activeFx.set(this.id, {
-        nodes: [convolver, wetGain, tap],
-        cleanup: () => { try { masterNode?.disconnect(tap); } catch { /* */ } },
+      engageDubBusFx(this.id, {
+        springWet: 0.85,
+        echoIntensity: 0.30,
+        echoWet: 0.40,
+        returnGain: 0.90,
       });
     },
     disengage() {
-      const state = activeFx.get(this.id);
-      if (state) {
-        const wet = state.nodes[1] as GainNode;
-        const ctx = getCtx();
-        wet.gain.setTargetAtTime(0, ctx.currentTime, 0.5);
-        state.timer = setTimeout(() => cleanupFx(this.id), 3000);
-        activeFx.set(this.id, { ...state });
-      }
+      disengageDubBusFx(this.id);
     },
   };
 }
@@ -631,47 +550,21 @@ function createFlanger(): DjFxAction {
     category: 'modulation',
     mode: 'momentary',
     engage() {
-      cleanupFx(this.id);
-      const ctx = getCtx();
-
-      const delay = ctx.createDelay();
-      delay.delayTime.value = 0.003;
-
-      const lfo = ctx.createOscillator();
-      lfo.type = 'sine';
-      lfo.frequency.value = 0.5;
-
-      const lfoGain = ctx.createGain();
-      lfoGain.gain.value = 0.002;
-
-      lfo.connect(lfoGain);
-      lfoGain.connect(delay.delayTime);
-      lfo.start();
-
-      const feedback = ctx.createGain();
-      feedback.gain.value = 0.7;
-      delay.connect(feedback);
-      feedback.connect(delay);
-
-      const wetGain = ctx.createGain();
-      wetGain.gain.value = 0.5;
-      delay.connect(wetGain);
-      wetGain.connect(ctx.destination);
-
-      const tap = ctx.createGain();
-      tap.gain.value = 1;
-      tap.connect(delay);
-
-      const masterNode = getMasterOutputNode();
-      if (masterNode) masterNode.connect(tap);
-
-      activeFx.set(this.id, {
-        nodes: [delay, feedback, lfoGain, wetGain, tap],
-        oscillator: lfo,
-        cleanup: () => { try { masterNode?.disconnect(tap); } catch { /* */ } },
+      engageDubBusFx(this.id, {
+        // Use the DubBus liquid sweep (parallel comb filter with LFO)
+        sweepAmount: 0.65,
+        sweepRateHz: 0.3,
+        sweepDepthMs: 6,
+        sweepFeedback: 0.78,
+        echoIntensity: 0.35,
+        echoWet: 0.40,
+        springWet: 0.25,
+        returnGain: 0.80,
       });
     },
-    disengage() { cleanupFx(this.id); },
+    disengage() {
+      disengageDubBusFx(this.id);
+    },
   };
 }
 
