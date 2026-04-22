@@ -163,6 +163,10 @@ export class DrumPadEngine {
     return this.dubBus.setSirenFeedback(amount, rampSec);
   }
 
+  startSiren(): () => void {
+    return this.dubBus.startSiren();
+  }
+
   dubPanic(): void { this.dubBus.dubPanic(); }
 
   filterDrop(targetHz = 300, downSec = 0.4, upSec = 0.6): () => void {
