@@ -536,6 +536,8 @@ export const DeckFXPads: React.FC<DeckFXPadsProps> = ({ deckId }) => {
           const pressed = activePads.has(pad.id);
           const colorKey = active ? pad.activeColor : pad.color;
           const colors = PAD_COLORS[colorKey] || PAD_COLORS.gray;
+          // Inactive pads use a subtle tint of their color so they look like buttons
+          const inactiveColors = PAD_COLORS[pad.color] || PAD_COLORS.gray;
           return (
             <button
               key={pad.id}
@@ -547,10 +549,11 @@ export const DeckFXPads: React.FC<DeckFXPadsProps> = ({ deckId }) => {
                 height: 48,
                 transition: pressed ? 'transform 50ms' : 'transform 120ms ease-out',
                 transform: pressed ? 'scale(0.92)' : 'scale(1)',
-                backgroundColor: active ? colors.bg : 'var(--color-dark-bgHover)',
-                color: active ? colors.text : 'var(--color-text-secondary)',
-                border: `1px solid ${active ? colors.border : 'var(--color-dark-borderLight)'}`,
-                boxShadow: active ? `0 0 12px ${colors.glow}, inset 0 0 8px ${colors.glow}` : 'inset 0 1px 0 rgba(255,255,255,0.04)',
+                backgroundColor: active ? colors.bg : inactiveColors.bg.replace(/[\d.]+\)$/, '0.12)'),
+                color: active ? colors.text : inactiveColors.text,
+                border: `1px solid ${active ? colors.border : inactiveColors.border.replace(/[\d.]+\)$/, '0.35)')}`,
+                boxShadow: active ? `0 0 12px ${colors.glow}, inset 0 0 8px ${colors.glow}` : `inset 0 1px 0 rgba(255,255,255,0.06), 0 1px 2px rgba(0,0,0,0.3)`,
+                opacity: active ? 1 : 0.85,
               }}
               title={`${pad.label} ${pad.sublabel ?? ''} (${pad.mode})`}
             >

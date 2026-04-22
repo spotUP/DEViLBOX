@@ -269,23 +269,31 @@ export const PadButton: React.FC<PadButtonProps> = ({
 
   // Determine pad style based on state
   const padStyle = useMemo(() => {
-    // If pad has actual data, use its custom color
-    if (hasActualData && pad.color) {
-      return { className: 'bg-dark-border', textColor: ensureContrast(pad.color) };
+    const baseColor = pad.color ?? (
+      pad.sample ? '#34d399' :   // emerald for samples
+      (pad.synthConfig || pad.instrumentId != null) ? '#60a5fa' :  // blue for synths
+      pad.djFxAction ? '#a78bfa' :  // violet for DJ FX
+      pad.dubAction ? '#fbbf24' :   // amber for dub actions
+      undefined
+    );
+
+    if (hasActualData && baseColor) {
+      const contrastColor = ensureContrast(baseColor);
+      // Parse hex to get RGB for tinted backgrounds
+      const hex = baseColor.replace('#', '');
+      const r = parseInt(hex.substring(0, 2), 16);
+      const g = parseInt(hex.substring(2, 4), 16);
+      const b = parseInt(hex.substring(4, 6), 16);
+      return {
+        textColor: contrastColor,
+        bgColor: `rgba(${r},${g},${b},0.12)`,
+        borderColor: `rgba(${r},${g},${b},0.35)`,
+        glowColor: `rgba(${r},${g},${b},0.5)`,
+      };
     }
 
-    if (!isLoaded) {
-      return { className: 'bg-dark-border', textColor: undefined };
-    }
-
-    // Synth-only pads get a blue text accent
-    if (!pad.sample && (pad.synthConfig || pad.instrumentId != null)) {
-      return { className: 'bg-dark-border', textColor: '#60a5fa' }; // blue-400 - already bright
-    }
-
-    // Sample pads get emerald text
-    return { className: 'bg-dark-border', textColor: '#34d399' }; // emerald-400 - already bright
-  }, [isLoaded, pad.sample, pad.instrumentId, pad.synthConfig, pad.color, hasActualData, ensureContrast]);
+    return { textColor: undefined, bgColor: undefined, borderColor: undefined, glowColor: undefined };
+  }, [isLoaded, pad.sample, pad.instrumentId, pad.synthConfig, pad.color, pad.djFxAction, pad.dubAction, hasActualData, ensureContrast]);
 
   // Flash overlay opacity driven by triggerIntensity (animated)
   const flashOpacity = triggerIntensity > 0.01 ? triggerIntensity : 0;
@@ -297,7 +305,6 @@ export const PadButton: React.FC<PadButtonProps> = ({
       data-sample-drop-zone
       className={`
         relative rounded-lg select-none overflow-hidden cursor-pointer outline-none
-        ${padStyle.className}
         ${!isLoaded ? 'opacity-40' : ''}
         ${isPressed && isLoaded ? 'scale-95' : 'scale-100'}
         ${isSelected ? 'ring-2 ring-accent-primary ring-offset-2 ring-offset-dark-bg' : ''}
@@ -307,6 +314,11 @@ export const PadButton: React.FC<PadButtonProps> = ({
       `}
       style={{
         transition: isPressed ? 'transform 50ms' : 'transform 120ms',
+        backgroundColor: padStyle.bgColor ?? 'var(--color-dark-border)',
+        border: `1px solid ${padStyle.borderColor ?? 'var(--color-dark-borderLight)'}`,
+        boxShadow: isPressed && padStyle.glowColor
+          ? `0 0 12px ${padStyle.glowColor}, inset 0 0 8px ${padStyle.glowColor}`
+          : 'inset 0 1px 0 rgba(255,255,255,0.06), 0 1px 2px rgba(0,0,0,0.3)',
       }}
       onMouseDown={handleMouseDown}
       onMouseUp={handleMouseUp}
@@ -327,7 +339,9 @@ export const PadButton: React.FC<PadButtonProps> = ({
         <div
           className="absolute inset-0 rounded-lg pointer-events-none"
           style={{
-            background: `radial-gradient(circle at center, rgba(16, 185, 129, ${flashOpacity * 0.9}) 0%, rgba(52, 211, 153, ${flashOpacity * 0.5}) 60%, transparent 100%)`,
+            background: padStyle.glowColor
+              ? `radial-gradient(circle at center, ${padStyle.glowColor.replace(/[\d.]+\)$/, `${flashOpacity * 0.9})`)} 0%, ${padStyle.glowColor.replace(/[\d.]+\)$/, `${flashOpacity * 0.5})`)} 60%, transparent 100%)`
+              : `radial-gradient(circle at center, rgba(16, 185, 129, ${flashOpacity * 0.9}) 0%, rgba(52, 211, 153, ${flashOpacity * 0.5}) 60%, transparent 100%)`,
           }}
         />
       )}
