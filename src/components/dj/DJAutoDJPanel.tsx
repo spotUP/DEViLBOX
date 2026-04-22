@@ -6,7 +6,7 @@
  */
 
 import React, { useCallback, useRef, useState } from 'react';
-import { SkipForward, Shuffle, SlidersHorizontal, Scissors, Zap, Pause, Play, Layers } from 'lucide-react';
+import { SkipForward, Shuffle, SlidersHorizontal, Scissors, Zap, Pause, Play, Layers, Wand2 } from 'lucide-react';
 import { useDJStore, type AutoDJStatus } from '@/stores/useDJStore';
 import { useDJPlaylistStore } from '@/stores/useDJPlaylistStore';
 import { useUIStore } from '@/stores/useUIStore';
@@ -50,6 +50,7 @@ export const DJAutoDJPanel: React.FC<DJAutoDJPanelProps> = ({ onClose }) => {
   const withFilter = useDJStore((s) => s.autoDJWithFilter);
   const smartCuts = useDJStore((s) => s.autoDJSmartCuts);
   const stemPreSep = useDJStore((s) => s.stemPreSeparation);
+  const streamAutoDub = useDJStore((s) => s.streamAutoDub);
   const setConfig = useDJStore((s) => s.setAutoDJConfig);
 
   const activePlaylistId = useDJPlaylistStore((s) => s.activePlaylistId);
@@ -457,6 +458,36 @@ export const DJAutoDJPanel: React.FC<DJAutoDJPanelProps> = ({ onClose }) => {
           }
         >
           <Layers size={12} />
+        </button>
+        {/* Stream Auto Dub — fire dub moves timed to beat grid */}
+        <button
+          onClick={() => {
+            const next = !streamAutoDub;
+            setConfig({ streamAutoDub: next });
+            import('@/engine/dub/StreamAutoDub').then(({ startStreamAutoDub, stopAllStreamAutoDub }) => {
+              if (next) {
+                // Start on all playing decks
+                const decks = useDJStore.getState().decks;
+                for (const id of ['A', 'B', 'C'] as const) {
+                  if (decks[id].isPlaying) startStreamAutoDub(id);
+                }
+              } else {
+                stopAllStreamAutoDub();
+              }
+            });
+          }}
+          className={`p-1.5 rounded border transition-all ${
+            streamAutoDub
+              ? 'border-violet-500 bg-violet-900/20 text-violet-400'
+              : 'border-dark-borderLight bg-dark-bgTertiary text-text-tertiary hover:text-text-secondary'
+          }`}
+          title={
+            streamAutoDub
+              ? 'Stream Auto Dub ON — dub moves fire automatically timed to the beat grid'
+              : 'Stream Auto Dub OFF — click to enable auto dub effects on audio decks'
+          }
+        >
+          <Wand2 size={12} />
         </button>
       </div>
 
