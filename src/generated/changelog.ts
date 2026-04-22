@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-04-19T18:50:12.258Z
+ * Generated: 2026-04-22T07:52:11.467Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,10 +19,10 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.5802';
-export const BUILD_NUMBER = '5802';
-export const BUILD_HASH = 'bc5eecac4';
-export const BUILD_DATE = '2026-04-19';
+export const BUILD_VERSION = '1.0.6036';
+export const BUILD_NUMBER = '6036';
+export const BUILD_HASH = '459764aaa';
+export const BUILD_DATE = '2026-04-22';
 
 // Full version (patch IS the build number, so no need to append)
 export const FULL_VERSION = BUILD_VERSION;
@@ -30,204 +30,214 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.5802',
-    date: '2026-04-19',
+    version: '1.0.6036',
+    date: '2026-04-22',
     changes: [
       {
         type: 'fix',
-        "description": "Ensure DrumPadEngine exists on tracker-view mount"
+        "description": "Harden dub system: clamp feedback params, fix panic cleanup"
+      },
+      {
+        type: 'feature',
+        "description": "Add preview button to tracker Modland/HVSC browser"
       },
       {
         type: 'fix',
-        "description": "More distinct click-flash + fire setFlashedChannel on click"
-      },
-      {
-        type: 'improvement',
-        "description": "Re-apply SidMon1Replayer migration"
+        "description": "Fix dub bus bass shelf self-oscillation in feedback loop"
       },
       {
         type: 'fix',
-        "description": "Replace 'selected channel' highlight with click-flash feedback"
-      },
-      {
-        type: 'feature',
-        "description": "DJ-only 180 Hz HPF on deck taps (always kick-dodge for DJ)"
-      },
-      {
-        type: 'improvement',
-        "description": "Tweak(dub): lower default HPF cutoff 180 → 40 Hz"
+        "description": "Clamp dub bass shelf to ±12 dB — prevents feedback loop NaN blowup"
       },
       {
         type: 'fix',
-        "description": "Auto-apply default dubSend on tracker channels when bus enables"
-      },
-      {
-        type: 'feature',
-        "description": "Bind W to Echo Throw on the selected tracker channel"
-      },
-      {
-        type: 'feature',
-        "description": "DubDeckStrip + DubLaneTimeline rendered in TrackerView"
-      },
-      {
-        type: 'improvement',
-        "description": "Revert(engine): back out SidMon1Replayer migration, silence regression"
-      },
-      {
-        type: 'feature',
-        "description": "DubLanePlayer + wire into transport setCurrentRow"
-      },
-      {
-        type: 'feature',
-        "description": "DubRecorder + useTrackerStore.setPatternDubLane action"
-      },
-      {
-        type: 'improvement',
-        "description": "Rename DubEvent.beat → row (tracker-native)"
-      },
-      {
-        type: 'feature',
-        "description": "DubRouter — single fire() entry for all dub moves"
-      },
-      {
-        type: 'feature',
-        "description": "Echo Throw move — first tracker-dub move"
-      },
-      {
-        type: 'improvement',
-        "description": "Extract WASMSingletonBase, migrate 6 reference engines"
-      },
-      {
-        type: 'feature',
-        "description": "Tracker channel dubSend tap + DubBus openChannelTap/modulateFeedback"
-      },
-      {
-        type: 'feature',
-        "description": "UseDubStore — armed flag + rAF-batched write helper"
-      },
-      {
-        type: 'improvement',
-        "description": "Chore(persistence): bump SCHEMA_VERSION 19→20 for Pattern.dubLane"
-      },
-      {
-        type: 'feature',
-        "description": "Optional dubLane field on Pattern"
-      },
-      {
-        type: 'feature',
-        "description": "Add DubEvent, DubLane, QuantizeMode types for Phase 1"
-      },
-      {
-        type: 'improvement',
-        "description": "Chore: regenerate changelog"
-      },
-      {
-        type: 'improvement',
-        "description": "Chore(dj): remove SID playlist auto-repair — was spamming console for days"
+        "description": "Cap all live-automated filters at -12 rolloff to prevent NaN audio death"
       },
       {
         type: 'fix',
-        "description": "Loading a sample clears any prior synth config"
-      },
-      {
-        type: 'feature',
-        "description": "Drag-and-drop audio files directly onto pads"
+        "description": "Prevent dub siren filter from killing all audio"
       },
       {
         type: 'fix',
-        "description": "One friendly warn per broken instrument, not two stack-traces"
+        "description": "Write automation curves for all dub moves, not just holds/globals"
       },
       {
         type: 'fix',
-        "description": "Cap bridge reconnect attempts at 5"
-      },
-      {
-        type: 'improvement',
-        "description": "Chore(dev): default local API port 3001 → 3011"
-      },
-      {
-        type: 'feature',
-        "description": "Auto-apply sound system on first bus enable"
+        "description": "Display dub effect commands as Zxx instead of ?XX in pattern editor"
       },
       {
         type: 'fix',
-        "description": "Abort mini-drain when a new synth-pad tap attaches"
+        "description": "Match empty XM pattern lengths and order to actual song data"
       },
       {
         type: 'fix',
-        "description": "Scale mini-drain window to echo rate so buffer fully flushes"
+        "description": "Route .dbx synth songs through libopenmpt for proper looping"
+      }
+    ]
+  },
+  {
+    version: '2026-04-21',
+    date: '2026-04-21',
+    changes: [
+      {
+        type: 'fix',
+        "description": "Fix DefleMask import: handle corrupted zlib checksums + proper DMF detection"
+      },
+      {
+        type: 'improvement',
+        "description": "Remove .dvbx extension — standardize on .dbx only"
+      },
+      {
+        type: 'feature',
+        "description": "Add zlib compression for .dbx/.dvbx project files + LZMA for NanoExporter"
       },
       {
         type: 'fix',
-        "description": "Mini-drain bus when last synth-pad tap detaches"
+        "description": "Add masterVol/systemVol/systemPan to WASM file-ops path"
       },
       {
         type: 'fix',
-        "description": "Fade out synth-pad dub-bus tap on release so tails can decay"
-      },
-      {
-        type: 'feature',
-        "description": "Route synth pads through the dub bus via pad.dubSend"
+        "description": ".fur files misidentified as DefleMask when WASM unavailable"
       },
       {
         type: 'fix',
-        "description": "Close DubBusPanel on click outside / Esc"
-      },
-      {
-        type: 'improvement',
-        "description": "Drop transition re-exports, migrate importers to @/types/dub"
-      },
-      {
-        type: 'improvement',
-        "description": "Move DubBusPanel to src/components/dub/"
-      },
-      {
-        type: 'improvement',
-        "description": "Extract DubBus from DrumPadEngine"
-      },
-      {
-        type: 'feature',
-        "description": "Test(dub): add pure-function regression floor for DubActions"
-      },
-      {
-        type: 'improvement',
-        "description": "Move DubActions to src/engine/dub/"
-      },
-      {
-        type: 'improvement',
-        "description": "Move DubSirenSynth to src/engine/dub/"
-      },
-      {
-        type: 'improvement',
-        "description": "Extract dub types to src/types/dub.ts"
-      },
-      {
-        type: 'improvement',
-        "description": "Chore: ignore .superpowers/ and drop tracked scheduler lockfile"
-      },
-      {
-        type: 'feature',
-        "description": "PAD master knob + Kill FX button in the manager header"
-      },
-      {
-        type: 'feature',
-        "description": "Mark tracks as played across view switches"
-      },
-      {
-        type: 'feature',
-        "description": "Auto DJ warns when playlist has missing analysis data"
+        "description": "Correct POST_AMP enum IDs + apply masterVol/systemVol/systemPan"
       },
       {
         type: 'fix',
-        "description": "Route XM/IT/S3M/modern-MOD analysis through the local pipeline"
+        "description": "Scale multi-chip output by 1/chipCount — root cause of distortion"
+      },
+      {
+        type: 'fix',
+        "description": "Add safety limiter to master bus — prevents catastrophic clipping"
       },
       {
         type: 'feature',
-        "description": "Rewrite auto-gain — target -6 dB RMS, +9 dB fallback, no peak clamp"
+        "description": "Prime scratch ring buffer at deck load — scratch-audible before play"
+      },
+      {
+        type: 'fix',
+        "description": "Scratch on stopped deck — Option C (no audio-source resume)"
+      },
+      {
+        type: 'fix',
+        "description": "Scratching stopped deck — release pauses immediately, no forward burst"
+      },
+      {
+        type: 'fix',
+        "description": "Scratch on stopped deck — correct behavior (scratch sounds, release pauses)"
+      },
+      {
+        type: 'improvement',
+        "description": "Rename(dub): \"GHOST\" bus-bleed toggle → \"BLEED\" to avoid ghost-pattern collision"
+      },
+      {
+        type: 'fix',
+        "description": "Move blacklist button is now actually findable"
+      },
+      {
+        type: 'fix',
+        "description": "Scratching a stopped deck no longer starts playback on release"
+      },
+      {
+        type: 'improvement',
+        "description": "Diag(dub-recorder): log cell-write decisions to trace missing Zxx cells"
+      },
+      {
+        type: 'fix',
+        "description": "Fall back to any non-empty channel when role match empty"
       },
       {
         type: 'feature',
-        "description": "Master volume ceiling 1.5 → 2.0, tighter limiter (-0.3 dBFS, hard knee)"
+        "description": "Resonance Tamer — auto-clear fighting frequencies on master"
+      },
+      {
+        type: 'fix',
+        "description": "Restore automationCurves + dubBus + autoDub on .dbx import"
+      },
+      {
+        type: 'improvement',
+        "description": "Test(ui-smoke): skip flow 08 until warm-reload baseline is root-caused"
+      },
+      {
+        type: 'feature',
+        "description": "Extract 5 dub voices as standalone synths in the registry"
+      },
+      {
+        type: 'feature',
+        "description": "Extended Zxx encoding + global/hold → automation curves + 27-move picker"
+      },
+      {
+        type: 'feature',
+        "description": "SoundTouch WASM key-lock + dub fullscreen + export peak-limit"
+      },
+      {
+        type: 'feature',
+        "description": "Any-instrument promotion — bass/perc below dominance threshold"
+      },
+      {
+        type: 'feature',
+        "description": "DubRecorder writes Zxx cells inline + source=lane replay guard"
+      },
+      {
+        type: 'improvement',
+        "description": "Test(ui-smoke): flow 13 — role classification from real Modland dub MOD"
+      },
+      {
+        type: 'improvement',
+        "description": "Global FX lane chapter section + Zxx 36/37/38 correction"
+      },
+      {
+        type: 'feature',
+        "description": "Global FX lane — pattern-editor row above channels"
+      },
+      {
+        type: 'feature',
+        "description": "Runtime channel-tap role classifier — Phase 1"
+      },
+      {
+        type: 'feature',
+        "description": "Global (pattern-level) automation lane engine support"
+      },
+      {
+        type: 'fix',
+        "description": "Chore(dj): DUB 3/4 tab Nch suffix + scratch-action regression tests"
+      },
+      {
+        type: 'feature',
+        "description": "Expose dub.* as picker params — draw curves, edit, save"
+      },
+      {
+        type: 'fix',
+        "description": "Move Zxx effect commands off effTyp 33 — fine-porta collision"
+      },
+      {
+        type: 'feature',
+        "description": "Spectral sample classifier — instrument role from raw PCM"
+      },
+      {
+        type: 'fix',
+        "description": "Dub bus always starts off, even after persisted state"
+      },
+      {
+        type: 'improvement',
+        "description": "Dub Bus, Auto Dub & Auto-Name Channels chapter"
+      },
+      {
+        type: 'improvement',
+        "description": "Tune(dj): Auto-DJ deferral — proportional cap, short-fade skip, tighter chord window"
+      },
+      {
+        type: 'feature',
+        "description": "Zxx dub effect commands — inline dub moves in tracker cells"
+      },
+      {
+        type: 'feature',
+        "description": "Save Auto Dub + DubBusSettings so dubs survive reload"
+      },
+      {
+        type: 'feature',
+        "description": "Pattern-data awareness — look-ahead, density bias, rename boost, break deferral"
       }
     ]
   }

@@ -27,13 +27,13 @@ import { STEM_NAMES_4S, STEM_NAMES_6S } from './types';
 
 const MODEL_URLS: Record<DemucsModelType, string> = {
   '4s': 'https://devilbox.uprough.net/models/ggml-model-htdemucs-4s-f16.bin',
-  '6s': 'https://devilbox.uprough.net/models/ggml-model-htdemucs_6s-f16.bin',
+  '6s': 'https://devilbox.uprough.net/models/ggml-model-htdemucs-6s-f16.bin',
 };
 
 // Fallback: HuggingFace direct links
 const MODEL_URLS_FALLBACK: Record<DemucsModelType, string> = {
   '4s': 'https://huggingface.co/datasets/Retrobear/demucs.cpp/resolve/main/ggml-model-htdemucs-4s-f16.bin',
-  '6s': 'https://huggingface.co/datasets/Retrobear/demucs.cpp/resolve/main/ggml-model-htdemucs_6s-f16.bin',
+  '6s': 'https://huggingface.co/datasets/Retrobear/demucs.cpp/resolve/main/ggml-model-htdemucs-6s-f16.bin',
 };
 
 // ── IndexedDB for model weights ────────────────────────────────────────────
