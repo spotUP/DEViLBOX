@@ -180,6 +180,8 @@ const tonejs: EffectDescriptor[] = [
       { name: 'Large Hall', params: { decay: 5.0, preDelay: 0.1 } },
       { name: 'Cathedral', params: { decay: 12.0, preDelay: 0.3 } },
       { name: 'Plate', params: { decay: 2.5, preDelay: 0.005 } },
+      { name: 'Dub Plate Room', params: { decay: 3.5, preDelay: 0.04 } },
+      { name: 'Sound System Hall', params: { decay: 7.0, preDelay: 0.08 } },
     ],
   },
   {
@@ -197,6 +199,7 @@ const tonejs: EffectDescriptor[] = [
       { name: 'Tight Room', params: { roomSize: 0.2 } },
       { name: 'Medium', params: { roomSize: 0.5 } },
       { name: 'Large Space', params: { roomSize: 0.9 } },
+      { name: 'Dub Chamber', params: { roomSize: 0.7 } },
     ],
   },
   {
@@ -212,6 +215,8 @@ const tonejs: EffectDescriptor[] = [
       { name: 'Quarter Note', params: { time: 0.25, feedback: 0.4 } },
       { name: 'Dotted Eighth', params: { time: 0.1875, feedback: 0.45 } },
       { name: 'Long Ambient', params: { time: 0.5, feedback: 0.7 } },
+      { name: 'Dub Echo', params: { time: 0.375, feedback: 0.65 } },
+      { name: 'Sound System Slap', params: { time: 0.12, feedback: 0.35 } },
     ],
   },
   {
@@ -227,6 +232,8 @@ const tonejs: EffectDescriptor[] = [
       { name: 'Echo', params: { time: 0.25, feedback: 0.45 } },
       { name: 'Dub', params: { time: 0.375, feedback: 0.7 } },
       { name: 'Runaway', params: { time: 0.3, feedback: 0.85 } },
+      { name: 'King Tubby Echo', params: { time: 0.5, feedback: 0.75 } },
+      { name: 'Steppers Delay', params: { time: 0.1875, feedback: 0.55 } },
     ],
   },
   {
@@ -241,6 +248,8 @@ const tonejs: EffectDescriptor[] = [
       { name: 'Tight Stereo', params: { time: 0.1, feedback: 0.3 } },
       { name: 'Wide Bounce', params: { time: 0.25, feedback: 0.5 } },
       { name: 'Spacious', params: { time: 0.45, feedback: 0.65 } },
+      { name: 'Dub Stereo Echo', params: { time: 0.375, feedback: 0.7 } },
+      { name: 'Sound System Ping Pong', params: { time: 0.5, feedback: 0.6 } },
     ],
   },
   {
@@ -261,6 +270,11 @@ const tonejs: EffectDescriptor[] = [
       { name: 'Classic', params: { mode: 8, rate: 250, intensity: 0.6, echoVolume: 0.7, reverbVolume: 0.3, bass: 5, treble: 5 } },
       { name: 'Tape Wobble', params: { mode: 5, rate: 200, intensity: 0.85, echoVolume: 0.7, reverbVolume: 0.6, bass: 6, treble: 2, bpmSync: 0, syncDivision: '1/8' } },
       { name: 'Ambient Wash', params: { mode: 11, rate: 400, intensity: 0.5, echoVolume: 0.6, reverbVolume: 0.8, bass: 3, treble: 5, bpmSync: 1, syncDivision: '1/4' } },
+      { name: 'King Tubby Space Echo', params: { mode: 8, rate: 330, intensity: 0.74, echoVolume: 0.9, reverbVolume: 0.5, bass: 7, treble: 2 } },
+      { name: 'Scientist Dub', params: { mode: 5, rate: 280, intensity: 0.65, echoVolume: 0.8, reverbVolume: 0.35, bass: 6, treble: 3 } },
+      { name: 'Lee Perry Madness', params: { mode: 11, rate: 220, intensity: 0.88, echoVolume: 0.95, reverbVolume: 0.7, bass: 8, treble: 3 } },
+      { name: 'Roots Echo', params: { mode: 8, rate: 375, intensity: 0.6, echoVolume: 0.75, reverbVolume: 0.45, bass: 7, treble: 2, bpmSync: 1, syncDivision: '1/4' } },
+      { name: 'Sound System Siren', params: { mode: 1, rate: 180, intensity: 0.82, echoVolume: 0.9, reverbVolume: 0.2, bass: 5, treble: 4 } },
     ],
   },
   {
@@ -280,6 +294,8 @@ const tonejs: EffectDescriptor[] = [
       { name: 'Short Tape', params: { firstTap: 120, tapSize: 80, feedback: 30, multiTap: 1, tapeFilter: 0 } },
       { name: 'Long Tape', params: { firstTap: 400, tapSize: 200, feedback: 50, multiTap: 1, tapeFilter: 0 } },
       { name: 'Dub Space', params: { firstTap: 300, tapSize: 250, feedback: 70, multiTap: 1, tapeFilter: 1 } },
+      { name: 'Roots Dub Delay', params: { firstTap: 375, tapSize: 180, feedback: 65, multiTap: 1, tapeFilter: 1 } },
+      { name: 'Sound System Multi-Tap', params: { firstTap: 250, tapSize: 125, feedback: 55, multiTap: 1, tapeFilter: 1 } },
     ],
   },
   {
@@ -304,6 +320,12 @@ const tonejs: EffectDescriptor[] = [
       { name: 'Space Echo', params: { mode: 7, repeatRate: 0.6, intensity: 0.7, echoVolume: 0.9, wow: 0.05, flutter: 0.05, dirt: 0, inputBleed: 0, loopAmount: 0, playheadFilter: 0.8 } },
       { name: 'Dub Siren', params: { mode: 1, repeatRate: 0.8, intensity: 0.85, echoVolume: 1.0, wow: 0.2, flutter: 0.15, dirt: 0.2, inputBleed: 0, loopAmount: 0, playheadFilter: 0.6 } },
       { name: 'Subtle Warmth', params: { mode: 3, repeatRate: 0.3, intensity: 0.3, echoVolume: 0.5, wow: 0.1, flutter: 0.08, dirt: 0.05, inputBleed: 0, loopAmount: 0, playheadFilter: 1 } },
+      { name: 'King Tubby Tape', params: { mode: 7, repeatRate: 0.25, intensity: 0.72, echoVolume: 0.95, wow: 0.18, flutter: 0.12, dirt: 0.15, inputBleed: 0, loopAmount: 0, playheadFilter: 0.55 } },
+      { name: 'Scientist Echo', params: { mode: 4, repeatRate: 0.45, intensity: 0.6, echoVolume: 0.8, wow: 0.08, flutter: 0.06, dirt: 0.08, inputBleed: 0, loopAmount: 0, playheadFilter: 0.75 } },
+      { name: 'Sound System Drop', params: { mode: 1, repeatRate: 0.15, intensity: 0.78, echoVolume: 0.9, wow: 0.12, flutter: 0.1, dirt: 0.12, inputBleed: 0, loopAmount: 0, playheadFilter: 0.5 } },
+      { name: 'Steppers Tape', params: { mode: 4, repeatRate: 0.55, intensity: 0.55, echoVolume: 0.75, wow: 0.06, flutter: 0.04, dirt: 0.05, inputBleed: 0, loopAmount: 0, playheadFilter: 0.85 } },
+      { name: 'Roots Dub Wash', params: { mode: 7, repeatRate: 0.2, intensity: 0.68, echoVolume: 0.88, wow: 0.22, flutter: 0.15, dirt: 0.18, inputBleed: 0, loopAmount: 0, playheadFilter: 0.45 } },
+      { name: 'Runaway Feedback', params: { mode: 5, repeatRate: 0.4, intensity: 0.88, echoVolume: 0.95, wow: 0.1, flutter: 0.08, dirt: 0.1, inputBleed: 0, loopAmount: 0, playheadFilter: 0.65 } },
     ],
   },
 
@@ -606,6 +628,8 @@ const tonejs: EffectDescriptor[] = [
       { name: 'Ethereal', params: { time: 500, feedback: 70, taps: 4, filterType: 'lowpass', filterFreq: 2000, filterQ: 2, modRate: 20, modDepth: 25, stereoSpread: 80, diffusion: 40 } },
       { name: 'Subtle Space', params: { time: 250, feedback: 35, taps: 2, filterType: 'lowpass', filterFreq: 3500, filterQ: 1, modRate: 15, modDepth: 8, stereoSpread: 40, diffusion: 15 } },
       { name: 'Infinite', params: { time: 600, feedback: 85, taps: 4, filterType: 'lowpass', filterFreq: 1800, filterQ: 2.5, modRate: 40, modDepth: 30, stereoSpread: 90, diffusion: 50 } },
+      { name: 'Midnight Dub', params: { time: 500, feedback: 72, taps: 3, filterType: 'lowpass', filterFreq: 2200, filterQ: 1.8, modRate: 12, modDepth: 18, stereoSpread: 70, diffusion: 35 } },
+      { name: 'Dub Atmosphere', params: { time: 666, feedback: 68, taps: 4, filterType: 'lowpass', filterFreq: 1600, filterQ: 2.2, modRate: 25, modDepth: 22, stereoSpread: 85, diffusion: 45 } },
     ],
   },
 ];
