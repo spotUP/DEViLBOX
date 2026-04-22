@@ -85,6 +85,13 @@ export interface DubBusSettings {
   // Filter drop target in Hz — where the bus LPF drops to while a
   // dub_filter_drop pad is held. 80-600 Hz is the classic muffle range.
   filterDropHz: number;
+  // Echo engine — which delay effect the bus uses. Default 'spaceEcho'
+  // preserves the original bus behavior. Swapping the engine changes the
+  // tonal character: RE-201 adds tape magnetisation + spring reverb,
+  // AnotherDelay adds wow/flutter + Freeverb, RETapeEcho adds BBD echo.
+  // Character presets auto-set this per engineer (Tubby=RE-201, etc.).
+  echoEngine: 'spaceEcho' | 're201' | 'anotherDelay' | 'reTapeEcho';
+
   // Echo rate BPM-sync — when non-'off', the SpaceEcho `rate` is derived
   // live from transport BPM using the selected note division instead of
   // the free-running `echoRateMs`. That's how classic dub delays stay
@@ -199,6 +206,7 @@ export const DEFAULT_DUB_BUS: DubBusSettings = {
   echoIntensity: 0.62,   // was 0.55 — 4-5 repeats before decay
   echoWet: 0.7,          // was 0.5 — the echo is the CONTENT of the bus, push it forward
   echoRateMs: 300,
+  echoEngine: 'spaceEcho',
   sidechainAmount: 0.15,
   sidechainSource: 'bus',
   sidechainChannelIndex: 0,
@@ -304,6 +312,7 @@ export const DUB_CHARACTER_PRESETS: Record<Exclude<DubBusSettings['characterPres
       stereoWidth:    0.45,  // narrow — 4-track console + loose spring
       sweepAmount:    0,      // no flanger; Tubby's "sweep" was filter, not comb
       tapeSatMode:   'single',
+      echoEngine:    're201',     // Tubby's MCI → RE-201 signal chain
     },
     springsLength: 0.35, springsDamp: 0.55, springsChaos: 0.20, springsScatter: 0.60, springsTone: 0.55,
     tapeSatDrive:  0.55,
@@ -325,6 +334,7 @@ export const DUB_CHARACTER_PRESETS: Record<Exclude<DubBusSettings['characterPres
       stereoWidth:    1.4,
       sweepAmount:    0,
       tapeSatMode:   'single',
+      echoEngine:    'spaceEcho',  // Scientist used clean digital delays
     },
     springsLength: 0.55, springsDamp: 0.25, springsChaos: 0.40, springsScatter: 0.40, springsTone: 0.70,
     tapeSatDrive:  0.20,
@@ -352,6 +362,7 @@ export const DUB_CHARACTER_PRESETS: Record<Exclude<DubBusSettings['characterPres
       sweepDepthMs:   7,
       sweepFeedback:  0.78,
       tapeSatMode:    'stack', // 3 parallel tape paths ≈ 4-track bouncing
+      echoEngine:    'anotherDelay', // Perry's runaway wow-flutter madness
     },
     springsLength: 0.65, springsDamp: 0.10, springsChaos: 0.85, springsScatter: 0.85, springsTone: 0.35,
     tapeSatDrive:  0.70,   // per-path drive; stack provides total character
@@ -376,6 +387,7 @@ export const DUB_CHARACTER_PRESETS: Record<Exclude<DubBusSettings['characterPres
       sweepDepthMs:   7,
       sweepFeedback:  0.80,
       tapeSatMode:   'single',
+      echoEngine:    'reTapeEcho',  // BBD character for 80s dub
     },
     springsLength: 0.25, springsDamp: 0.85, springsChaos: 0.15, springsScatter: 0.30, springsTone: 0.60,
     tapeSatDrive:  0.35,
@@ -397,6 +409,7 @@ export const DUB_CHARACTER_PRESETS: Record<Exclude<DubBusSettings['characterPres
       stereoWidth:    1.9,    // ultra-wide Ariwa ping-pong
       sweepAmount:    0,
       tapeSatMode:   'single',
+      echoEngine:    're201',       // Ariwa studio's RE-201 for lush tape + spring
     },
     springsLength: 0.55, springsDamp: 0.45, springsChaos: 0.10, springsScatter: 0.55, springsTone: 0.65,
     tapeSatDrive:  0.12,   // pristine
