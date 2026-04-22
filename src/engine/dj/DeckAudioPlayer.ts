@@ -62,6 +62,12 @@ export class DeckAudioPlayer {
     return this._originalFileBytes;
   }
 
+  /** Get the decoded AudioBuffer (stereo). Used for stem separation. */
+  getAudioBuffer(): AudioBuffer | null {
+    if (!this._loaded || !this.player.buffer?.loaded) return null;
+    return this.player.buffer.get() as AudioBuffer;
+  }
+
   private _loadVersion = 0;
 
   async loadAudioFile(buffer: ArrayBuffer, filename: string, precomputedPeaks?: Float32Array): Promise<AudioFileInfo> {

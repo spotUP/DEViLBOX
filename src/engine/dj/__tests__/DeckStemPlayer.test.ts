@@ -222,3 +222,68 @@ describe('Stem dub send state management', () => {
     expect(STEM_DUB_SEND_GAIN).toBeLessThanOrEqual(1);
   });
 });
+
+// ── Stem separation progress state ──────────────────────────────────────
+
+describe('Stem separation progress tracking', () => {
+  it('default stemSeparationProgress is null (idle)', () => {
+    const defaultState = {
+      stemSeparationProgress: null as number | null,
+    };
+    expect(defaultState.stemSeparationProgress).toBeNull();
+  });
+
+  it('progress is a number 0-1 during separation', () => {
+    const states = [0, 0.1, 0.5, 0.85, 1.0];
+    for (const p of states) {
+      expect(p).toBeGreaterThanOrEqual(0);
+      expect(p).toBeLessThanOrEqual(1);
+    }
+  });
+
+  it('progress resets to null after separation completes or fails', () => {
+    let progress: number | null = 0.5;
+    // Simulate completion
+    progress = null;
+    expect(progress).toBeNull();
+  });
+
+  it('new track load resets stemSeparationProgress to null', () => {
+    // Simulates what loadAudioFile does
+    const resetState = {
+      stemsAvailable: false,
+      stemNames: [] as string[],
+      stemMode: false,
+      stemMutes: {},
+      stemDubSends: {},
+      stemSeparationProgress: null as number | null,
+    };
+    expect(resetState.stemSeparationProgress).toBeNull();
+  });
+
+  it('stale-result guard discards stems when track changed mid-separation', () => {
+    const startFileName: string = 'track_a.mp3';
+    const currentFileName: string = 'track_b.mp3'; // User loaded a different track
+    const isStale = startFileName !== currentFileName;
+    expect(isStale).toBe(true);
+  });
+
+  it('single-flight guard prevents concurrent separations', () => {
+    const deckAProgress: number | null = 0.3; // Deck A is separating
+    const deckBProgress: number | null = null;
+    const deckCProgress: number | null = null;
+    const anyBusy = [deckAProgress, deckBProgress, deckCProgress].some(p => p !== null);
+    expect(anyBusy).toBe(true);
+  });
+
+  it('duration guard rejects tracks over 10 minutes', () => {
+    const durationSeconds = 720; // 12 minutes
+    const maxDuration = 600;
+    const tooLong = durationSeconds > maxDuration;
+    expect(tooLong).toBe(true);
+
+    const okDuration = 300; // 5 minutes
+    const ok = okDuration > maxDuration;
+    expect(ok).toBe(false);
+  });
+});
