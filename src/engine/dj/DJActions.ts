@@ -1024,6 +1024,58 @@ export function toggleStemDubSend(deckId: DeckId, stemName: string): void {
   state.setDeckState(deckId, { stemDubSends: newSends });
 }
 
+/** Set per-stem volume (0-1). */
+export function setStemVolume(deckId: DeckId, stemName: string, volume: number): void {
+  try {
+    getDJEngine().getDeck(deckId).stemPlayer.setStemVolume(stemName, volume);
+  } catch { /* engine not ready */ }
+  const state = useDJStore.getState();
+  const newVols = { ...state.decks[deckId].stemVolumes, [stemName]: volume };
+  state.setDeckState(deckId, { stemVolumes: newVols });
+}
+
+/** Toggle solo on an individual stem — solos mute all other stems. */
+export function toggleStemSolo(deckId: DeckId, stemName: string): void {
+  const state = useDJStore.getState();
+  const current = state.decks[deckId].stemSolos[stemName] ?? false;
+  const newSolos = { ...state.decks[deckId].stemSolos };
+  const stemNames = state.decks[deckId].stemNames;
+
+  if (current) {
+    // Un-solo: clear this solo, unmute all
+    newSolos[stemName] = false;
+    const anySoloLeft = stemNames.some(n => n !== stemName && newSolos[n]);
+    if (!anySoloLeft) {
+      // No solos left — unmute all
+      const newMutes: Record<string, boolean> = {};
+      for (const n of stemNames) newMutes[n] = false;
+      state.setDeckState(deckId, { stemSolos: newSolos, stemMutes: newMutes });
+      try {
+        for (const n of stemNames) getDJEngine().getDeck(deckId).setStemMute(n, false);
+      } catch { /* engine not ready */ }
+    } else {
+      // Other solos still active — mute un-soloed stems
+      const newMutes: Record<string, boolean> = {};
+      for (const n of stemNames) newMutes[n] = !newSolos[n];
+      state.setDeckState(deckId, { stemSolos: newSolos, stemMutes: newMutes });
+      try {
+        for (const n of stemNames) getDJEngine().getDeck(deckId).setStemMute(n, !newSolos[n]);
+      } catch { /* engine not ready */ }
+    }
+  } else {
+    // Solo: set this solo, mute all others
+    for (const n of stemNames) newSolos[n] = (n === stemName);
+    const newMutes: Record<string, boolean> = {};
+    for (const n of stemNames) newMutes[n] = (n !== stemName);
+    state.setDeckState(deckId, { stemSolos: newSolos, stemMutes: newMutes });
+    try {
+      for (const n of stemNames) {
+        getDJEngine().getDeck(deckId).setStemMute(n, n !== stemName);
+      }
+    } catch { /* engine not ready */ }
+  }
+}
+
 /**
  * Run Demucs stem separation on the currently loaded deck audio.
  * Works with all formats — audio files have stereo AudioBuffer directly,
@@ -1085,6 +1137,9 @@ export async function separateStems(deckId: DeckId): Promise<void> {
 
     if (result) {
       await deck.loadStems(result, sampleRate);
+      // Compute per-stem waveform peaks for visualization
+      const stemPeaks = deck.stemPlayer.computeStemPeaks();
+      useDJStore.getState().setDeckState(deckId, { stemWaveformPeaks: stemPeaks });
       console.log(`[DJActions] Stems separated for ${fileName}`);
     }
     useDJStore.getState().setDeckState(deckId, { stemSeparationProgress: null });

@@ -276,7 +276,8 @@ export type WaveformMsg =
   | { type: 'cuePoints'; cuePoints: SerializedCuePoint[] }
   | { type: 'overview'; overview: WaveformOverviewState }
   | { type: 'otherDeck'; peaks: number[] | null; durationMs: number; audioPosition: number }
-  | { type: 'resize'; w: number; h: number; dpr: number };
+  | { type: 'resize'; w: number; h: number; dpr: number }
+  | { type: 'stemPeaks'; stems: Record<string, number[]> | null };
 
 // ─── Beat Grid ───────────────────────────────────────────────────────────────
 
