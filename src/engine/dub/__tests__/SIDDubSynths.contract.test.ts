@@ -10,7 +10,7 @@
  *   - DubBus SID mode delegates are wired to the correct synth methods.
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 
 // Test the ADSR byte packing logic (same as module's private helper)
 const adsr = (hi: number, lo: number) => ((hi & 0xF) << 4) | (lo & 0xF);
@@ -122,5 +122,29 @@ describe('DubBus SID mode contract', () => {
     expect(source).toContain('enableSIDMode()');
     // Must call disableSIDMode when stopping SID engine
     expect(source).toContain('disableSIDMode()');
+  });
+
+  it('per-voice SID taps are registered when available (NativeEngineRouting contract)', async () => {
+    const fs = await import('fs');
+    const source = fs.readFileSync('src/engine/replayer/NativeEngineRouting.ts', 'utf-8');
+
+    // Must register per-voice taps and dub send gain with DubBus
+    expect(source).toContain('registerSidDubSend');
+    expect(source).toContain('registerSidVoiceTaps');
+    expect(source).toContain('getVoiceOutputs');
+    expect(source).toContain('getDubSendGain');
+  });
+
+  it('DubBus has registerSidVoiceTaps and registerSidDubSend methods', async () => {
+    const fs = await import('fs');
+    const source = fs.readFileSync('src/engine/dub/DubBus.ts', 'utf-8');
+
+    // Per-voice SID tap registration
+    expect(source).toContain('registerSidVoiceTaps(voiceOutputs: GainNode[])');
+    expect(source).toContain('registerSidDubSend(gain: GainNode, baseline: number)');
+    expect(source).toContain('unregisterSidDubSend()');
+    // Must connect voice taps to dub bus input
+    expect(source).toContain('voiceOutputs[i].connect(tapGain)');
+    expect(source).toContain('tapGain.connect(this.input)');
   });
 });

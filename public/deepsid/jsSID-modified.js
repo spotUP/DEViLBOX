@@ -456,7 +456,7 @@ function playSID(sidurl,subtune) { //convenience function to create default-name
 }
 
 
-function jsSID (bufferlen, background_noise, asid_enable = false, webusb_enable = false)
+function jsSID (bufferlen, background_noise, asid_enable = false, webusb_enable = false, externalCtx = null)
 {
 
  this.author='Hermit'; this.sourcecode='http://hermit.uw.hu'; this.version='0.9.1.7'; this.year='2019';
@@ -487,17 +487,28 @@ function jsSID (bufferlen, background_noise, asid_enable = false, webusb_enable 
   maxsid = 3;
  }
  var asid_enabled = asid_enable;
- //create Web Audio context and scriptNode at jsSID object initialization (at the moment only mono output)
+ //create Web Audio context and scriptNode at jsSID object initialization
  // For ASID, we set a samplerate 200 times bigger than the buffer size - to be able to get a steady 200Hz clock (4x at 50). No audio is output so actual rate doesn't matter
- if ( typeof AudioContext !== 'undefined') { var jsSID_audioCtx = new AudioContext((asid_enabled || webusb_enabled) ? {sampleRate: bufferlen*200} : {}); }
+ // DEViLBOX: accept external AudioContext for per-voice routing
+ if (externalCtx) { var jsSID_audioCtx = externalCtx; }
+ else if ( typeof AudioContext !== 'undefined') { var jsSID_audioCtx = new AudioContext((asid_enabled || webusb_enabled) ? {sampleRate: bufferlen*200} : {}); }
  else { var jsSID_audioCtx = new webkitAudioContext((asid_enabled || webusb_enabled) ? {sampleRate: bufferlen*200} : {}); }
  var samplerate = jsSID_audioCtx.sampleRate; 
- if (typeof jsSID_audioCtx.createJavaScriptNode === 'function') { var jsSID_scriptNode = jsSID_audioCtx.createJavaScriptNode(bufferlen,0,1); }
- else { var jsSID_scriptNode = jsSID_audioCtx.createScriptProcessor(bufferlen,0,1); }
+ // DEViLBOX: 4-channel output (ch0=mix, ch1=voice0, ch2=voice1, ch3=voice2) for per-voice dub taps
+ var numOutputChannels = externalCtx ? 4 : 1;
+ if (typeof jsSID_audioCtx.createJavaScriptNode === 'function') { var jsSID_scriptNode = jsSID_audioCtx.createJavaScriptNode(bufferlen,0,numOutputChannels); }
+ else { var jsSID_scriptNode = jsSID_audioCtx.createScriptProcessor(bufferlen,0,numOutputChannels); }
+ // DEViLBOX: per-voice output accumulators (written by play(), read by onaudioprocess)
+ var voiceOut = [0, 0, 0];
  
  jsSID_scriptNode.onaudioprocess = function(e) { //scriptNode will be replaced by AudioWorker in new browsers sooner or later
   var outBuffer = e.outputBuffer; var outData = outBuffer.getChannelData(0); 
-  for (var sample = 0; sample < outBuffer.length; sample++) { outData[sample]=play(); }
+  if (numOutputChannels >= 4) {
+   var v0Data = outBuffer.getChannelData(1), v1Data = outBuffer.getChannelData(2), v2Data = outBuffer.getChannelData(3);
+   for (var sample = 0; sample < outBuffer.length; sample++) { outData[sample]=play(); v0Data[sample]=voiceOut[0]; v1Data[sample]=voiceOut[1]; v2Data[sample]=voiceOut[2]; }
+  } else {
+   for (var sample = 0; sample < outBuffer.length; sample++) { outData[sample]=play(); }
+  }
   if (typeof buffercallback!=="undefined") buffercallback(); // Added by JCH
  }
  
@@ -625,6 +636,10 @@ function jsSID (bufferlen, background_noise, asid_enable = false, webusb_enable 
  this.setbuffercallback = function(fname) { buffercallback=fname; } // Added by JCH
  this.setSpeedMultiplier = function(multiplier) { speed(multiplier); } // Added by JCH
  this.issuspended = function() { return jsSID_audioCtx.state=="suspended"; } // Added by JCH
+ // DEViLBOX: expose scriptNode + audioCtx for external routing (per-voice dub taps)
+ this.getScriptNode = function() { return jsSID_scriptNode; }
+ this.getAudioContext = function() { return jsSID_audioCtx; }
+ this.hasPerVoiceOutput = function() { return numOutputChannels >= 4; }
 
  var //emulated machine constants
  C64_PAL_CPUCLK = 985248, //Hz
@@ -1032,10 +1047,12 @@ function jsSID (bufferlen, background_noise, asid_enable = false, webusb_enable 
    prevaccu[channel] = phaseaccu[channel]; sourceMSB[num] = MSB;            //(So the decay is not an exact value. Anyway, we just simply keep the value to avoid clicks and support SounDemon digi later...)
 
    if (voiceMask & (1 << channel)) { // Added by JCH
+    var voiceSig = (wfout-0x8000)*(envcnt[channel]/256); // DEViLBOX: capture per-voice signal
+    voiceOut[channel % SID_CHANNEL_AMOUNT] = voiceSig / OUTPUT_SCALEDOWN; // DEViLBOX: per-voice tap (pre-filter, pre-volume)
     //routing the channel signal to either the filter or the unfiltered master output depending on filter-switch SID-registers
-    if (memory[SIDaddr+0x17]&FILTSW[channel]) filtin += (wfout-0x8000)*(envcnt[channel]/256); 
-    else if ((channel%SID_CHANNEL_AMOUNT)!=2 || !(memory[SIDaddr+0x18]&OFF3_BITMASK)) output += (wfout-0x8000)*(envcnt[channel]/256);  
-   }
+    if (memory[SIDaddr+0x17]&FILTSW[channel]) filtin += voiceSig; 
+    else if ((channel%SID_CHANNEL_AMOUNT)!=2 || !(memory[SIDaddr+0x18]&OFF3_BITMASK)) output += voiceSig;  
+   } else { voiceOut[channel % SID_CHANNEL_AMOUNT] = 0; } // DEViLBOX: muted voice = silence
   }
 
   //update readable SID-registers (some SID tunes might use 3rd channel ENV3/OSC3 value as control)
