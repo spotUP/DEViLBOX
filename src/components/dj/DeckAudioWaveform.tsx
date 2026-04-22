@@ -172,6 +172,25 @@ export const DeckAudioWaveform: React.FC<DeckAudioWaveformProps> = ({ deckId }) 
       },
     );
 
+    // Stem waveform peaks (on stem separation / auto-load)
+    const sendStemPeaks = (stemPeaks: Record<string, Float32Array> | null) => {
+      if (!stemPeaks) {
+        bridgeRef.current?.post({ type: 'stemPeaks', stems: null });
+        return;
+      }
+      const serialized: Record<string, number[]> = {};
+      for (const [name, fa] of Object.entries(stemPeaks)) {
+        serialized[name] = Array.from(fa);
+      }
+      bridgeRef.current?.post({ type: 'stemPeaks', stems: serialized });
+    };
+    // Send initial stem peaks if already available
+    sendStemPeaks(useDJStore.getState().decks[deckId].stemWaveformPeaks);
+    const unsubStemPeaks = useDJStore.subscribe(
+      (s) => s.decks[deckId].stemWaveformPeaks,
+      sendStemPeaks,
+    );
+
     // Resize observer
     const observer = new ResizeObserver((entries) => {
       const entry = entries[0];
@@ -192,6 +211,7 @@ export const DeckAudioWaveform: React.FC<DeckAudioWaveformProps> = ({ deckId }) 
       unsubTheme();
       unsubOtherPos();
       unsubOtherPeaks();
+      unsubStemPeaks();
       observer.disconnect();
       bridge.dispose();
       bridgeRef.current = null;

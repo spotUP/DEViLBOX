@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-04-22T07:52:11.467Z
+ * Generated: 2026-04-22T13:08:52.164Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,9 +19,9 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.6036';
-export const BUILD_NUMBER = '6036';
-export const BUILD_HASH = '459764aaa';
+export const BUILD_VERSION = '1.0.6048';
+export const BUILD_NUMBER = '6048';
+export const BUILD_HASH = '2806c02b1';
 export const BUILD_DATE = '2026-04-22';
 
 // Full version (patch IS the build number, so no need to append)
@@ -30,9 +30,57 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.6036',
+    version: '1.0.6048',
     date: '2026-04-22',
     changes: [
+      {
+        type: 'feature',
+        "description": "Add stem separation priority queue, pre-separation, and auto-load"
+      },
+      {
+        type: 'improvement',
+        "description": "Persist stem separation results across component unmount/remount"
+      },
+      {
+        type: 'feature',
+        "description": "Add fine-grained stem separation progress from WASM log parsing"
+      },
+      {
+        type: 'fix',
+        "description": "Fix stem button not visible after HMR (undefined vs null guard)"
+      },
+      {
+        type: 'feature',
+        "description": "Add on-demand stem separation for all DJ formats"
+      },
+      {
+        type: 'fix',
+        "description": "Fix Demucs WASM crash (HEAPU8 export), model URLs, resonance tamer"
+      },
+      {
+        type: 'feature',
+        "description": "Per-stem dub effect sends"
+      },
+      {
+        type: 'feature',
+        "description": "Integrate stem separation into Sample Editor, Import Dialog, Beat Slicer"
+      },
+      {
+        type: 'feature',
+        "description": "DJ deck stem playback (Phase 4)"
+      },
+      {
+        type: 'feature',
+        "description": "Add Demucs WASM stem separation engine (Phase 1-3)"
+      },
+      {
+        type: 'improvement',
+        "description": "Convert Auto Dub from inline toolbar to portal dropdown dialog"
+      },
+      {
+        type: 'fix',
+        "description": "Fix MOVES dropdown clipped by overflow-hidden, preview plays directly"
+      },
       {
         type: 'fix',
         "description": "Harden dub system: clamp feedback params, fix panic cleanup"
@@ -190,54 +238,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'feature',
         "description": "Global FX lane — pattern-editor row above channels"
-      },
-      {
-        type: 'feature',
-        "description": "Runtime channel-tap role classifier — Phase 1"
-      },
-      {
-        type: 'feature',
-        "description": "Global (pattern-level) automation lane engine support"
-      },
-      {
-        type: 'fix',
-        "description": "Chore(dj): DUB 3/4 tab Nch suffix + scratch-action regression tests"
-      },
-      {
-        type: 'feature',
-        "description": "Expose dub.* as picker params — draw curves, edit, save"
-      },
-      {
-        type: 'fix',
-        "description": "Move Zxx effect commands off effTyp 33 — fine-porta collision"
-      },
-      {
-        type: 'feature',
-        "description": "Spectral sample classifier — instrument role from raw PCM"
-      },
-      {
-        type: 'fix',
-        "description": "Dub bus always starts off, even after persisted state"
-      },
-      {
-        type: 'improvement',
-        "description": "Dub Bus, Auto Dub & Auto-Name Channels chapter"
-      },
-      {
-        type: 'improvement',
-        "description": "Tune(dj): Auto-DJ deferral — proportional cap, short-fade skip, tighter chord window"
-      },
-      {
-        type: 'feature',
-        "description": "Zxx dub effect commands — inline dub moves in tracker cells"
-      },
-      {
-        type: 'feature',
-        "description": "Save Auto Dub + DubBusSettings so dubs survive reload"
-      },
-      {
-        type: 'feature',
-        "description": "Pattern-data awareness — look-ahead, density bias, rename boost, break deferral"
       }
     ]
   }

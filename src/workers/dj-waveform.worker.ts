@@ -43,6 +43,18 @@ let colors: DeckColors = { bg: '#6e1418', bgSecondary: '#7c1a1e', bgTertiary: '#
 let beats: number[] | null = null;
 let downbeats: number[] | null = null;
 
+// Stem waveform peaks for per-stem colored layers
+let stemPeakData: Record<string, number[]> | null = null;
+
+const STEM_RENDER_COLORS: Record<string, string> = {
+  drums:  '249, 115, 22',   // orange
+  bass:   '59, 130, 246',   // blue
+  vocals: '236, 72, 153',   // pink
+  other:  '34, 197, 94',    // green
+  guitar: '168, 85, 247',   // purple
+  piano:  '234, 179, 8',    // yellow
+};
+
 function applyOverview(ov: WaveformOverviewState): void {
   frequencyPeaks   = ov.frequencyPeaks;
   loopActive       = ov.loopActive;
@@ -105,6 +117,10 @@ self.onmessage = (e: MessageEvent<WaveformMsg>) => {
       }
       dirty = true;
       break;
+    case 'stemPeaks':
+      stemPeakData = msg.stems;
+      dirty = true;
+      break;
   }
 };
 
@@ -132,7 +148,29 @@ function renderOverview(): void {
   if (waveformPeaks && waveformPeaks.length > 0 && durationSec > 0) {
     const midY = oh / 2;
 
-    if (frequencyPeaks && frequencyPeaks.length === 3 && frequencyPeaks[0].length > 0) {
+    if (stemPeakData && Object.keys(stemPeakData).length > 0) {
+      // Stem-colored overview: render each stem as colored layer
+      const stemOrder = ['other', 'bass', 'drums', 'vocals', 'guitar', 'piano'];
+      const stemEntries = Object.entries(stemPeakData);
+      stemEntries.sort((a, b) => {
+        const ia = stemOrder.indexOf(a[0]);
+        const ib = stemOrder.indexOf(b[0]);
+        return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
+      });
+
+      for (const [stemName, peaks] of stemEntries) {
+        const rgb = STEM_RENDER_COLORS[stemName] ?? '150, 150, 150';
+        const stemBins = peaks.length;
+        const binW = width / stemBins;
+
+        for (let i = 0; i < stemBins; i++) {
+          const barH = peaks[i] * midY * 0.9;
+          if (barH < 0.3) continue;
+          ctx.fillStyle = `rgba(${rgb}, 0.55)`;
+          ctx.fillRect(i * binW, midY - barH, Math.max(1, binW - 0.3), barH * 2);
+        }
+      }
+    } else if (frequencyPeaks && frequencyPeaks.length === 3 && frequencyPeaks[0].length > 0) {
       const low = frequencyPeaks[0], mid = frequencyPeaks[1], high = frequencyPeaks[2];
       const freqBins = low.length;
       const binW = width / freqBins;
@@ -237,13 +275,46 @@ function renderScrollingWaveform(): void {
     ctx.fillRect(otherCenterX - 0.5, topY, 1, wfH);
   }
 
-  // ── This deck's waveform (foreground) — 3-band frequency coloring ──
+  // ── This deck's waveform — stem-colored or frequency-band coloring ──
   const numBins = waveformPeaks.length;
-  const hasFreq = frequencyPeaks && frequencyPeaks.length === 3 && frequencyPeaks[0].length > 0;
-  const freqLow  = hasFreq ? frequencyPeaks![0] : null;
-  const freqMid  = hasFreq ? frequencyPeaks![1] : null;
-  const freqHigh = hasFreq ? frequencyPeaks![2] : null;
-  const freqBins = freqLow?.length ?? 0;
+  const hasStemData = stemPeakData && Object.keys(stemPeakData).length > 0;
+
+  if (hasStemData) {
+    // Stem-colored layers: render each stem as its own colored waveform layer
+    const stemOrder = ['other', 'bass', 'drums', 'vocals', 'guitar', 'piano'];
+    const stemEntries = Object.entries(stemPeakData!);
+    stemEntries.sort((a, b) => {
+      const ia = stemOrder.indexOf(a[0]);
+      const ib = stemOrder.indexOf(b[0]);
+      return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
+    });
+
+    for (const [stemName, peaks] of stemEntries) {
+      const rgb = STEM_RENDER_COLORS[stemName] ?? '150, 150, 150';
+      const stemBins = peaks.length;
+
+      for (let px = 0; px < width; px++) {
+        const timeSec = startSec + (px / width) * windowSec;
+        const fraction = timeSec / durationSec;
+        const binIndex = Math.floor(fraction * stemBins);
+        if (binIndex < 0 || binIndex >= stemBins) continue;
+
+        const played = timeSec < audioPosition;
+        const alpha = played ? 0.35 : 0.6;
+        const amp = peaks[binIndex];
+        const barH = amp * (wfH / 2) * 0.85;
+
+        ctx.fillStyle = `rgba(${rgb}, ${alpha})`;
+        ctx.fillRect(px, midY - barH, 1, barH * 2);
+      }
+    }
+  } else {
+    // Frequency-band coloring (no stems)
+    const hasFreq = frequencyPeaks && frequencyPeaks.length === 3 && frequencyPeaks[0].length > 0;
+    const freqLow  = hasFreq ? frequencyPeaks![0] : null;
+    const freqMid  = hasFreq ? frequencyPeaks![1] : null;
+    const freqHigh = hasFreq ? frequencyPeaks![2] : null;
+    const freqBins = freqLow?.length ?? 0;
 
   for (let px = 0; px < width; px++) {
     const timeSec  = startSec + (px / width) * windowSec;
@@ -286,6 +357,7 @@ function renderScrollingWaveform(): void {
       ctx.fillRect(px, midY - barH, 1, barH * 2);
     }
   }
+  } // end else (no stem data)
 
   // ── Beat grid ticks in scrolling view ──
   const endSec = audioPosition + windowSec / 2;

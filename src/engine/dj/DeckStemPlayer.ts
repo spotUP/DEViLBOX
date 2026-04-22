@@ -106,6 +106,41 @@ export class DeckStemPlayer {
     return stemNames;
   }
 
+  /**
+   * Compute per-stem waveform peaks (for visualization).
+   * Returns a record of stemName → Float32Array of peak values (0-1),
+   * sampled at ~200 peaks per second for smooth rendering.
+   */
+  computeStemPeaks(peaksPerSecond = 200): Record<string, Float32Array> {
+    const result: Record<string, Float32Array> = {};
+    for (const [name, slot] of this.stems.entries()) {
+      const buf = slot.player.buffer;
+      if (!buf) continue;
+      const audioBuffer = buf.get();
+      if (!audioBuffer) continue;
+
+      const totalPeaks = Math.ceil(audioBuffer.duration * peaksPerSecond);
+      const samplesPerPeak = Math.floor(audioBuffer.length / totalPeaks);
+      const peaks = new Float32Array(totalPeaks);
+      const left = audioBuffer.getChannelData(0);
+      const right = audioBuffer.numberOfChannels >= 2 ? audioBuffer.getChannelData(1) : left;
+
+      for (let i = 0; i < totalPeaks; i++) {
+        const start = i * samplesPerPeak;
+        const end = Math.min(start + samplesPerPeak, audioBuffer.length);
+        let maxAbs = 0;
+        for (let s = start; s < end; s++) {
+          const v = Math.abs(left[s]) + Math.abs(right[s]);
+          if (v > maxAbs) maxAbs = v;
+        }
+        // Normalize: sum of abs(L)+abs(R), max is 2.0
+        peaks[i] = Math.min(1, maxAbs * 0.5);
+      }
+      result[name] = peaks;
+    }
+    return result;
+  }
+
   /** Enable stem output (unmute the bus). */
   enable(): void {
     if (!this._loaded) return;

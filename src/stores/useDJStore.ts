@@ -164,7 +164,10 @@ export interface DeckState {
   stemNames: string[];              // e.g. ['drums', 'bass', 'vocals', 'other']
   stemMode: boolean;                // true = stem playback active (vs full mix)
   stemMutes: Record<string, boolean>;  // per-stem mute state
+  stemVolumes: Record<string, number>; // per-stem volume 0-1
+  stemSolos: Record<string, boolean>;  // per-stem solo state
   stemDubSends: Record<string, boolean>;  // per-stem dub bus send toggles
+  stemWaveformPeaks: Record<string, Float32Array> | null; // per-stem waveform peaks for visualization
   stemSeparationProgress: number | null;  // null = idle, 0-1 = separation in progress
 }
 
@@ -266,7 +269,10 @@ const makeDefaultDeckState = (): DeckState => ({
   stemNames: [],
   stemMode: false,
   stemMutes: {},
+  stemVolumes: {},
+  stemSolos: {},
   stemDubSends: {},
+  stemWaveformPeaks: null,
   stemSeparationProgress: null,
 });
 
