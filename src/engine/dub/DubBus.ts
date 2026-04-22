@@ -468,7 +468,7 @@ export class DubBus {
     this.bassShelf.type = 'lowshelf';
     this.bassShelf.frequency.value = this.settings.bassShelfFreqHz;
     this.bassShelf.Q.value = this.settings.bassShelfQ;
-    this.bassShelf.gain.value = this.settings.bassShelfGainDb;
+    this.bassShelf.gain.value = Math.max(-12, Math.min(12, this.settings.bassShelfGainDb));
 
     // Scientist mid-scoop — peaking cut around 700 Hz. Inserted on the
     // return side between Glue compressor and the final LPF so it shapes
@@ -1581,9 +1581,13 @@ export class DubBus {
 
     // ── Coloring params (research doc §3) ───────────────────────────────
     // All smoothed via setTargetAtTime so mid-gig knob twitches don't click.
+    // Bass shelf gain is clamped to ±12 dB — the shelf sits INSIDE the echo
+    // feedback loop, so extreme boosts (+18 dB = 8× linear) cause runaway
+    // that overflows to NaN and permanently kills the audio graph.
+    const safeBassGain = Math.max(-12, Math.min(12, merged.bassShelfGainDb));
     this.bassShelf.frequency.setTargetAtTime(merged.bassShelfFreqHz, now, 0.02);
     this.bassShelf.Q.setTargetAtTime(merged.bassShelfQ, now, 0.02);
-    this.bassShelf.gain.setTargetAtTime(merged.bassShelfGainDb, now, 0.02);
+    this.bassShelf.gain.setTargetAtTime(safeBassGain, now, 0.02);
     this.midScoop.frequency.setTargetAtTime(merged.midScoopFreqHz, now, 0.02);
     this.midScoop.Q.setTargetAtTime(merged.midScoopQ, now, 0.02);
     this.midScoop.gain.setTargetAtTime(merged.midScoopGainDb, now, 0.02);
@@ -1593,7 +1597,7 @@ export class DubBus {
     const masterActive = this.enabled && this.masterInsertActive;
     this.masterBassShelf.frequency.setTargetAtTime(merged.bassShelfFreqHz, now, 0.02);
     this.masterBassShelf.Q.setTargetAtTime(merged.bassShelfQ, now, 0.02);
-    this.masterBassShelf.gain.setTargetAtTime(masterActive ? merged.bassShelfGainDb : 0, now, 0.02);
+    this.masterBassShelf.gain.setTargetAtTime(masterActive ? safeBassGain : 0, now, 0.02);
     this.masterMidScoop.frequency.setTargetAtTime(merged.midScoopFreqHz, now, 0.02);
     this.masterMidScoop.Q.setTargetAtTime(merged.midScoopQ, now, 0.02);
     this.masterMidScoop.gain.setTargetAtTime(masterActive ? merged.midScoopGainDb : 0, now, 0.02);
