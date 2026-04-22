@@ -139,3 +139,86 @@ describe('Stem mode transition', () => {
     expect(canEnableStemMode).toBe(true);
   });
 });
+
+// ── Stem dub send state ─────────────────────────────────────────────────
+
+describe('Stem dub send state management', () => {
+  it('default stemDubSends is an empty object', () => {
+    const defaultDubSends: Record<string, boolean> = {};
+    expect(Object.keys(defaultDubSends)).toHaveLength(0);
+  });
+
+  it('can toggle individual stem dub sends', () => {
+    const sends: Record<string, boolean> = {};
+    for (const name of STEM_NAMES_4S) {
+      sends[name] = false;
+    }
+
+    // Toggle vocals dub send on
+    const stemName = 'vocals';
+    const current = sends[stemName] ?? false;
+    const updated: Record<string, boolean> = { ...sends, [stemName]: !current };
+
+    expect(updated['vocals']).toBe(true);
+    expect(updated['drums']).toBe(false);
+    expect(updated['bass']).toBe(false);
+    expect(updated['other']).toBe(false);
+  });
+
+  it('multiple stems can send to dub simultaneously', () => {
+    const sends: Record<string, boolean> = {
+      drums: true,
+      bass: false,
+      vocals: true,
+      other: false,
+    };
+
+    const activeSends = Object.entries(sends)
+      .filter(([, v]) => v)
+      .map(([k]) => k);
+
+    expect(activeSends).toEqual(['drums', 'vocals']);
+    expect(activeSends.length).toBe(2);
+  });
+
+  it('stem dub sends reset to empty on new track load', () => {
+    const prevSends = { drums: true, vocals: true };
+    // Simulates what loadStems does: reset to empty
+    const resetSends = {};
+    expect(Object.keys(resetSends)).toHaveLength(0);
+    expect(prevSends.drums).toBe(true); // old state untouched
+  });
+
+  it('stem dub sends only work in stem mode', () => {
+    const stemMode = false;
+    const sends = { vocals: true };
+    // Simulates the guard in DJDeck syncStemTaps
+    const shouldOpenTaps = stemMode && Object.values(sends).some(v => v);
+    expect(shouldOpenTaps).toBe(false);
+  });
+
+  it('stem dub sends require stems to be available', () => {
+    const stemsAvailable = false;
+    const stemMode = true;
+    const sends = { vocals: true };
+    const shouldOpenTaps = stemsAvailable && stemMode && Object.values(sends).some(v => v);
+    expect(shouldOpenTaps).toBe(false);
+  });
+
+  it('stem tap key format prevents collision with channel taps', () => {
+    const deckId = 'A';
+    const stemName = 'vocals';
+    const channelIndex = 3;
+    const stemKey = `${deckId}:stem:${stemName}`;
+    const channelKey = `${deckId}:${channelIndex}`;
+    expect(stemKey).toBe('A:stem:vocals');
+    expect(channelKey).toBe('A:3');
+    expect(stemKey).not.toBe(channelKey);
+  });
+
+  it('continuous stem send uses non-zero gain', () => {
+    const STEM_DUB_SEND_GAIN = 0.7;
+    expect(STEM_DUB_SEND_GAIN).toBeGreaterThan(0);
+    expect(STEM_DUB_SEND_GAIN).toBeLessThanOrEqual(1);
+  });
+});

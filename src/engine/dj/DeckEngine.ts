@@ -491,6 +491,14 @@ export class DeckEngine {
       this.stemPlayer.disable();
       this._stemMode = false;
     }
+    // Clear all stem-related store state (mutes, dub sends) for new track
+    useDJStore.getState().setDeckState(this.id, {
+      stemsAvailable: false,
+      stemNames: [],
+      stemMode: false,
+      stemMutes: {},
+      stemDubSends: {},
+    });
     this._playbackMode = 'audio';
 
     // Clear pattern-scratch state from previous track (see loadSong).
@@ -1517,6 +1525,7 @@ export class DeckEngine {
       stemsAvailable: true,
       stemNames,
       stemMutes: Object.fromEntries(stemNames.map(n => [n, false])),
+      stemDubSends: {},
     });
     console.log(`[DeckEngine ${this.id}] Stems loaded: ${stemNames.join(', ')}`);
   }
@@ -1583,6 +1592,28 @@ export class DeckEngine {
     const currentMutes = { ...useDJStore.getState().decks[this.id].stemMutes };
     currentMutes[stemName] = muted;
     useDJStore.getState().setDeckState(this.id, { stemMutes: currentMutes });
+  }
+
+  /**
+   * Open a tap on an individual stem's GainNode for dub bus routing.
+   * Creates an intermediate GainNode so the caller can disconnect
+   * without affecting the main stem playback chain.
+   */
+  openStemTap(stemName: string): { output: GainNode; dispose(): void } | null {
+    if (!this._stemMode || !this.stemPlayer.isLoaded()) return null;
+    const stemGain = this.stemPlayer.getStemGainNode(stemName);
+    if (!stemGain) return null;
+    const ctx = stemGain.context as AudioContext;
+    const tap = ctx.createGain();
+    tap.gain.value = 1;
+    stemGain.connect(tap);
+    return {
+      output: tap,
+      dispose: () => {
+        try { stemGain.disconnect(tap); } catch { /* ok */ }
+        try { tap.disconnect(); } catch { /* ok */ }
+      },
+    };
   }
 
   // ==========================================================================

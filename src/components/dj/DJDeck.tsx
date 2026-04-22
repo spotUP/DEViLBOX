@@ -180,7 +180,92 @@ export const DJDeck: React.FC<DJDeckProps> = ({ deckId }) => {
     };
   }, [deckId]);
 
-  // Wire replayer callbacks to store
+  // ── Stem dub send routing ─────────────────────────────────────────────────
+  //
+  // Mirrors the channel-tap effect above but routes individual stem GainNodes
+  // into the dub bus as continuous sends. When the user toggles a stem's DUB
+  // button, the stem audio feeds the echo/spring/etc. chain live.
+  useEffect(() => {
+    const openStemTaps = new Map<string, { dispose(): void }>();
+    let disposed = false;
+
+    const syncStemTaps = async () => {
+      if (disposed) return;
+      try {
+        const [{ getDJEngine: getEng }, dubModule] = await Promise.all([
+          import('@/engine/dj/DJEngine'),
+          import('@/hooks/drumpad/useMIDIPadRouting'),
+        ]);
+        const bus = dubModule.getDrumPadEngine()?.getDubBus();
+        const deck = getEng().getDeck(deckId);
+        if (!bus || !deck) return;
+
+        const { stemDubSends, stemMode, stemsAvailable } = useDJStore.getState().decks[deckId];
+
+        // If not in stem mode or no stems, close all taps
+        if (!stemMode || !stemsAvailable) {
+          for (const [name, src] of openStemTaps) {
+            try { bus.unregisterDeckStemTap(deckId, name); } catch { /* ok */ }
+            try { src.dispose(); } catch { /* ok */ }
+          }
+          openStemTaps.clear();
+          return;
+        }
+
+        // Close taps no longer wanted
+        for (const [name, src] of openStemTaps) {
+          if (!stemDubSends[name]) {
+            try { bus.unregisterDeckStemTap(deckId, name); } catch { /* ok */ }
+            try { src.dispose(); } catch { /* ok */ }
+            openStemTaps.delete(name);
+          }
+        }
+
+        // Open newly wanted taps
+        for (const [name, enabled] of Object.entries(stemDubSends)) {
+          if (!enabled || openStemTaps.has(name)) continue;
+          const tap = deck.openStemTap(name);
+          if (!tap) continue;
+          try {
+            bus.registerDeckStemTap(deckId, name, tap.output);
+            openStemTaps.set(name, tap);
+          } catch (e) {
+            console.warn(`[DJDeck] registerDeckStemTap(${deckId}:${name}) failed:`, e);
+            try { tap.dispose(); } catch { /* ok */ }
+          }
+        }
+      } catch { /* bus/engine not ready yet */ }
+    };
+
+    // Subscribe to stemDubSends + stemMode + stemsAvailable changes
+    let prevSends = useDJStore.getState().decks[deckId].stemDubSends;
+    let prevMode = useDJStore.getState().decks[deckId].stemMode;
+    let prevAvailable = useDJStore.getState().decks[deckId].stemsAvailable;
+    void syncStemTaps();
+    const unsubscribe = useDJStore.subscribe((state) => {
+      const { stemDubSends, stemMode, stemsAvailable } = state.decks[deckId];
+      if (stemDubSends !== prevSends || stemMode !== prevMode || stemsAvailable !== prevAvailable) {
+        prevSends = stemDubSends;
+        prevMode = stemMode;
+        prevAvailable = stemsAvailable;
+        void syncStemTaps();
+      }
+    });
+
+    return () => {
+      disposed = true;
+      unsubscribe();
+      for (const [name, src] of openStemTaps) {
+        try {
+          void import('@/hooks/drumpad/useMIDIPadRouting').then(m => {
+            m.getDrumPadEngine()?.getDubBus()?.unregisterDeckStemTap(deckId, name);
+          });
+        } catch { /* ok */ }
+        try { src.dispose(); } catch { /* ok */ }
+      }
+      openStemTaps.clear();
+    };
+  }, [deckId]);
   useEffect(() => {
     try {
       const engine = getDJEngine();
