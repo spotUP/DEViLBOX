@@ -12,12 +12,24 @@ static bool  s_hannInit = false;
 static void ensureHann() {
     if (s_hannInit) return;
     for (size_t i = 0; i < STFT::FFT_SIZE; ++i) {
-        // Hann: 0.5 * (1 - cos(2π i / (N-1))).
-        // With 50 % overlap this gives perfect OLA reconstruction on
-        // unmodified frames (sum of squared Hann windows = 1 at hop 1024).
+        // √Hann: sqrt(0.5 * (1 - cos(2π i / (N-1)))).
+        //
+        // Why √Hann and not Hann? We apply this window on BOTH analysis
+        // and synthesis (in ResonanceTamerEffect). Combined: √Hann × √Hann
+        // = Hann. Sum of Hann at 50 % overlap (hop N/2) = 1.0 constant —
+        // perfect OLA reconstruction.
+        //
+        // Alternative pairings cause audible artifacts:
+        //   - Hann analysis + rectangular synthesis: modified frames
+        //     produce boundary clicks at hop rate (47 Hz stutter).
+        //   - Hann analysis + Hann synthesis: OLA sum is Hann² which
+        //     varies 0.5..1.0 → ~47 Hz amplitude modulation.
+        // √Hann on both sides gives the best of both: the synthesis
+        // taper kills boundary clicks; the combined Hann sums to constant.
         const float phase = (2.0f * 3.14159265358979323846f * static_cast<float>(i))
                           / static_cast<float>(STFT::FFT_SIZE - 1);
-        s_hannWindow[i] = 0.5f * (1.0f - std::cos(phase));
+        const float hann = 0.5f * (1.0f - std::cos(phase));
+        s_hannWindow[i] = std::sqrt(hann);
     }
     s_hannInit = true;
 }
@@ -39,27 +51,35 @@ void STFT::push(const float* in, size_t n) {
     for (size_t i = 0; i < n; ++i) {
         inputRing_[inputWritePos_] = in[i];
         inputWritePos_ = (inputWritePos_ + 1) % FFT_SIZE;
-        ++samplesSincePull_;
         ++totalInputWritten_;
     }
 }
 
 const float* STFT::pullFrame() {
-    // Need to have accumulated at least one hop since the previous pull,
-    // AND the input ring must be filled once (first pull waits for FFT_SIZE).
+    // Gate 1: input ring must be fully populated once before any frame is
+    // readable (first pull needs FFT_SIZE samples).
     if (totalInputWritten_ < FFT_SIZE) return nullptr;
-    if (samplesSincePull_ < HOP_SIZE) return nullptr;
 
-    // Read the last FFT_SIZE samples from the ring, oldest first.
-    // Ring is circular; the oldest sample is at inputWritePos_ (next write
-    // overwrites the oldest). Walk FFT_SIZE forward from there.
+    // Gate 2: each subsequent pull must be exactly one hop (HOP_SIZE new
+    // samples) after the previous pull. Without this check, the first pull
+    // could be followed immediately by a second pull reading the same ring
+    // contents — two frames with identical content committed at different
+    // OLA positions, corrupting the first second of output.
+    if (firstPullDone_) {
+        const size_t advanced = totalInputWritten_ - totalInputAtLastPull_;
+        if (advanced < HOP_SIZE) return nullptr;
+    }
+
+    // Walk the ring from the oldest sample (at inputWritePos_ — next slot to
+    // be overwritten) forward FFT_SIZE positions to reach the newest.
     size_t readPos = inputWritePos_;
     const float* hann = window();
     for (size_t i = 0; i < FFT_SIZE; ++i) {
         frameBuf_[i] = inputRing_[readPos] * hann[i];
         readPos = (readPos + 1) % FFT_SIZE;
     }
-    samplesSincePull_ -= HOP_SIZE;
+    totalInputAtLastPull_ = totalInputWritten_;
+    firstPullDone_ = true;
     return frameBuf_.data();
 }
 
@@ -89,12 +109,12 @@ void STFT::clear() {
     std::fill(inputRing_.begin(),  inputRing_.end(),  0.0f);
     std::fill(frameBuf_.begin(),   frameBuf_.end(),   0.0f);
     std::fill(outputRing_.begin(), outputRing_.end(), 0.0f);
-    inputWritePos_     = 0;
-    inputFrameStart_   = 0;
-    samplesSincePull_  = 0;
-    outputReadPos_     = 0;
-    outputWritePos_    = 0;
-    totalInputWritten_ = 0;
+    inputWritePos_        = 0;
+    outputReadPos_        = 0;
+    outputWritePos_       = 0;
+    totalInputWritten_    = 0;
+    totalInputAtLastPull_ = 0;
+    firstPullDone_        = false;
 }
 
 } // namespace devilbox

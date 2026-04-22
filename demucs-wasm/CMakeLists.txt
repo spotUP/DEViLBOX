@@ -30,7 +30,7 @@ add_executable(demucs ${DEMUCS_LIB_SOURCES} ${BRIDGE_SOURCE})
 target_include_directories(demucs PRIVATE ${DEMUCS_ROOT}/src_wasm)
 
 set_target_properties(demucs PROPERTIES
-    LINK_FLAGS "${COMMON_LINK_FLAGS} -s EXPORT_NAME='libdemucs' -s EXPORTED_FUNCTIONS=\"['_malloc', '_free', '_modelInit', '_modelDemixSegment']\""
+    LINK_FLAGS "${COMMON_LINK_FLAGS} -s EXPORT_NAME='libdemucs' -s EXPORTED_FUNCTIONS=\"['_malloc', '_free', '_modelInit', '_modelDemixSegment']\" -s EXPORTED_RUNTIME_METHODS=\"['HEAPU8', 'HEAPF32']\""
 )
 
 # Copy output to public/demucs/

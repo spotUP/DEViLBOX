@@ -51,11 +51,17 @@ private:
     std::vector<float> frameBuf_;    // FFT_SIZE windowed frame handed to caller
     std::vector<float> outputRing_;  // overlap-add accumulator
     size_t inputWritePos_ = 0;        // next write index in input ring (mod FFT_SIZE)
-    size_t inputFrameStart_ = 0;      // read index of the last frame we handed out
-    size_t samplesSincePull_ = 0;     // counts new samples since last pullFrame
     size_t outputReadPos_ = 0;        // next read index in output ring
     size_t outputWritePos_ = 0;       // write head (aligned to frame starts)
-    size_t totalInputWritten_ = 0;    // running sample counter for frame alignment
+    size_t totalInputWritten_ = 0;    // running sample counter since construction
+    // Sample count at the most recent successful pullFrame. A pull only
+    // succeeds when `totalInputWritten_ - totalInputAtLastPull_ >= HOP_SIZE`,
+    // which guarantees each frame advances the read position by exactly
+    // one hop relative to the previous frame — even when the first frame
+    // is pulled from a 2048-sample backlog that would otherwise satisfy
+    // the guard twice in a row.
+    size_t totalInputAtLastPull_ = 0;
+    bool   firstPullDone_ = false;
 };
 
 } // namespace devilbox
