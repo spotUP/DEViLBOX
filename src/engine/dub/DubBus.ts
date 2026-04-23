@@ -2328,11 +2328,53 @@ export class DubBus {
       incomingPreset !== 'custom' &&
       incomingPreset !== this._lastAppliedPreset
     ) {
+      /* Warmup mute for same-engine preset transitions (e.g. Tubby→MadProfessor,
+         both re201). An engine swap has its own 120ms mute inside _swapEchoEngine;
+         but when the echo engine is unchanged, _swapEchoEngine returns early and
+         no mute fires — so the spring.setParamById() storm in _applyCharacterPreset
+         (5 params in rapid succession) emits an audible click that a +5–9dB bass
+         shelf then amplifies into the "bwoooaap" + reverb-compressor pumping.
+         Skipping when a swap IS about to happen (_swapEchoEngine handles its
+         own mute). */
+      const engineChanging = merged.echoEngine !== this._currentEchoEngine;
+      if (!engineChanging) {
+        this._warmupMute();
+      }
       this._applyCharacterPreset(incomingPreset);
       this._lastAppliedPreset = incomingPreset;
     } else if (incomingPreset === 'custom') {
       this._lastAppliedPreset = 'custom';
     }
+  }
+
+  /**
+   * Hold feedback + return_ at 0 for 120ms, then ramp back to their prior
+   * values. Used for character-preset transitions that don't involve an
+   * engine swap (same-engine param storms can still push the spring reverb
+   * into emitting a transient that kills the reverb via compressor pumping).
+   * The engine-swap path has its own inline warmup — do not call this from
+   * inside _swapEchoEngine.
+   */
+  private _warmupMute(): void {
+    const ctx = this.context;
+    const RAMP_SEC = 0.02;
+    const WARMUP_SEC = 0.12;
+    const priorFeedback = this.feedback.gain.value;
+    const priorReturn = this.return_.gain.value;
+    try {
+      const now = ctx.currentTime;
+      this.feedback.gain.cancelScheduledValues(now);
+      this.feedback.gain.setValueAtTime(this.feedback.gain.value, now);
+      this.feedback.gain.linearRampToValueAtTime(0, now + RAMP_SEC);
+      this.feedback.gain.setValueAtTime(0, now + WARMUP_SEC);
+      this.feedback.gain.linearRampToValueAtTime(priorFeedback, now + WARMUP_SEC + RAMP_SEC);
+
+      this.return_.gain.cancelScheduledValues(now);
+      this.return_.gain.setValueAtTime(this.return_.gain.value, now);
+      this.return_.gain.linearRampToValueAtTime(0, now + RAMP_SEC);
+      this.return_.gain.setValueAtTime(0, now + WARMUP_SEC);
+      this.return_.gain.linearRampToValueAtTime(priorReturn, now + WARMUP_SEC + RAMP_SEC);
+    } catch { /* ok */ }
   }
 
   /**
