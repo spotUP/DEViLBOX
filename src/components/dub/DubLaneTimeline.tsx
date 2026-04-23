@@ -134,8 +134,13 @@ export const DubLaneTimeline: React.FC = () => {
         const ts = useTransportStore.getState();
         sub = ts.currentRow;
         if (ts.isPlaying && replayer) {
-          const audioTime = Tone.now();
-          const state = replayer.getStateAtTime(audioTime, true);
+          // Match PatternEditorCanvas: lookahead + active drain of the ring
+          // buffer. Using peek=true here left the lane seeing whatever the
+          // last other consumer dequeued, which caused one-frame-late row
+          // transitions and a visible stutter with FXX-groove modules where
+          // row durations alternate 4x.
+          const audioTime = Tone.now() + 0.01;
+          const state = replayer.getStateAtTime(audioTime);
           if (state && state.duration > 0) {
             const progress = Math.min(Math.max((audioTime - state.time) / state.duration, 0), 1);
             sub = state.row + progress;
