@@ -1123,12 +1123,8 @@ export class DubBus {
    * useful (SID audio doesn't flow through those channels).
    */
   setSidVoiceDubSend(voiceIndex: number, amount: number): boolean {
-    if (!this._sidMode) {
-      console.log(`[DubBus] setSidVoiceDubSend ch${voiceIndex}=${amount.toFixed(2)} → NOT SID MODE (returning false)`);
-      return false;
-    }
+    if (!this._sidMode) return false;
     const clamped = Math.max(0, Math.min(1, amount));
-    console.log(`[DubBus] setSidVoiceDubSend ch${voiceIndex}=${clamped.toFixed(2)} sidMode=${this._sidMode} hasPerVoice=${this._sidHasPerVoiceTaps} hasDubSendGain=${!!this._sidDubSendGain} enabled=${this.settings.enabled}`);
 
     // Path 1: per-voice tap (jsSID only — we registered them explicitly).
     // Guarded by _sidHasPerVoiceTaps so stale non-SID channelTaps left over
@@ -1152,7 +1148,6 @@ export class DubBus {
       this._sidDubSendGain.gain.cancelScheduledValues(now);
       this._sidDubSendGain.gain.setValueAtTime(this._sidDubSendGain.gain.value, now);
       this._sidDubSendGain.gain.linearRampToValueAtTime(maxSend, now + 0.02);
-      console.log(`[DubBus] Path2 ramp _sidDubSendGain to ${maxSend.toFixed(2)} (sliders=[${this._sidChannelDubSends.map(v=>v.toFixed(2)).join(',')}])`);
       return true;
     }
 
