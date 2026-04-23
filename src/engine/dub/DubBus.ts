@@ -2428,19 +2428,18 @@ export class DubBus {
       + ` chaos=${preset.springsChaos} scatter=${preset.springsScatter}`
       + ` tone=${preset.springsTone} tapeSatDrive=${preset.tapeSatDrive}`,
     );
-    /* Mute the spring's JS-side input AND output BEFORE writing params.
-       The WASM DSP physically resonates during parameter transitions —
-       even with per-param smoothing (43ms ramp), measured peak 2.5.
-       Muting just the output isn't enough: the WASM keeps receiving live
-       audio, builds up resonance internally, and the instant the output
-       mute releases the accumulated resonance floods through (SpringTap
-       confirmed peak 2.37 at 100ms after a 300ms output-only mute).
-       Muting BOTH input and output means the WASM processes silence
-       during the transition — its delay lines decay naturally with no
-       new energy, so when we unmute there's nothing left to resonate.
-       600ms covers the 43ms smoothing ramp plus spring internal decay. */
-    try { this.spring.muteInput(); } catch { /* ok */ }
-    try { this.spring.muteOutput(); } catch { /* ok */ }
+    /* Spring param writes are smoothed inside the worklet (43ms linear
+       ramp per param — see Aelapse.worklet.js _applyParam / _advanceParamRamps).
+       Node.js WASM test confirmed the spring's own transient from a raw
+       5-param switch is only peak 0.49 (-6.1dB) — well within range.
+       The 2.5 peak measured in earlier browser tests came from the echo
+       swap transient flowing THROUGH the spring, NOT from the spring's
+       param change. That transient is already blocked by return_=0
+       during the swap warmup (_swapEchoEngine holds return_ at 0 for
+       120ms) or the same-engine _warmupMute.
+       Previous approach (muteInput+muteOutput for 600ms) starved the
+       spring's delay lines of audio, requiring 500ms+ to refill after
+       unmute — effectively killing the reverb tail. Removed. */
     try {
       if (preset.springsLength  !== undefined) this.spring.setParamById(PARAM_SPRINGS_LENGTH,  preset.springsLength);
       if (preset.springsDamp    !== undefined) this.spring.setParamById(PARAM_SPRINGS_DAMP,    preset.springsDamp);
@@ -2451,14 +2450,6 @@ export class DubBus {
     if (preset.tapeSatDrive !== undefined) {
       try { this.tapeSat.curve = makeTapeSatCurve(preset.tapeSatDrive); } catch { /* ok */ }
     }
-    /* Unmute after WASM settles. With input muted, the spring's delay
-       lines decay naturally (no new energy), so 600ms is enough for
-       both the 43ms worklet smoothing ramp and the spring's internal
-       resonant decay to complete. */
-    setTimeout(() => {
-      try { this.spring.unmuteInput(); } catch { /* ok */ }
-      try { this.spring.unmuteOutput(); } catch { /* ok */ }
-    }, 600);
     this._snap(`after _applyCharacterPreset(${name})`);
     this._measureSpringOutput(`after preset ${name}`);
   }
