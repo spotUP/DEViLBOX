@@ -183,6 +183,16 @@ export class DubBus {
   // iteration (shelf boost → saturator clips to 1.0 → feedback sends
   // back → shelf boosts again → stable full-amplitude bass drone).
   private feedbackShelfComp: BiquadFilterNode;
+  /** NaN/Inf scrubber inserted between `echo.output` and `this.feedback`.
+   *  Starts life as a passthrough GainNode while the AudioWorklet module
+   *  loads, then the worklet is spliced in-place (transparent to the rest
+   *  of the graph). Prevents transient non-finite samples from the echo
+   *  engine (e.g. first block of a freshly-initialised RE-201 WASM
+   *  worklet, or a disposed ToneAudioNode's final block) from latching
+   *  the feedback-chain biquads to "state is bad" permanently.
+   *  Ref: 2026-04-29 Tubby-preset crash investigation. */
+  private _feedbackScrubber: AudioNode;
+  private _feedbackScrubberIsWorklet = false;
   // Scientist mid-scoop — peaking cut around 700 Hz. Sits on the return
   // side (post-comp) so it shapes the already-echoed/sprung signal.
   private midScoop: BiquadFilterNode;
@@ -252,6 +262,49 @@ export class DubBus {
     this._springWetCache = v;
     try { this.spring.setParamById(PARAM_SPRINGS_DRYWET, v); } catch { /* ok */ }
   }
+
+  /** Asynchronously load `nan-scrubber.worklet.js` and splice the worklet
+   *  in place of the placeholder GainNode on the feedback tap. Idempotent;
+   *  no-ops if already upgraded or if the load fails (falls back silently
+   *  to the passthrough — bus still functions, just without the NaN guard).
+   *  Only called once from the constructor. */
+  private async _loadFeedbackScrubberWorklet(): Promise<void> {
+    if (this._feedbackScrubberIsWorklet) return;
+    try {
+      const base = (import.meta as { env?: { BASE_URL?: string } }).env?.BASE_URL ?? '/';
+      if (!DubBus._scrubberModuleLoaded.has(this.context)) {
+        let p = DubBus._scrubberModulePromises.get(this.context);
+        if (!p) {
+          p = this.context.audioWorklet.addModule(`${base}worklets/nan-scrubber.worklet.js`);
+          DubBus._scrubberModulePromises.set(this.context, p);
+        }
+        await p;
+        DubBus._scrubberModuleLoaded.add(this.context);
+      }
+      const worklet = new AudioWorkletNode(this.context, 'nan-scrubber', {
+        numberOfInputs: 1,
+        numberOfOutputs: 1,
+        outputChannelCount: [2],
+        channelCount: 2,
+        channelCountMode: 'explicit',
+      });
+      /* Splice: disconnect the placeholder GainNode, connect the worklet
+         in its place. feedback → (old scrubber) → feedbackShelfComp becomes
+         feedback → worklet → feedbackShelfComp. Must be atomic — do the
+         disconnect AFTER the connect so the feedback loop is never open. */
+      try { this.feedback.connect(worklet); } catch { /* ok */ }
+      try { worklet.connect(this.feedbackShelfComp); } catch { /* ok */ }
+      try { this.feedback.disconnect(this._feedbackScrubber); } catch { /* ok */ }
+      try { (this._feedbackScrubber as GainNode).disconnect(); } catch { /* ok */ }
+      this._feedbackScrubber = worklet;
+      this._feedbackScrubberIsWorklet = true;
+    } catch (err) {
+      console.warn('[DubBus] NaN-scrubber worklet load failed — using passthrough:', err);
+    }
+  }
+  private static _scrubberModuleLoaded = new WeakSet<AudioContext>();
+  private static _scrubberModulePromises = new WeakMap<AudioContext, Promise<void>>();
+
 
   /**
    * Hot-swap the echo engine without dropping audio. Ramps the return gain
@@ -999,6 +1052,20 @@ export class DubBus {
     this.feedbackShelfComp.Q.value = this.settings.bassShelfQ;
     this.feedbackShelfComp.gain.value = -Math.max(-12, Math.min(12, this.settings.bassShelfGainDb));
 
+    /* NaN/Inf scrubber on the feedback tap (echo.output → feedback → SCRUBBER
+       → feedbackShelfComp → input). Starts as a passthrough GainNode so the
+       graph is live immediately, then the AudioWorklet module is loaded
+       asynchronously and spliced in as a drop-in replacement. Without this
+       guard, a single bad sample from the echo engine (RE-201 WASM during
+       worklet-swap, a ToneAudioNode's final disposal block, denormal
+       runaway) latches the hpf cascade + bassShelf + feedbackShelfComp to
+       NaN internally — Chrome surfaces "BiquadFilterNode: state is bad"
+       and the bus goes permanently silent until full engine re-init. */
+    const scrubPassthrough = this.context.createGain();
+    scrubPassthrough.gain.value = 1;
+    this._feedbackScrubber = scrubPassthrough;
+    void this._loadFeedbackScrubberWorklet();
+
     // Pink noise floor — ~-55 dBFS continuous noise that you don't notice
     // during normal play, but becomes audible during mute-and-dub drops as
     // the "tape hiss" texture of vintage dub records. Two-second loop buffer
@@ -1058,7 +1125,8 @@ export class DubBus {
     // Pre-spring means the siren rings without flooding the spring with
     // runaway self-oscillation.
     Tone.connect(this.echo.output, this.feedback as unknown as Tone.InputNode);
-    this.feedback.connect(this.feedbackShelfComp);
+    this.feedback.connect(this._feedbackScrubber);
+    this._feedbackScrubber.connect(this.feedbackShelfComp);
     this.feedbackShelfComp.connect(this.input);
     // Post-spring output chain with coloring inserts (mid scoop + M/S width).
     const springOut = (this.spring as unknown as { output: Tone.ToneAudioNode }).output;
@@ -1840,91 +1908,15 @@ export class DubBus {
 
     const merged: DubBusSettings = { ...this.settings, ...settings };
 
-    /* DIAGNOSTIC: log every biquad's current param values + target values
-       when a character preset is picked. Gated on `characterPreset`
-       transitions so the console doesn't flood on crossfader sweeps.
-       Used to find the exact biquad that Chrome flags "state is bad". */
-    const isPresetPick = typeof settings.characterPreset === 'string'
-      && settings.characterPreset !== this.settings.characterPreset;
-    if (isPresetPick) {
-      const safeBassGain = Math.max(-12, Math.min(12, merged.bassShelfGainDb));
-      const hpfFreq = merged.hpfStepped ? snapToAltecStep(merged.hpfCutoff) : merged.hpfCutoff;
-      console.log('[DubBus/diag] ===== preset pick:', settings.characterPreset, '=====');
-      console.log('[DubBus/diag] PRE  hpf:', {
-        freq: this.hpf.frequency.value, Q: this.hpf.Q.value, type: this.hpf.type,
-      });
-      console.log('[DubBus/diag] PRE  hpf2:', {
-        freq: this.hpf2.frequency.value, Q: this.hpf2.Q.value,
-      });
-      console.log('[DubBus/diag] PRE  hpf3:', {
-        freq: this.hpf3.frequency.value, Q: this.hpf3.Q.value,
-      });
-      console.log('[DubBus/diag] PRE  bassShelf:', {
-        freq: this.bassShelf.frequency.value,
-        Q: this.bassShelf.Q.value,
-        gain: this.bassShelf.gain.value,
-        type: this.bassShelf.type,
-      });
-      console.log('[DubBus/diag] PRE  feedbackShelfComp:', {
-        freq: this.feedbackShelfComp.frequency.value,
-        Q: this.feedbackShelfComp.Q.value,
-        gain: this.feedbackShelfComp.gain.value,
-        type: this.feedbackShelfComp.type,
-      });
-      console.log('[DubBus/diag] PRE  midScoop:', {
-        freq: this.midScoop.frequency.value, Q: this.midScoop.Q.value,
-        gain: this.midScoop.gain.value, type: this.midScoop.type,
-      });
-      console.log('[DubBus/diag] PRE  lpf:', {
-        freq: this.lpf.frequency.value, Q: this.lpf.Q.value, type: this.lpf.type,
-      });
-      console.log('[DubBus/diag] PRE  feedback.gain:', this.feedback.gain.value);
-      console.log('[DubBus/diag] PRE  input.gain:', this.input.gain.value);
-      console.log('[DubBus/diag] PRE  return_.gain:', this.return_.gain.value);
-      console.log('[DubBus/diag] PRE  echo type:', this._currentEchoEngine);
-      console.log('[DubBus/diag] targets:', {
-        hpfFreq, bassShelfFreq: merged.bassShelfFreqHz, bassShelfQ: merged.bassShelfQ,
-        bassShelfGain: safeBassGain, feedbackShelfGain: -safeBassGain,
-        midScoopFreq: merged.midScoopFreqHz, midScoopQ: merged.midScoopQ,
-        midScoopGain: merged.midScoopGainDb, newEchoEngine: merged.echoEngine,
-      });
-
-      /* Schedule post-mortem reads at t+50ms, t+200ms, t+500ms to see
-         WHICH biquad param first reads back as NaN. Chrome sets the
-         internal filter state to NaN when it's unstable, but the
-         AudioParam .value reflects the scheduled ramp — if we see NaN
-         in .value, the param itself was written badly. If params stay
-         finite but the bus is silent, the NaN is in the filter's
-         internal delay taps (not readable from JS — would need an
-         AnalyserNode tripwire). */
-      const audit = (tag: string) => {
-        const check = (label: string, b: BiquadFilterNode) => {
-          const f = b.frequency.value, q = b.Q.value, g = b.gain.value;
-          const bad = !Number.isFinite(f) || !Number.isFinite(q) || !Number.isFinite(g);
-          if (bad || tag === 't+500ms') {
-            console.log(`[DubBus/diag] ${tag} ${label}: freq=${f} Q=${q} gain=${g}${bad ? ' ❌ NaN!' : ''}`);
-          }
-        };
-        check('hpf', this.hpf);
-        check('hpf2', this.hpf2);
-        check('hpf3', this.hpf3);
-        check('bassShelf', this.bassShelf);
-        check('feedbackShelfComp', this.feedbackShelfComp);
-        check('midScoop', this.midScoop);
-        check('lpf', this.lpf);
-        const gainCheck = (label: string, g: GainNode) => {
-          const v = g.gain.value;
-          if (!Number.isFinite(v) || tag === 't+500ms') {
-            console.log(`[DubBus/diag] ${tag} ${label}.gain=${v}${!Number.isFinite(v) ? ' ❌' : ''}`);
-          }
-        };
-        gainCheck('input', this.input);
-        gainCheck('feedback', this.feedback);
-        gainCheck('return_', this.return_);
-      };
-      setTimeout(() => audit('t+50ms'), 50);
-      setTimeout(() => audit('t+200ms'), 200);
-      setTimeout(() => audit('t+500ms'), 500);
+    /* Character preset transition — log a compact one-liner for support
+       triage. Verbose per-biquad diagnostic dumps are no longer needed
+       (the 2026-04-29 Tubby crash was fixed by installing a NaN-scrubber
+       AudioWorklet on the feedback tap — see _loadFeedbackScrubberWorklet).
+       Left as a breadcrumb so future crashes can be correlated with the
+       preset pick that triggered them. */
+    if (typeof settings.characterPreset === 'string'
+        && settings.characterPreset !== this.settings.characterPreset) {
+      console.log(`[DubBus] characterPreset: ${this.settings.characterPreset} → ${settings.characterPreset}`);
     }
 
     // Log every *meaningful* settings write — enable flag, non-zero echo /
