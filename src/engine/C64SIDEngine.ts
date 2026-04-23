@@ -51,6 +51,7 @@ export class C64SIDEngine {
   private gainNode: GainNode | null = null;
   private masterVolume = 1.0; // 0-1 linear
   private playbackRate = 1.0; // pitch multiplier (1.0 = normal)
+  private dubBoost = 1.0; // dub-mode make-up gain multiplier on top of ENGINE_GAIN
 
   // Hardware SID output — reads emulated SID registers at audio-clock rate
   // and forwards them to SIDHardwareManager (USB-SID-Pico / ASID). Skipped
@@ -556,16 +557,46 @@ export class C64SIDEngine {
     this.masterVolume = Math.max(0, Math.min(1, volume));
     if (this.engineType) {
       const engineGain = ENGINE_GAIN[this.engineType] ?? 1.0;
+      const effective = engineGain * this.dubBoost;
 
       // jsSID uses its own AudioContext — control volume via its API
       if (this.engineType === 'jssid' && this.engine) {
-        (this.engine as JSSIDEngine).setVolume(this.masterVolume * engineGain);
+        (this.engine as JSSIDEngine).setVolume(this.masterVolume * effective);
       }
       // For engines routed through synthBus, only apply engine-specific compensation.
       // Master volume is handled by ToneEngine's masterChannel.
       if (this.gainNode) {
-        this.gainNode.gain.value = engineGain;
+        this.gainNode.gain.value = effective;
       }
+    }
+  }
+
+  /**
+   * Dub-boost make-up gain. When the user enables the dub deck in SID mode
+   * the SID's dry signal often sits much quieter than the dub effects
+   * (especially CheeseCutter/webSID imports). DubBus calls this with
+   * boost > 1 on enable to bring the SID up to parity with the wet chain,
+   * and 1 on disable to restore the baseline. Applied multiplicatively on
+   * top of the engine-specific ENGINE_GAIN so per-engine calibration is
+   * preserved.
+   */
+  setDubBoost(boost: number): void {
+    const b = Math.max(0.25, Math.min(4, boost));
+    this.dubBoost = b;
+    if (!this.engineType) return;
+    const engineGain = ENGINE_GAIN[this.engineType] ?? 1.0;
+    const target = engineGain * b;
+    if (this.engineType === 'jssid' && this.engine) {
+      try { (this.engine as JSSIDEngine).setVolume(this.masterVolume * target); } catch { /* ok */ }
+    }
+    if (this.gainNode) {
+      try {
+        const ctx = this.gainNode.context;
+        const now = ctx.currentTime;
+        this.gainNode.gain.cancelScheduledValues(now);
+        this.gainNode.gain.setValueAtTime(this.gainNode.gain.value, now);
+        this.gainNode.gain.linearRampToValueAtTime(target, now + 0.12);
+      } catch { /* ok */ }
     }
   }
 
