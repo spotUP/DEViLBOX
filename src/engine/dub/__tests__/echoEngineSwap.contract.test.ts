@@ -165,25 +165,40 @@ describe('DubBus — biquad automation safety contract (Chrome "state is bad" pr
   });
 });
 
-describe('RE201Effect.swapToWasm — fallback-disconnect-first contract', () => {
-  const src = read('src/engine/effects/RE201Effect.ts');
-  const fn = extractFn(src, 'swapToWasm');
+describe('Echo effect swapToWasm — fallback-disconnect-first contract (all dub-bus echoes)', () => {
+  /* Three of the four DubBus echo engines have a JS fallback → WASM
+     swap path: RE-201 (Tubby, Mad Professor), RETapeEcho (Mad Professor
+     alternate), AnotherDelay (Perry). All three must disconnect the
+     fallback BEFORE wiring the worklet into the wet summing node —
+     otherwise the fallback's internal recursive delay loop briefly
+     overlaps with the worklet output, producing a transient that
+     poisons upstream biquads in the DubBus feedback chain. */
+  const echoFiles = [
+    { path: 'src/engine/effects/RE201Effect.ts', label: 'RE-201' },
+    { path: 'src/engine/effects/RETapeEchoEffect.ts', label: 'RETapeEcho' },
+    { path: 'src/engine/effects/AnotherDelayEffect.ts', label: 'AnotherDelay' },
+  ];
 
-  it('calls `disconnectFallback()` BEFORE connecting the worklet to the wet node', () => {
-    const disconnectIdx = fn.indexOf('this.disconnectFallback()');
-    const workletConnectIdx = fn.indexOf('this.workletNode.connect(rawWet)');
-    expect(disconnectIdx, 'disconnectFallback call must be present').toBeGreaterThan(-1);
-    expect(workletConnectIdx, 'worklet→wet connect must be present').toBeGreaterThan(-1);
-    expect(disconnectIdx).toBeLessThan(workletConnectIdx);
-  });
+  for (const { path, label } of echoFiles) {
+    describe(label, () => {
+      const src = read(path);
+      const fn = extractFn(src, 'swapToWasm');
 
-  it('also disconnects fallback before connecting input to worklet', () => {
-    /* Both wet-side (worklet→wet) and input-side (input→worklet) must
-       happen after fallback teardown so the wet node and input fan-out
-       are never double-driven. */
-    const disconnectIdx = fn.indexOf('this.disconnectFallback()');
-    const inputConnectIdx = fn.indexOf('rawInput.connect(this.workletNode)');
-    expect(inputConnectIdx, 'input→worklet connect must be present').toBeGreaterThan(-1);
-    expect(disconnectIdx).toBeLessThan(inputConnectIdx);
-  });
+      it('calls `disconnectFallback()` BEFORE connecting the worklet to the wet node', () => {
+        const disconnectIdx = fn.indexOf('this.disconnectFallback()');
+        const workletConnectIdx = fn.indexOf('this.workletNode.connect(rawWet)');
+        expect(disconnectIdx, `${label}: disconnectFallback must be present`).toBeGreaterThan(-1);
+        expect(workletConnectIdx, `${label}: worklet→wet connect must be present`).toBeGreaterThan(-1);
+        expect(disconnectIdx).toBeLessThan(workletConnectIdx);
+      });
+
+      it('disconnects fallback before wiring input to worklet', () => {
+        const disconnectIdx = fn.indexOf('this.disconnectFallback()');
+        const inputConnectIdx = fn.indexOf('rawInput.connect(this.workletNode)');
+        expect(inputConnectIdx, `${label}: input→worklet connect must be present`).toBeGreaterThan(-1);
+        expect(disconnectIdx).toBeLessThan(inputConnectIdx);
+      });
+    });
+  }
 });
+
