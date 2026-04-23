@@ -206,6 +206,7 @@ function getEditorMode(synthType: SynthType): EditorMode {
   if (synthType === 'AsapSynth') return 'wasm-info';
   if (synthType === 'KlysSynth') return 'wasm-info';
   if (synthType === 'QsfSynth') return 'wasm-info';
+  if (synthType === 'UADESynth') return 'wasm-info';
   // UADEEditableSynth already has chip-RAM editing via UADE — falls through to existing handler
   if (synthType === 'PreTrackerSynth') return 'pretracker';
   if (isHivelyType(synthType)) return 'hively';
