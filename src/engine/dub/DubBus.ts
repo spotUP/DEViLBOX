@@ -30,6 +30,8 @@ import { VinylNoiseEffect } from '../effects/VinylNoiseEffect';
 import { ToneArmEffect } from '../effects/ToneArmEffect';
 import { MadProfessorPlateEffect } from '../effects/MadProfessorPlateEffect';
 import { DattorroPlateEffect } from '../effects/DattorroPlateEffect';
+import { ParametricEQEffect } from '../effects/ParametricEQEffect';
+import { CalfPhaserEffect } from '../effects/CalfPhaserEffect';
 import { getNativeAudioNode } from '@utils/audio-context';
 import type { DJMixerEngine } from '../dj/DJMixerEngine';
 import type { DeckId } from '../dj/DeckEngine';
@@ -260,6 +262,15 @@ export class DubBus {
   private sweepFeedback: GainNode;
   private sweepFeedbackHpf: BiquadFilterNode;
   private sweepOutput: GainNode;      // wet amount (0..1)
+  // ─── True phaser (CalfPhaser WASM) — alternative to comb sweep ────────
+  // Both comb and phaser are permanently wired from sweepInput; their
+  // output gains crossfade based on sweepMode. No disconnect/reconnect.
+  private phaser: CalfPhaserEffect;
+  private phaserOutput: GainNode;     // 0 when sweepMode='comb', sweepAmount when 'phaser'
+  private combOutput: GainNode;       // sweepAmount when sweepMode='comb', 0 when 'phaser'
+  // ─── Return EQ — WASM parametric inserted between midScoop and LPF ────
+  // Always 100% wet (series insert). Bypass via flat gain (0 dB).
+  private returnEQ: ParametricEQEffect;
   /** Aelapse-ported spring-reverb DSP (C++ → WASM). Replaces the old
    *  Tone.js-based SpringReverbEffect — proper tank simulation with chaos,
    *  damping, and per-spring scatter. Delay side disabled since the bus
@@ -630,8 +641,77 @@ export class DubBus {
     }
   }
 
+  // ─── Return EQ public API ───────────────────────────────────────────────
+
+  /** Set the primary return EQ band (band 2 peaking). Used by eqSweep move. */
+  setReturnEQ(freq: number, gain: number, q: number): void {
+    this.returnEQ.setB2Freq(freq);
+    this.returnEQ.setB2Gain(gain);
+    this.returnEQ.setB2Q(q);
+    this.settings = {
+      ...this.settings,
+      returnEqEnabled: gain !== 0,
+      returnEqFreq: freq,
+      returnEqGain: gain,
+      returnEqQ: q,
+    };
+  }
+
+  /** Get the current return EQ band 2 frequency (for sweep animation). */
+  getReturnEQFreq(): number { return this.settings.returnEqFreq; }
+  /** Get current return EQ band 2 gain. */
+  getReturnEQGain(): number { return this.settings.returnEqGain; }
+  /** Get current return EQ band 2 Q. */
+  getReturnEQQ(): number { return this.settings.returnEqQ; }
+
+  // EQ sweep state — managed by DubBus so panic/dispose can clean up.
+  private _eqSweepTimer: ReturnType<typeof setInterval> | null = null;
+  private _eqSweepPrior: { freq: number; gain: number; q: number } | null = null;
+
+  /** Start an EQ sweep from startHz to endHz over sweepSec. Returns disposer.
+   *  Uses audioContext.currentTime as clock. Snapshots prior EQ state. */
+  startEQSweep(startHz: number, endHz: number, gain: number, q: number, sweepSec: number): () => void {
+    // Snapshot prior state
+    this._eqSweepPrior = {
+      freq: this.settings.returnEqFreq,
+      gain: this.settings.returnEqGain,
+      q: this.settings.returnEqQ,
+    };
+    const startTime = this.context.currentTime;
+    this.setReturnEQ(startHz, gain, q);
+
+    this._eqSweepTimer = setInterval(() => {
+      const elapsed = this.context.currentTime - startTime;
+      const t = Math.min(elapsed / sweepSec, 1);
+      // Exponential interpolation for perceptually linear frequency sweep
+      const freq = startHz * Math.pow(endHz / startHz, t);
+      this.returnEQ.setB2Freq(freq);
+      this.settings = { ...this.settings, returnEqFreq: freq };
+      if (t >= 1) this.stopEQSweep();
+    }, 16);
+
+    return () => this.stopEQSweep();
+  }
+
+  /** Stop the EQ sweep and restore prior state. */
+  stopEQSweep(): void {
+    if (this._eqSweepTimer) {
+      clearInterval(this._eqSweepTimer);
+      this._eqSweepTimer = null;
+    }
+    if (this._eqSweepPrior) {
+      this.setReturnEQ(
+        this._eqSweepPrior.freq,
+        this._eqSweepPrior.gain,
+        this._eqSweepPrior.q,
+      );
+      this._eqSweepPrior = null;
+    }
+  }
+
   /** Read the current springs dry/wet — diagnostic for gig-sims/tests.
    *  AelapseEffect doesn't expose a param reader, so we mirror it in
+
    *  `_springWetCache`. */
   getSpringWet(): number { return this._springWetCache; }
 
@@ -1058,14 +1138,57 @@ export class DubBus {
     // Wet send level — 0 disables the branch entirely.
     this.sweepOutput = this.context.createGain();
     this.sweepOutput.gain.value = this.settings.sweepAmount;
-    // Topology: hpf3 → sweepInput → sweepDelay → sweepOutput
-    //                                ↓ (feedback branch)
-    //                     sweepFeedback → sweepFeedbackHpf → sweepDelay
+    // Comb and phaser branch gains — crossfade based on sweepMode.
+    // Both wired permanently; only one has gain > 0 at a time.
+    const isComb = this.settings.sweepMode !== 'phaser';
+    this.combOutput = this.context.createGain();
+    this.combOutput.gain.value = isComb ? 1 : 0;
+    this.phaserOutput = this.context.createGain();
+    this.phaserOutput.gain.value = isComb ? 0 : 1;
+    // Phaser — CalfPhaser WASM. Constructed with mix=1 so it outputs
+    // effect-only (no dry pass-through; we don't want to double-feed dry).
+    this.phaser = new CalfPhaserEffect({
+      rate: this.settings.phaserRate,
+      depth: this.settings.phaserDepth,
+      stages: this.settings.phaserStages,
+      feedback: this.settings.phaserFeedback,
+      stereoPhase: 90,
+      mix: 1.0,
+      wet: 1.0,
+    });
+    // Topology: hpf3 → sweepInput → sweepDelay → combOutput ─┐
+    //                                ↓ (feedback branch)       ├→ sweepOutput → tapeSat
+    //                     sweepFeedback → sweepFeedbackHpf     │
+    //           sweepInput → phaser → phaserOutput ───────────┘
     this.sweepInput.connect(this.sweepDelay);
     this.sweepDelay.connect(this.sweepFeedback);
     this.sweepFeedback.connect(this.sweepFeedbackHpf);
     this.sweepFeedbackHpf.connect(this.sweepDelay);
-    this.sweepDelay.connect(this.sweepOutput);
+    this.sweepDelay.connect(this.combOutput);
+    this.combOutput.connect(this.sweepOutput);
+    // Phaser branch: sweepInput → phaser → phaserOutput → sweepOutput
+    Tone.connect(this.sweepInput as unknown as Tone.OutputNode, this.phaser.input);
+    Tone.connect(this.phaser.output, this.phaserOutput as unknown as Tone.InputNode);
+    this.phaserOutput.connect(this.sweepOutput);
+
+    // Return EQ — 4-band WASM parametric inserted between midScoop and LPF.
+    // Always 100% wet (series insert). Bands start flat unless a character
+    // preset enables them. Band 2 is the primary "sweep" band.
+    this.returnEQ = new ParametricEQEffect({
+      b1Freq: this.settings.returnEqB1Freq,
+      b1Gain: this.settings.returnEqB1Gain,
+      b1Q:    this.settings.returnEqB1Q,
+      b2Freq: this.settings.returnEqFreq,
+      b2Gain: this.settings.returnEqEnabled ? this.settings.returnEqGain : 0,
+      b2Q:    this.settings.returnEqQ,
+      b3Freq: this.settings.returnEqB3Freq,
+      b3Gain: this.settings.returnEqB3Gain,
+      b3Q:    this.settings.returnEqB3Q,
+      b4Freq: this.settings.returnEqB4Freq,
+      b4Gain: this.settings.returnEqB4Gain,
+      b4Q:    this.settings.returnEqB4Q,
+      wet:    1.0,
+    });
 
     // Tape saturation — asymmetric tanh curve that models the positive/negative
     // asymmetry of transformer-coupled magnetic tape. Softens positive peaks
@@ -1361,7 +1484,9 @@ export class DubBus {
     }
     this.sidechain.connect(this.glue);
     this.glue.connect(this.midScoop);
-    this.midScoop.connect(this.lpf);
+    // Return EQ: midScoop → returnEQ → lpf
+    Tone.connect(this.midScoop as unknown as Tone.OutputNode, this.returnEQ.input);
+    Tone.connect(this.returnEQ.output, this.lpf as unknown as Tone.InputNode);
     this.lpf.connect(this.stereoSplit);
     this.stereoMerge.connect(this.return_);
     this.return_.connect(this.master);
@@ -2020,10 +2145,11 @@ export class DubBus {
     }
 
     // 3. Kill siren feedback + reset LPF to open + neutralize bass shelf comp.
-    //    Also clear any tape wobble intervals — otherwise they keep modulating
-    //    echo rate from zombie setIntervals after panic.
+    //    Also clear any tape wobble intervals + EQ sweep — otherwise they keep
+    //    modulating from zombie setIntervals after panic.
     for (const h of this.wobbleHandles) clearInterval(h);
     this.wobbleHandles.clear();
+    this.stopEQSweep();
     try {
       this.feedback.gain.cancelScheduledValues(now);
       this.feedback.gain.setValueAtTime(0, now);
@@ -2377,6 +2503,40 @@ export class DubBus {
         try { this.tapeSat.curve = makeTapeSatCurve(drive); } catch { /* ok */ }
       }
     }
+
+    // ─── Return EQ ─────────────────────────────────────────────────────────
+    if (settings.returnEqEnabled !== undefined || settings.returnEqFreq !== undefined ||
+        settings.returnEqGain !== undefined || settings.returnEqQ !== undefined) {
+      const enabled = merged.returnEqEnabled;
+      this.returnEQ.setB2Freq(merged.returnEqFreq);
+      this.returnEQ.setB2Gain(enabled ? merged.returnEqGain : 0);
+      this.returnEQ.setB2Q(merged.returnEqQ);
+    }
+    // Advanced bands (MCP/power users)
+    if (settings.returnEqB1Freq !== undefined) this.returnEQ.setB1Freq(merged.returnEqB1Freq);
+    if (settings.returnEqB1Gain !== undefined) this.returnEQ.setB1Gain(merged.returnEqB1Gain);
+    if (settings.returnEqB1Q !== undefined) this.returnEQ.setB1Q(merged.returnEqB1Q);
+    if (settings.returnEqB3Freq !== undefined) this.returnEQ.setB3Freq(merged.returnEqB3Freq);
+    if (settings.returnEqB3Gain !== undefined) this.returnEQ.setB3Gain(merged.returnEqB3Gain);
+    if (settings.returnEqB3Q !== undefined) this.returnEQ.setB3Q(merged.returnEqB3Q);
+    if (settings.returnEqB4Freq !== undefined) this.returnEQ.setB4Freq(merged.returnEqB4Freq);
+    if (settings.returnEqB4Gain !== undefined) this.returnEQ.setB4Gain(merged.returnEqB4Gain);
+    if (settings.returnEqB4Q !== undefined) this.returnEQ.setB4Q(merged.returnEqB4Q);
+
+    // ─── Sweep mode (comb vs phaser) ───────────────────────────────────────
+    if (settings.sweepMode !== undefined || settings.sweepAmount !== undefined) {
+      const isPhaser = merged.sweepMode === 'phaser';
+      const amt = Math.max(0, Math.min(1, merged.sweepAmount));
+      // Crossfade: one branch at full gain, other at 0
+      this.combOutput.gain.setTargetAtTime(isPhaser ? 0 : 1, now, 0.01);
+      this.phaserOutput.gain.setTargetAtTime(isPhaser ? 1 : 0, now, 0.01);
+      this.sweepOutput.gain.setTargetAtTime(amt, now, 0.02);
+    }
+    // Phaser params — update even when mode is 'comb' (no harm, WASM just idles)
+    if (settings.phaserRate !== undefined) this.phaser.setRate(merged.phaserRate);
+    if (settings.phaserDepth !== undefined) this.phaser.setDepth(merged.phaserDepth);
+    if (settings.phaserStages !== undefined) this.phaser.setStages(merged.phaserStages);
+    if (settings.phaserFeedback !== undefined) this.phaser.setFeedback(merged.phaserFeedback);
 
     // Character-preset selection: apply the DSP-side bits (spring, tape
     // saturator curve) when the preset NAME transitions. The settings-side
@@ -3132,6 +3292,57 @@ export class DubBus {
       this._setSpringWet(this.settings.springWet);
     }, ms);
     this.throwTimers.add(t);
+  }
+
+  /**
+   * kickSpring — inject a 5ms broadband impulse directly into the spring
+   * input at massive amplitude. Models physically kicking the reverb tank.
+   * All spring resonant modes fire at once → thunderous crash.
+   */
+  kickSpring(amount = 1.0, holdMs = 600): void {
+    console.log(`[DubBusCtrl] kickSpring(amount=${amount.toFixed(3)}, holdMs=${holdMs})`);
+    if (!this.enabled) return;
+    const gain = Math.min(1.0, Math.max(0, amount));
+
+    try {
+      const ctx = this.context;
+      const now = ctx.currentTime;
+      const sr = ctx.sampleRate;
+
+      // Ultra-short broadband impulse — 5ms of full-spectrum noise
+      // shaped by a 0.5ms attack + 4.5ms exponential decay.
+      const dur = 0.005;
+      const buf = ctx.createBuffer(2, Math.round(sr * dur), sr);
+      for (let c = 0; c < 2; c++) {
+        const ch = buf.getChannelData(c);
+        for (let i = 0; i < ch.length; i++) {
+          const t = i / sr;
+          const env = Math.min(1, t / 0.0005) * Math.exp(-t / 0.0015);
+          ch[i] = (Math.random() * 2 - 1) * env;
+        }
+      }
+      const src = ctx.createBufferSource();
+      src.buffer = buf;
+      const impulseGain = ctx.createGain();
+      impulseGain.gain.value = gain * 6.0;  // hit HARD
+      src.connect(impulseGain);
+      Tone.connect(impulseGain, this.spring.input as unknown as Tone.InputNode);
+      src.start(now);
+      src.stop(now + dur + 0.01);
+      src.onended = () => {
+        try { src.disconnect(); impulseGain.disconnect(); } catch { /* ok */ }
+      };
+    } catch (err) {
+      console.warn('[DubBus] kickSpring impulse failed:', err);
+    }
+
+    // Crank wet so the tank ring is clearly audible
+    this._setSpringWet(Math.max(this.settings.springWet, gain));
+    const t2 = setTimeout(() => {
+      this.throwTimers.delete(t2);
+      this._setSpringWet(this.settings.springWet);
+    }, holdMs);
+    this.throwTimers.add(t2);
   }
 
   /**
@@ -4392,6 +4603,9 @@ export class DubBus {
     try { this.spring.dispose(); } catch { /* ok */ }
     try { this.echo.dispose(); } catch { /* ok */ }
     this._teardownPlateStage();
+    this.stopEQSweep();
+    try { this.returnEQ.dispose(); } catch { /* ok */ }
+    try { this.phaser.dispose(); } catch { /* ok */ }
     // SID dub synths
     if (this._sidSynths) {
       this._sidSynths.dispose();

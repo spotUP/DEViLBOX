@@ -67,6 +67,9 @@ import { tapeWobble } from '../moves/tapeWobble';
 import { tapeStop } from '../moves/tapeStop';
 import { backwardReverb } from '../moves/backwardReverb';
 import { delayPreset380, delayPresetDotted } from '../moves/delayPreset';
+import { springKick } from '../moves/springKick';
+import { delayPresetQuarter, delayPreset8th, delayPresetTriplet, delayPreset16th, delayPresetDoubler } from '../moves/delayPreset';
+import { eqSweep } from '../moves/eqSweep';
 
 /**
  * A `DubBus` stub where every method under test is a spy. Methods that
@@ -87,6 +90,7 @@ function buildFakeBus() {
     tubbyScream: vi.fn(),
     stereoDoubler: vi.fn(),
     tapeWobble: vi.fn(),
+    eqSweep: vi.fn(),
   };
   const bus = {
     openChannelTap: vi.fn().mockReturnValue(release.channelTap),
@@ -105,6 +109,8 @@ function buildFakeBus() {
     fireRadioRiser: vi.fn(),
     fireSubSwell: vi.fn(),
     slamSpring: vi.fn(),
+    kickSpring: vi.fn(),
+    startEQSweep: vi.fn().mockReturnValue(vi.fn()),
     throwEchoTime: vi.fn(),
     tapeStop: vi.fn(),
     reverseEcho: vi.fn().mockResolvedValue(undefined),
@@ -397,5 +403,78 @@ describe('delayPresetDotted', () => {
     delayPresetDotted.execute(ctx(bus, { bpm: 10 }));
     // Clamped to 30 BPM: 60000 / 30 × 1.5 = 3000
     expect(bus.setEchoRate).toHaveBeenCalledWith(3000);
+  });
+});
+
+// ── springKick — broadband impulse into spring tank ─────────────────────
+describe('springKick', () => {
+  it('calls kickSpring with default amount and holdMs', () => {
+    const { bus } = buildFakeBus();
+    const r = springKick.execute(ctx(bus));
+    expect(bus.kickSpring).toHaveBeenCalledWith(1.0, 600);
+    expect(r).toBeNull();
+  });
+
+  it('passes custom params when provided', () => {
+    const { bus } = buildFakeBus();
+    springKick.execute(ctx(bus, { params: { amount: 0.5, holdMs: 300 } }));
+    expect(bus.kickSpring).toHaveBeenCalledWith(0.5, 300);
+  });
+});
+
+// ── eqSweep — hold move that sweeps return EQ frequency ─────────────────
+describe('eqSweep', () => {
+  it('calls startEQSweep and returns a disposer that calls stop', () => {
+    const { bus } = buildFakeBus();
+    const stopper = vi.fn();
+    bus.startEQSweep.mockReturnValue(stopper);
+    const r = eqSweep.execute(ctx(bus));
+    expect(bus.startEQSweep).toHaveBeenCalled();
+    expect(r).toHaveProperty('dispose');
+    r!.dispose();
+    expect(stopper).toHaveBeenCalled();
+  });
+});
+
+// ── BPM-synced delay preset bank ────────────────────────────────────────
+describe('delayPresetQuarter', () => {
+  it('computes quarter-note delay from BPM (120 → 500ms)', () => {
+    const { bus } = buildFakeBus();
+    delayPresetQuarter.execute(ctx(bus, { bpm: 120 }));
+    expect(bus.setEchoRate).toHaveBeenCalledWith(500);
+  });
+});
+
+describe('delayPreset8th', () => {
+  it('computes eighth-note delay from BPM (120 → 250ms)', () => {
+    const { bus } = buildFakeBus();
+    delayPreset8th.execute(ctx(bus, { bpm: 120 }));
+    expect(bus.setEchoRate).toHaveBeenCalledWith(250);
+  });
+});
+
+describe('delayPresetTriplet', () => {
+  it('computes triplet quarter delay from BPM (120 → 333ms)', () => {
+    const { bus } = buildFakeBus();
+    delayPresetTriplet.execute(ctx(bus, { bpm: 120 }));
+    // 60000 / 120 × (2/3) = 333.33...
+    const ms = bus.setEchoRate.mock.calls[0][0];
+    expect(ms).toBeCloseTo(333.33, 0);
+  });
+});
+
+describe('delayPreset16th', () => {
+  it('computes sixteenth-note delay from BPM (120 → 125ms)', () => {
+    const { bus } = buildFakeBus();
+    delayPreset16th.execute(ctx(bus, { bpm: 120 }));
+    expect(bus.setEchoRate).toHaveBeenCalledWith(125);
+  });
+});
+
+describe('delayPresetDoubler', () => {
+  it('snaps to 25ms slapback regardless of BPM', () => {
+    const { bus } = buildFakeBus();
+    delayPresetDoubler.execute(ctx(bus, { bpm: 140 }));
+    expect(bus.setEchoRate).toHaveBeenCalledWith(25);
   });
 });
