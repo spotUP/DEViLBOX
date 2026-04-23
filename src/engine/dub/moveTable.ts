@@ -50,11 +50,14 @@ export const DUB_MOVE_TABLE: readonly string[] = [
   'delayPresetTriplet',  // 31
   'delayPreset16th',     // 32
   'delayPresetDoubler',  // 33
+  'ghostReverb',         // 34
+  'voltageStarve',       // 35
+  'ringMod',             // 36
 ];
 
 /** Ratchet: tests assert `DUB_MOVE_TABLE.length === DUB_MOVE_TABLE_VERSION`
  *  so any append forces a one-line bump here — a cheap review signal. */
-export const DUB_MOVE_TABLE_VERSION = 34;
+export const DUB_MOVE_TABLE_VERSION = 37;
 
 /**
  * Dub effect-command slots. Picked at 36-38 to sit BEYOND the existing

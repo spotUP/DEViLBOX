@@ -598,6 +598,95 @@ export const DubBusPanel: React.FC = () => {
           )}
           </Section>
 
+          {/* ── Post-echo tape saturation — degrading repeats ───────────── */}
+          <Section title="Post-echo saturation">
+          <label className="flex items-center gap-2 text-[11px] font-mono text-text-secondary cursor-pointer">
+            <input
+              type="checkbox"
+              checked={dubBus.postEchoSatEnabled}
+              onChange={(e) => patch({ postEchoSatEnabled: e.target.checked })}
+              className="accent-accent-primary"
+            />
+            Enable post-echo saturation
+          </label>
+          <Slider
+            label="Drive"
+            value={dubBus.postEchoSatDrive}
+            min={0.1}
+            max={5}
+            step={0.1}
+            onChange={(v) => patch({ postEchoSatDrive: v })}
+            format={(v) => `${v.toFixed(1)}×`}
+            disabled={!dubBus.postEchoSatEnabled}
+          />
+          </Section>
+
+          {/* ── Ring modulator — metallic dub textures ─────────────────── */}
+          <Section title="Ring modulator">
+          <label className="flex items-center gap-2 text-[11px] font-mono text-text-secondary cursor-pointer">
+            <input
+              type="checkbox"
+              checked={dubBus.ringModEnabled}
+              onChange={(e) => patch({ ringModEnabled: e.target.checked })}
+              className="accent-accent-primary"
+            />
+            Enable ring modulator
+          </label>
+          <Slider
+            label="Frequency"
+            value={dubBus.ringModFreq}
+            min={20}
+            max={2000}
+            step={1}
+            onChange={(v) => patch({ ringModFreq: v })}
+            format={(v) => `${Math.round(v)} Hz`}
+            disabled={!dubBus.ringModEnabled}
+          />
+          <Slider
+            label="Mix"
+            value={dubBus.ringModMix}
+            min={0}
+            max={1}
+            step={0.01}
+            onChange={(v) => patch({ ringModMix: v })}
+            format={(v) => `${Math.round(v * 100)}%`}
+            disabled={!dubBus.ringModEnabled}
+          />
+          <Slider
+            label="Amount"
+            value={dubBus.ringModAmount}
+            min={0}
+            max={1}
+            step={0.01}
+            onChange={(v) => patch({ ringModAmount: v })}
+            format={(v) => `${Math.round(v * 100)}%`}
+            disabled={!dubBus.ringModEnabled}
+          />
+          </Section>
+
+          {/* ── Lo-fi / voltage starve — bitcrusher degradation ────────── */}
+          <Section title="Lo-fi / voltage starve">
+          <label className="flex items-center gap-2 text-[11px] font-mono text-text-secondary cursor-pointer">
+            <input
+              type="checkbox"
+              checked={dubBus.lofiEnabled}
+              onChange={(e) => patch({ lofiEnabled: e.target.checked })}
+              className="accent-accent-primary"
+            />
+            Enable lo-fi
+          </label>
+          <Slider
+            label="Bit depth"
+            value={dubBus.lofiBits}
+            min={1}
+            max={16}
+            step={1}
+            onChange={(v) => patch({ lofiBits: v })}
+            format={(v) => `${v} bit`}
+            disabled={!dubBus.lofiEnabled}
+          />
+          </Section>
+
           {/* ── Dub Action settings — how much dub-throw/hold/mute pads inject ── */}
           <Section title="Dub actions (deck taps)">
           <Slider

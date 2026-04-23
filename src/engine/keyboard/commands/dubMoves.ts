@@ -117,6 +117,9 @@ export function dubDelayPreset8th():     boolean { return fireTrigger('delayPres
 export function dubDelayPresetTriplet(): boolean { return fireTrigger('delayPresetTriplet', 'Delay Triplet'); }
 export function dubDelayPreset16th():    boolean { return fireTrigger('delayPreset16th', 'Delay 16th'); }
 export function dubDelayPresetDoubler(): boolean { return fireTrigger('delayPresetDoubler', 'Delay Doubler'); }
+export const dubGhostReverb:    MoveHandler = holdCommand('ghostReverb',    'Ghost Reverb');
+export const dubVoltageStarve: MoveHandler = holdCommand('voltageStarve',  'Voltage Starve');
+export const dubRingMod:       MoveHandler = holdCommand('ringMod',        'Ring Modulator');
 
 // ── Panic — release everything ────────────────────────────────────────────
 export function dubPanicReleaseAll(): boolean {

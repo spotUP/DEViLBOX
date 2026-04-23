@@ -70,6 +70,9 @@ import { delayPreset380, delayPresetDotted } from '../moves/delayPreset';
 import { springKick } from '../moves/springKick';
 import { delayPresetQuarter, delayPreset8th, delayPresetTriplet, delayPreset16th, delayPresetDoubler } from '../moves/delayPreset';
 import { eqSweep } from '../moves/eqSweep';
+import { ghostReverb } from '../moves/ghostReverb';
+import { voltageStarve } from '../moves/voltageStarve';
+import { ringMod } from '../moves/ringMod';
 
 /**
  * A `DubBus` stub where every method under test is a spy. Methods that
@@ -116,6 +119,7 @@ function buildFakeBus() {
     reverseEcho: vi.fn().mockResolvedValue(undefined),
     backwardReverb: vi.fn().mockResolvedValue(undefined),
     setEchoRate: vi.fn(),
+    setSettings: vi.fn(),
   };
   return { bus, release };
 }
@@ -476,5 +480,103 @@ describe('delayPresetDoubler', () => {
     const { bus } = buildFakeBus();
     delayPresetDoubler.execute(ctx(bus, { bpm: 140 }));
     expect(bus.setEchoRate).toHaveBeenCalledWith(25);
+  });
+});
+
+// ─── Phase 2 moves ───────────────────────────────────────────────────────
+
+describe('ghostReverb', () => {
+  beforeEach(() => {
+    mixerChannels.length = 0;
+    mixerChannels.push({ muted: false, dubSend: 0.3 });
+    mixerMutations.setChannelMute.mockClear();
+    mixerMutations.setChannelDubSend.mockClear();
+  });
+
+  it('returns null when channelId is undefined (global move guard)', () => {
+    const { bus } = buildFakeBus();
+    const result = ghostReverb.execute(ctx(bus, {}));
+    expect(result).toBeNull();
+  });
+
+  it('mutes dry channel and cranks dub send to 1.0', () => {
+    const { bus } = buildFakeBus();
+    ghostReverb.execute(ctx(bus, { channelId: 0 }));
+    expect(mixerMutations.setChannelMute).toHaveBeenCalledWith(0, true);
+    expect(mixerMutations.setChannelDubSend).toHaveBeenCalledWith(0, 1.0);
+  });
+
+  it('dispose restores original mute state and dub send', () => {
+    const { bus } = buildFakeBus();
+    const handle = ghostReverb.execute(ctx(bus, { channelId: 0 }));
+    expect(handle).not.toBeNull();
+    handle!.dispose();
+    // Restores to original: muted=false, dubSend=0.3
+    expect(mixerMutations.setChannelMute).toHaveBeenLastCalledWith(0, false);
+    expect(mixerMutations.setChannelDubSend).toHaveBeenLastCalledWith(0, 0.3);
+  });
+});
+
+describe('voltageStarve', () => {
+  it('enables lofi with default target bits on hold', () => {
+    const { bus } = buildFakeBus();
+    voltageStarve.execute(ctx(bus, {}));
+    expect(bus.setSettings).toHaveBeenCalledWith(
+      expect.objectContaining({ lofiEnabled: true, lofiBits: 6 }),
+    );
+  });
+
+  it('uses custom targetBits param', () => {
+    const { bus } = buildFakeBus();
+    voltageStarve.execute(ctx(bus, { params: { targetBits: 4 } }));
+    expect(bus.setSettings).toHaveBeenCalledWith(
+      expect.objectContaining({ lofiEnabled: true, lofiBits: 4 }),
+    );
+  });
+
+  it('dispose restores full quality (16 bits) and disables lofi', () => {
+    const { bus } = buildFakeBus();
+    const handle = voltageStarve.execute(ctx(bus, {}));
+    expect(handle).not.toBeNull();
+    handle!.dispose();
+    expect(bus.setSettings).toHaveBeenLastCalledWith(
+      expect.objectContaining({ lofiEnabled: false, lofiBits: 16 }),
+    );
+  });
+});
+
+describe('ringMod', () => {
+  it('enables ring mod with default freq and amount on hold', () => {
+    const { bus } = buildFakeBus();
+    ringMod.execute(ctx(bus, {}));
+    expect(bus.setSettings).toHaveBeenCalledWith(
+      expect.objectContaining({
+        ringModEnabled: true,
+        ringModFreq: 440,
+        ringModAmount: 0.5,
+      }),
+    );
+  });
+
+  it('uses custom freq and amount params', () => {
+    const { bus } = buildFakeBus();
+    ringMod.execute(ctx(bus, { params: { freq: 880, amount: 0.8 } }));
+    expect(bus.setSettings).toHaveBeenCalledWith(
+      expect.objectContaining({
+        ringModEnabled: true,
+        ringModFreq: 880,
+        ringModAmount: 0.8,
+      }),
+    );
+  });
+
+  it('dispose disables ring mod and zeroes amount', () => {
+    const { bus } = buildFakeBus();
+    const handle = ringMod.execute(ctx(bus, {}));
+    expect(handle).not.toBeNull();
+    handle!.dispose();
+    expect(bus.setSettings).toHaveBeenLastCalledWith(
+      expect.objectContaining({ ringModEnabled: false, ringModAmount: 0 }),
+    );
   });
 });

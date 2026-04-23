@@ -19,6 +19,9 @@ import { dubSiren } from './moves/dubSiren';
 import { springSlam } from './moves/springSlam';
 import { springKick } from './moves/springKick';
 import { channelMute } from './moves/channelMute';
+import { ghostReverb } from './moves/ghostReverb';
+import { voltageStarve } from './moves/voltageStarve';
+import { ringMod } from './moves/ringMod';
 import { channelThrow } from './moves/channelThrow';
 import { delayTimeThrow } from './moves/delayTimeThrow';
 import { tapeWobble } from './moves/tapeWobble';
@@ -85,6 +88,9 @@ const MOVES: Record<string, DubMove> = {
   springSlam,
   springKick,
   channelMute,
+  ghostReverb,
+  voltageStarve,
+  ringMod,
   channelThrow,
   delayTimeThrow,
   tapeWobble,

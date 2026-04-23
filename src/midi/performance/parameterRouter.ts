@@ -108,6 +108,9 @@ export const DUB_MOVE_KINDS: Record<string, 'trigger' | 'hold'> = {
   delayPresetTriplet:  'trigger', // bus.setEchoRate(...)
   delayPreset16th:     'trigger', // bus.setEchoRate(...)
   delayPresetDoubler:  'trigger', // bus.setEchoRate(25ms slapback)
+  ghostReverb:         'hold',   // mute dry + full dub send
+  voltageStarve:       'hold',   // ramp bit depth down (lo-fi)
+  ringMod:             'hold',   // ring modulator activation
 };
 
 /**
