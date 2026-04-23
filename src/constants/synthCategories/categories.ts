@@ -255,6 +255,10 @@ export const SYNTH_CATEGORIES: SynthCategory[] = [
       SYNTH_INFO.TFMXSynth,
       SYNTH_INFO.OctaMEDSynth,
       SYNTH_INFO.SymphonieSynth,
+      SYNTH_INFO.SawteethSynth,
+      SYNTH_INFO.PreTrackerSynth,
+      SYNTH_INFO.RonKlarenSynth,
+      SYNTH_INFO.EupminiSynth,
       // C64SID is a .sid file player, not an editable synth — omitted from browser
       SYNTH_INFO.KlysSynth,
       SYNTH_INFO.Sc68Synth,
