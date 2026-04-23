@@ -69,6 +69,7 @@ export const MobileTrackerView: React.FC<MobileTrackerViewProps> = () => {
 
   const pattern = patterns[currentPatternIndex];
   const editorMode = useFormatStore((s) => s.editorMode);
+  const hasC64Sid = useFormatStore((s) => s.c64SidFileData !== null);
   const gtViewMode = useGTUltraStore((s) => s.viewMode);
   const { isPortrait, isLandscape } = useOrientation();
 
@@ -206,6 +207,10 @@ export const MobileTrackerView: React.FC<MobileTrackerViewProps> = () => {
                     </div>
                   </div>
                 )}
+              </Suspense>
+            ) : hasC64Sid ? (
+              <Suspense fallback={<div className="flex-1 flex items-center justify-center text-text-muted text-xs">Loading visualizer...</div>}>
+                <Sc68Visualizer />
               </Suspense>
             ) : (
               <PatternEditorCanvas

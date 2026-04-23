@@ -24,6 +24,7 @@ import { bpmSyncedEchoRate, getActiveBpm } from '@/engine/dub/DubActions';
 import { subscribeDubRouter, subscribeDubRelease, fire as fireDub } from '@/engine/dub/DubRouter';
 import { startDubRecorder } from '@/engine/dub/DubRecorder';
 import { dubLanePlayer } from '@/engine/dub/DubLanePlayer';
+import { getSongTimeSec } from '@/engine/dub/songTime';
 import { ensureDrumPadEngine } from '@hooks/drumpad/useMIDIPadRouting';
 import { getChannelRoutedEffectsManager } from '@/engine/tone/ChannelRoutedEffects';
 import { getToneEngine } from '@/engine/ToneEngine';
@@ -418,6 +419,21 @@ export const DubDeckStrip: React.FC = () => {
 
   useEffect(() => {
     dubLanePlayer.setLane(pattern?.dubLane ?? null);
+  }, [pattern]);
+
+  // Time-mode rAF driver — row-mode lanes are driven by the tracker tick
+  // loop in useTransportStore, but time-mode lanes (raw SID / SC68) have no
+  // row tick. Poll song-time at rAF rate and forward to onTimeTick while the
+  // active lane is time-indexed.
+  useEffect(() => {
+    if (pattern?.dubLane?.kind !== 'time') return;
+    let rafId = 0;
+    const tick = () => {
+      rafId = requestAnimationFrame(tick);
+      dubLanePlayer.onTimeTick(getSongTimeSec());
+    };
+    rafId = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(rafId);
   }, [pattern]);
 
   const visibleChannelCount = pattern?.channels.length ?? 4;
