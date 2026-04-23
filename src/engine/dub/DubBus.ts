@@ -1052,19 +1052,45 @@ export class DubBus {
     this.feedbackShelfComp.Q.value = this.settings.bassShelfQ;
     this.feedbackShelfComp.gain.value = -Math.max(-12, Math.min(12, this.settings.bassShelfGainDb));
 
-    /* NaN/Inf scrubber on the feedback tap (echo.output → feedback → SCRUBBER
-       → feedbackShelfComp → input). Starts as a passthrough GainNode so the
-       graph is live immediately, then the AudioWorklet module is loaded
-       asynchronously and spliced in as a drop-in replacement. Without this
-       guard, a single bad sample from the echo engine (RE-201 WASM during
-       worklet-swap, a ToneAudioNode's final disposal block, denormal
-       runaway) latches the hpf cascade + bassShelf + feedbackShelfComp to
-       NaN internally — Chrome surfaces "BiquadFilterNode: state is bad"
-       and the bus goes permanently silent until full engine re-init. */
-    const scrubPassthrough = this.context.createGain();
-    scrubPassthrough.gain.value = 1;
-    this._feedbackScrubber = scrubPassthrough;
-    void this._loadFeedbackScrubberWorklet();
+    /* NaN/Inf scrubber + soft-limiter on the feedback tap (echo.output →
+       feedback → SCRUBBER → feedbackShelfComp → input). Preferred path: the
+       'nan-scrubber' AudioWorklet module is pre-loaded by ToneEngine during
+       app boot, so the node can be instantiated synchronously right here —
+       NO placeholder, NO async splice race. Fallback path: if pre-load
+       hasn't landed yet (cold boot, hot-reload, different AudioContext),
+       we use a GainNode passthrough and kick off _loadFeedbackScrubberWorklet
+       to splice in the real worklet when the module finally resolves.
+
+       Without this guard, a single bad sample from the echo engine (RE-201
+       WASM init, a Tone ECHO node's final-disposal block, denormal runaway
+       from the King Tubby +9 dB bass shelf feedback loop) latches the hpf
+       cascade + bassShelf + feedbackShelfComp to NaN internally — Chrome
+       surfaces "BiquadFilterNode: state is bad" and the bus goes
+       permanently silent until full engine re-init. The worklet's tanh
+       soft-limiter also caps feedback runaway at ±0.95 so the loop cannot
+       grow past unity even if the comp mirror desyncs mid-ramp. */
+    let feedbackScrub: AudioNode;
+    let scrubIsWorklet = false;
+    try {
+      feedbackScrub = new AudioWorkletNode(this.context, 'nan-scrubber', {
+        numberOfInputs: 1,
+        numberOfOutputs: 1,
+        outputChannelCount: [2],
+        channelCount: 2,
+        channelCountMode: 'explicit',
+      });
+      scrubIsWorklet = true;
+    } catch {
+      /* Module not registered yet — fall back to passthrough + async splice. */
+      const scrubPassthrough = this.context.createGain();
+      scrubPassthrough.gain.value = 1;
+      feedbackScrub = scrubPassthrough;
+    }
+    this._feedbackScrubber = feedbackScrub;
+    this._feedbackScrubberIsWorklet = scrubIsWorklet;
+    if (!scrubIsWorklet) {
+      void this._loadFeedbackScrubberWorklet();
+    }
 
     // Pink noise floor — ~-55 dBFS continuous noise that you don't notice
     // during normal play, but becomes audible during mute-and-dub drops as
@@ -1916,7 +1942,7 @@ export class DubBus {
        preset pick that triggered them. */
     if (typeof settings.characterPreset === 'string'
         && settings.characterPreset !== this.settings.characterPreset) {
-      console.log(`[DubBus] characterPreset: ${this.settings.characterPreset} → ${settings.characterPreset}`);
+      console.log(`[DubBus] characterPreset: ${this.settings.characterPreset} → ${settings.characterPreset} (scrubber=${this._feedbackScrubberIsWorklet ? 'worklet' : 'passthrough'})`);
     }
 
     // Log every *meaningful* settings write — enable flag, non-zero echo /

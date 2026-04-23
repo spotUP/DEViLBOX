@@ -160,7 +160,7 @@ describe('BiquadFilterNode stability — no cascaded filters in automated paths'
       // stable full-amplitude bass drone: each iteration boosts bass →
       // saturator clips to 1.0 → feedback sends back → boost again
       expect(src).toMatch(/feedbackShelfComp/);
-      expect(src).toMatch(/feedbackShelfComp\.gain\.setTargetAtTime\(-safeBassGain/);
+      expect(src).toMatch(/rampBiquadParam\(this\.feedbackShelfComp\.gain,\s*-safeBassGain/);
     });
 
     it('clears wobble handles in dubPanic()', () => {

@@ -312,7 +312,10 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
                       onDoubleClick={() => {
                         if (file.isDirectory) return;
                         nav.setSelectedFile(file);
-                        if (mode === 'load') nav.handleLoad();
+                        /* Pass `file` explicitly: the setSelectedFile above
+                           hasn't flushed yet, so handleLoad's closure/ref
+                           still sees the previous selection. */
+                        if (mode === 'load') nav.handleLoad(file);
                       }}
                       className={`flex items-center gap-3 p-3 rounded cursor-pointer transition-colors ${
                         nav.selectedFile?.id === file.id
@@ -387,7 +390,7 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
           </button>
           {fileSource !== 'online' && (
             <button
-              onClick={mode === 'load' ? nav.handleLoad : nav.handleSave}
+              onClick={mode === 'load' ? () => nav.handleLoad() : nav.handleSave}
               disabled={mode === 'load' && (!nav.selectedFile || nav.selectedFile.isDirectory)}
               className={`flex items-center gap-2 px-6 py-2 rounded font-medium ${
                 (mode === 'load' && (!nav.selectedFile || nav.selectedFile.isDirectory))

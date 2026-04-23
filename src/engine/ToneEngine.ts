@@ -442,6 +442,24 @@ export class ToneEngine {
     // Init pitch resampler for WASM engine pitch shifting (async — falls back to direct connection)
     this.initPitchResampler();
 
+    /* Pre-register the dub-bus feedback-tap NaN/soft-limit worklet on the
+       shared AudioContext. DubBus is constructed later by DrumPadEngine;
+       by the time its constructor runs, this addModule promise is usually
+       resolved so the worklet can be instantiated synchronously on the
+       feedback tap — closing the race window where the placeholder
+       passthrough GainNode would leak NaN from an echo-engine swap into
+       the feedback biquad chain and latch all 5 biquads to "state is
+       bad" (the King Tubby preset symptom). Fire-and-forget; DubBus
+       also retries the load itself as a safety net. */
+    try {
+      const base = (import.meta as { env?: { BASE_URL?: string } }).env?.BASE_URL ?? '/';
+      (Tone.getContext().rawContext as AudioContext).audioWorklet
+        .addModule(`${base}worklets/nan-scrubber.worklet.js`)
+        .catch((e) => {
+          console.warn('[ToneEngine] nan-scrubber worklet pre-load failed (dub bus will fallback):', e);
+        });
+    } catch { /* ok — DubBus has its own load path */ }
+
     // Instrument map
     this.instruments = new Map();
 
