@@ -100,6 +100,11 @@ const FORMAT_INFO: Record<string, { name: string; description: string; color: st
     description: 'Capcom QSound format. Z80 CPU + QSound DSP emulation for CPS1/CPS2 arcade music.',
     color: '#cc4488',
   },
+  UADESynth: {
+    name: 'UADE',
+    description: 'Unix Amiga Delitracker Emulator. Playback-only engine for 130+ exotic Amiga tracker formats — load a file to play, instruments are managed by the underlying replayer.',
+    color: '#aaccff',
+  },
 };
 
 export const WasmInfoEditor: React.FC<WasmInfoEditorProps> = ({ synthType, instrumentName }) => {
