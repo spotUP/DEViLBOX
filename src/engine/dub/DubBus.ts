@@ -469,10 +469,15 @@ export class DubBus {
       this.feedback.gain.setValueAtTime(this.feedback.gain.value, now);
       this.feedback.gain.linearRampToValueAtTime(0, now + RAMP_SEC);
 
-      // Disable sidechain compression during the transition so the burst
-      // can't lock up the compressor's gain reduction.
-      this.sidechain.threshold.cancelScheduledValues(now);
-      this.sidechain.threshold.setValueAtTime(0, now);
+      // Bypass BOTH compressors during the transition. Setting threshold
+      // to 0 isn't enough — the spring burst peaks at +8dB, which still
+      // triggers 6.7dB gain reduction at ratio 6:1. Setting ratio=1
+      // makes gain_reduction = 0 regardless of signal level. Also bypass
+      // the glue compressor (threshold -14, ratio 3:1) for the same reason.
+      this.sidechain.ratio.cancelScheduledValues(now);
+      this.sidechain.ratio.setValueAtTime(1, now);
+      this.glue.ratio.cancelScheduledValues(now);
+      this.glue.ratio.setValueAtTime(1, now);
     } catch { /* ok */ }
 
     // Schedule the swap after the ramp completes
@@ -496,8 +501,8 @@ export class DubBus {
         Tone.connect(this.echo.output, this.feedback as unknown as Tone.InputNode);
 
         // Apply deferred character preset NOW — return_ is at 0, so the
-        // spring burst can't reach master. Sidechain is disabled (threshold
-        // at 0dB), so the compressor won't lock up from the burst either.
+        // spring burst can't reach master. Compressors are bypassed (ratio=1),
+        // so they won't lock up from the burst either.
         if (deferredPreset) {
           this._applyCharacterPreset(deferredPreset);
           this._lastAppliedPreset = deferredPreset;
@@ -526,10 +531,16 @@ export class DubBus {
           now2 + WARMUP_SEC + RAMP_SEC,
         );
 
-        // Restore sidechain threshold after the warmup — the burst has
-        // settled by now and the compressor starts from a clean state.
-        this.sidechain.threshold.cancelScheduledValues(now2);
-        this.sidechain.threshold.setValueAtTime(0, now2);
+        // Restore compressor ratios after the warmup — the burst has
+        // settled by now and the compressors start from a clean state.
+        this.sidechain.ratio.cancelScheduledValues(now2);
+        this.sidechain.ratio.setValueAtTime(1, now2);
+        this.sidechain.ratio.setTargetAtTime(6, now2 + WARMUP_SEC, 0.02);
+        this.glue.ratio.cancelScheduledValues(now2);
+        this.glue.ratio.setValueAtTime(1, now2);
+        this.glue.ratio.setTargetAtTime(3, now2 + WARMUP_SEC, 0.02);
+        // Also restore the sidechain threshold (it was set during
+        // setSettings but the swap's immediate write may have overridden it).
         this.sidechain.threshold.setTargetAtTime(targetThreshold, now2 + WARMUP_SEC, 0.05);
 
         console.log(`[DubBus] swap warmup armed: feedback→${priorFeedbackGain.toFixed(3)} return_→${(this.enabled ? settings.returnGain : 0).toFixed(3)} threshold→${targetThreshold.toFixed(1)}dB after ${(WARMUP_SEC*1000).toFixed(0)}ms hold`);
@@ -547,6 +558,8 @@ export class DubBus {
           this.feedback.gain.setValueAtTime(priorFeedbackGain, t);
           this.return_.gain.setValueAtTime(this.enabled ? settings.returnGain : 0, t);
           this.sidechain.threshold.setValueAtTime(targetThreshold, t);
+          this.sidechain.ratio.setValueAtTime(6, t);
+          this.glue.ratio.setValueAtTime(3, t);
         } catch { /* ok */ }
       }
     }, RAMP_SEC * 1000 + 5);
@@ -2422,8 +2435,16 @@ export class DubBus {
       this.return_.gain.setValueAtTime(0, now + WARMUP_SEC);
       this.return_.gain.linearRampToValueAtTime(priorReturn, now + WARMUP_SEC + RAMP_SEC);
 
-      // Disable sidechain compression during the transition so the spring
-      // burst can't lock up the compressor's gain reduction.
+      // Bypass BOTH compressors during the transition (ratio=1 means
+      // gain_reduction=0 regardless of signal level). Threshold=0 alone
+      // isn't enough — spring burst peaks at +8dB above 0dB.
+      this.sidechain.ratio.cancelScheduledValues(now);
+      this.sidechain.ratio.setValueAtTime(1, now);
+      this.sidechain.ratio.setTargetAtTime(6, now + WARMUP_SEC, 0.02);
+      this.glue.ratio.cancelScheduledValues(now);
+      this.glue.ratio.setValueAtTime(1, now);
+      this.glue.ratio.setTargetAtTime(3, now + WARMUP_SEC, 0.02);
+      // Also restore sidechain threshold after warmup
       this.sidechain.threshold.cancelScheduledValues(now);
       this.sidechain.threshold.setValueAtTime(0, now);
       this.sidechain.threshold.setTargetAtTime(targetThreshold, now + WARMUP_SEC, 0.05);
