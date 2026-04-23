@@ -425,20 +425,18 @@ export class DubBus {
    * to 0 for 20 ms, disconnects old engine, creates new one, reconnects,
    * then ramps back up. The brief silence window masks the graph splice.
    */
-  private _swapEchoEngine(settings: DubBusSettings): void {
+  private _swapEchoEngine(settings: DubBusSettings, deferredPreset?: Exclude<DubBusSettings['characterPreset'], 'custom'>): void {
     const newType = settings.echoEngine;
     if (newType === this._currentEchoEngine) return;
-    console.log(`[DubBus] Swapping echo engine: ${this._currentEchoEngine} → ${newType}`);
+    console.log(`[DubBus] Swapping echo engine: ${this._currentEchoEngine} → ${newType} (deferredPreset=${deferredPreset ?? 'none'})`);
     this._snap(`pre-swap ${this._currentEchoEngine}→${newType}`);
     const ctx = this.context;
     const RAMP_SEC = 0.02;
     /* Warmup hold: covers the new WASM echo engine's DC/LF startup
-       transient. The spring reverb used to also emit a catastrophic
-       post-param-storm explosion here (~6.75e8 peak) but that is now
-       prevented at the source by sample-accurate per-param smoothing
-       inside Aelapse.worklet.js, so the short 120ms hold is sufficient
-       again. */
-    const WARMUP_SEC = 0.12;
+       transient + spring param-change burst. Extended from 120ms to
+       800ms to cover the full spring burst envelope (peak at ~400ms,
+       settled by ~800ms per SpringTap measurements). */
+    const WARMUP_SEC = 0.80;
 
     /* Fully quiesce the bus during the splice. Just ramping `return_` to 0
        masks output but leaves the internal graph live — the forward chain
@@ -451,6 +449,12 @@ export class DubBus {
        zero external feedback, then splice, then unmute. */
     const priorInputGain = this.input.gain.value;
     const priorFeedbackGain = this.feedback.gain.value;
+    /* Capture the target sidechain threshold so we can restore it after
+       the warmup. During the burst the compressor must be disabled —
+       otherwise the DynamicsCompressorNode enters deep gain reduction
+       (attack 2ms, release 180ms exponential) and takes 1-2s to recover,
+       killing audible reverb even after return_ unmutes. */
+    const targetThreshold = -6 - (settings.sidechainAmount ?? 0.15) * 30;
     try {
       const now = ctx.currentTime;
       this.return_.gain.cancelScheduledValues(now);
@@ -464,6 +468,11 @@ export class DubBus {
       this.feedback.gain.cancelScheduledValues(now);
       this.feedback.gain.setValueAtTime(this.feedback.gain.value, now);
       this.feedback.gain.linearRampToValueAtTime(0, now + RAMP_SEC);
+
+      // Disable sidechain compression during the transition so the burst
+      // can't lock up the compressor's gain reduction.
+      this.sidechain.threshold.cancelScheduledValues(now);
+      this.sidechain.threshold.setValueAtTime(0, now);
     } catch { /* ok */ }
 
     // Schedule the swap after the ramp completes
@@ -486,11 +495,19 @@ export class DubBus {
         // Rebuild feedback path
         Tone.connect(this.echo.output, this.feedback as unknown as Tone.InputNode);
 
+        // Apply deferred character preset NOW — return_ is at 0, so the
+        // spring burst can't reach master. Sidechain is disabled (threshold
+        // at 0dB), so the compressor won't lock up from the burst either.
+        if (deferredPreset) {
+          this._applyCharacterPreset(deferredPreset);
+          this._lastAppliedPreset = deferredPreset;
+        }
+
         /* Unmute: input recovers immediately (no signal in ≠ no signal out
            problem). Feedback + return_ stay at 0 for WARMUP_SEC, then ramp
-           up. This mutes the new echo's startup transient before it can
-           self-amplify through feedback or bass-shelf boost through spring
-           and slam the compressor. */
+           up. This mutes the new echo's startup transient + spring param
+           burst before it can self-amplify through feedback or bass-shelf
+           boost through spring and slam the compressor. */
         const now2 = ctx.currentTime;
         this.input.gain.cancelScheduledValues(now2);
         this.input.gain.setValueAtTime(0, now2);
@@ -508,7 +525,14 @@ export class DubBus {
           this.enabled ? settings.returnGain : 0,
           now2 + WARMUP_SEC + RAMP_SEC,
         );
-        console.log(`[DubBus] swap warmup armed: feedback→${priorFeedbackGain.toFixed(3)} return_→${(this.enabled ? settings.returnGain : 0).toFixed(3)} after ${(WARMUP_SEC*1000).toFixed(0)}ms hold`);
+
+        // Restore sidechain threshold after the warmup — the burst has
+        // settled by now and the compressor starts from a clean state.
+        this.sidechain.threshold.cancelScheduledValues(now2);
+        this.sidechain.threshold.setValueAtTime(0, now2);
+        this.sidechain.threshold.setTargetAtTime(targetThreshold, now2 + WARMUP_SEC, 0.05);
+
+        console.log(`[DubBus] swap warmup armed: feedback→${priorFeedbackGain.toFixed(3)} return_→${(this.enabled ? settings.returnGain : 0).toFixed(3)} threshold→${targetThreshold.toFixed(1)}dB after ${(WARMUP_SEC*1000).toFixed(0)}ms hold`);
         // Snap again after warmup completes so we can see whether the bus
         // actually recovered (or something else pinned gains to 0).
         setTimeout(() => this._snap(`post-swap-warmup ${this._currentEchoEngine}`),
@@ -522,6 +546,7 @@ export class DubBus {
           this.input.gain.setValueAtTime(priorInputGain, t);
           this.feedback.gain.setValueAtTime(priorFeedbackGain, t);
           this.return_.gain.setValueAtTime(this.enabled ? settings.returnGain : 0, t);
+          this.sidechain.threshold.setValueAtTime(targetThreshold, t);
         } catch { /* ok */ }
       }
     }, RAMP_SEC * 1000 + 5);
@@ -2216,8 +2241,20 @@ export class DubBus {
     // ── Echo engine swap ──────────────────────────────────────────────────
     // When echoEngine changes (character preset or manual selection), tear
     // down the old effect and install the new one in the same graph position.
-    if (settings.echoEngine && settings.echoEngine !== this._currentEchoEngine) {
-      this._swapEchoEngine(merged);
+    // Detect an upcoming preset transition so we can defer the spring param
+    // writes into the swap callback (after return_ is at 0).
+    const incomingPreset = settings.characterPreset;
+    const presetTransitioning =
+      typeof incomingPreset === 'string' &&
+      incomingPreset !== 'custom' &&
+      incomingPreset !== this._lastAppliedPreset;
+    const engineChanging = !!(settings.echoEngine && settings.echoEngine !== this._currentEchoEngine);
+
+    if (engineChanging) {
+      this._swapEchoEngine(
+        merged,
+        presetTransitioning ? (incomingPreset as Exclude<typeof incomingPreset, 'custom'>) : undefined,
+      );
     }
     // Suppress echo/spring writes while panic is draining the delay lines.
     // The drain restore timer applies the user's settings at the end of the
@@ -2234,8 +2271,13 @@ export class DubBus {
     this.echo.setRate(merged.echoRateMs);
     // Sidechain depth maps to compressor threshold — more duck = lower threshold.
     // 0 → -6 dB threshold (barely compresses), 1 → -36 dB (heavy pumping).
-    const threshold = -6 - merged.sidechainAmount * 30;
-    this.sidechain.threshold.setTargetAtTime(threshold, now, 0.05);
+    // Skip during an echo swap — the swap sets threshold to 0dB during the
+    // transition and schedules its own restoration. Writing here would
+    // override that protection.
+    if (!engineChanging) {
+      const threshold = -6 - merged.sidechainAmount * 30;
+      this.sidechain.threshold.setTargetAtTime(threshold, now, 0.05);
+    }
 
     // ── Coloring params (research doc §3) ───────────────────────────────
     // All smoothed via setTargetAtTime so mid-gig knob twitches don't click.
@@ -2329,26 +2371,21 @@ export class DubBus {
     // setDubBus action — we don't need to re-apply them here. Gate on a
     // real transition so a mirror-effect render with unchanged preset
     // doesn't rebuild the WaveShaper curve on every tick.
-    const incomingPreset = settings.characterPreset;
-    if (
-      typeof incomingPreset === 'string' &&
-      incomingPreset !== 'custom' &&
-      incomingPreset !== this._lastAppliedPreset
-    ) {
-      /* Warmup mute for same-engine preset transitions (e.g. Tubby→MadProfessor,
-         both re201). An engine swap has its own 120ms mute inside _swapEchoEngine;
-         but when the echo engine is unchanged, _swapEchoEngine returns early and
-         no mute fires — so the spring.setParamById() storm in _applyCharacterPreset
-         (5 params in rapid succession) emits an audible click that a +5–9dB bass
-         shelf then amplifies into the "bwoooaap" + reverb-compressor pumping.
-         Skipping when a swap IS about to happen (_swapEchoEngine handles its
-         own mute). */
-      const engineChanging = merged.echoEngine !== this._currentEchoEngine;
-      if (!engineChanging) {
-        this._warmupMute();
+    if (presetTransitioning) {
+      if (engineChanging) {
+        // Swap is in progress — _swapEchoEngine will apply the preset
+        // inside its setTimeout callback (after return_ is at 0 and
+        // sidechain is disabled). Just record the name here.
+        this._lastAppliedPreset = incomingPreset;
+      } else {
+        /* Same-engine preset transition (e.g. Tubby→MadProfessor, both
+           re201). No echo swap fires, but spring param writes still
+           produce a burst that can lock the sidechain compressor. Gate
+           with warmup mute + sidechain disable. */
+        this._warmupMute(merged.sidechainAmount);
+        this._applyCharacterPreset(incomingPreset as Exclude<typeof incomingPreset, 'custom'>);
+        this._lastAppliedPreset = incomingPreset;
       }
-      this._applyCharacterPreset(incomingPreset);
-      this._lastAppliedPreset = incomingPreset;
     } else if (incomingPreset === 'custom') {
       this._lastAppliedPreset = 'custom';
     }
@@ -2363,12 +2400,13 @@ export class DubBus {
    * sample-accurate per-param smoothing inside Aelapse.worklet.js, so
    * no long ride-out is needed here.
    */
-  private _warmupMute(): void {
+  private _warmupMute(sidechainAmount = 0.15): void {
     const ctx = this.context;
     const RAMP_SEC = 0.02;
-    const WARMUP_SEC = 0.12;
+    const WARMUP_SEC = 0.80;
     const priorFeedback = this.feedback.gain.value;
     const priorReturn = this.return_.gain.value;
+    const targetThreshold = -6 - sidechainAmount * 30;
     console.log(`[DubBusCtrl] _warmupMute fired | feedback ${priorFeedback.toFixed(3)}→0→${priorFeedback.toFixed(3)} return_ ${priorReturn.toFixed(3)}→0→${priorReturn.toFixed(3)} hold=${(WARMUP_SEC*1000).toFixed(0)}ms`);
     try {
       const now = ctx.currentTime;
@@ -2383,6 +2421,12 @@ export class DubBus {
       this.return_.gain.linearRampToValueAtTime(0, now + RAMP_SEC);
       this.return_.gain.setValueAtTime(0, now + WARMUP_SEC);
       this.return_.gain.linearRampToValueAtTime(priorReturn, now + WARMUP_SEC + RAMP_SEC);
+
+      // Disable sidechain compression during the transition so the spring
+      // burst can't lock up the compressor's gain reduction.
+      this.sidechain.threshold.cancelScheduledValues(now);
+      this.sidechain.threshold.setValueAtTime(0, now);
+      this.sidechain.threshold.setTargetAtTime(targetThreshold, now + WARMUP_SEC, 0.05);
     } catch (err) {
       console.warn('[DubBusCtrl] _warmupMute threw:', err);
     }
