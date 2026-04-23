@@ -505,9 +505,17 @@ export class DubBus {
         this.return_.gain.cancelScheduledValues(now2);
         this.return_.gain.setValueAtTime(0, now2);
         this.return_.gain.setValueAtTime(0, now2 + WARMUP_SEC);
+        /* Slow recovery ramp (400ms instead of RAMP_SEC/20ms). At the
+           moment warmup releases, the spring is still emitting ~0.7 rms
+           (per SpringTap) of residual decay from the preset storm. A
+           fast 20ms open would dump that whole tail into master as an
+           audible "boom". Ramping over 400ms means return_ rises while
+           the spring tail is simultaneously decaying — the gate only
+           approaches unity once spring output has dropped to ~0.1 rms. */
+        const RETURN_RECOVER_SEC = 0.4;
         this.return_.gain.linearRampToValueAtTime(
           this.enabled ? settings.returnGain : 0,
-          now2 + WARMUP_SEC + RAMP_SEC,
+          now2 + WARMUP_SEC + RETURN_RECOVER_SEC,
         );
         console.log(`[DubBus] swap warmup armed: feedback→${priorFeedbackGain.toFixed(3)} return_→${(this.enabled ? settings.returnGain : 0).toFixed(3)} after ${(WARMUP_SEC*1000).toFixed(0)}ms hold`);
         // Snap again after warmup completes so we can see whether the bus
@@ -2374,22 +2382,28 @@ export class DubBus {
        sidechain compressor and lock it into permanent max ducking. 600ms
        covers the entire observed settling window with margin. */
     const WARMUP_SEC = 0.6;
+    /* Recovery ramp: slow open of return_ so the 0.7 rms residual spring
+       decay at t=600ms doesn't dump into master as a boom. Ramps return_
+       from 0 → priorValue over 400ms while spring simultaneously decays
+       further, so the gate approaches unity only once spring is near
+       silence. */
+    const RETURN_RECOVER_SEC = 0.4;
     const priorFeedback = this.feedback.gain.value;
     const priorReturn = this.return_.gain.value;
-    console.log(`[DubBusCtrl] _warmupMute fired | feedback ${priorFeedback.toFixed(3)}→0→${priorFeedback.toFixed(3)} return_ ${priorReturn.toFixed(3)}→0→${priorReturn.toFixed(3)} hold=${(WARMUP_SEC*1000).toFixed(0)}ms`);
+    console.log(`[DubBusCtrl] _warmupMute fired | feedback ${priorFeedback.toFixed(3)}→0→${priorFeedback.toFixed(3)} return_ ${priorReturn.toFixed(3)}→0→${priorReturn.toFixed(3)} hold=${(WARMUP_SEC*1000).toFixed(0)}ms recover=${(RETURN_RECOVER_SEC*1000).toFixed(0)}ms`);
     try {
       const now = ctx.currentTime;
       this.feedback.gain.cancelScheduledValues(now);
       this.feedback.gain.setValueAtTime(this.feedback.gain.value, now);
       this.feedback.gain.linearRampToValueAtTime(0, now + RAMP_SEC);
       this.feedback.gain.setValueAtTime(0, now + WARMUP_SEC);
-      this.feedback.gain.linearRampToValueAtTime(priorFeedback, now + WARMUP_SEC + RAMP_SEC);
+      this.feedback.gain.linearRampToValueAtTime(priorFeedback, now + WARMUP_SEC + RETURN_RECOVER_SEC);
 
       this.return_.gain.cancelScheduledValues(now);
       this.return_.gain.setValueAtTime(this.return_.gain.value, now);
       this.return_.gain.linearRampToValueAtTime(0, now + RAMP_SEC);
       this.return_.gain.setValueAtTime(0, now + WARMUP_SEC);
-      this.return_.gain.linearRampToValueAtTime(priorReturn, now + WARMUP_SEC + RAMP_SEC);
+      this.return_.gain.linearRampToValueAtTime(priorReturn, now + WARMUP_SEC + RETURN_RECOVER_SEC);
     } catch (err) {
       console.warn('[DubBusCtrl] _warmupMute threw:', err);
     }
@@ -2435,30 +2449,13 @@ export class DubBus {
       + ` chaos=${preset.springsChaos} scatter=${preset.springsScatter}`
       + ` tone=${preset.springsTone} tapeSatDrive=${preset.tapeSatDrive}`,
     );
-    /* The spring WASM emits a catastrophic transient (peak > 6e8) when
-       its length/damp/chaos/scatter/tone params are stormed at once —
-       abruptly-changed delay line taps read uninitialized memory / the
-       internal recirculation momentarily exceeds unity. Mute the spring
-       INTERNALLY by zeroing PARAM_SPRINGS_DRYWET before the storm, apply
-       the params, let the worklet settle, then ramp dry/wet back up. The
-       wet path downstream stays connected — the WASM is just outputting
-       its dry path only during the settle window, so the explosion has
-       no audible effect. */
-    const springsWetTarget = this.settings.springWet;
     try {
-      this.spring.setParamById(PARAM_SPRINGS_DRYWET, 0);
       if (preset.springsLength  !== undefined) this.spring.setParamById(PARAM_SPRINGS_LENGTH,  preset.springsLength);
       if (preset.springsDamp    !== undefined) this.spring.setParamById(PARAM_SPRINGS_DAMP,    preset.springsDamp);
       if (preset.springsChaos   !== undefined) this.spring.setParamById(PARAM_SPRINGS_CHAOS,   preset.springsChaos);
       if (preset.springsScatter !== undefined) this.spring.setParamById(PARAM_SPRINGS_SCATTER, preset.springsScatter);
       if (preset.springsTone    !== undefined) this.spring.setParamById(PARAM_SPRINGS_TONE,    preset.springsTone);
     } catch (err) { console.warn('[DubBusCtrl] spring param write threw:', err); }
-    /* Restore internal dry/wet after the WASM has had time to settle.
-       SpringTap observed full settling by ~600ms. Use a short linear ramp
-       at restore time so the return doesn't cause its own click. */
-    setTimeout(() => {
-      try { this.spring.setParamById(PARAM_SPRINGS_DRYWET, springsWetTarget); } catch { /* ok */ }
-    }, 600);
     if (preset.tapeSatDrive !== undefined) {
       try { this.tapeSat.curve = makeTapeSatCurve(preset.tapeSatDrive); } catch { /* ok */ }
     }
