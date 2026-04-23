@@ -28,6 +28,15 @@ const CH_SIREN = 0;
 const CH_BASS = 1;
 const CH_ONESHOT = 2;
 
+// Table type constants (match GoatTracker defines)
+const PTBL = 1; // Pulse table
+
+// Pulse table layout (0-based row → 1-based pointer)
+// Wide pulse (50% duty cycle = classic square wave)
+const PTBL_WIDE_ROW = 0;   // ptr = 1
+// Narrow pulse (12.5% duty = buzzy, gritty)
+const PTBL_NARROW_ROW = 2; // ptr = 3
+
 // Instrument indices (1-based; index 0 is unused in GT)
 const INST = {
   // ── Sirens (ch 0) ──
@@ -174,15 +183,36 @@ export class SIDDubSynths {
     const e = this.engine;
     if (!e) return;
 
+    // Set up pulse table entries (required for pulse-wave instruments).
+    // Without these, pulse width = 0 → pulse wave output is always silent.
+    //
+    // Wide pulse (50% duty = symmetric square): row 0-1, ptr 1
+    e.setTableEntry(PTBL, 0, PTBL_WIDE_ROW, 0x88);     // left: set cmd, hi nibble 8 → 0x800
+    e.setTableEntry(PTBL, 1, PTBL_WIDE_ROW, 0x00);     // right: lo byte 0x00
+    e.setTableEntry(PTBL, 0, PTBL_WIDE_ROW + 1, 0xFF); // left: jump/stop
+    e.setTableEntry(PTBL, 1, PTBL_WIDE_ROW + 1, 0x00); // right: target 0 = stop
+    //
+    // Narrow pulse (12.5% duty = buzzy/gritty): row 2-3, ptr 3
+    e.setTableEntry(PTBL, 0, PTBL_NARROW_ROW, 0x82);     // left: set cmd, hi nibble 2 → 0x200
+    e.setTableEntry(PTBL, 1, PTBL_NARROW_ROW, 0x00);     // right: lo byte 0x00
+    e.setTableEntry(PTBL, 0, PTBL_NARROW_ROW + 1, 0xFF); // left: jump/stop
+    e.setTableEntry(PTBL, 1, PTBL_NARROW_ROW + 1, 0x00); // right: target 0 = stop
+
+    // Instruments that use pulse waveform need a pulse table pointer
+    const pulseInstruments: Record<number, number> = {
+      [INST.SIREN]:        PTBL_WIDE_ROW + 1,   // ptr 1 → wide 50%
+      [INST.SIREN_WARBLE]: PTBL_WIDE_ROW + 1,   // ptr 1 → wide 50%
+      [INST.CRUSH_BASS]:   PTBL_NARROW_ROW + 1,  // ptr 3 → narrow 12.5%
+      [INST.STAB]:         PTBL_WIDE_ROW + 1,   // ptr 1 → wide 50%
+    };
+
     for (const [idx, [firstwave, ad, sr]] of Object.entries(INSTRUMENTS)) {
       const i = Number(idx);
       e.setInstrumentFirstwave(i, firstwave);
       e.setInstrumentAD(i, ad);
       e.setInstrumentSR(i, sr);
-      // Table pointers stay at 0 (no wave/pulse/filter modulation tables).
-      // This gives us raw static waveforms — perfectly authentic for dub FX.
-      e.setInstrumentTablePtr(i, 0, 0); // wave table
-      e.setInstrumentTablePtr(i, 1, 0); // pulse table
+      e.setInstrumentTablePtr(i, 0, 0); // wave table — no modulation
+      e.setInstrumentTablePtr(i, 1, pulseInstruments[i] ?? 0); // pulse table
       e.setInstrumentTablePtr(i, 2, 0); // filter table
       e.setInstrumentTablePtr(i, 3, 0); // speed table
     }
@@ -215,7 +245,9 @@ export class SIDDubSynths {
    */
   startSiren(baseNote?: number, range?: number, rateHz?: number): () => void {
     const engine = this.engine;
-    if (!engine) return () => {};
+    if (!engine) {
+      return () => {};
+    }
 
     const p = this._sirenPreset;
     const bn = baseNote ?? p.baseNote;
@@ -327,7 +359,7 @@ export class SIDDubSynths {
   }
 
   // ── Sub Bass: Pure triangle sub ───────────────────────────────────────
-  startSubBass(note = 0x50): () => void {
+  startSubBass(note = 0x60): () => void {
     const engine = this.engine;
     if (!engine) return () => {};
     engine.playTestNote(CH_BASS, note, INST.SUB_BASS);
