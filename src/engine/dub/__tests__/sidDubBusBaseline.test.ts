@@ -63,4 +63,39 @@ describe('SID dub bus baseline', () => {
     expect(mixerSrc).toMatch(/setSidVoiceDubSend[\s\S]*handledBySid\s*=\s*true/);
     expect(mixerSrc).toMatch(/if\s*\(\s*!handledBySid\s*\)/);
   });
+
+  // ── SID make-up boost when dub bus is enabled ─────────────────────────
+  // The SID's dry signal sits ~6 dB below the perceived loudness of the
+  // dub wet chain. When the user turns the dub bus on we ramp the SID
+  // master up, and we MUST ramp it back to 1.0 on disable so the SID
+  // doesn't get stuck amplified when the user toggles dub off.
+  it('C64SIDEngine exposes setDubBoost that applies engineGain * boost', () => {
+    expect(c64Src).toContain('setDubBoost(boost: number)');
+    // The effective gain must multiply ENGINE_GAIN by the clamped boost
+    expect(c64Src).toMatch(/engineGain\s*\*\s*b/);
+    // Must also cover the jsSID setVolume path
+    expect(c64Src).toMatch(/setDubBoost[\s\S]*setVolume\(this\.masterVolume\s*\*\s*target\)/);
+  });
+
+  it('DubBus has registerSidBoostHandler and ramps on enable/disable', () => {
+    expect(dubBusSrc).toContain('registerSidBoostHandler');
+    expect(dubBusSrc).toContain('_sidBoostHandler');
+    // The enable/disable branch in setSettings must call the handler with
+    // boost on enable and 1 on disable.
+    expect(dubBusSrc).toMatch(
+      /_sidBoostHandler[\s\S]{0,400}settings\.enabled\s*\?\s*this\._sidBoostAmount\s*:\s*1/,
+    );
+  });
+
+  it('DubBus.disableSIDMode restores SID master boost to 1', () => {
+    // If dub stays enabled while SID engine goes away, we must unboost
+    // before clearing state or a later non-SID engine reusing the handler
+    // slot would inherit a stuck 2x gain.
+    expect(dubBusSrc).toMatch(/disableSIDMode[\s\S]{0,400}_sidBoostHandler[\s\S]{0,100}\(1\)/);
+  });
+
+  it('NativeEngineRouting registers the SID boost handler on init', () => {
+    expect(routingSrc).toContain('registerSidBoostHandler');
+    expect(routingSrc).toMatch(/setDubBoost\(boost\)/);
+  });
 });

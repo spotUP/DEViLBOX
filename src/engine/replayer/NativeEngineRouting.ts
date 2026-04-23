@@ -1179,6 +1179,15 @@ export async function startNativeEngines(
                 dubBus.registerSidVoiceTaps(voiceOutputs);
                 console.log('[NativeEngineRouting] Per-voice SID dub taps registered');
               }
+              // Make-up boost: when the dub bus is live the SID's dry output
+              // tends to sit way below the wet dub effects. Let DubBus
+              // ramp the SID master up while dub is enabled and restore it
+              // when disabled. Captures the engine so it survives later
+              // bus enable/disable toggles.
+              const sidEngineRef = c64SidEngine;
+              dubBus.registerSidBoostHandler((boost) => {
+                try { sidEngineRef.setDubBoost(boost); } catch { /* ok */ }
+              });
             }
           }
         } catch (e) {

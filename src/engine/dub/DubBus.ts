@@ -530,6 +530,13 @@ export class DubBus {
   // whole-mix Path 2 instead of being fooled by stale non-SID channelTaps
   // left over from prior tracker sessions.
   private _sidHasPerVoiceTaps = false;
+  // Callback to apply a make-up gain on the SID engine's master output when
+  // the dub bus is enabled/disabled. Registered by NativeEngineRouting when
+  // the SID engine comes online. Kept as a callback (not a node reference)
+  // so DubBus doesn't need to know about ENGINE_GAIN or jsSID's separate
+  // AudioContext path.
+  private _sidBoostHandler: ((boost: number) => void) | null = null;
+  private _sidBoostAmount = 2.0; // ~+6 dB make-up when dub enabled in SID mode
 
   private readonly context: AudioContext;
   private readonly master: AudioNode;
@@ -1075,6 +1082,13 @@ export class DubBus {
   disableSIDMode(): void {
     if (!this._sidMode) return;
     this._sidMode = false;
+    // Restore SID master gain to baseline if we had boosted it — when the
+    // user switches tracker songs the dub bus may stay enabled while the
+    // SID engine goes away, and we must not leak boost onto a non-SID
+    // engine that later reuses the handler slot.
+    if (this._sidBoostHandler) {
+      try { this._sidBoostHandler(1); } catch { /* ok */ }
+    }
     if (this._sidSynths) {
       const output = this._sidSynths.output;
       if (output) {
@@ -1094,6 +1108,31 @@ export class DubBus {
   registerSidDubSend(gain: GainNode, baseline: number): void {
     this._sidDubSendGain = gain;
     this._sidDubSendBaseline = baseline;
+  }
+
+  /**
+   * Register a make-up gain callback for the SID engine. Called with
+   * boost=_sidBoostAmount when the dub bus is enabled (and SID mode is
+   * active) and boost=1 when disabled, so the SID's dry output matches
+   * the loudness of the dub-wet chain. The callback is typically
+   * `(b) => c64SidEngine.setDubBoost(b)`.
+   */
+  registerSidBoostHandler(handler: (boost: number) => void): void {
+    this._sidBoostHandler = handler;
+    // If dub bus is already enabled when the SID comes online mid-session,
+    // apply the boost immediately so the user doesn't have to toggle.
+    if (this.enabled && this._sidMode) {
+      try { handler(this._sidBoostAmount); } catch { /* ok */ }
+    }
+  }
+
+  unregisterSidBoostHandler(): void {
+    // Restore baseline before clearing so the SID doesn't get stuck boosted
+    // if dub is disabled later while the handler is gone.
+    if (this._sidBoostHandler) {
+      try { this._sidBoostHandler(1); } catch { /* ok */ }
+    }
+    this._sidBoostHandler = null;
   }
 
   /**
@@ -1758,6 +1797,15 @@ export class DubBus {
       // they later toggle back off without re-enabling — helpful during
       // soundcheck when knobs move around.
       if (settings.enabled) this._warnedBusDisabled = false;
+      // SID make-up boost: when the dub bus goes live in SID mode the SID's
+      // dry signal can sit much quieter than the wet effects chain. Ramp
+      // the SID master up by _sidBoostAmount on enable, back to unity on
+      // disable. Handler is installed by NativeEngineRouting on SID init.
+      if (this._sidBoostHandler && this._sidMode) {
+        try {
+          this._sidBoostHandler(settings.enabled ? this._sidBoostAmount : 1);
+        } catch { /* ok */ }
+      }
       // Gate the pink-noise source level alongside the bus return. Pure
       // silence when disabled — no rogue noise floor, no wasted CPU
       // feeding inaudible samples through the whole chain.
