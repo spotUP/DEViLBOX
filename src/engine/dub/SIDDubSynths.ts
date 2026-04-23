@@ -374,6 +374,39 @@ export class SIDDubSynths {
     setTimeout(() => engine.releaseTestNote(CH_BASS), durationMs);
   }
 
+  /**
+   * Short sub-blip on the one-shot channel for sub-harmonic boosting.
+   * Uses SUB_BASS (instant-attack triangle, 48 ms release) on CH_ONESHOT
+   * so it doesn't steal the CH_BASS voice from ongoing oscBass/crushBass
+   * throws. Designed to be re-triggered rapidly (every kick).
+   */
+  fireSubBooster(note = 0x50, durationMs = 120): void {
+    const engine = this.engine;
+    if (!engine) return;
+    engine.playTestNote(CH_ONESHOT, note, INST.SUB_BASS);
+    setTimeout(() => engine.releaseTestNote(CH_ONESHOT), durationMs);
+  }
+
+  /**
+   * Spring-slam excitation: two-voice SID impulse designed to hit a spring
+   * tank. Fires a noise snare (the metallic shang) on CH_ONESHOT in
+   * parallel with a pure-triangle sub blip on CH_BASS (the tank whump).
+   * Used in SID mode to replace the WebAudio 55 Hz sine + bandpass-noise
+   * tandem that gave the slam a modern flavor.
+   */
+  fireSlam(durationMs = 250): void {
+    const engine = this.engine;
+    if (!engine) return;
+    // Metal shang: short noise burst on CH_ONESHOT
+    engine.playTestNote(CH_ONESHOT, 0x80, INST.SNARE);
+    // Tank whump: low triangle on CH_BASS (instant attack, full sustain)
+    engine.playTestNote(CH_BASS, 0x48, INST.SUB_BASS);
+    setTimeout(() => {
+      engine.releaseTestNote(CH_ONESHOT);
+      engine.releaseTestNote(CH_BASS);
+    }, durationMs);
+  }
+
   // ── Lifecycle ─────────────────────────────────────────────────────────
   dispose(): void {
     if (this._disposed) return;
