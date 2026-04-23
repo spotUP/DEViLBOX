@@ -216,6 +216,11 @@ export function useFileNavigation({
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedFile, setSelectedFile] = useState<FileItem | null>(null);
+  /* Mirror of `selectedFile` in a ref so `handleLoad` can be invoked in the
+     same tick as `setSelectedFile` (e.g. double-clicking an unselected row)
+     without reading a stale state value. */
+  const selectedFileRef = useRef<FileItem | null>(null);
+  useEffect(() => { selectedFileRef.current = selectedFile; }, [selectedFile]);
   const [saveFilename, setSaveFilename] = useState(suggestedFilename);
   const [hasFilesystemAccess, setHasFilesystemAccess] = useState(false);
   const [hasServerFS, setHasServerFS] = useState(false);
@@ -576,7 +581,22 @@ export function useFileNavigation({
   };
 
   // Load selected file
-  const handleLoad = async () => {
+  /**
+   * Load either the currently-selected file OR an explicit `fileOverride`.
+   *
+   * The override exists because `handleLoad` is a closure that captures
+   * `selectedFile` at render time. When the user double-clicks an unselected
+   * row the caller runs `setSelectedFile(file); handleLoad();` back-to-back;
+   * the `setSelectedFile` call schedules a state update but React hasn't
+   * re-rendered yet, so `selectedFile` in this closure is still stale
+   * (either `null` → silent return, or the previously-selected file → loads
+   * the wrong song). Passing `fileOverride` lets the double-click path pass
+   * the fresh `FileItem` directly and side-step the stale closure entirely.
+   * The "Load" button in the footer still calls `handleLoad()` with no args
+   * and falls through to `selectedFile` the normal way.
+   */
+  const handleLoad = async (fileOverride?: FileItem) => {
+    const selectedFile = fileOverride ?? selectedFileRef.current;
     if (!selectedFile) return;
     setIsLoading(true);
     setError(null);
