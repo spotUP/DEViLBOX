@@ -22,14 +22,16 @@
  * mathematical limit (output strictly bounded by ±1).
  */
 const LIMIT = 0.95;
-/* Forward-mode safety ceiling. Normal reverb/echo tails peak well below
-   1.0, so a 4.0 ceiling is transparent to musical signal but catches
-   the catastrophic WASM blow-ups observed on certain spring-reverb
-   preset transitions (SpringTap measured rms=253,414,992 at t+400ms
-   on the tubby character preset — without a limit this lands on the
-   sidechain compressor and locks its gain-reduction at maximum,
-   permanently killing the reverb return until the bus is reset). */
-const FORWARD_CEIL = 4.0;
+/* Forward-mode safety ceiling. Normal reverb/echo tails peak below ~0.9,
+   so a 1.2 ceiling is transparent to musical signal but catches the
+   catastrophic WASM blow-ups observed on certain spring-reverb preset
+   transitions (SpringTap measured rms=253,414,992 at t+400ms on the
+   tubby character preset — without a limit this lands on the sidechain
+   compressor and locks its gain-reduction at maximum, permanently
+   killing the reverb return until the bus is reset). Originally ±4.0
+   but peak=4.0 was audibly a "boom" — lowered to ±1.2 so the clamped
+   transient is at 0 dBFS (audible but not explosive). */
+const FORWARD_CEIL = 1.2;
 class NaNScrubberProcessor extends AudioWorkletProcessor {
   constructor(options) {
     super();
