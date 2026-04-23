@@ -32,6 +32,8 @@ import { MadProfessorPlateEffect } from '../effects/MadProfessorPlateEffect';
 import { DattorroPlateEffect } from '../effects/DattorroPlateEffect';
 import { ParametricEQEffect } from '../effects/ParametricEQEffect';
 import { CalfPhaserEffect } from '../effects/CalfPhaserEffect';
+import { RingModEffect } from '../effects/RingModEffect';
+import { BittaEffect } from '../effects/BittaEffect';
 import { getNativeAudioNode } from '@utils/audio-context';
 import type { DJMixerEngine } from '../dj/DJMixerEngine';
 import type { DeckId } from '../dj/DeckEngine';
@@ -271,6 +273,17 @@ export class DubBus {
   // ─── Return EQ — WASM parametric inserted between midScoop and LPF ────
   // Always 100% wet (series insert). Bypass via flat gain (0 dB).
   private returnEQ: ParametricEQEffect;
+  // ─── Post-echo tape saturation — degrades echo repeats ─────────────
+  private postEchoSat: WaveShaperNode;
+  private postEchoSatBypass: GainNode;   // 1 when off (dry through), 0 when sat on
+  private postEchoSatWet: GainNode;      // 0 when off, 1 when sat on
+  // ─── Ring modulator — parallel send ────────────────────────────────
+  private ringMod: RingModEffect;
+  private ringModSend: GainNode;         // amount of ring mod mixed into bus
+  // ─── Lo-fi / voltage starve — bitcrusher ──────────────────────────
+  private lofi: BittaEffect;
+  private lofiSend: GainNode;            // gated on/off
+  private lofiBypass: GainNode;          // dry bypass when off
   /** Aelapse-ported spring-reverb DSP (C++ → WASM). Replaces the old
    *  Tone.js-based SpringReverbEffect — proper tank simulation with chaos,
    *  damping, and per-spring scatter. Delay side disabled since the bus
@@ -382,12 +395,19 @@ export class DubBus {
     const echoOutNative = getNativeAudioNode(echoOut);
     const springInNative = getNativeAudioNode(springIn);
     if (echoOutNative && springInNative) {
-      try { echoOutNative.connect(this._echoSpringScrubber); } catch { /* ok */ }
+      // Post-echo saturation: echo → [bypass + sat] → scrubber → spring
+      // Parallel dry/wet: echoOut → satBypass → scrubber (dry path)
+      //                   echoOut → postEchoSat → satWet → scrubber (wet path)
+      try {
+        echoOutNative.connect(this.postEchoSatBypass);
+        echoOutNative.connect(this.postEchoSat);
+        this.postEchoSat.connect(this.postEchoSatWet);
+        this.postEchoSatBypass.connect(this._echoSpringScrubber);
+        this.postEchoSatWet.connect(this._echoSpringScrubber);
+      } catch { /* ok */ }
       try { (this._echoSpringScrubber as AudioNode).connect(springInNative); } catch { /* ok */ }
       return;
     }
-    /* Fall back to direct echo→spring if native extraction fails. The
-       protection is best-effort: reverb routing > NaN safety. */
     console.warn('[DubBus] echo→spring scrubber insertion failed, using direct Tone.connect');
     try { this.echo.connect(this.spring); } catch { /* ok */ }
   }
@@ -1190,6 +1210,38 @@ export class DubBus {
       wet:    1.0,
     });
 
+    // Post-echo tape saturation — same curve as pre-echo tapeSat but
+    // positioned AFTER echo output, BEFORE spring. First echo repeat
+    // overdrives hard; subsequent repeats are quieter → lighter distortion.
+    this.postEchoSat = this.context.createWaveShaper();
+    this.postEchoSat.curve = makeTapeSatCurve(this.settings.postEchoSatDrive);
+    this.postEchoSat.oversample = '2x';
+    this.postEchoSatBypass = this.context.createGain();
+    this.postEchoSatBypass.gain.value = this.settings.postEchoSatEnabled ? 0 : 1;
+    this.postEchoSatWet = this.context.createGain();
+    this.postEchoSatWet.gain.value = this.settings.postEchoSatEnabled ? 1 : 0;
+
+    // Ring modulator — parallel send. Carrier × input creates metallic textures.
+    this.ringMod = new RingModEffect({
+      frequency: this.settings.ringModFreq,
+      waveform:  this.settings.ringModWaveform,
+      mix:       this.settings.ringModMix,
+      wet:       1.0,
+    });
+    this.ringModSend = this.context.createGain();
+    this.ringModSend.gain.value = this.settings.ringModEnabled ? this.settings.ringModAmount : 0;
+
+    // Lo-fi / voltage starve — Bitta WASM bitcrusher
+    this.lofi = new BittaEffect({
+      crush: this.settings.lofiBits,
+      mix:   1.0,
+      wet:   1.0,
+    });
+    this.lofiSend = this.context.createGain();
+    this.lofiSend.gain.value = this.settings.lofiEnabled ? 1 : 0;
+    this.lofiBypass = this.context.createGain();
+    this.lofiBypass.gain.value = this.settings.lofiEnabled ? 0 : 1;
+
     // Tape saturation — asymmetric tanh curve that models the positive/negative
     // asymmetry of transformer-coupled magnetic tape. Softens positive peaks
     // more than negative, which is what gives RE-201 / Studer saturation its
@@ -1488,7 +1540,21 @@ export class DubBus {
     Tone.connect(this.midScoop as unknown as Tone.OutputNode, this.returnEQ.input);
     Tone.connect(this.returnEQ.output, this.lpf as unknown as Tone.InputNode);
     this.lpf.connect(this.stereoSplit);
-    this.stereoMerge.connect(this.return_);
+    // Lo-fi (bitcrusher): inline on the main path via dry/wet crossfade.
+    // stereoMerge → lofiBypass → return (dry, gain=1 when off)
+    // stereoMerge → lofi → lofiSend → return (wet, gain=1 when on)
+    this.stereoMerge.connect(this.lofiBypass);
+    Tone.connect(this.stereoMerge as unknown as Tone.OutputNode, this.lofi.input);
+    Tone.connect(this.lofi.output, this.lofiSend as unknown as Tone.InputNode);
+    this.lofiBypass.connect(this.return_);
+    this.lofiSend.connect(this.return_);
+
+    // Ring modulator: additive parallel send from stereoMerge.
+    // Adds metallic texture on top of the main signal.
+    Tone.connect(this.stereoMerge as unknown as Tone.OutputNode, this.ringMod.input);
+    Tone.connect(this.ringMod.output, this.ringModSend as unknown as Tone.InputNode);
+    this.ringModSend.connect(this.return_);
+
     this.return_.connect(this.master);
 
     // Optional plate-stage insert — branches from stereoMerge into the
@@ -2537,6 +2603,33 @@ export class DubBus {
     if (settings.phaserDepth !== undefined) this.phaser.setDepth(merged.phaserDepth);
     if (settings.phaserStages !== undefined) this.phaser.setStages(merged.phaserStages);
     if (settings.phaserFeedback !== undefined) this.phaser.setFeedback(merged.phaserFeedback);
+
+    // ─── Post-echo tape saturation ────────────────────────────────────────
+    if (settings.postEchoSatEnabled !== undefined || settings.postEchoSatDrive !== undefined) {
+      const enabled = merged.postEchoSatEnabled;
+      this.postEchoSatBypass.gain.setTargetAtTime(enabled ? 0 : 1, now, 0.01);
+      this.postEchoSatWet.gain.setTargetAtTime(enabled ? 1 : 0, now, 0.01);
+      if (settings.postEchoSatDrive !== undefined) {
+        this.postEchoSat.curve = makeTapeSatCurve(merged.postEchoSatDrive);
+      }
+    }
+
+    // ─── Ring modulator ───────────────────────────────────────────────────
+    if (settings.ringModEnabled !== undefined || settings.ringModAmount !== undefined) {
+      const amt = merged.ringModEnabled ? merged.ringModAmount : 0;
+      this.ringModSend.gain.setTargetAtTime(amt, now, 0.02);
+    }
+    if (settings.ringModFreq !== undefined) this.ringMod.setFrequency(merged.ringModFreq);
+    if (settings.ringModWaveform !== undefined) this.ringMod.setWaveform(merged.ringModWaveform);
+    if (settings.ringModMix !== undefined) this.ringMod.setMix(merged.ringModMix);
+
+    // ─── Lo-fi / voltage starve ───────────────────────────────────────────
+    if (settings.lofiEnabled !== undefined || settings.lofiBits !== undefined) {
+      const enabled = merged.lofiEnabled;
+      this.lofiBypass.gain.setTargetAtTime(enabled ? 0 : 1, now, 0.01);
+      this.lofiSend.gain.setTargetAtTime(enabled ? 1 : 0, now, 0.01);
+      if (settings.lofiBits !== undefined) this.lofi.setCrush(merged.lofiBits);
+    }
 
     // Character-preset selection: apply the DSP-side bits (spring, tape
     // saturator curve) when the preset NAME transitions. The settings-side
@@ -4606,6 +4699,8 @@ export class DubBus {
     this.stopEQSweep();
     try { this.returnEQ.dispose(); } catch { /* ok */ }
     try { this.phaser.dispose(); } catch { /* ok */ }
+    try { this.ringMod.dispose(); } catch { /* ok */ }
+    try { this.lofi.dispose(); } catch { /* ok */ }
     // SID dub synths
     if (this._sidSynths) {
       this._sidSynths.dispose();

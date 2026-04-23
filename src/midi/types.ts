@@ -393,6 +393,9 @@ export type DubMoveParameter =
   | 'dub.delayPresetTriplet'
   | 'dub.delayPreset16th'
   | 'dub.delayPresetDoubler'
+  | 'dub.ghostReverb'
+  | 'dub.voltageStarve'
+  | 'dub.ringMod'
   // Continuous bus settings
   | 'dub.echoIntensity'
   | 'dub.echoWet'
