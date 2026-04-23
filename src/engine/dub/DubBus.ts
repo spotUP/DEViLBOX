@@ -297,6 +297,7 @@ export class DubBus {
         outputChannelCount: [2],
         channelCount: 2,
         channelCountMode: 'explicit',
+        processorOptions: { mode: 'feedback' },
       });
       /* Splice: disconnect the placeholder GainNode, connect the worklet
          in its place. feedback → (old scrubber) → feedbackShelfComp becomes
@@ -337,6 +338,7 @@ export class DubBus {
         outputChannelCount: [2],
         channelCount: 2,
         channelCountMode: 'explicit',
+        processorOptions: { mode: 'forward' },
       });
       const springOut = (this.spring as unknown as { output: Tone.ToneAudioNode }).output;
       const springOutNative = getNativeAudioNode(springOut as unknown);
@@ -1125,7 +1127,7 @@ export class DubBus {
        _loadForwardScrubberWorklet. The worklet's tanh soft-limiter at
        ±0.95 also caps feedback runaway so the loop cannot grow past unity
        even if the comp mirror desyncs mid-ramp. */
-    const makeScrubber = (): { node: AudioNode; isWorklet: boolean } => {
+    const makeScrubber = (mode: 'feedback' | 'forward'): { node: AudioNode; isWorklet: boolean } => {
       try {
         const w = new AudioWorkletNode(this.context, 'nan-scrubber', {
           numberOfInputs: 1,
@@ -1133,6 +1135,7 @@ export class DubBus {
           outputChannelCount: [2],
           channelCount: 2,
           channelCountMode: 'explicit',
+          processorOptions: { mode },
         });
         return { node: w, isWorklet: true };
       } catch {
@@ -1141,12 +1144,12 @@ export class DubBus {
         return { node: g, isWorklet: false };
       }
     };
-    const fb = makeScrubber();
+    const fb = makeScrubber('feedback');
     this._feedbackScrubber = fb.node;
     this._feedbackScrubberIsWorklet = fb.isWorklet;
     if (!fb.isWorklet) void this._loadFeedbackScrubberWorklet();
 
-    const fwd = makeScrubber();
+    const fwd = makeScrubber('forward');
     this._forwardScrubber = fwd.node;
     this._forwardScrubberIsWorklet = fwd.isWorklet;
     if (!fwd.isWorklet) void this._loadForwardScrubberWorklet();
