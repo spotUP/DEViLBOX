@@ -109,6 +109,62 @@ describe('DubBus._swapEchoEngine — transactional quiesce contract', () => {
   });
 });
 
+describe('DubBus — biquad automation safety contract (Chrome "state is bad" prevention)', () => {
+  const src = read('src/engine/dub/DubBus.ts');
+
+  it('exposes a `rampBiquadParam` helper', () => {
+    /* The helper MUST use cancelScheduledValues + setValueAtTime +
+       linearRampToValueAtTime — Chrome's biquad destabilizes with
+       `setTargetAtTime` when freq/Q/gain change simultaneously (the
+       exponential approach has no deterministic endpoint and can leave
+       the filter's internal state in an unstable region). */
+    expect(src).toMatch(/function\s+rampBiquadParam\s*\(/);
+    const fnMatch = /function\s+rampBiquadParam[\s\S]*?^}/m.exec(src);
+    expect(fnMatch, 'rampBiquadParam body must parse').toBeTruthy();
+    const body = fnMatch![0];
+    expect(body).toMatch(/cancelScheduledValues/);
+    expect(body).toMatch(/setValueAtTime/);
+    expect(body).toMatch(/linearRampToValueAtTime/);
+    /* NaN guard — prevents a stale NaN in param.value from propagating
+       into the ramp's origin and poisoning the linear interpolation. */
+    expect(body).toMatch(/Number\.isFinite/);
+  });
+
+  it('routes the at-risk biquad params through the helper (no raw setTargetAtTime on feedback-loop biquads)', () => {
+    /* These biquads sit INSIDE the echo feedback loop or the forward
+       chain that feeds it — `bassShelf`, `feedbackShelfComp`, the hpf
+       cascade, `midScoop`, and their master-insert counterparts. A
+       setTargetAtTime on any of them during a Tubby-style multi-param
+       transition (gain 0→+9 dB with simultaneous freq + Q change) will
+       flag "state is bad" and NaN the filter. */
+    const atRiskIdentifiers = [
+      'this.hpf.frequency',
+      'this.hpf2.frequency',
+      'this.hpf3.frequency',
+      'this.bassShelf.frequency',
+      'this.bassShelf.Q',
+      'this.bassShelf.gain',
+      'this.feedbackShelfComp.frequency',
+      'this.feedbackShelfComp.Q',
+      'this.feedbackShelfComp.gain',
+      'this.midScoop.frequency',
+      'this.midScoop.Q',
+      'this.midScoop.gain',
+      'this.masterBassShelf.frequency',
+      'this.masterBassShelf.Q',
+      'this.masterBassShelf.gain',
+      'this.masterMidScoop.frequency',
+      'this.masterMidScoop.Q',
+      'this.masterMidScoop.gain',
+    ];
+    for (const id of atRiskIdentifiers) {
+      const esc = id.replace(/\./g, '\\.');
+      const bad = new RegExp(`${esc}\\.setTargetAtTime`);
+      expect(src, `${id} must not use setTargetAtTime — route through rampBiquadParam`).not.toMatch(bad);
+    }
+  });
+});
+
 describe('RE201Effect.swapToWasm — fallback-disconnect-first contract', () => {
   const src = read('src/engine/effects/RE201Effect.ts');
   const fn = extractFn(src, 'swapToWasm');
