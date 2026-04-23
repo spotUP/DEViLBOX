@@ -127,8 +127,8 @@ struct ParametricEQInstance {
 
         // Band 1: Low shelf
         bands[0] = { LOW_SHELF, 100.0f, 0.0f, 0.707f, 20.0f, 500.0f };
-        // Band 2: Peaking
-        bands[1] = { PEAKING, 500.0f, 0.0f, 1.0f, 100.0f, 2000.0f };
+        // Band 2: Peaking (dub return EQ — widened range for Tubby-style sweeps)
+        bands[1] = { PEAKING, 500.0f, 0.0f, 1.0f, 100.0f, 5000.0f };
         // Band 3: Peaking
         bands[2] = { PEAKING, 2000.0f, 0.0f, 1.0f, 500.0f, 8000.0f };
         // Band 4: High shelf

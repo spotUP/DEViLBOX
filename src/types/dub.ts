@@ -179,6 +179,36 @@ export interface DubBusSettings {
   // plateStage !== 'off'); 1 = fully wet. Default 0.35 — audible colored
   // tail without overwhelming the bus.
   plateStageMix: number;
+
+  // ─── Return EQ — sweepable parametric on the return path (2026-04-23) ──
+  // 4-band WASM parametric EQ inserted between midScoop and LPF on the
+  // return path. Only band 2 (peaking) is exposed as the primary dub knob;
+  // bands 1/3/4 are flat by default (advanced users tweak via MCP).
+  // The classic Tubby technique: sweep a resonant peak across the echo/
+  // spring return to make it "sing." Always 100% wet (series insert).
+  returnEqEnabled: boolean;
+  returnEqFreq: number;   // band 2 center freq, 200-5000 Hz
+  returnEqGain: number;   // band 2 gain, -18 to +18 dB (0 = flat/bypass)
+  returnEqQ: number;      // band 2 Q, 0.5-8 (higher = narrower/more resonant)
+  // Advanced: bands 1/3/4 for MCP/power users. Flat (0 dB gain) by default.
+  returnEqB1Freq: number;
+  returnEqB1Gain: number;
+  returnEqB1Q: number;
+  returnEqB3Freq: number;
+  returnEqB3Gain: number;
+  returnEqB3Q: number;
+  returnEqB4Freq: number;
+  returnEqB4Gain: number;
+  returnEqB4Q: number;
+
+  // ─── Sweep mode — comb filter vs true phaser (2026-04-23) ─────────────
+  // 'comb' = current liquid-sweep short-delay flanger (default)
+  // 'phaser' = CalfPhaser WASM all-pass cascade (authentic Mutron Bi-Phase)
+  sweepMode: 'comb' | 'phaser';
+  phaserRate: number;      // LFO rate Hz (0.01-10)
+  phaserDepth: number;     // LFO depth (0-1)
+  phaserStages: number;    // all-pass stages (2-12)
+  phaserFeedback: number;  // feedback (-0.95 to 0.95)
 }
 
 export const DEFAULT_DUB_BUS: DubBusSettings = {
@@ -250,6 +280,28 @@ export const DEFAULT_DUB_BUS: DubBusSettings = {
   tapeSatMode:      'single',
   plateStage:       'off',
   plateStageMix:    0.35,
+
+  // Return EQ — flat by default (no coloring until user sweeps).
+  returnEqEnabled:  false,
+  returnEqFreq:     800,
+  returnEqGain:     0,
+  returnEqQ:        2.0,
+  returnEqB1Freq:   100,
+  returnEqB1Gain:   0,
+  returnEqB1Q:      0.7,
+  returnEqB3Freq:   2000,
+  returnEqB3Gain:   0,
+  returnEqB3Q:      0.7,
+  returnEqB4Freq:   8000,
+  returnEqB4Gain:   0,
+  returnEqB4Q:      0.7,
+
+  // Sweep mode — comb by default (backwards compat).
+  sweepMode:        'comb',
+  phaserRate:       0.3,
+  phaserDepth:      0.7,
+  phaserStages:     6,
+  phaserFeedback:   0.5,
 };
 
 /** The 11 stepped positions of the Altec 9069B filter, per audiothing.net/
@@ -313,6 +365,12 @@ export const DUB_CHARACTER_PRESETS: Record<Exclude<DubBusSettings['characterPres
       sweepAmount:    0,      // no flanger; Tubby's "sweep" was filter, not comb
       tapeSatMode:   'single',
       echoEngine:    're201',     // Tubby's MCI → RE-201 signal chain
+      // Tubby's return EQ — the "Big Knob" sweep on the echo return.
+      // Resonant midrange peak that he swept by hand during mixing.
+      returnEqEnabled: true,
+      returnEqFreq:   700,
+      returnEqGain:   8,
+      returnEqQ:      3.0,
     },
     springsLength: 0.35, springsDamp: 0.55, springsChaos: 0.20, springsScatter: 0.60, springsTone: 0.55,
     tapeSatDrive:  0.55,
@@ -355,12 +413,13 @@ export const DUB_CHARACTER_PRESETS: Record<Exclude<DubBusSettings['characterPres
       sidechainAmount: 0.4,
       stereoWidth:    0.25,  // near-mono — Perry's defining texture
       // Perry had actual phasers (Mutron Bi-Phase, Eventide, MXR Phase 90)
-      // on guitars and vocals. We approximate the family of motion effects
-      // with the sweep — a parallel short-delay comb filter with LFO.
+      // on guitars and vocals. True phaser mode with all-pass cascade.
       sweepAmount:    0.50,
-      sweepRateHz:    0.15,   // slow, Space Echo wow territory
-      sweepDepthMs:   7,
-      sweepFeedback:  0.78,
+      sweepMode:      'phaser',
+      phaserRate:     0.15,   // slow, Space Echo wow territory
+      phaserDepth:    0.8,
+      phaserStages:   8,      // Mutron Bi-Phase is 6-stage; 8 for extra depth
+      phaserFeedback: 0.65,
       tapeSatMode:    'stack', // 3 parallel tape paths ≈ 4-track bouncing
       echoEngine:    'anotherDelay', // Perry's runaway wow-flutter madness
     },

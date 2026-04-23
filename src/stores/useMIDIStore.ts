@@ -235,6 +235,13 @@ const DEFAULT_CC_MAPPINGS: CCMapping[] = [
   { ccNumber: 44, parameter: 'dub.echoBuildUp',       min: 0, max: 1, curve: 'linear' },
   { ccNumber: 45, parameter: 'dub.delayPreset380',    min: 0, max: 1, curve: 'linear' },
   { ccNumber: 46, parameter: 'dub.delayPresetDotted', min: 0, max: 1, curve: 'linear' },
+  { ccNumber: 56, parameter: 'dub.eqSweep',           min: 0, max: 1, curve: 'linear' },
+  { ccNumber: 57, parameter: 'dub.springKick',        min: 0, max: 1, curve: 'linear' },
+  { ccNumber: 58, parameter: 'dub.delayPresetQuarter', min: 0, max: 1, curve: 'linear' },
+  { ccNumber: 59, parameter: 'dub.delayPreset8th',     min: 0, max: 1, curve: 'linear' },
+  { ccNumber: 60, parameter: 'dub.delayPresetTriplet', min: 0, max: 1, curve: 'linear' },
+  { ccNumber: 61, parameter: 'dub.delayPreset16th',    min: 0, max: 1, curve: 'linear' },
+  { ccNumber: 62, parameter: 'dub.delayPresetDoubler', min: 0, max: 1, curve: 'linear' },
 
   // Dub bus continuous params — min/max are documentary; the actual
   // normalisation is handled by DUB_BUS_PARAMS transforms in

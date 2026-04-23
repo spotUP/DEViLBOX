@@ -433,8 +433,83 @@ export const DubBusPanel: React.FC = () => {
           </label>
           </Section>
 
-          {/* ── Liquid sweep — parallel short-delay comb filter (flanger) ── */}
-          <Section title="Liquid sweep (flanger)">
+          {/* ── Return EQ — parametric EQ on echo/spring return path ── */}
+          <Section title="Return EQ (Tubby voicing)">
+          <label className="flex items-center gap-3 text-[11px] font-mono text-text-secondary">
+            <span className="w-24 shrink-0">Return EQ</span>
+            <input
+              type="checkbox"
+              checked={dubBus.returnEqEnabled}
+              onChange={(e) => patch({ returnEqEnabled: e.target.checked })}
+              className="accent-accent-primary"
+            />
+            <span className="text-xs text-text-muted">
+              {dubBus.returnEqEnabled ? '4-band parametric on return path' : 'bypassed (flat)'}
+            </span>
+          </label>
+          <Slider
+            label="Mid freq"
+            value={dubBus.returnEqFreq}
+            min={200}
+            max={5000}
+            step={10}
+            onChange={(v) => patch({ returnEqFreq: v })}
+            format={(v) => v >= 1000 ? `${(v / 1000).toFixed(1)}k` : `${Math.round(v)} Hz`}
+            disabled={!dubBus.returnEqEnabled}
+          />
+          <Slider
+            label="Mid gain"
+            value={dubBus.returnEqGain}
+            min={-18}
+            max={18}
+            step={0.5}
+            onChange={(v) => patch({ returnEqGain: v })}
+            format={(v) => `${v >= 0 ? '+' : ''}${v.toFixed(1)} dB`}
+            disabled={!dubBus.returnEqEnabled}
+          />
+          <Slider
+            label="Mid Q"
+            value={dubBus.returnEqQ}
+            min={0.5}
+            max={8}
+            step={0.1}
+            onChange={(v) => patch({ returnEqQ: v })}
+            format={(v) => v.toFixed(1)}
+            disabled={!dubBus.returnEqEnabled}
+          />
+          <Slider
+            label="Low shelf"
+            value={dubBus.returnEqB1Gain}
+            min={-18}
+            max={18}
+            step={0.5}
+            onChange={(v) => patch({ returnEqB1Gain: v })}
+            format={(v) => `${v >= 0 ? '+' : ''}${v.toFixed(1)} dB @ ${Math.round(dubBus.returnEqB1Freq)} Hz`}
+            disabled={!dubBus.returnEqEnabled}
+          />
+          <Slider
+            label="High shelf"
+            value={dubBus.returnEqB4Gain}
+            min={-18}
+            max={18}
+            step={0.5}
+            onChange={(v) => patch({ returnEqB4Gain: v })}
+            format={(v) => `${v >= 0 ? '+' : ''}${v.toFixed(1)} dB @ ${(dubBus.returnEqB4Freq / 1000).toFixed(1)}k`}
+            disabled={!dubBus.returnEqEnabled}
+          />
+          </Section>
+
+          {/* ── Liquid sweep — comb filter (flanger) or CalfPhaser ── */}
+          <Section title={dubBus.sweepMode === 'phaser' ? 'Phase sweep (Mutron)' : 'Liquid sweep (flanger)'}>
+          <Choice
+            label="Sweep mode"
+            value={dubBus.sweepMode}
+            options={[
+              { value: 'comb',   label: 'Comb filter (flanger)' },
+              { value: 'phaser', label: 'True phaser (Mutron)' },
+            ] as const}
+            onChange={(v) => patch({ sweepMode: v })}
+          />
           <Slider
             label="Sweep amount"
             value={dubBus.sweepAmount}
@@ -444,36 +519,83 @@ export const DubBusPanel: React.FC = () => {
             onChange={(v) => patch({ sweepAmount: v })}
             format={(v) => v === 0 ? 'off' : `${Math.round(v * 100)}%`}
           />
-          <Slider
-            label="Sweep rate"
-            value={dubBus.sweepRateHz}
-            min={0.05}
-            max={5}
-            step={0.05}
-            onChange={(v) => patch({ sweepRateHz: v })}
-            format={(v) => `${v.toFixed(2)} Hz`}
-            disabled={dubBus.sweepAmount === 0}
-          />
-          <Slider
-            label="Sweep depth"
-            value={dubBus.sweepDepthMs}
-            min={0.5}
-            max={10}
-            step={0.1}
-            onChange={(v) => patch({ sweepDepthMs: v })}
-            format={(v) => `${v.toFixed(1)} ms`}
-            disabled={dubBus.sweepAmount === 0}
-          />
-          <Slider
-            label="Sweep feedback"
-            value={dubBus.sweepFeedback}
-            min={0}
-            max={0.85}
-            step={0.01}
-            onChange={(v) => patch({ sweepFeedback: v })}
-            format={(v) => `${Math.round(v * 100)}%`}
-            disabled={dubBus.sweepAmount === 0}
-          />
+          {dubBus.sweepMode === 'comb' ? (
+            <>
+            <Slider
+              label="Sweep rate"
+              value={dubBus.sweepRateHz}
+              min={0.05}
+              max={5}
+              step={0.05}
+              onChange={(v) => patch({ sweepRateHz: v })}
+              format={(v) => `${v.toFixed(2)} Hz`}
+              disabled={dubBus.sweepAmount === 0}
+            />
+            <Slider
+              label="Sweep depth"
+              value={dubBus.sweepDepthMs}
+              min={0.5}
+              max={10}
+              step={0.1}
+              onChange={(v) => patch({ sweepDepthMs: v })}
+              format={(v) => `${v.toFixed(1)} ms`}
+              disabled={dubBus.sweepAmount === 0}
+            />
+            <Slider
+              label="Sweep feedback"
+              value={dubBus.sweepFeedback}
+              min={0}
+              max={0.85}
+              step={0.01}
+              onChange={(v) => patch({ sweepFeedback: v })}
+              format={(v) => `${Math.round(v * 100)}%`}
+              disabled={dubBus.sweepAmount === 0}
+            />
+            </>
+          ) : (
+            <>
+            <Slider
+              label="Phaser rate"
+              value={dubBus.phaserRate}
+              min={0.01}
+              max={10}
+              step={0.01}
+              onChange={(v) => patch({ phaserRate: v })}
+              format={(v) => `${v.toFixed(2)} Hz`}
+              disabled={dubBus.sweepAmount === 0}
+            />
+            <Slider
+              label="Phaser depth"
+              value={dubBus.phaserDepth}
+              min={0}
+              max={1}
+              step={0.01}
+              onChange={(v) => patch({ phaserDepth: v })}
+              format={(v) => `${Math.round(v * 100)}%`}
+              disabled={dubBus.sweepAmount === 0}
+            />
+            <Slider
+              label="Phaser stages"
+              value={dubBus.phaserStages}
+              min={2}
+              max={12}
+              step={2}
+              onChange={(v) => patch({ phaserStages: v })}
+              format={(v) => `${v} stages`}
+              disabled={dubBus.sweepAmount === 0}
+            />
+            <Slider
+              label="Phaser feedback"
+              value={dubBus.phaserFeedback}
+              min={-0.95}
+              max={0.95}
+              step={0.01}
+              onChange={(v) => patch({ phaserFeedback: v })}
+              format={(v) => `${Math.round(v * 100)}%`}
+              disabled={dubBus.sweepAmount === 0}
+            />
+            </>
+          )}
           </Section>
 
           {/* ── Dub Action settings — how much dub-throw/hold/mute pads inject ── */}

@@ -59,6 +59,13 @@ const MOVE_COLOR: Record<string, string> = {
   oscBass:           'bg-accent-secondary/40',  // bass family, deeper
   crushBass:         'bg-accent-error/50',      // destructive bass crush
   subHarmonic:       'bg-accent-secondary/30',  // sub family, deepest
+  eqSweep:           'bg-accent-highlight/40',  // sweepable EQ — highlight accent
+  springKick:        'bg-accent-warning/50',    // explosive spring tank kick
+  delayPresetQuarter:  'bg-accent-primary/25',  // delay preset family
+  delayPreset8th:      'bg-accent-primary/25',
+  delayPresetTriplet:  'bg-accent-primary/25',
+  delayPreset16th:     'bg-accent-primary/25',
+  delayPresetDoubler:  'bg-accent-primary/25',
 };
 
 // Hold-kind moves have a meaningful durationRows. Keep in sync with the
@@ -68,6 +75,7 @@ const HOLD_KINDS = new Set([
   'channelMute', 'filterDrop', 'dubSiren', 'tapeWobble', 'masterDrop', 'toast',
   // PR #42 holds (moves that return a disposer)
   'tubbyScream', 'stereoDoubler', 'oscBass', 'crushBass', 'subHarmonic',
+  'eqSweep',
 ]);
 
 const POINT_WIDTH_PX = 6;   // rendered width for trigger events
