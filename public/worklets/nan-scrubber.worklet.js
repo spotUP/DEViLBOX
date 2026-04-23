@@ -22,35 +22,58 @@
  * mathematical limit (output strictly bounded by ±1).
  */
 const LIMIT = 0.95;
+/* Forward-mode safety ceiling. Normal reverb/echo tails peak well below
+   1.0, so a 4.0 ceiling is transparent to musical signal but catches
+   the catastrophic WASM blow-ups observed on certain spring-reverb
+   preset transitions (SpringTap measured rms=253,414,992 at t+400ms
+   on the tubby character preset — without a limit this lands on the
+   sidechain compressor and locks its gain-reduction at maximum,
+   permanently killing the reverb return until the bus is reset). */
+const FORWARD_CEIL = 4.0;
 class NaNScrubberProcessor extends AudioWorkletProcessor {
   constructor(options) {
     super();
     /* `mode: 'feedback'` (default) applies tanh soft-limit to break
-       runaway loops. `mode: 'forward'` does NaN-scrubbing only — used
-       on open (non-recirculating) paths where tanh would unnecessarily
-       compress reverb/echo tails into a squashed low-end rumble. */
+       runaway loops. `mode: 'forward'` does NaN-scrubbing + a HIGH-
+       threshold hard safety limiter — normal reverb tails (peak < 1)
+       pass through untouched, but any sample exceeding ±FORWARD_CEIL
+       is clamped. Without this, a 250M-sample WASM blow-up slams the
+       downstream compressor into permanent max ducking. */
     const mode = (options && options.processorOptions && options.processorOptions.mode) || 'feedback';
-    this._softLimit = mode !== 'forward';
+    this._mode = mode;
   }
   process(inputs, outputs) {
     const input = inputs[0];
     const output = outputs[0];
     if (!input || !output) return true;
     const numCh = Math.min(input.length, output.length);
-    const soft = this._softLimit;
+    const mode = this._mode;
     for (let ch = 0; ch < numCh; ch++) {
       const src = input[ch];
       const dst = output[ch];
       if (!src || !dst) continue;
       const n = Math.min(src.length, dst.length);
-      for (let i = 0; i < n; i++) {
-        const s = src[i];
-        if (s !== s || s === Infinity || s === -Infinity) {
-          dst[i] = 0;
-        } else if (soft) {
-          dst[i] = LIMIT * Math.tanh(s / LIMIT);
-        } else {
-          dst[i] = s;
+      if (mode === 'forward') {
+        for (let i = 0; i < n; i++) {
+          const s = src[i];
+          if (s !== s || s === Infinity || s === -Infinity) {
+            dst[i] = 0;
+          } else if (s > FORWARD_CEIL) {
+            dst[i] = FORWARD_CEIL;
+          } else if (s < -FORWARD_CEIL) {
+            dst[i] = -FORWARD_CEIL;
+          } else {
+            dst[i] = s;
+          }
+        }
+      } else {
+        for (let i = 0; i < n; i++) {
+          const s = src[i];
+          if (s !== s || s === Infinity || s === -Infinity) {
+            dst[i] = 0;
+          } else {
+            dst[i] = LIMIT * Math.tanh(s / LIMIT);
+          }
         }
       }
     }
