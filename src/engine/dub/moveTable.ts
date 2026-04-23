@@ -43,11 +43,18 @@ export const DUB_MOVE_TABLE: readonly string[] = [
   'delayPresetDotted',// 24
   'crushBass',        // 25
   'subHarmonic',      // 26
+  'eqSweep',          // 27
+  'springKick',       // 28
+  'delayPresetQuarter',  // 29
+  'delayPreset8th',      // 30
+  'delayPresetTriplet',  // 31
+  'delayPreset16th',     // 32
+  'delayPresetDoubler',  // 33
 ];
 
 /** Ratchet: tests assert `DUB_MOVE_TABLE.length === DUB_MOVE_TABLE_VERSION`
  *  so any append forces a one-line bump here — a cheap review signal. */
-export const DUB_MOVE_TABLE_VERSION = 27;
+export const DUB_MOVE_TABLE_VERSION = 34;
 
 /**
  * Dub effect-command slots. Picked at 36-38 to sit BEYOND the existing

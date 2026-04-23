@@ -110,6 +110,13 @@ export const dubStereoDoubler: MoveHandler = holdCommand('stereoDoubler', 'Stere
 export const dubOscBass:      MoveHandler = holdCommand('oscBass',       'Osc Bass');
 export const dubCrushBass:    MoveHandler = holdCommand('crushBass',     'Crush Bass');
 export const dubSubHarmonic:  MoveHandler = holdCommand('subHarmonic',   'Sub Harmonic');
+export const dubEqSweep:      MoveHandler = holdCommand('eqSweep',       'EQ Sweep');
+export function dubSpringKick():         boolean { return fireTrigger('springKick', 'Spring Kick'); }
+export function dubDelayPresetQuarter(): boolean { return fireTrigger('delayPresetQuarter', 'Delay Quarter'); }
+export function dubDelayPreset8th():     boolean { return fireTrigger('delayPreset8th', 'Delay 8th'); }
+export function dubDelayPresetTriplet(): boolean { return fireTrigger('delayPresetTriplet', 'Delay Triplet'); }
+export function dubDelayPreset16th():    boolean { return fireTrigger('delayPreset16th', 'Delay 16th'); }
+export function dubDelayPresetDoubler(): boolean { return fireTrigger('delayPresetDoubler', 'Delay Doubler'); }
 
 // ── Panic — release everything ────────────────────────────────────────────
 export function dubPanicReleaseAll(): boolean {

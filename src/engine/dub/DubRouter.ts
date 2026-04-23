@@ -17,6 +17,7 @@ import { dubStab } from './moves/dubStab';
 import { filterDrop } from './moves/filterDrop';
 import { dubSiren } from './moves/dubSiren';
 import { springSlam } from './moves/springSlam';
+import { springKick } from './moves/springKick';
 import { channelMute } from './moves/channelMute';
 import { channelThrow } from './moves/channelThrow';
 import { delayTimeThrow } from './moves/delayTimeThrow';
@@ -35,9 +36,10 @@ import { radioRiser } from './moves/radioRiser';
 import { subSwell } from './moves/subSwell';
 import { oscBass } from './moves/oscBass';
 import { echoBuildUp } from './moves/echoBuildUp';
-import { delayPreset380, delayPresetDotted } from './moves/delayPreset';
+import { delayPreset380, delayPresetDotted, delayPresetQuarter, delayPreset8th, delayPresetTriplet, delayPreset16th, delayPresetDoubler } from './moves/delayPreset';
 import { crushBass } from './moves/crushBass';
 import { subHarmonic } from './moves/subHarmonic';
+import { eqSweep } from './moves/eqSweep';
 import type { DubMove, DubMoveContext } from './moves/_types';
 import type { DubBus } from './DubBus';
 import { useTransportStore } from '@/stores/useTransportStore';
@@ -81,6 +83,7 @@ const MOVES: Record<string, DubMove> = {
   filterDrop,
   dubSiren,
   springSlam,
+  springKick,
   channelMute,
   channelThrow,
   delayTimeThrow,
@@ -101,8 +104,14 @@ const MOVES: Record<string, DubMove> = {
   echoBuildUp,
   delayPreset380,
   delayPresetDotted,
+  delayPresetQuarter,
+  delayPreset8th,
+  delayPresetTriplet,
+  delayPreset16th,
+  delayPresetDoubler,
   crushBass,
   subHarmonic,
+  eqSweep,
 };
 
 /**

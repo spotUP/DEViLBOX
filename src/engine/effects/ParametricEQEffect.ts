@@ -169,7 +169,7 @@ export class ParametricEQEffect extends Tone.ToneAudioNode {
   setB1Freq(v: number): void { this._b1Freq = clamp(v, 20, 500); this.sendParam('b1Freq', this._b1Freq); }
   setB1Gain(v: number): void { this._b1Gain = clamp(v, -18, 18); this.sendParam('b1Gain', this._b1Gain); }
   setB1Q(v: number): void { this._b1Q = clamp(v, 0.1, 10); this.sendParam('b1Q', this._b1Q); }
-  setB2Freq(v: number): void { this._b2Freq = clamp(v, 100, 2000); this.sendParam('b2Freq', this._b2Freq); }
+  setB2Freq(v: number): void { this._b2Freq = clamp(v, 100, 5000); this.sendParam('b2Freq', this._b2Freq); }
   setB2Gain(v: number): void { this._b2Gain = clamp(v, -18, 18); this.sendParam('b2Gain', this._b2Gain); }
   setB2Q(v: number): void { this._b2Q = clamp(v, 0.1, 10); this.sendParam('b2Q', this._b2Q); }
   setB3Freq(v: number): void { this._b3Freq = clamp(v, 500, 8000); this.sendParam('b3Freq', this._b3Freq); }

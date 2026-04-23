@@ -386,6 +386,13 @@ export type DubMoveParameter =
   | 'dub.echoBuildUp'
   | 'dub.delayPreset380'
   | 'dub.delayPresetDotted'
+  | 'dub.eqSweep'
+  | 'dub.springKick'
+  | 'dub.delayPresetQuarter'
+  | 'dub.delayPreset8th'
+  | 'dub.delayPresetTriplet'
+  | 'dub.delayPreset16th'
+  | 'dub.delayPresetDoubler'
   // Continuous bus settings
   | 'dub.echoIntensity'
   | 'dub.echoWet'
