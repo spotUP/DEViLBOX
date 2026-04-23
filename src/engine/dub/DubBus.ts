@@ -2438,6 +2438,27 @@ export class DubBus {
   slamSpring(amount = 1.0, ms = 800): void {
     if (!this.enabled) return;
     const target = Math.min(1.0, Math.max(0, amount));
+
+    // SID mode: replace the clean WebAudio sine+noise tandem with authentic
+    // SID-chip excitation (triangle sub on CH_BASS + noise snare on
+    // CH_ONESHOT). The SID output already feeds bus.input, so the chip
+    // audio flows through HPF → tapeSat → spring naturally. We just crank
+    // the spring wet for the tail window so the kick rings through clearly.
+    if (this._sidMode && this._sidSynths?.isReady) {
+      try {
+        this._sidSynths.fireSlam(Math.min(400, ms));
+      } catch (err) {
+        console.warn('[DubBus] SID slamSpring excitation failed:', err);
+      }
+      this._setSpringWet(target);
+      const t = setTimeout(() => {
+        this.throwTimers.delete(t);
+        this._setSpringWet(this.settings.springWet);
+      }, ms);
+      this.throwTimers.add(t);
+      return;
+    }
+
     // Kick the tank: TWO stacked layers model the physical reality of
     // hitting a spring reverb unit.
     //   1. SUB-THUMP — a 55 Hz sine with 200 ms exp decay, the tank body
@@ -3020,7 +3041,24 @@ export class DubBus {
     let rafHandle = 0;
     let lastFireAt = 0;
     let running = true;
+    // In SID mode we fire a SID triangle sub-blip on CH_ONESHOT instead of
+    // a clean WebAudio sine so the booster has 8-bit character matching
+    // the SID that's actually playing. Falls through to the WebAudio path
+    // if the SID synths aren't ready yet.
+    const useSid = this._sidMode && this._sidSynths?.isReady;
+    const sidSynths = this._sidSynths;
     const fireSub = () => {
+      if (useSid && sidSynths) {
+        try {
+          // Low SID note roughly matching `freq`. 0x48 ≈ C-1, 0x50 ≈ G-1,
+          // 0x60 ≈ C-2. Clamp `freq` into the expected 30–120 Hz range
+          // and map linearly to the 0x48–0x60 SID note band.
+          const clamped = Math.max(30, Math.min(120, freq));
+          const noteByte = Math.round(0x48 + ((clamped - 30) / 90) * 0x18);
+          sidSynths.fireSubBooster(noteByte, 120);
+        } catch { /* ok */ }
+        return;
+      }
       const now = ctx.currentTime;
       const osc = ctx.createOscillator();
       osc.type = 'sine';
