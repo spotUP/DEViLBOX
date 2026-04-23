@@ -1839,6 +1839,94 @@ export class DubBus {
     if (!changed) return;
 
     const merged: DubBusSettings = { ...this.settings, ...settings };
+
+    /* DIAGNOSTIC: log every biquad's current param values + target values
+       when a character preset is picked. Gated on `characterPreset`
+       transitions so the console doesn't flood on crossfader sweeps.
+       Used to find the exact biquad that Chrome flags "state is bad". */
+    const isPresetPick = typeof settings.characterPreset === 'string'
+      && settings.characterPreset !== this.settings.characterPreset;
+    if (isPresetPick) {
+      const safeBassGain = Math.max(-12, Math.min(12, merged.bassShelfGainDb));
+      const hpfFreq = merged.hpfStepped ? snapToAltecStep(merged.hpfCutoff) : merged.hpfCutoff;
+      console.log('[DubBus/diag] ===== preset pick:', settings.characterPreset, '=====');
+      console.log('[DubBus/diag] PRE  hpf:', {
+        freq: this.hpf.frequency.value, Q: this.hpf.Q.value, type: this.hpf.type,
+      });
+      console.log('[DubBus/diag] PRE  hpf2:', {
+        freq: this.hpf2.frequency.value, Q: this.hpf2.Q.value,
+      });
+      console.log('[DubBus/diag] PRE  hpf3:', {
+        freq: this.hpf3.frequency.value, Q: this.hpf3.Q.value,
+      });
+      console.log('[DubBus/diag] PRE  bassShelf:', {
+        freq: this.bassShelf.frequency.value,
+        Q: this.bassShelf.Q.value,
+        gain: this.bassShelf.gain.value,
+        type: this.bassShelf.type,
+      });
+      console.log('[DubBus/diag] PRE  feedbackShelfComp:', {
+        freq: this.feedbackShelfComp.frequency.value,
+        Q: this.feedbackShelfComp.Q.value,
+        gain: this.feedbackShelfComp.gain.value,
+        type: this.feedbackShelfComp.type,
+      });
+      console.log('[DubBus/diag] PRE  midScoop:', {
+        freq: this.midScoop.frequency.value, Q: this.midScoop.Q.value,
+        gain: this.midScoop.gain.value, type: this.midScoop.type,
+      });
+      console.log('[DubBus/diag] PRE  lpf:', {
+        freq: this.lpf.frequency.value, Q: this.lpf.Q.value, type: this.lpf.type,
+      });
+      console.log('[DubBus/diag] PRE  feedback.gain:', this.feedback.gain.value);
+      console.log('[DubBus/diag] PRE  input.gain:', this.input.gain.value);
+      console.log('[DubBus/diag] PRE  return_.gain:', this.return_.gain.value);
+      console.log('[DubBus/diag] PRE  echo type:', this._currentEchoEngine);
+      console.log('[DubBus/diag] targets:', {
+        hpfFreq, bassShelfFreq: merged.bassShelfFreqHz, bassShelfQ: merged.bassShelfQ,
+        bassShelfGain: safeBassGain, feedbackShelfGain: -safeBassGain,
+        midScoopFreq: merged.midScoopFreqHz, midScoopQ: merged.midScoopQ,
+        midScoopGain: merged.midScoopGainDb, newEchoEngine: merged.echoEngine,
+      });
+
+      /* Schedule post-mortem reads at t+50ms, t+200ms, t+500ms to see
+         WHICH biquad param first reads back as NaN. Chrome sets the
+         internal filter state to NaN when it's unstable, but the
+         AudioParam .value reflects the scheduled ramp — if we see NaN
+         in .value, the param itself was written badly. If params stay
+         finite but the bus is silent, the NaN is in the filter's
+         internal delay taps (not readable from JS — would need an
+         AnalyserNode tripwire). */
+      const audit = (tag: string) => {
+        const check = (label: string, b: BiquadFilterNode) => {
+          const f = b.frequency.value, q = b.Q.value, g = b.gain.value;
+          const bad = !Number.isFinite(f) || !Number.isFinite(q) || !Number.isFinite(g);
+          if (bad || tag === 't+500ms') {
+            console.log(`[DubBus/diag] ${tag} ${label}: freq=${f} Q=${q} gain=${g}${bad ? ' ❌ NaN!' : ''}`);
+          }
+        };
+        check('hpf', this.hpf);
+        check('hpf2', this.hpf2);
+        check('hpf3', this.hpf3);
+        check('bassShelf', this.bassShelf);
+        check('feedbackShelfComp', this.feedbackShelfComp);
+        check('midScoop', this.midScoop);
+        check('lpf', this.lpf);
+        const gainCheck = (label: string, g: GainNode) => {
+          const v = g.gain.value;
+          if (!Number.isFinite(v) || tag === 't+500ms') {
+            console.log(`[DubBus/diag] ${tag} ${label}.gain=${v}${!Number.isFinite(v) ? ' ❌' : ''}`);
+          }
+        };
+        gainCheck('input', this.input);
+        gainCheck('feedback', this.feedback);
+        gainCheck('return_', this.return_);
+      };
+      setTimeout(() => audit('t+50ms'), 50);
+      setTimeout(() => audit('t+200ms'), 200);
+      setTimeout(() => audit('t+500ms'), 500);
+    }
+
     // Log every *meaningful* settings write — enable flag, non-zero echo /
     // spring / feedback / return changes. Skips incidental tweaks like
     // tiny returnGain adjustments that happen during live mixing so the
