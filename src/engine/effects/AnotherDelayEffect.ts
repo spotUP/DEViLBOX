@@ -116,7 +116,8 @@ export class AnotherDelayEffect extends Tone.ToneAudioNode {
       this.fallbackFilter = rawContext.createBiquadFilter();
 
       this.fallbackDelay.delayTime.value = this._options.delayTime / 1000;
-      this.fallbackFeedback.gain.value = this._options.feedback;
+      // Cap JS fallback feedback well below unity — see setFeedback().
+      this.fallbackFeedback.gain.value = Math.min(this._options.feedback, 0.7);
       this.fallbackFilter.type = 'lowpass';
       this.fallbackFilter.frequency.value = this._options.lowpass;
 
@@ -292,7 +293,13 @@ export class AnotherDelayEffect extends Tone.ToneAudioNode {
     this._options.feedback = Math.max(0, Math.min(val, 0.95));
     this.sendParam('feedback', this._options.feedback);
     if (this.fallbackFeedback) {
-      this.fallbackFeedback.gain.value = val;
+      // JS fallback is pure delay+filter feedback — no reverb model, no
+      // tape-ageing losses. Near-unity feedback sustains for 15+ seconds
+      // and sounds like it "goes on forever". Scale down so the JS path
+      // has audible decay even at maxed-out echoIntensity. WASM path
+      // stays at full range for the real tape simulation.
+      const fallbackMax = 0.7;
+      this.fallbackFeedback.gain.value = Math.min(this._options.feedback, fallbackMax);
     }
   }
 
