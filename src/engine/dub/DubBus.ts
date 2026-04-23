@@ -432,14 +432,14 @@ export class DubBus {
     this._snap(`pre-swap ${this._currentEchoEngine}→${newType}`);
     const ctx = this.context;
     const RAMP_SEC = 0.02;
-    /* Warmup: after the new WASM echo engine is created it may emit a
-       DC / low-frequency startup transient on its very first render
-       quanta before internal state settles. Holding feedback + return_
-       at 0 for ~120ms lets that transient bleed off silently instead
-       of (a) self-amplifying via the feedback loop and (b) being
-       bass-shelf boosted by the spring reverb into a "bwoooaap" and
-       slamming the post-spring compressor. */
-    const WARMUP_SEC = 0.12;
+    /* Warmup: covers BOTH the new WASM echo engine's DC/LF startup
+       transient AND the spring reverb's post-param-storm explosion
+       (measured peak ~6.75e8 for ~500ms after tubby/madProfessor preset
+       apply). Hold feedback + return_ at 0 for the full settling window
+       — prevents self-amplification via the feedback loop, bass-shelf
+       "bwoooaap", and catastrophic spikes slamming the post-spring
+       sidechain compressor into permanent max ducking. */
+    const WARMUP_SEC = 0.6;
 
     /* Fully quiesce the bus during the splice. Just ramping `return_` to 0
        masks output but leaves the internal graph live — the forward chain
@@ -2366,7 +2366,14 @@ export class DubBus {
   private _warmupMute(): void {
     const ctx = this.context;
     const RAMP_SEC = 0.02;
-    const WARMUP_SEC = 0.12;
+    /* Hold duration: the spring WASM worklet has been observed to emit
+       astronomical transient output (peak ~6.75e8, rms ~2.5e8 measured
+       via [SpringTap]) for ~400-500ms after a 5-param character preset
+       storm (notably when switching into tubby / madProfessor). A 120ms
+       hold used to release mid-explosion, letting the spike reach the
+       sidechain compressor and lock it into permanent max ducking. 600ms
+       covers the entire observed settling window with margin. */
+    const WARMUP_SEC = 0.6;
     const priorFeedback = this.feedback.gain.value;
     const priorReturn = this.return_.gain.value;
     console.log(`[DubBusCtrl] _warmupMute fired | feedback ${priorFeedback.toFixed(3)}→0→${priorFeedback.toFixed(3)} return_ ${priorReturn.toFixed(3)}→0→${priorReturn.toFixed(3)} hold=${(WARMUP_SEC*1000).toFixed(0)}ms`);
