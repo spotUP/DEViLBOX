@@ -164,6 +164,35 @@ describe('SIDDubSynths uses playTestNote (not jamNoteOn)', () => {
   });
 });
 
+describe('SIDDubSynths pulse-wave instruments have pulse table', () => {
+  it('pulse instruments have non-zero pulse table pointers (prevents silence)', async () => {
+    const fs = await import('fs');
+    const source = fs.readFileSync('src/engine/dub/SIDDubSynths.ts', 'utf-8');
+
+    // Pulse table entries MUST be written (pulse width 0 = silence on SID)
+    expect(source).toContain('setTableEntry(PTBL,');
+    // At least one set-pulse command (left byte >= 0x80)
+    expect(source).toMatch(/setTableEntry\(PTBL,\s*0,\s*\w+,\s*0x8/);
+
+    // Pulse instruments must NOT all have pulse table ptr = 0
+    // The pulseInstruments map must exist with non-zero values
+    expect(source).toContain('pulseInstruments');
+    expect(source).toMatch(/INST\.SIREN\]:\s*PTBL_WIDE_ROW/);
+    expect(source).toMatch(/INST\.CRUSH_BASS\]:\s*PTBL_NARROW_ROW/);
+  });
+
+  it('startSubBass note is within valid range (>= 0x60 FIRSTNOTE)', async () => {
+    const fs = await import('fs');
+    const source = fs.readFileSync('src/engine/dub/SIDDubSynths.ts', 'utf-8');
+
+    // startSubBass default note must be >= 0x60 (FIRSTNOTE)
+    const match = source.match(/startSubBass\(note\s*=\s*(0x[0-9a-fA-F]+)/);
+    expect(match).toBeTruthy();
+    const noteValue = parseInt(match![1], 16);
+    expect(noteValue).toBeGreaterThanOrEqual(0x60);
+  });
+});
+
 describe('DubBus SID mode contract', () => {
   it('DubBus exports enableSIDMode and disableSIDMode methods', async () => {
     // Static source contract: grep for the method signatures
