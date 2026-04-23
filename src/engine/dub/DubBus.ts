@@ -432,14 +432,13 @@ export class DubBus {
     this._snap(`pre-swap ${this._currentEchoEngine}→${newType}`);
     const ctx = this.context;
     const RAMP_SEC = 0.02;
-    /* Warmup: covers BOTH the new WASM echo engine's DC/LF startup
-       transient AND the spring reverb's post-param-storm explosion
-       (measured peak ~6.75e8 for ~500ms after tubby/madProfessor preset
-       apply). Hold feedback + return_ at 0 for the full settling window
-       — prevents self-amplification via the feedback loop, bass-shelf
-       "bwoooaap", and catastrophic spikes slamming the post-spring
-       sidechain compressor into permanent max ducking. */
-    const WARMUP_SEC = 0.6;
+    /* Warmup hold: covers the new WASM echo engine's DC/LF startup
+       transient. The spring reverb used to also emit a catastrophic
+       post-param-storm explosion here (~6.75e8 peak) but that is now
+       prevented at the source by sample-accurate per-param smoothing
+       inside Aelapse.worklet.js, so the short 120ms hold is sufficient
+       again. */
+    const WARMUP_SEC = 0.12;
 
     /* Fully quiesce the bus during the splice. Just ramping `return_` to 0
        masks output but leaves the internal graph live — the forward chain
@@ -505,17 +504,9 @@ export class DubBus {
         this.return_.gain.cancelScheduledValues(now2);
         this.return_.gain.setValueAtTime(0, now2);
         this.return_.gain.setValueAtTime(0, now2 + WARMUP_SEC);
-        /* Slow recovery ramp (400ms instead of RAMP_SEC/20ms). At the
-           moment warmup releases, the spring is still emitting ~0.7 rms
-           (per SpringTap) of residual decay from the preset storm. A
-           fast 20ms open would dump that whole tail into master as an
-           audible "boom". Ramping over 400ms means return_ rises while
-           the spring tail is simultaneously decaying — the gate only
-           approaches unity once spring output has dropped to ~0.1 rms. */
-        const RETURN_RECOVER_SEC = 0.4;
         this.return_.gain.linearRampToValueAtTime(
           this.enabled ? settings.returnGain : 0,
-          now2 + WARMUP_SEC + RETURN_RECOVER_SEC,
+          now2 + WARMUP_SEC + RAMP_SEC,
         );
         console.log(`[DubBus] swap warmup armed: feedback→${priorFeedbackGain.toFixed(3)} return_→${(this.enabled ? settings.returnGain : 0).toFixed(3)} after ${(WARMUP_SEC*1000).toFixed(0)}ms hold`);
         // Snap again after warmup completes so we can see whether the bus
@@ -2366,44 +2357,32 @@ export class DubBus {
   /**
    * Hold feedback + return_ at 0 for 120ms, then ramp back to their prior
    * values. Used for character-preset transitions that don't involve an
-   * engine swap (same-engine param storms can still push the spring reverb
-   * into emitting a transient that kills the reverb via compressor pumping).
-   * The engine-swap path has its own inline warmup — do not call this from
-   * inside _swapEchoEngine.
+   * engine swap. The short warmup shields the bus from transient level
+   * spikes during simultaneous multi-effect param writes (bass shelf,
+   * tape saturation etc.) — the spring reverb itself is protected by
+   * sample-accurate per-param smoothing inside Aelapse.worklet.js, so
+   * no long ride-out is needed here.
    */
   private _warmupMute(): void {
     const ctx = this.context;
     const RAMP_SEC = 0.02;
-    /* Hold duration: the spring WASM worklet has been observed to emit
-       astronomical transient output (peak ~6.75e8, rms ~2.5e8 measured
-       via [SpringTap]) for ~400-500ms after a 5-param character preset
-       storm (notably when switching into tubby / madProfessor). A 120ms
-       hold used to release mid-explosion, letting the spike reach the
-       sidechain compressor and lock it into permanent max ducking. 600ms
-       covers the entire observed settling window with margin. */
-    const WARMUP_SEC = 0.6;
-    /* Recovery ramp: slow open of return_ so the 0.7 rms residual spring
-       decay at t=600ms doesn't dump into master as a boom. Ramps return_
-       from 0 → priorValue over 400ms while spring simultaneously decays
-       further, so the gate approaches unity only once spring is near
-       silence. */
-    const RETURN_RECOVER_SEC = 0.4;
+    const WARMUP_SEC = 0.12;
     const priorFeedback = this.feedback.gain.value;
     const priorReturn = this.return_.gain.value;
-    console.log(`[DubBusCtrl] _warmupMute fired | feedback ${priorFeedback.toFixed(3)}→0→${priorFeedback.toFixed(3)} return_ ${priorReturn.toFixed(3)}→0→${priorReturn.toFixed(3)} hold=${(WARMUP_SEC*1000).toFixed(0)}ms recover=${(RETURN_RECOVER_SEC*1000).toFixed(0)}ms`);
+    console.log(`[DubBusCtrl] _warmupMute fired | feedback ${priorFeedback.toFixed(3)}→0→${priorFeedback.toFixed(3)} return_ ${priorReturn.toFixed(3)}→0→${priorReturn.toFixed(3)} hold=${(WARMUP_SEC*1000).toFixed(0)}ms`);
     try {
       const now = ctx.currentTime;
       this.feedback.gain.cancelScheduledValues(now);
       this.feedback.gain.setValueAtTime(this.feedback.gain.value, now);
       this.feedback.gain.linearRampToValueAtTime(0, now + RAMP_SEC);
       this.feedback.gain.setValueAtTime(0, now + WARMUP_SEC);
-      this.feedback.gain.linearRampToValueAtTime(priorFeedback, now + WARMUP_SEC + RETURN_RECOVER_SEC);
+      this.feedback.gain.linearRampToValueAtTime(priorFeedback, now + WARMUP_SEC + RAMP_SEC);
 
       this.return_.gain.cancelScheduledValues(now);
       this.return_.gain.setValueAtTime(this.return_.gain.value, now);
       this.return_.gain.linearRampToValueAtTime(0, now + RAMP_SEC);
       this.return_.gain.setValueAtTime(0, now + WARMUP_SEC);
-      this.return_.gain.linearRampToValueAtTime(priorReturn, now + WARMUP_SEC + RETURN_RECOVER_SEC);
+      this.return_.gain.linearRampToValueAtTime(priorReturn, now + WARMUP_SEC + RAMP_SEC);
     } catch (err) {
       console.warn('[DubBusCtrl] _warmupMute threw:', err);
     }
