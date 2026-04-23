@@ -1082,8 +1082,9 @@ export const subscribeToDJLiveValue = subscribeToParamLiveValue;
 
 /** Fire all live-value subscribers for a param with a normalized 0-1 value.
  *  Called by both routeDJParameter and routeParameterToEngine so any knob
- *  in the app can bypass React. */
-function fireParamLiveSubscribers(param: string, normalized: number): void {
+ *  in the app can bypass React. Also used by DubBus to animate channel
+ *  send faders during tap open/close. */
+export function fireParamLiveSubscribers(param: string, normalized: number): void {
   const subs = _paramLiveSubscribers.get(param);
   if (subs && subs.size > 0) {
     for (const cb of subs) cb(normalized);

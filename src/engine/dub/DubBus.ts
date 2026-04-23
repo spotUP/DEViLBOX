@@ -34,6 +34,7 @@ import { getNativeAudioNode } from '@utils/audio-context';
 import type { DJMixerEngine } from '../dj/DJMixerEngine';
 import type { DeckId } from '../dj/DeckEngine';
 import { clearAllPendingThrows } from './DubActions';
+import { fireParamLiveSubscribers } from '@/midi/performance/parameterRouter';
 
 const DECK_IDS: DeckId[] = ['A', 'B', 'C'];
 
@@ -2266,11 +2267,13 @@ export class DubBus {
       tap.gain.cancelScheduledValues(now);
       tap.gain.setValueAtTime(tap.gain.value, now);
       tap.gain.linearRampToValueAtTime(clamped, now + attackSec);
+      fireParamLiveSubscribers(`dub.channelSend.ch${channelId}`, clamped);
       return () => {
         const release = this.context.currentTime;
         tap.gain.cancelScheduledValues(release);
         tap.gain.setValueAtTime(tap.gain.value, release);
         tap.gain.linearRampToValueAtTime(baseline, release + 0.08);
+        fireParamLiveSubscribers(`dub.channelSend.ch${channelId}`, baseline);
       };
     }
 
@@ -2287,11 +2290,18 @@ export class DubBus {
       gain.cancelScheduledValues(now);
       gain.setValueAtTime(gain.value, now);
       gain.linearRampToValueAtTime(clamped, now + attackSec);
+      // Animate all SID channel faders to show the tap opening
+      for (let ch = 0; ch < 3; ch++) {
+        fireParamLiveSubscribers(`dub.channelSend.ch${ch}`, clamped);
+      }
       return () => {
         const release = this.context.currentTime;
         gain.cancelScheduledValues(release);
         gain.setValueAtTime(gain.value, release);
         gain.linearRampToValueAtTime(baseline, release + 0.08);
+        for (let ch = 0; ch < 3; ch++) {
+          fireParamLiveSubscribers(`dub.channelSend.ch${ch}`, this._sidChannelDubSends[ch] ?? 0);
+        }
       };
     }
 
