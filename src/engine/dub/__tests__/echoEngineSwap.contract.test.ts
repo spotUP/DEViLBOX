@@ -202,3 +202,46 @@ describe('Echo effect swapToWasm — fallback-disconnect-first contract (all dub
   }
 });
 
+describe('DubBus — NaN-scrubber contract on feedback tap', () => {
+  /* 2026-04-29: after fixes 1+2+3 (transactional quiesce, biquad ramp
+     helper, fallback-disconnect-first) the Tubby preset crash still
+     reproduced — meaning a non-finite sample can still enter the
+     feedback tap (echo.output → feedback → shelf → input) from a source
+     we haven't identified. A single NaN sample latches the hpf cascade +
+     bassShelf + feedbackShelfComp to "state is bad" permanently because
+     `0 * NaN === NaN` in IEEE-754, so even `feedback.gain = 0` doesn't
+     stop the poison.
+
+     Defence: insert an AudioWorklet-based sample-level NaN/Inf scrubber
+     between `this.feedback` and `this.feedbackShelfComp`. Any non-finite
+     sample is replaced with 0 before it reaches the biquads. */
+  const src = read('src/engine/dub/DubBus.ts');
+  const worklet = read('public/worklets/nan-scrubber.worklet.js');
+
+  it('declares the `_feedbackScrubber` node field', () => {
+    expect(src).toMatch(/private\s+_feedbackScrubber\s*:/);
+  });
+
+  it('wires feedback → _feedbackScrubber → feedbackShelfComp', () => {
+    expect(src).toMatch(/this\.feedback\.connect\(this\._feedbackScrubber\)/);
+    expect(src).toMatch(/this\._feedbackScrubber\.connect\(this\.feedbackShelfComp\)/);
+  });
+
+  it('no longer wires feedback directly into feedbackShelfComp (scrubber must be in the path)', () => {
+    expect(src).not.toMatch(/this\.feedback\.connect\(this\.feedbackShelfComp\)/);
+  });
+
+  it('loads the scrubber worklet module at construction', () => {
+    expect(src).toMatch(/_loadFeedbackScrubberWorklet/);
+    expect(src).toMatch(/addModule\(.*worklets\/nan-scrubber\.worklet\.js/);
+  });
+
+  it('scrubber worklet replaces NaN/Inf with 0', () => {
+    expect(worklet).toMatch(/registerProcessor\(\s*['"]nan-scrubber['"]/);
+    /* NaN self-inequality check or equivalent, and both Infinities */
+    expect(worklet).toMatch(/s\s*!==\s*s|isNaN|Number\.isNaN/);
+    expect(worklet).toMatch(/Infinity/);
+  });
+});
+
+
