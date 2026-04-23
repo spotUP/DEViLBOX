@@ -429,6 +429,7 @@ export class DubBus {
     const newType = settings.echoEngine;
     if (newType === this._currentEchoEngine) return;
     console.log(`[DubBus] Swapping echo engine: ${this._currentEchoEngine} → ${newType}`);
+    this._snap(`pre-swap ${this._currentEchoEngine}→${newType}`);
     const ctx = this.context;
     const RAMP_SEC = 0.02;
     /* Warmup: after the new WASM echo engine is created it may emit a
@@ -508,6 +509,11 @@ export class DubBus {
           this.enabled ? settings.returnGain : 0,
           now2 + WARMUP_SEC + RAMP_SEC,
         );
+        console.log(`[DubBus] swap warmup armed: feedback→${priorFeedbackGain.toFixed(3)} return_→${(this.enabled ? settings.returnGain : 0).toFixed(3)} after ${(WARMUP_SEC*1000).toFixed(0)}ms hold`);
+        // Snap again after warmup completes so we can see whether the bus
+        // actually recovered (or something else pinned gains to 0).
+        setTimeout(() => this._snap(`post-swap-warmup ${this._currentEchoEngine}`),
+                   (WARMUP_SEC + RAMP_SEC) * 1000 + 20);
       } catch (err) {
         console.error('[DubBus] Echo engine swap failed:', err);
         /* Recovery: try to restore gains so the bus isn't permanently
@@ -534,6 +540,7 @@ export class DubBus {
    * the WASM worklet so a disabled plate costs nothing.
    */
   setPlateStage(stage: DubBusSettings['plateStage']): void {
+    console.log(`[DubBusCtrl] setPlateStage(${stage})`);
     if (stage === this.settings.plateStage && this.plateStage !== null) return;
     this._teardownPlateStage();
     this.settings = { ...this.settings, plateStage: stage };
@@ -545,6 +552,7 @@ export class DubBus {
   /** Set the plate-stage wet amount (0..1). No-op when plateStage='off'. */
   setPlateStageMix(mix: number): void {
     const clamped = Math.max(0, Math.min(1, mix));
+    console.log(`[DubBusCtrl] setPlateStageMix(${clamped.toFixed(3)})`);
     this.settings = { ...this.settings, plateStageMix: clamped };
     if (this.plateSend) this.plateSend.gain.value = clamped;
   }
@@ -2361,6 +2369,7 @@ export class DubBus {
     const WARMUP_SEC = 0.12;
     const priorFeedback = this.feedback.gain.value;
     const priorReturn = this.return_.gain.value;
+    console.log(`[DubBusCtrl] _warmupMute fired | feedback ${priorFeedback.toFixed(3)}→0→${priorFeedback.toFixed(3)} return_ ${priorReturn.toFixed(3)}→0→${priorReturn.toFixed(3)} hold=${(WARMUP_SEC*1000).toFixed(0)}ms`);
     try {
       const now = ctx.currentTime;
       this.feedback.gain.cancelScheduledValues(now);
@@ -2374,6 +2383,27 @@ export class DubBus {
       this.return_.gain.linearRampToValueAtTime(0, now + RAMP_SEC);
       this.return_.gain.setValueAtTime(0, now + WARMUP_SEC);
       this.return_.gain.linearRampToValueAtTime(priorReturn, now + WARMUP_SEC + RAMP_SEC);
+    } catch (err) {
+      console.warn('[DubBusCtrl] _warmupMute threw:', err);
+    }
+  }
+
+  /** Dense one-liner snapshot of the bus's live audio state. Use to pair with
+   *  user-triggered actions so we can correlate "pushed button X" → "bus
+   *  looks like Y" without needing many verbose log lines per event. */
+  private _snap(label: string): void {
+    try {
+      console.log(
+        `[DubBusSnap] ${label} | enabled=${this.enabled}`
+        + ` input=${this.input.gain.value.toFixed(3)}`
+        + ` feedback=${this.feedback.gain.value.toFixed(3)}`
+        + ` return_=${this.return_.gain.value.toFixed(3)}`
+        + ` springWet=${this._springWetCache.toFixed(3)}`
+        + ` echo=${this._currentEchoEngine}`
+        + ` preset=${this._lastAppliedPreset}`
+        + ` masterInsert=${this.masterInsertActive}`
+        + ` draining=${this._draining}`,
+      );
     } catch { /* ok */ }
   }
 
@@ -2392,16 +2422,23 @@ export class DubBus {
   private _applyCharacterPreset(name: Exclude<DubBusSettings['characterPreset'], 'custom'>): void {
     const preset = DUB_CHARACTER_PRESETS[name];
     if (!preset) return;
+    console.log(
+      `[DubBusCtrl] _applyCharacterPreset ${name} |`
+      + ` springsLength=${preset.springsLength} damp=${preset.springsDamp}`
+      + ` chaos=${preset.springsChaos} scatter=${preset.springsScatter}`
+      + ` tone=${preset.springsTone} tapeSatDrive=${preset.tapeSatDrive}`,
+    );
     try {
       if (preset.springsLength  !== undefined) this.spring.setParamById(PARAM_SPRINGS_LENGTH,  preset.springsLength);
       if (preset.springsDamp    !== undefined) this.spring.setParamById(PARAM_SPRINGS_DAMP,    preset.springsDamp);
       if (preset.springsChaos   !== undefined) this.spring.setParamById(PARAM_SPRINGS_CHAOS,   preset.springsChaos);
       if (preset.springsScatter !== undefined) this.spring.setParamById(PARAM_SPRINGS_SCATTER, preset.springsScatter);
       if (preset.springsTone    !== undefined) this.spring.setParamById(PARAM_SPRINGS_TONE,    preset.springsTone);
-    } catch { /* ok */ }
+    } catch (err) { console.warn('[DubBusCtrl] spring param write threw:', err); }
     if (preset.tapeSatDrive !== undefined) {
       try { this.tapeSat.curve = makeTapeSatCurve(preset.tapeSatDrive); } catch { /* ok */ }
     }
+    this._snap(`after _applyCharacterPreset(${name})`);
   }
 
   /**
@@ -2415,6 +2452,8 @@ export class DubBus {
    * same nodes after a hot-reload — we undo the previous wiring first.
    */
   wireMasterInsert(source: AudioNode, dest: AudioNode): void {
+    console.log('[DubBusCtrl] wireMasterInsert');
+    this._snap('pre-wireMasterInsert');
     if (this.masterInsertActive &&
         this.masterInsertSource === source &&
         this.masterInsertDest === dest) {
@@ -2467,6 +2506,8 @@ export class DubBus {
 
   /** Reverse the master insert. Safe to call when inactive. */
   unwireMasterInsert(): void {
+    console.log('[DubBusCtrl] unwireMasterInsert');
+    this._snap('pre-unwireMasterInsert');
     if (!this.masterInsertActive || !this.masterInsertSource || !this.masterInsertDest) {
       this.masterInsertActive = false;
       return;
@@ -2785,6 +2826,7 @@ export class DubBus {
    * that is the defining Echo Throw sound.
    */
   modulateFeedback(delta: number, ms: number): void {
+    console.log(`[DubBusCtrl] modulateFeedback(delta=${delta.toFixed(3)}, ms=${ms})`);
     if (!this.enabled) return;
     const target = Math.min(0.95, this.settings.echoIntensity + Math.max(0, delta));
     try { this.echo.setIntensityInstant(target); } catch { /* ok */ }
@@ -2856,6 +2898,7 @@ export class DubBus {
    * disposal works the same way. No-op when bus is disabled.
    */
   slamSpring(amount = 1.0, ms = 800): void {
+    console.log(`[DubBusCtrl] slamSpring(amount=${amount.toFixed(3)}, ms=${ms})`);
     if (!this.enabled) return;
     const target = Math.min(1.0, Math.max(0, amount));
 
@@ -2986,6 +3029,7 @@ export class DubBus {
    * pitch rises or falls.
    */
   throwEchoTime(targetMs: number, downMs = 120, holdMs = 200, upMs = 300): void {
+    console.log(`[DubBusCtrl] throwEchoTime(target=${targetMs}ms, downMs=${downMs}, holdMs=${holdMs}, upMs=${upMs})`);
     if (!this.enabled) return;
     const baseline = this.settings.echoRateMs;
     const target = Math.max(20, Math.min(1500, targetMs));
@@ -3297,6 +3341,7 @@ export class DubBus {
    * pass from the UI will push the user's rate back).
    */
   setEchoRate(ms: number): void {
+    console.log(`[DubBusCtrl] setEchoRate(${ms}ms)`);
     if (!this.enabled) return;
     try { this.echo.setRate(Math.max(10, Math.min(1500, ms))); } catch { /* ok */ }
   }
@@ -3716,6 +3761,7 @@ export class DubBus {
     sweepSec = 3,
     feedbackAmount = 2.2,
   ): () => void {
+    console.log(`[DubBusCtrl] startTubbyScream(center=${centerHz}Hz, top=${topHz}Hz, sweep=${sweepSec}s, fb=${feedbackAmount})`);
     if (!this.enabled) return () => {};
     const ctx = this.context;
     const now = ctx.currentTime;
@@ -3825,7 +3871,9 @@ export class DubBus {
    */
   private _reverseChainOrder = false;
   setReverseChainOrder(on: boolean): void {
+    console.log(`[DubBusCtrl] setReverseChainOrder(${on})`);
     if (on === this._reverseChainOrder) return;
+    this._snap(`pre-setReverseChainOrder(${on})`);
     const springIn = this.spring.input as unknown as Tone.InputNode;
     const echoIn = this.echo.input as unknown as Tone.InputNode;
     const echoOut = this.echo.output as unknown as Tone.ToneAudioNode;
