@@ -234,12 +234,30 @@ export class DubBus {
     const ctx = this.context;
     const RAMP_SEC = 0.02;
 
-    // Ramp return to 0 during splice
+    /* Fully quiesce the bus during the splice. Just ramping `return_` to 0
+       masks output but leaves the internal graph live — the forward chain
+       (hpf→bassShelf→…) and the external feedback tap (echo.output →
+       feedback → feedbackShelfComp → input) continue to process while
+       the engine is disposed, recreated, and rewired. Disposing a live
+       ToneAudioNode can emit a one-block transient, which combined with
+       the new RE-201's fallback-start produced NaN in the biquad chain
+       (state is bad, permanent). Transactional swap: mute input gate,
+       zero external feedback, then splice, then unmute. */
+    const priorInputGain = this.input.gain.value;
+    const priorFeedbackGain = this.feedback.gain.value;
     try {
       const now = ctx.currentTime;
       this.return_.gain.cancelScheduledValues(now);
       this.return_.gain.setValueAtTime(this.return_.gain.value, now);
       this.return_.gain.linearRampToValueAtTime(0, now + RAMP_SEC);
+
+      this.input.gain.cancelScheduledValues(now);
+      this.input.gain.setValueAtTime(this.input.gain.value, now);
+      this.input.gain.linearRampToValueAtTime(0, now + RAMP_SEC);
+
+      this.feedback.gain.cancelScheduledValues(now);
+      this.feedback.gain.setValueAtTime(this.feedback.gain.value, now);
+      this.feedback.gain.linearRampToValueAtTime(0, now + RAMP_SEC);
     } catch { /* ok */ }
 
     // Schedule the swap after the ramp completes
@@ -262,16 +280,34 @@ export class DubBus {
         // Rebuild feedback path
         Tone.connect(this.echo.output, this.feedback as unknown as Tone.InputNode);
 
-        // Ramp return back up
-        const now = ctx.currentTime;
-        this.return_.gain.cancelScheduledValues(now);
-        this.return_.gain.setValueAtTime(0, now);
+        /* Unmute: restore input + feedback + return to their prior values
+           over the ramp window. Uses the post-splice time, not the stale
+           `now` from the outer scope. */
+        const now2 = ctx.currentTime;
+        this.input.gain.cancelScheduledValues(now2);
+        this.input.gain.setValueAtTime(0, now2);
+        this.input.gain.linearRampToValueAtTime(priorInputGain, now2 + RAMP_SEC);
+
+        this.feedback.gain.cancelScheduledValues(now2);
+        this.feedback.gain.setValueAtTime(0, now2);
+        this.feedback.gain.linearRampToValueAtTime(priorFeedbackGain, now2 + RAMP_SEC);
+
+        this.return_.gain.cancelScheduledValues(now2);
+        this.return_.gain.setValueAtTime(0, now2);
         this.return_.gain.linearRampToValueAtTime(
           this.enabled ? settings.returnGain : 0,
-          now + RAMP_SEC,
+          now2 + RAMP_SEC,
         );
       } catch (err) {
         console.error('[DubBus] Echo engine swap failed:', err);
+        /* Recovery: try to restore gains so the bus isn't permanently
+           silenced by a swap failure. */
+        try {
+          const t = ctx.currentTime;
+          this.input.gain.setValueAtTime(priorInputGain, t);
+          this.feedback.gain.setValueAtTime(priorFeedbackGain, t);
+          this.return_.gain.setValueAtTime(this.enabled ? settings.returnGain : 0, t);
+        } catch { /* ok */ }
       }
     }, RAMP_SEC * 1000 + 5);
   }
