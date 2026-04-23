@@ -39,6 +39,22 @@ import { fireParamLiveSubscribers } from '@/midi/performance/parameterRouter';
 const DECK_IDS: DeckId[] = ['A', 'B', 'C'];
 
 /**
+ * Soft-compression curve for channel→dub send levels. Keeps low/mid slider
+ * travel essentially untouched (identity at 0, near-identity through 0.5) but
+ * rolls the top off so pulling a fader to max doesn't drown the dry signal in
+ * reverb. At x=1.0 the effective send is 0.7 (~−3 dB vs. linear), which tames
+ * the overall wet loudness while preserving the "phatness" that comes from
+ * the low-mid range where the curve is nearly linear.
+ *
+ *   x=0.25 → 0.245   x=0.50 → 0.463   x=0.75 → 0.624   x=1.00 → 0.700
+ */
+function applyDubSendCurve(x: number): number {
+  if (x <= 0) return 0;
+  if (x >= 1) return 0.7;
+  return x * (1 - 0.3 * x * x);
+}
+
+/**
  * Asymmetric tanh curve for WaveShaper — models transformer-coupled magnetic
  * tape saturation. Positive half compresses a touch harder than the negative
  * half; that asymmetry is the audible signature of tape vs. digital clipping.
@@ -1125,6 +1141,7 @@ export class DubBus {
   setSidVoiceDubSend(voiceIndex: number, amount: number): boolean {
     if (!this._sidMode) return false;
     const clamped = Math.max(0, Math.min(1, amount));
+    const curved = applyDubSendCurve(clamped);
 
     // Path 1: per-voice tap (jsSID only — we registered them explicitly).
     // Guarded by _sidHasPerVoiceTaps so stale non-SID channelTaps left over
@@ -1135,7 +1152,7 @@ export class DubBus {
         const now = this.context.currentTime;
         tap.gain.cancelScheduledValues(now);
         tap.gain.setValueAtTime(tap.gain.value, now);
-        tap.gain.linearRampToValueAtTime(clamped, now + 0.02);
+        tap.gain.linearRampToValueAtTime(curved, now + 0.02);
         return true;
       }
     }
@@ -1143,7 +1160,7 @@ export class DubBus {
     // Path 2: whole-mix dub send (websid + any voice index < 3)
     if (this._sidDubSendGain && voiceIndex >= 0 && voiceIndex < 3) {
       this._sidChannelDubSends[voiceIndex] = clamped;
-      const maxSend = Math.max(...this._sidChannelDubSends);
+      const maxSend = applyDubSendCurve(Math.max(...this._sidChannelDubSends));
       const now = this.context.currentTime;
       this._sidDubSendGain.gain.cancelScheduledValues(now);
       this._sidDubSendGain.gain.setValueAtTime(this._sidDubSendGain.gain.value, now);

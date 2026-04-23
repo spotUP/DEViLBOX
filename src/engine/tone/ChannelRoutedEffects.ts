@@ -308,6 +308,10 @@ export class ChannelRoutedEffectsManager {
     if (channelIndex < 0 || channelIndex >= MAX_DUB_CHANNELS) return;
     const clamped = Math.max(0, Math.min(1, amount));
     this.channelDubSendValues[channelIndex] = clamped;
+    // Soft-compression curve matching DubBus.applyDubSendCurve — keeps low/mid
+    // slider travel nearly linear but caps the top at 0.7 so max send doesn't
+    // drown the dry signal in reverb. Identity at 0, 0.7 at 1.0.
+    const curved = clamped <= 0 ? 0 : clamped >= 1 ? 0.7 : clamped * (1 - 0.3 * clamped * clamped);
 
     const gain = this.channelDubGains[channelIndex];
     if (!gain || !this.dubBusInput) {
@@ -321,7 +325,7 @@ export class ChannelRoutedEffectsManager {
     try {
       gain.gain.cancelScheduledValues(now);
       gain.gain.setValueAtTime(gain.gain.value, now);
-      gain.gain.linearRampToValueAtTime(clamped, now + 0.02);
+      gain.gain.linearRampToValueAtTime(curved, now + 0.02);
     } catch (e) {
       console.warn('[ChannelRoutedEffects] setChannelDubSend ramp failed:', e);
     }
