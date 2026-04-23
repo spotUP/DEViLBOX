@@ -22,7 +22,7 @@ target_link_options(AnotherDelay PRIVATE
   "SHELL:-s MODULARIZE=1"
   "SHELL:-s EXPORT_NAME='createAnotherDelay'"
   "SHELL:-s EXPORTED_FUNCTIONS=['_malloc','_free','_another_delay_create','_another_delay_destroy','_another_delay_process','_another_delay_set_delay_time','_another_delay_set_feedback','_another_delay_set_lowpass','_another_delay_set_highpass','_another_delay_set_flutter_freq','_another_delay_set_flutter_depth','_another_delay_set_wow_freq','_another_delay_set_wow_depth','_another_delay_set_reverb_enabled','_another_delay_set_room_size','_another_delay_set_damping','_another_delay_set_width','_another_delay_set_gain']"
-  "SHELL:-s EXPORTED_RUNTIME_METHODS=['ccall','cwrap']"
+  "SHELL:-s EXPORTED_RUNTIME_METHODS=['ccall','cwrap','wasmMemory','HEAPF32','HEAPU8']"
   "SHELL:-s ALLOW_MEMORY_GROWTH=0"
   "SHELL:-s INITIAL_MEMORY=8388608"
   "SHELL:-s ENVIRONMENT='web,worker'"
