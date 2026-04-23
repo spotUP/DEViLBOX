@@ -66,6 +66,9 @@ const MOVE_COLOR: Record<string, string> = {
   delayPresetTriplet:  'bg-accent-primary/25',
   delayPreset16th:     'bg-accent-primary/25',
   delayPresetDoubler:  'bg-accent-primary/25',
+  ghostReverb:         'bg-accent-highlight/30', // spectral wet-only ghost
+  voltageStarve:       'bg-accent-error/30',     // lo-fi degradation
+  ringMod:             'bg-accent-secondary/40', // metallic ring mod
 };
 
 // Hold-kind moves have a meaningful durationRows. Keep in sync with the
@@ -75,7 +78,7 @@ const HOLD_KINDS = new Set([
   'channelMute', 'filterDrop', 'dubSiren', 'tapeWobble', 'masterDrop', 'toast',
   // PR #42 holds (moves that return a disposer)
   'tubbyScream', 'stereoDoubler', 'oscBass', 'crushBass', 'subHarmonic',
-  'eqSweep',
+  'eqSweep', 'ghostReverb', 'voltageStarve', 'ringMod',
 ]);
 
 const POINT_WIDTH_PX = 6;   // rendered width for trigger events

@@ -242,6 +242,9 @@ const DEFAULT_CC_MAPPINGS: CCMapping[] = [
   { ccNumber: 60, parameter: 'dub.delayPresetTriplet', min: 0, max: 1, curve: 'linear' },
   { ccNumber: 61, parameter: 'dub.delayPreset16th',    min: 0, max: 1, curve: 'linear' },
   { ccNumber: 62, parameter: 'dub.delayPresetDoubler', min: 0, max: 1, curve: 'linear' },
+  { ccNumber: 63, parameter: 'dub.ghostReverb',        min: 0, max: 1, curve: 'linear' },
+  { ccNumber: 66, parameter: 'dub.voltageStarve',     min: 0, max: 1, curve: 'linear' },
+  { ccNumber: 67, parameter: 'dub.ringMod',            min: 0, max: 1, curve: 'linear' },
 
   // Dub bus continuous params — min/max are documentary; the actual
   // normalisation is handled by DUB_BUS_PARAMS transforms in

@@ -209,6 +209,26 @@ export interface DubBusSettings {
   phaserDepth: number;     // LFO depth (0-1)
   phaserStages: number;    // all-pass stages (2-12)
   phaserFeedback: number;  // feedback (-0.95 to 0.95)
+
+  // ─── Post-echo tape saturation (2026-04-23) ───────────────────────────
+  // Second tape sat AFTER echo output, BEFORE spring. First echo repeat
+  // overdrives hard, subsequent repeats lighter (they're quieter).
+  // Creates "degrading repeats" character. Independent of pre-echo tapeSat.
+  postEchoSatEnabled: boolean;
+  postEchoSatDrive: number;  // 0-1 drive amount
+
+  // ─── Ring modulator (2026-04-23) ──────────────────────────────────────
+  // Parallel send into RingModEffect WASM. Carrier multiplied with input.
+  ringModEnabled: boolean;
+  ringModFreq: number;      // carrier frequency Hz (20-2000)
+  ringModWaveform: number;  // 0=sine, 1=square, 2=triangle, 3=saw
+  ringModMix: number;       // 0-1 wet/dry on the ring mod output
+  ringModAmount: number;    // 0-1 how much ring mod signal in the bus
+
+  // ─── Lo-fi / voltage starve (2026-04-23) ──────────────────────────────
+  // Bitta WASM bitcrusher for "near dead battery" / dictaphone effects.
+  lofiEnabled: boolean;
+  lofiBits: number;         // 1-16 bit depth (16 = full quality / off)
 }
 
 export const DEFAULT_DUB_BUS: DubBusSettings = {
@@ -302,6 +322,18 @@ export const DEFAULT_DUB_BUS: DubBusSettings = {
   phaserDepth:      0.7,
   phaserStages:     6,
   phaserFeedback:   0.5,
+
+  postEchoSatEnabled: false,
+  postEchoSatDrive:   0.35,
+
+  ringModEnabled:   false,
+  ringModFreq:      440,
+  ringModWaveform:  0,     // sine
+  ringModMix:       0.5,
+  ringModAmount:    0,
+
+  lofiEnabled:      false,
+  lofiBits:         16,    // full quality = effectively off
 };
 
 /** The 11 stepped positions of the Altec 9069B filter, per audiothing.net/
