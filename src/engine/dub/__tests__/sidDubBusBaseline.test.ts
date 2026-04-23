@@ -47,7 +47,7 @@ describe('SID dub bus baseline', () => {
     expect(dubBusSrc).toContain('_sidChannelDubSends');
     expect(dubBusSrc).toContain('_sidDubSendGain');
     // Path 2 comment documents the websid fallback
-    expect(dubBusSrc).toMatch(/no per-voice taps.*websid/i);
+    expect(dubBusSrc).toMatch(/websid.*no per-voice output/i);
   });
 
   it('mixer store uses getActiveDubBus (sync) not async import', () => {
@@ -57,9 +57,10 @@ describe('SID dub bus baseline', () => {
     expect(mixerSrc).toContain('getActiveDubBus');
   });
 
-  it('mixer store calls setSidVoiceDubSend and returns early if handled', () => {
+  it('mixer store calls setSidVoiceDubSend and short-circuits tracker path when SID handles it', () => {
     expect(mixerSrc).toContain('setSidVoiceDubSend');
-    // Should return early when SID handles it
-    expect(mixerSrc).toMatch(/setSidVoiceDubSend.*\n.*return.*handled/s);
+    // Should flag SID-handled and skip the ChannelRoutedEffects path
+    expect(mixerSrc).toMatch(/setSidVoiceDubSend[\s\S]*handledBySid\s*=\s*true/);
+    expect(mixerSrc).toMatch(/if\s*\(\s*!handledBySid\s*\)/);
   });
 });
