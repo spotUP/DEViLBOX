@@ -39,6 +39,37 @@ import { fireParamLiveSubscribers } from '@/midi/performance/parameterRouter';
 const DECK_IDS: DeckId[] = ['A', 'B', 'C'];
 
 /**
+ * Safe biquad AudioParam ramp. Chrome's native BiquadFilterNode is sensitive
+ * to simultaneous freq/Q/gain changes via `setTargetAtTime` — the exponential
+ * approach + its short time-constant can leave the filter's internal state
+ * transiently unstable, which Chrome surfaces as "state is bad, probably due
+ * to unstable filter caused by fast parameter automation" and latches the
+ * param buffer to NaN (permanent silence on everything downstream in the
+ * chain).
+ *
+ * This helper does the four moves Chrome tolerates reliably:
+ *   1. cancelScheduledValues — clears any prior setTargetAtTime tail.
+ *   2. setValueAtTime(current) — pins the starting point so the ramp has
+ *      a known origin.
+ *   3. linearRampToValueAtTime(target, now + duration) — deterministic end,
+ *      linear trajectory, no exponential asymptote.
+ *   4. (No step — single linear ramp covers it.)
+ *
+ * Used for ALL at-risk bus biquad params (hpf cascade, bassShelf,
+ * feedbackShelfComp, midScoop, and their master counterparts).
+ */
+function rampBiquadParam(param: AudioParam, target: number, now: number, duration = 0.05): void {
+  try {
+    const safeTarget = Number.isFinite(target) ? target : 0;
+    const current = Number.isFinite(param.value) ? param.value : safeTarget;
+    param.cancelScheduledValues(now);
+    param.setValueAtTime(current, now);
+    param.linearRampToValueAtTime(safeTarget, now + duration);
+  } catch { /* ok */ }
+}
+
+
+/**
  * Soft-compression curve for channel→dub send levels. Keeps low/mid slider
  * travel essentially untouched (identity at 0, near-identity through 0.5) but
  * rolls the top off so pulling a fader to max doesn't drown the dry signal in
@@ -1906,9 +1937,9 @@ export class DubBus {
     // writing. Keeps the "Big Knob" staccato character on presets + user
     // drags alike. Continuous mode passes the raw value through.
     const hpfFreq = merged.hpfStepped ? snapToAltecStep(merged.hpfCutoff) : merged.hpfCutoff;
-    this.hpf.frequency.setTargetAtTime(hpfFreq, now, 0.02);
-    this.hpf2.frequency.setTargetAtTime(hpfFreq, now, 0.02);
-    this.hpf3.frequency.setTargetAtTime(hpfFreq, now, 0.02);
+    rampBiquadParam(this.hpf.frequency, hpfFreq, now);
+    rampBiquadParam(this.hpf2.frequency, hpfFreq, now);
+    rampBiquadParam(this.hpf3.frequency, hpfFreq, now);
     this.return_.gain.setTargetAtTime(
       this.enabled ? merged.returnGain : 0, now, 0.02,
     );
@@ -1942,26 +1973,26 @@ export class DubBus {
     // feedback loop, so extreme boosts (+18 dB = 8× linear) cause runaway
     // that overflows to NaN and permanently kills the audio graph.
     const safeBassGain = Math.max(-12, Math.min(12, merged.bassShelfGainDb));
-    this.bassShelf.frequency.setTargetAtTime(merged.bassShelfFreqHz, now, 0.02);
-    this.bassShelf.Q.setTargetAtTime(merged.bassShelfQ, now, 0.02);
-    this.bassShelf.gain.setTargetAtTime(safeBassGain, now, 0.02);
+    rampBiquadParam(this.bassShelf.frequency, merged.bassShelfFreqHz, now);
+    rampBiquadParam(this.bassShelf.Q, merged.bassShelfQ, now);
+    rampBiquadParam(this.bassShelf.gain, safeBassGain, now);
     // Mirror compensating cut in feedback path — negated gain, same freq/Q
-    this.feedbackShelfComp.frequency.setTargetAtTime(merged.bassShelfFreqHz, now, 0.02);
-    this.feedbackShelfComp.Q.setTargetAtTime(merged.bassShelfQ, now, 0.02);
-    this.feedbackShelfComp.gain.setTargetAtTime(-safeBassGain, now, 0.02);
-    this.midScoop.frequency.setTargetAtTime(merged.midScoopFreqHz, now, 0.02);
-    this.midScoop.Q.setTargetAtTime(merged.midScoopQ, now, 0.02);
-    this.midScoop.gain.setTargetAtTime(merged.midScoopGainDb, now, 0.02);
+    rampBiquadParam(this.feedbackShelfComp.frequency, merged.bassShelfFreqHz, now);
+    rampBiquadParam(this.feedbackShelfComp.Q, merged.bassShelfQ, now);
+    rampBiquadParam(this.feedbackShelfComp.gain, -safeBassGain, now);
+    rampBiquadParam(this.midScoop.frequency, merged.midScoopFreqHz, now);
+    rampBiquadParam(this.midScoop.Q, merged.midScoopQ, now);
+    rampBiquadParam(this.midScoop.gain, merged.midScoopGainDb, now);
     this._applyStereoWidth(merged.stereoWidth);
     // Master-insert TONE EQ — drives the whole mix (dry + wet) when wired.
     // Gain writes are gated so a disabled bus stays transparent on master.
     const masterActive = this.enabled && this.masterInsertActive;
-    this.masterBassShelf.frequency.setTargetAtTime(merged.bassShelfFreqHz, now, 0.02);
-    this.masterBassShelf.Q.setTargetAtTime(merged.bassShelfQ, now, 0.02);
-    this.masterBassShelf.gain.setTargetAtTime(masterActive ? safeBassGain : 0, now, 0.02);
-    this.masterMidScoop.frequency.setTargetAtTime(merged.midScoopFreqHz, now, 0.02);
-    this.masterMidScoop.Q.setTargetAtTime(merged.midScoopQ, now, 0.02);
-    this.masterMidScoop.gain.setTargetAtTime(masterActive ? merged.midScoopGainDb : 0, now, 0.02);
+    rampBiquadParam(this.masterBassShelf.frequency, merged.bassShelfFreqHz, now);
+    rampBiquadParam(this.masterBassShelf.Q, merged.bassShelfQ, now);
+    rampBiquadParam(this.masterBassShelf.gain, masterActive ? safeBassGain : 0, now);
+    rampBiquadParam(this.masterMidScoop.frequency, merged.midScoopFreqHz, now);
+    rampBiquadParam(this.masterMidScoop.Q, merged.midScoopQ, now);
+    rampBiquadParam(this.masterMidScoop.gain, masterActive ? merged.midScoopGainDb : 0, now);
     // Master width: 4-gain coeff matrix matching the bus-level pattern.
     // Neutral (width=1 → coeffA=1, coeffB=0) when bus disabled or inactive
     // so the master stays untouched.
@@ -2166,8 +2197,8 @@ export class DubBus {
       try { this.masterInsertEnvelope.gain.setValueAtTime(1, this.context.currentTime); } catch { /* ok */ }
     }, (FADE_SEC * 1000) + 5);
     // Reset master-side gains to neutral so even a dangling reference is silent.
-    try { this.masterBassShelf.gain.setTargetAtTime(0, now, 0.02); } catch { /* ok */ }
-    try { this.masterMidScoop.gain.setTargetAtTime(0, now, 0.02); } catch { /* ok */ }
+    rampBiquadParam(this.masterBassShelf.gain, 0, now);
+    rampBiquadParam(this.masterMidScoop.gain, 0, now);
     try {
       this.masterMid.gain.setTargetAtTime(1, now, 0.02);
       this.masterSide.gain.setTargetAtTime(1, now, 0.02);
