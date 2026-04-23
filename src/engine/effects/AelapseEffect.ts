@@ -224,6 +224,21 @@ export class AelapseEffect extends Tone.ToneAudioNode {
   set wet(value: number) {
     this._options.wet = Math.max(0, Math.min(1, value));
     this.dryGain.gain.value = 1 - this._options.wet;
+    this.wetGain.gain.value = this._outputMuted ? 0 : this._options.wet;
+  }
+
+  /* JS-graph-level output mute. Zeros wetGain so WASM output is silenced
+     without affecting the WASM DSP state. Used by DubBus to silence
+     spring output during parameter transitions — the WASM can resonate
+     internally all it wants, we just don't let it reach downstream nodes
+     (which prevents the sidechain compressor from locking up). */
+  private _outputMuted = false;
+  muteOutput(): void {
+    this._outputMuted = true;
+    this.wetGain.gain.value = 0;
+  }
+  unmuteOutput(): void {
+    this._outputMuted = false;
     this.wetGain.gain.value = this._options.wet;
   }
 
