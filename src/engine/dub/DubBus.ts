@@ -339,9 +339,14 @@ export class DubBus {
         channelCountMode: 'explicit',
       });
       const springOut = (this.spring as unknown as { output: Tone.ToneAudioNode }).output;
-      try { Tone.connect(springOut, worklet as unknown as Tone.InputNode); } catch { /* ok */ }
-      try { worklet.connect(this.sidechain as unknown as AudioNode); } catch { /* ok */ }
-      try { (springOut as unknown as { disconnect: (n: AudioNode) => void }).disconnect(this._forwardScrubber); } catch { /* ok */ }
+      const springOutNative = getNativeAudioNode(springOut as unknown);
+      if (!springOutNative) {
+        console.warn('[DubBus] forward scrubber splice: spring native extract failed');
+        return;
+      }
+      try { springOutNative.connect(worklet); } catch { /* ok */ }
+      try { worklet.connect(this.sidechain); } catch { /* ok */ }
+      try { springOutNative.disconnect(this._forwardScrubber); } catch { /* ok */ }
       try { (this._forwardScrubber as GainNode).disconnect(); } catch { /* ok */ }
       this._forwardScrubber = worklet;
       this._forwardScrubberIsWorklet = true;
@@ -1209,11 +1214,27 @@ export class DubBus {
     this._feedbackScrubber.connect(this.feedbackShelfComp);
     this.feedbackShelfComp.connect(this.input);
     // Post-spring output chain with coloring inserts (mid scoop + M/S width).
-    // Forward scrubber sits between spring and the post-spring biquads — see
-    // the dual-scrubber comment in the constructor for why this matters.
+    /* Forward scrubber sits between spring and the post-spring biquads —
+       see the dual-scrubber comment in the constructor for why this
+       matters. We extract the NATIVE AudioNode from spring.output (same
+       pattern PitchResampler uses for synthBus → resampler → masterFx in
+       ToneEngine) and route it through the worklet with raw .connect()
+       calls. Going through Tone.connect() against a raw AudioWorkletNode
+       was producing silent output on the wet path during the 2026-04-30
+       retest — Tone wrappers can swallow the connection if the destination
+       isn't a recognised Tone shape. Native-on-native always works. */
     const springOut = (this.spring as unknown as { output: Tone.ToneAudioNode }).output;
-    Tone.connect(springOut, this._forwardScrubber as unknown as Tone.InputNode);
-    (this._forwardScrubber as AudioNode).connect(this.sidechain as unknown as AudioNode);
+    const springOutNative = getNativeAudioNode(springOut as unknown);
+    if (springOutNative) {
+      springOutNative.connect(this._forwardScrubber);
+      (this._forwardScrubber as AudioNode).connect(this.sidechain);
+    } else {
+      /* Should never happen — spring.output is a Tone.Gain. Fall back to
+         the original direct path so reverb still routes even if our
+         native-extract trick fails on a future Tone.js version. */
+      console.warn('[DubBus] spring.output native extraction failed — bypassing forward scrubber');
+      Tone.connect(springOut, this.sidechain as unknown as Tone.InputNode);
+    }
     this.sidechain.connect(this.glue);
     this.glue.connect(this.midScoop);
     this.midScoop.connect(this.lpf);
