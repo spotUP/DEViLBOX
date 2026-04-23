@@ -21,7 +21,7 @@ import { useTrackerStore } from '@/stores/useTrackerStore';
 import { useUIStore } from '@/stores/useUIStore';
 import { useTransportStore } from '@/stores/useTransportStore';
 import { bpmSyncedEchoRate, getActiveBpm } from '@/engine/dub/DubActions';
-import { subscribeDubRouter, fire as fireDub } from '@/engine/dub/DubRouter';
+import { subscribeDubRouter, subscribeDubRelease, fire as fireDub } from '@/engine/dub/DubRouter';
 import { startDubRecorder } from '@/engine/dub/DubRecorder';
 import { dubLanePlayer } from '@/engine/dub/DubLanePlayer';
 import { ensureDrumPadEngine } from '@hooks/drumpad/useMIDIPadRouting';
@@ -151,6 +151,46 @@ export const DubDeckStrip: React.FC = () => {
   const activeHolds = useRef<Map<string, () => void>>(new Map());
 
   const [heldMoves, setHeldMoves] = useState<Set<string>>(new Set());
+
+  // ── Active-fire animation state ───────────────────────────────────────────
+  // Tracks ALL currently-firing moves (auto-dub, manual triggers, holds) so
+  // buttons and faders animate while the move is alive. Keyed by
+  // `moveId:channelId|g`. One-shots auto-expire after 400ms; held moves
+  // clear on DubReleaseEvent.
+  const [activeFires, setActiveFires] = useState<Set<string>>(new Set());
+  const fireTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+  // Map invocationId → moveKey so we can clear on release
+  const invocationToKey = useRef<Map<string, string>>(new Map());
+
+  useEffect(() => {
+    const unsubFire = subscribeDubRouter((ev) => {
+      const key = `${ev.moveId}:${ev.channelId ?? 'g'}`;
+      setActiveFires(prev => new Set(prev).add(key));
+      invocationToKey.current.set(ev.invocationId, key);
+
+      // Clear any existing expiry timer for this key
+      const existing = fireTimers.current.get(key);
+      if (existing) clearTimeout(existing);
+
+      // One-shots (triggers) auto-expire after 400ms visual flash.
+      // Holds stay lit until the release event arrives.
+      const t = setTimeout(() => {
+        fireTimers.current.delete(key);
+        setActiveFires(prev => { const n = new Set(prev); n.delete(key); return n; });
+      }, 400);
+      fireTimers.current.set(key, t);
+    });
+    const unsubRelease = subscribeDubRelease((ev) => {
+      const key = invocationToKey.current.get(ev.invocationId);
+      invocationToKey.current.delete(ev.invocationId);
+      if (!key) return;
+      // Clear the expiry timer and remove immediately
+      const t = fireTimers.current.get(key);
+      if (t) { clearTimeout(t); fireTimers.current.delete(key); }
+      setActiveFires(prev => { const n = new Set(prev); n.delete(key); return n; });
+    });
+    return () => { unsubFire(); unsubRelease(); };
+  }, []);
 
   const releaseAllHeld = useCallback(() => {
     for (const release of heldReleasers.current.values()) {
@@ -371,8 +411,6 @@ export const DubDeckStrip: React.FC = () => {
 
   useEffect(() => {
     return subscribeDubRouter((ev) => {
-      if (ev.moveId !== 'echoThrow') return;
-      if (ev.source !== 'live') return;
       if (ev.channelId === undefined) return;
       setFlashedChannel(ev.channelId);
     });
@@ -706,7 +744,7 @@ export const DubDeckStrip: React.FC = () => {
           <div className="flex gap-1.5 flex-wrap">
             {GLOBAL_MOVES.filter(m => m.category === 'gen').map((m) => {
               const key = `${m.moveId}:g`;
-              const active = heldMoves.has(key);
+              const active = heldMoves.has(key) || activeFires.has(key);
               const isHold = m.kind === 'hold';
               return (
                 <button
@@ -735,7 +773,7 @@ export const DubDeckStrip: React.FC = () => {
           <div className="flex gap-1.5 flex-wrap">
             {GLOBAL_MOVES.filter(m => m.category === 'proc').map((m) => {
               const key = `${m.moveId}:g`;
-              const active = heldMoves.has(key);
+              const active = heldMoves.has(key) || activeFires.has(key);
               const isHold = m.kind === 'hold';
               const disabled = !busEnabled || !anySend;
               return (
@@ -773,16 +811,19 @@ export const DubDeckStrip: React.FC = () => {
           const hasDubSend = dubSend > 0;
           const isHeld = heldChannels.has(i);
           const isFlashed = i === flashedChannel;
+          const channelFiring = CHANNEL_OPS.some(op => activeFires.has(`${op.moveId}:${i}`));
           return (
             <div
               key={i}
               className={
                 'flex flex-col items-center gap-1.5 px-2 py-1.5 rounded border min-w-[64px] shrink-0 transition-colors ' +
-                (isHeld
-                  ? 'bg-accent-primary/10 border-accent-primary'
-                  : hasDubSend
-                    ? 'bg-dark-bg border-dark-borderLight'
-                    : 'bg-dark-bgTertiary border-dark-border')
+                (channelFiring
+                  ? 'bg-accent-highlight/15 border-accent-highlight'
+                  : isHeld
+                    ? 'bg-accent-primary/10 border-accent-primary'
+                    : hasDubSend
+                      ? 'bg-dark-bg border-dark-borderLight'
+                      : 'bg-dark-bgTertiary border-dark-border')
               }
             >
               <span
@@ -793,7 +834,7 @@ export const DubDeckStrip: React.FC = () => {
               </span>
               {CHANNEL_OPS.map((op) => {
                 const key = `${op.moveId}:${i}`;
-                const active = heldMoves.has(key);
+                const active = heldMoves.has(key) || activeFires.has(key);
                 const isHold = op.kind === 'hold';
                 return (
                   <button
@@ -832,7 +873,7 @@ export const DubDeckStrip: React.FC = () => {
               <Fader
                 value={dubSend}
                 size="md"
-                color="accent-primary"
+                color={channelFiring ? 'accent-highlight' : 'accent-primary'}
                 onChange={(v) => setChannelDubSend(i, v)}
                 title={`Ch ${i + 1} dub send — ${Math.round(dubSend * 100)}%. Drag vertically; double-click for full send. Each real dub desk had faders on every channel — riding these is how Tubby mixed.`}
                 disabled={!busEnabled}
