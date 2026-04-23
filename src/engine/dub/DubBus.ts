@@ -431,6 +431,14 @@ export class DubBus {
     console.log(`[DubBus] Swapping echo engine: ${this._currentEchoEngine} → ${newType}`);
     const ctx = this.context;
     const RAMP_SEC = 0.02;
+    /* Warmup: after the new WASM echo engine is created it may emit a
+       DC / low-frequency startup transient on its very first render
+       quanta before internal state settles. Holding feedback + return_
+       at 0 for ~120ms lets that transient bleed off silently instead
+       of (a) self-amplifying via the feedback loop and (b) being
+       bass-shelf boosted by the spring reverb into a "bwoooaap" and
+       slamming the post-spring compressor. */
+    const WARMUP_SEC = 0.12;
 
     /* Fully quiesce the bus during the splice. Just ramping `return_` to 0
        masks output but leaves the internal graph live — the forward chain
@@ -478,9 +486,11 @@ export class DubBus {
         // Rebuild feedback path
         Tone.connect(this.echo.output, this.feedback as unknown as Tone.InputNode);
 
-        /* Unmute: restore input + feedback + return to their prior values
-           over the ramp window. Uses the post-splice time, not the stale
-           `now` from the outer scope. */
+        /* Unmute: input recovers immediately (no signal in ≠ no signal out
+           problem). Feedback + return_ stay at 0 for WARMUP_SEC, then ramp
+           up. This mutes the new echo's startup transient before it can
+           self-amplify through feedback or bass-shelf boost through spring
+           and slam the compressor. */
         const now2 = ctx.currentTime;
         this.input.gain.cancelScheduledValues(now2);
         this.input.gain.setValueAtTime(0, now2);
@@ -488,13 +498,15 @@ export class DubBus {
 
         this.feedback.gain.cancelScheduledValues(now2);
         this.feedback.gain.setValueAtTime(0, now2);
-        this.feedback.gain.linearRampToValueAtTime(priorFeedbackGain, now2 + RAMP_SEC);
+        this.feedback.gain.setValueAtTime(0, now2 + WARMUP_SEC);
+        this.feedback.gain.linearRampToValueAtTime(priorFeedbackGain, now2 + WARMUP_SEC + RAMP_SEC);
 
         this.return_.gain.cancelScheduledValues(now2);
         this.return_.gain.setValueAtTime(0, now2);
+        this.return_.gain.setValueAtTime(0, now2 + WARMUP_SEC);
         this.return_.gain.linearRampToValueAtTime(
           this.enabled ? settings.returnGain : 0,
-          now2 + RAMP_SEC,
+          now2 + WARMUP_SEC + RAMP_SEC,
         );
       } catch (err) {
         console.error('[DubBus] Echo engine swap failed:', err);
