@@ -2439,6 +2439,45 @@ export class DubBus {
       try { this.tapeSat.curve = makeTapeSatCurve(preset.tapeSatDrive); } catch { /* ok */ }
     }
     this._snap(`after _applyCharacterPreset(${name})`);
+    // Diagnostic: measure spring output RMS over the next 2s so we can tell
+    // whether the spring worklet latched silent after its param storm.
+    this._measureSpringOutput(`after preset ${name}`);
+  }
+
+  /** Tap the spring output with a transient AnalyserNode, log RMS every
+   *  200ms for 2s. Used to diagnose whether the spring worklet is
+   *  latching silent after a preset transition. Disposes itself. */
+  private _measureSpringOutput(label: string): void {
+    try {
+      const springOut = (this.spring as unknown as { output: Tone.ToneAudioNode }).output;
+      const native = getNativeAudioNode(springOut as unknown);
+      if (!native) { console.log(`[SpringTap] ${label} — could not get native spring.output`); return; }
+      const analyser = this.context.createAnalyser();
+      analyser.fftSize = 1024;
+      analyser.smoothingTimeConstant = 0;
+      (native as AudioNode).connect(analyser);
+      const buf = new Float32Array(analyser.fftSize);
+      let ticks = 0;
+      const tick = () => {
+        analyser.getFloatTimeDomainData(buf);
+        let sumSq = 0, peak = 0;
+        for (let i = 0; i < buf.length; i++) {
+          const s = buf[i]; sumSq += s * s;
+          const a = Math.abs(s); if (a > peak) peak = a;
+        }
+        const rms = Math.sqrt(sumSq / buf.length);
+        const rmsDb = rms > 0 ? 20 * Math.log10(rms) : -Infinity;
+        console.log(`[SpringTap] ${label} t+${ticks*200}ms | rms=${rms.toFixed(5)} (${rmsDb.toFixed(1)}dB) peak=${peak.toFixed(5)}`);
+        ticks++;
+        if (ticks < 10) setTimeout(tick, 200);
+        else {
+          try { (native as AudioNode).disconnect(analyser); } catch { /* ok */ }
+        }
+      };
+      setTimeout(tick, 200);
+    } catch (err) {
+      console.warn('[SpringTap] measurement failed:', err);
+    }
   }
 
   /**
