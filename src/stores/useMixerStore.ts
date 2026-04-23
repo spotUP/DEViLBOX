@@ -97,6 +97,37 @@ interface ChannelOnEngine {
 const _muteMaskEngineCache = new Map<string, { Engine: MuteMaskEngine; chLimit?: number }>();
 const _gainEngineCache = new Map<string, { Engine: GainEngine; maxCh: number }>();
 const _channelOnEngineCache = new Map<string, { Engine: ChannelOnEngine; maxCh: number }>();
+// rAF-batched dubSend state writes. During slider drag, setChannelDubSend
+// is called ~60x/sec. Each zustand setState triggers DubDeckStrip to
+// re-render (it subscribes to `channels`). To keep the main thread free
+// for the SID ScriptProcessor, we batch drag writes into one setState
+// per frame. Last value per channel wins within a frame.
+const _pendingDubSends = new Map<number, number>();
+let _pendingDubRaf = 0;
+function scheduleDubSendStoreWrite(
+  ch: number,
+  amount: number,
+  setter: (fn: (state: any) => void) => void,
+): void {
+  _pendingDubSends.set(ch, amount);
+  if (_pendingDubRaf) return;
+  _pendingDubRaf = (typeof requestAnimationFrame !== 'undefined')
+    ? requestAnimationFrame(flush)
+    : (setTimeout(flush, 16) as unknown as number);
+  function flush(): void {
+    _pendingDubRaf = 0;
+    if (_pendingDubSends.size === 0) return;
+    const updates = Array.from(_pendingDubSends.entries());
+    _pendingDubSends.clear();
+    setter((state: any) => {
+      for (const [c, v] of updates) {
+        if (c < 0 || c >= state.channels.length) continue;
+        state.channels[c].dubSend = v;
+      }
+    });
+  }
+}
+
 let _engineCacheWarmedUp = false;
 
 // Cached singleton refs populated during warm-up (avoids require() in runtime paths)
@@ -871,28 +902,34 @@ export const useMixerStore = create<MixerStore>()(
     // ChannelRoutedEffects. Tracker worklets (LibOpenMPT/Furnace/Hively/UADE)
     // dedicate outputs [5..36] to per-channel dub taps; the manager owns
     // those 32 GainNodes and lazily activates them as needed.
+    //
+    // Audio update fires immediately (smooth gain ramp). Zustand state
+    // write is rAF-batched so rapid drag (60 calls/sec) produces at most
+    // one React re-render per frame — prevents main-thread stalls that
+    // cause SID ScriptProcessor audio stutter during slider drag.
     setChannelDubSend(ch: number, amount: number): void {
       const clamped = Math.max(0, Math.min(1, amount));
-      set((state) => {
-        if (ch < 0 || ch >= state.channels.length) return;
-        state.channels[ch].dubSend = clamped;
-      });
 
+      // Audio update FIRST — immediate, never deferred.
       // SID mode: route to per-voice taps on the dub bus directly.
-      // Worklet-based isolation doesn't exist for SID — voice taps are
-      // registered as channelTaps on DubBus and controlled here.
+      let handledBySid = false;
       try {
         const dubBus = getActiveDubBus();
         if (dubBus?.setSidVoiceDubSend(ch, clamped)) {
-          return; // handled by SID per-voice tap
+          handledBySid = true;
         }
       } catch { /* not in SID mode or dub bus not ready */ }
 
-      try {
-        getChannelRoutedEffectsManager()?.setChannelDubSend(ch, clamped);
-      } catch (e) {
-        console.warn('[MixerStore] setChannelDubSend: manager unavailable', e);
+      if (!handledBySid) {
+        try {
+          getChannelRoutedEffectsManager()?.setChannelDubSend(ch, clamped);
+        } catch (e) {
+          console.warn('[MixerStore] setChannelDubSend: manager unavailable', e);
+        }
       }
+
+      // State update — rAF-batched so drag doesn't cause 60 re-renders/sec.
+      scheduleDubSendStoreWrite(ch, clamped, set);
     },
 
     // Send levels
