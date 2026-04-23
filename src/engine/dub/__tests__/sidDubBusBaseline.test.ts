@@ -41,6 +41,15 @@ describe('SID dub bus baseline', () => {
     expect(dubBusSrc).toMatch(/setSidVoiceDubSend\(voiceIndex:\s*number,\s*amount:\s*number\):\s*boolean/);
   });
 
+  it('DubBus.setSidVoiceDubSend has whole-mix fallback for websid (no per-voice taps)', () => {
+    // When there are no per-voice taps (websid), the method should
+    // fall back to controlling the whole-mix _sidDubSendGain
+    expect(dubBusSrc).toContain('_sidChannelDubSends');
+    expect(dubBusSrc).toContain('_sidDubSendGain');
+    // Path 2 comment documents the websid fallback
+    expect(dubBusSrc).toMatch(/no per-voice taps.*websid/i);
+  });
+
   it('mixer store uses getActiveDubBus (sync) not async import', () => {
     // Must NOT use async import for SID dub send routing
     expect(mixerSrc).not.toMatch(/import\s*\(\s*['"].*useMIDIPadRouting['"]\s*\)/);

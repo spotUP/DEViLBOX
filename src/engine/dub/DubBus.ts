@@ -506,6 +506,8 @@ export class DubBus {
   // (full-mix throw — authentic dub technique since SID is monolithic).
   private _sidDubSendGain: GainNode | null = null;
   private _sidDubSendBaseline = 0.4;
+  // Per-channel dub send amounts for whole-mix fallback (websid has no per-voice output)
+  private _sidChannelDubSends: number[] = [0, 0, 0];
 
   private readonly context: AudioContext;
   private readonly master: AudioNode;
@@ -1097,18 +1099,39 @@ export class DubBus {
   /**
    * Set the dub send level for a SID voice (channel 0-2).
    * Called by the mixer store when the user moves channel dub send sliders.
-   * Returns true if the channel was handled (SID mode + tap exists).
+   * Returns true if the channel was handled (SID mode active).
+   *
+   * Two paths:
+   *  1. jsSID with per-voice taps → controls individual voice tap gain
+   *  2. websid (no per-voice output) → falls back to whole-mix dubSendGain,
+   *     using the max of all channel slider values as the send level
    */
   setSidVoiceDubSend(voiceIndex: number, amount: number): boolean {
     if (!this._sidMode) return false;
-    const tap = this.channelTaps.get(voiceIndex);
-    if (!tap) return false;
     const clamped = Math.max(0, Math.min(1, amount));
-    const now = this.context.currentTime;
-    tap.gain.cancelScheduledValues(now);
-    tap.gain.setValueAtTime(tap.gain.value, now);
-    tap.gain.linearRampToValueAtTime(clamped, now + 0.02);
-    return true;
+
+    // Path 1: per-voice tap exists (jsSID) — control individual voice
+    const tap = this.channelTaps.get(voiceIndex);
+    if (tap) {
+      const now = this.context.currentTime;
+      tap.gain.cancelScheduledValues(now);
+      tap.gain.setValueAtTime(tap.gain.value, now);
+      tap.gain.linearRampToValueAtTime(clamped, now + 0.02);
+      return true;
+    }
+
+    // Path 2: no per-voice taps (websid) — control whole-mix dub send
+    if (this._sidDubSendGain && voiceIndex >= 0 && voiceIndex < 3) {
+      this._sidChannelDubSends[voiceIndex] = clamped;
+      const maxSend = Math.max(...this._sidChannelDubSends);
+      const now = this.context.currentTime;
+      this._sidDubSendGain.gain.cancelScheduledValues(now);
+      this._sidDubSendGain.gain.setValueAtTime(this._sidDubSendGain.gain.value, now);
+      this._sidDubSendGain.gain.linearRampToValueAtTime(maxSend, now + 0.02);
+      return true;
+    }
+
+    return false;
   }
 
   /**
@@ -1116,6 +1139,7 @@ export class DubBus {
    */
   unregisterSidDubSend(): void {
     this._sidDubSendGain = null;
+    this._sidChannelDubSends = [0, 0, 0];
     // Clean up per-voice taps
     for (let i = 0; i < 3; i++) {
       const tap = this.channelTaps.get(i);
@@ -2256,7 +2280,9 @@ export class DubBus {
     // and the engineer pushes the strip's aux send for the throw.
     if (this._sidMode && this._sidDubSendGain) {
       const gain = this._sidDubSendGain.gain;
-      const baseline = this._sidDubSendBaseline;
+      // Baseline is the higher of the registered baseline and any manual channel slider
+      const sliderMax = Math.max(...this._sidChannelDubSends);
+      const baseline = Math.max(this._sidDubSendBaseline, sliderMax);
       const now = this.context.currentTime;
       gain.cancelScheduledValues(now);
       gain.setValueAtTime(gain.value, now);
