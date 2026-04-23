@@ -2428,6 +2428,14 @@ export class DubBus {
       + ` chaos=${preset.springsChaos} scatter=${preset.springsScatter}`
       + ` tone=${preset.springsTone} tapeSatDrive=${preset.tapeSatDrive}`,
     );
+    /* Mute the spring's JS-side wetGain BEFORE writing params. The WASM
+       DSP physically resonates during parameter transitions (even with
+       per-param smoothing over 43ms) — measured peak 2.5 on tubby. By
+       zeroing the JS output gate, the transient never reaches downstream
+       nodes (sidechain compressor, return_ gain, master). We hold the
+       mute for 300ms to cover the 43ms smoothing ramp plus ~250ms of
+       WASM settling, then unmute so normal reverb tails pass through. */
+    try { this.spring.muteOutput(); } catch { /* ok */ }
     try {
       if (preset.springsLength  !== undefined) this.spring.setParamById(PARAM_SPRINGS_LENGTH,  preset.springsLength);
       if (preset.springsDamp    !== undefined) this.spring.setParamById(PARAM_SPRINGS_DAMP,    preset.springsDamp);
@@ -2438,9 +2446,15 @@ export class DubBus {
     if (preset.tapeSatDrive !== undefined) {
       try { this.tapeSat.curve = makeTapeSatCurve(preset.tapeSatDrive); } catch { /* ok */ }
     }
+    /* Unmute after WASM settles. 300ms covers the 43ms worklet-side
+       smoothing ramp plus the spring's resonant decay. The SpringTap
+       data shows peaks subside below 0.5 rms by ~800ms, but most of
+       that is normal reverb tail — the transient energy (>1.0 peak)
+       dissipates within ~200ms of the ramp completing. */
+    setTimeout(() => {
+      try { this.spring.unmuteOutput(); } catch { /* ok */ }
+    }, 300);
     this._snap(`after _applyCharacterPreset(${name})`);
-    // Diagnostic: measure spring output RMS over the next 2s so we can tell
-    // whether the spring worklet latched silent after its param storm.
     this._measureSpringOutput(`after preset ${name}`);
   }
 
