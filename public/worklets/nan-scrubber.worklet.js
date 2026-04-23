@@ -23,11 +23,21 @@
  */
 const LIMIT = 0.95;
 class NaNScrubberProcessor extends AudioWorkletProcessor {
+  constructor(options) {
+    super();
+    /* `mode: 'feedback'` (default) applies tanh soft-limit to break
+       runaway loops. `mode: 'forward'` does NaN-scrubbing only — used
+       on open (non-recirculating) paths where tanh would unnecessarily
+       compress reverb/echo tails into a squashed low-end rumble. */
+    const mode = (options && options.processorOptions && options.processorOptions.mode) || 'feedback';
+    this._softLimit = mode !== 'forward';
+  }
   process(inputs, outputs) {
     const input = inputs[0];
     const output = outputs[0];
     if (!input || !output) return true;
     const numCh = Math.min(input.length, output.length);
+    const soft = this._softLimit;
     for (let ch = 0; ch < numCh; ch++) {
       const src = input[ch];
       const dst = output[ch];
@@ -35,15 +45,12 @@ class NaNScrubberProcessor extends AudioWorkletProcessor {
       const n = Math.min(src.length, dst.length);
       for (let i = 0; i < n; i++) {
         const s = src[i];
-        /* NaN check (NaN !== NaN) + explicit ±Infinity — flush to zero
-           instead of clamp, because a clamp would leak a sustained DC
-           level into the feedback loop on a pathological upstream. */
         if (s !== s || s === Infinity || s === -Infinity) {
           dst[i] = 0;
-        } else {
-          /* tanh(x) approx for |x| < ~2; Math.tanh is accurate and fast
-             enough in V8. Scale so the limit sits at LIMIT. */
+        } else if (soft) {
           dst[i] = LIMIT * Math.tanh(s / LIMIT);
+        } else {
+          dst[i] = s;
         }
       }
     }
