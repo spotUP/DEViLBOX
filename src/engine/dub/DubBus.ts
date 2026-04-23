@@ -193,6 +193,16 @@ export class DubBus {
    *  Ref: 2026-04-29 Tubby-preset crash investigation. */
   private _feedbackScrubber: AudioNode;
   private _feedbackScrubberIsWorklet = false;
+  /** NaN/Inf scrubber inserted between `spring.output` and the post-spring
+   *  forward chain (sidechain → glue → midScoop → lpf → master*). Same
+   *  story as the feedback scrubber but on the FORWARD path: a NaN sample
+   *  from a freshly-swapped echo engine propagates echo→spring→sidechain
+   *  and latches the 5 forward biquads (midScoop, lpf, masterBassShelf,
+   *  masterMidScoop, masterLpf) to "state is bad" — exactly what the
+   *  2026-04-29 anotherDelay→re201 swap reproduced even with the
+   *  feedback-tap scrubber active. Same worklet, dual-path coverage. */
+  private _forwardScrubber: AudioNode;
+  private _forwardScrubberIsWorklet = false;
   // Scientist mid-scoop — peaking cut around 700 Hz. Sits on the return
   // side (post-comp) so it shapes the already-echoed/sprung signal.
   private midScoop: BiquadFilterNode;
@@ -304,6 +314,41 @@ export class DubBus {
   }
   private static _scrubberModuleLoaded = new WeakSet<AudioContext>();
   private static _scrubberModulePromises = new WeakMap<AudioContext, Promise<void>>();
+
+  /** Async splice path for the FORWARD scrubber (spring.output → SCRUBBER →
+   *  sidechain). Mirror of _loadFeedbackScrubberWorklet — see that method
+   *  and the dual-scrubber comment in the constructor for context. */
+  private async _loadForwardScrubberWorklet(): Promise<void> {
+    if (this._forwardScrubberIsWorklet) return;
+    try {
+      const base = (import.meta as { env?: { BASE_URL?: string } }).env?.BASE_URL ?? '/';
+      if (!DubBus._scrubberModuleLoaded.has(this.context)) {
+        let p = DubBus._scrubberModulePromises.get(this.context);
+        if (!p) {
+          p = this.context.audioWorklet.addModule(`${base}worklets/nan-scrubber.worklet.js`);
+          DubBus._scrubberModulePromises.set(this.context, p);
+        }
+        await p;
+        DubBus._scrubberModuleLoaded.add(this.context);
+      }
+      const worklet = new AudioWorkletNode(this.context, 'nan-scrubber', {
+        numberOfInputs: 1,
+        numberOfOutputs: 1,
+        outputChannelCount: [2],
+        channelCount: 2,
+        channelCountMode: 'explicit',
+      });
+      const springOut = (this.spring as unknown as { output: Tone.ToneAudioNode }).output;
+      try { Tone.connect(springOut, worklet as unknown as Tone.InputNode); } catch { /* ok */ }
+      try { worklet.connect(this.sidechain as unknown as AudioNode); } catch { /* ok */ }
+      try { (springOut as unknown as { disconnect: (n: AudioNode) => void }).disconnect(this._forwardScrubber); } catch { /* ok */ }
+      try { (this._forwardScrubber as GainNode).disconnect(); } catch { /* ok */ }
+      this._forwardScrubber = worklet;
+      this._forwardScrubberIsWorklet = true;
+    } catch (err) {
+      console.warn('[DubBus] forward NaN-scrubber worklet load failed — using passthrough:', err);
+    }
+  }
 
 
   /**
@@ -1052,45 +1097,54 @@ export class DubBus {
     this.feedbackShelfComp.Q.value = this.settings.bassShelfQ;
     this.feedbackShelfComp.gain.value = -Math.max(-12, Math.min(12, this.settings.bassShelfGainDb));
 
-    /* NaN/Inf scrubber + soft-limiter on the feedback tap (echo.output →
-       feedback → SCRUBBER → feedbackShelfComp → input). Preferred path: the
-       'nan-scrubber' AudioWorklet module is pre-loaded by ToneEngine during
-       app boot, so the node can be instantiated synchronously right here —
-       NO placeholder, NO async splice race. Fallback path: if pre-load
-       hasn't landed yet (cold boot, hot-reload, different AudioContext),
-       we use a GainNode passthrough and kick off _loadFeedbackScrubberWorklet
-       to splice in the real worklet when the module finally resolves.
+    /* NaN/Inf scrubber + soft-limiter. Two scrubbers, one on each
+       NaN-vulnerable path leaving the WASM/native echo engine:
 
-       Without this guard, a single bad sample from the echo engine (RE-201
-       WASM init, a Tone ECHO node's final-disposal block, denormal runaway
-       from the King Tubby +9 dB bass shelf feedback loop) latches the hpf
-       cascade + bassShelf + feedbackShelfComp to NaN internally — Chrome
-       surfaces "BiquadFilterNode: state is bad" and the bus goes
-       permanently silent until full engine re-init. The worklet's tanh
-       soft-limiter also caps feedback runaway at ±0.95 so the loop cannot
-       grow past unity even if the comp mirror desyncs mid-ramp. */
-    let feedbackScrub: AudioNode;
-    let scrubIsWorklet = false;
-    try {
-      feedbackScrub = new AudioWorkletNode(this.context, 'nan-scrubber', {
-        numberOfInputs: 1,
-        numberOfOutputs: 1,
-        outputChannelCount: [2],
-        channelCount: 2,
-        channelCountMode: 'explicit',
-      });
-      scrubIsWorklet = true;
-    } catch {
-      /* Module not registered yet — fall back to passthrough + async splice. */
-      const scrubPassthrough = this.context.createGain();
-      scrubPassthrough.gain.value = 1;
-      feedbackScrub = scrubPassthrough;
-    }
-    this._feedbackScrubber = feedbackScrub;
-    this._feedbackScrubberIsWorklet = scrubIsWorklet;
-    if (!scrubIsWorklet) {
-      void this._loadFeedbackScrubberWorklet();
-    }
+         (a) FEEDBACK tap: echo.output → feedback → SCRUBBER →
+             feedbackShelfComp → input. Protects the hpf cascade, bassShelf,
+             feedbackShelfComp from latching on a single bad sample.
+
+         (b) FORWARD tap: spring.output → SCRUBBER → sidechain. Protects
+             midScoop, lpf, masterBassShelf, masterMidScoop, masterLpf
+             (the 5 forward-chain biquads that latched after
+             anotherDelay→re201 swap on 2026-04-29 even with the feedback
+             scrubber active — RE-201's first WASM block emitted NaN that
+             flowed forward through spring into the post-spring biquads).
+
+       Preferred path: 'nan-scrubber' AudioWorklet module is pre-loaded by
+       ToneEngine during app boot, so both nodes instantiate synchronously
+       here — NO placeholder, NO async splice race. Fallback path: if the
+       pre-load hasn't landed (cold boot, hot-reload, different
+       AudioContext), each falls back to a GainNode passthrough and kicks
+       off the matching async splice via _loadFeedbackScrubberWorklet /
+       _loadForwardScrubberWorklet. The worklet's tanh soft-limiter at
+       ±0.95 also caps feedback runaway so the loop cannot grow past unity
+       even if the comp mirror desyncs mid-ramp. */
+    const makeScrubber = (): { node: AudioNode; isWorklet: boolean } => {
+      try {
+        const w = new AudioWorkletNode(this.context, 'nan-scrubber', {
+          numberOfInputs: 1,
+          numberOfOutputs: 1,
+          outputChannelCount: [2],
+          channelCount: 2,
+          channelCountMode: 'explicit',
+        });
+        return { node: w, isWorklet: true };
+      } catch {
+        const g = this.context.createGain();
+        g.gain.value = 1;
+        return { node: g, isWorklet: false };
+      }
+    };
+    const fb = makeScrubber();
+    this._feedbackScrubber = fb.node;
+    this._feedbackScrubberIsWorklet = fb.isWorklet;
+    if (!fb.isWorklet) void this._loadFeedbackScrubberWorklet();
+
+    const fwd = makeScrubber();
+    this._forwardScrubber = fwd.node;
+    this._forwardScrubberIsWorklet = fwd.isWorklet;
+    if (!fwd.isWorklet) void this._loadForwardScrubberWorklet();
 
     // Pink noise floor — ~-55 dBFS continuous noise that you don't notice
     // during normal play, but becomes audible during mute-and-dub drops as
@@ -1155,8 +1209,11 @@ export class DubBus {
     this._feedbackScrubber.connect(this.feedbackShelfComp);
     this.feedbackShelfComp.connect(this.input);
     // Post-spring output chain with coloring inserts (mid scoop + M/S width).
+    // Forward scrubber sits between spring and the post-spring biquads — see
+    // the dual-scrubber comment in the constructor for why this matters.
     const springOut = (this.spring as unknown as { output: Tone.ToneAudioNode }).output;
-    Tone.connect(springOut, this.sidechain as unknown as Tone.InputNode);
+    Tone.connect(springOut, this._forwardScrubber as unknown as Tone.InputNode);
+    (this._forwardScrubber as AudioNode).connect(this.sidechain as unknown as AudioNode);
     this.sidechain.connect(this.glue);
     this.glue.connect(this.midScoop);
     this.midScoop.connect(this.lpf);
@@ -1942,7 +1999,7 @@ export class DubBus {
        preset pick that triggered them. */
     if (typeof settings.characterPreset === 'string'
         && settings.characterPreset !== this.settings.characterPreset) {
-      console.log(`[DubBus] characterPreset: ${this.settings.characterPreset} → ${settings.characterPreset} (scrubber=${this._feedbackScrubberIsWorklet ? 'worklet' : 'passthrough'})`);
+      console.log(`[DubBus] characterPreset: ${this.settings.characterPreset} → ${settings.characterPreset} (fbScrub=${this._feedbackScrubberIsWorklet ? 'worklet' : 'passthrough'} fwdScrub=${this._forwardScrubberIsWorklet ? 'worklet' : 'passthrough'})`);
     }
 
     // Log every *meaningful* settings write — enable flag, non-zero echo /
