@@ -150,6 +150,15 @@ export class RE201Effect extends Tone.ToneAudioNode {
         return;
       }
 
+      /* Tear down the fallback FIRST so the wet summing node isn't driven
+         by two recursive paths simultaneously (fallback delay loop + WASM
+         worklet). Double-driving the wet bus during the overlap window
+         produced a brief transient that upstream biquads (in DubBus'
+         feedback-loop chain) interpreted as "state is bad" and latched to
+         NaN — permanently killing the dub bus. Silence during the
+         handover is bounded to one processing block. */
+      this.disconnectFallback();
+
       rawInput.connect(this.workletNode);
       this.workletNode.connect(rawWet);
 
@@ -157,8 +166,6 @@ export class RE201Effect extends Tone.ToneAudioNode {
       keepalive.gain.value = 0;
       this.workletNode.connect(keepalive);
       keepalive.connect(rawContext.destination);
-
-      this.disconnectFallback();
     } catch (err) {
       console.warn('[RE201] WASM swap failed, staying on fallback:', err);
     }
