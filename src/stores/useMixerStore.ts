@@ -15,6 +15,7 @@ import type { EffectConfig } from '@typedefs/instrument';
 import { getChannelEffectsManager } from '../engine/ChannelEffectsManager';
 import { getSendBusManager } from '../engine/SendBusManager';
 import { getChannelRoutedEffectsManager } from '../engine/tone/ChannelRoutedEffects';
+import { getActiveDubBus } from '../engine/dub/DubBus';
 
 // Rebuild WASM per-channel effect routing after any insert-effect mutation
 // or when a master effect's selectedChannels changes.
@@ -881,7 +882,6 @@ export const useMixerStore = create<MixerStore>()(
       // Worklet-based isolation doesn't exist for SID — voice taps are
       // registered as channelTaps on DubBus and controlled here.
       try {
-        const { getActiveDubBus } = require('../engine/dub/DubBus');
         const dubBus = getActiveDubBus();
         if (dubBus?.setSidVoiceDubSend(ch, clamped)) {
           return; // handled by SID per-voice tap
