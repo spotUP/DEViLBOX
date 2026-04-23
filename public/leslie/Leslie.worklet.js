@@ -22,6 +22,16 @@ if (typeof URL === 'undefined') {
 let processorRegistered = false;
 
 // Shared WASM module (single instance for all processors)
+// AudioWorkletGlobalScope lacks WorkerGlobalScope and self, causing Emscripten
+// to detect "shell" environment and abort. Shim them for ENVIRONMENT_IS_WORKER.
+if (typeof globalThis.WorkerGlobalScope === 'undefined') {
+  globalThis.WorkerGlobalScope = globalThis.constructor;
+}
+if (typeof self === 'undefined') {
+  globalThis.self = globalThis;
+  if (!self.location) self.location = { href: '' };
+}
+
 let sharedModule = null;
 let sharedModulePromise = null;
 
