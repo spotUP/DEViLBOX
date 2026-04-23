@@ -3718,28 +3718,56 @@ export class DubBus {
     } catch { /* ok */ }
 
     setTimeout(() => {
+      /* Previously used Tone.disconnect(springOut, sidechain) to tear
+         down the forward path — but since the forward NaN-scrubber was
+         spliced in (spring.output native → forwardScrubber → sidechain),
+         there is no direct spring→sidechain connection to disconnect,
+         so this swap started crashing with InvalidAccessError. The
+         scrubber sits at the "forward entry to the post-spring
+         biquads", and in both normal and reverse mode the last audio
+         node in the chain before the biquads must route through it.
+         Normal:  spring.output (native) → scrubber → sidechain
+         Reverse: echo.output  (native) → scrubber → sidechain */
+      const springOutNative = getNativeAudioNode(springOut as unknown);
+      const echoOutNative = getNativeAudioNode(echoOut as unknown);
       try {
         if (on) {
-          // Normal → Reverse: was tapeSat→echo→spring→sidechain.
-          // Want tapeSat→spring→echo→sidechain.
-          Tone.disconnect(this.tapeSatBypass, echoIn);
-          Tone.disconnect(this.tapeStackMix, echoIn);
-          Tone.disconnect(echoOut, springIn);
-          Tone.disconnect(springOut, this.sidechain as unknown as Tone.InputNode);
+          // Normal → Reverse: was tapeSat→echo→spring→scrubber.
+          // Want tapeSat→spring→echo→scrubber.
+          try { Tone.disconnect(this.tapeSatBypass, echoIn); } catch { /* ok */ }
+          try { Tone.disconnect(this.tapeStackMix, echoIn); } catch { /* ok */ }
+          try { Tone.disconnect(echoOut, springIn); } catch { /* ok */ }
+          if (springOutNative) {
+            try { springOutNative.disconnect(this._forwardScrubber); } catch { /* ok */ }
+          } else {
+            try { Tone.disconnect(springOut, this._forwardScrubber as unknown as Tone.InputNode); } catch { /* ok */ }
+          }
           Tone.connect(this.tapeSatBypass, springIn);
           Tone.connect(this.tapeStackMix, springIn);
           Tone.connect(springOut, echoIn);
-          Tone.connect(echoOut, this.sidechain as unknown as Tone.InputNode);
+          if (echoOutNative) {
+            echoOutNative.connect(this._forwardScrubber);
+          } else {
+            Tone.connect(echoOut, this._forwardScrubber as unknown as Tone.InputNode);
+          }
         } else {
-          // Reverse → Normal: the mirror operation.
-          Tone.disconnect(this.tapeSatBypass, springIn);
-          Tone.disconnect(this.tapeStackMix, springIn);
-          Tone.disconnect(springOut, echoIn);
-          Tone.disconnect(echoOut, this.sidechain as unknown as Tone.InputNode);
+          // Reverse → Normal: mirror.
+          try { Tone.disconnect(this.tapeSatBypass, springIn); } catch { /* ok */ }
+          try { Tone.disconnect(this.tapeStackMix, springIn); } catch { /* ok */ }
+          try { Tone.disconnect(springOut, echoIn); } catch { /* ok */ }
+          if (echoOutNative) {
+            try { echoOutNative.disconnect(this._forwardScrubber); } catch { /* ok */ }
+          } else {
+            try { Tone.disconnect(echoOut, this._forwardScrubber as unknown as Tone.InputNode); } catch { /* ok */ }
+          }
           Tone.connect(this.tapeSatBypass, echoIn);
           Tone.connect(this.tapeStackMix, echoIn);
           Tone.connect(echoOut, springIn);
-          Tone.connect(springOut, this.sidechain as unknown as Tone.InputNode);
+          if (springOutNative) {
+            springOutNative.connect(this._forwardScrubber);
+          } else {
+            Tone.connect(springOut, this._forwardScrubber as unknown as Tone.InputNode);
+          }
         }
         this._reverseChainOrder = on;
       } catch (err) {
