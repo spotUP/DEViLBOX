@@ -2428,13 +2428,18 @@ export class DubBus {
       + ` chaos=${preset.springsChaos} scatter=${preset.springsScatter}`
       + ` tone=${preset.springsTone} tapeSatDrive=${preset.tapeSatDrive}`,
     );
-    /* Mute the spring's JS-side wetGain BEFORE writing params. The WASM
-       DSP physically resonates during parameter transitions (even with
-       per-param smoothing over 43ms) — measured peak 2.5 on tubby. By
-       zeroing the JS output gate, the transient never reaches downstream
-       nodes (sidechain compressor, return_ gain, master). We hold the
-       mute for 300ms to cover the 43ms smoothing ramp plus ~250ms of
-       WASM settling, then unmute so normal reverb tails pass through. */
+    /* Mute the spring's JS-side input AND output BEFORE writing params.
+       The WASM DSP physically resonates during parameter transitions —
+       even with per-param smoothing (43ms ramp), measured peak 2.5.
+       Muting just the output isn't enough: the WASM keeps receiving live
+       audio, builds up resonance internally, and the instant the output
+       mute releases the accumulated resonance floods through (SpringTap
+       confirmed peak 2.37 at 100ms after a 300ms output-only mute).
+       Muting BOTH input and output means the WASM processes silence
+       during the transition — its delay lines decay naturally with no
+       new energy, so when we unmute there's nothing left to resonate.
+       600ms covers the 43ms smoothing ramp plus spring internal decay. */
+    try { this.spring.muteInput(); } catch { /* ok */ }
     try { this.spring.muteOutput(); } catch { /* ok */ }
     try {
       if (preset.springsLength  !== undefined) this.spring.setParamById(PARAM_SPRINGS_LENGTH,  preset.springsLength);
@@ -2446,14 +2451,14 @@ export class DubBus {
     if (preset.tapeSatDrive !== undefined) {
       try { this.tapeSat.curve = makeTapeSatCurve(preset.tapeSatDrive); } catch { /* ok */ }
     }
-    /* Unmute after WASM settles. 300ms covers the 43ms worklet-side
-       smoothing ramp plus the spring's resonant decay. The SpringTap
-       data shows peaks subside below 0.5 rms by ~800ms, but most of
-       that is normal reverb tail — the transient energy (>1.0 peak)
-       dissipates within ~200ms of the ramp completing. */
+    /* Unmute after WASM settles. With input muted, the spring's delay
+       lines decay naturally (no new energy), so 600ms is enough for
+       both the 43ms worklet smoothing ramp and the spring's internal
+       resonant decay to complete. */
     setTimeout(() => {
+      try { this.spring.unmuteInput(); } catch { /* ok */ }
       try { this.spring.unmuteOutput(); } catch { /* ok */ }
-    }, 300);
+    }, 600);
     this._snap(`after _applyCharacterPreset(${name})`);
     this._measureSpringOutput(`after preset ${name}`);
   }

@@ -242,6 +242,22 @@ export class AelapseEffect extends Tone.ToneAudioNode {
     this.wetGain.gain.value = this._options.wet;
   }
 
+  /* JS-graph-level input mute. Zeros the input gain so the WASM worklet
+     processes silence. Used together with muteOutput during param
+     transitions — without this, the spring's delay network keeps
+     receiving live audio and builds up resonance that floods out the
+     instant the output mute releases. */
+  private _inputMuted = false;
+  muteInput(): void {
+    this._inputMuted = true;
+    this.input.gain.value = 0;
+  }
+  unmuteInput(): void {
+    if (!this._inputMuted) return;
+    this._inputMuted = false;
+    this.input.gain.value = 1;
+  }
+
   // ── RMS snapshot access (consumed by the hardware UI shader) ─────────────
 
   getRMSSnapshot(): { stack: Float32Array; pos: number } {
