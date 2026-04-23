@@ -137,6 +137,24 @@ class AelapseProcessor extends AudioWorkletProcessor {
 
     this._wasmMemory = null;
 
+    /* Parameter smoothing — the WASM DSP does NOT gracefully handle
+       sudden large changes to spring-reverb params (length, damp, chaos,
+       scatter, tone). A 5-param synchronous write from the main thread
+       measured spring.output rms=253,414,992 / peak=6.75e8 on the next
+       audio block — a catastrophic transient that slams every downstream
+       compressor into permanent max-ducking lockup. Solution: ramp any
+       continuous param from its last-written value to the target across
+       ~43ms (2048 samples @ 48kHz = 16 process() blocks). First-time
+       writes snap directly (no baseline to ramp from). Boolean / mode
+       params are NEVER ramped — _NO_RAMP_IDS lists them. */
+    this._paramRamps = new Map();      // paramId → {current, target, stepsLeft}
+    this._lastParamValues = new Map(); // paramId → last value written
+    this._PARAM_RAMP_BLOCKS = 16;      // 16 × 128 samples = 2048 samples ≈ 43ms
+    /* Never ramp: DELAY_ACTIVE(0), DELAY_MODE(8), SPRINGS_ACTIVE(9).
+       These are discrete-switching params; interpolating would put them
+       in nonsensical intermediate states. */
+    this._NO_RAMP_IDS = new Set([0, 8, 9]);
+
     this.port.onmessage = this.handleMessage.bind(this);
   }
 
@@ -148,7 +166,7 @@ class AelapseProcessor extends AudioWorkletProcessor {
         break;
       case 'parameter':
         if (this.effect && this.isInitialized) {
-          this.effect.setParameter(data.paramId, data.value);
+          this._applyParam(data.paramId, data.value);
         } else {
           this.pendingMessages.push(event.data);
         }
@@ -234,6 +252,57 @@ class AelapseProcessor extends AudioWorkletProcessor {
     }
   }
 
+  /* Route a parameter write through the smoothing machinery.
+     - First-time writes snap directly (no prior value to ramp from)
+     - Boolean/mode params in _NO_RAMP_IDS always snap
+     - No-op if the value is unchanged (< 1e-6)
+     - Otherwise: schedule a ramp over _PARAM_RAMP_BLOCKS process() blocks.
+       A ramp in flight for the same paramId is replaced, starting from
+       wherever the in-flight ramp currently is (not from the original
+       target) so successive preset changes don't zipper. */
+  _applyParam(paramId, target) {
+    const last = this._lastParamValues.get(paramId);
+    if (last === undefined || this._NO_RAMP_IDS.has(paramId)) {
+      this.effect.setParameter(paramId, target);
+      this._lastParamValues.set(paramId, target);
+      this._paramRamps.delete(paramId);
+      return;
+    }
+    const existing = this._paramRamps.get(paramId);
+    const start = existing ? existing.current : last;
+    if (Math.abs(start - target) < 1e-6) {
+      this._paramRamps.delete(paramId);
+      return;
+    }
+    this._paramRamps.set(paramId, {
+      current: start,
+      target,
+      stepsLeft: this._PARAM_RAMP_BLOCKS,
+      totalSteps: this._PARAM_RAMP_BLOCKS,
+    });
+  }
+
+  /* Advance all in-flight parameter ramps by one process() block. Called
+     once per process() call BEFORE effect.process(), so the WASM sees
+     a smoothly-interpolated param trajectory instead of an abrupt jump. */
+  _advanceParamRamps() {
+    if (this._paramRamps.size === 0) return;
+    for (const [paramId, ramp] of this._paramRamps) {
+      ramp.stepsLeft--;
+      if (ramp.stepsLeft <= 0) {
+        this.effect.setParameter(paramId, ramp.target);
+        this._lastParamValues.set(paramId, ramp.target);
+        this._paramRamps.delete(paramId);
+      } else {
+        const t = 1 - (ramp.stepsLeft / ramp.totalSteps);
+        const value = ramp.current + (ramp.target - ramp.current) * t;
+        this.effect.setParameter(paramId, value);
+        this._lastParamValues.set(paramId, value);
+        ramp.current = value;
+      }
+    }
+  }
+
   _refreshViewsIfMemoryGrew() {
     const currentBuffer = this._wasmMemory
       ? this._wasmMemory.buffer
@@ -271,6 +340,8 @@ class AelapseProcessor extends AudioWorkletProcessor {
 
     try {
       this._refreshViewsIfMemoryGrew();
+
+      this._advanceParamRamps();
 
       this.inputBufferL.set(inputL.subarray(0, numSamples));
       this.inputBufferR.set(inputR.subarray(0, numSamples));
