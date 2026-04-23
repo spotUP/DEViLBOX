@@ -25,12 +25,12 @@ const LIMIT = 0.95;
 class NaNScrubberProcessor extends AudioWorkletProcessor {
   constructor(options) {
     super();
-    /* `mode: 'feedback'` (default) applies tanh soft-limit to break
-       runaway loops. `mode: 'forward'` does NaN-scrubbing only — used
-       on open (non-recirculating) paths where tanh would unnecessarily
-       compress reverb/echo tails into a squashed low-end rumble. */
     const mode = (options && options.processorOptions && options.processorOptions.mode) || 'feedback';
     this._softLimit = mode !== 'forward';
+    this._mode = mode;
+    this._diagBlocks = 0;
+    this._diagPeakIn = 0;
+    this._diagPeakOut = 0;
   }
   process(inputs, outputs) {
     const input = inputs[0];
@@ -38,6 +38,8 @@ class NaNScrubberProcessor extends AudioWorkletProcessor {
     if (!input || !output) return true;
     const numCh = Math.min(input.length, output.length);
     const soft = this._softLimit;
+    let peakIn = this._diagPeakIn;
+    let peakOut = this._diagPeakOut;
     for (let ch = 0; ch < numCh; ch++) {
       const src = input[ch];
       const dst = output[ch];
@@ -45,14 +47,30 @@ class NaNScrubberProcessor extends AudioWorkletProcessor {
       const n = Math.min(src.length, dst.length);
       for (let i = 0; i < n; i++) {
         const s = src[i];
+        const ai = s !== s ? NaN : (s < 0 ? -s : s);
+        if (ai === ai && ai > peakIn) peakIn = ai;
+        let out;
         if (s !== s || s === Infinity || s === -Infinity) {
-          dst[i] = 0;
+          out = 0;
         } else if (soft) {
-          dst[i] = LIMIT * Math.tanh(s / LIMIT);
+          out = LIMIT * Math.tanh(s / LIMIT);
         } else {
-          dst[i] = s;
+          out = s;
         }
+        dst[i] = out;
+        const ao = out < 0 ? -out : out;
+        if (ao > peakOut) peakOut = ao;
       }
+    }
+    this._diagPeakIn = peakIn;
+    this._diagPeakOut = peakOut;
+    this._diagBlocks++;
+    /* ~375 blocks @ 128 samples = ~1 sec @ 48 kHz */
+    if (this._diagBlocks >= 375) {
+      this.port.postMessage({ mode: this._mode, peakIn, peakOut, chIn: input.length, chOut: output.length });
+      this._diagBlocks = 0;
+      this._diagPeakIn = 0;
+      this._diagPeakOut = 0;
     }
     return true;
   }
