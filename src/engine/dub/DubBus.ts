@@ -294,11 +294,12 @@ export class DubBus {
       const worklet = new AudioWorkletNode(this.context, 'nan-scrubber', {
         numberOfInputs: 1,
         numberOfOutputs: 1,
-        outputChannelCount: [2],
-        channelCount: 2,
-        channelCountMode: 'explicit',
         processorOptions: { mode: 'feedback' },
       });
+      worklet.port.onmessage = (ev) => {
+        const d = ev.data as { mode: string; peakIn: number; peakOut: number; chIn: number; chOut: number };
+        console.log(`[DubBus] scrubber[${d.mode}] chIn=${d.chIn} chOut=${d.chOut} peakIn=${d.peakIn.toFixed(4)} peakOut=${d.peakOut.toFixed(4)}`);
+      };
       /* Splice: disconnect the placeholder GainNode, connect the worklet
          in its place. feedback → (old scrubber) → feedbackShelfComp becomes
          feedback → worklet → feedbackShelfComp. Must be atomic — do the
@@ -335,11 +336,12 @@ export class DubBus {
       const worklet = new AudioWorkletNode(this.context, 'nan-scrubber', {
         numberOfInputs: 1,
         numberOfOutputs: 1,
-        outputChannelCount: [2],
-        channelCount: 2,
-        channelCountMode: 'explicit',
         processorOptions: { mode: 'forward' },
       });
+      worklet.port.onmessage = (ev) => {
+        const d = ev.data as { mode: string; peakIn: number; peakOut: number; chIn: number; chOut: number };
+        console.log(`[DubBus] scrubber[${d.mode}] chIn=${d.chIn} chOut=${d.chOut} peakIn=${d.peakIn.toFixed(4)} peakOut=${d.peakOut.toFixed(4)}`);
+      };
       const springOut = (this.spring as unknown as { output: Tone.ToneAudioNode }).output;
       const springOutNative = getNativeAudioNode(springOut as unknown);
       if (!springOutNative) {
@@ -1132,11 +1134,12 @@ export class DubBus {
         const w = new AudioWorkletNode(this.context, 'nan-scrubber', {
           numberOfInputs: 1,
           numberOfOutputs: 1,
-          outputChannelCount: [2],
-          channelCount: 2,
-          channelCountMode: 'explicit',
           processorOptions: { mode },
         });
+        w.port.onmessage = (ev) => {
+          const d = ev.data as { mode: string; peakIn: number; peakOut: number; chIn: number; chOut: number };
+          console.log(`[DubBus] scrubber[${d.mode}] chIn=${d.chIn} chOut=${d.chOut} peakIn=${d.peakIn.toFixed(4)} peakOut=${d.peakOut.toFixed(4)}`);
+        };
         return { node: w, isWorklet: true };
       } catch {
         const g = this.context.createGain();
