@@ -509,6 +509,11 @@ export class DubBus {
   private _sidDubSendBaseline = 0.4;
   // Per-channel dub send amounts for whole-mix fallback (websid has no per-voice output)
   private _sidChannelDubSends: number[] = [0, 0, 0];
+  // Set to true only when registerSidVoiceTaps ran (jsSID with per-voice outputs).
+  // websid has no per-voice output → stays false, so setSidVoiceDubSend uses
+  // whole-mix Path 2 instead of being fooled by stale non-SID channelTaps
+  // left over from prior tracker sessions.
+  private _sidHasPerVoiceTaps = false;
 
   private readonly context: AudioContext;
   private readonly master: AudioNode;
@@ -1062,6 +1067,7 @@ export class DubBus {
       // Don't dispose — keep the engine warm for quick re-enable
     }
     this._sidDubSendGain = null;
+    this._sidHasPerVoiceTaps = false;
     console.log('[DubBus] SID mode disabled — dub synths use WebAudio');
   }
 
@@ -1094,6 +1100,7 @@ export class DubBus {
       // Register as a standard channel tap so openChannelTap() works
       this.channelTaps.set(i, tapGain);
     }
+    this._sidHasPerVoiceTaps = voiceOutputs.length > 0;
     console.log(`[DubBus] Registered ${voiceOutputs.length} per-voice SID taps`);
   }
 
@@ -1106,22 +1113,34 @@ export class DubBus {
    *  1. jsSID with per-voice taps → controls individual voice tap gain
    *  2. websid (no per-voice output) → falls back to whole-mix dubSendGain,
    *     using the max of all channel slider values as the send level
+   *
+   * IMPORTANT: In SID mode we ALWAYS return true (even for voices >= 3 or
+   * when _sidDubSendGain is null). If we returned false the mixer store
+   * would fall through to ChannelRoutedEffects.setChannelDubSend which
+   * activates a WASM dub slot on the Tone.js channel — that's for
+   * tracker-channel routing which the SID bypasses entirely. Activating
+   * those slots causes audio stutters from worklet setup and does nothing
+   * useful (SID audio doesn't flow through those channels).
    */
   setSidVoiceDubSend(voiceIndex: number, amount: number): boolean {
     if (!this._sidMode) return false;
     const clamped = Math.max(0, Math.min(1, amount));
 
-    // Path 1: per-voice tap exists (jsSID) — control individual voice
-    const tap = this.channelTaps.get(voiceIndex);
-    if (tap) {
-      const now = this.context.currentTime;
-      tap.gain.cancelScheduledValues(now);
-      tap.gain.setValueAtTime(tap.gain.value, now);
-      tap.gain.linearRampToValueAtTime(clamped, now + 0.02);
-      return true;
+    // Path 1: per-voice tap (jsSID only — we registered them explicitly).
+    // Guarded by _sidHasPerVoiceTaps so stale non-SID channelTaps left over
+    // from prior tracker sessions don't fool us into touching the wrong node.
+    if (this._sidHasPerVoiceTaps) {
+      const tap = this.channelTaps.get(voiceIndex);
+      if (tap) {
+        const now = this.context.currentTime;
+        tap.gain.cancelScheduledValues(now);
+        tap.gain.setValueAtTime(tap.gain.value, now);
+        tap.gain.linearRampToValueAtTime(clamped, now + 0.02);
+        return true;
+      }
     }
 
-    // Path 2: no per-voice taps (websid) — control whole-mix dub send
+    // Path 2: whole-mix dub send (websid + any voice index < 3)
     if (this._sidDubSendGain && voiceIndex >= 0 && voiceIndex < 3) {
       this._sidChannelDubSends[voiceIndex] = clamped;
       const maxSend = Math.max(...this._sidChannelDubSends);
@@ -1132,7 +1151,10 @@ export class DubBus {
       return true;
     }
 
-    return false;
+    // SID mode active but this voice index has no effect (>= 3 or no send
+    // gain). Still return true to keep the mixer store from falling through
+    // to tracker-channel dub activation, which would stutter the SID audio.
+    return true;
   }
 
   /**
@@ -1141,6 +1163,7 @@ export class DubBus {
   unregisterSidDubSend(): void {
     this._sidDubSendGain = null;
     this._sidChannelDubSends = [0, 0, 0];
+    this._sidHasPerVoiceTaps = false;
     // Clean up per-voice taps
     for (let i = 0; i < 3; i++) {
       const tap = this.channelTaps.get(i);
