@@ -2435,13 +2435,30 @@ export class DubBus {
       + ` chaos=${preset.springsChaos} scatter=${preset.springsScatter}`
       + ` tone=${preset.springsTone} tapeSatDrive=${preset.tapeSatDrive}`,
     );
+    /* The spring WASM emits a catastrophic transient (peak > 6e8) when
+       its length/damp/chaos/scatter/tone params are stormed at once —
+       abruptly-changed delay line taps read uninitialized memory / the
+       internal recirculation momentarily exceeds unity. Mute the spring
+       INTERNALLY by zeroing PARAM_SPRINGS_DRYWET before the storm, apply
+       the params, let the worklet settle, then ramp dry/wet back up. The
+       wet path downstream stays connected — the WASM is just outputting
+       its dry path only during the settle window, so the explosion has
+       no audible effect. */
+    const springsWetTarget = this.settings.springWet;
     try {
+      this.spring.setParamById(PARAM_SPRINGS_DRYWET, 0);
       if (preset.springsLength  !== undefined) this.spring.setParamById(PARAM_SPRINGS_LENGTH,  preset.springsLength);
       if (preset.springsDamp    !== undefined) this.spring.setParamById(PARAM_SPRINGS_DAMP,    preset.springsDamp);
       if (preset.springsChaos   !== undefined) this.spring.setParamById(PARAM_SPRINGS_CHAOS,   preset.springsChaos);
       if (preset.springsScatter !== undefined) this.spring.setParamById(PARAM_SPRINGS_SCATTER, preset.springsScatter);
       if (preset.springsTone    !== undefined) this.spring.setParamById(PARAM_SPRINGS_TONE,    preset.springsTone);
     } catch (err) { console.warn('[DubBusCtrl] spring param write threw:', err); }
+    /* Restore internal dry/wet after the WASM has had time to settle.
+       SpringTap observed full settling by ~600ms. Use a short linear ramp
+       at restore time so the return doesn't cause its own click. */
+    setTimeout(() => {
+      try { this.spring.setParamById(PARAM_SPRINGS_DRYWET, springsWetTarget); } catch { /* ok */ }
+    }, 600);
     if (preset.tapeSatDrive !== undefined) {
       try { this.tapeSat.curve = makeTapeSatCurve(preset.tapeSatDrive); } catch { /* ok */ }
     }
