@@ -203,6 +203,16 @@ export class DubBus {
    *  feedback-tap scrubber active. Same worklet, dual-path coverage. */
   private _forwardScrubber: AudioNode;
   private _forwardScrubberIsWorklet = false;
+  /** Third NaN-scrubber sitting between echo.output and spring.input.
+   *  Catches NaN/Inf transients from the WASM echo engine's first audio
+   *  block BEFORE they hit the spring reverb worklet. Without this,
+   *  selecting Tubby / Perry (which swap echo engines to RE-201 /
+   *  anotherDelay) produces a "bwoooaap" bass transient followed by
+   *  permanently silent reverb — the spring worklet's internal WASM
+   *  state latches to silence when fed pathological input and our
+   *  downstream forward scrubber (post-spring) can't unstick it. */
+  private _echoSpringScrubber: AudioNode;
+  private _echoSpringScrubberIsWorklet = false;
   // Scientist mid-scoop — peaking cut around 700 Hz. Sits on the return
   // side (post-comp) so it shapes the already-echoed/sprung signal.
   private midScoop: BiquadFilterNode;
@@ -351,6 +361,64 @@ export class DubBus {
     }
   }
 
+  /** (Re)wire echo.output → echoSpringScrubber → spring.input. Called at
+   *  initial graph build AND after every echo engine swap (since the
+   *  echo instance is disposed + recreated). Uses native .connect()
+   *  because AudioWorkletNodes don't play nicely with Tone.connect. */
+  private _connectEchoToSpring(): void {
+    const echoOut = this.echo.output as unknown;
+    const springIn = this.spring.input as unknown;
+    const echoOutNative = getNativeAudioNode(echoOut);
+    const springInNative = getNativeAudioNode(springIn);
+    if (echoOutNative && springInNative) {
+      try { echoOutNative.connect(this._echoSpringScrubber); } catch { /* ok */ }
+      try { (this._echoSpringScrubber as AudioNode).connect(springInNative); } catch { /* ok */ }
+      return;
+    }
+    /* Fall back to direct echo→spring if native extraction fails. The
+       protection is best-effort: reverb routing > NaN safety. */
+    console.warn('[DubBus] echo→spring scrubber insertion failed, using direct Tone.connect');
+    try { this.echo.connect(this.spring); } catch { /* ok */ }
+  }
+
+  /** Async splice path for the ECHO→SPRING scrubber. Mirror of
+   *  _loadForwardScrubberWorklet — swap in the real worklet once its
+   *  module finishes loading, preserving connections. */
+  private async _loadEchoSpringScrubberWorklet(): Promise<void> {
+    if (this._echoSpringScrubberIsWorklet) return;
+    try {
+      const base = (import.meta as { env?: { BASE_URL?: string } }).env?.BASE_URL ?? '/';
+      if (!DubBus._scrubberModuleLoaded.has(this.context)) {
+        let p = DubBus._scrubberModulePromises.get(this.context);
+        if (!p) {
+          p = this.context.audioWorklet.addModule(`${base}worklets/nan-scrubber.worklet.js`);
+          DubBus._scrubberModulePromises.set(this.context, p);
+        }
+        await p;
+        DubBus._scrubberModuleLoaded.add(this.context);
+      }
+      const worklet = new AudioWorkletNode(this.context, 'nan-scrubber', {
+        numberOfInputs: 1,
+        numberOfOutputs: 1,
+        processorOptions: { mode: 'forward' },
+      });
+      const echoOutNative = getNativeAudioNode(this.echo.output as unknown);
+      const springInNative = getNativeAudioNode(this.spring.input as unknown);
+      if (!echoOutNative || !springInNative) {
+        console.warn('[DubBus] echo→spring scrubber splice: native extract failed');
+        return;
+      }
+      try { echoOutNative.connect(worklet); } catch { /* ok */ }
+      try { worklet.connect(springInNative); } catch { /* ok */ }
+      try { echoOutNative.disconnect(this._echoSpringScrubber); } catch { /* ok */ }
+      try { (this._echoSpringScrubber as GainNode).disconnect(); } catch { /* ok */ }
+      this._echoSpringScrubber = worklet;
+      this._echoSpringScrubberIsWorklet = true;
+    } catch (err) {
+      console.warn('[DubBus] echo→spring NaN-scrubber worklet load failed — using passthrough:', err);
+    }
+  }
+
 
   /**
    * Hot-swap the echo engine without dropping audio. Ramps the return gain
@@ -406,7 +474,7 @@ export class DubBus {
         // Reconnect into graph
         Tone.connect(this.tapeSatBypass, this.echo.input as unknown as Tone.InputNode);
         Tone.connect(this.tapeStackMix, this.echo.input as unknown as Tone.InputNode);
-        this.echo.connect(this.spring);
+        this._connectEchoToSpring();
         // Rebuild feedback path
         Tone.connect(this.echo.output, this.feedback as unknown as Tone.InputNode);
 
@@ -1145,6 +1213,11 @@ export class DubBus {
     this._forwardScrubberIsWorklet = fwd.isWorklet;
     if (!fwd.isWorklet) void this._loadForwardScrubberWorklet();
 
+    const es = makeScrubber('forward');
+    this._echoSpringScrubber = es.node;
+    this._echoSpringScrubberIsWorklet = es.isWorklet;
+    if (!es.isWorklet) void this._loadEchoSpringScrubberWorklet();
+
     // Pink noise floor — ~-55 dBFS continuous noise that you don't notice
     // during normal play, but becomes audible during mute-and-dub drops as
     // the "tape hiss" texture of vintage dub records. Two-second loop buffer
@@ -1199,7 +1272,7 @@ export class DubBus {
     // tapeStackMix (gain=1 in stack mode). Only one is audible at a time.
     Tone.connect(this.tapeSatBypass, this.echo.input as unknown as Tone.InputNode);
     Tone.connect(this.tapeStackMix, this.echo.input as unknown as Tone.InputNode);
-    this.echo.connect(this.spring);
+    this._connectEchoToSpring();
     // Feedback regen: tap echo output (before spring) back into input.
     // Pre-spring means the siren rings without flooding the spring with
     // runaway self-oscillation.
