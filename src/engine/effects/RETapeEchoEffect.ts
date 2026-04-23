@@ -176,7 +176,14 @@ export class RETapeEchoEffect extends Tone.ToneAudioNode {
         return;
       }
 
-      // Connect WASM FIRST, then disconnect fallback (avoids silent gap)
+      /* Tear down the fallback FIRST so the wet summing node isn't
+         driven by two recursive paths (fallback delay loop + WASM
+         worklet) during the swap window. Upstream biquads in the
+         DubBus feedback chain interpreted that overlap as a transient
+         and latched to NaN ("state is bad"). Bounded silence for one
+         processing block is the safer tradeoff. */
+      this.disconnectFallback();
+
       rawInput.connect(this.workletNode);
       this.workletNode.connect(rawWet);
 
@@ -185,9 +192,6 @@ export class RETapeEchoEffect extends Tone.ToneAudioNode {
       keepalive.gain.value = 0;
       this.workletNode.connect(keepalive);
       keepalive.connect(rawContext.destination);
-
-      // Now safe to disconnect fallback
-      this.disconnectFallback();
     } catch (err) {
       console.warn('[RETapeEcho] WASM swap failed, staying on fallback:', err);
     }

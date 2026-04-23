@@ -156,6 +156,13 @@ export class AnotherDelayEffect extends Tone.ToneAudioNode {
         return;
       }
 
+      /* Tear down the fallback FIRST so the wet summing node isn't
+         double-driven by the fallback's internal delay loop AND the
+         worklet during the handover. Double-driving produced a
+         transient that poisoned upstream biquads in the DubBus
+         feedback chain ("state is bad" → permanent NaN). */
+      this.disconnectFallback();
+
       rawInput.connect(this.workletNode);
       this.workletNode.connect(rawWet);
 
@@ -163,8 +170,6 @@ export class AnotherDelayEffect extends Tone.ToneAudioNode {
       keepalive.gain.value = 0;
       this.workletNode.connect(keepalive);
       keepalive.connect(rawContext.destination);
-
-      this.disconnectFallback();
     } catch (err) {
       console.warn('[AnotherDelay] WASM swap failed, staying on fallback:', err);
     }
