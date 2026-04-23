@@ -16,6 +16,7 @@ import * as Tone from 'tone';
 import { useTrackerStore } from '@/stores/useTrackerStore';
 import { useTransportStore } from '@/stores/useTransportStore';
 import { getTrackerReplayer } from '@/engine/TrackerReplayer';
+import { getSongTimeSec } from '@/engine/dub/songTime';
 import type { DubEvent } from '@/types/dub';
 
 // Move-id → Tailwind bg-color class. New moves add entries here.
@@ -86,6 +87,34 @@ export const DubLaneTimeline: React.FC = () => {
   const patternLength = pattern?.length ?? 64;
   const channelCount = pattern?.channels.length ?? 4;
 
+  // ── Lane mode selection ───────────────────────────────────────────────
+  // Time-mode lanes (raw SID / SC68) scale the X axis by seconds, not rows.
+  // `laneSpan` is the axis length in native units (rows or seconds).
+  const isTimeMode = lane?.kind === 'time';
+  // Default visible window for time-mode lanes when no duration hint is
+  // set — 90 s fits most SID tunes comfortably; UI auto-grows if events
+  // land past it.
+  const DEFAULT_TIME_SPAN_SEC = 90;
+  const timeSpan = isTimeMode
+    ? Math.max(
+        lane?.durationSec ?? DEFAULT_TIME_SPAN_SEC,
+        // Expand the axis if the user has recorded past the default window
+        // so no event sits off-screen forever.
+        ...((lane?.events ?? []).map(e => (e.timeSec ?? 0) + (e.durationSec ?? 0.5))),
+      )
+    : 0;
+  const laneSpan = isTimeMode ? timeSpan : patternLength;
+  // Position-accessor: returns the event's X position in native units.
+  const eventPos = useCallback(
+    (ev: DubEvent): number => (isTimeMode ? (ev.timeSec ?? 0) : ev.row),
+    [isTimeMode],
+  );
+  const eventDuration = useCallback(
+    (ev: DubEvent): number | undefined =>
+      isTimeMode ? ev.durationSec : ev.durationRows,
+    [isTimeMode],
+  );
+
   const containerRef = useRef<HTMLDivElement | null>(null);
   const playheadRef = useRef<HTMLDivElement | null>(null);
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
@@ -98,27 +127,36 @@ export const DubLaneTimeline: React.FC = () => {
       rafId = requestAnimationFrame(tick);
       const el = playheadRef.current;
       if (!el) return;
-      const ts = useTransportStore.getState();
-      let sub = ts.currentRow;
-      if (ts.isPlaying && replayer) {
-        const audioTime = Tone.now();
-        const state = replayer.getStateAtTime(audioTime, true);
-        if (state && state.duration > 0) {
-          const progress = Math.min(Math.max((audioTime - state.time) / state.duration, 0), 1);
-          sub = state.row + progress;
+      let sub: number;
+      if (isTimeMode) {
+        sub = getSongTimeSec();
+      } else {
+        const ts = useTransportStore.getState();
+        sub = ts.currentRow;
+        if (ts.isPlaying && replayer) {
+          const audioTime = Tone.now();
+          const state = replayer.getStateAtTime(audioTime, true);
+          if (state && state.duration > 0) {
+            const progress = Math.min(Math.max((audioTime - state.time) / state.duration, 0), 1);
+            sub = state.row + progress;
+          }
         }
       }
-      const pct = patternLength > 0 ? (sub / patternLength) * 100 : 0;
-      el.style.left = `${pct}%`;
+      const pct = laneSpan > 0 ? (sub / laneSpan) * 100 : 0;
+      el.style.left = `${Math.min(100, Math.max(0, pct))}%`;
     };
     rafId = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(rafId);
-  }, [patternLength]);
+  }, [laneSpan, isTimeMode]);
 
   // ── Lane mutations ──
   const replaceEvents = useCallback((fn: (prev: DubEvent[]) => DubEvent[]) => {
     if (!lane) return;
-    const next = fn(lane.events).sort((a, b) => a.row - b.row);
+    const next = fn(lane.events).sort((a, b) => {
+      const ap = lane.kind === 'time' ? (a.timeSec ?? 0) : a.row;
+      const bp = lane.kind === 'time' ? (b.timeSec ?? 0) : b.row;
+      return ap - bp;
+    });
     setPatternDubLane(patternIdx, { ...lane, events: next });
   }, [lane, patternIdx, setPatternDubLane]);
 
@@ -133,11 +171,13 @@ export const DubLaneTimeline: React.FC = () => {
     const copy: DubEvent = {
       ...ev,
       id: (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`,
-      row: Math.min(patternLength - 0.01, ev.row + 0.5),
+      ...(isTimeMode
+        ? { timeSec: Math.min(laneSpan - 0.01, (ev.timeSec ?? 0) + 0.5) }
+        : { row: Math.min(patternLength - 0.01, ev.row + 0.5) }),
       params: { ...ev.params },
     };
     replaceEvents(evs => [...evs, copy]);
-  }, [lane, patternLength, replaceEvents]);
+  }, [lane, patternLength, laneSpan, isTimeMode, replaceEvents]);
 
   const cloneToChannel = useCallback((id: string, newChannelId: number) => {
     if (!lane) return;
@@ -166,17 +206,17 @@ export const DubLaneTimeline: React.FC = () => {
     eventId: string;
     mode: 'move' | 'resize';
     startX: number;
-    startRow: number;
-    startDuration: number;
+    startPos: number;       // row OR timeSec depending on mode
+    startDuration: number;  // durationRows OR durationSec depending on mode
   } | null>(null);
 
-  const pxToRow = useCallback((deltaPx: number): number => {
+  const pxToUnits = useCallback((deltaPx: number): number => {
     const el = containerRef.current;
     if (!el) return 0;
     const w = el.getBoundingClientRect().width;
     if (w <= 0) return 0;
-    return (deltaPx / w) * patternLength;
-  }, [patternLength]);
+    return (deltaPx / w) * laneSpan;
+  }, [laneSpan]);
 
   const onPointerDown = useCallback((e: React.PointerEvent, ev: DubEvent) => {
     if (e.button !== 0) return;
@@ -186,28 +226,34 @@ export const DubLaneTimeline: React.FC = () => {
     const target = e.currentTarget as HTMLElement;
     const rect = target.getBoundingClientRect();
     const localX = e.clientX - rect.left;
-    const isHold = ev.durationRows !== undefined && HOLD_KINDS.has(ev.moveId);
+    const dur = eventDuration(ev);
+    const isHold = dur !== undefined && HOLD_KINDS.has(ev.moveId);
     const inResize = isHold && localX >= rect.width - RESIZE_GRAB_PX;
 
     dragRef.current = {
       eventId: ev.id,
       mode: inResize ? 'resize' : 'move',
       startX: e.clientX,
-      startRow: ev.row,
-      startDuration: ev.durationRows ?? 0,
+      startPos: eventPos(ev),
+      startDuration: dur ?? 0,
     };
 
     const onMove = (me: PointerEvent) => {
       const drag = dragRef.current;
       if (!drag) return;
       me.preventDefault();
-      const deltaRows = pxToRow(me.clientX - drag.startX);
+      const deltaUnits = pxToUnits(me.clientX - drag.startX);
       if (drag.mode === 'move') {
-        const nextRow = Math.max(0, Math.min(patternLength - 0.01, drag.startRow + deltaRows));
-        replaceEvents(evs => evs.map(v => v.id === drag.eventId ? { ...v, row: nextRow } : v));
+        const nextPos = Math.max(0, Math.min(laneSpan - 0.01, drag.startPos + deltaUnits));
+        replaceEvents(evs => evs.map(v => v.id === drag.eventId
+          ? (isTimeMode ? { ...v, timeSec: nextPos } : { ...v, row: nextPos })
+          : v));
       } else {
-        const nextDur = Math.max(0.05, Math.min(patternLength - drag.startRow, drag.startDuration + deltaRows));
-        replaceEvents(evs => evs.map(v => v.id === drag.eventId ? { ...v, durationRows: nextDur } : v));
+        const maxDur = laneSpan - drag.startPos;
+        const nextDur = Math.max(0.05, Math.min(maxDur, drag.startDuration + deltaUnits));
+        replaceEvents(evs => evs.map(v => v.id === drag.eventId
+          ? (isTimeMode ? { ...v, durationSec: nextDur } : { ...v, durationRows: nextDur })
+          : v));
       }
     };
     const onUp = () => {
@@ -219,7 +265,7 @@ export const DubLaneTimeline: React.FC = () => {
     window.addEventListener('pointermove', onMove);
     window.addEventListener('pointerup', onUp);
     window.addEventListener('pointercancel', onUp);
-  }, [pxToRow, patternLength, replaceEvents]);
+  }, [pxToUnits, laneSpan, replaceEvents, isTimeMode, eventDuration, eventPos]);
 
   // ── Context menu ──
   const onContextMenuEvent = useCallback((e: React.MouseEvent, eventId: string) => {
@@ -260,13 +306,20 @@ export const DubLaneTimeline: React.FC = () => {
         onContextMenu={onContextMenuBackground}
       >
         {lane?.events.map(ev => {
-          const leftPct = (ev.row / patternLength) * 100;
-          const isHold = ev.durationRows !== undefined && HOLD_KINDS.has(ev.moveId);
-          const widthPct = isHold
-            ? Math.max(0.5, (ev.durationRows! / patternLength) * 100)
+          const pos = eventPos(ev);
+          const leftPct = laneSpan > 0 ? (pos / laneSpan) * 100 : 0;
+          const dur = eventDuration(ev);
+          const isHold = dur !== undefined && HOLD_KINDS.has(ev.moveId);
+          const widthPct = isHold && laneSpan > 0
+            ? Math.max(0.5, (dur! / laneSpan) * 100)
             : undefined;
           const colorClass = MOVE_COLOR[ev.moveId] ?? 'bg-text-muted';
-          const durationLabel = isHold ? ` · ${ev.durationRows!.toFixed(2)} rows held` : '';
+          const durLabel = isHold
+            ? ` · ${isTimeMode ? `${dur!.toFixed(2)}s held` : `${dur!.toFixed(2)} rows held`}`
+            : '';
+          const posLabel = isTimeMode
+            ? `${pos.toFixed(2)}s`
+            : `row ${pos.toFixed(1)}`;
           return (
             <div
               key={ev.id}
@@ -279,8 +332,8 @@ export const DubLaneTimeline: React.FC = () => {
               }}
               onPointerDown={(e) => onPointerDown(e, ev)}
               onContextMenu={(e) => onContextMenuEvent(e, ev.id)}
-              title={`${ev.moveId}${ev.channelId !== undefined ? ` · ch ${ev.channelId + 1}` : ''} · row ${ev.row.toFixed(1)}${durationLabel} · drag to move · right-click for menu${isHold ? ' · drag right edge to resize' : ''}`}
-              aria-label={`${ev.moveId} at row ${ev.row.toFixed(1)}`}
+              title={`${ev.moveId}${ev.channelId !== undefined ? ` · ch ${ev.channelId + 1}` : ''} · ${posLabel}${durLabel} · drag to move · right-click for menu${isHold ? ' · drag right edge to resize' : ''}`}
+              aria-label={`${ev.moveId} at ${posLabel}`}
             >
               {/* Right-edge resize affordance for hold events */}
               {isHold && widthPct !== undefined && (widthPct * (containerRef.current?.getBoundingClientRect().width ?? 0) / 100) > 12 && (
@@ -315,7 +368,7 @@ export const DubLaneTimeline: React.FC = () => {
           {menuEvent ? (
             <>
               <div className="px-3 py-1 text-text-muted text-xs border-b border-dark-border">
-                {menuEvent.moveId}{menuEvent.channelId !== undefined ? ` · ch ${menuEvent.channelId + 1}` : ''} · row {menuEvent.row.toFixed(1)}
+                {menuEvent.moveId}{menuEvent.channelId !== undefined ? ` · ch ${menuEvent.channelId + 1}` : ''} · {isTimeMode ? `${(menuEvent.timeSec ?? 0).toFixed(2)}s` : `row ${menuEvent.row.toFixed(1)}`}
               </div>
               <button
                 className="w-full text-left px-3 py-1 text-text-primary hover:bg-dark-bgHover"

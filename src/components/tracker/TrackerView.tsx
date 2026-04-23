@@ -216,6 +216,7 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
   // Pattern order modal
   const [showPatternOrder, setShowPatternOrder] = useState(false);
   const channelTrackTables = useFormatStore((state) => state.channelTrackTables);
+  const hasC64Sid = useFormatStore((state) => state.c64SidFileData !== null);
 
   // MusicLine format data (hook must be called unconditionally — rules of hooks)
   const mlFormatData = useMusicLineFormatData();
@@ -664,13 +665,17 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
                   </div>
                 </div>
               ) : (
-                <TrackerEditorWithBg
-                  trackerVisualBg={trackerVisualBg}
-                  onAcidGenerator={() => {}}
-                  onRandomize={handleRandomize}
-                  onSwipeLeft={handleSwipeLeft}
-                  onSwipeRight={handleSwipeRight}
-                />
+                hasC64Sid ? (
+                  <Sc68Visualizer />
+                ) : (
+                  <TrackerEditorWithBg
+                    trackerVisualBg={trackerVisualBg}
+                    onAcidGenerator={() => {}}
+                    onRandomize={handleRandomize}
+                    onSwipeLeft={handleSwipeLeft}
+                    onSwipeRight={handleSwipeRight}
+                  />
+                )
               );
 
               // Custom format: support pop-out

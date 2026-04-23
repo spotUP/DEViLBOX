@@ -118,8 +118,11 @@ const safeCancelIdleCallback = cancelIdleCallbackPolyfill;
  * - 20: Phase 1 of Tracker Dub Studio — Pattern.dubLane added for per-pattern
  *       dub automation (DubEvent[] recorded live or written in the lane editor).
  *       Purely additive; patterns without dubLane load identically to v19.
+ * - 21: Time-mode dub lanes for non-editable formats (raw SID, SC68). DubLane
+ *       gains optional `kind: 'row' | 'time'` and `durationSec`; DubEvent gains
+ *       optional `timeSec` and `durationSec`. Absence = row mode (back-compat).
  */
-const SCHEMA_VERSION = 20;
+const SCHEMA_VERSION = 21;
 
 interface SavedProject {
   version: string;

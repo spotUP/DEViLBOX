@@ -45,6 +45,7 @@ import { useDubStore } from '@/stores/useDubStore';
 import { getTrackerReplayer } from '@/engine/TrackerReplayer';
 import { decodeDubEffect, decodeDubParamStep, DUB_EFFECT_PARAM_STEP, isDubMoveEffectSlot } from './moveTable';
 import { routeParameterToEngine } from '@/midi/performance/parameterRouter';
+import { getSongTimeSec } from './songTime';
 import * as Tone from 'tone';
 
 /**
@@ -118,6 +119,10 @@ export interface DubFireEvent {
   channelId?: number;
   params: Record<string, number>;
   row: number;
+  /** Song-time in seconds at fire moment. Recorder uses this when the active
+   *  song has a time-mode lane (raw SID, SC68). Always populated — cheap to
+   *  compute — so the recorder doesn't need a special code path to query it. */
+  timeSec: number;
   source: 'live' | 'lane';
 }
 
@@ -129,6 +134,9 @@ export interface DubFireEvent {
 export interface DubReleaseEvent {
   invocationId: string;
   row: number;  // release row position (for durationRows = releaseRow - fireRow)
+  /** Song-time in seconds at release moment. Paired with DubFireEvent.timeSec
+   *  to compute durationSec for time-mode held moves. */
+  timeSec: number;
   source: 'live' | 'lane';
 }
 
@@ -197,7 +205,7 @@ export function fire(
   const disposer = move.execute(ctx);
 
   const invocationId = nextInvocationId();
-  const event: DubFireEvent = { invocationId, moveId, channelId, params: merged, row, source };
+  const event: DubFireEvent = { invocationId, moveId, channelId, params: merged, row, timeSec: getSongTimeSec(), source };
   for (const fn of subscribers) {
     try {
       fn(event);
@@ -219,7 +227,7 @@ export function fire(
       released = true;
       try { disposer.dispose(); } catch (e) { console.warn('[DubRouter] disposer threw:', e); }
       const releaseRow = currentRow();
-      const relEvent: DubReleaseEvent = { invocationId, row: releaseRow, source };
+      const relEvent: DubReleaseEvent = { invocationId, row: releaseRow, timeSec: getSongTimeSec(), source };
       for (const fn of releaseSubscribers) {
         try {
           fn(relEvent);
