@@ -428,18 +428,29 @@ export const DUB_CHARACTER_PRESETS: Record<Exclude<DubBusSettings['characterPres
 export type QuantizeMode = 'off' | '1/16' | '1/8' | 'offbeat' | 'bar';
 
 /** A single recorded dub move. Lives on the pattern's dubLane.events[].
- *  Stored sorted by `row` so DubLanePlayer can advance a cursor in O(1)/tick. */
+ *  Stored sorted by `row` (row-mode lanes) or `timeSec` (time-mode lanes)
+ *  so DubLanePlayer can advance a cursor in O(1)/tick. */
 export interface DubEvent {
   /** Stable uuid — survives edits so the lane editor can reference events. */
   id: string;
   /** Move registry key — 'echoThrow' today; 'dubStab', 'channelMute', … in later phases. */
   moveId: string;
-  /** Target tracker channel (0-based). Undefined for global moves (siren, master drop, …). */
+  /** Target channel (0-based). For row-mode lanes: tracker channel. For time-mode
+   *  lanes (raw SID / SC68): SID voice 0–2, or undefined for global moves. */
   channelId?: number;
-  /** Quantized row within pattern (float — fractional for sub-row placement). */
+  /** Quantized row within pattern (float — fractional for sub-row placement).
+   *  Used by row-mode lanes. Ignored (kept as 0) for time-mode lanes. */
   row: number;
-  /** For hold-style moves: filled on release. Undefined = trigger/one-shot. */
+  /** Song-time position in seconds from song start. Only set on events in
+   *  time-mode lanes (raw SID, SC68, etc. — formats with no structured pattern).
+   *  When present, `row` is ignored and `DubLanePlayer.onTimeTick` schedules
+   *  this event instead of the row-based cursor. */
+  timeSec?: number;
+  /** For hold-style moves: filled on release. Undefined = trigger/one-shot.
+   *  Row-mode: fractional rows. */
   durationRows?: number;
+  /** Hold duration in seconds — time-mode lanes. */
+  durationSec?: number;
   /** Move-specific params — e.g. echoThrow: { throwBeats, feedbackBoost }. */
   params: Record<string, number>;
   /** Kept so the lane editor can re-quantize later without losing user intent. */
@@ -447,8 +458,22 @@ export interface DubEvent {
 }
 
 /** Per-pattern dub lane. `enabled: false` mute/solos the whole lane so the
- *  user can audition the naked song (and still perform moves live on top). */
+ *  user can audition the naked song (and still perform moves live on top).
+ *
+ *  Two kinds:
+ *    - 'row' (default, back-compat): events are row-indexed, replayed by the
+ *      tracker tick loop. All editable formats use this.
+ *    - 'time': events are seconds-indexed from song start, replayed by a
+ *      rAF driver. Used for raw SIDs, SC68/SNDH, and other formats with no
+ *      structured pattern data — the user can still perform dub moves on
+ *      top of register-level emulation and have them recorded/edited. */
 export interface DubLane {
   enabled: boolean;
   events: DubEvent[];
+  /** Lane mode. Absent or 'row' = row-indexed (tracker formats). */
+  kind?: 'row' | 'time';
+  /** For time-mode lanes only: song duration in seconds if known (e.g. SID
+   *  metadata length). Used by the timeline UI to scale the axis. Lanes can
+   *  still hold events past this duration — it's purely a display hint. */
+  durationSec?: number;
 }
