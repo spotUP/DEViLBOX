@@ -194,6 +194,10 @@ export const DubDeckStrip: React.FC = () => {
   // before activating the new one. Clicking the active one turns it off.
   const [activeRatePreset, setActiveRatePreset] = useState<string | null>(null);
   const rateDisposer = useRef<(() => void) | null>(null);
+  // Stable ref so the BPM-sync effect can read the current preset without
+  // needing it in its dependency array (which would cause excessive re-runs).
+  const activeRatePresetRef = useRef<string | null>(null);
+  useEffect(() => { activeRatePresetRef.current = activeRatePreset; }, [activeRatePreset]);
 
   // Generic per-move "active hold" tracking — covers channel-scoped holds
   // (e.g. channelMute per channel) AND global holds (filterDrop, dubSiren,
@@ -433,7 +437,10 @@ export const DubDeckStrip: React.FC = () => {
         const bpm = getActiveBpm();
         const safeBpm = Math.max(30, Math.min(300, bpm || 120));
         const beatMs = 60000 / safeBpm;
-        const synced = bpmSyncedEchoRate(bpm, dubBusSettings.echoSyncDivision, dubBusSettings.echoRateMs);
+        // When a RATE preset is active, treat division as 'off' so the preset
+        // rate is preserved and doesn't drift with BPM changes.
+        const effectiveDivision = activeRatePresetRef.current ? 'off' : dubBusSettings.echoSyncDivision;
+        const synced = bpmSyncedEchoRate(bpm, effectiveDivision, dubBusSettings.echoRateMs);
         // Mad Professor ping-pong BPM sync — 3/8 note L, 1/2 note R.
         const patch: typeof dubBusSettings = { ...dubBusSettings, echoRateMs: synced };
         if (dubBusSettings.pingPongSyncToBpm) {
