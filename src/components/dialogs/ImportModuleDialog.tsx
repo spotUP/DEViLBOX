@@ -132,7 +132,7 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
   const [isLoading, setIsLoading]       = useState(false);
   const [isImporting, setIsImporting]   = useState(false);
   const safeClose = useCallback(() => { if (!isImporting) onClose(); }, [isImporting, onClose]);
-  useModalClose({ isOpen, onClose: safeClose });
+  useModalClose({ isOpen, onClose: safeClose, enableEnter: false }); // Enter handled below (loads song)
   // Stable ref so the keydown handler always calls the latest handleImport
   // without needing it to be declared before the effect.
   const handleImportRef = useRef<() => Promise<void>>(async () => {});
@@ -410,9 +410,10 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
   // Keep ref in sync so the Enter key handler always calls the latest version
   useEffect(() => { handleImportRef.current = handleImport; }, [handleImport]);
 
-  // Enter key submits the dialog. Always preventDefault so a focused Cancel
-  // button doesn't close the dialog accidentally. Skip interception when an
-  // input/select is focused (e.g. subsong number input).
+  // Enter key submits the dialog. Use capture phase so this fires before the
+  // pattern editor's keyboard handler, then stopPropagation prevents the
+  // event from reaching any other listener (pattern editor row navigation, etc).
+  // Skip when an input/select is focused (e.g. subsong number field).
   useEffect(() => {
     if (!isOpen) return;
     const handler = (e: KeyboardEvent) => {
@@ -420,12 +421,13 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
       const tag = (e.target as HTMLElement).tagName;
       if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') return;
       e.preventDefault();
+      e.stopPropagation(); // stop pattern editor from also receiving Enter
       if (moduleInfo && !isLoading && !isImporting) {
         void handleImportRef.current();
       }
     };
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
+    window.addEventListener('keydown', handler, { capture: true });
+    return () => window.removeEventListener('keydown', handler, { capture: true });
   }, [isOpen, moduleInfo, isLoading, isImporting]);
 
   const handleClose = useCallback(() => {
