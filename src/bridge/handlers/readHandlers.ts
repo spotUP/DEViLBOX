@@ -659,6 +659,20 @@ export async function getAutoDubState(): Promise<Record<string, unknown>> {
   };
 }
 
+/** Returns the ring buffer of move IDs chosen by the Auto Dub tick loop
+ *  since the last clearAutoDubFireLog call (or since the module loaded). */
+export async function getAutoDubFireLog(): Promise<Record<string, unknown>> {
+  const { getAutoDubFireLog: getLog } = await import('../../engine/dub/AutoDub');
+  return { moves: Array.from(getLog()) };
+}
+
+/** Clears the Auto Dub fire log ring buffer. */
+export async function clearAutoDubFireLog(): Promise<Record<string, unknown>> {
+  const { clearAutoDubFireLog: clear } = await import('../../engine/dub/AutoDub');
+  clear();
+  return { ok: true };
+}
+
 /**
  * Report the currently-resolved channel role table + channel names that
  * Auto-Dub's rule engine targets. Merges the three-stage pipeline that

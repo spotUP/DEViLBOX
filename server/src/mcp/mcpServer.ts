@@ -675,6 +675,20 @@ export function createMcpServer(): McpServer {
   );
 
   server.tool(
+    'get_auto_dub_fire_log',
+    'Return { moves: string[] } — the ring buffer (last 200 entries) of move IDs chosen by the Auto Dub tick loop since the last clear_auto_dub_fire_log call. Use to verify specific moves fired during a test window.',
+    {},
+    () => call('get_auto_dub_fire_log'),
+  );
+
+  server.tool(
+    'clear_auto_dub_fire_log',
+    'Clear the Auto Dub fire log ring buffer. Call before a test window to get a clean read from get_auto_dub_fire_log.',
+    {},
+    () => call('clear_auto_dub_fire_log'),
+  );
+
+  server.tool(
     'mute_all_channels',
     'Mute all channels',
     {},
