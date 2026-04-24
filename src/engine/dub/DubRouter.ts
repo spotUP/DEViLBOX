@@ -15,6 +15,8 @@
 import { echoThrow } from './moves/echoThrow';
 import { dubStab } from './moves/dubStab';
 import { filterDrop } from './moves/filterDrop';
+import { hpfRise } from './moves/hpfRise';
+import { madProfPingPong } from './moves/madProfPingPong';
 import { dubSiren } from './moves/dubSiren';
 import { springSlam } from './moves/springSlam';
 import { springKick } from './moves/springKick';
@@ -84,6 +86,8 @@ const MOVES: Record<string, DubMove> = {
   echoThrow,
   dubStab,
   filterDrop,
+  hpfRise,
+  madProfPingPong,
   dubSiren,
   springSlam,
   springKick,

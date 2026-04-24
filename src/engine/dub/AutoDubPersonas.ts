@@ -67,24 +67,27 @@ export const AUTO_DUB_PERSONAS: Record<AutoDubPersonaId, AutoDubPersona> = {
   tubby: {
     id: 'tubby',
     label: 'King Tubby',
-    description: 'Echo throws on snares, bass-channel mutes on bar edges, Big-Knob HPF sweeps. Punchy, precise.',
+    description: 'Echo throws on snares, bass-channel mutes on bar edges, Altec Big-Knob HPF sweeps. Punchy, precise.',
     suggestedCharacterPreset: 'tubby',
     intensityDefault: 0.55,
     weights: {
+      hpfRise:        2.0,   // research: Tubby's PRIMARY move — stepping the Altec filter up
       echoThrow:      1.5,
       channelMute:    1.5,
-      filterDrop:     1.4,
+      filterDrop:     1.0,   // secondary — LPF drops less common than HPF rises
       tubbyScream:    1.8,
       snareCrack:     1.3,
       radioRiser:     1.1,
       tapeStop:       0.5,
-      backwardReverb: 0.3,
-      reverseEcho:    0.4,
-      dubSiren:       0.7,
+      backwardReverb: 0.2,
+      reverseEcho:    0.3,
+      dubSiren:       0.6,
       echoBuildUp:    0.8,
+      springKick:     0.4,   // occasional spring kicks, not primary
+      springSlam:     0.5,
     },
     variance: 0.0,
-    signatureMove: 'echoThrow',
+    signatureMove: 'hpfRise',   // updated — this is the Big Knob gesture
   },
 
   scientist: {
@@ -118,48 +121,57 @@ export const AUTO_DUB_PERSONAS: Record<AutoDubPersonaId, AutoDubPersona> = {
   perry: {
     id: 'perry',
     label: 'Lee "Scratch" Perry',
-    description: 'Chaos: reverse echo, siren, backward reverb, offbeat channel throws. High variance.',
+    description: 'Chaos: kickable spring crashes, phaser + reverse echo, room sounds as percussion. High variance.',
     suggestedCharacterPreset: 'perry',
     intensityDefault: 0.7,
     weights: {
-      reverseEcho:    2.0,
-      backwardReverb: 2.0,
-      dubSiren:       1.8,
+      springKick:     2.2,   // research: Perry physically kicked the spring tank — this IS the Perry move
+      springSlam:     1.8,   // spring crashes are Perry's primary texture
+      reverseEcho:    1.8,
+      backwardReverb: 1.6,
+      dubSiren:       1.5,
       channelThrow:   1.5,
       sonarPing:      1.5,
-      tubbyScream:    1.3,
-      echoThrow:      1.0,
+      tubbyScream:    1.1,
+      echoThrow:      0.8,
       tapeStop:       0.5,
-      snareCrack:     0.7,
-      filterDrop:     0.8,
+      snareCrack:     0.9,
+      filterDrop:     0.6,
+      voltageStarve:  0.8,   // tape degradation — Perry's 7.5 ips stacked character
+      ringMod:        0.6,   // metallic room-noise character
     },
     variance: 0.35,
-    signatureMove: 'reverseEcho',
+    signatureMove: 'springKick',  // the definitive Perry gesture
   },
 
   madProfessor: {
     id: 'madProfessor',
     label: 'Mad Professor',
-    description: 'Spacey/polished: long throws, stereo doubler, subtle filter drops, subSwell.',
+    description: 'Hi-fi, wide. Long reverb swells, ghost reverb tails, PCM-70 lushness. Polished, unhurried.',
     suggestedCharacterPreset: 'madProfessor',
     intensityDefault: 0.5,
     weights: {
-      stereoDoubler: 1.8,
+      ghostReverb:    2.0,   // research: Mad Prof's signature — lush long reverb decay
+      madProfPingPong:1.8,  // research: Ariwa SDE-3000 L/R asymmetric stereo
+      stereoDoubler:  1.4,  // secondary width
       subSwell:      1.6,
-      echoThrow:     1.4,
-      springSlam:    1.3,
-      filterDrop:    0.8,
-      echoBuildUp:   1.1,
+      echoBuildUp:   1.4,   // builds toward a dense swell, patient timing
+      echoThrow:     1.2,
+      springSlam:    1.0,
+      filterDrop:    0.7,
       tapeStop:      0.3,
-      tubbyScream:   0.4,
-      reverseEcho:   0.6,
-      dubSiren:      0.5,
+      tubbyScream:   0.3,
+      reverseEcho:   0.5,
+      dubSiren:      0.4,
+      subHarmonic:   1.0,   // sub presence — key Mad Prof texture
     },
     paramOverrides: {
-      echoThrow: { throwBeats: 6, feedbackBoost: 0.1 },
+      echoThrow:   { throwBeats: 6, feedbackBoost: 0.1 },  // long Ariwa echo tail
+      ghostReverb: {},
     },
     variance: 0.05,
-    signatureMove: 'stereoDoubler',
+    signatureMove: 'ghostReverb',  // the defining Mad Professor texture
+    densityBias: 0.3,  // slightly favors dense passages like Scientist, but less extreme
   },
 
   jammy: {
