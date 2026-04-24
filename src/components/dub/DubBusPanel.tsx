@@ -287,6 +287,26 @@ export const DubBusPanel: React.FC = () => {
             }
           />
           <Slider
+            label="Feedback High Pass"
+            value={dubBus.echoFeedbackHpfHz}
+            min={20}
+            max={2000}
+            step={10}
+            onChange={(v) => patch({ echoFeedbackHpfHz: v })}
+            format={(v) => v >= 1000 ? `${(v / 1000).toFixed(1)} kHz` : `${Math.round(v)} Hz`}
+            disabled={dubBus.echoEngine !== 'spaceEcho'}
+          />
+          <Slider
+            label="Feedback Low Pass"
+            value={dubBus.echoFeedbackLpfHz}
+            min={500}
+            max={12000}
+            step={100}
+            onChange={(v) => patch({ echoFeedbackLpfHz: v })}
+            format={(v) => v >= 1000 ? `${(v / 1000).toFixed(1)} kHz` : `${Math.round(v)} Hz`}
+            disabled={dubBus.echoEngine !== 'spaceEcho'}
+          />
+          <Slider
             label="Sidechain duck"
             value={dubBus.sidechainAmount}
             min={0}
