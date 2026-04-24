@@ -26,7 +26,6 @@ import {
 } from '../effects/AelapseEffect';
 import type { DubEchoEngine } from './DubEchoEngine';
 import { createDubEchoEngine } from './DubEchoEngine';
-import { SpaceEchoEffect } from '../effects/SpaceEchoEffect';
 import { VinylNoiseEffect } from '../effects/VinylNoiseEffect';
 import { ToneArmEffect } from '../effects/ToneArmEffect';
 import { MadProfessorPlateEffect } from '../effects/MadProfessorPlateEffect';
@@ -2881,14 +2880,14 @@ export class DubBus {
     this.tapeSatBypass.gain.setTargetAtTime(wantStack ? 0 : 1, now, 0.03);
     this.tapeStackMix.gain.setTargetAtTime(wantStack ? 1 : 0, now, 0.03);
 
-    // SpaceEcho in-feedback filter params — only meaningful when the
-    // active echo engine IS SpaceEcho; other engines silently ignore these.
-    // Smoothed by the setFeedback* methods (50 ms ramp).
-    if (merged.echoFeedbackHpfHz !== undefined && this.echo instanceof SpaceEchoEffect) {
-      (this.echo as SpaceEchoEffect).setFeedbackHpf(merged.echoFeedbackHpfHz);
+    // In-feedback filter params — all engines implement setFeedbackHpf/Lpf
+    // via the DubEchoEngine interface. SpaceEcho and AnotherDelay route to
+    // dedicated biquad nodes; RE-201 and RETapeEcho adapt to their native APIs.
+    if (merged.echoFeedbackHpfHz !== undefined) {
+      try { this.echo.setFeedbackHpf(merged.echoFeedbackHpfHz); } catch { /* ok */ }
     }
-    if (merged.echoFeedbackLpfHz !== undefined && this.echo instanceof SpaceEchoEffect) {
-      (this.echo as SpaceEchoEffect).setFeedbackLpf(merged.echoFeedbackLpfHz);
+    if (merged.echoFeedbackLpfHz !== undefined) {
+      try { this.echo.setFeedbackLpf(merged.echoFeedbackLpfHz); } catch { /* ok */ }
     }
 
     // Plate-stage changes — swap the insert if the type changed, OR
