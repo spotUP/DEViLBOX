@@ -49,13 +49,24 @@ function makeMockBus() {
       log('throwEchoTime', target, down, hold, up)),
     backwardReverb: vi.fn(async (dur: number) => log('backwardReverb', dur)),
     tapeStop: vi.fn((down: number, hold: number) => log('tapeStop', down, hold)),
+    startTapeHold: vi.fn((down: number) => { log('startTapeHold', down); return () => log('startTapeHoldRelease'); }),
     sweepMasterLpf: vi.fn((hz: number, down: number, hold: number) =>
       log('sweepMasterLpf', hz, down, hold)),
     soloChannelTap: vi.fn((ch: number) => {
       log('soloChannelTap', ch);
       return () => log('soloRelease', ch);
     }),
-    inputNode: { context: {} as AudioContext } as unknown as GainNode,
+    inputNode: {
+      context: {
+        createGain: () => ({
+          gain: { value: 0, cancelScheduledValues: () => {}, setValueAtTime: () => {}, linearRampToValueAtTime: () => {} },
+          connect: () => {}, disconnect: () => {},
+        }),
+        currentTime: 0,
+      } as unknown as AudioContext,
+      connect: () => {},
+      disconnect: () => {},
+    } as unknown as GainNode,
   };
   return { bus: bus as unknown as DubBus, calls, mock: bus };
 }
@@ -67,7 +78,7 @@ describe('DubRouter + moves', () => {
   });
 
   describe('move registry surface', () => {
-    it('registers all 15 documented moves', () => {
+    it('registers documented core moves', () => {
       const { bus } = makeMockBus();
       setDubBusForRouter(bus);
       const moves = [
@@ -168,11 +179,12 @@ describe('DubRouter + moves', () => {
       expect(mock.throwEchoTime).toHaveBeenCalledWith(60, 100, 200, 300);
     });
 
-    it('tapeStop delegates to bus.tapeStop', () => {
+    it('tapeStop delegates to bus.startTapeHold (hold move)', () => {
       const { bus, mock } = makeMockBus();
       setDubBusForRouter(bus);
-      fire('tapeStop', undefined, { downSec: 0.5, holdSec: 0.1 });
-      expect(mock.tapeStop).toHaveBeenCalledWith(0.5, 0.1);
+      const result = fire('tapeStop', undefined, { downSec: 0.4 });
+      expect(mock.startTapeHold).toHaveBeenCalledWith(0.4);
+      expect(result).not.toBeNull();
     });
   });
 
