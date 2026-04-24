@@ -29,6 +29,7 @@ import { launchBrowser, type BrowserHandle } from './browser';
 
 const FIXTURE_DIR = resolve(dirname(fileURLToPath(import.meta.url)), '../../src/__tests__/fixtures');
 const FIXTURE_MOD = resolve(FIXTURE_DIR, 'mortimer-twang-2118bytes.mod');
+const FIXTURE_DUB = resolve(FIXTURE_DIR, 'dub-test-fixture.mod');
 
 const FLOW_TIMEOUT_MS = 60000;
 
@@ -525,10 +526,17 @@ describe('ui-smoke — flow 12: Auto Dub runs clean (no biquad blowup, no stuck 
       try { await c.call('stop'); } catch { /* ok */ }
       await sleep(200);
       await c.call('clear_console_errors');
+      await c.call('clear_auto_dub_fire_log');
 
-      // Load the committed MOD fixture — enough pattern depth for the
-      // Auto Dub tick loop to fire bar-phase moves across a few bars.
-      const payload = loadFixtureBase64(FIXTURE_MOD);
+      // Load the richer dub-test fixture (bass / kick / snare / lead channels)
+      // so the role classifier returns non-empty roles and role-targeted moves
+      // (channelMute on bass, echoThrow + snareCrack on percussion) are
+      // eligible. Regression for 2026-04-24 bug: getCurrentPatternBundle() was
+      // using transport.currentPatternIndex (always 0 on libopenmpt songs) as
+      // the look-ahead pattern; sparse pattern 0 meant channelHasNoteInWindow
+      // returned false for all channels → all role-targeted rules silently
+      // skipped. Fix: use richest pattern (max total notes) for look-ahead.
+      const payload = loadFixtureBase64(FIXTURE_DUB);
       await c.call('load_file', { filename: payload.filename, data: payload.data });
       await sleep(400);
 
@@ -540,13 +548,12 @@ describe('ui-smoke — flow 12: Auto Dub runs clean (no biquad blowup, no stuck 
 
       // Apply Tubby bus voicing explicitly (since 2026-04-21 persona pick
       // no longer auto-applies voice — see AutoDubPanel.contract.test.ts).
-      // Without this, moves still fire but not the Tubby-flavored ones.
       await c.call('set_dub_bus_settings', { settings: { characterPreset: 'tubby' } });
       await sleep(100);
 
-      // Enable Auto Dub with Tubby persona + high-ish intensity so moves
-      // fire densely enough that a 10 s window surely sees a tubbyScream.
-      await c.call('set_auto_dub_config', { enabled: true, persona: 'tubby', intensity: 0.75 });
+      // High intensity so the tick roll passes often enough that role-targeted
+      // moves are virtually guaranteed to fire within the 15 s window.
+      await c.call('set_auto_dub_config', { enabled: true, persona: 'tubby', intensity: 1.0 });
       await sleep(150);
 
       const stateOn = await c.call<{ enabled?: boolean; persona?: string; isRunning?: boolean }>('get_auto_dub_state');
@@ -554,21 +561,42 @@ describe('ui-smoke — flow 12: Auto Dub runs clean (no biquad blowup, no stuck 
       expect(stateOn.persona, 'persona should stick as tubby').toBe('tubby');
       expect(stateOn.isRunning, 'tick loop should be live when enabled+busEnabled').toBe(true);
 
-      // Play + run the tick loop through at least 4 bars at 125 BPM (~7.6 s).
+      // Play for 15 s — at 125 BPM that is ~7 full bars.
+      // channelMute fires on odd bars (bars 1,3,5): 3 opportunities × 30% roll.
+      // snareCrack fires in a window each bar: many opportunities.
+      // channelThrow fires on even-bar offbeats: several opportunities.
+      // Combined P(at least one role-targeted move fires) > 0.99 in 15 s.
       await c.call('play');
-      await sleep(10_000);
+      await sleep(15_000);
+
+      // --- Role-targeted move assertion ---
+      // The move IDs listed here all require role data (channelRole set in the
+      // RULES table). If ANY of them fired, the look-ahead + role pipeline is
+      // working end-to-end. Pre-fix, none of these ever fired on libopenmpt
+      // songs because channelHasNoteInWindow always returned false for the
+      // sparse pattern 0.
+      const ROLE_TARGETED: string[] = [
+        'channelMute', 'echoThrow', 'snareCrack', 'channelThrow',
+        'springKick', 'sonarPing',
+      ];
+      const fireLogRes = await c.call<{ moves?: string[] }>('get_auto_dub_fire_log');
+      const fired = new Set(fireLogRes.moves ?? []);
+      const roleTargetedFired = ROLE_TARGETED.filter(m => fired.has(m));
+      expect(
+        roleTargetedFired.length,
+        `At least one role-targeted move must fire in 15 s. ` +
+        `Fired moves: ${[...fired].join(', ') || '(none)'}`
+      ).toBeGreaterThan(0);
 
       // --- Error surface checks ---
       const errs = await c.call<{ entries?: Array<{ level: string; message: string }> }>('get_console_errors');
       const entries = errs.entries ?? [];
 
-      // (1) No BiquadFilterNode instability. This was 100% correlated with
-      //     every tubbyScream fire pre-fix. Post-fix expected count: 0.
+      // (1) No BiquadFilterNode instability.
       const biquad = entries.filter((e) => /BiquadFilterNode: state is bad/.test(e.message));
       expect(biquad.length, `tubbyScream must NOT reinstate biquad instability: ${JSON.stringify(biquad.slice(0, 3))}`).toBe(0);
 
-      // (2) No "unknown moveId" / "no bus registered" from DubRouter — those
-      //     fire if a move name is wrong or the bus dropped out mid-tick.
+      // (2) No "unknown moveId" / "no bus registered" from DubRouter.
       const routerNoise = entries.filter((e) =>
         /\[DubRouter\].*(unknown moveId|no bus registered)/.test(e.message),
       );
@@ -582,13 +610,13 @@ describe('ui-smoke — flow 12: Auto Dub runs clean (no biquad blowup, no stuck 
 
       // --- Toggle-off + drain ---
       await c.call('set_auto_dub_config', { enabled: false });
-      await sleep(1500);  // mini-drain is 1.1 s; give 400 ms margin
+      await sleep(1500);
 
       const stateOff = await c.call<{ enabled?: boolean; isRunning?: boolean }>('get_auto_dub_state');
       expect(stateOff.enabled, 'toggle-off flips store').toBe(false);
       expect(stateOff.isRunning, 'tick loop disposes on toggle-off').toBe(false);
 
-      // Cleanup so follow-up flows start from neutral state.
+      // Cleanup.
       await c.call('stop');
       await c.call('set_dub_bus_enabled', { enabled: false });
     },
