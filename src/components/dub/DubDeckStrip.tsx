@@ -431,6 +431,13 @@ export const DubDeckStrip: React.FC = () => {
   // (bus-audio modifiers) can only make sound when at least one channel
   // is feeding the bus. Used to dim the processor row + show a hint.
   const anySend = channels.slice(0, visibleChannelCount).some(c => (c?.dubSend ?? 0) > 0);
+
+  // Master send value — the max of all visible channel sends. Used as
+  // the display/control value for the master fader.
+  const masterSendValue = Math.max(
+    0,
+    ...channels.slice(0, visibleChannelCount).map(c => c?.dubSend ?? 0),
+  );
   // Previously auto-seeded every channel's dubSend to 0.4 on bus-enable
   // for instant gratification. Removed — it turned "enable bus" into
   // "everything gets bathed in echo+spring" which drowned master insert
@@ -818,6 +825,65 @@ export const DubDeckStrip: React.FC = () => {
           fader → send % readout. Horizontal scroll if the pattern has
           more channels than fit. */}
       <div className="flex items-end gap-2 overflow-x-auto pt-1.5">
+        {/* Master send — scales all channel sends at once */}
+        <div
+          className={
+            'flex flex-col items-center gap-1.5 px-2 py-1.5 rounded border min-w-[64px] shrink-0 ' +
+            'bg-dark-bgSecondary border-accent-primary/40'
+          }
+        >
+          <span className="text-xs font-bold text-accent-primary leading-none">MASTER</span>
+          <button
+            className={
+              'px-2 py-1 rounded border w-full text-xs font-bold transition-all duration-150 ' +
+              'bg-dark-bgTertiary border-dark-borderLight text-text-primary hover:border-accent-primary'
+            }
+            onClick={() => {
+              // Set all visible channels to max send
+              for (let i = 0; i < visibleChannelCount; i++) {
+                setChannelDubSend(i, 1.0);
+              }
+            }}
+            title="Set all channel sends to 100%"
+            disabled={!busEnabled}
+          >
+            ALL
+          </button>
+          <button
+            className={
+              'px-2 py-1 rounded border w-full text-xs font-bold transition-all duration-150 ' +
+              'bg-dark-bgTertiary border-dark-borderLight text-text-muted hover:text-text-primary hover:border-accent-error'
+            }
+            onClick={() => {
+              // Zero all visible channel sends
+              for (let i = 0; i < visibleChannelCount; i++) {
+                setChannelDubSend(i, 0);
+              }
+            }}
+            title="Zero all channel sends"
+            disabled={!busEnabled}
+          >
+            NONE
+          </button>
+          <Fader
+            value={masterSendValue}
+            size="md"
+            color="accent-primary"
+            onChange={(v) => {
+              for (let i = 0; i < visibleChannelCount; i++) {
+                setChannelDubSend(i, v);
+              }
+            }}
+            title={`Master dub send — ${Math.round(masterSendValue * 100)}%. Sets all channel sends simultaneously.`}
+            disabled={!busEnabled}
+            doubleClickValue={1}
+          />
+          <span className="text-xs font-mono text-accent-primary leading-none">
+            {Math.round(masterSendValue * 100)}%
+          </span>
+        </div>
+        {/* Separator */}
+        <div className="w-px h-32 bg-dark-border shrink-0 self-center" />
         {Array.from({ length: visibleChannelCount }, (_, i) => {
           const ch = channels[i];
           const dubSend = ch?.dubSend ?? 0;
