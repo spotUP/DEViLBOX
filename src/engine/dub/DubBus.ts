@@ -1047,6 +1047,7 @@ export class DubBus {
   // would only lift the wet portion (~35 % of the audible signal) and
   // feel subtle. Here we insert between `masterEffectsInput` and `blepInput`
   // so the dry + wet sum gets shaped.
+  private masterHpf!: BiquadFilterNode;       // full-mix HPF — swept by hpfRise so Rise is audible on dry mix
   private masterBassShelf!: BiquadFilterNode;
   private masterMidScoop!: BiquadFilterNode;
   private masterLpf!: BiquadFilterNode;
@@ -1282,6 +1283,10 @@ export class DubBus {
     // Identical filter types to bus-level, but operates on the full master
     // signal. Starts flat (gain 0) and only becomes audible once the bus
     // is enabled AND the user's TONE settings are non-neutral.
+    this.masterHpf = this.context.createBiquadFilter();
+    this.masterHpf.type = 'highpass';
+    this.masterHpf.frequency.value = initialHpfFreq;  // tracks hpfCutoff; swept by startHpfRise
+    this.masterHpf.Q.value = 0.5;  // Butterworth — no resonance on the full mix
     this.masterBassShelf = this.context.createBiquadFilter();
     this.masterBassShelf.type = 'lowshelf';
     this.masterBassShelf.frequency.value = this.settings.bassShelfFreqHz;
@@ -1422,7 +1427,8 @@ export class DubBus {
     // destination node when wireMasterInsert runs.
     this.vinylDirect = this.context.createGain();
     this.vinylDirect.gain.value = 1;
-    this.masterInsertHead = this.masterBassShelf;
+    this.masterHpf.connect(this.masterBassShelf);
+    this.masterInsertHead = this.masterHpf;
     // G15: insert the envelope gain between vinylSum (chain tail) and the
     // destination that wireMasterInsert will connect to. Steady-state gain
     // is 1 (full passthrough); ramped to 0 around (dis)connection events
@@ -2705,6 +2711,7 @@ export class DubBus {
       rampBiquadParam(this.hpf2.frequency, hz, now);
       rampBiquadParam(this.hpf3.frequency, hz, now);
       rampBiquadParam(this.hpfResonance.frequency, hz, now);
+      rampBiquadParam(this.masterHpf.frequency, hz, now);  // full-mix HPF for audibility
     };
 
     if (this.settings.hpfStepped) {
@@ -2752,6 +2759,7 @@ export class DubBus {
       rampBiquadParam(this.hpf2.frequency, targetHz, now, 0.4);
       rampBiquadParam(this.hpf3.frequency, targetHz, now, 0.4);
       rampBiquadParam(this.hpfResonance.frequency, targetHz, now, 0.4);
+      rampBiquadParam(this.masterHpf.frequency, targetHz, now, 0.4);
       // Resonance gain boost at peak — same as stepped mode.
       const peakTimer = setTimeout(() => {
         timers.splice(timers.indexOf(peakTimer), 1);
@@ -2765,6 +2773,7 @@ export class DubBus {
         rampBiquadParam(this.hpf2.frequency, originHz, n, 0.6);
         rampBiquadParam(this.hpf3.frequency, originHz, n, 0.6);
         rampBiquadParam(this.hpfResonance.frequency, originHz, n, 0.6);
+        rampBiquadParam(this.masterHpf.frequency, originHz, n, 0.6);
         rampBiquadParam(this.hpfResonance.gain, baseDb, n, 0.15);
       }, 400 + holdMs);
       timers.push(restoreTimer);
@@ -2907,6 +2916,8 @@ export class DubBus {
     // Resonance node tracks the same frequency so the peak follows the sweep.
     rampBiquadParam(this.hpfResonance.frequency, hpfFreq, now);
     rampBiquadParam(this.hpfResonance.gain, merged.hpfResonanceDb ?? 0, now);
+    // Master insert HPF tracks the same cutoff — makes Rise audible on the dry mix.
+    rampBiquadParam(this.masterHpf.frequency, hpfFreq, now);
     // Guard: skip return_.gain write when a mute hold is active (swap
     // or warmup). A re-entrant setSettings call (PadGrid mirror, DJ sync)
     // would insert a setTargetAtTime event that defeats the warmup hold,
