@@ -93,21 +93,22 @@ const GLOBAL_MOVES: Array<GlobalMove> = [
 // we can't build class names dynamically with string concatenation.
 const colorClasses = (token: string, active: boolean) => {
   const base = 'px-2.5 py-1 rounded border text-xs font-bold transition-all duration-150 ';
+  const idle = 'bg-dark-bgTertiary border-dark-borderLight text-text-secondary ';
   switch (token) {
-    case 'accent-primary':      return base + (active ? 'bg-accent-primary text-text-inverse border-accent-primary shadow-[0_0_6px_var(--color-accent-primary)]' : 'bg-dark-bgTertiary border-dark-border text-text-muted hover:border-accent-primary hover:text-accent-primary');
-    case 'accent-primary/70':   return base + (active ? 'bg-accent-primary/70 text-text-inverse border-accent-primary/70' : 'bg-dark-bgTertiary border-dark-border text-text-muted hover:border-accent-primary/70 hover:text-accent-primary');
-    case 'accent-secondary':    return base + (active ? 'bg-accent-secondary text-text-inverse border-accent-secondary' : 'bg-dark-bgTertiary border-dark-border text-text-muted hover:border-accent-secondary hover:text-accent-secondary');
-    case 'accent-secondary/70': return base + (active ? 'bg-accent-secondary/70 text-text-inverse border-accent-secondary/70' : 'bg-dark-bgTertiary border-dark-border text-text-muted hover:border-accent-secondary/70 hover:text-accent-secondary');
-    case 'accent-highlight':    return base + (active ? 'bg-accent-highlight text-text-inverse border-accent-highlight' : 'bg-dark-bgTertiary border-dark-border text-text-muted hover:border-accent-highlight hover:text-accent-highlight');
-    case 'accent-highlight/70': return base + (active ? 'bg-accent-highlight/70 text-text-inverse border-accent-highlight/70' : 'bg-dark-bgTertiary border-dark-border text-text-muted hover:border-accent-highlight/70 hover:text-accent-highlight');
-    case 'accent-warning':      return base + (active ? 'bg-accent-warning text-text-inverse border-accent-warning' : 'bg-dark-bgTertiary border-dark-border text-text-muted hover:border-accent-warning hover:text-accent-warning');
-    case 'accent-warning/70':   return base + (active ? 'bg-accent-warning/70 text-text-inverse border-accent-warning/70' : 'bg-dark-bgTertiary border-dark-border text-text-muted hover:border-accent-warning/70 hover:text-accent-warning');
-    case 'accent-error':        return base + (active ? 'bg-accent-error text-text-inverse border-accent-error' : 'bg-dark-bgTertiary border-dark-border text-text-muted hover:border-accent-error hover:text-accent-error');
-    case 'accent-error/70':     return base + (active ? 'bg-accent-error/70 text-text-inverse border-accent-error/70' : 'bg-dark-bgTertiary border-dark-border text-text-muted hover:border-accent-error/70 hover:text-accent-error');
-    case 'accent-success':      return base + (active ? 'bg-accent-success text-text-inverse border-accent-success' : 'bg-dark-bgTertiary border-dark-border text-text-muted hover:border-accent-success hover:text-accent-success');
-    case 'accent-success/70':   return base + (active ? 'bg-accent-success/70 text-text-inverse border-accent-success/70' : 'bg-dark-bgTertiary border-dark-border text-text-muted hover:border-accent-success/70 hover:text-accent-success');
-    case 'text-primary':        return base + (active ? 'bg-text-primary text-dark-bg border-text-primary' : 'bg-dark-bgTertiary border-dark-border text-text-muted hover:border-text-primary hover:text-text-primary');
-    default:                    return base + 'bg-dark-bgTertiary border-dark-border text-text-muted';
+    case 'accent-primary':      return base + (active ? 'bg-accent-primary text-text-inverse border-accent-primary shadow-[0_0_6px_var(--color-accent-primary)]' : idle + 'hover:border-accent-primary hover:text-accent-primary');
+    case 'accent-primary/70':   return base + (active ? 'bg-accent-primary/70 text-text-inverse border-accent-primary/70' : idle + 'hover:border-accent-primary/70 hover:text-accent-primary');
+    case 'accent-secondary':    return base + (active ? 'bg-accent-secondary text-text-inverse border-accent-secondary' : idle + 'hover:border-accent-secondary hover:text-accent-secondary');
+    case 'accent-secondary/70': return base + (active ? 'bg-accent-secondary/70 text-text-inverse border-accent-secondary/70' : idle + 'hover:border-accent-secondary/70 hover:text-accent-secondary');
+    case 'accent-highlight':    return base + (active ? 'bg-accent-highlight text-text-inverse border-accent-highlight' : idle + 'hover:border-accent-highlight hover:text-accent-highlight');
+    case 'accent-highlight/70': return base + (active ? 'bg-accent-highlight/70 text-text-inverse border-accent-highlight/70' : idle + 'hover:border-accent-highlight/70 hover:text-accent-highlight');
+    case 'accent-warning':      return base + (active ? 'bg-accent-warning text-text-inverse border-accent-warning' : idle + 'hover:border-accent-warning hover:text-accent-warning');
+    case 'accent-warning/70':   return base + (active ? 'bg-accent-warning/70 text-text-inverse border-accent-warning/70' : idle + 'hover:border-accent-warning/70 hover:text-accent-warning');
+    case 'accent-error':        return base + (active ? 'bg-accent-error text-text-inverse border-accent-error' : idle + 'hover:border-accent-error hover:text-accent-error');
+    case 'accent-error/70':     return base + (active ? 'bg-accent-error/70 text-text-inverse border-accent-error/70' : idle + 'hover:border-accent-error/70 hover:text-accent-error');
+    case 'accent-success':      return base + (active ? 'bg-accent-success text-text-inverse border-accent-success' : idle + 'hover:border-accent-success hover:text-accent-success');
+    case 'accent-success/70':   return base + (active ? 'bg-accent-success/70 text-text-inverse border-accent-success/70' : idle + 'hover:border-accent-success/70 hover:text-accent-success');
+    case 'text-primary':        return base + (active ? 'bg-text-primary text-dark-bg border-text-primary' : idle + 'hover:border-text-primary hover:text-text-primary');
+    default:                    return base + idle;
   }
 };
 
@@ -561,7 +562,7 @@ export const DubDeckStrip: React.FC = () => {
             'px-2.5 py-1 rounded border transition-colors ' +
             (busEnabled
               ? 'bg-accent-primary/10 border-accent-primary text-accent-primary'
-              : 'bg-dark-bgTertiary border-dark-border text-text-muted hover:text-text-primary')
+              : 'bg-dark-bgTertiary border-dark-borderLight text-text-secondary hover:text-text-primary')
           }
           onClick={() => setDubBus({ enabled: !busEnabled })}
           title={busEnabled ? 'Dub Bus ON — click to disable' : 'Dub Bus OFF — click to enable'}
@@ -573,7 +574,7 @@ export const DubDeckStrip: React.FC = () => {
             'px-2.5 py-1 rounded border transition-colors ' +
             (armed
               ? `bg-accent-error/20 border-accent-error text-accent-error ${capturedRecently ? 'animate-pulse' : ''}`
-              : 'bg-dark-bgTertiary border-dark-border text-text-muted hover:text-text-primary')
+              : 'bg-dark-bgTertiary border-dark-borderLight text-text-secondary hover:text-text-primary')
           }
           onClick={() => setArmed(!armed)}
           title={armed ? 'Recording — live moves capture to the lane' : 'Click to arm recording'}
@@ -635,7 +636,7 @@ export const DubDeckStrip: React.FC = () => {
             'px-2.5 py-1 rounded border transition-colors ' +
             (ghostBus
               ? 'bg-accent-highlight/20 border-accent-highlight text-accent-highlight'
-              : 'bg-dark-bgTertiary border-dark-border text-text-muted hover:text-text-primary')
+              : 'bg-dark-bgTertiary border-dark-borderLight text-text-secondary hover:text-text-primary')
           }
           onClick={() => setGhostBus(!ghostBus)}
           title={ghostBus ? 'Bus Bleed ON — every channel bleeds through the dub return at -36 dB, even when muted in main' : 'Bus Bleed — parallel -36 dB bleed so muted channels stay faintly audible through the dub return'}
@@ -648,7 +649,7 @@ export const DubDeckStrip: React.FC = () => {
             'px-2.5 py-1 rounded border transition-colors ' +
             (masterChorus
               ? 'bg-accent-secondary/20 border-accent-secondary text-accent-secondary'
-              : 'bg-dark-bgTertiary border-dark-border text-text-muted hover:text-text-primary')
+              : 'bg-dark-bgTertiary border-dark-borderLight text-text-secondary hover:text-text-primary')
           }
           onClick={() => setMasterChorus(!masterChorus)}
           title={masterChorus ? 'Master Chorus ON — dub finisher smear on the whole output' : 'Master Chorus OFF — enable for a smooth trippy polish on the full mix'}
@@ -661,7 +662,7 @@ export const DubDeckStrip: React.FC = () => {
             'px-2.5 py-1 rounded border transition-colors ' +
             (clubSim
               ? 'bg-accent-warning/20 border-accent-warning text-accent-warning'
-              : 'bg-dark-bgTertiary border-dark-border text-text-muted hover:text-text-primary')
+              : 'bg-dark-bgTertiary border-dark-borderLight text-text-secondary hover:text-text-primary')
           }
           onClick={() => setClubSim(!clubSim)}
           title={clubSim ? 'Club Simulator ON — 350 ms convolution IR on the master (audition how the mix lands in a venue)' : 'Club Simulator — add a small-room impulse response as master insert for venue-check'}
@@ -674,7 +675,7 @@ export const DubDeckStrip: React.FC = () => {
             'px-2.5 py-1 rounded border transition-colors ' +
             (quantize
               ? 'bg-accent-primary/20 border-accent-primary text-accent-primary'
-              : 'bg-dark-bgTertiary border-dark-border text-text-muted hover:text-text-primary')
+              : 'bg-dark-bgTertiary border-dark-borderLight text-text-secondary hover:text-text-primary')
           }
           onClick={() => setQuantize(!quantize)}
           title={quantize ? 'Quantize ON — dub move timings snap to nearest row for cleaner lane recordings' : 'Quantize OFF — moves record at exact timing (free-form)'}
@@ -687,7 +688,7 @@ export const DubDeckStrip: React.FC = () => {
             'px-2.5 py-1 rounded border transition-colors ' +
             (chainOrder !== 'echoSpring'
               ? 'bg-accent-secondary/20 border-accent-secondary text-accent-secondary'
-              : 'bg-dark-bgTertiary border-dark-border text-text-muted hover:text-text-primary')
+              : 'bg-dark-bgTertiary border-dark-borderLight text-text-secondary hover:text-text-primary')
           }
           onClick={() => {
             const next = chainOrder === 'echoSpring' ? 'springEcho' : chainOrder === 'springEcho' ? 'parallel' : 'echoSpring';
@@ -912,7 +913,7 @@ export const DubDeckStrip: React.FC = () => {
               'px-2 py-1 rounded border w-full text-[9px] font-bold transition-all duration-150 ' +
               (anySend
                 ? 'bg-accent-primary/20 border-accent-primary text-accent-primary hover:bg-accent-error/20 hover:border-accent-error hover:text-accent-error'
-                : 'bg-dark-bgTertiary border-dark-borderLight text-text-muted hover:text-text-primary hover:border-accent-primary')
+                : 'bg-dark-bgTertiary border-dark-borderLight text-text-secondary hover:text-text-primary hover:border-accent-primary')
             }
             onClick={() => {
               if (anySend) {
@@ -1004,7 +1005,7 @@ export const DubDeckStrip: React.FC = () => {
                       ? 'bg-accent-highlight/30 border-accent-highlight text-accent-highlight'
                       : hasDubSend
                         ? 'bg-dark-bgTertiary border-dark-borderLight text-text-primary hover:border-accent-primary'
-                        : 'bg-dark-bgTertiary border-dark-border text-text-muted hover:text-text-primary')
+                        : 'bg-dark-bgTertiary border-dark-borderLight text-text-secondary hover:text-text-primary')
                 }
                 onClick={() => toggleHold(i)}
                 title={`Ch ${i + 1}${ch ? ' · ' + ch.name : ''} — click to ${isHeld ? 'STOP' : 'START'} sustained dubbing. Multiple channels can dub simultaneously.`}
