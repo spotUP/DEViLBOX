@@ -81,6 +81,7 @@ export class RE201Effect extends Tone.ToneAudioNode {
     this.dryGain.connect(this.output);
     this.wetGain.connect(this.output);
 
+    console.log(`[RE201] constructor | mode=${this._options.delayMode} rate=${this._options.repeatRate.toFixed(3)} intensity=${this._options.intensity.toFixed(3)} echoVol=${this._options.echoVolume.toFixed(3)} reverbVol=${this._options.reverbVolume.toFixed(3)} wet=${this._options.wet.toFixed(3)}`);
     this.initFallback();
     this.initWasm();
   }
@@ -121,6 +122,7 @@ export class RE201Effect extends Tone.ToneAudioNode {
       this.fallbackFeedback.connect(this.fallbackDelay);
 
       this._usingFallback = true;
+      console.log(`[RE201] fallback init OK | delay=${this.rateToDelaySec().toFixed(3)}s feedback=${(this._options.intensity * 0.85).toFixed(3)}`);
     } catch (err) {
       console.warn('[RE201] JS fallback init failed:', err);
       try { this.input.connect(this.wetGain); } catch { /* ignored */ }
@@ -146,17 +148,10 @@ export class RE201Effect extends Tone.ToneAudioNode {
       const rawWet = getNativeAudioNode(this.wetGain);
 
       if (!rawInput || !rawWet) {
-        console.warn('[RE201] Cannot swap to WASM — native node access failed');
+        console.warn('[RE201] Cannot swap to WASM — native node access failed | rawInput=', !!rawInput, 'rawWet=', !!rawWet);
         return;
       }
 
-      /* Tear down the fallback FIRST so the wet summing node isn't driven
-         by two recursive paths simultaneously (fallback delay loop + WASM
-         worklet). Double-driving the wet bus during the overlap window
-         produced a brief transient that upstream biquads (in DubBus'
-         feedback-loop chain) interpreted as "state is bad" and latched to
-         NaN — permanently killing the dub bus. Silence during the
-         handover is bounded to one processing block. */
       this.disconnectFallback();
 
       rawInput.connect(this.workletNode);
@@ -166,6 +161,7 @@ export class RE201Effect extends Tone.ToneAudioNode {
       keepalive.gain.value = 0;
       this.workletNode.connect(keepalive);
       keepalive.connect(rawContext.destination);
+      console.log('[RE201] WASM swap complete — worklet connected');
     } catch (err) {
       console.warn('[RE201] WASM swap failed, staying on fallback:', err);
     }
@@ -189,6 +185,7 @@ export class RE201Effect extends Tone.ToneAudioNode {
       this.workletNode.port.onmessage = (event) => {
         if (event.data.type === 'ready') {
           this._wasmReady = true;
+          console.log('[RE201] WASM ready — sending params and swapping');
           this.sendParam('bass', this._options.bass);
           this.sendParam('treble', this._options.treble);
           this.sendParam('delayMode', this._options.delayMode);
