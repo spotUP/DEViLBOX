@@ -739,6 +739,20 @@ describe('ui-smoke — flow 09: dub bus silences cleanly after stop + disable', 
         } catch { /* move not registered — skip */ }
       }
 
+      // Assert the bus is producing audio while moves are active.
+      // This catches the look-ahead regression (2026-04-24) where role-targeted
+      // moves were silently blocked, producing a valid-looking test that passed
+      // even though nothing fired. The generator moves (dubSiren, oscBass,
+      // crushBass, radioRiser) should be ringing through the bus right now.
+      const duringLevel = await c.call<{
+        rmsAvg?: number; peakMax?: number; isSilent?: boolean;
+      }>('get_audio_level', { durationMs: 400 });
+      const duringRms = (duringLevel.rmsAvg ?? 0) + (duringLevel.peakMax ?? 0);
+      expect(
+        duringRms,
+        `dub moves must produce audio while held — rms+peak: ${JSON.stringify(duringLevel)}`,
+      ).toBeGreaterThan(0.001);
+
       // Stop the song AND disable the bus — this is what a user does
       // when they want the session silent ("stop + hit KILL").
       try { await c.call('stop'); } catch { /* ok */ }
