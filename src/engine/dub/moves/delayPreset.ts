@@ -1,101 +1,67 @@
 /**
  * delayPreset380 / delayPresetDotted / delayPresetQuarter / delayPreset8th /
- * delayPresetTriplet / delayPreset16th / delayPresetDoubler — one-shot moves
- * that snap the echo rate to a canonical dub setting.
+ * delayPresetTriplet / delayPreset16th / delayPresetDoubler — toggle moves
+ * that snap the echo rate to a canonical dub timing.
  *
- * - 380 ms — the "Tubby / Perry chord delay" that pops up everywhere in
- *   the research. Use for vocal chops and chord stabs: a single throw
- *   lands into a familiar-feeling echo rhythm regardless of host BPM.
- * - Dotted 3/8 — 1.5-beat delay, research-quoted as "very typical".
- *   BPM-synced: computed from transport BPM at fire time so it always
- *   lines up with the track.
- * - Quarter — 1 beat. Standard on-beat echo.
- * - 8th — half beat. Double-time echo.
- * - Triplet — 2/3 beat. Swing-feel echo that creates a galloping rhythm.
- * - 16th — quarter beat. Machine-gun echo, dense.
- * - Doubler — 25ms. Not an echo at all — doubles the source like a
- *   short slapback. Techniken Defunkus technique from the Dubroom.
+ * Toggle (hold) semantics:
+ *   - Activate: captures the current echo rate, applies the preset rate.
+ *   - Deactivate (dispose): restores the captured rate.
  *
- * Triggers; no dispose. The rate persists until the user (or another
- * move) changes it.
+ * This lets the DubDeckStrip implement mutual exclusion: clicking one rate
+ * deactivates the previous one (restoring the original rate) before the new
+ * one activates. The performer gets a radio-button feel — only one rate is
+ * "on" at a time, and toggling it off reverts to the original setting.
+ *
+ * - 380 ms  — King Tubby / Lee Perry chord delay
+ * - Dotted  — 1.5-beat delay (very typical in classic dub)
+ * - 1/4     — quarter note (on-beat echo)
+ * - 1/8     — 8th note (double-time)
+ * - Triplet — 2/3 beat (swing/gallop feel)
+ * - 1/16    — 16th note (dense machine-gun echo)
+ * - Doubler — 25ms slapback (beat doubling, not a true echo)
  */
 
 import type { DubMove } from './_types';
 
+function rateToggle(getMs: (bpm: number) => number): DubMove['execute'] {
+  return ({ bus, bpm }) => {
+    const prev = bus.getEchoRateMs();
+    bus.setEchoRate(getMs(bpm));
+    return { dispose: () => bus.setEchoRate(prev) };
+  };
+}
+
 export const delayPreset380: DubMove = {
-  id: 'delayPreset380',
-  kind: 'trigger',
-  defaults: {},
-  execute({ bus }) {
-    bus.setEchoRate(380);
-    return null;
-  },
+  id: 'delayPreset380', kind: 'hold', defaults: {},
+  execute: rateToggle(() => 380),
 };
 
 export const delayPresetDotted: DubMove = {
-  id: 'delayPresetDotted',
-  kind: 'trigger',
-  defaults: {},
-  execute({ bus, bpm }) {
-    // Dotted 8th = 1.5 × quarter-note = 1.5 × (60 / bpm) seconds.
-    const ms = (60_000 / Math.max(30, bpm)) * 1.5;
-    bus.setEchoRate(ms);
-    return null;
-  },
+  id: 'delayPresetDotted', kind: 'hold', defaults: {},
+  execute: rateToggle((bpm) => (60_000 / Math.max(30, bpm)) * 1.5),
 };
 
 export const delayPresetQuarter: DubMove = {
-  id: 'delayPresetQuarter',
-  kind: 'trigger',
-  defaults: {},
-  execute({ bus, bpm }) {
-    const ms = 60_000 / Math.max(30, bpm);
-    bus.setEchoRate(ms);
-    return null;
-  },
+  id: 'delayPresetQuarter', kind: 'hold', defaults: {},
+  execute: rateToggle((bpm) => 60_000 / Math.max(30, bpm)),
 };
 
 export const delayPreset8th: DubMove = {
-  id: 'delayPreset8th',
-  kind: 'trigger',
-  defaults: {},
-  execute({ bus, bpm }) {
-    const ms = 30_000 / Math.max(30, bpm);
-    bus.setEchoRate(ms);
-    return null;
-  },
+  id: 'delayPreset8th', kind: 'hold', defaults: {},
+  execute: rateToggle((bpm) => 30_000 / Math.max(30, bpm)),
 };
 
 export const delayPresetTriplet: DubMove = {
-  id: 'delayPresetTriplet',
-  kind: 'trigger',
-  defaults: {},
-  execute({ bus, bpm }) {
-    // Triplet quarter = 2/3 of a beat
-    const ms = (60_000 / Math.max(30, bpm)) * (2 / 3);
-    bus.setEchoRate(ms);
-    return null;
-  },
+  id: 'delayPresetTriplet', kind: 'hold', defaults: {},
+  execute: rateToggle((bpm) => (60_000 / Math.max(30, bpm)) * (2 / 3)),
 };
 
 export const delayPreset16th: DubMove = {
-  id: 'delayPreset16th',
-  kind: 'trigger',
-  defaults: {},
-  execute({ bus, bpm }) {
-    const ms = 15_000 / Math.max(30, bpm);
-    bus.setEchoRate(ms);
-    return null;
-  },
+  id: 'delayPreset16th', kind: 'hold', defaults: {},
+  execute: rateToggle((bpm) => 15_000 / Math.max(30, bpm)),
 };
 
 export const delayPresetDoubler: DubMove = {
-  id: 'delayPresetDoubler',
-  kind: 'trigger',
-  defaults: {},
-  execute({ bus }) {
-    // 25ms slapback — beat doubling, not an echo
-    bus.setEchoRate(25);
-    return null;
-  },
+  id: 'delayPresetDoubler', kind: 'hold', defaults: {},
+  execute: rateToggle(() => 25),
 };
