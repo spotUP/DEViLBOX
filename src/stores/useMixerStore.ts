@@ -697,6 +697,7 @@ interface MixerStoreActions {
 
   // Reset mute/solo state (called on song load)
   resetMuteState: () => void;
+  reapplyAllMutes: () => void;
 }
 
 type MixerStore = MixerStoreState & MixerStoreActions;
@@ -797,6 +798,18 @@ export const useMixerStore = create<MixerStore>()(
       forwardAllWasmChannelGains(channels, isSoloing);
       forwardReplayerMuteMask(channels, isSoloing);
       syncMuteToPatternChannels();
+    },
+
+    reapplyAllMutes(): void {
+      const { channels, isSoloing } = get();
+      applyToEngine(() => {
+        channels.forEach((c, i) => {
+          const effectiveMute = isSoloing ? !c.soloed : c.muted;
+          try { getToneEngine().setChannelMute(i, effectiveMute); } catch { /* ok */ }
+        });
+      });
+      forwardAllWasmChannelGains(channels, isSoloing);
+      forwardReplayerMuteMask(channels, isSoloing);
     },
 
     setChannelEffect(ch: number, slot: 0 | 1, type: string | null): void {
