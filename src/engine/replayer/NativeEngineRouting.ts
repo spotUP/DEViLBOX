@@ -949,21 +949,10 @@ export async function startNativeEngines(
         console.log(`[NativeEngineRouting] ${desc.key} loaded & playing`);
 
         // Capture HivelyEngine for position sync in TrackerReplayer.
-        // AHX/HVL are SID-adjacent (4-voice chip with SID-like timbres) —
-        // enable SID dub mode so they get the real GoatTracker/SID dub
-        // instruments instead of the generic WebAudio fallbacks.
+        // AHX/HVL are Amiga chip formats — NOT C64 SID — so they use the
+        // standard WebAudio dub bus path, not SID dub mode.
         if (desc.key === 'Hively') {
           hivelyEngine = instance as unknown as HivelyEngine;
-          void (async () => {
-            try {
-              const { getDrumPadEngine } = await import('@hooks/drumpad/useMIDIPadRouting');
-              const dubBus = getDrumPadEngine()?.getDubBus?.();
-              if (dubBus) {
-                void dubBus.enableSIDMode();
-                console.log('[NativeEngineRouting] SID dub mode enabled for AHX/HVL (Hively)');
-              }
-            } catch { /* DubBus not ready */ }
-          })();
         }
 
         // Capture UADEEngine for position sync in TrackerReplayer
@@ -1389,12 +1378,6 @@ export function stopNativeEngines(
   // Clear the running engine guard so next play() can start fresh
   _runningEngineKeys.clear();
 
-  // Disable SID dub mode when Hively/AHX stops (it was enabled on load).
-  if (wasRunning.has('Hively')) {
-    void import('@hooks/drumpad/useMIDIPadRouting').then(({ getDrumPadEngine }) => {
-      getDrumPadEngine()?.getDubBus?.()?.disableSIDMode();
-    }).catch(() => {});
-  }
 
   // Clear WASM position tracking (synchronous — async import caused race with startNativeEngines)
   useWasmPositionStore.getState().clear();
