@@ -345,6 +345,18 @@ export const DubBusPanel: React.FC = () => {
             onChange={(v) => patch({ sidechainAmount: v })}
             format={(v) => `${Math.round(v * 100)}%`}
           />
+          <label className="flex items-center gap-3 text-[11px] font-mono text-text-secondary">
+            <span className="w-24 shrink-0">Glue bypass</span>
+            <input
+              type="checkbox"
+              checked={dubBus.glueBypass ?? false}
+              onChange={(e) => patch({ glueBypass: e.target.checked })}
+              className="w-3.5 h-3.5 accent-accent-secondary"
+            />
+            <span className="text-text-muted">
+              {dubBus.glueBypass ? 'Scientist mode — no bus compression (1:1 ratio)' : '3:1 glue compression active'}
+            </span>
+          </label>
           {/* G13: sidechain source selector. 'bus' = self-compression
               (classic pumping dub); 'channel' = a specific tracker channel
               triggers the duck, so a kick on ch1 can pump the dub return
@@ -460,6 +472,18 @@ export const DubBusPanel: React.FC = () => {
             format={(v) => v === 0 ? 'mono' : v === 1 ? 'stereo' : `${v.toFixed(2)}×`}
           />
           <div className="h-px bg-dark-borderLight my-1" />
+          <label className="flex items-center gap-3 text-[11px] font-mono text-text-secondary">
+            <span className="w-24 shrink-0">Ping-pong sync</span>
+            <input
+              type="checkbox"
+              checked={dubBus.pingPongSyncToBpm ?? false}
+              onChange={(e) => patch({ pingPongSyncToBpm: e.target.checked })}
+              className="w-3.5 h-3.5 accent-accent-highlight"
+            />
+            <span className="text-text-muted">
+              {dubBus.pingPongSyncToBpm ? 'BPM synced (3/8 L, 1/2 R — Ariwa SDE-3000)' : 'fixed ms values'}
+            </span>
+          </label>
           <Slider
             label="Ping-pong L delay"
             value={dubBus.pingPongLMs ?? 337}
