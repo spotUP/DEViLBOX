@@ -133,6 +133,10 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
   const [isImporting, setIsImporting]   = useState(false);
   const safeClose = useCallback(() => { if (!isImporting) onClose(); }, [isImporting, onClose]);
   useModalClose({ isOpen, onClose: safeClose });
+  // Stable ref so the keydown handler always calls the latest handleImport
+  // without needing it to be declared before the effect.
+  const handleImportRef = useRef<() => Promise<void>>(async () => {});
+
   const [uadeInitProgress, setUadeInitProgress] = useState(0);
   const [uadeInitPhase, setUadeInitPhase] = useState('');
   const [error, setError]               = useState<string | null>(null);
@@ -402,6 +406,22 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
     }
     onClose();
   }, [moduleInfo, nativeFmt, isNativeOnly, setFormatEngine, onImport, onClose, selectedSubsong, activeCompanions]);
+
+  // Keep ref in sync so the Enter key handler always calls the latest version
+  useEffect(() => { handleImportRef.current = handleImport; }, [handleImport]);
+
+  // Enter key submits when a module is loaded and ready
+  useEffect(() => {
+    if (!isOpen) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Enter' && moduleInfo && !isLoading && !isImporting) {
+        e.preventDefault();
+        void handleImportRef.current();
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [isOpen, moduleInfo, isLoading, isImporting]);
 
   const handleClose = useCallback(() => {
     // Cancel any in-flight UADE scan so it doesn't resolve after the dialog closes
@@ -915,7 +935,7 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
         <div className="flex justify-end gap-2 px-4 py-3 border-t border-dark-border">
           <Button variant="ghost" size="sm" onClick={handleClose} disabled={isImporting}>Cancel</Button>
           <Button variant="primary" size="sm" onClick={handleImport} disabled={!moduleInfo || isLoading || isImporting}>
-            {isImporting ? 'Importing…' : isLoading ? 'Loading…' : 'Import Module'}
+            {isImporting ? 'Loading…' : isLoading ? 'Loading…' : 'Load'}
           </Button>
         </div>
       </div>
