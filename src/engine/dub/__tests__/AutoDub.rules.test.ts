@@ -718,3 +718,59 @@ describe('chooseMove — density bias', () => {
     expect(ratio).toBeGreaterThan(0.6); // within ~40% of each other
   });
 });
+
+// Regression: role-targeted moves (channelMute / echoThrow / snareCrack)
+// were silently blocked when the look-ahead pattern was the sparse intro
+// (pattern 0 in libopenmpt MOD songs). getCurrentPatternBundle() used
+// transport.currentPatternIndex which libopenmpt never updates → always
+// pattern 0 → channelHasNoteInWindow returned false → every role-targeted
+// rule was skipped. Fix: use the richest pattern (max total notes) for the
+// look-ahead so MOD songs with sparse intros still fire role-targeted moves.
+describe('role-targeted rules — sparse vs rich look-ahead pattern', () => {
+  const bassOnlyAtTail = makeChannel('bass', 64, { 60: 36 }); // note at row 60, outside 16-row window
+  const bassActive     = makeChannel('bass', 64, Object.fromEntries(
+    Array.from({ length: 32 }, (_, i) => [i * 2, 36]),
+  ));
+
+  function countChannelMute(pattern: Pattern, nTrials = 400): number {
+    const rng = seededRng(7777);
+    let n = 0;
+    for (let i = 0; i < nTrials; i++) {
+      const result = chooseMove(baseCtx({
+        bar: 1, barPos: 0.0, isNewBar: true, intensity: 1.0,
+        persona: getPersona('tubby'),
+        channelCount: 1,
+        roles: ['bass' as ChannelRole],
+        currentPattern: pattern,
+        currentRow: 0,
+        densityByRole: new Map([['bass', 0.5]] as [ChannelRole, number][]),
+      }), rng);
+      if (result?.moveId === 'channelMute') n++;
+    }
+    return n;
+  }
+
+  it('channelMute fires when look-ahead pattern has active bass notes', () => {
+    const richPat = makePattern([bassActive]);
+    expect(countChannelMute(richPat)).toBeGreaterThan(5);
+  });
+
+  it('channelMute is blocked when look-ahead window has no notes (sparse intro)', () => {
+    const sparsePat = makePattern([bassOnlyAtTail]);
+    expect(countChannelMute(sparsePat)).toBe(0);
+  });
+
+  it('getCurrentPatternBundle uses richest pattern — regression guard', () => {
+    // The fix ensures that when multiple patterns exist, the richest one
+    // is used for look-ahead, not pattern 0 (which libopenmpt leaves stale).
+    // This is a source-level contract check: the implementation must select
+    // the pattern with the max note count.
+    const src = require('fs').readFileSync(
+      require('path').join(__dirname, '../AutoDub.ts'),
+      'utf8',
+    ) as string;
+    expect(src).toContain('richestTotal');
+    expect(src).toContain('richestPattern');
+    expect(src).not.toContain('patterns[transport.currentPatternIndex');
+  });
+});

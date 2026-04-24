@@ -644,8 +644,26 @@ function getCurrentPatternBundle(): {
     const patterns = tracker.patterns;
     if (!Array.isArray(patterns) || patterns.length === 0) return empty;
     const transport = useTransportStore.getState();
-    const idx = transport.currentPatternIndex ?? 0;
-    const pattern = patterns[Math.max(0, Math.min(idx, patterns.length - 1))];
+
+    // Use the richest pattern (max total notes across all channels) for the
+    // look-ahead. libopenmpt engines never update transport.currentPatternIndex
+    // so it stays at 0 even mid-song, meaning pattern 0 (often a sparse intro)
+    // would cause channelHasNoteInWindow to return false for every channel and
+    // silently skip all role-targeted rules (channelMute, echoThrow, snareCrack).
+    // The richest pattern is the best proxy for "does this channel play notes
+    // in this song at all" — which is the only question the look-ahead answers.
+    let richestPattern = patterns[0];
+    let richestTotal = 0;
+    for (const pat of patterns) {
+      if (!pat?.channels) continue;
+      let total = 0;
+      for (const ch of pat.channels) {
+        if (!ch?.rows) continue;
+        for (const cell of ch.rows) if (cell && cell.note >= 1 && cell.note <= 96) total++;
+      }
+      if (total > richestTotal) { richestTotal = total; richestPattern = pat; }
+    }
+    const pattern = richestPattern;
     if (!pattern || !pattern.channels?.length) return empty;
 
     const insts = useInstrumentStore.getState().instruments;
@@ -658,10 +676,13 @@ function getCurrentPatternBundle(): {
     const runtimeHints = getAllRuntimeChannelRoles(offlineRoles.length);
     const mergedRoles = mergeOfflineAndRuntimeRoles(offlineRoles, runtimeHints);
 
+    // Names come from the first pattern — channel names are global per the
+    // tracker store's updateChannelName (same name across all patterns).
+    const nameSource = patterns[0];
     return {
       roles: mergedRoles,
       pattern,
-      names: pattern.channels.map(c => c.name ?? null),
+      names: nameSource.channels.map(c => c.name ?? null),
       currentRow: transport.currentRow ?? 0,
     };
   } catch {
