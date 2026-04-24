@@ -40,6 +40,9 @@ import type { DJMixerEngine } from '../dj/DJMixerEngine';
 import type { DeckId } from '../dj/DeckEngine';
 import { clearAllPendingThrows } from './DubActions';
 import { fireParamLiveSubscribers } from '@/midi/performance/parameterRouter';
+import { RE201Effect } from '../effects/RE201Effect';
+import { AnotherDelayEffect } from '../effects/AnotherDelayEffect';
+import { RETapeEchoEffect } from '../effects/RETapeEchoEffect';
 
 const DECK_IDS: DeckId[] = ['A', 'B', 'C'];
 
@@ -702,11 +705,12 @@ export class DubBus {
     this._pendingPostHoldSettings = null;
     const ctx = this.context;
     const RAMP_SEC = 0.02;
-    /* Warmup hold: covers the new WASM echo engine's DC/LF startup
-       transient + spring param-change burst. Extended from 120ms to
-       800ms to cover the full spring burst envelope (peak at ~400ms,
-       settled by ~800ms per SpringTap measurements). */
-    const WARMUP_SEC = 0.80;
+    /* Warmup hold: covers the new WASM echo engine's DC/LF startup transient.
+       Previously 800ms to cover spring burst envelope, but spring output is
+       now explicitly muted during the hold (muteOutput/unmuteOutput) so the
+       burst can't reach downstream nodes. 200ms is sufficient for WASM
+       worklet boot (~50ms with pre-heated modules) + safety margin. */
+    const WARMUP_SEC = 0.20;
 
     /* Fully quiesce the bus during the splice. Just ramping `return_` to 0
        masks output but leaves the internal graph live — the forward chain
@@ -1896,10 +1900,32 @@ export class DubBus {
       tap.connect(this.deckHpf);   // routed through DJ-only HPF, not direct to input
       this.deckTaps.set(deck, tap);
     }
+
+    // Pre-heat: load all WASM modules in the background so the first engine
+    // swap is instant. Without this, the first swap to RE201/AnotherDelay/
+    // RETapeEcho incurs 200-900ms of WASM fetch + compile latency ON TOP of
+    // the 800ms warmup hold. After pre-heat, modules are cached and worklet
+    // boot is ~50ms.
+    void this._preheatWASMModules();
   }
 
   /** The bus input node — pad sources connect to this. */
   get inputNode(): GainNode { return this.input; }
+
+  /** Pre-load all WASM effect modules so the first engine swap is instant. */
+  private async _preheatWASMModules(): Promise<void> {
+    try {
+      await Promise.allSettled([
+        RE201Effect.ensureModuleLoaded(this.context),
+        AnotherDelayEffect.ensureModuleLoaded(this.context),
+        RETapeEchoEffect.ensureModuleLoaded(this.context),
+        AelapseEffect.ensureInitialized(this.context),
+      ]);
+      console.log('[DubBus] WASM modules pre-heated');
+    } catch {
+      console.warn('[DubBus] WASM pre-heat partial failure (non-fatal)');
+    }
+  }
 
   /** Whether the bus is currently enabled (return gain > 0). */
   get isEnabled(): boolean { return this.enabled; }
@@ -3029,7 +3055,7 @@ export class DubBus {
   private _warmupMute(sidechainAmount = 0.15): void {
     const ctx = this.context;
     const RAMP_SEC = 0.02;
-    const WARMUP_SEC = 0.80;
+    const WARMUP_SEC = 0.20; // reduced from 0.80 — spring output mute handles burst
     const priorFeedback = this.feedback.gain.value;
     const priorReturn = this.return_.gain.value;
     const targetThreshold = -6 - sidechainAmount * 30;
