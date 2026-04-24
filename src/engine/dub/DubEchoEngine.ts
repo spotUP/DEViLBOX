@@ -69,14 +69,14 @@ export class RE201Adapter implements DubEchoEngine {
 
   constructor(settings: DubBusSettings) {
     this.fx = new RE201Effect({
-      delayMode: 7,          // 3 heads + reverb — richest mode
+      delayMode: 3,          // 3 echo heads, no internal reverb — DubBus has its own spring
       repeatRate: this.msToRepeatRate(settings.echoRateMs),
       intensity: settings.echoIntensity,
       echoVolume: 0.85,
-      reverbVolume: 0.45,    // built-in spring character
+      reverbVolume: 0,       // disabled — DubBus Aelapse spring handles reverb
       bass: 0.7,
       treble: 0.3,
-      inputLevel: 1.2,       // tape magnetisation warmth
+      inputLevel: 1.0,       // unity gain — DubBus handles levels
       wet: settings.echoWet,
     });
   }
@@ -113,15 +113,15 @@ export class AnotherDelayAdapter implements DubEchoEngine {
   constructor(settings: DubBusSettings) {
     this.fx = new AnotherDelayEffect({
       delayTime: settings.echoRateMs,
-      feedback: settings.echoIntensity * 0.95,  // clamp to safe range
-      gain: 1.3,
+      feedback: settings.echoIntensity * 0.75,  // conservative — DubBus adds its own spring reverb
+      gain: 1.0,             // reduced from 1.3 — DubBus gain staging handles level
       lowpass: 3000,
       highpass: 150,
       flutterFreq: 2.5,
       flutterDepth: 0.03,
       wowFreq: 0.2,
       wowDepth: 0.015,
-      reverbEnabled: true,
+      reverbEnabled: false,  // disabled — DubBus has its own spring reverb (Aelapse)
       roomSize: 0.55,
       damping: 0.35,
       width: 1,
@@ -132,12 +132,11 @@ export class AnotherDelayAdapter implements DubEchoEngine {
   setRate(ms: number): void { this.fx.setDelayTime(ms); }
 
   setIntensity(amount: number): void {
-    this.fx.setFeedback(amount * 0.95);  // AnotherDelay max safe = 0.95
+    this.fx.setFeedback(amount * 0.75);  // conservative — DubBus spring adds energy
   }
 
   setIntensityInstant(amount: number): void {
-    // No instant variant — use normal setFeedback
-    this.fx.setFeedback(amount * 0.95);
+    this.fx.setFeedback(amount * 0.75);
   }
 
   get wet() { return this.fx.wet; }
