@@ -182,6 +182,13 @@ export const DubDeckStrip: React.FC = () => {
   const [toggledMoves, setToggledMoves] = useState<Set<string>>(new Set());
   const toggleDisposers = useRef<Map<string, () => void>>(new Map());
 
+  // Persistent mic routing — microphone input wired into the dub bus input.
+  // Separate from the Toast hold move (which does momentary mic + music ducking).
+  const [micActive, setMicActive] = useState(false);
+  const [micGain, setMicGain] = useState(0.8);
+  const micStreamRef = useRef<MediaStream | null>(null);
+  const micTapRef = useRef<{ setGain(g: number): void; disconnect(): void } | null>(null);
+
   // Rate preset radio group — at most ONE rate preset active at a time.
   // Clicking a new rate deactivates the old one (restoring its saved rate)
   // before activating the new one. Clicking the active one turns it off.
@@ -259,6 +266,16 @@ export const DubDeckStrip: React.FC = () => {
       rateDisposer.current = null;
     }
     setActiveRatePreset(null);
+    // Release persistent mic tap
+    if (micTapRef.current) {
+      try { micTapRef.current.disconnect(); } catch { /* ok */ }
+      micTapRef.current = null;
+    }
+    if (micStreamRef.current) {
+      micStreamRef.current.getTracks().forEach(t => t.stop());
+      micStreamRef.current = null;
+    }
+    setMicActive(false);
   }, []);
 
   useEffect(() => {
@@ -617,6 +634,43 @@ export const DubDeckStrip: React.FC = () => {
     }
   }, [busEnabled]);
 
+  // Persistent mic toggle — connects mic into the dub bus input until toggled off.
+  const toggleMic = useCallback(async () => {
+    if (micActive) {
+      micTapRef.current?.disconnect();
+      micTapRef.current = null;
+      micStreamRef.current?.getTracks().forEach(t => t.stop());
+      micStreamRef.current = null;
+      setMicActive(false);
+      return;
+    }
+    if (!navigator.mediaDevices?.getUserMedia) {
+      notify.error('Mic not supported in this browser');
+      return;
+    }
+    let stream: MediaStream;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({
+        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: false },
+      });
+    } catch {
+      notify.error('Mic permission denied — allow mic access and try again');
+      return;
+    }
+    try {
+      const bus = ensureDrumPadEngine().getDubBus();
+      const ctx = bus.inputNode.context as AudioContext;
+      const src = ctx.createMediaStreamSource(stream);
+      micStreamRef.current = stream;
+      micTapRef.current = bus.connectMicInput(src, micGain);
+      setMicActive(true);
+    } catch (e) {
+      stream.getTracks().forEach(t => t.stop());
+      notify.error('Failed to connect mic to dub bus');
+      console.warn('[DubDeckStrip] mic tap failed:', e);
+    }
+  }, [micActive, micGain]);
+
   // Rate preset radio handler — mutual exclusion: only one active at a time.
   const handleRatePreset = useCallback((moveId: string) => {
     if (!busEnabled) return;
@@ -808,12 +862,41 @@ export const DubDeckStrip: React.FC = () => {
           />
           <span className="w-8 text-text-secondary text-xs">{vinylLevel.toFixed(1)}</span>
         </div>
+        {/* ── Mic controls ─────────────────────────────────────────────── */}
+        <div className="flex items-center gap-1.5 ml-2">
+          <button
+            className={
+              'px-2.5 py-1 rounded border transition-colors text-xs font-bold ' +
+              (micActive
+                ? 'bg-accent-error/20 border-accent-error text-accent-error animate-pulse'
+                : 'bg-dark-bgTertiary border-dark-borderLight text-text-secondary hover:text-text-primary hover:border-accent-primary')
+            }
+            onClick={() => void toggleMic()}
+            title={micActive ? 'Mic ON — routing to dub bus. Click to stop.' : 'Mic OFF — click to route microphone into dub bus (for MC vocals, dub siren, Toast)'}
+            disabled={!busEnabled}
+          >
+            🎤 {micActive ? 'ON' : 'OFF'}
+          </button>
+          {micActive && (
+            <input
+              type="range" min={0} max={1.5} step={0.05}
+              value={micGain}
+              onChange={(e) => {
+                const g = Number(e.target.value);
+                setMicGain(g);
+                micTapRef.current?.setGain(g);
+              }}
+              className="w-16 accent-accent-error"
+              title={`Mic gain: ${micGain.toFixed(2)}×`}
+            />
+          )}
+        </div>
         <span className="flex-1" />
         <span className="text-text-muted">
           {pattern?.dubLane?.events.length ?? 0} events on this pattern
         </span>
         <button
-          className="px-2.5 py-1 rounded bg-accent-error text-text-inverse font-semibold hover:bg-accent-error/80"
+          className="px-2.5 py-1 rounded bg-accent-error text-white font-semibold hover:bg-accent-error/80"
           onClick={() => window.dispatchEvent(new Event('dub-panic'))}
           title="Drain the bus + disarm recording"
         >

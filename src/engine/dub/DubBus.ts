@@ -4480,6 +4480,33 @@ export class DubBus {
   getEchoRateMs(): number { return this.settings.echoRateMs; }
 
   /**
+   * Connect an external audio source (e.g. mic) into the bus input with its
+   * own gain node. Returns a controller so the caller can adjust gain or
+   * disconnect without knowing the bus internals.
+   *
+   * Safe to call when bus is disabled — the gain node is wired regardless so
+   * the mic is ready when the bus is enabled.
+   */
+  connectMicInput(sourceNode: AudioNode, initialGain = 0.8): { setGain(g: number): void; disconnect(): void } {
+    const gainNode = this.context.createGain();
+    gainNode.gain.value = Math.max(0, Math.min(2, initialGain));
+    try { sourceNode.connect(gainNode); } catch { /* ok */ }
+    try { gainNode.connect(this.inputNode); } catch { /* ok */ }
+    let torn = false;
+    return {
+      setGain(g: number) {
+        gainNode.gain.setTargetAtTime(Math.max(0, Math.min(2, g)), gainNode.context.currentTime, 0.02);
+      },
+      disconnect() {
+        if (torn) return;
+        torn = true;
+        try { sourceNode.disconnect(gainNode); } catch { /* ok */ }
+        try { gainNode.disconnect(); } catch { /* ok */ }
+      },
+    };
+  }
+
+  /**
    * Sonar Ping — single sine pulse fed into the echo input so it repeats
    * across 3 tape heads. Clean tone, short envelope, ride the default
    * echo rate. Classic Tubby / Perry transition accent.
