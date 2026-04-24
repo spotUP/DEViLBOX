@@ -106,22 +106,26 @@ const GLOBAL_MOVES: Array<GlobalMove> = [
 
 // Map color tokens to button class fragments. Keeps Tailwind's JIT happy —
 // we can't build class names dynamically with string concatenation.
+// text-text-inverse = #1a1a1a (near-black). Only works on bright/light accent
+// backgrounds. For dark or semi-transparent accents use text-white instead.
 const colorClasses = (token: string, active: boolean) => {
   const base = 'px-2.5 py-1 rounded border text-xs font-bold transition-all duration-150 ';
   const idle = 'bg-dark-bgTertiary border-dark-borderLight text-text-secondary ';
   switch (token) {
+    // Bright opaque backgrounds — dark text has 9-12:1 contrast
     case 'accent-primary':      return base + (active ? 'bg-accent-primary text-text-inverse border-accent-primary shadow-[0_0_6px_var(--color-accent-primary)]' : idle + 'hover:border-accent-primary hover:text-accent-primary');
-    case 'accent-primary/70':   return base + (active ? 'bg-accent-primary/70 text-text-inverse border-accent-primary/70' : idle + 'hover:border-accent-primary/70 hover:text-accent-primary');
-    case 'accent-secondary':    return base + (active ? 'bg-accent-secondary text-text-inverse border-accent-secondary' : idle + 'hover:border-accent-secondary hover:text-accent-secondary');
-    case 'accent-secondary/70': return base + (active ? 'bg-accent-secondary/70 text-text-inverse border-accent-secondary/70' : idle + 'hover:border-accent-secondary/70 hover:text-accent-secondary');
     case 'accent-highlight':    return base + (active ? 'bg-accent-highlight text-text-inverse border-accent-highlight' : idle + 'hover:border-accent-highlight hover:text-accent-highlight');
-    case 'accent-highlight/70': return base + (active ? 'bg-accent-highlight/70 text-text-inverse border-accent-highlight/70' : idle + 'hover:border-accent-highlight/70 hover:text-accent-highlight');
     case 'accent-warning':      return base + (active ? 'bg-accent-warning text-text-inverse border-accent-warning' : idle + 'hover:border-accent-warning hover:text-accent-warning');
-    case 'accent-warning/70':   return base + (active ? 'bg-accent-warning/70 text-text-inverse border-accent-warning/70' : idle + 'hover:border-accent-warning/70 hover:text-accent-warning');
-    case 'accent-error':        return base + (active ? 'bg-accent-error text-text-inverse border-accent-error' : idle + 'hover:border-accent-error hover:text-accent-error');
-    case 'accent-error/70':     return base + (active ? 'bg-accent-error/70 text-text-inverse border-accent-error/70' : idle + 'hover:border-accent-error/70 hover:text-accent-error');
     case 'accent-success':      return base + (active ? 'bg-accent-success text-text-inverse border-accent-success' : idle + 'hover:border-accent-success hover:text-accent-success');
-    case 'accent-success/70':   return base + (active ? 'bg-accent-success/70 text-text-inverse border-accent-success/70' : idle + 'hover:border-accent-success/70 hover:text-accent-success');
+    // Dark or semi-transparent backgrounds — white text is required for visibility
+    case 'accent-primary/70':   return base + (active ? 'bg-accent-primary/70 text-white border-accent-primary/70' : idle + 'hover:border-accent-primary/70 hover:text-accent-primary');
+    case 'accent-secondary':    return base + (active ? 'bg-accent-secondary text-white border-accent-secondary' : idle + 'hover:border-accent-secondary hover:text-accent-secondary');
+    case 'accent-secondary/70': return base + (active ? 'bg-accent-secondary/70 text-white border-accent-secondary/70' : idle + 'hover:border-accent-secondary/70 hover:text-accent-secondary');
+    case 'accent-highlight/70': return base + (active ? 'bg-accent-highlight/70 text-white border-accent-highlight/70' : idle + 'hover:border-accent-highlight/70 hover:text-accent-highlight');
+    case 'accent-warning/70':   return base + (active ? 'bg-accent-warning/70 text-white border-accent-warning/70' : idle + 'hover:border-accent-warning/70 hover:text-accent-warning');
+    case 'accent-error':        return base + (active ? 'bg-accent-error text-white border-accent-error' : idle + 'hover:border-accent-error hover:text-accent-error');
+    case 'accent-error/70':     return base + (active ? 'bg-accent-error/70 text-white border-accent-error/70' : idle + 'hover:border-accent-error/70 hover:text-accent-error');
+    case 'accent-success/70':   return base + (active ? 'bg-accent-success/70 text-white border-accent-success/70' : idle + 'hover:border-accent-success/70 hover:text-accent-success');
     case 'text-primary':        return base + (active ? 'bg-text-primary text-dark-bg border-text-primary' : idle + 'hover:border-text-primary hover:text-text-primary');
     default:                    return base + idle;
   }
