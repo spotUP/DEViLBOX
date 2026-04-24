@@ -82,3 +82,75 @@ describe('DubBus dry-bus regression — feedback cycle DelayNode', () => {
     expect(disposeBody).toMatch(/extFeedbackDelay.*disconnect/s);
   });
 });
+
+// ── Mute-hold guard regression (2026-04-25) ────────────────────────────
+// Root cause: PadGrid mirror effect fires setDubBusSettings ~50ms after a
+// preset change. This re-entrant call wrote return_.gain.setTargetAtTime()
+// which inserted an event defeating the warmup hold. The spring burst
+// leaked through to master ("big effect on activation").
+// Fix: _muteHoldActive flag + _pendingPostHoldSettings replay.
+
+const ECHO_ENGINE_SRC = readFileSync(
+  resolve(dirname(fileURLToPath(import.meta.url)), '../DubEchoEngine.ts'),
+  'utf8',
+);
+
+describe('DubBus mute-hold guard — prevents burst leak during engine swap', () => {
+  it('has _muteHoldActive flag field', () => {
+    expect(DUBBUS_SRC).toMatch(/_muteHoldActive/);
+  });
+
+  it('has _pendingPostHoldSettings for deferred replay', () => {
+    expect(DUBBUS_SRC).toMatch(/_pendingPostHoldSettings/);
+  });
+
+  it('sets _muteHoldActive = true in _swapEchoEngine', () => {
+    const swapStart = DUBBUS_SRC.indexOf('_swapEchoEngine(');
+    const swapBody = DUBBUS_SRC.slice(swapStart, swapStart + 2000);
+    expect(swapBody).toMatch(/_muteHoldActive\s*=\s*true/);
+  });
+
+  it('sets _muteHoldActive = true in _warmupMute', () => {
+    const warmupStart = DUBBUS_SRC.indexOf('_warmupMute(');
+    const warmupBody = DUBBUS_SRC.slice(warmupStart, warmupStart + 2000);
+    expect(warmupBody).toMatch(/_muteHoldActive\s*=\s*true/);
+  });
+
+  it('clears _muteHoldActive = false after warmup timeout', () => {
+    expect(DUBBUS_SRC).toMatch(/_muteHoldActive\s*=\s*false/);
+  });
+
+  it('guards return_.gain write with _muteHoldActive check', () => {
+    expect(DUBBUS_SRC).toMatch(/if\s*\(\s*this\._muteHoldActive\s*\)/);
+  });
+
+  it('guards sidechain.threshold write with _muteHoldActive check', () => {
+    expect(DUBBUS_SRC).toMatch(/!this\._muteHoldActive/);
+  });
+
+  it('replays pending settings after hold ends', () => {
+    expect(DUBBUS_SRC).toMatch(/_pendingPostHoldSettings/);
+    expect(DUBBUS_SRC).toMatch(/pending\.returnGain/);
+  });
+});
+
+describe('DubEchoEngine adapter — safe feedback for DubBus context', () => {
+  it('AnotherDelay adapter disables internal reverb (DubBus has its own spring)', () => {
+    const adapterStart = ECHO_ENGINE_SRC.indexOf('class AnotherDelayAdapter');
+    const adapterBody = ECHO_ENGINE_SRC.slice(adapterStart, adapterStart + 1000);
+    expect(adapterBody).toMatch(/reverbEnabled:\s*false/);
+  });
+
+  it('AnotherDelay adapter uses conservative feedback multiplier', () => {
+    const adapterStart = ECHO_ENGINE_SRC.indexOf('class AnotherDelayAdapter');
+    const adapterBody = ECHO_ENGINE_SRC.slice(adapterStart, adapterStart + 1500);
+    expect(adapterBody).not.toMatch(/\*\s*0\.95/);
+    expect(adapterBody).toMatch(/\*\s*0\.75/);
+  });
+
+  it('RE201 adapter disables internal reverb volume', () => {
+    const adapterStart = ECHO_ENGINE_SRC.indexOf('class RE201Adapter');
+    const adapterBody = ECHO_ENGINE_SRC.slice(adapterStart, adapterStart + 1000);
+    expect(adapterBody).toMatch(/reverbVolume:\s*0\b/);
+  });
+});
