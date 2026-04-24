@@ -208,6 +208,25 @@ export const DubBusPanel: React.FC = () => {
             ] as const}
             onChange={(v) => patch({ echoEngine: v })}
           />
+          <Choice
+            label="RE-201 Mode"
+            value={String(dubBus.echoMode ?? 4)}
+            options={[
+              { value: '1',  label: '1 — Head 1 (single short tap)' },
+              { value: '2',  label: '2 — Head 2 (single mid tap)' },
+              { value: '3',  label: '3 — Head 3 (single long tap)' },
+              { value: '4',  label: '4 — H2 + H3 (classic dub double)' },
+              { value: '5',  label: '5 — H1 + Spring' },
+              { value: '6',  label: '6 — H2 + Spring' },
+              { value: '7',  label: '7 — H3 + Spring' },
+              { value: '8',  label: '8 — H1 + H2 + Spring' },
+              { value: '9',  label: '9 — H2 + H3 + Spring (Tubby)' },
+              { value: '10', label: '10 — H1 + H3 + Spring' },
+              { value: '11', label: '11 — All heads + Spring' },
+              { value: '12', label: '12 — Spring only (reverb)' },
+            ] as const}
+            onChange={(v) => patch({ echoMode: Number(v) })}
+          />
           <Slider
             label="Spring wet"
             value={dubBus.springWet}

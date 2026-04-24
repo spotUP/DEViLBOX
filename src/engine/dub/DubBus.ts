@@ -2812,6 +2812,9 @@ export class DubBus {
       this.echo.wet = merged.echoWet;
     }
     this.echo.setRate(merged.echoRateMs);
+    if (merged.echoMode !== undefined) {
+      try { this.echo.setMode(merged.echoMode); } catch { /* ok */ }
+    }
     // Sidechain depth maps to compressor threshold — more duck = lower threshold.
     // 0 → -6 dB threshold (barely compresses), 1 → -36 dB (heavy pumping).
     // Skip during an echo swap — the swap sets threshold to 0dB during the

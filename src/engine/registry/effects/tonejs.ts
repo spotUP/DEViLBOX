@@ -527,6 +527,43 @@ const tonejs: EffectDescriptor[] = [
       { name: 'V-Shape', params: { low: 5, mid: -3, high: 5, lowFrequency: 250, highFrequency: 3500 } },
       { name: 'Vocal Presence', params: { low: -2, mid: 4, high: 1, lowFrequency: 300, highFrequency: 4000 } },
       { name: 'Flat', params: { low: 0, mid: 0, high: 0, lowFrequency: 250, highFrequency: 3500 } },
+      // ── Reggae / Dub hygiene (research doc 2026-04-20_dub-sound-coloring.md §2) ──
+      // Classic per-source EQ starting points for live dub mixing. Apply on
+      // a channel insert before routing to the dub bus send.
+      { name: 'Dub Bass', params: {
+        // Research: +4-6 dB @ 80-120 Hz (Q 0.7), cut -5-6 dB @ 1-2 kHz.
+        // "Treble all the way down" — fat lows, remove all mids.
+        low: 5, mid: -5, high: -3,
+        lowFrequency: 100, highFrequency: 1500,
+      }},
+      { name: 'Reggae Kick', params: {
+        // Research: +3-4 dB @ 60-80 Hz, cut -4 to -6 dB @ 300-500 Hz.
+        // Dark, punchy — LPF character baked in via high cut.
+        low: 4, mid: -5, high: -4,
+        lowFrequency: 70, highFrequency: 2500,
+      }},
+      { name: 'Skank Guitar', params: {
+        // Research: HPF 150 Hz, cut @ 300-500 Hz, boost @ 2-4 kHz.
+        // "Chank" presence cut low end; bite in the upper mids.
+        low: -3, mid: -3, high: 4,
+        lowFrequency: 150, highFrequency: 3000,
+      }},
+      { name: 'Dub Horns', params: {
+        // Research: cut -2-4 dB @ 2-4 kHz to tame honk, +2 dB @ 400-600 Hz body.
+        low: 0, mid: 2, high: -3,
+        lowFrequency: 500, highFrequency: 3000,
+      }},
+      { name: 'Dub Vocals', params: {
+        // Research: cut -3 dB @ 300 Hz mud, +2 dB @ 3-5 kHz presence.
+        low: -3, mid: 0, high: 3,
+        lowFrequency: 300, highFrequency: 4000,
+      }},
+      { name: 'Scientist Mid-Scoop', params: {
+        // Research: -6 dB @ 700 Hz (Q 1.4) — the Scientist "hollow dub" signature.
+        // Extreme mid-cut so vocals + horns pop through the echo tail.
+        low: 1, mid: -8, high: 2,
+        lowFrequency: 200, highFrequency: 700,
+      }},
     ],
   },
   {
