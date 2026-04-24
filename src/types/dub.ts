@@ -565,6 +565,14 @@ export const DUB_CHARACTER_PRESETS: Record<Exclude<DubBusSettings['characterPres
       tapeSatMode:    'stack', // 3 parallel tape paths ≈ 4-track bouncing
       echoFeedbackHpfHz: 200,   // research spec: loose, low HPF — Perry's murky chaos
       echoFeedbackLpfHz: 2000,  // research spec: very dark repeats — 7.5 ips tape color
+      // Research: "Space Echo output patched back into a second TEAC input →
+      // semi-manual feedback loop." The extFeedback loop recreates this —
+      // return audio re-enters the input chain through a peaking EQ, creating
+      // the self-feeding chaos that defined Perry's Black Ark sound.
+      extFeedbackGain:   0.28,  // moderate semi-manual feedback — not runaway, but alive
+      extFeedbackEqFreq: 400,   // boost at 400 Hz — the tape-saturation warmth zone
+      extFeedbackEqGain: 3,     // gentle 3 dB lift per pass — accumulates over repeats
+      extFeedbackEqQ:    1.2,
       echoEngine:    'anotherDelay', // Perry's runaway wow-flutter madness
       chainOrder:    'springEcho',   // spring FIRST: reverb cloud feeds the echo,
                                       // so repeats decay cleanly instead of adding

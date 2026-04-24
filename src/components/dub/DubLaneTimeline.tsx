@@ -81,6 +81,8 @@ const HOLD_KINDS = new Set([
   // PR #42 holds (moves that return a disposer)
   'tubbyScream', 'stereoDoubler', 'oscBass', 'crushBass', 'subHarmonic',
   'eqSweep', 'ghostReverb', 'voltageStarve', 'ringMod',
+  // New moves
+  'hpfRise', 'madProfPingPong',
 ]);
 
 const POINT_WIDTH_PX = 6;   // rendered width for trigger events
