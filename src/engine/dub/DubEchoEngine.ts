@@ -69,11 +69,11 @@ export class RE201Adapter implements DubEchoEngine {
 
   constructor(settings: DubBusSettings) {
     this.fx = new RE201Effect({
-      delayMode: 3,          // 3 echo heads, no internal reverb — DubBus has its own spring
+      delayMode: 7,          // head 1 + reverb — Tubby's signature short-tap + spring character
       repeatRate: this.msToRepeatRate(settings.echoRateMs),
       intensity: settings.echoIntensity,
-      echoVolume: 0.85,
-      reverbVolume: 0,       // disabled — DubBus Aelapse spring handles reverb
+      echoVolume: 0.90,
+      reverbVolume: 0.20,    // light internal spring — adds body without clashing with DubBus spring
       bass: 0.7,
       treble: 0.3,
       inputLevel: 1.0,       // unity gain — DubBus handles levels
@@ -113,14 +113,14 @@ export class AnotherDelayAdapter implements DubEchoEngine {
   constructor(settings: DubBusSettings) {
     this.fx = new AnotherDelayEffect({
       delayTime: settings.echoRateMs,
-      feedback: settings.echoIntensity * 0.75,  // conservative — DubBus adds its own spring reverb
-      gain: 1.0,             // reduced from 1.3 — DubBus gain staging handles level
+      feedback: settings.echoIntensity * 0.55,  // conservative — DubBus spring extends tail naturally
+      gain: 1.0,
       lowpass: 3000,
       highpass: 150,
-      flutterFreq: 2.5,
-      flutterDepth: 0.03,
-      wowFreq: 0.2,
-      wowDepth: 0.015,
+      flutterFreq: 2.0,
+      flutterDepth: 0.015,   // halved — prevents "weoweo" modulation dominating
+      wowFreq: 0.15,
+      wowDepth: 0.008,       // halved — subtle pitch drift, not seasickness
       reverbEnabled: false,  // disabled — DubBus has its own spring reverb (Aelapse)
       roomSize: 0.55,
       damping: 0.35,
@@ -132,11 +132,11 @@ export class AnotherDelayAdapter implements DubEchoEngine {
   setRate(ms: number): void { this.fx.setDelayTime(ms); }
 
   setIntensity(amount: number): void {
-    this.fx.setFeedback(amount * 0.75);  // conservative — DubBus spring adds energy
+    this.fx.setFeedback(amount * 0.55);  // conservative — DubBus spring adds energy
   }
 
   setIntensityInstant(amount: number): void {
-    this.fx.setFeedback(amount * 0.75);
+    this.fx.setFeedback(amount * 0.55);
   }
 
   get wet() { return this.fx.wet; }
