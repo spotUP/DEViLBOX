@@ -154,3 +154,70 @@ describe('DubEchoEngine adapter — safe feedback for DubBus context', () => {
     expect(adapterBody).toMatch(/reverbVolume:\s*0\b/);
   });
 });
+
+// ── RE201 WASM stability regression (2026-04-24) ───────────────────────
+// Root cause: RE201WASM.cpp had two stability bugs:
+//   1. ToneStack 3rd-order IIR had no denormal/NaN protection — filter state
+//      diverged to NaN at ~640ms, poisoning the entire downstream Web Audio chain.
+//   2. Spring Reverb waveguide feedback (0.3f) + allpass gains (0.3-0.7) created
+//      a combined loop gain >1.0, causing exponential growth to Inf→NaN.
+// Fix: Added sanitize() for denormal/NaN/Inf protection in all filters,
+//   safeSample() clamping in ToneStack and TapeDelay output,
+//   reduced waveguide feedback 0.3→0.15, capped allpass gains to 0.2-0.45.
+
+const RE201_WASM_SRC = (() => {
+  try {
+    return readFileSync(
+      resolve(dirname(fileURLToPath(import.meta.url)), '../../../../re201-wasm/RE201WASM.cpp'),
+      'utf8',
+    );
+  } catch {
+    return '';
+  }
+})();
+
+describe('RE201 WASM stability — NaN prevention in DSP code', () => {
+  it('has sanitize() helper for denormal/NaN/Inf protection', () => {
+    expect(RE201_WASM_SRC).toMatch(/sanitize/);
+    expect(RE201_WASM_SRC).toMatch(/0x7F800000/); // exponent mask for NaN/Inf check
+  });
+
+  it('has safeSample() helper for output clamping', () => {
+    expect(RE201_WASM_SRC).toMatch(/safeSample/);
+  });
+
+  it('sanitizes Biquad filter state (y1) to prevent NaN accumulation', () => {
+    // Biquad::process must sanitize y1 before storing
+    const biquadProcess = RE201_WASM_SRC.match(/struct Biquad[\s\S]*?float process\(float x\)\s*\{[\s\S]*?\}/);
+    expect(biquadProcess).not.toBeNull();
+    expect(biquadProcess![0]).toMatch(/sanitize\(y\)/);
+  });
+
+  it('sanitizes ToneStack 3rd-order IIR state to prevent NaN at 640ms', () => {
+    const toneProcess = RE201_WASM_SRC.match(/struct ToneStack[\s\S]*?float process\(float x\)\s*\{[\s\S]*?\}/);
+    expect(toneProcess).not.toBeNull();
+    expect(toneProcess![0]).toMatch(/sanitize/);
+    expect(toneProcess![0]).toMatch(/safeSample/);
+  });
+
+  it('uses reduced waveguide feedback (<=0.2) to prevent spring reverb runaway', () => {
+    // WaveguideUnit::process writes: delay.write(x + y * FEEDBACK)
+    // FEEDBACK must be <= 0.2 (was 0.3 which caused exponential growth)
+    const wgProcess = RE201_WASM_SRC.match(/float process\(float x, float delay_samp\)[\s\S]*?return y;\s*\}/);
+    expect(wgProcess).not.toBeNull();
+    // Should contain y * 0.15f (or similar small value)
+    expect(wgProcess![0]).toMatch(/y \* 0\.1[0-5]f/);
+  });
+
+  it('caps allpass dispersor gains to prevent combined loop gain >1', () => {
+    // AllPassDelay gains should be capped below 0.5
+    // Original was 0.3 + rand*0.4 (up to 0.7), now 0.2 + rand*0.25 (up to 0.45)
+    expect(RE201_WASM_SRC).toMatch(/0\.2f \+ fabsf\(rng\.next\(\)\) \* 0\.25f/);
+  });
+
+  it('clamps TapeDelay feedback output with safeSample', () => {
+    const tapeBlock = RE201_WASM_SRC.match(/void processBlock\([\s\S]*?feedbackSample = /);
+    expect(tapeBlock).not.toBeNull();
+    expect(tapeBlock![0]).toMatch(/safeSample/);
+  });
+});

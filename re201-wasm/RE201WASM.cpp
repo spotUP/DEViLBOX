@@ -33,6 +33,22 @@ static inline float clampf(float x, float lo, float hi) {
   return x < lo ? lo : (x > hi ? hi : x);
 }
 
+// Flush denormals and Inf/NaN to zero
+static inline float sanitize(float x) {
+  // Catch NaN, Inf, and denormals
+  union { float f; uint32_t i; } u;
+  u.f = x;
+  uint32_t exp = u.i & 0x7F800000u;
+  if (exp == 0u || exp == 0x7F800000u) return 0.0f;
+  return x;
+}
+
+// Clamp audio sample to safe range and sanitize
+static inline float safeSample(float x) {
+  if (!(x >= -10.0f && x <= 10.0f)) return 0.0f;  // catches NaN too
+  return x;
+}
+
 // ============================================================
 // White noise (xorshift32)
 // ============================================================
@@ -62,6 +78,7 @@ struct OnePole {
   }
   float process(float x) {
     z1 = x * a0 + z1 * b1;
+    z1 = sanitize(z1);
     return z1;
   }
   void reset() { z1 = 0.0f; }
@@ -141,7 +158,7 @@ struct Biquad {
   float process(float x) {
     float y = b0 * x + b1 * x1 + b2 * x2 - a1 * y1 - a2 * y2;
     x2 = x1; x1 = x;
-    y2 = y1; y1 = y;
+    y2 = y1; y1 = sanitize(y);
     return y;
   }
   void reset() { x1 = x2 = y1 = y2 = 0.0f; }
@@ -297,8 +314,8 @@ struct ToneStack {
     float y = b0c * x + b1c * x1 + b2c * x2 + b3c * x3
             - a1c * y1 - a2c * y2 - a3c * y3;
     x3 = x2; x2 = x1; x1 = x;
-    y3 = y2; y2 = y1; y1 = y;
-    return y;
+    y3 = y2; y2 = y1; y1 = sanitize(y);
+    return safeSample(y);
   }
 
   void reset() {
@@ -440,6 +457,7 @@ struct TapeDelay {
       // Speed-dependent EQ
       out = hpf.process(out);
       out = lpf.process(out);
+      out = safeSample(out);
 
       feedbackSample = out;
 
@@ -495,7 +513,7 @@ struct AllPassDelay {
     if (rd < 0) rd += sz;
     float delayed = buf[rd];
     float y = -g * x + delayed;
-    buf[wr] = x + g * delayed;
+    buf[wr] = sanitize(x + g * delayed);
     if (++wr >= sz) wr = 0;
     return y;
   }
@@ -519,7 +537,7 @@ struct WaveguideUnit {
     NoiseGen rng(seed);
     for (int i = 0; i < 5; i++) {
       int apDelay = 3 + (int)(fabsf(rng.next()) * 30.0f);
-      float apGain = 0.3f + fabsf(rng.next()) * 0.4f;
+      float apGain = 0.2f + fabsf(rng.next()) * 0.25f;  // 0.2-0.45 (capped for stability)
       ap[i].init(apDelay, apGain);
     }
 
@@ -536,7 +554,8 @@ struct WaveguideUnit {
     }
     y = lpf.process(y);
     y = hpf.process(y);
-    delay.write(x + y * 0.3f);  // feedback
+    y = safeSample(y);
+    delay.write(x + y * 0.15f);  // reduced feedback for stability (was 0.3f)
     return y;
   }
 
