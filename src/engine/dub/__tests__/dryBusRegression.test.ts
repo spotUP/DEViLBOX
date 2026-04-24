@@ -287,3 +287,53 @@ describe('Perry preset uses springEcho chain order for clean decay', () => {
     expect(parseFloat(match![1])).toBeLessThanOrEqual(0.60);
   });
 });
+
+// ── Tubby springEcho chain order (2026-04-24) ───────────────────────────
+// Tubby (RE201, echoIntensity 0.65 + springWet 0.60 in echoSpring) had
+// moderate stacking risk — each echo repeat added new spring reverb tail.
+// Switched to springEcho like Perry.
+
+describe('Tubby preset uses springEcho chain order', () => {
+  it('tubby preset sets chainOrder to springEcho', () => {
+    const tubbyBlock = DUB_TYPES_SRC.match(/tubby:\s*\{[\s\S]*?\n  \}/);
+    expect(tubbyBlock).not.toBeNull();
+    expect(tubbyBlock![0]).toContain("chainOrder:    'springEcho'");
+  });
+});
+
+// ── WASM pre-heat on DubBus construction (2026-04-24) ───────────────────
+// Pre-loads all echo engine WASM modules at DubBus construction so the
+// first engine swap is instant (no 200-900ms fetch+compile delay).
+
+describe('DubBus pre-heats WASM modules on construction', () => {
+  it('constructor calls _preheatWASMModules', () => {
+    expect(DUBBUS_SRC).toContain('void this._preheatWASMModules()');
+  });
+
+  it('_preheatWASMModules loads all four WASM effects', () => {
+    const preheatBlock = DUBBUS_SRC.match(/_preheatWASMModules[\s\S]*?console\.log/);
+    expect(preheatBlock).not.toBeNull();
+    expect(preheatBlock![0]).toContain('RE201Effect.ensureModuleLoaded');
+    expect(preheatBlock![0]).toContain('AnotherDelayEffect.ensureModuleLoaded');
+    expect(preheatBlock![0]).toContain('RETapeEchoEffect.ensureModuleLoaded');
+    expect(preheatBlock![0]).toContain('AelapseEffect.ensureInitialized');
+  });
+});
+
+// ── Reduced warmup hold (2026-04-24) ────────────────────────────────────
+// Spring output mute handles the burst, so the warmup hold is reduced
+// from 800ms to 200ms for faster transitions.
+
+describe('Warmup hold reduced with spring mute protection', () => {
+  it('_swapEchoEngine warmup is 200ms or less', () => {
+    const swapBlock = DUBBUS_SRC.match(/_swapEchoEngine[\s\S]*?const WARMUP_SEC = ([\d.]+)/);
+    expect(swapBlock).not.toBeNull();
+    expect(parseFloat(swapBlock![1])).toBeLessThanOrEqual(0.20);
+  });
+
+  it('_warmupMute hold is 200ms or less', () => {
+    const warmupBlock = DUBBUS_SRC.match(/_warmupMute[\s\S]*?const WARMUP_SEC = ([\d.]+)/);
+    expect(warmupBlock).not.toBeNull();
+    expect(parseFloat(warmupBlock![1])).toBeLessThanOrEqual(0.20);
+  });
+});

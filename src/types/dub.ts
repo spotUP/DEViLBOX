@@ -431,12 +431,14 @@ export const DUB_CHARACTER_PRESETS: Record<Exclude<DubBusSettings['characterPres
       echoIntensity:  0.65,   // more repeats — Tubby's signature multi-tap
       echoRateMs:     300,
       echoWet:        0.80,
-      springWet:      0.60,
+      springWet:      0.50,   // reduced from 0.60 — prevents echo+spring stacking
       sidechainAmount: 0.3,
       stereoWidth:    0.45,  // narrow — 4-track console + loose spring
       sweepAmount:    0,      // no flanger; Tubby's "sweep" was filter, not comb
       tapeSatMode:   'single',
       echoEngine:    're201',     // Tubby's MCI → RE-201 signal chain
+      chainOrder:    'springEcho', // spring FIRST: same fix as Perry — prevents
+                                    // each RE-201 repeat from adding new spring tail
       // Tubby's return EQ — the "Big Knob" sweep on the echo return.
       // Resonant midrange peak that he swept by hand during mixing.
       returnEqEnabled: true,

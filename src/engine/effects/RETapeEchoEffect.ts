@@ -251,7 +251,7 @@ export class RETapeEchoEffect extends Tone.ToneAudioNode {
     }
   }
 
-  private static async ensureModuleLoaded(context: AudioContext): Promise<void> {
+  static async ensureModuleLoaded(context: AudioContext): Promise<void> {
     if (moduleLoaded) return;
     if (moduleLoadPromise) return moduleLoadPromise;
 

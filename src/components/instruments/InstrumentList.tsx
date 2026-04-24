@@ -611,7 +611,7 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
                 className={`
                   instrument-list-item
                   flex items-center gap-2 px-2 py-1.5 cursor-pointer
-                  transition-colors group
+                  transition-colors group relative
                   ${isSelected
                     ? 'bg-ft2-cursor text-ft2-bg'
                     : 'hover:bg-ft2-header text-ft2-text'
@@ -676,7 +676,7 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
 
                 {/* Actions (visible on hover, always visible when selected) */}
                 {showActions && (
-                  <div className={`instrument-action-buttons flex gap-0.5 ${isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'} transition-opacity`}>
+                  <div className={`instrument-action-buttons flex gap-0.5 absolute right-1 ${isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'} transition-opacity`}>
                     <button
                       onClick={(e) => handlePopOut(e, instrument.id)}
                       className={`p-0.5 rounded ${isSelected ? 'hover:bg-ft2-bg/20 text-ft2-bg' : 'hover:bg-ft2-border text-accent-highlight'}`}
@@ -756,7 +756,7 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
                 draggable="true"
                 onDragStart={(e) => handleDragStart(e, instrument.id)}
                 className={`
-                  group flex items-center gap-2 px-3 py-2 cursor-pointer transition-all
+                  group flex items-center gap-2 px-3 py-2 cursor-pointer transition-all relative
                   ${isSelected
                     ? 'bg-accent-primary/20 border-l-2 border-accent-primary'
                     : 'hover:bg-dark-bgHover border-l-2 border-transparent'
@@ -851,7 +851,7 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
 
                 {/* Actions (on hover) */}
                 {showActions && (
-                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity ml-auto">
+                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity absolute right-2">
                     <button
                       onClick={(e) => handlePopOut(e, instrument.id)}
                       className="p-1 text-text-muted hover:text-accent-highlight"
