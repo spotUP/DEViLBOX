@@ -85,7 +85,7 @@ export const DUB_MOVE_KINDS: Record<string, 'trigger' | 'hold'> = {
   delayTimeThrow:    'trigger',
   backwardReverb:    'trigger',
   masterDrop:        'hold',
-  tapeStop:          'trigger',
+  tapeStop:          'hold',
   transportTapeStop: 'trigger',
   toast:             'hold',
   // ── PR #42 moves — kind matches move file (hold = startXxx returns a disposer) ──

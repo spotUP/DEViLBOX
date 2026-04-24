@@ -42,6 +42,7 @@ function makeMockBus() {
     throwEchoTime: vi.fn(),
     backwardReverb: vi.fn(async () => {}),
     tapeStop: vi.fn(),
+    startTapeHold: vi.fn(() => () => {}),
     soloChannelTap: vi.fn(() => () => {}),
     muteAndDub: vi.fn(() => () => {}),
     startDubStab: vi.fn(() => () => {}),
