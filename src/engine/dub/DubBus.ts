@@ -2699,8 +2699,23 @@ export class DubBus {
         }, (i + 1) * 80);
         timers.push(t);
       });
-      // Hold at peak, then sweep back down
+      // At peak: briefly boost the resonance gain for extra Altec character —
+      // the T-network rings more audibly at the top of the sweep.
       const riseMs = (steps.length + 1) * 80;
+      const peakResonanceTimer = setTimeout(() => {
+        timers.splice(timers.indexOf(peakResonanceTimer), 1);
+        const n = this.context.currentTime;
+        const baseDb = this.settings.hpfResonanceDb ?? 0;
+        rampBiquadParam(this.hpfResonance.gain, baseDb + 2.5, n, 0.06);
+        // Decay back to base after holdMs
+        const decayTimer = setTimeout(() => {
+          timers.splice(timers.indexOf(decayTimer), 1);
+          rampBiquadParam(this.hpfResonance.gain, baseDb, this.context.currentTime, 0.15);
+        }, holdMs);
+        timers.push(decayTimer);
+      }, riseMs);
+      timers.push(peakResonanceTimer);
+
       const downSteps = [...steps].reverse();
       downSteps.push(originHz);
       downSteps.forEach((hz, i) => {
@@ -2919,6 +2934,20 @@ export class DubBus {
     if (!engineChanging && !this._muteHoldActive) {
       const threshold = -6 - merged.sidechainAmount * 30;
       this.sidechain.threshold.setTargetAtTime(threshold, now, 0.05);
+    }
+
+    // Glue compressor bypass — Scientist mode. The research quotes him:
+    // "If you want to see a goddamn monster come out of me, try mastering
+    // a song with compression." When bypassed, set ratio to 1:1 (unity)
+    // and threshold to 0 dB so the compressor passes everything untouched.
+    if (!this._muteHoldActive) {
+      if (merged.glueBypass) {
+        this.glue.ratio.setTargetAtTime(1, now, 0.05);
+        this.glue.threshold.setTargetAtTime(0, now, 0.05);
+      } else {
+        this.glue.ratio.setTargetAtTime(3, now, 0.05);
+        this.glue.threshold.setTargetAtTime(-14, now, 0.05);
+      }
     }
 
     // ── Coloring params (research doc §3) ───────────────────────────────

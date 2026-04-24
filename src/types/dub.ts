@@ -136,6 +136,12 @@ export interface DubBusSettings {
   // coloring param when selected. 'custom' = user-edited, don't overwrite.
   characterPreset: 'custom' | 'tubby' | 'scientist' | 'perry' | 'madProfessor' | 'gatedFlanger';
 
+  /** Glue compressor bypass — Scientist mode. When true sets the glue
+   *  DynamicsCompressor to 1:1 ratio (unity), passing the signal untouched.
+   *  Research: Scientist explicitly rejected all bus compression as a design
+   *  principle. Default false (3:1 ratio, −14 dB threshold active). */
+  glueBypass: boolean;
+
   // ─── Altec-style stepped HPF (Tubby "Big Knob") ─────────────────────────
   // When true, the bus snaps hpfCutoff to the nearest of 11 discrete Altec
   // positions (70/100/150/250/500/1k/2k/3k/5k/7.5k/10k Hz) on every write.
@@ -177,6 +183,9 @@ export interface DubBusSettings {
   pingPongRMs: number;   // right delay time in ms (default: 450 = 1/2 at 120 BPM)
   pingPongFeedback: number; // feedback 0-0.9 (default 0.45)
   pingPongWet: number;   // 0-1 (default 0.65)
+  /** When true, L/R delay times auto-calculate from BPM: L = 3/8 beat,
+   *  R = 1/2 beat (the Ariwa SDE-3000 configuration). */
+  pingPongSyncToBpm: boolean;
 
   // ─── SpaceEcho head mode (RE-201 mode selector) ──────────────────────────
   // The RE-201 has 12 mode positions selecting which tape heads are active
@@ -362,12 +371,14 @@ export const DEFAULT_DUB_BUS: DubBusSettings = {
   stereoWidth:      1.0,
   characterPreset:  'custom',
 
+  glueBypass:       false,
   hpfStepped:       false,
   hpfResonanceDb:   0,
-  pingPongLMs:      337,   // ~3/8 note at 120 BPM
-  pingPongRMs:      450,   // ~1/2 note at 120 BPM
-  pingPongFeedback: 0.45,
-  pingPongWet:      0.65,
+  pingPongLMs:          337,   // ~3/8 note at 120 BPM
+  pingPongRMs:          450,   // ~1/2 note at 120 BPM
+  pingPongFeedback:     0.45,
+  pingPongWet:          0.65,
+  pingPongSyncToBpm:    false,
   sweepAmount:      0,
   sweepRateHz:      0.15,
   sweepDepthMs:     4,
@@ -507,6 +518,7 @@ export const DUB_CHARACTER_PRESETS: Record<Exclude<DubBusSettings['characterPres
     overrides: {
       returnGain:     0.65,
       hpfCutoff:       80,
+      glueBypass:      true,   // research: "try mastering a song with compression" — he rejected ALL bus comp
       hpfStepped:      false,
       bassShelfGainDb: 1,     // drier low end vs Tubby
       midScoopGainDb: -10, midScoopFreqHz: 700, midScoopQ: 1.6,  // deeper signature scoop
@@ -605,10 +617,11 @@ export const DUB_CHARACTER_PRESETS: Record<Exclude<DubBusSettings['characterPres
       tapeSatMode:   'single',
       echoFeedbackHpfHz: 400,   // research spec: cleaner HPF — Mad Prof hi-fi clarity
       echoFeedbackLpfHz: 8000,  // research spec: bright, articulate repeats — Lexicon PCM-70 character
-      pingPongLMs:      337,    // research: Ariwa SDE-3000 ran 3/8 note left
-      pingPongRMs:      450,    // research: Ariwa SDE-3000 ran 1/2 note right
-      pingPongFeedback: 0.50,
-      pingPongWet:      0.70,
+      pingPongLMs:          337,    // research: Ariwa SDE-3000 ran 3/8 note left
+      pingPongRMs:          450,    // research: Ariwa SDE-3000 ran 1/2 note right
+      pingPongFeedback:     0.50,
+      pingPongWet:          0.70,
+      pingPongSyncToBpm:    true,   // auto-follows song BPM — always metrically correct
       echoEngine:    're201',       // Ariwa studio's RE-201 for lush tape + spring
     },
     springsLength: 0.55, springsDamp: 0.45, springsChaos: 0.10, springsScatter: 0.55, springsTone: 0.65,
