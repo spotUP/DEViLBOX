@@ -119,7 +119,7 @@ function buildFakeBus() {
     startPingPong: vi.fn().mockReturnValue(vi.fn()),
     startEQSweep: vi.fn().mockReturnValue(vi.fn()),
     throwEchoTime: vi.fn(),
-    tapeStop: vi.fn(),
+    startTapeHold: vi.fn().mockReturnValue(vi.fn()),
     reverseEcho: vi.fn().mockResolvedValue(undefined),
     backwardReverb: vi.fn().mockResolvedValue(undefined),
     setEchoRate: vi.fn(),
@@ -365,10 +365,19 @@ describe.each([
 
 // ── tapeStop ───────────────────────────────────────────────────────────────
 describe('tapeStop', () => {
-  it('fires the bus tape-stop with default 0.6s down / 0.15s hold', () => {
+  it('calls startTapeHold with default 0.4s sweep and returns a disposer', () => {
     const { bus } = buildFakeBus();
-    tapeStop.execute(ctx(bus));
-    expect(bus.tapeStop).toHaveBeenCalledWith(0.6, 0.15);
+    const result = tapeStop.execute(ctx(bus));
+    expect(bus.startTapeHold).toHaveBeenCalledWith(0.4);
+    expect(result).not.toBeNull();
+    expect(typeof result?.dispose).toBe('function');
+  });
+  it('calling dispose invokes the bus release', () => {
+    const { bus } = buildFakeBus();
+    const result = tapeStop.execute(ctx(bus));
+    result?.dispose();
+    const releaseFn = (bus.startTapeHold as ReturnType<typeof vi.fn>).mock.results[0].value;
+    expect(releaseFn).toHaveBeenCalledTimes(1);
   });
 });
 
