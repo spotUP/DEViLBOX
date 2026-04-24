@@ -70,7 +70,7 @@ const GLOBAL_MOVES: Array<GlobalMove> = [
   { label: 'PING',   title: 'Sonar Ping — 1 kHz sine through the echo',         moveId: 'sonarPing',         color: 'accent-primary/70',  kind: 'trigger', group: 'click' },
   { label: 'RADIO',  title: 'Radio Riser — pink noise sweep 200 Hz → 5 kHz',    moveId: 'radioRiser',        color: 'accent-warning/70',  kind: 'trigger', group: 'click' },
   { label: 'SUB',    title: 'Sub Swell — 55 Hz sine pulse to return',            moveId: 'subSwell',          color: 'accent-primary',     kind: 'trigger', group: 'click' },
-  { label: 'STOP!',  title: 'Transport Tape Stop — real tempo+pitch slowdown (LibOpenMPT)',  moveId: 'transportTapeStop', color: 'accent-error',    kind: 'trigger', group: 'click' },
+  { label: 'STOP!',  title: 'Transport Tape Stop — hold to slow tempo+pitch to floor (LibOpenMPT), releases on let go', moveId: 'transportTapeStop', color: 'accent-error', kind: 'hold', group: 'hold' },
   { label: 'Reverse',  title: 'Reverse Echo — last 0.4 s of bus audio reversed and echoed',  moveId: 'reverseEcho',   color: 'accent-highlight/70', kind: 'trigger', group: 'click', needsSend: true },
   { label: 'Backward', title: 'Backward Reverb — last 0.8 s reversed through full bus chain', moveId: 'backwardReverb', color: 'accent-highlight',   kind: 'trigger', group: 'click', needsSend: true },
   { label: 'Throw',    title: 'Echo Throw — sweep echo delay time (pitch whoosh)',  moveId: 'delayTimeThrow',  color: 'accent-highlight/70', kind: 'trigger', group: 'click', needsSend: true },
@@ -101,7 +101,7 @@ const GLOBAL_MOVES: Array<GlobalMove> = [
   { label: 'Sweep',      title: 'EQ Sweep — resonant filter sweep (toggle)',                       moveId: 'eqSweep',      color: 'accent-highlight/70', kind: 'hold', group: 'toggle', needsSend: true },
   { label: 'Ring',       title: 'Ring Mod — metallic ring modulation (toggle)',                    moveId: 'ringMod',      color: 'accent-warning',     kind: 'hold', group: 'toggle', needsSend: true },
   { label: 'Starve',     title: 'Voltage Starve — bit-crush degradation (toggle)',                 moveId: 'voltageStarve', color: 'accent-error/70',   kind: 'hold', group: 'toggle', needsSend: true },
-  { label: 'PING',   title: 'Mad Professor Ping-Pong — Ariwa SDE-3000 L/R asymmetric stereo delay (toggle)', moveId: 'madProfPingPong', color: 'accent-highlight/70', kind: 'hold', group: 'toggle', needsSend: true },
+  { label: 'Ping-Pong', title: 'Mad Professor Ping-Pong — Ariwa SDE-3000 L/R asymmetric stereo delay (toggle)', moveId: 'madProfPingPong', color: 'accent-highlight/70', kind: 'hold', group: 'toggle', needsSend: true },
 ];
 
 // Map color tokens to button class fragments. Keeps Tailwind's JIT happy —

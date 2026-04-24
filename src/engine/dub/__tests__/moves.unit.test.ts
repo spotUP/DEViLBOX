@@ -506,8 +506,18 @@ describe('ghostReverb', () => {
     mixerMutations.setChannelDubSend.mockClear();
   });
 
-  it('returns null when channelId is undefined (global move guard)', () => {
+  it('ghosts all channels with non-zero sends when channelId is undefined', () => {
     const { bus } = buildFakeBus();
+    // mixerChannels[0] has dubSend: 0.3 (non-zero) — should be ghosted
+    const result = ghostReverb.execute(ctx(bus, {}));
+    expect(result).not.toBeNull();
+    expect(mixerMutations.setChannelMute).toHaveBeenCalledWith(0, true);
+    expect(mixerMutations.setChannelDubSend).toHaveBeenCalledWith(0, 1.0);
+  });
+
+  it('returns null when no channels have a send (nothing to ghost globally)', () => {
+    const { bus } = buildFakeBus();
+    mixerChannels[0].dubSend = 0;
     const result = ghostReverb.execute(ctx(bus, {}));
     expect(result).toBeNull();
   });
