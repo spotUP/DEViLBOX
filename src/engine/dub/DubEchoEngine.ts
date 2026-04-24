@@ -24,6 +24,10 @@ export interface DubEchoEngine {
   setRate(ms: number): void;
   setIntensity(amount: number): void;
   setIntensityInstant(amount: number): void;
+  /** In-feedback HPF — strips sub rumble per echo pass (RE-201 tape-head gap). */
+  setFeedbackHpf(hz: number): void;
+  /** In-feedback LPF — progressively darkens each repeat (tape-head wear). */
+  setFeedbackLpf(hz: number): void;
   get wet(): number;
   set wet(value: number);
   connect(dest: Tone.InputNode): this;
@@ -48,12 +52,16 @@ export class SpaceEchoAdapter implements DubEchoEngine {
       treble: -2,
       wow: 0.35,
       wet: settings.echoWet,
+      feedbackHpfHz: settings.echoFeedbackHpfHz,
+      feedbackLpfHz: settings.echoFeedbackLpfHz,
     });
   }
 
   setRate(ms: number): void { this.fx.setRate(ms); }
   setIntensity(amount: number): void { this.fx.setIntensity(amount); }
   setIntensityInstant(amount: number): void { this.fx.setIntensityInstant(amount); }
+  setFeedbackHpf(hz: number): void { this.fx.setFeedbackHpf(hz); }
+  setFeedbackLpf(hz: number): void { this.fx.setFeedbackLpf(hz); }
   get wet() { return this.fx.wet; }
   set wet(v: number) { this.fx.wet = v; }
   connect(dest: Tone.InputNode): this { this.fx.connect(dest); return this; }
@@ -97,6 +105,14 @@ export class RE201Adapter implements DubEchoEngine {
     this.fx.setIntensity(amount);
   }
 
+  // RE-201 WASM doesn't expose per-Hz feedback filter controls — its
+  // bass/treble knobs are 0-1 panel positions, not frequency values.
+  // The fallback JS path has a fixed 8 kHz LPF. These are intentional
+  // no-ops: the RE-201's inherent tape-head character provides equivalent
+  // darkening without a configurable filter.
+  setFeedbackHpf(_hz: number): void { /* RE-201 handles internally */ }
+  setFeedbackLpf(_hz: number): void { /* RE-201 handles internally */ }
+
   get wet() { return this.fx.wet; }
   set wet(v: number) { this.fx.wet = v; }
   connect(dest: Tone.InputNode): this { this.fx.connect(dest); return this; }
@@ -115,8 +131,8 @@ export class AnotherDelayAdapter implements DubEchoEngine {
       delayTime: settings.echoRateMs,
       feedback: settings.echoIntensity * 0.55,  // conservative — DubBus spring extends tail naturally
       gain: 1.0,
-      lowpass: 3000,
-      highpass: 150,
+      lowpass: settings.echoFeedbackLpfHz ?? 3000,
+      highpass: settings.echoFeedbackHpfHz ?? 150,
       flutterFreq: 3.5,
       flutterDepth: 0.002,   // barely perceptible — just enough for analog character
       wowFreq: 0.3,
@@ -138,6 +154,10 @@ export class AnotherDelayAdapter implements DubEchoEngine {
   setIntensityInstant(amount: number): void {
     this.fx.setFeedback(amount * 0.55);
   }
+
+  // AnotherDelayEffect has native setHighpass/setLowpass — route directly.
+  setFeedbackHpf(hz: number): void { this.fx.setHighpass(hz); }
+  setFeedbackLpf(hz: number): void { this.fx.setLowpass(hz); }
 
   get wet() { return this.fx.wet; }
   set wet(v: number) { this.fx.wet = v; }
@@ -185,6 +205,12 @@ export class RETapeEchoAdapter implements DubEchoEngine {
     // No instant variant — use normal setIntensity
     this.fx.setIntensity(amount);
   }
+
+  // RETapeEcho's playheadFilter is binary (4 kHz on/off); no per-Hz HPF.
+  // Map LPF: enable/disable the playhead filter based on whether LPF is below
+  // 8 kHz (typical tape range) or above (wants brightness). HPF is no-op.
+  setFeedbackHpf(_hz: number): void { /* BBD has no in-feedback HPF control */ }
+  setFeedbackLpf(hz: number): void { this.fx.setPlayheadFilter(hz < 8000); }
 
   get wet() { return this.fx.wet; }
   set wet(v: number) { this.fx.wet = v; }
