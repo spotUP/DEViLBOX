@@ -333,6 +333,41 @@ const RULES: Rule[] = [
   { moveId: 'delayPresetTriplet',
     condition: (c) => c.isNewBar && c.bar % 8 === 7,
     baseWeight: 0.08, wet: true },
+  // 380ms — King Tubby's classic chord delay. Fires on phrase starts.
+  { moveId: 'delayPreset380',
+    condition: (c) => c.isNewBar && c.bar % 8 === 0 && c.intensity > 0.3,
+    baseWeight: 0.12, wet: true },
+  // Quarter-note grid lock — rhythmically tight echo.
+  { moveId: 'delayPresetQuarter',
+    condition: (c) => c.isNewBar && c.bar % 8 === 4 && c.intensity > 0.4,
+    baseWeight: 0.10, wet: true },
+  // 8th note — double-time density, high-intensity moments.
+  { moveId: 'delayPreset8th',
+    condition: (c) => c.isNewBar && c.bar % 16 === 12 && c.intensity > 0.6,
+    baseWeight: 0.08, wet: true },
+  // 16th — machine-gun echo, sparing use at peak intensity.
+  { moveId: 'delayPreset16th',
+    condition: (c) => c.isNewBar && c.bar % 16 === 8 && c.intensity > 0.75,
+    baseWeight: 0.06, wet: true },
+  // Doubler — 25ms slapback, odd-bar fills.
+  { moveId: 'delayPresetDoubler',
+    condition: (c) => c.isNewBar && c.bar % 12 === 11 && c.intensity > 0.5,
+    baseWeight: 0.07, wet: true },
+  // Echo time throw — pitch whoosh on bar 2 of 4, builds tension.
+  { moveId: 'delayTimeThrow',
+    condition: (c) => c.isNewBar && c.bar % 4 === 2 && c.intensity > 0.4,
+    baseWeight: 0.14, wet: true },
+  // Master Drop — mutes dry, lets echo tail ring. Dramatic phrase transition.
+  { moveId: 'masterDrop',
+    condition: (c) => c.isNewBar && c.bar % 8 === 0 && c.intensity > 0.5,
+    baseWeight: 0.10, holdBars: 1 },
+  // Tape Wobble — LFO on echo rate, 2-bar hands-free texture.
+  { moveId: 'tapeWobble',
+    condition: (c) => c.isNewBar && c.bar % 4 === 1 && c.intensity > 0.35,
+    baseWeight: 0.10, holdBars: 2, wet: true },
+  // oscBass and crushBass are intentionally excluded from AutoDub:
+  // both are self-oscillating generators that stomp on the mix when
+  // auto-fired. They are manual-only performance pads.
 ];
 
 /** Unique move IDs Auto Dub can fire. Deduplicated from RULES — several
