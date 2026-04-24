@@ -93,6 +93,8 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
     undo: s.undo, redo: s.redo, canUndo: s.canUndo, canRedo: s.canRedo,
   })));
 
+  const editorFullscreen = useUIStore((s) => s.editorFullscreen);
+
   const handleUndo = useCallback(() => {
     if (!canUndo()) return;
     const pattern = undo();
@@ -498,105 +500,139 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
     { id: 'nibbles', label: 'Nibbles', icon: <Gamepad2 size={14} />, onClick: () => setShowNibbles(true) },
   ];
 
+  // Action buttons — rendered in row 2 normally, or inline in row 1 when fullscreened.
+  const actionButtons = (
+    <>
+      <DropdownButton
+        items={hamburgerMenuItems}
+        zIndex={200}
+        className="inline-flex items-center justify-center gap-2 font-medium transition-colors focus:outline-none btn-ghost btn-sm px-1.5"
+      >
+        <Menu size={16} />
+      </DropdownButton>
+      <Button variant={isPlayingSong ? 'danger' : 'primary'} size="sm"
+        onClick={(e) => {
+          if (isPlayingSong && e.shiftKey) { e.preventDefault(); getTrackerScratchController().triggerPowerCut(); }
+          else if (isPlaying && (e.altKey || e.metaKey)) {
+            e.preventDefault();
+            const replayer = getTrackerReplayer();
+            replayer.forcePosition(0, 0);
+            setIsLooping(false);
+          }
+          else { handlePlaySong(); }
+        }}
+        onContextMenu={(e) => {
+          if (isPlayingSong) { e.preventDefault(); getTrackerScratchController().triggerPowerCut(); }
+        }}
+        title={isPlayingSong ? 'Click: Stop (spindown) · Alt+click: Restart · Shift+click: Power off' : 'Play Song'}
+        className="min-w-[72px]">{isPlayingSong ? 'Stop Song' : 'Play Song'}</Button>
+      <Button variant={isPlayingPattern ? 'danger' : 'primary'} size="sm"
+        onClick={(e) => {
+          if (isPlayingPattern && e.shiftKey) { e.preventDefault(); getTrackerScratchController().triggerPowerCut(); }
+          else if (isPlaying && (e.altKey || e.metaKey)) {
+            e.preventDefault();
+            const replayer = getTrackerReplayer();
+            replayer.forcePosition(replayer.getSongPos(), 0);
+            setIsLooping(true);
+          }
+          else { handlePlayPattern(); }
+        }}
+        onContextMenu={(e) => {
+          if (isPlayingPattern) { e.preventDefault(); getTrackerScratchController().triggerPowerCut(); }
+        }}
+        title={isPlayingPattern ? 'Click: Stop (spindown) · Alt+click: Restart · Shift+click: Power off' : 'Play Pattern'}
+        className="min-w-[88px]">{isPlayingPattern ? 'Stop Pattern' : 'Play Pattern'}</Button>
+      <Button variant="ghost" size="sm" onClick={() => setShowFileBrowser(true)} disabled={isLoading} loading={isLoading}>Load</Button>
+      <Button variant="ghost" size="sm" onClick={handleSave} title="Save to browser & download .dbx (Ctrl+S)">Save</Button>
+      <Button variant="ghost" size="sm" onClick={handleUndo} disabled={!canUndo()} title="Undo (Ctrl+Z)">Undo</Button>
+      <Button variant="ghost" size="sm" onClick={handleRedo} disabled={!canRedo()} title="Redo (Ctrl+Shift+Z)">Redo</Button>
+      <MIDIToolbarDropdown />
+      <Button
+        variant={asidEnabled ? 'primary' : 'default'}
+        size="sm"
+        onClick={handleToggleASID}
+        title={asidEnabled ? `ASID active${asidReady ? '' : ' (no device)'}` : 'Enable ASID hardware SID output'}
+        className={asidEnabled ? 'text-green-400 border-green-500/50' : 'text-text-muted'}
+      >Hardware</Button>
+    </>
+  );
+
   return (
     <div className="ft2-toolbar">
-      <div className="flex flex-1 min-w-0 flex-wrap gap-y-1 items-start overflow-hidden">
-        <div className="min-w-0 flex-1 overflow-hidden">
-          <div className="ft2-toolbar-row">
+      {editorFullscreen ? (
+        /* Fullscreen compact mode: single row with numerics + action buttons side by side */
+        <div className="flex items-center gap-1.5 w-full overflow-x-auto no-scrollbar">
+          <div className="ft2-toolbar-row shrink-0">
             <div className="ft2-section ft2-col-1">
-              <FT2NumericInput label="Position" value={displayPositionIndex} onChange={handlePositionChange} min={0} max={patternOrder.length - 1} />
+              <FT2NumericInput label="Pos" value={displayPositionIndex} onChange={handlePositionChange} min={0} max={patternOrder.length - 1} />
             </div>
             <div className="ft2-section ft2-col-3">
-              <FT2NumericInput label="Pattern" value={patternOrder[displayPositionIndex] ?? currentPatternIndex} onChange={handlePatternChange} min={0} max={patterns.length - 1} />
-            </div>
-            <div className="ft2-section ft2-col-3">
-              <FT2NumericInput
-                label="Length"
-                value={patternLength}
-                onChange={handleLengthChange}
-                min={1}
-                max={256}
-                presets={[
-                  { label: '16 rows', value: 16 },
-                  { label: '32 rows', value: 32 },
-                  { label: '48 rows', value: 48 },
-                  { label: '64 rows (default)', value: 64 },
-                  { label: '96 rows', value: 96 },
-                  { label: '128 rows', value: 128 },
-                  { label: '192 rows', value: 192 },
-                  { label: '256 rows (max)', value: 256 },
-                ]}
-              />
+              <FT2NumericInput label="Pat" value={patternOrder[displayPositionIndex] ?? currentPatternIndex} onChange={handlePatternChange} min={0} max={patterns.length - 1} />
             </div>
             <div className="ft2-section ft2-col-4">
-              <FT2NumericInput label="Edit Step" value={editStep} onChange={setEditStep} min={0} max={16} />
+              <FT2NumericInput label="Step" value={editStep} onChange={setEditStep} min={0} max={16} />
             </div>
             <div className="ft2-section ft2-col-3">
-              <FT2NumericInput label="Speed" value={speed} onChange={setSpeed} min={1} max={31} />
+              <FT2NumericInput label="Spd" value={speed} onChange={setSpeed} min={1} max={31} />
             </div>
             <div className="ft2-section ft2-col-2">
               <FT2NumericInput label="BPM" value={bpm} onChange={setBPM} min={32} max={255} throttleMs={50} />
             </div>
-            <div className="ft2-section ft2-col-3">
-              <FT2NumericInput label="Song Len" value={songLength} onChange={handleSongLengthChange} min={1} max={256} />
+          </div>
+          <div className="w-px h-5 bg-dark-border shrink-0" />
+          {actionButtons}
+        </div>
+      ) : (
+        /* Normal two-row layout */
+        <>
+          <div className="flex flex-1 min-w-0 flex-wrap gap-y-1 items-start overflow-hidden">
+            <div className="min-w-0 flex-1 overflow-hidden">
+              <div className="ft2-toolbar-row">
+                <div className="ft2-section ft2-col-1">
+                  <FT2NumericInput label="Position" value={displayPositionIndex} onChange={handlePositionChange} min={0} max={patternOrder.length - 1} />
+                </div>
+                <div className="ft2-section ft2-col-3">
+                  <FT2NumericInput label="Pattern" value={patternOrder[displayPositionIndex] ?? currentPatternIndex} onChange={handlePatternChange} min={0} max={patterns.length - 1} />
+                </div>
+                <div className="ft2-section ft2-col-3">
+                  <FT2NumericInput
+                    label="Length"
+                    value={patternLength}
+                    onChange={handleLengthChange}
+                    min={1}
+                    max={256}
+                    presets={[
+                      { label: '16 rows', value: 16 },
+                      { label: '32 rows', value: 32 },
+                      { label: '48 rows', value: 48 },
+                      { label: '64 rows (default)', value: 64 },
+                      { label: '96 rows', value: 96 },
+                      { label: '128 rows', value: 128 },
+                      { label: '192 rows', value: 192 },
+                      { label: '256 rows (max)', value: 256 },
+                    ]}
+                  />
+                </div>
+                <div className="ft2-section ft2-col-4">
+                  <FT2NumericInput label="Edit Step" value={editStep} onChange={setEditStep} min={0} max={16} />
+                </div>
+                <div className="ft2-section ft2-col-3">
+                  <FT2NumericInput label="Speed" value={speed} onChange={setSpeed} min={1} max={31} />
+                </div>
+                <div className="ft2-section ft2-col-2">
+                  <FT2NumericInput label="BPM" value={bpm} onChange={setBPM} min={32} max={255} throttleMs={50} />
+                </div>
+                <div className="ft2-section ft2-col-3">
+                  <FT2NumericInput label="Song Len" value={songLength} onChange={handleSongLengthChange} min={1} max={256} />
+                </div>
+              </div>
             </div>
           </div>
-        </div>
-
-        </div>
-      <div className="flex items-center gap-1.5 w-full overflow-x-auto no-scrollbar">
-        <DropdownButton
-          items={hamburgerMenuItems}
-          zIndex={200}
-          className="inline-flex items-center justify-center gap-2 font-medium transition-colors focus:outline-none btn-ghost btn-sm px-1.5"
-        >
-          <Menu size={16} />
-        </DropdownButton>
-              <Button variant={isPlayingSong ? 'danger' : 'primary'} size="sm"
-                onClick={(e) => {
-                  if (isPlayingSong && e.shiftKey) { e.preventDefault(); getTrackerScratchController().triggerPowerCut(); }
-                  else if (isPlaying && (e.altKey || e.metaKey)) {
-                    e.preventDefault();
-                    const replayer = getTrackerReplayer();
-                    replayer.forcePosition(0, 0);
-                    setIsLooping(false);
-                  }
-                  else { handlePlaySong(); }
-                }}
-                onContextMenu={(e) => {
-                  if (isPlayingSong) { e.preventDefault(); getTrackerScratchController().triggerPowerCut(); }
-                }}
-                title={isPlayingSong ? 'Click: Stop (spindown) · Alt+click: Restart · Shift+click: Power off' : 'Play Song'}
-                className="min-w-[72px]">{isPlayingSong ? 'Stop Song' : 'Play Song'}</Button>
-              <Button variant={isPlayingPattern ? 'danger' : 'primary'} size="sm"
-                onClick={(e) => {
-                  if (isPlayingPattern && e.shiftKey) { e.preventDefault(); getTrackerScratchController().triggerPowerCut(); }
-                  else if (isPlaying && (e.altKey || e.metaKey)) {
-                    e.preventDefault();
-                    const replayer = getTrackerReplayer();
-                    replayer.forcePosition(replayer.getSongPos(), 0);
-                    setIsLooping(true);
-                  }
-                  else { handlePlayPattern(); }
-                }}
-                onContextMenu={(e) => {
-                  if (isPlayingPattern) { e.preventDefault(); getTrackerScratchController().triggerPowerCut(); }
-                }}
-                title={isPlayingPattern ? 'Click: Stop (spindown) · Alt+click: Restart · Shift+click: Power off' : 'Play Pattern'}
-                className="min-w-[88px]">{isPlayingPattern ? 'Stop Pattern' : 'Play Pattern'}</Button>
-        <Button variant="ghost" size="sm" onClick={() => setShowFileBrowser(true)} disabled={isLoading} loading={isLoading}>Load</Button>
-        <Button variant="ghost" size="sm" onClick={handleSave} title="Save to browser & download .dbx (Ctrl+S)">Save</Button>
-        <Button variant="ghost" size="sm" onClick={handleUndo} disabled={!canUndo()} title="Undo (Ctrl+Z)">Undo</Button>
-        <Button variant="ghost" size="sm" onClick={handleRedo} disabled={!canRedo()} title="Redo (Ctrl+Shift+Z)">Redo</Button>
-        <MIDIToolbarDropdown />
-        <Button
-          variant={asidEnabled ? 'primary' : 'default'}
-          size="sm"
-          onClick={handleToggleASID}
-          title={asidEnabled ? `ASID active${asidReady ? '' : ' (no device)'}` : 'Enable ASID hardware SID output'}
-          className={asidEnabled ? 'text-green-400 border-green-500/50' : 'text-text-muted'}
-        >Hardware</Button>
-      </div>
+          <div className="flex items-center gap-1.5 w-full overflow-x-auto no-scrollbar">
+            {actionButtons}
+          </div>
+        </>
+      )}
 
       <ImportModuleDialog
         isOpen={showImportDialog}
