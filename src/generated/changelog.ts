@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-04-23T09:59:52.747Z
+ * Generated: 2026-04-24T13:37:44.985Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,10 +19,10 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.6094';
-export const BUILD_NUMBER = '6094';
-export const BUILD_HASH = '8483160e8';
-export const BUILD_DATE = '2026-04-23';
+export const BUILD_VERSION = '1.0.6134';
+export const BUILD_NUMBER = '6134';
+export const BUILD_HASH = 'b27ded6f1';
+export const BUILD_DATE = '2026-04-24';
 
 // Full version (patch IS the build number, so no need to append)
 export const FULL_VERSION = BUILD_VERSION;
@@ -30,9 +30,175 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.6094',
+    version: '1.0.6134',
+    date: '2026-04-24',
+    changes: [
+      {
+        type: 'fix',
+        "description": "Tubby springEcho, BBD treble, WASM pre-heat, faster swap, hover layout"
+      },
+      {
+        type: 'fix',
+        "description": "Spring output mute during warmup + Perry springEcho chain order"
+      },
+      {
+        type: 'fix',
+        "description": "Tune RE201 and AnotherDelay adapter voicing"
+      },
+      {
+        type: 'fix',
+        "description": "RE201 WASM stability — fix NaN at 640ms from unstable filters"
+      },
+      {
+        type: 'fix',
+        "description": "Mute-hold guard prevents spring burst leak during echo engine swap"
+      },
+      {
+        type: 'fix',
+        "description": "Fix dry bus — ConvolverNode null buffer + feedback cycle without DelayNode"
+      },
+      {
+        type: 'fix',
+        "description": "Resonance Tamer — transient-vs-sustained discrimination"
+      },
+      {
+        type: 'feature',
+        "description": "Phase 3+ — chain reorder, ext feedback, club sim, intros, macros"
+      }
+    ]
+  },
+  {
+    version: '2026-04-23',
     date: '2026-04-23',
     changes: [
+      {
+        type: 'feature',
+        "description": "Phase 2 — ghost reverb, siren presets, post-echo sat, ring mod, lo-fi"
+      },
+      {
+        type: 'feature',
+        "description": "Phase 1 — return EQ, true phaser, spring kick, delay presets"
+      },
+      {
+        type: 'feature',
+        "description": "Test: add contract test for compressor ratio bypass during echo swap"
+      },
+      {
+        type: 'fix',
+        "description": "Bypass compressors with ratio=1 during echo swap"
+      },
+      {
+        type: 'fix',
+        "description": "Defer spring params until return_ is at 0, disable sidechain during swap"
+      },
+      {
+        type: 'fix',
+        "description": "Remove spring input/output mute — was starving delay lines, killing reverb"
+      },
+      {
+        type: 'fix',
+        "description": "Mute spring input+output during param transitions + debounce slider updates"
+      },
+      {
+        type: 'fix',
+        "description": "Mute spring JS output during param transitions"
+      },
+      {
+        type: 'fix',
+        "description": "Root-cause — smooth Aelapse params in worklet, revert band-aids"
+      },
+      {
+        type: 'fix',
+        "description": "Revert DRYWET=0 hack, lower ceiling, slow recovery ramp"
+      },
+      {
+        type: 'fix',
+        "description": "Mute spring INTERNALLY during preset param storm"
+      },
+      {
+        type: 'fix',
+        "description": "Safety limiter on spring.output + longer warmup holds"
+      },
+      {
+        type: 'improvement',
+        "description": "Diag(dub): SpringTap — measure spring.output RMS for 2s after preset change"
+      },
+      {
+        type: 'feature',
+        "description": "Diag(dub): add [DubBusCtrl]/[DubBusSnap] logs for interactive walkthrough"
+      },
+      {
+        type: 'fix',
+        "description": "Warmup mute on same-engine preset transitions (Tubby↔MadProfessor)"
+      },
+      {
+        type: 'fix',
+        "description": "Hold feedback+return muted 120ms after engine swap to bleed WASM startup transient"
+      },
+      {
+        type: 'fix',
+        "description": "Third NaN-scrubber between echo→spring protects spring worklet"
+      },
+      {
+        type: 'fix',
+        "description": "Reverse-chain-order preserves forward NaN-scrubber"
+      },
+      {
+        type: 'fix',
+        "description": "Chore(dub): remove scrubber amplitude telemetry — fix confirmed"
+      },
+      {
+        type: 'improvement',
+        "description": "Diag(dub): scrubber amplitude telemetry + drop explicit channel forcing"
+      },
+      {
+        type: 'fix',
+        "description": "Forward scrubber is NaN-only, no tanh — fixes 'dreaded bass sound'"
+      },
+      {
+        type: 'fix',
+        "description": "Forward scrubber uses native .connect() — reverb no longer silent"
+      },
+      {
+        type: 'fix',
+        "description": "Forward NaN-scrubber on spring.output → sidechain"
+      },
+      {
+        type: 'fix',
+        "description": "Eliminate scrubber race + soft-limit feedback runaway"
+      },
+      {
+        type: 'fix',
+        "description": "NaN-scrubber AudioWorklet on feedback tap prevents Tubby crash"
+      },
+      {
+        type: 'improvement',
+        "description": "Diag(dub): log biquad + gain node state pre/post character preset pick"
+      },
+      {
+        type: 'fix',
+        "description": "Apply fallback-disconnect-first to RETapeEcho + AnotherDelay"
+      },
+      {
+        type: 'fix',
+        "description": "Safe biquad automation to prevent 'state is bad' NaN latch"
+      },
+      {
+        type: 'fix',
+        "description": "Transactional echo-engine swap + RE-201 fallback/WASM ordering"
+      },
+      {
+        type: 'improvement',
+        "description": "Test: contract test for Phase 4 standalone per-voice synths"
+      },
+      {
+        type: 'improvement',
+        "description": "Route UADESynth to wasm-info editor"
+      },
+      {
+        type: 'improvement',
+        "description": "Expose Eupmini/PreTracker/RonKlaren/Sawteeth synths in browser"
+      },
       {
         type: 'improvement',
         "description": "Dub: smoother lane playhead (match PatternEditorCanvas drain pattern)"
@@ -72,172 +238,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'fix',
         "description": "Debug: trace setSidVoiceDubSend path selection for slider→reverb issue"
-      },
-      {
-        type: 'fix',
-        "description": "SID channel sliders — no reverb + audio stutter"
-      },
-      {
-        type: 'feature',
-        "description": "Animate channel faders during dub tap open/close"
-      },
-      {
-        type: 'feature',
-        "description": "Animate dub deck buttons and faders on move fire"
-      },
-      {
-        type: 'fix',
-        "description": "WASM worklets crash in AudioWorklet — environment shims"
-      },
-      {
-        type: 'fix',
-        "description": "SID channel dub sends silent with websid — whole-mix fallback"
-      },
-      {
-        type: 'fix',
-        "description": "SID dub synths pulse-wave instruments silent — pulse width was 0"
-      },
-      {
-        type: 'fix',
-        "description": "SID dub synths use playTestNote for reliable note triggering"
-      },
-      {
-        type: 'fix',
-        "description": "SID dub bus — zero baseline, sync voice tap routing, singleton accessor"
-      },
-      {
-        type: 'feature',
-        "description": "Expand SID dub synths — 8 siren presets, 9 new instruments, preset selection"
-      },
-      {
-        type: 'feature',
-        "description": "Per-voice SID echo throws, GT Ultra presets, SidMon2 synth browser"
-      },
-      {
-        type: 'improvement',
-        "description": "SID dub synths (GTUltra WASM), auto-dub format warning, 16 tests"
-      },
-      {
-        type: 'fix',
-        "description": "Fix master FX preset display: derive active preset via fingerprint matching"
-      },
-      {
-        type: 'fix',
-        "description": "SID per-voice mute/solo — track bitmask per engine"
-      }
-    ]
-  },
-  {
-    version: '2026-04-22',
-    date: '2026-04-22',
-    changes: [
-      {
-        type: 'fix',
-        "description": "Connect SID engine output to dub bus send"
-      },
-      {
-        type: 'feature',
-        "description": "Swappable DubBus echo engine + RE-201/AnotherDelay master FX presets"
-      },
-      {
-        type: 'feature',
-        "description": "Add dub/sound system presets to all reverb and echo effects"
-      },
-      {
-        type: 'feature',
-        "description": "Proper dub/sound system presets for RE-201 and AnotherDelay"
-      },
-      {
-        type: 'feature',
-        "description": "Port RE-201 Space Echo and AnotherDelay to WASM"
-      },
-      {
-        type: 'improvement',
-        "description": "Keyboard navigation UX overhaul: menus, focus rings, focus traps, dynamic shortcuts"
-      },
-      {
-        type: 'feature',
-        "description": "Add UI labeling rule to CLAUDE.md — never abbreviate labels"
-      },
-      {
-        type: 'improvement',
-        "description": "Use full readable words for DJ FX pad labels instead of abbreviations"
-      },
-      {
-        type: 'improvement',
-        "description": "Route DJ FX pads through DubBus WASM effects instead of naive Web Audio"
-      },
-      {
-        type: 'fix',
-        "description": "Siren pad fires actual synth instead of silent feedback ramp"
-      },
-      {
-        type: 'improvement',
-        "description": "Color-tinted backgrounds for FX pads, stem controls, and drum pads"
-      },
-      {
-        type: 'improvement',
-        "description": "Make stem controls and FX pads look like proper buttons"
-      },
-      {
-        type: 'improvement',
-        "description": "Increase text sizes across all dub components + add hover info bar"
-      },
-      {
-        type: 'improvement',
-        "description": "Increase dub strip button and text sizes for readability"
-      },
-      {
-        type: 'feature',
-        "description": "Loop all songs by default in DJ view"
-      },
-      {
-        type: 'feature',
-        "description": "Playlist-level stem separation — auto-queue on add + bulk separate"
-      },
-      {
-        type: 'feature',
-        "description": "Add server status badges to app header"
-      },
-      {
-        type: 'feature',
-        "description": "Add preview/apply/discard flow to sample enhancer"
-      },
-      {
-        type: 'feature',
-        "description": "Add progress bar to sample enhancer panel"
-      },
-      {
-        type: 'feature',
-        "description": "Add 4-stem / 6-stem model selector for Demucs separation"
-      },
-      {
-        type: 'fix',
-        "description": "Scope port cleanup to DEViLBOX-owned processes only"
-      },
-      {
-        type: 'improvement',
-        "description": "Stream Auto Dub — autonomous dub effects for DJ audio decks"
-      },
-      {
-        type: 'improvement',
-        "description": "DJ stem mixer UI + per-stem waveform visualization"
-      },
-      {
-        type: 'feature',
-        "description": "Add stem separation priority queue, pre-separation, and auto-load"
-      },
-      {
-        type: 'improvement',
-        "description": "Persist stem separation results across component unmount/remount"
-      },
-      {
-        type: 'feature',
-        "description": "Add fine-grained stem separation progress from WASM log parsing"
-      },
-      {
-        type: 'fix',
-        "description": "Fix stem button not visible after HMR (undefined vs null guard)"
       }
     ]
   }

@@ -325,15 +325,24 @@ describe('DubBus pre-heats WASM modules on construction', () => {
 // from 800ms to 200ms for faster transitions.
 
 describe('Warmup hold reduced with spring mute protection', () => {
-  it('_swapEchoEngine warmup is 200ms or less', () => {
+  it('_swapEchoEngine warmup is 400ms or less', () => {
     const swapBlock = DUBBUS_SRC.match(/_swapEchoEngine[\s\S]*?const WARMUP_SEC = ([\d.]+)/);
     expect(swapBlock).not.toBeNull();
-    expect(parseFloat(swapBlock![1])).toBeLessThanOrEqual(0.20);
+    expect(parseFloat(swapBlock![1])).toBeLessThanOrEqual(0.40);
   });
 
-  it('_warmupMute hold is 200ms or less', () => {
+  it('_warmupMute hold is 400ms or less', () => {
     const warmupBlock = DUBBUS_SRC.match(/_warmupMute[\s\S]*?const WARMUP_SEC = ([\d.]+)/);
     expect(warmupBlock).not.toBeNull();
-    expect(parseFloat(warmupBlock![1])).toBeLessThanOrEqual(0.20);
+    expect(parseFloat(warmupBlock![1])).toBeLessThanOrEqual(0.40);
+  });
+
+  it('_swapEchoEngine mutes spring input AND output during hold', () => {
+    const swapBlock = DUBBUS_SRC.match(/_swapEchoEngine[\s\S]*?setTimeout\(\(\) => \{[\s\S]*?\}, RAMP_SEC/);
+    expect(swapBlock).not.toBeNull();
+    expect(swapBlock![0]).toContain('spring.muteInput()');
+    expect(swapBlock![0]).toContain('spring.muteOutput()');
+    expect(swapBlock![0]).toContain('spring.unmuteInput()');
+    expect(swapBlock![0]).toContain('spring.unmuteOutput()');
   });
 });

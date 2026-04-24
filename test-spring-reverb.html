@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Spring Reverb Isolated Test</title>
+  <style>
+    body { background: #111; color: #eee; font: 13px/1.6 monospace; padding: 20px; }
+    .pass { color: #4f4; } .fail { color: #f44; } .warn { color: #fa0; }
+    button { font: 14px monospace; padding: 8px 16px; margin: 4px; cursor: pointer; }
+    #log { white-space: pre-wrap; max-height: 80vh; overflow-y: auto; }
+    table { border-collapse: collapse; margin: 10px 0; }
+    td, th { border: 1px solid #444; padding: 4px 8px; text-align: right; }
+    th { background: #222; }
+  </style>
+</head>
+<body>
+<h2>🔧 Spring Reverb Isolated Test</h2>
+<p>Tests the Aelapse spring reverb WASM in isolation — no DubBus, no sidechain, no compressor.</p>
+<button onclick="runAllTests()">▶ Run All Tests</button>
+<button onclick="runSingleTest('tubby')">Test Tubby</button>
+<button onclick="runSingleTest('madProfessor')">Test Mad Professor</button>
+<button onclick="runSingleTest('scientist')">Test Scientist</button>
+<button onclick="runSingleTest('perry')">Test Perry</button>
+<button onclick="testMuteUnmute()">Test Mute/Unmute</button>
+<div id="log"></div>
+
+<script>
+const PRESETS = {
+  tubby:        { length: 0.35, damp: 0.55, chaos: 0.20, scatter: 0.60, tone: 0.55, springWet: 0.60 },
+  madProfessor: { length: 0.55, damp: 0.45, chaos: 0.10, scatter: 0.55, tone: 0.65, springWet: 0.68 },
+  scientist:    { length: 0.55, damp: 0.25, chaos: 0.40, scatter: 0.40, tone: 0.70, springWet: 0.40 },
+  perry:        { length: 0.65, damp: 0.10, chaos: 0.85, scatter: 0.85, tone: 0.35, springWet: 0.75 },
+};
+
+// Param IDs from AelapseEffect.ts
+const PARAM = {
+  DELAY_ACTIVE: 0, DELAY_DRYWET: 1, DELAY_SECONDS: 2, DELAY_FEEDBACK: 3,
+  SPRINGS_ACTIVE: 9, SPRINGS_DRYWET: 10, SPRINGS_WIDTH: 11,
+  SPRINGS_LENGTH: 12, SPRINGS_DECAY: 13, SPRINGS_DAMP: 14,
+  SPRINGS_SHAPE: 15, SPRINGS_TONE: 16, SPRINGS_SCATTER: 17, SPRINGS_CHAOS: 18,
+};
+
+let ctx, springWorklet, inputGain, wetGain, analyser;
+const logEl = document.getElementById('log');
+
+function log(msg, cls) {
+  const span = document.createElement('span');
+  span.className = cls || '';
+  span.textContent = msg + '\n';
+  logEl.appendChild(span);
+  logEl.scrollTop = logEl.scrollHeight;
+}
+
+function rms(buf) {
+  let sum = 0;
+  for (let i = 0; i < buf.length; i++) sum += buf[i] * buf[i];
+  return Math.sqrt(sum / buf.length);
+}
+
+function peak(buf) {
+  let mx = 0;
+  for (let i = 0; i < buf.length; i++) { const a = Math.abs(buf[i]); if (a > mx) mx = a; }
+  return mx;
+}
+
+function dB(v) { return v > 0 ? (20 * Math.log10(v)).toFixed(1) : '-Inf'; }
+
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+async function ensureAudio() {
+  if (ctx) return;
+  ctx = new AudioContext({ sampleRate: 48000 });
+  await ctx.resume();
+  log(`AudioContext: ${ctx.sampleRate}Hz, state=${ctx.state}`);
+
+  // Load worklet
+  await ctx.audioWorklet.addModule('/aelapse/Aelapse.worklet.js');
+  log('Aelapse worklet loaded');
+
+  // Create worklet node
+  springWorklet = new AudioWorkletNode(ctx, 'aelapse-processor', {
+    numberOfInputs: 1, numberOfOutputs: 1,
+    outputChannelCount: [2],
+  });
+
+  // Load WASM
+  const wasmResp = await fetch('/aelapse/Aelapse.wasm');
+  const wasmBuf = await wasmResp.arrayBuffer();
+  springWorklet.port.postMessage({ type: 'init', wasmBinary: wasmBuf });
+  log('WASM binary sent to worklet');
+
+  // Wait for WASM ready
+  await new Promise((resolve) => {
+    springWorklet.port.onmessage = (e) => {
+      if (e.data?.type === 'ready') {
+        log('WASM ready ✓');
+        resolve();
+      }
+    };
+  });
+
+  // Disable delay, enable springs
+  setParam(PARAM.DELAY_ACTIVE, 0);
+  setParam(PARAM.SPRINGS_ACTIVE, 1);
+  setParam(PARAM.SPRINGS_DRYWET, 0.5);
+
+  // Build graph: inputGain → worklet → wetGain → analyser → destination
+  inputGain = ctx.createGain();
+  inputGain.gain.value = 1;
+  wetGain = ctx.createGain();
+  wetGain.gain.value = 1;
+  analyser = ctx.createAnalyser();
+  analyser.fftSize = 2048;
+  analyser.smoothingTimeConstant = 0;
+
+  inputGain.connect(springWorklet);
+  springWorklet.connect(wetGain);
+  wetGain.connect(analyser);
+  analyser.connect(ctx.destination);
+
+  log('Graph: inputGain → worklet → wetGain → analyser → speakers');
+  log('');
+}
+
+function setParam(id, value) {
+  springWorklet.port.postMessage({ type: 'parameter', paramId: id, value });
+}
+
+function applyPreset(name) {
+  const p = PRESETS[name];
+  setParam(PARAM.SPRINGS_LENGTH, p.length);
+  setParam(PARAM.SPRINGS_DAMP, p.damp);
+  setParam(PARAM.SPRINGS_CHAOS, p.chaos);
+  setParam(PARAM.SPRINGS_SCATTER, p.scatter);
+  setParam(PARAM.SPRINGS_TONE, p.tone);
+  setParam(PARAM.SPRINGS_DRYWET, p.springWet);
+}
+
+function measure() {
+  const buf = new Float32Array(analyser.fftSize);
+  analyser.getFloatTimeDomainData(buf);
+  return { rms: rms(buf), peak: peak(buf) };
+}
+
+// Feed white noise into the spring
+function startNoise() {
+  const bufSize = ctx.sampleRate * 2;
+  const noiseBuf = ctx.createBuffer(1, bufSize, ctx.sampleRate);
+  const data = noiseBuf.getChannelData(0);
+  for (let i = 0; i < bufSize; i++) data[i] = (Math.random() * 2 - 1) * 0.3;
+  const src = ctx.createBufferSource();
+  src.buffer = noiseBuf;
+  src.loop = true;
+  src.connect(inputGain);
+  src.start();
+  return src;
+}
+
+async function measureOverTime(label, durationMs, intervalMs) {
+  const results = [];
+  const ticks = Math.floor(durationMs / intervalMs);
+  for (let i = 0; i < ticks; i++) {
+    await sleep(intervalMs);
+    const m = measure();
+    results.push({ t: (i + 1) * intervalMs, ...m });
+  }
+  log(`\n  ${label}:`);
+  log('  Time(ms)  RMS          Peak         RMS(dB)  Peak(dB)');
+  log('  ───────── ──────────── ──────────── ──────── ────────');
+  for (const r of results) {
+    log(`  ${String(r.t).padStart(7)}   ${r.rms.toFixed(6).padStart(10)}   ${r.peak.toFixed(6).padStart(10)}   ${dB(r.rms).padStart(6)}   ${dB(r.peak).padStart(6)}`);
+  }
+  return results;
+}
+
+async function runSingleTest(presetName) {
+  await ensureAudio();
+  log(`\n${'═'.repeat(60)}`);
+  log(`TEST: ${presetName.toUpperCase()} preset`);
+  log('═'.repeat(60));
+
+  // Start with default params, let spring settle
+  setParam(PARAM.SPRINGS_LENGTH, 0.5);
+  setParam(PARAM.SPRINGS_DAMP, 0.3);
+  setParam(PARAM.SPRINGS_CHAOS, 0.1);
+  setParam(PARAM.SPRINGS_SCATTER, 0.5);
+  setParam(PARAM.SPRINGS_TONE, 0.5);
+  setParam(PARAM.SPRINGS_DRYWET, 0.5);
+
+  const noise = startNoise();
+
+  // Phase 1: baseline with default params
+  log('\n[Phase 1] Baseline — default params, noise feeding');
+  await sleep(500);
+  const baseline = await measureOverTime('Baseline', 600, 200);
+
+  // Phase 2: switch to target preset WITHOUT mute (the old way)
+  log('\n[Phase 2] Switch to ' + presetName + ' WITHOUT mute — raw param change');
+  applyPreset(presetName);
+  const raw = await measureOverTime('Raw switch', 2000, 200);
+  const rawPeak = Math.max(...raw.map(r => r.peak));
+  const rawSteady = raw[raw.length - 1].rms;
+
+  // Phase 3: reset, re-establish baseline, then switch WITH input+output mute
+  setParam(PARAM.SPRINGS_LENGTH, 0.5);
+  setParam(PARAM.SPRINGS_DAMP, 0.3);
+  setParam(PARAM.SPRINGS_CHAOS, 0.1);
+  setParam(PARAM.SPRINGS_SCATTER, 0.5);
+  setParam(PARAM.SPRINGS_TONE, 0.5);
+  setParam(PARAM.SPRINGS_DRYWET, 0.5);
+  await sleep(500);
+
+  log('\n[Phase 3] Switch to ' + presetName + ' WITH input+output mute (600ms)');
+  inputGain.gain.value = 0;   // mute input
+  wetGain.gain.value = 0;     // mute output
+  applyPreset(presetName);
+  // Wait 600ms for WASM to settle
+  await sleep(600);
+  inputGain.gain.value = 1;   // unmute input
+  wetGain.gain.value = 1;     // unmute output
+  const muted = await measureOverTime('Muted switch', 2000, 200);
+  const mutedPeak = Math.max(...muted.map(r => r.peak));
+  const mutedSteady = muted[muted.length - 1].rms;
+
+  // Phase 4: steady-state — just let it run and measure
+  log('\n[Phase 4] Steady state after muted switch');
+  const steady = await measureOverTime('Steady state', 2000, 500);
+  const steadyAvg = steady.reduce((s, r) => s + r.rms, 0) / steady.length;
+
+  noise.stop();
+  noise.disconnect();
+
+  // Summary
+  log('\n' + '─'.repeat(60));
+  log(`SUMMARY: ${presetName}`);
+  log('─'.repeat(60));
+  log(`  Raw switch peak:      ${rawPeak.toFixed(4)} (${dB(rawPeak)}dB)`);
+  log(`  Muted switch peak:    ${mutedPeak.toFixed(4)} (${dB(mutedPeak)}dB)`);
+  log(`  Peak reduction:       ${((1 - mutedPeak/rawPeak) * 100).toFixed(1)}%`);
+  log(`  Raw steady RMS:       ${rawSteady.toFixed(6)} (${dB(rawSteady)}dB)`);
+  log(`  Muted steady RMS:     ${mutedSteady.toFixed(6)} (${dB(mutedSteady)}dB)`);
+  log(`  Long-run avg RMS:     ${steadyAvg.toFixed(6)} (${dB(steadyAvg)}dB)`);
+
+  if (steadyAvg > 0.01) {
+    log(`  ✅ Reverb IS producing output (${dB(steadyAvg)}dB)`, 'pass');
+  } else {
+    log(`  ❌ Reverb output too low or silent (${dB(steadyAvg)}dB)`, 'fail');
+  }
+
+  if (mutedPeak > 1.0) {
+    log(`  ⚠️  Peak > 1.0 even with mute — would trigger compressor`, 'warn');
+  } else if (mutedPeak > 0.5) {
+    log(`  ⚠️  Peak ${mutedPeak.toFixed(2)} — moderate, compressor may reduce`, 'warn');
+  } else {
+    log(`  ✅ Peak ${mutedPeak.toFixed(2)} — clean transition`, 'pass');
+  }
+  log('');
+}
+
+async function testMuteUnmute() {
+  await ensureAudio();
+  log(`\n${'═'.repeat(60)}`);
+  log('TEST: MUTE/UNMUTE MECHANISM');
+  log('═'.repeat(60));
+
+  const noise = startNoise();
+
+  // Let spring build up with default params
+  await sleep(500);
+  log('\n[1] Baseline — spring running, noise in');
+  const pre = await measureOverTime('Before mute', 400, 200);
+
+  // Mute input + output
+  log('\n[2] Muting input + output...');
+  inputGain.gain.value = 0;
+  wetGain.gain.value = 0;
+  const during = await measureOverTime('During mute (should be silent)', 600, 200);
+
+  // Unmute
+  log('\n[3] Unmuting input + output...');
+  inputGain.gain.value = 1;
+  wetGain.gain.value = 1;
+  const after = await measureOverTime('After unmute', 2000, 200);
+
+  noise.stop();
+  noise.disconnect();
+
+  const prePeak = Math.max(...pre.map(r => r.peak));
+  const duringPeak = Math.max(...during.map(r => r.peak));
+  const afterPeak = Math.max(...after.map(r => r.peak));
+  const afterSteady = after[after.length - 1].rms;
+
+  log('\n' + '─'.repeat(60));
+  log('MUTE/UNMUTE SUMMARY');
+  log('─'.repeat(60));
+  log(`  Pre-mute peak:     ${prePeak.toFixed(4)} (${dB(prePeak)}dB)`);
+  log(`  During-mute peak:  ${duringPeak.toFixed(6)} (${dB(duringPeak)}dB)  ${duringPeak < 0.001 ? '✅ silent' : '❌ NOT silent'}`, duringPeak < 0.001 ? 'pass' : 'fail');
+  log(`  Post-unmute peak:  ${afterPeak.toFixed(4)} (${dB(afterPeak)}dB)  ${afterPeak < 1.0 ? '✅ no boom' : '❌ BOOM'}`, afterPeak < 1.0 ? 'pass' : 'fail');
+  log(`  Post-unmute steady: ${afterSteady.toFixed(6)} (${dB(afterSteady)}dB)  ${afterSteady > 0.01 ? '✅ reverb alive' : '❌ reverb dead'}`, afterSteady > 0.01 ? 'pass' : 'fail');
+  log('');
+}
+
+async function runAllTests() {
+  logEl.textContent = '';
+  log('Starting all spring reverb tests...\n');
+  for (const name of Object.keys(PRESETS)) {
+    await runSingleTest(name);
+  }
+  await testMuteUnmute();
+  log('\n' + '═'.repeat(60));
+  log('ALL TESTS COMPLETE');
+  log('═'.repeat(60));
+}
+</script>
+</body>
+</html>
