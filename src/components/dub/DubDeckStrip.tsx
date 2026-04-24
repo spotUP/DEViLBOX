@@ -704,12 +704,10 @@ export const DubDeckStrip: React.FC = () => {
 
       {!stripCollapsed && (
       <>
-      {/* Hover info bar — shows description of hovered button */}
-      {hoverHint && (
-        <div className="px-3 py-1 bg-dark-bg border border-dark-borderLight rounded text-xs text-text-secondary font-mono truncate">
-          {hoverHint}
-        </div>
-      )}
+      {/* Hover info bar — always rendered to reserve space and prevent layout jitter */}
+      <div className={`px-3 py-1 border rounded text-xs font-mono truncate ${hoverHint ? 'bg-dark-bg border-dark-borderLight text-text-secondary' : 'border-transparent text-transparent'}`}>
+        {hoverHint || '\u00A0'}
+      </div>
 
       {/* Master section — TONE EQ + global generators + global processors.
           Kept as full-width bands above the channel strips so the layout
