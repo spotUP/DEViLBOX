@@ -1007,6 +1007,43 @@ export const DubDeckStrip: React.FC = () => {
             />
             <span className="w-12 text-text-secondary">{dubBusSettings.stereoWidth.toFixed(2)}×</span>
           </div>
+          {/* Comb sweep / phaser wet amount + mode toggle */}
+          <div className="flex items-center gap-1.5">
+            <button
+              className={`px-1.5 py-0.5 rounded text-[10px] font-mono border transition-colors ${
+                dubBusSettings.sweepMode === 'phaser'
+                  ? 'bg-accent-secondary/20 border-accent-secondary text-accent-secondary'
+                  : 'bg-dark-bgTertiary border-dark-borderLight text-text-muted'
+              }`}
+              onClick={() => setDubBus({ sweepMode: dubBusSettings.sweepMode === 'phaser' ? 'comb' : 'phaser', characterPreset: 'custom' })}
+              disabled={!busEnabled}
+              title={`Sweep mode: ${dubBusSettings.sweepMode === 'phaser' ? 'Phaser (all-pass cascade, Perry Mutron Bi-Phase)' : 'Comb (short-delay flanger, liquid dub sweep)'} — click to toggle`}
+            >
+              {dubBusSettings.sweepMode === 'phaser' ? 'Phaser' : 'Comb'}
+            </button>
+            <span>SWEEP</span>
+            <input
+              type="range" min={0} max={1} step={0.01}
+              value={dubBusSettings.sweepAmount}
+              onChange={(e) => setDubBus({ sweepAmount: Number(e.target.value), characterPreset: 'custom' })}
+              className="w-20 accent-accent-secondary"
+              disabled={!busEnabled}
+              title={`${dubBusSettings.sweepMode === 'phaser' ? 'Phaser' : 'Comb sweep'} wet amount ${Math.round(dubBusSettings.sweepAmount * 100)}% · 0 = off · Perry = 0.50 (phaser), Gated Flanger = 0.65 (comb)`}
+            />
+            <span className="w-8 text-text-secondary">{Math.round(dubBusSettings.sweepAmount * 100)}%</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span>RATE</span>
+            <input
+              type="range" min={0.05} max={3} step={0.05}
+              value={dubBusSettings.sweepRateHz}
+              onChange={(e) => setDubBus({ sweepRateHz: Number(e.target.value), characterPreset: 'custom' })}
+              className="w-20 accent-accent-secondary"
+              disabled={!busEnabled || dubBusSettings.sweepAmount === 0}
+              title={`Sweep LFO rate ${dubBusSettings.sweepRateHz.toFixed(2)} Hz · slow (0.1) = dreamy Jamaican wash, fast (1+) = metallic flutter`}
+            />
+            <span className="w-12 text-text-secondary">{dubBusSettings.sweepRateHz.toFixed(2)}Hz</span>
+          </div>
           <span className="flex-1" />
         </div>
 
