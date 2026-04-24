@@ -357,4 +357,55 @@ describe('Warmup hold reduced with spring mute protection', () => {
     expect(swapBlock![0]).toContain('spring.unmuteInput()');
     expect(swapBlock![0]).toContain('spring.unmuteOutput()');
   });
+
+  it('firePing routes through bus input (full chain) not echo or return directly', () => {
+    const firePingBlock = DUBBUS_SRC.match(/firePing\([\s\S]*?\n  \}/);
+    expect(firePingBlock).not.toBeNull();
+    const body = firePingBlock![0];
+    // Must connect to this.input (bus input → full chain: HPF → tapeSat → echo → spring)
+    expect(body).toContain('env.connect(this.input)');
+    // Must NOT connect directly to echo.input or return_ (bypasses bus coloration)
+    expect(body).not.toMatch(/connect\(this\.echo\.input/);
+    expect(body).not.toMatch(/connect\(this\.return_\)/);
+  });
+});
+
+describe('dub move contracts', () => {
+  const MASTER_DROP_SRC = readFileSync(
+    resolve(dirname(fileURLToPath(import.meta.url)), '../moves/masterDrop.ts'),
+    'utf8',
+  );
+  const TOAST_SRC = readFileSync(
+    resolve(dirname(fileURLToPath(import.meta.url)), '../moves/toast.ts'),
+    'utf8',
+  );
+  const TAPE_STOP_SRC = readFileSync(
+    resolve(dirname(fileURLToPath(import.meta.url)), '../moves/transportTapeStop.ts'),
+    'utf8',
+  );
+
+  it('masterDrop uses fresh ctx.currentTime inside async callback', () => {
+    // The async IIFE must capture currentTime AFTER the await, not before
+    expect(MASTER_DROP_SRC).toMatch(/const collected = await collectDryGains[\s\S]*?const t = ctx\.currentTime/);
+  });
+
+  it('masterDrop notifies user when no dry gains found', () => {
+    expect(MASTER_DROP_SRC).toContain('useNotificationStore');
+  });
+
+  it('toast notifies user when DJ mic is not active', () => {
+    expect(TOAST_SRC).toContain('useNotificationStore');
+    expect(TOAST_SRC).toMatch(/notify\.warning.*mic/i);
+  });
+
+  it('toast ducks WASM engine outputs in addition to Tone.js buses', () => {
+    expect(TOAST_SRC).toContain('LibopenmptEngine');
+    expect(TOAST_SRC).toContain('HivelyEngine');
+    expect(TOAST_SRC).toContain('UADEEngine');
+    expect(TOAST_SRC).toContain('FurnaceDispatchEngine');
+  });
+
+  it('transportTapeStop notifies user on non-LibOpenMPT engines', () => {
+    expect(TAPE_STOP_SRC).toContain('useNotificationStore');
+  });
 });

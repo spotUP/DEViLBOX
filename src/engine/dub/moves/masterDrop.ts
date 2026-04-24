@@ -69,21 +69,30 @@ export const masterDrop: DubMove = {
     const releaseSec = params.releaseSec ?? this.defaults.releaseSec;
     const ctx = bus.inputNode.context as AudioContext;
 
-    // Snapshot + ramp eagerly in a promise; on dispose, ramp back.
+    // Snapshot + ramp. Tone.js buses are available synchronously; WASM
+    // engines require dynamic imports but resolve near-instantly (modules
+    // are already loaded). Using fresh `ctx.currentTime` inside the
+    // callback avoids scheduling ramps at stale timestamps.
     const pairs: Array<{ param: AudioParam; prev: number }> = [];
     let disposed = false;
 
     void (async () => {
       const collected = await collectDryGains();
-      if (disposed) return;  // already released while collecting — just no-op
-      const now = ctx.currentTime;
-      console.log(`[masterDrop] fired — dry gains collected: ${collected.length} (${collected.length === 0 ? 'NO ENGINES FOUND — drop will be INAUDIBLE' : 'ramping to 0'})`);
+      if (disposed) return;
+      const t = ctx.currentTime;
+      if (collected.length === 0) {
+        console.warn('[masterDrop] no dry gains found — drop will be inaudible');
+        void import('@/stores/useNotificationStore').then(({ notify }) =>
+          notify.warning('Drop: no active audio sources found'));
+      } else {
+        console.log(`[masterDrop] fired — ramping ${collected.length} dry gains to 0`);
+      }
       for (const entry of collected) {
         pairs.push(entry);
         try {
-          entry.param.cancelScheduledValues(now);
-          entry.param.setValueAtTime(entry.param.value, now);
-          entry.param.linearRampToValueAtTime(0, now + attackSec);
+          entry.param.cancelScheduledValues(t);
+          entry.param.setValueAtTime(entry.param.value, t);
+          entry.param.linearRampToValueAtTime(0, t + attackSec);
         } catch { /* ok */ }
       }
     })();

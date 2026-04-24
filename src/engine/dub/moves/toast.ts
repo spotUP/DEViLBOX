@@ -28,6 +28,8 @@ export const toast: DubMove = {
     const src = mic?.getSourceNode?.();
     if (!mic?.isActive || !src) {
       console.warn('[toast] no active DJ mic — start the mic in the DJ view first');
+      void import('@/stores/useNotificationStore').then(({ notify }) =>
+        notify.warning('Toast needs the DJ mic — start it in the DJ view first'));
       return null;
     }
 
@@ -53,22 +55,47 @@ export const toast: DubMove = {
       return null;
     }
 
-    // Duck Tone.js buses (sample + synth). WASM replayer outputs would need
-    // their own ramping — deferred.
-    let prevSample = 1;
-    let prevSynth = 1;
+    // Duck ALL audio buses — Tone.js + any active WASM replayer outputs.
+    // This ensures the voice sits cleanly over the music regardless of
+    // which engine is playing.
+    const duckedParams: Array<{ param: AudioParam; prev: number }> = [];
     try {
       const tone = getToneEngine();
-      prevSample = tone.masterInput.gain.value;
-      prevSynth = tone.synthBus.gain.value;
       const now = ctx.currentTime;
-      tone.masterInput.gain.cancelScheduledValues(now);
-      tone.masterInput.gain.setValueAtTime(prevSample, now);
-      tone.masterInput.gain.linearRampToValueAtTime(prevSample * duckFactor, now + attackSec);
-      tone.synthBus.gain.cancelScheduledValues(now);
-      tone.synthBus.gain.setValueAtTime(prevSynth, now);
-      tone.synthBus.gain.linearRampToValueAtTime(prevSynth * duckFactor, now + attackSec);
+      for (const g of [tone.masterInput.gain, tone.synthBus.gain]) {
+        const prev = g.value;
+        duckedParams.push({ param: g as unknown as AudioParam, prev });
+        g.cancelScheduledValues(now);
+        g.setValueAtTime(prev, now);
+        g.linearRampToValueAtTime(prev * duckFactor, now + attackSec);
+      }
     } catch { /* tone engine not ready */ }
+
+    // Duck WASM engine outputs (best-effort, async)
+    void (async () => {
+      const engineLoaders = [
+        () => import('@/engine/libopenmpt/LibopenmptEngine').then(m => m.LibopenmptEngine),
+        () => import('@/engine/hively/HivelyEngine').then(m => m.HivelyEngine),
+        () => import('@/engine/uade/UADEEngine').then(m => m.UADEEngine),
+        () => import('@/engine/furnace-dispatch/FurnaceDispatchEngine').then(m => m.FurnaceDispatchEngine),
+      ];
+      const now = ctx.currentTime;
+      for (const load of engineLoaders) {
+        try {
+          const E = await load();
+          if (E && (E as any).hasInstance?.() ) {
+            const inst = (E as any).getInstance();
+            const g = (inst.output as GainNode | undefined)?.gain;
+            if (g) {
+              duckedParams.push({ param: g, prev: g.value });
+              g.cancelScheduledValues(now);
+              g.setValueAtTime(g.value, now);
+              g.linearRampToValueAtTime(g.value * duckFactor, now + attackSec);
+            }
+          }
+        } catch { /* engine not loaded */ }
+      }
+    })();
 
     return {
       dispose() {
@@ -81,16 +108,14 @@ export const toast: DubMove = {
             try { tap.disconnect(); } catch { /* ok */ }
           }, Math.ceil((releaseSec + 0.05) * 1000));
         } catch { /* ok */ }
-        try {
-          const tone = getToneEngine();
-          const t = ctx.currentTime;
-          tone.masterInput.gain.cancelScheduledValues(t);
-          tone.masterInput.gain.setValueAtTime(tone.masterInput.gain.value, t);
-          tone.masterInput.gain.linearRampToValueAtTime(prevSample, t + releaseSec);
-          tone.synthBus.gain.cancelScheduledValues(t);
-          tone.synthBus.gain.setValueAtTime(tone.synthBus.gain.value, t);
-          tone.synthBus.gain.linearRampToValueAtTime(prevSynth, t + releaseSec);
-        } catch { /* ok */ }
+        // Restore all ducked gains
+        for (const { param, prev } of duckedParams) {
+          try {
+            param.cancelScheduledValues(now);
+            param.setValueAtTime(param.value, now);
+            param.linearRampToValueAtTime(prev, now + releaseSec);
+          } catch { /* ok */ }
+        }
       },
     };
   },

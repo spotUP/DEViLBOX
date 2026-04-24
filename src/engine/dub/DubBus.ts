@@ -4180,7 +4180,7 @@ export class DubBus {
    * across 3 tape heads. Clean tone, short envelope, ride the default
    * echo rate. Classic Tubby / Perry transition accent.
    */
-  firePing(freq = 1000, durationMs = 140, level = 0.8): void {
+  firePing(freq = 1000, durationMs = 200, level = 0.8): void {
     if (!this.enabled) return;
     // SID mode: triangle ping
     if (this._sidMode && this._sidSynths?.isReady) {
@@ -4200,21 +4200,15 @@ export class DubBus {
       env.gain.setValueAtTime(0, now);
       env.gain.linearRampToValueAtTime(peak, now + 0.005);
       env.gain.exponentialRampToValueAtTime(Math.max(0.0001, peak * 0.01), now + durationMs / 1000);
-      // Route into echo input so the repeats stack; small parallel to return_
-      // so the first ping lands audibly even if return gain is low.
-      const toEcho = ctx.createGain();
-      toEcho.gain.value = 1.0;
-      env.connect(toEcho);
-      const echoIn = this.echo.input as unknown as Tone.InputNode;
-      Tone.connect(toEcho, echoIn);
-      const toReturn = ctx.createGain();
-      toReturn.gain.value = 0.6;
-      env.connect(toReturn);
-      toReturn.connect(this.return_);
+      // Route into the bus input so the ping passes through the full chain:
+      // HPF → tapeSat → echo → spring → sidechain → return. This gives
+      // the ping the bus character (tape color, spring reverb, echo repeats)
+      // instead of sounding like a flat beep.
+      env.connect(this.input);
       osc.start(now);
       osc.stop(now + durationMs / 1000 + 0.02);
       osc.onended = () => {
-        try { env.disconnect(); toEcho.disconnect(); toReturn.disconnect(); } catch { /* ok */ }
+        try { env.disconnect(); } catch { /* ok */ }
       };
     } catch (err) {
       console.warn('[DubBus] firePing failed:', err);
