@@ -73,6 +73,8 @@ import { eqSweep } from '../moves/eqSweep';
 import { ghostReverb } from '../moves/ghostReverb';
 import { voltageStarve } from '../moves/voltageStarve';
 import { ringMod } from '../moves/ringMod';
+import { hpfRise } from '../moves/hpfRise';
+import { madProfPingPong } from '../moves/madProfPingPong';
 
 /**
  * A `DubBus` stub where every method under test is a spy. Methods that
@@ -113,6 +115,8 @@ function buildFakeBus() {
     fireSubSwell: vi.fn(),
     slamSpring: vi.fn(),
     kickSpring: vi.fn(),
+    startHpfRise: vi.fn().mockReturnValue(vi.fn()),
+    startPingPong: vi.fn().mockReturnValue(vi.fn()),
     startEQSweep: vi.fn().mockReturnValue(vi.fn()),
     throwEchoTime: vi.fn(),
     tapeStop: vi.fn(),
@@ -578,5 +582,53 @@ describe('ringMod', () => {
     expect(bus.setSettings).toHaveBeenLastCalledWith(
       expect.objectContaining({ ringModEnabled: false, ringModAmount: 0 }),
     );
+  });
+});
+
+describe('hpfRise', () => {
+  it('calls startHpfRise with default peakHz and holdMs', () => {
+    const { bus } = buildFakeBus();
+    hpfRise.execute(ctx(bus, {}));
+    expect(bus.startHpfRise).toHaveBeenCalledWith(2000, 1000);
+  });
+
+  it('forwards custom peakHz and holdMs from params', () => {
+    const { bus } = buildFakeBus();
+    hpfRise.execute(ctx(bus, { params: { peakHz: 5000, holdMs: 500 } }));
+    expect(bus.startHpfRise).toHaveBeenCalledWith(5000, 500);
+  });
+
+  it('returns a handle with dispose that calls the startHpfRise release fn', () => {
+    const releaseFn = vi.fn();
+    const { bus } = buildFakeBus();
+    bus.startHpfRise.mockReturnValue(releaseFn);
+    const handle = hpfRise.execute(ctx(bus, {}));
+    expect(handle).not.toBeNull();
+    handle!.dispose();
+    expect(releaseFn).toHaveBeenCalled();
+  });
+});
+
+describe('madProfPingPong', () => {
+  it('calls startPingPong with default L/R delays, feedback, and wet', () => {
+    const { bus } = buildFakeBus();
+    madProfPingPong.execute(ctx(bus, {}));
+    expect(bus.startPingPong).toHaveBeenCalledWith(337, 450, 0.5, 0.7);
+  });
+
+  it('forwards custom params to startPingPong', () => {
+    const { bus } = buildFakeBus();
+    madProfPingPong.execute(ctx(bus, { params: { lMs: 200, rMs: 300, feedback: 0.6, wet: 0.8 } }));
+    expect(bus.startPingPong).toHaveBeenCalledWith(200, 300, 0.6, 0.8);
+  });
+
+  it('returns a handle with dispose that calls the startPingPong release fn', () => {
+    const releaseFn = vi.fn();
+    const { bus } = buildFakeBus();
+    bus.startPingPong.mockReturnValue(releaseFn);
+    const handle = madProfPingPong.execute(ctx(bus, {}));
+    expect(handle).not.toBeNull();
+    handle!.dispose();
+    expect(releaseFn).toHaveBeenCalled();
   });
 });
