@@ -4506,6 +4506,33 @@ export class DubBus {
   getEchoRateMs(): number { return this.settings.echoRateMs; }
 
   /**
+   * Drain echo/feedback content when all channel sends go to 0.
+   * Instantly zeroes the echo feedback and external feedback loop so the
+   * delay lines drain within one cycle (~300ms) instead of sustaining
+   * indefinitely. Restores settings after 1.5s so the next send-open
+   * has full echo available immediately.
+   */
+  drainEchoContent(): void {
+    if (!this.enabled || this._disposed) return;
+    const savedIntensity = this.settings.echoIntensity;
+    const savedExtFb = this.settings.extFeedbackGain;
+    const now = this.context.currentTime;
+    try {
+      this.echo.setIntensityInstant(0);
+      this.extFeedbackGain.gain.cancelScheduledValues(now);
+      this.extFeedbackGain.gain.setTargetAtTime(0, now, 0.02);
+    } catch { /* ok */ }
+    setTimeout(() => {
+      if (this._disposed) return;
+      try {
+        this.echo.setIntensity(savedIntensity);
+        const t = this.context.currentTime;
+        this.extFeedbackGain.gain.setTargetAtTime(savedExtFb, t, 0.1);
+      } catch { /* ok */ }
+    }, 1500);
+  }
+
+  /**
    * Connect an external audio source (e.g. mic) into the bus input with its
    * own gain node. Returns a controller so the caller can adjust gain or
    * disconnect without knowing the bus internals.

@@ -527,6 +527,18 @@ export const DubDeckStrip: React.FC = () => {
     0,
     ...channels.slice(0, visibleChannelCount).map(c => c?.dubSend ?? 0),
   );
+  // Drain echo feedback when all channel sends go to 0 — prevents the
+  // Space Echo (and other delay engines) from sustaining or growing
+  // indefinitely via their feedback loops when there's no input signal.
+  const prevAnySendRef = useRef(anySend);
+  useEffect(() => {
+    const wasActive = prevAnySendRef.current;
+    prevAnySendRef.current = anySend;
+    if (wasActive && !anySend && busEnabled) {
+      try { ensureDrumPadEngine().getDubBus().drainEchoContent(); } catch { /* ok */ }
+    }
+  }, [anySend, busEnabled]);
+
   // Previously auto-seeded every channel's dubSend to 0.4 on bus-enable
   // for instant gratification. Removed — it turned "enable bus" into
   // "everything gets bathed in echo+spring" which drowned master insert

@@ -109,8 +109,9 @@ export class SpaceEchoEffect extends Tone.ToneAudioNode {
 
     this.echoGain = new Tone.Gain(this._options.echoVolume);
 
-    // 3. Feedback Loop
-    this.feedbackGain = new Tone.Gain(this._options.intensity);
+    // 3. Feedback Loop — clamp at construction so the initial gain can never
+    // exceed unity regardless of what options were passed.
+    this.feedbackGain = new Tone.Gain(Math.max(0, Math.min(0.95, this._options.intensity)));
     this.saturation = new Tone.Distortion(0.1);
     this.eq = new Tone.EQ3({
       low: this._options.bass,
@@ -194,9 +195,17 @@ export class SpaceEchoEffect extends Tone.ToneAudioNode {
     const h2 = [2, 4, 6, 8, 9, 11].includes(mode);
     const h3 = [3, 4, 7, 9, 10, 11].includes(mode);
 
-    this.head1Gain.gain.rampTo(h1 ? 1 : 0, 0.1);
-    this.head2Gain.gain.rampTo(h2 ? 1 : 0, 0.1);
-    this.head3Gain.gain.rampTo(h3 ? 1 : 0, 0.1);
+    // Normalize by active head count so the sum into the feedback loop is
+    // always 1.0 regardless of how many heads are active. Without this,
+    // each additional head adds another copy of the signal — with 2 heads
+    // the sum is 2× and loop gain = 2 × echoGain × feedbackGain, which
+    // exceeds 1.0 at any moderate feedback setting and causes exponential
+    // growth ("eating up" the mix). N heads → each head gain = 1/N.
+    const activeCount = [h1, h2, h3].filter(Boolean).length || 1;
+    const headGain = 1 / activeCount;
+    this.head1Gain.gain.rampTo(h1 ? headGain : 0, 0.1);
+    this.head2Gain.gain.rampTo(h2 ? headGain : 0, 0.1);
+    this.head3Gain.gain.rampTo(h3 ? headGain : 0, 0.1);
 
     const reverbOn = mode >= 5;
     this.reverbGain.gain.rampTo(reverbOn ? this._options.reverbVolume : 0, 0.1);
