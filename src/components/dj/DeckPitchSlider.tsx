@@ -8,6 +8,7 @@
 
 import React, { useCallback, useRef, useEffect, useState } from 'react';
 import { useDJStore } from '@/stores/useDJStore';
+import { setDeckRepitchLock } from '@/engine/dj/DJActions';
 
 interface DeckPitchSliderProps {
   deckId: 'A' | 'B' | 'C';
@@ -19,6 +20,7 @@ const HANDLE_HEIGHT = 24;  // px - height of the rectangular handle
 
 export const DeckPitchSlider: React.FC<DeckPitchSliderProps> = ({ deckId }) => {
   const pitchOffset = useDJStore((s) => s.decks[deckId].pitchOffset);
+  const repitchLock = useDJStore((s) => s.decks[deckId].repitchLock);
   const setDeckPitch = useDJStore((s) => s.setDeckPitch);
 
   // Use ref pattern from CLAUDE.md for drag handling to avoid stale state
@@ -112,6 +114,21 @@ export const DeckPitchSlider: React.FC<DeckPitchSliderProps> = ({ deckId }) => {
 
   return (
     <div className="flex flex-col items-center gap-2 select-none h-full">
+      {/* Repitch lock chip — only visible when locked */}
+      <button
+        className={
+          'px-1.5 py-0.5 rounded text-[9px] font-bold font-mono border transition-colors shrink-0 ' +
+          (repitchLock
+            ? 'bg-accent-warning/20 border-accent-warning text-accent-warning'
+            : 'bg-dark-bgTertiary border-dark-borderLight text-text-secondary hover:border-accent-warning hover:text-accent-warning')
+        }
+        onClick={() => setDeckRepitchLock(deckId, !repitchLock)}
+        title={repitchLock
+          ? 'Repitch Lock ON — fader moves without changing pitch. Click or press Tab/\\ to unlock.'
+          : 'Repitch Lock OFF — pitch follows fader. Click or press Tab/\\ to lock.'}
+      >
+        {repitchLock ? 'LOCK' : 'lock'}
+      </button>
       {/* Slider track container — fills available height */}
       <div
         ref={trackRef}

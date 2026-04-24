@@ -168,6 +168,10 @@ export class DeckEngine {
   // Current pitch state (for hot-swap)
   private _currentPitchSemitones = 0;
 
+  // Repitch lock — when true, fader moves update the store visually but do
+  // NOT change the audible rate. Unlocking re-applies the fader position.
+  private _repitchLocked = false;
+
   // Slip mode for audio playback + scratch
   private _slipEnabled = false;
   private slipGhostPosition = 0;       // Where the track "would be" if not scratching/looping
@@ -681,9 +685,17 @@ export class DeckEngine {
     if (!Number.isFinite(semitones)) semitones = 0;
     if (semitones > 16) semitones = 16;
     else if (semitones < -16) semitones = -16;
+
+    // Always track the fader position — needed so unlock can restore it.
+    this._currentPitchSemitones = semitones;
+
+    // While repitchLock is on: store updates and the fader moves visually,
+    // but we don't touch the audio graph. restMultiplier is also held so
+    // scratch recovery returns to the locked rate, not the fader position.
+    if (this._repitchLocked) return;
+
     const multiplier = Math.pow(2, semitones / 12);
     this.restMultiplier = multiplier;                // Always track — scratch/pattern restore target
-    this._currentPitchSemitones = semitones;
 
     // KEY LOCK: when on, pitch/detune are pinned to neutral so the audible
     // pitch stays at the track's original key. Tempo still follows the fader.
@@ -741,6 +753,30 @@ export class DeckEngine {
     this.setPitch(this._currentPitchSemitones);
   }
   getKeyLock(): boolean { return this.keyLockEnabled; }
+
+  /**
+   * Enable / disable repitch lock.
+   *
+   * When ON: the pitch fader updates the store (visual) but does NOT change
+   * the audible rate — useful for sliding the fader to a target position
+   * during a mix without the tempo/pitch jumping. Matches the SL-1200's
+   * "pitch lock" button behavior.
+   *
+   * When OFF: re-applies the current fader position to audio immediately,
+   * so the playback rate snaps to wherever the fader is sitting.
+   */
+  setRepitchLock(locked: boolean): void {
+    if (this._repitchLocked === locked) return;
+    if (locked) {
+      this._repitchLocked = true;
+      // No audio change — already playing at the fader's current pitch.
+    } else {
+      this._repitchLocked = false;
+      // Re-sync audio to wherever the fader is now.
+      this.setPitch(this._currentPitchSemitones);
+    }
+  }
+  getRepitchLock(): boolean { return this._repitchLocked; }
 
   // ==========================================================================
   // SCRATCH

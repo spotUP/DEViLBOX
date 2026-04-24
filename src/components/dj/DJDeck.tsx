@@ -8,7 +8,7 @@
 import React, { useEffect, useRef, useCallback, useState } from 'react';
 import { useDJStore } from '@/stores/useDJStore';
 import { getDJEngine } from '@/engine/dj/DJEngine';
-import { setDeckPitch, setDeckChannelMuteMask } from '@/engine/dj/DJActions';
+import { setDeckPitch, setDeckChannelMuteMask, setDeckRepitchLock } from '@/engine/dj/DJActions';
 import { parseModuleToSong } from '@/lib/import/parseModuleToSong';
 import { detectBPM } from '@/engine/dj/DJBeatDetector';
 import { cacheSong } from '@/engine/dj/DJSongCache';
@@ -61,6 +61,19 @@ export const DJDeck: React.FC<DJDeckProps> = ({ deckId }) => {
       if (newPitch !== prevPitch) {
         prevPitch = newPitch;
         setDeckPitch(deckId, newPitch);
+      }
+    });
+    return unsubscribe;
+  }, [deckId]);
+
+  // Subscribe to repitchLock changes and push to the engine.
+  useEffect(() => {
+    let prev = useDJStore.getState().decks[deckId].repitchLock;
+    const unsubscribe = useDJStore.subscribe((state) => {
+      const next = state.decks[deckId].repitchLock;
+      if (next !== prev) {
+        prev = next;
+        setDeckRepitchLock(deckId, next);
       }
     });
     return unsubscribe;

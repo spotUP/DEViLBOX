@@ -19,6 +19,7 @@ import {
   setCrossfader,
   killAllDecks,
   setDeckSlipEnabled,
+  setDeckRepitchLock,
   djPanic,
 } from '@/engine/dj/DJActions';
 import { DJBeatSync } from '@/engine/dj/DJBeatSync';
@@ -193,7 +194,7 @@ export function useDJKeyboardHandler(): void {
 
       case 'tab': // Repitch lock toggle
         e.preventDefault();
-        store.setDeckState('A', { repitchLock: !store.decks.A.repitchLock });
+        setDeckRepitchLock('A', !store.decks.A.repitchLock);
         break;
 
       // ================================================================
@@ -286,7 +287,7 @@ export function useDJKeyboardHandler(): void {
         break;
 
       case '\\': // Repitch lock toggle
-        store.setDeckState('B', { repitchLock: !store.decks.B.repitchLock });
+        setDeckRepitchLock('B', !store.decks.B.repitchLock);
         break;
 
       // ================================================================
