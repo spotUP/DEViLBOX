@@ -796,6 +796,15 @@ export class DubBus {
           now2 + WARMUP_SEC + RAMP_SEC,
         );
 
+        // Mute spring output during warmup: spring param changes (length,
+        // chaos, scatter, tone) can excite internal waveguide resonances.
+        // With return_ at 0 the burst is blocked, but it accumulates in the
+        // spring's delay lines. When return_ unmutes the stored energy dumps
+        // out as an audible "crash". muteOutput() zeros wetGain at the JS
+        // graph level — the WASM keeps running (filling delay lines) but
+        // its output is discarded. unmuteOutput() restores wet level cleanly.
+        try { this.spring.muteOutput(); } catch { /* ok */ }
+
         // Restore compressor ratios after the warmup — the burst has
         // settled by now and the compressors start from a clean state.
         this.sidechain.ratio.cancelScheduledValues(now2);
@@ -813,6 +822,7 @@ export class DubBus {
         // actually recovered (or something else pinned gains to 0).
         setTimeout(() => {
           this._snap(`post-swap-warmup ${this._currentEchoEngine}`);
+          try { this.spring.unmuteOutput(); } catch { /* ok */ }
           this._muteHoldActive = false;
           // Replay any settings that were suppressed during the hold
           if (this._pendingPostHoldSettings) {
@@ -3026,6 +3036,10 @@ export class DubBus {
     console.log(`[DubBusCtrl] _warmupMute fired | feedback ${priorFeedback.toFixed(3)}→0→${priorFeedback.toFixed(3)} return_ ${priorReturn.toFixed(3)}→0→${priorReturn.toFixed(3)} hold=${(WARMUP_SEC*1000).toFixed(0)}ms`);
     this._muteHoldActive = true;
     this._pendingPostHoldSettings = null;
+    // Mute spring output during warmup — same rationale as _swapEchoEngine:
+    // spring param changes can excite waveguide resonances whose energy would
+    // burst through when return_ unmutes.
+    try { this.spring.muteOutput(); } catch { /* ok */ }
     try {
       const now = ctx.currentTime;
       this.feedback.gain.cancelScheduledValues(now);
@@ -3056,6 +3070,7 @@ export class DubBus {
     }
     // Release the hold after warmup completes
     setTimeout(() => {
+      try { this.spring.unmuteOutput(); } catch { /* ok */ }
       this._muteHoldActive = false;
       if (this._pendingPostHoldSettings) {
         const pending = this._pendingPostHoldSettings;
