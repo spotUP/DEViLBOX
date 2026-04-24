@@ -163,6 +163,18 @@ export interface DubBusSettings {
   //               engineer's trick for "heavier/dirtier bottom."
   tapeSatMode: 'single' | 'stack' | 'tape15ips';
 
+  // ─── SpaceEcho head mode (RE-201 mode selector) ──────────────────────────
+  // The RE-201 has 12 mode positions selecting which tape heads are active
+  // and whether the spring reverb is mixed in. Only applies when echoEngine
+  // is 'spaceEcho'. Ignored (no-op) for re201/anotherDelay/reTapeEcho.
+  //
+  // Head map (per SpaceEchoEffect.setMode):
+  //   1=H1,  2=H2,  3=H3,  4=H2+H3
+  //   5=H1+reverb,  6=H2+reverb,  7=H3+reverb
+  //   8=H1+H2+reverb,  9=H2+H3+reverb,  10=H1+H3+reverb
+  //   11=all heads+reverb,  12=reverb only
+  echoMode: number;  // 1-12, default 4 (H2+H3 — the classic dub multi-tap)
+
   // ─── SpaceEcho in-feedback filters ───────────────────────────────────────
   // HPF in the feedback path prevents low-end buildup: each repeat passes
   // through a highpass, so bass rumble can't accumulate pass-over-pass.
@@ -341,6 +353,7 @@ export const DEFAULT_DUB_BUS: DubBusSettings = {
   sweepDepthMs:     4,
   sweepFeedback:    0.72,
   tapeSatMode:      'single',
+  echoMode:         4,        // H2+H3 — classic dub two-tap timing
   echoFeedbackHpfHz: 250,
   echoFeedbackLpfHz: 4000,
   plateStage:       'off',
