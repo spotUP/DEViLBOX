@@ -89,8 +89,6 @@ export function dubSonarPing():         boolean { return fireTrigger('sonarPing'
 export function dubRadioRiser():        boolean { return fireTrigger('radioRiser',        'Radio Riser'); }
 export function dubSubSwell():          boolean { return fireTrigger('subSwell',          'Sub Swell'); }
 export function dubEchoBuildUp():       boolean { return fireTrigger('echoBuildUp',       'Echo Build Up'); }
-export function dubDelayPreset380():    boolean { return fireTrigger('delayPreset380',    'Delay 380ms'); }
-export function dubDelayPresetDotted(): boolean { return fireTrigger('delayPresetDotted', 'Delay Dotted'); }
 
 // ── Hold moves (handler(true) on press, handler(false) on release) ────────
 function holdCommand(moveId: string, label: string): MoveHandler {
@@ -111,12 +109,14 @@ export const dubOscBass:      MoveHandler = holdCommand('oscBass',       'Osc Ba
 export const dubCrushBass:    MoveHandler = holdCommand('crushBass',     'Crush Bass');
 export const dubSubHarmonic:  MoveHandler = holdCommand('subHarmonic',   'Sub Harmonic');
 export const dubEqSweep:      MoveHandler = holdCommand('eqSweep',       'EQ Sweep');
+export const dubDelayPreset380:     MoveHandler = holdCommand('delayPreset380',     '380ms');
+export const dubDelayPresetDotted:  MoveHandler = holdCommand('delayPresetDotted',  'Dotted');
+export const dubDelayPresetQuarter: MoveHandler = holdCommand('delayPresetQuarter', '1/4');
+export const dubDelayPreset8th:     MoveHandler = holdCommand('delayPreset8th',     '1/8');
+export const dubDelayPresetTriplet: MoveHandler = holdCommand('delayPresetTriplet', 'Triplet');
+export const dubDelayPreset16th:    MoveHandler = holdCommand('delayPreset16th',    '1/16');
+export const dubDelayPresetDoubler: MoveHandler = holdCommand('delayPresetDoubler', 'Doubler');
 export function dubSpringKick():         boolean { return fireTrigger('springKick', 'Spring Kick'); }
-export function dubDelayPresetQuarter(): boolean { return fireTrigger('delayPresetQuarter', 'Delay Quarter'); }
-export function dubDelayPreset8th():     boolean { return fireTrigger('delayPreset8th', 'Delay 8th'); }
-export function dubDelayPresetTriplet(): boolean { return fireTrigger('delayPresetTriplet', 'Delay Triplet'); }
-export function dubDelayPreset16th():    boolean { return fireTrigger('delayPreset16th', 'Delay 16th'); }
-export function dubDelayPresetDoubler(): boolean { return fireTrigger('delayPresetDoubler', 'Delay Doubler'); }
 export const dubGhostReverb:    MoveHandler = holdCommand('ghostReverb',    'Ghost Reverb');
 export const dubVoltageStarve: MoveHandler = holdCommand('voltageStarve',  'Voltage Starve');
 export const dubRingMod:       MoveHandler = holdCommand('ringMod',        'Ring Modulator');

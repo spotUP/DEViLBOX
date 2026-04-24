@@ -65,6 +65,7 @@ function makeMockBus() {
     fireSubSwell: vi.fn(),
     setDelayPreset: vi.fn(() => () => {}),
     setEchoRate: vi.fn(),
+    getEchoRateMs: vi.fn().mockReturnValue(300),
     toast: vi.fn(() => () => {}),
     startToast: vi.fn(() => () => {}),
     fireMasterDrop: vi.fn(() => () => {}),

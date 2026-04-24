@@ -99,15 +99,15 @@ export const DUB_MOVE_KINDS: Record<string, 'trigger' | 'hold'> = {
   crushBass:         'hold',   // bus.startCrushBass(...)
   subHarmonic:       'hold',   // bus.startSubHarmonic(...)
   echoBuildUp:       'trigger', // mixer dubSend envelope (no dispose)
-  delayPreset380:    'trigger', // bus.setEchoRate(...) one-shot
-  delayPresetDotted: 'trigger', // bus.setEchoRate(...) one-shot
+  delayPreset380:    'hold',
+  delayPresetDotted: 'hold',
   eqSweep:           'hold',   // bus.startEQSweep(...)
   springKick:        'trigger', // bus.kickSpring(...)
-  delayPresetQuarter:  'trigger', // bus.setEchoRate(...)
-  delayPreset8th:      'trigger', // bus.setEchoRate(...)
-  delayPresetTriplet:  'trigger', // bus.setEchoRate(...)
-  delayPreset16th:     'trigger', // bus.setEchoRate(...)
-  delayPresetDoubler:  'trigger', // bus.setEchoRate(25ms slapback)
+  delayPresetQuarter:  'hold',
+  delayPreset8th:      'hold',
+  delayPresetTriplet:  'hold',
+  delayPreset16th:     'hold',
+  delayPresetDoubler:  'hold',
   ghostReverb:         'hold',   // mute dry + full dub send
   voltageStarve:       'hold',   // ramp bit depth down (lo-fi)
   ringMod:             'hold',   // ring modulator activation

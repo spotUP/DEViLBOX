@@ -4476,6 +4476,9 @@ export class DubBus {
     }).catch(() => {});
   }
 
+  /** Current echo delay time in ms (as last set via setEchoRate or setSettings). */
+  getEchoRateMs(): number { return this.settings.echoRateMs; }
+
   /**
    * Sonar Ping — single sine pulse fed into the echo input so it repeats
    * across 3 tape heads. Clean tone, short envelope, ride the default

@@ -60,7 +60,7 @@ interface GlobalMove {
   moveId: string;
   color: string;
   kind: 'trigger' | 'hold';
-  group: 'click' | 'hold' | 'toggle';
+  group: 'click' | 'hold' | 'toggle' | 'rate';
   needsSend?: boolean;
 }
 const GLOBAL_MOVES: Array<GlobalMove> = [
@@ -75,13 +75,13 @@ const GLOBAL_MOVES: Array<GlobalMove> = [
   { label: 'Reverse',  title: 'Reverse Echo — last 0.4 s of bus audio reversed and echoed',  moveId: 'reverseEcho',   color: 'accent-highlight/70', kind: 'trigger', group: 'click', needsSend: true },
   { label: 'Backward', title: 'Backward Reverb — last 0.8 s reversed through full bus chain', moveId: 'backwardReverb', color: 'accent-highlight',   kind: 'trigger', group: 'click', needsSend: true },
   { label: 'Throw',    title: 'Echo Throw — sweep echo delay time (pitch whoosh)',  moveId: 'delayTimeThrow',  color: 'accent-highlight/70', kind: 'trigger', group: 'click', needsSend: true },
-  { label: '380ms',    title: 'Tubby 380 — snap echo rate to 380 ms',             moveId: 'delayPreset380',    color: 'accent-secondary/70', kind: 'trigger', group: 'click' },
-  { label: 'Dotted',   title: 'Dotted — snap echo rate to dotted-8th (BPM-synced)', moveId: 'delayPresetDotted', color: 'accent-secondary/70', kind: 'trigger', group: 'click' },
-  { label: '1/4',    title: 'Quarter — snap echo rate to quarter note (BPM-synced)', moveId: 'delayPresetQuarter', color: 'accent-secondary/70', kind: 'trigger', group: 'click' },
-  { label: '1/8',    title: '8th — snap echo rate to 8th note (BPM-synced)',    moveId: 'delayPreset8th',    color: 'accent-secondary/70', kind: 'trigger', group: 'click' },
-  { label: 'Triplet', title: 'Triplet — snap echo rate to triplet (BPM-synced)', moveId: 'delayPresetTriplet', color: 'accent-secondary/70', kind: 'trigger', group: 'click' },
-  { label: '1/16',   title: '16th — snap echo rate to 16th note (BPM-synced)',  moveId: 'delayPreset16th',   color: 'accent-secondary/70', kind: 'trigger', group: 'click' },
-  { label: 'x2',     title: 'Doubler — double the echo rate',                   moveId: 'delayPresetDoubler', color: 'accent-secondary/70', kind: 'trigger', group: 'click' },
+  { label: '380ms',  title: 'Tubby 380 — snap echo rate to 380 ms (click again to restore)',              moveId: 'delayPreset380',    color: 'accent-secondary/70', kind: 'hold', group: 'rate' },
+  { label: 'Dotted', title: 'Dotted — snap echo rate to dotted-8th, BPM-synced (click again to restore)', moveId: 'delayPresetDotted', color: 'accent-secondary/70', kind: 'hold', group: 'rate' },
+  { label: '1/4',    title: '1/4 — snap echo rate to quarter note, BPM-synced (click again to restore)',  moveId: 'delayPresetQuarter', color: 'accent-secondary/70', kind: 'hold', group: 'rate' },
+  { label: '1/8',    title: '1/8 — snap echo rate to 8th note, BPM-synced (click again to restore)',      moveId: 'delayPreset8th',    color: 'accent-secondary/70', kind: 'hold', group: 'rate' },
+  { label: 'Triplet', title: 'Triplet — snap echo rate to triplet, BPM-synced (click again to restore)', moveId: 'delayPresetTriplet', color: 'accent-secondary/70', kind: 'hold', group: 'rate' },
+  { label: '1/16',   title: '1/16 — snap echo rate to 16th note, BPM-synced (click again to restore)',   moveId: 'delayPreset16th',   color: 'accent-secondary/70', kind: 'hold', group: 'rate' },
+  { label: 'x2',     title: 'Doubler — 25ms slapback echo (click again to restore)',                      moveId: 'delayPresetDoubler', color: 'accent-secondary/70', kind: 'hold', group: 'rate' },
 
   // ── HOLD — press and hold for precise duration, release to stop ──
   { label: 'Rise',       title: 'HPF Rise — Altec Big Knob: steps HPF up through positions, sweeps back on release', moveId: 'hpfRise',    color: 'accent-primary',     kind: 'hold', group: 'hold', needsSend: true },
@@ -182,6 +182,12 @@ export const DubDeckStrip: React.FC = () => {
   const [toggledMoves, setToggledMoves] = useState<Set<string>>(new Set());
   const toggleDisposers = useRef<Map<string, () => void>>(new Map());
 
+  // Rate preset radio group — at most ONE rate preset active at a time.
+  // Clicking a new rate deactivates the old one (restoring its saved rate)
+  // before activating the new one. Clicking the active one turns it off.
+  const [activeRatePreset, setActiveRatePreset] = useState<string | null>(null);
+  const rateDisposer = useRef<(() => void) | null>(null);
+
   // Generic per-move "active hold" tracking — covers channel-scoped holds
   // (e.g. channelMute per channel) AND global holds (filterDrop, dubSiren,
   // tapeWobble, masterDrop, toast). Keyed by `${moveId}:${channelId ?? 'g'}`
@@ -247,6 +253,12 @@ export const DubDeckStrip: React.FC = () => {
     }
     toggleDisposers.current.clear();
     setToggledMoves(new Set());
+    // Release active rate preset
+    if (rateDisposer.current) {
+      try { rateDisposer.current(); } catch { /* ok */ }
+      rateDisposer.current = null;
+    }
+    setActiveRatePreset(null);
   }, []);
 
   useEffect(() => {
@@ -605,6 +617,28 @@ export const DubDeckStrip: React.FC = () => {
     }
   }, [busEnabled]);
 
+  // Rate preset radio handler — mutual exclusion: only one active at a time.
+  const handleRatePreset = useCallback((moveId: string) => {
+    if (!busEnabled) return;
+    if (activeRatePreset === moveId) {
+      // Same preset — deactivate (restores previous rate)
+      rateDisposer.current?.();
+      rateDisposer.current = null;
+      setActiveRatePreset(null);
+    } else {
+      // Different preset — deactivate current first, then activate new one
+      if (rateDisposer.current) {
+        try { rateDisposer.current(); } catch { /* ok */ }
+        rateDisposer.current = null;
+      }
+      const disp = fireDub(moveId, undefined);
+      if (disp) {
+        rateDisposer.current = () => disp.dispose();
+        setActiveRatePreset(moveId);
+      }
+    }
+  }, [busEnabled, activeRatePreset]);
+
   return (
     <div className="flex flex-col gap-1.5 px-2 py-1.5 bg-dark-bgSecondary border-t border-dark-border font-mono">
       {/* Header row */}
@@ -866,6 +900,35 @@ export const DubDeckStrip: React.FC = () => {
                   onPointerLeave={() => setHoverHint(null)}
                   onMouseEnter={() => setHoverHint(`${m.label} — ${m.title}${noSend ? ' (needs CH send)' : ''}`)}
                   title={m.title + (noSend ? ' — raise a CH send to hear' : '')}
+                  disabled={!busEnabled}
+                >
+                  {m.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* ── RATE — echo rate radio group: click to set, click again to restore ── */}
+        <div className="flex items-start gap-1.5 text-xs">
+          <span
+            className="text-accent-secondary/60 w-16 shrink-0 pt-0.5 font-bold tracking-wide"
+            title="Echo rate presets — click to activate, click again to restore previous rate. Only one active at a time."
+          >RATE ▸</span>
+          <div className="flex gap-1.5 flex-wrap">
+            {GLOBAL_MOVES.filter(m => m.group === 'rate').map((m) => {
+              const isActive = activeRatePreset === m.moveId;
+              return (
+                <button
+                  key={m.moveId}
+                  className={
+                    colorClasses(m.color, isActive) +
+                    (isActive ? ' ring-2 ring-offset-1 ring-offset-dark-bgSecondary ring-white/70' : '')
+                  }
+                  onClick={() => handleRatePreset(m.moveId)}
+                  onPointerLeave={() => setHoverHint(null)}
+                  onMouseEnter={() => setHoverHint(`${m.label} — ${m.title}${isActive ? ' (active — click to restore)' : ''}`)}
+                  title={m.title}
                   disabled={!busEnabled}
                 >
                   {m.label}

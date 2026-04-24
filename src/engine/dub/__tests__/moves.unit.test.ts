@@ -123,6 +123,7 @@ function buildFakeBus() {
     reverseEcho: vi.fn().mockResolvedValue(undefined),
     backwardReverb: vi.fn().mockResolvedValue(undefined),
     setEchoRate: vi.fn(),
+    getEchoRateMs: vi.fn().mockReturnValue(300),
     setSettings: vi.fn(),
   };
   return { bus, release };
@@ -398,21 +399,27 @@ describe('backwardReverb', () => {
   });
 });
 
-// ── delayPreset380 / delayPresetDotted — canonical-rate snap ─────────────
+// ── delayPreset* — toggle moves: set rate on activate, restore on dispose ──
 describe('delayPreset380', () => {
-  it('snaps echo rate to exactly 380 ms regardless of BPM', () => {
+  it('snaps echo rate to 380 ms and returns a disposer that restores', () => {
     const { bus } = buildFakeBus();
-    delayPreset380.execute(ctx(bus, { bpm: 99 }));
+    bus.getEchoRateMs.mockReturnValue(300);
+    const r = delayPreset380.execute(ctx(bus, { bpm: 99 }));
     expect(bus.setEchoRate).toHaveBeenCalledWith(380);
+    expect(r).toHaveProperty('dispose');
+    r!.dispose();
+    expect(bus.setEchoRate).toHaveBeenLastCalledWith(300);
   });
 });
 
 describe('delayPresetDotted', () => {
-  it('computes dotted-eighth in ms from BPM (120 → 750)', () => {
+  it('computes dotted-eighth in ms from BPM (120 → 750) and restores on dispose', () => {
     const { bus } = buildFakeBus();
-    delayPresetDotted.execute(ctx(bus, { bpm: 120 }));
-    // 60000 / 120 × 1.5 = 750
+    bus.getEchoRateMs.mockReturnValue(300);
+    const r = delayPresetDotted.execute(ctx(bus, { bpm: 120 }));
     expect(bus.setEchoRate).toHaveBeenCalledWith(750);
+    r!.dispose();
+    expect(bus.setEchoRate).toHaveBeenLastCalledWith(300);
   });
 
   it('clamps very low BPM so the rate does not become absurd', () => {
@@ -455,18 +462,20 @@ describe('eqSweep', () => {
 
 // ── BPM-synced delay preset bank ────────────────────────────────────────
 describe('delayPresetQuarter', () => {
-  it('computes quarter-note delay from BPM (120 → 500ms)', () => {
+  it('computes quarter-note delay from BPM (120 → 500ms) and restores on dispose', () => {
     const { bus } = buildFakeBus();
-    delayPresetQuarter.execute(ctx(bus, { bpm: 120 }));
+    const r = delayPresetQuarter.execute(ctx(bus, { bpm: 120 }));
     expect(bus.setEchoRate).toHaveBeenCalledWith(500);
+    expect(r).toHaveProperty('dispose');
   });
 });
 
 describe('delayPreset8th', () => {
-  it('computes eighth-note delay from BPM (120 → 250ms)', () => {
+  it('computes eighth-note delay from BPM (120 → 250ms) and restores on dispose', () => {
     const { bus } = buildFakeBus();
-    delayPreset8th.execute(ctx(bus, { bpm: 120 }));
+    const r = delayPreset8th.execute(ctx(bus, { bpm: 120 }));
     expect(bus.setEchoRate).toHaveBeenCalledWith(250);
+    expect(r).toHaveProperty('dispose');
   });
 });
 
@@ -481,18 +490,20 @@ describe('delayPresetTriplet', () => {
 });
 
 describe('delayPreset16th', () => {
-  it('computes sixteenth-note delay from BPM (120 → 125ms)', () => {
+  it('computes sixteenth-note delay from BPM (120 → 125ms) and restores on dispose', () => {
     const { bus } = buildFakeBus();
-    delayPreset16th.execute(ctx(bus, { bpm: 120 }));
+    const r = delayPreset16th.execute(ctx(bus, { bpm: 120 }));
     expect(bus.setEchoRate).toHaveBeenCalledWith(125);
+    expect(r).toHaveProperty('dispose');
   });
 });
 
 describe('delayPresetDoubler', () => {
-  it('snaps to 25ms slapback regardless of BPM', () => {
+  it('snaps to 25ms slapback regardless of BPM and restores on dispose', () => {
     const { bus } = buildFakeBus();
-    delayPresetDoubler.execute(ctx(bus, { bpm: 140 }));
+    const r = delayPresetDoubler.execute(ctx(bus, { bpm: 140 }));
     expect(bus.setEchoRate).toHaveBeenCalledWith(25);
+    expect(r).toHaveProperty('dispose');
   });
 });
 
