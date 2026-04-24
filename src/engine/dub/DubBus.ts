@@ -3280,6 +3280,18 @@ export class DubBus {
       this._muteHoldActive = false;
       this._pendingPostHoldSettings = null;
     }
+    // G15: also mute the master-insert envelope during warmup so any click
+    // from spring/echo node rewiring doesn't leak through to the master output.
+    if (this.masterInsertActive) {
+      try {
+        const now = ctx.currentTime;
+        this.masterInsertEnvelope.gain.cancelScheduledValues(now);
+        this.masterInsertEnvelope.gain.setValueAtTime(0, now);
+        this.masterInsertEnvelope.gain.setValueAtTime(0, now + WARMUP_SEC);
+        this.masterInsertEnvelope.gain.linearRampToValueAtTime(1, now + WARMUP_SEC + RAMP_SEC);
+      } catch { /* ok */ }
+    }
+
     // Release the hold after warmup completes
     setTimeout(() => {
       try { this.spring.unmuteInput(); } catch { /* ok */ }

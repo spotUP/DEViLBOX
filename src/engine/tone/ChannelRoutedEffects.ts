@@ -346,11 +346,22 @@ export class ChannelRoutedEffectsManager {
     const engine = await getActiveIsolationEngine();
     if (!engine?.isAvailable()) {
       this.channelDubPendingActivation.add(channelIndex);
+      // Retry once after 500ms — engine may still be initialising
+      setTimeout(() => {
+        if (this.channelDubPendingActivation.has(channelIndex)) {
+          void this._activateDubChannel(channelIndex);
+        }
+      }, 500);
       return;
     }
     const worklet = engine.getWorkletNode();
     if (!worklet) {
       this.channelDubPendingActivation.add(channelIndex);
+      setTimeout(() => {
+        if (this.channelDubPendingActivation.has(channelIndex)) {
+          void this._activateDubChannel(channelIndex);
+        }
+      }, 500);
       return;
     }
 
