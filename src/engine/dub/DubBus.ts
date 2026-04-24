@@ -26,6 +26,7 @@ import {
 } from '../effects/AelapseEffect';
 import type { DubEchoEngine } from './DubEchoEngine';
 import { createDubEchoEngine } from './DubEchoEngine';
+import { SpaceEchoEffect } from '../effects/SpaceEchoEffect';
 import { VinylNoiseEffect } from '../effects/VinylNoiseEffect';
 import { ToneArmEffect } from '../effects/ToneArmEffect';
 import { MadProfessorPlateEffect } from '../effects/MadProfessorPlateEffect';
@@ -2879,6 +2880,16 @@ export class DubBus {
     const wantStack = merged.tapeSatMode === 'stack';
     this.tapeSatBypass.gain.setTargetAtTime(wantStack ? 0 : 1, now, 0.03);
     this.tapeStackMix.gain.setTargetAtTime(wantStack ? 1 : 0, now, 0.03);
+
+    // SpaceEcho in-feedback filter params — only meaningful when the
+    // active echo engine IS SpaceEcho; other engines silently ignore these.
+    // Smoothed by the setFeedback* methods (50 ms ramp).
+    if (merged.echoFeedbackHpfHz !== undefined && this.echo instanceof SpaceEchoEffect) {
+      (this.echo as SpaceEchoEffect).setFeedbackHpf(merged.echoFeedbackHpfHz);
+    }
+    if (merged.echoFeedbackLpfHz !== undefined && this.echo instanceof SpaceEchoEffect) {
+      (this.echo as SpaceEchoEffect).setFeedbackLpf(merged.echoFeedbackLpfHz);
+    }
 
     // Plate-stage changes — swap the insert if the type changed, OR
     // update the wet send if only the mix moved. Type change is

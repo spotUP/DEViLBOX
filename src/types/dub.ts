@@ -163,6 +163,20 @@ export interface DubBusSettings {
   //               engineer's trick for "heavier/dirtier bottom."
   tapeSatMode: 'single' | 'stack' | 'tape15ips';
 
+  // ─── SpaceEcho in-feedback filters ───────────────────────────────────────
+  // HPF in the feedback path prevents low-end buildup: each repeat passes
+  // through a highpass, so bass rumble can't accumulate pass-over-pass.
+  // The RE-201's tape-head gap naturally acts as a HPF around 200-400 Hz.
+  //
+  // LPF in the feedback path progressively darkens each repeat: simulates
+  // tape-head wear and head-to-tape distance — the further a repeat travels,
+  // the more HF is lost. Classic "warm distant echo" character.
+  //
+  // Both filters ramp smoothly (50 ms) so automating them during playback
+  // (e.g. sweeping feedbackLpfHz down on a breakdown) is click-free.
+  echoFeedbackHpfHz: number;  // 20-2000 Hz, default 250
+  echoFeedbackLpfHz: number;  // 500-20000 Hz, default 4000
+
   // ─── Optional plate-stage insert (2026-04-21) ──────────────────────────
   // When non-'off', a plate reverb is inserted as a POST-processing stage
   // at the very end of the bus chain (after the M/S width matrix, before
@@ -327,6 +341,8 @@ export const DEFAULT_DUB_BUS: DubBusSettings = {
   sweepDepthMs:     4,
   sweepFeedback:    0.72,
   tapeSatMode:      'single',
+  echoFeedbackHpfHz: 250,
+  echoFeedbackLpfHz: 4000,
   plateStage:       'off',
   plateStageMix:    0.35,
 
@@ -436,6 +452,8 @@ export const DUB_CHARACTER_PRESETS: Record<Exclude<DubBusSettings['characterPres
       stereoWidth:    0.45,  // narrow — 4-track console + loose spring
       sweepAmount:    0,      // no flanger; Tubby's "sweep" was filter, not comb
       tapeSatMode:   'single',
+      echoFeedbackHpfHz: 250,  // research spec: prevents sub buildup, RE-201 tape-head gap
+      echoFeedbackLpfHz: 3000, // research spec: warm, dark repeats — Tubby's heavy spring tail
       echoEngine:    're201',     // Tubby's MCI → RE-201 signal chain
       chainOrder:    'springEcho', // spring FIRST: same fix as Perry — prevents
                                     // each RE-201 repeat from adding new spring tail
@@ -466,6 +484,8 @@ export const DUB_CHARACTER_PRESETS: Record<Exclude<DubBusSettings['characterPres
       stereoWidth:    1.4,
       sweepAmount:    0,
       tapeSatMode:   'single',
+      echoFeedbackHpfHz: 300,   // research spec: tighter HPF — Scientist's precise, dry repeats
+      echoFeedbackLpfHz: 5000,  // research spec: brighter tail — plate, not spring
       echoEngine:    'spaceEcho',  // Scientist used clean digital delays
     },
     springsLength: 0.55, springsDamp: 0.25, springsChaos: 0.40, springsScatter: 0.40, springsTone: 0.70,
@@ -496,6 +516,8 @@ export const DUB_CHARACTER_PRESETS: Record<Exclude<DubBusSettings['characterPres
       phaserStages:   8,      // Mutron Bi-Phase is 6-stage; 8 for extra depth
       phaserFeedback: 0.65,
       tapeSatMode:    'stack', // 3 parallel tape paths ≈ 4-track bouncing
+      echoFeedbackHpfHz: 200,   // research spec: loose, low HPF — Perry's murky chaos
+      echoFeedbackLpfHz: 2000,  // research spec: very dark repeats — 7.5 ips tape color
       echoEngine:    'anotherDelay', // Perry's runaway wow-flutter madness
       chainOrder:    'springEcho',   // spring FIRST: reverb cloud feeds the echo,
                                       // so repeats decay cleanly instead of adding
@@ -546,6 +568,8 @@ export const DUB_CHARACTER_PRESETS: Record<Exclude<DubBusSettings['characterPres
       stereoWidth:    1.9,    // ultra-wide Ariwa ping-pong
       sweepAmount:    0,
       tapeSatMode:   'single',
+      echoFeedbackHpfHz: 400,   // research spec: cleaner HPF — Mad Prof hi-fi clarity
+      echoFeedbackLpfHz: 8000,  // research spec: bright, articulate repeats — Lexicon PCM-70 character
       echoEngine:    're201',       // Ariwa studio's RE-201 for lush tape + spring
     },
     springsLength: 0.55, springsDamp: 0.45, springsChaos: 0.10, springsScatter: 0.55, springsTone: 0.65,
