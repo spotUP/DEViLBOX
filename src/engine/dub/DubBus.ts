@@ -3107,8 +3107,11 @@ export class DubBus {
     }
 
     // ─── Return EQ ─────────────────────────────────────────────────────────
-    if (settings.returnEqEnabled !== undefined || settings.returnEqFreq !== undefined ||
-        settings.returnEqGain !== undefined || settings.returnEqQ !== undefined) {
+    // Skipped on preset transitions — applied after the warmup by
+    // _applyCharacterPreset so the resonant peak (Tubby Q=3 +8dB) never
+    // activates while spring tail is still flowing through return_.
+    if (!presetTransitioning && (settings.returnEqEnabled !== undefined || settings.returnEqFreq !== undefined ||
+        settings.returnEqGain !== undefined || settings.returnEqQ !== undefined)) {
       const enabled = merged.returnEqEnabled;
       this.returnEQ.setB2Freq(merged.returnEqFreq);
       this.returnEQ.setB2Gain(enabled ? merged.returnEqGain : 0);
@@ -3391,6 +3394,21 @@ export class DubBus {
     } catch (err) { console.warn('[DubBusCtrl] spring param write threw:', err); }
     if (preset.tapeSatDrive !== undefined) {
       try { this.tapeSat.curve = makeTapeSatCurve(preset.tapeSatDrive); } catch { /* ok */ }
+    }
+    // Apply returnEQ changes after a short delay so the return_ ramp (20ms)
+    // completes before the resonant peak is activated. Avoids the Q=3 +8dB
+    // Tubby peak ringing against the spring tail during the warmup window.
+    const ov = preset.overrides;
+    if (ov.returnEqEnabled !== undefined || ov.returnEqGain !== undefined ||
+        ov.returnEqFreq !== undefined || ov.returnEqQ !== undefined) {
+      setTimeout(() => {
+        try {
+          const enabled = ov.returnEqEnabled ?? false;
+          if (ov.returnEqFreq !== undefined) this.returnEQ.setB2Freq(ov.returnEqFreq);
+          this.returnEQ.setB2Gain(enabled ? (ov.returnEqGain ?? 0) : 0);
+          if (ov.returnEqQ !== undefined) this.returnEQ.setB2Q(ov.returnEqQ);
+        } catch { /* ok */ }
+      }, 35); // 35ms > RAMP_SEC (20ms) — return_ is fully at 0 before the EQ activates
     }
     this._snap(`after _applyCharacterPreset(${name})`);
     this._measureSpringOutput(`after preset ${name}`);
