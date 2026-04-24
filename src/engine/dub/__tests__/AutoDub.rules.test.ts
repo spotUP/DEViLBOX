@@ -66,6 +66,8 @@ describe('AutoDub chooseMove', () => {
       'channelMute', 'springSlam', 'echoBuildUp', 'dubSiren', 'reverseEcho',
       'backwardReverb', 'crushBass', 'tubbyScream', 'sonarPing', 'subSwell',
       'stereoDoubler', 'channelThrow', 'subHarmonic',
+      'springKick', 'ghostReverb', 'ringMod', 'voltageStarve', 'eqSweep',
+      'delayPresetDotted', 'delayPresetTriplet',
     ]);
     const rng = seededRng(42);
     const result = chooseMove(baseCtx({ blacklist, intensity: 1 }), rng);
