@@ -717,7 +717,16 @@ function tickImpl(): void {
   }
 
   const transport = useTransportStore.getState();
-  if (!transport.isPlaying) return;
+  if (!transport.isPlaying) {
+    // Release all held auto-dub moves so effects don't linger after stop.
+    if (_heldDisposers.size > 0) {
+      for (const d of _heldDisposers) {
+        try { d.dispose(); } catch { /* ok */ }
+      }
+      _heldDisposers.clear();
+    }
+    return;
+  }
 
   const bpm = transport.bpm || 120;
   const beats = ((performance.now() - _enableTimeMs) / 1000) * (bpm / 60);

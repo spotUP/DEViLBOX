@@ -694,7 +694,13 @@ export const usePatternPlayback = () => {
         // Start or resume real-time playback
         // Always call play() - initial start OR after reload
         getTrackerScratchController().notifyPlaybackStarted();
-        replayer.play().catch((err) => {
+        replayer.play().then(() => {
+          // Re-sync mute/solo after play — loadSong() resets channelMuteMask to 0xFFFF.
+          // Without this, channels muted before stop would play again after restart.
+          import('@stores/useMixerStore').then(({ useMixerStore }) => {
+            useMixerStore.getState().reapplyAllMutes();
+          }).catch(() => {});
+        }).catch((err) => {
           console.error('Failed to start playback:', err);
         });
       }
