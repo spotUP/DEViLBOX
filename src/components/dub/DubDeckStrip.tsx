@@ -33,6 +33,19 @@ import { getNativeAudioNode } from '@utils/audio-context';
 import { Fader } from '@components/controls/Fader';
 import { DubLaneTimeline } from './DubLaneTimeline';
 import { AutoDubPanel } from './AutoDubPanel';
+import { DUB_CHARACTER_PRESETS } from '@/types/dub';
+
+// ─── Role inference ────────────────────────────────────────────────────────
+function inferRoleFromName(name: string): 'percussion' | 'bass' | 'lead' | 'chord' | 'arpeggio' | 'pad' | null {
+  const n = name.toLowerCase();
+  if (/kick|snare|hat|clap|drum|perc|cymbal|rim/.test(n)) return 'percussion';
+  if (/bass|sub/.test(n)) return 'bass';
+  if (/chord|harm/.test(n)) return 'chord';
+  if (/arp/.test(n)) return 'arpeggio';
+  if (/pad|atmos|ambien|string|synth/.test(n)) return 'pad';
+  if (/lead|melody|melodic|vocal|voice|horn|brass|flute|sax/.test(n)) return 'lead';
+  return null;
+}
 
 // ─── Per-channel ops ────────────────────────────────────────────────────────
 // Each channel strip shows these 4 buttons alongside the hold-toggle + send
@@ -577,6 +590,22 @@ export const DubDeckStrip: React.FC = () => {
 
   const capturedRecently = lastCapturedAt !== null && (performance.now() - lastCapturedAt) < 300;
 
+  // Apply default channel send levels for a named character preset. Called
+  // when the user switches the VOICE selector — gives the bus signal to
+  // process immediately without manual fader riding.
+  const applyCharacterPresetSends = useCallback((presetKey: string) => {
+    const preset = DUB_CHARACTER_PRESETS[presetKey as keyof typeof DUB_CHARACTER_PRESETS];
+    if (!preset?.defaultSendsByRole) return;
+    const sends = preset.defaultSendsByRole;
+    const visible = pattern?.channels.length ?? 8;
+    for (let i = 0; i < visible; i++) {
+      const name = useMixerStore.getState().channels[i]?.name ?? '';
+      const role = inferRoleFromName(name);
+      const level = role != null ? (sends[role] ?? sends.default) : sends.default;
+      setChannelDubSend(i, level);
+    }
+  }, [pattern, setChannelDubSend]);
+
   // Sustained-hold channel tap. HOLD must work regardless of the channel's
   // current dubSend fader position — including 0 (no send). We drive the
   // mixer's dubSend directly: HOLD pushes to 1.0 (activates the worklet
@@ -754,8 +783,12 @@ export const DubDeckStrip: React.FC = () => {
         <select
           className="bg-dark-bgTertiary border border-dark-border rounded px-1.5 py-1 text-text-primary text-xs font-mono focus:ring-1 focus:ring-accent-primary"
           value={dubBusSettings.characterPreset}
-          onChange={(e) => setDubBus({ characterPreset: e.target.value as typeof dubBusSettings.characterPreset })}
-          title="Engineer character preset — loads EQ curve + spring + echo + tape saturator values tuned to that engineer's signature. See research at thoughts/shared/research/2026-04-20_dub-sound-coloring.md"
+          onChange={(e) => {
+            const preset = e.target.value as typeof dubBusSettings.characterPreset;
+            setDubBus({ characterPreset: preset });
+            if (preset !== 'custom') applyCharacterPresetSends(preset);
+          }}
+          title="Engineer character preset — loads EQ curve + spring + echo + tape saturator values tuned to that engineer's signature. Also seeds channel send faders with role-appropriate defaults so the bus has signal immediately."
           disabled={!busEnabled}
         >
           <option value="custom">Custom</option>
