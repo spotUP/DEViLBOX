@@ -268,8 +268,10 @@ export const DubBusPanel: React.FC = () => {
               { value: 'off',  label: 'Off (manual ms)' },
               { value: '1/2',  label: 'Half note (long)' },
               { value: '1/4',  label: 'Quarter (on-beat)' },
+              { value: '1/4T', label: 'Quarter triplet (Perry)' },
               { value: '1/8D', label: 'Dotted 1/8 (dub skank)' },
               { value: '1/8',  label: 'Eighth' },
+              { value: '1/8T', label: 'Eighth triplet (syncopated)' },
               { value: '1/16', label: 'Sixteenth (dense)' },
             ] as const}
             onChange={(v) => patch({ echoSyncDivision: v })}
