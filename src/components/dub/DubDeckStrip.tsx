@@ -875,7 +875,7 @@ export const DubDeckStrip: React.FC = () => {
             onClick={() => {
               for (let i = 0; i < visibleChannelCount; i++) toggleHold(i);
             }}
-            title="HOLD all channels — sustained dubbing on every channel"
+            title="HOLD all channels — sustained dubbing on every channel (restores prior sends when released)"
             disabled={!busEnabled}
           >
             HOLD
@@ -883,28 +883,21 @@ export const DubDeckStrip: React.FC = () => {
           <button
             className={
               'px-2 py-1 rounded border w-full text-[9px] font-bold transition-all duration-150 ' +
-              'bg-dark-bgTertiary border-dark-borderLight text-text-primary hover:border-accent-primary'
+              (anySend
+                ? 'bg-accent-primary/20 border-accent-primary text-accent-primary hover:bg-accent-error/20 hover:border-accent-error hover:text-accent-error'
+                : 'bg-dark-bgTertiary border-dark-borderLight text-text-muted hover:text-text-primary hover:border-accent-primary')
             }
             onClick={() => {
-              for (let i = 0; i < visibleChannelCount; i++) setChannelDubSend(i, 1.0);
+              if (anySend) {
+                for (let i = 0; i < visibleChannelCount; i++) setChannelDubSend(i, 0);
+              } else {
+                for (let i = 0; i < visibleChannelCount; i++) setChannelDubSend(i, 1.0);
+              }
             }}
-            title="Set all channel sends to 100%"
+            title={anySend ? 'Zero all channel sends' : 'Set all channel sends to 100%'}
             disabled={!busEnabled}
           >
-            ALL
-          </button>
-          <button
-            className={
-              'px-2 py-1 rounded border w-full text-[9px] font-bold transition-all duration-150 ' +
-              'bg-dark-bgTertiary border-dark-borderLight text-text-muted hover:text-text-primary hover:border-accent-error'
-            }
-            onClick={() => {
-              for (let i = 0; i < visibleChannelCount; i++) setChannelDubSend(i, 0);
-            }}
-            title="Zero all channel sends"
-            disabled={!busEnabled}
-          >
-            NONE
+            {anySend ? 'NONE' : 'ALL'}
           </button>
           <Fader
             value={masterSendValue}
