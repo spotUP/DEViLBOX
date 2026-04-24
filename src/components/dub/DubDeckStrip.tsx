@@ -65,12 +65,12 @@ interface GlobalMove {
 }
 const GLOBAL_MOVES: Array<GlobalMove> = [
   // ── CLICK — one-shot triggers ──
-  { label: 'SLAM',   title: 'Spring Slam — instant splash of spring reverb',     moveId: 'springSlam',        color: 'accent-success',     kind: 'trigger', group: 'click' },
-  { label: 'KICK',   title: 'Spring Kick — punchier shorter spring hit',         moveId: 'springKick',        color: 'accent-success/70',  kind: 'trigger', group: 'click' },
-  { label: 'CRACK',  title: 'Snare Crack — bandpass noise burst',                moveId: 'snareCrack',        color: 'text-primary',       kind: 'trigger', group: 'click' },
-  { label: 'PING',   title: 'Sonar Ping — 1 kHz sine through the echo',         moveId: 'sonarPing',         color: 'accent-primary/70',  kind: 'trigger', group: 'click' },
-  { label: 'RADIO',  title: 'Radio Riser — pink noise sweep 200 Hz → 5 kHz',    moveId: 'radioRiser',        color: 'accent-warning/70',  kind: 'trigger', group: 'click' },
-  { label: 'SUB',    title: 'Sub Swell — 55 Hz sine pulse to return',            moveId: 'subSwell',          color: 'accent-primary',     kind: 'trigger', group: 'click' },
+  { label: 'Slam',   title: 'Spring Slam — instant splash of spring reverb',     moveId: 'springSlam',        color: 'accent-success',     kind: 'trigger', group: 'click' },
+  { label: 'Kick',   title: 'Spring Kick — punchier shorter spring hit',         moveId: 'springKick',        color: 'accent-success/70',  kind: 'trigger', group: 'click' },
+  { label: 'Crack',  title: 'Snare Crack — bandpass noise burst',                moveId: 'snareCrack',        color: 'text-primary',       kind: 'trigger', group: 'click' },
+  { label: 'Ping',   title: 'Sonar Ping — 1 kHz sine through the echo',         moveId: 'sonarPing',         color: 'accent-primary/70',  kind: 'trigger', group: 'click' },
+  { label: 'Radio',  title: 'Radio Riser — pink noise sweep 200 Hz → 5 kHz',    moveId: 'radioRiser',        color: 'accent-warning/70',  kind: 'trigger', group: 'click' },
+  { label: 'Sub',    title: 'Sub Swell — 55 Hz sine pulse to return',            moveId: 'subSwell',          color: 'accent-primary',     kind: 'trigger', group: 'click' },
   { label: 'STOP!',  title: 'Transport Tape Stop — hold to slow tempo+pitch to floor (LibOpenMPT), releases on let go', moveId: 'transportTapeStop', color: 'accent-error', kind: 'hold', group: 'hold' },
   { label: 'Reverse',  title: 'Reverse Echo — last 0.4 s of bus audio reversed and echoed',  moveId: 'reverseEcho',   color: 'accent-highlight/70', kind: 'trigger', group: 'click', needsSend: true },
   { label: 'Backward', title: 'Backward Reverb — last 0.8 s reversed through full bus chain', moveId: 'backwardReverb', color: 'accent-highlight',   kind: 'trigger', group: 'click', needsSend: true },
@@ -1102,9 +1102,6 @@ export const DubDeckStrip: React.FC = () => {
               );
             })}
           </div>
-          {!anySend && busEnabled && (
-            <span className="text-text-muted text-xs italic ml-1">some need CH send</span>
-          )}
         </div>
       </div>
 
