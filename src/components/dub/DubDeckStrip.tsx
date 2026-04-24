@@ -253,7 +253,8 @@ export const DubDeckStrip: React.FC = () => {
     const handler = () => {
       releaseAllHeld();
       try { ensureDrumPadEngine().dubPanic(); } catch (e) { console.warn('[DubDeckStrip] dubPanic failed:', e); }
-      useDrumPadStore.getState().setDubBus({ enabled: false });
+      // Do NOT disable the bus — KILL drains effects but keeps the deck open
+      // so the performer can re-engage immediately without re-opening the strip.
       setArmed(false);
     };
     window.addEventListener('dub-panic', handler);
