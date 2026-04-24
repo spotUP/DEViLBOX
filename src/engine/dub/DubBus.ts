@@ -256,12 +256,18 @@ export class DubBus {
   // implementing Messian Dread's "mixer as instrument" technique.
   private extFeedbackGain: GainNode;
   private extFeedbackEq: BiquadFilterNode;
+  // One-block delay ensures the ext-feedback cycle contains a native
+  // DelayNode so the Web Audio renderer can topologically sort it.
+  private extFeedbackDelay: DelayNode;
 
   // ─── Club simulation (ConvolverNode on master output) ─────────────────
   private clubConvolver: ConvolverNode;
   private clubDry: GainNode;
   private clubWet: GainNode;
   private _clubSimPreset: string = '';
+  /** Whether the ConvolverNode is currently connected to return_.
+   *  We only wire it when club sim is enabled to avoid null-buffer issues. */
+  private _clubConvolverWired = false;
 
   // ─── Chain order state ─────────────────────────────────────────────────
   /** Current core routing order. Updated by _applyCoreRouting(). */
@@ -1480,6 +1486,13 @@ export class DubBus {
     this.extFeedbackEq.frequency.value = this.settings.extFeedbackEqFreq;
     this.extFeedbackEq.gain.value = this.settings.extFeedbackEqGain;
     this.extFeedbackEq.Q.value = this.settings.extFeedbackEqQ;
+    // One-block delay: Web Audio requires a native DelayNode in every
+    // cycle for topological sorting. The WASM echo engines have internal
+    // delays but they're inside AudioWorkletNodes, not native DelayNodes.
+    // Without this, the cycle return_ → ... → input → ... → return_ is
+    // illegal and Chrome silences every node in the cycle.
+    this.extFeedbackDelay = this.context.createDelay(0.01);
+    this.extFeedbackDelay.delayTime.value = 128 / this.context.sampleRate;
 
     // Club simulation: ConvolverNode with synthetic IR on the master output.
     // Dry/wet crossfade so clubSimMix=0 is pure dry, 1 is pure wet.
@@ -1780,21 +1793,29 @@ export class DubBus {
     this.ringModSend.connect(this.return_);
 
     // Club simulation: return → dry/wet split → master.
-    // When off (default): dry=1, wet=0 → transparent.
+    // When off (default): only the dry path is wired (return_ → clubDry → master).
+    // The ConvolverNode is NOT connected until club sim is enabled, because
+    // a ConvolverNode with null buffer can cause browser-specific audio
+    // graph issues (silent output, rendering errors) on some Chrome versions.
     this.return_.connect(this.clubDry);
-    this.return_.connect(this.clubConvolver);
-    this.clubConvolver.connect(this.clubWet);
     this.clubDry.connect(this.master);
     this.clubWet.connect(this.master);
+    if (clubEnabled) {
+      this.return_.connect(this.clubConvolver);
+      this.clubConvolver.connect(this.clubWet);
+      this._clubConvolverWired = true;
+    }
 
-    // External feedback loop: return → EQ → gain → input (back to echo).
+    // External feedback loop: return → EQ → gain → delay → input (back to echo).
     // At gain=0 (default), no feedback. When raised, each echo repeat
     // recirculates through the full bus chain (EQ, saturation, spring)
     // gaining mixer coloration each pass. Capped at 0.85 to prevent
-    // runaway self-oscillation.
+    // runaway self-oscillation. The DelayNode ensures the cycle is legal
+    // for Web Audio's topological sort.
     this.return_.connect(this.extFeedbackEq);
     this.extFeedbackEq.connect(this.extFeedbackGain);
-    this.extFeedbackGain.connect(this.input);
+    this.extFeedbackGain.connect(this.extFeedbackDelay);
+    this.extFeedbackDelay.connect(this.input);
 
     // Optional plate-stage insert — branches from stereoMerge into the
     // selected plate (MadProfessor or Dattorro), blends back into return
@@ -2891,6 +2912,22 @@ export class DubBus {
       const mix = enabled ? merged.clubSimMix : 0;
       this.clubDry.gain.setTargetAtTime(enabled ? 1 - mix : 1, now, 0.02);
       this.clubWet.gain.setTargetAtTime(mix, now, 0.02);
+      // Wire/unwire the ConvolverNode lazily to avoid null-buffer issues.
+      if (enabled && !this._clubConvolverWired) {
+        this.return_.connect(this.clubConvolver);
+        this.clubConvolver.connect(this.clubWet);
+        this._clubConvolverWired = true;
+        // Ensure we have a buffer
+        if (!this.clubConvolver.buffer) {
+          const preset = CLUB_IR_PRESETS[merged.clubSimPreset] ?? CLUB_IR_PRESETS.soundSystem;
+          this.clubConvolver.buffer = generateIR(this.context, preset);
+          this._clubSimPreset = merged.clubSimPreset;
+        }
+      } else if (!enabled && this._clubConvolverWired) {
+        try { this.return_.disconnect(this.clubConvolver); } catch { /* ok */ }
+        try { this.clubConvolver.disconnect(this.clubWet); } catch { /* ok */ }
+        this._clubConvolverWired = false;
+      }
     }
     if (settings.clubSimPreset !== undefined && merged.clubSimPreset !== this._clubSimPreset) {
       const preset = CLUB_IR_PRESETS[merged.clubSimPreset] ?? CLUB_IR_PRESETS.soundSystem;
@@ -4931,6 +4968,8 @@ export class DubBus {
     try { this.glue.disconnect(); } catch { /* ok */ }
     try { this.lpf.disconnect(); } catch { /* ok */ }
     try { this.return_.disconnect(); } catch { /* ok */ }
+    try { this.extFeedbackDelay.disconnect(); } catch { /* ok */ }
+    try { this.clubConvolver.disconnect(); } catch { /* ok */ }
     try { this.spring.dispose(); } catch { /* ok */ }
     try { this.echo.dispose(); } catch { /* ok */ }
     this._teardownPlateStage();
