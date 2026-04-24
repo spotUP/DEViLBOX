@@ -68,6 +68,8 @@ export const transportTapeStop: DubMove = {
       const isLib = mod.LibopenmptEngine.hasInstance() && mod.LibopenmptEngine.getInstance().isAvailable();
       if (!isLib) {
         console.warn('[transportTapeStop] only implemented for LibOpenMPT — bus-only tapeStop carries the effect');
+        void import('@/stores/useNotificationStore').then(({ notify }) =>
+          notify.info('Tape Stop: transport slowdown only works with .mod/.xm/.s3m/.it formats — using bus-only effect'));
         return;
       }
       const timers = new Set<ReturnType<typeof setTimeout>>();

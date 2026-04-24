@@ -302,10 +302,10 @@ describe('snareCrack', () => {
   });
 });
 describe('sonarPing', () => {
-  it('fires a ping with default 1kHz / 140ms / 0.8 level', () => {
+  it('fires a ping with default 1kHz / 200ms / 0.8 level', () => {
     const { bus } = buildFakeBus();
     sonarPing.execute(ctx(bus));
-    expect(bus.firePing).toHaveBeenCalledWith(1000, 140, 0.8);
+    expect(bus.firePing).toHaveBeenCalledWith(1000, 200, 0.8);
   });
 });
 describe('radioRiser', () => {
