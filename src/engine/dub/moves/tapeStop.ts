@@ -1,32 +1,25 @@
 /**
- * tapeStop — the bus-tail version of the classic reel-to-reel slowdown.
+ * tapeStop — press-and-hold HOLD move.
  *
- * Real tape-stop is a transport-level speed ramp (pitch drops with speed).
- * That requires per-engine coordination across libopenmpt / UADE / Hively /
- * Furnace and none of their worklets currently expose a smooth speed ramp,
- * so this move does a bus-only approximation that still reads as "dub
- * collapses into silence":
- *   - LPF sweeps down to 80 Hz (all high-end vanishes)
- *   - Echo rate ramps ×2.5 (tail slows and pitches down)
- *   - Return gain drops to 0 in the final 15% for a muffled disappearance
- * After the hold window everything snaps back to baseline.
+ * While held: LPF sweeps down to 100 Hz and return gain drops to 0 so the
+ * bus goes silent (the bus-audio "tape stop" — dry signal continues in the
+ * main mix). On release: LPF and return gain ramp back to baseline.
  *
- * Global move, one-shot. A real transport tape-stop can come in a later
- * phase alongside a cross-engine speed abstraction.
+ * The transport keeps playing throughout — only the dub bus return is muted.
+ * A full pitch-and-speed tape-stop needs per-engine speed ramp support and
+ * lives separately as transportTapeStop.
  */
 
 import type { DubMove } from './_types';
 
 export const tapeStop: DubMove = {
   id: 'tapeStop',
-  kind: 'trigger',
-  defaults: { downSec: 0.6, holdSec: 0.15 },
+  kind: 'hold',
+  defaults: { downSec: 0.4 },
 
   execute({ bus, params }) {
-    const downSec = params.downSec ?? this.defaults.downSec;
-    const holdSec = params.holdSec ?? this.defaults.holdSec;
-    console.log(`[tapeStop] fired downSec=${downSec} holdSec=${holdSec} (bus-only — dry mix unaffected)`);
-    bus.tapeStop(downSec, holdSec);
-    return null;
+    const downSec = (params.downSec as number | undefined) ?? (this.defaults.downSec as number);
+    const restore = bus.startTapeHold(downSec);
+    return { dispose: restore };
   },
 };

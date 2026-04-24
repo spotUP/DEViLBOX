@@ -5162,6 +5162,47 @@ export class DubBus {
     this.throwTimers.add(restore);
   }
 
+  /**
+   * Hold-to-stop variant: sweeps LPF + return gain down immediately, stays
+   * collapsed until the returned disposer is called (on pointer-up), then
+   * restores. Used by the HOLD "Tape Stop" button.
+   */
+  startTapeHold(downSec = 0.4): () => void {
+    if (!this.enabled) return () => {};
+    const now = this.context.currentTime;
+    const baselineReturn = this.settings.returnGain;
+    const baselineRate = this.settings.echoRateMs;
+    let disposed = false;
+    try {
+      const f = this.lpf.frequency;
+      f.cancelScheduledValues(now);
+      f.setValueAtTime(f.value, now);
+      f.exponentialRampToValueAtTime(100, now + downSec);
+      const rg = this.return_.gain;
+      rg.cancelScheduledValues(now);
+      rg.setValueAtTime(rg.value, now);
+      rg.linearRampToValueAtTime(0, now + downSec);
+    } catch { /* ok */ }
+
+    return () => {
+      if (disposed) return;
+      disposed = true;
+      if (this._disposed) return;
+      const t2 = this.context.currentTime;
+      try {
+        const f = this.lpf.frequency;
+        f.cancelScheduledValues(t2);
+        f.setValueAtTime(f.value, t2);
+        f.exponentialRampToValueAtTime(20000, t2 + 0.2);
+        this.echo.setRate(baselineRate);
+        const rg = this.return_.gain;
+        rg.cancelScheduledValues(t2);
+        rg.setValueAtTime(rg.value, t2);
+        rg.linearRampToValueAtTime(this.enabled ? baselineReturn : 0, t2 + 0.12);
+      } catch { /* ok */ }
+    };
+  }
+
   tapeStop(downSec = 0.6, holdSec = 0.15): void {
     if (!this.enabled) return;
     const now = this.context.currentTime;

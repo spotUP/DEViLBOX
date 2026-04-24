@@ -84,7 +84,6 @@ export function dubSpringSlam():        boolean { return fireTrigger('springSlam
 export function dubSnareCrack():        boolean { return fireTrigger('snareCrack',        'Snare Crack'); }
 export function dubDelayTimeThrow():    boolean { return fireTrigger('delayTimeThrow',    'Delay Throw'); }
 export function dubBackwardReverb():    boolean { return fireTrigger('backwardReverb',    'Backward Reverb'); }
-export function dubTapeStop():          boolean { return fireTrigger('tapeStop',          'Tape Stop'); }
 export function dubTransportTapeStop(): boolean { return fireTrigger('transportTapeStop', 'Transport Tape Stop'); }
 export function dubReverseEcho():       boolean { return fireTrigger('reverseEcho',       'Reverse Echo'); }
 export function dubSonarPing():         boolean { return fireTrigger('sonarPing',         'Sonar Ping'); }
@@ -105,6 +104,7 @@ export const dubSiren:        MoveHandler = holdCommand('dubSiren',      'Siren'
 export const dubTapeWobble:   MoveHandler = holdCommand('tapeWobble',    'Tape Wobble');
 export const dubMasterDrop:   MoveHandler = holdCommand('masterDrop',    'Master Drop');
 export const dubToast:        MoveHandler = holdCommand('toast',         'Toast');
+export const dubTapeStop:     MoveHandler = holdCommand('tapeStop',      'Tape Stop');
 export const dubTubbyScream:  MoveHandler = holdCommand('tubbyScream',   'Tubby Scream');
 export const dubStereoDoubler: MoveHandler = holdCommand('stereoDoubler', 'Stereo Doubler');
 export const dubOscBass:      MoveHandler = holdCommand('oscBass',       'Osc Bass');
