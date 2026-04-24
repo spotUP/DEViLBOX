@@ -129,27 +129,29 @@ export const SIDInfoPanel: React.FC<SIDInfoPanelProps> = ({
         )}
 
         {/* SID Engine Selector */}
-        <div className="flex items-center gap-3 border-t border-blue-800/30 pt-2">
-          <div className="flex items-center gap-1.5 shrink-0">
-            <Zap className="w-3 h-3 text-blue-400/60" />
-            <label className="text-xs text-text-muted whitespace-nowrap">Engine:</label>
+        <div className="flex flex-col gap-1 border-t border-blue-800/30 pt-2">
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-1.5 shrink-0">
+              <Zap className="w-3 h-3 text-blue-400/60" />
+              <label className="text-xs text-text-muted whitespace-nowrap">Engine:</label>
+            </div>
+            <CustomSelect
+              value={sidEngine}
+              onChange={(v) => setSidEngine(v as SIDEngineType)}
+              options={Object.values(SID_ENGINES).map(eng => ({
+                value: eng.id,
+                label: `${eng.name} — ${eng.accuracy}, ${eng.speed} (${eng.size})${eng.features.asidHardware ? ' ★ HW' : ''}`,
+              }))}
+              className="flex-1 text-xs bg-dark-bgSecondary border border-blue-800/40 rounded px-2 py-1 text-text-primary"
+            />
           </div>
-          <CustomSelect
-            value={sidEngine}
-            onChange={(v) => setSidEngine(v as SIDEngineType)}
-            options={Object.values(SID_ENGINES).map(eng => ({
-              value: eng.id,
-              label: `${eng.name} — ${eng.accuracy}, ${eng.speed} (${eng.size})${eng.features.asidHardware ? ' ★ HW' : ''}`,
-            }))}
-            className="flex-1 text-xs bg-dark-bgSecondary border border-blue-800/40 rounded px-2 py-1 text-text-primary"
-          />
           {sidHwMode !== 'off' && !SID_ENGINES[sidEngine].features.asidHardware && (
-            <p className="text-[10px] text-yellow-400 leading-tight mt-1">
+            <p className="text-[10px] text-accent-warning leading-tight">
               ⚠ Hardware SID output requires jsSID engine. Select jsSID ★ HW above.
             </p>
           )}
           {sidHwMode !== 'off' && SID_ENGINES[sidEngine].features.asidHardware && (
-            <p className="text-[10px] text-green-400 leading-tight mt-1">
+            <p className="text-[10px] text-accent-success leading-tight">
               ✓ Hardware SID output active via {sidHwMode === 'webusb' ? 'USB-SID-Pico' : 'ASID'}
             </p>
           )}
