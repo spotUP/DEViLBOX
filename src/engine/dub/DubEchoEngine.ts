@@ -161,6 +161,7 @@ export class RETapeEchoAdapter implements DubEchoEngine {
       wow: 0.3,
       flutter: 0.25,
       dirt: 0.15,
+      playheadFilter: 1,  // enable 4kHz lowpass — tames BBD treble ringing
       wet: settings.echoWet,
     });
   }

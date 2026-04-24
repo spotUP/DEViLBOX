@@ -368,7 +368,7 @@ export class AelapseEffect extends Tone.ToneAudioNode {
     }
   }
 
-  private static async ensureInitialized(ctx: AudioContext): Promise<void> {
+  static async ensureInitialized(ctx: AudioContext): Promise<void> {
     if (this.loadedContexts.has(ctx)) return;
     const existing = this.initPromises.get(ctx);
     if (existing) return existing;
