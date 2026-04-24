@@ -221,3 +221,69 @@ describe('RE201 WASM stability — NaN prevention in DSP code', () => {
     expect(tapeBlock![0]).toMatch(/safeSample/);
   });
 });
+
+// ── Spring output mute during warmup (2026-04-24) ──────────────────────
+// Root cause: switching to Mad Professor (RE201) produced an audible "crash"
+// sound. Spring param changes during _swapEchoEngine excite waveguide
+// resonances that accumulate in the spring's delay lines. When return_
+// unmutes at 800ms, the stored energy burst through.
+// Fix: muteOutput()/unmuteOutput() the spring during both _swapEchoEngine
+// and _warmupMute warmup holds.
+
+describe('Spring output muted during warmup to prevent crash sound', () => {
+  it('_swapEchoEngine mutes spring output during warmup hold', () => {
+    const swapBlock = DUBBUS_SRC.match(/_swapEchoEngine[\s\S]*?setTimeout\(\(\) => \{[\s\S]*?\}, RAMP_SEC/);
+    expect(swapBlock).not.toBeNull();
+    expect(swapBlock![0]).toContain('spring.muteOutput()');
+    expect(swapBlock![0]).toContain('spring.unmuteOutput()');
+  });
+
+  it('_warmupMute mutes spring output during hold', () => {
+    const warmupBlock = DUBBUS_SRC.match(/_warmupMute\([\s\S]*?setTimeout\(\(\) => \{[\s\S]*?_muteHoldActive = false/);
+    expect(warmupBlock).not.toBeNull();
+    expect(warmupBlock![0]).toContain('spring.muteOutput()');
+    expect(warmupBlock![0]).toContain('spring.unmuteOutput()');
+  });
+});
+
+// ── Perry springEcho chain order (2026-04-24) ───────────────────────────
+// Root cause: Lee Perry echo "never rolls off" because echoSpring topology
+// adds new spring reverb tail to each echo repeat, creating overlapping
+// energy that never fully decays. springEcho reverses the flow: dry signal
+// hits spring first (reverb cloud), then echo repeats the cloud — the echo
+// decays cleanly without adding new reverb to each repeat.
+
+const DUB_TYPES_SRC = (() => {
+  try {
+    return readFileSync(
+      resolve(dirname(fileURLToPath(import.meta.url)), '../../../types/dub.ts'),
+      'utf8',
+    );
+  } catch {
+    return '';
+  }
+})();
+
+describe('Perry preset uses springEcho chain order for clean decay', () => {
+  it('perry preset sets chainOrder to springEcho', () => {
+    const perryBlock = DUB_TYPES_SRC.match(/perry:\s*\{[\s\S]*?\n  \}/);
+    expect(perryBlock).not.toBeNull();
+    expect(perryBlock![0]).toContain("chainOrder:    'springEcho'");
+  });
+
+  it('perry echoIntensity is below 0.75 for clean decay', () => {
+    const perryBlock = DUB_TYPES_SRC.match(/perry:\s*\{[\s\S]*?\n  \}/);
+    expect(perryBlock).not.toBeNull();
+    const match = perryBlock![0].match(/echoIntensity:\s*([\d.]+)/);
+    expect(match).not.toBeNull();
+    expect(parseFloat(match![1])).toBeLessThanOrEqual(0.75);
+  });
+
+  it('perry springWet is below 0.60 to avoid burying echo decay', () => {
+    const perryBlock = DUB_TYPES_SRC.match(/perry:\s*\{[\s\S]*?\n  \}/);
+    expect(perryBlock).not.toBeNull();
+    const match = perryBlock![0].match(/springWet:\s*([\d.]+)/);
+    expect(match).not.toBeNull();
+    expect(parseFloat(match![1])).toBeLessThanOrEqual(0.60);
+  });
+});
