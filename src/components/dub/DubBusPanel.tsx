@@ -217,8 +217,29 @@ export const DubBusPanel: React.FC = () => {
             ] as const}
             onChange={(v) => patch({ echoEngine: v })}
           />
+          {dubBus.echoEngine === 're201' && (
           <Choice
             label="RE-201 Mode"
+            value={String(dubBus.re201DelayMode ?? 7)}
+            options={[
+              { value: '0',  label: '0 — Reverb only' },
+              { value: '1',  label: '1 — Head 1 only' },
+              { value: '2',  label: '2 — Head 2 only' },
+              { value: '3',  label: '3 — Head 3 only' },
+              { value: '4',  label: '4 — H1 + H2' },
+              { value: '5',  label: '5 — H1 + H3' },
+              { value: '6',  label: '6 — H2 + H3' },
+              { value: '7',  label: '7 — H1 + Reverb (default)' },
+              { value: '8',  label: '8 — H1 + H2 + Reverb' },
+              { value: '9',  label: '9 — H2 + H3 + Reverb (Tubby)' },
+              { value: '10', label: '10 — All heads + Reverb' },
+            ] as const}
+            onChange={(v) => patch({ re201DelayMode: Number(v) })}
+          />
+          )}
+          {dubBus.echoEngine === 'spaceEcho' && (
+          <Choice
+            label="SpaceEcho Mode"
             value={String(dubBus.echoMode ?? 4)}
             options={[
               { value: '1',  label: '1 — Head 1 (single short tap)' },
@@ -236,6 +257,7 @@ export const DubBusPanel: React.FC = () => {
             ] as const}
             onChange={(v) => patch({ echoMode: Number(v) })}
           />
+          )}
           <Slider
             label="Spring wet"
             value={dubBus.springWet}
@@ -581,23 +603,63 @@ export const DubBusPanel: React.FC = () => {
             disabled={!dubBus.returnEqEnabled}
           />
           <Slider
-            label="Low shelf"
+            label="Low shelf freq"
+            value={dubBus.returnEqB1Freq}
+            min={40}
+            max={500}
+            step={5}
+            onChange={(v) => patch({ returnEqB1Freq: v })}
+            format={(v) => `${Math.round(v)} Hz`}
+            disabled={!dubBus.returnEqEnabled}
+          />
+          <Slider
+            label="Low shelf gain"
             value={dubBus.returnEqB1Gain}
             min={-18}
             max={18}
             step={0.5}
             onChange={(v) => patch({ returnEqB1Gain: v })}
-            format={(v) => `${v >= 0 ? '+' : ''}${v.toFixed(1)} dB @ ${Math.round(dubBus.returnEqB1Freq)} Hz`}
+            format={(v) => `${v >= 0 ? '+' : ''}${v.toFixed(1)} dB`}
             disabled={!dubBus.returnEqEnabled}
           />
           <Slider
-            label="High shelf"
+            label="Upper mid freq"
+            value={dubBus.returnEqB3Freq}
+            min={800}
+            max={8000}
+            step={50}
+            onChange={(v) => patch({ returnEqB3Freq: v })}
+            format={(v) => v >= 1000 ? `${(v / 1000).toFixed(1)}k` : `${Math.round(v)} Hz`}
+            disabled={!dubBus.returnEqEnabled}
+          />
+          <Slider
+            label="Upper mid gain"
+            value={dubBus.returnEqB3Gain}
+            min={-18}
+            max={18}
+            step={0.5}
+            onChange={(v) => patch({ returnEqB3Gain: v })}
+            format={(v) => `${v >= 0 ? '+' : ''}${v.toFixed(1)} dB`}
+            disabled={!dubBus.returnEqEnabled}
+          />
+          <Slider
+            label="High shelf freq"
+            value={dubBus.returnEqB4Freq}
+            min={2000}
+            max={16000}
+            step={100}
+            onChange={(v) => patch({ returnEqB4Freq: v })}
+            format={(v) => `${(v / 1000).toFixed(1)}k`}
+            disabled={!dubBus.returnEqEnabled}
+          />
+          <Slider
+            label="High shelf gain"
             value={dubBus.returnEqB4Gain}
             min={-18}
             max={18}
             step={0.5}
             onChange={(v) => patch({ returnEqB4Gain: v })}
-            format={(v) => `${v >= 0 ? '+' : ''}${v.toFixed(1)} dB @ ${(dubBus.returnEqB4Freq / 1000).toFixed(1)}k`}
+            format={(v) => `${v >= 0 ? '+' : ''}${v.toFixed(1)} dB`}
             disabled={!dubBus.returnEqEnabled}
           />
           </Section>
@@ -897,6 +959,17 @@ export const DubBusPanel: React.FC = () => {
               { value: 'bar',     label: 'Bar (downbeat)' },
             ] as const}
             onChange={(v) => patch({ throwQuantize: v })}
+          />
+          <Choice
+            label="Siren voice"
+            value={dubBus.sirenPreset ?? 'rasta'}
+            options={[
+              { value: 'rasta',   label: 'Rasta Box (classic low sweep)' },
+              { value: 'pirate',  label: 'Pirate Radio (high FM sweep)' },
+              { value: 'foghorn', label: 'Foghorn (deep drone)' },
+              { value: 'alarm',   label: 'Alarm (two-tone fast)' },
+            ] as const}
+            onChange={(v) => patch({ sirenPreset: v })}
           />
           <Slider
             label="Siren feedback"

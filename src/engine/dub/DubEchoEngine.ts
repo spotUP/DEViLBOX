@@ -80,7 +80,7 @@ export class RE201Adapter implements DubEchoEngine {
 
   constructor(settings: DubBusSettings) {
     this.fx = new RE201Effect({
-      delayMode: 7,          // head 1 + reverb — Tubby's signature short-tap + spring character
+      delayMode: settings.re201DelayMode ?? 7, // configurable — Tubby mode 9 = H2+H3+reverb
       repeatRate: this.msToRepeatRate(settings.echoRateMs),
       intensity: settings.echoIntensity,
       echoVolume: 0.90,
@@ -115,7 +115,8 @@ export class RE201Adapter implements DubEchoEngine {
   // darkening without a configurable filter.
   setFeedbackHpf(_hz: number): void { /* RE-201 handles internally */ }
   setFeedbackLpf(_hz: number): void { /* RE-201 handles internally */ }
-  setMode(_mode: number): void { /* RE-201 has fixed head config */ }
+  // RE-201 uses 0-10 mode range. Clamp and pass through to the effect.
+  setMode(mode: number): void { this.fx.setDelayMode(Math.max(0, Math.min(10, Math.round(mode)))); }
 
   get wet() { return this.fx.wet; }
   set wet(v: number) { this.fx.wet = v; }

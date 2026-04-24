@@ -187,6 +187,21 @@ export interface DubBusSettings {
    *  R = 1/2 beat (the Ariwa SDE-3000 configuration). */
   pingPongSyncToBpm: boolean;
 
+  // ─── RE-201 delay mode ────────────────────────────────────────────────────
+  // Selects the tape-head combination on the RE-201 engine (0-10):
+  //   0=reverb only  1=H1  2=H2  3=H3  4=H1+H2  5=H1+H3  6=H2+H3
+  //   7=H1+reverb   8=H1+H2+reverb  9=H2+H3+reverb (Tubby!)  10=all
+  // Ignored when echoEngine is not 're201'. Default 7 (H1+reverb).
+  re201DelayMode: number;
+
+  // ─── Dub siren preset ────────────────────────────────────────────────────
+  // Named voice for the dub siren (dubSiren move + Auto Dub):
+  //   'rasta'     = classic low-sweep Jamaican rasta box (default, ~MIDI 36)
+  //   'pirate'    = high FM sweep radio noise (~MIDI 72, fast sweep)
+  //   'foghorn'   = deep resonant drone (~MIDI 28, slow)
+  //   'alarm'     = two-tone alternating (60/67 semitones, fast)
+  sirenPreset: 'rasta' | 'pirate' | 'foghorn' | 'alarm';
+
   // ─── SpaceEcho head mode (RE-201 mode selector) ──────────────────────────
   // The RE-201 has 12 mode positions selecting which tape heads are active
   // and whether the spring reverb is mixed in. Only applies when echoEngine
@@ -372,6 +387,8 @@ export const DEFAULT_DUB_BUS: DubBusSettings = {
   characterPreset:  'custom',
 
   glueBypass:       false,
+  re201DelayMode:   7,     // H1+reverb — stock RE-201 default
+  sirenPreset:      'rasta' as const,
   hpfStepped:       false,
   hpfResonanceDb:   0,
   pingPongLMs:          337,   // ~3/8 note at 120 BPM
@@ -499,6 +516,7 @@ export const DUB_CHARACTER_PRESETS: Record<Exclude<DubBusSettings['characterPres
       tapeSatMode:   'single',
       echoFeedbackHpfHz: 250,  // research spec: prevents sub buildup, RE-201 tape-head gap
       echoFeedbackLpfHz: 3000, // research spec: warm, dark repeats — Tubby's heavy spring tail
+      re201DelayMode: 9,       // research: Tubby's signature = H2+H3+reverb (two-tap + spring)
       echoEngine:    're201',     // Tubby's MCI → RE-201 signal chain
       chainOrder:    'springEcho', // spring FIRST: same fix as Perry — prevents
                                     // each RE-201 repeat from adding new spring tail

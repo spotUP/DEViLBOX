@@ -2420,6 +2420,21 @@ export class DubBus {
     if (this._sidMode && this._sidSynths?.isReady) {
       return this._sidSynths.startSiren();
     }
+
+    // Map named presets to MIDI notes. Each voice has a distinct character:
+    //   rasta   — classic Jamaican rasta-box: low C (MIDI 36), resonant sweep
+    //   pirate  — high FM sweep: C6 (MIDI 84), fast modulation
+    //   foghorn — deep resonant drone: C1 (MIDI 24), very slow sweep
+    //   alarm   — two-tone (unused synth variation): D#4 (MIDI 63)
+    const SIREN_NOTES: Record<string, number> = {
+      rasta:   36,   // C2 — deep Jamaican box
+      pirate:  84,   // C6 — high pirate radio sweep
+      foghorn: 24,   // C1 — deep resonant foghorn drone
+      alarm:   63,   // D#4 — two-tone alert character
+    };
+    const preset = this.settings.sirenPreset ?? 'rasta';
+    const midiNote = SIREN_NOTES[preset] ?? 36;
+
     let released = false;
     let release: (() => void) | null = null;
     void this._ensureSirenSynth().then((synth) => {
@@ -2432,7 +2447,7 @@ export class DubBus {
           console.warn('[DubBus] siren synth connect failed:', err);
         }
       }
-      try { synth.triggerAttack(undefined, undefined, 1.0); } catch { /* ok */ }
+      try { synth.triggerAttack(undefined, midiNote, 1.0); } catch { /* ok */ }
       release = () => { try { synth.triggerRelease(); } catch { /* ok */ } };
       if (released) release();
     });
@@ -2935,7 +2950,11 @@ export class DubBus {
       this.echo.wet = merged.echoWet;
     }
     this.echo.setRate(merged.echoRateMs);
-    if (merged.echoMode !== undefined) {
+    // Route mode to the correct engine: SpaceEcho uses echoMode (1-12),
+    // RE-201 uses re201DelayMode (0-10). Both go through setMode() on the adapter.
+    if (merged.echoEngine === 're201' && merged.re201DelayMode !== undefined) {
+      try { this.echo.setMode(merged.re201DelayMode); } catch { /* ok */ }
+    } else if (merged.echoMode !== undefined) {
       try { this.echo.setMode(merged.echoMode); } catch { /* ok */ }
     }
     // Sidechain depth maps to compressor threshold — more duck = lower threshold.
