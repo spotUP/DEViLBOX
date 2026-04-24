@@ -521,6 +521,19 @@ function connect(): void {
       backoffMs = INITIAL_BACKOFF_MS;
       connectAttempts = 0;
       console.log('[mcp-bridge] MCP server active');
+      // Auto-dismiss the startup dialog so MCP sessions don't start blocked.
+      // Mark the current version as seen so the What's New changelog doesn't open.
+      try {
+        import('@generated/changelog').then(({ BUILD_NUMBER }) => {
+          localStorage.setItem('devilbox-seen-version', String(BUILD_NUMBER));
+          localStorage.setItem('show-tips-at-startup', 'false');
+        }).catch(() => {});
+        // Close the modal immediately if it's already open
+        import('@stores/useUIStore').then(({ useUIStore }) => {
+          const { modalOpen, closeModal } = useUIStore.getState();
+          if (modalOpen === 'tips') closeModal();
+        }).catch(() => {});
+      } catch { /* ok */ }
     }
     handleMessage(typeof event.data === 'string' ? event.data : event.data.toString());
   };
