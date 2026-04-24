@@ -698,6 +698,8 @@ export class DubBus {
     if (newType === this._currentEchoEngine) return;
     console.log(`[DubBus] Swapping echo engine: ${this._currentEchoEngine} → ${newType} (deferredPreset=${deferredPreset ?? 'none'})`);
     this._snap(`pre-swap ${this._currentEchoEngine}→${newType}`);
+    this._muteHoldActive = true;
+    this._pendingPostHoldSettings = null;
     const ctx = this.context;
     const RAMP_SEC = 0.02;
     /* Warmup hold: covers the new WASM echo engine's DC/LF startup
@@ -809,10 +811,27 @@ export class DubBus {
         console.log(`[DubBus] swap warmup armed: feedback→${priorFeedbackGain.toFixed(3)} return_→${(this.enabled ? settings.returnGain : 0).toFixed(3)} threshold→${targetThreshold.toFixed(1)}dB after ${(WARMUP_SEC*1000).toFixed(0)}ms hold`);
         // Snap again after warmup completes so we can see whether the bus
         // actually recovered (or something else pinned gains to 0).
-        setTimeout(() => this._snap(`post-swap-warmup ${this._currentEchoEngine}`),
-                   (WARMUP_SEC + RAMP_SEC) * 1000 + 20);
+        setTimeout(() => {
+          this._snap(`post-swap-warmup ${this._currentEchoEngine}`);
+          this._muteHoldActive = false;
+          // Replay any settings that were suppressed during the hold
+          if (this._pendingPostHoldSettings) {
+            const pending = this._pendingPostHoldSettings;
+            this._pendingPostHoldSettings = null;
+            const now3 = ctx.currentTime;
+            this.return_.gain.setTargetAtTime(
+              this.enabled ? pending.returnGain : 0, now3, 0.02,
+            );
+            if (!this._draining && this.enabled) {
+              const threshold = -6 - pending.sidechainAmount * 30;
+              this.sidechain.threshold.setTargetAtTime(threshold, now3, 0.05);
+            }
+          }
+        }, (WARMUP_SEC + RAMP_SEC) * 1000 + 20);
       } catch (err) {
         console.error('[DubBus] Echo engine swap failed:', err);
+        this._muteHoldActive = false;
+        this._pendingPostHoldSettings = null;
         /* Recovery: try to restore gains so the bus isn't permanently
            silenced by a swap failure. */
         try {
@@ -1137,6 +1156,19 @@ export class DubBus {
   private _warnedBusDisabled = false;
   private _warnedNoMixer = false;
   private _disposed = false;
+  /**
+   * Mute-hold guard. While true, `_applySettings` skips writes to
+   * `return_.gain` and `sidechain.threshold` so a re-entrant
+   * `setSettings` call (PadGrid mirror effect, DJ deck sync, etc.)
+   * can't insert a setTargetAtTime event that defeats the warmup hold.
+   *
+   * Set by both `_swapEchoEngine` (engine swap) and `_warmupMute`
+   * (same-engine preset transitions). Cleared when the hold timer
+   * fires. Any settings suppressed during the hold are replayed from
+   * `_pendingPostHoldSettings` once the hold ends.
+   */
+  private _muteHoldActive = false;
+  private _pendingPostHoldSettings: DubBusSettings | null = null;
 
   // SID mode — when active, dub synths use real SID chip emulation (GTUltra)
   private _sidSynths: import('./SIDDubSynths').SIDDubSynths | null = null;
@@ -2700,9 +2732,18 @@ export class DubBus {
     rampBiquadParam(this.hpf.frequency, hpfFreq, now);
     rampBiquadParam(this.hpf2.frequency, hpfFreq, now);
     rampBiquadParam(this.hpf3.frequency, hpfFreq, now);
-    this.return_.gain.setTargetAtTime(
-      this.enabled ? merged.returnGain : 0, now, 0.02,
-    );
+    // Guard: skip return_.gain write when a mute hold is active (swap
+    // or warmup). A re-entrant setSettings call (PadGrid mirror, DJ sync)
+    // would insert a setTargetAtTime event that defeats the warmup hold,
+    // letting the spring burst through to master. Queue the settings so
+    // the hold-release callback can replay them.
+    if (this._muteHoldActive) {
+      this._pendingPostHoldSettings = merged;
+    } else {
+      this.return_.gain.setTargetAtTime(
+        this.enabled ? merged.returnGain : 0, now, 0.02,
+      );
+    }
     // ── Echo engine swap ──────────────────────────────────────────────────
     // When echoEngine changes (character preset or manual selection), tear
     // down the old effect and install the new one in the same graph position.
@@ -2739,7 +2780,7 @@ export class DubBus {
     // Skip during an echo swap — the swap sets threshold to 0dB during the
     // transition and schedules its own restoration. Writing here would
     // override that protection.
-    if (!engineChanging) {
+    if (!engineChanging && !this._muteHoldActive) {
       const threshold = -6 - merged.sidechainAmount * 30;
       this.sidechain.threshold.setTargetAtTime(threshold, now, 0.05);
     }
@@ -2983,6 +3024,8 @@ export class DubBus {
     const priorReturn = this.return_.gain.value;
     const targetThreshold = -6 - sidechainAmount * 30;
     console.log(`[DubBusCtrl] _warmupMute fired | feedback ${priorFeedback.toFixed(3)}→0→${priorFeedback.toFixed(3)} return_ ${priorReturn.toFixed(3)}→0→${priorReturn.toFixed(3)} hold=${(WARMUP_SEC*1000).toFixed(0)}ms`);
+    this._muteHoldActive = true;
+    this._pendingPostHoldSettings = null;
     try {
       const now = ctx.currentTime;
       this.feedback.gain.cancelScheduledValues(now);
@@ -2997,22 +3040,36 @@ export class DubBus {
       this.return_.gain.setValueAtTime(0, now + WARMUP_SEC);
       this.return_.gain.linearRampToValueAtTime(priorReturn, now + WARMUP_SEC + RAMP_SEC);
 
-      // Bypass BOTH compressors during the transition (ratio=1 means
-      // gain_reduction=0 regardless of signal level). Threshold=0 alone
-      // isn't enough — spring burst peaks at +8dB above 0dB.
       this.sidechain.ratio.cancelScheduledValues(now);
       this.sidechain.ratio.setValueAtTime(1, now);
       this.sidechain.ratio.setTargetAtTime(6, now + WARMUP_SEC, 0.02);
       this.glue.ratio.cancelScheduledValues(now);
       this.glue.ratio.setValueAtTime(1, now);
       this.glue.ratio.setTargetAtTime(3, now + WARMUP_SEC, 0.02);
-      // Also restore sidechain threshold after warmup
       this.sidechain.threshold.cancelScheduledValues(now);
       this.sidechain.threshold.setValueAtTime(0, now);
       this.sidechain.threshold.setTargetAtTime(targetThreshold, now + WARMUP_SEC, 0.05);
     } catch (err) {
       console.warn('[DubBusCtrl] _warmupMute threw:', err);
+      this._muteHoldActive = false;
+      this._pendingPostHoldSettings = null;
     }
+    // Release the hold after warmup completes
+    setTimeout(() => {
+      this._muteHoldActive = false;
+      if (this._pendingPostHoldSettings) {
+        const pending = this._pendingPostHoldSettings;
+        this._pendingPostHoldSettings = null;
+        const now2 = ctx.currentTime;
+        this.return_.gain.setTargetAtTime(
+          this.enabled ? pending.returnGain : 0, now2, 0.02,
+        );
+        if (!this._draining && this.enabled) {
+          const threshold = -6 - pending.sidechainAmount * 30;
+          this.sidechain.threshold.setTargetAtTime(threshold, now2, 0.05);
+        }
+      }
+    }, (WARMUP_SEC + RAMP_SEC) * 1000 + 20);
   }
 
   /** Dense one-liner snapshot of the bus's live audio state. Use to pair with
