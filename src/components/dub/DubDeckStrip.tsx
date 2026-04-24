@@ -822,11 +822,11 @@ export const DubDeckStrip: React.FC = () => {
           vertical column: label → op buttons stacked → HOLD → vertical
           fader → send % readout. Horizontal scroll if the pattern has
           more channels than fit. */}
-      <div className="flex items-end gap-2 overflow-x-auto pt-1.5">
+      <div className="flex items-stretch gap-2 overflow-x-auto pt-1.5">
         {/* Master send — scales all channel sends at once */}
         <div
           className={
-            'flex flex-col items-center gap-1.5 px-2 py-1.5 rounded border min-w-[64px] shrink-0 ' +
+            'flex flex-col items-center justify-between gap-1.5 px-2 py-1.5 rounded border min-w-[64px] shrink-0 ' +
             'bg-dark-bgSecondary border-accent-primary/40'
           }
         >
@@ -927,7 +927,7 @@ export const DubDeckStrip: React.FC = () => {
             <div
               key={i}
               className={
-                'flex flex-col items-center gap-1.5 px-2 py-1.5 rounded border min-w-[64px] shrink-0 transition-colors ' +
+                'flex flex-col items-center justify-between gap-1.5 px-2 py-1.5 rounded border min-w-[64px] shrink-0 transition-colors ' +
                 (channelFiring
                   ? 'bg-accent-highlight/15 border-accent-highlight'
                   : isHeld
