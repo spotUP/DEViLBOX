@@ -145,13 +145,13 @@ describe('DubEchoEngine adapter — safe feedback for DubBus context', () => {
     const adapterStart = ECHO_ENGINE_SRC.indexOf('class AnotherDelayAdapter');
     const adapterBody = ECHO_ENGINE_SRC.slice(adapterStart, adapterStart + 1500);
     expect(adapterBody).not.toMatch(/\*\s*0\.95/);
-    expect(adapterBody).toMatch(/\*\s*0\.75/);
+    expect(adapterBody).toMatch(/\*\s*0\.55/);
   });
 
-  it('RE201 adapter disables internal reverb volume', () => {
+  it('RE201 adapter enables light internal reverb for body', () => {
     const adapterStart = ECHO_ENGINE_SRC.indexOf('class RE201Adapter');
     const adapterBody = ECHO_ENGINE_SRC.slice(adapterStart, adapterStart + 1000);
-    expect(adapterBody).toMatch(/reverbVolume:\s*0\b/);
+    expect(adapterBody).toMatch(/reverbVolume:\s*0\.2/);
   });
 });
 
