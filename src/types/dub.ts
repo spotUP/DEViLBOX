@@ -101,7 +101,7 @@ export interface DubBusSettings {
   //   '1/8D' = dotted eighth  (the classic reggae/dub skank feel)
   //   '1/16' = sixteenth      (very dense)
   //   '1/2'  = half note      (long dub tail)
-  echoSyncDivision: 'off' | '1/4' | '1/8' | '1/8D' | '1/16' | '1/2';
+  echoSyncDivision: 'off' | '1/4' | '1/4T' | '1/8' | '1/8D' | '1/8T' | '1/16' | '1/2';
   // Throw quantize — when non-'off', dub throws wait for the next beat
   // subdivision boundary before firing. Gives the pad a "locked-to-the-
   // groove" feel instead of free-timing. 'offbeat' is the King Tubby
@@ -503,6 +503,7 @@ export const DUB_CHARACTER_PRESETS: Record<Exclude<DubBusSettings['characterPres
       echoIntensity:  0.72,   // reduced from 0.85 — with springEcho topology the echo
                                // repeats the reverbed cloud; lower feedback prevents wash
       echoRateMs:     380,
+      echoSyncDivision: '1/4T', // research: Perry used triplet-feel echoes against the riddim
       echoWet:        0.85,   // reduced from 0.92 — mix some dry through for clarity
       springWet:      0.55,   // reduced from 0.75 — spring tail was burying the echo decay
       sidechainAmount: 0.4,

@@ -84,11 +84,13 @@ function trackedSetTimeout(fn: () => void, delayMs: number): () => void {
  * current tempo. 'off' means "use the user's slider value unchanged".
  *
  * Division math:
- *   1/4  = one beat            → 60000 / bpm
- *   1/8  = half a beat         → 30000 / bpm
- *   1/8D = dotted eighth       → 45000 / bpm  (classic dub skank delay)
- *   1/16 = quarter of a beat   → 15000 / bpm
- *   1/2  = two beats           → 120000 / bpm
+ *   1/4   = one beat              → 60000 / bpm
+ *   1/4T  = quarter-note triplet  → 40000 / bpm  (Perry's triplet-feel echoes)
+ *   1/8   = half a beat           → 30000 / bpm
+ *   1/8D  = dotted eighth         → 45000 / bpm  (classic dub skank delay)
+ *   1/8T  = eighth-note triplet   → 20000 / bpm  (syncopated dub feel)
+ *   1/16  = quarter of a beat     → 15000 / bpm
+ *   1/2   = two beats             → 120000 / bpm
  */
 export function bpmSyncedEchoRate(
   bpm: number,
@@ -100,8 +102,10 @@ export function bpmSyncedEchoRate(
   const beatMs = 60000 / safeBpm;
   switch (division) {
     case '1/4':  return beatMs;
+    case '1/4T': return beatMs * (2 / 3);
     case '1/8':  return beatMs * 0.5;
     case '1/8D': return beatMs * 0.75;
+    case '1/8T': return beatMs * (1 / 3);
     case '1/16': return beatMs * 0.25;
     case '1/2':  return beatMs * 2;
     default:     return fallbackMs;
