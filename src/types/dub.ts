@@ -493,6 +493,19 @@ export interface DubCharacterPreset {
   springsScatter?: number;
   springsTone?: number;
   tapeSatDrive?: number;  // 0..1 — TapeSat WaveShaper curve drive
+  /** Default channel send levels applied when this preset is selected.
+   *  Keyed by inferred channel role. 'default' is the fallback for any
+   *  channel whose name doesn't match a known role. Applied to ALL visible
+   *  channels on preset load — gives the bus audio to process immediately. */
+  defaultSendsByRole?: {
+    percussion?: number;
+    bass?: number;
+    lead?: number;
+    chord?: number;
+    arpeggio?: number;
+    pad?: number;
+    default: number;
+  };
 }
 
 export const DUB_CHARACTER_PRESETS: Record<Exclude<DubBusSettings['characterPreset'], 'custom'>, DubCharacterPreset> = {
@@ -529,6 +542,9 @@ export const DUB_CHARACTER_PRESETS: Record<Exclude<DubBusSettings['characterPres
     },
     springsLength: 0.35, springsDamp: 0.55, springsChaos: 0.20, springsScatter: 0.60, springsTone: 0.55,
     tapeSatDrive:  0.55,
+    // Tubby's style: everything through the bus, loud. Drums + bass dominate;
+    // melodic lines get heavy echo throws; nothing stays dry.
+    defaultSendsByRole: { percussion: 1.0, bass: 0.85, lead: 0.70, chord: 0.60, arpeggio: 0.60, pad: 0.50, default: 0.55 },
   },
   scientist: {
     label: 'Scientist',
@@ -554,6 +570,9 @@ export const DUB_CHARACTER_PRESETS: Record<Exclude<DubBusSettings['characterPres
     },
     springsLength: 0.55, springsDamp: 0.25, springsChaos: 0.40, springsScatter: 0.40, springsTone: 0.70,
     tapeSatDrive:  0.20,
+    // Scientist: selective — melodics get the most echo, bass controlled,
+    // drums moderate. The mid-scoop drop only bites when leads are routed in.
+    defaultSendsByRole: { percussion: 0.70, bass: 0.60, lead: 0.80, chord: 0.50, arpeggio: 0.55, pad: 0.40, default: 0.45 },
   },
   perry: {
     label: 'Lee "Scratch" Perry',
@@ -598,6 +617,9 @@ export const DUB_CHARACTER_PRESETS: Record<Exclude<DubBusSettings['characterPres
     },
     springsLength: 0.65, springsDamp: 0.20, springsChaos: 0.85, springsScatter: 0.85, springsTone: 0.35,
     tapeSatDrive:  0.70,   // per-path drive; stack provides total character
+    // Perry: maximum chaos — everything bleeds. He literally had nothing dry.
+    // The self-feeding ext-feedback loop needs all channels routed through.
+    defaultSendsByRole: { percussion: 1.0, bass: 0.95, lead: 0.90, chord: 0.85, arpeggio: 0.85, pad: 0.80, default: 0.85 },
   },
   gatedFlanger: {
     label: 'Gated Flanger',
@@ -623,6 +645,9 @@ export const DUB_CHARACTER_PRESETS: Record<Exclude<DubBusSettings['characterPres
     },
     springsLength: 0.25, springsDamp: 0.85, springsChaos: 0.15, springsScatter: 0.30, springsTone: 0.60,
     tapeSatDrive:  0.35,
+    // Gated Flanger: aggressive but controlled. Heavy on percussion for the
+    // gated-reverb snap; pads get the flanger treatment.
+    defaultSendsByRole: { percussion: 0.85, bass: 0.55, lead: 0.60, chord: 0.65, arpeggio: 0.55, pad: 0.75, default: 0.55 },
   },
   madProfessor: {
     label: 'Mad Professor',
@@ -652,6 +677,9 @@ export const DUB_CHARACTER_PRESETS: Record<Exclude<DubBusSettings['characterPres
     },
     springsLength: 0.55, springsDamp: 0.45, springsChaos: 0.10, springsScatter: 0.55, springsTone: 0.65,
     tapeSatDrive:  0.12,   // pristine
+    // Mad Professor: balanced and lush. Pads and leads get the most reverb
+    // (ghostReverb/madProfPingPong); drums are present but not dominant.
+    defaultSendsByRole: { percussion: 0.65, bass: 0.60, lead: 0.70, chord: 0.70, arpeggio: 0.65, pad: 0.80, default: 0.60 },
   },
 };
 
