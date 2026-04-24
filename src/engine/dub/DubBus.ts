@@ -2858,6 +2858,13 @@ export class DubBus {
         this.noiseGain.gain.cancelScheduledValues(t);
         this.noiseGain.gain.setValueAtTime(0, t);
       } catch { /* ok */ }
+      // Pre-warm reverseCapture on initial enable (the drain-cancel path
+      // above handles re-enable, but a cold first-enable also needs this
+      // so Reverse/Backward work immediately on the first send open).
+      if (settings.enabled && !this._draining) {
+        void this._ensureReverseCapture().catch(() => { /* worklet optional */ });
+      }
+
       // Restore the bus input gain when re-enabling. dubPanic() mutes it
       // to 0 to drain the echo — re-enable needs to open the gate back up
       // or the bus would accept audio but produce nothing audible from new
@@ -2887,6 +2894,7 @@ export class DubBus {
         // worklet boots. Without this kick, the first fire hits the
         // `if (!frames)` abort path and produces silence (sweep Δpk
         // 0.006 vs 0.103 on subsequent fires — 2026-04-20 run).
+        // Also called on the initial-enable path (below the drain-cancel block).
         void this._ensureReverseCapture().catch(() => { /* worklet optional */ });
       } else {
         // Disabling: truly silence the bus. return_.gain alone isn't enough
@@ -4277,6 +4285,9 @@ export class DubBus {
           console.log(`[DubBus] backwardReverb snapshot received — frames=${frames}`);
           if (!frames) {
             console.warn('[DubBus] backwardReverb abort — empty ring buffer (no audio reached bus.input yet)');
+            void import('@stores/useNotificationStore').then(({ notify }) =>
+              notify.warning('Backward Reverb: open a CH send and let audio play for a moment first')
+            ).catch(() => {});
             resolve();
             return;
           }
@@ -4398,6 +4409,9 @@ export class DubBus {
       }
     }
     console.warn('[DubBus] reverseEcho abort — ring still empty after retries; bus input likely silent');
+    void import('@stores/useNotificationStore').then(({ notify }) =>
+      notify.warning('Reverse Echo: open a CH send and let audio play for a moment first')
+    ).catch(() => {});
   }
 
   private async _snapshotReverseRingOnce(
