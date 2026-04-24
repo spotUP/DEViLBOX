@@ -80,6 +80,12 @@ interface DubStore {
   /** Move ids the user never wants fired. UI is a chip row. */
   autoDubMoveBlacklist: string[];
   setAutoDubMoveBlacklist: (v: string[]) => void;
+
+  /** Quantize — when on, dub move fire/release events are snapped to the
+   *  nearest row boundary for cleaner lane recordings. Audio fires
+   *  immediately for feel, only the recorded row is quantized. */
+  quantize: boolean;
+  setQuantize: (v: boolean) => void;
 }
 
 /** Persona identifiers. Full definitions live in AutoDubPersonas.ts so the
@@ -124,6 +130,8 @@ export const useDubStore = create<DubStore>((set) => ({
   setAutoDubPersona: (v) => set({ autoDubPersona: v }),
   autoDubMoveBlacklist: [],
   setAutoDubMoveBlacklist: (v) => set({ autoDubMoveBlacklist: v }),
+  quantize: true,
+  setQuantize: (v) => set({ quantize: v }),
 }));
 
 /**

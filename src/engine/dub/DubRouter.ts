@@ -214,7 +214,9 @@ export function fire(
 
   const merged = { ...move.defaults, ...params };
   const bpm = useTransportStore.getState().bpm || 120;
-  const row = currentRow();
+  const rawRow = currentRow();
+  const quantize = useDubStore.getState().quantize;
+  const row = quantize ? Math.round(rawRow) : rawRow;
 
   const ctx: DubMoveContext = { bus: _bus, channelId, deckId: opts?.deckId, params: merged, bpm, source };
   const disposer = move.execute(ctx);
@@ -241,7 +243,8 @@ export function fire(
       if (released) return;
       released = true;
       try { disposer.dispose(); } catch (e) { console.warn('[DubRouter] disposer threw:', e); }
-      const releaseRow = currentRow();
+      const rawReleaseRow = currentRow();
+      const releaseRow = useDubStore.getState().quantize ? Math.round(rawReleaseRow) : rawReleaseRow;
       const relEvent: DubReleaseEvent = { invocationId, row: releaseRow, timeSec: getSongTimeSec(), source };
       for (const fn of releaseSubscribers) {
         try {

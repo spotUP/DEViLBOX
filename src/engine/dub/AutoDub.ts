@@ -231,10 +231,10 @@ const RULES: Rule[] = [
   { moveId: 'echoBuildUp',
     condition: (c) => c.isNewBar && c.bar % 4 === 2,
     baseWeight: 0.25, holdBars: 2, wet: true },
-  // High-intensity siren on bar 1 of 4.
+  // Dub siren — the signature move. Bar 1 of 4, or any bar at high intensity.
   { moveId: 'dubSiren',
-    condition: (c) => c.intensity > 0.6 && c.isNewBar && c.bar % 4 === 1,
-    baseWeight: 0.10, holdBars: 1 },
+    condition: (c) => c.isNewBar && (c.bar % 4 === 1 || c.intensity > 0.7),
+    baseWeight: 0.22, holdBars: 1 },
   // Reverse echo — Perry territory.
   { moveId: 'reverseEcho',
     condition: (c) => c.barPos > 0.75 && c.bar % 4 === 3,
@@ -285,6 +285,35 @@ const RULES: Rule[] = [
   { moveId: 'sonarPing',
     condition: (c) => hasTransientForRole(c, 'lead'),
     baseWeight: 0.12, wet: true },
+
+  // ─── Phase 4: expanded move palette ─────────────────────────────────────
+  // Spring kick — punchier spring hit, fits drum-heavy sections.
+  { moveId: 'springKick',
+    condition: (c) => hasTransientForRole(c, 'percussion') && c.barPos > 0.4,
+    baseWeight: 0.10, wet: true },
+  // Ghost reverb — subtle reverb swell on non-percussion channels.
+  { moveId: 'ghostReverb',
+    condition: (c) => c.isNewBar && c.bar % 4 === 0,
+    baseWeight: 0.12, holdBars: 2, wet: true },
+  // Ring mod — metallic Perry-style texture burst.
+  { moveId: 'ringMod',
+    condition: (c) => c.intensity > 0.5 && c.barPos > 0.6 && c.bar % 4 === 3,
+    baseWeight: 0.08, holdBars: 1, wet: true },
+  // Voltage starve — bit-crush degradation, sparing use.
+  { moveId: 'voltageStarve',
+    condition: (c) => c.intensity > 0.6 && c.isNewBar && c.bar % 8 === 5,
+    baseWeight: 0.08, holdBars: 1, wet: true },
+  // EQ sweep — resonant filter sweep, mid-bar transitions.
+  { moveId: 'eqSweep',
+    condition: (c) => c.barPos > 0.5 && c.bar % 4 === 2,
+    baseWeight: 0.10, holdBars: 1, wet: true },
+  // Delay preset snaps — occasional rate changes for variety.
+  { moveId: 'delayPresetDotted',
+    condition: (c) => c.isNewBar && c.bar % 8 === 3,
+    baseWeight: 0.08, wet: true },
+  { moveId: 'delayPresetTriplet',
+    condition: (c) => c.isNewBar && c.bar % 8 === 7,
+    baseWeight: 0.08, wet: true },
 ];
 
 /** Unique move IDs Auto Dub can fire. Deduplicated from RULES — several
