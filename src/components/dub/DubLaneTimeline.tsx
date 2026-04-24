@@ -33,6 +33,8 @@ const MOVE_COLOR: Record<string, string> = {
   // ── Phase 1 moves ──
   echoThrow: 'bg-accent-primary',
   dubStab: 'bg-accent-highlight',
+  hpfRise: 'bg-accent-primary',
+  madProfPingPong: 'bg-accent-highlight',
   filterDrop: 'bg-accent-secondary',
   dubSiren: 'bg-accent-warning',
   springSlam: 'bg-accent-success',

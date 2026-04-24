@@ -143,6 +143,11 @@ export interface DubBusSettings {
   // filter on effect-return channels. Independent of HPF slope (which is
   // always 18 dB/oct as of 2026-04-20 — 3-biquad cascade).
   hpfStepped: boolean;
+  /** Altec 9069B T-network resonant peak gain (dB). The real passive filter
+   *  has a resonant hump just above the cutoff that gives Tubby's sweeps their
+   *  characteristic voice vs a plain HPF. 0 = flat/off, 2.5 = authentic Altec.
+   *  Q is fixed at 2.0 (moderately tight peak). */
+  hpfResonanceDb: number;
 
   // ─── Liquid sweep — parallel short-delay comb filter with LFO ──────────
   // Dub's "liquid drums" motion. Technically a flanger (1-10ms modulated
@@ -162,6 +167,16 @@ export interface DubBusSettings {
   //               tape speed (half of 30 ips). Research-quoted as the dub
   //               engineer's trick for "heavier/dirtier bottom."
   tapeSatMode: 'single' | 'stack' | 'tape15ips';
+
+  // ─── Mad Professor asymmetric L/R ping-pong ──────────────────────────────
+  // Two delay lines panned hard L/R with independent delay times (research:
+  // Ariwa's SDE-3000 ran 3/8 note to the left and 1/2 note to the right).
+  // Creates genuine stereo rhythmic motion vs the M/S width which is
+  // mono-compatible. Activates on startPingPong(); off by default.
+  pingPongLMs: number;   // left delay time in ms (default: 337.5 = 3/8 at 120 BPM)
+  pingPongRMs: number;   // right delay time in ms (default: 450 = 1/2 at 120 BPM)
+  pingPongFeedback: number; // feedback 0-0.9 (default 0.45)
+  pingPongWet: number;   // 0-1 (default 0.65)
 
   // ─── SpaceEcho head mode (RE-201 mode selector) ──────────────────────────
   // The RE-201 has 12 mode positions selecting which tape heads are active
@@ -348,6 +363,11 @@ export const DEFAULT_DUB_BUS: DubBusSettings = {
   characterPreset:  'custom',
 
   hpfStepped:       false,
+  hpfResonanceDb:   0,
+  pingPongLMs:      337,   // ~3/8 note at 120 BPM
+  pingPongRMs:      450,   // ~1/2 note at 120 BPM
+  pingPongFeedback: 0.45,
+  pingPongWet:      0.65,
   sweepAmount:      0,
   sweepRateHz:      0.15,
   sweepDepthMs:     4,
@@ -455,6 +475,7 @@ export const DUB_CHARACTER_PRESETS: Record<Exclude<DubBusSettings['characterPres
       returnGain:     0.75,  // heavy bus presence — Tubby is LOUD
       hpfCutoff:      100,
       hpfStepped:     true,   // the "Big Knob" rhythmic staccato sweeps
+      hpfResonanceDb: 2.5,    // Altec 9069B T-network resonant hump — the "voice" of the filter
       bassShelfGainDb: 9, bassShelfFreqHz: 85,  bassShelfQ: 0.9,  // chest-punch bass lift
       midScoopGainDb:  0,
       echoIntensity:  0.65,   // more repeats — Tubby's signature multi-tap
@@ -584,6 +605,10 @@ export const DUB_CHARACTER_PRESETS: Record<Exclude<DubBusSettings['characterPres
       tapeSatMode:   'single',
       echoFeedbackHpfHz: 400,   // research spec: cleaner HPF — Mad Prof hi-fi clarity
       echoFeedbackLpfHz: 8000,  // research spec: bright, articulate repeats — Lexicon PCM-70 character
+      pingPongLMs:      337,    // research: Ariwa SDE-3000 ran 3/8 note left
+      pingPongRMs:      450,    // research: Ariwa SDE-3000 ran 1/2 note right
+      pingPongFeedback: 0.50,
+      pingPongWet:      0.70,
       echoEngine:    're201',       // Ariwa studio's RE-201 for lush tape + spring
     },
     springsLength: 0.55, springsDamp: 0.45, springsChaos: 0.10, springsScatter: 0.55, springsTone: 0.65,

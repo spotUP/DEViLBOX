@@ -196,6 +196,15 @@ export const DubBusPanel: React.FC = () => {
             onChange={(v) => patch({ hpfCutoff: v })}
             format={(v) => `${Math.round(v)} Hz`}
           />
+          <Slider
+            label="HPF resonance"
+            value={dubBus.hpfResonanceDb ?? 0}
+            min={0}
+            max={6}
+            step={0.1}
+            onChange={(v) => patch({ hpfResonanceDb: v })}
+            format={(v) => v === 0 ? 'off' : `+${v.toFixed(1)} dB`}
+          />
           <div className="h-px bg-dark-borderLight my-1" />
           <Choice
             label="Echo engine"
@@ -450,6 +459,35 @@ export const DubBusPanel: React.FC = () => {
             onChange={(v) => patch({ stereoWidth: v })}
             format={(v) => v === 0 ? 'mono' : v === 1 ? 'stereo' : `${v.toFixed(2)}×`}
           />
+          <div className="h-px bg-dark-borderLight my-1" />
+          <Slider
+            label="Ping-pong L delay"
+            value={dubBus.pingPongLMs ?? 337}
+            min={50}
+            max={1000}
+            step={5}
+            onChange={(v) => patch({ pingPongLMs: v })}
+            format={(v) => `${Math.round(v)} ms`}
+          />
+          <Slider
+            label="Ping-pong R delay"
+            value={dubBus.pingPongRMs ?? 450}
+            min={50}
+            max={1000}
+            step={5}
+            onChange={(v) => patch({ pingPongRMs: v })}
+            format={(v) => `${Math.round(v)} ms`}
+          />
+          <Slider
+            label="Ping-pong feedback"
+            value={dubBus.pingPongFeedback ?? 0.45}
+            min={0}
+            max={0.9}
+            step={0.01}
+            onChange={(v) => patch({ pingPongFeedback: v })}
+            format={(v) => `${Math.round(v * 100)}%`}
+          />
+          <div className="h-px bg-dark-borderLight my-1" />
           <Choice
             label="Tape sat mode"
             value={dubBus.tapeSatMode}

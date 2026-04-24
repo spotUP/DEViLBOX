@@ -120,6 +120,8 @@ export function dubDelayPresetDoubler(): boolean { return fireTrigger('delayPres
 export const dubGhostReverb:    MoveHandler = holdCommand('ghostReverb',    'Ghost Reverb');
 export const dubVoltageStarve: MoveHandler = holdCommand('voltageStarve',  'Voltage Starve');
 export const dubRingMod:       MoveHandler = holdCommand('ringMod',        'Ring Modulator');
+export const dubHpfRise:       MoveHandler = holdCommand('hpfRise',        'HPF Rise (Big Knob)');
+export const dubMadProfPingPong: MoveHandler = holdCommand('madProfPingPong', 'Mad Prof Ping-Pong');
 
 // ── Panic — release everything ────────────────────────────────────────────
 export function dubPanicReleaseAll(): boolean {

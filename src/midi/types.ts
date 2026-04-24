@@ -396,6 +396,8 @@ export type DubMoveParameter =
   | 'dub.ghostReverb'
   | 'dub.voltageStarve'
   | 'dub.ringMod'
+  | 'dub.hpfRise'
+  | 'dub.madProfPingPong'
   // Continuous bus settings
   | 'dub.echoIntensity'
   | 'dub.echoWet'

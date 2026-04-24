@@ -200,6 +200,12 @@ interface Rule {
 }
 
 const RULES: Rule[] = [
+  // Bar 1 of 4 — Tubby's Altec Big Knob HPF rise. Research: Tubby swept the
+  // HPF up at the top of a 4-bar phrase to build tension, then released on
+  // the downbeat. Bar 1 (the second bar of a 4-bar phrase) is the sweet spot.
+  { moveId: 'hpfRise',
+    condition: (c) => c.isNewBar && c.bar % 4 === 1,
+    baseWeight: 0.30, holdBars: 1 },
   // Bar 3 of 4 — echo throw on percussion (the signature Tubby move).
   { moveId: 'echoThrow', channelRole: 'percussion',
     condition: (c) => c.isNewBar && c.bar % 4 === 3,
@@ -288,13 +294,26 @@ const RULES: Rule[] = [
 
   // ─── Phase 4: expanded move palette ─────────────────────────────────────
   // Spring kick — punchier spring hit, fits drum-heavy sections.
+  // Also fires mid-bar on any beat (Perry's random tank-kick gesture).
   { moveId: 'springKick',
     condition: (c) => hasTransientForRole(c, 'percussion') && c.barPos > 0.4,
     baseWeight: 0.10, wet: true },
+  { moveId: 'springKick',
+    condition: (c) => c.barPos >= 0.45 && c.barPos < 0.52 && c.bar % 3 === 1,
+    baseWeight: 0.08, wet: true },
   // Ghost reverb — subtle reverb swell on non-percussion channels.
+  // Also fires on bar 2 of 4 for Mad Professor's lush swell pattern.
   { moveId: 'ghostReverb',
     condition: (c) => c.isNewBar && c.bar % 4 === 0,
     baseWeight: 0.12, holdBars: 2, wet: true },
+  { moveId: 'ghostReverb',
+    condition: (c) => c.isNewBar && c.bar % 4 === 2,
+    baseWeight: 0.10, holdBars: 2, wet: true },
+  // Mad Professor ping-pong — Ariwa SDE-3000 asymmetric stereo delay.
+  // Fires on the downbeat of a 4-bar phrase, held for 2 bars of wide motion.
+  { moveId: 'madProfPingPong',
+    condition: (c) => c.isNewBar && c.bar % 8 === 4,
+    baseWeight: 0.10, holdBars: 2, wet: true },
   // Ring mod — metallic Perry-style texture burst.
   { moveId: 'ringMod',
     condition: (c) => c.intensity > 0.5 && c.barPos > 0.6 && c.bar % 4 === 3,
