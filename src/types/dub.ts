@@ -478,10 +478,11 @@ export const DUB_CHARACTER_PRESETS: Record<Exclude<DubBusSettings['characterPres
       hpfStepped:      false,
       bassShelfGainDb: 2, bassShelfFreqHz: 80, bassShelfQ: 0.5,
       midScoopGainDb: -4, midScoopFreqHz: 800,
-      echoIntensity:  0.85,   // near self-oscillation — Perry's runaway repeats
+      echoIntensity:  0.72,   // reduced from 0.85 — with springEcho topology the echo
+                               // repeats the reverbed cloud; lower feedback prevents wash
       echoRateMs:     380,
-      echoWet:        0.92,
-      springWet:      0.75,
+      echoWet:        0.85,   // reduced from 0.92 — mix some dry through for clarity
+      springWet:      0.55,   // reduced from 0.75 — spring tail was burying the echo decay
       sidechainAmount: 0.4,
       stereoWidth:    0.25,  // near-mono — Perry's defining texture
       // Perry had actual phasers (Mutron Bi-Phase, Eventide, MXR Phase 90)
@@ -494,8 +495,11 @@ export const DUB_CHARACTER_PRESETS: Record<Exclude<DubBusSettings['characterPres
       phaserFeedback: 0.65,
       tapeSatMode:    'stack', // 3 parallel tape paths ≈ 4-track bouncing
       echoEngine:    'anotherDelay', // Perry's runaway wow-flutter madness
+      chainOrder:    'springEcho',   // spring FIRST: reverb cloud feeds the echo,
+                                      // so repeats decay cleanly instead of adding
+                                      // new reverb tail to each repeat
     },
-    springsLength: 0.65, springsDamp: 0.10, springsChaos: 0.85, springsScatter: 0.85, springsTone: 0.35,
+    springsLength: 0.65, springsDamp: 0.20, springsChaos: 0.85, springsScatter: 0.85, springsTone: 0.35,
     tapeSatDrive:  0.70,   // per-path drive; stack provides total character
   },
   gatedFlanger: {
