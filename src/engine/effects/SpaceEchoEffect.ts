@@ -11,6 +11,12 @@ export interface SpaceEchoOptions {
   treble?: number;      // EQ high band (-20 to +20)
   wow?: number;         // Wow/Flutter amount (0-1)
   wet?: number;         // 0-1
+  /** In-feedback HPF cutoff (Hz). Prevents low-end buildup per repeat.
+   *  RE-201 characteristic: each pass clips bass rumble. Default 250 Hz. */
+  feedbackHpfHz?: number;
+  /** In-feedback LPF cutoff (Hz). Darkens each repeat progressively.
+   *  Simulates tape-head wear — high repeats become warm/dark. Default 4000 Hz. */
+  feedbackLpfHz?: number;
 }
 
 /**
@@ -42,6 +48,8 @@ export class SpaceEchoEffect extends Tone.ToneAudioNode {
   private feedbackGain: Tone.Gain;
   private saturation: Tone.Distortion;
   private eq: Tone.EQ3;
+  private feedbackHpf: Tone.Filter;
+  private feedbackLpf: Tone.Filter;
   
   private reverb: Tone.Reverb;
   private reverbGain: Tone.Gain;
@@ -78,6 +86,8 @@ export class SpaceEchoEffect extends Tone.ToneAudioNode {
       treble: options.treble ?? -3,
       wow: options.wow ?? 0.15,
       wet: options.wet ?? 1,
+      feedbackHpfHz: options.feedbackHpfHz ?? 250,
+      feedbackLpfHz: options.feedbackLpfHz ?? 4000,
     };
 
     this.input = new Tone.Gain(1);
@@ -108,6 +118,21 @@ export class SpaceEchoEffect extends Tone.ToneAudioNode {
       high: this._options.treble,
       lowFrequency: 200,
       highFrequency: 2500,
+    });
+    // Dedicated HPF + LPF in the feedback path — the RE-201's tape-head
+    // characteristic. HPF strips sub rumble that accumulates each pass;
+    // LPF darkens each repeat (simulates tape-head wear + head-to-tape
+    // distance). Together they ensure repeats decay cleanly rather than
+    // building bass mud or staying unnaturally bright.
+    this.feedbackHpf = new Tone.Filter({
+      type: 'highpass',
+      frequency: this._options.feedbackHpfHz,
+      rolloff: -12,
+    });
+    this.feedbackLpf = new Tone.Filter({
+      type: 'lowpass',
+      frequency: this._options.feedbackLpfHz,
+      rolloff: -12,
     });
 
     // 4. Modulation
@@ -147,7 +172,9 @@ export class SpaceEchoEffect extends Tone.ToneAudioNode {
     this.echoGain.connect(this.eq);
 
     this.eq.connect(this.saturation);
-    this.saturation.connect(this.feedbackGain);
+    this.saturation.connect(this.feedbackHpf);
+    this.feedbackHpf.connect(this.feedbackLpf);
+    this.feedbackLpf.connect(this.feedbackGain);
     this.feedbackGain.connect(this.head1);
     this.feedbackGain.connect(this.head2);
     this.feedbackGain.connect(this.head3);
@@ -226,6 +253,16 @@ export class SpaceEchoEffect extends Tone.ToneAudioNode {
     this.eq.mid.value = val;
   }
 
+  setFeedbackHpf(hz: number) {
+    this._options.feedbackHpfHz = Math.max(20, Math.min(2000, hz));
+    this.feedbackHpf.frequency.rampTo(this._options.feedbackHpfHz, 0.05);
+  }
+
+  setFeedbackLpf(hz: number) {
+    this._options.feedbackLpfHz = Math.max(500, Math.min(20000, hz));
+    this.feedbackLpf.frequency.rampTo(this._options.feedbackLpfHz, 0.05);
+  }
+
   setTreble(val: number) {
     this._options.treble = val;
     this.eq.high.value = val;
@@ -250,6 +287,8 @@ export class SpaceEchoEffect extends Tone.ToneAudioNode {
     this.head2Gain.dispose();
     this.head3Gain.dispose();
     this.feedbackGain.dispose();
+    this.feedbackHpf.dispose();
+    this.feedbackLpf.dispose();
     this.reverb.dispose();
     this.reverbGain.dispose();
     this.echoGain.dispose();
