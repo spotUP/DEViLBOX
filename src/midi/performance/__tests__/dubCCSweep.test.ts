@@ -72,7 +72,14 @@ function makeMockBus() {
     muteAndDubChannel: vi.fn(() => () => {}),
     mute: vi.fn(() => () => {}),
     transportTapeStop: vi.fn(() => () => {}),
-    inputNode: { context: {} as AudioContext } as unknown as GainNode,
+    inputNode: {
+      context: {
+        createGain: () => ({ gain: { value: 0, cancelScheduledValues: () => {}, setValueAtTime: () => {}, linearRampToValueAtTime: () => {} }, connect: () => {}, disconnect: () => {} }),
+        currentTime: 0,
+      } as unknown as AudioContext,
+      connect: () => {},
+      disconnect: () => {},
+    } as unknown as GainNode,
     context: {} as AudioContext,
   };
   return bus as unknown as DubBus;
