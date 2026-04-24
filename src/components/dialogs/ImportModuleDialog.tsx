@@ -410,12 +410,17 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
   // Keep ref in sync so the Enter key handler always calls the latest version
   useEffect(() => { handleImportRef.current = handleImport; }, [handleImport]);
 
-  // Enter key submits when a module is loaded and ready
+  // Enter key submits the dialog. Always preventDefault so a focused Cancel
+  // button doesn't close the dialog accidentally. Skip interception when an
+  // input/select is focused (e.g. subsong number input).
   useEffect(() => {
     if (!isOpen) return;
     const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Enter' && moduleInfo && !isLoading && !isImporting) {
-        e.preventDefault();
+      if (e.key !== 'Enter') return;
+      const tag = (e.target as HTMLElement).tagName;
+      if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') return;
+      e.preventDefault();
+      if (moduleInfo && !isLoading && !isImporting) {
         void handleImportRef.current();
       }
     };
