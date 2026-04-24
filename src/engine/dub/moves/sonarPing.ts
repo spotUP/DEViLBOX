@@ -11,7 +11,7 @@ import type { DubMove } from './_types';
 export const sonarPing: DubMove = {
   id: 'sonarPing',
   kind: 'trigger',
-  defaults: { freq: 1000, durationMs: 140, level: 0.8 },
+  defaults: { freq: 1000, durationMs: 200, level: 0.8 },
 
   execute({ bus, params }) {
     const freq = params.freq ?? this.defaults.freq;
