@@ -57,12 +57,6 @@ interface DubStore {
   clubSim: boolean;
   setClubSim: (v: boolean) => void;
 
-  /** Reverb→Delay chain order. When true, the bus runs spring→echo
-   *  instead of the default echo→spring. Produces the "whole room
-   *  repeated" dub geometry. Live-switchable. */
-  reverseChainOrder: boolean;
-  setReverseChainOrder: (v: boolean) => void;
-
   /** JA Press — vinyl-degradation level 0-10. 0 = factory-new pressing,
    *  10 = gutter-scraped Jamaican 7-inch: heavy surface noise, pops,
    *  wow/flutter, HF roll-off, sub rumble, L/R drift. Master-insert. */
@@ -118,9 +112,6 @@ export const useDubStore = create<DubStore>((set) => ({
 
   clubSim: false,
   setClubSim: (v) => set({ clubSim: v }),
-
-  reverseChainOrder: false,
-  setReverseChainOrder: (v) => set({ reverseChainOrder: v }),
 
   vinylLevel: 0,
   setVinylLevel: (v) => set({ vinylLevel: Math.max(0, Math.min(10, v)) }),

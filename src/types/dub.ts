@@ -229,6 +229,35 @@ export interface DubBusSettings {
   // Bitta WASM bitcrusher for "near dead battery" / dictaphone effects.
   lofiEnabled: boolean;
   lofiBits: number;         // 1-16 bit depth (16 = full quality / off)
+
+  // ─── External feedback loop (2026-04-23) ──────────────────────────────
+  // Messian Dread: "Don't use delay feedback internally — loop back through
+  // a mixer channel." Routes echo/spring return back to echo input through
+  // a gain + parametric EQ. Adds mixer coloration to each repeat — the
+  // "mixing desk as sound source" technique.
+  extFeedbackGain: number;  // 0-0.85 (capped below unity to prevent runaway)
+  extFeedbackEqFreq: number;  // 200-5000 Hz center of peaking EQ on feedback path
+  extFeedbackEqGain: number;  // -18 to +18 dB
+  extFeedbackEqQ: number;     // 0.5-8
+
+  // ─── Club simulation via convolution (2026-04-23) ─────────────────────
+  // ConvolverNode on the master output with algorithmically generated IRs.
+  // Simulates listening in a real venue — "how does this mix translate to
+  // a sound system dance?" (Interruptor).
+  clubSimEnabled: boolean;
+  clubSimPreset: 'smallClub' | 'soundSystem' | 'studioMonitor';
+  clubSimMix: number;  // 0-1 dry/wet blend
+
+  // ─── Effect chain order (2026-04-23) ──────────────────────────────────
+  // "Combine effects in unusual order" — Interruptor. The two core effects
+  // (echo + spring) can be reordered for dramatically different textures:
+  // - 'echoSpring': echo → spring (default, Tubby/Scientist)
+  //   Echoes get spring reverb → each repeat is progressively more washy
+  // - 'springEcho': spring → echo (Perry — liquid chaos)
+  //   Reverb tail gets echoed → "a room repeated", each repeat is a room
+  // - 'parallel': both receive dry input, mix at output
+  //   Independent echo + spring textures blended together
+  chainOrder: 'echoSpring' | 'springEcho' | 'parallel';
 }
 
 export const DEFAULT_DUB_BUS: DubBusSettings = {
@@ -334,6 +363,17 @@ export const DEFAULT_DUB_BUS: DubBusSettings = {
 
   lofiEnabled:      false,
   lofiBits:         16,    // full quality = effectively off
+
+  extFeedbackGain:    0,      // off by default
+  extFeedbackEqFreq:  1000,   // 1kHz center
+  extFeedbackEqGain:  0,      // flat
+  extFeedbackEqQ:     1.5,    // moderate bandwidth
+
+  clubSimEnabled:     false,
+  clubSimPreset:      'soundSystem',
+  clubSimMix:         0.15,   // subtle — just adds room character
+
+  chainOrder:         'echoSpring',
 };
 
 /** The 11 stepped positions of the Altec 9069B filter, per audiothing.net/

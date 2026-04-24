@@ -34,6 +34,7 @@ import { ParametricEQEffect } from '../effects/ParametricEQEffect';
 import { CalfPhaserEffect } from '../effects/CalfPhaserEffect';
 import { RingModEffect } from '../effects/RingModEffect';
 import { BittaEffect } from '../effects/BittaEffect';
+import { generateIR, CLUB_IR_PRESETS } from './generateIR';
 import { getNativeAudioNode } from '@utils/audio-context';
 import type { DJMixerEngine } from '../dj/DJMixerEngine';
 import type { DeckId } from '../dj/DeckEngine';
@@ -250,6 +251,24 @@ export class DubBus {
   private tapeStackMix: GainNode;    // sum of 3 paths, gated by tapeSatMode
   private tapeSatBypass: GainNode;   // single-path pass, gated by tapeSatMode
 
+  // ─── External feedback loop ───────────────────────────────────────────
+  // Routes return path back to echo input through a peaking EQ + gain,
+  // implementing Messian Dread's "mixer as instrument" technique.
+  private extFeedbackGain: GainNode;
+  private extFeedbackEq: BiquadFilterNode;
+
+  // ─── Club simulation (ConvolverNode on master output) ─────────────────
+  private clubConvolver: ConvolverNode;
+  private clubDry: GainNode;
+  private clubWet: GainNode;
+  private _clubSimPreset: string = '';
+
+  // ─── Chain order state ─────────────────────────────────────────────────
+  /** Current core routing order. Updated by _applyCoreRouting(). */
+  private _chainOrder: 'echoSpring' | 'springEcho' | 'parallel' = 'echoSpring';
+  /** Monotonic version counter for racing setChainOrder / worklet loads. */
+  private _routingVersion = 0;
+
   // ─── Liquid sweep — parallel comb filter with LFO ─────────────────────
   // Flanger-family short-delay comb (1-10 ms modulated delay + feedback)
   // taking the user's "liquid drums" motion cue. Feedback loop has an HPF
@@ -347,11 +366,13 @@ export class DubBus {
   private static _scrubberModuleLoaded = new WeakSet<AudioContext>();
   private static _scrubberModulePromises = new WeakMap<AudioContext, Promise<void>>();
 
-  /** Async splice path for the FORWARD scrubber (spring.output → SCRUBBER →
-   *  sidechain). Mirror of _loadFeedbackScrubberWorklet — see that method
-   *  and the dual-scrubber comment in the constructor for context. */
+  /** Async splice path for the FORWARD scrubber. Chain-order-aware:
+   *  - echoSpring: spring.output → SCRUBBER → sidechain
+   *  - springEcho: echo postEchoSat → SCRUBBER → sidechain
+   *  - parallel:   spring.output → SCRUBBER → sidechain (echo bypasses) */
   private async _loadForwardScrubberWorklet(): Promise<void> {
     if (this._forwardScrubberIsWorklet) return;
+    const versionBefore = this._routingVersion;
     try {
       const base = (import.meta as { env?: { BASE_URL?: string } }).env?.BASE_URL ?? '/';
       if (!DubBus._scrubberModuleLoaded.has(this.context)) {
@@ -363,6 +384,8 @@ export class DubBus {
         await p;
         DubBus._scrubberModuleLoaded.add(this.context);
       }
+      if (this._routingVersion !== versionBefore) return;
+
       const worklet = new AudioWorkletNode(this.context, 'nan-scrubber', {
         numberOfInputs: 1,
         numberOfOutputs: 1,
@@ -370,16 +393,31 @@ export class DubBus {
       });
       const springOut = (this.spring as unknown as { output: Tone.ToneAudioNode }).output;
       const springOutNative = getNativeAudioNode(springOut as unknown);
-      if (!springOutNative) {
-        console.warn('[DubBus] forward scrubber splice: spring native extract failed');
-        return;
+
+      // Disconnect old passthrough from its neighbors
+      if (this._chainOrder === 'echoSpring' || this._chainOrder === 'parallel') {
+        if (springOutNative) {
+          try { springOutNative.disconnect(this._forwardScrubber); } catch { /* ok */ }
+        }
+      } else if (this._chainOrder === 'springEcho') {
+        try { this.postEchoSatBypass.disconnect(this._forwardScrubber); } catch { /* ok */ }
+        try { this.postEchoSatWet.disconnect(this._forwardScrubber); } catch { /* ok */ }
       }
-      try { springOutNative.connect(worklet); } catch { /* ok */ }
-      try { worklet.connect(this.sidechain); } catch { /* ok */ }
-      try { springOutNative.disconnect(this._forwardScrubber); } catch { /* ok */ }
       try { (this._forwardScrubber as GainNode).disconnect(); } catch { /* ok */ }
+
       this._forwardScrubber = worklet;
       this._forwardScrubberIsWorklet = true;
+
+      // Reconnect with new worklet based on current chain order
+      if (this._chainOrder === 'echoSpring' || this._chainOrder === 'parallel') {
+        if (springOutNative) {
+          try { springOutNative.connect(worklet); } catch { /* ok */ }
+        }
+      } else if (this._chainOrder === 'springEcho') {
+        try { this.postEchoSatBypass.connect(worklet); } catch { /* ok */ }
+        try { this.postEchoSatWet.connect(worklet); } catch { /* ok */ }
+      }
+      try { worklet.connect(this.sidechain); } catch { /* ok */ }
     } catch (err) {
       console.warn('[DubBus] forward NaN-scrubber worklet load failed — using passthrough:', err);
     }
@@ -412,11 +450,175 @@ export class DubBus {
     try { this.echo.connect(this.spring); } catch { /* ok */ }
   }
 
+  /**
+   * Tear down ALL chain-order-dependent audio edges. Every disconnect
+   * is try-caught because only the edges of the CURRENT order actually
+   * exist — the rest silently no-op.
+   *
+   * Chain-order-dependent = everything between tapeSat outputs and sidechain
+   * input, including echo↔spring inter-stage, postEchoSat, scrubbers, and
+   * the feedback tap from echo output.
+   */
+  private _disconnectCoreRouting(): void {
+    const echoIn = this.echo.input as unknown as AudioNode;
+    const echoOut = this.echo.output as unknown as Tone.ToneAudioNode;
+    const springIn = this.spring.input as unknown as AudioNode;
+    const springOut = (this.spring as unknown as { output: Tone.ToneAudioNode }).output;
+    const echoOutNative = getNativeAudioNode(echoOut as unknown);
+    const springOutNative = getNativeAudioNode(springOut as unknown);
+    const springInNative = getNativeAudioNode(springIn as unknown);
+
+    // tapeSat → echo/spring inputs
+    try { this.tapeSatBypass.disconnect(echoIn); } catch { /* ok */ }
+    try { this.tapeStackMix.disconnect(echoIn); } catch { /* ok */ }
+    try { this.tapeSatBypass.disconnect(springIn); } catch { /* ok */ }
+    try { this.tapeStackMix.disconnect(springIn); } catch { /* ok */ }
+
+    // echo → postEchoSat → echoSpringScrubber → spring (echoSpring order)
+    if (echoOutNative) {
+      try { echoOutNative.disconnect(this.postEchoSatBypass); } catch { /* ok */ }
+      try { echoOutNative.disconnect(this.postEchoSat); } catch { /* ok */ }
+    }
+    try { this.postEchoSat.disconnect(this.postEchoSatWet); } catch { /* ok */ }
+    try { this.postEchoSatBypass.disconnect(this._echoSpringScrubber); } catch { /* ok */ }
+    try { this.postEchoSatWet.disconnect(this._echoSpringScrubber); } catch { /* ok */ }
+    if (springInNative) {
+      try { (this._echoSpringScrubber as AudioNode).disconnect(springInNative); } catch { /* ok */ }
+    }
+
+    // spring → echoSpringScrubber → echo (springEcho order)
+    if (springOutNative) {
+      try { springOutNative.disconnect(this._echoSpringScrubber); } catch { /* ok */ }
+    }
+    if (echoIn) {
+      try { (this._echoSpringScrubber as AudioNode).disconnect(echoIn); } catch { /* ok */ }
+    }
+
+    // echo/spring → forwardScrubber → sidechain
+    if (echoOutNative) {
+      try { echoOutNative.disconnect(this._forwardScrubber); } catch { /* ok */ }
+    }
+    if (springOutNative) {
+      try { springOutNative.disconnect(this._forwardScrubber); } catch { /* ok */ }
+    }
+    try { (this._forwardScrubber as AudioNode).disconnect(this.sidechain); } catch { /* ok */ }
+
+    // postEchoSat → forwardScrubber / sidechain (for springEcho/parallel)
+    try { this.postEchoSatBypass.disconnect(this._forwardScrubber); } catch { /* ok */ }
+    try { this.postEchoSatWet.disconnect(this._forwardScrubber); } catch { /* ok */ }
+    try { this.postEchoSatBypass.disconnect(this.sidechain); } catch { /* ok */ }
+    try { this.postEchoSatWet.disconnect(this.sidechain); } catch { /* ok */ }
+
+    // Direct Tone.connect fallbacks (only exist if native extraction failed)
+    try { Tone.disconnect(springOut, this.sidechain as unknown as Tone.InputNode); } catch { /* ok */ }
+    try { Tone.disconnect(echoOut, this.sidechain as unknown as Tone.InputNode); } catch { /* ok */ }
+    try { Tone.disconnect(springOut, this.echo.input as unknown as Tone.InputNode); } catch { /* ok */ }
+    try { Tone.disconnect(echoOut, springIn as unknown as Tone.InputNode); } catch { /* ok */ }
+
+    // Feedback tap from echo output
+    try { Tone.disconnect(echoOut, this.feedback as unknown as Tone.InputNode); } catch { /* ok */ }
+    try { this.feedback.disconnect(this._feedbackScrubber); } catch { /* ok */ }
+    try { this._feedbackScrubber.disconnect(this.feedbackShelfComp); } catch { /* ok */ }
+    try { this.feedbackShelfComp.disconnect(this.input); } catch { /* ok */ }
+  }
+
+  /**
+   * Wire the core routing topology for the given chain order. Call after
+   * _disconnectCoreRouting() or during initial graph build.
+   *
+   * Three orders:
+   * - echoSpring: tapeSat → ECHO → [postEchoSat → scrubber] → SPRING → [scrubber] → sidechain
+   * - springEcho: tapeSat → SPRING → [scrubber] → ECHO → [postEchoSat → scrubber] → sidechain
+   * - parallel:   tapeSat → ECHO → [postEchoSat → sidechain] + SPRING → [scrubber → sidechain]
+   *
+   * All orders wire: echo.output → feedback → feedbackScrubber → feedbackShelfComp → input
+   */
+  private _applyCoreRouting(order: 'echoSpring' | 'springEcho' | 'parallel'): void {
+    this._chainOrder = order;
+    const echoIn = this.echo.input as unknown as Tone.InputNode;
+    const springIn = this.spring.input as unknown as Tone.InputNode;
+    const echoOut = this.echo.output as unknown as Tone.ToneAudioNode;
+    const springOut = (this.spring as unknown as { output: Tone.ToneAudioNode }).output;
+    const echoOutNative = getNativeAudioNode(echoOut as unknown);
+    const springOutNative = getNativeAudioNode(springOut as unknown);
+    const echoInNative = getNativeAudioNode(this.echo.input as unknown);
+
+    if (order === 'springEcho') {
+      // tapeSat → spring
+      Tone.connect(this.tapeSatBypass, springIn);
+      Tone.connect(this.tapeStackMix, springIn);
+      // spring → echoSpringScrubber → echo
+      if (springOutNative) {
+        springOutNative.connect(this._echoSpringScrubber);
+      }
+      if (echoInNative) {
+        (this._echoSpringScrubber as AudioNode).connect(echoInNative);
+      } else {
+        Tone.connect(springOut, echoIn);
+      }
+      // echo → postEchoSat → forwardScrubber → sidechain
+      if (echoOutNative) {
+        echoOutNative.connect(this.postEchoSatBypass);
+        echoOutNative.connect(this.postEchoSat);
+        this.postEchoSat.connect(this.postEchoSatWet);
+        this.postEchoSatBypass.connect(this._forwardScrubber);
+        this.postEchoSatWet.connect(this._forwardScrubber);
+        (this._forwardScrubber as AudioNode).connect(this.sidechain);
+      } else {
+        Tone.connect(echoOut, this.sidechain as unknown as Tone.InputNode);
+      }
+    } else if (order === 'parallel') {
+      // tapeSat → both echo and spring
+      Tone.connect(this.tapeSatBypass, echoIn);
+      Tone.connect(this.tapeStackMix, echoIn);
+      Tone.connect(this.tapeSatBypass, springIn);
+      Tone.connect(this.tapeStackMix, springIn);
+      // echo → postEchoSat → sidechain (no scrubber between, feeds sidechain directly)
+      if (echoOutNative) {
+        echoOutNative.connect(this.postEchoSatBypass);
+        echoOutNative.connect(this.postEchoSat);
+        this.postEchoSat.connect(this.postEchoSatWet);
+        this.postEchoSatBypass.connect(this.sidechain);
+        this.postEchoSatWet.connect(this.sidechain);
+      }
+      // spring → forwardScrubber → sidechain
+      if (springOutNative) {
+        springOutNative.connect(this._forwardScrubber);
+        (this._forwardScrubber as AudioNode).connect(this.sidechain);
+      } else {
+        Tone.connect(springOut, this.sidechain as unknown as Tone.InputNode);
+      }
+    } else {
+      // echoSpring (default): tapeSat → echo → [postEchoSat → scrubber] → spring → scrubber → sidechain
+      Tone.connect(this.tapeSatBypass, echoIn);
+      Tone.connect(this.tapeStackMix, echoIn);
+      // echo → postEchoSat → echoSpringScrubber → spring
+      this._connectEchoToSpring();
+      // spring → forwardScrubber → sidechain
+      if (springOutNative) {
+        springOutNative.connect(this._forwardScrubber);
+        (this._forwardScrubber as AudioNode).connect(this.sidechain);
+      } else {
+        console.warn('[DubBus] spring.output native extraction failed — bypassing forward scrubber');
+        Tone.connect(springOut, this.sidechain as unknown as Tone.InputNode);
+      }
+    }
+
+    // Feedback regen: echo output → feedback → scrubber → shelfComp → input.
+    // Common to all orders — feedback always taps the echo output.
+    Tone.connect(echoOut, this.feedback as unknown as Tone.InputNode);
+    this.feedback.connect(this._feedbackScrubber);
+    this._feedbackScrubber.connect(this.feedbackShelfComp);
+    this.feedbackShelfComp.connect(this.input);
+  }
+
   /** Async splice path for the ECHO→SPRING scrubber. Mirror of
    *  _loadForwardScrubberWorklet — swap in the real worklet once its
-   *  module finishes loading, preserving connections. */
+   *  module finishes loading, preserving connections.
+   *  Chain-order-aware: reconnects neighbors based on _chainOrder. */
   private async _loadEchoSpringScrubberWorklet(): Promise<void> {
     if (this._echoSpringScrubberIsWorklet) return;
+    const versionBefore = this._routingVersion;
     try {
       const base = (import.meta as { env?: { BASE_URL?: string } }).env?.BASE_URL ?? '/';
       if (!DubBus._scrubberModuleLoaded.has(this.context)) {
@@ -428,23 +630,52 @@ export class DubBus {
         await p;
         DubBus._scrubberModuleLoaded.add(this.context);
       }
+      // If routing changed during the async load, abandon — a rebuild already happened
+      if (this._routingVersion !== versionBefore) return;
+
       const worklet = new AudioWorkletNode(this.context, 'nan-scrubber', {
         numberOfInputs: 1,
         numberOfOutputs: 1,
         processorOptions: { mode: 'forward' },
       });
-      const echoOutNative = getNativeAudioNode(this.echo.output as unknown);
-      const springInNative = getNativeAudioNode(this.spring.input as unknown);
-      if (!echoOutNative || !springInNative) {
-        console.warn('[DubBus] echo→spring scrubber splice: native extract failed');
-        return;
-      }
-      try { echoOutNative.connect(worklet); } catch { /* ok */ }
-      try { worklet.connect(springInNative); } catch { /* ok */ }
-      try { echoOutNative.disconnect(this._echoSpringScrubber); } catch { /* ok */ }
+      // Disconnect old passthrough node from its neighbors
       try { (this._echoSpringScrubber as GainNode).disconnect(); } catch { /* ok */ }
+      // Disconnect fan-in sources from old node
+      const springOutNative = getNativeAudioNode(
+        (this.spring as unknown as { output: Tone.ToneAudioNode }).output as unknown
+      );
+      if (this._chainOrder === 'echoSpring') {
+        // echoOut → postEchoSat → old_scrubber → spring
+        try { this.postEchoSatBypass.disconnect(this._echoSpringScrubber); } catch { /* ok */ }
+        try { this.postEchoSatWet.disconnect(this._echoSpringScrubber); } catch { /* ok */ }
+      } else if (this._chainOrder === 'springEcho') {
+        // springOut → old_scrubber → echo
+        if (springOutNative) {
+          try { springOutNative.disconnect(this._echoSpringScrubber); } catch { /* ok */ }
+        }
+      }
+      // parallel order doesn't use the echoSpring scrubber — skip
+
       this._echoSpringScrubber = worklet;
       this._echoSpringScrubberIsWorklet = true;
+
+      // Reconnect with new worklet based on current chain order
+      const springInNative = getNativeAudioNode(this.spring.input as unknown);
+      const echoInNative = getNativeAudioNode(this.echo.input as unknown);
+      if (this._chainOrder === 'echoSpring') {
+        try { this.postEchoSatBypass.connect(worklet); } catch { /* ok */ }
+        try { this.postEchoSatWet.connect(worklet); } catch { /* ok */ }
+        if (springInNative) {
+          try { worklet.connect(springInNative); } catch { /* ok */ }
+        }
+      } else if (this._chainOrder === 'springEcho') {
+        if (springOutNative) {
+          try { springOutNative.connect(worklet); } catch { /* ok */ }
+        }
+        if (echoInNative) {
+          try { worklet.connect(echoInNative); } catch { /* ok */ }
+        }
+      }
     } catch (err) {
       console.warn('[DubBus] echo→spring NaN-scrubber worklet load failed — using passthrough:', err);
     }
@@ -515,8 +746,7 @@ export class DubBus {
     setTimeout(() => {
       try {
         // Disconnect old echo from graph
-        try { this.tapeSatBypass.disconnect(this.echo.input as unknown as AudioNode); } catch { /* ok */ }
-        try { this.tapeStackMix.disconnect(this.echo.input as unknown as AudioNode); } catch { /* ok */ }
+        this._disconnectCoreRouting();
         try { this.echo.output.disconnect(); } catch { /* ok */ }
         try { this.echo.dispose(); } catch { /* ok */ }
 
@@ -524,12 +754,8 @@ export class DubBus {
         this.echo = createDubEchoEngine(newType, settings);
         this._currentEchoEngine = newType;
 
-        // Reconnect into graph
-        Tone.connect(this.tapeSatBypass, this.echo.input as unknown as Tone.InputNode);
-        Tone.connect(this.tapeStackMix, this.echo.input as unknown as Tone.InputNode);
-        this._connectEchoToSpring();
-        // Rebuild feedback path
-        Tone.connect(this.echo.output, this.feedback as unknown as Tone.InputNode);
+        // Reconnect using current chain order
+        this._applyCoreRouting(this._chainOrder);
 
         // Apply deferred character preset NOW — return_ is at 0, so the
         // spring burst can't reach master. Compressors are bypassed (ratio=1),
@@ -1242,6 +1468,34 @@ export class DubBus {
     this.lofiBypass = this.context.createGain();
     this.lofiBypass.gain.value = this.settings.lofiEnabled ? 0 : 1;
 
+    // External feedback loop: return → extFeedbackEq → extFeedbackGain → input.
+    // Messian Dread's core technique: loop the wet output back to the echo
+    // input through the mixer channel so you get EQ + fader control on every
+    // repeat. Distinct from the internal echo feedback — this path adds
+    // mixer coloration to each recirculation.
+    this.extFeedbackGain = this.context.createGain();
+    this.extFeedbackGain.gain.value = Math.min(0.85, this.settings.extFeedbackGain);
+    this.extFeedbackEq = this.context.createBiquadFilter();
+    this.extFeedbackEq.type = 'peaking';
+    this.extFeedbackEq.frequency.value = this.settings.extFeedbackEqFreq;
+    this.extFeedbackEq.gain.value = this.settings.extFeedbackEqGain;
+    this.extFeedbackEq.Q.value = this.settings.extFeedbackEqQ;
+
+    // Club simulation: ConvolverNode with synthetic IR on the master output.
+    // Dry/wet crossfade so clubSimMix=0 is pure dry, 1 is pure wet.
+    this.clubConvolver = this.context.createConvolver();
+    this.clubDry = this.context.createGain();
+    this.clubWet = this.context.createGain();
+    const clubEnabled = this.settings.clubSimEnabled;
+    this.clubDry.gain.value = clubEnabled ? 1 - this.settings.clubSimMix : 1;
+    this.clubWet.gain.value = clubEnabled ? this.settings.clubSimMix : 0;
+    // Generate initial IR
+    if (clubEnabled) {
+      const preset = CLUB_IR_PRESETS[this.settings.clubSimPreset] ?? CLUB_IR_PRESETS.soundSystem;
+      this.clubConvolver.buffer = generateIR(this.context, preset);
+      this._clubSimPreset = this.settings.clubSimPreset;
+    }
+
     // Tape saturation — asymmetric tanh curve that models the positive/negative
     // asymmetry of transformer-coupled magnetic tape. Softens positive peaks
     // more than negative, which is what gives RE-201 / Studer saturation its
@@ -1499,41 +1753,11 @@ export class DubBus {
     for (const path of this.tapeStackPaths) {
       this.sweepOutput.connect(path.inGain);
     }
-    // Both saturator paths feed the echo via their gating gains — single
-    // path through tapeSatBypass (gain=1 in single mode), stack path through
-    // tapeStackMix (gain=1 in stack mode). Only one is audible at a time.
-    Tone.connect(this.tapeSatBypass, this.echo.input as unknown as Tone.InputNode);
-    Tone.connect(this.tapeStackMix, this.echo.input as unknown as Tone.InputNode);
-    this._connectEchoToSpring();
-    // Feedback regen: tap echo output (before spring) back into input.
-    // Pre-spring means the siren rings without flooding the spring with
-    // runaway self-oscillation.
-    Tone.connect(this.echo.output, this.feedback as unknown as Tone.InputNode);
-    this.feedback.connect(this._feedbackScrubber);
-    this._feedbackScrubber.connect(this.feedbackShelfComp);
-    this.feedbackShelfComp.connect(this.input);
-    // Post-spring output chain with coloring inserts (mid scoop + M/S width).
-    /* Forward scrubber sits between spring and the post-spring biquads —
-       see the dual-scrubber comment in the constructor for why this
-       matters. We extract the NATIVE AudioNode from spring.output (same
-       pattern PitchResampler uses for synthBus → resampler → masterFx in
-       ToneEngine) and route it through the worklet with raw .connect()
-       calls. Going through Tone.connect() against a raw AudioWorkletNode
-       was producing silent output on the wet path during the 2026-04-30
-       retest — Tone wrappers can swallow the connection if the destination
-       isn't a recognised Tone shape. Native-on-native always works. */
-    const springOut = (this.spring as unknown as { output: Tone.ToneAudioNode }).output;
-    const springOutNative = getNativeAudioNode(springOut as unknown);
-    if (springOutNative) {
-      springOutNative.connect(this._forwardScrubber);
-      (this._forwardScrubber as AudioNode).connect(this.sidechain);
-    } else {
-      /* Should never happen — spring.output is a Tone.Gain. Fall back to
-         the original direct path so reverb still routes even if our
-         native-extract trick fails on a future Tone.js version. */
-      console.warn('[DubBus] spring.output native extraction failed — bypassing forward scrubber');
-      Tone.connect(springOut, this.sidechain as unknown as Tone.InputNode);
-    }
+    // ─── Chain order routing ─────────────────────────────────────────────
+    // Handled by _applyCoreRouting() which wires the topology for the
+    // chosen order (echoSpring / springEcho / parallel).
+    this._applyCoreRouting(this.settings.chainOrder);
+    // ─── Common downstream wiring (all chain orders) ─────────────────────
     this.sidechain.connect(this.glue);
     this.glue.connect(this.midScoop);
     // Return EQ: midScoop → returnEQ → lpf
@@ -1555,7 +1779,22 @@ export class DubBus {
     Tone.connect(this.ringMod.output, this.ringModSend as unknown as Tone.InputNode);
     this.ringModSend.connect(this.return_);
 
-    this.return_.connect(this.master);
+    // Club simulation: return → dry/wet split → master.
+    // When off (default): dry=1, wet=0 → transparent.
+    this.return_.connect(this.clubDry);
+    this.return_.connect(this.clubConvolver);
+    this.clubConvolver.connect(this.clubWet);
+    this.clubDry.connect(this.master);
+    this.clubWet.connect(this.master);
+
+    // External feedback loop: return → EQ → gain → input (back to echo).
+    // At gain=0 (default), no feedback. When raised, each echo repeat
+    // recirculates through the full bus chain (EQ, saturation, spring)
+    // gaining mixer coloration each pass. Capped at 0.85 to prevent
+    // runaway self-oscillation.
+    this.return_.connect(this.extFeedbackEq);
+    this.extFeedbackEq.connect(this.extFeedbackGain);
+    this.extFeedbackGain.connect(this.input);
 
     // Optional plate-stage insert — branches from stereoMerge into the
     // selected plate (MadProfessor or Dattorro), blends back into return
@@ -2629,6 +2868,39 @@ export class DubBus {
       this.lofiBypass.gain.setTargetAtTime(enabled ? 0 : 1, now, 0.01);
       this.lofiSend.gain.setTargetAtTime(enabled ? 1 : 0, now, 0.01);
       if (settings.lofiBits !== undefined) this.lofi.setCrush(merged.lofiBits);
+    }
+
+    // ─── External feedback loop ───────────────────────────────────────────
+    if (settings.extFeedbackGain !== undefined) {
+      const clamped = Math.min(0.85, Math.max(0, merged.extFeedbackGain));
+      this.extFeedbackGain.gain.setTargetAtTime(clamped, now, 0.02);
+    }
+    if (settings.extFeedbackEqFreq !== undefined) {
+      this.extFeedbackEq.frequency.setTargetAtTime(merged.extFeedbackEqFreq, now, 0.01);
+    }
+    if (settings.extFeedbackEqGain !== undefined) {
+      this.extFeedbackEq.gain.setTargetAtTime(merged.extFeedbackEqGain, now, 0.01);
+    }
+    if (settings.extFeedbackEqQ !== undefined) {
+      this.extFeedbackEq.Q.setTargetAtTime(merged.extFeedbackEqQ, now, 0.01);
+    }
+
+    // ─── Club simulation ──────────────────────────────────────────────────
+    if (settings.clubSimEnabled !== undefined || settings.clubSimMix !== undefined) {
+      const enabled = merged.clubSimEnabled;
+      const mix = enabled ? merged.clubSimMix : 0;
+      this.clubDry.gain.setTargetAtTime(enabled ? 1 - mix : 1, now, 0.02);
+      this.clubWet.gain.setTargetAtTime(mix, now, 0.02);
+    }
+    if (settings.clubSimPreset !== undefined && merged.clubSimPreset !== this._clubSimPreset) {
+      const preset = CLUB_IR_PRESETS[merged.clubSimPreset] ?? CLUB_IR_PRESETS.soundSystem;
+      this.clubConvolver.buffer = generateIR(this.context, preset);
+      this._clubSimPreset = merged.clubSimPreset;
+    }
+
+    // Chain order: live-switchable reordering of echo/spring core routing.
+    if (settings.chainOrder !== undefined && merged.chainOrder !== this._chainOrder) {
+      this.setChainOrder(merged.chainOrder);
     }
 
     // Character-preset selection: apply the DSP-side bits (spring, tape
@@ -4287,92 +4559,58 @@ export class DubBus {
    * return_.gain across the splice eliminates the feedback path —
    * total dip is ~50 ms of wet bus, well within dub tolerance.
    */
-  private _reverseChainOrder = false;
-  setReverseChainOrder(on: boolean): void {
-    console.log(`[DubBusCtrl] setReverseChainOrder(${on})`);
-    if (on === this._reverseChainOrder) return;
-    this._snap(`pre-setReverseChainOrder(${on})`);
-    const springIn = this.spring.input as unknown as Tone.InputNode;
-    const echoIn = this.echo.input as unknown as Tone.InputNode;
-    const echoOut = this.echo.output as unknown as Tone.ToneAudioNode;
-    const springOut = (this.spring as unknown as { output: Tone.ToneAudioNode }).output;
+  setChainOrder(order: 'echoSpring' | 'springEcho' | 'parallel'): void {
+    console.log(`[DubBusCtrl] setChainOrder(${order})`);
+    if (order === this._chainOrder) return;
+    this._snap(`pre-setChainOrder(${order})`);
 
     const ctx = this.context;
-    const priorGain = this.return_.gain.value;
+    const priorReturnGain = this.return_.gain.value;
+    const priorInputGain = this.input.gain.value;
+    const priorFeedbackGain = this.feedback.gain.value;
     const RAMP_SEC = 0.02;
     const SWAP_DELAY_MS = RAMP_SEC * 1000 + 5;
+    const version = ++this._routingVersion;
 
-    // Ramp return to 0 FIRST so the splice window runs silent.
+    // Full quiesce: mute return + input + feedback to prevent transients
     try {
       const now = ctx.currentTime;
       this.return_.gain.cancelScheduledValues(now);
-      this.return_.gain.setValueAtTime(priorGain, now);
+      this.return_.gain.setValueAtTime(priorReturnGain, now);
       this.return_.gain.linearRampToValueAtTime(0, now + RAMP_SEC);
+
+      this.input.gain.cancelScheduledValues(now);
+      this.input.gain.setValueAtTime(priorInputGain, now);
+      this.input.gain.linearRampToValueAtTime(0, now + RAMP_SEC);
+
+      this.feedback.gain.cancelScheduledValues(now);
+      this.feedback.gain.setValueAtTime(priorFeedbackGain, now);
+      this.feedback.gain.linearRampToValueAtTime(0, now + RAMP_SEC);
     } catch { /* ok */ }
 
     setTimeout(() => {
-      /* Previously used Tone.disconnect(springOut, sidechain) to tear
-         down the forward path — but since the forward NaN-scrubber was
-         spliced in (spring.output native → forwardScrubber → sidechain),
-         there is no direct spring→sidechain connection to disconnect,
-         so this swap started crashing with InvalidAccessError. The
-         scrubber sits at the "forward entry to the post-spring
-         biquads", and in both normal and reverse mode the last audio
-         node in the chain before the biquads must route through it.
-         Normal:  spring.output (native) → scrubber → sidechain
-         Reverse: echo.output  (native) → scrubber → sidechain */
-      const springOutNative = getNativeAudioNode(springOut as unknown);
-      const echoOutNative = getNativeAudioNode(echoOut as unknown);
+      // Race guard: if another setChainOrder was called, abandon this one
+      if (this._routingVersion !== version) return;
       try {
-        if (on) {
-          // Normal → Reverse: was tapeSat→echo→spring→scrubber.
-          // Want tapeSat→spring→echo→scrubber.
-          try { Tone.disconnect(this.tapeSatBypass, echoIn); } catch { /* ok */ }
-          try { Tone.disconnect(this.tapeStackMix, echoIn); } catch { /* ok */ }
-          try { Tone.disconnect(echoOut, springIn); } catch { /* ok */ }
-          if (springOutNative) {
-            try { springOutNative.disconnect(this._forwardScrubber); } catch { /* ok */ }
-          } else {
-            try { Tone.disconnect(springOut, this._forwardScrubber as unknown as Tone.InputNode); } catch { /* ok */ }
-          }
-          Tone.connect(this.tapeSatBypass, springIn);
-          Tone.connect(this.tapeStackMix, springIn);
-          Tone.connect(springOut, echoIn);
-          if (echoOutNative) {
-            echoOutNative.connect(this._forwardScrubber);
-          } else {
-            Tone.connect(echoOut, this._forwardScrubber as unknown as Tone.InputNode);
-          }
-        } else {
-          // Reverse → Normal: mirror.
-          try { Tone.disconnect(this.tapeSatBypass, springIn); } catch { /* ok */ }
-          try { Tone.disconnect(this.tapeStackMix, springIn); } catch { /* ok */ }
-          try { Tone.disconnect(springOut, echoIn); } catch { /* ok */ }
-          if (echoOutNative) {
-            try { echoOutNative.disconnect(this._forwardScrubber); } catch { /* ok */ }
-          } else {
-            try { Tone.disconnect(echoOut, this._forwardScrubber as unknown as Tone.InputNode); } catch { /* ok */ }
-          }
-          Tone.connect(this.tapeSatBypass, echoIn);
-          Tone.connect(this.tapeStackMix, echoIn);
-          Tone.connect(echoOut, springIn);
-          if (springOutNative) {
-            springOutNative.connect(this._forwardScrubber);
-          } else {
-            Tone.connect(springOut, this._forwardScrubber as unknown as Tone.InputNode);
-          }
-        }
-        this._reverseChainOrder = on;
+        this._disconnectCoreRouting();
+        this._applyCoreRouting(order);
       } catch (err) {
-        console.warn('[DubBus] setReverseChainOrder swap failed:', err);
+        console.warn('[DubBus] setChainOrder swap failed:', err);
       }
-      // Ramp back regardless — if splice threw, keep the old topology
-      // audible rather than stay muted.
+      // Ramp back regardless
       try {
         const now2 = ctx.currentTime;
         this.return_.gain.cancelScheduledValues(now2);
         this.return_.gain.setValueAtTime(0, now2);
-        this.return_.gain.linearRampToValueAtTime(priorGain, now2 + RAMP_SEC);
+        this.return_.gain.linearRampToValueAtTime(priorReturnGain, now2 + RAMP_SEC);
+
+        this.input.gain.cancelScheduledValues(now2);
+        this.input.gain.setValueAtTime(0, now2);
+        this.input.gain.linearRampToValueAtTime(priorInputGain, now2 + RAMP_SEC);
+
+        this.feedback.gain.cancelScheduledValues(now2);
+        this.feedback.gain.setValueAtTime(0, now2);
+        this.feedback.gain.linearRampToValueAtTime(priorFeedbackGain, now2 + RAMP_SEC);
       } catch { /* ok */ }
     }, SWAP_DELAY_MS);
   }
