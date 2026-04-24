@@ -833,16 +833,60 @@ export const DubDeckStrip: React.FC = () => {
           }
         >
           <span className="text-xs font-bold text-accent-primary leading-none">MASTER</span>
+          {CHANNEL_OPS.map((op) => {
+            const masterKey = `${op.moveId}:master`;
+            const active = heldMoves.has(masterKey) || CHANNEL_OPS.some(
+              () => Array.from({ length: visibleChannelCount }, (_, i) => `${op.moveId}:${i}`).some(k => activeFires.has(k))
+            );
+            const isHold = op.kind === 'hold';
+            return (
+              <button
+                key={op.moveId}
+                className={colorClasses(op.color, active) + ' w-full text-center'}
+                onClick={isHold ? undefined : () => {
+                  for (let i = 0; i < visibleChannelCount; i++) fireTrigger(op.moveId, i);
+                }}
+                onPointerDown={isHold ? () => {
+                  for (let i = 0; i < visibleChannelCount; i++) holdStart(op.moveId, i);
+                } : undefined}
+                onPointerUp={isHold ? () => {
+                  for (let i = 0; i < visibleChannelCount; i++) holdEnd(op.moveId, i);
+                } : undefined}
+                onPointerLeave={isHold ? () => {
+                  for (let i = 0; i < visibleChannelCount; i++) holdEnd(op.moveId, i);
+                  setHoverHint(null);
+                } : () => setHoverHint(null)}
+                onPointerCancel={isHold ? () => {
+                  for (let i = 0; i < visibleChannelCount; i++) holdEnd(op.moveId, i);
+                } : undefined}
+                onMouseEnter={() => setHoverHint(`ALL · ${op.label} — ${op.title}`)}
+                title={`ALL channels · ${op.title}${isHold ? ' (press-and-hold)' : ''}`}
+                disabled={!busEnabled}
+              >
+                {op.label}
+              </button>
+            );
+          })}
           <button
             className={
               'px-2 py-1 rounded border w-full text-xs font-bold transition-all duration-150 ' +
               'bg-dark-bgTertiary border-dark-borderLight text-text-primary hover:border-accent-primary'
             }
             onClick={() => {
-              // Set all visible channels to max send
-              for (let i = 0; i < visibleChannelCount; i++) {
-                setChannelDubSend(i, 1.0);
-              }
+              for (let i = 0; i < visibleChannelCount; i++) toggleHold(i);
+            }}
+            title="HOLD all channels — sustained dubbing on every channel"
+            disabled={!busEnabled}
+          >
+            HOLD
+          </button>
+          <button
+            className={
+              'px-2 py-1 rounded border w-full text-[9px] font-bold transition-all duration-150 ' +
+              'bg-dark-bgTertiary border-dark-borderLight text-text-primary hover:border-accent-primary'
+            }
+            onClick={() => {
+              for (let i = 0; i < visibleChannelCount; i++) setChannelDubSend(i, 1.0);
             }}
             title="Set all channel sends to 100%"
             disabled={!busEnabled}
@@ -851,14 +895,11 @@ export const DubDeckStrip: React.FC = () => {
           </button>
           <button
             className={
-              'px-2 py-1 rounded border w-full text-xs font-bold transition-all duration-150 ' +
+              'px-2 py-1 rounded border w-full text-[9px] font-bold transition-all duration-150 ' +
               'bg-dark-bgTertiary border-dark-borderLight text-text-muted hover:text-text-primary hover:border-accent-error'
             }
             onClick={() => {
-              // Zero all visible channel sends
-              for (let i = 0; i < visibleChannelCount; i++) {
-                setChannelDubSend(i, 0);
-              }
+              for (let i = 0; i < visibleChannelCount; i++) setChannelDubSend(i, 0);
             }}
             title="Zero all channel sends"
             disabled={!busEnabled}
