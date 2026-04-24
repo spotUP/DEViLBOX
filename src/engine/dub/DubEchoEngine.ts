@@ -28,6 +28,8 @@ export interface DubEchoEngine {
   setFeedbackHpf(hz: number): void;
   /** In-feedback LPF — progressively darkens each repeat (tape-head wear). */
   setFeedbackLpf(hz: number): void;
+  /** RE-201 mode selector (1-12). Only meaningful for SpaceEcho engine. */
+  setMode(mode: number): void;
   get wet(): number;
   set wet(value: number);
   connect(dest: Tone.InputNode): this;
@@ -43,7 +45,7 @@ export class SpaceEchoAdapter implements DubEchoEngine {
 
   constructor(settings: DubBusSettings) {
     this.fx = new SpaceEchoEffect({
-      mode: 4,
+      mode: settings.echoMode ?? 4,
       rate: settings.echoRateMs,
       intensity: settings.echoIntensity,
       echoVolume: 0.7,
@@ -62,6 +64,7 @@ export class SpaceEchoAdapter implements DubEchoEngine {
   setIntensityInstant(amount: number): void { this.fx.setIntensityInstant(amount); }
   setFeedbackHpf(hz: number): void { this.fx.setFeedbackHpf(hz); }
   setFeedbackLpf(hz: number): void { this.fx.setFeedbackLpf(hz); }
+  setMode(mode: number): void { this.fx.setMode(Math.max(1, Math.min(12, mode))); }
   get wet() { return this.fx.wet; }
   set wet(v: number) { this.fx.wet = v; }
   connect(dest: Tone.InputNode): this { this.fx.connect(dest); return this; }
@@ -112,6 +115,7 @@ export class RE201Adapter implements DubEchoEngine {
   // darkening without a configurable filter.
   setFeedbackHpf(_hz: number): void { /* RE-201 handles internally */ }
   setFeedbackLpf(_hz: number): void { /* RE-201 handles internally */ }
+  setMode(_mode: number): void { /* RE-201 has fixed head config */ }
 
   get wet() { return this.fx.wet; }
   set wet(v: number) { this.fx.wet = v; }
@@ -158,6 +162,7 @@ export class AnotherDelayAdapter implements DubEchoEngine {
   // AnotherDelayEffect has native setHighpass/setLowpass — route directly.
   setFeedbackHpf(hz: number): void { this.fx.setHighpass(hz); }
   setFeedbackLpf(hz: number): void { this.fx.setLowpass(hz); }
+  setMode(_mode: number): void { /* AnotherDelay has no head mode */ }
 
   get wet() { return this.fx.wet; }
   set wet(v: number) { this.fx.wet = v; }
@@ -211,6 +216,7 @@ export class RETapeEchoAdapter implements DubEchoEngine {
   // 8 kHz (typical tape range) or above (wants brightness). HPF is no-op.
   setFeedbackHpf(_hz: number): void { /* BBD has no in-feedback HPF control */ }
   setFeedbackLpf(hz: number): void { this.fx.setPlayheadFilter(hz < 8000); }
+  setMode(_mode: number): void { /* RETapeEcho has no head mode */ }
 
   get wet() { return this.fx.wet; }
   set wet(v: number) { this.fx.wet = v; }
