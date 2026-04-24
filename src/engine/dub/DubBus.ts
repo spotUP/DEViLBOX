@@ -749,6 +749,16 @@ export class DubBus {
       this.feedback.gain.setValueAtTime(this.feedback.gain.value, now);
       this.feedback.gain.linearRampToValueAtTime(0, now + RAMP_SEC);
 
+      // G15: also silence the master-insert envelope so the new echo engine's
+      // WASM startup transient (RE-201 resonant filters ringing on boot) can't
+      // leak through the master output path during the swap window.
+      if (this.masterInsertActive) {
+        this.masterInsertEnvelope.gain.cancelScheduledValues(now);
+        this.masterInsertEnvelope.gain.setValueAtTime(0, now);
+        this.masterInsertEnvelope.gain.setValueAtTime(0, now + WARMUP_SEC);
+        this.masterInsertEnvelope.gain.linearRampToValueAtTime(1, now + WARMUP_SEC + RAMP_SEC);
+      }
+
       // Bypass BOTH compressors during the transition. Setting threshold
       // to 0 isn't enough — the spring burst peaks at +8dB, which still
       // triggers 6.7dB gain reduction at ratio 6:1. Setting ratio=1
