@@ -822,7 +822,11 @@ export class DubBus {
         this.sidechain.ratio.setTargetAtTime(6, now2 + WARMUP_SEC, 0.02);
         this.glue.ratio.cancelScheduledValues(now2);
         this.glue.ratio.setValueAtTime(1, now2);
-        this.glue.ratio.setTargetAtTime(3, now2 + WARMUP_SEC, 0.02);
+        // Respect glueBypass — Scientist mode must stay at 1:1 even after warmup.
+        this.glue.ratio.setTargetAtTime(this.settings.glueBypass ? 1 : 3, now2 + WARMUP_SEC, 0.02);
+        if (!this.settings.glueBypass) {
+          this.glue.threshold.setTargetAtTime(-14, now2 + WARMUP_SEC, 0.02);
+        }
         // Also restore the sidechain threshold (it was set during
         // setSettings but the swap's immediate write may have overridden it).
         this.sidechain.threshold.setTargetAtTime(targetThreshold, now2 + WARMUP_SEC, 0.05);
@@ -2726,12 +2730,19 @@ export class DubBus {
         timers.push(t);
       });
     } else {
-      // Continuous mode: linear sweep up over 400ms, hold, sweep back
+      // Continuous mode: smooth ramp up over 400ms, hold, ramp back.
       const now = this.context.currentTime;
+      const baseDb = this.settings.hpfResonanceDb ?? 0;
       rampBiquadParam(this.hpf.frequency, targetHz, now, 0.4);
       rampBiquadParam(this.hpf2.frequency, targetHz, now, 0.4);
       rampBiquadParam(this.hpf3.frequency, targetHz, now, 0.4);
       rampBiquadParam(this.hpfResonance.frequency, targetHz, now, 0.4);
+      // Resonance gain boost at peak — same as stepped mode.
+      const peakTimer = setTimeout(() => {
+        timers.splice(timers.indexOf(peakTimer), 1);
+        rampBiquadParam(this.hpfResonance.gain, baseDb + 2.5, this.context.currentTime, 0.06);
+      }, 400);
+      timers.push(peakTimer);
       const restoreTimer = setTimeout(() => {
         timers.splice(timers.indexOf(restoreTimer), 1);
         const n = this.context.currentTime;
@@ -2739,6 +2750,7 @@ export class DubBus {
         rampBiquadParam(this.hpf2.frequency, originHz, n, 0.6);
         rampBiquadParam(this.hpf3.frequency, originHz, n, 0.6);
         rampBiquadParam(this.hpfResonance.frequency, originHz, n, 0.6);
+        rampBiquadParam(this.hpfResonance.gain, baseDb, n, 0.15);
       }, 400 + holdMs);
       timers.push(restoreTimer);
     }
@@ -3226,7 +3238,10 @@ export class DubBus {
       this.sidechain.ratio.setTargetAtTime(6, now + WARMUP_SEC, 0.02);
       this.glue.ratio.cancelScheduledValues(now);
       this.glue.ratio.setValueAtTime(1, now);
-      this.glue.ratio.setTargetAtTime(3, now + WARMUP_SEC, 0.02);
+      this.glue.ratio.setTargetAtTime(this.settings.glueBypass ? 1 : 3, now + WARMUP_SEC, 0.02);
+      if (!this.settings.glueBypass) {
+        this.glue.threshold.setTargetAtTime(-14, now + WARMUP_SEC, 0.02);
+      }
       this.sidechain.threshold.cancelScheduledValues(now);
       this.sidechain.threshold.setValueAtTime(0, now);
       this.sidechain.threshold.setTargetAtTime(targetThreshold, now + WARMUP_SEC, 0.05);
