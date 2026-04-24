@@ -148,6 +148,18 @@ describe('DubEchoEngine adapter — safe feedback for DubBus context', () => {
     expect(adapterBody).toMatch(/\*\s*0\.55/);
   });
 
+  it('AnotherDelay adapter uses near-zero wow/flutter to avoid drunk pitch wobble', () => {
+    const adapterStart = ECHO_ENGINE_SRC.indexOf('class AnotherDelayAdapter');
+    const adapterBody = ECHO_ENGINE_SRC.slice(adapterStart, adapterStart + 1500);
+    const flutterMatch = adapterBody.match(/flutterDepth:\s*([\d.]+)/);
+    const wowMatch = adapterBody.match(/wowDepth:\s*([\d.]+)/);
+    expect(flutterMatch).not.toBeNull();
+    expect(wowMatch).not.toBeNull();
+    // Both modulation depths must be ≤ 0.005 to prevent audible pitch wobble
+    expect(parseFloat(flutterMatch![1])).toBeLessThanOrEqual(0.005);
+    expect(parseFloat(wowMatch![1])).toBeLessThanOrEqual(0.005);
+  });
+
   it('RE201 adapter enables light internal reverb for body', () => {
     const adapterStart = ECHO_ENGINE_SRC.indexOf('class RE201Adapter');
     const adapterBody = ECHO_ENGINE_SRC.slice(adapterStart, adapterStart + 1000);

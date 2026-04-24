@@ -117,10 +117,10 @@ export class AnotherDelayAdapter implements DubEchoEngine {
       gain: 1.0,
       lowpass: 3000,
       highpass: 150,
-      flutterFreq: 2.0,
-      flutterDepth: 0.015,   // halved — prevents "weoweo" modulation dominating
-      wowFreq: 0.15,
-      wowDepth: 0.008,       // halved — subtle pitch drift, not seasickness
+      flutterFreq: 3.5,
+      flutterDepth: 0.002,   // barely perceptible — just enough for analog character
+      wowFreq: 0.3,
+      wowDepth: 0.001,       // near-zero — prevents pitch wobble / "drunk" sound
       reverbEnabled: false,  // disabled — DubBus has its own spring reverb (Aelapse)
       roomSize: 0.55,
       damping: 0.35,
