@@ -45,50 +45,63 @@ const CHANNEL_OPS: Array<{ label: string; title: string; moveId: string; color: 
 ];
 
 // ─── Global moves ──────────────────────────────────────────────────────────
-// `category`: 'gen' self-generates audio (PING, RADIO, BASS, CRUSH, SUB, CRACK,
-// SIREN, SLAM, SCREAM, DROP, STOP!, TOAST, SUB) — works without any channel
-// sending into the bus. 'proc' processes the bus signal (WIDE, RVRSE, FILT,
-// WOBBLE, BACK, STOP, 380, DOT, SUBH) — needs a channel dubSend > 0 to hear
-// anything. Group shown separately in the strip with a tiny divider so the
-// user knows why a processor is silent when the bus has no input.
-interface GlobalMove { label: string; title: string; moveId: string; color: string; kind: 'trigger' | 'hold'; category: 'gen' | 'proc'; }
+// Grouped by interaction type so performers can read the board at a glance:
+//
+//   CLICK  — tap once to fire (one-shot effect, no hold needed)
+//   HOLD   — press + hold for exact duration, release to stop
+//   TOGGLE — click once to activate, click again to deactivate (hands-free)
+//
+// `needsSend` marks moves that process bus audio; they're dimmed when no
+// channel is sending into the bus (nothing to process).
+interface GlobalMove {
+  label: string;
+  title: string;
+  moveId: string;
+  color: string;
+  kind: 'trigger' | 'hold';
+  group: 'click' | 'hold' | 'toggle';
+  needsSend?: boolean;
+}
 const GLOBAL_MOVES: Array<GlobalMove> = [
-  // ── Generators (no channel send needed) ──
-  { label: 'SLAM',   title: 'Spring Slam — instant splash of spring reverb [generator]', moveId: 'springSlam', color: 'accent-success', kind: 'trigger', category: 'gen' },
-  { label: 'KICK',   title: 'Spring Kick — shorter, punchier spring hit [generator]', moveId: 'springKick', color: 'accent-success/70', kind: 'trigger', category: 'gen' },
-  { label: 'SIREN',  title: 'Dub Siren — Rasta-box pitch-swept synth through bus [generator]', moveId: 'dubSiren', color: 'accent-warning', kind: 'hold', category: 'gen' },
-  { label: 'CRACK',  title: 'Snare Crack — bandpass noise burst [generator]', moveId: 'snareCrack', color: 'text-primary', kind: 'trigger', category: 'gen' },
-  { label: 'DROP',   title: 'Master Drop — mute dry while held; bus tail survives [generator]', moveId: 'masterDrop', color: 'accent-error/70', kind: 'hold', category: 'gen' },
-  { label: 'STOP!',  title: 'Transport Tape Stop — real tempo+pitch slowdown (LibOpenMPT only) [generator]', moveId: 'transportTapeStop', color: 'accent-error', kind: 'trigger', category: 'gen' },
-  { label: 'TOAST',  title: 'Toast — route DJ mic into bus while held (needs DJ mic started)', moveId: 'toast', color: 'accent-success/70', kind: 'hold', category: 'gen' },
-  { label: 'SCREAM', title: 'Tubby Scream — reverb self-feedback, rising metallic cry [generator]', moveId: 'tubbyScream', color: 'accent-error', kind: 'hold', category: 'gen' },
-  { label: 'PING',   title: 'Sonar Ping — 1 kHz sine fed through the echo [generator]', moveId: 'sonarPing', color: 'accent-primary/70', kind: 'trigger', category: 'gen' },
-  { label: 'RADIO',  title: 'Radio Riser — pink noise sweep 200 Hz → 5 kHz [generator]', moveId: 'radioRiser', color: 'accent-warning/70', kind: 'trigger', category: 'gen' },
-  { label: 'SUB',    title: 'Sub Swell — 55 Hz sine pulse direct to return [generator]', moveId: 'subSwell', color: 'accent-primary', kind: 'trigger', category: 'gen' },
-  { label: 'BASS',   title: 'Osc Bass — self-oscillating LPF as bass drone (hold) [generator]', moveId: 'oscBass', color: 'accent-primary', kind: 'hold', category: 'gen' },
-  { label: 'CRUSH',  title: 'Crush Bass — 3-bit quantize saw drone (hold) [generator]', moveId: 'crushBass', color: 'accent-error/70', kind: 'hold', category: 'gen' },
-  // ── Processors (need CH send > 0 to be audible) ──
-  { label: 'HPF',    title: 'HPF Rise — Altec Big Knob: steps HPF up through positions, holds, sweeps back [PROCESSOR — needs CH send]', moveId: 'hpfRise', color: 'accent-primary', kind: 'hold', category: 'proc' },
-  { label: 'FILT',   title: 'Filter Drop — LPF sweeps down while held [PROCESSOR — needs CH send]', moveId: 'filterDrop', color: 'accent-secondary', kind: 'hold', category: 'proc' },
-  { label: 'WOBBLE', title: 'Tape Wobble — LFO on echo rate while held [PROCESSOR — needs CH send]', moveId: 'tapeWobble', color: 'accent-warning/70', kind: 'hold', category: 'proc' },
-  { label: 'DELAY',  title: 'Delay-Time Throw — echo rate sweep (pitch whoosh) [PROCESSOR — needs CH send]', moveId: 'delayTimeThrow', color: 'accent-highlight/70', kind: 'trigger', category: 'proc' },
-  { label: 'BACK',   title: 'Backward Reverb — last 0.8 s reversed through bus [PROCESSOR — needs CH send]', moveId: 'backwardReverb', color: 'accent-highlight', kind: 'trigger', category: 'proc' },
-  { label: 'STOP',   title: 'Tape Stop — bus LPF + echo-rate collapse [PROCESSOR — needs CH send]', moveId: 'tapeStop', color: 'accent-secondary/70', kind: 'trigger', category: 'proc' },
-  { label: 'WIDE',   title: 'Stereo Doubler — 20ms cross-fed widening (hold) [PROCESSOR — needs CH send]', moveId: 'stereoDoubler', color: 'accent-highlight', kind: 'hold', category: 'proc' },
-  { label: 'PING',   title: 'Mad Professor Ping-Pong — Ariwa SDE-3000: 3/8 note L + 1/2 note R asymmetric stereo delay (hold) [PROCESSOR — needs CH send]', moveId: 'madProfPingPong', color: 'accent-highlight/70', kind: 'hold', category: 'proc' },
-  { label: 'RVRSE',  title: 'Reverse Echo — last 0.4s reversed through tape echo [PROCESSOR — needs CH send]', moveId: 'reverseEcho', color: 'accent-highlight/70', kind: 'trigger', category: 'proc' },
-  { label: 'GHOST',  title: 'Ghost Reverb — extra reverb decay on channel (hold) [PROCESSOR — needs CH send]', moveId: 'ghostReverb', color: 'accent-secondary', kind: 'hold', category: 'proc' },
-  { label: 'RING',   title: 'Ring Mod — metallic ring modulation (hold) [PROCESSOR — needs CH send]', moveId: 'ringMod', color: 'accent-warning', kind: 'hold', category: 'proc' },
-  { label: 'STARVE', title: 'Voltage Starve — bit-crush degradation (hold) [PROCESSOR — needs CH send]', moveId: 'voltageStarve', color: 'accent-error/70', kind: 'hold', category: 'proc' },
-  { label: 'SUBH',   title: 'Sub Harmonic — env-follower sub pulse on every transient (hold) [PROCESSOR — needs CH send]', moveId: 'subHarmonic', color: 'accent-primary/70', kind: 'hold', category: 'proc' },
-  { label: 'SWEEP',  title: 'EQ Sweep — resonant filter sweep (hold) [PROCESSOR — needs CH send]', moveId: 'eqSweep', color: 'accent-highlight/70', kind: 'hold', category: 'proc' },
-  { label: '380',    title: 'Tubby 380 — snap echo rate to 380 ms [PROCESSOR — needs CH send]', moveId: 'delayPreset380', color: 'accent-secondary/70', kind: 'trigger', category: 'proc' },
-  { label: 'DOT',    title: 'Dotted — snap echo rate to dotted-8th (BPM-synced) [PROCESSOR — needs CH send]', moveId: 'delayPresetDotted', color: 'accent-secondary/70', kind: 'trigger', category: 'proc' },
-  { label: '1/4',    title: 'Quarter — snap echo rate to quarter note (BPM-synced) [PROCESSOR — needs CH send]', moveId: 'delayPresetQuarter', color: 'accent-secondary/70', kind: 'trigger', category: 'proc' },
-  { label: '1/8',    title: '8th — snap echo rate to 8th note (BPM-synced) [PROCESSOR — needs CH send]', moveId: 'delayPreset8th', color: 'accent-secondary/70', kind: 'trigger', category: 'proc' },
-  { label: 'TRIP',   title: 'Triplet — snap echo rate to triplet (BPM-synced) [PROCESSOR — needs CH send]', moveId: 'delayPresetTriplet', color: 'accent-secondary/70', kind: 'trigger', category: 'proc' },
-  { label: '1/16',   title: '16th — snap echo rate to 16th note (BPM-synced) [PROCESSOR — needs CH send]', moveId: 'delayPreset16th', color: 'accent-secondary/70', kind: 'trigger', category: 'proc' },
-  { label: 'x2',     title: 'Doubler — double the echo rate [PROCESSOR — needs CH send]', moveId: 'delayPresetDoubler', color: 'accent-secondary/70', kind: 'trigger', category: 'proc' },
+  // ── CLICK — one-shot triggers ──
+  { label: 'SLAM',   title: 'Spring Slam — instant splash of spring reverb',     moveId: 'springSlam',        color: 'accent-success',     kind: 'trigger', group: 'click' },
+  { label: 'KICK',   title: 'Spring Kick — punchier shorter spring hit',         moveId: 'springKick',        color: 'accent-success/70',  kind: 'trigger', group: 'click' },
+  { label: 'CRACK',  title: 'Snare Crack — bandpass noise burst',                moveId: 'snareCrack',        color: 'text-primary',       kind: 'trigger', group: 'click' },
+  { label: 'PING',   title: 'Sonar Ping — 1 kHz sine through the echo',         moveId: 'sonarPing',         color: 'accent-primary/70',  kind: 'trigger', group: 'click' },
+  { label: 'RADIO',  title: 'Radio Riser — pink noise sweep 200 Hz → 5 kHz',    moveId: 'radioRiser',        color: 'accent-warning/70',  kind: 'trigger', group: 'click' },
+  { label: 'SUB',    title: 'Sub Swell — 55 Hz sine pulse to return',            moveId: 'subSwell',          color: 'accent-primary',     kind: 'trigger', group: 'click' },
+  { label: 'STOP!',  title: 'Transport Tape Stop — real tempo+pitch slowdown (LibOpenMPT)',  moveId: 'transportTapeStop', color: 'accent-error',    kind: 'trigger', group: 'click' },
+  { label: 'RVRSE',  title: 'Reverse Echo — last 0.4 s reversed through tape echo',  moveId: 'reverseEcho',   color: 'accent-highlight/70',kind: 'trigger', group: 'click', needsSend: true },
+  { label: 'BACK',   title: 'Backward Reverb — last 0.8 s reversed through bus', moveId: 'backwardReverb',   color: 'accent-highlight',   kind: 'trigger', group: 'click', needsSend: true },
+  { label: 'STOP',   title: 'Tape Stop — bus LPF + echo-rate collapse',         moveId: 'tapeStop',          color: 'accent-secondary/70',kind: 'trigger', group: 'click', needsSend: true },
+  { label: 'DELAY',  title: 'Delay-Time Throw — echo rate sweep (pitch whoosh)',  moveId: 'delayTimeThrow',  color: 'accent-highlight/70',kind: 'trigger', group: 'click', needsSend: true },
+  { label: '380',    title: 'Tubby 380 — snap echo rate to 380 ms',             moveId: 'delayPreset380',    color: 'accent-secondary/70',kind: 'trigger', group: 'click', needsSend: true },
+  { label: 'DOT',    title: 'Dotted — snap echo rate to dotted-8th (BPM-synced)', moveId: 'delayPresetDotted', color: 'accent-secondary/70', kind: 'trigger', group: 'click', needsSend: true },
+  { label: '1/4',    title: 'Quarter — snap echo rate to quarter note (BPM-synced)', moveId: 'delayPresetQuarter', color: 'accent-secondary/70', kind: 'trigger', group: 'click', needsSend: true },
+  { label: '1/8',    title: '8th — snap echo rate to 8th note (BPM-synced)',    moveId: 'delayPreset8th',    color: 'accent-secondary/70',kind: 'trigger', group: 'click', needsSend: true },
+  { label: 'TRIP',   title: 'Triplet — snap echo rate to triplet (BPM-synced)', moveId: 'delayPresetTriplet',color: 'accent-secondary/70',kind: 'trigger', group: 'click', needsSend: true },
+  { label: '1/16',   title: '16th — snap echo rate to 16th note (BPM-synced)',  moveId: 'delayPreset16th',   color: 'accent-secondary/70',kind: 'trigger', group: 'click', needsSend: true },
+  { label: 'x2',     title: 'Doubler — double the echo rate',                   moveId: 'delayPresetDoubler',color: 'accent-secondary/70',kind: 'trigger', group: 'click', needsSend: true },
+
+  // ── HOLD — press and hold for precise duration, release to stop ──
+  { label: 'HPF',    title: 'HPF Rise — Altec Big Knob: steps HPF up then sweeps back on release', moveId: 'hpfRise',    color: 'accent-primary',     kind: 'hold', group: 'hold', needsSend: true },
+  { label: 'FILT',   title: 'Filter Drop — LPF sweeps down while held',         moveId: 'filterDrop',        color: 'accent-secondary',   kind: 'hold', group: 'hold', needsSend: true },
+  { label: 'DROP',   title: 'Master Drop — mutes dry signal while held; echo+spring tail survives', moveId: 'masterDrop', color: 'accent-error/70', kind: 'hold', group: 'hold' },
+  { label: 'TOAST',  title: 'Toast — route DJ mic into bus while held (start DJ mic first)', moveId: 'toast', color: 'accent-success/70', kind: 'hold', group: 'hold' },
+
+  // ── TOGGLE — click once to activate, click again to deactivate (hands-free) ──
+  { label: 'SIREN',  title: 'Dub Siren — Rasta-box pitch-swept synth (toggle on/off)',   moveId: 'dubSiren',     color: 'accent-warning',     kind: 'hold', group: 'toggle' },
+  { label: 'SCREAM', title: 'Tubby Scream — reverb self-feedback rising metallic cry (toggle)', moveId: 'tubbyScream', color: 'accent-error', kind: 'hold', group: 'toggle' },
+  { label: 'BASS',   title: 'Osc Bass — self-oscillating LPF bass drone (toggle on/off)', moveId: 'oscBass',     color: 'accent-primary',     kind: 'hold', group: 'toggle' },
+  { label: 'CRUSH',  title: 'Crush Bass — 3-bit quantize saw drone (toggle on/off)',      moveId: 'crushBass',    color: 'accent-error/70',    kind: 'hold', group: 'toggle' },
+  { label: 'WIDE',   title: 'Stereo Doubler — 20ms cross-fed widening (toggle)',         moveId: 'stereoDoubler', color: 'accent-highlight',   kind: 'hold', group: 'toggle', needsSend: true },
+  { label: 'WOBBLE', title: 'Tape Wobble — LFO on echo rate (toggle)',                   moveId: 'tapeWobble',   color: 'accent-warning/70',  kind: 'hold', group: 'toggle', needsSend: true },
+  { label: 'GHOST',  title: 'Ghost Reverb — extra reverb decay on channels (toggle)',    moveId: 'ghostReverb',  color: 'accent-secondary',   kind: 'hold', group: 'toggle', needsSend: true },
+  { label: 'SUBH',   title: 'Sub Harmonic — env-follower sub pulse on transients (toggle)', moveId: 'subHarmonic', color: 'accent-primary/70', kind: 'hold', group: 'toggle', needsSend: true },
+  { label: 'SWEEP',  title: 'EQ Sweep — resonant filter sweep (toggle)',                 moveId: 'eqSweep',      color: 'accent-highlight/70',kind: 'hold', group: 'toggle', needsSend: true },
+  { label: 'RING',   title: 'Ring Mod — metallic ring modulation (toggle)',              moveId: 'ringMod',      color: 'accent-warning',     kind: 'hold', group: 'toggle', needsSend: true },
+  { label: 'STARVE', title: 'Voltage Starve — bit-crush degradation (toggle)',           moveId: 'voltageStarve',color: 'accent-error/70',    kind: 'hold', group: 'toggle', needsSend: true },
+  { label: 'PING',   title: 'Mad Professor Ping-Pong — Ariwa SDE-3000 L/R asymmetric stereo delay (toggle)', moveId: 'madProfPingPong', color: 'accent-highlight/70', kind: 'hold', group: 'toggle', needsSend: true },
 ];
 
 // Map color tokens to button class fragments. Keeps Tailwind's JIT happy —
@@ -159,6 +172,11 @@ export const DubDeckStrip: React.FC = () => {
   const [heldChannels, setHeldChannels] = useState<Set<number>>(new Set());
   const heldReleasers = useRef<Map<number, () => void>>(new Map());
 
+  // Toggle state — click-once to activate, click-again to deactivate.
+  // Separate from heldMoves (which are physical press-and-hold).
+  const [toggledMoves, setToggledMoves] = useState<Set<string>>(new Set());
+  const toggleDisposers = useRef<Map<string, () => void>>(new Map());
+
   // Generic per-move "active hold" tracking — covers channel-scoped holds
   // (e.g. channelMute per channel) AND global holds (filterDrop, dubSiren,
   // tapeWobble, masterDrop, toast). Keyed by `${moveId}:${channelId ?? 'g'}`
@@ -218,6 +236,12 @@ export const DubDeckStrip: React.FC = () => {
     }
     activeHolds.current.clear();
     setHeldMoves(new Set());
+    // Also release all toggled moves
+    for (const release of toggleDisposers.current.values()) {
+      try { release(); } catch { /* ok */ }
+    }
+    toggleDisposers.current.clear();
+    setToggledMoves(new Set());
   }, []);
 
   useEffect(() => {
@@ -556,6 +580,25 @@ export const DubDeckStrip: React.FC = () => {
     try { release(); } catch { /* ok */ }
   }, []);
 
+  // Toggle handler — click once to activate, click again to deactivate.
+  const handleToggle = useCallback((moveId: string) => {
+    if (!busEnabled) return;
+    if (toggleDisposers.current.has(moveId)) {
+      // Currently active — deactivate
+      const release = toggleDisposers.current.get(moveId)!;
+      toggleDisposers.current.delete(moveId);
+      setToggledMoves(prev => { const n = new Set(prev); n.delete(moveId); return n; });
+      try { release(); } catch { /* ok */ }
+    } else {
+      // Not active — activate (fire as hold, store disposer)
+      const disp = fireDub(moveId, undefined);
+      if (disp) {
+        toggleDisposers.current.set(moveId, () => disp.dispose());
+        setToggledMoves(prev => new Set(prev).add(moveId));
+      }
+    }
+  }, [busEnabled]);
+
   return (
     <div className="flex flex-col gap-1.5 px-2 py-1.5 bg-dark-bgSecondary border-t border-dark-border font-mono">
       {/* Header row */}
@@ -792,25 +835,25 @@ export const DubDeckStrip: React.FC = () => {
           <span className="flex-1" />
         </div>
 
-        {/* Generators — self-generating moves (no channel send needed) */}
-        <div className="flex items-center gap-1.5 text-xs">
-          <span className="text-text-muted w-16 shrink-0" title="Instruments (self-generating — no channel send needed)">INSTR ▸</span>
+        {/* ── CLICK — one-shot triggers ── */}
+        <div className="flex items-start gap-1.5 text-xs">
+          <span
+            className="text-text-muted w-16 shrink-0 pt-0.5 font-bold tracking-wide"
+            title="Click to fire once — no hold needed"
+          >CLICK ▸</span>
           <div className="flex gap-1.5 flex-wrap">
-            {GLOBAL_MOVES.filter(m => m.category === 'gen').map((m) => {
+            {GLOBAL_MOVES.filter(m => m.group === 'click').map((m) => {
               const key = `${m.moveId}:g`;
-              const active = heldMoves.has(key) || activeFires.has(key);
-              const isHold = m.kind === 'hold';
+              const active = activeFires.has(key);
+              const dimmed = m.needsSend && !anySend && busEnabled;
               return (
                 <button
                   key={m.moveId}
-                  className={colorClasses(m.color, active)}
-                  onClick={isHold ? undefined : () => fireTrigger(m.moveId)}
-                  onPointerDown={isHold ? () => holdStart(m.moveId) : undefined}
-                  onPointerUp={isHold ? () => holdEnd(m.moveId) : undefined}
-                  onPointerLeave={isHold ? () => { holdEnd(m.moveId); setHoverHint(null); } : () => setHoverHint(null)}
-                  onPointerCancel={isHold ? () => holdEnd(m.moveId) : undefined}
+                  className={colorClasses(m.color, active) + (dimmed ? ' opacity-40' : '')}
+                  onClick={() => fireTrigger(m.moveId)}
+                  onPointerLeave={() => setHoverHint(null)}
                   onMouseEnter={() => setHoverHint(`${m.label} — ${m.title}`)}
-                  title={m.title + (isHold ? ' (press-and-hold)' : '')}
+                  title={m.title + (m.needsSend && !anySend ? ' — raise a CH send to hear' : '')}
                   disabled={!busEnabled}
                 >
                   {m.label}
@@ -820,28 +863,61 @@ export const DubDeckStrip: React.FC = () => {
           </div>
         </div>
 
-        {/* Processors — modify bus content, need channel send > 0 to be
-            audible. Dimmed when no channel is sending. */}
-        <div className="flex items-center gap-1.5 text-xs">
-          <span className="text-text-muted w-16 shrink-0" title="Processors (need channel send > 0 to hear)">PROC ▸</span>
+        {/* ── HOLD — press and hold for exact duration ── */}
+        <div className="flex items-start gap-1.5 text-xs">
+          <span
+            className="text-accent-warning/60 w-16 shrink-0 pt-0.5 font-bold tracking-wide"
+            title="Press and hold — releases when you let go"
+          >HOLD ▸</span>
           <div className="flex gap-1.5 flex-wrap">
-            {GLOBAL_MOVES.filter(m => m.category === 'proc').map((m) => {
+            {GLOBAL_MOVES.filter(m => m.group === 'hold').map((m) => {
               const key = `${m.moveId}:g`;
               const active = heldMoves.has(key) || activeFires.has(key);
-              const isHold = m.kind === 'hold';
-              const disabled = !busEnabled || !anySend;
+              const dimmed = m.needsSend && !anySend && busEnabled;
               return (
                 <button
                   key={m.moveId}
-                  className={colorClasses(m.color, active) + (disabled && busEnabled ? ' opacity-40' : '')}
-                  onClick={isHold ? undefined : () => fireTrigger(m.moveId)}
-                  onPointerDown={isHold ? () => holdStart(m.moveId) : undefined}
-                  onPointerUp={isHold ? () => holdEnd(m.moveId) : undefined}
-                  onPointerLeave={isHold ? () => { holdEnd(m.moveId); setHoverHint(null); } : () => setHoverHint(null)}
-                  onPointerCancel={isHold ? () => holdEnd(m.moveId) : undefined}
+                  className={colorClasses(m.color, active) + (dimmed ? ' opacity-40' : '')}
+                  onPointerDown={() => holdStart(m.moveId)}
+                  onPointerUp={() => holdEnd(m.moveId)}
+                  onPointerLeave={() => { holdEnd(m.moveId); setHoverHint(null); }}
+                  onPointerCancel={() => holdEnd(m.moveId)}
                   onMouseEnter={() => setHoverHint(`${m.label} — ${m.title}`)}
-                  title={m.title + (isHold ? ' (press-and-hold)' : '') + (!anySend ? ' — RAISE A CHANNEL SEND TO HEAR' : '')}
-                  disabled={disabled}
+                  title={m.title + ' (press-and-hold)' + (m.needsSend && !anySend ? ' — raise a CH send to hear' : '')}
+                  disabled={!busEnabled}
+                >
+                  {m.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* ── TOGGLE — click once on, click again off (hands-free) ── */}
+        <div className="flex items-start gap-1.5 text-xs">
+          <span
+            className="text-accent-highlight/60 w-16 shrink-0 pt-0.5 font-bold tracking-wide"
+            title="Click to activate, click again to deactivate — stays on hands-free"
+          >TOGGLE ▸</span>
+          <div className="flex gap-1.5 flex-wrap">
+            {GLOBAL_MOVES.filter(m => m.group === 'toggle').map((m) => {
+              const key = `${m.moveId}:g`;
+              const toggled = toggledMoves.has(m.moveId);
+              const active = toggled || heldMoves.has(key) || activeFires.has(key);
+              const dimmed = m.needsSend && !anySend && busEnabled && !active;
+              return (
+                <button
+                  key={m.moveId}
+                  className={
+                    colorClasses(m.color, active) +
+                    (dimmed ? ' opacity-40' : '') +
+                    (toggled ? ' ring-1 ring-offset-1 ring-offset-dark-bgSecondary ring-current' : '')
+                  }
+                  onClick={() => handleToggle(m.moveId)}
+                  onPointerLeave={() => setHoverHint(null)}
+                  onMouseEnter={() => setHoverHint(`${m.label} — ${m.title}${toggled ? ' (active — click to stop)' : ' (click to toggle on)'}`)}
+                  title={m.title + (toggled ? ' — ACTIVE, click to deactivate' : ' — click to toggle on/off') + (m.needsSend && !anySend && !active ? ' — raise a CH send to hear' : '')}
+                  disabled={!busEnabled}
                 >
                   {m.label}
                 </button>
@@ -849,7 +925,7 @@ export const DubDeckStrip: React.FC = () => {
             })}
           </div>
           {!anySend && busEnabled && (
-            <span className="text-text-muted text-xs italic">raise a CH send to hear processors</span>
+            <span className="text-text-muted text-xs italic ml-1">some need CH send</span>
           )}
         </div>
       </div>
