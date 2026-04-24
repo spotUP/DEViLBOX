@@ -821,6 +821,13 @@ export function setDeckPitch(deckId: DeckId, semitones: number): void {
   } catch { /* engine not ready */ }
 }
 
+export function setDeckRepitchLock(deckId: DeckId, locked: boolean): void {
+  useDJStore.getState().setDeckState(deckId, { repitchLock: locked });
+  try {
+    getDJEngine().getDeck(deckId).setRepitchLock(locked);
+  } catch { /* engine not ready */ }
+}
+
 // ============================================================================
 // CHANNEL MUTE MASK
 // ============================================================================
