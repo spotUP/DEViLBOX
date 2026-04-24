@@ -14,6 +14,7 @@
  */
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { notify } from '@stores/useNotificationStore';
 import { useDubStore } from '@/stores/useDubStore';
 import { useDrumPadStore } from '@/stores/useDrumPadStore';
 import { useMixerStore } from '@/stores/useMixerStore';
@@ -855,11 +856,17 @@ export const DubDeckStrip: React.FC = () => {
                 <button
                   key={m.moveId}
                   className={colorClasses(m.color, active) + (noSend && busEnabled ? ' opacity-40' : '')}
-                  onClick={() => fireTrigger(m.moveId)}
+                  onClick={() => {
+                    if (noSend) {
+                      notify.warning('Raise a CH send first — drag a channel fader up on the right');
+                      return;
+                    }
+                    fireTrigger(m.moveId);
+                  }}
                   onPointerLeave={() => setHoverHint(null)}
-                  onMouseEnter={() => setHoverHint(`${m.label} — ${m.title}`)}
+                  onMouseEnter={() => setHoverHint(`${m.label} — ${m.title}${noSend ? ' (needs CH send)' : ''}`)}
                   title={m.title + (noSend ? ' — raise a CH send to hear' : '')}
-                  disabled={!busEnabled || noSend}
+                  disabled={!busEnabled}
                 >
                   {m.label}
                 </button>
@@ -883,13 +890,19 @@ export const DubDeckStrip: React.FC = () => {
                 <button
                   key={m.moveId}
                   className={colorClasses(m.color, active) + (noSend && busEnabled ? ' opacity-40' : '')}
-                  onPointerDown={() => holdStart(m.moveId)}
+                  onPointerDown={() => {
+                    if (noSend) {
+                      notify.warning('Raise a CH send first — drag a channel fader up on the right');
+                      return;
+                    }
+                    holdStart(m.moveId);
+                  }}
                   onPointerUp={() => holdEnd(m.moveId)}
                   onPointerLeave={() => { holdEnd(m.moveId); setHoverHint(null); }}
                   onPointerCancel={() => holdEnd(m.moveId)}
-                  onMouseEnter={() => setHoverHint(`${m.label} — ${m.title}`)}
+                  onMouseEnter={() => setHoverHint(`${m.label} — ${m.title}${noSend ? ' (needs CH send)' : ''}`)}
                   title={m.title + ' (press-and-hold)' + (noSend ? ' — raise a CH send to hear' : '')}
-                  disabled={!busEnabled || noSend}
+                  disabled={!busEnabled}
                 >
                   {m.label}
                 </button>
@@ -919,11 +932,17 @@ export const DubDeckStrip: React.FC = () => {
                     (dimmed ? ' opacity-40' : '') +
                     (toggled ? ' ring-2 ring-offset-1 ring-offset-dark-bgSecondary ring-white/70' : '')
                   }
-                  onClick={() => handleToggle(m.moveId)}
+                  onClick={() => {
+                    if (noSend && !toggled) {
+                      notify.warning('Raise a CH send first — drag a channel fader up on the right');
+                      return;
+                    }
+                    handleToggle(m.moveId);
+                  }}
                   onPointerLeave={() => setHoverHint(null)}
-                  onMouseEnter={() => setHoverHint(`${m.label} — ${m.title}${toggled ? ' (ON — click to stop)' : ' (click to toggle on)'}`)}
+                  onMouseEnter={() => setHoverHint(`${m.label} — ${m.title}${toggled ? ' (ON — click to stop)' : noSend ? ' (needs CH send)' : ' (click to toggle on)'}`)}
                   title={m.title + (toggled ? ' — ON, click to deactivate' : ' — click to toggle on/off') + (noSend && !toggled ? ' — raise a CH send to hear' : '')}
-                  disabled={!busEnabled || (noSend && !toggled)}
+                  disabled={!busEnabled}
                 >
                   {m.label}
                 </button>
