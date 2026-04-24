@@ -114,8 +114,7 @@ export const DubDeckStrip: React.FC = () => {
   const setMasterChorus = useDubStore(s => s.setMasterChorus);
   const clubSim = useDubStore(s => s.clubSim);
   const setClubSim = useDubStore(s => s.setClubSim);
-  const reverseChainOrder = useDubStore(s => s.reverseChainOrder);
-  const setReverseChainOrder = useDubStore(s => s.setReverseChainOrder);
+  const chainOrder = useDrumPadStore(s => s.dubBus.chainOrder ?? 'echoSpring');
   const vinylLevel = useDubStore(s => s.vinylLevel);
   const setVinylLevel = useDubStore(s => s.setVinylLevel);
 
@@ -334,15 +333,6 @@ export const DubDeckStrip: React.FC = () => {
       console.warn('[DubDeckStrip] setClubSim failed:', e);
     }
   }, [clubSim]);
-
-  useEffect(() => {
-    try {
-      const bus = ensureDrumPadEngine().getDubBus();
-      bus.setReverseChainOrder(reverseChainOrder);
-    } catch (e) {
-      console.warn('[DubDeckStrip] setReverseChainOrder failed:', e);
-    }
-  }, [reverseChainOrder]);
 
   useEffect(() => {
     try {
@@ -663,15 +653,22 @@ export const DubDeckStrip: React.FC = () => {
         <button
           className={
             'px-2.5 py-1 rounded border transition-colors ' +
-            (reverseChainOrder
+            (chainOrder !== 'echoSpring'
               ? 'bg-accent-secondary/20 border-accent-secondary text-accent-secondary'
               : 'bg-dark-bgTertiary border-dark-border text-text-muted hover:text-text-primary')
           }
-          onClick={() => setReverseChainOrder(!reverseChainOrder)}
-          title={reverseChainOrder ? 'Signal order: SPRING → ECHO (reverb-first, "whole room repeated")' : 'Signal order: ECHO → SPRING (default). Click to swap order to spring-first for reverberant echoes'}
+          onClick={() => {
+            const next = chainOrder === 'echoSpring' ? 'springEcho' : chainOrder === 'springEcho' ? 'parallel' : 'echoSpring';
+            setDubBus({ chainOrder: next });
+          }}
+          title={
+            chainOrder === 'echoSpring' ? 'Signal order: ECHO → SPRING (default). Click to cycle chain order.'
+            : chainOrder === 'springEcho' ? 'Signal order: SPRING → ECHO (reverb-first). Click to cycle to parallel.'
+            : 'Signal order: PARALLEL (echo + spring independent). Click to cycle to default.'
+          }
           disabled={!busEnabled}
         >
-          {reverseChainOrder ? 'VRB→DLY' : 'DLY→VRB'}
+          {chainOrder === 'echoSpring' ? 'DLY→VRB' : chainOrder === 'springEcho' ? 'VRB→DLY' : 'PARALLEL'}
         </button>
         <div className="flex items-center gap-1.5">
           <span className="text-text-muted text-xs">JA</span>

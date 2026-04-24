@@ -687,6 +687,82 @@ export const DubBusPanel: React.FC = () => {
           />
           </Section>
 
+          {/* ── Club simulation — convolution room sim ───────────────── */}
+          <Section title="Club simulation">
+          <label className="flex items-center gap-2 text-[11px] font-mono text-text-secondary cursor-pointer">
+            <input
+              type="checkbox"
+              checked={dubBus.clubSimEnabled}
+              onChange={(e) => patch({ clubSimEnabled: e.target.checked })}
+              className="accent-accent-primary"
+            />
+            Enable club simulation
+          </label>
+          <Choice
+            label="Room preset"
+            value={dubBus.clubSimPreset}
+            options={[
+              { value: 'smallClub',     label: 'Small Club' },
+              { value: 'soundSystem',   label: 'Sound System Dance' },
+              { value: 'studioMonitor', label: 'Studio Monitor' },
+            ] as const}
+            onChange={(v) => patch({ clubSimPreset: v })}
+          />
+          <Slider
+            label="Room mix"
+            value={dubBus.clubSimMix}
+            min={0}
+            max={1}
+            step={0.01}
+            onChange={(v) => patch({ clubSimMix: v })}
+            format={(v) => `${Math.round(v * 100)}%`}
+            disabled={!dubBus.clubSimEnabled}
+          />
+          </Section>
+
+          {/* ── External feedback loop — mixer as instrument ────────────── */}
+          <Section title="External feedback loop">
+          <Slider
+            label="Feedback gain"
+            value={dubBus.extFeedbackGain}
+            min={0}
+            max={0.85}
+            step={0.01}
+            onChange={(v) => patch({ extFeedbackGain: v })}
+            format={(v) => `${Math.round(v * 100)}%`}
+          />
+          <Slider
+            label="Feedback EQ freq"
+            value={dubBus.extFeedbackEqFreq}
+            min={200}
+            max={5000}
+            step={10}
+            onChange={(v) => patch({ extFeedbackEqFreq: v })}
+            format={(v) => `${Math.round(v)} Hz`}
+            disabled={dubBus.extFeedbackGain === 0}
+          />
+          <Slider
+            label="Feedback EQ gain"
+            value={dubBus.extFeedbackEqGain}
+            min={-18}
+            max={18}
+            step={0.5}
+            onChange={(v) => patch({ extFeedbackEqGain: v })}
+            format={(v) => `${v > 0 ? '+' : ''}${v.toFixed(1)} dB`}
+            disabled={dubBus.extFeedbackGain === 0}
+          />
+          <Slider
+            label="Feedback EQ Q"
+            value={dubBus.extFeedbackEqQ}
+            min={0.5}
+            max={8}
+            step={0.1}
+            onChange={(v) => patch({ extFeedbackEqQ: v })}
+            format={(v) => v.toFixed(1)}
+            disabled={dubBus.extFeedbackGain === 0}
+          />
+          </Section>
+
           {/* ── Dub Action settings — how much dub-throw/hold/mute pads inject ── */}
           <Section title="Dub actions (deck taps)">
           <Slider
