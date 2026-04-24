@@ -111,6 +111,8 @@ export const DUB_MOVE_KINDS: Record<string, 'trigger' | 'hold'> = {
   ghostReverb:         'hold',   // mute dry + full dub send
   voltageStarve:       'hold',   // ramp bit depth down (lo-fi)
   ringMod:             'hold',   // ring modulator activation
+  hpfRise:             'hold',   // Altec Big Knob HPF sweep up + back
+  madProfPingPong:     'hold',   // Ariwa SDE-3000 asymmetric L/R ping-pong
 };
 
 /**

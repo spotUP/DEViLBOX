@@ -14,7 +14,7 @@
 
 import * as Tone from 'tone';
 import type { DubBusSettings } from '../../types/dub';
-import { DEFAULT_DUB_BUS, DUB_CHARACTER_PRESETS, snapToAltecStep } from '../../types/dub';
+import { DEFAULT_DUB_BUS, DUB_CHARACTER_PRESETS, ALTEC_HPF_STEPS, snapToAltecStep } from '../../types/dub';
 import {
   AelapseEffect,
   PARAM_SPRINGS_DRYWET,
@@ -181,6 +181,11 @@ export class DubBus {
   private hpf: BiquadFilterNode;
   private hpf2: BiquadFilterNode;
   private hpf3: BiquadFilterNode;
+  /** Altec 9069B T-network resonant peak — peaking BiquadFilter positioned
+   *  immediately after the 3-stage HPF cascade. The real Altec T-network has
+   *  a resonant hump just above the cutoff frequency; this reproduces it.
+   *  Frequency tracks hpfCutoff so the peak follows every sweep step. */
+  private hpfResonance: BiquadFilterNode;
   // ─── Sound coloring stage (research 2026-04-20_dub-sound-coloring.md) ──
   // King Tubby bass shelf — resonant low-shelf at ~90 Hz for the dub
   // "weight." Sits after the HPF so it doesn't amplify sub-rumble.
@@ -327,6 +332,7 @@ export class DubBus {
    *  can zero it and restore without re-reading the engine. Mirrors what
    *  SpringReverbEffect's `.wet` used to hold inline. */
   private _springWetCache: number = 0.55;
+  private _springsChaosCache: number = 0.20; // tracks current chaos for kickSpring restore
 
   /** Set the Aelapse springs dry/wet AND cache it. Use everywhere old code
    *  did `this.spring.wet = v`. */
@@ -1240,6 +1246,16 @@ export class DubBus {
     this.hpf.connect(this.hpf2);
     this.hpf2.connect(this.hpf3);
 
+    // Altec 9069B resonant hump — peaking filter tracking the HPF cutoff.
+    // The real T-network has a characteristic resonance just above cutoff
+    // that gives Tubby's sweep its distinctive voice vs a plain highpass.
+    this.hpfResonance = this.context.createBiquadFilter();
+    this.hpfResonance.type = 'peaking';
+    this.hpfResonance.frequency.value = initialHpfFreq;
+    this.hpfResonance.Q.value = 2.0;
+    this.hpfResonance.gain.value = this.settings.hpfResonanceDb ?? 0;
+    this.hpf3.connect(this.hpfResonance);
+
     // Tubby bass shelf — resonant low-shelf at 90 Hz (research default).
     // Positioned AFTER the HPF so the shelf doesn't re-amplify rumble the
     // HPF just removed.
@@ -1795,8 +1811,8 @@ export class DubBus {
     //
     //   Spring.output → Sidechain → Glue → MidScoop → LPF → StereoMS → return → master
     this.input.connect(this.hpf);
-    // hpf → hpf2 → hpf3 chain was wired in construction; hpf3 is the cascade output.
-    this.hpf3.connect(this.bassShelf);
+    // hpf → hpf2 → hpf3 → hpfResonance (Altec T-network peak) — resonance is the cascade output.
+    this.hpfResonance.connect(this.bassShelf);
     // bassShelf output feeds BOTH the single-path saturator AND the 3-path
     // stack in parallel. The two paths crossfade via tapeSatBypass/tapeStackMix
     // gains on their output side; echo input receives their sum.
@@ -1805,10 +1821,9 @@ export class DubBus {
     for (const path of this.tapeStackPaths) {
       this.bassShelf.connect(path.inGain);
     }
-    // Parallel liquid-sweep branch — taps hpf3 output, sums into the
-    // saturator input (pre-shaper) so flanged audio also gets the tape
-    // coloring + stack behavior when enabled.
-    this.hpf3.connect(this.sweepInput);
+    // Parallel liquid-sweep branch — taps after the resonance node so the
+    // flanger picks up the post-Altec signal (resonance colors the sweep too).
+    this.hpfResonance.connect(this.sweepInput);
     this.sweepOutput.connect(this.tapeSat);
     for (const path of this.tapeStackPaths) {
       this.sweepOutput.connect(path.inGain);
@@ -2642,6 +2657,84 @@ export class DubBus {
     });
   }
 
+  /**
+   * startHpfRise — Tubby's "Big Knob" gesture: sweep the HPF UP through
+   * Altec positions to peakHz, hold, then sweep back to the original position.
+   *
+   * In stepped mode the frequency snaps to Altec positions at each interval;
+   * in continuous mode it ramps smoothly. The resonance node tracks along so
+   * the Altec hump follows every position change.
+   *
+   * Returns a dispose fn that cancels pending timers and snaps back to the
+   * user's current hpfCutoff (used when the hold is released early).
+   */
+  startHpfRise(peakHz = 2000, holdMs = 1000): () => void {
+    if (!this.enabled) return () => {};
+
+    const originHz = this.settings.hpfStepped
+      ? snapToAltecStep(this.settings.hpfCutoff)
+      : this.settings.hpfCutoff;
+    const targetHz = this.settings.hpfStepped
+      ? snapToAltecStep(peakHz)
+      : peakHz;
+
+    const timers: ReturnType<typeof setTimeout>[] = [];
+
+    const setHpf = (hz: number) => {
+      const now = this.context.currentTime;
+      rampBiquadParam(this.hpf.frequency, hz, now);
+      rampBiquadParam(this.hpf2.frequency, hz, now);
+      rampBiquadParam(this.hpf3.frequency, hz, now);
+      rampBiquadParam(this.hpfResonance.frequency, hz, now);
+    };
+
+    if (this.settings.hpfStepped) {
+      // Step up through Altec positions at 80 ms intervals — the rhythmic
+      // click pattern that is Tubby's signature filter sweep sound.
+      const steps = ([...ALTEC_HPF_STEPS] as number[]).filter(s => s > originHz && s <= targetHz);
+      steps.forEach((hz, i) => {
+        const t = setTimeout(() => {
+          timers.splice(timers.indexOf(t), 1);
+          setHpf(hz);
+        }, (i + 1) * 80);
+        timers.push(t);
+      });
+      // Hold at peak, then sweep back down
+      const riseMs = (steps.length + 1) * 80;
+      const downSteps = [...steps].reverse();
+      downSteps.push(originHz);
+      downSteps.forEach((hz, i) => {
+        const t = setTimeout(() => {
+          timers.splice(timers.indexOf(t), 1);
+          setHpf(hz);
+        }, riseMs + holdMs + (i + 1) * 80);
+        timers.push(t);
+      });
+    } else {
+      // Continuous mode: linear sweep up over 400ms, hold, sweep back
+      const now = this.context.currentTime;
+      rampBiquadParam(this.hpf.frequency, targetHz, now, 0.4);
+      rampBiquadParam(this.hpf2.frequency, targetHz, now, 0.4);
+      rampBiquadParam(this.hpf3.frequency, targetHz, now, 0.4);
+      rampBiquadParam(this.hpfResonance.frequency, targetHz, now, 0.4);
+      const restoreTimer = setTimeout(() => {
+        timers.splice(timers.indexOf(restoreTimer), 1);
+        const n = this.context.currentTime;
+        rampBiquadParam(this.hpf.frequency, originHz, n, 0.6);
+        rampBiquadParam(this.hpf2.frequency, originHz, n, 0.6);
+        rampBiquadParam(this.hpf3.frequency, originHz, n, 0.6);
+        rampBiquadParam(this.hpfResonance.frequency, originHz, n, 0.6);
+      }, 400 + holdMs);
+      timers.push(restoreTimer);
+    }
+
+    return () => {
+      for (const t of timers) clearTimeout(t);
+      timers.length = 0;
+      setHpf(originHz);
+    };
+  }
+
   /** Update the dub bus settings (enable, gains, delay params). */
   setSettings(settings: Partial<DubBusSettings>): void {
     // Short-circuit no-op writes. PadGrid + DJSamplerPanel mirror this state
@@ -2769,6 +2862,9 @@ export class DubBus {
     rampBiquadParam(this.hpf.frequency, hpfFreq, now);
     rampBiquadParam(this.hpf2.frequency, hpfFreq, now);
     rampBiquadParam(this.hpf3.frequency, hpfFreq, now);
+    // Resonance node tracks the same frequency so the peak follows the sweep.
+    rampBiquadParam(this.hpfResonance.frequency, hpfFreq, now);
+    rampBiquadParam(this.hpfResonance.gain, merged.hpfResonanceDb ?? 0, now);
     // Guard: skip return_.gain write when a mute hold is active (swap
     // or warmup). A re-entrant setSettings call (PadGrid mirror, DJ sync)
     // would insert a setTargetAtTime event that defeats the warmup hold,
@@ -3185,7 +3281,7 @@ export class DubBus {
     try {
       if (preset.springsLength  !== undefined) this.spring.setParamById(PARAM_SPRINGS_LENGTH,  preset.springsLength);
       if (preset.springsDamp    !== undefined) this.spring.setParamById(PARAM_SPRINGS_DAMP,    preset.springsDamp);
-      if (preset.springsChaos   !== undefined) this.spring.setParamById(PARAM_SPRINGS_CHAOS,   preset.springsChaos);
+      if (preset.springsChaos   !== undefined) { this.spring.setParamById(PARAM_SPRINGS_CHAOS, preset.springsChaos); this._springsChaosCache = preset.springsChaos; }
       if (preset.springsScatter !== undefined) this.spring.setParamById(PARAM_SPRINGS_SCATTER, preset.springsScatter);
       if (preset.springsTone    !== undefined) this.spring.setParamById(PARAM_SPRINGS_TONE,    preset.springsTone);
     } catch (err) { console.warn('[DubBusCtrl] spring param write threw:', err); }
@@ -3812,6 +3908,93 @@ export class DubBus {
   }
 
   /**
+   * startPingPong — Mad Professor's Ariwa Sounds SDE-3000 asymmetric L/R
+   * ping-pong delay. Creates genuine stereo rhythmic motion by routing two
+   * delay lines at different times hard-panned left (3/8 note) and right
+   * (1/2 note), with cross-channel feedback. Completely different sonic
+   * character from M/S width — stereo content is rhythmically offset.
+   *
+   * Returns a dispose function that tears down the nodes and disconnects.
+   */
+  startPingPong(lMs?: number, rMs?: number, feedback?: number, wet?: number): () => void {
+    if (!this.enabled) return () => {};
+    const ctx = this.context;
+    const now = ctx.currentTime;
+    const lDelay = Math.max(10, Math.min(2000, lMs ?? this.settings.pingPongLMs));
+    const rDelay = Math.max(10, Math.min(2000, rMs ?? this.settings.pingPongRMs));
+    const fb     = Math.max(0,  Math.min(0.9,  feedback ?? this.settings.pingPongFeedback));
+    const wetAmt = Math.max(0,  Math.min(1,    wet      ?? this.settings.pingPongWet));
+
+    // Stereo splitter
+    const splitter = ctx.createChannelSplitter(2);
+    const merger   = ctx.createChannelMerger(2);
+
+    // L path: delay at lMs, panned hard left
+    const delayL    = ctx.createDelay(2.0);
+    delayL.delayTime.value = lDelay / 1000;
+    const feedbackL = ctx.createGain();
+    feedbackL.gain.value = fb;
+
+    // R path: delay at rMs, panned hard right
+    const delayR    = ctx.createDelay(2.0);
+    delayR.delayTime.value = rDelay / 1000;
+    const feedbackR = ctx.createGain();
+    feedbackR.gain.value = fb;
+
+    // Input gain
+    const inputGain = ctx.createGain();
+    inputGain.gain.value = 1.0;
+
+    // Wet gain for output
+    const wetGain = ctx.createGain();
+    wetGain.gain.value = wetAmt;
+    wetGain.gain.setValueAtTime(0, now);
+    wetGain.gain.linearRampToValueAtTime(wetAmt, now + 0.05);
+
+    // Routing:
+    //   inputGain → delayL → merger(L) → wetGain → return
+    //   inputGain → delayR → merger(R) → wetGain → return
+    //   Cross feedback: delayL → feedbackL → delayR, delayR → feedbackR → delayL
+    inputGain.connect(delayL);
+    inputGain.connect(delayR);
+    delayL.connect(merger, 0, 0);   // L delay → left channel
+    delayR.connect(merger, 0, 1);   // R delay → right channel
+    delayL.connect(feedbackL);
+    feedbackL.connect(delayR);      // L → R cross-feed
+    delayR.connect(feedbackR);
+    feedbackR.connect(delayL);      // R → L cross-feed
+    merger.connect(wetGain);
+
+    // Tap from the bus return path (post-echo) as input.
+    // return_ is the final gain before master — we tap post-processing here
+    // so the ping-pong processes the already-effected bus signal.
+    const returnNode = this.return_ as unknown as AudioNode;
+    try {
+      returnNode.connect(inputGain);
+      wetGain.connect(returnNode);
+    } catch (err) {
+      console.warn('[DubBus] startPingPong connect failed:', err);
+    }
+
+    return () => {
+      const t = ctx.currentTime;
+      wetGain.gain.setValueAtTime(wetGain.gain.value, t);
+      wetGain.gain.linearRampToValueAtTime(0, t + 0.08);
+      setTimeout(() => {
+        try {
+          returnNode.disconnect(inputGain);
+          wetGain.disconnect();
+          merger.disconnect();
+          delayL.disconnect(); delayR.disconnect();
+          feedbackL.disconnect(); feedbackR.disconnect();
+          splitter.disconnect();
+          inputGain.disconnect();
+        } catch { /* ok */ }
+      }, 100);
+    };
+  }
+
+  /**
    * kickSpring — inject a 5ms broadband impulse directly into the spring
    * input at massive amplitude. Models physically kicking the reverb tank.
    * All spring resonant modes fire at once → thunderous crash.
@@ -3860,6 +4043,27 @@ export class DubBus {
       this._setSpringWet(this.settings.springWet);
     }, holdMs);
     this.throwTimers.add(t2);
+
+    // Perry chaos animation — physically kicking the spring tank causes
+    // chaotic resonance that gradually settles. Spike chaos to maximum
+    // on the kick, then step it back to the user's setting over ~2 s.
+    // This produces the authentic "falling spring tank" crash that Perry
+    // was famous for, rather than a clean impulse hit.
+    const savedChaos = this._springsChaosCache;
+    try { this.spring.setParamById(PARAM_SPRINGS_CHAOS, 0.95); } catch { /* ok */ }
+    const chaosSteps: [number, number][] = [
+      [100,  0.75],
+      [400,  0.55],
+      [900,  0.35],
+      [1800, savedChaos],
+    ];
+    for (const [delayMs, chaosVal] of chaosSteps) {
+      const t = setTimeout(() => {
+        this.throwTimers.delete(t);
+        try { this.spring.setParamById(PARAM_SPRINGS_CHAOS, chaosVal); } catch { /* ok */ }
+      }, delayMs);
+      this.throwTimers.add(t);
+    }
   }
 
   /**
