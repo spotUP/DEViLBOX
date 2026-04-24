@@ -55,6 +55,7 @@ interface GlobalMove { label: string; title: string; moveId: string; color: stri
 const GLOBAL_MOVES: Array<GlobalMove> = [
   // ── Generators (no channel send needed) ──
   { label: 'SLAM',   title: 'Spring Slam — instant splash of spring reverb [generator]', moveId: 'springSlam', color: 'accent-success', kind: 'trigger', category: 'gen' },
+  { label: 'KICK',   title: 'Spring Kick — shorter, punchier spring hit [generator]', moveId: 'springKick', color: 'accent-success/70', kind: 'trigger', category: 'gen' },
   { label: 'SIREN',  title: 'Dub Siren — Rasta-box pitch-swept synth through bus [generator]', moveId: 'dubSiren', color: 'accent-warning', kind: 'hold', category: 'gen' },
   { label: 'CRACK',  title: 'Snare Crack — bandpass noise burst [generator]', moveId: 'snareCrack', color: 'text-primary', kind: 'trigger', category: 'gen' },
   { label: 'DROP',   title: 'Master Drop — mute dry while held; bus tail survives [generator]', moveId: 'masterDrop', color: 'accent-error/70', kind: 'hold', category: 'gen' },
@@ -74,9 +75,18 @@ const GLOBAL_MOVES: Array<GlobalMove> = [
   { label: 'STOP',   title: 'Tape Stop — bus LPF + echo-rate collapse [PROCESSOR — needs CH send]', moveId: 'tapeStop', color: 'accent-secondary/70', kind: 'trigger', category: 'proc' },
   { label: 'WIDE',   title: 'Stereo Doubler — 20ms cross-fed widening (hold) [PROCESSOR — needs CH send]', moveId: 'stereoDoubler', color: 'accent-highlight', kind: 'hold', category: 'proc' },
   { label: 'RVRSE',  title: 'Reverse Echo — last 0.4s reversed through tape echo [PROCESSOR — needs CH send]', moveId: 'reverseEcho', color: 'accent-highlight/70', kind: 'trigger', category: 'proc' },
+  { label: 'GHOST',  title: 'Ghost Reverb — extra reverb decay on channel (hold) [PROCESSOR — needs CH send]', moveId: 'ghostReverb', color: 'accent-secondary', kind: 'hold', category: 'proc' },
+  { label: 'RING',   title: 'Ring Mod — metallic ring modulation (hold) [PROCESSOR — needs CH send]', moveId: 'ringMod', color: 'accent-warning', kind: 'hold', category: 'proc' },
+  { label: 'STARVE', title: 'Voltage Starve — bit-crush degradation (hold) [PROCESSOR — needs CH send]', moveId: 'voltageStarve', color: 'accent-error/70', kind: 'hold', category: 'proc' },
   { label: 'SUBH',   title: 'Sub Harmonic — env-follower sub pulse on every transient (hold) [PROCESSOR — needs CH send]', moveId: 'subHarmonic', color: 'accent-primary/70', kind: 'hold', category: 'proc' },
+  { label: 'SWEEP',  title: 'EQ Sweep — resonant filter sweep (hold) [PROCESSOR — needs CH send]', moveId: 'eqSweep', color: 'accent-highlight/70', kind: 'hold', category: 'proc' },
   { label: '380',    title: 'Tubby 380 — snap echo rate to 380 ms [PROCESSOR — needs CH send]', moveId: 'delayPreset380', color: 'accent-secondary/70', kind: 'trigger', category: 'proc' },
   { label: 'DOT',    title: 'Dotted — snap echo rate to dotted-8th (BPM-synced) [PROCESSOR — needs CH send]', moveId: 'delayPresetDotted', color: 'accent-secondary/70', kind: 'trigger', category: 'proc' },
+  { label: '1/4',    title: 'Quarter — snap echo rate to quarter note (BPM-synced) [PROCESSOR — needs CH send]', moveId: 'delayPresetQuarter', color: 'accent-secondary/70', kind: 'trigger', category: 'proc' },
+  { label: '1/8',    title: '8th — snap echo rate to 8th note (BPM-synced) [PROCESSOR — needs CH send]', moveId: 'delayPreset8th', color: 'accent-secondary/70', kind: 'trigger', category: 'proc' },
+  { label: 'TRIP',   title: 'Triplet — snap echo rate to triplet (BPM-synced) [PROCESSOR — needs CH send]', moveId: 'delayPresetTriplet', color: 'accent-secondary/70', kind: 'trigger', category: 'proc' },
+  { label: '1/16',   title: '16th — snap echo rate to 16th note (BPM-synced) [PROCESSOR — needs CH send]', moveId: 'delayPreset16th', color: 'accent-secondary/70', kind: 'trigger', category: 'proc' },
+  { label: 'x2',     title: 'Doubler — double the echo rate [PROCESSOR — needs CH send]', moveId: 'delayPresetDoubler', color: 'accent-secondary/70', kind: 'trigger', category: 'proc' },
 ];
 
 // Map color tokens to button class fragments. Keeps Tailwind's JIT happy —
@@ -117,6 +127,8 @@ export const DubDeckStrip: React.FC = () => {
   const chainOrder = useDrumPadStore(s => s.dubBus.chainOrder ?? 'echoSpring');
   const vinylLevel = useDubStore(s => s.vinylLevel);
   const setVinylLevel = useDubStore(s => s.setVinylLevel);
+  const quantize = useDubStore(s => s.quantize);
+  const setQuantize = useDubStore(s => s.setQuantize);
 
   const busEnabled = useDrumPadStore(s => s.dubBus.enabled);
   const setDubBus = useDrumPadStore(s => s.setDubBus);
@@ -660,6 +672,19 @@ export const DubDeckStrip: React.FC = () => {
         <button
           className={
             'px-2.5 py-1 rounded border transition-colors ' +
+            (quantize
+              ? 'bg-accent-primary/20 border-accent-primary text-accent-primary'
+              : 'bg-dark-bgTertiary border-dark-border text-text-muted hover:text-text-primary')
+          }
+          onClick={() => setQuantize(!quantize)}
+          title={quantize ? 'Quantize ON — dub move timings snap to nearest row for cleaner lane recordings' : 'Quantize OFF — moves record at exact timing (free-form)'}
+          disabled={!busEnabled}
+        >
+          QUANTIZE
+        </button>
+        <button
+          className={
+            'px-2.5 py-1 rounded border transition-colors ' +
             (chainOrder !== 'echoSpring'
               ? 'bg-accent-secondary/20 border-accent-secondary text-accent-secondary'
               : 'bg-dark-bgTertiary border-dark-border text-text-muted hover:text-text-primary')
@@ -826,10 +851,12 @@ export const DubDeckStrip: React.FC = () => {
         {/* Master send — scales all channel sends at once */}
         <div
           className={
-            'flex flex-col items-center justify-between gap-1.5 px-2 py-1.5 rounded border min-w-[64px] shrink-0 ' +
+            'flex flex-col items-center gap-1.5 px-2 py-1.5 rounded border min-w-[64px] shrink-0 ' +
             'bg-dark-bgSecondary border-accent-primary/40'
           }
         >
+          {/* Top group: label + ops + hold — must match channel columns */}
+          <div className="flex flex-col items-center gap-1.5 w-full">
           <span className="text-xs font-bold text-accent-primary leading-none">MASTER</span>
           {CHANNEL_OPS.map((op) => {
             const masterKey = `${op.moveId}:master`;
@@ -878,6 +905,8 @@ export const DubDeckStrip: React.FC = () => {
           >
             HOLD
           </button>
+          </div>
+          {/* Bottom group: ALL/NONE + fader — master-only controls */}
           <button
             className={
               'px-2 py-1 rounded border w-full text-[9px] font-bold transition-all duration-150 ' +
@@ -927,7 +956,7 @@ export const DubDeckStrip: React.FC = () => {
             <div
               key={i}
               className={
-                'flex flex-col items-center justify-between gap-1.5 px-2 py-1.5 rounded border min-w-[64px] shrink-0 transition-colors ' +
+                'flex flex-col items-center gap-1.5 px-2 py-1.5 rounded border min-w-[64px] shrink-0 transition-colors ' +
                 (channelFiring
                   ? 'bg-accent-highlight/15 border-accent-highlight'
                   : isHeld
@@ -937,6 +966,8 @@ export const DubDeckStrip: React.FC = () => {
                       : 'bg-dark-bgTertiary border-dark-border')
               }
             >
+              {/* Top group: label + ops + hold — matches master column */}
+              <div className="flex flex-col items-center gap-1.5 w-full">
               <span
                 className="text-xs font-bold text-text-secondary leading-none truncate max-w-[56px]"
                 title={`Ch ${i + 1}${ch ? ' · ' + ch.name : ''}`}
@@ -981,6 +1012,8 @@ export const DubDeckStrip: React.FC = () => {
               >
                 HOLD
               </button>
+              </div>
+              {/* Bottom group: fader + readout */}
               <Fader
                 value={dubSend}
                 size="md"
