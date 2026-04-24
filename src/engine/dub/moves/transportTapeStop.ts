@@ -3,18 +3,24 @@
  * tapeStop.ts. Ramps both tempo AND pitch down together so the song
  * pitches as it slows, matching a physical tape reel decelerating.
  *
- * Currently only wired for LibOpenMPT (setTempoFactor + setPitchFactor
- * exposed on the engine wrapper). Other engines (UADE / Hively / Furnace)
- * don't expose a smooth speed ramp from their worklets yet — this move
- * warns and falls through to the bus-only tapeStop when it can't drive
- * the transport directly.
+ * HOLD behaviour:
+ *   - Press: transport ramps to floor (~8% speed) over 0.8s. Bus LPF also
+ *     closes to mask LibOpenMPT's resampler aliasing.
+ *   - Hold: transport stays near-silent.
+ *   - Release (dispose): transport ramps back to 1.0 over 0.25s.
  *
- * Global, one-shot. After `downSec + holdSec`, everything snaps back.
+ * Currently only wired for LibOpenMPT. For other engines the bus-only
+ * tapeStop (DubBus.startTapeHold) carries the effect.
  */
 
 import type { DubMove } from './_types';
 
-const STEPS = 24;  // steps per ramp direction — 24 over 600ms = ~25ms per step, smooth enough
+const STEPS = 24;
+
+function cancelTimers(timers: Set<ReturnType<typeof setTimeout>>): void {
+  for (const t of timers) clearTimeout(t);
+  timers.clear();
+}
 
 async function rampLibOpenMPT(
   fromFactor: number,
@@ -30,60 +36,73 @@ async function rampLibOpenMPT(
     const v = fromFactor + (toFactor - fromFactor) * (i / STEPS);
     const t = setTimeout(() => {
       timers.delete(t);
-      try {
-        eng.setTempoFactor(v);
-        eng.setPitchFactor(v);
-      } catch { /* ok */ }
+      try { eng.setTempoFactor(v); eng.setPitchFactor(v); } catch { /* ok */ }
     }, stepMs * i);
     timers.add(t);
   }
 }
 
+async function setLibOpenMPTFactor(factor: number): Promise<void> {
+  const mod = await import('@/engine/libopenmpt/LibopenmptEngine');
+  if (!mod.LibopenmptEngine.hasInstance()) return;
+  const eng = mod.LibopenmptEngine.getInstance();
+  try { eng.setTempoFactor(factor); eng.setPitchFactor(factor); } catch { /* ok */ }
+}
+
 export const transportTapeStop: DubMove = {
   id: 'transportTapeStop',
-  kind: 'trigger',
-  defaults: { downSec: 0.8, holdSec: 0.2, floorFactor: 0.08 },
+  kind: 'hold',
+  defaults: { downSec: 0.8, floorFactor: 0.08 },
 
   execute({ bus, params }) {
-    const downSec = params.downSec ?? this.defaults.downSec;
-    const holdSec = params.holdSec ?? this.defaults.holdSec;
-    const floorFactor = Math.max(0.05, params.floorFactor ?? this.defaults.floorFactor);
+    const downSec = (params.downSec as number | undefined) ?? (this.defaults.downSec as number);
+    const floorFactor = Math.max(0.05, (params.floorFactor as number | undefined) ?? (this.defaults.floorFactor as number));
 
-    // Stack the bus-only tape stop on top of the transport slowdown so the
-    // tail gets analog tape coloration (LPF closing + echo-rate ramp +
-    // spring) alongside the digital transport time-stretch. Without this
-    // the transport slowdown sounds purely mathematical — tape character
-    // comes from the bus wet chain, not the libopenmpt resampler.
-    console.log(`[transportTapeStop] fired downSec=${downSec} holdSec=${holdSec} floor=${floorFactor}`);
-    bus.tapeStop(downSec, holdSec);
-    // Sweep the master-insert LPF down to 400 Hz over the stop — hides
-    // LibOpenMPT's resampler aliasing ("bit crush") during extreme
-    // slowdown by rolling off the highs that carry the artifacts.
-    bus.sweepMasterLpf(400, downSec, holdSec + 0.1);
+    const timers = new Set<ReturnType<typeof setTimeout>>();
+    let disposed = false;
 
-    // Best-effort: check if LibOpenMPT is the active engine. If not, the
-    // bus-only tapeStop above is the whole effect.
+    // Bus-only analog tape coloring (works for ALL engines):
+    // LPF closes as transport slows, hides digital aliasing artifacts.
+    const busRestore = bus.startTapeHold(downSec);
+    bus.sweepMasterLpf(400, downSec, 9999); // hold LPF closed until release
+
+    // Best-effort LibOpenMPT transport ramp
     void (async () => {
       const mod = await import('@/engine/libopenmpt/LibopenmptEngine');
       const isLib = mod.LibopenmptEngine.hasInstance() && mod.LibopenmptEngine.getInstance().isAvailable();
       if (!isLib) {
-        console.warn('[transportTapeStop] only implemented for LibOpenMPT — bus-only tapeStop carries the effect');
         void import('@/stores/useNotificationStore').then(({ notify }) =>
-          notify.info('Tape Stop: transport slowdown only works with .mod/.xm/.s3m/.it formats — using bus-only effect'));
+          notify.info('Tape Stop: transport slowdown only works with .mod/.xm/.s3m/.it formats'));
         return;
       }
-      const timers = new Set<ReturnType<typeof setTimeout>>();
-      // Ramp down
       await rampLibOpenMPT(1.0, floorFactor, downSec, timers);
-      // Hold at floor
-      await new Promise<void>(r => {
-        const t = setTimeout(() => { timers.delete(t); r(); }, (downSec + holdSec) * 1000);
-        timers.add(t);
-      });
-      // Ramp back up to normal speed
-      await rampLibOpenMPT(floorFactor, 1.0, 0.25, timers);
     })();
 
-    return null;
+    return {
+      dispose() {
+        if (disposed) return;
+        disposed = true;
+        cancelTimers(timers);
+        // Restore bus LPF + return gain
+        busRestore();
+        bus.sweepMasterLpf(20000, 0.15, 0);
+        // Ramp transport back to full speed
+        void (async () => {
+          const mod = await import('@/engine/libopenmpt/LibopenmptEngine');
+          if (!mod.LibopenmptEngine.hasInstance()) return;
+          const eng = mod.LibopenmptEngine.getInstance();
+          if (!eng.isAvailable()) return;
+          // Cancel any in-progress ramp by checking current factor
+          try {
+            const currentFactor = (eng as unknown as { getTempoFactor?: () => number }).getTempoFactor?.() ?? floorFactor;
+            const restoreTimers = new Set<ReturnType<typeof setTimeout>>();
+            await rampLibOpenMPT(currentFactor, 1.0, 0.25, restoreTimers);
+          } catch {
+            // Fallback: snap to 1.0
+            await setLibOpenMPTFactor(1.0);
+          }
+        })();
+      },
+    };
   },
 };
