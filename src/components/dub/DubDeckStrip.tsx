@@ -88,13 +88,13 @@ const GLOBAL_MOVES: Array<GlobalMove> = [
   { label: 'Filter',    title: 'Filter Drop — LPF sweeps down while held, opens on release',  moveId: 'filterDrop',  color: 'accent-secondary',   kind: 'hold', group: 'hold', needsSend: true },
   { label: 'Tape Stop', title: 'Tape Stop — bus LPF + echo-rate collapses while held, restores on release', moveId: 'tapeStop', color: 'accent-secondary/70', kind: 'hold', group: 'hold', needsSend: true },
   { label: 'Drop',      title: 'Master Drop — mutes dry signal while held; echo+spring tail survives', moveId: 'masterDrop', color: 'accent-error/70', kind: 'hold', group: 'hold' },
-  { label: 'Toast',     title: 'Toast — route DJ mic into bus while held (start DJ mic first)', moveId: 'toast', color: 'accent-success/70', kind: 'hold', group: 'hold' },
+  { label: 'Toast',     title: 'Toast — route DJ mic into bus while held (auto-starts mic)', moveId: 'toast', color: 'accent-success/70', kind: 'hold', group: 'hold' },
+  { label: 'Siren',     title: 'Dub Siren — Rasta-box pitch-swept synth while held',           moveId: 'dubSiren',     color: 'accent-warning',  kind: 'hold', group: 'hold' },
+  { label: 'Scream',    title: 'Tubby Scream — reverb self-feedback, rising metallic cry',      moveId: 'tubbyScream',  color: 'accent-error',    kind: 'hold', group: 'hold' },
+  { label: 'Bass',      title: 'Osc Bass — self-oscillating LPF bass drone while held',         moveId: 'oscBass',      color: 'accent-primary',  kind: 'hold', group: 'hold' },
+  { label: 'Crush Bass', title: 'Crush Bass — 3-bit quantize saw drone while held',             moveId: 'crushBass',    color: 'accent-error/70', kind: 'hold', group: 'hold' },
 
   // ── TOGGLE — click once to activate, click again to deactivate (hands-free) ──
-  { label: 'Siren',      title: 'Dub Siren — Rasta-box pitch-swept synth (toggle on/off)',         moveId: 'dubSiren',     color: 'accent-warning',     kind: 'hold', group: 'toggle' },
-  { label: 'Scream',     title: 'Tubby Scream — reverb self-feedback, rising metallic cry (toggle)', moveId: 'tubbyScream',  color: 'accent-error',       kind: 'hold', group: 'toggle' },
-  { label: 'Bass',       title: 'Osc Bass — self-oscillating LPF bass drone (toggle on/off)',       moveId: 'oscBass',      color: 'accent-primary',     kind: 'hold', group: 'toggle' },
-  { label: 'Crush Bass', title: 'Crush Bass — 3-bit quantize saw drone (toggle on/off)',            moveId: 'crushBass',    color: 'accent-error/70',    kind: 'hold', group: 'toggle' },
   { label: 'Wide',       title: 'Stereo Doubler — 20ms cross-fed widening (toggle)',               moveId: 'stereoDoubler', color: 'accent-highlight',   kind: 'hold', group: 'toggle', needsSend: true },
   { label: 'Wobble',     title: 'Tape Wobble — LFO on echo rate (toggle)',                         moveId: 'tapeWobble',   color: 'accent-warning/70',  kind: 'hold', group: 'toggle', needsSend: true },
   { label: 'Ghost',      title: 'Ghost Reverb — extra reverb decay on channels (toggle)',          moveId: 'ghostReverb',  color: 'accent-secondary',   kind: 'hold', group: 'toggle', needsSend: true },

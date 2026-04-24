@@ -4455,15 +4455,25 @@ export class DubBus {
   }
 
   /**
-   * Set the echo delay rate directly. Used by delayPreset* moves to snap
-   * to canonical Tubby / Perry timings without touching the user-facing
-   * settings.echoRateMs (so the preset is "drive-by" — next setSettings
-   * pass from the UI will push the user's rate back).
+   * Set the echo delay rate. Used by delayPreset* moves.
+   *
+   * Deliberately persistent: updates both the live echo engine AND
+   * this.settings.echoRateMs so that the DubDeckStrip BPM-sync effect
+   * (which re-sends settings every 100ms) reinforces rather than reverts
+   * the preset rate. Also syncs to the DrumPad store for the same reason.
+   *
+   * No `enabled` guard — presets should change the rate even while the
+   * bus return is silent so the rate is ready when a send is opened.
    */
   setEchoRate(ms: number): void {
-    console.log(`[DubBusCtrl] setEchoRate(${ms}ms)`);
-    if (!this.enabled) return;
-    try { this.echo.setRate(Math.max(10, Math.min(1500, ms))); } catch { /* ok */ }
+    const clamped = Math.max(10, Math.min(1500, ms));
+    try { this.echo.setRate(clamped); } catch { /* ok */ }
+    this.settings = { ...this.settings, echoRateMs: clamped };
+    // Sync to Zustand store so BPM-sync effect sees new value and
+    // doesn't overwrite it with the old echoRateMs 100ms later.
+    void import('@stores/useDrumPadStore').then(({ useDrumPadStore }) => {
+      useDrumPadStore.getState().setDubBus({ echoRateMs: clamped });
+    }).catch(() => {});
   }
 
   /**
@@ -5331,7 +5341,6 @@ export class DubBus {
   }
 
   startTapeWobble(depthMs = 30, rateHz = 2.5): () => void {
-    if (!this.enabled) return () => {};
     const baseline = this.settings.echoRateMs;
     const period = 1000 / Math.max(0.05, rateHz);
     const stepMs = Math.max(16, period / 16);  // 16 steps per cycle, ≥16ms
