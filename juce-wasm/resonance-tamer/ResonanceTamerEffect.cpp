@@ -115,13 +115,19 @@ public:
         const float tauSeconds = 1.5f;
         avgAlpha_ = 1.0f - std::exp(-1.0f / (tauSeconds * hopsPerSec));
 
-        // Attack 80 ms / release 800 ms — deliberately slow. The previous
-        // 20 ms attack produced a -2.5 dB step every hop (21 ms) which was
-        // audible as rhythmic stuttering at 47 Hz. 80 ms smooths each
-        // step to ≈ -0.65 dB; the 800 ms release trails off musically
-        // rather than chattering back up every hop.
-        attackAlpha_  = 1.0f - std::exp(-1.0f / (0.080f * hopsPerSec));
-        releaseAlpha_ = 1.0f - std::exp(-1.0f / (0.800f * hopsPerSec));
+        // Attack 250 ms / release 500 ms — tuned to discriminate between
+        // transients (shouldn't engage) and sustained resonances (should).
+        //
+        // Why slow attack matters: at 80 ms attack, a 100 ms drum transient
+        // fully engages the cut, then release takes 800 ms to recover —
+        // leaving the gain depressed the entire time between hits in a
+        // 120 BPM mix, creating continuous gain modulation audible as
+        // "dirt". At 250 ms attack, the cut only reaches ~35 % of target
+        // during a short transient, so transients come through mostly clean.
+        // Sustained content (>400 ms) still builds to full cut — which is
+        // exactly the resonance/ringing material this effect targets.
+        attackAlpha_  = 1.0f - std::exp(-1.0f / (0.250f * hopsPerSec));
+        releaseAlpha_ = 1.0f - std::exp(-1.0f / (0.500f * hopsPerSec));
 
         // Warmup: hold gain at 1.0 for the first ~1 s while the EMA seeds.
         // Without this, every bin of the first frame triggers because
@@ -297,10 +303,12 @@ private:
         const int brightMinBin = (character == 2)
             ? static_cast<int>(3000.0f / hzPerBin)
             : 0;
-        // Transparent default is 7-bin box (was 3): wider smoothing avoids
-        // single-bin spikes that ring, and produces a softer-sounding cut.
-        // Warm widens to 9.
-        const int smoothWidth = (character == 1) ? 9 : 7;
+        // Wider smoothing (Transparent=15, Warm=21) makes each cut span a
+        // natural-sounding bandwidth instead of surgical single-bin notches.
+        // At 48 kHz with 2048-point FFT, each bin is ~23 Hz; 15 bins = ~350 Hz
+        // (roughly a third-octave band at 1 kHz), which is in the psycho-
+        // acoustic sweet spot for "unprocessed-sounding" EQ cuts.
+        const int smoothWidth = (character == 1) ? 21 : 15;
 
         // Reset target buffer to unity in place (no allocation).
         for (size_t i = 0; i < NUM_BINS; ++i) targetGainBuf_[i] = 1.0f;
