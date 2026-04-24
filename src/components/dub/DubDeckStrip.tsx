@@ -372,8 +372,16 @@ export const DubDeckStrip: React.FC = () => {
     const h = setTimeout(() => {
       try {
         const bpm = getActiveBpm();
+        const safeBpm = Math.max(30, Math.min(300, bpm || 120));
+        const beatMs = 60000 / safeBpm;
         const synced = bpmSyncedEchoRate(bpm, dubBusSettings.echoSyncDivision, dubBusSettings.echoRateMs);
-        ensureDrumPadEngine().setDubBusSettings({ ...dubBusSettings, echoRateMs: synced });
+        // Mad Professor ping-pong BPM sync — 3/8 note L, 1/2 note R.
+        const patch: typeof dubBusSettings = { ...dubBusSettings, echoRateMs: synced };
+        if (dubBusSettings.pingPongSyncToBpm) {
+          patch.pingPongLMs = Math.round(beatMs * 0.75);  // 3/8 note (dotted 8th)
+          patch.pingPongRMs = Math.round(beatMs * 1.0);   // 1/2 note (half of a beat)
+        }
+        ensureDrumPadEngine().setDubBusSettings(patch);
       } catch (e) {
         console.warn('[DubDeckStrip] setDubBusSettings failed:', e);
       }
