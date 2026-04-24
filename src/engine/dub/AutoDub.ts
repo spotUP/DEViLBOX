@@ -748,6 +748,7 @@ function tickImpl(): void {
 
   if (!choice) return;
 
+  _recordAutoDubFire(choice.moveId);
   const disposer = fire(choice.moveId, choice.channelId, choice.params, 'live');
   _movesFiredThisBar += 1;
   if (choice.wet) _wetFiredThisBar += 1;
@@ -794,6 +795,27 @@ export function stopAutoDub(): void {
 
 export function isAutoDubRunning(): boolean {
   return _timer !== null;
+}
+
+// ───────────────────────── Fire log (bridge + CI assertions) ─────────────────
+// Ring buffer of the last FIRE_LOG_CAP moves chosen by the tick loop.
+// Exposed via getAutoDubFireLog / clearAutoDubFireLog MCP tools so
+// ui-smoke tests can assert that role-targeted moves actually fired.
+
+const FIRE_LOG_CAP = 200;
+const _fireLog: string[] = [];
+
+export function _recordAutoDubFire(moveId: string): void {
+  _fireLog.push(moveId);
+  if (_fireLog.length > FIRE_LOG_CAP) _fireLog.shift();
+}
+
+export function getAutoDubFireLog(): readonly string[] {
+  return _fireLog;
+}
+
+export function clearAutoDubFireLog(): void {
+  _fireLog.length = 0;
 }
 
 // ───────────────────────── Test-only hooks ─────────────────────────
