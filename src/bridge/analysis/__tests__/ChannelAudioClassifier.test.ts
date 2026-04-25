@@ -120,23 +120,27 @@ describe('ChannelAudioClassifier', () => {
 
   // ── Merge policy ──────────────────────────────────────────────────────
 
-  it('mergeOfflineAndRuntimeRoles overrides offline=empty/pad with runtime bass', () => {
-    const offline: ChannelRole[] = ['empty', 'pad', 'lead', 'percussion'];
+  it('mergeOfflineAndRuntimeRoles overrides note-stats roles with runtime audio', () => {
+    // In tracker music, samples contain arbitrary audio — a sample marked C-3 (lead-ish
+    // note) might actually be a bass riff. Note-stats roles (chord/lead/arpeggio/pad/empty)
+    // are unreliable; runtime audio tap always wins when confident.
+    // Only percussion (detected from PCM drumType/SampleSpectrum) is kept unconditionally.
+    const offline: ChannelRole[] = ['empty', 'pad', 'lead', 'chord', 'arpeggio', 'percussion'];
     const runtime = [
       { role: 'bass' as ChannelRole, confidence: 0.85, support: 1 },
       { role: 'bass' as ChannelRole, confidence: 0.85, support: 1 },
       { role: 'bass' as ChannelRole, confidence: 0.85, support: 1 },
+      { role: 'percussion' as ChannelRole, confidence: 0.85, support: 1 },
+      { role: 'lead' as ChannelRole, confidence: 0.85, support: 1 },
       { role: 'bass' as ChannelRole, confidence: 0.85, support: 1 },
     ];
     const out = mergeOfflineAndRuntimeRoles(offline, runtime);
-    // Index 0: offline=empty + runtime=bass → bass (weak offline → override)
-    expect(out[0]).toBe('bass');
-    // Index 1: offline=pad + runtime=bass → bass (weak offline → override)
-    expect(out[1]).toBe('bass');
-    // Index 2: offline=lead + runtime=bass → stay lead (strong offline wins)
-    expect(out[2]).toBe('lead');
-    // Index 3: offline=percussion + runtime=bass → stay percussion (strong offline wins)
-    expect(out[3]).toBe('percussion');
+    expect(out[0]).toBe('bass');       // empty → bass (runtime wins)
+    expect(out[1]).toBe('bass');       // pad → bass (runtime wins)
+    expect(out[2]).toBe('bass');       // lead → bass (note-stats unreliable, runtime wins)
+    expect(out[3]).toBe('percussion'); // chord → percussion (runtime wins)
+    expect(out[4]).toBe('lead');       // arpeggio → lead (runtime wins)
+    expect(out[5]).toBe('percussion'); // percussion offline — protected, runtime bass ignored
   });
 
   it('mergeOfflineAndRuntimeRoles keeps offline when runtime is null', () => {
