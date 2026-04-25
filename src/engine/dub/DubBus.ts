@@ -4620,8 +4620,11 @@ export class DubBus {
     this.settings = { ...this.settings, echoRateMs: clamped };
     // Sync to Zustand store so BPM-sync effect sees new value and
     // doesn't overwrite it with the old echoRateMs 100ms later.
+    // Preserve characterPreset — omitting it would trigger the store's
+    // CHARACTER_FIELDS auto-reset which flips the style dropdown to Custom.
     void import('@stores/useDrumPadStore').then(({ useDrumPadStore }) => {
-      useDrumPadStore.getState().setDubBus({ echoRateMs: clamped });
+      const s = useDrumPadStore.getState();
+      s.setDubBus({ echoRateMs: clamped, characterPreset: s.dubBus.characterPreset });
     }).catch(() => {});
   }
 
