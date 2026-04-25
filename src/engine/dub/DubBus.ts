@@ -35,6 +35,7 @@ import { CalfPhaserEffect } from '../effects/CalfPhaserEffect';
 import { RingModEffect } from '../effects/RingModEffect';
 import { BittaEffect } from '../effects/BittaEffect';
 import { generateIR, CLUB_IR_PRESETS } from './generateIR';
+import { PerChannelDubFx } from './PerChannelDubFx';
 import { getNativeAudioNode } from '@utils/audio-context';
 import type { DJMixerEngine } from '../dj/DJMixerEngine';
 import type { DeckId } from '../dj/DeckEngine';
@@ -2138,7 +2139,6 @@ export class DubBus {
         voiceOutputs[i].connect(tapGain);
         tapGain.connect(panner);
         // Insert per-channel mini-chain between panner and bus input
-        const { PerChannelDubFx } = require('./PerChannelDubFx') as typeof import('./PerChannelDubFx');
         const fx = new PerChannelDubFx(this.context, this.input, this.drySpringBus);
         panner.connect(fx.input);
         this._sidPerChannelFx.set(i, fx);
