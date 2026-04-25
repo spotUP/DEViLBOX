@@ -18,6 +18,7 @@ import { fire as fireDub } from '@/engine/dub/DubRouter';
 import { useFormatStore } from '@/stores/useFormatStore';
 import { supportsChannelIsolation } from '@engine/tone/ChannelRoutedEffects';
 import { useNotificationStore } from '@/stores/useNotificationStore';
+import { useMixerStore } from '@/stores/useMixerStore';
 
 interface AutoDubPanelProps {
   busEnabled: boolean;
@@ -71,6 +72,17 @@ export const AutoDubPanel: React.FC<AutoDubPanelProps> = ({ busEnabled }) => {
   useEffect(() => {
     if (enabled && busEnabled) {
       if (!isAutoDubRunning()) {
+        // Seed a baseline 15% send on channels that are fully at 0 so the
+        // bus has some ambient wet signal between AutoDub moves.
+        // Only touches channels the user hasn't explicitly set.
+        {
+          const { channels, setChannelDubSend } = useMixerStore.getState();
+          const visibleCount = Math.min(channels.length, 16);
+          for (let i = 0; i < visibleCount; i++) {
+            if ((channels[i]?.dubSend ?? 0) === 0) setChannelDubSend(i, 0.15);
+          }
+        }
+
         if (!isPlaying) {
           // Song is stopped — run a silent 5-second scrub to warm up the
           // runtime channel classifier before AutoDub fires its first move.

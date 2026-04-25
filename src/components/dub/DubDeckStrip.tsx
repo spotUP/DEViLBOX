@@ -756,7 +756,7 @@ export const DubDeckStrip: React.FC = () => {
   }, [busEnabled, activeRatePreset]);
 
   return (
-    <div className="flex flex-col gap-1.5 px-2 py-1.5 bg-dark-bgSecondary border-t border-dark-border font-mono">
+    <div className="flex flex-col gap-1.5 px-2 py-1.5 bg-dark-bgSecondary border-t border-dark-border font-mono overflow-y-auto max-h-[60vh]">
       {/* Header row */}
       <div className="flex items-center gap-2 text-xs">
         <button
