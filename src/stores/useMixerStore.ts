@@ -608,6 +608,7 @@ export interface MixerChannelState {
   insertEffects: EffectConfig[]; // Full insert effect chain (up to 4)
   sendLevels: number[]; // Send levels per return bus (0-1), indexed by bus number
   dubSend: number;  // 0–1 send into shared DubBus (0 = no send, 1 = full send)
+  dubRole: string | null; // User-set channel role override for AutoDub targeting. null = use classifier.
 }
 
 function defaultChannels(): MixerChannelState[] {
@@ -621,6 +622,7 @@ function defaultChannels(): MixerChannelState[] {
     insertEffects: [],
     sendLevels: [0, 0, 0, 0], // 4 send buses
     dubSend: 0,               // dub bus send (0 = off)
+    dubRole: null,            // auto — use classifier
   }));
 }
 
@@ -681,6 +683,9 @@ interface MixerStoreActions {
 
   // Dub bus send
   setChannelDubSend: (ch: number, amount: number) => void;
+
+  // Manual dub role override (null = auto, string = ChannelRole)
+  setChannelDubRole: (ch: number, role: string | null) => void;
 
   // Send levels
   setChannelSendLevel: (ch: number, sendIndex: number, level: number) => void;
@@ -943,6 +948,13 @@ export const useMixerStore = create<MixerStore>()(
 
       // State update — rAF-batched so drag doesn't cause 60 re-renders/sec.
       scheduleDubSendStoreWrite(ch, clamped, set);
+    },
+
+    setChannelDubRole(ch: number, role: string | null): void {
+      set((state) => {
+        if (ch < 0 || ch >= state.channels.length) return;
+        state.channels[ch].dubRole = role;
+      });
     },
 
     // Send levels
