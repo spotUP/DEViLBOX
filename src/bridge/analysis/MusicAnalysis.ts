@@ -244,7 +244,7 @@ export function detectChord(pitchClasses: number[]): string {
 
 // ─── Channel Role Classification ─────────────────────────────────────────────
 
-export type ChannelRole = 'bass' | 'lead' | 'chord' | 'percussion' | 'arpeggio' | 'pad' | 'empty';
+export type ChannelRole = 'bass' | 'lead' | 'chord' | 'percussion' | 'arpeggio' | 'pad' | 'empty' | 'skank';
 
 export interface ChannelAnalysis {
   channel: number;
@@ -305,6 +305,54 @@ export function classifyChannel(channelIndex: number, notes: number[], totalRows
   }
 
   return result;
+}
+
+/**
+ * Detect reggae/dub skank patterns from raw row occupancy.
+ *
+ * A skank is characterized by off-beat placement: notes fall predominantly on
+ * beats 2/4 (or the "and" beats) rather than the downbeat. We test multiple
+ * bar-unit hypotheses (8 / 16 / 32 rows) and pick the strongest signal.
+ *
+ * Returns a confidence score (0..1). Caller should treat >= 0.65 as a skank.
+ *
+ * @param noteRows - array of row indices where notes occur (from pattern data)
+ * @param totalRows - total rows in the pattern
+ */
+export function detectSkankPattern(noteRows: number[], totalRows: number): number {
+  if (noteRows.length < 4) return 0;
+
+  // Try bar lengths of 8, 16, 32 rows. For each, compute "upbeat fraction":
+  // fraction of hits that fall in the SECOND half of each beat unit (i.e.
+  // the off-beat / backbeat position). A strong skank shows upbeat > 0.65.
+  const candidates = [8, 16, 32].filter(n => n <= totalRows);
+  if (candidates.length === 0) return 0;
+
+  let bestScore = 0;
+  for (const barLen of candidates) {
+    const half = barLen / 2;
+    let upbeats = 0;
+    let downbeats = 0;
+    for (const row of noteRows) {
+      const pos = row % barLen;
+      if (pos < half) downbeats++; else upbeats++;
+    }
+    const total = upbeats + downbeats;
+    if (total === 0) continue;
+
+    // Additional check: are the upbeat hits CONSISTENT (not random scatter)?
+    // Measure how many unique positions are hit vs how many hits — low unique/hit
+    // ratio → consistent off-beat rhythm, high ratio → random (pad/lead scatter).
+    const upbeatRows = noteRows.filter(r => (r % barLen) >= half);
+    const uniqueUpbeatPos = new Set(upbeatRows.map(r => r % barLen)).size;
+    const consistency = upbeatRows.length > 0 ? 1 - (uniqueUpbeatPos / upbeatRows.length) : 0;
+
+    const upbeatRatio = upbeats / total;
+    // Score: fraction off-beat × consistency. Max ~0.95 on a perfect 2+4 skank.
+    const score = upbeatRatio * (0.5 + 0.5 * consistency);
+    if (score > bestScore) bestScore = score;
+  }
+  return +(bestScore).toFixed(3);
 }
 
 /**
