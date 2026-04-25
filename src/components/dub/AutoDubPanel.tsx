@@ -9,9 +9,15 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useDubStore } from '@/stores/useDubStore';
+import { useDrumPadStore } from '@/stores/useDrumPadStore';
 import { startAutoDub, stopAutoDub, isAutoDubRunning, AUTO_DUB_RULE_MOVES, runChannelAudioScrub, cancelChannelScrub } from '@/engine/dub/AutoDub';
 import { useTransportStore } from '@/stores/useTransportStore';
 import { useFormatStore } from '@/stores/useFormatStore';
+import { DUB_CHARACTER_PRESETS } from '@/types/dub';
+import { classifySongRoles } from '@/bridge/analysis/ChannelNaming';
+import { useTrackerStore } from '@/stores/useTrackerStore';
+import { useInstrumentStore } from '@/stores/useInstrumentStore';
+import type { InstrumentConfig } from '@/types/instrument/defaults';
 import { supportsChannelIsolation } from '@engine/tone/ChannelRoutedEffects';
 import { useNotificationStore } from '@/stores/useNotificationStore';
 import { useMixerStore } from '@/stores/useMixerStore';
@@ -93,13 +99,49 @@ export const AutoDubPanel: React.FC<AutoDubPanelProps> = ({ busEnabled, open: op
   useEffect(() => {
     if (enabled && busEnabled) {
       if (!isAutoDubRunning()) {
-        // Seed a baseline 15% send on channels that are fully at 0 so the
-        // bus has some ambient wet signal between AutoDub moves.
+        // Seed channel sends so AutoDub has signal to work with.
+        // If a named character preset is active, apply its role-appropriate
+        // send levels (drums 100%, bass 85% etc.) to channels still at 0.
+        // Otherwise fall back to a flat 15% baseline.
+        // NOTE: perChannelFxByRole (comb sweep, filters) is NOT applied here
+        // to avoid sustained tones from comb filter resonance.
         {
           const { channels, setChannelDubSend } = useMixerStore.getState();
           const visibleCount = Math.min(channels.length, 16);
+          const characterPreset = useDrumPadStore.getState().dubBus.characterPreset;
+          const presetData = characterPreset && characterPreset !== 'custom'
+            ? DUB_CHARACTER_PRESETS[characterPreset as keyof typeof DUB_CHARACTER_PRESETS]
+            : null;
+
+          // Resolve roles for role-appropriate sends
+          let roles: string[] = [];
+          if (presetData?.defaultSendsByRole) {
+            try {
+              const tracker = useTrackerStore.getState();
+              const patterns = tracker.patterns;
+              if (Array.isArray(patterns) && patterns.length > 0) {
+                const insts = useInstrumentStore.getState().instruments;
+                const lookup = new Map<number, InstrumentConfig>();
+                for (const inst of insts) {
+                  if (inst && typeof inst.id === 'number') lookup.set(inst.id, inst);
+                }
+                roles = classifySongRoles(patterns, lookup);
+              }
+            } catch { /* fall back to flat sends */ }
+          }
+
           for (let i = 0; i < visibleCount; i++) {
-            if ((channels[i]?.dubSend ?? 0) === 0) setChannelDubSend(i, 0.15);
+            if ((channels[i]?.dubSend ?? 0) > 0) continue; // don't overwrite user-set sends
+            if (presetData?.defaultSendsByRole && roles.length > 0) {
+              const role = roles[i] as keyof typeof presetData.defaultSendsByRole | undefined;
+              const sends = presetData.defaultSendsByRole;
+              const level = role && role in sends
+                ? (sends[role as keyof typeof sends] as number)
+                : (sends.default ?? 0.15);
+              setChannelDubSend(i, level);
+            } else {
+              setChannelDubSend(i, 0.15);
+            }
           }
         }
 
