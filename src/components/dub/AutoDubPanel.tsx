@@ -1,20 +1,16 @@
 /**
- * AutoDubPanel — toggle button + portal dropdown for autonomous dub performance.
+ * AutoDubPanel — Auto Dub settings popover (intensity + move blacklist).
  *
- * Renders a single "Auto Dub" button inline. Clicking it opens a dropdown
- * (via createPortal) containing: ON/OFF toggle, persona picker, voicing apply,
- * audition, move blacklist, and intensity slider. Matches the Auto DJ dropdown
- * pattern in DJView.
+ * All controls (ON/OFF toggle, style selection, audition) now live in the
+ * DubDeckStrip header. This panel is purely the configuration detail panel,
+ * opened by the ⚙ gear icon next to the AUTO DUB button.
  */
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { useDubStore, type AutoDubPersonaId } from '@/stores/useDubStore';
-import { useDrumPadStore } from '@/stores/useDrumPadStore';
+import { useDubStore } from '@/stores/useDubStore';
 import { startAutoDub, stopAutoDub, isAutoDubRunning, AUTO_DUB_RULE_MOVES, runChannelAudioScrub, cancelChannelScrub } from '@/engine/dub/AutoDub';
 import { useTransportStore } from '@/stores/useTransportStore';
-import { getPersona, AUTO_DUB_PERSONAS } from '@/engine/dub/AutoDubPersonas';
-import { fire as fireDub } from '@/engine/dub/DubRouter';
 import { useFormatStore } from '@/stores/useFormatStore';
 import { supportsChannelIsolation } from '@engine/tone/ChannelRoutedEffects';
 import { useNotificationStore } from '@/stores/useNotificationStore';
@@ -22,39 +18,64 @@ import { useMixerStore } from '@/stores/useMixerStore';
 
 interface AutoDubPanelProps {
   busEnabled: boolean;
+  /** Whether the settings popover is open (controlled by parent DubDeckStrip). */
+  open?: boolean;
+  /** Called when the popover should close. */
+  onClose?: () => void;
+  /** Ref to the trigger button — used to position the popover. */
+  anchorRef?: React.RefObject<HTMLButtonElement | null>;
 }
 
-export const AutoDubPanel: React.FC<AutoDubPanelProps> = ({ busEnabled }) => {
+export const AutoDubPanel: React.FC<AutoDubPanelProps> = ({ busEnabled, open: openProp, onClose, anchorRef }) => {
+  // Self-contained mode: when open/onClose/anchorRef are not provided (e.g. DJView),
+  // the panel manages its own open state and renders its own trigger button.
+  const selfContained = openProp === undefined;
+  const [selfOpen, setSelfOpen] = useState(false);
+  const selfBtnRef = useRef<HTMLButtonElement | null>(null);
+  const open = selfContained ? selfOpen : openProp!;
+  const effectiveOnClose = selfContained ? () => setSelfOpen(false) : onClose!;
+  const effectiveAnchorRef = selfContained ? selfBtnRef : anchorRef!;
   const enabled = useDubStore(s => s.autoDubEnabled);
   const setEnabled = useDubStore(s => s.setAutoDubEnabled);
   const isPlaying = useTransportStore(s => s.isPlaying);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const intensity = useDubStore(s => s.autoDubIntensity);
   const setIntensity = useDubStore(s => s.setAutoDubIntensity);
-  const persona = useDubStore(s => s.autoDubPersona);
-  const setPersona = useDubStore(s => s.setAutoDubPersona);
   const blacklist = useDubStore(s => s.autoDubMoveBlacklist);
   const setBlacklist = useDubStore(s => s.setAutoDubMoveBlacklist);
-  const setDubBus = useDrumPadStore(s => s.setDubBus);
   const editorMode = useFormatStore(s => s.editorMode);
   const hasSidData = useFormatStore(s => s.c64SidFileData !== null);
 
-  const [open, setOpen] = useState(false);
   const [pos, setPos] = useState({ top: 0, left: 0 });
-  const btnRef = useRef<HTMLButtonElement | null>(null);
   const dropRef = useRef<HTMLDivElement | null>(null);
 
-  // Click outside closes dropdown
+  // Position popover below the anchor button when it opens
+  useEffect(() => {
+    if (open && effectiveAnchorRef.current) {
+      const r = effectiveAnchorRef.current.getBoundingClientRect();
+      setPos({ top: r.bottom + 4, left: r.right - 288 });
+    }
+  }, [open, effectiveAnchorRef]);
+
+  // Click outside closes popover
   useEffect(() => {
     if (!open) return;
     const onDown = (e: MouseEvent) => {
       const t = e.target as Node;
-      if (btnRef.current?.contains(t) || dropRef.current?.contains(t)) return;
-      setOpen(false);
+      if (effectiveAnchorRef.current?.contains(t) || dropRef.current?.contains(t)) return;
+      effectiveOnClose();
     };
     window.addEventListener('mousedown', onDown);
     return () => window.removeEventListener('mousedown', onDown);
-  }, [open]);
+  }, [open, effectiveOnClose, effectiveAnchorRef]);
+
+  // Escape key closes popover
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') effectiveOnClose(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [open, effectiveOnClose]);
 
   const toggleMove = useCallback((moveId: string, allowed: boolean) => {
     const current = new Set(blacklist);
@@ -74,7 +95,6 @@ export const AutoDubPanel: React.FC<AutoDubPanelProps> = ({ busEnabled }) => {
       if (!isAutoDubRunning()) {
         // Seed a baseline 15% send on channels that are fully at 0 so the
         // bus has some ambient wet signal between AutoDub moves.
-        // Only touches channels the user hasn't explicitly set.
         {
           const { channels, setChannelDubSend } = useMixerStore.getState();
           const visibleCount = Math.min(channels.length, 16);
@@ -84,27 +104,23 @@ export const AutoDubPanel: React.FC<AutoDubPanelProps> = ({ busEnabled }) => {
         }
 
         if (!isPlaying) {
-          // Song is stopped — run a silent 5-second scrub to warm up the
-          // runtime channel classifier before AutoDub fires its first move.
           setIsAnalyzing(true);
           runChannelAudioScrub((done) => {
             setIsAnalyzing(false);
             if (done) startAutoDub();
           }).catch(() => {
             setIsAnalyzing(false);
-            startAutoDub(); // fall through even if scrub fails
+            startAutoDub();
           });
         } else {
-          startAutoDub(); // Already playing — classifier is already running
+          startAutoDub();
         }
-        // Warn if format lacks per-channel isolation (echo throws won't target individual channels)
+
         const isSID = hasSidData || ['sidfactory2', 'cheesecutter', 'goattracker'].includes(editorMode);
         if (isSID) {
-          // Check if per-voice taps are available (jsSID with external AudioContext)
           import('@hooks/drumpad/useMIDIPadRouting').then(({ getDrumPadEngine }) => {
             const dpEngine = getDrumPadEngine();
             const dubBus = dpEngine?.getDubBus?.();
-            // If per-voice taps exist (channelTaps has entries 0-2), per-channel echo throws work
             const hasVoiceTaps = dubBus && [0, 1, 2].some(i => (dubBus as any).channelTaps?.has(i));
             useNotificationStore.getState().addNotification({
               type: 'info',
@@ -135,157 +151,96 @@ export const AutoDubPanel: React.FC<AutoDubPanelProps> = ({ busEnabled }) => {
     return () => window.removeEventListener('dub-panic', onPanic);
   }, [setEnabled]);
 
-  const handlePersonaChange = useCallback((id: AutoDubPersonaId) => {
-    setPersona(id);
-    const p = getPersona(id);
-    setIntensity(p.intensityDefault);
-    // Auto-apply bus character preset when switching persona, but only if the
-    // current preset is 'custom' (user hasn't deliberately chosen a different
-    // sound) OR already matches the persona's preset (no-op on re-select).
-    if (p.suggestedCharacterPreset) {
-      const currentPreset = useDrumPadStore.getState().dubBus.characterPreset;
-      if (currentPreset === 'custom' || currentPreset === p.suggestedCharacterPreset) {
-        setDubBus({ characterPreset: p.suggestedCharacterPreset });
-      }
-    }
-  }, [setPersona, setIntensity, setDubBus]);
-
-  const auditionPersona = useCallback(() => {
-    if (!busEnabled) setDubBus({ enabled: true });
-    const p = getPersona(persona);
-    fireDub(p.signatureMove, undefined, p.paramOverrides?.[p.signatureMove] ?? {}, 'live');
-  }, [persona, busEnabled, setDubBus]);
-
-  const handleToggle = useCallback(() => {
-    if (!enabled && !busEnabled) setDubBus({ enabled: true });
-    setEnabled(!enabled);
-  }, [enabled, busEnabled, setEnabled, setDubBus]);
-
-  const controlsDisabled = !enabled;
-  const personaOptions = Object.values(AUTO_DUB_PERSONAS).map(p => ({ id: p.id, label: p.label }));
   const activeCount = AUTO_DUB_RULE_MOVES.length - blacklist.filter(m => AUTO_DUB_RULE_MOVES.includes(m)).length;
 
-  return (
-    <>
-      <button
-        ref={btnRef}
-        type="button"
-        className={`px-3 py-1.5 rounded-md text-xs font-mono border transition-all ${
-          open || enabled
-            ? 'border-accent-highlight bg-accent-highlight/20 text-accent-highlight'
-            : 'border-dark-borderLight bg-dark-bgTertiary text-text-secondary hover:bg-dark-bgHover hover:text-text-primary'
-        }`}
-        onClick={() => {
-          if (!open && btnRef.current) {
-            const r = btnRef.current.getBoundingClientRect();
-            setPos({ top: r.bottom + 4, left: r.left });
-          }
-          setOpen(v => !v);
-        }}
-        title="Auto Dub — autonomous dub performer"
-      >
-        {isAnalyzing ? 'Analyzing...' : `Auto Dub${enabled ? ' ON' : ''}`}
-      </button>
+  const settingsPanel = open ? createPortal(
+    <div
+      ref={dropRef}
+      className="fixed z-[99989] w-72 bg-dark-bgSecondary border border-dark-border rounded-lg shadow-xl p-3 font-mono text-[11px]"
+      style={{ top: pos.top, left: pos.left }}
+    >
+      <div className="flex items-center justify-between mb-3">
+        <span className="text-text-secondary font-bold text-xs">AUTO DUB SETTINGS</span>
+        {isAnalyzing && <span className="text-accent-warning text-xs animate-pulse">Analyzing...</span>}
+      </div>
 
-      {open && createPortal(
-        <div
-          ref={dropRef}
-          className="fixed z-[99989] w-72 bg-dark-bgSecondary border border-dark-border rounded-lg shadow-xl p-3 font-mono text-[11px]"
-          style={{ top: pos.top, left: pos.left }}
-        >
-          {/* Header: ON/OFF + Audition */}
-          <div className="flex items-center gap-2 mb-3">
-            <button
-              type="button"
-              className={`flex-1 px-3 py-1.5 rounded-md border text-xs font-bold transition-colors ${
-                enabled
-                  ? 'bg-accent-highlight/20 border-accent-highlight text-accent-highlight'
-                  : 'bg-dark-bgTertiary border-dark-border text-text-primary hover:text-accent-highlight hover:border-accent-highlight'
-              }`}
-              onClick={handleToggle}
-            >
-              {enabled ? '● AUTO DUB ON' : '○ AUTO DUB OFF'}
-            </button>
-            <button
-              type="button"
-              className="px-2 py-1.5 rounded-md border bg-dark-bgTertiary border-dark-border text-text-muted hover:text-accent-highlight hover:border-accent-highlight transition-colors"
-              onClick={auditionPersona}
-              title={`Audition ${getPersona(persona).label}`}
-            >
-              ▶
-            </button>
-          </div>
+      {/* Intensity slider */}
+      <div className="flex items-center gap-2 mb-3">
+        <span className="text-text-muted text-xs w-16 shrink-0">Intensity</span>
+        <input
+          type="range" min={0} max={1} step={0.01}
+          value={intensity}
+          onChange={(e) => setIntensity(Number(e.target.value))}
+          className="flex-1 accent-accent-highlight disabled:opacity-50"
+          disabled={!enabled}
+          title={`${(intensity * 100).toFixed(0)}%`}
+        />
+        <span className="w-8 text-right text-text-secondary text-xs">{(intensity * 100).toFixed(0)}%</span>
+      </div>
 
-          {/* Persona selector */}
-          <div className="flex items-center gap-2 mb-2">
-            <span className="text-text-muted text-xs w-16 shrink-0">Persona</span>
-            <select
-              className="flex-1 bg-dark-bgTertiary border border-dark-border rounded px-2 py-1 text-text-primary text-[11px] focus:ring-1 focus:ring-accent-highlight disabled:opacity-50"
-              value={persona}
-              onChange={(e) => handlePersonaChange(e.target.value as AutoDubPersonaId)}
-              disabled={controlsDisabled}
-              title={getPersona(persona).description}
-            >
-              {personaOptions.map(o => (
-                <option key={o.id} value={o.id}>{o.label}</option>
-              ))}
-            </select>
-          </div>
-
-          {/* Intensity slider */}
-          <div className="flex items-center gap-2 mb-3">
-            <span className="text-text-muted text-xs w-16 shrink-0">Intensity</span>
-            <input
-              type="range" min={0} max={1} step={0.01}
-              value={intensity}
-              onChange={(e) => setIntensity(Number(e.target.value))}
-              className="flex-1 accent-accent-highlight disabled:opacity-50"
-              disabled={controlsDisabled}
-              title={`${(intensity * 100).toFixed(0)}%`}
-            />
-            <span className="w-8 text-right text-text-secondary text-xs">{(intensity * 100).toFixed(0)}%</span>
-          </div>
-
-          {/* Move blacklist */}
-          <div className="border-t border-dark-border pt-2">
-            <div className="flex items-center justify-between mb-1.5">
-              <span className="text-text-secondary font-bold text-xs">
-                MOVES {activeCount}/{AUTO_DUB_RULE_MOVES.length}
-              </span>
-              <button
-                type="button"
-                className="text-text-muted hover:text-accent-highlight text-xs"
-                onClick={() => setBlacklist([])}
-                disabled={blacklist.length === 0}
+      {/* Move blacklist */}
+      <div className="border-t border-dark-border pt-2">
+        <div className="flex items-center justify-between mb-1.5">
+          <span className="text-text-secondary font-bold text-xs">
+            MOVES {activeCount}/{AUTO_DUB_RULE_MOVES.length}
+          </span>
+          <button
+            type="button"
+            className="text-text-muted hover:text-accent-highlight text-xs"
+            onClick={() => setBlacklist([])}
+            disabled={blacklist.length === 0}
+          >
+            reset
+          </button>
+        </div>
+        <div className="flex flex-col gap-0.5 max-h-48 overflow-y-auto">
+          {AUTO_DUB_RULE_MOVES.map(moveId => {
+            const allowed = !blacklist.includes(moveId);
+            return (
+              <label
+                key={moveId}
+                className="flex items-center gap-1.5 px-1.5 py-1 rounded hover:bg-dark-bgHover cursor-pointer"
               >
-                reset
-              </button>
-            </div>
-            <div className="flex flex-col gap-0.5 max-h-48 overflow-y-auto">
-              {AUTO_DUB_RULE_MOVES.map(moveId => {
-                const allowed = !blacklist.includes(moveId);
-                return (
-                  <label
-                    key={moveId}
-                    className="flex items-center gap-1.5 px-1.5 py-1 rounded hover:bg-dark-bgHover cursor-pointer"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={allowed}
-                      onChange={(e) => toggleMove(moveId, e.target.checked)}
-                      className="accent-accent-highlight"
-                    />
-                    <span className={`text-xs ${allowed ? 'text-text-primary' : 'text-text-muted line-through'}`}>
-                      {moveId}
-                    </span>
-                  </label>
-                );
-              })}
-            </div>
-          </div>
-        </div>,
-        document.body
-      )}
-    </>
-  );
+                <input
+                  type="checkbox"
+                  checked={allowed}
+                  onChange={(e) => toggleMove(moveId, e.target.checked)}
+                  className="accent-accent-highlight"
+                />
+                <span className={`text-xs ${allowed ? 'text-text-primary' : 'text-text-muted line-through'}`}>
+                  {moveId}
+                </span>
+              </label>
+            );
+          })}
+        </div>
+      </div>
+    </div>,
+    document.body
+  ) : null;
+
+  // Self-contained mode (DJView): render own trigger button + settings panel
+  if (selfContained) {
+    return (
+      <>
+        <button
+          ref={selfBtnRef}
+          type="button"
+          className={`px-3 py-1.5 rounded-md text-xs font-mono border transition-all ${
+            selfOpen || enabled
+              ? 'border-accent-highlight bg-accent-highlight/20 text-accent-highlight'
+              : 'border-dark-borderLight bg-dark-bgTertiary text-text-secondary hover:bg-dark-bgHover hover:text-text-primary'
+          }`}
+          onClick={() => setSelfOpen(v => !v)}
+          title="Auto Dub — autonomous dub performer"
+        >
+          {isAnalyzing ? 'Analyzing...' : `Auto Dub${enabled ? ' ON' : ''}`}
+        </button>
+        {settingsPanel}
+      </>
+    );
+  }
+
+  // Controlled mode (DubDeckStrip): just the portal panel
+  return settingsPanel;
 };
