@@ -15,12 +15,17 @@ import type { DubMove } from './_types';
 export const combSweep: DubMove = {
   id: 'combSweep',
   kind: 'hold',
-  defaults: { amount: 0.65, rampMs: 80 },
+  // amount: wet level. rateHz: LFO speed — 0.8 Hz gives one full sweep per bar
+  // at most reggae tempos, clearly audible. depthMs: 8ms is a deep, rich comb.
+  defaults: { amount: 0.75, rampMs: 80, rateHz: 0.8, depthMs: 8 },
 
   execute({ bus, params }) {
-    const amount = params.amount ?? this.defaults.amount;
-    const rampMs = params.rampMs ?? this.defaults.rampMs;
-    const stop = bus.startCombSweep(amount, rampMs / 1000);
+    const stop = bus.startCombSweep(
+      params.amount  ?? this.defaults.amount,
+      (params.rampMs ?? this.defaults.rampMs) / 1000,
+      params.rateHz  ?? this.defaults.rateHz,
+      params.depthMs ?? this.defaults.depthMs,
+    );
     return { dispose() { stop(); } };
   },
 };
