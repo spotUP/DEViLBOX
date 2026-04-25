@@ -23,6 +23,7 @@ import type { EffectConfig } from '@typedefs/instrument';
 import { createEffect } from '../factories/EffectFactory';
 import { getNativeAudioNode } from '@utils/audio-context';
 import { applyEffectParametersDiff } from './EffectParameterEngine';
+import { PerChannelDubFx } from '../dub/PerChannelDubFx';
 
 /** First worklet output index dedicated to per-channel dub sends. */
 export const DUB_OUTPUT_BASE = 5;
@@ -276,7 +277,6 @@ export class ChannelRoutedEffectsManager {
       g.gain.value = 0;
       if (drySpringBus) {
         // Insert per-channel mini-chain between the gain and the bus input
-        const { PerChannelDubFx } = require('../dub/PerChannelDubFx') as typeof import('../dub/PerChannelDubFx');
         const fx = new PerChannelDubFx(ctx, dubBusInput, drySpringBus);
         g.connect(fx.input);
         this.perChannelFx.set(ch, fx);
