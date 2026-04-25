@@ -1267,6 +1267,7 @@ export class DubBus {
   // left over from prior tracker sessions.
   private _sidHasPerVoiceTaps = false;
   private _sidPerChannelFx: Map<number, import('./PerChannelDubFx').PerChannelDubFx> = new Map();
+  private _sidVoicePanners: Map<number, StereoPannerNode> = new Map();
   // Callback to apply a make-up gain on the SID engine's master output when
   // the dub bus is enabled/disabled. Registered by NativeEngineRouting when
   // the SID engine comes online. Kept as a callback (not a node reference)
@@ -2123,32 +2124,50 @@ export class DubBus {
     // Dispose any existing SID per-channel FX before re-registering
     for (const fx of this._sidPerChannelFx.values()) { try { fx.dispose(); } catch { /* ok */ } }
     this._sidPerChannelFx.clear();
+    for (const p of this._sidVoicePanners.values()) { try { p.disconnect(); } catch { /* ok */ } }
+    this._sidVoicePanners.clear();
 
     for (let i = 0; i < voiceOutputs.length; i++) {
       const tapGain = this.context.createGain();
       tapGain.gain.value = 0; // silent until echo throw opens the tap
+      // StereoPanner per voice — pan position set via setSidVoicePan()
+      const panner = this.context.createStereoPanner();
+      panner.pan.value = 0; // center by default
+      this._sidVoicePanners.set(i, panner);
       try {
         voiceOutputs[i].connect(tapGain);
-        // Insert per-channel mini-chain between tap and bus input
+        tapGain.connect(panner);
+        // Insert per-channel mini-chain between panner and bus input
         const { PerChannelDubFx } = require('./PerChannelDubFx') as typeof import('./PerChannelDubFx');
         const fx = new PerChannelDubFx(this.context, this.input, this.drySpringBus);
-        tapGain.connect(fx.input);
+        panner.connect(fx.input);
         this._sidPerChannelFx.set(i, fx);
       } catch (e) {
         console.warn(`[DubBus] Failed to connect SID voice ${i} tap:`, e);
-        // Fallback: connect directly without per-channel FX
         try { voiceOutputs[i].connect(tapGain); tapGain.connect(this.input); } catch { /* ok */ }
         continue;
       }
-      // Register as a standard channel tap so openChannelTap() works
       this.channelTaps.set(i, tapGain);
     }
     this._sidHasPerVoiceTaps = voiceOutputs.length > 0;
-    console.log(`[DubBus] Registered ${voiceOutputs.length} per-voice SID taps with per-channel FX`);
+    console.log(`[DubBus] Registered ${voiceOutputs.length} per-voice SID taps with pan + per-channel FX`);
   }
 
-  /** Get the per-channel FX chain for a SID voice. Returns null for non-SID
-   *  or voices without per-voice taps. */
+  /** Set stereo pan for a SID voice (−1 = full left, 0 = center, +1 = full right).
+   *  Affects how that voice's audio appears in the dub bus effects chain. */
+  setSidVoicePan(voiceIndex: number, pan: number): void {
+    const panner = this._sidVoicePanners.get(voiceIndex);
+    if (!panner) return;
+    panner.pan.setTargetAtTime(Math.max(-1, Math.min(1, pan)), this.context.currentTime, 0.02);
+  }
+
+  /** Set the dry spring reverb send level for a SID voice (0–1).
+   *  Bypasses the echo, routes directly to the spring. */
+  setSidVoiceReverbSend(voiceIndex: number, amount: number): void {
+    this._sidPerChannelFx.get(voiceIndex)?.setReverbSend(Math.max(0, Math.min(1, amount)));
+  }
+
+  /** Get the per-channel FX chain for a SID voice. */
   getSidPerChannelFx(voiceIndex: number): import('./PerChannelDubFx').PerChannelDubFx | null {
     return this._sidPerChannelFx.get(voiceIndex) ?? null;
   }
