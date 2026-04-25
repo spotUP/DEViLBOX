@@ -35,6 +35,21 @@ import { Fader } from '@components/controls/Fader';
 import { DubLaneTimeline } from './DubLaneTimeline';
 import { AutoDubPanel } from './AutoDubPanel';
 import { DUB_CHARACTER_PRESETS } from '@/types/dub';
+import { getPersona } from '@/engine/dub/AutoDubPersonas';
+import type { AutoDubPersonaId } from '@/stores/useDubStore';
+
+// ── Unified Dub Style table ──────────────────────────────────────────────────
+// Each style applies BOTH a bus character preset (engineer tone) AND an AutoDub
+// persona (AI behavior). This eliminates the old VOICE/persona duplication.
+const DUB_STYLES = [
+  { id: 'custom',       label: 'Custom',              characterPreset: 'custom'       as const, personaId: 'custom'       as AutoDubPersonaId },
+  { id: 'tubby',        label: 'King Tubby',          characterPreset: 'tubby'        as const, personaId: 'tubby'        as AutoDubPersonaId },
+  { id: 'scientist',    label: 'Scientist',           characterPreset: 'scientist'    as const, personaId: 'scientist'    as AutoDubPersonaId },
+  { id: 'perry',        label: 'Lee "Scratch" Perry', characterPreset: 'perry'        as const, personaId: 'perry'        as AutoDubPersonaId },
+  { id: 'madProfessor', label: 'Mad Professor',       characterPreset: 'madProfessor' as const, personaId: 'madProfessor' as AutoDubPersonaId },
+  { id: 'jammy',        label: 'Prince Jammy',        characterPreset: null           as null,  personaId: 'jammy'        as AutoDubPersonaId },
+  { id: 'gatedFlanger', label: 'Gated Flanger',       characterPreset: 'gatedFlanger' as const, personaId: 'custom'       as AutoDubPersonaId },
+];
 
 // ─── Role inference ────────────────────────────────────────────────────────
 function inferRoleFromName(name: string): 'percussion' | 'bass' | 'lead' | 'chord' | 'arpeggio' | 'pad' | null {
@@ -167,11 +182,27 @@ export const DubDeckStrip: React.FC = () => {
   const quantize = useDubStore(s => s.quantize);
   const setQuantize = useDubStore(s => s.setQuantize);
 
+  const autoDubEnabled = useDubStore(s => s.autoDubEnabled);
+  const setAutoDubEnabled = useDubStore(s => s.setAutoDubEnabled);
+  const autoDubPersona = useDubStore(s => s.autoDubPersona);
+  const setAutoDubPersona = useDubStore(s => s.setAutoDubPersona);
+  const setAutoDubIntensity = useDubStore(s => s.setAutoDubIntensity);
+
   const busEnabled = useDrumPadStore(s => s.dubBus.enabled);
   const setDubBus = useDrumPadStore(s => s.setDubBus);
   const dubBusSettings = useDrumPadStore(s => s.dubBus);
   const dubBusStash = useDrumPadStore(s => s.dubBusStash);
   const swapDubBusStash = useDrumPadStore(s => s.swapDubBusStash);
+
+  // Auto Dub settings panel (intensity + blacklist) — opened by ⚙ icon
+  const [autoDubSettingsOpen, setAutoDubSettingsOpen] = useState(false);
+  const autoDubSettingsBtnRef = useRef<HTMLButtonElement | null>(null);
+
+  // Derive current style from both stores (characterPreset + persona)
+  const currentStyle = DUB_STYLES.find(
+    s => s.characterPreset === (dubBusSettings.characterPreset || 'custom')
+      && s.personaId === autoDubPersona
+  ) ?? DUB_STYLES[0];
 
   const channels = useMixerStore(s => s.channels);
   const setChannelDubSend = useMixerStore(s => s.setChannelDubSend);
@@ -605,8 +636,37 @@ export const DubDeckStrip: React.FC = () => {
 
   const capturedRecently = lastCapturedAt !== null && (performance.now() - lastCapturedAt) < 300;
 
+  // Apply a unified dub style — sets both character preset (bus sound) and AutoDub persona.
+  const applyStyle = useCallback((styleId: string) => {
+    const style = DUB_STYLES.find(s => s.id === styleId) ?? DUB_STYLES[0];
+    // Apply bus character preset
+    if (style.characterPreset) {
+      setDubBus({ characterPreset: style.characterPreset });
+      applyCharacterPresetSends(style.characterPreset);
+    } else {
+      setDubBus({ characterPreset: 'custom' });
+    }
+    // Apply AutoDub persona
+    setAutoDubPersona(style.personaId);
+    setAutoDubIntensity(getPersona(style.personaId).intensityDefault);
+  }, [setDubBus, setAutoDubPersona, setAutoDubIntensity]); // applyCharacterPresetSends added below
+
+  // AutoDub toggle — enables/disables autonomous performer. Bus auto-enables.
+  const handleAutoDubToggle = useCallback(() => {
+    if (!autoDubEnabled && !busEnabled) setDubBus({ enabled: true });
+    setAutoDubEnabled(!autoDubEnabled);
+  }, [autoDubEnabled, busEnabled, setDubBus, setAutoDubEnabled]);
+
+  // Audition the current style's signature move — fires once so the user
+  // can hear what a style sounds like without enabling AutoDub.
+  const auditionCurrentStyle = useCallback(() => {
+    if (!busEnabled) setDubBus({ enabled: true });
+    const persona = getPersona(currentStyle.personaId);
+    fireDub(persona.signatureMove, undefined, persona.paramOverrides?.[persona.signatureMove] ?? {}, 'live');
+  }, [busEnabled, setDubBus, currentStyle]);
+
   // Apply default channel send levels for a named character preset. Called
-  // when the user switches the VOICE selector — gives the bus signal to
+  // when the user switches the STYLE selector — gives the bus signal to
   // process immediately without manual fader riding.
   const applyCharacterPresetSends = useCallback((presetKey: string) => {
     const preset = DUB_CHARACTER_PRESETS[presetKey as keyof typeof DUB_CHARACTER_PRESETS];
@@ -804,27 +864,23 @@ export const DubDeckStrip: React.FC = () => {
         >
           ● REC {armed ? 'armed' : 'off'}
         </button>
-        {/* Character voicing — 4 engineer presets + custom. Loads a
-            curated snapshot of EQ + spring + echo + saturator values. */}
-        <span className="text-text-muted ml-2">VOICE</span>
+        {/* Unified style — sets both engineer bus character AND AutoDub persona. */}
+        <span className="text-text-muted ml-2">STYLE</span>
         <select
           className="bg-dark-bgTertiary border border-dark-border rounded px-1.5 py-1 text-text-primary text-xs font-mono focus:ring-1 focus:ring-accent-primary"
-          value={dubBusSettings.characterPreset}
-          onChange={(e) => {
-            const preset = e.target.value as typeof dubBusSettings.characterPreset;
-            setDubBus({ characterPreset: preset });
-            if (preset !== 'custom') applyCharacterPresetSends(preset);
-          }}
-          title="Engineer character preset — loads EQ curve + spring + echo + tape saturator values tuned to that engineer's signature. Also seeds channel send faders with role-appropriate defaults so the bus has signal immediately."
+          value={currentStyle.id}
+          onChange={(e) => applyStyle(e.target.value)}
+          title="Dub style — sets the engineer sound coloring (bus EQ, echo, spring) AND the AutoDub performance persona simultaneously."
           disabled={!busEnabled}
         >
-          <option value="custom">Custom</option>
-          <option value="tubby">King Tubby</option>
-          <option value="scientist">Scientist</option>
-          <option value="perry">Lee Perry</option>
-          <option value="madProfessor">Mad Professor</option>
-          <option value="gatedFlanger">Gated Flanger</option>
+          {DUB_STYLES.map(s => <option key={s.id} value={s.id}>{s.label}</option>)}
         </select>
+        <button
+          className="px-2 py-1 rounded border bg-dark-bgTertiary border-dark-border text-text-muted hover:text-accent-highlight hover:border-accent-highlight transition-colors disabled:opacity-40"
+          onClick={auditionCurrentStyle}
+          disabled={!busEnabled}
+          title={`Audition ${currentStyle.label} — fire the signature dub move once`}
+        >▶</button>
         <span className="text-text-muted ml-2">ECHO</span>
         <select
           className="bg-dark-bgTertiary border border-dark-border rounded px-1.5 py-1 text-text-primary text-xs font-mono focus:ring-1 focus:ring-accent-primary"
@@ -856,7 +912,27 @@ export const DubDeckStrip: React.FC = () => {
         >
           A/B
         </button>
-        <AutoDubPanel busEnabled={busEnabled} />
+        {/* Auto Dub — direct toggle + gear for settings */}
+        <button
+          className={`px-2.5 py-1 rounded border transition-colors text-xs font-mono ${
+            autoDubEnabled
+              ? 'bg-accent-highlight/20 border-accent-highlight text-accent-highlight'
+              : 'bg-dark-bgTertiary border-dark-borderLight text-text-secondary hover:bg-dark-bgHover hover:text-text-primary'
+          }`}
+          onClick={handleAutoDubToggle}
+          disabled={!busEnabled}
+          title={autoDubEnabled ? 'Auto Dub is ON — click to stop' : 'Auto Dub — click to enable autonomous dub performance'}
+        >
+          {autoDubEnabled ? '● AUTO DUB' : '○ AUTO DUB'}
+        </button>
+        <button
+          ref={autoDubSettingsBtnRef}
+          className="px-1.5 py-1 rounded border bg-dark-bgTertiary border-dark-borderLight text-text-muted hover:text-accent-highlight hover:border-accent-highlight transition-colors text-xs disabled:opacity-40"
+          onClick={() => setAutoDubSettingsOpen(v => !v)}
+          disabled={!busEnabled}
+          title="Auto Dub settings — intensity and move blacklist"
+        >⚙</button>
+        <AutoDubPanel busEnabled={busEnabled} open={autoDubSettingsOpen} onClose={() => setAutoDubSettingsOpen(false)} anchorRef={autoDubSettingsBtnRef} />
         <button
           className={
             'px-2.5 py-1 rounded border transition-colors ' +

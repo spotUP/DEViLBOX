@@ -93,9 +93,12 @@ export const SIDScopeTab: React.FC<SIDScopeTabProps> = ({ className }) => {
         analyser = ctx.createAnalyser();
         analyser.fftSize = FFT_SIZE;
         analyser.smoothingTimeConstant = 0;
-        const masterNode = (te.masterInput as any)._gainNode ?? (te.masterInput as any).input?.node;
-        if (masterNode) {
-          (masterNode as AudioNode).connect(analyser);
+        // SID audio flows through synthBus (not masterInput — that's for tracker instruments).
+        // synthBus is unaffected by DubBus wireMasterInsert, so the tap works
+        // both when the dub deck is enabled and when it isn't.
+        const tapNode = (te.synthBus as any)._gainNode ?? (te.synthBus as any).input?.node;
+        if (tapNode) {
+          (tapNode as AudioNode).connect(analyser);
           connected = true;
         }
         analyserRef.current = analyser;
