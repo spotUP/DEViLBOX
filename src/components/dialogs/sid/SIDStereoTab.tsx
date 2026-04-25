@@ -1,13 +1,18 @@
 /**
- * SIDStereoTab — DOM per-voice stereo panning controls for SID playback.
+ * SIDStereoTab — per-voice stereo panning + reverb send for SID playback.
  *
- * Provides L/R balance sliders for each SID voice (3 voices),
- * stereo enhance mode, headphones toggle, reverb amount, and quick presets.
+ * Pan sliders set the voice's stereo position in the dub bus effects chain
+ * (via DubBus.setSidVoicePan). Reverb slider sets the dry spring reverb
+ * send level for all voices equally (via DubBus.setSidVoiceReverbSend).
+ *
+ * Settings apply immediately to the audio graph and persist until the
+ * SID dialog is closed (voices re-register on next song load).
  */
 
 import React, { useState, useCallback } from 'react';
 import { Headphones, RotateCcw } from 'lucide-react';
 import { CustomSelect } from '@components/common/CustomSelect';
+import { getActiveDubBus } from '@/engine/dub/DubBus';
 
 interface SIDStereoTabProps {
   className?: string;
@@ -50,14 +55,29 @@ export const SIDStereoTab: React.FC<SIDStereoTabProps> = ({ className }) => {
   const [voices, setVoices] = useState<VoicePan[]>(makeVoices);
   const [stereoMode, setStereoMode] = useState('none');
   const [headphones, setHeadphones] = useState(false);
-  const [reverb, setReverb] = useState(25);
+  const [reverb, setReverb] = useState(0);
 
   const updateVoicePan = useCallback((index: number, pan: number) => {
     setVoices(prev => prev.map((v, i) => i === index ? { ...v, pan } : v));
+    try { getActiveDubBus()?.setSidVoicePan(index, pan); } catch { /* ok */ }
   }, []);
 
   const applyPreset = useCallback((preset: number[]) => {
     setVoices(prev => prev.map((v, i) => ({ ...v, pan: preset[i] ?? 0 })));
+    preset.forEach((pan, i) => {
+      try { getActiveDubBus()?.setSidVoicePan(i, pan); } catch { /* ok */ }
+    });
+  }, []);
+
+  const handleReverb = useCallback((value: number) => {
+    setReverb(value);
+    const amount = value / 100;
+    try {
+      const bus = getActiveDubBus();
+      if (bus) {
+        for (let i = 0; i < 3; i++) bus.setSidVoiceReverbSend(i, amount);
+      }
+    } catch { /* ok */ }
   }, []);
 
   return (
@@ -128,7 +148,7 @@ export const SIDStereoTab: React.FC<SIDStereoTabProps> = ({ className }) => {
         ))}
       </div>
 
-      {/* Reverb slider */}
+      {/* Reverb slider — routes all voices to dry spring send */}
       <div className="flex items-center gap-2">
         <label className="text-[10px] font-mono text-text-secondary w-14 shrink-0">Reverb</label>
         <input
@@ -137,7 +157,7 @@ export const SIDStereoTab: React.FC<SIDStereoTabProps> = ({ className }) => {
           max={100}
           step={1}
           value={reverb}
-          onChange={e => setReverb(parseInt(e.target.value))}
+          onChange={e => handleReverb(parseInt(e.target.value))}
           className="flex-1 h-1 accent-accent-primary cursor-pointer"
         />
         <span className="text-[10px] font-mono text-accent-primary w-10 text-right tabular-nums">
