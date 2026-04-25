@@ -158,6 +158,23 @@ export class TrackerCanvas2DRenderer {
     const startRow = Math.max(0, scrollRow);
     const endRow   = Math.min(numRows, startRow + visibleRows);
 
+    // D effect (0xD = Pattern Break) — rows from breakRow onward are unreachable.
+    // Find the earliest D in any channel/row. `numRows` = no break.
+    let breakRow = numRows;
+    outer: for (let r = 0; r < numRows; r++) {
+      for (let ch = 0; ch < pattern.channels.length; ch++) {
+        const cell = pattern.channels[ch]?.rows?.[r];
+        if (!cell) continue;
+        if (cell.effTyp === 0xD || cell.effTyp2 === 0xD ||
+            cell.effTyp3 === 0xD || cell.effTyp4 === 0xD ||
+            cell.effTyp5 === 0xD || cell.effTyp6 === 0xD ||
+            cell.effTyp7 === 0xD || cell.effTyp8 === 0xD) {
+          breakRow = r + 1; // rows AFTER the D row are unreachable
+          break outer;
+        }
+      }
+    }
+
     const { offsets: chanOffsets, widths: chanWidths } = layout;
     const numChan = pattern.channels.length;
 
@@ -168,6 +185,7 @@ export class TrackerCanvas2DRenderer {
     // ── Row backgrounds ─────────────────────────────────────────────────────
     for (let r = startRow; r < endRow; r++) {
       const y = (r - scrollRow) * rowH;
+      const isPast = r >= breakRow;
 
       if (isPlaying && r === playRow) {
         ctx.fillStyle = 'rgba(233,69,96,0.18)';
@@ -175,27 +193,36 @@ export class TrackerCanvas2DRenderer {
         r >= selection.startRow && r <= selection.endRow) {
         ctx.fillStyle = theme.selection;
       } else if (hi2Interval > 0 && r % hi2Interval === 0) {
-        ctx.fillStyle = theme.rowSecondaryHighlight;
+        ctx.fillStyle = isPast ? theme.rowNormal : theme.rowSecondaryHighlight;
       } else if (r % hiInterval === 0) {
-        ctx.fillStyle = theme.rowHighlight;
+        ctx.fillStyle = isPast ? theme.rowNormal : theme.rowHighlight;
       } else {
         ctx.fillStyle = theme.rowNormal;
       }
       ctx.fillRect(0, y, W, rowH);
+
+      // Hatching overlay for unreachable rows (past D00 break)
+      if (isPast) {
+        ctx.fillStyle = 'rgba(0,0,0,0.35)';
+        ctx.fillRect(0, y, W, rowH);
+      }
     }
 
     // ── Line number gutter ──────────────────────────────────────────────────
     ctx.font = font;
     for (let r = startRow; r < endRow; r++) {
       const y = (r - scrollRow) * rowH;
-      const isHi2 = hi2Interval > 0 && r % hi2Interval === 0;
-      const isHi = r % hiInterval === 0;
+      const isPast = r >= breakRow;
+      const isHi2 = !isPast && hi2Interval > 0 && r % hi2Interval === 0;
+      const isHi = !isPast && r % hiInterval === 0;
+      ctx.globalAlpha = isPast ? 0.3 : 1;
       ctx.fillStyle = (isHi2 || isHi) ? theme.lineNumberHighlight : theme.lineNumber;
       const label = ui.useHex
         ? r.toString(16).toUpperCase().padStart(3, '0')
         : r.toString().padStart(3, ' ');
       ctx.fillText(label, 2, y + rowH - Math.round(6 * (this.mobile ? MOBILE_SCALE : 1)));
     }
+    ctx.globalAlpha = 1;
 
     // ── Bookmark indicators ──────────────────────────────────────────────────
     if (ui.bookmarks && ui.bookmarks.length > 0) {
@@ -242,6 +269,9 @@ export class TrackerCanvas2DRenderer {
       if (isDimmed) ctx.globalAlpha = MUTED_ALPHA;
 
       for (let r = startRow; r < endRow; r++) {
+        // Unreachable rows (past D00 break) render at reduced alpha
+        const isPastBreak = r >= breakRow;
+        if (!isDimmed) ctx.globalAlpha = isPastBreak ? 0.25 : 1;
         const y   = (r - scrollRow) * rowH + rowH / 2;
         const cell = chan.rows[r];
         const isPlayRow = isPlaying && r === playRow;
@@ -316,8 +346,8 @@ export class TrackerCanvas2DRenderer {
         }
       }
 
-      // Restore alpha after muted channel
-      if (isDimmed) ctx.globalAlpha = 1;
+      // Restore alpha after muted channel or past-break rows
+      ctx.globalAlpha = 1;
     }
 
     // ── Cursor rect ─────────────────────────────────────────────────────────
