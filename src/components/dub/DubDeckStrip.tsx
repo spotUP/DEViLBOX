@@ -891,7 +891,7 @@ export const DubDeckStrip: React.FC = () => {
         <select
           className="bg-dark-bgTertiary border border-dark-border rounded px-1.5 py-1 text-text-primary text-xs font-mono focus:ring-1 focus:ring-accent-primary"
           value={dubBusSettings.echoEngine}
-          onChange={(e) => setDubBus({ echoEngine: e.target.value as typeof dubBusSettings.echoEngine })}
+          onChange={(e) => setDubBus({ echoEngine: e.target.value as typeof dubBusSettings.echoEngine, characterPreset: dubBusSettings.characterPreset })}
           title="Echo engine — swaps the delay effect in the dub bus chain"
           disabled={!busEnabled}
         >
@@ -1000,7 +1000,7 @@ export const DubDeckStrip: React.FC = () => {
           }
           onClick={() => {
             const next = chainOrder === 'echoSpring' ? 'springEcho' : chainOrder === 'springEcho' ? 'parallel' : 'echoSpring';
-            setDubBus({ chainOrder: next });
+            setDubBus({ chainOrder: next, characterPreset: dubBusSettings.characterPreset });
           }}
           title={
             chainOrder === 'echoSpring' ? 'Signal order: ECHO → SPRING (default). Click to cycle chain order.'

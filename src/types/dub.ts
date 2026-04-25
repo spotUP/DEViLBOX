@@ -551,16 +551,19 @@ export const DUB_CHARACTER_PRESETS: Record<Exclude<DubBusSettings['characterPres
       tapeSatMode:   'single',
       echoFeedbackHpfHz: 180,  // was 250 — let more low-end survive echo repeats
       echoFeedbackLpfHz: 5500, // was 3000 — brighter echo tails, less "in a jar"
-      re201DelayMode: 9,       // research: Tubby's signature = H2+H3+reverb (two-tap + spring)
+      re201DelayMode: 7,       // H1+H2+H3 (three-tap) — was mode 9 (H2+H3+reverb) which caused
+                               // an init beep from the RE-201's internal spring settling.
+                               // Aelapse provides the spring separately; no need for double spring.
       echoEngine:    're201',     // Tubby's MCI → RE-201 signal chain
       chainOrder:    'springEcho', // spring FIRST: same fix as Perry — prevents
                                     // each RE-201 repeat from adding new spring tail
-      // Tubby's return EQ — the "Big Knob" sweep on the echo return.
-      // Resonant midrange peak that he swept by hand during mixing.
-      returnEqEnabled: true,
+      // Tubby's return EQ — meant to be swept by hand during performance, not left on.
+      // Keeping it enabled at a fixed frequency created a constant 700Hz "beep".
+      // User can enable + sweep manually via DubBusPanel.
+      returnEqEnabled: false,
       returnEqFreq:   700,
-      returnEqGain:   3,   // was 5 — mid hump contributing to "in a jar"; subtle now
-      returnEqQ:      1.5, // was 2.0 — wider, gentler presence peak
+      returnEqGain:   3,
+      returnEqQ:      1.5,
     },
     springsLength: 0.35, springsDamp: 0.35, springsChaos: 0.20, springsScatter: 0.60, springsTone: 0.65,
     tapeSatDrive:  0.55,
@@ -632,12 +635,11 @@ export const DUB_CHARACTER_PRESETS: Record<Exclude<DubBusSettings['characterPres
       hpfStepped:      false,
       bassShelfGainDb: 2, bassShelfFreqHz: 80, bassShelfQ: 0.5,
       midScoopGainDb: -4, midScoopFreqHz: 800,
-      echoIntensity:  0.72,   // reduced from 0.85 — with springEcho topology the echo
-                               // repeats the reverbed cloud; lower feedback prevents wash
+      echoIntensity:  0.55,   // was 0.72 — high feedback with springEcho = rolling forever
       echoRateMs:     380,
       echoSyncDivision: '1/4T', // research: Perry used triplet-feel echoes against the riddim
-      echoWet:        0.85,   // reduced from 0.92 — mix some dry through for clarity
-      springWet:      0.55,   // reduced from 0.75 — spring tail was burying the echo decay
+      echoWet:        0.80,
+      springWet:      0.38,   // was 0.55 — spring before echo was accumulating per repeat
       sidechainAmount: 0.4,
       stereoWidth:    0.25,  // near-mono — Perry's defining texture
       // Perry had actual phasers (Mutron Bi-Phase, Eventide, MXR Phase 90)
@@ -655,7 +657,7 @@ export const DUB_CHARACTER_PRESETS: Record<Exclude<DubBusSettings['characterPres
       // semi-manual feedback loop." The extFeedback loop recreates this —
       // return audio re-enters the input chain through a peaking EQ, creating
       // the self-feeding chaos that defined Perry's Black Ark sound.
-      extFeedbackGain:   0.18,  // moderate semi-manual feedback — not runaway, but alive
+      extFeedbackGain:   0,     // was 0.18 — extra feedback loop was the "neverending" culprit
       extFeedbackEqFreq: 400,   // boost at 400 Hz — the tape-saturation warmth zone
       extFeedbackEqGain: 3,     // gentle 3 dB lift per pass — accumulates over repeats
       extFeedbackEqQ:    1.2,
