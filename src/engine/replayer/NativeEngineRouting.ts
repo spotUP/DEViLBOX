@@ -863,6 +863,10 @@ export function clearRunningEngineKeys(): void {
   _runningEngineKeys.clear();
 }
 
+let _activeC64SidEngine: C64SIDEngine | null = null;
+/** Get the currently active C64SIDEngine instance (null when no SID is playing). */
+export function getActiveC64SidEngine(): C64SIDEngine | null { return _activeC64SidEngine; }
+
 export async function startNativeEngines(
   song: TrackerSong,
   separationInputTone: Tone.ToneAudioNode,
@@ -1137,6 +1141,8 @@ export async function startNativeEngines(
         if (globalPitch !== 0) {
           c64SidEngine.setPlaybackRate(Math.pow(2, globalPitch / 12));
         }
+
+        _activeC64SidEngine = c64SidEngine;
 
         if (!muted) {
           await c64SidEngine.play();
@@ -1507,6 +1513,7 @@ export function stopNativeEngines(
     } catch (err) {
       console.warn('[NativeEngineRouting] Error stopping C64SIDEngine:', err);
     }
+    _activeC64SidEngine = null;
     return null;
   }
 

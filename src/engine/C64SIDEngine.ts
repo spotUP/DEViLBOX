@@ -50,6 +50,18 @@ export class C64SIDEngine {
   private sidData: Uint8Array;
   private gainNode: GainNode | null = null;
   private masterVolume = 1.0; // 0-1 linear
+
+  // ── Stereo processor (Haas effect + headphone crossfeed) ────────────────
+  // Inserted between gainNode and destination. gainNode → splitter →
+  //   L: direct → merger L
+  //   R: haasDelay → merger R
+  // → crossfeed (when headphones=true) → stereoOut → destination
+  private _stereoSplitter: ChannelSplitterNode | null = null;
+  private _stereoMerger: ChannelMergerNode | null = null;
+  private _haasDelay: DelayNode | null = null;
+  private _stereoOut: GainNode | null = null;   // final node before destination
+  private _stereoEnhance: 'none' | 'low' | 'medium' | 'high' = 'none';
+  private _headphonesEnabled = false;
   private playbackRate = 1.0; // pitch multiplier (1.0 = normal)
   private dubBoost = 1.0; // dub-mode make-up gain multiplier on top of ENGINE_GAIN
 
@@ -151,7 +163,21 @@ export class C64SIDEngine {
     // Create a master GainNode for volume control + per-engine level compensation.
     // All engine outputs connect here instead of directly to destination.
     this.gainNode = audioContext.createGain();
-    this.gainNode.connect(destination ?? audioContext.destination);
+    const dest = destination ?? audioContext.destination;
+
+    // ── Stereo processor (Haas + crossfeed) ──────────────────────────────
+    // gainNode → splitter → [L direct, R+haasDelay] → merger → stereoOut → dest
+    this._stereoSplitter = audioContext.createChannelSplitter(2);
+    this._stereoMerger = audioContext.createChannelMerger(2);
+    this._haasDelay = audioContext.createDelay(0.03); // max 30 ms
+    this._haasDelay.delayTime.value = 0; // off by default
+    this._stereoOut = audioContext.createGain();
+    this.gainNode.connect(this._stereoSplitter);
+    this._stereoSplitter.connect(this._stereoMerger, 0, 0); // L → L (direct)
+    this._stereoSplitter.connect(this._haasDelay, 1);       // R → delay
+    this._haasDelay.connect(this._stereoMerger, 0, 1);      // delayed → R
+    this._stereoMerger.connect(this._stereoOut);
+    this._stereoOut.connect(dest);
 
     // Get user's preferred engine from settings
     const engineType = useSettingsStore.getState().sidEngine || 'websid';
@@ -381,11 +407,36 @@ export class C64SIDEngine {
   connectTo(destination: AudioNode): void {
     if (!this.gainNode) return;
     try { this.gainNode.disconnect(); } catch { /* already disconnected */ }
-    this.gainNode.connect(destination);
-    // Re-attach dub send if it was connected
+
+    if (this._stereoOut) {
+      // Route through stereo processor
+      try { this._stereoOut.disconnect(); } catch { /* ok */ }
+      this.gainNode.connect(this._stereoSplitter!);
+      this._stereoOut.connect(destination);
+    } else {
+      this.gainNode.connect(destination);
+    }
     if (this.dubSendGain) {
       try { this.gainNode.connect(this.dubSendGain); } catch { /* ok */ }
     }
+  }
+
+  /** Stereo enhance via Haas effect — small delay on R creates stereo spread
+   *  from SID's essentially mono output. */
+  setStereoEnhance(level: 'none' | 'low' | 'medium' | 'high'): void {
+    this._stereoEnhance = level;
+    const delayMs = { none: 0, low: 5, medium: 12, high: 22 }[level];
+    const delaySec = this._headphonesEnabled ? delayMs * 0.4 / 1000 : delayMs / 1000;
+    this._haasDelay?.delayTime.setTargetAtTime(delaySec, this._haasDelay.context.currentTime, 0.02);
+  }
+
+  /** Headphones mode — reduces Haas delay (less extreme widening is more
+   *  comfortable on cans) and swaps the delayed channel to L instead of R
+   *  to match typical headphone psychoacoustics. */
+  setHeadphones(enabled: boolean): void {
+    this._headphonesEnabled = enabled;
+    // Re-apply current enhance level with updated delay
+    this.setStereoEnhance(this._stereoEnhance);
   }
 
   // ── Dub bus send ─────────────────────────────────────────────────────
