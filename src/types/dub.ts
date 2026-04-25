@@ -536,10 +536,10 @@ export const DUB_CHARACTER_PRESETS: Record<Exclude<DubBusSettings['characterPres
     description: 'Dark, noisy, loose-spring. Stepped filter + tape-echo feedback. Narrow stereo. Light bus compression.',
     overrides: {
       returnGain:     0.75,  // heavy bus presence — Tubby is LOUD
-      hpfCutoff:      100,
+      hpfCutoff:      65,   // was 100 — lower to let sub-bass breathe
       hpfStepped:     true,   // the "Big Knob" rhythmic staccato sweeps
       hpfResonanceDb: 2.5,    // Altec 9069B T-network resonant hump — the "voice" of the filter
-      bassShelfGainDb: 9, bassShelfFreqHz: 85,  bassShelfQ: 0.9,  // chest-punch bass lift
+      bassShelfGainDb: 9, bassShelfFreqHz: 60,  bassShelfQ: 0.9,  // was 85Hz — lower shelf = true sub depth
       midScoopGainDb:  0,
       echoIntensity:  0.65,   // more repeats — Tubby's signature multi-tap
       echoRateMs:     300,
@@ -549,8 +549,8 @@ export const DUB_CHARACTER_PRESETS: Record<Exclude<DubBusSettings['characterPres
       stereoWidth:    0.45,  // narrow — 4-track console + loose spring
       sweepAmount:    0,      // no flanger; Tubby's "sweep" was filter, not comb
       tapeSatMode:   'single',
-      echoFeedbackHpfHz: 250,  // research spec: prevents sub buildup, RE-201 tape-head gap
-      echoFeedbackLpfHz: 3000, // research spec: warm, dark repeats — Tubby's heavy spring tail
+      echoFeedbackHpfHz: 180,  // was 250 — let more low-end survive echo repeats
+      echoFeedbackLpfHz: 5500, // was 3000 — brighter echo tails, less "in a jar"
       re201DelayMode: 9,       // research: Tubby's signature = H2+H3+reverb (two-tap + spring)
       echoEngine:    're201',     // Tubby's MCI → RE-201 signal chain
       chainOrder:    'springEcho', // spring FIRST: same fix as Perry — prevents
@@ -559,10 +559,10 @@ export const DUB_CHARACTER_PRESETS: Record<Exclude<DubBusSettings['characterPres
       // Resonant midrange peak that he swept by hand during mixing.
       returnEqEnabled: true,
       returnEqFreq:   700,
-      returnEqGain:   5,   // was 8 — high Q+gain was creating a resonant 700Hz tone
-      returnEqQ:      2.0, // was 3.0 — reduced to avoid audible resonance peak
+      returnEqGain:   3,   // was 5 — mid hump contributing to "in a jar"; subtle now
+      returnEqQ:      1.5, // was 2.0 — wider, gentler presence peak
     },
-    springsLength: 0.35, springsDamp: 0.55, springsChaos: 0.20, springsScatter: 0.60, springsTone: 0.55,
+    springsLength: 0.35, springsDamp: 0.35, springsChaos: 0.20, springsScatter: 0.60, springsTone: 0.65,
     tapeSatDrive:  0.55,
     // Tubby's style: everything through the bus, loud. Drums + bass dominate;
     // melodic lines get heavy echo throws; nothing stays dry.
@@ -586,7 +586,7 @@ export const DUB_CHARACTER_PRESETS: Record<Exclude<DubBusSettings['characterPres
     description: 'Bright, dry, precise. Plate not spring. ZERO bus compression. Extreme mid-scoop on drops.',
     overrides: {
       returnGain:     0.65,
-      hpfCutoff:       80,
+      hpfCutoff:       50,   // was 80 — more sub-bass room
       glueBypass:      true,   // research: "try mastering a song with compression" — he rejected ALL bus comp
       hpfStepped:      false,
       bassShelfGainDb: 1,     // drier low end vs Tubby
@@ -649,8 +649,8 @@ export const DUB_CHARACTER_PRESETS: Record<Exclude<DubBusSettings['characterPres
       phaserStages:   8,      // Mutron Bi-Phase is 6-stage; 8 for extra depth
       phaserFeedback: 0.65,
       tapeSatMode:    'stack', // 3 parallel tape paths ≈ 4-track bouncing
-      echoFeedbackHpfHz: 200,   // research spec: loose, low HPF — Perry's murky chaos
-      echoFeedbackLpfHz: 2000,  // research spec: very dark repeats — 7.5 ips tape color
+      echoFeedbackHpfHz: 150,   // was 200 — more bass survives each repeat
+      echoFeedbackLpfHz: 3200,  // was 2000 (extremely dark) — still tape-warm but not muffled
       // Research: "Space Echo output patched back into a second TEAC input →
       // semi-manual feedback loop." The extFeedback loop recreates this —
       // return audio re-enters the input chain through a peaking EQ, creating
@@ -664,7 +664,7 @@ export const DUB_CHARACTER_PRESETS: Record<Exclude<DubBusSettings['characterPres
                                       // so repeats decay cleanly instead of adding
                                       // new reverb tail to each repeat
     },
-    springsLength: 0.65, springsDamp: 0.20, springsChaos: 0.85, springsScatter: 0.85, springsTone: 0.35,
+    springsLength: 0.65, springsDamp: 0.20, springsChaos: 0.85, springsScatter: 0.85, springsTone: 0.45,
     tapeSatDrive:  0.70,   // per-path drive; stack provides total character
     // Perry: maximum chaos — everything bleeds. He literally had nothing dry.
     // The self-feeding ext-feedback loop needs all channels routed through.
@@ -706,7 +706,7 @@ export const DUB_CHARACTER_PRESETS: Record<Exclude<DubBusSettings['characterPres
       tapeSatMode:   'single',
       echoEngine:    'reTapeEcho',  // BBD character for 80s dub
     },
-    springsLength: 0.25, springsDamp: 0.85, springsChaos: 0.15, springsScatter: 0.30, springsTone: 0.60,
+    springsLength: 0.25, springsDamp: 0.65, springsChaos: 0.15, springsScatter: 0.30, springsTone: 0.68,
     tapeSatDrive:  0.35,
     // Gated Flanger: aggressive but controlled. Heavy on percussion for the
     // gated-reverb snap; pads get the flanger treatment.
@@ -750,7 +750,7 @@ export const DUB_CHARACTER_PRESETS: Record<Exclude<DubBusSettings['characterPres
       pingPongSyncToBpm:    true,   // auto-follows song BPM — always metrically correct
       echoEngine:    're201',       // Ariwa studio's RE-201 for lush tape + spring
     },
-    springsLength: 0.55, springsDamp: 0.45, springsChaos: 0.10, springsScatter: 0.55, springsTone: 0.65,
+    springsLength: 0.55, springsDamp: 0.28, springsChaos: 0.10, springsScatter: 0.55, springsTone: 0.72,
     tapeSatDrive:  0.12,   // pristine
     // Mad Professor: balanced and lush. Pads and leads get the most reverb
     // (ghostReverb/madProfPingPong); drums are present but not dominant.
