@@ -1139,16 +1139,17 @@ export const DubDeckStrip: React.FC = () => {
                 <button
                   key={m.moveId}
                   className={colorClasses(m.color, active) + (noSend && busEnabled ? ' opacity-40' : '')}
-                  onPointerDown={() => {
+                  onPointerDown={(e) => {
                     if (noSend) {
                       notify.warning('Raise a CH send first — drag a channel fader up on the right');
                       return;
                     }
+                    e.currentTarget.setPointerCapture(e.pointerId);
                     holdStart(m.moveId);
                   }}
-                  onPointerUp={() => holdEnd(m.moveId)}
-                  onPointerLeave={() => { holdEnd(m.moveId); setHoverHint(null); }}
-                  onPointerCancel={() => holdEnd(m.moveId)}
+                  onPointerUp={(e) => { e.currentTarget.releasePointerCapture(e.pointerId); holdEnd(m.moveId); }}
+                  onPointerLeave={() => setHoverHint(null)}
+                  onPointerCancel={(e) => { e.currentTarget.releasePointerCapture(e.pointerId); holdEnd(m.moveId); }}
                   onMouseEnter={() => setHoverHint(`${m.label} — ${m.title}${noSend ? ' (needs CH send)' : ''}`)}
                   title={m.title + ' (press-and-hold)' + (noSend ? ' — raise a CH send to hear' : '')}
                   disabled={!busEnabled}
@@ -1229,17 +1230,17 @@ export const DubDeckStrip: React.FC = () => {
                 onClick={isHold ? undefined : () => {
                   for (let i = 0; i < visibleChannelCount; i++) fireTrigger(op.moveId, i);
                 }}
-                onPointerDown={isHold ? () => {
+                onPointerDown={isHold ? (e) => {
+                  e.currentTarget.setPointerCapture(e.pointerId);
                   for (let i = 0; i < visibleChannelCount; i++) holdStart(op.moveId, i);
                 } : undefined}
-                onPointerUp={isHold ? () => {
+                onPointerUp={isHold ? (e) => {
+                  e.currentTarget.releasePointerCapture(e.pointerId);
                   for (let i = 0; i < visibleChannelCount; i++) holdEnd(op.moveId, i);
                 } : undefined}
-                onPointerLeave={isHold ? () => {
-                  for (let i = 0; i < visibleChannelCount; i++) holdEnd(op.moveId, i);
-                  setHoverHint(null);
-                } : () => setHoverHint(null)}
-                onPointerCancel={isHold ? () => {
+                onPointerLeave={() => setHoverHint(null)}
+                onPointerCancel={isHold ? (e) => {
+                  e.currentTarget.releasePointerCapture(e.pointerId);
                   for (let i = 0; i < visibleChannelCount; i++) holdEnd(op.moveId, i);
                 } : undefined}
                 onMouseEnter={() => setHoverHint(`ALL · ${op.label} — ${op.title}`)}
@@ -1428,10 +1429,10 @@ export const DubDeckStrip: React.FC = () => {
                     key={op.moveId}
                     className={colorClasses(op.color, active) + ' w-full text-center'}
                     onClick={isHold ? undefined : () => fireTrigger(op.moveId, i)}
-                    onPointerDown={isHold ? () => holdStart(op.moveId, i) : undefined}
-                    onPointerUp={isHold ? () => holdEnd(op.moveId, i) : undefined}
-                    onPointerLeave={isHold ? () => { holdEnd(op.moveId, i); setHoverHint(null); } : () => setHoverHint(null)}
-                    onPointerCancel={isHold ? () => holdEnd(op.moveId, i) : undefined}
+                    onPointerDown={isHold ? (e) => { e.currentTarget.setPointerCapture(e.pointerId); holdStart(op.moveId, i); } : undefined}
+                    onPointerUp={isHold ? (e) => { e.currentTarget.releasePointerCapture(e.pointerId); holdEnd(op.moveId, i); } : undefined}
+                    onPointerLeave={() => setHoverHint(null)}
+                    onPointerCancel={isHold ? (e) => { e.currentTarget.releasePointerCapture(e.pointerId); holdEnd(op.moveId, i); } : undefined}
                     onMouseEnter={() => setHoverHint(`Ch ${i + 1} · ${op.label} — ${op.title}`)}
                     title={`Ch ${i + 1} · ${op.title}${isHold ? ' (press-and-hold)' : ''}`}
                     disabled={!busEnabled}
