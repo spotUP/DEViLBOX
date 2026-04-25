@@ -5111,10 +5111,10 @@ export class DubBus {
     // "BiquadFilterNode: state is bad" coefficient-blowup detection on
     // every fire (poles sit too close to the unit circle).
     bp.Q.value = 2.2;
-    // Cap at 2.5 — at spring dry/wet 0.55, the tap's output passes through
-    // the spring at ~0.45× (dry only, since fb doesn't excite wet), so the
-    // tap must exceed ~2.2 to build up self-oscillation from the noise seed.
-    const fbAmt = Math.max(0, Math.min(2.5, feedbackAmount));
+    // Cap at 1.8 — above this the loop saturates into harsh metallic noise
+    // (Chromium filter instability + hard clipping). Default 1.6 gives a warm
+    // resonant squeal; 1.8 is the hard ceiling for "still musical."
+    const fbAmt = Math.max(0, Math.min(1.8, feedbackAmount));
     // Hold the feedback at 0 for 30 ms after connect so the bandpass has
     // at least a few render quanta of clean signal to reach steady state
     // before the loop closes at gain > 1. Without this hold, the filter
@@ -5123,11 +5123,10 @@ export class DubBus {
     tap.gain.setValueAtTime(0, now);
     tap.gain.setValueAtTime(0, now + 0.03);
     tap.gain.linearRampToValueAtTime(fbAmt, now + 0.23);
-    // Crank spring wet to 1.0 for the duration of SCREAM so the loop runs
-    // through 100% wet spring (where the resonant ringing lives). Prior
-    // value restored on dispose.
+    // Boost spring wet for the scream loop — 0.85 gives enough resonance
+    // without over-saturating. 1.0 added harsh metallic overtones.
     const priorWet = this._springWetCache;
-    this._setSpringWet(1.0);
+    this._setSpringWet(Math.min(0.85, Math.max(priorWet, 0.65)));
     // Sweep center frequency over sweepSec — rising whine
     bp.frequency.cancelScheduledValues(now);
     bp.frequency.setValueAtTime(Math.max(100, centerHz), now);
