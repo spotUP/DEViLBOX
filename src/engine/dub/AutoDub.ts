@@ -871,6 +871,99 @@ export function isAutoDubRunning(): boolean {
   return _timer !== null;
 }
 
+// ───────────────────────── Pre-play audio scrub ───────────────────────────────
+
+let _scrubActive = false;
+
+/**
+ * Silently play the song's richest pattern for ~5 seconds before AutoDub
+ * starts, so the ChannelAudioClassifier gets actual audio content to work
+ * with instead of relying solely on the offline note-data heuristics.
+ *
+ * Flow:
+ *  1. Find richest pattern (most total notes) — avoids sparse intros
+ *  2. Seek transport to that pattern with correct tempo context
+ *  3. Mute master output (inaudible to the user)
+ *  4. Start playback and poll oscilloscope every 250 ms for 5 s
+ *  5. Stop, seek back to 0, restore master volume
+ *
+ * Resolves immediately if the song is already playing or if no patterns
+ * are loaded. Cancelled cleanly if the user starts playback themselves.
+ */
+export async function runChannelAudioScrub(
+  onProgress?: (done: boolean) => void,
+): Promise<void> {
+  const transport = useTransportStore.getState();
+  if (transport.isPlaying) return; // Classifier is already running via playback
+
+  const tracker = useTrackerStore.getState();
+  const patterns = tracker.patterns;
+  if (!Array.isArray(patterns) || patterns.length === 0) return;
+
+  // Find richest pattern (most note activity — typically the chorus/main drop)
+  let richestIdx = 0;
+  let richestTotal = 0;
+  for (let i = 0; i < patterns.length; i++) {
+    const pat = patterns[i];
+    if (!pat?.channels) continue;
+    let total = 0;
+    for (const ch of pat.channels) {
+      if (!ch?.rows) continue;
+      for (const cell of ch.rows) if (cell && cell.note >= 1 && cell.note <= 96) total++;
+    }
+    if (total > richestTotal) { richestTotal = total; richestIdx = i; }
+  }
+
+  // Mute master output — user won't hear the scrub
+  const mixer = useMixerStore.getState();
+  const priorVol = (mixer as unknown as { masterVolume?: number }).masterVolume ?? 1;
+  try { mixer.setMasterVolume(0); } catch { /* ok */ }
+
+  // Seek to richest pattern (tempo-aware — engine processes Fxx up to this point)
+  try { useTransportStore.getState().setCurrentPattern(richestIdx); } catch { /* ok */ }
+
+  // Start silent playback
+  try { await useTransportStore.getState().play(); } catch {
+    try { mixer.setMasterVolume(priorVol); } catch { /* ok */ }
+    return;
+  }
+
+  _scrubActive = true;
+  onProgress?.(false);
+
+  const SCRUB_MS = 5000;
+  const POLL_MS = 250;
+  const deadline = performance.now() + SCRUB_MS;
+
+  await new Promise<void>(resolve => {
+    const poll = setInterval(() => {
+      // Feed oscilloscope data into the classifier each tick
+      updateRuntimeClassifierFromOscilloscope();
+
+      const stopped = !useTransportStore.getState().isPlaying;
+      const done = performance.now() >= deadline;
+
+      if (!_scrubActive || stopped || done) {
+        clearInterval(poll);
+        _scrubActive = false;
+        resolve();
+      }
+    }, POLL_MS);
+  });
+
+  // Stop, restore, return to start
+  try { useTransportStore.getState().stop(); } catch { /* ok */ }
+  try { useTransportStore.getState().setCurrentPattern(0); } catch { /* ok */ }
+  try { mixer.setMasterVolume(priorVol); } catch { /* ok */ }
+
+  onProgress?.(true);
+}
+
+/** Cancel an in-progress scrub (e.g. user pressed play during the scrub window). */
+export function cancelChannelScrub(): void {
+  _scrubActive = false;
+}
+
 // ───────────────────────── Fire log (bridge + CI assertions) ─────────────────
 // Ring buffer of the last FIRE_LOG_CAP moves chosen by the tick loop.
 // Exposed via getAutoDubFireLog / clearAutoDubFireLog MCP tools so

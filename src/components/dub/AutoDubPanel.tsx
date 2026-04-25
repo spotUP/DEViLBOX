@@ -11,7 +11,8 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useDubStore, type AutoDubPersonaId } from '@/stores/useDubStore';
 import { useDrumPadStore } from '@/stores/useDrumPadStore';
-import { startAutoDub, stopAutoDub, isAutoDubRunning, AUTO_DUB_RULE_MOVES } from '@/engine/dub/AutoDub';
+import { startAutoDub, stopAutoDub, isAutoDubRunning, AUTO_DUB_RULE_MOVES, runChannelAudioScrub, cancelChannelScrub } from '@/engine/dub/AutoDub';
+import { useTransportStore } from '@/stores/useTransportStore';
 import { getPersona, AUTO_DUB_PERSONAS } from '@/engine/dub/AutoDubPersonas';
 import { fire as fireDub } from '@/engine/dub/DubRouter';
 import { useFormatStore } from '@/stores/useFormatStore';
@@ -25,6 +26,8 @@ interface AutoDubPanelProps {
 export const AutoDubPanel: React.FC<AutoDubPanelProps> = ({ busEnabled }) => {
   const enabled = useDubStore(s => s.autoDubEnabled);
   const setEnabled = useDubStore(s => s.setAutoDubEnabled);
+  const isPlaying = useTransportStore(s => s.isPlaying);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
   const intensity = useDubStore(s => s.autoDubIntensity);
   const setIntensity = useDubStore(s => s.setAutoDubIntensity);
   const persona = useDubStore(s => s.autoDubPersona);
@@ -59,11 +62,29 @@ export const AutoDubPanel: React.FC<AutoDubPanelProps> = ({ busEnabled }) => {
     setBlacklist(Array.from(current));
   }, [blacklist, setBlacklist]);
 
+  // When user stops playback mid-scrub, cancel the scrub
+  useEffect(() => {
+    if (!isPlaying && isAnalyzing) cancelChannelScrub();
+  }, [isPlaying, isAnalyzing]);
+
   // Keep runtime engine in sync with store flag
   useEffect(() => {
     if (enabled && busEnabled) {
       if (!isAutoDubRunning()) {
-        startAutoDub();
+        if (!isPlaying) {
+          // Song is stopped — run a silent 5-second scrub to warm up the
+          // runtime channel classifier before AutoDub fires its first move.
+          setIsAnalyzing(true);
+          runChannelAudioScrub((done) => {
+            setIsAnalyzing(false);
+            if (done) startAutoDub();
+          }).catch(() => {
+            setIsAnalyzing(false);
+            startAutoDub(); // fall through even if scrub fails
+          });
+        } else {
+          startAutoDub(); // Already playing — classifier is already running
+        }
         // Warn if format lacks per-channel isolation (echo throws won't target individual channels)
         const isSID = hasSidData || ['sidfactory2', 'cheesecutter', 'goattracker'].includes(editorMode);
         if (isSID) {
@@ -90,7 +111,7 @@ export const AutoDubPanel: React.FC<AutoDubPanelProps> = ({ busEnabled }) => {
     } else {
       if (isAutoDubRunning()) stopAutoDub();
     }
-  }, [enabled, busEnabled, editorMode, hasSidData]);
+  }, [enabled, busEnabled, editorMode, hasSidData, isPlaying]);
 
   // Panic event halts Auto Dub
   useEffect(() => {
@@ -148,7 +169,7 @@ export const AutoDubPanel: React.FC<AutoDubPanelProps> = ({ busEnabled }) => {
         }}
         title="Auto Dub — autonomous dub performer"
       >
-        Auto Dub{enabled ? ' ON' : ''}
+        {isAnalyzing ? 'Analyzing...' : `Auto Dub${enabled ? ' ON' : ''}`}
       </button>
 
       {open && createPortal(
