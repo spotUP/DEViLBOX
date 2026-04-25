@@ -1144,6 +1144,12 @@ export async function startNativeEngines(
 
         _activeC64SidEngine = c64SidEngine;
 
+        // Apply global headphones mode if enabled in settings
+        try {
+          const { useSettingsStore } = await import('@stores/useSettingsStore');
+          if (useSettingsStore.getState().headphonesMode) c64SidEngine.setHeadphones(true);
+        } catch { /* ok */ }
+
         if (!muted) {
           await c64SidEngine.play();
           console.log('[NativeEngineRouting] C64SIDEngine loaded & playing');
