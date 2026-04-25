@@ -1438,11 +1438,17 @@ export const DubDeckStrip: React.FC = () => {
                     onChange={(e) => setChannelDubRole(i, e.target.value || null)}
                     className={
                       'w-full text-[8px] font-mono rounded border px-0.5 py-0.5 transition-colors ' +
-                      (userRole
-                        ? 'bg-accent-highlight/20 border-accent-highlight text-accent-highlight'
-                        : 'bg-dark-bgTertiary border-dark-border text-text-muted')
+                      (userRole === 'empty'
+                        ? 'bg-accent-error/20 border-accent-error text-accent-error'
+                        : userRole
+                          ? 'bg-accent-highlight/20 border-accent-highlight text-accent-highlight'
+                          : 'bg-dark-bgTertiary border-dark-border text-text-muted')
                     }
-                    title={`Ch ${i + 1} role — classifier says "${autoRole ?? '?'}". Override locks AutoDub targeting.`}
+                    title={
+                      userRole === 'empty'
+                        ? `Ch ${i + 1} — excluded from AutoDub (no moves will target this channel)`
+                        : `Ch ${i + 1} role — classifier says "${autoRole ?? '?'}". Override locks AutoDub targeting.`
+                    }
                     disabled={!busEnabled}
                   >
                     <option value="">{autoRole ?? '—'}</option>
@@ -1451,6 +1457,7 @@ export const DubDeckStrip: React.FC = () => {
                     <option value="lead">Lead</option>
                     <option value="skank">Skank</option>
                     <option value="pad">Pad</option>
+                    <option value="empty">Exclude</option>
                   </select>
                 );
               })()}
