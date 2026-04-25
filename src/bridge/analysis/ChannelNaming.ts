@@ -14,7 +14,7 @@
 import type { ChannelData, Pattern } from '@/types/tracker';
 import type { InstrumentConfig } from '@/types/instrument/defaults';
 import type { SampleCategory } from '@typedefs/samplePack';
-import { classifyChannel, PERCUSSION_NAME_RE, type ChannelAnalysis, type ChannelRole } from './MusicAnalysis';
+import { classifyChannel, detectSkankPattern, PERCUSSION_NAME_RE, type ChannelAnalysis, type ChannelRole } from './MusicAnalysis';
 import { categorizeSample } from '@/lib/import/maxForLiveImport';
 import { DRUM_SYNTHS } from '@/midi/performance/lightGuide';
 import { analyzeEnvelopeShape } from '@/lib/import/EnvelopeConverter';
@@ -323,6 +323,22 @@ export function classifyChannelWithInstruments(
     enhanced.subrole = 'sub';
   }
 
+  // Skank detection — runs on chord/lead/pad candidates (roles that note-stats
+  // assigns to off-beat chordal channels but can't distinguish from skanks).
+  // A skank has off-beat row placement + consistent spacing. Confidence >= 0.65
+  // overrides the role to 'skank'. Skip if already percussion/bass — those are
+  // determined by more specific signals and shouldn't be reclassified.
+  const SKANK_PROMOTABLE_FROM: readonly ChannelRole[] = ['chord', 'lead', 'pad', 'empty', 'arpeggio'];
+  if (SKANK_PROMOTABLE_FROM.includes(enhanced.role)) {
+    const noteRows = channel.rows
+      .map((cell, i) => (cell && cell.note >= 1 && cell.note <= 96 ? i : -1))
+      .filter(i => i >= 0);
+    const skankScore = detectSkankPattern(noteRows, channel.rows.length);
+    if (skankScore >= 0.65) {
+      enhanced.role = 'skank';
+    }
+  }
+
   return enhanced;
 }
 
@@ -346,6 +362,8 @@ export function suggestChannelName(analysis: EnhancedChannelAnalysis): string | 
       return 'Arp';
     case 'pad':
       return 'Pad';
+    case 'skank':
+      return 'Skank';
     case 'empty':
     default:
       return null;
