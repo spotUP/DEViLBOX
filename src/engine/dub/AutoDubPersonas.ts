@@ -83,6 +83,8 @@ export const AUTO_DUB_PERSONAS: Record<AutoDubPersonaId, AutoDubPersona> = {
       masterDrop:        1.2,   // dramatic dry mute with echo tail
       tapeWobble:        1.4,   // RE-201 tape wow/flutter — Tubby's mechanical character
       combSweep:         1.6,   // research: Tubby's liquid comb-sweep on drums is THE signature
+      // Skank targeting — Tubby loved muting and throwing the rhythm guitar
+      // channelMute: 1.5 already set globally; echoThrow on skank is primary
       tapeStop:          0.5,
       backwardReverb:    0.2,
       reverseEcho:       0.3,
