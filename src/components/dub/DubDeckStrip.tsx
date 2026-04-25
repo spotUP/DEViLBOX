@@ -23,6 +23,7 @@ import { useUIStore } from '@/stores/useUIStore';
 import { useTransportStore } from '@/stores/useTransportStore';
 import { bpmSyncedEchoRate, getActiveBpm } from '@/engine/dub/DubActions';
 import { subscribeDubRouter, subscribeDubRelease, fire as fireDub } from '@/engine/dub/DubRouter';
+import { getAutoDubCurrentRoles } from '@/engine/dub/AutoDub';
 import { startDubRecorder } from '@/engine/dub/DubRecorder';
 import { dubLanePlayer } from '@/engine/dub/DubLanePlayer';
 import { getSongTimeSec } from '@/engine/dub/songTime';
@@ -34,6 +35,17 @@ import { Fader } from '@components/controls/Fader';
 import { DubLaneTimeline } from './DubLaneTimeline';
 import { AutoDubPanel } from './AutoDubPanel';
 import { DUB_CHARACTER_PRESETS } from '@/types/dub';
+
+// ─── Manual channel role override options ──────────────────────────────────
+// Compact labels shown as chips in the channel strip. 'auto' = null (use classifier).
+const ROLE_OPTIONS: Array<{ role: string | null; label: string; title: string }> = [
+  { role: null,          label: 'Auto',   title: 'Auto — use classifier (note-stats + audio analysis)' },
+  { role: 'percussion',  label: 'Drums',  title: 'Drums — percussion channel: echoThrow, snareCrack, combSweep target this' },
+  { role: 'bass',        label: 'Bass',   title: 'Bass — low-end channel: channelMute, echoThrow on bass targeted here' },
+  { role: 'lead',        label: 'Lead',   title: 'Lead — melodic channel: sonarPing, echoThrow on leads target this' },
+  { role: 'skank',       label: 'Skank',  title: 'Skank — off-beat chord stab: combSweep and echoThrow target this' },
+  { role: 'pad',         label: 'Pad',    title: 'Pad — sustained atmosphere: ghostReverb and ping-pong target this' },
+];
 
 // ─── Role inference ────────────────────────────────────────────────────────
 function inferRoleFromName(name: string): 'percussion' | 'bass' | 'lead' | 'chord' | 'arpeggio' | 'pad' | null {
@@ -173,6 +185,7 @@ export const DubDeckStrip: React.FC = () => {
 
   const channels = useMixerStore(s => s.channels);
   const setChannelDubSend = useMixerStore(s => s.setChannelDubSend);
+  const setChannelDubRole = useMixerStore(s => s.setChannelDubRole);
   const patternIdx = useTrackerStore(s => s.currentPatternIndex);
   const pattern = useTrackerStore(s => s.patterns[patternIdx]);
 
@@ -184,6 +197,14 @@ export const DubDeckStrip: React.FC = () => {
     const t = setTimeout(() => setFlashedChannel(null), 400);
     return () => clearTimeout(t);
   }, [flashedChannel]);
+
+  // Auto-detected channel roles — polled from AutoDub at 500ms so the UI
+  // reflects what the classifier currently thinks even while it's running.
+  const [autoRoles, setAutoRoles] = useState<readonly string[]>([]);
+  useEffect(() => {
+    const t = setInterval(() => setAutoRoles(getAutoDubCurrentRoles()), 500);
+    return () => clearInterval(t);
+  }, []);
 
   // Dub-hold state — sustained Echo Throw on a channel (one tap open for as
   // long as the toggle is on). Decoupled from the M/T/E/✦ row so the user
@@ -1319,6 +1340,35 @@ export const DubDeckStrip: React.FC = () => {
               >
                 CH {i + 1}
               </span>
+              {/* Role selector — compact chips. 'Auto' shows classifier result.
+                  User selection overrides classifier for AutoDub targeting. */}
+              <div className="flex flex-wrap gap-0.5 justify-center w-full">
+                {ROLE_OPTIONS.map(({ role, label, title: optTitle }) => {
+                  const userRole = ch?.dubRole ?? null;
+                  const autoRole = autoRoles[i] ?? null;
+                  const isSelected = userRole === role;
+                  // Auto chip: show current classifier result as dim label
+                  const chipLabel = (role === null && autoRole)
+                    ? `${autoRole.slice(0, 4)}`
+                    : label;
+                  return (
+                    <button
+                      key={label}
+                      className={
+                        'px-1 py-0.5 rounded text-[8px] font-mono border transition-colors ' +
+                        (isSelected
+                          ? 'bg-accent-highlight/30 border-accent-highlight text-accent-highlight'
+                          : 'bg-dark-bgTertiary border-dark-border text-text-muted hover:border-accent-primary hover:text-text-secondary')
+                      }
+                      onClick={() => setChannelDubRole(i, isSelected ? null : role)}
+                      title={`Ch ${i + 1} · ${optTitle}${role === null && autoRole ? ` (currently: ${autoRole})` : ''}`}
+                      disabled={!busEnabled}
+                    >
+                      {chipLabel}
+                    </button>
+                  );
+                })}
+              </div>
               {CHANNEL_OPS.map((op) => {
                 const key = `${op.moveId}:${i}`;
                 const active = heldMoves.has(key) || activeFires.has(key);
