@@ -184,6 +184,7 @@ export const DubDeckStrip: React.FC = () => {
 
   const autoDubEnabled = useDubStore(s => s.autoDubEnabled);
   const setAutoDubEnabled = useDubStore(s => s.setAutoDubEnabled);
+  const autoDubPersona = useDubStore(s => s.autoDubPersona);
   const setAutoDubPersona = useDubStore(s => s.setAutoDubPersona);
   const setAutoDubIntensity = useDubStore(s => s.setAutoDubIntensity);
 
@@ -197,13 +198,18 @@ export const DubDeckStrip: React.FC = () => {
   const [autoDubSettingsOpen, setAutoDubSettingsOpen] = useState(false);
   const autoDubSettingsBtnRef = useRef<HTMLButtonElement | null>(null);
 
-  // Derive current style from the character preset only.
-  // The persona is set as a side effect of applyStyle but doesn't gate the
-  // dropdown display — requiring both to match was fragile and caused the
-  // dropdown to flicker to "Custom" on any batching race.
-  const currentStyle = DUB_STYLES.find(
-    s => s.characterPreset === (dubBusSettings.characterPreset || 'custom')
-  ) ?? DUB_STYLES[0];
+  // Derive current style. For presets with unique characterPreset values
+  // (tubby/scientist/perry/madProfessor/gatedFlanger) the characterPreset alone
+  // identifies the style. For 'custom' characterPreset, multiple styles map
+  // here (Custom and Prince Jammy both have null/custom preset) — use the
+  // persona to disambiguate between them.
+  const currentStyle = DUB_STYLES.find(s => {
+    const effectivePreset = s.characterPreset ?? 'custom';
+    if (effectivePreset !== (dubBusSettings.characterPreset || 'custom')) return false;
+    // When the characterPreset is 'custom', use persona to pick the right entry
+    if (effectivePreset === 'custom') return s.personaId === autoDubPersona;
+    return true;
+  }) ?? DUB_STYLES[0];
 
   const channels = useMixerStore(s => s.channels);
   const setChannelDubSend = useMixerStore(s => s.setChannelDubSend);
