@@ -1329,8 +1329,7 @@ export const DubDeckStrip: React.FC = () => {
               >
                 CH {i + 1}
               </span>
-              {/* Role override — select shows classifier result when on Auto,
-                  user pick locks targeting for this channel in AutoDub. */}
+              {/* Role override — dim = auto (classifier), amber = locked by user */}
               {(() => {
                 const userRole = ch?.dubRole ?? null;
                 const autoRole = autoRoles[i] ?? null;
@@ -1344,10 +1343,10 @@ export const DubDeckStrip: React.FC = () => {
                         ? 'bg-accent-highlight/20 border-accent-highlight text-accent-highlight'
                         : 'bg-dark-bgTertiary border-dark-border text-text-muted')
                     }
-                    title={`Ch ${i + 1} role — Auto uses classifier (currently: ${autoRole ?? '?'}). Override locks AutoDub targeting.`}
+                    title={`Ch ${i + 1} role — classifier says "${autoRole ?? '?'}". Override locks AutoDub targeting.`}
                     disabled={!busEnabled}
                   >
-                    <option value="">Auto{autoRole ? ` (${autoRole})` : ''}</option>
+                    <option value="">{autoRole ?? '—'}</option>
                     <option value="percussion">Drums</option>
                     <option value="bass">Bass</option>
                     <option value="lead">Lead</option>
