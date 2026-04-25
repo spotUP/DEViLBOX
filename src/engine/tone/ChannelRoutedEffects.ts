@@ -280,6 +280,20 @@ export class ChannelRoutedEffectsManager {
         const fx = new PerChannelDubFx(ctx, dubBusInput, drySpringBus);
         g.connect(fx.input);
         this.perChannelFx.set(ch, fx);
+        // Re-apply any stored channel settings (survive song reload / bus recreate)
+        try {
+          const { useMixerStore } = require('@stores/useMixerStore') as typeof import('@stores/useMixerStore');
+          const ch_state = useMixerStore.getState().channels[ch];
+          if (ch_state) {
+            fx.setFilterMode(ch_state.dubFilterMode ?? 'off');
+            fx.setFilterHz(ch_state.dubFilterHz ?? 200);
+            fx.setReverbSend(ch_state.dubReverbSend ?? 0);
+            fx.setSweepAmount(ch_state.dubSweepAmount ?? 0);
+            fx.setSweepRate(ch_state.dubSweepRateHz ?? 0.8);
+            fx.setSweepDepth(ch_state.dubSweepDepthMs ?? 8);
+            fx.setSweepFeedback(ch_state.dubSweepFeedback ?? 0.5);
+          }
+        } catch { /* ok — store may not be ready on first init */ }
       } else {
         g.connect(dubBusInput);
       }

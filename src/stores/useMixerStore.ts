@@ -613,6 +613,9 @@ export interface MixerChannelState {
   dubFilterHz: number;      // Filter cutoff frequency (Hz)
   dubReverbSend: number;    // 0–1 dry spring send (bypasses echo, feeds spring directly)
   dubSweepAmount: number;   // 0–1 per-channel comb sweep wet level
+  dubSweepRateHz: number;   // Comb sweep LFO rate (Hz)
+  dubSweepDepthMs: number;  // Comb sweep LFO depth (ms)
+  dubSweepFeedback: number; // Comb sweep feedback (0–0.9)
 }
 
 function defaultChannels(): MixerChannelState[] {
@@ -631,6 +634,9 @@ function defaultChannels(): MixerChannelState[] {
     dubFilterHz: 200,
     dubReverbSend: 0,
     dubSweepAmount: 0,
+    dubSweepRateHz: 0.8,
+    dubSweepDepthMs: 8,
+    dubSweepFeedback: 0.5,
   }));
 }
 
@@ -699,6 +705,9 @@ interface MixerStoreActions {
   setChannelDubFilter: (ch: number, mode: 'off' | 'hpf' | 'lpf', hz?: number) => void;
   setChannelDubReverbSend: (ch: number, amount: number) => void;
   setChannelDubSweepAmount: (ch: number, amount: number) => void;
+  setChannelDubSweepParams: (ch: number, rateHz: number, depthMs: number, feedback: number) => void;
+  /** Apply a full ChannelFxConfig to a channel (used by character preset loading). */
+  applyChannelFxConfig: (ch: number, cfg: import('@/types/dub').ChannelFxConfig) => void;
 
   // Send levels
   setChannelSendLevel: (ch: number, sendIndex: number, level: number) => void;
@@ -1005,6 +1014,34 @@ export const useMixerStore = create<MixerStore>()(
         const fx = getChannelRoutedEffectsManager()?.getPerChannelFx(ch);
         fx?.setSweepAmount(clamped);
       } catch { /* ok */ }
+    },
+
+    setChannelDubSweepParams(ch: number, rateHz: number, depthMs: number, feedback: number): void {
+      set((state) => {
+        if (ch < 0 || ch >= state.channels.length) return;
+        state.channels[ch].dubSweepRateHz = rateHz;
+        state.channels[ch].dubSweepDepthMs = depthMs;
+        state.channels[ch].dubSweepFeedback = feedback;
+      });
+      try {
+        const fx = getChannelRoutedEffectsManager()?.getPerChannelFx(ch);
+        if (fx) { fx.setSweepRate(rateHz); fx.setSweepDepth(depthMs); fx.setSweepFeedback(feedback); }
+      } catch { /* ok */ }
+    },
+
+    applyChannelFxConfig(ch: number, cfg: import('@/types/dub').ChannelFxConfig): void {
+      get().setChannelDubFilter(ch, cfg.filterMode, cfg.filterHz);
+      get().setChannelDubReverbSend(ch, cfg.reverbSend);
+      get().setChannelDubSweepAmount(ch, cfg.sweepAmount);
+      if (cfg.sweepRateHz !== undefined || cfg.sweepDepthMs !== undefined || cfg.sweepFeedback !== undefined) {
+        const cur = get().channels[ch];
+        get().setChannelDubSweepParams(
+          ch,
+          cfg.sweepRateHz  ?? cur?.dubSweepRateHz  ?? 0.8,
+          cfg.sweepDepthMs ?? cur?.dubSweepDepthMs ?? 8,
+          cfg.sweepFeedback ?? cur?.dubSweepFeedback ?? 0.5,
+        );
+      }
     },
 
     // Send levels
