@@ -108,6 +108,7 @@ export class ChannelRoutedEffectsManager {
    */
   private dubBusInput: AudioNode | null = null;
   private channelDubGains: (GainNode | null)[] = new Array(MAX_DUB_CHANNELS).fill(null);
+  private perChannelFx: Map<number, import('../dub/PerChannelDubFx').PerChannelDubFx> = new Map();
   /** Target gain value each channel should ramp to. Persists across engine rebuilds. */
   private channelDubSendValues: number[] = new Array(MAX_DUB_CHANNELS).fill(0);
   /** Active state — true when the worklet is rendering this channel into its dub output. */
@@ -262,29 +263,42 @@ export class ChannelRoutedEffectsManager {
    * The GainNodes exist independently of any engine. setChannelDubSend uses
    * `dubBusInput.context` to stay in the correct audio graph.
    */
-  setupDubBusWiring(dubBusInput: AudioNode): void {
+  setupDubBusWiring(dubBusInput: AudioNode, dubBus?: import('../dub/DubBus').DubBus): void {
     if (this.dubBusInput === dubBusInput) return;
-    // Tear down existing wiring if we're switching buses (rare — happens if
-    // the DubBus is disposed and recreated).
     if (this.dubBusInput) this._teardownDubWiring();
 
     this.dubBusInput = dubBusInput;
     const ctx = dubBusInput.context as AudioContext;
+    const drySpringBus = dubBus?.drySpringBusNode ?? null;
+
     for (let ch = 0; ch < MAX_DUB_CHANNELS; ch++) {
       const g = ctx.createGain();
       g.gain.value = 0;
-      g.connect(dubBusInput);
+      if (drySpringBus) {
+        // Insert per-channel mini-chain between the gain and the bus input
+        const { PerChannelDubFx } = require('../dub/PerChannelDubFx') as typeof import('../dub/PerChannelDubFx');
+        const fx = new PerChannelDubFx(ctx, dubBusInput, drySpringBus);
+        g.connect(fx.input);
+        this.perChannelFx.set(ch, fx);
+      } else {
+        g.connect(dubBusInput);
+      }
       this.channelDubGains[ch] = g;
     }
-    console.log(`[ChannelRoutedEffects] Dub bus wiring ready (32 per-channel gains → dubBusInput)`);
+    console.log(`[ChannelRoutedEffects] Dub bus wiring ready (${MAX_DUB_CHANNELS} per-channel FX chains → dubBusInput)`);
+  }
+
+  /** Get the per-channel effect chain for a tracker channel. */
+  getPerChannelFx(ch: number): import('../dub/PerChannelDubFx').PerChannelDubFx | null {
+    return this.perChannelFx.get(ch) ?? null;
   }
 
   private _teardownDubWiring(): void {
+    for (const fx of this.perChannelFx.values()) { try { fx.dispose(); } catch { /* ok */ } }
+    this.perChannelFx.clear();
     for (let ch = 0; ch < MAX_DUB_CHANNELS; ch++) {
       const g = this.channelDubGains[ch];
-      if (g) {
-        try { g.disconnect(); } catch { /* ok */ }
-      }
+      if (g) { try { g.disconnect(); } catch { /* ok */ } }
       this.channelDubGains[ch] = null;
       this.channelDubActive[ch] = false;
     }

@@ -322,6 +322,10 @@ export class DubBus {
    *  damping, and per-spring scatter. Delay side disabled since the bus
    *  already runs SpaceEcho as its dedicated tape-head chain. */
   private spring: AelapseEffect;
+  /** Receives per-channel reverb sends and routes directly to spring.input,
+   *  bypassing the echo chain. Allows each channel to have an independent
+   *  spring reverb send level separate from its main dub send. */
+  private drySpringBus!: GainNode;
   // Optional plate-stage insert — see `setPlateStage` + the DubBusSettings
   // `plateStage` field. null when plateStage='off'. Instantiated lazily.
   private plateStage: MadProfessorPlateEffect | DattorroPlateEffect | null = null;
@@ -1262,6 +1266,7 @@ export class DubBus {
   // whole-mix Path 2 instead of being fooled by stale non-SID channelTaps
   // left over from prior tracker sessions.
   private _sidHasPerVoiceTaps = false;
+  private _sidPerChannelFx: Map<number, import('./PerChannelDubFx').PerChannelDubFx> = new Map();
   // Callback to apply a make-up gain on the SID engine's master output when
   // the dub bus is enabled/disabled. Registered by NativeEngineRouting when
   // the SID engine comes online. Kept as a callback (not a node reference)
@@ -1708,6 +1713,16 @@ export class DubBus {
                              // through fully processed audio.
     });
 
+    // Per-channel dry reverb send — bypasses echo, feeds spring directly.
+    // Each channel can have its own reverb send level independent of the
+    // main dub send (which goes through echo first).
+    this.drySpringBus = this.context.createGain();
+    this.drySpringBus.gain.value = 1;
+    const springInNative = getNativeAudioNode(this.spring.input as unknown);
+    if (springInNative) {
+      try { this.drySpringBus.connect(springInNative); } catch { /* ok */ }
+    }
+
     this.echo = createDubEchoEngine(this.settings.echoEngine, this.settings);
 
     // Sidechain pumping — fast: catches transients, makes the tail breathe
@@ -1989,6 +2004,10 @@ export class DubBus {
   /** The bus input node — pad sources connect to this. */
   get inputNode(): GainNode { return this.input; }
 
+  /** Receives per-channel dry reverb sends; feeds spring.input directly,
+   *  bypassing the echo chain. PerChannelDubFx instances connect here. */
+  get drySpringBusNode(): GainNode { return this.drySpringBus; }
+
   /** Pre-load all WASM effect modules so the first engine swap is instant. */
   private async _preheatWASMModules(): Promise<void> {
     try {
@@ -2101,21 +2120,37 @@ export class DubBus {
    * The tap gains start at 0 (silent) — echo throws ramp them up.
    */
   registerSidVoiceTaps(voiceOutputs: GainNode[]): void {
+    // Dispose any existing SID per-channel FX before re-registering
+    for (const fx of this._sidPerChannelFx.values()) { try { fx.dispose(); } catch { /* ok */ } }
+    this._sidPerChannelFx.clear();
+
     for (let i = 0; i < voiceOutputs.length; i++) {
       const tapGain = this.context.createGain();
       tapGain.gain.value = 0; // silent until echo throw opens the tap
       try {
         voiceOutputs[i].connect(tapGain);
-        tapGain.connect(this.input);
+        // Insert per-channel mini-chain between tap and bus input
+        const { PerChannelDubFx } = require('./PerChannelDubFx') as typeof import('./PerChannelDubFx');
+        const fx = new PerChannelDubFx(this.context, this.input, this.drySpringBus);
+        tapGain.connect(fx.input);
+        this._sidPerChannelFx.set(i, fx);
       } catch (e) {
         console.warn(`[DubBus] Failed to connect SID voice ${i} tap:`, e);
+        // Fallback: connect directly without per-channel FX
+        try { voiceOutputs[i].connect(tapGain); tapGain.connect(this.input); } catch { /* ok */ }
         continue;
       }
       // Register as a standard channel tap so openChannelTap() works
       this.channelTaps.set(i, tapGain);
     }
     this._sidHasPerVoiceTaps = voiceOutputs.length > 0;
-    console.log(`[DubBus] Registered ${voiceOutputs.length} per-voice SID taps`);
+    console.log(`[DubBus] Registered ${voiceOutputs.length} per-voice SID taps with per-channel FX`);
+  }
+
+  /** Get the per-channel FX chain for a SID voice. Returns null for non-SID
+   *  or voices without per-voice taps. */
+  getSidPerChannelFx(voiceIndex: number): import('./PerChannelDubFx').PerChannelDubFx | null {
+    return this._sidPerChannelFx.get(voiceIndex) ?? null;
   }
 
   /**
