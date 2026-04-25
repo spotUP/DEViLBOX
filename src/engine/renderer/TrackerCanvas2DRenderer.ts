@@ -158,21 +158,22 @@ export class TrackerCanvas2DRenderer {
     const startRow = Math.max(0, scrollRow);
     const endRow   = Math.min(numRows, startRow + visibleRows);
 
-    // D effect (0xD = Pattern Break) — the D row is the last active row;
-    // rows after it are unreachable within this pattern.
-    // Find the earliest D in any channel/row. -1 = no break found.
+    // D (0xD = Pattern Break) and B (0xB = Position Jump) effects both cause
+    // the pattern to end early — rows after either are unreachable.
+    // Find the earliest occurrence across all channels.
     let dRow = -1;
     let breakRow = numRows; // first unreachable row index
     outer: for (let r = 0; r < numRows; r++) {
       for (let ch = 0; ch < pattern.channels.length; ch++) {
         const cell = pattern.channels[ch]?.rows?.[r];
         if (!cell) continue;
-        if (cell.effTyp === 0xD || cell.effTyp2 === 0xD ||
-            cell.effTyp3 === 0xD || cell.effTyp4 === 0xD ||
-            cell.effTyp5 === 0xD || cell.effTyp6 === 0xD ||
-            cell.effTyp7 === 0xD || cell.effTyp8 === 0xD) {
+        const isBreak = (e: number | undefined) => e === 0xD || e === 0xB;
+        if (isBreak(cell.effTyp)  || isBreak(cell.effTyp2) ||
+            isBreak(cell.effTyp3) || isBreak(cell.effTyp4) ||
+            isBreak(cell.effTyp5) || isBreak(cell.effTyp6) ||
+            isBreak(cell.effTyp7) || isBreak(cell.effTyp8)) {
           dRow = r;
-          breakRow = r + 1; // rows AFTER the D row are unreachable
+          breakRow = r + 1; // rows AFTER the break row are unreachable
           break outer;
         }
       }
