@@ -82,6 +82,7 @@ export const AUTO_DUB_PERSONAS: Record<AutoDubPersonaId, AutoDubPersona> = {
       delayTimeThrow:    1.3,   // pitch whoosh on phrase changes
       masterDrop:        1.2,   // dramatic dry mute with echo tail
       tapeWobble:        1.4,   // RE-201 tape wow/flutter — Tubby's mechanical character
+      combSweep:         1.6,   // research: Tubby's liquid comb-sweep on drums is THE signature
       tapeStop:          0.5,
       backwardReverb:    0.2,
       reverseEcho:       0.3,
@@ -141,6 +142,7 @@ export const AUTO_DUB_PERSONAS: Record<AutoDubPersonaId, AutoDubPersona> = {
       sonarPing:         1.5,
       tubbyScream:       1.1,
       tapeWobble:        1.3,   // Perry's 7.5 ips tape wow/flutter
+      combSweep:         0.8,
       masterDrop:        1.0,
       delayTimeThrow:    1.2,   // pitch whoosh on phrase turns
       echoThrow:         0.8,

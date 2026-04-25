@@ -112,6 +112,7 @@ const GLOBAL_MOVES: Array<GlobalMove> = [
   { label: 'Wobble',     title: 'Tape Wobble — LFO on echo rate (toggle)',                         moveId: 'tapeWobble',   color: 'accent-warning/70',  kind: 'hold', group: 'toggle', needsSend: true },
   { label: 'Ghost',      title: 'Ghost Reverb — extra reverb decay on channels (toggle)',          moveId: 'ghostReverb',  color: 'accent-secondary',   kind: 'hold', group: 'toggle', needsSend: true },
   { label: 'Sub Harm',   title: 'Sub Harmonic — env-follower sub pulse on every transient (toggle)', moveId: 'subHarmonic', color: 'accent-primary/70', kind: 'hold', group: 'toggle', needsSend: true },
+  { label: 'Liquid',     title: 'Liquid Sweep — comb filter / phaser swirl on the bus return (toggle)', moveId: 'combSweep', color: 'accent-secondary/80', kind: 'hold', group: 'toggle', needsSend: true },
   { label: 'Sweep',      title: 'EQ Sweep — resonant filter sweep (toggle)',                       moveId: 'eqSweep',      color: 'accent-highlight/70', kind: 'hold', group: 'toggle', needsSend: true },
   { label: 'Ring',       title: 'Ring Mod — metallic ring modulation (toggle)',                    moveId: 'ringMod',      color: 'accent-warning',     kind: 'hold', group: 'toggle', needsSend: true },
   { label: 'Starve',     title: 'Voltage Starve — bit-crush degradation (toggle)',                 moveId: 'voltageStarve', color: 'accent-error/70',   kind: 'hold', group: 'toggle', needsSend: true },
