@@ -794,7 +794,15 @@ function tickImpl(): void {
 
   const persona = getPersona(dub.autoDubPersona);
   const bundle = getCurrentPatternBundle();
-  const roles = bundle.roles;
+
+  // Apply user-set channel role overrides (highest priority — overrides
+  // both offline analysis and runtime audio classifier).
+  const mixerChannels = useMixerStore.getState().channels;
+  const roles: ChannelRole[] = bundle.roles.map((r, i) => {
+    const userRole = mixerChannels[i]?.dubRole;
+    return (userRole as ChannelRole | null) ?? r;
+  });
+  _lastComputedRoles = roles;
   const channelCount = roles.length > 0 ? roles.length : getChannelCount();
   const transientChannels = detectTransientsFromOscilloscope();
 
@@ -869,6 +877,16 @@ export function stopAutoDub(): void {
 
 export function isAutoDubRunning(): boolean {
   return _timer !== null;
+}
+
+/** Last computed channel roles (merged offline + runtime + user overrides).
+ *  Updated every tick while AutoDub is running. Empty array when stopped or
+ *  no song is loaded. Used by the dub deck UI to show what the classifier
+ *  currently thinks so the user can confirm or correct it. */
+let _lastComputedRoles: ChannelRole[] = [];
+
+export function getAutoDubCurrentRoles(): readonly ChannelRole[] {
+  return _lastComputedRoles;
 }
 
 // ───────────────────────── Pre-play audio scrub ───────────────────────────────
