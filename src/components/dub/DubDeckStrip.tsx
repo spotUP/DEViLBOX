@@ -609,14 +609,26 @@ export const DubDeckStrip: React.FC = () => {
   // process immediately without manual fader riding.
   const applyCharacterPresetSends = useCallback((presetKey: string) => {
     const preset = DUB_CHARACTER_PRESETS[presetKey as keyof typeof DUB_CHARACTER_PRESETS];
-    if (!preset?.defaultSendsByRole) return;
-    const sends = preset.defaultSendsByRole;
+    if (!preset) return;
     const visible = pattern?.channels.length ?? 8;
+    const mixerState = useMixerStore.getState();
     for (let i = 0; i < visible; i++) {
-      const name = useMixerStore.getState().channels[i]?.name ?? '';
+      const name = mixerState.channels[i]?.name ?? '';
       const role = inferRoleFromName(name);
-      const level = role != null ? (sends[role] ?? sends.default) : sends.default;
-      setChannelDubSend(i, level);
+
+      // Apply channel send level
+      if (preset.defaultSendsByRole) {
+        const sends = preset.defaultSendsByRole;
+        const level = role != null ? (sends[role as keyof typeof sends] ?? sends.default) : sends.default;
+        setChannelDubSend(i, level);
+      }
+
+      // Apply per-channel FX config (filter, reverb, sweep)
+      if (preset.perChannelFxByRole) {
+        const fxMap = preset.perChannelFxByRole;
+        const cfg = (role != null ? fxMap[role as keyof typeof fxMap] : null) ?? fxMap.default;
+        if (cfg) mixerState.applyChannelFxConfig(i, cfg);
+      }
     }
   }, [pattern, setChannelDubSend]);
 

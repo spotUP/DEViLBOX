@@ -506,6 +506,28 @@ export interface DubCharacterPreset {
     pad?: number;
     default: number;
   };
+  /** Per-channel PerChannelDubFx settings applied when this preset loads.
+   *  Keyed by channel role. 'default' is the fallback. */
+  perChannelFxByRole?: {
+    percussion?: ChannelFxConfig;
+    bass?: ChannelFxConfig;
+    lead?: ChannelFxConfig;
+    chord?: ChannelFxConfig;
+    arpeggio?: ChannelFxConfig;
+    pad?: ChannelFxConfig;
+    skank?: ChannelFxConfig;
+    default?: ChannelFxConfig;
+  };
+}
+
+export interface ChannelFxConfig {
+  filterMode: 'off' | 'hpf' | 'lpf';
+  filterHz?: number;
+  reverbSend: number;
+  sweepAmount: number;
+  sweepRateHz?: number;
+  sweepDepthMs?: number;
+  sweepFeedback?: number;
 }
 
 export const DUB_CHARACTER_PRESETS: Record<Exclude<DubBusSettings['characterPreset'], 'custom'>, DubCharacterPreset> = {
@@ -545,6 +567,19 @@ export const DUB_CHARACTER_PRESETS: Record<Exclude<DubBusSettings['characterPres
     // Tubby's style: everything through the bus, loud. Drums + bass dominate;
     // melodic lines get heavy echo throws; nothing stays dry.
     defaultSendsByRole: { percussion: 1.0, bass: 0.85, lead: 0.70, chord: 0.60, arpeggio: 0.60, pad: 0.50, default: 0.55 },
+    // Percussion gets the signature liquid comb sweep. Bass stays completely
+    // dry (no filter, no reverb — it competes with the bass shelf). Leads get
+    // a gentle HPF to prevent mud buildup during echo throws.
+    perChannelFxByRole: {
+      percussion: { filterMode: 'hpf', filterHz: 150, reverbSend: 0.0, sweepAmount: 0.75, sweepRateHz: 0.12, sweepDepthMs: 4.0, sweepFeedback: 0.70 },
+      bass:       { filterMode: 'off', filterHz: 80,  reverbSend: 0.0, sweepAmount: 0.0 },
+      lead:       { filterMode: 'hpf', filterHz: 200, reverbSend: 0.0, sweepAmount: 0.50, sweepRateHz: 0.15, sweepDepthMs: 5.0, sweepFeedback: 0.65 },
+      chord:      { filterMode: 'hpf', filterHz: 120, reverbSend: 0.0, sweepAmount: 0.40, sweepRateHz: 0.10, sweepDepthMs: 3.0, sweepFeedback: 0.60 },
+      skank:      { filterMode: 'hpf', filterHz: 120, reverbSend: 0.0, sweepAmount: 0.55, sweepRateHz: 0.12, sweepDepthMs: 4.0, sweepFeedback: 0.65 },
+      arpeggio:   { filterMode: 'hpf', filterHz: 180, reverbSend: 0.0, sweepAmount: 0.35, sweepRateHz: 0.15, sweepDepthMs: 4.5, sweepFeedback: 0.62 },
+      pad:        { filterMode: 'off', filterHz: 80,  reverbSend: 0.0, sweepAmount: 0.0 },
+      default:    { filterMode: 'hpf', filterHz: 150, reverbSend: 0.0, sweepAmount: 0.45, sweepRateHz: 0.12, sweepDepthMs: 3.5, sweepFeedback: 0.65 },
+    },
   },
   scientist: {
     label: 'Scientist',
@@ -573,6 +608,19 @@ export const DUB_CHARACTER_PRESETS: Record<Exclude<DubBusSettings['characterPres
     // Scientist: selective — melodics get the most echo, bass controlled,
     // drums moderate. The mid-scoop drop only bites when leads are routed in.
     defaultSendsByRole: { percussion: 0.70, bass: 0.60, lead: 0.80, chord: 0.50, arpeggio: 0.55, pad: 0.40, default: 0.45 },
+    // No comb sweep (antithetical to precision). Leads + pads get the highest
+    // reverb send into the plate/spring (bypassing echo). Bass gets LPF to
+    // prevent honk from muddying the plate return.
+    perChannelFxByRole: {
+      percussion: { filterMode: 'hpf', filterHz: 200, reverbSend: 0.0,  sweepAmount: 0.0 },
+      bass:       { filterMode: 'lpf', filterHz: 800, reverbSend: 0.0,  sweepAmount: 0.0 },
+      lead:       { filterMode: 'hpf', filterHz: 250, reverbSend: 0.60, sweepAmount: 0.0 },
+      chord:      { filterMode: 'off', filterHz: 200, reverbSend: 0.0,  sweepAmount: 0.0 },
+      skank:      { filterMode: 'hpf', filterHz: 220, reverbSend: 0.0,  sweepAmount: 0.0 },
+      arpeggio:   { filterMode: 'hpf', filterHz: 220, reverbSend: 0.50, sweepAmount: 0.0 },
+      pad:        { filterMode: 'off', filterHz: 200, reverbSend: 0.35, sweepAmount: 0.0 },
+      default:    { filterMode: 'hpf', filterHz: 180, reverbSend: 0.0,  sweepAmount: 0.0 },
+    },
   },
   perry: {
     label: 'Lee "Scratch" Perry',
@@ -620,6 +668,19 @@ export const DUB_CHARACTER_PRESETS: Record<Exclude<DubBusSettings['characterPres
     // Perry: maximum chaos — everything bleeds. He literally had nothing dry.
     // The self-feeding ext-feedback loop needs all channels routed through.
     defaultSendsByRole: { percussion: 1.0, bass: 0.95, lead: 0.90, chord: 0.85, arpeggio: 0.85, pad: 0.80, default: 0.85 },
+    // No filters — Perry's philosophy was "everything through, nothing dry."
+    // High reverb sends feed the ext-feedback chaos. Aggressive sweep on all
+    // channels matches the phaser + tape-stack + spring chaos character.
+    perChannelFxByRole: {
+      percussion: { filterMode: 'off', filterHz: 80,  reverbSend: 0.50, sweepAmount: 0.80, sweepRateHz: 0.12, sweepDepthMs: 6.0, sweepFeedback: 0.75 },
+      bass:       { filterMode: 'off', filterHz: 80,  reverbSend: 0.65, sweepAmount: 0.70, sweepRateHz: 0.10, sweepDepthMs: 5.5, sweepFeedback: 0.72 },
+      lead:       { filterMode: 'off', filterHz: 80,  reverbSend: 0.70, sweepAmount: 0.85, sweepRateHz: 0.15, sweepDepthMs: 7.0, sweepFeedback: 0.78 },
+      chord:      { filterMode: 'off', filterHz: 80,  reverbSend: 0.60, sweepAmount: 0.75, sweepRateHz: 0.12, sweepDepthMs: 6.0, sweepFeedback: 0.75 },
+      skank:      { filterMode: 'off', filterHz: 80,  reverbSend: 0.65, sweepAmount: 0.80, sweepRateHz: 0.13, sweepDepthMs: 6.5, sweepFeedback: 0.76 },
+      arpeggio:   { filterMode: 'off', filterHz: 80,  reverbSend: 0.55, sweepAmount: 0.80, sweepRateHz: 0.14, sweepDepthMs: 6.5, sweepFeedback: 0.76 },
+      pad:        { filterMode: 'off', filterHz: 80,  reverbSend: 0.40, sweepAmount: 0.65, sweepRateHz: 0.08, sweepDepthMs: 5.0, sweepFeedback: 0.70 },
+      default:    { filterMode: 'off', filterHz: 80,  reverbSend: 0.50, sweepAmount: 0.75, sweepRateHz: 0.12, sweepDepthMs: 6.0, sweepFeedback: 0.75 },
+    },
   },
   gatedFlanger: {
     label: 'Gated Flanger',
@@ -648,6 +709,18 @@ export const DUB_CHARACTER_PRESETS: Record<Exclude<DubBusSettings['characterPres
     // Gated Flanger: aggressive but controlled. Heavy on percussion for the
     // gated-reverb snap; pads get the flanger treatment.
     defaultSendsByRole: { percussion: 0.85, bass: 0.55, lead: 0.60, chord: 0.65, arpeggio: 0.55, pad: 0.75, default: 0.55 },
+    // Jammy-style minimalism: extremely selective routing, tight HPFs.
+    // Only lead and pad get any reverb. Bass gets LPF to stay clean.
+    perChannelFxByRole: {
+      percussion: { filterMode: 'hpf', filterHz: 80,  reverbSend: 0.0,  sweepAmount: 0.0 },
+      bass:       { filterMode: 'lpf', filterHz: 600, reverbSend: 0.15, sweepAmount: 0.0 },
+      lead:       { filterMode: 'hpf', filterHz: 120, reverbSend: 0.40, sweepAmount: 0.0 },
+      chord:      { filterMode: 'off', filterHz: 200, reverbSend: 0.0,  sweepAmount: 0.0 },
+      skank:      { filterMode: 'off', filterHz: 200, reverbSend: 0.0,  sweepAmount: 0.0 },
+      arpeggio:   { filterMode: 'off', filterHz: 200, reverbSend: 0.0,  sweepAmount: 0.0 },
+      pad:        { filterMode: 'off', filterHz: 200, reverbSend: 0.30, sweepAmount: 0.0 },
+      default:    { filterMode: 'hpf', filterHz: 100, reverbSend: 0.0,  sweepAmount: 0.0 },
+    },
   },
   madProfessor: {
     label: 'Mad Professor',
@@ -680,6 +753,19 @@ export const DUB_CHARACTER_PRESETS: Record<Exclude<DubBusSettings['characterPres
     // Mad Professor: balanced and lush. Pads and leads get the most reverb
     // (ghostReverb/madProfPingPong); drums are present but not dominant.
     defaultSendsByRole: { percussion: 0.65, bass: 0.60, lead: 0.70, chord: 0.70, arpeggio: 0.65, pad: 0.80, default: 0.60 },
+    // No comb sweep (width comes from ping-pong, not flanger). Pads + bass get
+    // the highest direct spring reverb send — "sub bass in reverb" is the
+    // definitive Mad Prof texture. Leads swim in lush plate decay.
+    perChannelFxByRole: {
+      percussion: { filterMode: 'hpf', filterHz: 80,  reverbSend: 0.0,  sweepAmount: 0.0 },
+      bass:       { filterMode: 'off', filterHz: 80,  reverbSend: 0.65, sweepAmount: 0.0 },
+      lead:       { filterMode: 'hpf', filterHz: 150, reverbSend: 0.75, sweepAmount: 0.0 },
+      chord:      { filterMode: 'hpf', filterHz: 120, reverbSend: 0.65, sweepAmount: 0.0 },
+      skank:      { filterMode: 'hpf', filterHz: 130, reverbSend: 0.55, sweepAmount: 0.0 },
+      arpeggio:   { filterMode: 'hpf', filterHz: 140, reverbSend: 0.60, sweepAmount: 0.0 },
+      pad:        { filterMode: 'off', filterHz: 80,  reverbSend: 0.80, sweepAmount: 0.0 },
+      default:    { filterMode: 'hpf', filterHz: 100, reverbSend: 0.50, sweepAmount: 0.0 },
+    },
   },
 };
 
