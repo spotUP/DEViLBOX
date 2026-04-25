@@ -559,8 +559,8 @@ export const DUB_CHARACTER_PRESETS: Record<Exclude<DubBusSettings['characterPres
       // Resonant midrange peak that he swept by hand during mixing.
       returnEqEnabled: true,
       returnEqFreq:   700,
-      returnEqGain:   8,
-      returnEqQ:      3.0,
+      returnEqGain:   5,   // was 8 — high Q+gain was creating a resonant 700Hz tone
+      returnEqQ:      2.0, // was 3.0 — reduced to avoid audible resonance peak
     },
     springsLength: 0.35, springsDamp: 0.55, springsChaos: 0.20, springsScatter: 0.60, springsTone: 0.55,
     tapeSatDrive:  0.55,
@@ -608,17 +608,18 @@ export const DUB_CHARACTER_PRESETS: Record<Exclude<DubBusSettings['characterPres
     // Scientist: selective — melodics get the most echo, bass controlled,
     // drums moderate. The mid-scoop drop only bites when leads are routed in.
     defaultSendsByRole: { percussion: 0.70, bass: 0.60, lead: 0.80, chord: 0.50, arpeggio: 0.55, pad: 0.40, default: 0.45 },
-    // No comb sweep (antithetical to precision). Leads + pads get the highest
-    // reverb send into the plate/spring (bypassing echo). Bass gets LPF to
-    // prevent honk from muddying the plate return.
+    // No comb sweep (antithetical to precision). "Dry" means minimal direct
+    // spring sends — Scientist's reverb should come from the echo decay, not
+    // constant spring saturation. Leads get a touch of plate air; everything
+    // else stays analytical and clean.
     perChannelFxByRole: {
       percussion: { filterMode: 'hpf', filterHz: 200, reverbSend: 0.0,  sweepAmount: 0.0 },
       bass:       { filterMode: 'lpf', filterHz: 800, reverbSend: 0.0,  sweepAmount: 0.0 },
-      lead:       { filterMode: 'hpf', filterHz: 250, reverbSend: 0.60, sweepAmount: 0.0 },
+      lead:       { filterMode: 'hpf', filterHz: 250, reverbSend: 0.25, sweepAmount: 0.0 },
       chord:      { filterMode: 'off', filterHz: 200, reverbSend: 0.0,  sweepAmount: 0.0 },
-      skank:      { filterMode: 'hpf', filterHz: 250, reverbSend: 0.35, sweepAmount: 0.0 },
-      arpeggio:   { filterMode: 'hpf', filterHz: 220, reverbSend: 0.50, sweepAmount: 0.0 },
-      pad:        { filterMode: 'off', filterHz: 200, reverbSend: 0.35, sweepAmount: 0.0 },
+      skank:      { filterMode: 'hpf', filterHz: 250, reverbSend: 0.10, sweepAmount: 0.0 },
+      arpeggio:   { filterMode: 'hpf', filterHz: 220, reverbSend: 0.20, sweepAmount: 0.0 },
+      pad:        { filterMode: 'off', filterHz: 200, reverbSend: 0.15, sweepAmount: 0.0 },
       default:    { filterMode: 'hpf', filterHz: 180, reverbSend: 0.0,  sweepAmount: 0.0 },
     },
   },
