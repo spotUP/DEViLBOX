@@ -158,9 +158,11 @@ export class TrackerCanvas2DRenderer {
     const startRow = Math.max(0, scrollRow);
     const endRow   = Math.min(numRows, startRow + visibleRows);
 
-    // D effect (0xD = Pattern Break) — rows from breakRow onward are unreachable.
-    // Find the earliest D in any channel/row. `numRows` = no break.
-    let breakRow = numRows;
+    // D effect (0xD = Pattern Break) — the D row is the last active row;
+    // rows after it are unreachable within this pattern.
+    // Find the earliest D in any channel/row. -1 = no break found.
+    let dRow = -1;
+    let breakRow = numRows; // first unreachable row index
     outer: for (let r = 0; r < numRows; r++) {
       for (let ch = 0; ch < pattern.channels.length; ch++) {
         const cell = pattern.channels[ch]?.rows?.[r];
@@ -169,6 +171,7 @@ export class TrackerCanvas2DRenderer {
             cell.effTyp3 === 0xD || cell.effTyp4 === 0xD ||
             cell.effTyp5 === 0xD || cell.effTyp6 === 0xD ||
             cell.effTyp7 === 0xD || cell.effTyp8 === 0xD) {
+          dRow = r;
           breakRow = r + 1; // rows AFTER the D row are unreachable
           break outer;
         }
@@ -205,6 +208,13 @@ export class TrackerCanvas2DRenderer {
       if (isPast) {
         ctx.fillStyle = 'rgba(0,0,0,0.35)';
         ctx.fillRect(0, y, W, rowH);
+      }
+
+      // D row indicator — accent line at the bottom of the break row so
+      // it's visible even when D00 is on the last row (nothing to dim below)
+      if (r === dRow) {
+        ctx.fillStyle = 'rgba(233,180,69,0.7)'; // amber
+        ctx.fillRect(0, y + rowH - 2, W, 2);
       }
     }
 
