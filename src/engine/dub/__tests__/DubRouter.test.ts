@@ -48,6 +48,8 @@ function makeMockBus() {
     throwEchoTime: vi.fn((target: number, down: number, hold: number, up: number) =>
       log('throwEchoTime', target, down, hold, up)),
     backwardReverb: vi.fn(async (dur: number) => log('backwardReverb', dur)),
+    startCombSweep: vi.fn((amt: number, ramp: number) => { log('startCombSweep', amt, ramp); return () => log('combSweepRelease'); }),
+    startEQSweep: vi.fn((s: number, e: number, g: number, q: number, sec: number) => { log('startEQSweep', s, e, g, q, sec); return () => log('eqSweepStop'); }),
     tapeStop: vi.fn((down: number, hold: number) => log('tapeStop', down, hold)),
     startTapeHold: vi.fn((down: number) => { log('startTapeHold', down); return () => log('startTapeHoldRelease'); }),
     sweepMasterLpf: vi.fn((hz: number, down: number, hold: number) =>
@@ -85,7 +87,7 @@ describe('DubRouter + moves', () => {
         'echoThrow', 'dubStab', 'filterDrop', 'dubSiren', 'springSlam',
         'channelMute', 'channelThrow', 'delayTimeThrow', 'tapeWobble',
         'masterDrop', 'snareCrack', 'tapeStop', 'backwardReverb', 'toast',
-        'transportTapeStop',
+        'transportTapeStop', 'combSweep', 'eqSweep',
       ];
       for (const moveId of moves) {
         const result = fire(moveId, moveId === 'toast' ? undefined : 0);

@@ -187,7 +187,7 @@ export function computeDensityByRole(
  *  non-empty channel. Falls back to random channel pick if no role data. */
 interface Rule {
   moveId: string;
-  channelRole?: 'any' | 'percussion' | 'bass' | 'chord' | 'pad' | 'lead' | 'arpeggio';
+  channelRole?: 'any' | 'percussion' | 'bass' | 'chord' | 'pad' | 'lead' | 'arpeggio' | 'skank';
   condition: (ctx: AutoDubTickCtx) => boolean;
   baseWeight: number;
   /** For hold-kind moves: how many bars to hold before auto-release. Default 1. */
@@ -365,6 +365,17 @@ const RULES: Rule[] = [
   { moveId: 'tapeWobble',
     condition: (c) => c.isNewBar && c.bar % 4 === 1 && c.intensity > 0.35,
     baseWeight: 0.10, holdBars: 2, wet: true },
+  // Comb sweep — liquid LFO flanger swirl. Two rules:
+  //   1. Bar-edge hold on every even bar for percussion channels — the
+  //      classic "underwater drums" texture from dub's golden era.
+  //   2. Transient-reactive: fires on skank off-beats for that swirling
+  //      chord stab feel. Short hold (1 bar) so it doesn't overstay.
+  { moveId: 'combSweep', channelRole: 'percussion',
+    condition: (c) => c.isNewBar && c.bar % 2 === 0,
+    baseWeight: 0.22, holdBars: 2, wet: true },
+  { moveId: 'combSweep', channelRole: 'skank',
+    condition: (c) => hasTransientForRole(c, 'percussion') && c.barPos < 0.15,
+    baseWeight: 0.18, holdBars: 1, wet: true },
   // oscBass and crushBass are intentionally excluded from AutoDub:
   // both are self-oscillating generators that stomp on the mix when
   // auto-fired. They are manual-only performance pads.

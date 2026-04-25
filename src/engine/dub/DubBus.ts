@@ -1015,6 +1015,23 @@ export class DubBus {
     }
   }
 
+  /**
+   * Ramp the comb/phaser sweep wet amount to `targetAmount`, hold while the
+   * caller's disposer is live, then restore the prior value on release.
+   * The LFO is always running; this just gates the output gain.
+   */
+  startCombSweep(targetAmount: number, rampSec = 0.08): () => void {
+    const prior = this.settings.sweepAmount;
+    const now = this.context.currentTime;
+    this.sweepOutput.gain.cancelScheduledValues(now);
+    this.sweepOutput.gain.setTargetAtTime(Math.min(1, Math.max(0, targetAmount)), now, rampSec / 3);
+    return () => {
+      const t = this.context.currentTime;
+      this.sweepOutput.gain.cancelScheduledValues(t);
+      this.sweepOutput.gain.setTargetAtTime(prior, t, 0.05);
+    };
+  }
+
   /** Read the current springs dry/wet — diagnostic for gig-sims/tests.
    *  AelapseEffect doesn't expose a param reader, so we mirror it in
 

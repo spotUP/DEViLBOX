@@ -71,6 +71,7 @@ const MOVE_COLOR: Record<string, string> = {
   ghostReverb:         'bg-accent-highlight/30', // spectral wet-only ghost
   voltageStarve:       'bg-accent-error/30',     // lo-fi degradation
   ringMod:             'bg-accent-secondary/40', // metallic ring mod
+  combSweep:           'bg-accent-secondary/80', // liquid comb sweep — same family as sweep controls
 };
 
 // Hold-kind moves have a meaningful durationRows. Keep in sync with the
@@ -82,7 +83,7 @@ const HOLD_KINDS = new Set([
   'tubbyScream', 'stereoDoubler', 'oscBass', 'crushBass', 'subHarmonic',
   'eqSweep', 'ghostReverb', 'voltageStarve', 'ringMod',
   // New moves
-  'hpfRise', 'madProfPingPong',
+  'hpfRise', 'madProfPingPong', 'combSweep', 'eqSweep', 'tapeStop', 'transportTapeStop',
 ]);
 
 const POINT_WIDTH_PX = 6;   // rendered width for trigger events
