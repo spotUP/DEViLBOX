@@ -175,6 +175,9 @@ export const DubDeckStrip: React.FC = () => {
   const channels = useMixerStore(s => s.channels);
   const setChannelDubSend = useMixerStore(s => s.setChannelDubSend);
   const setChannelDubRole = useMixerStore(s => s.setChannelDubRole);
+  const setChannelDubFilter = useMixerStore(s => s.setChannelDubFilter);
+  const setChannelDubReverbSend = useMixerStore(s => s.setChannelDubReverbSend);
+  const setChannelDubSweepAmount = useMixerStore(s => s.setChannelDubSweepAmount);
   const patternIdx = useTrackerStore(s => s.currentPatternIndex);
   const pattern = useTrackerStore(s => s.patterns[patternIdx]);
 
@@ -377,7 +380,7 @@ export const DubDeckStrip: React.FC = () => {
     // the user left the tracker view. The engine owns the lifecycle.
     try {
       const mgr = getChannelRoutedEffectsManager(getToneEngine().masterEffectsInput);
-      mgr.setupDubBusWiring(bus.inputNode);
+      mgr.setupDubBusWiring(bus.inputNode, bus);
     } catch (e) {
       console.warn('[DubDeckStrip] setupDubBusWiring failed:', e);
     }
@@ -1353,6 +1356,67 @@ export const DubDeckStrip: React.FC = () => {
                     <option value="skank">Skank</option>
                     <option value="pad">Pad</option>
                   </select>
+                );
+              })()}
+              {/* Per-channel mini-bus: filter + reverb send + sweep */}
+              {(() => {
+                const filterMode = ch?.dubFilterMode ?? 'off';
+                const filterHz = ch?.dubFilterHz ?? 200;
+                const reverbSend = ch?.dubReverbSend ?? 0;
+                const sweepAmt = ch?.dubSweepAmount ?? 0;
+                return (
+                  <>
+                    <select
+                      value={filterMode}
+                      onChange={(e) => setChannelDubFilter(i, e.target.value as 'off' | 'hpf' | 'lpf')}
+                      className={
+                        'w-full text-[8px] font-mono rounded border px-0.5 py-0.5 transition-colors ' +
+                        (filterMode !== 'off'
+                          ? 'bg-accent-warning/20 border-accent-warning text-accent-warning'
+                          : 'bg-dark-bgTertiary border-dark-border text-text-muted')
+                      }
+                      title={`Ch ${i + 1} filter — Off / High Pass / Low Pass. Shapes the audio before it enters the dub bus mix.`}
+                      disabled={!busEnabled}
+                    >
+                      <option value="off">Filter off</option>
+                      <option value="hpf">High Pass</option>
+                      <option value="lpf">Low Pass</option>
+                    </select>
+                    {filterMode !== 'off' && (
+                      <input
+                        type="range" min={40} max={8000} step={10}
+                        value={filterHz}
+                        onChange={(e) => setChannelDubFilter(i, filterMode, Number(e.target.value))}
+                        className="w-full accent-accent-warning"
+                        disabled={!busEnabled}
+                        title={`Filter cutoff ${filterHz} Hz`}
+                      />
+                    )}
+                    <div className="flex gap-1 w-full">
+                      <div className="flex flex-col items-center flex-1">
+                        <span className="text-[7px] text-text-muted">Rvb</span>
+                        <input
+                          type="range" min={0} max={1} step={0.01}
+                          value={reverbSend}
+                          onChange={(e) => setChannelDubReverbSend(i, Number(e.target.value))}
+                          className="w-full accent-accent-secondary"
+                          disabled={!busEnabled}
+                          title={`Ch ${i + 1} dry spring reverb send ${Math.round(reverbSend * 100)}% — bypasses echo, feeds spring directly`}
+                        />
+                      </div>
+                      <div className="flex flex-col items-center flex-1">
+                        <span className="text-[7px] text-text-muted">Swp</span>
+                        <input
+                          type="range" min={0} max={1} step={0.01}
+                          value={sweepAmt}
+                          onChange={(e) => setChannelDubSweepAmount(i, Number(e.target.value))}
+                          className="w-full accent-accent-secondary"
+                          disabled={!busEnabled}
+                          title={`Ch ${i + 1} per-channel comb sweep ${Math.round(sweepAmt * 100)}%`}
+                        />
+                      </div>
+                    </div>
+                  </>
                 );
               })()}
               {CHANNEL_OPS.map((op) => {
