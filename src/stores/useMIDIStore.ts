@@ -247,6 +247,7 @@ const DEFAULT_CC_MAPPINGS: CCMapping[] = [
   { ccNumber: 67, parameter: 'dub.ringMod',            min: 0, max: 1, curve: 'linear' },
   { ccNumber: 68, parameter: 'dub.hpfRise',            min: 0, max: 1, curve: 'linear' },
   { ccNumber: 69, parameter: 'dub.madProfPingPong',    min: 0, max: 1, curve: 'linear' },
+  { ccNumber: 70, parameter: 'dub.combSweep',          min: 0, max: 1, curve: 'linear' },
 
   // Dub bus continuous params — min/max are documentary; the actual
   // normalisation is handled by DUB_BUS_PARAMS transforms in

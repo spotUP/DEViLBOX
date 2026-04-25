@@ -45,6 +45,7 @@ import { delayPreset380, delayPresetDotted, delayPresetQuarter, delayPreset8th, 
 import { crushBass } from './moves/crushBass';
 import { subHarmonic } from './moves/subHarmonic';
 import { eqSweep } from './moves/eqSweep';
+import { combSweep } from './moves/combSweep';
 import type { DubMove, DubMoveContext } from './moves/_types';
 import type { DubBus } from './DubBus';
 import { useTransportStore } from '@/stores/useTransportStore';
@@ -122,6 +123,7 @@ const MOVES: Record<string, DubMove> = {
   crushBass,
   subHarmonic,
   eqSweep,
+  combSweep,
 };
 
 /**
