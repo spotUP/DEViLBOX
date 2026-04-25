@@ -208,13 +208,27 @@ export function getRuntimeClassifierGeneration(): number {
 
 /**
  * Merge offline (SampleSpectrum + note-stats) roles with runtime hints
- * from the live audio tap. Runtime overrides ONLY when:
- *   - offline role is `empty` or `pad` (weak signal), AND
- *   - runtime hint exists with sufficient support + confidence, AND
- *   - runtime role is one of {bass, percussion, lead} — roles the tap
- *     can detect with high specificity. Pad/chord/arpeggio are much
- *     harder to distinguish from lead at the feature level, so runtime
- *     doesn't override with those.
+ * from the live audio tap.
+ *
+ * In tracker music a sample slot can contain anything — a drum loop, a
+ * bass riff, a melody phrase. That means note-stats roles ('chord',
+ * 'lead', 'arpeggio', 'pad') are close to noise: the NOTE pitch says
+ * nothing about what the SAMPLE sounds like. Only two offline signals are
+ * trustworthy:
+ *   - `percussion` — detected from PCM (SampleSpectrum kick/hat/snare),
+ *     drumType field, or DRUM_SYNTHS set. Keep unconditionally.
+ *   - `bass` detected by SampleSpectrum low centroid + tonal shape —
+ *     keep unless runtime strongly disagrees.
+ *
+ * Everything else (`chord`, `lead`, `arpeggio`, `pad`, `empty`) should
+ * yield to the runtime audio tap when it has a confident reading, because
+ * the live audio is always more truthful than note-position heuristics for
+ * sample-based channels.
+ *
+ * Runtime can promote to {bass, percussion, lead} — the three roles the
+ * spectral tap detects with high specificity. Pad/chord/arpeggio require
+ * harmonic analysis beyond what a single FFT frame provides, so runtime
+ * never promotes to those.
  *
  * Pure — never mutates `offline`. Returns a new array.
  */
@@ -224,7 +238,12 @@ export function mergeOfflineAndRuntimeRoles(
   minConfidence: number = 0.6,
 ): ChannelRole[] {
   const out: ChannelRole[] = [];
-  const OVERRIDABLE_OFFLINE: readonly ChannelRole[] = ['empty', 'pad'];
+  // Note-stats roles that are unreliable for sample-based tracker channels.
+  // 'skank' is kept because off-beat note-position IS meaningful even when
+  // the sample content is unknown — an off-beat stab is still a stab.
+  const OVERRIDABLE_OFFLINE: readonly ChannelRole[] = [
+    'empty', 'pad', 'chord', 'lead', 'arpeggio',
+  ];
   const RUNTIME_CAN_PROMOTE_TO: readonly ChannelRole[] = ['bass', 'percussion', 'lead'];
   for (let i = 0; i < offline.length; i++) {
     const o = offline[i];
