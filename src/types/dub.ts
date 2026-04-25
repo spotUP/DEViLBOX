@@ -654,7 +654,7 @@ export const DUB_CHARACTER_PRESETS: Record<Exclude<DubBusSettings['characterPres
       // semi-manual feedback loop." The extFeedback loop recreates this —
       // return audio re-enters the input chain through a peaking EQ, creating
       // the self-feeding chaos that defined Perry's Black Ark sound.
-      extFeedbackGain:   0.28,  // moderate semi-manual feedback — not runaway, but alive
+      extFeedbackGain:   0.18,  // moderate semi-manual feedback — not runaway, but alive
       extFeedbackEqFreq: 400,   // boost at 400 Hz — the tape-saturation warmth zone
       extFeedbackEqGain: 3,     // gentle 3 dB lift per pass — accumulates over repeats
       extFeedbackEqQ:    1.2,
@@ -669,17 +669,18 @@ export const DUB_CHARACTER_PRESETS: Record<Exclude<DubBusSettings['characterPres
     // The self-feeding ext-feedback loop needs all channels routed through.
     defaultSendsByRole: { percussion: 1.0, bass: 0.95, lead: 0.90, chord: 0.85, arpeggio: 0.85, pad: 0.80, default: 0.85 },
     // No filters — Perry's philosophy was "everything through, nothing dry."
-    // High reverb sends feed the ext-feedback chaos. Aggressive sweep on all
-    // channels matches the phaser + tape-stack + spring chaos character.
+    // reverbSend is 0 — Perry's reverb comes from the echo→spring chain (chainOrder: springEcho),
+    // not from direct per-channel spring taps. Constant direct sends created a rolling reverb bed.
+    // Phaser sweep is present but moderate — too high across all channels stacks into a wash.
     perChannelFxByRole: {
-      percussion: { filterMode: 'off', filterHz: 80,  reverbSend: 0.50, sweepAmount: 0.80, sweepRateHz: 0.12, sweepDepthMs: 6.0, sweepFeedback: 0.75 },
-      bass:       { filterMode: 'off', filterHz: 80,  reverbSend: 0.80, sweepAmount: 0.70, sweepRateHz: 0.10, sweepDepthMs: 5.5, sweepFeedback: 0.72 },
-      lead:       { filterMode: 'off', filterHz: 80,  reverbSend: 0.85, sweepAmount: 0.85, sweepRateHz: 0.15, sweepDepthMs: 7.0, sweepFeedback: 0.78 },
-      chord:      { filterMode: 'off', filterHz: 80,  reverbSend: 0.60, sweepAmount: 0.75, sweepRateHz: 0.12, sweepDepthMs: 6.0, sweepFeedback: 0.75 },
-      skank:      { filterMode: 'off', filterHz: 80,  reverbSend: 0.65, sweepAmount: 0.80, sweepRateHz: 0.13, sweepDepthMs: 6.5, sweepFeedback: 0.76 },
-      arpeggio:   { filterMode: 'off', filterHz: 80,  reverbSend: 0.55, sweepAmount: 0.80, sweepRateHz: 0.14, sweepDepthMs: 6.5, sweepFeedback: 0.76 },
-      pad:        { filterMode: 'off', filterHz: 80,  reverbSend: 0.40, sweepAmount: 0.65, sweepRateHz: 0.08, sweepDepthMs: 5.0, sweepFeedback: 0.70 },
-      default:    { filterMode: 'off', filterHz: 80,  reverbSend: 0.50, sweepAmount: 0.75, sweepRateHz: 0.12, sweepDepthMs: 6.0, sweepFeedback: 0.75 },
+      percussion: { filterMode: 'off', filterHz: 80,  reverbSend: 0.0, sweepAmount: 0.40, sweepRateHz: 0.12, sweepDepthMs: 6.0, sweepFeedback: 0.65 },
+      bass:       { filterMode: 'off', filterHz: 80,  reverbSend: 0.0, sweepAmount: 0.35, sweepRateHz: 0.10, sweepDepthMs: 5.5, sweepFeedback: 0.62 },
+      lead:       { filterMode: 'off', filterHz: 80,  reverbSend: 0.0, sweepAmount: 0.45, sweepRateHz: 0.15, sweepDepthMs: 6.0, sweepFeedback: 0.68 },
+      chord:      { filterMode: 'off', filterHz: 80,  reverbSend: 0.0, sweepAmount: 0.40, sweepRateHz: 0.12, sweepDepthMs: 6.0, sweepFeedback: 0.65 },
+      skank:      { filterMode: 'off', filterHz: 80,  reverbSend: 0.0, sweepAmount: 0.42, sweepRateHz: 0.13, sweepDepthMs: 6.0, sweepFeedback: 0.66 },
+      arpeggio:   { filterMode: 'off', filterHz: 80,  reverbSend: 0.0, sweepAmount: 0.40, sweepRateHz: 0.14, sweepDepthMs: 5.5, sweepFeedback: 0.65 },
+      pad:        { filterMode: 'off', filterHz: 80,  reverbSend: 0.0, sweepAmount: 0.30, sweepRateHz: 0.08, sweepDepthMs: 5.0, sweepFeedback: 0.60 },
+      default:    { filterMode: 'off', filterHz: 80,  reverbSend: 0.0, sweepAmount: 0.38, sweepRateHz: 0.12, sweepDepthMs: 5.5, sweepFeedback: 0.64 },
     },
   },
   gatedFlanger: {
