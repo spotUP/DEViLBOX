@@ -398,6 +398,7 @@ export type DubMoveParameter =
   | 'dub.ringMod'
   | 'dub.hpfRise'
   | 'dub.madProfPingPong'
+  | 'dub.combSweep'
   // Continuous bus settings
   | 'dub.echoIntensity'
   | 'dub.echoWet'
