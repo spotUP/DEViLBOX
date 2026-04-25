@@ -13,6 +13,7 @@ import React, { useState, useCallback } from 'react';
 import { Headphones, RotateCcw } from 'lucide-react';
 import { CustomSelect } from '@components/common/CustomSelect';
 import { getActiveDubBus } from '@/engine/dub/DubBus';
+import { getActiveC64SidEngine } from '@/engine/replayer/NativeEngineRouting';
 
 interface SIDStereoTabProps {
   className?: string;
@@ -87,7 +88,10 @@ export const SIDStereoTab: React.FC<SIDStereoTabProps> = ({ className }) => {
         <label className="text-[10px] font-mono text-text-secondary shrink-0">Stereo Enhance</label>
         <CustomSelect
           value={stereoMode}
-          onChange={(v) => setStereoMode(v)}
+          onChange={(v) => {
+            setStereoMode(v);
+            try { getActiveC64SidEngine()?.setStereoEnhance(v as 'none' | 'low' | 'medium' | 'high'); } catch { /* ok */ }
+          }}
           options={STEREO_OPTIONS.map(o => ({ value: o.value, label: o.label }))}
           className="bg-dark-bg border border-dark-border text-text-primary text-[10px] font-mono
                      px-2 py-1 rounded"
@@ -99,7 +103,10 @@ export const SIDStereoTab: React.FC<SIDStereoTabProps> = ({ className }) => {
           <input
             type="checkbox"
             checked={headphones}
-            onChange={e => setHeadphones(e.target.checked)}
+            onChange={e => {
+              setHeadphones(e.target.checked);
+              try { getActiveC64SidEngine()?.setHeadphones(e.target.checked); } catch { /* ok */ }
+            }}
             className="accent-accent-primary"
           />
           <Headphones size={12} />
