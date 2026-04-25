@@ -1,15 +1,10 @@
 /**
  * Contract tests for AutoDubPanel's persona handling.
  *
- * Persona pick used to auto-apply the matching bus VOICE character preset
- * (via setDubBus({ characterPreset })), silently clobbering hand-tuned
- * voicings. Verified 2026-04-21 with Playwright on world-class-dub.mod:
- * changing persona while voice=scientist wiped voice to the persona's
- * suggested preset.
- *
- * The fix separates the two: `handlePersonaChange` only sets persona +
- * intensity. The new `applyPersonaVoice` handler is bound to a dedicated
- * "♫" button that the user must click explicitly.
+ * 2026-04-25 design: when the user picks a persona, the bus character preset is
+ * auto-applied IF the current preset is 'custom' (safe — no hand-tuning) OR
+ * already matches the persona's preset (no-op). Any other preset is left
+ * untouched so users who deliberately chose a different sound aren't clobbered.
  *
  * Text-level assertions — no React Testing Library, no DOM, runs in <50 ms.
  */
@@ -28,38 +23,23 @@ function read(rel: string): string {
 describe('AutoDubPanel — persona/voice separation contract', () => {
   const src = read('components/dub/AutoDubPanel.tsx');
 
-  it('defines a separate applyPersonaVoice handler', () => {
-    expect(src).toMatch(/const\s+applyPersonaVoice\s*=\s*useCallback/);
-  });
-
-  it('applyPersonaVoice is the ONLY handler that calls setDubBus with characterPreset', () => {
-    // Find the body of handlePersonaChange — it must NOT include setDubBus(...)
+  it('handlePersonaChange applies preset conditionally (custom or same preset only)', () => {
+    // handlePersonaChange must check the CURRENT characterPreset before applying,
+    // so it never silently clobbers a hand-tuned voicing.
     const handlerMatch = src.match(/const\s+handlePersonaChange\s*=\s*useCallback\([\s\S]*?\},\s*\[[^\]]*\]\);/);
     expect(handlerMatch, 'handlePersonaChange should exist').not.toBeNull();
     const handlerBody = handlerMatch![0];
-    expect(
-      handlerBody,
-      'handlePersonaChange must NOT call setDubBus — that silently clobbered hand-tuned voicings'
-    ).not.toMatch(/setDubBus\s*\(/);
-    expect(handlerBody).not.toMatch(/characterPreset/);
+    // Must check currentPreset before applying
+    expect(handlerBody).toMatch(/currentPreset/);
+    // Must guard with 'custom' check so hand-tuned voicings survive
+    expect(handlerBody).toMatch(/'custom'/);
   });
 
-  it('applyPersonaVoice is gated on suggestedCharacterPreset', () => {
-    const handlerMatch = src.match(/const\s+applyPersonaVoice\s*=\s*useCallback\([\s\S]*?\},\s*\[[^\]]*\]\);/);
-    expect(handlerMatch, 'applyPersonaVoice should exist').not.toBeNull();
-    const body = handlerMatch![0];
-    expect(body).toMatch(/suggestedCharacterPreset/);
-    expect(body).toMatch(/setDubBus\s*\(\s*\{\s*characterPreset\s*:/);
-  });
-
-  it('renders the ♫ button only when the current persona has a suggestedCharacterPreset', () => {
-    // Button render guarded so Custom persona (suggestedCharacterPreset: null) has no button.
-    expect(src).toMatch(/getPersona\(persona\)\.suggestedCharacterPreset\s*&&[\s\S]*?♫/);
-  });
-
-  it('♫ button onClick wires to applyPersonaVoice (not handlePersonaChange)', () => {
-    const buttonMatch = src.match(/<button[^>]*onClick=\{applyPersonaVoice\}[\s\S]*?♫[\s\S]*?<\/button>/);
-    expect(buttonMatch, '♫ button must call applyPersonaVoice').not.toBeNull();
+  it('does NOT render an unconditional ♫ apply button (auto-apply handles it)', () => {
+    // The ♫ button was removed when auto-apply landed in handlePersonaChange.
+    // A ♫ button that fires WITHOUT checking the current preset is the bug
+    // from 2026-04-21. The button is no longer needed.
+    expect(src).not.toMatch(/onClick=\{applyPersonaVoice\}/);
   });
 });
 
