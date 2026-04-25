@@ -399,17 +399,56 @@ export function classifySongChannels(
   const schema = patterns[0];
   if (!schema || !Array.isArray(schema.channels)) return [];
 
+  // Sample up to 50 patterns evenly distributed across the song so mid-song
+  // instrument changes (e.g. intro pad → chorus skank) are captured.
+  const MAX_PATTERNS = 50;
+  const step = patterns.length <= MAX_PATTERNS ? 1 : Math.floor(patterns.length / MAX_PATTERNS);
+  const sampled: Pattern[] = [];
+  for (let i = 0; i < patterns.length; i += step) sampled.push(patterns[i]);
+
   const analyses: EnhancedChannelAnalysis[] = schema.channels.map((_, idx) => {
-    let best: { pat: Pattern; noteCount: number } | null = null;
-    for (const pat of patterns) {
+    // Collect role votes across all sampled patterns for this channel.
+    // Use highest-confidence result per pattern; skip empty-role patterns.
+    const votes = new Map<ChannelRole, number>();
+    let bestResult: EnhancedChannelAnalysis | null = null;
+
+    for (const pat of sampled) {
       const ch = pat.channels?.[idx];
       if (!ch) continue;
-      let n = 0;
-      for (const cell of ch.rows) if (cell && cell.note >= 1 && cell.note <= 96) n++;
-      if (!best || n > best.noteCount) best = { pat, noteCount: n };
+      const result = classifyChannelWithInstruments(ch, idx, instruments);
+      if (result.role === 'empty') continue;
+
+      votes.set(result.role, (votes.get(result.role) ?? 0) + 1);
+
+      // Track first non-empty result as fallback
+      if (!bestResult) bestResult = result;
     }
-    const pat = best ? best.pat : schema;
-    return classifyChannelWithInstruments(pat.channels[idx], idx, instruments);
+
+    if (!bestResult) {
+      // All patterns were empty for this channel
+      return classifyChannelWithInstruments(schema.channels[idx], idx, instruments);
+    }
+
+    // Majority vote — pick the role that appeared most often
+    let winnerRole: ChannelRole = bestResult.role;
+    let winnerCount = 0;
+    for (const [role, count] of votes) {
+      if (count > winnerCount) { winnerCount = count; winnerRole = role; }
+    }
+
+    // If the majority role matches bestResult, use it; otherwise re-run
+    // classifyChannelWithInstruments on the pattern where that role appeared
+    // to get the full EnhancedChannelAnalysis (subrole, etc.).
+    if (winnerRole === bestResult.role) return bestResult;
+
+    // Find the pattern where the majority role was produced and return that result
+    for (const pat of sampled) {
+      const ch = pat.channels?.[idx];
+      if (!ch) continue;
+      const result = classifyChannelWithInstruments(ch, idx, instruments);
+      if (result.role === winnerRole) return result;
+    }
+    return bestResult;
   });
 
   _songRolesCache.set(patterns, analyses);

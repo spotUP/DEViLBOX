@@ -291,6 +291,19 @@ const RULES: Rule[] = [
   { moveId: 'sonarPing',
     condition: (c) => hasTransientForRole(c, 'lead'),
     baseWeight: 0.12, wet: true },
+  // Skank-specific rules — reggae off-beat chord stabs benefit from:
+  //   1. Echo throw on the stab hit itself (off-beat echo tail)
+  //   2. Channel mute for 1 bar ("drop the skank") — classic roots move
+  //   3. Transient-reactive echo on every stab hit (lower weight to avoid spam)
+  { moveId: 'echoThrow', channelRole: 'skank',
+    condition: (c) => c.isNewBar && c.bar % 4 === 1,
+    baseWeight: 0.30, wet: true },
+  { moveId: 'channelMute', channelRole: 'skank',
+    condition: (c) => c.isNewBar && c.bar % 8 === 4,
+    baseWeight: 0.22, holdBars: 1 },
+  { moveId: 'echoThrow', channelRole: 'skank',
+    condition: (c) => hasTransientForRole(c, 'percussion') && c.barPos > 0.25,
+    baseWeight: 0.18, wet: true },
 
   // ─── Phase 4: expanded move palette ─────────────────────────────────────
   // Spring kick — punchier spring hit, fits drum-heavy sections.
