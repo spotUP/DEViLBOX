@@ -184,7 +184,6 @@ export const DubDeckStrip: React.FC = () => {
 
   const autoDubEnabled = useDubStore(s => s.autoDubEnabled);
   const setAutoDubEnabled = useDubStore(s => s.setAutoDubEnabled);
-  const autoDubPersona = useDubStore(s => s.autoDubPersona);
   const setAutoDubPersona = useDubStore(s => s.setAutoDubPersona);
   const setAutoDubIntensity = useDubStore(s => s.setAutoDubIntensity);
 
@@ -198,10 +197,12 @@ export const DubDeckStrip: React.FC = () => {
   const [autoDubSettingsOpen, setAutoDubSettingsOpen] = useState(false);
   const autoDubSettingsBtnRef = useRef<HTMLButtonElement | null>(null);
 
-  // Derive current style from both stores (characterPreset + persona)
+  // Derive current style from the character preset only.
+  // The persona is set as a side effect of applyStyle but doesn't gate the
+  // dropdown display — requiring both to match was fragile and caused the
+  // dropdown to flicker to "Custom" on any batching race.
   const currentStyle = DUB_STYLES.find(
     s => s.characterPreset === (dubBusSettings.characterPreset || 'custom')
-      && s.personaId === autoDubPersona
   ) ?? DUB_STYLES[0];
 
   const channels = useMixerStore(s => s.channels);
@@ -636,34 +637,39 @@ export const DubDeckStrip: React.FC = () => {
 
   const capturedRecently = lastCapturedAt !== null && (performance.now() - lastCapturedAt) < 300;
 
-  // Apply a unified dub style — sets both character preset (bus sound) and AutoDub persona.
+  // Apply a unified dub style — sets the bus character preset (sound) and AutoDub persona.
+  // Does NOT auto-apply per-channel sends/FX — those are applied explicitly via ▶ audition
+  // or the "Apply Sends" action. Auto-applying sends immediately on style change caused
+  // the comb-sweep per-channel FX (sweepAmount 0.75, feedback 0.70) to start running on
+  // all percussion channels instantly, sustaining tones from any existing echo tails.
   const applyStyle = useCallback((styleId: string) => {
     const style = DUB_STYLES.find(s => s.id === styleId) ?? DUB_STYLES[0];
-    // Apply bus character preset
-    if (style.characterPreset) {
-      setDubBus({ characterPreset: style.characterPreset });
-      applyCharacterPresetSends(style.characterPreset);
-    } else {
-      setDubBus({ characterPreset: 'custom' });
-    }
-    // Apply AutoDub persona
+    // setDubBus with characterPreset applies all bus overrides (EQ, echo, spring, etc.)
+    setDubBus({ characterPreset: style.characterPreset ?? 'custom' });
     setAutoDubPersona(style.personaId);
     setAutoDubIntensity(getPersona(style.personaId).intensityDefault);
-  }, [setDubBus, setAutoDubPersona, setAutoDubIntensity]); // applyCharacterPresetSends added below
+  }, [setDubBus, setAutoDubPersona, setAutoDubIntensity]);
 
   // AutoDub toggle — enables/disables autonomous performer. Bus auto-enables.
+  // Preserve characterPreset when enabling so the preset dropdown doesn't flip to Custom.
   const handleAutoDubToggle = useCallback(() => {
-    if (!autoDubEnabled && !busEnabled) setDubBus({ enabled: true });
+    if (!autoDubEnabled && !busEnabled) {
+      setDubBus({ enabled: true, characterPreset: dubBusSettings.characterPreset });
+    }
     setAutoDubEnabled(!autoDubEnabled);
-  }, [autoDubEnabled, busEnabled, setDubBus, setAutoDubEnabled]);
+  }, [autoDubEnabled, busEnabled, setDubBus, setAutoDubEnabled, dubBusSettings.characterPreset]);
 
-  // Audition the current style's signature move — fires once so the user
-  // can hear what a style sounds like without enabling AutoDub.
+  // Audition the current style — applies channel sends (deferred from applyStyle to avoid
+  // immediately triggering comb sweeps) THEN fires the signature move once.
   const auditionCurrentStyle = useCallback(() => {
-    if (!busEnabled) setDubBus({ enabled: true });
+    if (!busEnabled) setDubBus({ enabled: true, characterPreset: dubBusSettings.characterPreset });
+    // Apply sends now that the user explicitly asked to hear this style
+    if (currentStyle.characterPreset && currentStyle.characterPreset !== 'custom') {
+      applyCharacterPresetSends(currentStyle.characterPreset);
+    }
     const persona = getPersona(currentStyle.personaId);
     fireDub(persona.signatureMove, undefined, persona.paramOverrides?.[persona.signatureMove] ?? {}, 'live');
-  }, [busEnabled, setDubBus, currentStyle]);
+  }, [busEnabled, setDubBus, dubBusSettings.characterPreset, currentStyle]);
 
   // Apply default channel send levels for a named character preset. Called
   // when the user switches the STYLE selector — gives the bus signal to
@@ -879,7 +885,7 @@ export const DubDeckStrip: React.FC = () => {
           className="px-2 py-1 rounded border bg-dark-bgTertiary border-dark-border text-text-muted hover:text-accent-highlight hover:border-accent-highlight transition-colors disabled:opacity-40"
           onClick={auditionCurrentStyle}
           disabled={!busEnabled}
-          title={`Audition ${currentStyle.label} — fire the signature dub move once`}
+          title={`Audition ${currentStyle.label} — apply channel sends + fire the signature move`}
         >▶</button>
         <span className="text-text-muted ml-2">ECHO</span>
         <select
