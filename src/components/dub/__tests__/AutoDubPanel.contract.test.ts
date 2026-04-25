@@ -21,25 +21,24 @@ function read(rel: string): string {
 }
 
 describe('AutoDubPanel — persona/voice separation contract', () => {
-  const src = read('components/dub/AutoDubPanel.tsx');
+  const dubDeckSrc = read('components/dub/DubDeckStrip.tsx');
 
-  it('handlePersonaChange applies preset conditionally (custom or same preset only)', () => {
-    // handlePersonaChange must check the CURRENT characterPreset before applying,
-    // so it never silently clobbers a hand-tuned voicing.
-    const handlerMatch = src.match(/const\s+handlePersonaChange\s*=\s*useCallback\([\s\S]*?\},\s*\[[^\]]*\]\);/);
-    expect(handlerMatch, 'handlePersonaChange should exist').not.toBeNull();
+  it('applyStyle in DubDeckStrip applies both character preset and persona', () => {
+    // The unified applyStyle function (replaced the old VOICE dropdown + persona selector)
+    // must apply both: character preset to the bus AND the persona to AutoDub.
+    const handlerMatch = dubDeckSrc.match(/const\s+applyStyle\s*=\s*useCallback\([\s\S]*?\},\s*\[[^\]]*\]\);/);
+    expect(handlerMatch, 'applyStyle should exist in DubDeckStrip').not.toBeNull();
     const handlerBody = handlerMatch![0];
-    // Must check currentPreset before applying
-    expect(handlerBody).toMatch(/currentPreset/);
-    // Must guard with 'custom' check so hand-tuned voicings survive
-    expect(handlerBody).toMatch(/'custom'/);
+    // Must set character preset
+    expect(handlerBody).toMatch(/setDubBus/);
+    // Must set persona
+    expect(handlerBody).toMatch(/setAutoDubPersona/);
   });
 
-  it('does NOT render an unconditional ♫ apply button (auto-apply handles it)', () => {
-    // The ♫ button was removed when auto-apply landed in handlePersonaChange.
-    // A ♫ button that fires WITHOUT checking the current preset is the bug
-    // from 2026-04-21. The button is no longer needed.
-    expect(src).not.toMatch(/onClick=\{applyPersonaVoice\}/);
+  it('does NOT render an unconditional ♫ apply button (applyStyle handles it)', () => {
+    // The separate ♫ button was removed. applyStyle now applies BOTH the character
+    // preset AND persona together. No free-standing ♫ button should exist.
+    expect(dubDeckSrc).not.toMatch(/onClick=\{applyPersonaVoice\}/);
   });
 });
 

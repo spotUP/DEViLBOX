@@ -249,7 +249,7 @@ export const AUTO_DUB_PERSONAS: Record<AutoDubPersonaId, AutoDubPersona> = {
     id: 'jammy',
     label: 'Prince Jammy',
     description: 'Minimalist digital. One move per bar, phrase-opening downbeats only. Tape stops, version drops, channel mutes. Nothing fancy.',
-    suggestedCharacterPreset: 'gatedFlanger',
+    suggestedCharacterPreset: null,
     intensityDefault: 0.35,
     phraseArcShape: 'inverted',     // fires hard at phrase start, then silence
     minBarsBetweenFires: 3.0,       // extremely sparse — one move every 3+ bars

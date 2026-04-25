@@ -1,13 +1,14 @@
 /**
- * Sc68Visualizer — Canvas-based visualizer for SC68/SNDH (Atari ST) playback.
+ * FormatVisualizer — Canvas-based audio visualizer for formats with no pattern data.
  *
- * Replaces the pattern editor when editorMode is 'sc68' since SC68 files
- * contain opaque 68000 machine code with no structured pattern data.
+ * Used for SC68/SNDH (Atari ST), SID (C64), and any other format that outputs
+ * raw audio without structured tracker pattern data.
  */
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useTransportStore } from '@/stores/useTransportStore';
 import { useTrackerStore } from '@/stores/useTrackerStore';
+import { useFormatStore } from '@/stores/useFormatStore';
 import { getToneEngine } from '@engine/ToneEngine';
 
 type VizMode = 'waveform' | 'spectrum' | 'vectorscope' | 'bars';
@@ -19,12 +20,23 @@ const VIZ_LABELS: Record<VizMode, string> = {
   bars: 'FREQUENCY BARS',
 };
 
-// Atari ST color palette
 const YM_GREEN = '#00cc55';
 const YM_CYAN = '#44ddcc';
 const YM_AMBER = '#ddaa33';
 const YM_BG = '#0a0e12';
 const YM_GRID = '#1a2030';
+
+/** Labels shown in the header chip/format badge per editorMode. */
+const FORMAT_LABELS: Record<string, { chip: string; format: string }> = {
+  sc68:        { chip: 'YM2149',  format: 'SC68'    },
+  c64sid:      { chip: 'SID',     format: 'C64'     },
+  pxtone:      { chip: 'PxTone',  format: 'PXTCOP'  },
+  organya:     { chip: 'OrgAnya', format: 'ORG'     },
+  sunvox:      { chip: 'SunVox',  format: 'SUNVOX'  },
+  zxtune:      { chip: 'AY-3',    format: 'ZXTune'  },
+  pretracker:  { chip: 'Paula',   format: 'PRE'     },
+  artofnoise:  { chip: 'Paula',   format: 'AON'     },
+};
 
 export const Sc68Visualizer: React.FC = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -33,6 +45,7 @@ export const Sc68Visualizer: React.FC = () => {
   const [mode, setMode] = useState<VizMode>('waveform');
   const isPlaying = useTransportStore(s => s.isPlaying);
   const songName = useTrackerStore(s => s.patterns[s.currentPatternIndex]?.name ?? '');
+  const editorMode = useFormatStore(s => s.editorMode);
 
   const cycleMode = useCallback(() => {
     setMode(m => VIZ_MODES[(VIZ_MODES.indexOf(m) + 1) % VIZ_MODES.length]);
@@ -52,7 +65,7 @@ export const Sc68Visualizer: React.FC = () => {
       ctx.fillStyle = '#445566';
       ctx.font = '14px monospace';
       ctx.textAlign = 'center';
-      ctx.fillText('ATARI ST \u2014 SC68/SNDH PLAYER', w / 2, h / 2);
+      ctx.fillText('AUDIO PLAYER \u2014 PRESS PLAY', w / 2, h / 2);
       return;
     }
 
@@ -192,8 +205,9 @@ export const Sc68Visualizer: React.FC = () => {
   }, []);
 
   // Parse title/composer from song name (format: "Title — Composer [FORMAT]")
+  const formatInfo = FORMAT_LABELS[editorMode ?? ''] ?? { chip: 'AUDIO', format: 'PLAYER' };
   const parts = songName.split(' \u2014 ');
-  const title = parts[0] || 'SC68 File';
+  const title = parts[0] || songName || 'Loading...';
   const composerAndFormat = parts[1] || '';
   const composer = composerAndFormat.replace(/\s*\[.*\]$/, '');
 
@@ -201,11 +215,11 @@ export const Sc68Visualizer: React.FC = () => {
     <div className="flex-1 flex flex-col min-h-0 bg-[#0a0e12] select-none">
       {/* Header */}
       <div className="flex items-center gap-3 px-3 py-1.5 border-b border-[#1a2030] shrink-0">
-        <span className="text-xs font-bold" style={{ color: YM_GREEN }}>YM2149</span>
+        <span className="text-xs font-bold" style={{ color: YM_GREEN }}>{formatInfo.chip}</span>
         <span className="text-xs text-text-secondary truncate">{title}</span>
         {composer && <span className="text-xs truncate" style={{ color: YM_AMBER }}>{composer}</span>}
         <div className="flex-1" />
-        <span className="text-xs" style={{ color: YM_CYAN }}>SC68</span>
+        <span className="text-xs" style={{ color: YM_CYAN }}>{formatInfo.format}</span>
         <button
           onClick={cycleMode}
           className="text-xs px-2 py-0.5 text-text-secondary hover:text-text-primary transition-colors"
