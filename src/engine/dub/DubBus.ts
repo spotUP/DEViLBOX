@@ -1016,19 +1016,43 @@ export class DubBus {
   }
 
   /**
-   * Ramp the comb/phaser sweep wet amount to `targetAmount`, hold while the
-   * caller's disposer is live, then restore the prior value on release.
-   * The LFO is always running; this just gates the output gain.
+   * Open the comb/phaser sweep with dramatic rate + depth boost so it's
+   * audible as a distinct sweeping effect rather than background texture.
+   *
+   * On fire:  ramps wet to `targetAmount`, boosts LFO rate to `rateHz`
+   *           (default 0.8 Hz — one full sweep per bar at most tempos) and
+   *           depth to `depthMs` (default 8 ms — deep enough to clearly hear).
+   * On release: restores all three params to their pre-fire values.
    */
-  startCombSweep(targetAmount: number, rampSec = 0.08): () => void {
-    const prior = this.settings.sweepAmount;
+  startCombSweep(
+    targetAmount = 0.75,
+    rampSec = 0.08,
+    rateHz = 0.8,
+    depthMs = 8,
+  ): () => void {
+    const priorAmt   = this.settings.sweepAmount;
+    const priorRate  = this.settings.sweepRateHz;
+    const priorDepth = this.settings.sweepDepthMs;
     const now = this.context.currentTime;
+    const tc = rampSec / 3;
+
     this.sweepOutput.gain.cancelScheduledValues(now);
-    this.sweepOutput.gain.setTargetAtTime(Math.min(1, Math.max(0, targetAmount)), now, rampSec / 3);
+    this.sweepOutput.gain.setTargetAtTime(Math.min(1, Math.max(0, targetAmount)), now, tc);
+
+    this.sweepLfo.frequency.cancelScheduledValues(now);
+    this.sweepLfo.frequency.setTargetAtTime(Math.max(0.05, rateHz), now, tc);
+
+    this.sweepLfoGain.gain.cancelScheduledValues(now);
+    this.sweepLfoGain.gain.setTargetAtTime(Math.max(0, depthMs) / 1000, now, tc);
+
     return () => {
       const t = this.context.currentTime;
       this.sweepOutput.gain.cancelScheduledValues(t);
-      this.sweepOutput.gain.setTargetAtTime(prior, t, 0.05);
+      this.sweepOutput.gain.setTargetAtTime(priorAmt, t, 0.05);
+      this.sweepLfo.frequency.cancelScheduledValues(t);
+      this.sweepLfo.frequency.setTargetAtTime(priorRate, t, 0.08);
+      this.sweepLfoGain.gain.cancelScheduledValues(t);
+      this.sweepLfoGain.gain.setTargetAtTime(priorDepth / 1000, t, 0.08);
     };
   }
 

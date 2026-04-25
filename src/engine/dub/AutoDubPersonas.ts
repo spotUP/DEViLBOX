@@ -117,6 +117,7 @@ export const AUTO_DUB_PERSONAS: Record<AutoDubPersonaId, AutoDubPersona> = {
     paramOverrides: {
       echoThrow:   { throwBeats: 4, feedbackBoost: 0.25 },
       echoBuildUp: { feedback: 0.85 },
+      combSweep:   { amount: 0.80, rateHz: 0.6, depthMs: 9 }, // slightly slower/deeper for Tubby's deliberate sweeps
     },
     variance: 0.05,
     signatureMove: 'echoBuildUp',
