@@ -243,6 +243,7 @@ interface SettingsStore {
   stereoSeparation: number;  // 0-100% stereo separation (20 = Amiga default, 100 = full)
   stereoSeparationMode: 'pt2' | 'modplug';
   modplugSeparation: number;    // 0–200% (OpenMPT scale; 0=mono, 100=normal, 200=enhanced)
+  headphonesMode: boolean;      // Snap stereo separation to 35% + enable SID Haas reduction
 
   // MIDI Settings
   midiPolyphonic: boolean;   // Enable polyphonic MIDI playback (multiple simultaneous notes)
@@ -288,6 +289,7 @@ interface SettingsStore {
   setStereoSeparation: (percent: number) => void;
   setStereoSeparationMode: (mode: 'pt2' | 'modplug') => void;
   setModplugSeparation: (percent: number) => void;
+  setHeadphonesMode: (enabled: boolean) => void;
   setMidiPolyphonic: (enabled: boolean) => void;
   setTrackerVisualBg: (enabled: boolean) => void;
   setTrackerVisualMode: (mode: number) => void;
@@ -476,6 +478,7 @@ export const useSettingsStore = create<SettingsStore>()(
       stereoSeparation: 25,  // Default: 25% — rich mono (slight stereo cues, no harsh Amiga LRRL)
       stereoSeparationMode: 'pt2' as const,
       modplugSeparation: 50,        // Default: 50/200 — equivalent rich mono for ModPlug mode
+      headphonesMode: false,
       midiPolyphonic: true,  // Default: polyphonic enabled for better jamming
       trackerVisualBg: false,  // Default: off
       trackerVisualMode: 0,    // Default: spectrum bars
@@ -589,6 +592,20 @@ export const useSettingsStore = create<SettingsStore>()(
       setModplugSeparation: (modplugSeparation) =>
         set((state) => {
           state.modplugSeparation = Math.max(0, Math.min(200, modplugSeparation));
+        }),
+
+      setHeadphonesMode: (enabled) =>
+        set((state) => {
+          state.headphonesMode = enabled;
+          // Snap stereo separation to a comfortable headphone level (35%)
+          // when enabling; restore a sensible default when disabling.
+          if (enabled) {
+            state.stereoSeparation = 35;
+            state.modplugSeparation = 35;
+          } else {
+            state.stereoSeparation = 25;
+            state.modplugSeparation = 50;
+          }
         }),
 
       setMidiPolyphonic: (midiPolyphonic) =>

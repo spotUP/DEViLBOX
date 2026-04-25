@@ -16,6 +16,7 @@ import { Toggle } from '@components/controls/Toggle';
 import { KeyboardShortcutSheet } from '@components/tracker/KeyboardShortcutSheet';
 import { BG_MODES, getBgModeLabel } from '@/components/tracker/TrackerVisualBackground';
 import { getASIDDeviceManager } from '@lib/sid/ASIDDeviceManager';
+import { getActiveC64SidEngine } from '@engine/replayer/NativeEngineRouting';
 import { useModalClose } from '@hooks/useDialogKeyboard';
 import {
   useSettingsDialog,
@@ -324,6 +325,22 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
                       </div>
                     </div>
                   )}
+
+                  {/* Headphones mode */}
+                  <div className="flex items-center justify-between pt-2 border-t border-ft2-border/40">
+                    <div>
+                      <span className="text-ft2-text text-[10px] font-mono">Headphones</span>
+                      <span className="text-[9px] text-ft2-textDim font-mono ml-2">— snaps separation to 35%, reduces SID Haas</span>
+                    </div>
+                    <Toggle
+                      value={s.headphonesMode}
+                      label=""
+                      onChange={(enabled) => {
+                        s.setHeadphonesMode(enabled);
+                        try { getActiveC64SidEngine()?.setHeadphones(enabled); } catch { /* ok */ }
+                      }}
+                    />
+                  </div>
                 </div>
               </section>
 

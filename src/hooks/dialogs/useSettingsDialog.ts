@@ -185,6 +185,8 @@ export function useSettingsDialog({ isOpen }: UseSettingsDialogOptions) {
   const setStereoSeparationMode = useSettingsStore((s) => s.setStereoSeparationMode);
   const modplugSeparation = useSettingsStore((s) => s.modplugSeparation);
   const setModplugSeparation = useSettingsStore((s) => s.setModplugSeparation);
+  const headphonesMode = useSettingsStore((s) => s.headphonesMode);
+  const setHeadphonesMode = useSettingsStore((s) => s.setHeadphonesMode);
   const midiPolyphonic = useSettingsStore((s) => s.midiPolyphonic);
   const setMidiPolyphonic = useSettingsStore((s) => s.setMidiPolyphonic);
   const vuMeterMode = useSettingsStore((s) => s.vuMeterMode);
@@ -392,6 +394,7 @@ export function useSettingsDialog({ isOpen }: UseSettingsDialogOptions) {
     welcomeJingleEnabled, setWelcomeJingleEnabled,
     amigaLimits, setAmigaLimits, linearInterpolation, setLinearInterpolation,
     useBLEP, setUseBLEP, stereoSeparation, stereoSeparationMode, modplugSeparation,
+    headphonesMode, setHeadphonesMode,
     midiPolyphonic, setMidiPolyphonic,
     vuMeterMode, setVuMeterMode, vuMeterStyle, setVuMeterStyle,
     vuMeterSwing, setVuMeterSwing, vuMeterMirror, setVuMeterMirror,
