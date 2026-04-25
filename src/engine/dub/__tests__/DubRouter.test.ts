@@ -87,7 +87,7 @@ describe('DubRouter + moves', () => {
         'echoThrow', 'dubStab', 'filterDrop', 'dubSiren', 'springSlam',
         'channelMute', 'channelThrow', 'delayTimeThrow', 'tapeWobble',
         'masterDrop', 'snareCrack', 'tapeStop', 'backwardReverb', 'toast',
-        'transportTapeStop', 'combSweep', 'eqSweep',
+        'transportTapeStop', 'combSweep', 'eqSweep', 'versionDrop',
       ];
       for (const moveId of moves) {
         const result = fire(moveId, moveId === 'toast' ? undefined : 0);

@@ -123,6 +123,7 @@ export const dubRingMod:       MoveHandler = holdCommand('ringMod',        'Ring
 export const dubHpfRise:       MoveHandler = holdCommand('hpfRise',        'HPF Rise (Big Knob)');
 export const dubMadProfPingPong: MoveHandler = holdCommand('madProfPingPong', 'Mad Prof Ping-Pong');
 export const dubCombSweep:      MoveHandler = holdCommand('combSweep',      'Liquid Comb Sweep');
+export const dubVersionDrop:    MoveHandler = holdCommand('versionDrop',    'Version Drop');
 
 // ── Panic — release everything ────────────────────────────────────────────
 export function dubPanicReleaseAll(): boolean {

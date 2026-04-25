@@ -399,6 +399,7 @@ export type DubMoveParameter =
   | 'dub.hpfRise'
   | 'dub.madProfPingPong'
   | 'dub.combSweep'
+  | 'dub.versionDrop'
   // Continuous bus settings
   | 'dub.echoIntensity'
   | 'dub.echoWet'
