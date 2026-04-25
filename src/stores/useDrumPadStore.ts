@@ -537,6 +537,16 @@ export const useDrumPadStore = create<DrumPadStore>((set, get) => ({
         // a field, flipping us to Custom.
         effective = { ...preset.overrides, ...patch };
       }
+    } else if (patch.characterPreset === 'custom' && prevSettings.characterPreset !== 'custom') {
+      // Explicitly switching to Custom resets all character-owned fields back
+      // to DEFAULT_DUB_BUS. Without this, the previous preset's overrides
+      // (e.g. Tubby's returnEqEnabled +8dB Q=3) persist silently under the
+      // Custom label — the bus sounds like the old preset even though the UI
+      // shows "Custom". User expects Custom to be a neutral starting point.
+      const defaults = Object.fromEntries(
+        [...CHARACTER_FIELDS].map(k => [k, DEFAULT_DUB_BUS[k as keyof DubBusSettings]])
+      );
+      effective = { ...defaults, ...patch };
     } else if (patch.characterPreset === undefined && get().dubBus.characterPreset !== 'custom') {
       // G16: auto-flip to 'custom' when a character field is edited without
       // an explicit characterPreset in the patch. Without this, the VOICE
