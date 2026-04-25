@@ -609,6 +609,10 @@ export interface MixerChannelState {
   sendLevels: number[]; // Send levels per return bus (0-1), indexed by bus number
   dubSend: number;  // 0–1 send into shared DubBus (0 = no send, 1 = full send)
   dubRole: string | null; // User-set channel role override for AutoDub targeting. null = use classifier.
+  dubFilterMode: 'off' | 'hpf' | 'lpf'; // Per-channel filter before the dub bus mix point
+  dubFilterHz: number;      // Filter cutoff frequency (Hz)
+  dubReverbSend: number;    // 0–1 dry spring send (bypasses echo, feeds spring directly)
+  dubSweepAmount: number;   // 0–1 per-channel comb sweep wet level
 }
 
 function defaultChannels(): MixerChannelState[] {
@@ -623,6 +627,10 @@ function defaultChannels(): MixerChannelState[] {
     sendLevels: [0, 0, 0, 0], // 4 send buses
     dubSend: 0,               // dub bus send (0 = off)
     dubRole: null,            // auto — use classifier
+    dubFilterMode: 'off',
+    dubFilterHz: 200,
+    dubReverbSend: 0,
+    dubSweepAmount: 0,
   }));
 }
 
@@ -686,6 +694,11 @@ interface MixerStoreActions {
 
   // Manual dub role override (null = auto, string = ChannelRole)
   setChannelDubRole: (ch: number, role: string | null) => void;
+
+  // Per-channel dub mini-chain controls
+  setChannelDubFilter: (ch: number, mode: 'off' | 'hpf' | 'lpf', hz?: number) => void;
+  setChannelDubReverbSend: (ch: number, amount: number) => void;
+  setChannelDubSweepAmount: (ch: number, amount: number) => void;
 
   // Send levels
   setChannelSendLevel: (ch: number, sendIndex: number, level: number) => void;
@@ -955,6 +968,43 @@ export const useMixerStore = create<MixerStore>()(
         if (ch < 0 || ch >= state.channels.length) return;
         state.channels[ch].dubRole = role;
       });
+    },
+
+    setChannelDubFilter(ch: number, mode: 'off' | 'hpf' | 'lpf', hz?: number): void {
+      set((state) => {
+        if (ch < 0 || ch >= state.channels.length) return;
+        state.channels[ch].dubFilterMode = mode;
+        if (hz !== undefined) state.channels[ch].dubFilterHz = hz;
+      });
+      try {
+        const fx = getChannelRoutedEffectsManager()?.getPerChannelFx(ch);
+        fx?.setFilterMode(mode);
+        if (hz !== undefined) fx?.setFilterHz(hz);
+      } catch { /* ok */ }
+    },
+
+    setChannelDubReverbSend(ch: number, amount: number): void {
+      const clamped = Math.max(0, Math.min(1, amount));
+      set((state) => {
+        if (ch < 0 || ch >= state.channels.length) return;
+        state.channels[ch].dubReverbSend = clamped;
+      });
+      try {
+        const fx = getChannelRoutedEffectsManager()?.getPerChannelFx(ch);
+        fx?.setReverbSend(clamped);
+      } catch { /* ok */ }
+    },
+
+    setChannelDubSweepAmount(ch: number, amount: number): void {
+      const clamped = Math.max(0, Math.min(1, amount));
+      set((state) => {
+        if (ch < 0 || ch >= state.channels.length) return;
+        state.channels[ch].dubSweepAmount = clamped;
+      });
+      try {
+        const fx = getChannelRoutedEffectsManager()?.getPerChannelFx(ch);
+        fx?.setSweepAmount(clamped);
+      } catch { /* ok */ }
     },
 
     // Send levels
