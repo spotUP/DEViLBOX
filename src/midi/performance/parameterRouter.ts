@@ -114,6 +114,7 @@ export const DUB_MOVE_KINDS: Record<string, 'trigger' | 'hold'> = {
   hpfRise:             'hold',   // Altec Big Knob HPF sweep up + back
   madProfPingPong:     'hold',   // Ariwa SDE-3000 asymmetric L/R ping-pong
   combSweep:           'hold',   // bus.startCombSweep(...)
+  versionDrop:         'hold',   // mute melodic channels, keep riddim
 };
 
 /**

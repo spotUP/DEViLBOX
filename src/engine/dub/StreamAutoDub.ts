@@ -167,6 +167,8 @@ function tickForDeck(deckId: DeckId): void {
     currentRow: 0,
     channelNames: names,
     densityByRole: new Map(), // no pattern density for streams
+    phraseIntensityMult: 1.0,
+    lastGlobalFireBar: -99,
   };
 
   const choice = chooseMove(ctx, Math.random);

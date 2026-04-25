@@ -137,15 +137,18 @@ export const AutoDubPanel: React.FC<AutoDubPanelProps> = ({ busEnabled }) => {
 
   const handlePersonaChange = useCallback((id: AutoDubPersonaId) => {
     setPersona(id);
-    setIntensity(getPersona(id).intensityDefault);
-  }, [setPersona, setIntensity]);
-
-  const applyPersonaVoice = useCallback(() => {
-    const p = getPersona(persona);
+    const p = getPersona(id);
+    setIntensity(p.intensityDefault);
+    // Auto-apply bus character preset when switching persona, but only if the
+    // current preset is 'custom' (user hasn't deliberately chosen a different
+    // sound) OR already matches the persona's preset (no-op on re-select).
     if (p.suggestedCharacterPreset) {
-      setDubBus({ characterPreset: p.suggestedCharacterPreset });
+      const currentPreset = useDrumPadStore.getState().dubBus.characterPreset;
+      if (currentPreset === 'custom' || currentPreset === p.suggestedCharacterPreset) {
+        setDubBus({ characterPreset: p.suggestedCharacterPreset });
+      }
     }
-  }, [persona, setDubBus]);
+  }, [setPersona, setIntensity, setDubBus]);
 
   const auditionPersona = useCallback(() => {
     if (!busEnabled) setDubBus({ enabled: true });
@@ -227,17 +230,6 @@ export const AutoDubPanel: React.FC<AutoDubPanelProps> = ({ busEnabled }) => {
                 <option key={o.id} value={o.id}>{o.label}</option>
               ))}
             </select>
-            {getPersona(persona).suggestedCharacterPreset && (
-              <button
-                type="button"
-                className="px-2 py-1 rounded border bg-dark-bgTertiary border-dark-border text-text-muted hover:text-accent-highlight hover:border-accent-highlight transition-colors disabled:opacity-50"
-                onClick={applyPersonaVoice}
-                disabled={controlsDisabled}
-                title={`Load ${getPersona(persona).label}'s bus voicing`}
-              >
-                ♫
-              </button>
-            )}
           </div>
 
           {/* Intensity slider */}

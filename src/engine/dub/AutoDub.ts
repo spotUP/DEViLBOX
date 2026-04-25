@@ -35,7 +35,32 @@ import type { InstrumentConfig } from '@/types/instrument/defaults';
 
 const TICK_MS = 250;
 const HARD_FIRES_PER_BAR_CAP = 3;
-const COOLDOWN_BARS = 6;
+/** Per-move cooldown table (bars). Moves not listed use DEFAULT_COOLDOWN_BARS. */
+const MOVE_COOLDOWNS: Record<string, number> = {
+  // Phrase-structure moves — rare, don't repeat within a phrase
+  versionDrop:        16,
+  tapeStop:            8,
+  masterDrop:          8,
+  dubSiren:            8,
+  transportTapeStop:  12,
+  // Signature moves — medium cooldown
+  hpfRise:             4,
+  echoBuildUp:         4,
+  ghostReverb:         4,
+  madProfPingPong:     6,
+  filterDrop:          4,
+  eqSweep:             4,
+  // Accent moves — can repeat within a phrase
+  echoThrow:           2,
+  springKick:          2,
+  springSlam:          2,
+  snareCrack:          2,
+  sonarPing:           3,
+  channelMute:         2,
+  combSweep:           3,
+  channelThrow:        2,
+};
+const DEFAULT_COOLDOWN_BARS = 6;
 /** Cap on wet moves (echo/reverb-contributing) per bar, regardless of total
  *  budget. Without this cap, bar-phase echoThrow + transient-echoThrow +
  *  springSlam + echoBuildUp + reverseEcho all stack into a reverb mush
@@ -180,6 +205,42 @@ export function computeDensityByRole(
   }
   return out;
 }
+
+// ── Phrase-level intensity arc ────────────────────────────────────────────────
+
+/** Shape of the 16-bar intensity envelope. Controls how firing probability
+ *  ramps over the phrase cycle. Each persona has a characteristic shape that
+ *  defines their musical phrasing style. */
+export type PhraseArcShape = 'standard' | 'sharp' | 'flat' | 'inverted' | 'slow';
+
+function lerp(a: number, b: number, t: number): number { return a + (b - a) * t; }
+
+/** Returns 0..1.5 multiplier on rollProb based on position within a 16-bar phrase.
+ *  @param phraseBar  integer bar count modulo 16 (0..15)
+ *  @param arc        persona arc shape */
+export function getPhraseIntensityMult(phraseBar: number, arc: PhraseArcShape): number {
+  const t = Math.max(0, Math.min(1, (phraseBar % 16) / 16));
+  switch (arc) {
+    case 'standard': // Tubby — gradual build, sustained peak, gentle decay
+      if (t < 0.25)  return lerp(0.30, 0.90, t / 0.25);
+      if (t < 0.75)  return 1.00;
+      return lerp(1.00, 0.30, (t - 0.75) / 0.25);
+    case 'sharp':    // Scientist — fast attack, long peak
+      if (t < 0.10)  return lerp(0.20, 1.00, t / 0.10);
+      if (t < 0.85)  return 1.00;
+      return lerp(1.00, 0.20, (t - 0.85) / 0.15);
+    case 'flat':     // Perry — constant chaos, no arc
+      return 1.00;
+    case 'inverted': // Jammy — fires hard at start, falls silent
+      if (t < 0.10)  return 1.20;
+      return lerp(1.00, 0.10, t / 0.90);
+    case 'slow':     // Mad Professor — patient, very gradual build, no decay
+      if (t < 0.50)  return lerp(0.20, 1.00, t / 0.50);
+      return 1.00;
+  }
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
 
 /** Rule = "when this condition holds, consider firing `moveId` with weight
  *  `baseWeight`." channelRole narrows channel selection to channels matching
@@ -392,6 +453,45 @@ const RULES: Rule[] = [
   // oscBass and crushBass are intentionally excluded from AutoDub:
   // both are self-oscillating generators that stomp on the mix when
   // auto-fired. They are manual-only performance pads.
+
+  // ── Lead channel targeting ────────────────────────────────────────────────
+  // Lead channels are melodic and benefit from resonant EQ sweeps and
+  // occasional ghost reverb. Echo throws on lead transients create the
+  // "catch the melody note in echo" technique.
+  { moveId: 'echoThrow', channelRole: 'lead',
+    condition: (c) => hasTransientForRole(c, 'lead') && c.barPos > 0.30,
+    baseWeight: 0.14, holdBars: 1, wet: true },
+  { moveId: 'eqSweep', channelRole: 'lead',
+    condition: (c) => c.isNewBar && c.bar % 4 === 2,
+    baseWeight: 0.12, holdBars: 1 },
+  { moveId: 'ghostReverb', channelRole: 'lead',
+    condition: (c) => c.isNewBar && c.bar % 8 === 0,
+    baseWeight: 0.10, holdBars: 2, wet: true },
+
+  // ── Chord / skank targeting ───────────────────────────────────────────────
+  // Chord channels suit dotted-eighth echo (classic reggae timing) and
+  // occasional ghost reverb.
+  { moveId: 'delayPresetDotted', channelRole: 'chord',
+    condition: (c) => c.isNewBar && c.bar % 4 === 1,
+    baseWeight: 0.12, holdBars: 2, wet: true },
+
+  // ── Pad targeting ─────────────────────────────────────────────────────────
+  // Pad channels are slow-attack sustained tones — ghost reverb makes them
+  // bloom into the bus return beautifully.
+  { moveId: 'ghostReverb', channelRole: 'pad',
+    condition: (c) => c.isNewBar && c.bar % 4 === 2,
+    baseWeight: 0.14, holdBars: 2, wet: true },
+
+  // ── Version Drop ─────────────────────────────────────────────────────────
+  // The defining dub technique: mute all melodic channels, keep the riddim.
+  // Fires at bar 4 of a 16-bar phrase (classic "drop" position) and on a
+  // 32-bar cycle for longer drops at higher intensity.
+  { moveId: 'versionDrop',
+    condition: (c) => c.isNewBar && c.bar % 16 === 4,
+    baseWeight: 0.18, holdBars: 2 },
+  { moveId: 'versionDrop',
+    condition: (c) => c.isNewBar && c.bar % 32 === 20 && c.intensity > 0.5,
+    baseWeight: 0.14, holdBars: 4 },
 ];
 
 /** Unique move IDs Auto Dub can fire. Deduplicated from RULES — several
@@ -436,6 +536,12 @@ export interface AutoDubTickCtx {
    *  normalised 0..1. Higher = more notes per row. Personas use this to
    *  bias rule firing toward dense (Scientist) or sparse (Jammy) passages. */
   densityByRole: ReadonlyMap<ChannelRole, number>;
+  /** Phrase-arc multiplier for this tick (0.1..1.2). Modulates rollProb so
+   *  firing probability rises and falls with the 16-bar phrase envelope. */
+  phraseIntensityMult: number;
+  /** Bar of the last move fired by ANY rule this session. Used to enforce the
+   *  persona's `minBarsBetweenFires` breathing room between gestures. */
+  lastGlobalFireBar: number;
 }
 
 export interface AutoDubChoice {
@@ -481,7 +587,14 @@ export function chooseMove(ctx: AutoDubTickCtx, rng: () => number): AutoDubChoic
   const rollDensityMult = rollBias !== 0
     ? Math.max(0.25, Math.min(1.75, 1 + rollBias * (maxDensity - 0.5) * 1.5))
     : 1;
-  const rollProb = ctx.intensity * 0.3 * rollDensityMult;
+  // Global inter-fire breathing room — persona sets minimum bars between any
+  // two AutoDub moves so the mix has space to breathe between gestures.
+  const minBetween = ctx.persona.minBarsBetweenFires ?? 1.0;
+  if (ctx.bar - ctx.lastGlobalFireBar < minBetween) return null;
+
+  // Phrase-arc multiplier modulates the roll gate so AutoDub naturally builds
+  // and breathes over 16-bar phrases instead of firing at a constant rate.
+  const rollProb = ctx.intensity * 0.3 * rollDensityMult * ctx.phraseIntensityMult;
   if (rng() > rollProb) return null;
 
   const variance = ctx.persona.variance ?? 0;
@@ -539,8 +652,9 @@ export function chooseMove(ctx: AutoDubTickCtx, rng: () => number): AutoDubChoic
     }
 
     const lastBar = ctx.moveLastFiredBar.get(rule.moveId);
+    const moveCooldown = MOVE_COOLDOWNS[rule.moveId] ?? DEFAULT_COOLDOWN_BARS;
     const cooldownDecay = lastBar !== undefined
-      ? Math.min(1, (ctx.bar - lastBar) / COOLDOWN_BARS)
+      ? Math.min(1, (ctx.bar - lastBar) / moveCooldown)
       : 1;
     if (cooldownDecay <= 0) continue;
 
@@ -649,6 +763,7 @@ const ALL_CHANNELS: readonly number[] = Object.freeze(
 let _timer: ReturnType<typeof setInterval> | null = null;
 let _enableTimeMs = 0;
 let _lastBar = -1;
+let _lastGlobalFireBar = -99;
 let _movesFiredThisBar = 0;
 let _wetFiredThisBar = 0;
 const _heldDisposers = new Set<{ dispose(): void }>();
@@ -824,6 +939,9 @@ function tickImpl(): void {
   // upcoming passage" means.
   const densityByRole = computeDensityByRole(bundle.pattern, bundle.currentRow, roles, 16);
 
+  const phraseBar = bar % 16;
+  const phraseIntensityMult = getPhraseIntensityMult(phraseBar, persona.phraseArcShape ?? 'standard');
+
   const choice = chooseMove({
     bar, barPos, isNewBar,
     intensity: dub.autoDubIntensity,
@@ -839,6 +957,8 @@ function tickImpl(): void {
     currentRow: bundle.currentRow,
     channelNames: bundle.names,
     densityByRole,
+    phraseIntensityMult,
+    lastGlobalFireBar: _lastGlobalFireBar,
   }, _rng);
 
   if (!choice) return;
@@ -848,6 +968,7 @@ function tickImpl(): void {
   _movesFiredThisBar += 1;
   if (choice.wet) _wetFiredThisBar += 1;
   _moveLastFiredBar.set(choice.moveId, bar);
+  _lastGlobalFireBar = bar;
 
   if (disposer) {
     _heldDisposers.add(disposer);
@@ -865,6 +986,7 @@ export function startAutoDub(): void {
   if (_timer !== null) return;
   _enableTimeMs = performance.now();
   _lastBar = -1;
+  _lastGlobalFireBar = -99;
   _movesFiredThisBar = 0;
   _wetFiredThisBar = 0;
   _moveLastFiredBar.clear();
@@ -1028,6 +1150,7 @@ export function _resetAutoDubStateForTest(): void {
   _movesFiredThisBar = 0;
   _wetFiredThisBar = 0;
   _lastBar = -1;
+  _lastGlobalFireBar = -99;
   _rollingPeaks.length = 0;
   _rng = Math.random;
 }

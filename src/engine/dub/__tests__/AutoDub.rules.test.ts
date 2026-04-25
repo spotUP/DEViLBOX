@@ -48,6 +48,8 @@ function baseCtx(overrides: Partial<AutoDubTickCtx> = {}): AutoDubTickCtx {
     currentRow: 0,
     channelNames: [],
     densityByRole: new Map(),
+    phraseIntensityMult: 1.0,
+    lastGlobalFireBar: -99,
     ...overrides,
   };
 }
@@ -218,12 +220,12 @@ describe('AutoDub chooseMove', () => {
   });
 
   it('cooldown decay suppresses moves fired within the last 4 bars', () => {
-    // At bar=7, isNewBar, echoThrow is eligible (bar%4===3). If echoThrow
-    // fired recently on bar 5, decay = (7-5)/4 = 0.5 → echoThrow weight halved.
+    // At bar=7, isNewBar, echoThrow is eligible (bar%4===3). echoThrow has a
+    // 2-bar cooldown; fired at bar 6 → decay = (7-6)/2 = 0.5 → weight halved.
     // Over many rolls with a continuous RNG, echoThrow should be picked less
     // often when the cooldown is active.
     const lastFired = new Map<string, number>();
-    lastFired.set('echoThrow', 5);
+    lastFired.set('echoThrow', 6);
 
     const rngA = seededRng(9000);
     const rngB = seededRng(9000);
