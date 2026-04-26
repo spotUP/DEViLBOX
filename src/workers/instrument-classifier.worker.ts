@@ -78,10 +78,11 @@ async function fetchWithCache(primary: string, fallback: string): Promise<ArrayB
 async function _doLoadSession(): Promise<void> {
   self.postMessage({ type: 'loading', progress: 0 });
   const buf = await fetchWithCache(MODEL_URL_PRIMARY, MODEL_URL_FALLBACK);
+  console.warn(`[CED worker] model fetched: ${buf.byteLength.toLocaleString()} bytes`);
   self.postMessage({ type: 'loading', progress: 80 });
-  session = await ort.InferenceSession.create(buf, {
+  // Pass as Uint8Array — some ORT versions require typed array, not raw ArrayBuffer
+  session = await ort.InferenceSession.create(new Uint8Array(buf), {
     executionProviders: ['wasm'],
-    graphOptimizationLevel: 'all',
   });
   self.postMessage({ type: 'loading', progress: 90 });
   try {
