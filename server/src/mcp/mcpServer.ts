@@ -633,7 +633,7 @@ export function createMcpServer(): McpServer {
   server.tool(
     'set_dub_bus_settings',
     'Adjust dub bus parameters (echoIntensity, echoRateMs, echoWet, springWet, returnGain, hpfCutoff, sidechainAmount).',
-    { settings: z.record(z.any()).describe('Partial DubBusSettings object') },
+    { settings: z.record(z.string(), z.any()).describe('Partial DubBusSettings object') },
     (p) => call('set_dub_bus_settings', p),
   );
 
@@ -643,7 +643,7 @@ export function createMcpServer(): McpServer {
     {
       moveId: z.string().describe('Move id (e.g. "echoThrow", "tubbyScream")'),
       channelId: z.number().int().optional().describe('Tracker channel index when the move is channel-scoped'),
-      params: z.record(z.number()).optional().describe('Override move defaults (e.g. throwBeats)'),
+      params: z.record(z.string(), z.number()).optional().describe('Override move defaults (e.g. throwBeats)'),
       source: z.enum(['live', 'lane']).optional().describe('Source for telemetry (default "live")'),
     },
     (p) => call('fire_dub_move', p),
