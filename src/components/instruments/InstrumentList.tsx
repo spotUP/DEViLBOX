@@ -147,14 +147,36 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
 
   const isFT2 = variant === 'ft2';
 
-  // Scroll to selected instrument when it changes
+  // Inject flash keyframe once
   useEffect(() => {
-    if (selectedRef.current && listRef.current) {
-      selectedRef.current.scrollIntoView({
-        behavior: 'smooth',
-        block: 'nearest',
-      });
+    const id = 'ft2-select-flash-style';
+    if (!document.getElementById(id)) {
+      const s = document.createElement('style');
+      s.id = id;
+      s.textContent = `
+        @keyframes ft2-select-flash {
+          0%   { opacity: 1; }
+          100% { opacity: 0; }
+        }
+      `;
+      document.head.appendChild(s);
     }
+  }, []);
+
+  // Flash animation — briefly highlights a newly selected row
+  const [flashId, setFlashId] = useState<number | null>(null);
+  const flashTimerRef = useRef<number | null>(null);
+
+  // Scroll to selected + fire flash animation when selection changes
+  useEffect(() => {
+    if (currentInstrumentId == null) return;
+    setFlashId(currentInstrumentId);
+    if (flashTimerRef.current) clearTimeout(flashTimerRef.current);
+    flashTimerRef.current = window.setTimeout(() => setFlashId(null), 380);
+    if (selectedRef.current && listRef.current) {
+      selectedRef.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+    return () => { if (flashTimerRef.current) clearTimeout(flashTimerRef.current); };
   }, [currentInstrumentId]);
 
   // Start previewing an instrument (called after hold delay)
@@ -621,13 +643,24 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
                 className={`
                   instrument-list-item
                   flex items-center gap-2 px-2 py-1.5 cursor-pointer
-                  transition-colors group relative
+                  transition-all duration-200 ease-out group relative overflow-hidden
                   ${isSelected
                     ? 'bg-ft2-cursor text-ft2-bg'
                     : 'hover:bg-ft2-header text-ft2-text'
                   }
                 `}
               >
+                {/* Flash overlay — fades out after selection */}
+                {flashId === instrument.id && (
+                  <span
+                    className="absolute inset-0 pointer-events-none"
+                    style={{
+                      background: 'rgba(255,255,255,0.18)',
+                      animation: 'ft2-select-flash 380ms cubic-bezier(0.4,0,0.2,1) forwards',
+                    }}
+                  />
+                )}
+
                 {/* ID */}
                 <span className={`font-mono text-xs font-bold w-6 ${isSelected ? 'text-ft2-bg' : 'text-ft2-highlight'}`}>
                   {useHexNumbers
