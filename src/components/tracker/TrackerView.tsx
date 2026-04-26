@@ -817,7 +817,7 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
 
         {/* Instrument List Panel - Flex item 3 - Collapsed in fullscreen */}
         {windowWidth >= 900 && showInstrumentPanel && (
-          <div className={`flex-shrink-0 border-l border-ft2-border flex flex-col overflow-hidden animate-fade-in ${editorFullscreen ? 'w-36' : 'w-fit min-w-48 max-w-80'}`}>
+          <div className={`flex-shrink-0 border-l border-ft2-border flex flex-col overflow-hidden animate-fade-in ${editorFullscreen ? 'w-36' : 'w-fit min-w-[12rem]'}`}>
             <InstrumentList
               variant="ft2"
               showPreviewOnClick={true}

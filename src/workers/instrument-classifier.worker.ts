@@ -41,6 +41,9 @@ const MIN_SAMPLES = 2560;
 // ── State ─────────────────────────────────────────────────────────────────────
 let session: ort.InferenceSession | null = null;
 let id2label: Record<string, string> = {};
+// Single loading promise — prevents parallel model loads when many classify
+// messages arrive before the model is ready.
+let _loadPromise: Promise<void> | null = null;
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -59,7 +62,7 @@ async function fetchWithCache(primary: string, fallback: string): Promise<ArrayB
   throw new Error('Failed to fetch from all sources');
 }
 
-async function loadSession(): Promise<void> {
+async function _doLoadSession(): Promise<void> {
   self.postMessage({ type: 'loading', progress: 0 });
   const buf = await fetchWithCache(MODEL_URL_PRIMARY, MODEL_URL_FALLBACK);
   self.postMessage({ type: 'loading', progress: 80 });
@@ -68,16 +71,19 @@ async function loadSession(): Promise<void> {
     graphOptimizationLevel: 'all',
   });
   self.postMessage({ type: 'loading', progress: 90 });
-
-  // Load id2label mapping
   try {
     const cfgBuf = await fetchWithCache(CONFIG_URL_PRIMARY, CONFIG_URL_FALLBACK);
     const cfg = JSON.parse(new TextDecoder().decode(cfgBuf)) as { id2label?: Record<string, string> };
     if (cfg.id2label) id2label = cfg.id2label;
-  } catch { /* non-fatal — string matching still works */ }
-
+  } catch { /* non-fatal */ }
   self.postMessage({ type: 'loading', progress: 100 });
   self.postMessage({ type: 'ready' });
+}
+
+function ensureSession(): Promise<void> {
+  if (session) return Promise.resolve();
+  if (!_loadPromise) _loadPromise = _doLoadSession();
+  return _loadPromise;
 }
 
 function softmax(logits: Float32Array): Float32Array {
@@ -148,7 +154,7 @@ self.addEventListener('message', async (e: MessageEvent) => {
   const msg = e.data;
 
   if (msg.type === 'init') {
-    try { await loadSession(); }
+    try { await ensureSession(); }
     catch (err) { self.postMessage({ type: 'error', id: 'init', error: String(err) }); }
     return;
   }
@@ -158,7 +164,7 @@ self.addEventListener('message', async (e: MessageEvent) => {
       id: string; instrumentId: number; pcm: Float32Array; sampleRate: number;
     };
     try {
-      if (!session) await loadSession();
+      await ensureSession();
       const result = await classify(msg.instrumentId as number, pcm, sampleRate);
       self.postMessage({ type: 'result', id, instrumentId, ...result });
     } catch (err) {
