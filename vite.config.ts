@@ -120,13 +120,17 @@ export default defineConfig({
       'Cross-Origin-Opener-Policy': 'same-origin',
       'Cross-Origin-Embedder-Policy': 'credentialless',
     },
-    // HMR enabled — only watch src/ and server/ to keep file-watcher count low (~3K files).
+    // HMR enabled — only watch src/ to keep file-watcher count low (~3K files).
+    // server/ is intentionally excluded: it's backend-only (Express/MCP), none of it is
+    // imported by the frontend. Including it caused tsx watch restarts to trigger Vite
+    // HMR updates → full page reloads → MCPBridge connect/disconnect storm.
     // The 182 *-wasm/ dirs, third-party/ (83K files), public/ (20K), tools/ (5K),
     // docs/ (3K), and other non-source trees are ignored to stay under the fd limit.
     watch: {
       usePolling: false,
       ignored: [
         '**/node_modules/**',
+        '**/server/**',
         '**/third-party/**',
         '**/Reference Code/**',
         '**/Reference Music/**',
