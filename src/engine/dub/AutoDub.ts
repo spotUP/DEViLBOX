@@ -31,7 +31,12 @@ import {
   resetRuntimeChannelClassifier,
 } from '@/bridge/analysis/ChannelAudioClassifier';
 import { useInstrumentTypeStore } from '@/stores/useInstrumentTypeStore';
+import { useChannelTypeStore } from '@/stores/useChannelTypeStore';
+import { useFormatStore } from '@/stores/useFormatStore';
 import { buildSongRoleTimeline, getRolesAtPosition, type SongRoleTimeline } from '@/bridge/analysis/SongRoleTimeline';
+import { cedChannelAccumulator } from '@/bridge/analysis/CedChannelAccumulator';
+import { sidVoiceClassifier } from '@/bridge/analysis/SidVoiceClassifier';
+import { getActiveC64SidEngine } from '@engine/replayer/NativeEngineRouting';
 import type { Pattern } from '@/types/tracker';
 import type { InstrumentConfig } from '@/types/instrument/defaults';
 
@@ -812,6 +817,18 @@ function detectTransientsFromOscilloscope(): number[] {
   }
 }
 
+// ── SID per-voice offline render — trigger once per file load ────────────────
+let _lastSidFileRef: Uint8Array | null = null;
+
+function triggerSidVoiceClassificationIfNew(): void {
+  try {
+    const sidData = useFormatStore.getState().c64SidFileData;
+    if (!sidData || sidData === _lastSidFileRef) return;
+    _lastSidFileRef = sidData;
+    useChannelTypeStore.getState().classifySidVoicesFromFile(sidData, 'song.sid');
+  } catch { /* never throw into tick */ }
+}
+
 // ── CED song role timeline cache ─────────────────────────────────────────────
 // Rebuilt whenever the instrument type map changes (new CED results arrive).
 // Keyed by the patterns array reference + instrumentTypes map size to detect
@@ -848,6 +865,8 @@ function updateRuntimeClassifierFromOscilloscope(): void {
     const data = osc.channelData;
     if (!Array.isArray(data) || data.length === 0) return;
     updateChannelClassifierFromTap(data);
+    // Feed into the CED channel accumulator (larger ring → CED inference when full)
+    cedChannelAccumulator.feed(data);
   } catch { /* classifier must never throw into the tick loop */ }
 }
 
@@ -928,6 +947,12 @@ function getCurrentPatternBundle(): {
       mergedRoles = mergedRoles.map((r, ch) => cedRoles[ch] ?? r);
     }
 
+    // Overlay live channel CED results (from CedChannelAccumulator / SidVoiceClassifier).
+    // These have higher priority because they reflect what's actually playing NOW,
+    // not a static instrument-level snapshot. Only override when we have a result.
+    const channelCedRoles = useChannelTypeStore.getState().getRolesSnapshot(mergedRoles.length);
+    mergedRoles = mergedRoles.map((r, ch) => channelCedRoles[ch] ?? r);
+
     // Names come from the first pattern — channel names are global per the
     // tracker store's updateChannelName (same name across all patterns).
     const nameSource = patterns[0];
@@ -978,6 +1003,18 @@ function tickImpl(): void {
   // and merges them with the offline analysis. Cheap: one FFT pass per
   // non-empty channel, capped at 4× per second by the tick cadence.
   updateRuntimeClassifierFromOscilloscope();
+
+  // SID voice register classifier — accumulate voice state statistics and
+  // classify each voice into a ChannelRole every CLASSIFY_EVERY_BARS bars.
+  // Works with all SID backends (no audio capture needed).
+  try {
+    const sidEngine = getActiveC64SidEngine();
+    if (sidEngine) sidVoiceClassifier.tick(sidEngine, bar);
+  } catch { /* never throw into tick */ }
+
+  // SID per-voice offline render — fires once when a new SID file is loaded,
+  // produces CED-quality classifications that override the register heuristics.
+  triggerSidVoiceClassificationIfNew();
 
   const persona = getPersona(dub.autoDubPersona);
   const bundle = getCurrentPatternBundle();
