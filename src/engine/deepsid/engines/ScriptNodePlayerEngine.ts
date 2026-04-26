@@ -493,6 +493,26 @@ export class ScriptNodePlayerEngine {
   }
 
   /**
+   * Set the 6581 filter curve parameters. Only supported by the WebSID backend
+   * (`this.engineType === 'websid'`). No-op on tinyrsid/websidplay.
+   *
+   * Parameter order matches WebSID's `setFilterConfig6581(base, max, steepness,
+   * x_offset, distort, distortOffset, distortScale, distortThreshold, kink)`.
+   */
+  setFilterConfig6581(
+    minimum: number, maximum: number, steepness: number, xOffset: number,
+    kink: number, distortion: number, distOffset: number, distScale: number,
+    distThreshold: number,
+  ): void {
+    try {
+      this.adapter?.setFilterConfig6581?.(
+        minimum, maximum, steepness, xOffset,
+        distortion, distOffset, distScale, distThreshold, kink,
+      );
+    } catch { /* adapter not ready or backend doesn't support it */ }
+  }
+
+  /**
    * Install a callback that fires immediately after each ScriptProcessorNode
    * audio buffer fill. The C64 emulator advances inside onaudioprocess, so
    * reading RAM in this callback gives the freshest possible position data
