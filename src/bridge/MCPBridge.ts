@@ -420,6 +420,21 @@ const handlers: Record<string, Handler> = {
     setTimeout(() => { window.location.reload(); }, 150);
     return { ok: true, message: 'Reloading in 150ms' };
   },
+  unlock_audio: async () => {
+    // Resume the AudioContext — equivalent to clicking in the browser.
+    // Chrome requires a user gesture, but programmatic resume() works
+    // once the page has had any prior interaction.
+    try {
+      const { getContext } = await import('tone');
+      const ctx = getContext().rawContext as AudioContext;
+      if (ctx.state !== 'running') {
+        await ctx.resume();
+      }
+      return { ok: true, state: ctx.state };
+    } catch (e) {
+      return { ok: false, error: String(e) };
+    }
+  },
   evaluate_script: evaluateScript,
 
   // ─── Soak Test (dev-only) ───────────────────────────────────────────────
