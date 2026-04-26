@@ -2277,6 +2277,13 @@ export function createMcpServer(): McpServer {
   );
 
   server.tool(
+    'unlock_audio',
+    'Resume the AudioContext to unlock audio output — equivalent to clicking in the browser. Call this after hard_reload or on a fresh page load before using play/audio tools.',
+    {},
+    () => call('unlock_audio'),
+  );
+
+  server.tool(
     'play_fur',
     'Load a .fur file from disk and immediately start playback. Combines load_file + play in one call.',
     {
