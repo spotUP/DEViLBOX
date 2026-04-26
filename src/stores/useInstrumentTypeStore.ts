@@ -124,6 +124,12 @@ export const useInstrumentTypeStore = create<InstrumentTypeState & {
     const { classifiedUrls, classifiedSynthIds } = get();
     const worker = getWorker();
 
+    // Stagger dispatches so we don't flood the worker with all instruments at
+    // once. ONNX inference is CPU-heavy; sending one every 200ms keeps the
+    // browser responsive while the 86.9MB model warms up.
+    let delay = 0;
+    const STAGGER_MS = 200;
+
     for (const inst of instruments) {
       const url = inst.sample?.url;
       const hasSample = typeof url === 'string' && url.startsWith('data:audio/wav;base64,');
@@ -136,16 +142,22 @@ export const useInstrumentTypeStore = create<InstrumentTypeState & {
 
         classifiedUrls.add(url!);
         const id = String(++_reqId);
-        set(s => ({ pendingIds: new Set([...s.pendingIds, inst.id]) }));
+        const pcm = decoded.pcm;
+        const sampleRate = decoded.sampleRate;
+        const instId = inst.id;
+        set(s => ({ pendingIds: new Set([...s.pendingIds, instId]) }));
 
-        worker.postMessage({
-          type: 'classify',
-          id,
-          instrumentId: inst.id,
-          pcm: decoded.pcm,
-          sampleRate: decoded.sampleRate,
-          name: inst.name,
-        }, [decoded.pcm.buffer]);
+        setTimeout(() => {
+          worker.postMessage({
+            type: 'classify',
+            id,
+            instrumentId: instId,
+            pcm,
+            sampleRate,
+            name: inst.name,
+          }, [pcm.buffer]);
+        }, delay);
+        delay += STAGGER_MS;
         continue;
       }
 
@@ -174,8 +186,8 @@ export const useInstrumentTypeStore = create<InstrumentTypeState & {
       if (classifiedSynthIds.has(inst.id)) continue;
       classifiedSynthIds.add(inst.id);
       set(s => ({ pendingIds: new Set([...s.pendingIds, inst.id]) }));
-      // Fire async, errors caught inside
-      void bakeSynthAndClassify(inst, worker);
+      setTimeout(() => void bakeSynthAndClassify(inst, worker), delay);
+      delay += STAGGER_MS;
     }
   },
 
