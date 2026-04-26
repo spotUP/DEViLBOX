@@ -41,7 +41,15 @@ interface InitRequest {
   type: 'init';
 }
 
-type WorkerMessage = RenderRequest | InitRequest;
+interface RenderSidVoicesRequest {
+  type: 'renderSidVoices';
+  id: string;
+  fileBuffer: ArrayBuffer;
+  filename: string;
+  subsong?: number;
+}
+
+type WorkerMessage = RenderRequest | InitRequest | RenderSidVoicesRequest;
 
 // ── UADE extensions for format routing ───────────────────────────────────────
 // Synced with UADE_EXTENSIONS in UADEParser.ts — the authoritative source.
@@ -1012,6 +1020,80 @@ async function renderWithSID(
   return { left, right, sampleRate };
 }
 
+/**
+ * Render each of the 3 SID voices in isolation for CED instrument classification.
+ *
+ * Uses `emu_enable_voice(sidIdx, voice, on)` — available in WebSID WASM — to
+ * silence the two voices we don't want, then renders 2 seconds. Three passes
+ * total. Each pass reloads the SID file to reset music state.
+ *
+ * Returns 3 Float32Arrays (one per voice) at 44100 Hz mono.
+ */
+async function renderSidVoices(
+  fileBuffer: ArrayBuffer,
+  filename: string,
+  subsong: number,
+): Promise<Float32Array[]> {
+  await initSID();
+  const mod = sidModule;
+  const sampleRate = 44100;
+  const durationSec = 2.0;
+  const targetFrames = Math.floor(sampleRate * durationSec);
+  const results: Float32Array[] = [];
+
+  for (let activeVoice = 0; activeVoice < 3; activeVoice++) {
+    // Load / reload the SID file for each voice pass
+    const data = new Uint8Array(fileBuffer);
+    const buf = mod._malloc(data.length);
+    mod.HEAPU8.set(data, buf);
+    const ret = mod.ccall('emu_load_file', 'number',
+      ['string', 'number', 'number', 'number', 'number', 'number', 'number', 'number', 'number', 'number'],
+      [filename, buf, data.length, sampleRate, 8192, 0, 0, 0, 0, 0]);
+    mod._free(buf);
+    if (ret !== 0) break;
+
+    if (subsong >= 0) {
+      mod.ccall('emu_set_subsong', 'number', ['number'], [subsong]);
+    }
+
+    // Mute all voices except activeVoice (sidIdx=0 for single-chip SID files)
+    for (let v = 0; v < 3; v++) {
+      mod.ccall('emu_enable_voice', 'number', ['number', 'number', 'number'],
+        [0, v, v === activeVoice ? 1 : 0]);
+    }
+
+    const chunks: Float32Array[] = [];
+    let totalFrames = 0;
+
+    while (totalFrames < targetFrames) {
+      const ended = mod._emu_compute_audio_samples();
+      const audioBufPtr = mod._emu_get_audio_buffer() >> 1;
+      const numSamples = mod._emu_get_audio_buffer_length();
+      if (numSamples <= 0) { if (ended) break; continue; }
+
+      const remaining = targetFrames - totalFrames;
+      const take = Math.min(numSamples, remaining);
+      const chunk = new Float32Array(take);
+      for (let i = 0; i < take; i++) {
+        // Stereo interleaved — take left channel only
+        chunk[i] = mod.HEAP16[audioBufPtr + i * 2] / 32768.0;
+      }
+      chunks.push(chunk);
+      totalFrames += take;
+      if (ended) break;
+    }
+
+    mod._emu_teardown();
+
+    const voicePcm = new Float32Array(totalFrames);
+    let off = 0;
+    for (const c of chunks) { voicePcm.set(c, off); off += c.length; }
+    results.push(voicePcm);
+  }
+
+  return results;
+}
+
 /** Decode a base64 string to Uint8Array */
 function base64ToUint8Array(b64: string): Uint8Array {
   const raw = atob(b64);
@@ -1223,6 +1305,20 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
         const errorMsg = err instanceof Error ? err.message : String(err);
         console.error(`[DJRenderWorker] Render failed for ${filename}:`, errorMsg);
         (self as unknown as Worker).postMessage({ type: 'renderError', id, error: errorMsg });
+      }
+      break;
+    }
+
+    case 'renderSidVoices': {
+      const { id, fileBuffer, filename, subsong = 0 } = msg;
+      try {
+        const voices = await renderSidVoices(fileBuffer, filename, subsong);
+        (self as unknown as Worker).postMessage(
+          { type: 'sidVoicesReady', id, voices, sampleRate: 44100 },
+          voices.map(v => v.buffer),
+        );
+      } catch (err) {
+        (self as unknown as Worker).postMessage({ type: 'renderError', id, error: String(err) });
       }
       break;
     }
