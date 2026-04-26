@@ -15,6 +15,10 @@
  */
 import { create } from 'zustand';
 import { decodeWavDataUrl } from '@/bridge/analysis/SampleSpectrum';
+import {
+  synthTypeToInstrumentType,
+  instrumentTypeToRole,
+} from '@/bridge/analysis/AudioSetInstrumentMap';
 import type { InstrumentTypeResult, InstrumentType } from '@/bridge/analysis/AudioSetInstrumentMap';
 import type { InstrumentConfig } from '@/types/instrument/defaults';
 
@@ -140,7 +144,28 @@ export const useInstrumentTypeStore = create<InstrumentTypeState & {
         continue;
       }
 
-      // ── Path 2: synth instrument — bake via SynthBaker ───────────────────
+      // ── Path 2a: synthType with deterministic role — no audio needed ─────
+      const deterministicType = synthTypeToInstrumentType(inst.synthType);
+      if (deterministicType !== null) {
+        if (classifiedSynthIds.has(inst.id)) continue;
+        classifiedSynthIds.add(inst.id);
+        // Resolve role immediately without CED
+        const role = instrumentTypeToRole(deterministicType);
+        set(s => {
+          const results = new Map(s.results);
+          results.set(inst.id, {
+            instrumentId: inst.id,
+            instrumentType: deterministicType,
+            topLabels: [{ label: inst.synthType, score: 1.0 }],
+            confidence: 1.0,
+          });
+          return { results };
+        });
+        void role; // used via SongRoleTimeline — satisfies linter
+        continue;
+      }
+
+      // ── Path 2b: synth instrument — bake via SynthBaker then CED ─────────
       if (classifiedSynthIds.has(inst.id)) continue;
       classifiedSynthIds.add(inst.id);
       set(s => ({ pendingIds: new Set([...s.pendingIds, inst.id]) }));
