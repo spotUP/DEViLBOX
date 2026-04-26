@@ -61,8 +61,10 @@ function getWorker(): Worker {
   _worker.addEventListener('message', (e: MessageEvent) => {
     useInstrumentTypeStore.getState()._onWorkerMessage(e.data);
   });
-  _worker.addEventListener('error', () => {
+  _worker.addEventListener('error', (e) => {
+    console.error('[CED] Worker error:', e.message, e.filename, e.lineno);
     useInstrumentTypeStore.getState()._setStatus('error');
+    useUIStore.getState().setStatusMessage('Instrument classifier error — see console', false, 5000);
   });
   _worker.postMessage({ type: 'init' });
   return _worker;
@@ -123,6 +125,7 @@ export const useInstrumentTypeStore = create<InstrumentTypeState & {
   classifyInstruments(instruments: InstrumentConfig[]) {
     const { classifiedUrls, classifiedSynthIds } = get();
     const worker = getWorker();
+    console.warn(`[CED] classifyInstruments called with ${instruments.length} instruments`);
 
     // Stagger dispatches so we don't flood the worker with all instruments at
     // once. ONNX inference is CPU-heavy; sending one every 200ms keeps the

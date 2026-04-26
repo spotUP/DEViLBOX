@@ -158,8 +158,9 @@ self.addEventListener('message', async (e: MessageEvent) => {
   const msg = e.data;
 
   if (msg.type === 'init') {
-    try { await ensureSession(); }
-    catch (err) { self.postMessage({ type: 'error', id: 'init', error: String(err) }); }
+    console.warn('[CED worker] init received, loading model...');
+    try { await ensureSession(); console.warn('[CED worker] model ready'); }
+    catch (err) { console.error('[CED worker] init failed:', err); self.postMessage({ type: 'error', id: 'init', error: String(err) }); }
     return;
   }
 
