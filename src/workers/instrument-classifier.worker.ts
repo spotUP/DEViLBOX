@@ -51,12 +51,21 @@ let _loadPromise: Promise<void> | null = null;
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
+// Minimum size we'd expect for any valid ONNX model (1MB safety margin)
+const MIN_MODEL_BYTES = 1_000_000;
+
 async function fetchWithCache(primary: string, fallback: string): Promise<ArrayBuffer> {
   const cache = await caches.open(CACHE_NAME);
   for (const url of [primary, fallback]) {
     try {
       const cached = await cache.match(url);
-      if (cached) return cached.arrayBuffer();
+      if (cached) {
+        const buf = await cached.arrayBuffer();
+        if (buf.byteLength >= MIN_MODEL_BYTES) return buf;
+        // Cache entry is truncated/corrupt — delete and re-fetch
+        console.warn(`[CED worker] Cached model too small (${buf.byteLength} bytes), evicting and re-fetching`);
+        await cache.delete(url);
+      }
       const res = await fetch(url);
       if (!res.ok) continue;
       await cache.put(url, res.clone());
