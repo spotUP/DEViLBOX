@@ -183,14 +183,13 @@ import {
 } from './handlers/djHandlers';
 
 const WS_URL = 'ws://localhost:4003';
-const INITIAL_BACKOFF_MS = 2000;
-const MAX_BACKOFF_MS = 30000;
+const INITIAL_BACKOFF_MS = 500;
+const MAX_BACKOFF_MS = 10000;
 // Give up after this many consecutive failed reconnects with no messages ever
 // received. The browser logs an unsuppressible "WebSocket connection failed"
 // on each attempt, and retrying forever pollutes the console when the relay
 // isn't running (common in prod builds and when the user hasn't run dev.sh).
 // 5 attempts with 2s/4s/8s/16s/30s backoff = ~60s of trying before giving up.
-const MAX_RECONNECT_ATTEMPTS = 5;
 
 type Handler = (params: Record<string, unknown>) => unknown | Promise<unknown>;
 
@@ -561,17 +560,11 @@ function connect(): void {
   ws.onclose = () => {
     connectAttempts++;
     if (connectAttempts === 1) {
-      console.log('[mcp-bridge] MCP relay not available, will retry in background');
+      console.log('[mcp-bridge] MCP relay not available, retrying...');
     }
     ws = null;
-    // Stop retrying after MAX_RECONNECT_ATTEMPTS consecutive failures WITHOUT
-    // ever receiving a message. If the relay eventually comes up, a page
-    // reload will resume the bridge. If we HAVE received messages before
-    // (relay was up, then dropped) we keep retrying forever.
-    if (!receivedMessage && connectAttempts >= MAX_RECONNECT_ATTEMPTS) {
-      console.log(`[mcp-bridge] Giving up after ${connectAttempts} failed attempts — reload the page if the relay comes up later`);
-      return;
-    }
+    // Always retry — never give up. The relay comes back after Express restarts,
+    // HMR reloads, or Claude Code restarts. Backoff caps at 10s so recovery is fast.
     scheduleReconnect();
   };
 
