@@ -123,7 +123,6 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
     setShowNewInstrumentBrowser: s.setShowNewInstrumentBrowser,
   })));
   const cedResults = useInstrumentTypeStore(s => s.results);
-  const cedStatus  = useInstrumentTypeStore(s => s.status);
   const classifyInstruments = useInstrumentTypeStore(s => s.classifyInstruments);
 
   // Trigger CED classification whenever the instrument list changes (song load, add, etc.)
@@ -945,27 +944,17 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
         </div>
       </div>
 
-      {/* Footer with count + CED status */}
+      {/* Footer with count */}
       <div className={
         isFT2
-          ? 'px-3 py-1.5 bg-ft2-header border-t border-ft2-border flex items-center justify-between gap-2'
-          : 'px-3 py-1 border-t border-dark-border bg-dark-bgSecondary flex items-center justify-between gap-2'
+          ? 'px-3 py-1.5 bg-ft2-header border-t border-ft2-border'
+          : 'px-3 py-1 border-t border-dark-border bg-dark-bgSecondary'
       }>
         <span className={isFT2 ? 'text-ft2-textDim text-[10px] font-mono' : 'text-[10px] text-text-muted'}>
           {isFiltered
             ? `${visibleInstruments.length} of ${instruments.length} instrument${instruments.length !== 1 ? 's' : ''}`
             : `${instruments.length} instrument${instruments.length !== 1 ? 's' : ''}`}
         </span>
-        {cedStatus === 'loading' && (
-          <span className="text-[9px] font-mono text-accent-warning animate-pulse shrink-0">
-            ◌ analyzing...
-          </span>
-        )}
-        {cedStatus === 'ready' && cedResults.size > 0 && (
-          <span className="text-[9px] font-mono text-accent-success shrink-0">
-            ◉ {cedResults.size} typed
-          </span>
-        )}
       </div>
 
       {/* Modals (FT2 variant) */}

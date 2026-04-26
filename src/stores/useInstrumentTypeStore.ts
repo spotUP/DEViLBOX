@@ -15,6 +15,7 @@
  */
 import { create } from 'zustand';
 import { decodeWavDataUrl } from '@/bridge/analysis/SampleSpectrum';
+import { useUIStore } from '@/stores/useUIStore';
 import {
   synthTypeToInstrumentType,
   instrumentTypeToRole,
@@ -201,9 +202,21 @@ export const useInstrumentTypeStore = create<InstrumentTypeState & {
   _onWorkerMessage(data: unknown) {
     const msg = data as Record<string, unknown>;
 
-    if (msg.type === 'loading') { set({ status: 'loading' }); return; }
-    if (msg.type === 'ready')   { set({ status: 'ready' });   return; }
-    if (msg.type === 'error' && msg.id === 'init') { set({ status: 'error' }); return; }
+    if (msg.type === 'loading') {
+      set({ status: 'loading' });
+      useUIStore.getState().setStatusMessage('Loading instrument classifier…', false, 0);
+      return;
+    }
+    if (msg.type === 'ready') {
+      set({ status: 'ready' });
+      // Status message will be updated once results arrive
+      return;
+    }
+    if (msg.type === 'error' && msg.id === 'init') {
+      set({ status: 'error' });
+      useUIStore.getState().setStatusMessage('Instrument classifier unavailable', false, 3000);
+      return;
+    }
 
     if (msg.type === 'result') {
       const { instrumentId, topLabels, instrumentType, confidence } = msg as {
@@ -224,6 +237,13 @@ export const useInstrumentTypeStore = create<InstrumentTypeState & {
         results.set(instrumentId, { instrumentId, topLabels, instrumentType, confidence });
         const pendingIds = new Set(s.pendingIds);
         pendingIds.delete(instrumentId);
+        // Announce when the last pending result arrives
+        if (pendingIds.size === 0 && results.size > 0) {
+          useUIStore.getState().setStatusMessage(
+            `Instruments classified: ${results.size} typed`,
+            false, 3000
+          );
+        }
         return { results, pendingIds };
       });
     }
