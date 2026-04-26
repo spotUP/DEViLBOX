@@ -2,8 +2,16 @@
  * Instrument type classification store.
  *
  * Manages the CED worker lifecycle and stores per-instrument type results.
- * Classification is triggered once per unique instrument (keyed by sample URL),
- * results arrive asynchronously and are stored here for AutoDub + UI to read.
+ *
+ * Two classification paths:
+ *  1. Sample instruments — PCM decoded directly from data:audio/wav;base64 URL.
+ *  2. Synth instruments  — rendered via SynthBaker.bakeToSample() in the main
+ *     thread (OfflineAudioContext), then PCM sent to the worker. Falls back
+ *     gracefully for WASM-based engines that InstrumentFactory can't render.
+ *
+ * Both paths send Float32Array PCM to the CED ONNX worker and receive an
+ * InstrumentTypeResult back. Results are stored here and consumed by AutoDub
+ * (via SongRoleTimeline) and the instrument list UI.
  */
 import { create } from 'zustand';
 import { decodeWavDataUrl } from '@/bridge/analysis/SampleSpectrum';
@@ -18,9 +26,11 @@ interface InstrumentTypeState {
   results: Map<number, InstrumentTypeResult>;
   status: WorkerStatus;
   pendingIds: Set<number>;
-  classifiedUrls: Set<string>;       // dedup by sample URL
+  classifiedUrls: Set<string>;   // dedup sample instruments by URL
+  classifiedSynthIds: Set<number>; // dedup synth instruments by ID
 
-  /** Classify all instruments that have sample PCM data. Safe to call repeatedly — dedupes. */
+  /** Classify all instruments — samples via PCM decode, synths via bake.
+   *  Safe to call on every AutoDub tick — deduplicates automatically. */
   classifyInstruments(instruments: InstrumentConfig[]): void;
   getType(instrumentId: number): InstrumentType | null;
   getResult(instrumentId: number): InstrumentTypeResult | null;
@@ -49,41 +59,93 @@ function getWorker(): Worker {
   return _worker;
 }
 
+// ── Synth baking (main thread, OfflineAudioContext) ───────────────────────────
+
+/** Send an AudioBuffer's channel 0 to the CED worker. */
+function sendAudioBufferToWorker(
+  worker: Worker,
+  instrumentId: number,
+  buffer: AudioBuffer,
+): void {
+  // Copy to avoid detaching a read-only AudioBuffer channel
+  const src = buffer.getChannelData(0);
+  const pcm = new Float32Array(src);
+  const id = String(++_reqId);
+  useInstrumentTypeStore.getState()._markPending(instrumentId);
+  worker.postMessage({
+    type: 'classify',
+    id,
+    instrumentId,
+    pcm,
+    sampleRate: buffer.sampleRate,
+    name: '',
+  }, [pcm.buffer]);
+}
+
+/** Bake a synth instrument offline and classify via CED.
+ *  Silently skips instruments that InstrumentFactory cannot render (WASM engines). */
+async function bakeSynthAndClassify(
+  inst: InstrumentConfig,
+  worker: Worker,
+): Promise<void> {
+  try {
+    const { SynthBaker } = await import('@/lib/audio/SynthBaker');
+    const duration = SynthBaker.getSmartDuration(inst);
+    const buffer = await SynthBaker.bakeToSample(inst, Math.max(1.0, duration));
+    sendAudioBufferToWorker(worker, inst.id, buffer);
+  } catch {
+    // WASM/non-Tone engines fail silently — no classification for this instrument
+    useInstrumentTypeStore.getState()._clearPending(inst.id);
+  }
+}
+
 // ── Store ─────────────────────────────────────────────────────────────────────
 
-export const useInstrumentTypeStore = create<InstrumentTypeState>((set, get) => ({
+export const useInstrumentTypeStore = create<InstrumentTypeState & {
+  _markPending(id: number): void;
+  _clearPending(id: number): void;
+}>((set, get) => ({
   results: new Map(),
   status: 'idle',
   pendingIds: new Set(),
   classifiedUrls: new Set(),
+  classifiedSynthIds: new Set(),
 
   classifyInstruments(instruments: InstrumentConfig[]) {
-    const { classifiedUrls, pendingIds } = get();
+    const { classifiedUrls, classifiedSynthIds } = get();
     const worker = getWorker();
 
     for (const inst of instruments) {
       const url = inst.sample?.url;
-      if (!url || typeof url !== 'string') continue;
-      if (!url.startsWith('data:audio/wav;base64,')) continue;
-      if (classifiedUrls.has(url)) continue;
+      const hasSample = typeof url === 'string' && url.startsWith('data:audio/wav;base64,');
 
-      const decoded = decodeWavDataUrl(url);
-      if (!decoded || decoded.pcm.length < 64) continue;
+      // ── Path 1: sample instrument ─────────────────────────────────────────
+      if (hasSample) {
+        if (classifiedUrls.has(url!)) continue;
+        const decoded = decodeWavDataUrl(url!);
+        if (!decoded || decoded.pcm.length < 64) continue;
 
-      const id = String(++_reqId);
-      pendingIds.add(inst.id);
-      classifiedUrls.add(url);
+        classifiedUrls.add(url!);
+        const id = String(++_reqId);
+        set(s => ({ pendingIds: new Set([...s.pendingIds, inst.id]) }));
 
-      worker.postMessage({
-        type: 'classify',
-        id,
-        instrumentId: inst.id,
-        pcm: decoded.pcm,
-        sampleRate: decoded.sampleRate,
-        name: inst.name,
-      }, [decoded.pcm.buffer]);   // transfer ownership
+        worker.postMessage({
+          type: 'classify',
+          id,
+          instrumentId: inst.id,
+          pcm: decoded.pcm,
+          sampleRate: decoded.sampleRate,
+          name: inst.name,
+        }, [decoded.pcm.buffer]);
+        continue;
+      }
 
-      set(s => ({ pendingIds: new Set(s.pendingIds) }));
+      // ── Path 2: synth instrument — bake via SynthBaker ───────────────────
+      if (classifiedSynthIds.has(inst.id)) continue;
+      classifiedSynthIds.add(inst.id);
+      set(s => ({ pendingIds: new Set([...s.pendingIds, inst.id]) }));
+      // Fire async, errors caught inside
+      void bakeSynthAndClassify(inst, worker);
     }
   },
 
@@ -95,21 +157,25 @@ export const useInstrumentTypeStore = create<InstrumentTypeState>((set, get) => 
     return get().results.get(instrumentId) ?? null;
   },
 
+  _markPending(id: number) {
+    set(s => ({ pendingIds: new Set([...s.pendingIds, id]) }));
+  },
+
+  _clearPending(id: number) {
+    set(s => {
+      const pendingIds = new Set(s.pendingIds);
+      pendingIds.delete(id);
+      return { pendingIds };
+    });
+  },
+
   _onWorkerMessage(data: unknown) {
     const msg = data as Record<string, unknown>;
 
-    if (msg.type === 'loading') {
-      set({ status: 'loading' });
-      return;
-    }
-    if (msg.type === 'ready') {
-      set({ status: 'ready' });
-      return;
-    }
-    if (msg.type === 'error' && msg.id === 'init') {
-      set({ status: 'error' });
-      return;
-    }
+    if (msg.type === 'loading') { set({ status: 'loading' }); return; }
+    if (msg.type === 'ready')   { set({ status: 'ready' });   return; }
+    if (msg.type === 'error' && msg.id === 'init') { set({ status: 'error' }); return; }
+
     if (msg.type === 'result') {
       const { instrumentId, topLabels, instrumentType, confidence } = msg as {
         instrumentId: number;
@@ -125,6 +191,7 @@ export const useInstrumentTypeStore = create<InstrumentTypeState>((set, get) => 
         return { results, pendingIds };
       });
     }
+
     if (msg.type === 'error' && msg.instrumentId !== undefined) {
       const instrumentId = msg.instrumentId as number;
       set(s => {
