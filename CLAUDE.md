@@ -1,5 +1,30 @@
 # DEViLBOX Project Memory
 
+## CRITICAL: Debugging — Use DEViLBOX MCP + Real Chrome, NOT Playwright
+
+**!!! NEVER USE PLAYWRIGHT FOR DEBUGGING DEViLBOX !!!**
+
+Playwright uses a Chromium build that lacks WASM SIMD support, breaks
+cross-origin isolation, and cannot run ONNX inference or AudioWorklets
+properly. It gives false negatives for features that work fine in real Chrome.
+
+**ALWAYS debug using the DEViLBOX MCP tools** (get_console_errors, play_fur,
+load_file, etc.) which control the REAL browser via the MCP relay:
+- `get_console_errors()` — captures browser errors from real Chrome
+- `load_file(path)` — loads a real file into the running app
+- `play()` / `stop()` — controls real audio playback
+- `get_audio_level()` — checks actual audio output
+
+**Prerequisites:**
+1. `npm run dev` must be running (starts Express:3011 + Vite:5173 + WS relay:4003)
+2. Browser open at `http://localhost:5173`
+3. Click in the browser once to unlock AudioContext
+
+If MCP shows "No browser connected" — check `lsof -nP -iTCP:4003 -sTCP:LISTEN`
+to confirm Express owns port 4003, then reconnect.
+
+---
+
 ## CRITICAL: Deployment — Hetzner (NOT GitHub Pages)
 
 **!!! NEVER USE `gh-pages` OR `npx gh-pages -d dist` !!!**
