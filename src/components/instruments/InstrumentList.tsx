@@ -10,6 +10,8 @@ import { useUIStore } from '@stores/useUIStore';
 import { useShallow } from 'zustand/react/shallow';
 import { getSynthInfo } from '@constants/synthCategories';
 import { getSynthBadge } from '@constants/channelTypeCompat';
+import { useInstrumentTypeStore } from '@stores/useInstrumentTypeStore';
+import { instrumentTypeLabel } from '@/bridge/analysis/AudioSetInstrumentMap';
 import { Plus, Trash2, Copy, Repeat, Repeat1, FolderOpen, Pencil, Package, ExternalLink, Download, Upload, Cpu, X, Music2 } from 'lucide-react';
 import * as LucideIcons from 'lucide-react';
 
@@ -120,6 +122,7 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
     showNewInstrumentBrowser: s.showNewInstrumentBrowser,
     setShowNewInstrumentBrowser: s.setShowNewInstrumentBrowser,
   })));
+  const cedResults = useInstrumentTypeStore(s => s.results);
   const listRef = useRef<HTMLDivElement>(null);
   const selectedRef = useRef<HTMLDivElement>(null);
   const previewTimeoutRef = useRef<number | null>(null);
@@ -670,6 +673,24 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
                       }}
                     >
                       {badge.label}
+                    </span>
+                  );
+                })()}
+
+                {/* CED neural instrument type tag */}
+                {(() => {
+                  const ced = cedResults.get(instrument.id);
+                  if (!ced || ced.instrumentType === 'unknown') return null;
+                  return (
+                    <span
+                      className={`text-[9px] px-1 py-0.5 rounded font-mono font-bold border ${
+                        isSelected
+                          ? 'bg-ft2-bg/20 text-ft2-bg border-ft2-bg/30'
+                          : 'bg-accent-primary/10 text-accent-primary border-accent-primary/30'
+                      }`}
+                      title={`CED: ${ced.topLabels[0]?.label ?? ''} (${Math.round(ced.confidence * 100)}%)`}
+                    >
+                      {instrumentTypeLabel(ced.instrumentType)}
                     </span>
                   );
                 })()}
