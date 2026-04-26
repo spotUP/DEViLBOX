@@ -13,13 +13,10 @@
  * CLIENT mode: If port 4003 is already taken, connects as a WS client
  * (used by MCP subprocess when Express already owns the port).
  *
- * ⚠️  RACE CONDITION: Both Express (server/src/index.ts) and the MCP
- * subprocess (server/src/mcp/index.ts) call startRelay(). Whichever starts
- * first owns port 4003 in SERVER mode; the other falls back to CLIENT mode.
- * CORRECT order: Express starts first (owns 4003), MCP subprocess starts
- * second (client mode). If Express restarts (Vite HMR, crash), it reclaims
- * port 4003 and the MCP subprocess loses its connection with NO auto-reconnect.
- * Fix: kill the MCP subprocess PID; Claude Code will restart it in client mode.
+ * EXPRESS always owns port 4003 in SERVER mode.
+ * MCP subprocess always calls connectAsClient() — never startRelay() — so
+ * there is no port race. If Express restarts the client auto-reconnects via
+ * the 'close' handler's attempt(2000) loop.
  */
 
 import { randomUUID } from 'crypto';
@@ -228,16 +225,22 @@ export function startRelay(): void {
  * Connect to an existing relay as an MCP client (used by MCP subprocess
  * when Express already owns port 4003). Auto-reconnects if the relay restarts.
  */
-function connectAsClient(): void {
+export function connectAsClient(): void {
   mode = 'client';
 
-  function attempt(delayMs = 0): void {
+  let retries = 0;
+
+  function attempt(): void {
+    // Exponential backoff: 500ms, 1s, 2s, 4s, 8s, capped at 10s.
+    // Starts fast so a fresh Express boot is picked up immediately.
+    const delay = retries === 0 ? 500 : Math.min(500 * 2 ** retries, 10_000);
     setTimeout(() => {
       const ws = new WebSocket(`ws://localhost:${PORT}/mcp`);
 
       ws.on('open', () => {
+        retries = 0;
         browserSocket = ws;
-        console.error('[mcp-bridge] Connected to existing relay as MCP client');
+        console.error('[mcp-bridge] Connected to relay as MCP client');
       });
 
       ws.on('message', (data) => {
@@ -248,22 +251,20 @@ function connectAsClient(): void {
             pending.delete(msg.id);
             resolve(msg as BridgeResponse);
           }
-        } catch {
-          // ignore
-        }
+        } catch { /* ignore */ }
       });
 
       ws.on('close', () => {
-        console.error('[mcp-bridge] MCP client connection closed — reconnecting in 2s');
         browserSocket = null;
-        attempt(2000);
+        retries++;
+        console.error(`[mcp-bridge] Relay disconnected — retry ${retries} in ${Math.min(500 * 2 ** retries, 10_000)}ms`);
+        attempt();
       });
 
-      ws.on('error', (err) => {
-        console.error('[mcp-bridge] MCP client error:', err.message);
-        // 'close' fires after error, so reconnect is handled there
+      ws.on('error', () => {
+        // 'close' fires immediately after 'error', reconnect handled there
       });
-    }, delayMs);
+    }, delay);
   }
 
   attempt();

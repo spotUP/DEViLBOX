@@ -2,7 +2,8 @@
 /**
  * DEViLBOX MCP Server Entry Point
  *
- * Starts the WebSocket relay (port 4003) and MCP stdio transport.
+ * Connects to the Express WebSocket relay (port 4003) as a client and
+ * starts the MCP stdio transport.
  * Run: npx tsx server/src/mcp/index.ts
  *
  * Phase timing is logged to stderr (captured by Claude Code) so the
@@ -13,7 +14,7 @@
  */
 
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import { startRelay } from './wsRelay';
+import { connectAsClient } from './wsRelay';
 import { createMcpServer } from './mcpServer';
 
 // Earliest possible ready-marker — lets the harness know we're alive
@@ -22,13 +23,11 @@ console.error(`[mcp] subprocess spawned (pid=${process.pid})`);
 const spawnedAt = Date.now();
 
 async function main(): Promise<void> {
-  // Start the WS relay for browser communication (non-fatal if port is busy).
-  try {
-    startRelay();
-  } catch (err) {
-    console.error('[mcp] WS relay failed to start (port busy?), MCP will work without browser bridge');
-  }
-  console.error(`[mcp] +${Date.now() - spawnedAt}ms relay started`);
+  // Connect to the Express relay as a client. Express always owns port 4003.
+  // connectAsClient() retries with exponential backoff — survives Express not
+  // being up yet and auto-reconnects if Express restarts.
+  connectAsClient();
+  console.error(`[mcp] +${Date.now() - spawnedAt}ms relay client started`);
 
   // Register all tools synchronously (163 server.tool() calls).
   const mcpServer = createMcpServer();
