@@ -130,6 +130,70 @@ export function instrumentTypeToRole(type: InstrumentType): ChannelRole | null {
   }
 }
 
+// ── SynthType → InstrumentType (deterministic, no audio needed) ───────────────
+
+/** Map SynthType strings that have a known, fixed instrument role to an
+ *  InstrumentType directly — skipping CED inference entirely for these types.
+ *  Returns null for ambiguous types (e.g. FMSynth, Synth) where the role
+ *  depends on how the instrument is programmed and played. */
+export function synthTypeToInstrumentType(synthType: string): InstrumentType | null {
+  switch (synthType) {
+    // ── Always percussion ─────────────────────────────────────────────────────
+    case 'Geonkick':
+    case 'MembraneSynth':
+    case 'NoiseSynth':
+    case 'TR808':
+    case 'TR909':
+    case 'DrumMachine':
+    case 'Synare':
+    case 'BuzzKick':
+    case 'BuzzKickXP':
+    case 'BuzzTrilok':
+    case 'MAMETR707':
+      return 'percussion';
+
+    // ── Always bass ───────────────────────────────────────────────────────────
+    case 'TB303':
+    case 'Buzz3o3':
+    case 'Buzz3o3DF':
+    case 'WobbleBass':
+    case 'OscBass':
+    case 'CrushBass':
+      return 'bass';
+
+    // ── Always organ / keyboard ───────────────────────────────────────────────
+    case 'Organ':
+    case 'SetBfree':
+    case 'Aeolus':
+      return 'organ';
+    case 'OpenWurli':
+    case 'MdaEPiano':
+    case 'MdaJX10':
+    case 'RdPianoSynth':
+      return 'keyboard';
+
+    // ── Always strings ────────────────────────────────────────────────────────
+    case 'StringMachine':
+      return 'strings';
+
+    // ── Always voice / speech ─────────────────────────────────────────────────
+    case 'FormantSynth':
+    case 'PinkTrombone':
+    case 'DECtalk':
+    case 'V2Speech':
+    case 'Sam':
+    case 'MAMETMS5220':
+    case 'MAMEVotrax':
+    case 'MAMESP0250':
+    case 'MAMEMEA8000':
+      return 'voice';
+
+    // ── Ambiguous — let CED or SynthBaker decide ──────────────────────────────
+    default:
+      return null;
+  }
+}
+
 // ── Display helpers ───────────────────────────────────────────────────────────
 
 /** Short display label for the instrument list UI tag. */
