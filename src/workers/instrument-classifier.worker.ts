@@ -13,7 +13,7 @@
  *   Worker → Main: { type: 'loading', progress }
  */
 
-import * as ort from 'onnxruntime-web';
+import * as ort from 'onnxruntime-web/wasm';
 import {
   computeCedMelSpectrogram,
   resampleTo16k,
@@ -27,6 +27,10 @@ import type { InstrumentType } from '@/bridge/analysis/AudioSetInstrumentMap';
 
 // ── ONNX Runtime WASM path ────────────────────────────────────────────────────
 ort.env.wasm.wasmPaths = '/onnx-wasm/';
+// Disable multi-threading: ORT's pthread WASM creates nested Workers using
+// import.meta.url which Vite transforms, causing [object Event] init failures.
+// Single-threaded mode is plenty fast for our 83MB model inference.
+ort.env.wasm.numThreads = 1;
 
 // ── Model URLs — own server first, HuggingFace CDN fallback ──────────────────
 const MODEL_URL_PRIMARY  = '/models/ced/model.onnx';
