@@ -32,9 +32,9 @@ describe('snapToAltecStep', () => {
 });
 
 describe('DUB_CHARACTER_PRESETS', () => {
-  it('has all 4 documented engineer presets', () => {
+  it('has all 5 documented engineer presets', () => {
     expect(Object.keys(DUB_CHARACTER_PRESETS).sort()).toEqual(
-      ['madProfessor', 'perry', 'scientist', 'tubby'],
+      ['gatedFlanger', 'madProfessor', 'perry', 'scientist', 'tubby'],
     );
   });
 
@@ -45,10 +45,17 @@ describe('DUB_CHARACTER_PRESETS', () => {
     expect(p.overrides.stereoWidth).toBeLessThan(1);
   });
 
-  it('scientist has the signature -6dB mid-scoop at 700Hz', () => {
+  it('scientist has the signature deep mid-scoop at 700Hz', () => {
     const p = DUB_CHARACTER_PRESETS.scientist;
-    expect(p.overrides.midScoopGainDb).toBe(-6);
+    expect(p.overrides.midScoopGainDb).toBe(-10);
     expect(p.overrides.midScoopFreqHz).toBe(700);
+  });
+
+  it('gatedFlanger has heavy sweep + gated-short spring', () => {
+    const p = DUB_CHARACTER_PRESETS.gatedFlanger;
+    expect(p.overrides.sweepAmount).toBeGreaterThan(0.5);
+    expect(p.overrides.springWet).toBeLessThan(0.5);
+    expect(p.overrides.tapeSatMode).toBe('single');
   });
 
   it('perry enables tape stack + non-zero sweep amount + near-mono', () => {
