@@ -47,6 +47,10 @@ interface InstrumentTypeState {
 let _worker: Worker | null = null;
 let _reqId = 0;
 
+/** Export worker accessor so CedChannelAccumulator / SidVoiceClassifier can
+ *  dispatch channel PCM to the same worker without a second instance. */
+export function getInstrumentClassifierWorker(): Worker | null { return _worker; }
+
 function getWorker(): Worker {
   if (_worker) return _worker;
   _worker = new Worker(
@@ -208,6 +212,13 @@ export const useInstrumentTypeStore = create<InstrumentTypeState & {
         instrumentType: InstrumentType;
         confidence: number;
       };
+      // Negative IDs are channel-direct classifications — route to channel store
+      if (instrumentId < 0) {
+        void import('@stores/useChannelTypeStore').then(({ useChannelTypeStore }) => {
+          useChannelTypeStore.getState()._onWorkerResult({ instrumentId, topLabels, instrumentType, confidence });
+        }).catch(() => {});
+        return;
+      }
       set(s => {
         const results = new Map(s.results);
         results.set(instrumentId, { instrumentId, topLabels, instrumentType, confidence });
