@@ -6,6 +6,8 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useInstrumentStore } from '@stores/useInstrumentStore';
 import { useUIStore } from '@stores/useUIStore';
+import { useInstrumentTypeStore } from '@stores/useInstrumentTypeStore';
+import { instrumentTypeLabel, instrumentTypeColor } from '@/bridge/analysis/AudioSetInstrumentMap';
 import { getSynthInfo } from '@constants/synthCategories';
 import * as LucideIcons from 'lucide-react';
 import { useClickOutside } from '@hooks/useClickOutside';
@@ -23,6 +25,8 @@ export const InstrumentSelector: React.FC<InstrumentSelectorProps> = ({
     currentInstrumentId,
     setCurrentInstrument,
   } = useInstrumentStore();
+
+  const cedResults = useInstrumentTypeStore(s => s.results);
 
   const useHexNumbers = useUIStore((state) => state.useHexNumbers);
 
@@ -177,6 +181,14 @@ export const InstrumentSelector: React.FC<InstrumentSelectorProps> = ({
                 </span>
                 <IconComponent size={12} className={info.color} />
                 <span className="flex-1 text-xs truncate">{instrument.name}</span>
+                {(() => {
+                  const r = cedResults.get(instrument.id);
+                  return r && r.instrumentType !== 'unknown' ? (
+                    <span className={`text-[9px] font-mono ${instrumentTypeColor(r.instrumentType)}`}>
+                      {instrumentTypeLabel(r.instrumentType)}
+                    </span>
+                  ) : null;
+                })()}
                 <span className="text-[10px] text-text-muted font-mono">
                   {info.shortName}
                 </span>

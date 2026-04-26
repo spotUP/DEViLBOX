@@ -30,6 +30,8 @@ import {
   mergeOfflineAndRuntimeRoles,
   resetRuntimeChannelClassifier,
 } from '@/bridge/analysis/ChannelAudioClassifier';
+import { useInstrumentTypeStore } from '@/stores/useInstrumentTypeStore';
+import { buildSongRoleTimeline, getRolesAtPosition, type SongRoleTimeline } from '@/bridge/analysis/SongRoleTimeline';
 import type { Pattern } from '@/types/tracker';
 import type { InstrumentConfig } from '@/types/instrument/defaults';
 
@@ -810,6 +812,33 @@ function detectTransientsFromOscilloscope(): number[] {
   }
 }
 
+// ── CED song role timeline cache ─────────────────────────────────────────────
+// Rebuilt whenever the instrument type map changes (new CED results arrive).
+// Keyed by the patterns array reference + instrumentTypes map size to detect
+// both song changes and progressive CED result updates.
+let _cedTimeline: SongRoleTimeline | null = null;
+let _cedTimelinePatternRef: Pattern[] | null = null;
+let _cedTimelineResultCount = -1;
+
+function getCedTimeline(patterns: Pattern[], patternOrder: number[]): SongRoleTimeline | null {
+  const store = useInstrumentTypeStore.getState();
+  const resultCount = store.results.size;
+  if (resultCount === 0) return null;
+  // Rebuild when patterns change or new CED results arrive
+  if (
+    _cedTimeline === null ||
+    _cedTimelinePatternRef !== patterns ||
+    _cedTimelineResultCount !== resultCount
+  ) {
+    const typeMap = new Map<number, import('@/bridge/analysis/AudioSetInstrumentMap').InstrumentType>();
+    for (const [id, r] of store.results) typeMap.set(id, r.instrumentType);
+    _cedTimeline = buildSongRoleTimeline(patterns, patternOrder, typeMap);
+    _cedTimelinePatternRef = patterns;
+    _cedTimelineResultCount = resultCount;
+  }
+  return _cedTimeline;
+}
+
 /** Feed the live tap into the runtime channel classifier (ChannelAudio-
  *  Classifier). Same data source as `detectTransientsFromOscilloscope` but
  *  accumulates samples into a ring buffer for spectral classification. */
@@ -880,9 +909,24 @@ function getCurrentPatternBundle(): {
       if (inst && typeof inst.id === 'number') lookup.set(inst.id, inst);
     }
 
+    // Trigger CED instrument classification in the background (no-op if already running).
+    useInstrumentTypeStore.getState().classifyInstruments(insts);
+
     const offlineRoles = classifySongRoles(patterns, lookup);
     const runtimeHints = getAllRuntimeChannelRoles(offlineRoles.length);
-    const mergedRoles = mergeOfflineAndRuntimeRoles(offlineRoles, runtimeHints);
+    let mergedRoles = mergeOfflineAndRuntimeRoles(offlineRoles, runtimeHints);
+
+    // Overlay CED timeline roles where available. CED knows the CURRENT
+    // instrument at each song position, so it tracks mid-song instrument
+    // switches that static classifySongRoles misses.
+    const patternOrder: number[] = tracker.patternOrder ?? [];
+    const positionIndex: number = tracker.currentPositionIndex ?? 0;
+    const currentRow = transport.currentRow ?? 0;
+    const cedTimeline = getCedTimeline(patterns, patternOrder);
+    if (cedTimeline) {
+      const cedRoles = getRolesAtPosition(cedTimeline, positionIndex, currentRow);
+      mergedRoles = mergedRoles.map((r, ch) => cedRoles[ch] ?? r);
+    }
 
     // Names come from the first pattern — channel names are global per the
     // tracker store's updateChannelName (same name across all patterns).
@@ -891,7 +935,7 @@ function getCurrentPatternBundle(): {
       roles: mergedRoles,
       pattern,
       names: nameSource.channels.map(c => c.name ?? null),
-      currentRow: transport.currentRow ?? 0,
+      currentRow,
     };
   } catch {
     return empty;
