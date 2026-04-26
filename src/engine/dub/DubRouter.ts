@@ -47,6 +47,7 @@ import { subHarmonic } from './moves/subHarmonic';
 import { eqSweep } from './moves/eqSweep';
 import { combSweep } from './moves/combSweep';
 import { versionDrop } from './moves/versionDrop';
+import { skankEchoThrow } from './moves/skankEchoThrow';
 import type { DubMove, DubMoveContext } from './moves/_types';
 import type { DubBus } from './DubBus';
 import { useTransportStore } from '@/stores/useTransportStore';
@@ -126,6 +127,7 @@ const MOVES: Record<string, DubMove> = {
   eqSweep,
   combSweep,
   versionDrop,
+  skankEchoThrow,
 };
 
 /**

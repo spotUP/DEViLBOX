@@ -73,6 +73,7 @@ const MOVE_COLOR: Record<string, string> = {
   ringMod:             'bg-accent-secondary/40', // metallic ring mod
   combSweep:           'bg-accent-secondary/80', // liquid comb sweep — same family as sweep controls
   versionDrop:         'bg-accent-error',         // full melodic drop — same as channelMute (dramatic)
+  skankEchoThrow:      'bg-accent-highlight/60',  // floating offbeat echo — highlight family, semi-transparent
 };
 
 // Hold-kind moves have a meaningful durationRows. Keep in sync with the
@@ -86,6 +87,7 @@ const HOLD_KINDS = new Set([
   // New moves
   'hpfRise', 'madProfPingPong', 'combSweep', 'eqSweep', 'tapeStop', 'transportTapeStop',
   'versionDrop',
+  'skankEchoThrow',
 ]);
 
 const POINT_WIDTH_PX = 6;   // rendered width for trigger events
