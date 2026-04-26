@@ -415,6 +415,11 @@ const handlers: Record<string, Handler> = {
   // ─── Console Capture ────────────────────────────────────────────────────
   get_console_errors: () => getConsoleErrors(),
   clear_console_errors: () => clearConsoleErrors(),
+  hard_reload: () => {
+    // Respond before reloading so the MCP tool call gets a response
+    setTimeout(() => { window.location.reload(); }, 150);
+    return { ok: true, message: 'Reloading in 150ms' };
+  },
   evaluate_script: evaluateScript,
 
   // ─── Soak Test (dev-only) ───────────────────────────────────────────────
