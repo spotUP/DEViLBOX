@@ -18,6 +18,7 @@ import { useMixerStore } from '../../stores/useMixerStore';
 import { useHistoryStore } from '../../stores/useHistoryStore';
 import { useProjectStore } from '../../stores/useProjectStore';
 import { useOscilloscopeStore } from '../../stores/useOscilloscopeStore';
+import { useInstrumentTypeStore } from '../../stores/useInstrumentTypeStore';
 import { useDJStore } from '../../stores/useDJStore';
 import { useDrumPadStore } from '../../stores/useDrumPadStore';
 import { getDJEngineIfActive } from '../../engine/dj/DJEngine';
@@ -228,13 +229,18 @@ export function getChannelColumn(params: Record<string, unknown>): Record<string
 
 export function getInstrumentsList(): Record<string, unknown>[] {
   const instruments = useInstrumentStore.getState().instruments;
+  const cedResults = useInstrumentTypeStore.getState().results;
   if (instruments.length > 0) {
-    return instruments.map((inst) => ({
-      id: inst.id,
-      name: inst.name,
-      type: inst.type,
-      synthType: inst.synthType,
-    }));
+    return instruments.map((inst) => {
+      const ced = cedResults.get(inst.id);
+      return {
+        id: inst.id,
+        name: inst.name,
+        type: inst.type,
+        synthType: inst.synthType,
+        ...(ced ? { cedType: ced.instrumentType, cedConfidence: ced.confidence } : {}),
+      };
+    });
   }
   // Fallback: check TrackerReplayer song for imported module instruments
   try {
