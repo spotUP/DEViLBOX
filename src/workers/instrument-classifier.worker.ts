@@ -28,9 +28,6 @@ import type { InstrumentType } from '@/bridge/analysis/AudioSetInstrumentMap';
 
 // ── ONNX Runtime WASM path ────────────────────────────────────────────────────
 ort.env.wasm.wasmPaths = '/onnx-wasm/';
-// Single-threaded: prevents Emscripten pthread sub-worker creation which
-// breaks under Vite's module URL transformation.
-ort.env.wasm.numThreads = 1;
 
 // ── Model URLs — own server first, HuggingFace CDN fallback ──────────────────
 const MODEL_URL_PRIMARY  = '/models/ced/model.onnx';
