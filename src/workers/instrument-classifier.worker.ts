@@ -28,6 +28,11 @@ import type { InstrumentType } from '@/bridge/analysis/AudioSetInstrumentMap';
 
 // ── ONNX Runtime WASM path ────────────────────────────────────────────────────
 ort.env.wasm.wasmPaths = '/onnx-wasm/';
+// ORT's Emscripten pthread threads create sub-workers using import.meta.url.
+// Vite serves the WASM mjs with ?import suffix which breaks the nested URL —
+// the sub-worker fails to load → [object Event] crash. numThreads=1 avoids
+// all sub-worker creation entirely. Inference is slower but reliable.
+ort.env.wasm.numThreads = 1;
 
 // ── Model URLs — own server first, HuggingFace CDN fallback ──────────────────
 const MODEL_URL_PRIMARY  = '/models/ced/model.onnx';
