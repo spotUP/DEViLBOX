@@ -105,10 +105,12 @@ export default defineConfig({
     },
   },
   optimizeDeps: {
-    exclude: ['chiptune3', '@echogarden/espeak-ng-emscripten', 'onnxruntime-web'],
+    exclude: ['chiptune3', '@echogarden/espeak-ng-emscripten'],
     // Pre-bundle @dnd-kit packages upfront so lazy-loaded components that use
     // them don't trigger a runtime re-optimization (504 Outdated Optimize Dep).
-    include: ['react', 'react-dom', '@dnd-kit/core', '@dnd-kit/sortable', '@dnd-kit/utilities'],
+    // onnxruntime-web/wasm is pre-bundled so the instrument-classifier Worker's
+    // first import doesn't trigger a mid-session "optimized deps changed" reload.
+    include: ['react', 'react-dom', '@dnd-kit/core', '@dnd-kit/sortable', '@dnd-kit/utilities', 'onnxruntime-web/wasm'],
     // Don't scan Reference Code folder for dependencies
     entries: ['src/**/*.{ts,tsx,js,jsx}'],
   },
