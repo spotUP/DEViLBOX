@@ -123,6 +123,13 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
     setShowNewInstrumentBrowser: s.setShowNewInstrumentBrowser,
   })));
   const cedResults = useInstrumentTypeStore(s => s.results);
+  const classifyInstruments = useInstrumentTypeStore(s => s.classifyInstruments);
+
+  // Trigger CED classification whenever the instrument list changes (song load, add, etc.)
+  useEffect(() => {
+    if (instruments.length > 0) classifyInstruments(instruments);
+  }, [instruments, classifyInstruments]);
+
   const listRef = useRef<HTMLDivElement>(null);
   const selectedRef = useRef<HTMLDivElement>(null);
   const previewTimeoutRef = useRef<number | null>(null);
