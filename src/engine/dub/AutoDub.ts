@@ -450,6 +450,21 @@ const RULES: Rule[] = [
   { moveId: 'combSweep', channelRole: 'skank',
     condition: (c) => hasTransientForRole(c, 'percussion') && c.barPos < 0.15,
     baseWeight: 0.18, holdBars: 1, wet: true },
+  // ── Skank echo throw ─────────────────────────────────────────────────────
+  // The defining offbeat dub move: throw the upbeat chord/skank channel into
+  // a dotted-delay echo so repeats float at 2/3 tempo. Fires on bar 1 and 3
+  // of each 4-bar phrase (strong phrase positions for the chord change feel),
+  // plus transient-reactive on chord hits.
+  { moveId: 'skankEchoThrow', channelRole: 'skank',
+    condition: (c) => c.isNewBar && c.bar % 4 === 1,
+    baseWeight: 0.28, holdBars: 2, wet: true },
+  { moveId: 'skankEchoThrow', channelRole: 'chord',
+    condition: (c) => c.isNewBar && c.bar % 4 === 3,
+    baseWeight: 0.20, holdBars: 1, wet: true },
+  { moveId: 'skankEchoThrow', channelRole: 'skank',
+    condition: (c) => hasTransientForRole(c, 'skank') && c.barPos > 0.25 && c.barPos < 0.5,
+    baseWeight: 0.22, holdBars: 1, wet: true },
+
   // oscBass and crushBass are intentionally excluded from AutoDub:
   // both are self-oscillating generators that stomp on the mix when
   // auto-fired. They are manual-only performance pads.
