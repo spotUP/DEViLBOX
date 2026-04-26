@@ -70,6 +70,8 @@ describe('AutoDub chooseMove', () => {
       'stereoDoubler', 'channelThrow', 'subHarmonic',
       'springKick', 'ghostReverb', 'ringMod', 'voltageStarve', 'eqSweep',
       'delayPresetDotted', 'delayPresetTriplet',
+      // skankEchoThrow (chord rule fires at bar % 4 === 3):
+      'skankEchoThrow',
     ]);
     const rng = seededRng(42);
     const result = chooseMove(baseCtx({ blacklist, intensity: 1 }), rng);
@@ -456,7 +458,7 @@ describe('transient-triggered rules', () => {
     function countWithTransient(active: boolean): number {
       const rng = seededRng(3001);
       let count = 0;
-      for (let i = 0; i < 500; i++) {
+      for (let i = 0; i < 5000; i++) {
         const result = chooseMove(baseCtx({
           bar: 3, barPos: 0.0, isNewBar: true, intensity: 1,
           channelCount: 3, roles,

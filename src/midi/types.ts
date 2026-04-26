@@ -400,6 +400,7 @@ export type DubMoveParameter =
   | 'dub.madProfPingPong'
   | 'dub.combSweep'
   | 'dub.versionDrop'
+  | 'dub.skankEchoThrow'
   // Continuous bus settings
   | 'dub.echoIntensity'
   | 'dub.echoWet'

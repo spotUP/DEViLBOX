@@ -67,10 +67,11 @@ function inferRoleFromName(name: string): 'percussion' | 'bass' | 'lead' | 'chor
 // Each channel strip shows these 4 buttons alongside the hold-toggle + send
 // knob. Label/title/moveId tuple keeps the rendering loop tight.
 const CHANNEL_OPS: Array<{ label: string; title: string; moveId: string; color: string; kind: 'trigger' | 'hold' }> = [
-  { label: 'Mute',  title: 'Mute — silence this channel while held',          moveId: 'channelMute',  color: 'accent-error',      kind: 'hold' },
-  { label: 'Throw', title: 'Throw — long echoThrow (4 beats + heavy tail)',   moveId: 'channelThrow', color: 'accent-primary/70', kind: 'trigger' },
-  { label: 'Echo',  title: 'Echo Throw — open tap + feedback spike',          moveId: 'echoThrow',    color: 'accent-primary',    kind: 'trigger' },
-  { label: '✦',    title: 'Dub Stab — short-sharp echo kiss',                 moveId: 'dubStab',      color: 'accent-highlight',  kind: 'trigger' },
+  { label: 'Mute',  title: 'Mute — silence this channel while held',          moveId: 'channelMute',     color: 'accent-error',      kind: 'hold' },
+  { label: 'Throw', title: 'Throw — long echoThrow (4 beats + heavy tail)',   moveId: 'channelThrow',    color: 'accent-primary/70', kind: 'trigger' },
+  { label: 'Echo',  title: 'Echo Throw — open tap + feedback spike',          moveId: 'echoThrow',       color: 'accent-primary',    kind: 'trigger' },
+  { label: 'Skank', title: 'Skank Echo — dotted-delay floating echo (1.5 × beat). The echo repeats at offset positions so it sounds like a lower tempo — the defining offbeat dub sound.', moveId: 'skankEchoThrow', color: 'accent-highlight/70', kind: 'hold' },
+  { label: '✦',    title: 'Dub Stab — short-sharp echo kiss',                 moveId: 'dubStab',         color: 'accent-highlight',  kind: 'trigger' },
   { label: 'Build', title: 'Build — ramp send up over 2 bars, mute dry, let echoes carry (offbeat-guitar gesture)', moveId: 'echoBuildUp', color: 'accent-warning', kind: 'trigger' },
 ];
 
