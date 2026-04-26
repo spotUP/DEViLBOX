@@ -162,6 +162,8 @@ export type TrackerWorkerMsg =
       smoothOffset: number;
       patternIndex: number;
       isPlaying: boolean;
+      /** Song order position (0-based). Updates on D00/Bxx even when patternIndex stays the same. */
+      songPosition?: number;
     }
   | { type: 'resize'; w: number; h: number; dpr: number }
   | { type: 'theme'; theme: ThemeSnapshot }

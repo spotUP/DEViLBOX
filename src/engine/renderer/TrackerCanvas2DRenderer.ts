@@ -109,7 +109,7 @@ export class TrackerCanvas2DRenderer {
     scrollX: number;
     cursor: CursorSnapshot;
     selection: SelectionSnapshot | null;
-    playback: { row: number; smoothOffset: number; patternIndex: number; isPlaying: boolean };
+    playback: { row: number; smoothOffset: number; patternIndex: number; isPlaying: boolean; songPosition?: number };
     theme: ThemeSnapshot;
     ui: UIStateSnapshot;
     layout: ChannelLayoutSnapshot;
@@ -120,7 +120,7 @@ export class TrackerCanvas2DRenderer {
       playback, theme, ui, layout,
     } = opts;
 
-    const { isPlaying, row: playRow, patternIndex: playPatIdx } = playback;
+    const { isPlaying, row: playRow, patternIndex: playPatIdx, songPosition } = playback;
     const activePatIdx = isPlaying ? playPatIdx : currentPatternIndex;
     const pattern = patterns[activePatIdx];
 
@@ -384,6 +384,25 @@ export class TrackerCanvas2DRenderer {
     ctx.lineTo(W, centerY);
     ctx.stroke();
     ctx.globalAlpha = 1;
+
+    // ── Song position badge ──────────────────────────────────────────────────
+    // Show "♦ N" (order position) during playback — visible even when D00/Bxx
+    // jumps to a repeated pattern so the position change is never ambiguous.
+    if (isPlaying && songPosition !== undefined) {
+      const badgeFont = `bold ${this.mobile ? 14 : 10}px "JetBrains Mono", "Fira Code", monospace`;
+      const label = `♦ ${songPosition}`;
+      ctx.font = badgeFont;
+      const tw = ctx.measureText(label).width;
+      const bx = W - tw - 6;
+      const by = 4;
+      const bh = this.mobile ? 18 : 13;
+      ctx.globalAlpha = 0.75;
+      ctx.fillStyle = theme.bg;
+      ctx.fillRect(bx - 2, by, tw + 4, bh);
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = theme.accentGlow;
+      ctx.fillText(label, bx, by + bh - 3);
+    }
 
     ctx.restore();
   }

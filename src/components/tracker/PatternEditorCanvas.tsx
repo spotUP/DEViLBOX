@@ -2558,6 +2558,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
       let currentRow   = useCursorStore.getState().cursor.rowIndex;
       let activePatternIdx = trackerState.currentPatternIndex;
       let smoothOffset = 0;
+      let songPosition: number | undefined;
 
       // WASM engine position — check FIRST (bypasses replayer which returns stale state)
       // In format mode, allow wasmPos only when FormatPlaybackState is NOT driving scroll
@@ -2570,6 +2571,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
         const patternOrder = trackerState.patternOrder;
         if (wasmPos.songPos >= 0 && wasmPos.songPos < patternOrder.length) {
           activePatternIdx = patternOrder[wasmPos.songPos] ?? wasmPos.songPos;
+          songPosition = wasmPos.songPos;
         }
       } else if (isPlaying) {
         // Check if scratch is active — use scratch position instead of replayer
@@ -2589,6 +2591,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
           if (audioState) {
             currentRow       = audioState.row;
             activePatternIdx = audioState.pattern;
+            songPosition     = audioState.position;
 
             // Compute smooth offset for worker rendering
             if (transportState.smoothScrolling && audioState.duration > 0) {
@@ -2628,6 +2631,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
           bpm:          transportState.bpm,
           speed:        transportState.speed,
           smoothScrolling: transportState.smoothScrolling,
+          songPosition,
         } as any);
       }
 
