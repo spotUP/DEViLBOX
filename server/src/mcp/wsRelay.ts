@@ -134,11 +134,14 @@ export function startRelay(): void {
       });
     } else {
       // Browser connection
+      const browserOrigin = req.headers['origin'] ?? req.headers['host'] ?? 'unknown';
+      const browserUA = (req.headers['user-agent'] ?? '').slice(0, 60);
       if (browserSocket && browserSocket.readyState === WebSocket.OPEN) {
+        console.error(`[mcp-bridge] Kicking old browser to make room for new one (origin=${browserOrigin})`);
         browserSocket.close();
       }
       browserSocket = ws;
-      console.error('[mcp-bridge] Browser connected');
+      console.error(`[mcp-bridge] Browser connected (origin=${browserOrigin} ua=${browserUA})`);
 
       ws.on('message', (data) => {
         let msg: BridgeResponse;
@@ -172,8 +175,8 @@ export function startRelay(): void {
         }
       });
 
-      ws.on('close', () => {
-        console.error('[mcp-bridge] Browser disconnected');
+      ws.on('close', (code, reason) => {
+        console.error(`[mcp-bridge] Browser disconnected (code=${code} reason=${reason?.toString() || 'none'})`);
         if (browserSocket === ws) browserSocket = null;
         // Reject all pending local requests
         for (const [id, resolve] of pending) {
