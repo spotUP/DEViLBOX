@@ -439,6 +439,27 @@ export class C64SIDEngine {
     this.setStereoEnhance(this._stereoEnhance);
   }
 
+  /**
+   * Set the 6581 filter curve shape. Only effective when the active engine
+   * backend is WebSID — jsSID has a hardcoded filter curve with no API.
+   * Parameters match the DeepSID filter curve UI (SIDFilterTab):
+   *   minimum, maximum, steepness, xOffset, kink,
+   *   distortion, distOffset, distScale, distThreshold
+   */
+  setFilterConfig6581(
+    minimum: number, maximum: number, steepness: number, xOffset: number,
+    kink: number, distortion: number, distOffset: number, distScale: number,
+    distThreshold: number,
+  ): void {
+    if (this.engine instanceof ScriptNodePlayerEngine) {
+      this.engine.setFilterConfig6581(
+        minimum, maximum, steepness, xOffset,
+        kink, distortion, distOffset, distScale, distThreshold,
+      );
+    }
+    // JSSIDEngine: no filter curve API — parameters have no effect
+  }
+
   // ── Dub bus send ─────────────────────────────────────────────────────
   private dubSendGain: GainNode | null = null;
 

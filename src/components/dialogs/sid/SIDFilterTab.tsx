@@ -5,9 +5,10 @@
  * reset button, and a small SVG filter curve preview.
  */
 
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import { RotateCcw } from 'lucide-react';
 import { CustomSelect } from '@components/common/CustomSelect';
+import { getActiveC64SidEngine } from '@/engine/replayer/NativeEngineRouting';
 
 interface SIDFilterTabProps {
   className?: string;
@@ -111,9 +112,32 @@ function buildFillPath(params: FilterParams): string {
   return `${curve} L ${SVG_W - PAD} ${SVG_H - PAD} L ${PAD} ${SVG_H - PAD} Z`;
 }
 
+function applyFilterToEngine(p: FilterParams): void {
+  try {
+    getActiveC64SidEngine()?.setFilterConfig6581(
+      p.minimum, p.maximum, p.steepness, p.xOffset,
+      p.kink, p.distortion, p.distOffset, p.distScale, p.distThreshold,
+    );
+  } catch { /* engine not ready */ }
+}
+
 export const SIDFilterTab: React.FC<SIDFilterTabProps> = ({ className }) => {
   const [params, setParams] = useState<FilterParams>({ ...DEFAULT_PARAMS });
   const [revision, setRevision] = useState('r2');
+  const [engineSupported, setEngineSupported] = useState<boolean | null>(null);
+
+  // Check whether the active engine supports filter curve control (WebSID only)
+  useEffect(() => {
+    const engine = getActiveC64SidEngine();
+    // WebSID backend: adapter has setFilterConfig6581; jsSID: no API
+    const supported = typeof engine?.setFilterConfig6581 === 'function';
+    setEngineSupported(supported);
+  }, []);
+
+  // Apply params to engine whenever they change
+  useEffect(() => {
+    applyFilterToEngine(params);
+  }, [params]);
 
   const updateParam = useCallback((key: ParamKey, value: number) => {
     setParams(prev => ({ ...prev, [key]: value }));
@@ -146,6 +170,10 @@ export const SIDFilterTab: React.FC<SIDFilterTabProps> = ({ className }) => {
         />
 
         <div className="flex-1" />
+
+        {engineSupported === false && (
+          <span className="text-[9px] font-mono text-text-muted italic">jsSID — visual only</span>
+        )}
 
         <button
           onClick={handleReset}
