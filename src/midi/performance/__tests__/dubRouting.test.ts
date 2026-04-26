@@ -24,6 +24,7 @@ function makeMockBus() {
     filterDrop: vi.fn(() => () => {}),
     setSirenFeedback: vi.fn(() => () => {}),
     startTapeWobble: vi.fn(() => () => {}),
+    startTapeHold: vi.fn(() => () => {}),
     fireNoiseBurst: vi.fn(),
     throwEchoTime: vi.fn(),
     backwardReverb: vi.fn(async () => {}),
