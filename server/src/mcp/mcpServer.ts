@@ -2270,6 +2270,13 @@ export function createMcpServer(): McpServer {
   );
 
   server.tool(
+    'hard_reload',
+    'Force a hard browser reload (bypasses cache, like Cmd+Shift+R). Use when HMR has stale state, MCPBridge gave up retrying, or after Vite config changes. The browser will disconnect and reconnect — wait 3-5s then call get_song_info to confirm reconnection.',
+    {},
+    () => call('hard_reload'),
+  );
+
+  server.tool(
     'play_fur',
     'Load a .fur file from disk and immediately start playback. Combines load_file + play in one call.',
     {
