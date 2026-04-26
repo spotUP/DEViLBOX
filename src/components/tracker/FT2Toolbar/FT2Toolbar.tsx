@@ -581,7 +581,7 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
             </div>
           </div>
           <div className="w-px h-5 bg-dark-border shrink-0" />
-          <InstrumentSelector compact />
+          <InstrumentSelector />
           <div className="w-px h-5 bg-dark-border shrink-0" />
           {actionButtons}
         </div>

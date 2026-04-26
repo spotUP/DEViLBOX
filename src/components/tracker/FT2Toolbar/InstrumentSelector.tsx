@@ -3,32 +3,29 @@
  * Matches the Position/Pattern selector styling with dropdown capability
  */
 
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { useInstrumentStore } from '@stores/useInstrumentStore';
 import { useUIStore } from '@stores/useUIStore';
+import { useShallow } from 'zustand/react/shallow';
 import { useInstrumentTypeStore } from '@stores/useInstrumentTypeStore';
 import { instrumentTypeLabel, instrumentTypeColor } from '@/bridge/analysis/AudioSetInstrumentMap';
 import { getSynthInfo } from '@constants/synthCategories';
 import * as LucideIcons from 'lucide-react';
 import { useClickOutside } from '@hooks/useClickOutside';
 
-interface InstrumentSelectorProps {
-  /** Show compact mode with just number */
-  compact?: boolean;
-}
+type InstrumentSelectorProps = Record<string, never>;
 
-export const InstrumentSelector: React.FC<InstrumentSelectorProps> = ({
-  compact = false,
-}) => {
-  const {
-    instruments,
-    currentInstrumentId,
-    setCurrentInstrument,
-  } = useInstrumentStore();
+export const InstrumentSelector: React.FC<InstrumentSelectorProps> = () => {
+  const { instruments, currentInstrumentId, setCurrentInstrument } = useInstrumentStore(
+    useShallow(s => ({
+      instruments: s.instruments,
+      currentInstrumentId: s.currentInstrumentId,
+      setCurrentInstrument: s.setCurrentInstrument,
+    }))
+  );
 
   const cedResults = useInstrumentTypeStore(s => s.results);
-
-  const useHexNumbers = useUIStore((state) => state.useHexNumbers);
+  const useHexNumbers = useUIStore(s => s.useHexNumbers);
 
   const [showDropdown, setShowDropdown] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -39,11 +36,10 @@ export const InstrumentSelector: React.FC<InstrumentSelectorProps> = ({
     valueRef.current = currentInstrumentId ?? 0;
   }, [currentInstrumentId]);
 
-  // Sort instruments by ID
-  const sortedInstruments = [...instruments].sort((a, b) => a.id - b.id);
-
-  // Current instrument info
-  const currentInstrument = instruments.find((i) => i.id === currentInstrumentId);
+  const sortedInstruments = useMemo(
+    () => [...instruments].sort((a, b) => a.id - b.id),
+    [instruments]
+  );
 
   // Close dropdown when clicking outside
   useClickOutside(dropdownRef, () => setShowDropdown(false), { enabled: showDropdown });
@@ -118,26 +114,19 @@ export const InstrumentSelector: React.FC<InstrumentSelectorProps> = ({
       <button
         className="ft2-numeric-value cursor-pointer hover:bg-dark-bgHover rounded px-1"
         onClick={() => setShowDropdown(!showDropdown)}
-        title={currentInstrument?.name || 'Select instrument'}
+        title="Select instrument"
       >
         {formatValue(currentInstrumentId ?? 0)}
       </button>
-
-      {/* Show instrument name in non-compact mode */}
-      {!compact && currentInstrument && (
-        <span className="ml-1 text-[10px] text-text-muted truncate max-w-[60px]" title={currentInstrument.name}>
-          {currentInstrument.name.slice(0, 8)}
-        </span>
-      )}
 
       {/* Up/Down arrows */}
       <div className="ft2-numeric-arrows">
         <button
           className="ft2-arrow ft2-arrow-up"
-          onMouseDown={() => startRepeat(() => navigateInstrument(-1))}
+          onMouseDown={() => startRepeat(() => navigateInstrument(1))}
           onMouseUp={stopRepeat}
           onMouseLeave={stopRepeat}
-          onTouchStart={() => startRepeat(() => navigateInstrument(-1))}
+          onTouchStart={() => startRepeat(() => navigateInstrument(1))}
           onTouchEnd={stopRepeat}
           title="Previous instrument"
         >
@@ -145,7 +134,7 @@ export const InstrumentSelector: React.FC<InstrumentSelectorProps> = ({
         </button>
         <button
           className="ft2-arrow ft2-arrow-down"
-          onMouseDown={() => startRepeat(() => navigateInstrument(1))}
+          onMouseDown={() => startRepeat(() => navigateInstrument(-1))}
           onMouseUp={stopRepeat}
           onMouseLeave={stopRepeat}
           onTouchStart={() => startRepeat(() => navigateInstrument(1))}
