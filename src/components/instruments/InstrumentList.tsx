@@ -123,6 +123,7 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
     setShowNewInstrumentBrowser: s.setShowNewInstrumentBrowser,
   })));
   const cedResults = useInstrumentTypeStore(s => s.results);
+  const cedStatus  = useInstrumentTypeStore(s => s.status);
   const classifyInstruments = useInstrumentTypeStore(s => s.classifyInstruments);
 
   // Trigger CED classification whenever the instrument list changes (song load, add, etc.)
@@ -687,16 +688,16 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
                   />
                 ) : (
                   <span
-                    className="text-xs font-mono whitespace-nowrap cursor-text"
+                    className="text-xs font-mono whitespace-nowrap shrink-0 cursor-text"
                     onDoubleClick={(e) => handleStartEdit(e, instrument.id, instrument.name)}
-                    title="Double-click to rename"
+                    title={instrument.name}
                   >
                     {instrument.name}
                   </span>
                 )}
 
                 {/* Synth Type Badge */}
-                <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold border ${isSelected ? 'bg-ft2-bg/20 text-ft2-bg border-ft2-bg/40' : 'bg-ft2-header text-ft2-textDim border-ft2-border'}`}>
+                <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold border shrink-0 ${isSelected ? 'bg-transparent text-ft2-bg border-ft2-bg/60' : 'bg-ft2-header text-ft2-textDim border-ft2-border'}`}>
                   {instrument.metadata?.displayType || synthInfo?.shortName || instrument.synthType}
                 </span>
 
@@ -705,12 +706,11 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
                   const badge = getSynthBadge(instrument.synthType);
                   return (
                     <span
-                      className="text-[10px] px-1.5 py-0.5 rounded font-bold border"
-                      style={{
-                        backgroundColor: isSelected ? 'rgba(0,0,0,0.2)' : `${badge.cssColor}20`,
-                        color: isSelected ? 'var(--color-ft2-bg)' : badge.cssColor,
-                        borderColor: isSelected ? 'rgba(0,0,0,0.3)' : `${badge.cssColor}40`,
-                      }}
+                      className="text-[10px] px-1.5 py-0.5 rounded font-bold border shrink-0"
+                      style={isSelected
+                        ? { backgroundColor: 'transparent', color: 'var(--color-ft2-bg)', borderColor: 'var(--color-ft2-bg)' }
+                        : { backgroundColor: `${badge.cssColor}20`, color: badge.cssColor, borderColor: `${badge.cssColor}40` }
+                      }
                     >
                       {badge.label}
                     </span>
@@ -945,17 +945,27 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
         </div>
       </div>
 
-      {/* Footer with count */}
+      {/* Footer with count + CED status */}
       <div className={
         isFT2
-          ? 'px-3 py-1.5 bg-ft2-header border-t border-ft2-border'
-          : 'px-3 py-1 border-t border-dark-border bg-dark-bgSecondary'
+          ? 'px-3 py-1.5 bg-ft2-header border-t border-ft2-border flex items-center justify-between gap-2'
+          : 'px-3 py-1 border-t border-dark-border bg-dark-bgSecondary flex items-center justify-between gap-2'
       }>
         <span className={isFT2 ? 'text-ft2-textDim text-[10px] font-mono' : 'text-[10px] text-text-muted'}>
           {isFiltered
             ? `${visibleInstruments.length} of ${instruments.length} instrument${instruments.length !== 1 ? 's' : ''}`
             : `${instruments.length} instrument${instruments.length !== 1 ? 's' : ''}`}
         </span>
+        {cedStatus === 'loading' && (
+          <span className="text-[9px] font-mono text-accent-warning animate-pulse shrink-0">
+            ◌ analyzing...
+          </span>
+        )}
+        {cedStatus === 'ready' && cedResults.size > 0 && (
+          <span className="text-[9px] font-mono text-accent-success shrink-0">
+            ◉ {cedResults.size} typed
+          </span>
+        )}
       </div>
 
       {/* Modals (FT2 variant) */}
