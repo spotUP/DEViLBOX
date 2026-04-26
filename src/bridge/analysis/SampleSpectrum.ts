@@ -14,12 +14,15 @@
  * sample instrument, so decoding is an `atob` + WAV-chunk walk, no network.
  *
  * Classifier:
- *   - low centroid + low flatness                  → bass (tonal + low)
+ *   - peakHz < 350 + low flatness                 → bass (KEY FIX: peakHz not centroid,
+ *                                                     because square-wave bass at 220 Hz
+ *                                                     has centroid ~524 Hz from harmonics)
  *   - low centroid + high flatness + short decay   → kick
+ *   - high centroid + noisy/high-ZCR + very short → hat  (ZCR: LFSR noise better than flatness)
  *   - mid centroid + high flatness + short decay   → snare
- *   - high centroid + high flatness + short decay  → hat
- *   - mid/high centroid + low flatness + long env  → pad
- *   - mid/high centroid + low flatness + mid env   → lead
+ *   - chromaEntropy > 1.8 bits + long decay       → pad  (NEW: polyphonic sustained)
+ *   - chromaEntropy > 1.8 bits + short decay      → chord (NEW: polyphonic stab)
+ *   - chromaEntropy < 1.8 bits + mid/long decay   → lead (monophonic melody)
  * Confidence is 0.75 — slots between sample-URL categorize (0.8) and
  * instrument-name regex (0.6) in classifyInstrument's priority order.
  */
