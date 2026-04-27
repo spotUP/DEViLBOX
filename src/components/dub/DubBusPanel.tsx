@@ -89,7 +89,7 @@ const Section: React.FC<{
   );
 };
 
-export const DubBusPanel: React.FC = () => {
+export const DubBusPanel: React.FC<{ inline?: boolean }> = ({ inline = false }) => {
   const dubBus = useDrumPadStore((s) => s.dubBus);
   const setDubBus = useDrumPadStore((s) => s.setDubBus);
   const applySoundSystemToBank = useDrumPadStore((s) => s.applySoundSystemToBank);
@@ -119,27 +119,10 @@ export const DubBusPanel: React.FC = () => {
     };
   }, [open]);
 
-  return (
-    <div className="relative" ref={wrapperRef}>
-      <button
-        onClick={() => setOpen((v) => !v)}
-        title="Dub Bus — shared send FX for all pads"
-        className={`px-2.5 py-1 text-xs font-mono flex items-center gap-1 rounded border transition-colors ${
-          dubBus.enabled
-            ? 'bg-accent-primary/10 border-accent-primary text-accent-primary'
-            : 'bg-dark-surface border-dark-border text-text-muted hover:text-text-primary'
-        }`}
-      >
-        <Speaker size={12} />
-        Dub Bus{dubBus.enabled ? ' · ON' : ''}
-      </button>
-
-      {open && (
-        <div
-          className="absolute right-0 top-full mt-1 z-50 w-80 bg-dark-bgSecondary border border-dark-border rounded shadow-xl p-3 flex flex-col gap-2"
-          // Clicking inside the panel shouldn't close it
-          onClick={(e) => e.stopPropagation()}
-        >
+  // Inline mode: render panel content directly (used by DubDeckStrip BUS tab)
+  if (inline) {
+    return (
+      <div className="flex flex-col gap-2 p-3 overflow-y-auto">
           <div className="flex items-center justify-between pb-1 border-b border-dark-borderLight">
             <span className="text-xs font-bold text-text-primary">Dub Bus</span>
             <div className="flex items-center gap-2">
@@ -990,6 +973,31 @@ export const DubBusPanel: React.FC = () => {
             format={(v) => `${Math.round(v)} Hz`}
           />
           </Section>
+      </div>
+    );
+  }
+
+  // Popover mode (default): button that toggles a floating panel
+  return (
+    <div className="relative" ref={wrapperRef}>
+      <button
+        onClick={() => setOpen((v) => !v)}
+        title="Dub Bus — shared send FX for all pads"
+        className={`px-2.5 py-1 text-xs font-mono flex items-center gap-1 rounded border transition-colors ${
+          dubBus.enabled
+            ? 'bg-accent-primary/10 border-accent-primary text-accent-primary'
+            : 'bg-dark-surface border-dark-border text-text-muted hover:text-text-primary'
+        }`}
+      >
+        <Speaker size={12} />
+        Dub Bus{dubBus.enabled ? ' · ON' : ''}
+      </button>
+      {open && (
+        <div
+          className="absolute right-0 top-full mt-1 z-50 w-80 bg-dark-bgSecondary border border-dark-border rounded shadow-xl p-3 overflow-y-auto max-h-[80vh]"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <DubBusPanel inline />
         </div>
       )}
     </div>

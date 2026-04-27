@@ -36,7 +36,7 @@ import { DubLaneTimeline } from './DubLaneTimeline';
 import { AutoDubPanel } from './AutoDubPanel';
 import { Fil4EqPanel } from '@components/effects/Fil4EqPanel';
 import { getActiveDubBus } from '@engine/dub/DubBus';
-import { DubBusPanel } from './DubBusPanel';
+
 import { DUB_CHARACTER_PRESETS } from '@/types/dub';
 import { getPersona } from '@/engine/dub/AutoDubPersonas';
 import type { AutoDubPersonaId } from '@/stores/useDubStore';
@@ -201,7 +201,7 @@ export const DubDeckStrip: React.FC = () => {
   // Auto Dub settings panel (intensity + blacklist) — opened by ⚙ icon
   const [autoDubSettingsOpen, setAutoDubSettingsOpen] = useState(false);
   // Active tab — PERFORM is default; EQ / BUS / RECORD for deeper panels
-  const [activeTab, setActiveTab] = useState<'perform' | 'eq' | 'bus' | 'record'>('perform');
+  const [activeTab, setActiveTab] = useState<'perform' | 'eq' | 'bus'>('perform');
   const autoDubSettingsBtnRef = useRef<HTMLButtonElement | null>(null);
 
   // Derive current style. For presets with unique characterPreset values
@@ -1077,7 +1077,7 @@ export const DubDeckStrip: React.FC = () => {
       {/* Tab bar — only when strip is expanded */}
       {!stripCollapsed && (
         <div className="flex gap-0.5 border-b border-dark-border text-[10px] font-mono">
-          {(['perform', 'eq', 'bus', 'record'] as const).map(tab => (
+          {(['perform', 'eq', 'bus'] as const).map(tab => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -1102,90 +1102,7 @@ export const DubDeckStrip: React.FC = () => {
         {hoverHint || '\u00A0'}
       </div>
 
-      {/* Master section — TONE EQ + global generators + global processors.
-          Kept as full-width bands above the channel strips so the layout
-          below reads like a real mixing desk: master up top, channels as
-          vertical columns underneath. */}
       <div className="flex flex-col gap-1.5 pb-1.5 border-b border-dark-border">
-        {/* Tone row — bass shelf + mid scoop + stereo width */}
-        <div className="flex items-center gap-2 text-xs text-text-muted">
-          <span className="w-16 shrink-0">TONE ▸</span>
-          <div className="flex items-center gap-1.5">
-            <span>BASS</span>
-            <input
-              type="range" min={-12} max={12} step={0.5}
-              value={dubBusSettings.bassShelfGainDb}
-              onChange={(e) => setDubBus({ bassShelfGainDb: Number(e.target.value), characterPreset: 'custom' })}
-              className="w-20 accent-accent-primary"
-              disabled={!busEnabled}
-              title={`Bass shelf at ${dubBusSettings.bassShelfFreqHz}Hz · ${dubBusSettings.bassShelfGainDb > 0 ? '+' : ''}${dubBusSettings.bassShelfGainDb.toFixed(1)} dB · classic Tubby bass lift`}
-            />
-            <span className="w-12 text-text-secondary">{dubBusSettings.bassShelfGainDb > 0 ? '+' : ''}{dubBusSettings.bassShelfGainDb.toFixed(1)}dB</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <span>MID</span>
-            <input
-              type="range" min={-12} max={6} step={0.5}
-              value={dubBusSettings.midScoopGainDb}
-              onChange={(e) => setDubBus({ midScoopGainDb: Number(e.target.value), characterPreset: 'custom' })}
-              className="w-20 accent-accent-secondary"
-              disabled={!busEnabled}
-              title={`Mid peaking at ${dubBusSettings.midScoopFreqHz}Hz · ${dubBusSettings.midScoopGainDb > 0 ? '+' : ''}${dubBusSettings.midScoopGainDb.toFixed(1)} dB · the Scientist mid-scoop`}
-            />
-            <span className="w-12 text-text-secondary">{dubBusSettings.midScoopGainDb > 0 ? '+' : ''}{dubBusSettings.midScoopGainDb.toFixed(1)}dB</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <span>WIDTH</span>
-            <input
-              type="range" min={0} max={2} step={0.05}
-              value={dubBusSettings.stereoWidth}
-              onChange={(e) => setDubBus({ stereoWidth: Number(e.target.value), characterPreset: 'custom' })}
-              className="w-20 accent-accent-highlight"
-              disabled={!busEnabled}
-              title={`Stereo width ${dubBusSettings.stereoWidth.toFixed(2)}× · 0 = mono (Perry), 1 = neutral, 2 = wide (Mad Professor)`}
-            />
-            <span className="w-12 text-text-secondary">{dubBusSettings.stereoWidth.toFixed(2)}×</span>
-          </div>
-          {/* Comb sweep / phaser wet amount + mode toggle */}
-          <div className="flex items-center gap-1.5">
-            <button
-              className={`px-1.5 py-0.5 rounded text-[10px] font-mono border transition-colors ${
-                dubBusSettings.sweepMode === 'phaser'
-                  ? 'bg-accent-secondary/20 border-accent-secondary text-accent-secondary'
-                  : 'bg-dark-bgTertiary border-dark-borderLight text-text-muted'
-              }`}
-              onClick={() => setDubBus({ sweepMode: dubBusSettings.sweepMode === 'phaser' ? 'comb' : 'phaser', characterPreset: 'custom' })}
-              disabled={!busEnabled}
-              title={`Sweep mode: ${dubBusSettings.sweepMode === 'phaser' ? 'Phaser (all-pass cascade, Perry Mutron Bi-Phase)' : 'Comb (short-delay flanger, liquid dub sweep)'} — click to toggle`}
-            >
-              {dubBusSettings.sweepMode === 'phaser' ? 'Phaser' : 'Comb'}
-            </button>
-            <span>SWEEP</span>
-            <input
-              type="range" min={0} max={1} step={0.01}
-              value={dubBusSettings.sweepAmount}
-              onChange={(e) => setDubBus({ sweepAmount: Number(e.target.value), characterPreset: 'custom' })}
-              className="w-20 accent-accent-secondary"
-              disabled={!busEnabled}
-              title={`${dubBusSettings.sweepMode === 'phaser' ? 'Phaser' : 'Comb sweep'} wet amount ${Math.round(dubBusSettings.sweepAmount * 100)}% · 0 = off · Perry = 0.50 (phaser), Gated Flanger = 0.65 (comb)`}
-            />
-            <span className="w-8 text-text-secondary">{Math.round(dubBusSettings.sweepAmount * 100)}%</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <span>RATE</span>
-            <input
-              type="range" min={0.05} max={3} step={0.05}
-              value={dubBusSettings.sweepRateHz}
-              onChange={(e) => setDubBus({ sweepRateHz: Number(e.target.value), characterPreset: 'custom' })}
-              className="w-20 accent-accent-secondary"
-              disabled={!busEnabled || dubBusSettings.sweepAmount === 0}
-              title={`Sweep LFO rate ${dubBusSettings.sweepRateHz.toFixed(2)} Hz · slow (0.1) = dreamy Jamaican wash, fast (1+) = metallic flutter`}
-            />
-            <span className="w-12 text-text-secondary">{dubBusSettings.sweepRateHz.toFixed(2)}Hz</span>
-          </div>
-          <span className="flex-1" />
-        </div>
-
         {/* ── CLICK — one-shot triggers ── */}
         <div className="flex items-start gap-1.5 text-xs">
           <span
@@ -1610,6 +1527,13 @@ export const DubDeckStrip: React.FC = () => {
         })}
       </div>
 
+      {/* Lane timeline — always in PERFORM, below channel strips */}
+      <div className="flex items-center gap-2 text-xs text-text-muted px-1 mt-1">
+        <span>{pattern?.dubLane?.events.length ?? 0} events</span>
+        <span className="flex-1" />
+      </div>
+      <DubLaneTimeline />
+
       </>)}
 
       {/* ── EQ tab ──────────────────────────────────────────────────────────── */}
@@ -1624,24 +1548,67 @@ export const DubDeckStrip: React.FC = () => {
           : <div className="py-4 text-center text-text-muted text-xs font-mono">Enable bus to use the return EQ</div>
       )}
 
-      {/* ── BUS tab ─────────────────────────────────────────────────────────── */}
+      {/* ── BUS tab — TONE shaping controls ────────────────────────────────── */}
       {activeTab === 'bus' && (
-        <DubBusPanel />
-      )}
-
-      {/* ── RECORD tab ──────────────────────────────────────────────────────── */}
-      {activeTab === 'record' && (
-        <div className="flex flex-col gap-1.5">
-          <div className="flex items-center gap-2 text-xs text-text-muted px-1">
-            <span>{pattern?.dubLane?.events.length ?? 0} events on this pattern</span>
-            <span className="flex-1" />
-            <button
-              className="px-2.5 py-1 rounded bg-accent-error text-white font-semibold hover:bg-accent-error/80 text-xs"
-              onClick={() => window.dispatchEvent(new Event('dub-panic'))}
-              title="Drain the bus + disarm recording"
-            >KILL</button>
+        <div className="flex flex-col gap-2 p-2 text-xs text-text-muted">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="w-16 shrink-0 font-bold text-text-secondary">BASS</span>
+            <input type="range" min={-12} max={12} step={0.5}
+              value={dubBusSettings.bassShelfGainDb}
+              onChange={(e) => setDubBus({ bassShelfGainDb: Number(e.target.value), characterPreset: 'custom' })}
+              className="w-32 accent-accent-primary" disabled={!busEnabled}
+              title={`Bass shelf at ${dubBusSettings.bassShelfFreqHz}Hz · classic Tubby bass lift`}
+            />
+            <span className="w-12">{dubBusSettings.bassShelfGainDb > 0 ? '+' : ''}{dubBusSettings.bassShelfGainDb.toFixed(1)} dB</span>
           </div>
-          <DubLaneTimeline />
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="w-16 shrink-0 font-bold text-text-secondary">MID</span>
+            <input type="range" min={-12} max={6} step={0.5}
+              value={dubBusSettings.midScoopGainDb}
+              onChange={(e) => setDubBus({ midScoopGainDb: Number(e.target.value), characterPreset: 'custom' })}
+              className="w-32 accent-accent-secondary" disabled={!busEnabled}
+              title={`Mid peaking at ${dubBusSettings.midScoopFreqHz}Hz · Scientist mid-scoop`}
+            />
+            <span className="w-12">{dubBusSettings.midScoopGainDb > 0 ? '+' : ''}{dubBusSettings.midScoopGainDb.toFixed(1)} dB</span>
+          </div>
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="w-16 shrink-0 font-bold text-text-secondary">WIDTH</span>
+            <input type="range" min={0} max={2} step={0.05}
+              value={dubBusSettings.stereoWidth}
+              onChange={(e) => setDubBus({ stereoWidth: Number(e.target.value), characterPreset: 'custom' })}
+              className="w-32 accent-accent-highlight" disabled={!busEnabled}
+              title={`Stereo width · 0=mono (Perry), 1=neutral, 2=wide (Mad Professor)`}
+            />
+            <span className="w-12">{dubBusSettings.stereoWidth.toFixed(2)}×</span>
+          </div>
+          <div className="flex items-center gap-2 flex-wrap">
+            <button
+              className={`px-1.5 py-0.5 rounded text-[10px] font-mono border transition-colors w-16 shrink-0 ${
+                dubBusSettings.sweepMode === 'phaser'
+                  ? 'bg-accent-secondary/20 border-accent-secondary text-accent-secondary'
+                  : 'bg-dark-bgTertiary border-dark-borderLight text-text-muted'
+              }`}
+              onClick={() => setDubBus({ sweepMode: dubBusSettings.sweepMode === 'phaser' ? 'comb' : 'phaser', characterPreset: 'custom' })}
+              disabled={!busEnabled}
+            >{dubBusSettings.sweepMode === 'phaser' ? 'Phaser' : 'Comb'}</button>
+            <input type="range" min={0} max={1} step={0.01}
+              value={dubBusSettings.sweepAmount}
+              onChange={(e) => setDubBus({ sweepAmount: Number(e.target.value), characterPreset: 'custom' })}
+              className="w-32 accent-accent-secondary" disabled={!busEnabled}
+              title={`Sweep wet amount`}
+            />
+            <span className="w-12">{Math.round(dubBusSettings.sweepAmount * 100)}%</span>
+          </div>
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="w-16 shrink-0 font-bold text-text-secondary">RATE</span>
+            <input type="range" min={0.05} max={3} step={0.05}
+              value={dubBusSettings.sweepRateHz}
+              onChange={(e) => setDubBus({ sweepRateHz: Number(e.target.value), characterPreset: 'custom' })}
+              className="w-32 accent-accent-secondary" disabled={!busEnabled || dubBusSettings.sweepAmount === 0}
+              title={`Sweep LFO rate`}
+            />
+            <span className="w-12">{dubBusSettings.sweepRateHz.toFixed(2)} Hz</span>
+          </div>
         </div>
       )}
       </>
