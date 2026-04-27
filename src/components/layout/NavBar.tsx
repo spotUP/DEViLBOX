@@ -113,7 +113,7 @@ const NavBarComponent: React.FC = () => {
   return (
     <div className="bg-dark-bgSecondary border-b border-dark-border relative z-40">
       {/* Top Bar: Title and Volume */}
-      <nav className="flex items-center justify-between px-4 py-2 border-b border-dark-border">
+      <nav className="relative flex items-center justify-between px-4 py-2 border-b border-dark-border">
         {/* Left: App Title */}
         <div className="flex items-center gap-4">
           <h1 className="font-bold text-lg tracking-tight">
@@ -157,6 +157,27 @@ const NavBarComponent: React.FC = () => {
             </button>
           )}
         </div>
+
+        {/* Center: FT2 transport — visible when dub deck is expanded */}
+        {dubDeckTransportActive && (
+          <div className="flex items-center gap-1 absolute left-1/2 -translate-x-1/2">
+            <Button
+              variant={isPlayingSong ? 'danger' : 'primary'}
+              size="sm"
+              onClick={() => ft2Actions.playSong?.()}
+            >{isPlayingSong ? 'Stop Song' : 'Play Song'}</Button>
+            <Button
+              variant={isPlayingPattern ? 'danger' : 'primary'}
+              size="sm"
+              onClick={() => ft2Actions.playPattern?.()}
+            >{isPlayingPattern ? 'Stop Pattern' : 'Play Pattern'}</Button>
+            <div className="w-px h-4 bg-dark-border mx-0.5 shrink-0" />
+            <Button variant="ghost" size="sm" onClick={() => ft2Actions.openFileBrowser?.()}>Load</Button>
+            <Button variant="ghost" size="sm" onClick={() => ft2Actions.save?.()}>Save</Button>
+            <Button variant="ghost" size="sm" onClick={() => ft2Actions.undo?.()} disabled={!canUndo()}>Undo</Button>
+            <Button variant="ghost" size="sm" onClick={() => ft2Actions.redo?.()} disabled={!canRedo()}>Redo</Button>
+          </div>
+        )}
 
         {/* Right: View Switcher, Settings, MIDI */}
         <div className="flex items-center gap-2">
@@ -313,28 +334,6 @@ const NavBarComponent: React.FC = () => {
           <Plus size={16} />
         </button>
       </div>}
-
-      {/* Compact FT2 transport row — visible when dub deck strip is expanded
-          so the tracker toolbar action row can be hidden to reclaim space */}
-      {dubDeckTransportActive && (
-        <div className="flex items-center gap-1.5 px-3 py-1 border-b border-dark-border bg-dark-bg">
-          <Button
-            variant={isPlayingSong ? 'danger' : 'primary'}
-            size="sm"
-            onClick={() => ft2Actions.playSong?.()}
-          >{isPlayingSong ? 'Stop Song' : 'Play Song'}</Button>
-          <Button
-            variant={isPlayingPattern ? 'danger' : 'primary'}
-            size="sm"
-            onClick={() => ft2Actions.playPattern?.()}
-          >{isPlayingPattern ? 'Stop Pattern' : 'Play Pattern'}</Button>
-          <div className="w-px h-4 bg-dark-border mx-0.5 shrink-0" />
-          <Button variant="ghost" size="sm" onClick={() => ft2Actions.openFileBrowser?.()}>Load</Button>
-          <Button variant="ghost" size="sm" onClick={() => ft2Actions.save?.()}>Save</Button>
-          <Button variant="ghost" size="sm" onClick={() => ft2Actions.undo?.()} disabled={!canUndo()}>Undo</Button>
-          <Button variant="ghost" size="sm" onClick={() => ft2Actions.redo?.()} disabled={!canRedo()}>Redo</Button>
-        </div>
-      )}
 
       {/* Download Modal */}
       <DownloadModal
