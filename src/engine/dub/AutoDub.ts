@@ -958,10 +958,12 @@ function _applyImprovDeltas(): void {
     for (let i = 0; i < 4; i++) {
       const b = current.p[i];
       if (!b) continue;
-      // Subtract previous tick's delta before adding the new one — prevents
-      // accumulation since current params already include _prevImprovBandDeltas[i].
-      returnEQ.setBand(i, b.enabled, b.freq, b.bw,
-        b.gain - _prevImprovBandDeltas[i] + _improvBandDeltas[i]);
+      const newGain = b.gain - _prevImprovBandDeltas[i] + _improvBandDeltas[i];
+      // Auto-enable the band when gain is audible (> 0.2 dB); disable when it
+      // returns to near-zero so we don't leave phantom filter nodes active.
+      // Passing b.enabled was the bug — all return EQ bands start disabled, so
+      // gain writes had no effect on audio even though values were changing.
+      returnEQ.setBand(i, Math.abs(newGain) > 0.2, b.freq, b.bw, newGain);
     }
     for (let i = 0; i < 4; i++) _prevImprovBandDeltas[i] = _improvBandDeltas[i];
   } catch { /* ok */ }
