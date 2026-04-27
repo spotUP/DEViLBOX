@@ -657,7 +657,7 @@ export const DUB_CHARACTER_PRESETS: Record<Exclude<DubBusSettings['characterPres
       // semi-manual feedback loop." The extFeedback loop recreates this —
       // return audio re-enters the input chain through a peaking EQ, creating
       // the self-feeding chaos that defined Perry's Black Ark sound.
-      extFeedbackGain:   0,     // was 0.18 — extra feedback loop was the "neverending" culprit
+      extFeedbackGain:   0.06,  // re-enabled at safe level — Black Ark self-feeding character
       extFeedbackEqFreq: 400,   // boost at 400 Hz — the tape-saturation warmth zone
       extFeedbackEqGain: 3,     // gentle 3 dB lift per pass — accumulates over repeats
       extFeedbackEqQ:    1.2,

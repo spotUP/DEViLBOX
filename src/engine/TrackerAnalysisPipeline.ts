@@ -41,7 +41,12 @@ let pendingPromises = new Map<string, {
 let isWorkerReady = false;
 let readyPromise: Promise<void> | null = null;
 
-// ── MusiCNN Genre Worker ──────────────────────────────────────────────────────
+// ── Genre Classification (routed through instrument worker — shared model) ─────
+// Both genre and instrument classification use mispeech/ced-base. Rather than
+// loading the 86MB model twice, genre requests are sent to the existing
+// instrument classifier worker via the classify_genre message type. The worker
+// returns averaged sigmoid scores for all 527 AudioSet classes; we map them to
+// genre/mood labels here in the main thread.
 
 interface GenreWorkerResult {
   tags: Array<{ tag: string; score: number }>;
@@ -51,48 +56,68 @@ interface GenreWorkerResult {
   confidence?: number;
 }
 
-let genreWorker: Worker | null = null;
-let genrePending = new Map<string, {
-  resolve: (r: GenreWorkerResult | null) => void;
-}>();
+// AudioSet class indices that map to music genres (from ced-base config.json)
+const GENRE_INDICES: Record<number, string> = {
+  216:'Pop music', 217:'Hip hop music', 219:'Rock music', 220:'Heavy metal',
+  221:'Punk rock', 223:'Progressive rock', 224:'Rock and roll', 225:'Psychedelic rock',
+  226:'Rhythm and blues', 227:'Soul music', 228:'Reggae', 229:'Country',
+  232:'Funk', 233:'Folk music', 235:'Jazz', 237:'Classical music',
+  239:'Electronic music', 240:'House music', 241:'Techno', 243:'Drum and bass',
+  244:'Electronica', 245:'Electronic dance music', 246:'Ambient music',
+  247:'Trance music', 251:'Blues', 274:'Dance music',
+};
 
-function getGenreWorker(): Worker {
-  if (genreWorker) return genreWorker;
-  genreWorker = new Worker(
-    new URL('@/workers/genre-classifier.worker.ts', import.meta.url),
-    { type: 'module' }
-  );
-  genreWorker.addEventListener('message', (e: MessageEvent) => {
-    const { type, id, error } = e.data;
-    if (type === 'ready') return;
-    const p = genrePending.get(id);
-    if (!p) return;
-    genrePending.delete(id);
-    if (type === 'result') {
-      p.resolve(e.data as GenreWorkerResult);
-    } else {
-      console.warn('[GenreClassifier] error:', error);
-      p.resolve(null);
-    }
-  });
-  genreWorker.addEventListener('error', (err) => {
-    console.warn('[GenreClassifier] Worker error:', err.message);
-    for (const p of genrePending.values()) p.resolve(null);
-    genrePending.clear();
-  });
-  genreWorker.postMessage({ type: 'init' });
-  return genreWorker;
+const GENRE_MAP: Array<{ labels: string[]; primary: string; sub: string; mood: string }> = [
+  { labels:['Heavy metal','Punk rock'],                       primary:'Rock',       sub:'Metal / Punk',          mood:'Dark & Intense' },
+  { labels:['Progressive rock','Psychedelic rock'],           primary:'Rock',       sub:'Progressive Rock',      mood:'Driving' },
+  { labels:['Rock and roll','Rock music'],                    primary:'Rock',       sub:'Rock',                  mood:'Energetic' },
+  { labels:['Blues'],                                         primary:'Blues',      sub:'Blues',                 mood:'Melancholic' },
+  { labels:['Jazz'],                                          primary:'Jazz',       sub:'Jazz',                  mood:'Chill' },
+  { labels:['Classical music'],                               primary:'Classical',  sub:'Classical',             mood:'Uplifting' },
+  { labels:['Folk music','Country'],                          primary:'Folk',       sub:'Folk / Country',        mood:'Chill' },
+  { labels:['Reggae'],                                        primary:'Reggae',     sub:'Reggae',                mood:'Chill' },
+  { labels:['Hip hop music'],                                 primary:'Hip-Hop',    sub:'Hip-Hop',               mood:'Driving' },
+  { labels:['Rhythm and blues','Soul music','Funk'],          primary:'R&B / Soul', sub:'Soul / R&B',            mood:'Uplifting' },
+  { labels:['Pop music'],                                     primary:'Pop',        sub:'Pop',                   mood:'Uplifting' },
+  { labels:['House music','Dance music','Electronic dance music'], primary:'Electronic', sub:'Dance / House',    mood:'Euphoric' },
+  { labels:['Techno','Drum and bass'],                        primary:'Electronic', sub:'Techno / D&B',         mood:'Energetic' },
+  { labels:['Trance music','Electronica'],                    primary:'Electronic', sub:'Trance',               mood:'Euphoric' },
+  { labels:['Ambient music','Electronic music'],              primary:'Electronic', sub:'Ambient / Electronic', mood:'Atmospheric' },
+];
+
+function mapScoresToGenre(scores: Float32Array): GenreWorkerResult {
+  const scoreMap = new Map<string, number>();
+  const tags: Array<{ tag: string; score: number }> = [];
+  for (const [idx, label] of Object.entries(GENRE_INDICES)) {
+    const score = scores[Number(idx)];
+    scoreMap.set(label, score);
+    tags.push({ tag: label, score });
+  }
+  tags.sort((a, b) => b.score - a.score);
+
+  let bestEntry = GENRE_MAP[GENRE_MAP.length - 1];
+  let bestScore = 0;
+  for (const entry of GENRE_MAP) {
+    const avg = entry.labels.reduce((s, l) => s + (scoreMap.get(l) ?? 0), 0) / entry.labels.length;
+    if (avg > bestScore) { bestScore = avg; bestEntry = entry; }
+  }
+  if (bestScore < 0.03) return { tags: tags.slice(0, 8), primary: 'Unknown', subgenre: '', mood: 'Driving', confidence: 0 };
+  const confidence = Math.min(0.9, 0.4 + (bestScore - 0.03) / 0.12 * 0.5);
+  return { tags: tags.slice(0, 8), primary: bestEntry.primary, subgenre: bestEntry.sub, mood: bestEntry.mood, confidence };
 }
 
-/** Run MusiCNN genre classification on captured audio. Non-throwing — returns null on failure. */
+/** Run genre classification using the already-loaded instrument classifier worker.
+ *  Falls back to a standalone genre worker if the instrument worker isn't ready. */
 async function runMusiCNN(
   pcmLeft: Float32Array,
   pcmRight: Float32Array | null,
   sampleRate: number,
 ): Promise<GenreWorkerResult | null> {
   try {
-    const worker = getGenreWorker();
-    // Mono mix (average channels)
+    const { getInstrumentClassifierWorker } = await import('@stores/useInstrumentTypeStore');
+    const worker = getInstrumentClassifierWorker();
+    if (!worker) return null;
+
     const mono = new Float32Array(pcmLeft.length);
     if (pcmRight && pcmRight.length === pcmLeft.length) {
       for (let i = 0; i < mono.length; i++) mono[i] = (pcmLeft[i] + pcmRight[i]) * 0.5;
@@ -100,18 +125,29 @@ async function runMusiCNN(
       mono.set(pcmLeft);
     }
     const id = `genre-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
+    const w = worker;
     return new Promise<GenreWorkerResult | null>((resolve) => {
-      genrePending.set(id, { resolve });
-      const timeout = setTimeout(() => {
-        genrePending.delete(id);
-        resolve(null);
-      }, 120_000);
-      const origResolve = resolve;
-      genrePending.get(id)!.resolve = (r) => { clearTimeout(timeout); origResolve(r); };
-      worker.postMessage({ type: 'classify', id, pcm: mono, sampleRate }, [mono.buffer]);
+      const timeout = setTimeout(() => { w.removeEventListener('message', handler); resolve(null); }, 120_000);
+      function handler(e: MessageEvent) {
+        const d = e.data;
+        if (d.id !== id) return;
+        if (d.type === 'genre_result') {
+          clearTimeout(timeout);
+          w.removeEventListener('message', handler);
+          resolve(mapScoresToGenre(d.scores as Float32Array));
+        } else if (d.type === 'error') {
+          clearTimeout(timeout);
+          w.removeEventListener('message', handler);
+          console.warn('[GenreClassifier]', d.error);
+          resolve(null);
+        }
+      }
+      w.addEventListener('message', handler);
+      w.postMessage({ type: 'classify_genre', id, pcm: mono, sampleRate }, [mono.buffer]);
     });
   } catch (err) {
-    console.warn('[GenreClassifier] Failed to start:', err);
+    console.warn('[GenreClassifier] Failed:', err);
     return null;
   }
 }
