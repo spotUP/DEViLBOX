@@ -6,6 +6,7 @@
  */
 
 import type { GenreResult } from '@/stores/useTrackerAnalysisStore';
+import type { InstrumentHints } from '@/workers/dj-analysis.worker';
 
 // Worker's AnalysisResult type (matches dj-analysis.worker.ts)
 interface WorkerAnalysisResult {
@@ -30,7 +31,7 @@ interface WorkerAnalysisResult {
   };
 }
 
-// ── Worker Management ────────────────────────────────────────────────────────
+// ── Worker Management ─────────────────────────────────────────────────────────
 
 let analysisWorker: Worker | null = null;
 let pendingPromises = new Map<string, {
@@ -39,6 +40,81 @@ let pendingPromises = new Map<string, {
 }>();
 let isWorkerReady = false;
 let readyPromise: Promise<void> | null = null;
+
+// ── MusiCNN Genre Worker ──────────────────────────────────────────────────────
+
+interface GenreWorkerResult {
+  tags: Array<{ tag: string; score: number }>;
+  primary: string;
+  subgenre: string;
+  mood: string;
+  confidence?: number;
+}
+
+let genreWorker: Worker | null = null;
+let genrePending = new Map<string, {
+  resolve: (r: GenreWorkerResult | null) => void;
+}>();
+
+function getGenreWorker(): Worker {
+  if (genreWorker) return genreWorker;
+  genreWorker = new Worker(
+    new URL('@/workers/genre-classifier.worker.ts', import.meta.url),
+    { type: 'module' }
+  );
+  genreWorker.addEventListener('message', (e: MessageEvent) => {
+    const { type, id, error } = e.data;
+    if (type === 'ready') return;
+    const p = genrePending.get(id);
+    if (!p) return;
+    genrePending.delete(id);
+    if (type === 'result') {
+      p.resolve(e.data as GenreWorkerResult);
+    } else {
+      console.warn('[GenreClassifier] error:', error);
+      p.resolve(null);
+    }
+  });
+  genreWorker.addEventListener('error', (err) => {
+    console.warn('[GenreClassifier] Worker error:', err.message);
+    for (const p of genrePending.values()) p.resolve(null);
+    genrePending.clear();
+  });
+  genreWorker.postMessage({ type: 'init' });
+  return genreWorker;
+}
+
+/** Run MusiCNN genre classification on captured audio. Non-throwing — returns null on failure. */
+async function runMusiCNN(
+  pcmLeft: Float32Array,
+  pcmRight: Float32Array | null,
+  sampleRate: number,
+): Promise<GenreWorkerResult | null> {
+  try {
+    const worker = getGenreWorker();
+    // Mono mix (average channels)
+    const mono = new Float32Array(pcmLeft.length);
+    if (pcmRight && pcmRight.length === pcmLeft.length) {
+      for (let i = 0; i < mono.length; i++) mono[i] = (pcmLeft[i] + pcmRight[i]) * 0.5;
+    } else {
+      mono.set(pcmLeft);
+    }
+    const id = `genre-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    return new Promise<GenreWorkerResult | null>((resolve) => {
+      genrePending.set(id, { resolve });
+      const timeout = setTimeout(() => {
+        genrePending.delete(id);
+        resolve(null);
+      }, 120_000);
+      const origResolve = resolve;
+      genrePending.get(id)!.resolve = (r) => { clearTimeout(timeout); origResolve(r); };
+      worker.postMessage({ type: 'classify', id, pcm: mono, sampleRate }, [mono.buffer]);
+    });
+  } catch (err) {
+    console.warn('[GenreClassifier] Failed to start:', err);
+    return null;
+  }
+}
 
 /**
  * Initialize the analysis worker.
@@ -107,6 +183,62 @@ async function ensureWorkerReady(): Promise<void> {
 
 // ── Public API ───────────────────────────────────────────────────────────────
 
+/** Build instrument presence hints from CED results + spectral analysis. */
+function buildInstrumentHints(): InstrumentHints {
+  const hints: InstrumentHints = {
+    hasGuitar: false, hasBass: false, hasPercussion: false,
+    hasPiano: false, hasStrings: false, hasBrass: false,
+    hasWind: false, hasVoice: false, hasSynth: false, hasOrgan: false,
+  };
+
+  // Try CED results first (lazy import to avoid circular deps at module load)
+  try {
+    const { useInstrumentTypeStore } = require('@stores/useInstrumentTypeStore') as
+      typeof import('@stores/useInstrumentTypeStore');
+    const { analyzeSampleForClassification } = require('@/bridge/analysis/SampleSpectrum') as
+      typeof import('@/bridge/analysis/SampleSpectrum');
+    const { useInstrumentStore } = require('@stores/useInstrumentStore') as
+      typeof import('@stores/useInstrumentStore');
+
+    const cedResults = useInstrumentTypeStore.getState().results;
+    const instruments = useInstrumentStore.getState().instruments;
+
+    for (const inst of instruments) {
+      // CED result (confidence-filtered — same 0.15 threshold as AutoDub)
+      const ced = cedResults.get(inst.id);
+      const type = ced && ced.confidence >= 0.15 && ced.instrumentType !== 'unknown'
+        ? ced.instrumentType
+        : null;
+
+      if (type) {
+        if (type === 'guitar') hints.hasGuitar = true;
+        else if (type === 'bass') hints.hasBass = true;
+        else if (['kick','snare','hihat','cymbal','drum','percussion'].includes(type)) hints.hasPercussion = true;
+        else if (type === 'piano') hints.hasPiano = true;
+        else if (type === 'strings') hints.hasStrings = true;
+        else if (type === 'brass') hints.hasBrass = true;
+        else if (type === 'wind') hints.hasWind = true;
+        else if (type === 'voice') hints.hasVoice = true;
+        else if (['synthesizer','pad','keyboard','sampler'].includes(type)) hints.hasSynth = true;
+        else if (type === 'organ') hints.hasOrgan = true;
+        continue;
+      }
+
+      // Spectral fallback for instruments CED didn't classify confidently
+      const url = inst.sample?.url;
+      if (typeof url === 'string' && url.startsWith('data:audio/wav;base64,')) {
+        const spec = analyzeSampleForClassification(url);
+        if (spec && spec.confidence >= 0.6) {
+          if (spec.role === 'bass') hints.hasBass = true;
+          else if (spec.role === 'percussion') hints.hasPercussion = true;
+        }
+      }
+    }
+  } catch { /* non-fatal — analysis continues without hints */ }
+
+  return hints;
+}
+
 /**
  * Analyze captured audio and return genre/mood/BPM results.
  * 
@@ -146,10 +278,13 @@ export async function analyzeAudio(
       originalResolve(result);
     };
     
+    // Build instrument hints from CED + spectral results in the main thread
+    const instrumentHints = buildInstrumentHints();
+
     // Clone the arrays since we need them for analysis (transferables would make them unusable)
     const leftCopy = new Float32Array(pcmLeft);
     const rightCopy = new Float32Array(pcmRight);
-    
+
     // Send to worker with transferables for efficiency
     analysisWorker!.postMessage(
       {
@@ -159,9 +294,24 @@ export async function analyzeAudio(
         pcmRight: rightCopy,
         sampleRate,
         numBins: 400, // Fewer bins needed for tracker display
+        instrumentHints,
       },
       [leftCopy.buffer, rightCopy.buffer]
     );
+  }).then(async (essentiaResult) => {
+    // Run MusiCNN genre classification in parallel with Essentia.
+    // MusiCNN is authoritative for genre/mood — falls back to Essentia if it fails.
+    const musicnn = await runMusiCNN(pcmLeft, pcmRight, sampleRate);
+    if (musicnn && musicnn.primary !== 'Unknown') {
+      essentiaResult.genre = {
+        ...essentiaResult.genre,
+        primary: musicnn.primary,
+        subgenre: musicnn.subgenre,
+        mood: musicnn.mood,
+        confidence: musicnn.confidence ?? essentiaResult.genre?.confidence ?? 0.6,
+      };
+    }
+    return essentiaResult;
   });
 }
 

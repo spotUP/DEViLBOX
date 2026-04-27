@@ -23,6 +23,7 @@ import { instrumentTypeToRole } from './AudioSetInstrumentMap';
 interface RoleChange {
   key: number;       // comparable scalar: positionIdx * MAX_ROWS + row
   role: ChannelRole;
+  confidence: number; // CED confidence at time of classification
 }
 
 export interface SongRoleTimeline {
@@ -48,6 +49,7 @@ export function buildSongRoleTimeline(
   patterns: Pattern[],
   patternOrder: number[],
   instrumentTypes: Map<number, InstrumentType>,
+  confidences?: Map<number, number>,
 ): SongRoleTimeline {
   if (!patterns.length || !patternOrder.length) {
     return { channelChanges: [], nChannels: 0 };
@@ -91,6 +93,7 @@ export function buildSongRoleTimeline(
         channelChanges[ch].push({
           key: posIdx * MAX_ROWS + row,
           role,
+          confidence: confidences?.get(instrId) ?? 1.0,
         });
       }
     }
@@ -112,35 +115,37 @@ export function getRoleAtPosition(
   channel: number,
   positionIndex: number,
   row: number,
+  minConfidence = 0,
 ): ChannelRole | null {
   const changes = timeline.channelChanges[channel];
   if (!changes || changes.length === 0) return null;
 
   const key = positionIndex * MAX_ROWS + row;
-  // Find the last entry with key <= current key
-  let lo = 0, hi = changes.length - 1, result: ChannelRole | null = null;
+  let lo = 0, hi = changes.length - 1, result: RoleChange | null = null;
   while (lo <= hi) {
     const mid = (lo + hi) >> 1;
     if (changes[mid].key <= key) {
-      result = changes[mid].role;
+      result = changes[mid];
       lo = mid + 1;
     } else {
       hi = mid - 1;
     }
   }
-  return result;
+  if (!result) return null;
+  return result.confidence >= minConfidence ? result.role : null;
 }
 
 /**
  * Snapshot of current roles at a position — one ChannelRole per channel.
- * Returns null entries for channels with no CED data.
+ * Returns null entries for channels with no CED data or below minConfidence.
  */
 export function getRolesAtPosition(
   timeline: SongRoleTimeline,
   positionIndex: number,
   row: number,
+  minConfidence = 0,
 ): Array<ChannelRole | null> {
   return Array.from({ length: timeline.nChannels }, (_, ch) =>
-    getRoleAtPosition(timeline, ch, positionIndex, row)
+    getRoleAtPosition(timeline, ch, positionIndex, row, minConfidence)
   );
 }
