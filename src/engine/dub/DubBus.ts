@@ -1138,19 +1138,15 @@ export class DubBus {
   // JA Press vinyl — DSP is applied POST-MASTER so vinyl noise processes the
   // complete mix (dry signal + reverb return). vinylOutputNode is the final
   // output that DrumPadEngine connects to context.destination / DJ master.
-  private vinylSum!: GainNode;
   private vinylLevel = 0;  // 0..1 (0..10 scaled)
   // vinylOutputNode: sits after this.master. DrumPadEngine connects it to
   // the actual output destination so vinyl sees dry + wet together.
   private vinylOutputNode!: GainNode;
   // Direct output tap (legacy field, kept for wireMasterInsert logic).
   private vinylDirect!: GainNode;
-  // Real vinyl DSP — combined ToneArm (physics: wow/flutter/coil/RIAA/
-  // stylus) + VinylNoiseEffect (surface degradation: dust/dropout/age/
-  // ghostEcho/warp/eccentricity/pinch/innerGroove). Chained in series
-  // inside the master-insert path: convolverSum → toneArm → vinylNoise
-  // → vinylSum. Both load their worklets lazily; synchronous pass-
-  // through until ready.
+  // Real vinyl DSP — ToneArm (wow/flutter) in the dry insert chain;
+  // VinylNoiseEffect in the post-master chain (this.master → vinylEffect
+  // → vinylOutputNode). Both load worklets lazily (pass-through until ready).
   private toneArmEffect: ToneArmEffect | null = null;
   private vinylEffect: VinylNoiseEffect | null = null;
   // Stereo width on master — M/S matrix identical in topology to the
@@ -1422,11 +1418,6 @@ export class DubBus {
     this.masterConvolverDry.gain.value = 1;
     this.masterConvolverWet = this.context.createGain();
     this.masterConvolverWet.gain.value = 0;
-    // JA Press vinyl — VinylNoiseEffect + (future: ToneArmEffect) own the
-    // DSP. `vinylSum` is the tail that feeds masterInsertTail; the vinyl
-    // effects are created later (see below) and wired into the chain.
-    this.vinylSum = this.context.createGain();
-    this.vinylSum.gain.value = 1;
     // M/S width matrix — 4-gain topology mirroring the proven bus-level
     // `_applyStereoWidth` coefficients:
     //   L_out = L×coeffA + R×coeffB
@@ -1477,8 +1468,8 @@ export class DubBus {
     const convolverSum = this.context.createGain();
     this.masterConvolverDry.connect(convolverSum);
     this.masterConvolverWet.connect(convolverSum);
-    // Vinyl chain — ToneArm (physics) → VinylNoise (surface defects) → vinylSum.
-    // Params all start at 0; setVinylLevel scales them together 0-10.
+    // ToneArm (wow/flutter) is in the master insert chain; VinylNoiseEffect is
+    // post-master (see vinylOutputNode setup below). Params start at 0.
     this.toneArmEffect = new ToneArmEffect({
       wow: 0, coil: 0, flutter: 0, riaa: 0, stylus: 0, hiss: 0, pops: 0, rpm: 33.333, wet: 1,
     });

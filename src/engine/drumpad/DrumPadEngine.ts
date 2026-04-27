@@ -288,8 +288,13 @@ export class DrumPadEngine {
    * Used when switching between standalone and DJ mixer routing.
    */
   rerouteOutput(destination: AudioNode): void {
-    this.masterGain.disconnect();
-    this.masterGain.connect(destination);
+    // Reroute at the vinylOutputNode level (not masterGain) so the
+    // post-master vinyl chain stays active regardless of destination.
+    // masterGain always feeds → vinylEffect → vinylOutputNode; only
+    // vinylOutputNode's downstream target changes on reroute.
+    const vinylOut = this.dubBus.getVinylOutputNode();
+    vinylOut.disconnect();
+    vinylOut.connect(destination);
   }
 
   /**
