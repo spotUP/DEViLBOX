@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-04-26T17:00:11.203Z
+ * Generated: 2026-04-27T13:42:50.442Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,10 +19,10 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.6230';
-export const BUILD_NUMBER = '6230';
-export const BUILD_HASH = 'f1c8e84a9';
-export const BUILD_DATE = '2026-04-26';
+export const BUILD_VERSION = '1.0.6296';
+export const BUILD_NUMBER = '6296';
+export const BUILD_HASH = '13e859b52';
+export const BUILD_DATE = '2026-04-27';
 
 // Full version (patch IS the build number, so no need to append)
 export const FULL_VERSION = BUILD_VERSION;
@@ -30,214 +30,208 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.6230',
-    date: '2026-04-26',
-    changes: [
-      {
-        type: 'fix',
-        "description": "Shrink volume slider + add MCP debugging rule to CLAUDE.md"
-      },
-      {
-        type: 'fix',
-        "description": "MCP subprocess always connects as client, never races for port 4003"
-      },
-      {
-        type: 'fix',
-        "description": "Stagger CED instrument classifications 200ms apart"
-      },
-      {
-        type: 'fix',
-        "description": "Use status message bar for CED progress, remove tiny footer indicator"
-      },
-      {
-        type: 'fix',
-        "description": "Instrument list badges + CED worker race condition + width"
-      },
-      {
-        type: 'feature',
-        "description": "Smooth selection animation in instrument list"
-      },
-      {
-        type: 'fix',
-        "description": "InstrumentSelector — remove name, fix arrows, fix re-renders"
-      },
-      {
-        type: 'fix',
-        "description": "Trigger CED classification on instrument list mount/change, not only AutoDub tick"
-      },
-      {
-        type: 'feature',
-        "description": "CED type tags in InstrumentList + InstrumentSelector in FT2Toolbar"
-      },
-      {
-        type: 'feature',
-        "description": "Channel classification for UADE/SID song-level replayers"
-      },
-      {
-        type: 'feature',
-        "description": "Deterministic synthType → role mapping, no CED needed"
-      },
-      {
-        type: 'feature',
-        "description": "Classify synth instruments via SynthBaker bake + CED"
-      },
-      {
-        type: 'feature',
-        "description": "CED neural instrument classifier — per-channel live role timeline"
-      },
-      {
-        type: 'feature',
-        "description": "Skank echo throw — dotted-delay offbeat dub move"
-      },
-      {
-        type: 'feature',
-        "description": "SID filter curve wiring + D00 song position display"
-      },
-      {
-        type: 'fix',
-        "description": "Prince Jammy style reverts to Custom in dropdown"
-      }
-    ]
-  },
-  {
-    version: '2026-04-25',
-    date: '2026-04-25',
+    version: '1.0.6296',
+    date: '2026-04-27',
     changes: [
       {
         type: 'feature',
-        "description": "AutoDub seeds role-appropriate sends on enable when a style is active"
+        "description": "PatternEditorCanvas — MASTER_DUB_LANE_WIDTH slot + MasterDubLane render"
       },
       {
         type: 'feature',
-        "description": "AutoDub channel exclude — 'Exclude' option in per-channel role selector"
-      },
-      {
-        type: 'fix',
-        "description": "Style dropdown reverts to Custom + Tubby init beep"
-      },
-      {
-        type: 'fix',
-        "description": "Open up dub bus presets — less 'in a jar', more treble air and sub depth"
-      },
-      {
-        type: 'fix',
-        "description": "TubbyScream — warm mid-range squeal instead of metallic subway brake"
-      },
-      {
-        type: 'fix',
-        "description": "Character preset audit — Scientist reverb, Tubby return EQ"
-      },
-      {
-        type: 'fix',
-        "description": "Perry preset — remove constant direct spring sends, reduce phaser sweep"
-      },
-      {
-        type: 'fix',
-        "description": "Dub deck style selector — stable derivation and defer channel sends"
-      },
-      {
-        type: 'fix',
-        "description": "Dub deck UX + SID visualizer + generic format visualizer"
+        "description": "MasterDubLane — 48px global dub automation column"
       },
       {
         type: 'feature',
-        "description": "World-class dub deck — version drop, phrase arc, authentic personas"
-      },
-      {
-        type: 'fix',
-        "description": "Extend pattern break dimming to cover Bxx (position jump) effect"
-      },
-      {
-        type: 'fix',
-        "description": "D00 indicator visible even when break is on the last row"
+        "description": "AutomationLane — color + label dub.* parameters using MOVE_COLOR"
       },
       {
         type: 'feature',
-        "description": "Dim unreachable rows past D (Pattern Break) effect"
-      },
-      {
-        type: 'feature',
-        "description": "Per-channel EQ/reverb/sweep presets per dub persona"
+        "description": "Fil4EqPanel — vertical gain faders, freq via curve handles"
       },
       {
         type: 'fix',
-        "description": "Dub deck layout overflow + AutoDub baseline sends"
+        "description": "Fil4EqCurve — remove dead helpers, non-passive wheel listener for React 19"
+      },
+      {
+        type: 'feature',
+        "description": "Fil4EqCurve — export freqToX/dbToY/BandId, add draggable band handles overlay"
       },
       {
         type: 'fix',
-        "description": "Replace require() with proper ESM imports for PerChannelDubFx"
+        "description": "Remove dead fireRow from pendingHolds, tighten spike-row assertion"
+      },
+      {
+        type: 'feature',
+        "description": "DubRecorder — write automation curves per-channel, remove dubLane events"
       },
       {
         type: 'fix',
-        "description": "Hold buttons use setPointerCapture to prevent premature release"
+        "description": "Dub.channelMute restore uses volume column even after mute row"
       },
       {
         type: 'feature',
-        "description": "Multi-pattern role voting + skank AutoDub rules"
-      },
-      {
-        type: 'feature',
-        "description": "Global Headphones mode toggle in tracker settings"
-      },
-      {
-        type: 'feature',
-        "description": "Wire SID Stereo Enhance + Headphones controls to audio engine"
-      },
-      {
-        type: 'feature',
-        "description": "Wire SID dialog pan + reverb to live audio engine"
-      },
-      {
-        type: 'feature',
-        "description": "Per-channel dub mini-chain (filter + reverb send + comb sweep)"
+        "description": "AutomationBaker — dub.* effect mappings (channelMute, echoThrow, eqSweep)"
       },
       {
         type: 'fix',
-        "description": "Make combSweep audible — boost rate+depth on fire, restore on release"
+        "description": "Remove duplicate eqSweep from HOLD_KINDS"
+      },
+      {
+        type: 'improvement',
+        "description": "Extract MOVE_COLOR + HOLD_KINDS to moveColors.ts"
+      },
+      {
+        type: 'improvement',
+        "description": "Dub studio visual spec — vertical EQ faders + unified dub automation lanes"
+      },
+      {
+        type: 'improvement',
+        "description": "Replace EQ knobs with horizontal sliders in Fil4EqPanel"
       },
       {
         type: 'fix',
-        "description": "Role select shows detected role when auto, amber when locked"
-      },
-      {
-        type: 'fix',
-        "description": "Replace role chips with compact select dropdown in channel strip"
+        "description": "Dub deck tabs — PERFORM/EQ/BUS only, TONE in BUS tab, lane in PERFORM"
       },
       {
         type: 'feature',
-        "description": "Manual channel role override for AutoDub targeting"
+        "description": "Tabbed DubDeckStrip — PERFORM / EQ / BUS / RECORD tabs"
       },
       {
         type: 'fix',
-        "description": "Runtime audio overrides note-stats roles for tracker music"
+        "description": "Fil4EQ — genre preset dropdown + flat reset + EQ in DubDeckStrip + N_IR 4096→1024"
       },
       {
         type: 'feature',
-        "description": "Pre-play audio scrub for channel role classification"
+        "description": "EQ button in DubDeckStrip + fix WASM N_IR 4096→1024 (eliminates silence on knob moves)"
+      },
+      {
+        type: 'feature',
+        "description": "Fil4EqPanel auto-EQ info bar — genre label, strength slider"
+      },
+      {
+        type: 'feature',
+        "description": "DubBus auto-EQ — enhancer chain, analysis subscription, _applyAutoEQ, dispose cleanup"
+      },
+      {
+        type: 'feature',
+        "description": "Add DubBusEnhancer — spectral exciter, transient sharpener, offline lo-fi pipeline"
+      },
+      {
+        type: 'improvement',
+        "description": "Test: AutoEQ.ts unit tests — genre baseline, instrument modulation, spectral, detectLoFi"
+      },
+      {
+        type: 'feature',
+        "description": "Add AutoEQ.ts — genre/instrument/spectral EQ computation + lo-fi detection"
+      },
+      {
+        type: 'feature',
+        "description": "Add frequencyPeaks to FullAnalysisResult + autoEqStrength/autoEqLastGenre to DubBusSettings"
+      },
+      {
+        type: 'improvement',
+        "description": "Auto EQ implementation plan (7 tasks)"
+      },
+      {
+        type: 'improvement',
+        "description": "Update auto-EQ spec — add DC removal, denoise, spectral exciter, transient sharpener stages"
+      },
+      {
+        type: 'improvement',
+        "description": "Auto-EQ design spec (genre+instrument+spectral+neural enhancement)"
       },
       {
         type: 'fix',
-        "description": "Add dub.combSweep to MappableParameter type"
+        "description": "Fil4EQ — getMagnitude promise cleanup on dispose, Q-to-BW conversion in compat aliases, params emit on worklet ready, Button for toggles"
       },
       {
         type: 'feature',
-        "description": "Skank channel role + off-beat pattern detector"
+        "description": "Wire Fil4EqPanel into MasterEffectsModal for master FX chain"
       },
       {
         type: 'feature',
-        "description": "Liquid comb sweep dub move + AutoDub rules"
+        "description": "Add Fil4EqCurve canvas display and Fil4EqPanel master FX UI"
+      },
+      {
+        type: 'feature',
+        "description": "Register Fil4EQ as master FX effect type (AudioEffectType, unifiedEffects, EffectFactory)"
+      },
+      {
+        type: 'feature',
+        "description": "Swap DubBus returnEQ from ParametricEQEffect to Fil4EqEffect + HP/LP wiring"
+      },
+      {
+        type: 'feature',
+        "description": "Add returnEqHp*/returnEqLp* fields to DubBusSettings for Fil4 pass filters"
+      },
+      {
+        type: 'improvement',
+        "description": "Test: Fil4EqEffect contract test covering ParametricEQEffect surface"
       },
       {
         type: 'fix',
-        "description": "Reset character fields to defaults when switching to Custom preset"
-      },
-      {
-        type: 'fix',
-        "description": "Defer returnEQ activation during preset transitions to prevent beep"
+        "description": "Fil4EqEffect set_shelf uses which:0/1 not shelf:'low'/'high' to match worklet"
       },
       {
         type: 'feature',
-        "description": "Add comb sweep / phaser controls to dub deck TONE row"
+        "description": "Add Fil4EqEffect ToneAudioNode wrapper (drop-in for ParametricEQEffect)"
+      },
+      {
+        type: 'feature',
+        "description": "Add Fil4 AudioWorklet processor"
+      },
+      {
+        type: 'feature',
+        "description": "Build fil4 WASM parametric EQ (8-band, Regalia-Mitra, Goertzel magnitude)"
+      },
+      {
+        type: 'fix',
+        "description": "Fil4_wasm parametric band gain divisor /40 → /20 (linear amplitude, not sqrt)"
+      },
+      {
+        type: 'feature',
+        "description": "Chore: add fil4.lv2 DSP source files (iir, filters, hip, lop)"
+      },
+      {
+        type: 'improvement',
+        "description": "Fil4 WASM EQ implementation plan"
+      },
+      {
+        type: 'improvement',
+        "description": "Fil4 WASM parametric EQ design spec"
+      },
+      {
+        type: 'fix',
+        "description": "Dub bus defaults — eliminate damp cloth sound character"
+      },
+      {
+        type: 'fix',
+        "description": "Cxx volume fires without note; apply instrument default volume on switch"
+      },
+      {
+        type: 'feature',
+        "description": "Implement E6x pattern loop and EEx pattern delay in TS scheduler path"
+      },
+      {
+        type: 'feature',
+        "description": "Implement missing XM effects for synth channels in hybrid mode"
+      },
+      {
+        type: 'fix',
+        "description": "Sync transport speed display when Fxx effect fires during playback"
+      },
+      {
+        type: 'fix',
+        "description": "Persona hints in AutoDub panel, remove dead genre worker"
+      },
+      {
+        type: 'fix',
+        "description": "Classification follow-ups — shared model, CED Tier 3, dub refinements"
+      },
+      {
+        type: 'feature',
+        "description": "CED neural instrument/genre classification overhaul"
       }
     ]
   }
