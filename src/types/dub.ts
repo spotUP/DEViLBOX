@@ -568,7 +568,7 @@ export const DUB_CHARACTER_PRESETS: Record<Exclude<DubBusSettings['characterPres
       echoIntensity:  0.65,   // more repeats — Tubby's signature multi-tap
       echoRateMs:     300,
       echoWet:        0.80,
-      springWet:      0.38,   // reduced from 0.50
+      springWet:      0.50,   // restored — Tubby's spring is load-bearing
       sidechainAmount: 0.3,
       stereoWidth:    0.45,  // narrow — 4-track console + loose spring
       sweepAmount:    0,      // no flanger; Tubby's "sweep" was filter, not comb
