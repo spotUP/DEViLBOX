@@ -55,19 +55,16 @@ export const Fil4EqCurve: React.FC<Props> = ({ effect, width = W, height = H, on
   const [params, setParams] = useState<Fil4Params>(() => effect.getParams());
   const [activeHandle, setActiveHandle] = useState<BandId | null>(null);
   const rafRef = useRef<number | null>(null);
-  const dirtyRef = useRef(false);
   const plotW = width - PAD_L - PAD_R;
   const plotH = height - PAD_T - PAD_B;
 
   useEffect(() => {
-    const onParams = (p: Fil4Params) => { setParams({ ...p }); dirtyRef.current = true; };
+    const onParams = (p: Fil4Params) => { setParams({ ...p }); };
     effect.on('params', onParams);
     return () => { effect.off('params', onParams); };
   }, [effect]);
 
   useEffect(() => {
-    if (!dirtyRef.current) return;
-    dirtyRef.current = false;
     effect.getMagnitude(N_POINTS).then(setMagnitude);
   }, [params, effect]);
 
@@ -180,7 +177,8 @@ export const Fil4EqCurve: React.FC<Props> = ({ effect, width = W, height = H, on
       // Freq: log-scale drag — map pixel delta to frequency multiplier
       const freqScale = Math.pow(FREQ_MAX / FREQ_MIN, dx / plotW);
       const newFreq = Math.round(Math.max(FREQ_MIN, Math.min(FREQ_MAX, d.startFreq * freqScale)));
-      const patch: { freq?: number; gain?: number } = { freq: newFreq };
+      // Always include enabled:true so dragging a disabled band activates it immediately
+      const patch: { freq?: number; gain?: number; enabled: boolean } = { freq: newFreq, enabled: true };
       if (d.hasGain) {
         const dbPerPx = (DB_MAX - DB_MIN) / plotH;
         const newGain = parseFloat(Math.max(DB_MIN, Math.min(DB_MAX, d.startGain - dy * dbPerPx)).toFixed(1));
