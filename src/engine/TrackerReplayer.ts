@@ -516,6 +516,10 @@ export class TrackerReplayer {
   private pattDelTime = 0;       // Set by EEx on tick 0, copied to pattDelTime2 at row boundary
   private pattDelTime2 = 0;      // Decremented each row; while > 0, row repeats (no new notes read)
 
+  // E6x pattern loop state (per-channel; last channel wins when multiple channels set E60/E6N on same row)
+  private e6xLoopStart: number[] = [];   // Per-channel loop start row
+  private e6xLoopCount: number[] = [];   // Per-channel loop counter
+
   // Channels
   private channels: ChannelState[] = [];
 
@@ -1328,9 +1332,36 @@ export class TrackerReplayer {
         // F00: Stop song
         this.stop();
         return;
+      } else if (effect === 0xE) {
+        // Extended effects — handle E6x and EEx at tick 0
+        const subCmd = (param >> 4) & 0xF;
+        const subVal = param & 0xF;
+        if (subCmd === 0x6) {
+          // E6x Pattern loop (FT2-accurate, per-channel)
+          if (subVal === 0) {
+            this.e6xLoopStart[ch] = this.pattPos;
+          } else {
+            if (!this.e6xLoopCount[ch]) {
+              this.e6xLoopCount[ch] = subVal;
+              this.pBreakPos = this.e6xLoopStart[ch] ?? 0;
+              this.pBreakFlag = true;
+            } else {
+              this.e6xLoopCount[ch]--;
+              if (this.e6xLoopCount[ch] > 0) {
+                this.pBreakPos = this.e6xLoopStart[ch] ?? 0;
+                this.pBreakFlag = true;
+              } else {
+                this.e6xLoopCount[ch] = 0; // Loop exhausted — don't jump
+              }
+            }
+          }
+        } else if (subCmd === 0xE && this.useXMPeriods) {
+          // EEx Pattern delay (XM only: repeat current row N extra times)
+          if (subVal > 0) this.pattDelTime = subVal;
+        }
       }
 
-      // Also scan extra effect columns for Fxx/Bxx/Dxx
+      // Also scan extra effect columns for Fxx/Bxx/Dxx/E6x/EEx
       for (const [eTyp, eVal] of [
         [row.effTyp2, row.eff2], [row.effTyp3, row.eff3], [row.effTyp4, row.eff4],
         [row.effTyp5, row.eff5], [row.effTyp6, row.eff6], [row.effTyp7, row.eff7],
@@ -1344,6 +1375,20 @@ export class TrackerReplayer {
         } else if (eTyp === 0xD && eVal !== undefined) {
           this.pBreakPos = this.useXMPeriods ? eVal : ((eVal >> 4) * 10 + (eVal & 0xF));
           this.posJumpFlag = true;
+        } else if (eTyp === 0xE && eVal !== undefined) {
+          const sc = (eVal >> 4) & 0xF;
+          const sv = eVal & 0xF;
+          if (sc === 0x6) {
+            if (sv === 0) { this.e6xLoopStart[ch] = this.pattPos; }
+            else if (!this.e6xLoopCount[ch]) {
+              this.e6xLoopCount[ch] = sv;
+              this.pBreakPos = this.e6xLoopStart[ch] ?? 0; this.pBreakFlag = true;
+            } else if (--this.e6xLoopCount[ch] > 0) {
+              this.pBreakPos = this.e6xLoopStart[ch] ?? 0; this.pBreakFlag = true;
+            } else { this.e6xLoopCount[ch] = 0; }
+          } else if (sc === 0xE && this.useXMPeriods && sv > 0) {
+            this.pattDelTime = sv;
+          }
         }
       }
 
@@ -1776,6 +1821,8 @@ export class TrackerReplayer {
     this.patternDelay = 0;
     this.pattDelTime = 0;
     this.pattDelTime2 = 0;
+    this.e6xLoopStart = [];
+    this.e6xLoopCount = [];
 
     // Reset per-deck pitch/tempo state (prevents carry-over between songs & views)
     this.tempoMultiplier = 1.0;
