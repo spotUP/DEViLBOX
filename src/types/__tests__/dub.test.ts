@@ -51,9 +51,12 @@ describe('DUB_CHARACTER_PRESETS', () => {
     expect(p.overrides.midScoopFreqHz).toBe(700);
   });
 
-  it('gatedFlanger has heavy sweep + gated-short spring', () => {
+  it('gatedFlanger has controlled sweep + gated-short spring', () => {
     const p = DUB_CHARACTER_PRESETS.gatedFlanger;
-    expect(p.overrides.sweepAmount).toBeGreaterThan(0.5);
+    // Sweep present but tamed (was 0.65/0.80fb — too wild; now 0.42/0.52fb)
+    expect(p.overrides.sweepAmount).toBeGreaterThan(0.3);
+    expect(p.overrides.sweepAmount).toBeLessThan(0.6);
+    expect(p.overrides.sweepFeedback).toBeLessThan(0.6);
     expect(p.overrides.springWet).toBeLessThan(0.5);
     expect(p.overrides.tapeSatMode).toBe('single');
   });

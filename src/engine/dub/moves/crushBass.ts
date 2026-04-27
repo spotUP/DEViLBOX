@@ -13,7 +13,7 @@ import type { DubMove } from './_types';
 export const crushBass: DubMove = {
   id: 'crushBass',
   kind: 'hold',
-  defaults: { freq: 55, bits: 3, level: 0.75 },
+  defaults: { freq: 55, bits: 3, level: 0.55 },
 
   execute({ bus, params }) {
     const freq = params.freq ?? this.defaults.freq;
