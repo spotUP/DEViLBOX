@@ -4,7 +4,6 @@
  */
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { Fil4EqCurve } from './Fil4EqCurve';
-import { Knob } from '@components/controls/Knob';
 import { Button } from '@components/ui/Button';
 import type { Fil4EqEffect } from '@/engine/effects/Fil4EqEffect';
 import { useDrumPadStore } from '@/stores/useDrumPadStore';
@@ -39,10 +38,66 @@ function stateFromEffect(effect: Fil4EqEffect): PanelState {
   };
 }
 
+// ── Log-scale helpers for frequency sliders ──────────────────────────────────
+const freqToSlider = (hz: number, min: number, max: number) =>
+  (Math.log(Math.max(hz, min) / min) / Math.log(max / min)) * 100;
+const sliderToFreq = (v: number, min: number, max: number) =>
+  Math.round(min * Math.pow(max / min, v / 100));
+
+// ── Value formatters ──────────────────────────────────────────────────────────
+const fmtHz = (v: number) =>
+  v >= 1000 ? `${(v / 1000).toFixed(v >= 10000 ? 0 : 1)}k` : `${Math.round(v)}`;
+const fmtDb = (v: number) => `${v >= 0 ? '+' : ''}${v.toFixed(1)}`;
+const fmtQ  = (v: number) => v.toFixed(2);
+const fmtBw = (v: number) => `${v.toFixed(2)}`;
+
+// ── EqFader — compact labeled slider ─────────────────────────────────────────
+interface FaderProps {
+  label: string;
+  value: number;
+  min: number;
+  max: number;
+  step?: number;
+  onChange: (v: number) => void;
+  fmt?: (v: number) => string;
+  logScale?: boolean;
+}
+
+const EqFader: React.FC<FaderProps> = ({
+  label, value, min, max, step = 0.01, onChange, fmt, logScale,
+}) => {
+  const sliderVal = logScale ? freqToSlider(value, min, max) : value;
+  return (
+    <div className="flex flex-col gap-0 w-full">
+      <div className="flex items-center justify-between px-0.5">
+        <span className="text-[8px] font-mono text-text-muted leading-tight">{label}</span>
+        <span className="text-[8px] font-mono text-text-secondary tabular-nums leading-tight">
+          {fmt ? fmt(value) : value.toFixed(2)}
+        </span>
+      </div>
+      <input
+        type="range"
+        min={logScale ? 0 : min}
+        max={logScale ? 100 : max}
+        step={logScale ? 0.2 : step}
+        value={sliderVal}
+        onChange={e => {
+          const raw = Number(e.target.value);
+          onChange(logScale ? sliderToFreq(raw, min, max) : raw);
+        }}
+        className="w-full accent-accent-primary cursor-pointer"
+        style={{ height: '14px' }}
+      />
+    </div>
+  );
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 interface Props { effect: Fil4EqEffect; }
 
 export const Fil4EqPanel: React.FC<Props> = ({ effect }) => {
-  const dubBus = useDrumPadStore(s => s.dubBus);
+  const dubBus    = useDrumPadStore(s => s.dubBus);
   const setDubBus = useDrumPadStore(s => s.setDubBus);
 
   const [state, setState] = useState<PanelState>(() => stateFromEffect(effect));
@@ -106,20 +161,19 @@ export const Fil4EqPanel: React.FC<Props> = ({ effect }) => {
       type="button"
       variant="compact"
       onClick={onClick}
-      className={on ? 'border-accent-highlight bg-accent-highlight/20 text-accent-highlight' : ''}
+      className={on ? 'border-accent-highlight bg-accent-highlight/20 text-accent-highlight w-full' : 'w-full'}
     >
       {on ? 'ON' : 'OFF'}
     </Button>
   );
 
   const col = (label: string, content: React.ReactNode) => (
-    <div className="flex flex-col items-center gap-1 px-2 border-r border-dark-border last:border-0 min-w-[58px]">
-      <span className="text-[9px] font-mono text-text-secondary font-bold">{label}</span>
+    <div className="flex flex-col items-stretch gap-1 px-2 py-1 border-r border-dark-border last:border-0 min-w-[88px]">
+      <span className="text-[9px] font-mono text-text-secondary font-bold text-center">{label}</span>
       {content}
     </div>
   );
 
-  // Apply a genre preset curve to the effect
   const applyGenrePreset = useCallback((genre: string) => {
     if (genre === '') return;
     const curve = computeGenreBaseline(genre, 0.7, 0.6);
@@ -143,6 +197,7 @@ export const Fil4EqPanel: React.FC<Props> = ({ effect }) => {
 
   return (
     <div className="flex flex-col gap-2 p-2 bg-dark-bgSecondary rounded-lg select-none">
+
       {/* Preset row */}
       <div className="flex items-center gap-2">
         <span className="text-[9px] font-mono text-text-muted shrink-0">Preset</span>
@@ -165,71 +220,82 @@ export const Fil4EqPanel: React.FC<Props> = ({ effect }) => {
           Flat
         </button>
       </div>
-      <div className="flex items-start gap-2">
-        <Fil4EqCurve effect={effect} width={552} height={136} />
-        <div className="flex flex-col gap-1 items-center pt-1">
-          <span className="text-[9px] font-mono text-text-muted">GAIN</span>
-          <Knob value={state.masterGain} min={0} max={2} step={0.01}
-            onChange={setGain} size="sm" label="Gain" />
-          <span className="text-[9px] font-mono text-text-secondary">
-            {(20 * Math.log10(Math.max(state.masterGain, 0.001))).toFixed(1)}dB
-          </span>
-        </div>
+
+      {/* Curve */}
+      <Fil4EqCurve effect={effect} width={552} height={120} />
+
+      {/* Master gain strip */}
+      <div className="flex items-center gap-2 px-1">
+        <span className="text-[9px] font-mono text-text-muted w-8 shrink-0">Gain</span>
+        <input
+          type="range" min={0} max={2} step={0.01}
+          value={state.masterGain}
+          onChange={e => setGain(Number(e.target.value))}
+          className="flex-1 accent-accent-primary cursor-pointer"
+          style={{ height: '14px' }}
+        />
+        <span className="text-[9px] font-mono text-text-secondary w-12 text-right tabular-nums shrink-0">
+          {(20 * Math.log10(Math.max(state.masterGain, 0.001))).toFixed(1)} dB
+        </span>
       </div>
 
+      {/* Auto EQ bar */}
       {dubBus && (
-        <div className="flex items-center gap-2 px-1 py-0.5 text-[10px] font-mono border-b border-dark-border">
-          <span className="text-accent-highlight">⚡</span>
-          <span className="text-text-secondary font-bold">Auto EQ</span>
-          <span className="text-text-muted">
+        <div className="flex items-center gap-2 px-1 py-0.5 text-[10px] font-mono border-t border-dark-border">
+          <span className="text-accent-highlight shrink-0">⚡</span>
+          <span className="text-text-secondary font-bold shrink-0">Auto EQ</span>
+          <span className="text-text-muted shrink-0">
             {dubBus.autoEqLastGenre
               ? `${dubBus.autoEqLastGenre} · ${Math.round((dubBus.autoEqStrength ?? 0.85) * 100)}%`
               : 'analyzing…'}
           </span>
           <input
-            type="range"
-            min={0} max={1} step={0.01}
+            type="range" min={0} max={1} step={0.01}
             value={dubBus.autoEqStrength ?? 0.85}
             onChange={e => setDubBus({ autoEqStrength: Number(e.target.value) })}
-            className="flex-1 accent-accent-highlight h-1"
+            className="flex-1 accent-accent-highlight cursor-pointer"
+            style={{ height: '12px' }}
             title={`Auto EQ strength: ${Math.round((dubBus.autoEqStrength ?? 0.85) * 100)}%`}
           />
         </div>
       )}
 
+      {/* Band columns */}
       <div className="flex items-start border border-dark-border rounded overflow-x-auto">
+
         {col('HP', <>
-          <Knob value={state.hp.freq} min={5} max={1000} step={1} onChange={v => setHP({ freq: v })} size="sm" label="Hz" />
-          <Knob value={state.hp.q}    min={0.1} max={4} step={0.01}  onChange={v => setHP({ q: v })}    size="sm" label="Q"  />
+          <EqFader label="Hz"  value={state.hp.freq} min={5}   max={1000} onChange={v => setHP({ freq: v })} fmt={fmtHz} logScale />
+          <EqFader label="Q"   value={state.hp.q}    min={0.1} max={4}    step={0.01} onChange={v => setHP({ q: v })} fmt={fmtQ} />
           {toggle(state.hp.enabled, () => setHP({ enabled: !state.hp.enabled }))}
         </>)}
 
         {col('Lo Shelf', <>
-          <Knob value={state.ls.freq} min={20}   max={800}  step={1}   onChange={v => setLS({ freq: v })} size="sm" label="Hz"  />
-          <Knob value={state.ls.gain} min={-24}  max={24}   step={0.5} onChange={v => setLS({ gain: v })} size="sm" label="dB"  />
-          <Knob value={state.ls.q}    min={0.1}  max={2}    step={0.01} onChange={v => setLS({ q: v })}   size="sm" label="Q"   />
+          <EqFader label="Hz"  value={state.ls.freq} min={20}  max={800}  onChange={v => setLS({ freq: v })} fmt={fmtHz} logScale />
+          <EqFader label="dB"  value={state.ls.gain} min={-24} max={24}   step={0.5}  onChange={v => setLS({ gain: v })} fmt={fmtDb} />
+          <EqFader label="Q"   value={state.ls.q}    min={0.1} max={2}    step={0.01} onChange={v => setLS({ q: v })} fmt={fmtQ} />
           {toggle(state.ls.enabled, () => setLS({ enabled: !state.ls.enabled }))}
         </>)}
 
         {([0,1,2,3] as const).map(i => col(`P${i+1}`, <>
-          <Knob value={state.p[i].freq} min={20}  max={20000} step={1}    onChange={v => setP(i, { freq: v })} size="sm" label="Hz" />
-          <Knob value={state.p[i].gain} min={-24} max={24}    step={0.5}  onChange={v => setP(i, { gain: v })} size="sm" label="dB" />
-          <Knob value={state.p[i].bw}   min={0.05} max={4}    step={0.05} onChange={v => setP(i, { bw: v })}   size="sm" label="BW" />
+          <EqFader label="Hz"  value={state.p[i].freq} min={20}   max={20000} onChange={v => setP(i, { freq: v })} fmt={fmtHz} logScale />
+          <EqFader label="dB"  value={state.p[i].gain} min={-24}  max={24}    step={0.5}  onChange={v => setP(i, { gain: v })} fmt={fmtDb} />
+          <EqFader label="BW"  value={state.p[i].bw}   min={0.05} max={4}     step={0.05} onChange={v => setP(i, { bw: v })} fmt={fmtBw} />
           {toggle(state.p[i].enabled, () => setP(i, { enabled: !state.p[i].enabled }))}
         </>))}
 
         {col('Hi Shelf', <>
-          <Knob value={state.hs.freq} min={1000} max={20000} step={10}  onChange={v => setHS({ freq: v })} size="sm" label="Hz" />
-          <Knob value={state.hs.gain} min={-24}  max={24}    step={0.5} onChange={v => setHS({ gain: v })} size="sm" label="dB" />
-          <Knob value={state.hs.q}    min={0.1}  max={2}     step={0.01} onChange={v => setHS({ q: v })}   size="sm" label="Q"  />
+          <EqFader label="Hz"  value={state.hs.freq} min={1000} max={20000} onChange={v => setHS({ freq: v })} fmt={fmtHz} logScale />
+          <EqFader label="dB"  value={state.hs.gain} min={-24}  max={24}    step={0.5}  onChange={v => setHS({ gain: v })} fmt={fmtDb} />
+          <EqFader label="Q"   value={state.hs.q}    min={0.1}  max={2}     step={0.01} onChange={v => setHS({ q: v })} fmt={fmtQ} />
           {toggle(state.hs.enabled, () => setHS({ enabled: !state.hs.enabled }))}
         </>)}
 
         {col('LP', <>
-          <Knob value={state.lp.freq} min={500}  max={20000} step={10}   onChange={v => setLP({ freq: v })} size="sm" label="Hz" />
-          <Knob value={state.lp.q}    min={0.1}  max={4}     step={0.01} onChange={v => setLP({ q: v })}    size="sm" label="Q"  />
+          <EqFader label="Hz"  value={state.lp.freq} min={500}  max={20000} onChange={v => setLP({ freq: v })} fmt={fmtHz} logScale />
+          <EqFader label="Q"   value={state.lp.q}    min={0.1}  max={4}     step={0.01} onChange={v => setLP({ q: v })} fmt={fmtQ} />
           {toggle(state.lp.enabled, () => setLP({ enabled: !state.lp.enabled }))}
         </>)}
+
       </div>
     </div>
   );
