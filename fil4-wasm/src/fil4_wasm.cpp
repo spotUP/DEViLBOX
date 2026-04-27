@@ -190,7 +190,9 @@ EMSCRIPTEN_KEEPALIVE void fil4_get_magnitude(int h, float* log_freqs, float* out
 
     Fil4Instance& inst = instances[h];
     const float sr = inst.sample_rate;
-    const int   N_IR = 4096;
+    // 1024 samples ≈ 0.5ms computation — well within the 2.9ms audio frame budget.
+    // 4096 (original) overran the budget and caused ~2s silence on rapid knob moves.
+    const int   N_IR = 1024;
 
     float* ir = (float*)calloc(N_IR, sizeof(float));
     if (!ir) { memset(out_db, 0, (size_t)n * sizeof(float)); return; }
