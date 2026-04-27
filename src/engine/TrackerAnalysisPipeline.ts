@@ -220,7 +220,7 @@ async function ensureWorkerReady(): Promise<void> {
 // ── Public API ───────────────────────────────────────────────────────────────
 
 /** Build instrument presence hints from CED results + spectral analysis. */
-function buildInstrumentHints(): InstrumentHints {
+export function buildInstrumentHints(): InstrumentHints {
   const hints: InstrumentHints = {
     hasGuitar: false, hasBass: false, hasPercussion: false,
     hasPiano: false, hasStrings: false, hasBrass: false,
