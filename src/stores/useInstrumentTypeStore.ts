@@ -37,6 +37,10 @@ interface InstrumentTypeState {
   /** Classify all instruments — samples via PCM decode, synths via bake.
    *  Safe to call on every AutoDub tick — deduplicates automatically. */
   classifyInstruments(instruments: InstrumentConfig[]): void;
+  /** Clear dedup sets so the next classifyInstruments call reclassifies everything. */
+  resetClassified(): void;
+  /** Manually assign an instrument type, overriding auto-detection. Pass null to clear. */
+  setManualType(instrumentId: number, type: InstrumentType | null): void;
   getType(instrumentId: number): InstrumentType | null;
   getResult(instrumentId: number): InstrumentTypeResult | null;
   _onWorkerMessage(data: unknown): void;
@@ -47,6 +51,9 @@ interface InstrumentTypeState {
 
 let _worker: Worker | null = null;
 let _reqId = 0;
+// Track pending stagger timeouts so resetClassified() can cancel them,
+// preventing bleed from a previous song load when a new one starts quickly.
+const _pendingTimeouts: ReturnType<typeof setTimeout>[] = [];
 
 /** Export worker accessor so CedChannelAccumulator / SidVoiceClassifier can
  *  dispatch channel PCM to the same worker without a second instance. */
@@ -122,11 +129,52 @@ export const useInstrumentTypeStore = create<InstrumentTypeState & {
   classifiedUrls: new Set(),
   classifiedSynthIds: new Set(),
 
+  resetClassified() {
+    // Cancel any staggered dispatches from the previous song load before clearing state.
+    for (const id of _pendingTimeouts) clearTimeout(id);
+    _pendingTimeouts.length = 0;
+    set({ classifiedUrls: new Set(), classifiedSynthIds: new Set(), results: new Map(), pendingIds: new Set() });
+  },
+
+  setManualType(instrumentId: number, type: InstrumentType | null) {
+    // Persist to InstrumentConfig so it survives reloads
+    void import('@stores/useInstrumentStore').then(({ useInstrumentStore }) => {
+      useInstrumentStore.getState().updateInstrument(instrumentId, { manualInstrumentType: type ?? undefined });
+    });
+    set(s => {
+      const results = new Map(s.results);
+      if (type) {
+        results.set(instrumentId, {
+          instrumentId,
+          instrumentType: type,
+          topLabels: [{ label: type, score: 1.0 }],
+          confidence: 1.0,
+        });
+      } else {
+        results.delete(instrumentId);
+      }
+      return { results };
+    });
+  },
+
   classifyInstruments(instruments: InstrumentConfig[]) {
+    // Inject manual type overrides immediately — they beat CED and spectral.
+    const manualResults = new Map(get().results);
+    for (const inst of instruments) {
+      if (inst.manualInstrumentType) {
+        const type = inst.manualInstrumentType as InstrumentType;
+        manualResults.set(inst.id, {
+          instrumentId: inst.id,
+          instrumentType: type,
+          topLabels: [{ label: type, score: 1.0 }],
+          confidence: 1.0,
+        });
+      }
+    }
+    if (manualResults.size !== get().results.size) set({ results: manualResults });
+
     const { classifiedUrls, classifiedSynthIds } = get();
     const worker = getWorker();
-    console.warn(`[CED] classifyInstruments called with ${instruments.length} instruments`);
-
     // Stagger dispatches so we don't flood the worker with all instruments at
     // once. ONNX inference is CPU-heavy; sending one every 200ms keeps the
     // browser responsive while the 86.9MB model warms up.
@@ -134,6 +182,9 @@ export const useInstrumentTypeStore = create<InstrumentTypeState & {
     const STAGGER_MS = 200;
 
     for (const inst of instruments) {
+      // Manual type already injected above — skip CED entirely for this instrument.
+      if (inst.manualInstrumentType) continue;
+
       const url = inst.sample?.url;
       const hasSample = typeof url === 'string' && url.startsWith('data:audio/wav;base64,');
 
@@ -150,7 +201,7 @@ export const useInstrumentTypeStore = create<InstrumentTypeState & {
         const instId = inst.id;
         set(s => ({ pendingIds: new Set([...s.pendingIds, instId]) }));
 
-        setTimeout(() => {
+        _pendingTimeouts.push(setTimeout(() => {
           worker.postMessage({
             type: 'classify',
             id,
@@ -159,7 +210,7 @@ export const useInstrumentTypeStore = create<InstrumentTypeState & {
             sampleRate,
             name: inst.name,
           }, [pcm.buffer]);
-        }, delay);
+        }, delay));
         delay += STAGGER_MS;
         continue;
       }
@@ -189,7 +240,7 @@ export const useInstrumentTypeStore = create<InstrumentTypeState & {
       if (classifiedSynthIds.has(inst.id)) continue;
       classifiedSynthIds.add(inst.id);
       set(s => ({ pendingIds: new Set([...s.pendingIds, inst.id]) }));
-      setTimeout(() => void bakeSynthAndClassify(inst, worker), delay);
+      _pendingTimeouts.push(setTimeout(() => void bakeSynthAndClassify(inst, worker), delay));
       delay += STAGGER_MS;
     }
   },
@@ -265,6 +316,7 @@ export const useInstrumentTypeStore = create<InstrumentTypeState & {
 
     if (msg.type === 'error' && msg.instrumentId !== undefined) {
       const instrumentId = msg.instrumentId as number;
+      console.warn(`[CED] classify error inst=${instrumentId}:`, msg.error);
       set(s => {
         const pendingIds = new Set(s.pendingIds);
         pendingIds.delete(instrumentId);

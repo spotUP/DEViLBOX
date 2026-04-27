@@ -621,7 +621,6 @@ export function chooseMove(ctx: AutoDubTickCtx, rng: () => number): AutoDubChoic
 
   const variance = ctx.persona.variance ?? 0;
   const hasRoles = ctx.roles.length > 0;
-  const wetBudgetExhausted = ctx.wetFiredThisBar >= WET_FIRES_PER_BAR_CAP;
   const eligible: Array<{ rule: Rule; weight: number; matchingChannels: readonly number[] }> = [];
 
   for (const rule of RULES) {
@@ -629,7 +628,7 @@ export function chooseMove(ctx: AutoDubTickCtx, rng: () => number): AutoDubChoic
     // Per-bar wet cap: once a wet move has fired this bar, skip every
     // other wet rule until the next bar. Dry moves (tapeStop, filterDrop,
     // channelMute, subSwell, etc.) stay eligible.
-    if (rule.wet && wetBudgetExhausted) continue;
+    if (rule.wet && ctx.wetFiredThisBar >= WET_FIRES_PER_BAR_CAP) continue;
 
     const condOk = rule.condition(ctx) || (variance > 0 && rng() < variance * 0.1);
     if (!condOk) continue;
@@ -755,7 +754,7 @@ export function chooseMove(ctx: AutoDubTickCtx, rng: () => number): AutoDubChoic
       });
       const total = weights.reduce((s, w) => s + w, 0);
       let roll = rng() * total;
-      channelId = picked.matchingChannels[picked.matchingChannels.length - 1];
+      channelId = picked.matchingChannels[0]; // safe default: first match
       for (let i = 0; i < picked.matchingChannels.length; i++) {
         if (roll < weights[i]) { channelId = picked.matchingChannels[i]; break; }
         roll -= weights[i];
@@ -848,8 +847,15 @@ function getCedTimeline(patterns: Pattern[], patternOrder: number[]): SongRoleTi
     _cedTimelineResultCount !== resultCount
   ) {
     const typeMap = new Map<number, import('@/bridge/analysis/AudioSetInstrumentMap').InstrumentType>();
-    for (const [id, r] of store.results) typeMap.set(id, r.instrumentType);
-    _cedTimeline = buildSongRoleTimeline(patterns, patternOrder, typeMap);
+    const confidenceMap = new Map<number, number>();
+    const MIN_CED_CONFIDENCE = 0.15;
+    for (const [id, r] of store.results) {
+      if (r.instrumentType !== 'unknown' && r.confidence >= MIN_CED_CONFIDENCE) {
+        typeMap.set(id, r.instrumentType);
+        confidenceMap.set(id, r.confidence);
+      }
+    }
+    _cedTimeline = buildSongRoleTimeline(patterns, patternOrder, typeMap, confidenceMap);
     _cedTimelinePatternRef = patterns;
     _cedTimelineResultCount = resultCount;
   }
@@ -943,7 +949,8 @@ function getCurrentPatternBundle(): {
     const currentRow = transport.currentRow ?? 0;
     const cedTimeline = getCedTimeline(patterns, patternOrder);
     if (cedTimeline) {
-      const cedRoles = getRolesAtPosition(cedTimeline, positionIndex, currentRow);
+      // Only override roles where CED had at least 0.3 confidence at that position.
+      const cedRoles = getRolesAtPosition(cedTimeline, positionIndex, currentRow, 0.3);
       mergedRoles = mergedRoles.map((r, ch) => cedRoles[ch] ?? r);
     }
 

@@ -110,11 +110,28 @@ export function resampleTo16k(pcm: Float32Array, fromRate: number): Float32Array
   const ratio = fromRate / CED_SAMPLE_RATE;
   const outLen = Math.floor(pcm.length / ratio);
   const out = new Float32Array(outLen);
-  for (let i = 0; i < outLen; i++) {
-    const src = i * ratio;
-    const lo = Math.floor(src);
-    const hi = Math.min(lo + 1, pcm.length - 1);
-    out[i] = pcm[lo] + (pcm[hi] - pcm[lo]) * (src - lo);
+
+  // Anti-aliasing: for downsampling, average input samples within each output
+  // window to prevent frequency content above the Nyquist of the target rate
+  // from aliasing into the mel spectrogram.
+  if (ratio > 1) {
+    const halfWin = ratio / 2;
+    for (let i = 0; i < outLen; i++) {
+      const center = i * ratio;
+      const start = Math.max(0, Math.floor(center - halfWin));
+      const end = Math.min(pcm.length - 1, Math.ceil(center + halfWin));
+      let sum = 0;
+      for (let j = start; j <= end; j++) sum += pcm[j];
+      out[i] = sum / (end - start + 1);
+    }
+  } else {
+    // Upsampling: linear interpolation is fine
+    for (let i = 0; i < outLen; i++) {
+      const src = i * ratio;
+      const lo = Math.floor(src);
+      const hi = Math.min(lo + 1, pcm.length - 1);
+      out[i] = pcm[lo] + (pcm[hi] - pcm[lo]) * (src - lo);
+    }
   }
   return out;
 }

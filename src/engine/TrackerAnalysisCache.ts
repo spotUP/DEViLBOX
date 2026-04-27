@@ -8,7 +8,7 @@
 import type { FullAnalysisResult } from '@/stores/useTrackerAnalysisStore';
 
 const DB_NAME = 'DEViLBOX_TrackerAnalysis';
-const DB_VERSION = 1;
+const DB_VERSION = 2; // bumped: CED-based genre classifier replaces hand-rolled BPM waterfall
 const STORE_NAME = 'analysisCache';
 const MAX_ENTRIES = 500; // Max cached analyses
 
@@ -41,11 +41,12 @@ async function initDB(): Promise<IDBDatabase> {
 
     request.onupgradeneeded = (event) => {
       const database = (event.target as IDBOpenDBRequest).result;
-      if (!database.objectStoreNames.contains(STORE_NAME)) {
-        const store = database.createObjectStore(STORE_NAME, { keyPath: 'hash' });
-        store.createIndex('timestamp', 'timestamp', { unique: false });
-        console.log('[TrackerAnalysisCache] Object store created');
+      // Wipe the store on any version upgrade so stale genre results don't persist.
+      if (database.objectStoreNames.contains(STORE_NAME)) {
+        database.deleteObjectStore(STORE_NAME);
       }
+      const store = database.createObjectStore(STORE_NAME, { keyPath: 'hash' });
+      store.createIndex('timestamp', 'timestamp', { unique: false });
     };
   });
 }
