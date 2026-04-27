@@ -25,13 +25,19 @@ const FX_VOLUME_SLIDE = 0xA;
 const FX_SET_VOLUME = 0xC;
 const FX_EXTENDED = 0xE;
 
+// Main effects
+const FX_SET_PAN = 0x8;
+
 // Extended effects (E sub-commands)
 const EFX_FINE_PORTA_UP = 0x1;
 const EFX_FINE_PORTA_DOWN = 0x2;
 const EFX_VIBRATO_WAVEFORM = 0x4;
+const EFX_TREMOLO_WAVEFORM = 0x7;
+const EFX_NOTE_RETRIGGER = 0x9;
 const EFX_FINE_VOLUME_UP = 0xA;
 const EFX_FINE_VOLUME_DOWN = 0xB;
 const EFX_NOTE_CUT = 0xC;
+const EFX_NOTE_DELAY = 0xD;
 
 // XM linear period → frequency: period change of 1 = 2^(1/768) frequency ratio
 // Porta speed of N → N*4 period units per tick in XM
@@ -66,10 +72,16 @@ export interface SynthEffectDeps {
   applySynthFrequency(instrumentId: number, frequency: number, channelIndex: number, rampTime?: number): void;
   /** Set volume on a channel's gain node (0-1 linear) */
   setChannelGain(channelIndex: number, gain: number, time: number): void;
+  /** Set panning on a channel (0=full left, 128=center, 255=full right) */
+  setChannelPan(channelIndex: number, pan: number): void;
   /** Get the last triggered frequency for a channel from ToneEngine */
   getChannelBaseFrequency(channelIndex: number): number;
   /** Get the instrument ID currently active on a channel */
   getChannelInstrumentId(channelIndex: number): number;
+  /** Retrigger the currently playing note on a channel (E9x) */
+  retriggerNote(channelIndex: number, time: number): void;
+  /** Trigger a delayed note at tick N (EDx) */
+  triggerDelayedNote(channelIndex: number, xmNote: number, instrumentId: number, volume: number, time: number): void;
 }
 
 interface EffectChannelState {
@@ -108,6 +120,19 @@ interface EffectChannelState {
   // Fine portamento (effect memory)
   finePortaUpSpeed: number;
   finePortaDownSpeed: number;
+
+  // Panning
+  currentPan: number;            // 0=left, 128=center, 255=right
+
+  // Note retrigger (E9x): retrigger every N ticks
+  retriggerInterval: number;     // 0 = inactive
+  retriggerCounter: number;      // countdown; fires when it reaches 0
+
+  // Note delay (EDx): delay note trigger by N ticks
+  noteDelayTick: number;         // 0 = no delay; >0 = fire at this tick
+  noteDelayXmNote: number;       // XM note number to trigger
+  noteDelayInstrumentId: number; // instrument ID for delayed trigger
+  noteDelayVolume: number;       // volume for delayed trigger (0-64)
 
   // Current effect
   effectType: number;
@@ -198,6 +223,14 @@ export class SynthEffectProcessor {
 
       state.instrumentId = instId;
 
+      // Reset per-row transient state (retrigger counter, note delay) on each new row
+      state.retriggerInterval = 0;
+      state.retriggerCounter = 0;
+      state.noteDelayTick = 0;
+      state.noteDelayXmNote = 0;
+      state.noteDelayInstrumentId = 0;
+      state.noteDelayVolume = 64;
+
       // Only reset base/current frequency when a new note triggers (not on empty rows).
       // For tone portamento (3xx/5xy), the note sets portaTarget instead — don't reset.
       const fx = cell.effTyp ?? 0;
@@ -234,6 +267,11 @@ export class SynthEffectProcessor {
   private initEffect(ch: number, state: EffectChannelState, fx: number, param: number,
     cell: EffectPatternCell, time: number): void {
     switch (fx) {
+      case FX_SET_PAN:
+        state.currentPan = param;
+        this.deps.setChannelPan(ch, param);
+        break;
+
       case FX_ARPEGGIO:
         if (param !== 0) {
           state.arpeggioX = (param >> 4) & 0x0F;
@@ -305,6 +343,24 @@ export class SynthEffectProcessor {
           case EFX_VIBRATO_WAVEFORM:
             state.vibratoWaveform = subParam & 0x03;
             break;
+          case EFX_TREMOLO_WAVEFORM:
+            state.tremoloWaveform = subParam & 0x03;
+            break;
+          case EFX_NOTE_RETRIGGER:
+            if (subParam > 0) {
+              state.retriggerInterval = subParam;
+              state.retriggerCounter = subParam;
+            }
+            break;
+          case EFX_NOTE_DELAY:
+            // Only delay if the row has a note to defer
+            if (subParam > 0 && cell.note > 0 && cell.note < 97) {
+              state.noteDelayTick = subParam;
+              state.noteDelayXmNote = cell.note;
+              state.noteDelayInstrumentId = cell.instrument || state.instrumentId;
+              state.noteDelayVolume = (cell.volume > 0 && cell.volume <= 64) ? cell.volume : state.currentVolume;
+            }
+            break;
           case EFX_FINE_VOLUME_UP:
             state.currentVolume = Math.min(64, state.currentVolume + subParam);
             state.baseVolume = state.currentVolume;
@@ -372,6 +428,20 @@ export class SynthEffectProcessor {
           if (subCmd === EFX_NOTE_CUT && tick === subParam) {
             state.currentVolume = 0;
             this.deps.setChannelGain(ch, 0, time);
+          }
+          if (subCmd === EFX_NOTE_RETRIGGER && state.retriggerInterval > 0) {
+            state.retriggerCounter--;
+            if (state.retriggerCounter <= 0) {
+              state.retriggerCounter = state.retriggerInterval;
+              this.deps.retriggerNote(ch, time);
+            }
+          }
+          if (subCmd === EFX_NOTE_DELAY && state.noteDelayTick > 0 && tick === state.noteDelayTick) {
+            const delayNote = state.noteDelayXmNote;
+            const delayInst = state.noteDelayInstrumentId;
+            const delayVol = state.noteDelayVolume;
+            state.noteDelayTick = 0;
+            this.deps.triggerDelayedNote(ch, delayNote, delayInst, delayVol, time);
           }
           break;
         }
@@ -534,6 +604,13 @@ function createDefaultState(instrumentId: number): EffectChannelState {
     volSlideSpeed: 0,
     finePortaUpSpeed: 0,
     finePortaDownSpeed: 0,
+    currentPan: 128,
+    retriggerInterval: 0,
+    retriggerCounter: 0,
+    noteDelayTick: 0,
+    noteDelayXmNote: 0,
+    noteDelayInstrumentId: 0,
+    noteDelayVolume: 64,
     effectType: 0,
     effectParam: 0,
   };

@@ -1130,6 +1130,9 @@ export class TrackerReplayer {
         channel.instrument = updatedInst;
       }
 
+      // EDx Note Delay: suppress tick-0 trigger — SynthEffectProcessor fires at tick N
+      if (hasEdNoteDelay(row)) continue;
+
       // Fire the note — it sustains until the next note, note-off, or instrument switch.
       // No scheduled release. This matches tracker behavior: notes ring until explicitly stopped.
       this.processHybridRow(ch, channel, row, time);
@@ -2307,6 +2310,38 @@ export class TrackerReplayer {
                 return typeof ch.instrument === 'number' ? ch.instrument
                   : ch.instrument != null && typeof ch.instrument === 'object' && 'id' in ch.instrument
                     ? (ch.instrument as { id: number }).id : 0;
+              },
+              setChannelPan: (channelIndex, pan) => {
+                const ch = replayer.channels[channelIndex];
+                if (!ch?.panNode) return;
+                try { ch.panNode.pan.setValueAtTime((pan - 128) / 128, Tone.now()); }
+                catch { /* ignored */ }
+              },
+              retriggerNote: (channelIndex, time) => {
+                const ch = replayer.channels[channelIndex];
+                if (!ch) return;
+                const inst = typeof ch.instrument === 'object' && ch.instrument !== null
+                  ? (ch.instrument as InstrumentConfig) : null;
+                if (!inst?.synthType || inst.synthType === 'Sampler') return;
+                try {
+                  getToneEngine().triggerNote(inst.id, ch.lastPlayedNoteName ?? 'C4', 0, time, 1, inst, false, false, channelIndex);
+                } catch { /* ignored */ }
+              },
+              triggerDelayedNote: (channelIndex, xmNote, instrumentId, volume, time) => {
+                const ch = replayer.channels[channelIndex];
+                if (!ch) return;
+                const inst = replayer.instrumentMap.get(instrumentId);
+                if (!inst?.synthType || inst.synthType === 'Sampler') return;
+                ch.instrument = inst;
+                try {
+                  const noteName = xmNoteToNoteName(xmNote);
+                  if (volume > 0 && volume <= 64) {
+                    ch.volume = volume;
+                    ch.gainNode?.gain.setValueAtTime(volume / 64, time);
+                  }
+                  ch.lastPlayedNoteName = noteName;
+                  getToneEngine().triggerNote(inst.id, noteName, 0, time, 1, inst, false, false, channelIndex);
+                } catch { /* ignored */ }
               },
             });
             mptEngine.onPositionTick = (audioTime, row, order, speed, tempo) => {
@@ -3874,6 +3909,20 @@ export class TrackerReplayer {
     this.channels = [];
     this.song = null;
   }
+}
+
+// ============================================================================
+// MODULE-LEVEL HELPERS
+// ============================================================================
+
+/** Returns true if any effect column in the cell is an EDx note delay with delay > 0. */
+function hasEdNoteDelay(row: TrackerCell): boolean {
+  const check = (effTyp: number | undefined, eff: number | undefined) =>
+    effTyp === 0xE && eff !== undefined && (eff >> 4) === 0xD && (eff & 0xF) > 0;
+  return check(row.effTyp, row.eff) ||
+    check(row.effTyp2, row.eff2) ||
+    check(row.effTyp3, row.eff3) ||
+    check(row.effTyp4, row.eff4);
 }
 
 // ============================================================================
