@@ -34,6 +34,7 @@ export interface FullAnalysisResult {
   rmsDb: number;
   peakDb: number;
   analyzedAt: number;    // Timestamp
+  frequencyPeaks?: number[][];  // [freq_hz, magnitude_db] pairs from Essentia
 }
 
 export type AnalysisState = 'idle' | 'capturing' | 'analyzing' | 'ready' | 'error';

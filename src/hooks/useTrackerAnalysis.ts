@@ -136,6 +136,7 @@ export function useTrackerAnalysis(): void {
         rmsDb: result.rmsDb ?? -60,
         peakDb: result.peakDb ?? -60,
         analyzedAt: Date.now(),
+        frequencyPeaks: result.frequencyPeaks ?? [],
       };
       
       // Only update if still the same file

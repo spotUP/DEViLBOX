@@ -330,6 +330,12 @@ export interface DubBusSettings {
   // - 'parallel': both receive dry input, mix at output
   //   Independent echo + spring textures blended together
   chainOrder: 'echoSpring' | 'springEcho' | 'parallel';
+
+  // ─── Auto EQ (2026-04-27) ────────────────────────────────────────────────
+  /** 0–1 blend of computed auto-EQ curve toward flat. 0=flat, 1=full curve. Default 0.85. */
+  autoEqStrength: number;
+  /** Last genre label used by auto-EQ — set by DubBus when analysis fires. */
+  autoEqLastGenre: string;
 }
 
 export const DEFAULT_DUB_BUS: DubBusSettings = {
@@ -466,6 +472,9 @@ export const DEFAULT_DUB_BUS: DubBusSettings = {
   clubSimMix:         0.15,   // subtle — just adds room character
 
   chainOrder:         'echoSpring',
+
+  autoEqStrength:   0.85,
+  autoEqLastGenre:  '',
 };
 
 /** The 11 stepped positions of the Altec 9069B filter, per audiothing.net/
