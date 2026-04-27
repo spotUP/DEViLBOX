@@ -64,7 +64,7 @@ export const HOLD_KINDS = new Set([
   'tubbyScream', 'stereoDoubler', 'oscBass', 'crushBass', 'subHarmonic',
   'eqSweep', 'ghostReverb', 'voltageStarve', 'ringMod',
   // New moves
-  'hpfRise', 'madProfPingPong', 'combSweep', 'eqSweep', 'tapeStop', 'transportTapeStop',
+  'hpfRise', 'madProfPingPong', 'combSweep', 'tapeStop', 'transportTapeStop',
   'versionDrop',
   'skankEchoThrow',
 ]);
