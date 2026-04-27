@@ -3,7 +3,7 @@
  * and file I/O operations in the FileBrowser dialog.
  */
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import {
   isFileSystemAccessSupported,
   requestDirectoryAccess,
@@ -191,6 +191,7 @@ const _lastState = {
   fileSource: 'demo' as FileSource,
   currentPath: '',
   electronDirectory: null as string | null,
+  searchQuery: '',
 };
 
 /** Read the last file source the dialog was on. */
@@ -212,7 +213,17 @@ export function useFileNavigation({
   currentProjectData,
   suggestedFilename,
 }: UseFileNavigationOptions) {
-  const [files, setFiles] = useState<FileItem[]>([]);
+  const [rawFiles, setFiles] = useState<FileItem[]>([]);
+  const [searchQuery, _setSearchQuery] = useState<string>(_lastState.searchQuery);
+  const setSearchQuery = useCallback((q: string) => {
+    _lastState.searchQuery = q;
+    _setSearchQuery(q);
+  }, []);
+  const files = useMemo(() => {
+    if (!searchQuery.trim()) return rawFiles;
+    const q = searchQuery.toLowerCase();
+    return rawFiles.filter(f => f.name.toLowerCase().includes(q));
+  }, [rawFiles, searchQuery]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedFile, setSelectedFile] = useState<FileItem | null>(null);
@@ -786,6 +797,8 @@ export function useFileNavigation({
   return {
     // State
     files,
+    searchQuery,
+    setSearchQuery,
     isLoading,
     error,
     setError,
