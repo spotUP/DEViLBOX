@@ -116,6 +116,7 @@ export const DUB_MOVE_KINDS: Record<string, 'trigger' | 'hold'> = {
   combSweep:           'hold',   // bus.startCombSweep(...)
   versionDrop:         'hold',   // mute melodic channels, keep riddim
   skankEchoThrow:      'hold',   // dotted-delay floating echo on upbeat chord
+  riddimSection:       'hold',   // bass+drums breakdown with skank echo return
 };
 
 /**

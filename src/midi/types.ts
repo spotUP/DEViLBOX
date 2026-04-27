@@ -401,6 +401,7 @@ export type DubMoveParameter =
   | 'dub.combSweep'
   | 'dub.versionDrop'
   | 'dub.skankEchoThrow'
+  | 'dub.riddimSection'
   // Continuous bus settings
   | 'dub.echoIntensity'
   | 'dub.echoWet'

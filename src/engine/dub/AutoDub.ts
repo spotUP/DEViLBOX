@@ -104,6 +104,7 @@ const HARD_FIRES_PER_BAR_CAP = 3;
 const MOVE_COOLDOWNS: Record<string, number> = {
   // Phrase-structure moves — rare, don't repeat within a phrase
   versionDrop:        16,
+  riddimSection:      16,
   tapeStop:            8,
   masterDrop:          8,
   dubSiren:            8,
@@ -572,6 +573,18 @@ const RULES: Rule[] = [
   { moveId: 'versionDrop',
     condition: (c) => c.isNewBar && c.bar % 32 === 20 && c.intensity > 0.5,
     baseWeight: 0.14, holdBars: 4 },
+
+  // ── Riddim Section — bass+drums breakdown with skank echo return ──────────
+  // Per-persona config. Only fires when persona enables it, every N bars.
+  // Guarded by !inRiddimSection so the rule can't re-trigger itself mid-hold.
+  { moveId: 'riddimSection',
+    condition: (c) =>
+      c.isNewBar
+      && (c.persona.riddimConfig?.enabled ?? false)
+      && c.bar % (c.persona.riddimConfig?.freqBars ?? 16) === 0
+      && c.intensity > 0.35
+      && !c.inRiddimSection,
+    baseWeight: 0.60, holdBars: 4 },
 ];
 
 /** Unique move IDs Auto Dub can fire. Deduplicated from RULES — several
@@ -757,6 +770,29 @@ export function chooseMove(ctx: AutoDubTickCtx, rng: () => number): AutoDubChoic
       );
       if (liveCandidates.length === 0) continue;
       matchingChannels = liveCandidates;
+    }
+
+    // Riddim section guard: while a riddimSection hold is active, only
+    // bass- and percussion-targeted rules are eligible. Melodic-role rules
+    // are skipped entirely; 'any'-role rules have their channel candidates
+    // trimmed to bass/percussion channels so they stay in-genre.
+    if (ctx.inRiddimSection && rule.moveId !== 'riddimSection') {
+      const RIDDIM_ROLES = new Set<ChannelRole>(['percussion', 'bass']);
+      if (rule.channelRole && rule.channelRole !== 'any') {
+        // Rule explicitly targets a non-bass/percussion role — skip it
+        if (!RIDDIM_ROLES.has(rule.channelRole as ChannelRole)) continue;
+      } else if (rule.channelRole === 'any' && matchingChannels.length > 0 && ctx.roles.length > 0) {
+        // 'any'-role rule: restrict candidates to bass+percussion channels
+        const riddimCandidates = matchingChannels.filter(
+          ch => RIDDIM_ROLES.has(ctx.roles[ch] ?? 'empty'),
+        );
+        if (riddimCandidates.length === 0) continue;
+        matchingChannels = riddimCandidates;
+      } else if (!rule.channelRole) {
+        // Global (no channelRole) rules are still eligible — they don't
+        // target any channel, so they can still fire (e.g. tapeWobble,
+        // masterDrop). Keep them in the pool.
+      }
     }
 
     // Density bias: personas with densityBias != 0 steer rule firing
@@ -1185,10 +1221,16 @@ function tickImpl(): void {
 
   if (disposer) {
     _heldDisposers.add(disposer);
+    if (choice.moveId === 'riddimSection') {
+      _inRiddimSection = true;
+    }
     const holdMs = (60000 / bpm) * 4 * choice.holdBars;
     setTimeout(() => {
       try { disposer.dispose(); } catch { /* ok */ }
       _heldDisposers.delete(disposer);
+      if (choice.moveId === 'riddimSection') {
+        _inRiddimSection = false;
+      }
     }, holdMs);
   }
 }
