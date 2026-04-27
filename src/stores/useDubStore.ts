@@ -137,9 +137,9 @@ export const useDubStore = create<DubStore>((set) => ({
   autoDubMoveBlacklist: [],
   setAutoDubMoveBlacklist: (v) => set({ autoDubMoveBlacklist: v }),
   autoDubEqMode: 'both',
-  setAutoDubEqMode: (mode) => set((s) => ({ ...s, autoDubEqMode: mode })),
+  setAutoDubEqMode: (mode) => set({ autoDubEqMode: mode }),
   autoDubEqDepthMult: 1.0,
-  setAutoDubEqDepthMult: (v) => set((s) => ({ ...s, autoDubEqDepthMult: Math.max(0, Math.min(1, v)) })),
+  setAutoDubEqDepthMult: (v) => set({ autoDubEqDepthMult: Math.max(0, Math.min(1, v)) }),
   quantize: true,
   setQuantize: (v) => set({ quantize: v }),
 }));
