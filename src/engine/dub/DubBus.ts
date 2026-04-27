@@ -2255,6 +2255,11 @@ export class DubBus {
   /**
    * Unregister the SID dub send (called when SID engine stops).
    */
+  /** True when jsSID per-voice outputs are registered — false for websid
+   *  (combined output only). AutoDubPanel uses this to pick the right status
+   *  message instead of probing the internal channelTaps Map. */
+  hasSidPerVoiceTaps(): boolean { return this._sidHasPerVoiceTaps; }
+
   unregisterSidDubSend(): void {
     this._sidDubSendGain = null;
     this._sidChannelDubSends = [0, 0, 0];
