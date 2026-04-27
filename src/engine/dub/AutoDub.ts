@@ -1210,9 +1210,14 @@ function tickImpl(): void {
   if (!choice) return;
 
   _recordAutoDubFire(choice.moveId);
-  const adaptedParams = (choice.moveId === 'eqSweep' || choice.moveId === 'hpfRise')
+  let adaptedParams = (choice.moveId === 'eqSweep' || choice.moveId === 'hpfRise')
     ? adaptEQParams(choice.moveId, choice.params, _eqSnapshot, persona)
     : choice.params;
+  // For riddimSection, inject holdBars from persona config
+  if (choice.moveId === 'riddimSection') {
+    const holdBars = persona.riddimConfig?.holdBars ?? 4;
+    adaptedParams = { ...adaptedParams, holdBars };
+  }
   const disposer = fire(choice.moveId, choice.channelId, adaptedParams, 'live');
   _movesFiredThisBar += 1;
   if (choice.wet) _wetFiredThisBar += 1;

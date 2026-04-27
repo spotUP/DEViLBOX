@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-04-27T13:42:50.442Z
+ * Generated: 2026-04-27T14:17:38.245Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,9 +19,9 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.6296';
-export const BUILD_NUMBER = '6296';
-export const BUILD_HASH = '13e859b52';
+export const BUILD_VERSION = '1.0.6299';
+export const BUILD_NUMBER = '6299';
+export const BUILD_HASH = '47699cdc2';
 export const BUILD_DATE = '2026-04-27';
 
 // Full version (patch IS the build number, so no need to append)
@@ -30,9 +30,21 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.6296',
+    version: '1.0.6299',
     date: '2026-04-27',
     changes: [
+      {
+        type: 'improvement',
+        "description": "Delete DubLaneTimeline.tsx (replaced by AutomationLane dub.* support)"
+      },
+      {
+        type: 'feature',
+        "description": "DubDeckStrip — remove DubLaneTimeline, arm button clears dub curves"
+      },
+      {
+        type: 'feature',
+        "description": "UseProjectPersistence — migrate dubLane.events[] to automation curves on load"
+      },
       {
         type: 'feature',
         "description": "PatternEditorCanvas — MASTER_DUB_LANE_WIDTH slot + MasterDubLane render"
@@ -220,18 +232,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'fix',
         "description": "Sync transport speed display when Fxx effect fires during playback"
-      },
-      {
-        type: 'fix',
-        "description": "Persona hints in AutoDub panel, remove dead genre worker"
-      },
-      {
-        type: 'fix',
-        "description": "Classification follow-ups — shared model, CED Tier 3, dub refinements"
-      },
-      {
-        type: 'feature',
-        "description": "CED neural instrument/genre classification overhaul"
       }
     ]
   }
