@@ -62,9 +62,9 @@ export interface AutoDubPersona {
    *  Jammy = 3.0. Default 1.0 when not set. */
   minBarsBetweenFires?: number;
   /** EQ improv loop config. */
-  improvConfig?: import('@/types/dub').PersonaImprovConfig;
+  improvConfig: import('@/types/dub').PersonaImprovConfig;
   /** Riddim section (bass+drums breakdown) config. */
-  riddimConfig?: import('@/types/dub').PersonaRiddimConfig;
+  riddimConfig: import('@/types/dub').PersonaRiddimConfig;
 }
 
 export const AUTO_DUB_PERSONAS: Record<AutoDubPersonaId, AutoDubPersona> = {
@@ -78,6 +78,8 @@ export const AUTO_DUB_PERSONAS: Record<AutoDubPersonaId, AutoDubPersona> = {
     signatureMove: 'echoThrow',
     phraseArcShape: 'standard',
     minBarsBetweenFires: 1.0,
+    improvConfig: { driver: 'beat-sync', liveBands: [0, 3], depth: 4, rate: 1.0 },
+    riddimConfig: { enabled: true, freqBars: 16, holdBars: 4 },
   },
 
   tubby: {
@@ -123,6 +125,8 @@ export const AUTO_DUB_PERSONAS: Record<AutoDubPersonaId, AutoDubPersona> = {
     },
     variance: 0.0,
     signatureMove: 'hpfRise',
+    improvConfig: { driver: 'beat-sync', liveBands: [0, 3], depth: 4, rate: 1.0 },
+    riddimConfig: { enabled: true, freqBars: 16, holdBars: 4 },
   },
 
   scientist: {
@@ -165,6 +169,8 @@ export const AUTO_DUB_PERSONAS: Record<AutoDubPersonaId, AutoDubPersona> = {
     variance: 0.05,
     signatureMove: 'echoBuildUp',
     densityBias: 0.5,
+    improvConfig: { driver: 'spectral', liveBands: [2, 3], depth: 6, rate: 0.7 },
+    riddimConfig: { enabled: true, freqBars: 24, holdBars: 4 },
   },
 
   perry: {
@@ -207,6 +213,8 @@ export const AUTO_DUB_PERSONAS: Record<AutoDubPersonaId, AutoDubPersona> = {
     },
     variance: 0.35,
     signatureMove: 'springKick',
+    improvConfig: { driver: 'beat-sync', liveBands: [0], depth: 3, rate: 0.8 },
+    riddimConfig: { enabled: true, freqBars: 12, holdBars: 4 },
   },
 
   madProfessor: {
@@ -247,6 +255,8 @@ export const AUTO_DUB_PERSONAS: Record<AutoDubPersonaId, AutoDubPersona> = {
     variance: 0.05,
     signatureMove: 'ghostReverb',
     densityBias: 0.3,
+    improvConfig: { driver: 'energy-reactive', liveBands: [0, 1, 2, 3], depth: 12, rate: 1.4 },
+    riddimConfig: { enabled: true, freqBars: 8, holdBars: 8 },
   },
 
   jammy: {
@@ -292,6 +302,8 @@ export const AUTO_DUB_PERSONAS: Record<AutoDubPersonaId, AutoDubPersona> = {
     variance: 0.0,
     signatureMove: 'tapeStop',
     densityBias: -0.6,
+    improvConfig: { driver: 'spectral', liveBands: [1, 2], depth: 5, rate: 0.5 },
+    riddimConfig: { enabled: false, freqBars: 16, holdBars: 4 },
   },
 };
 
