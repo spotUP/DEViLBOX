@@ -443,11 +443,89 @@ function getQSoundEffectMapping(p: string): EffectMapping | null {
   return null;
 }
 
+// ── Dub Move Parameters ──────────────────────────────────────────────────────
+
+/**
+ * Effect mappings for dub.* automation parameters (dub moves).
+ * Values are always 0-1 normalized (same convention as all other mappings).
+ */
+function getDubEffectMapping(p: string): EffectMapping | null {
+  // dub.channelmute: value >= 0.5 → mute (vol=0), value < 0.5 → restore (vol=64)
+  if (p === 'dub.channelmute') {
+    return {
+      write: (cell, v, _prevValue, fmt) => {
+        const vol = v >= 0.5 ? 0 : 64;
+        if (hasVolumeColumn(fmt)) {
+          if (cell.volume === 0 || cell.volume === undefined) {
+            cell.volume = 0x10 + vol;
+            return true;
+          }
+        }
+        return writeEffect(cell, 12, vol, fmt);
+      },
+    };
+  }
+
+  // dub.channelthrow: value >= 0.5 → full-volume spike (vol=64)
+  if (p === 'dub.channelthrow') {
+    return {
+      write: (cell, v, _prevValue, fmt) => {
+        if (v < 0.5) return true; // no-op on release
+        if (hasVolumeColumn(fmt)) {
+          if (cell.volume === 0 || cell.volume === undefined) {
+            cell.volume = 0x10 + 64;
+            return true;
+          }
+        }
+        return writeEffect(cell, 12, 64, fmt);
+      },
+    };
+  }
+
+  // dub.echothrow / dub.skankechothrow: echo delay toggle (Exx in XM/IT/S3M; skip MOD)
+  if (p === 'dub.echothrow' || p === 'dub.skankechothrow') {
+    return {
+      write: (cell, v, _prevValue, fmt) => {
+        if (fmt.name === 'MOD') return false;
+        if (v < 0.5) return true; // no-op on release
+        return writeEffect(cell, 0x0e, 0x80, fmt);
+      },
+    };
+  }
+
+  // dub.echobuildup: ascending echo feedback E0x–EFx
+  if (p === 'dub.echobuildup') {
+    return {
+      write: (cell, v, _prevValue, fmt) => {
+        if (fmt.name === 'MOD') return false;
+        const nibble = norm(v, 15);
+        return writeEffect(cell, 0x0e, nibble, fmt);
+      },
+    };
+  }
+
+  // dub.eqsweep: Zxx filter cutoff (IT/S3M only, effect type 0x1A = 26)
+  if (p === 'dub.eqsweep') {
+    return {
+      write: (cell, v, _prevValue, fmt) => {
+        if (fmt.name !== 'IT' && fmt.name !== 'S3M') return false;
+        const cutoff = norm(v, 0x7f);
+        return writeEffect(cell, 0x1a, cutoff, fmt);
+      },
+    };
+  }
+
+  return null;
+}
+
 // ── Effect Mappings ─────────────────────────────────────────────────────────
 
 function getEffectMapping(param: string, format: FormatConstraints): EffectMapping | null {
   const p = param.toLowerCase();
   const chip = format.chipType;
+
+  // ── Dub move parameters ──────────────────────────────────────────────────
+  if (p.startsWith('dub.')) return getDubEffectMapping(p);
 
   // ── Chip-specific effects (Furnace format) ────────────────────────────
   if (chip) {
