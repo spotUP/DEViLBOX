@@ -188,6 +188,69 @@ export function synthTypeToInstrumentType(synthType: string): InstrumentType | n
     case 'MAMEMEA8000':
       return 'voice';
 
+    // ── Chiptune / WASM replayer synths — always synthesizer ─────────────────
+    // These WASM engines can't be rendered offline by SynthBaker; assign a
+    // deterministic type so the instrument list shows a tag immediately.
+    case 'C64SID':
+    case 'GTUltraSynth':
+    case 'SF2Synth':        // SID Factory II
+    case 'HivelySynth':
+    case 'SunVoxSynth':
+    case 'SunVoxModular':
+    case 'ModularSynth':
+    case 'KlysSynth':
+    case 'ChiptuneModule':
+    case 'ChipSynth':
+    case 'SidMonSynth':
+    case 'SidMon1Synth':
+    case 'FCSynth':
+    case 'FredSynth':
+    case 'FredEditorReplayerSynth':
+    case 'TFMXSynth':
+    case 'HippelCoSoSynth':
+    case 'SoundMonSynth':
+    case 'DigMugSynth':
+    case 'DeltaMusic1Synth':
+    case 'DeltaMusic2Synth':
+    case 'SonicArrangerSynth':
+    case 'InStereo2Synth':
+    case 'InStereo1Synth':
+    case 'JamCrackerSynth':
+    case 'PreTrackerSynth':
+    case 'FuturePlayerSynth':
+    case 'OctaMEDSynth':
+    case 'DavidWhittakerSynth':
+    case 'RobHubbardSynth':
+    case 'SteveTurnerSynth':
+    case 'SymphonieSynth':
+    case 'MusicLineSynth':
+    case 'Furnace':
+    case 'V2Synth':
+    case 'OidosSynth':
+    case 'WaveSabreSynth':
+    case 'TunefishSynth':
+    case 'SuperCollider':
+    case 'Sc68Synth':
+    case 'UADESynth':
+    case 'UADEEditableSynth':
+    case 'PluckSynth':
+    case 'HarmonicSynth':
+    case 'FMSynth':
+    case 'RaffoSynth':
+    case 'Odin2':
+    case 'SurgeXT':
+    case 'VASynth':
+    case 'AMSynth':
+    case 'WAMTinySynth':
+    case 'PWMSynth':
+    case 'SuperSaw':
+    case 'PolySynth':
+    case 'WobbleBass':  // already bass above — keep for symmetry
+    case 'Synth':
+    case 'MonoSynth':
+    case 'DuoSynth':
+      return 'synthesizer';
+
     // ── Ambiguous — let CED or SynthBaker decide ──────────────────────────────
     default:
       return null;

@@ -220,6 +220,22 @@ export const AutoDubPanel: React.FC<AutoDubPanelProps> = ({ busEnabled, open: op
         <span className="w-8 text-right text-text-secondary text-xs">{(intensity * 100).toFixed(0)}%</span>
       </div>
 
+      {/* Reset sends */}
+      <div className="border-t border-dark-border pt-2 pb-2 mb-2 flex items-center justify-between">
+        <span className="text-text-muted text-xs">Channel sends</span>
+        <button
+          type="button"
+          className="text-xs text-text-muted hover:text-accent-error transition-colors"
+          onClick={() => {
+            const { channels, setChannelDubSend } = useMixerStore.getState();
+            channels.forEach((_, i) => setChannelDubSend(i, 0));
+          }}
+          title="Clear all channel dub sends to 0"
+        >
+          Clear all
+        </button>
+      </div>
+
       {/* Move blacklist */}
       <div className="border-t border-dark-border pt-2">
         <div className="flex items-center justify-between mb-1.5">

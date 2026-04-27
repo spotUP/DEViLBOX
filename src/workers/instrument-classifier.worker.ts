@@ -5,9 +5,14 @@
  * instrument samples from their PCM data. Variable-length input: no tiling
  * needed, short samples work natively.
  *
+ * Also handles song-level genre classification (classify_genre) so both tasks
+ * share a single 86MB ONNX session rather than loading it twice.
+ *
  * Protocol:
  *   Main → Worker: { type: 'classify', id, instrumentId, pcm, sampleRate, name }
+ *   Main → Worker: { type: 'classify_genre', id, pcm, sampleRate }
  *   Worker → Main: { type: 'result', id, instrumentId, topLabels, instrumentType, confidence }
+ *   Worker → Main: { type: 'genre_result', id, scores: Float32Array }
  *   Worker → Main: { type: 'error', id, error }
  *   Worker → Main: { type: 'ready' }
  *   Worker → Main: { type: 'loading', progress }
@@ -40,6 +45,9 @@ const CACHE_NAME = 'instrument-classifier-ced-v1';
 
 // 2 seconds at 16kHz — enough context for the model, stays within WASM heap limits.
 const MIN_SAMPLES = 32000;
+// Song-level genre classification: 2s chunks spread across the song.
+const GENRE_CHUNK_SAMPLES = 32000;
+const GENRE_MAX_CHUNKS = 15;
 
 // ── State ─────────────────────────────────────────────────────────────────────
 let session: ort.InferenceSession | null = null;
@@ -172,6 +180,35 @@ self.addEventListener('message', async (e: MessageEvent) => {
       self.postMessage({ type: 'result', id, instrumentId, ...result });
     } catch (err) {
       self.postMessage({ type: 'error', id, instrumentId, error: String(err) });
+    }
+  }
+
+  // Song-level genre: process multiple chunks across the full audio and return
+  // averaged raw sigmoid scores for all 527 AudioSet classes. The main thread
+  // (genre-classifier.worker.ts) maps scores to genre/mood labels.
+  if (msg.type === 'classify_genre') {
+    const { id, pcm, sampleRate } = msg as { id: string; pcm: Float32Array; sampleRate: number };
+    try {
+      await ensureSession();
+      const audio = resampleTo16k(pcm, sampleRate);
+      const accumulated = new Float32Array(527);
+      let nChunks = 0;
+      const totalChunks = Math.floor(audio.length / GENRE_CHUNK_SAMPLES);
+      const startChunk = Math.max(0, Math.floor(totalChunks * 0.1)); // skip intro
+      const step = Math.max(1, Math.floor(totalChunks / GENRE_MAX_CHUNKS));
+      const inputName = session!.inputNames[0];
+      for (let c = startChunk; c < totalChunks && nChunks < GENRE_MAX_CHUNKS; c += step) {
+        const chunk = audio.slice(c * GENRE_CHUNK_SAMPLES, (c + 1) * GENRE_CHUNK_SAMPLES);
+        const tensor = new ort.Tensor('float32', chunk, [1, chunk.length]);
+        const out = await session!.run({ [inputName]: tensor });
+        const scores = out[session!.outputNames[0]].data as Float32Array;
+        for (let i = 0; i < 527; i++) accumulated[i] += scores[i];
+        nChunks++;
+      }
+      if (nChunks > 0) for (let i = 0; i < 527; i++) accumulated[i] /= nChunks;
+      self.postMessage({ type: 'genre_result', id, scores: accumulated });
+    } catch (err) {
+      self.postMessage({ type: 'error', id, error: String(err) });
     }
   }
 });
