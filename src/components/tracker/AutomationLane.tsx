@@ -9,6 +9,38 @@ import { useAutomationStore } from '@stores/useAutomationStore';
 import { useChannelAutomationParams } from '@hooks/useChannelAutomationParams';
 import type { AutomatableParamInfo } from '@hooks/useChannelAutomationParams';
 import { ChevronDown, ChevronUp, Trash2 } from 'lucide-react';
+import { MOVE_COLOR } from '@/engine/dub/moveColors';
+
+// Tailwind bg-* class → concrete CSS variable name.
+// MOVE_COLOR values are 'bg-accent-primary', 'bg-text-primary', etc.
+// Tailwind maps these to CSS vars that don't follow a simple 'bg-X → --color-X' rule.
+const TAILWIND_BG_TO_CSS_VAR: Record<string, string> = {
+  'accent-primary':   '--color-accent',
+  'accent-secondary': '--color-accent-secondary',
+  'accent-highlight': '--color-accent-highlight',
+  'accent-warning':   '--color-warning',
+  'accent-error':     '--color-error',
+  'accent-success':   '--color-success',
+  'text-primary':     '--color-text',
+  'text-secondary':   '--color-text-secondary',
+  'text-muted':       '--color-text-muted',
+};
+
+/** Convert 'dub.echoThrow' → 'Echo Throw' */
+function dubMoveLabel(parameter: string): string {
+  const moveId = parameter.slice(4); // strip 'dub.'
+  return moveId.replace(/([A-Z])/g, ' $1').replace(/^./, s => s.toUpperCase()).trim();
+}
+
+/** Map 'dub.echoThrow' to a CSS color string using MOVE_COLOR. */
+function dubMoveColor(parameter: string): string {
+  const moveId = parameter.slice(4); // strip 'dub.'
+  const cls = MOVE_COLOR[moveId] ?? 'bg-text-muted';
+  // Strip leading 'bg-' and trailing opacity suffix like '/70'
+  const tokenName = cls.replace(/^bg-/, '').replace(/\/\d+$/, '');
+  const cssVar = TAILWIND_BG_TO_CSS_VAR[tokenName] ?? '--color-text-muted';
+  return `var(${cssVar})`;
+}
 
 interface AutomationLaneProps {
   patternId: string;
@@ -66,6 +98,11 @@ export const AutomationLane: React.FC<AutomationLaneProps> = ({
   // Get parameter info
   const paramInfo: AutomatableParamInfo | undefined = params.find((p) => p.key === activeParameter);
 
+  // Dub-move overrides
+  const isDub = activeParameter.startsWith('dub.');
+  const resolvedColor = isDub ? dubMoveColor(activeParameter) : (paramInfo?.color ?? 'var(--color-synth-filter)');
+  const resolvedLabel = isDub ? dubMoveLabel(activeParameter) : (paramInfo?.shortLabel ?? activeParameter ?? '---');
+
   // Canvas dimensions
   const width = 200;
   const height = compact ? 32 : 60;
@@ -98,13 +135,14 @@ export const AutomationLane: React.FC<AutomationLaneProps> = ({
       ctx.stroke();
     }
 
-    // Resolve color — use CSS variable value or fallback
-    const color = paramInfo?.color ?? 'var(--color-synth-filter)';
-    // For canvas we need a concrete color; parse from CSS variable
-    const resolvedColor = getComputedColor(canvas, color);
+    // Resolve color — dub.* moves use MOVE_COLOR, others use paramInfo
+    const curveColor = getComputedColor(canvas, resolvedColor);
 
     if (activeCurve && activeCurve.points.length > 0) {
-      ctx.strokeStyle = resolvedColor;
+      // dub.* parameters always use steps mode regardless of stored curve.mode
+      const effectiveMode = activeCurve.parameter.startsWith('dub.') ? 'steps' : activeCurve.mode;
+
+      ctx.strokeStyle = curveColor;
       ctx.lineWidth = 2;
       ctx.beginPath();
 
@@ -112,13 +150,22 @@ export const AutomationLane: React.FC<AutomationLaneProps> = ({
         const x = (point.row / patternLength) * width;
         // Values are 0-1 normalized
         const y = height - point.value * height;
-        if (i === 0) ctx.moveTo(x, y);
-        else ctx.lineTo(x, y);
+        if (i === 0) {
+          ctx.moveTo(x, y);
+        } else if (effectiveMode === 'steps') {
+          // Step-connect: horizontal then vertical
+          const prevPoint = activeCurve.points[i - 1];
+          const prevY = height - prevPoint.value * height;
+          ctx.lineTo(x, prevY);
+          ctx.lineTo(x, y);
+        } else {
+          ctx.lineTo(x, y);
+        }
       });
       ctx.stroke();
 
       // Points
-      ctx.fillStyle = resolvedColor;
+      ctx.fillStyle = curveColor;
       activeCurve.points.forEach((point) => {
         const x = (point.row / patternLength) * width;
         const y = height - point.value * height;
@@ -134,7 +181,7 @@ export const AutomationLane: React.FC<AutomationLaneProps> = ({
       ctx.textAlign = 'center';
       ctx.fillText('Click to add points', width / 2, height / 2 + 4);
     }
-  }, [activeCurve, patternLength, width, height, paramInfo]);
+  }, [activeCurve, patternLength, width, height, resolvedColor]);
 
   // Handle canvas click
   const handleCanvasClick = useCallback(
@@ -191,9 +238,9 @@ export const AutomationLane: React.FC<AutomationLaneProps> = ({
           className="flex items-center gap-1 text-[10px] text-text-muted hover:text-text-primary"
         >
           <ChevronDown size={10} />
-          <span style={{ color: paramInfo?.color }}>{paramInfo?.shortLabel ?? '---'}</span>
+          <span style={{ color: resolvedColor }}>{resolvedLabel}</span>
           {activeCurve && activeCurve.points.length > 0 && (
-            <span className="w-2 h-2 rounded-full" style={{ backgroundColor: paramInfo?.color }} />
+            <span className="w-2 h-2 rounded-full" style={{ backgroundColor: resolvedColor }} />
           )}
         </button>
       </div>
@@ -219,9 +266,9 @@ export const AutomationLane: React.FC<AutomationLaneProps> = ({
             <button
               onClick={() => setShowParamMenu(!showParamMenu)}
               className="flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium transition-colors"
-              style={{ color: paramInfo?.color, backgroundColor: `${paramInfo?.color}20` }}
+              style={{ color: resolvedColor, backgroundColor: `${resolvedColor}20` }}
             >
-              {paramInfo?.shortLabel || activeParameter}
+              {resolvedLabel}
               <ChevronDown size={10} />
             </button>
 
