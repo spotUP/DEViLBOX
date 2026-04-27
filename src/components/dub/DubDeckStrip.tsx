@@ -1078,6 +1078,23 @@ export const DubDeckStrip: React.FC = () => {
         </button>
       </div>
 
+      {/* FX Wet — quick returnGain fader, always visible when bus is on */}
+      {busEnabled && (
+        <div className="flex items-center gap-2 px-1 py-1 border-b border-dark-border">
+          <span className="text-text-muted text-[9px] font-mono shrink-0 w-10 text-right">FX WET</span>
+          <input
+            type="range" min={0} max={1} step={0.01}
+            value={dubBusSettings.returnGain}
+            onChange={(e) => setDubBus({ returnGain: Number(e.target.value) })}
+            className="flex-1 accent-accent-highlight cursor-pointer"
+            title={`FX wet level: ${(dubBusSettings.returnGain * 100).toFixed(0)}%`}
+          />
+          <span className="text-text-secondary text-[9px] font-mono tabular-nums w-7 text-right shrink-0">
+            {(dubBusSettings.returnGain * 100).toFixed(0)}%
+          </span>
+        </div>
+      )}
+
       {/* Tab bar — only when strip is expanded */}
       {!stripCollapsed && (
         <div className="flex gap-0.5 border-b border-dark-border text-[10px] font-mono">
