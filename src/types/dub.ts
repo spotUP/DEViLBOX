@@ -359,7 +359,7 @@ export const DEFAULT_DUB_BUS: DubBusSettings = {
   // with it. DJ users who want the dub-trick HPF raise it via the Dub Bus
   // panel slider (20-600 Hz range).
   hpfCutoff: 40,
-  springWet: 0.55,       // was 0.4 — more audible spring tank character
+  springWet: 0.40,       // was 0.55
   echoIntensity: 0.62,   // was 0.55 — 4-5 repeats before decay
   echoWet: 0.5,          // 0.7 was too dominant — dark feedback LPF smeared the whole return.
                          // 0.5 keeps echo audible as accent without drowning clarity.
@@ -568,7 +568,7 @@ export const DUB_CHARACTER_PRESETS: Record<Exclude<DubBusSettings['characterPres
       echoIntensity:  0.65,   // more repeats — Tubby's signature multi-tap
       echoRateMs:     300,
       echoWet:        0.80,
-      springWet:      0.50,   // reduced from 0.60 — prevents echo+spring stacking
+      springWet:      0.38,   // reduced from 0.50
       sidechainAmount: 0.3,
       stereoWidth:    0.45,  // narrow — 4-track console + loose spring
       sweepAmount:    0,      // no flanger; Tubby's "sweep" was filter, not comb
@@ -621,7 +621,7 @@ export const DUB_CHARACTER_PRESETS: Record<Exclude<DubBusSettings['characterPres
       echoIntensity:  0.35,   // drier — Scientist's hallmark precision
       echoRateMs:     280,
       echoWet:        0.55,
-      springWet:      0.40,   // plate decays faster than spring; less wet
+      springWet:      0.30,   // plate decays faster than spring; less wet
       sidechainAmount: 0.7,   // more pumping to compensate for no bus comp
       stereoWidth:    1.4,
       sweepAmount:    0,
@@ -663,7 +663,7 @@ export const DUB_CHARACTER_PRESETS: Record<Exclude<DubBusSettings['characterPres
       echoRateMs:     380,
       echoSyncDivision: '1/4T', // research: Perry used triplet-feel echoes against the riddim
       echoWet:        0.80,
-      springWet:      0.38,   // was 0.55 — spring before echo was accumulating per repeat
+      springWet:      0.28,   // was 0.38
       sidechainAmount: 0.4,
       stereoWidth:    0.25,  // near-mono — Perry's defining texture
       // Perry had actual phasers (Mutron Bi-Phase, Eventide, MXR Phase 90)
@@ -722,7 +722,7 @@ export const DUB_CHARACTER_PRESETS: Record<Exclude<DubBusSettings['characterPres
       echoIntensity:  0.55,
       echoRateMs:     250,
       echoWet:        0.7,
-      springWet:      0.35,   // gated — short
+      springWet:      0.25,   // gated — short
       sidechainAmount: 0.5,
       stereoWidth:    1.3,
       sweepAmount:    0.65,   // heavy flanger on returns
@@ -762,7 +762,7 @@ export const DUB_CHARACTER_PRESETS: Record<Exclude<DubBusSettings['characterPres
       echoIntensity:  0.38,   // cleaner, fewer repeats
       echoRateMs:     360,
       echoWet:        0.55,
-      springWet:      0.68,   // lusher long springs
+      springWet:      0.50,   // lusher long springs (was 0.68)
       sidechainAmount: 0.5,
       stereoWidth:    1.9,    // ultra-wide Ariwa ping-pong
       sweepAmount:    0,
