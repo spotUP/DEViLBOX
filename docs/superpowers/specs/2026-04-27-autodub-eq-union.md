@@ -153,16 +153,64 @@ Visual feedback in EQ tab is automatic — `Fil4EqCurve` redraws whenever `retur
 
 ---
 
+## Riddim Section — Bass & Drums Breakdown
+
+The ultra-classic dub move: strip the mix to bass and drums for a phrase, play with them, then bring the skank back with tape reverb.
+
+### Behaviour
+
+1. **Drop** — on entering riddim section, `channelMute` fires on every channel with role `lead`, `chord`, `arpeggio`, or `pad`. The bus is now bass + drums only.
+2. **Play** — while in riddim section, AutoDub only targets channels with role `bass` or `percussion` for move selection. Echo throws, channel throws, and filter drops land on the rhythm section.
+3. **Skank return** — at `riddimSectionHoldBars × 0.6` bars in, AutoDub un-mutes exactly one `chord`-role channel (the skank) and immediately fires `echoThrow` on it. The skank enters soaked in tape reverb.
+4. **Full return** — at `riddimSectionHoldBars` bars, all remaining mutes release and the full mix returns.
+
+### New persona fields
+
+```typescript
+riddimSectionEnabled: boolean;       // whether this persona does breakdowns
+riddimSectionFreqBars: number;       // how often (every N bars). Default 16.
+riddimSectionHoldBars: number;       // how long the breakdown lasts. Default 4.
+```
+
+Default values per persona:
+| Persona | Enabled | Freq | Hold |
+|---|---|---|---|
+| Tubby | true | 16 | 4 |
+| Scientist | true | 24 | 4 |
+| Mad Professor | true | 8 | 8 |
+| Perry | true | 12 | 4 |
+| Jammy | false | — | — |
+
+Jammy is too sparse to benefit from a riddim section (there's already nothing there).
+
+### New move: `riddimSection`
+
+```typescript
+// src/engine/dub/moves/riddimSection.ts
+// kind: 'hold'
+// On fire: mute all non-bass/drum channels; schedule skank return at 60% of hold duration
+// On dispose: release all managed mutes
+```
+
+The move manages all internal disposers. It stores the muted-channel disposers and the skank-return timer. On dispose (when hold ends), it clears the timer and releases all remaining mutes.
+
+### AutoDub changes
+
+- New rule fires `riddimSection` when `c.isNewBar && c.bar % persona.riddimSectionFreqBars === 0 && c.intensity > 0.35 && persona.riddimSectionEnabled`
+- New `_inRiddimSection` flag set while the hold is active
+- When `_inRiddimSection`, `chooseMove` filters candidate channel IDs to `bass`/`percussion` roles only
+
 ## File Map
 
 | File | Change |
 |---|---|
-| `src/engine/dub/AutoDub.ts` | Add `EQSnapshot` type; populate `ctx.eqSnapshot` each tick; add `adaptEQParams()` pure function; add improv loop alongside existing move-firing loop |
-| `src/engine/dub/AutoDubPersonas.ts` | Add `improvConfig: PersonaImprovConfig` to each persona definition |
-| `src/engine/dub/moves/eqSweep.ts` | Read adapted params from ctx (passed through by AutoDub) |
+| `src/engine/dub/AutoDub.ts` | Add `EQSnapshot` type; populate `ctx.eqSnapshot` each tick; add `adaptEQParams()` pure function; add improv loop; add riddim rule + `_inRiddimSection` flag |
+| `src/engine/dub/AutoDubPersonas.ts` | Add `improvConfig: PersonaImprovConfig` + riddim fields to each persona |
+| `src/engine/dub/moves/eqSweep.ts` | Read adapted params from ctx |
 | `src/engine/dub/moves/hpfRise.ts` | Read adapted params from ctx |
+| `src/engine/dub/moves/riddimSection.ts` | **New** — bass & drums breakdown move |
 | `src/components/dub/AutoDubPanel.tsx` | Add EQ mode toggle, depth slider, driver badge |
-| `src/types/dub.ts` | Add `eqMode` to `AutoDubSettings`; add `PersonaImprovConfig` interface |
+| `src/types/dub.ts` | Add `eqMode`/`eqImprovDepthMult` to `AutoDubSettings`; add `PersonaImprovConfig` interface; add riddim fields to persona type |
 
 ---
 
@@ -189,3 +237,6 @@ Visual feedback in EQ tab is automatic — `Fil4EqCurve` redraws whenever `retur
 3. Switch to SWEEPS only — confirm improv breathing stops, eqSweep still fires
 4. Switch to OFF — confirm EQ is static, only AutoEQ baseline applies
 5. Load a song with no analysis yet — confirm eqSweep fires with persona hardcoded fallback values (no crash)
+6. Load `world class dub.mod`, set Tubby persona, play for 16 bars — confirm riddim section fires: lead/chord channels mute, only bass+drums audible, then skank returns wet with echo
+7. During riddim section, confirm AutoDub only fires moves on bass/drum channels (check automation lanes)
+8. Mad Professor at 8-bar frequency — riddim section fires more frequently, holds 8 bars
