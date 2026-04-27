@@ -98,6 +98,38 @@ export function adaptEQParams(
   return rawParams;
 }
 
+/**
+ * Compute the gain delta (dB) for the improv loop for a single tick.
+ * Pure function — no side effects.
+ *
+ * @param driver     Which modulation engine to use
+ * @param beatPhase  0–1 position within current beat
+ * @param energy     Current song energy 0–1
+ * @param prevEnergy Energy from previous tick (for energy-reactive delta)
+ * @param depth      Max modulation in dB
+ */
+export function computeImprovDelta(
+  driver: 'beat-sync' | 'energy-reactive' | 'spectral',
+  beatPhase: number,
+  energy: number,
+  prevEnergy: number,
+  depth: number,
+): number {
+  switch (driver) {
+    case 'beat-sync':
+      return Math.sin(beatPhase * 2 * Math.PI) * depth * energy;
+
+    case 'energy-reactive': {
+      const rawDelta = (energy - prevEnergy) * depth * 8;
+      return Math.max(-depth, Math.min(depth, rawDelta));
+    }
+
+    case 'spectral':
+      // Spectral is computed per-band inline in improvTick (needs frequency peak data).
+      return 0;
+  }
+}
+
 const TICK_MS = 250;
 const HARD_FIRES_PER_BAR_CAP = 3;
 /** Per-move cooldown table (bars). Moves not listed use DEFAULT_COOLDOWN_BARS. */
@@ -892,6 +924,10 @@ let _rng: () => number = Math.random;
 const _rollingPeaks: number[][] = [];
 let _eqSnapshot: EQSnapshot | null = null;
 let _inRiddimSection = false;
+let _improvTimer: ReturnType<typeof setInterval> | null = null;
+let _prevEnergy = 0;
+/** Per-band gain delta from improv loop (indices 0-3 = parametric bands P1-P4). */
+const _improvBandDeltas = [0, 0, 0, 0];
 
 function _makeFlatBaseline(): import('@/engine/effects/Fil4EqEffect').Fil4Params {
   return {
@@ -907,6 +943,112 @@ function _makeFlatBaseline(): import('@/engine/effects/Fil4EqEffect').Fil4Params
     ],
     masterGain: 1,
   };
+}
+
+function _applyImprovDeltas(): void {
+  try {
+    const dubBus = getActiveDubBus?.();
+    if (!dubBus) return;
+    const returnEQ = dubBus.getReturnEQ();
+    const baseline = returnEQ.getParams();
+    for (let i = 0; i < 4; i++) {
+      const b = baseline.p[i];
+      if (!b) continue;
+      returnEQ.setBand(i, b.enabled, b.freq, b.bw, b.gain + _improvBandDeltas[i]);
+    }
+  } catch { /* ok */ }
+}
+
+function improvTick(): void {
+  const dub = useDubStore.getState();
+  const eqMode = dub.autoDubEqMode ?? 'both';
+  if (eqMode === 'off' || eqMode === 'collaborative') {
+    // No improv — ramp deltas toward zero this tick
+    let changed = false;
+    for (let i = 0; i < 4; i++) {
+      if (Math.abs(_improvBandDeltas[i]) > 0.01) {
+        _improvBandDeltas[i] *= 0.85; // exponential decay
+        changed = true;
+      } else {
+        _improvBandDeltas[i] = 0;
+      }
+    }
+    if (changed) _applyImprovDeltas();
+    return;
+  }
+
+  const snapshot = _eqSnapshot;
+  if (!snapshot) return;
+
+  const persona = getPersona(dub.autoDubPersona);
+  const cfg = persona.improvConfig;
+  if (!cfg) return;
+
+  const depthMult = dub.autoDubEqDepthMult ?? 1.0;
+  const effectiveDepth = cfg.depth * depthMult;
+  const { energy, beatPhase, frequencyPeaks } = snapshot;
+
+  for (const bandIdx of cfg.liveBands) {
+    if (bandIdx < 0 || bandIdx > 3) continue;
+    const baseline = snapshot.baseline.p[bandIdx];
+    if (!baseline) continue;
+
+    let delta: number;
+
+    if (cfg.driver === 'spectral') {
+      // Find frequency peak nearest this band's center frequency
+      const bandFreq = baseline.freq;
+      if (frequencyPeaks.length === 0) {
+        delta = 0;
+      } else {
+        const nearest = frequencyPeaks.reduce(
+          (best, p) => Math.abs(p[0] - bandFreq) < Math.abs(best[0] - bandFreq) ? p : best,
+          frequencyPeaks[0],
+        );
+        const peakAboveBaseline = nearest[1] - baseline.gain;
+        delta = peakAboveBaseline > 3
+          ? -effectiveDepth * 0.4  // Problem frequency: gentle cut
+          : effectiveDepth * 0.3;  // Sweet spot: gentle boost
+      }
+    } else {
+      delta = computeImprovDelta(cfg.driver, beatPhase, energy, _prevEnergy, effectiveDepth);
+    }
+
+    _improvBandDeltas[bandIdx] = Math.max(-effectiveDepth, Math.min(effectiveDepth, delta));
+  }
+
+  _prevEnergy = energy;
+  _applyImprovDeltas();
+}
+
+function _rampBandsToBaseline(): void {
+  // Exponential decay to zero over ~200ms
+  const timer = setInterval(() => {
+    let allZero = true;
+    for (let i = 0; i < 4; i++) {
+      _improvBandDeltas[i] *= 0.7;
+      if (Math.abs(_improvBandDeltas[i]) > 0.01) allZero = false;
+      else _improvBandDeltas[i] = 0;
+    }
+    _applyImprovDeltas();
+    if (allZero) clearInterval(timer);
+  }, 20);
+}
+
+function startImprovLoop(): void {
+  if (_improvTimer !== null) return;
+  const persona = getPersona(useDubStore.getState().autoDubPersona);
+  const rate = persona.improvConfig?.rate ?? 1.0;
+  const cadenceMs = Math.max(50, Math.round(250 / rate));
+  _improvTimer = setInterval(improvTick, cadenceMs);
+}
+
+function stopImprovLoop(): void {
+  if (_improvTimer !== null) {
+    clearInterval(_improvTimer);
+    _improvTimer = null;
+  }
+  _rampBandsToBaseline();
 }
 
 function getChannelCount(): number {
@@ -1255,11 +1397,14 @@ export function startAutoDub(): void {
   // stale classifications don't bleed into a fresh bundle. The classifier
   // needs ~2 s of live audio to refill before it starts voting again.
   resetRuntimeChannelClassifier();
+  _prevEnergy = 0;
   _timer = setInterval(tickImpl, TICK_MS);
+  startImprovLoop();
 }
 
 /** Stop the loop AND dispose every currently-held move — the panic off. */
 export function stopAutoDub(): void {
+  stopImprovLoop();
   if (_timer !== null) {
     clearInterval(_timer);
     _timer = null;

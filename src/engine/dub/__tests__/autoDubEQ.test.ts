@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { adaptEQParams } from '../AutoDub';
+import { adaptEQParams, computeImprovDelta } from '../AutoDub';
 import type { EQSnapshot } from '../AutoDub';
 import type { AutoDubPersona } from '../AutoDubPersonas';
 
@@ -113,5 +113,45 @@ describe('adaptEQParams — hpfRise', () => {
     const raw = { peakHz: 3000, holdMs: 800 };
     const out = adaptEQParams('hpfRise', raw, null, PERSONA_STUB);
     expect(out).toEqual(raw);
+  });
+});
+
+describe('computeImprovDelta', () => {
+  it('beat-sync at beatPhase=0.25 (sin(π/2)=1): delta = 1.0 × depth × energy', () => {
+    const delta = computeImprovDelta('beat-sync', 0.25, 0.8, 0.0, 8);
+    // sin(0.25 × 2π) = sin(π/2) = 1.0 → 1.0 × 8 × 0.8 = 6.4
+    expect(delta).toBeCloseTo(1.0 * 8 * 0.8, 1);
+  });
+
+  it('beat-sync at beatPhase=0: delta ≈ 0', () => {
+    const delta = computeImprovDelta('beat-sync', 0, 0.8, 0.0, 8);
+    expect(Math.abs(delta)).toBeLessThan(0.1);
+  });
+
+  it('beat-sync at beatPhase=0.5 (sin(π)=0): delta ≈ 0', () => {
+    const delta = computeImprovDelta('beat-sync', 0.5, 0.8, 0.0, 8);
+    expect(Math.abs(delta)).toBeLessThan(0.1);
+  });
+
+  it('beat-sync: negative at beatPhase=0.75 (sin(3π/2)=-1)', () => {
+    const delta = computeImprovDelta('beat-sync', 0.75, 0.8, 0.0, 8);
+    expect(delta).toBeLessThan(0);
+  });
+
+  it('energy-reactive: positive delta on energy rise', () => {
+    const delta = computeImprovDelta('energy-reactive', 0.5, 0.8, 0.4, 8);
+    // energyDelta = 0.4 → positive
+    expect(delta).toBeGreaterThan(0);
+  });
+
+  it('energy-reactive: clamped to [-depth, +depth]', () => {
+    const delta = computeImprovDelta('energy-reactive', 0.5, 1.0, 0.0, 6);
+    expect(delta).toBeLessThanOrEqual(6);
+    expect(delta).toBeGreaterThanOrEqual(-6);
+  });
+
+  it('spectral: returns 0 (spectral is per-band, computed in loop)', () => {
+    const delta = computeImprovDelta('spectral', 0.5, 0.8, 0.8, 6);
+    expect(delta).toBe(0);
   });
 });
