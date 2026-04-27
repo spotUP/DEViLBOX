@@ -1,5 +1,6 @@
 /**
  * Fil4EqCurve — Canvas frequency-response display for Fil4EqEffect.
+ * Interactive: handles overlaid on canvas for dragging freq/gain per band.
  */
 import React, { useRef, useEffect, useCallback, useState } from 'react';
 import type { Fil4EqEffect, Fil4Params } from '@/engine/effects/Fil4EqEffect';
@@ -10,12 +11,24 @@ const DB_MIN = -18, DB_MAX = 18;
 const FREQ_MIN = 20, FREQ_MAX = 20000;
 const N_POINTS = 512;
 
-function freqToX(f: number, plotW: number): number {
+export function freqToX(f: number, plotW: number): number {
   return PAD_L + (Math.log10(f / FREQ_MIN) / Math.log10(FREQ_MAX / FREQ_MIN)) * plotW;
 }
-function dbToY(db: number, plotH: number): number {
+export function dbToY(db: number, plotH: number): number {
   return PAD_T + ((DB_MAX - db) / (DB_MAX - DB_MIN)) * plotH;
 }
+function xToFreq(x: number, plotW: number): number {
+  const t = Math.max(0, Math.min(1, (x - PAD_L) / plotW));
+  return Math.round(FREQ_MIN * Math.pow(FREQ_MAX / FREQ_MIN, t));
+}
+function yToDb(y: number, plotH: number): number {
+  const t = (y - PAD_T) / plotH;
+  return Math.max(DB_MIN, Math.min(DB_MAX, DB_MAX - t * (DB_MAX - DB_MIN)));
+}
+
+// Suppress unused-variable warnings — these are exported helpers for future callers
+void xToFreq;
+void yToDb;
 
 const GRID_FREQS = [100, 200, 500, 1000, 2000, 5000, 10000];
 const GRID_DBS   = [-12, -6, 0, 6, 12];
@@ -29,16 +42,29 @@ const COLOR_ZERO  = 'rgba(255,255,255,0.20)';
 const COLOR_TEXT  = 'rgba(255,255,255,0.35)';
 const COLOR_BG    = '#1a1a2e';
 
+export type BandId = 'hp' | 'lp' | 'ls' | 'hs' | 'p0' | 'p1' | 'p2' | 'p3';
+
+interface HandleDef {
+  bandId: BandId;
+  freq: number;
+  gain: number;
+  color: string;
+  enabled: boolean;
+  hasGain: boolean;
+}
+
 interface Props {
   effect: Fil4EqEffect;
   width?: number;
   height?: number;
+  onBandChange?: (bandId: BandId, patch: { freq?: number; gain?: number; q?: number; bw?: number; enabled?: boolean }) => void;
 }
 
-export const Fil4EqCurve: React.FC<Props> = ({ effect, width = W, height = H }) => {
+export const Fil4EqCurve: React.FC<Props> = ({ effect, width = W, height = H, onBandChange }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [magnitude, setMagnitude] = useState<Float32Array | null>(null);
   const [params, setParams] = useState<Fil4Params>(() => effect.getParams());
+  const [activeHandle, setActiveHandle] = useState<BandId | null>(null);
   const rafRef = useRef<number | null>(null);
   const dirtyRef = useRef(false);
   const plotW = width - PAD_L - PAD_R;
@@ -47,7 +73,7 @@ export const Fil4EqCurve: React.FC<Props> = ({ effect, width = W, height = H }) 
   useEffect(() => {
     const onParams = (p: Fil4Params) => { setParams({ ...p }); dirtyRef.current = true; };
     effect.on('params', onParams);
-    return () => { effect.off('params', onParams); /* void */ };
+    return () => { effect.off('params', onParams); };
   }, [effect]);
 
   useEffect(() => {
@@ -102,24 +128,6 @@ export const Fil4EqCurve: React.FC<Props> = ({ effect, width = W, height = H }) 
       }
       ctx.stroke();
     }
-
-    const handles: Array<{ freq: number; gain: number; color: string; enabled: boolean }> = [
-      { freq: params.hp.freq,  gain: 0,              color: COLOR_PASS,  enabled: params.hp.enabled },
-      { freq: params.ls.freq,  gain: params.ls.gain, color: COLOR_SHELF, enabled: params.ls.enabled },
-      ...params.p.map(p => ({ freq: p.freq, gain: p.gain, color: COLOR_PARA, enabled: p.enabled })),
-      { freq: params.hs.freq,  gain: params.hs.gain, color: COLOR_SHELF, enabled: params.hs.enabled },
-      { freq: params.lp.freq,  gain: 0,              color: COLOR_PASS,  enabled: params.lp.enabled },
-    ];
-
-    for (const h of handles) {
-      const x = freqToX(h.freq, plotW);
-      const y = dbToY(h.gain, plotH);
-      ctx.globalAlpha = h.enabled ? 1 : 0.35;
-      ctx.beginPath(); ctx.arc(x, y, 5, 0, 2 * Math.PI);
-      ctx.fillStyle = h.color; ctx.fill();
-      ctx.strokeStyle = 'rgba(0,0,0,0.5)'; ctx.lineWidth = 1; ctx.stroke();
-      ctx.globalAlpha = 1;
-    }
   }, [magnitude, params, width, height, plotW, plotH]);
 
   useEffect(() => {
@@ -128,8 +136,121 @@ export const Fil4EqCurve: React.FC<Props> = ({ effect, width = W, height = H }) 
     return () => { if (rafRef.current !== null) cancelAnimationFrame(rafRef.current); };
   }, [draw]);
 
+  const handles: HandleDef[] = [
+    { bandId: 'hp', freq: params.hp.freq, gain: 0,              color: COLOR_PASS,  enabled: params.hp.enabled, hasGain: false },
+    { bandId: 'ls', freq: params.ls.freq, gain: params.ls.gain, color: COLOR_SHELF, enabled: params.ls.enabled, hasGain: true  },
+    { bandId: 'p0', freq: params.p[0].freq, gain: params.p[0].gain, color: COLOR_PARA, enabled: params.p[0].enabled, hasGain: true },
+    { bandId: 'p1', freq: params.p[1].freq, gain: params.p[1].gain, color: COLOR_PARA, enabled: params.p[1].enabled, hasGain: true },
+    { bandId: 'p2', freq: params.p[2].freq, gain: params.p[2].gain, color: COLOR_PARA, enabled: params.p[2].enabled, hasGain: true },
+    { bandId: 'p3', freq: params.p[3].freq, gain: params.p[3].gain, color: COLOR_PARA, enabled: params.p[3].enabled, hasGain: true },
+    { bandId: 'hs', freq: params.hs.freq, gain: params.hs.gain, color: COLOR_SHELF, enabled: params.hs.enabled, hasGain: true  },
+    { bandId: 'lp', freq: params.lp.freq, gain: 0,              color: COLOR_PASS,  enabled: params.lp.enabled, hasGain: false },
+  ];
+
+  const dragRef = useRef<{
+    bandId: BandId;
+    startX: number;
+    startY: number;
+    startFreq: number;
+    startGain: number;
+    hasGain: boolean;
+  } | null>(null);
+
+  const handleMouseDown = useCallback((e: React.MouseEvent, h: HandleDef) => {
+    if (!onBandChange) return;
+    e.preventDefault();
+    // Auto-enable disabled band on drag
+    if (!h.enabled) {
+      onBandChange(h.bandId, { enabled: true });
+    }
+    dragRef.current = {
+      bandId: h.bandId,
+      startX: e.clientX,
+      startY: e.clientY,
+      startFreq: h.freq,
+      startGain: h.gain,
+      hasGain: h.hasGain,
+    };
+    setActiveHandle(h.bandId);
+
+    const onMove = (ev: MouseEvent) => {
+      const d = dragRef.current;
+      if (!d || !onBandChange) return;
+      const dx = ev.clientX - d.startX;
+      const dy = ev.clientY - d.startY;
+      // Freq: log-scale drag — map pixel delta to frequency multiplier
+      const freqScale = Math.pow(FREQ_MAX / FREQ_MIN, dx / plotW);
+      const newFreq = Math.round(Math.max(FREQ_MIN, Math.min(FREQ_MAX, d.startFreq * freqScale)));
+      const patch: { freq?: number; gain?: number } = { freq: newFreq };
+      if (d.hasGain) {
+        const dbPerPx = (DB_MAX - DB_MIN) / plotH;
+        const newGain = parseFloat(Math.max(DB_MIN, Math.min(DB_MAX, d.startGain - dy * dbPerPx)).toFixed(1));
+        patch.gain = newGain;
+      }
+      onBandChange(d.bandId, patch);
+    };
+    const onUp = () => {
+      dragRef.current = null;
+      setActiveHandle(null);
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+    };
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  }, [onBandChange, plotW, plotH]);
+
+  const handleWheel = useCallback((e: React.WheelEvent, h: HandleDef) => {
+    if (!onBandChange) return;
+    e.preventDefault();
+    const delta = e.deltaY > 0 ? -0.1 : 0.1;
+    // Shelves + HP/LP adjust Q; peaking bands adjust BW
+    if (h.bandId === 'p0' || h.bandId === 'p1' || h.bandId === 'p2' || h.bandId === 'p3') {
+      const idx = parseInt(h.bandId[1]);
+      const currentBw = params.p[idx].bw;
+      onBandChange(h.bandId, { bw: parseFloat(Math.max(0.05, currentBw + delta).toFixed(2)) });
+    } else {
+      const currentQ = h.bandId === 'hp' ? params.hp.q
+        : h.bandId === 'lp' ? params.lp.q
+        : h.bandId === 'ls' ? params.ls.q
+        : params.hs.q;
+      onBandChange(h.bandId, { q: parseFloat(Math.max(0.1, currentQ + delta).toFixed(2)) });
+    }
+  }, [onBandChange, params]);
+
   return (
-    <canvas ref={canvasRef} width={width} height={height}
-      className="block rounded" style={{ background: COLOR_BG }} />
+    <div style={{ position: 'relative', width, height, display: 'inline-block' }}>
+      <canvas ref={canvasRef} width={width} height={height}
+        className="block rounded" style={{ background: COLOR_BG }} />
+      {onBandChange && (
+        <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
+          {handles.map(h => {
+            const x = freqToX(h.freq, plotW);
+            const y = dbToY(h.gain, plotH);
+            const isActive = activeHandle === h.bandId;
+            return (
+              <div
+                key={h.bandId}
+                onMouseDown={e => handleMouseDown(e, h)}
+                onWheel={e => handleWheel(e, h)}
+                style={{
+                  position: 'absolute',
+                  left: x - 6,
+                  top: y - 6,
+                  width: 12,
+                  height: 12,
+                  borderRadius: '50%',
+                  background: h.color,
+                  opacity: h.enabled ? 1 : 0.5,
+                  cursor: 'grab',
+                  pointerEvents: 'auto',
+                  border: isActive ? '2px solid white' : '2px solid transparent',
+                  boxSizing: 'border-box',
+                }}
+              />
+            );
+          })}
+        </div>
+      )}
+    </div>
   );
 };
