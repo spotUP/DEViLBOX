@@ -22,10 +22,13 @@ import { DJSetRecordButton } from '@/components/dj/DJSetRecordButton';
 import { DJMicControl } from '@/components/dj/DJMicControl';
 import { DJVideoExport } from '@/components/dj/DJVideoExport';
 import { DJStreamControl } from '@/components/dj/DJStreamControl';
+import { useDrumPadStore } from '@/stores/useDrumPadStore';
 
 export const DJMixer: React.FC = () => {
   const thirdDeck = useDJStore((s) => s.thirdDeckActive);
   const [showBroadcast, setShowBroadcast] = useState(false);
+  const dubBusEnabled = useDrumPadStore((s) => s.dubBus.enabled);
+  const returnGain    = useDrumPadStore((s) => s.dubBus.returnGain);
 
   return (
     <div
@@ -87,6 +90,28 @@ export const DJMixer: React.FC = () => {
       <div className="w-full border-b border-dark-border pb-2">
         <MixerTransition />
       </div>
+
+      {/* Row 3.5: FX Wet — master dub bus return level, visible when bus is on */}
+      {dubBusEnabled && (
+        <div className="flex items-center gap-2 w-full border-b border-dark-border pb-2">
+          <span className="text-text-muted text-[9px] font-mono shrink-0 w-10 text-right">FX WET</span>
+          <input
+            type="range"
+            min={0}
+            max={1}
+            step={0.01}
+            value={returnGain}
+            onChange={(e) =>
+              useDrumPadStore.getState().setDubBus({ returnGain: Number(e.target.value) })
+            }
+            className="flex-1 accent-accent-highlight cursor-pointer"
+            title={`FX wet level: ${(returnGain * 100).toFixed(0)}%`}
+          />
+          <span className="text-text-secondary text-[9px] font-mono tabular-nums w-7 text-right shrink-0">
+            {(returnGain * 100).toFixed(0)}%
+          </span>
+        </div>
+      )}
 
       {/* Row 4: Master + Cue */}
       <div className="flex items-center justify-center gap-2 w-full">
