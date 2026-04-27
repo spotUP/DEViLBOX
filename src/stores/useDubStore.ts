@@ -80,6 +80,12 @@ interface DubStore {
   /** Move ids the user never wants fired. UI is a chip row. */
   autoDubMoveBlacklist: string[];
   setAutoDubMoveBlacklist: (v: string[]) => void;
+  /** EQ intelligence mode for Auto Dub. */
+  autoDubEqMode: 'off' | 'collaborative' | 'improv' | 'both';
+  setAutoDubEqMode: (mode: 'off' | 'collaborative' | 'improv' | 'both') => void;
+  /** Scales the EQ depth applied by Auto Dub. 0–1. */
+  autoDubEqDepthMult: number;
+  setAutoDubEqDepthMult: (v: number) => void;
 
   /** Quantize — when on, dub move fire/release events are snapped to the
    *  nearest row boundary for cleaner lane recordings. Audio fires
@@ -130,6 +136,10 @@ export const useDubStore = create<DubStore>((set) => ({
   setAutoDubPersona: (v) => set({ autoDubPersona: v }),
   autoDubMoveBlacklist: [],
   setAutoDubMoveBlacklist: (v) => set({ autoDubMoveBlacklist: v }),
+  autoDubEqMode: 'both',
+  setAutoDubEqMode: (mode) => set((s) => ({ ...s, autoDubEqMode: mode })),
+  autoDubEqDepthMult: 1.0,
+  setAutoDubEqDepthMult: (v) => set((s) => ({ ...s, autoDubEqDepthMult: Math.max(0, Math.min(1, v)) })),
   quantize: true,
   setQuantize: (v) => set({ quantize: v }),
 }));
