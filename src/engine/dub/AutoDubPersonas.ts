@@ -61,6 +61,10 @@ export interface AutoDubPersona {
    *  so moves don't stack on every tick. Persona-specific: Perry = 0.25,
    *  Jammy = 3.0. Default 1.0 when not set. */
   minBarsBetweenFires?: number;
+  /** EQ improv loop config. */
+  improvConfig?: import('@/types/dub').PersonaImprovConfig;
+  /** Riddim section (bass+drums breakdown) config. */
+  riddimConfig?: import('@/types/dub').PersonaRiddimConfig;
 }
 
 export const AUTO_DUB_PERSONAS: Record<AutoDubPersonaId, AutoDubPersona> = {

@@ -40,6 +40,17 @@ import { getActiveC64SidEngine } from '@engine/replayer/NativeEngineRouting';
 import type { Pattern } from '@/types/tracker';
 import type { InstrumentConfig } from '@/types/instrument/defaults';
 
+/** Live analysis context injected into every tick. Null until analysis has run. */
+export interface EQSnapshot {
+  genre: string;
+  energy: number;           // 0–1
+  danceability: number;     // 0–1
+  bpm: number;
+  beatPhase: number;        // 0–1, position within current beat
+  frequencyPeaks: [number, number][];  // [[hz, db], ...] sorted by magnitude desc
+  baseline: import('@/engine/effects/Fil4EqEffect').Fil4Params;
+}
+
 const TICK_MS = 250;
 const HARD_FIRES_PER_BAR_CAP = 3;
 /** Per-move cooldown table (bars). Moves not listed use DEFAULT_COOLDOWN_BARS. */
@@ -564,6 +575,10 @@ export interface AutoDubTickCtx {
   /** Bar of the last move fired by ANY rule this session. Used to enforce the
    *  persona's `minBarsBetweenFires` breathing room between gestures. */
   lastGlobalFireBar: number;
+  /** Live EQ analysis snapshot. Null when no analysis has run yet. */
+  eqSnapshot: EQSnapshot | null;
+  /** True while a riddimSection hold is active — restricts channel picks to bass/percussion. */
+  inRiddimSection: boolean;
 }
 
 export interface AutoDubChoice {
@@ -1062,6 +1077,8 @@ function tickImpl(): void {
     densityByRole,
     phraseIntensityMult,
     lastGlobalFireBar: _lastGlobalFireBar,
+    eqSnapshot: null,
+    inRiddimSection: false,
   }, _rng);
 
   if (!choice) return;

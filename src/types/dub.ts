@@ -797,6 +797,28 @@ export const DUB_CHARACTER_PRESETS: Record<Exclude<DubBusSettings['characterPres
   },
 };
 
+// ── AutoDub EQ Union ─────────────────────────────────────────────────────
+
+export interface PersonaImprovConfig {
+  /** Which analysis signal drives the continuous EQ loop. */
+  driver: 'beat-sync' | 'energy-reactive' | 'spectral';
+  /** Which Fil4 parametric bands (0-3) the loop may modulate. */
+  liveBands: number[];
+  /** Maximum gain delta in dB the loop can apply above/below baseline. */
+  depth: number;
+  /** Loop cadence multiplier. 1.0 = 250 ms base. */
+  rate: number;
+}
+
+export interface PersonaRiddimConfig {
+  /** Whether this persona performs bass+drums breakdowns. */
+  enabled: boolean;
+  /** How often the breakdown fires (every N bars). */
+  freqBars: number;
+  /** How long the breakdown lasts (bars). */
+  holdBars: number;
+}
+
 // ─── Phase 1: dub lane + event types ──────────────────────────────────────
 // Per-pattern automation: dub moves performed live (or written offline in
 // the lane editor) are serialised as DubEvents and replayed by DubLanePlayer
