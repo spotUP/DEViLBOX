@@ -89,7 +89,9 @@ describe('DubRecorder — automation store write path', () => {
     const curve = curves.find(c => c.parameter === 'dub.echoThrow');
     expect(curve).toBeDefined();
     expect(curve!.points.some(p => p.row === 12 && p.value === 1)).toBe(true);
-    expect(curve!.points.some(p => p.value === 0)).toBe(true);
+    const spikePoint = curve!.points.find(p => p.value === 0);
+    expect(spikePoint).toBeDefined();
+    expect(spikePoint!.row).toBeCloseTo(12 + 0.05, 3);
   });
 
   it('per-channel move uses channelIndex = event.channelId', () => {
