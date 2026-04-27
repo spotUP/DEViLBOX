@@ -19,7 +19,10 @@ The auto-EQ fires once per song analysis and re-fires when the song changes. The
 
 ```
 Channel sends
-  → [NeuralEnhancer, inserted if lo-fi sources detected]
+  → [DC Offset Removal + Denoise, offline on sample buffers if 8-bit detected]
+  → [NeuralEnhancer AudioWorklet, real-time if 8-bit detected]
+  → Spectral Exciter (real-time, all sources, gentle harmonic brightening)
+  → Transient Sharpening (real-time, all sources, punch/snap)
   → HPF → TapeSat → Echo / Spring → Fil4 return EQ (auto-EQ applied here)
   → Return gain → Master
 ```
@@ -29,10 +32,11 @@ Channel sends
 ## File Layout
 
 ```
-src/engine/dub/AutoEQ.ts          # New — pure computeAutoEQ() function + genre maps
-src/engine/dub/DubBus.ts          # Modify — subscribe to analysis store, apply auto-EQ + enhancer
-src/types/dub.ts                  # Modify — autoEqStrength, autoEqLastGenre fields
-src/components/effects/Fil4EqPanel.tsx  # Modify — slim info bar above curve
+src/engine/dub/AutoEQ.ts               # New — computeAutoEQ() + genre maps + spectral + detectLoFi
+src/engine/dub/DubBusEnhancer.ts       # New — offline DC+denoise pipeline + real-time exciter/sharpener worklets
+src/engine/dub/DubBus.ts               # Modify — subscribe to analysis store, apply auto-EQ + enhancer chain
+src/types/dub.ts                       # Modify — autoEqStrength, autoEqLastGenre
+src/components/effects/Fil4EqPanel.tsx # Modify — slim info bar above curve
 ```
 
 ---
@@ -95,7 +99,7 @@ The spectral stage primarily affects P1–P4 parametric bands; HP/shelves come f
 
 ---
 
-## Stage 4 — Neural Enhancement (lo-fi sources)
+## Stage 4 — Lo-fi Restoration + Signal Enhancement
 
 `detectLoFiSources(editorMode, instruments) → boolean`
 
@@ -103,9 +107,20 @@ Detection — either condition triggers enhancement:
 1. `editorMode` is a chip format: `c64sid`, `sidfactory2`, `cheesecutter`, `goattracker`, `furnace` (with chip chips), `hively`, `klys`, `sc68`, `uade`, or any format in the chip-dump group (`NSF`, `SID`, `SAP`, `VGM`, `YM`)
 2. Any instrument has `synthType` in the deterministic lo-fi set: `C64SID`, `GTUltraSynth`, `SF2Synth`, `HivelySynth`, `KlysSynth`, `ChipSynth`, `SidMonSynth`, `SidMon1Synth`, `FCSynth`, `FredSynth`, `TFMXSynth`, `Furnace`, `ChiptuneModule`, and other WASM replayer types from `synthTypeToInstrumentType()` → `'synthesizer'`
 
-**Application:** Insert a `NeuralEffectWrapper` using the existing sample-upscaling neural model into the dub bus input node (before the HPF) when lo-fi is detected. Remove it when not needed. Zero-overhead passthrough when inactive.
+**4a — DC Offset Removal (offline, 8-bit only):**
+When lo-fi sources detected, run `WaveformProcessor.removeDCOffset()` (src/lib/audio/WaveformProcessor.ts:343) on each affected instrument's sample buffer at song load / dub bus enable. Applied once, result cached in instrument store. Removes the thump/click DC bias common in chip audio.
 
-The neural model index for sample enhancement is sourced from `GUITARML_MODEL_REGISTRY` — use the same model the sample editor uses for 8-bit → 16-bit enhancement.
+**4b — Denoise (offline, 8-bit only):**
+Run `SampleProcessing.denoise()` (src/utils/audio/SampleProcessing.ts:84) on each affected sample buffer. Strips quantization noise. Applied offline alongside DC removal.
+
+**4c — Neural Enhancer (real-time AudioWorklet, 8-bit only):**
+Insert a `NeuralEffectWrapper` using the existing sample-upscaling / "resurrect" model into the dub bus input node when lo-fi is detected. Zero-overhead passthrough when not needed. Model sourced from `NeuralEnhancerWorker.ts` — same as the sample editor's enhancement path.
+
+**4d — Spectral Exciter (real-time, all sources):**
+Insert `SampleProcessing.spectralExciter()` logic as a lightweight AudioWorklet on the dub bus input — HPF-filtered waveshaper + 8 kHz air boost. Adds harmonic brightness complementing the auto-EQ high shelf. Uses a gentle drive (0.15) so it enhances rather than saturates. Applied to ALL sources, not just lo-fi.
+
+**4e — Transient Sharpening (real-time, all sources):**
+Insert `SampleProcessing.sharpenTransients()` logic as a lightweight AudioWorklet on the dub bus input — HPF isolation + 3 kHz presence boost. Adds punch/snap before the echo chain. Gentle (gain 1.2×, not aggressive sharpening). Applied to ALL sources.
 
 ---
 
