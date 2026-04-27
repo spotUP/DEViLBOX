@@ -69,11 +69,12 @@ export const riddimSection: DubMove = {
       return { dispose() {} };
     }
 
-    // Schedule skank return at 60% of a 4-bar hold
-    // barMs = one bar in ms. Four bars × 60% = 2.4 bars.
+    // Schedule skank return at 60% of the hold duration
+    // barMs = one bar in ms. holdBars comes from persona config via adaptedParams.
     const bpm = ctx.bpm || 120;
     const barMs = (60000 / bpm) * 4;
-    const skankReturnMs = barMs * 4 * 0.6; // 60% of 4 bars
+    const holdBars = (typeof ctx.params?.holdBars === 'number') ? ctx.params.holdBars : 4;
+    const skankReturnMs = barMs * holdBars * 0.6; // 60% of hold duration
 
     let skankTimer: ReturnType<typeof setTimeout> | null = null;
 
