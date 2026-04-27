@@ -8,6 +8,7 @@ import { Knob } from '@components/controls/Knob';
 import { Button } from '@components/ui/Button';
 import type { Fil4EqEffect } from '@/engine/effects/Fil4EqEffect';
 import { useDrumPadStore } from '@/stores/useDrumPadStore';
+import { computeGenreBaseline } from '@engine/dub/AutoEQ';
 
 interface BandState {
   enabled: boolean;
@@ -118,8 +119,52 @@ export const Fil4EqPanel: React.FC<Props> = ({ effect }) => {
     </div>
   );
 
+  // Apply a genre preset curve to the effect
+  const applyGenrePreset = useCallback((genre: string) => {
+    if (genre === '') return;
+    const curve = computeGenreBaseline(genre, 0.7, 0.6);
+    effect.setHP(curve.hp.enabled, curve.hp.freq, curve.hp.q);
+    effect.setLowShelf(curve.ls.enabled, curve.ls.freq, curve.ls.gain ?? 0, curve.ls.q ?? 0.8);
+    effect.setHighShelf(curve.hs.enabled, curve.hs.freq, curve.hs.gain ?? 0, curve.hs.q ?? 0.8);
+    [curve.p0, curve.p1, curve.p2, curve.p3].forEach((band, i) => {
+      effect.setBand(i as 0|1|2|3, band.enabled, band.freq, band.bw ?? 1.2, band.gain ?? 0);
+    });
+    effect.setMasterGain(1.0);
+  }, [effect]);
+
+  const resetFlat = useCallback(() => {
+    effect.setHP(false, 25, 0.7);
+    effect.setLP(false, 20000, 0.7);
+    effect.setLowShelf(false, 80, 0, 0.8);
+    effect.setHighShelf(false, 10000, 0, 0.8);
+    ([0,1,2,3] as const).forEach(i => effect.setBand(i, false, [200,500,2000,8000][i], 1.0, 0));
+    effect.setMasterGain(1.0);
+  }, [effect]);
+
   return (
     <div className="flex flex-col gap-2 p-2 bg-dark-bgSecondary rounded-lg select-none">
+      {/* Preset row */}
+      <div className="flex items-center gap-2">
+        <span className="text-[9px] font-mono text-text-muted shrink-0">Preset</span>
+        <select
+          className="bg-dark-bgTertiary border border-dark-border rounded px-1.5 py-0.5 text-[10px] font-mono text-text-primary focus:ring-1 focus:ring-accent-primary flex-1"
+          defaultValue=""
+          onChange={e => { applyGenrePreset(e.target.value); e.target.value = ''; }}
+        >
+          <option value="" disabled>Select genre curve…</option>
+          {['Reggae','Electronic','Hip-Hop','Rock','Jazz','Classical','Blues','Folk','Unknown'].map(g => (
+            <option key={g} value={g}>{g}</option>
+          ))}
+        </select>
+        <button
+          type="button"
+          onClick={resetFlat}
+          className="text-[9px] font-mono text-text-muted hover:text-accent-error transition-colors px-1.5 py-0.5 rounded border border-dark-borderLight hover:border-accent-error shrink-0"
+          title="Reset all bands to flat (0 dB)"
+        >
+          Flat
+        </button>
+      </div>
       <div className="flex items-start gap-2">
         <Fil4EqCurve effect={effect} width={552} height={136} />
         <div className="flex flex-col gap-1 items-center pt-1">
