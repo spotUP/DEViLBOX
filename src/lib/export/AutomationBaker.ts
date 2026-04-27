@@ -456,7 +456,7 @@ function getDubEffectMapping(p: string): EffectMapping | null {
       write: (cell, v, _prevValue, fmt) => {
         const vol = v >= 0.5 ? 0 : 64;
         if (hasVolumeColumn(fmt)) {
-          if (cell.volume === 0 || cell.volume === undefined) {
+          if (!cell.volume || (cell.volume >= 0x10 && cell.volume <= 0x50)) {
             cell.volume = 0x10 + vol;
             return true;
           }
