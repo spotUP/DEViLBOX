@@ -24,7 +24,7 @@ import { useTransportStore } from '@/stores/useTransportStore';
 import { bpmSyncedEchoRate, getActiveBpm } from '@/engine/dub/DubActions';
 import { subscribeDubRouter, subscribeDubRelease, fire as fireDub } from '@/engine/dub/DubRouter';
 import { getAutoDubCurrentRoles } from '@/engine/dub/AutoDub';
-import { startDubRecorder } from '@/engine/dub/DubRecorder';
+import { startDubRecorder, clearDubCurvesForCurrentPattern } from '@/engine/dub/DubRecorder';
 import { dubLanePlayer } from '@/engine/dub/DubLanePlayer';
 import { getSongTimeSec } from '@/engine/dub/songTime';
 import { ensureDrumPadEngine } from '@hooks/drumpad/useMIDIPadRouting';
@@ -32,7 +32,6 @@ import { getChannelRoutedEffectsManager } from '@/engine/tone/ChannelRoutedEffec
 import { getToneEngine } from '@/engine/ToneEngine';
 import { getNativeAudioNode } from '@utils/audio-context';
 import { Fader } from '@components/controls/Fader';
-import { DubLaneTimeline } from './DubLaneTimeline';
 import { AutoDubPanel } from './AutoDubPanel';
 import { Fil4EqPanel } from '@components/effects/Fil4EqPanel';
 import { getActiveDubBus } from '@engine/dub/DubBus';
@@ -876,8 +875,13 @@ export const DubDeckStrip: React.FC = () => {
               ? `bg-accent-error/20 border-accent-error text-accent-error ${capturedRecently ? 'animate-pulse' : ''}`
               : 'bg-dark-bgTertiary border-dark-borderLight text-text-secondary hover:text-text-primary')
           }
-          onClick={() => setArmed(!armed)}
-          title={armed ? 'Recording — live moves capture to the lane' : 'Click to arm recording'}
+          onClick={() => {
+            if (!armed) {
+              clearDubCurvesForCurrentPattern();
+            }
+            setArmed(!armed);
+          }}
+          title={armed ? 'Recording armed — click to stop' : 'Arm recording (clears previous dub curves)'}
           disabled={!busEnabled}
         >
           ● REC {armed ? 'armed' : 'off'}
@@ -1527,12 +1531,6 @@ export const DubDeckStrip: React.FC = () => {
         })}
       </div>
 
-      {/* Lane timeline — always in PERFORM, below channel strips */}
-      <div className="flex items-center gap-2 text-xs text-text-muted px-1 mt-1">
-        <span>{pattern?.dubLane?.events.length ?? 0} events</span>
-        <span className="flex-1" />
-      </div>
-      <DubLaneTimeline />
 
       </>)}
 
