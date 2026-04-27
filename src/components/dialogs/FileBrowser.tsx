@@ -7,7 +7,7 @@
  */
 
 import React, { useState, useRef, useEffect } from 'react';
-import { X, Folder, FolderOpen, FileAudio, ArrowLeft, Trash2, File, Cloud, HardDrive, History, RotateCcw, Globe } from 'lucide-react';
+import { X, Folder, FolderOpen, FileAudio, ArrowLeft, Trash2, File, Cloud, HardDrive, History, RotateCcw, Globe, Search } from 'lucide-react';
 import '@cubone/react-file-manager/dist/style.css';
 import { hasElectronFS } from '@utils/electron';
 import { useFileNavigation, isTrackerModule, type FileSource, getLastFileSource, setLastFileSource } from './useFileNavigation';
@@ -171,6 +171,29 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
             </button>
           )}
         </div>
+
+        {/* Search bar — shown for demo/cloud tabs */}
+        {fileSource !== 'online' && (
+          <div className="flex-shrink-0 flex items-center gap-2 px-4 py-2 border-b border-dark-border bg-dark-bgTertiary">
+            <Search size={14} className="text-text-muted shrink-0" />
+            <input
+              type="text"
+              value={nav.searchQuery}
+              onChange={(e) => nav.setSearchQuery(e.target.value)}
+              placeholder="Search files…"
+              className="flex-1 bg-transparent text-text-primary text-sm placeholder:text-text-muted outline-none"
+            />
+            {nav.searchQuery && (
+              <button
+                onClick={() => nav.setSearchQuery('')}
+                className="text-text-muted hover:text-text-primary shrink-0"
+                aria-label="Clear search"
+              >
+                <X size={14} />
+              </button>
+            )}
+          </div>
+        )}
 
         {/* Online panel renders its own toolbar + content */}
         {fileSource === 'online' ? (
