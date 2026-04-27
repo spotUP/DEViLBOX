@@ -1308,6 +1308,7 @@ export class TrackerReplayer {
         // Fxx: Set speed (1-31) or tempo (32+)
         if (param < 32) {
           this.speed = param;
+          useTransportStore.getState().setSpeed(param);
         } else {
           this.bpm = param;
         }
@@ -1333,7 +1334,7 @@ export class TrackerReplayer {
         [row.effTyp8, row.eff8],
       ]) {
         if (eTyp === 0xF && eVal !== undefined && eVal > 0) {
-          if (eVal < 32) this.speed = eVal; else this.bpm = eVal;
+          if (eVal < 32) { this.speed = eVal; useTransportStore.getState().setSpeed(eVal); } else this.bpm = eVal;
         } else if (eTyp === 0xB && eVal !== undefined) {
           this.songPos = eVal - 1;
           this.posJumpFlag = true;
