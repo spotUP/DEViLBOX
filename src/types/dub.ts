@@ -265,6 +265,13 @@ export interface DubBusSettings {
   returnEqB4Freq: number;
   returnEqB4Gain: number;
   returnEqB4Q: number;
+  // ─── Fil4 HP / LP on the return EQ (2026-04-27) ──────────────────────────
+  returnEqHpEnabled: boolean;
+  returnEqHpFreq: number;    // Hz
+  returnEqHpQ: number;
+  returnEqLpEnabled: boolean;
+  returnEqLpFreq: number;    // Hz
+  returnEqLpQ: number;
 
   // ─── Sweep mode — comb filter vs true phaser (2026-04-23) ─────────────
   // 'comb' = current liquid-sweep short-delay flanger (default)
@@ -423,6 +430,12 @@ export const DEFAULT_DUB_BUS: DubBusSettings = {
   returnEqB4Freq:   8000,
   returnEqB4Gain:   2.5,   // air shelf: restores sparkle the tape/echo steals
   returnEqB4Q:      0.7,
+  returnEqHpEnabled: false,
+  returnEqHpFreq:    20,
+  returnEqHpQ:       0.7,
+  returnEqLpEnabled: false,
+  returnEqLpFreq:    20000,
+  returnEqLpQ:       0.7,
 
   // Sweep mode — comb by default (backwards compat).
   sweepMode:        'comb',
