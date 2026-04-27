@@ -1237,8 +1237,34 @@ export class TrackerReplayer {
       return;
     }
 
+    // FT2: when instrument+note both present, reset channel volume to instrument's default.
+    // This matches FT2 behavior: instrument switch resets volume unless Cxx overrides it.
+    const hasNote = noteValue && noteValue > 0 && noteValue < 97;
+    if (hasNote && instNum > 0 && ch.instrument) {
+      const defaultVol = ch.instrument.metadata?.modPlayback?.defaultVolume ?? 64;
+      ch.volume = defaultVol;
+      ch.gainNode.gain.setValueAtTime(defaultVol / 64, time);
+    }
+
+    // Cxx (set volume): applies regardless of whether there is a note on this row.
+    // FT2: Cxx always fires at tick 0 and overrides instrument default volume.
+    if (effect === 0xC) {
+      ch.volume = Math.min(64, param);
+      ch.gainNode.gain.setValueAtTime(ch.volume / 64, time);
+    }
+    for (const [eTyp, eVal] of [
+      [row.effTyp2, row.eff2], [row.effTyp3, row.eff3], [row.effTyp4, row.eff4],
+      [row.effTyp5, row.eff5], [row.effTyp6, row.eff6], [row.effTyp7, row.eff7],
+      [row.effTyp8, row.eff8],
+    ]) {
+      if (eTyp === 0xC && eVal !== undefined) {
+        ch.volume = Math.min(64, eVal);
+        ch.gainNode.gain.setValueAtTime(ch.volume / 64, time);
+      }
+    }
+
     // Normal note trigger
-    if (noteValue && noteValue > 0 && noteValue < 97 && !probabilitySkip) {
+    if (hasNote && !probabilitySkip) {
       ch.xmNote = noteValue;
 
       // Determine playback period/pitch
@@ -1255,22 +1281,6 @@ export class TrackerReplayer {
       const newNoteName = (this.useXMPeriods || isSynthInstrument)
         ? xmNoteToNoteName(noteValue)
         : periodToNoteName(usePeriod);
-
-      // Apply CXX (set volume) from all effect columns before triggering
-      if (effect === 0xC) {
-        ch.volume = Math.min(64, param);
-        ch.gainNode.gain.setValueAtTime(ch.volume / 64, time);
-      }
-      for (const [eTyp, eVal] of [
-        [row.effTyp2, row.eff2], [row.effTyp3, row.eff3], [row.effTyp4, row.eff4],
-        [row.effTyp5, row.eff5], [row.effTyp6, row.eff6], [row.effTyp7, row.eff7],
-        [row.effTyp8, row.eff8],
-      ]) {
-        if (eTyp === 0xC && eVal !== undefined) {
-          ch.volume = Math.min(64, eVal);
-          ch.gainNode.gain.setValueAtTime(ch.volume / 64, time);
-        }
-      }
 
       // Release previous synth note (unless sliding)
       if (!slideActive && ch.lastPlayedNoteName && ch.instrument?.synthType && ch.instrument.synthType !== 'Sampler') {
