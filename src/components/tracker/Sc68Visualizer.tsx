@@ -212,7 +212,7 @@ export const Sc68Visualizer: React.FC = () => {
   const composer = composerAndFormat.replace(/\s*\[.*\]$/, '');
 
   return (
-    <div className="flex-1 flex flex-col min-h-0 bg-[#0a0e12] select-none">
+    <div className="flex-1 flex flex-col min-h-0 bg-[#0a0e12] select-none" style={{ minHeight: '120px' }}>
       {/* Header */}
       <div className="flex items-center gap-3 px-3 py-1.5 border-b border-[#1a2030] shrink-0">
         <span className="text-xs font-bold" style={{ color: YM_GREEN }}>{formatInfo.chip}</span>

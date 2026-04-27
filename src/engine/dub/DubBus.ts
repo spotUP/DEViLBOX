@@ -1135,14 +1135,15 @@ export class DubBus {
   private masterConvolver: ConvolverNode | null = null;
   private masterConvolverWet!: GainNode;
   private masterConvolverDry!: GainNode;
-  // JA Press vinyl — DSP comes from dedicated effect classes (below).
-  // vinylSum is the tail gain that feeds masterInsertTail.
+  // JA Press vinyl — DSP is applied POST-MASTER so vinyl noise processes the
+  // complete mix (dry signal + reverb return). vinylOutputNode is the final
+  // output that DrumPadEngine connects to context.destination / DJ master.
   private vinylSum!: GainNode;
   private vinylLevel = 0;  // 0..1 (0..10 scaled)
-  // Direct output tap — clicks/scratches bypass the master insert chain
-  // (EQ, LPF, width matrix, chorus, convolver) so they sound like pure
-  // vinyl transients on the finished output, not FX-colored noise bursts.
-  // Connected to masterChannel native input in wireMasterInsert.
+  // vinylOutputNode: sits after this.master. DrumPadEngine connects it to
+  // the actual output destination so vinyl sees dry + wet together.
+  private vinylOutputNode!: GainNode;
+  // Direct output tap (legacy field, kept for wireMasterInsert logic).
   private vinylDirect!: GainNode;
   // Real vinyl DSP — combined ToneArm (physics: wow/flutter/coil/RIAA/
   // stylus) + VinylNoiseEffect (surface degradation: dust/dropout/age/
@@ -1487,25 +1488,25 @@ export class DubBus {
       innerGroove: 0, ghostEcho: 0, dropout: 0, warp: 0, eccentricity: 0,
       wet: 1,
     });
+    // Master insert chain ends at toneArm → masterInsertEnvelope.
+    // Vinyl is applied POST-MASTER (after this.master receives both dry +
+    // reverb return) so the complete mix gets vinyl-degraded together.
     Tone.connect(convolverSum, this.toneArmEffect.input as unknown as Tone.InputNode);
-    Tone.connect(this.toneArmEffect.output as unknown as Tone.ToneAudioNode, this.vinylEffect.input as unknown as Tone.InputNode);
-    Tone.connect(this.vinylEffect.output as unknown as Tone.ToneAudioNode, this.vinylSum as unknown as Tone.InputNode);
-    // Direct-output tap for vinyl clicks/scratches — bypasses every
-    // master-side FX so the transients land on the output as raw vinyl
-    // defects, not "FX-chain processed noise bursts". Wired to the master
-    // destination node when wireMasterInsert runs.
     this.vinylDirect = this.context.createGain();
     this.vinylDirect.gain.value = 1;
     this.masterHpf.connect(this.masterBassShelf);
     this.masterInsertHead = this.masterHpf;
-    // G15: insert the envelope gain between vinylSum (chain tail) and the
-    // destination that wireMasterInsert will connect to. Steady-state gain
-    // is 1 (full passthrough); ramped to 0 around (dis)connection events
-    // so the chain swap happens during silence instead of mid-buffer.
     this.masterInsertEnvelope = this.context.createGain();
     this.masterInsertEnvelope.gain.value = 1;
-    this.vinylSum.connect(this.masterInsertEnvelope);
+    Tone.connect(this.toneArmEffect.output as unknown as Tone.ToneAudioNode, this.masterInsertEnvelope as unknown as Tone.InputNode);
     this.masterInsertTail = this.masterInsertEnvelope;
+
+    // Post-master vinyl output: this.master → vinylEffect → vinylOutputNode.
+    // DrumPadEngine connects vinylOutputNode to context.destination / DJ master
+    // so vinyl noise processes the final mix, not just the dry signal.
+    this.vinylOutputNode = this.context.createGain();
+    Tone.connect(master as unknown as Tone.ToneAudioNode, this.vinylEffect.input as unknown as Tone.InputNode);
+    Tone.connect(this.vinylEffect.output as unknown as Tone.ToneAudioNode, this.vinylOutputNode as unknown as Tone.InputNode);
 
     // Liquid sweep — parallel comb-filter branch. See class-level docstring.
     // The LFO runs continuously (can't stop + restart an OscillatorNode),
@@ -2031,6 +2032,10 @@ export class DubBus {
 
   /** The bus input node — pad sources connect to this. */
   get inputNode(): GainNode { return this.input; }
+
+  /** Post-master vinyl output. Connect this to context.destination / DJ master
+   *  so VinylNoiseEffect processes the complete mix (dry + reverb return). */
+  getVinylOutputNode(): GainNode { return this.vinylOutputNode; }
 
   /** Receives per-channel dry reverb sends; feeds spring.input directly,
    *  bypassing the echo chain. PerChannelDubFx instances connect here. */
