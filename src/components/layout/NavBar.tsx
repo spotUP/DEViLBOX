@@ -20,6 +20,10 @@ import { useProjectStore } from '@stores/useProjectStore';
 import { useTabsStore } from '@stores/useTabsStore';
 import { CustomSelect } from '@components/common/CustomSelect';
 import { ServerStatusBadges } from './ServerStatusBadges';
+import { useDubStore } from '@stores/useDubStore';
+import { useTransportStore } from '@stores/useTransportStore';
+import { useHistoryStore } from '@stores/useHistoryStore';
+import { useFT2ToolbarActions } from '@stores/useFT2ToolbarActions';
 
 const NavBarComponent: React.FC = () => {
   const n = useNavBar();
@@ -29,6 +33,18 @@ const NavBarComponent: React.FC = () => {
   const modalOpen = useUIStore((state) => state.modalOpen);
   const closeModal = useUIStore((state) => state.closeModal);
   const tourActive = useTourStore((s) => s.isActive);
+
+  // Dub deck transport bar — shown in header when strip is expanded so FT2
+  // toolbar action row can be hidden to reclaim vertical space.
+  const stripCollapsed = useDubStore((s) => s.stripCollapsed);
+  const isPlaying = useTransportStore((s) => s.isPlaying);
+  const isLooping = useTransportStore((s) => s.isLooping);
+  const isPlayingSong    = isPlaying && !isLooping;
+  const isPlayingPattern = isPlaying && isLooping;
+  const canUndo = useHistoryStore((s) => s.canUndo);
+  const canRedo = useHistoryStore((s) => s.canRedo);
+  const ft2Actions = useFT2ToolbarActions();
+  const dubDeckTransportActive = n.activeView === 'tracker' && !stripCollapsed && !editorFullscreen;
 
   const handleStartTour = useCallback(async () => {
     const { getTourEngine } = await import('@/engine/tour/TourEngine');
@@ -295,6 +311,28 @@ const NavBarComponent: React.FC = () => {
           <Plus size={16} />
         </button>
       </div>}
+
+      {/* Compact FT2 transport row — visible when dub deck strip is expanded
+          so the tracker toolbar action row can be hidden to reclaim space */}
+      {dubDeckTransportActive && (
+        <div className="flex items-center gap-1.5 px-3 py-1 border-b border-dark-border bg-dark-bg">
+          <Button
+            variant={isPlayingSong ? 'danger' : 'primary'}
+            size="sm"
+            onClick={() => ft2Actions.playSong?.()}
+          >{isPlayingSong ? 'Stop Song' : 'Play Song'}</Button>
+          <Button
+            variant={isPlayingPattern ? 'danger' : 'primary'}
+            size="sm"
+            onClick={() => ft2Actions.playPattern?.()}
+          >{isPlayingPattern ? 'Stop Pattern' : 'Play Pattern'}</Button>
+          <div className="w-px h-4 bg-dark-border mx-0.5 shrink-0" />
+          <Button variant="ghost" size="sm" onClick={() => ft2Actions.openFileBrowser?.()}>Load</Button>
+          <Button variant="ghost" size="sm" onClick={() => ft2Actions.save?.()}>Save</Button>
+          <Button variant="ghost" size="sm" onClick={() => ft2Actions.undo?.()} disabled={!canUndo()}>Undo</Button>
+          <Button variant="ghost" size="sm" onClick={() => ft2Actions.redo?.()} disabled={!canRedo()}>Redo</Button>
+        </div>
+      )}
 
       {/* Download Modal */}
       <DownloadModal

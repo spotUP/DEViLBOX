@@ -1,12 +1,13 @@
 /**
  * Regression tests for the SID dub bus signal chain.
  *
- * Bug: SID audio permanently bled into echo/reverb because:
- *   1. Dub send baseline was 0.4 (40% of signal always went to wet chain)
- *   2. Channel sliders used worklet path which doesn't know about SID
- *   3. Per-voice taps weren't controllable from the mixer UI
- *
- * Fix: Baseline→0, getActiveDubBus() singleton, setSidVoiceDubSend() method.
+ * History:
+ *   Original bug: baseline was 0.4 — always bled into echo/reverb unintentionally.
+ *   Fix 1 (2026-01): Baseline→0, getActiveDubBus() singleton, setSidVoiceDubSend().
+ *   Fix 2 (2026-04): Baseline restored to 0.35 so SID gets spring/echo drip when
+ *     the dub bus is enabled — user expectation is that dub effects apply to SID too.
+ *     The difference from the original bug: 0.35 is intentional and consistent with
+ *     how drum pads feed the bus; 0.4 was accidental leftover from an init path.
  */
 import { describe, it, expect } from 'vitest';
 
@@ -27,9 +28,9 @@ describe('SID dub bus baseline', () => {
     expect(c64Src).toMatch(/connectDubSend\([^)]*amount\s*=\s*0\)/);
   });
 
-  it('NativeEngineRouting passes 0 baseline to connectDubSend and registerSidDubSend', () => {
-    expect(routingSrc).toContain('connectDubSend(dubInput, 0)');
-    expect(routingSrc).toContain('registerSidDubSend(sendGain, 0)');
+  it('NativeEngineRouting passes 0.35 baseline to connectDubSend and registerSidDubSend (intentional — enables spring/echo drip on SID songs)', () => {
+    expect(routingSrc).toContain('connectDubSend(dubInput, 0.35)');
+    expect(routingSrc).toContain('registerSidDubSend(sendGain, 0.35)');
   });
 
   it('DubBus exports getActiveDubBus singleton accessor', () => {

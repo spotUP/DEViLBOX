@@ -5355,10 +5355,9 @@ export class DubBus {
     } catch { /* ok */ }
   }
 
-  /** Enable/disable the Club Simulator convolver. Lazy-allocates the IR
-   *  on first enable — a procedurally-generated small-club impulse with
-   *  ~350 ms decay and some high-frequency roll-off to mimic a PA-in-room
-   *  response. */
+  /** Enable/disable the Club Simulator convolver. Uses the full generateIR
+   *  soundSystem preset (2.5 s, 20 early reflections, 25 ms pre-delay) so
+   *  the effect is unmistakably audible — not the old 350 ms noise blob. */
   setClubSim(on: boolean): void {
     if (!this.masterConvolverWet) return;
     const ctx = this.context;
@@ -5366,20 +5365,7 @@ export class DubBus {
     if (on && !this.masterConvolver) {
       try {
         this.masterConvolver = ctx.createConvolver();
-        // Generate a 350ms IR with exponential decay + stereo decorrelation.
-        const len = Math.round(ctx.sampleRate * 0.35);
-        const buf = ctx.createBuffer(2, len, ctx.sampleRate);
-        for (let c = 0; c < 2; c++) {
-          const ch = buf.getChannelData(c);
-          for (let i = 0; i < len; i++) {
-            const tau = len * 0.22;
-            const env = Math.exp(-i / tau);
-            // Low-pass noise — duplicate last sample weighted for rolling avg
-            const noise = (Math.random() * 2 - 1) * env;
-            ch[i] = i > 0 ? ch[i - 1] * 0.6 + noise * 0.4 : noise;
-          }
-        }
-        this.masterConvolver.buffer = buf;
+        this.masterConvolver.buffer = generateIR(ctx, CLUB_IR_PRESETS.soundSystem);
         this.masterConvolver.normalize = true;
         this.masterConvolverDry.connect(this.masterConvolver);
         this.masterConvolver.connect(this.masterConvolverWet);
@@ -5391,7 +5377,7 @@ export class DubBus {
     try {
       this.masterConvolverWet.gain.cancelScheduledValues(now);
       this.masterConvolverWet.gain.setValueAtTime(this.masterConvolverWet.gain.value, now);
-      this.masterConvolverWet.gain.linearRampToValueAtTime(on ? 0.55 : 0, now + 0.3);
+      this.masterConvolverWet.gain.linearRampToValueAtTime(on ? 0.82 : 0, now + 0.3);
     } catch { /* ok */ }
   }
 
