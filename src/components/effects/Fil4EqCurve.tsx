@@ -17,18 +17,6 @@ export function freqToX(f: number, plotW: number): number {
 export function dbToY(db: number, plotH: number): number {
   return PAD_T + ((DB_MAX - db) / (DB_MAX - DB_MIN)) * plotH;
 }
-function xToFreq(x: number, plotW: number): number {
-  const t = Math.max(0, Math.min(1, (x - PAD_L) / plotW));
-  return Math.round(FREQ_MIN * Math.pow(FREQ_MAX / FREQ_MIN, t));
-}
-function yToDb(y: number, plotH: number): number {
-  const t = (y - PAD_T) / plotH;
-  return Math.max(DB_MIN, Math.min(DB_MAX, DB_MAX - t * (DB_MAX - DB_MIN)));
-}
-
-// Suppress unused-variable warnings — these are exported helpers for future callers
-void xToFreq;
-void yToDb;
 
 const GRID_FREQS = [100, 200, 500, 1000, 2000, 5000, 10000];
 const GRID_DBS   = [-12, -6, 0, 6, 12];
@@ -62,6 +50,7 @@ interface Props {
 
 export const Fil4EqCurve: React.FC<Props> = ({ effect, width = W, height = H, onBandChange }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const [magnitude, setMagnitude] = useState<Float32Array | null>(null);
   const [params, setParams] = useState<Fil4Params>(() => effect.getParams());
   const [activeHandle, setActiveHandle] = useState<BandId | null>(null);
@@ -85,6 +74,16 @@ export const Fil4EqCurve: React.FC<Props> = ({ effect, width = W, height = H, on
   useEffect(() => {
     effect.getMagnitude(N_POINTS).then(setMagnitude);
   }, [effect]);
+
+  // Prevent page scroll when scrolling over EQ canvas (React 19 passive wheel workaround)
+  useEffect(() => {
+    if (!onBandChange) return;
+    const el = containerRef.current;
+    if (!el) return;
+    const prevent = (e: WheelEvent) => e.preventDefault();
+    el.addEventListener('wheel', prevent, { passive: false });
+    return () => el.removeEventListener('wheel', prevent);
+  }, [onBandChange]);
 
   const draw = useCallback(() => {
     const canvas = canvasRef.current;
@@ -218,7 +217,7 @@ export const Fil4EqCurve: React.FC<Props> = ({ effect, width = W, height = H, on
   }, [onBandChange, params]);
 
   return (
-    <div style={{ position: 'relative', width, height, display: 'inline-block' }}>
+    <div ref={containerRef} style={{ position: 'relative', width, height, display: 'inline-block' }}>
       <canvas ref={canvasRef} width={width} height={height}
         className="block rounded" style={{ background: COLOR_BG }} />
       {onBandChange && (
