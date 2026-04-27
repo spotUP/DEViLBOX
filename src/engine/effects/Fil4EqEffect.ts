@@ -152,8 +152,8 @@ export class Fil4EqEffect extends Tone.ToneAudioNode {
     const { hp, lp, ls, hs, p, masterGain } = this.params;
     this._send({ type: 'set_hp',    enabled: hp.enabled, freq: hp.freq, q: hp.q });
     this._send({ type: 'set_lp',    enabled: lp.enabled, freq: lp.freq, q: lp.q });
-    this._send({ type: 'set_shelf', shelf: 'low',  enabled: ls.enabled, freq: ls.freq, gain: ls.gain, q: ls.q });
-    this._send({ type: 'set_shelf', shelf: 'high', enabled: hs.enabled, freq: hs.freq, gain: hs.gain, q: hs.q });
+    this._send({ type: 'set_shelf', which: 0, enabled: ls.enabled, freq: ls.freq, gain: ls.gain, q: ls.q });
+    this._send({ type: 'set_shelf', which: 1, enabled: hs.enabled, freq: hs.freq, gain: hs.gain, q: hs.q });
     for (let i = 0; i < p.length; i++)
       this._send({ type: 'set_band', band: i, enabled: p[i].enabled, freq: p[i].freq, bw: p[i].bw, gain: p[i].gain });
     this._send({ type: 'set_gain', gain: masterGain });
@@ -180,13 +180,13 @@ export class Fil4EqEffect extends Tone.ToneAudioNode {
 
   setLowShelf(enabled: boolean, freq: number, gain: number, q: number): void {
     this.params.ls = { enabled, freq, gain, q };
-    this._send({ type: 'set_shelf', shelf: 'low', enabled, freq, gain, q });
+    this._send({ type: 'set_shelf', which: 0, enabled, freq, gain, q });
     this._notifyListeners();
   }
 
   setHighShelf(enabled: boolean, freq: number, gain: number, q: number): void {
     this.params.hs = { enabled, freq, gain, q };
-    this._send({ type: 'set_shelf', shelf: 'high', enabled, freq, gain, q });
+    this._send({ type: 'set_shelf', which: 1, enabled, freq, gain, q });
     this._notifyListeners();
   }
 
