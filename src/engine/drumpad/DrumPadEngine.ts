@@ -75,7 +75,9 @@ export class DrumPadEngine {
     // yet, so a conservative default is the safer place to land.
     this.masterGain = this.context.createGain();
     this.masterGain.gain.value = 0.25;
-    this.masterGain.connect(outputDestination ?? this.context.destination);
+    // Don't connect masterGain → destination directly — DubBus will connect
+    // its vinylOutputNode (masterGain → vinylEffect → vinylOutputNode → dest)
+    // so JA Press vinyl processes the complete mix, not just the dry signal.
 
     // Create separate output buses
     this.outputs.set('stereo', this.masterGain);
@@ -87,6 +89,8 @@ export class DrumPadEngine {
 
     // Dub bus lives in its own class now — see src/engine/dub/DubBus.ts.
     this.dubBus = new DubBus(this.context, this.masterGain);
+    // Connect post-master vinyl output to the actual audio destination.
+    this.dubBus.getVinylOutputNode().connect(outputDestination ?? this.context.destination);
 
     // Register with the DubRouter so ANY view (tracker, DJ, drumpad) can
     // fire dub moves the moment the engine exists, without waiting for a

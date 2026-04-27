@@ -186,12 +186,16 @@ interface UseFileNavigationOptions {
   suggestedFilename: string;
 }
 
-// Module-level cache so the dialog remembers its last state across open/close
+// Module-level cache so the dialog remembers its last state across open/close.
+// searchQuery additionally persists to localStorage so it survives HMR/reload.
+const _SEARCH_KEY = 'dvbx_file_browser_search';
 const _lastState = {
   fileSource: 'demo' as FileSource,
   currentPath: '',
   electronDirectory: null as string | null,
-  searchQuery: '',
+  searchQuery: (() => {
+    try { return localStorage.getItem(_SEARCH_KEY) ?? ''; } catch { return ''; }
+  })(),
 };
 
 /** Read the last file source the dialog was on. */
@@ -217,6 +221,7 @@ export function useFileNavigation({
   const [searchQuery, _setSearchQuery] = useState<string>(_lastState.searchQuery);
   const setSearchQuery = useCallback((q: string) => {
     _lastState.searchQuery = q;
+    try { if (q) localStorage.setItem(_SEARCH_KEY, q); else localStorage.removeItem(_SEARCH_KEY); } catch { /* ok */ }
     _setSearchQuery(q);
   }, []);
   const files = useMemo(() => {

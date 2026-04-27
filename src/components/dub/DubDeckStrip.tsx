@@ -190,6 +190,8 @@ export const DubDeckStrip: React.FC = () => {
   const autoDubPersona = useDubStore(s => s.autoDubPersona);
   const setAutoDubPersona = useDubStore(s => s.setAutoDubPersona);
   const setAutoDubIntensity = useDubStore(s => s.setAutoDubIntensity);
+  const autoDubEqMode = useDubStore(s => s.autoDubEqMode ?? 'both');
+  const setAutoDubEqMode = useDubStore(s => s.setAutoDubEqMode);
 
   const busEnabled = useDrumPadStore(s => s.dubBus.enabled);
   const setDubBus = useDrumPadStore(s => s.setDubBus);
@@ -954,6 +956,23 @@ export const DubDeckStrip: React.FC = () => {
           disabled={!busEnabled}
           title="Auto Dub settings — intensity and move blacklist"
         >⚙</button>
+        {/* EQ mode — cycle Off → Sweeps → Improv → Both. Visible so user can find it. */}
+        <button
+          className={`px-1.5 py-1 rounded border transition-colors text-[9px] font-mono disabled:opacity-40 ${
+            autoDubEqMode !== 'off'
+              ? 'border-accent-secondary bg-accent-secondary/10 text-accent-secondary'
+              : 'bg-dark-bgTertiary border-dark-borderLight text-text-muted hover:text-text-primary'
+          }`}
+          onClick={() => {
+            const cycle: typeof autoDubEqMode[] = ['off', 'collaborative', 'improv', 'both'];
+            const next = cycle[(cycle.indexOf(autoDubEqMode) + 1) % cycle.length];
+            setAutoDubEqMode(next);
+          }}
+          disabled={!busEnabled}
+          title={`Auto Dub EQ: ${autoDubEqMode} — click to cycle Off → Sweeps → Improv → Both`}
+        >
+          EQ:{autoDubEqMode === 'off' ? 'Off' : autoDubEqMode === 'collaborative' ? 'Sweeps' : autoDubEqMode === 'improv' ? 'Improv' : '★Both'}
+        </button>
         <AutoDubPanel busEnabled={busEnabled} open={autoDubSettingsOpen} onClose={() => setAutoDubSettingsOpen(false)} anchorRef={autoDubSettingsBtnRef} />
         <button
           className={

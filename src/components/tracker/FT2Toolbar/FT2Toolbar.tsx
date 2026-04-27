@@ -612,8 +612,14 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
           </div>
           <div className="w-px h-5 bg-dark-border shrink-0" />
           <InstrumentSelector />
-          <div className="w-px h-5 bg-dark-border shrink-0" />
-          {actionButtons}
+          {/* In dub-deck-expanded state the strip sets editorFullscreen=true and
+              NavBar shows the transport — hide here to avoid duplication */}
+          {stripCollapsed && (
+            <>
+              <div className="w-px h-5 bg-dark-border shrink-0" />
+              {actionButtons}
+            </>
+          )}
         </div>
       ) : (
         /* Normal two-row layout */
