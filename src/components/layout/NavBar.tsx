@@ -44,7 +44,9 @@ const NavBarComponent: React.FC = () => {
   const canUndo = useHistoryStore((s) => s.canUndo);
   const canRedo = useHistoryStore((s) => s.canRedo);
   const ft2Actions = useFT2ToolbarActions();
-  const dubDeckTransportActive = n.activeView === 'tracker' && !stripCollapsed && !editorFullscreen;
+  // Expanding the dub deck also sets editorFullscreen=true (DubDeckStrip line 408),
+  // so we must NOT gate on !editorFullscreen — that would make the condition impossible.
+  const dubDeckTransportActive = n.activeView === 'tracker' && !stripCollapsed;
 
   const handleStartTour = useCallback(async () => {
     const { getTourEngine } = await import('@/engine/tour/TourEngine');
