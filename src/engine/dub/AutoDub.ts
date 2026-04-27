@@ -51,6 +51,51 @@ export interface EQSnapshot {
   baseline: import('@/engine/effects/Fil4EqEffect').Fil4Params;
 }
 
+/**
+ * Adapt a move's raw persona params using live analysis data.
+ * Returns raw params unchanged when snapshot is null (analysis not yet run).
+ * Pure function — no side effects.
+ */
+export function adaptEQParams(
+  moveId: string,
+  rawParams: Record<string, number>,
+  snapshot: EQSnapshot | null,
+  persona: AutoDubPersona,
+): Record<string, number> {
+  if (!snapshot) return rawParams;
+
+  const { energy, danceability, bpm, frequencyPeaks } = snapshot;
+
+  if (moveId === 'eqSweep') {
+    // Dominant peak = highest-magnitude entry (first in sorted-by-db array)
+    const dominant = frequencyPeaks.length > 0 ? frequencyPeaks[0][0] : null;
+    const startHz = dominant !== null
+      ? Math.max(20, Math.min(20000, dominant * 0.5))
+      : rawParams.startHz;
+    const endHz = dominant !== null
+      ? Math.max(20, Math.min(20000, dominant * 2.5))
+      : rawParams.endHz;
+    const depth = persona.improvConfig?.depth ?? 8;
+    const gain = depth * (0.5 + energy * 0.5);
+    const q = 2 + danceability * 3;
+    const sweepSec = 4 * 60 / bpm; // 4 beats at detected tempo
+    return { ...rawParams, startHz, endHz, gain, q, sweepSec };
+  }
+
+  if (moveId === 'hpfRise') {
+    // Highest-magnitude peak above 800 Hz
+    const above = frequencyPeaks.filter(([hz]) => hz > 800);
+    const peakHz = above.length > 0
+      ? Math.max(1200, Math.min(6000, above[0][0]))
+      : rawParams.peakHz;
+    const beatMs = 60000 / bpm;
+    const holdMs = 2 * beatMs * energy;
+    return { ...rawParams, peakHz, holdMs };
+  }
+
+  return rawParams;
+}
+
 const TICK_MS = 250;
 const HARD_FIRES_PER_BAR_CAP = 3;
 /** Per-move cooldown table (bars). Moves not listed use DEFAULT_COOLDOWN_BARS. */
