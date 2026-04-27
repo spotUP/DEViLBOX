@@ -348,7 +348,8 @@ export const DEFAULT_DUB_BUS: DubBusSettings = {
   hpfCutoff: 40,
   springWet: 0.55,       // was 0.4 — more audible spring tank character
   echoIntensity: 0.62,   // was 0.55 — 4-5 repeats before decay
-  echoWet: 0.7,          // was 0.5 — the echo is the CONTENT of the bus, push it forward
+  echoWet: 0.5,          // 0.7 was too dominant — dark feedback LPF smeared the whole return.
+                         // 0.5 keeps echo audible as accent without drowning clarity.
   echoRateMs: 300,
   echoEngine: 'spaceEcho',
   sidechainAmount: 0.15,
@@ -372,14 +373,13 @@ export const DEFAULT_DUB_BUS: DubBusSettings = {
   // Coloring defaults — mild Tubby shelf out of the box so the bus has
   // some inherent dub character, mid scoop off (engaged per preset),
   // neutral stereo width. User picks a CHARACTER to load the full voicing.
-  bassShelfGainDb:  3,
-  // 200 Hz shelf covers the useful bass range across all sources: chip tunes
-  // (sub at 30-80 Hz), Amiga MODs (fundamentals 80-250 Hz), XM/IT and native
-  // synths (full range). A lowshelf at 200 Hz with gentle Q lifts everything
-  // below uniformly — an 18 dB boost lands clearly on Amiga bass + chip bass
-  // + modern synth bass alike.
-  bassShelfFreqHz:  200,
-  bassShelfQ:       0.5,
+  //
+  // Bass shelf at 80 Hz (deep sub), not 200 Hz (which was boxy low-mid mud).
+  // Real dub weight comes from sub fundamentals — 200 Hz just clouds the mids.
+  // Q 0.9 keeps the shelf tight so it doesn't bleed into 300-400 Hz.
+  bassShelfGainDb:  2,
+  bassShelfFreqHz:  80,
+  bassShelfQ:       0.9,
   midScoopGainDb:   0,
   midScoopFreqHz:   700,
   midScoopQ:        1.4,
@@ -402,24 +402,26 @@ export const DEFAULT_DUB_BUS: DubBusSettings = {
   sweepFeedback:    0.72,
   tapeSatMode:      'single',
   echoMode:         4,        // H2+H3 — classic dub two-tap timing
-  echoFeedbackHpfHz: 250,
+  echoFeedbackHpfHz: 350,   // was 250 — more low-end cleanup each repeat pass
   echoFeedbackLpfHz: 4000,
   plateStage:       'off',
   plateStageMix:    0.35,
 
-  // Return EQ — flat by default (no coloring until user sweeps).
-  returnEqEnabled:  false,
+  // Return EQ — active with air shelf by default. Tape sat + dark feedback LPF
+  // absorb high frequencies; +2 dB shelf at 8 kHz restores presence without
+  // brightness. Band 2 (sweepable peak) stays flat until the user engages it.
+  returnEqEnabled:  true,
   returnEqFreq:     800,
-  returnEqGain:     0,
+  returnEqGain:     0,      // band 2 flat — the performance sweep knob
   returnEqQ:        2.0,
   returnEqB1Freq:   100,
   returnEqB1Gain:   0,
   returnEqB1Q:      0.7,
-  returnEqB3Freq:   2000,
+  returnEqB3Freq:   2500,   // low presence band
   returnEqB3Gain:   0,
   returnEqB3Q:      0.7,
   returnEqB4Freq:   8000,
-  returnEqB4Gain:   0,
+  returnEqB4Gain:   2.5,   // air shelf: restores sparkle the tape/echo steals
   returnEqB4Q:      0.7,
 
   // Sweep mode — comb by default (backwards compat).
