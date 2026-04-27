@@ -981,6 +981,8 @@ export class DubBus {
   getReturnEQGain(): number { return this.settings.returnEqGain; }
   /** Get current return EQ band 2 Q. */
   getReturnEQQ(): number { return this.settings.returnEqQ; }
+  /** Get the Fil4EqEffect instance for the return EQ — used by DubDeckStrip to render the EQ curve panel. */
+  getReturnEQ(): import('@engine/effects/Fil4EqEffect').Fil4EqEffect { return this.returnEQ; }
 
   // EQ sweep state — managed by DubBus so panic/dispose can clean up.
   private _eqSweepTimer: ReturnType<typeof setInterval> | null = null;
