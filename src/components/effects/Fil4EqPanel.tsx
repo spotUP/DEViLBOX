@@ -5,6 +5,7 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { Fil4EqCurve } from './Fil4EqCurve';
 import { Knob } from '@components/controls/Knob';
+import { Button } from '@components/ui/Button';
 import type { Fil4EqEffect } from '@/engine/effects/Fil4EqEffect';
 
 interface BandState {
@@ -96,12 +97,14 @@ export const Fil4EqPanel: React.FC<Props> = ({ effect }) => {
   }, [effect]);
 
   const toggle = (on: boolean, onClick: () => void) => (
-    <button type="button" onClick={onClick}
-      className={`text-[9px] font-mono px-1 py-0.5 rounded border transition-colors ${
-        on ? 'border-accent-highlight bg-accent-highlight/20 text-accent-highlight'
-           : 'border-dark-borderLight bg-dark-bgTertiary text-text-muted'}`}>
+    <Button
+      type="button"
+      variant="compact"
+      onClick={onClick}
+      className={on ? 'border-accent-highlight bg-accent-highlight/20 text-accent-highlight' : ''}
+    >
       {on ? 'ON' : 'OFF'}
-    </button>
+    </Button>
   );
 
   const col = (label: string, content: React.ReactNode) => (
