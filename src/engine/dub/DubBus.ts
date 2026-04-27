@@ -44,6 +44,13 @@ import { fireParamLiveSubscribers } from '@/midi/performance/parameterRouter';
 import { RE201Effect } from '../effects/RE201Effect';
 import { AnotherDelayEffect } from '../effects/AnotherDelayEffect';
 import { RETapeEchoEffect } from '../effects/RETapeEchoEffect';
+import { computeAutoEQ, detectLoFiSources } from './AutoEQ';
+import { DubBusEnhancer } from './DubBusEnhancer';
+import { buildInstrumentHints } from '@engine/TrackerAnalysisPipeline';
+import { useTrackerAnalysisStore } from '@/stores/useTrackerAnalysisStore';
+import { useFormatStore } from '@/stores/useFormatStore';
+import { useInstrumentStore } from '@/stores/useInstrumentStore';
+import { useNotificationStore } from '@/stores/useNotificationStore';
 
 const DECK_IDS: DeckId[] = ['A', 'B', 'C'];
 
@@ -1238,6 +1245,8 @@ export class DubBus {
   private _warnedBusDisabled = false;
   private _warnedNoMixer = false;
   private _disposed = false;
+  private _enhancer: DubBusEnhancer | null = null;
+  private _autoEQUnsub: (() => void) | null = null;
   /**
    * Mute-hold guard. While true, `_applySettings` skips writes to
    * `return_.gain` and `sidechain.threshold` so a re-entrant
@@ -1888,7 +1897,9 @@ export class DubBus {
     //   → stable full-amplitude bass drone.
     //
     //   Spring.output → Sidechain → Glue → MidScoop → LPF → StereoMS → return → master
-    this.input.connect(this.hpf);
+    // Insert enhancer chain (spectral exciter + transient sharpener) between input and HPF
+    this._enhancer = new DubBusEnhancer(this.context);
+    this._enhancer.connect(this.input, this.hpf);
     // hpf → hpf2 → hpf3 → hpfResonance (Altec T-network peak) — resonance is the cascade output.
     this.hpfResonance.connect(this.bassShelf);
     // bassShelf output feeds BOTH the single-path saturator AND the 3-path
@@ -2001,6 +2012,19 @@ export class DubBus {
     // the 800ms warmup hold. After pre-heat, modules are cached and worklet
     // boot is ~50ms.
     void this._preheatWASMModules();
+
+    // Auto EQ: subscribe to analysis store — fires when analysis completes
+    this._autoEQUnsub = useTrackerAnalysisStore.subscribe(
+      (s) => s.analysisState,
+      (analysisState) => {
+        if (analysisState === 'ready' && !this._disposed) {
+          const state = useTrackerAnalysisStore.getState();
+          if (state.currentAnalysis && this.settings.enabled) {
+            void this._applyAutoEQ(state.currentAnalysis);
+          }
+        }
+      }
+    );
   }
 
   /** The bus input node — pad sources connect to this. */
@@ -5572,9 +5596,55 @@ export class DubBus {
     };
   }
 
+  private async _applyAutoEQ(
+    analysis: import('@/stores/useTrackerAnalysisStore').FullAnalysisResult
+  ): Promise<void> {
+    try {
+      const hints = buildInstrumentHints();
+      const { params, genre } = computeAutoEQ(analysis, hints, this.settings.autoEqStrength);
+
+      // Apply EQ curve to the Fil4 return EQ
+      if (params.hp) this.returnEQ.setHP(params.hp.enabled, params.hp.freq, params.hp.q);
+      if (params.ls) this.returnEQ.setLowShelf(params.ls.enabled, params.ls.freq, params.ls.gain, params.ls.q ?? 0.8);
+      if (params.hs) this.returnEQ.setHighShelf(params.hs.enabled, params.hs.freq, params.hs.gain, params.hs.q ?? 0.8);
+      if (params.p) {
+        params.p.forEach((band, i) => {
+          this.returnEQ.setBand(i as 0|1|2|3, band.enabled, band.freq, band.bw ?? 1.0, band.gain);
+        });
+      }
+
+      // Lo-fi detection and offline sample enhancement
+      const instruments = useInstrumentStore.getState().instruments;
+      const editorMode  = useFormatStore.getState().editorMode;
+      const isLoFi = detectLoFiSources(editorMode, instruments);
+
+      if (isLoFi && this._enhancer) {
+        await this._enhancer.processLoFiSamples(instruments);
+      } else if (!isLoFi) {
+        this._enhancer?.clearProcessedCache();
+      }
+
+      // Mirror genre to settings for UI display
+      this.settings = { ...this.settings, autoEqLastGenre: genre };
+
+      // Notify user
+      const strengthPct = Math.round(this.settings.autoEqStrength * 100);
+      useNotificationStore.getState().addNotification({
+        type: 'info',
+        message: `Auto EQ — ${genre} · ${strengthPct}%${isLoFi ? ' · Enhanced' : ''}`,
+      });
+    } catch (err) {
+      console.warn('[DubBus] Auto EQ failed:', err);
+    }
+  }
+
   /** Dispose and release all bus resources. */
   dispose(): void {
     this._disposed = true;
+    this._autoEQUnsub?.();
+    this._autoEQUnsub = null;
+    this._enhancer?.dispose();
+    this._enhancer = null;
     if (_activeDubBus === this) _activeDubBus = null;
     // Detach from any mixer the bus was pulling deck taps from.
     this.detachDJMixer();
