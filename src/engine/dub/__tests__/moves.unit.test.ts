@@ -342,7 +342,7 @@ describe.each([
   ['oscBass',       oscBass,       'startOscBass',       'oscBass',       { freq: 55, level: 0.9 }],
   ['crushBass',     crushBass,     'startCrushBass',     'crushBass',     { freq: 55, bits: 3, level: 0.75 }],
   ['subHarmonic',   subHarmonic,   'startSubHarmonic',   'subHarmonic',   { freq: 55, threshold: 0.035, level: 0.85 }],
-  ['tubbyScream',   tubbyScream,   'startTubbyScream',   'tubbyScream',   { centerHz: 700, sweepHz: 1600, sweepSec: 3.5, feedbackAmount: 1.6 }],
+  ['tubbyScream',   tubbyScream,   'startTubbyScream',   'tubbyScream',   { centerHz: 500, sweepHz: 900, sweepSec: 3.5, feedbackAmount: 1.3 }],
   ['stereoDoubler', stereoDoubler, 'startStereoDoubler', 'stereoDoubler', { delayMs: 25, feedback: 0.55, wet: 0.9 }],
   ['tapeWobble',    tapeWobble,    'startTapeWobble',    'tapeWobble',    { depthMs: 35, rateHz: 2.5 }],
 ] as const)('hold move %s', (_name, move, busMethod, releaseKey, expectedDefaults) => {
