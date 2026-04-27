@@ -36,6 +36,7 @@ import { DubLaneTimeline } from './DubLaneTimeline';
 import { AutoDubPanel } from './AutoDubPanel';
 import { Fil4EqPanel } from '@components/effects/Fil4EqPanel';
 import { getActiveDubBus } from '@engine/dub/DubBus';
+import { DubBusPanel } from './DubBusPanel';
 import { DUB_CHARACTER_PRESETS } from '@/types/dub';
 import { getPersona } from '@/engine/dub/AutoDubPersonas';
 import type { AutoDubPersonaId } from '@/stores/useDubStore';
@@ -199,7 +200,8 @@ export const DubDeckStrip: React.FC = () => {
 
   // Auto Dub settings panel (intensity + blacklist) — opened by ⚙ icon
   const [autoDubSettingsOpen, setAutoDubSettingsOpen] = useState(false);
-  const [showReturnEQ, setShowReturnEQ] = useState(false);
+  // Active tab — PERFORM is default; EQ / BUS / RECORD for deeper panels
+  const [activeTab, setActiveTab] = useState<'perform' | 'eq' | 'bus' | 'record'>('perform');
   const autoDubSettingsBtnRef = useRef<HTMLButtonElement | null>(null);
 
   // Derive current style. For presets with unique characterPreset values
@@ -950,12 +952,6 @@ export const DubDeckStrip: React.FC = () => {
         >⚙</button>
         <AutoDubPanel busEnabled={busEnabled} open={autoDubSettingsOpen} onClose={() => setAutoDubSettingsOpen(false)} anchorRef={autoDubSettingsBtnRef} />
         <button
-          className={`px-1.5 py-1 rounded border text-xs transition-colors disabled:opacity-40 ${showReturnEQ ? 'bg-accent-highlight/20 border-accent-highlight text-accent-highlight' : 'bg-dark-bgTertiary border-dark-borderLight text-text-muted hover:text-accent-highlight hover:border-accent-highlight'}`}
-          onClick={() => setShowReturnEQ(v => !v)}
-          disabled={!busEnabled}
-          title="Return EQ — Fil4 parametric EQ on the dub bus return path"
-        >EQ</button>
-        <button
           className={
             'px-2.5 py-1 rounded border transition-colors ' +
             (ghostBus
@@ -1069,11 +1065,8 @@ export const DubDeckStrip: React.FC = () => {
           )}
         </div>
         <span className="flex-1" />
-        <span className="text-text-muted">
-          {pattern?.dubLane?.events.length ?? 0} events on this pattern
-        </span>
         <button
-          className="px-2.5 py-1 rounded bg-accent-error text-white font-semibold hover:bg-accent-error/80"
+          className="px-2.5 py-1 rounded bg-accent-error text-white font-semibold hover:bg-accent-error/80 text-xs"
           onClick={() => window.dispatchEvent(new Event('dub-panic'))}
           title="Drain the bus + disarm recording"
         >
@@ -1081,14 +1074,29 @@ export const DubDeckStrip: React.FC = () => {
         </button>
       </div>
 
-      {/* Return EQ panel — shown when EQ button is toggled */}
-      {showReturnEQ && busEnabled && (() => {
-        const eq = getActiveDubBus()?.getReturnEQ();
-        return eq ? <Fil4EqPanel effect={eq} /> : null;
-      })()}
+      {/* Tab bar — only when strip is expanded */}
+      {!stripCollapsed && (
+        <div className="flex gap-0.5 border-b border-dark-border text-[10px] font-mono">
+          {(['perform', 'eq', 'bus', 'record'] as const).map(tab => (
+            <button
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              className={`px-3 py-1 transition-colors uppercase tracking-wide ${
+                activeTab === tab
+                  ? 'text-accent-highlight border-b-2 border-accent-highlight bg-dark-bgTertiary'
+                  : 'text-text-muted hover:text-text-primary'
+              }`}
+            >
+              {tab}
+            </button>
+          ))}
+        </div>
+      )}
 
       {!stripCollapsed && (
       <>
+      {/* ── PERFORM tab ─────────────────────────────────────────────────────── */}
+      {activeTab === 'perform' && (<>
       {/* Hover info bar — always rendered to reserve space and prevent layout jitter */}
       <div className={`px-3 py-1 border rounded text-xs font-mono truncate ${hoverHint ? 'bg-dark-bg border-dark-borderLight text-text-secondary' : 'border-transparent text-transparent'}`}>
         {hoverHint || '\u00A0'}
@@ -1602,8 +1610,40 @@ export const DubDeckStrip: React.FC = () => {
         })}
       </div>
 
-      {/* Lane timeline */}
-      <DubLaneTimeline />
+      </>)}
+
+      {/* ── EQ tab ──────────────────────────────────────────────────────────── */}
+      {activeTab === 'eq' && (
+        busEnabled
+          ? (() => {
+              const eq = getActiveDubBus()?.getReturnEQ();
+              return eq
+                ? <Fil4EqPanel effect={eq} />
+                : <div className="py-4 text-center text-text-muted text-xs font-mono">Return EQ not available</div>;
+            })()
+          : <div className="py-4 text-center text-text-muted text-xs font-mono">Enable bus to use the return EQ</div>
+      )}
+
+      {/* ── BUS tab ─────────────────────────────────────────────────────────── */}
+      {activeTab === 'bus' && (
+        <DubBusPanel />
+      )}
+
+      {/* ── RECORD tab ──────────────────────────────────────────────────────── */}
+      {activeTab === 'record' && (
+        <div className="flex flex-col gap-1.5">
+          <div className="flex items-center gap-2 text-xs text-text-muted px-1">
+            <span>{pattern?.dubLane?.events.length ?? 0} events on this pattern</span>
+            <span className="flex-1" />
+            <button
+              className="px-2.5 py-1 rounded bg-accent-error text-white font-semibold hover:bg-accent-error/80 text-xs"
+              onClick={() => window.dispatchEvent(new Event('dub-panic'))}
+              title="Drain the bus + disarm recording"
+            >KILL</button>
+          </div>
+          <DubLaneTimeline />
+        </div>
+      )}
       </>
       )}
     </div>
