@@ -50,6 +50,8 @@ function baseCtx(overrides: Partial<AutoDubTickCtx> = {}): AutoDubTickCtx {
     densityByRole: new Map(),
     phraseIntensityMult: 1.0,
     lastGlobalFireBar: -99,
+    eqSnapshot: null,
+    inRiddimSection: false,
     ...overrides,
   };
 }
