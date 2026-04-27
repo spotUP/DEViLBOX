@@ -110,9 +110,14 @@ export const Fil4EqPanel: React.FC<Props> = ({ effect }) => {
     return () => { effect.off('params', onP); };
   }, [effect]);
 
+  // Auto-enable a band when any value (freq/gain/q/bw) is changed while it
+  // is disabled, UNLESS the patch is itself toggling the enabled flag.
+  const autoEnable = (enabled: boolean, patch: Partial<BandState>) =>
+    !enabled && !('enabled' in patch);
+
   const setHP = useCallback((patch: Partial<BandState>) => {
     setState(s => {
-      const next = { ...s.hp, ...patch };
+      const next = { ...s.hp, ...(autoEnable(s.hp.enabled, patch) ? { enabled: true } : {}), ...patch };
       effect.setHP(next.enabled, next.freq, next.q);
       return { ...s, hp: next };
     });
@@ -120,7 +125,7 @@ export const Fil4EqPanel: React.FC<Props> = ({ effect }) => {
 
   const setLP = useCallback((patch: Partial<BandState>) => {
     setState(s => {
-      const next = { ...s.lp, ...patch };
+      const next = { ...s.lp, ...(autoEnable(s.lp.enabled, patch) ? { enabled: true } : {}), ...patch };
       effect.setLP(next.enabled, next.freq, next.q);
       return { ...s, lp: next };
     });
@@ -128,7 +133,7 @@ export const Fil4EqPanel: React.FC<Props> = ({ effect }) => {
 
   const setLS = useCallback((patch: Partial<BandState>) => {
     setState(s => {
-      const next = { ...s.ls, ...patch };
+      const next = { ...s.ls, ...(autoEnable(s.ls.enabled, patch) ? { enabled: true } : {}), ...patch };
       effect.setLowShelf(next.enabled, next.freq, next.gain, next.q);
       return { ...s, ls: next };
     });
@@ -136,7 +141,7 @@ export const Fil4EqPanel: React.FC<Props> = ({ effect }) => {
 
   const setHS = useCallback((patch: Partial<BandState>) => {
     setState(s => {
-      const next = { ...s.hs, ...patch };
+      const next = { ...s.hs, ...(autoEnable(s.hs.enabled, patch) ? { enabled: true } : {}), ...patch };
       effect.setHighShelf(next.enabled, next.freq, next.gain, next.q);
       return { ...s, hs: next };
     });
@@ -145,7 +150,7 @@ export const Fil4EqPanel: React.FC<Props> = ({ effect }) => {
   const setP = useCallback((band: 0|1|2|3, patch: Partial<BandState>) => {
     setState(s => {
       const bands = [...s.p];
-      bands[band] = { ...bands[band], ...patch };
+      bands[band] = { ...bands[band], ...(autoEnable(s.p[band].enabled, patch) ? { enabled: true } : {}), ...patch };
       const b = bands[band];
       effect.setBand(band, b.enabled, b.freq, b.bw, b.gain);
       return { ...s, p: bands };
