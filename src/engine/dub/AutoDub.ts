@@ -613,6 +613,7 @@ const RULES: Rule[] = [
     condition: (c) =>
       c.isNewBar
       && (c.persona.riddimConfig?.enabled ?? false)
+      && c.bar > 0                                           // never fire on bar 0 (instant mute on start)
       && c.bar % (c.persona.riddimConfig?.freqBars ?? 16) === 0
       && c.intensity > 0.35
       && !c.inRiddimSection,
