@@ -340,7 +340,7 @@ describe('delayTimeThrow', () => {
 // ── oscBass / crushBass / subHarmonic / tubbyScream / stereoDoubler / tapeWobble ──
 describe.each([
   ['oscBass',       oscBass,       'startOscBass',       'oscBass',       { freq: 55, level: 0.9 }],
-  ['crushBass',     crushBass,     'startCrushBass',     'crushBass',     { freq: 55, bits: 3, level: 0.75 }],
+  ['crushBass',     crushBass,     'startCrushBass',     'crushBass',     { freq: 55, bits: 3, level: 0.55 }],
   ['subHarmonic',   subHarmonic,   'startSubHarmonic',   'subHarmonic',   { freq: 55, threshold: 0.035, level: 0.85 }],
   ['tubbyScream',   tubbyScream,   'startTubbyScream',   'tubbyScream',   { centerHz: 500, sweepHz: 900, sweepSec: 3.5, feedbackAmount: 1.3 }],
   ['stereoDoubler', stereoDoubler, 'startStereoDoubler', 'stereoDoubler', { delayMs: 25, feedback: 0.55, wet: 0.9 }],

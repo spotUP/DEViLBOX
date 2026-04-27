@@ -662,8 +662,8 @@ export const DUB_CHARACTER_PRESETS: Record<Exclude<DubBusSettings['characterPres
       echoIntensity:  0.55,   // was 0.72 — high feedback with springEcho = rolling forever
       echoRateMs:     380,
       echoSyncDivision: '1/4T', // research: Perry used triplet-feel echoes against the riddim
-      echoWet:        0.80,
-      springWet:      0.28,   // was 0.38
+      echoWet:        0.60,   // was 0.80 — spring feeds echo in springEcho order, so this was doubling reverb
+      springWet:      0.20,   // was 0.28
       sidechainAmount: 0.4,
       stereoWidth:    0.25,  // near-mono — Perry's defining texture
       // Perry had actual phasers (Mutron Bi-Phase, Eventide, MXR Phase 90)
@@ -725,10 +725,10 @@ export const DUB_CHARACTER_PRESETS: Record<Exclude<DubBusSettings['characterPres
       springWet:      0.25,   // gated — short
       sidechainAmount: 0.5,
       stereoWidth:    1.3,
-      sweepAmount:    0.65,   // heavy flanger on returns
-      sweepRateHz:    0.4,
-      sweepDepthMs:   7,
-      sweepFeedback:  0.80,
+      sweepAmount:    0.42,   // flanger on returns — not overwhelming
+      sweepRateHz:    1.5,    // faster cycle = more musical, less liquid/wild
+      sweepDepthMs:   3,      // narrow comb = controlled metallic sheen
+      sweepFeedback:  0.52,   // was 0.80 — high feedback caused runaway resonance
       tapeSatMode:   'single',
       echoEngine:    'reTapeEcho',  // BBD character for 80s dub
     },
