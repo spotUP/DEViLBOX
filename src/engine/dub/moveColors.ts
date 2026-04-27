@@ -53,6 +53,7 @@ export const MOVE_COLOR: Record<string, string> = {
   combSweep:           'bg-accent-secondary/80', // liquid comb sweep — same family as sweep controls
   versionDrop:         'bg-accent-error',         // full melodic drop — same as channelMute (dramatic)
   skankEchoThrow:      'bg-accent-highlight/60',  // floating offbeat echo — highlight family, semi-transparent
+  riddimSection:       'bg-accent-error/70',      // bass+drums breakdown — dramatic drop, lighter than full versionDrop
 };
 
 // Hold-kind moves have a meaningful durationRows. Keep in sync with the
@@ -67,4 +68,5 @@ export const HOLD_KINDS = new Set([
   'hpfRise', 'madProfPingPong', 'combSweep', 'tapeStop', 'transportTapeStop',
   'versionDrop',
   'skankEchoThrow',
+  'riddimSection',
 ]);
