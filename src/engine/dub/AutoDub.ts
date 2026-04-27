@@ -929,6 +929,9 @@ let _improvTimer: ReturnType<typeof setInterval> | null = null;
 let _prevEnergy = 0;
 /** Per-band gain delta from improv loop (indices 0-3 = parametric bands P1-P4). */
 const _improvBandDeltas = [0, 0, 0, 0];
+/** Deltas applied in the PREVIOUS tick — subtracted before applying new deltas
+ *  to avoid accumulation when returnEQ.getParams() already includes last tick's write. */
+const _prevImprovBandDeltas = [0, 0, 0, 0];
 
 function _makeFlatBaseline(): import('@/engine/effects/Fil4EqEffect').Fil4Params {
   return {
@@ -951,12 +954,16 @@ function _applyImprovDeltas(): void {
     const dubBus = getActiveDubBus?.();
     if (!dubBus) return;
     const returnEQ = dubBus.getReturnEQ();
-    const baseline = returnEQ.getParams();
+    const current = returnEQ.getParams();
     for (let i = 0; i < 4; i++) {
-      const b = baseline.p[i];
+      const b = current.p[i];
       if (!b) continue;
-      returnEQ.setBand(i, b.enabled, b.freq, b.bw, b.gain + _improvBandDeltas[i]);
+      // Subtract previous tick's delta before adding the new one — prevents
+      // accumulation since current params already include _prevImprovBandDeltas[i].
+      returnEQ.setBand(i, b.enabled, b.freq, b.bw,
+        b.gain - _prevImprovBandDeltas[i] + _improvBandDeltas[i]);
     }
+    for (let i = 0; i < 4; i++) _prevImprovBandDeltas[i] = _improvBandDeltas[i];
   } catch { /* ok */ }
 }
 
@@ -1032,7 +1039,10 @@ function _rampBandsToBaseline(): void {
       else _improvBandDeltas[i] = 0;
     }
     _applyImprovDeltas();
-    if (allZero) clearInterval(timer);
+    if (allZero) {
+      clearInterval(timer);
+      _prevImprovBandDeltas.fill(0);
+    }
   }, 20);
 }
 
@@ -1399,6 +1409,8 @@ export function startAutoDub(): void {
   // needs ~2 s of live audio to refill before it starts voting again.
   resetRuntimeChannelClassifier();
   _prevEnergy = 0;
+  _improvBandDeltas.fill(0);
+  _prevImprovBandDeltas.fill(0);
   _timer = setInterval(tickImpl, TICK_MS);
   startImprovLoop();
 }
