@@ -16,10 +16,8 @@
 import * as ort from 'onnxruntime-web/wasm';
 
 import {
-  computeCedMelSpectrogram,
   resampleTo16k,
   tileToMinLength,
-  CED_N_MELS,
 } from '@/bridge/analysis/CedMelSpectrogram';
 import {
   audioSetLabelToInstrumentType,
@@ -40,8 +38,8 @@ const CONFIG_URL_PRIMARY  = '/models/ced/config.json';
 const CONFIG_URL_FALLBACK = 'https://huggingface.co/mispeech/ced-base/resolve/main/config.json';
 const CACHE_NAME = 'instrument-classifier-ced-v1';
 
-// Minimum PCM length at 16kHz before tiling (~160ms)
-const MIN_SAMPLES = 2560;
+// 2 seconds at 16kHz — enough context for the model, stays within WASM heap limits.
+const MIN_SAMPLES = 32000;
 
 // ── State ─────────────────────────────────────────────────────────────────────
 let session: ort.InferenceSession | null = null;
@@ -52,19 +50,16 @@ let _loadPromise: Promise<void> | null = null;
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-// Minimum size we'd expect for any valid ONNX model (1MB safety margin)
-const MIN_MODEL_BYTES = 1_000_000;
-
-async function fetchWithCache(primary: string, fallback: string): Promise<ArrayBuffer> {
+async function fetchWithCache(primary: string, fallback: string, minBytes = 0): Promise<ArrayBuffer> {
   const cache = await caches.open(CACHE_NAME);
   for (const url of [primary, fallback]) {
     try {
       const cached = await cache.match(url);
       if (cached) {
         const buf = await cached.arrayBuffer();
-        if (buf.byteLength >= MIN_MODEL_BYTES) return buf;
+        if (buf.byteLength >= minBytes) return buf;
         // Cache entry is truncated/corrupt — delete and re-fetch
-        console.warn(`[CED worker] Cached model too small (${buf.byteLength} bytes), evicting and re-fetching`);
+        console.warn(`[CED worker] Cached entry too small (${buf.byteLength} bytes), evicting: ${url}`);
         await cache.delete(url);
       }
       const res = await fetch(url);
@@ -78,18 +73,22 @@ async function fetchWithCache(primary: string, fallback: string): Promise<ArrayB
 
 async function _doLoadSession(): Promise<void> {
   self.postMessage({ type: 'loading', progress: 0 });
-  const buf = await fetchWithCache(MODEL_URL_PRIMARY, MODEL_URL_FALLBACK);
+  const buf = await fetchWithCache(MODEL_URL_PRIMARY, MODEL_URL_FALLBACK, 1_000_000);
   console.warn(`[CED worker] model fetched: ${buf.byteLength.toLocaleString()} bytes`);
   self.postMessage({ type: 'loading', progress: 80 });
   // Pass as Uint8Array — some ORT versions require typed array, not raw ArrayBuffer
   session = await ort.InferenceSession.create(new Uint8Array(buf), {
     executionProviders: ['wasm'],
   });
+  console.warn('[CED worker] inputNames:', session.inputNames, 'outputNames:', session.outputNames);
   self.postMessage({ type: 'loading', progress: 90 });
   try {
     const cfgBuf = await fetchWithCache(CONFIG_URL_PRIMARY, CONFIG_URL_FALLBACK);
     const cfg = JSON.parse(new TextDecoder().decode(cfgBuf)) as { id2label?: Record<string, string> };
-    if (cfg.id2label) id2label = cfg.id2label;
+    if (cfg.id2label) {
+      id2label = cfg.id2label;
+      console.warn(`[CED worker] id2label loaded: ${Object.keys(id2label).length} labels`);
+    }
   } catch { /* non-fatal */ }
   self.postMessage({ type: 'loading', progress: 100 });
   self.postMessage({ type: 'ready' });
@@ -99,16 +98,6 @@ function ensureSession(): Promise<void> {
   if (session) return Promise.resolve();
   if (!_loadPromise) _loadPromise = _doLoadSession();
   return _loadPromise;
-}
-
-function softmax(logits: Float32Array): Float32Array {
-  let max = -Infinity;
-  for (let i = 0; i < logits.length; i++) if (logits[i] > max) max = logits[i];
-  const exp = new Float32Array(logits.length);
-  let sum = 0;
-  for (let i = 0; i < logits.length; i++) { exp[i] = Math.exp(logits[i] - max); sum += exp[i]; }
-  for (let i = 0; i < exp.length; i++) exp[i] /= sum;
-  return exp;
 }
 
 function topK(probs: Float32Array, k: number): Array<{ index: number; score: number }> {
@@ -127,19 +116,17 @@ async function classify(
 
   // Resample → 16kHz
   let audio = resampleTo16k(pcm, sampleRate);
-  // Tile very short samples
+  // Tile very short samples to ensure minimum length
   audio = tileToMinLength(audio, MIN_SAMPLES);
 
-  // Compute mel spectrogram
-  const { data, nFrames } = computeCedMelSpectrogram(audio);
+  // CED model takes raw waveform [batch=1, num_samples] — does mel spectrogram internally.
+  const inputName = session.inputNames[0];
+  const tensor = new ort.Tensor('float32', audio, [1, audio.length]);
+  const results = await session.run({ [inputName]: tensor });
 
-  // Shape: (1, 64, T) — create tensor
-  const tensor = new ort.Tensor('float32', data, [1, CED_N_MELS, nFrames]);
-  const results = await session.run({ input_values: tensor });
-
-  const logitsKey = Object.keys(results)[0];
-  const logits = results[logitsKey].data as Float32Array;
-  const probs = softmax(logits);
+  // Model outputs sigmoid probabilities (multi-label AudioSet) — use directly, no softmax.
+  const outputKey = Object.keys(results)[0];
+  const probs = results[outputKey].data as Float32Array;
   const top = topK(probs, 10);
 
   // Map to labels

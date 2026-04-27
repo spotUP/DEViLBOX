@@ -12,6 +12,8 @@ import { getSynthInfo } from '@constants/synthCategories';
 import { getSynthBadge } from '@constants/channelTypeCompat';
 import { useInstrumentTypeStore } from '@stores/useInstrumentTypeStore';
 import { instrumentTypeLabel } from '@/bridge/analysis/AudioSetInstrumentMap';
+import type { InstrumentType } from '@/bridge/analysis/AudioSetInstrumentMap';
+import { analyzeSampleForClassification } from '@/bridge/analysis/SampleSpectrum';
 import { Plus, Trash2, Copy, Repeat, Repeat1, FolderOpen, Pencil, Package, ExternalLink, Download, Upload, Cpu, X, Music2 } from 'lucide-react';
 import * as LucideIcons from 'lucide-react';
 
@@ -123,12 +125,9 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
     setShowNewInstrumentBrowser: s.setShowNewInstrumentBrowser,
   })));
   const cedResults = useInstrumentTypeStore(s => s.results);
-  const classifyInstruments = useInstrumentTypeStore(s => s.classifyInstruments);
-
-  // Trigger CED classification whenever the instrument list changes (song load, add, etc.)
-  useEffect(() => {
-    if (instruments.length > 0) classifyInstruments(instruments);
-  }, [instruments, classifyInstruments]);
+  const cedPending = useInstrumentTypeStore(s => s.pendingIds);
+  const setManualType = useInstrumentTypeStore(s => s.setManualType);
+  const [typePickerFor, setTypePickerFor] = useState<number | null>(null);
 
   const listRef = useRef<HTMLDivElement>(null);
   const selectedRef = useRef<HTMLDivElement>(null);
@@ -147,9 +146,9 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
 
   const isFT2 = variant === 'ft2';
 
-  // Inject flash keyframe once
+  // Inject animation keyframes once
   useEffect(() => {
-    const id = 'ft2-select-flash-style';
+    const id = 'instrument-list-keyframes';
     if (!document.getElementById(id)) {
       const s = document.createElement('style');
       s.id = id;
@@ -157,6 +156,10 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
         @keyframes ft2-select-flash {
           0%   { opacity: 1; }
           100% { opacity: 0; }
+        }
+        @keyframes ced-scan {
+          0%   { transform: translateX(-100%); }
+          100% { transform: translateX(500%); }
         }
       `;
       document.head.appendChild(s);
@@ -716,23 +719,105 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
                   );
                 })()}
 
-                {/* CED neural instrument type tag */}
+                {/* Instrument type tag — clickable to assign/override manually */}
                 {(() => {
                   const ced = cedResults.get(instrument.id);
-                  if (!ced || ced.instrumentType === 'unknown') return null;
+                  const isPending = cedPending.has(instrument.id);
+                  const isManual = ced?.confidence === 1.0 && ced.topLabels[0]?.label === ced.instrumentType;
+                  const open = typePickerFor === instrument.id;
+                  const toggle = (e: React.MouseEvent) => { e.stopPropagation(); setTypePickerFor(open ? null : instrument.id); };
+
+                  let badgeEl: React.ReactNode = null;
+
+                  if (ced && ced.instrumentType !== 'unknown' && ced.confidence >= 0.05) {
+                    badgeEl = (
+                      <span
+                        className={`text-[9px] px-1 py-0.5 rounded font-mono font-bold border shrink-0 cursor-pointer ${
+                          isSelected
+                            ? 'bg-ft2-bg/20 text-ft2-bg border-ft2-bg/30'
+                            : isManual
+                              ? 'bg-accent-highlight/15 text-accent-highlight border-accent-highlight/40'
+                              : 'bg-accent-primary/10 text-accent-primary border-accent-primary/30'
+                        }`}
+                        title={isManual ? 'Manual — click to change' : `CED ${Math.round(ced.confidence * 100)}% — click to override`}
+                        onClick={toggle}
+                      >
+                        {instrumentTypeLabel(ced.instrumentType)}
+                      </span>
+                    );
+                  } else if (isPending) {
+                    badgeEl = (
+                      <span
+                        className={`text-[9px] px-1 py-0.5 rounded font-mono border shrink-0 ${
+                          isSelected ? 'text-ft2-bg/50 border-ft2-bg/20' : 'text-text-muted border-dark-border'
+                        }`}
+                        title="Analysing…"
+                      >
+                        ···
+                      </span>
+                    );
+                  } else {
+                    const url = instrument.sample?.url;
+                    if (typeof url === 'string' && url.startsWith('data:audio/wav;base64,')) {
+                      const spec = analyzeSampleForClassification(url);
+                      if (spec && spec.role !== 'empty' && spec.confidence >= 0.6) {
+                        const label = spec.role === 'bass'
+                          ? (spec.subrole === 'sub' ? 'SUB' : 'BASS')
+                          : spec.subrole ? spec.subrole.toUpperCase() : spec.role.toUpperCase();
+                        badgeEl = (
+                          <span
+                            className={`text-[9px] px-1 py-0.5 rounded font-mono font-bold border shrink-0 cursor-pointer ${
+                              isSelected ? 'bg-ft2-bg/20 text-ft2-bg/80 border-ft2-bg/20' : 'bg-accent-secondary/10 text-accent-secondary border-accent-secondary/30'
+                            }`}
+                            title={`Spectral ${Math.round(spec.confidence * 100)}% — click to override`}
+                            onClick={toggle}
+                          >
+                            {label}
+                          </span>
+                        );
+                      }
+                    }
+                    if (!badgeEl) {
+                      badgeEl = (
+                        <span
+                          className={`text-[9px] px-1 py-0.5 rounded font-mono border shrink-0 cursor-pointer opacity-0 group-hover:opacity-60 hover:!opacity-100 transition-opacity ${
+                            isSelected ? 'text-ft2-bg border-ft2-bg/30' : 'text-text-muted border-dark-borderLight'
+                          }`}
+                          title="Click to classify"
+                          onClick={toggle}
+                        >
+                          ?
+                        </span>
+                      );
+                    }
+                  }
+
                   return (
-                    <span
-                      className={`text-[9px] px-1 py-0.5 rounded font-mono font-bold border ${
-                        isSelected
-                          ? 'bg-ft2-bg/20 text-ft2-bg border-ft2-bg/30'
-                          : 'bg-accent-primary/10 text-accent-primary border-accent-primary/30'
-                      }`}
-                      title={`CED: ${ced.topLabels[0]?.label ?? ''} (${Math.round(ced.confidence * 100)}%)`}
-                    >
-                      {instrumentTypeLabel(ced.instrumentType)}
-                    </span>
+                    <div className="relative shrink-0">
+                      {badgeEl}
+                      {open && (
+                        <InstrumentTypePicker
+                          current={isManual ? ced!.instrumentType : null}
+                          onSelect={type => { setManualType(instrument.id, type); setTypePickerFor(null); }}
+                          onClose={() => setTypePickerFor(null)}
+                        />
+                      )}
+                    </div>
                   );
                 })()}
+
+                {/* CED scan progress bar — sweeps across the row bottom while pending */}
+                {cedPending.has(instrument.id) && (
+                  <span
+                    className="absolute bottom-0 left-0 h-[2px] w-1/5 pointer-events-none"
+                    style={{
+                      background: isSelected
+                        ? 'rgba(255,255,255,0.5)'
+                        : 'var(--color-accent-primary, #6366f1)',
+                      animation: 'ced-scan 1.4s ease-in-out infinite',
+                    }}
+                  />
+                )}
 
                 {/* Actions (visible on hover, always visible when selected) */}
                 {showActions && (
@@ -889,6 +974,17 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
                   );
                 })()}
 
+                {/* CED scan progress bar (default variant) */}
+                {cedPending.has(instrument.id) && (
+                  <span
+                    className="absolute bottom-0 left-0 h-[2px] w-1/5 pointer-events-none"
+                    style={{
+                      background: 'var(--color-accent-primary, #6366f1)',
+                      animation: 'ced-scan 1.4s ease-in-out infinite',
+                    }}
+                  />
+                )}
+
                 {/* Sample loop indicator - enhanced visibility */}
                 {instrument.sample?.loop && (
                   <span
@@ -1005,3 +1101,73 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
 });
 
 InstrumentList.displayName = 'InstrumentList';
+
+// ── Instrument Type Picker ────────────────────────────────────────────────────
+
+const TYPE_GROUPS: Array<{ label: string; types: InstrumentType[] }> = [
+  { label: 'Drums', types: ['kick', 'snare', 'hihat', 'cymbal', 'drum', 'percussion'] },
+  { label: 'Melodic', types: ['bass', 'guitar', 'piano', 'keyboard', 'organ', 'synthesizer', 'pad', 'strings', 'brass', 'wind', 'voice'] },
+  { label: 'Other', types: ['sampler'] },
+];
+
+const TYPE_NAMES: Record<InstrumentType, string> = {
+  kick: 'Kick', snare: 'Snare', hihat: 'Hi-hat', cymbal: 'Cymbal', drum: 'Drum', percussion: 'Perc',
+  bass: 'Bass', guitar: 'Guitar', piano: 'Piano', keyboard: 'Keys', organ: 'Organ',
+  synthesizer: 'Synth', pad: 'Pad', strings: 'Strings', brass: 'Brass', wind: 'Wind',
+  voice: 'Voice', sampler: 'Sampler', unknown: 'Unknown',
+};
+
+interface InstrumentTypePickerProps {
+  current: InstrumentType | null | undefined;
+  onSelect: (type: InstrumentType | null) => void;
+  onClose: () => void;
+}
+
+const InstrumentTypePicker: React.FC<InstrumentTypePickerProps> = ({ current, onSelect, onClose }) => {
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) onClose();
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [onClose]);
+
+  return (
+    <div
+      ref={ref}
+      className="absolute right-0 top-full mt-1 z-[9999] bg-dark-bg border border-dark-border rounded shadow-xl p-2 min-w-[160px]"
+      onClick={e => e.stopPropagation()}
+    >
+      {TYPE_GROUPS.map(group => (
+        <div key={group.label} className="mb-1.5 last:mb-0">
+          <div className="text-[9px] text-text-muted font-mono uppercase px-1 mb-0.5">{group.label}</div>
+          <div className="flex flex-wrap gap-1">
+            {group.types.map(type => (
+              <button
+                key={type}
+                onClick={() => onSelect(type)}
+                className={`text-[9px] px-1.5 py-0.5 rounded font-mono font-bold border transition-colors ${
+                  current === type
+                    ? 'bg-accent-highlight/20 text-accent-highlight border-accent-highlight/50'
+                    : 'bg-dark-bgSecondary text-text-secondary border-dark-border hover:border-accent-primary hover:text-accent-primary'
+                }`}
+              >
+                {TYPE_NAMES[type]}
+              </button>
+            ))}
+          </div>
+        </div>
+      ))}
+      {current && (
+        <button
+          onClick={() => onSelect(null)}
+          className="mt-1.5 w-full text-[9px] px-1.5 py-0.5 rounded font-mono border border-dark-borderLight text-text-muted hover:text-accent-error hover:border-accent-error/40 transition-colors"
+        >
+          ✕ Reset to auto
+        </button>
+      )}
+    </div>
+  );
+};

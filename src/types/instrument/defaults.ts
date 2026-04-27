@@ -366,6 +366,8 @@ export interface InstrumentConfig {
   metadata?: InstrumentMetadata; // Import metadata and transformation history
   rawBinaryData?: Uint8Array;   // Raw binary instrument data for WASM upload (e.g. native .fur format)
   uadeChipRam?: UADEChipRamInfo;  // present when loaded via UADE native parser
+  /** User-assigned instrument role — overrides CED neural + spectral auto-detection. */
+  manualInstrumentType?: string;
 }
 
 export interface InstrumentPreset {

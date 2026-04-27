@@ -15,6 +15,20 @@
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
+/** Instrument presence hints derived from CED neural + spectral analysis. */
+export interface InstrumentHints {
+  hasGuitar: boolean;
+  hasBass: boolean;
+  hasPercussion: boolean;
+  hasPiano: boolean;
+  hasStrings: boolean;
+  hasBrass: boolean;
+  hasWind: boolean;
+  hasVoice: boolean;
+  hasSynth: boolean;
+  hasOrgan: boolean;
+}
+
 interface AnalyzeRequest {
   type: 'analyze';
   id: string;
@@ -22,6 +36,7 @@ interface AnalyzeRequest {
   pcmRight: Float32Array | null;  // null for mono
   sampleRate: number;
   numBins?: number;               // Number of waveform bins (default: 800)
+  instrumentHints?: InstrumentHints;
 }
 
 interface InitRequest {
@@ -370,6 +385,7 @@ function classifyGenre(
   beats: number[],
   _mono: Float32Array,
   _sampleRate: number,
+  hints?: InstrumentHints,
 ): GenreResult {
   // ── Spectral Feature Extraction ──────────────────────────────────────────
   const [lowBand, midBand, highBand] = frequencyPeaks;
@@ -426,7 +442,7 @@ function classifyGenre(
   // ── Energy & Dynamics ────────────────────────────────────────────────────
   
   // Energy (normalized from dB)
-  const energy = Math.min(1, Math.max(0, (rmsDb + 40) / 40)); // -40dB → 0, 0dB → 1
+  const energy = Math.min(1, Math.max(0, (rmsDb + 60) / 60)); // -60dB → 0, 0dB → 1
   const isHighEnergy = energy > 0.65;
   const isMidEnergy = energy > 0.4 && energy <= 0.65;
   const isLowEnergy = energy <= 0.4;
@@ -440,20 +456,22 @@ function classifyGenre(
   // BPM detection can sometimes detect half or double the actual tempo
   
   let effectiveBpm = bpm;
-  
-  // If BPM is very low but energy is high with regular beats, likely half-time
-  if (bpm >= 55 && bpm < 75 && isHighEnergy && isFourOnFloor) {
+
+  // Half-time correction: 55-74 BPM with regular four-on-floor beat is likely
+  // detected at half the real tempo. Guards:
+  //   !isLowEnergy — don't double genuinely slow/quiet ambient tracks
+  //   !isBassHeavy — protect reggae/dub/hip-hop (heavy bass at this BPM = real slow tempo)
+  if (bpm >= 55 && bpm < 75 && !isLowEnergy && isFourOnFloor && !isBassHeavy) {
     effectiveBpm = bpm * 2;
-  } else if (bpm >= 75 && bpm < 95 && isHighEnergy && beatRegularity > 0.6) {
-    // Could be half-time house/techno or actual hip-hop tempo
-    // Check spectral characteristics
-    if (isFourOnFloor && !isSyncopated) {
-      effectiveBpm = bpm * 2;
-    }
   }
-  
-  // If BPM is very high, might be double-time detection
-  if (bpm > 200 && bpm <= 280 && !isHighEnergy) {
+  // 75-94 BPM: no automatic doubling — this range covers real hip-hop, reggae,
+  // and slow house. The previous conditional branch was dead code (isFourOnFloor
+  // already implies beatRegularity > 0.65) and caused false positives.
+
+  // Double-time correction: 201-280 BPM with low energy + regular beat is likely
+  // detected at double the real tempo. Require regular beats to avoid halving
+  // genuine high-BPM breakcore.
+  if (bpm > 200 && bpm <= 280 && !isHighEnergy && beatRegularity > 0.55) {
     effectiveBpm = bpm / 2;
   }
   
@@ -488,8 +506,55 @@ function classifyGenre(
     mood = 'Driving';
   }
   
-  // ── Genre Classification ─────────────────────────────────────────────────
-  
+  // ── Instrument-aware non-electronic genre detection ──────────────────────
+  // Short-circuit the BPM-based waterfall when CED/spectral confirms real instruments.
+  if (hints?.hasGuitar) {
+    const isAcoustic = !hints.hasSynth && !hints.hasOrgan && !isBassHeavy;
+    const hasFull = hints.hasPercussion && hints.hasBass;
+
+    if (isAcoustic && !hints.hasPercussion && effectiveBpm < 110) {
+      return { primary: 'Folk / Acoustic', subgenre: 'Acoustic', confidence: 0.65, mood: isMinor ? 'Melancholic' : 'Chill', energy, danceability };
+    }
+    if (hints.hasBass && isMinor && effectiveBpm < 110 && !isFourOnFloor) {
+      return { primary: 'Blues', subgenre: isHighEnergy ? 'Electric Blues' : 'Blues', confidence: 0.65, mood: 'Melancholic', energy, danceability };
+    }
+    if ((hints.hasBrass || hints.hasPiano) && isSyncopated) {
+      return { primary: 'Jazz', subgenre: isHighEnergy ? 'Jazz Fusion' : 'Jazz', confidence: 0.65, mood: isHighEnergy ? 'Energetic' : 'Chill', energy, danceability };
+    }
+    if (hasFull && effectiveBpm >= 80 && effectiveBpm < 180) {
+      const sub = effectiveBpm >= 150 ? 'Punk / Hardcore' : effectiveBpm >= 130 && isHighEnergy ? 'Hard Rock' : effectiveBpm >= 100 && isHighEnergy ? 'Rock' : effectiveBpm >= 100 ? 'Indie Rock' : isMinor && isDark ? 'Alternative Rock' : 'Rock';
+      const m = isHighEnergy ? 'Energetic' : isMidEnergy ? 'Driving' : isMinor ? 'Melancholic' : 'Uplifting';
+      return { primary: 'Rock', subgenre: sub, confidence: 0.7, mood: m, energy, danceability };
+    }
+    if (hints.hasSynth || hints.hasPiano) {
+      return { primary: 'Pop / Rock', subgenre: 'Pop Rock', confidence: 0.6, mood: isHighEnergy ? 'Energetic' : 'Uplifting', energy, danceability };
+    }
+    return { primary: 'Folk / Acoustic', subgenre: 'Acoustic', confidence: 0.55, mood: isMinor ? 'Melancholic' : 'Chill', energy, danceability };
+  }
+  if ((hints?.hasPiano || hints?.hasStrings) && !hints?.hasSynth) {
+    if (hints?.hasBrass || isSyncopated) {
+      return { primary: 'Jazz', subgenre: 'Jazz', confidence: 0.6, mood: isHighEnergy ? 'Energetic' : 'Chill', energy, danceability };
+    }
+    if (effectiveBpm < 140 && !hints?.hasPercussion) {
+      return { primary: 'Classical', subgenre: 'Contemporary Classical', confidence: 0.55, mood: isMinor ? 'Melancholic' : 'Uplifting', energy, danceability };
+    }
+  }
+  if (hints?.hasVoice && !hints?.hasGuitar && !hints?.hasSynth) {
+    const hasSoul = hints?.hasBass && hints?.hasPercussion;
+    return { primary: hasSoul ? 'R&B / Soul' : 'Singer-Songwriter', subgenre: hasSoul ? (isHighEnergy ? 'Soul' : 'R&B') : 'Singer-Songwriter', confidence: 0.6, mood: isMinor ? 'Melancholic' : 'Uplifting', energy, danceability };
+  }
+
+  // Reggae / Dub — bass + percussion at slow-medium BPM, not synth-dominated.
+  // Catches reggae MODs where no guitar is detected but bass & drums are clear.
+  if ((hints?.hasBass || isBassHeavy) && hints?.hasPercussion && !hints?.hasSynth && !hints?.hasGuitar) {
+    if (effectiveBpm >= 60 && effectiveBpm <= 110 && !isFourOnFloor) {
+      const sub = effectiveBpm < 80 ? 'Dub' : isMajor ? 'Reggae' : 'Roots Reggae';
+      return { primary: 'Reggae / Dub', subgenre: sub, confidence: 0.6, mood: isMajor ? 'Uplifting' : 'Chill', energy, danceability };
+    }
+  }
+
+  // ── Genre Classification (BPM-based — electronic / unrecognised) ─────────
+
   let primary: string;
   let subgenre: string;
   let confidence = 0.55; // Base confidence
@@ -845,8 +910,11 @@ function classifyGenre(
     }
   }
   
-  // IDM detection: irregular beats + complex spectrum + electronic
-  if (primary === 'Electronic' && isDense && !isFourOnFloor && spectralVariance > 0.18) {
+  // IDM detection: only promote to IDM from generic Electronic fallback subgenres
+  // (Electronic, Downtempo). Never overwrite a specific classification like Ambient,
+  // Techno, D&B, etc. that already has a confident assignment.
+  const IDM_OVERRIDABLE = new Set(['Electronic', 'Downtempo']);
+  if (primary === 'Electronic' && IDM_OVERRIDABLE.has(subgenre) && isDense && !isFourOnFloor && spectralVariance > 0.18) {
     subgenre = 'IDM';
     confidence = 0.6;
   }
@@ -854,7 +922,7 @@ function classifyGenre(
   return {
     primary,
     subgenre,
-    confidence: Math.min(0.9, Math.max(0.4, confidence)),
+    confidence: Math.min(0.95, Math.max(0.3, confidence)),
     mood,
     energy,
     danceability,
@@ -927,6 +995,7 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
           rhythm.beats,
           mono,
           sampleRate,
+          (msg as AnalyzeRequest).instrumentHints,
         );
         postProgress(id, 98);
 

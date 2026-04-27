@@ -229,7 +229,24 @@ export function useTrackerAnalysis(): void {
       // Start capture if not already capturing/analyzed
       if (analysisState === 'idle' && !isCurrentlyCapturing()) {
         console.log(`[TrackerAnalysis] Starting capture for ${fileHash}`);
-        startCapture(fileHash, handleCaptureComplete);
+
+        // Seek to ~25% into the song so we capture the main body, not the intro.
+        // Done async before capture starts; waits 300ms for BPM/speed commands to settle.
+        void (async () => {
+          try {
+            const { useTrackerStore } = await import('@/stores/useTrackerStore');
+            const { patternOrder, currentPositionIndex } = useTrackerStore.getState();
+            const targetPos = Math.floor(patternOrder.length * 0.25);
+            const alreadyPastIntro = currentPositionIndex / Math.max(1, patternOrder.length) > 0.1;
+            if (patternOrder.length > 4 && targetPos > 0 && !alreadyPastIntro) {
+              const { getTrackerReplayer } = await import('@/engine/TrackerReplayer');
+              getTrackerReplayer()?.seekTo(targetPos, 0);
+              // Wait for the engine to process speed/BPM commands at the new position
+              await new Promise(r => setTimeout(r, 300));
+            }
+          } catch { /* non-fatal — proceed from current position */ }
+          startCapture(fileHash, handleCaptureComplete);
+        })();
       }
     } else {
       // Playback stopped - finish early if we have enough data
