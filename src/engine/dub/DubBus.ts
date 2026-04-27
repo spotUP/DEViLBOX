@@ -5145,9 +5145,9 @@ export class DubBus {
     // inside a loop-gain>1 feedback path triggers Chromium's
     // "BiquadFilterNode: state is bad" coefficient-blowup detection on
     // every fire (poles sit too close to the unit circle).
-    bp.Q.value = 2.2;
+    bp.Q.value = 1.6;  // lower Q = wider, warmer resonance; 2.2 was too sharp/icy
     // Cap at 1.8 — above this the loop saturates into harsh metallic noise
-    // (Chromium filter instability + hard clipping). Default 1.6 gives a warm
+    // (Chromium filter instability + hard clipping). Default 1.3 gives a warm
     // resonant squeal; 1.8 is the hard ceiling for "still musical."
     const fbAmt = Math.max(0, Math.min(1.8, feedbackAmount));
     // Hold the feedback at 0 for 30 ms after connect so the bandpass has
@@ -5158,10 +5158,10 @@ export class DubBus {
     tap.gain.setValueAtTime(0, now);
     tap.gain.setValueAtTime(0, now + 0.03);
     tap.gain.linearRampToValueAtTime(fbAmt, now + 0.23);
-    // Boost spring wet for the scream loop — 0.85 gives enough resonance
-    // without over-saturating. 1.0 added harsh metallic overtones.
+    // Boost spring wet just enough to sustain feedback — keep it below 0.65
+    // so the scream is warm, not dominating the whole mix.
     const priorWet = this._springWetCache;
-    this._setSpringWet(Math.min(0.85, Math.max(priorWet, 0.65)));
+    this._setSpringWet(Math.min(0.65, Math.max(priorWet, 0.45)));
     // Sweep center frequency over sweepSec — rising whine
     bp.frequency.cancelScheduledValues(now);
     bp.frequency.setValueAtTime(Math.max(100, centerHz), now);

@@ -20,9 +20,10 @@ export const tubbyScream: DubMove = {
   kind: 'hold',
   // feedbackAmount must stay below ~1.8 — above that the loop saturates into
   // harsh metallic noise ("subway brake" artefact) instead of a warm squeal.
-  // sweepHz kept at 1600 Hz — going higher produces harsh metallic overtones;
-  // real Tubby screams were warm mid-range feedback, not piercing shrieks.
-  defaults: { centerHz: 700, sweepHz: 1600, sweepSec: 3.5, feedbackAmount: 1.6 },
+  // sweepHz capped at 900 Hz — real Tubby screams are warm mid-range howls,
+  // not bright upper-mid shrieks. 700→900 Hz keeps the "crying metal" character
+  // without the ice-pick quality of anything above 1 kHz.
+  defaults: { centerHz: 500, sweepHz: 900, sweepSec: 3.5, feedbackAmount: 1.3 },
 
   execute({ bus, params }) {
     const centerHz = params.centerHz ?? this.defaults.centerHz;
