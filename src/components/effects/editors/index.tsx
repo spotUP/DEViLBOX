@@ -28,6 +28,7 @@ import { DistortionEditor, ReverbEditor, DelayEditor, ChorusEditor, PhaserEditor
 import { AutoFilterEditor, CompressorEditor, EQ3Editor, FilterEditor, DubFilterEditor, SidechainCompressorEditor, MoogFilterEditor } from './FilterEffectEditors';
 import { BiPhaseEditor, TapeSaturationEditor, VinylNoiseEditor, MVerbEditor, MadProfessorPlateEditor, DattorroPlateEditor, LeslieEditor, SpringReverbEditor, KissOfShameEditor } from './VintageEffectEditors';
 import { AelapseEditor } from './AelapseEditor';
+import { Fil4EqEditor } from './Fil4EqEditor';
 import { SpaceyDelayerEditor, RETapeEchoEditor, SpaceEchoEditor, ToneArmEditor, TumultEditor } from './DelayVariantEditors';
 import { AutoPannerEditor, AutoWahEditor, BitCrusherEditor, ChebyshevEditor, FrequencyShifterEditor, PitchShiftEditor, JCReverbEditor, StereoWidenerEditor } from './SpecializedEffectEditors';
 import { VocoderEditor, AutoTuneEditor } from './VoiceEffectEditors';
@@ -120,6 +121,7 @@ const EFFECT_EDITORS: Record<string, React.FC<VisualEffectEditorProps>> = {
   Leslie: LeslieEditor,
   SpringReverb: SpringReverbEditor,
   Aelapse: AelapseEditor,
+  Fil4EQ: Fil4EqEditor,
   TapeDegradation: TapeDegradationEditor,
   AmbientDelay: AmbientDelayEditor,
   ShimmerReverb: ShimmerReverbEditor,
@@ -335,6 +337,7 @@ export const ENCLOSURE_COLORS: Record<string, { bg: string; bgEnd: string; accen
   Della:               { bg: '#081420', bgEnd: '#040e18', accent: '#3b82f6', border: '#0a1e30' },
   Roomy:               { bg: '#0e0a20', bgEnd: '#080618', accent: '#6366f1', border: '#1a1430' },
   // ── WASM effects — EQ & Filter ──
+  Fil4EQ:              { bg: '#081420', bgEnd: '#040e18', accent: '#3b82f6', border: '#0a1e30' },
   ParametricEQ:        { bg: '#081420', bgEnd: '#040e18', accent: '#3b82f6', border: '#0a1e30' },
   BassEnhancer:        { bg: '#201408', bgEnd: '#180e04', accent: '#f59e0b', border: '#301e0a' },
   EQ5Band:             { bg: '#081420', bgEnd: '#040e18', accent: '#3b82f6', border: '#0a1e30' },
@@ -499,6 +502,7 @@ export const VisualEffectEditorWrapper: React.FC<VisualEffectEditorWrapperProps>
     Della: <Clock size={18} className="text-text-primary" />,
     Roomy: <Waves size={18} className="text-text-primary" />,
     // ── WASM EQ & Filter ──
+    Fil4EQ: <Sliders size={18} className="text-text-primary" />,
     ParametricEQ: <Sliders size={18} className="text-text-primary" />,
     BassEnhancer: <Sliders size={18} className="text-text-primary" />,
     EQ5Band: <Sliders size={18} className="text-text-primary" />,
