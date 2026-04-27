@@ -240,9 +240,19 @@ export function useTrackerAnalysis(): void {
             const alreadyPastIntro = currentPositionIndex / Math.max(1, patternOrder.length) > 0.1;
             if (patternOrder.length > 4 && targetPos > 0 && !alreadyPastIntro) {
               const { getTrackerReplayer } = await import('@/engine/TrackerReplayer');
-              getTrackerReplayer()?.seekTo(targetPos, 0);
-              // Wait for the engine to process speed/BPM commands at the new position
-              await new Promise(r => setTimeout(r, 300));
+              const replayer = getTrackerReplayer();
+              if (replayer) {
+                replayer.seekTo(targetPos, 0);
+                // Poll until the engine reports it has reached targetPos, then
+                // wait one more tick for BPM/speed commands to settle.
+                // Timeout after 500ms to avoid hanging on stalled engines.
+                const deadline = Date.now() + 500;
+                while (replayer.getCurrentPosition() !== targetPos && Date.now() < deadline) {
+                  await new Promise(r => setTimeout(r, 16));
+                }
+                // One extra tick for speed/BPM Fxx to propagate
+                await new Promise(r => setTimeout(r, 32));
+              }
             }
           } catch { /* non-fatal — proceed from current position */ }
           startCapture(fileHash, handleCaptureComplete);
