@@ -9,7 +9,7 @@
  * └─────────────────────────────────────────────────────────────────────────┘
  */
 
-import React, { useRef, useState, useCallback } from 'react';
+import React, { useRef, useState, useCallback, useEffect } from 'react';
 import * as Tone from 'tone';
 import { Button } from '@components/ui/Button';
 import { FT2NumericInput } from './FT2NumericInput';
@@ -48,6 +48,8 @@ import type { TB303Config } from '@typedefs/instrument';
 import type { Pattern } from '@typedefs';
 
 import { CURRENT_VERSION } from '@generated/changelog';
+import { useFT2ToolbarActions } from '@stores/useFT2ToolbarActions';
+import { useDubStore } from '@stores/useDubStore';
 
 
 interface FT2ToolbarProps {
@@ -478,6 +480,34 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
   const isPlayingSong = isGT ? gtPlaying : (isPlaying && !isLooping);
   const isPlayingPattern = isGT ? false : (isPlaying && isLooping);
 
+  const stripCollapsed = useDubStore((s) => s.stripCollapsed);
+
+  // Register stable handler wrappers in the actions store so NavBar can
+  // invoke them when the dub deck expands and the toolbar row is hidden.
+  const _playSongRef      = useRef(handlePlaySong);
+  const _playPatternRef   = useRef(handlePlayPattern);
+  const _saveRef          = useRef(handleSave);
+  const _undoRef          = useRef(handleUndo);
+  const _redoRef          = useRef(handleRedo);
+  const _openBrowserRef   = useRef(() => setShowFileBrowser(true));
+  _playSongRef.current    = handlePlaySong;
+  _playPatternRef.current = handlePlayPattern;
+  _saveRef.current        = handleSave;
+  _undoRef.current        = handleUndo;
+  _redoRef.current        = handleRedo;
+
+  useEffect(() => {
+    useFT2ToolbarActions.getState().register({
+      playSong:        () => _playSongRef.current(),
+      playPattern:     () => _playPatternRef.current(),
+      save:            () => _saveRef.current(),
+      undo:            () => _undoRef.current(),
+      redo:            () => _redoRef.current(),
+      openFileBrowser: () => _openBrowserRef.current(),
+    });
+    return () => useFT2ToolbarActions.getState().unregister();
+  }, []); // stable wrappers — refs always point to latest handlers
+
   // WASM engines (MusicLine etc.) report position to wasmPositionStore, not trackerStore
   const wasmSongPos = useWasmPositionStore(s => s.songPos);
   const wasmActive = useWasmPositionStore(s => s.active);
@@ -634,9 +664,12 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
               </div>
             </div>
           </div>
-          <div className="flex items-center gap-1.5 w-full overflow-x-auto no-scrollbar">
-            {actionButtons}
-          </div>
+          {/* Hide action row when dub deck is expanded — NavBar shows them there */}
+          {stripCollapsed && (
+            <div className="flex items-center gap-1.5 w-full overflow-x-auto no-scrollbar">
+              {actionButtons}
+            </div>
+          )}
         </>
       )}
 

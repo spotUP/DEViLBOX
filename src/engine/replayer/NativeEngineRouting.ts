@@ -1176,8 +1176,8 @@ export async function startNativeEngines(
           const dpEngine = getDrumPadEngine();
           if (dpEngine) {
             const dubInput = dpEngine.getDubBusInput();
-            c64SidEngine.connectDubSend(dubInput, 0); // silent at rest
-            console.log('[NativeEngineRouting] SID dub bus send connected (baseline=0, wet only)');
+            c64SidEngine.connectDubSend(dubInput, 0.35); // always-on send so spring/echo drip
+            console.log('[NativeEngineRouting] SID dub bus send connected (baseline=0.35)');
             // Enable SID mode on the dub bus so dub synths use real SID chip
             const dubBus = dpEngine.getDubBus?.();
             if (dubBus) {
@@ -1185,7 +1185,7 @@ export async function startNativeEngines(
               // Register the dub send gain so full-mix echo throws work
               const sendGain = c64SidEngine.getDubSendGain();
               if (sendGain) {
-                dubBus.registerSidDubSend(sendGain, 0); // baseline=0
+                dubBus.registerSidDubSend(sendGain, 0.35); // baseline matches connectDubSend above
               }
               // Register per-voice taps if available (jsSID with external AudioContext)
               const voiceOutputs = c64SidEngine.getVoiceOutputs();
