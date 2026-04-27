@@ -63,10 +63,17 @@ export function adaptEQParams(
   rawParams: Record<string, number>,
   snapshot: EQSnapshot | null,
   persona: AutoDubPersona,
+  /** Transport BPM — use for timing so sweepSec matches the holdMs
+   *  calculated from the same bpm in tickImpl (avoids mismatch when
+   *  the audio analyzer detects a different BPM than the transport). */
+  transportBpm?: number,
 ): Record<string, number> {
   if (!snapshot) return rawParams;
 
-  const { energy, danceability, bpm, frequencyPeaks } = snapshot;
+  const { energy, danceability, frequencyPeaks } = snapshot;
+  // Timing uses transport bpm when provided; falls back to snapshot bpm
+  // (analysis-detected) only when transport isn't available.
+  const bpm = transportBpm ?? snapshot.bpm;
 
   if (moveId === 'eqSweep') {
     // Dominant peak = highest-magnitude entry (first in sorted-by-db array)
@@ -1364,9 +1371,15 @@ function tickImpl(): void {
 
   if (!choice) return;
 
+  // Gate EQ-based rule moves on eqMode — 'off' suppresses all EQ moves,
+  // 'improv' lets the improv loop handle EQ exclusively (avoid double-EQ).
+  const eqMode = dub.autoDubEqMode ?? 'both';
+  const isEqMove = choice.moveId === 'eqSweep' || choice.moveId === 'hpfRise';
+  if (isEqMove && (eqMode === 'off' || eqMode === 'improv')) return;
+
   _recordAutoDubFire(choice.moveId);
-  let adaptedParams = (choice.moveId === 'eqSweep' || choice.moveId === 'hpfRise')
-    ? adaptEQParams(choice.moveId, choice.params, _eqSnapshot, persona)
+  let adaptedParams = isEqMove
+    ? adaptEQParams(choice.moveId, choice.params, _eqSnapshot, persona, bpm)
     : choice.params;
   // For riddimSection, inject holdBars from persona config
   if (choice.moveId === 'riddimSection') {
