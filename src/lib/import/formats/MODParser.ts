@@ -558,7 +558,7 @@ export async function parseMODFile(buffer: ArrayBuffer, filename: string): Promi
       solo:         false,
       collapsed:    false,
       volume:       100,
-      pan:          0,
+      pan:          [-50, 50, 50, -50][ch % 4] ?? 0, // Amiga L-R-R-L stereo
       instrumentId: null,
       color:        null,
       rows: modPat.map((row): TrackerCell => {
