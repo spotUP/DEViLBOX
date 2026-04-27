@@ -57,11 +57,11 @@ function parseKeys(src: string, constName: string): string[] {
 describe('dub move registry contract', () => {
   const router = read('engine/dub/DubRouter.ts');
   const paramRouter = read('midi/performance/parameterRouter.ts');
-  const laneTimeline = read('components/dub/DubLaneTimeline.tsx');
+  const moveColors = read('engine/dub/moveColors.ts');
 
   const moveIds = parseKeys(router, 'MOVES').sort();
   const midiKinds = parseKeys(paramRouter, 'DUB_MOVE_KINDS').sort();
-  const laneColors = parseKeys(laneTimeline, 'MOVE_COLOR').sort();
+  const laneColors = parseKeys(moveColors, 'MOVE_COLOR').sort();
 
   it('DubRouter.MOVES has more than one entry (smoke)', () => {
     expect(moveIds.length).toBeGreaterThanOrEqual(15);
@@ -90,7 +90,7 @@ describe('dub move registry contract', () => {
     const missingFromColor = moveIds.filter((id) => !laneColors.includes(id));
     expect(
       missingFromColor,
-      `Moves in DubRouter.MOVES but not in MOVE_COLOR (DubLaneTimeline.tsx). ` +
+      `Moves in DubRouter.MOVES but not in MOVE_COLOR (engine/dub/moveColors.ts). ` +
       `Consequence: these moves render as the default grey bar on the lane timeline.`,
     ).toEqual([]);
   });
