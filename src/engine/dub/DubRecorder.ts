@@ -48,7 +48,6 @@ function ensureDubCurve(patternId: string, channelIndex: number, moveId: string)
  *  fire also wrote an automation-curve point; the release handler uses it
  *  to stamp a fall-point so the lane replays the release correctly. */
 const pendingHolds = new Map<string, {
-  fireRow: number;
   curveId?: string;
 }>();
 
@@ -117,7 +116,6 @@ export function startDubRecorder(): () => void {
 
         // Record the pairing so a later release stamps a fall-point on the curve.
         pendingHolds.set(fireEvent.invocationId, {
-          fireRow: fireEvent.row,
           curveId: curveId || undefined,
         });
       }
