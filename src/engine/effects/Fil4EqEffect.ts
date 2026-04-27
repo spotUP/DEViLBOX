@@ -47,6 +47,7 @@ export class Fil4EqEffect extends Tone.ToneAudioNode {
   private workletNode: AudioWorkletNode | null = null;
   private isReady = false;
   private pendingMessages: Array<Record<string, unknown>> = [];
+  private _magHandlers = new Set<() => void>();
 
   private params: Fil4Params = deepClone(DEFAULT_PARAMS);
   private listeners = new Set<ParamsListener>();
@@ -124,6 +125,8 @@ export class Fil4EqEffect extends Tone.ToneAudioNode {
           } catch (swapErr) {
             console.warn('[Fil4EQ] WASM swap failed, staying on passthrough:', swapErr);
           }
+          // Notify listeners so Fil4EqCurve refreshes its magnitude curve now that WASM is ready
+          this._notifyListeners();
         }
         // magnitude_result is handled per-request inside getMagnitude()
       };
@@ -217,10 +220,9 @@ export class Fil4EqEffect extends Tone.ToneAudioNode {
     const b = this.params.p[0];
     this.setBand(0, v !== 0, b.freq, b.bw, v);
   }
-  setB1Q(v: number): void {
-    const b = this.params.p[0];
-    this.setBand(0, b.enabled, b.freq, v, b.gain);
-  }
+  // Q-to-bandwidth conversion: bw_oct = 1/ln(2)/Q ≈ 1.4427/Q
+  // ParametricEQEffect used Q factor; Fil4EqEffect uses bandwidth in octaves.
+  setB1Q(v: number): void { const p = this.params.p[0]; this.setBand(0, p.enabled, p.freq, 1.4427 / Math.max(0.1, v), p.gain); }
 
   setB2Freq(v: number): void {
     const b = this.params.p[1];
@@ -230,10 +232,7 @@ export class Fil4EqEffect extends Tone.ToneAudioNode {
     const b = this.params.p[1];
     this.setBand(1, v !== 0, b.freq, b.bw, v);
   }
-  setB2Q(v: number): void {
-    const b = this.params.p[1];
-    this.setBand(1, b.enabled, b.freq, v, b.gain);
-  }
+  setB2Q(v: number): void { const p = this.params.p[1]; this.setBand(1, p.enabled, p.freq, 1.4427 / Math.max(0.1, v), p.gain); }
 
   setB3Freq(v: number): void {
     const b = this.params.p[2];
@@ -243,10 +242,7 @@ export class Fil4EqEffect extends Tone.ToneAudioNode {
     const b = this.params.p[2];
     this.setBand(2, v !== 0, b.freq, b.bw, v);
   }
-  setB3Q(v: number): void {
-    const b = this.params.p[2];
-    this.setBand(2, b.enabled, b.freq, v, b.gain);
-  }
+  setB3Q(v: number): void { const p = this.params.p[2]; this.setBand(2, p.enabled, p.freq, 1.4427 / Math.max(0.1, v), p.gain); }
 
   setB4Freq(v: number): void {
     const b = this.params.p[3];
@@ -256,10 +252,7 @@ export class Fil4EqEffect extends Tone.ToneAudioNode {
     const b = this.params.p[3];
     this.setBand(3, v !== 0, b.freq, b.bw, v);
   }
-  setB4Q(v: number): void {
-    const b = this.params.p[3];
-    this.setBand(3, b.enabled, b.freq, v, b.gain);
-  }
+  setB4Q(v: number): void { const p = this.params.p[3]; this.setBand(3, p.enabled, p.freq, 1.4427 / Math.max(0.1, v), p.gain); }
 
   // ── getMagnitude ──────────────────────────────────────────────────────────
 
@@ -272,14 +265,20 @@ export class Fil4EqEffect extends Tone.ToneAudioNode {
     for (let i = 0; i < n; i++) {
       freqs[i] = 20 * Math.pow(20000 / 20, i / (n - 1));
     }
-    return new Promise<Float32Array>((resolve) => {
+    return new Promise<Float32Array>((resolve, reject) => {
       const handler = (e: MessageEvent) => {
-        const data = e.data as { type: string; id: string; data: Float32Array };
-        if (data.type === 'magnitude_result' && data.id === id) {
+        const d = e.data as { type: string; id: string; data: Float32Array };
+        if (d.type === 'magnitude_result' && d.id === id) {
+          this._magHandlers.delete(cleanup);
           this.workletNode!.port.removeEventListener('message', handler);
-          resolve(data.data);
+          resolve(d.data);
         }
       };
+      const cleanup = () => {
+        this.workletNode?.port.removeEventListener('message', handler);
+        reject(new Error('disposed'));
+      };
+      this._magHandlers.add(cleanup);
       this.workletNode!.port.addEventListener('message', handler);
       this.workletNode!.port.postMessage({ type: 'get_magnitude', id, freqs }, [freqs.buffer]);
     });
@@ -300,6 +299,8 @@ export class Fil4EqEffect extends Tone.ToneAudioNode {
   // ── Dispose ───────────────────────────────────────────────────────────────
 
   dispose(): this {
+    for (const cancel of this._magHandlers) cancel();
+    this._magHandlers.clear();
     if (this.workletNode) {
       try { this.workletNode.port.postMessage({ type: 'dispose' }); } catch { /* */ }
       try { this.workletNode.disconnect(); } catch { /* */ }

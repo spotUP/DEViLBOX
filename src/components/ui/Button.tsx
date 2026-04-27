@@ -6,7 +6,7 @@
 import React from 'react';
 
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: 'primary' | 'default' | 'ghost' | 'icon' | 'ft2' | 'danger';
+  variant?: 'primary' | 'default' | 'ghost' | 'icon' | 'ft2' | 'danger' | 'compact';
   size?: 'sm' | 'md' | 'lg' | 'icon';
   color?: 'default' | 'red' | 'green' | 'yellow' | 'blue' | 'purple' | 'cyan' | 'amber';
   fullWidth?: boolean;
@@ -40,6 +40,7 @@ export const Button: React.FC<ButtonProps> = ({
     icon: 'btn-icon',
     danger: 'btn-danger',
     ft2: '', // FT2 handled separately with color variants
+    compact: 'btn-compact', // Compact toggle style for dense panels (9px font-mono with border)
   };
 
   // Size modifier classes (applied to all button variants)
