@@ -23,6 +23,27 @@ import { supportsChannelIsolation } from '@engine/tone/ChannelRoutedEffects';
 import { useNotificationStore } from '@/stores/useNotificationStore';
 import { useMixerStore } from '@/stores/useMixerStore';
 
+// ─── Driver Badge ────────────────────────────────────────────────────────────
+
+const DRIVER_LABELS: Record<string, string> = {
+  'beat-sync': 'BEAT',
+  'spectral': 'SPECTRAL',
+  'energy-reactive': 'ENERGY',
+};
+
+function DriverBadge({ personaId }: { personaId: string }) {
+  const persona = getPersona(personaId as Parameters<typeof getPersona>[0]);
+  const driver = persona?.improvConfig?.driver ?? '';
+  const label = DRIVER_LABELS[driver] ?? '—';
+  return (
+    <span className="text-[8px] font-mono text-accent-highlight px-1 py-0.5 rounded border border-accent-highlight/30 shrink-0">
+      {label}
+    </span>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 interface AutoDubPanelProps {
   busEnabled: boolean;
   /** Whether the settings popover is open (controlled by parent DubDeckStrip). */
@@ -51,6 +72,10 @@ export const AutoDubPanel: React.FC<AutoDubPanelProps> = ({ busEnabled, open: op
   const currentPersonaId = useDubStore(s => s.autoDubPersona);
   const blacklist = useDubStore(s => s.autoDubMoveBlacklist);
   const setBlacklist = useDubStore(s => s.setAutoDubMoveBlacklist);
+  const eqMode = useDubStore(s => s.autoDubEqMode ?? 'both');
+  const setEqMode = useDubStore(s => s.setAutoDubEqMode);
+  const eqDepthMult = useDubStore(s => s.autoDubEqDepthMult ?? 1.0);
+  const setEqDepthMult = useDubStore(s => s.setAutoDubEqDepthMult);
   const editorMode = useFormatStore(s => s.editorMode);
   const hasSidData = useFormatStore(s => s.c64SidFileData !== null);
 
@@ -233,6 +258,49 @@ export const AutoDubPanel: React.FC<AutoDubPanelProps> = ({ busEnabled, open: op
         />
         <span className="w-8 text-right text-text-secondary text-xs">{(intensity * 100).toFixed(0)}%</span>
       </div>
+
+      {/* EQ Mode */}
+      {busEnabled && (
+        <div className="border-t border-dark-border pt-2 pb-2 mb-2 flex flex-col gap-1">
+          <span className="text-[9px] font-mono text-text-muted uppercase tracking-wider mb-0.5">EQ Mode</span>
+          <div className="flex gap-1 flex-wrap">
+            {(['off', 'collaborative', 'improv', 'both'] as const).map((mode) => (
+              <button
+                key={mode}
+                type="button"
+                onClick={() => setEqMode(mode)}
+                className={`px-1.5 py-0.5 rounded text-[9px] font-mono border transition-colors ${
+                  eqMode === mode
+                    ? 'border-accent-primary bg-accent-primary/20 text-accent-primary'
+                    : 'border-dark-borderLight bg-dark-bgTertiary text-text-muted hover:text-text-primary hover:bg-dark-bgHover'
+                }`}
+              >
+                {mode === 'off' ? 'Off'
+                  : mode === 'collaborative' ? 'Sweeps'
+                  : mode === 'improv' ? 'Improv'
+                  : '★ Both'}
+              </button>
+            ))}
+          </div>
+
+          {(eqMode === 'improv' || eqMode === 'both') && (
+            <div className="flex items-center gap-2 pt-0.5">
+              <span className="text-[9px] font-mono text-text-muted shrink-0">Depth</span>
+              <input
+                type="range" min={0} max={1} step={0.01}
+                value={eqDepthMult}
+                onChange={(e) => setEqDepthMult(Number(e.target.value))}
+                className="flex-1 accent-accent-primary cursor-pointer"
+                style={{ height: '12px' }}
+              />
+              <span className="text-[9px] font-mono text-text-secondary tabular-nums w-8 text-right shrink-0">
+                {Math.round(eqDepthMult * 100)}%
+              </span>
+              <DriverBadge personaId={currentPersonaId} />
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Reset sends */}
       <div className="border-t border-dark-border pt-2 pb-2 mb-2 flex items-center justify-between">
