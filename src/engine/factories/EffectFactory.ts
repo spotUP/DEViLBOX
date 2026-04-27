@@ -740,6 +740,12 @@ export async function createEffect(
       });
       break;
 
+    case 'Fil4EQ': {
+      const { Fil4EqEffect } = await import('../effects/Fil4EqEffect');
+      node = new Fil4EqEffect();
+      break;
+    }
+
     case 'ToneArm': {
       node = new ToneArmEffect({
         wow:     (p.wow     != null ? Number(p.wow)     : 20) / 100,
