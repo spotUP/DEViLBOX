@@ -72,7 +72,8 @@ export type AudioEffectType =
   | 'WAMFaustDelay'     // Faust Delay
   | 'WAMPitchShifter'   // Csound Pitch Shifter
   | 'WAMGraphicEQ'      // Graphic Equalizer
-  | 'WAMPedalboard';    // Pedalboard multi-FX
+  | 'WAMPedalboard'    // Pedalboard multi-FX
+  | 'Fil4EQ';          // fil4 8-band parametric EQ (HP+LoShelf+4xPara+HiShelf+LP)
 
 export type EffectCategory = 'tonejs' | 'neural' | 'wasm' | 'wam';
 

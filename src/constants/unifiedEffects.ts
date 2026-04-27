@@ -462,6 +462,8 @@ export const AVAILABLE_EFFECTS: AvailableEffect[] = [
   { category: 'wasm', type: 'X42Comp', label: 'X42 Compressor', group: 'Dynamics', description: 'Clean digital compressor' },
 
   // ── EQ & Filter ──
+  { category: 'wasm', type: 'Fil4EQ', label: 'Parametric EQ (Fil4)', group: 'EQ & Filter',
+    description: 'fil4 8-band parametric EQ — HP/LP pass filters + low shelf + 4 Regalia-Mitra parametric bands + high shelf. Smoothed parameters, no clicks on live automation.' },
   { category: 'wasm', type: 'ParametricEQ', label: 'Parametric EQ', group: 'EQ & Filter', description: '4-band parametric equalizer' },
   { category: 'wasm', type: 'EQ5Band', label: '5-Band EQ', group: 'EQ & Filter', description: '5-band equalizer' },
   { category: 'wasm', type: 'EQ8Band', label: '8-Band EQ', group: 'EQ & Filter', description: '8-band equalizer' },
