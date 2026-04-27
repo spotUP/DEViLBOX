@@ -11,6 +11,7 @@ import { useWasmPositionStore } from '@stores/useWasmPositionStore';
 import { channelLayout } from './channelLayout';
 import { AutomationLanes } from './AutomationLanes';
 import { GlobalAutomationLane } from './GlobalAutomationLane';
+import { MasterDubLane } from './MasterDubLane';
 import { AutomationParameterPicker } from '../automation/AutomationParameterPicker';
 import { MacroLanes } from './MacroLanes';
 import { useUIStore } from '@stores/useUIStore';
@@ -33,6 +34,7 @@ import { getFormatPlaybackState, getClockPosition } from '@engine/FormatPlayback
 import * as Tone from 'tone';
 import { useSettingsStore } from '@stores/useSettingsStore';
 import { useFormatStore } from '@stores/useFormatStore';
+import { useDrumPadStore } from '@stores/useDrumPadStore';
 import type { CursorPosition } from '@typedefs';
 // OffscreenCanvas + WebGL2 worker bridge
 import { TrackerOffscreenBridge } from '@engine/renderer/OffscreenBridge';
@@ -53,6 +55,7 @@ import { TrackerVisualBackground } from './TrackerVisualBackground';
 
 const CHAR_WIDTH = 10;
 const LINE_NUMBER_WIDTH = 40;
+const MASTER_DUB_LANE_WIDTH = 48;
 
 /** Add a flat amount to each RGB channel of a hex color */
 function lightenHex(hex: string, add: number): string {
@@ -178,6 +181,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
   const macroOverlayRef = useRef<HTMLDivElement>(null);
   const automationOverlayRef = useRef<HTMLDivElement>(null);
   const automationPrevLenRef = useRef(0);
+  const masterDubLaneRef = useRef<HTMLDivElement>(null);
   const peerCursorDivRef = useRef<HTMLDivElement>(null);
   // Peer selection overlay (DOM overlay div — kept local)
   const peerSelectionDivRef = useRef<HTMLDivElement>(null);
@@ -275,6 +279,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
   const showChannelNames = useUIStore(s => s.showChannelNames);
   const showAutomationLanes = useUIStore(s => s.showAutomationLanes);
   const showMacroLanes = useUIStore(s => s.showMacroLanes);
+  const dubBusEnabled = useDrumPadStore(s => Boolean(s.dubBus?.enabled));
 
   // Per-channel automation lane count (for multi-lane width allocation)
   const channelLaneCounts = useAutomationStore(useShallow((s) => {
@@ -400,10 +405,17 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     return Math.floor((dimensions.width - usedWidth) / 2);
   }, [editorFullscreen, totalChannelsWidth, dimensions.width, numChannels, LNW]);
 
+  // Master dub lane occupies 48px between the row-number column and channel 0.
+  // Only shown when dubBus is enabled, automation lanes are visible, and not in format mode.
+  const masterDubLaneWidth = (showAutomationLanes && !hideAutoLanesProp && !isFormatMode && dubBusEnabled)
+    ? MASTER_DUB_LANE_WIDTH
+    : 0;
+
   const channelOffsets = useMemo(() => {
-    if (centerPadding === 0) return rawChannelOffsets;
-    return rawChannelOffsets.map(x => x + centerPadding);
-  }, [rawChannelOffsets, centerPadding]);
+    const base = centerPadding === 0 ? rawChannelOffsets : rawChannelOffsets.map(x => x + centerPadding);
+    if (masterDubLaneWidth === 0) return base;
+    return base.map(x => x + masterDubLaneWidth);
+  }, [rawChannelOffsets, centerPadding, masterDubLaneWidth]);
 
   // Keep channelOffsetsRef/channelWidthsRef in sync for the RAF loop (selection math)
   // Also publish to shared channelLayout for TrackScopesStrip alignment
@@ -2550,6 +2562,9 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
             automationOverlayRef.current.style.clipPath = `inset(0px ${rightClip}px 0px ${leftClip}px)`;
           }
         }
+        if (masterDubLaneRef.current) {
+          masterDubLaneRef.current.style.top = `${overlayTop}px`;
+        }
         rafId = requestAnimationFrame(tick);
         return;
       }
@@ -2670,6 +2685,9 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
           const rightClip = Math.max(0, dimensions.width - rightEdge);
           automationOverlayRef.current.style.clipPath = `inset(0px ${rightClip}px 0px ${leftClip}px)`;
         }
+      }
+      if (masterDubLaneRef.current) {
+        masterDubLaneRef.current.style.top = `${overlayTop}px`;
       }
 
       // Peer cursor overlay — thin caret at peer's channel + row
@@ -3432,6 +3450,29 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
         {/* Automation Lanes Overlay — positioned imperatively by RAF loop */}
         {pattern && (
           <>
+            {/* Master dub lane — 48px column between row numbers and channel 0,
+                visible only when dubBus is enabled + automation lanes are shown */}
+            {masterDubLaneWidth > 0 && (
+              <div
+                ref={masterDubLaneRef}
+                style={{
+                  position: 'absolute',
+                  top: scrollYRef.current,
+                  left: LNW,
+                  pointerEvents: 'auto',
+                  zIndex: 4,
+                }}
+              >
+                <MasterDubLane
+                  patternId={pattern.id}
+                  patternLength={pattern.length}
+                  rowHeight={rowHeight}
+                  top={0}
+                  height={pattern.length * rowHeight}
+                  left={0}
+                />
+              </div>
+            )}
             {showAutomationLanes && !hideAutoLanesProp && !hideVUMeters && (
               <>
               {/* Per-channel automation parameter pickers */}
