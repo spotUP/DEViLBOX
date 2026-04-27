@@ -56,6 +56,9 @@ function canBakeParameter(param: string, format: FormatConstraints): boolean {
   if (p.includes('pitch') || p.includes('frequency') || p.includes('period') || p.includes('detune') || p.includes('finetune')) return true;
   if (p.includes('vibrato') || p.includes('tremolo')) return true;
 
+  // Dub move parameters — bakeable via getDubEffectMapping (format-gated internally)
+  if (p.startsWith('dub.')) return true;
+
   return false;
 }
 
