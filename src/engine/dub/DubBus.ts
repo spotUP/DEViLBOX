@@ -30,7 +30,7 @@ import { VinylNoiseEffect } from '../effects/VinylNoiseEffect';
 import { ToneArmEffect } from '../effects/ToneArmEffect';
 import { MadProfessorPlateEffect } from '../effects/MadProfessorPlateEffect';
 import { DattorroPlateEffect } from '../effects/DattorroPlateEffect';
-import { ParametricEQEffect } from '../effects/ParametricEQEffect';
+import { Fil4EqEffect } from '../effects/Fil4EqEffect';
 import { CalfPhaserEffect } from '../effects/CalfPhaserEffect';
 import { RingModEffect } from '../effects/RingModEffect';
 import { BittaEffect } from '../effects/BittaEffect';
@@ -306,7 +306,7 @@ export class DubBus {
   private combOutput: GainNode;       // sweepAmount when sweepMode='comb', 0 when 'phaser'
   // ─── Return EQ — WASM parametric inserted between midScoop and LPF ────
   // Always 100% wet (series insert). Bypass via flat gain (0 dB).
-  private returnEQ: ParametricEQEffect;
+  private returnEQ: Fil4EqEffect;
   // ─── Post-echo tape saturation — degrades echo repeats ─────────────
   private postEchoSat: WaveShaperNode;
   private postEchoSatBypass: GainNode;   // 1 when off (dry through), 0 when sat on
@@ -1557,21 +1557,21 @@ export class DubBus {
     // Return EQ — 4-band WASM parametric inserted between midScoop and LPF.
     // Always 100% wet (series insert). Bands start flat unless a character
     // preset enables them. Band 2 is the primary "sweep" band.
-    this.returnEQ = new ParametricEQEffect({
-      b1Freq: this.settings.returnEqB1Freq,
-      b1Gain: this.settings.returnEqB1Gain,
-      b1Q:    this.settings.returnEqB1Q,
-      b2Freq: this.settings.returnEqFreq,
-      b2Gain: this.settings.returnEqEnabled ? this.settings.returnEqGain : 0,
-      b2Q:    this.settings.returnEqQ,
-      b3Freq: this.settings.returnEqB3Freq,
-      b3Gain: this.settings.returnEqB3Gain,
-      b3Q:    this.settings.returnEqB3Q,
-      b4Freq: this.settings.returnEqB4Freq,
-      b4Gain: this.settings.returnEqB4Gain,
-      b4Q:    this.settings.returnEqB4Q,
-      wet:    1.0,
-    });
+    this.returnEQ = new Fil4EqEffect();
+    this.returnEQ.setB1Freq(this.settings.returnEqB1Freq);
+    this.returnEQ.setB1Gain(this.settings.returnEqB1Gain);
+    this.returnEQ.setB1Q(this.settings.returnEqB1Q);
+    this.returnEQ.setB2Freq(this.settings.returnEqFreq);
+    this.returnEQ.setB2Gain(this.settings.returnEqEnabled ? this.settings.returnEqGain : 0);
+    this.returnEQ.setB2Q(this.settings.returnEqQ);
+    this.returnEQ.setB3Freq(this.settings.returnEqB3Freq);
+    this.returnEQ.setB3Gain(this.settings.returnEqB3Gain);
+    this.returnEQ.setB3Q(this.settings.returnEqB3Q);
+    this.returnEQ.setB4Freq(this.settings.returnEqB4Freq);
+    this.returnEQ.setB4Gain(this.settings.returnEqB4Gain);
+    this.returnEQ.setB4Q(this.settings.returnEqB4Q);
+    this.returnEQ.setHP(this.settings.returnEqHpEnabled, this.settings.returnEqHpFreq, this.settings.returnEqHpQ);
+    this.returnEQ.setLP(this.settings.returnEqLpEnabled, this.settings.returnEqLpFreq, this.settings.returnEqLpQ);
 
     // Post-echo tape saturation — same curve as pre-echo tapeSat but
     // positioned AFTER echo output, BEFORE spring. First echo repeat
@@ -3222,6 +3222,12 @@ export class DubBus {
     if (settings.returnEqB4Freq !== undefined) this.returnEQ.setB4Freq(merged.returnEqB4Freq);
     if (settings.returnEqB4Gain !== undefined) this.returnEQ.setB4Gain(merged.returnEqB4Gain);
     if (settings.returnEqB4Q !== undefined) this.returnEQ.setB4Q(merged.returnEqB4Q);
+    if (settings.returnEqHpEnabled !== undefined || settings.returnEqHpFreq !== undefined || settings.returnEqHpQ !== undefined) {
+      this.returnEQ.setHP(merged.returnEqHpEnabled, merged.returnEqHpFreq, merged.returnEqHpQ);
+    }
+    if (settings.returnEqLpEnabled !== undefined || settings.returnEqLpFreq !== undefined || settings.returnEqLpQ !== undefined) {
+      this.returnEQ.setLP(merged.returnEqLpEnabled, merged.returnEqLpFreq, merged.returnEqLpQ);
+    }
 
     // ─── Sweep mode (comb vs phaser) ───────────────────────────────────────
     if (settings.sweepMode !== undefined || settings.sweepAmount !== undefined) {
