@@ -9,6 +9,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useDubStore } from '@/stores/useDubStore';
+import { getPersona } from '@/engine/dub/AutoDubPersonas';
 import { useDrumPadStore } from '@/stores/useDrumPadStore';
 import { startAutoDub, stopAutoDub, isAutoDubRunning, AUTO_DUB_RULE_MOVES, runChannelAudioScrub, cancelChannelScrub } from '@/engine/dub/AutoDub';
 import { useTransportStore } from '@/stores/useTransportStore';
@@ -47,6 +48,7 @@ export const AutoDubPanel: React.FC<AutoDubPanelProps> = ({ busEnabled, open: op
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const intensity = useDubStore(s => s.autoDubIntensity);
   const setIntensity = useDubStore(s => s.setAutoDubIntensity);
+  const currentPersonaId = useDubStore(s => s.autoDubPersona);
   const blacklist = useDubStore(s => s.autoDubMoveBlacklist);
   const setBlacklist = useDubStore(s => s.setAutoDubMoveBlacklist);
   const editorMode = useFormatStore(s => s.editorMode);
@@ -205,6 +207,18 @@ export const AutoDubPanel: React.FC<AutoDubPanelProps> = ({ busEnabled, open: op
         <span className="text-text-secondary font-bold text-xs">AUTO DUB SETTINGS</span>
         {isAnalyzing && <span className="text-accent-warning text-xs animate-pulse">Analyzing...</span>}
       </div>
+
+      {/* Active persona hint */}
+      {(() => {
+        const persona = getPersona(currentPersonaId);
+        if (!persona || currentPersonaId === 'custom') return null;
+        return (
+          <div className="mb-3 px-2 py-1.5 bg-dark-bgTertiary border border-dark-borderLight rounded text-[10px] text-text-muted leading-relaxed">
+            <span className="text-accent-highlight font-bold">{persona.label}: </span>
+            {persona.description}
+          </div>
+        );
+      })()}
 
       {/* Intensity slider */}
       <div className="flex items-center gap-2 mb-3">
