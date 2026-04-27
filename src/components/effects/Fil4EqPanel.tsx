@@ -7,6 +7,7 @@ import { Fil4EqCurve } from './Fil4EqCurve';
 import { Knob } from '@components/controls/Knob';
 import { Button } from '@components/ui/Button';
 import type { Fil4EqEffect } from '@/engine/effects/Fil4EqEffect';
+import { useDrumPadStore } from '@/stores/useDrumPadStore';
 
 interface BandState {
   enabled: boolean;
@@ -40,6 +41,9 @@ function stateFromEffect(effect: Fil4EqEffect): PanelState {
 interface Props { effect: Fil4EqEffect; }
 
 export const Fil4EqPanel: React.FC<Props> = ({ effect }) => {
+  const dubBus = useDrumPadStore(s => s.dubBus);
+  const setDubBus = useDrumPadStore(s => s.setDubBus);
+
   const [state, setState] = useState<PanelState>(() => stateFromEffect(effect));
   const stateRef = useRef(state);
   useEffect(() => { stateRef.current = state; }, [state]);
@@ -127,6 +131,26 @@ export const Fil4EqPanel: React.FC<Props> = ({ effect }) => {
           </span>
         </div>
       </div>
+
+      {dubBus && (
+        <div className="flex items-center gap-2 px-1 py-0.5 text-[10px] font-mono border-b border-dark-border">
+          <span className="text-accent-highlight">⚡</span>
+          <span className="text-text-secondary font-bold">Auto EQ</span>
+          <span className="text-text-muted">
+            {dubBus.autoEqLastGenre
+              ? `${dubBus.autoEqLastGenre} · ${Math.round((dubBus.autoEqStrength ?? 0.85) * 100)}%`
+              : 'analyzing…'}
+          </span>
+          <input
+            type="range"
+            min={0} max={1} step={0.01}
+            value={dubBus.autoEqStrength ?? 0.85}
+            onChange={e => setDubBus({ autoEqStrength: Number(e.target.value) })}
+            className="flex-1 accent-accent-highlight h-1"
+            title={`Auto EQ strength: ${Math.round((dubBus.autoEqStrength ?? 0.85) * 100)}%`}
+          />
+        </div>
+      )}
 
       <div className="flex items-start border border-dark-border rounded overflow-x-auto">
         {col('HP', <>
