@@ -39,6 +39,8 @@ import { sidVoiceClassifier } from '@/bridge/analysis/SidVoiceClassifier';
 import { getActiveC64SidEngine } from '@engine/replayer/NativeEngineRouting';
 import type { Pattern } from '@/types/tracker';
 import type { InstrumentConfig } from '@/types/instrument/defaults';
+import { useTrackerAnalysisStore } from '@/stores/useTrackerAnalysisStore';
+import { getActiveDubBus } from '@/engine/dub/DubBus';
 
 /** Live analysis context injected into every tick. Null until analysis has run. */
 export interface EQSnapshot {
@@ -852,6 +854,24 @@ const _moveLastFiredBar = new Map<string, number>();
 let _rng: () => number = Math.random;
 /** Per-channel rolling peak history for transient detection. Grown lazily. */
 const _rollingPeaks: number[][] = [];
+let _eqSnapshot: EQSnapshot | null = null;
+let _inRiddimSection = false;
+
+function _makeFlatBaseline(): import('@/engine/effects/Fil4EqEffect').Fil4Params {
+  return {
+    hp: { enabled: false, freq: 40, q: 0.7 },
+    lp: { enabled: false, freq: 20000, q: 0.7 },
+    ls: { enabled: false, freq: 80, gain: 0, q: 0.7 },
+    hs: { enabled: false, freq: 8000, gain: 0, q: 0.7 },
+    p: [
+      { enabled: false, freq: 200, bw: 1, gain: 0 },
+      { enabled: false, freq: 500, bw: 1, gain: 0 },
+      { enabled: false, freq: 2000, bw: 1, gain: 0 },
+      { enabled: false, freq: 8000, bw: 1, gain: 0 },
+    ],
+    masterGain: 1,
+  };
+}
 
 function getChannelCount(): number {
   try {
@@ -1105,6 +1125,31 @@ function tickImpl(): void {
   const phraseBar = bar % 16;
   const phraseIntensityMult = getPhraseIntensityMult(phraseBar, persona.phraseArcShape ?? 'standard');
 
+  // Beat phase within current beat (0–1)
+  const beatInBar = barPos * 4; // 4 beats per bar
+  const beatPhase = beatInBar % 1;
+
+  // Refresh EQ snapshot each tick
+  const analysis = useTrackerAnalysisStore.getState().currentAnalysis;
+  if (analysis) {
+    let baseline = _makeFlatBaseline();
+    try {
+      const dubBus = getActiveDubBus();
+      if (dubBus) baseline = dubBus.getReturnEQ().getParams();
+    } catch { /* ok */ }
+    _eqSnapshot = {
+      genre: analysis.genre.primary || 'Unknown',
+      energy: analysis.genre.energy,
+      danceability: analysis.genre.danceability,
+      bpm: analysis.genre.bpm || bpm,
+      beatPhase,
+      frequencyPeaks: (analysis.frequencyPeaks ?? []) as [number, number][],
+      baseline,
+    };
+  } else {
+    _eqSnapshot = null;
+  }
+
   const choice = chooseMove({
     bar, barPos, isNewBar,
     intensity: dub.autoDubIntensity,
@@ -1122,14 +1167,17 @@ function tickImpl(): void {
     densityByRole,
     phraseIntensityMult,
     lastGlobalFireBar: _lastGlobalFireBar,
-    eqSnapshot: null,
-    inRiddimSection: false,
+    eqSnapshot: _eqSnapshot,
+    inRiddimSection: _inRiddimSection,
   }, _rng);
 
   if (!choice) return;
 
   _recordAutoDubFire(choice.moveId);
-  const disposer = fire(choice.moveId, choice.channelId, choice.params, 'live');
+  const adaptedParams = (choice.moveId === 'eqSweep' || choice.moveId === 'hpfRise')
+    ? adaptEQParams(choice.moveId, choice.params, _eqSnapshot, persona)
+    : choice.params;
+  const disposer = fire(choice.moveId, choice.channelId, adaptedParams, 'live');
   _movesFiredThisBar += 1;
   if (choice.wet) _wetFiredThisBar += 1;
   _moveLastFiredBar.set(choice.moveId, bar);
@@ -1169,6 +1217,7 @@ export function stopAutoDub(): void {
     clearInterval(_timer);
     _timer = null;
   }
+  _inRiddimSection = false;
   for (const d of _heldDisposers) {
     try { d.dispose(); } catch { /* ok */ }
   }
