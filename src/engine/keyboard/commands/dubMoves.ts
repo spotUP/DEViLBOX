@@ -125,6 +125,7 @@ export const dubMadProfPingPong: MoveHandler = holdCommand('madProfPingPong', 'M
 export const dubCombSweep:      MoveHandler = holdCommand('combSweep',      'Liquid Comb Sweep');
 export const dubVersionDrop:       MoveHandler = holdCommand('versionDrop',    'Version Drop');
 export const dubSkankEchoThrow:    MoveHandler = holdCommand('skankEchoThrow', 'Skank Echo Throw');
+export const dubRiddimSection:     MoveHandler = holdCommand('riddimSection',   'Riddim Section');
 
 // ── Panic — release everything ────────────────────────────────────────────
 export function dubPanicReleaseAll(): boolean {
