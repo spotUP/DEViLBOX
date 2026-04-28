@@ -120,6 +120,12 @@ export interface DubBusSettings {
   bassShelfGainDb: number;
   bassShelfFreqHz: number;
   bassShelfQ: number;
+  /** Master-only bass enhancer (dB). Stacks on top of `bassShelfGainDb` for
+   *  the master-insert dry path ONLY — does not affect the wet bus's
+   *  feedback-loop bass shelf. Use this to add punch without triggering the
+   *  feedback-runaway "BWOOOOOOOOO" that high `bassShelfGainDb` produces.
+   *  Clamped to ±18 dB. Default 0. */
+  masterBassPunchDb: number;
   // Scientist mid-scoop — peaking cut around 700 Hz for the "hollow" dub
   // space that lets vocals + horns pop through the echo tail. Gain in dB
   // (negative = cut). Default 0 — engage per-engineer via CHARACTER preset.
@@ -393,6 +399,7 @@ export const DEFAULT_DUB_BUS: DubBusSettings = {
   bassShelfGainDb:  2,
   bassShelfFreqHz:  80,
   bassShelfQ:       0.9,
+  masterBassPunchDb: 0,
   midScoopGainDb:   0,
   midScoopFreqHz:   700,
   midScoopQ:        1.4,
@@ -564,6 +571,7 @@ export const DUB_CHARACTER_PRESETS: Record<Exclude<DubBusSettings['characterPres
       hpfStepped:     true,   // the "Big Knob" rhythmic staccato sweeps
       hpfResonanceDb: 2.5,    // Altec 9069B T-network resonant hump — the "voice" of the filter
       bassShelfGainDb: 9, bassShelfFreqHz: 60,  bassShelfQ: 0.9,  // was 85Hz — lower shelf = true sub depth
+      masterBassPunchDb: 6,   // dry-path punch — Tubby's signature kick weight
       midScoopGainDb:  0,
       echoIntensity:  0.55,   // was 0.65 — echoSpring mode: repeats each get a spring tail,
                                // so fewer repeats avoids exponential spring buildup
@@ -625,6 +633,7 @@ export const DUB_CHARACTER_PRESETS: Record<Exclude<DubBusSettings['characterPres
       glueBypass:      true,   // research: "try mastering a song with compression" — he rejected ALL bus comp
       hpfStepped:      false,
       bassShelfGainDb: 1,     // drier low end vs Tubby
+      masterBassPunchDb: 4,   // dry-path punch — Scientist still wants tight, present low end
       midScoopGainDb: -10, midScoopFreqHz: 700, midScoopQ: 1.6,  // deeper signature scoop
       echoIntensity:  0.35,   // drier — Scientist's hallmark precision
       echoRateMs:     280,
@@ -666,6 +675,7 @@ export const DUB_CHARACTER_PRESETS: Record<Exclude<DubBusSettings['characterPres
       hpfCutoff:       40,
       hpfStepped:      false,
       bassShelfGainDb: 2, bassShelfFreqHz: 80, bassShelfQ: 0.5,
+      masterBassPunchDb: 8,   // dry-path punch — Perry's saturated, fat low end
       midScoopGainDb: -4, midScoopFreqHz: 800,
       echoIntensity:  0.55,   // was 0.72 — high feedback with springEcho = rolling forever
       echoRateMs:     380,
@@ -726,6 +736,7 @@ export const DUB_CHARACTER_PRESETS: Record<Exclude<DubBusSettings['characterPres
       hpfCutoff:      60,
       hpfStepped:     false,
       bassShelfGainDb: 2, bassShelfFreqHz: 90,
+      masterBassPunchDb: 5,   // dry-path punch — 80s dub still wants kick weight
       midScoopGainDb:  0,
       echoIntensity:  0.55,
       echoRateMs:     250,
@@ -766,6 +777,7 @@ export const DUB_CHARACTER_PRESETS: Record<Exclude<DubBusSettings['characterPres
       hpfCutoff:       35,
       hpfStepped:      false,
       bassShelfGainDb: 5, bassShelfFreqHz: 70, bassShelfQ: 0.7,  // deeper rumble lift
+      masterBassPunchDb: 6,   // dry-path punch — Mad Prof's lush hi-fi sub
       midScoopGainDb:  0,
       echoIntensity:  0.38,   // cleaner, fewer repeats
       echoRateMs:     360,

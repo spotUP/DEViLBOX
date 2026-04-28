@@ -3179,9 +3179,14 @@ export class DubBus {
     // Master-insert TONE EQ — drives the whole mix (dry + wet) when wired.
     // Gain writes are gated so a disabled bus stays transparent on master.
     const masterActive = this.enabled && this.masterInsertActive;
+    // masterBassPunchDb adds dry-path-only bass enhancement on top of the
+    // shared shelf gain. Master path is OUTSIDE the echo feedback loop so
+    // we can push this much harder than the wet bus's bassShelfGainDb (which
+    // self-oscillates above ~+12 dB even with the feedback compensator).
+    const safeMasterPunch = Math.max(-18, Math.min(18, merged.masterBassPunchDb ?? 0));
     rampBiquadParam(this.masterBassShelf.frequency, merged.bassShelfFreqHz, now);
     rampBiquadParam(this.masterBassShelf.Q, merged.bassShelfQ, now);
-    rampBiquadParam(this.masterBassShelf.gain, masterActive ? safeBassGain : 0, now);
+    rampBiquadParam(this.masterBassShelf.gain, masterActive ? safeBassGain + safeMasterPunch : 0, now);
     rampBiquadParam(this.masterMidScoop.frequency, merged.midScoopFreqHz, now);
     rampBiquadParam(this.masterMidScoop.Q, merged.midScoopQ, now);
     rampBiquadParam(this.masterMidScoop.gain, masterActive ? merged.midScoopGainDb : 0, now);
