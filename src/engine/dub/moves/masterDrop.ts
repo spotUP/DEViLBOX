@@ -84,8 +84,6 @@ export const masterDrop: DubMove = {
         console.warn('[masterDrop] no dry gains found — drop will be inaudible');
         void import('@/stores/useNotificationStore').then(({ notify }) =>
           notify.warning('Drop: no active audio sources found'));
-      } else {
-        console.log(`[masterDrop] MUTE — ramping ${collected.length} dry gains to 0 (prevs: ${collected.map(e => e.prev.toFixed(3)).join(',')})`);
       }
       for (const entry of collected) {
         // Guard: if a gain is already 0 when collected (e.g. from a previous
@@ -105,7 +103,6 @@ export const masterDrop: DubMove = {
       dispose() {
         disposed = true;
         const now = ctx.currentTime;
-        console.log(`[masterDrop] RESTORE — restoring ${pairs.length} gains (targets: ${pairs.map(e => e.prev.toFixed(3)).join(',')})`);
         for (const { param, prev } of pairs) {
           try {
             param.cancelScheduledValues(now);
