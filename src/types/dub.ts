@@ -565,7 +565,8 @@ export const DUB_CHARACTER_PRESETS: Record<Exclude<DubBusSettings['characterPres
       hpfResonanceDb: 2.5,    // Altec 9069B T-network resonant hump — the "voice" of the filter
       bassShelfGainDb: 9, bassShelfFreqHz: 60,  bassShelfQ: 0.9,  // was 85Hz — lower shelf = true sub depth
       midScoopGainDb:  0,
-      echoIntensity:  0.65,   // more repeats — Tubby's signature multi-tap
+      echoIntensity:  0.55,   // was 0.65 — echoSpring mode: repeats each get a spring tail,
+                               // so fewer repeats avoids exponential spring buildup
       echoRateMs:     300,
       echoWet:        0.80,
       springWet:      0.50,   // restored — Tubby's spring is load-bearing
@@ -579,8 +580,15 @@ export const DUB_CHARACTER_PRESETS: Record<Exclude<DubBusSettings['characterPres
                                // an init beep from the RE-201's internal spring settling.
                                // Aelapse provides the spring separately; no need for double spring.
       echoEngine:    're201',     // Tubby's MCI → RE-201 signal chain
-      chainOrder:    'springEcho', // spring FIRST: same fix as Perry — prevents
-                                    // each RE-201 repeat from adding new spring tail
+      chainOrder:    'echoSpring', // echo FIRST (historically correct for Tubby's RE-201):
+                                    // dry → RE-201 tape echo → spring. springEcho was borrowed
+                                    // from Perry but kills audibility: in springEcho the RE-201
+                                    // output is the ONLY contributor to the bus return (spring
+                                    // feeds into RE-201, not directly to output), so the RE-201
+                                    // echoing a low-energy spring tail produces an inaudible wash.
+                                    // echoSpring: spring's output reaches the sidechain directly,
+                                    // each RE-201 repeat goes through the spring once (the "double
+                                    // tail" concern), but springWet: 0.50 keeps that under control.
       // Tubby's return EQ — meant to be swept by hand during performance, not left on.
       // Keeping it enabled at a fixed frequency created a constant 700Hz "beep".
       // User can enable + sweep manually via DubBusPanel.
