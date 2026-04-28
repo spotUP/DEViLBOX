@@ -855,7 +855,7 @@ export class DubBus {
         // settled by now and the compressors start from a clean state.
         this.sidechain.ratio.cancelScheduledValues(now2);
         this.sidechain.ratio.setValueAtTime(1, now2);
-        this.sidechain.ratio.setTargetAtTime(10, now2 + WARMUP_SEC, 0.02);
+        this.sidechain.ratio.setTargetAtTime(6, now2 + WARMUP_SEC, 0.02);
         this.glue.ratio.cancelScheduledValues(now2);
         this.glue.ratio.setValueAtTime(1, now2);
         // Respect glueBypass — Scientist mode must stay at 1:1 even after warmup.
@@ -901,7 +901,7 @@ export class DubBus {
           this.feedback.gain.setValueAtTime(priorFeedbackGain, t);
           this.return_.gain.setValueAtTime(this.enabled ? settings.returnGain : 0, t);
           this.sidechain.threshold.setValueAtTime(targetThreshold, t);
-          this.sidechain.ratio.setValueAtTime(10, t);
+          this.sidechain.ratio.setValueAtTime(6, t);
           this.glue.ratio.setValueAtTime(3, t);
         } catch { /* ok */ }
       }
@@ -1762,15 +1762,11 @@ export class DubBus {
     // routing) but the fast-attack/release compression produces the same
     // "duck on every hit" feel.
     this.sidechain = this.context.createDynamicsCompressor();
-    // Threshold and ratio tuned so a single effect tail barely clips the knee
-    // but stacked tails (two wet moves overlapping) get clamped hard. The glue
-    // compressor downstream handles the slow "lathe" texture; this one is the
-    // fast guard against peak energy when effects pile up.
-    this.sidechain.threshold.value = -22;
-    this.sidechain.ratio.value = 10;
-    this.sidechain.attack.value = 0.001;
+    this.sidechain.threshold.value = -28;
+    this.sidechain.ratio.value = 6;
+    this.sidechain.attack.value = 0.002;
     this.sidechain.release.value = 0.18;
-    this.sidechain.knee.value = 4;
+    this.sidechain.knee.value = 6;
 
     // Glue compressor — slow: models the compression character of cutting
     // a dub straight to acetate lathe. Soft attack (30ms) lets transients
@@ -3445,7 +3441,7 @@ export class DubBus {
 
       this.sidechain.ratio.cancelScheduledValues(now);
       this.sidechain.ratio.setValueAtTime(1, now);
-      this.sidechain.ratio.setTargetAtTime(10, now + WARMUP_SEC, 0.02);
+      this.sidechain.ratio.setTargetAtTime(6, now + WARMUP_SEC, 0.02);
       this.glue.ratio.cancelScheduledValues(now);
       this.glue.ratio.setValueAtTime(1, now);
       this.glue.ratio.setTargetAtTime(this.settings.glueBypass ? 1 : 3, now + WARMUP_SEC, 0.02);
