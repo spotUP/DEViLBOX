@@ -164,7 +164,6 @@ class HivelyProcessor extends AudioWorkletProcessor {
 
       case 'setChannelGain':
         if (data.channel >= 0 && data.channel < 16) {
-          console.log(`[HivelyWorklet] setChannelGain ch${data.channel} gain=${data.gain.toFixed(3)} tuneLoaded=${this.tuneLoaded}`);
           this.channelGains[data.channel] = data.gain;
         }
         if (this.wasm && typeof this.wasm._hively_set_channel_gain === 'function') {
@@ -493,10 +492,6 @@ class HivelyProcessor extends AudioWorkletProcessor {
     // Use binary mute: 0.0 if channelGains[ch]===0 (user-muted), else 1.0.
     // The ToneEngine's downstream channel gain node handles volume attenuation —
     // applying channelGains directly here would double-apply the volume.
-    if (!this._gainDiagDone) {
-      this._gainDiagDone = true;
-      console.log(`[HivelyWorklet] step4 first render: numChannels=${numChannels} isolatedBits=${isolatedBits} gains=[${Array.from(this.channelGains.slice(0, numChannels)).map(g => g.toFixed(2)).join(',')}]`);
-    }
     for (let ch = 0; ch < numChannels; ch++) {
       const isolatedOut = (isolatedBits & (1 << ch)) !== 0;
       const muted = isolatedOut || this.channelGains[ch] === 0;

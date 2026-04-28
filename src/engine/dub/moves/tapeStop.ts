@@ -19,11 +19,9 @@ export const tapeStop: DubMove = {
 
   execute({ bus, params }) {
     const downSec = (params.downSec as number | undefined) ?? (this.defaults.downSec as number);
-    console.log(`[tapeStop] MUTE bus return (downSec=${downSec})`);
     const restore = bus.startTapeHold(downSec);
     return {
       dispose() {
-        console.log('[tapeStop] RESTORE bus return');
         restore();
       },
     };
