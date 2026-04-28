@@ -35,10 +35,10 @@ describe('DubBus.wireMasterInsert — glitch guard (G15)', () => {
   });
 
   it('inserts the envelope between toneArm and the chain tail at construction', () => {
-    // Vinyl was moved to post-master so toneArm now feeds directly into
-    // masterInsertEnvelope (vinylSum is no longer in the dry insert chain).
-    // The glitch guard still works — masterInsertEnvelope is still the tail.
-    expect(SOURCE).toMatch(/Tone\.connect\(this\.toneArmEffect\.output[\s\S]{0,80}this\.masterInsertEnvelope/);
+    // Vinyl moved to post-master. ToneArm now feeds masterInsertEnvelope via
+    // native connect (getNativeAudioNode) to avoid Tone→native silent breakage.
+    expect(SOURCE).toMatch(/getNativeAudioNode\(this\.toneArmEffect\.output\)/);
+    expect(SOURCE).toMatch(/\.connect\(this\.masterInsertEnvelope\)/);
     expect(SOURCE).toMatch(/this\.masterInsertTail\s*=\s*this\.masterInsertEnvelope/);
   });
 
