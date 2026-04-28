@@ -453,7 +453,14 @@ class HivelyProcessor extends AudioWorkletProcessor {
     const needsSplit = hasIsolation || hasDub || this.oscEnabled;
 
     if (!needsSplit || !hasSplitApi) {
-      // Fast path: no isolation or oscilloscope, use combined decode
+      // Fast path: no isolation or oscilloscope, use combined decode.
+      // Apply channelGains so user mutes work without isolation being active.
+      if (this.wasm._hively_set_channel_gain) {
+        const nc = this.wasm._hively_get_channels ? this.wasm._hively_get_channels() : 4;
+        for (let c = 0; c < nc; c++) {
+          this.wasm._hively_set_channel_gain(c, this.channelGains[c]);
+        }
+      }
       const samples = this.wasm._hively_decode_frame(this.decodePtrL, this.decodePtrR);
       if (samples <= 0) return;
       this._writeToMainRing(samples);
@@ -480,10 +487,13 @@ class HivelyProcessor extends AudioWorkletProcessor {
     // We don't have a getter — assume 1.0 for all unmuted channels, 0 for muted
     // The gains are set to isolate channels below
 
-    // 4. Render main output (with isolated channels muted)
+    // 4. Render main output (with isolated channels muted).
+    // Apply this.channelGains so user mutes (setChannelGain) are honoured —
+    // without this, every render frame was resetting all gains to 1.0,
+    // making setChannelGain/channel-mute a no-op in the isolation path.
     for (let ch = 0; ch < numChannels; ch++) {
-      const muted = (isolatedBits & (1 << ch)) !== 0;
-      this.wasm._hively_set_channel_gain(ch, muted ? 0.0 : 1.0);
+      const isolatedOut = (isolatedBits & (1 << ch)) !== 0;
+      this.wasm._hively_set_channel_gain(ch, isolatedOut ? 0.0 : this.channelGains[ch]);
     }
     const samples = this.wasm._hively_render_frame(this.decodePtrL, this.decodePtrR);
     if (samples <= 0) return;
