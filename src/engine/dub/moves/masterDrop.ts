@@ -85,9 +85,13 @@ export const masterDrop: DubMove = {
         void import('@/stores/useNotificationStore').then(({ notify }) =>
           notify.warning('Drop: no active audio sources found'));
       } else {
-        console.log(`[masterDrop] fired — ramping ${collected.length} dry gains to 0`);
+        console.log(`[masterDrop] MUTE — ramping ${collected.length} dry gains to 0 (prevs: ${collected.map(e => e.prev.toFixed(3)).join(',')})`);
       }
       for (const entry of collected) {
+        // Guard: if a gain is already 0 when collected (e.g. from a previous
+        // failed restore), treat it as 1.0 so we never "restore" to permanent
+        // silence — the snowball case where dispose → prev=0 → stays at 0.
+        if (entry.prev < 0.05) entry.prev = 1.0;
         pairs.push(entry);
         try {
           entry.param.cancelScheduledValues(t);
@@ -101,12 +105,15 @@ export const masterDrop: DubMove = {
       dispose() {
         disposed = true;
         const now = ctx.currentTime;
+        console.log(`[masterDrop] RESTORE — restoring ${pairs.length} gains (targets: ${pairs.map(e => e.prev.toFixed(3)).join(',')})`);
         for (const { param, prev } of pairs) {
           try {
             param.cancelScheduledValues(now);
             param.setValueAtTime(param.value, now);
             param.linearRampToValueAtTime(prev, now + releaseSec);
-          } catch { /* ok */ }
+          } catch (err) {
+            console.error('[masterDrop] RESTORE failed for a gain:', err);
+          }
         }
       },
     };
