@@ -377,7 +377,6 @@ class HivelyProcessor extends AudioWorkletProcessor {
 
     if (ok) {
       this.tuneLoaded = true;
-      this._gainDiagDone = false;  // reset per-tune first-render diagnostic
       this.resetRingBuffer();
 
       const meta = {
