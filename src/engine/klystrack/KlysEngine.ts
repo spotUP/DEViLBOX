@@ -95,6 +95,10 @@ export class KlysEngine extends WASMSingletonBase {
         KlysEngine.instance.dispose();
       }
       KlysEngine.instance = new KlysEngine();
+      // Self-register globally so the mixer can find the active instance
+      // regardless of module-graph identity. See HivelyEngine for context.
+      const g = globalThis as { __devilboxActiveKlysEngine?: KlysEngine };
+      g.__devilboxActiveKlysEngine = KlysEngine.instance;
     }
     return KlysEngine.instance;
   }
@@ -338,6 +342,10 @@ export class KlysEngine extends WASMSingletonBase {
     this._songEndCallbacks.clear();
     if (KlysEngine.instance === this) {
       KlysEngine.instance = null;
+    }
+    const g = globalThis as { __devilboxActiveKlysEngine?: KlysEngine | null };
+    if (g.__devilboxActiveKlysEngine === this) {
+      g.__devilboxActiveKlysEngine = null;
     }
   }
 }
