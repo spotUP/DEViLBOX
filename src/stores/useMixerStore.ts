@@ -260,12 +260,18 @@ function forwardReplayerMuteMask(channels: MixerChannelState[], isSoloing: boole
   }
 
   // Gain-based engines (setChannelGain)
-  for (const [, { Engine, maxCh }] of _gainEngineCache) {
+  for (const [name, { Engine, maxCh }] of _gainEngineCache) {
     try {
       if (Engine.hasInstance()) {
         const inst = Engine.getInstance();
+        const silentChs: number[] = [];
         for (let ch = 0; ch < maxCh; ch++) {
-          inst.setChannelGain(ch, (mask & (1 << ch)) !== 0 ? 1.0 : 0.0);
+          const gain = (mask & (1 << ch)) !== 0 ? 1.0 : 0.0;
+          if (gain === 0) silentChs.push(ch);
+          inst.setChannelGain(ch, gain);
+        }
+        if (silentChs.length > 0) {
+          console.log(`[Mixer] forwardReplayerMuteMask → ${name}: mask=0x${mask.toString(16)} silentChs=[${silentChs.join(',')}]`);
         }
       }
     } catch (e: any) {
