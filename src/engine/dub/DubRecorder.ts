@@ -18,12 +18,31 @@
 import { subscribeDubRouter, subscribeDubRelease } from './DubRouter';
 import { scheduleDubStoreSync } from '@/stores/useDubStore';
 import { useTrackerStore } from '@/stores/useTrackerStore';
+import { useFormatStore } from '@/stores/useFormatStore';
 import { useAutomationStore } from '@/stores/useAutomationStore';
 import { useUIStore } from '@/stores/useUIStore';
 import { DUB_MOVE_KINDS } from '@/midi/performance/parameterRouter';
 import { encodeDubEffect } from './moveTable';
 import { currentSongIsTimeBasedLane } from './laneMode';
 import type { AutomationParameter } from '@/types/automation';
+
+/** Songs whose pattern editor renders from a native data structure rather
+ *  than `pattern.channels[ch].rows[row]` — Zxx cells written to the standard
+ *  store are never displayed for these. Force curve-only output so AutoDub
+ *  fires still appear visually (in the per-channel automation lanes / global
+ *  lane) even when the cell column is dark. */
+function songRendersFromNativeData(): boolean {
+  try {
+    const fmt = useFormatStore.getState();
+    return !!(
+      fmt.hivelyNative
+      || fmt.musiclineFileData
+      || fmt.tfmxFileData
+    );
+  } catch {
+    return false;
+  }
+}
 
 /** Width of the 0→1→0 spike written to a curve for trigger-kind moves.
  *  AutomationPlayer's upward-edge detection re-fires the move once per pass
@@ -107,7 +126,12 @@ export function startDubRecorder(): () => void {
         && !isGlobal
         && cellRow >= 0 && cellRow < pattern.length
         && (fireEvent.channelId as number) >= 0
-        && (fireEvent.channelId as number) < pattern.channels.length;
+        && (fireEvent.channelId as number) < pattern.channels.length
+        // Skip cells when the pattern editor doesn't render from
+        // pattern.channels (Hively/AHX, MusicLine, GTUltra, TFMX) — the
+        // cell would be invisible. Curve-only output makes AutoDub fires
+        // show up in the per-channel automation lane instead.
+        && !songRendersFromNativeData();
       let cellWritten = false;
       if (canWriteCell) {
         const chId = fireEvent.channelId as number;
