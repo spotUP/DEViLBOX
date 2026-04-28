@@ -1,9 +1,17 @@
 /**
- * DubRecorder — automation-store write tests.
+ * DubRecorder — write-path tests.
  *
- * After the dub-studio-visual rewrite, DubRecorder writes to
- * useAutomationStore (step curves) on every live fire — the armed state
- * is no longer a write gate.
+ * On every live fire DubRecorder picks ONE inline target so replay never
+ * double-fires:
+ *   - Trigger moves  → cell effect command (DUB_EFFECT_GLOBAL/PERCHANNEL)
+ *                       on the pattern. Curve is intentionally skipped to
+ *                       prevent DubEffectScanner + AutomationPlayer both
+ *                       firing the same row.
+ *   - Hold moves     → automation step curve only. Cells can't encode
+ *                       release, so cell-fired holds would leak the disposer.
+ *
+ * Lane-sourced fires (DubLanePlayer replays) are ignored to avoid an
+ * infinite capture loop.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { fire, setDubBusForRouter } from '../DubRouter';
@@ -11,6 +19,7 @@ import { startDubRecorder } from '../DubRecorder';
 import { useAutomationStore } from '@/stores/useAutomationStore';
 import { useTrackerStore } from '@/stores/useTrackerStore';
 import { useTransportStore } from '@/stores/useTransportStore';
+import { isDubMoveEffectSlot, decodeDubEffect } from '../moveTable';
 import type { DubBus } from '../DubBus';
 
 function makeMockBus(): DubBus {
@@ -60,6 +69,12 @@ function getCurves(patternId: string, channelIndex: number) {
   return useAutomationStore.getState().getCurvesForPattern(patternId, channelIndex);
 }
 
+/** Read the (effTyp, eff) pair at (channel, row) from the current pattern. */
+function getCell(channel: number, row: number): { effTyp?: number; eff?: number } {
+  const pat = useTrackerStore.getState().patterns[0];
+  return pat?.channels[channel]?.rows[row] ?? {};
+}
+
 describe('DubRecorder — automation store write path', () => {
   let unsubRecorder: (() => void) | null = null;
 
@@ -82,32 +97,45 @@ describe('DubRecorder — automation store write path', () => {
     vi.unstubAllGlobals();
   });
 
-  it('trigger move: step curve written at fire row with value=1 then spike-to-0', () => {
+  it('per-channel trigger writes effect cell on the firing channel (no curve)', () => {
     setRow(12);
     fire('echoThrow', 2, { intensity: 0.75 });
+    const cell = getCell(2, 12);
+    expect(cell.effTyp).toBeDefined();
+    expect(isDubMoveEffectSlot(cell.effTyp!)).toBe(true);
+    const decoded = decodeDubEffect(cell.effTyp!, cell.eff!);
+    expect(decoded?.moveId).toBe('echoThrow');
+    expect(decoded?.channelId).toBe(2);
+    // Curve intentionally skipped to avoid double-fire on replay (cell + curve)
     const curves = getCurves('p0', 2);
-    const curve = curves.find(c => c.parameter === 'dub.echoThrow');
-    expect(curve).toBeDefined();
-    expect(curve!.points.some(p => p.row === 12 && p.value === 1)).toBe(true);
-    const spikePoint = curve!.points.find(p => p.value === 0);
-    expect(spikePoint).toBeDefined();
-    expect(spikePoint!.row).toBeCloseTo(12 + 0.05, 3);
+    expect(curves.some(c => c.parameter === 'dub.echoThrow')).toBe(false);
   });
 
-  it('per-channel move uses channelIndex = event.channelId', () => {
+  it('per-channel hold writes curve only — cells leak disposers', () => {
     setRow(5);
     fire('channelMute', 3);
+    // Cell on the firing channel must NOT be written (cell-fired holds
+    // would leak their disposer; the move would never release on replay).
+    const cell = getCell(3, 5);
+    expect(cell.effTyp).toBeUndefined();
+    // Curve IS written so AutomationPlayer can replay fire+release.
     const curves = getCurves('p0', 3);
     expect(curves.some(c => c.parameter === 'dub.channelMute')).toBe(true);
-    const otherCurves = getCurves('p0', 0);
-    expect(otherCurves.some(c => c.parameter === 'dub.channelMute')).toBe(false);
   });
 
-  it('global move (no channelId) uses channelIndex=-1', () => {
+  it('global trigger writes effect cell on channel 0 (no curve)', () => {
     setRow(8);
     fire('springSlam', undefined);
+    const cell = getCell(0, 8);
+    expect(cell.effTyp).toBeDefined();
+    expect(isDubMoveEffectSlot(cell.effTyp!)).toBe(true);
+    const decoded = decodeDubEffect(cell.effTyp!, cell.eff!);
+    expect(decoded?.moveId).toBe('springSlam');
+    // Global slot decodes with no channelId
+    expect(decoded?.channelId).toBeUndefined();
+    // Global curves intentionally skipped for triggers
     const globalCurves = useAutomationStore.getState().getGlobalCurves('p0');
-    expect(globalCurves.some(c => c.parameter === 'dub.springSlam')).toBe(true);
+    expect(globalCurves.some(c => c.parameter === 'dub.springSlam')).toBe(false);
   });
 
   it('hold move: value=1 at fire row, value=0 stamped at release row', () => {
@@ -126,13 +154,19 @@ describe('DubRecorder — automation store write path', () => {
   it('writes regardless of armed state', () => {
     setRow(8);
     fire('echoThrow', 0);
-    const curves = getCurves('p0', 0);
-    expect(curves.some(c => c.parameter === 'dub.echoThrow')).toBe(true);
+    // echoThrow on channel 0 → effect cell on (ch 0, row 8)
+    const cell = getCell(0, 8);
+    expect(cell.effTyp).toBeDefined();
+    expect(isDubMoveEffectSlot(cell.effTyp!)).toBe(true);
+    expect(decodeDubEffect(cell.effTyp!, cell.eff!)?.moveId).toBe('echoThrow');
   });
 
   it('lane-sourced fires are ignored', () => {
     setRow(10);
     fire('echoThrow', 0, {}, 'lane');
+    // No cell, no curve — lane fires loop forever otherwise.
+    const cell = getCell(0, 10);
+    expect(cell.effTyp).toBeUndefined();
     const curves = getCurves('p0', 0);
     expect(curves.some(c => c.parameter === 'dub.echoThrow')).toBe(false);
   });
