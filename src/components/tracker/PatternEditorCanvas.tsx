@@ -12,7 +12,7 @@ import { useChannelTypeStore } from '@stores/useChannelTypeStore';
 import { useWasmPositionStore } from '@stores/useWasmPositionStore';
 import { channelLayout } from './channelLayout';
 import { AutomationLanes } from './AutomationLanes';
-import { GlobalAutomationLane } from './GlobalAutomationLane';
+import { GlobalLaneCurves } from './GlobalLaneCurves';
 import { MasterDubLane } from './MasterDubLane';
 import { AutomationParameterPicker } from '../automation/AutomationParameterPicker';
 import { MacroLanes } from './MacroLanes';
@@ -68,6 +68,11 @@ function lightenHex(hex: string, add: number): string {
   return `#${r.toString(16).padStart(2,'0')}${g.toString(16).padStart(2,'0')}${b.toString(16).padStart(2,'0')}`;
 }
 const AUTOMATION_LANE_W = AUTOMATION_LANE_WIDTH; // Re-export alias for readability
+/** Width of the GLOBAL FX lane column rendered to the left of channel 1.
+ *  Reserved when automation lanes are visible; pushes channels right by
+ *  this much. Matches AUTOMATION_LANE_WIDTH so the column lines up
+ *  visually with per-channel automation lanes. */
+const GLOBAL_LANE_W = AUTOMATION_LANE_WIDTH;
 // Mobile-scaled layout constants (must match TrackerCanvas2DRenderer MOBILE_SCALE)
 const MOBILE_SCALE = 1.6;
 const M_CHAR_WIDTH = Math.round(CHAR_WIDTH * MOBILE_SCALE);
@@ -324,15 +329,24 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
   const CW = mobileCanvas ? M_CHAR_WIDTH : CHAR_WIDTH;
   const LNW = mobileCanvas ? M_LINE_NUMBER_WIDTH : LINE_NUMBER_WIDTH;
 
+  // True when the GLOBAL FX column should reserve space at the left edge of
+  // the channel area. Sits between the row-number gutter (LNW) and channel 0.
+  // Always visible when automation lanes are on so AutoDub global moves and
+  // bus-wide param curves have a fixed home.
+  const globalLaneVisible = showAutomationLanes && !hideAutoLanesProp;
+
   // Channel Metrics: calculate numChannels, offsets, and widths once per pattern/theme change
   const { numChannels, channelOffsets: rawChannelOffsets, channelWidths, totalChannelsWidth } = useMemo(() => {
+    // Global lane reserves GLOBAL_LANE_W between LNW (row number gutter) and
+    // channel 0. When visible, every channel offset shifts right by that much.
+    const globalLaneOffset = globalLaneVisible ? GLOBAL_LANE_W : 0;
     // FORMAT MODE: compute widths from column definitions (per-channel columns supported)
     if (isFormatMode && formatColumns && formatChannels) {
       const FORMAT_COL_GAP  = mobileCanvas ? Math.round(4 * MOBILE_SCALE) : 4;
       const FORMAT_CHAN_PAD = mobileCanvas ? Math.round(40 * MOBILE_SCALE) : 40;
       const widths: number[] = [];
       const offsets: number[] = [];
-      let currentX = LNW;
+      let currentX = LNW + globalLaneOffset;
       for (let i = 0; i < formatChannels.length; i++) {
         const cols = formatChannels[i].columns ?? formatColumns;
         const contentWidth = cols.reduce(
@@ -360,7 +374,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
 
     const nc = pattern.channels.length;
     const noteWidth = CW * 3 + 4;
-    
+
     // Determine extra column visibility from store settings (stable!)
     const showAcid = columnVisibility.flag1 || columnVisibility.flag2;
     const showProb = columnVisibility.probability;
@@ -374,7 +388,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     // Calculate per-channel widths based on effectCols
     const offsets: number[] = [];
     const widths: number[] = [];
-    let currentX = LNW;
+    let currentX = LNW + globalLaneOffset;
 
     for (let ch = 0; ch < nc; ch++) {
       const channel = pattern.channels[ch];
@@ -408,7 +422,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
       channelWidths: widths,
       totalChannelsWidth: currentX - LNW
     };
-  }, [pattern, instruments, columnVisibility, isFormatMode, formatColumns, formatChannels, mobileCanvas, CW, LNW, showAutomationLanes, channelLaneCounts]);
+  }, [pattern, instruments, columnVisibility, isFormatMode, formatColumns, formatChannels, mobileCanvas, CW, LNW, showAutomationLanes, channelLaneCounts, globalLaneVisible]);
 
   // Center channels horizontally when in fullscreen and channels don't fill the viewport
   const editorFullscreen = useUIStore(s => s.editorFullscreen);
@@ -3019,22 +3033,9 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
             <div style={{ width: totalChannelsWidth, height: 1 }} />
           </div>
 
-          {/* Global automation lane — pattern-level curves for bus-wide dub
-              params (dub.echoWet etc.) and song-level globals (BPM, master
-              vol). Sits above the channel headers; hidden in format mode
-              (Hively/MusicLine/etc.) because the horizontal strip overlaps
-              the format-mode pattern body. Proper placement as a vertical
-              column to the left of channel 1 is a future refactor that
-              would need the canvas channel-offset system extended for a
-              "global pseudo-channel" lane. */}
-          {showAutomationLanes && !hideAutoLanesProp && !isFormatMode && pattern && (
-            <GlobalAutomationLane
-              patternId={pattern.id}
-              patternLength={pattern.length}
-              rowHeight={rowHeight}
-              compact={true}
-            />
-          )}
+          {/* Horizontal global lane removed — global FX now lives as a
+              vertical column to the left of channel 1 (rendered inside the
+              canvas overlay area). See globalLaneVisible / GLOBAL_LANE_W. */}
 
           {isFormatMode && formatColumns && formatChannels ? (
             <div className="flex-shrink-0 bg-dark-bgTertiary border-b border-dark-border z-20">
@@ -3053,6 +3054,18 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
                   data-vu-scroll
                 >
                   <div className="flex" style={{ width: totalChannelsWidth - LINE_NUMBER_WIDTH, marginLeft: centerPadding }}>
+                    {/* GLOBAL FX lane header — sits to the left of channel 1.
+                        Bus-wide dub params + song-level transport curves live
+                        on this lane (channelIndex = -1). */}
+                    {globalLaneVisible && (
+                      <div
+                        className="flex-shrink-0 flex items-center justify-center px-1 border-r border-accent-highlight/40 bg-accent-highlight/10"
+                        style={{ width: GLOBAL_LANE_W }}
+                        title="Global FX lane — bus-wide dub params + song-level BPM / master vol"
+                      >
+                        <span className="text-[8px] font-mono font-bold text-accent-highlight uppercase tracking-wider">⬢ GLOBAL</span>
+                      </div>
+                    )}
                     {formatChannels.map((ch, idx) => {
                       const channel = ch.isPatternChannel ? pattern?.channels[idx] : undefined;
                       const isCollapsed = channel?.collapsed;
@@ -3283,6 +3296,18 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
                 data-vu-scroll
               >
                 <div className="flex" style={{ width: totalChannelsWidth, marginLeft: centerPadding }}>
+                  {/* GLOBAL FX lane header — sits to the left of channel 1.
+                      Bus-wide dub params + song-level transport curves live
+                      on this lane (channelIndex = -1). */}
+                  {globalLaneVisible && (
+                    <div
+                      className="flex-shrink-0 flex items-center justify-center px-1 border-r border-accent-highlight/40 bg-accent-highlight/10"
+                      style={{ width: GLOBAL_LANE_W }}
+                      title="Global FX lane — bus-wide dub params + song-level BPM / master vol"
+                    >
+                      <span className="text-[8px] font-mono font-bold text-accent-highlight uppercase tracking-wider">⬢ GLOBAL</span>
+                    </div>
+                  )}
                   {(pattern?.channels ?? []).map((channel, idx) => {
                     // Trigger levels are animation-driven via RAF; ChannelVUMeter is disabled
                     const trigger = { level: 0, triggered: false };
@@ -3558,6 +3583,21 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
                   // changes pick up new bounds on the next frame.
                 }}
               >
+              {/* GLOBAL FX vertical lane — fills the GLOBAL_LANE_W slot
+                  reserved at the left of channel 0 (see globalLaneVisible).
+                  Renders a thin column of step markers for every curve at
+                  channelIndex = -1 (bus-wide dub params + song-level
+                  globals). Read-only for now; full editing parity with
+                  per-channel AutomationLanes is a follow-up. */}
+              {globalLaneVisible && pattern && (
+                <GlobalLaneCurves
+                  patternId={pattern.id}
+                  patternLength={pattern.length}
+                  rowHeight={rowHeight}
+                  laneLeft={LNW}
+                  laneWidth={GLOBAL_LANE_W}
+                />
+              )}
               <AutomationLanes
                 key={`automation-${pattern.id}`}
                 patternId={pattern.id}
