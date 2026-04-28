@@ -280,7 +280,9 @@ export class Fil4EqEffect extends Tone.ToneAudioNode {
       };
       this._magHandlers.add(cleanup);
       this.workletNode!.port.addEventListener('message', handler);
-      this.workletNode!.port.postMessage({ type: 'get_magnitude', id, freqs }, [freqs.buffer]);
+      // forceAllEnabled: display shows the full intended response even for
+      // disabled bands — dots and curve always match, audio unaffected.
+      this.workletNode!.port.postMessage({ type: 'get_magnitude', id, freqs, forceAllEnabled: true }, [freqs.buffer]);
     });
   }
 

@@ -24,12 +24,14 @@ export const channelMute: DubMove = {
     const store = useMixerStore.getState();
     const wasMuted = store.channels[channelId]?.muted ?? false;
     if (!wasMuted) store.setChannelMute(channelId, true);
+    console.log(`[channelMute] MUTE ch${channelId} (wasMuted=${wasMuted})`);
 
     return {
       dispose() {
+        console.log(`[channelMute] RESTORE ch${channelId} (wasMuted=${wasMuted})`);
         if (!wasMuted) {
           try { useMixerStore.getState().setChannelMute(channelId, false); }
-          catch { /* ok */ }
+          catch (err) { console.error(`[channelMute] restore failed ch${channelId}:`, err); }
         }
       },
     };

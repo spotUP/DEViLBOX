@@ -5363,7 +5363,9 @@ export class DubBus {
         vn.setWornStylus(0.4 * sq);      // HF smear (avoid doubling w/ToneArm stylus)
         vn.setPinch(0.3 * lin);          // even-harmonic distortion
         vn.setInnerGroove(0.5 * sq);     // asymmetric waveshaping
-        vn.setGhostEcho(0.4 * cubed);    // BPF pre-echo (groove pre-print)
+        vn.setGhostEcho(0);              // 0 — keeps vinyl surface noise truly "outside
+                                         // the record": no reverb/echo colouring on the
+                                         // noise itself. The dub bus provides the space.
         vn.setDropout(0.6 * cubed);      // random amplitude dips
         vn.setWarp(0.4 * sq);            // multi-LFO pitch wobble
         vn.setEccentricity(0.5 * sq);    // rotation-rate drift
