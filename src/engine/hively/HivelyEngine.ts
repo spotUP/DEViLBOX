@@ -83,6 +83,14 @@ export class HivelyEngine extends WASMSingletonBase implements IsolationCapableE
         HivelyEngine.instance.dispose();
       }
       HivelyEngine.instance = new HivelyEngine();
+      // Self-register on globalThis so consumers (mixer, dub moves) can find
+      // the active instance without depending on module-graph identity.
+      // Vite dev sometimes serves a static import as one module copy and a
+      // dynamic import as another, so consumers that hold a different copy
+      // of this class would read hasInstance()=false even when this copy has
+      // a live singleton. The global slot bypasses that entirely.
+      const g = globalThis as { __devilboxActiveHivelyEngine?: HivelyEngine };
+      g.__devilboxActiveHivelyEngine = HivelyEngine.instance;
     }
     return HivelyEngine.instance;
   }
@@ -359,6 +367,10 @@ export class HivelyEngine extends WASMSingletonBase implements IsolationCapableE
     this._songEndCallbacks.clear();
     if (HivelyEngine.instance === this) {
       HivelyEngine.instance = null;
+    }
+    const g = globalThis as { __devilboxActiveHivelyEngine?: HivelyEngine | null };
+    if (g.__devilboxActiveHivelyEngine === this) {
+      g.__devilboxActiveHivelyEngine = null;
     }
   }
 }

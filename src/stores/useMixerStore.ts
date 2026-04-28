@@ -204,6 +204,11 @@ void (async () => {
     import('../engine/hippelcoso/HippelCoSoEngine').then(m => _regBitmask('HippelCoSoEngine', m.HippelCoSoEngine, 32)).catch(() => {}),
 
     // ── Gain-only engines (setChannelGain, no setMuteMask) ─────────────────
+    // These are still cached for the legacy fallback path, but the primary
+    // lookup uses a globalThis registry that the engine instance writes to
+    // on creation. The cache class can differ from the actual playing
+    // class under Vite's dev-mode module duplication, so we can't rely on
+    // cache.Engine.hasInstance() for these.
     import('../engine/hively/HivelyEngine').then(({ HivelyEngine }) => { _gainEngineCache.set('HivelyEngine', { Engine: HivelyEngine as unknown as GainEngine, maxCh: 16 }); }).catch(() => {}),
     import('../engine/klystrack/KlysEngine').then(({ KlysEngine }) => { _gainEngineCache.set('KlysEngine', { Engine: KlysEngine as unknown as GainEngine, maxCh: 32 }); }).catch(() => {}),
 
@@ -260,14 +265,29 @@ function forwardReplayerMuteMask(channels: MixerChannelState[], isSoloing: boole
   }
 
   // Gain-based engines (setChannelGain)
+  // Globally-registered active engines take precedence — bypasses Vite
+  // module duplication where the cached class differs from the one playing.
+  type GainOnly = { setChannelGain(ch: number, gain: number): void };
+  const g = globalThis as {
+    __devilboxActiveHivelyEngine?: GainOnly | null;
+    __devilboxActiveKlysEngine?: GainOnly | null;
+  };
+  const broadcasted = new Set<GainOnly>();
+  const broadcast = (inst: GainOnly, maxCh: number) => {
+    if (broadcasted.has(inst)) return;
+    broadcasted.add(inst);
+    for (let ch = 0; ch < maxCh; ch++) {
+      const gain = (mask & (1 << ch)) !== 0 ? 1.0 : 0.0;
+      inst.setChannelGain(ch, gain);
+    }
+  };
+  if (g.__devilboxActiveHivelyEngine) broadcast(g.__devilboxActiveHivelyEngine, 16);
+  if (g.__devilboxActiveKlysEngine) broadcast(g.__devilboxActiveKlysEngine, 32);
   for (const [, { Engine, maxCh }] of _gainEngineCache) {
     try {
       if (Engine.hasInstance()) {
-        const inst = Engine.getInstance();
-        for (let ch = 0; ch < maxCh; ch++) {
-          const gain = (mask & (1 << ch)) !== 0 ? 1.0 : 0.0;
-          inst.setChannelGain(ch, gain);
-        }
+        const inst = Engine.getInstance() as GainOnly;
+        broadcast(inst, maxCh);
       }
     } catch (e: any) {
       console.warn('[Mixer] setChannelGain error:', e?.message);
@@ -415,6 +435,15 @@ function getFurnaceDispatchEngine(): any {
  * Iterates the warm-up cache — only one engine will have an active instance at a time.
  */
 export function getActiveGainEngine(): { setChannelGain(ch: number, gain: number): void } | null {
+  // Prefer the globally-registered active instance — bypasses Vite module
+  // duplication where the cached Engine class differs from the one that
+  // actually plays the song, leaving Engine.hasInstance() permanently false.
+  const g = globalThis as {
+    __devilboxActiveHivelyEngine?: { setChannelGain(ch: number, gain: number): void } | null;
+    __devilboxActiveKlysEngine?: { setChannelGain(ch: number, gain: number): void } | null;
+  };
+  if (g.__devilboxActiveHivelyEngine) return g.__devilboxActiveHivelyEngine;
+  if (g.__devilboxActiveKlysEngine) return g.__devilboxActiveKlysEngine;
   if (!_engineCacheWarmedUp) return null;
   for (const [, { Engine }] of _gainEngineCache) {
     try {
