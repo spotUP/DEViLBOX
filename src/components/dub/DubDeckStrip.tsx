@@ -49,8 +49,7 @@ const DUB_STYLES = [
   { id: 'scientist',    label: 'Scientist',           characterPreset: 'scientist'    as const, personaId: 'scientist'    as AutoDubPersonaId },
   { id: 'perry',        label: 'Lee "Scratch" Perry', characterPreset: 'perry'        as const, personaId: 'perry'        as AutoDubPersonaId },
   { id: 'madProfessor', label: 'Mad Professor',       characterPreset: 'madProfessor' as const, personaId: 'madProfessor' as AutoDubPersonaId },
-  { id: 'jammy',        label: 'Prince Jammy',        characterPreset: null           as null,  personaId: 'jammy'        as AutoDubPersonaId },
-  { id: 'gatedFlanger', label: 'Gated Flanger',       characterPreset: 'gatedFlanger' as const, personaId: 'custom'       as AutoDubPersonaId },
+  { id: 'jammy',        label: 'Prince Jammy',        characterPreset: 'jammy'        as const, personaId: 'jammy'        as AutoDubPersonaId },
 ];
 
 // ─── Role inference ────────────────────────────────────────────────────────
@@ -206,7 +205,7 @@ export const DubDeckStrip: React.FC = () => {
   const autoDubSettingsBtnRef = useRef<HTMLButtonElement | null>(null);
 
   // Derive current style. For presets with unique characterPreset values
-  // (tubby/scientist/perry/madProfessor/gatedFlanger) the characterPreset alone
+  // (tubby/scientist/perry/madProfessor/jammy) the characterPreset alone
   // identifies the style. For 'custom' characterPreset, multiple styles map
   // here (Custom and Prince Jammy both have null/custom preset) — use the
   // persona to disambiguate between them.

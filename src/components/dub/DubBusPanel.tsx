@@ -405,7 +405,7 @@ export const DubBusPanel: React.FC<{ inline?: boolean }> = ({ inline = false }) 
               { value: 'scientist',    label: 'Scientist (hollow)' },
               { value: 'perry',        label: 'Lee Perry (wild)' },
               { value: 'madProfessor', label: 'Mad Professor (wide)' },
-              { value: 'gatedFlanger', label: 'Gated Flanger (80s)' },
+              { value: 'jammy',        label: 'Prince Jammy (digital)' },
             ] as const}
             onChange={(v) => patch({ characterPreset: v })}
           />
