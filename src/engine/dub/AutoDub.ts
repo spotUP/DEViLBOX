@@ -944,6 +944,11 @@ let _wetFiredThisBar = 0;
  *  wet moves can't stack on top of an active hold. -Infinity = no block. */
 let _nextWetAllowedMs = -Infinity;
 const _heldDisposers = new Set<{ dispose(): void }>();
+/** Timers paired with held disposers. When a force-dispose fires on transport
+ *  stop / autoDub disable, the disposer is called immediately and its timer
+ *  must be cancelled so the timer-driven dispose path doesn't run a second
+ *  time after the audio state has already been restored. */
+const _heldTimers = new Map<{ dispose(): void }, ReturnType<typeof setTimeout>>();
 const _moveLastFiredBar = new Map<string, number>();
 let _rng: () => number = Math.random;
 /** Per-channel rolling peak history for transient detection. Grown lazily. */
@@ -1282,10 +1287,14 @@ function tickImpl(): void {
     // Release all held auto-dub moves so effects don't linger after stop.
     if (_heldDisposers.size > 0) {
       for (const d of _heldDisposers) {
+        const timer = _heldTimers.get(d);
+        if (timer !== undefined) clearTimeout(timer);
         try { d.dispose(); } catch { /* ok */ }
       }
       _heldDisposers.clear();
+      _heldTimers.clear();
     }
+    _inRiddimSection = false;
     return;
   }
 
@@ -1426,16 +1435,18 @@ function tickImpl(): void {
     }
     const holdMs = (60000 / bpm) * 4 * choice.holdBars;
     console.log(`[AutoDub] ▶ HOLD ${choice.moveId}${chStr} holdBars=${choice.holdBars} (${holdMs.toFixed(0)}ms) heldTotal=${_heldDisposers.size}`);
-    setTimeout(() => {
+    const timer = setTimeout(() => {
       console.log(`[AutoDub] ◀ RELEASE ${choice.moveId}${chStr}`);
       try { disposer.dispose(); } catch (err) {
         console.error(`[AutoDub] disposer threw for ${choice.moveId}${chStr}:`, err);
       }
       _heldDisposers.delete(disposer);
+      _heldTimers.delete(disposer);
       if (choice.moveId === 'riddimSection') {
         _inRiddimSection = false;
       }
     }, holdMs);
+    _heldTimers.set(disposer, timer);
   } else {
     console.log(`[AutoDub] ▶ ONESHOT ${choice.moveId}${chStr}`);
   }
@@ -1473,9 +1484,12 @@ export function stopAutoDub(): void {
   }
   _inRiddimSection = false;
   for (const d of _heldDisposers) {
+    const timer = _heldTimers.get(d);
+    if (timer !== undefined) clearTimeout(timer);
     try { d.dispose(); } catch { /* ok */ }
   }
   _heldDisposers.clear();
+  _heldTimers.clear();
 }
 
 export function isAutoDubRunning(): boolean {
