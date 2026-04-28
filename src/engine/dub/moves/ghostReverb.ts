@@ -32,13 +32,15 @@ export const ghostReverb: DubMove = {
       const priorDubSend = ch.dubSend;
       if (!wasMuted) store.setChannelMute(channelId, true);
       store.setChannelDubSend(channelId, 1.0);
+      console.log(`[ghostReverb] MUTE ch${channelId} send→1.0 (wasMuted=${wasMuted} priorSend=${priorDubSend.toFixed(2)})`);
       return {
         dispose() {
+          console.log(`[ghostReverb] RESTORE ch${channelId} send→${priorDubSend.toFixed(2)}`);
           try {
             const s = useMixerStore.getState();
             if (!wasMuted) s.setChannelMute(channelId, false);
             s.setChannelDubSend(channelId, priorDubSend);
-          } catch { /* ok */ }
+          } catch (err) { console.error(`[ghostReverb] restore failed ch${channelId}:`, err); }
         },
       };
     }
@@ -53,16 +55,18 @@ export const ghostReverb: DubMove = {
     });
 
     if (snapshots.length === 0) return null;
+    console.log(`[ghostReverb] MUTE-ALL channels=${snapshots.map(s => s.idx).join(',')}`);
 
     return {
       dispose() {
+        console.log(`[ghostReverb] RESTORE-ALL channels=${snapshots.map(s => s.idx).join(',')}`);
         try {
           const s = useMixerStore.getState();
           for (const { idx, wasMuted, priorSend } of snapshots) {
             if (!wasMuted) s.setChannelMute(idx, false);
             s.setChannelDubSend(idx, priorSend);
           }
-        } catch { /* ok */ }
+        } catch (err) { console.error('[ghostReverb] restore-all failed:', err); }
       },
     };
   },

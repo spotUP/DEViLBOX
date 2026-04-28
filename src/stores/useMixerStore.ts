@@ -510,10 +510,13 @@ function forwardWasmChannelGain(ch: number, channels: MixerChannelState[], isSol
       const c = channels[ch];
       const effectiveMute = isSoloing ? !c.soloed : c.muted;
       const gain = effectiveMute ? 0 : c.volume;
+      console.log(`[Mixer] setChannelGain ch${ch} gain=${gain.toFixed(2)} (muted=${effectiveMute})`);
       gainEngine.setChannelGain(ch, gain);
     } catch (e: any) {
       console.warn('[Mixer] setChannelGain error:', e?.message);
     }
+  } else {
+    console.warn(`[Mixer] forwardWasmChannelGain ch${ch}: no active gain engine — mute may not reach WASM`);
   }
 }
 

@@ -1412,19 +1412,26 @@ function tickImpl(): void {
   _moveLastFiredBar.set(choice.moveId, bar);
   _lastGlobalFireBar = bar;
 
+  const chStr = choice.channelId !== undefined ? ` ch${choice.channelId}` : '';
   if (disposer) {
     _heldDisposers.add(disposer);
     if (choice.moveId === 'riddimSection') {
       _inRiddimSection = true;
     }
     const holdMs = (60000 / bpm) * 4 * choice.holdBars;
+    console.log(`[AutoDub] ▶ HOLD ${choice.moveId}${chStr} holdBars=${choice.holdBars} (${holdMs.toFixed(0)}ms) heldTotal=${_heldDisposers.size}`);
     setTimeout(() => {
-      try { disposer.dispose(); } catch { /* ok */ }
+      console.log(`[AutoDub] ◀ RELEASE ${choice.moveId}${chStr}`);
+      try { disposer.dispose(); } catch (err) {
+        console.error(`[AutoDub] disposer threw for ${choice.moveId}${chStr}:`, err);
+      }
       _heldDisposers.delete(disposer);
       if (choice.moveId === 'riddimSection') {
         _inRiddimSection = false;
       }
     }, holdMs);
+  } else {
+    console.log(`[AutoDub] ▶ ONESHOT ${choice.moveId}${chStr}`);
   }
 }
 

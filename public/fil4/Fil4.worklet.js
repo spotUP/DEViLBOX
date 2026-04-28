@@ -60,6 +60,19 @@ class Fil4Processor extends AudioWorkletProcessor {
     this.L_ptr = 0; this.R_ptr = 0;
     this.heapL = null; this.heapR = null;
     this._wasmMemory = null;
+    // Mirror of current band params so forceAllEnabled can restore after preview
+    this._lastParams = {
+      hp: { enabled: false, freq: 20, q: 0.7 },
+      lp: { enabled: false, freq: 20000, q: 0.7 },
+      ls: { enabled: false, freq: 80, gain: 0, q: 0.7 },
+      hs: { enabled: false, freq: 8000, gain: 0, q: 0.7 },
+      p: [
+        { enabled: false, freq: 200, bw: 1.0, gain: 0 },
+        { enabled: false, freq: 500, bw: 1.0, gain: 0 },
+        { enabled: false, freq: 2000, bw: 1.0, gain: 0 },
+        { enabled: false, freq: 8000, bw: 1.0, gain: 0 },
+      ],
+    };
     this.port.onmessage = this.handleMessage.bind(this);
   }
 
@@ -69,7 +82,7 @@ class Fil4Processor extends AudioWorkletProcessor {
       case 'init':    await this.initialize(data); break;
       case 'dispose': this.cleanup(); break;
       case 'get_magnitude':
-        if (this.isInitialized && this.handle >= 0) this.computeMagnitude(data.id, data.freqs);
+        if (this.isInitialized && this.handle >= 0) this.computeMagnitude(data.id, data.freqs, data.forceAllEnabled);
         break;
       default:
         if (this.isInitialized && this.handle >= 0) this.applyCmd(type, data);
@@ -81,20 +94,52 @@ class Fil4Processor extends AudioWorkletProcessor {
   applyCmd(type, data) {
     const M = this.Module, h = this.handle;
     switch (type) {
-      case 'set_hp':    M._fil4_set_hp   (h, data.enabled ? 1 : 0, data.freq, data.q); break;
-      case 'set_lp':    M._fil4_set_lp   (h, data.enabled ? 1 : 0, data.freq, data.q); break;
-      case 'set_shelf': M._fil4_set_shelf(h, data.which, data.enabled ? 1 : 0, data.freq, data.gain, data.q); break;
-      case 'set_band':  M._fil4_set_band (h, data.band,  data.enabled ? 1 : 0, data.freq, data.bw,   data.gain); break;
-      case 'set_gain':  M._fil4_set_gain (h, data.gain); break;
+      case 'set_hp':
+        M._fil4_set_hp(h, data.enabled ? 1 : 0, data.freq, data.q);
+        this._lastParams.hp = { enabled: !!data.enabled, freq: data.freq, q: data.q };
+        break;
+      case 'set_lp':
+        M._fil4_set_lp(h, data.enabled ? 1 : 0, data.freq, data.q);
+        this._lastParams.lp = { enabled: !!data.enabled, freq: data.freq, q: data.q };
+        break;
+      case 'set_shelf':
+        M._fil4_set_shelf(h, data.which, data.enabled ? 1 : 0, data.freq, data.gain, data.q);
+        if (data.which === 0) this._lastParams.ls = { enabled: !!data.enabled, freq: data.freq, gain: data.gain, q: data.q };
+        else                  this._lastParams.hs = { enabled: !!data.enabled, freq: data.freq, gain: data.gain, q: data.q };
+        break;
+      case 'set_band':
+        M._fil4_set_band(h, data.band, data.enabled ? 1 : 0, data.freq, data.bw, data.gain);
+        if (data.band >= 0 && data.band < 4) {
+          this._lastParams.p[data.band] = { enabled: !!data.enabled, freq: data.freq, bw: data.bw, gain: data.gain };
+        }
+        break;
+      case 'set_gain':
+        M._fil4_set_gain(h, data.gain);
+        break;
     }
   }
 
-  computeMagnitude(id, freqs) {
+  computeMagnitude(id, freqs, forceAllEnabled) {
     const M = this.Module, h = this.handle;
     const n = freqs.length;
     const freqPtr = M._malloc(n * 4);
     const outPtr  = M._malloc(n * 4);
     try {
+      // forceAllEnabled: temporarily enable all bands so the display always
+      // shows the intended response regardless of per-band enabled state.
+      if (forceAllEnabled) {
+        const p = this._lastParams;
+        if (p) {
+          M._fil4_set_hp   (h, 1, p.hp.freq, p.hp.q);
+          M._fil4_set_lp   (h, 1, p.lp.freq, p.lp.q);
+          M._fil4_set_shelf(h, 0, 1, p.ls.freq, p.ls.gain, p.ls.q);
+          M._fil4_set_shelf(h, 1, 1, p.hs.freq, p.hs.gain, p.hs.q);
+          for (let i = 0; i < (p.p?.length ?? 0); i++) {
+            const b = p.p[i];
+            M._fil4_set_band(h, i, 1, b.freq, b.bw, b.gain);
+          }
+        }
+      }
       this.refreshHeap();
       const buf = this._wasmMemory ? this._wasmMemory.buffer
                 : (M.HEAPF32 ? M.HEAPF32.buffer : null);
@@ -105,6 +150,20 @@ class Fil4Processor extends AudioWorkletProcessor {
       const result = new Float32Array(buf, outPtr, n).slice();
       this.port.postMessage({ type: 'magnitude_result', id, data: result }, [result.buffer]);
     } finally {
+      // Restore actual enabled states after forceAllEnabled preview
+      if (forceAllEnabled) {
+        const p = this._lastParams;
+        if (p) {
+          M._fil4_set_hp   (h, p.hp.enabled ? 1 : 0, p.hp.freq, p.hp.q);
+          M._fil4_set_lp   (h, p.lp.enabled ? 1 : 0, p.lp.freq, p.lp.q);
+          M._fil4_set_shelf(h, 0, p.ls.enabled ? 1 : 0, p.ls.freq, p.ls.gain, p.ls.q);
+          M._fil4_set_shelf(h, 1, p.hs.enabled ? 1 : 0, p.hs.freq, p.hs.gain, p.hs.q);
+          for (let i = 0; i < (p.p?.length ?? 0); i++) {
+            const b = p.p[i];
+            M._fil4_set_band(h, i, b.enabled ? 1 : 0, b.freq, b.bw, b.gain);
+          }
+        }
+      }
       M._free(freqPtr);
       M._free(outPtr);
     }
