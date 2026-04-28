@@ -300,16 +300,19 @@ describe('Perry preset uses springEcho chain order for clean decay', () => {
   });
 });
 
-// ── Tubby springEcho chain order (2026-04-24) ───────────────────────────
-// Tubby (RE201, echoIntensity 0.65 + springWet 0.60 in echoSpring) had
-// moderate stacking risk — each echo repeat added new spring reverb tail.
-// Switched to springEcho like Perry.
+// ── Tubby echoSpring chain order (restored 2026-04-28) ──────────────────
+// springEcho was applied to prevent echo stacking (each RE-201 repeat adds
+// spring tail) but made the RE-201 effect completely inaudible: in springEcho
+// the RE-201 output is the SOLE contributor to the bus return — echoing an
+// already-diffuse spring signal produces an inaudible wash.
+// Restored to echoSpring (historically correct: dry → RE-201 → spring).
+// Stacking controlled by lowering echoIntensity from 0.65 → 0.55.
 
-describe('Tubby preset uses springEcho chain order', () => {
-  it('tubby preset sets chainOrder to springEcho', () => {
+describe('Tubby preset uses echoSpring chain order (RE-201 audibility fix)', () => {
+  it('tubby preset sets chainOrder to echoSpring', () => {
     const tubbyBlock = DUB_TYPES_SRC.match(/tubby:\s*\{[\s\S]*?\n  \}/);
     expect(tubbyBlock).not.toBeNull();
-    expect(tubbyBlock![0]).toContain("chainOrder:    'springEcho'");
+    expect(tubbyBlock![0]).toContain("chainOrder:    'echoSpring'");
   });
 });
 
