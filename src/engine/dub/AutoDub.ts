@@ -1551,7 +1551,11 @@ export async function runChannelAudioScrub(
 
   // Mute master output — user won't hear the scrub
   const mixer = useMixerStore.getState();
-  const priorVol = (mixer as unknown as { masterVolume?: number }).masterVolume ?? 1;
+  // Read from the actual nested field. The previous cast looked for
+  // `masterVolume` (doesn't exist) which always defaulted to 1, so the
+  // restore at the end of scrub silently snapped the user's master volume
+  // to 1.0 even if they had it lower.
+  const priorVol = mixer.master?.volume ?? 1;
   try { mixer.setMasterVolume(0); } catch { /* ok */ }
 
   // Seek to richest pattern (tempo-aware — engine processes Fxx up to this point)
