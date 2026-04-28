@@ -487,19 +487,23 @@ export class DubBus {
    * the feedback tap from echo output.
    */
   private _disconnectCoreRouting(): void {
-    const echoIn = this.echo.input as unknown as AudioNode;
     const echoOut = this.echo.output as unknown as Tone.ToneAudioNode;
-    const springIn = this.spring.input as unknown as AudioNode;
     const springOut = (this.spring as unknown as { output: Tone.ToneAudioNode }).output;
     const echoOutNative = getNativeAudioNode(echoOut as unknown);
     const springOutNative = getNativeAudioNode(springOut as unknown);
-    const springInNative = getNativeAudioNode(springIn as unknown);
+    // Use native extraction so disconnect actually targets the node tapeSat was connected to
+    const echoInNative = getNativeAudioNode(this.echo.input as unknown);
+    const springInNative = getNativeAudioNode(this.spring.input as unknown);
 
-    // tapeSat → echo/spring inputs
-    try { this.tapeSatBypass.disconnect(echoIn); } catch { /* ok */ }
-    try { this.tapeStackMix.disconnect(echoIn); } catch { /* ok */ }
-    try { this.tapeSatBypass.disconnect(springIn); } catch { /* ok */ }
-    try { this.tapeStackMix.disconnect(springIn); } catch { /* ok */ }
+    // tapeSat → echo/spring inputs (native nodes; catch = already disconnected, fine)
+    if (echoInNative) {
+      try { this.tapeSatBypass.disconnect(echoInNative); } catch { /* ok */ }
+      try { this.tapeStackMix.disconnect(echoInNative); } catch { /* ok */ }
+    }
+    if (springInNative) {
+      try { this.tapeSatBypass.disconnect(springInNative); } catch { /* ok */ }
+      try { this.tapeStackMix.disconnect(springInNative); } catch { /* ok */ }
+    }
 
     // echo → postEchoSat → echoSpringScrubber → spring (echoSpring order)
     if (echoOutNative) {
@@ -517,8 +521,8 @@ export class DubBus {
     if (springOutNative) {
       try { springOutNative.disconnect(this._echoSpringScrubber); } catch { /* ok */ }
     }
-    if (echoIn) {
-      try { (this._echoSpringScrubber as AudioNode).disconnect(echoIn); } catch { /* ok */ }
+    if (echoInNative) {
+      try { (this._echoSpringScrubber as AudioNode).disconnect(echoInNative); } catch { /* ok */ }
     }
 
     // echo/spring → forwardScrubber → sidechain
@@ -536,11 +540,11 @@ export class DubBus {
     try { this.postEchoSatBypass.disconnect(this.sidechain); } catch { /* ok */ }
     try { this.postEchoSatWet.disconnect(this.sidechain); } catch { /* ok */ }
 
-    // Direct Tone.connect fallbacks (only exist if native extraction failed)
+    // Direct Tone.disconnect fallbacks (only exist if native extraction failed at connect time)
     try { Tone.disconnect(springOut, this.sidechain as unknown as Tone.InputNode); } catch { /* ok */ }
     try { Tone.disconnect(echoOut, this.sidechain as unknown as Tone.InputNode); } catch { /* ok */ }
     try { Tone.disconnect(springOut, this.echo.input as unknown as Tone.InputNode); } catch { /* ok */ }
-    try { Tone.disconnect(echoOut, springIn as unknown as Tone.InputNode); } catch { /* ok */ }
+    try { Tone.disconnect(echoOut, this.spring.input as unknown as Tone.InputNode); } catch { /* ok */ }
 
     // Feedback tap from echo output
     try { Tone.disconnect(echoOut, this.feedback as unknown as Tone.InputNode); } catch { /* ok */ }
@@ -562,18 +566,21 @@ export class DubBus {
    */
   private _applyCoreRouting(order: 'echoSpring' | 'springEcho' | 'parallel'): void {
     this._chainOrder = order;
-    const echoIn = this.echo.input as unknown as Tone.InputNode;
-    const springIn = this.spring.input as unknown as Tone.InputNode;
     const echoOut = this.echo.output as unknown as Tone.ToneAudioNode;
     const springOut = (this.spring as unknown as { output: Tone.ToneAudioNode }).output;
     const echoOutNative = getNativeAudioNode(echoOut as unknown);
     const springOutNative = getNativeAudioNode(springOut as unknown);
+    // tapeSatBypass/tapeStackMix are native GainNodes — must use native .connect()
+    // to avoid the silent Tone↔native boundary failure.
     const echoInNative = getNativeAudioNode(this.echo.input as unknown);
+    const springInNative = getNativeAudioNode(this.spring.input as unknown);
 
     if (order === 'springEcho') {
-      // tapeSat → spring
-      Tone.connect(this.tapeSatBypass, springIn);
-      Tone.connect(this.tapeStackMix, springIn);
+      // tapeSat → spring (native→native)
+      if (springInNative) {
+        this.tapeSatBypass.connect(springInNative);
+        this.tapeStackMix.connect(springInNative);
+      }
       // spring → echoSpringScrubber → echo
       if (springOutNative) {
         springOutNative.connect(this._echoSpringScrubber);
@@ -581,7 +588,7 @@ export class DubBus {
       if (echoInNative) {
         (this._echoSpringScrubber as AudioNode).connect(echoInNative);
       } else {
-        Tone.connect(springOut, echoIn);
+        Tone.connect(springOut, this.echo.input as unknown as Tone.InputNode);
       }
       // echo → postEchoSat → forwardScrubber → sidechain
       if (echoOutNative) {
@@ -595,11 +602,15 @@ export class DubBus {
         Tone.connect(echoOut, this.sidechain as unknown as Tone.InputNode);
       }
     } else if (order === 'parallel') {
-      // tapeSat → both echo and spring
-      Tone.connect(this.tapeSatBypass, echoIn);
-      Tone.connect(this.tapeStackMix, echoIn);
-      Tone.connect(this.tapeSatBypass, springIn);
-      Tone.connect(this.tapeStackMix, springIn);
+      // tapeSat → both echo and spring (native→native)
+      if (echoInNative) {
+        this.tapeSatBypass.connect(echoInNative);
+        this.tapeStackMix.connect(echoInNative);
+      }
+      if (springInNative) {
+        this.tapeSatBypass.connect(springInNative);
+        this.tapeStackMix.connect(springInNative);
+      }
       // echo → postEchoSat → sidechain (no scrubber between, feeds sidechain directly)
       if (echoOutNative) {
         echoOutNative.connect(this.postEchoSatBypass);
@@ -617,8 +628,11 @@ export class DubBus {
       }
     } else {
       // echoSpring (default): tapeSat → echo → [postEchoSat → scrubber] → spring → scrubber → sidechain
-      Tone.connect(this.tapeSatBypass, echoIn);
-      Tone.connect(this.tapeStackMix, echoIn);
+      // tapeSat nodes are native GainNodes — use native .connect() (native→native)
+      if (echoInNative) {
+        this.tapeSatBypass.connect(echoInNative);
+        this.tapeStackMix.connect(echoInNative);
+      }
       // echo → postEchoSat → echoSpringScrubber → spring
       this._connectEchoToSpring();
       // spring → forwardScrubber → sidechain
