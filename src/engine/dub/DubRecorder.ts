@@ -81,44 +81,49 @@ export function startDubRecorder(): () => void {
       // the pattern editor, not just in the automation lanes overlay.
       //
       // Coverage:
-      //   - Per-channel TRIGGER  → cell on the firing channel (DUB_EFFECT_PERCHANNEL)
-      //   - Global TRIGGER       → cell on channel 0 (DUB_EFFECT_GLOBAL). Channel 0
-      //                             is the conventional "effects column anchor" —
-      //                             the decoder is channel-agnostic for global
-      //                             slots so this is purely visual placement.
-      //
-      // HOLD moves are intentionally skipped here. A cell-fired hold would leak
-      // its disposer (DubEffectScanner discards the return value of fireFromEffectCommand),
-      // so the move would never release on replay. The automation curve (written
-      // below for ALL moves) handles the fire+release pair correctly via
-      // AutomationPlayer's edge detection.
+      //   - Per-channel TRIGGER  → cell on the firing channel
+      //                             (DUB_EFFECT_PERCHANNEL/_X). Cell IS the
+      //                             source of truth — curve is skipped to
+      //                             prevent double-fire.
+      //   - Per-channel HOLD     → curve only (channelIndex = firing channel).
+      //                             Cell-fired holds leak their disposer
+      //                             (DubEffectScanner drops the return value
+      //                             of fireFromEffectCommand) so the move
+      //                             would never release on replay.
+      //   - Global (any kind)    → curve on the GLOBAL lane (channelIndex=-1).
+      //                             Bus-wide moves don't belong on a specific
+      //                             channel; the global lane is the right
+      //                             home, matching where continuous bus
+      //                             params (echoWet, hpfCutoff) already live.
       //
       // Skipped:
-      //   - moveKind === 'hold' (release tracking required)
-      //   - Move not encodable in DUB_MOVE_TABLE (index ≥ 32)
+      //   - Move not encodable in DUB_MOVE_TABLE (index ≥ 32) — cell write
+      //     simply no-ops; curve still goes to global / per-channel lane.
       //   - Pattern row out of range
       const cellRow = Math.floor(fireEvent.row);
       const isGlobal = fireEvent.channelId === undefined;
-      const targetChannel = isGlobal ? 0 : (fireEvent.channelId as number);
       const canWriteCell =
         moveKind === 'trigger'
+        && !isGlobal
         && cellRow >= 0 && cellRow < pattern.length
-        && targetChannel >= 0 && targetChannel < pattern.channels.length;
+        && (fireEvent.channelId as number) >= 0
+        && (fireEvent.channelId as number) < pattern.channels.length;
       let cellWritten = false;
       if (canWriteCell) {
-        const encoded = encodeDubEffect(fireEvent.moveId, isGlobal ? undefined : targetChannel);
+        const chId = fireEvent.channelId as number;
+        const encoded = encodeDubEffect(fireEvent.moveId, chId);
         if (encoded) {
-          tracker.setCell(targetChannel, cellRow, { effTyp: encoded.effTyp, eff: encoded.eff });
+          tracker.setCell(chId, cellRow, { effTyp: encoded.effTyp, eff: encoded.eff });
           cellWritten = true;
         }
       }
 
-      // Write automation step curve for HOLD moves and any TRIGGER move that
-      // didn't get a cell write (move not encodable, channel out of range,
-      // etc.). Skipping the curve when a cell exists prevents double-fire on
-      // replay — DubEffectScanner fires the cell, AutomationPlayer fires the
-      // curve, both with source='lane' and no inter-path dedup. One source
-      // of truth per row.
+      // Write automation step curve when no cell was written. For triggers
+      // this only happens for globals (curve on -1 = global lane) or moves
+      // not encodable; for holds it's the always-on path. Skipping the curve
+      // when a cell exists prevents double-fire on replay — DubEffectScanner
+      // fires the cell, AutomationPlayer fires the curve, both with
+      // source='lane' and no inter-path dedup.
       if (moveKind !== undefined && !cellWritten) {
         const curveId = ensureDubCurve(pattern.id, channelIndex, fireEvent.moveId);
         if (curveId) {

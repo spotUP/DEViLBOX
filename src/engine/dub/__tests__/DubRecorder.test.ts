@@ -123,19 +123,19 @@ describe('DubRecorder — automation store write path', () => {
     expect(curves.some(c => c.parameter === 'dub.channelMute')).toBe(true);
   });
 
-  it('global trigger writes effect cell on channel 0 (no curve)', () => {
+  it('global trigger writes curve to global lane (channelIndex=-1, no cell)', () => {
     setRow(8);
     fire('springSlam', undefined);
-    const cell = getCell(0, 8);
-    expect(cell.effTyp).toBeDefined();
-    expect(isDubMoveEffectSlot(cell.effTyp!)).toBe(true);
-    const decoded = decodeDubEffect(cell.effTyp!, cell.eff!);
-    expect(decoded?.moveId).toBe('springSlam');
-    // Global slot decodes with no channelId
-    expect(decoded?.channelId).toBeUndefined();
-    // Global curves intentionally skipped for triggers
+    // No cell on any channel — global moves don't belong on a per-channel
+    // effect column. They live on the global FX lane next to bus-wide
+    // automation (echoWet, hpfCutoff, returnGain, etc.).
+    for (let ch = 0; ch < 4; ch++) {
+      const cell = getCell(ch, 8);
+      expect(cell.effTyp).toBeUndefined();
+    }
+    // Curve appears on the global lane (channelIndex = -1).
     const globalCurves = useAutomationStore.getState().getGlobalCurves('p0');
-    expect(globalCurves.some(c => c.parameter === 'dub.springSlam')).toBe(false);
+    expect(globalCurves.some(c => c.parameter === 'dub.springSlam')).toBe(true);
   });
 
   it('hold move: value=1 at fire row, value=0 stamped at release row', () => {
