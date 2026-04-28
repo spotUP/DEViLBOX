@@ -113,7 +113,7 @@ const NavBarComponent: React.FC = () => {
   return (
     <div className="bg-dark-bgSecondary border-b border-dark-border relative z-40">
       {/* Top Bar: Title and Volume */}
-      <nav className="relative flex items-center justify-between px-4 py-2 border-b border-dark-border">
+      <nav className="grid grid-cols-3 items-center px-4 py-2 border-b border-dark-border">
         {/* Left: App Title */}
         <div className="flex items-center gap-4">
           <h1 className="font-bold text-lg tracking-tight">
@@ -159,8 +159,8 @@ const NavBarComponent: React.FC = () => {
         </div>
 
         {/* Center: FT2 transport — visible when dub deck is expanded */}
-        {dubDeckTransportActive && (
-          <div className="flex items-center gap-1 absolute left-1/2 -translate-x-1/2">
+        <div className="flex items-center justify-center gap-1">
+        {dubDeckTransportActive && (<>
             <Button
               variant={isPlayingSong ? 'danger' : 'primary'}
               size="sm"
@@ -176,11 +176,11 @@ const NavBarComponent: React.FC = () => {
             <Button variant="ghost" size="sm" onClick={() => ft2Actions.save?.()}>Save</Button>
             <Button variant="ghost" size="sm" onClick={() => ft2Actions.undo?.()} disabled={!canUndo()}>Undo</Button>
             <Button variant="ghost" size="sm" onClick={() => ft2Actions.redo?.()} disabled={!canRedo()}>Redo</Button>
-          </div>
-        )}
+          </>)}
+        </div>
 
         {/* Right: View Switcher, Settings, MIDI */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center justify-end gap-2">
           {/* View Switcher */}
           <CustomSelect
             value={n.activeView}
