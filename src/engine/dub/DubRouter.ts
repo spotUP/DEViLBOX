@@ -52,6 +52,7 @@ import { riddimSection } from './moves/riddimSection';
 import type { DubMove, DubMoveContext } from './moves/_types';
 import type { DubBus } from './DubBus';
 import { useTransportStore } from '@/stores/useTransportStore';
+import { useWasmPositionStore } from '@/stores/useWasmPositionStore';
 import { useDubStore } from '@/stores/useDubStore';
 import { getTrackerReplayer } from '@/engine/TrackerReplayer';
 import { decodeDubEffect, decodeDubParamStep, DUB_EFFECT_PARAM_STEP, isDubMoveEffectSlot } from './moveTable';
@@ -83,6 +84,17 @@ function currentRow(): number {
       }
     }
   } catch { /* replayer not ready */ }
+  // WASM engines (Hively/AHX, JamCracker, PreTracker, etc.) push position
+  // updates to useWasmPositionStore from their worklet — they don't drive
+  // useTransportStore.currentRow. Read here BEFORE falling back so AutoDub
+  // fires get the correct row, not 0. Without this every fire stacked on
+  // row 0 and overwrote the previous one.
+  try {
+    const wasmStore = useWasmPositionStore.getState();
+    if (wasmStore.active && typeof wasmStore.row === 'number') {
+      return wasmStore.row;
+    }
+  } catch { /* store not ready */ }
   return useTransportStore.getState().currentRow ?? 0;
 }
 

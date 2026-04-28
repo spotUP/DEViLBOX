@@ -957,6 +957,13 @@ export async function startNativeEngines(
         // standard WebAudio dub bus path, not SID dub mode.
         if (desc.key === 'Hively') {
           hivelyEngine = instance as unknown as HivelyEngine;
+          // Also push positions to useWasmPositionStore so DubRouter can read
+          // the live row for AutoDub fires. Without this every fire stamped
+          // on row 0 (the transport-store fallback) and overwrote the
+          // previous one — Zxx cells appeared to "never get written".
+          hivelyEngine.onPositionUpdate((update) => {
+            useWasmPositionStore.getState().setPosition(update.row, update.position);
+          });
         }
 
         // Capture UADEEngine for position sync in TrackerReplayer
