@@ -902,7 +902,7 @@ export class DubBus {
           this.return_.gain.setValueAtTime(this.enabled ? settings.returnGain : 0, t);
           this.sidechain.threshold.setValueAtTime(targetThreshold, t);
           this.sidechain.ratio.setValueAtTime(6, t);
-          this.glue.ratio.setValueAtTime(3, t);
+          this.glue.ratio.setValueAtTime(this.settings.glueBypass ? 1 : 3, t);
         } catch { /* ok */ }
       }
     }, RAMP_SEC * 1000 + 5);
@@ -5188,7 +5188,11 @@ export class DubBus {
     tap.gain.linearRampToValueAtTime(fbAmt, now + 0.23);
     // Boost spring wet just enough to sustain feedback — keep it below 0.65
     // so the scream is warm, not dominating the whole mix.
-    const priorWet = this._springWetCache;
+    // If the cache is in the post-release flush state (~0), fall back to the
+    // user's current setting so a rapid double-fire doesn't capture 0 and
+    // restore the spring to silence on the second release.
+    const cached = this._springWetCache;
+    const priorWet = cached < 0.1 ? this.settings.springWet : cached;
     this._setSpringWet(Math.min(0.65, Math.max(priorWet, 0.45)));
     // Sweep center frequency over sweepSec — rising whine
     bp.frequency.cancelScheduledValues(now);
