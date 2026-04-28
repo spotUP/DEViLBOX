@@ -61,11 +61,16 @@ export const versionDrop: DubMove = {
       }
     }
 
+    console.log(`[versionDrop] MUTE melodic channels=[${muted.join(',')}]`);
+
     return {
       dispose() {
+        console.log(`[versionDrop] RESTORE channels=[${muted.join(',')}]`);
         const m = useMixerStore.getState();
         for (const i of muted) {
-          try { m.setChannelMute(i, false); } catch { /* ok */ }
+          try { m.setChannelMute(i, false); } catch (err) {
+            console.error(`[versionDrop] RESTORE failed ch${i}:`, err);
+          }
         }
       },
     };
