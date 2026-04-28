@@ -172,11 +172,12 @@ const DEFAULT_COOLDOWN_BARS = 6;
  *  (2026-04-21 feedback). Dry moves (tapeStop, filterDrop, channelMute,
  *  etc.) are unaffected. */
 const WET_FIRES_PER_BAR_CAP = 1;
-/** Minimum real-time gap between wet fires (seconds). Cross-bar complement to
- *  WET_FIRES_PER_BAR_CAP: the bar counter resets at every bar boundary but
- *  a prior wet tail keeps ringing. This floor ensures at least 2 bars of
- *  decay time at any BPM before a new wet move adds to the return. */
-const WET_COOLDOWN_SEC = 3.5;
+/** Extra decay time (ms) added after a wet hold releases before allowing the
+ *  next wet fire. The hold itself is already tracked — this is for echo/spring
+ *  ring-out after the hold ends. 2 seconds covers most reverb tails. */
+const WET_DECAY_EXTRA_MS = 2000;
+/** Minimum wet block duration for oneshot (non-hold) wet fires (ms). */
+const WET_ONESHOT_BLOCK_MS = 3500;
 /** Rolling peak window for transient detection — last N ticks (~N * 250ms). */
 const TRANSIENT_WINDOW = 8;
 /** A channel's peak must exceed `RATIO * rollingAvg` to count as a transient. */
@@ -652,9 +653,9 @@ export interface AutoDubTickCtx {
   /** Subset of movesFiredThisBar that fired wet-tagged rules. Capped by
    *  `WET_FIRES_PER_BAR_CAP`. */
   wetFiredThisBar: number;
-  /** Seconds elapsed since the last wet fire. Used with WET_COOLDOWN_SEC to
-   *  prevent echo/reverb tails stacking across bar boundaries. */
-  secsSinceLastWetFire: number;
+  /** performance.now() ms after which the next wet fire is allowed. Compared
+   *  directly against performance.now() — no arithmetic needed in the gate. */
+  nextWetAllowedMs: number;
   moveLastFiredBar: ReadonlyMap<string, number>;
   channelCount: number;
   /** Per-channel role, parallel to channel indices (0..channelCount-1).
@@ -752,10 +753,11 @@ export function chooseMove(ctx: AutoDubTickCtx, rng: () => number): AutoDubChoic
     // other wet rule until the next bar. Dry moves (tapeStop, filterDrop,
     // channelMute, subSwell, etc.) stay eligible.
     if (rule.wet && ctx.wetFiredThisBar >= WET_FIRES_PER_BAR_CAP) continue;
-    // Cross-bar wet cooldown: even if the bar counter just reset, the prior
-    // tail is still ringing — block new wet fires until enough decay time
-    // has passed. This is the bar-boundary complement to the per-bar cap.
-    if (rule.wet && ctx.secsSinceLastWetFire < WET_COOLDOWN_SEC) continue;
+    // Cross-bar wet block: block new wet fires until the current wet hold has
+    // released AND the echo/spring tail has had WET_DECAY_EXTRA_MS to decay.
+    // This correctly tracks hold duration (not a fixed constant) so a 2-bar
+    // hold at slow BPM can't have a new wet move fire while it's still active.
+    if (rule.wet && performance.now() < ctx.nextWetAllowedMs) continue;
 
     const condOk = rule.condition(ctx) || (variance > 0 && rng() < variance * 0.1);
     if (!condOk) continue;
@@ -937,9 +939,10 @@ let _lastBar = -1;
 let _lastGlobalFireBar = -99;
 let _movesFiredThisBar = 0;
 let _wetFiredThisBar = 0;
-/** performance.now() timestamp of the last wet fire. -Infinity at start so
- *  the first fire is never blocked. Reset to -Infinity on stop/reset. */
-let _lastWetFireTimeSec = -Infinity;
+/** performance.now() timestamp (ms) after which the next wet fire is allowed.
+ *  Set to: holdMs + WET_DECAY_EXTRA_MS after a hold-based wet fire so new
+ *  wet moves can't stack on top of an active hold. -Infinity = no block. */
+let _nextWetAllowedMs = -Infinity;
 const _heldDisposers = new Set<{ dispose(): void }>();
 const _moveLastFiredBar = new Map<string, number>();
 let _rng: () => number = Math.random;
@@ -1363,7 +1366,6 @@ function tickImpl(): void {
     _eqSnapshot = null;
   }
 
-  const nowSec = performance.now() / 1000;
   const choice = chooseMove({
     bar, barPos, isNewBar,
     intensity: dub.autoDubIntensity,
@@ -1371,7 +1373,7 @@ function tickImpl(): void {
     blacklist: new Set(dub.autoDubMoveBlacklist),
     movesFiredThisBar: _movesFiredThisBar,
     wetFiredThisBar: _wetFiredThisBar,
-    secsSinceLastWetFire: nowSec - _lastWetFireTimeSec,
+    nextWetAllowedMs: _nextWetAllowedMs,
     moveLastFiredBar: _moveLastFiredBar,
     channelCount,
     roles,
@@ -1407,7 +1409,11 @@ function tickImpl(): void {
   _movesFiredThisBar += 1;
   if (choice.wet) {
     _wetFiredThisBar += 1;
-    _lastWetFireTimeSec = performance.now() / 1000;
+    // Block the next wet fire until this hold expires + decay time.
+    // For oneshots (no holdBars), use WET_ONESHOT_BLOCK_MS.
+    const holdMs = choice.holdBars > 0 ? (60000 / bpm) * 4 * choice.holdBars : 0;
+    const blockMs = Math.max(WET_ONESHOT_BLOCK_MS, holdMs + WET_DECAY_EXTRA_MS);
+    _nextWetAllowedMs = performance.now() + blockMs;
   }
   _moveLastFiredBar.set(choice.moveId, bar);
   _lastGlobalFireBar = bar;
@@ -1444,7 +1450,7 @@ export function startAutoDub(): void {
   _lastGlobalFireBar = -99;
   _movesFiredThisBar = 0;
   _wetFiredThisBar = 0;
-  _lastWetFireTimeSec = -Infinity;
+  _nextWetAllowedMs = -Infinity;
   _moveLastFiredBar.clear();
   _rollingPeaks.length = 0;
   // Drop any runtime role votes from a previous session / previous song so
@@ -1611,7 +1617,7 @@ export function _resetAutoDubStateForTest(): void {
   _moveLastFiredBar.clear();
   _movesFiredThisBar = 0;
   _wetFiredThisBar = 0;
-  _lastWetFireTimeSec = -Infinity;
+  _nextWetAllowedMs = -Infinity;
   _lastBar = -1;
   _lastGlobalFireBar = -99;
   _rollingPeaks.length = 0;

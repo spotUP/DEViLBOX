@@ -36,7 +36,7 @@ function baseCtx(overrides: Partial<AutoDubTickCtx> = {}): AutoDubTickCtx {
     blacklist: new Set(),
     movesFiredThisBar: 0,
     wetFiredThisBar: 0,
-    secsSinceLastWetFire: Infinity,
+    nextWetAllowedMs: -Infinity,
     moveLastFiredBar: new Map(),
     channelCount: 8,
     roles: [],
