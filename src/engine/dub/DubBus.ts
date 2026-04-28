@@ -1482,22 +1482,35 @@ export class DubBus {
     // Master insert chain ends at toneArm → masterInsertEnvelope.
     // Vinyl is applied POST-MASTER (after this.master receives both dry +
     // reverb return) so the complete mix gets vinyl-degraded together.
-    Tone.connect(convolverSum, this.toneArmEffect.input as unknown as Tone.InputNode);
+    { const rawTAIn = getNativeAudioNode(this.toneArmEffect.input);
+      if (rawTAIn) convolverSum.connect(rawTAIn);
+      else Tone.connect(convolverSum, this.toneArmEffect.input as unknown as Tone.InputNode); }
     this.vinylDirect = this.context.createGain();
     this.vinylDirect.gain.value = 1;
     this.masterHpf.connect(this.masterBassShelf);
     this.masterInsertHead = this.masterHpf;
     this.masterInsertEnvelope = this.context.createGain();
     this.masterInsertEnvelope.gain.value = 1;
-    Tone.connect(this.toneArmEffect.output as unknown as Tone.ToneAudioNode, this.masterInsertEnvelope as unknown as Tone.InputNode);
+    // Use native connect (not Tone.connect) for Tone→native boundary so the
+    // WebAudio connection is guaranteed regardless of Tone.js wrapper behaviour.
+    // Previously Tone.connect(toneArmEffect.output, masterInsertEnvelope) was
+    // used here but the Tone→native path silently broke the master insert chain
+    // when bus was enabled, killing the SID oscilloscope visualiser.
+    { const raw = getNativeAudioNode(this.toneArmEffect.output);
+      if (raw) raw.connect(this.masterInsertEnvelope);
+      else console.warn('[DubBus] toneArm output not extractable — master insert chain broken'); }
     this.masterInsertTail = this.masterInsertEnvelope;
 
     // Post-master vinyl output: this.master → vinylEffect → vinylOutputNode.
     // DrumPadEngine connects vinylOutputNode to context.destination / DJ master
     // so vinyl noise processes the final mix, not just the dry signal.
     this.vinylOutputNode = this.context.createGain();
-    Tone.connect(master as unknown as Tone.ToneAudioNode, this.vinylEffect.input as unknown as Tone.InputNode);
-    Tone.connect(this.vinylEffect.output as unknown as Tone.ToneAudioNode, this.vinylOutputNode as unknown as Tone.InputNode);
+    { const rawMaster = getNativeAudioNode(this.vinylEffect.input);
+      if (rawMaster) master.connect(rawMaster);
+      else Tone.connect(master as unknown as Tone.ToneAudioNode, this.vinylEffect.input as unknown as Tone.InputNode); }
+    { const rawVinylOut = getNativeAudioNode(this.vinylEffect.output);
+      if (rawVinylOut) rawVinylOut.connect(this.vinylOutputNode);
+      else Tone.connect(this.vinylEffect.output as unknown as Tone.ToneAudioNode, this.vinylOutputNode as unknown as Tone.InputNode); }
 
     // Liquid sweep — parallel comb-filter branch. See class-level docstring.
     // The LFO runs continuously (can't stop + restart an OscillatorNode),
