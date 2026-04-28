@@ -420,10 +420,8 @@ const RULES: Rule[] = [
   { moveId: 'backwardReverb',
     condition: (c) => c.barPos > 0.8 && c.bar % 8 === 6,
     baseWeight: 0.10, wet: true },
-  // Tubby scream — rising through bar 2 of 4.
-  { moveId: 'tubbyScream',
-    condition: (c) => c.barPos > 0.7 && c.bar % 4 === 2,
-    baseWeight: 0.10, wet: true },
+  // tubbyScream removed from AutoDub — it builds uncontrollable spring
+  // energy and saturates the mix when fired autonomously. Manual-only.
   // Sonar ping — narrow window mid-bar.
   { moveId: 'sonarPing',
     condition: (c) => c.barPos >= 0.6 && c.barPos < 0.65,
