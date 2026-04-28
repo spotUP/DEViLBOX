@@ -749,7 +749,17 @@ export const useDrumPadStore = create<DrumPadStore>((set, get) => ({
           // startup reloaded with the bus on if the user had ever clicked
           // it. Tuning (character preset, echo/spring params, HPF, etc.)
           // still restores normally.
-          dubBus: { ...DEFAULT_DUB_BUS, ...(state.dubBus || {}), enabled: false },
+          //
+          // characterPreset rename 'gatedFlanger' → 'jammy': map any saved
+          // 'gatedFlanger' value forward so older sessions keep their voicing
+          // instead of falling back to default on the now-invalid string.
+          dubBus: ((): typeof DEFAULT_DUB_BUS => {
+            const merged = { ...DEFAULT_DUB_BUS, ...(state.dubBus || {}), enabled: false };
+            if ((merged as { characterPreset?: string }).characterPreset === 'gatedFlanger') {
+              merged.characterPreset = 'jammy';
+            }
+            return merged;
+          })(),
         });
 
         if (process.env.NODE_ENV === 'development') {

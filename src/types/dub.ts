@@ -140,7 +140,7 @@ export interface DubBusSettings {
 
   // Engineer character preset — applies a curated snapshot of every
   // coloring param when selected. 'custom' = user-edited, don't overwrite.
-  characterPreset: 'custom' | 'tubby' | 'scientist' | 'perry' | 'madProfessor' | 'gatedFlanger';
+  characterPreset: 'custom' | 'tubby' | 'scientist' | 'perry' | 'madProfessor' | 'jammy';
 
   /** Glue compressor bypass — Scientist mode. When true sets the glue
    *  DynamicsCompressor to 1:1 ratio (unity), passing the signal untouched.
@@ -748,9 +748,9 @@ export const DUB_CHARACTER_PRESETS: Record<Exclude<DubBusSettings['characterPres
       default:    { filterMode: 'off', filterHz: 80,  reverbSend: 0.0, sweepAmount: 0.38, sweepRateHz: 0.12, sweepDepthMs: 5.5, sweepFeedback: 0.64 },
     },
   },
-  gatedFlanger: {
-    label: 'Gated Flanger',
-    description: 'Gated-reverb + heavy liquid-sweep combo. Snappy reverb tail chopped short, aggressive flanger on returns. The "80s dub" voicing that sits between classic and modern.',
+  jammy: {
+    label: 'Prince Jammy',
+    description: 'Lloyd "Prince Jammy" James — digital dancehall pioneer (Sleng Teng era). Crisp gated drums, bright Lexicon reverb tails, BBD echo, heavy sidechain. The bridge from analog dub into 80s/90s digital. Cleaner and more groove-locked than Sherwood, less echoey than Tubby.',
     overrides: {
       returnGain:     0.80,
       hpfCutoff:      60,
@@ -764,7 +764,8 @@ export const DUB_CHARACTER_PRESETS: Record<Exclude<DubBusSettings['characterPres
       springWet:      0.25,   // gated — short
       sidechainAmount: 0.5,
       stereoWidth:    1.3,
-      sweepAmount:    0.42,   // flanger on returns — not overwhelming
+      sweepAmount:    0.30,   // 0.42 → 0.30 — Jammy was less flanger-heavy than
+                              // Sherwood. Subtle modulation, not the swirly On-U Sound character.
       sweepRateHz:    1.5,    // faster cycle = more musical, less liquid/wild
       sweepDepthMs:   3,      // narrow comb = controlled metallic sheen
       sweepFeedback:  0.52,   // was 0.80 — high feedback caused runaway resonance
@@ -776,8 +777,8 @@ export const DUB_CHARACTER_PRESETS: Record<Exclude<DubBusSettings['characterPres
     springsLength: 0.25, springsDamp: 0.65, springsChaos: 0.15, springsScatter: 0.50, springsTone: 0.68,
     // springsScatter 0.30 → 0.50 — wider gated tail for deeper space.
     tapeSatDrive:  0.55,  // 0.35 → 0.55 — drive the BBD curve harder for fatter low end.
-    // Gated Flanger: aggressive but controlled. Heavy on percussion for the
-    // gated-reverb snap; pads get the flanger treatment.
+    // Prince Jammy: crisp gated drums + heavy sidechain. Heavy on percussion
+    // for the digital dancehall snap; less swirly than Sherwood-style preset.
     defaultSendsByRole: { percussion: 0.85, bass: 0.55, lead: 0.60, chord: 0.65, arpeggio: 0.55, pad: 0.75, default: 0.55 },
     // Jammy-style minimalism: extremely selective routing, tight HPFs.
     // Only lead and pad get any reverb. Bass gets LPF to stay clean.

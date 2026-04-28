@@ -34,7 +34,7 @@ describe('snapToAltecStep', () => {
 describe('DUB_CHARACTER_PRESETS', () => {
   it('has all 5 documented engineer presets', () => {
     expect(Object.keys(DUB_CHARACTER_PRESETS).sort()).toEqual(
-      ['gatedFlanger', 'madProfessor', 'perry', 'scientist', 'tubby'],
+      ['jammy', 'madProfessor', 'perry', 'scientist', 'tubby'],
     );
   });
 
@@ -51,11 +51,12 @@ describe('DUB_CHARACTER_PRESETS', () => {
     expect(p.overrides.midScoopFreqHz).toBe(700);
   });
 
-  it('gatedFlanger has controlled sweep + gated-short spring', () => {
-    const p = DUB_CHARACTER_PRESETS.gatedFlanger;
-    // Sweep present but tamed (was 0.65/0.80fb — too wild; now 0.42/0.52fb)
-    expect(p.overrides.sweepAmount).toBeGreaterThan(0.3);
-    expect(p.overrides.sweepAmount).toBeLessThan(0.6);
+  it('jammy has controlled sweep + gated-short spring', () => {
+    const p = DUB_CHARACTER_PRESETS.jammy;
+    // Sweep present but tamed — Jammy was less flanger-heavy than Sherwood,
+    // so sweepAmount sits at ~0.30 (was 0.42 under the old "gatedFlanger" name).
+    expect(p.overrides.sweepAmount).toBeGreaterThan(0.2);
+    expect(p.overrides.sweepAmount).toBeLessThan(0.5);
     expect(p.overrides.sweepFeedback).toBeLessThan(0.6);
     expect(p.overrides.springWet).toBeLessThan(0.5);
     // 'tape15ips' = warmer BBD-style saturation. 'single' was too thin to
