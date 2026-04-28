@@ -418,7 +418,7 @@ class HivelyProcessor extends AudioWorkletProcessor {
   _reapplyChannelGains() {
     if (!this.wasm || typeof this.wasm._hively_set_channel_gain !== 'function') return;
     for (let ch = 0; ch < 16; ch++) {
-      this.wasm._hively_set_channel_gain(ch, this.channelGains[ch]);
+      this.wasm._hively_set_channel_gain(ch, this.channelGains[ch] === 0 ? 0.0 : 1.0);
     }
   }
 
@@ -456,11 +456,11 @@ class HivelyProcessor extends AudioWorkletProcessor {
 
     if (!needsSplit || !hasSplitApi) {
       // Fast path: no isolation or oscilloscope, use combined decode.
-      // Apply channelGains so user mutes work without isolation being active.
+      // Binary mute only — volume is applied by the ToneEngine channel gain.
       if (this.wasm._hively_set_channel_gain) {
         const nc = this.wasm._hively_get_channels ? this.wasm._hively_get_channels() : 4;
         for (let c = 0; c < nc; c++) {
-          this.wasm._hively_set_channel_gain(c, this.channelGains[c]);
+          this.wasm._hively_set_channel_gain(c, this.channelGains[c] === 0 ? 0.0 : 1.0);
         }
       }
       const samples = this.wasm._hively_decode_frame(this.decodePtrL, this.decodePtrR);
@@ -490,16 +490,17 @@ class HivelyProcessor extends AudioWorkletProcessor {
     // The gains are set to isolate channels below
 
     // 4. Render main output (with isolated channels muted).
-    // Apply this.channelGains so user mutes (setChannelGain) are honoured —
-    // without this, every render frame was resetting all gains to 1.0,
-    // making setChannelGain/channel-mute a no-op in the isolation path.
+    // Use binary mute: 0.0 if channelGains[ch]===0 (user-muted), else 1.0.
+    // The ToneEngine's downstream channel gain node handles volume attenuation —
+    // applying channelGains directly here would double-apply the volume.
     if (!this._gainDiagDone) {
       this._gainDiagDone = true;
       console.log(`[HivelyWorklet] step4 first render: numChannels=${numChannels} isolatedBits=${isolatedBits} gains=[${Array.from(this.channelGains.slice(0, numChannels)).map(g => g.toFixed(2)).join(',')}]`);
     }
     for (let ch = 0; ch < numChannels; ch++) {
       const isolatedOut = (isolatedBits & (1 << ch)) !== 0;
-      this.wasm._hively_set_channel_gain(ch, isolatedOut ? 0.0 : this.channelGains[ch]);
+      const muted = isolatedOut || this.channelGains[ch] === 0;
+      this.wasm._hively_set_channel_gain(ch, muted ? 0.0 : 1.0);
     }
     const samples = this.wasm._hively_render_frame(this.decodePtrL, this.decodePtrR);
     if (samples <= 0) return;
