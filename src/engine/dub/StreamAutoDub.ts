@@ -39,7 +39,7 @@ interface DeckDubState {
   lastBar: number;
   movesFiredThisBar: number;
   wetFiredThisBar: number;
-  lastWetFireTimeSec: number;
+  nextWetAllowedMs: number;
   moveLastFiredBar: Map<string, number>;
   heldDisposers: Set<{ dispose(): void }>;
 }
@@ -55,7 +55,7 @@ function getOrCreateDeckState(deckId: DeckId): DeckDubState {
       lastBar: -1,
       movesFiredThisBar: 0,
       wetFiredThisBar: 0,
-      lastWetFireTimeSec: -Infinity,
+      nextWetAllowedMs: -Infinity,
       moveLastFiredBar: new Map(),
       heldDisposers: new Set(),
     };
@@ -161,7 +161,7 @@ function tickForDeck(deckId: DeckId): void {
     blacklist: new Set(dub.autoDubMoveBlacklist),
     movesFiredThisBar: s.movesFiredThisBar,
     wetFiredThisBar: s.wetFiredThisBar,
-    secsSinceLastWetFire: performance.now() / 1000 - s.lastWetFireTimeSec,
+    nextWetAllowedMs: s.nextWetAllowedMs,
     moveLastFiredBar: s.moveLastFiredBar,
     channelCount: count || 1,
     roles,
@@ -184,7 +184,8 @@ function tickForDeck(deckId: DeckId): void {
   s.movesFiredThisBar += 1;
   if (choice.wet) {
     s.wetFiredThisBar += 1;
-    s.lastWetFireTimeSec = performance.now() / 1000;
+    const holdMs = choice.holdBars > 0 ? (60000 / bpm) * 4 * choice.holdBars : 0;
+    s.nextWetAllowedMs = performance.now() + Math.max(3500, holdMs + 2000);
   }
   s.moveLastFiredBar.set(choice.moveId, bar);
 
@@ -225,7 +226,7 @@ export function startStreamAutoDub(deckId: DeckId): void {
   s.lastBar = -1;
   s.movesFiredThisBar = 0;
   s.wetFiredThisBar = 0;
-  s.lastWetFireTimeSec = -Infinity;
+  s.nextWetAllowedMs = -Infinity;
   s.moveLastFiredBar.clear();
   s.timer = setInterval(() => tickForDeck(deckId), TICK_MS);
 }
