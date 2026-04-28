@@ -681,7 +681,15 @@ export const DubDeckStrip: React.FC = () => {
       applyCharacterPresetSends(currentStyle.characterPreset);
     }
     const persona = getPersona(currentStyle.personaId);
-    fireDub(persona.signatureMove, undefined, persona.paramOverrides?.[persona.signatureMove] ?? {}, 'live');
+    const disposer = fireDub(persona.signatureMove, undefined, persona.paramOverrides?.[persona.signatureMove] ?? {}, 'live');
+    // Auto-dispose hold moves after 2 bars so the audition doesn't leave
+    // channels permanently muted (ghostReverb mutes and never restores if
+    // the disposer is thrown away).
+    if (disposer) {
+      const bpm = useTransportStore.getState().bpm || 120;
+      const twoBarMs = (60000 / bpm) * 8;
+      setTimeout(() => { try { disposer.dispose(); } catch { /* ok */ } }, twoBarMs);
+    }
   }, [busEnabled, setDubBus, dubBusSettings.characterPreset, currentStyle]);
 
   // Apply default channel send levels for a named character preset. Called

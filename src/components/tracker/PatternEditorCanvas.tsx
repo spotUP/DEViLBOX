@@ -283,11 +283,17 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
   const showMacroLanes = useUIStore(s => s.showMacroLanes);
   const dubBusEnabled = useDrumPadStore(s => Boolean(s.dubBus?.enabled));
 
-  // Channel role overrides — read from mixer store, auto-roles from classifier
+  // Channel role overrides — read from mixer store, auto-roles from classifier.
+  // Subscribe to the raw results Map (stable reference); derive the array with
+  // useMemo so getRolesSnapshot's Array.from never causes an infinite re-render.
   const mixerChannels = useMixerStore(s => s.channels);
   const setChannelDubRole = useMixerStore(s => s.setChannelDubRole);
   const channelCount = pattern?.channels.length ?? 0;
-  const autoRoles = useChannelTypeStore(s => s.getRolesSnapshot(channelCount));
+  const channelTypeResults = useChannelTypeStore(s => s.results);
+  const autoRoles = useMemo(
+    () => Array.from({ length: channelCount }, (_, ch) => channelTypeResults.get(ch)?.role ?? null),
+    [channelTypeResults, channelCount],
+  );
 
   // Per-channel automation lane count (for multi-lane width allocation)
   const channelLaneCounts = useAutomationStore(useShallow((s) => {
