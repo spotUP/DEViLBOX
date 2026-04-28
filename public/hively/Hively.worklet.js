@@ -22,6 +22,11 @@ class HivelyProcessor extends AudioWorkletProcessor {
     this.ringReadPos = 0;
     this.ringAvailable = 0;
 
+    // Per-channel gain state (1.0 = full volume, 0.0 = muted).
+    // Persisted so gains survive song loops — hvl_InitSubsong resets ht_ChannelGain
+    // to 256 on every loop, which would un-mute any channels the user muted.
+    this.channelGains = new Float32Array(16).fill(1.0);
+
     // Per-channel isolation ring buffers (4 slots max)
     this.isolationSlots = [null, null, null, null];
     this.isoRings = [null, null, null, null]; // { ringL, ringR, ringWritePos, ringReadPos, ringAvailable }
@@ -69,6 +74,7 @@ class HivelyProcessor extends AudioWorkletProcessor {
       case 'initSubsong':
         if (this.wasm && this.tuneLoaded) {
           this.wasm._hively_init_subsong(data.nr || 0);
+          this._reapplyChannelGains();
           this.resetRingBuffer();
         }
         break;
@@ -157,6 +163,9 @@ class HivelyProcessor extends AudioWorkletProcessor {
         break;
 
       case 'setChannelGain':
+        if (data.channel >= 0 && data.channel < 16) {
+          this.channelGains[data.channel] = data.gain;
+        }
         if (this.wasm && typeof this.wasm._hively_set_channel_gain === 'function') {
           this.wasm._hively_set_channel_gain(data.channel, data.gain);
         }
@@ -170,10 +179,12 @@ class HivelyProcessor extends AudioWorkletProcessor {
 
       case 'setMuteMask':
         this.muteMask = data.mask;
+        for (let ch = 0; ch < 16; ch++) {
+          this.channelGains[ch] = (data.mask & (1 << ch)) !== 0 ? 1.0 : 0.0;
+        }
         if (this.wasm && typeof this.wasm._hively_set_channel_gain === 'function') {
           for (let ch = 0; ch < 16; ch++) {
-            const active = (data.mask & (1 << ch)) !== 0;
-            this.wasm._hively_set_channel_gain(ch, active ? 1.0 : 0.0);
+            this.wasm._hively_set_channel_gain(ch, this.channelGains[ch]);
           }
         }
         break;
@@ -402,6 +413,13 @@ class HivelyProcessor extends AudioWorkletProcessor {
     this.ringAvailable = 0;
   }
 
+  _reapplyChannelGains() {
+    if (!this.wasm || typeof this.wasm._hively_set_channel_gain !== 'function') return;
+    for (let ch = 0; ch < 16; ch++) {
+      this.wasm._hively_set_channel_gain(ch, this.channelGains[ch]);
+    }
+  }
+
   destroyAllPlayers() {
     if (!this.wasm || !this.playerOutPtrs) return;
     for (const h of Object.keys(this.playerOutPtrs)) {
@@ -420,6 +438,8 @@ class HivelyProcessor extends AudioWorkletProcessor {
     if (this.wasm._hively_is_song_end()) {
       if (this.looping) {
         this.wasm._hively_init_subsong(0);
+        // hvl_InitSubsong resets ht_ChannelGain[i]=256 — re-apply user mutes
+        this._reapplyChannelGains();
       } else {
         this.playing = false;
         this.port.postMessage({ type: 'songEnd' });
