@@ -7,6 +7,8 @@
 
 import React, { useRef, useEffect, useCallback, useState, useMemo } from 'react';
 import { useTrackerStore, useCursorStore, useTransportStore, useThemeStore, useInstrumentStore, useEditorStore, useAutomationStore } from '@stores';
+import { useMixerStore } from '@stores/useMixerStore';
+import { useChannelTypeStore } from '@stores/useChannelTypeStore';
 import { useWasmPositionStore } from '@stores/useWasmPositionStore';
 import { channelLayout } from './channelLayout';
 import { AutomationLanes } from './AutomationLanes';
@@ -280,6 +282,12 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
   const showAutomationLanes = useUIStore(s => s.showAutomationLanes);
   const showMacroLanes = useUIStore(s => s.showMacroLanes);
   const dubBusEnabled = useDrumPadStore(s => Boolean(s.dubBus?.enabled));
+
+  // Channel role overrides — read from mixer store, auto-roles from classifier
+  const mixerChannels = useMixerStore(s => s.channels);
+  const setChannelDubRole = useMixerStore(s => s.setChannelDubRole);
+  const channelCount = pattern?.channels.length ?? 0;
+  const autoRoles = useChannelTypeStore(s => s.getRolesSnapshot(channelCount));
 
   // Per-channel automation lane count (for multi-lane width allocation)
   const channelLaneCounts = useAutomationStore(useShallow((s) => {
@@ -3060,7 +3068,26 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
                           }}
                         >
                           {/* Pattern channel: full controls */}
-                          {channel && !isCollapsed && (
+                          {channel && !isCollapsed && (() => {
+                            const ROLE_CYCLE = [null, 'percussion', 'bass', 'lead', 'skank', 'pad', 'empty'] as const;
+                            const ROLE_LABEL: Record<string, string> = {
+                              percussion: 'DRUMS', bass: 'BASS', lead: 'LEAD',
+                              skank: 'SKANK', pad: 'PAD', empty: 'EXCL',
+                            };
+                            const userRole = mixerChannels[idx]?.dubRole ?? null;
+                            const autoRole = autoRoles[idx] ?? null;
+                            const displayLabel = userRole ? (ROLE_LABEL[userRole] ?? userRole.toUpperCase()) : (autoRole ? (ROLE_LABEL[autoRole] ?? autoRole.slice(0,4).toUpperCase()) : null);
+                            const chipClass = userRole === 'empty'
+                              ? 'text-accent-error border-accent-error/40'
+                              : userRole
+                                ? 'text-accent-highlight border-accent-highlight/40'
+                                : 'text-text-muted border-dark-borderLight';
+                            const cycleRole = () => {
+                              const cur = ROLE_CYCLE.indexOf(userRole as typeof ROLE_CYCLE[number]);
+                              const next = ROLE_CYCLE[(cur + 1) % ROLE_CYCLE.length];
+                              setChannelDubRole(idx, next ?? null);
+                            };
+                            return (
                             <>
                               <div className="flex items-center gap-1.5 overflow-hidden flex-1 min-w-0">
                                 <span
@@ -3080,6 +3107,13 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
                                     title={`Click to rename channel (Short: ${channel.shortName || (idx + 1)})`}
                                   />
                                 )}
+                                <button
+                                  onClick={cycleRole}
+                                  className={`flex-shrink-0 font-mono text-[8px] leading-none px-0.5 py-0.5 rounded border transition-colors ${chipClass}`}
+                                  title={userRole ? `Role: ${ROLE_LABEL[userRole] ?? userRole} (locked) — click to cycle. AutoDub targets this channel as ${ROLE_LABEL[userRole] ?? userRole}.` : `Role: auto (${autoRole ?? '—'}) — click to lock`}
+                                >
+                                  {displayLabel ?? '—'}
+                                </button>
                                 <div className="flex-shrink-0">
                                   <ChannelVUMeter level={0} isActive={false} />
                                 </div>
@@ -3148,7 +3182,8 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
                                 </button>
                               </div>
                             </>
-                          )}
+                            );
+                          })()}
 
                           {/* Pattern channel collapsed state */}
                           {channel && isCollapsed && (
