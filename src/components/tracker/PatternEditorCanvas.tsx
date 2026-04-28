@@ -3021,12 +3021,13 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
 
           {/* Global automation lane — pattern-level curves for bus-wide dub
               params (dub.echoWet etc.) and song-level globals (BPM, master
-              vol). Sits above the channel headers; only hidden when the
-              global automation toggle is off. Format-mode views (Hively,
-              JamCracker, etc.) still need it because AutoDub global moves
-              and continuous bus params land here regardless of how the
-              pattern body is rendered. */}
-          {showAutomationLanes && !hideAutoLanesProp && pattern && (
+              vol). Sits above the channel headers; hidden in format mode
+              (Hively/MusicLine/etc.) because the horizontal strip overlaps
+              the format-mode pattern body. Proper placement as a vertical
+              column to the left of channel 1 is a future refactor that
+              would need the canvas channel-offset system extended for a
+              "global pseudo-channel" lane. */}
+          {showAutomationLanes && !hideAutoLanesProp && !isFormatMode && pattern && (
             <GlobalAutomationLane
               patternId={pattern.id}
               patternLength={pattern.length}
