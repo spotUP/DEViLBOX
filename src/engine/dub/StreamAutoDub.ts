@@ -39,6 +39,7 @@ interface DeckDubState {
   lastBar: number;
   movesFiredThisBar: number;
   wetFiredThisBar: number;
+  lastWetFireTimeSec: number;
   moveLastFiredBar: Map<string, number>;
   heldDisposers: Set<{ dispose(): void }>;
 }
@@ -54,6 +55,7 @@ function getOrCreateDeckState(deckId: DeckId): DeckDubState {
       lastBar: -1,
       movesFiredThisBar: 0,
       wetFiredThisBar: 0,
+      lastWetFireTimeSec: -Infinity,
       moveLastFiredBar: new Map(),
       heldDisposers: new Set(),
     };
@@ -159,6 +161,7 @@ function tickForDeck(deckId: DeckId): void {
     blacklist: new Set(dub.autoDubMoveBlacklist),
     movesFiredThisBar: s.movesFiredThisBar,
     wetFiredThisBar: s.wetFiredThisBar,
+    secsSinceLastWetFire: performance.now() / 1000 - s.lastWetFireTimeSec,
     moveLastFiredBar: s.moveLastFiredBar,
     channelCount: count || 1,
     roles,
@@ -179,7 +182,10 @@ function tickForDeck(deckId: DeckId): void {
   // Fire dub move — channelId = -1 for global (stems are tapped via DubBus)
   const disposer = fire(choice.moveId, -1, choice.params, 'live');
   s.movesFiredThisBar += 1;
-  if (choice.wet) s.wetFiredThisBar += 1;
+  if (choice.wet) {
+    s.wetFiredThisBar += 1;
+    s.lastWetFireTimeSec = performance.now() / 1000;
+  }
   s.moveLastFiredBar.set(choice.moveId, bar);
 
   if (disposer) {
@@ -219,6 +225,7 @@ export function startStreamAutoDub(deckId: DeckId): void {
   s.lastBar = -1;
   s.movesFiredThisBar = 0;
   s.wetFiredThisBar = 0;
+  s.lastWetFireTimeSec = -Infinity;
   s.moveLastFiredBar.clear();
   s.timer = setInterval(() => tickForDeck(deckId), TICK_MS);
 }
