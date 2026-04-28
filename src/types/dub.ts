@@ -581,7 +581,10 @@ export const DUB_CHARACTER_PRESETS: Record<Exclude<DubBusSettings['characterPres
       sidechainAmount: 0.3,
       stereoWidth:    0.45,  // narrow — 4-track console + loose spring
       sweepAmount:    0,      // no flanger; Tubby's "sweep" was filter, not comb
-      tapeSatMode:   'single',
+      // Tubby's MCI 416B ran at 15 ips — heavier, dirtier bottom. tape15ips
+      // gives the same "heavier/dirtier bottom" character that makes the bus
+      // feel phat the way Perry's tape-stack does, with Tubby's own voice.
+      tapeSatMode:   'tape15ips',
       echoFeedbackHpfHz: 180,  // was 250 — let more low-end survive echo repeats
       echoFeedbackLpfHz: 5500, // was 3000 — brighter echo tails, less "in a jar"
       re201DelayMode: 7,       // H1+H2+H3 (three-tap) — was mode 9 (H2+H3+reverb) which caused
@@ -605,8 +608,10 @@ export const DUB_CHARACTER_PRESETS: Record<Exclude<DubBusSettings['characterPres
       returnEqGain:   3,
       returnEqQ:      1.5,
     },
-    springsLength: 0.35, springsDamp: 0.35, springsChaos: 0.20, springsScatter: 0.60, springsTone: 0.65,
-    tapeSatDrive:  0.55,
+    springsLength: 0.35, springsDamp: 0.35, springsChaos: 0.20, springsScatter: 0.75, springsTone: 0.65,
+    // springsScatter 0.60 → 0.75 — more spatial diffusion in the spring tail
+    // so even the narrow Tubby width has dimensional depth.
+    tapeSatDrive:  0.65,  // 0.55 → 0.65 — drive the 15 ips curve harder for phat low end.
     // Tubby's style: everything through the bus, loud. Drums + bass dominate;
     // melodic lines get heavy echo throws; nothing stays dry.
     defaultSendsByRole: { percussion: 1.0, bass: 0.85, lead: 0.70, chord: 0.60, arpeggio: 0.60, pad: 0.50, default: 0.55 },
@@ -647,8 +652,10 @@ export const DUB_CHARACTER_PRESETS: Record<Exclude<DubBusSettings['characterPres
       echoFeedbackLpfHz: 5000,  // research spec: brighter tail — plate, not spring
       echoEngine:    'spaceEcho',  // Scientist used clean digital delays
     },
-    springsLength: 0.55, springsDamp: 0.25, springsChaos: 0.40, springsScatter: 0.40, springsTone: 0.70,
-    tapeSatDrive:  0.20,
+    springsLength: 0.55, springsDamp: 0.25, springsChaos: 0.40, springsScatter: 0.55, springsTone: 0.70,
+    // springsScatter 0.40 → 0.55 — wider plate-style diffusion adds dimension
+    // without sacrificing Scientist's precision.
+    tapeSatDrive:  0.40,  // 0.20 → 0.40 — more body without losing clarity.
     // Scientist: selective — melodics get the most echo, bass controlled,
     // drums moderate. The mid-scoop drop only bites when leads are routed in.
     defaultSendsByRole: { percussion: 0.70, bass: 0.60, lead: 0.80, chord: 0.50, arpeggio: 0.55, pad: 0.40, default: 0.45 },
@@ -761,11 +768,14 @@ export const DUB_CHARACTER_PRESETS: Record<Exclude<DubBusSettings['characterPres
       sweepRateHz:    1.5,    // faster cycle = more musical, less liquid/wild
       sweepDepthMs:   3,      // narrow comb = controlled metallic sheen
       sweepFeedback:  0.52,   // was 0.80 — high feedback caused runaway resonance
-      tapeSatMode:   'single',
+      // tape15ips for warmer BBD-style saturation — adds the phat 80s low-end
+      // body without compromising the gated/sweep character.
+      tapeSatMode:   'tape15ips',
       echoEngine:    'reTapeEcho',  // BBD character for 80s dub
     },
-    springsLength: 0.25, springsDamp: 0.65, springsChaos: 0.15, springsScatter: 0.30, springsTone: 0.68,
-    tapeSatDrive:  0.35,
+    springsLength: 0.25, springsDamp: 0.65, springsChaos: 0.15, springsScatter: 0.50, springsTone: 0.68,
+    // springsScatter 0.30 → 0.50 — wider gated tail for deeper space.
+    tapeSatDrive:  0.55,  // 0.35 → 0.55 — drive the BBD curve harder for fatter low end.
     // Gated Flanger: aggressive but controlled. Heavy on percussion for the
     // gated-reverb snap; pads get the flanger treatment.
     defaultSendsByRole: { percussion: 0.85, bass: 0.55, lead: 0.60, chord: 0.65, arpeggio: 0.55, pad: 0.75, default: 0.55 },
@@ -799,7 +809,9 @@ export const DUB_CHARACTER_PRESETS: Record<Exclude<DubBusSettings['characterPres
       sidechainAmount: 0.5,
       stereoWidth:    1.9,    // ultra-wide Ariwa ping-pong
       sweepAmount:    0,
-      tapeSatMode:   'single',
+      // tape15ips for the lush low-end body that defines Mad Prof's hi-fi
+      // saturation. Cleaner than Perry's stack, but still phat.
+      tapeSatMode:   'tape15ips',
       echoFeedbackHpfHz: 400,   // research spec: cleaner HPF — Mad Prof hi-fi clarity
       echoFeedbackLpfHz: 8000,  // research spec: bright, articulate repeats — Lexicon PCM-70 character
       pingPongLMs:          337,    // research: Ariwa SDE-3000 ran 3/8 note left
@@ -809,8 +821,10 @@ export const DUB_CHARACTER_PRESETS: Record<Exclude<DubBusSettings['characterPres
       pingPongSyncToBpm:    true,   // auto-follows song BPM — always metrically correct
       echoEngine:    're201',       // Ariwa studio's RE-201 for lush tape + spring
     },
-    springsLength: 0.55, springsDamp: 0.28, springsChaos: 0.10, springsScatter: 0.55, springsTone: 0.72,
-    tapeSatDrive:  0.12,   // pristine
+    springsLength: 0.55, springsDamp: 0.28, springsChaos: 0.20, springsScatter: 0.65, springsTone: 0.72,
+    // springsChaos 0.10 → 0.20 — subtle dimensional movement (still hi-fi clean).
+    // springsScatter 0.55 → 0.65 — wider plate diffusion for deeper space.
+    tapeSatDrive:  0.30,   // 0.12 → 0.30 — saturation body without losing clarity.
     // Mad Professor: balanced and lush. Pads and leads get the most reverb
     // (ghostReverb/madProfPingPong); drums are present but not dominant.
     defaultSendsByRole: { percussion: 0.65, bass: 0.60, lead: 0.70, chord: 0.70, arpeggio: 0.65, pad: 0.80, default: 0.60 },

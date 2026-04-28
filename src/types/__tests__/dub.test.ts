@@ -58,7 +58,10 @@ describe('DUB_CHARACTER_PRESETS', () => {
     expect(p.overrides.sweepAmount).toBeLessThan(0.6);
     expect(p.overrides.sweepFeedback).toBeLessThan(0.6);
     expect(p.overrides.springWet).toBeLessThan(0.5);
-    expect(p.overrides.tapeSatMode).toBe('single');
+    // 'tape15ips' = warmer BBD-style saturation. 'single' was too thin to
+    // give the persona Perry-level depth; tape15ips adds the phat 80s
+    // low-end body without breaking the gated/sweep character.
+    expect(p.overrides.tapeSatMode).toBe('tape15ips');
   });
 
   it('perry enables tape stack + non-zero sweep amount + near-mono', () => {
@@ -71,8 +74,13 @@ describe('DUB_CHARACTER_PRESETS', () => {
   it('madProfessor is wide + pristine (low tapeSatDrive)', () => {
     const p = DUB_CHARACTER_PRESETS.madProfessor;
     expect(p.overrides.stereoWidth).toBeGreaterThan(1.3);
-    expect(p.tapeSatDrive).toBeLessThan(0.25);
-    expect(p.overrides.tapeSatMode).toBe('single');
+    // 0.30 → still cleaner than Perry (0.70), still well below 'gritty'
+    // territory, but bumped from 0.12 to give the lush hi-fi texture some
+    // body so the persona doesn't sound thinner than Perry.
+    expect(p.tapeSatDrive).toBeLessThan(0.4);
+    // 'tape15ips' = lush low-end body. Mad Prof's hi-fi sound benefits from
+    // the slow-tape warmth without the per-path complexity of Perry's stack.
+    expect(p.overrides.tapeSatMode).toBe('tape15ips');
   });
 });
 
