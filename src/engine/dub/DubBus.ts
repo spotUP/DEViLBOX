@@ -5230,17 +5230,21 @@ export class DubBus {
     } catch { /* ok */ }
     return () => {
       const release = ctx.currentTime;
+      // Kill feedback gain IMMEDIATELY — a long ramp lets the loop keep
+      // building energy in the spring and risks drowning the mix on release.
       try {
         tap.gain.cancelScheduledValues(release);
-        tap.gain.setValueAtTime(tap.gain.value, release);
-        tap.gain.linearRampToValueAtTime(0, release + 0.2);
+        tap.gain.setValueAtTime(0, release);
       } catch { /* ok */ }
-      // Restore spring wet to the user's prior setting.
-      try { this._setSpringWet(priorWet); } catch { /* ok */ }
-      // Disconnect after ramp completes
+      // Disconnect loop nodes right away (no setTimeout).
+      try { bp.disconnect(); tap.disconnect(); } catch { /* ok */ }
+      // Flush the spring's accumulated ring-out energy by momentarily
+      // zeroing spring wet, then restoring. Without this the self-oscillation
+      // tail rings for several seconds and saturates the sidechain compressor.
+      try { this._setSpringWet(0); } catch { /* ok */ }
       setTimeout(() => {
-        try { bp.disconnect(); tap.disconnect(); } catch { /* ok */ }
-      }, 300);
+        try { this._setSpringWet(priorWet); } catch { /* ok */ }
+      }, 120);
     };
   }
 
