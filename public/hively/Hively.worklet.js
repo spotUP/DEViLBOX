@@ -164,6 +164,7 @@ class HivelyProcessor extends AudioWorkletProcessor {
 
       case 'setChannelGain':
         if (data.channel >= 0 && data.channel < 16) {
+          console.log(`[HivelyWorklet] setChannelGain ch${data.channel} gain=${data.gain.toFixed(3)} tuneLoaded=${this.tuneLoaded}`);
           this.channelGains[data.channel] = data.gain;
         }
         if (this.wasm && typeof this.wasm._hively_set_channel_gain === 'function') {
@@ -377,6 +378,7 @@ class HivelyProcessor extends AudioWorkletProcessor {
 
     if (ok) {
       this.tuneLoaded = true;
+      this._gainDiagDone = false;  // reset per-tune first-render diagnostic
       this.resetRingBuffer();
 
       const meta = {
@@ -491,6 +493,10 @@ class HivelyProcessor extends AudioWorkletProcessor {
     // Apply this.channelGains so user mutes (setChannelGain) are honoured —
     // without this, every render frame was resetting all gains to 1.0,
     // making setChannelGain/channel-mute a no-op in the isolation path.
+    if (!this._gainDiagDone) {
+      this._gainDiagDone = true;
+      console.log(`[HivelyWorklet] step4 first render: numChannels=${numChannels} isolatedBits=${isolatedBits} gains=[${Array.from(this.channelGains.slice(0, numChannels)).map(g => g.toFixed(2)).join(',')}]`);
+    }
     for (let ch = 0; ch < numChannels; ch++) {
       const isolatedOut = (isolatedBits & (1 << ch)) !== 0;
       this.wasm._hively_set_channel_gain(ch, isolatedOut ? 0.0 : this.channelGains[ch]);
