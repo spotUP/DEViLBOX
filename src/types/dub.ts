@@ -677,7 +677,8 @@ export const DUB_CHARACTER_PRESETS: Record<Exclude<DubBusSettings['characterPres
       bassShelfGainDb: 2, bassShelfFreqHz: 80, bassShelfQ: 0.5,
       masterBassPunchDb: 8,   // dry-path punch — Perry's saturated, fat low end
       midScoopGainDb: -4, midScoopFreqHz: 800,
-      echoIntensity:  0.55,   // was 0.72 — high feedback with springEcho = rolling forever
+      echoIntensity:  0.45,   // 0.55 → 0.45 — fewer audible repeats so 400 Hz energy
+                              // can't pile up in the self-feeding loop and turn muddy
       echoRateMs:     380,
       echoSyncDivision: '1/4T', // research: Perry used triplet-feel echoes against the riddim
       echoWet:        0.60,   // was 0.80 — spring feeds echo in springEcho order, so this was doubling reverb
@@ -693,22 +694,34 @@ export const DUB_CHARACTER_PRESETS: Record<Exclude<DubBusSettings['characterPres
       phaserStages:   8,      // Mutron Bi-Phase is 6-stage; 8 for extra depth
       phaserFeedback: 0.65,
       tapeSatMode:    'stack', // 3 parallel tape paths ≈ 4-track bouncing
-      echoFeedbackHpfHz: 150,   // was 200 — more bass survives each repeat
-      echoFeedbackLpfHz: 3200,  // was 2000 (extremely dark) — still tape-warm but not muffled
+      echoFeedbackHpfHz: 220,   // 150 → 220 — cut sub-bass mud from repeats. Sub frequencies
+                                // pile up in the feedback loop and get more pronounced with
+                                // every pass, turning the tail muddy after ~3-4 repeats.
+      echoFeedbackLpfHz: 3500,  // 3200 → 3500 — slightly brighter, still tape-warm. Lower
+                                // value caused the tail to sound dark+thick (mud territory).
       // Research: "Space Echo output patched back into a second TEAC input →
       // semi-manual feedback loop." The extFeedback loop recreates this —
       // return audio re-enters the input chain through a peaking EQ, creating
       // the self-feeding chaos that defined Perry's Black Ark sound.
-      extFeedbackGain:   0.06,  // re-enabled at safe level — Black Ark self-feeding character
-      extFeedbackEqFreq: 400,   // boost at 400 Hz — the tape-saturation warmth zone
-      extFeedbackEqGain: 3,     // gentle 3 dB lift per pass — accumulates over repeats
+      extFeedbackGain:   0.035,  // 0.06 → 0.035 — halved so the self-feeding loop quiets
+                                 // down quickly after the initial impact instead of
+                                 // sustaining at full level for many seconds.
+      extFeedbackEqFreq: 400,   // 400 Hz — the tape-saturation warmth zone
+      extFeedbackEqGain: 1,     // 3 → 1 dB — was the main mud culprit. +3 dB at 400 Hz
+                                // compounded over each feedback pass (3 dB × N passes)
+                                // eventually saturated the low-mids into wool.
       extFeedbackEqQ:    1.2,
       echoEngine:    'anotherDelay', // Perry's runaway wow-flutter madness
       chainOrder:    'springEcho',   // spring FIRST: reverb cloud feeds the echo,
                                       // so repeats decay cleanly instead of adding
                                       // new reverb tail to each repeat
     },
-    springsLength: 0.65, springsDamp: 0.20, springsChaos: 0.85, springsScatter: 0.85, springsTone: 0.45,
+    springsLength: 0.65, springsDamp: 0.55, springsChaos: 0.85, springsScatter: 0.85, springsTone: 0.45,
+    // springsLength stays at 0.65 (the tail still LINGERS as long as before).
+    // springsDamp 0.20 → 0.55 — high-frequency energy decays much faster, so the
+    // perceived loudness of the spring drops quickly even though the physical
+    // ring-out continues. This is the "fast attenuation, slow decay" feel: the
+    // initial impact is loud, then it falls away into a quiet sustained tail.
     tapeSatDrive:  0.70,   // per-path drive; stack provides total character
     // Perry: maximum chaos — everything bleeds. He literally had nothing dry.
     // The self-feeding ext-feedback loop needs all channels routed through.
