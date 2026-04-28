@@ -409,9 +409,11 @@ const RULES: Rule[] = [
     condition: (c) => c.isNewBar && c.bar % 4 === 2,
     baseWeight: 0.25, holdBars: 2, wet: true },
   // Dub siren — the signature move. Bar 1 of 4, or any bar at high intensity.
+  // wet:true so it respects WET_FIRES_PER_BAR_CAP and the cross-bar cooldown —
+  // prevents simultaneous firing with echoThrow which creates a saturating echo tail.
   { moveId: 'dubSiren',
     condition: (c) => c.isNewBar && (c.bar % 4 === 1 || c.intensity > 0.7),
-    baseWeight: 0.22, holdBars: 1 },
+    baseWeight: 0.22, holdBars: 1, wet: true },
   // Reverse echo — Perry territory.
   { moveId: 'reverseEcho',
     condition: (c) => c.barPos > 0.75 && c.bar % 4 === 3,
