@@ -9,7 +9,12 @@ const W = 600, H = 160;
 const PAD_L = 32, PAD_R = 8, PAD_T = 8, PAD_B = 20;
 const DB_MIN = -18, DB_MAX = 18;
 const FREQ_MIN = 20, FREQ_MAX = 20000;
-const N_POINTS = 512;
+// 192 points: visually smooth on a 600 px wide canvas (~3 px per sample),
+// while halving the Goertzel DFT cost vs the previous 512. 512 was pushing
+// the audio worklet's 2.9 ms render-quantum budget on every drag frame —
+// the magnitude call ran ~0.5 M multiply-adds and stole enough thread time
+// from process() to cause audible dropouts when knobs were dragged.
+const N_POINTS = 192;
 
 export function freqToX(f: number, plotW: number): number {
   return PAD_L + (Math.log10(f / FREQ_MIN) / Math.log10(FREQ_MAX / FREQ_MIN)) * plotW;
@@ -64,8 +69,34 @@ export const Fil4EqCurve: React.FC<Props> = ({ effect, width = W, height = H, on
     return () => { effect.off('params', onParams); };
   }, [effect]);
 
+  // rAF-throttle magnitude requests. Each call hits the audio worklet to
+  // run a 1024-sample IR through 8 filter stages and (when the panel passes
+  // forceAllEnabled) toggle every band's enable flag twice. Computing that
+  // 60×/sec while the user drags a knob steals enough audio-thread time to
+  // cause dropouts. Coalescing to one request per frame keeps the curve
+  // smooth without starving the audio worklet.
+  const magReqRef = useRef<{ scheduled: boolean; pending: boolean }>({ scheduled: false, pending: false });
   useEffect(() => {
-    effect.getMagnitude(N_POINTS).then(setMagnitude);
+    const requestNow = () => {
+      magReqRef.current.scheduled = false;
+      effect.getMagnitude(N_POINTS).then((m) => {
+        setMagnitude(m);
+        // If another change came in while the request was in flight, schedule one more.
+        if (magReqRef.current.pending) {
+          magReqRef.current.pending = false;
+          schedule();
+        }
+      });
+    };
+    const schedule = () => {
+      if (magReqRef.current.scheduled) {
+        magReqRef.current.pending = true;
+        return;
+      }
+      magReqRef.current.scheduled = true;
+      requestAnimationFrame(requestNow);
+    };
+    schedule();
   }, [params, effect]);
 
   useEffect(() => {
