@@ -61,12 +61,14 @@ const HEX1: string[] = Array.from({ length: 16 }, (_, i) => i.toString(16).toUpp
 function hex2(v: number): string { return HEX[v & 0xff] ?? '00'; }
 
 // Effect type → display char (matches TrackerGLRenderer's EFFECT_CHARS)
-const EFFECT_CHARS_2D: string[] = new Array(39);
+const EFFECT_CHARS_2D: string[] = new Array(41);
 for (let i = 0; i < 10; i++) EFFECT_CHARS_2D[i] = i.toString();
 for (let i = 10; i < 36; i++) EFFECT_CHARS_2D[i] = String.fromCharCode(55 + i);
 EFFECT_CHARS_2D[36] = 'Z';  // DUB_EFFECT_GLOBAL
 EFFECT_CHARS_2D[37] = 'Z';  // DUB_EFFECT_PERCHANNEL
 EFFECT_CHARS_2D[38] = 'Z';  // DUB_EFFECT_PARAM_STEP
+EFFECT_CHARS_2D[39] = 'Z';  // DUB_EFFECT_GLOBAL_X — extended slot for moves 16-31
+EFFECT_CHARS_2D[40] = 'Z';  // DUB_EFFECT_PERCHANNEL_X — extended slot for moves 16-31
 
 // ─────────────────────────────────────────────────────────────────────────────
 
