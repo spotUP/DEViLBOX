@@ -112,6 +112,9 @@ async function playStartupJingle(): Promise<void> {
 const DesignSystemPage = lazy(() => import('./components/design-system/DesignSystemPage').then(m => ({ default: m.DesignSystemPage })));
 const IsolatedComponent = lazy(() => import('./components/design-system/IsolatedComponent').then(m => ({ default: m.IsolatedComponent })));
 
+// Embed mode: lightweight pattern editor for iframe embedding
+const PatternEditorEmbed = lazy(() => import('./components/embed/PatternEditorEmbed').then(m => ({ default: m.PatternEditorEmbed })));
+
 /** Wrapper that intercepts #/design-system before App mounts its hooks. */
 function AppRouter() {
   const [isDesignSystem, setIsDesignSystem] = useState(window.location.hash === '#/design-system');
@@ -133,6 +136,13 @@ function AppRouter() {
       }, 500);
     }
   }, []);
+
+  // Embed mode: ?embed=pattern-editor — minimal pattern editor for iframe embedding
+  const params0 = new URLSearchParams(window.location.search);
+  const embedMode = params0.get('embed');
+  if (embedMode === 'pattern-editor') {
+    return <Suspense fallback={<div style={{ background: '#0d0d0d', color: '#6b6b80', display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', fontFamily: 'monospace' }}>Loading pattern editor...</div>}><PatternEditorEmbed /></Suspense>;
+  }
 
   if (isDesignSystem) {
     return <Suspense fallback={<div style={{ background: '#121218', color: '#6b6b80', display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh' }}>Loading design system...</div>}><DesignSystemPage /></Suspense>;
