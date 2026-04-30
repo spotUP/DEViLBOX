@@ -25,6 +25,8 @@ import { PatternEditorCanvas } from '../tracker/PatternEditorCanvas';
 import { useTrackerStore, useTransportStore, useAudioStore } from '../../stores';
 import { getToneEngine } from '../../engine/ToneEngine';
 import { usePatternPlayback } from '../../hooks/audio/usePatternPlayback';
+import { useGlobalKeyboardHandler } from '../../hooks/useGlobalKeyboardHandler';
+import { initKeyboardRouter, destroyKeyboardRouter } from '../../engine/keyboard/KeyboardRouter';
 import { loadFile } from '../../lib/file/UnifiedFileLoader';
 
 const ALLOWED_ORIGINS = new Set([
@@ -76,6 +78,13 @@ export function PatternEditorEmbed() {
 
   // Pattern playback engine (same as App-level mount)
   usePatternPlayback();
+
+  // Keyboard router for pattern editor navigation
+  useGlobalKeyboardHandler();
+  useEffect(() => {
+    initKeyboardRouter();
+    return () => { destroyKeyboardRouter(); };
+  }, []);
 
   // Initialize audio engine (same as App.tsx lines 400-432)
   useEffect(() => {
