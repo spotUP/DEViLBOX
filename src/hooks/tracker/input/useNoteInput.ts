@@ -71,10 +71,8 @@ export const useNoteInput = (refs: TrackerInputRefs) => {
     currentRow: state.currentRow,
   })));
 
-  const {
-    instruments,
-    currentInstrumentId,
-  } = useInstrumentStore();
+  const instruments = useInstrumentStore((s) => s.instruments);
+  const currentInstrumentId = useInstrumentStore((s) => s.currentInstrumentId);
 
   const pattern = patterns[currentPatternIndex];
 
