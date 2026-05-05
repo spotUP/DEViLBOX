@@ -502,8 +502,9 @@ export function setMasterVolume(volume: number): void {
  */
 export function setBoothVolume(volume: number): void {
   const clamped = Math.max(0, Math.min(1.5, volume));
-  useDJStore.getState().setBoothVolume(clamped);
-  // Booth volume is store-only — no engine equivalent yet
+  batchDJSet('booth-vol', (state) => {
+    state.boothVolume = clamped;
+  });
 }
 
 // ============================================================================
