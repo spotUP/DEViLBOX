@@ -18,6 +18,25 @@
 
 import { create } from 'zustand';
 
+// ── Batched store writes for continuous dub controls ────────────────────
+const _pendingDub = new Map<string, Record<string, unknown>>();
+let _dubBatchScheduled = false;
+
+function batchDubSet(key: string, partial: Record<string, unknown>): void {
+  _pendingDub.set(key, partial);
+  if (!_dubBatchScheduled) {
+    _dubBatchScheduled = true;
+    requestAnimationFrame(() => {
+      _dubBatchScheduled = false;
+      if (_pendingDub.size === 0) return;
+      const merged: Record<string, unknown> = {};
+      for (const p of _pendingDub.values()) Object.assign(merged, p);
+      _pendingDub.clear();
+      useDubStore.setState(merged);
+    });
+  }
+}
+
 interface DubStore {
   /** When true, DubRecorder captures live router events into the current
    *  pattern's dubLane. Live performances always fire audio regardless. */
@@ -126,12 +145,12 @@ export const useDubStore = create<DubStore>((set) => ({
   setClubSim: (v) => set({ clubSim: v }),
 
   vinylLevel: 0,
-  setVinylLevel: (v) => set({ vinylLevel: Math.max(0, Math.min(10, v)) }),
+  setVinylLevel: (v) => batchDubSet('vinyl', { vinylLevel: Math.max(0, Math.min(10, v)) }),
 
   autoDubEnabled: false,
   setAutoDubEnabled: (v) => set({ autoDubEnabled: v }),
   autoDubIntensity: 0.5,
-  setAutoDubIntensity: (v) => set({ autoDubIntensity: Math.max(0, Math.min(1, v)) }),
+  setAutoDubIntensity: (v) => batchDubSet('intensity', { autoDubIntensity: Math.max(0, Math.min(1, v)) }),
   autoDubPersona: 'custom',
   setAutoDubPersona: (v) => set({ autoDubPersona: v }),
   autoDubMoveBlacklist: [],
@@ -139,7 +158,7 @@ export const useDubStore = create<DubStore>((set) => ({
   autoDubEqMode: 'both',
   setAutoDubEqMode: (mode) => set({ autoDubEqMode: mode }),
   autoDubEqDepthMult: 1.0,
-  setAutoDubEqDepthMult: (v) => set({ autoDubEqDepthMult: Math.max(0, Math.min(1, v)) }),
+  setAutoDubEqDepthMult: (v) => batchDubSet('eqDepth', { autoDubEqDepthMult: Math.max(0, Math.min(1, v)) }),
   quantize: true,
   setQuantize: (v) => set({ quantize: v }),
 }));
