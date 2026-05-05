@@ -29,6 +29,28 @@ import { smartSort } from './DJPlaylistSort';
 import { useDJPlaylistStore } from '@/stores/useDJPlaylistStore';
 import type { DeckId, FaderLFODivision } from './DeckEngine';
 
+// ── Batched store writes for continuous controls ───────────────────────
+// Audio engine calls happen immediately. Only the Zustand state write
+// (which triggers Immer + React) is batched to once per animation frame.
+const _pendingDJ = new Map<string, (state: any) => void>();
+let _djBatchScheduled = false;
+
+function batchDJSet(key: string, mutation: (state: any) => void): void {
+  _pendingDJ.set(key, mutation);
+  if (!_djBatchScheduled) {
+    _djBatchScheduled = true;
+    requestAnimationFrame(() => {
+      _djBatchScheduled = false;
+      if (_pendingDJ.size === 0) return;
+      const mutations = [..._pendingDJ.values()];
+      _pendingDJ.clear();
+      useDJStore.setState((state: any) => {
+        for (const m of mutations) m(state);
+      });
+    });
+  }
+}
+
 // ============================================================================
 // TYPES
 // ============================================================================
@@ -312,10 +334,14 @@ export function syncDeckBPM(deckId: DeckId, otherDeckId?: DeckId): void {
  */
 export function setDeckEQ(deckId: DeckId, band: 'low' | 'mid' | 'high', dB: number): void {
   const clamped = Math.max(-12, Math.min(12, dB));
-  useDJStore.getState().setDeckEQ(deckId, band, clamped);
   try {
     getDJEngine().getDeck(deckId).setEQ(band, clamped);
   } catch { /* engine not ready */ }
+  batchDJSet(`${deckId}-eq-${band}`, (state) => {
+    const key = `eq${band.charAt(0).toUpperCase() + band.slice(1)}` as 'eqLow' | 'eqMid' | 'eqHigh';
+    state.decks[deckId][key] = clamped;
+    state.decks[deckId].eqPreset = null;
+  });
 }
 
 /** Apply a quick-EQ preset to a deck (all 3 bands atomically). */
@@ -373,10 +399,12 @@ export function setDeckEQKill(
  */
 export function setDeckFilter(deckId: DeckId, position: number): void {
   const clamped = Math.max(-1, Math.min(1, position));
-  useDJStore.getState().setDeckFilter(deckId, clamped);
   try {
     getDJEngine().getDeck(deckId).setFilterPosition(clamped);
   } catch { /* engine not ready */ }
+  batchDJSet(`${deckId}-filter`, (state) => {
+    state.decks[deckId].filterPosition = clamped;
+  });
 }
 
 /**
@@ -386,10 +414,12 @@ export function setDeckFilter(deckId: DeckId, position: number): void {
  */
 export function setDeckFilterResonance(deckId: DeckId, q: number): void {
   const clamped = Math.max(0.5, Math.min(15, q));
-  useDJStore.getState().setDeckFilterResonance(deckId, clamped);
   try {
     getDJEngine().getDeck(deckId).setFilterResonance(clamped);
   } catch { /* engine not ready */ }
+  batchDJSet(`${deckId}-filter-q`, (state) => {
+    state.decks[deckId].filterResonance = clamped;
+  });
 }
 
 // ============================================================================
@@ -401,10 +431,12 @@ export function setDeckFilterResonance(deckId: DeckId, q: number): void {
  */
 export function setDeckVolume(deckId: DeckId, volume: number): void {
   const clamped = Math.max(0, Math.min(1, volume));
-  useDJStore.getState().setDeckVolume(deckId, clamped);
   try {
     getDJEngine().getDeck(deckId).setVolume(clamped);
   } catch { /* engine not ready */ }
+  batchDJSet(`${deckId}-vol`, (state) => {
+    state.decks[deckId].volume = clamped;
+  });
 }
 
 /**
@@ -412,10 +444,12 @@ export function setDeckVolume(deckId: DeckId, volume: number): void {
  */
 export function setDeckTrimGain(deckId: DeckId, dB: number): void {
   const clamped = Math.max(-12, Math.min(12, dB));
-  useDJStore.getState().setDeckTrimGain(deckId, clamped);
   try {
     getDJEngine().getDeck(deckId).setTrimGain(clamped);
   } catch { /* engine not ready */ }
+  batchDJSet(`${deckId}-trim`, (state) => {
+    state.decks[deckId].trimGain = clamped;
+  });
 }
 
 // ============================================================================
@@ -427,10 +461,12 @@ export function setDeckTrimGain(deckId: DeckId, dB: number): void {
  */
 export function setCrossfader(position: number): void {
   const clamped = Math.max(0, Math.min(1, position));
-  useDJStore.getState().setCrossfader(clamped);
   try {
     getDJEngine().mixer.setCrossfader(clamped);
   } catch { /* engine not ready */ }
+  batchDJSet('crossfader', (state) => {
+    state.crossfader = clamped;
+  });
 }
 
 /**
@@ -452,10 +488,12 @@ export function setCrossfaderCurve(curve: CrossfaderCurve): void {
  */
 export function setMasterVolume(volume: number): void {
   const clamped = Math.max(0, Math.min(1.5, volume));
-  useDJStore.getState().setMasterVolume(clamped);
   try {
     getDJEngine().mixer.setMasterVolume(clamped);
   } catch { /* engine not ready */ }
+  batchDJSet('master-vol', (state) => {
+    state.masterVolume = clamped;
+  });
 }
 
 /**
@@ -815,10 +853,14 @@ if (typeof window !== 'undefined') {
 export function setDeckPitch(deckId: DeckId, semitones: number): void {
   const safe = Number.isFinite(semitones) ? semitones : 0;
   const clamped = Math.max(-16, Math.min(16, safe));
-  useDJStore.getState().setDeckPitch(deckId, clamped);
   try {
     getDJEngine().getDeck(deckId).setPitch(clamped);
   } catch { /* engine not ready */ }
+  batchDJSet(`${deckId}-pitch`, (state) => {
+    state.decks[deckId].pitchOffset = clamped;
+    const baseBPM = state.decks[deckId].detectedBPM || 120;
+    state.decks[deckId].effectiveBPM = Math.round(baseBPM * Math.pow(2, clamped / 12) * 100) / 100;
+  });
 }
 
 export function setDeckRepitchLock(deckId: DeckId, locked: boolean): void {

@@ -14,6 +14,7 @@ import type {
 } from '@typedefs/instrument';
 import type { BeatSlice, BeatSliceConfig } from '@typedefs/beatSlicer';
 import { isDevilboxSynth } from '@typedefs/synth';
+import { createBatchedSet } from '@/utils/batchedSet';
 import {
   DEFAULT_ENVELOPE,
   DEFAULT_OSCILLATOR,
@@ -110,6 +111,10 @@ interface InstrumentStore {
   setPreviewInstrument: (instrument: InstrumentConfig | null) => void;
   getInstrument: (id: number) => InstrumentConfig | undefined;
   updateInstrument: (id: number, updates: DeepPartial<InstrumentConfig>) => void;
+  /** Realtime update for continuous controls (knobs/faders). Sends param changes
+   *  to the audio engine immediately and batches the Zustand store write to avoid
+   *  React re-render cascades that starve the audio worklet. */
+  updateInstrumentRealtime: (id: number, updates: DeepPartial<InstrumentConfig>) => void;
   createInstrument: (config?: DeepPartial<InstrumentConfig>) => number;
   addInstrument: (config: InstrumentConfig) => void;
   deleteInstrument: (id: number) => void;
@@ -199,7 +204,13 @@ function findNextId(existingIds: number[]): number {
 };
 
 export const useInstrumentStore = create<InstrumentStore>()(
-  immer((set, get) => ({
+  immer((set, get) => {
+    // Batched set for continuous controls — audio engine updates happen
+    // immediately; only the Zustand/Immer state write is deferred so 54+
+    // subscribers don't re-render on every knob frame.
+    const batch = createBatchedSet<InstrumentStore>(set as any);
+
+    return {
     // Initial state - Start empty, user creates instruments as needed
     instruments: [],
     currentInstrumentId: 0,  // 0 = no instrument selected
@@ -854,6 +865,182 @@ export const useInstrumentStore = create<InstrumentStore>()(
           } catch { /* replayer not initialized yet */ }
         }
       }
+    },
+
+    updateInstrumentRealtime: (id, updates) => {
+      // Fast path for continuous controls (knob/fader drags).
+      // 1. Merge updates onto current instrument in JS (no Immer)
+      // 2. Route merged config to audio engine immediately
+      // 3. Batch the Zustand store write for next animation frame
+      const current = get().instruments.find((inst) => inst.id === id);
+      if (!current) return;
+
+      // Shallow-merge nested objects (same logic as updateInstrument's set())
+      const merged = { ...current } as Record<string, any>;
+      for (const [key, value] of Object.entries(updates as Record<string, unknown>)) {
+        if (key === 'id') continue;
+        if (value && typeof value === 'object' && !Array.isArray(value) && merged[key]) {
+          merged[key] = { ...merged[key] as Record<string, unknown>, ...value as Record<string, unknown> };
+        } else {
+          merged[key] = value;
+        }
+      }
+      const mergedInst = merged as InstrumentConfig;
+
+      // Route to audio engine immediately (same dispatch as updateInstrument)
+      try {
+        const engine = getToneEngine();
+
+        // Volume/pan fast path
+        if ((updates.volume !== undefined || updates.pan !== undefined) && !updates.oscillator && !updates.envelope && !updates.filter) {
+          const instruments = (engine as any).instruments as Map<number, any>;
+          if (instruments) {
+            for (const [key, synth] of instruments.entries()) {
+              if ((key >>> 16) === id && synth) {
+                if (updates.volume !== undefined) {
+                  const vol = mergedInst.volume ?? -6;
+                  const linearGain = Math.pow(10, vol / 20);
+                  if (synth.output?.gain) synth.output.gain.value = linearGain;
+                  else if (synth.set && typeof synth.set === 'function') {
+                    try { synth.set('volume', vol); } catch { /* */ }
+                  }
+                }
+              }
+            }
+          }
+          const otherKeys = Object.keys(updates).filter(k => k !== 'volume' && k !== 'pan');
+          if (otherKeys.length === 0) {
+            batch(`inst-${id}`, (state) => {
+              const inst = state.instruments.find((i: InstrumentConfig) => i.id === id);
+              if (!inst) return;
+              if (updates.volume !== undefined) inst.volume = updates.volume as number;
+              if (updates.pan !== undefined) inst.pan = updates.pan as number;
+            });
+            return;
+          }
+        }
+
+        // TB303 / Buzz3o3
+        if ((mergedInst.synthType === 'TB303' || mergedInst.synthType === 'Buzz3o3') && mergedInst.tb303 && updates.tb303) {
+          engine.updateTB303Parameters(id, mergedInst.tb303);
+        }
+        // DubSiren
+        else if (mergedInst.synthType === 'DubSiren' && mergedInst.dubSiren && updates.dubSiren) {
+          engine.updateDubSirenParameters(id, mergedInst.dubSiren);
+        }
+        // SpaceLaser
+        else if (mergedInst.synthType === 'SpaceLaser' && mergedInst.spaceLaser && updates.spaceLaser) {
+          engine.updateSpaceLaserParameters(id, mergedInst.spaceLaser);
+        }
+        // V2
+        else if (mergedInst.synthType === 'V2' && mergedInst.v2 && updates.v2) {
+          engine.updateComplexSynthParameters(id, mergedInst.v2);
+        }
+        // V2Speech
+        else if ((mergedInst.synthType === 'V2' || mergedInst.synthType === 'V2Speech') && mergedInst.v2Speech && updates.v2Speech) {
+          engine.updateComplexSynthParameters(id, mergedInst.v2Speech);
+        }
+        // Sam
+        else if (mergedInst.synthType === 'Sam' && mergedInst.sam && updates.sam) {
+          engine.updateComplexSynthParameters(id, mergedInst.sam);
+        }
+        // Synare
+        else if (mergedInst.synthType === 'Synare' && mergedInst.synare && updates.synare) {
+          engine.updateSynareParameters(id, mergedInst.synare);
+        }
+        // HarmonicSynth
+        else if (mergedInst.synthType === 'HarmonicSynth' && mergedInst.harmonicSynth && updates.harmonicSynth) {
+          engine.updateHarmonicSynthParameters(id, mergedInst.harmonicSynth);
+        }
+        // Furnace
+        else if (mergedInst.synthType?.startsWith('Furnace') && mergedInst.furnace && updates.furnace) {
+          engine.updateFurnaceInstrument(id, mergedInst);
+        }
+        // Buzzmachine
+        else if (mergedInst.synthType?.startsWith('Buzz') && mergedInst.buzzmachine && updates.buzzmachine) {
+          engine.updateBuzzmachineParameters(id, mergedInst.buzzmachine);
+        }
+        // WAM
+        else if (mergedInst.synthType === 'WAM' && mergedInst.wam && updates.wam) {
+          engine.updateWAMParameters(id, mergedInst.wam);
+        }
+        // Demoscene WASM synths
+        else if (mergedInst.synthType === 'TunefishSynth' && mergedInst.tunefish && updates.tunefish) {
+          engine.updateComplexSynthParameters(id, mergedInst.tunefish);
+        }
+        else if (mergedInst.synthType === 'OidosSynth' && mergedInst.oidos && updates.oidos) {
+          engine.updateComplexSynthParameters(id, mergedInst.oidos);
+        }
+        else if (mergedInst.wavesabre && updates.wavesabre) {
+          const variant = mergedInst.wavesabre.slaughter ? mergedInst.wavesabre.slaughter
+            : mergedInst.wavesabre.falcon ? mergedInst.wavesabre.falcon : null;
+          if (variant) engine.updateComplexSynthParameters(id, variant);
+        }
+        // Retromulator
+        else if (mergedInst.synthType === 'OpenWurli' && mergedInst.openWurli && updates.openWurli) {
+          engine.updateComplexSynthParameters(id, mergedInst.openWurli);
+        }
+        else if (mergedInst.synthType === 'OPL3' && mergedInst.opl3 && updates.opl3) {
+          engine.updateComplexSynthParameters(id, mergedInst.opl3);
+        }
+        // Zynthian synths
+        else {
+          const zynthianConfigMap: Record<string, string> = {
+            MdaEPiano: 'mdaEPiano', MdaJX10: 'mdaJX10', MdaDX10: 'mdaDX10',
+            Amsynth: 'amsynth', RaffoSynth: 'raffo', CalfMono: 'calfMono',
+            SetBfree: 'setbfree', SynthV1: 'synthv1', Monique: 'monique', VL1: 'vl1',
+            TalNoizeMaker: 'talNoizeMaker', Aeolus: 'aeolus', FluidSynth: 'fluidsynth',
+            Sfizz: 'sfizz',
+          };
+          const zynthConfigKey = zynthianConfigMap[mergedInst.synthType];
+          if (zynthConfigKey) {
+            const synthConfig = (mergedInst as any)[zynthConfigKey];
+            if (synthConfig && (updates as any)[zynthConfigKey]) {
+              engine.updateComplexSynthParameters(id, synthConfig);
+            }
+          }
+          // PinkTrombone / DECtalk
+          else if (mergedInst.synthType === 'PinkTrombone' && mergedInst.pinkTrombone && updates.pinkTrombone) {
+            engine.updateComplexSynthParameters(id, mergedInst.pinkTrombone);
+          }
+          else if (mergedInst.synthType === 'DECtalk' && mergedInst.dectalk && updates.dectalk) {
+            engine.updateComplexSynthParameters(id, mergedInst.dectalk);
+          }
+          // Complex factory synths
+          else {
+            const configKeyMap: Record<string, string> = {
+              WobbleBass: 'wobbleBass', SuperSaw: 'superSaw', FormantSynth: 'formantSynth',
+              StringMachine: 'stringMachine', PWMSynth: 'pwmSynth', ChipSynth: 'chipSynth', Organ: 'organ',
+            };
+            const configKey = configKeyMap[mergedInst.synthType];
+            const synthConfig = configKey ? (mergedInst as any)[configKey] : null;
+            if (synthConfig) {
+              engine.updateComplexSynthParameters(id, synthConfig);
+            }
+            // Tone.js synths
+            else if ((updates.oscillator || updates.envelope || updates.filter || updates.filterEnvelope || updates.lfo || updates.volume !== undefined)) {
+              engine.updateToneJsSynthInPlace(id, mergedInst);
+            }
+          }
+        }
+      } catch {
+        // Engine not ready — store write still happens below
+      }
+
+      // Batched store write — one Immer produce per animation frame
+      batch(`inst-${id}`, (state) => {
+        const inst = state.instruments.find((i: InstrumentConfig) => i.id === id);
+        if (!inst) return;
+        for (const [key, value] of Object.entries(updates as Record<string, unknown>)) {
+          if (key === 'id') continue;
+          const typedKey = key as keyof InstrumentConfig;
+          if (value && typeof value === 'object' && !Array.isArray(value) && inst[typedKey]) {
+            (inst[typedKey] as Record<string, unknown>) = { ...(inst[typedKey] as Record<string, unknown>), ...(value as Record<string, unknown>) };
+          } else {
+            (inst[typedKey] as unknown) = value;
+          }
+        }
+      });
     },
 
     createInstrument: (config) => {
@@ -2063,5 +2250,6 @@ export const useInstrumentStore = create<InstrumentStore>()(
       });
 
     },
-  }))
+  };
+  })
 );

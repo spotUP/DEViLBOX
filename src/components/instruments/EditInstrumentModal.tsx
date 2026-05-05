@@ -92,6 +92,7 @@ export const EditInstrumentModal: React.FC<EditInstrumentModalProps> = ({
   const currentInstrumentId = useInstrumentStore((state) => state.currentInstrumentId);
   const createInstrument = useInstrumentStore((state) => state.createInstrument);
   const updateInstrument = useInstrumentStore((state) => state.updateInstrument);
+  const updateInstrumentRealtime = useInstrumentStore((state) => state.updateInstrumentRealtime);
   const setPreviewInstrument = useInstrumentStore((state) => state.setPreviewInstrument);
   const setCurrentInstrument = useInstrumentStore((state) => state.setCurrentInstrument);
 
@@ -592,7 +593,7 @@ export const EditInstrumentModal: React.FC<EditInstrumentModalProps> = ({
                   {activeTab === 'sound' && (
                     <InstrumentEditor
                       instrument={currentInstrument}
-                      onChange={(updates) => updateInstrument(currentInstrument.id, updates)}
+                      onChange={(updates) => updateInstrumentRealtime(currentInstrument.id, updates)}
                     />
                   )}
 

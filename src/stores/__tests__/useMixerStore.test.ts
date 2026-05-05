@@ -1,5 +1,9 @@
-import { describe, it, expect, beforeEach } from 'vitest';
-import { useMixerStore } from '../useMixerStore';
+import { describe, it, expect, beforeEach, vi, afterAll } from 'vitest';
+import { muteUsesMuteMaskOnly, useMixerStore } from '../useMixerStore';
+
+// Make requestAnimationFrame synchronous so batched store writes flush immediately in tests
+vi.stubGlobal('requestAnimationFrame', (cb: () => void) => { cb(); return 0; });
+afterAll(() => { vi.restoreAllMocks(); });
 
 describe('useMixerStore', () => {
   beforeEach(() => {
@@ -97,5 +101,13 @@ describe('useMixerStore — solo/mute interaction (tracker convention)', () => {
     const s = useMixerStore.getState();
     expect(s.isSoloing).toBe(false);
     expect(s.channels[4].soloed).toBe(false);
+  });
+});
+
+describe('muteUsesMuteMaskOnly', () => {
+  it('treats classic/libopenmpt formats as mask-routed rather than gain-routed', () => {
+    expect(muteUsesMuteMaskOnly('classic')).toBe(true);
+    expect(muteUsesMuteMaskOnly('furnace')).toBe(false);
+    expect(muteUsesMuteMaskOnly('hively')).toBe(false);
   });
 });

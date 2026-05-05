@@ -365,10 +365,11 @@ const FxLoadingFallback = () => (
 // ─── Main Component ──────────────────────────────────────────────────────────
 export const InstrumentKnobPanel: React.FC = memo(() => {
   // ALL HOOKS AT THE TOP
-  const { instruments, updateInstrument, currentInstrumentId } = useInstrumentStore(
+  const { instruments, updateInstrument, updateInstrumentRealtime, currentInstrumentId } = useInstrumentStore(
     useShallow((state) => ({
       instruments: state.instruments,
       updateInstrument: state.updateInstrument,
+      updateInstrumentRealtime: state.updateInstrumentRealtime,
       currentInstrumentId: state.currentInstrumentId,
     }))
   );
@@ -413,10 +414,10 @@ export const InstrumentKnobPanel: React.FC = memo(() => {
     if (!targetInstrument) return;
     const latest = useInstrumentStore.getState().instruments.find((i) => i.id === targetInstrument.id);
     if (!latest?.tb303) return;
-    updateInstrument(targetInstrument.id, {
+    updateInstrumentRealtime(targetInstrument.id, {
       tb303: { ...latest.tb303, ...updates },
     });
-  }, [targetInstrument, updateInstrument]);
+  }, [targetInstrument, updateInstrumentRealtime]);
 
   // TB-303 preset load handler
   const handlePresetLoad = useCallback(async (preset: { tb303?: Partial<TB303Config>; effects?: Array<Record<string, unknown>> }) => {
@@ -439,8 +440,8 @@ export const InstrumentKnobPanel: React.FC = memo(() => {
   // Generic instrument update handler
   const handleGenericUpdate = useCallback((updates: Partial<InstrumentConfig>) => {
     if (!targetInstrument) return;
-    updateInstrument(targetInstrument.id, updates);
-  }, [targetInstrument, updateInstrument]);
+    updateInstrumentRealtime(targetInstrument.id, updates);
+  }, [targetInstrument, updateInstrumentRealtime]);
 
   // Right-side content for tab bar — action buttons for FX tabs
   const instFxActions = useMemo(() => (
