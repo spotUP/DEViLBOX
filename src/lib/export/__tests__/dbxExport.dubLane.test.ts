@@ -18,6 +18,9 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import type { DubLane } from '@/types/dub';
 
+// Stub rAF so batched store writes fire synchronously (useDubStore uses rAF batching)
+vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => { cb(0); return 0; });
+
 // Capture whatever blob `file-saver` receives.
 const captured: { blob: Blob | null; filename: string | null } = { blob: null, filename: null };
 vi.mock('file-saver', () => ({

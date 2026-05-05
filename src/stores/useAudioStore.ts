@@ -11,6 +11,7 @@ import type { EffectConfig, AudioEffectType as EffectType } from '@typedefs/inst
 import type { ToneEngine } from '@engine/ToneEngine';
 import { getDefaultEffectParameters } from '@engine/InstrumentFactory';
 import { getDefaultEffectWet } from '@engine/factories/EffectFactory';
+import { createBatchedSet } from '@/utils/batchedSet';
 
 interface AudioStore {
   // State
@@ -52,7 +53,10 @@ interface AudioStore {
 }
 
 export const useAudioStore = create<AudioStore>()(
-  immer((set, get) => ({
+  immer((set, get) => {
+    const batch = createBatchedSet<AudioStore>(set as any);
+
+    return {
     // Initial state
     initialized: false,
     contextState: 'suspended',
@@ -82,17 +86,16 @@ export const useAudioStore = create<AudioStore>()(
         state.contextState = contextState;
       }),
 
-    setMasterVolume: (volume) =>
-      set((state) => {
-        // Clamp between -60 and 0 dB
-        state.masterVolume = Math.max(-60, Math.min(0, volume));
-
-        // Apply to ToneEngine (handles all audio including SID routed through synthBus)
-        const engine = get().toneEngineInstance;
-        if (engine) {
-          engine.setMasterVolume(state.masterVolume);
-        }
-      }),
+    setMasterVolume: (volume) => {
+      const clamped = Math.max(-60, Math.min(0, volume));
+      // Immediate engine update
+      const engine = get().toneEngineInstance;
+      if (engine) engine.setMasterVolume(clamped);
+      // Batched store write
+      batch('master-vol', (state) => {
+        state.masterVolume = clamped;
+      });
+    },
 
     setMasterMuted: (muted) =>
       set((state) => {
@@ -135,19 +138,17 @@ export const useAudioStore = create<AudioStore>()(
         }
       }),
 
-    setSampleBusGain: (db) =>
-      set((state) => {
-        state.sampleBusGain = db;
-        const engine = get().toneEngineInstance;
-        if (engine) engine.setSampleBusGain(db);
-      }),
+    setSampleBusGain: (db) => {
+      const engine = get().toneEngineInstance;
+      if (engine) engine.setSampleBusGain(db);
+      batch('sample-bus', (state) => { state.sampleBusGain = db; });
+    },
 
-    setSynthBusGain: (db) =>
-      set((state) => {
-        state.synthBusGain = db;
-        const engine = get().toneEngineInstance;
-        if (engine) engine.setSynthBusGain(db);
-      }),
+    setSynthBusGain: (db) => {
+      const engine = get().toneEngineInstance;
+      if (engine) engine.setSynthBusGain(db);
+      batch('synth-bus', (state) => { state.synthBusGain = db; });
+    },
 
     setAutoGain: (enabled) =>
       set((state) => {
@@ -295,5 +296,6 @@ export const useAudioStore = create<AudioStore>()(
         state.masterEffects = migratedEffects;
         // Engine rebuild handled by usePatternPlayback's useEffect on masterEffectsKey
       }),
-  }))
+  };
+  })
 );
