@@ -215,6 +215,8 @@ export class ToneEngine {
   private _sunvoxOutputConnected = false;
   // Track loading promises for samplers/players (keyed by instrument key)
   private instrumentLoadingPromises: Map<number, Promise<void>> = new Map();
+  // Track pending effect chain builds so preloadInstruments can await them
+  private pendingEffectChains: Map<number, Promise<void>> = new Map();
   // Store decoded AudioBuffers for TrackerReplayer access (keyed by instrument ID)
   private decodedAudioBuffers: Map<number, AudioBuffer> = new Map();
 
@@ -1076,6 +1078,18 @@ export class ToneEngine {
         if (generation !== this.preloadGeneration) return; // Superseded
       } catch (error) {
         console.error('[ToneEngine] Some WASM synths failed to initialize:', error);
+      }
+    }
+
+    // Wait for all pending instrument effect chains to connect.
+    // Without this, DevilboxSynths (TB-303, TR-909, Synare) may have no
+    // audio routing when the first note triggers after import.
+    if (this.pendingEffectChains.size > 0) {
+      try {
+        await Promise.all(this.pendingEffectChains.values());
+        if (generation !== this.preloadGeneration) return; // Superseded
+      } catch (error) {
+        console.error('[ToneEngine] Some effect chains failed to build:', error);
       }
     }
 
@@ -2540,11 +2554,16 @@ export class ToneEngine {
         this._sunvoxOutputConnected = true;
       }
     } else {
-      // Create instrument effect chain and connect (fire-and-forget for initial creation)
-      // For effect updates, use rebuildInstrumentEffects() which properly awaits
-      this.buildInstrumentEffectChain(key, config.effects || [], instrument).catch((error) => {
-        console.error('[ToneEngine] Failed to build initial effect chain:', error);
-      });
+      // Create instrument effect chain and connect — track promise so
+      // preloadInstruments can await all chains before playback starts.
+      const chainPromise = this.buildInstrumentEffectChain(key, config.effects || [], instrument)
+        .catch((error) => {
+          console.error('[ToneEngine] Failed to build initial effect chain:', error);
+        })
+        .finally(() => {
+          this.pendingEffectChains.delete(key);
+        });
+      this.pendingEffectChains.set(key, chainPromise);
     }
 
     // Route native chip engine output to synthBus for master effects processing.
@@ -4348,6 +4367,7 @@ export class ToneEngine {
       this.instruments.delete(key);
       this.instrumentSynthTypes.delete(key);
       this.instrumentLoadingPromises.delete(key);
+      this.pendingEffectChains.delete(key);
 
       // Release all notes on this synth before disposal
       try {
@@ -4412,6 +4432,7 @@ export class ToneEngine {
     });
     this.instrumentSynthTypes.clear();
     this.instrumentLoadingPromises.clear();
+    this.pendingEffectChains.clear();
     this.decodedAudioBuffers.clear();
     this.activeVoices.clear();
     this.channelLastNote.clear();
