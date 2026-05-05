@@ -104,8 +104,20 @@ export function computeInstrumentModulation(hints: InstrumentHints): InstDeltas 
   return { subDelta, presenceDelta, presenceFreqDelta, airDelta, hpFreqDelta };
 }
 
+function cloneEQCurve(curve: EQCurve): EQCurve {
+  return {
+    hp: { ...curve.hp },
+    ls: { ...curve.ls },
+    p0: { ...curve.p0 },
+    p1: { ...curve.p1 },
+    p2: { ...curve.p2 },
+    p3: { ...curve.p3 },
+    hs: { ...curve.hs },
+  };
+}
+
 function applyInstDeltas(curve: EQCurve, d: InstDeltas): EQCurve {
-  const r = JSON.parse(JSON.stringify(curve)) as EQCurve;
+  const r = cloneEQCurve(curve);
   r.ls.gain  += d.subDelta;
   r.p1.gain  += d.presenceDelta;
   r.hs.gain  += d.airDelta;
@@ -125,7 +137,7 @@ export function computeSpectralCompensation(
 ): EQCurve {
   if (!peaks || peaks.length < 3) return curve;
 
-  const r = JSON.parse(JSON.stringify(curve)) as EQCurve;
+  const r = cloneEQCurve(curve);
 
   const regions: Array<{ band: 'p0' | 'p1' | 'p2' | 'p3'; minHz: number; maxHz: number; targetDb: number }> = [
     { band: 'p0', minHz: 200,  maxHz: 600,   targetDb: -3 },

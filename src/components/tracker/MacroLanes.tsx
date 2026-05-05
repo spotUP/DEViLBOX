@@ -56,7 +56,7 @@ const generateMacroPaths = (
   };
 };
 
-export const MacroLanes: React.FC<MacroLanesProps> = ({
+export const MacroLanes: React.FC<MacroLanesProps> = React.memo(({
   pattern,
   rowHeight,
   channelCount,
@@ -214,4 +214,4 @@ export const MacroLanes: React.FC<MacroLanesProps> = ({
       })}
     </div>
   );
-};
+});

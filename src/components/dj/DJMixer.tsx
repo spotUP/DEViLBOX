@@ -9,7 +9,7 @@
  *   5. Broadcast (collapsed)
  */
 
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { useDJStore } from '@/stores/useDJStore';
 import { MixerFilterKnob, MixerEQBandKnob } from '@/components/dj/MixerEQ';
 import { MixerVUMeter } from '@/components/dj/MixerVUMeter';
@@ -29,6 +29,10 @@ export const DJMixer: React.FC = () => {
   const [showBroadcast, setShowBroadcast] = useState(false);
   const dubBusEnabled = useDrumPadStore((s) => s.dubBus.enabled);
   const returnGain    = useDrumPadStore((s) => s.dubBus.returnGain);
+
+  const handleReturnGainChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    useDrumPadStore.getState().setDubBus({ returnGain: Number(e.target.value) });
+  }, []);
 
   return (
     <div
@@ -101,9 +105,7 @@ export const DJMixer: React.FC = () => {
             max={1}
             step={0.01}
             value={returnGain}
-            onChange={(e) =>
-              useDrumPadStore.getState().setDubBus({ returnGain: Number(e.target.value) })
-            }
+            onChange={handleReturnGainChange}
             className="flex-1 accent-accent-highlight cursor-pointer"
             title={`FX wet level: ${(returnGain * 100).toFixed(0)}%`}
           />

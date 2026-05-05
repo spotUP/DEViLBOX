@@ -84,19 +84,26 @@ export const DJView: React.FC<DJViewProps> = ({ onShowDrumpads: _onShowDrumpads 
   // Uses a rolling average to avoid flickering between green/yellow/red
   const [syncDriftMs, setSyncDriftMs] = useState<number | null>(null);
   const driftHistoryRef = useRef<number[]>([]);
+  const prevDriftRef = useRef<number | null>(null);
   useEffect(() => {
     const timer = setInterval(() => {
       if (document.hidden) return;
       const s = useDJStore.getState();
       if (!s.decks.A.isPlaying || !s.decks.B.isPlaying || !s.decks.A.beatGrid || !s.decks.B.beatGrid) {
-        setSyncDriftMs(null);
+        if (prevDriftRef.current !== null) {
+          prevDriftRef.current = null;
+          setSyncDriftMs(null);
+        }
         driftHistoryRef.current = [];
         return;
       }
       try {
         const phaseA = getPhaseInfo('A');
         const phaseB = getPhaseInfo('B');
-        if (!phaseA || !phaseB) { setSyncDriftMs(null); return; }
+        if (!phaseA || !phaseB) {
+          if (prevDriftRef.current !== null) { prevDriftRef.current = null; setSyncDriftMs(null); }
+          return;
+        }
         let phaseDiff = Math.abs(phaseA.beatPhase - phaseB.beatPhase);
         if (phaseDiff > 0.5) phaseDiff = 1 - phaseDiff;
         const beatPeriodMs = (60 / (s.decks.A.beatGrid?.bpm ?? 120)) * 1000;
@@ -108,8 +115,14 @@ export const DJView: React.FC<DJViewProps> = ({ onShowDrumpads: _onShowDrumpads 
         if (history.length > 10) history.shift();
         const avgDrift = Math.round(history.reduce((a, b) => a + b, 0) / history.length);
 
-        setSyncDriftMs(avgDrift);
-      } catch { setSyncDriftMs(null); }
+        // Only setState when value actually changes — avoids 10Hz re-render churn
+        if (avgDrift !== prevDriftRef.current) {
+          prevDriftRef.current = avgDrift;
+          setSyncDriftMs(avgDrift);
+        }
+      } catch {
+        if (prevDriftRef.current !== null) { prevDriftRef.current = null; setSyncDriftMs(null); }
+      }
     }, 100);
     return () => clearInterval(timer);
   }, []);
