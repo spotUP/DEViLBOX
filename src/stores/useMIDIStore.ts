@@ -318,6 +318,10 @@ export function refreshDJKnobLabels(): void {
 // Track active MIDI notes for proper release
 const activeMidiNotes = new Map<number, string>();
 
+// rAF batch state for setKnobValue — avoids Immer overhead on every MIDI CC frame
+let _pendingKnobValues: Record<string, number> = {};
+let _knobRaf = 0;
+
 export const useMIDIStore = create<MIDIStore>()(
   persist(
     immer((set, get) => ({
@@ -1123,9 +1127,20 @@ export const useMIDIStore = create<MIDIStore>()(
       },
 
       setKnobValue: (param, value) => {
-        set((state) => {
-          state.knobValues[param] = value;
-        });
+        // rAF-batched to avoid Immer overhead on every MIDI CC frame
+        _pendingKnobValues[param] = value;
+        if (!_knobRaf) {
+          _knobRaf = requestAnimationFrame(() => {
+            _knobRaf = 0;
+            const pending = { ..._pendingKnobValues };
+            _pendingKnobValues = {};
+            set((state) => {
+              for (const k in pending) {
+                state.knobValues[k] = pending[k];
+              }
+            });
+          });
+        }
       },
 
       // Send CC to external hardware (TD-3-MO, etc.)

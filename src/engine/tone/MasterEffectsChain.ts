@@ -134,8 +134,13 @@ export async function rebuildMasterEffects(ctx: MasterEffectsContext, effects: E
   // Debug log only (verbose in StrictMode due to double-invocation)
   // console.log('[ToneEngine] rebuildMasterEffects v' + myVersion + ', effects:', effects.map(e => `${e.type}(${e.id})`));
 
-  // Deep clone effects to avoid Immer proxy revocation issues during async operations
-  const effectsCopy = structuredClone(effects) as EffectConfig[];
+  // Clone effects to avoid Immer proxy revocation during async operations.
+  // Shallow-clone each effect + its parameters object (avoids structuredClone overhead).
+  const effectsCopy = effects.map(e => ({
+    ...e,
+    parameters: { ...e.parameters },
+    selectedChannels: e.selectedChannels ? [...e.selectedChannels] : undefined,
+  })) as EffectConfig[];
 
   // Snapshot old chain so we can tear it down AFTER the new chain is fully built.
   // This eliminates the audio gap that occurred when we disconnected before the async

@@ -15,6 +15,7 @@ import { getToneEngine } from '../../engine/ToneEngine';
 import { getChannelFilterManager } from '../../engine/ChannelFilterManager';
 import { getDJEngine } from '../../engine/dj/DJEngine';
 import { useDJStore } from '../../stores/useDJStore';
+import * as DJActions from '../../engine/dj/DJActions';
 import type { MappableParameter } from '../types';
 
 // ============================================================================
@@ -1220,62 +1221,65 @@ export function resetDJSoftTakeover(): void {
  * Shared by both useMIDIStore (generic controllers) and DJControllerMapper (DJ presets).
  */
 export function syncDJParamToStore(param: string, normalized: number): void {
-  const store = useDJStore.getState();
   switch (param) {
     case 'dj.crossfader':
-      store.setCrossfader(normalized);
+      DJActions.setCrossfader(normalized);
       break;
     case 'dj.deckA.volume':
-      store.setDeckVolume('A', normalized * 1.5);
+      DJActions.setDeckVolume('A', normalized * 1.5);
       break;
     case 'dj.deckB.volume':
-      store.setDeckVolume('B', normalized * 1.5);
+      DJActions.setDeckVolume('B', normalized * 1.5);
       break;
     case 'dj.masterVolume':
-      store.setMasterVolume(normalized * 1.5);
+      DJActions.setMasterVolume(normalized * 1.5);
       break;
     case 'dj.deckA.pitch':
-      store.setDeckPitch('A', -6 + normalized * 12);
+      DJActions.setDeckPitch('A', -6 + normalized * 12);
       break;
     case 'dj.deckB.pitch':
-      store.setDeckPitch('B', -6 + normalized * 12);
+      DJActions.setDeckPitch('B', -6 + normalized * 12);
       break;
     case 'dj.deckA.eqHi':
-      store.setDeckEQ('A', 'high', -12 + normalized * 24);
+      DJActions.setDeckEQ('A', 'high', -12 + normalized * 24);
       break;
     case 'dj.deckA.eqMid':
-      store.setDeckEQ('A', 'mid', -12 + normalized * 24);
+      DJActions.setDeckEQ('A', 'mid', -12 + normalized * 24);
       break;
     case 'dj.deckA.eqLow':
-      store.setDeckEQ('A', 'low', -12 + normalized * 24);
+      DJActions.setDeckEQ('A', 'low', -12 + normalized * 24);
       break;
     case 'dj.deckB.eqHi':
-      store.setDeckEQ('B', 'high', -12 + normalized * 24);
+      DJActions.setDeckEQ('B', 'high', -12 + normalized * 24);
       break;
     case 'dj.deckB.eqMid':
-      store.setDeckEQ('B', 'mid', -12 + normalized * 24);
+      DJActions.setDeckEQ('B', 'mid', -12 + normalized * 24);
       break;
     case 'dj.deckB.eqLow':
-      store.setDeckEQ('B', 'low', -12 + normalized * 24);
+      DJActions.setDeckEQ('B', 'low', -12 + normalized * 24);
       break;
     case 'dj.deckA.filter':
-      store.setDeckFilter('A', -1 + normalized * 2);
+      DJActions.setDeckFilter('A', -1 + normalized * 2);
       break;
     case 'dj.deckB.filter':
-      store.setDeckFilter('B', -1 + normalized * 2);
+      DJActions.setDeckFilter('B', -1 + normalized * 2);
       break;
     case 'dj.deckA.filterQ':
-      store.setDeckState('A', { filterResonance: 0.5 + normalized * 14.5 });
+      DJActions.setDeckFilterResonance('A', 0.5 + normalized * 14.5);
       break;
     case 'dj.deckB.filterQ':
-      store.setDeckState('B', { filterResonance: 0.5 + normalized * 14.5 });
+      DJActions.setDeckFilterResonance('B', 0.5 + normalized * 14.5);
       break;
-    case 'dj.deckA.scratchVelocity':
+    case 'dj.deckA.scratchVelocity': {
+      const store = useDJStore.getState();
       store.setDeckState('A', { scratchVelocity: -4 + normalized * 8 });
       break;
-    case 'dj.deckB.scratchVelocity':
+    }
+    case 'dj.deckB.scratchVelocity': {
+      const store = useDJStore.getState();
       store.setDeckState('B', { scratchVelocity: -4 + normalized * 8 });
       break;
+    }
   }
 }
 

@@ -79,8 +79,9 @@ export function useHelpDialog({ isOpen, initialTab = 'shortcuts' }: UseHelpDialo
 
   // Store subscriptions
   const cursor = useCursorStore((s) => s.cursor);
-  const { patterns, currentPatternIndex } = useTrackerStore();
-  const { instruments } = useInstrumentStore();
+  const patterns = useTrackerStore((s) => s.patterns);
+  const currentPatternIndex = useTrackerStore((s) => s.currentPatternIndex);
+  const instruments = useInstrumentStore((s) => s.instruments);
 
   // Chip detection
   const currentChip = useMemo<number | null>(() => {

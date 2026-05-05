@@ -200,7 +200,11 @@ export function gridToTrackerCells(pattern: GridPattern, instrumentId: number = 
  * Hook to manage grid pattern state
  */
 export function useGridPattern(channelIndex: number) {
-  const { patterns, currentPatternIndex, setCell, resizePattern, resizeAllPatterns } = useTrackerStore();
+  const patterns = useTrackerStore((s) => s.patterns);
+  const currentPatternIndex = useTrackerStore((s) => s.currentPatternIndex);
+  const setCell = useTrackerStore((s) => s.setCell);
+  const resizePattern = useTrackerStore((s) => s.resizePattern);
+  const resizeAllPatterns = useTrackerStore((s) => s.resizeAllPatterns);
   const [baseOctave, setBaseOctave] = useState(3);
 
   const currentPattern = patterns[currentPatternIndex];
