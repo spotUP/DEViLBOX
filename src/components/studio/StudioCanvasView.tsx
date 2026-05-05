@@ -157,7 +157,7 @@ const StudioGrid: React.FC<{ offsetX: number; offsetY: number; scale: number }> 
 const InstrumentPanelContent: React.FC = () => {
   const instruments = useInstrumentStore(s => s.instruments);
   const currentId = useInstrumentStore(s => s.currentInstrumentId);
-  const updateInstrument = useInstrumentStore(s => s.updateInstrument);
+  const updateInstrumentRealtime = useInstrumentStore(s => s.updateInstrumentRealtime);
   const setCurrentInstrument = useInstrumentStore(s => s.setCurrentInstrument);
 
   const current = instruments.find(i => i.id === currentId) ?? instruments[0];
@@ -197,7 +197,7 @@ const InstrumentPanelContent: React.FC = () => {
         <Suspense fallback={<div className="flex items-center justify-center text-text-muted text-xs p-4">Loading...</div>}>
           <UnifiedInstrumentEditor
             instrument={current}
-            onChange={(updates) => updateInstrument(current.id, updates)}
+            onChange={(updates) => updateInstrumentRealtime(current.id, updates)}
           />
         </Suspense>
       </div>

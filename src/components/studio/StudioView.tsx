@@ -39,7 +39,7 @@ const LoadingFallback: React.FC<{ label: string }> = ({ label }) => (
 const InstrumentPanel: React.FC = () => {
   const instruments = useInstrumentStore(s => s.instruments);
   const currentId = useInstrumentStore(s => s.currentInstrumentId);
-  const updateInstrument = useInstrumentStore(s => s.updateInstrument);
+  const updateInstrumentRealtime = useInstrumentStore(s => s.updateInstrumentRealtime);
   const setCurrentInstrument = useInstrumentStore(s => s.setCurrentInstrument);
 
   const current = instruments.find(i => i.id === currentId) ?? instruments[0];
@@ -81,7 +81,7 @@ const InstrumentPanel: React.FC = () => {
         <Suspense fallback={<LoadingFallback label="instrument editor" />}>
           <UnifiedInstrumentEditor
             instrument={current}
-            onChange={(updates) => updateInstrument(current.id, updates)}
+            onChange={(updates) => updateInstrumentRealtime(current.id, updates)}
           />
         </Suspense>
       </div>

@@ -8,7 +8,7 @@
 
 import React, { useCallback, useRef, useEffect, useState } from 'react';
 import { useDJStore } from '@/stores/useDJStore';
-import { setDeckRepitchLock } from '@/engine/dj/DJActions';
+import { setDeckRepitchLock, setDeckPitch as setDeckPitchAction } from '@/engine/dj/DJActions';
 
 interface DeckPitchSliderProps {
   deckId: 'A' | 'B' | 'C';
@@ -21,7 +21,6 @@ const HANDLE_HEIGHT = 24;  // px - height of the rectangular handle
 export const DeckPitchSlider: React.FC<DeckPitchSliderProps> = ({ deckId }) => {
   const pitchOffset = useDJStore((s) => s.decks[deckId].pitchOffset);
   const repitchLock = useDJStore((s) => s.decks[deckId].repitchLock);
-  const setDeckPitch = useDJStore((s) => s.setDeckPitch);
 
   // Use ref pattern from CLAUDE.md for drag handling to avoid stale state
   const pitchRef = useRef(pitchOffset);
@@ -65,9 +64,9 @@ export const DeckPitchSlider: React.FC<DeckPitchSliderProps> = ({ deckId }) => {
       const rect = trackRef.current.getBoundingClientRect();
       const y = clientY - rect.top - HANDLE_HEIGHT / 2;
       const newPitch = Math.round(yToPitch(y) * 10) / 10; // 0.1 resolution
-      setDeckPitch(deckId, newPitch);
+      setDeckPitchAction(deckId, newPitch);
     },
-    [deckId, setDeckPitch, yToPitch]
+    [deckId, yToPitch]
   );
 
   const handleMouseDown = useCallback(
@@ -100,8 +99,8 @@ export const DeckPitchSlider: React.FC<DeckPitchSliderProps> = ({ deckId }) => {
   }, [isDragging, updatePitch]);
 
   const handleDoubleClick = useCallback(() => {
-    setDeckPitch(deckId, 0);
-  }, [deckId, setDeckPitch]);
+    setDeckPitchAction(deckId, 0);
+  }, [deckId]);
 
   const handleY = pitchToY(pitchOffset);
   const centerY = pitchToY(0);
@@ -136,7 +135,7 @@ export const DeckPitchSlider: React.FC<DeckPitchSliderProps> = ({ deckId }) => {
         style={{ width: 32 }}
         onMouseDown={handleMouseDown}
         onDoubleClick={handleDoubleClick}
-        onContextMenu={(e) => { e.preventDefault(); setDeckPitch(deckId, 0); }}
+        onContextMenu={(e) => { e.preventDefault(); setDeckPitchAction(deckId, 0); }}
       >
         {/* Groove track — recessed black slot like the TD-3 sequencer groove */}
         <div
