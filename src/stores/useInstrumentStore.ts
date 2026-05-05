@@ -1568,18 +1568,17 @@ export const useInstrumentStore = create<InstrumentStore>()(
     },
 
     updateEffect: (instrumentId, effectId, updates) => {
-      set((state) => {
-        const instrument = state.instruments.find((inst) => inst.id === instrumentId);
-        if (instrument) {
-          const idx = instrument.effects.findIndex((eff) => eff.id === effectId);
-          if (idx !== -1) {
-            instrument.effects[idx] = applyEffectUpdates(instrument.effects[idx], updates);
-          }
-        }
-      });
-
-      // Only rebuild if enabled state changed (other params can be updated in-place later)
+      // Structural change (enable/disable) → synchronous store write + rebuild
       if (updates.enabled !== undefined) {
+        set((state) => {
+          const instrument = state.instruments.find((inst) => inst.id === instrumentId);
+          if (instrument) {
+            const idx = instrument.effects.findIndex((eff) => eff.id === effectId);
+            if (idx !== -1) {
+              instrument.effects[idx] = applyEffectUpdates(instrument.effects[idx], updates);
+            }
+          }
+        });
         const instrument = get().instruments.find((inst) => inst.id === instrumentId);
         if (instrument) {
           (async () => {
@@ -1591,32 +1590,38 @@ export const useInstrumentStore = create<InstrumentStore>()(
             }
           })();
         }
-      } else {
-        // Push parameter/wet changes to the audio engine in real-time
-        const instrument = get().instruments.find((inst) => inst.id === instrumentId);
-        const effect = instrument?.effects.find((eff) => eff.id === effectId);
-        if (effect) {
-          try {
-            const engine = getToneEngine();
-            engine.updateInstrumentEffectParams(effectId, effect);
-          } catch {
-            // Engine not initialized yet
-          }
-        }
+        return;
       }
 
-      // If bpmSync is ON after update, apply synced timing
-      const updatedInstrument = get().instruments.find((inst) => inst.id === instrumentId);
-      const updatedEffect = updatedInstrument?.effects.find((eff) => eff.id === effectId);
-      if (updatedEffect?.parameters.bpmSync === 1) {
-        try {
-          const engine = getToneEngine();
-          const bpm = engine.getBPM();
-          engine.updateBpmSyncedEffects(bpm);
-        } catch {
-          // Engine not initialized yet
+      // Parameter/wet change → immediate engine update + batched store write
+      const instrument = get().instruments.find((inst) => inst.id === instrumentId);
+      const effect = instrument?.effects.find((eff) => eff.id === effectId);
+      if (!effect) return;
+
+      // Compute merged effect for engine call
+      const mergedEffect = applyEffectUpdates({ ...effect }, updates);
+
+      // Immediate engine update (outside Immer)
+      try {
+        const engine = getToneEngine();
+        engine.updateInstrumentEffectParams(effectId, mergedEffect);
+        if (mergedEffect.parameters.bpmSync === 1) {
+          engine.updateBpmSyncedEffects(engine.getBPM());
         }
+      } catch {
+        // Engine not initialized yet
       }
+
+      // Batched store write
+      batch(`instfx-${instrumentId}-${effectId}`, (state) => {
+        const inst = state.instruments.find((i) => i.id === instrumentId);
+        if (inst) {
+          const idx = inst.effects.findIndex((eff) => eff.id === effectId);
+          if (idx !== -1) {
+            inst.effects[idx] = applyEffectUpdates(inst.effects[idx], updates);
+          }
+        }
+      });
     },
 
     reorderEffects: (instrumentId, fromIndex, toIndex) => {
