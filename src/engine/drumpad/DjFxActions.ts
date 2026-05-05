@@ -458,9 +458,12 @@ function createFilterSweep(type: 'highpass' | 'lowpass' | 'bandpass'): DjFxActio
       scheduleSweep(startFreq, endFreq, now + sweepDuration * 2);
       scheduleSweep(endFreq, startFreq, now + sweepDuration * 3);
 
-      // Continue scheduling sweeps via interval
+      // Continue scheduling sweeps via interval (max 120 iterations = 4min safety)
+      let sweepIter = 0;
       const intervalId = setInterval(() => {
         sweepCount++;
+        sweepIter++;
+        if (sweepIter > 120) { clearInterval(intervalId); return; }
         const nextTime = ctx.currentTime;
         const isForward = sweepCount % 2 === 0;
         scheduleSweep(

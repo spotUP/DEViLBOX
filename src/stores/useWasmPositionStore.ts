@@ -28,6 +28,11 @@ interface WasmPositionState {
   clear: () => void;
 }
 
+// rAF-throttled position updates — WASM engines fire onPositionUpdate at audio
+// callback rate (potentially 100s/sec). We coalesce into one store write per frame.
+let _pendingPos: { row: number; songPos?: number; channelRows?: number[]; channelPositions?: number[] } | null = null;
+let _posRaf = 0;
+
 export const useWasmPositionStore = create<WasmPositionState>()((set, _get) => ({
   active: false,
   row: 0,
@@ -35,14 +40,27 @@ export const useWasmPositionStore = create<WasmPositionState>()((set, _get) => (
   channelRows: [],
   channelPositions: [],
   setPosition: (row: number, songPos?: number, channelRows?: number[], channelPositions?: number[]) => {
-    set({
-      active: true, row,
-      ...(songPos !== undefined ? { songPos } : {}),
-      ...(channelRows ? { channelRows } : {}),
-      ...(channelPositions ? { channelPositions } : {}),
-    });
+    // Last-write-wins: overwrite pending with latest position
+    _pendingPos = { row, songPos, channelRows, channelPositions };
+    if (!_posRaf) {
+      _posRaf = requestAnimationFrame(() => {
+        _posRaf = 0;
+        const p = _pendingPos;
+        if (!p) return;
+        _pendingPos = null;
+        set({
+          active: true, row: p.row,
+          ...(p.songPos !== undefined ? { songPos: p.songPos } : {}),
+          ...(p.channelRows ? { channelRows: p.channelRows } : {}),
+          ...(p.channelPositions ? { channelPositions: p.channelPositions } : {}),
+        });
+      });
+    }
   },
   clear: () => {
+    // Cancel any pending position update
+    if (_posRaf) { cancelAnimationFrame(_posRaf); _posRaf = 0; }
+    _pendingPos = null;
     set({ active: false, row: 0, songPos: 0, channelRows: [], channelPositions: [] });
   },
 }));
