@@ -9,6 +9,7 @@
 import { useDJStore } from '@/stores/useDJStore';
 import type { DJSet } from './DJSetFormat';
 import type { DJSetEvent, TrackSource } from './DJSetEvent';
+import * as DJActions from '../DJActions';
 
 type DeckId = 'A' | 'B' | 'C';
 
@@ -124,49 +125,49 @@ export class DJSetPlayer {
         if (deck) store.setDeckPlaying(deck, false);
         break;
 
-      // ── Mixing ──
+      // ── Mixing (route through DJActions for rAF-batched store writes) ──
       case 'crossfader':
-        if (event.value != null) store.setCrossfader(event.value);
+        if (event.value != null) DJActions.setCrossfader(event.value);
         break;
       case 'crossfaderCurve':
-        if (event.values?.curve) store.setCrossfaderCurve(event.values.curve as 'linear' | 'cut' | 'smooth');
+        if (event.values?.curve) DJActions.setCrossfaderCurve(event.values.curve as 'linear' | 'cut' | 'smooth');
         break;
       case 'volume':
-        if (deck && event.value != null) store.setDeckVolume(deck, event.value);
+        if (deck && event.value != null) DJActions.setDeckVolume(deck, event.value);
         break;
       case 'masterVolume':
-        if (event.value != null) store.setMasterVolume(event.value);
+        if (event.value != null) DJActions.setMasterVolume(event.value);
         break;
 
       // ── EQ ──
       case 'eqLow':
-        if (deck && event.value != null) store.setDeckEQ(deck, 'low', event.value);
+        if (deck && event.value != null) DJActions.setDeckEQ(deck, 'low', event.value);
         break;
       case 'eqMid':
-        if (deck && event.value != null) store.setDeckEQ(deck, 'mid', event.value);
+        if (deck && event.value != null) DJActions.setDeckEQ(deck, 'mid', event.value);
         break;
       case 'eqHigh':
-        if (deck && event.value != null) store.setDeckEQ(deck, 'high', event.value);
+        if (deck && event.value != null) DJActions.setDeckEQ(deck, 'high', event.value);
         break;
       case 'eqKill':
         if (deck && event.values) {
-          store.setDeckEQKill(deck, event.values.band as 'low' | 'mid' | 'high', event.values.kill as boolean);
+          DJActions.setDeckEQKill(deck, event.values.band as 'low' | 'mid' | 'high', event.values.kill as boolean);
         }
         break;
 
       // ── Filter ──
       case 'filter':
-        if (deck && event.value != null) store.setDeckFilter(deck, event.value);
+        if (deck && event.value != null) DJActions.setDeckFilter(deck, event.value);
         break;
       case 'filterRes':
         if (deck && event.value != null) {
-          store.setDeckState(deck, { filterResonance: event.value });
+          DJActions.setDeckFilterResonance(deck, event.value);
         }
         break;
 
       // ── Pitch ──
       case 'pitch':
-        if (deck && event.value != null) store.setDeckPitch(deck, event.value);
+        if (deck && event.value != null) DJActions.setDeckPitch(deck, event.value);
         break;
       case 'keyLock':
         if (deck && event.values) {

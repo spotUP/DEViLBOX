@@ -29,6 +29,21 @@ export const ChannelLevelsCompact: React.FC<ChannelLevelsCompactProps> = ({
   const lastGensRef = useRef<number[]>([]);
   // PERF: Cache gradient to avoid createLinearGradient every frame
   const gradientCacheRef = useRef<{ gradient: CanvasGradient; width: number; cyan: boolean } | null>(null);
+  // PERF: Cache container width — reading clientWidth forces layout reflow (~0.5-2ms)
+  const cachedWidthRef = useRef(0);
+
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+    cachedWidthRef.current = container.clientWidth;
+    const observer = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        cachedWidthRef.current = entry.contentRect.width;
+      }
+    });
+    observer.observe(container);
+    return () => observer.disconnect();
+  }, []);
 
   const { patterns, currentPatternIndex } = useTrackerStore(
     useShallow((state) => ({
@@ -71,7 +86,7 @@ export const ChannelLevelsCompact: React.FC<ChannelLevelsCompactProps> = ({
         const ctx = canvas.getContext('2d');
         if (ctx) {
           const dpr = window.devicePixelRatio || 1;
-          const actualWidth = container.clientWidth;
+          const actualWidth = cachedWidthRef.current || container.clientWidth;
           canvas.width = actualWidth * dpr;
           canvas.height = height * dpr;
           ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -125,7 +140,7 @@ export const ChannelLevelsCompact: React.FC<ChannelLevelsCompactProps> = ({
       const cyan = isCyanThemeRef.current;
 
       const dpr = window.devicePixelRatio || 1;
-      const actualWidth = container.clientWidth;
+      const actualWidth = cachedWidthRef.current || 200;
       if (canvas.width !== Math.ceil(actualWidth * dpr) || canvas.height !== Math.ceil(h * dpr)) {
         canvas.width = Math.ceil(actualWidth * dpr);
         canvas.height = Math.ceil(h * dpr);

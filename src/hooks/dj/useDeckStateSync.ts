@@ -73,28 +73,24 @@ export function useDeckStateSync(deckId: DeckId): void {
           // Tracker module mode — poll replayer position
           const replayer = deck.replayer;
           if (replayer.isPlaying()) {
-            store.setDeckPosition(deckId, replayer.getSongPos(), replayer.getPattPos());
+            // Coalesce all deck state into a single setDeckState call
+            // to avoid multiple Immer writes per poll
+            const deckUpdate: Record<string, unknown> = {
+              songPos: replayer.getSongPos(),
+              pattPos: replayer.getPattPos(),
+            };
 
-            // During pattern scratch the sequencer is frozen (tempoMultiplier ~ 0)
-            // so effectiveBPM would read near-zero. Skip BPM/elapsed updates to
-            // keep the pre-scratch values visible and prevent sync indicator flickering.
             if (deck.isPatternActive()) {
               // Push scratch velocity + fader gain to store so UI reacts
               const { velocity, faderGain } = deck.getScratchState();
               const prevV = store.decks[deckId].scratchVelocity;
               const prevF = store.decks[deckId].scratchFaderGain;
-              const update: Partial<typeof store.decks.A> = {};
-              if (Math.abs(velocity - prevV) > 0.05) update.scratchVelocity = velocity;
-              if (faderGain !== prevF) update.scratchFaderGain = faderGain;
-              if (Object.keys(update).length > 0) {
-                store.setDeckState(deckId, update);
-              }
+              if (Math.abs(velocity - prevV) > 0.05) deckUpdate.scratchVelocity = velocity;
+              if (faderGain !== prevF) deckUpdate.scratchFaderGain = faderGain;
             } else {
               const liveBPM = Math.round(replayer.getBPM() * replayer.getTempoMultiplier() * 100) / 100;
-              store.setDeckState(deckId, {
-                elapsedMs: replayer.getElapsedMs(),
-                effectiveBPM: liveBPM,
-              });
+              deckUpdate.elapsedMs = replayer.getElapsedMs();
+              deckUpdate.effectiveBPM = liveBPM;
               // Relay BPM changes to ScratchPlayback for LFO resync
               try { deck.notifyBPMChange(liveBPM); } catch { /* engine not ready */ }
 
@@ -107,13 +103,16 @@ export function useDeckStateSync(deckId: DeckId): void {
                 const posInPeriod = elapsed % periodMs;
                 const lfoFaderGain = posInPeriod < periodMs * 0.5 ? 1 : 0;
                 if (lfoFaderGain !== store.decks[deckId].scratchFaderGain) {
-                  store.setDeckState(deckId, { scratchFaderGain: lfoFaderGain });
+                  deckUpdate.scratchFaderGain = lfoFaderGain;
                 }
               } else if (store.decks[deckId].scratchVelocity !== 0 || store.decks[deckId].scratchFaderGain !== 1) {
                 // Clear scratch state when not scratching
-                store.setDeckState(deckId, { scratchVelocity: 0, scratchFaderGain: 1 });
+                deckUpdate.scratchVelocity = 0;
+                deckUpdate.scratchFaderGain = 1;
               }
             }
+
+            store.setDeckState(deckId, deckUpdate);
           }
 
           // Auto-clear activePatternName when a one-shot pattern finishes naturally
