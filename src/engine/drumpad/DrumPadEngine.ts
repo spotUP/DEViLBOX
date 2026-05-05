@@ -336,7 +336,17 @@ export class DrumPadEngine {
       return null;
     }
 
-    const hash = JSON.stringify(pad.effects.map(e => ({ t: e.type, e: e.enabled, w: e.wet, p: e.parameters })));
+    // Fast config fingerprint — avoids JSON.stringify overhead on every pad hit
+    let hash = '';
+    for (const e of pad.effects) {
+      hash += e.type + (e.enabled ? '1' : '0') + e.wet;
+      if (e.parameters) {
+        for (const k in e.parameters) {
+          hash += k + e.parameters[k];
+        }
+      }
+      hash += '|';
+    }
     const existing = this.padEffects.get(pad.id);
     if (existing && existing.configHash === hash) return existing;
 
