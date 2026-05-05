@@ -8,6 +8,8 @@
 
 import { useCallback, useMemo } from 'react';
 import { useCheeseCutterStore } from '@/stores/useCheeseCutterStore';
+import { useTransportStore } from '@/stores/useTransportStore';
+import { useTrackerStore } from '@/stores/useTrackerStore';
 import { cheeseCutterToFormatChannels } from './cheeseCutterAdapter';
 import type { FormatChannel } from '@/components/shared/format-editor-types';
 
@@ -18,17 +20,60 @@ export interface CheeseCutterFormatData {
   handleCellChange: (channelIdx: number, rowIdx: number, columnKey: string, value: number) => void;
 }
 
+interface ResolveCheeseCutterPlaybackViewArgs {
+  transportPlaying: boolean;
+  transportRow: number;
+  transportSongPos: number;
+  storePlaying: boolean;
+  storePlaybackRow: number;
+  storePlaybackSongPos: number;
+  orderCursor: number;
+  cursorRow: number;
+}
+
+export function resolveCheeseCutterPlaybackView({
+  transportPlaying,
+  transportRow,
+  transportSongPos,
+  storePlaying,
+  storePlaybackRow,
+  storePlaybackSongPos,
+  orderCursor,
+  cursorRow,
+}: ResolveCheeseCutterPlaybackViewArgs): { currentOrderPos: number; displayRow: number; isPlaying: boolean } {
+  const isPlaying = transportPlaying || storePlaying;
+  const liveSongPos = transportPlaying ? transportSongPos : storePlaybackSongPos;
+  const liveRow = transportPlaying ? transportRow : storePlaybackRow;
+
+  return {
+    currentOrderPos: isPlaying ? liveSongPos : orderCursor,
+    displayRow: isPlaying ? liveRow : cursorRow,
+    isPlaying,
+  };
+}
+
 export function useCheeseCutterFormatData(): CheeseCutterFormatData {
-  const playing = useCheeseCutterStore((s) => s.playing);
+  const storePlaying = useCheeseCutterStore((s) => s.playing);
   const playbackRow = useCheeseCutterStore((s) => s.playbackPos.row);
   const sequences = useCheeseCutterStore((s) => s.sequences);
   const trackLists = useCheeseCutterStore((s) => s.trackLists);
   const playbackPos = useCheeseCutterStore((s) => s.playbackPos);
   const orderCursor = useCheeseCutterStore((s) => s.orderCursor);
   const cursorRow = useCheeseCutterStore((s) => s.cursor.row);
+  const transportPlaying = useTransportStore((s) => s.isPlaying);
+  const transportRow = useTransportStore((s) => s.currentRow);
+  const transportSongPos = useTrackerStore((s) => s.currentPositionIndex);
 
-  const currentOrderPos = playing ? playbackPos.songPos : orderCursor;
-  const displayRow = playing ? playbackRow : cursorRow;
+  const { currentOrderPos, displayRow, isPlaying } = resolveCheeseCutterPlaybackView({
+    transportPlaying,
+    transportRow,
+    transportSongPos,
+    storePlaying,
+    storePlaybackRow: playbackRow,
+    storePlaybackSongPos: playbackPos.songPos,
+    orderCursor,
+    cursorRow,
+  });
 
   const channels = useMemo(
     () => cheeseCutterToFormatChannels(sequences, trackLists, currentOrderPos),
@@ -57,5 +102,5 @@ export function useCheeseCutterFormatData(): CheeseCutterFormatData {
     [currentOrderPos],
   );
 
-  return { channels, currentRow: displayRow, isPlaying: playing, handleCellChange };
+  return { channels, currentRow: displayRow, isPlaying, handleCellChange };
 }

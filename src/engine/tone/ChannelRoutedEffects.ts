@@ -373,6 +373,12 @@ export class ChannelRoutedEffectsManager {
     if (!gain) return;
     const engine = await getActiveIsolationEngine();
     if (!engine?.isAvailable()) {
+      try {
+        const { getActiveDubBus } = await import('../dub/DubBus');
+        if (getActiveDubBus()?.hasWholeMixTap()) {
+          return;
+        }
+      } catch { /* ok */ }
       this.channelDubPendingActivation.add(channelIndex);
       // Retry once after 500ms — engine may still be initialising
       setTimeout(() => {
@@ -384,6 +390,12 @@ export class ChannelRoutedEffectsManager {
     }
     const worklet = engine.getWorkletNode();
     if (!worklet) {
+      try {
+        const { getActiveDubBus } = await import('../dub/DubBus');
+        if (getActiveDubBus()?.hasWholeMixTap()) {
+          return;
+        }
+      } catch { /* ok */ }
       this.channelDubPendingActivation.add(channelIndex);
       setTimeout(() => {
         if (this.channelDubPendingActivation.has(channelIndex)) {
@@ -705,6 +717,13 @@ const engineResolversByMode: Record<string, () => Promise<IsolationCapableEngine
   // Vite HMR divergence where a re-imported engine module registers into
   // a different copy of this map than the store-side resolver reads from.
   tfmx: async () => {
+    try {
+      const { useFormatStore } = await import('../../stores/useFormatStore');
+      if (useFormatStore.getState().tfmxFileData) {
+        const { TFMXEngine } = await import('../tfmx/TFMXEngine');
+        if (TFMXEngine.hasInstance()) return null;
+      }
+    } catch { /* fall through to UADEEngine */ }
     const { UADEEngine } = await import('../uade/UADEEngine');
     if (UADEEngine.hasInstance()) {
       const engine = UADEEngine.getInstance();

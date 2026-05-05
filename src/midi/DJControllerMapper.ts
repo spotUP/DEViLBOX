@@ -12,13 +12,18 @@
 
 import { getMIDIManager } from './MIDIManager';
 import { isDJContext } from './MIDIContextRouter';
-import { routeDJParameter, resetDJSoftTakeover } from './performance/parameterRouter';
+import { routeDJParameter, resetDJSoftTakeover, routeParameterToEngine } from './performance/parameterRouter';
 import { getDJEngine } from '../engine/dj/DJEngine';
 import { useDJStore } from '../stores/useDJStore';
 import { DJBeatSync } from '../engine/dj/DJBeatSync';
 import { getTrackerScratchController } from '../engine/TrackerScratchController';
 import { useVocoderStore } from '../stores/useVocoderStore';
-import type { DJControllerPreset, DJControllerCCMapping, DJControllerNoteMapping } from './djControllerPresets';
+import type {
+  DJControllerPreset,
+  DJControllerCCMapping,
+  DJControllerNoteMapping,
+  DJControllerPitchBendMapping
+} from './djControllerPresets';
 import type { MIDIMessage } from './types';
 class DJControllerMapper {
   private static instance: DJControllerMapper | null = null;
@@ -28,6 +33,7 @@ class DJControllerMapper {
 
   // Lookup tables built from preset (for fast message routing)
   private ccLookup = new Map<string, DJControllerCCMapping>();
+  private pitchBendLookup = new Map<number, DJControllerPitchBendMapping>();
   private noteLookup = new Map<string, DJControllerNoteMapping>();
   private jogCCs = new Set<string>();       // "channel:cc" keys for jog wheel CCs
   private jogTouchNotes = new Map<string, 'A' | 'B' | 'C'>(); // "channel:note" → deck
@@ -59,6 +65,7 @@ class DJControllerMapper {
   setPreset(preset: DJControllerPreset | null): void {
     this.activePreset = preset;
     this.ccLookup.clear();
+    this.pitchBendLookup.clear();
     this.noteLookup.clear();
     this.jogCCs.clear();
     this.jogTouchNotes.clear();
@@ -68,6 +75,10 @@ class DJControllerMapper {
       // Build CC lookup: "channel:cc" → mapping
       for (const m of preset.ccMappings) {
         this.ccLookup.set(`${m.channel}:${m.cc}`, m);
+      }
+
+      for (const m of preset.pitchBendMappings ?? []) {
+        this.pitchBendLookup.set(m.channel, m);
       }
 
       // Build note lookup: "channel:note" → mapping
@@ -186,6 +197,8 @@ class DJControllerMapper {
   private handleMessage(msg: MIDIMessage): void {
     if (msg.type === 'cc' && msg.cc !== undefined && msg.value !== undefined) {
       this.handleCC(msg.channel, msg.cc, msg.value);
+    } else if (msg.type === 'pitchBend' && msg.value !== undefined) {
+      this.handlePitchBend(msg.channel, msg.value);
     } else if (msg.type === 'noteOn' && msg.note !== undefined && msg.velocity !== undefined) {
       // Jog wheel touch
       const touchKey = `${msg.channel}:${msg.note}`;
@@ -216,8 +229,10 @@ class DJControllerMapper {
 
       // PTT release (hold-to-talk: note-on = talk, note-off = mute)
       const noteMapping = this.noteLookup.get(touchKey);
-      if (noteMapping?.action === 'ptt') {
+      if (noteMapping && 'action' in noteMapping && noteMapping.action === 'ptt') {
         useVocoderStore.getState().setPTT(false);
+      } else if (noteMapping && 'param' in noteMapping && noteMapping.offValue !== null) {
+        routeParameterToEngine(noteMapping.param, noteMapping.offValue ?? 0);
       }
     }
   }
@@ -253,12 +268,28 @@ class DJControllerMapper {
   }
 
   /**
+   * Handle pitch-bend messages — used by Mackie-style motor faders and jogs.
+   */
+  private handlePitchBend(channel: number, value: number): void {
+    const mapping = this.pitchBendLookup.get(channel);
+    if (mapping) {
+      const normalized = mapping.invert ? 1 - value : value;
+      routeDJParameter(mapping.param, normalized);
+    }
+  }
+
+  /**
    * Handle a note-on message — trigger a DJ action.
    */
   private handleNote(channel: number, note: number): void {
     const key = `${channel}:${note}`;
     const mapping = this.noteLookup.get(key);
     if (!mapping) return;
+
+    if ('param' in mapping) {
+      routeParameterToEngine(mapping.param, mapping.onValue ?? 1);
+      return;
+    }
 
     // Check if this is a loop roll action
     if (mapping.action.startsWith('loop_roll_')) {

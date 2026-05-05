@@ -46,11 +46,9 @@ export const InstrumentEffectsPanel = forwardRef<InstrumentEffectsPanelHandle, I
   }), []);
 
 
-  const {
-    addEffectConfig,
-    removeEffect,
-    updateEffect,
-  } = useInstrumentStore();
+  const addEffectConfig = useInstrumentStore((s) => s.addEffectConfig);
+  const removeEffect = useInstrumentStore((s) => s.removeEffect);
+  const updateEffect = useInstrumentStore((s) => s.updateEffect);
 
   const handleAddEffect = useCallback((availableEffect: AvailableEffect) => {
     const type = (availableEffect.type as EffectType) || 'Distortion';

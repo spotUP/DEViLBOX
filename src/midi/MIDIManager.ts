@@ -494,6 +494,21 @@ class MIDIManager {
   }
 
   /**
+   * Dispatch a synthetic MIDI message directly to all handlers.
+   * Used by MaschineHIDBridge to inject HID events into the MIDI pipeline.
+   */
+  dispatchMessage(message: MIDIMessage): void {
+    this.lastActivityTimestamp = Date.now();
+    this.messageHandlers.forEach((handler) => {
+      try {
+        handler(message, 'maschine-hid');
+      } catch (error) {
+        console.error('[MIDIManager] Handler error:', error);
+      }
+    });
+  }
+
+  /**
    * Add message handler
    */
   addMessageHandler(handler: MIDIMessageHandler): void {

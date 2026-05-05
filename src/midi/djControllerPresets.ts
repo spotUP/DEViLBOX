@@ -22,11 +22,27 @@ export interface DJControllerCCMapping {
   invert?: boolean; // Some faders are physically inverted
 }
 
-export interface DJControllerNoteMapping {
+export interface DJControllerPitchBendMapping {
+  channel: number;  // MIDI channel (0-indexed: 0-15)
+  param: string;    // Parameter path (matches parameterRouter keys)
+  invert?: boolean;
+}
+
+export interface DJControllerNoteActionMapping {
   channel: number;  // MIDI channel (0-indexed)
   note: number;     // MIDI note number
   action: string;   // DJ action identifier
 }
+
+export interface DJControllerNoteParamMapping {
+  channel: number;      // MIDI channel (0-indexed)
+  note: number;         // MIDI note number
+  param: string;        // Parameter path (matches routeParameterToEngine keys)
+  onValue?: number;     // Normalized 0-1 value sent on noteOn (default = 1)
+  offValue?: number | null; // Value sent on noteOff (default = 0, null = ignore noteOff)
+}
+
+export type DJControllerNoteMapping = DJControllerNoteActionMapping | DJControllerNoteParamMapping;
 
 export interface DJControllerJogMapping {
   channel: number;
@@ -42,6 +58,7 @@ export interface DJControllerPreset {
   /** Device name patterns for auto-detection (case insensitive substring match) */
   detectPatterns?: string[];
   ccMappings: DJControllerCCMapping[];
+  pitchBendMappings?: DJControllerPitchBendMapping[];
   noteMappings: DJControllerNoteMapping[];
   jogMapping?: {
     deckA: DJControllerJogMapping;
@@ -379,11 +396,178 @@ const ROLAND_DJ_202: DJControllerPreset = {
   },
 };
 
+/**
+ * Behringer X-Touch Compact
+ * 8 motor faders + main fader (CC), 16 encoders, 39 buttons.
+ *
+ * Runs best in the controller's standard MIDI mode where faders, encoders, and
+ * buttons expose direct CC/note messages we can map for DJ + dub use.
+ */
+const BEHRINGER_X_TOUCH_COMPACT: DJControllerPreset = {
+  id: 'behringer-xtouch-compact',
+  name: 'X-Touch Compact',
+  manufacturer: 'Behringer',
+  description: '9-fader dub mixer surface with DJ + dub bus mappings',
+  detectPatterns: ['x-touch compact', 'xtouch compact', 'x touch compact'],
+  ccMappings: [
+    // Faders 1-8 = deck strips
+    { channel: 0, cc: 1, param: 'dj.deckA.volume' },
+    { channel: 0, cc: 2, param: 'dj.deckA.eqHi' },
+    { channel: 0, cc: 3, param: 'dj.deckA.eqMid' },
+    { channel: 0, cc: 4, param: 'dj.deckA.eqLow' },
+    { channel: 0, cc: 5, param: 'dj.deckB.volume' },
+    { channel: 0, cc: 6, param: 'dj.deckB.eqHi' },
+    { channel: 0, cc: 7, param: 'dj.deckB.eqMid' },
+    { channel: 0, cc: 8, param: 'dj.deckB.eqLow' },
+    { channel: 0, cc: 9, param: 'dj.crossfader' },
+
+    // Top encoder row = deck control + key dub sends
+    { channel: 0, cc: 10, param: 'dj.deckA.filter' },
+    { channel: 0, cc: 11, param: 'dj.deckA.filterQ' },
+    { channel: 0, cc: 12, param: 'dj.deckA.pitch' },
+    { channel: 0, cc: 13, param: 'dub.echoWet' },
+    { channel: 0, cc: 14, param: 'dj.deckB.filter' },
+    { channel: 0, cc: 15, param: 'dj.deckB.filterQ' },
+    { channel: 0, cc: 16, param: 'dj.deckB.pitch' },
+    { channel: 0, cc: 17, param: 'dub.echoIntensity' },
+
+    // Right encoder row = dub bus + master
+    { channel: 0, cc: 18, param: 'dub.echoRateMs' },
+    { channel: 0, cc: 19, param: 'dub.springWet' },
+    { channel: 0, cc: 20, param: 'dub.returnGain' },
+    { channel: 0, cc: 21, param: 'dub.hpfCutoff' },
+    { channel: 0, cc: 22, param: 'dub.sidechainAmount' },
+    { channel: 0, cc: 23, param: 'dj.masterVolume' },
+    { channel: 0, cc: 24, param: 'dj.deckA.filter' },
+    { channel: 0, cc: 25, param: 'dj.deckB.filter' },
+  ],
+  noteMappings: [
+    // Top row = deck state buttons with useful LED feedback
+    { channel: 0, note: 16, action: 'play_a' },
+    { channel: 0, note: 17, action: 'pfl_a' },
+    { channel: 0, note: 18, action: 'loop_a' },
+    { channel: 0, note: 19, action: 'cue_a' },
+    { channel: 0, note: 20, action: 'play_b' },
+    { channel: 0, note: 21, action: 'pfl_b' },
+    { channel: 0, note: 22, action: 'loop_b' },
+    { channel: 0, note: 23, action: 'cue_b' },
+
+    // Second row = dub performance
+    { channel: 0, note: 24, param: 'dub.echoThrow' },
+    { channel: 0, note: 25, param: 'dub.reverseEcho' },
+    { channel: 0, note: 26, param: 'dub.tapeStop' },
+    { channel: 0, note: 27, param: 'dub.tubbyScream' },
+    { channel: 0, note: 28, param: 'dub.springSlam' },
+    { channel: 0, note: 29, param: 'dub.delayPresetQuarter' },
+    { channel: 0, note: 30, param: 'dub.delayPresetDotted' },
+    { channel: 0, note: 31, param: 'dub.masterDrop' },
+
+    // Third row = cues / jumps
+    { channel: 0, note: 32, action: 'hotcue1_a' },
+    { channel: 0, note: 33, action: 'hotcue2_a' },
+    { channel: 0, note: 34, action: 'hotcue1_b' },
+    { channel: 0, note: 35, action: 'hotcue2_b' },
+    { channel: 0, note: 36, action: 'beatjump_back_a' },
+    { channel: 0, note: 37, action: 'beatjump_fwd_a' },
+    { channel: 0, note: 38, action: 'beatjump_back_b' },
+    { channel: 0, note: 39, action: 'beatjump_fwd_b' },
+
+    // Transport row
+    { channel: 0, note: 49, action: 'sync_a' },
+    { channel: 0, note: 50, action: 'sync_b' },
+    { channel: 0, note: 51, param: 'dub.delayPresetQuarter' },
+    { channel: 0, note: 52, param: 'dub.delayPresetDotted' },
+    { channel: 0, note: 53, param: 'dub.echoBuildUp' },
+    { channel: 0, note: 54, param: 'dub.springKick' },
+  ],
+};
+
+/**
+ * Behringer X-Touch
+ * Mackie Control style surface with pitch-bend motor faders and note-driven buttons.
+ */
+const BEHRINGER_X_TOUCH: DJControllerPreset = {
+  id: 'behringer-xtouch',
+  name: 'X-Touch',
+  manufacturer: 'Behringer',
+  description: 'Mackie-style 9-fader DJ/dub surface',
+  detectPatterns: ['x-touch', 'xtouch', 'x touch'],
+  ccMappings: [
+    { channel: 0, cc: 16, param: 'dj.deckA.filter' },
+    { channel: 0, cc: 17, param: 'dj.deckA.filterQ' },
+    { channel: 0, cc: 18, param: 'dj.deckA.pitch' },
+    { channel: 0, cc: 19, param: 'dub.echoWet' },
+    { channel: 0, cc: 20, param: 'dj.deckB.filter' },
+    { channel: 0, cc: 21, param: 'dj.deckB.filterQ' },
+    { channel: 0, cc: 22, param: 'dj.deckB.pitch' },
+    { channel: 0, cc: 23, param: 'dub.echoIntensity' },
+  ],
+  pitchBendMappings: [
+    { channel: 0, param: 'dj.deckA.volume' },
+    { channel: 1, param: 'dj.deckA.eqHi' },
+    { channel: 2, param: 'dj.deckA.eqMid' },
+    { channel: 3, param: 'dj.deckA.eqLow' },
+    { channel: 4, param: 'dj.deckB.volume' },
+    { channel: 5, param: 'dj.deckB.eqHi' },
+    { channel: 6, param: 'dj.deckB.eqMid' },
+    { channel: 7, param: 'dj.deckB.eqLow' },
+    { channel: 8, param: 'dj.crossfader' },
+  ],
+  noteMappings: [
+    { channel: 0, note: 0, action: 'play_a' },
+    { channel: 0, note: 8, action: 'pfl_a' },
+    { channel: 0, note: 16, action: 'loop_a' },
+    { channel: 0, note: 24, action: 'cue_a' },
+    { channel: 0, note: 4, action: 'play_b' },
+    { channel: 0, note: 12, action: 'pfl_b' },
+    { channel: 0, note: 20, action: 'loop_b' },
+    { channel: 0, note: 28, action: 'cue_b' },
+
+    { channel: 0, note: 91, param: 'dub.echoThrow' },
+    { channel: 0, note: 92, param: 'dub.reverseEcho' },
+    { channel: 0, note: 93, param: 'dub.tapeStop' },
+    { channel: 0, note: 94, param: 'dub.springSlam' },
+    { channel: 0, note: 95, param: 'dub.tubbyScream' },
+  ],
+};
+
+/**
+ * Behringer X-Touch One
+ * Single-fader MCU surface. Best used here as a compact transport + crossfader station.
+ */
+const BEHRINGER_X_TOUCH_ONE: DJControllerPreset = {
+  id: 'behringer-xtouch-one',
+  name: 'X-Touch One',
+  manufacturer: 'Behringer',
+  description: 'Single-fader transport and crossfader surface',
+  detectPatterns: ['x-touch one', 'xtouch one', 'x touch one'],
+  ccMappings: [
+    { channel: 0, cc: 16, param: 'dj.masterVolume' },
+  ],
+  pitchBendMappings: [
+    { channel: 0, param: 'dj.crossfader' },
+  ],
+  noteMappings: [
+    { channel: 0, note: 91, action: 'cue_a' },
+    { channel: 0, note: 92, action: 'cue_b' },
+    { channel: 0, note: 93, action: 'loop_a' },
+    { channel: 0, note: 94, action: 'play_a' },
+    { channel: 0, note: 95, action: 'play_b' },
+    { channel: 0, note: 84, param: 'dub.echoThrow' },
+    { channel: 0, note: 85, param: 'dub.reverseEcho' },
+    { channel: 0, note: 86, param: 'dub.tapeStop' },
+    { channel: 0, note: 87, param: 'dub.springSlam' },
+  ],
+};
+
 // ============================================================================
 // PRESET REGISTRY
 // ============================================================================
 
 export const DJ_HARDWARE_PRESETS: DJControllerPreset[] = [
+  BEHRINGER_X_TOUCH_COMPACT,
+  BEHRINGER_X_TOUCH_ONE,
+  BEHRINGER_X_TOUCH,
   PIONEER_DDJ_SB3,
   PIONEER_DDJ_FLX4,
   PIONEER_DDJ_1000,

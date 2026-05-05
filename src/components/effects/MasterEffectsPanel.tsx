@@ -224,14 +224,12 @@ export const MasterEffectsPanel = forwardRef<MasterEffectsPanelHandle, MasterEff
     togglePresetMenu: () => setShowPresetMenu(prev => !prev),
   }), []);
 
-  const {
-    masterEffects,
-    addMasterEffectConfig,
-    removeMasterEffect,
-    updateMasterEffect,
-    reorderMasterEffects,
-    setMasterEffects,
-  } = useAudioStore();
+  const masterEffects = useAudioStore((s) => s.masterEffects);
+  const addMasterEffectConfig = useAudioStore((s) => s.addMasterEffectConfig);
+  const removeMasterEffect = useAudioStore((s) => s.removeMasterEffect);
+  const updateMasterEffect = useAudioStore((s) => s.updateMasterEffect);
+  const reorderMasterEffects = useAudioStore((s) => s.reorderMasterEffects);
+  const setMasterEffects = useAudioStore((s) => s.setMasterEffects);
 
   // Channel count for channel selection UI
   const numChannels = useTrackerStore(s => s.patterns[s.currentPatternIndex]?.channels?.length ?? 16);

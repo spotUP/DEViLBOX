@@ -14,7 +14,9 @@ import type { DeckId } from '../dj/DeckEngine';
 import { DubBus } from '../dub/DubBus';
 import { setDubBusForRouter } from '../dub/DubRouter';
 import { getToneEngine } from '../ToneEngine';
+import { getChannelRoutedEffectsManager } from '../tone/ChannelRoutedEffects';
 import { getNativeAudioNode } from '../../utils/audio-context';
+import { useMixerStore } from '../../stores/useMixerStore';
 
 
 interface VoiceState {
@@ -91,6 +93,20 @@ export class DrumPadEngine {
     this.dubBus = new DubBus(this.context, this.masterGain);
     // Connect post-master vinyl output to the actual audio destination.
     this.dubBus.getVinylOutputNode().connect(outputDestination ?? this.context.destination);
+    try {
+      const tone = getToneEngine();
+      const mgr = getChannelRoutedEffectsManager(tone.masterEffectsInput);
+      mgr.setupDubBusWiring(this.dubBus.inputNode, this.dubBus);
+      const trackerMix = getNativeAudioNode(tone.masterInput as any);
+      if (trackerMix) {
+        this.dubBus.registerWholeMixTap('tracker-master-input', trackerMix);
+      }
+      this.dubBus.setChannelActivationCallback((ch, amt) => {
+        useMixerStore.getState().setChannelDubSend(ch, amt);
+      });
+    } catch (e) {
+      console.warn('[DrumPadEngine] dub routing bootstrap failed:', e);
+    }
 
     // Register with the DubRouter so ANY view (tracker, DJ, drumpad) can
     // fire dub moves the moment the engine exists, without waiting for a

@@ -130,7 +130,26 @@ describe('DubBus mute-hold guard — prevents burst leak during engine swap', ()
 
   it('replays pending settings after hold ends', () => {
     expect(DUBBUS_SRC).toMatch(/_pendingPostHoldSettings/);
-    expect(DUBBUS_SRC).toMatch(/pending\.returnGain/);
+    expect(DUBBUS_SRC).toMatch(/setSettings\(pending\)/);
+  });
+});
+
+describe('DubBus gain-staging regression guards', () => {
+  it('compensates the external feedback loop bass shelf before feeding back into input', () => {
+    expect(DUBBUS_SRC).toMatch(/extFeedbackShelfComp/);
+    expect(DUBBUS_SRC).toMatch(/extFeedbackEq.*connect.*extFeedbackShelfComp/s);
+    expect(DUBBUS_SRC).toMatch(/extFeedbackShelfComp.*connect.*extFeedbackGain/s);
+  });
+
+  it('soft-clips the summed dub input before the HPF chain', () => {
+    expect(DUBBUS_SRC).toMatch(/inputClip/);
+    expect(DUBBUS_SRC).toMatch(/_enhancer\.connect\(this\.input,\s*this\.inputClip\)/);
+    expect(DUBBUS_SRC).toMatch(/inputClip\.connect\(this\.hpf\)/);
+  });
+
+  it('caps combined master bass shelf gain instead of stacking unlimited punch on top of shelf gain', () => {
+    expect(DUBBUS_SRC).toMatch(/safeMasterShelfGain/);
+    expect(DUBBUS_SRC).toMatch(/Math\.max\(-12,\s*Math\.min\(9,\s*safeBassGain \+ safeMasterPunch\)\)/);
   });
 });
 

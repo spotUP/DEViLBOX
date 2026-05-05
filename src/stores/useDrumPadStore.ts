@@ -144,8 +144,14 @@ const DEFAULT_PREFERENCES: DrumPadState['preferences'] = {
  * Computed from the presets so it self-maintains: adding a new field to a
  * preset's overrides automatically adds it to this set.
  */
+const NON_CHARACTER_DUB_FIELDS = new Set<keyof DubBusSettings>([
+  'returnGain',
+]);
+
 const CHARACTER_FIELDS: ReadonlySet<string> = new Set(
-  Object.values(DUB_CHARACTER_PRESETS).flatMap(p => Object.keys(p.overrides)),
+  Object.values(DUB_CHARACTER_PRESETS)
+    .flatMap(p => Object.keys(p.overrides))
+    .filter((key): key is keyof DubBusSettings => !NON_CHARACTER_DUB_FIELDS.has(key as keyof DubBusSettings)),
 );
 
 // Bump this when factory presets or stored schema changes — discards stale data

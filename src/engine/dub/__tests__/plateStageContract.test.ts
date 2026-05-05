@@ -4,10 +4,9 @@
  *
  * The plate-stage is a lazily-instantiated WASM post-stage: when
  * `plateStage='off'` nothing is created (zero WASM overhead), and
- * swapping between types tears down the previous plate before
- * building the next. Violating either invariant leaks WASM
- * instances — invisible in normal use, measurable in a 2-hour gig as
- * rising memory + audio crackle.
+ * swapping between types crossfades to the new plate before the old
+ * one is retired. Violating either invariant leaks WASM instances or
+ * causes an audible cut on engine switches.
  *
  * happy-dom can't load a WASM worklet to assert this at runtime, so
  * we grep the DubBus source for the key invariants. Same pattern as
@@ -43,19 +42,26 @@ describe('DubBus plate-stage — wiring invariants', () => {
     expect(teardownBody, 'should null the send ref').toMatch(/this\.plateSend = null/);
   });
 
-  it('setPlateStage always tears down before building a new plate', () => {
+  it('setPlateStage builds the new plate before retiring the old one', () => {
     const setterIdx = SOURCE.indexOf('setPlateStage(stage:');
     expect(setterIdx).toBeGreaterThan(-1);
-    const setterBody = SOURCE.slice(setterIdx, setterIdx + 800);
-    // _teardownPlateStage must appear BEFORE any subsequent
-    // _installPlateStage in the method body. Order matters: install
-    // first would allocate a second WASM worklet before the old one
-    // is freed, doubling the peak footprint on swap.
-    const teardownIdxIn = setterBody.indexOf('_teardownPlateStage');
-    const installIdxIn = setterBody.indexOf('_installPlateStage');
-    expect(teardownIdxIn, 'expected _teardownPlateStage call in setPlateStage').toBeGreaterThan(-1);
-    expect(installIdxIn, 'expected _installPlateStage call in setPlateStage').toBeGreaterThan(-1);
-    expect(teardownIdxIn).toBeLessThan(installIdxIn);
+    const setterBody = SOURCE.slice(setterIdx, setterIdx + 2200);
+    const swapBranchMatch = setterBody.match(/const nextPlateNodes = this\._createPlateStageNodes\(stage, 0\);[\s\S]*?_schedulePlateStageTeardown\(currentPlate, currentSend, fadeSec\);/);
+    expect(swapBranchMatch, 'expected swap branch to create new plate and retire old one').not.toBeNull();
+    const swapBranch = swapBranchMatch![0];
+    const createIdx = swapBranch.indexOf('_createPlateStageNodes(stage, 0)');
+    const retireIdx = swapBranch.indexOf('_schedulePlateStageTeardown(currentPlate, currentSend, fadeSec)');
+    expect(createIdx, 'expected new plate creation in setPlateStage').toBeGreaterThan(-1);
+    expect(retireIdx, 'expected delayed teardown in setPlateStage').toBeGreaterThan(-1);
+    expect(createIdx).toBeLessThan(retireIdx);
+  });
+
+  it('switching plateStage off ramps the existing send down before teardown', () => {
+    const setterIdx = SOURCE.indexOf('setPlateStage(stage:');
+    expect(setterIdx).toBeGreaterThan(-1);
+    const setterBody = SOURCE.slice(setterIdx, setterIdx + 2200);
+    expect(setterBody).toMatch(/if \(stage === 'off'\)[\s\S]*linearRampToValueAtTime\(0, now \+ fadeSec\)/);
+    expect(setterBody).toContain('_schedulePlateStageTeardown(currentPlate, currentSend, fadeSec)');
   });
 
   it('dispose() tears down the plate-stage alongside spring + echo', () => {

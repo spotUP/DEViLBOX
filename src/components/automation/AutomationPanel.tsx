@@ -14,8 +14,16 @@ import { useUIStore } from '@stores/useUIStore';
 import { getParamsForFormat, groupParams, type AutomationFormat } from '../../engine/automation/AutomationParams';
 
 export const AutomationPanel: React.FC = () => {
-  const { patterns, currentPatternIndex } = useTrackerStore();
-  const { getAutomation, setAutomation, setActiveParameter, setShowLane, recordMode, setRecordMode, copyCurve, pasteCurve } = useAutomationStore();
+  const patterns = useTrackerStore((s) => s.patterns);
+  const currentPatternIndex = useTrackerStore((s) => s.currentPatternIndex);
+  const getAutomation = useAutomationStore((s) => s.getAutomation);
+  const setAutomation = useAutomationStore((s) => s.setAutomation);
+  const setActiveParameter = useAutomationStore((s) => s.setActiveParameter);
+  const setShowLane = useAutomationStore((s) => s.setShowLane);
+  const recordMode = useAutomationStore((s) => s.recordMode);
+  const setRecordMode = useAutomationStore((s) => s.setRecordMode);
+  const copyCurve = useAutomationStore((s) => s.copyCurve);
+  const pasteCurve = useAutomationStore((s) => s.pasteCurve);
   const [selectedParameter, setSelectedParameter] = useState<string | null>(null);
   const [selectedChannel, setSelectedChannel] = useState<number>(0);
 
@@ -217,7 +225,11 @@ export const AutomationPanel: React.FC = () => {
 /** Register params section — chip register params selectable as automation targets */
 const RegisterParamsSection: React.FC<{ channelIndex: number; patternId: string; numChannels: number }> = ({ channelIndex, patternId, numChannels }) => {
   const editorMode = useFormatStore(s => s.editorMode);
-  const { setActiveParameter, setShowLane, addCurve, addPoint, getCurvesForPattern } = useAutomationStore();
+  const setActiveParameter = useAutomationStore((s) => s.setActiveParameter);
+  const setShowLane = useAutomationStore((s) => s.setShowLane);
+  const addCurve = useAutomationStore((s) => s.addCurve);
+  const addPoint = useAutomationStore((s) => s.addPoint);
+  const getCurvesForPattern = useAutomationStore((s) => s.getCurvesForPattern);
   const furnaceNative = useFormatStore(s => s.furnaceNative);
 
   // Selected register channel (defaults to the panel's main channel)

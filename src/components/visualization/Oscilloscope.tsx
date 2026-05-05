@@ -20,7 +20,8 @@ export const Oscilloscope: React.FC<OscilloscopeProps> = ({
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animationRef = useRef<number>(0);
-  const { analyserNode, fftNode } = useAudioStore();
+  const analyserNode = useAudioStore((s) => s.analyserNode);
+  const fftNode = useAudioStore((s) => s.fftNode);
   const [measuredWidth, setMeasuredWidth] = useState(800);
 
   // Derived actual width: use prop when numeric, measured when 'auto'

@@ -73,7 +73,6 @@ export function PatternEditorEmbed() {
     }))
   );
 
-  const currentPatternIndex = useTrackerStore((s) => s.currentPatternIndex);
   const currentPositionIndex = useTrackerStore((s) => s.currentPositionIndex);
 
   // Pattern playback engine (same as App-level mount)

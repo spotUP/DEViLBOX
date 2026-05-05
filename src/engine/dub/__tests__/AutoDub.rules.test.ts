@@ -7,14 +7,23 @@
  */
 
 import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'fs';
+import { fileURLToPath } from 'url';
+import { dirname, resolve } from 'path';
 import {
   chooseMove, detectTransients, hasTransientForRole,
-  channelHasNoteInWindow, computeDensityByRole,
+  channelHasNoteInWindow, computeDensityByRole, shouldSuppressAutoDubSparseDrop,
+  shouldSuppressAutoDubStartupMove,
   type AutoDubTickCtx,
 } from '../AutoDub';
 import { getPersona } from '../AutoDubPersonas';
 import type { ChannelRole } from '@/bridge/analysis/MusicAnalysis';
 import type { Pattern, ChannelData, TrackerCell } from '@/types/tracker';
+
+const AUTODUB_SRC = readFileSync(
+  resolve(dirname(fileURLToPath(import.meta.url)), '../AutoDub.ts'),
+  'utf8',
+);
 
 /** Deterministic linear-congruential RNG. xorshift would be nicer but this
  *  is plenty for "roll the same sequence twice in a test." */
@@ -58,6 +67,35 @@ function baseCtx(overrides: Partial<AutoDubTickCtx> = {}): AutoDubTickCtx {
 }
 
 describe('AutoDub chooseMove', () => {
+  it('suppresses full-mix drop moves on 4-channel songs', () => {
+    expect(shouldSuppressAutoDubSparseDrop('masterDrop', 4)).toBe(true);
+    expect(shouldSuppressAutoDubSparseDrop('versionDrop', 4)).toBe(true);
+    expect(shouldSuppressAutoDubSparseDrop('tapeStop', 4)).toBe(true);
+    expect(shouldSuppressAutoDubSparseDrop('filterDrop', 4)).toBe(false);
+    expect(shouldSuppressAutoDubSparseDrop('masterDrop', 5)).toBe(false);
+  });
+
+  it('suppresses startup-disruptive moves on AutoDub bar 0', () => {
+    expect(shouldSuppressAutoDubStartupMove('masterDrop', 0)).toBe(true);
+    expect(shouldSuppressAutoDubStartupMove('ghostReverb', 0)).toBe(true);
+    expect(shouldSuppressAutoDubStartupMove('versionDrop', 0)).toBe(true);
+    expect(shouldSuppressAutoDubStartupMove('tapeStop', 0)).toBe(true);
+    expect(shouldSuppressAutoDubStartupMove('subHarmonic', 0)).toBe(false);
+    expect(shouldSuppressAutoDubStartupMove('masterDrop', 1)).toBe(false);
+    expect(shouldSuppressAutoDubStartupMove('versionDrop', 1)).toBe(false);
+  });
+
+  it('channel-count fallback prefers active engine/tracker channels before the mixer default 16', () => {
+    expect(AUTODUB_SRC).toMatch(/osc\.numChannels > 0/);
+    expect(AUTODUB_SRC).toMatch(/pattern\?\.channels\?\.length/);
+    expect(AUTODUB_SRC).toMatch(/activeSends/);
+  });
+
+  it('reuses a single improv ramp timer when stopping repeatedly', () => {
+    expect(AUTODUB_SRC).toMatch(/let _improvRampTimer/);
+    expect(AUTODUB_SRC).toMatch(/clearInterval\(_improvRampTimer\)/);
+  });
+
   it('returns null when intensity is 0 (per-tick roll always fails)', () => {
     const rng = seededRng(1);
     const result = chooseMove(baseCtx({ intensity: 0 }), rng);
@@ -261,6 +299,66 @@ describe('AutoDub chooseMove', () => {
         return;
       }
     }
+  });
+
+  it('does not auto-fire masterDrop, versionDrop, or tapeStop on sparse 4-channel songs', () => {
+    const rng = seededRng(4242);
+    const forbidden = new Set(['masterDrop', 'versionDrop', 'tapeStop']);
+    const roles: ChannelRole[] = ['percussion', 'bass', 'lead', 'chord'];
+    for (let i = 0; i < 3000; i++) {
+      const bar = i % 32;
+      const barPos = (i % 32) / 32;
+      const result = chooseMove(baseCtx({
+        bar,
+        barPos,
+        isNewBar: (i % 4) === 0,
+        intensity: 1,
+        channelCount: 4,
+        roles,
+      }), rng);
+      if (result) expect(forbidden.has(result.moveId)).toBe(false);
+    }
+  });
+
+  it('does not auto-fire masterDrop or ghostReverb on the first autonomous bar', () => {
+    const rng = seededRng(5150);
+    const seen = new Set<string>();
+    for (let i = 0; i < 4000; i++) {
+      const result = chooseMove(baseCtx({
+        bar: 0,
+        barPos: 0.0,
+        isNewBar: true,
+        intensity: 1,
+        phraseIntensityMult: 1.2,
+        lastGlobalFireBar: -99,
+      }), rng);
+      if (result && (result.moveId === 'masterDrop' || result.moveId === 'ghostReverb')) {
+        seen.add(result.moveId);
+      }
+    }
+    expect(seen).toEqual(new Set());
+  });
+
+  it('still allows full-mix drop moves on larger arrangements', () => {
+    const rng = seededRng(5151);
+    const seen = new Set<string>();
+    const roles: ChannelRole[] = ['percussion', 'bass', 'lead', 'chord', 'pad', 'arpeggio'];
+    for (let i = 0; i < 6000; i++) {
+      const bar = i % 32;
+      const barPos = (i % 32) / 32;
+      const result = chooseMove(baseCtx({
+        bar,
+        barPos,
+        isNewBar: (i % 4) === 0,
+        intensity: 1,
+        channelCount: roles.length,
+        roles,
+      }), rng);
+      if (result && (result.moveId === 'masterDrop' || result.moveId === 'versionDrop' || result.moveId === 'tapeStop')) {
+        seen.add(result.moveId);
+      }
+    }
+    expect(seen.size).toBeGreaterThan(0);
   });
 
   // ─── Phase 2: role-aware targeting ────────────────────────────────────────
@@ -669,18 +767,25 @@ describe('chooseMove — density bias', () => {
       Array.from({ length: 16 }, (_, i) => [i, 24]),
     ));
     const sparseDrums = makeChannel('d', 64, { 0: 24, 8: 24 });
-    const densePattern = makePattern([denseDrums]);
-    const sparsePattern = makePattern([sparseDrums]);
+    const bass = makeChannel('b', 64, {});
+    const lead = makeChannel('l', 64, {});
+    const chord = makeChannel('c', 64, {});
+    const pad = makeChannel('p', 64, {});
+    const densePattern = makePattern([denseDrums, bass, lead, chord, pad]);
+    const sparsePattern = makePattern([sparseDrums, bass, lead, chord, pad]);
+    const roles: ChannelRole[] = ['percussion', 'bass', 'lead', 'chord', 'pad'];
     function countFires(pattern: Pattern): number {
       const rng = seededRng(2222);
       let n = 0;
       for (let i = 0; i < 500; i++) {
-        // bar 8 of 8 → tapeStop eligible; Jammy's signature move.
-        const density = computeDensityByRole(pattern, 0, ['percussion'], 16);
+        // bar 8 of 8 → tapeStop eligible; Jammy's signature move. Use a
+        // 5-channel arrangement so sparse-song drop suppression does not
+        // mask the persona's negative density bias.
+        const density = computeDensityByRole(pattern, 0, roles, 16);
         const result = chooseMove(baseCtx({
           bar: 7, barPos: 0.0, isNewBar: true, intensity: 0.8,
           persona: getPersona('jammy'),
-          channelCount: 1, roles: ['percussion'],
+          channelCount: roles.length, roles,
           currentPattern: pattern, currentRow: 0,
           densityByRole: density,
         }), rng);

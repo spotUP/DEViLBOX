@@ -246,4 +246,12 @@ describe('DubBus SID mode contract', () => {
     expect(source).toContain('voiceOutputs[i].connect(tapGain)');
     expect(source).toContain('tapGain.connect(this.input)');
   });
+
+  it('unregisterSidDubSend resets SID mode so reloads cannot leave silent zombie state', async () => {
+    const fs = await import('fs');
+    const source = fs.readFileSync('src/engine/dub/DubBus.ts', 'utf-8');
+
+    expect(source).toContain('unregisterSidDubSend(): void {');
+    expect(source).toContain('this._sidMode = false;');
+  });
 });

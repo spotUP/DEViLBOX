@@ -105,7 +105,8 @@ export const DrumPadManager: React.FC<DrumPadManagerProps> = ({ onClose }) => {
 
   // DJ presets — action-only select (no persistent selection)
 
-  const { loadProgram, loadSampleToPad } = useDrumPadStore();
+  const loadProgram = useDrumPadStore((s) => s.loadProgram);
+  const loadSampleToPad = useDrumPadStore((s) => s.loadSampleToPad);
 
 
 
