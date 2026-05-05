@@ -204,16 +204,14 @@ const DEFAULT_CC_MAPPINGS: CCMapping[] = [
   { ccNumber: 10, parameter: 'envMod', min: 0, max: 100, curve: 'linear' },
   { ccNumber: 75, parameter: 'decay', min: 30, max: 3000, curve: 'logarithmic' },
 
-  // Maschine MK2 Controller Editor knobs (CC 14-21, Page 1, ch 1)
-  // Knob7/8 use CC 20-21 which take priority over the dub move defaults for those CCs
+  // Maschine MK2 Controller Editor knobs (CC 14-19, Page 1, ch 1)
+  // CC 20-21 are reserved for dub moves below
   { ccNumber: 14, parameter: 'cutoff',    min: 0, max: 1, curve: 'linear' },
   { ccNumber: 15, parameter: 'resonance', min: 0, max: 1, curve: 'linear' },
   { ccNumber: 16, parameter: 'envMod',    min: 0, max: 1, curve: 'linear' },
   { ccNumber: 17, parameter: 'decay',     min: 0, max: 1, curve: 'linear' },
   { ccNumber: 18, parameter: 'accent',    min: 0, max: 1, curve: 'linear' },
   { ccNumber: 19, parameter: 'overdrive', min: 0, max: 1, curve: 'linear' },
-  { ccNumber: 20, parameter: 'slideTime', min: 0, max: 1, curve: 'linear' },
-  { ccNumber: 21, parameter: 'volume',    min: 0, max: 1, curve: 'linear' },
 
   // Maschine MK2 HID bridge encoders (base CC 110, indices 0-14)
   // Mapped to TB303 parameters 1:1 across the 8 main knobs
@@ -724,9 +722,11 @@ export const useMIDIStore = create<MIDIStore>()(
                   }
                 }
                 
-                // Auto-connect to first non-Maschine device (Maschine is owned by HID bridge)
+                // Auto-connect: prefer Maschine MK2 (virtual or direct), then any other device
                 if (!newState.selectedInputId && newState.inputDevices.length > 0) {
-                  const preferred = newState.inputDevices.find(d => !d.name?.toLowerCase().includes('maschine'))
+                  const preferred = newState.inputDevices.find(d => d.name?.toLowerCase().includes('maschine mk2 virtual'))
+                    ?? newState.inputDevices.find(d => d.name?.toLowerCase().includes('maschine controller mk2'))
+                    ?? newState.inputDevices.find(d => !d.name?.toLowerCase().includes('maschine'))
                     ?? newState.inputDevices[0];
                   console.log('[useMIDIStore] Auto-connecting to first MIDI input:', preferred.name);
                   get().selectInput(preferred.id);
@@ -742,10 +742,12 @@ export const useMIDIStore = create<MIDIStore>()(
             // Initial device refresh
             get().refreshDevices();
 
-            // Auto-connect to first non-Maschine device (Maschine is owned by HID bridge)
+            // Auto-connect: prefer Maschine MK2 (virtual or direct), then any other device
             const currentState = get();
             if (!currentState.selectedInputId && currentState.inputDevices.length > 0) {
-              const preferred = currentState.inputDevices.find(d => !d.name?.toLowerCase().includes('maschine'))
+              const preferred = currentState.inputDevices.find(d => d.name?.toLowerCase().includes('maschine mk2 virtual'))
+                ?? currentState.inputDevices.find(d => d.name?.toLowerCase().includes('maschine controller mk2'))
+                ?? currentState.inputDevices.find(d => !d.name?.toLowerCase().includes('maschine'))
                 ?? currentState.inputDevices[0];
               console.log('[useMIDIStore] Auto-connecting to first MIDI input:', preferred.name);
               await get().selectInput(preferred.id);
