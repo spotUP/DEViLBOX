@@ -144,19 +144,30 @@ export const DeckTrackOverview: React.FC<DeckTrackOverviewProps> = ({ deckId }) 
   }, [deckId]);
 
   /** Update only the visual position marker (no audio seek — prevents noise during drag) */
+  const _pendingPreviewRef = useRef<number | null>(null);
+  const _previewRafRef = useRef(0);
   const previewPosition = useCallback((fraction: number) => {
     const f = Math.max(0, Math.min(1, fraction));
-    try {
-      const state = useDJStore.getState().decks[deckId];
-      if (state.playbackMode === 'audio') {
-        const seekSec = f * (state.durationMs / 1000);
-        useDJStore.getState().setDeckState(deckId, { audioPosition: seekSec, elapsedMs: seekSec * 1000 });
-      } else {
-        const total = Math.max(state.totalPositions, 1);
-        const targetPos = Math.min(Math.floor(f * total), total - 1);
-        useDJStore.getState().setDeckPosition(deckId, targetPos, 0);
-      }
-    } catch { /* Engine not ready */ }
+    _pendingPreviewRef.current = f;
+    if (!_previewRafRef.current) {
+      _previewRafRef.current = requestAnimationFrame(() => {
+        _previewRafRef.current = 0;
+        const pf = _pendingPreviewRef.current;
+        if (pf === null) return;
+        _pendingPreviewRef.current = null;
+        try {
+          const state = useDJStore.getState().decks[deckId];
+          if (state.playbackMode === 'audio') {
+            const seekSec = pf * (state.durationMs / 1000);
+            useDJStore.getState().setDeckState(deckId, { audioPosition: seekSec, elapsedMs: seekSec * 1000 });
+          } else {
+            const total = Math.max(state.totalPositions, 1);
+            const targetPos = Math.min(Math.floor(pf * total), total - 1);
+            useDJStore.getState().setDeckPosition(deckId, targetPos, 0);
+          }
+        } catch { /* Engine not ready */ }
+      });
+    }
   }, [deckId]);
 
   const isDraggingRef = useRef(false);
