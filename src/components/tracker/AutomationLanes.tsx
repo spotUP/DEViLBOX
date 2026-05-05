@@ -96,7 +96,7 @@ function useParameterColor(parameter: string): string {
 
 const LANE_WIDTH = 48;
 
-export const AutomationLanes: React.FC<AutomationLanesProps> = ({
+export const AutomationLanes: React.FC<AutomationLanesProps> = React.memo(({
   patternId,
   patternLength,
   rowHeight,
@@ -763,4 +763,4 @@ export const AutomationLanes: React.FC<AutomationLanesProps> = ({
       )}
     </div>
   );
-};
+});

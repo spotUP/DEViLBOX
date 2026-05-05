@@ -148,9 +148,12 @@ export class V2SpeechSynth implements DevilboxSynth {
       (config.formantShift !== undefined && config.formantShift !== this._config.formantShift) ||
       (config.singMode !== undefined && config.singMode !== this._config.singMode);
 
-    // Track vowel sequence changes
-    const seqChanged = config.vowelSequence !== undefined &&
-      JSON.stringify(config.vowelSequence) !== JSON.stringify(this._config.vowelSequence);
+    // Track vowel sequence changes (shallow array compare — avoids JSON.stringify)
+    const newSeq = config.vowelSequence;
+    const oldSeq = this._config.vowelSequence;
+    const seqChanged = newSeq !== undefined && (
+      !oldSeq || newSeq.length !== oldSeq.length || newSeq.some((v, i) => v !== oldSeq[i])
+    );
 
     this._config = { ...this._config, ...config };
 
