@@ -10,6 +10,8 @@ import fs from 'fs';
 import path from 'path';
 import db from '../db/database';
 
+const MODLAND_INDEX_SCHEMA_VERSION = '2';
+
 // ── Format whitelist (modland folder name → file extension) ─────────────────
 
 const PLAYABLE_FORMATS: Record<string, string> = {
@@ -231,6 +233,8 @@ const PLAYABLE_FORMATS: Record<string, string> = {
 
 let indexingStatus: 'ready' | 'indexing' | 'not_initialized' = 'not_initialized';
 let updateTimer: ReturnType<typeof setInterval> | null = null;
+let isSupportedModlandFilename: ((filename: string) => boolean) | null = null;
+let modlandFilenameMatcherPromise: Promise<void> | null = null;
 
 // Cached format counts (refreshed on index update)
 let cachedFormats: { format: string; count: number }[] | null = null;
@@ -261,13 +265,32 @@ interface ParsedEntry {
   extension: string;
 }
 
+async function ensureModlandFilenameMatcher(): Promise<void> {
+  if (isSupportedModlandFilename) return;
+  if (!modlandFilenameMatcherPromise) {
+    modlandFilenameMatcherPromise = import('../../../src/lib/import/FormatRegistry.ts')
+      .then((mod) => {
+        isSupportedModlandFilename = mod.isSupportedFormat;
+      })
+      .catch((err) => {
+        modlandFilenameMatcherPromise = null;
+        throw err;
+      });
+  }
+  await modlandFilenameMatcherPromise;
+}
+
 function parseAllmodsLine(line: string): ParsedEntry | null {
   const match = line.match(LINE_REGEX);
   if (!match) return null;
 
   const [, format, author, filename] = match;
-  const ext = PLAYABLE_FORMATS[format];
-  if (!ext) return null; // Not a playable format
+  const lowerFilename = filename.toLowerCase();
+  const mappedExt = PLAYABLE_FORMATS[format];
+  if (!mappedExt && !isSupportedModlandFilename?.(lowerFilename)) return null;
+
+  const ext = mappedExt ?? path.extname(lowerFilename).slice(1);
+  if (!ext) return null;
 
   return {
     format,
@@ -456,8 +479,10 @@ export async function forceReindex(): Promise<number> {
     const zipBuffer = await downloadAllmods();
     fs.writeFileSync(ALLMODS_PATH, zipBuffer);
     const text = extractAllmodsText(zipBuffer);
+    await ensureModlandFilenameMatcher();
     const count = indexEntries(text);
     setMeta('last_index_update', Date.now().toString());
+    setMeta('index_schema_version', MODLAND_INDEX_SCHEMA_VERSION);
     invalidateFormatsCache();
     indexingStatus = 'ready';
     console.log(`[Modland] Force re-index complete: ${count} files indexed`);
@@ -475,10 +500,11 @@ export async function initModlandIndex(): Promise<void> {
   ensureCacheDirs();
 
   const lastUpdate = getMeta('last_index_update');
+  const schemaVersion = getMeta('index_schema_version');
   if (lastUpdate) {
     const elapsed = Date.now() - parseInt(lastUpdate, 10);
     const hours = elapsed / (1000 * 60 * 60);
-    if (hours < 24) {
+    if (hours < 24 && schemaVersion === MODLAND_INDEX_SCHEMA_VERSION) {
       const { totalFiles } = getIndexStatus();
       if (totalFiles > 0) {
         console.log(`[Modland] Index is fresh (${hours.toFixed(1)}h old, ${totalFiles} files). Skipping update.`);
@@ -496,6 +522,7 @@ async function runIndexUpdate(): Promise<void> {
   console.log('[Modland] Starting index update...');
 
   try {
+    await ensureModlandFilenameMatcher();
     const zipBuffer = await downloadAllmods();
 
     // Save zip for potential debugging
@@ -505,6 +532,7 @@ async function runIndexUpdate(): Promise<void> {
     const count = indexEntries(text);
 
     setMeta('last_index_update', Date.now().toString());
+    setMeta('index_schema_version', MODLAND_INDEX_SCHEMA_VERSION);
     invalidateFormatsCache();
     indexingStatus = 'ready';
 

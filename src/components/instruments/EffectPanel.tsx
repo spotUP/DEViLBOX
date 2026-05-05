@@ -312,7 +312,7 @@ const EFFECT_PARAMETERS: Record<string, EffectParameter[]> = {
 };
 
 export const EffectPanel: React.FC<EffectPanelProps> = ({ instrumentId, effect, onClose }) => {
-  const { updateEffect } = useInstrumentStore();
+  const updateEffect = useInstrumentStore((s) => s.updateEffect);
 
   const parameters = EFFECT_PARAMETERS[effect.type] || [];
 

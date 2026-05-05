@@ -6,7 +6,7 @@
  */
 
 import React, { useRef, useEffect, useCallback, useState, useMemo } from 'react';
-import { useTrackerStore, useCursorStore, useTransportStore, useThemeStore, useInstrumentStore, useEditorStore, useAutomationStore } from '@stores';
+import { useTrackerStore, useCursorStore, useTransportStore, useThemeStore, useEditorStore, useAutomationStore } from '@stores';
 import { useMixerStore } from '@stores/useMixerStore';
 import { useChannelTypeStore } from '@stores/useChannelTypeStore';
 import { useWasmPositionStore } from '@stores/useWasmPositionStore';
@@ -275,9 +275,6 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
   const activeChannelIndex = useCursorStore((s) => s.cursor.channelIndex);
   const mobileChannelIndex = cursorRef.current.channelIndex;
 
-  const { instruments } = useInstrumentStore(useShallow((state) => ({
-    instruments: state.instruments
-  })));
 
   const trackerVisualBg = useSettingsStore(s => s.trackerVisualBg);
   const channelColorBlend = useSettingsStore(s => s.channelColorBlend);
@@ -422,7 +419,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
       channelWidths: widths,
       totalChannelsWidth: currentX - LNW
     };
-  }, [pattern, instruments, columnVisibility, isFormatMode, formatColumns, formatChannels, mobileCanvas, CW, LNW, showAutomationLanes, channelLaneCounts, globalLaneVisible]);
+  }, [pattern, columnVisibility, isFormatMode, formatColumns, formatChannels, mobileCanvas, CW, LNW, showAutomationLanes, channelLaneCounts, globalLaneVisible]);
 
   // Center channels horizontally when in fullscreen and channels don't fill the viewport
   const editorFullscreen = useUIStore(s => s.editorFullscreen);

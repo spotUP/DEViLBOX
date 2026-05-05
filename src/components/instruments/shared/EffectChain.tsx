@@ -184,7 +184,10 @@ export const EffectChain: React.FC<EffectChainProps> = ({
   onEditEffect,
 }) => {
   const [showAddMenu, setShowAddMenu] = useState(false);
-  const { updateEffect, removeEffect, addEffect, reorderEffects } = useInstrumentStore();
+  const updateEffect = useInstrumentStore((s) => s.updateEffect);
+  const removeEffect = useInstrumentStore((s) => s.removeEffect);
+  const addEffect = useInstrumentStore((s) => s.addEffect);
+  const reorderEffects = useInstrumentStore((s) => s.reorderEffects);
 
   const sensors = useSensors(
     useSensor(PointerSensor),

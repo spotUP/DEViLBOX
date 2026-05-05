@@ -5,7 +5,7 @@
 #   • API server    (Express + SC compile)   → http://localhost:3011  [logs/backend.log]
 #   • Collab server (WebSocket signaling)    → ws://localhost:4002    [logs/collab.log]
 #   • MCP relay     (WS bridge for AI/MCP)  → ws://localhost:4003    [started by API server]
-#   • Frontend      (Vite)                  → http://localhost:5173  [stdout — always visible]
+#   • Frontend      (Vite)                  → http://localhost:5174  [stdout — always visible]
 #
 # Vite runs in the foreground so TypeScript errors and crashes are immediately visible.
 # Ctrl-C kills Vite and the EXIT trap shuts down the two background servers.
@@ -18,11 +18,12 @@ set -euo pipefail
 # Raise file descriptor limit — macOS default (256) is too low for Vite's file watchers
 ulimit -n 65536 2>/dev/null || true
 
-FRONTEND_PORT=5173
+FRONTEND_PORT=5174
 BACKEND_PORT=3011
 COLLAB_PORT=4002
 MCP_PORT=4003
 FORMAT_PORT=4444
+MASCHINE_PORT=4005
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # ── Colours ────────────────────────────────────────────────────────────────────
@@ -53,11 +54,12 @@ kill_port() {
   sleep 0.3
 }
 
-log "Clearing ports $BACKEND_PORT, $COLLAB_PORT, $MCP_PORT, $FORMAT_PORT and $FRONTEND_PORT..."
+log "Clearing ports $BACKEND_PORT, $COLLAB_PORT, $MCP_PORT, $FORMAT_PORT, $MASCHINE_PORT and $FRONTEND_PORT..."
 kill_port "$BACKEND_PORT"
 kill_port "$COLLAB_PORT"
 kill_port "$MCP_PORT"
 kill_port "$FORMAT_PORT"
+kill_port "$MASCHINE_PORT"
 kill_port "$FRONTEND_PORT"
 
 # Kill any orphaned tsx processes whose cwd is inside THIS repo — catches
@@ -80,6 +82,7 @@ kill_project_tsx_orphans
 BACKEND_PID=""
 COLLAB_PID=""
 FORMAT_PID=""
+MASCHINE_PID=""
 
 cleanup() {
   echo ""
@@ -87,12 +90,14 @@ cleanup() {
   # Kill entire process groups (not just the wrapper PIDs) to catch tsx watch children
   [ -n "$BACKEND_PID" ] && kill -- -"$BACKEND_PID" 2>/dev/null || kill "$BACKEND_PID" 2>/dev/null || true
   [ -n "$COLLAB_PID" ]  && kill -- -"$COLLAB_PID"  2>/dev/null || kill "$COLLAB_PID"  2>/dev/null || true
-  [ -n "$FORMAT_PID" ]  && kill -- -"$FORMAT_PID"  2>/dev/null || kill "$FORMAT_PID"  2>/dev/null || true
+  [ -n "$FORMAT_PID" ]   && kill -- -"$FORMAT_PID"   2>/dev/null || kill "$FORMAT_PID"   2>/dev/null || true
+  [ -n "$MASCHINE_PID" ] && kill -- -"$MASCHINE_PID" 2>/dev/null || kill "$MASCHINE_PID" 2>/dev/null || true
   # Also kill any orphaned tsx/node processes on our ports
   kill_port "$BACKEND_PORT"
   kill_port "$COLLAB_PORT"
   kill_port "$MCP_PORT"
   kill_port "$FORMAT_PORT"
+  kill_port "$MASCHINE_PORT"
   kill_port "$FRONTEND_PORT"
   ok "Done."
 }
@@ -145,6 +150,8 @@ mkdir -p logs
 : > logs/backend.log
 : > logs/collab.log
 : > logs/format-server.log
+
+# ── Maschine HID bridge — start FIRST before browser claims the device ────────
 
 # ── API server (Express) ───────────────────────────────────────────────────────
 log "Starting API server on port $BACKEND_PORT..."
@@ -201,15 +208,17 @@ for i in $(seq 1 20); do
   sleep 0.5
 done
 
+
 # ── Status banner (backend up, Vite starting below) ───────────────────────────
 echo ""
 echo -e "${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}"
 echo -e "${GREEN}  DEViLBOX back-end running${RESET}"
-echo -e "  API    → ${CYAN}http://localhost:$BACKEND_PORT${RESET}   (logs/backend.log)"
-echo -e "  Collab → ${CYAN}ws://localhost:$COLLAB_PORT${RESET}    (logs/collab.log)"
-echo -e "  MCP    → ${CYAN}ws://localhost:$MCP_PORT${RESET}    (AI tools relay)"
-echo -e "  Format → ${CYAN}http://localhost:$FORMAT_PORT${RESET}  (logs/format-server.log)"
-echo -e "  Vite   → ${CYAN}http://localhost:$FRONTEND_PORT${RESET}  (output below)"
+echo -e "  API     → ${CYAN}http://localhost:$BACKEND_PORT${RESET}   (logs/backend.log)"
+echo -e "  Collab  → ${CYAN}ws://localhost:$COLLAB_PORT${RESET}    (logs/collab.log)"
+echo -e "  MCP     → ${CYAN}ws://localhost:$MCP_PORT${RESET}    (AI tools relay)"
+echo -e "  Format  → ${CYAN}http://localhost:$FORMAT_PORT${RESET}  (logs/format-server.log)"
+echo -e "  Maschine→ ${CYAN}ws://localhost:$MASCHINE_PORT${RESET}   (logs/maschine-bridge.log)"
+echo -e "  Vite    → ${CYAN}http://localhost:$FRONTEND_PORT${RESET}  (output below)"
 echo -e "${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}"
 echo -e "  ${YELLOW}Ctrl-C to stop all servers${RESET}"
 echo ""
@@ -220,7 +229,7 @@ echo ""
 # Give Node.js 4GB heap to prevent OOM kills during HMR with large codebase.
 # Auto-restart on crash/OOM so the gig never stops — only Ctrl-C (SIGINT) exits.
 while true; do
-  NODE_OPTIONS="--max-old-space-size=4096" ./node_modules/.bin/vite
+  NODE_OPTIONS="--max-old-space-size=4096" ./node_modules/.bin/vite --port "$FRONTEND_PORT" --strictPort
   EXIT_CODE=$?
   # Ctrl-C sends SIGINT (130) — respect the user's intent to stop
   if [ $EXIT_CODE -eq 130 ] || [ $EXIT_CODE -eq 0 ]; then

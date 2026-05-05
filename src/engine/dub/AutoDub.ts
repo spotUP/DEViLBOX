@@ -37,6 +37,7 @@ import { buildSongRoleTimeline, getRolesAtPosition, type SongRoleTimeline } from
 import { cedChannelAccumulator } from '@/bridge/analysis/CedChannelAccumulator';
 import { sidVoiceClassifier } from '@/bridge/analysis/SidVoiceClassifier';
 import { getActiveC64SidEngine } from '@engine/replayer/NativeEngineRouting';
+import { AudioDataBus } from '@/engine/vj/AudioDataBus';
 import type { Pattern } from '@/types/tracker';
 import type { InstrumentConfig } from '@/types/instrument/defaults';
 import { useTrackerAnalysisStore } from '@/stores/useTrackerAnalysisStore';
@@ -178,12 +179,36 @@ const WET_FIRES_PER_BAR_CAP = 1;
 const WET_DECAY_EXTRA_MS = 2000;
 /** Minimum wet block duration for oneshot (non-hold) wet fires (ms). */
 const WET_ONESHOT_BLOCK_MS = 3500;
+/** Sparse tracker songs (classic 4-channel modules especially) do not tolerate
+ *  autonomous full-mix drops well — a "version drop" or "master drop" wipes
+ *  most of the arrangement and feels random rather than musical. Keep these
+ *  dramatic gestures manual-only on small arrangements. */
+export const AUTO_DUB_SPARSE_DROP_CHANNEL_LIMIT = 4;
 /** Rolling peak window for transient detection — last N ticks (~N * 250ms). */
 const TRANSIENT_WINDOW = 8;
 /** A channel's peak must exceed `RATIO * rollingAvg` to count as a transient. */
 const TRANSIENT_RATIO = 1.6;
 /** Minimum absolute peak for a transient to register — avoids noise floor spikes. */
 const TRANSIENT_MIN_PEAK = 800;
+
+const SPARSE_FULL_MIX_DROP_MOVES = new Set(['masterDrop', 'versionDrop', 'tapeStop']);
+const STARTUP_DISRUPTIVE_MOVES = new Set(['masterDrop', 'ghostReverb', 'versionDrop', 'tapeStop']);
+
+export function shouldSuppressAutoDubSparseDrop(
+  moveId: string,
+  channelCount: number,
+): boolean {
+  return channelCount > 0
+    && channelCount <= AUTO_DUB_SPARSE_DROP_CHANNEL_LIMIT
+    && SPARSE_FULL_MIX_DROP_MOVES.has(moveId);
+}
+
+export function shouldSuppressAutoDubStartupMove(
+  moveId: string,
+  bar: number,
+): boolean {
+  return bar === 0 && STARTUP_DISRUPTIVE_MOVES.has(moveId);
+}
 
 /**
  * Detect transient spikes per channel by comparing the current peak sample
@@ -749,6 +774,8 @@ export function chooseMove(ctx: AutoDubTickCtx, rng: () => number): AutoDubChoic
 
   for (const rule of RULES) {
     if (ctx.blacklist.has(rule.moveId)) continue;
+    if (shouldSuppressAutoDubSparseDrop(rule.moveId, ctx.channelCount)) continue;
+    if (shouldSuppressAutoDubStartupMove(rule.moveId, ctx.bar)) continue;
     // Per-bar wet cap: once a wet move has fired this bar, skip every
     // other wet rule until the next bar. Dry moves (tapeStop, filterDrop,
     // channelMute, subSwell, etc.) stay eligible.
@@ -956,6 +983,7 @@ const _rollingPeaks: number[][] = [];
 let _eqSnapshot: EQSnapshot | null = null;
 let _inRiddimSection = false;
 let _improvTimer: ReturnType<typeof setInterval> | null = null;
+let _improvRampTimer: ReturnType<typeof setInterval> | null = null;
 let _prevEnergy = 0;
 /** Per-band gain delta from improv loop (indices 0-3 = parametric bands P1-P4). */
 const _improvBandDeltas = [0, 0, 0, 0];
@@ -1062,8 +1090,12 @@ function improvTick(): void {
 }
 
 function _rampBandsToBaseline(): void {
+  if (_improvRampTimer !== null) {
+    clearInterval(_improvRampTimer);
+    _improvRampTimer = null;
+  }
   // Exponential decay to zero over ~200ms
-  const timer = setInterval(() => {
+  _improvRampTimer = setInterval(() => {
     let allZero = true;
     for (let i = 0; i < 4; i++) {
       _improvBandDeltas[i] *= 0.7;
@@ -1072,7 +1104,10 @@ function _rampBandsToBaseline(): void {
     }
     _applyImprovDeltas();
     if (allZero) {
-      clearInterval(timer);
+      if (_improvRampTimer !== null) {
+        clearInterval(_improvRampTimer);
+        _improvRampTimer = null;
+      }
       _prevImprovBandDeltas.fill(0);
     }
   }, 20);
@@ -1080,6 +1115,10 @@ function _rampBandsToBaseline(): void {
 
 function startImprovLoop(): void {
   if (_improvTimer !== null) return;
+  if (_improvRampTimer !== null) {
+    clearInterval(_improvRampTimer);
+    _improvRampTimer = null;
+  }
   const persona = getPersona(useDubStore.getState().autoDubPersona);
   const rate = persona.improvConfig?.rate ?? 1.0;
   const cadenceMs = Math.max(50, Math.round(250 / rate));
@@ -1096,8 +1135,16 @@ function stopImprovLoop(): void {
 
 function getChannelCount(): number {
   try {
+    const osc = useOscilloscopeStore.getState();
+    if (osc.numChannels > 0) return osc.numChannels;
+    const tracker = useTrackerStore.getState();
+    const pattern = tracker.patterns[tracker.currentPatternIndex];
+    const trackerChannels = pattern?.channels?.length ?? 0;
+    if (trackerChannels > 0) return trackerChannels;
     const mixer = useMixerStore.getState();
-    const chans = (mixer as unknown as { channels?: unknown[] }).channels;
+    const chans = mixer.channels;
+    const activeSends = chans.filter((channel) => channel.dubSend > 0.001).length;
+    if (activeSends > 0) return activeSends;
     return Array.isArray(chans) ? chans.length : 0;
   } catch {
     return 0;
@@ -1299,9 +1346,7 @@ function tickImpl(): void {
   }
 
   const bpm = transport.bpm || 120;
-  const beats = ((performance.now() - _enableTimeMs) / 1000) * (bpm / 60);
-  const bar = Math.floor(beats / 4);
-  const barPos = (beats % 4) / 4;
+  const { bar, barPos } = getAutoDubBarClock();
 
   const isNewBar = bar !== _lastBar;
   if (isNewBar) {
@@ -1405,7 +1450,6 @@ function tickImpl(): void {
   const isEqMove = choice.moveId === 'eqSweep' || choice.moveId === 'hpfRise';
   if (isEqMove && (eqMode === 'off' || eqMode === 'improv')) return;
 
-  _recordAutoDubFire(choice.moveId);
   let adaptedParams = isEqMove
     ? adaptEQParams(choice.moveId, choice.params, _eqSnapshot, persona, bpm)
     : choice.params;
@@ -1428,12 +1472,26 @@ function tickImpl(): void {
   _lastGlobalFireBar = bar;
 
   const chStr = choice.channelId !== undefined ? ` ch${choice.channelId}` : '';
+  const holdMs = (60000 / bpm) * 4 * choice.holdBars;
+  _recordAutoDubFire({
+    kind: 'fire',
+    timeMs: performance.now(),
+    bar,
+    barPos,
+    moveId: choice.moveId,
+    channelId: choice.channelId,
+    holdBars: choice.holdBars,
+    holdMs: Math.round(holdMs),
+    wet: choice.wet,
+    activeHolds: _heldDisposers.size + (disposer ? 1 : 0),
+    audio: sampleAutoDubAudio(),
+    bus: sampleDubBusDiagnostics(),
+  });
   if (disposer) {
     _heldDisposers.add(disposer);
     if (choice.moveId === 'riddimSection') {
       _inRiddimSection = true;
     }
-    const holdMs = (60000 / bpm) * 4 * choice.holdBars;
     console.log(`[AutoDub] ▶ HOLD ${choice.moveId}${chStr} holdBars=${choice.holdBars} (${holdMs.toFixed(0)}ms) heldTotal=${_heldDisposers.size}`);
     const timer = setTimeout(() => {
       console.log(`[AutoDub] ◀ RELEASE ${choice.moveId}${chStr}`);
@@ -1445,6 +1503,20 @@ function tickImpl(): void {
       if (choice.moveId === 'riddimSection') {
         _inRiddimSection = false;
       }
+      _recordAutoDubFire({
+        kind: 'release',
+        timeMs: performance.now(),
+        bar,
+        barPos,
+        moveId: choice.moveId,
+        channelId: choice.channelId,
+        holdBars: choice.holdBars,
+        holdMs: Math.round(holdMs),
+        wet: choice.wet,
+        activeHolds: _heldDisposers.size,
+        audio: sampleAutoDubAudio(),
+        bus: sampleDubBusDiagnostics(),
+      });
     }, holdMs);
     _heldTimers.set(disposer, timer);
   } else {
@@ -1473,10 +1545,21 @@ export function startAutoDub(): void {
   _prevImprovBandDeltas.fill(0);
   _timer = setInterval(tickImpl, TICK_MS);
   startImprovLoop();
+  const { bar, barPos } = getAutoDubBarClock();
+  _recordAutoDubFire({
+    kind: 'start',
+    timeMs: performance.now(),
+    bar,
+    barPos,
+    activeHolds: _heldDisposers.size,
+    audio: sampleAutoDubAudio(),
+    bus: sampleDubBusDiagnostics(),
+  });
 }
 
 /** Stop the loop AND dispose every currently-held move — the panic off. */
 export function stopAutoDub(): void {
+  const { bar, barPos } = getAutoDubBarClock();
   stopImprovLoop();
   if (_timer !== null) {
     clearInterval(_timer);
@@ -1490,6 +1573,15 @@ export function stopAutoDub(): void {
   }
   _heldDisposers.clear();
   _heldTimers.clear();
+  _recordAutoDubFire({
+    kind: 'stop',
+    timeMs: performance.now(),
+    bar,
+    barPos,
+    activeHolds: 0,
+    audio: sampleAutoDubAudio(),
+    bus: sampleDubBusDiagnostics(),
+  });
 }
 
 export function isAutoDubRunning(): boolean {
@@ -1501,6 +1593,79 @@ export function isAutoDubRunning(): boolean {
  *  no song is loaded. Used by the dub deck UI to show what the classifier
  *  currently thinks so the user can confirm or correct it. */
 let _lastComputedRoles: ChannelRole[] = [];
+
+interface AutoDubAudioSnapshot {
+  rms: number;
+  peak: number;
+  sub: number;
+  bass: number;
+  mid: number;
+  high: number;
+  beat: boolean;
+}
+
+export interface AutoDubFireLogEntry {
+  kind: 'start' | 'fire' | 'release' | 'stop';
+  timeMs: number;
+  bar: number;
+  barPos: number;
+  moveId?: string;
+  channelId?: number;
+  holdBars?: number;
+  holdMs?: number;
+  wet?: boolean;
+  activeHolds: number;
+  audio: AutoDubAudioSnapshot | null;
+  bus: Record<string, number | boolean | string | null> | null;
+}
+
+function sampleAutoDubAudio(): AutoDubAudioSnapshot | null {
+  try {
+    const bus = AudioDataBus.getShared();
+    bus.update();
+    const frame = bus.getFrame();
+    return {
+      rms: +frame.rms.toFixed(4),
+      peak: +frame.peak.toFixed(4),
+      sub: +frame.subEnergy.toFixed(4),
+      bass: +frame.bassEnergy.toFixed(4),
+      mid: +frame.midEnergy.toFixed(4),
+      high: +frame.highEnergy.toFixed(4),
+      beat: !!frame.beat,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function sampleDubBusDiagnostics(): Record<string, number | boolean | string | null> | null {
+  try {
+    return getActiveDubBus()?.getDiagnosticSnapshot() ?? null;
+  } catch {
+    return null;
+  }
+}
+
+function getAutoDubBarClock(): { bar: number; barPos: number; isRowAligned: boolean } {
+  const transport = useTransportStore.getState();
+  const globalRow = transport.currentGlobalRow;
+  const row = transport.currentRow;
+  const rowLike = Number.isFinite(globalRow) && globalRow > 0
+    ? globalRow
+    : (Number.isFinite(row) && row > 0 ? row : null);
+  if (rowLike !== null) {
+    const bar = Math.floor(rowLike / 16);
+    const barPos = (rowLike % 16) / 16;
+    return { bar, barPos, isRowAligned: true };
+  }
+  const bpm = transport.bpm || 120;
+  const beats = ((performance.now() - _enableTimeMs) / 1000) * (bpm / 60);
+  return {
+    bar: Math.floor(beats / 4),
+    barPos: (beats % 4) / 4,
+    isRowAligned: false,
+  };
+}
 
 export function getAutoDubCurrentRoles(): readonly ChannelRole[] {
   return _lastComputedRoles;
@@ -1610,9 +1775,16 @@ export function cancelChannelScrub(): void {
 
 const FIRE_LOG_CAP = 200;
 const _fireLog: string[] = [];
+const _fireEntries: AutoDubFireLogEntry[] = [];
 
-export function _recordAutoDubFire(moveId: string): void {
-  _fireLog.push(moveId);
+export function _recordAutoDubFire(entry: string | AutoDubFireLogEntry): void {
+  if (typeof entry === 'string') {
+    _fireLog.push(entry);
+  } else {
+    if (entry.moveId) _fireLog.push(entry.moveId);
+    _fireEntries.push(entry);
+    if (_fireEntries.length > FIRE_LOG_CAP) _fireEntries.shift();
+  }
   if (_fireLog.length > FIRE_LOG_CAP) _fireLog.shift();
 }
 
@@ -1620,8 +1792,13 @@ export function getAutoDubFireLog(): readonly string[] {
   return _fireLog;
 }
 
+export function getAutoDubFireLogEntries(): readonly AutoDubFireLogEntry[] {
+  return _fireEntries;
+}
+
 export function clearAutoDubFireLog(): void {
   _fireLog.length = 0;
+  _fireEntries.length = 0;
 }
 
 // ───────────────────────── Test-only hooks ─────────────────────────
@@ -1640,4 +1817,5 @@ export function _resetAutoDubStateForTest(): void {
   _lastGlobalFireBar = -99;
   _rollingPeaks.length = 0;
   _rng = Math.random;
+  clearAutoDubFireLog();
 }

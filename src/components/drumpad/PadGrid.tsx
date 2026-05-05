@@ -49,12 +49,14 @@ export const PadGrid: React.FC<PadGridProps> = ({
   const [focusedPadId, setFocusedPadId] = useState<number>(1);
 
   // Current bank
-  const { currentBank, setBank } = useDrumPadStore();
+  const currentBank = useDrumPadStore((s) => s.currentBank);
+  const setBank = useDrumPadStore((s) => s.setBank);
 
   const { isPortrait } = useOrientation();
   const gridCols = isPortrait ? 2 : 4;
 
-  const { programs, currentProgramId } = useDrumPadStore();
+  const programs = useDrumPadStore((s) => s.programs);
+  const currentProgramId = useDrumPadStore((s) => s.currentProgramId);
   const currentProgram = programs.get(currentProgramId);
   const controllerPadCount = useDrumPadStore(s => s.controllerPadCount);
   const visiblePads = Math.min(controllerPadCount, 8);

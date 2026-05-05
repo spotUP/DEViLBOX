@@ -195,7 +195,7 @@ export const MIDIControllerWizard: React.FC = () => {
         </div>
 
         {/* Content */}
-        <div className="px-5 py-5 space-y-4">
+        <div className="px-5 py-5 space-y-4 overflow-y-auto" style={{ maxHeight: 'calc(85vh - 120px)' }}>
 
           {/* Step 1: Detect */}
           {step === 'detect' && (

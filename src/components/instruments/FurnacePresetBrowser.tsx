@@ -132,7 +132,7 @@ interface FurnacePresetBrowserProps {
 
 export const FurnacePresetBrowser: React.FC<FurnacePresetBrowserProps> = ({ onClose }) => {
   const [activeFamily, setActiveFamily] = useState<FamilyKey>('FM');
-  const { createInstrument } = useInstrumentStore();
+  const createInstrument = useInstrumentStore((s) => s.createInstrument);
   const portalRef = useRef<HTMLDivElement | null>(null);
 
   // Create a portal target once.

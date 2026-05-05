@@ -3,7 +3,7 @@
  *
  * Locks the rule: the VOICE dropdown must never lie. If the current
  * `characterPreset` says "Tubby" but one of the preset-owned fields
- * (echoWet, bassShelfGainDb, returnGain, …) has been edited, the state
+ * (echoWet, bassShelfGainDb, …) has been edited, the state
  * is incoherent and the reported preset name misleads the user into
  * thinking the settings still match the preset.
  *
@@ -37,10 +37,11 @@ describe('useDrumPadStore — character/edit coherence (G16)', () => {
     expect(s.echoWet).toBe(DUB_CHARACTER_PRESETS.tubby.overrides.echoWet);
   });
 
-  it('editing a character field without characterPreset auto-flips to custom', () => {
-    // returnGain is in every preset's overrides, so it's a character field.
+  it('editing returnGain does NOT auto-flip the preset', () => {
+    // Wet level is a performance control. It changes how loud the return is,
+    // but not which engineer voicing is selected.
     useDrumPadStore.getState().setDubBus({ returnGain: 0.5 });
-    expect(useDrumPadStore.getState().dubBus.characterPreset).toBe('custom');
+    expect(useDrumPadStore.getState().dubBus.characterPreset).toBe('tubby');
     expect(useDrumPadStore.getState().dubBus.returnGain).toBe(0.5);
   });
 
@@ -88,11 +89,11 @@ describe('useDrumPadStore — character/edit coherence (G16)', () => {
     expect(useDrumPadStore.getState().dubBus.returnGain).toBe(0.33);
   });
 
-  it('mixed patch (character field + non-character field, no characterPreset) flips', () => {
-    // Realistic case: one UI component updates both enabled and returnGain
-    // in the same patch. As long as any character field is touched, we flip.
+  it('mixed patch of non-character fields does NOT flip', () => {
+    // Realistic case: one UI component updates enabled + wet level in the
+    // same patch. Neither is part of the engineer voicing.
     useDrumPadStore.getState().setDubBus({ enabled: true, returnGain: 0.6 });
-    expect(useDrumPadStore.getState().dubBus.characterPreset).toBe('custom');
+    expect(useDrumPadStore.getState().dubBus.characterPreset).toBe('tubby');
     expect(useDrumPadStore.getState().dubBus.enabled).toBe(true);
     expect(useDrumPadStore.getState().dubBus.returnGain).toBe(0.6);
   });

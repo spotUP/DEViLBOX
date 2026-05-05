@@ -30,23 +30,23 @@ export const PatternContextMenu: React.FC<PatternContextMenuProps> = ({
   children,
 }) => {
   const { position, open, close, isOpen } = useContextMenu();
-  const { isLiveMode, queuePattern, pendingPatternIndex } = useLiveModeStore();
-  const {
-    patterns,
-    currentPatternIndex,
-    clipboard,
-    setCurrentPattern,
-    duplicatePattern,
-    deletePattern,
-    expandPattern,
-    shrinkPattern,
-    resizePattern,
-    updatePatternName,
-    paste,
-    pasteMix,
-    pasteFlood,
-    pastePushForward,
-  } = useTrackerStore();
+  const isLiveMode = useLiveModeStore((s) => s.isLiveMode);
+  const queuePattern = useLiveModeStore((s) => s.queuePattern);
+  const pendingPatternIndex = useLiveModeStore((s) => s.pendingPatternIndex);
+  const patterns = useTrackerStore((s) => s.patterns);
+  const currentPatternIndex = useTrackerStore((s) => s.currentPatternIndex);
+  const clipboard = useTrackerStore((s) => s.clipboard);
+  const setCurrentPattern = useTrackerStore((s) => s.setCurrentPattern);
+  const duplicatePattern = useTrackerStore((s) => s.duplicatePattern);
+  const deletePattern = useTrackerStore((s) => s.deletePattern);
+  const expandPattern = useTrackerStore((s) => s.expandPattern);
+  const shrinkPattern = useTrackerStore((s) => s.shrinkPattern);
+  const resizePattern = useTrackerStore((s) => s.resizePattern);
+  const updatePatternName = useTrackerStore((s) => s.updatePatternName);
+  const paste = useTrackerStore((s) => s.paste);
+  const pasteMix = useTrackerStore((s) => s.pasteMix);
+  const pasteFlood = useTrackerStore((s) => s.pasteFlood);
+  const pastePushForward = useTrackerStore((s) => s.pastePushForward);
 
   // Dialog states
   const [showRenameDialog, setShowRenameDialog] = useState(false);

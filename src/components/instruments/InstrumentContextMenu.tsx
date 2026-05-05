@@ -32,13 +32,11 @@ export const InstrumentContextMenu: React.FC<InstrumentContextMenuProps> = ({
   children,
 }) => {
   const { position, open, close, isOpen } = useContextMenu();
-  const {
-    instruments,
-    setCurrentInstrument,
-    cloneInstrument,
-    deleteInstrument,
-    updateInstrument,
-  } = useInstrumentStore();
+  const instruments = useInstrumentStore((s) => s.instruments);
+  const setCurrentInstrument = useInstrumentStore((s) => s.setCurrentInstrument);
+  const cloneInstrument = useInstrumentStore((s) => s.cloneInstrument);
+  const deleteInstrument = useInstrumentStore((s) => s.deleteInstrument);
+  const updateInstrument = useInstrumentStore((s) => s.updateInstrument);
 
 
   // Dialog states

@@ -654,7 +654,7 @@ export function getDubBusState(): Record<string, unknown> {
 
 export async function getAutoDubState(): Promise<Record<string, unknown>> {
   const { useDubStore } = await import('../../stores/useDubStore');
-  const { isAutoDubRunning } = await import('../../engine/dub/AutoDub');
+  const { isAutoDubRunning, getAutoDubFireLogEntries } = await import('../../engine/dub/AutoDub');
   const s = useDubStore.getState();
   return {
     enabled: s.autoDubEnabled,
@@ -662,14 +662,21 @@ export async function getAutoDubState(): Promise<Record<string, unknown>> {
     intensity: s.autoDubIntensity,
     moveBlacklist: s.autoDubMoveBlacklist,
     isRunning: isAutoDubRunning(),
+    recentEventCount: getAutoDubFireLogEntries().length,
   };
 }
 
 /** Returns the ring buffer of move IDs chosen by the Auto Dub tick loop
  *  since the last clearAutoDubFireLog call (or since the module loaded). */
 export async function getAutoDubFireLog(): Promise<Record<string, unknown>> {
-  const { getAutoDubFireLog: getLog } = await import('../../engine/dub/AutoDub');
-  return { moves: Array.from(getLog()) };
+  const {
+    getAutoDubFireLog: getLog,
+    getAutoDubFireLogEntries: getEntries,
+  } = await import('../../engine/dub/AutoDub');
+  return {
+    moves: Array.from(getLog()),
+    entries: Array.from(getEntries()),
+  };
 }
 
 /** Clears the Auto Dub fire log ring buffer. */

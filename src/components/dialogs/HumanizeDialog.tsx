@@ -19,7 +19,7 @@ interface HumanizeDialogProps {
 
 export const HumanizeDialog: React.FC<HumanizeDialogProps> = ({ isOpen, onClose }) => {
   const selection = useCursorStore((s) => s.selection);
-  const { humanizeSelection } = useTrackerStore();
+  const humanizeSelection = useTrackerStore((s) => s.humanizeSelection);
   const [volumeVariation, setVolumeVariation] = useState(15);
 
   const handleApply = () => {

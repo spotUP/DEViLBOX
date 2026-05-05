@@ -36,6 +36,7 @@ import type { SeratoTrack } from '@/lib/serato';
 import { getDJPipeline } from '@/engine/dj/DJPipeline';
 import { useDeckStateSync } from '@/hooks/dj/useDeckStateSync';
 import { useDJHealth } from '@/hooks/dj/useDJHealth';
+import { useXTouchFeedback } from '@/hooks/useXTouchFeedback';
 import type { DeckId } from '@/engine/dj/DeckEngine';
 import { onNextBeat } from '@/engine/dj/DJAutoSync';
 import { CustomSelect } from '@components/common/CustomSelect';
@@ -77,6 +78,7 @@ export const DJView: React.FC<DJViewProps> = ({ onShowDrumpads: _onShowDrumpads 
     return p?.name ?? null;
   });
   const health = useDJHealth();
+  useXTouchFeedback();
 
   // Sync status: poll phase alignment between decks at 10Hz with hysteresis
   // Uses a rolling average to avoid flickering between green/yellow/red

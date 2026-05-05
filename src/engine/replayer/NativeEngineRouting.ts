@@ -21,6 +21,7 @@ import { SF2Engine } from '../sf2/SF2Engine';
 import { SilenceDetector } from './SilenceDetector';
 import { useWasmPositionStore } from '../../stores/useWasmPositionStore';
 import { JamCrackerEngine } from '../jamcracker/JamCrackerEngine';
+import { getActiveDubBus } from '../dub/DubBus';
 
 export { C64SIDEngine };
 export { SF2Engine };
@@ -90,7 +91,7 @@ const WASM_ENGINES: NativeEngineDescriptor[] = [
   {
     key: 'Hively',
     synthType: 'HivelySynth',
-    suppressNotes: false,
+    suppressNotes: true,
     fileDataKey: 'hivelyFileData',
     formats: ['HVL', 'AHX'],
     loadMethod: 'loadTune',
@@ -837,6 +838,21 @@ function shouldActivate(desc: NativeEngineDescriptor, song: TrackerSong): boolea
   return desc.formats.includes(song.format);
 }
 
+function registerWholeMixDubSend(key: string, source: AudioNode | null | undefined): void {
+  if (!source) return;
+  try {
+    getActiveDubBus()?.registerWholeMixTap(key, source);
+  } catch (e) {
+    console.warn(`[NativeEngineRouting] ${key} whole-mix dub send skipped:`, e);
+  }
+}
+
+function unregisterWholeMixDubSend(key: string): void {
+  try {
+    getActiveDubBus()?.unregisterWholeMixTap(key);
+  } catch { /* ok */ }
+}
+
 // ---------------------------------------------------------------------------
 // Result type
 // ---------------------------------------------------------------------------
@@ -989,10 +1005,6 @@ export async function startNativeEngines(
           const msPerJiffy = 20; // VBlank: 1/50s. For CIA, the timing table jiffies are already scaled.
           const sr = Tone.context.sampleRate || 44100;
 
-          // Also drive FormatPlaybackState so TFMX format-mode rendering scrolls
-          const { setFormatPlaybackRow, setFormatPlaybackPlaying } = await import('@/engine/FormatPlaybackState');
-          setFormatPlaybackPlaying(true);
-
           let _posLogCount = 0;
           (instance as any).onPositionUpdate((update: { samplesRendered: number; elapsedMs?: number; songEnd: boolean }) => {
             if (!timingTable || timingTable.length === 0) return;
@@ -1023,7 +1035,6 @@ export async function startNativeEngines(
 
             if (Number.isFinite(row) && Number.isFinite(position)) {
               useWasmPositionStore.getState().setPosition(row, position);
-              setFormatPlaybackRow(row);
             }
           });
           console.log(`[NativeEngineRouting] TFMXModule position sync wired (${timingTable?.length ?? 0} entries, msPerJiffy=${msPerJiffy})`);
@@ -1075,11 +1086,13 @@ export async function startNativeEngines(
               console.log(`[NativeEngineRouting] ${desc.key} output → stereo separation`);
             }
             routedNativeEngines.add(desc.synthType);
+            registerWholeMixDubSend(`native:${desc.synthType}`, instance.output);
           } else {
             // Fallback: connect directly to audio context destination
             const ctx = instance.output.context;
             instance.output.connect(ctx.destination);
             routedNativeEngines.add(desc.synthType);
+            registerWholeMixDubSend(`native:${desc.synthType}`, instance.output);
             console.log(`[NativeEngineRouting] ${desc.key} output → destination (fallback)`);
           }
         }
@@ -1232,6 +1245,7 @@ export async function startNativeEngines(
       const synthBusNode = getNativeAudioNode(toneEngine.synthBus as any);
       if (synthBusNode) cc.connectTo(synthBusNode);
       else if (cc.output) cc.output.connect(Tone.getContext().rawContext as AudioContext as unknown as AudioNode);
+      registerWholeMixDubSend('native:CheeseCutterSynth', cc.output);
 
       // Read multiplier from store data
       const { useCheeseCutterStore } = await import('@stores/useCheeseCutterStore');
@@ -1293,10 +1307,12 @@ export async function startNativeEngines(
           if (nativeInput) {
             node.connect(nativeInput);
             routedNativeEngines.add('SymphonieSynth');
+            registerWholeMixDubSend('native:SymphonieSynth', node);
             console.log('[NativeEngineRouting] Symphonie output → stereo separation');
           } else {
             node.connect(ctx.destination);
             routedNativeEngines.add('SymphonieSynth');
+            registerWholeMixDubSend('native:SymphonieSynth', node);
             console.log('[NativeEngineRouting] Symphonie output → destination (fallback)');
           }
         } else {
@@ -1371,6 +1387,9 @@ export async function startNativeEngines(
         if (nativeInput) {
           toneEngine.rerouteNativeEngine(inst.synthType, nativeInput);
           routedNativeEngines.add(inst.synthType);
+          if (inst.synthType === 'SunVoxSynth' || inst.synthType === 'SunVoxModular') {
+            registerWholeMixDubSend(`native:${inst.synthType}`, toneEngine.getNativeEngineOutput(inst.synthType));
+          }
         }
       }
     }
@@ -1412,6 +1431,7 @@ export function stopNativeEngines(
     const toneEngine = getToneEngine();
     for (const st of routedNativeEngines) {
       try { toneEngine.stopNativeEngine(st); } catch { /* ignored */ }
+      unregisterWholeMixDubSend(`native:${st}`);
     }
   }
 
@@ -1425,13 +1445,14 @@ export function stopNativeEngines(
     // Try synchronous stop first (fast path)
     const ref = tryResolveSync(desc);
     if (ref) {
-      try {
-        if (ref.hasInstance()) {
-          const inst = ref.getInstance();
-          inst.stop();
-          // Immediately mute the output gain to prevent audio leaking while
-          // the async stop message is processed by the worklet thread.
-          const output = (inst as unknown as { output?: { gain?: AudioParam } }).output;
+        try {
+          if (ref.hasInstance()) {
+            const inst = ref.getInstance();
+            inst.stop();
+            unregisterWholeMixDubSend(`native:${desc.synthType}`);
+            // Immediately mute the output gain to prevent audio leaking while
+            // the async stop message is processed by the worklet thread.
+            const output = (inst as unknown as { output?: { gain?: AudioParam } }).output;
           if (output?.gain) {
             try { output.gain.setValueAtTime(0, 0); } catch { /* best effort */ }
           }
@@ -1442,7 +1463,10 @@ export function stopNativeEngines(
     // cached dynamic resolver. This handles TFMXModule and other dynamicResolver engines.
     if (!ref && desc.dynamicResolver && wasRunning.has(desc.key)) {
       asyncStops.push(desc.dynamicResolver().then(cls => {
-        try { if (cls.hasInstance()) cls.getInstance().stop(); } catch { /* ignored */ }
+        try {
+          if (cls.hasInstance()) cls.getInstance().stop();
+          unregisterWholeMixDubSend(`native:${desc.synthType}`);
+        } catch { /* ignored */ }
       }).catch(() => {}));
     }
   }
@@ -1470,6 +1494,7 @@ export function stopNativeEngines(
       if (SymphonieEngine.hasInstance()) {
         const engine = SymphonieEngine.getInstance();
         engine.stop();
+        unregisterWholeMixDubSend('native:SymphonieSynth');
         const node = engine.getNode();
         if (node) { try { node.disconnect(); } catch { /* ignored */ } }
       }
@@ -1503,6 +1528,7 @@ export function stopNativeEngines(
     if (CheeseCutterEngine.hasInstance()) {
       const engine = CheeseCutterEngine.getInstance();
       engine.stop();
+      unregisterWholeMixDubSend('native:CheeseCutterSynth');
       const node = engine.output;
       if (node) { try { node.disconnect(); } catch { /* ignored */ } }
     }

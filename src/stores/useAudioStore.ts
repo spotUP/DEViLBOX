@@ -5,7 +5,6 @@
 
 import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
-import { current } from 'immer';
 import type * as Tone from 'tone';
 import type { EffectConfig, AudioEffectType as EffectType } from '@typedefs/instrument';
 import type { ToneEngine } from '@engine/ToneEngine';
@@ -203,54 +202,60 @@ export const useAudioStore = create<AudioStore>()(
         }
       }),
 
-    updateMasterEffect: (effectId, updates) =>
-      set((state) => {
-        const effect = state.masterEffects.find((e) => e.id === effectId);
-        if (effect) {
-          // Ensure defaults are populated for effects with sparse parameters
-          if (updates.parameters && Object.keys(effect.parameters).length < Object.keys(getDefaultEffectParameters(effect.type)).length) {
-            effect.parameters = { ...getDefaultEffectParameters(effect.type), ...effect.parameters };
-          }
-          Object.assign(effect, updates);
+    updateMasterEffect: (effectId, updates) => {
+      // Read current effects to compute merged state
+      const effects = get().masterEffects;
+      const effect = effects.find((e) => e.id === effectId);
+      if (!effect) return;
 
-          // When `enabled` changes, a full rebuildMasterEffects is triggered by the
-          // masterEffectsKey useEffect in usePatternPlayback / DJView. Calling
-          // updateMasterEffectParams here would fail because disabled effects don't
-          // have Tone nodes. Skip the per-param update path for enable/disable toggles.
-          if ('enabled' in updates) {
-            // If this is a channel-targeted effect, also trigger WASM isolation rebuild
-            if (Array.isArray(effect.selectedChannels) && effect.selectedChannels.length > 0) {
-              import('./useMixerStore').then(({ scheduleWasmEffectRebuild }) => {
-                scheduleWasmEffectRebuild();
-              }).catch(() => {});
-            }
-            return;
-          }
-
-          // When selectedChannels changes, trigger WASM isolation rebuild
-          // (the masterEffectsKey useEffect handles the master chain rebuild)
-          if ('selectedChannels' in updates) {
-            import('./useMixerStore').then(({ scheduleWasmEffectRebuild }) => {
-              scheduleWasmEffectRebuild();
-            }).catch(() => {});
-          }
-
-          // Extract plain object from Immer draft before passing to ToneEngine
-          const effectCopy = current(effect) as EffectConfig;
-
-          // Notify ToneEngine to update effect parameters
-          const engine = get().toneEngineInstance;
-          if (engine) {
-            engine.updateMasterEffectParams(effectId, effectCopy);
-
-            // If bpmSync is ON after update, apply synced timing
-            if (effectCopy.parameters.bpmSync === 1) {
-              const bpm = engine.getBPM();
-              engine.updateBpmSyncedEffects(bpm);
-            }
-          }
+      // For enable/disable toggles, just write to store (engine rebuild is handled
+      // by usePatternPlayback's useEffect on masterEffectsKey).
+      if ('enabled' in updates) {
+        set((state) => {
+          const fx = state.masterEffects.find((e) => e.id === effectId);
+          if (fx) Object.assign(fx, updates);
+        });
+        if (Array.isArray(effect.selectedChannels) && effect.selectedChannels.length > 0) {
+          import('./useMixerStore').then(({ scheduleWasmEffectRebuild }) => {
+            scheduleWasmEffectRebuild();
+          }).catch(() => {});
         }
-      }),
+        return;
+      }
+
+      // Compute merged effect BEFORE entering Immer (avoids engine work inside set())
+      const mergedParams = updates.parameters
+        ? { ...getDefaultEffectParameters(effect.type), ...effect.parameters, ...updates.parameters }
+        : effect.parameters;
+      const mergedEffect: EffectConfig = { ...effect, ...updates, parameters: mergedParams };
+
+      // Immediate engine update — outside set()
+      const engine = get().toneEngineInstance;
+      if (engine) {
+        engine.updateMasterEffectParams(effectId, mergedEffect);
+        if (mergedEffect.parameters.bpmSync === 1) {
+          engine.updateBpmSyncedEffects(engine.getBPM());
+        }
+      }
+
+      // When selectedChannels changes, trigger WASM isolation rebuild
+      if ('selectedChannels' in updates) {
+        import('./useMixerStore').then(({ scheduleWasmEffectRebuild }) => {
+          scheduleWasmEffectRebuild();
+        }).catch(() => {});
+      }
+
+      // Batched store write
+      batch(`fx-${effectId}`, (state) => {
+        const fx = state.masterEffects.find((e) => e.id === effectId);
+        if (fx) {
+          if (updates.parameters) {
+            fx.parameters = { ...getDefaultEffectParameters(fx.type), ...fx.parameters, ...updates.parameters };
+          }
+          Object.assign(fx, updates);
+        }
+      });
+    },
 
     reorderMasterEffects: (fromIndex, toIndex) =>
       set((state) => {

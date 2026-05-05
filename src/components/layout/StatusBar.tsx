@@ -293,7 +293,7 @@ const SIDHardwareBadge: React.FC = () => {
 
 export const StatusBar: React.FC<StatusBarProps> = React.memo(() => {
   const activeView = useUIStore((s) => s.activeView);
-  const { contextState } = useAudioStore();
+  const contextState = useAudioStore((s) => s.contextState);
   const collabStatus = useCollaborationStore((s) => s.status);
   const collabRoomCode = useCollaborationStore((s) => s.roomCode);
 

@@ -43,7 +43,10 @@ export const BeatSlicerPanel: React.FC<BeatSlicerPanelProps> = ({
   selectedSliceId,
   onClose,
 }) => {
-  const { updateSlices, updateSliceConfig, createSlicedInstruments, createDrumKitFromSlices } = useInstrumentStore();
+  const updateSlices = useInstrumentStore((s) => s.updateSlices);
+  const updateSliceConfig = useInstrumentStore((s) => s.updateSliceConfig);
+  const createSlicedInstruments = useInstrumentStore((s) => s.createSlicedInstruments);
+  const createDrumKitFromSlices = useInstrumentStore((s) => s.createDrumKitFromSlices);
   const bpm = useTransportStore((state) => state.bpm);
 
   // Local state

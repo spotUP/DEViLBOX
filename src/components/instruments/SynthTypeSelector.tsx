@@ -15,7 +15,7 @@ interface SynthTypeSelectorProps {
 }
 
 export const SynthTypeSelector: React.FC<SynthTypeSelectorProps> = ({ instrument }) => {
-  const { updateInstrument } = useInstrumentStore();
+  const updateInstrument = useInstrumentStore((s) => s.updateInstrument);
   const [searchQuery, setSearchQuery] = useState('');
 
   // Filter synths based on search query

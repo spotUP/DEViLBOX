@@ -11,8 +11,7 @@ import { createPortal } from 'react-dom';
 import { useDubStore } from '@/stores/useDubStore';
 import { getPersona } from '@/engine/dub/AutoDubPersonas';
 import { useDrumPadStore } from '@/stores/useDrumPadStore';
-import { startAutoDub, stopAutoDub, isAutoDubRunning, AUTO_DUB_RULE_MOVES, runChannelAudioScrub, cancelChannelScrub } from '@/engine/dub/AutoDub';
-import { useTransportStore } from '@/stores/useTransportStore';
+import { startAutoDub, stopAutoDub, isAutoDubRunning, AUTO_DUB_RULE_MOVES } from '@/engine/dub/AutoDub';
 import { useFormatStore } from '@/stores/useFormatStore';
 import { DUB_CHARACTER_PRESETS } from '@/types/dub';
 import { classifySongRoles } from '@/bridge/analysis/ChannelNaming';
@@ -54,6 +53,24 @@ interface AutoDubPanelProps {
   anchorRef?: React.RefObject<HTMLButtonElement | null>;
 }
 
+export function getAutoDubSeedChannelCount(
+  patternChannelCount: number | undefined,
+  mixerChannelCount: number,
+): number {
+  const fromPattern = typeof patternChannelCount === 'number' && patternChannelCount > 0
+    ? patternChannelCount
+    : mixerChannelCount;
+  return Math.max(0, Math.min(fromPattern, mixerChannelCount, 16));
+}
+
+export function getAutoDubSeedSendLevel(level: number): number {
+  const clamped = Math.max(0, Math.min(1, level));
+  // AutoDub only needs enough baseline send to have material to work with.
+  // Full performance preset sends (especially Perry's 0.85-1.0 defaults)
+  // swamp the dry mix before any move fires.
+  return Math.max(0.15, Math.min(clamped * 0.5, 0.45));
+}
+
 export const AutoDubPanel: React.FC<AutoDubPanelProps> = ({ busEnabled, open: openProp, onClose, anchorRef }) => {
   // Self-contained mode: when open/onClose/anchorRef are not provided (e.g. DJView),
   // the panel manages its own open state and renders its own trigger button.
@@ -65,8 +82,6 @@ export const AutoDubPanel: React.FC<AutoDubPanelProps> = ({ busEnabled, open: op
   const effectiveAnchorRef = selfContained ? selfBtnRef : anchorRef!;
   const enabled = useDubStore(s => s.autoDubEnabled);
   const setEnabled = useDubStore(s => s.setAutoDubEnabled);
-  const isPlaying = useTransportStore(s => s.isPlaying);
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
   const intensity = useDubStore(s => s.autoDubIntensity);
   const setIntensity = useDubStore(s => s.setAutoDubIntensity);
   const currentPersonaId = useDubStore(s => s.autoDubPersona);
@@ -117,11 +132,6 @@ export const AutoDubPanel: React.FC<AutoDubPanelProps> = ({ busEnabled, open: op
     setBlacklist(Array.from(current));
   }, [blacklist, setBlacklist]);
 
-  // When user stops playback mid-scrub, cancel the scrub
-  useEffect(() => {
-    if (!isPlaying && isAnalyzing) cancelChannelScrub();
-  }, [isPlaying, isAnalyzing]);
-
   // Keep runtime engine in sync with store flag
   useEffect(() => {
     if (enabled && busEnabled) {
@@ -134,7 +144,9 @@ export const AutoDubPanel: React.FC<AutoDubPanelProps> = ({ busEnabled, open: op
         // to avoid sustained tones from comb filter resonance.
         {
           const { channels, setChannelDubSend } = useMixerStore.getState();
-          const visibleCount = Math.min(channels.length, 16);
+          const tracker = useTrackerStore.getState();
+          const patternChannelCount = tracker.patterns[tracker.currentPatternIndex]?.channels.length;
+          const visibleCount = getAutoDubSeedChannelCount(patternChannelCount, channels.length);
           const characterPreset = useDrumPadStore.getState().dubBus.characterPreset;
           const presetData = characterPreset && characterPreset !== 'custom'
             ? DUB_CHARACTER_PRESETS[characterPreset as keyof typeof DUB_CHARACTER_PRESETS]
@@ -144,7 +156,6 @@ export const AutoDubPanel: React.FC<AutoDubPanelProps> = ({ busEnabled, open: op
           let roles: string[] = [];
           if (presetData?.defaultSendsByRole) {
             try {
-              const tracker = useTrackerStore.getState();
               const patterns = tracker.patterns;
               if (Array.isArray(patterns) && patterns.length > 0) {
                 const insts = useInstrumentStore.getState().instruments;
@@ -165,25 +176,13 @@ export const AutoDubPanel: React.FC<AutoDubPanelProps> = ({ busEnabled, open: op
               const level = role && role in sends
                 ? (sends[role as keyof typeof sends] as number)
                 : (sends.default ?? 0.15);
-              setChannelDubSend(i, level);
+              setChannelDubSend(i, getAutoDubSeedSendLevel(level));
             } else {
               setChannelDubSend(i, 0.15);
             }
           }
         }
-
-        if (!isPlaying) {
-          setIsAnalyzing(true);
-          runChannelAudioScrub((done) => {
-            setIsAnalyzing(false);
-            if (done) startAutoDub();
-          }).catch(() => {
-            setIsAnalyzing(false);
-            startAutoDub();
-          });
-        } else {
-          startAutoDub();
-        }
+        startAutoDub();
 
         const isSID = hasSidData || ['sidfactory2', 'cheesecutter', 'goattracker'].includes(editorMode);
         if (isSID) {
@@ -208,7 +207,7 @@ export const AutoDubPanel: React.FC<AutoDubPanelProps> = ({ busEnabled, open: op
     } else {
       if (isAutoDubRunning()) stopAutoDub();
     }
-  }, [enabled, busEnabled, editorMode, hasSidData, isPlaying]);
+  }, [enabled, busEnabled, editorMode, hasSidData]);
 
   // Panic event halts Auto Dub
   useEffect(() => {
@@ -230,7 +229,6 @@ export const AutoDubPanel: React.FC<AutoDubPanelProps> = ({ busEnabled, open: op
     >
       <div className="flex items-center justify-between mb-3">
         <span className="text-text-secondary font-bold text-xs">AUTO DUB SETTINGS</span>
-        {isAnalyzing && <span className="text-accent-warning text-xs animate-pulse">Analyzing...</span>}
       </div>
 
       {/* Active persona hint */}
@@ -374,7 +372,7 @@ export const AutoDubPanel: React.FC<AutoDubPanelProps> = ({ busEnabled, open: op
           onClick={() => setSelfOpen(v => !v)}
           title="Auto Dub — autonomous dub performer"
         >
-          {isAnalyzing ? 'Analyzing...' : `Auto Dub${enabled ? ' ON' : ''}`}
+          {`Auto Dub${enabled ? ' ON' : ''}`}
         </button>
         {settingsPanel}
       </>
