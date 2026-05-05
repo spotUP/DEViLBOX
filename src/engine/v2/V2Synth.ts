@@ -112,7 +112,6 @@ export class V2Synth implements DevilboxSynth {
       }, 10000);
 
       this._worklet!.port.onmessage = (event) => {
-        console.log('[V2Synth] main thread received msg:', event.data?.type, JSON.stringify(event.data).slice(0, 80));
         if (event.data.type === 'ready' || event.data.type === 'initialized') {
           clearTimeout(timeout);
           this._initialized = true;

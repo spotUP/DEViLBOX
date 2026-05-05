@@ -48,6 +48,8 @@ export interface ChannelRoutingContext {
   itFilterWorkletLoaded: boolean;
   nativeContext: AudioContext | null;
   FILTER_CUTOFF_LUT: Float64Array;
+  /** Pooled array for getChannelLevels — avoids per-frame allocation */
+  _levelsBuf?: number[];
 }
 
 // ============================================
@@ -659,7 +661,11 @@ export function disposeChannelOutputs(ctx: ChannelRoutingContext): void {
  * Returns array of normalized values (0-1) for each channel
  */
 export function getChannelLevels(ctx: ChannelRoutingContext, numChannels: number): number[] {
-  const levels: number[] = [];
+  // Reuse/grow a cached array to avoid allocation per frame
+  if (!ctx._levelsBuf || ctx._levelsBuf.length < numChannels) {
+    ctx._levelsBuf = new Array(numChannels).fill(0);
+  }
+  const levels = ctx._levelsBuf;
   // Noise floor threshold — meters below this are treated as silent
   // to prevent VU meters from getting stuck at low residual values
   const NOISE_FLOOR = 0.02;
@@ -670,9 +676,9 @@ export function getChannelLevels(ctx: ChannelRoutingContext, numChannels: number
       // -60dB = 0, 0dB = 1
       const db = channelOutput.meter.getValue() as number;
       const normalized = Math.max(0, Math.min(1, (db + 60) / 60));
-      levels.push(normalized > NOISE_FLOOR ? normalized : 0);
+      levels[i] = normalized > NOISE_FLOOR ? normalized : 0;
     } else {
-      levels.push(0);
+      levels[i] = 0;
     }
   }
   return levels;
