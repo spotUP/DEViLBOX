@@ -404,8 +404,16 @@ export class PedalboardEngine {
             this.setEffectEnabled(newEffect.id, newEffect.enabled);
           }
 
-          // Update parameters if changed
-          if (JSON.stringify(newEffect.parameters) !== JSON.stringify(oldEffect.parameters)) {
+          // Update parameters if changed (shallow compare avoids JSON.stringify cost)
+          if (newEffect.parameters && oldEffect.parameters) {
+            const np = newEffect.parameters as Record<string, unknown>;
+            const op = oldEffect.parameters as Record<string, unknown>;
+            const keys = Object.keys(np);
+            const changed = keys.length !== Object.keys(op).length || keys.some(k => np[k] !== op[k]);
+            if (changed) {
+              this.applyEffectParameters(processor.engine, newEffect);
+            }
+          } else if (newEffect.parameters !== oldEffect.parameters) {
             this.applyEffectParameters(processor.engine, newEffect);
           }
 

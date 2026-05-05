@@ -21,6 +21,7 @@ export const InstrumentEditorPopout: React.FC = () => {
   const instruments = useInstrumentStore((state) => state.instruments);
   const currentInstrumentId = useInstrumentStore((state) => state.currentInstrumentId);
   const updateInstrument = useInstrumentStore((state) => state.updateInstrument);
+  const updateInstrumentRealtime = useInstrumentStore((state) => state.updateInstrumentRealtime);
   const setCurrentInstrument = useInstrumentStore((state) => state.setCurrentInstrument);
 
   const currentInstrument = instruments.find((inst) => inst.id === currentInstrumentId) || null;
@@ -166,7 +167,7 @@ export const InstrumentEditorPopout: React.FC = () => {
             instrument={currentInstrument}
             onChange={(updates: Partial<InstrumentConfig>) => {
               console.log('[InstrumentEditorPopout] onChange called with updates:', updates);
-              updateInstrument(currentInstrument.id, updates);
+              updateInstrumentRealtime(currentInstrument.id, updates);
             }}
           />
         )}

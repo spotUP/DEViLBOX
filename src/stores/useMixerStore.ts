@@ -13,6 +13,7 @@ import { getToneEngine } from '../engine/ToneEngine';
 import { useFormatStore } from './useFormatStore';
 import type { EffectConfig } from '@typedefs/instrument';
 import { getChannelEffectsManager } from '../engine/ChannelEffectsManager';
+import { createBatchedSet } from '@/utils/batchedSet';
 import { getSendBusManager } from '../engine/SendBusManager';
 import { getChannelRoutedEffectsManager } from '../engine/tone/ChannelRoutedEffects';
 import { getActiveDubBus } from '../engine/dub/DubBus';
@@ -509,6 +510,10 @@ function forwardSunVoxModuleMute(channels: MixerChannelState[], isSoloing: boole
   }
 }
 
+export function muteUsesMuteMaskOnly(editorMode: string): boolean {
+  return editorMode === 'classic';
+}
+
 function forwardWasmChannelGain(ch: number, channels: MixerChannelState[], isSoloing: boolean): void {
   const fmt = useFormatStore.getState();
 
@@ -532,6 +537,11 @@ function forwardWasmChannelGain(ch: number, channels: MixerChannelState[], isSol
     forwardSunVoxModuleMute(channels, isSoloing);
     return;
   }
+
+  // LibOpenMPT / classic tracker formats mute through TrackerReplayer's
+  // channel mask path (forwardReplayerMuteMask), not through a gain-only API.
+  // Warning here only creates noise during intentional channel mutes.
+  if (muteUsesMuteMaskOnly(fmt.editorMode)) return;
 
   // Other WASM engines use gain API (0.0 - 1.0)
   const gainEngine = getActiveGainEngine();
@@ -772,7 +782,13 @@ function buildInitialState(): MixerStoreState {
 }
 
 export const useMixerStore = create<MixerStore>()(
-  immer((set, get) => ({
+  immer((set, get) => {
+    // Batched set for continuous controls (knobs/faders) — audio engine
+    // updates happen immediately; only the Zustand state write is deferred
+    // so React doesn't re-render 50+ subscribers on every mouse-move frame.
+    const batch = createBatchedSet<MixerStore>(set as any);
+
+    return {
     ...buildInitialState(),
 
     getInitialState(): MixerStoreState {
@@ -780,23 +796,24 @@ export const useMixerStore = create<MixerStore>()(
     },
 
     setChannelVolume(ch: number, vol: number): void {
-      set((state) => {
-        state.channels[ch].volume = vol;
-      });
+      // Immediate audio update
       applyToEngine(() => {
         getToneEngine().setMixerChannelVolume(ch, toDb(vol));
       });
-      // Forward gain to active WASM engine
       const { channels, isSoloing } = get();
       forwardWasmChannelGain(ch, channels, isSoloing);
+      // Batched store write
+      batch(`ch${ch}-vol`, (state) => {
+        state.channels[ch].volume = vol;
+      });
     },
 
     setChannelPan(ch: number, pan: number): void {
-      set((state) => {
-        state.channels[ch].pan = pan;
-      });
       applyToEngine(() => {
         getToneEngine().setMixerChannelPan(ch, pan);
+      });
+      batch(`ch${ch}-pan`, (state) => {
+        state.channels[ch].pan = pan;
       });
     },
 
@@ -880,11 +897,11 @@ export const useMixerStore = create<MixerStore>()(
     },
 
     setMasterVolume(vol: number): void {
-      set((state) => {
-        state.master.volume = vol;
-      });
       applyToEngine(() => {
         getToneEngine().setMasterVolume(toDb(vol));
+      });
+      batch('master-vol', (state) => {
+        state.master.volume = vol;
       });
     },
 
@@ -998,6 +1015,9 @@ export const useMixerStore = create<MixerStore>()(
         } catch (e) {
           console.warn('[MixerStore] setChannelDubSend: manager unavailable', e);
         }
+        try {
+          getActiveDubBus()?.setWholeMixDubSend(ch, clamped);
+        } catch { /* whole-mix fallback not active */ }
       }
 
       // State update — rAF-batched so drag doesn't cause 60 re-renders/sec.
@@ -1197,5 +1217,6 @@ export const useMixerStore = create<MixerStore>()(
       // Rebuild WASM isolation for the new effect chain
       scheduleWasmEffectRebuild();
     },
-  }))
+  };
+  })
 );
