@@ -52,6 +52,27 @@ const DUB_STYLES = [
   { id: 'jammy',        label: 'Prince Jammy',        characterPreset: 'jammy'        as const, personaId: 'jammy'        as AutoDubPersonaId },
 ];
 
+const CUSTOM_DUB_STYLE = DUB_STYLES.find((style) => style.id === 'custom') ?? DUB_STYLES[0];
+
+export function resolveCurrentDubStyle(
+  characterPreset: string | null | undefined,
+  autoDubPersona: AutoDubPersonaId,
+) {
+  const effectivePreset = characterPreset || 'custom';
+  const exact = DUB_STYLES.find((style) => (
+    (style.characterPreset ?? 'custom') === effectivePreset
+      && style.personaId === autoDubPersona
+  ));
+  if (exact) return exact;
+  if (effectivePreset === 'custom' && autoDubPersona !== 'custom') {
+    return DUB_STYLES.find((style) => style.personaId === autoDubPersona) ?? CUSTOM_DUB_STYLE;
+  }
+  if (effectivePreset !== 'custom') {
+    return DUB_STYLES.find((style) => (style.characterPreset ?? 'custom') === effectivePreset) ?? CUSTOM_DUB_STYLE;
+  }
+  return CUSTOM_DUB_STYLE;
+}
+
 // ─── Role inference ────────────────────────────────────────────────────────
 function inferRoleFromName(name: string): 'percussion' | 'bass' | 'lead' | 'chord' | 'arpeggio' | 'pad' | null {
   const n = name.toLowerCase();
@@ -209,13 +230,7 @@ export const DubDeckStrip: React.FC = () => {
   // identifies the style. For 'custom' characterPreset, multiple styles map
   // here (Custom and Prince Jammy both have null/custom preset) — use the
   // persona to disambiguate between them.
-  const currentStyle = DUB_STYLES.find(s => {
-    const effectivePreset = s.characterPreset ?? 'custom';
-    if (effectivePreset !== (dubBusSettings.characterPreset || 'custom')) return false;
-    // When the characterPreset is 'custom', use persona to pick the right entry
-    if (effectivePreset === 'custom') return s.personaId === autoDubPersona;
-    return true;
-  }) ?? DUB_STYLES[0];
+  const currentStyle = resolveCurrentDubStyle(dubBusSettings.characterPreset, autoDubPersona);
 
   const channels = useMixerStore(s => s.channels);
   const setChannelDubSend = useMixerStore(s => s.setChannelDubSend);
@@ -417,27 +432,16 @@ export const DubDeckStrip: React.FC = () => {
   useEffect(() => {
     const engine = ensureDrumPadEngine();
     const bus = engine.getDubBus();
-    // NOTE: DubRouter registration now happens inside DrumPadEngine's
-    // constructor so every view — tracker, DJ, drumpad, VJ — can fire
-    // dub moves without coupling to a specific UI mount. We intentionally
-    // do NOT call setDubBusForRouter(null) on unmount: that would break
-    // the DJ DUB tab + drumpad dub pads + MIDI dub routing the instant
-    // the user left the tracker view. The engine owns the lifecycle.
+    // NOTE: DubRouter registration, cold-channel activation ownership, and the
+    // initial setupDubBusWiring bootstrap now happen inside DrumPadEngine so
+    // formats still receive dub routing before this view mounts. Keep this
+    // best-effort re-run because the bus can be recreated mid-session.
     try {
       const mgr = getChannelRoutedEffectsManager(getToneEngine().masterEffectsInput);
       mgr.setupDubBusWiring(bus.inputNode, bus);
     } catch (e) {
       console.warn('[DubDeckStrip] setupDubBusWiring failed:', e);
     }
-    // Lazy activation path — moves (Echo Throw, Dub Stab, etc) fired on a
-    // channel whose fader is at 0 need a way to spin up the worklet dub
-    // slot. openChannelTap calls this to drive setChannelDubSend.
-    bus.setChannelActivationCallback((ch, amt) => {
-      useMixerStore.getState().setChannelDubSend(ch, amt);
-    });
-    return () => {
-      bus.setChannelActivationCallback(null);
-    };
   }, []);
 
   // Master-insert TONE EQ — when the bus is ON we splice the bass shelf +
@@ -655,7 +659,7 @@ export const DubDeckStrip: React.FC = () => {
   // the comb-sweep per-channel FX (sweepAmount 0.75, feedback 0.70) to start running on
   // all percussion channels instantly, sustaining tones from any existing echo tails.
   const applyStyle = useCallback((styleId: string) => {
-    const style = DUB_STYLES.find(s => s.id === styleId) ?? DUB_STYLES[0];
+    const style = DUB_STYLES.find(s => s.id === styleId) ?? CUSTOM_DUB_STYLE;
     // setDubBus with characterPreset applies all bus overrides (EQ, echo, spring, etc.)
     setDubBus({ characterPreset: style.characterPreset ?? 'custom' });
     setAutoDubPersona(style.personaId);

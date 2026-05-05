@@ -203,7 +203,31 @@ const DEFAULT_CC_MAPPINGS: CCMapping[] = [
   { ccNumber: 71, parameter: 'resonance', min: 0, max: 100, curve: 'linear' },
   { ccNumber: 10, parameter: 'envMod', min: 0, max: 100, curve: 'linear' },
   { ccNumber: 75, parameter: 'decay', min: 30, max: 3000, curve: 'logarithmic' },
-  { ccNumber: 16, parameter: 'accent', min: 0, max: 100, curve: 'linear' },
+
+  // Maschine MK2 Controller Editor knobs (CC 14-21, Page 1, ch 1)
+  // Knob7/8 use CC 20-21 which take priority over the dub move defaults for those CCs
+  { ccNumber: 14, parameter: 'cutoff',    min: 0, max: 1, curve: 'linear' },
+  { ccNumber: 15, parameter: 'resonance', min: 0, max: 1, curve: 'linear' },
+  { ccNumber: 16, parameter: 'envMod',    min: 0, max: 1, curve: 'linear' },
+  { ccNumber: 17, parameter: 'decay',     min: 0, max: 1, curve: 'linear' },
+  { ccNumber: 18, parameter: 'accent',    min: 0, max: 1, curve: 'linear' },
+  { ccNumber: 19, parameter: 'overdrive', min: 0, max: 1, curve: 'linear' },
+  { ccNumber: 20, parameter: 'slideTime', min: 0, max: 1, curve: 'linear' },
+  { ccNumber: 21, parameter: 'volume',    min: 0, max: 1, curve: 'linear' },
+
+  // Maschine MK2 HID bridge encoders (base CC 110, indices 0-14)
+  // Mapped to TB303 parameters 1:1 across the 8 main knobs
+  { ccNumber: 110, parameter: 'cutoff',    min: 0, max: 1, curve: 'linear' },
+  { ccNumber: 111, parameter: 'resonance', min: 0, max: 1, curve: 'linear' },
+  { ccNumber: 112, parameter: 'envMod',    min: 0, max: 1, curve: 'linear' },
+  { ccNumber: 113, parameter: 'decay',     min: 0, max: 1, curve: 'linear' },
+  { ccNumber: 114, parameter: 'accent',    min: 0, max: 1, curve: 'linear' },
+  { ccNumber: 115, parameter: 'overdrive', min: 0, max: 1, curve: 'linear' },
+  { ccNumber: 116, parameter: 'slideTime', min: 0, max: 1, curve: 'linear' },
+  { ccNumber: 117, parameter: 'volume',    min: 0, max: 1, curve: 'linear' },
+  { ccNumber: 118, parameter: 'tuning',    min: 0, max: 1, curve: 'linear' },
+  { ccNumber: 119, parameter: 'waveform',  min: 0, max: 1, curve: 'linear' },
+  { ccNumber: 120, parameter: 'cutoff',    min: 0, max: 1, curve: 'linear' },
 
   // Dub moves — 27 global triggers + holds. min/max/curve unused by the
   // dub router (it normalises 0-1 and fires on upward 0.5 crossing), but
@@ -696,10 +720,12 @@ export const useMIDIStore = create<MIDIStore>()(
                   }
                 }
                 
-                // Auto-connect to first device if none selected
+                // Auto-connect to first non-Maschine device (Maschine is owned by HID bridge)
                 if (!newState.selectedInputId && newState.inputDevices.length > 0) {
-                  console.log('[useMIDIStore] Auto-connecting to first MIDI input:', newState.inputDevices[0].name);
-                  get().selectInput(newState.inputDevices[0].id);
+                  const preferred = newState.inputDevices.find(d => !d.name?.toLowerCase().includes('maschine'))
+                    ?? newState.inputDevices[0];
+                  console.log('[useMIDIStore] Auto-connecting to first MIDI input:', preferred.name);
+                  get().selectInput(preferred.id);
                 }
               }
               
@@ -712,11 +738,13 @@ export const useMIDIStore = create<MIDIStore>()(
             // Initial device refresh
             get().refreshDevices();
 
-            // Auto-connect to first available input device
+            // Auto-connect to first non-Maschine device (Maschine is owned by HID bridge)
             const currentState = get();
             if (!currentState.selectedInputId && currentState.inputDevices.length > 0) {
-              console.log('[useMIDIStore] Auto-connecting to first MIDI input:', currentState.inputDevices[0].name);
-              await get().selectInput(currentState.inputDevices[0].id);
+              const preferred = currentState.inputDevices.find(d => !d.name?.toLowerCase().includes('maschine'))
+                ?? currentState.inputDevices[0];
+              console.log('[useMIDIStore] Auto-connecting to first MIDI input:', preferred.name);
+              await get().selectInput(preferred.id);
             }
             
             // Auto-show knob bar if devices are connected

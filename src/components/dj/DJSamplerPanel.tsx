@@ -48,7 +48,11 @@ export const DJSamplerPanel: React.FC<DJSamplerPanelProps> = ({ onClose }) => {
   } = useMIDIPadRouting();
 
   // Store state
-  const { programs, currentProgramId, currentBank, setBank, loadProgram } = useDrumPadStore();
+  const programs = useDrumPadStore((s) => s.programs);
+  const currentProgramId = useDrumPadStore((s) => s.currentProgramId);
+  const currentBank = useDrumPadStore((s) => s.currentBank);
+  const setBank = useDrumPadStore((s) => s.setBank);
+  const loadProgram = useDrumPadStore((s) => s.loadProgram);
   const currentProgram = programs.get(currentProgramId);
 
   // ── DJ mixer attach (mount-only, with a short retry) ──

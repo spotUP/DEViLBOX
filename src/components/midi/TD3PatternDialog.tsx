@@ -50,7 +50,9 @@ export const TD3PatternDialog: React.FC<TD3PatternDialogProps> = ({ isOpen, onCl
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { selectedOutputId, selectedInputId } = useMIDIStore();
-  const { patterns, currentPatternIndex, setCell } = useTrackerStore();
+  const patterns = useTrackerStore((s) => s.patterns);
+  const currentPatternIndex = useTrackerStore((s) => s.currentPatternIndex);
+  const setCell = useTrackerStore((s) => s.setCell);
   const cursor = useCursorStore((s) => s.cursor);
 
   const currentPattern = patterns[currentPatternIndex];

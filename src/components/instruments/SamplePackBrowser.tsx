@@ -50,7 +50,9 @@ interface SamplePackBrowserProps {
 }
 
 export const SamplePackBrowser: React.FC<SamplePackBrowserProps> = ({ onClose, mode = 'instrument', onSelectSample }) => {
-  const { currentInstrumentId, updateInstrument, setPreviewInstrument } = useInstrumentStore();
+  const currentInstrumentId = useInstrumentStore((s) => s.currentInstrumentId);
+  const updateInstrument = useInstrumentStore((s) => s.updateInstrument);
+  const setPreviewInstrument = useInstrumentStore((s) => s.setPreviewInstrument);
   const { uploadZip, uploadDirectory, removeUserPack } = useSamplePackStore();
   const allPacks = useAllSamplePacks();
 

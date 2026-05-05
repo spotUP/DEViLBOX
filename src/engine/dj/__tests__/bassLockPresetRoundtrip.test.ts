@@ -13,10 +13,13 @@
  * revert to per-type defaults — invisible to the user.
  */
 
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { useAudioStore } from '../../../stores/useAudioStore';
 import { effectiveBassLock, getDefaultBassLock } from '../bassLockDefaults';
 import type { EffectConfig } from '@typedefs/instrument';
+
+// Stub rAF so batched store writes fire synchronously
+vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => { cb(0); return 0; });
 
 describe('bassLock — preset round-trip via addMasterEffectConfig', () => {
   beforeEach(() => {

@@ -277,7 +277,8 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
   // Custom (purpose-built) vs Generic (auto-generated VSTBridge) UI for WASM synths with custom editors
   const [vstUiMode, setVstUiMode] = useState<'custom' | 'generic'>('custom');
 
-  const { bakeInstrument, unbakeInstrument } = useInstrumentStore();
+  const bakeInstrument = useInstrumentStore((s) => s.bakeInstrument);
+  const unbakeInstrument = useInstrumentStore((s) => s.unbakeInstrument);
 
   const handleChange = useCallback((updates: Partial<InstrumentConfig>) => {
     onChange(updates);

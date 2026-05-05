@@ -10,6 +10,7 @@ import { StatusBar } from '@components/layout/StatusBar';
 import { useAudioStore, useTrackerStore, useUIStore } from './stores';
 import { useMIDIStore } from './stores/useMIDIStore';
 import { getMIDIManager } from './midi/MIDIManager';
+import { initMaschineHIDBridge } from './midi/MaschineHIDBridge';
 import { useDJStore } from './stores/useDJStore';
 import { useSettingsStore } from './stores/useSettingsStore';
 import { useHistoryStore } from './stores/useHistoryStore';
@@ -307,6 +308,7 @@ function App() {
       midiStore.init().then(success => {
         if (success) {
           console.log('✅ [App] MIDI auto-initialized successfully');
+          initMaschineHIDBridge();
           
           // Auto-select device if only one available
           const state = useMIDIStore.getState();

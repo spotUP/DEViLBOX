@@ -620,6 +620,10 @@ export class ToneEngine {
     console.log(`[ToneEngine] Rerouted ${engineKey} output → DJ deck`);
   }
 
+  public getNativeEngineOutput(engineKey: string): GainNode | null {
+    return this.nativeEngineRouting.get(engineKey)?.gain ?? null;
+  }
+
   /**
    * Restore a native engine's audio output back to synthBus (default routing).
    * Called when a DJ deck unloads a Furnace song or disposes.

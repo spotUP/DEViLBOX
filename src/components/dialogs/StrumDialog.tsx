@@ -19,7 +19,7 @@ interface StrumDialogProps {
 
 export const StrumDialog: React.FC<StrumDialogProps> = ({ isOpen, onClose }) => {
   const selection = useCursorStore((s) => s.selection);
-  const { strumSelection } = useTrackerStore();
+  const strumSelection = useTrackerStore((s) => s.strumSelection);
   const [tickDelay, setTickDelay] = useState(1);
   const [direction, setDirection] = useState<'up' | 'down'>('down');
 

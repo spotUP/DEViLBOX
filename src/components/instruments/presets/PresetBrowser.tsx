@@ -18,7 +18,7 @@ export const PresetBrowser: React.FC<PresetBrowserProps> = ({ instrumentId, onCl
   const [searchQuery, setSearchQuery] = useState('');
   const [hoveredPreset, setHoveredPreset] = useState<string | null>(null);
 
-  const { updateInstrument } = useInstrumentStore();
+  const updateInstrument = useInstrumentStore((s) => s.updateInstrument);
 
   const categories = Object.keys(PRESET_CATEGORIES) as PresetCategory[];
 

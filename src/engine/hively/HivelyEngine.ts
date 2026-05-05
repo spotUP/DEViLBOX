@@ -66,6 +66,7 @@ export class HivelyEngine extends WASMSingletonBase implements IsolationCapableE
   private _tunePromise: Promise<HivelyTuneInfo> | null = null;
   private _resolveTune: ((info: HivelyTuneInfo) => void) | null = null;
   private _rejectTune: ((err: Error) => void) | null = null;
+  private _tuneLoaded = false;
   private _positionCallbacks: Set<PositionCallback> = new Set();
   private _songEndCallbacks: Set<() => void> = new Set();
   private _playerHandleResolvers: Array<(handle: number) => void> = [];
@@ -133,6 +134,7 @@ export class HivelyEngine extends WASMSingletonBase implements IsolationCapableE
           break;
 
         case 'tuneLoaded':
+          this._tuneLoaded = true;
           if (this._resolveTune) {
             const numCh = data.channels ?? 4;
             const chNames = Array.from({ length: numCh }, (_, i) => `CH${i + 1}`);
@@ -155,6 +157,7 @@ export class HivelyEngine extends WASMSingletonBase implements IsolationCapableE
           break;
 
         case 'error':
+          this._tuneLoaded = false;
           console.error('[HivelyEngine]', data.message);
           if (this._rejectTune) {
             this._rejectTune(new Error(data.message));
@@ -259,6 +262,11 @@ export class HivelyEngine extends WASMSingletonBase implements IsolationCapableE
 
   freeTune(): void {
     this.workletNode?.port.postMessage({ type: 'freeTune' });
+    this._tuneLoaded = false;
+  }
+
+  hasLoadedTune(): boolean {
+    return this._tuneLoaded;
   }
 
   /** Subscribe to position updates (~15fps). Returns unsubscribe function. */

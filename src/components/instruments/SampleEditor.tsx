@@ -110,7 +110,7 @@ const IconBtn: React.FC<{
 // ─── Component ─────────────────────────────────────────────────────────
 
 export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange }) => {
-  const { updateInstrument: storeUpdateInstrument } = useInstrumentStore();
+  const storeUpdateInstrument = useInstrumentStore((s) => s.updateInstrument);
   const allInstruments = useInstrumentStore((s) => s.instruments);
 
   const updateInstrument = useCallback(

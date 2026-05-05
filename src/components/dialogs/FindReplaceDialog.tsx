@@ -22,7 +22,8 @@ type SearchType = 'note' | 'instrument' | 'effect';
 type SearchScope = 'selection' | 'pattern' | 'all';
 
 export const FindReplaceDialog: React.FC<FindReplaceDialogProps> = ({ isOpen, onClose }) => {
-  const { patterns, currentPatternIndex } = useTrackerStore();
+  const patterns = useTrackerStore((s) => s.patterns);
+  const currentPatternIndex = useTrackerStore((s) => s.currentPatternIndex);
   const selection = useCursorStore((s) => s.selection);
   const [searchType, setSearchType] = useState<SearchType>('note');
   const [scope, setScope] = useState<SearchScope>('pattern');

@@ -59,14 +59,12 @@ export const MasterEffectsModal: React.FC<MasterEffectsModalProps> = ({ isOpen, 
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedGroup, setSelectedGroup] = useState<string>('all');
 
-  const {
-    masterEffects,
-    addMasterEffectConfig,
-    removeMasterEffect,
-    updateMasterEffect,
-    reorderMasterEffects,
-    setMasterEffects,
-  } = useAudioStore();
+  const masterEffects = useAudioStore((s) => s.masterEffects);
+  const addMasterEffectConfig = useAudioStore((s) => s.addMasterEffectConfig);
+  const removeMasterEffect = useAudioStore((s) => s.removeMasterEffect);
+  const updateMasterEffect = useAudioStore((s) => s.updateMasterEffect);
+  const reorderMasterEffects = useAudioStore((s) => s.reorderMasterEffects);
+  const setMasterEffects = useAudioStore((s) => s.setMasterEffects);
 
   const numChannels = useTrackerStore(s => s.patterns[s.currentPatternIndex]?.channels?.length ?? 16);
   const editorMode = useFormatStore(s => s.editorMode);

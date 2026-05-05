@@ -505,7 +505,9 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
       redo:            () => _redoRef.current(),
       openFileBrowser: () => _openBrowserRef.current(),
     });
-    return () => useFT2ToolbarActions.getState().unregister();
+    // Keep the last registered handlers alive when the toolbar unmounts because
+    // the Dub Deck expands by toggling editorFullscreen, which hides this
+    // component while the NavBar transport row is still visible.
   }, []); // stable wrappers — refs always point to latest handlers
 
   // WASM engines (MusicLine etc.) report position to wasmPositionStore, not trackerStore

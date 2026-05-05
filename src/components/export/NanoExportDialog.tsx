@@ -10,9 +10,11 @@ interface NanoExportDialogProps {
 
 export const NanoExportDialog: React.FC<NanoExportDialogProps> = ({ onClose }) => {
   const [copied, setCopied] = useState(false);
-  const { instruments } = useInstrumentStore();
-  const { patterns, patternOrder } = useTrackerStore();
-  const { bpm, speed } = useTransportStore();
+  const instruments = useInstrumentStore((s) => s.instruments);
+  const patterns = useTrackerStore((s) => s.patterns);
+  const patternOrder = useTrackerStore((s) => s.patternOrder);
+  const bpm = useTransportStore((s) => s.bpm);
+  const speed = useTransportStore((s) => s.speed);
 
   const binaryData = useMemo(() => {
     return NanoExporter.export(instruments, patterns, patternOrder, bpm, speed);

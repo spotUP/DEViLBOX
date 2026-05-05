@@ -204,6 +204,10 @@ export class DubBus {
   // iteration (shelf boost → saturator clips to 1.0 → feedback sends
   // back → shelf boosts again → stable full-amplitude bass drone).
   private feedbackShelfComp: BiquadFilterNode;
+  /** Ext-feedback variant of feedbackShelfComp. The external return loop
+   *  recirculates post-return audio back into the bus input, so it needs the
+   *  same bass compensation as the internal feedback path. */
+  private extFeedbackShelfComp: BiquadFilterNode;
   /** NaN/Inf scrubber inserted between `echo.output` and `this.feedback`.
    *  Starts life as a passthrough GainNode while the AudioWorklet module
    *  loads, then the worklet is spliced in-place (transparent to the rest
@@ -340,6 +344,7 @@ export class DubBus {
   // Send gain that feeds the plate input. On/off gate via mix level.
   // When plateStage is null, this node is disconnected.
   private plateSend: GainNode | null = null;
+  private static readonly PLATE_SWAP_SEC = 0.12;
   /** Cached mirror of the current springs dry/wet so dubPanic + mini-drain
    *  can zero it and restore without re-reading the engine. Mirrors what
    *  SpringReverbEffect's `.wet` used to hold inline. */
@@ -879,14 +884,7 @@ export class DubBus {
           if (this._pendingPostHoldSettings) {
             const pending = this._pendingPostHoldSettings;
             this._pendingPostHoldSettings = null;
-            const now3 = ctx.currentTime;
-            this.return_.gain.setTargetAtTime(
-              this.enabled ? pending.returnGain : 0, now3, 0.02,
-            );
-            if (!this._draining && this.enabled) {
-              const threshold = -6 - pending.sidechainAmount * 30;
-              this.sidechain.threshold.setTargetAtTime(threshold, now3, 0.05);
-            }
+            this.setSettings(pending);
           }
         }, (WARMUP_SEC + RAMP_SEC) * 1000 + 20);
       } catch (err) {
@@ -922,10 +920,49 @@ export class DubBus {
   setPlateStage(stage: DubBusSettings['plateStage']): void {
     console.log(`[DubBusCtrl] setPlateStage(${stage})`);
     if (stage === this.settings.plateStage && this.plateStage !== null) return;
-    this._teardownPlateStage();
     this.settings = { ...this.settings, plateStage: stage };
-    if (stage !== 'off') {
-      this._installPlateStage(stage, this.settings.plateStageMix);
+    const currentPlate = this.plateStage;
+    const currentSend = this.plateSend;
+    const now = this.context.currentTime;
+    const fadeSec = DubBus.PLATE_SWAP_SEC;
+    const targetMix = Math.max(0, Math.min(1, this.settings.plateStageMix));
+
+    if (stage === 'off') {
+      if (currentPlate && currentSend) {
+        try {
+          currentSend.gain.cancelScheduledValues(now);
+          currentSend.gain.setValueAtTime(currentSend.gain.value, now);
+          currentSend.gain.linearRampToValueAtTime(0, now + fadeSec);
+        } catch { /* ok */ }
+        this.plateStage = null;
+        this.plateSend = null;
+        this._schedulePlateStageTeardown(currentPlate, currentSend, fadeSec);
+      } else {
+        this._teardownPlateStage();
+      }
+      return;
+    }
+
+    const nextPlateNodes = this._createPlateStageNodes(stage, 0);
+    if (!nextPlateNodes) return;
+    const { plate, send } = nextPlateNodes;
+
+    this.plateStage = plate;
+    this.plateSend = send;
+
+    try {
+      send.gain.cancelScheduledValues(now);
+      send.gain.setValueAtTime(0, now);
+      send.gain.linearRampToValueAtTime(targetMix, now + fadeSec);
+    } catch { /* ok */ }
+
+    if (currentPlate && currentSend) {
+      try {
+        currentSend.gain.cancelScheduledValues(now);
+        currentSend.gain.setValueAtTime(currentSend.gain.value, now);
+        currentSend.gain.linearRampToValueAtTime(0, now + fadeSec);
+      } catch { /* ok */ }
+      this._schedulePlateStageTeardown(currentPlate, currentSend, fadeSec);
     }
   }
 
@@ -939,6 +976,16 @@ export class DubBus {
 
   /** Build + wire the plate stage. stereoMerge → plateSend → plate → return_. */
   private _installPlateStage(stage: 'madprofessor' | 'dattorro', mix: number): void {
+    const nodes = this._createPlateStageNodes(stage, mix);
+    if (!nodes) return;
+    this.plateStage = nodes.plate;
+    this.plateSend = nodes.send;
+  }
+
+  private _createPlateStageNodes(stage: 'madprofessor' | 'dattorro', mix: number): {
+    plate: MadProfessorPlateEffect | DattorroPlateEffect;
+    send: GainNode;
+  } | null {
     try {
       const plate: MadProfessorPlateEffect | DattorroPlateEffect =
         stage === 'madprofessor'
@@ -950,13 +997,11 @@ export class DubBus {
       const plateInput = (plate as unknown as { input: { input: AudioNode } }).input.input;
       send.connect(plateInput);
       Tone.connect(plate, this.return_);
-      this.plateStage = plate;
-      this.plateSend = send;
       console.log(`[DubBus] plateStage installed: ${stage} mix=${mix.toFixed(2)}`);
+      return { plate, send };
     } catch (err) {
       console.warn(`[DubBus] plateStage install failed (${stage}):`, err);
-      this.plateStage = null;
-      this.plateSend = null;
+      return null;
     }
   }
 
@@ -971,6 +1016,18 @@ export class DubBus {
       try { this.plateStage.dispose(); } catch { /* ok */ }
       this.plateStage = null;
     }
+  }
+
+  private _schedulePlateStageTeardown(
+    plate: MadProfessorPlateEffect | DattorroPlateEffect,
+    send: GainNode,
+    afterSec: number,
+  ): void {
+    window.setTimeout(() => {
+      try { send.disconnect(); } catch { /* ok */ }
+      try { plate.disconnect(); } catch { /* ok */ }
+      try { plate.dispose(); } catch { /* ok */ }
+    }, Math.max(0, afterSec * 1000 + 20));
   }
 
   // ─── Return EQ public API ───────────────────────────────────────────────
@@ -1216,6 +1273,10 @@ export class DubBus {
   // Wiring: sourceGain → busGain → deckHpf → input. busGain starts at
   // 0 so idle taps cost nothing audibly.
   private deckChannelTaps: Map<string, { busGain: GainNode; disposeSource: () => void }> = new Map();
+  // Whole-mix taps for engines that only expose a single stereo output.
+  // Unlike per-channel taps, these feed the entire player mix into the bus.
+  private wholeMixTaps: Map<string, { busGain: GainNode; disposeSource: () => void; baseline: number }> = new Map();
+  private wholeMixChannelDubSends: number[] = new Array(32).fill(0);
   private attachedMixer: DJMixerEngine | null = null;
   // Track mixer→tap connections so we can cleanly detach if the mixer changes.
   private mixerTapConnections: Array<{ nativeFrom: AudioNode; to: GainNode }> = [];
@@ -1301,6 +1362,7 @@ export class DubBus {
 
   private readonly context: AudioContext;
   private readonly master: AudioNode;
+  private inputClip: WaveShaperNode;
 
   constructor(context: AudioContext, master: AudioNode) {
     this.context = context;
@@ -1311,6 +1373,9 @@ export class DubBus {
     // so sends have zero effect (no audible bus output, but graph stays wired).
     this.input = this.context.createGain();
     this.input.gain.value = 1;
+    this.inputClip = this.context.createWaveShaper();
+    this.inputClip.curve = makeTapeSatCurve(0.2);
+    this.inputClip.oversample = '2x';
 
     // HPF cascade (18 dB/oct). All three stages share frequency + Q at runtime.
     const initialHpfFreq = this.settings.hpfStepped
@@ -1835,6 +1900,11 @@ export class DubBus {
     this.feedbackShelfComp.frequency.value = this.settings.bassShelfFreqHz;
     this.feedbackShelfComp.Q.value = this.settings.bassShelfQ;
     this.feedbackShelfComp.gain.value = -Math.max(-12, Math.min(12, this.settings.bassShelfGainDb));
+    this.extFeedbackShelfComp = this.context.createBiquadFilter();
+    this.extFeedbackShelfComp.type = 'lowshelf';
+    this.extFeedbackShelfComp.frequency.value = this.settings.bassShelfFreqHz;
+    this.extFeedbackShelfComp.Q.value = this.settings.bassShelfQ;
+    this.extFeedbackShelfComp.gain.value = -Math.max(-12, Math.min(12, this.settings.bassShelfGainDb));
 
     /* NaN/Inf scrubber + soft-limiter. Two scrubbers, one on each
        NaN-vulnerable path leaving the WASM/native echo engine:
@@ -1920,7 +1990,8 @@ export class DubBus {
     //   Spring.output → Sidechain → Glue → MidScoop → LPF → StereoMS → return → master
     // Insert enhancer chain (spectral exciter + transient sharpener) between input and HPF
     this._enhancer = new DubBusEnhancer(this.context);
-    this._enhancer.connect(this.input, this.hpf);
+    this._enhancer.connect(this.input, this.inputClip);
+    this.inputClip.connect(this.hpf);
     // hpf → hpf2 → hpf3 → hpfResonance (Altec T-network peak) — resonance is the cascade output.
     this.hpfResonance.connect(this.bassShelf);
     // bassShelf output feeds BOTH the single-path saturator AND the 3-path
@@ -1985,7 +2056,8 @@ export class DubBus {
     // runaway self-oscillation. The DelayNode ensures the cycle is legal
     // for Web Audio's topological sort.
     this.return_.connect(this.extFeedbackEq);
-    this.extFeedbackEq.connect(this.extFeedbackGain);
+    this.extFeedbackEq.connect(this.extFeedbackShelfComp);
+    this.extFeedbackShelfComp.connect(this.extFeedbackGain);
     this.extFeedbackGain.connect(this.extFeedbackDelay);
     this.extFeedbackDelay.connect(this.input);
 
@@ -2287,6 +2359,7 @@ export class DubBus {
     this._sidDubSendGain = null;
     this._sidChannelDubSends = [0, 0, 0];
     this._sidHasPerVoiceTaps = false;
+    this._sidMode = false;
     // Clean up per-voice taps
     for (let i = 0; i < 3; i++) {
       const tap = this.channelTaps.get(i);
@@ -3172,6 +3245,9 @@ export class DubBus {
     rampBiquadParam(this.feedbackShelfComp.frequency, merged.bassShelfFreqHz, now);
     rampBiquadParam(this.feedbackShelfComp.Q, merged.bassShelfQ, now);
     rampBiquadParam(this.feedbackShelfComp.gain, -safeBassGain, now);
+    rampBiquadParam(this.extFeedbackShelfComp.frequency, merged.bassShelfFreqHz, now);
+    rampBiquadParam(this.extFeedbackShelfComp.Q, merged.bassShelfQ, now);
+    rampBiquadParam(this.extFeedbackShelfComp.gain, -safeBassGain, now);
     rampBiquadParam(this.midScoop.frequency, merged.midScoopFreqHz, now);
     rampBiquadParam(this.midScoop.Q, merged.midScoopQ, now);
     rampBiquadParam(this.midScoop.gain, merged.midScoopGainDb, now);
@@ -3184,9 +3260,10 @@ export class DubBus {
     // we can push this much harder than the wet bus's bassShelfGainDb (which
     // self-oscillates above ~+12 dB even with the feedback compensator).
     const safeMasterPunch = Math.max(-18, Math.min(18, merged.masterBassPunchDb ?? 0));
+    const safeMasterShelfGain = Math.max(-12, Math.min(9, safeBassGain + safeMasterPunch));
     rampBiquadParam(this.masterBassShelf.frequency, merged.bassShelfFreqHz, now);
     rampBiquadParam(this.masterBassShelf.Q, merged.bassShelfQ, now);
-    rampBiquadParam(this.masterBassShelf.gain, masterActive ? safeBassGain + safeMasterPunch : 0, now);
+    rampBiquadParam(this.masterBassShelf.gain, masterActive ? safeMasterShelfGain : 0, now);
     rampBiquadParam(this.masterMidScoop.frequency, merged.midScoopFreqHz, now);
     rampBiquadParam(this.masterMidScoop.Q, merged.midScoopQ, now);
     rampBiquadParam(this.masterMidScoop.gain, masterActive ? merged.midScoopGainDb : 0, now);
@@ -3481,14 +3558,7 @@ export class DubBus {
       if (this._pendingPostHoldSettings) {
         const pending = this._pendingPostHoldSettings;
         this._pendingPostHoldSettings = null;
-        const now2 = ctx.currentTime;
-        this.return_.gain.setTargetAtTime(
-          this.enabled ? pending.returnGain : 0, now2, 0.02,
-        );
-        if (!this._draining && this.enabled) {
-          const threshold = -6 - pending.sidechainAmount * 30;
-          this.sidechain.threshold.setTargetAtTime(threshold, now2, 0.05);
-        }
+        this.setSettings(pending);
       }
     }, (WARMUP_SEC + RAMP_SEC) * 1000 + 20);
   }
@@ -3749,6 +3819,34 @@ export class DubBus {
     return { ...this.settings };
   }
 
+  /** Lightweight live snapshot for AutoDub / MCP diagnostics. */
+  getDiagnosticSnapshot(): Record<string, number | boolean | string | null> {
+    const round = (value: number): number => +value.toFixed(4);
+    return {
+      enabled: this.enabled,
+      draining: this._draining,
+      miniDrainPending: this._miniDrainPending,
+      masterInsertActive: this.masterInsertActive,
+      echoEngine: this.settings.echoEngine,
+      characterPreset: this.settings.characterPreset,
+      inputGain: round(this.input.gain.value),
+      feedbackGain: round(this.feedback.gain.value),
+      returnGainNode: round(this.return_.gain.value),
+      storeReturnGain: round(this.settings.returnGain),
+      storeEchoIntensity: round(this.settings.echoIntensity),
+      storeEchoWet: round(this.settings.echoWet),
+      storeSpringWet: round(this.settings.springWet),
+      storeSidechainAmount: round(this.settings.sidechainAmount),
+      storeHpfCutoff: Math.round(this.settings.hpfCutoff),
+      echoRateMs: Math.round(this.settings.echoRateMs),
+      activeActionReleasers: this.actionReleasers.size,
+      activeThrowTimers: this.throwTimers.size,
+      activeWobbles: this.wobbleHandles.size,
+      registeredChannelTaps: this.channelTaps.size,
+      sidMode: this._sidMode,
+    };
+  }
+
   // ─── Tracker Channel Tap API ───────────────────────────────────────────────
 
   /** Called by ChannelRoutedEffects when a per-channel tap is created. */
@@ -3759,6 +3857,67 @@ export class DubBus {
   /** Called by ChannelRoutedEffects when a tap is torn down (dubSend → 0). */
   unregisterChannelTap(channelId: number): void {
     this.channelTaps.delete(channelId);
+  }
+
+  hasWholeMixTap(): boolean {
+    return this.wholeMixTaps.size > 0;
+  }
+
+  private getWholeMixTargetForBaseline(baseline: number): number {
+    const sliderMax = applyDubSendCurve(Math.max(0, ...this.wholeMixChannelDubSends));
+    return Math.max(baseline, sliderMax);
+  }
+
+  registerWholeMixTap(key: string, source: AudioNode, baseline = 0): void {
+    this.unregisterWholeMixTap(key);
+
+    const busGain = this.context.createGain();
+    busGain.gain.value = this.getWholeMixTargetForBaseline(Math.max(0, Math.min(1, baseline)));
+    try {
+      source.connect(busGain);
+      busGain.connect(this.input);
+    } catch (e) {
+      console.warn(`[DubBus] registerWholeMixTap(${key}) connect failed:`, e);
+      try { busGain.disconnect(); } catch { /* ok */ }
+      return;
+    }
+
+    const disposeSource = () => {
+      try { source.disconnect(busGain); } catch { /* ok */ }
+    };
+    this.wholeMixTaps.set(key, {
+      busGain,
+      disposeSource,
+      baseline: Math.max(0, Math.min(1, baseline)),
+    });
+    console.log(`[DubBus] whole-mix tap registered: ${key}`);
+  }
+
+  unregisterWholeMixTap(key: string): void {
+    const entry = this.wholeMixTaps.get(key);
+    if (!entry) return;
+    try { entry.disposeSource(); } catch { /* ok */ }
+    try { entry.busGain.disconnect(); } catch { /* ok */ }
+    this.wholeMixTaps.delete(key);
+    console.log(`[DubBus] whole-mix tap unregistered: ${key}`);
+  }
+
+  setWholeMixDubSend(channelId: number, amount: number): boolean {
+    if (this.wholeMixTaps.size === 0) return false;
+    const idx = Math.max(0, channelId | 0);
+    if (idx >= this.wholeMixChannelDubSends.length) {
+      this.wholeMixChannelDubSends.length = idx + 1;
+      this.wholeMixChannelDubSends.fill(0, 32);
+    }
+    this.wholeMixChannelDubSends[idx] = Math.max(0, Math.min(1, amount));
+    const now = this.context.currentTime;
+    for (const entry of this.wholeMixTaps.values()) {
+      const target = this.getWholeMixTargetForBaseline(entry.baseline);
+      entry.busGain.gain.cancelScheduledValues(now);
+      entry.busGain.gain.setValueAtTime(entry.busGain.gain.value, now);
+      entry.busGain.gain.linearRampToValueAtTime(target, now + 0.02);
+    }
+    return true;
   }
 
   // ─── DJ deck per-channel taps ──────────────────────────────────────────
@@ -3972,6 +4131,29 @@ export class DubBus {
         for (let ch = 0; ch < 3; ch++) {
           fireParamLiveSubscribers(`dub.channelSend.ch${ch}`, this._sidChannelDubSends[ch] ?? 0);
         }
+      };
+    }
+
+    if (this.wholeMixTaps.size > 0) {
+      const now = this.context.currentTime;
+      const baselines = new Map<string, number>();
+      for (const [key, entry] of this.wholeMixTaps) {
+        const baseline = this.getWholeMixTargetForBaseline(entry.baseline);
+        baselines.set(key, baseline);
+        entry.busGain.gain.cancelScheduledValues(now);
+        entry.busGain.gain.setValueAtTime(entry.busGain.gain.value, now);
+        entry.busGain.gain.linearRampToValueAtTime(clamped, now + attackSec);
+      }
+      fireParamLiveSubscribers(`dub.channelSend.ch${channelId}`, clamped);
+      return () => {
+        const release = this.context.currentTime;
+        for (const [key, entry] of this.wholeMixTaps) {
+          const baseline = baselines.get(key) ?? this.getWholeMixTargetForBaseline(entry.baseline);
+          entry.busGain.gain.cancelScheduledValues(release);
+          entry.busGain.gain.setValueAtTime(entry.busGain.gain.value, release);
+          entry.busGain.gain.linearRampToValueAtTime(baseline, release + 0.08);
+        }
+        fireParamLiveSubscribers(`dub.channelSend.ch${channelId}`, Math.max(0, ...this.wholeMixChannelDubSends));
       };
     }
 
@@ -5686,6 +5868,11 @@ export class DubBus {
     // Channel taps are owned by ChannelEffectsManager — just clear our registry.
     // The actual Tone.Gain nodes are disposed by ChannelEffectsManager.disposeAll().
     this.channelTaps.clear();
+    for (const entry of this.wholeMixTaps.values()) {
+      try { entry.disposeSource(); } catch { /* ok */ }
+      try { entry.busGain.disconnect(); } catch { /* ok */ }
+    }
+    this.wholeMixTaps.clear();
     // Deck-channel taps are OWNED by the bus (we created the busGain).
     // Tear down every entry: disconnect the source side, disconnect the
     // bus gain, clear the map.
@@ -5721,6 +5908,8 @@ export class DubBus {
     try { this.lpf.disconnect(); } catch { /* ok */ }
     try { this.return_.disconnect(); } catch { /* ok */ }
     try { this.extFeedbackDelay.disconnect(); } catch { /* ok */ }
+    try { this.extFeedbackShelfComp.disconnect(); } catch { /* ok */ }
+    try { this.inputClip.disconnect(); } catch { /* ok */ }
     try { this.clubConvolver.disconnect(); } catch { /* ok */ }
     try { this.spring.dispose(); } catch { /* ok */ }
     try { this.echo.dispose(); } catch { /* ok */ }

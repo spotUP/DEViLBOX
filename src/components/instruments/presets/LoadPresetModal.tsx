@@ -21,7 +21,9 @@ interface LoadPresetModalProps {
 }
 
 export const LoadPresetModal: React.FC<LoadPresetModalProps> = ({ onClose }) => {
-  const { currentInstrumentId, updateInstrument, setPreviewInstrument } = useInstrumentStore();
+  const currentInstrumentId = useInstrumentStore((s) => s.currentInstrumentId);
+  const updateInstrument = useInstrumentStore((s) => s.updateInstrument);
+  const setPreviewInstrument = useInstrumentStore((s) => s.setPreviewInstrument);
   const {
     userPresets,
     deletePreset,

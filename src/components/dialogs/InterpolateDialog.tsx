@@ -38,7 +38,7 @@ const CURVE_OPTIONS: { value: InterpolateCurve; label: string; description: stri
 
 export const InterpolateDialog: React.FC<InterpolateDialogProps> = ({ isOpen, onClose }) => {
   const selection = useCursorStore((s) => s.selection);
-  const { interpolateSelection } = useTrackerStore();
+  const interpolateSelection = useTrackerStore((s) => s.interpolateSelection);
   const [column, setColumn] = useState<InterpolateColumn>('volume');
   const [startValue, setStartValue] = useState(64);
   const [endValue, setEndValue] = useState(0);

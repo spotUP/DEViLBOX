@@ -62,6 +62,29 @@ export type FileLoadResult =
   | { success: 'pending-confirmation'; file: File }
   | { success: 'pending-import'; file: File };
 
+async function stopActivePlaybackForIncomingSong(
+  engine: ReturnType<typeof getToneEngine>,
+  options: { resetPosition?: boolean } = {},
+): Promise<void> {
+  const transport = useTransportStore.getState();
+  transport.stop();
+  if (options.resetPosition) {
+    transport.setCurrentRow(0);
+    transport.setCurrentPattern(0);
+  }
+  engine.releaseAll();
+
+  try {
+    const { getTrackerReplayer } = await import('@/engine/TrackerReplayer');
+    getTrackerReplayer().stop();
+  } catch { /* replayer not initialized yet */ }
+
+  try {
+    const { getAdPlugPlayer } = await import('@/lib/import/AdPlugPlayer');
+    getAdPlugPlayer().stop();
+  } catch { /* player may not be initialized */ }
+}
+
 // ─── Unified Tracker Module Import ─────────────────────────────────────────
 // THE single import function for all tracker modules (MOD/XM/IT/S3M/FUR/DMF/
 // Amiga/UADE/etc.). Called by ImportModuleDialog's onImport callback from both
@@ -111,27 +134,13 @@ export async function importTrackerModule(
   // Full state reset
   const { loadPatterns, setPatternOrder, setCurrentPattern } = useTrackerStore.getState();
   const { loadInstruments, reset: resetInstruments } = useInstrumentStore.getState();
-  const { setBPM, setSpeed, stop, reset: resetTransport } = useTransportStore.getState();
+  const { setBPM, setSpeed, reset: resetTransport } = useTransportStore.getState();
   const { setMetadata } = useProjectStore.getState();
   const { reset: resetAutomation } = useAutomationStore.getState();
   const { setOriginalModuleData, applyEditorMode } = useFormatStore.getState();
   const engine = getToneEngine();
 
-  stop();
-  engine.releaseAll();
-
-  // Stop native engines (CheeseCutter, UADE, Hively, etc.) from the previous song
-  try {
-    const { getTrackerReplayer } = await import('@/engine/TrackerReplayer');
-    getTrackerReplayer().stop();
-  } catch { /* replayer not initialized yet */ }
-
-  // Stop any running AdPlug streaming player from a previous song — otherwise
-  // its worklet node stays connected and plays in parallel with the new song.
-  try {
-    const { getAdPlugPlayer } = await import('@/lib/import/AdPlugPlayer');
-    getAdPlugPlayer().stop();
-  } catch { /* player may not be initialized */ }
+  await stopActivePlaybackForIncomingSong(engine);
 
   resetAutomation();
   resetTransport();
@@ -642,7 +651,7 @@ async function loadSongFile(file: File, options: FileLoadOptions, preReadBuffer?
   const { loadPatterns, setPatternOrder, setCurrentPattern, reset: resetTracker } = useTrackerStore.getState();
   const { applyEditorMode, setOriginalModuleData } = useFormatStore.getState();
   const { loadInstruments, addInstrument, reset: resetInstruments } = useInstrumentStore.getState();
-  const { setBPM, setSpeed, setGrooveTemplate, reset: resetTransport, isPlaying, stop: stopTransport } = useTransportStore.getState();
+  const { setBPM, setSpeed, setGrooveTemplate, reset: resetTransport } = useTransportStore.getState();
   const { setMetadata } = useProjectStore.getState();
   const { reset: resetAutomation } = useAutomationStore.getState();
   const engine = getToneEngine();
@@ -660,8 +669,7 @@ async function loadSongFile(file: File, options: FileLoadOptions, preReadBuffer?
     if (isGoatTrackerSong(gtBuf)) {
       console.log('[UnifiedFileLoader] GoatTracker .sng detected — routing to GTUltra engine');
       // Stop playback but do NOT reset instruments/patterns — GT has its own state
-      if (isPlaying) stopTransport();
-      engine.releaseAll();
+      await stopActivePlaybackForIncomingSong(engine);
 
       const { useGTUltraStore } = await import('@/stores/useGTUltraStore');
       const gtStore = useGTUltraStore.getState();
@@ -705,15 +713,7 @@ async function loadSongFile(file: File, options: FileLoadOptions, preReadBuffer?
     // 1. usePatternPlayback effect from auto-restarting when patterns change mid-playback
     // 2. Replayer position from first song (e.g. pattern 150) exceeding second song's
     //    pattern count (e.g. 103), causing immediate "song end" on first play
-    const transport = useTransportStore.getState();
-    transport.stop();
-    transport.setCurrentRow(0);
-    transport.setCurrentPattern(0);
-
-    try {
-      const { getTrackerReplayer } = await import('@/engine/TrackerReplayer');
-      getTrackerReplayer().stop();
-    } catch { /* replayer not initialized yet */ }
+    await stopActivePlaybackForIncomingSong(engine, { resetPosition: true });
 
     // Wait for any in-flight shared song load to finish — the worklet processes
     // messages sequentially, so a pending loadSong blocks new createHandle calls.
@@ -816,14 +816,7 @@ async function loadSongFile(file: File, options: FileLoadOptions, preReadBuffer?
   }
 
   // === FULL STATE RESET (unless preserveInstruments) ===
-  if (isPlaying) stopTransport();
-  engine.releaseAll();
-
-  // Stop any running AdPlug streaming player from a previous song
-  try {
-    const { getAdPlugPlayer } = await import('@/lib/import/AdPlugPlayer');
-    getAdPlugPlayer().stop();
-  } catch { /* player may not be initialized */ }
+  await stopActivePlaybackForIncomingSong(engine);
 
   // TD-3 append mode: skip full reset — the TD-3 handler manages patterns itself
   const isTD3Append = (filename.endsWith('.sqs') || filename.endsWith('.seq')) && options.replacePatterns === false;
@@ -1851,4 +1844,3 @@ async function loadAdPlugFile(file: File, companionFiles?: Map<string, ArrayBuff
     return { success: false, error: `Failed to load AdPlug file: ${msg}` };
   }
 }
-

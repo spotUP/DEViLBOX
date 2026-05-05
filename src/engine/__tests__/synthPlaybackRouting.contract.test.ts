@@ -29,6 +29,8 @@ function read(rel: string): string {
 
 describe('Synth playback routing — libopenmpt creation contract', () => {
   const src = read('engine/TrackerReplayer.ts');
+  const nativeRouting = read('engine/replayer/NativeEngineRouting.ts');
+  const instrumentFactory = read('engine/InstrumentFactory.ts');
 
   it('Phase 5.4 does not gate on synthType or hasOnlyNativePlayerSynths', () => {
     // Extract the Phase 5.4 section (between "Phase 5.4" comment and the try block)
@@ -63,5 +65,22 @@ describe('Synth playback routing — libopenmpt creation contract', () => {
     expect(nativeIdx).toBeGreaterThan(0);
     expect(phase54Idx).toBeGreaterThan(0);
     expect(nativeIdx).toBeLessThan(phase54Idx);
+  });
+
+  it('Hively whole-song playback suppresses tracker note synthesis', () => {
+    expect(nativeRouting).toMatch(/key:\s*'Hively'[\s\S]*?suppressNotes:\s*true/);
+  });
+
+  it('Hively instrument wrapper skips standalone player setup when a tune is already loaded', () => {
+    expect(instrumentFactory).toMatch(/config\.hively && !hvlSynth\.getEngine\(\)\.hasLoadedTune\(\)/);
+  });
+
+  it('TFMX playback uses the wasm position store directly, not the global FormatPlaybackState singleton', () => {
+    const tfmxBlockMatch = nativeRouting.match(/if\s*\(desc\.key === 'TFMXModule'[\s\S]*?console\.log\(`\[NativeEngineRouting\] TFMXModule position sync wired[\s\S]*?\n\s*\}/);
+    expect(tfmxBlockMatch, 'TFMXModule position sync block should exist').not.toBeNull();
+    const tfmxBlock = tfmxBlockMatch![0];
+    expect(tfmxBlock).toContain('useWasmPositionStore.getState().setPosition(row, position);');
+    expect(tfmxBlock).not.toContain('setFormatPlaybackPlaying(true)');
+    expect(tfmxBlock).not.toContain('setFormatPlaybackRow(row)');
   });
 });

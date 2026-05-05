@@ -147,7 +147,9 @@ export const RandomizeDialog: React.FC<RandomizeDialogProps> = ({
   onClose,
 }) => {
   useModalClose({ isOpen: true, onClose });
-  const { patterns, currentPatternIndex, setChannelRows } = useTrackerStore();
+  const patterns = useTrackerStore((s) => s.patterns);
+  const currentPatternIndex = useTrackerStore((s) => s.currentPatternIndex);
+  const setChannelRows = useTrackerStore((s) => s.setChannelRows);
   const currentPattern = patterns[currentPatternIndex];
 
   const [selectedChannel, setSelectedChannel] = useState(initialChannelIndex);

@@ -26,14 +26,12 @@ export const InstrumentEffectsModal: React.FC<InstrumentEffectsModalProps> = ({ 
   const [showPresetMenu, setShowPresetMenu] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
-  const {
-    instruments,
-    currentInstrumentId,
-    addEffectConfig,
-    removeEffect,
-    updateEffect,
-    updateInstrument,
-  } = useInstrumentStore();
+  const instruments = useInstrumentStore((s) => s.instruments);
+  const currentInstrumentId = useInstrumentStore((s) => s.currentInstrumentId);
+  const addEffectConfig = useInstrumentStore((s) => s.addEffectConfig);
+  const removeEffect = useInstrumentStore((s) => s.removeEffect);
+  const updateEffect = useInstrumentStore((s) => s.updateEffect);
+  const updateInstrument = useInstrumentStore((s) => s.updateInstrument);
 
   // Get current instrument
   const currentInstrument = instruments.find((inst) => inst.id === currentInstrumentId);

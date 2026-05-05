@@ -13,6 +13,8 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'fs';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
+import { getAutoDubSeedChannelCount, getAutoDubSeedSendLevel } from '../AutoDubPanel';
+import { resolveCurrentDubStyle } from '../DubDeckStrip';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 
@@ -63,5 +65,49 @@ describe('DubBus.ts — tubbyScream stability contract', () => {
     expect(holdMatch, 'tap.gain must have a setValueAtTime(0, now + delay) hold').not.toBeNull();
     const holdSec = parseFloat(holdMatch![1]);
     expect(holdSec).toBeGreaterThanOrEqual(0.02);
+  });
+});
+
+describe('AutoDubPanel — channel seeding regression', () => {
+  it('seeds only the loaded pattern channels when the mixer has more slots', () => {
+    expect(getAutoDubSeedChannelCount(4, 16)).toBe(4);
+  });
+
+  it('falls back to mixer channels when no pattern channel count is available', () => {
+    expect(getAutoDubSeedChannelCount(undefined, 16)).toBe(16);
+  });
+
+  it('caps hot preset sends so AutoDub startup does not flood the wet return', () => {
+    expect(getAutoDubSeedSendLevel(1.0)).toBe(0.45);
+    expect(getAutoDubSeedSendLevel(0.85)).toBe(0.425);
+  });
+
+  it('keeps low preset sends audible instead of collapsing to near-zero', () => {
+    expect(getAutoDubSeedSendLevel(0.2)).toBe(0.15);
+  });
+});
+
+describe('AutoDubPanel — enable behavior regression', () => {
+  const panelSrc = read('components/dub/AutoDubPanel.tsx');
+
+  it('starts the AutoDub loop directly instead of launching a playback scrub when enabled', () => {
+    expect(panelSrc).toContain('startAutoDub();');
+    expect(panelSrc).not.toContain('runChannelAudioScrub(');
+    expect(panelSrc).not.toContain('cancelChannelScrub(');
+    expect(panelSrc).not.toContain('Analyzing...');
+  });
+});
+
+describe('DubDeckStrip — style resolution regression', () => {
+  it('uses the persona style when the bus is custom but AutoDub persona is still non-custom', () => {
+    expect(resolveCurrentDubStyle('custom', 'perry').id).toBe('perry');
+  });
+
+  it('uses the bus preset style when preset and persona have drifted', () => {
+    expect(resolveCurrentDubStyle('scientist', 'perry').id).toBe('scientist');
+  });
+
+  it('falls back to Custom instead of Tubby when neither preset nor persona map cleanly', () => {
+    expect(resolveCurrentDubStyle(undefined, 'custom').id).toBe('custom');
   });
 });
