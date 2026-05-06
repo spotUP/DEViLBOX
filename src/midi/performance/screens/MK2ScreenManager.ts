@@ -236,9 +236,11 @@ class MK2ScreenManager {
     // Nav buttons affect context within current mode
     switch (buttonName) {
       case 'navLeft':
+      case 'pageLeft':
         this.navigateLeft();
         return true;
       case 'navRight':
+      case 'pageRight':
         this.navigateRight();
         return true;
       case 'groupA': case 'groupB': case 'groupC': case 'groupD':
@@ -268,9 +270,9 @@ class MK2ScreenManager {
         this.markDirty();
         return true;
       }
-      // Encoder push — enter/confirm in browse mode, toggle play otherwise
+      // Encoder push — enter/confirm in browse mode
       case 'enter':
-      case 'encoderPush': {
+      case 'nav': {
         if (this.mode === 'browse') {
           const instruments = useInstrumentStore.getState().instruments;
           const inst = instruments[this.ctx.browseScrollPos];
@@ -287,6 +289,27 @@ class MK2ScreenManager {
         return true;
       case 'pattern':
         this.setMode('step');
+        return true;
+      // Grid — toggle metronome
+      case 'grid':
+        useTransportStore.getState().toggleMetronome();
+        this.markDirty();
+        return true;
+      // Volume — switch to mixer
+      case 'volume':
+        this.setMode('mixer');
+        return true;
+      // Consumed buttons (no action yet but don't leak to MIDI)
+      case 'tempo':
+      case 'swing':
+      case 'auto':
+      case 'all':
+      case 'noteRepeat':
+      case 'duplicate':
+      case 'select':
+      case 'shift':
+      case 'rec':
+      case 'erase':
         return true;
       // Step left/right — move cursor row in step mode, move pattern in song mode
       case 'stepLeft': {
