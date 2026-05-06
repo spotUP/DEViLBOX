@@ -73,7 +73,7 @@ export const useAudioStore = create<AudioStore>()(
     // they're mixing sample-heavy material alongside synths.
     autoGain: false,
     masterLimiterEnabled: true,
-    masterLimiterThreshold: -6,  // -6 dB — less aggressive than old -1 dB default
+    masterLimiterThreshold: -1,  // -1 dB — only catch peaks near clipping
     analyserNode: null,
     fftNode: null,
     toneEngineInstance: null,
