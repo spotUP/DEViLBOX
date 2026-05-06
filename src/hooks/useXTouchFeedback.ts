@@ -64,10 +64,13 @@ export function useXTouchFeedback(): void {
     let initializedOutput = false;
 
     const sendFaderInit = (outputId: string) => {
-      // Set all faders to 0 on both Layer A (CC 1-9) and Layer B (CC 28-36)
-      for (const cc of [1, 2, 3, 4, 5, 6, 7, 8, 9, 28, 29, 30, 31, 32, 33, 34, 35, 36]) {
-        manager.sendRawToDevice(outputId, new Uint8Array([0xb0, cc, 0]));
-      }
+      // DON'T zero faders — the first flush() will send actual current values.
+      // Zeroing here would fight restored mixer state from persistence.
+
+      // But DO send faders on the wrong channel (0xb0) to zero position,
+      // in case the device was left in a stale state from a different app.
+      // The correct output channel is 0xb1 — 0xb0 is a no-op for motor control.
+
       // Zero all encoder rings: top row (CC 10-17) and right column (CC 18-25)
       for (let cc = 10; cc <= 25; cc++) {
         manager.sendRawToDevice(outputId, new Uint8Array([0xb1, cc, 0]));
@@ -95,10 +98,17 @@ export function useXTouchFeedback(): void {
       }
       if (!output) return;
 
-      // On first connection, zero all faders
+      // On first connection, init LEDs/rings and schedule a deferred flush
+      // to catch persisted state that loads async from IndexedDB
       if (!initializedOutput) {
         initializedOutput = true;
         sendFaderInit(output.id);
+        // Clear lastSentFaderCC so the upcoming flush sends actual values
+        // (not cached zeros from a previous session)
+        setTimeout(() => {
+          lastPayloadRef.current = '';
+          scheduleFlush();
+        }, 500);
       }
 
       const messages = buildXTouchFeedbackMessages(preset, getFeedbackState(liveSendsRef.current, activeMovesRef.current), touchedRef.current);
