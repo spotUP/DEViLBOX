@@ -5,6 +5,7 @@ import {
   buildXTouchFeedbackMessages,
   encodeCompactButtonLED,
   recordFaderTouchRelease,
+  resetFaderCache,
   type XTouchFeedbackState,
   type XTouchTouchedMap
 } from '../midi/xTouchFeedback';
@@ -103,10 +104,11 @@ export function useXTouchFeedback(): void {
       if (!initializedOutput) {
         initializedOutput = true;
         sendFaderInit(output.id);
-        // Clear lastSentFaderCC so the upcoming flush sends actual values
-        // (not cached zeros from a previous session)
+        // Clear caches so the deferred flush re-sends all values
+        // (catches persisted state that loads async from IndexedDB)
         setTimeout(() => {
           lastPayloadRef.current = '';
+          resetFaderCache();
           scheduleFlush();
         }, 500);
       }
@@ -221,7 +223,15 @@ export function useXTouchFeedback(): void {
     };
 
     const unsubscribeDJ = useDJStore.subscribe(scheduleFlush);
-    const unsubscribeDub = useDrumPadStore.subscribe(scheduleFlush);
+    const unsubscribeDub = useDrumPadStore.subscribe((state, prev) => {
+      // When dub bus enable toggles, fader meanings change entirely
+      // (DJ volumes ↔ dub sends) — clear motor cache to force re-send
+      if (state.dubBus.enabled !== prev.dubBus.enabled) {
+        resetFaderCache();
+        lastPayloadRef.current = '';
+      }
+      scheduleFlush();
+    });
     const unsubscribeMixer = useMixerStore.subscribe(scheduleFlush);
     const unsubscribeDevices = manager.onDeviceChange(scheduleFlush);
     manager.addMessageHandler(midiTouchHandler);
