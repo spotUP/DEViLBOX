@@ -53,24 +53,24 @@ export const PadGrid: React.FC<PadGridProps> = ({
   const setBank = useDrumPadStore((s) => s.setBank);
 
   const { isPortrait } = useOrientation();
-  const gridCols = isPortrait ? 2 : 4;
 
   const programs = useDrumPadStore((s) => s.programs);
   const currentProgramId = useDrumPadStore((s) => s.currentProgramId);
   const currentProgram = programs.get(currentProgramId);
   const controllerPadCount = useDrumPadStore(s => s.controllerPadCount);
-  const visiblePads = Math.min(controllerPadCount, 8);
+  const visiblePads = Math.min(controllerPadCount, 16);
+  const gridCols = controllerPadCount >= 16 ? 4 : (isPortrait ? 2 : 4);
 
   // Grid container ref for keyboard focus
   const gridRef = useRef<HTMLDivElement>(null);
 
   // Reset focused pad and clear visual state when bank changes
   useEffect(() => {
-    const bankOffset = { A: 0, B: 8 }[currentBank];
+    const bankOffset = controllerPadCount >= 16 ? 0 : { A: 0, B: 8 }[currentBank];
     setFocusedPadId(bankOffset + 1);
     setPadVelocities({});
     releaseAllHeld();
-  }, [currentBank, releaseAllHeld]);
+  }, [currentBank, releaseAllHeld, controllerPadCount]);
 
   // Dub Bus settings mirror — push store state to the audio engine.
   // Only re-run when fields that affect the engine actually change.
@@ -218,11 +218,12 @@ export const PadGrid: React.FC<PadGridProps> = ({
     hookReleasePad(padId);
   }, [hookReleasePad]);
 
-  // Get pads for current bank (memoized for performance)
+  // Get pads for current view (all 16 for MK2, bank-split for 8-pad controllers)
   const bankPads = useMemo(() => {
     if (!currentProgram) return [];
+    if (controllerPadCount >= 16) return currentProgram.pads;
     return getBankPads(currentProgram.pads, currentBank);
-  }, [currentProgram, currentBank]);
+  }, [currentProgram, currentBank, controllerPadCount]);
 
   // Arrange pads in rows, bottom-up (MPC layout: pad 1 = bottom-left)
   const rows = useMemo(() => {
@@ -248,7 +249,7 @@ export const PadGrid: React.FC<PadGridProps> = ({
         return;
       }
 
-      const bankOffset = { A: 0, B: 8 }[currentBank];
+      const bankOffset = controllerPadCount >= 16 ? 0 : { A: 0, B: 8 }[currentBank];
       const bankStart = bankOffset + 1;
       const bankEnd = bankOffset + visiblePads;
 
