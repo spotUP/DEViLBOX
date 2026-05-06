@@ -23,6 +23,7 @@ const KNOB_CC_BASE = 70;
 const PAD_NOTE_BASE = 36;
 
 // Button → note mapping (buttons on ch 14, pads on ch 15 to avoid collision)
+// Named keys for known buttons; numeric btnN keys discovered via NIHIA
 const BUTTON_NOTES: Record<string, number> = {
   play:      116,
   rec:       117,
@@ -46,10 +47,21 @@ const BUTTON_NOTES: Record<string, number> = {
   groupH:    7,
 };
 
+// NIHIA button ID → semantic name (discovered by physical button presses)
+// Button IDs are the raw uint32 from EVT_BTN_DATA offset 16.
+// Extend this map as buttons are discovered — press buttons with bridge
+// running and read stderr for "[maschine] BTN N PRESSED" log lines.
+const NIHIA_BTN_ID_TO_NAME: Record<number, string> = {
+  // Populated by physical discovery — press each button, note the ID,
+  // add it here. The log line format is:
+  //   [maschine] BTN 45 PRESSED
+  // Then add:  45: 'play',
+};
+
 type MaschineEvent =
   | { type: 'encoder'; index: number; name: string; value: number; raw: number }
   | { type: 'pad';     pad: number; velocity: number; pressed: boolean }
-  | { type: 'button';  name: string; pressed: boolean };
+  | { type: 'button';  name: string; btnId?: number; pressed: boolean };
 
 type MaschineCommand =
   | { type: 'setPadColor';     pad: number; r: number; g: number; b: number }
@@ -153,7 +165,18 @@ class MaschineHIDBridge {
       };
       mgr.dispatchMessage(msg);
     } else if (evt.type === 'button') {
-      const note = BUTTON_NOTES[evt.name];
+      // Resolve button name: try NIHIA btnId → name mapping first, then raw name
+      let resolvedName = evt.name;
+      if (evt.btnId !== undefined) {
+        const mapped = NIHIA_BTN_ID_TO_NAME[evt.btnId];
+        if (mapped) {
+          resolvedName = mapped;
+        } else {
+          // Unknown button ID — log for discovery
+          console.debug(`[MaschineHID] Unknown button ID ${evt.btnId} (${evt.name}), add to NIHIA_BTN_ID_TO_NAME`);
+        }
+      }
+      const note = BUTTON_NOTES[resolvedName];
       if (note === undefined) return;
       const msg: MIDIMessage = {
         type: evt.pressed ? 'noteOn' : 'noteOff',

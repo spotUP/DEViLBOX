@@ -249,6 +249,10 @@ export const useInstrumentStore = create<InstrumentStore>()(
           }
         }).catch(() => { /* ignore if store not ready */ });
       }
+      // Sync NKS knob mappings + hardware display when switching instruments
+      import('../midi/NKSAutoMapper').then(({ syncNKSToSynth }) => {
+        syncNKSToSynth(inst.synthType);
+      }).catch(() => { /* NKS unavailable — safe to skip */ });
     },
 
     setPreviewInstrument: (instrument) =>
