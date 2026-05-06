@@ -447,7 +447,8 @@ export const PadGrid: React.FC<PadGridProps> = ({
       </div>
       )}
 
-      {/* Bank selector */}
+      {/* Bank selector — hidden when controller has 16+ pads (all visible at once) */}
+      {controllerPadCount < 16 && (
       <div className="flex items-center gap-1 shrink-0">
         <span className="text-[10px] font-mono text-text-muted mr-1">BANK</span>
         {bankButtons.map(bank => (
@@ -464,12 +465,13 @@ export const PadGrid: React.FC<PadGridProps> = ({
           </button>
         ))}
       </div>
+      )}
 
-      {/* Responsive Pad Grid — 8 pads (4x2 landscape, 2x4 portrait) */}
+      {/* Responsive Pad Grid — adapts rows to fit all visible pads */}
       <div
         ref={gridRef}
         className={`grid flex-1 min-h-0 ${performanceMode ? 'gap-3' : 'gap-1.5'} ${gridCols === 2 ? 'grid-cols-2' : 'grid-cols-4'}`}
-        style={{ gridTemplateRows: `repeat(${gridCols === 2 ? 4 : 2}, 1fr)` }}
+        style={{ gridTemplateRows: `repeat(${Math.ceil(visiblePads / gridCols)}, 1fr)` }}
         role="grid"
         aria-label="Drum pad grid"
       >
