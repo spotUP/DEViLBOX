@@ -35,6 +35,13 @@ export function scheduleWasmEffectRebuild(): void {
           return;
         }
 
+        // Skip isolation when hybrid playback is active — native Tone.js synths
+        // bypass the WASM worklet, so isolation can't capture their audio.
+        const { getTrackerReplayer } = await import('../engine/TrackerReplayer');
+        if (getTrackerReplayer().hasReplacedInstruments) {
+          return;
+        }
+
         const { getToneEngine } = await import('../engine/ToneEngine');
         const masterEffectsInput = getToneEngine().masterEffectsInput;
         const mgr = getChannelRoutedEffectsManager(masterEffectsInput);

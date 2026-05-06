@@ -161,8 +161,8 @@ export const usePatternPlayback = () => {
 
   const patternStructureKey = useMemo(() => {
     if (!pattern) return '';
-    return `${patterns.length}:${pattern.channels.length}:${pattern.length}:${pattern.importMetadata?.sourceFormat ?? ''}:${patternOrderKey}:v${instrumentLoadVersion}`;
-  }, [patterns.length, pattern?.channels.length, pattern?.length, pattern?.importMetadata?.sourceFormat, patternOrderKey, instrumentLoadVersion]);
+    return `${patterns.length}:${pattern.length}:${pattern.importMetadata?.sourceFormat ?? ''}:${patternOrderKey}:v${instrumentLoadVersion}`;
+  }, [patterns.length, pattern?.length, pattern?.importMetadata?.sourceFormat, patternOrderKey, instrumentLoadVersion]);
 
   // Track if we've started playback
   const hasStartedRef = useRef(false);
