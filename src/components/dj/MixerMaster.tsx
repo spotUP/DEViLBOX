@@ -1,13 +1,14 @@
 /**
- * MixerMaster - Master volume knob + stereo VU meter
+ * MixerMaster - Master volume knob + stereo VU meter + limiter controls
  *
  * Single knob controlling the master output volume (0 to 1.5),
- * with a dual L/R LED-style VU meter and a limiter indicator.
+ * with a dual L/R LED-style VU meter and a toggleable limiter.
  */
 
 import React, { useCallback, useRef, useEffect, useState } from 'react';
 import { Knob } from '@components/controls/Knob';
 import { useDJStore } from '@/stores/useDJStore';
+import { useAudioStore } from '@/stores/useAudioStore';
 import { getDJEngine } from '@/engine/dj/DJEngine';
 import * as DJActions from '@/engine/dj/DJActions';
 
@@ -31,6 +32,10 @@ function getSegmentColor(index: number, lit: boolean): string {
 
 export const MixerMaster: React.FC = () => {
   const masterVolume = useDJStore((s) => s.masterVolume);
+  const limiterEnabled = useAudioStore((s) => s.masterLimiterEnabled);
+  const limiterThreshold = useAudioStore((s) => s.masterLimiterThreshold);
+  const setLimiterEnabled = useAudioStore((s) => s.setMasterLimiterEnabled);
+  const setLimiterThreshold = useAudioStore((s) => s.setMasterLimiterThreshold);
   const [levelL, setLevelL] = useState(-Infinity);
   const [levelR, setLevelR] = useState(-Infinity);
   const [limiterActive, setLimiterActive] = useState(false);
@@ -141,19 +146,45 @@ export const MixerMaster: React.FC = () => {
         </div>
       </div>
 
-      {/* Limiter indicator */}
-      <div className="flex items-center gap-0.5" title="Limiter — lights red when output is clipping">
+      {/* Limiter controls */}
+      <button
+        className="flex items-center gap-0.5 cursor-pointer hover:opacity-80"
+        title={limiterEnabled
+          ? `Limiter active (threshold: ${limiterThreshold} dB) — click to disable`
+          : 'Limiter disabled — click to enable'}
+        onClick={() => setLimiterEnabled(!limiterEnabled)}
+      >
         <div
           className="rounded-full"
           style={{
             width: 5,
             height: 5,
-            backgroundColor: limiterActive ? 'var(--color-error)' : 'var(--color-bg-tertiary)',
+            backgroundColor: !limiterEnabled
+              ? 'var(--color-bg-tertiary)'
+              : limiterActive
+                ? 'var(--color-error)'
+                : 'var(--color-success)',
             transition: 'background-color 0.1s',
           }}
         />
-        <span className="text-text-muted text-[8px] font-mono">LIM</span>
-      </div>
+        <span className={`text-[8px] font-mono ${limiterEnabled ? 'text-text-primary' : 'text-text-muted'}`}>
+          Limiter
+        </span>
+      </button>
+      {limiterEnabled && (
+        <Knob
+          value={limiterThreshold}
+          min={-24}
+          max={0}
+          onChange={setLimiterThreshold}
+          label="Threshold"
+          size="sm"
+          color="#ef4444"
+          defaultValue={-6}
+          formatValue={(v) => `${v.toFixed(0)} dB`}
+          title="Limiter threshold — higher values allow more headroom before limiting kicks in"
+        />
+      )}
     </div>
   );
 };
