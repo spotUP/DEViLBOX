@@ -55,41 +55,29 @@ export const DJDeck: React.FC<DJDeckProps> = ({ deckId }) => {
   // Subscribe to pitch changes in store and propagate to engine
   // This catches ALL pitch sources (slider, keyboard, sync button) in one place
   useEffect(() => {
-    let prevPitch = useDJStore.getState().decks[deckId].pitchOffset;
-    const unsubscribe = useDJStore.subscribe((state) => {
-      const newPitch = state.decks[deckId].pitchOffset;
-      if (newPitch !== prevPitch) {
-        prevPitch = newPitch;
-        setDeckPitch(deckId, newPitch);
-      }
-    });
+    const unsubscribe = useDJStore.subscribe(
+      (state) => state.decks[deckId].pitchOffset,
+      (newPitch) => { setDeckPitch(deckId, newPitch); },
+    );
     return unsubscribe;
   }, [deckId]);
 
   // Subscribe to repitchLock changes and push to the engine.
   useEffect(() => {
-    let prev = useDJStore.getState().decks[deckId].repitchLock;
-    const unsubscribe = useDJStore.subscribe((state) => {
-      const next = state.decks[deckId].repitchLock;
-      if (next !== prev) {
-        prev = next;
-        setDeckRepitchLock(deckId, next);
-      }
-    });
+    const unsubscribe = useDJStore.subscribe(
+      (state) => state.decks[deckId].repitchLock,
+      (next) => { setDeckRepitchLock(deckId, next); },
+    );
     return unsubscribe;
   }, [deckId]);
 
   // Subscribe to channel mute mask changes and push to the deck's replayer.
   // Each deck owns its own mask so Deck A and Deck B are fully independent.
   useEffect(() => {
-    let prevMask = useDJStore.getState().decks[deckId].channelMask;
-    const unsubscribe = useDJStore.subscribe((state) => {
-      const newMask = state.decks[deckId].channelMask;
-      if (newMask !== prevMask) {
-        prevMask = newMask;
-        setDeckChannelMuteMask(deckId, newMask);
-      }
-    });
+    const unsubscribe = useDJStore.subscribe(
+      (state) => state.decks[deckId].channelMask,
+      (newMask) => { setDeckChannelMuteMask(deckId, newMask); },
+    );
     return unsubscribe;
   }, [deckId]);
 
@@ -157,17 +145,11 @@ export const DJDeck: React.FC<DJDeckProps> = ({ deckId }) => {
       } catch { /* bus not ready yet — retry on next change */ }
     };
 
-    // Subscribe to fxTargetChannels changes. Set identity changes on
-    // every immer write so reference equality is enough.
-    let prev = useDJStore.getState().decks[deckId].fxTargetChannels;
     void syncTaps();
-    const unsubscribe = useDJStore.subscribe((state) => {
-      const next = state.decks[deckId].fxTargetChannels;
-      if (next !== prev) {
-        prev = next;
-        void syncTaps();
-      }
-    });
+    const unsubscribe = useDJStore.subscribe(
+      (state) => state.decks[deckId].fxTargetChannels,
+      () => { void syncTaps(); },
+    );
 
     return () => {
       disposed = true;
@@ -250,20 +232,16 @@ export const DJDeck: React.FC<DJDeckProps> = ({ deckId }) => {
       } catch { /* bus/engine not ready yet */ }
     };
 
-    // Subscribe to stemDubSends + stemMode + stemsAvailable changes
-    let prevSends = useDJStore.getState().decks[deckId].stemDubSends;
-    let prevMode = useDJStore.getState().decks[deckId].stemMode;
-    let prevAvailable = useDJStore.getState().decks[deckId].stemsAvailable;
     void syncStemTaps();
-    const unsubscribe = useDJStore.subscribe((state) => {
-      const { stemDubSends, stemMode, stemsAvailable } = state.decks[deckId];
-      if (stemDubSends !== prevSends || stemMode !== prevMode || stemsAvailable !== prevAvailable) {
-        prevSends = stemDubSends;
-        prevMode = stemMode;
-        prevAvailable = stemsAvailable;
-        void syncStemTaps();
-      }
-    });
+    const unsubscribe = useDJStore.subscribe(
+      (state) => ({
+        stemDubSends: state.decks[deckId].stemDubSends,
+        stemMode: state.decks[deckId].stemMode,
+        stemsAvailable: state.decks[deckId].stemsAvailable,
+      }),
+      () => { void syncStemTaps(); },
+      { equalityFn: (a, b) => a.stemDubSends === b.stemDubSends && a.stemMode === b.stemMode && a.stemsAvailable === b.stemsAvailable },
+    );
 
     return () => {
       disposed = true;
