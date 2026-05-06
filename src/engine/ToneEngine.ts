@@ -399,7 +399,7 @@ export class ToneEngine {
     // destroying WAV exports and screen recordings while sounding OK through speakers
     // (because the DAC clips inaudibly at moderate volume).
     this.safetyLimiter = new Tone.Compressor({
-      threshold: -1,    // Start compressing near full scale
+      threshold: -6,    // Start compressing at -6 dBFS (configurable via store)
       ratio: 20,        // Near-brickwall limiting
       attack: 0.003,    // 3ms — fast enough for transients
       release: 0.25,    // Smooth release
@@ -1315,6 +1315,22 @@ export class ToneEngine {
   /** Returns current auto-gain corrections in dB (informational, for UI display) */
   public getAutoGainCorrections(): { sample: number; synth: number } {
     return this.autoGain?.getAutoGainCorrections() ?? { sample: 0, synth: 0 };
+  }
+
+  /** Enable/disable the master safety limiter. When disabled, the limiter
+   *  passes audio through unchanged (ratio set to 1:1). */
+  public setMasterLimiterEnabled(enabled: boolean): void {
+    this.safetyLimiter.ratio.value = enabled ? 20 : 1;
+  }
+
+  /** Set the master limiter threshold in dB (-24 to 0). */
+  public setMasterLimiterThreshold(db: number): void {
+    this.safetyLimiter.threshold.value = Math.max(-24, Math.min(0, db));
+  }
+
+  /** Get current limiter gain reduction in dB (0 = no compression, negative = compressing). */
+  public getMasterLimiterReduction(): number {
+    return this.safetyLimiter.reduction;
   }
 
   /**

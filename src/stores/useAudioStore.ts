@@ -21,6 +21,8 @@ interface AudioStore {
   sampleBusGain: number; // dB offset on tracker/sample path (masterInput); 0 = unity
   synthBusGain: number;  // dB offset on synth/chip path (synthBus); 0 = unity
   autoGain: boolean;     // Auto-gain: auto-balance sample vs synth bus levels
+  masterLimiterEnabled: boolean;  // Safety limiter on master bus
+  masterLimiterThreshold: number; // Limiter threshold in dB (-24 to 0)
   analyserNode: Tone.Analyser | null;
   fftNode: Tone.FFT | null;
   toneEngineInstance: ToneEngine | null;
@@ -38,6 +40,8 @@ interface AudioStore {
   setSampleBusGain: (db: number) => void;
   setSynthBusGain: (db: number) => void;
   setAutoGain: (enabled: boolean) => void;
+  setMasterLimiterEnabled: (enabled: boolean) => void;
+  setMasterLimiterThreshold: (db: number) => void;
   setAnalyserNode: (node: Tone.Analyser | null) => void;
   setFFTNode: (node: Tone.FFT | null) => void;
   setToneEngineInstance: (instance: ToneEngine) => void;
@@ -68,6 +72,8 @@ export const useAudioStore = create<AudioStore>()(
     // they already peak near 0 dBFS. Users can opt in via the mixer when
     // they're mixing sample-heavy material alongside synths.
     autoGain: false,
+    masterLimiterEnabled: true,
+    masterLimiterThreshold: -6,  // -6 dB — less aggressive than old -1 dB default
     analyserNode: null,
     fftNode: null,
     toneEngineInstance: null,
@@ -135,6 +141,11 @@ export const useAudioStore = create<AudioStore>()(
         if (instance && state.autoGain) {
           instance.setAutoGain(true);
         }
+        // Apply limiter settings
+        if (instance) {
+          instance.setMasterLimiterEnabled(state.masterLimiterEnabled);
+          instance.setMasterLimiterThreshold(state.masterLimiterThreshold);
+        }
       }),
 
     setSampleBusGain: (db) => {
@@ -155,6 +166,19 @@ export const useAudioStore = create<AudioStore>()(
         const engine = get().toneEngineInstance;
         if (engine) engine.setAutoGain(enabled);
       }),
+
+    setMasterLimiterEnabled: (enabled) => {
+      const engine = get().toneEngineInstance;
+      if (engine) engine.setMasterLimiterEnabled(enabled);
+      set((state) => { state.masterLimiterEnabled = enabled; });
+    },
+
+    setMasterLimiterThreshold: (db) => {
+      const clamped = Math.max(-24, Math.min(0, db));
+      const engine = get().toneEngineInstance;
+      if (engine) engine.setMasterLimiterThreshold(clamped);
+      batch('limiter-threshold', (state) => { state.masterLimiterThreshold = clamped; });
+    },
 
     // Master Effects Actions
     addMasterEffect: (effectType) => {
