@@ -74,6 +74,18 @@ const NIHIA_BTN_ID_TO_NAME: Record<number, string> = {
   44: 'duplicate', 45: 'select', 46: 'solo', 47: 'mute',
 };
 
+// HID button name → screen manager name normalization
+// HID reader sends names from MK2_BUTTON_NAMES[] in maschine-nihia.c;
+// screen manager expects slightly different names for some buttons.
+const HID_NAME_NORMALIZE: Record<string, string> = {
+  softA: 'soft1', softB: 'soft2', softC: 'soft3', softD: 'soft4',
+  softE: 'soft5', softF: 'soft6', softG: 'soft7', softH: 'soft8',
+  allLeft: 'left', allRight: 'right',
+  autoWrite: 'auto',
+  enterPush: 'enter',
+  tap: 'tempo',
+};
+
 type MaschineEvent =
   | { type: 'encoder'; index: number; name: string; value: number; raw: number }
   | { type: 'pad';     pad: number; velocity: number; pressed: boolean }
@@ -208,17 +220,16 @@ class MaschineHIDBridge {
       };
       mgr.dispatchMessage(msg);
     } else if (evt.type === 'button') {
-      // Resolve button name: try NIHIA btnId → name mapping first, then raw name
+      // HID path sends semantic names directly (play, step, mute, etc.)
+      // Normalize HID-specific variants to screen manager names
       let resolvedName = evt.name;
-      if (evt.btnId !== undefined) {
-        const mapped = NIHIA_BTN_ID_TO_NAME[evt.btnId];
-        if (mapped) {
-          resolvedName = mapped;
-        } else {
-          console.warn(`[MaschineHID] Unknown button ID ${evt.btnId} (${evt.name}), add to NIHIA_BTN_ID_TO_NAME`);
-        }
+      if (HID_NAME_NORMALIZE[resolvedName]) {
+        resolvedName = HID_NAME_NORMALIZE[resolvedName];
+      } else if (evt.btnId !== undefined && NIHIA_BTN_ID_TO_NAME[evt.btnId]) {
+        // Fallback: NIHIA protocol button ID mapping (legacy path)
+        resolvedName = NIHIA_BTN_ID_TO_NAME[evt.btnId];
       }
-      console.log(`[MaschineHID] BUTTON: btnId=${evt.btnId} name="${evt.name}" resolved="${resolvedName}" pressed=${evt.pressed}`);
+      console.log(`[MaschineHID] BUTTON: "${resolvedName}" pressed=${evt.pressed}`);
 
       // Handle transport buttons directly on press
       if (evt.pressed) {

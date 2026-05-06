@@ -23,6 +23,7 @@ import type { DJControllerPreset } from '@/midi/djControllerPresets';
 import { getMIDIManager } from '@/midi/MIDIManager';
 import type { MIDIMessage } from '@/midi/types';
 import { notify } from '@/stores/useNotificationStore';
+import { useUIStore } from '@/stores/useUIStore';
 
 // ============================================================================
 // FACTORY ASSIGNMENTS — derived from current preset
@@ -81,17 +82,17 @@ function buildFactoryAssignments(layout: ControllerLayout): Record<string, Contr
 // ============================================================================
 
 interface MIDIMapperModalProps {
-  isOpen: boolean;
-  onClose: () => void;
   /** Override which layout to show (otherwise auto-detects from connected controller) */
   layoutId?: string;
 }
 
 export const MIDIMapperModal: React.FC<MIDIMapperModalProps> = ({
-  isOpen,
-  onClose,
   layoutId: layoutIdProp,
 }) => {
+  const modalOpen = useUIStore(s => s.modalOpen);
+  const closeModal = useUIStore(s => s.closeModal);
+  const isOpen = modalOpen === 'midi-mapper';
+  const onClose = closeModal;
   // Resolve layout
   const resolvedLayoutId = layoutIdProp ?? 'behringer-xtouch-compact';
   const layout = useMemo(() => getControllerLayout(resolvedLayoutId), [resolvedLayoutId]);

@@ -33,7 +33,7 @@ const WS_PORT   = 4005;
 type NIHIAEvent =
   | { type: 'knob';   knob: number; delta: number; raw: number }
   | { type: 'pad';    pad: number;  velocity: number; pressed: boolean }
-  | { type: 'button'; btn: number; pressed: number };
+  | { type: 'button'; btn?: number; btnId?: number; name?: string; pressed: number | boolean };
 
 export type MaschineEvent =
   | { type: 'encoder'; index: number; name: string; value: number; raw: number }
@@ -113,10 +113,12 @@ function routeNIHIAEvent(evt: NIHIAEvent): void {
   } else if (evt.type === 'pad') {
     broadcast({ type: 'pad', pad: evt.pad, velocity: evt.velocity, pressed: evt.pressed });
   } else if (evt.type === 'button') {
-    const name = `btn${evt.btn}`;
+    // HID path sends {name, btnId, pressed: bool}, NIHIA path sends {btn, pressed: 0|1}
+    const btnId = evt.btnId ?? evt.btn ?? -1;
+    const name = evt.name ?? `btn${btnId}`;
     const pressed = !!evt.pressed;
-    console.error(`[maschine] BTN ${evt.btn} ${pressed ? 'PRESSED' : 'RELEASED'}`);
-    broadcast({ type: 'button', name, btnId: evt.btn, pressed });
+    console.error(`[maschine] BTN ${btnId} "${name}" ${pressed ? 'PRESSED' : 'RELEASED'}`);
+    broadcast({ type: 'button', name, btnId, pressed });
   }
 }
 
