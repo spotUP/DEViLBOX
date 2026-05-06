@@ -96,8 +96,14 @@ class MaschineHIDBridge {
   private constructor() {}
 
   static getInstance(): MaschineHIDBridge {
+    // Survive Vite HMR — store singleton on window to prevent orphaned WebSocket
+    const win = typeof window !== 'undefined' ? window as any : null;
+    if (win?.__mk2Bridge) {
+      MaschineHIDBridge.instance = win.__mk2Bridge as MaschineHIDBridge;
+    }
     if (!MaschineHIDBridge.instance) {
       MaschineHIDBridge.instance = new MaschineHIDBridge();
+      if (win) win.__mk2Bridge = MaschineHIDBridge.instance;
     }
     return MaschineHIDBridge.instance;
   }
@@ -126,8 +132,8 @@ class MaschineHIDBridge {
         try {
           const evt = JSON.parse(event.data as string) as MaschineEvent;
           this.routeEvent(evt);
-        } catch {
-          // ignore
+        } catch (err) {
+          console.error('[MaschineHID] Event routing error:', err);
         }
       });
 
@@ -157,6 +163,13 @@ class MaschineHIDBridge {
     const mgr = getMIDIManager();
 
     if (evt.type === 'encoder') {
+      console.log(`[MaschineHID] KNOB: index=${evt.index} value=${evt.value}`);
+      // Let screen manager handle knob first (mixer volumes, browse scroll, etc.)
+      const screenMgr = getMK2ScreenManager();
+      if (screenMgr.handleKnob(evt.index, evt.value)) {
+        return; // consumed by screen manager
+      }
+      // Fall through to MIDI CC routing for NKS params
       const cc = KNOB_CC_BASE + evt.index;
       const msg: MIDIMessage = {
         type: 'cc',
@@ -167,7 +180,15 @@ class MaschineHIDBridge {
         timestamp: performance.now(),
       };
       mgr.dispatchMessage(msg);
+      // Force screen update for visual feedback after NKS param change
+      screenMgr.markDirty();
     } else if (evt.type === 'pad') {
+      // Let screen manager handle pad first (step toggle, mixer select, etc.)
+      const screenMgr = getMK2ScreenManager();
+      if (screenMgr.handlePad(evt.pad, evt.velocity, evt.pressed)) {
+        return; // consumed by screen manager
+      }
+      // Fall through to MIDI note routing for instrument auditioning
       const note = PAD_NOTE_BASE + evt.pad;
       const msg: MIDIMessage = {
         type: evt.pressed ? 'noteOn' : 'noteOff',
@@ -190,9 +211,10 @@ class MaschineHIDBridge {
         if (mapped) {
           resolvedName = mapped;
         } else {
-          console.debug(`[MaschineHID] Unknown button ID ${evt.btnId} (${evt.name}), add to NIHIA_BTN_ID_TO_NAME`);
+          console.warn(`[MaschineHID] Unknown button ID ${evt.btnId} (${evt.name}), add to NIHIA_BTN_ID_TO_NAME`);
         }
       }
+      console.log(`[MaschineHID] BUTTON: btnId=${evt.btnId} name="${evt.name}" resolved="${resolvedName}" pressed=${evt.pressed}`);
 
       // Handle transport buttons directly on press
       if (evt.pressed) {
@@ -267,7 +289,8 @@ class MaschineHIDBridge {
       import('./performance/screens/SampleScreen'),
       import('./performance/screens/BrowseScreen'),
       import('./performance/screens/SongScreen'),
-    ]).then(([instMod, mixMod, stepMod, sampleMod, browseMod, songMod]) => {
+      import('./performance/screens/PlaybackScreen'),
+    ]).then(([instMod, mixMod, stepMod, sampleMod, browseMod, songMod, playMod]) => {
       const mgr = getMK2ScreenManager();
       mgr.registerScreen('instrument', new instMod.InstrumentScreen());
       mgr.registerScreen('mixer', new mixMod.MixerScreen());
@@ -275,8 +298,13 @@ class MaschineHIDBridge {
       mgr.registerScreen('sample', new sampleMod.SampleScreen());
       mgr.registerScreen('browse', new browseMod.BrowseScreen());
       mgr.registerScreen('song', new songMod.SongScreen());
+      mgr.registerScreen('playback', new playMod.PlaybackScreen());
+      // Always (re)start — handles HMR and WebSocket reconnects
       mgr.start();
-      console.log('[MaschineHID] Screen manager initialized with 6 modes');
+      // Reset hashes so first render always sends display data
+      mgr.resetDisplayHashes();
+      mgr.forceRender();
+      console.log('[MaschineHID] Screen manager initialized with 7 modes');
     }).catch((err) => {
       console.warn('[MaschineHID] Failed to init screen manager:', err);
     });
