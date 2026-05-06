@@ -233,7 +233,7 @@ export const MIDIMapperModal: React.FC<MIDIMapperModalProps> = ({
     );
   }
 
-  const overrideCount = Object.keys(userOverrides).length;
+  const overrideCount = Object.keys(userOverrides ?? {}).length;
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} size="xl">
