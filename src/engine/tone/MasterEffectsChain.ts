@@ -427,12 +427,18 @@ export function canUseParameterUpdatePath(ctx: MasterEffectsContext, newEffects:
   // When isolation isn't available (no engine, or hybrid playback with native synths),
   // all effects are global — selectedChannels is ignored.
   let isolationAvailable = supportsChannelIsolation(useFormatStore.getState().editorMode);
-  if (isolationAvailable && _cachedGetTrackerReplayer) {
-    // Hybrid playback: native synths bypass the WASM worklet, so isolation can't
-    // capture their audio. Treat all effects as global to keep them audible.
-    try {
-      if (_cachedGetTrackerReplayer().hasReplacedInstruments) isolationAvailable = false;
-    } catch { /* replayer not initialized */ }
+  if (isolationAvailable) {
+    if (!_cachedGetTrackerReplayer) {
+      // No cached replayer getter → we haven't confirmed a WASM engine is running.
+      // Assume isolation is NOT available (safe default — keeps all effects in global chain).
+      isolationAvailable = false;
+    } else {
+      // Hybrid playback: native synths bypass the WASM worklet, so isolation can't
+      // capture their audio. Treat all effects as global to keep them audible.
+      try {
+        if (_cachedGetTrackerReplayer().hasReplacedInstruments) isolationAvailable = false;
+      } catch { /* replayer not initialized */ }
+    }
   }
   const globalNew = isolationAvailable
     ? enabledNew.filter(fx => !Array.isArray(fx.selectedChannels) || fx.selectedChannels.length === 0)
