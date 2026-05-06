@@ -25,6 +25,9 @@ class MIDIManager {
   private selectedInputId: string | null = null;
   private selectedOutputId: string | null = null;
 
+  // Additional open inputs (for multi-controller support — e.g., X-Touch + Maschine)
+  private additionalInputIds: Set<string> = new Set();
+
   // Message handlers
   private messageHandlers: Set<MIDIMessageHandler> = new Set();
 
@@ -267,6 +270,40 @@ class MIDIManager {
           console.error(`[MIDIManager] Failed to open input ${input.name}:`, error);
         }
       }
+    }
+  }
+
+  /**
+   * Open an additional MIDI input alongside the selected input.
+   * Messages from additional inputs are dispatched to all handlers (with their own deviceId).
+   * Used for multi-controller setups (e.g., X-Touch Compact + Maschine MK2).
+   */
+  async openAdditionalInput(deviceId: string): Promise<boolean> {
+    if (deviceId === this.selectedInputId) return true; // already the primary
+    if (this.additionalInputIds.has(deviceId)) return true; // already open
+
+    const input = this.inputs.get(deviceId);
+    if (!input) return false;
+
+    try {
+      await input.open();
+      input.onmidimessage = (event: MIDIMessageEvent) => {
+        const data = event.data;
+        if (!data || data.length === 0) return;
+        this.lastActivityTimestamp = Date.now();
+        const message = this.parseMIDIMessage(data[0], data, event.timeStamp);
+        this.messageHandlers.forEach((handler) => {
+          try { handler(message, deviceId); } catch (e) {
+            console.error('[MIDIManager] Handler error (additional input):', e);
+          }
+        });
+      };
+      this.additionalInputIds.add(deviceId);
+      console.log(`[MIDIManager] Additional input opened: ${input.name}`);
+      return true;
+    } catch (error) {
+      console.error(`[MIDIManager] Failed to open additional input ${input.name}:`, error);
+      return false;
     }
   }
 

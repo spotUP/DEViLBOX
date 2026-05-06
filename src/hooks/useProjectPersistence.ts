@@ -15,6 +15,9 @@ import type { EffectConfig } from '@typedefs/instrument';
 import { needsMigration, migrateProject } from '@/lib/migration';
 import { getOriginalModuleDataForExport, getNativeEngineDataForExport, getNativeEngineMetaForExport, restoreNativeEngineData } from '@/lib/export/exporters';
 import { compressProject } from '@/lib/projectCompression';
+import { useMixerStore } from '@stores/useMixerStore';
+import { useDrumPadStore } from '@stores/useDrumPadStore';
+import { useDubStore } from '@stores/useDubStore';
 
 
 const AUTO_SAVE_INTERVAL = 300000; // 5 minutes
@@ -145,6 +148,9 @@ interface SavedProject {
   originalModuleData?: { base64: string; format: string; sourceFile?: string };
   nativeEngineData?: Record<string, string>;
   nativeEngineMeta?: Record<string, unknown>;
+  mixer?: import('@stores/useMixerStore').MixerSnapshot;
+  dubBus?: Partial<import('@/types/dub').DubBusSettings>;
+  autoDub?: { enabled: boolean; persona: string; intensity: number; moveBlacklist: string[] };
 }
 
 // ============================================================================
@@ -397,6 +403,26 @@ function buildSavedProject(): SavedProject {
       } catch { /* replayer not initialized */ }
       return {};
     })(),
+    // Mixer state — channel volumes, pans, mutes, solos, dub sends, send buses
+    mixer: {
+      channels: useMixerStore.getState().channels,
+      master: useMixerStore.getState().master,
+      sendBuses: useMixerStore.getState().sendBuses,
+    },
+    // Dub bus tuning — character preset + coloring params
+    dubBus: useDrumPadStore.getState().dubBus,
+    // Auto Dub state
+    ...(() => {
+      const s = useDubStore.getState();
+      return {
+        autoDub: {
+          enabled: s.autoDubEnabled,
+          persona: s.autoDubPersona,
+          intensity: s.autoDubIntensity,
+          moveBlacklist: s.autoDubMoveBlacklist ?? [],
+        },
+      };
+    })(),
   };
 }
 
@@ -605,6 +631,26 @@ export async function loadProjectFromStorage(): Promise<boolean> {
     }
 
     projectStore.markAsSaved();
+
+    // Restore mixer state (channel volumes, pans, mutes, solos, dub sends, send buses)
+    if (project.mixer) {
+      useMixerStore.getState().loadMixerState(project.mixer);
+    }
+
+    // Restore dub bus tuning
+    if (project.dubBus) {
+      useDrumPadStore.getState().setDubBus(project.dubBus as any);
+    }
+
+    // Restore Auto Dub state
+    if (project.autoDub) {
+      const s = useDubStore.getState();
+      s.setAutoDubPersona(project.autoDub.persona as any);
+      s.setAutoDubIntensity(project.autoDub.intensity);
+      s.setAutoDubMoveBlacklist(project.autoDub.moveBlacklist ?? []);
+      s.setAutoDubEnabled(project.autoDub.enabled);
+    }
+
     // Restoring user's own saved project — auto-save is safe
     explicitlySaved = true;
     return true;
@@ -730,6 +776,26 @@ export async function loadProjectFromObject(data: unknown): Promise<boolean> {
     }
 
     projectStore.markAsSaved();
+
+    // Restore mixer state
+    if (project.mixer) {
+      useMixerStore.getState().loadMixerState(project.mixer);
+    }
+
+    // Restore dub bus tuning
+    if (project.dubBus) {
+      useDrumPadStore.getState().setDubBus(project.dubBus as any);
+    }
+
+    // Restore Auto Dub state
+    if (project.autoDub) {
+      const s = useDubStore.getState();
+      s.setAutoDubPersona(project.autoDub.persona as any);
+      s.setAutoDubIntensity(project.autoDub.intensity);
+      s.setAutoDubMoveBlacklist(project.autoDub.moveBlacklist ?? []);
+      s.setAutoDubEnabled(project.autoDub.enabled);
+    }
+
     return true;
   } catch (err) {
     console.error('[Persistence] Failed to load project from object:', err);
@@ -827,6 +893,26 @@ export async function loadLocalRevision(key: number): Promise<boolean> {
     }
 
     projectStore.markAsSaved();
+
+    // Restore mixer state
+    if (project.mixer) {
+      useMixerStore.getState().loadMixerState(project.mixer);
+    }
+
+    // Restore dub bus tuning
+    if (project.dubBus) {
+      useDrumPadStore.getState().setDubBus(project.dubBus as any);
+    }
+
+    // Restore Auto Dub state
+    if (project.autoDub) {
+      const s = useDubStore.getState();
+      s.setAutoDubPersona(project.autoDub.persona as any);
+      s.setAutoDubIntensity(project.autoDub.intensity);
+      s.setAutoDubMoveBlacklist(project.autoDub.moveBlacklist ?? []);
+      s.setAutoDubEnabled(project.autoDub.enabled);
+    }
+
     // Restoring user's own revision — auto-save is safe
     explicitlySaved = true;
     return true;

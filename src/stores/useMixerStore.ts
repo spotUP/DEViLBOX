@@ -774,6 +774,16 @@ interface MixerStoreActions {
   // Reset mute/solo state (called on song load)
   resetMuteState: () => void;
   reapplyAllMutes: () => void;
+
+  // Bulk load mixer state from saved project
+  loadMixerState: (snapshot: MixerSnapshot) => void;
+}
+
+/** Serializable mixer snapshot for .dbx persistence */
+export interface MixerSnapshot {
+  channels: Partial<MixerChannelState>[];
+  master?: { volume: number };
+  sendBuses?: Partial<SendBusState>[];
 }
 
 type MixerStore = MixerStoreState & MixerStoreActions;
@@ -1223,6 +1233,41 @@ export const useMixerStore = create<MixerStore>()(
       }
       // Rebuild WASM isolation for the new effect chain
       scheduleWasmEffectRebuild();
+    },
+
+    loadMixerState(snapshot: MixerSnapshot): void {
+      set((state) => {
+        // Merge saved channels over defaults (partial — older saves may lack newer fields)
+        const defaults = defaultChannels();
+        for (let i = 0; i < Math.min(snapshot.channels.length, state.channels.length); i++) {
+          state.channels[i] = { ...defaults[i < defaults.length ? i : 0], ...snapshot.channels[i] };
+        }
+        if (snapshot.master?.volume != null) {
+          state.master.volume = snapshot.master.volume;
+        }
+        if (snapshot.sendBuses) {
+          const defaultBuses = defaultSendBuses();
+          for (let i = 0; i < Math.min(snapshot.sendBuses.length, state.sendBuses.length); i++) {
+            state.sendBuses[i] = { ...defaultBuses[i < defaultBuses.length ? i : 0], ...snapshot.sendBuses[i] };
+          }
+        }
+        state.isSoloing = state.channels.some(c => c.soloed);
+      });
+      // Apply loaded state to audio engine
+      const { channels, master, isSoloing } = get();
+      applyToEngine(() => {
+        const engine = getToneEngine();
+        engine.setMasterVolume(toDb(master.volume));
+        channels.forEach((c, i) => {
+          engine.setMixerChannelVolume(i, toDb(c.volume));
+          engine.setMixerChannelPan(i, c.pan);
+          const effectiveMute = isSoloing ? !c.soloed : c.muted;
+          try { engine.setChannelMute(i, effectiveMute); } catch { /* ok */ }
+        });
+      });
+      forwardAllWasmChannelGains(channels, isSoloing);
+      forwardReplayerMuteMask(channels, isSoloing);
+      syncMuteToPatternChannels();
     },
   };
   })

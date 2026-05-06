@@ -176,6 +176,10 @@ export interface SongExport {
   nativeEngineMeta?: Record<string, unknown>; // JSON-serializable native engine metadata
   replacedInstruments?: number[]; // Instrument IDs replaced with synths for hybrid playback
 
+  /** Mixer state — channel volumes, pans, mutes, solos, dub sends, send buses.
+   *  Partial so older .dbx files without mixer state still load cleanly. */
+  mixer?: import('@stores/useMixerStore').MixerSnapshot;
+
   /** Dub bus tuning — character preset (Tubby/Scientist/…), echo/spring/
    *  tape-sat params, HPF, EQ, stereo width. Without this block a saved
    *  .dbx would reload with DEFAULT_DUB_BUS and lose every sound-design
@@ -282,6 +286,20 @@ export function exportSong(
       try {
         const dubBus = useDrumPadStore.getState().dubBus;
         return dubBus ? { dubBus } : {};
+      } catch { return {}; }
+    })(),
+    // Mixer state — channel volumes, pans, mutes, solos, dub sends, send buses.
+    ...(() => {
+      try {
+        const { useMixerStore } = require('@stores/useMixerStore');
+        const state = useMixerStore.getState();
+        return {
+          mixer: {
+            channels: state.channels,
+            master: state.master,
+            sendBuses: state.sendBuses,
+          },
+        };
       } catch { return {}; }
     })(),
     // Auto Dub state — enabled, persona, intensity, move blacklist.
