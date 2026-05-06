@@ -25,60 +25,51 @@ const KNOB_CC_BASE = 70;
 const PAD_NOTE_BASE = 36;
 
 // Button → note mapping (buttons on ch 14, pads on ch 15 to avoid collision)
-// Named keys for known buttons; numeric btnN keys discovered via NIHIA
+// Maps every MK2 button name to a unique MIDI note for learn/mapping system
 const BUTTON_NOTES: Record<string, number> = {
-  // Transport
-  play:      116, rec:       117, erase:     118, restart:   119,
-  stepLeft:  120, stepRight: 121, grid:      122, shift:     123,
-  // Left column
-  scene:     80,  pattern:   81,  padMode:   82,  navigate:  83,
-  duplicate: 84,  select:    85,  solo:      86,  mute:      87,
-  // Groups A-H
-  groupA:    0,   groupB:    1,   groupC:    2,   groupD:    3,
-  groupE:    4,   groupF:    5,   groupG:    6,   groupH:    7,
-  // Top row
-  control:   88,  step:      89,  browse:    90,  sampling:  91,
-  left:      92,  right:     93,  all:       94,  auto:      95,
-  // Encoder area
-  volume:    96,  swing:     97,  tempo:     98,
-  navLeft:   99,  navRight:  100, enter:     101, noteRepeat:102,
-  encoderPush:103,
-  // Soft buttons (above screens)
+  // Byte 0: Soft buttons (above screens)
   soft1:     104, soft2:     105, soft3:     106, soft4:     107,
   soft5:     108, soft6:     109, soft7:     110, soft8:     111,
+  // Byte 1: Top row
+  control:   88,  step:      89,  browse:    90,  sampling:  91,
+  pageRight: 92,  pageLeft:  93,  all:       94,  auto:      95,
+  // Byte 2: Encoder area
+  volume:    96,  swing:     97,  tempo:     98,
+  navLeft:   99,  navRight:  100, enter:     101, noteRepeat:102,
+  nav:       103,
+  // Byte 3: Groups A-H
+  groupA:    0,   groupB:    1,   groupC:    2,   groupD:    3,
+  groupE:    4,   groupF:    5,   groupG:    6,   groupH:    7,
+  // Byte 4: Transport
+  restart:   119, stepLeft:  120, stepRight: 121, grid:      122,
+  play:      116, rec:       117, erase:     118, shift:     123,
+  // Byte 5: Left column
+  scene:     80,  pattern:   81,  padMode:   82,  navigate:  83,
+  duplicate: 84,  select:    85,  solo:      86,  mute:      87,
 };
 
-// NIHIA button ID → semantic name (discovered by physical button presses)
-// Button IDs are the raw uint32 from EVT_BTN_DATA offset 16.
-// Extend this map as buttons are discovered — press buttons with bridge
-// running and read stderr for "[maschine] BTN N PRESSED" log lines.
+// NIHIA button ID → semantic name (legacy NIHIA protocol path)
+// Button IDs from HID bitmask (byte*8+bit). Names match MK2_BUTTON_NAMES in maschine-nihia.c.
+// Verified against maschine.rs (SnovaxZ/MaschineMK2_linux).
 const NIHIA_BTN_ID_TO_NAME: Record<number, string> = {
-  // Soft buttons (above screens, unlabeled, context-dependent)
+  // Byte 0: Soft buttons
   0: 'soft1', 1: 'soft2', 2: 'soft3', 3: 'soft4',
   4: 'soft5', 5: 'soft6', 6: 'soft7', 7: 'soft8',
-  // Top row
+  // Byte 1: Top row
   8: 'control', 9: 'step', 10: 'browse', 11: 'sampling',
-  12: 'left', 13: 'right', 14: 'all', 15: 'auto',
-  // Encoder area
+  12: 'pageRight', 13: 'pageLeft', 14: 'all', 15: 'auto',
+  // Byte 2: Encoder area
   16: 'volume', 17: 'swing', 18: 'tempo',
-  19: 'navLeft', 20: 'navRight', 21: 'enter', 22: 'noteRepeat',
-  23: 'encoderPush',
-  // Group buttons (A-H)
+  19: 'navLeft', 20: 'navRight', 21: 'enter', 22: 'noteRepeat', 23: 'nav',
+  // Byte 3: Group buttons A-H
   24: 'groupA', 25: 'groupB', 26: 'groupC', 27: 'groupD',
   28: 'groupE', 29: 'groupF', 30: 'groupG', 31: 'groupH',
-  // Transport
+  // Byte 4: Transport
   32: 'restart', 33: 'stepLeft', 34: 'stepRight', 35: 'grid',
   36: 'play', 37: 'rec', 38: 'erase', 39: 'shift',
-  // Left column
+  // Byte 5: Left column
   40: 'scene', 41: 'pattern', 42: 'padMode', 43: 'navigate',
   44: 'duplicate', 45: 'select', 46: 'solo', 47: 'mute',
-};
-
-// HID button name → screen manager name normalization
-// HID reader sends names from MK2_BUTTON_NAMES[] in maschine-nihia.c;
-// screen manager expects slightly different names for a couple buttons.
-const HID_NAME_NORMALIZE: Record<string, string> = {
-  nav: 'encoderPush',
 };
 
 type MaschineEvent =
@@ -215,13 +206,9 @@ class MaschineHIDBridge {
       };
       mgr.dispatchMessage(msg);
     } else if (evt.type === 'button') {
-      // HID path sends semantic names directly (play, step, mute, etc.)
-      // Normalize HID-specific variants to screen manager names
+      // HID path sends correct semantic names directly from MK2_BUTTON_NAMES[]
       let resolvedName = evt.name;
-      if (HID_NAME_NORMALIZE[resolvedName]) {
-        resolvedName = HID_NAME_NORMALIZE[resolvedName];
-      } else if (evt.btnId !== undefined && NIHIA_BTN_ID_TO_NAME[evt.btnId]) {
-        // Fallback: NIHIA protocol button ID mapping (legacy path)
+      if (evt.btnId !== undefined && NIHIA_BTN_ID_TO_NAME[evt.btnId]) {
         resolvedName = NIHIA_BTN_ID_TO_NAME[evt.btnId];
       }
       console.log(`[MaschineHID] BUTTON: "${resolvedName}" pressed=${evt.pressed}`);
@@ -232,6 +219,9 @@ class MaschineHIDBridge {
         switch (resolvedName) {
           case 'play':     transport.togglePlayPause(); return;
           case 'restart':  transport.stop(); transport.togglePlayPause(); return;
+          case 'rec':      // Toggle recording (future) — consumed but no-op for now
+            return;
+          case 'erase':    transport.stop(); return;
           default:
             break;
         }
