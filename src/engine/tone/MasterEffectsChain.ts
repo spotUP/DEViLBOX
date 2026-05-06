@@ -152,8 +152,20 @@ export async function rebuildMasterEffects(ctx: MasterEffectsContext, effects: E
   // Filter to only enabled effects
   const enabledEffects = effectsCopy.filter((fx) => fx.enabled);
 
-  // Check if isolation is available for the current format
-  const isolationAvailable = supportsChannelIsolation(useFormatStore.getState().editorMode);
+  // Check if isolation is available for the current format AND an engine is
+  // actually running. supportsChannelIsolation is a static mode check; when
+  // no WASM multi-output engine is active (e.g. classic mode with Tone.js
+  // synths), channel-targeted effects must stay in the global chain —
+  // otherwise they silently vanish (no global chain node, no WASM slot).
+  const modeSupportsIsolation = supportsChannelIsolation(useFormatStore.getState().editorMode);
+  let isolationAvailable = false;
+  if (modeSupportsIsolation) {
+    try {
+      const { getActiveIsolationEngine } = await import('./ChannelRoutedEffects');
+      const engine = await getActiveIsolationEngine();
+      isolationAvailable = engine !== null && engine.isAvailable();
+    } catch { /* engine not available */ }
+  }
 
   // Separate global effects from channel-targeted effects.
   // When isolation isn't available, treat all effects as global (ignore selectedChannels).
