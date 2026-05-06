@@ -52,7 +52,7 @@
 
 #define EVT_KNOB_ROTATE  0x03654e00u
 #define EVT_PAD_DATA     0x03504e00u
-#define EVT_BTN_DATA     0x03424e00u
+#define EVT_BTN_DATA     0x03734e00u
 
 /* ── HID constants ───────────────────────────────────────────────────────── */
 #define MK2_VID 0x17CCu
@@ -223,6 +223,15 @@ static CFDataRef instance_cb(CFMessagePortRef local __attribute__((unused)),
     const uint8_t *d = CFDataGetBytePtr(data);
     CFIndex len = CFDataGetLength(data);
     uint32_t mid = (len>=4) ? read_u32le(d) : 0;
+
+    /* Debug: dump all incoming messages */
+    fprintf(stderr,"[nihia] EVT mid=0x%08x len=%ld msgid=%d", mid, (long)len, (int)msgid);
+    if (len >= 8) fprintf(stderr," d4=0x%08x", read_u32le(d+4));
+    if (len >= 12) fprintf(stderr," d8=0x%08x", read_u32le(d+8));
+    if (len >= 16) fprintf(stderr," d12=0x%08x", read_u32le(d+12));
+    if (len >= 20) fprintf(stderr," d16=0x%08x", read_u32le(d+16));
+    if (len >= 24) fprintf(stderr," d20=0x%08x", read_u32le(d+20));
+    fprintf(stderr,"\n");
     if (mid == EVT_KNOB_ROTATE && len >= 24) {
         uint32_t knob = read_u32le(d+16);
         int32_t  rot  = read_i32le(d+20);
