@@ -143,13 +143,8 @@ export function updateMaschineDisplay(
   // Don't send if empty — avoids overwriting hardware state with all-zeros.
   if (pageParams.length > 0) {
     const pageColor = PAGE_PAD_COLORS[currentPage % PAGE_PAD_COLORS.length];
-    const activeCount = Math.min(pageParams.length, 16);
-    console.log(`[NIHardwareProtocol] Setting ${activeCount} pads to ${JSON.stringify(pageColor)}`);
-    bridge.setAllPadColors(
-      Array.from({ length: 16 }, (_, i) =>
-        i < activeCount ? pageColor : NI_COLORS.OFF
-      )
-    );
+    console.log(`[NIHardwareProtocol] Setting all 16 pads to ${JSON.stringify(pageColor)}`);
+    bridge.setAllPadColors(Array(16).fill(pageColor));
   } else {
     console.log('[NIHardwareProtocol] No params — skipping pad LED update');
   }
