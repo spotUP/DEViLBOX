@@ -153,6 +153,24 @@ mkdir -p logs
 
 # ── Maschine HID bridge — start FIRST before browser claims the device ────────
 
+# ── Maschine MK2 NIHIA bridge — start before browser to own the hardware ──────
+log "Starting Maschine NIHIA bridge on port $MASCHINE_PORT..."
+: > logs/maschine-bridge.log
+npx tsx "$SCRIPT_DIR/tools/maschine-bridge.ts" > logs/maschine-bridge.log 2>&1 &
+MASCHINE_PID=$!
+log "Waiting for Maschine bridge..."
+for i in $(seq 1 10); do
+  if nc -z localhost "$MASCHINE_PORT" 2>/dev/null; then
+    ok "Maschine bridge ready (PID: $MASCHINE_PID)"
+    break
+  fi
+  if [ "$i" -eq 10 ]; then
+    warn "Maschine bridge slow — check logs/maschine-bridge.log"
+    tail -3 logs/maschine-bridge.log | sed 's/^/  /'
+  fi
+  sleep 0.5
+done
+
 # ── API server (Express) ───────────────────────────────────────────────────────
 log "Starting API server on port $BACKEND_PORT..."
 # Unset CLAUDECODE so the AI endpoint can spawn `claude` CLI without the nesting guard
