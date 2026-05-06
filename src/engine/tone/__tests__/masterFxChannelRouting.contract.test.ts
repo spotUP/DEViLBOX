@@ -10,8 +10,15 @@
  * was active (Tone.js synths replacing WASM channels). WASM isolation only captures
  * the worklet output, not native synth audio — so the effect heard nothing.
  *
+ * Bug 3: canUseParameterUpdatePath assumed isolation was available when
+ * _cachedGetTrackerReplayer was null (never populated because no WASM engine ran).
+ * This caused selectedChannels changes to skip the fast path and trigger full
+ * chain rebuilds — audible audio dropouts on every channel button click.
+ *
  * Fix: the rebuild path checks both engine availability AND that no instruments
- * are "replaced" by native synths (hybrid playback).
+ * are "replaced" by native synths (hybrid playback). The fast-path check
+ * conservatively assumes isolation is NOT available when the replayer getter
+ * hasn't been cached yet.
  */
 
 import { describe, it, expect } from 'vitest';
@@ -55,5 +62,16 @@ describe('Master FX channel routing', () => {
     );
     expect(rebuildFn).toContain('engine !== null');
     expect(rebuildFn).toContain('engine.isAvailable()');
+  });
+
+  it('falls back to isolation=false when cached replayer getter is unavailable', () => {
+    // canUseParameterUpdatePath must NOT assume isolation is available when
+    // _cachedGetTrackerReplayer is null — this means no WASM engine ever ran.
+    const canUseFn = src.slice(
+      src.indexOf('export function canUseParameterUpdatePath'),
+      src.indexOf('export function updateEffectParameters'),
+    );
+    expect(canUseFn).toContain('!_cachedGetTrackerReplayer');
+    expect(canUseFn).toContain('isolationAvailable = false');
   });
 });
