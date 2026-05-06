@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-05-06T10:54:59.702Z
+ * Generated: 2026-05-06T12:53:56.090Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,9 +19,9 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.6381';
-export const BUILD_NUMBER = '6381';
-export const BUILD_HASH = '1694814e0';
+export const BUILD_VERSION = '1.0.6386';
+export const BUILD_NUMBER = '6386';
+export const BUILD_HASH = '5da5958cd';
 export const BUILD_DATE = '2026-05-06';
 
 // Full version (patch IS the build number, so no need to append)
@@ -30,9 +30,29 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.6381',
+    version: '1.0.6386',
     date: '2026-05-06',
     changes: [
+      {
+        type: 'feature',
+        "description": "Maschine MK2 HID bridge + NKS auto-mapper updates"
+      },
+      {
+        type: 'fix',
+        "description": "Use updateInstrumentRealtime in SCKnobPanel for smooth knob control"
+      },
+      {
+        type: 'improvement',
+        "description": "Update auto-generated changelog"
+      },
+      {
+        type: 'feature',
+        "description": "Add Maschine MK2 display rendering and NI hardware protocol"
+      },
+      {
+        type: 'improvement',
+        "description": "Rewrite Maschine MK2 bridge to hybrid NIHIA/HID architecture"
+      },
       {
         type: 'fix',
         "description": "Fix per-channel master FX: skip rebuild when no WASM isolation engine"
@@ -230,26 +250,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'fix',
         "description": "Hively/AHX mute/solo — re-apply channel gains after song loop"
-      },
-      {
-        type: 'fix',
-        "description": "Prevent dub effect stacking — cross-bar wet cooldown + stiffer sidechain"
-      },
-      {
-        type: 'fix',
-        "description": "Dub bus core routing — native→native connect for tapeSat inputs"
-      },
-      {
-        type: 'fix',
-        "description": "King Tubby RE-201 inaudible — restore echoSpring chain order"
-      },
-      {
-        type: 'fix',
-        "description": "GhostReverb audition stuck + role chip infinite re-render loop"
-      },
-      {
-        type: 'feature',
-        "description": "Role chip in channel headers — click to cycle dub role override"
       }
     ]
   }
