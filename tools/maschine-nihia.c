@@ -566,22 +566,22 @@ static void pad_update(int idx, float raw_pressure) {
 }
 
 /* MK2 button names — matched to physical layout.
- * Button report 0x01 is 7 bytes (6 button bytes + 1 encoder byte).
- * Each bit = one button. Byte 0 bit 0 = button index 0, etc. (48 buttons total).
- * Names sourced from checkpoint-002 button mapping work. */
+ * Button report 0x01: buf[1..6] = 6 bytes button bitmask (48 buttons).
+ * Bit order: LSB first within each byte.
+ * Mapping verified against maschine.rs (SnovaxZ/MaschineMK2_linux). */
 static const char *MK2_BUTTON_NAMES[48] = {
-    /* Byte 0, bits 0-7 */
-    "control","step","browse","sampling","allLeft","allRight","autoWrite","volume",
+    /* Byte 0, bits 0-7: soft buttons (F1-F8, above screens) */
+    "soft1","soft2","soft3","soft4","soft5","soft6","soft7","soft8",
     /* Byte 1, bits 0-7 */
-    "swing","tempo","enterPush","noteRepeat","encoderPush",NULL,NULL,NULL,
+    "control","step","browse","sampling","pageRight","pageLeft","all","auto",
     /* Byte 2, bits 0-7 */
-    "scene","pattern","padMode","navigate","duplicate","select","solo","mute",
-    /* Byte 3, bits 0-7 */
+    "volume","swing","tempo","navLeft","navRight","enter","noteRepeat","nav",
+    /* Byte 3, bits 0-7: group buttons A-H */
     "groupA","groupB","groupC","groupD","groupE","groupF","groupG","groupH",
-    /* Byte 4, bits 0-7 */
-    "softA","softB","softC","softD","softE","softF","softG","softH",
-    /* Byte 5, bits 0-7 */
-    "restart","erase","tap","enter","navLeft","navRight","shift","play"
+    /* Byte 4, bits 0-7: transport row */
+    "restart","stepLeft","stepRight","grid","play","rec","erase","shift",
+    /* Byte 5, bits 0-7: left column */
+    "scene","pattern","padMode","navigate","duplicate","select","solo","mute"
 };
 
 static void *hid_reader_thread(void *arg) {

@@ -3,6 +3,7 @@
  */
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { useMIDIStore } from '../../stores/useMIDIStore';
 import { MIDIDeviceSelector } from './MIDIDeviceSelector';
 import { MIDILearnModal } from './MIDILearnModal';
@@ -21,6 +22,18 @@ const MIDIToolbarDropdownComponent: React.FC<MIDIToolbarDropdownProps> = ({ inli
   const [isInitializing, setIsInitializing] = useState(false);
   const [showLearnModal, setShowLearnModal] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const [dropdownPos, setDropdownPos] = useState<{ top: number; right: number } | null>(null);
+
+  // Position the portal dropdown relative to the button
+  useEffect(() => {
+    if (!isOpen || inline || !buttonRef.current) return;
+    const rect = buttonRef.current.getBoundingClientRect();
+    setDropdownPos({
+      top: rect.bottom + 4,
+      right: window.innerWidth - rect.right,
+    });
+  }, [isOpen, inline]);
 
   // PERFORMANCE OPTIMIZATION: Use individual selectors
   const isSupported = useMIDIStore((state) => state.isSupported);
@@ -65,7 +78,7 @@ const MIDIToolbarDropdownComponent: React.FC<MIDIToolbarDropdownProps> = ({ inli
     if (isLearning) cancelLearn();
   }, [isLearning, cancelLearn]);
 
-  useClickOutside(dropdownRef, handleCloseDropdown, { enabled: isOpen });
+  useClickOutside(dropdownRef, handleCloseDropdown, { enabled: isOpen && !inline, portalSelector: '[data-midi-toggle]' });
 
   // Activity flash effect
   const [showActivity, setShowActivity] = useState(false);
@@ -90,12 +103,205 @@ const MIDIToolbarDropdownComponent: React.FC<MIDIToolbarDropdownProps> = ({ inli
     return 'text-accent-warning';
   };
 
+  const dropdownPanel = isOpen ? (
+    <div
+      ref={dropdownRef}
+      className={inline
+        ? "w-full"
+        : "fixed w-80 max-h-[85vh] bg-dark-bgTertiary border border-dark-border rounded-lg shadow-xl z-[99990] overflow-y-auto overflow-x-hidden"
+      }
+      style={!inline && dropdownPos ? { top: dropdownPos.top, right: dropdownPos.right } : undefined}
+    >
+      {/* Header (only in dropdown mode) */}
+      {!inline && (
+        <div className="px-4 py-3 border-b border-dark-border bg-dark-bgSecondary">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-bold text-text-primary">MIDI Settings</h3>
+            {isInitializing && <Loader2 size={14} className="animate-spin text-accent-primary" />}
+          </div>
+          {lastError && (
+            <div className="flex items-center gap-2 mt-1 text-xs text-accent-error">
+              <AlertCircle size={12} />
+              <span>{lastError}</span>
+            </div>
+          )}
+        </div>
+      )}
+
+      {isSupported === false ? (
+        <div className="px-4 py-6">
+          <div className="flex items-center gap-2 mb-3 justify-center">
+            {midiInfo.isIOS || midiInfo.instructions?.includes('Android') ? (
+              <Smartphone size={24} className="text-text-muted" />
+            ) : (
+              <AlertCircle size={24} className="text-text-muted" />
+            )}
+          </div>
+          <p className="text-sm text-text-secondary text-center mb-3">
+            Web MIDI API is not supported in this browser.
+          </p>
+
+          {/* Safari-specific troubleshooting - Only show if there's an error or failed attempt */}
+          {midiInfo.isIOS && lastError && (
+            <div className="text-xs bg-accent-warning/10 border border-accent-warning/30 rounded p-3 mb-3">
+              <p className="font-bold text-accent-warning mb-2">Safari Troubleshooting:</p>
+              <ul className="list-disc list-inside space-y-1 text-text-secondary">
+                <li>Make sure you're using <strong>Safari</strong> (not Chrome on iOS)</li>
+                <li>Web MIDI requires <strong>HTTPS</strong> - check the URL starts with https://</li>
+                <li>Disable <strong>Private Browsing Mode</strong> - MIDI doesn't work in private mode</li>
+                <li>Check <strong>Settings → Safari → Advanced → Experimental Features</strong> and ensure 'Web MIDI API' is ON</li>
+                <li><strong>Home Screen Apps (PWA):</strong> Apple sometimes disables MIDI for apps saved to the home screen. Try using the regular Safari browser tab.</li>
+                <li>Update to <strong>iOS 15+</strong> for full MIDI support</li>
+                <li>Check browser console for detailed error messages</li>
+              </ul>
+              
+              {/* Real-time diagnostics */}
+              <div className="mt-3 pt-3 border-t border-accent-warning/20 font-mono text-[10px] text-text-muted space-y-1">
+                <div className="flex justify-between">
+                  <span>Secure Context:</span>
+                  <span className={window.isSecureContext ? "text-accent-success" : "text-accent-error"}>
+                    {window.isSecureContext ? "YES" : "NO"}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span>PWA Mode:</span>
+                  <span>{
+                    // @ts-ignore
+                    (navigator.standalone || window.matchMedia('(display-mode: standalone)').matches) ? "YES" : "NO"
+                  }</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Protocol:</span>
+                  <span>{window.location.protocol}</span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {midiInfo.instructions && (
+            <div className="text-xs text-text-muted text-left bg-dark-bgSecondary rounded p-3 max-h-64 overflow-y-auto whitespace-pre-line">
+              {midiInfo.instructions}
+            </div>
+          )}
+
+          {/* Retry button — on iOS, MIDI API may need a user gesture to activate */}
+          <button
+            onClick={handleRetryInit}
+            disabled={isInitializing}
+            className="w-full mt-3 px-4 py-2.5 bg-accent-primary/20 border border-accent-primary/30 rounded-lg text-sm font-bold text-accent-primary hover:bg-accent-primary/30 transition-colors disabled:opacity-50"
+          >
+            {isInitializing ? 'Checking...' : 'Retry MIDI Detection'}
+          </button>
+        </div>
+      ) : isSupported === null ? (
+        <div className="px-4 py-6 text-center">
+          <Loader2 size={24} className="mx-auto mb-2 text-text-muted animate-spin" />
+          <p className="text-sm text-text-secondary">
+            Checking MIDI support...
+          </p>
+        </div>
+      ) : (
+        <>
+          {/* Device Selection */}
+          <div className="px-4 py-3 space-y-3 border-b border-dark-border">
+            <MIDIDeviceSelector
+              label="Input Device"
+              devices={inputDevices}
+              selectedId={selectedInputId}
+              onSelect={selectInput}
+            />
+            <MIDIDeviceSelector
+              label="Output Device"
+              devices={outputDevices}
+              selectedId={selectedOutputId}
+              onSelect={selectOutput}
+            />
+            {/* Mobile Help - Only show instructions if on mobile, no devices connected, AND there was an error */}
+            {(midiInfo.isIOS || midiInfo.instructions?.includes('Android')) &&
+             inputDevices.length === 0 && outputDevices.length === 0 && lastError && (
+              <div className="mt-2 p-3 bg-dark-bgSecondary rounded border border-dark-border">
+                <div className="flex items-center gap-2 mb-2">
+                  <Smartphone size={14} className="text-accent-primary" />
+                  <span className="text-xs font-medium text-text-primary">
+                    Mobile MIDI Setup
+                  </span>
+                </div>
+                <div className="text-xs text-text-muted whitespace-pre-line max-h-48 overflow-y-auto">
+                  {midiInfo.instructions}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Quick Actions */}
+          <div className="px-4 py-2 border-b border-dark-border space-y-2">
+            {/* MIDI Controller Setup */}
+            <button
+              onClick={() => {
+                setIsOpen(false);
+                setShowLearnModal(true);
+              }}
+              className="w-full px-3 py-2 text-sm font-medium bg-accent-primary/20 border border-accent-primary/30 rounded flex items-center justify-center gap-2 hover:bg-accent-primary/30 transition-colors text-accent-primary"
+            >
+              <Settings2 size={14} />
+              MIDI Controller Setup...
+            </button>
+            {/* Visual Controller Mapper */}
+            <button
+              onClick={() => {
+                setIsOpen(false);
+                useUIStore.getState().openModal('midi-mapper');
+              }}
+              className="w-full px-3 py-2 text-sm font-medium bg-dark-bgActive rounded flex items-center justify-center gap-2 hover:bg-dark-bgHover transition-colors"
+            >
+              <Sliders size={14} />
+              Controller Mapper...
+            </button>
+            {/* TD-3 Pattern Transfer */}
+            <button
+              onClick={() => {
+                setIsOpen(false);
+                openPatternDialog();
+              }}
+              className="w-full px-3 py-2 text-sm font-medium bg-dark-bgActive rounded flex items-center justify-center gap-2 hover:bg-dark-bgHover transition-colors"
+            >
+              <ArrowUpDown size={14} />
+              TD-3 Patterns...
+            </button>
+          </div>
+
+          {/* NKS Panel */}
+          <div className="border-t border-dark-border">
+            <PerformancePanel />
+          </div>
+
+          {/* Activity Indicator */}
+          {selectedInputId && (
+            <div className="px-4 py-2 border-t border-dark-border bg-dark-bgSecondary">
+              <div className="flex items-center gap-2 text-xs text-text-muted">
+                <CircleDot
+                  size={10}
+                  className={showActivity ? 'text-accent-success' : 'text-text-muted'}
+                />
+                <span>
+                  {showActivity ? 'Receiving MIDI...' : 'Listening for MIDI input'}
+                </span>
+              </div>
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  ) : null;
+
   return (
     <>
-    <div className={inline ? "w-full" : "relative"} ref={inline ? undefined : dropdownRef}>
+    <div className={inline ? "w-full" : "relative"}>
       {/* Toolbar Button (hidden in inline mode) */}
       {!inline && (
         <button
+          ref={buttonRef}
+          data-midi-toggle
           onClick={() => setIsOpen(!isOpen)}
           className={`
             flex items-center gap-1.5 px-2 py-1 rounded text-[10px] font-medium
@@ -124,191 +330,12 @@ const MIDIToolbarDropdownComponent: React.FC<MIDIToolbarDropdownProps> = ({ inli
         </button>
       )}
 
-      {/* Dropdown / Inline Content */}
-      {isOpen && (
-        <div className={inline ? "w-full" : "absolute right-0 top-full mt-1 w-80 max-h-[80vh] bg-dark-bgTertiary border border-dark-border rounded-lg shadow-xl z-[99990] overflow-y-auto"}>
-          {/* Header (only in dropdown mode) */}
-          {!inline && (
-            <div className="px-4 py-3 border-b border-dark-border bg-dark-bgSecondary">
-              <div className="flex items-center justify-between">
-                <h3 className="text-sm font-bold text-text-primary">MIDI Settings</h3>
-                {isInitializing && <Loader2 size={14} className="animate-spin text-accent-primary" />}
-              </div>
-              {lastError && (
-                <div className="flex items-center gap-2 mt-1 text-xs text-accent-error">
-                  <AlertCircle size={12} />
-                  <span>{lastError}</span>
-                </div>
-              )}
-            </div>
-          )}
-
-          {isSupported === false ? (
-            <div className="px-4 py-6">
-              <div className="flex items-center gap-2 mb-3 justify-center">
-                {midiInfo.isIOS || midiInfo.instructions?.includes('Android') ? (
-                  <Smartphone size={24} className="text-text-muted" />
-                ) : (
-                  <AlertCircle size={24} className="text-text-muted" />
-                )}
-              </div>
-              <p className="text-sm text-text-secondary text-center mb-3">
-                Web MIDI API is not supported in this browser.
-              </p>
-
-              {/* Safari-specific troubleshooting - Only show if there's an error or failed attempt */}
-              {midiInfo.isIOS && lastError && (
-                <div className="text-xs bg-accent-warning/10 border border-accent-warning/30 rounded p-3 mb-3">
-                  <p className="font-bold text-accent-warning mb-2">Safari Troubleshooting:</p>
-                  <ul className="list-disc list-inside space-y-1 text-text-secondary">
-                    <li>Make sure you're using <strong>Safari</strong> (not Chrome on iOS)</li>
-                    <li>Web MIDI requires <strong>HTTPS</strong> - check the URL starts with https://</li>
-                    <li>Disable <strong>Private Browsing Mode</strong> - MIDI doesn't work in private mode</li>
-                    <li>Check <strong>Settings → Safari → Advanced → Experimental Features</strong> and ensure 'Web MIDI API' is ON</li>
-                    <li><strong>Home Screen Apps (PWA):</strong> Apple sometimes disables MIDI for apps saved to the home screen. Try using the regular Safari browser tab.</li>
-                    <li>Update to <strong>iOS 15+</strong> for full MIDI support</li>
-                    <li>Check browser console for detailed error messages</li>
-                  </ul>
-                  
-                  {/* Real-time diagnostics */}
-                  <div className="mt-3 pt-3 border-t border-accent-warning/20 font-mono text-[10px] text-text-muted space-y-1">
-                    <div className="flex justify-between">
-                      <span>Secure Context:</span>
-                      <span className={window.isSecureContext ? "text-accent-success" : "text-accent-error"}>
-                        {window.isSecureContext ? "YES" : "NO"}
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>PWA Mode:</span>
-                      <span>{
-                        // @ts-ignore
-                        (navigator.standalone || window.matchMedia('(display-mode: standalone)').matches) ? "YES" : "NO"
-                      }</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>Protocol:</span>
-                      <span>{window.location.protocol}</span>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {midiInfo.instructions && (
-                <div className="text-xs text-text-muted text-left bg-dark-bgSecondary rounded p-3 max-h-64 overflow-y-auto whitespace-pre-line">
-                  {midiInfo.instructions}
-                </div>
-              )}
-
-              {/* Retry button — on iOS, MIDI API may need a user gesture to activate */}
-              <button
-                onClick={handleRetryInit}
-                disabled={isInitializing}
-                className="w-full mt-3 px-4 py-2.5 bg-accent-primary/20 border border-accent-primary/30 rounded-lg text-sm font-bold text-accent-primary hover:bg-accent-primary/30 transition-colors disabled:opacity-50"
-              >
-                {isInitializing ? 'Checking...' : 'Retry MIDI Detection'}
-              </button>
-            </div>
-          ) : isSupported === null ? (
-            <div className="px-4 py-6 text-center">
-              <Loader2 size={24} className="mx-auto mb-2 text-text-muted animate-spin" />
-              <p className="text-sm text-text-secondary">
-                Checking MIDI support...
-              </p>
-            </div>
-          ) : (
-            <>
-              {/* Device Selection */}
-              <div className="px-4 py-3 space-y-3 border-b border-dark-border">
-                <MIDIDeviceSelector
-                  label="Input Device"
-                  devices={inputDevices}
-                  selectedId={selectedInputId}
-                  onSelect={selectInput}
-                />
-                <MIDIDeviceSelector
-                  label="Output Device"
-                  devices={outputDevices}
-                  selectedId={selectedOutputId}
-                  onSelect={selectOutput}
-                />
-                {/* Mobile Help - Only show instructions if on mobile, no devices connected, AND there was an error */}
-                {(midiInfo.isIOS || midiInfo.instructions?.includes('Android')) &&
-                 inputDevices.length === 0 && outputDevices.length === 0 && lastError && (
-                  <div className="mt-2 p-3 bg-dark-bgSecondary rounded border border-dark-border">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Smartphone size={14} className="text-accent-primary" />
-                      <span className="text-xs font-medium text-text-primary">
-                        Mobile MIDI Setup
-                      </span>
-                    </div>
-                    <div className="text-xs text-text-muted whitespace-pre-line max-h-48 overflow-y-auto">
-                      {midiInfo.instructions}
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Quick Actions */}
-              <div className="px-4 py-2 border-b border-dark-border space-y-2">
-                {/* MIDI Controller Setup */}
-                <button
-                  onClick={() => {
-                    setIsOpen(false);
-                    setShowLearnModal(true);
-                  }}
-                  className="w-full px-3 py-2 text-sm font-medium bg-accent-primary/20 border border-accent-primary/30 rounded flex items-center justify-center gap-2 hover:bg-accent-primary/30 transition-colors text-accent-primary"
-                >
-                  <Settings2 size={14} />
-                  MIDI Controller Setup...
-                </button>
-                {/* Visual Controller Mapper */}
-                <button
-                  onClick={() => {
-                    setIsOpen(false);
-                    useUIStore.getState().openModal('midi-mapper');
-                  }}
-                  className="w-full px-3 py-2 text-sm font-medium bg-dark-bgActive rounded flex items-center justify-center gap-2 hover:bg-dark-bgHover transition-colors"
-                >
-                  <Sliders size={14} />
-                  Controller Mapper...
-                </button>
-                {/* TD-3 Pattern Transfer */}
-                <button
-                  onClick={() => {
-                    setIsOpen(false);
-                    openPatternDialog();
-                  }}
-                  className="w-full px-3 py-2 text-sm font-medium bg-dark-bgActive rounded flex items-center justify-center gap-2 hover:bg-dark-bgHover transition-colors"
-                >
-                  <ArrowUpDown size={14} />
-                  TD-3 Patterns...
-                </button>
-              </div>
-
-              {/* NKS Panel */}
-              <div className="border-t border-dark-border">
-                <PerformancePanel />
-              </div>
-
-              {/* Activity Indicator */}
-              {selectedInputId && (
-                <div className="px-4 py-2 border-t border-dark-border bg-dark-bgSecondary">
-                  <div className="flex items-center gap-2 text-xs text-text-muted">
-                    <CircleDot
-                      size={10}
-                      className={showActivity ? 'text-accent-success' : 'text-text-muted'}
-                    />
-                    <span>
-                      {showActivity ? 'Receiving MIDI...' : 'Listening for MIDI input'}
-                    </span>
-                  </div>
-                </div>
-              )}
-            </>
-          )}
-        </div>
-      )}
+      {/* Inline mode renders dropdown in-place */}
+      {inline && dropdownPanel}
     </div>
+
+    {/* Portal mode renders dropdown above everything */}
+    {!inline && dropdownPanel && createPortal(dropdownPanel, document.body)}
 
     {/* MIDI Learn Modal */}
     <MIDILearnModal
