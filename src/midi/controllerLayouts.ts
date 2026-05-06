@@ -349,6 +349,143 @@ const MASCHINE_MK2: ControllerLayout = {
 };
 
 // ============================================================================
+// AKAI MPK MINI MK3
+// ============================================================================
+
+const MPK_MINI_MK3: ControllerLayout = {
+  id: 'akai-mpk-mini-mk3',
+  name: 'MPK Mini MK3',
+  manufacturer: 'Akai',
+  width: 20,
+  height: 12,
+  controls: [
+    // ── 8 knobs (CC 70-77, ch 0) ────────────────────────────────
+    ...Array.from({ length: 8 }, (_, i): ControlDescriptor => ({
+      id: `knob-${i + 1}`,
+      type: 'encoder',
+      x: i * 2 + 2, y: 0,
+      midi: { type: 'cc', channel: 0, number: 70 + i },
+      hasRingLed: false,
+      group: 'knobs',
+      label: `K${i + 1}`,
+    })),
+
+    // ── Joystick (pitchbend + mod wheel CC1) ────────────────────
+    {
+      id: 'joystick-x',
+      type: 'encoder',
+      x: 0, y: 3,
+      midi: { type: 'pitchbend', channel: 0, number: 0 },
+      hasRingLed: false,
+      group: 'joystick',
+      label: 'Pitch',
+    },
+    {
+      id: 'joystick-y',
+      type: 'encoder',
+      x: 0, y: 5,
+      midi: { type: 'cc', channel: 0, number: 1 },
+      hasRingLed: false,
+      group: 'joystick',
+      label: 'Mod',
+    },
+
+    // ── 8 pads (notes 36-43, ch 9 for Bank A) ──────────────────
+    // Physical layout: 2 rows × 4 columns
+    // Bottom row: pads 1-4 (notes 36-39)
+    // Top row:    pads 5-8 (notes 40-43)
+    ...Array.from({ length: 8 }, (_, i): ControlDescriptor => {
+      const col = i % 4;
+      const row = Math.floor(i / 4);
+      return {
+        id: `pad-${i + 1}`,
+        type: 'pad',
+        x: 2 + col * 2,
+        y: 5 - row * 2, // top row at y=3, bottom at y=5
+        midi: { type: 'note', channel: 9, number: 36 + i },
+        hasLed: true,
+        group: 'pads',
+        label: `Pad ${i + 1}`,
+      };
+    }),
+
+    // ── Bank select / Program buttons ───────────────────────────
+    {
+      id: 'btn-bank-a',
+      type: 'button',
+      x: 12, y: 3,
+      midi: { type: 'cc', channel: 0, number: 0 }, // Bank A indicator
+      hasLed: true,
+      group: 'bank',
+      label: 'Bank A',
+    },
+    {
+      id: 'btn-bank-b',
+      type: 'button',
+      x: 14, y: 3,
+      midi: { type: 'cc', channel: 0, number: 0 },
+      hasLed: true,
+      group: 'bank',
+      label: 'Bank B',
+    },
+
+    // ── Arpeggiator & controls ──────────────────────────────────
+    {
+      id: 'btn-arp',
+      type: 'button',
+      x: 12, y: 5,
+      midi: { type: 'note', channel: 0, number: 127 },
+      hasLed: true,
+      group: 'controls',
+      label: 'Arp',
+    },
+    {
+      id: 'btn-sustain',
+      type: 'button',
+      x: 14, y: 5,
+      midi: { type: 'note', channel: 0, number: 126 },
+      hasLed: true,
+      group: 'controls',
+      label: 'Sustain',
+    },
+
+    // ── Octave buttons ──────────────────────────────────────────
+    {
+      id: 'btn-octave-down',
+      type: 'button',
+      x: 16, y: 3,
+      midi: { type: 'note', channel: 0, number: 124 },
+      hasLed: true,
+      group: 'octave',
+      label: 'Oct -',
+    },
+    {
+      id: 'btn-octave-up',
+      type: 'button',
+      x: 18, y: 3,
+      midi: { type: 'note', channel: 0, number: 125 },
+      hasLed: true,
+      group: 'octave',
+      label: 'Oct +',
+    },
+
+    // ── Keyboard representation (25 keys, visual only) ──────────
+    // Show as a row of buttons to indicate the keyboard area
+    ...Array.from({ length: 13 }, (_, i): ControlDescriptor => ({
+      id: `key-${i}`,
+      type: 'button',
+      x: 2 + i,
+      y: 9,
+      w: 1, h: 2,
+      midi: { type: 'note', channel: 0, number: 48 + i },
+      hasLed: false,
+      group: 'keyboard',
+      label: i === 0 ? 'C' : '',
+    })),
+  ],
+};
+
+// ============================================================================
 // REGISTRY
 // ============================================================================
 
@@ -356,6 +493,7 @@ const MASCHINE_MK2: ControllerLayout = {
 export const CONTROLLER_LAYOUTS = new Map<string, ControllerLayout>([
   [XTOUCH_COMPACT.id, XTOUCH_COMPACT],
   [MASCHINE_MK2.id, MASCHINE_MK2],
+  [MPK_MINI_MK3.id, MPK_MINI_MK3],
 ]);
 
 /** Get layout for a preset, or null if none defined */
