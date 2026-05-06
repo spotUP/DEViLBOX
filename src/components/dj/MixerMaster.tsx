@@ -180,7 +180,7 @@ export const MixerMaster: React.FC = () => {
           label="Threshold"
           size="sm"
           color="#ef4444"
-          defaultValue={-6}
+          defaultValue={-1}
           formatValue={(v) => `${v.toFixed(0)} dB`}
           title="Limiter threshold — higher values allow more headroom before limiting kicks in"
         />
