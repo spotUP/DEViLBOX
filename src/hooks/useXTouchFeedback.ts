@@ -110,7 +110,7 @@ export function useXTouchFeedback(): void {
           lastPayloadRef.current = '';
           resetFaderCache();
           scheduleFlush();
-        }, 500);
+        }, 1500);
       }
 
       const messages = buildXTouchFeedbackMessages(preset, getFeedbackState(liveSendsRef.current, activeMovesRef.current), touchedRef.current);
@@ -237,6 +237,14 @@ export function useXTouchFeedback(): void {
     manager.addMessageHandler(midiTouchHandler);
     scheduleFlush();
 
+    // MIDI devices enumerate asynchronously — the first flush() likely
+    // can't find an output yet. Retry a few times during startup to
+    // catch the device once it appears.
+    const initRetries = [300, 800, 1500, 3000];
+    const initTimers = initRetries.map(delay => setTimeout(() => {
+      if (!initializedOutput) scheduleFlush();
+    }, delay));
+
     return () => {
       unsubscribeDJ();
       unsubscribeDub();
@@ -248,6 +256,7 @@ export function useXTouchFeedback(): void {
       unsubRelease();
       unsubFireFlash();
       for (const t of triggerTimers.values()) clearTimeout(t);
+      for (const t of initTimers) clearTimeout(t);
       if (throttleTimer !== null) {
         clearTimeout(throttleTimer);
         throttleTimer = null;
