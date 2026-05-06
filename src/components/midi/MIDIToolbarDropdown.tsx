@@ -6,8 +6,9 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useMIDIStore } from '../../stores/useMIDIStore';
 import { MIDIDeviceSelector } from './MIDIDeviceSelector';
 import { MIDILearnModal } from './MIDILearnModal';
+import { MIDIMapperModal } from './MIDIMapperModal';
 import { PerformancePanel } from './PerformancePanel';
-import { Cable, CircleDot, AlertCircle, Loader2, ArrowUpDown, Settings2, Smartphone } from 'lucide-react';
+import { Cable, CircleDot, AlertCircle, Loader2, ArrowUpDown, Settings2, Smartphone, Sliders } from 'lucide-react';
 import { getBluetoothMIDIInfo } from '../../midi/BluetoothMIDIManager';
 import { useClickOutside } from '@hooks/useClickOutside';
 
@@ -19,6 +20,7 @@ const MIDIToolbarDropdownComponent: React.FC<MIDIToolbarDropdownProps> = ({ inli
   const [isOpen, setIsOpen] = useState(inline); // Start open if inline mode
   const [isInitializing, setIsInitializing] = useState(false);
   const [showLearnModal, setShowLearnModal] = useState(false);
+  const [showMapperModal, setShowMapperModal] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   // PERFORMANCE OPTIMIZATION: Use individual selectors
@@ -260,6 +262,17 @@ const MIDIToolbarDropdownComponent: React.FC<MIDIToolbarDropdownProps> = ({ inli
                   <Settings2 size={14} />
                   MIDI Controller Setup...
                 </button>
+                {/* Visual Controller Mapper */}
+                <button
+                  onClick={() => {
+                    setIsOpen(false);
+                    setShowMapperModal(true);
+                  }}
+                  className="w-full px-3 py-2 text-sm font-medium bg-dark-bgActive rounded flex items-center justify-center gap-2 hover:bg-dark-bgHover transition-colors"
+                >
+                  <Sliders size={14} />
+                  Controller Mapper...
+                </button>
                 {/* TD-3 Pattern Transfer */}
                 <button
                   onClick={() => {
@@ -302,6 +315,11 @@ const MIDIToolbarDropdownComponent: React.FC<MIDIToolbarDropdownProps> = ({ inli
     <MIDILearnModal
       isOpen={showLearnModal}
       onClose={() => setShowLearnModal(false)}
+    />
+    {/* MIDI Controller Mapper Modal */}
+    <MIDIMapperModal
+      isOpen={showMapperModal}
+      onClose={() => setShowMapperModal(false)}
     />
     </>
   );

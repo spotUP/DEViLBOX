@@ -10,9 +10,27 @@ import React, { useCallback, useState, useEffect } from 'react';
 import { DJ_CONTROLLER_PRESETS, getPresetById, detectDJPreset } from '@/midi/djControllerPresets';
 import { getDJControllerMapper } from '@/midi/DJControllerMapper';
 import { getMIDIManager } from '@/midi/MIDIManager';
+import { getControllerLayout, mergeOverridesIntoPreset } from '@/midi/controllerLayouts';
+import { useMIDIPresetStore } from '@/stores/useMIDIPresetStore';
 import { CustomSelect } from '@components/common/CustomSelect';
 
 const STORAGE_KEY = 'devilbox-dj-controller-preset';
+
+/** Apply a preset with user overrides merged in */
+function applyPresetWithOverrides(presetId: string): void {
+  const preset = getPresetById(presetId);
+  if (!preset) {
+    getDJControllerMapper().setPreset(null);
+    return;
+  }
+  const layout = getControllerLayout(preset.id);
+  const overrides = useMIDIPresetStore.getState().getOverrides(preset.id);
+  if (layout && Object.keys(overrides).length > 0) {
+    getDJControllerMapper().setPreset(mergeOverridesIntoPreset(preset, overrides, layout));
+  } else {
+    getDJControllerMapper().setPreset(preset);
+  }
+}
 
 export const DJControllerSelector: React.FC = () => {
   const [selectedId, setSelectedId] = useState<string>(() => {
@@ -22,8 +40,7 @@ export const DJControllerSelector: React.FC = () => {
   // Restore saved preset OR auto-detect from connected MIDI device
   useEffect(() => {
     if (selectedId) {
-      const preset = getPresetById(selectedId);
-      getDJControllerMapper().setPreset(preset);
+      applyPresetWithOverrides(selectedId);
       return;
     }
 
@@ -35,7 +52,7 @@ export const DJControllerSelector: React.FC = () => {
       if (detected) {
         console.log(`[DJ] Auto-detected controller: ${input.name} → ${detected.name}`);
         setSelectedId(detected.id);
-        getDJControllerMapper().setPreset(detected);
+        applyPresetWithOverrides(detected.id);
         localStorage.setItem(STORAGE_KEY, detected.id);
       }
     }
@@ -45,8 +62,7 @@ export const DJControllerSelector: React.FC = () => {
     setSelectedId(id);
 
     if (id) {
-      const preset = getPresetById(id);
-      getDJControllerMapper().setPreset(preset);
+      applyPresetWithOverrides(id);
       localStorage.setItem(STORAGE_KEY, id);
     } else {
       getDJControllerMapper().setPreset(null);
