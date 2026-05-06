@@ -399,11 +399,11 @@ export class ToneEngine {
     // destroying WAV exports and screen recordings while sounding OK through speakers
     // (because the DAC clips inaudibly at moderate volume).
     this.safetyLimiter = new Tone.Compressor({
-      threshold: -6,    // Start compressing at -6 dBFS (configurable via store)
-      ratio: 20,        // Near-brickwall limiting
-      attack: 0.003,    // 3ms — fast enough for transients
-      release: 0.25,    // Smooth release
-      knee: 1,          // Tight knee
+      threshold: -1,    // Only catch peaks near 0 dBFS
+      ratio: 4,         // Gentle limiting — no pumping
+      attack: 0.001,    // 1ms — catch transients without squashing
+      release: 0.1,     // Quick release — transparent on short peaks
+      knee: 6,          // Soft knee — smooth onset, no audible compression
     });
 
     // Post-limiter export tap — WAV/MP3 captures tap here (post-limiter, pre-master-volume)
@@ -1320,7 +1320,7 @@ export class ToneEngine {
   /** Enable/disable the master safety limiter. When disabled, the limiter
    *  passes audio through unchanged (ratio set to 1:1). */
   public setMasterLimiterEnabled(enabled: boolean): void {
-    this.safetyLimiter.ratio.value = enabled ? 20 : 1;
+    this.safetyLimiter.ratio.value = enabled ? 4 : 1;
   }
 
   /** Set the master limiter threshold in dB (-24 to 0). */

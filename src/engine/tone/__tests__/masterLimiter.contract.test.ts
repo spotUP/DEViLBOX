@@ -27,15 +27,16 @@ describe('Master Limiter — ToneEngine contract', () => {
     expect(toneEngineSrc).toMatch(/setMasterLimiterThreshold\s*\(\s*db\s*:\s*number\s*\)/);
   });
 
-  it('defaults safetyLimiter threshold to -6 dB (not -1)', () => {
-    // The constructor should set threshold: -6
-    expect(toneEngineSrc).toMatch(/threshold:\s*-6/);
-    expect(toneEngineSrc).not.toMatch(/threshold:\s*-1\b/);
+  it('defaults safetyLimiter threshold to -1 dB', () => {
+    expect(toneEngineSrc).toMatch(/threshold:\s*-1/);
   });
 
   it('disables limiter by setting ratio to 1 (transparent passthrough)', () => {
-    // When disabled, ratio should be set to 1 for transparent pass
     expect(toneEngineSrc).toMatch(/ratio.*=.*1/);
+  });
+
+  it('uses gentle ratio of 4 (not brickwall 20)', () => {
+    expect(toneEngineSrc).toMatch(/ratio:\s*4/);
   });
 });
 
@@ -44,8 +45,8 @@ describe('Master Limiter — Audio store contract', () => {
     expect(audioStoreSrc).toMatch(/masterLimiterEnabled/);
   });
 
-  it('has masterLimiterThreshold state (default -6)', () => {
-    expect(audioStoreSrc).toMatch(/masterLimiterThreshold.*-6/);
+  it('has masterLimiterThreshold state (default -1)', () => {
+    expect(audioStoreSrc).toMatch(/masterLimiterThreshold.*-1/);
   });
 
   it('has setMasterLimiterEnabled action', () => {
