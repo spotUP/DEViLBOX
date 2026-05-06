@@ -84,6 +84,8 @@ export const EditorControlsBar: React.FC<EditorControlsBarProps> = React.memo(({
   // Volume
   const masterVolume = useAudioStore(s => s.masterVolume);
   const setMasterVolume = useAudioStore(s => s.setMasterVolume);
+  const limiterEnabled = useAudioStore(s => s.masterLimiterEnabled);
+  const setLimiterEnabled = useAudioStore(s => s.setMasterLimiterEnabled);
 
   // DOM-only: UI store for view-mode switching and groove dialog command
   const modalOpen = useUIStore(s => s.modalOpen);
@@ -226,6 +228,19 @@ export const EditorControlsBar: React.FC<EditorControlsBarProps> = React.memo(({
           className="w-16 max-w-[4rem] shrink-0 grow-0"
           title={`Volume: ${masterVolume} dB`}
         />
+
+        {/* Master Limiter Toggle */}
+        <button
+          className={`shrink-0 px-1.5 h-5 rounded text-[9px] font-mono border transition-colors ${
+            limiterEnabled
+              ? 'bg-accent-error/20 border-accent-error/40 text-accent-error'
+              : 'bg-dark-bgSecondary border-dark-border text-text-muted hover:text-text-secondary'
+          }`}
+          title={limiterEnabled ? 'Master limiter enabled — click to disable' : 'Master limiter disabled — click to enable'}
+          onClick={() => setLimiterEnabled(!limiterEnabled)}
+        >
+          Limiter
+        </button>
 
         {/* Hardware System Preset Selector */}
         <div className="flex items-center gap-1.5">
