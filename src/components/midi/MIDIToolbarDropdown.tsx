@@ -6,11 +6,11 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useMIDIStore } from '../../stores/useMIDIStore';
 import { MIDIDeviceSelector } from './MIDIDeviceSelector';
 import { MIDILearnModal } from './MIDILearnModal';
-import { MIDIMapperModal } from './MIDIMapperModal';
 import { PerformancePanel } from './PerformancePanel';
 import { Cable, CircleDot, AlertCircle, Loader2, ArrowUpDown, Settings2, Smartphone, Sliders } from 'lucide-react';
 import { getBluetoothMIDIInfo } from '../../midi/BluetoothMIDIManager';
 import { useClickOutside } from '@hooks/useClickOutside';
+import { useUIStore } from '@/stores/useUIStore';
 
 interface MIDIToolbarDropdownProps {
   inline?: boolean; // If true, always shows expanded without button (for mobile menu)
@@ -20,7 +20,6 @@ const MIDIToolbarDropdownComponent: React.FC<MIDIToolbarDropdownProps> = ({ inli
   const [isOpen, setIsOpen] = useState(inline); // Start open if inline mode
   const [isInitializing, setIsInitializing] = useState(false);
   const [showLearnModal, setShowLearnModal] = useState(false);
-  const [showMapperModal, setShowMapperModal] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   // PERFORMANCE OPTIMIZATION: Use individual selectors
@@ -266,7 +265,7 @@ const MIDIToolbarDropdownComponent: React.FC<MIDIToolbarDropdownProps> = ({ inli
                 <button
                   onClick={() => {
                     setIsOpen(false);
-                    setShowMapperModal(true);
+                    useUIStore.getState().openModal('midi-mapper');
                   }}
                   className="w-full px-3 py-2 text-sm font-medium bg-dark-bgActive rounded flex items-center justify-center gap-2 hover:bg-dark-bgHover transition-colors"
                 >
@@ -315,11 +314,6 @@ const MIDIToolbarDropdownComponent: React.FC<MIDIToolbarDropdownProps> = ({ inli
     <MIDILearnModal
       isOpen={showLearnModal}
       onClose={() => setShowLearnModal(false)}
-    />
-    {/* MIDI Controller Mapper Modal */}
-    <MIDIMapperModal
-      isOpen={showMapperModal}
-      onClose={() => setShowMapperModal(false)}
     />
     </>
   );
