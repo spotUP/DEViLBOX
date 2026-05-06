@@ -126,6 +126,10 @@ class MaschineHIDBridge {
         }
         // Start the screen manager now that we have a connection
         this.initScreenManager();
+        // MK2 has 16 pads — tell the drum pad UI
+        import('@/stores/useDrumPadStore').then(({ useDrumPadStore }) => {
+          useDrumPadStore.getState().setControllerPadCount(16);
+        });
       });
 
       this.ws.addEventListener('message', (event) => {
