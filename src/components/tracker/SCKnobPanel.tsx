@@ -10,10 +10,10 @@ import { useShallow } from 'zustand/react/shallow';
 import { ChevronDown, ChevronUp, ChevronLeft, ChevronRight } from 'lucide-react';
 
 export const SCKnobPanel: React.FC = memo(() => {
-  const { instruments, updateInstrument } = useInstrumentStore(
+  const { instruments, updateInstrumentRealtime } = useInstrumentStore(
     useShallow((s) => ({
       instruments: s.instruments,
-      updateInstrument: s.updateInstrument,
+      updateInstrumentRealtime: s.updateInstrumentRealtime,
     }))
   );
 
@@ -49,11 +49,11 @@ export const SCKnobPanel: React.FC = memo(() => {
       const updatedParams = latest.superCollider.params.map((p) =>
         p.name === paramName ? { ...p, value } : p
       );
-      updateInstrument(scInstrument.id, {
+      updateInstrumentRealtime(scInstrument.id, {
         superCollider: { ...latest.superCollider, params: updatedParams },
       });
     },
-    [scInstrument, scConfig, updateInstrument]
+    [scInstrument, scConfig, updateInstrumentRealtime]
   );
 
   if (!scInstrument) return null;
