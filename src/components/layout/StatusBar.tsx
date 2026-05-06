@@ -309,6 +309,8 @@ export const StatusBar: React.FC<StatusBarProps> = React.memo(() => {
   const hasMIDIDevice = isInitialized && inputDevices.length > 0;
   const selectedDevice = hasMIDIDevice ? (inputDevices.find(d => d.id === selectedInputId) || inputDevices[0]) : null;
   const deviceName = selectedDevice?.name || 'MIDI Controller';
+  // Hide knob bar when MK2 hardware controls the knobs (displays show params instead)
+  const hasMK2 = useDrumPadStore(s => s.controllerPadCount) >= 16;
 
   const masterEffects = useAudioStore(s => s.masterEffects);
 
@@ -427,7 +429,7 @@ export const StatusBar: React.FC<StatusBarProps> = React.memo(() => {
   return (
     <div className="flex flex-col">
       {/* MIDI Knob Controls - Expanded (hidden when nothing to control) */}
-      {activeView !== 'vj' && activeView !== 'dj' && showKnobBar && contextKnobs.length > 0 && (
+      {activeView !== 'vj' && activeView !== 'dj' && !hasMK2 && showKnobBar && contextKnobs.length > 0 && (
         <div className="bg-dark-bgTertiary border-t border-dark-border px-4 py-2 flex items-center gap-2">
           {/* Page nav left */}
           {showPageNav && (
