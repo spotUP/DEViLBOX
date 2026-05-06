@@ -1140,6 +1140,47 @@ export const CONTROLLER_PROFILES: ControllerProfile[] = [
       },
     },
   },
+
+  // ========================================
+  // Native Instruments Maschine MK2
+  // 8 NIHIA knobs (CC 70-77), 16 pads (notes 36-51), buttons via NIHIA IPC
+  // Dual OLED displays (256×64 monochrome), RGB pad LEDs
+  // Knobs and buttons routed via tools/maschine-bridge.ts WebSocket bridge
+  // ========================================
+  {
+    id: 'ni-maschine-mk2',
+    name: 'Maschine MK2',
+    manufacturer: 'Native Instruments',
+    detectPatterns: ['maschine mk2', 'maschine', 'ni maschine'],
+    knobs: [
+      { cc: 70, name: 'Knob 1', defaultMapping: 'tb303.cutoff' },
+      { cc: 71, name: 'Knob 2', defaultMapping: 'tb303.resonance' },
+      { cc: 72, name: 'Knob 3', defaultMapping: 'tb303.envMod' },
+      { cc: 73, name: 'Knob 4', defaultMapping: 'tb303.decay' },
+      { cc: 74, name: 'Knob 5', defaultMapping: 'tb303.accent' },
+      { cc: 75, name: 'Knob 6', defaultMapping: 'tb303.overdrive' },
+      { cc: 76, name: 'Knob 7', defaultMapping: 'tb303.slideTime' },
+      { cc: 77, name: 'Knob 8', defaultMapping: 'tb303.volume' },
+    ],
+    pads: [
+      ...Array.from({ length: 16 }, (_, i) => ({
+        note: 36 + i,
+        name: `Pad ${i + 1}`,
+      })),
+    ],
+    suggestedLayout: {
+      knobs: {
+        70: 'tb303.cutoff',
+        71: 'tb303.resonance',
+        72: 'tb303.envMod',
+        73: 'tb303.decay',
+        74: 'tb303.accent',
+        75: 'tb303.overdrive',
+        76: 'tb303.slideTime',
+        77: 'tb303.volume',
+      },
+    },
+  },
 ];
 
 /**

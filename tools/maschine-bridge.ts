@@ -33,12 +33,12 @@ const WS_PORT   = 4005;
 type NIHIAEvent =
   | { type: 'knob';   knob: number; delta: number; raw: number }
   | { type: 'pad';    pad: number;  velocity: number; pressed: boolean }
-  | { type: 'button'; btn: number };
+  | { type: 'button'; btn: number; pressed: number };
 
 export type MaschineEvent =
   | { type: 'encoder'; index: number; name: string; value: number; raw: number }
   | { type: 'pad';     pad: number;   velocity: number; pressed: boolean }
-  | { type: 'button';  name: string;  pressed: boolean };
+  | { type: 'button';  name: string; btnId: number; pressed: boolean };
 
 export type MaschineCommand =
   | { type: 'setPadColor';     pad: number; r: number; g: number; b: number }
@@ -113,11 +113,10 @@ function routeNIHIAEvent(evt: NIHIAEvent): void {
   } else if (evt.type === 'pad') {
     broadcast({ type: 'pad', pad: evt.pad, velocity: evt.velocity, pressed: evt.pressed });
   } else if (evt.type === 'button') {
-    // Map raw button IDs to names (extend as needed)
     const name = `btn${evt.btn}`;
-    broadcast({ type: 'button', name, pressed: true });
-    // Auto-release after 50ms (hardware sends no release for some buttons)
-    setTimeout(() => broadcast({ type: 'button', name, pressed: false }), 50);
+    const pressed = !!evt.pressed;
+    console.error(`[maschine] BTN ${evt.btn} ${pressed ? 'PRESSED' : 'RELEASED'}`);
+    broadcast({ type: 'button', name, btnId: evt.btn, pressed });
   }
 }
 
