@@ -11,6 +11,7 @@
 
 import React, { useCallback, useRef, useState, useEffect } from 'react';
 import { useDJStore } from '@/stores/useDJStore';
+import { useShallow } from 'zustand/react/shallow';
 import * as DJActions from '@/engine/dj/DJActions';
 
 interface MixerChannelStripProps {
@@ -32,11 +33,15 @@ function volumeToDb(volume: number): string {
 }
 
 export const MixerChannelStrip: React.FC<MixerChannelStripProps> = ({ deckId, stretch }) => {
-  const volume = useDJStore((s) => s.decks[deckId].volume);
-  const trimGain = useDJStore((s) => s.decks[deckId].trimGain);
-  const scratchFaderGain = useDJStore((s) => s.decks[deckId].scratchFaderGain);
-  const activePatternName = useDJStore((s) => s.decks[deckId].activePatternName);
-  const faderLFOActive = useDJStore((s) => s.decks[deckId].faderLFOActive);
+  const { volume, trimGain, scratchFaderGain, activePatternName, faderLFOActive } = useDJStore(
+    useShallow((s) => ({
+      volume: s.decks[deckId].volume,
+      trimGain: s.decks[deckId].trimGain,
+      scratchFaderGain: s.decks[deckId].scratchFaderGain,
+      activePatternName: s.decks[deckId].activePatternName,
+      faderLFOActive: s.decks[deckId].faderLFOActive,
+    }))
+  );
   const [dragging, setDragging] = useState(false);
   const trackRef = useRef<HTMLDivElement>(null);
 
