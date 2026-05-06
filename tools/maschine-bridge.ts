@@ -31,9 +31,10 @@ const WS_PORT   = 4005;
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 type NIHIAEvent =
-  | { type: 'knob';   knob: number; delta: number; raw: number }
-  | { type: 'pad';    pad: number;  velocity: number; pressed: boolean }
-  | { type: 'button'; btn?: number; btnId?: number; name?: string; pressed: number | boolean };
+  | { type: 'knob';    knob: number; delta: number; raw: number }
+  | { type: 'encoder'; index: number; name: string; value: number; raw: number }
+  | { type: 'pad';     pad: number;  velocity: number; pressed: boolean }
+  | { type: 'button';  btn?: number; btnId?: number; name?: string; pressed: number | boolean };
 
 export type MaschineEvent =
   | { type: 'encoder'; index: number; name: string; value: number; raw: number }
@@ -110,6 +111,9 @@ function routeNIHIAEvent(evt: NIHIAEvent): void {
       type: 'encoder', index: i, name: KNOB_NAMES[i],
       value: knobValues[i], raw: evt.raw,
     });
+  } else if (evt.type === 'encoder') {
+    // HID path: C binary sends encoder events directly with index/value
+    broadcast(evt as MaschineEvent);
   } else if (evt.type === 'pad') {
     broadcast({ type: 'pad', pad: evt.pad, velocity: evt.velocity, pressed: evt.pressed });
   } else if (evt.type === 'button') {

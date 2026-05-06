@@ -679,7 +679,7 @@ static void *hid_reader_thread(void *arg) {
                         if (knob_pos[k] > 127) knob_pos[k] = 127;
                         if (knob_pos[k] == old_pos) continue;
                         printf("{\"type\":\"encoder\",\"index\":%d,\"name\":\"%s\",\"value\":%d,\"raw\":%d}\n",
-                               k+1, KNOB_NAMES[k], knob_pos[k], (int)delta);
+                               k, KNOB_NAMES[k], knob_pos[k], (int)delta);
                         fflush(stdout);
                     }
                 }
