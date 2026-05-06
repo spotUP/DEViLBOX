@@ -88,10 +88,38 @@ export const DeckTrackOverview: React.FC<DeckTrackOverviewProps> = ({ deckId }) 
       ...snapshotDeck(deck),
     }, [offscreen]);
 
-    // Deck state subscription
-    const unsub = useDJStore.subscribe(
-      (s) => s.decks[deckId],
-      (deck) => bridgeRef.current?.post({ type: 'state', ...snapshotDeck(deck) }),
+    // Position-only subscription (fires ~20Hz during playback — cheap post, no array copies)
+    const unsubPos = useDJStore.subscribe(
+      (s) => {
+        const d = s.decks[deckId];
+        return { audioPosition: d.audioPosition, songPos: d.songPos, totalPositions: d.totalPositions };
+      },
+      () => {
+        const d = useDJStore.getState().decks[deckId];
+        bridgeRef.current?.post({ type: 'state', ...snapshotDeck(d) });
+      },
+      { equalityFn: (a, b) => a.audioPosition === b.audioPosition && a.songPos === b.songPos && a.totalPositions === b.totalPositions },
+    );
+
+    // Structural state subscription (fires on track load, cue, loop changes — rare)
+    const unsubStructure = useDJStore.subscribe(
+      (s) => {
+        const d = s.decks[deckId];
+        return {
+          playbackMode: d.playbackMode, cuePoint: d.cuePoint,
+          loopActive: d.loopActive, patternLoopStart: d.patternLoopStart,
+          patternLoopEnd: d.patternLoopEnd, durationMs: d.durationMs,
+          waveformPeaks: d.waveformPeaks, frequencyPeaks: d.frequencyPeaks,
+        };
+      },
+      () => {
+        const d = useDJStore.getState().decks[deckId];
+        bridgeRef.current?.post({ type: 'state', ...snapshotDeck(d) });
+      },
+      { equalityFn: (a, b) => a.playbackMode === b.playbackMode && a.cuePoint === b.cuePoint &&
+          a.loopActive === b.loopActive && a.patternLoopStart === b.patternLoopStart &&
+          a.patternLoopEnd === b.patternLoopEnd && a.durationMs === b.durationMs &&
+          a.waveformPeaks === b.waveformPeaks && a.frequencyPeaks === b.frequencyPeaks },
     );
 
     // Theme subscription
@@ -113,7 +141,8 @@ export const DeckTrackOverview: React.FC<DeckTrackOverviewProps> = ({ deckId }) 
     observer.observe(container);
 
     return () => {
-      unsub();
+      unsubPos();
+      unsubStructure();
       unsubTheme();
       observer.disconnect();
       bridge.dispose();
