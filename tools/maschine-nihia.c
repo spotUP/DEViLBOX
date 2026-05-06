@@ -238,10 +238,17 @@ static CFDataRef instance_cb(CFMessagePortRef local __attribute__((unused)),
         printf("{\"type\":\"pad\",\"pad\":%u,\"velocity\":%d,\"pressed\":%d}\n",
                phys, vel, vel>0);
         fflush(stdout);
-    } else if (mid == EVT_BTN_DATA && len >= 8) {
-        uint32_t btn = read_u32le(d+4);
-        printf("{\"type\":\"button\",\"btn\":%u}\n", btn);
-        fflush(stdout);
+    } else if (mid == EVT_BTN_DATA && len >= 21) {
+        /* Layout: mid(4) cnt(4) unk1(4) msgtype(4) btn(4) state(1)
+         * MK2 uses msgtype==1 for parseable button events */
+        uint32_t msgtype = read_u32le(d+12);
+        if (msgtype != 1) { /* ignore msgtype 0 (MK2 quirk) */ }
+        else {
+            uint32_t btn   = read_u32le(d+16);
+            uint8_t  state = d[20];
+            printf("{\"type\":\"button\",\"btn\":%u,\"pressed\":%d}\n", btn, state > 0);
+            fflush(stdout);
+        }
     }
     (void)msgid;
     return NULL;
