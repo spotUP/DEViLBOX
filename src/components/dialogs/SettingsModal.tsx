@@ -601,6 +601,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
                         <p className="text-[9px] text-ft2-textDim font-mono">Detect and configure MIDI controller</p>
                       </div>
                     </button>
+                    <button onClick={() => { onClose(); useUIStore.getState().openModal('midi-mapper'); }}
+                      className="w-full flex items-center gap-2 px-3 py-2 bg-blue-500/10 border border-blue-500/30 rounded text-left hover:bg-blue-500/20 transition-colors">
+                      <span className="text-accent-primary text-xs">🎚</span>
+                      <div className="flex-1">
+                        <p className="text-xs text-ft2-highlight font-mono">Controller Mapper</p>
+                        <p className="text-[9px] text-ft2-textDim font-mono">Visual mapping editor for knobs, faders, buttons</p>
+                      </div>
+                    </button>
                     <button onClick={() => { onClose(); useUIStore.getState().openModal('nks-wizard'); }}
                       className="w-full flex items-center gap-2 px-3 py-2 bg-orange-500/10 border border-orange-500/30 rounded text-left hover:bg-orange-500/20 transition-colors">
                       <span className="text-orange-400 text-xs">🎹</span>

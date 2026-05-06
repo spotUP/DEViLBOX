@@ -36,6 +36,7 @@ import { UpdateNotification } from '@components/ui/UpdateNotification';
 import { SynthErrorDialog } from '@components/ui/SynthErrorDialog';
 import { USBSIDWizard } from '@components/dialogs/USBSIDWizard';
 import { MIDIControllerWizard } from '@components/dialogs/MIDIControllerWizard';
+import { MIDIMapperModal } from '@components/midi/MIDIMapperModal';
 import { NKSSetupWizard } from '@components/dialogs/NKSSetupWizard';
 import { RomUploadDialog } from '@components/ui/RomUploadDialog';
 import { ModlandContributionModal } from '@components/modland/ModlandContributionModal';
@@ -1310,6 +1311,9 @@ function App() {
 
       {/* MIDI Controller Setup Wizard */}
       <MIDIControllerWizard />
+
+      {/* MIDI Controller Mapper */}
+      <MIDIMapperModal />
 
       {/* NKS Performance Setup Wizard */}
       <NKSSetupWizard />
