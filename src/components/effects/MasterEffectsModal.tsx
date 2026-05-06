@@ -795,6 +795,8 @@ function SortableEffectItem({ effect, isSelected, onSelect, onToggle, onRemove, 
             max="100"
             value={effect.wet}
             onChange={(e) => onWetChange(Number(e.target.value))}
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={(e) => e.stopPropagation()}
             className="w-16 h-1 rounded-lg appearance-none cursor-pointer
                      [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-2.5 [&::-webkit-slider-thumb]:h-2.5
                      [&::-webkit-slider-thumb]:rounded-full"
