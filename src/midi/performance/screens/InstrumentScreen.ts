@@ -10,7 +10,9 @@
 import { MK2Display } from '../MK2Display';
 import type { MK2Screen, MK2ScreenContext } from './MK2ScreenManager';
 import { useInstrumentStore } from '@/stores/useInstrumentStore';
+import { useMIDIStore } from '@/stores/useMIDIStore';
 import { getNKSParametersForSynth, buildNKSPages } from '../synthParameterMaps';
+import { getKnobPageName } from '@/midi/knobBanks';
 import type { SynthType, InstrumentConfig } from '@/types/instrument';
 
 // ── Synth name abbreviations for header ──────────────────────────────────────
@@ -32,15 +34,17 @@ function abbrevSynth(synthType: string): string {
 
 export class InstrumentScreen implements MK2Screen {
 
-  render(left: MK2Display, right: MK2Display, ctx: MK2ScreenContext): void {
+  render(left: MK2Display, right: MK2Display, _ctx: MK2ScreenContext): void {
     const inst = useInstrumentStore.getState().currentInstrument;
     if (!inst) {
       this.renderEmpty(left, right);
       return;
     }
 
-    this.renderLeft(left, inst.synthType, inst.name);
-    this.renderRight(right, inst.synthType as SynthType, ctx.nksPage, inst);
+    // Use actual knob page from MIDI store (synced by soft buttons / page nav)
+    const nksPage = useMIDIStore.getState().nksKnobPage;
+    this.renderLeft(left, inst.synthType, inst.name, nksPage);
+    this.renderRight(right, inst.synthType as SynthType, nksPage, inst);
   }
 
   softLabels(): string[] {
@@ -50,16 +54,20 @@ export class InstrumentScreen implements MK2Screen {
     const params = getNKSParametersForSynth(inst.synthType as SynthType);
     const pages = buildNKSPages(params);
     const total = pages.length;
+    const currentPage = useMIDIStore.getState().nksKnobPage;
 
-    // Show page numbers as soft button labels, highlight current
-    return Array.from({ length: 8 }, (_, i) =>
-      i < total ? `P${i + 1}` : '',
-    );
+    // Show page names as soft button labels
+    return Array.from({ length: 8 }, (_, i) => {
+      if (i >= total) return '';
+      const name = getKnobPageName(inst.synthType as SynthType, i) || `P${i + 1}`;
+      // Mark current page with brackets
+      return i === currentPage ? `[${name.substring(0, 4)}]` : name.substring(0, 5);
+    });
   }
 
   // ── Left screen: instrument name + waveform area ───────────────────────
 
-  private renderLeft(d: MK2Display, synthType: string, name: string): void {
+  private renderLeft(d: MK2Display, synthType: string, name: string, pageIndex: number): void {
     const { W, WHITE, BLACK, CHAR_H } = MK2Display;
 
     // Content area: between soft labels (top 9px) and transport bar (bottom 8px)
@@ -74,8 +82,12 @@ export class InstrumentScreen implements MK2Screen {
     const shortName = (name || 'Untitled').substring(0, 20);
     d.text(4, contentY + 20, shortName, WHITE);
 
+    // Current knob page name
+    const pageName = getKnobPageName(synthType as SynthType, pageIndex) || `Page ${pageIndex + 1}`;
+    d.text(4, contentY + 30, `Knobs: ${pageName}`, WHITE);
+
     // Draw a simple waveform icon based on synth type
-    const waveY = contentY + 30;
+    const waveY = contentY + 40;
     const waveH = contentH - 32;
     if (waveH > 4) {
       this.drawSynthIcon(d, 4, waveY, W - 8, waveH, synthType);

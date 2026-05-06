@@ -18,6 +18,7 @@ import { useInstrumentStore } from '@/stores/useInstrumentStore';
 import { useOscilloscopeStore } from '@/stores/useOscilloscopeStore';
 import { useTrackerStore } from '@/stores/useTrackerStore';
 import { useDrumPadStore } from '@/stores/useDrumPadStore';
+import { useMIDIStore } from '@/stores/useMIDIStore';
 import type { PadBank } from '@/types/drumpad';
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -507,9 +508,13 @@ class MK2ScreenManager {
         break;
       }
       case 'instrument': {
-        // Soft 1-8 → NKS page 1-8
-        this.ctx.nksPage = index;
-        this.markDirty();
+        // Soft 1-8 → NKS knob page
+        const midiStore = useMIDIStore.getState();
+        if (index < midiStore.nksKnobTotalPages) {
+          midiStore.setKnobPage(index);
+          this.ctx.nksPage = index;
+          this.markDirty();
+        }
         break;
       }
     }
@@ -518,10 +523,9 @@ class MK2ScreenManager {
   private navigateLeft(): void {
     switch (this.mode) {
       case 'instrument':
-        if (this.ctx.nksPage > 0) {
-          this.ctx.nksPage--;
-          this.markDirty();
-        }
+        useMIDIStore.getState().prevKnobPage();
+        this.ctx.nksPage = useMIDIStore.getState().nksKnobPage;
+        this.markDirty();
         break;
       case 'mixer':
         if (this.ctx.selectedChannel > 0) {
@@ -552,7 +556,8 @@ class MK2ScreenManager {
   private navigateRight(): void {
     switch (this.mode) {
       case 'instrument':
-        this.ctx.nksPage++;
+        useMIDIStore.getState().nextKnobPage();
+        this.ctx.nksPage = useMIDIStore.getState().nksKnobPage;
         this.markDirty();
         break;
       case 'mixer':
