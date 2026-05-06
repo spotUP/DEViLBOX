@@ -260,17 +260,23 @@ class MaschineHIDBridge {
   }
 
   private initScreenManager(): void {
-    import('./performance/screens/InstrumentScreen').then(({ InstrumentScreen }) => {
-      import('./performance/screens/MixerScreen').then(({ MixerScreen }) => {
-        import('./performance/screens/StepScreen').then(({ StepScreen }) => {
-          const mgr = getMK2ScreenManager();
-          mgr.registerScreen('instrument', new InstrumentScreen());
-          mgr.registerScreen('mixer', new MixerScreen());
-          mgr.registerScreen('step', new StepScreen());
-          mgr.start();
-          console.log('[MaschineHID] Screen manager initialized with 3 modes');
-        });
-      });
+    Promise.all([
+      import('./performance/screens/InstrumentScreen'),
+      import('./performance/screens/MixerScreen'),
+      import('./performance/screens/StepScreen'),
+      import('./performance/screens/SampleScreen'),
+      import('./performance/screens/BrowseScreen'),
+      import('./performance/screens/SongScreen'),
+    ]).then(([instMod, mixMod, stepMod, sampleMod, browseMod, songMod]) => {
+      const mgr = getMK2ScreenManager();
+      mgr.registerScreen('instrument', new instMod.InstrumentScreen());
+      mgr.registerScreen('mixer', new mixMod.MixerScreen());
+      mgr.registerScreen('step', new stepMod.StepScreen());
+      mgr.registerScreen('sample', new sampleMod.SampleScreen());
+      mgr.registerScreen('browse', new browseMod.BrowseScreen());
+      mgr.registerScreen('song', new songMod.SongScreen());
+      mgr.start();
+      console.log('[MaschineHID] Screen manager initialized with 6 modes');
     }).catch((err) => {
       console.warn('[MaschineHID] Failed to init screen manager:', err);
     });
