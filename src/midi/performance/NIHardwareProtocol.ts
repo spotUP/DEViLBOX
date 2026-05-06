@@ -27,11 +27,6 @@ const NI_COLORS = {
   WHITE:       { r: 255, g: 255, b: 255 },
 } as const;
 
-const PAGE_PAD_COLORS = [
-  NI_COLORS.GREEN, NI_COLORS.CYAN,   NI_COLORS.BLUE,   NI_COLORS.VIOLET,
-  NI_COLORS.MAGENTA, NI_COLORS.RED,  NI_COLORS.ORANGE, NI_COLORS.YELLOW,
-] as const;
-
 // ── Screen 1 (right) — synth parameters ───────────────────────────────────
 
 
@@ -138,16 +133,8 @@ export function updateMaschineDisplay(
   renderParamScreen(synthType, currentPage, totalPages, pageParams, currentValues)
     .flush(1);
 
-  // Pad LEDs: only update if we have params to show.
-  // Pads 0–(n-1) = page color, rest = off.
-  // Don't send if empty — avoids overwriting hardware state with all-zeros.
-  if (pageParams.length > 0) {
-    const pageColor = PAGE_PAD_COLORS[currentPage % PAGE_PAD_COLORS.length];
-    console.log(`[NIHardwareProtocol] Setting all 16 pads to ${JSON.stringify(pageColor)}`);
-    bridge.setAllPadColors(Array(16).fill(pageColor));
-  } else {
-    console.log('[NIHardwareProtocol] No params — skipping pad LED update');
-  }
+  // Pad LEDs: reflect drum pad bank colors (each pad's assigned action has its own color)
+  syncMaschinePadColors();
 }
 
 /**
@@ -224,6 +211,36 @@ export function setMaschinePadPlayState(isPlaying: boolean): void {
   if (!bridge.isConnected()) return;
   const color = isPlaying ? NI_COLORS.GREEN : NI_COLORS.OFF;
   bridge.setAllPadColors(Array(16).fill(color));
+}
+
+/**
+ * Sync MK2 pad LEDs with the current drum pad bank colors.
+ * Reads each pad's `.color` (CSS hex) from useDrumPadStore and sends RGB to hardware.
+ */
+export async function syncMaschinePadColors(): Promise<void> {
+  const bridge = getMaschineHIDBridge();
+  if (!bridge.isConnected()) return;
+
+  const { useDrumPadStore } = await import('@/stores/useDrumPadStore');
+  const state = useDrumPadStore.getState();
+  const pads = state.getCurrentBankPads();
+
+  const colors = Array.from({ length: 16 }, (_, i) => {
+    const pad = pads[i];
+    const hex = pad?.color;
+    if (!hex) return { r: 40, g: 40, b: 40 }; // dim white for unassigned
+    return hexToRgb(hex);
+  });
+  bridge.setAllPadColors(colors);
+}
+
+function hexToRgb(hex: string): { r: number; g: number; b: number } {
+  const h = hex.replace('#', '');
+  return {
+    r: parseInt(h.substring(0, 2), 16) || 0,
+    g: parseInt(h.substring(2, 4), 16) || 0,
+    b: parseInt(h.substring(4, 6), 16) || 0,
+  };
 }
 
 /** Turn all pad LEDs off. */
