@@ -158,6 +158,11 @@ export function buildXTouchFeedbackMessages(
 const _lastSentFaderCC = new Map<number, number>();
 const FADER_DEADBAND = 2; // ignore changes smaller than 2 CC steps (~1.6%)
 
+/** Reset fader send cache — forces the next flush to re-send all fader positions */
+export function resetFaderCache(): void {
+  _lastSentFaderCC.clear();
+}
+
 // Post-touch grace period — after user lifts finger, suppress motor for 200ms
 // to prevent snap-back when a dub move releases during touch.
 const _touchReleaseTime = new Map<number, number>();
