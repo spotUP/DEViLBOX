@@ -15,6 +15,7 @@
 import { getMIDIManager } from './MIDIManager';
 import type { MIDIMessage } from './types';
 import { useTransportStore } from '../stores/useTransportStore';
+import { getMK2ScreenManager } from './performance/screens/MK2ScreenManager';
 
 // Maschine encoder CC base = 70 → routes through NKS bank knob system (CC 70-77)
 // The MIDI store's NKS handler maps these to the active synth's page parameters
@@ -117,6 +118,8 @@ class MaschineHIDBridge {
           clearTimeout(this.reconnectTimer);
           this.reconnectTimer = null;
         }
+        // Start the screen manager now that we have a connection
+        this.initScreenManager();
       });
 
       this.ws.addEventListener('message', (event) => {
@@ -197,21 +200,13 @@ class MaschineHIDBridge {
         switch (resolvedName) {
           case 'play':     transport.togglePlayPause(); return;
           case 'restart':  transport.stop(); transport.togglePlayPause(); return;
-          case 'solo':
-          case 'mute':
-          case 'select':
-          case 'scene':
-          case 'pattern':
-          case 'padMode':
-          case 'navigate':
-          case 'duplicate':
-          case 'erase':
-          case 'shift':
-          case 'groupA': case 'groupB': case 'groupC': case 'groupD':
-          case 'groupE': case 'groupF': case 'groupG': case 'groupH':
-            break; // fall through to MIDI dispatch for ButtonMapManager
           default:
             break;
+        }
+
+        // Let the screen manager handle mode & navigation buttons
+        if (getMK2ScreenManager().handleButton(resolvedName)) {
+          return; // consumed by screen manager
         }
       }
 
@@ -262,6 +257,23 @@ class MaschineHIDBridge {
   /** Update the project name shown on the Maschine MK2 screen via MSG_PROJECTNAME. */
   setProjectName(name: string): void {
     this.send({ type: 'setProjectName', name });
+  }
+
+  private initScreenManager(): void {
+    import('./performance/screens/InstrumentScreen').then(({ InstrumentScreen }) => {
+      import('./performance/screens/MixerScreen').then(({ MixerScreen }) => {
+        import('./performance/screens/StepScreen').then(({ StepScreen }) => {
+          const mgr = getMK2ScreenManager();
+          mgr.registerScreen('instrument', new InstrumentScreen());
+          mgr.registerScreen('mixer', new MixerScreen());
+          mgr.registerScreen('step', new StepScreen());
+          mgr.start();
+          console.log('[MaschineHID] Screen manager initialized with 3 modes');
+        });
+      });
+    }).catch((err) => {
+      console.warn('[MaschineHID] Failed to init screen manager:', err);
+    });
   }
 
   private send(cmd: MaschineCommand): void {
