@@ -17,6 +17,7 @@
  */
 
 import { useMIDIStore } from '@/stores/useMIDIStore';
+import { updateMaschineDisplay } from './NIHardwareProtocol';
 import type { NKSParameter } from './types';
 
 /**
@@ -252,4 +253,7 @@ export function updateNKSDisplay(
   sendPreset(preset).catch(() => {
     // Silently ignore - no MPK Mini connected is fine
   });
+
+  // Update Maschine MK2 display and pad LEDs (no-op if not connected)
+  updateMaschineDisplay(synthType, currentPage, totalPages, pageParams);
 }
