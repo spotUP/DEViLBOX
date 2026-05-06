@@ -452,9 +452,9 @@ export const useDrumPadStore = create<DrumPadStore>((set, get) => ({
     // Atomic bulk clear: one set() + one save cycle instead of 16 back-to-back
     // clearPad() calls. The looped version raced on concurrent saveToIndexedDB
     // transactions, occasionally leaving one pad's sample intact in IndexedDB.
-    const bankIndex = { A: 0, B: 1 }[bank];
-    const bankStart = bankIndex * 8;
-    const bankEnd = bankStart + 8;
+    const bankIndex = { A: 0, B: 1, C: 2, D: 3, E: 4, F: 5, G: 6, H: 7 }[bank];
+    const bankStart = bankIndex * 16;
+    const bankEnd = bankStart + 16;
     set((state) => {
       const programs = new Map(state.programs);
       const currentProgram = programs.get(state.currentProgramId);
@@ -734,8 +734,8 @@ export const useDrumPadStore = create<DrumPadStore>((set, get) => ({
             veloToFilter: p.veloToFilter ?? 0,
             veloToPitch: p.veloToPitch ?? 0,
           }));
-          // Expand 16-pad programs to 64
-          while (migratedPads.length < 64) {
+          // Expand programs to 128 pads (8 groups × 16 pads)
+          while (migratedPads.length < 128) {
             const ep = createEmptyPad(migratedPads.length + 1);
             migratedPads.push({ ...ep, instrumentNote: ep.instrumentNote });
           }

@@ -61,12 +61,14 @@ export const PadGrid: React.FC<PadGridProps> = ({
   const visiblePads = Math.min(controllerPadCount, 16);
   const gridCols = controllerPadCount >= 16 ? 4 : (isPortrait ? 2 : 4);
 
+  const BANK_OFFSETS: Record<string, number> = { A: 0, B: 16, C: 32, D: 48, E: 64, F: 80, G: 96, H: 112 };
+
   // Grid container ref for keyboard focus
   const gridRef = useRef<HTMLDivElement>(null);
 
   // Reset focused pad and clear visual state when bank changes
   useEffect(() => {
-    const bankOffset = controllerPadCount >= 16 ? 0 : { A: 0, B: 8 }[currentBank];
+    const bankOffset = BANK_OFFSETS[currentBank] ?? 0;
     setFocusedPadId(bankOffset + 1);
     setPadVelocities({});
     releaseAllHeld();
@@ -218,12 +220,11 @@ export const PadGrid: React.FC<PadGridProps> = ({
     hookReleasePad(padId);
   }, [hookReleasePad]);
 
-  // Get pads for current view (all 16 for MK2, bank-split for 8-pad controllers)
+  // Get 16 pads for current bank/group
   const bankPads = useMemo(() => {
     if (!currentProgram) return [];
-    if (controllerPadCount >= 16) return currentProgram.pads;
     return getBankPads(currentProgram.pads, currentBank);
-  }, [currentProgram, currentBank, controllerPadCount]);
+  }, [currentProgram, currentBank]);
 
   // Arrange pads in rows, bottom-up (MPC layout: pad 1 = bottom-left)
   const rows = useMemo(() => {
@@ -249,7 +250,7 @@ export const PadGrid: React.FC<PadGridProps> = ({
         return;
       }
 
-      const bankOffset = controllerPadCount >= 16 ? 0 : { A: 0, B: 8 }[currentBank];
+      const bankOffset = BANK_OFFSETS[currentBank] ?? 0;
       const bankStart = bankOffset + 1;
       const bankEnd = bankOffset + visiblePads;
 
@@ -381,7 +382,9 @@ export const PadGrid: React.FC<PadGridProps> = ({
 
   const contextMenuItems = usePadContextMenu(contextMenuPadId, contextMenuCallbacks);
 
-  const bankButtons: PadBank[] = ['A', 'B'];
+  const bankButtons: PadBank[] = controllerPadCount >= 16
+    ? ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H']
+    : ['A', 'B'];
   const bankLoadedCount = bankPads.slice(0, visiblePads).filter(p => p.sample !== null || p.synthConfig || p.instrumentId != null).length;
   const totalLoadedCount = currentProgram.pads.filter(p => p.sample !== null || p.synthConfig || p.instrumentId != null).length;
 
@@ -441,16 +444,15 @@ export const PadGrid: React.FC<PadGridProps> = ({
             Import
           </button>
           <div className="text-xs text-text-muted" title={`${totalLoadedCount} samples across all banks`}>
-            {bankLoadedCount}/{visiblePads} ({totalLoadedCount}/16)
+            {bankLoadedCount}/{visiblePads} ({totalLoadedCount}/{currentProgram.pads.length})
           </div>
         </div>
       </div>
       )}
 
-      {/* Bank selector — hidden when controller has 16+ pads (all visible at once) */}
-      {controllerPadCount < 16 && (
+      {/* Bank/Group selector */}
       <div className="flex items-center gap-1 shrink-0">
-        <span className="text-[10px] font-mono text-text-muted mr-1">BANK</span>
+        <span className="text-[10px] font-mono text-text-muted mr-1">{controllerPadCount >= 16 ? 'GROUP' : 'BANK'}</span>
         {bankButtons.map(bank => (
           <button
             key={bank}
@@ -465,7 +467,6 @@ export const PadGrid: React.FC<PadGridProps> = ({
           </button>
         ))}
       </div>
-      )}
 
       {/* Responsive Pad Grid — adapts rows to fit all visible pads */}
       <div

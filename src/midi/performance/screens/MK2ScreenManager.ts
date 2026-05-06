@@ -17,6 +17,8 @@ import { useTransportStore } from '@/stores/useTransportStore';
 import { useInstrumentStore } from '@/stores/useInstrumentStore';
 import { useOscilloscopeStore } from '@/stores/useOscilloscopeStore';
 import { useTrackerStore } from '@/stores/useTrackerStore';
+import { useDrumPadStore } from '@/stores/useDrumPadStore';
+import type { PadBank } from '@/types/drumpad';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -247,6 +249,9 @@ class MK2ScreenManager {
       case 'groupE': case 'groupF': case 'groupG': case 'groupH': {
         const pageIndex = buttonName.charCodeAt(5) - 65; // 'A'=0..'H'=7
         this.ctx.nksPage = pageIndex;
+        // Also switch drum pad bank (Group A→Bank A, etc.)
+        const bank = buttonName.charAt(5) as PadBank;
+        useDrumPadStore.getState().setBank(bank);
         this.markDirty();
         return true;
       }

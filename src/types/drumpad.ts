@@ -15,7 +15,7 @@ export type OutputBus = 'stereo' | 'out1' | 'out2' | 'out3' | 'out4';
 export type FilterType = 'lpf' | 'hpf' | 'bpf' | 'off';
 export type PlayMode = 'oneshot' | 'sustain' | 'toggle';
 export type DecayMode = 'start' | 'end';  // Decay from note-on or sample-end
-export type PadBank = 'A' | 'B';
+export type PadBank = 'A' | 'B' | 'C' | 'D' | 'E' | 'F' | 'G' | 'H';
 
 export interface MpcResampleConfig {
   enabled: boolean;
@@ -203,7 +203,7 @@ export function createEmptyProgram(id: string, name: string): DrumProgram {
   return {
     id,
     name,
-    pads: Array.from({ length: 16 }, (_, i) => createEmptyPad(i + 1)),
+    pads: Array.from({ length: 128 }, (_, i) => createEmptyPad(i + 1)),
     masterLevel: 100,
     masterTune: 0,
   };
@@ -269,9 +269,10 @@ export function createDefaultPadFX(): EffectConfig[] {
   ] as EffectConfig[];
 }
 
-/** Get the bank letter for a pad ID (1-16) */
+/** Get the bank letter for a pad ID (1-128) */
 export function getPadBank(padId: number): PadBank {
-  return padId <= 8 ? 'A' : 'B';
+  const banks: PadBank[] = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
+  return banks[Math.floor((padId - 1) / 16)] ?? 'A';
 }
 
 /** Apply velocity curve transformation (input: 0-127, output: 0-127) */
@@ -300,10 +301,10 @@ export function applyVelocityCurve(velocity: number, curve: VelocityCurve = 'lin
   return Math.max(1, Math.min(127, Math.round(result * 127)));
 }
 
-/** Get the 8 pads for a given bank */
+/** Get the 16 pads for a given bank (A=0..15, B=16..31, ..., H=112..127) */
 export function getBankPads(pads: DrumPad[], bank: PadBank): DrumPad[] {
-  const bankIndex = { A: 0, B: 1 }[bank];
-  return pads.slice(bankIndex * 8, (bankIndex + 1) * 8);
+  const bankIndex = { A: 0, B: 1, C: 2, D: 3, E: 4, F: 5, G: 6, H: 7 }[bank];
+  return pads.slice(bankIndex * 16, (bankIndex + 1) * 16);
 }
 
 /** Create a pad-owned synth-based InstrumentConfig (used when user picks a synth type in PadEditor) */
