@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-05-05T17:06:57.598Z
+ * Generated: 2026-05-06T10:54:59.702Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,10 +19,10 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.6365';
-export const BUILD_NUMBER = '6365';
-export const BUILD_HASH = 'a79ce98d1';
-export const BUILD_DATE = '2026-05-05';
+export const BUILD_VERSION = '1.0.6381';
+export const BUILD_NUMBER = '6381';
+export const BUILD_HASH = '1694814e0';
+export const BUILD_DATE = '2026-05-06';
 
 // Full version (patch IS the build number, so no need to append)
 export const FULL_VERSION = BUILD_VERSION;
@@ -30,7 +30,83 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.6365',
+    version: '1.0.6381',
+    date: '2026-05-06',
+    changes: [
+      {
+        type: 'fix',
+        "description": "Fix per-channel master FX: skip rebuild when no WASM isolation engine"
+      },
+      {
+        type: 'improvement',
+        "description": "Retune safety limiter — gentle soft-knee instead of brickwall"
+      },
+      {
+        type: 'fix',
+        "description": "Fix master FX mix slider triggering drag reorder"
+      },
+      {
+        type: 'feature',
+        "description": "Add master limiter controls — toggle + threshold knob"
+      },
+      {
+        type: 'fix',
+        "description": "Master FX channel routing with hybrid playback + channel-add stutter"
+      },
+      {
+        type: 'fix',
+        "description": "Master FX channel routing kills all effects when no isolation engine"
+      },
+      {
+        type: 'fix',
+        "description": "DJ subscriber storms — split subscriptions, useShallow, selectors"
+      }
+    ]
+  },
+  {
+    version: '2026-05-05',
+    date: '2026-05-05',
+    changes: [
+      {
+        type: 'feature',
+        "description": "Auto-connect to Maschine MK2 Virtual Input, disable HID bridge"
+      },
+      {
+        type: 'fix',
+        "description": "Deep audit pass 2 — hot paths, re-render storms, engine allocations"
+      },
+      {
+        type: 'fix',
+        "description": "Deep audio interference audit — batch WASM position, DJ playback, layout reflow"
+      },
+      {
+        type: 'fix',
+        "description": "Audit sweep — batch remaining audio-interfering paths"
+      },
+      {
+        type: 'fix',
+        "description": "Await instrument effect chain builds before playback starts"
+      },
+      {
+        type: 'fix',
+        "description": "Batch instrument effect wet/param store writes to stop audio halts"
+      },
+      {
+        type: 'improvement',
+        "description": "Eliminate UI audio interference: selectors + batched master FX"
+      },
+      {
+        type: 'improvement',
+        "description": "Batch remaining continuous stores: dub, audio, booth volume"
+      },
+      {
+        type: 'fix',
+        "description": "Batch store writes for all continuous controls to prevent audio glitches"
+      }
+    ]
+  },
+  {
+    version: '2026-04-30',
     date: '2026-04-30',
     changes: [
       {
@@ -174,76 +250,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'feature',
         "description": "Role chip in channel headers — click to cycle dub role override"
-      },
-      {
-        type: 'fix',
-        "description": "Transport buttons in nav header now clickable — grid layout replaces absolute"
-      },
-      {
-        type: 'fix',
-        "description": "SID visualizer dead when bus ON — Tone→native connections in master insert"
-      }
-    ]
-  },
-  {
-    version: '2026-04-27',
-    date: '2026-04-27',
-    changes: [
-      {
-        type: 'fix',
-        "description": "AutoDub EQ mode gate + BPM sync for adaptive EQ timing"
-      },
-      {
-        type: 'fix',
-        "description": "RerouteOutput bypassed post-master vinyl + remove dead vinylSum node"
-      },
-      {
-        type: 'fix',
-        "description": "Auto Dub improv EQ was inaudible — bands never enabled"
-      },
-      {
-        type: 'fix',
-        "description": "Move FT2 transport into main app header nav row (centered)"
-      },
-      {
-        type: 'fix',
-        "description": "NavBar transport, search persistence, SID viz, EQ visibility, vinyl post-mix"
-      },
-      {
-        type: 'fix',
-        "description": "Dub audit — EQ auto-enable, gated flanger, crushBass level"
-      },
-      {
-        type: 'fix',
-        "description": "SID per-voice tap check + clearer Auto Dub status messages"
-      },
-      {
-        type: 'fix',
-        "description": "Tubby scream — warm mid-range howl, not ice-pick shriek"
-      },
-      {
-        type: 'fix',
-        "description": "Club sim IR quality + SID dub send baseline + FT2 transport in NavBar"
-      },
-      {
-        type: 'feature',
-        "description": "File dialog persists search query with inline X to clear"
-      },
-      {
-        type: 'fix',
-        "description": "Improv loop — subtract prev delta before applying new to stop EQ accumulation drift"
-      },
-      {
-        type: 'feature',
-        "description": "FX Wet fader in DubDeckStrip — same quick returnGain control as DJ mixer"
-      },
-      {
-        type: 'fix',
-        "description": "RiddimSection — guard c.bar > 0 to prevent instant mute on AutoDub start"
-      },
-      {
-        type: 'fix',
-        "description": "Restore Tubby springWet 0.38→0.50 — spring is load-bearing for click moves"
       }
     ]
   }
