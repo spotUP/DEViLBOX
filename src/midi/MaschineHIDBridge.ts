@@ -76,14 +76,9 @@ const NIHIA_BTN_ID_TO_NAME: Record<number, string> = {
 
 // HID button name → screen manager name normalization
 // HID reader sends names from MK2_BUTTON_NAMES[] in maschine-nihia.c;
-// screen manager expects slightly different names for some buttons.
+// screen manager expects slightly different names for a couple buttons.
 const HID_NAME_NORMALIZE: Record<string, string> = {
-  softA: 'soft1', softB: 'soft2', softC: 'soft3', softD: 'soft4',
-  softE: 'soft5', softF: 'soft6', softG: 'soft7', softH: 'soft8',
-  allLeft: 'left', allRight: 'right',
-  autoWrite: 'auto',
-  enterPush: 'enter',
-  tap: 'tempo',
+  nav: 'encoderPush',
 };
 
 type MaschineEvent =
