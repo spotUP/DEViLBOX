@@ -118,6 +118,11 @@ export function encodeCompactButtonLED(note: number, lit: boolean): MidiBytes {
   return [0x90 | COMPACT_OUTPUT_CHANNEL, note & 0x7f, lit ? COMPACT_BUTTON_LED_ON : COMPACT_BUTTON_LED_OFF];
 }
 
+/** Record that a fader was just released from touch — starts grace period */
+export function recordFaderTouchRelease(cc: number): void {
+  _touchReleaseTime.set(cc, performance.now());
+}
+
 export function encodeCompactRingValue(channel: number, inputCC: number, normalized: number): MidiBytes {
   // Ring LED uses the SAME CC as the encoder turn (hardware-confirmed).
   // Value 0-127 maps to ring LED position.
@@ -153,6 +158,11 @@ export function buildXTouchFeedbackMessages(
 const _lastSentFaderCC = new Map<number, number>();
 const FADER_DEADBAND = 2; // ignore changes smaller than 2 CC steps (~1.6%)
 
+// Post-touch grace period — after user lifts finger, suppress motor for 200ms
+// to prevent snap-back when a dub move releases during touch.
+const _touchReleaseTime = new Map<number, number>();
+const TOUCH_GRACE_MS = 200;
+
 function buildCompactMessages(state: XTouchFeedbackState, touched: XTouchTouchedMap): number[][] {
   const messages: number[][] = [];
 
@@ -184,6 +194,9 @@ function buildCompactMessages(state: XTouchFeedbackState, touched: XTouchTouched
 
   for (const [cc, value] of faders) {
     if (touched[`cc:${cc}`]) continue;
+    // Post-touch grace period: suppress motor commands briefly after finger lift
+    const releaseTime = _touchReleaseTime.get(cc);
+    if (releaseTime && (performance.now() - releaseTime) < TOUCH_GRACE_MS) continue;
     const ccValue = Math.round(clamp01(value) * 127);
     const lastSent = _lastSentFaderCC.get(cc) ?? -999;
     if (Math.abs(ccValue - lastSent) < FADER_DEADBAND) continue;

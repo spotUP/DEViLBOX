@@ -4,6 +4,7 @@ import { getDJControllerMapper } from '../midi/DJControllerMapper';
 import {
   buildXTouchFeedbackMessages,
   encodeCompactButtonLED,
+  recordFaderTouchRelease,
   type XTouchFeedbackState,
   type XTouchTouchedMap
 } from '../midi/xTouchFeedback';
@@ -197,6 +198,11 @@ export function useXTouchFeedback(): void {
       let changed = false;
       if (preset.id === 'behringer-xtouch-compact') {
         changed = updateCompactTouchState(msg, touchedRef.current);
+        // On touch release, schedule a delayed flush after grace period
+        // so the motor catches up to the current value
+        if (changed && msg.type === 'cc' && msg.value !== undefined && msg.value <= 0.5) {
+          setTimeout(scheduleFlush, 250);
+        }
       } else {
         changed = updateMCUTouchState(msg, touchedRef.current);
       }
@@ -307,10 +313,15 @@ function updateCompactTouchState(msg: MIDIMessage, touched: XTouchTouchedMap): b
   if (msg.type !== 'cc' || msg.cc === undefined || msg.value === undefined) return false;
   if (msg.cc < 101 || msg.cc > 109) return false;
 
-  const key = `cc:${msg.cc - 100}`;
+  const faderCC = msg.cc - 100;
+  const key = `cc:${faderCC}`;
   const next = msg.value > 0.5;
   if (touched[key] === next) return false;
   touched[key] = next;
+  // On touch release, record timestamp so motor has a grace period before snapping
+  if (!next) {
+    recordFaderTouchRelease(faderCC);
+  }
   return true;
 }
 
