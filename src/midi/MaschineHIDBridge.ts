@@ -15,8 +15,9 @@
 import { getMIDIManager } from './MIDIManager';
 import type { MIDIMessage } from './types';
 
-// Maschine encoder CC base — chosen to avoid ALL NKS TB303 CCs (7,71,74,85-87,91-92,94,102-106)
-const KNOB_CC_BASE = 110;
+// Maschine encoder CC base = 70 → routes through NKS bank knob system (CC 70-77)
+// The MIDI store's NKS handler maps these to the active synth's page parameters
+const KNOB_CC_BASE = 70;
 
 // Pad → note mapping (pads 0-15 → notes 36-51, standard GM drum layout)
 const PAD_NOTE_BASE = 36;
@@ -54,7 +55,8 @@ type MaschineCommand =
   | { type: 'setPadColor';     pad: number; r: number; g: number; b: number }
   | { type: 'setAllPadColors'; colors: Array<{ r: number; g: number; b: number }> }
   | { type: 'setButtonLed';    leds: number[] }
-  | { type: 'drawDisplay';     screen: 0 | 1; pixels: number[] };
+  | { type: 'drawDisplay';     screen: 0 | 1; pixels: string } /* base64 RGB565 big-endian */
+  | { type: 'setProjectName';  name: string };
 
 class MaschineHIDBridge {
   private static instance: MaschineHIDBridge | null = null;
@@ -185,8 +187,18 @@ class MaschineHIDBridge {
     this.send({ type: 'setButtonLed', leds });
   }
 
+  /** Send a packed 1bpp bitmap to one of the two MK2 OLED displays.
+   *  pixels: Uint8Array of 128×64/8 = 1024 bytes (bit 7 = leftmost pixel per byte).
+   *  Base64-encoded for transport (~1.4 KB per frame). */
   drawDisplay(screen: 0 | 1, pixels: Uint8Array): void {
-    this.send({ type: 'drawDisplay', screen, pixels: Array.from(pixels) });
+    let binary = '';
+    for (let i = 0; i < pixels.length; i++) binary += String.fromCharCode(pixels[i]);
+    this.send({ type: 'drawDisplay', screen, pixels: btoa(binary) });
+  }
+
+  /** Update the project name shown on the Maschine MK2 screen via MSG_PROJECTNAME. */
+  setProjectName(name: string): void {
+    this.send({ type: 'setProjectName', name });
   }
 
   private send(cmd: MaschineCommand): void {
