@@ -8,7 +8,7 @@ import { useMIDIStore } from '../../stores/useMIDIStore';
 import { MIDIDeviceSelector } from './MIDIDeviceSelector';
 import { MIDILearnModal } from './MIDILearnModal';
 import { PerformancePanel } from './PerformancePanel';
-import { Cable, CircleDot, AlertCircle, Loader2, ArrowUpDown, Settings2, Smartphone, Sliders } from 'lucide-react';
+import { Cable, CircleDot, AlertCircle, Loader2, Settings2, Smartphone, Sliders } from 'lucide-react';
 import { getBluetoothMIDIInfo } from '../../midi/BluetoothMIDIManager';
 import { useClickOutside } from '@hooks/useClickOutside';
 import { useUIStore } from '@/stores/useUIStore';
@@ -49,7 +49,6 @@ const MIDIToolbarDropdownComponent: React.FC<MIDIToolbarDropdownProps> = ({ inli
   const selectInput = useMIDIStore((state) => state.selectInput);
   const selectOutput = useMIDIStore((state) => state.selectOutput);
   const cancelLearn = useMIDIStore((state) => state.cancelLearn);
-  const openPatternDialog = useMIDIStore((state) => state.openPatternDialog);
 
   // Initialize MIDI on mount (when isSupported is null, we haven't checked yet)
   // On iOS, we still auto-try but the store will retry if the API isn't ready yet
@@ -256,17 +255,6 @@ const MIDIToolbarDropdownComponent: React.FC<MIDIToolbarDropdownProps> = ({ inli
             >
               <Sliders size={14} />
               Controller Mapper...
-            </button>
-            {/* TD-3 Pattern Transfer */}
-            <button
-              onClick={() => {
-                setIsOpen(false);
-                openPatternDialog();
-              }}
-              className="w-full px-3 py-2 text-sm font-medium bg-dark-bgActive rounded flex items-center justify-center gap-2 hover:bg-dark-bgHover transition-colors"
-            >
-              <ArrowUpDown size={14} />
-              TD-3 Patterns...
             </button>
           </div>
 

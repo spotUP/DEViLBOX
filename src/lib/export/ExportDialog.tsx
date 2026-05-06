@@ -4,8 +4,9 @@
  */
 
 import React, { useState, useRef, useEffect } from 'react';
-import { X, Download, Upload, FileMusic, Zap, Settings, Volume2, Music2, Cpu } from 'lucide-react';
+import { X, Download, Upload, FileMusic, Zap, Settings, Volume2, Music2, Cpu, Cable } from 'lucide-react';
 import { useUIStore } from '@stores/useUIStore';
+import { useMIDIStore } from '@stores/useMIDIStore';
 import { saveAs } from 'file-saver';
 import { useExportDialog } from '@hooks/dialogs/useExportDialog';
 import { AudioExportPanel } from './AudioExportPanel';
@@ -340,6 +341,16 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                       <div className="font-mono text-sm font-semibold">Native</div>
                     </button>
                   )}
+                  <button
+                    onClick={() => {
+                      onClose();
+                      useMIDIStore.getState().openPatternDialog();
+                    }}
+                    className="p-4 rounded-lg border-2 transition-all text-center bg-dark-bgSecondary text-text-primary border-dark-border hover:border-dark-borderLight"
+                  >
+                    <Cable size={24} className="mx-auto mb-2" />
+                    <div className="font-mono text-sm font-semibold">TD-3</div>
+                  </button>
                 </div>
               </div>
 
@@ -617,6 +628,21 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                   </li>
                 </ul>
               </div>
+
+              {/* TD-3 Hardware Transfer */}
+              <button
+                onClick={() => {
+                  onClose();
+                  useMIDIStore.getState().openPatternDialog();
+                }}
+                className="mt-4 w-full flex items-center gap-3 px-4 py-3 bg-dark-bgSecondary border border-dark-border rounded-lg text-left hover:bg-dark-bgHover transition-colors"
+              >
+                <Cable size={20} className="text-accent-secondary shrink-0" />
+                <div>
+                  <p className="text-sm font-mono font-bold text-text-primary">TD-3 Pattern Transfer</p>
+                  <p className="text-[11px] font-mono text-text-muted">Send or receive patterns via MIDI SysEx</p>
+                </div>
+              </button>
             </>
           )}
         </div>
