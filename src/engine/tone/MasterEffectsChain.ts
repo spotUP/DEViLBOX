@@ -24,6 +24,11 @@ const scExternalSources = new WeakMap<Tone.ToneAudioNode, AudioNode>();
 // Track which sidechain effects use isolation taps (for cleanup on source change)
 const scIsolationChannels = new WeakMap<Tone.ToneAudioNode, { channel: number; scInput: AudioNode }>();
 
+// Lazy-cached reference to getTrackerReplayer — populated on first rebuildMasterEffects
+// to avoid circular imports. Used by the synchronous canUseParameterUpdatePath.
+type ReplayerGetter = () => { hasReplacedInstruments: boolean };
+let _cachedGetTrackerReplayer: ReplayerGetter | null = null;
+
 // Lazy resolver for ToneEngine — avoids circular import deadlock
 // (MasterEffectsChain is imported by ToneEngine, so dynamic import hangs)
 type ChannelOutputGetter = (index: number) => { channel: Tone.Channel } | null;
@@ -157,13 +162,23 @@ export async function rebuildMasterEffects(ctx: MasterEffectsContext, effects: E
   // no WASM multi-output engine is active (e.g. classic mode with Tone.js
   // synths), channel-targeted effects must stay in the global chain —
   // otherwise they silently vanish (no global chain node, no WASM slot).
+  // Additionally, when hybrid playback is active (Tone.js synths replacing
+  // WASM channels), isolation cannot capture the native synth audio —
+  // it only captures the WASM worklet output which is muted for replaced
+  // instruments. Keep all effects in the global chain in this case.
   const modeSupportsIsolation = supportsChannelIsolation(useFormatStore.getState().editorMode);
   let isolationAvailable = false;
   if (modeSupportsIsolation) {
     try {
       const { getActiveIsolationEngine } = await import('./ChannelRoutedEffects');
       const engine = await getActiveIsolationEngine();
-      isolationAvailable = engine !== null && engine.isAvailable();
+      if (engine !== null && engine.isAvailable()) {
+        // Check for hybrid playback — replaced instruments bypass WASM worklet
+        const { getTrackerReplayer } = await import('../TrackerReplayer');
+        _cachedGetTrackerReplayer = getTrackerReplayer;
+        const replayer = getTrackerReplayer();
+        isolationAvailable = !replayer.hasReplacedInstruments;
+      }
     } catch { /* engine not available */ }
   }
 
@@ -409,8 +424,16 @@ export function canUseParameterUpdatePath(ctx: MasterEffectsContext, newEffects:
   // For the fast path, compare GLOBAL effects (no selectedChannels) against current chain.
   // If selectedChannels changed, we need a full rebuild to move effects between
   // the global serial chain and the per-channel WASM isolation system.
-  // When isolation isn't available, all effects are global.
-  const isolationAvailable = supportsChannelIsolation(useFormatStore.getState().editorMode);
+  // When isolation isn't available (no engine, or hybrid playback with native synths),
+  // all effects are global — selectedChannels is ignored.
+  let isolationAvailable = supportsChannelIsolation(useFormatStore.getState().editorMode);
+  if (isolationAvailable && _cachedGetTrackerReplayer) {
+    // Hybrid playback: native synths bypass the WASM worklet, so isolation can't
+    // capture their audio. Treat all effects as global to keep them audible.
+    try {
+      if (_cachedGetTrackerReplayer().hasReplacedInstruments) isolationAvailable = false;
+    } catch { /* replayer not initialized */ }
+  }
   const globalNew = isolationAvailable
     ? enabledNew.filter(fx => !Array.isArray(fx.selectedChannels) || fx.selectedChannels.length === 0)
     : enabledNew;
