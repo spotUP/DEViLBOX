@@ -650,16 +650,11 @@ export const usePatternPlayback = () => {
         let lastPatternNum = -1;
         let lastPosition = -1;
 
-        // Format-mode views (HivelyView, etc.) read currentRow from the transport
-        // store and don't use getStateAtTime(), so they need every-row updates.
-        const isFormatEngine = !!hivelyNative || !!musiclineFileData;
-
         replayer.onRowChange = (row, patternNum, position) => {
-          // Format engines: update currentRow on every row (throttled to 50Hz)
-          if (isFormatEngine) {
-            const currentPatterns = patternsRef.current;
-            setCurrentRowThrottled(row, currentPatterns[patternNum]?.length ?? 64, true);
-          }
+          // Always update currentRow so external consumers (MK2 displays, etc.)
+          // can follow playback via the transport store.
+          const currentPatterns = patternsRef.current;
+          setCurrentRowThrottled(row, currentPatterns[patternNum]?.length ?? 64, true);
 
           // During playback, the standard pattern editor RAF loop reads position
           // directly from getStateAtTime() — no React store updates needed for
@@ -672,10 +667,6 @@ export const usePatternPlayback = () => {
               startTransition(() => {
                 setCurrentPattern(patternNum, true);
                 setCurrentPosition(position, true);
-                if (!isFormatEngine) {
-                  const currentPatterns = patternsRef.current;
-                  setCurrentRowThrottled(row, currentPatterns[patternNum]?.length ?? 64, true);
-                }
               });
               const globalRow = position * 64 + row;
               useTransportStore.getState().setCurrentGlobalRow(globalRow);
