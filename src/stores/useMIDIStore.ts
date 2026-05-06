@@ -40,6 +40,7 @@ interface MIDIStore {
   selectedInputId: string | null;
   selectedOutputId: string | null;
   lastDeviceId: string | null; // Persisted last device for auto-reconnect
+  lastDeviceName: string | null; // Persisted device name (IDs change across sessions)
 
   // CC Mapping
   ccMappings: CCMapping[];
@@ -332,6 +333,7 @@ export const useMIDIStore = create<MIDIStore>()(
       selectedInputId: null,
       selectedOutputId: null,
       lastDeviceId: null, // Persisted for auto-reconnect
+      lastDeviceName: null, // Persisted device name
       ccMappings: [...DEFAULT_CC_MAPPINGS],
       isLearning: false,
       learningParameter: null,
@@ -402,7 +404,7 @@ export const useMIDIStore = create<MIDIStore>()(
               console.log('[useMIDIStore] MIDI initialized successfully, adding message handler');
 
             // Set up message handler for notes and CC
-            manager.addMessageHandler((message) => {
+            manager.addMessageHandler((message, deviceId) => {
               const store = get();
 
               // Update activity timestamp
@@ -610,6 +612,14 @@ export const useMIDIStore = create<MIDIStore>()(
               // Handle CC messages
               if (message.type === 'cc' && message.cc !== undefined && message.value !== undefined) {
 
+                // When a DJ controller preset is active, it handles its own CCs via DJControllerMapper.
+                // Skip useMIDIStore routing for CCs that fall in the preset's mapped range.
+                // Only bypass for real MIDI devices — Maschine HID uses its own CC range (70+).
+                // Layer A: CC 1-25, Layer B: CC 28-52
+                if (deviceId !== 'maschine-hid' && getDJControllerMapper().hasActivePreset() && ((message.cc >= 1 && message.cc <= 25) || (message.cc >= 28 && message.cc <= 52))) {
+                  return;
+                }
+
                 // Handle Mod Wheel (CC 1) -> Y-axis on MPK Mini joystick
                 if (message.cc === 1) {
                   const normalizedMW = message.value / 127;
@@ -709,9 +719,10 @@ export const useMIDIStore = create<MIDIStore>()(
               
               // Device connected
               if (newDeviceCount > prevDeviceCount) {
-                // Try to reconnect to last device if it's now available
-                if (newState.lastDeviceId && !newState.selectedInputId) {
-                  const lastDevice = newState.inputDevices.find(d => d.id === newState.lastDeviceId);
+                // Try to reconnect to last device by ID or name
+                if (!newState.selectedInputId) {
+                  const lastDevice = (newState.lastDeviceId && newState.inputDevices.find(d => d.id === newState.lastDeviceId))
+                    || (newState.lastDeviceName && newState.inputDevices.find(d => d.name === newState.lastDeviceName));
                   if (lastDevice) {
                     console.log('[useMIDIStore] Reconnecting to last device:', lastDevice.name);
                     get().selectInput(lastDevice.id);
@@ -742,14 +753,18 @@ export const useMIDIStore = create<MIDIStore>()(
             // Initial device refresh
             get().refreshDevices();
 
-            // Auto-connect: prefer Maschine MK2 (virtual or direct), then any other device
+            // Auto-connect: try last device by name first, then prefer Maschine MK2, then any
             const currentState = get();
             if (!currentState.selectedInputId && currentState.inputDevices.length > 0) {
-              const preferred = currentState.inputDevices.find(d => d.name?.toLowerCase().includes('maschine mk2 virtual'))
+              const lastByName = currentState.lastDeviceName
+                ? currentState.inputDevices.find(d => d.name === currentState.lastDeviceName)
+                : null;
+              const preferred = lastByName
+                ?? currentState.inputDevices.find(d => d.name?.toLowerCase().includes('maschine mk2 virtual'))
                 ?? currentState.inputDevices.find(d => d.name?.toLowerCase().includes('maschine controller mk2'))
                 ?? currentState.inputDevices.find(d => !d.name?.toLowerCase().includes('maschine'))
                 ?? currentState.inputDevices[0];
-              console.log('[useMIDIStore] Auto-connecting to first MIDI input:', preferred.name);
+              console.log('[useMIDIStore] Auto-connecting to MIDI input:', preferred.name);
               await get().selectInput(preferred.id);
             }
             
@@ -765,6 +780,9 @@ export const useMIDIStore = create<MIDIStore>()(
             // Initialize ButtonMapManager for MIDI button control
             const buttonMapManager = getButtonMapManager();
             buttonMapManager.init();
+
+            // Initialize DJControllerMapper — restores/detects preset from connected device
+            getDJControllerMapper().init();
 
             set((state) => {
               state.isInitialized = true;
@@ -813,6 +831,8 @@ export const useMIDIStore = create<MIDIStore>()(
           // Remember this device for auto-reconnect
           if (id) {
             state.lastDeviceId = id;
+            const device = state.inputDevices.find(d => d.id === id);
+            if (device?.name) state.lastDeviceName = device.name;
           }
         });
 
@@ -1232,6 +1252,7 @@ export const useMIDIStore = create<MIDIStore>()(
         selectedInputId: state.selectedInputId,
         selectedOutputId: state.selectedOutputId,
         lastDeviceId: state.lastDeviceId, // Persist for auto-reconnect
+        lastDeviceName: state.lastDeviceName, // Persist device name (IDs change across sessions)
         controlledInstrumentId: state.controlledInstrumentId,
         knobBank: state.knobBank,
         showKnobBar: state.showKnobBar,

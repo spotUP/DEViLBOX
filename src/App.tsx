@@ -18,6 +18,7 @@ import { useLiveModeStore } from './stores/useLiveModeStore';
 import { useButtonMappings } from './hooks/midi/useButtonMappings';
 import { useMIDIActions } from './hooks/useMIDIActions';
 import { useMIDIPadRouting } from './hooks/drumpad/useMIDIPadRouting';
+import { useXTouchFeedback } from './hooks/useXTouchFeedback';
 import { useProjectPersistence } from './hooks/useProjectPersistence';
 import { useGlobalKeyboardHandler } from './hooks/useGlobalKeyboardHandler';
 import { initKeyboardRouter, destroyKeyboardRouter } from './engine/keyboard/KeyboardRouter';
@@ -380,6 +381,9 @@ function App() {
 
   // Route MIDI pad notes (36-43) to drum pads in DJ / VJ views
   useMIDIPadRouting();
+
+  // X-Touch motor fader / ring / LED feedback (always active regardless of view)
+  useXTouchFeedback();
 
   // Pattern playback engine - mounted at App level so it persists across view switches
   // (tracker/grid/arrangement/303). Previously in TrackerView which caused audio cutoff

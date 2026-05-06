@@ -9,6 +9,9 @@ import {
 const FEEDBACK_STATE: XTouchFeedbackState = {
   crossfader: 0.5,
   masterVolume: 0.8,
+  channelMutes: [false, true, false, false, false, false, false, false],
+  channelSolos: [false, false, false, true, false, false, false, false],
+  activeMoveNotes: new Set([16]),
   deckA: {
     volume: 0.75,
     eqHi: 0.6,
@@ -63,10 +66,10 @@ describe('X-Touch support', () => {
     const preset = detectDJPreset('Behringer X-Touch Compact');
     const messages = buildXTouchFeedbackMessages(preset, FEEDBACK_STATE);
 
-    expect(messages).toContainEqual([0xb0, 1, 95]);
-    expect(messages).toContainEqual([0xb0, 9, 64]);
-    expect(messages).toContainEqual([0x9c, 16, 2]);
-    expect(messages).toContainEqual([0x9c, 22, 0]);
+    expect(messages).toContainEqual([0xb1, 1, 95]);
+    expect(messages).toContainEqual([0xb1, 9, 64]);
+    expect(messages).toContainEqual([0x91, 16, 2]);
+    expect(messages).toContainEqual([0x91, 22, 0]);
   });
 
   it('stops driving a touched MCU motor fader until touch is released', () => {

@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-05-06T12:53:56.090Z
+ * Generated: 2026-05-06T18:17:49.535Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,9 +19,9 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.6386';
-export const BUILD_NUMBER = '6386';
-export const BUILD_HASH = '5da5958cd';
+export const BUILD_VERSION = '1.0.6389';
+export const BUILD_NUMBER = '6389';
+export const BUILD_HASH = 'c3880e688';
 export const BUILD_DATE = '2026-05-06';
 
 // Full version (patch IS the build number, so no need to append)
@@ -30,9 +30,21 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.6386',
+    version: '1.0.6389',
     date: '2026-05-06',
     changes: [
+      {
+        type: 'feature',
+        "description": "Add sample, browse, song screen modes"
+      },
+      {
+        type: 'feature',
+        "description": "MK2 screen manager + 3 display modes"
+      },
+      {
+        type: 'feature',
+        "description": "Complete 48-button NIHIA map + transport wiring"
+      },
       {
         type: 'feature',
         "description": "Maschine MK2 HID bridge + NKS auto-mapper updates"
@@ -238,18 +250,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'fix',
         "description": "Debug: add diagnostics to find Hively silence regression"
-      },
-      {
-        type: 'fix',
-        "description": "Hively mute/solo actually broken in isolation path — gains reset every frame"
-      },
-      {
-        type: 'fix',
-        "description": "Four dub/EQ issues — EQ curve, vinyl noise, stuck-music logging, beep"
-      },
-      {
-        type: 'fix',
-        "description": "Hively/AHX mute/solo — re-apply channel gains after song loop"
       }
     ]
   }

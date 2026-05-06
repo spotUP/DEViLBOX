@@ -163,6 +163,8 @@ export interface DubFireEvent {
    *  compute — so the recorder doesn't need a special code path to query it. */
   timeSec: number;
   source: 'live' | 'lane';
+  /** True if this move has a disposer (hold move), false for one-shots/triggers */
+  isHold?: boolean;
 }
 
 /**
@@ -246,7 +248,7 @@ export function fire(
   const disposer = move.execute(ctx);
 
   const invocationId = nextInvocationId();
-  const event: DubFireEvent = { invocationId, moveId, channelId, params: merged, row, timeSec: getSongTimeSec(), source };
+  const event: DubFireEvent = { invocationId, moveId, channelId, params: merged, row, timeSec: getSongTimeSec(), source, isHold: !!disposer };
   for (const fn of subscribers) {
     try {
       fn(event);
