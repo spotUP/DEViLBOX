@@ -20,6 +20,8 @@ import { useMIDIPresetStore } from '@/stores/useMIDIPresetStore';
 import type { ControlAssignment } from '@/stores/useMIDIPresetStore';
 import { DJ_CONTROLLER_PRESETS } from '@/midi/djControllerPresets';
 import type { DJControllerPreset } from '@/midi/djControllerPresets';
+import { CONTROLLER_PROFILES } from '@/midi/controllerProfiles';
+import type { ControllerProfile } from '@/midi/controllerProfiles';
 import { getMIDIManager } from '@/midi/MIDIManager';
 import type { MIDIMessage } from '@/midi/types';
 import { notify } from '@/stores/useNotificationStore';
@@ -29,47 +31,107 @@ import { useUIStore } from '@/stores/useUIStore';
 // FACTORY ASSIGNMENTS — derived from current preset
 // ============================================================================
 
+// Known button→action mappings for controllers that don't use DJ presets
+// (these are hardcoded in MK2ScreenManager.handleButton / MaschineHIDBridge.routeEvent)
+const MK2_BUTTON_ACTIONS: Record<string, string> = {
+  play: 'transport.play', restart: 'transport.restart', erase: 'transport.stop',
+  rec: 'transport.record',
+  control: 'mode.mixer', step: 'mode.step', browse: 'mode.browse',
+  sampling: 'mode.sample', padMode: 'mode.instrument', navigate: 'mode.song',
+  scene: 'mode.song', pattern: 'mode.step', volume: 'mode.mixer',
+  grid: 'transport.metronome',
+  navLeft: 'nav.left', navRight: 'nav.right', pageLeft: 'nav.pageLeft', pageRight: 'nav.pageRight',
+  stepLeft: 'nav.stepLeft', stepRight: 'nav.stepRight',
+  enter: 'nav.enter', nav: 'nav.encoder',
+  solo: 'channel.solo', mute: 'channel.mute',
+  groupA: 'bank.A', groupB: 'bank.B', groupC: 'bank.C', groupD: 'bank.D',
+  groupE: 'bank.E', groupF: 'bank.F', groupG: 'bank.G', groupH: 'bank.H',
+};
+
+const MPK_PAD_ACTIONS: Record<number, string> = {
+  36: 'transport.play', 37: 'transport.stop', 38: 'transport.record', 39: 'transport.loop',
+  40: 'nav.patternDown', 41: 'nav.patternUp', 42: 'edit.octaveDown', 43: 'edit.octaveUp',
+};
+
 function buildFactoryAssignments(layout: ControllerLayout): Record<string, ControlAssignment> {
   const assignments: Record<string, ControlAssignment> = {};
 
+  // Try DJ controller preset first (X-Touch, etc.)
   const preset: DJControllerPreset | undefined = DJ_CONTROLLER_PRESETS.find(
     (p) => p.id === layout.id,
   );
-  if (!preset) return assignments;
+
+  if (preset) {
+    for (const control of layout.controls) {
+      const { midi } = control;
+      if (midi.type === 'cc') {
+        const ccMapping = preset.ccMappings?.find(
+          (m) => m.channel === midi.channel && m.cc === midi.number,
+        );
+        if (ccMapping) {
+          const kind = ccMapping.param.startsWith('dub.') ? 'dub' : 'param';
+          assignments[control.id] = { kind, target: ccMapping.param, invert: ccMapping.invert };
+        }
+      }
+      if (midi.type === 'note' || midi.pushNote !== undefined) {
+        const noteNum = midi.type === 'note' ? midi.number : midi.pushNote!;
+        const noteCh = midi.type === 'note' ? midi.channel : (midi.pushChannel ?? midi.channel);
+        const noteMapping = preset.noteMappings?.find(
+          (m) => m.channel === noteCh && m.note === noteNum,
+        );
+        if (noteMapping) {
+          if ('action' in noteMapping) {
+            assignments[control.id] = { kind: 'action', target: noteMapping.action };
+          } else if ('param' in noteMapping) {
+            const kind = noteMapping.param.startsWith('dub.') ? 'dub' : 'param';
+            assignments[control.id] = {
+              kind, target: noteMapping.param,
+              onValue: noteMapping.onValue, offValue: noteMapping.offValue,
+            };
+          }
+        }
+      }
+    }
+    return assignments;
+  }
+
+  // Fall back to controller profile (Maschine MK2, MPK Mini, etc.)
+  const profile: ControllerProfile | undefined = CONTROLLER_PROFILES.find(
+    (p) => p.id === layout.id,
+  );
+
+  // Determine button action table based on layout id
+  const buttonActions: Record<string, string> =
+    layout.id === 'ni-maschine-mk2' ? MK2_BUTTON_ACTIONS : {};
+  const padActions: Record<number, string> =
+    layout.id === 'akai-mpk-mini-mk3' ? MPK_PAD_ACTIONS : {};
 
   for (const control of layout.controls) {
     const { midi } = control;
 
-    // Check CC mappings
-    if (midi.type === 'cc') {
-      const ccMapping = preset.ccMappings?.find(
-        (m) => m.channel === midi.channel && m.cc === midi.number,
-      );
-      if (ccMapping) {
-        const kind = ccMapping.param.startsWith('dub.') ? 'dub' : 'param';
-        assignments[control.id] = { kind, target: ccMapping.param, invert: ccMapping.invert };
+    // Knob CC → parameter from profile suggestedLayout
+    if (midi.type === 'cc' && profile?.suggestedLayout?.knobs?.[midi.number]) {
+      assignments[control.id] = { kind: 'param', target: profile.suggestedLayout.knobs[midi.number] };
+      continue;
+    }
+
+    // Pad notes → action from known pad action table or profile suggestedLayout
+    if (control.type === 'pad' && midi.type === 'note') {
+      const profileAction = profile?.suggestedLayout?.pads?.[midi.number];
+      const hardcodedAction = padActions[midi.number];
+      const action = profileAction ?? hardcodedAction;
+      if (action) {
+        assignments[control.id] = { kind: 'action', target: action };
+        continue;
       }
     }
 
-    // Check note mappings (button actions/params)
-    if (midi.type === 'note' || midi.pushNote !== undefined) {
-      const noteNum = midi.type === 'note' ? midi.number : midi.pushNote!;
-      const noteCh = midi.type === 'note' ? midi.channel : (midi.pushChannel ?? midi.channel);
-      const noteMapping = preset.noteMappings?.find(
-        (m) => m.channel === noteCh && m.note === noteNum,
-      );
-      if (noteMapping) {
-        if ('action' in noteMapping) {
-          assignments[control.id] = { kind: 'action', target: noteMapping.action };
-        } else if ('param' in noteMapping) {
-          const kind = noteMapping.param.startsWith('dub.') ? 'dub' : 'param';
-          assignments[control.id] = {
-            kind,
-            target: noteMapping.param,
-            onValue: noteMapping.onValue,
-            offValue: noteMapping.offValue,
-          };
-        }
+    // Button → action from hardcoded table (MK2 screen manager actions)
+    if (control.type === 'button' && control.id.startsWith('btn-')) {
+      const btnName = control.id.replace('btn-', '');
+      const action = buttonActions[btnName];
+      if (action) {
+        assignments[control.id] = { kind: 'action', target: action };
       }
     }
   }
