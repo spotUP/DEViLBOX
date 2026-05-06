@@ -14,7 +14,7 @@ import { Button } from '@/components/ui/Button';
 import { Sliders, Zap, RotateCcw, Download, Upload } from 'lucide-react';
 import { ControllerLayoutView } from './ControllerLayoutView';
 import { MIDIAssignPopover } from './MIDIAssignPopover';
-import { getControllerLayout } from '@/midi/controllerLayouts';
+import { getControllerLayout, CONTROLLER_LAYOUTS } from '@/midi/controllerLayouts';
 import type { ControllerLayout, ControlDescriptor } from '@/midi/controllerLayouts';
 import { useMIDIPresetStore } from '@/stores/useMIDIPresetStore';
 import type { ControlAssignment } from '@/stores/useMIDIPresetStore';
@@ -93,8 +93,19 @@ export const MIDIMapperModal: React.FC<MIDIMapperModalProps> = ({
   const closeModal = useUIStore(s => s.closeModal);
   const isOpen = modalOpen === 'midi-mapper';
   const onClose = closeModal;
-  // Resolve layout
-  const resolvedLayoutId = layoutIdProp ?? 'behringer-xtouch-compact';
+
+  // Available layouts for the selector
+  const layoutEntries = useMemo(() => {
+    const entries: Array<{ id: string; label: string }> = [];
+    CONTROLLER_LAYOUTS.forEach((l, id) => {
+      entries.push({ id, label: `${l.manufacturer} ${l.name}` });
+    });
+    return entries;
+  }, []);
+
+  // Resolve layout — prop override → user selection → first available
+  const [selectedLayoutId, setSelectedLayoutId] = useState(layoutIdProp ?? 'behringer-xtouch-compact');
+  const resolvedLayoutId = layoutIdProp ?? selectedLayoutId;
   const layout = useMemo(() => getControllerLayout(resolvedLayoutId), [resolvedLayoutId]);
 
   // Factory + user assignments
@@ -244,6 +255,28 @@ export const MIDIMapperModal: React.FC<MIDIMapperModalProps> = ({
         icon={<Sliders size={18} />}
         onClose={onClose}
       />
+
+      {/* Controller selector (when multiple layouts available) */}
+      {layoutEntries.length > 1 && !layoutIdProp && (
+        <div className="px-4 pt-2 flex items-center gap-2">
+          <span className="text-[10px] font-mono text-text-muted">Controller:</span>
+          <div className="flex gap-1">
+            {layoutEntries.map(entry => (
+              <button
+                key={entry.id}
+                className={`px-3 py-1 rounded text-[10px] font-mono transition-colors ${
+                  entry.id === resolvedLayoutId
+                    ? 'bg-accent-primary/20 border border-accent-primary text-accent-primary'
+                    : 'bg-dark-bgTertiary border border-dark-borderLight text-text-secondary hover:text-text-primary'
+                }`}
+                onClick={() => setSelectedLayoutId(entry.id)}
+              >
+                {entry.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="flex-1 overflow-auto p-4 relative">
         {/* Learn mode indicator */}
