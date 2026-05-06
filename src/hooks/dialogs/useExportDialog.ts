@@ -556,6 +556,12 @@ export function useExportDialog({ isOpen }: UseExportDialogOptions) {
               s.setAutoDubEnabled(data.autoDub.enabled);
             }
 
+            // Restore mixer state (channel volumes, pans, mutes, solos, dub sends, send buses)
+            if (data.mixer) {
+              const { useMixerStore } = await import('@/stores/useMixerStore');
+              useMixerStore.getState().loadMixerState(data.mixer);
+            }
+
             notify.success(`Song "${data.metadata.name}" imported!`);
           }
           break;

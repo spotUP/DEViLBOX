@@ -15,6 +15,8 @@ import { isDJContext } from './MIDIContextRouter';
 import { routeDJParameter, resetDJSoftTakeover, routeParameterToEngine } from './performance/parameterRouter';
 import { getDJEngine } from '../engine/dj/DJEngine';
 import { useDJStore } from '../stores/useDJStore';
+import { useDrumPadStore } from '../stores/useDrumPadStore';
+import { useMixerStore } from '../stores/useMixerStore';
 import { DJBeatSync } from '../engine/dj/DJBeatSync';
 import { getTrackerScratchController } from '../engine/TrackerScratchController';
 import { useVocoderStore } from '../stores/useVocoderStore';
@@ -24,7 +26,28 @@ import type {
   DJControllerNoteMapping,
   DJControllerPitchBendMapping
 } from './djControllerPresets';
+import { detectDJPreset, getPresetById } from './djControllerPresets';
 import type { MIDIMessage } from './types';
+
+const _motorSendTimestamps = new Map<number, number>();
+// Track which faders are physically touched (CC 101-109, value > 0 = touched)
+const _faderTouched = new Map<number, boolean>();
+
+/** Called by xTouchFeedback when a motor fader command is sent */
+export function recordMotorSend(cc: number): void {
+  _motorSendTimestamps.set(cc, performance.now());
+}
+
+/** Called when a fader touch sensor CC arrives */
+export function setFaderTouched(faderCC: number, touched: boolean): void {
+  _faderTouched.set(faderCC, touched);
+}
+
+/** Returns true if the fader is being physically held by the user */
+export function isFaderTouched(faderCC: number): boolean {
+  return _faderTouched.get(faderCC) ?? false;
+}
+
 class DJControllerMapper {
   private static instance: DJControllerMapper | null = null;
 
@@ -57,6 +80,14 @@ class DJControllerMapper {
       DJControllerMapper.instance = new DJControllerMapper();
     }
     return DJControllerMapper.instance;
+  }
+
+  /**
+   * Initialize the mapper — registers MIDI handler, restores/detects preset.
+   * Safe to call multiple times (idempotent via ensureHandlerRegistered).
+   */
+  init(): void {
+    this.ensureHandlerRegistered();
   }
 
   /**
@@ -129,6 +160,9 @@ class DJControllerMapper {
       this.handleMessage(msg);
     });
 
+    // Restore saved preset OR auto-detect from connected MIDI device
+    this.restoreOrDetectPreset();
+
     // Snapshot the currently selected device for auto-reconnect
     this.snapshotBoundDevice();
 
@@ -137,6 +171,63 @@ class DJControllerMapper {
     manager.onDeviceChange(() => {
       this.handleDeviceChange();
     });
+  }
+
+  /**
+   * Restore a previously saved DJ controller preset from localStorage,
+   * or auto-detect from any connected MIDI input device.
+   * This runs at startup so the preset is active regardless of which view is shown.
+   * If the detected device isn't the selected input, opens it as an additional input.
+   */
+  private restoreOrDetectPreset(): void {
+    const saved = localStorage.getItem('devilbox-dj-controller-preset');
+    if (saved) {
+      const preset = getPresetById(saved);
+      if (preset) {
+        console.log(`[DJControllerMapper] Restored preset from localStorage: ${preset.id} (${preset.name})`);
+        this.setPreset(preset);
+        // Ensure the device is open even if not the selected input
+        this.ensureDeviceOpen();
+        return;
+      }
+    }
+
+    // Scan all connected inputs for a match (not just the selected one)
+    const manager = getMIDIManager();
+    const inputs = manager.getInputDevices();
+    for (const input of inputs) {
+      if (!input.name) continue;
+      const detected = detectDJPreset(input.name);
+      if (detected && detected.id !== 'generic-8x8') {
+        console.log(`[DJControllerMapper] Auto-detected: ${input.name} → ${detected.name}`);
+        this.setPreset(detected);
+        localStorage.setItem('devilbox-dj-controller-preset', detected.id);
+        // Open as additional input if not already the selected device
+        if (input.id !== manager.getSelectedInput()?.id) {
+          manager.openAdditionalInput(input.id);
+        }
+        return;
+      }
+    }
+  }
+
+  /**
+   * Ensure the device matching the active preset is open (as additional input if needed).
+   */
+  private ensureDeviceOpen(): void {
+    if (!this.activePreset?.detectPatterns) return;
+    const manager = getMIDIManager();
+    const selectedId = manager.getSelectedInput()?.id;
+    const inputs = manager.getInputDevices();
+    for (const input of inputs) {
+      if (!input.name) continue;
+      const lower = input.name.toLowerCase();
+      const matches = this.activePreset.detectPatterns.some(p => lower.includes(p.toLowerCase()));
+      if (matches && input.id !== selectedId) {
+        manager.openAdditionalInput(input.id);
+        return;
+      }
+    }
   }
 
   /**
@@ -251,6 +342,30 @@ class DJControllerMapper {
       return;
     }
 
+    // X-Touch Compact: when dub bus is enabled, faders 1-8 control dub channel sends
+    // Layer A: CC 1-8, Layer B: CC 28-35
+    if (this.activePreset?.id === 'behringer-xtouch-compact'
+        && channel === 0
+        && useDrumPadStore.getState().dubBus.enabled) {
+      // Track fader touch sensors (CC 101-109)
+      if (cc >= 101 && cc <= 109) {
+        const faderCC = cc - 100; // touch CC 101 → fader CC 1
+        setFaderTouched(faderCC, value > 0);
+        return;
+      }
+      let chIndex = -1;
+      if (cc >= 1 && cc <= 8) chIndex = cc - 1;        // Layer A
+      else if (cc >= 28 && cc <= 35) chIndex = cc - 28; // Layer B
+      if (chIndex >= 0) {
+        // Only accept fader input when user is physically touching it.
+        // If not touched, it's motor echo — ignore completely.
+        if (!isFaderTouched(cc)) return;
+        const normalized = value / 127;
+        useMixerStore.getState().setChannelDubSend(chIndex, normalized);
+        return;
+      }
+    }
+
     // Check parameter mapping
     const mapping = this.ccLookup.get(key);
     if (!mapping) return;
@@ -314,6 +429,24 @@ class DJControllerMapper {
     // Push-to-talk: note-on activates, note-off deactivates (hold-to-talk)
     if (action === 'ptt') {
       useVocoderStore.getState().setPTT(true);
+      return;
+    }
+
+    // Channel mute/solo — works in any context (tracker, DJ, etc.)
+    if (action.startsWith('channel_mute_')) {
+      const ch = parseInt(action.replace('channel_mute_', ''), 10) - 1;
+      if (ch >= 0 && ch < 32) {
+        const mixer = useMixerStore.getState();
+        mixer.setChannelMute(ch, !mixer.channels[ch]?.muted);
+      }
+      return;
+    }
+    if (action.startsWith('channel_solo_')) {
+      const ch = parseInt(action.replace('channel_solo_', ''), 10) - 1;
+      if (ch >= 0 && ch < 32) {
+        const mixer = useMixerStore.getState();
+        mixer.setChannelSolo(ch, !mixer.channels[ch]?.soloed);
+      }
       return;
     }
 

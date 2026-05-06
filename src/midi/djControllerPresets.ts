@@ -102,7 +102,12 @@ export type DJAction =
   | 'tracker_scratch_chirp' | 'tracker_scratch_stab' | 'tracker_scratch_8crab'
   | 'tracker_scratch_twdl' | 'tracker_scratch_stop'
   // Vocoder push-to-talk
-  | 'ptt';
+  | 'ptt'
+  // Channel mute/solo (1-indexed, for hardware mixer surfaces)
+  | 'channel_mute_1' | 'channel_mute_2' | 'channel_mute_3' | 'channel_mute_4'
+  | 'channel_mute_5' | 'channel_mute_6' | 'channel_mute_7' | 'channel_mute_8'
+  | 'channel_solo_1' | 'channel_solo_2' | 'channel_solo_3' | 'channel_solo_4'
+  | 'channel_solo_5' | 'channel_solo_6' | 'channel_solo_7' | 'channel_solo_8';
 
 // ============================================================================
 // CONTROLLER PRESETS
@@ -407,78 +412,102 @@ const BEHRINGER_X_TOUCH_COMPACT: DJControllerPreset = {
   id: 'behringer-xtouch-compact',
   name: 'X-Touch Compact',
   manufacturer: 'Behringer',
-  description: '9-fader dub mixer surface with DJ + dub bus mappings',
+  description: 'Dub mixer surface — faders=channel sends, encoders=FX params, buttons=performance',
   detectPatterns: ['x-touch compact', 'xtouch compact', 'x touch compact'],
   ccMappings: [
-    // Faders 1-8 = deck strips
-    { channel: 0, cc: 1, param: 'dj.deckA.volume' },
-    { channel: 0, cc: 2, param: 'dj.deckA.eqHi' },
-    { channel: 0, cc: 3, param: 'dj.deckA.eqMid' },
-    { channel: 0, cc: 4, param: 'dj.deckA.eqLow' },
-    { channel: 0, cc: 5, param: 'dj.deckB.volume' },
-    { channel: 0, cc: 6, param: 'dj.deckB.eqHi' },
-    { channel: 0, cc: 7, param: 'dj.deckB.eqMid' },
-    { channel: 0, cc: 8, param: 'dj.deckB.eqLow' },
-    { channel: 0, cc: 9, param: 'dj.crossfader' },
+    // Faders 1-8: routed to dub channel sends via special-case in handleCC (not here)
+    // Master fader (CC 9): master volume
+    { channel: 0, cc: 9, param: 'dj.masterVolume' },
 
-    // Top encoder row = deck control + key dub sends
-    { channel: 0, cc: 10, param: 'dj.deckA.filter' },
-    { channel: 0, cc: 11, param: 'dj.deckA.filterQ' },
-    { channel: 0, cc: 12, param: 'dj.deckA.pitch' },
-    { channel: 0, cc: 13, param: 'dub.echoWet' },
-    { channel: 0, cc: 14, param: 'dj.deckB.filter' },
-    { channel: 0, cc: 15, param: 'dj.deckB.filterQ' },
-    { channel: 0, cc: 16, param: 'dj.deckB.pitch' },
-    { channel: 0, cc: 17, param: 'dub.echoIntensity' },
+    // Top encoder row (CC 10-17): echo + spring dub params
+    { channel: 0, cc: 10, param: 'dub.echoWet' },
+    { channel: 0, cc: 11, param: 'dub.echoIntensity' },
+    { channel: 0, cc: 12, param: 'dub.echoRateMs' },
+    { channel: 0, cc: 13, param: 'dub.springWet' },
+    { channel: 0, cc: 14, param: 'dub.returnGain' },
+    { channel: 0, cc: 15, param: 'dub.hpfCutoff' },
+    { channel: 0, cc: 16, param: 'dub.sidechainAmount' },
+    { channel: 0, cc: 17, param: 'dj.masterVolume' },
 
-    // Right encoder row = dub bus + master
-    { channel: 0, cc: 18, param: 'dub.echoRateMs' },
-    { channel: 0, cc: 19, param: 'dub.springWet' },
-    { channel: 0, cc: 20, param: 'dub.returnGain' },
-    { channel: 0, cc: 21, param: 'dub.hpfCutoff' },
-    { channel: 0, cc: 22, param: 'dub.sidechainAmount' },
-    { channel: 0, cc: 23, param: 'dj.masterVolume' },
-    { channel: 0, cc: 24, param: 'dj.deckA.filter' },
-    { channel: 0, cc: 25, param: 'dj.deckB.filter' },
+    // Right encoder column (CC 18-25): filters + DJ params
+    { channel: 0, cc: 18, param: 'dj.deckA.filter' },
+    { channel: 0, cc: 19, param: 'dj.deckA.filterQ' },
+    { channel: 0, cc: 20, param: 'dj.deckB.filter' },
+    { channel: 0, cc: 21, param: 'dj.deckB.filterQ' },
+    { channel: 0, cc: 22, param: 'dj.deckA.pitch' },
+    { channel: 0, cc: 23, param: 'dj.deckB.pitch' },
+    { channel: 0, cc: 24, param: 'dj.crossfader' },
+    { channel: 0, cc: 25, param: 'dj.deckA.volume' },
   ],
   noteMappings: [
-    // Top row = deck state buttons with useful LED feedback
-    { channel: 0, note: 16, action: 'play_a' },
-    { channel: 0, note: 17, action: 'pfl_a' },
-    { channel: 0, note: 18, action: 'loop_a' },
-    { channel: 0, note: 19, action: 'cue_a' },
-    { channel: 0, note: 20, action: 'play_b' },
-    { channel: 0, note: 21, action: 'pfl_b' },
-    { channel: 0, note: 22, action: 'loop_b' },
-    { channel: 0, note: 23, action: 'cue_b' },
+    // Row 1 (notes 16-23): primary dub performance triggers
+    { channel: 0, note: 16, param: 'dub.echoThrow' },
+    { channel: 0, note: 17, param: 'dub.reverseEcho' },
+    { channel: 0, note: 18, param: 'dub.tapeStop' },
+    { channel: 0, note: 19, param: 'dub.tubbyScream' },
+    { channel: 0, note: 20, param: 'dub.springSlam' },
+    { channel: 0, note: 21, param: 'dub.eqSweep' },
+    { channel: 0, note: 22, param: 'dub.masterDrop' },
+    { channel: 0, note: 23, param: 'dub.crushBass' },
 
-    // Second row = dub performance
-    { channel: 0, note: 24, param: 'dub.echoThrow' },
-    { channel: 0, note: 25, param: 'dub.reverseEcho' },
-    { channel: 0, note: 26, param: 'dub.tapeStop' },
-    { channel: 0, note: 27, param: 'dub.tubbyScream' },
-    { channel: 0, note: 28, param: 'dub.springSlam' },
-    { channel: 0, note: 29, param: 'dub.delayPresetQuarter' },
-    { channel: 0, note: 30, param: 'dub.delayPresetDotted' },
-    { channel: 0, note: 31, param: 'dub.masterDrop' },
+    // Row 2 (notes 24-31): channel mutes 1-8
+    { channel: 0, note: 24, action: 'channel_mute_1' },
+    { channel: 0, note: 25, action: 'channel_mute_2' },
+    { channel: 0, note: 26, action: 'channel_mute_3' },
+    { channel: 0, note: 27, action: 'channel_mute_4' },
+    { channel: 0, note: 28, action: 'channel_mute_5' },
+    { channel: 0, note: 29, action: 'channel_mute_6' },
+    { channel: 0, note: 30, action: 'channel_mute_7' },
+    { channel: 0, note: 31, action: 'channel_mute_8' },
 
-    // Third row = cues / jumps
-    { channel: 0, note: 32, action: 'hotcue1_a' },
-    { channel: 0, note: 33, action: 'hotcue2_a' },
-    { channel: 0, note: 34, action: 'hotcue1_b' },
-    { channel: 0, note: 35, action: 'hotcue2_b' },
-    { channel: 0, note: 36, action: 'beatjump_back_a' },
-    { channel: 0, note: 37, action: 'beatjump_fwd_a' },
-    { channel: 0, note: 38, action: 'beatjump_back_b' },
-    { channel: 0, note: 39, action: 'beatjump_fwd_b' },
+    // Row 3 (notes 32-39): channel solos 1-8
+    { channel: 0, note: 32, action: 'channel_solo_1' },
+    { channel: 0, note: 33, action: 'channel_solo_2' },
+    { channel: 0, note: 34, action: 'channel_solo_3' },
+    { channel: 0, note: 35, action: 'channel_solo_4' },
+    { channel: 0, note: 36, action: 'channel_solo_5' },
+    { channel: 0, note: 37, action: 'channel_solo_6' },
+    { channel: 0, note: 38, action: 'channel_solo_7' },
+    { channel: 0, note: 39, action: 'channel_solo_8' },
 
-    // Transport row
-    { channel: 0, note: 49, action: 'sync_a' },
-    { channel: 0, note: 50, action: 'sync_b' },
-    { channel: 0, note: 51, param: 'dub.delayPresetQuarter' },
-    { channel: 0, note: 52, param: 'dub.delayPresetDotted' },
-    { channel: 0, note: 53, param: 'dub.echoBuildUp' },
-    { channel: 0, note: 54, param: 'dub.springKick' },
+    // Encoder buttons (notes 0-7): quick-select dub echo presets
+    { channel: 0, note: 0, param: 'dub.delayPresetQuarter' },
+    { channel: 0, note: 1, param: 'dub.delayPresetDotted' },
+    { channel: 0, note: 2, param: 'dub.delayPresetTriplet' },
+    { channel: 0, note: 3, param: 'dub.delayPreset8th' },
+    { channel: 0, note: 4, param: 'dub.echoBuildUp' },
+    { channel: 0, note: 5, param: 'dub.springKick' },
+    { channel: 0, note: 6, param: 'dub.stereoDoubler' },
+    { channel: 0, note: 7, param: 'dub.backwardReverb' },
+
+    // Right encoder buttons (notes 8-15): more dub triggers
+    { channel: 0, note: 8, param: 'dub.delayPreset380' },
+    { channel: 0, note: 9, param: 'dub.delayPreset16th' },
+    { channel: 0, note: 10, param: 'dub.delayPresetDoubler' },
+    { channel: 0, note: 11, param: 'dub.snareCrack' },
+    { channel: 0, note: 12, param: 'dub.sonarPing' },
+    { channel: 0, note: 13, param: 'dub.subSwell' },
+    { channel: 0, note: 14, param: 'dub.radioRiser' },
+    { channel: 0, note: 15, param: 'dub.delayTimeThrow' },
+
+    // Select row (notes 40-48): hold/toggle dub moves
+    { channel: 0, note: 40, param: 'dub.transportTapeStop' },
+    { channel: 0, note: 41, param: 'dub.hpfRise' },
+    { channel: 0, note: 42, param: 'dub.filterDrop' },
+    { channel: 0, note: 43, param: 'dub.versionDrop' },
+    { channel: 0, note: 44, param: 'dub.dubSiren' },
+    { channel: 0, note: 45, param: 'dub.oscBass' },
+    { channel: 0, note: 46, param: 'dub.tapeWobble' },
+    { channel: 0, note: 47, param: 'dub.subHarmonic' },
+    { channel: 0, note: 48, param: 'dub.voltageStarve' },
+
+    // Transport (notes 49-54): play/stop/record
+    { channel: 0, note: 49, action: 'play_a' },
+    { channel: 0, note: 50, action: 'play_b' },
+    { channel: 0, note: 51, action: 'cue_a' },
+    { channel: 0, note: 52, action: 'cue_b' },
+    { channel: 0, note: 53, action: 'sync_a' },
+    { channel: 0, note: 54, action: 'sync_b' },
   ],
 };
 
