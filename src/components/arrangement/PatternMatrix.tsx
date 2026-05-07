@@ -28,10 +28,10 @@ import { Copy, Trash2, Plus, VolumeX, Volume2 } from 'lucide-react';
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
-const CELL_W = 32;
-const CELL_H = 22;
-const POS_COL_W = 36;
-const HEADER_H = 44;
+const CELL_W = 48;
+const CELL_H = 28;
+const POS_COL_W = 44;
+const HEADER_H = 48;
 
 // Track colors — Renoise-style palette, cycles per channel
 const TRACK_COLORS = [
@@ -120,7 +120,7 @@ export const PatternMatrix: React.FC = () => {
     return pat?.channels.length ?? 4;
   }, [patterns, patternOrder]);
 
-  // Compute which slots have content
+  // Compute which slots have content (notes, instruments, effects, or volume)
   const contentMap = useMemo(() => {
     const map = new Map<string, boolean>();
     for (let posIdx = 0; posIdx < patternOrder.length; posIdx++) {
@@ -607,7 +607,7 @@ export const PatternMatrix: React.FC = () => {
                 />
                 {/* Track name */}
                 <div className="text-[7px] font-mono text-text-muted leading-none truncate w-full text-center px-0.5">
-                  {name.length > 4 ? name.slice(0, 4) : name}
+                  {name.length > 5 ? name.slice(0, 5) : name}
                 </div>
                 {/* Track number */}
                 <div className="text-[7px] font-mono text-text-muted/50 leading-none mt-0.5">
@@ -685,21 +685,18 @@ export const PatternMatrix: React.FC = () => {
                     onContextMenu={(e) => handleContextMenu(e, posIdx, ch)}
                     title={`Pos ${posIdx}, Track ${ch + 1}, Pattern ${patIdx}${isMuted ? ' [slot muted]' : ''}${dimmed ? ' [track muted]' : ''}`}
                   >
-                    {/* Content block */}
-                    {hasContent && (
-                      <div
-                        className={`absolute rounded-[2px] transition-opacity
-                          ${(isMuted || dimmed) ? 'opacity-15' : isRepeated ? 'opacity-40' : 'opacity-75'}`}
-                        style={{
-                          backgroundColor: color,
-                          top: 3, left: 3, right: 3, bottom: 3,
-                          // Gradient for repeated slots (Renoise style)
-                          ...(isRepeated ? {
-                            background: `linear-gradient(135deg, ${color}66 0%, ${color}33 100%)`,
-                          } : {}),
-                        }}
-                      />
-                    )}
+                    {/* Block — always shown; bright if content, dim if empty */}
+                    <div
+                      className={`absolute rounded-[2px] transition-opacity
+                        ${(isMuted || dimmed) ? 'opacity-10' : hasContent ? (isRepeated ? 'opacity-50' : 'opacity-80') : 'opacity-15'}`}
+                      style={{
+                        backgroundColor: color,
+                        top: 3, left: 3, right: 3, bottom: 3,
+                        ...(isRepeated && hasContent ? {
+                          background: `linear-gradient(135deg, ${color}88 0%, ${color}44 100%)`,
+                        } : {}),
+                      }}
+                    />
                     {/* Mute cross indicator */}
                     {isMuted && (
                       <svg className="absolute inset-0 w-full h-full pointer-events-none" viewBox={`0 0 ${CELL_W} ${CELL_H}`}>
@@ -707,12 +704,11 @@ export const PatternMatrix: React.FC = () => {
                         <line x1={CELL_W - 5} y1="5" x2="5" y2={CELL_H - 5} stroke="white" strokeWidth="1.5" opacity="0.5" />
                       </svg>
                     )}
-                    {/* Repeated slot indicator — pattern number in corner */}
-                    {isRepeated && !isMuted && (
-                      <span className="absolute bottom-0 right-0.5 text-[6px] font-mono text-text-muted/40 leading-none pointer-events-none">
-                        {patIdx}
-                      </span>
-                    )}
+                    {/* Pattern number overlay */}
+                    <span className={`absolute inset-0 flex items-center justify-center text-[8px] font-mono pointer-events-none
+                      ${hasContent ? 'text-white/60' : 'text-white/20'}`}>
+                      {String(patIdx).padStart(2, '0')}
+                    </span>
                     {/* Selection highlight */}
                     {selected && (
                       <div className="absolute inset-0 bg-accent-highlight/15 pointer-events-none" />
