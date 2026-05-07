@@ -39,6 +39,7 @@ import { USBSIDWizard } from '@components/dialogs/USBSIDWizard';
 import { MIDIControllerWizard } from '@components/dialogs/MIDIControllerWizard';
 import { MIDIMapperModal } from '@components/midi/MIDIMapperModal';
 import { NKSSetupWizard } from '@components/dialogs/NKSSetupWizard';
+import { NKSLibraryModal } from '@components/midi/NKSLibraryModal';
 import { RomUploadDialog } from '@components/ui/RomUploadDialog';
 import { ModlandContributionModal } from '@components/modland/ModlandContributionModal';
 import { useModlandContributionModal } from '@stores/useModlandContributionModal';
@@ -1318,6 +1319,9 @@ function App() {
 
       {/* NKS Performance Setup Wizard */}
       <NKSSetupWizard />
+
+      {/* NKS Library Browser modal */}
+      <NKSLibraryModal />
 
       {/* ROM Upload Dialog - Shows when ROM-dependent synths can't auto-load ROMs */}
       <RomUploadDialog />
