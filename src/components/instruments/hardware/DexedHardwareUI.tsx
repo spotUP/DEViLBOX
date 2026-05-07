@@ -15,6 +15,7 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { getToneEngine } from '../../../engine/ToneEngine';
 import { unpackDX7Voice } from '../../../engine/dx7/dx7sysex';
+import { consumePendingPresetData } from '../../../lib/pendingPresetData';
 
 interface DexedUIModule {
   _dexed_ui_init: () => void;
@@ -252,6 +253,12 @@ export const DexedHardwareUI: React.FC<DexedHardwareUIProps> = ({
         }
 
         moduleRef.current = m;
+
+        // Check for pending preset data from Library browser
+        const pendingData = consumePendingPresetData('dexed');
+        if (pendingData) {
+          loadSysexData(pendingData as ArrayBuffer, 'library preset');
+        }
 
         // Initialize WASM at DPR scale for Retina-crisp rendering
         const dpr = window.devicePixelRatio || 1;
