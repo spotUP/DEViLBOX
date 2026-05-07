@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
-import { kontaktBridge, type KontaktBridgeSnapshot } from '@engine/kontakt/KontaktBridge';
+import { kontaktBridge } from '@/engine/kontakt/KontaktBridge';
 
 export type KontaktBridgeStatus = 'disconnected' | 'connecting' | 'ready' | 'error';
 
@@ -8,34 +8,21 @@ interface KontaktState {
   bridgeStatus: KontaktBridgeStatus;
   currentPreset: string | null;
   error: string | null;
-  sampleRate: number;
   volume: number;
   connect: () => Promise<void>;
   disconnect: () => void;
-  loadPreset: (path: string) => void;
   noteOn: (note: number, velocity?: number, channel?: number) => void;
   noteOff: (note: number, channel?: number) => void;
   setVolume: (value: number) => void;
-  requestStatus: () => void;
-}
-
-const DEFAULT_SAMPLE_RATE = 44100;
-
-function applySnapshot(snapshot: KontaktBridgeSnapshot): Pick<KontaktState, 'bridgeStatus' | 'currentPreset' | 'error' | 'sampleRate'> {
-  return {
-    bridgeStatus: snapshot.bridgeStatus,
-    currentPreset: snapshot.currentPreset,
-    error: snapshot.error,
-    sampleRate: snapshot.sampleRate || DEFAULT_SAMPLE_RATE,
-  };
+  cc: (ccNum: number, value: number, channel?: number) => void;
+  loadPreset: (path: string) => void;
 }
 
 export const useKontaktStore = create<KontaktState>()(
   immer((set) => ({
-    bridgeStatus: 'disconnected',
+    bridgeStatus: 'disconnected' as KontaktBridgeStatus,
     currentPreset: null,
     error: null,
-    sampleRate: DEFAULT_SAMPLE_RATE,
     volume: 0.75,
 
     connect: async () => {
@@ -43,16 +30,14 @@ export const useKontaktStore = create<KontaktState>()(
         state.bridgeStatus = 'connecting';
         state.error = null;
       });
-
       try {
         await kontaktBridge.connect();
-      } catch (error) {
-        const message = error instanceof Error ? error.message : 'Failed to connect to Kontakt bridge';
+        console.log('[Kontakt] Bridge connected via WebSocket');
+      } catch (e) {
         set((state) => {
           state.bridgeStatus = 'error';
-          state.error = message;
+          state.error = e instanceof Error ? e.message : 'Bridge connection failed';
         });
-        throw error;
       }
     },
 
@@ -65,32 +50,35 @@ export const useKontaktStore = create<KontaktState>()(
       });
     },
 
-    loadPreset: (path) => {
-      kontaktBridge.loadPreset(path);
-    },
-
     noteOn: (note, velocity = 100, channel = 0) => {
-      kontaktBridge.noteOn(note, velocity, channel);
+      try { kontaktBridge.noteOn(note, velocity, channel); } catch { /* not connected */ }
     },
 
     noteOff: (note, channel = 0) => {
-      kontaktBridge.noteOff(note, channel);
+      try { kontaktBridge.noteOff(note, channel); } catch { /* not connected */ }
     },
 
     setVolume: (value) => {
       const clamped = Math.max(0, Math.min(1, value));
-      set((state) => {
-        state.volume = clamped;
-      });
-      kontaktBridge.cc(7, Math.round(clamped * 127), 0);
+      set((state) => { state.volume = clamped; });
+      try { kontaktBridge.cc(7, Math.round(clamped * 127), 0); } catch { /* */ }
     },
 
-    requestStatus: () => {
-      kontaktBridge.requestStatus();
+    cc: (ccNum, value, channel = 0) => {
+      try { kontaktBridge.cc(ccNum, value, channel); } catch { /* */ }
+    },
+
+    loadPreset: (path) => {
+      try { kontaktBridge.loadPreset(path); } catch { /* */ }
     },
   })),
 );
 
+// Subscribe to bridge status AFTER store is created (avoids immer draft error during init)
 kontaktBridge.subscribe((snapshot) => {
-  useKontaktStore.setState(applySnapshot(snapshot));
+  useKontaktStore.setState({
+    bridgeStatus: snapshot.bridgeStatus,
+    currentPreset: snapshot.currentPreset,
+    error: snapshot.error,
+  });
 });

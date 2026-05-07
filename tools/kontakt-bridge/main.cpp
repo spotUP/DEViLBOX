@@ -4,7 +4,9 @@
 #include <atomic>
 #include <csignal>
 #include <cstdint>
+#include <cstdio>
 #include <cstring>
+#include <execinfo.h>
 #include <filesystem>
 #include <iostream>
 #include <optional>
@@ -12,11 +14,34 @@
 #include <sstream>
 #include <string>
 #include <thread>
+#include <unistd.h>
 #include <vector>
+
+#ifdef __APPLE__
+#include <CoreFoundation/CoreFoundation.h>
+#endif
 
 namespace {
 constexpr std::uint32_t kBridgeMagic = 0x4B425247u;
 std::atomic<bool> gRunning{true};
+
+void crashHandler(int sig) {
+    const char* name = (sig == SIGSEGV) ? "SIGSEGV" : (sig == SIGABRT) ? "SIGABRT" : (sig == SIGBUS) ? "SIGBUS" : (sig == SIGILL) ? "SIGILL" : (sig == SIGFPE) ? "SIGFPE" : (sig == SIGTRAP) ? "SIGTRAP" : "UNKNOWN";
+    write(STDERR_FILENO, "\n[kontakt-bridge] CRASH: ", 25);
+    write(STDERR_FILENO, name, strlen(name));
+    write(STDERR_FILENO, "\nBacktrace:\n", 12);
+    void* frames[64];
+    int count = backtrace(frames, 64);
+    backtrace_symbols_fd(frames, count, STDERR_FILENO);
+    _exit(128 + sig);
+}
+
+void atexitHandler() {
+    fprintf(stderr, "[kontakt-bridge] atexit called — process exiting normally\n");
+    void* frames[64];
+    int count = backtrace(frames, 64);
+    backtrace_symbols_fd(frames, count, STDERR_FILENO);
+}
 
 void handleSignal(int) {
     gRunning = false;
@@ -95,9 +120,17 @@ std::vector<std::uint8_t> encodeAudioFrame(const float* left, const float* right
 }
 } // namespace
 
-int main() {
+int main(int argc, char* argv[]) {
     std::signal(SIGINT, handleSignal);
     std::signal(SIGTERM, handleSignal);
+    std::signal(SIGSEGV, crashHandler);
+    std::signal(SIGABRT, crashHandler);
+    std::signal(SIGBUS, crashHandler);
+    std::signal(SIGILL, crashHandler);
+    std::signal(SIGFPE, crashHandler);
+    std::signal(SIGTRAP, crashHandler);
+    std::signal(SIGPIPE, SIG_IGN);  // Ignore SIGPIPE — handle send() errors via return value
+    std::atexit(atexitHandler);
 
     KontaktHost host;
     WebSocketServer server(4009);
@@ -106,7 +139,10 @@ int main() {
         if (!server.hasClient()) {
             return;
         }
-        server.sendBinary(encodeAudioFrame(left, right, sampleCount));
+        auto frame = encodeAudioFrame(left, right, sampleCount);
+        if (!server.sendBinary(frame)) {
+            write(STDERR_FILENO, "[audio] sendBinary failed\n", 26);
+        }
     });
 
     auto sendStatus = [&]() {
@@ -175,14 +211,57 @@ int main() {
         return 1;
     }
 
-    if (!host.initialize()) {
-        std::cerr << "[kontakt-bridge] host initialization warning: " << host.getStatus().lastError << std::endl;
+    // Check for --no-au flag for debugging
+    bool skipAU = false;
+    for (int i = 1; i < argc; ++i) {
+        if (std::string(argv[i]) == "--no-au") skipAU = true;
+    }
+
+    if (!skipAU) {
+        if (!host.initialize()) {
+            std::cerr << "[kontakt-bridge] host initialization warning: " << host.getStatus().lastError << std::endl;
+        }
+        // Kontakt AU may override our signal handlers during init.
+        // Reinstall them after AU is loaded.
+        std::signal(SIGSEGV, crashHandler);
+        std::signal(SIGABRT, crashHandler);
+        std::signal(SIGBUS, crashHandler);
+        std::signal(SIGILL, crashHandler);
+        std::signal(SIGFPE, crashHandler);
+        std::signal(SIGTRAP, crashHandler);
+        std::signal(SIGPIPE, SIG_IGN);
+    } else {
+        std::cout << "[kontakt-bridge] skipping AU load (--no-au)" << std::endl;
     }
 
     std::cout << "[kontakt-bridge] press Ctrl+C to stop" << std::endl;
+
+#ifdef __APPLE__
+    // Many AU plugins (including Kontakt) dispatch work to the main thread's
+    // CFRunLoop. Without pumping it, those blocks never execute and the plugin
+    // may time out and call _exit(). Replace sleep loop with CFRunLoop.
+    // The SIGINT/SIGTERM handlers set gRunning=false; we install a repeating
+    // timer that checks gRunning and stops the run loop when it's time to exit.
+    CFRunLoopTimerContext timerCtx{};
+    timerCtx.info = nullptr;
+    CFRunLoopTimerRef timer = CFRunLoopTimerCreateWithHandler(
+        kCFAllocatorDefault,
+        CFAbsoluteTimeGetCurrent(),
+        0.2, // 200ms interval
+        0, 0,
+        ^(CFRunLoopTimerRef) {
+            if (!gRunning) {
+                CFRunLoopStop(CFRunLoopGetMain());
+            }
+        });
+    CFRunLoopAddTimer(CFRunLoopGetMain(), timer, kCFRunLoopCommonModes);
+    CFRunLoopRun();
+    CFRelease(timer);
+#else
     while (gRunning) {
         std::this_thread::sleep_for(std::chrono::milliseconds(200));
     }
+#endif
 
     host.shutdown();
     server.stop();
