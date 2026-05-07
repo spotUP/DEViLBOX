@@ -6,9 +6,18 @@ export interface KontaktAudioFrame {
   right: Float32Array;
 }
 
+export interface PluginInfo {
+  name: string;
+  manufacturer: string;
+  type: string;
+  subType: string;
+  mfr: string;
+}
+
 export interface KontaktStatusMessage {
   type: 'status';
   connected: boolean;
+  pluginName: string | null;
   presetName: string | null;
   sampleRate: number;
   blockSize?: number;
@@ -16,12 +25,21 @@ export interface KontaktStatusMessage {
   platform?: string;
 }
 
+export interface KontaktPluginListMessage {
+  type: 'plugin_list';
+  plugins: PluginInfo[];
+}
+
 export interface KontaktErrorMessage {
   type: 'error';
   message: string;
 }
 
-export type KontaktBridgeMessage = KontaktStatusMessage | KontaktErrorMessage | Record<string, unknown>;
+export type KontaktBridgeMessage =
+  | KontaktStatusMessage
+  | KontaktPluginListMessage
+  | KontaktErrorMessage
+  | Record<string, unknown>;
 
 export function parseKontaktAudioFrame(buffer: ArrayBuffer): KontaktAudioFrame | null {
   if (buffer.byteLength < 8) {

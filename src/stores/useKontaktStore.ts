@@ -1,16 +1,21 @@
 import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
 import { kontaktBridge } from '@/engine/kontakt/KontaktBridge';
+import type { PluginInfo } from '@/engine/kontakt/protocol';
 
 export type KontaktBridgeStatus = 'disconnected' | 'connecting' | 'ready' | 'error';
 
 interface KontaktState {
   bridgeStatus: KontaktBridgeStatus;
+  pluginName: string | null;
   currentPreset: string | null;
+  plugins: PluginInfo[];
   error: string | null;
   volume: number;
   connect: () => Promise<void>;
   disconnect: () => void;
+  loadPlugin: (name: string) => void;
+  unloadPlugin: () => void;
   noteOn: (note: number, velocity?: number, channel?: number) => void;
   noteOff: (note: number, channel?: number) => void;
   setVolume: (value: number) => void;
@@ -21,7 +26,9 @@ interface KontaktState {
 export const useKontaktStore = create<KontaktState>()(
   immer((set) => ({
     bridgeStatus: 'disconnected' as KontaktBridgeStatus,
+    pluginName: null,
     currentPreset: null,
+    plugins: [] as PluginInfo[],
     error: null,
     volume: 0.75,
 
@@ -46,8 +53,18 @@ export const useKontaktStore = create<KontaktState>()(
       set((state) => {
         state.bridgeStatus = 'disconnected';
         state.error = null;
+        state.pluginName = null;
         state.currentPreset = null;
+        state.plugins = [];
       });
+    },
+
+    loadPlugin: (name) => {
+      try { kontaktBridge.loadPlugin(name); } catch { /* not connected */ }
+    },
+
+    unloadPlugin: () => {
+      try { kontaktBridge.unloadPlugin(); } catch { /* not connected */ }
     },
 
     noteOn: (note, velocity = 100, channel = 0) => {
@@ -78,7 +95,9 @@ export const useKontaktStore = create<KontaktState>()(
 kontaktBridge.subscribe((snapshot) => {
   useKontaktStore.setState({
     bridgeStatus: snapshot.bridgeStatus,
+    pluginName: snapshot.pluginName,
     currentPreset: snapshot.currentPreset,
+    plugins: snapshot.plugins,
     error: snapshot.error,
   });
 });

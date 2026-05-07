@@ -59,11 +59,15 @@ const BLACK_KEYS_RENDER = KEYBOARD.filter((key) => key.isBlack);
 export const KontaktPlayer: React.FC = () => {
   const {
     bridgeStatus,
+    pluginName,
     currentPreset,
+    plugins,
     error,
     volume,
     connect,
     disconnect,
+    loadPlugin,
+    unloadPlugin,
     noteOn,
     noteOff,
     setVolume,
@@ -77,6 +81,7 @@ export const KontaktPlayer: React.FC = () => {
   }, [activeNotes]);
 
   const isReady = bridgeStatus === 'ready';
+  const hasPlugin = Boolean(pluginName);
 
   const statusBadgeClass = useMemo(() => {
     if (isReady) {
@@ -142,49 +147,92 @@ export const KontaktPlayer: React.FC = () => {
     <div className="h-full flex flex-col bg-dark-bg text-text-primary">
       <div className="flex items-center justify-between gap-2 px-3 py-2 border-b border-dark-border bg-dark-bgSecondary">
         <div>
-          <div className="text-[11px] font-mono uppercase tracking-widest text-accent-primary">Kontakt Bridge</div>
-          <div className="text-[9px] text-text-muted">Native bridge on ws://localhost:4009</div>
+          <div className="text-[11px] font-mono uppercase tracking-widest text-accent-primary">AU Bridge</div>
+          <div className="text-[9px] text-text-muted">Native plugin host on ws://localhost:4009</div>
         </div>
         <span className={`text-[9px] font-mono px-2 py-1 rounded ${statusBadgeClass}`}>
-          {isReady ? 'Bridge Connected' : bridgeStatus === 'connecting' ? 'Bridge Connecting' : 'Bridge Disconnected'}
+          {isReady ? (hasPlugin ? pluginName : 'No Plugin Loaded') : bridgeStatus === 'connecting' ? 'Connecting' : 'Disconnected'}
         </span>
       </div>
 
       <div className="flex-1 overflow-y-auto p-3 space-y-3">
+        {/* Connection + Plugin Picker */}
         <div className="bg-dark-bgSecondary border border-dark-border rounded p-3 space-y-3">
           <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0">
-              <div className="text-[10px] font-mono uppercase tracking-widest text-text-muted">Current Preset</div>
-              <div className="text-[12px] text-text-primary truncate">
-                {currentPreset ?? 'No preset loaded'}
+            <div className="min-w-0 flex-1">
+              <div className="text-[10px] font-mono uppercase tracking-widest text-text-muted">
+                {hasPlugin ? 'Active Plugin' : 'Plugin'}
               </div>
-              <div className="text-[9px] text-text-muted">{bridgeStatus === 'ready' ? 'Bridge connected' : 'Bridge not running'}</div>
+              <div className="text-[12px] text-text-primary truncate">
+                {pluginName ?? 'No plugin loaded'}
+              </div>
+              {currentPreset && (
+                <div className="text-[9px] text-text-muted truncate">{currentPreset}</div>
+              )}
             </div>
-            <div className="flex gap-2">
+            <div className="flex gap-2 flex-shrink-0">
               {isReady ? (
-                <Button variant="danger" size="sm" onClick={handleDisconnect}>Disconnect</Button>
+                <>
+                  {hasPlugin && (
+                    <Button variant="default" size="sm" onClick={unloadPlugin}>Unload</Button>
+                  )}
+                  <Button variant="danger" size="sm" onClick={handleDisconnect}>Disconnect</Button>
+                </>
               ) : (
                 <Button variant="primary" size="sm" onClick={handleConnect}>Connect</Button>
               )}
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
-            <div className="flex-shrink-0">
-              <Knob
-                label="Volume"
-                min={0}
-                max={1}
-                value={volume}
-                onChange={setVolume}
-                size="sm"
-                formatValue={(value) => `${Math.round(value * 127)}`}
-              />
+          {/* Plugin Picker — shown when connected */}
+          {isReady && plugins.length > 0 && (
+            <div className="space-y-1.5">
+              <div className="text-[10px] font-mono uppercase tracking-widest text-text-muted">Available Plugins</div>
+              <div className="grid gap-1 max-h-40 overflow-y-auto">
+                {plugins.map((plugin) => {
+                  const isActive = pluginName === plugin.name;
+                  return (
+                    <button
+                      key={plugin.name}
+                      type="button"
+                      onClick={() => { if (!isActive) loadPlugin(plugin.name); }}
+                      className={[
+                        'w-full text-left px-2 py-1.5 rounded text-[10px] font-mono transition-colors',
+                        isActive
+                          ? 'bg-accent-primary/15 text-accent-primary border border-accent-primary/30'
+                          : 'bg-dark-bgTertiary border border-dark-borderLight hover:bg-dark-bgHover text-text-primary',
+                      ].join(' ')}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="truncate">{plugin.name}</span>
+                        {isActive && <span className="text-[8px] text-accent-primary ml-2">Active</span>}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
-            <div className="text-[10px] text-text-secondary leading-relaxed">
-              Sends MIDI Control Change 7 to Kontakt.
+          )}
+
+          {/* Volume knob */}
+          {hasPlugin && (
+            <div className="flex items-center gap-3">
+              <div className="flex-shrink-0">
+                <Knob
+                  label="Volume"
+                  min={0}
+                  max={1}
+                  value={volume}
+                  onChange={setVolume}
+                  size="sm"
+                  formatValue={(value) => `${Math.round(value * 127)}`}
+                />
+              </div>
+              <div className="text-[10px] text-text-secondary leading-relaxed">
+                Sends MIDI CC 7 to plugin.
+              </div>
             </div>
-          </div>
+          )}
 
           {error && (
             <div className="rounded border border-accent-error/30 bg-accent-error/10 px-2 py-1.5 text-[10px] text-accent-error">
@@ -193,60 +241,63 @@ export const KontaktPlayer: React.FC = () => {
           )}
         </div>
 
-        <div className="bg-dark-bgSecondary border border-dark-border rounded p-3 space-y-2">
-          <div className="text-[10px] font-mono uppercase tracking-widest text-text-muted">Keyboard</div>
-          <div className="relative h-36 select-none overflow-hidden rounded border border-dark-border bg-dark-bg">
-            <div className="absolute inset-0 flex">
-              {WHITE_KEYS.map((key) => {
-                const active = activeNotes.includes(key.midi);
-                return (
-                  <button
-                    key={key.midi}
-                    type="button"
-                    className={[
-                      'relative flex-1 border-r border-dark-borderLight last:border-r-0 text-[9px] font-mono text-text-muted',
-                      active ? 'bg-accent-primary/20 text-accent-primary' : 'bg-dark-bgSecondary hover:bg-dark-bgHover',
-                    ].join(' ')}
-                    onMouseDown={() => handleKeyDown(key.midi)}
-                    onMouseUp={() => handleKeyUp(key.midi)}
-                    onMouseLeave={() => handleKeyUp(key.midi)}
-                  >
-                    <span className="absolute bottom-2 inset-x-0 text-center">{key.label}</span>
-                  </button>
-                );
-              })}
+        {/* Keyboard — shown when plugin is loaded */}
+        {hasPlugin && (
+          <div className="bg-dark-bgSecondary border border-dark-border rounded p-3 space-y-2">
+            <div className="text-[10px] font-mono uppercase tracking-widest text-text-muted">Keyboard</div>
+            <div className="relative h-36 select-none overflow-hidden rounded border border-dark-border bg-dark-bg">
+              <div className="absolute inset-0 flex">
+                {WHITE_KEYS.map((key) => {
+                  const active = activeNotes.includes(key.midi);
+                  return (
+                    <button
+                      key={key.midi}
+                      type="button"
+                      className={[
+                        'relative flex-1 border-r border-dark-borderLight last:border-r-0 text-[9px] font-mono text-text-muted',
+                        active ? 'bg-accent-primary/20 text-accent-primary' : 'bg-dark-bgSecondary hover:bg-dark-bgHover',
+                      ].join(' ')}
+                      onMouseDown={() => handleKeyDown(key.midi)}
+                      onMouseUp={() => handleKeyUp(key.midi)}
+                      onMouseLeave={() => handleKeyUp(key.midi)}
+                    >
+                      <span className="absolute bottom-2 inset-x-0 text-center">{key.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+              <div className="absolute inset-x-0 top-0 h-[58%] pointer-events-none">
+                {BLACK_KEYS_RENDER.map((key) => {
+                  const active = activeNotes.includes(key.midi);
+                  return (
+                    <button
+                      key={key.midi}
+                      type="button"
+                      className={[
+                        'absolute top-0 h-full w-[9%] rounded-b border border-dark-border pointer-events-auto text-[8px] font-mono',
+                        active ? 'bg-accent-highlight/30 text-accent-highlight' : 'bg-dark-bgTertiary text-text-secondary hover:bg-dark-bgHover',
+                      ].join(' ')}
+                      style={{ left: `${(key.left / WHITE_KEYS.length) * 100}%` }}
+                      onMouseDown={() => handleKeyDown(key.midi)}
+                      onMouseUp={() => handleKeyUp(key.midi)}
+                      onMouseLeave={() => handleKeyUp(key.midi)}
+                    >
+                      <span className="absolute bottom-2 inset-x-0 text-center">{key.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
-            <div className="absolute inset-x-0 top-0 h-[58%] pointer-events-none">
-              {BLACK_KEYS_RENDER.map((key) => {
-                const active = activeNotes.includes(key.midi);
-                return (
-                  <button
-                    key={key.midi}
-                    type="button"
-                    className={[
-                      'absolute top-0 h-full w-[9%] rounded-b border border-dark-border pointer-events-auto text-[8px] font-mono',
-                      active ? 'bg-accent-highlight/30 text-accent-highlight' : 'bg-dark-bgTertiary text-text-secondary hover:bg-dark-bgHover',
-                    ].join(' ')}
-                    style={{ left: `${(key.left / WHITE_KEYS.length) * 100}%` }}
-                    onMouseDown={() => handleKeyDown(key.midi)}
-                    onMouseUp={() => handleKeyUp(key.midi)}
-                    onMouseLeave={() => handleKeyUp(key.midi)}
-                  >
-                    <span className="absolute bottom-2 inset-x-0 text-center">{key.label}</span>
-                  </button>
-                );
-              })}
-            </div>
+            <div className="text-[9px] text-text-muted">Two octaves from C3 to B4.</div>
           </div>
-          <div className="text-[9px] text-text-muted">Two octaves from C3 to B4.</div>
-        </div>
+        )}
 
         {!isReady && (
           <div className="bg-dark-bgSecondary border border-dark-border rounded p-3 space-y-2">
             <div className="text-[10px] font-mono uppercase tracking-widest text-text-muted">Setup</div>
             <pre className="bg-dark-bgTertiary border border-dark-borderLight rounded p-2 text-[9px] font-mono text-text-secondary overflow-x-auto whitespace-pre-wrap">
 {`cd /Users/spot/Code/DEViLBOX/tools/kontakt-bridge
-mkdir build && cd build
+mkdir -p build && cd build
 cmake .. && make
 ./kontakt-bridge`}
             </pre>
