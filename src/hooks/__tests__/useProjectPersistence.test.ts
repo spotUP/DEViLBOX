@@ -48,7 +48,9 @@ async function resetIDB(): Promise<void> {
 
 // Importing useProjectPersistence pulls in a heavy module graph
 // (stores, engine, migration helpers). First test absorbs the cold-start.
-const SLOW_MS = 30_000;
+// Cold-start can take 40+ seconds when the test runner hasn't cached the
+// module graph (useProjectPersistence → useInstrumentStore → ToneEngine → Tone.js).
+const SLOW_MS = 60_000;
 
 describe('useProjectPersistence — IDB round-trip', () => {
   beforeEach(async () => {

@@ -62,7 +62,9 @@ const STORE_MODULES: Array<[name: string, load: () => Promise<Record<string, unk
 
 // Give each store test a generous budget — a few stores pull in Tone.js and
 // heavy factories on import, which can push cold-start past the default 5 s.
-const IMPORT_TIMEOUT_MS = 30000;
+// useAudioStore pulls in InstrumentFactory (50+ imports → Tone.js, WASM) and
+// can take 40+ seconds on cold start.
+const IMPORT_TIMEOUT_MS = 60000;
 
 describe('Store safety net — import + init', () => {
   for (const [name, load] of STORE_MODULES) {
