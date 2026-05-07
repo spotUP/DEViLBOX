@@ -3,8 +3,8 @@
  *
  * Four tabs:
  *   Synth   — Browse synth types (CategorizedSynthSelector)
- *   Preset  — Browse factory/user presets (LoadPresetModal)
- *   Sample  — Browse sample packs (SamplePackBrowser)
+ *   Preset  — Browse factory/user presets (LoadPresetModal embedded)
+ *   Sample  — Browse sample packs (SamplePackBrowser embedded)
  *   Library — Browse NKS/DEViLBOX preset library (NKSLibraryBrowser)
  */
 
@@ -75,37 +75,17 @@ export const AddInstrumentDialog: React.FC<AddInstrumentDialogProps> = ({
     notify.success(`Loaded: ${preset.name}`);
   };
 
-  // For Preset and Sample tabs, open their respective full-screen modals
-  // and auto-close this dialog
-  if (activeTab === 'preset') {
-    return (
-      <LoadPresetModal onClose={() => {
-        setActiveTab('synth');
-        onClose();
-      }} />
-    );
-  }
-
-  if (activeTab === 'sample') {
-    return (
-      <SamplePackBrowser onClose={() => {
-        setActiveTab('synth');
-        onClose();
-      }} />
-    );
-  }
-
   return createPortal(
     <div
       className="fixed inset-0 z-[99990] bg-black/80 flex items-center justify-center"
       onClick={onClose}
     >
       <div
-        className="bg-dark-bg border border-dark-border rounded-lg shadow-2xl w-[90%] max-w-4xl max-h-[85vh] flex flex-col"
+        className="bg-dark-bg border border-dark-border rounded-lg shadow-2xl w-[95%] max-w-5xl h-[85vh] flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header with tabs */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-dark-border">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-dark-border flex-shrink-0">
           <div className="flex items-center gap-4">
             <h3 className="text-lg font-semibold text-text-primary flex items-center gap-2">
               <Music2 size={20} className="text-accent-primary" />
@@ -137,17 +117,23 @@ export const AddInstrumentDialog: React.FC<AddInstrumentDialogProps> = ({
         </div>
 
         {/* Tab content */}
-        <div className="flex-1 overflow-y-auto min-h-0">
+        <div className="flex-1 overflow-hidden min-h-0 flex flex-col">
           {activeTab === 'synth' && (
-            <div className="p-4">
+            <div className="flex-1 overflow-y-auto p-4">
               <CategorizedSynthSelector
                 onSelect={(type) => onCreateWithSynthType(type)}
                 createMode
               />
             </div>
           )}
+          {activeTab === 'preset' && (
+            <LoadPresetModal onClose={onClose} embedded />
+          )}
+          {activeTab === 'sample' && (
+            <SamplePackBrowser onClose={onClose} embedded />
+          )}
           {activeTab === 'library' && (
-            <div className="flex-1 min-h-0 h-[70vh]">
+            <div className="flex-1 min-h-0">
               <NKSLibraryBrowser onLoadPreset={handleLibraryLoad} />
             </div>
           )}
