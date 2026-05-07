@@ -13,8 +13,18 @@ const router = Router();
 
 const PROJECT_ROOT = path.resolve(__dirname, '../../..');
 const HELM_PRESET_ROOT = path.join(PROJECT_ROOT, 'third-party/helm-master/patches/Factory Presets');
+const SURGE_PRESET_ROOT = path.join(PROJECT_ROOT, 'third-party/surge-xt/resources/data/patches_3rdparty');
+const OBXF_PRESET_ROOT = path.join(PROJECT_ROOT, 'third-party/OB-Xf-main/assets/installer/Surge Synth Team/OB-Xf/Patches');
+const ODIN2_PRESET_ROOT = path.join(PROJECT_ROOT, 'third-party/odin2-master/assets/Soundbanks/Factory Presets');
 const DEXED_PRESET_COUNT = 32;
 const DEXED_PATH_PREFIX = 'dexed:init:';
+
+const ALLOWED_ROOTS = [
+  HELM_PRESET_ROOT,
+  SURGE_PRESET_ROOT,
+  OBXF_PRESET_ROOT,
+  ODIN2_PRESET_ROOT,
+];
 
 interface DevilboxProduct {
   id: string;
@@ -86,6 +96,69 @@ function getHelmPresets(): DevilboxPreset[] {
   return presets;
 }
 
+// ── Generic .fxp / .odin scanner ─────────────────────────────────────────────
+
+function scanPresetFiles(
+  dir: string,
+  synth: string,
+  ext: string,
+  presets: DevilboxPreset[],
+  extraTags: string[] = [],
+): void {
+  if (!fs.existsSync(dir)) return;
+  const entries = fs.readdirSync(dir, { withFileTypes: true });
+  for (const entry of entries) {
+    const absolutePath = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      scanPresetFiles(absolutePath, synth, ext, presets, extraTags);
+      continue;
+    }
+    if (!entry.isFile() || !entry.name.endsWith(ext)) continue;
+    const category = path.basename(path.dirname(absolutePath));
+    const relativePath = toProjectRelativePath(absolutePath);
+    presets.push({
+      id: `${synth}:${relativePath}`,
+      name: path.basename(entry.name, ext),
+      category,
+      synth,
+      path: relativePath,
+      tags: [category, ...extraTags],
+    });
+  }
+}
+
+let surgePresetCache: DevilboxPreset[] | null = null;
+function getSurgePresets(): DevilboxPreset[] {
+  if (surgePresetCache) return surgePresetCache;
+  const presets: DevilboxPreset[] = [];
+  scanPresetFiles(SURGE_PRESET_ROOT, 'surge', '.fxp', presets);
+  presets.sort((a, b) => a.category.localeCompare(b.category) || a.name.localeCompare(b.name));
+  surgePresetCache = presets;
+  return presets;
+}
+
+let obxfPresetCache: DevilboxPreset[] | null = null;
+function getObxfPresets(): DevilboxPreset[] {
+  if (obxfPresetCache) return obxfPresetCache;
+  const presets: DevilboxPreset[] = [];
+  scanPresetFiles(OBXF_PRESET_ROOT, 'obxf', '.fxp', presets, ['Oberheim']);
+  presets.sort((a, b) => a.category.localeCompare(b.category) || a.name.localeCompare(b.name));
+  obxfPresetCache = presets;
+  return presets;
+}
+
+let odin2PresetCache: DevilboxPreset[] | null = null;
+function getOdin2Presets(): DevilboxPreset[] {
+  if (odin2PresetCache) return odin2PresetCache;
+  const presets: DevilboxPreset[] = [];
+  scanPresetFiles(ODIN2_PRESET_ROOT, 'odin2', '.odin', presets);
+  presets.sort((a, b) => a.category.localeCompare(b.category) || a.name.localeCompare(b.name));
+  odin2PresetCache = presets;
+  return presets;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 function buildDexedPresetPath(index: number): string {
   return `${DEXED_PATH_PREFIX}${index}`;
 }
@@ -147,11 +220,35 @@ function buildDexedInitVoice(index: number): Buffer {
 function getProducts(): DevilboxProduct[] {
   return [
     {
+      id: 'surge',
+      name: 'Surge XT',
+      vendor: 'Surge Synth Team',
+      presetCount: getSurgePresets().length,
+      synth: 'surge',
+      category: 'Instrument',
+    },
+    {
       id: 'helm',
       name: 'Helm',
       vendor: 'Matt Tytel',
       presetCount: getHelmPresets().length,
       synth: 'helm',
+      category: 'Instrument',
+    },
+    {
+      id: 'obxf',
+      name: 'OB-Xf',
+      vendor: 'Surge Synth Team',
+      presetCount: getObxfPresets().length,
+      synth: 'obxf',
+      category: 'Instrument',
+    },
+    {
+      id: 'odin2',
+      name: 'Odin 2',
+      vendor: 'TheWaveWarden',
+      presetCount: getOdin2Presets().length,
+      synth: 'odin2',
       category: 'Instrument',
     },
     {
@@ -196,6 +293,12 @@ router.get('/presets', (req: Request, res: Response) => {
   let presets: DevilboxPreset[] = [];
   if (synth === 'helm') {
     presets = filterPresets(getHelmPresets(), category, search);
+  } else if (synth === 'surge') {
+    presets = filterPresets(getSurgePresets(), category, search);
+  } else if (synth === 'obxf') {
+    presets = filterPresets(getObxfPresets(), category, search);
+  } else if (synth === 'odin2') {
+    presets = filterPresets(getOdin2Presets(), category, search);
   } else if (synth === 'dexed') {
     presets = filterPresets(buildDexedPresets(), category, search);
   }
@@ -223,17 +326,24 @@ router.get('/preset-data', (req: Request, res: Response) => {
   }
 
   const absolutePath = path.resolve(PROJECT_ROOT, presetPath);
-  if (!absolutePath.startsWith(HELM_PRESET_ROOT)) {
+  const isAllowed = ALLOWED_ROOTS.some(root => absolutePath.startsWith(root));
+  if (!isAllowed) {
     res.status(403).json({ error: 'Forbidden' });
     return;
   }
-  if (!absolutePath.endsWith('.helm') || !fs.existsSync(absolutePath)) {
+  if (!fs.existsSync(absolutePath)) {
     res.status(404).json({ error: 'Preset not found' });
     return;
   }
 
-  res.type('application/json');
-  res.send(fs.readFileSync(absolutePath, 'utf8'));
+  // Helm presets are JSON, everything else is binary
+  if (absolutePath.endsWith('.helm')) {
+    res.type('application/json');
+    res.send(fs.readFileSync(absolutePath, 'utf8'));
+  } else {
+    res.type('application/octet-stream');
+    res.send(fs.readFileSync(absolutePath));
+  }
 });
 
 export default router;
