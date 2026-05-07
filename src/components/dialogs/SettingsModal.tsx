@@ -19,6 +19,7 @@ import { getASIDDeviceManager } from '@lib/sid/ASIDDeviceManager';
 import { getActiveC64SidEngine } from '@engine/replayer/NativeEngineRouting';
 import { useModalClose } from '@hooks/useDialogKeyboard';
 import { KKLightGuidePanel } from '@components/midi/KKLightGuidePanel';
+import { MIDIToolbarDropdown } from '@components/midi/MIDIToolbarDropdown';
 import {
   useSettingsDialog,
   SETTINGS_TABS,
@@ -581,63 +582,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
                 )}
               </section>
 
-              {/* MIDI */}
-              <section>
-                <h3 className="text-ft2-highlight text-xs font-bold mb-3 tracking-wide">MIDI</h3>
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div className="flex flex-col">
-                      <label className="text-ft2-text text-xs font-mono">Polyphonic Mode:</label>
-                      <span className="text-[9px] text-ft2-textDim font-mono">Play multiple notes simultaneously</span>
-                    </div>
-                    <Toggle label="" value={s.midiPolyphonic} onChange={s.setMidiPolyphonic} size="sm" />
-                  </div>
-
-                  <div className="pt-3 border-t border-ft2-border/30 space-y-2">
-                    <button onClick={() => { onClose(); useUIStore.getState().openModal('midi-wizard'); }}
-                      className="w-full flex items-center gap-2 px-3 py-2 bg-purple-500/10 border border-purple-500/30 rounded text-left hover:bg-purple-500/20 transition-colors">
-                      <span className="text-accent-secondary text-xs">🎛</span>
-                      <div className="flex-1">
-                        <p className="text-xs text-ft2-highlight font-mono">Controller Setup Wizard</p>
-                        <p className="text-[9px] text-ft2-textDim font-mono">Detect and configure MIDI controller</p>
-                      </div>
-                    </button>
-                    <button onClick={() => { onClose(); useUIStore.getState().openModal('midi-mapper'); }}
-                      className="w-full flex items-center gap-2 px-3 py-2 bg-blue-500/10 border border-blue-500/30 rounded text-left hover:bg-blue-500/20 transition-colors">
-                      <span className="text-accent-primary text-xs">🎚</span>
-                      <div className="flex-1">
-                        <p className="text-xs text-ft2-highlight font-mono">Controller Mapper</p>
-                        <p className="text-[9px] text-ft2-textDim font-mono">Visual mapping editor for knobs, faders, buttons</p>
-                      </div>
-                    </button>
-                    <button onClick={() => { onClose(); useUIStore.getState().openModal('nks-wizard'); }}
-                      className="w-full flex items-center gap-2 px-3 py-2 bg-orange-500/10 border border-orange-500/30 rounded text-left hover:bg-orange-500/20 transition-colors">
-                      <span className="text-orange-400 text-xs">🎹</span>
-                      <div className="flex-1">
-                        <p className="text-xs text-ft2-highlight font-mono">NKS Performance Setup</p>
-                        <p className="text-[9px] text-ft2-textDim font-mono">Parameter pages, hardware integration</p>
-                      </div>
-                    </button>
-                    <button onClick={() => { onClose(); useUIStore.getState().openModal('nks-library'); }}
-                      className="w-full flex items-center gap-2 px-3 py-2 bg-purple-500/10 border border-purple-500/30 rounded text-left hover:bg-purple-500/20 transition-colors">
-                      <span className="text-purple-400 text-xs">📚</span>
-                      <div className="flex-1">
-                        <p className="text-xs text-ft2-highlight font-mono">NKS Library Browser</p>
-                        <p className="text-[9px] text-ft2-textDim font-mono">Browse Komplete Kontrol preset library</p>
-                      </div>
-                    </button>
-                  </div>
-                </div>
-              </section>
-
-              {/* KK Light Guide */}
-              <section>
-                <h3 className="text-ft2-highlight text-xs font-bold mb-3 tracking-wide">KK LIGHT GUIDE</h3>
-                <div className="bg-dark-bgSecondary/40 border border-dark-border/50 rounded p-3">
-                  <KKLightGuidePanel />
-                </div>
-              </section>
-
               {/* Vinyl Scratch */}
               <section>
                 <h3 className="text-ft2-highlight text-xs font-bold mb-3 tracking-wide">VINYL SCRATCH</h3>
@@ -680,6 +624,82 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
                     <div>Scroll wheel/trackpad during playback</div>
                     <div>Hold <kbd className="px-1 py-0.5 bg-ft2-border text-ft2-text rounded text-[8px]">Z</kbd> = fader cut · <kbd className="px-1 py-0.5 bg-ft2-border text-ft2-text rounded text-[8px]">X</kbd> = crab</div>
                   </div>
+                </div>
+              </section>
+            </>
+          )}
+
+          {/* ═══════════════════════════════════════════════════════════════════
+              MIDI TAB
+              ═══════════════════════════════════════════════════════════════════ */}
+          {s.activeTab === 'midi' && (
+            <>
+              {/* MIDI Devices */}
+              <section>
+                <h3 className="text-ft2-highlight text-xs font-bold mb-3 tracking-wide">MIDI DEVICES</h3>
+                <div className="bg-dark-bgSecondary/40 border border-dark-border/50 rounded p-3">
+                  <MIDIToolbarDropdown inline />
+                </div>
+              </section>
+
+              {/* MIDI Settings */}
+              <section>
+                <h3 className="text-ft2-highlight text-xs font-bold mb-3 tracking-wide">MIDI SETTINGS</h3>
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex flex-col">
+                      <label className="text-ft2-text text-xs font-mono">Polyphonic Mode:</label>
+                      <span className="text-[9px] text-ft2-textDim font-mono">Play multiple notes simultaneously</span>
+                    </div>
+                    <Toggle label="" value={s.midiPolyphonic} onChange={s.setMidiPolyphonic} size="sm" />
+                  </div>
+                </div>
+              </section>
+
+              {/* MIDI Tools */}
+              <section>
+                <h3 className="text-ft2-highlight text-xs font-bold mb-3 tracking-wide">MIDI TOOLS</h3>
+                <div className="space-y-2">
+                  <button onClick={() => { onClose(); useUIStore.getState().openModal('midi-wizard'); }}
+                    className="w-full flex items-center gap-2 px-3 py-2 bg-purple-500/10 border border-purple-500/30 rounded text-left hover:bg-purple-500/20 transition-colors">
+                    <span className="text-accent-secondary text-xs">🎛</span>
+                    <div className="flex-1">
+                      <p className="text-xs text-ft2-highlight font-mono">Controller Setup Wizard</p>
+                      <p className="text-[9px] text-ft2-textDim font-mono">Detect and configure MIDI controller</p>
+                    </div>
+                  </button>
+                  <button onClick={() => { onClose(); useUIStore.getState().openModal('midi-mapper'); }}
+                    className="w-full flex items-center gap-2 px-3 py-2 bg-blue-500/10 border border-blue-500/30 rounded text-left hover:bg-blue-500/20 transition-colors">
+                    <span className="text-accent-primary text-xs">🎚</span>
+                    <div className="flex-1">
+                      <p className="text-xs text-ft2-highlight font-mono">Controller Mapper</p>
+                      <p className="text-[9px] text-ft2-textDim font-mono">Visual mapping editor for knobs, faders, buttons</p>
+                    </div>
+                  </button>
+                  <button onClick={() => { onClose(); useUIStore.getState().openModal('nks-wizard'); }}
+                    className="w-full flex items-center gap-2 px-3 py-2 bg-orange-500/10 border border-orange-500/30 rounded text-left hover:bg-orange-500/20 transition-colors">
+                    <span className="text-orange-400 text-xs">🎹</span>
+                    <div className="flex-1">
+                      <p className="text-xs text-ft2-highlight font-mono">NKS Performance Setup</p>
+                      <p className="text-[9px] text-ft2-textDim font-mono">Parameter pages, hardware integration</p>
+                    </div>
+                  </button>
+                  <button onClick={() => { onClose(); useUIStore.getState().openModal('nks-library'); }}
+                    className="w-full flex items-center gap-2 px-3 py-2 bg-purple-500/10 border border-purple-500/30 rounded text-left hover:bg-purple-500/20 transition-colors">
+                    <span className="text-purple-400 text-xs">📚</span>
+                    <div className="flex-1">
+                      <p className="text-xs text-ft2-highlight font-mono">NKS Library Browser</p>
+                      <p className="text-[9px] text-ft2-textDim font-mono">Browse Komplete Kontrol preset library</p>
+                    </div>
+                  </button>
+                </div>
+              </section>
+
+              {/* KK Light Guide */}
+              <section>
+                <h3 className="text-ft2-highlight text-xs font-bold mb-3 tracking-wide">KK LIGHT GUIDE</h3>
+                <div className="bg-dark-bgSecondary/40 border border-dark-border/50 rounded p-3">
+                  <KKLightGuidePanel />
                 </div>
               </section>
             </>
