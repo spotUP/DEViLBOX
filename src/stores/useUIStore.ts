@@ -9,7 +9,7 @@ import type { PanelType } from '@typedefs/project';
 
 export type PerformanceQuality = 'high' | 'medium' | 'low';
 
-export type TrackerViewMode = 'tracker' | 'grid' | 'sunvox' | 'dj' | 'drumpad' | 'vj';
+export type TrackerViewMode = 'tracker' | 'grid' | 'pianoroll' | 'matrix' | 'sunvox' | 'dj' | 'drumpad' | 'vj';
 
 export type DialogCommand =
   | 'interpolate-volume'

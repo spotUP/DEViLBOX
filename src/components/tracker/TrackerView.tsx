@@ -6,6 +6,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { PatternEditorCanvas } from './PatternEditorCanvas';
 import { useSettingsStore } from '@stores/useSettingsStore';
 import { GridSequencer } from '@components/grid/GridSequencer';
+import { PianoRollView } from './PianoRollView';
 import { useTrackerStore, useCursorStore, useInstrumentStore, useUIStore , useFormatStore } from '@stores';
 import { useShallow } from 'zustand/react/shallow';
 import { useTrackerView } from '@hooks/views/useTrackerView';
@@ -66,6 +67,7 @@ import { TrackScopesStrip } from './TrackScopesStrip';
 import { PatternBottomBar } from './PatternBottomBar';
 import { DubDeckStrip } from '@components/dub/DubDeckStrip';
 import { PatternOrderSidebar } from '@components/arrangement/PatternOrderSidebar';
+import { PatternMatrix } from '@components/arrangement/PatternMatrix';
 
 interface TrackerViewProps {
   onShowExport?: () => void;
@@ -769,8 +771,12 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
                 </div>
               );
             })()
+          ) : viewMode === 'matrix' ? (
+            <PatternMatrix />
           ) : viewMode === 'grid' ? (
             <GridSequencer channelIndex={gridChannelIndex} />
+          ) : viewMode === 'pianoroll' ? (
+            <PianoRollView channelIndex={gridChannelIndex} />
           ) : null}
 
           {/* Pattern Bottom Bar — edit step, octave, column toggles (tracker view only) */}
