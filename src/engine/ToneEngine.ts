@@ -2921,8 +2921,10 @@ export class ToneEngine {
     if (config.synthType === 'Kontakt') {
       import('@stores/useKontaktStore').then(({ useKontaktStore }) => {
         import('@/utils/audio-context').then(({ noteToMidi }) => {
+          const store = useKontaktStore.getState();
+          if (store.bridgeStatus !== 'ready') return;
           const midiNote = typeof note === 'string' ? noteToMidi(note) : note;
-          useKontaktStore.getState().noteOn(midiNote, Math.round(velocity * 127));
+          try { store.noteOn(midiNote, Math.round(velocity * 127)); } catch { /* bridge disconnected */ }
         });
       });
       return;
@@ -3241,8 +3243,10 @@ export class ToneEngine {
     if (config.synthType === 'Kontakt') {
       import('@stores/useKontaktStore').then(({ useKontaktStore }) => {
         import('@/utils/audio-context').then(({ noteToMidi }) => {
+          const store = useKontaktStore.getState();
+          if (store.bridgeStatus !== 'ready') return;
           const midiNote = typeof note === 'string' ? noteToMidi(note) : note;
-          useKontaktStore.getState().noteOff(midiNote);
+          try { store.noteOff(midiNote); } catch { /* bridge disconnected */ }
         });
       });
       return;
@@ -3699,12 +3703,15 @@ export class ToneEngine {
     if (config.synthType === 'Kontakt') {
       import('@stores/useKontaktStore').then(({ useKontaktStore }) => {
         import('@/utils/audio-context').then(({ noteToMidi }) => {
-          const midiNote = typeof note === 'string' ? noteToMidi(note) : note;
           const store = useKontaktStore.getState();
-          store.noteOn(midiNote, Math.round(velocity * 127));
-          if (duration > 0) {
-            setTimeout(() => store.noteOff(midiNote), duration * 1000);
-          }
+          if (store.bridgeStatus !== 'ready') return;
+          const midiNote = typeof note === 'string' ? noteToMidi(note) : note;
+          try {
+            store.noteOn(midiNote, Math.round(velocity * 127));
+            if (duration > 0) {
+              setTimeout(() => { try { store.noteOff(midiNote); } catch { /* */ } }, duration * 1000);
+            }
+          } catch { /* bridge disconnected */ }
         });
       });
       return;
