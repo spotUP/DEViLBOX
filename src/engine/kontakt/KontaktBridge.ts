@@ -261,3 +261,8 @@ export class KontaktBridge {
 }
 
 export const kontaktBridge = new KontaktBridge();
+
+// Auto-connect on startup — silently stays disconnected if bridge binary isn't running
+kontaktBridge.connect().catch(() => {
+  // Bridge not running — that's fine, user can connect manually later
+});
