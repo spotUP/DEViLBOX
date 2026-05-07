@@ -617,6 +617,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
                         <p className="text-[9px] text-ft2-textDim font-mono">Parameter pages, hardware integration</p>
                       </div>
                     </button>
+                    <button onClick={() => { onClose(); useUIStore.getState().openModal('nks-library'); }}
+                      className="w-full flex items-center gap-2 px-3 py-2 bg-purple-500/10 border border-purple-500/30 rounded text-left hover:bg-purple-500/20 transition-colors">
+                      <span className="text-purple-400 text-xs">📚</span>
+                      <div className="flex-1">
+                        <p className="text-xs text-ft2-highlight font-mono">NKS Library Browser</p>
+                        <p className="text-[9px] text-ft2-textDim font-mono">Browse Komplete Kontrol preset library</p>
+                      </div>
+                    </button>
                   </div>
                 </div>
               </section>
