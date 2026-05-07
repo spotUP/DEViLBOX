@@ -8,8 +8,7 @@ import { X } from 'lucide-react';
 import { Button } from '@components/ui/Button';
 import { KontaktPlayer } from '@components/instruments/KontaktPlayer';
 import { useUIStore } from '@stores/useUIStore';
-import { NKSLibraryBrowser } from './NKSLibraryBrowser';
-import type { DevilboxPreset, NKSPreset } from '@/stores/useNKSLibraryStore';
+import { NKSLibraryBrowser, type PresetLoadEvent } from './NKSLibraryBrowser';
 import { notify } from '@stores/useNotificationStore';
 
 export const NKSLibraryModal: React.FC = () => {
@@ -18,7 +17,7 @@ export const NKSLibraryModal: React.FC = () => {
 
   if (modalOpen !== 'nks-library') return null;
 
-  const handleLoad = (preset: NKSPreset | DevilboxPreset) => {
+  const handleLoad = ({ preset }: PresetLoadEvent) => {
     notify.success(`Loaded: ${preset.name}`);
   };
 

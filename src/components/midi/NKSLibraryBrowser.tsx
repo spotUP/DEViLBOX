@@ -25,6 +25,12 @@ const HELM_CATEGORIES = ['Arp', 'Bass', 'Chip', 'Harsh', 'Keys', 'Lead', 'Pad', 
 
 type LibraryPreset = NKSPreset | DevilboxPreset;
 
+export interface PresetLoadEvent {
+  preset: LibraryPreset;
+  /** Fetched preset data (JSON for Helm, ArrayBuffer for others) */
+  data?: unknown;
+}
+
 const ProductTile = React.memo(({
   label,
   presetCount,
@@ -163,7 +169,7 @@ const DevilboxPresetRow = React.memo(({ preset, onLoad }: {
 ));
 
 interface NKSLibraryBrowserProps {
-  onLoadPreset?: (preset: LibraryPreset) => void;
+  onLoadPreset?: (event: PresetLoadEvent) => void;
 }
 
 export const NKSLibraryBrowser: React.FC<NKSLibraryBrowserProps> = ({ onLoadPreset }) => {
@@ -312,7 +318,7 @@ export const NKSLibraryBrowser: React.FC<NKSLibraryBrowserProps> = ({ onLoadPres
     try {
       loadKontaktPreset(preset.filePath || preset.fileName);
       notify.success(`Loading ${preset.name} in Kontakt`);
-      onLoadPreset?.(preset);
+      onLoadPreset?.({ preset });
     } catch (error) {
       notify.error(error instanceof Error ? error.message : `Failed to load ${preset.name}`);
     }
@@ -325,15 +331,12 @@ export const NKSLibraryBrowser: React.FC<NKSLibraryBrowserProps> = ({ onLoadPres
         throw new Error(`Preset load failed (${response.status})`);
       }
 
-      if (preset.synth === 'helm') {
-        const data = await response.json();
-        window.dispatchEvent(new CustomEvent('devilbox:load-helm-preset', { detail: { data } }));
-      } else {
-        const data = await response.arrayBuffer();
-        window.dispatchEvent(new CustomEvent('devilbox:load-dexed-preset', { detail: { data } }));
-      }
+      const data = preset.synth === 'helm'
+        ? await response.json()
+        : await response.arrayBuffer();
 
-      onLoadPreset?.(preset);
+      // Pass preset + fetched data to parent — parent handles instrument creation & event dispatch
+      onLoadPreset?.({ preset, data });
     } catch (error) {
       notify.error(error instanceof Error ? error.message : `Failed to load ${preset.name}`);
     }
