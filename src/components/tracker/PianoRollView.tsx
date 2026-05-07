@@ -174,31 +174,34 @@ export const PianoRollView: React.FC<PianoRollViewProps> = ({
     return extractNotes(pattern.channels, patternLength, channelIndices);
   }, [pattern, patternLength, channelIndices]);
 
-  // Note range (visible pitch range)
+  // Note range — always show full range but auto-scroll to where the notes are
   const noteRange = useMemo(() => {
-    let minN = MIN_NOTE;
-    let maxN = MAX_NOTE;
-    // Expand to fit actual notes
-    for (const bar of noteBars) {
-      const n = bar.xmNote - 1; // Convert to 0-based
-      if (n < minN) minN = Math.max(0, n - 2);
-      if (n > maxN) maxN = Math.min(95, n + 2);
-    }
-    return { min: minN, max: maxN, count: maxN - minN + 1 };
+    return { min: MIN_NOTE, max: MAX_NOTE, count: MAX_NOTE - MIN_NOTE + 1 };
+  }, []);
+
+  // Find the vertical center of actual notes (for auto-scroll)
+  const noteCenterPitch = useMemo(() => {
+    if (noteBars.length === 0) return 48; // Default to C-3
+    let sum = 0;
+    for (const bar of noteBars) sum += bar.xmNote - 1;
+    return Math.round(sum / noteBars.length);
   }, [noteBars]);
 
   // Canvas dimensions
   const gridW = patternLength * COL_W;
   const gridH = noteRange.count * ROW_H;
 
-  // Auto-scroll to center of note range on mount
+  // Auto-scroll to center on actual notes
+  const hasAutoScrolled = useRef(false);
+  // Reset auto-scroll when channel or pattern changes
+  useEffect(() => { hasAutoScrolled.current = false; }, [channelIndex, currentPatternIndex]);
   useEffect(() => {
-    if (containerRef.current) {
-      const centerNote = Math.floor((noteRange.min + noteRange.max) / 2);
-      const centerY = (noteRange.max - centerNote) * ROW_H - containerRef.current.clientHeight / 2 + HEADER_H;
-      setScrollY(Math.max(0, centerY));
+    if (containerRef.current && !hasAutoScrolled.current) {
+      hasAutoScrolled.current = true;
+      const centerY = (noteRange.max - noteCenterPitch) * ROW_H - containerRef.current.clientHeight / 2 + HEADER_H;
+      setScrollY(Math.max(0, Math.min(gridH - containerRef.current.clientHeight + HEADER_H, centerY)));
     }
-  }, [noteRange.min, noteRange.max]);
+  }, [noteCenterPitch, noteRange.max, gridH]);
 
   // Resize observer
   useEffect(() => {
