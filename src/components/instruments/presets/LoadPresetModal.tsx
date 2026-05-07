@@ -506,6 +506,21 @@ export const LoadPresetModal: React.FC<LoadPresetModalProps> = ({ onClose }) => 
         {browseMode === 'library' ? (
           <div className="flex-1 min-h-0">
             <NKSLibraryBrowser onLoadPreset={(preset: NKSPreset | DevilboxPreset) => {
+              // DEViLBOX synth presets → create instrument with the right synth type
+              if ('synth' in preset && preset.synth) {
+                const synthTypeMap: Record<string, string> = {
+                  helm: 'Helm', surge: 'Surge', obxf: 'OBXf', odin2: 'Odin2', dexed: 'DX7',
+                };
+                const synthType = synthTypeMap[preset.synth];
+                if (synthType) {
+                  const hasCurrentInstrument = currentInstrumentId !== null && instruments.some(i => i.id === currentInstrumentId);
+                  if (hasCurrentInstrument) {
+                    updateInstrument(currentInstrumentId!, { name: preset.name, synthType: synthType as InstrumentConfig['synthType'] });
+                  } else {
+                    createInstrument({ name: preset.name, synthType: synthType as InstrumentConfig['synthType'] });
+                  }
+                }
+              }
               notify.success(`Loaded: ${preset.name}`);
             }} />
           </div>
