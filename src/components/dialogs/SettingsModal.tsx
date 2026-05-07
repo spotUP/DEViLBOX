@@ -18,6 +18,7 @@ import { BG_MODES, getBgModeLabel } from '@/components/tracker/TrackerVisualBack
 import { getASIDDeviceManager } from '@lib/sid/ASIDDeviceManager';
 import { getActiveC64SidEngine } from '@engine/replayer/NativeEngineRouting';
 import { useModalClose } from '@hooks/useDialogKeyboard';
+import { KKLightGuidePanel } from '@components/midi/KKLightGuidePanel';
 import {
   useSettingsDialog,
   SETTINGS_TABS,
@@ -626,6 +627,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
                       </div>
                     </button>
                   </div>
+                </div>
+              </section>
+
+              {/* KK Light Guide */}
+              <section>
+                <h3 className="text-ft2-highlight text-xs font-bold mb-3 tracking-wide">KK LIGHT GUIDE</h3>
+                <div className="bg-dark-bgSecondary/40 border border-dark-border/50 rounded p-3">
+                  <KKLightGuidePanel />
                 </div>
               </section>
 

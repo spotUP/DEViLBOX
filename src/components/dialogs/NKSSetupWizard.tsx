@@ -14,6 +14,7 @@ import { useMIDIStore } from '@stores/useMIDIStore';
 import { useInstrumentStore } from '@stores/useInstrumentStore';
 import { notify } from '@stores/useNotificationStore';
 import { useModalClose } from '@hooks/useDialogKeyboard';
+import { KKLightGuidePanel } from '@components/midi/KKLightGuidePanel';
 
 type WizardStep = 'intro' | 'pages' | 'export' | 'done';
 
@@ -363,6 +364,15 @@ export const NKSSetupWizard: React.FC = () => {
                   <strong>Tip:</strong> Parameter pages auto-switch when you change instruments.
                   Each synth type (TB-303, OB-Xd, Dexed, etc.) has its own optimized NKS mapping.
                 </p>
+              </div>
+
+              {/* Light Guide configuration */}
+              <div className="bg-dark-bgSecondary/50 border border-dark-border/50 rounded-lg p-3 space-y-2">
+                <p className="text-xs text-text-secondary font-semibold flex items-center gap-2">
+                  <Keyboard size={12} className="text-orange-400" />
+                  Key Light Guide
+                </p>
+                <KKLightGuidePanel />
               </div>
 
               <button
