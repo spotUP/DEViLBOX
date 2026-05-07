@@ -10,6 +10,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { getKKDawSurface, type KKSurfaceStatus } from '@/midi/kk/KKDawSurface';
 import { isKKDawPort } from '@/midi/kk/KKDawProtocol';
+import type { LGConfig } from '@/midi/kk/KKLightGuide';
 
 const RECONNECT_INTERVAL_MS = 5000;
 
@@ -107,6 +108,11 @@ export function useKKDawIntegration() {
   }, [tryConnect]);
 
   return status;
+}
+
+/** Set the Light Guide config on the singleton surface. */
+export function setKKLightGuide(cfg: Partial<LGConfig>): void {
+  getKKDawSurface().setLightGuideConfig(cfg);
 }
 
 /**
