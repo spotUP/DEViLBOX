@@ -284,7 +284,9 @@ export const EditorControlsBar: React.FC<EditorControlsBarProps> = React.memo(({
           onChange={(v) => _onViewModeChange(v as TrackerViewMode)}
           options={[
             { value: 'tracker', label: 'Tracker' },
+            { value: 'matrix', label: 'Matrix' },
             { value: 'grid', label: 'Grid' },
+            { value: 'pianoroll', label: 'Piano Roll' },
           ]}
         />
 
@@ -304,7 +306,7 @@ export const EditorControlsBar: React.FC<EditorControlsBarProps> = React.memo(({
         </button>
 
         {/* Channel Selector (grid and piano roll views) */}
-        {viewMode === 'grid' && (
+        {(viewMode === 'grid' || viewMode === 'pianoroll') && (
           <>
             <span className="text-text-secondary text-[10px] font-medium">CH:</span>
             <CustomSelect
