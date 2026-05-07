@@ -827,13 +827,8 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
             <InstrumentList
               variant="ft2"
               showPreviewOnClick={true}
-              showPresetButton={true}
-              showSamplePackButton={true}
               showEditButton={true}
               onEditInstrument={onShowInstruments}
-              showHivelyImport={editorMode === 'hively'}
-              showSunVoxImport={true}
-              showFurnaceBrowser={true}
             />
           </div>
         )}

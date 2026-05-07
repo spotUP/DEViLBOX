@@ -1,0 +1,159 @@
+/**
+ * AddInstrumentDialog — Unified dialog for adding instruments.
+ *
+ * Four tabs:
+ *   Synth   — Browse synth types (CategorizedSynthSelector)
+ *   Preset  — Browse factory/user presets (LoadPresetModal)
+ *   Sample  — Browse sample packs (SamplePackBrowser)
+ *   Library — Browse NKS/DEViLBOX preset library (NKSLibraryBrowser)
+ */
+
+import React, { useState } from 'react';
+import { createPortal } from 'react-dom';
+import { X, Music2, FolderOpen, Package, Library } from 'lucide-react';
+import { CategorizedSynthSelector } from './shared/CategorizedSynthSelector';
+import { LoadPresetModal } from './presets';
+import { SamplePackBrowser } from './SamplePackBrowser';
+import { NKSLibraryBrowser, type PresetLoadEvent } from '@components/midi/NKSLibraryBrowser';
+import { useInstrumentStore } from '@stores/useInstrumentStore';
+import { notify } from '@stores/useNotificationStore';
+import { setPendingPresetData } from '@lib/pendingPresetData';
+import type { InstrumentConfig, SynthType } from '@typedefs/instrument';
+
+type AddTab = 'synth' | 'preset' | 'sample' | 'library';
+
+interface AddInstrumentDialogProps {
+  onClose: () => void;
+  onCreateWithSynthType: (synthType: SynthType) => void;
+}
+
+const TABS: { id: AddTab; label: string; icon: React.ReactNode }[] = [
+  { id: 'synth', label: 'Synth', icon: <Music2 size={14} /> },
+  { id: 'preset', label: 'Preset', icon: <FolderOpen size={14} /> },
+  { id: 'sample', label: 'Sample', icon: <Package size={14} /> },
+  { id: 'library', label: 'Library', icon: <Library size={14} /> },
+];
+
+export const AddInstrumentDialog: React.FC<AddInstrumentDialogProps> = ({
+  onClose,
+  onCreateWithSynthType,
+}) => {
+  const [activeTab, setActiveTab] = useState<AddTab>('synth');
+
+  const currentInstrumentId = useInstrumentStore((s) => s.currentInstrumentId);
+  const instruments = useInstrumentStore((s) => s.instruments);
+  const updateInstrument = useInstrumentStore((s) => s.updateInstrument);
+  const createInstrument = useInstrumentStore((s) => s.createInstrument);
+
+  const handleLibraryLoad = ({ preset, data }: PresetLoadEvent) => {
+    if ('synth' in preset && preset.synth) {
+      const synthTypeMap: Record<string, string> = {
+        helm: 'Helm', surge: 'Surge', obxf: 'OBXf', odin2: 'Odin2', dexed: 'DX7',
+      };
+      const synthType = synthTypeMap[preset.synth];
+      if (synthType) {
+        const hasCurrentInstrument = currentInstrumentId !== null &&
+          instruments.some(i => i.id === currentInstrumentId);
+        if (hasCurrentInstrument) {
+          updateInstrument(currentInstrumentId!, {
+            name: preset.name,
+            synthType: synthType as InstrumentConfig['synthType'],
+          });
+        } else {
+          createInstrument({
+            name: preset.name,
+            synthType: synthType as InstrumentConfig['synthType'],
+          });
+        }
+        if (data) {
+          const presetType = preset.synth === 'helm' ? 'helm' : 'dexed';
+          setPendingPresetData(presetType as 'helm' | 'dexed', data);
+        }
+        onClose();
+      }
+    }
+    notify.success(`Loaded: ${preset.name}`);
+  };
+
+  // For Preset and Sample tabs, open their respective full-screen modals
+  // and auto-close this dialog
+  if (activeTab === 'preset') {
+    return (
+      <LoadPresetModal onClose={() => {
+        setActiveTab('synth');
+        onClose();
+      }} />
+    );
+  }
+
+  if (activeTab === 'sample') {
+    return (
+      <SamplePackBrowser onClose={() => {
+        setActiveTab('synth');
+        onClose();
+      }} />
+    );
+  }
+
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[99990] bg-black/80 flex items-center justify-center"
+      onClick={onClose}
+    >
+      <div
+        className="bg-dark-bg border border-dark-border rounded-lg shadow-2xl w-[90%] max-w-4xl max-h-[85vh] flex flex-col"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header with tabs */}
+        <div className="flex items-center justify-between px-4 py-3 border-b border-dark-border">
+          <div className="flex items-center gap-4">
+            <h3 className="text-lg font-semibold text-text-primary flex items-center gap-2">
+              <Music2 size={20} className="text-accent-primary" />
+              Add Instrument
+            </h3>
+            <div className="flex bg-dark-bgSecondary rounded overflow-hidden border border-dark-border">
+              {TABS.map(tab => (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold uppercase tracking-wide transition-all ${
+                    activeTab === tab.id
+                      ? 'bg-accent-primary text-text-inverse'
+                      : 'text-text-muted hover:text-text-primary hover:bg-dark-bgHover'
+                  }`}
+                >
+                  {tab.icon}
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-1.5 rounded hover:bg-dark-bgHover text-text-muted hover:text-text-primary transition-colors"
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        {/* Tab content */}
+        <div className="flex-1 overflow-y-auto min-h-0">
+          {activeTab === 'synth' && (
+            <div className="p-4">
+              <CategorizedSynthSelector
+                onSelect={(type) => onCreateWithSynthType(type)}
+                createMode
+              />
+            </div>
+          )}
+          {activeTab === 'library' && (
+            <div className="flex-1 min-h-0 h-[70vh]">
+              <NKSLibraryBrowser onLoadPreset={handleLibraryLoad} />
+            </div>
+          )}
+        </div>
+      </div>
+    </div>,
+    document.body
+  );
+};
