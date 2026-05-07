@@ -26,6 +26,7 @@ import renderRoutes from './routes/render';
 import djsetsRoutes from './routes/djsets';
 import playlistsRoutes from './routes/playlists';
 import ratingsRoutes from './routes/ratings';
+import nksRoutes from './routes/nks';
 import { handleStreamConnection, checkFfmpeg } from './routes/stream';
 import { initDataDirectories } from './utils/fileSystem';
 import { initModlandIndex, scheduleModlandUpdates } from './services/modlandIndexer';
@@ -72,6 +73,7 @@ app.use('/api/render', express.raw({ type: 'application/octet-stream', limit: '1
 app.use('/api/djsets', djsetsRoutes);
 app.use('/api/playlists', playlistsRoutes);
 app.use('/api/ratings', ratingsRoutes);
+app.use('/api/nks', nksRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {
