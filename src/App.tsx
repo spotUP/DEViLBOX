@@ -11,6 +11,7 @@ import { useAudioStore, useTrackerStore, useUIStore } from './stores';
 import { useMIDIStore } from './stores/useMIDIStore';
 import { getMIDIManager } from './midi/MIDIManager';
 import { initMaschineHIDBridge } from './midi/MaschineHIDBridge';
+import { KKDawProvider } from './hooks/useKKDawIntegration';
 import { useDJStore } from './stores/useDJStore';
 import { useSettingsStore } from './stores/useSettingsStore';
 import { useHistoryStore } from './stores/useHistoryStore';
@@ -1346,6 +1347,9 @@ function App() {
           />
         </Suspense>
       )}
+
+      {/* KK DAW Surface — Komplete Kontrol keyboard display/transport integration */}
+      <KKDawProvider />
 
       {/* DOM Expose Overlay — view switcher (Mission Control style) */}
       <ExposeOverlay />
