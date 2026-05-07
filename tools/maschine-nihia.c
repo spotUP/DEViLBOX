@@ -37,6 +37,7 @@
 #define CONST_TRUE   0x74727565u
 #define PORT_MAIN    "NIHWMainHandler"
 #define MK2_ID       0x1140u
+#define MK3_ID       0x1600u
 
 #define MSGID_PID_CONNECT      0x03447500u
 #define MSGID_ACK_NOT_PORT     0x03404300u
@@ -63,6 +64,7 @@
 /* ── HID constants ───────────────────────────────────────────────────────── */
 #define MK2_VID 0x17CCu
 #define MK2_PID 0x1140u
+#define MK3_PID 0x1600u
 
 /* ── Globals ─────────────────────────────────────────────────────────────── */
 static hid_device       *g_hid = NULL;
@@ -70,8 +72,13 @@ static pthread_mutex_t   g_hid_mutex = PTHREAD_MUTEX_INITIALIZER;
 static pthread_t         g_stdin_thread;
 static CFMessagePortRef  g_inst_req_port = NULL;
 static char              g_device_serial[64] = "00000000";
-static int              g_main_sent = 0;
+static int               g_main_sent = 0;
+static int               g_device_is_mk3 = 0;
 static int do_nihia_connect(void);  /* forward decl */
+
+static uint32_t current_device_id(void) {
+    return g_device_is_mk3 ? MK3_ID : MK2_ID;
+}
 
 /* ── NIHIA helpers ───────────────────────────────────────────────────────── */
 static void write_u32le(uint8_t *buf, uint32_t v) {
@@ -137,15 +144,26 @@ static int parse_port_reply(const uint8_t *rd, CFIndex rlen,
 }
 
 /* ── HID output ──────────────────────────────────────────────────────────── */
+static hid_device *hid_open_iface_for_pid(unsigned short pid, const char *label) {
+    struct hid_device_info *devs = hid_enumerate(MK2_VID, pid);
+    hid_device *device = NULL;
+    for (struct hid_device_info *cur = devs; cur; cur = cur->next) {
+        fprintf(stderr,"[nihia] %s HID iface %d usage_page=0x%04x usage=0x%04x\n",
+                label, cur->interface_number, cur->usage_page, cur->usage);
+        if (cur->interface_number == 2 && !device) {
+            device = hid_open_path(cur->path);
+            if (device) fprintf(stderr,"[nihia] %s HID opened iface 2 (display+input)\n", label);
+        }
+    }
+    hid_free_enumeration(devs);
+    return device;
+}
+
 static void hid_try_reopen(void) {
     if (g_hid) { hid_close(g_hid); g_hid = NULL; }
     usleep(500000);
-    struct hid_device_info *devs = hid_enumerate(MK2_VID, MK2_PID);
-    for (struct hid_device_info *cur = devs; cur && !g_hid; cur = cur->next) {
-        hid_device *d = hid_open_path(cur->path);
-        if (d) { g_hid = d; fprintf(stderr,"[nihia] HID reopened\n"); }
-    }
-    hid_free_enumeration(devs);
+    g_hid = hid_open_iface_for_pid(g_device_is_mk3 ? MK3_PID : MK2_PID, g_device_is_mk3 ? "MK3" : "MK2");
+    if (g_hid) fprintf(stderr,"[nihia] HID reopened\n");
 }
 
 static void hid_send(const uint8_t *data, size_t len) {
@@ -163,21 +181,56 @@ static void hid_send(const uint8_t *data, size_t len) {
 
 static void hid_open_device(void) {
     if (hid_init() != 0) return;
-    struct hid_device_info *devs = hid_enumerate(MK2_VID, MK2_PID);
-    for (struct hid_device_info *cur = devs; cur; cur = cur->next) {
-        fprintf(stderr,"[nihia] HID iface %d usage_page=0x%04x usage=0x%04x\n",
-                cur->interface_number, cur->usage_page, cur->usage);
-        if (cur->interface_number == 2 && !g_hid) {
-            hid_device *d = hid_open_path(cur->path);
-            if (d) { g_hid = d;
-                fprintf(stderr,"[nihia] HID opened iface 2 (display+input)\n"); }
-        }
+    g_device_is_mk3 = 0;
+    g_hid = hid_open_iface_for_pid(MK2_PID, "MK2");
+    if (!g_hid) {
+        g_hid = hid_open_iface_for_pid(MK3_PID, "MK3");
+        g_device_is_mk3 = g_hid ? 1 : 0;
     }
-    hid_free_enumeration(devs);
-    if (!g_hid) fprintf(stderr,"[nihia] HID open failed\n");
+    if (!g_hid) {
+        fprintf(stderr,"[nihia] HID open failed\n");
+        return;
+    }
+    printf("{\"type\":\"device\",\"model\":\"%s\"}\n", g_device_is_mk3 ? "mk3" : "mk2");
+    fflush(stdout);
+}
+
+static void hid_send_display_mk3(int screen, const uint8_t *pixels, int byte_count) {
+    if (!g_hid || byte_count < (480 * 272 * 2)) return;
+    const int width = 480;
+    const int height = 272;
+    const int row_bytes = width * 2;
+    const int chunk_size = 512;
+    const int chunk_count = (byte_count + chunk_size - 1) / chunk_size;
+    uint8_t *flipped = (uint8_t*)malloc((size_t)byte_count);
+    if (!flipped) return;
+    for (int y = 0; y < height; y++) {
+        memcpy(flipped + y * row_bytes, pixels + (height - 1 - y) * row_bytes, (size_t)row_bytes);
+    }
+
+    uint8_t report[521];
+    for (int chunk = 0; chunk < chunk_count; chunk++) {
+        const int remaining = byte_count - chunk * chunk_size;
+        const int payload = remaining > chunk_size ? chunk_size : remaining;
+        memset(report, 0, sizeof(report));
+        report[0] = (screen == 0) ? 0x84 : 0x85;
+        report[1] = 0x00;
+        report[2] = (uint8_t)(chunk & 0xFF);
+        report[3] = (uint8_t)(chunk_count & 0xFF);
+        report[4] = (uint8_t)(payload & 0xFF);
+        report[5] = (uint8_t)((payload >> 8) & 0xFF);
+        memcpy(report + 9, flipped + chunk * chunk_size, (size_t)payload);
+        hid_send(report, 9 + (size_t)payload);
+    }
+    free(flipped);
+    fprintf(stderr,"[nihia] mk3 display %d sent (%d chunks)\n", screen, chunk_count);
 }
 
 static void hid_send_display(int screen, const uint8_t *bytes, int byte_count) {
+    if (g_device_is_mk3) {
+        hid_send_display_mk3(screen, bytes, byte_count);
+        return;
+    }
     if (!g_hid || byte_count < 2048) { return; }
     uint8_t report[265];
     for (int chunk = 0; chunk < 8; chunk++) {
@@ -195,7 +248,7 @@ static void hid_send_display(int screen, const uint8_t *bytes, int byte_count) {
 static void hid_send_pad_leds(const uint8_t *rgb48) {
     uint8_t report[49];
     report[0] = 0x80;
-    for (int i = 0; i < 48; i++) report[1+i] = rgb48[i] >> 1;
+    for (int i = 0; i < 48; i++) report[1+i] = g_device_is_mk3 ? rgb48[i] : (uint8_t)(rgb48[i] >> 1);
     hid_send(report, sizeof(report));
 }
 
@@ -239,7 +292,7 @@ static void send_main_sequence(void) {
     nihia_inst(pb, (CFIndex)pl); free(pb);
     /* Remaining sequence */
     fprintf(stderr,"[nihia] MAIN: sending MGD...\n");
-    write_u32le(buf, MSGID_MGD); write_u32le(buf+4, MK2_ID); nihia_inst(buf,8);
+    write_u32le(buf, MSGID_MGD); write_u32le(buf+4, current_device_id()); nihia_inst(buf,8);
     fprintf(stderr,"[nihia] MAIN: sending TRTS...\n");
     write_u32le(buf, MSGID_TRTS); write_u32le(buf+4, MSGID_TRTS_PAYLOAD); nihia_inst(buf,8);
     fprintf(stderr,"[nihia] MAIN: sending TSI...\n");
@@ -371,7 +424,7 @@ static CFDataRef device_cb(CFMessagePortRef local __attribute__((unused)),
             size_t sl = strlen(g_device_serial)+1;
             size_t pl = 5*4 + sl;
             uint8_t *sm = (uint8_t*)calloc(pl,1);
-            write_u32le(sm, MSGID_SERIAL_CONNECT); write_u32le(sm+4, MK2_ID);
+            write_u32le(sm, MSGID_SERIAL_CONNECT); write_u32le(sm+4, current_device_id());
             write_u32le(sm+8, CONST_NIM2); write_u32le(sm+12, CONST_PRMY);
             write_u32le(sm+16, (uint32_t)sl);
             memcpy(sm+20, g_device_serial, sl);
@@ -410,7 +463,7 @@ static int do_nihia_connect(void) {
     if (!mp) { fprintf(stderr,"[nihia] NIHIA not available (NIHardwareAgent not running?)\n"); return 0; }
     fprintf(stderr,"[nihia] Connected to NIHWMainHandler\n");
     uint8_t msg[20];
-    write_u32le(msg, MSGID_PID_CONNECT); write_u32le(msg+4, MK2_ID);
+    write_u32le(msg, MSGID_PID_CONNECT); write_u32le(msg+4, current_device_id());
     write_u32le(msg+8, CONST_NIM2); write_u32le(msg+12, CONST_PRMY); write_u32le(msg+16, 0);
     CFDataRef reply = nihia_send(mp, msg, 20);
     CFRelease(mp);
@@ -475,7 +528,7 @@ static void process_command(const char *line) {
     size_t tl=0; const char *tv=json_str(line,"type",&tl);
     if(!tv) return;
 
-    if (tl==11 && !memcmp(tv,"drawDisplay",11)) {
+    if ((tl==11 && !memcmp(tv,"drawDisplay",11)) || (tl==14 && !memcmp(tv,"drawDisplayMK3",14))) {
         const char *sp=strstr(line,"\"screen\""); if(!sp) return;
         sp+=8; while(*sp==' '||*sp==':')sp++;
         int scr=parse_int(&sp)&1;
@@ -569,6 +622,15 @@ static void pad_update(int idx, float raw_pressure) {
  * Button report 0x01: buf[1..6] = 6 bytes button bitmask (48 buttons).
  * Bit order: LSB first within each byte.
  * Mapping verified against maschine.rs (SnovaxZ/MaschineMK2_linux). */
+static const char *MK3_BUTTON_NAMES[48] = {
+    "f1","f2","f3","f4","f5","f6","f7","f8",
+    "settings","swing","tempo","browsePrev","browseNext","enter","noteRepeat","browser",
+    "volume","pitch","filter","sort","type","autoWrite","macro","lock",
+    "groupA","groupB","groupC","groupD","groupE","groupF","groupG","groupH",
+    "restart","stepLeft","stepRight","grid","play","rec","erase","shift",
+    "scene","pattern","padMode","navigate","duplicate","select","solo","mute"
+};
+
 static const char *MK2_BUTTON_NAMES[48] = {
     /* Byte 0, bits 0-7: soft buttons (F1-F8, above screens) */
     "soft1","soft2","soft3","soft4","soft5","soft6","soft7","soft8",
@@ -634,8 +696,9 @@ static void *hid_reader_thread(void *arg) {
                     if (!(diff & (1 << bit))) continue;
                     int btn_id = byte_idx * 8 + bit;
                     int pressed = (curr & (1 << bit)) ? 1 : 0;
-                    const char *name = (btn_id < 48 && MK2_BUTTON_NAMES[btn_id])
-                        ? MK2_BUTTON_NAMES[btn_id] : "unknown";
+                    const char **button_names = g_device_is_mk3 ? MK3_BUTTON_NAMES : MK2_BUTTON_NAMES;
+                    const char *name = (btn_id < 48 && button_names[btn_id])
+                        ? button_names[btn_id] : "unknown";
                     printf("{\"type\":\"button\",\"name\":\"%s\",\"btnId\":%d,\"pressed\":%s}\n",
                            name, btn_id, pressed ? "true" : "false");
                     fflush(stdout);
@@ -722,7 +785,7 @@ static void *stdin_reader_thread(void *arg) {
 
 /* ── Main ────────────────────────────────────────────────────────────────── */
 int main(void) {
-    fprintf(stderr,"[nihia] Maschine MK2 hybrid bridge (HID output + NIHIA input)\n");
+    fprintf(stderr,"[nihia] Maschine hybrid bridge (HID output + NIHIA input)\n");
 
     /* Become a foreground macOS app so NIHardwareAgent treats us as active */
     id app = ((id(*)(id,SEL))objc_msgSend)((id)objc_getClass("NSApplication"),

@@ -12,6 +12,7 @@
  */
 
 import { MK2Display } from '../MK2Display';
+import { MK3Display } from '../MK3Display';
 import { getMaschineHIDBridge } from '@/midi/MaschineHIDBridge';
 import { useTransportStore } from '@/stores/useTransportStore';
 import { useInstrumentStore } from '@/stores/useInstrumentStore';
@@ -47,7 +48,7 @@ export interface MK2ScreenContext {
 
 export interface MK2Screen {
   /** Render both displays. Called on state change (debounced). */
-  render(left: MK2Display, right: MK2Display, ctx: MK2ScreenContext): void;
+  render(left: any, right: any, ctx: MK2ScreenContext): void;
   /** Labels for the 8 soft buttons above the screens (max 4 chars each) */
   softLabels(): string[];
 }
@@ -113,6 +114,41 @@ function drawSoftLabels(d: MK2Display, labels: string[]): void {
   d.hline(0, MK2Display.CHAR_H + 1, W, WHITE);
 }
 
+function drawSoftLabelsMK3(d: MK3Display, labels: string[]): void {
+  const slotW = Math.floor(MK3Display.W / 8);
+  d.fillRect(0, 0, MK3Display.W, 18, MK3Display.rgb(10, 10, 14));
+  for (let i = 0; i < 8; i++) {
+    const label = (labels[i] || '').substring(0, 9);
+    const textW = label.length * MK3Display.CHAR_W;
+    const cx = i * slotW + Math.max(8, Math.floor((slotW - textW) / 2));
+    d.text(cx, 5, label, i === 0 ? MK3Display.NI_ORANGE : MK3Display.WHITE, 1);
+  }
+  d.hline(0, 18, MK3Display.W, MK3Display.GRAY);
+}
+
+function drawTransportBarMK3(d: MK3Display, mode: MK2Mode): void {
+  const barY = MK3Display.H - 18;
+  d.fillRect(0, barY, MK3Display.W, 18, MK3Display.rgb(8, 8, 10));
+  d.hline(0, barY, MK3Display.W, MK3Display.GRAY);
+
+  const transport = useTransportStore.getState();
+  d.text(8, barY + 5, transport.isPlaying ? 'PLAY' : 'STOP', transport.isPlaying ? MK3Display.GREEN : MK3Display.RED, 1);
+  d.text(72, barY + 5, `${Math.round(transport.bpm)} BPM`, MK3Display.WHITE, 1);
+  d.text(172, barY + 5, `P${transport.currentPatternIndex} R${String(transport.currentRow).padStart(2, '0')}`, MK3Display.LGRAY, 1);
+  d.text(392, barY + 5, mode.toUpperCase().substring(0, 9), MK3Display.NI_ORANGE, 1);
+}
+
+function blitLegacyMK2ToMK3(source: MK2Display, dest: MK3Display): void {
+  const src = source.getBuffer();
+  for (let y = 0; y < MK3Display.H; y++) {
+    const sy = Math.min(MK2Display.H - 1, Math.floor((y / MK3Display.H) * MK2Display.H));
+    for (let x = 0; x < MK3Display.W; x++) {
+      const sx = Math.min(MK2Display.W - 1, Math.floor((x / MK3Display.W) * MK2Display.W));
+      if (src[sy * MK2Display.W + sx]) dest.pixel(x, y, MK3Display.WHITE);
+    }
+  }
+}
+
 // ── Screen Manager singleton ─────────────────────────────────────────────────
 
 class MK2ScreenManager {
@@ -128,11 +164,13 @@ class MK2ScreenManager {
   };
 
   private screens = new Map<MK2Mode, MK2Screen>();
+  private mk3Screens = new Map<MK2Mode, MK2Screen>();
   private dirty = true;
   private rafId: number | null = null;
   private lastLeftHash = 0;
   private lastRightHash = 0;
   private unsubscribers: Array<() => void> = [];
+  private deviceModel: 'mk2' | 'mk3' = 'mk2';
   /** Mode to restore when playback stops */
   private modeBeforePlayback: MK2Mode | null = null;
   private started = false;
@@ -154,6 +192,17 @@ class MK2ScreenManager {
 
   registerScreen(mode: MK2Mode, screen: MK2Screen): void {
     this.screens.set(mode, screen);
+  }
+
+  registerMK3Screen(mode: MK2Mode, screen: MK2Screen): void {
+    this.mk3Screens.set(mode, screen);
+  }
+
+  setDeviceModel(model: 'mk2' | 'mk3'): void {
+    if (this.deviceModel === model) return;
+    this.deviceModel = model;
+    this.resetDisplayHashes();
+    this.markDirty();
   }
 
   /** Start reactive rendering. Call after bridge connects. Safe to call multiple times. */
@@ -652,29 +701,63 @@ class MK2ScreenManager {
     const bridge = getMaschineHIDBridge();
     if (!bridge.isConnected()) return;
 
-    const screen = this.screens.get(this.mode);
+    const screen = this.deviceModel === 'mk3'
+      ? (this.mk3Screens.get(this.mode) ?? this.screens.get(this.mode))
+      : this.screens.get(this.mode);
     if (!screen) return;
 
     try {
+      if (this.deviceModel === 'mk3') {
+        const mk3Screen = this.mk3Screens.get(this.mode);
+        const left = new MK3Display();
+        const right = new MK3Display();
+        left.clear(MK3Display.BLACK);
+        right.clear(MK3Display.BLACK);
+
+        if (mk3Screen) {
+          mk3Screen.render(left, right, this.ctx);
+          drawSoftLabelsMK3(left, mk3Screen.softLabels());
+        } else {
+          const legacyLeft = new MK2Display();
+          const legacyRight = new MK2Display();
+          legacyLeft.clear(MK2Display.BLACK);
+          legacyRight.clear(MK2Display.BLACK);
+          screen.render(legacyLeft, legacyRight, this.ctx);
+          drawSoftLabels(legacyLeft, screen.softLabels());
+          drawTransportBar(legacyLeft);
+          blitLegacyMK2ToMK3(legacyLeft, left);
+          blitLegacyMK2ToMK3(legacyRight, right);
+        }
+
+        drawTransportBarMK3(left, this.mode);
+
+        const leftPacked = left.pack();
+        const rightPacked = right.pack();
+        const leftHash = fastHash(leftPacked);
+        const rightHash = fastHash(rightPacked);
+
+        if (leftHash != this.lastLeftHash) {
+          bridge.drawDisplayMK3(0, leftPacked);
+          this.lastLeftHash = leftHash;
+        }
+        if (rightHash != this.lastRightHash) {
+          bridge.drawDisplayMK3(1, rightPacked);
+          this.lastRightHash = rightHash;
+        }
+        return;
+      }
+
       const left = new MK2Display();
       const right = new MK2Display();
 
-      // Black backgrounds
       left.clear(MK2Display.BLACK);
       right.clear(MK2Display.BLACK);
-
-      // Render mode-specific content
       screen.render(left, right, this.ctx);
-
-      // Overlay: soft button labels on left screen top
       drawSoftLabels(left, screen.softLabels());
-      // Overlay: transport bar on left screen bottom
       drawTransportBar(left);
 
-      // Pack and skip unchanged
       const leftPacked = left.pack();
       const rightPacked = right.pack();
-
       const leftHash = fastHash(leftPacked);
       const rightHash = fastHash(rightPacked);
 

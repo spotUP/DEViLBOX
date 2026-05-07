@@ -74,15 +74,17 @@ const NIHIA_BTN_ID_TO_NAME: Record<number, string> = {
 
 type MaschineEvent =
   | { type: 'encoder'; index: number; name: string; value: number; raw: number }
-  | { type: 'pad';     pad: number; velocity: number; pressed: boolean }
-  | { type: 'button';  name: string; btnId?: number; pressed: boolean };
+  | { type: 'pad'; pad: number; velocity: number; pressed: boolean }
+  | { type: 'button'; name: string; btnId?: number; pressed: boolean }
+  | { type: 'device'; model: 'mk2' | 'mk3' };
 
 type MaschineCommand =
-  | { type: 'setPadColor';     pad: number; r: number; g: number; b: number }
+  | { type: 'setPadColor'; pad: number; r: number; g: number; b: number }
   | { type: 'setAllPadColors'; colors: Array<{ r: number; g: number; b: number }> }
-  | { type: 'setButtonLed';    leds: number[] }
-  | { type: 'drawDisplay';     screen: 0 | 1; pixels: string } /* base64 RGB565 big-endian */
-  | { type: 'setProjectName';  name: string };
+  | { type: 'setButtonLed'; leds: number[] }
+  | { type: 'drawDisplay'; screen: 0 | 1; pixels: string }
+  | { type: 'drawDisplayMK3'; screen: 0 | 1; pixels: string }
+  | { type: 'setProjectName'; name: string };
 
 class MaschineHIDBridge {
   private static instance: MaschineHIDBridge | null = null;
@@ -90,6 +92,7 @@ class MaschineHIDBridge {
   private ws: WebSocket | null = null;
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private connected = false;
+  private deviceModel: 'mk2' | 'mk3' = 'mk2';
 
   private constructor() {}
 
@@ -163,6 +166,15 @@ class MaschineHIDBridge {
 
   private routeEvent(evt: MaschineEvent): void {
     const mgr = getMIDIManager();
+
+    if (evt.type === 'device') {
+      this.deviceModel = evt.model;
+      const screenMgr = getMK2ScreenManager();
+      screenMgr.setDeviceModel(evt.model);
+      screenMgr.resetDisplayHashes();
+      screenMgr.markDirty();
+      return;
+    }
 
     if (evt.type === 'encoder' && evt.name === 'mainEncoder') {
       // Main encoder is relative: value 65 = CW, 63 = CCW
@@ -260,6 +272,10 @@ class MaschineHIDBridge {
     return this.connected;
   }
 
+  getDeviceModel(): 'mk2' | 'mk3' {
+    return this.deviceModel;
+  }
+
   setPadColor(pad: number, r: number, g: number, b: number): void {
     this.send({ type: 'setPadColor', pad, r, g, b });
   }
@@ -276,9 +292,11 @@ class MaschineHIDBridge {
    *  pixels: Uint8Array of 128×64/8 = 1024 bytes (bit 7 = leftmost pixel per byte).
    *  Base64-encoded for transport (~1.4 KB per frame). */
   drawDisplay(screen: 0 | 1, pixels: Uint8Array): void {
-    let binary = '';
-    for (let i = 0; i < pixels.length; i++) binary += String.fromCharCode(pixels[i]);
-    this.send({ type: 'drawDisplay', screen, pixels: btoa(binary) });
+    this.send({ type: 'drawDisplay', screen, pixels: encodeBytesBase64(pixels) });
+  }
+
+  drawDisplayMK3(screen: 0 | 1, pixels: Uint8Array): void {
+    this.send({ type: 'drawDisplayMK3', screen, pixels: encodeBytesBase64(pixels) });
   }
 
   /** Update the project name shown on the Maschine MK2 screen via MSG_PROJECTNAME. */
@@ -295,7 +313,8 @@ class MaschineHIDBridge {
       import('./performance/screens/BrowseScreen'),
       import('./performance/screens/SongScreen'),
       import('./performance/screens/PlaybackScreen'),
-    ]).then(([instMod, mixMod, stepMod, sampleMod, browseMod, songMod, playMod]) => {
+      import('./performance/screens/MK3Screens'),
+    ]).then(([instMod, mixMod, stepMod, sampleMod, browseMod, songMod, playMod, mk3Mod]) => {
       const mgr = getMK2ScreenManager();
       mgr.registerScreen('instrument', new instMod.InstrumentScreen());
       mgr.registerScreen('mixer', new mixMod.MixerScreen());
@@ -304,12 +323,16 @@ class MaschineHIDBridge {
       mgr.registerScreen('browse', new browseMod.BrowseScreen());
       mgr.registerScreen('song', new songMod.SongScreen());
       mgr.registerScreen('playback', new playMod.PlaybackScreen());
+      mgr.registerMK3Screen('instrument', new mk3Mod.MK3InstrumentScreen());
+      mgr.registerMK3Screen('mixer', new mk3Mod.MK3MixerScreen());
+      mgr.registerMK3Screen('browse', new mk3Mod.MK3BrowseScreen());
+      mgr.setDeviceModel(this.deviceModel);
       // Always (re)start — handles HMR and WebSocket reconnects
       mgr.start();
       // Reset hashes so first render always sends display data
       mgr.resetDisplayHashes();
       mgr.forceRender();
-      console.log('[MaschineHID] Screen manager initialized with 7 modes');
+      console.log('[MaschineHID] Screen manager initialized with MK2 and MK3 modes');
     }).catch((err) => {
       console.warn('[MaschineHID] Failed to init screen manager:', err);
     });
@@ -320,6 +343,17 @@ class MaschineHIDBridge {
       this.ws.send(JSON.stringify(cmd));
     }
   }
+}
+
+
+function encodeBytesBase64(bytes: Uint8Array): string {
+  let binary = '';
+  const chunkSize = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    const slice = bytes.subarray(i, i + chunkSize);
+    binary += String.fromCharCode(...slice);
+  }
+  return btoa(binary);
 }
 
 export function getMaschineHIDBridge(): MaschineHIDBridge {

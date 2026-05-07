@@ -50,6 +50,14 @@ export interface DJControllerJogMapping {
   touchNote?: number; // Note for jog wheel touch (platter touch sensor)
 }
 
+export interface DJControllerFeedbackMapping {
+  channel: number;
+  note?: number;
+  cc?: number;
+  action?: string;
+  param?: string;
+}
+
 export interface DJControllerPreset {
   id: string;
   name: string;
@@ -60,6 +68,7 @@ export interface DJControllerPreset {
   ccMappings: DJControllerCCMapping[];
   pitchBendMappings?: DJControllerPitchBendMapping[];
   noteMappings: DJControllerNoteMapping[];
+  feedbackMappings?: DJControllerFeedbackMapping[];
   jogMapping?: {
     deckA: DJControllerJogMapping;
     deckB: DJControllerJogMapping;
@@ -93,6 +102,9 @@ export type DJAction =
   // Quantized FX
   | 'fx_echo_a' | 'fx_reverb_a' | 'fx_delay_a' | 'fx_flanger_a'
   | 'fx_echo_b' | 'fx_reverb_b' | 'fx_delay_b' | 'fx_flanger_b'
+  // Deck modes
+  | 'reverse_a' | 'reverse_b'
+  | 'flux_a' | 'flux_b'
   // Scratch controls
   | 'scratch_a' | 'scratch_b'
   // Tracker scratch patterns (work without DJ engine)
