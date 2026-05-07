@@ -122,6 +122,10 @@ export default defineConfig({
       'Cross-Origin-Opener-Policy': 'same-origin',
       'Cross-Origin-Embedder-Policy': 'credentialless',
     },
+    // Proxy /api/* to Express so relative URL fetches work in dev
+    proxy: {
+      '/api': { target: 'http://localhost:3011', changeOrigin: false },
+    },
     // HMR enabled — only watch src/ to keep file-watcher count low (~3K files).
     // server/ is intentionally excluded: it's backend-only (Express/MCP), none of it is
     // imported by the frontend. Including it caused tsx watch restarts to trigger Vite
