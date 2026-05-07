@@ -3,6 +3,7 @@
  */
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { useInstrumentStore } from '@stores';
 import { usePresetStore, type PresetCategory as UserPresetCategory } from '@stores/usePresetStore';
 import { notify } from '@stores/useNotificationStore';
@@ -343,7 +344,7 @@ export const LoadPresetModal: React.FC<LoadPresetModalProps> = ({ onClose }) => 
 
   const presetCount = browseMode === 'factory' ? filteredFactoryPresets.length : filteredUserPresets.length;
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-[99990] flex items-center justify-center bg-black/90">
       <div className="w-full h-full bg-ft2-bg flex flex-col overflow-hidden">
         {/* Header */}
@@ -692,6 +693,7 @@ export const LoadPresetModal: React.FC<LoadPresetModalProps> = ({ onClose }) => 
         className="hidden"
         onChange={handleImportNKSF}
       />
-    </div>
+    </div>,
+    document.body
   );
 };
