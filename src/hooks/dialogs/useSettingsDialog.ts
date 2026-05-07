@@ -22,7 +22,7 @@ import { getASIDDeviceManager, isASIDSupported } from '@lib/sid/ASIDDeviceManage
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
-export type SettingsTab = 'general' | 'audio' | 'visual' | 'recording' | 'input' | 'sid' | 'about';
+export type SettingsTab = 'general' | 'audio' | 'visual' | 'recording' | 'input' | 'midi' | 'sid' | 'about';
 
 // ─── Constants (exported, not in hook return) ────────────────────────────────
 
@@ -32,6 +32,7 @@ export const SETTINGS_TABS: Array<{ id: SettingsTab; label: string }> = [
   { id: 'visual', label: 'Visual' },
   { id: 'recording', label: 'Recording' },
   { id: 'input', label: 'Input' },
+  { id: 'midi', label: 'MIDI' },
   { id: 'sid', label: 'SID' },
   { id: 'about', label: 'About' },
 ];
