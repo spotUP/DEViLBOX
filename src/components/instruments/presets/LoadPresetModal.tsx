@@ -21,9 +21,11 @@ type BrowseMode = 'factory' | 'user' | 'library';
 
 interface LoadPresetModalProps {
   onClose: () => void;
+  /** When true, renders inline without portal/overlay/header chrome */
+  embedded?: boolean;
 }
 
-export const LoadPresetModal: React.FC<LoadPresetModalProps> = ({ onClose }) => {
+export const LoadPresetModal: React.FC<LoadPresetModalProps> = ({ onClose, embedded = false }) => {
   const currentInstrumentId = useInstrumentStore((s) => s.currentInstrumentId);
   const instruments = useInstrumentStore((s) => s.instruments);
   const updateInstrument = useInstrumentStore((s) => s.updateInstrument);
@@ -354,61 +356,68 @@ export const LoadPresetModal: React.FC<LoadPresetModalProps> = ({ onClose }) => 
 
   const presetCount = browseMode === 'factory' ? filteredFactoryPresets.length : filteredUserPresets.length;
 
-  return createPortal(
-    <div className="fixed inset-0 z-[99990] flex items-center justify-center bg-black/90">
-      <div className="w-full h-full bg-ft2-bg flex flex-col overflow-hidden">
-        {/* Header */}
+  // In embedded mode, force Factory/User only (Library is a top-level tab in AddInstrumentDialog)
+  const activeBrowseMode: BrowseMode = embedded && browseMode === 'library' ? 'factory' : browseMode;
+
+  const innerContent = (
+    <div className={`${embedded ? 'h-full' : 'w-full h-full'} bg-ft2-bg flex flex-col overflow-hidden`}>
+      {/* Header — only in standalone mode */}
+      {!embedded && (
         <div className="flex items-center justify-between px-4 py-3 bg-ft2-header border-b-2 border-ft2-border">
           <div>
             <h2 className="text-ft2-highlight font-bold text-sm uppercase tracking-widest">LOAD PRESET</h2>
             <p className="text-ft2-textDim text-[10px]">Browse, Jam and Load sounds</p>
           </div>
           <div className="flex items-center gap-2">
-            {/* Mode Toggle */}
             <div className="flex bg-ft2-bg rounded overflow-hidden border border-ft2-border">
               <button
                 onClick={() => handleModeChange('factory')}
                 className={`px-3 py-1.5 text-[10px] font-black uppercase tracking-tighter transition-all ${
-                  browseMode === 'factory'
-                    ? 'bg-ft2-cursor text-ft2-bg'
-                    : 'text-ft2-textDim hover:text-ft2-text'
+                  activeBrowseMode === 'factory' ? 'bg-ft2-cursor text-ft2-bg' : 'text-ft2-textDim hover:text-ft2-text'
                 }`}
-              >
-                Factory
-              </button>
+              >Factory</button>
               <button
                 onClick={() => handleModeChange('user')}
                 className={`px-3 py-1.5 text-[10px] font-black uppercase tracking-tighter transition-all ${
-                  browseMode === 'user'
-                    ? 'bg-amber-500 text-black'
-                    : 'text-ft2-textDim hover:text-ft2-text'
+                  activeBrowseMode === 'user' ? 'bg-amber-500 text-black' : 'text-ft2-textDim hover:text-ft2-text'
                 }`}
-              >
-                User ({userPresets.length})
-              </button>
+              >User ({userPresets.length})</button>
               <button
                 onClick={() => handleModeChange('library')}
                 className={`px-3 py-1.5 text-[10px] font-black uppercase tracking-tighter transition-all flex items-center gap-1 ${
-                  browseMode === 'library'
-                    ? 'bg-accent-primary text-text-inverse'
-                    : 'text-ft2-textDim hover:text-ft2-text'
+                  activeBrowseMode === 'library' ? 'bg-accent-primary text-text-inverse' : 'text-ft2-textDim hover:text-ft2-text'
                 }`}
-              >
-                <Library size={10} />
-                Library
-              </button>
+              ><Library size={10} /> Library</button>
             </div>
-            <button
-              onClick={onClose}
-              className="p-2 text-ft2-textDim hover:text-ft2-text hover:bg-ft2-border rounded transition-colors"
-            >
+            <button onClick={onClose} className="p-2 text-ft2-textDim hover:text-ft2-text hover:bg-ft2-border rounded transition-colors">
               <X size={20} />
             </button>
           </div>
         </div>
+      )}
+
+      {/* Embedded mode: Factory/User sub-tabs */}
+      {embedded && (
+        <div className="flex items-center gap-2 px-4 py-2 bg-dark-bgSecondary border-b border-dark-border">
+          <div className="flex bg-dark-bgTertiary rounded overflow-hidden border border-dark-border">
+            <button
+              onClick={() => handleModeChange('factory')}
+              className={`px-3 py-1 text-[10px] font-bold uppercase tracking-wide transition-all ${
+                activeBrowseMode === 'factory' ? 'bg-accent-primary text-text-inverse' : 'text-text-muted hover:text-text-primary'
+              }`}
+            >Factory</button>
+            <button
+              onClick={() => handleModeChange('user')}
+              className={`px-3 py-1 text-[10px] font-bold uppercase tracking-wide transition-all ${
+                activeBrowseMode === 'user' ? 'bg-accent-primary text-text-inverse' : 'text-text-muted hover:text-text-primary'
+              }`}
+            >User ({userPresets.length})</button>
+          </div>
+        </div>
+      )}
 
         {/* Search Bar — hidden in Library mode (has its own search) */}
-        {browseMode !== 'library' && (
+        {activeBrowseMode !== 'library' && (
         <div className="px-4 py-3 bg-ft2-header border-b border-ft2-border">
           <div className="relative">
             <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-ft2-textDim" />
@@ -416,7 +425,7 @@ export const LoadPresetModal: React.FC<LoadPresetModalProps> = ({ onClose }) => 
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder={browseMode === 'factory' ? 'Search factory presets...' : 'Search user presets by name, synth type, or tag...'}
+              placeholder={activeBrowseMode === 'factory' ? 'Search factory presets...' : 'Search user presets by name, synth type, or tag...'}
               className="w-full pl-10 pr-4 py-2 bg-ft2-bg border border-ft2-border text-ft2-text rounded focus:border-ft2-highlight focus:outline-none placeholder:text-ft2-textDim/50"
               autoFocus
             />
@@ -425,9 +434,9 @@ export const LoadPresetModal: React.FC<LoadPresetModalProps> = ({ onClose }) => 
         )}
 
         {/* Category Tabs — hidden in Library mode */}
-        {browseMode !== 'library' && (
+        {activeBrowseMode !== 'library' && (
         <div className="flex flex-wrap gap-1 px-4 py-2 bg-ft2-header border-b border-ft2-border">
-          {browseMode === 'factory' ? (
+          {activeBrowseMode === 'factory' ? (
             factoryCategories.map((category) => {
               const isActive = activeCategory === category;
               return (
@@ -503,7 +512,7 @@ export const LoadPresetModal: React.FC<LoadPresetModalProps> = ({ onClose }) => 
         )} {/* end category tabs */}
 
         {/* Library Browser (NKS + DEViLBOX presets) */}
-        {browseMode === 'library' ? (
+        {activeBrowseMode === 'library' ? (
           <div className="flex-1 min-h-0">
             <NKSLibraryBrowser onLoadPreset={({ preset, data }: PresetLoadEvent) => {
               // DEViLBOX synth presets → create instrument with the right synth type
@@ -533,8 +542,8 @@ export const LoadPresetModal: React.FC<LoadPresetModalProps> = ({ onClose }) => 
             }} />
           </div>
         ) : (
-          <div className="flex-1 overflow-y-auto p-4 scrollbar-ft2" key={`${browseMode}-${activeCategory}-${userFilterCategory}`}>
-          {browseMode === 'factory' ? (
+          <div className="flex-1 overflow-y-auto p-4 scrollbar-ft2" key={`${activeBrowseMode}-${activeCategory}-${userFilterCategory}`}>
+          {activeBrowseMode === 'factory' ? (
             // Factory presets
             filteredFactoryPresets.length === 0 ? (
               <div className="flex items-center justify-center h-full text-ft2-textDim font-mono text-sm uppercase">
@@ -666,11 +675,11 @@ export const LoadPresetModal: React.FC<LoadPresetModalProps> = ({ onClose }) => 
         )} {/* end factory/user branch */}
 
         {/* Footer — hidden in Library mode */}
-        {browseMode !== 'library' && (
+        {activeBrowseMode !== 'library' && (
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 px-4 py-3 pb-6 sm:pb-3 bg-ft2-header border-t-2 border-ft2-border safe-area-bottom">
           <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 min-w-0">
             <div className="text-ft2-textDim text-xs font-mono truncate">
-              {presetCount} PRESET{presetCount !== 1 ? 'S' : ''} • {browseMode === 'factory' ? activeCategory.toUpperCase() : (userFilterCategory === 'All' ? 'ALL USER' : userFilterCategory.toUpperCase())}
+              {presetCount} PRESET{presetCount !== 1 ? 'S' : ''} • {activeBrowseMode === 'factory' ? activeCategory.toUpperCase() : (userFilterCategory === 'All' ? 'ALL USER' : userFilterCategory.toUpperCase())}
               {(selectedPresetName || selectedUserPresetId) && <span className="ml-2 text-ft2-text hidden sm:inline">• DOUBLE-CLICK TO APPLY</span>}
             </div>
 
@@ -692,7 +701,7 @@ export const LoadPresetModal: React.FC<LoadPresetModalProps> = ({ onClose }) => 
             </button>
             <button
               onClick={() => {
-                if (browseMode === 'user' && selectedUserPresetId) {
+                if (activeBrowseMode === 'user' && selectedUserPresetId) {
                   const preset = userPresets.find(p => p.id === selectedUserPresetId);
                   if (preset) handleLoadUserPreset(preset.id, preset.config);
                 } else if (selectedPreset) {
@@ -708,24 +717,33 @@ export const LoadPresetModal: React.FC<LoadPresetModalProps> = ({ onClose }) => 
           </div>
         </div>
         )} {/* end footer */}
-      </div>
 
-      {/* Hidden file inputs */}
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept=".json"
-        className="hidden"
-        onChange={handleImportJSON}
-      />
-      <input
-        ref={nksfInputRef}
-        type="file"
-        accept=".nksf"
-        multiple
-        className="hidden"
-        onChange={handleImportNKSF}
-      />
+        {/* Hidden file inputs */}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".json"
+          className="hidden"
+          onChange={handleImportJSON}
+        />
+        <input
+          ref={nksfInputRef}
+          type="file"
+          accept=".nksf"
+          multiple
+          className="hidden"
+          onChange={handleImportNKSF}
+        />
+      </div>
+  );
+
+  if (embedded) {
+    return innerContent;
+  }
+
+  return createPortal(
+    <div className="fixed inset-0 z-[99990] flex items-center justify-center bg-black/90">
+      {innerContent}
     </div>,
     document.body
   );
