@@ -11,6 +11,7 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { getToneEngine } from '../../../engine/ToneEngine';
 import { buildHelmParameterUpdates, type HelmPresetFile } from '../../../lib/helmPresetLoader';
+import { consumePendingPresetData } from '../../../lib/pendingPresetData';
 
 interface HelmUIModule {
   _helm_ui_init: () => void;
@@ -187,6 +188,12 @@ export const HelmHardwareUI: React.FC<HelmHardwareUIProps> = ({
 
         moduleRef.current = m;
         m._helm_ui_init();
+
+        // Check for pending preset data from Library browser
+        const pendingData = consumePendingPresetData('helm');
+        if (pendingData) {
+          applyHelmPreset(pendingData as HelmPresetFile);
+        }
 
         const w = m._helm_ui_get_width();
         const h = m._helm_ui_get_height();

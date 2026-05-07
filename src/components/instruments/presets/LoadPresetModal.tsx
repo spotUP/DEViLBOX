@@ -14,8 +14,8 @@ import * as LucideIcons from 'lucide-react';
 import { X, Search, Check, Zap, Trash2, Download, Upload, Tag, Library } from 'lucide-react';
 import * as Tone from 'tone';
 import type { InstrumentConfig, InstrumentPreset } from '@typedefs/instrument';
-import { NKSLibraryBrowser } from '@components/midi/NKSLibraryBrowser';
-import type { DevilboxPreset, NKSPreset } from '@stores/useNKSLibraryStore';
+import { NKSLibraryBrowser, type PresetLoadEvent } from '@components/midi/NKSLibraryBrowser';
+import { setPendingPresetData } from '@lib/pendingPresetData';
 
 type BrowseMode = 'factory' | 'user' | 'library';
 
@@ -505,7 +505,7 @@ export const LoadPresetModal: React.FC<LoadPresetModalProps> = ({ onClose }) => 
         {/* Library Browser (NKS + DEViLBOX presets) */}
         {browseMode === 'library' ? (
           <div className="flex-1 min-h-0">
-            <NKSLibraryBrowser onLoadPreset={(preset: NKSPreset | DevilboxPreset) => {
+            <NKSLibraryBrowser onLoadPreset={({ preset, data }: PresetLoadEvent) => {
               // DEViLBOX synth presets → create instrument with the right synth type
               if ('synth' in preset && preset.synth) {
                 const synthTypeMap: Record<string, string> = {
@@ -519,6 +519,14 @@ export const LoadPresetModal: React.FC<LoadPresetModalProps> = ({ onClose }) => 
                   } else {
                     createInstrument({ name: preset.name, synthType: synthType as InstrumentConfig['synthType'] });
                   }
+
+                  // Store preset data so the hardware UI can pick it up on mount
+                  if (data) {
+                    const presetType = preset.synth === 'helm' ? 'helm' : 'dexed';
+                    setPendingPresetData(presetType as 'helm' | 'dexed', data);
+                  }
+
+                  onClose();
                 }
               }
               notify.success(`Loaded: ${preset.name}`);
