@@ -14,9 +14,12 @@ import {
   useNKSLibraryStore,
   type DevilboxPreset,
   type DevilboxProduct,
+  type NKSLibraryEntry,
   type NKSPreset,
 } from '@/stores/useNKSLibraryStore';
+import { Button } from '@components/ui/Button';
 import { notify } from '@stores/useNotificationStore';
+import { useKontaktStore } from '@stores/useKontaktStore';
 
 const HELM_CATEGORIES = ['Arp', 'Bass', 'Chip', 'Harsh', 'Keys', 'Lead', 'Pad', 'Percussion', 'SFX'] as const;
 
@@ -72,6 +75,33 @@ const ProductTile = React.memo(({
   </button>
 ));
 
+const LibraryRow = React.memo(({
+  library,
+  isPreviewing,
+  onTogglePreview,
+}: {
+  library: NKSLibraryEntry;
+  isPreviewing: boolean;
+  onTogglePreview: (library: NKSLibraryEntry) => void;
+}) => (
+  <div className="flex items-center gap-2 rounded border border-dark-border/50 bg-dark-bg px-2 py-1.5">
+    <div className="min-w-0 flex-1">
+      <div className="truncate text-[10px] text-text-primary">{library.name}</div>
+      <div className="truncate text-[8px] font-mono text-text-muted">{library.libraryPath}</div>
+    </div>
+    {library.previewOgg && (
+      <Button
+        variant="ghost"
+        size="sm"
+        className="px-2 py-1 text-[9px] font-mono"
+        onClick={() => onTogglePreview(library)}
+      >
+        {isPreviewing ? 'Stop' : 'Preview'}
+      </Button>
+    )}
+  </div>
+));
+
 const NKSPresetRow = React.memo(({ preset, onLoad }: {
   preset: NKSPreset;
   onLoad: (preset: NKSPreset) => void;
@@ -96,12 +126,14 @@ const NKSPresetRow = React.memo(({ preset, onLoad }: {
         {preset.types.split(' / ')[0]}
       </span>
     )}
-    <button
-      className="opacity-0 group-hover:opacity-100 text-[9px] px-1.5 py-0.5 rounded bg-accent-primary/20 text-accent-primary border border-accent-primary/40 flex-shrink-0"
+    <Button
+      variant="ghost"
+      size="sm"
+      className="opacity-0 group-hover:opacity-100 text-[9px] px-1.5 py-0.5 border border-accent-primary/40 text-accent-primary bg-accent-primary/10 flex-shrink-0"
       onClick={() => onLoad(preset)}
     >
-      Load
-    </button>
+      ▶ Load
+    </Button>
   </div>
 ));
 
@@ -139,6 +171,8 @@ export const NKSLibraryBrowser: React.FC<NKSLibraryBrowserProps> = ({ onLoadPres
     status,
     products,
     productsLoading,
+    libraries,
+    librariesLoading,
     devilboxProducts,
     devilboxProductsLoading,
     presets,
@@ -156,6 +190,7 @@ export const NKSLibraryBrowser: React.FC<NKSLibraryBrowserProps> = ({ onLoadPres
     characters,
     loadStatus,
     loadProducts,
+    loadLibraries,
     loadDevilboxProducts,
     loadPresets,
     loadDevilboxPresets,
@@ -170,9 +205,14 @@ export const NKSLibraryBrowser: React.FC<NKSLibraryBrowserProps> = ({ onLoadPres
     resetFilters,
   } = useNKSLibraryStore();
 
+  const bridgeStatus = useKontaktStore((state) => state.bridgeStatus);
+  const loadKontaktPreset = useKontaktStore((state) => state.loadPreset);
+
   const [searchInput, setSearchInput] = useState(searchQuery);
   const [devilboxCategory, setDevilboxCategory] = useState('');
+  const [activePreviewUrl, setActivePreviewUrl] = useState<string | null>(null);
   const searchTimer = useRef<number | null>(null);
+  const previewAudioRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
     setSearchInput(searchQuery);
@@ -181,11 +221,17 @@ export const NKSLibraryBrowser: React.FC<NKSLibraryBrowserProps> = ({ onLoadPres
   useEffect(() => {
     void loadStatus();
     void loadProducts();
+    void loadLibraries();
     void loadDevilboxProducts();
     void loadTypes();
     void loadCharacters();
     void loadPresets();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => () => {
+    previewAudioRef.current?.pause();
+    previewAudioRef.current = null;
+  }, []);
 
   const selectedDevilboxProduct = useMemo(
     () => devilboxProducts.find((product) => product.id === selectedDevilboxSynth) ?? null,
@@ -196,6 +242,7 @@ export const NKSLibraryBrowser: React.FC<NKSLibraryBrowserProps> = ({ onLoadPres
   const displayedTotal = selectedDevilboxSynth ? devilboxPresets.length : presetsTotal;
   const displayedLoading = selectedDevilboxSynth ? devilboxPresetsLoading : presetsLoading;
   const isHelmSelected = selectedDevilboxSynth === 'helm';
+  const isBridgeReady = bridgeStatus === 'ready';
   const hasFilters = selectedDevilboxSynth
     ? Boolean(selectedDevilboxSynth || devilboxCategory || searchInput)
     : Boolean(selectedProduct || searchQuery || filterType || filterCharacter);
@@ -227,9 +274,49 @@ export const NKSLibraryBrowser: React.FC<NKSLibraryBrowserProps> = ({ onLoadPres
     }
   }, [loadPresets, presetsLoading, presetsOffset, presetsTotal, selectedDevilboxSynth]);
 
+  const handleTogglePreview = useCallback(async (library: NKSLibraryEntry) => {
+    if (!library.previewOgg) {
+      notify.warning('No preview file found for this library');
+      return;
+    }
+
+    if (activePreviewUrl === library.previewOgg) {
+      previewAudioRef.current?.pause();
+      previewAudioRef.current = null;
+      setActivePreviewUrl(null);
+      return;
+    }
+
+    previewAudioRef.current?.pause();
+    const audio = new Audio(library.previewOgg);
+    audio.onended = () => {
+      setActivePreviewUrl((current) => (current === library.previewOgg ? null : current));
+    };
+
+    try {
+      await audio.play();
+      previewAudioRef.current = audio;
+      setActivePreviewUrl(library.previewOgg);
+    } catch (error) {
+      notify.error(error instanceof Error ? error.message : 'Failed to play library preview');
+      setActivePreviewUrl(null);
+    }
+  }, [activePreviewUrl]);
+
   const handleLoadNKSPreset = useCallback((preset: NKSPreset) => {
-    onLoadPreset?.(preset);
-  }, [onLoadPreset]);
+    if (!isBridgeReady) {
+      notify.warning('Bridge not running');
+      return;
+    }
+
+    try {
+      loadKontaktPreset(preset.filePath || preset.fileName);
+      notify.success(`Loading ${preset.name} in Kontakt`);
+      onLoadPreset?.(preset);
+    } catch (error) {
+      notify.error(error instanceof Error ? error.message : `Failed to load ${preset.name}`);
+    }
+  }, [isBridgeReady, loadKontaktPreset, onLoadPreset]);
 
   const handleLoadDevilboxPreset = useCallback(async (preset: DevilboxPreset) => {
     try {
@@ -285,8 +372,16 @@ export const NKSLibraryBrowser: React.FC<NKSLibraryBrowserProps> = ({ onLoadPres
         <span className="text-[11px] font-mono text-accent-primary font-semibold tracking-wider">
           {selectedDevilboxProduct ? 'DEViLBOX PRESETS' : 'NKS LIBRARY'}
         </span>
+        <span className={[
+          'text-[9px] font-mono px-2 py-0.5 rounded border ml-auto',
+          isBridgeReady
+            ? 'text-accent-success border-accent-success/30 bg-accent-success/10'
+            : 'text-accent-error border-accent-error/30 bg-accent-error/10',
+        ].join(' ')}>
+          {isBridgeReady ? 'Kontakt Bridge Ready' : 'Kontakt Bridge Offline'}
+        </span>
         {status && (
-          <span className="text-[9px] text-text-muted ml-auto">
+          <span className="text-[9px] text-text-muted">
             {selectedDevilboxProduct
               ? `${selectedDevilboxProduct.name} · ${selectedDevilboxProduct.presetCount} factory presets`
               : status.presetCount > 0
@@ -297,7 +392,7 @@ export const NKSLibraryBrowser: React.FC<NKSLibraryBrowserProps> = ({ onLoadPres
       </div>
 
       <div className="flex flex-1 min-h-0 overflow-hidden">
-        <div className="w-52 flex-shrink-0 flex flex-col border-r border-dark-border bg-dark-bgSecondary overflow-hidden">
+        <div className="w-60 flex-shrink-0 flex flex-col border-r border-dark-border bg-dark-bgSecondary overflow-hidden">
           <div className="px-2 py-1.5 border-b border-dark-border">
             <span className="text-[9px] font-mono text-text-muted uppercase tracking-widest">Libraries</span>
           </div>
@@ -328,6 +423,24 @@ export const NKSLibraryBrowser: React.FC<NKSLibraryBrowserProps> = ({ onLoadPres
                   artworkUrl={product.artworkUrl}
                   fallbackLabel="NI"
                   capitalize
+                />
+              ))}
+            </div>
+
+            <div className="border-t border-dark-border pt-2 space-y-1">
+              <div className="px-1 py-1 text-[9px] font-mono uppercase tracking-widest text-text-muted">📦 Libraries</div>
+              {librariesLoading && (
+                <div className="text-[10px] text-text-muted text-center py-2">Loading…</div>
+              )}
+              {!librariesLoading && libraries.length === 0 && (
+                <div className="px-2 py-1 text-[9px] text-text-muted">No .nicnt libraries found in /Users/Shared.</div>
+              )}
+              {libraries.map((library) => (
+                <LibraryRow
+                  key={library.nicntPath}
+                  library={library}
+                  isPreviewing={activePreviewUrl === library.previewOgg}
+                  onTogglePreview={handleTogglePreview}
                 />
               ))}
             </div>
@@ -397,12 +510,14 @@ export const NKSLibraryBrowser: React.FC<NKSLibraryBrowserProps> = ({ onLoadPres
             )}
 
             {hasFilters && (
-              <button
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-[9px] px-1.5 py-0.5 border border-accent-error/30 text-accent-error bg-accent-error/10 flex-shrink-0"
                 onClick={handleReset}
-                className="text-[9px] px-1.5 py-0.5 rounded bg-accent-error/20 text-accent-error border border-accent-error/30 flex-shrink-0"
               >
                 Clear
-              </button>
+              </Button>
             )}
 
             <span className="text-[9px] text-text-muted flex-shrink-0">
@@ -458,12 +573,14 @@ export const NKSLibraryBrowser: React.FC<NKSLibraryBrowserProps> = ({ onLoadPres
             )}
 
             {!selectedDevilboxSynth && !presetsLoading && presetsOffset < presetsTotal && (
-              <button
+              <Button
+                variant="ghost"
+                size="sm"
                 className="w-full text-[10px] text-text-muted py-2 hover:text-text-secondary"
                 onClick={() => loadPresets(true)}
               >
                 Load more ({presetsTotal - presetsOffset} remaining)
-              </button>
+              </Button>
             )}
           </div>
         </div>

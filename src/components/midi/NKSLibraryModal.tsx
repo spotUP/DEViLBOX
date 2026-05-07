@@ -5,6 +5,8 @@
 
 import React from 'react';
 import { X } from 'lucide-react';
+import { Button } from '@components/ui/Button';
+import { KontaktPlayer } from '@components/instruments/KontaktPlayer';
 import { useUIStore } from '@stores/useUIStore';
 import { NKSLibraryBrowser } from './NKSLibraryBrowser';
 import type { DevilboxPreset, NKSPreset } from '@/stores/useNKSLibraryStore';
@@ -18,7 +20,6 @@ export const NKSLibraryModal: React.FC = () => {
 
   const handleLoad = (preset: NKSPreset | DevilboxPreset) => {
     notify.success(`Loaded: ${preset.name}`);
-    closeModal();
   };
 
   return (
@@ -26,17 +27,22 @@ export const NKSLibraryModal: React.FC = () => {
       <div className="flex flex-col w-full h-full bg-dark-bg">
         <div className="flex items-center justify-between px-4 py-2 border-b border-dark-border bg-dark-bgSecondary flex-shrink-0">
           <span className="text-sm font-semibold text-text-primary tracking-wide">Preset Library Browser</span>
-          <button
+          <Button
+            variant="ghost"
+            size="sm"
             onClick={closeModal}
-            className="p-1 rounded hover:bg-dark-bgHover text-text-muted hover:text-text-primary transition-colors"
             aria-label="Close"
-          >
-            <X size={16} />
-          </button>
+            icon={<X size={16} />}
+          />
         </div>
 
-        <div className="flex-1 min-h-0">
-          <NKSLibraryBrowser onLoadPreset={handleLoad} />
+        <div className="flex flex-1 min-h-0">
+          <div className="flex-1 min-h-0 min-w-0">
+            <NKSLibraryBrowser onLoadPreset={handleLoad} />
+          </div>
+          <aside className="w-[22rem] border-l border-dark-border bg-dark-bgSecondary min-h-0">
+            <KontaktPlayer />
+          </aside>
         </div>
       </div>
     </div>
