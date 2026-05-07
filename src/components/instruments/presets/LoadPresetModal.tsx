@@ -25,7 +25,9 @@ interface LoadPresetModalProps {
 
 export const LoadPresetModal: React.FC<LoadPresetModalProps> = ({ onClose }) => {
   const currentInstrumentId = useInstrumentStore((s) => s.currentInstrumentId);
+  const instruments = useInstrumentStore((s) => s.instruments);
   const updateInstrument = useInstrumentStore((s) => s.updateInstrument);
+  const createInstrument = useInstrumentStore((s) => s.createInstrument);
   const setPreviewInstrument = useInstrumentStore((s) => s.setPreviewInstrument);
   const {
     userPresets,
@@ -202,16 +204,24 @@ export const LoadPresetModal: React.FC<LoadPresetModalProps> = ({ onClose }) => 
 
   // Handle loading a preset
   const handleLoadPreset = (preset: InstrumentPreset['config']) => {
-    if (currentInstrumentId === null) return;
-    updateInstrument(currentInstrumentId, preset);
+    const hasCurrentInstrument = currentInstrumentId !== null && instruments.some(i => i.id === currentInstrumentId);
+    if (hasCurrentInstrument) {
+      updateInstrument(currentInstrumentId!, preset);
+    } else {
+      createInstrument(preset);
+    }
     onClose();
   };
 
   // Handle loading a user preset
   const handleLoadUserPreset = (presetId: string, config: InstrumentPreset['config']) => {
-    if (currentInstrumentId === null) return;
     addToRecent(presetId);
-    updateInstrument(currentInstrumentId, config);
+    const hasCurrentInstrument = currentInstrumentId !== null && instruments.some(i => i.id === currentInstrumentId);
+    if (hasCurrentInstrument) {
+      updateInstrument(currentInstrumentId!, config);
+    } else {
+      createInstrument(config);
+    }
     onClose();
   };
 
