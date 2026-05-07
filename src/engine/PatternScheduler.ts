@@ -16,6 +16,7 @@ import { getAutomationPlayer } from './AutomationPlayer';
 import { getEffectProcessor } from './EffectCommands';
 import { useTransportStore } from '@stores/useTransportStore';
 import { useSettingsStore } from '@stores/useSettingsStore';
+import { useTrackerStore } from '@stores/useTrackerStore';
 import { notify } from '@stores/useNotificationStore';
 import { xmNoteToToneJS, xmEffectToString } from '@/lib/xmConversions';
 import type { Pattern } from '@typedefs';
@@ -594,8 +595,10 @@ export class PatternScheduler {
                 return;
               }
 
-              // Trigger note if requested (skip if channel is muted)
-              if (effectResult.triggerNote && !effectResult.preventNoteTrigger && !engine.isChannelMuted(channelIndex)) {
+              // Trigger note if requested (skip if channel is muted or slot is muted)
+              const trackerState = useTrackerStore.getState();
+              const slotMuted = trackerState.slotMutes.has(`${trackerState.currentPositionIndex}:${channelIndex}`);
+              if (effectResult.triggerNote && !effectResult.preventNoteTrigger && !engine.isChannelMuted(channelIndex) && !slotMuted) {
                 if (instrument) {
                   // --- Groove Velocity/Dynamics ---
                   const transportState = useTransportStore.getState();

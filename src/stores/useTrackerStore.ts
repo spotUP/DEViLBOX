@@ -192,6 +192,8 @@ interface TrackerStore {
   // FT2: Pattern Order List (Song Position List)
   patternOrder: number[]; // Array of pattern indices for song arrangement
   currentPositionIndex: number; // Current position in pattern order (for editing)
+  /** Per-slot mutes: Set of "posIndex:channelIndex" keys. Muted slots are silent during playback. */
+  slotMutes: Set<string>;
 
   // Actions
   setCurrentPattern: (index: number, fromReplayer?: boolean) => void;
@@ -288,6 +290,14 @@ interface TrackerStore {
   clearOrder: () => void;
   reorderPositions: (oldIndex: number, newIndex: number) => void;
   setCurrentPosition: (positionIndex: number, fromReplayer?: boolean) => void;
+  /** Toggle mute for a specific slot (position + channel). */
+  toggleSlotMute: (positionIndex: number, channelIndex: number) => void;
+  /** Bulk set slot mutes (for rectangular selection mute toggle). */
+  setSlotMutes: (keys: string[], muted: boolean) => void;
+  /** Check if a slot is muted. */
+  isSlotMuted: (positionIndex: number, channelIndex: number) => boolean;
+  /** Clear all slot mutes. */
+  clearSlotMutes: () => void;
 
   // Channel management
   addChannel: () => void;
@@ -405,6 +415,7 @@ export const useTrackerStore = create<TrackerStore>()(
     // FT2: Pattern Order List (Song Position List)
     patternOrder: [0], // Start with first pattern in order
     currentPositionIndex: 0, // Start at position 0
+    slotMutes: new Set<string>(),
 
 
     // Actions
@@ -2044,6 +2055,36 @@ export const useTrackerStore = create<TrackerStore>()(
           }
         }
       }),
+
+    toggleSlotMute: (positionIndex, channelIndex) => {
+      const key = `${positionIndex}:${channelIndex}`;
+      set((state) => {
+        // Immer can't handle Set mutation directly — rebuild
+        const next = new Set(state.slotMutes);
+        if (next.has(key)) next.delete(key);
+        else next.add(key);
+        state.slotMutes = next;
+      });
+    },
+
+    setSlotMutes: (keys, muted) => {
+      set((state) => {
+        const next = new Set(state.slotMutes);
+        for (const k of keys) {
+          if (muted) next.add(k);
+          else next.delete(k);
+        }
+        state.slotMutes = next;
+      });
+    },
+
+    isSlotMuted: (positionIndex, channelIndex) => {
+      return get().slotMutes.has(`${positionIndex}:${channelIndex}`);
+    },
+
+    clearSlotMutes: () => {
+      set((state) => { state.slotMutes = new Set(); });
+    },
 
     // UADE live pattern display — uses immer draft for safe mutation, no undo
     setLiveChannelData: (row, channelData) =>
