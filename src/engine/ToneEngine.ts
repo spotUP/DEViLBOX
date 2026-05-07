@@ -2501,6 +2501,7 @@ export class ToneEngine {
       case 'Sc68Synth':
       case 'GTUltraSynth':
       case 'SF2Synth':
+      case 'Kontakt':
         return null;
 
       default: {
