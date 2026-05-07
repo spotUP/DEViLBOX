@@ -14,16 +14,15 @@ import { useInstrumentTypeStore } from '@stores/useInstrumentTypeStore';
 import { instrumentTypeLabel } from '@/bridge/analysis/AudioSetInstrumentMap';
 import type { InstrumentType } from '@/bridge/analysis/AudioSetInstrumentMap';
 import { analyzeSampleForClassification } from '@/bridge/analysis/SampleSpectrum';
-import { Plus, Trash2, Copy, Repeat, Repeat1, FolderOpen, Pencil, Package, ExternalLink, Download, Upload, Cpu, X, Music2 } from 'lucide-react';
+import { Plus, Trash2, Copy, Repeat, Repeat1, Pencil, ExternalLink, Download, Upload } from 'lucide-react';
 import * as LucideIcons from 'lucide-react';
 
 import { InstrumentContextMenu } from './InstrumentContextMenu';
-import { LoadPresetModal } from './presets';
-import { CategorizedSynthSelector } from './shared/CategorizedSynthSelector';
+import { AddInstrumentDialog } from './AddInstrumentDialog';
 import { focusPopout } from '@components/ui/PopOutWindow';
 import { getToneEngine } from '@engine/ToneEngine';
 import * as Tone from 'tone';
-import type { InstrumentConfig, HivelyConfig, SunVoxConfig, SynthType } from '@typedefs/instrument';
+import type { InstrumentConfig, SynthType } from '@typedefs/instrument';
 import {
   DEFAULT_TB303,
   DEFAULT_DRUM_MACHINE,
@@ -45,9 +44,6 @@ import { exportAsAhi } from '@lib/export/HivelyExporter';
 import { parseAhiFile } from '@lib/import/formats/HivelyParser';
 import { exportMusicLineInstrument } from '@lib/export/MusicLineExporter';
 import { parseMusicLineInstrument } from '@lib/import/formats/MusicLineParser';
-import { HivelyImportDialog } from './HivelyImportDialog';
-import { SunVoxImportDialog } from './SunVoxImportDialog';
-import { FurnacePresetBrowser } from './FurnacePresetBrowser';
 import { SYSTEM_PRESETS } from '@constants/systemPresets';
 
 interface InstrumentListProps {
@@ -61,10 +57,6 @@ interface InstrumentListProps {
   onInstrumentChange?: (id: number) => void;
   /** Optional: Preview instrument on click */
   showPreviewOnClick?: boolean;
-  /** Optional: Show sample pack button in action bar */
-  showSamplePackButton?: boolean;
-  /** Optional: Show preset button in action bar */
-  showPresetButton?: boolean;
   /** Optional: Show edit button in action bar */
   showEditButton?: boolean;
   /** Optional: Callback when edit button is clicked */
@@ -73,12 +65,6 @@ interface InstrumentListProps {
   variant?: 'default' | 'ft2';
   /** Optional: Callback when create new is clicked */
   onCreateNew?: () => void;
-  /** Optional: Show HVL/AHX import button */
-  showHivelyImport?: boolean;
-  /** Optional: Show SunSynth import button */
-  showSunVoxImport?: boolean;
-  /** Optional: Show Furnace chip preset browser button */
-  showFurnaceBrowser?: boolean;
 }
 
 // PERFORMANCE: Memoize to prevent expensive re-renders on every scroll step
@@ -88,14 +74,9 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
   showActions = true,
   onInstrumentChange,
   showPreviewOnClick = false,
-  showSamplePackButton = false,
-  showPresetButton = false,
   showEditButton = false,
   onEditInstrument,
   variant = 'default',
-  showHivelyImport = false,
-  showSunVoxImport = false,
-  showFurnaceBrowser = false,
 }) => {
   const {
     instruments,
@@ -115,9 +96,8 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
     updateInstrument: state.updateInstrument,
   })));
 
-  const { useHexNumbers, setShowSamplePackModal, setInstrumentEditorPoppedOut, instrumentEditorPoppedOut, activeSystemPreset, showNewInstrumentBrowser, setShowNewInstrumentBrowser } = useUIStore(useShallow(s => ({
+  const { useHexNumbers, setInstrumentEditorPoppedOut, instrumentEditorPoppedOut, activeSystemPreset, showNewInstrumentBrowser, setShowNewInstrumentBrowser } = useUIStore(useShallow(s => ({
     useHexNumbers: s.useHexNumbers,
-    setShowSamplePackModal: s.setShowSamplePackModal,
     setInstrumentEditorPoppedOut: s.setInstrumentEditorPoppedOut,
     instrumentEditorPoppedOut: s.instrumentEditorPoppedOut,
     activeSystemPreset: s.activeSystemPreset,
@@ -137,10 +117,6 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
   const previewInfoRef = useRef<{ instId: number; note: string; inst: InstrumentConfig; type?: 'gt' | 'sf2' } | null>(null);
   const editInputRef = useRef<HTMLInputElement>(null);
 
-  const [showLoadModal, setShowLoadModal] = useState(false);
-  const [showHivelyImportDialog, setShowHivelyImportDialog] = useState(false);
-  const [showSunVoxImportDialog, setShowSunVoxImportDialog] = useState(false);
-  const [showFurnaceBrowserDialog, setShowFurnaceBrowserDialog] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editingName, setEditingName] = useState('');
 
@@ -442,22 +418,6 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
     input.click();
   }, [updateInstrument]);
 
-  const handleHivelyImport = useCallback(
-    (toImport: Array<{ name: string; config: HivelyConfig }>) => {
-      for (const { name, config: hively } of toImport) {
-        createInstrument({ name, synthType: 'HivelySynth', hively });
-      }
-    },
-    [createInstrument]
-  );
-
-  const handleSunVoxImport = useCallback(
-    (name: string, config: SunVoxConfig) => {
-      createInstrument({ name, synthType: 'SunVoxSynth', sunvox: config });
-    },
-    [createInstrument]
-  );
-
   const handleSaveMli = useCallback((e: React.MouseEvent, inst: InstrumentConfig) => {
     e.stopPropagation();
     const bytes = exportMusicLineInstrument(inst);
@@ -527,14 +487,14 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
   };
 
   // Show action bar if any action buttons are enabled
-  const showActionBar = isFT2 && (showPresetButton || showSamplePackButton || showEditButton || showHivelyImport || showSunVoxImport || showFurnaceBrowser);
+  const showActionBar = isFT2;
 
   return (
     <div className={`flex flex-col h-full ${isFT2 ? 'bg-ft2-bg border-l border-ft2-border' : ''}`}>
       {/* Action Buttons (FT2 variant) */}
       {showActionBar && (
         <div className="px-2 py-2 bg-ft2-header border-b border-ft2-border flex-shrink-0">
-          <div className="grid grid-cols-4 gap-1">
+          <div className="grid grid-cols-2 gap-1">
             <button
               onClick={handleAdd}
               className="flex flex-col items-center gap-0.5 px-1 py-1.5 bg-ft2-bg border border-ft2-border hover:border-ft2-highlight hover:text-ft2-highlight transition-colors text-ft2-text"
@@ -543,26 +503,6 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
               <Plus size={14} />
               <span className="text-[8px] font-bold">ADD</span>
             </button>
-            {showPresetButton && (
-              <button
-                onClick={() => setShowLoadModal(true)}
-                className="flex flex-col items-center gap-0.5 px-1 py-1.5 bg-ft2-bg border border-ft2-border hover:border-ft2-highlight hover:text-ft2-highlight transition-colors text-ft2-text"
-                title="Load preset into current instrument"
-              >
-                <FolderOpen size={14} />
-                <span className="text-[8px] font-bold">PRESET</span>
-              </button>
-            )}
-            {showSamplePackButton && (
-              <button
-                onClick={() => setShowSamplePackModal(true)}
-                className="flex flex-col items-center gap-0.5 px-1 py-1.5 bg-ft2-bg border border-ft2-border hover:border-ft2-highlight hover:text-ft2-highlight transition-colors text-ft2-text"
-                title="Browse sample packs"
-              >
-                <Package size={14} />
-                <span className="text-[8px] font-bold">SAMPLE</span>
-              </button>
-            )}
             {showEditButton && (
               <button
                 onClick={() => onEditInstrument?.(currentInstrumentId!)}
@@ -571,36 +511,6 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
               >
                 <Pencil size={14} />
                 <span className="text-[8px] font-bold">EDIT</span>
-              </button>
-            )}
-            {showHivelyImport && (
-              <button
-                onClick={() => setShowHivelyImportDialog(true)}
-                className="flex flex-col items-center gap-0.5 px-1 py-1.5 bg-ft2-bg border border-ft2-border hover:border-ft2-highlight hover:text-ft2-highlight transition-colors text-ft2-text"
-                title="Import instruments from HVL/AHX file"
-              >
-                <Upload size={14} />
-                <span className="text-[8px] font-bold">HVL</span>
-              </button>
-            )}
-            {showSunVoxImport && (
-              <button
-                onClick={() => setShowSunVoxImportDialog(true)}
-                className="flex flex-col items-center gap-0.5 px-1 py-1.5 bg-ft2-bg border border-ft2-border hover:border-ft2-highlight hover:text-ft2-highlight transition-colors text-ft2-text"
-                title="Import instrument from .sunsynth file"
-              >
-                <Upload size={14} />
-                <span className="text-[8px] font-bold">SVX</span>
-              </button>
-            )}
-            {showFurnaceBrowser && (
-              <button
-                onClick={() => setShowFurnaceBrowserDialog(true)}
-                className="flex flex-col items-center gap-0.5 px-1 py-1.5 bg-ft2-bg border border-ft2-border hover:border-accent-primary hover:text-accent-primary transition-colors text-ft2-text"
-                title="Browse Furnace chip synths"
-              >
-                <Cpu size={14} />
-                <span className="text-[8px] font-bold">CHIP</span>
               </button>
             )}
           </div>
@@ -1053,48 +963,12 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
         </span>
       </div>
 
-      {/* Modals (FT2 variant) */}
-      {showLoadModal && (
-        <LoadPresetModal onClose={() => setShowLoadModal(false)} />
-      )}
-      {showHivelyImportDialog && (
-        <HivelyImportDialog
-          onClose={() => setShowHivelyImportDialog(false)}
-          onImport={handleHivelyImport}
-        />
-      )}
-      {showSunVoxImportDialog && (
-        <SunVoxImportDialog
-          onClose={() => setShowSunVoxImportDialog(false)}
-          onImport={handleSunVoxImport}
-        />
-      )}
-      {showFurnaceBrowserDialog && (
-        <FurnacePresetBrowser onClose={() => setShowFurnaceBrowserDialog(false)} />
-      )}
+      {/* Add Instrument Dialog (unified: Synth / Preset / Sample / Library) */}
       {showNewInstrumentBrowser && (
-        <div className="fixed inset-0 z-[99990] bg-black/80 flex items-center justify-center" onClick={() => setShowNewInstrumentBrowser(false)}>
-          <div className="bg-dark-bg border border-dark-border rounded-lg shadow-2xl w-[90%] max-w-4xl max-h-[85vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between px-4 py-3 border-b border-dark-border">
-              <h3 className="text-lg font-semibold text-text-primary flex items-center gap-2">
-                <Music2 size={20} className="text-accent-primary" />
-                Add New Instrument
-              </h3>
-              <button
-                onClick={() => setShowNewInstrumentBrowser(false)}
-                className="p-1.5 rounded hover:bg-dark-bgHover text-text-muted hover:text-text-primary transition-colors"
-              >
-                <X size={18} />
-              </button>
-            </div>
-            <div className="flex-1 overflow-y-auto p-4">
-              <CategorizedSynthSelector
-                onSelect={(type) => handleCreateWithSynthType(type)}
-                createMode
-              />
-            </div>
-          </div>
-        </div>
+        <AddInstrumentDialog
+          onClose={() => setShowNewInstrumentBrowser(false)}
+          onCreateWithSynthType={(type) => handleCreateWithSynthType(type)}
+        />
       )}
     </div>
   );
