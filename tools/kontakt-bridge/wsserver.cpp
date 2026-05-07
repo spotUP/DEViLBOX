@@ -15,6 +15,7 @@
 #pragma comment(lib, "ws2_32.lib")
 #else
 #include <arpa/inet.h>
+#include <csignal>
 #include <netinet/in.h>
 #include <sys/socket.h>
 #include <unistd.h>
@@ -240,6 +241,10 @@ bool WebSocketServer::start() {
     setsockopt(serverSocket_, SOL_SOCKET, SO_REUSEADDR, reinterpret_cast<const char*>(&reuse), sizeof(reuse));
 #else
     setsockopt(serverSocket_, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(reuse));
+#ifdef SO_NOSIGPIPE
+    int nosigpipe = 1;
+    setsockopt(serverSocket_, SOL_SOCKET, SO_NOSIGPIPE, &nosigpipe, sizeof(nosigpipe));
+#endif
 #endif
 
     sockaddr_in addr{};
@@ -333,6 +338,12 @@ void WebSocketServer::shutdownSockets() {
 }
 
 void WebSocketServer::acceptLoop() {
+    // Block SIGPIPE on this thread
+    sigset_t sigpipeMask;
+    sigemptyset(&sigpipeMask);
+    sigaddset(&sigpipeMask, SIGPIPE);
+    pthread_sigmask(SIG_BLOCK, &sigpipeMask, nullptr);
+    
     while (running_) {
         sockaddr_in clientAddr{};
 #ifdef _WIN32
@@ -340,17 +351,23 @@ void WebSocketServer::acceptLoop() {
 #else
         socklen_t clientLen = sizeof(clientAddr);
 #endif
+        write(STDERR_FILENO, "[ws] accept waiting\n", 20);
         const SocketHandle socket = accept(serverSocket_, reinterpret_cast<sockaddr*>(&clientAddr), &clientLen);
         if (socket == kInvalidSocket) {
             continue;
         }
 
+        write(STDERR_FILENO, "[ws] client accepted\n", 21);
+
         if (!performHandshake(socket)) {
+            write(STDERR_FILENO, "[ws] handshake failed\n", 22);
             closeSocket(socket);
             continue;
         }
 
+        write(STDERR_FILENO, "[ws] handshake ok\n", 18);
         replaceClient(socket);
+        write(STDERR_FILENO, "[ws] replaceClient done\n", 24);
     }
 }
 
@@ -359,6 +376,11 @@ void WebSocketServer::replaceClient(SocketHandle socket) {
     if (clientThread_.joinable()) {
         clientThread_.join();
     }
+
+#if !defined(_WIN32) && defined(SO_NOSIGPIPE)
+    int nosigpipe = 1;
+    setsockopt(socket, SOL_SOCKET, SO_NOSIGPIPE, &nosigpipe, sizeof(nosigpipe));
+#endif
 
     {
         std::lock_guard<std::mutex> lock(clientMutex_);
@@ -529,12 +551,18 @@ bool WebSocketServer::sendFrame(std::uint8_t opcode, const void* data, std::size
     }
 
     if (!sendAll(socket, header.data(), header.size())) {
+        // Send failed — close the dead client
+        closeClientSocket();
         return false;
     }
     if (size == 0) {
         return true;
     }
-    return sendAll(socket, data, size);
+    if (!sendAll(socket, data, size)) {
+        closeClientSocket();
+        return false;
+    }
+    return true;
 }
 
 void WebSocketServer::closeServerSocket() {

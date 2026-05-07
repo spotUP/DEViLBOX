@@ -2,8 +2,10 @@
 
 #include <algorithm>
 #include <chrono>
+#include <csignal>
 #include <cstring>
 #include <filesystem>
+#include <fstream>
 #include <iostream>
 #include <vector>
 
@@ -110,41 +112,133 @@ bool KontaktHost::loadPreset(const std::string& path) {
         return false;
     }
 
-    bool loaded = false;
-    CFURLRef url = CFURLCreateFromFileSystemRepresentation(kCFAllocatorDefault,
-                                                           reinterpret_cast<const UInt8*>(path.c_str()),
-                                                           static_cast<CFIndex>(path.size()),
-                                                           false);
-    if (url) {
-        const auto result = AudioUnitSetProperty(unit_,
-                                                 kAudioUnitProperty_ClassInfoFromDocument,
-                                                 kAudioUnitScope_Global,
-                                                 0,
-                                                 &url,
-                                                 sizeof(url));
-        loaded = (result == noErr);
-        CFRelease(url);
+    // Read the entire file
+    std::ifstream file(path, std::ios::binary | std::ios::ate);
+    if (!file) {
+        setError("Cannot open file: " + path);
+        return false;
+    }
+    auto fileSize = file.tellg();
+    file.seekg(0);
+    std::vector<uint8_t> fileData(static_cast<size_t>(fileSize));
+    file.read(reinterpret_cast<char*>(fileData.data()), fileSize);
+    file.close();
+
+    // Try to extract PCHK blob from NKSF RIFF container
+    std::vector<uint8_t> pchkBlob;
+    if (fileSize >= 12) {
+        uint32_t riffId = 0;
+        std::memcpy(&riffId, fileData.data(), 4);
+        // "RIFF" = 0x46464952 little-endian
+        if (riffId == 0x46464952u) {
+            // Skip RIFF header (4 bytes ID + 4 bytes size + 4 bytes form type)
+            size_t offset = 12;
+            while (offset + 8 <= fileData.size()) {
+                uint32_t chunkId = 0;
+                uint32_t chunkSize = 0;
+                std::memcpy(&chunkId, fileData.data() + offset, 4);
+                std::memcpy(&chunkSize, fileData.data() + offset + 4, 4); // LE
+
+                // "PCHK" = 0x4B484350 big-endian
+                if (chunkId == 0x4B484350u) {
+                    // PCHK chunk: skip 4-byte version, rest is plugin state blob
+                    if (offset + 8 + 4 <= fileData.size() && chunkSize > 4) {
+                        size_t blobStart = offset + 8 + 4;
+                        size_t blobSize = chunkSize - 4;
+                        if (blobStart + blobSize <= fileData.size()) {
+                            pchkBlob.assign(fileData.data() + blobStart,
+                                            fileData.data() + blobStart + blobSize);
+                            std::cout << "[kontakt-bridge] extracted PCHK blob: " << blobSize << " bytes" << std::endl;
+                        }
+                    }
+                    break;
+                }
+
+                // Advance to next chunk (aligned to 2-byte boundary per RIFF spec)
+                offset += 8 + chunkSize;
+                if (offset % 2 != 0) offset++;
+            }
+        }
     }
 
+    bool loaded = false;
+
+    if (!pchkBlob.empty()) {
+        // Build an AUPreset CFDictionary with the PCHK blob as the "data" key
+        AudioComponentDescription auDesc{};
+        AudioComponentGetDescription(component_, &auDesc);
+
+        CFMutableDictionaryRef dict = CFDictionaryCreateMutable(
+            kCFAllocatorDefault, 0,
+            &kCFTypeDictionaryKeyCallBacks,
+            &kCFTypeDictionaryValueCallBacks);
+
+        SInt32 typeVal = static_cast<SInt32>(auDesc.componentType);
+        SInt32 subtypeVal = static_cast<SInt32>(auDesc.componentSubType);
+        SInt32 mfrVal = static_cast<SInt32>(auDesc.componentManufacturer);
+        SInt32 versionVal = 0;
+
+        CFNumberRef typeNum = CFNumberCreate(kCFAllocatorDefault, kCFNumberSInt32Type, &typeVal);
+        CFNumberRef subtypeNum = CFNumberCreate(kCFAllocatorDefault, kCFNumberSInt32Type, &subtypeVal);
+        CFNumberRef mfrNum = CFNumberCreate(kCFAllocatorDefault, kCFNumberSInt32Type, &mfrVal);
+        CFNumberRef versionNum = CFNumberCreate(kCFAllocatorDefault, kCFNumberSInt32Type, &versionVal);
+
+        CFStringRef presetNameCF = CFStringCreateWithCString(kCFAllocatorDefault, pathStem(path).c_str(), kCFStringEncodingUTF8);
+        CFDataRef blobData = CFDataCreate(kCFAllocatorDefault, pchkBlob.data(), static_cast<CFIndex>(pchkBlob.size()));
+
+        CFDictionarySetValue(dict, CFSTR("type"), typeNum);
+        CFDictionarySetValue(dict, CFSTR("subtype"), subtypeNum);
+        CFDictionarySetValue(dict, CFSTR("manufacturer"), mfrNum);
+        CFDictionarySetValue(dict, CFSTR("version"), versionNum);
+        CFDictionarySetValue(dict, CFSTR("name"), presetNameCF);
+        CFDictionarySetValue(dict, CFSTR("data"), blobData);
+
+        CFPropertyListRef plist = dict;
+        OSStatus result = AudioUnitSetProperty(unit_,
+                                                kAudioUnitProperty_ClassInfo,
+                                                kAudioUnitScope_Global,
+                                                0,
+                                                &plist,
+                                                sizeof(plist));
+        loaded = (result == noErr);
+        if (!loaded) {
+            std::cerr << "[kontakt-bridge] kAudioUnitProperty_ClassInfo failed: " << result << std::endl;
+        } else {
+            std::cout << "[kontakt-bridge] preset restored via ClassInfo" << std::endl;
+        }
+
+        CFRelease(blobData);
+        CFRelease(presetNameCF);
+        CFRelease(versionNum);
+        CFRelease(mfrNum);
+        CFRelease(subtypeNum);
+        CFRelease(typeNum);
+        CFRelease(dict);
+    }
+
+    // Fallback: try ClassInfoFromDocument (works for .aupreset and some .nki)
     if (!loaded) {
-        CFStringRef presetName = CFStringCreateWithCString(kCFAllocatorDefault, pathStem(path).c_str(), kCFStringEncodingUTF8);
-        if (presetName) {
-            AUPreset preset{};
-            preset.presetNumber = -1;
-            preset.presetName = presetName;
+        CFURLRef url = CFURLCreateFromFileSystemRepresentation(kCFAllocatorDefault,
+                                                               reinterpret_cast<const UInt8*>(path.c_str()),
+                                                               static_cast<CFIndex>(path.size()),
+                                                               false);
+        if (url) {
             const auto result = AudioUnitSetProperty(unit_,
-                                                     kAudioUnitProperty_PresentPreset,
+                                                     kAudioUnitProperty_ClassInfoFromDocument,
                                                      kAudioUnitScope_Global,
                                                      0,
-                                                     &preset,
-                                                     sizeof(preset));
+                                                     &url,
+                                                     sizeof(url));
             loaded = (result == noErr);
-            CFRelease(presetName);
+            if (loaded) {
+                std::cout << "[kontakt-bridge] preset loaded via ClassInfoFromDocument" << std::endl;
+            }
+            CFRelease(url);
         }
     }
 
     if (!loaded) {
-        setError("Kontakt AU did not accept the .nki path; load the preset from the plugin UI");
+        setError("Could not load preset: " + pathStem(path));
         return false;
     }
 
@@ -192,6 +286,7 @@ bool KontaktHost::initializeMacAU() {
         });
 
         if (lowerName.find("kontakt 8") != std::string::npos || lowerName.find("kontakt") != std::string::npos) {
+            std::cout << "[kontakt-bridge] found AU: " << name << std::endl;
             break;
         }
     }
@@ -258,9 +353,17 @@ bool KontaktHost::initializeWindowsVst3Stub() {
 
 void KontaktHost::renderLoop() {
 #ifdef __APPLE__
+    // Block SIGPIPE on this thread — AU plugins may override process-wide
+    // SIG_IGN on their own threads, so we need thread-level masking
+    sigset_t sigpipeMask;
+    sigemptyset(&sigpipeMask);
+    sigaddset(&sigpipeMask, SIGPIPE);
+    pthread_sigmask(SIG_BLOCK, &sigpipeMask, nullptr);
+    
     std::vector<float> left(status_.blockSize, 0.0f);
     std::vector<float> right(status_.blockSize, 0.0f);
     std::uint64_t framePosition = 0;
+    std::uint64_t frameCount = 0;
 
     struct StereoBufferList {
         UInt32 mNumberBuffers;
@@ -276,6 +379,10 @@ void KontaktHost::renderLoop() {
     bufferList.mBuffers[1].mData = right.data();
 
     while (running_) {
+        // Clear buffers before each render (AU may not zero them)
+        std::fill(left.begin(), left.end(), 0.0f);
+        std::fill(right.begin(), right.end(), 0.0f);
+
         AudioTimeStamp timeStamp{};
         timeStamp.mFlags = kAudioTimeStampSampleTimeValid;
         timeStamp.mSampleTime = static_cast<Float64>(framePosition);
@@ -292,9 +399,13 @@ void KontaktHost::renderLoop() {
         }
 
         if (result != noErr) {
+            if (frameCount < 5) {
+                std::cerr << "[kontakt-bridge] AudioUnitRender error: " << result << " at frame " << framePosition << std::endl;
+            }
             std::fill(left.begin(), left.end(), 0.0f);
             std::fill(right.begin(), right.end(), 0.0f);
         }
+        frameCount++;
 
         if (callback) {
             callback(left.data(), right.data(), status_.blockSize);

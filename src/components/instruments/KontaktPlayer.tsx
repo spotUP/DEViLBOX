@@ -61,14 +61,12 @@ export const KontaktPlayer: React.FC = () => {
     bridgeStatus,
     currentPreset,
     error,
-    sampleRate,
     volume,
     connect,
     disconnect,
     noteOn,
     noteOff,
     setVolume,
-    requestStatus,
   } = useKontaktStore();
 
   const [activeNotes, setActiveNotes] = useState<number[]>([]);
@@ -110,12 +108,11 @@ export const KontaktPlayer: React.FC = () => {
   const handleConnect = useCallback(async () => {
     try {
       await connect();
-      requestStatus();
-      notify.success('Kontakt bridge connected');
+      notify.success('Kontakt MIDI output connected');
     } catch (connectError) {
-      notify.error(connectError instanceof Error ? connectError.message : 'Kontakt bridge connection failed');
+      notify.error(connectError instanceof Error ? connectError.message : 'Kontakt MIDI connection failed');
     }
-  }, [connect, requestStatus]);
+  }, [connect]);
 
   const handleDisconnect = useCallback(() => {
     releaseAll();
@@ -161,7 +158,7 @@ export const KontaktPlayer: React.FC = () => {
               <div className="text-[12px] text-text-primary truncate">
                 {currentPreset ?? 'No preset loaded'}
               </div>
-              <div className="text-[9px] text-text-muted">{sampleRate} Hz · Stereo</div>
+              <div className="text-[9px] text-text-muted">{bridgeStatus === 'ready' ? 'Bridge connected' : 'Bridge not running'}</div>
             </div>
             <div className="flex gap-2">
               {isReady ? (
