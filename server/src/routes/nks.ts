@@ -3,13 +3,15 @@
  *
  * Reads from the Komplete Kontrol / Maschine komplete.db3 SQLite database
  * (populated when NKS plugins/libraries are installed via Native Access),
- * plus scans for .nksf files found through macOS plist ContentDir entries.
+ * plus scans for .nicnt libraries and preview files.
  *
  * Endpoints:
- *   GET /api/nks/status         — DB path, preset count, product count
- *   GET /api/nks/products       — all product/brand entries with artwork paths
- *   GET /api/nks/presets        — paginated preset list with filters
- *   GET /api/nks/artwork/:brand/:product/:file  — serve artwork image
+ *   GET /api/nks/status            — DB path, preset count, product count
+ *   GET /api/nks/products          — all product/brand entries with artwork paths
+ *   GET /api/nks/presets           — paginated preset list with filters
+ *   GET /api/nks/libraries         — installed Kontakt libraries from .nicnt files
+ *   GET /api/nks/library-preview   — serve library preview OGG files
+ *   GET /api/nks/artwork/:product/:file  — serve artwork image
  */
 
 import { Router, Request, Response } from 'express';
@@ -25,14 +27,12 @@ const router = Router();
 function getKKDbPath(): string {
   if (process.platform === 'darwin') {
     const home = os.homedir();
-    // Priority order: most data first
     const candidates = [
       path.join(home, 'Library/Application Support/Native Instruments/Kontakt 8/komplete.db3'),
       path.join(home, 'Library/Application Support/Native Instruments/Kontakt 7/komplete.db3'),
       path.join(home, 'Library/Application Support/Native Instruments/Maschine 3/komplete.db3'),
       path.join(home, 'Library/Application Support/Native Instruments/Komplete Kontrol/Browser Data/komplete.db3'),
     ];
-    // Return the first candidate that exists and has data (size > 100KB)
     for (const p of candidates) {
       try {
         const stat = fs.statSync(p);
@@ -41,7 +41,7 @@ function getKKDbPath(): string {
     }
     return candidates[candidates.length - 1];
   }
-  // Windows
+
   return path.join(
     process.env.LOCALAPPDATA ?? '',
     'Native Instruments/Komplete Kontrol/komplete.db3',
@@ -60,6 +60,13 @@ function getUserContentPath(): string {
     return path.join(os.homedir(), 'Documents/Native Instruments/User Content');
   }
   return path.join(os.homedir(), 'Documents/Native Instruments/User Content');
+}
+
+function getKontaktLibraryRoots(): string[] {
+  if (process.platform === 'darwin') {
+    return ['/Users/Shared'];
+  }
+  return ['C:/Users/Public/Documents'];
 }
 
 // ── DB helper ─────────────────────────────────────────────────────────────────
@@ -99,9 +106,17 @@ interface NKSPreset {
   subbank: string | null;
   types: string | null;
   character: string | null;
-  deviceType: string;
+  deviceType: number;
   fileName: string;
   fileExt: string;
+  filePath: string;
+}
+
+interface NKSLibraryEntry {
+  name: string;
+  libraryPath: string;
+  previewOgg: string | null;
+  nicntPath: string;
 }
 
 // ── Artwork helpers ────────────────────────────────────────────────────────────
@@ -116,17 +131,6 @@ const LOGO_FILES = [
   'VB_logo.png',
   'OSO_logo.png',
 ];
-
-function findArtwork(productName: string, files: string[]): string | null {
-  const base = getNIResourcesPath();
-  const folder = path.join(base, productName.toLowerCase());
-  if (!fs.existsSync(folder)) return null;
-  for (const f of files) {
-    const full = path.join(folder, f);
-    if (fs.existsSync(full)) return full;
-  }
-  return null;
-}
 
 function artworkApiUrl(productName: string, fileName: string): string {
   const encoded = encodeURIComponent(productName.toLowerCase());
@@ -165,12 +169,105 @@ function scanNIProducts(): string[] {
     return fs.readdirSync(base)
       .filter(f => fs.statSync(path.join(base, f)).isDirectory())
       .sort();
-  } catch { return []; }
+  } catch {
+    return [];
+  }
+}
+
+// ── Kontakt library scanning helpers ───────────────────────────────────────────
+
+function scanForNicntFiles(basePath: string, maxDepth: number, depth = 0): string[] {
+  if (depth > maxDepth || !fs.existsSync(basePath)) {
+    return [];
+  }
+
+  const results: string[] = [];
+  for (const entry of fs.readdirSync(basePath, { withFileTypes: true })) {
+    const fullPath = path.join(basePath, entry.name);
+    if (entry.isFile() && entry.name.toLowerCase().endsWith('.nicnt')) {
+      results.push(fullPath);
+      continue;
+    }
+    if (entry.isDirectory()) {
+      results.push(...scanForNicntFiles(fullPath, maxDepth, depth + 1));
+    }
+  }
+  return results;
+}
+
+function parseNicntName(buffer: Buffer): string | null {
+  const text = buffer.toString('utf8');
+  const start = text.indexOf('<ProductHints');
+  if (start === -1) {
+    return null;
+  }
+
+  const end = text.indexOf('</ProductHints>', start);
+  const xml = end === -1 ? text.slice(start) : text.slice(start, end + '</ProductHints>'.length);
+  const match = xml.match(/<Name>([^<]+)<\/Name>/i);
+  return match?.[1]?.trim() || null;
+}
+
+function buildLibraryPreviewUrl(filePath: string): string {
+  return `/api/nks/library-preview?path=${encodeURIComponent(filePath)}`;
+}
+
+function findPreviewOgg(libraryPath: string): string | null {
+  const candidates = [
+    path.join(libraryPath, 'Instruments', '.previews'),
+    path.join(libraryPath, '.previews'),
+  ];
+
+  for (const folder of candidates) {
+    if (!fs.existsSync(folder)) {
+      continue;
+    }
+
+    const files = fs.readdirSync(folder)
+      .filter((file) => file.toLowerCase().endsWith('.ogg'))
+      .sort((a, b) => Number(!a.toLowerCase().endsWith('.nki.ogg')) - Number(!b.toLowerCase().endsWith('.nki.ogg')) || a.localeCompare(b));
+
+    if (files.length > 0) {
+      return buildLibraryPreviewUrl(path.join(folder, files[0]));
+    }
+  }
+
+  return null;
+}
+
+function isPathInsideRoots(candidatePath: string, roots: string[]): boolean {
+  const resolved = path.resolve(candidatePath);
+  return roots.some((root) => {
+    const base = path.resolve(root);
+    return resolved === base || resolved.startsWith(`${base}${path.sep}`);
+  });
+}
+
+function scanKontaktLibraries(): NKSLibraryEntry[] {
+  const nicntFiles = getKontaktLibraryRoots().flatMap((root) => scanForNicntFiles(root, 3));
+  const libraries = new Map<string, NKSLibraryEntry>();
+
+  for (const nicntPath of nicntFiles) {
+    try {
+      const buffer = fs.readFileSync(nicntPath);
+      const libraryPath = path.dirname(nicntPath);
+      const name = parseNicntName(buffer) || path.basename(libraryPath);
+      libraries.set(nicntPath, {
+        name,
+        libraryPath,
+        previewOgg: findPreviewOgg(libraryPath),
+        nicntPath,
+      });
+    } catch (error) {
+      console.warn('[NKS] nicnt parse error:', nicntPath, error);
+    }
+  }
+
+  return [...libraries.values()].sort((a, b) => a.name.localeCompare(b.name));
 }
 
 // ── Routes ────────────────────────────────────────────────────────────────────
 
-/** GET /api/nks/status */
 router.get('/status', (_req: Request, res: Response) => {
   const dbPath = getKKDbPath();
   const dbExists = fs.existsSync(dbPath);
@@ -197,12 +294,10 @@ router.get('/status', (_req: Request, res: Response) => {
   });
 });
 
-/** GET /api/nks/products */
 router.get('/products', (_req: Request, res: Response) => {
   const db = openDb();
   const niProducts = scanNIProducts();
 
-  // Build a map of products from the DB
   const dbProducts = new Map<string, { brand: string; count: number }>();
   if (db) {
     try {
@@ -218,11 +313,9 @@ router.get('/products', (_req: Request, res: Response) => {
     } catch { /* empty */ }
   }
 
-  // Merge DB products + NI Resources products
   const seen = new Set<string>();
   const products: NKSProduct[] = [];
 
-  // Products from DB first (have preset counts)
   for (const [key, info] of dbProducts) {
     seen.add(key);
     const { artworkUrl, logoUrl } = buildArtworkUrls(key);
@@ -235,7 +328,6 @@ router.get('/products', (_req: Request, res: Response) => {
     });
   }
 
-  // Then NI Resources products (might have artwork but no presets loaded yet)
   for (const p of niProducts) {
     if (seen.has(p)) continue;
     seen.add(p);
@@ -252,7 +344,31 @@ router.get('/products', (_req: Request, res: Response) => {
   res.json(products);
 });
 
-/** GET /api/nks/presets?q=&product=&brand=&type=&character=&offset=&limit= */
+router.get('/libraries', (_req: Request, res: Response) => {
+  res.json(scanKontaktLibraries());
+});
+
+router.get('/library-preview', (req: Request, res: Response) => {
+  const requested = typeof req.query.path === 'string' ? req.query.path : '';
+  if (!requested) {
+    res.status(400).json({ error: 'Missing path' });
+    return;
+  }
+
+  const resolved = path.resolve(requested);
+  if (!resolved.toLowerCase().endsWith('.ogg') || !isPathInsideRoots(resolved, getKontaktLibraryRoots())) {
+    res.status(403).json({ error: 'Forbidden' });
+    return;
+  }
+
+  if (!fs.existsSync(resolved)) {
+    res.status(404).json({ error: 'Not found' });
+    return;
+  }
+
+  res.sendFile(resolved);
+});
+
 router.get('/presets', (req: Request, res: Response) => {
   const db = openDb();
   if (!db) {
@@ -260,13 +376,13 @@ router.get('/presets', (req: Request, res: Response) => {
     return;
   }
 
-  const q         = (req.query.q as string) ?? '';
-  const product   = (req.query.product as string) ?? '';
-  const brand     = (req.query.brand as string) ?? '';
-  const type      = (req.query.type as string) ?? '';
+  const q = (req.query.q as string) ?? '';
+  const product = (req.query.product as string) ?? '';
+  const brand = (req.query.brand as string) ?? '';
+  const type = (req.query.type as string) ?? '';
   const character = (req.query.character as string) ?? '';
-  const offset    = parseInt((req.query.offset as string) ?? '0', 10);
-  const limit     = Math.min(200, parseInt((req.query.limit as string) ?? '50', 10));
+  const offset = parseInt((req.query.offset as string) ?? '0', 10);
+  const limit = Math.min(200, parseInt((req.query.limit as string) ?? '50', 10));
 
   const conditions: string[] = [];
   const params: string[] = [];
@@ -305,7 +421,15 @@ router.get('/presets', (req: Request, res: Response) => {
       SELECT s.id, s.name,
              COALESCE(b.bcvendor, 'Native Instruments') AS vendor,
              b.entry1 AS product, b.entry2 AS bank, b.entry3 AS subbank,
-             s.device_type_flags, s.file_name, COALESCE(s.file_ext, 'nksf') AS file_ext,
+             s.device_type_flags AS deviceType,
+             s.file_name AS fileName,
+             COALESCE(s.file_ext, 'nksf') AS fileExt,
+             CASE
+               WHEN s.file_name LIKE '/%' OR s.file_name GLOB '[A-Za-z]:/*' THEN s.file_name
+               WHEN cp.path IS NOT NULL AND s.sub_path IS NOT NULL AND s.sub_path != '' THEN cp.path || '/' || s.sub_path || '/' || s.file_name
+               WHEN cp.path IS NOT NULL THEN cp.path || '/' || s.file_name
+               ELSE s.file_name
+             END AS filePath,
              (SELECT group_concat(c.category || COALESCE(', ' || c.subcategory, ''), ' / ')
               FROM k_category c JOIN k_sound_info_category sc ON c.id = sc.category_id
               WHERE sc.sound_info_id = s.id LIMIT 3) AS types,
@@ -314,6 +438,7 @@ router.get('/presets', (req: Request, res: Response) => {
               WHERE sm.sound_info_id = s.id LIMIT 5) AS character
       FROM k_sound_info s
       JOIN k_bank_chain b ON s.bank_chain_id = b.id
+      LEFT JOIN k_content_path cp ON s.content_path_id = cp.id
       ${where}
       ORDER BY b.entry1, s.name
       LIMIT ? OFFSET ?
@@ -326,20 +451,16 @@ router.get('/presets', (req: Request, res: Response) => {
   }
 });
 
-/** GET /api/nks/artwork/:product/:file — serve artwork image from NI Resources */
 router.get('/artwork/:product/:file', (req: Request, res: Response) => {
   const product = decodeURIComponent(req.params.product);
-  const file    = decodeURIComponent(req.params.file);
+  const file = decodeURIComponent(req.params.file);
 
-  // Sanitize — only allow safe filenames
   if (!/^[\w .()-]+$/.test(product) || !/^[\w .-]+$/.test(file)) {
     res.status(400).json({ error: 'Invalid path' });
     return;
   }
 
   const fullPath = path.join(getNIResourcesPath(), product, file);
-
-  // Ensure the resolved path is inside NI Resources (prevent traversal)
   const safeBase = path.resolve(getNIResourcesPath());
   const resolved = path.resolve(fullPath);
   if (!resolved.startsWith(safeBase)) {
@@ -355,7 +476,6 @@ router.get('/artwork/:product/:file', (req: Request, res: Response) => {
   res.sendFile(resolved);
 });
 
-/** GET /api/nks/types — all unique types from DB */
 router.get('/types', (_req: Request, res: Response) => {
   const db = openDb();
   if (!db) { res.json([]); return; }
@@ -369,7 +489,6 @@ router.get('/types', (_req: Request, res: Response) => {
   }
 });
 
-/** GET /api/nks/characters — all unique character/mode tags */
 router.get('/characters', (_req: Request, res: Response) => {
   const db = openDb();
   if (!db) { res.json([]); return; }

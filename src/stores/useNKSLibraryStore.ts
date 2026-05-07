@@ -30,6 +30,14 @@ export interface NKSPreset {
   deviceType: number;
   fileName: string;
   fileExt: string;
+  filePath: string;
+}
+
+export interface NKSLibraryEntry {
+  name: string;
+  libraryPath: string;
+  previewOgg: string | null;
+  nicntPath: string;
 }
 
 export interface DevilboxProduct {
@@ -67,6 +75,10 @@ interface NKSLibraryState {
   productsLoading: boolean;
   selectedProduct: string | null;
 
+  // Installed Kontakt libraries
+  libraries: NKSLibraryEntry[];
+  librariesLoading: boolean;
+
   // DEViLBOX products
   devilboxProducts: DevilboxProduct[];
   devilboxProductsLoading: boolean;
@@ -97,6 +109,7 @@ interface NKSLibraryState {
 interface NKSLibraryActions {
   loadStatus: () => Promise<void>;
   loadProducts: () => Promise<void>;
+  loadLibraries: () => Promise<void>;
   loadDevilboxProducts: () => Promise<void>;
   loadPresets: (append?: boolean) => Promise<void>;
   loadDevilboxPresets: (synth: string, category?: string, search?: string) => Promise<void>;
@@ -135,6 +148,8 @@ export const useNKSLibraryStore = create<NKSLibraryStore>()(
     products: [],
     productsLoading: false,
     selectedProduct: null,
+    libraries: [],
+    librariesLoading: false,
     devilboxProducts: [],
     devilboxProductsLoading: false,
     selectedDevilboxSynth: null,
@@ -173,6 +188,17 @@ export const useNKSLibraryStore = create<NKSLibraryStore>()(
       } catch (e) {
         console.warn('[NKSStore] products error', e);
         set(s => { s.productsLoading = false; });
+      }
+    },
+
+    loadLibraries: async () => {
+      set(s => { s.librariesLoading = true; });
+      try {
+        const data = await apiFetch<NKSLibraryEntry[]>(`${API}/libraries`);
+        set(s => { s.libraries = data; s.librariesLoading = false; });
+      } catch (e) {
+        console.warn('[NKSStore] libraries error', e);
+        set(s => { s.librariesLoading = false; });
       }
     },
 
