@@ -31,22 +31,25 @@ const WS_PORT   = 4005;
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 type NIHIAEvent =
-  | { type: 'knob';    knob: number; delta: number; raw: number }
+  | { type: 'knob'; knob: number; delta: number; raw: number }
   | { type: 'encoder'; index: number; name: string; value: number; raw: number }
-  | { type: 'pad';     pad: number;  velocity: number; pressed: boolean }
-  | { type: 'button';  btn?: number; btnId?: number; name?: string; pressed: number | boolean };
+  | { type: 'pad'; pad: number; velocity: number; pressed: boolean }
+  | { type: 'button'; btn?: number; btnId?: number; name?: string; pressed: number | boolean }
+  | { type: 'device'; model: 'mk2' | 'mk3' };
 
 export type MaschineEvent =
   | { type: 'encoder'; index: number; name: string; value: number; raw: number }
-  | { type: 'pad';     pad: number;   velocity: number; pressed: boolean }
-  | { type: 'button';  name: string; btnId: number; pressed: boolean };
+  | { type: 'pad'; pad: number; velocity: number; pressed: boolean }
+  | { type: 'button'; name: string; btnId: number; pressed: boolean }
+  | { type: 'device'; model: 'mk2' | 'mk3' };
 
 export type MaschineCommand =
-  | { type: 'setPadColor';     pad: number; r: number; g: number; b: number }
+  | { type: 'setPadColor'; pad: number; r: number; g: number; b: number }
   | { type: 'setAllPadColors'; colors: Array<{ r: number; g: number; b: number }> }
-  | { type: 'setButtonLed';    leds: number[] }
-  | { type: 'drawDisplay';     screen: 0 | 1; pixels: number[] }
-  | { type: 'setProjectName';  name: string };
+  | { type: 'setButtonLed'; leds: number[] }
+  | { type: 'drawDisplay'; screen: 0 | 1; pixels: string }
+  | { type: 'drawDisplayMK3'; screen: 0 | 1; pixels: string }
+  | { type: 'setProjectName'; name: string };
 
 // ── Knob config ───────────────────────────────────────────────────────────────
 
@@ -57,6 +60,7 @@ const KNOB_NAMES = [
 
 // Accumulated absolute positions (0-127), start at midpoint
 const knobValues = new Array<number>(8).fill(64);
+let currentDeviceModel: 'mk2' | 'mk3' | null = null;
 
 // Sensitivity: how much each NIHIA delta tick changes the 0-127 value
 // NIHIA gives one event per physical detent, so 1 = 1 CC step per click
@@ -70,6 +74,11 @@ const clients = new Set<WebSocket>();
 wss.on('connection', (ws) => {
   clients.add(ws);
   console.log(`[maschine] Browser connected (${clients.size} clients)`);
+
+  if (currentDeviceModel) {
+    const msg = JSON.stringify({ type: 'device', model: currentDeviceModel } satisfies MaschineEvent);
+    if (ws.readyState === WebSocket.OPEN) ws.send(msg);
+  }
 
   // Send current knob positions on connect
   for (let i = 0; i < 8; i++) {
@@ -116,6 +125,9 @@ function routeNIHIAEvent(evt: NIHIAEvent): void {
     broadcast(evt as MaschineEvent);
   } else if (evt.type === 'pad') {
     broadcast({ type: 'pad', pad: evt.pad, velocity: evt.velocity, pressed: evt.pressed });
+  } else if (evt.type === 'device') {
+    currentDeviceModel = evt.model;
+    broadcast(evt);
   } else if (evt.type === 'button') {
     // HID path sends {name, btnId, pressed: bool}, NIHIA path sends {btn, pressed: 0|1}
     const btnId = evt.btnId ?? evt.btn ?? -1;
@@ -172,5 +184,5 @@ function handleCommand(cmd: MaschineCommand): void {
 
 // ── Start ─────────────────────────────────────────────────────────────────────
 
-console.log(`[maschine] Maschine MK2 NIHIA bridge starting on ws://localhost:${WS_PORT}`);
+console.log(`[maschine] Maschine HID bridge starting on ws://localhost:${WS_PORT}`);
 startNIHIA();

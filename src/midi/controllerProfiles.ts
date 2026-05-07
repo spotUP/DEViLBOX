@@ -1109,6 +1109,285 @@ export const CONTROLLER_PROFILES: ControllerProfile[] = [
   },
 
   // ========================================
+  // Native Instruments Traktor Kontrol Z1
+  // 2-channel mixer with crossfader and filter knobs
+  // ========================================
+  {
+    id: 'traktor-z1',
+    name: 'Traktor Kontrol Z1',
+    manufacturer: 'Native Instruments',
+    detectPatterns: ['traktor kontrol z1', 'traktor z1', 'z1'],
+    knobs: [
+      { cc: 2, name: 'Deck A EQ High', defaultMapping: 'dj.deckA.eqHi' },
+      { cc: 3, name: 'Deck A EQ Mid', defaultMapping: 'dj.deckA.eqMid' },
+      { cc: 4, name: 'Deck A EQ Low', defaultMapping: 'dj.deckA.eqLow' },
+      { cc: 7, name: 'Deck A Filter', defaultMapping: 'dj.deckA.filter' },
+      { cc: 2, name: 'Deck B EQ High', defaultMapping: 'dj.deckB.eqHi' },
+      { cc: 3, name: 'Deck B EQ Mid', defaultMapping: 'dj.deckB.eqMid' },
+      { cc: 4, name: 'Deck B EQ Low', defaultMapping: 'dj.deckB.eqLow' },
+      { cc: 7, name: 'Deck B Filter', defaultMapping: 'dj.deckB.filter' },
+    ],
+    pads: [
+      { note: 0, name: 'Deck A Cue', defaultMapping: 'dj.deckA.cue' },
+      { note: 1, name: 'Deck A Play', defaultMapping: 'dj.deckA.play' },
+      { note: 0, name: 'Deck B Cue', defaultMapping: 'dj.deckB.cue' },
+      { note: 1, name: 'Deck B Play', defaultMapping: 'dj.deckB.play' },
+    ],
+    extras: {
+      faders: [
+        { cc: 0, name: 'Crossfader', defaultMapping: 'dj.crossfader' },
+        { cc: 1, name: 'Deck A Volume', defaultMapping: 'dj.deckA.volume' },
+        { cc: 1, name: 'Deck B Volume', defaultMapping: 'dj.deckB.volume' },
+      ],
+    },
+    suggestedLayout: {
+      knobs: {
+        2: 'dj.deckA.eqHi',
+        3: 'dj.deckA.eqMid',
+        4: 'dj.deckA.eqLow',
+        7: 'dj.deckA.filter',
+      },
+      pads: {
+        0: 'dj.deckA.cue',
+        1: 'dj.deckA.play',
+      },
+      faders: {
+        0: 'dj.crossfader',
+        1: 'dj.deckA.volume',
+      },
+    },
+  },
+
+  // ========================================
+  // Native Instruments Traktor Kontrol Z2
+  // Z1 layout plus sends, master, loop/sync/hot cues
+  // ========================================
+  {
+    id: 'traktor-z2',
+    name: 'Traktor Kontrol Z2',
+    manufacturer: 'Native Instruments',
+    detectPatterns: ['traktor kontrol z2', 'traktor z2', 'z2'],
+    knobs: [
+      { cc: 2, name: 'Deck A EQ High', defaultMapping: 'dj.deckA.eqHi' },
+      { cc: 3, name: 'Deck A EQ Mid', defaultMapping: 'dj.deckA.eqMid' },
+      { cc: 4, name: 'Deck A EQ Low', defaultMapping: 'dj.deckA.eqLow' },
+      { cc: 5, name: 'Deck A Send', defaultMapping: 'dj.deckA.send' },
+      { cc: 7, name: 'Deck A Filter', defaultMapping: 'dj.deckA.filter' },
+      { cc: 2, name: 'Deck B EQ High', defaultMapping: 'dj.deckB.eqHi' },
+      { cc: 3, name: 'Deck B EQ Mid', defaultMapping: 'dj.deckB.eqMid' },
+      { cc: 4, name: 'Deck B EQ Low', defaultMapping: 'dj.deckB.eqLow' },
+      { cc: 5, name: 'Deck B Send', defaultMapping: 'dj.deckB.send' },
+      { cc: 7, name: 'Deck B Filter', defaultMapping: 'dj.deckB.filter' },
+    ],
+    pads: [
+      { note: 0, name: 'Deck A Cue', defaultMapping: 'dj.deckA.cue' },
+      { note: 1, name: 'Deck A Play', defaultMapping: 'dj.deckA.play' },
+      { note: 2, name: 'Deck A Loop', defaultMapping: 'transport.loop' },
+      { note: 3, name: 'Deck A Sync', defaultMapping: 'dj.sync' },
+      { note: 4, name: 'Deck A Hot Cue 1', defaultMapping: 'dj.deckA.play' },
+      { note: 5, name: 'Deck A Hot Cue 2', defaultMapping: 'dj.deckA.cue' },
+      { note: 0, name: 'Deck B Cue', defaultMapping: 'dj.deckB.cue' },
+      { note: 1, name: 'Deck B Play', defaultMapping: 'dj.deckB.play' },
+      { note: 2, name: 'Deck B Loop', defaultMapping: 'transport.loop' },
+      { note: 3, name: 'Deck B Sync', defaultMapping: 'dj.sync' },
+      { note: 4, name: 'Deck B Hot Cue 1', defaultMapping: 'dj.deckB.play' },
+      { note: 5, name: 'Deck B Hot Cue 2', defaultMapping: 'dj.deckB.cue' },
+    ],
+    extras: {
+      faders: [
+        { cc: 0, name: 'Crossfader', defaultMapping: 'dj.crossfader' },
+        { cc: 1, name: 'Deck A Volume', defaultMapping: 'dj.deckA.volume' },
+        { cc: 1, name: 'Deck B Volume', defaultMapping: 'dj.deckB.volume' },
+        { cc: 6, name: 'Master Volume', defaultMapping: 'dj.masterVolume' },
+      ],
+    },
+    suggestedLayout: {
+      knobs: {
+        2: 'dj.deckA.eqHi',
+        3: 'dj.deckA.eqMid',
+        4: 'dj.deckA.eqLow',
+        5: 'dj.deckA.send',
+        7: 'dj.deckA.filter',
+      },
+      pads: {
+        0: 'dj.deckA.cue',
+        1: 'dj.deckA.play',
+        2: 'transport.loop',
+        3: 'dj.sync',
+      },
+      faders: {
+        0: 'dj.crossfader',
+        1: 'dj.deckA.volume',
+        6: 'dj.masterVolume',
+      },
+    },
+  },
+
+  // ========================================
+  // Native Instruments Traktor Kontrol S2 MK3
+  // Z2 layout plus pitch faders and 16 pads
+  // ========================================
+  {
+    id: 'traktor-s2',
+    name: 'Traktor Kontrol S2 MK3',
+    manufacturer: 'Native Instruments',
+    detectPatterns: ['traktor kontrol s2 mk3', 'traktor s2 mk3', 'traktor s2', 's2 mk3'],
+    knobs: [
+      { cc: 2, name: 'Deck A EQ High', defaultMapping: 'dj.deckA.eqHi' },
+      { cc: 3, name: 'Deck A EQ Mid', defaultMapping: 'dj.deckA.eqMid' },
+      { cc: 4, name: 'Deck A EQ Low', defaultMapping: 'dj.deckA.eqLow' },
+      { cc: 5, name: 'Deck A Send', defaultMapping: 'dj.deckA.send' },
+      { cc: 7, name: 'Deck A Filter', defaultMapping: 'dj.deckA.filter' },
+      { cc: 2, name: 'Deck B EQ High', defaultMapping: 'dj.deckB.eqHi' },
+      { cc: 3, name: 'Deck B EQ Mid', defaultMapping: 'dj.deckB.eqMid' },
+      { cc: 4, name: 'Deck B EQ Low', defaultMapping: 'dj.deckB.eqLow' },
+      { cc: 5, name: 'Deck B Send', defaultMapping: 'dj.deckB.send' },
+      { cc: 7, name: 'Deck B Filter', defaultMapping: 'dj.deckB.filter' },
+    ],
+    pads: [
+      { note: 0, name: 'Deck A Cue', defaultMapping: 'dj.deckA.cue' },
+      { note: 1, name: 'Deck A Play', defaultMapping: 'dj.deckA.play' },
+      { note: 2, name: 'Deck A Loop', defaultMapping: 'transport.loop' },
+      { note: 3, name: 'Deck A Sync', defaultMapping: 'dj.sync' },
+      { note: 4, name: 'Deck A Hot Cue 1', defaultMapping: 'dj.deckA.play' },
+      { note: 5, name: 'Deck A Hot Cue 2', defaultMapping: 'dj.deckA.cue' },
+      { note: 6, name: 'Deck A Reverse', defaultMapping: 'dj.deckA.pause' },
+      { note: 7, name: 'Deck A Flux', defaultMapping: 'dj.deckA.stop' },
+      { note: 36, name: 'Pad 1', defaultMapping: 'dj.deckA.play' },
+      { note: 37, name: 'Pad 2', defaultMapping: 'dj.deckA.cue' },
+      { note: 38, name: 'Pad 3', defaultMapping: 'dj.deckB.play' },
+      { note: 39, name: 'Pad 4', defaultMapping: 'dj.deckB.cue' },
+      { note: 40, name: 'Pad 5', defaultMapping: 'dj.killAll' },
+      { note: 41, name: 'Pad 6', defaultMapping: 'dj.sync' },
+      { note: 42, name: 'Pad 7', defaultMapping: 'dj.knobPage.prev' },
+      { note: 43, name: 'Pad 8', defaultMapping: 'dj.knobPage.next' },
+      { note: 44, name: 'Pad 9', defaultMapping: 'dj.deckA.play' },
+      { note: 45, name: 'Pad 10', defaultMapping: 'dj.deckA.cue' },
+      { note: 46, name: 'Pad 11', defaultMapping: 'dj.deckB.play' },
+      { note: 47, name: 'Pad 12', defaultMapping: 'dj.deckB.cue' },
+      { note: 48, name: 'Pad 13', defaultMapping: 'dj.killAll' },
+      { note: 49, name: 'Pad 14', defaultMapping: 'dj.sync' },
+      { note: 50, name: 'Pad 15', defaultMapping: 'dj.knobPage.prev' },
+      { note: 51, name: 'Pad 16', defaultMapping: 'dj.knobPage.next' },
+    ],
+    extras: {
+      faders: [
+        { cc: 0, name: 'Crossfader', defaultMapping: 'dj.crossfader' },
+        { cc: 1, name: 'Deck A Volume', defaultMapping: 'dj.deckA.volume' },
+        { cc: 1, name: 'Deck B Volume', defaultMapping: 'dj.deckB.volume' },
+        { cc: 6, name: 'Master Volume', defaultMapping: 'dj.masterVolume' },
+        { cc: 8, name: 'Deck A Pitch', defaultMapping: 'dj.deckA.pitch' },
+        { cc: 8, name: 'Deck B Pitch', defaultMapping: 'dj.deckB.pitch' },
+      ],
+    },
+    suggestedLayout: {
+      knobs: {
+        2: 'dj.deckA.eqHi',
+        3: 'dj.deckA.eqMid',
+        4: 'dj.deckA.eqLow',
+        5: 'dj.deckA.send',
+        7: 'dj.deckA.filter',
+      },
+      pads: {
+        0: 'dj.deckA.cue',
+        1: 'dj.deckA.play',
+        36: 'dj.deckA.play',
+        37: 'dj.deckA.cue',
+        38: 'dj.deckB.play',
+        39: 'dj.deckB.cue',
+      },
+      faders: {
+        0: 'dj.crossfader',
+        1: 'dj.deckA.volume',
+        6: 'dj.masterVolume',
+        8: 'dj.deckA.pitch',
+      },
+    },
+  },
+
+  // ========================================
+  // Native Instruments Traktor Kontrol S4 MK3
+  // 4-deck version of S2 — decks A/B mapped, decks C/D reserved
+  // ========================================
+  {
+    id: 'traktor-s4',
+    name: 'Traktor Kontrol S4 MK3',
+    manufacturer: 'Native Instruments',
+    detectPatterns: ['traktor kontrol s4 mk3', 'traktor s4 mk3', 'traktor s4', 's4 mk3'],
+    knobs: [
+      { cc: 2, name: 'Deck A EQ High', defaultMapping: 'dj.deckA.eqHi' },
+      { cc: 3, name: 'Deck A EQ Mid', defaultMapping: 'dj.deckA.eqMid' },
+      { cc: 4, name: 'Deck A EQ Low', defaultMapping: 'dj.deckA.eqLow' },
+      { cc: 5, name: 'Deck A Send', defaultMapping: 'dj.deckA.send' },
+      { cc: 7, name: 'Deck A Filter', defaultMapping: 'dj.deckA.filter' },
+      { cc: 2, name: 'Deck B EQ High', defaultMapping: 'dj.deckB.eqHi' },
+      { cc: 3, name: 'Deck B EQ Mid', defaultMapping: 'dj.deckB.eqMid' },
+      { cc: 4, name: 'Deck B EQ Low', defaultMapping: 'dj.deckB.eqLow' },
+      { cc: 5, name: 'Deck B Send', defaultMapping: 'dj.deckB.send' },
+      { cc: 7, name: 'Deck B Filter', defaultMapping: 'dj.deckB.filter' },
+    ],
+    pads: [
+      { note: 0, name: 'Deck A Cue', defaultMapping: 'dj.deckA.cue' },
+      { note: 1, name: 'Deck A Play', defaultMapping: 'dj.deckA.play' },
+      { note: 2, name: 'Deck A Loop', defaultMapping: 'transport.loop' },
+      { note: 3, name: 'Deck A Sync', defaultMapping: 'dj.sync' },
+      { note: 4, name: 'Deck A Hot Cue 1', defaultMapping: 'dj.deckA.play' },
+      { note: 5, name: 'Deck A Hot Cue 2', defaultMapping: 'dj.deckA.cue' },
+      { note: 6, name: 'Deck A Reverse', defaultMapping: 'dj.deckA.pause' },
+      { note: 7, name: 'Deck A Flux', defaultMapping: 'dj.deckA.stop' },
+      { note: 36, name: 'Pad 1', defaultMapping: 'dj.deckA.play' },
+      { note: 37, name: 'Pad 2', defaultMapping: 'dj.deckA.cue' },
+      { note: 38, name: 'Pad 3', defaultMapping: 'dj.deckB.play' },
+      { note: 39, name: 'Pad 4', defaultMapping: 'dj.deckB.cue' },
+      { note: 40, name: 'Pad 5', defaultMapping: 'dj.killAll' },
+      { note: 41, name: 'Pad 6', defaultMapping: 'dj.sync' },
+      { note: 42, name: 'Pad 7', defaultMapping: 'dj.knobPage.prev' },
+      { note: 43, name: 'Pad 8', defaultMapping: 'dj.knobPage.next' },
+      { note: 44, name: 'Pad 9', defaultMapping: 'dj.deckA.play' },
+      { note: 45, name: 'Pad 10', defaultMapping: 'dj.deckA.cue' },
+      { note: 46, name: 'Pad 11', defaultMapping: 'dj.deckB.play' },
+      { note: 47, name: 'Pad 12', defaultMapping: 'dj.deckB.cue' },
+      { note: 48, name: 'Pad 13', defaultMapping: 'dj.killAll' },
+      { note: 49, name: 'Pad 14', defaultMapping: 'dj.sync' },
+      { note: 50, name: 'Pad 15', defaultMapping: 'dj.knobPage.prev' },
+      { note: 51, name: 'Pad 16', defaultMapping: 'dj.knobPage.next' },
+    ],
+    extras: {
+      faders: [
+        { cc: 0, name: 'Crossfader', defaultMapping: 'dj.crossfader' },
+        { cc: 1, name: 'Deck A Volume', defaultMapping: 'dj.deckA.volume' },
+        { cc: 1, name: 'Deck B Volume', defaultMapping: 'dj.deckB.volume' },
+        { cc: 6, name: 'Master Volume', defaultMapping: 'dj.masterVolume' },
+        { cc: 8, name: 'Deck A Pitch', defaultMapping: 'dj.deckA.pitch' },
+        { cc: 8, name: 'Deck B Pitch', defaultMapping: 'dj.deckB.pitch' },
+      ],
+    },
+    suggestedLayout: {
+      knobs: {
+        2: 'dj.deckA.eqHi',
+        3: 'dj.deckA.eqMid',
+        4: 'dj.deckA.eqLow',
+        5: 'dj.deckA.send',
+        7: 'dj.deckA.filter',
+      },
+      pads: {
+        0: 'dj.deckA.cue',
+        1: 'dj.deckA.play',
+        36: 'dj.deckA.play',
+        37: 'dj.deckA.cue',
+        38: 'dj.deckB.play',
+        39: 'dj.deckB.cue',
+      },
+      faders: {
+        0: 'dj.crossfader',
+        1: 'dj.deckA.volume',
+        6: 'dj.masterVolume',
+        8: 'dj.deckA.pitch',
+      },
+    },
+  },
+
+  // ========================================
   // Generic (for unknown controllers)
   // Standard MIDI CCs with sensible defaults
   // ========================================

@@ -17,7 +17,7 @@ import { getMaschineHIDBridge } from '@/midi/MaschineHIDBridge';
 // Each byte is one column of pixels, bit 0 = top row, bit 6 = bottom row.
 // Source: classic Adafruit GFX font5x7 / PCD8544 font
 /* eslint-disable prettier/prettier */
-const FONT5X7 = new Uint8Array([
+export const FONT5X7 = new Uint8Array([
   0x00,0x00,0x00,0x00,0x00, // 0x20 space
   0x00,0x00,0x5F,0x00,0x00, // 0x21 !
   0x00,0x07,0x00,0x07,0x00, // 0x22 "

@@ -11,6 +11,133 @@
 import type { DJControllerPreset } from './djControllerPresets';
 
 // ============================================================================
+// NATIVE INSTRUMENTS TRAKTOR KONTROL
+// ============================================================================
+
+export const TRAKTOR_Z1: DJControllerPreset = {
+  id: 'traktor-z1',
+  name: 'Traktor Kontrol Z1',
+  manufacturer: 'Native Instruments',
+  description: '2-channel DJ mixer with crossfader and filter knobs',
+  detectPatterns: ['traktor kontrol z1', 'traktor z1', 'z1'],
+  ccMappings: [
+    { channel: 0, cc: 0, param: 'dj.crossfader' },
+    { channel: 0, cc: 1, param: 'dj.deckA.volume' },
+    { channel: 0, cc: 2, param: 'dj.deckA.eqHi' },
+    { channel: 0, cc: 3, param: 'dj.deckA.eqMid' },
+    { channel: 0, cc: 4, param: 'dj.deckA.eqLow' },
+    { channel: 0, cc: 7, param: 'dj.deckA.filter' },
+    { channel: 1, cc: 1, param: 'dj.deckB.volume' },
+    { channel: 1, cc: 2, param: 'dj.deckB.eqHi' },
+    { channel: 1, cc: 3, param: 'dj.deckB.eqMid' },
+    { channel: 1, cc: 4, param: 'dj.deckB.eqLow' },
+    { channel: 1, cc: 7, param: 'dj.deckB.filter' },
+  ],
+  noteMappings: [
+    { channel: 0, note: 0, action: 'cue_a' },
+    { channel: 0, note: 1, action: 'play_a' },
+    { channel: 1, note: 0, action: 'cue_b' },
+    { channel: 1, note: 1, action: 'play_b' },
+  ],
+  feedbackMappings: [
+    { channel: 0, note: 0, action: 'cue_a' },
+    { channel: 0, note: 1, action: 'play_a' },
+    { channel: 1, note: 0, action: 'cue_b' },
+    { channel: 1, note: 1, action: 'play_b' },
+  ],
+};
+
+export const TRAKTOR_Z2: DJControllerPreset = {
+  id: 'traktor-z2',
+  name: 'Traktor Kontrol Z2',
+  manufacturer: 'Native Instruments',
+  description: '2-channel DJ mixer with loop controls and FX sends',
+  detectPatterns: ['traktor kontrol z2', 'traktor z2', 'z2'],
+  ccMappings: [
+    ...TRAKTOR_Z1.ccMappings,
+    { channel: 0, cc: 5, param: 'dj.deckA.send' },
+    { channel: 1, cc: 5, param: 'dj.deckB.send' },
+    { channel: 0, cc: 6, param: 'dj.masterVolume' },
+  ],
+  noteMappings: [
+    ...TRAKTOR_Z1.noteMappings,
+    { channel: 0, note: 2, action: 'loop_a' },
+    { channel: 0, note: 3, action: 'sync_a' },
+    { channel: 0, note: 4, action: 'hotcue1_a' },
+    { channel: 0, note: 5, action: 'hotcue2_a' },
+    { channel: 1, note: 2, action: 'loop_b' },
+    { channel: 1, note: 3, action: 'sync_b' },
+    { channel: 1, note: 4, action: 'hotcue1_b' },
+    { channel: 1, note: 5, action: 'hotcue2_b' },
+  ],
+  feedbackMappings: [
+    ...(TRAKTOR_Z1.feedbackMappings ?? []),
+    { channel: 0, note: 2, action: 'loop_a' },
+    { channel: 0, note: 3, action: 'sync_a' },
+    { channel: 0, note: 4, action: 'hotcue1_a' },
+    { channel: 0, note: 5, action: 'hotcue2_a' },
+    { channel: 1, note: 2, action: 'loop_b' },
+    { channel: 1, note: 3, action: 'sync_b' },
+    { channel: 1, note: 4, action: 'hotcue1_b' },
+    { channel: 1, note: 5, action: 'hotcue2_b' },
+  ],
+};
+
+export const TRAKTOR_S2: DJControllerPreset = {
+  id: 'traktor-s2',
+  name: 'Traktor Kontrol S2 MK3',
+  manufacturer: 'Native Instruments',
+  description: 'Full 2-deck Traktor controller with pitch faders and performance pads',
+  detectPatterns: ['traktor kontrol s2 mk3', 'traktor s2 mk3', 'traktor s2', 's2 mk3'],
+  ccMappings: [
+    ...TRAKTOR_Z2.ccMappings,
+    { channel: 0, cc: 8, param: 'dj.deckA.pitch', invert: true },
+    { channel: 1, cc: 8, param: 'dj.deckB.pitch', invert: true },
+  ],
+  noteMappings: [
+    ...TRAKTOR_Z2.noteMappings,
+    { channel: 0, note: 6, action: 'reverse_a' },
+    { channel: 0, note: 7, action: 'flux_a' },
+    { channel: 1, note: 6, action: 'reverse_b' },
+    { channel: 1, note: 7, action: 'flux_b' },
+    { channel: 9, note: 36, action: 'hotcue1_a' },
+    { channel: 9, note: 37, action: 'hotcue2_a' },
+    { channel: 9, note: 38, action: 'hotcue3_a' },
+    { channel: 9, note: 39, action: 'hotcue4_a' },
+    { channel: 9, note: 40, action: 'hotcue5_a' },
+    { channel: 9, note: 41, action: 'hotcue6_a' },
+    { channel: 9, note: 42, action: 'hotcue7_a' },
+    { channel: 9, note: 43, action: 'hotcue8_a' },
+    { channel: 9, note: 44, action: 'hotcue1_b' },
+    { channel: 9, note: 45, action: 'hotcue2_b' },
+    { channel: 9, note: 46, action: 'hotcue3_b' },
+    { channel: 9, note: 47, action: 'hotcue4_b' },
+    { channel: 9, note: 48, action: 'hotcue5_b' },
+    { channel: 9, note: 49, action: 'hotcue6_b' },
+    { channel: 9, note: 50, action: 'hotcue7_b' },
+    { channel: 9, note: 51, action: 'hotcue8_b' },
+  ],
+  feedbackMappings: [
+    ...(TRAKTOR_Z2.feedbackMappings ?? []),
+    { channel: 0, note: 6, action: 'reverse_a' },
+    { channel: 0, note: 7, action: 'flux_a' },
+    { channel: 1, note: 6, action: 'reverse_b' },
+    { channel: 1, note: 7, action: 'flux_b' },
+  ],
+};
+
+export const TRAKTOR_S4: DJControllerPreset = {
+  id: 'traktor-s4',
+  name: 'Traktor Kontrol S4 MK3',
+  manufacturer: 'Native Instruments',
+  description: '4-deck Traktor controller profile with decks A/B mapped and C/D reserved',
+  detectPatterns: ['traktor kontrol s4 mk3', 'traktor s4 mk3', 'traktor s4', 's4 mk3'],
+  ccMappings: [...TRAKTOR_S2.ccMappings],
+  noteMappings: [...TRAKTOR_S2.noteMappings],
+  feedbackMappings: [...(TRAKTOR_S2.feedbackMappings ?? [])],
+};
+
+// ============================================================================
 // GENERIC TEMPLATES
 // ============================================================================
 
@@ -175,7 +302,7 @@ export const GENERIC_4DECK: DJControllerPreset = {
   name: 'Generic 4-Deck Controller',
   manufacturer: 'Generic',
   description: 'Full 4-deck layout (A+B mapped, C+D reserved)',
-  detectPatterns: ['mcx8000', 'traktor s4', 'traktor kontrol s4'],
+  detectPatterns: ['mcx8000'],
   
   ccMappings: [
     // Deck A (Channel 0)
@@ -274,6 +401,10 @@ export const GENERIC_TWISTER: DJControllerPreset = {
 // ============================================================================
 
 export const DJ_GENERIC_CONTROLLERS: DJControllerPreset[] = [
+  TRAKTOR_Z1,
+  TRAKTOR_Z2,
+  TRAKTOR_S2,
+  TRAKTOR_S4,
   GENERIC_8x8,
   GENERIC_4x16,
   GENERIC_MIXER,
