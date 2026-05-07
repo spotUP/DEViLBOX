@@ -363,17 +363,8 @@ class MK2ScreenManager {
         // Just force re-render for visual feedback
         this.markDirty();
         return false; // let MIDI path handle actual value change
-      case 'browse': {
-        // First knob scrolls the list
-        if (index === 0) {
-          const instruments = useInstrumentStore.getState().instruments;
-          const maxScroll = Math.max(0, instruments.length - 1);
-          this.ctx.browseScrollPos = Math.round((value / 127) * maxScroll);
-          this.markDirty();
-          return true;
-        }
-        return false;
-      }
+      case 'browse':
+        return false; // Main encoder handles browse scrolling
       case 'step': {
         // Knob 0 → scroll rows, knob 1 → scroll channels
         if (index === 0) {
@@ -395,6 +386,52 @@ class MK2ScreenManager {
       }
       default:
         return false;
+    }
+  }
+
+  /** Called by MaschineHIDBridge for the main (big) encoder. delta: +1 CW, -1 CCW. */
+  handleMainEncoder(delta: number): void {
+    switch (this.mode) {
+      case 'browse': {
+        const instruments = useInstrumentStore.getState().instruments;
+        const max = Math.max(0, instruments.length - 1);
+        this.ctx.browseScrollPos = Math.max(0, Math.min(max, this.ctx.browseScrollPos + delta));
+        this.markDirty();
+        break;
+      }
+      case 'step': {
+        // Scroll row cursor
+        const state = useTrackerStore.getState();
+        const pat = state.patterns[state.currentPatternIndex];
+        const maxRow = (pat?.length ?? 64) - 1;
+        this.ctx.stepCursorRow = Math.max(0, Math.min(maxRow, this.ctx.stepCursorRow + delta));
+        this.markDirty();
+        break;
+      }
+      case 'mixer': {
+        // Scroll selected channel
+        const state = useTrackerStore.getState();
+        const pat = state.patterns[state.currentPatternIndex];
+        const maxCh = Math.max(0, (pat?.channels.length ?? 1) - 1);
+        this.ctx.selectedChannel = Math.max(0, Math.min(maxCh, this.ctx.selectedChannel + delta));
+        this.markDirty();
+        break;
+      }
+      case 'instrument': {
+        // Scroll through instruments
+        const instStore = useInstrumentStore.getState();
+        const instruments = instStore.instruments;
+        const curInst = instStore.currentInstrument;
+        const curIdx = curInst ? instruments.findIndex(i => i.id === curInst.id) : 0;
+        const newIdx = Math.max(0, Math.min(instruments.length - 1, curIdx + delta));
+        if (instruments[newIdx]) {
+          instStore.setCurrentInstrument(instruments[newIdx].id);
+        }
+        this.markDirty();
+        break;
+      }
+      default:
+        break;
     }
   }
 
