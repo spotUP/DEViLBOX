@@ -10,11 +10,13 @@ import { PRESET_CATEGORIES, type PresetCategory } from '@constants/factoryPreset
 import { getSynthInfo } from '@constants/synthCategories';
 import { getToneEngine } from '@engine/ToneEngine';
 import * as LucideIcons from 'lucide-react';
-import { X, Search, Check, Zap, Trash2, Download, Upload, Tag } from 'lucide-react';
+import { X, Search, Check, Zap, Trash2, Download, Upload, Tag, Library } from 'lucide-react';
 import * as Tone from 'tone';
 import type { InstrumentConfig, InstrumentPreset } from '@typedefs/instrument';
+import { NKSLibraryBrowser } from '@components/midi/NKSLibraryBrowser';
+import type { DevilboxPreset, NKSPreset } from '@stores/useNKSLibraryStore';
 
-type BrowseMode = 'factory' | 'user';
+type BrowseMode = 'factory' | 'user' | 'library';
 
 interface LoadPresetModalProps {
   onClose: () => void;
@@ -373,6 +375,17 @@ export const LoadPresetModal: React.FC<LoadPresetModalProps> = ({ onClose }) => 
               >
                 User ({userPresets.length})
               </button>
+              <button
+                onClick={() => handleModeChange('library')}
+                className={`px-3 py-1.5 text-[10px] font-black uppercase tracking-tighter transition-all flex items-center gap-1 ${
+                  browseMode === 'library'
+                    ? 'bg-accent-primary text-text-inverse'
+                    : 'text-ft2-textDim hover:text-ft2-text'
+                }`}
+              >
+                <Library size={10} />
+                Library
+              </button>
             </div>
             <button
               onClick={onClose}
@@ -383,7 +396,8 @@ export const LoadPresetModal: React.FC<LoadPresetModalProps> = ({ onClose }) => 
           </div>
         </div>
 
-        {/* Search Bar */}
+        {/* Search Bar — hidden in Library mode (has its own search) */}
+        {browseMode !== 'library' && (
         <div className="px-4 py-3 bg-ft2-header border-b border-ft2-border">
           <div className="relative">
             <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-ft2-textDim" />
@@ -397,8 +411,10 @@ export const LoadPresetModal: React.FC<LoadPresetModalProps> = ({ onClose }) => 
             />
           </div>
         </div>
+        )}
 
-        {/* Category Tabs */}
+        {/* Category Tabs — hidden in Library mode */}
+        {browseMode !== 'library' && (
         <div className="flex flex-wrap gap-1 px-4 py-2 bg-ft2-header border-b border-ft2-border">
           {browseMode === 'factory' ? (
             factoryCategories.map((category) => {
@@ -473,9 +489,17 @@ export const LoadPresetModal: React.FC<LoadPresetModalProps> = ({ onClose }) => 
             </>
           )}
         </div>
+        )} {/* end category tabs */}
 
-        {/* Preset Grid */}
-        <div className="flex-1 overflow-y-auto p-4 scrollbar-ft2" key={`${browseMode}-${activeCategory}-${userFilterCategory}`}>
+        {/* Library Browser (NKS + DEViLBOX presets) */}
+        {browseMode === 'library' ? (
+          <div className="flex-1 min-h-0">
+            <NKSLibraryBrowser onLoadPreset={(preset: NKSPreset | DevilboxPreset) => {
+              notify.success(`Loaded: ${preset.name}`);
+            }} />
+          </div>
+        ) : (
+          <div className="flex-1 overflow-y-auto p-4 scrollbar-ft2" key={`${browseMode}-${activeCategory}-${userFilterCategory}`}>
           {browseMode === 'factory' ? (
             // Factory presets
             filteredFactoryPresets.length === 0 ? (
@@ -605,8 +629,10 @@ export const LoadPresetModal: React.FC<LoadPresetModalProps> = ({ onClose }) => 
             )
           )}
         </div>
+        )} {/* end factory/user branch */}
 
-        {/* Footer */}
+        {/* Footer — hidden in Library mode */}
+        {browseMode !== 'library' && (
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 px-4 py-3 pb-6 sm:pb-3 bg-ft2-header border-t-2 border-ft2-border safe-area-bottom">
           <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 min-w-0">
             <div className="text-ft2-textDim text-xs font-mono truncate">
@@ -647,6 +673,7 @@ export const LoadPresetModal: React.FC<LoadPresetModalProps> = ({ onClose }) => 
             </button>
           </div>
         </div>
+        )} {/* end footer */}
       </div>
 
       {/* Hidden file inputs */}
