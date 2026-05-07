@@ -1,6 +1,5 @@
 import {
   parseKontaktAudioFrame,
-  type KontaktAudioFrame,
   type KontaktBridgeMessage,
   type KontaktErrorMessage,
   type KontaktStatusMessage,
@@ -16,10 +15,6 @@ export interface KontaktBridgeSnapshot {
   error: string | null;
 }
 
-interface QueuedKontaktFrame extends KontaktAudioFrame {
-  offset: number;
-}
-
 type KontaktBridgeListener = (snapshot: KontaktBridgeSnapshot) => void;
 
 const EMPTY_SNAPSHOT: KontaktBridgeSnapshot = {
@@ -30,11 +25,61 @@ const EMPTY_SNAPSHOT: KontaktBridgeSnapshot = {
   error: null,
 };
 
+// Ring buffer for smooth audio playback — eliminates stutter from network jitter
+const RING_SIZE = 44100; // 1 second ring buffer
+const PREFILL_SAMPLES = 4096; // ~93ms pre-buffer before starting drain
+
+class AudioRingBuffer {
+  private left = new Float32Array(RING_SIZE);
+  private right = new Float32Array(RING_SIZE);
+  private writePos = 0;
+  private readPos = 0;
+  private available = 0;
+  private primed = false;
+
+  push(leftData: Float32Array, rightData: Float32Array, count: number): void {
+    for (let i = 0; i < count; i++) {
+      this.left[this.writePos] = leftData[i];
+      this.right[this.writePos] = rightData[i];
+      this.writePos = (this.writePos + 1) % RING_SIZE;
+    }
+    this.available = Math.min(this.available + count, RING_SIZE);
+    if (this.available >= PREFILL_SAMPLES) {
+      this.primed = true;
+    }
+  }
+
+  drain(outLeft: Float32Array, outRight: Float32Array, count: number): void {
+    if (!this.primed) {
+      // Still buffering — output silence
+      return;
+    }
+    const toDrain = Math.min(count, this.available);
+    for (let i = 0; i < toDrain; i++) {
+      outLeft[i] = this.left[this.readPos];
+      outRight[i] = this.right[this.readPos];
+      this.readPos = (this.readPos + 1) % RING_SIZE;
+    }
+    this.available -= toDrain;
+    // If we underrun, reset prime to re-buffer
+    if (this.available === 0) {
+      this.primed = false;
+    }
+  }
+
+  clear(): void {
+    this.writePos = 0;
+    this.readPos = 0;
+    this.available = 0;
+    this.primed = false;
+  }
+}
+
 export class KontaktBridge {
   private ws: WebSocket | null = null;
   private audioCtx: AudioContext | null = null;
   private processor: ScriptProcessorNode | null = null;
-  private audioQueue: QueuedKontaktFrame[] = [];
+  private ringBuffer = new AudioRingBuffer();
   private listeners = new Set<KontaktBridgeListener>();
   private connectPromise: Promise<void> | null = null;
   private snapshot: KontaktBridgeSnapshot = { ...EMPTY_SNAPSHOT };
@@ -95,7 +140,7 @@ export class KontaktBridge {
 
       ws.onclose = () => {
         this.ws = null;
-        this.audioQueue = [];
+        this.ringBuffer.clear();
         this.setSnapshot({ bridgeStatus: 'disconnected', connected: false });
         if (!settled) {
           settled = true;
@@ -110,7 +155,7 @@ export class KontaktBridge {
   }
 
   disconnect(): void {
-    this.audioQueue = [];
+    this.ringBuffer.clear();
     if (this.ws) {
       this.ws.onclose = null;
       this.ws.close();
@@ -165,7 +210,7 @@ export class KontaktBridge {
 
     if (!this.audioCtx) {
       this.audioCtx = new AudioContext({ sampleRate: 44100, latencyHint: 'interactive' });
-      this.processor = this.audioCtx.createScriptProcessor(4096, 0, 2);
+      this.processor = this.audioCtx.createScriptProcessor(2048, 0, 2);
       this.processor.onaudioprocess = (event) => {
         this.drainAudio(event.outputBuffer);
       };
@@ -182,23 +227,7 @@ export class KontaktBridge {
     const right = outputBuffer.getChannelData(1);
     left.fill(0);
     right.fill(0);
-
-    let writeOffset = 0;
-    while (writeOffset < outputBuffer.length && this.audioQueue.length > 0) {
-      const frame = this.audioQueue[0];
-      const remaining = frame.sampleCount - frame.offset;
-      const copyCount = Math.min(outputBuffer.length - writeOffset, remaining);
-
-      left.set(frame.left.subarray(frame.offset, frame.offset + copyCount), writeOffset);
-      right.set(frame.right.subarray(frame.offset, frame.offset + copyCount), writeOffset);
-
-      frame.offset += copyCount;
-      writeOffset += copyCount;
-
-      if (frame.offset >= frame.sampleCount) {
-        this.audioQueue.shift();
-      }
-    }
+    this.ringBuffer.drain(left, right, outputBuffer.length);
   }
 
   private async handleMessage(event: MessageEvent): Promise<void> {
@@ -247,22 +276,9 @@ export class KontaktBridge {
       return;
     }
 
-    if (this.audioQueue.length >= 48) {
-      this.audioQueue.splice(0, this.audioQueue.length - 24);
-    }
-
-    this.audioQueue.push({
-      ...frame,
-      offset: 0,
-    });
-
+    this.ringBuffer.push(frame.left, frame.right, frame.sampleCount);
     void this.ensureAudio();
   }
 }
 
 export const kontaktBridge = new KontaktBridge();
-
-// Auto-connect on startup — silently stays disconnected if bridge binary isn't running
-kontaktBridge.connect().catch(() => {
-  // Bridge not running — that's fine, user can connect manually later
-});

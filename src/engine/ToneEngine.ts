@@ -2917,14 +2917,21 @@ export class ToneEngine {
       console.log(`[NOTE] ▶ attack id=${instrumentId} ${config.synthType} ${note} ch=${channelIndex ?? '-'} vel=${velocity.toFixed(2)}`);
     }
 
-    // Kontakt bridge — route MIDI externally, no internal instrument needed
+    // Kontakt — route MIDI to Kontakt AU via bridge WebSocket
     if (config.synthType === 'Kontakt') {
       import('@stores/useKontaktStore').then(({ useKontaktStore }) => {
         import('@/utils/audio-context').then(({ noteToMidi }) => {
           const store = useKontaktStore.getState();
-          if (store.bridgeStatus !== 'ready') return;
+          if (store.bridgeStatus !== 'ready') {
+            store.connect().then(() => {
+              const s = useKontaktStore.getState();
+              const midiNote = typeof note === 'string' ? noteToMidi(note) : note;
+              s.noteOn(midiNote, Math.round(velocity * 127));
+            }).catch(() => { /* bridge not running */ });
+            return;
+          }
           const midiNote = typeof note === 'string' ? noteToMidi(note) : note;
-          try { store.noteOn(midiNote, Math.round(velocity * 127)); } catch { /* bridge disconnected */ }
+          try { store.noteOn(midiNote, Math.round(velocity * 127)); } catch { /* */ }
         });
       });
       return;
@@ -3239,14 +3246,14 @@ export class ToneEngine {
   ): void {
     notifyInstrumentRelease(instrumentId);
 
-    // Kontakt bridge — route MIDI externally
+    // Kontakt — route MIDI to Kontakt AU via bridge WebSocket
     if (config.synthType === 'Kontakt') {
       import('@stores/useKontaktStore').then(({ useKontaktStore }) => {
         import('@/utils/audio-context').then(({ noteToMidi }) => {
           const store = useKontaktStore.getState();
           if (store.bridgeStatus !== 'ready') return;
           const midiNote = typeof note === 'string' ? noteToMidi(note) : note;
-          try { store.noteOff(midiNote); } catch { /* bridge disconnected */ }
+          try { store.noteOff(midiNote); } catch { /* */ }
         });
       });
       return;
@@ -3699,7 +3706,7 @@ export class ToneEngine {
       console.log(`[NOTE] ▶ trigger id=${instrumentId} ${config.synthType} ${note} ch=${channelIndex} dur=${duration.toFixed(3)} vel=${velocity.toFixed(2)}`);
     }
 
-    // Kontakt bridge — route MIDI externally with duration-based note-off
+    // Kontakt — route MIDI to Kontakt AU via bridge WebSocket
     if (config.synthType === 'Kontakt') {
       import('@stores/useKontaktStore').then(({ useKontaktStore }) => {
         import('@/utils/audio-context').then(({ noteToMidi }) => {
@@ -3711,7 +3718,7 @@ export class ToneEngine {
             if (duration > 0) {
               setTimeout(() => { try { store.noteOff(midiNote); } catch { /* */ } }, duration * 1000);
             }
-          } catch { /* bridge disconnected */ }
+          } catch { /* */ }
         });
       });
       return;
