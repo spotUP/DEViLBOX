@@ -2915,6 +2915,18 @@ export class ToneEngine {
     if (ToneEngine.NOTE_DEBUG) {
       console.log(`[NOTE] ▶ attack id=${instrumentId} ${config.synthType} ${note} ch=${channelIndex ?? '-'} vel=${velocity.toFixed(2)}`);
     }
+
+    // Kontakt bridge — route MIDI externally, no internal instrument needed
+    if (config.synthType === 'Kontakt') {
+      import('@stores/useKontaktStore').then(({ useKontaktStore }) => {
+        import('@/utils/audio-context').then(({ noteToMidi }) => {
+          const midiNote = typeof note === 'string' ? noteToMidi(note) : note;
+          useKontaktStore.getState().noteOn(midiNote, Math.round(velocity * 127));
+        });
+      });
+      return;
+    }
+
     if (config.synthType === 'SuperCollider') {
       console.log('[SC:ToneEngine] triggerNoteAttack called — id:', instrumentId, 'note:', note, 'channelIndex:', channelIndex);
     }
@@ -3223,6 +3235,18 @@ export class ToneEngine {
     channelIndex?: number
   ): void {
     notifyInstrumentRelease(instrumentId);
+
+    // Kontakt bridge — route MIDI externally
+    if (config.synthType === 'Kontakt') {
+      import('@stores/useKontaktStore').then(({ useKontaktStore }) => {
+        import('@/utils/audio-context').then(({ noteToMidi }) => {
+          const midiNote = typeof note === 'string' ? noteToMidi(note) : note;
+          useKontaktStore.getState().noteOff(midiNote);
+        });
+      });
+      return;
+    }
+
     const instrument = this.getInstrument(instrumentId, config, channelIndex);
 
     if (!instrument || !(instrument as any).triggerRelease) {
@@ -3668,6 +3692,21 @@ export class ToneEngine {
 
     if (ToneEngine.NOTE_DEBUG) {
       console.log(`[NOTE] ▶ trigger id=${instrumentId} ${config.synthType} ${note} ch=${channelIndex} dur=${duration.toFixed(3)} vel=${velocity.toFixed(2)}`);
+    }
+
+    // Kontakt bridge — route MIDI externally with duration-based note-off
+    if (config.synthType === 'Kontakt') {
+      import('@stores/useKontaktStore').then(({ useKontaktStore }) => {
+        import('@/utils/audio-context').then(({ noteToMidi }) => {
+          const midiNote = typeof note === 'string' ? noteToMidi(note) : note;
+          const store = useKontaktStore.getState();
+          store.noteOn(midiNote, Math.round(velocity * 127));
+          if (duration > 0) {
+            setTimeout(() => store.noteOff(midiNote), duration * 1000);
+          }
+        });
+      });
+      return;
     }
 
     const instrument = this.getInstrument(instrumentId, config, channelIndex);

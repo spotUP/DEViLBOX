@@ -330,7 +330,9 @@ export type SynthType =
   | 'TFMXModuleSynth'          // TFMX Module (WASM replayer variant)
   | 'V2MSynth'                 // V2M file playback (Farbrausch V2 player)
   | 'VoodooWasmSynth'          // Voodoo Supreme Synthesizer (WASM replayer)
-  | 'SunVoxModular';   // SunVox WASM modular synthesizer with visual editor
+  | 'SunVoxModular'    // SunVox WASM modular synthesizer with visual editor
+  // External instrument bridges
+  | 'Kontakt';         // NI Kontakt (MIDI routed through Kontakt bridge)
 
 export type WaveformType = 'sine' | 'square' | 'sawtooth' | 'triangle' | 'noise';
 

@@ -46,6 +46,7 @@ export const AddInstrumentDialog: React.FC<AddInstrumentDialogProps> = ({
   const createInstrument = useInstrumentStore((s) => s.createInstrument);
 
   const handleLibraryLoad = ({ preset, data }: PresetLoadEvent) => {
+    // DEViLBOX-native synth presets (Helm, Surge, Dexed, etc.)
     if ('synth' in preset && preset.synth) {
       const synthTypeMap: Record<string, string> = {
         helm: 'Helm', surge: 'Surge', obxf: 'OBXf', odin2: 'Odin2', dexed: 'DX7',
@@ -69,9 +70,24 @@ export const AddInstrumentDialog: React.FC<AddInstrumentDialogProps> = ({
           const presetType = preset.synth === 'helm' ? 'helm' : 'dexed';
           setPendingPresetData(presetType as 'helm' | 'dexed', data);
         }
+        notify.success(`Loaded: ${preset.name}`);
         onClose();
+        return;
       }
     }
+
+    // NKS presets (Kontakt, Massive, FM8, etc.) — route MIDI through bridge
+    if ('vendor' in preset && 'product' in preset) {
+      const presetName = `${(preset as { product: string }).product}: ${preset.name}`;
+      createInstrument({
+        name: presetName,
+        synthType: 'Kontakt' as InstrumentConfig['synthType'],
+      });
+      notify.success(`Loaded: ${presetName}`);
+      onClose();
+      return;
+    }
+
     notify.success(`Loaded: ${preset.name}`);
   };
 
