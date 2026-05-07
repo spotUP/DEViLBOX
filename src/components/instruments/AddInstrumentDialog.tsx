@@ -1,26 +1,28 @@
 /**
  * AddInstrumentDialog — Unified dialog for adding instruments.
  *
- * Four tabs:
+ * Five tabs:
  *   Synth   — Browse synth types (CategorizedSynthSelector)
  *   Preset  — Browse factory/user presets (LoadPresetModal embedded)
  *   Sample  — Browse sample packs (SamplePackBrowser embedded)
  *   Library — Browse NKS/DEViLBOX preset library (NKSLibraryBrowser)
+ *   AU      — Browse and load native AudioUnit plugins via bridge
  */
 
 import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Music2, FolderOpen, Package, Library } from 'lucide-react';
+import { X, Music2, FolderOpen, Package, Library, Plug } from 'lucide-react';
 import { CategorizedSynthSelector } from './shared/CategorizedSynthSelector';
 import { LoadPresetModal } from './presets';
 import { SamplePackBrowser } from './SamplePackBrowser';
+import { AUPluginPicker } from './AUPluginPicker';
 import { NKSLibraryBrowser, type PresetLoadEvent } from '@components/midi/NKSLibraryBrowser';
 import { useInstrumentStore } from '@stores/useInstrumentStore';
 import { notify } from '@stores/useNotificationStore';
 import { setPendingPresetData } from '@lib/pendingPresetData';
 import type { InstrumentConfig, SynthType } from '@typedefs/instrument';
 
-type AddTab = 'synth' | 'preset' | 'sample' | 'library';
+type AddTab = 'synth' | 'preset' | 'sample' | 'library' | 'au';
 
 interface AddInstrumentDialogProps {
   onClose: () => void;
@@ -32,6 +34,7 @@ const TABS: { id: AddTab; label: string; icon: React.ReactNode }[] = [
   { id: 'preset', label: 'Preset', icon: <FolderOpen size={14} /> },
   { id: 'sample', label: 'Sample', icon: <Package size={14} /> },
   { id: 'library', label: 'Library', icon: <Library size={14} /> },
+  { id: 'au', label: 'VST', icon: <Plug size={14} /> },
 ];
 
 export const AddInstrumentDialog: React.FC<AddInstrumentDialogProps> = ({
@@ -151,6 +154,11 @@ export const AddInstrumentDialog: React.FC<AddInstrumentDialogProps> = ({
           {activeTab === 'library' && (
             <div className="flex-1 min-h-0">
               <NKSLibraryBrowser onLoadPreset={handleLibraryLoad} />
+            </div>
+          )}
+          {activeTab === 'au' && (
+            <div className="flex-1 min-h-0">
+              <AUPluginPicker onClose={onClose} />
             </div>
           )}
         </div>
