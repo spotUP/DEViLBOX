@@ -84,17 +84,13 @@ export const DexedHardwareUI: React.FC<DexedHardwareUIProps> = ({
   const [patchInfo, setPatchInfo] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  /** Load a .syx file into both the UI WASM and audio engine */
-  const loadSysexFile = useCallback(async (file: File) => {
-    const buffer = await file.arrayBuffer();
+  /** Load sysex data into both the UI WASM and audio engine */
+  const loadSysexData = useCallback((buffer: ArrayBuffer, sourceLabel: string) => {
     const data = new Uint8Array(buffer);
     const m = moduleRef.current;
 
     if (data.length === 4104 || data.length === 4096) {
-      // 32-voice bulk dump (with or without sysex wrapper)
       const voiceData = data.length === 4104 ? data.subarray(6, 4102) : data;
-
-      // Load first voice VCED into the UI
       const firstVoice = unpackDX7Voice(voiceData.subarray(0, 128));
       if (m) {
         const ptr = m._malloc(155);
@@ -103,14 +99,12 @@ export const DexedHardwareUI: React.FC<DexedHardwareUIProps> = ({
         m._free(ptr);
       }
 
-      // Load full cartridge into audio engine
       if (instrumentId) {
         try {
           const engine = getToneEngine();
           const key = (instrumentId << 16) | 0xFFFF;
           const synth = engine.instruments.get(key) as any;
           if (synth?.loadSysex) {
-            // Wrap in proper sysex envelope if raw
             if (data.length === 4096) {
               const sysex = new Uint8Array(4104);
               sysex[0] = 0xF0; sysex[1] = 0x43; sysex[2] = 0x00;
@@ -127,9 +121,11 @@ export const DexedHardwareUI: React.FC<DexedHardwareUIProps> = ({
           }
         } catch { /* engine not ready */ }
       }
-      setPatchInfo(`Loaded ${file.name} (32 voices)`);
-    } else if (data.length >= 155 && data.length <= 163) {
-      // Single voice VCED
+      setPatchInfo(`Loaded ${sourceLabel} (32 voices)`);
+      return;
+    }
+
+    if (data.length >= 155 && data.length <= 163) {
       const vcedStart = data[0] === 0xF0 ? 6 : 0;
       const vcedData = data.subarray(vcedStart, vcedStart + 155);
       if (m) {
@@ -138,7 +134,6 @@ export const DexedHardwareUI: React.FC<DexedHardwareUIProps> = ({
         m._dexed_ui_load_sysex(ptr, 155);
         m._free(ptr);
       }
-      // Also send to audio engine via bulk dump path
       if (instrumentId) {
         try {
           const engine = getToneEngine();
@@ -149,11 +144,16 @@ export const DexedHardwareUI: React.FC<DexedHardwareUIProps> = ({
           }
         } catch { /* engine not ready */ }
       }
-      setPatchInfo(`Loaded ${file.name} (single voice)`);
-    } else {
-      setPatchInfo(`Unknown format (${data.length} bytes)`);
+      setPatchInfo(`Loaded ${sourceLabel} (single voice)`);
+      return;
     }
+
+    setPatchInfo(`Unknown format (${data.length} bytes)`);
   }, [instrumentId]);
+
+  const loadSysexFile = useCallback(async (file: File) => {
+    loadSysexData(await file.arrayBuffer(), file.name);
+  }, [loadSysexData]);
 
   const handleFileDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -168,6 +168,21 @@ export const DexedHardwareUI: React.FC<DexedHardwareUIProps> = ({
     if (file) loadSysexFile(file);
     e.target.value = '';
   }, [loadSysexFile]);
+
+
+  useEffect(() => {
+    const handlePresetLoad = (event: Event) => {
+      const presetEvent = event as CustomEvent<{ data?: ArrayBuffer }>;
+      if (presetEvent.detail?.data) {
+        loadSysexData(presetEvent.detail.data, 'browser preset');
+      }
+    };
+
+    window.addEventListener('devilbox:load-dexed-preset', handlePresetLoad as EventListener);
+    return () => {
+      window.removeEventListener('devilbox:load-dexed-preset', handlePresetLoad as EventListener);
+    };
+  }, [loadSysexData]);
 
   const fbWidthRef = useRef(866);
   const fbHeightRef = useRef(674);
