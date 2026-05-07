@@ -2,7 +2,9 @@ import {
   parseKontaktAudioFrame,
   type KontaktBridgeMessage,
   type KontaktErrorMessage,
+  type KontaktPluginListMessage,
   type KontaktStatusMessage,
+  type PluginInfo,
 } from './protocol';
 
 export type KontaktBridgeStatus = 'disconnected' | 'connecting' | 'ready' | 'error';
@@ -10,9 +12,11 @@ export type KontaktBridgeStatus = 'disconnected' | 'connecting' | 'ready' | 'err
 export interface KontaktBridgeSnapshot {
   bridgeStatus: KontaktBridgeStatus;
   connected: boolean;
+  pluginName: string | null;
   currentPreset: string | null;
   sampleRate: number;
   error: string | null;
+  plugins: PluginInfo[];
 }
 
 type KontaktBridgeListener = (snapshot: KontaktBridgeSnapshot) => void;
@@ -20,9 +24,11 @@ type KontaktBridgeListener = (snapshot: KontaktBridgeSnapshot) => void;
 const EMPTY_SNAPSHOT: KontaktBridgeSnapshot = {
   bridgeStatus: 'disconnected',
   connected: false,
+  pluginName: null,
   currentPreset: null,
   sampleRate: 44100,
   error: null,
+  plugins: [],
 };
 
 // Ring buffer for smooth audio playback — eliminates stutter from network jitter
@@ -119,8 +125,9 @@ export class KontaktBridge {
       ws.onopen = () => {
         this.ws = ws;
         void this.ensureAudio();
-        this.setSnapshot({ bridgeStatus: 'ready', connected: true, error: null });
+        this.setSnapshot({ bridgeStatus: 'ready', connected: false, error: null });
         this.requestStatus();
+        this.listPlugins();
         settled = true;
         resolve();
       };
@@ -178,6 +185,18 @@ export class KontaktBridge {
 
   loadPreset(path: string): void {
     this.send({ type: 'load_preset', path });
+  }
+
+  listPlugins(): void {
+    this.send({ type: 'list_plugins' });
+  }
+
+  loadPlugin(name: string): void {
+    this.send({ type: 'load_plugin', name });
+  }
+
+  unloadPlugin(): void {
+    this.send({ type: 'unload_plugin' });
   }
 
   requestStatus(): void {
@@ -254,10 +273,17 @@ export class KontaktBridge {
       this.setSnapshot({
         bridgeStatus: 'ready',
         connected: Boolean(status.connected),
+        pluginName: typeof status.pluginName === 'string' ? status.pluginName : null,
         currentPreset: typeof status.presetName === 'string' ? status.presetName : null,
         sampleRate: Number.isFinite(status.sampleRate) ? status.sampleRate : this.snapshot.sampleRate,
         error: null,
       });
+      return;
+    }
+
+    if (type === 'plugin_list') {
+      const list = message as KontaktPluginListMessage;
+      this.setSnapshot({ plugins: Array.isArray(list.plugins) ? list.plugins : [] });
       return;
     }
 
