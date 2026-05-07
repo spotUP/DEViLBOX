@@ -24,10 +24,22 @@ const router = Router();
 
 function getKKDbPath(): string {
   if (process.platform === 'darwin') {
-    return path.join(
-      os.homedir(),
-      'Library/Application Support/Native Instruments/Komplete Kontrol/Browser Data/komplete.db3',
-    );
+    const home = os.homedir();
+    // Priority order: most data first
+    const candidates = [
+      path.join(home, 'Library/Application Support/Native Instruments/Kontakt 8/komplete.db3'),
+      path.join(home, 'Library/Application Support/Native Instruments/Kontakt 7/komplete.db3'),
+      path.join(home, 'Library/Application Support/Native Instruments/Maschine 3/komplete.db3'),
+      path.join(home, 'Library/Application Support/Native Instruments/Komplete Kontrol/Browser Data/komplete.db3'),
+    ];
+    // Return the first candidate that exists and has data (size > 100KB)
+    for (const p of candidates) {
+      try {
+        const stat = fs.statSync(p);
+        if (stat.size > 100_000) return p;
+      } catch { /* not found */ }
+    }
+    return candidates[candidates.length - 1];
   }
   // Windows
   return path.join(
