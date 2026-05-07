@@ -47,9 +47,11 @@ interface SamplePackBrowserProps {
   onClose: () => void;
   mode?: 'instrument' | 'drumpad';
   onSelectSample?: (sample: SampleData) => void;
+  /** When true, renders inline without fixed overlay chrome */
+  embedded?: boolean;
 }
 
-export const SamplePackBrowser: React.FC<SamplePackBrowserProps> = ({ onClose, mode = 'instrument', onSelectSample }) => {
+export const SamplePackBrowser: React.FC<SamplePackBrowserProps> = ({ onClose, mode = 'instrument', onSelectSample, embedded = false }) => {
   const currentInstrumentId = useInstrumentStore((s) => s.currentInstrumentId);
   const updateInstrument = useInstrumentStore((s) => s.updateInstrument);
   const setPreviewInstrument = useInstrumentStore((s) => s.setPreviewInstrument);
@@ -647,8 +649,8 @@ export const SamplePackBrowser: React.FC<SamplePackBrowserProps> = ({ onClose, m
   };
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 pt-16">
-      <div className="w-full h-full bg-ft2-bg flex flex-col overflow-hidden border-t-2 border-ft2-border relative">
+    <div className={embedded ? "h-full flex flex-col" : "fixed inset-0 z-[100] flex items-center justify-center bg-black/90 pt-16"}>
+      <div className={`${embedded ? 'h-full' : 'w-full h-full'} bg-ft2-bg flex flex-col overflow-hidden ${embedded ? '' : 'border-t-2 border-ft2-border'} relative`}>
         {/* Loading Overlay */}
         {(isUploading || isDecoding) && (
           <div className="absolute inset-0 z-[99990] flex flex-col items-center justify-center bg-black/60 backdrop-blur-sm">
@@ -665,20 +667,22 @@ export const SamplePackBrowser: React.FC<SamplePackBrowserProps> = ({ onClose, m
         )}
 
         {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 bg-ft2-header border-b-2 border-ft2-border">
-          <div className="flex items-center gap-3">
-            <Package size={20} className="text-ft2-highlight" />
-            <div>
-              <h2 className="text-ft2-highlight font-bold text-sm">
-                {isDrumpadMode ? 'SELECT SAMPLE' : 'SAMPLE PACKS'}
-              </h2>
-              <p className="text-ft2-textDim text-xs">Browse and load samples</p>
+        <div className={`flex items-center justify-between px-4 py-3 ${embedded ? 'bg-dark-bgSecondary border-b border-dark-border' : 'bg-ft2-header border-b-2 border-ft2-border'}`}>
+          {!embedded && (
+            <div className="flex items-center gap-3">
+              <Package size={20} className="text-ft2-highlight" />
+              <div>
+                <h2 className="text-ft2-highlight font-bold text-sm">
+                  {isDrumpadMode ? 'SELECT SAMPLE' : 'SAMPLE PACKS'}
+                </h2>
+                <p className="text-ft2-textDim text-xs">Browse and load samples</p>
+              </div>
             </div>
-          </div>
+          )}
           <div className="flex items-center gap-2">
             <button
               onClick={() => audioFileInputRef.current?.click()}
-              className="flex items-center gap-2 px-3 py-1.5 bg-ft2-bg border border-ft2-border hover:border-ft2-highlight text-ft2-text rounded transition-colors text-xs font-bold"
+              className={`flex items-center gap-2 px-3 py-1.5 border rounded transition-colors text-xs font-bold ${embedded ? 'bg-dark-bgTertiary border-dark-borderLight hover:border-accent-primary text-text-primary' : 'bg-ft2-bg border-ft2-border hover:border-ft2-highlight text-ft2-text'}`}
               title="Upload single audio file"
             >
               <FileAudio size={14} />
@@ -686,7 +690,7 @@ export const SamplePackBrowser: React.FC<SamplePackBrowserProps> = ({ onClose, m
             </button>
             <button
               onClick={() => zipInputRef.current?.click()}
-              className="flex items-center gap-2 px-3 py-1.5 bg-ft2-bg border border-ft2-border hover:border-ft2-highlight text-ft2-text rounded transition-colors text-xs font-bold"
+              className={`flex items-center gap-2 px-3 py-1.5 border rounded transition-colors text-xs font-bold ${embedded ? 'bg-dark-bgTertiary border-dark-borderLight hover:border-accent-primary text-text-primary' : 'bg-ft2-bg border-ft2-border hover:border-ft2-highlight text-ft2-text'}`}
               title="Upload ZIP pack"
             >
               <Upload size={14} />
@@ -694,18 +698,20 @@ export const SamplePackBrowser: React.FC<SamplePackBrowserProps> = ({ onClose, m
             </button>
             <button
               onClick={() => dirInputRef.current?.click()}
-              className="flex items-center gap-2 px-3 py-1.5 bg-ft2-bg border border-ft2-border hover:border-ft2-highlight text-ft2-text rounded transition-colors text-xs font-bold"
+              className={`flex items-center gap-2 px-3 py-1.5 border rounded transition-colors text-xs font-bold ${embedded ? 'bg-dark-bgTertiary border-dark-borderLight hover:border-accent-primary text-text-primary' : 'bg-ft2-bg border-ft2-border hover:border-ft2-highlight text-ft2-text'}`}
               title="Upload Folder (supports Max for Live device folders)"
             >
               <Folder size={14} />
               FOLDER / M4L
             </button>
-            <button
-              onClick={onClose}
-              className="p-2 text-ft2-textDim hover:text-ft2-text hover:bg-ft2-border rounded transition-colors"
-            >
-              <X size={20} />
-            </button>
+            {!embedded && (
+              <button
+                onClick={onClose}
+                className="p-2 text-ft2-textDim hover:text-ft2-text hover:bg-ft2-border rounded transition-colors"
+              >
+                <X size={20} />
+              </button>
+            )}
           </div>
 
           {/* Hidden inputs */}
