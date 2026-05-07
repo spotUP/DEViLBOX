@@ -26,6 +26,7 @@ import {
 import { useTransportStore }  from '@/stores/useTransportStore';
 import { useInstrumentStore } from '@/stores/useInstrumentStore';
 import { useTrackerStore }    from '@/stores/useTrackerStore';
+import { KKLightGuide, type LGConfig } from './KKLightGuide';
 import {
   getNKSParametersForSynth,
   buildNKSPages,
@@ -66,6 +67,9 @@ export class KKDawSurface {
   private nksPages: NKSPage[] = [];
   private lastInstrumentId: number | null = null;
 
+  // Light Guide — separate port, same MIDIAccess
+  readonly lightGuide = new KKLightGuide();
+
   private unsubscribers: Unsubscribe[] = [];
   private pollTimer: number | null = null;
   private flushTimer: number | null = null;
@@ -89,6 +93,9 @@ export class KKDawSurface {
       }
     }
 
+    // Connect Light Guide to its own port (non-DAW MIDI port)
+    this.lightGuide.connect(access);
+
     if (!this.output || !this.input) return false;
 
     this.input.onmidimessage = this.onMidiMessage;
@@ -110,10 +117,26 @@ export class KKDawSurface {
     if (this.input) {
       this.input.onmidimessage = null;
     }
+    this.lightGuide.disconnect();
     this.output = null;
     this.input  = null;
     this.protocolVersion = 0;
     this.notifyStatus();
+  }
+
+  /** Update Light Guide configuration (mode, scale, colors). */
+  setLightGuideConfig(cfg: Partial<LGConfig>): void {
+    this.lightGuide.setConfig(cfg);
+  }
+
+  /** Call when a MIDI note-on reaches the active instrument (for playing mode). */
+  noteOn(note: number): void {
+    this.lightGuide.addPlayingNote(note);
+  }
+
+  /** Call when a MIDI note-off leaves the active instrument. */
+  noteOff(note: number): void {
+    this.lightGuide.removePlayingNote(note);
   }
 
   getStatus(): KKSurfaceStatus {
@@ -171,10 +194,14 @@ export class KKDawSurface {
       }),
     );
 
-    // Instrument selection / parameters
+    // Instrument selection / parameters — Focus Follow
     this.unsubscribers.push(
       useInstrumentStore.subscribe((s, prev) => {
-        if (s.currentInstrumentId !== prev.currentInstrumentId) scheduleFlush();
+        if (s.currentInstrumentId !== prev.currentInstrumentId) {
+          // Instrument changed — immediately update preset name + rebuild pages
+          this.lastInstrumentId = null; // force rebuild
+          scheduleFlush();
+        }
         const curInst = s.instruments.find(i => i.id === s.currentInstrumentId);
         const prevInst = prev.instruments.find(i => i.id === prev.currentInstrumentId);
         if (curInst !== prevInst) scheduleFlush();
