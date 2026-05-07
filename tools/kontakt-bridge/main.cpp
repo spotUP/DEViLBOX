@@ -85,7 +85,15 @@ std::string makeStatusJson(const KontaktHost::Status& status) {
     out << '{'
         << "\"type\":\"status\","
         << "\"connected\":" << (status.pluginLoaded ? "true" : "false") << ','
-        << "\"presetName\":";
+        << "\"pluginName\":";
+
+    if (status.pluginName.empty()) {
+        out << "null";
+    } else {
+        out << '"' << jsonEscape(status.pluginName) << '"';
+    }
+
+    out << ",\"presetName\":";
 
     if (status.presetName.empty()) {
         out << "null";
@@ -106,6 +114,21 @@ std::string makeStatusJson(const KontaktHost::Status& status) {
     return out.str();
 }
 
+std::string makePluginListJson(const std::vector<PluginInfo>& plugins) {
+    std::ostringstream out;
+    out << "{\"type\":\"plugin_list\",\"plugins\":[";
+    for (size_t i = 0; i < plugins.size(); ++i) {
+        if (i > 0) out << ',';
+        out << "{\"name\":\"" << jsonEscape(plugins[i].name) << "\""
+            << ",\"manufacturer\":\"" << jsonEscape(plugins[i].manufacturer) << "\""
+            << ",\"type\":" << plugins[i].type
+            << ",\"subType\":" << plugins[i].subType
+            << "}";
+    }
+    out << "]}";
+    return out.str();
+}
+
 std::string makeErrorJson(const std::string& message) {
     return std::string("{\"type\":\"error\",\"message\":\"") + jsonEscape(message) + "\"}";
 }
@@ -121,6 +144,23 @@ std::vector<std::uint8_t> encodeAudioFrame(const float* left, const float* right
 } // namespace
 
 int main(int argc, char* argv[]) {
+    // Block ALL signals first, then selectively unblock the ones we handle.
+    // This prevents ANY unhandled signal from killing the process — AU plugins
+    // and socket operations can generate unexpected signals.
+    sigset_t allSignals;
+    sigfillset(&allSignals);
+    // Keep SIGINT/SIGTERM unblocked for graceful shutdown
+    sigdelset(&allSignals, SIGINT);
+    sigdelset(&allSignals, SIGTERM);
+    // Keep crash signals unblocked so our handlers fire
+    sigdelset(&allSignals, SIGSEGV);
+    sigdelset(&allSignals, SIGABRT);
+    sigdelset(&allSignals, SIGBUS);
+    sigdelset(&allSignals, SIGILL);
+    sigdelset(&allSignals, SIGFPE);
+    sigdelset(&allSignals, SIGTRAP);
+    pthread_sigmask(SIG_BLOCK, &allSignals, nullptr);
+
     std::signal(SIGINT, handleSignal);
     std::signal(SIGTERM, handleSignal);
     std::signal(SIGSEGV, crashHandler);
@@ -129,7 +169,7 @@ int main(int argc, char* argv[]) {
     std::signal(SIGILL, crashHandler);
     std::signal(SIGFPE, crashHandler);
     std::signal(SIGTRAP, crashHandler);
-    std::signal(SIGPIPE, SIG_IGN);  // Ignore SIGPIPE — handle send() errors via return value
+    std::signal(SIGPIPE, SIG_IGN);
     std::atexit(atexitHandler);
 
     KontaktHost host;
@@ -203,6 +243,39 @@ int main(int argc, char* argv[]) {
             return;
         }
 
+        if (*type == "list_plugins") {
+            server.sendText(makePluginListJson(host.listPlugins()));
+            return;
+        }
+
+        if (*type == "load_plugin") {
+            const auto pluginName = extractString(json, "name");
+            if (!pluginName) {
+                server.sendText(makeErrorJson("load_plugin requires a name"));
+                return;
+            }
+            if (!host.loadPlugin(*pluginName)) {
+                server.sendText(makeErrorJson(host.getStatus().lastError));
+                return;
+            }
+            // Reinstall signal handlers after AU init
+            std::signal(SIGSEGV, crashHandler);
+            std::signal(SIGABRT, crashHandler);
+            std::signal(SIGBUS, crashHandler);
+            std::signal(SIGILL, crashHandler);
+            std::signal(SIGFPE, crashHandler);
+            std::signal(SIGTRAP, crashHandler);
+            std::signal(SIGPIPE, SIG_IGN);
+            sendStatus();
+            return;
+        }
+
+        if (*type == "unload_plugin") {
+            host.unloadPlugin();
+            sendStatus();
+            return;
+        }
+
         server.sendText(makeErrorJson("Unknown message type: " + *type));
     });
 
@@ -211,18 +284,22 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
-    // Check for --no-au flag for debugging
+    // Check for --plugin flag to auto-load a specific plugin on startup
+    std::string autoLoadPlugin;
     bool skipAU = false;
     for (int i = 1; i < argc; ++i) {
-        if (std::string(argv[i]) == "--no-au") skipAU = true;
+        if (std::string(argv[i]) == "--no-au") {
+            skipAU = true;
+        } else if (std::string(argv[i]) == "--plugin" && i + 1 < argc) {
+            autoLoadPlugin = argv[++i];
+        }
     }
 
-    if (!skipAU) {
-        if (!host.initialize()) {
-            std::cerr << "[kontakt-bridge] host initialization warning: " << host.getStatus().lastError << std::endl;
+    if (!skipAU && !autoLoadPlugin.empty()) {
+        if (!host.loadPlugin(autoLoadPlugin)) {
+            std::cerr << "[au-bridge] auto-load warning: " << host.getStatus().lastError << std::endl;
         }
-        // Kontakt AU may override our signal handlers during init.
-        // Reinstall them after AU is loaded.
+        // AU plugins may override our signal handlers during init
         std::signal(SIGSEGV, crashHandler);
         std::signal(SIGABRT, crashHandler);
         std::signal(SIGBUS, crashHandler);
@@ -230,8 +307,10 @@ int main(int argc, char* argv[]) {
         std::signal(SIGFPE, crashHandler);
         std::signal(SIGTRAP, crashHandler);
         std::signal(SIGPIPE, SIG_IGN);
+    } else if (skipAU) {
+        std::cout << "[au-bridge] skipping AU load (--no-au)" << std::endl;
     } else {
-        std::cout << "[kontakt-bridge] skipping AU load (--no-au)" << std::endl;
+        std::cout << "[au-bridge] ready — send {\"type\":\"list_plugins\"} to see available plugins" << std::endl;
     }
 
     std::cout << "[kontakt-bridge] press Ctrl+C to stop" << std::endl;

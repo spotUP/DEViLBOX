@@ -6,10 +6,19 @@
 #include <mutex>
 #include <string>
 #include <thread>
+#include <vector>
 
 #ifdef __APPLE__
 #include <AudioToolbox/AudioToolbox.h>
 #endif
+
+struct PluginInfo {
+    std::string name;
+    std::string manufacturer;
+    std::uint32_t type = 0;
+    std::uint32_t subType = 0;
+    std::uint32_t mfr = 0;
+};
 
 class KontaktHost {
 public:
@@ -18,6 +27,7 @@ public:
     struct Status {
         bool pluginLoaded = false;
         std::string backend;
+        std::string pluginName;
         std::string presetName;
         double sampleRate = 44100.0;
         std::uint32_t blockSize = 512;
@@ -29,6 +39,10 @@ public:
 
     bool initialize();
     void shutdown();
+
+    std::vector<PluginInfo> listPlugins() const;
+    bool loadPlugin(const std::string& name);
+    void unloadPlugin();
 
     bool noteOn(int note, int velocity, int channel);
     bool noteOff(int note, int channel);

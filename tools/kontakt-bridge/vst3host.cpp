@@ -52,6 +52,175 @@ void KontaktHost::shutdown() {
         unit_ = nullptr;
     }
     component_ = nullptr;
+    status_.pluginLoaded = false;
+    status_.pluginName.clear();
+#endif
+}
+
+std::vector<PluginInfo> KontaktHost::listPlugins() const {
+    std::vector<PluginInfo> results;
+#ifdef __APPLE__
+    const UInt32 types[] = {
+        kAudioUnitType_MusicDevice,
+        kAudioUnitType_MusicEffect,
+    };
+
+    for (UInt32 auType : types) {
+        AudioComponentDescription desc{};
+        desc.componentType = auType;
+        AudioComponent comp = nullptr;
+        while ((comp = AudioComponentFindNext(comp, &desc)) != nullptr) {
+            CFStringRef nameRef = nullptr;
+            if (AudioComponentCopyName(comp, &nameRef) != noErr || !nameRef) {
+                continue;
+            }
+            char name[256] = {};
+            CFStringGetCString(nameRef, name, sizeof(name), kCFStringEncodingUTF8);
+            CFRelease(nameRef);
+
+            AudioComponentDescription compDesc{};
+            AudioComponentGetDescription(comp, &compDesc);
+
+            PluginInfo info;
+            info.name = name;
+            info.type = compDesc.componentType;
+            info.subType = compDesc.componentSubType;
+            info.mfr = compDesc.componentManufacturer;
+
+            std::string nameStr(name);
+            auto colon = nameStr.find(':');
+            if (colon != std::string::npos) {
+                info.manufacturer = nameStr.substr(0, colon);
+            }
+
+            results.push_back(std::move(info));
+        }
+    }
+#endif
+    return results;
+}
+
+bool KontaktHost::loadPlugin(const std::string& name) {
+#ifdef __APPLE__
+    unloadPlugin();
+
+    std::string lowerQuery = name;
+    std::transform(lowerQuery.begin(), lowerQuery.end(), lowerQuery.begin(),
+                   [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+
+    // Search across instrument types
+    const UInt32 types[] = {
+        kAudioUnitType_MusicDevice,
+        kAudioUnitType_MusicEffect,
+    };
+
+    std::string foundName;
+    for (UInt32 auType : types) {
+        AudioComponentDescription desc{};
+        desc.componentType = auType;
+        AudioComponent comp = nullptr;
+        while ((comp = AudioComponentFindNext(comp, &desc)) != nullptr) {
+            CFStringRef nameRef = nullptr;
+            if (AudioComponentCopyName(comp, &nameRef) != noErr || !nameRef) {
+                continue;
+            }
+            char cname[256] = {};
+            CFStringGetCString(nameRef, cname, sizeof(cname), kCFStringEncodingUTF8);
+            CFRelease(nameRef);
+
+            std::string lowerName(cname);
+            std::transform(lowerName.begin(), lowerName.end(), lowerName.begin(),
+                           [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+
+            if (lowerName.find(lowerQuery) != std::string::npos) {
+                component_ = comp;
+                foundName = cname;
+                break;
+            }
+        }
+        if (component_) break;
+    }
+
+    if (!component_) {
+        setError("AU plugin not found: " + name);
+        return false;
+    }
+
+    std::cout << "[au-bridge] found: " << foundName << std::endl;
+
+    if (AudioComponentInstanceNew(component_, &unit_) != noErr || !unit_) {
+        setError("Failed to instantiate AU: " + foundName);
+        component_ = nullptr;
+        return false;
+    }
+
+    Float64 sampleRate = status_.sampleRate;
+    UInt32 maxFrames = status_.blockSize;
+    AudioUnitSetProperty(unit_, kAudioUnitProperty_SampleRate, kAudioUnitScope_Output, 0, &sampleRate, sizeof(sampleRate));
+    AudioUnitSetProperty(unit_, kAudioUnitProperty_MaximumFramesPerSlice, kAudioUnitScope_Global, 0, &maxFrames, sizeof(maxFrames));
+
+    AudioStreamBasicDescription format{};
+    format.mSampleRate = sampleRate;
+    format.mFormatID = kAudioFormatLinearPCM;
+    format.mFormatFlags = kAudioFormatFlagsNativeFloatPacked | kAudioFormatFlagIsNonInterleaved;
+    format.mBitsPerChannel = 32;
+    format.mChannelsPerFrame = 2;
+    format.mFramesPerPacket = 1;
+    format.mBytesPerFrame = sizeof(float);
+    format.mBytesPerPacket = sizeof(float);
+
+    AudioUnitSetProperty(unit_, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Output, 0, &format, sizeof(format));
+
+    if (AudioUnitInitialize(unit_) != noErr) {
+        setError("AudioUnitInitialize failed for: " + foundName);
+        AudioComponentInstanceDispose(unit_);
+        unit_ = nullptr;
+        component_ = nullptr;
+        return false;
+    }
+
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        status_.backend = "au";
+        status_.pluginLoaded = true;
+        status_.pluginName = foundName;
+        status_.presetName.clear();
+        status_.lastError.clear();
+    }
+
+    running_ = true;
+    renderThread_ = std::thread(&KontaktHost::renderLoop, this);
+    std::cout << "[au-bridge] hosting: " << foundName << std::endl;
+
+    // Reinstall signal handlers — AU plugins may override them during init
+    std::signal(SIGPIPE, SIG_IGN);
+
+    return true;
+#else
+    (void)name;
+    setError("AU hosting is only supported on macOS");
+    return false;
+#endif
+}
+
+void KontaktHost::unloadPlugin() {
+    running_ = false;
+    if (renderThread_.joinable()) {
+        renderThread_.join();
+    }
+
+#ifdef __APPLE__
+    std::lock_guard<std::mutex> lock(mutex_);
+    if (unit_) {
+        AudioUnitUninitialize(unit_);
+        AudioComponentInstanceDispose(unit_);
+        unit_ = nullptr;
+    }
+    component_ = nullptr;
+    status_.pluginLoaded = false;
+    status_.pluginName.clear();
+    status_.presetName.clear();
+    status_.backend = "none";
 #endif
 }
 
