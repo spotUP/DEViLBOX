@@ -10,6 +10,7 @@
 
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { getToneEngine } from '../../../engine/ToneEngine';
+import { buildHelmParameterUpdates, type HelmPresetFile } from '../../../lib/helmPresetLoader';
 
 interface HelmUIModule {
   _helm_ui_init: () => void;
@@ -96,6 +97,49 @@ export const HelmHardwareUI: React.FC<HelmHardwareUIProps> = ({
     if (e.buttons & 1) mods |= 16;
     return mods;
   }, []);
+
+
+  const applyHelmPreset = useCallback((preset: HelmPresetFile) => {
+    const updates = buildHelmParameterUpdates(preset);
+    const module = moduleRef.current;
+
+    if (module) {
+      for (const { paramId, value } of updates) {
+        module._helm_ui_set_param(paramId, value);
+      }
+    }
+
+    if (!instrumentId) {
+      return;
+    }
+
+    try {
+      const engine = getToneEngine();
+      const key = (instrumentId << 16) | 0xFFFF;
+      const synth = engine.instruments.get(key) as { setParameter?: (paramId: number, value: number) => void } | undefined;
+      if (synth?.setParameter) {
+        for (const { paramId, value } of updates) {
+          synth.setParameter(paramId, value);
+        }
+      }
+    } catch {
+      /* engine not ready */
+    }
+  }, [instrumentId]);
+
+  useEffect(() => {
+    const handlePresetLoad = (event: Event) => {
+      const presetEvent = event as CustomEvent<{ data?: HelmPresetFile }>;
+      if (presetEvent.detail?.data) {
+        applyHelmPreset(presetEvent.detail.data);
+      }
+    };
+
+    window.addEventListener('devilbox:load-helm-preset', handlePresetLoad as EventListener);
+    return () => {
+      window.removeEventListener('devilbox:load-helm-preset', handlePresetLoad as EventListener);
+    };
+  }, [applyHelmPreset]);
 
   useEffect(() => {
     let cancelled = false;
