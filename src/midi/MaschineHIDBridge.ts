@@ -164,7 +164,12 @@ class MaschineHIDBridge {
   private routeEvent(evt: MaschineEvent): void {
     const mgr = getMIDIManager();
 
-    if (evt.type === 'encoder') {
+    if (evt.type === 'encoder' && evt.name === 'mainEncoder') {
+      // Main encoder is relative: value 65 = CW, 63 = CCW
+      const delta = evt.value > 64 ? 1 : -1;
+      const screenMgr = getMK2ScreenManager();
+      screenMgr.handleMainEncoder(delta);
+    } else if (evt.type === 'encoder') {
       console.log(`[MaschineHID] KNOB: index=${evt.index} value=${evt.value}`);
       // Let screen manager handle knob first (mixer volumes, browse scroll, etc.)
       const screenMgr = getMK2ScreenManager();
