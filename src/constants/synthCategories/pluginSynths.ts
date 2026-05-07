@@ -366,4 +366,13 @@ export const pluginSynthEntries: Record<string, SynthInfo> = {
     icon: 'Piano',
     color: 'text-blue-500',
   },
+  Kontakt: {
+    type: 'Kontakt',
+    name: 'Kontakt (Bridge)',
+    shortName: 'Kontakt',
+    description: 'NI Kontakt instrument loaded via bridge — MIDI routed to external Kontakt instance',
+    bestFor: ['External instruments', 'NKS presets', 'Sample libraries'],
+    icon: 'ExternalLink',
+    color: 'text-sky-400',
+  },
 };
