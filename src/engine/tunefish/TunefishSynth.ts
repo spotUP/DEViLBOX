@@ -277,8 +277,11 @@ export class TunefishSynth implements DevilboxSynth {
     this.setParameters(params);
   }
 
+  private _currentMidiNote = 69;
+
   noteOn(note: string | number, velocity: number = 1, _time?: number): void {
     const midi = typeof note === 'string' ? this.noteToMidi(note) : note;
+    this._currentMidiNote = midi;
     const vel = Math.round(velocity * 127);
     this.workletNode?.port.postMessage({
       type: 'noteOn',
@@ -306,6 +309,19 @@ export class TunefishSynth implements DevilboxSynth {
       type: 'pitchBend',
       data: { semitones, cents },
     });
+  }
+
+  /**
+   * Set oscillator frequency in Hz for tracker effect commands.
+   * Converts to semitone offset for Tunefish pitch bend.
+   */
+  setFrequency(hz: number): void {
+    if (hz <= 0) return;
+    const currentNoteHz = 440 * Math.pow(2, (this._currentMidiNote - 69) / 12);
+    const semitoneOffset = 12 * Math.log2(hz / currentNoteHz);
+    const wholeSemitones = Math.trunc(semitoneOffset);
+    const cents = (semitoneOffset - wholeSemitones) * 100;
+    this.pitchBend(wholeSemitones, cents);
   }
 
   modWheel(amount: number): void {

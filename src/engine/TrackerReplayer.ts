@@ -2356,6 +2356,14 @@ export class TrackerReplayer {
                   try { ch.gainNode.gain.setValueAtTime(gain, Tone.now()); }
                   catch { /* ignored */ }
                 }
+                // Also route through ToneEngine for WASM synths (DevilboxSynth output GainNode)
+                const instId = typeof ch?.instrument === 'number' ? ch.instrument
+                  : ch?.instrument != null && typeof ch.instrument === 'object' && 'id' in ch.instrument
+                    ? (ch.instrument as { id: number }).id : 0;
+                if (instId > 0) {
+                  try { getToneEngine().applySynthVolume(instId, gain, Tone.now(), channelIndex); }
+                  catch { /* ToneEngine not ready */ }
+                }
               },
               getChannelBaseFrequency: (channelIndex) => {
                 try { return getToneEngine().getChannelLastNoteFrequency(channelIndex); }

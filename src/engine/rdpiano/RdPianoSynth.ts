@@ -419,10 +419,13 @@ export class RdPianoSynth implements DevilboxSynth {
     this.setParameter(PARAM.VOLUME, vol);
   }
 
+  private _currentMidiNote = 69;
+
   triggerAttack(frequency: number | string, _time?: number, velocity = 1): void {
     const midiNote = typeof frequency === 'string'
       ? noteToMidi(frequency)
       : noteToMidi(frequency);
+    this._currentMidiNote = midiNote;
     const vel = Math.round(Math.max(0, Math.min(1, velocity)) * 127);
 
     if (this.romLoadError) return;
@@ -476,6 +479,20 @@ export class RdPianoSynth implements DevilboxSynth {
       type: 'pitchBend',
       value,
     });
+  }
+
+  /**
+   * Set oscillator frequency in Hz for tracker effect commands.
+   * Converts to MIDI pitch bend (14-bit, 8192 = center, ±2 semitone range).
+   */
+  setFrequency(hz: number): void {
+    if (hz <= 0) return;
+    const currentNoteHz = 440 * Math.pow(2, (this._currentMidiNote - 69) / 12);
+    const semitoneOffset = 12 * Math.log2(hz / currentNoteHz);
+    const bendRange = 2;
+    const normalized = Math.max(-1, Math.min(1, semitoneOffset / bendRange));
+    const midiValue = Math.round(8192 + normalized * 8191);
+    this.pitchBend(midiValue);
   }
 
   getCurrentPatch(): number {
