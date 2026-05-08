@@ -121,6 +121,11 @@ export class DeckAudioPlayer {
     this._numberOfChannels = audioBuffer.numberOfChannels;
     this._loaded = true;
 
+    // Set loopEnd to full duration so the default whole-track loop works.
+    // Without this, loopEnd stays at the constructor default (0) which
+    // creates a zero-length loop that stops playback immediately.
+    this.player.loopEnd = audioBuffer.duration;
+
     // Use pre-computed peaks if available (from background pre-render),
     // otherwise compute them asynchronously with yielding to avoid UI jank
     if (precomputedPeaks && precomputedPeaks.length > 0) {
@@ -442,10 +447,12 @@ export class DeckAudioPlayer {
       // Safety net: rAF fallback catches edge cases (rate changes near boundary)
       this.startLoopCheck();
     } else {
-      // Restore whole-track loop (no custom region)
+      // Restore whole-track loop (no custom region).
+      // loopEnd must equal the buffer duration — setting it to 0 creates a
+      // zero-length loop that stops playback immediately.
       this.player.loop = true;
       this.player.loopStart = 0;
-      this.player.loopEnd = 0;
+      this.player.loopEnd = this._duration || this.player.buffer?.duration || 0;
       this.stopLoopCheck();
     }
   }

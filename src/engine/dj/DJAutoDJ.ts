@@ -488,10 +488,31 @@ class DJAutoDJ {
           store.setDeckPlaying(this.activeDeck, true);
         }
 
+        // Continue tracking stale position in transition-pending state
+        if (Math.abs(timeRemaining - this.lastTimeRemaining) < 0.1) {
+          this.staleCount++;
+        } else {
+          this.staleCount = 0;
+        }
+        this.lastTimeRemaining = timeRemaining;
+
         // Check if it's time to start the transition
         const transitionDuration = this.getTransitionDurationSec();
         if (DEBUG_POLL && this.pollCount % 4 === 0) {
-          console.log(`[AutoDJ transition-pending] timeLeft=${timeRemaining.toFixed(1)}s, transitionDur=${transitionDuration.toFixed(1)}s, preloadedDeck=${this.preloadedDeck}`);
+          console.log(`[AutoDJ transition-pending] timeLeft=${timeRemaining.toFixed(1)}s, transitionDur=${transitionDuration.toFixed(1)}s, staleCount=${this.staleCount}, preloadedDeck=${this.preloadedDeck}`);
+        }
+        // When timeRemaining is Infinity (duration unknown — e.g. looping
+        // tracker modules) or position is frozen (song ended/looped back),
+        // use the stale-position heuristic to force the transition.
+        if (timeRemaining === Infinity || (this.staleCount > 6 && timeRemaining < 2)) {
+          if (this.staleCount > 6) {
+            // Position frozen ~3s — track has likely ended, force transition
+            console.warn(`[AutoDJ] Stale position (${this.staleCount} polls, timeLeft=${timeRemaining.toFixed(1)}s) — forcing transition`);
+            this.patternDeferCount = 0;
+            this.triggerTransition(store.autoDJTransitionBars);
+            break;
+          }
+          break;
         }
         if (timeRemaining <= transitionDuration) {
           // Pattern-aware deferral (default on — independent of the

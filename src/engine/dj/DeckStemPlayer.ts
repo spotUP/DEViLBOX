@@ -363,10 +363,11 @@ export class DeckStemPlayer {
         player.loopStart = loopIn;
         player.loopEnd = loopOut;
       } else {
-        // Restore whole-track loop
+        // Restore whole-track loop — loopEnd must be the buffer duration,
+        // not 0 (which creates a zero-length loop that stops immediately).
         player.loop = true;
         player.loopStart = 0;
-        player.loopEnd = 0;
+        player.loopEnd = player.buffer?.duration || 0;
       }
     }
   }
