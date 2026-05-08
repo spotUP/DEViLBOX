@@ -6,12 +6,12 @@
  * Kontakt-type instrument routed through the bridge.
  */
 
-import React, { useCallback } from 'react';
+import React, { useCallback, useEffect } from 'react';
 import { Button } from '@components/ui/Button';
 import { useKontaktStore } from '@stores/useKontaktStore';
 import { useInstrumentStore } from '@stores/useInstrumentStore';
 import { notify } from '@stores/useNotificationStore';
-import { Plug, Wifi, Loader2 } from 'lucide-react';
+import { Plug, Wifi, Loader2, RefreshCw } from 'lucide-react';
 import type { InstrumentConfig } from '@typedefs/instrument';
 
 interface AUPluginPickerProps {
@@ -26,10 +26,18 @@ export const AUPluginPicker: React.FC<AUPluginPickerProps> = ({ onClose }) => {
   const connect = useKontaktStore((s) => s.connect);
   const loadPlugin = useKontaktStore((s) => s.loadPlugin);
   const createInstrument = useInstrumentStore((s) => s.createInstrument);
+  const updateInstrument = useInstrumentStore((s) => s.updateInstrument);
 
   const isReady = bridgeStatus === 'ready';
 
-  const handleConnect = useCallback(async () => {
+  // Auto-connect when this tab becomes visible
+  useEffect(() => {
+    if (bridgeStatus === 'disconnected' || bridgeStatus === 'error') {
+      connect().catch(() => {});
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleRetry = useCallback(async () => {
     try {
       await connect();
     } catch (e) {
@@ -38,21 +46,54 @@ export const AUPluginPicker: React.FC<AUPluginPickerProps> = ({ onClose }) => {
   }, [connect]);
 
   const handleSelectPlugin = useCallback((name: string) => {
-    loadPlugin(name);
-    createInstrument({
-      name,
-      synthType: 'Kontakt' as InstrumentConfig['synthType'],
-    });
-    notify.success(`Loaded AU plugin: ${name}`);
-    onClose();
-  }, [loadPlugin, createInstrument, onClose]);
+    const existingSlots = new Set(useKontaktStore.getState().slots.map((slot) => slot.slot));
+    let unsubscribe: (() => void) | undefined;
+    let cleanupTimer: number | undefined;
 
-  // Not connected — show setup instructions
+    try {
+      loadPlugin(name);
+      const instrumentId = createInstrument({
+        name,
+        synthType: 'AUPlugin' as InstrumentConfig['synthType'],
+        auPluginName: name,
+      });
+
+      unsubscribe = useKontaktStore.subscribe((state) => {
+        const newSlot = state.slots.find((slot) => !existingSlots.has(slot.slot));
+        if (!newSlot) return;
+        updateInstrument(instrumentId, {
+          bridgeSlotId: newSlot.slot,
+          auPluginName: name,
+        });
+        unsubscribe?.();
+        if (cleanupTimer !== undefined) {
+          window.clearTimeout(cleanupTimer);
+        }
+      });
+
+      cleanupTimer = window.setTimeout(() => {
+        unsubscribe?.();
+      }, 15000);
+
+      notify.success(`Loaded AU plugin: ${name}`);
+      onClose();
+    } catch (e) {
+      unsubscribe?.();
+      if (cleanupTimer !== undefined) {
+        window.clearTimeout(cleanupTimer);
+      }
+      notify.error(e instanceof Error ? e.message : `Could not load AU plugin: ${name}`);
+    }
+  }, [loadPlugin, createInstrument, updateInstrument, onClose]);
+
+  // Not connected — show status
   if (!isReady) {
+    const isConnecting = bridgeStatus === 'connecting';
+    const isError = bridgeStatus === 'error';
     return (
       <div className="flex-1 flex flex-col items-center justify-center gap-6 p-8">
         <div className="w-16 h-16 rounded-full bg-dark-bgSecondary border border-dark-border flex items-center justify-center">
-          {bridgeStatus === 'connecting' ? (
+          {isConnecting ? (
             <Loader2 size={28} className="text-accent-primary animate-spin" />
           ) : (
             <Plug size={28} className="text-text-muted" />
@@ -61,8 +102,9 @@ export const AUPluginPicker: React.FC<AUPluginPickerProps> = ({ onClose }) => {
         <div className="text-center space-y-2 max-w-md">
           <h3 className="text-base font-semibold text-text-primary">Native Plugin Bridge</h3>
           <p className="text-[11px] text-text-secondary leading-relaxed">
-            Host AudioUnit, VST3, and CLAP plugins natively on your Mac.
-            The bridge streams audio and MIDI over WebSocket.
+            {isConnecting
+              ? 'Starting the AU bridge and connecting...'
+              : 'Host AudioUnit, VST3, and CLAP plugins natively on your Mac.'}
           </p>
         </div>
 
@@ -72,19 +114,22 @@ export const AUPluginPicker: React.FC<AUPluginPickerProps> = ({ onClose }) => {
           </div>
         )}
 
-        <Button variant="primary" onClick={handleConnect}>
-          <Wifi size={14} />
-          Connect to Bridge
-        </Button>
+        {isError && (
+          <Button variant="primary" onClick={handleRetry}>
+            <RefreshCw size={14} />
+            Retry Connection
+          </Button>
+        )}
 
-        <div className="bg-dark-bgSecondary border border-dark-border rounded p-4 max-w-md w-full">
-          <div className="text-[10px] font-mono uppercase tracking-widest text-text-muted mb-2">Start the bridge first</div>
-          <pre className="bg-dark-bgTertiary border border-dark-borderLight rounded p-2 text-[9px] font-mono text-text-secondary whitespace-pre-wrap">
+        {isError && (
+          <div className="bg-dark-bgSecondary border border-dark-border rounded p-4 max-w-md w-full">
+            <div className="text-[10px] font-mono uppercase tracking-widest text-text-muted mb-2">Bridge binary not found?</div>
+            <pre className="bg-dark-bgTertiary border border-dark-borderLight rounded p-2 text-[9px] font-mono text-text-secondary whitespace-pre-wrap">
 {`cd tools/kontakt-bridge/build
-cmake .. && make
-./kontakt-bridge`}
-          </pre>
-        </div>
+cmake .. && make`}
+            </pre>
+          </div>
+        )}
       </div>
     );
   }
