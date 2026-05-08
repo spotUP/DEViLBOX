@@ -9,7 +9,7 @@
  *   AU      — Browse and load native AudioUnit plugins via bridge
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { X, Music2, FolderOpen, Package, Library, Plug } from 'lucide-react';
 import { CategorizedSynthSelector } from './shared/CategorizedSynthSelector';
@@ -18,6 +18,7 @@ import { SamplePackBrowser } from './SamplePackBrowser';
 import { AUPluginPicker } from './AUPluginPicker';
 import { NKSLibraryBrowser, type PresetLoadEvent } from '@components/midi/NKSLibraryBrowser';
 import { useInstrumentStore } from '@stores/useInstrumentStore';
+import { useKontaktStore } from '@stores/useKontaktStore';
 import { notify } from '@stores/useNotificationStore';
 import { setPendingPresetData } from '@lib/pendingPresetData';
 import type { InstrumentConfig, SynthType } from '@typedefs/instrument';
@@ -30,9 +31,9 @@ interface AddInstrumentDialogProps {
 }
 
 const TABS: { id: AddTab; label: string; icon: React.ReactNode }[] = [
-  { id: 'synth', label: 'Synth', icon: <Music2 size={14} /> },
-  { id: 'preset', label: 'Preset', icon: <FolderOpen size={14} /> },
-  { id: 'sample', label: 'Sample', icon: <Package size={14} /> },
+  { id: 'synth', label: 'Built-in', icon: <Music2 size={14} /> },
+  { id: 'preset', label: 'Presets', icon: <FolderOpen size={14} /> },
+  { id: 'sample', label: 'Samples', icon: <Package size={14} /> },
   { id: 'library', label: 'Library', icon: <Library size={14} /> },
   { id: 'au', label: 'VST', icon: <Plug size={14} /> },
 ];
@@ -47,6 +48,15 @@ export const AddInstrumentDialog: React.FC<AddInstrumentDialogProps> = ({
   const instruments = useInstrumentStore((s) => s.instruments);
   const updateInstrument = useInstrumentStore((s) => s.updateInstrument);
   const createInstrument = useInstrumentStore((s) => s.createInstrument);
+
+  // Auto-start the AU bridge when the dialog opens
+  const bridgeStatus = useKontaktStore((s) => s.bridgeStatus);
+  const connect = useKontaktStore((s) => s.connect);
+  useEffect(() => {
+    if (bridgeStatus === 'disconnected') {
+      connect().catch(() => {/* bridge unavailable — user can retry from AU tab */});
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleLibraryLoad = ({ preset, data }: PresetLoadEvent) => {
     // DEViLBOX-native synth presets (Helm, Surge, Dexed, etc.)
@@ -79,14 +89,52 @@ export const AddInstrumentDialog: React.FC<AddInstrumentDialogProps> = ({
       }
     }
 
-    // NKS presets (Kontakt, Massive, FM8, etc.) — route MIDI through bridge
+    // NKS presets (Kontakt, Massive, FM8, etc.) — load via AU bridge
     if ('vendor' in preset && 'product' in preset) {
-      const presetName = `${(preset as { product: string }).product}: ${preset.name}`;
+      const nksPreset = preset as { product: string; name: string; filePath?: string };
+      const presetName = `${nksPreset.product}: ${preset.name}`;
+
+      // Ensure bridge is connected, load Kontakt AU, then load the preset file
+      const doNKSLoad = async () => {
+        try {
+          const { connect, bridgeStatus } = useKontaktStore.getState();
+          console.log('[NKS] Starting load, bridgeStatus:', bridgeStatus, 'preset:', nksPreset.filePath);
+
+          if (bridgeStatus !== 'ready') {
+            console.log('[NKS] Connecting to bridge...');
+            await connect();
+          }
+
+          const postConnect = useKontaktStore.getState();
+          console.log('[NKS] Post-connect bridgeStatus:', postConnect.bridgeStatus);
+          if (postConnect.bridgeStatus !== 'ready') {
+            notify.error('Could not connect to AU bridge');
+            return;
+          }
+
+          console.log('[NKS] Loading Kontakt AU plugin...');
+          postConnect.loadPlugin('Kontakt');
+
+          if (nksPreset.filePath) {
+            // Wait for Kontakt to initialize before loading preset
+            setTimeout(() => {
+              console.log('[NKS] Loading preset:', nksPreset.filePath);
+              useKontaktStore.getState().loadPreset(nksPreset.filePath!);
+            }, 3000);
+          }
+        } catch (err) {
+          console.error('[NKS] Load failed:', err);
+          notify.error('Could not connect to AU bridge');
+        }
+      };
+
+      void doNKSLoad();
+
       createInstrument({
         name: presetName,
         synthType: 'Kontakt' as InstrumentConfig['synthType'],
       });
-      notify.success(`Loaded: ${presetName}`);
+      notify.success(`Loading: ${presetName}`);
       onClose();
       return;
     }
@@ -100,7 +148,7 @@ export const AddInstrumentDialog: React.FC<AddInstrumentDialogProps> = ({
       onClick={onClose}
     >
       <div
-        className="bg-dark-bg border border-dark-border rounded-lg shadow-2xl w-[95%] max-w-5xl h-[85vh] flex flex-col"
+        className="bg-dark-bg border border-dark-border rounded-lg shadow-2xl w-[95%] max-w-5xl h-[85vh] max-h-[85vh] flex flex-col overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header with tabs */}
@@ -152,7 +200,7 @@ export const AddInstrumentDialog: React.FC<AddInstrumentDialogProps> = ({
             <SamplePackBrowser onClose={onClose} embedded />
           )}
           {activeTab === 'library' && (
-            <div className="flex-1 min-h-0">
+            <div className="flex-1 min-h-0 overflow-hidden">
               <NKSLibraryBrowser onLoadPreset={handleLibraryLoad} />
             </div>
           )}
