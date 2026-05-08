@@ -368,6 +368,10 @@ export interface InstrumentConfig {
   uadeChipRam?: UADEChipRamInfo;  // present when loaded via UADE native parser
   /** User-assigned instrument role — overrides CED neural + spectral auto-detection. */
   manualInstrumentType?: string;
+  /** Bridge slot ID for AU/Kontakt instruments — assigned when plugin is loaded into the native bridge. */
+  bridgeSlotId?: number;
+  /** AU plugin name to load in the bridge (e.g. "ABL3", "Kontakt") */
+  auPluginName?: string;
 }
 
 export interface InstrumentPreset {

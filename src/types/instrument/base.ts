@@ -332,7 +332,8 @@ export type SynthType =
   | 'VoodooWasmSynth'          // Voodoo Supreme Synthesizer (WASM replayer)
   | 'SunVoxModular'    // SunVox WASM modular synthesizer with visual editor
   // External instrument bridges
-  | 'Kontakt';         // NI Kontakt (MIDI routed through Kontakt bridge)
+  | 'Kontakt'          // NI Kontakt (MIDI routed through Kontakt bridge)
+  | 'AUPlugin';        // Generic AU/VST plugin (MIDI routed through AU bridge)
 
 export type WaveformType = 'sine' | 'square' | 'sawtooth' | 'triangle' | 'noise';
 
