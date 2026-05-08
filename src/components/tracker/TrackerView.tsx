@@ -244,6 +244,19 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
     useCursorStore.getState().moveCursor('right');
   }, [isMobile]);
 
+  // Edit instrument — AU bridge instruments open their native GUI instead of our editor
+  const handleEditInstrument = useCallback(() => {
+    const { currentInstrumentId, instruments } = useInstrumentStore.getState();
+    const inst = instruments.find(i => i.id === currentInstrumentId);
+    if (inst?.synthType === 'Kontakt' || inst?.synthType === 'AUPlugin') {
+      import('@stores/useKontaktStore').then(({ useKontaktStore }) => {
+        useKontaktStore.getState().showGUI(inst.bridgeSlotId);
+      });
+    } else {
+      onShowInstruments?.();
+    }
+  }, [onShowInstruments]);
+
   // Use external or internal import state
   const showImportModule = externalShowImportModule ?? internalShowImportModule;
   const setShowImportModule = onShowImportModule ?? setInternalShowImportModule;
@@ -828,7 +841,7 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
               variant="ft2"
               showPreviewOnClick={true}
               showEditButton={true}
-              onEditInstrument={onShowInstruments}
+              onEditInstrument={handleEditInstrument}
             />
           </div>
         )}
