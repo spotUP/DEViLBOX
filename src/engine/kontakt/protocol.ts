@@ -14,6 +14,20 @@ export interface PluginInfo {
   mfr: string;
 }
 
+export interface KontaktInstrument {
+  name: string;
+  vendor: string;
+  path: string;
+  cached: boolean;
+}
+
+export interface BridgeSlotInfo {
+  slot: number;
+  pluginName: string;
+  presetName: string | null;
+  connected: boolean;
+}
+
 export interface KontaktStatusMessage {
   type: 'status';
   connected: boolean;
@@ -23,11 +37,39 @@ export interface KontaktStatusMessage {
   blockSize?: number;
   backend?: string;
   platform?: string;
+  slots?: BridgeSlotInfo[];
+}
+
+export interface KontaktPluginLoadedMessage {
+  type: 'plugin_loaded';
+  slot: number;
+  pluginName: string;
+}
+
+export interface KontaktSlotListMessage {
+  type: 'slot_list';
+  slots: BridgeSlotInfo[];
 }
 
 export interface KontaktPluginListMessage {
   type: 'plugin_list';
   plugins: PluginInfo[];
+}
+
+export interface KontaktInstrumentListMessage {
+  type: 'instrument_list';
+  instruments: KontaktInstrument[];
+}
+
+export interface KontaktInstrumentLoadedMessage {
+  type: 'instrument_loaded';
+  name: string;
+}
+
+export interface KontaktStateCachedMessage {
+  type: 'state_cached';
+  name: string;
+  path: string;
 }
 
 export interface KontaktErrorMessage {
@@ -37,7 +79,12 @@ export interface KontaktErrorMessage {
 
 export type KontaktBridgeMessage =
   | KontaktStatusMessage
+  | KontaktPluginLoadedMessage
+  | KontaktSlotListMessage
   | KontaktPluginListMessage
+  | KontaktInstrumentListMessage
+  | KontaktInstrumentLoadedMessage
+  | KontaktStateCachedMessage
   | KontaktErrorMessage
   | Record<string, unknown>;
 
