@@ -21,6 +21,7 @@ import { Button } from '@components/ui/Button';
 import { notify } from '@stores/useNotificationStore';
 import { useKontaktStore } from '@stores/useKontaktStore';
 
+
 const HELM_CATEGORIES = ['Arp', 'Bass', 'Chip', 'Harsh', 'Keys', 'Lead', 'Pad', 'Percussion', 'SFX'] as const;
 
 type LibraryPreset = NKSPreset | DevilboxPreset;
@@ -212,7 +213,6 @@ export const NKSLibraryBrowser: React.FC<NKSLibraryBrowserProps> = ({ onLoadPres
   } = useNKSLibraryStore();
 
   const bridgeStatus = useKontaktStore((state) => state.bridgeStatus);
-  const loadKontaktPreset = useKontaktStore((state) => state.loadPreset);
 
   const [searchInput, setSearchInput] = useState(searchQuery);
   const [devilboxCategory, setDevilboxCategory] = useState('');
@@ -309,20 +309,14 @@ export const NKSLibraryBrowser: React.FC<NKSLibraryBrowserProps> = ({ onLoadPres
     }
   }, [activePreviewUrl]);
 
+  // NKS preset loading — connects to AU bridge and loads the plugin + preset
   const handleLoadNKSPreset = useCallback((preset: NKSPreset) => {
-    if (!isBridgeReady) {
-      notify.warning('Bridge not running');
-      return;
-    }
-
     try {
-      loadKontaktPreset(preset.filePath || preset.fileName);
-      notify.success(`Loading ${preset.name} in Kontakt`);
       onLoadPreset?.({ preset });
     } catch (error) {
       notify.error(error instanceof Error ? error.message : `Failed to load ${preset.name}`);
     }
-  }, [isBridgeReady, loadKontaktPreset, onLoadPreset]);
+  }, [onLoadPreset]);
 
   const handleLoadDevilboxPreset = useCallback(async (preset: DevilboxPreset) => {
     try {

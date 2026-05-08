@@ -27,6 +27,7 @@ import djsetsRoutes from './routes/djsets';
 import playlistsRoutes from './routes/playlists';
 import ratingsRoutes from './routes/ratings';
 import nksRoutes from './routes/nks';
+import bridgeRoutes from './routes/bridge';
 import devilboxPresetRoutes from './routes/devilbox-presets';
 import { handleStreamConnection, checkFfmpeg } from './routes/stream';
 import { initDataDirectories } from './utils/fileSystem';
@@ -75,6 +76,7 @@ app.use('/api/djsets', djsetsRoutes);
 app.use('/api/playlists', playlistsRoutes);
 app.use('/api/ratings', ratingsRoutes);
 app.use('/api/nks', nksRoutes);
+app.use('/api/bridge', bridgeRoutes);
 app.use('/api/devilbox-presets', devilboxPresetRoutes);
 
 // Health check
