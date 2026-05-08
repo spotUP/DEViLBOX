@@ -372,9 +372,30 @@ void WebSocketServer::acceptLoop() {
 }
 
 void WebSocketServer::replaceClient(SocketHandle socket) {
+    // Signal old client thread to stop, then close its socket
     closeClientSocket();
     if (clientThread_.joinable()) {
-        clientThread_.join();
+        // Give the old thread a short time to finish, then force-detach
+        // to avoid blocking the accept loop when messageHandler_ is slow
+        auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(2);
+        bool joined = false;
+        while (std::chrono::steady_clock::now() < deadline) {
+            // Check if thread finished by attempting a timed join (via polling)
+            if (!clientThread_.joinable()) { joined = true; break; }
+            // Small sleep to allow thread to exit
+            std::this_thread::sleep_for(std::chrono::milliseconds(50));
+            // Try joining non-blocking by checking if the socket closed caused exit
+            // clientThread_ will break out of clientLoop when recv fails
+            // Just keep waiting until deadline
+        }
+        if (!joined && clientThread_.joinable()) {
+            // Thread still stuck in messageHandler_ — detach it
+            // (the old socket is closed so it will exit eventually)
+            write(STDERR_FILENO, "[ws] old client thread slow, detaching\n", 39);
+            clientThread_.detach();
+        } else {
+            clientThread_.join();
+        }
     }
 
 #if !defined(_WIN32) && defined(SO_NOSIGPIPE)
@@ -396,6 +417,7 @@ void WebSocketServer::replaceClient(SocketHandle socket) {
 }
 
 void WebSocketServer::clientLoop() {
+    write(STDERR_FILENO, "[ws] clientLoop started\n", 23);
     while (running_) {
         SocketHandle socket = kInvalidSocket;
         {
@@ -403,13 +425,28 @@ void WebSocketServer::clientLoop() {
             socket = clientSocket_;
         }
         if (socket == kInvalidSocket) {
+            write(STDERR_FILENO, "[ws] clientLoop: socket invalid, exiting\n", 41);
             break;
         }
 
         std::uint8_t opcode = 0;
         std::vector<std::uint8_t> payload;
         if (!readFrame(socket, opcode, payload)) {
+            write(STDERR_FILENO, "[ws] clientLoop: readFrame failed, exiting\n", 43);
             break;
+        }
+
+        if (opcode == 0x1u) {
+            // Log first 80 chars of text messages
+            std::string msg(payload.begin(), payload.end());
+            std::string logLine = "[ws] recv text: " + msg.substr(0, 80) + "\n";
+            write(STDERR_FILENO, logLine.c_str(), logLine.size());
+        } else if (opcode == 0x2u) {
+            // binary — don't log (audio frames)
+        } else {
+            char buf[64];
+            int len = snprintf(buf, sizeof(buf), "[ws] recv opcode=0x%02x len=%zu\n", opcode, payload.size());
+            write(STDERR_FILENO, buf, len);
         }
 
         if (opcode == 0x1u && messageHandler_) {
