@@ -163,7 +163,7 @@ export async function importTrackerModule(
           sourceFormat: song.format,
         } as typeof song.patterns[0]['importMetadata'];
       }
-      loadInstruments(song.instruments);
+      loadInstruments(song.instruments, { skipPreload: true });
       loadPatterns(song.patterns);
       setCurrentPattern(0);
       if (song.songPositions.length > 0) setPatternOrder(song.songPositions);
@@ -361,7 +361,7 @@ export async function importTrackerModule(
       nextId += converted.length;
     }
 
-    loadInstruments(instruments);
+    loadInstruments(instruments, { skipPreload: true });
     loadPatterns(result.patterns);
     setCurrentPattern(0);
     if (result.order?.length > 0) setPatternOrder(result.order);
@@ -411,7 +411,7 @@ export async function importTrackerModule(
     }
     const { parseModuleToSong } = await import('@lib/import/parseModuleToSong');
     const song = await parseModuleToSong(info.file, options.subsong ?? 0, options.uadeMetadata, options.midiOptions, options.companionFiles);
-    loadInstruments(song.instruments);
+    loadInstruments(song.instruments, { skipPreload: true });
     loadPatterns(song.patterns);
     setCurrentPattern(0);
     if (song.songPositions.length > 0) setPatternOrder(song.songPositions);
@@ -448,7 +448,7 @@ export async function importTrackerModule(
       console.warn('[Import] convertModule produced no patterns, trying parseModuleToSong');
       const { parseModuleToSong } = await import('@lib/import/parseModuleToSong');
       const song = await parseModuleToSong(info.file, options.subsong ?? 0, options.uadeMetadata, options.midiOptions, options.companionFiles);
-      loadInstruments(song.instruments);
+      loadInstruments(song.instruments, { skipPreload: true });
       loadPatterns(song.patterns);
       setCurrentPattern(0);
       if (song.songPositions.length > 0) setPatternOrder(song.songPositions);
@@ -483,7 +483,7 @@ export async function importTrackerModule(
   }
 
   const instruments = createInstrumentsForModule(result.patterns, result.instrumentNames, sampleUrls);
-  loadInstruments(instruments);
+  loadInstruments(instruments, { skipPreload: true });
   loadPatterns(result.patterns);
   setCurrentPattern(0);
   if (result.order?.length > 0) setPatternOrder(result.order);
