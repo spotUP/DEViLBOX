@@ -26,6 +26,7 @@ export class VSTBridgeSynth implements DevilboxSynth {
   private _paramValues = new Map<number, number>();
   private _pendingNotes: Array<{ note: number; velocity: number }> = [];
   private _initialConfig: InstrumentConfig | undefined;
+  private _currentMidiNote: number = 69;
 
   constructor(descriptor: VSTBridgeDescriptor, config?: InstrumentConfig) {
     this._descriptor = descriptor;
@@ -129,6 +130,7 @@ export class VSTBridgeSynth implements DevilboxSynth {
   triggerAttack(frequency: number | string, _time?: number, velocity = 1): this {
     const midiNote = noteToMidi(frequency);
     const vel = Math.round(velocity * 127);
+    this._currentMidiNote = midiNote;
 
     if (this._worklet && this._isReady) {
       this._worklet.port.postMessage({ type: 'noteOn', note: midiNote, velocity: vel });
@@ -269,6 +271,21 @@ export class VSTBridgeSynth implements DevilboxSynth {
   /** Send pitch bend (14-bit, 8192 = center) */
   pitchBend(value: number): void {
     this._worklet?.port.postMessage({ type: 'pitchBend', value });
+  }
+
+  /**
+   * Set oscillator frequency in Hz for tracker effect commands.
+   * Converts to MIDI pitch bend (±2 semitone range = standard).
+   */
+  setFrequency(hz: number): void {
+    if (!this._worklet || hz <= 0) return;
+    const currentNoteHz = 440 * Math.pow(2, (this._currentMidiNote - 69) / 12);
+    const semitoneOffset = 12 * Math.log2(hz / currentNoteHz);
+    // Standard MIDI pitch bend range is ±2 semitones
+    const bendRange = 2;
+    const normalized = Math.max(-1, Math.min(1, semitoneOffset / bendRange));
+    const midiValue = Math.round(8192 + normalized * 8191);
+    this.pitchBend(midiValue);
   }
 
   /** Send program change */

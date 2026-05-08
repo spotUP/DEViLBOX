@@ -5546,10 +5546,26 @@ export class ToneEngine {
    */
   public applySynthVolume(instrumentId: number, volume: number, time: number, channelIndex?: number): void {
     const key = this.getInstrumentKey(instrumentId, channelIndex);
-    const instrument = this.instruments.get(key);
+    let instrument = this.instruments.get(key);
+
+    if (!instrument && channelIndex !== undefined) {
+      const legacyKey = this.getInstrumentKey(instrumentId, -1);
+      instrument = this.instruments.get(legacyKey);
+    }
+
     if (!instrument) return;
 
     const safeTime = this.getSafeTime(time) ?? Tone.now();
+
+    // DevilboxSynth (WASM): modulate the output GainNode directly
+    if (isDevilboxSynth(instrument)) {
+      const out = instrument.output;
+      if (out instanceof GainNode) {
+        try { out.gain.setValueAtTime(Math.max(0, Math.min(1, volume)), safeTime); }
+        catch { /* ignored */ }
+      }
+      return;
+    }
     
     // Convert 0-1 linear gain to decibels for Tone.js
     const dbVolume = volume <= 0 ? -Infinity : Tone.gainToDb(volume);
@@ -5599,9 +5615,26 @@ export class ToneEngine {
    */
   public applySynthPitch(instrumentId: number, semitones: number, time: number, channelIndex?: number, rampTime?: number): void {
     const key = this.getInstrumentKey(instrumentId, channelIndex);
-    const instrument = this.instruments.get(key);
+    let instrument = this.instruments.get(key);
+
+    if (!instrument && channelIndex !== undefined) {
+      const legacyKey = this.getInstrumentKey(instrumentId, -1);
+      instrument = this.instruments.get(legacyKey);
+    }
     
     if (!instrument) return;
+
+    // DevilboxSynth (WASM): convert semitone offset to frequency and use setFrequency
+    if (isDevilboxSynth(instrument)) {
+      if (instrument.setFrequency && channelIndex !== undefined) {
+        const baseFreq = this.getChannelLastNoteFrequency(channelIndex);
+        if (baseFreq > 0) {
+          const targetFreq = baseFreq * Math.pow(2, semitones / 12);
+          instrument.setFrequency(targetFreq, rampTime);
+        }
+      }
+      return;
+    }
 
     const safeTime = this.getSafeTime(time) ?? Tone.now();
     const cents = semitones * 100;
@@ -5673,6 +5706,14 @@ export class ToneEngine {
     }
     
     if (!instrument) return;
+
+    // DevilboxSynth (WASM synths): use setFrequency if available
+    if (isDevilboxSynth(instrument)) {
+      if (instrument.setFrequency) {
+        instrument.setFrequency(frequency, rampTime);
+      }
+      return;
+    }
 
     const safeTime = this.getSafeTime() ?? Tone.now();
 
