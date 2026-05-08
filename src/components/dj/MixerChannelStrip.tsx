@@ -82,8 +82,20 @@ export const MixerChannelStrip: React.FC<MixerChannelStripProps> = ({ deckId, st
   const deckNum = deckId === 'A' ? '1' : '2';
   const isB = deckId === 'B';
 
-  // Thumb Y position: top of track = volume 1, bottom = volume 0
-  const usableHeight = TRACK_HEIGHT - THUMB_HEIGHT;
+  // Thumb Y position: top of track = volume 1, bottom = volume 0.
+  // When stretch=true the track grows beyond TRACK_HEIGHT, so we must
+  // measure the actual rendered height to keep thumb and drag in sync.
+  const [trackHeight, setTrackHeight] = useState(TRACK_HEIGHT);
+  useEffect(() => {
+    const el = trackRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(([entry]) => {
+      setTrackHeight(entry.contentRect.height);
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  const usableHeight = trackHeight - THUMB_HEIGHT;
   const thumbTop = (1 - volume) * usableHeight;
 
   // Scratch fader state: show cut indicator when fader is closed during scratch
