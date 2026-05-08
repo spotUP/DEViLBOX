@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-05-06T18:17:49.535Z
+ * Generated: 2026-05-08T14:27:01.802Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,10 +19,10 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.6389';
-export const BUILD_NUMBER = '6389';
-export const BUILD_HASH = 'c3880e688';
-export const BUILD_DATE = '2026-05-06';
+export const BUILD_VERSION = '1.0.6441';
+export const BUILD_NUMBER = '6441';
+export const BUILD_HASH = '2e30ee5c4';
+export const BUILD_DATE = '2026-05-08';
 
 // Full version (patch IS the build number, so no need to append)
 export const FULL_VERSION = BUILD_VERSION;
@@ -30,226 +30,214 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.6389',
+    version: '1.0.6441',
+    date: '2026-05-07',
+    changes: [
+      {
+        type: 'improvement',
+        "description": "Consolidate MIDI settings into dedicated tab"
+      },
+      {
+        type: 'feature',
+        "description": "Add VST tab to Add Instrument dialog"
+      },
+      {
+        type: 'feature',
+        "description": "AU plugin picker UI — browse and load any AU instrument"
+      },
+      {
+        type: 'feature',
+        "description": "Generalize AU bridge — enumerate and load any AU plugin"
+      },
+      {
+        type: 'fix',
+        "description": "Kontakt bridge crash — CFRunLoop + SIGPIPE hardening"
+      },
+      {
+        type: 'fix',
+        "description": "Fix unhandled rejections in Kontakt MIDI routing"
+      },
+      {
+        type: 'fix',
+        "description": "Fix Kontakt synth type init error when selecting instrument"
+      },
+      {
+        type: 'feature',
+        "description": "Add Kontakt synth type for NKS preset MIDI routing"
+      },
+      {
+        type: 'fix',
+        "description": "Fix Add Instrument dialog: all 4 tabs render inline"
+      },
+      {
+        type: 'feature',
+        "description": "Consolidate instrument toolbar into unified Add dialog"
+      },
+      {
+        type: 'fix',
+        "description": "Fix NKS preset loading with pending preset data pattern"
+      },
+      {
+        type: 'fix',
+        "description": "Fix NKS Library preset load + Kontakt bridge auto-connect"
+      },
+      {
+        type: 'fix',
+        "description": "Fix Load Preset: create instrument when none selected"
+      },
+      {
+        type: 'fix',
+        "description": "Fix preset dialog hidden behind nav bar"
+      },
+      {
+        type: 'feature',
+        "description": "Add Library tab to instrument preset browser"
+      },
+      {
+        type: 'fix',
+        "description": "Fix Vite proxy: forward /api/* to Express:3011 in dev"
+      },
+      {
+        type: 'feature',
+        "description": "Add Surge XT (2618), OB-Xf (330), Odin2 (260) to preset browser"
+      },
+      {
+        type: 'feature',
+        "description": "Add cross-platform Kontakt bridge (AU/VST3 host, WebSocket audio streaming)"
+      },
+      {
+        type: 'fix',
+        "description": "Fix NKS browser to read from Kontakt 8 database (568 presets)"
+      },
+      {
+        type: 'feature',
+        "description": "Add DevilBOX synth preset browser (Helm + Dexed)"
+      },
+      {
+        type: 'feature',
+        "description": "Add Maschine MK3 display support and Traktor controller profiles"
+      },
+      {
+        type: 'feature',
+        "description": "Add KK Light Guide, Focus Follow, and Light Guide settings panel"
+      },
+      {
+        type: 'feature',
+        "description": "Add NKS Library Browser UI"
+      },
+      {
+        type: 'feature',
+        "description": "Add KK DAW MIDI protocol integration for Komplete Kontrol keyboards"
+      },
+      {
+        type: 'fix',
+        "description": "Fix flaky test timeouts: bump to 60s for heavy imports"
+      },
+      {
+        type: 'improvement',
+        "description": "SongScreen: show position chain with slot mute counts"
+      },
+      {
+        type: 'fix',
+        "description": "Pattern matrix sizing, always-show blocks, pattern numbers"
+      },
+      {
+        type: 'fix',
+        "description": "Fix piano roll auto-scroll to center on actual notes"
+      },
+      {
+        type: 'feature',
+        "description": "Renoise-style Pattern Matrix view with per-slot muting"
+      },
+      {
+        type: 'feature',
+        "description": "Add piano roll view to pattern editor"
+      },
+      {
+        type: 'feature',
+        "description": "Separate main encoder from knobs, add context-aware scrolling"
+      },
+      {
+        type: 'feature',
+        "description": "Add default factory mappings for Maschine MK2 and MPK Mini MK3"
+      },
+      {
+        type: 'feature',
+        "description": "Add Akai MPK Mini MK3 layout to MIDI controller mapper"
+      },
+      {
+        type: 'feature',
+        "description": "Add Maschine MK2 layout to MIDI controller mapper"
+      }
+    ]
+  },
+  {
+    version: '2026-05-06',
     date: '2026-05-06',
     changes: [
       {
-        type: 'feature',
-        "description": "Add sample, browse, song screen modes"
-      },
-      {
-        type: 'feature',
-        "description": "MK2 screen manager + 3 display modes"
-      },
-      {
-        type: 'feature',
-        "description": "Complete 48-button NIHIA map + transport wiring"
-      },
-      {
-        type: 'feature',
-        "description": "Maschine MK2 HID bridge + NKS auto-mapper updates"
+        type: 'fix',
+        "description": "MK2 knob mapping: fix index, wire page switching, hide NKS bar"
       },
       {
         type: 'fix',
-        "description": "Use updateInstrumentRealtime in SCKnobPanel for smooth knob control"
+        "description": "Motor fader init retry + cache clear on dub toggle"
       },
       {
         type: 'improvement',
-        "description": "Update auto-generated changelog"
+        "description": "Expand drum pads to 8 groups (A-H, 128 pads) for MK2"
+      },
+      {
+        type: 'fix',
+        "description": "Clear motor fader cache on init flush and dub toggle"
+      },
+      {
+        type: 'fix',
+        "description": "Fix drum pad grid: show all 16 pads for MK2, hide bank selector"
+      },
+      {
+        type: 'improvement',
+        "description": "Move TD-3 Pattern Transfer to Export/Import dialog"
+      },
+      {
+        type: 'fix',
+        "description": "Wire all 48 MK2 buttons: fix name mapping, add grid/volume/nav handlers"
+      },
+      {
+        type: 'fix',
+        "description": "Fix MIDI dropdown clipped by toolbar overflow-hidden"
+      },
+      {
+        type: 'fix',
+        "description": "Fix Controller Mapper modal not opening"
+      },
+      {
+        type: 'fix',
+        "description": "Fix motor faders not matching app state after reload"
+      },
+      {
+        type: 'fix',
+        "description": "Fix MK2 playback display: always update currentRow in transport store"
+      },
+      {
+        type: 'fix',
+        "description": "Fix null crash in MIDIMapperModal when no user overrides exist"
+      },
+      {
+        type: 'fix',
+        "description": "Visual MIDI controller mapper + motor fader snap-back fix"
+      },
+      {
+        type: 'improvement',
+        "description": "MK2: show 16 pads in 4x4 grid, set controllerPadCount on connect"
+      },
+      {
+        type: 'improvement',
+        "description": "MK2 pad LEDs reflect drum pad bank colors"
       },
       {
         type: 'feature',
-        "description": "Add Maschine MK2 display rendering and NI hardware protocol"
-      },
-      {
-        type: 'improvement',
-        "description": "Rewrite Maschine MK2 bridge to hybrid NIHIA/HID architecture"
-      },
-      {
-        type: 'fix',
-        "description": "Fix per-channel master FX: skip rebuild when no WASM isolation engine"
-      },
-      {
-        type: 'improvement',
-        "description": "Retune safety limiter — gentle soft-knee instead of brickwall"
-      },
-      {
-        type: 'fix',
-        "description": "Fix master FX mix slider triggering drag reorder"
-      },
-      {
-        type: 'feature',
-        "description": "Add master limiter controls — toggle + threshold knob"
-      },
-      {
-        type: 'fix',
-        "description": "Master FX channel routing with hybrid playback + channel-add stutter"
-      },
-      {
-        type: 'fix',
-        "description": "Master FX channel routing kills all effects when no isolation engine"
-      },
-      {
-        type: 'fix',
-        "description": "DJ subscriber storms — split subscriptions, useShallow, selectors"
-      }
-    ]
-  },
-  {
-    version: '2026-05-05',
-    date: '2026-05-05',
-    changes: [
-      {
-        type: 'feature',
-        "description": "Auto-connect to Maschine MK2 Virtual Input, disable HID bridge"
-      },
-      {
-        type: 'fix',
-        "description": "Deep audit pass 2 — hot paths, re-render storms, engine allocations"
-      },
-      {
-        type: 'fix',
-        "description": "Deep audio interference audit — batch WASM position, DJ playback, layout reflow"
-      },
-      {
-        type: 'fix',
-        "description": "Audit sweep — batch remaining audio-interfering paths"
-      },
-      {
-        type: 'fix',
-        "description": "Await instrument effect chain builds before playback starts"
-      },
-      {
-        type: 'fix',
-        "description": "Batch instrument effect wet/param store writes to stop audio halts"
-      },
-      {
-        type: 'improvement',
-        "description": "Eliminate UI audio interference: selectors + batched master FX"
-      },
-      {
-        type: 'improvement',
-        "description": "Batch remaining continuous stores: dub, audio, booth volume"
-      },
-      {
-        type: 'fix',
-        "description": "Batch store writes for all continuous controls to prevent audio glitches"
-      }
-    ]
-  },
-  {
-    version: '2026-04-30',
-    date: '2026-04-30',
-    changes: [
-      {
-        type: 'feature',
-        "description": "Embed: add keyboard router for pattern editor navigation"
-      },
-      {
-        type: 'feature',
-        "description": "Add ?embed=pattern-editor mode for iframe embedding"
-      }
-    ]
-  },
-  {
-    version: '2026-04-28',
-    date: '2026-04-28',
-    changes: [
-      {
-        type: 'fix',
-        "description": "Throttle magnitude requests to prevent audio dropouts on drag"
-      },
-      {
-        type: 'feature',
-        "description": "GLOBAL FX lane is now a vertical column to the left of channel 1"
-      },
-      {
-        type: 'improvement',
-        "description": "Revert: hide global FX lane in format mode (Hively/MusicLine/etc.)"
-      },
-      {
-        type: 'fix',
-        "description": "Dub auto-write reaches Hively/AHX songs (native-data formats)"
-      },
-      {
-        type: 'fix',
-        "description": "AutoDub Zxx cells use live WASM row + globals go to the global lane"
-      },
-      {
-        type: 'fix',
-        "description": "Render Zxx for extended dub-effect slots (effTyp 39/40)"
-      },
-      {
-        type: 'feature',
-        "description": "AutoDub writes effect cells inline for trigger moves (global + per-channel)"
-      },
-      {
-        type: 'fix',
-        "description": "Rename Gated Flanger → Prince Jammy"
-      },
-      {
-        type: 'fix',
-        "description": "Phat width + depth on Tubby/Scientist/MadProf/GatedFlanger"
-      },
-      {
-        type: 'fix',
-        "description": "Faster decay + cure muddy buildup in echo + spring tail"
-      },
-      {
-        type: 'feature',
-        "description": "Punchy bass via masterBassPunchDb + fix scrub volume snap"
-      },
-      {
-        type: 'fix',
-        "description": "Hively/Klystrack mute via globalThis registry — Vite dup-module workaround"
-      },
-      {
-        type: 'fix',
-        "description": "AutoDub disposer cleanup and tubbyScream priorWet snowball"
-      },
-      {
-        type: 'improvement',
-        "description": "Revert: restore sidechain compressor ratio=6 — diagnostic was negative"
-      },
-      {
-        type: 'improvement',
-        "description": "Chore: remove diagnostic logging from dub moves and mixer"
-      },
-      {
-        type: 'fix',
-        "description": "Replace fixed WET_COOLDOWN_SEC with dynamic nextWetAllowedMs"
-      },
-      {
-        type: 'improvement',
-        "description": "Test: disable sidechain compressor (ratio=1) to diagnose mix smashing"
-      },
-      {
-        type: 'fix',
-        "description": "DubSiren missing wet:true — was bypassing wet stacking cooldowns"
-      },
-      {
-        type: 'fix',
-        "description": "Remove tubbyScream from AutoDub rules — manual-only move"
-      },
-      {
-        type: 'fix',
-        "description": "TubbyScream release — kill feedback immediately, flush spring energy"
-      },
-      {
-        type: 'fix',
-        "description": "MasterDrop snowball silence + logging on all output-affecting moves"
-      },
-      {
-        type: 'improvement',
-        "description": "Revert: sidechain back to original -28dB/6:1 — was crushing the mix"
-      },
-      {
-        type: 'fix',
-        "description": "Hively volume double-application — use binary mute in WASM gains"
-      },
-      {
-        type: 'fix',
-        "description": "Debug: add diagnostics to find Hively silence regression"
+        "description": "Persist mixer state in .dbx + reset X-Touch controls on init"
       }
     ]
   }
