@@ -21,10 +21,17 @@ import { FurnaceDispatchEngine } from './furnace-dispatch/FurnaceDispatchEngine'
 import { FurnaceSynth } from './FurnaceSynth';
 import { OPL3Synth } from './opl3/OPL3Synth';
 import { normalizeUrl } from '@utils/urlUtils';
-import { getNativeAudioNode, setDevilboxAudioContext } from '@utils/audio-context';
+import { getNativeAudioNode, setDevilboxAudioContext, noteToMidi } from '@utils/audio-context';
 import { VinylNoiseEffect } from './effects/VinylNoiseEffect';
 import { TumultEffect } from './effects/TumultEffect';
 import { isEffectBpmSynced, getEffectSyncDivision, computeSyncedValue, SYNCABLE_EFFECT_PARAMS } from './bpmSync';
+import { kontaktBridge } from './kontakt/KontaktBridge';
+
+/** Returns true for synthTypes that route MIDI through the AU bridge (Kontakt, generic AU plugins). */
+function isAUBridgeSynthType(synthType: string | undefined): boolean {
+  return synthType === 'Kontakt' || synthType === 'AUPlugin';
+}
+
 import { reportSynthError } from '../stores/useSynthErrorStore';
 import { SYNTH_REGISTRY } from './vstbridge/synth-registry';
 import { WAMSynth } from './wam/WAMSynth';
@@ -211,6 +218,10 @@ export class ToneEngine {
   public instruments: Map<number, Tone.ToneAudioNode | DevilboxSynth>;
   // Track synth types for proper release handling
   private instrumentSynthTypes: Map<number, string> = new Map();
+  private kontaktChannelNotes: Map<number, Map<number, Set<number>>> = new Map();
+  private bridgeSlots: Map<number, number> = new Map();
+  // Cached reference to kontakt store for zero-latency MIDI — populated on first use
+  private _kontaktStore: typeof import('@stores/useKontaktStore').useKontaktStore | null = null;
   // SunVox output connected to synthBus (reset on disposeAllInstruments to reconnect on next song)
   private _sunvoxOutputConnected = false;
   // Track loading promises for samplers/players (keyed by instrument key)
@@ -1384,6 +1395,11 @@ export class ToneEngine {
 
     // Update all BPM-synced effects (master + per-instrument)
     this.updateBpmSyncedEffects(bpm);
+
+    // Sync BPM to AU plugin bridge if playing
+    if (this._isPlaying) {
+      try { kontaktBridge.transportSetTempo(bpm); } catch { /* bridge not connected */ }
+    }
   }
 
   /**
@@ -1499,6 +1515,9 @@ export class ToneEngine {
     this._isPlaying = true;
     this._notifyNoiseEffectsPlaying(true);
     Tone.getTransport().start();
+
+    // Sync AU plugin transport (safe — no-op if bridge not connected)
+    try { kontaktBridge.transportStart(Tone.getTransport().bpm.value); } catch { /* bridge not connected */ }
   }
 
   /**
@@ -1509,6 +1528,9 @@ export class ToneEngine {
     this.releaseAll();
     this._isPlaying = false;
     this._notifyNoiseEffectsPlaying(false);
+
+    // Sync AU plugin transport (safe — no-op if bridge not connected)
+    try { kontaktBridge.transportStop(); } catch { /* bridge not connected */ }
 
     // Clear VU meter trigger levels so meters die instantly on stop
     this.clearChannelTriggerLevels();
@@ -2502,6 +2524,7 @@ export class ToneEngine {
       case 'GTUltraSynth':
       case 'SF2Synth':
       case 'Kontakt':
+      case 'AUPlugin':
         return null;
 
       default: {
@@ -2917,23 +2940,34 @@ export class ToneEngine {
       console.log(`[NOTE] ▶ attack id=${instrumentId} ${config.synthType} ${note} ch=${channelIndex ?? '-'} vel=${velocity.toFixed(2)}`);
     }
 
-    // Kontakt — route MIDI to Kontakt AU via bridge WebSocket
-    if (config.synthType === 'Kontakt') {
-      import('@stores/useKontaktStore').then(({ useKontaktStore }) => {
-        import('@/utils/audio-context').then(({ noteToMidi }) => {
-          const store = useKontaktStore.getState();
-          if (store.bridgeStatus !== 'ready') {
-            store.connect().then(() => {
-              const s = useKontaktStore.getState();
-              const midiNote = typeof note === 'string' ? noteToMidi(note) : note;
-              s.noteOn(midiNote, Math.round(velocity * 127));
-            }).catch(() => { /* bridge not running */ });
-            return;
+    // AU bridge instruments (Kontakt, generic AU plugins) — route MIDI via bridge WebSocket
+    if (isAUBridgeSynthType(config.synthType)) {
+      const instrumentKey = this.getInstrumentKey(instrumentId, channelIndex);
+      this.instrumentSynthTypes.set(instrumentKey, config.synthType!);
+      const slot = config.bridgeSlotId ?? 0;
+      this.bridgeSlots.set(instrumentKey, slot);
+      const midiNote = typeof note === 'string' ? noteToMidi(note) : (typeof note === 'number' ? note : 60);
+      const midiVel = Math.round(velocity * 127);
+      const store = this.getKontaktStore();
+      if (store) {
+        const state = store.getState();
+        if (state.bridgeStatus === 'ready') {
+          try { state.noteOn(midiNote, midiVel, 0, slot); } catch { /* */ }
+        } else {
+          state.connect().then(() => {
+            try { store.getState().noteOn(midiNote, midiVel, 0, slot); } catch { /* */ }
+          }).catch(() => { /* bridge not running */ });
+        }
+      } else {
+        // First call — store not cached yet
+        void import('@stores/useKontaktStore').then(({ useKontaktStore }) => {
+          this._kontaktStore = useKontaktStore;
+          const state = useKontaktStore.getState();
+          if (state.bridgeStatus === 'ready') {
+            try { state.noteOn(midiNote, midiVel, 0, slot); } catch { /* */ }
           }
-          const midiNote = typeof note === 'string' ? noteToMidi(note) : note;
-          try { store.noteOn(midiNote, Math.round(velocity * 127)); } catch { /* */ }
         });
-      });
+      }
       return;
     }
 
@@ -3246,16 +3280,9 @@ export class ToneEngine {
   ): void {
     notifyInstrumentRelease(instrumentId);
 
-    // Kontakt — route MIDI to Kontakt AU via bridge WebSocket
-    if (config.synthType === 'Kontakt') {
-      import('@stores/useKontaktStore').then(({ useKontaktStore }) => {
-        import('@/utils/audio-context').then(({ noteToMidi }) => {
-          const store = useKontaktStore.getState();
-          if (store.bridgeStatus !== 'ready') return;
-          const midiNote = typeof note === 'string' ? noteToMidi(note) : note;
-          try { store.noteOff(midiNote); } catch { /* */ }
-        });
-      });
+    // AU bridge instruments — route MIDI noteOff via bridge WebSocket
+    if (isAUBridgeSynthType(config.synthType)) {
+      this.sendKontaktNoteOff(note, config.bridgeSlotId ?? 0);
       return;
     }
 
@@ -3593,11 +3620,73 @@ export class ToneEngine {
     return this.liveVoiceAllocation.size > 0;
   }
 
+  /** Eagerly resolve and cache the kontakt store for synchronous access. */
+  private getKontaktStore(): typeof import('@stores/useKontaktStore').useKontaktStore | null {
+    if (this._kontaktStore) return this._kontaktStore;
+    // Kick off the import — will be cached for next call
+    void import('@stores/useKontaktStore').then(({ useKontaktStore }) => {
+      this._kontaktStore = useKontaktStore;
+    });
+    return null;
+  }
+
+  private getBridgeSlotForInstrument(instrumentId: number, channelIndex?: number): number {
+    const key = this.getInstrumentKey(instrumentId, channelIndex);
+    const legacyKey = this.getInstrumentKey(instrumentId, -1);
+    return this.bridgeSlots.get(key)
+      ?? this.bridgeSlots.get(legacyKey)
+      ?? 0;
+  }
+
+  /** Send noteOff to the Kontakt AU bridge (synchronous when store is cached). */
+  private sendKontaktNoteOff(note: string | number, slot?: number): void {
+    const store = this.getKontaktStore();
+    if (store) {
+      const state = store.getState();
+      if (state.bridgeStatus !== 'ready') return;
+      const midiNote = typeof note === 'string' ? noteToMidi(note) : note;
+      try { state.noteOff(midiNote, 0, slot); } catch { /* */ }
+    } else {
+      // First call — store not cached yet, fall back to async
+      void import('@stores/useKontaktStore').then(({ useKontaktStore }) => {
+        this._kontaktStore = useKontaktStore;
+        const state = useKontaktStore.getState();
+        if (state.bridgeStatus !== 'ready') return;
+        const midiNote = typeof note === 'string' ? noteToMidi(note) : note;
+        try { state.noteOff(midiNote, 0, slot); } catch { /* */ }
+      });
+    }
+  }
+
   /**
    * Release a note (simpler version without config)
    */
   public releaseNote(instrumentId: number, note: string, time?: number, channelIndex?: number): void {
+    // Kontakt — route noteOff to bridge (no Tone.js instrument exists for Kontakt)
+    // Check instrumentSynthTypes first (fast), then fall back to instrument store
     const key = this.getInstrumentKey(instrumentId, channelIndex);
+    const legacyKey = this.getInstrumentKey(instrumentId, -1);
+    const storedSynthType = this.instrumentSynthTypes.get(key) || this.instrumentSynthTypes.get(legacyKey);
+
+    if (isAUBridgeSynthType(storedSynthType)) {
+      const slot = this.getBridgeSlotForInstrument(instrumentId, channelIndex);
+      this.sendKontaktNoteOff(note, slot);
+      return;
+    }
+
+    // AU bridge instruments never create Tone.js instances, so instrumentSynthTypes
+    // won't have an entry on first call. Check the instrument store as fallback.
+    if (!storedSynthType) {
+      void import('@stores/useInstrumentStore').then(({ useInstrumentStore }) => {
+        const inst = useInstrumentStore.getState().instruments.find((i) => i.id === instrumentId);
+        if (inst && isAUBridgeSynthType(inst.synthType)) {
+          this.instrumentSynthTypes.set(key, inst.synthType);
+          this.sendKontaktNoteOff(note, inst.bridgeSlotId ?? 0);
+        }
+      });
+      // Can't determine synthType synchronously — if it's a bridge type, the async path handles it
+    }
+
     let instrument = this.instruments.get(key);
 
     // Fallback to legacy key if not found
@@ -3706,17 +3795,36 @@ export class ToneEngine {
       console.log(`[NOTE] ▶ trigger id=${instrumentId} ${config.synthType} ${note} ch=${channelIndex} dur=${duration.toFixed(3)} vel=${velocity.toFixed(2)}`);
     }
 
-    // Kontakt — route MIDI to Kontakt AU via bridge WebSocket
-    if (config.synthType === 'Kontakt') {
+    // AU bridge instruments — route MIDI via bridge WebSocket
+    if (isAUBridgeSynthType(config.synthType)) {
+      const instrumentKey = this.getInstrumentKey(instrumentId, channelIndex);
+      this.instrumentSynthTypes.set(instrumentKey, config.synthType!);
+      const slot = config.bridgeSlotId ?? 0;
+      this.bridgeSlots.set(instrumentKey, slot);
+      if (channelIndex !== undefined) {
+        const prevNotesBySlot = this.kontaktChannelNotes?.get(channelIndex);
+        const prevNotes = prevNotesBySlot?.get(slot);
+        if (prevNotes && prevNotes.size > 0) {
+          for (const prevNote of prevNotes) {
+            this.sendKontaktNoteOff(prevNote, slot);
+          }
+          prevNotes.clear();
+        }
+      }
       import('@stores/useKontaktStore').then(({ useKontaktStore }) => {
         import('@/utils/audio-context').then(({ noteToMidi }) => {
           const store = useKontaktStore.getState();
           if (store.bridgeStatus !== 'ready') return;
           const midiNote = typeof note === 'string' ? noteToMidi(note) : note;
           try {
-            store.noteOn(midiNote, Math.round(velocity * 127));
-            if (duration > 0) {
-              setTimeout(() => { try { store.noteOff(midiNote); } catch { /* */ } }, duration * 1000);
+            store.noteOn(midiNote, Math.round(velocity * 127), 0, slot);
+            // Track active note per channel for proper release on next note
+            if (channelIndex !== undefined) {
+              if (!this.kontaktChannelNotes) this.kontaktChannelNotes = new Map();
+              if (!this.kontaktChannelNotes.has(channelIndex)) this.kontaktChannelNotes.set(channelIndex, new Map());
+              const channelSlots = this.kontaktChannelNotes.get(channelIndex)!;
+              if (!channelSlots.has(slot)) channelSlots.set(slot, new Set());
+              channelSlots.get(slot)!.add(midiNote);
             }
           } catch { /* */ }
         });
