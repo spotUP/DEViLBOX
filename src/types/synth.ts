@@ -25,6 +25,12 @@ export interface DevilboxSynth {
   get?(param: string): number | undefined;
   /** Get all automatable parameters (for synths with dynamic/runtime params like VST plugins) */
   getAutomatableParams?(): Array<{ id: string; name: string; min: number; max: number; section?: string }>;
+  /**
+   * Set the oscillator frequency in Hz (for tracker effect commands like portamento/vibrato).
+   * Synths that support mid-note pitch changes should implement this.
+   * If not implemented, frequency effects are silently skipped.
+   */
+  setFrequency?(hz: number, rampTime?: number): void;
 }
 
 /**

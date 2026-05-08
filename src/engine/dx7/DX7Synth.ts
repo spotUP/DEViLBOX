@@ -385,8 +385,11 @@ export class DX7Synth implements DevilboxSynth {
     return DX7Synth.wasmFetchPromise;
   }
 
+  private _currentMidiNote = 69;
+
   triggerAttack(note: string | number, _time?: number, velocity = 1) {
     const midi = typeof note === 'string' ? noteToMidi(note) : note;
+    this._currentMidiNote = midi;
     this.send({ type: 'noteOn', note: midi, velocity: Math.round(velocity * 127) });
   }
 
@@ -418,6 +421,20 @@ export class DX7Synth implements DevilboxSynth {
     // Convert -1..1 range to 0..127 MIDI MSB
     const msb = Math.round((value + 1) * 63.5);
     this.send({ type: 'pitchBend', value: msb });
+  }
+
+  /**
+   * Set oscillator frequency in Hz for tracker effect commands.
+   * Converts to DX7 pitch bend (-1..1 mapped to 0..127 MSB).
+   */
+  setFrequency(hz: number): void {
+    if (hz <= 0) return;
+    const currentNoteHz = 440 * Math.pow(2, (this._currentMidiNote - 69) / 12);
+    const semitoneOffset = 12 * Math.log2(hz / currentNoteHz);
+    // DX7 pitch bend range is ±2 semitones by default
+    const bendRange = 2;
+    const normalized = Math.max(-1, Math.min(1, semitoneOffset / bendRange));
+    this.pitchBend(normalized);
   }
 
   modWheel(value: number) {

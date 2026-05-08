@@ -248,6 +248,8 @@ export class DB303Synth implements DevilboxSynth {
   // Store current slideTime for hammer restoration
   private _savedSlideTime: number = 0.5;
   private _currentSlideTime: number = 0.5;
+  // Track current MIDI note for pitchBend-based setFrequency
+  private _currentMidiNote: number = 69; // A4
 
   triggerAttack(note: string | number, _time?: number, velocity: number = 1, accent: boolean = false, slide: boolean = false, hammer: boolean = false): void {
     if (!this.workletNode || this._disposed) return;
@@ -262,6 +264,8 @@ export class DB303Synth implements DevilboxSynth {
     const midiNote = typeof note === 'string'
       ? noteToMidi(note)
       : Math.round(12 * Math.log2(note / 440) + 69);
+
+    this._currentMidiNote = midiNote;
 
     // Map accent flag to velocity (DB303 uses high velocity for accent)
     let finalVelocity = Math.floor(velocity * 127);
@@ -489,6 +493,19 @@ export class DB303Synth implements DevilboxSynth {
       // Legacy snake_case aliases (for setParam compatibility)
       case 'filterFM':      this.setFilterFmDepth(value); break;
     }
+  }
+
+  /**
+   * Set oscillator frequency in Hz for tracker effect commands (portamento, vibrato, arpeggio).
+   * Converts the target frequency to a semitone offset from the current note and sends
+   * pitchBend to the WASM engine, which applies it as a frequency multiplier.
+   */
+  setFrequency(hz: number, _rampTime?: number): void {
+    if (!this.workletNode || this._disposed || hz <= 0) return;
+    // Convert target Hz to semitone offset from current note
+    const currentNoteHz = 440 * Math.pow(2, (this._currentMidiNote - 69) / 12);
+    const semitoneOffset = 12 * Math.log2(hz / currentNoteHz);
+    this.workletNode.port.postMessage({ type: 'pitchBend', value: semitoneOffset });
   }
 
   // --- Core Setters ---

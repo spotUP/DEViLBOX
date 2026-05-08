@@ -375,8 +375,11 @@ export class SfizzSynthEngine implements DevilboxSynth {
     this._worklet.port.postMessage({ type: 'loadSfzString', sfzText: sfzContent, virtualPath: '/loaded.sfz' });
   }
 
+  private _currentMidiNote = 69;
+
   triggerAttack(frequency: number | string, _time?: number, velocity?: number): this {
     const note = typeof frequency === 'string' ? noteToMidi(frequency) : Math.round(12 * Math.log2(frequency / 440) + 69);
+    this._currentMidiNote = note;
     const vel = Math.max(0, Math.min(1, velocity ?? 0.8));
     if (!this.isInitialized || !this._worklet) {
       this.pendingNotes.push({ note, velocity: vel });
@@ -421,6 +424,20 @@ export class SfizzSynthEngine implements DevilboxSynth {
 
   get(param: string): number | undefined {
     return (this.config as Record<string, number | undefined>)[param];
+  }
+
+  /**
+   * Set oscillator frequency in Hz for tracker effect commands.
+   * Converts to sfizz pitch wheel value (-8191..8191).
+   */
+  setFrequency(hz: number): void {
+    if (!this._worklet || !this.isInitialized || hz <= 0) return;
+    const currentNoteHz = 440 * Math.pow(2, (this._currentMidiNote - 69) / 12);
+    const semitoneOffset = 12 * Math.log2(hz / currentNoteHz);
+    // Sfizz pitch wheel: ±2 semitone range by default
+    const bendRange = 2;
+    const normalized = Math.max(-1, Math.min(1, semitoneOffset / bendRange));
+    this._worklet.port.postMessage({ type: 'pitchWheel', delay: 0, value: Math.round(normalized * 8191) });
   }
 
   setPreset(name: string): void {

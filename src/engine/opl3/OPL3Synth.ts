@@ -104,12 +104,15 @@ export class OPL3Synth implements DevilboxSynth {
     return OPL3Synth.wasmFetchPromise;
   }
 
+  private _currentMidiNote = 69;
+
   triggerAttack(note: string | number, _time?: number, velocity = 1) {
     if (!this._unmuted) {
       this.output.gain.value = 1.0;
       this._unmuted = true;
     }
     const midi = typeof note === 'string' ? noteToMidi(note) : note;
+    this._currentMidiNote = midi;
     if (this._channelIndex >= 0) {
       this.send({ type: 'chNoteOn', ch: this._channelIndex, note: midi, velocity: Math.round(velocity * 127) });
     } else {
@@ -156,6 +159,17 @@ export class OPL3Synth implements DevilboxSynth {
 
   pitchBend(semitones: number) {
     this.send({ type: 'pitchBend', semitones });
+  }
+
+  /**
+   * Set oscillator frequency in Hz for tracker effect commands.
+   * Converts to semitone offset for OPL3 pitch bend.
+   */
+  setFrequency(hz: number): void {
+    if (hz <= 0) return;
+    const currentNoteHz = 440 * Math.pow(2, (this._currentMidiNote - 69) / 12);
+    const semitoneOffset = 12 * Math.log2(hz / currentNoteHz);
+    this.pitchBend(semitoneOffset);
   }
 
   /**
