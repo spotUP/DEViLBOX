@@ -390,13 +390,25 @@ class DJAutoDJ {
     const store = useDJStore.getState();
     if (!store.autoDJEnabled) return;
 
+    // If a transition is in progress, fast-complete it first so indices
+    // advance and the deck swap happens. Without this, cancelling a
+    // transition mid-flight leaves activeDeck/idleDeck stale and the
+    // playlist stuck on the same track.
+    if (this.transitionCancel) {
+      console.log('[AutoDJ] skip() — force-completing in-progress transition');
+      this.cancelTransition();
+      this.completeTransition();
+    }
+
+    // Sync to actual deck state in case the user manually loaded/played
+    // a track on a different deck.
+    this.syncDeckState();
+
     if (this.preloadedDeck) {
       // Next track is ready — do a short transition
-      this.cancelTransition();
       this.triggerTransition(SKIP_TRANSITION_BARS, true);
     } else {
       // Not preloaded yet — try to load and play immediately
-      this.cancelTransition();
       // Clear any stale preRenderedTrack so triggerTransition doesn't use it
       // in place of the track we're about to load directly to the deck.
       this.preRenderedTrack = null;
@@ -1062,6 +1074,28 @@ class DJAutoDJ {
       this.transitionCancel();
       this.transitionCancel = null;
     }
+  }
+
+  /**
+   * Check which deck is actually playing and sync activeDeck/idleDeck.
+   * The user may have manually loaded tracks or moved the crossfader,
+   * making the stored activeDeck/idleDeck stale. Without this sync,
+   * "Mix Now" can load the next track to the WRONG deck (the one that's
+   * already playing) or try to crossfade in the wrong direction.
+   */
+  private syncDeckState(): void {
+    const store = useDJStore.getState();
+    const aPlaying = store.decks.A.isPlaying;
+    const bPlaying = store.decks.B.isPlaying;
+
+    if (aPlaying && !bPlaying) {
+      this.activeDeck = 'A';
+      this.idleDeck = 'B';
+    } else if (bPlaying && !aPlaying) {
+      this.activeDeck = 'B';
+      this.idleDeck = 'A';
+    }
+    // If both or neither are playing, keep current assignment
   }
 
   private completeTransition(): void {
