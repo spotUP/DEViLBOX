@@ -94,6 +94,7 @@ import {
 } from '@/lib/playlistCloudApi';
 import { FX_PRESETS } from '@/constants/fxPresets';
 import { applyPerSongMasterFx } from '@/engine/dj/DJPerSongFx';
+import { useUIStore } from '@/stores/useUIStore';
 
 // Group master FX presets by primary tag (first tag wins) for <optgroup>.
 // Module-scope so every row memo-reuses the same reference instead of
@@ -1023,6 +1024,15 @@ export const DJPlaylistModal: React.FC<DJPlaylistModalProps> = ({ isOpen, onClos
 
 const DJPlaylistModalContent: React.FC<{ onClose: () => void }> = ({ onClose }) => {
   const isOpen = true;
+
+  // Register with useUIStore so the global keyboard handler knows a modal is
+  // open and skips tracker shortcuts (play, undo, delete, etc.) that could
+  // fire while the user types into playlist name / search inputs.
+  useEffect(() => {
+    useUIStore.getState().openModal('dj-playlist');
+    return () => useUIStore.getState().closeModal();
+  }, []);
+
   // ── Store bindings (consolidated with useShallow to prevent re-render storms) ──
   const { playlists, activePlaylistId } = useDJPlaylistStore(
     useShallow((s) => ({ playlists: s.playlists, activePlaylistId: s.activePlaylistId }))
@@ -3352,6 +3362,7 @@ const DJPlaylistModalContent: React.FC<{ onClose: () => void }> = ({ onClose }) 
                     <span className="shrink-0 w-16 text-center cursor-pointer hover:text-text-muted transition-colors" onClick={() => handleColumnSort('energy')}>
                       Energy {columnSort?.column === 'energy' && (columnSort.dir === 'asc' ? <ChevronUp size={16} className="inline" /> : <ChevronDown size={16} className="inline" />)}
                     </span>
+                    <span className="shrink-0 w-8" />
                     <span className="shrink-0 w-16 text-right cursor-pointer hover:text-text-muted transition-colors" onClick={() => handleColumnSort('time')}>
                       Time {columnSort?.column === 'time' && (columnSort.dir === 'asc' ? <ChevronUp size={16} className="inline" /> : <ChevronDown size={16} className="inline" />)}
                     </span>
@@ -3394,7 +3405,7 @@ const DJPlaylistModalContent: React.FC<{ onClose: () => void }> = ({ onClose }) 
                     <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
                       <SortableContext items={sortableIds} strategy={verticalListSortingStrategy}>
                         <div style={{ height: virtualizer.getTotalSize(), position: 'relative' }}>
-                          {virtualizer.getVirtualItems().map((virtualRow) => {
+                          {virtualItems.map((virtualRow) => {
                             const track = filteredTracks[virtualRow.index];
                             const realIndex = getRealIndex(virtualRow.index);
                             return (

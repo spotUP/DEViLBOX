@@ -265,7 +265,7 @@ const SortableTrackRow: React.FC<SortableTrackRowProps> = React.memo(({
       ) : track.played ? (
         <span className="text-green-500/50 text-[9px] shrink-0" title="Played">P</span>
       ) : null}
-      <span className={`flex-1 text-sm font-mono truncate min-w-0 ${
+      <span className={`flex-1 text-xs font-mono truncate min-w-0 ${
         isLoading ? 'text-cyan-400' : track.isBad ? 'text-red-500/90' : track.played ? 'text-text-muted/40' : 'text-text-secondary'
       }`}>
         {track.trackName}
@@ -292,7 +292,7 @@ const SortableTrackRow: React.FC<SortableTrackRowProps> = React.memo(({
           FX
         </span>
       )}
-      <span className={`flex items-center gap-0.5 shrink-0 transition-opacity ${isHovered || isFocused ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
+      <span className={`flex items-center gap-0.5 shrink-0 transition-opacity ${isHovered || isFocused ? 'opacity-100' : 'opacity-0 pointer-events-none w-0 overflow-hidden'}`}>
         {/* Preview button */}
         <button
           onClick={(e) => { e.stopPropagation(); isPreviewing ? onStopPreview() : onPreview(track, index); }}
@@ -1606,7 +1606,7 @@ export const DJPlaylistPanel: React.FC<DJPlaylistPanelProps> = ({ onClose }) => 
             <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
               <SortableContext items={sortableIds} strategy={verticalListSortingStrategy}>
                 <div style={{ height: virtualizer.getTotalSize(), position: 'relative' }}>
-                  {virtualizer.getVirtualItems().map((virtualRow) => {
+                  {virtualItems.map((virtualRow) => {
                     const track = filteredTracks[virtualRow.index];
                     const realIndex = getRealIndex(virtualRow.index);
                     return (
