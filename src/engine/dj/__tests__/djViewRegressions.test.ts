@@ -832,8 +832,8 @@ describe('One-Shots Live preset — Sammy Blammy on bank B', () => {
 
   it('oneshots-live creates bank A synths + bank B Sammy Blammy', () => {
     const block = presetSrc.split("id: 'oneshots-live'")[1]?.split('onApply')[0] ?? '';
-    expect(block).toContain('applyOneShotPads(program, 0, 8)');
-    expect(block).toContain('applySammyBlammyPads(program, 8)');
+    expect(block).toContain('applyOneShotPads(program, 0, 16)');
+    expect(block).toContain('applySammyBlammyPads(program, 16)');
   });
 
   it('applySammyBlammyPads sets pad metadata from SAMMY_BLAMMY_PACK', () => {
