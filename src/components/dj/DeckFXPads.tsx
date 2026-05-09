@@ -423,6 +423,15 @@ export const DeckFXPads: React.FC<DeckFXPadsProps> = ({ deckId }) => {
         } else {
           instantEQKill(deckId, band, false);
         }
+      } else if (pad.id === 'brake') {
+        // Cancel brake animation immediately on release
+        cancelPad(pad.id);
+      } else if (pad.id === 'filter-reset') {
+        if (filterResetTimerRef.current) {
+          clearTimeout(filterResetTimerRef.current);
+          filterResetTimerRef.current = undefined;
+        }
+        cancelPad(pad.id);
       }
     }
   }, [deckId, cancelPad]);

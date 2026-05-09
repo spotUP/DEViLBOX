@@ -149,12 +149,14 @@ class DJAutoDJ {
       console.warn('[AutoDJ] Need at least 2 tracks — have:', playlist.tracks.length);
       return `Need at least 2 tracks in playlist (have ${playlist.tracks.length})`;
     }
-    const downloadableCount = playlist.tracks.filter(t =>
-      t.fileName.startsWith('modland:') || t.fileName.startsWith('hvsc:')
-    ).length;
-    if (downloadableCount < 2) {
-      console.warn('[AutoDJ] Need at least 2 downloadable tracks — have:', downloadableCount);
-      return `Need at least 2 downloadable tracks (have ${downloadableCount} — add tracks from Online browser)`;
+    // Count playable tracks — anything not permanently marked bad.
+    // Local files are fully playable; modland:/hvsc: tracks will be downloaded
+    // on demand. The old "downloadable" check excluded local files entirely,
+    // which was wrong.
+    const playableCount = playlist.tracks.filter(t => !t.isBad).length;
+    if (playableCount < 2) {
+      console.warn('[AutoDJ] Need at least 2 playable tracks — have:', playableCount);
+      return `Need at least 2 playable tracks (have ${playableCount})`;
     }
     console.log(`[AutoDJ] Playlist: "${playlist.name}", ${playlist.tracks.length} tracks`);
 

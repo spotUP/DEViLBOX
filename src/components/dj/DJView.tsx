@@ -10,6 +10,7 @@ import { createPortal } from 'react-dom';
 import * as Tone from 'tone';
 import { useDJStore } from '@/stores/useDJStore';
 import { useDJPlaylistStore } from '@/stores/useDJPlaylistStore';
+import { useShallow } from 'zustand/react/shallow';
 import { getDJEngine, disposeDJEngine } from '@/engine/dj/DJEngine';
 import { clearSongCache } from '@/engine/dj/DJSongCache';
 import type { DJEngine } from '@/engine/dj/DJEngine';
@@ -61,16 +62,20 @@ interface DJViewProps {
 export const DJView: React.FC<DJViewProps> = ({ onShowDrumpads: _onShowDrumpads }) => {
   const djViewRef = useRef<HTMLDivElement>(null);
   const engineRef = useRef<DJEngine | null>(null);
+  const { deckViewMode, thirdDeckActive, autoDJEnabled } = useDJStore(
+    useShallow((s) => ({
+      deckViewMode: s.deckViewMode,
+      thirdDeckActive: s.thirdDeckActive,
+      autoDJEnabled: s.autoDJEnabled,
+    })),
+  );
   const setDJModeActive = useDJStore((s) => s.setDJModeActive);
-  const deckViewMode = useDJStore((s) => s.deckViewMode);
-  const thirdDeckActive = useDJStore((s) => s.thirdDeckActive);
   const setThirdDeckActive = useDJStore((s) => s.setThirdDeckActive);
   const [showCrate, setShowCrate] = useState(false);
   const [showPlaylistModal, setShowPlaylistModal] = useState(false);
   const [showAutoDJ, setShowAutoDJ] = useState(false);
   const autoDJBtnRef = useRef<HTMLButtonElement>(null);
   const [autoDJDropdownPos, setAutoDJDropdownPos] = useState({ top: 0, left: 0 });
-  const autoDJEnabled = useDJStore((s) => s.autoDJEnabled);
   const dubBusEnabledDJ = useDrumPadStore((s) => s.dubBus.enabled);
   const activePlaylistName = useDJPlaylistStore((s) => {
     const p = s.playlists.find((pl) => pl.id === s.activePlaylistId);

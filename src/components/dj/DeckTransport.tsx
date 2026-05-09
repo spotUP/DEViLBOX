@@ -7,6 +7,7 @@
 import React, { useCallback, useState } from 'react';
 import { Play, Pause, Disc3, Link, Lock } from 'lucide-react';
 import { useDJStore } from '@/stores/useDJStore';
+import { useShallow } from 'zustand/react/shallow';
 import { getQuantizeMode, setQuantizeMode, type QuantizeMode } from '@/engine/dj/DJQuantizedFX';
 import * as DJActions from '@/engine/dj/DJActions';
 
@@ -15,12 +16,16 @@ interface DeckTransportProps {
 }
 
 export const DeckTransport: React.FC<DeckTransportProps> = ({ deckId }) => {
-  const isPlaying = useDJStore((s) => s.decks[deckId].isPlaying);
-  const cuePoint = useDJStore((s) => s.decks[deckId].cuePoint);
-  const keyLockEnabled = useDJStore((s) => s.decks[deckId].keyLockEnabled);
-  const pendingAction = useDJStore((s) => s.decks[deckId].pendingAction);
-  const otherDeckId = deckId === 'A' ? 'B' : 'A';
-  const thisBPM = useDJStore((s) => s.decks[deckId].effectiveBPM);
+  const { isPlaying, cuePoint, keyLockEnabled, pendingAction, thisBPM } = useDJStore(
+    useShallow((s) => ({
+      isPlaying: s.decks[deckId].isPlaying,
+      cuePoint: s.decks[deckId].cuePoint,
+      keyLockEnabled: s.decks[deckId].keyLockEnabled,
+      pendingAction: s.decks[deckId].pendingAction,
+      thisBPM: s.decks[deckId].effectiveBPM,
+    })),
+  );
+  const otherDeckId = deckId === 'A' ? 'B' : deckId === 'B' ? 'A' : 'A';
   const otherBPM = useDJStore((s) => s.decks[otherDeckId].effectiveBPM);
   const isSynced = Math.abs(thisBPM - otherBPM) < 0.5;
 
@@ -35,7 +40,11 @@ export const DeckTransport: React.FC<DeckTransportProps> = ({ deckId }) => {
 
   const handlePlayPause = useCallback(async () => {
     if (!isPlaying) setIsStartingPlay(true);
-    await DJActions.togglePlay(deckId);
+    try {
+      await DJActions.togglePlay(deckId);
+    } catch (err) {
+      console.error('[DeckTransport] Play failed:', err);
+    }
     setIsStartingPlay(false);
   }, [deckId, isPlaying]);
 
