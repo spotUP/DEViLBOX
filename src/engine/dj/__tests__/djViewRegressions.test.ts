@@ -433,3 +433,85 @@ describe('DJ deck file size limit', () => {
     expect(src).toMatch(/MAX_FILE_SIZE\s*=\s*200\s*\*\s*1024\s*\*\s*1024/);
   });
 });
+
+// ── Transition sweep guard ──────────────────────────────────────────────────
+
+describe('Auto DJ transition sweep guard (prevents premature completeTransition)', () => {
+  const autoDJSrc = fs.readFileSync(
+    path.resolve(__dirname, '../DJAutoDJ.ts'),
+    'utf-8',
+  );
+
+  it('DJAutoDJ has transitionSweepStarted field', () => {
+    expect(autoDJSrc).toContain('private transitionSweepStarted');
+  });
+
+  it('triggerTransition resets transitionSweepStarted = false before awaits', () => {
+    // Use the method definition to isolate the body (not call-sites)
+    const triggerMatch = autoDJSrc.match(/private async triggerTransition\([^)]*\)[^{]*\{([\s\S]+?)\n  \}/);
+    expect(triggerMatch).not.toBeNull();
+    const triggerBody = triggerMatch![1];
+    const flagResetIdx = triggerBody.indexOf('this.transitionSweepStarted = false');
+    const firstAwaitIdx = triggerBody.indexOf('await import');
+    expect(flagResetIdx).toBeGreaterThan(-1);
+    expect(firstAwaitIdx).toBeGreaterThan(-1);
+    expect(flagResetIdx).toBeLessThan(firstAwaitIdx);
+  });
+
+  it('triggerTransition sets transitionSweepStarted = true after sweep starts', () => {
+    const triggerMatch = autoDJSrc.match(/private async triggerTransition\([^)]*\)[^{]*\{([\s\S]+?)\n  \}/);
+    expect(triggerMatch).not.toBeNull();
+    const triggerBody = triggerMatch![1];
+    const sweepStartIdx = triggerBody.indexOf('this.transitionSweepStarted = true');
+    expect(sweepStartIdx).toBeGreaterThan(-1);
+    const skipTransitionIdx = triggerBody.indexOf('skipTransition(');
+    const beatMatchedIdx = triggerBody.indexOf('beatMatchedTransition(');
+    expect(sweepStartIdx).toBeGreaterThan(skipTransitionIdx);
+    expect(sweepStartIdx).toBeGreaterThan(beatMatchedIdx);
+  });
+
+  it('poll loop transitioning case requires transitionSweepStarted for completion', () => {
+    const transitioningCase = autoDJSrc.split("case 'transitioning'")[1];
+    expect(transitioningCase).toBeDefined();
+    expect(transitioningCase).toContain('crossfaderDone && !outgoingPlaying && this.transitionSweepStarted');
+  });
+
+  it('poll loop checks incoming deck is playing before completing', () => {
+    const transitioningCase = autoDJSrc.split("case 'transitioning'")[1];
+    expect(transitioningCase).toBeDefined();
+    expect(transitioningCase).toContain('incomingPlaying');
+    expect(transitioningCase).toContain('force completing');
+  });
+
+  it('completeTransition resets transitionSweepStarted', () => {
+    const completeBody = autoDJSrc.split('completeTransition(): void')[1];
+    expect(completeBody).toBeDefined();
+    expect(completeBody!.substring(0, 200)).toContain('this.transitionSweepStarted = false');
+  });
+
+  it('cancelTransition resets transitionSweepStarted', () => {
+    const cancelBody = autoDJSrc.split('cancelTransition(): void')[1];
+    expect(cancelBody).toBeDefined();
+    expect(cancelBody!.substring(0, 200)).toContain('this.transitionSweepStarted = false');
+  });
+
+  it('TRANSITION_TIMEOUT_MS is 45 seconds (not 180)', () => {
+    expect(autoDJSrc).toMatch(/TRANSITION_TIMEOUT_MS\s*=\s*45[_,]?000/);
+  });
+
+  it('triggerTransition pre-starts incoming deck for skip transitions', () => {
+    const triggerMatch = autoDJSrc.match(/private async triggerTransition\([^)]*\)[^{]*\{([\s\S]+?)\n  \}/);
+    expect(triggerMatch).not.toBeNull();
+    const triggerBody = triggerMatch![1];
+    const preStartIdx = triggerBody.indexOf('await getDJEngine().getDeck(this.idleDeck).play()');
+    expect(preStartIdx).toBeGreaterThan(-1);
+    const skipTransitionIdx = triggerBody.indexOf('skipTransition(');
+    expect(preStartIdx).toBeLessThan(skipTransitionIdx);
+  });
+
+  it('enable() resets transitionSweepStarted', () => {
+    const enableBody = autoDJSrc.split('async enable(')[1];
+    expect(enableBody).toBeDefined();
+    expect(enableBody).toContain('this.transitionSweepStarted = false');
+  });
+});

@@ -111,6 +111,16 @@ class DJAutoDJ {
   // Transition resilience — timeout + crossfader guard
   private transitionStartTime = 0;
   /**
+   * Guard flag: set `false` at the START of `triggerTransition` (before any
+   * await), set `true` AFTER the crossfade sweep is actually running. The
+   * poll loop's 'transitioning' case checks this flag before calling
+   * `completeTransition` — without it, the poll loop can fire during
+   * `triggerTransition`'s await window (loading pre-rendered track, importing
+   * DJPerSongFx) and prematurely complete the transition before the sweep
+   * even starts, causing silence (outgoing stopped, incoming not yet started).
+   */
+  private transitionSweepStarted = false;
+  /**
    * Pattern-aware deferral counter. When a chord change is imminent on
    * the outgoing track, `triggerTransition` is deferred by one poll tick
    * (~500 ms) so the crossfade lands past the chord resolution instead
@@ -124,11 +134,10 @@ class DJAutoDJ {
   private lastCrossfaderValue = -1;
   private crossfaderStuckCount = 0;
   // Watchdog for stuck transitions. Max possible legit duration is 32 bars
-  // at 60 BPM = 128s. A transition running past 180s is almost certainly
+  // at 60 BPM = 128s. A transition running past 45s is almost certainly
   // stuck (crossfade scheduler died, incoming deck silent, etc) and worth
-  // force-completing. Previously 30s, which force-aborted any 16-bar fade
-  // below 125 BPM and any 32-bar fade at any BPM.
-  private static readonly TRANSITION_TIMEOUT_MS = 180_000;
+  // force-completing.
+  private static readonly TRANSITION_TIMEOUT_MS = 45_000;
   private static readonly CROSSFADER_STUCK_POLLS = 10; // 5 seconds at 500ms
 
 
@@ -188,6 +197,7 @@ class DJAutoDJ {
     this.preloadFailCount = 0;
     this.lastPreloadFailTime = 0;
     this.transitionStartTime = 0;
+    this.transitionSweepStarted = false;
     this.lastCrossfaderValue = -1;
     this.crossfaderStuckCount = 0;
 
@@ -628,12 +638,36 @@ class DJAutoDJ {
 
         if (DEBUG_POLL && this.pollCount % 4 === 0) {
           const incomingPlaying = store.decks[this.idleDeck].isPlaying;
-          console.log(`[AutoDJ transition] outgoing=${this.activeDeck}:${outgoingPlaying} incoming=${this.idleDeck}:${incomingPlaying} cf=${crossfader.toFixed(2)} cfDone=${crossfaderDone} elapsed=${(transElapsed / 1000).toFixed(0)}s`);
+          console.log(`[AutoDJ transition] outgoing=${this.activeDeck}:${outgoingPlaying} incoming=${this.idleDeck}:${incomingPlaying} cf=${crossfader.toFixed(2)} cfDone=${crossfaderDone} sweepStarted=${this.transitionSweepStarted} elapsed=${(transElapsed / 1000).toFixed(0)}s`);
         }
 
-        // Complete when crossfader is done AND outgoing has stopped
-        if (crossfaderDone && !outgoingPlaying) {
-          this.completeTransition();
+        // Complete when crossfader is done AND outgoing has stopped AND the
+        // sweep has actually started. Without the sweepStarted guard, the
+        // poll loop fires during triggerTransition's await window (loading
+        // pre-rendered track, importing DJPerSongFx) and completes the
+        // transition before the crossfade even begins — causing silence.
+        if (crossfaderDone && !outgoingPlaying && this.transitionSweepStarted) {
+          // Also verify the incoming deck is actually producing audio.
+          // Without this check, a failed play() on the incoming deck leads
+          // to silence: the outgoing is stopped, crossfader is at target,
+          // but nothing is playing on the incoming side.
+          let incomingPlaying = false;
+          try {
+            incomingPlaying = getDJEngine().getDeck(this.idleDeck).isPlaying();
+          } catch {
+            incomingPlaying = store.decks[this.idleDeck].isPlaying;
+          }
+          if (incomingPlaying) {
+            this.completeTransition();
+          } else if (transElapsed > 10_000) {
+            // Incoming deck still not playing after 10s — force-complete
+            // to prevent infinite stuck state. The timeout guard above
+            // catches the 45s case; this catches the "sweep done but
+            // incoming silent" case faster.
+            console.warn(`[AutoDJ] Incoming deck ${this.idleDeck} not playing after ${(transElapsed / 1000).toFixed(0)}s — force completing`);
+            try { getDJEngine().getDeck(this.idleDeck).play(); } catch { /* */ }
+            this.completeTransition();
+          }
         }
         break;
       }
@@ -860,6 +894,10 @@ class DJAutoDJ {
     }
     store.setAutoDJStatus('transitioning');
     this.transitionStartTime = Date.now();
+    // Reset sweep guard — the sweep hasn't started yet. The poll loop will
+    // NOT call completeTransition until this flag is set to true (after the
+    // crossfade sweep is actually running).
+    this.transitionSweepStarted = false;
 
     // Load pre-rendered track instantly if available (background render complete)
     if (this.preRenderedTrack) {
@@ -951,6 +989,24 @@ class DJAutoDJ {
     const bFile = store.decks.B.fileName?.split('/').pop() ?? 'empty';
     console.log(`[AutoDJ] ${isSkip ? 'SKIP ' : ''}${transType.toUpperCase()} ${bars}-bar: ${this.activeDeck} → ${this.idleDeck} | A:${aFile} B:${bFile}`);
 
+    // Pre-start the incoming deck for skip transitions. The skip path
+    // fires play() synchronously inside skipTransition, but it's
+    // fire-and-forget (async play, no await). If the AudioContext
+    // isn't running yet, play() awaits Tone.start() — meaning the
+    // crossfade may reach the target before audio is audible. By
+    // awaiting play() here BEFORE the sweep starts, we guarantee the
+    // incoming deck is producing audio when the crossfader moves.
+    // For non-skip transitions (beatMatched, etc.) play() is scheduled
+    // on the next downbeat alongside the sweep, so pre-starting would
+    // cause audio to leak before the crossfade begins.
+    if (isSkip) {
+      try {
+        await getDJEngine().getDeck(this.idleDeck).play();
+      } catch (err) {
+        console.warn('[AutoDJ] Pre-start incoming deck failed (skip):', err);
+      }
+    }
+
     // Skip: use skipTransition which starts immediately (no quantize delay).
     // Normal transitions wait for the next downbeat for a beat-matched blend.
     if (isSkip) {
@@ -979,6 +1035,10 @@ class DJAutoDJ {
           break;
       }
     }
+
+    // The crossfade sweep (or cut/echo-out) is now running. Allow the poll
+    // loop to detect completion.
+    this.transitionSweepStarted = true;
   }
 
   /**
@@ -1074,6 +1134,7 @@ class DJAutoDJ {
       this.transitionCancel();
       this.transitionCancel = null;
     }
+    this.transitionSweepStarted = false;
   }
 
   /**
@@ -1101,6 +1162,7 @@ class DJAutoDJ {
   private completeTransition(): void {
     console.log('[AutoDJ] completeTransition() START');
     this.transitionCancel = null;
+    this.transitionSweepStarted = false;
 
     // Stop and reset the outgoing deck
     try {
