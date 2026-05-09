@@ -290,6 +290,27 @@ export const DJ_PAD_PRESETS: DJPreset[] = [
     },
   },
   {
+    id: 'sammy-blammy',
+    name: 'Sammy Blammy',
+    description: 'Vocal drops, laser FX, and transitions by Sammy Blammy. Bank A only.',
+    create: () => {
+      const program = createEmptyProgram('D-SB', 'Sammy Blammy');
+      applySammyBlammyPads(program, 0);
+      return program;
+    },
+    onApply: ({ setDubBus }) => {
+      setDubBus({
+        enabled: true,
+        hpfCutoff: 120,
+        springWet: 0.35,
+        echoWet: 0.25,
+        echoIntensity: 0.30,
+        returnGain: 0.45,
+      });
+      void loadSammyBlammySamples(0);
+    },
+  },
+  {
     id: 'scratch-master',
     name: 'Scratch',
     description: 'Scratch pads — baby, flare, crab, orbit, and more',
