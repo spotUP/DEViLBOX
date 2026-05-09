@@ -2,7 +2,7 @@
  * DJ Program Presets — factory DrumProgram instances for DJ performance modes.
  */
 
-import { createEmptyProgram, makeSampleConfig } from '../types/drumpad';
+import { createEmptyProgram } from '../types/drumpad';
 import type { DrumProgram } from '../types/drumpad';
 import type { DubActionId, DubBusSettings } from '../types/dub';
 import { DJ_ONE_SHOT_PRESETS } from './djOneShotPresets';
@@ -108,31 +108,68 @@ function applyOneShotPads(program: DrumProgram, startPad: number, count: number)
   }
 }
 
-/** Load Sammy Blammy samples onto pads. Pulls from the registered pack. */
-function applySammyBlammyPads(program: DrumProgram, startPad: number): void {
-  const allSamples = [
-    ...SAMMY_BLAMMY_PACK.samples.vocals,
-    ...SAMMY_BLAMMY_PACK.samples.fx,
-    ...SAMMY_BLAMMY_PACK.samples.other,
-  ];
-  // DJ sample colors: vocals=cyan, fx=orange, transitions=purple
+/** Flat list of Sammy Blammy samples with colours per category */
+function getSammyBlammySamples() {
   const colorMap: Record<string, string> = {
     vocals: '#06b6d4',
     fx: '#f97316',
     other: '#a855f7',
   };
+  return [
+    ...SAMMY_BLAMMY_PACK.samples.vocals,
+    ...SAMMY_BLAMMY_PACK.samples.fx,
+    ...SAMMY_BLAMMY_PACK.samples.other,
+  ].map(s => ({ ...s, color: colorMap[s.category] ?? '#64748b' }));
+}
+
+/** Set pad metadata for Sammy Blammy sample pads (sync — no audio loaded yet). */
+function applySammyBlammyPads(program: DrumProgram, startPad: number): void {
+  const allSamples = getSammyBlammySamples();
   for (let i = 0; i < 16 && i < allSamples.length; i++) {
     const sample = allSamples[i];
     const pad = program.pads[startPad + i];
     if (!pad) continue;
-    const cfg = makeSampleConfig(pad.id, sample.name, sample.url);
     pad.name = sample.name;
-    pad.color = colorMap[sample.category] ?? '#64748b';
-    pad.synthConfig = cfg.synthConfig;
-    pad.instrumentNote = cfg.instrumentNote;
+    pad.color = sample.color;
     pad.playMode = 'oneshot';
     pad.dubSend = 0.3;
   }
+}
+
+/**
+ * Fetch + decode Sammy Blammy samples and wire them onto pads.
+ * Must be called AFTER the program is saved + loaded (so loadSampleToPad
+ * writes into the active program). Fire-and-forget from onApply.
+ */
+async function loadSammyBlammySamples(startPad: number): Promise<void> {
+  const [{ normalizeUrl }, { getAudioContext }, { useDrumPadStore }] = await Promise.all([
+    import('../utils/urlUtils'),
+    import('../audio/AudioContextSingleton'),
+    import('../stores/useDrumPadStore'),
+  ]);
+  const allSamples = getSammyBlammySamples();
+  const ctx = getAudioContext();
+  const store = useDrumPadStore;
+
+  await Promise.all(allSamples.slice(0, 16).map(async (sample, i) => {
+    const padId = startPad + i + 1; // pad.id is 1-based
+    try {
+      const resp = await fetch(normalizeUrl(sample.url));
+      if (!resp.ok) { console.warn(`[SammyBlammy] fetch failed for ${sample.name}: ${resp.status}`); return; }
+      const ab = await resp.arrayBuffer();
+      const audioBuffer = await ctx.decodeAudioData(ab);
+      await store.getState().loadSampleToPad(padId, {
+        id: `sb_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`,
+        name: sample.name,
+        audioBuffer,
+        duration: audioBuffer.duration,
+        sampleRate: audioBuffer.sampleRate,
+        sourceUrl: sample.url,
+      });
+    } catch (err) {
+      console.warn(`[SammyBlammy] failed to load ${sample.name}:`, err);
+    }
+  }));
 }
 
 function applyScratchPads(program: DrumProgram, startPad: number, count: number): void {
@@ -241,6 +278,9 @@ export const DJ_PAD_PRESETS: DJPreset[] = [
         echoIntensity: 0.35,
         returnGain: 0.5,       // gig-fix 2026-04-18: was 0.85 — one-shot presets should stay well under the dry mix
       });
+      // Fetch + decode Sammy Blammy samples onto bank B pads (async, fire-and-forget).
+      // Pads 8-15 in the program correspond to pad IDs 9-24 (1-based).
+      void loadSammyBlammySamples(8);
     },
   },
   {
