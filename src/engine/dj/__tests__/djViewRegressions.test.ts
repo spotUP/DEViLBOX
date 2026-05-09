@@ -836,10 +836,21 @@ describe('One-Shots Live preset — Sammy Blammy on bank B', () => {
     expect(block).toContain('applySammyBlammyPads(program, 8)');
   });
 
-  it('applySammyBlammyPads uses makeSampleConfig for sample pads', () => {
-    expect(presetSrc).toContain('makeSampleConfig');
-    const fnBlock = presetSrc.split('applySammyBlammyPads')[1]?.split('function ')[0] ?? '';
-    expect(fnBlock).toContain('SAMMY_BLAMMY_PACK.samples.vocals');
+  it('applySammyBlammyPads sets pad metadata from SAMMY_BLAMMY_PACK', () => {
+    // getSammyBlammySamples() pulls from SAMMY_BLAMMY_PACK, applySammyBlammyPads sets playMode
+    expect(presetSrc).toContain('SAMMY_BLAMMY_PACK.samples.vocals');
+    const fnBlock = presetSrc.split('function applySammyBlammyPads')[1]?.split('function ')[0] ?? '';
     expect(fnBlock).toContain("pad.playMode = 'oneshot'");
+  });
+
+  it('onApply triggers async sample loading for bank B', () => {
+    const onApplyBlock = presetSrc.split("id: 'oneshots-live'")[1]?.split("id: '")[0] ?? '';
+    expect(onApplyBlock).toContain('loadSammyBlammySamples');
+  });
+
+  it('loadSammyBlammySamples fetches and decodes audio via loadSampleToPad', () => {
+    expect(presetSrc).toContain('loadSampleToPad');
+    expect(presetSrc).toContain('decodeAudioData');
+    expect(presetSrc).toContain('normalizeUrl');
   });
 });
