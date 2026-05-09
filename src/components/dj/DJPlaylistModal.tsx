@@ -745,7 +745,7 @@ const ModalTrackRow: React.FC<ModalTrackRowProps> = React.memo(({
       </span>
 
       {/* Actions (visible on hover) */}
-      <span className={`flex items-center gap-2 shrink-0 w-72 justify-end transition-opacity ${isHovered || isFocused ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
+      <span className={`flex items-center gap-2 shrink-0 justify-end transition-all ${isHovered || isFocused ? 'w-72 opacity-100' : 'w-0 opacity-0 overflow-hidden pointer-events-none'}`}>
         <select
           value={track.masterFxPreset || ''}
           onClick={(e) => e.stopPropagation()}
