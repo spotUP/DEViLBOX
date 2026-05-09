@@ -423,24 +423,28 @@ export const useDJPlaylistStore = create<DJPlaylistState>()(
         set((state) => {
           const p = state.playlists.find((pl) => pl.id === playlistId);
           if (p) {
+            // Bounds check: stale indices from drag-reorder race conditions
+            if (fromIndex < 0 || fromIndex >= p.tracks.length) return;
+            const clampedTo = Math.max(0, Math.min(toIndex, p.tracks.length - 1));
             pushUndo(state);
             const [removed] = p.tracks.splice(fromIndex, 1);
-            p.tracks.splice(toIndex, 0, removed);
+            if (!removed) return;
+            p.tracks.splice(clampedTo, 0, removed);
             p.updatedAt = Date.now();
             // Update focused index to follow the moved track
             if (state.focusedTrackIndex === fromIndex) {
-              state.focusedTrackIndex = toIndex;
+              state.focusedTrackIndex = clampedTo;
             }
             // Remap selected indices to follow the reorder
             if (state.selectedTrackIndices.length > 0) {
               state.selectedTrackIndices = state.selectedTrackIndices.map(idx => {
-                if (idx === fromIndex) return toIndex;
-                if (fromIndex < toIndex) {
+                if (idx === fromIndex) return clampedTo;
+                if (fromIndex < clampedTo) {
                   // Moved forward: indices in (from, to] shift down by 1
-                  if (idx > fromIndex && idx <= toIndex) return idx - 1;
+                  if (idx > fromIndex && idx <= clampedTo) return idx - 1;
                 } else {
                   // Moved backward: indices in [to, from) shift up by 1
-                  if (idx >= toIndex && idx < fromIndex) return idx + 1;
+                  if (idx >= clampedTo && idx < fromIndex) return idx + 1;
                 }
                 return idx;
               });
