@@ -737,3 +737,84 @@ describe('Playlist preview — deck-based stop mechanism', () => {
     expect(handleBlock).toContain('previewDeckRef.current = idleDeck');
   });
 });
+
+// ── MIDI volume routing — no 1.5x multiplier ───────────────────────────────
+
+describe('MIDI DJ volume routes use unity gain (no 1.5x multiplier)', () => {
+  const routerSrc = fs.readFileSync(
+    path.resolve(__dirname, '../../../midi/performance/parameterRouter.ts'), 'utf-8',
+  );
+
+  it('deckA.volume route does not multiply by 1.5', () => {
+    const match = routerSrc.match(/'dj\.deckA\.volume':\s*\(v\)\s*=>\s*[^,]+/);
+    expect(match).not.toBeNull();
+    expect(match![0]).not.toContain('1.5');
+  });
+
+  it('deckB.volume route does not multiply by 1.5', () => {
+    const match = routerSrc.match(/'dj\.deckB\.volume':\s*\(v\)\s*=>\s*[^,]+/);
+    expect(match).not.toBeNull();
+    expect(match![0]).not.toContain('1.5');
+  });
+
+  it('masterVolume route does not multiply by 1.5', () => {
+    const match = routerSrc.match(/'dj\.masterVolume':\s*\(v\)\s*=>\s*[^,]+/);
+    expect(match).not.toBeNull();
+    expect(match![0]).not.toContain('1.5');
+  });
+});
+
+// ── MPK Mini — dedicated profile with volume on knobs ───────────────────────
+
+describe('MPK Mini has dedicated profile with volume on knobs', () => {
+  const genericSrc = fs.readFileSync(
+    path.resolve(__dirname, '../../../midi/djGenericControllers.ts'), 'utf-8',
+  );
+
+  it('MPK_MINI preset exists and is exported', () => {
+    expect(genericSrc).toContain('export const MPK_MINI');
+  });
+
+  it('MPK Mini detect pattern is separate from GENERIC_8x8', () => {
+    const generic8x8Match = genericSrc.match(/GENERIC_8x8[\s\S]*?detectPatterns:\s*\[([^\]]+)\]/);
+    expect(generic8x8Match).not.toBeNull();
+    expect(generic8x8Match![1]).not.toContain('mpk');
+  });
+
+  it('MPK Mini maps CC 70 to deckA.volume (not filter)', () => {
+    const mpkBlock = genericSrc.split('MPK_MINI')[1]?.split('export const')[0] ?? '';
+    const cc70Line = mpkBlock.match(/cc:\s*70,\s*param:\s*'([^']+)'/);
+    expect(cc70Line).not.toBeNull();
+    expect(cc70Line![1]).toBe('dj.deckA.volume');
+  });
+
+  it('MPK Mini maps CC 77 to crossfader', () => {
+    const mpkBlock = genericSrc.split('MPK_MINI')[1]?.split('export const')[0] ?? '';
+    const cc77Line = mpkBlock.match(/cc:\s*77,\s*param:\s*'([^']+)'/);
+    expect(cc77Line).not.toBeNull();
+    expect(cc77Line![1]).toBe('dj.crossfader');
+  });
+
+  it('MPK Mini is listed before GENERIC_8x8 in DJ_GENERIC_CONTROLLERS', () => {
+    const arrMatch = genericSrc.match(/DJ_GENERIC_CONTROLLERS[\s\S]*?\[([^\]]+)\]/);
+    expect(arrMatch).not.toBeNull();
+    const mpkIdx = arrMatch![1].indexOf('MPK_MINI');
+    const genericIdx = arrMatch![1].indexOf('GENERIC_8x8');
+    expect(mpkIdx).toBeGreaterThan(-1);
+    expect(mpkIdx).toBeLessThan(genericIdx);
+  });
+});
+
+// ── Analysis cache uses relative URL ────────────────────────────────────────
+
+describe('Analysis cache — relative URL for dev proxy', () => {
+  it('analysisCache.ts defaults to /api (not absolute URL)', () => {
+    const cacheSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../../lib/analysisCache.ts'), 'utf-8',
+    );
+    const urlMatch = cacheSrc.match(/const API_URL\s*=.*\|\|\s*'([^']+)'/);
+    expect(urlMatch).not.toBeNull();
+    expect(urlMatch![1]).toBe('/api');
+    expect(cacheSrc).not.toContain('devilbox.uprough.net');
+  });
+});

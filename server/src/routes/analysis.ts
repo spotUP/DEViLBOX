@@ -4,6 +4,9 @@
  * GET  /api/analysis/lookup/:hash  — Retrieve cached analysis by SHA-256
  * POST /api/analysis/cache         — Store analysis results
  * GET  /api/analysis/status        — Cache statistics
+ *
+ * When ANALYSIS_DB_MODE=remote, proxies requests to the live Hetzner server
+ * so local dev uses the production analysis database.
  */
 
 import { Router, Request, Response } from 'express';
@@ -11,14 +14,25 @@ import { lookupAnalysis, storeAnalysis, getAnalysisCacheStats } from '../service
 
 const router = Router();
 
+const isRemoteMode = process.env.ANALYSIS_DB_MODE === 'remote';
+const remoteUrl = process.env.ANALYSIS_DB_URL || 'https://devilbox.uprough.net/api';
+
 // ── GET /api/analysis/lookup/:hash ──────────────────────────────────────────
 
-router.get('/lookup/:hash', (req: Request, res: Response) => {
+router.get('/lookup/:hash', async (req: Request, res: Response) => {
   try {
     const hash = (req.params.hash || '').trim().toLowerCase();
 
     if (!hash || hash.length !== 64 || !/^[0-9a-f]{64}$/.test(hash)) {
       return res.status(400).json({ error: 'Invalid hash — must be 64 hex characters (SHA-256)' });
+    }
+
+    if (isRemoteMode) {
+      const remoteRes = await fetch(`${remoteUrl}/analysis/lookup/${hash}`, {
+        signal: AbortSignal.timeout(5000),
+      });
+      const data = await remoteRes.json();
+      return res.status(remoteRes.status).json(data);
     }
 
     const result = lookupAnalysis(hash);
@@ -35,7 +49,7 @@ router.get('/lookup/:hash', (req: Request, res: Response) => {
 
 // ── POST /api/analysis/cache ────────────────────────────────────────────────
 
-router.post('/cache', (req: Request, res: Response) => {
+router.post('/cache', async (req: Request, res: Response) => {
   try {
     const data = req.body;
 
@@ -44,6 +58,17 @@ router.post('/cache', (req: Request, res: Response) => {
     }
     if (typeof data.bpm !== 'number' || data.bpm <= 0) {
       return res.status(400).json({ error: 'Missing or invalid bpm' });
+    }
+
+    if (isRemoteMode) {
+      const remoteRes = await fetch(`${remoteUrl}/analysis/cache`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+        signal: AbortSignal.timeout(5000),
+      });
+      const result = await remoteRes.json();
+      return res.status(remoteRes.status).json(result);
     }
 
     storeAnalysis({

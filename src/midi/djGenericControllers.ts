@@ -142,6 +142,66 @@ export const TRAKTOR_S4: DJControllerPreset = {
 // ============================================================================
 
 /**
+ * AKAI MPK Mini (Mk2/Mk3)
+ * 8 knobs + 8 pads, no faders. Knobs must control volume + crossfader
+ * since the MPK Mini has no physical faders.
+ *
+ * MPK Mini Mk3 default: knobs send CC 70-77
+ * MPK Mini Mk2 default: knobs send CC 1-8
+ * We map both CC ranges to the same layout for compatibility.
+ */
+export const MPK_MINI: DJControllerPreset = {
+  id: 'mpk-mini',
+  name: 'AKAI MPK Mini',
+  manufacturer: 'Akai',
+  description: '8-knob + 8-pad controller (no faders — knobs control volume + crossfader)',
+  detectPatterns: ['mpk mini', 'mpkmini'],
+
+  ccMappings: [
+    // Mk3 layout (CC 70-77): Vol A, Hi A, Low A, Filter A, Vol B, Hi B, Low B, Crossfader
+    { channel: 0, cc: 70, param: 'dj.deckA.volume' },
+    { channel: 0, cc: 71, param: 'dj.deckA.eqHi' },
+    { channel: 0, cc: 72, param: 'dj.deckA.eqLow' },
+    { channel: 0, cc: 73, param: 'dj.deckA.filter' },
+    { channel: 0, cc: 74, param: 'dj.deckB.volume' },
+    { channel: 0, cc: 75, param: 'dj.deckB.eqHi' },
+    { channel: 0, cc: 76, param: 'dj.deckB.eqLow' },
+    { channel: 0, cc: 77, param: 'dj.crossfader' },
+    // Mk2 fallback (CC 1-8): same layout
+    { channel: 0, cc: 1, param: 'dj.deckA.volume' },
+    { channel: 0, cc: 2, param: 'dj.deckA.eqHi' },
+    { channel: 0, cc: 3, param: 'dj.deckA.eqLow' },
+    { channel: 0, cc: 4, param: 'dj.deckA.filter' },
+    { channel: 0, cc: 5, param: 'dj.deckB.volume' },
+    { channel: 0, cc: 6, param: 'dj.deckB.eqHi' },
+    { channel: 0, cc: 7, param: 'dj.deckB.eqLow' },
+    { channel: 0, cc: 8, param: 'dj.crossfader' },
+  ],
+
+  noteMappings: [
+    // Pads 1-4: Deck A controls
+    { channel: 9, note: 36, action: 'play_a' },
+    { channel: 9, note: 37, action: 'cue_a' },
+    { channel: 9, note: 38, action: 'sync_a' },
+    { channel: 9, note: 39, action: 'hotcue1_a' },
+    // Pads 5-8: Deck B controls
+    { channel: 9, note: 40, action: 'play_b' },
+    { channel: 9, note: 41, action: 'cue_b' },
+    { channel: 9, note: 42, action: 'sync_b' },
+    { channel: 9, note: 43, action: 'hotcue1_b' },
+    // Channel 0 pads (MPK Mini default): same layout
+    { channel: 0, note: 36, action: 'play_a' },
+    { channel: 0, note: 37, action: 'cue_a' },
+    { channel: 0, note: 38, action: 'sync_a' },
+    { channel: 0, note: 39, action: 'hotcue1_a' },
+    { channel: 0, note: 40, action: 'play_b' },
+    { channel: 0, note: 41, action: 'cue_b' },
+    { channel: 0, note: 42, action: 'sync_b' },
+    { channel: 0, note: 43, action: 'hotcue1_b' },
+  ],
+};
+
+/**
  * 8-Knob + 8-Pad Generic Controller
  * Standard layout: 8 knobs (CC 70-77), 8 pads (notes 36-43, channel 9)
  * 
@@ -152,7 +212,7 @@ export const GENERIC_8x8: DJControllerPreset = {
   name: 'Generic 8-Knob + 8-Pad',
   manufacturer: 'Generic',
   description: 'Standard 8-knob (CC 70-77) + 8-pad (36-43) layout',
-  detectPatterns: ['mpk mini', 'mpkmini', 'lpd8', 'launch control', 'beatstep'],
+  detectPatterns: ['lpd8', 'launch control', 'beatstep'],
   
   ccMappings: [
     // Knobs 1-4: Deck A (Flt, Hi, Mid, Lo)
@@ -405,6 +465,7 @@ export const DJ_GENERIC_CONTROLLERS: DJControllerPreset[] = [
   TRAKTOR_Z2,
   TRAKTOR_S2,
   TRAKTOR_S4,
+  MPK_MINI,
   GENERIC_8x8,
   GENERIC_4x16,
   GENERIC_MIXER,
