@@ -1964,10 +1964,47 @@ const DJPlaylistModalContent: React.FC<{ onClose: () => void }> = ({ onClose }) 
         }
       }
 
-      // Fallback: track has no known source scheme (old entries added before
-      // `local:` prefix persistence was wired up). Prompt for the file once,
-      // then upgrade the track: cache the bytes + flip fileName to `local:`
-      // so every future preview skips this prompt.
+      // Before prompting for a file, try the cache using the plain filename.
+      // Old playlist entries (pre-`local:` prefix) may already have bytes
+      // stored under the bare name from analysis or a previous Add-Files.
+      {
+        const plainFilename = track.fileName;
+        try {
+          const { getCachedAudioByFilename } = await import('@/engine/dj/DJAudioCache');
+          const cached = await getCachedAudioByFilename(plainFilename);
+          const buffer = cached?.sourceData ?? cached?.audioData;
+          if (buffer && buffer.byteLength > 0) {
+            // Found it — upgrade the fileName to `local:` so future loads
+            // skip this probe and go straight to the local: branch.
+            if (activePlaylistId) {
+              const playlist = useDJPlaylistStore.getState().playlists.find((p) => p.id === activePlaylistId);
+              const idx = playlist?.tracks.findIndex((t) => t.id === track.id);
+              if (idx !== undefined && idx >= 0) {
+                updateTrackMeta(activePlaylistId, idx, { fileName: 'local:' + plainFilename });
+              }
+            }
+
+            if (isAudioFile(plainFilename)) {
+              await engine.loadAudioToDeck(deckId, buffer, 'local:' + plainFilename, track.trackName);
+              useDJStore.getState().setDeckViewMode('vinyl');
+            } else if (isUADEFormat(plainFilename)) {
+              await loadUADEToDeck(engine, deckId, buffer, plainFilename, true, undefined, track.trackName, 'local:' + plainFilename);
+              useDJStore.getState().setDeckViewMode('visualizer');
+            } else {
+              const blob = new File([buffer], plainFilename, { type: 'application/octet-stream' });
+              const song = await parseModuleToSong(blob);
+              cacheSong('local:' + plainFilename, song);
+              await loadSongToDeck(song, 'local:' + plainFilename, deckId, buffer);
+            }
+            return;
+          }
+        } catch { /* cache miss — fall through to file picker */ }
+      }
+
+      // Fallback: track has no known source scheme AND the cache doesn't have
+      // its bytes. Prompt for the file once, then upgrade the track: cache the
+      // bytes + flip fileName to `local:` so every future preview skips this
+      // prompt.
       const input = document.createElement('input');
       input.type = 'file';
       input.accept = '*/*';

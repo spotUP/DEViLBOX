@@ -295,25 +295,51 @@ export async function analyzePlaylist(
             ? track.fileName.slice('local:'.length)
             : track.fileName;
           const cached = await getCachedAudioByFilename(filename).catch(() => null);
-          const buffer = cached?.sourceData;
-          if (!buffer || buffer.byteLength === 0) {
+          const sourceBuffer = cached?.sourceData;
+          const audioBuffer = cached?.audioData;
+
+          if (sourceBuffer && sourceBuffer.byteLength > 0) {
+            // Have raw source — render + analyze through the pipeline
+            const pipelineResult = await getDJPipeline().loadOrEnqueue(sourceBuffer, filename, undefined, 'low', undefined, 90);
+            if (!pipelineResult.analysis) {
+              throw new Error('Local pipeline returned no analysis');
+            }
+
+            const curr = resolveCurrent(trackId);
+            if (curr) {
+              queueMetaUpdate(curr.index, {
+                bpm: pipelineResult.analysis.bpm,
+                musicalKey: pipelineResult.analysis.musicalKey,
+                energy: pipelineResult.analysis.genre?.energy ?? 0,
+                duration: pipelineResult.duration,
+                analysisSkipped: false,
+              });
+            }
+          } else if (audioBuffer && audioBuffer.byteLength > 0 && cached) {
+            // Have rendered audio but no source — can still analyze the WAV
+            const pipelineResult = await getDJPipeline().loadOrEnqueue(audioBuffer, filename, undefined, 'low', undefined, 90);
+            if (!pipelineResult.analysis) {
+              throw new Error('Local pipeline returned no analysis');
+            }
+
+            const curr = resolveCurrent(trackId);
+            if (curr) {
+              queueMetaUpdate(curr.index, {
+                bpm: pipelineResult.analysis.bpm,
+                musicalKey: pipelineResult.analysis.musicalKey,
+                energy: pipelineResult.analysis.genre?.energy ?? 0,
+                duration: pipelineResult.duration,
+                analysisSkipped: false,
+              });
+            }
+          } else {
+            // Neither source nor audio cached — mark skipped so we don't
+            // retry every time. User needs to re-add the file to analyze.
+            const curr2 = resolveCurrent(trackId);
+            if (curr2) {
+              queueMetaUpdate(curr2.index, { analysisSkipped: true });
+            }
             throw new Error(`Local file "${filename}" not in cache — re-add it to the playlist to analyze`);
-          }
-
-          const pipelineResult = await getDJPipeline().loadOrEnqueue(buffer, filename, undefined, 'low', undefined, 90);
-          if (!pipelineResult.analysis) {
-            throw new Error('Local pipeline returned no analysis');
-          }
-
-          const curr = resolveCurrent(trackId);
-          if (curr) {
-            queueMetaUpdate(curr.index, {
-              bpm: pipelineResult.analysis.bpm,
-              musicalKey: pipelineResult.analysis.musicalKey,
-              energy: pipelineResult.analysis.genre?.energy ?? 0,
-              duration: pipelineResult.duration,
-              analysisSkipped: false,
-            });
           }
           analyzed++;
           const done = analyzed + failed;

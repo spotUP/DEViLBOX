@@ -532,11 +532,19 @@ export function skipTransition(
   try {
     beatsPerBar = useDJStore.getState().decks[fromDeck].beatGrid?.timeSignature || 4;
   } catch { /* fallback */ }
-  const totalBeats = bars * beatsPerBar;
+  // Skip uses half the bars for a snappy transition — the user wants to
+  // move on, not wait through a long blend.
+  const totalBeats = Math.max(4, Math.floor(bars * beatsPerBar / 2));
 
-  // Start the incoming deck immediately — no scheduleQuantized
+  // Start the incoming deck immediately — no scheduleQuantized.
+  // Await is not possible in a sync function, but play() only awaits
+  // Tone.start() (already running by this point in a DJ session).
+  // Catch unhandled rejection from the async call.
   try {
-    getDJEngine().getDeck(toDeck).play();
+    const deck = getDJEngine().getDeck(toDeck);
+    deck.play().catch((err: unknown) => {
+      console.error('[skipTransition] Async play() failed:', err);
+    });
   } catch (err) {
     console.error('[skipTransition] Failed to start incoming deck:', err);
   }
