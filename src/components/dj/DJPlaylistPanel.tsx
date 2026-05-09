@@ -43,6 +43,7 @@ import {
   type DJPlaylist,
 } from '@/stores/useDJPlaylistStore';
 import { useDJStore } from '@/stores/useDJStore';
+import { useShallow } from 'zustand/react/shallow';
 import { getDJEngine } from '@/engine/dj/DJEngine';
 import { parseModuleToSong } from '@/lib/import/parseModuleToSong';
 import { detectBPM, estimateSongDuration } from '@/engine/dj/DJBeatDetector';
@@ -354,38 +355,66 @@ interface DJPlaylistPanelProps {
 }
 
 export const DJPlaylistPanel: React.FC<DJPlaylistPanelProps> = ({ onClose }) => {
-  const playlists = useDJPlaylistStore((s) => s.playlists);
-  const activePlaylistId = useDJPlaylistStore((s) => s.activePlaylistId);
-  const createPlaylist = useDJPlaylistStore((s) => s.createPlaylist);
-  const deletePlaylist = useDJPlaylistStore((s) => s.deletePlaylist);
-  const renamePlaylist = useDJPlaylistStore((s) => s.renamePlaylist);
-  const setActivePlaylist = useDJPlaylistStore((s) => s.setActivePlaylist);
-  const addTrack = useDJPlaylistStore((s) => s.addTrack);
-  const addTracks = useDJPlaylistStore((s) => s.addTracks);
-  const removeTrack = useDJPlaylistStore((s) => s.removeTrack);
-  const reorderTrack = useDJPlaylistStore((s) => s.reorderTrack);
-  const sortTracksAction = useDJPlaylistStore((s) => s.sortTracks);
-  const clonePlaylist = useDJPlaylistStore((s) => s.clonePlaylist);
-  const selectedTrackIndices = useDJPlaylistStore((s) => s.selectedTrackIndices);
-  const focusedTrackIndex = useDJPlaylistStore((s) => s.focusedTrackIndex);
-  const selectTrack = useDJPlaylistStore((s) => s.selectTrack);
-  const selectTrackRange = useDJPlaylistStore((s) => s.selectTrackRange);
-  const toggleTrackSelection = useDJPlaylistStore((s) => s.toggleTrackSelection);
-  const selectAllTracks = useDJPlaylistStore((s) => s.selectAllTracks);
-  const clearSelection = useDJPlaylistStore((s) => s.clearSelection);
-  const setFocusedTrack = useDJPlaylistStore((s) => s.setFocusedTrack);
-  const removeSelectedTracks = useDJPlaylistStore((s) => s.removeSelectedTracks);
-  const moveSelectedTracks = useDJPlaylistStore((s) => s.moveSelectedTracks);
-  const copySelectedTracks = useDJPlaylistStore((s) => s.copySelectedTracks);
+  // Consolidated selectors — useShallow prevents re-renders when unrelated state changes
+  const { playlists, activePlaylistId } = useDJPlaylistStore(
+    useShallow((s) => ({ playlists: s.playlists, activePlaylistId: s.activePlaylistId }))
+  );
+  const playlistActions = useDJPlaylistStore(
+    useShallow((s) => ({
+      createPlaylist: s.createPlaylist,
+      deletePlaylist: s.deletePlaylist,
+      renamePlaylist: s.renamePlaylist,
+      setActivePlaylist: s.setActivePlaylist,
+      addTrack: s.addTrack,
+      addTracks: s.addTracks,
+      removeTrack: s.removeTrack,
+      reorderTrack: s.reorderTrack,
+      sortTracks: s.sortTracks,
+      clonePlaylist: s.clonePlaylist,
+      removeSelectedTracks: s.removeSelectedTracks,
+      moveSelectedTracks: s.moveSelectedTracks,
+      copySelectedTracks: s.copySelectedTracks,
+      updateTrackMeta: s.updateTrackMeta,
+    }))
+  );
+  const {
+    createPlaylist, deletePlaylist, renamePlaylist, setActivePlaylist,
+    addTrack, addTracks, removeTrack, reorderTrack, sortTracks: sortTracksAction,
+    clonePlaylist, removeSelectedTracks, moveSelectedTracks, copySelectedTracks,
+    updateTrackMeta,
+  } = playlistActions;
+
+  const { selectedTrackIndices, focusedTrackIndex } = useDJPlaylistStore(
+    useShallow((s) => ({ selectedTrackIndices: s.selectedTrackIndices, focusedTrackIndex: s.focusedTrackIndex }))
+  );
+  const selectionActions = useDJPlaylistStore(
+    useShallow((s) => ({
+      selectTrack: s.selectTrack,
+      selectTrackRange: s.selectTrackRange,
+      toggleTrackSelection: s.toggleTrackSelection,
+      selectAllTracks: s.selectAllTracks,
+      clearSelection: s.clearSelection,
+      setFocusedTrack: s.setFocusedTrack,
+    }))
+  );
+  const {
+    selectTrack, selectTrackRange, toggleTrackSelection,
+    selectAllTracks, clearSelection, setFocusedTrack,
+  } = selectionActions;
+
   const canUndo = useDJPlaylistStore((s) => s.canUndo);
   const canRedo = useDJPlaylistStore((s) => s.canRedo);
   const undo = useDJPlaylistStore((s) => s.undo);
   const redo = useDJPlaylistStore((s) => s.redo);
 
-  const autoDJEnabled = useDJStore((s) => s.autoDJEnabled);
-  const autoDJCurrentIdx = useDJStore((s) => s.autoDJCurrentTrackIndex);
-  const autoDJNextIdx = useDJStore((s) => s.autoDJNextTrackIndex);
-  const thirdDeckActive = useDJStore((s) => s.thirdDeckActive);
+  const { autoDJEnabled, autoDJCurrentIdx, autoDJNextIdx, thirdDeckActive } = useDJStore(
+    useShallow((s) => ({
+      autoDJEnabled: s.autoDJEnabled,
+      autoDJCurrentIdx: s.autoDJCurrentTrackIndex,
+      autoDJNextIdx: s.autoDJNextTrackIndex,
+      thirdDeckActive: s.thirdDeckActive,
+    }))
+  );
 
   const [isCreating, setIsCreating] = useState(false);
   const [newName, setNewName] = useState('');
@@ -401,8 +430,6 @@ export const DJPlaylistPanel: React.FC<DJPlaylistPanelProps> = ({ onClose }) => 
   const [previewingIndex, setPreviewingIndex] = useState<number | null>(null);
   const previewPlayerRef = useRef<AudioBufferSourceNode | null>(null);
   const previewGainRef = useRef<GainNode | null>(null);
-
-  const updateTrackMeta = useDJPlaylistStore((s) => s.updateTrackMeta);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const importInputRef = useRef<HTMLInputElement>(null);
