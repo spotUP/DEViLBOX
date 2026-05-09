@@ -818,3 +818,28 @@ describe('Analysis cache — relative URL for dev proxy', () => {
     expect(cacheSrc).not.toContain('devilbox.uprough.net');
   });
 });
+
+// ── Sammy Blammy samples on One-Shots Live bank B ───────────────────────────
+
+describe('One-Shots Live preset — Sammy Blammy on bank B', () => {
+  const presetSrc = fs.readFileSync(
+    path.resolve(__dirname, '../../../constants/djPadPresets.ts'), 'utf-8',
+  );
+
+  it('imports SAMMY_BLAMMY_PACK', () => {
+    expect(presetSrc).toMatch(/import.*SAMMY_BLAMMY_PACK.*from.*samplePacks/);
+  });
+
+  it('oneshots-live creates bank A synths + bank B Sammy Blammy', () => {
+    const block = presetSrc.split("id: 'oneshots-live'")[1]?.split('onApply')[0] ?? '';
+    expect(block).toContain('applyOneShotPads(program, 0, 8)');
+    expect(block).toContain('applySammyBlammyPads(program, 8)');
+  });
+
+  it('applySammyBlammyPads uses makeSampleConfig for sample pads', () => {
+    expect(presetSrc).toContain('makeSampleConfig');
+    const fnBlock = presetSrc.split('applySammyBlammyPads')[1]?.split('function ')[0] ?? '';
+    expect(fnBlock).toContain('SAMMY_BLAMMY_PACK.samples.vocals');
+    expect(fnBlock).toContain("pad.playMode = 'oneshot'");
+  });
+});
