@@ -151,11 +151,15 @@ async function loadSammyBlammySamples(startPad: number): Promise<void> {
   const ctx = getAudioContext();
   const store = useDrumPadStore;
 
+  console.log(`[SammyBlammy] loading ${Math.min(16, allSamples.length)} samples onto pads ${startPad + 1}..${startPad + 16}`);
+
+  let loaded = 0;
   await Promise.all(allSamples.slice(0, 16).map(async (sample, i) => {
     const padId = startPad + i + 1; // pad.id is 1-based
     try {
-      const resp = await fetch(normalizeUrl(sample.url));
-      if (!resp.ok) { console.warn(`[SammyBlammy] fetch failed for ${sample.name}: ${resp.status}`); return; }
+      const url = normalizeUrl(sample.url);
+      const resp = await fetch(url);
+      if (!resp.ok) { console.warn(`[SammyBlammy] fetch ${resp.status} for ${sample.name} (${url})`); return; }
       const ab = await resp.arrayBuffer();
       const audioBuffer = await ctx.decodeAudioData(ab);
       await store.getState().loadSampleToPad(padId, {
@@ -166,10 +170,12 @@ async function loadSammyBlammySamples(startPad: number): Promise<void> {
         sampleRate: audioBuffer.sampleRate,
         sourceUrl: sample.url,
       });
+      loaded++;
     } catch (err) {
       console.warn(`[SammyBlammy] failed to load ${sample.name}:`, err);
     }
   }));
+  console.log(`[SammyBlammy] ${loaded}/${allSamples.length} samples loaded`);
 }
 
 function applyScratchPads(program: DrumProgram, startPad: number, count: number): void {
@@ -260,10 +266,10 @@ export const DJ_PAD_PRESETS: DJPreset[] = [
     description: 'Bank A: synth one-shots (horns, sirens, risers). Bank B: Sammy Blammy vocal drops & FX. Routes through the Dub Bus.',
     create: () => {
       const program = createEmptyProgram('D-02', 'One-Shots Live');
-      // Bank A (pads 0-7): synth one-shots
-      applyOneShotPads(program, 0, 8);
-      // Bank B (pads 8-15+): Sammy Blammy samples
-      applySammyBlammyPads(program, 8);
+      // Bank A (pads 0-15): synth one-shots — fills full 16-pad bank
+      applyOneShotPads(program, 0, 16);
+      // Bank B (pads 16-31): Sammy Blammy samples
+      applySammyBlammyPads(program, 16);
       return program;
     },
     onApply: ({ setDubBus }) => {
@@ -279,8 +285,8 @@ export const DJ_PAD_PRESETS: DJPreset[] = [
         returnGain: 0.5,       // gig-fix 2026-04-18: was 0.85 — one-shot presets should stay well under the dry mix
       });
       // Fetch + decode Sammy Blammy samples onto bank B pads (async, fire-and-forget).
-      // Pads 8-15 in the program correspond to pad IDs 9-24 (1-based).
-      void loadSammyBlammySamples(8);
+      // Bank B = pad indices 16-31, pad IDs 17-32.
+      void loadSammyBlammySamples(16);
     },
   },
   {
