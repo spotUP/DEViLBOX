@@ -769,16 +769,20 @@ export const useDJPlaylistStore = create<DJPlaylistState>()(
       }),
       onRehydrateStorage: () => (state) => {
         if (state) {
-          for (const pl of state.playlists) {
-            for (const t of pl.tracks) {
-              t.played = undefined;
-              // Migrate: ensure all tracks have IDs
-              if (!t.id) t.id = generateTrackId();
+          try {
+            for (const pl of state.playlists) {
+              for (const t of pl.tracks) {
+                t.played = undefined;
+                // Migrate: ensure all tracks have IDs
+                if (!t.id) t.id = generateTrackId();
+              }
+              // Clear auto-saved environment/masterEffects that cause phantom FX.
+              // Environment is now only saved explicitly (cloud save / "Save DJ Set").
+              pl.environment = undefined;
+              pl.masterEffects = undefined;
             }
-            // Clear auto-saved environment/masterEffects that cause phantom FX.
-            // Environment is now only saved explicitly (cloud save / "Save DJ Set").
-            pl.environment = undefined;
-            pl.masterEffects = undefined;
+          } catch (err) {
+            console.error('[DJPlaylistStore] Rehydration error (playlists preserved):', err);
           }
 
           // If local playlists are empty, try restoring from cloud backup.
