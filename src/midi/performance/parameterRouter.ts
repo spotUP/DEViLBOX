@@ -887,12 +887,12 @@ function getDJRoutes(): Record<string, DJRouteHandler> {
     // Crossfader: 0-1 maps directly
     'dj.crossfader': (v) => getDJEngine().setCrossfader(v),
 
-    // Deck volumes: 0-1 maps to 0-1.5 (allows slight boost)
-    'dj.deckA.volume': (v) => getDJEngine().deckA.setVolume(v * 1.5),
-    'dj.deckB.volume': (v) => getDJEngine().deckB.setVolume(v * 1.5),
+    // Deck volumes: 0-1 maps directly (unity gain at max)
+    'dj.deckA.volume': (v) => getDJEngine().deckA.setVolume(v),
+    'dj.deckB.volume': (v) => getDJEngine().deckB.setVolume(v),
 
-    // Master volume: 0-1 maps to 0-1.5
-    'dj.masterVolume': (v) => getDJEngine().mixer.setMasterVolume(v * 1.5),
+    // Master volume: 0-1 maps directly (unity gain at max)
+    'dj.masterVolume': (v) => getDJEngine().mixer.setMasterVolume(v),
 
     // EQ: 0-1 maps to -12dB to +12dB range
     'dj.deckA.eqHi': (v) => getDJEngine().deckA.setEQ('high', -12 + v * 24),
@@ -1131,9 +1131,9 @@ function readDJParamNormalized(param: string): number | null {
   const store = useDJStore.getState();
   switch (param) {
     case 'dj.crossfader':      return store.crossfaderPosition;
-    case 'dj.deckA.volume':    return Math.max(0, Math.min(1, store.decks.A.volume / 1.5));
-    case 'dj.deckB.volume':    return Math.max(0, Math.min(1, store.decks.B.volume / 1.5));
-    case 'dj.masterVolume':    return Math.max(0, Math.min(1, store.masterVolume / 1.5));
+    case 'dj.deckA.volume':    return Math.max(0, Math.min(1, store.decks.A.volume));
+    case 'dj.deckB.volume':    return Math.max(0, Math.min(1, store.decks.B.volume));
+    case 'dj.masterVolume':    return Math.max(0, Math.min(1, store.masterVolume));
     case 'dj.deckA.eqHi':      return (store.decks.A.eqHigh + 12) / 24;
     case 'dj.deckA.eqMid':     return (store.decks.A.eqMid   + 12) / 24;
     case 'dj.deckA.eqLow':     return (store.decks.A.eqLow   + 12) / 24;
