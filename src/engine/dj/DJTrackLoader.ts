@@ -12,7 +12,7 @@ import { getDJEngine } from './DJEngine';
 import { getDJPipeline } from './DJPipeline';
 import { parseModuleToSong } from '@/lib/import/parseModuleToSong';
 import { detectBPM } from './DJBeatDetector';
-import { cacheSong } from './DJSongCache';
+import { cacheSong, getCachedSong } from './DJSongCache';
 import { isAudioFile } from '@/lib/audioFileUtils';
 import { getCachedAudioByFilename } from './DJAudioCache';
 import type { TrackerSong } from '@/engine/TrackerReplayer';
@@ -160,12 +160,14 @@ async function preRenderTrackInternal(track: PlaylistTrack): Promise<PreRendered
     const cached = await getCachedAudioByFilename(track.fileName);
     if (cached && cached.audioData.byteLength > 0) {
       console.log(`[DJTrackLoader] Pre-render cache hit: ${track.fileName}`);
+      const cachedSong = getCachedSong(track.fileName);
       return {
         wavData: cached.audioData,
         filename: track.fileName,
         trackName: track.trackName || cached.filename,
         bpm: cached.bpm || 125,
         duration: cached.duration,
+        song: cachedSong,
         waveformPeaks: cached.waveformPeaks instanceof Float32Array
           ? cached.waveformPeaks : new Float32Array(cached.waveformPeaks),
       };
@@ -406,10 +408,14 @@ async function loadPlaylistTrackToDeckInternal(
     const cached = await getCachedAudioByFilename(track.fileName);
     if (cached && cached.audioData.byteLength > 0) {
       console.log(`[DJTrackLoader] Using cached audio for: ${track.fileName}`);
+      // Retrieve the song from the song cache so pattern display works
+      // (without this, deck B shows oscilloscope instead of pattern data)
+      const cachedSong = getCachedSong(track.fileName);
       await getDJEngine().loadAudioToDeck(
         deckId, cached.audioData, track.fileName,
         track.trackName || cached.filename,
         cached.bpm || 125,
+        cachedSong,
       );
       useDJStore.getState().setDeckState(deckId, {
         fileName: track.fileName,
@@ -423,6 +429,7 @@ async function loadPlaylistTrackToDeckInternal(
         audioPosition: 0,
         elapsedMs: 0,
         isPlaying: false,
+        ...(cachedSong ? { totalPositions: cachedSong.songLength, songPos: 0, pattPos: 0 } : {}),
       });
       return true;
     }

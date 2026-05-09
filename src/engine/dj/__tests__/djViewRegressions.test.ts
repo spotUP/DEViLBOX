@@ -597,11 +597,76 @@ describe('Scratch-buffer priming vs play() race fix', () => {
     const fxSrc = fs.readFileSync(
       path.resolve(__dirname, '../DJQuantizedFX.ts'), 'utf-8',
     );
-    // Find the beatMatchedTransition function body
-    const bmtMatch = fxSrc.match(
-      /export function beatMatchedTransition[\s\S]*?\nreturn \(\) =>/m,
-    );
     // The play() call inside the downbeat callback must have .catch()
     expect(fxSrc).toContain('incoming.play().catch(');
+  });
+});
+
+// ── Fader range fix ─────────────────────────────────────────────────────────
+
+describe('Fader range — thumb height accounting', () => {
+  it('MixerChannelStrip getVolumeFromY accounts for THUMB_HEIGHT', () => {
+    const src = fs.readFileSync(
+      path.resolve(__dirname, '../../../components/dj/MixerChannelStrip.tsx'), 'utf-8',
+    );
+    const fnMatch = src.match(/getVolumeFromY[\s\S]*?return 1 - Math/);
+    expect(fnMatch).not.toBeNull();
+    const fnBody = fnMatch![0];
+    expect(fnBody).toContain('THUMB_HEIGHT');
+  });
+});
+
+// ── DubBus wireMasterInsert race fix ────────────────────────────────────────
+
+describe('DubBus wireMasterInsert stale connection cleanup', () => {
+  const dubBusSrc = fs.readFileSync(
+    path.resolve(__dirname, '../../dub/DubBus.ts'), 'utf-8',
+  );
+
+  it('wireMasterInsert completes stale disconnect when cancelling pending timer', () => {
+    const wireMatch = dubBusSrc.match(
+      /wireMasterInsert\(source: AudioNode[\s\S]*?\n  \}/m,
+    );
+    expect(wireMatch).not.toBeNull();
+    const wireBody = wireMatch![0];
+    expect(wireBody).toContain('staleSrc');
+    expect(wireBody).toContain('staleDest');
+    expect(wireBody).toContain('disconnect(this.masterInsertHead)');
+  });
+});
+
+// ── Deck 2 cached audio song data fix ───────────────────────────────────────
+
+describe('Cached audio path passes song data for pattern display', () => {
+  const loaderSrc = fs.readFileSync(
+    path.resolve(__dirname, '../DJTrackLoader.ts'), 'utf-8',
+  );
+
+  it('imports getCachedSong from DJSongCache', () => {
+    expect(loaderSrc).toContain('getCachedSong');
+    expect(loaderSrc).toMatch(/import.*getCachedSong.*from.*DJSongCache/);
+  });
+
+  it('loadPlaylistTrackToDeckInternal cached path sets totalPositions', () => {
+    const cachedBlock = loaderSrc.split('Using cached audio for')[1];
+    expect(cachedBlock).toBeDefined();
+    const nextSetDeck = cachedBlock.split('setDeckState(deckId')[1];
+    expect(nextSetDeck).toBeDefined();
+    const stateBlock = nextSetDeck.split(');')[0];
+    expect(stateBlock).toContain('totalPositions');
+  });
+
+  it('loadPlaylistTrackToDeckInternal cached path passes song to loadAudioToDeck', () => {
+    const cachedBlock = loaderSrc.split('Using cached audio for')[1];
+    expect(cachedBlock).toBeDefined();
+    const loadCall = cachedBlock.split('loadAudioToDeck(')[1]?.split(');')[0] ?? '';
+    expect(loadCall).toContain('cachedSong');
+  });
+
+  it('preRenderTrackInternal cached path includes song in result', () => {
+    const preRenderBlock = loaderSrc.split('Pre-render cache hit')[1];
+    expect(preRenderBlock).toBeDefined();
+    const returnBlock = preRenderBlock.split('return {')[1]?.split('}')[0] ?? '';
+    expect(returnBlock).toContain('song');
   });
 });

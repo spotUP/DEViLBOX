@@ -3701,9 +3701,26 @@ export class DubBus {
     // Cancel any in-flight rewire timer — rapid enable/disable cycles
     // would otherwise race (pending rewire fires after we've already
     // moved on). Safe to call when no timer is pending.
+    // CRITICAL: When a pending disconnect is cancelled, complete the stale
+    // disconnection immediately. Without this, the old insert chain nodes
+    // remain physically connected but logically inactive, and the subsequent
+    // reconnect silently fails — permanently killing audio output.
     if (this.masterInsertPending !== null) {
       clearTimeout(this.masterInsertPending);
       this.masterInsertPending = null;
+      // Complete the stale disconnect immediately so nodes are available
+      const staleSrc = this.masterInsertSource;
+      const staleDest = this.masterInsertDest;
+      if (staleSrc && staleDest) {
+        try { staleSrc.disconnect(this.masterInsertHead); } catch { /* ok */ }
+        try { this.masterInsertTail.disconnect(staleDest); } catch { /* ok */ }
+        try { this.vinylDirect.disconnect(staleDest); } catch { /* ok */ }
+        try { staleSrc.connect(staleDest); } catch { /* ok */ }
+        try { this.masterInsertEnvelope.gain.setValueAtTime(1, this.context.currentTime); } catch { /* ok */ }
+      }
+      this.masterInsertActive = false;
+      this.masterInsertSource = null;
+      this.masterInsertDest = null;
     }
     if (this.masterInsertActive) this.unwireMasterInsert();
     // G15: mute the insert envelope BEFORE touching the audio graph so

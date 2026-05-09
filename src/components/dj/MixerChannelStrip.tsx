@@ -58,9 +58,12 @@ export const MixerChannelStrip: React.FC<MixerChannelStripProps> = ({ deckId, st
     const track = trackRef.current;
     if (!track) return volume;
     const rect = track.getBoundingClientRect();
-    const y = clientY - rect.top;
-    // Top = 1 (max volume), bottom = 0 (min volume)
-    return 1 - Math.max(0, Math.min(1, y / rect.height));
+    const y = clientY - rect.top - THUMB_HEIGHT / 2;
+    // Top = 1 (max volume), bottom = 0 (min volume).
+    // Use usable height (track minus thumb) so the mapping matches the
+    // thumb rendering and fader travels the full 0–1 range.
+    const usable = rect.height - THUMB_HEIGHT;
+    return 1 - Math.max(0, Math.min(1, y / usable));
   }, [volume]);
 
   const handlePointerDown = useCallback((e: React.PointerEvent) => {
