@@ -11,7 +11,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { immer } from 'zustand/middleware/immer';
-import { pushToCloud } from '@/lib/cloudSync';
+import { pushToCloud, pullFromCloud } from '@/lib/cloudSync';
 import { SYNC_KEYS } from '@/hooks/useCloudSync';
 import type { EffectConfig } from '@/types/instrument/effects';
 import type { DJEnvironment } from '@/types/djEnvironment';
@@ -736,6 +736,11 @@ export const useDJPlaylistStore = create<DJPlaylistState>()(
     {
       name: 'devilbox-dj-playlists',
       version: 2,
+      // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+      // !! NEVER SET state.playlists = [] IN A MIGRATION.                !!
+      // !! On 2026-04-13, a destructive migration wiped 3 user playlists !!
+      // !! that took hours to create. Migrations MUST preserve all data. !!
+      // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
       migrate: (persisted: unknown) => {
         const state = persisted as Record<string, unknown>;
         // Preserve existing playlists during migration; only init if missing
@@ -759,6 +764,20 @@ export const useDJPlaylistStore = create<DJPlaylistState>()(
             // Environment is now only saved explicitly (cloud save / "Save DJ Set").
             pl.environment = undefined;
             pl.masterEffects = undefined;
+          }
+
+          // If local playlists are empty, try restoring from cloud backup.
+          // This recovers from accidental wipes (e.g. destructive migrations,
+          // cleared localStorage, new browser profile).
+          if (state.playlists.length === 0) {
+            pullFromCloud<DJPlaylist[]>(SYNC_KEYS.DJ_PLAYLISTS)
+              .then((remote) => {
+                if (remote?.data && Array.isArray(remote.data) && remote.data.length > 0) {
+                  console.log(`[DJPlaylistStore] Restored ${remote.data.length} playlists from cloud`);
+                  useDJPlaylistStore.getState().importPlaylists(remote.data);
+                }
+              })
+              .catch(() => { /* no cloud connection — that's ok */ });
           }
         }
       },
