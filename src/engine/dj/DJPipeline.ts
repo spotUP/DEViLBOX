@@ -970,11 +970,9 @@ export class DJPipeline {
     // ── Update deck state ────────────────────────────────────────────────
     if (task.deckId) {
       const currentState = useDJStore.getState().decks[task.deckId];
-      /* Stale-render guard: if the user reloaded this deck mid-render, the
-       * loaded file no longer matches task.filename. Writing our analysis
-       * onto the new track's state would clobber its fresh beatGrid /
-       * musicalKey with old-track data. */
-      if (currentState.fileName === task.filename) {
+      if (!currentState) {
+        console.warn(`[DJPipeline] Deck ${task.deckId} no longer exists, skipping state update`);
+      } else if (currentState.fileName === task.filename) {
         this.applyResultToDeck(task.deckId, { wavData, duration, sampleRate, waveformPeaks, analysis });
 
         // Hot-swap from Tracker engine to Audio engine if applicable.
@@ -1035,17 +1033,22 @@ export class DJPipeline {
         transferables.push(cloned);
         return { filename: cf.filename, buffer: cloned };
       });
-      this.renderWorker.postMessage(
-        {
-          type: 'render',
-          id: task.id,
-          fileBuffer: buffer,
-          filename: task.filename,
-          subsong: task.subsong,
-          companions,
-        },
-        transferables,
-      );
+      try {
+        this.renderWorker.postMessage(
+          {
+            type: 'render',
+            id: task.id,
+            fileBuffer: buffer,
+            filename: task.filename,
+            subsong: task.subsong,
+            companions,
+          },
+          transferables,
+        );
+      } catch (err) {
+        this.renderCallbacks.delete(task.id);
+        reject(new Error(`Render worker postMessage failed: ${err}`));
+      }
     });
   }
 
@@ -1063,14 +1066,19 @@ export class DJPipeline {
 
       this.analysisCallbacks.set(id, { resolve, reject });
 
-      // Clone arrays for transfer
-      const leftCopy = new Float32Array(left);
-      const rightCopy = new Float32Array(right);
+      try {
+        // Clone arrays for transfer — guard against detached buffers
+        const leftCopy = new Float32Array(left);
+        const rightCopy = new Float32Array(right);
 
-      this.analysisWorker.postMessage(
-        { type: 'analyze', id, pcmLeft: leftCopy, pcmRight: rightCopy, sampleRate, numBins: 800 },
-        [leftCopy.buffer, rightCopy.buffer],
-      );
+        this.analysisWorker.postMessage(
+          { type: 'analyze', id, pcmLeft: leftCopy, pcmRight: rightCopy, sampleRate, numBins: 800 },
+          [leftCopy.buffer, rightCopy.buffer],
+        );
+      } catch (err) {
+        this.analysisCallbacks.delete(id);
+        reject(new Error(`Analysis worker postMessage failed: ${err}`));
+      }
     });
   }
 
