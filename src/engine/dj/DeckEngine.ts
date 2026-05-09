@@ -543,18 +543,45 @@ export class DeckEngine {
    * failure never bubbles into the load path.
    */
   private _primingScratchBuffer = false;
+  private _primingCancelRequested = false;
+
+  /**
+   * Cancel scratch-buffer priming if active, and wait for it to finish.
+   *
+   * Must be called before any real play() — otherwise priming's temporary
+   * resume()/pause() cycle races with play():
+   *   1. Priming calls resume() → player appears 'started', gain=0
+   *   2. play() sees 'started' → no-op
+   *   3. Priming finishes → pause() stops the player → silence
+   *
+   * This was the root cause of Auto DJ fading before the next song played.
+   */
+  private async _cancelPrimingIfActive(): Promise<void> {
+    if (!this._primingScratchBuffer) return;
+    this._primingCancelRequested = true;
+    // Spin-wait for priming to exit (≤150ms worst case — priming checks
+    // the cancel flag in its wait loop and exits early).
+    for (let i = 0; i < 50 && this._primingScratchBuffer; i++) {
+      await new Promise(r => setTimeout(r, 5));
+    }
+    this._primingCancelRequested = false;
+  }
+
   private async _primeScratchBuffer(): Promise<void> {
     if (this._primingScratchBuffer) return;
     if (this._playbackMode !== 'audio') return;
     if (this.audioPlayer.isCurrentlyPlaying()) return;
 
     this._primingScratchBuffer = true;
+    this._primingCancelRequested = false;
     try {
       // Wait up to 500 ms for the scratch buffer worklet to initialise.
       for (let t = 0; !this.scratchBufferReady && t < 10; t++) {
+        if (this._primingCancelRequested) return;
         await new Promise(r => setTimeout(r, 50));
       }
       if (!this.scratchBufferReady) return;
+      if (this._primingCancelRequested) return;
 
       // Another play() may have landed while we were waiting; re-check.
       if (this.audioPlayer.isCurrentlyPlaying()) return;
@@ -575,7 +602,12 @@ export class DeckEngine {
         // Give the capture worklet time to fill the ring buffer. Ring is
         // 2048 frames ≈ 46 ms @ 44.1 kHz; 150 ms is 3× safety margin to
         // survive scheduler jitter and the Tone.Player's 10 ms fadeIn.
-        await new Promise(r => setTimeout(r, 150));
+        // Check cancel flag in a tight loop instead of a single 150ms sleep
+        // so play() doesn't have to wait the full duration.
+        for (let t = 0; t < 15; t++) {
+          if (this._primingCancelRequested) break;
+          await new Promise(r => setTimeout(r, 10));
+        }
       } finally {
         // Always pause + seek-back + restore gain, even if resume() threw.
         try { this.audioPlayer.pause(); } catch { /* ok */ }
@@ -596,6 +628,13 @@ export class DeckEngine {
   }
 
   async play(): Promise<void> {
+    // Cancel scratch-buffer priming if active. Priming temporarily starts +
+    // stops the player; if we don't cancel it first, our play() either no-ops
+    // (player appears 'started' during priming) or gets undone (priming's
+    // pause() fires after our start). This was the root cause of Auto DJ
+    // fading to silence before the incoming track played.
+    await this._cancelPrimingIfActive();
+
     if (this._playbackMode === 'audio') {
       console.log(`[DeckEngine] play() in audio mode (stem=${this._stemMode})`);
       if (this._stemMode) {

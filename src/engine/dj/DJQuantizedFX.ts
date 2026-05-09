@@ -468,7 +468,11 @@ export function beatMatchedTransition(
     try {
       const engine = getDJEngine();
       const incoming = engine.getDeck(toDeck);
-      incoming.play();
+      // play() is async (may need to cancel scratch-buffer priming); catch
+      // rejections explicitly so they don't become unhandled.
+      incoming.play().catch((err: unknown) => {
+        console.error('[beatMatchedTransition] Async play() failed:', err);
+      });
     } catch { /* engine not ready */ }
 
     // Crossfade: move from current position toward toDeck
