@@ -155,10 +155,21 @@ function ensureTrackId(track: Omit<PlaylistTrack, 'id'> & { id?: string }): Play
 }
 
 function deepClonePlaylists(playlists: DJPlaylist[]): DJPlaylist[] {
-  return JSON.parse(JSON.stringify(playlists));
+  // structuredClone is ~2-4x faster than JSON round-trip and handles
+  // undefined values correctly. Available in all modern browsers + Node 17+.
+  try {
+    return structuredClone(playlists);
+  } catch {
+    return JSON.parse(JSON.stringify(playlists));
+  }
 }
 
 const MAX_UNDO = 30;
+
+// Throttle undo snapshots to prevent rapid-fire deep clones (e.g. during
+// drag-reorder or rapid clicks). At most one snapshot per 500ms window.
+let _lastUndoPushTime = 0;
+const UNDO_THROTTLE_MS = 500;
 
 // ── Store ────────────────────────────────────────────────────────────────────
 
@@ -788,6 +799,15 @@ export const useDJPlaylistStore = create<DJPlaylistState>()(
 // ── Internal: push undo snapshot (called inside immer set()) ────────────────
 
 function pushUndo(state: DJPlaylistState): void {
+  const now = Date.now();
+  if (now - _lastUndoPushTime < UNDO_THROTTLE_MS) {
+    // Skip rapid-fire snapshots — the previous snapshot is recent enough.
+    // Still clear redo stack since state IS changing.
+    state._redoStack = [];
+    state.canRedo = false;
+    return;
+  }
+  _lastUndoPushTime = now;
   state._undoStack.push(deepClonePlaylists(state.playlists));
   if (state._undoStack.length > MAX_UNDO) {
     state._undoStack.shift();

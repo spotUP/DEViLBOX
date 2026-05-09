@@ -543,10 +543,17 @@ export const DJPlaylistPanel: React.FC<DJPlaylistPanelProps> = ({ onClose }) => 
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
 
-  const sortableIds = useMemo(() =>
-    filteredTracks.map((t) => t.id),
-    [filteredTracks]
-  );
+  // Only register visible + nearby items with dnd-kit. Passing ALL track IDs
+  // causes dnd-kit to create internal state for every item, and when virtualizer
+  // unmounts rows during scroll, dnd-kit tries to measure missing DOM nodes —
+  // triggering cascading re-renders that crash Chrome (OOM / "Aw Snap").
+  const virtualItems = virtualizer.getVirtualItems();
+  const sortableIds = useMemo(() => {
+    if (virtualItems.length === 0) return filteredTracks.map((t) => t.id);
+    const startIdx = Math.max(0, virtualItems[0].index - 5);
+    const endIdx = Math.min(filteredTracks.length, virtualItems[virtualItems.length - 1].index + 6);
+    return filteredTracks.slice(startIdx, endIdx).map((t) => t.id);
+  }, [filteredTracks, virtualItems]);
 
   const handleDragEnd = useCallback((event: DragEndEvent) => {
     if (!activePlaylistId || isFiltered) return;
