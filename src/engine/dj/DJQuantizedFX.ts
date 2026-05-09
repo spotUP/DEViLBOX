@@ -508,6 +508,67 @@ export function beatMatchedTransition(
   };
 }
 
+// ── Skip Transition ─────────────────────────────────────────────────────────
+
+/**
+ * Immediate crossfade for user-initiated skip: starts the incoming deck
+ * and crossfade RIGHT NOW — no quantize delay. Uses the same crossfader
+ * sweep as beatMatchedTransition so both decks overlap naturally, but
+ * fires synchronously so the user hears the new track instantly.
+ */
+export function skipTransition(
+  fromDeck: DeckId,
+  toDeck: DeckId,
+  bars: number = 4,
+  withFilter: boolean = true,
+): () => void {
+  const cancellers: (() => void)[] = [];
+  let cancelled = false;
+
+  // Sync BPM (best-effort, no quantize wait)
+  syncBPMToOther(toDeck, fromDeck);
+
+  let beatsPerBar = 4;
+  try {
+    beatsPerBar = useDJStore.getState().decks[fromDeck].beatGrid?.timeSignature || 4;
+  } catch { /* fallback */ }
+  const totalBeats = bars * beatsPerBar;
+
+  // Start the incoming deck immediately — no scheduleQuantized
+  try {
+    getDJEngine().getDeck(toDeck).play();
+  } catch (err) {
+    console.error('[skipTransition] Failed to start incoming deck:', err);
+  }
+
+  // Crossfade immediately
+  const crossfadeTarget = toDeck === 'A' ? 0 : toDeck === 'B' ? 1 : 0.5;
+  cancellers.push(
+    crossfaderSweep(crossfadeTarget, totalBeats, fromDeck, () => {
+      if (!cancelled) {
+        try { getDJEngine().getDeck(fromDeck).stop(); } catch { /* */ }
+        useDJStore.getState().setDeckPlaying(fromDeck, false);
+      }
+    })
+  );
+
+  // Optional HPF sweep on outgoing
+  if (withFilter) {
+    cancellers.push(
+      filterSweep(fromDeck, -0.6, Math.floor(totalBeats * 0.75), () => {
+        if (!cancelled) {
+          try { getDJEngine().getDeck(fromDeck).setFilterPosition(-1); } catch { /* */ }
+        }
+      })
+    );
+  }
+
+  return () => {
+    cancelled = true;
+    cancellers.forEach(c => c());
+  };
+}
+
 // ── Cut Transition ──────────────────────────────────────────────────────────
 
 /**

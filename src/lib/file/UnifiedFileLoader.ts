@@ -175,8 +175,8 @@ export async function importTrackerModule(
         linearPeriods: song.linearPeriods,
         libopenmptFileData: useLibopenmpt ? info.arrayBuffer : undefined,
       });
-      const samplerCount = song.instruments.filter(i => i.synthType === 'Sampler').length;
-      if (samplerCount > 0) {
+      const needsPreload = song.instruments.some(i => i.synthType && i.synthType !== 'Synth');
+      if (needsPreload) {
         await engine.preloadInstruments(song.instruments);
       }
       notify.success(`Imported "${song.name}" — ${song.patterns.length} patterns, ${song.instruments.length} instruments`);
@@ -379,13 +379,8 @@ export async function importTrackerModule(
       libopenmptFileData: useLibopenmpt ? info.arrayBuffer : undefined,
     });
 
-    const samplerCount = instruments.filter(i => i.synthType === 'Sampler').length;
-    const wasmSynthCount = instruments.filter(i => 
-      i.synthType === 'WaveSabreSynth' || 
-      i.synthType === 'OidosSynth' || 
-      i.synthType === 'TunefishSynth'
-    ).length;
-    if (samplerCount > 0 || wasmSynthCount > 0) await engine.preloadInstruments(instruments);
+    const needsPreload = instruments.some(i => i.synthType && i.synthType !== 'Synth');
+    if (needsPreload) await engine.preloadInstruments(instruments);
     notify.success(`Imported "${info.metadata.title}" — ${result.patterns.length} patterns, ${instruments.length} instruments`);
     if (info.file) checkModlandFileWithPatternHash(info.file, null);
     return;
@@ -427,9 +422,8 @@ export async function importTrackerModule(
     setSpeed(song.initialSpeed);
     setMetadata({ name: song.name, author: '', description: `Imported from ${info.file?.name || 'module'}` });
     applyEditorMode(song);
-    const samplerCount = song.instruments.filter(i => i.synthType === 'Sampler').length;
-    const hasWasmSynths = song.instruments.some(i => i.synthType && i.synthType !== 'Sampler' && i.synthType !== 'Synth');
-    if (samplerCount > 0 || hasWasmSynths) await engine.preloadInstruments(song.instruments);
+    const needsPreload = song.instruments.some(i => i.synthType && i.synthType !== 'Synth');
+    if (needsPreload) await engine.preloadInstruments(song.instruments);
     notify.success(`Imported "${song.name}" — ${song.patterns.length} patterns, ${song.instruments.length} instruments`);
     if (info.file) checkModlandFileWithPatternHash(info.file, null);
     return;
@@ -457,9 +451,8 @@ export async function importTrackerModule(
       setSpeed(song.initialSpeed);
       setMetadata({ name: song.name, author: '', description: `Imported from ${info.file?.name || 'module'}` });
       applyEditorMode(song);
-      const samplerCount = song.instruments.filter(i => i.synthType === 'Sampler').length;
-      const hasWasmSynths2 = song.instruments.some(i => i.synthType && i.synthType !== 'Sampler' && i.synthType !== 'Synth');
-      if (samplerCount > 0 || hasWasmSynths2) await engine.preloadInstruments(song.instruments);
+      const needsPreload = song.instruments.some(i => i.synthType && i.synthType !== 'Synth');
+      if (needsPreload) await engine.preloadInstruments(song.instruments);
       notify.success(`Imported "${song.name}" — ${song.patterns.length} patterns, ${song.instruments.length} instruments`);
       if (info.file) checkModlandFileWithPatternHash(info.file, null);
       return;
@@ -490,8 +483,8 @@ export async function importTrackerModule(
   setMetadata({ name: info.metadata.title, author: '', description: `Imported from ${info.file?.name || 'module'}` });
   setBPM(125);
 
-  const samplerCount = instruments.filter(i => i.synthType === 'Sampler').length;
-  if (samplerCount > 0) await engine.preloadInstruments(instruments);
+  const needsPreload = instruments.some(i => i.synthType && i.synthType !== 'Synth');
+  if (needsPreload) await engine.preloadInstruments(instruments);
   notify.success(`Imported "${info.metadata.title}" — ${result.patterns.length} patterns, ${instruments.length} instruments`);
   if (info.file) checkModlandFileWithPatternHash(info.file, null);
   } finally {

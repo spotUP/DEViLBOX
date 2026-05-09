@@ -18,7 +18,7 @@ import { useAudioStore } from '@/stores/useAudioStore';
 import type { DeckId } from './DeckEngine';
 import { getDJEngine } from './DJEngine';
 import {
-  beatMatchedTransition,
+  beatMatchedTransition, skipTransition,
   cutTransition, filterBuildTransition, bassSwapTransition, echoOutTransition,
 } from './DJQuantizedFX';
 import { loadPlaylistTrackToDeck } from './DJTrackLoader';
@@ -361,7 +361,7 @@ class DJAutoDJ {
 
     // Use the same smooth transition as skip
     this.preloadedDeck = this.idleDeck;
-    this.triggerTransition(SKIP_TRANSITION_BARS);
+    this.triggerTransition(SKIP_TRANSITION_BARS, true);
     console.log(`[AutoDJ] Transitioning to index ${index}: ${track.trackName}`);
   }
 
@@ -373,7 +373,7 @@ class DJAutoDJ {
     if (this.preloadedDeck) {
       // Next track is ready — do a short transition
       this.cancelTransition();
-      this.triggerTransition(SKIP_TRANSITION_BARS);
+      this.triggerTransition(SKIP_TRANSITION_BARS, true);
     } else {
       // Not preloaded yet — try to load and play immediately
       this.cancelTransition();
@@ -405,7 +405,7 @@ class DJAutoDJ {
 
       if (loaded) {
         this.preloadedDeck = this.idleDeck;
-        this.triggerTransition(SKIP_TRANSITION_BARS);
+        this.triggerTransition(SKIP_TRANSITION_BARS, true);
       }
     }
   }
@@ -814,7 +814,7 @@ class DJAutoDJ {
 
   // ── Private: Transition ──────────────────────────────────────────────────
 
-  private async triggerTransition(userBars: number): Promise<void> {
+  private async triggerTransition(userBars: number, isSkip: boolean = false): Promise<void> {
     const store = useDJStore.getState();
     if (!this.preloadedDeck) return;
 
@@ -917,27 +917,35 @@ class DJAutoDJ {
 
     const aFile = store.decks.A.fileName?.split('/').pop() ?? 'empty';
     const bFile = store.decks.B.fileName?.split('/').pop() ?? 'empty';
-    console.log(`[AutoDJ] ${transType.toUpperCase()} ${bars}-bar: ${this.activeDeck} → ${this.idleDeck} | A:${aFile} B:${bFile}`);
+    console.log(`[AutoDJ] ${isSkip ? 'SKIP ' : ''}${transType.toUpperCase()} ${bars}-bar: ${this.activeDeck} → ${this.idleDeck} | A:${aFile} B:${bFile}`);
 
-    switch (transType) {
-      case 'cut':
-        this.transitionCancel = cutTransition(this.activeDeck, this.idleDeck);
-        break;
-      case 'echo-out':
-        this.transitionCancel = echoOutTransition(this.activeDeck, this.idleDeck, bars * 4);
-        break;
-      case 'filter-build':
-        this.transitionCancel = filterBuildTransition(this.activeDeck, this.idleDeck, bars);
-        break;
-      case 'bass-swap':
-        this.transitionCancel = bassSwapTransition(this.activeDeck, this.idleDeck, bars);
-        break;
-      case 'crossfade':
-      default:
-        this.transitionCancel = beatMatchedTransition(
-          this.activeDeck, this.idleDeck, bars, store.autoDJWithFilter,
-        );
-        break;
+    // Skip: use skipTransition which starts immediately (no quantize delay).
+    // Normal transitions wait for the next downbeat for a beat-matched blend.
+    if (isSkip) {
+      this.transitionCancel = skipTransition(
+        this.activeDeck, this.idleDeck, bars, store.autoDJWithFilter,
+      );
+    } else {
+      switch (transType) {
+        case 'cut':
+          this.transitionCancel = cutTransition(this.activeDeck, this.idleDeck);
+          break;
+        case 'echo-out':
+          this.transitionCancel = echoOutTransition(this.activeDeck, this.idleDeck, bars * 4);
+          break;
+        case 'filter-build':
+          this.transitionCancel = filterBuildTransition(this.activeDeck, this.idleDeck, bars);
+          break;
+        case 'bass-swap':
+          this.transitionCancel = bassSwapTransition(this.activeDeck, this.idleDeck, bars);
+          break;
+        case 'crossfade':
+        default:
+          this.transitionCancel = beatMatchedTransition(
+            this.activeDeck, this.idleDeck, bars, store.autoDJWithFilter,
+          );
+          break;
+      }
     }
   }
 
