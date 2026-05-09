@@ -309,10 +309,11 @@ describe('DJTrackLoader live load path handles companions', () => {
 // ── Crossfader store property name ──────────────────────────────────────────
 
 describe('Crossfader animation regression', () => {
-  it('DJActions.setCrossfader writes to crossfaderPosition, not crossfader', () => {
-    // Bug: DJActions.setCrossfader wrote `state.crossfader = clamped` but the store
-    // property is `crossfaderPosition`. This caused the UI slider to never update
-    // while the audio-level crossfader worked correctly.
+  it('DJActions.setCrossfader uses direct setState, not batchDJSet', () => {
+    // Bug 1: DJActions.setCrossfader wrote `state.crossfader` instead of `state.crossfaderPosition`
+    // Bug 2: Using batchDJSet (rAF-deferred) causes React to reset the controlled
+    // <input type="range"> slider to the stale value, making it appear frozen.
+    // Fix: use direct useDJStore.getState().setCrossfader() for immediate update.
     const src = fs.readFileSync(
       path.resolve(__dirname, '../DJActions.ts'),
       'utf-8',
@@ -321,9 +322,10 @@ describe('Crossfader animation regression', () => {
       src.indexOf('export function setCrossfader'),
       src.indexOf('export function setCrossfaderCurve'),
     );
-    // Must write to crossfaderPosition, NOT crossfader
-    expect(fnBody).toContain('state.crossfaderPosition');
-    expect(fnBody).not.toMatch(/state\.crossfader\s*=/);
+    // Must NOT call batchDJSet( for crossfader (causes controlled input to freeze)
+    expect(fnBody).not.toMatch(/batchDJSet\(/);
+    // Must use direct store action
+    expect(fnBody).toContain('setCrossfader(clamped)');
   });
 
   it('useDJStore exposes crossfaderPosition (not crossfader) as the store property', () => {
@@ -375,5 +377,59 @@ describe('DJ mode echo prevention', () => {
     );
     expect(src).toContain('setDJMode(true)');
     expect(src).toContain('setDJMode(false)');
+  });
+});
+
+// ── Auto DJ deck detection and advancement ──────────────────────────────────
+
+describe('Auto DJ deck detection and skip advancement', () => {
+  it('DJAutoDJ has syncDeckState method that checks actual deck playing state', () => {
+    const src = fs.readFileSync(
+      path.resolve(__dirname, '../DJAutoDJ.ts'),
+      'utf-8',
+    );
+    expect(src).toContain('private syncDeckState()');
+    // Must check both decks
+    expect(src).toContain('decks.A.isPlaying');
+    expect(src).toContain('decks.B.isPlaying');
+  });
+
+  it('skip() calls syncDeckState before starting new transition', () => {
+    const src = fs.readFileSync(
+      path.resolve(__dirname, '../DJAutoDJ.ts'),
+      'utf-8',
+    );
+    const skipBody = src.slice(
+      src.indexOf('async skip():'),
+      src.indexOf('async skip():') + 2000,
+    );
+    expect(skipBody).toContain('syncDeckState()');
+  });
+
+  it('skip() force-completes in-progress transition to advance indices', () => {
+    const src = fs.readFileSync(
+      path.resolve(__dirname, '../DJAutoDJ.ts'),
+      'utf-8',
+    );
+    const skipBody = src.slice(
+      src.indexOf('async skip():'),
+      src.indexOf('async skip():') + 2000,
+    );
+    // When a transition is in progress, skip must complete it before starting new one
+    expect(skipBody).toContain('completeTransition()');
+    expect(skipBody).toContain('cancelTransition()');
+  });
+});
+
+// ── File size limit ─────────────────────────────────────────────────────────
+
+describe('DJ deck file size limit', () => {
+  it('DeckAudioPlayer allows files up to 200MB', () => {
+    const src = fs.readFileSync(
+      path.resolve(__dirname, '../DeckAudioPlayer.ts'),
+      'utf-8',
+    );
+    // Must be at least 200MB (200 * 1024 * 1024)
+    expect(src).toMatch(/MAX_FILE_SIZE\s*=\s*200\s*\*\s*1024\s*\*\s*1024/);
   });
 });
