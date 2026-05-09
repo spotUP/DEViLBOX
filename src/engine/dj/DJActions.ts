@@ -464,9 +464,12 @@ export function setCrossfader(position: number): void {
   try {
     getDJEngine().mixer.setCrossfader(clamped);
   } catch { /* engine not ready */ }
-  batchDJSet('crossfader', (state) => {
-    state.crossfaderPosition = clamped;
-  });
+  // Direct store update (no batchDJSet) — the crossfader uses a React
+  // controlled <input type="range">. rAF batching defers the setState,
+  // so React re-renders with the stale value and resets the slider thumb
+  // back to its old position, making it appear frozen. Direct setState
+  // ensures React sees the new value on the very next render.
+  useDJStore.getState().setCrossfader(clamped);
 }
 
 /**
