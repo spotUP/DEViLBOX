@@ -465,7 +465,7 @@ export function setCrossfader(position: number): void {
     getDJEngine().mixer.setCrossfader(clamped);
   } catch { /* engine not ready */ }
   batchDJSet('crossfader', (state) => {
-    state.crossfader = clamped;
+    state.crossfaderPosition = clamped;
   });
 }
 

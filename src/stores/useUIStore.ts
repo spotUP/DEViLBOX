@@ -570,10 +570,18 @@ export const useUIStore = create<UIStore>()(
                   transport.stop();
                   getToneEngine().stop();
                 }
+                // Mute ToneEngine master output to prevent echo —
+                // DJ audio goes through DJMixerEngine, not ToneEngine's masterChannel
+                getToneEngine().setDJMode(true);
               } catch { /* not ready */ }
             }, 0);
           } else if (prev === 'dj' && view !== 'dj' && view !== 'vj' && view !== 'drumpad') {
             setTimeout(() => {
+              try {
+                // Unmute ToneEngine master output (no longer in DJ mode)
+                const { getToneEngine } = require('@engine/ToneEngine');
+                getToneEngine().setDJMode(false);
+              } catch { /* not ready */ }
               try {
                 const { useDJStore } = require('@stores/useDJStore');
                 const djStore = useDJStore.getState();

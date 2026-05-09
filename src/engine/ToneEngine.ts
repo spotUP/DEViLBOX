@@ -198,6 +198,7 @@ export class ToneEngine {
   private _manualSampleGainDb: number = 0; // tracks last setSampleBusGain arg
   private _manualSynthGainDb: number = 0;
   private _masterVolumeDb: number = -6;   // tracks intended master volume (avoids race in stop())
+  private _djModeActive = false;          // when true, masterChannel stays muted to prevent echo
 
   // Native AudioContext — owned by DEViLBOX, shared with Tone.js via Tone.setContext()
   // This allows WASM/WAM synths to use the real BaseAudioContext directly.
@@ -1266,7 +1267,10 @@ export class ToneEngine {
    */
   public setMasterVolume(volumeDb: number): void {
     this._masterVolumeDb = volumeDb;
-    this.masterChannel.volume.value = volumeDb;
+    // In DJ mode, masterChannel stays muted — store the value but don't apply
+    if (!this._djModeActive) {
+      this.masterChannel.volume.value = volumeDb;
+    }
   }
 
   /**
@@ -1544,11 +1548,38 @@ export class ToneEngine {
     this.masterChannel.volume.value = -Infinity;
 
     // Restore volume after effects have flushed (delay/reverb tails)
+    // BUT NOT if DJ mode is active — masterChannel must stay muted to
+    // prevent echo through the parallel ToneEngine→destination path.
     setTimeout(() => {
-      this.masterChannel.volume.value = restoreVolume;
+      if (!this._djModeActive) {
+        this.masterChannel.volume.value = restoreVolume;
+      }
     }, 50);
 
     Tone.getTransport().stop();
+  }
+
+  /**
+   * Mute or unmute the ToneEngine master output for DJ mode.
+   *
+   * In DJ mode, audio reaches speakers through the DJ mixer's own path to
+   * Tone.getDestination(). The ToneEngine's masterChannel also connects to
+   * destination. If ANY audio leaks into masterEffectsInput (e.g. instrument
+   * effect chains built before overrides were set, or native engine routing
+   * edge cases), it would be heard ALONGSIDE the DJ mixer output — creating
+   * an audible echo / flanging artifact.
+   *
+   * Muting masterChannel for the duration of DJ mode eliminates this class
+   * of bugs entirely. DJ deck audio flows through the DJ mixer, not through
+   * the ToneEngine master chain.
+   */
+  public setDJMode(active: boolean): void {
+    this._djModeActive = active;
+    if (active) {
+      this.masterChannel.volume.value = -Infinity;
+    } else {
+      this.masterChannel.volume.value = this._masterVolumeDb;
+    }
   }
 
   /** Notify noise-generating master effects (VinylNoise, Tumult) of playback state. */
