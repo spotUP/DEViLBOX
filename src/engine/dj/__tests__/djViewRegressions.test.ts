@@ -515,3 +515,93 @@ describe('Auto DJ transition sweep guard (prevents premature completeTransition)
     expect(enableBody).toContain('this.transitionSweepStarted = false');
   });
 });
+
+// ── Scratch-buffer priming race fix ─────────────────────────────────────────
+//
+// Root cause: _primeScratchBuffer() fire-and-forgets a resume()/pause() cycle.
+// If play() fires between resume() and pause(), it sees state='started' and
+// no-ops, then priming's pause() kills the player → silence during crossfade.
+// Fix: play() must cancel priming before proceeding.
+
+describe('Scratch-buffer priming vs play() race fix', () => {
+  const deckEngineSrc = fs.readFileSync(
+    path.resolve(__dirname, '../DeckEngine.ts'), 'utf-8',
+  );
+
+  it('DeckEngine has _primingCancelRequested flag', () => {
+    expect(deckEngineSrc).toContain('_primingCancelRequested');
+  });
+
+  it('DeckEngine has _cancelPrimingIfActive method', () => {
+    expect(deckEngineSrc).toContain('_cancelPrimingIfActive');
+  });
+
+  it('play() calls _cancelPrimingIfActive before proceeding', () => {
+    // Extract the play() method body
+    const playMatch = deckEngineSrc.match(/async play\(\)[\s\S]*?\n  \}/m);
+    expect(playMatch).not.toBeNull();
+    const playBody = playMatch![0];
+    // _cancelPrimingIfActive must appear before any audioPlayer.play or replayer.play
+    const cancelIdx = playBody.indexOf('_cancelPrimingIfActive');
+    const audioPlayIdx = playBody.indexOf('audioPlayer.play()');
+    const replayerPlayIdx = playBody.indexOf('replayer.play()');
+    expect(cancelIdx).toBeGreaterThan(-1);
+    expect(cancelIdx).toBeLessThan(audioPlayIdx);
+    expect(cancelIdx).toBeLessThan(replayerPlayIdx);
+  });
+
+  it('_primeScratchBuffer checks _primingCancelRequested in worklet wait loop', () => {
+    // Extract the priming method
+    const primingMatch = deckEngineSrc.match(
+      /private async _primeScratchBuffer\(\)[\s\S]*?\n  \}/m,
+    );
+    expect(primingMatch).not.toBeNull();
+    const primingBody = primingMatch![0];
+    // Must check cancel flag inside the wait-for-worklet loop
+    const workletLoopMatch = primingBody.match(
+      /for \(let t = 0;[^)]*scratchBufferReady[^)]*\)[^{]*\{([^}]*)\}/,
+    );
+    expect(workletLoopMatch).not.toBeNull();
+    expect(workletLoopMatch![1]).toContain('_primingCancelRequested');
+  });
+
+  it('_primeScratchBuffer checks cancel before calling resume()', () => {
+    const primingMatch = deckEngineSrc.match(
+      /private async _primeScratchBuffer\(\)[\s\S]*?\n  \}/m,
+    );
+    expect(primingMatch).not.toBeNull();
+    const primingBody = primingMatch![0];
+    // There must be a cancel check between scratchBufferReady guard and resume()
+    const readyGuardIdx = primingBody.indexOf('if (!this.scratchBufferReady) return');
+    const resumeIdx = primingBody.indexOf('.resume()');
+    expect(readyGuardIdx).toBeGreaterThan(-1);
+    expect(resumeIdx).toBeGreaterThan(-1);
+    const between = primingBody.slice(readyGuardIdx, resumeIdx);
+    expect(between).toContain('_primingCancelRequested');
+  });
+
+  it('priming uses breakable wait loop instead of single 150ms sleep', () => {
+    const primingMatch = deckEngineSrc.match(
+      /private async _primeScratchBuffer\(\)[\s\S]*?\n  \}/m,
+    );
+    expect(primingMatch).not.toBeNull();
+    const primingBody = primingMatch![0];
+    // Must NOT have `await new Promise(r => setTimeout(r, 150))` — the old
+    // single-shot sleep. Should instead have a loop that checks cancel flag.
+    expect(primingBody).not.toContain('setTimeout(r, 150)');
+    // Must have a loop with cancel check for the fill-buffer wait
+    expect(primingBody).toMatch(/for \(let t = 0; t < 15/);
+  });
+
+  it('beatMatchedTransition catches async play() rejections', () => {
+    const fxSrc = fs.readFileSync(
+      path.resolve(__dirname, '../DJQuantizedFX.ts'), 'utf-8',
+    );
+    // Find the beatMatchedTransition function body
+    const bmtMatch = fxSrc.match(
+      /export function beatMatchedTransition[\s\S]*?\nreturn \(\) =>/m,
+    );
+    // The play() call inside the downbeat callback must have .catch()
+    expect(fxSrc).toContain('incoming.play().catch(');
+  });
+});
