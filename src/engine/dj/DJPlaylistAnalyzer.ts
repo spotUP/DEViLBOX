@@ -99,9 +99,19 @@ export function trackHasRemoteSource(track: PlaylistTrack): boolean {
 }
 
 /**
+ * Check if a track is a local file (added via file picker).
+ * Local tracks are stored either as plain filenames (e.g. "axelf.mod" from panel)
+ * or with "local:" prefix (e.g. "local:axelf.mod" from modal).
+ */
+export function trackIsLocal(track: PlaylistTrack): boolean {
+  return !track.fileName.startsWith('modland:') &&
+         !track.fileName.startsWith('hvsc:');
+}
+
+/**
  * Check if a playlist track is missing metadata AND can be analyzed.
- * Only remote tracks (modland:/hvsc:) can be analyzed — local files
- * already had BPM detected at import time and can't be re-downloaded.
+ * Remote tracks (modland:/hvsc:) are downloaded and rendered.
+ * Local tracks (plain filename) use cached sourceData in IndexedDB.
  *
  * Only BPM is required — it's the primary field that gates Auto DJ
  * sync. Key/energy are nice-to-have (smart sort, transition-type
@@ -111,8 +121,11 @@ export function trackHasRemoteSource(track: PlaylistTrack): boolean {
  */
 export function trackNeedsAnalysis(track: PlaylistTrack): boolean {
   if (track.analysisSkipped) return false;
-  if (!trackHasRemoteSource(track)) return false;
-  return track.bpm === 0;
+  if (track.bpm !== 0) return false;
+  // Remote tracks can always be analyzed (downloaded on demand).
+  // Local plain-filename tracks can be analyzed if their raw bytes are in
+  // IndexedDB (cached by cacheSourceFile when the user added the file).
+  return trackHasRemoteSource(track) || trackIsLocal(track);
 }
 
 /**
@@ -141,7 +154,7 @@ export function playlistNeedsAnalysis(playlist: DJPlaylist): boolean {
  * a remote source). Drives the "Retry failed" menu visibility/label.
  */
 export function playlistFailedAnalysisCount(playlist: DJPlaylist): number {
-  return playlist.tracks.filter(t => trackHasRemoteSource(t) && t.analysisSkipped).length;
+  return playlist.tracks.filter(t => (trackHasRemoteSource(t) || trackIsLocal(t)) && t.analysisSkipped).length;
 }
 
 /**
@@ -193,9 +206,10 @@ export async function analyzePlaylist(
   //   default      — bpm===0 && !analysisSkipped (new scan only)
   const trackIdSet = opts?.trackIds?.length ? new Set(opts.trackIds) : null;
   const filter = (track: PlaylistTrack): boolean => {
-    if (trackIdSet) return trackHasRemoteSource(track) && trackIdSet.has(track.id);
-    if (opts?.force) return trackHasRemoteSource(track);
-    if (opts?.retryFailed) return trackHasRemoteSource(track) && !!track.analysisSkipped;
+    const analyzable = trackHasRemoteSource(track) || trackIsLocal(track);
+    if (trackIdSet) return analyzable && trackIdSet.has(track.id);
+    if (opts?.force) return analyzable;
+    if (opts?.retryFailed) return analyzable && !!track.analysisSkipped;
     return trackShouldAnalyzeOnClick(track);
   };
   const tracksToAnalyze = initialPlaylist.tracks
@@ -246,33 +260,63 @@ export async function analyzePlaylist(
         continue;
       }
       const track = current.track;
-      const isHVSC = track.fileName.startsWith('hvsc:');
-      // Extensions the server's UADE renderer cannot handle — these must go
-      // through the local DJ pipeline (libopenmpt et al.) instead. UADE is
-      // Amiga-formats only (TFMX, MDAT, classic 4-channel MOD, etc.), so
-      // FastTracker 2 XM, Impulse Tracker IT, Scream Tracker S3M, and modern
-      // MOD variants all 422 on the server.
-      const ext = track.fileName.toLowerCase().split('.').pop() || '';
-      const needsLocalPipeline = isHVSC || [
-        'xm', 'it', 's3m', 'mod', 'mptm', 'umx', 'dbm', 'mo3',
-      ].includes(ext);
-      // `let` (not `const`) so the 404 auto-fix can rewrite them when it
-      // redirects the download to a different Modland path. Downstream code
-      // (server analyze query, TFMX companion dir, UADE companion probe)
-      // reads these AFTER the download loop, so stale values would point
-      // the server + companion fetches at the wrong file.
-      let remotePath = isHVSC
-        ? track.fileName.slice('hvsc:'.length)
-        : track.fileName.slice('modland:'.length);
-      let filename = remotePath.split('/').pop() || 'download.mod';
       const processed = analyzed + failed;
-
       onProgress?.({ current: processed + 1, total, analyzed, failed, trackName: track.trackName, status: 'analyzing' });
 
       try {
-        // Cache check before throttling. If we already have this file
-        // locally there will be no Modland request this iteration, so
-        // burning 4 s of sleep is pure delay — skip both.
+        // ── Local plain-filename track ──────────────────────────────────────
+        // Files added via the file picker are stored as plain filenames.
+        // Their raw bytes are in IndexedDB (cached by cacheSourceFile).
+        // Run them through the local pipeline to extract BPM/key/energy.
+        if (trackIsLocal(track)) {
+          // Strip `local:` prefix if present — cache stores by bare filename.
+          const filename = track.fileName.startsWith('local:')
+            ? track.fileName.slice('local:'.length)
+            : track.fileName;
+          const cached = await getCachedAudioByFilename(filename).catch(() => null);
+          const buffer = cached?.sourceData;
+          if (!buffer || buffer.byteLength === 0) {
+            throw new Error(`Local file "${filename}" not in cache — re-add it to the playlist to analyze`);
+          }
+
+          const pipelineResult = await getDJPipeline().loadOrEnqueue(buffer, filename, undefined, 'low');
+          if (!pipelineResult.analysis) {
+            throw new Error('Local pipeline returned no analysis');
+          }
+
+          const curr = resolveCurrent(trackId);
+          if (curr) {
+            useDJPlaylistStore.getState().updateTrackMeta(playlistId, curr.index, {
+              bpm: pipelineResult.analysis.bpm,
+              musicalKey: pipelineResult.analysis.musicalKey,
+              energy: pipelineResult.analysis.genre?.energy ?? 0,
+              duration: pipelineResult.duration,
+              analysisSkipped: false,
+            });
+          }
+          analyzed++;
+          const done = analyzed + failed;
+          onProgress?.({ current: done, total, analyzed, failed, trackName: track.trackName, status: 'done' });
+          console.log(`[PlaylistAnalyzer] ${done}/${total} OK (local) — ${track.trackName}`);
+          continue;
+        }
+
+        // ── Remote track (modland:/hvsc:) ──────────────────────────────────
+        const isHVSC = track.fileName.startsWith('hvsc:');
+        // Extensions the server's UADE renderer cannot handle — these must go
+        // through the local DJ pipeline (libopenmpt et al.) instead.
+        const ext = track.fileName.toLowerCase().split('.').pop() || '';
+        const needsLocalPipeline = isHVSC || [
+          'xm', 'it', 's3m', 'mod', 'mptm', 'umx', 'dbm', 'mo3',
+        ].includes(ext);
+        // `let` (not `const`) so the 404 auto-fix can rewrite them when it
+        // redirects the download to a different Modland path.
+        let remotePath = isHVSC
+          ? track.fileName.slice('hvsc:'.length)
+          : track.fileName.slice('modland:'.length);
+        let filename = remotePath.split('/').pop() || 'download.mod';
+
+        // Cache check before throttling — skip the 4s delay if bytes are local.
         const cached = await getCachedAudioByFilename(filename).catch(() => null);
         const cachedBuffer = cached?.sourceData && cached.sourceData.byteLength > 0
           ? cached.sourceData

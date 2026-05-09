@@ -300,15 +300,52 @@ async function preRenderTrackInternal(track: PlaylistTrack): Promise<PreRendered
     }
   }
 
-  return null;
+  // Plain filename — local file added via file picker (no prefix).
+  // Raw bytes were cached in IndexedDB by handleAddFiles/cacheSourceFile.
+  {
+    const filename = track.fileName;
+    try {
+      const cached = await getCachedAudioByFilename(filename);
+      const buffer = cached?.sourceData;
+      if (!buffer || buffer.byteLength === 0) {
+        console.warn(`[DJTrackLoader] Plain-filename pre-render: ${filename} not in cache — user must re-add it`);
+        return null;
+      }
+
+      if (isAudioFile(filename)) {
+        return {
+          wavData: buffer,
+          filename,
+          trackName: track.trackName || filename,
+          bpm: 125,
+          duration: 0,
+        };
+      }
+
+      const blob = new File([buffer], filename, { type: 'application/octet-stream' });
+      const song = await parseModuleToSong(blob);
+      cacheSong(filename, song);
+      const bpmResult = detectBPM(song);
+
+      const result = await getDJPipeline().loadOrEnqueue(buffer, filename, undefined, 'high');
+      return {
+        wavData: result.wavData,
+        filename,
+        trackName: song.name || track.trackName || filename,
+        bpm: result.analysis?.bpm || bpmResult.bpm,
+        song,
+        waveformPeaks: result.waveformPeaks,
+        duration: result.duration || 0,
+      };
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.warn(`[DJTrackLoader] Plain-filename pre-render failed: ${track.trackName || filename} — ${msg}`);
+      return null;
+    }
+  }
 }
 
 /**
- * Load a playlist track to a deck automatically (no user interaction).
- *
- * Works for:
- * - Modland tracks (auto-downloads from server)
- *
  * Returns false for local files that need a file picker.
  */
 export async function loadPlaylistTrackToDeck(
@@ -419,6 +456,7 @@ async function loadPlaylistTrackToDeckInternal(
         effectiveBPM: bpmResult.bpm,
         analysisState: 'rendering',
         isPlaying: false,
+        totalPositions: song.songLength,
       });
 
       const result = await getDJPipeline().loadOrEnqueue(buffer, filename, deckId, 'high');
@@ -502,6 +540,7 @@ async function loadPlaylistTrackToDeckInternal(
         effectiveBPM: bpmResult.bpm,
         analysisState: 'rendering',
         isPlaying: false,
+        totalPositions: song.songLength,
       });
 
       const result = await getDJPipeline().loadOrEnqueue(buffer, filename, deckId, 'high');
@@ -521,7 +560,52 @@ async function loadPlaylistTrackToDeckInternal(
     }
   }
 
-  // Files without a known source scheme can't be auto-loaded.
-  console.warn(`[DJTrackLoader] Cannot auto-load track: ${track.fileName}`);
-  return false;
+  // Plain filename — local file added via file picker (no prefix).
+  // Raw bytes were cached in IndexedDB by handleAddFiles/cacheSourceFile.
+  {
+    const filename = track.fileName;
+    try {
+      const cached = await getCachedAudioByFilename(filename);
+      const buffer = cached?.sourceData;
+      if (!buffer || buffer.byteLength === 0) {
+        console.warn(`[DJTrackLoader] Plain-filename local file not in cache: ${filename} — user must re-add it`);
+        return false;
+      }
+
+      if (isAudioFile(filename)) {
+        await getDJEngine().loadAudioToDeck(deckId, buffer, filename, track.trackName);
+        return true;
+      }
+
+      const blob = new File([buffer], filename, { type: 'application/octet-stream' });
+      const song = await parseModuleToSong(blob);
+      cacheSong(filename, song);
+      const bpmResult = detectBPM(song);
+
+      useDJStore.getState().setDeckState(deckId, {
+        fileName: filename,
+        trackName: song.name || track.trackName || filename,
+        detectedBPM: bpmResult.bpm,
+        effectiveBPM: bpmResult.bpm,
+        analysisState: 'rendering',
+        isPlaying: false,
+        totalPositions: song.songLength,
+      });
+
+      const result = await getDJPipeline().loadOrEnqueue(buffer, filename, deckId, 'high');
+      await getDJEngine().loadAudioToDeck(
+        deckId,
+        result.wavData,
+        filename,
+        song.name || track.trackName || filename,
+        result.analysis?.bpm || bpmResult.bpm,
+        song,
+      );
+      return true;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.warn(`[DJTrackLoader] Local plain-filename load failed: ${track.trackName || filename} — ${msg}`);
+      return false;
+    }
+  }
 }

@@ -379,6 +379,7 @@ export const DJDeck: React.FC<DJDeckProps> = ({ deckId }) => {
           effectiveBPM: bpmResult.bpm,
           analysisState: 'rendering',
           isPlaying: false,
+          totalPositions: song.songLength,
         });
 
         try {

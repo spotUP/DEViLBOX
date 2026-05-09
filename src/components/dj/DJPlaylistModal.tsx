@@ -320,15 +320,17 @@ function usePlayingDeckForTrack(fileName: string): PlayingDeckInfo | null {
  * the user sees smooth motion instead of a sweeping indeterminate chunk.
  */
 function useDeckRenderingProgress(fileName: string): number | null {
-  return useDJStore((s) => {
-    for (const id of ['A', 'B', 'C'] as const) {
-      const d = s.decks[id];
-      if (d.fileName === fileName && d.analysisState === 'rendering') {
-        return d.analysisProgress ?? 0;
+  return useDJStore(
+    useCallback((s) => {
+      for (const id of ['A', 'B', 'C'] as const) {
+        const d = s.decks[id];
+        if (d.fileName === fileName && d.analysisState === 'rendering') {
+          return d.analysisProgress ?? 0;
+        }
       }
-    }
-    return null;
-  });
+      return null;
+    }, [fileName]),
+  );
 }
 
 /**
@@ -1247,10 +1249,12 @@ const DJPlaylistModalContent: React.FC<{ onClose: () => void }> = ({ onClose }) 
 
   const filteredIndexMap = useMemo(() => {
     if (!isFiltered || !activePlaylist) return null;
+    // Use a Set for O(1) lookups instead of O(n) includes() — avoids O(n²) on large playlists.
+    const filteredSet = new Set(filteredTracks);
     const map = new Map<number, number>();
     let fi = 0;
     for (let i = 0; i < activePlaylist.tracks.length; i++) {
-      if (filteredTracks.includes(activePlaylist.tracks[i])) {
+      if (filteredSet.has(activePlaylist.tracks[i])) {
         map.set(fi, i);
         fi++;
       }
@@ -1360,7 +1364,10 @@ const DJPlaylistModalContent: React.FC<{ onClose: () => void }> = ({ onClose }) 
   );
 
   // Only register visible + nearby items with dnd-kit to prevent OOM crashes.
-  const virtualItems = virtualizer.getVirtualItems();
+  // CRITICAL: getVirtualItems() returns a new array reference on every render —
+  // it must be memoized or useMemo([..., virtualItems]) reruns every render,
+  // causing SortableContext to rebuild dnd-kit state for every item → OOM.
+  const virtualItems = useMemo(() => virtualizer.getVirtualItems(), [virtualizer]);
   const sortableIds = useMemo(() => {
     if (virtualItems.length === 0) return filteredTracks.map((t) => t.id);
     const startIdx = Math.max(0, virtualItems[0].index - 5);
@@ -1512,16 +1519,15 @@ const DJPlaylistModalContent: React.FC<{ onClose: () => void }> = ({ onClose }) 
     // confirm first since it's expensive (full re-download of every track).
     let force = false;
     if (activePlaylist && !playlistNeedsAnalysis(activePlaylist)) {
-      const remoteCount = activePlaylist.tracks.filter(
-        t => t.fileName.startsWith('modland:') || t.fileName.startsWith('hvsc:')
-      ).length;
-      if (remoteCount === 0) {
-        console.log('[DJPlaylistModal] No remote tracks to analyze');
+      // Count tracks that CAN be analyzed: any track (remote or local).
+      const analyzableCount = activePlaylist.tracks.length;
+      if (analyzableCount === 0) {
+        console.log('[DJPlaylistModal] No tracks to analyze');
         return;
       }
       const ok = await showConfirm({
         title: 'Re-analyze all tracks?',
-        message: `All ${remoteCount} remote tracks already have metadata. Re-analyze anyway? (Will re-download every track — Modland-throttled to ~1 per 4s.)`,
+        message: `All ${analyzableCount} tracks already have metadata. Re-analyze anyway? (Remote tracks will be re-downloaded — Modland-throttled to ~1 per 4s.)`,
         confirmLabel: 'Re-analyze',
       });
       if (!ok) return;

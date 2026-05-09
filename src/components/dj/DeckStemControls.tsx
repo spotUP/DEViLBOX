@@ -12,6 +12,7 @@
 
 import React, { useCallback, useRef, useState } from 'react';
 import { useDJStore } from '@/stores/useDJStore';
+import { useShallow } from 'zustand/react/shallow';
 import * as DJActions from '@/engine/dj/DJActions';
 import { fire as fireDubMove } from '@/engine/dub/DubRouter';
 
@@ -122,16 +123,21 @@ MiniFader.displayName = 'MiniFader';
 // ── Component ────────────────────────────────────────────────────────────────
 
 export const DeckStemControls: React.FC<DeckStemControlsProps> = ({ deckId }) => {
-  const fileName = useDJStore((s) => s.decks[deckId].fileName);
-  const playbackMode = useDJStore((s) => s.decks[deckId].playbackMode);
-  const stemsAvailable = useDJStore((s) => s.decks[deckId].stemsAvailable);
-  const stemMode = useDJStore((s) => s.decks[deckId].stemMode);
-  const stemNames = useDJStore((s) => s.decks[deckId].stemNames);
-  const stemMutes = useDJStore((s) => s.decks[deckId].stemMutes);
-  const stemVolumes = useDJStore((s) => s.decks[deckId].stemVolumes);
-  const stemSolos = useDJStore((s) => s.decks[deckId].stemSolos);
-  const stemDubSends = useDJStore((s) => s.decks[deckId].stemDubSends);
-  const stemSeparationProgress = useDJStore((s) => s.decks[deckId].stemSeparationProgress);
+  const {
+    fileName, playbackMode, stemsAvailable, stemMode, stemNames,
+    stemMutes, stemVolumes, stemSolos, stemDubSends, stemSeparationProgress,
+  } = useDJStore(
+    useShallow((s) => {
+      const d = s.decks[deckId];
+      return {
+        fileName: d.fileName, playbackMode: d.playbackMode,
+        stemsAvailable: d.stemsAvailable, stemMode: d.stemMode,
+        stemNames: d.stemNames, stemMutes: d.stemMutes,
+        stemVolumes: d.stemVolumes, stemSolos: d.stemSolos,
+        stemDubSends: d.stemDubSends, stemSeparationProgress: d.stemSeparationProgress,
+      };
+    }),
+  );
 
   const anyDeckSeparating = useDJStore((s) =>
     Object.values(s.decks).some((d) => d.stemSeparationProgress != null && d.stemSeparationProgress >= 0)

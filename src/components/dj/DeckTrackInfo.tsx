@@ -9,6 +9,7 @@
 
 import React, { useMemo } from 'react';
 import { useDJStore } from '@/stores/useDJStore';
+import { useShallow } from 'zustand/react/shallow';
 import { camelotDisplay, camelotColor, keyCompatibility, keyCompatibilityColor } from '@/engine/dj/DJKeyUtils';
 import { DeckBeatPhase } from './DeckBeatPhase';
 
@@ -19,30 +20,34 @@ interface DeckTrackInfoProps {
 const BPM_MATCH_THRESHOLD = 0.5; // BPM within 0.5 = "matched"
 
 export const DeckTrackInfo: React.FC<DeckTrackInfoProps> = ({ deckId }) => {
-  const trackName = useDJStore((s) => s.decks[deckId].trackName);
-  const trackAuthor = useDJStore((s) => s.decks[deckId].trackAuthor);
-  const fileName = useDJStore((s) => s.decks[deckId].fileName);
-  const effectiveBPM = useDJStore((s) => s.decks[deckId].effectiveBPM);
-  const detectedBPM = useDJStore((s) => s.decks[deckId].detectedBPM);
-  const elapsedMs = useDJStore((s) => s.decks[deckId].elapsedMs);
-  const playbackMode = useDJStore((s) => s.decks[deckId].playbackMode);
-  const durationMs = useDJStore((s) => s.decks[deckId].durationMs);
-  const musicalKey = useDJStore((s) => s.decks[deckId].musicalKey);
-  const seratoKey = useDJStore((s) => s.decks[deckId].seratoKey);
-  const analysisState = useDJStore((s) => s.decks[deckId].analysisState);
-  const analysisProgress = useDJStore((s) => s.decks[deckId].analysisProgress);
-  const analysisBPM = useDJStore((s) => s.decks[deckId].beatGrid?.bpm ?? 0);
-  const pitchOffset = useDJStore((s) => s.decks[deckId].pitchOffset);
-  
-  // Genre classification
-  const genrePrimary = useDJStore((s) => s.decks[deckId].genrePrimary);
-  const genreSubgenre = useDJStore((s) => s.decks[deckId].genreSubgenre);
-  const mood = useDJStore((s) => s.decks[deckId].mood);
-  const energy = useDJStore((s) => s.decks[deckId].energy);
+  const {
+    trackName, trackAuthor, fileName, effectiveBPM, detectedBPM,
+    elapsedMs, playbackMode, durationMs, musicalKey, seratoKey,
+    analysisState, analysisProgress, analysisBPM, pitchOffset,
+    genrePrimary, genreSubgenre, mood, energy,
+  } = useDJStore(
+    useShallow((s) => {
+      const d = s.decks[deckId];
+      return {
+        trackName: d.trackName, trackAuthor: d.trackAuthor, fileName: d.fileName,
+        effectiveBPM: d.effectiveBPM, detectedBPM: d.detectedBPM,
+        elapsedMs: d.elapsedMs, playbackMode: d.playbackMode, durationMs: d.durationMs,
+        musicalKey: d.musicalKey, seratoKey: d.seratoKey,
+        analysisState: d.analysisState, analysisProgress: d.analysisProgress,
+        analysisBPM: d.beatGrid?.bpm ?? 0, pitchOffset: d.pitchOffset,
+        genrePrimary: d.genrePrimary, genreSubgenre: d.genreSubgenre,
+        mood: d.mood, energy: d.energy,
+      };
+    }),
+  );
 
-  const otherDeckId = deckId === 'A' ? 'B' : 'A';
-  const otherBPM = useDJStore((s) => s.decks[otherDeckId].effectiveBPM);
-  const otherKey = useDJStore((s) => s.decks[otherDeckId].musicalKey ?? s.decks[otherDeckId].seratoKey);
+  const otherDeckId = deckId === 'A' ? 'B' : deckId === 'B' ? 'A' : 'A';
+  const { otherBPM, otherKey } = useDJStore(
+    useShallow((s) => ({
+      otherBPM: s.decks[otherDeckId].effectiveBPM,
+      otherKey: s.decks[otherDeckId].musicalKey ?? s.decks[otherDeckId].seratoKey,
+    })),
+  );
 
   // Use analysis BPM if available, otherwise tracker-detected BPM
   const displayBPM = analysisBPM > 0 ? analysisBPM : (playbackMode === 'audio' ? detectedBPM : effectiveBPM);
