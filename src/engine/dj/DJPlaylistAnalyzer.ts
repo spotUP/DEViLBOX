@@ -350,18 +350,21 @@ export async function analyzePlaylist(
 
         // ── Remote track (modland:/hvsc:) ──────────────────────────────────
         const isHVSC = track.fileName.startsWith('hvsc:');
-        // Extensions the server's UADE renderer cannot handle — these must go
-        // through the local DJ pipeline (libopenmpt et al.) instead.
-        const ext = track.fileName.toLowerCase().split('.').pop() || '';
-        const needsLocalPipeline = isHVSC || [
-          'xm', 'it', 's3m', 'mptm', 'umx', 'dbm', 'mo3',
-        ].includes(ext);
         // `let` (not `const`) so the 404 auto-fix can rewrite them when it
         // redirects the download to a different Modland path.
         let remotePath = isHVSC
           ? track.fileName.slice('hvsc:'.length)
           : track.fileName.slice('modland:'.length);
         let filename = remotePath.split('/').pop() || 'download.mod';
+
+        // Extensions the server's UADE renderer cannot handle — these must go
+        // through the local DJ pipeline (libopenmpt et al.) instead.
+        const ext = filename.toLowerCase().split('.').pop() || '';
+        const lcFilename = filename.toLowerCase();
+        const needsLocalPipeline = isHVSC || [
+          'xm', 'it', 's3m', 'mptm', 'umx', 'dbm', 'mo3',
+          'fred',   // server UADE returns 422 for Fred Editor
+        ].includes(ext) || lcFilename.startsWith('mdat.');  // TFMX needs companion (smpl.*) — local pipeline handles it
 
         // Cache check before throttling — skip the 4s delay if bytes are local.
         const cached = await getCachedAudioByFilename(filename).catch(() => null);
@@ -471,8 +474,34 @@ export async function analyzePlaylist(
         // analysis baked in and already returns bpm/musicalKey/energy/duration.
         let result: { bpm: number; musicalKey: string; energy: number; duration: number; rmsDb?: number; peakDb?: number };
 
+        // Pre-fetch companion files (TFMX smpl, Startrekker .nt, etc.) BEFORE
+        // any render call — the render worker needs them in virtual FS.
+        let companions: Array<{ filename: string; buffer: ArrayBuffer }> | undefined;
+        if (!isHVSC) {
+          if (lcFilename.startsWith('mdat.')) {
+            try {
+              const { downloadTFMXCompanion } = await import('@/lib/modlandApi');
+              const companion = await downloadTFMXCompanion(remotePath);
+              if (companion) {
+                companions = [{ filename: companion.filename, buffer: companion.buffer }];
+                await cacheSourceFile(companion.buffer, companion.filename);
+              }
+            } catch { /* non-fatal — render will fail with score-died if smpl is required */ }
+          }
+          try {
+            const { downloadUADECompanions } = await import('@/lib/modlandApi');
+            const uadeCompanions = await downloadUADECompanions(remotePath, buffer);
+            if (uadeCompanions.length > 0) {
+              companions = [...(companions ?? []), ...uadeCompanions.map(c => ({ filename: c.filename, buffer: c.buffer }))];
+              for (const c of uadeCompanions) {
+                await cacheSourceFile(c.buffer, c.filename);
+              }
+            }
+          } catch { /* non-fatal */ }
+        }
+
         if (needsLocalPipeline) {
-          const pipelineResult = await getDJPipeline().loadOrEnqueue(buffer, filename, undefined, 'low', undefined, 90);
+          const pipelineResult = await getDJPipeline().loadOrEnqueue(buffer, filename, undefined, 'low', companions, 90);
           if (!pipelineResult.analysis) {
             throw new Error('Local pipeline returned no analysis');
           }
@@ -565,7 +594,7 @@ export async function analyzePlaylist(
         try {
           await cacheSourceFile(buffer, filename);
           if (!needsLocalPipeline && !isAudioFile(filename) && !isHVSC) {
-            const piggybackResult = await getDJPipeline().loadOrEnqueue(buffer, filename, undefined, 'low', undefined, 90);
+            const piggybackResult = await getDJPipeline().loadOrEnqueue(buffer, filename, undefined, 'low', companions, 90);
             // Capture loudness from the local render for Modland tracks —
             // the server's /render/analyze response only returns bpm / key /
             // energy / duration, so without this the track has no rmsDb for
@@ -580,27 +609,7 @@ export async function analyzePlaylist(
               }
             }
           }
-          // Grab companion files too (TFMX mdat needs smpl; UADE multi-file formats)
-          if (!isHVSC) {
-            const lcName = filename.toLowerCase();
-            if (lcName.startsWith('mdat.')) {
-              try {
-                const { downloadTFMXCompanion } = await import('@/lib/modlandApi');
-                const companion = await downloadTFMXCompanion(remotePath);
-                if (companion) await cacheSourceFile(companion.buffer, companion.filename);
-              } catch { /* non-fatal */ }
-            }
-            try {
-              const { downloadUADECompanions } = await import('@/lib/modlandApi');
-              // Pass the main buffer so Startrekker-AM detection can gate the
-              // .nt probe — without it, every ProTracker MOD generates a
-              // harmless red 404 in the console (looks like a real failure).
-              const companions = await downloadUADECompanions(remotePath, buffer);
-              for (const c of companions) {
-                await cacheSourceFile(c.buffer, c.filename);
-              }
-            } catch { /* non-fatal */ }
-          }
+          // Companions already downloaded and cached before the render step above.
         } catch (cacheErr) {
           console.warn(`[PlaylistAnalyzer] Cache+render failed for ${filename} (analysis metadata still saved):`, cacheErr);
         }
