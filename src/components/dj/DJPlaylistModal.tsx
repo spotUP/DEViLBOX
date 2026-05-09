@@ -72,7 +72,7 @@ import { detectBPM, estimateSongDuration } from '@/engine/dj/DJBeatDetector';
 import { cacheSong } from '@/engine/dj/DJSongCache';
 import { smartSort, sortByBPM, sortByKey, sortByEnergy, sortByName } from '@/engine/dj/DJPlaylistSort';
 import { camelotDisplay, camelotColor } from '@/engine/dj/DJKeyUtils';
-import { analyzePlaylist, playlistNeedsAnalysis, playlistFailedAnalysisCount, type AnalysisProgress } from '@/engine/dj/DJPlaylistAnalyzer';
+import { analyzePlaylist, playlistNeedsAnalysis, playlistFailedAnalysisCount, trackHasRemoteSource, trackIsLocal, type AnalysisProgress } from '@/engine/dj/DJPlaylistAnalyzer';
 import { getDJPipeline } from '@/engine/dj/DJPipeline';
 import { isAudioFile } from '@/lib/audioFileUtils';
 import { isUADEFormat } from '@/lib/import/formats/UADEParser';
@@ -281,31 +281,45 @@ interface PlayingDeckInfo {
 }
 
 /**
- * Returns the deck currently playing this track, or null. Handles both audio
- * and tracker playback modes. Custom equality so rows whose track isn't
- * playing never re-render on deck state.
+ * Returns just the deck ID currently playing this file, or null.
+ * Uses a primitive return value (string | null) so React.memo rows
+ * skip re-renders when position ticks but the playing-deck hasn't changed.
  */
-function usePlayingDeckForTrack(fileName: string): PlayingDeckInfo | null {
+function usePlayingDeckId(fileName: string): DeckId | null {
   return useDJStore(
-    useShallow((s) => {
+    useCallback((s) => {
       for (const id of ['A', 'B', 'C'] as const) {
         const d = s.decks[id];
         if (!d.isPlaying || d.fileName !== fileName) continue;
         const hasProgress =
           (d.playbackMode === 'audio' && d.durationMs > 0) ||
           (d.playbackMode === 'tracker' && d.totalPositions > 0);
-        if (!hasProgress) continue;
-        return {
-          deckId: id,
-          playbackMode: d.playbackMode,
-          audioPosition: d.audioPosition,
-          durationMs: d.durationMs,
-          songPos: d.songPos,
-          totalPositions: d.totalPositions,
-          hotCues: d.hotCues,
-        };
+        if (hasProgress) return id;
       }
       return null;
+    }, [fileName]),
+  );
+}
+
+/**
+ * Returns full playback info for a specific deck. Only used inside
+ * TrackScrubber which needs position data and is allowed to re-render
+ * at polling rate (~20fps).
+ */
+function usePlayingDeckInfo(deckId: DeckId): PlayingDeckInfo | null {
+  return useDJStore(
+    useShallow((s) => {
+      const d = s.decks[deckId];
+      if (!d.isPlaying) return null;
+      return {
+        deckId,
+        playbackMode: d.playbackMode,
+        audioPosition: d.audioPosition,
+        durationMs: d.durationMs,
+        songPos: d.songPos,
+        totalPositions: d.totalPositions,
+        hotCues: d.hotCues,
+      };
     })
   );
 }
@@ -354,8 +368,12 @@ const DECK_COLOR: Record<DeckId, string> = {
   C: 'bg-accent-success',
 };
 
-const TrackScrubber: React.FC<PlayingDeckInfo> = React.memo(({ deckId, playbackMode, audioPosition, durationMs, songPos, totalPositions, hotCues }) => {
+const TrackScrubber: React.FC<{ deckId: DeckId }> = React.memo(({ deckId }) => {
+  const info = usePlayingDeckInfo(deckId);
   const barRef = useRef<HTMLDivElement>(null);
+
+  if (!info) return null;
+  const { playbackMode, audioPosition, durationMs, songPos, totalPositions, hotCues } = info;
 
   let progress = 0;
   let currentLabel = '';
@@ -582,7 +600,7 @@ const ModalTrackRow: React.FC<ModalTrackRowProps> = React.memo(({
   };
 
   const [isHovered, setIsHovered] = useState(false);
-  const playingDeck = usePlayingDeckForTrack(track.fileName);
+  const playingDeckId = usePlayingDeckId(track.fileName);
   const deckRenderProgress = useDeckRenderingProgress(track.fileName);
   const deckIsRendering = deckRenderProgress !== null;
   const isPreRendering = useIsPreRendering(track.fileName);
@@ -599,7 +617,7 @@ const ModalTrackRow: React.FC<ModalTrackRowProps> = React.memo(({
         ? 'bg-accent-success/10'
         : isSelected
           ? 'bg-accent-primary/15'
-          : playingDeck
+          : playingDeckId
             ? 'bg-accent-success/10'
             : isAutoDJCurrent
               ? 'bg-accent-success/10'
@@ -643,13 +661,13 @@ const ModalTrackRow: React.FC<ModalTrackRowProps> = React.memo(({
           </span>
         ) : track.isBad ? (
           <span className="text-accent-error text-[20px]" title={`Bad: ${track.badReason}`}>✗</span>
-        ) : playingDeck ? (
+        ) : playingDeckId ? (
           <span
             className="text-[20px] font-bold"
-            style={{ color: playingDeck.deckId === 'A' ? '#00d4ff' : playingDeck.deckId === 'B' ? '#ef4444' : '#22c55e' }}
-            title={`Playing on deck ${playingDeck.deckId}`}
+            style={{ color: playingDeckId === 'A' ? '#00d4ff' : playingDeckId === 'B' ? '#ef4444' : '#22c55e' }}
+            title={`Playing on deck ${playingDeckId}`}
           >
-            {playingDeck.deckId}
+            {playingDeckId}
           </span>
         ) : track.played ? (
           <span className="text-accent-success/50 text-[20px]" title="Played">✓</span>
@@ -745,7 +763,7 @@ const ModalTrackRow: React.FC<ModalTrackRowProps> = React.memo(({
       </span>
 
       {/* Actions (visible on hover) */}
-      <span className={`flex items-center gap-2 shrink-0 justify-end transition-all ${isHovered || isFocused ? 'w-72 opacity-100' : 'w-0 opacity-0 overflow-hidden pointer-events-none'}`}>
+      <span className={`flex items-center gap-2 shrink-0 justify-end transition-opacity ${isHovered || isFocused ? 'w-72 opacity-100' : 'w-0 opacity-0 overflow-hidden pointer-events-none'}`}>
         <select
           value={track.masterFxPreset || ''}
           onClick={(e) => e.stopPropagation()}
@@ -808,7 +826,7 @@ const ModalTrackRow: React.FC<ModalTrackRowProps> = React.memo(({
       </span>
 
       {/* Scrub bar — pinned to bottom, only while this track is playing on a deck in audio mode */}
-      {playingDeck && <TrackScrubber {...playingDeck} />}
+      {playingDeckId && <TrackScrubber deckId={playingDeckId} />}
 
       {/* Render-in-progress bar — shown when the pipeline is rendering or
           analyzing THIS specific track. Two visual modes:
@@ -821,7 +839,7 @@ const ModalTrackRow: React.FC<ModalTrackRowProps> = React.memo(({
             row is being prepped in the background". Both used to render in
             accent-primary, which looked like two tracks were playing at
             once. */}
-      {!playingDeck && isRendering && (
+      {!playingDeckId && isRendering && (
         <div
           className="absolute bottom-0 left-0 right-0 h-1 bg-dark-bgTertiary/50 overflow-hidden pointer-events-none"
           title={deckRenderProgress !== null ? `Rendering… ${Math.round(deckRenderProgress)}%` : 'Pre-rendering in background (Auto DJ / precache)…'}
@@ -1374,16 +1392,19 @@ const DJPlaylistModalContent: React.FC<{ onClose: () => void }> = ({ onClose }) 
   );
 
   // Only register visible + nearby items with dnd-kit to prevent OOM crashes.
-  // CRITICAL: getVirtualItems() returns a new array reference on every render —
-  // it must be memoized or useMemo([..., virtualItems]) reruns every render,
-  // causing SortableContext to rebuild dnd-kit state for every item → OOM.
-  const virtualItems = useMemo(() => virtualizer.getVirtualItems(), [virtualizer]);
+  // DO NOT memoize getVirtualItems() on [virtualizer] — the virtualizer object
+  // reference never changes, so useMemo would cache the initial empty result
+  // forever. The virtualizer triggers re-renders internally via setState when
+  // the scroll element resizes; calling getVirtualItems() directly each render
+  // picks up the updated visible items.
+  const virtualItems = virtualizer.getVirtualItems();
   const sortableIds = useMemo(() => {
-    if (virtualItems.length === 0) return filteredTracks.map((t) => t.id);
+    if (virtualItems.length === 0) return [] as string[];
     const startIdx = Math.max(0, virtualItems[0].index - 5);
     const endIdx = Math.min(filteredTracks.length, virtualItems[virtualItems.length - 1].index + 6);
     return filteredTracks.slice(startIdx, endIdx).map((t) => t.id);
-  }, [filteredTracks, virtualItems]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filteredTracks, virtualItems.length, virtualItems[0]?.index, virtualItems[virtualItems.length - 1]?.index]);
 
   const handleDragEnd = useCallback((event: DragEndEvent) => {
     setActiveDragId(null);
@@ -1505,15 +1526,38 @@ const DJPlaylistModalContent: React.FC<{ onClose: () => void }> = ({ onClose }) 
   const runAnalyze = useCallback(async (opts: { force?: boolean; retryFailed?: boolean; trackIds?: string[] }) => {
     if (!activePlaylistId || analysisProgress) return;
     const pid = activePlaylistId;
-    try {
-      await analyzePlaylist(pid, (p) => {
+    // Throttle progress updates to max 4/sec to avoid re-render storms during
+    // batch analysis. Each progress update triggers a full React re-render of
+    // the modal, which is expensive with virtualizer + dnd-kit.
+    let lastProgressTime = 0;
+    let pendingProgress: AnalysisProgress | null = null;
+    let progressTimer: ReturnType<typeof setTimeout> | null = null;
+    const flushProgress = () => {
+      if (pendingProgress) {
+        const p = pendingProgress;
+        pendingProgress = null;
         setAnalysisProgressMap(prev => {
           const next = new Map(prev);
           next.set(pid, { ...p });
           return next;
         });
-      }, undefined, opts);
+      }
+    };
+    const throttledProgress = (p: AnalysisProgress) => {
+      pendingProgress = p;
+      const now = Date.now();
+      if (now - lastProgressTime >= 250 || p.status === 'done' || p.current === p.total) {
+        lastProgressTime = now;
+        if (progressTimer) { clearTimeout(progressTimer); progressTimer = null; }
+        flushProgress();
+      } else if (!progressTimer) {
+        progressTimer = setTimeout(() => { progressTimer = null; flushProgress(); }, 250);
+      }
+    };
+    try {
+      await analyzePlaylist(pid, throttledProgress, undefined, opts);
     } finally {
+      if (progressTimer) clearTimeout(progressTimer);
       setAnalysisProgressMap(prev => {
         const next = new Map(prev);
         next.delete(pid);
@@ -2405,18 +2449,15 @@ const DJPlaylistModalContent: React.FC<{ onClose: () => void }> = ({ onClose }) 
       items.push({ type: 'divider' });
     }
 
-    // Single-track Analyze — only makes sense for remote (modland/hvsc)
-    // sources. Local files already had BPM detected at import time, and
-    // the server renderer can't pull them down. Uses the same analyzer +
-    // progress path as the playlist-wide "Analyze" button; the playlist's
-    // live progress bar shows the one-track run too.
-    const isRemote = track.fileName.startsWith('modland:') || track.fileName.startsWith('hvsc:');
-    if (isRemote) {
+    // Single-track Analyze — works for both remote (modland/hvsc) and local
+    // files. Local files use the WASM pipeline for BPM/key detection.
+    const canAnalyze = trackHasRemoteSource(track) || trackIsLocal(track);
+    if (canAnalyze) {
       items.push({
         id: 'analyze-track',
         label: track.bpm > 0 ? 'Re-analyze track' : 'Analyze track',
         disabled: !!analysisProgress,
-        onClick: () => { void runAnalyze({ trackIds: [track.id] }); },
+        onClick: () => { void runAnalyze({ trackIds: [track.id], force: true }); },
       });
     }
 
@@ -3367,7 +3408,6 @@ const DJPlaylistModalContent: React.FC<{ onClose: () => void }> = ({ onClose }) 
                       Time {columnSort?.column === 'time' && (columnSort.dir === 'asc' ? <ChevronUp size={16} className="inline" /> : <ChevronDown size={16} className="inline" />)}
                     </span>
                     <span className="shrink-0 w-10" />
-                    <span className="shrink-0 w-72" />
                   </div>
                 )}
 
@@ -3403,7 +3443,7 @@ const DJPlaylistModalContent: React.FC<{ onClose: () => void }> = ({ onClose }) 
                     onKeyDown={handleKeyDown}
                   >
                     <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-                      <SortableContext items={sortableIds} strategy={verticalListSortingStrategy}>
+                      <SortableContext items={analysisProgress ? [] : sortableIds} strategy={verticalListSortingStrategy}>
                         <div style={{ height: virtualizer.getTotalSize(), position: 'relative' }}>
                           {virtualItems.map((virtualRow) => {
                             const track = filteredTracks[virtualRow.index];

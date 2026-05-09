@@ -115,6 +115,8 @@ interface DJPlaylistState {
   reorderTrack: (playlistId: string, fromIndex: number, toIndex: number) => void;
   sortTracks: (playlistId: string, sortedTracks: PlaylistTrack[]) => void;
   updateTrackMeta: (playlistId: string, index: number, meta: Partial<Pick<PlaylistTrack, 'trackName' | 'author' | 'musicalKey' | 'energy' | 'rmsDb' | 'peakDb' | 'bpm' | 'duration' | 'fileName' | 'sourceUrl' | 'analysisSkipped' | 'played' | 'isBad' | 'badReason' | 'badTimestamp' | 'badFailCount' | 'masterFxPreset'>>) => void;
+  /** Batch-update multiple tracks in a single Immer transaction (single re-render). */
+  batchUpdateTrackMeta: (playlistId: string, updates: Array<{ index: number; meta: Partial<Pick<PlaylistTrack, 'trackName' | 'author' | 'musicalKey' | 'energy' | 'rmsDb' | 'peakDb' | 'bpm' | 'duration' | 'fileName' | 'sourceUrl' | 'analysisSkipped' | 'played' | 'isBad' | 'badReason' | 'badTimestamp' | 'badFailCount' | 'masterFxPreset'>> }>) => void;
   markTrackPlayed: (playlistId: string, index: number) => void;
   /** Remember the last track loaded to a deck from this playlist.
    *  Modal uses it to scroll-restore on open and after search clear. */
@@ -492,6 +494,18 @@ export const useDJPlaylistStore = create<DJPlaylistState>()(
         });
       },
 
+      batchUpdateTrackMeta: (playlistId: string, updates) => {
+        set((state) => {
+          const p = state.playlists.find((pl) => pl.id === playlistId);
+          if (!p) return;
+          for (const { index, meta } of updates) {
+            if (index >= 0 && index < p.tracks.length) {
+              Object.assign(p.tracks[index], meta);
+            }
+          }
+        });
+      },
+
       markTrackPlayed: (playlistId: string, index: number) => {
         set((state) => {
           const p = state.playlists.find((pl) => pl.id === playlistId);
@@ -769,6 +783,7 @@ export const useDJPlaylistStore = create<DJPlaylistState>()(
       }),
       onRehydrateStorage: () => (state) => {
         if (state) {
+          // Data fully rehydrated
           try {
             for (const pl of state.playlists) {
               for (const t of pl.tracks) {
