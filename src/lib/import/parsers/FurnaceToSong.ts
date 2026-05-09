@@ -372,8 +372,9 @@ async function parseFurnaceFileWasm(buffer: ArrayBuffer, _fileName: string, subs
   const { patterns, songPositions } = subsongToPatterns(activeSub);
   const numChannels = activeSub.channels.length;
 
-  // Store module-level wavetables/samples on the dispatch engine singleton
-  if (loaded.wavetables.length > 0 || loaded.samples.length > 0) {
+  // Store module-level wavetables/samples on the dispatch engine singleton.
+  // ALWAYS update — even when empty — to clear stale data from the previous song.
+  {
     const { FurnaceDispatchEngine } = await import('@engine/furnace-dispatch/FurnaceDispatchEngine');
     const engine = FurnaceDispatchEngine.getInstance();
     engine.setModuleWavetables(loaded.wavetables.length > 0 ? loaded.wavetables : null);
@@ -507,7 +508,7 @@ async function parseFurnaceFileTS(buffer: ArrayBuffer, _fileName: string, subson
     })),
   }));
 
-  if (result.wavetables.length > 0 || result.samples.length > 0) {
+  {
     const { FurnaceDispatchEngine } = await import('@engine/furnace-dispatch/FurnaceDispatchEngine');
     const engine = FurnaceDispatchEngine.getInstance();
     engine.setModuleWavetables(result.wavetables.length > 0 ? result.wavetables : null);
