@@ -11,6 +11,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { immer } from 'zustand/middleware/immer';
+import { current } from 'immer';
 import { pushToCloud, pullFromCloud } from '@/lib/cloudSync';
 import { SYNC_KEYS } from '@/hooks/useCloudSync';
 import type { EffectConfig } from '@/types/instrument/effects';
@@ -288,7 +289,7 @@ export const useDJPlaylistStore = create<DJPlaylistState>()(
           // Keep existing track IDs: regenerating all IDs after clone was causing
           // React to unmount+remount every visible row → 120+ simultaneous async
           // effects (IndexedDB reads, SHA hashes) → Chrome OOM ("Aw Snap").
-          const clone = deepClonePlaylists([source as unknown as DJPlaylist])[0];
+          const clone = deepClonePlaylists([current(source) as DJPlaylist])[0];
           clone.id = newId;
           clone.name = `${source.name} (Copy)`;
           clone.createdAt = Date.now();
@@ -723,7 +724,7 @@ export const useDJPlaylistStore = create<DJPlaylistState>()(
         set((state) => {
           if (state._undoStack.length === 0) return;
           const snapshot = state._undoStack.pop()!;
-          state._redoStack.push(deepClonePlaylists(state.playlists));
+          state._redoStack.push(deepClonePlaylists(current(state).playlists));
           state.playlists = snapshot as DJPlaylist[];
           state.canUndo = state._undoStack.length > 0;
           state.canRedo = true;
@@ -737,7 +738,7 @@ export const useDJPlaylistStore = create<DJPlaylistState>()(
         set((state) => {
           if (state._redoStack.length === 0) return;
           const snapshot = state._redoStack.pop()!;
-          state._undoStack.push(deepClonePlaylists(state.playlists));
+          state._undoStack.push(deepClonePlaylists(current(state).playlists));
           state.playlists = snapshot as DJPlaylist[];
           state.canUndo = true;
           state.canRedo = state._redoStack.length > 0;
@@ -804,14 +805,17 @@ export const useDJPlaylistStore = create<DJPlaylistState>()(
 function pushUndo(state: DJPlaylistState): void {
   const now = Date.now();
   if (now - _lastUndoPushTime < UNDO_THROTTLE_MS) {
-    // Skip rapid-fire snapshots — the previous snapshot is recent enough.
-    // Still clear redo stack since state IS changing.
     state._redoStack = [];
     state.canRedo = false;
     return;
   }
   _lastUndoPushTime = now;
-  state._undoStack.push(deepClonePlaylists(state.playlists));
+  // current() unwraps Immer Draft proxies into plain objects.
+  // structuredClone/JSON.stringify CANNOT handle Draft proxies — they throw
+  // or produce corrupt data, causing "Oh Snap" crashes on every mutation
+  // that calls pushUndo (rename, duplicate, reorder, etc.).
+  const plainPlaylists = current(state).playlists;
+  state._undoStack.push(deepClonePlaylists(plainPlaylists));
   if (state._undoStack.length > MAX_UNDO) {
     state._undoStack.shift();
   }
