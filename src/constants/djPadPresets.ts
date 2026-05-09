@@ -2,12 +2,13 @@
  * DJ Program Presets — factory DrumProgram instances for DJ performance modes.
  */
 
-import { createEmptyProgram } from '../types/drumpad';
+import { createEmptyProgram, makeSampleConfig } from '../types/drumpad';
 import type { DrumProgram } from '../types/drumpad';
 import type { DubActionId, DubBusSettings } from '../types/dub';
 import { DJ_ONE_SHOT_PRESETS } from './djOneShotPresets';
 import { DEFAULT_DJFX_PADS, DEFAULT_ONESHOT_PADS, DEFAULT_SCRATCH_PADS } from './djPadModeDefaults';
 import { PAD_INSTRUMENT_BASE } from '../types/drumpad';
+import { SAMMY_BLAMMY_PACK } from './samplePacks';
 
 // ─── Interfaces ──────────────────────────────────────────────────────────────
 
@@ -107,6 +108,33 @@ function applyOneShotPads(program: DrumProgram, startPad: number, count: number)
   }
 }
 
+/** Load Sammy Blammy samples onto pads. Pulls from the registered pack. */
+function applySammyBlammyPads(program: DrumProgram, startPad: number): void {
+  const allSamples = [
+    ...SAMMY_BLAMMY_PACK.samples.vocals,
+    ...SAMMY_BLAMMY_PACK.samples.fx,
+    ...SAMMY_BLAMMY_PACK.samples.other,
+  ];
+  // DJ sample colors: vocals=cyan, fx=orange, transitions=purple
+  const colorMap: Record<string, string> = {
+    vocals: '#06b6d4',
+    fx: '#f97316',
+    other: '#a855f7',
+  };
+  for (let i = 0; i < 16 && i < allSamples.length; i++) {
+    const sample = allSamples[i];
+    const pad = program.pads[startPad + i];
+    if (!pad) continue;
+    const cfg = makeSampleConfig(pad.id, sample.name, sample.url);
+    pad.name = sample.name;
+    pad.color = colorMap[sample.category] ?? '#64748b';
+    pad.synthConfig = cfg.synthConfig;
+    pad.instrumentNote = cfg.instrumentNote;
+    pad.playMode = 'oneshot';
+    pad.dubSend = 0.3;
+  }
+}
+
 function applyScratchPads(program: DrumProgram, startPad: number, count: number): void {
   for (let i = 0; i < count && i < DEFAULT_SCRATCH_PADS.length; i++) {
     const mapping = DEFAULT_SCRATCH_PADS[i];
@@ -192,10 +220,13 @@ export const DJ_PAD_PRESETS: DJPreset[] = [
   {
     id: 'oneshots-live',
     name: 'One-Shots',
-    description: 'One-shot pads — horns, sirens, impacts, risers. Routes through the Dub Bus for shared reverb + echo character (ONE SpringReverb instance, not 16).',
+    description: 'Bank A: synth one-shots (horns, sirens, risers). Bank B: Sammy Blammy vocal drops & FX. Routes through the Dub Bus.',
     create: () => {
       const program = createEmptyProgram('D-02', 'One-Shots Live');
-      applyOneShotPads(program, 0, 16);
+      // Bank A (pads 0-7): synth one-shots
+      applyOneShotPads(program, 0, 8);
+      // Bank B (pads 8-15+): Sammy Blammy samples
+      applySammyBlammyPads(program, 8);
       return program;
     },
     onApply: ({ setDubBus }) => {
