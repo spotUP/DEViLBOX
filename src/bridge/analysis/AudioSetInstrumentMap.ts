@@ -245,7 +245,6 @@ export function synthTypeToInstrumentType(synthType: string): InstrumentType | n
     case 'PWMSynth':
     case 'SuperSaw':
     case 'PolySynth':
-    case 'WobbleBass':  // already bass above — keep for symmetry
     case 'Synth':
     case 'MonoSynth':
     case 'DuoSynth':
