@@ -1021,16 +1021,20 @@ export const DJPlaylistModal: React.FC<DJPlaylistModalProps> = ({ isOpen, onClos
 
 const DJPlaylistModalContent: React.FC<{ onClose: () => void }> = ({ onClose }) => {
   const isOpen = true;
-  // ── Store bindings ──────────────────────────────────────────────────────
-  const playlists = useDJPlaylistStore((s) => s.playlists);
-  const activePlaylistId = useDJPlaylistStore((s) => s.activePlaylistId);
-  const createPlaylist = useDJPlaylistStore((s) => s.createPlaylist);
-  const deletePlaylist = useDJPlaylistStore((s) => s.deletePlaylist);
-  const renamePlaylist = useDJPlaylistStore((s) => s.renamePlaylist);
-  const setActivePlaylist = useDJPlaylistStore((s) => s.setActivePlaylist);
-  const addTrack = useDJPlaylistStore((s) => s.addTrack);
-  const addTracks = useDJPlaylistStore((s) => s.addTracks);
-  const rawRemoveTrack = useDJPlaylistStore((s) => s.removeTrack);
+  // ── Store bindings (consolidated with useShallow to prevent re-render storms) ──
+  const { playlists, activePlaylistId } = useDJPlaylistStore(
+    useShallow((s) => ({ playlists: s.playlists, activePlaylistId: s.activePlaylistId }))
+  );
+  const {
+    createPlaylist, deletePlaylist, renamePlaylist, setActivePlaylist,
+    addTrack, addTracks, removeTrack: rawRemoveTrack,
+  } = useDJPlaylistStore(
+    useShallow((s) => ({
+      createPlaylist: s.createPlaylist, deletePlaylist: s.deletePlaylist,
+      renamePlaylist: s.renamePlaylist, setActivePlaylist: s.setActivePlaylist,
+      addTrack: s.addTrack, addTracks: s.addTracks, removeTrack: s.removeTrack,
+    }))
+  );
   /**
    * Remove a track and also stop any audio attached to it. Before the store
    * removes the entry we check every deck — any deck whose fileName matches
@@ -1072,20 +1076,30 @@ const DJPlaylistModalContent: React.FC<{ onClose: () => void }> = ({ onClose }) 
     });
     rawRemoveTrack(playlistId, index);
   }, [rawRemoveTrack]);
-  const reorderTrack = useDJPlaylistStore((s) => s.reorderTrack);
-  const sortTracksAction = useDJPlaylistStore((s) => s.sortTracks);
-  const clonePlaylist = useDJPlaylistStore((s) => s.clonePlaylist);
-  const selectedTrackIndices = useDJPlaylistStore((s) => s.selectedTrackIndices);
-  const focusedTrackIndex = useDJPlaylistStore((s) => s.focusedTrackIndex);
-  const selectTrack = useDJPlaylistStore((s) => s.selectTrack);
-  const selectTrackRange = useDJPlaylistStore((s) => s.selectTrackRange);
-  const toggleTrackSelection = useDJPlaylistStore((s) => s.toggleTrackSelection);
-  const selectAllTracks = useDJPlaylistStore((s) => s.selectAllTracks);
-  const clearSelection = useDJPlaylistStore((s) => s.clearSelection);
-  const setFocusedTrack = useDJPlaylistStore((s) => s.setFocusedTrack);
-  const removeSelectedTracks = useDJPlaylistStore((s) => s.removeSelectedTracks);
-  const rawMoveSelectedTracks = useDJPlaylistStore((s) => s.moveSelectedTracks);
-  const copySelectedTracks = useDJPlaylistStore((s) => s.copySelectedTracks);
+  const {
+    reorderTrack, sortTracks: sortTracksAction, clonePlaylist,
+    removeSelectedTracks, moveSelectedTracks: rawMoveSelectedTracks, copySelectedTracks,
+    updateTrackMeta,
+  } = useDJPlaylistStore(
+    useShallow((s) => ({
+      reorderTrack: s.reorderTrack, sortTracks: s.sortTracks, clonePlaylist: s.clonePlaylist,
+      removeSelectedTracks: s.removeSelectedTracks, moveSelectedTracks: s.moveSelectedTracks,
+      copySelectedTracks: s.copySelectedTracks, updateTrackMeta: s.updateTrackMeta,
+    }))
+  );
+  const { selectedTrackIndices, focusedTrackIndex } = useDJPlaylistStore(
+    useShallow((s) => ({ selectedTrackIndices: s.selectedTrackIndices, focusedTrackIndex: s.focusedTrackIndex }))
+  );
+  const {
+    selectTrack, selectTrackRange, toggleTrackSelection,
+    selectAllTracks, clearSelection, setFocusedTrack,
+  } = useDJPlaylistStore(
+    useShallow((s) => ({
+      selectTrack: s.selectTrack, selectTrackRange: s.selectTrackRange,
+      toggleTrackSelection: s.toggleTrackSelection, selectAllTracks: s.selectAllTracks,
+      clearSelection: s.clearSelection, setFocusedTrack: s.setFocusedTrack,
+    }))
+  );
 
   /**
    * Stop any deck that's currently playing any selected track, and reset
@@ -1132,18 +1146,22 @@ const DJPlaylistModalContent: React.FC<{ onClose: () => void }> = ({ onClose }) 
   }, [rawMoveSelectedTracks, stopAudioForSelectedTracks]);
   const canUndo = useDJPlaylistStore((s) => s.canUndo);
   const canRedo = useDJPlaylistStore((s) => s.canRedo);
-  const undo = useDJPlaylistStore((s) => s.undo);
-  const redo = useDJPlaylistStore((s) => s.redo);
-  const updateTrackMeta = useDJPlaylistStore((s) => s.updateTrackMeta);
-
-  const autoDJEnabled = useDJStore((s) => s.autoDJEnabled);
-  const autoDJCurrentIdx = useDJStore((s) => s.autoDJCurrentTrackIndex);
-  const autoDJNextIdx = useDJStore((s) => s.autoDJNextTrackIndex);
-  const thirdDeckActive = useDJStore((s) => s.thirdDeckActive);
+  const { undo, redo } = useDJPlaylistStore(
+    useShallow((s) => ({ undo: s.undo, redo: s.redo }))
+  );
+  const { autoDJEnabled, autoDJCurrentIdx, autoDJNextIdx, thirdDeckActive } = useDJStore(
+    useShallow((s) => ({
+      autoDJEnabled: s.autoDJEnabled,
+      autoDJCurrentIdx: s.autoDJCurrentTrackIndex,
+      autoDJNextIdx: s.autoDJNextTrackIndex,
+      thirdDeckActive: s.thirdDeckActive,
+    }))
+  );
 
   const isLoggedIn = useAuthStore((s) => !!s.token && !!s.user);
-  const setPlaylistCloudId = useDJPlaylistStore((s) => s.setPlaylistCloudId);
-  const setPlaylistVisibilityStore = useDJPlaylistStore((s) => s.setPlaylistVisibility);
+  const { setPlaylistCloudId, setPlaylistVisibility: setPlaylistVisibilityStore } = useDJPlaylistStore(
+    useShallow((s) => ({ setPlaylistCloudId: s.setPlaylistCloudId, setPlaylistVisibility: s.setPlaylistVisibility }))
+  );
 
   // ── Local state ──────────────────────────────────────────────────────────
   const [isCreating, setIsCreating] = useState(false);
@@ -1285,12 +1303,7 @@ const DJPlaylistModalContent: React.FC<{ onClose: () => void }> = ({ onClose }) 
     count: filteredTracks.length,
     getScrollElement: () => scrollContainerRef.current,
     estimateSize: () => TRACK_ROW_HEIGHT,
-    // Each row mounts @dnd-kit's useSortable which is heavy enough that
-    // React can't reconcile a full screen of rows in one frame during fast
-    // wheel/trackpad flicks — the virtualizer's scrollTop outpaces React
-    // and reveals blank runway. 60 rows ≈ 2600px cushion in each direction,
-    // enough for several frames of catch-up on aggressive flicks.
-    overscan: 60,
+    overscan: 10,
   });
 
   // ── Scroll-restore to the last-played track ─────────────────────────────
@@ -1346,10 +1359,14 @@ const DJPlaylistModalContent: React.FC<{ onClose: () => void }> = ({ onClose }) 
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
 
-  const sortableIds = useMemo(() =>
-    filteredTracks.map((t) => t.id),
-    [filteredTracks]
-  );
+  // Only register visible + nearby items with dnd-kit to prevent OOM crashes.
+  const virtualItems = virtualizer.getVirtualItems();
+  const sortableIds = useMemo(() => {
+    if (virtualItems.length === 0) return filteredTracks.map((t) => t.id);
+    const startIdx = Math.max(0, virtualItems[0].index - 5);
+    const endIdx = Math.min(filteredTracks.length, virtualItems[virtualItems.length - 1].index + 6);
+    return filteredTracks.slice(startIdx, endIdx).map((t) => t.id);
+  }, [filteredTracks, virtualItems]);
 
   const handleDragEnd = useCallback((event: DragEndEvent) => {
     setActiveDragId(null);
