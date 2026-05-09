@@ -485,12 +485,19 @@ export const DJView: React.FC<DJViewProps> = ({ onShowDrumpads: _onShowDrumpads 
         </div>
         {/* Portal: renders outside DOM hierarchy so overflow:hidden can't clip it */}
         {showAutoDJ && createPortal(
-          <div
-            className="fixed z-[99989] w-80"
-            style={{ top: autoDJDropdownPos.top, left: autoDJDropdownPos.left }}
-          >
-            <DJAutoDJPanel onClose={() => { setShowAutoDJ(false); setShowCrate(false); }} />
-          </div>,
+          <>
+            {/* Invisible backdrop — click outside the panel to close */}
+            <div
+              className="fixed inset-0 z-[99988]"
+              onClick={() => { setShowAutoDJ(false); setShowCrate(false); }}
+            />
+            <div
+              className="fixed z-[99989] w-80"
+              style={{ top: autoDJDropdownPos.top, left: autoDJDropdownPos.left }}
+            >
+              <DJAutoDJPanel onClose={() => { setShowAutoDJ(false); setShowCrate(false); }} />
+            </div>
+          </>,
           document.body,
         )}
       </div>
