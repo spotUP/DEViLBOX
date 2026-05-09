@@ -66,6 +66,8 @@ export interface PipelineTask {
   /** Pre-existing WAV data (skip render, just load + analyze) */
   wavData?: ArrayBuffer;
   duration?: number;
+  /** Max render duration in seconds (default: 600). Use shorter for analysis-only batch. */
+  maxRenderSeconds?: number;
   /**
    * Optional companion files forwarded to the render worker for multi-file
    * formats like TFMX (mdat.<song> needs smpl.<song>). Without these, UADE
@@ -415,9 +417,10 @@ export class DJPipeline {
     deckId?: DeckId,
     priority: TaskPriority = 'normal',
     companions?: Array<{ filename: string; buffer: ArrayBuffer }>,
+    maxRenderSeconds?: number,
   ): Promise<PipelineResult> {
     const id = `${filename}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
-    return this.enqueue({ id, fileBuffer, filename, deckId, priority, companions });
+    return this.enqueue({ id, fileBuffer, filename, deckId, priority, companions, maxRenderSeconds });
   }
 
   /**
@@ -471,6 +474,7 @@ export class DJPipeline {
     deckId?: DeckId,
     priority: TaskPriority = 'high',
     companions?: Array<{ filename: string; buffer: ArrayBuffer }>,
+    maxRenderSeconds?: number,
   ): Promise<PipelineResult> {
     // Check cache
     const cached = await getCachedAudio(fileBuffer);
@@ -660,7 +664,7 @@ export class DJPipeline {
     }
 
     // Full render + analysis needed
-    const promise = this.renderAndAnalyze(fileBuffer, filename, deckId, priority, companions);
+    const promise = this.renderAndAnalyze(fileBuffer, filename, deckId, priority, companions, maxRenderSeconds);
     this.inflight.set(hash, promise);
     promise.finally(() => this.inflight.delete(hash));
     return promise;
@@ -1042,6 +1046,7 @@ export class DJPipeline {
             filename: task.filename,
             subsong: task.subsong,
             companions,
+            maxSeconds: task.maxRenderSeconds,
           },
           transferables,
         );
