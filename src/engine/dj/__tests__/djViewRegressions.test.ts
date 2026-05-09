@@ -305,3 +305,75 @@ describe('DJTrackLoader live load path handles companions', () => {
     expect(modlandSection).toContain("replace(/\\.[^.]+$/, '.wav')");
   });
 });
+
+// ── Crossfader store property name ──────────────────────────────────────────
+
+describe('Crossfader animation regression', () => {
+  it('DJActions.setCrossfader writes to crossfaderPosition, not crossfader', () => {
+    // Bug: DJActions.setCrossfader wrote `state.crossfader = clamped` but the store
+    // property is `crossfaderPosition`. This caused the UI slider to never update
+    // while the audio-level crossfader worked correctly.
+    const src = fs.readFileSync(
+      path.resolve(__dirname, '../DJActions.ts'),
+      'utf-8',
+    );
+    const fnBody = src.slice(
+      src.indexOf('export function setCrossfader'),
+      src.indexOf('export function setCrossfaderCurve'),
+    );
+    // Must write to crossfaderPosition, NOT crossfader
+    expect(fnBody).toContain('state.crossfaderPosition');
+    expect(fnBody).not.toMatch(/state\.crossfader\s*=/);
+  });
+
+  it('useDJStore exposes crossfaderPosition (not crossfader) as the store property', () => {
+    const src = fs.readFileSync(
+      path.resolve(__dirname, '../../../stores/useDJStore.ts'),
+      'utf-8',
+    );
+    expect(src).toContain('crossfaderPosition:');
+    // The store should NOT have a plain `crossfader:` property
+    expect(src).not.toMatch(/^\s+crossfader:\s+number/m);
+  });
+});
+
+// ── DJ mode ToneEngine master mute ──────────────────────────────────────────
+
+describe('DJ mode echo prevention', () => {
+  it('ToneEngine has setDJMode method that mutes masterChannel', () => {
+    const src = fs.readFileSync(
+      path.resolve(__dirname, '../../ToneEngine.ts'),
+      'utf-8',
+    );
+    // Must have setDJMode method
+    expect(src).toContain('public setDJMode(active: boolean)');
+    // Must set volume to -Infinity when active
+    const fnBody = src.slice(
+      src.indexOf('public setDJMode(active: boolean)'),
+      src.indexOf('}', src.indexOf('public setDJMode(active: boolean)') + 200),
+    );
+    expect(fnBody).toContain('-Infinity');
+    expect(fnBody).toContain('_masterVolumeDb');
+  });
+
+  it('stop() respects _djModeActive flag and does not restore volume in DJ mode', () => {
+    const src = fs.readFileSync(
+      path.resolve(__dirname, '../../ToneEngine.ts'),
+      'utf-8',
+    );
+    const stopBody = src.slice(
+      src.indexOf('public stop(): void'),
+      src.indexOf('Tone.getTransport().stop()'),
+    );
+    expect(stopBody).toContain('_djModeActive');
+  });
+
+  it('useUIStore calls setDJMode(true) when entering DJ view', () => {
+    const src = fs.readFileSync(
+      path.resolve(__dirname, '../../../stores/useUIStore.ts'),
+      'utf-8',
+    );
+    expect(src).toContain('setDJMode(true)');
+    expect(src).toContain('setDJMode(false)');
+  });
+});
