@@ -478,7 +478,7 @@ export class DJPipeline {
   ): Promise<PipelineResult> {
     // Check cache
     const cached = await getCachedAudio(fileBuffer);
-    if (cached && cached.beatGrid && cached.bpm) {
+    if (cached && cached.beatGrid && cached.bpm && cached.audioData.byteLength > 0) {
       // Fully cached + analyzed — return immediately
       console.log(`[DJPipeline] Full cache hit for ${filename}`);
 

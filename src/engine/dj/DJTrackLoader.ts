@@ -434,9 +434,21 @@ async function loadPlaylistTrackToDeckInternal(
   if (track.fileName.startsWith('modland:')) {
     const modlandPath = track.fileName.slice('modland:'.length);
     try {
-      const { downloadModlandFile } = await import('@/lib/modlandApi');
-      const buffer = await downloadModlandFile(modlandPath);
+      const { downloadModlandFile, downloadTFMXCompanion, downloadUADECompanions } = await import('@/lib/modlandApi');
+      // Download main file + TFMX companion in parallel
+      const [buffer, tfmxCompanion] = await Promise.all([
+        downloadModlandFile(modlandPath),
+        downloadTFMXCompanion(modlandPath),
+      ]);
       const filename = modlandPath.split('/').pop() || 'download.mod';
+
+      // Build companion list (TFMX smpl + UADE companions like .nt files)
+      const companions: Array<{ filename: string; buffer: ArrayBuffer }> = [];
+      if (tfmxCompanion) {
+        companions.push({ filename: tfmxCompanion.filename, buffer: tfmxCompanion.buffer });
+      }
+      const uadeCompanions = await downloadUADECompanions(modlandPath, buffer);
+      companions.push(...uadeCompanions);
 
       if (isAudioFile(filename)) {
         await getDJEngine().loadAudioToDeck(deckId, buffer, track.fileName);
@@ -459,11 +471,17 @@ async function loadPlaylistTrackToDeckInternal(
         totalPositions: song.songLength,
       });
 
-      const result = await getDJPipeline().loadOrEnqueue(buffer, filename, deckId, 'high');
+      const result = await getDJPipeline().loadOrEnqueue(
+        buffer, filename, deckId, 'high',
+        companions.length > 0 ? companions : undefined,
+      );
+
+      // Use .wav filename to avoid UADE re-init on decode
+      const wavFilename = track.fileName.replace(/\.[^.]+$/, '.wav');
       await getDJEngine().loadAudioToDeck(
         deckId,
         result.wavData,
-        track.fileName,
+        wavFilename,
         song.name || track.trackName || filename,
         result.analysis?.bpm || bpmResult.bpm,
         song,

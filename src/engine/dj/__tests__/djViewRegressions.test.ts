@@ -254,3 +254,54 @@ describe('DJPlaylistPanel memoized virtualItems (batch 4)', () => {
     expect(renderSection).toMatch(/virtualItems\.map/);
   });
 });
+
+// ── Pipeline cache hit with empty audioData ─────────────────────────────────
+
+describe('DJPipeline cache hit must require non-empty audioData', () => {
+  it('loadOrEnqueue checks audioData.byteLength > 0 for Full cache hit', () => {
+    // Regression: stub entries from cacheSourceFile have audioData = new ArrayBuffer(0)
+    // but updateCacheAnalysis adds beatGrid+bpm. Without byteLength check, the pipeline
+    // returns 0-byte audio as "Full cache hit" and loadAudioToDeck fails.
+    const src = fs.readFileSync(
+      path.resolve(__dirname, '../DJPipeline.ts'),
+      'utf-8',
+    );
+    const cacheCheck = src.match(/if\s*\(cached\s*&&.*Full cache hit/s);
+    expect(cacheCheck).not.toBeNull();
+    expect(cacheCheck![0]).toContain('audioData.byteLength');
+  });
+});
+
+// ── DJTrackLoader companion handling in live load path ───────────────────────
+
+describe('DJTrackLoader live load path handles companions', () => {
+  const src = fs.readFileSync(
+    path.resolve(__dirname, '../DJTrackLoader.ts'),
+    'utf-8',
+  );
+
+  // The loadPlaylistTrackToDeckInternal function (live load path)
+  const liveLoadSection = src.slice(src.indexOf('loadPlaylistTrackToDeckInternal'));
+
+  it('downloads TFMX companions in the live load modland path', () => {
+    expect(liveLoadSection).toContain('downloadTFMXCompanion');
+  });
+
+  it('downloads UADE companions in the live load modland path', () => {
+    expect(liveLoadSection).toContain('downloadUADECompanions');
+  });
+
+  it('passes companions to loadOrEnqueue in the live load path', () => {
+    const modlandSection = liveLoadSection.slice(
+      liveLoadSection.indexOf("startsWith('modland:')"),
+    );
+    expect(modlandSection).toMatch(/loadOrEnqueue\([^)]*companions/s);
+  });
+
+  it('uses .wav filename for loadAudioToDeck to avoid UADE re-init', () => {
+    const modlandSection = liveLoadSection.slice(
+      liveLoadSection.indexOf("startsWith('modland:')"),
+    );
+    expect(modlandSection).toContain("replace(/\\.[^.]+$/, '.wav')");
+  });
+});
