@@ -121,10 +121,7 @@ export function trackIsLocal(track: PlaylistTrack): boolean {
  */
 export function trackNeedsAnalysis(track: PlaylistTrack): boolean {
   if (track.analysisSkipped) return false;
-  if (track.bpm !== 0) return false;
-  // Remote tracks can always be analyzed (downloaded on demand).
-  // Local plain-filename tracks can be analyzed if their raw bytes are in
-  // IndexedDB (cached by cacheSourceFile when the user added the file).
+  if (track.bpm) return false;  // skip if bpm is truthy (non-zero, non-undefined)
   return trackHasRemoteSource(track) || trackIsLocal(track);
 }
 
@@ -237,9 +234,33 @@ export async function analyzePlaylist(
     let consecutiveNetworkFailures = 0;
     const MAX_CONSECUTIVE_NETWORK_FAILURES = 5;
 
+    // Batch store writes to avoid re-render storms. Each updateTrackMeta
+    // triggers Immer set() → new playlists ref → full modal re-render.
+    // Queue writes and flush at most every 500ms in one transaction.
+    let pendingMetaUpdates: Array<{ index: number; meta: Record<string, unknown> }> = [];
+    let metaFlushTimer: ReturnType<typeof setTimeout> | null = null;
+    const flushMetaUpdates = () => {
+      if (metaFlushTimer) { clearTimeout(metaFlushTimer); metaFlushTimer = null; }
+      if (pendingMetaUpdates.length === 0) return;
+      const batch = pendingMetaUpdates;
+      pendingMetaUpdates = [];
+      useDJPlaylistStore.getState().batchUpdateTrackMeta(playlistId, batch as never);
+    };
+    const queueMetaUpdate = (index: number, meta: Record<string, unknown>) => {
+      pendingMetaUpdates.push({ index, meta });
+      if (!metaFlushTimer) {
+        metaFlushTimer = setTimeout(flushMetaUpdates, 500);
+      }
+    };
+
     console.log(`[PlaylistAnalyzer] Analyzing ${total} tracks in "${initialPlaylist.name}"`);
 
     for (const { trackId, snapshotName } of tracksToAnalyze) {
+      // Yield to let React render, GC run, and avoid Aw Snap OOM crashes.
+      // Each pipeline render allocates large audio buffers — giving the
+      // browser a breather between tracks prevents memory pressure buildup.
+      await new Promise(r => setTimeout(r, 50));
+      flushMetaUpdates(); // Flush any pending store writes before next track
       // Honor caller abort (modal closed, user hit cancel, etc.)
       if (opts?.signal?.aborted) {
         console.log('[PlaylistAnalyzer] Aborted by caller');
@@ -279,14 +300,14 @@ export async function analyzePlaylist(
             throw new Error(`Local file "${filename}" not in cache — re-add it to the playlist to analyze`);
           }
 
-          const pipelineResult = await getDJPipeline().loadOrEnqueue(buffer, filename, undefined, 'low');
+          const pipelineResult = await getDJPipeline().loadOrEnqueue(buffer, filename, undefined, 'low', undefined, 90);
           if (!pipelineResult.analysis) {
             throw new Error('Local pipeline returned no analysis');
           }
 
           const curr = resolveCurrent(trackId);
           if (curr) {
-            useDJPlaylistStore.getState().updateTrackMeta(playlistId, curr.index, {
+            queueMetaUpdate(curr.index, {
               bpm: pipelineResult.analysis.bpm,
               musicalKey: pipelineResult.analysis.musicalKey,
               energy: pipelineResult.analysis.genre?.energy ?? 0,
@@ -307,7 +328,7 @@ export async function analyzePlaylist(
         // through the local DJ pipeline (libopenmpt et al.) instead.
         const ext = track.fileName.toLowerCase().split('.').pop() || '';
         const needsLocalPipeline = isHVSC || [
-          'xm', 'it', 's3m', 'mod', 'mptm', 'umx', 'dbm', 'mo3',
+          'xm', 'it', 's3m', 'mptm', 'umx', 'dbm', 'mo3',
         ].includes(ext);
         // `let` (not `const`) so the 404 auto-fix can rewrite them when it
         // redirects the download to a different Modland path.
@@ -396,7 +417,7 @@ export async function analyzePlaylist(
                       // Re-resolve before writing — row may have moved/been removed.
                       const curr = resolveCurrent(trackId);
                       if (curr) {
-                        useDJPlaylistStore.getState().updateTrackMeta(playlistId, curr.index, { fileName: newFileName });
+                        queueMetaUpdate(curr.index, { fileName: newFileName });
                       }
                       // Update the outer-scope remotePath + filename so
                       // downstream code (server /render/analyze query,
@@ -425,7 +446,7 @@ export async function analyzePlaylist(
         let result: { bpm: number; musicalKey: string; energy: number; duration: number; rmsDb?: number; peakDb?: number };
 
         if (needsLocalPipeline) {
-          const pipelineResult = await getDJPipeline().loadOrEnqueue(buffer, filename, undefined, 'low');
+          const pipelineResult = await getDJPipeline().loadOrEnqueue(buffer, filename, undefined, 'low', undefined, 90);
           if (!pipelineResult.analysis) {
             throw new Error('Local pipeline returned no analysis');
           }
@@ -508,20 +529,17 @@ export async function analyzePlaylist(
         if (Object.keys(meta).length > 0) {
           const curr = resolveCurrent(trackId);
           if (curr) {
-            useDJPlaylistStore.getState().updateTrackMeta(playlistId, curr.index, { ...meta, analysisSkipped: false });
+            queueMetaUpdate(curr.index, { ...meta, analysisSkipped: false });
           }
         }
 
-        // We already have the buffer downloaded — piggyback the precache work
-        // so first play is instant after analysis. Without this, users had to
-        // run Analyze AND Cache separately, each re-downloading every track.
-        // Failures here don't fail the analysis — metadata is the important bit.
-        // For HVSC we already called loadOrEnqueue to analyze; that same call
-        // caches the rendered WAV, so skip the duplicate render here.
+        // Cache the source bytes so first-play is instant.
+        // For needsLocalPipeline tracks, the loadOrEnqueue above already
+        // rendered + cached the audio — skip the piggyback re-render.
         try {
           await cacheSourceFile(buffer, filename);
-          if (!isAudioFile(filename) && !isHVSC) {
-            const piggybackResult = await getDJPipeline().loadOrEnqueue(buffer, filename, undefined, 'low');
+          if (!needsLocalPipeline && !isAudioFile(filename) && !isHVSC) {
+            const piggybackResult = await getDJPipeline().loadOrEnqueue(buffer, filename, undefined, 'low', undefined, 90);
             // Capture loudness from the local render for Modland tracks —
             // the server's /render/analyze response only returns bpm / key /
             // energy / duration, so without this the track has no rmsDb for
@@ -529,7 +547,7 @@ export async function analyzePlaylist(
             if (piggybackResult.analysis) {
               const curr2 = resolveCurrent(trackId);
               if (curr2) {
-                useDJPlaylistStore.getState().updateTrackMeta(playlistId, curr2.index, {
+                queueMetaUpdate(curr2.index, {
                   rmsDb: piggybackResult.analysis.rmsDb,
                   peakDb: piggybackResult.analysis.peakDb,
                 });
@@ -597,13 +615,16 @@ export async function analyzePlaylist(
         // Mark as skipped so it won't be re-scanned next time (id-resolved).
         const curr = resolveCurrent(trackId);
         if (curr) {
-          useDJPlaylistStore.getState().updateTrackMeta(playlistId, curr.index, { analysisSkipped: true });
+          queueMetaUpdate(curr.index, { analysisSkipped: true });
         }
         const done = analyzed + failed;
         onProgress?.({ current: done, total, analyzed, failed, trackName: track.trackName, status: 'error' });
         console.warn(`[PlaylistAnalyzer] ${done}/${total} FAIL — ${track.trackName}: ${reason}`);
       }
     }
+
+    // Flush any remaining batched meta updates
+    flushMetaUpdates();
 
     console.log(`[PlaylistAnalyzer] Complete — ${analyzed} analyzed, ${failed} failed out of ${total}`);
     if (failures.length > 0) {

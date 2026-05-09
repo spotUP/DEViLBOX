@@ -8,7 +8,7 @@
  */
 
 const DB_NAME = 'DEViLBOX_AudioCache';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const STORE_NAME = 'audioCache';
 const MAX_CACHE_SIZE_MB = 2000; // 2 GB limit (gig playlists need 200+ tracks)
 const MAX_CACHE_ENTRIES = 1000; // Max 1000 cached files
@@ -78,11 +78,20 @@ async function initDB(): Promise<IDBDatabase> {
 
     request.onupgradeneeded = (event) => {
       const database = (event.target as IDBOpenDBRequest).result;
+      const tx = (event.target as IDBOpenDBRequest).transaction!;
       if (!database.objectStoreNames.contains(STORE_NAME)) {
         // Create object store with hash as key
         const store = database.createObjectStore(STORE_NAME, { keyPath: 'hash' });
         // Index by timestamp for LRU eviction
         store.createIndex('timestamp', 'timestamp', { unique: false });
+        // Index by filename for efficient lookup without getAll()
+        store.createIndex('filename', 'filename', { unique: false });
+      } else {
+        // Existing store — add filename index if missing (v1 → v2 migration)
+        const store = tx.objectStore(STORE_NAME);
+        if (!store.indexNames.contains('filename')) {
+          store.createIndex('filename', 'filename', { unique: false });
+        }
       }
     };
   });
@@ -228,12 +237,20 @@ async function getCacheMetadata(): Promise<CacheMetadata> {
     return new Promise((resolve, reject) => {
       const tx = database.transaction(STORE_NAME, 'readonly');
       const store = tx.objectStore(STORE_NAME);
-      const request = store.getAll();
-
+      // Use cursor to sum sizes without loading all audioData into memory.
+      let totalSizeBytes = 0;
+      let entryCount = 0;
+      const request = store.openCursor();
       request.onsuccess = () => {
-        const entries = request.result as CachedAudio[];
-        const totalSizeBytes = entries.reduce((sum, e) => sum + e.sizeBytes, 0);
-        resolve({ totalSizeBytes, entryCount: entries.length });
+        const cursor = request.result;
+        if (!cursor) {
+          resolve({ totalSizeBytes, entryCount });
+          return;
+        }
+        const entry = cursor.value as CachedAudio;
+        totalSizeBytes += entry.sizeBytes;
+        entryCount++;
+        cursor.continue();
       };
       request.onerror = () => reject(request.error);
     });
@@ -470,12 +487,30 @@ export async function isSourceCachedByName(filename: string): Promise<boolean> {
     return new Promise((resolve) => {
       const tx = database.transaction(STORE_NAME, 'readonly');
       const store = tx.objectStore(STORE_NAME);
-      const request = store.getAll();
-      request.onsuccess = () => {
-        const entries = request.result as CachedAudio[];
-        resolve(entries.some(e => e.filename === filename && (e.audioData.byteLength > 0 || (e.sourceData && e.sourceData.byteLength > 0))));
-      };
-      request.onerror = () => resolve(false);
+      // Use filename index to avoid loading entire cache
+      if (store.indexNames.contains('filename')) {
+        const index = store.index('filename');
+        const request = index.getAll(filename);
+        request.onsuccess = () => {
+          const entries = request.result as CachedAudio[];
+          resolve(entries.some(e => e.audioData.byteLength > 0 || (e.sourceData && e.sourceData.byteLength > 0)));
+        };
+        request.onerror = () => resolve(false);
+      } else {
+        // Fallback: cursor scan
+        const request = store.openCursor();
+        request.onsuccess = () => {
+          const cursor = request.result;
+          if (!cursor) { resolve(false); return; }
+          const e = cursor.value as CachedAudio;
+          if (e.filename === filename && (e.audioData.byteLength > 0 || (e.sourceData && e.sourceData.byteLength > 0))) {
+            resolve(true);
+            return;
+          }
+          cursor.continue();
+        };
+        request.onerror = () => resolve(false);
+      }
     });
   } catch {
     return false;
@@ -492,16 +527,18 @@ export async function getCachedFilenames(): Promise<Set<string>> {
     return new Promise((resolve) => {
       const tx = database.transaction(STORE_NAME, 'readonly');
       const store = tx.objectStore(STORE_NAME);
-      const request = store.getAll();
+      const names = new Set<string>();
+      // Use a cursor to iterate without loading all audioData into memory.
+      // getAll() loaded the entire cache (up to 2GB of WAV data) which caused OOM.
+      const request = store.openCursor();
       request.onsuccess = () => {
-        const entries = request.result as CachedAudio[];
-        const names = new Set<string>();
-        for (const e of entries) {
-          if (e.audioData.byteLength > 0 || (e.sourceData && e.sourceData.byteLength > 0)) {
-            names.add(e.filename);
-          }
+        const cursor = request.result;
+        if (!cursor) { resolve(names); return; }
+        const e = cursor.value as CachedAudio;
+        if (e.audioData.byteLength > 0 || (e.sourceData && e.sourceData.byteLength > 0)) {
+          names.add(e.filename);
         }
-        resolve(names);
+        cursor.continue();
       };
       request.onerror = () => resolve(new Set());
     });
@@ -526,17 +563,41 @@ export async function getCachedAudioByFilename(filename: string): Promise<Cached
     return new Promise((resolve) => {
       const tx = database.transaction(STORE_NAME, 'readonly');
       const store = tx.objectStore(STORE_NAME);
-      const request = store.getAll();
-      request.onsuccess = () => {
-        const entries = request.result as CachedAudio[];
-        const match = entries.find(e =>
-          e.filename === filename &&
-          (e.audioData.byteLength > 0 || (e.sourceData && e.sourceData.byteLength > 0))
-        );
-        if (match) void touchCacheEntry(match.hash);
-        resolve(match ?? null);
-      };
-      request.onerror = () => resolve(null);
+      // Use the filename index (v2+) to load ONE matching record instead of getAll().
+      // getAll() loaded the ENTIRE cache (potentially 2GB of WAV data) into memory —
+      // with 20 visible playlist rows calling this concurrently, it caused Aw Snap OOM.
+      if (store.indexNames.contains('filename')) {
+        const index = store.index('filename');
+        const request = index.getAll(filename);
+        request.onsuccess = () => {
+          const entries = request.result as CachedAudio[];
+          const match = entries.find(e =>
+            e.audioData.byteLength > 0 || (e.sourceData && e.sourceData.byteLength > 0)
+          );
+          if (match) void touchCacheEntry(match.hash);
+          resolve(match ?? null);
+        };
+        request.onerror = () => resolve(null);
+      } else {
+        // Fallback for pre-v2 databases (before filename index exists).
+        // Use a cursor to avoid loading all records at once.
+        const request = store.openCursor();
+        let found: CachedAudio | null = null;
+        request.onsuccess = () => {
+          const cursor = request.result;
+          if (!cursor) { resolve(found); return; }
+          const entry = cursor.value as CachedAudio;
+          if (entry.filename === filename &&
+              (entry.audioData.byteLength > 0 || (entry.sourceData && entry.sourceData.byteLength > 0))) {
+            found = entry;
+            void touchCacheEntry(entry.hash);
+            resolve(found);
+            return; // stop iterating
+          }
+          cursor.continue();
+        };
+        request.onerror = () => resolve(null);
+      }
     });
   } catch {
     return null;

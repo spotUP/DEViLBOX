@@ -28,6 +28,8 @@ interface RenderRequest {
   fileBuffer: ArrayBuffer;
   filename: string;
   subsong?: number;
+  /** Max render duration in seconds (default: 600). Use shorter for analysis-only. */
+  maxSeconds?: number;
   /**
    * Optional companion files to register in UADE's virtual filesystem BEFORE
    * loading the main module. Required for multi-file formats like TFMX
@@ -392,6 +394,7 @@ async function renderWithUADE(
   subsong: number,
   id: string,
   companions?: Array<{ filename: string; buffer: ArrayBuffer }>,
+  maxSeconds = 600,
 ): Promise<{ left: Float32Array; right: Float32Array; sampleRate: number }> {
   // Force fresh UADE instance for each render — the IPC state machine
   // gets corrupted after a render cycle and cannot be reused.
@@ -502,7 +505,7 @@ async function renderWithUADE(
   wasm._free(filePtr);
   wasm._free(fnamePtr);
 
-  return renderWithUADEContinue(wasm, safeFilename, subsong, id);
+  return renderWithUADEContinue(wasm, safeFilename, subsong, id, maxSeconds);
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -511,6 +514,7 @@ async function renderWithUADEContinue(
   safeFilename: string,
   subsong: number,
   id: string,
+  maxSeconds = 600,
 ): Promise<{ left: Float32Array; right: Float32Array; sampleRate: number }> {
   // Set subsong if specified
   if (subsong > 0) {
@@ -530,8 +534,7 @@ async function renderWithUADEContinue(
   // Render loop
   const sampleRate = 44100;
   const CHUNK = 4096;
-  const MAX_SECONDS = 600; // 10 minute safety limit
-  const maxFrames = sampleRate * MAX_SECONDS;
+  const maxFrames = sampleRate * maxSeconds;
 
   const tmpL = wasm._malloc(CHUNK * 4);
   const tmpR = wasm._malloc(CHUNK * 4);
@@ -1146,6 +1149,7 @@ async function renderWithLibopenmpt(
   fileBuffer: ArrayBuffer,
   filename: string,
   id: string,
+  maxSeconds = 600,
 ): Promise<{ left: Float32Array; right: Float32Array; sampleRate: number }> {
   await initLibopenmpt();
   const lib = openmptLib;
@@ -1190,7 +1194,7 @@ async function renderWithLibopenmpt(
 
   const chunks: { left: Float32Array; right: Float32Array }[] = [];
   let totalFrames = 0;
-  const MAX_FRAMES = sampleRate * 600; // 10 min safety
+  const MAX_FRAMES = sampleRate * maxSeconds;
 
   while (totalFrames < MAX_FRAMES) {
     const rendered = lib._openmpt_module_read_float_stereo(modulePtr, sampleRate, CHUNK, leftPtr, rightPtr);
@@ -1249,7 +1253,7 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
     }
 
     case 'render': {
-      const { id, fileBuffer, filename, subsong = 0, companions } = msg;
+      const { id, fileBuffer, filename, subsong = 0, companions, maxSeconds } = msg;
       try {
         let result: { left: Float32Array; right: Float32Array; sampleRate: number };
 
@@ -1280,9 +1284,9 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
           // TODO: Implement synthesizer renderers (SunVox, V2, WaveSabre, etc.)
           throw new Error('Synthesizer formats not yet supported in DJ renderer (use main tracker)');
         } else if (isAmigaFormat(filename)) {
-          result = await renderWithUADE(fileBuffer, filename, subsong, id, companions);
+          result = await renderWithUADE(fileBuffer, filename, subsong, id, companions, maxSeconds);
         } else {
-          result = await renderWithLibopenmpt(fileBuffer, filename, id);
+          result = await renderWithLibopenmpt(fileBuffer, filename, id, maxSeconds);
         }
 
         const duration = result.left.length / result.sampleRate;

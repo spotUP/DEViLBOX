@@ -544,17 +544,17 @@ export const DJPlaylistPanel: React.FC<DJPlaylistPanelProps> = ({ onClose }) => 
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
 
-  // Only register visible + nearby items with dnd-kit. Passing ALL track IDs
   // Only register visible + nearby items with dnd-kit to prevent OOM crashes.
-  // CRITICAL: getVirtualItems() returns a new array reference on every render —
-  // memoize it so sortableIds useMemo doesn't rerun every single render.
-  const virtualItems = useMemo(() => virtualizer.getVirtualItems(), [virtualizer]);
+  // DO NOT memoize getVirtualItems() on [virtualizer] — the virtualizer object
+  // reference never changes, so useMemo caches the initial result forever.
+  const virtualItems = virtualizer.getVirtualItems();
   const sortableIds = useMemo(() => {
-    if (virtualItems.length === 0) return filteredTracks.map((t) => t.id);
+    if (virtualItems.length === 0) return [] as string[];
     const startIdx = Math.max(0, virtualItems[0].index - 5);
     const endIdx = Math.min(filteredTracks.length, virtualItems[virtualItems.length - 1].index + 6);
     return filteredTracks.slice(startIdx, endIdx).map((t) => t.id);
-  }, [filteredTracks, virtualItems]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filteredTracks, virtualItems.length, virtualItems[0]?.index, virtualItems[virtualItems.length - 1]?.index]);
 
   const handleDragEnd = useCallback((event: DragEndEvent) => {
     if (!activePlaylistId || isFiltered) return;
