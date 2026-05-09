@@ -530,12 +530,84 @@ export const SCRATCH_ORIGINALS_PACK: SamplePack = {
 };
 
 // ============================================================================
+// SAMMY BLAMMY SAMPLES
+// DJ vocal drops, laser FX, transitions, and sound effects
+// ============================================================================
+
+const SAMMY_BLAMMY_BASE = 'data/samples/packs/sammy-blammy';
+
+function sammyBlammySample(filename: string, category: SampleCategory): SampleInfo {
+  const name = filename
+    .replace(/\.(wav|mp3)$/i, '')
+    .replace(/^(Voice - |Sound Effects - )/, '')
+    .replace(/ - \d{4}$/, '')
+    .trim();
+  return {
+    filename,
+    name,
+    category,
+    url: normalizeUrl(`${SAMMY_BLAMMY_BASE}/${encodeURIComponent(filename)}`),
+  };
+}
+
+const SAMMY_VOCALS: SampleInfo[] = [
+  sammyBlammySample('Voice - Dale Dale Dale.wav', 'vocals'),
+  sammyBlammySample('Voice - Faayaaaa.wav', 'vocals'),
+  sammyBlammySample('Voice - Fyyyaaah.mp3', 'vocals'),
+  sammyBlammySample('Voice - Me Wah See Every Hand and Lighter.mp3', 'vocals'),
+  sammyBlammySample('Voice - Rrrru It.mp3', 'vocals'),
+  sammyBlammySample('Voice - Well Easy.mp3', 'vocals'),
+  sammyBlammySample('Pull Uuuuuup.mp3', 'vocals'),
+];
+
+const SAMMY_FX: SampleInfo[] = [
+  sammyBlammySample('Laser 1.mp3', 'fx'),
+  sammyBlammySample('Laser 2.mp3', 'fx'),
+  sammyBlammySample('Laser Lick Shot.mp3', 'fx'),
+  sammyBlammySample('Sound Effects - Mario.mp3', 'fx'),
+  sammyBlammySample('Sound Effects - Mario - Pt 2 -.mp3', 'fx'),
+  sammyBlammySample('Wata Wata Echo - 2014.wav', 'fx'),
+];
+
+const SAMMY_TRANSITIONS: SampleInfo[] = [
+  sammyBlammySample('Transition 1.mp3', 'other'),
+  sammyBlammySample('Transition 2.mp3', 'other'),
+  sammyBlammySample('Transition 3.mp3', 'other'),
+  sammyBlammySample('Transition 4.mp3', 'other'),
+];
+
+export const SAMMY_BLAMMY_PACK: SamplePack = {
+  id: 'sammy-blammy',
+  name: 'Sammy Blammy Samples',
+  author: 'Sammy Blammy',
+  description: 'DJ vocal drops, laser FX, transitions, and sound effects for live performance.',
+  basePath: SAMMY_BLAMMY_BASE,
+  categories: ['vocals', 'fx', 'other'],
+  samples: {
+    kicks: [],
+    snares: [],
+    hihats: [],
+    claps: [],
+    percussion: [],
+    fx: SAMMY_FX,
+    bass: [],
+    leads: [],
+    pads: [],
+    loops: [],
+    vocals: SAMMY_VOCALS,
+    other: SAMMY_TRANSITIONS,
+  },
+  sampleCount: SAMMY_VOCALS.length + SAMMY_FX.length + SAMMY_TRANSITIONS.length,
+};
+
+// ============================================================================
 // SAMPLE PACK REGISTRY
 // ============================================================================
 
 export const SAMPLE_PACKS: SamplePack[] = [
   DRUMNIBUS_PACK,
   CASIO_MT40_PACK,
+  SAMMY_BLAMMY_PACK,
   ST01_PACK,
   ST02_PACK,
   SCRATCH_ORIGINALS_PACK,
