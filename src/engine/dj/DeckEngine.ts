@@ -245,7 +245,7 @@ export class DeckEngine {
     // internal gain transients from rapid scratch transitions or Player source overlap.
     const ctx = Tone.getContext().rawContext as AudioContext;
     const limiter = ctx.createDynamicsCompressor();
-    limiter.threshold.value = -1;   // Start limiting at -1 dBFS
+    limiter.threshold.value = -3;   // Start limiting at -3 dBFS (professional headroom)
     limiter.knee.value = 0;          // Hard knee (brick-wall)
     limiter.ratio.value = 20;        // Near-infinite ratio
     limiter.attack.value = 0.001;    // 1ms attack (catch transients)
@@ -1753,7 +1753,7 @@ export class DeckEngine {
   }
 
   setVolume(value: number): void {
-    this.channelGain.gain.rampTo(Math.max(0, Math.min(1.5, value)), 0.02);
+    this.channelGain.gain.rampTo(Math.max(0, Math.min(1.0, value)), 0.02);
   }
 
   getVolume(): number {

@@ -670,3 +670,70 @@ describe('Cached audio path passes song data for pattern display', () => {
     expect(returnBlock).toContain('song');
   });
 });
+
+// ── Audio levels gain staging ───────────────────────────────────────────────
+
+describe('Audio levels — gain staging defaults prevent clipping', () => {
+  it('masterVolume defaults to 1.0 (not 2.0)', () => {
+    const storeSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../../stores/useDJStore.ts'), 'utf-8',
+    );
+    const match = storeSrc.match(/masterVolume:\s*([\d.]+)/);
+    expect(match).not.toBeNull();
+    expect(parseFloat(match![1])).toBeLessThanOrEqual(1.0);
+  });
+
+  it('channel fader clamps to 1.0 max (not 1.5)', () => {
+    const deckSrc = fs.readFileSync(
+      path.resolve(__dirname, '../DeckEngine.ts'), 'utf-8',
+    );
+    const setVolumeMatch = deckSrc.match(/setVolume\(value[\s\S]*?Math\.min\(([\d.]+)/);
+    expect(setVolumeMatch).not.toBeNull();
+    expect(parseFloat(setVolumeMatch![1])).toBeLessThanOrEqual(1.0);
+  });
+
+  it('master gain clamps to 1.5 max (not 2.0)', () => {
+    const mixerSrc = fs.readFileSync(
+      path.resolve(__dirname, '../DJMixerEngine.ts'), 'utf-8',
+    );
+    const setMasterMatch = mixerSrc.match(/setMasterVolume[\s\S]*?Math\.min\(([\d.]+)/);
+    expect(setMasterMatch).not.toBeNull();
+    expect(parseFloat(setMasterMatch![1])).toBeLessThanOrEqual(1.5);
+  });
+
+  it('deck brick-wall limiter threshold is -3 dBFS or lower', () => {
+    const deckSrc = fs.readFileSync(
+      path.resolve(__dirname, '../DeckEngine.ts'), 'utf-8',
+    );
+    const threshMatch = deckSrc.match(/limiter\.threshold\.value\s*=\s*(-[\d.]+)/);
+    expect(threshMatch).not.toBeNull();
+    expect(parseFloat(threshMatch![1])).toBeLessThanOrEqual(-3);
+  });
+});
+
+// ── Playlist preview play/stop ──────────────────────────────────────────────
+
+describe('Playlist preview — deck-based stop mechanism', () => {
+  const panelSrc = fs.readFileSync(
+    path.resolve(__dirname, '../../../components/dj/DJPlaylistPanel.tsx'), 'utf-8',
+  );
+
+  it('uses previewDeckRef instead of orphaned AudioBufferSourceNode refs', () => {
+    expect(panelSrc).toContain('previewDeckRef');
+    expect(panelSrc).not.toContain('previewPlayerRef');
+    expect(panelSrc).not.toContain('previewGainRef');
+  });
+
+  it('stopPreview stops the deck via getDJEngine', () => {
+    const stopBlock = panelSrc.split('stopPreview')[1];
+    expect(stopBlock).toBeDefined();
+    expect(stopBlock).toContain('previewDeckRef.current');
+    expect(stopBlock).toContain('getDJEngine()');
+  });
+
+  it('handlePreview saves the idle deck to previewDeckRef', () => {
+    const handleBlock = panelSrc.split('handlePreview')[1];
+    expect(handleBlock).toBeDefined();
+    expect(handleBlock).toContain('previewDeckRef.current = idleDeck');
+  });
+});
