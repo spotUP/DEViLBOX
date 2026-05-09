@@ -854,3 +854,21 @@ describe('One-Shots Live preset — Sammy Blammy on bank B', () => {
     expect(presetSrc).toContain('normalizeUrl');
   });
 });
+
+// ── MIDI bank offset for pad triggers ───────────────────────────────────────
+
+describe('MIDI pad routing applies currentBank offset', () => {
+  const midiSrc = fs.readFileSync(
+    path.resolve(__dirname, '../../../hooks/drumpad/useMIDIPadRouting.ts'), 'utf-8',
+  );
+
+  it('applies bankOffset based on currentBankRef to padId', () => {
+    // Must add bank offset so MIDI pads trigger the correct bank
+    expect(midiSrc).toContain('currentBankRef.current');
+    expect(midiSrc).toMatch(/bankOffset.*=.*\{.*A:\s*0.*B:\s*16/);
+  });
+
+  it('padId includes bankOffset', () => {
+    expect(midiSrc).toMatch(/padId\s*=\s*padIndex\s*\+\s*1\s*\+\s*bankOffset/);
+  });
+});

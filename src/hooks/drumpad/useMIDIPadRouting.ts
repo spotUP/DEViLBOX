@@ -804,9 +804,10 @@ export function useMIDIPadRouting() {
         return;
       }
       
-      // Map note to pad index (0-15) — MPK's PAD BANK A/B toggle sends
-      // different note ranges (36-43 vs 44-51) so DEViLBOX banks A/B are
-      // driven directly by the incoming note. No currentBank offset applied.
+      // Map note to pad index (0-based within the controller's pad range).
+      // MPK Mini sends 36-43 (bank A) and 44-51 (bank B) — 8 pads × 2 banks.
+      // We fold into 0-15 so the MPK's own A/B maps to the first/second row
+      // of whatever DEViLBOX bank is active.
       let padIndex: number;
       if (learnedNotes.length > 0) {
         padIndex = learnedNotes.indexOf(message.note);
@@ -817,7 +818,10 @@ export function useMIDIPadRouting() {
         padIndex = ((message.note - 36) % 16 + 16) % 16;
       }
 
-      const padId = padIndex + 1;
+      // Apply DEViLBOX bank offset so MIDI triggers the bank shown in the UI.
+      // Bank A = pad IDs 1-16, Bank B = 17-32, etc.
+      const bankOffset = { A: 0, B: 16, C: 32, D: 48, E: 64, F: 80, G: 96, H: 112 }[currentBankRef.current] ?? 0;
+      const padId = padIndex + 1 + bankOffset;
 
       if (message.type === 'noteOn' && message.velocity) {
         triggerRef.current(padId, message.velocity);
