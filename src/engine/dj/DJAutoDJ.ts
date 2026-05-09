@@ -199,6 +199,24 @@ class DJAutoDJ {
     store.setAutoDJEnabled(true);
     store.setAutoDJStatus('playing');
 
+    // Auto-sort the playlist using smart mix when analysis data is available.
+    // This gives the best harmonic/energy flow without requiring the user to
+    // manually sort before enabling Auto DJ.
+    try {
+      const { smartSort } = await import('./DJPlaylistSort');
+      const hasAnalysis = playlist.tracks.some(t => t.bpm && t.bpm > 0 && t.musicalKey);
+      if (hasAnalysis) {
+        const sorted = smartSort([...playlist.tracks]);
+        const plId = useDJPlaylistStore.getState().activePlaylistId;
+        if (plId) {
+          useDJPlaylistStore.getState().sortTracks(plId, sorted);
+          console.log('[AutoDJ] Applied smart mix sort to playlist');
+        }
+      }
+    } catch (err) {
+      console.warn('[AutoDJ] Smart sort failed:', err);
+    }
+
     // Apply playlist's saved master FX if present
     if (playlist.masterEffects && playlist.masterEffects.length > 0) {
       console.log(`[AutoDJ] Applying playlist master FX (${playlist.masterEffects.length} effects)`);

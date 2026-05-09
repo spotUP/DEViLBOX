@@ -2150,10 +2150,13 @@ const DJPlaylistModalContent: React.FC<{ onClose: () => void }> = ({ onClose }) 
         useDJPlaylistStore.getState().setLastPlayedTrack(activePlaylistId, track.id);
       }
       try {
-        getDJEngine().getDeck(deckId).play();
+        await getDJEngine().getDeck(deckId).play();
         useDJStore.getState().setDeckPlaying(deckId, true);
-      } catch { /* engine not ready */ }
-    } catch {
+      } catch (err) {
+        console.error('[DJPlaylistModal] Preview play failed:', err);
+      }
+    } catch (err) {
+      console.error('[DJPlaylistModal] Preview failed:', err);
       previewDeckRef.current = null;
       setPreviewingIndex(null);
     }
