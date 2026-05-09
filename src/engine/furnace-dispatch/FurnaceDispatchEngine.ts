@@ -2183,18 +2183,24 @@ export class FurnaceDispatchEngine implements IsolationCapableEngine {
       }
 
       // ── 3. Module samples + chip reset ─────────────────────────────────
-      // Must happen every play — switching songs leaves stale samples in
-      // WASM. Reset re-initializes each chip's DSP with the new sampleMem.
+      // Must happen every play — switching songs leaves stale register state
+      // and samples in WASM. Reset re-initializes each chip's DSP.
       const moduleSamples = this.getModuleSamples();
       if (moduleSamples && moduleSamples.length > 0) {
         for (const chipId of chipIds) {
           this.uploadModuleSamplesToPlatform(chipId, true);
         }
-        for (const chipId of chipIds) {
-          this.reset(chipId);
-        }
-        _log(`[FurnaceDispatchEngine] uploaded ${moduleSamples.length} module samples + reset chips`);
+        _log(`[FurnaceDispatchEngine] uploaded ${moduleSamples.length} module samples`);
       }
+      // ALWAYS reset chips between songs — without this, stale register state
+      // from the previous song persists (wrong instruments, waveforms, envelopes).
+      // Pure synthesis chips (SID, GB, AY, etc.) have no samples but still need
+      // their registers cleared for the new song's instruments to take effect.
+      for (const chipId of chipIds) {
+        this.reset(chipId);
+        this.forceIns(chipId);
+      }
+      _log(`[FurnaceDispatchEngine] reset ${chipIds.length} chips for new song`);
 
       // ── 4. Audio routing (one-shot) ────────────────────────────────────
       // routeNativeEngineOutput() handles this when a FurnaceDispatchSynth
