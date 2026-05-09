@@ -114,7 +114,7 @@ export class DJMixerEngine {
     // Attack 1ms catches crossfader transient spikes (10ms ramps)
     // Release 50ms balances fast recovery for battle cuts vs pumping avoidance
     this.limiter = new Tone.Compressor({
-      threshold: -0.3,
+      threshold: -1,
       ratio: 20,
       attack: 0.001,
       release: 0.05,
@@ -193,7 +193,7 @@ export class DJMixerEngine {
   // ==========================================================================
 
   setMasterVolume(value: number): void {
-    this.masterGain.gain.rampTo(Math.max(0, Math.min(2.0, value)), 0.02);
+    this.masterGain.gain.rampTo(Math.max(0, Math.min(1.5, value)), 0.02);
   }
 
   getMasterVolume(): number {
