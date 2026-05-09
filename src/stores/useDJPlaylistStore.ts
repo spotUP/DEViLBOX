@@ -283,17 +283,20 @@ export const useDJPlaylistStore = create<DJPlaylistState>()(
           pushUndo(state);
           const source = state.playlists.find((p) => p.id === playlistId);
           if (!source) return;
-          const clone: DJPlaylist = JSON.parse(JSON.stringify(source));
+          // Use deepClonePlaylists (structuredClone with JSON fallback) instead of
+          // JSON.parse on an Immer Draft proxy — safer and handles undefined values.
+          // Keep existing track IDs: regenerating all IDs after clone was causing
+          // React to unmount+remount every visible row → 120+ simultaneous async
+          // effects (IndexedDB reads, SHA hashes) → Chrome OOM ("Aw Snap").
+          const clone = deepClonePlaylists([source as unknown as DJPlaylist])[0];
           clone.id = newId;
           clone.name = `${source.name} (Copy)`;
           clone.createdAt = Date.now();
           clone.updatedAt = Date.now();
           clone.cloudId = undefined;
           clone.visibility = 'private';
-          // Give cloned tracks new IDs
-          for (const t of clone.tracks) {
-            t.id = generateTrackId();
-          }
+          // Don't clone the environment — it can be 200+ KB and bloats the undo stack.
+          clone.environment = undefined;
           state.playlists.push(clone);
           state.activePlaylistId = newId;
         });

@@ -52,6 +52,7 @@ import { smartSort, sortByBPM, sortByKey, sortByEnergy, sortByName } from '@/eng
 import { camelotDisplay, camelotColor } from '@/engine/dj/DJKeyUtils';
 import { getDJPipeline } from '@/engine/dj/DJPipeline';
 import { isAudioFile } from '@/lib/audioFileUtils';
+import { cacheSourceFile } from '@/engine/dj/DJAudioCache';
 import { isUADEFormat } from '@/lib/import/formats/UADEParser';
 import { loadUADEToDeck } from '@/engine/dj/DJUADEPrerender';
 import { precachePlaylist, type PrecacheProgress } from '@/engine/dj/DJPlaylistPrecache';
@@ -544,10 +545,10 @@ export const DJPlaylistPanel: React.FC<DJPlaylistPanelProps> = ({ onClose }) => 
   );
 
   // Only register visible + nearby items with dnd-kit. Passing ALL track IDs
-  // causes dnd-kit to create internal state for every item, and when virtualizer
-  // unmounts rows during scroll, dnd-kit tries to measure missing DOM nodes —
-  // triggering cascading re-renders that crash Chrome (OOM / "Aw Snap").
-  const virtualItems = virtualizer.getVirtualItems();
+  // Only register visible + nearby items with dnd-kit to prevent OOM crashes.
+  // CRITICAL: getVirtualItems() returns a new array reference on every render —
+  // memoize it so sortableIds useMemo doesn't rerun every single render.
+  const virtualItems = useMemo(() => virtualizer.getVirtualItems(), [virtualizer]);
   const sortableIds = useMemo(() => {
     if (virtualItems.length === 0) return filteredTracks.map((t) => t.id);
     const startIdx = Math.max(0, virtualItems[0].index - 5);
@@ -693,6 +694,11 @@ export const DJPlaylistPanel: React.FC<DJPlaylistPanelProps> = ({ onClose }) => 
           const isAudio = isAudioFile(file.name);
           const fileExt = file.name.split('.').pop()?.toUpperCase() ?? 'MOD';
 
+          // Cache raw bytes in IndexedDB so Auto DJ and the analyzer can
+          // render this file in future sessions without the user re-selecting it.
+          const buffer = await file.arrayBuffer();
+          await cacheSourceFile(buffer, file.name);
+
           if (isAudio) {
             addTrack(activePlaylistId, {
               fileName: file.name,
@@ -703,7 +709,9 @@ export const DJPlaylistPanel: React.FC<DJPlaylistPanelProps> = ({ onClose }) => 
               addedAt: Date.now(),
             });
           } else {
-            const song = await parseModuleToSong(file);
+            // parseModuleToSong needs a File object — create a Blob-based File
+            // from the buffer we already read so we don't re-read from disk.
+            const song = await parseModuleToSong(new File([buffer], file.name, { type: file.type }));
             cacheSong(file.name, song);
             const bpmResult = detectBPM(song);
             const duration = estimateSongDuration(song);

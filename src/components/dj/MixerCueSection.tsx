@@ -10,6 +10,7 @@ import React, { useCallback, useRef, useEffect, useState } from 'react';
 import { Headphones, Settings } from 'lucide-react';
 import { Knob } from '@components/controls/Knob';
 import { useDJStore } from '@/stores/useDJStore';
+import { useShallow } from 'zustand/react/shallow';
 import { HeadphoneSetupDialog } from './HeadphoneSetupDialog';
 
 interface CueState {
@@ -20,12 +21,16 @@ interface CueState {
 }
 
 export const MixerCueSection: React.FC = () => {
-  const pflA = useDJStore((s) => s.decks.A.pflEnabled);
-  const pflB = useDJStore((s) => s.decks.B.pflEnabled);
-  const cueVolume = useDJStore((s) => s.cueVolume);
-  const cueMix = useDJStore((s) => s.cueMix);
-  const cueDeviceId = useDJStore((s) => s.cueDeviceId);
-  const cueDeviceName = useDJStore((s) => s.cueDeviceName);
+  const { pflA, pflB, cueVolume, cueMix, cueDeviceId, cueDeviceName } = useDJStore(
+    useShallow((s) => ({
+      pflA: s.decks.A.pflEnabled,
+      pflB: s.decks.B.pflEnabled,
+      cueVolume: s.cueVolume,
+      cueMix: s.cueMix,
+      cueDeviceId: s.cueDeviceId,
+      cueDeviceName: s.cueDeviceName,
+    })),
+  );
 
   const [showSetup, setShowSetup] = useState(false);
 
