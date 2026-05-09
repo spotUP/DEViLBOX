@@ -5,7 +5,7 @@
  * from analysis done by any user. Keyed by SHA-256 of the file content.
  */
 
-const API_URL = import.meta.env.VITE_API_URL || 'https://devilbox.uprough.net/api';
+const API_URL = import.meta.env.VITE_API_URL || '/api';
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
