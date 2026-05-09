@@ -433,7 +433,7 @@ export const useDJStore = create<DJStore>()(
     crossfaderPosition: 0.5,
     crossfaderCurve: 'smooth' as CrossfaderCurve,
     hamsterSwitch: false,
-    masterVolume: 2.0,
+    masterVolume: 1.0,
     boothVolume: 1,
     sessionMonitorVolume: 1,
     cueMix: 0.5,
@@ -512,7 +512,7 @@ export const useDJStore = create<DJStore>()(
 
     setMasterVolume: (volume) =>
       set((state) => {
-        state.masterVolume = Math.max(0, Math.min(2.0, volume));
+        state.masterVolume = Math.max(0, Math.min(1.5, volume));
       }),
 
     setBoothVolume: (volume) =>

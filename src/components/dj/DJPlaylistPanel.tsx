@@ -429,8 +429,7 @@ export const DJPlaylistPanel: React.FC<DJPlaylistPanelProps> = ({ onClose }) => 
   const [showSearch, setShowSearch] = useState(false);
   const [editTrack, setEditTrack] = useState<{ index: number; track: PlaylistTrack } | null>(null);
   const [previewingIndex, setPreviewingIndex] = useState<number | null>(null);
-  const previewPlayerRef = useRef<AudioBufferSourceNode | null>(null);
-  const previewGainRef = useRef<GainNode | null>(null);
+  const previewDeckRef = useRef<'A' | 'B' | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const importInputRef = useRef<HTMLInputElement>(null);
@@ -937,13 +936,12 @@ export const DJPlaylistPanel: React.FC<DJPlaylistPanelProps> = ({ onClose }) => 
   // ── Preview playback (loads to idle deck for audition) ────────────────────
 
   const stopPreview = useCallback(() => {
-    if (previewPlayerRef.current) {
-      try { previewPlayerRef.current.stop(); } catch { /* already stopped */ }
-      previewPlayerRef.current = null;
-    }
-    if (previewGainRef.current) {
-      previewGainRef.current.disconnect();
-      previewGainRef.current = null;
+    if (previewDeckRef.current) {
+      try {
+        getDJEngine().getDeck(previewDeckRef.current).stop();
+        useDJStore.getState().setDeckPlaying(previewDeckRef.current, false);
+      } catch { /* deck not initialized */ }
+      previewDeckRef.current = null;
     }
     setPreviewingIndex(null);
   }, []);
@@ -955,6 +953,7 @@ export const DJPlaylistPanel: React.FC<DJPlaylistPanelProps> = ({ onClose }) => 
     // Load to whichever deck is idle (not playing) using our existing load infrastructure
     const store = useDJStore.getState();
     const idleDeck: 'A' | 'B' = store.decks.A.isPlaying ? 'B' : 'A';
+    previewDeckRef.current = idleDeck;
 
     setPreviewingIndex(index);
     try {
@@ -965,6 +964,7 @@ export const DJPlaylistPanel: React.FC<DJPlaylistPanelProps> = ({ onClose }) => 
         useDJStore.getState().setDeckPlaying(idleDeck, true);
       } catch { /* engine not ready */ }
     } catch {
+      previewDeckRef.current = null;
       setPreviewingIndex(null);
     }
   }, [loadTrackToDeck, stopPreview]);
