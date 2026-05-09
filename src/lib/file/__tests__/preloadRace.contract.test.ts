@@ -61,4 +61,47 @@ describe('preload race prevention (contract)', () => {
     // Sanity: we should find at least 4 pairs (the known import paths)
     expect(loadCalls.length).toBeGreaterThanOrEqual(4);
   });
+
+  it('preload conditions cover all WASM synth types, not just Samplers', () => {
+    // Every preloadInstruments call must be guarded by a condition that includes
+    // ALL synth types (Furnace, OPL3, etc.), not just Sampler/WaveSabre/Oidos.
+    // The correct pattern: `instruments.some(i => i.synthType && i.synthType !== 'Synth')`
+    // Wrong patterns: `samplerCount > 0` alone, or listing only specific WASM synth types.
+    const preloadLines: { line: number; text: string; contextBefore: string }[] = [];
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      if (line.includes('preloadInstruments(') && !line.trim().startsWith('//') && !line.trim().startsWith('*')) {
+        // Get the condition that guards this preload (look back up to 5 lines)
+        let contextBefore = '';
+        for (let j = Math.max(0, i - 5); j < i; j++) {
+          contextBefore += lines[j] + '\n';
+        }
+        preloadLines.push({ line: i + 1, text: line.trim(), contextBefore });
+      }
+    }
+
+    // Check for narrow preload conditions that miss Furnace/OPL3/etc synth types
+    const narrowConditions = preloadLines.filter(p => {
+      const ctx = p.contextBefore + p.text;
+      // OK patterns: unconditional preload, or checks for any non-Synth synthType
+      if (ctx.includes("synthType !== 'Synth'")) return false;
+      // OK: no condition at all (always preloads)
+      if (!ctx.includes('if (') && !ctx.includes('if(')) return false;
+      // BAD: only checks for samplerCount or specific WASM types
+      if (ctx.includes('samplerCount') && !ctx.includes("synthType !== 'Synth'")) return true;
+      if (ctx.includes('WaveSabreSynth') && !ctx.includes("synthType !== 'Synth'")) return true;
+      return false;
+    });
+
+    if (narrowConditions.length > 0) {
+      const msg = narrowConditions.map(v =>
+        `Line ${v.line}: ${v.text}\n  → Preload condition too narrow — must cover ALL WASM synth types (Furnace, OPL3, etc.)`
+      ).join('\n');
+      expect.fail(`Preload conditions that miss WASM synth types:\n${msg}`);
+    }
+
+    // Sanity: we should find preload calls
+    expect(preloadLines.length).toBeGreaterThanOrEqual(4);
+  });
 });
