@@ -172,3 +172,85 @@ describe('FX pad release handlers', () => {
     expect(src).toMatch(/handlePadUp[\s\S]*?filter-reset/);
   });
 });
+
+// ── Batch 4: pushUndo + Immer Draft proxy crashes ─────────────────────────
+
+describe('pushUndo Immer Draft safety (batch 4)', () => {
+  const storeSrc = fs.readFileSync(
+    path.resolve(__dirname, '../../../stores/useDJPlaylistStore.ts'),
+    'utf-8',
+  );
+
+  it('pushUndo uses current() to unwrap Immer Draft before deepClone', () => {
+    // pushUndo must call current(state) before passing playlists to
+    // deepClonePlaylists. Without this, structuredClone throws on Draft
+    // proxies → "Oh Snap" crash on every store mutation.
+    expect(storeSrc).toMatch(/current\(state\)\.playlists/);
+    // Must NOT pass raw state.playlists to deepClonePlaylists inside pushUndo
+    const pushUndoBlock = storeSrc.split('function pushUndo')[1]?.split(/^(?:function |const |export )/m)[0] ?? '';
+    expect(pushUndoBlock).not.toMatch(/deepClonePlaylists\(state\.playlists\)/);
+  });
+
+  it('clonePlaylist uses current() to unwrap Draft source', () => {
+    // clonePlaylist must not cast Draft to PlaylistTrack — use current()
+    expect(storeSrc).toMatch(/current\(source\)/);
+    expect(storeSrc).not.toMatch(/source as unknown as DJPlaylist/);
+  });
+
+  it('undo() uses current() before deepClone', () => {
+    // undo must unwrap Draft before cloning current playlists to redo stack
+    const undoMatch = storeSrc.match(/undo:\s*\(\)\s*=>\s*\{[\s\S]*?syncPlaylists\(\)/);
+    expect(undoMatch).not.toBeNull();
+    const undoBlock = undoMatch![0];
+    expect(undoBlock).toMatch(/current\(state\)\.playlists/);
+    expect(undoBlock).not.toMatch(/deepClonePlaylists\(state\.playlists\)/);
+  });
+
+  it('redo() uses current() before deepClone', () => {
+    // redo must unwrap Draft before cloning current playlists to undo stack
+    const redoMatch = storeSrc.match(/redo:\s*\(\)\s*=>\s*\{[\s\S]*?syncPlaylists\(\)/);
+    expect(redoMatch).not.toBeNull();
+    const redoBlock = redoMatch![0];
+    expect(redoBlock).toMatch(/current\(state\)\.playlists/);
+    expect(redoBlock).not.toMatch(/deepClonePlaylists\(state\.playlists\)/);
+  });
+
+  it('imports current from immer', () => {
+    expect(storeSrc).toMatch(/import\s*\{[^}]*current[^}]*\}\s*from\s*['"]immer['"]/);
+  });
+});
+
+describe('DJPlaylistModal keyboard safety (batch 4)', () => {
+  const modalSrc = fs.readFileSync(
+    path.resolve(__dirname, '../../../components/dj/DJPlaylistModal.tsx'),
+    'utf-8',
+  );
+
+  it('registers with useUIStore.openModal to block global keyboard handler', () => {
+    // The modal must call openModal('dj-playlist') so the global keyboard
+    // handler skips tracker shortcuts while the user types in inputs.
+    expect(modalSrc).toContain("openModal('dj-playlist')");
+    expect(modalSrc).toContain('closeModal()');
+  });
+
+  it('uses memoized virtualItems instead of duplicate getVirtualItems() call', () => {
+    // The JSX render must use the memoized virtualItems variable,
+    // not call virtualizer.getVirtualItems() again (duplicate allocation).
+    // Check the render section (after the last SortableContext usage in JSX)
+    const renderSection = modalSrc.split('<SortableContext').pop() ?? '';
+    expect(renderSection).not.toMatch(/virtualizer\.getVirtualItems\(\)\.map/);
+    expect(renderSection).toMatch(/virtualItems\.map/);
+  });
+});
+
+describe('DJPlaylistPanel memoized virtualItems (batch 4)', () => {
+  it('uses memoized virtualItems in JSX render', () => {
+    const panelSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../../components/dj/DJPlaylistPanel.tsx'),
+      'utf-8',
+    );
+    const renderSection = panelSrc.split('<SortableContext').pop() ?? '';
+    expect(renderSection).not.toMatch(/virtualizer\.getVirtualItems\(\)\.map/);
+    expect(renderSection).toMatch(/virtualItems\.map/);
+  });
+});
