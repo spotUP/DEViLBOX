@@ -176,6 +176,7 @@ export type TrackerWorkerMsg =
 
 export type TrackerWorkerReply =
   | { type: 'ready' }
+  | { type: 'booting' }
   | { type: 'webgl-unsupported' }
   | { type: 'error'; message: string }
   | { type: 'diag'; stage: string }
