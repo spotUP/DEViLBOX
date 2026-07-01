@@ -41,6 +41,7 @@ import type { CursorPosition } from '@typedefs';
 // OffscreenCanvas + WebGL2 worker bridge
 import { TrackerOffscreenBridge } from '@engine/renderer/OffscreenBridge';
 import { reportSynthError } from '@stores/useSynthErrorStore';
+import { watchdogStage1, watchdogStage2 } from './trackerWatchdog';
 import type {
   PatternSnapshot,
   ThemeSnapshot,
@@ -1954,16 +1955,15 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     canvasRef.current = canvas;
 
     let readyReceived = false;
-    const readyTimeoutId = setTimeout(() => {
-      if (!readyReceived) {
-        reportSynthError(
-          'Tracker Worker',
-          'Pattern editor failed to start (no ready signal after 10 s). ' +
-          'Try reloading the page. If this persists, your browser may not support OffscreenCanvas WebGL2.',
-          { errorType: 'init', debugData: { offscreenCanvasSupported: true } },
-        );
-      }
-    }, 10_000);
+    let bootingReceived = false;
+    // The 10 s ready-watchdog is armed only AFTER the init message is actually
+    // posted to the worker (see below). Arming it at bridge-construction time
+    // produced false positives: during heavy startup (86 MB CED model load,
+    // DSP WASM compile, worklet spin-up) the main thread can jank for ~10 s, so
+    // the wall-clock window elapsed before `init` was even sent — flagging a
+    // perfectly healthy worker as failed. Measuring from the init post instead
+    // times the only thing we're actually waiting on: the worker's reply.
+    let readyTimeoutId: ReturnType<typeof setTimeout> | undefined;
 
     const bridge = new TrackerOffscreenBridge(TrackerWorkerFactory, {
       onReady: () => {
@@ -1973,7 +1973,13 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
         bridge.post({ type: 'channelLayout', channelLayout: snapshotLayout() });
       },
       onMessage: (msg) => {
-        if (msg.type === 'webgl-unsupported') {
+        if (msg.type === 'booting') {
+          // Worker module + its (heavy) render imports finished loading. The
+          // thread is alive; any remaining delay is GL/shader init, not a dead
+          // worker — the watchdog gives that case a long leash instead of the
+          // scary "failed to start" dialog.
+          bootingReceived = true;
+        } else if (msg.type === 'webgl-unsupported') {
           clearTimeout(readyTimeoutId);
           setWebglUnsupported(true);
         } else if (msg.type === 'error') {
@@ -2051,6 +2057,38 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
         },
         [offscreen],
       );
+
+      // Two-stage ready-watchdog, armed now that init is in the worker's queue.
+      // Stage 1 (12 s): if we've had NO 'booting' heartbeat, the worker module
+      // itself never loaded — a genuine failure, report it. If 'booting' DID
+      // arrive, the thread is alive and merely slow finishing GL/shader init
+      // under startup contention (86 MB CED model load, WASM compiles); that is
+      // NOT a failure, so escalate to a long stage-2 grace instead of the scary
+      // dialog. Stage 2 (+30 s) only fires if the alive worker never becomes
+      // ready — i.e. GL init genuinely hung, a different, real error.
+      readyTimeoutId = setTimeout(() => {
+        const s1 = watchdogStage1(bootingReceived, readyReceived);
+        if (s1.action === 'ok') return;
+        if (s1.action === 'error-never-loaded') {
+          reportSynthError(
+            'Tracker Worker',
+            'Pattern editor failed to start (worker never loaded after 12 s). ' +
+            'Try reloading the page. If this persists, your browser may not support OffscreenCanvas WebGL2.',
+            { errorType: 'init', debugData: { offscreenCanvasSupported: true, booting: false } },
+          );
+          return;
+        }
+        // 'wait' — alive but not ready yet — keep waiting quietly, then a final check.
+        readyTimeoutId = setTimeout(() => {
+          if (watchdogStage2(readyReceived).action === 'ok') return;
+          reportSynthError(
+            'Tracker Worker',
+            'Pattern editor renderer stalled (worker booted but GL init did not ' +
+            'complete after 42 s). Try reloading the page.',
+            { errorType: 'init', debugData: { offscreenCanvasSupported: true, booting: true } },
+          );
+        }, 30_000);
+      }, 12_000);
       } catch (initErr) {
         clearTimeout(readyTimeoutId);
         reportSynthError(

@@ -64,6 +64,14 @@ let dirty = true; // Dirty flag — skip GPU draws when nothing changed
 // Reusable playback object for render calls (avoids per-frame allocation)
 const workerPlayback = { row: 0, smoothOffset: 0, patternIndex: 0, isPlaying: false };
 
+// ─── Boot heartbeat ─────────────────────────────────────────────────────────
+// Posted the instant the worker module finishes loading (all imports — including
+// the heavy TrackerGLRenderer/shader graph — resolved) and top-level executes.
+// This proves the worker THREAD came up, independent of main-thread jank. The
+// main-thread watchdog uses it to tell "worker never loaded" (real failure) from
+// "worker alive but GL init is slow under startup contention" (false alarm).
+(self as unknown as Worker).postMessage({ type: 'booting' } satisfies TrackerWorkerReply);
+
 // ─── Message handler ──────────────────────────────────────────────────────────
 
 self.onmessage = (e: MessageEvent<TrackerWorkerMsg>) => {
