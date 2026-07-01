@@ -9,6 +9,7 @@ import { FACTORY_PRESETS } from '@constants/factoryPresets';
 import type { SynthType, InstrumentConfig, InstrumentPreset } from '@typedefs/instrument';
 import { getSynthInfo } from '@constants/synthCategories';
 import { useClickOutside } from '@hooks/useClickOutside';
+import { usePresetStore } from '@stores/usePresetStore';
 
 interface PresetDropdownProps {
   synthType: SynthType;
@@ -29,10 +30,20 @@ export const PresetDropdown: React.FC<PresetDropdownProps> = ({
   // Sync external preset name changes
   useEffect(() => { setSelectedName(currentPresetName); }, [currentPresetName]);
 
-  // Filter factory presets by the current synth type
+  // Presets auto-harvested from loaded songs (synth voices only), merged with
+  // hand-written factory presets below.
+  const rippedPresets = usePresetStore(s => s.rippedPresets);
+
+  // Filter factory + ripped presets by the current synth type. Ripped presets
+  // store their playable data under `config` in the same flattened shape the
+  // factory presets use, so they slot straight into the list.
   const presets = useMemo(() => {
-    return FACTORY_PRESETS.filter(p => p.synthType === synthType);
-  }, [synthType]);
+    const factory = FACTORY_PRESETS.filter(p => p.synthType === synthType);
+    const ripped = rippedPresets
+      .filter(p => p.synthType === synthType)
+      .map(p => p.config as InstrumentPreset['config']);
+    return [...factory, ...ripped];
+  }, [synthType, rippedPresets]);
 
   // Close dropdown when clicking outside
   useClickOutside(dropdownRef, () => setIsOpen(false));

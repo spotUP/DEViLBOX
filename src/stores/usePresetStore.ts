@@ -19,6 +19,10 @@ import {
 import { writeNKSF } from '@/midi/performance/NKSFileFormat';
 import { pushToCloud } from '@/lib/cloudSync';
 import { SYNC_KEYS } from '@/hooks/useCloudSync';
+import { harvestNewPresets, presetFingerprint } from '@/lib/presets/harvestSongPresets';
+
+/** Cap on auto-harvested song presets kept in localStorage (oldest evicted). */
+const RIPPED_PRESET_CAP = 500;
 
 export type PresetCategory = 'Bass' | 'Lead' | 'Pad' | 'Drum' | 'FX' | 'User';
 
@@ -36,6 +40,8 @@ export interface UserPreset {
 interface PresetStore {
   // State
   userPresets: UserPreset[];
+  /** Auto-harvested synth presets ripped from loaded songs (separate from hand-saved). */
+  rippedPresets: UserPreset[];
   recentPresetIds: string[]; // Last 10 used presets
 
   // Actions
@@ -53,6 +59,9 @@ interface PresetStore {
   getPreset: (presetId: string) => UserPreset | undefined;
   getPresetsByCategory: (category: PresetCategory) => UserPreset[];
   getPresetsBySynthType: (synthType: SynthType) => UserPreset[];
+  /** Harvest synth-voiced instruments from a loaded song into rippedPresets. Returns count added. */
+  harvestFromSong: (instruments: InstrumentConfig[], sourceSong: string) => number;
+  getRippedPresetsBySynthType: (synthType: SynthType) => UserPreset[];
   addToRecent: (presetId: string) => void;
   clearRecent: () => void;
   importPresets: (presets: UserPreset[]) => void;
@@ -69,6 +78,7 @@ export const usePresetStore = create<PresetStore>()(
     immer((set, get) => ({
       // Initial state
       userPresets: [],
+      rippedPresets: [],
       recentPresetIds: [],
 
       // Save current instrument as preset
@@ -143,6 +153,27 @@ export const usePresetStore = create<PresetStore>()(
       // Get presets by synth type
       getPresetsBySynthType: (synthType) => {
         return get().userPresets.filter((p) => p.synthType === synthType);
+      },
+
+      // Harvest synth-voiced instruments from a loaded song into rippedPresets.
+      // Automatic (called at song load) — dedupes against existing ripped presets
+      // by voice fingerprint and caps total to bound localStorage.
+      harvestFromSong: (instruments, sourceSong) => {
+        const existing = get().rippedPresets;
+        const fingerprints = new Set(existing.map((p) => presetFingerprint(p.config)));
+        const additions = harvestNewPresets(instruments, sourceSong, fingerprints, Date.now());
+        if (additions.length === 0) return 0;
+        set((state) => {
+          state.rippedPresets.push(...additions);
+          const overflow = state.rippedPresets.length - RIPPED_PRESET_CAP;
+          if (overflow > 0) state.rippedPresets.splice(0, overflow);
+        });
+        return additions.length;
+      },
+
+      // Get harvested song presets by synth type (for the preset dropdown)
+      getRippedPresetsBySynthType: (synthType) => {
+        return get().rippedPresets.filter((p) => p.synthType === synthType);
       },
 
       // Track recently used presets

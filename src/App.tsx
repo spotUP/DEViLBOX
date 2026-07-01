@@ -1116,7 +1116,7 @@ function App() {
                   trs.getState().reset();
                   ts.getState().reset();
                   is.getState().reset();
-                  is.getState().loadInstruments(song.instruments);
+                  is.getState().loadInstruments(song.instruments, { sourceSong: song.name });
                   ts.getState().loadPatterns(song.patterns);
                   if (song.songPositions) ts.getState().setPatternOrder(song.songPositions);
                   trs.getState().setBPM(song.initialBPM ?? 125);
