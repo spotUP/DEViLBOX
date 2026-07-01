@@ -584,6 +584,14 @@ export const useInstrumentStore = create<InstrumentStore>()(
               return; // Handled
             }
 
+            // Cinter4 — re-render the voice's PCM live when its 12 params change
+            // (applyConfig swaps the buffer into any held note). Sample fallback
+            // stays in sync via the store update above.
+            if (updatedInstrument.synthType === 'Cinter4Synth' && updates.parameters) {
+              engine.updateComplexSynthParameters(id, updatedInstrument);
+              return; // Handled
+            }
+
             // Furnace instruments - re-encode and re-upload when parameters change
             if (updatedInstrument.synthType?.startsWith('Furnace') && updatedInstrument.furnace && updates.furnace) {
               engine.updateFurnaceInstrument(id, updatedInstrument);

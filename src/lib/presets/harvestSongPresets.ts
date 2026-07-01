@@ -85,6 +85,12 @@ export function toRippedPreset(
 ): RippedPreset {
   const { id: _id, ...configNoId } = inst;
   void _id;
+  // Cinter voices regenerate their PCM from the 12 params, so the baked WAV in
+  // `sample` is redundant in a preset — drop it to keep the preset small.
+  const params = inst.parameters as Record<string, unknown> | undefined;
+  if (params?.cinter === 1 && 'sample' in configNoId) {
+    delete (configNoId as { sample?: unknown }).sample;
+  }
   const fingerprint = presetFingerprint(inst);
   const cleanSong = sourceSong.replace(/\.[^/.]+$/, '').trim();
   const baseName = (inst.name || '').trim() || cleanSong || inst.synthType;

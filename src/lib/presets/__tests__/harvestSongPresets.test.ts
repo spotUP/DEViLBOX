@@ -56,6 +56,22 @@ describe('harvestSongPresets — rip synth voices from a loaded song', () => {
     expect(harvestNewPresets([inst], 'song', existing, 1000)).toHaveLength(0);
   });
 
+  it('harvests Cinter4 voices (now type:synth) and strips their baked WAV sample', () => {
+    const cinter = {
+      id: 5,
+      name: 'Acid Cinter',
+      type: 'synth',
+      synthType: 'Cinter4Synth',
+      parameters: { cinter: 1, p0: 10, lengthWords: 400 },
+      sample: { url: 'data:audio/wav;base64,AAAA', audioBuffer: new ArrayBuffer(8) },
+    } as unknown as InstrumentConfig;
+    expect(isHarvestableSynth(cinter)).toBe(true);
+    const [preset] = harvestNewPresets([cinter], 'Demo.cinter4', new Set(), 1000);
+    expect(preset).toBeDefined();
+    expect('sample' in preset.config).toBe(false); // baked WAV dropped — regenerated from params
+    expect((preset.config.parameters as Record<string, unknown>).cinter).toBe(1);
+  });
+
   it('toRippedPreset produces a deterministic id and drops the numeric instrument id', () => {
     const inst = synthInst({ id: 42, name: 'Acid' });
     const p1 = toRippedPreset(inst, 'Track.mod', 1000);

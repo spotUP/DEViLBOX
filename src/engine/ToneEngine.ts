@@ -2556,6 +2556,13 @@ export class ToneEngine {
       case 'SF2Synth':
       case 'Kontakt':
       case 'AUPlugin':
+      // NOTE: Cinter4Synth is intentionally NOT in this null-return group — it is
+      // now a first-class playable voice (SynthRegistry) for editor auditioning
+      // and harvested presets. `.cinter4` song replay is unaffected: those songs
+      // run through the WASM replayer with note-suppression, so the per-instrument
+      // voice is never triggered during playback.
+      case 'PumaTrackerSynth':
+      case 'ArtOfNoiseSynth':
         return null;
 
       default: {
