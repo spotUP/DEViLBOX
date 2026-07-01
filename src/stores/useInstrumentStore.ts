@@ -38,6 +38,7 @@ import { DEFAULT_WAVESABRE_INSTRUMENT } from '@typedefs/wavesabreInstrument';
 import { getFirstPresetForSynthType } from '@constants/factoryPresets';
 import { getDefaultFurnaceConfig } from '@engine/InstrumentFactory';
 import { getToneEngine } from '@engine/ToneEngine';
+import { recognizeCinter4Instruments } from '@engine/cinter4/cinter4Recognize';
 import { checkFormatViolation, getActiveFormatLimits, isViolationConfirmed } from '@/lib/formatCompatibility';
 import { FurnaceParser } from '@/lib/import/formats/FurnaceParser';
 import { DefleMaskParser } from '@/lib/import/formats/DefleMaskParser';
@@ -136,7 +137,7 @@ interface InstrumentStore {
   saveAsPreset: (instrumentId: number, name: string, category: InstrumentPreset['category']) => void;
 
   // Import
-  loadInstruments: (instruments: InstrumentConfig[], options?: { skipPreload?: boolean }) => void;
+  loadInstruments: (instruments: InstrumentConfig[], options?: { skipPreload?: boolean; sourceSong?: string }) => void;
   loadFurnaceInstrument: (buffer: ArrayBuffer) => void;
   loadDefleMaskInstrument: (buffer: ArrayBuffer) => void;
   loadDefleMaskWavetable: (buffer: ArrayBuffer) => void;
@@ -1679,6 +1680,23 @@ export const useInstrumentStore = create<InstrumentStore>()(
 
     // Import instruments from song file
     loadInstruments: (newInstruments, options) => {
+
+      // Recognize Cinter instruments by their sample names (any import path funnels
+      // through here). Tags param-encoded sample voices as live Cinter synths;
+      // already-recognized and non-Cinter instruments are left untouched.
+      try { recognizeCinter4Instruments(newInstruments); } catch { /* non-fatal */ }
+
+      // Auto-harvest this song's synth voices into the preset library so they
+      // become selectable in the synth editor's preset dropdown. Sample voices
+      // are skipped; dedup means tab-switches/undo re-runs are no-ops. Lazy +
+      // fire-and-forget to keep it off the load hot path and avoid import cycles.
+      {
+        const sourceSong = options?.sourceSong ?? '';
+        const toHarvest = newInstruments;
+        void import('./usePresetStore').then(({ usePresetStore }) => {
+          try { usePresetStore.getState().harvestFromSong(toHarvest, sourceSong); } catch { /* non-fatal */ }
+        }).catch(() => { /* non-fatal */ });
+      }
 
       // Revoke blob URLs from old instruments to prevent memory leaks
       get().instruments.forEach((inst) => {
