@@ -300,6 +300,10 @@ export interface TrackerSong {
   fredEditorWasmFileData?: ArrayBuffer;
   /** Raw Art of Noise (.aon) binary for ArtOfNoiseEngine WASM playback */
   artOfNoiseFileData?: ArrayBuffer;
+  /** Raw Cinter4 (.cinter4) binary for Cinter4Engine WASM playback */
+  cinter4FileData?: ArrayBuffer;
+  /** Companion raw-sample PCM (.raw) for Cinter4 songs that use raw instruments */
+  cinter4RawData?: ArrayBuffer;
   /** Raw QSF (.qsf/.miniqsf) binary for QsfEngine WASM playback (Capcom QSound) */
   qsfFileData?: ArrayBuffer;
   /** Raw PMD (.m/.m2) binary for PmdminiEngine WASM playback (PC-98 YM2608) */
@@ -2202,6 +2206,7 @@ export class TrackerReplayer {
     // subscription, command-log capture, and seqPlay. Returns a composite
     // cleanup we store as _seqPositionUnsub for stop().
     if (this.song.furnaceNative) {
+      console.log(`[TrackerReplayer] furnaceNative present: chipIds=${JSON.stringify(this.song.furnaceNative.chipIds)}`);
       try {
         const { FurnaceDispatchEngine } = await import('@engine/furnace-dispatch/FurnaceDispatchEngine');
         if (gen !== this._playGeneration) return;

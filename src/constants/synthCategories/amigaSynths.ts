@@ -307,4 +307,13 @@ export const amigaSynthEntries: Record<string, SynthInfo> = {
     icon: 'Cpu',
     color: 'text-green-400',
   },
+  Cinter4Synth: {
+    type: 'Cinter4Synth',
+    name: 'Cinter',
+    shortName: 'Cinter',
+    description: 'Askeksa Cinter Amiga synth — 12-param one-shot voice rendered to PCM (transpiled 68k). 83 ripped-song presets.',
+    bestFor: ['Amiga', 'Demoscene', '4k/64k intro', 'Synth samples'],
+    icon: 'Cpu',
+    color: 'text-blue-400',
+  },
 };

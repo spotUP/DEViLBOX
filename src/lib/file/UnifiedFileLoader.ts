@@ -212,7 +212,10 @@ export async function importTrackerModule(
       result = convertMODModule(
         patterns as any, importMetadata.originalChannelCount,
         importMetadata, parsedInstruments.map(i => i.name),
-        useLibopenmpt ? info.arrayBuffer : undefined,
+        // Always keep the original .mod bytes — needed for byte-exact Cinter
+        // crunching (out-of-range period cells can't survive an OpenMPT rebuild)
+        // and lossless re-export, regardless of which parser was used.
+        info.arrayBuffer,
       );
     } else if (format === 'FUR' || format === 'DMF') {
       const { getChannelMetadataFromFurnace } = await import('@components/tracker/trackerImportHelpers');
@@ -334,7 +337,7 @@ export async function importTrackerModule(
       result = convertMODModule(
         patterns as any, importMetadata.originalChannelCount,
         importMetadata, parsedInstruments.map(i => i.name),
-        useLibopenmpt ? info.arrayBuffer : undefined,
+        info.arrayBuffer, // always keep source bytes (byte-exact Cinter crunch / re-export)
       );
     }
 
@@ -406,6 +409,25 @@ export async function importTrackerModule(
     }
     const { parseModuleToSong } = await import('@lib/import/parseModuleToSong');
     const song = await parseModuleToSong(info.file, options.subsong ?? 0, options.uadeMetadata, options.midiOptions, options.companionFiles);
+    // Cinter4 with raw instruments needs its `.raw` companion PCM (the WASM engine
+    // populates the raw instruments from it before synthesizing). A negative first
+    // word in the .cinter4 means it has raw instruments. The .raw may arrive as a
+    // companion (server auto-discovery / multi-file drop); if it didn't, prompt for
+    // it — otherwise the raw sample instruments play silence.
+    const c4Data = (song as { cinter4FileData?: ArrayBuffer }).cinter4FileData;
+    if (c4Data && new DataView(c4Data).getInt16(0, false) < 0) {
+      let rawData: ArrayBuffer | undefined;
+      if (options.companionFiles) {
+        for (const [name, data] of options.companionFiles) {
+          if (/\.raw$/i.test(name)) { rawData = data; break; }
+        }
+      }
+      if (!rawData) {
+        const rawFile = await promptForCompanionFile('.raw', filename);
+        if (rawFile) rawData = await rawFile.arrayBuffer();
+      }
+      if (rawData) (song as { cinter4RawData?: ArrayBuffer }).cinter4RawData = rawData;
+    }
     loadInstruments(song.instruments, { skipPreload: true });
     loadPatterns(song.patterns);
     setCurrentPattern(0);

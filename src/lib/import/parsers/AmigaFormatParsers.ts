@@ -643,6 +643,15 @@ export async function tryRouteFormat(
       'ArtOfNoiseParser', { isFormat: isArtOfNoiseFormat, usesBytes: true, injectUADE: true });
   }
 
+  // ── Cinter4 ───────────────────────────────────────────────────────────────
+  // .cinter4 files — synthesizer-based format, WASM engine handles all playback.
+  if (matchesExt(filename, ['cinter4'])) {
+    const { isCinter4Format, parseCinter4File } = await import('@lib/import/formats/Cinter4Parser');
+    const bytes = new Uint8Array(buffer);
+    if (!isCinter4Format(bytes)) return null;
+    return parseCinter4File(bytes, filename);
+  }
+
   // ── Digital Symphony ──────────────────────────────────────────────────────
   // .dsym files — OpenMPT
   if (matchesExt(filename, ['dsym'])) {
