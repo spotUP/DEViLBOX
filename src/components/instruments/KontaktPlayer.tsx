@@ -174,7 +174,7 @@ export const KontaktPlayer: React.FC = () => {
               {isReady ? (
                 <>
                   {hasPlugin && (
-                    <Button variant="default" size="sm" onClick={unloadPlugin}>Unload</Button>
+                    <Button variant="default" size="sm" onClick={() => unloadPlugin()}>Unload</Button>
                   )}
                   <Button variant="danger" size="sm" onClick={handleDisconnect}>Disconnect</Button>
                 </>

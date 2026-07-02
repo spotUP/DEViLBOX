@@ -239,6 +239,11 @@ export function isViolationConfirmed(type: ViolationType): boolean {
   return _confirmedViolations.has(type);
 }
 
+/** True if the user has confirmed any edit that breaks the active native format. */
+export function hasAnyConfirmedFormatViolation(): boolean {
+  return _confirmedViolations.size > 0;
+}
+
 // ── Format Detection ────────────────────────────────────────────────────────
 
 /** Detect the active native format from the format store */

@@ -453,6 +453,17 @@ export const FORMAT_REGISTRY: FormatDefinition[] = [
     uadeFallback: true,
   },
   {
+    key: 'cinter4',
+    label: 'Cinter4',
+    description: 'Cinter4 Amiga synthesizer format — native WASM playback',
+    family: 'amiga-native',
+    matchMode: 'both',
+    extRegex: /\.cinter4$/i,
+    prefixes: [],
+    nativeParser: { module: '@lib/import/formats/Cinter4Parser', parseFn: 'parseCinter4File', detectFn: 'isCinter4Format' },
+    uadeFallback: false,
+  },
+  {
     key: 'digitalSymphony',
     label: 'Digital Symphony',
     description: 'Digital Symphony — native parser or UADE',

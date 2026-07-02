@@ -240,6 +240,7 @@ export const SYNTH_CATEGORIES: SynthCategory[] = [
       SYNTH_INFO.FurnaceZXBEEPER,
       SYNTH_INFO.FurnaceAMIGA,
       SYNTH_INFO.FurnacePCSPKR,
+      SYNTH_INFO.Cinter4Synth,
       SYNTH_INFO.HivelySynth,
       SYNTH_INFO.HippelCoSoSynth,
       SYNTH_INFO.RobHubbardSynth,

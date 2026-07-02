@@ -285,6 +285,23 @@ export class InstrumentFactory {
         instrument = createToneJSSynth({ ...config, synthType: "Player" })!;
         break;
 
+      case 'Cinter4Synth': {
+        // A Cinter instrument is a synth-generated sample voice (PCM rendered from
+        // its 12 params by cinter4Instrument). When it carries generated PCM, play
+        // it as a sample — period-based (Amiga Player) when it came from / targets a
+        // MOD so it tracks the periodtable like any Cinter/ProTracker sample, else a
+        // key-mapped Sampler. The playback-only .cinter4 case (no sample, WASM
+        // replayer drives the song) falls back to a basic synth and is never
+        // triggered directly (NativeEngineRouting suppresses notes).
+        if (config.sample?.url) {
+          const usePeriod = config.metadata?.modPlayback?.usePeriodPlayback;
+          instrument = createToneJSSynth({ ...config, synthType: usePeriod ? 'Player' : 'Sampler' })!;
+        } else {
+          instrument = createToneJSBasicSynth(config);
+        }
+        break;
+      }
+
       case 'Wavetable':
         instrument = createWavetable(config);
         break;

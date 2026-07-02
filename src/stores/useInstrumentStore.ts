@@ -39,6 +39,7 @@ import { getFirstPresetForSynthType } from '@constants/factoryPresets';
 import { getDefaultFurnaceConfig } from '@engine/InstrumentFactory';
 import { getToneEngine } from '@engine/ToneEngine';
 import { recognizeCinter4Instruments } from '@engine/cinter4/cinter4Recognize';
+import { cinter4ParamsToSampleName } from '@lib/import/formats/cinter4Params';
 import { checkFormatViolation, getActiveFormatLimits, isViolationConfirmed } from '@/lib/formatCompatibility';
 import { FurnaceParser } from '@/lib/import/formats/FurnaceParser';
 import { DefleMaskParser } from '@/lib/import/formats/DefleMaskParser';
@@ -413,6 +414,21 @@ export const useInstrumentStore = create<InstrumentStore>()(
           // Auto-initialize Space Laser config when synthType changes to 'SpaceLaser'
           if (synthTypeChanging && updates.synthType === 'SpaceLaser' && !instrument.spaceLaser) {
             instrument.spaceLaser = { ...DEFAULT_SPACE_LASER };
+          }
+
+          // Auto-initialize Cinter params when synthType changes to Cinter4Synth
+          // (fresh add from the synth browser) — without cinter params the voice
+          // renders silence and the editor shows "no parameters".
+          if (synthTypeChanging && updates.synthType === 'Cinter4Synth'
+              && (instrument.parameters as Record<string, unknown> | undefined)?.cinter !== 1) {
+            const defP = [5, 40, 50, 50, 50, 50, 20, 50, 0, 0, 0, 0];
+            instrument.type = 'synth';
+            instrument.parameters = {
+              cinter: 1, version: 4, lengthWords: 2000, replenWords: 0,
+              p0: defP[0], p1: defP[1], p2: defP[2], p3: defP[3], p4: defP[4], p5: defP[5],
+              p6: defP[6], p7: defP[7], p8: defP[8], p9: defP[9], p10: defP[10], p11: defP[11],
+              sampleName: cinter4ParamsToSampleName(defP),
+            } as unknown as Record<string, unknown>;
           }
 
           // Auto-initialize V2 config when synthType changes to 'V2'
@@ -964,6 +980,13 @@ export const useInstrumentStore = create<InstrumentStore>()(
         // HarmonicSynth
         else if (mergedInst.synthType === 'HarmonicSynth' && mergedInst.harmonicSynth && updates.harmonicSynth) {
           engine.updateHarmonicSynthParameters(id, mergedInst.harmonicSynth);
+        }
+        // Cinter4 — re-render the voice's PCM when the 12 params change (preset
+        // load or knob). Cinter params live in `parameters`, not a sub-config,
+        // so this is keyed off updates.parameters. applyConfig re-renders the
+        // buffer (and swaps it into a held looping note).
+        else if (mergedInst.synthType === 'Cinter4Synth' && updates.parameters) {
+          engine.updateComplexSynthParameters(id, mergedInst);
         }
         // Furnace
         else if (mergedInst.synthType?.startsWith('Furnace') && mergedInst.furnace && updates.furnace) {
