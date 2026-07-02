@@ -121,24 +121,32 @@ export class Cinter4Synth implements DevilboxSynth {
     try { voice.src.disconnect(); voice.gain.disconnect(); } catch { /* already gone */ }
   }
 
+  /** Fade + stop every active voice (short fade avoids clicks). */
+  private stopActiveVoices(t: number, fadeSec: number): void {
+    for (const voice of [...this.active]) {
+      try {
+        voice.gain.gain.cancelScheduledValues(t);
+        voice.gain.gain.setValueAtTime(voice.gain.gain.value, t);
+        voice.gain.gain.linearRampToValueAtTime(0, t + fadeSec);
+        voice.src.stop(t + fadeSec + 0.005);
+      } catch { /* already stopped */ }
+      const v = voice;
+      v.src.onended = () => { this.cleanup(v); };
+    }
+  }
+
   triggerAttack(note?: string | number, time?: number, velocity = 1): void {
     const t = time ?? audioNow();
+    // Cinter is a monophonic Amiga (Paula) voice: a new attack cuts the previous
+    // note. Without this, looping presets stack infinite loops on rapid retriggers
+    // (phasing / volume buildup / "weird"), and one-shots pile up.
+    this.stopActiveVoices(t, 0.004);
     this.startVoice(this.playbackRateFor(note), Math.max(0, Math.min(1, velocity)), t);
   }
 
   triggerRelease(_note?: string | number, time?: number): void {
     const t = time ?? audioNow();
-    // Fade + stop all voices (monophonic-ish auditioning; harmless if none).
-    for (const voice of [...this.active]) {
-      try {
-        voice.gain.gain.cancelScheduledValues(t);
-        voice.gain.gain.setValueAtTime(voice.gain.gain.value, t);
-        voice.gain.gain.linearRampToValueAtTime(0, t + 0.03);
-        voice.src.stop(t + 0.04);
-      } catch { /* already stopped */ }
-      const v = voice;
-      v.src.onended = () => { this.cleanup(v); };
-    }
+    this.stopActiveVoices(t, 0.03);
   }
 
   triggerAttackRelease(note: string | number, duration: number, time?: number, velocity = 1): void {
