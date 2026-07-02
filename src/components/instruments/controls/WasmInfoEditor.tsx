@@ -60,6 +60,11 @@ const FORMAT_INFO: Record<string, { name: string; description: string; color: st
     description: 'Jochen Hippel simple format (Amiga). Transpiled 68k replayer with Paula emulation.',
     color: '#aaff44',
   },
+  Cinter4Synth: {
+    name: 'Cinter4',
+    description: 'Cinter4 Amiga synthesizer format. All instruments synthesized from PCM at init time — transpiled 68k WASM replayer.',
+    color: '#ff9933',
+  },
   MusicAssemblerSynth: {
     name: 'Music-Assembler',
     description: 'Music-Assembler (Amiga). Transpiled 68k replayer — ADSR, vibrato, and arpeggio synthesis.',

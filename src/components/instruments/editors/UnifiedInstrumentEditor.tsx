@@ -193,6 +193,7 @@ function getEditorMode(synthType: SynthType): EditorMode {
   if (synthType === 'CpsycleSynth') return 'wasm-info';
   if (synthType === 'PumaTrackerSynth') return 'wasm-info';
   if (synthType === 'HippelSynth') return 'wasm-info';
+  if (synthType === 'Cinter4Synth') return 'cinter4';
   if (synthType === 'MdxminiSynth') return 'wasm-info';
   if (synthType === 'PmdminiSynth') return 'wasm-info';
   if (synthType === 'DssWasmSynth') return 'wasm-param';
