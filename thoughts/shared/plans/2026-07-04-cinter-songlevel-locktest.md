@@ -52,23 +52,30 @@ API: `setMemoryByte/getMemoryByte`, `loadProgram(u8, addr)`, `resetCPU`,
 `executeInstruction`, `getRegister/setRegister`. Register indices (from
 MoiraEmulator.ts): D0-7 = 0-7, A0-7 = 8-15 (A7/SP = 15), PC = 16.
 
-Scaffold: `tools/cinter-audit/moira-reference.cjs` (WIP). Run the assembled
-`reference/Cinter4.bin` blob: place code / working mem / music / 2 MB instrument
-space / stack in the flat 16 MB space; set A2=music, A4=inst, A6=work; call
-`CinterInit` (PC=base+0x0, push a sentinel return addr, `executeInstruction` until
-PC==sentinel), then per 50 Hz tick call `CinterPlay1` (base+0x1D8) then `CinterPlay2`
-(base+0x22C). Cinter4.S writes Paula via `$dff000` base: DMACON at `$dff096`, audio
-regs (AUD0-3 LC/LEN/PER/VOL) in the `$dff0a0..$dff0d7` block — all land in flat RAM,
-read them back after each tick. `$dff006` (raster) stays constant → the CinterPlay2
-`.dmawait` (`cmp.w $006(a3),d1; bgt`) falls through (no infinite loop). `$bfe001`
-write (filter LED) is a harmless RAM write.
+**DONE and WORKING** — `tools/cinter-audit/moira-reference.cjs`. Loads the assembled
+`reference/Cinter4.bin` (code / working mem / music / 2 MB instrument space / stack
+in the flat 16 MB space), sets A2=music A4=inst A6=work, calls `CinterInit`
+(synthesizes 420 KB of instruments), then per 50 Hz tick calls `CinterPlay1`
+(base+0x1D8) then `CinterPlay2` (base+0x22C) and reads the Paula audio regs
+(`$dff0a0 + ch*0x10`: LC@+0, LEN@+4, PER@+6, VOL@+8) + DMACON `$dff096`. Emits a
+per-tick, per-channel trace (period/volume/instrument/dmacon; `--json` for the
+comparator). Sample pointers map to instrument index via the c_Instruments table
+(work+156). Verified on CurtCool-BackInSpace: DMACON enables, note periods, per-tick
+pitch slides all sane.
 
-OPEN BUG in the scaffold: execution diverges early (a6 looks wrong at the first
-CinterMakeSinus store; runs off into RAM). Debug the register/memory setup +
-resetCPU ordering first. The Moira build also prints debug WATCHPOINT lines — noise.
+Gotchas solved (critical for anyone extending this):
+- **refillPrefetch()** after `setRegister(PC)` — else the CPU executes the stale
+  prefetch queue (fetched from the reset PC before code was loaded) and diverges.
+  This was THE bug in the first scaffold (a6 looked wrong / ran into RAM).
+- Subroutine calls: push a sentinel return addr, `addTrapAddress(SENT)` +
+  `executeUntilTrap()` (native speed) until PC==SENT.
+- The `.dmawait` raster spin (`cmp.w $006(a3),d1; bgt`) hangs — `$dff006` never
+  advances in flat RAM. NOP the `bgt` at code offset 0x2E6 (timing-only).
+- Moira reg map: D0-7=0-7, A0-7=8-15 (SP=15), PC=16. Memory: Chip 0-0x1FFFFF, Fast
+  0x200000-0xF7FFFF (so $dff000 is valid RAM). The build prints debug WATCHPOINT
+  noise — ignore.
 
-Fallback if Moira proves unworkable: vendor Musashi (~5 C files) under
-`tools/cinter-audit/musashi/`.
+Moira core lives in the amiexpress-web project (`MOIRA_JS` env); not vendored here.
 - Memory map: RAM for the `Cinter4.bin` blob (at a base addr), music data, a large
   instrument space, working memory. Map the Paula register block `$DFF0A0..$DFF0DF`
   (AUD0..3 LC/LEN/PER/VOL) + `$DFF096` (DMACON) to a write-trap that records
