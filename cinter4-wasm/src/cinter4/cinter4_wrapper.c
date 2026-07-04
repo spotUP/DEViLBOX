@@ -181,6 +181,9 @@ int      player_paula_period(int ch) { return (int)paula_reg_period(ch); }
 int      player_paula_volume(int ch) { return (int)paula_reg_volume(ch); }
 int      player_paula_len(int ch)    { return (int)(paula_reg_len_bytes(ch) / 2); } /* words */
 int      player_dmacon(void)         { return (int)paula_last_dmacon(); }
+
+/* Per-channel mute/solo for the isolation UI (gain 0 = mute, 1 = play). */
+void player_set_channel_gain(int ch, float gain) { paula_set_channel_gain(ch, gain); }
 /* Sample offset within instrument space (−1 if the channel points nowhere). */
 int player_paula_sample_off(int ch) {
     uintptr_t p = paula_reg_sample_ptr(ch);

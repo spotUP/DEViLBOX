@@ -28,9 +28,18 @@ static float        s_paula_clock = PAULA_CLOCK_PAL;
 /* Actual output sample rate (the worklet renders at the AudioContext rate, not the
    28150 Hz the step formula used to assume). Set via paula_set_output_rate(). */
 static float        s_output_rate = (float)PAULA_RATE_PAL;
+/* Per-channel user mute/gain (1.0 = play, 0.0 = muted). Kept OUTSIDE s_ch so
+   paula_reset (called on every song load) doesn't wipe the user's mute/solo. */
+static float        s_user_gain[PAULA_CHANNELS] = { 1.0f, 1.0f, 1.0f, 1.0f };
 
 void paula_reset(void) {
     memset(s_ch, 0, sizeof(s_ch));
+}
+
+/* Channel mute/solo for the per-channel isolation UI. gain 0 = mute, 1 = play. */
+void paula_set_channel_gain(int ch, float gain) {
+    if (ch < 0 || ch >= PAULA_CHANNELS) return;
+    s_user_gain[ch] = gain < 0.0f ? 0.0f : gain;
 }
 
 void paula_set_clock(float clock) {
@@ -107,7 +116,7 @@ static float sample_channel(PaulaChannel* ch) {
     }
     float s = (float)ch->sample[idx] / 128.0f;
     ch->pos += ch->step;
-    return s * ch->volume;
+    return s * ch->volume * s_user_gain[(int)(ch - s_ch)]; // per-channel mute/solo
 }
 
 void paula_debug_dump(void) {
