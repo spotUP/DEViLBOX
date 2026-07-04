@@ -5,7 +5,7 @@
  * are synthesized at init time from compact parameter sets — there are no samples.
  * The format uses a custom sequencer with 4 Paula channels.
  *
- * File layout (little-endian int16 words throughout):
+ * File layout (big-endian int16 words throughout — CinterConvert.py uses struct ">h"):
  *   First word: n_raw_instruments (if negative, |n| raw instrument blocks follow)
  *   Raw instrument blocks: [length(u16), replength(u16)] × |n_raw|
  *   Next word: n_gen_instruments (count of generated/synthesized instruments)
@@ -21,6 +21,7 @@ import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { InstrumentConfig } from '@/types';
 import { cinter4WordsToParams, cinter4DetectVersion } from './cinter4Params';
 import { buildCinter4Instrument } from '@/engine/cinter4/cinter4Instrument';
+import { decodeCinter4Music, foldCinter4ToModPatterns } from './cinter4Music';
 
 // ── Format Identification ─────────────────────────────────────────────────
 
@@ -171,56 +172,73 @@ export function parseCinter4File(bytes: Uint8Array, filename: string): TrackerSo
 
   const instrumentConfigs: InstrumentConfig[] = [...rawConfigs, ...genConfigs];
 
-  // ── Playback-only import ─────────────────────────────────────────────────────
+  // ── Editable decompiled import ───────────────────────────────────────────────
   // A .cinter4 file is COMPILED songdata (CinterConvert.py output): the original
   // ProTracker rows, speed/BPM commands and effects were expanded into a flat 50 Hz
-  // per-tick event stream during compilation, so there is no editable tracker
-  // structure to recover from it. We import it as a playback-only module — the WASM
-  // replayer plays the entire song (NativeEngineRouting routes Cinter4 with
-  // suppressNotes) — and present a single placeholder pattern. Authoring and editing
-  // Cinter songs happens on the ProTracker MOD path (DEViLBOX is MOD-native), not here.
-  const pattern = {
-    id: 'pattern-0',
-    name: 'Pattern 0',
-    length: 64,
-    channels: Array.from({ length: 4 }, (_, ch) => ({
-      id:           `channel-${ch}`,
-      name:         `Channel ${ch + 1}`,
-      muted:        false,
-      solo:         false,
-      collapsed:    false,
-      volume:       100,
-      pan:          ([-50, 50, 50, -50] as const)[ch] ?? 0,
-      instrumentId: null,
-      color:        null,
-      rows: Array.from({ length: 64 }, () => ({
-        note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0,
-      })),
-    })),
-    importMetadata: {
+  // per-tick note-word stream. `decodeCinter4Music` inverts that encoding back into the
+  // exporter's per-tick streams, and `foldCinter4ToPatterns` presents them as editable
+  // speed-1 patterns (one row per tick). Bit-exact WASM playback of the ORIGINAL file
+  // stays the default (NativeEngineRouting routes Cinter4 with suppressNotes via
+  // cinter4FileData); editing re-encodes the patterns through Cinter4Exporter. The
+  // decode↔encode round-trip is proven byte-exact (cinter4Music.roundtrip.test.ts).
+  const moduleName = filename.replace(/\.[^/.]+$/, '');
+  const decoded = decodeCinter4Music(bytes);
+
+  let patterns: TrackerSong['patterns'];
+  let songPositions: number[];
+  let restartPosition: number;
+  let cinter4Music: TrackerSong['cinter4Music'];
+  let initialSpeed = 6;
+
+  if (decoded) {
+    // Fold to MOD-like patterns at the recovered speed (notes on rows). Automation is
+    // not yet lifted into effect columns (Phase B) — playback stays on the WASM engine.
+    const folded = foldCinter4ToModPatterns(decoded);
+    patterns = folded.patterns as unknown as TrackerSong['patterns'];
+    songPositions = folded.songPositions;
+    restartPosition = folded.restartPosition;
+    initialSpeed = folded.speed;
+    cinter4Music = { ticksPerTrack: decoded.ticksPerTrack, restartTick: decoded.restartTick };
+    patterns[0].importMetadata = {
       sourceFormat:            'Cinter4',
       sourceFile:              filename,
       importedAt:              new Date().toISOString(),
       originalChannelCount:    4,
-      originalPatternCount:    0,
+      originalPatternCount:    patterns.length,
       originalInstrumentCount: instrumentConfigs.length,
-    },
-  };
-
-  const moduleName = filename.replace(/\.[^/.]+$/, '');
+    };
+  } else {
+    // Structurally unreadable music section: fall back to a single placeholder pattern
+    // so playback (WASM, original bytes) still works even if decode fails.
+    patterns = [{
+      id: 'pattern-0', name: 'Pattern 0', length: 64,
+      channels: Array.from({ length: 4 }, (_, ch) => ({
+        id: `channel-${ch}`, name: `Channel ${ch + 1}`,
+        muted: false, solo: false, collapsed: false,
+        volume: 100, pan: ([-50, 50, 50, -50] as const)[ch] ?? 0,
+        instrumentId: null, color: null,
+        rows: Array.from({ length: 64 }, () => ({
+          note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0,
+        })),
+      })),
+    }] as unknown as TrackerSong['patterns'];
+    songPositions = [0];
+    restartPosition = 0;
+  }
 
   return {
     name:            moduleName,
     format:          'Cinter4' as TrackerFormat,
-    patterns:        [pattern],
+    patterns,
     instruments:     instrumentConfigs,
-    songPositions:   [0],
-    songLength:      1,
-    restartPosition: 0,
+    songPositions,
+    songLength:      songPositions.length,
+    restartPosition,
     numChannels:     4,
-    initialSpeed:    6,
-    initialBPM:      125,
+    initialSpeed,        // recovered ProTracker speed (ticks per row) from the tick stream
+    initialBPM:      125, // Cinter runs at the standard 50 Hz PAL tick rate (BPM 125)
     linearPeriods:   false,
     cinter4FileData: new Uint8Array(bytes).buffer as ArrayBuffer,
+    ...(cinter4Music ? { cinter4Music } : {}),
   };
 }
