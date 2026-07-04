@@ -24,9 +24,11 @@ import {
 import {
   buildCinter4SampleConfig,
   readCinter4InstrumentParams,
+  cinter4WordsConfigPatch,
+  cinter4EffectiveWords,
   type Cinter4InstrumentParams,
 } from '@/engine/cinter4/cinter4Instrument';
-import { renderCinter4Sample } from '@/engine/cinter4/cinter4SynthCore';
+import { renderCinter4SampleFromWords } from '@/engine/cinter4/cinter4SynthCore';
 
 const PANEL_MIN_H = 150;
 const WAVE_H = 96;
@@ -36,7 +38,7 @@ const WAVE_POINTS = 900;
  *  whole sample, so the editor shows the full attack→decay envelope. */
 function previewWaveform(p: Cinter4InstrumentParams): number[] {
   const lengthSamples = Math.max(2, Math.min(p.lengthWords * 2, 32768));
-  const pcm = renderCinter4Sample(p.params, lengthSamples, null, p.version);
+  const pcm = renderCinter4SampleFromWords(cinter4EffectiveWords(p), lengthSamples, null);
   const n = Math.min(WAVE_POINTS, pcm.length);
   const out = new Array<number>(n);
   for (let i = 0; i < n; i++) out[i] = pcm[Math.floor((i / n) * pcm.length)];
@@ -134,7 +136,10 @@ export const Cinter4Controls: React.FC<Cinter4ControlsProps> = ({ instrument }) 
     if (!cur) return;
     const params = cur.params.slice();
     params[index] = Math.round(value);
-    const next: Cinter4InstrumentParams = { ...cur, params };
+    // Editing a param supersedes any verbatim import words: drop them so the voice
+    // re-encodes params→words canonically, and persist the recomputed w_* so the
+    // live Cinter4Synth voice renders the same edited words.
+    const next: Cinter4InstrumentParams = { ...cur, params, words: undefined };
     cfgRef.current = next;
 
     // Re-render the voice and push sample + params live (recreates the sampler).
@@ -143,6 +148,7 @@ export const Cinter4Controls: React.FC<Cinter4ControlsProps> = ({ instrument }) 
       sample,
       parameters: {
         [`p${index}`]: params[index],
+        ...cinter4WordsConfigPatch(params, next.version),
         sampleName: cinter4ParamsToSampleName(params),
       } as Record<string, unknown>,
     });
@@ -155,7 +161,7 @@ export const Cinter4Controls: React.FC<Cinter4ControlsProps> = ({ instrument }) 
     (patch: Partial<Pick<Cinter4InstrumentParams, 'lengthWords' | 'replenWords' | 'version'>>) => {
       const cur = cfgRef.current;
       if (!cur) return;
-      const next: Cinter4InstrumentParams = { ...cur, ...patch };
+      const next: Cinter4InstrumentParams = { ...cur, ...patch, words: undefined };
       if (next.replenWords > next.lengthWords) next.replenWords = next.lengthWords;
       cfgRef.current = next;
       const sample = buildCinter4SampleConfig(next);
@@ -165,6 +171,8 @@ export const Cinter4Controls: React.FC<Cinter4ControlsProps> = ({ instrument }) 
           lengthWords: next.lengthWords,
           replenWords: next.replenWords,
           version: next.version,
+          // version can change the pitch/decay curves — re-encode the words to match.
+          ...cinter4WordsConfigPatch(next.params, next.version),
           sampleName: cinter4ParamsToSampleName(next.params),
         } as Record<string, unknown>,
       });

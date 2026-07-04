@@ -1,12 +1,21 @@
 /**
  * cinter4SynthCore.ts — the Cinter 4 synth voice, generating instrument PCM
  *
- * A 1:1 TypeScript port of askeksa/Cinter's `cinter/src/engine.rs`
- * (`CinterInstrument` / `compute_sample`). Given the 12 instrument parameters it
- * synthesizes the 8-bit waveform exactly as the Amiga replayer regenerates it at
- * runtime. This is what makes a Cinter instrument a *live* DEViLBOX voice: edit a
- * param, re-render the buffer, the sample engine plays it — no render-to-disk and
- * re-import like the classic Cinter→ProTracker workflow.
+ * A 1:1 TypeScript port of the Amiga replayer's `CinterMakeInstruments`
+ * (cinter4-wasm/src/cinter4/cinter4.c, itself a validated port of Cinter4.S).
+ * Given the 9 stored synth words it synthesizes the 8-bit waveform exactly as the
+ * Amiga regenerates it at runtime. This is what makes a Cinter instrument a *live*
+ * DEViLBOX voice: edit a param, re-encode the words, re-render the buffer, the
+ * sample engine plays it — no render-to-disk / re-import like classic Cinter.
+ *
+ * IMPORTANT — synthesize from the STORED WORDS, not from params+version.
+ * The Amiga replayer never touches user params, pitchfun/decayfun, or a "version"
+ * at replay time; it reads the 9 words from songdata and feeds them straight into
+ * the loop (cinter4.c:399-430 init-state, :751-838 decay-apply). Re-deriving the
+ * words from a lossy words→params→words round-trip (with a guessed version) was the
+ * cause of wrong-pitch instruments on `.cinter4` import. The editor path converts
+ * params→words once via the canonical converter (cinter4ParamsToWords) and then
+ * feeds the SAME word-based synth — one path, zero version-guessing at audio time.
  *
  * Cinter is a two-oscillator phase-modulation synth with per-sample pitch/mod
  * decay, a power volume envelope, and iterated sine "distortion" (sine→square).
@@ -16,36 +25,20 @@
  * plain numbers are safe. Arithmetic right shifts on values that may exceed 32
  * bits use Math.floor(x / 2^n) (equivalent for these magnitudes, sign-correct).
  *
- * Reference: cinter/src/engine.rs — CinterEngine, CinterInstrument, compute_sample,
- *            sintab, distort, mul, p10/p100/envfun/pitchfun/decayfun.
+ * Reference: cinter4-wasm/src/cinter4/cinter4.c CinterMakeInstruments (ground
+ *            truth), Cinter4.S CinterMakeInstruments / CinterMakeSinus (upstream).
  */
 
 import {
-  CINTER4_PARAM_COUNT,
-  cinter4EnvFun,
-  cinter4PitchFun,
+  cinter4ParamsToWords,
+  type Cinter4SynthWords,
   type Cinter4Version,
 } from '../../lib/import/formats/cinter4Params';
 
-/**
- * Synth-side decay curve (engine.rs decayfun / decayfun3) — UNMASKED.
- *
- * Distinct from cinter4DecayFun in cinter4Params, which masks to 16 bits for
- * songdata storage. The synth multiplies pitch/mod by (decay/65536) every sample,
- * so the neutral value must be 65536 (×1.0, no change); the masked songdata 0
- * means the same thing to the Amiga only because its replayer skips-if-zero and
- * adds-the-original-if-positive. Here we replicate the VST synth directly.
- */
-const synthDecay = (p: number, version: Cinter4Version): number => {
-  // v3 uses the simple falloff curve directly (matches the Cinter 3 GUI render);
-  // v4 uses the exponential curve that can also grow.
-  if (version === 3) return Math.round(Math.exp(-0.000002 * p * p) * 65536);
-  const v = p / 50 - 1;
-  return Math.round(Math.exp(0.0008 * v + 0.1 * Math.pow(v, 7)) * 65536);
-};
-
 // ── Shared sine table (16384 entries, ±16384) ────────────────────────────────
 // sine_table[i] = round(sin(i/16384 · 2π) · 16384), clamped to i16.
+// (The Amiga builds this via an integer cubic polynomial, CinterMakeSinus; that
+//  differs from Math.sin by ≤3 LSB — a faint timbre nuance, not a pitch error.)
 
 let SINE_TABLE: Int16Array | null = null;
 
@@ -71,14 +64,13 @@ const asr = (x: number, n: number): number => Math.floor(x / Math.pow(2, n));
 // ── The voice ─────────────────────────────────────────────────────────────────
 
 export interface Cinter4VoiceConfig {
-  /** 12 user parameters (integer domain: idx 0-7 ∈ [0,100], idx 8-11 ∈ [0,10]). */
-  params: readonly number[];
+  /** The 9 stored synth words (mpitch, mod, bpitch, attack, dist, decay,
+   *  mpitchdecay, moddecay, bpitchdecay) — exactly what the Amiga replayer reads. */
+  words: Cinter4SynthWords;
   /** total sample length in 8-bit samples (bytes). */
   length: number;
   /** loop start in samples, or null for one-shot. */
   repeatStart?: number | null;
-  /** pitch/decay curve version (v3 or v4). Defaults to 4. */
-  version?: Cinter4Version;
 }
 
 /**
@@ -91,13 +83,12 @@ export class Cinter4Voice {
   private readonly length: number;
   private readonly repeatStart: number | null;
 
-  // running synth state (engine.rs CinterInstrument fields)
-  private attack: number;
-  private decay: number;
+  // running synth state (cinter4.c sample-state fields)
+  private decay: number;      // amp fall rate (envfun of the decay word)
   private mpitch: number;     // u32, <<16 fixed point
   private bpitch: number;
   private mod_: number;
-  private mpitchdecay: number;
+  private mpitchdecay: number; // stored 16-bit decay word (branch-applied)
   private bpitchdecay: number;
   private moddecay: number;
   private mdist: number;
@@ -113,32 +104,39 @@ export class Cinter4Voice {
 
   constructor(cfg: Cinter4VoiceConfig) {
     this.sine = sineTable();
-    const p = cfg.params;
-    if (p.length < CINTER4_PARAM_COUNT) throw new Error('Cinter4Voice: need 12 params');
-    const version = cfg.version ?? 4;
+    const w = cfg.words;
 
     this.length = cfg.length;
     this.repeatStart =
       cfg.repeatStart != null && cfg.repeatStart < cfg.length ? cfg.repeatStart : null;
 
-    // envfun(p) used directly here as the envelope rate (the stored "attack word"
-    // is 65536 - envfun, which the Amiga inverts back to this).
-    // Params here are the integer display values (idx 0-7 ∈ [0,100], 8-11 ∈ [0,10]).
-    this.attack = cinter4EnvFun(p[0]);
-    this.decay = cinter4EnvFun(p[1]);
-    this.mpitch = (cinter4PitchFun(p[2], version) * 65536) >>> 0;
-    this.mpitchdecay = synthDecay(p[3], version);
-    this.bpitch = (cinter4PitchFun(p[4], version) * 65536) >>> 0;
-    this.bpitchdecay = synthDecay(p[5], version);
-    this.mod_ = (p[6] * 65536) >>> 0;
-    this.moddecay = synthDecay(p[7], version);
-    this.mdist = p[8];
-    this.bdist = p[9];
-    this.vpower = p[10];
-    this.fdist = p[11];
+    // Pitch/mod states: stored word (unsigned 16-bit) placed in the high word,
+    // i.e. state = word << 16 (cinter4.c:399-405 MOVE.W then CLR.W).
+    this.mpitch = ((w.mpitch & 0xffff) * 65536) >>> 0;
+    this.bpitch = ((w.bpitch & 0xffff) * 65536) >>> 0;
+    this.mod_ = ((w.mod & 0xffff) * 65536) >>> 0;
+
+    // Per-sample decay words applied via the Amiga branch logic (applyDecay).
+    this.mpitchdecay = w.mpitchdecay & 0xffff;
+    this.bpitchdecay = w.bpitchdecay & 0xffff;
+    this.moddecay = w.moddecay & 0xffff;
+
+    // Amplitude envelope. The stored attack word = (65536 − envfun); as a signed
+    // int16 that is −envfun, and the Amiga does `amp -= attackWord` each sample,
+    // i.e. amp rises by envfun (cinter4.c:723). So ampDelta = −(int16)attackWord.
+    // The decay word is envfun(decay-param) directly; on clip ampDelta = −decay.
+    this.ampDelta = -(((w.attack & 0xffff) << 16) >> 16);
+    this.decay = w.decay & 0xffff;
+
+    // Distortion nibbles packed in the dist word (cinter4.c reads the dist word
+    // once per sample and walks it 0x1000 at a time: mdist, bdist, vpower, fdist).
+    const dist = w.dist & 0xffff;
+    this.mdist = (dist >> 12) & 0xf;
+    this.bdist = (dist >> 8) & 0xf;
+    this.vpower = (dist >> 4) & 0xf;
+    this.fdist = dist & 0xf;
 
     this.data.push(0, 0);
-    this.ampDelta = this.attack;
   }
 
   private sintab(i: number): number {
@@ -153,23 +151,41 @@ export class Cinter4Voice {
     return val;
   }
 
+  /**
+   * Per-sample pitch/mod decay (cinter4.c:751-838). The stored word carries only
+   * the fractional/excess part; the Amiga re-adds the implicit 1.0 via a branch:
+   *   word == 0            → state unchanged            (BEQ skip)
+   *   word high-bit set    → state = (word·state)>>16   (falloff, ×[0.5,1.0))
+   *   word positive (<0x8000) → state += (word·state)>>16 = state·(1+word/65536) (growth)
+   */
+  private applyDecay(state: number, word: number): number {
+    if (word === 0) return state;
+    const prod = asr(state * word, 16) >>> 0; // (word · state) >> 16, 32-bit
+    if (word & 0x8000) return prod >>> 0; // falloff (BMI)
+    return (state + prod) >>> 0; // growth
+  }
+
   private computeSample(): number {
-    const mval = this.distort(this.sintab(mul(this.phase, this.mpitch)), this.mdist);
+    // Oscillator phase is a 16-bit index (cinter4.c MOVE.W d6,d2, :463-468).
+    const ph = this.phase & 0xffff;
+    const mval = this.distort(this.sintab(mul(ph, this.mpitch)), this.mdist);
     let val = this.distort(
-      this.sintab(mul(this.phase, this.bpitch) + mul(mval, this.mod_)),
+      this.sintab(mul(ph, this.bpitch) + mul(mval, this.mod_)),
       this.bdist,
     );
     let pw = this.vpower;
     while (pw >= 0) {
-      val = Math.trunc((val * this.amp) / 32768);
+      // amplitude multiply: take the high 16 bits of (val·amp)<<1 = arithmetic
+      // floor((val·amp)/32768) (cinter4.c:647-654 MULS/ADD.L/SWAP).
+      val = Math.floor((val * this.amp) / 32768);
       pw -= 1;
     }
     val = Math.min(asr(this.distort(val, this.fdist), 7), 127);
 
-    // per-sample pitch / mod decays (u64 * u32 >> 16)
-    this.mpitch = asr(this.mpitch * this.mpitchdecay, 16) >>> 0;
-    this.bpitch = asr(this.bpitch * this.bpitchdecay, 16) >>> 0;
-    this.mod_ = asr(this.mod_ * this.moddecay, 16) >>> 0;
+    // per-sample pitch / mod decays (stored-word branch logic)
+    this.mpitch = this.applyDecay(this.mpitch, this.mpitchdecay);
+    this.bpitch = this.applyDecay(this.bpitch, this.bpitchdecay);
+    this.mod_ = this.applyDecay(this.mod_, this.moddecay);
 
     // amplitude envelope: rise by ampDelta until clipping, then fall by -decay
     this.amp += this.ampDelta;
@@ -210,12 +226,26 @@ export class Cinter4Voice {
   }
 }
 
-/** Convenience: render a Cinter instrument's PCM from its 12 params. */
+/** Render a Cinter instrument's PCM directly from its 9 stored synth words. */
+export function renderCinter4SampleFromWords(
+  words: Cinter4SynthWords,
+  length: number,
+  repeatStart: number | null = null,
+): Int8Array {
+  return new Cinter4Voice({ words, length, repeatStart }).render();
+}
+
+/**
+ * Convenience for the editor / presets: render from the 12 user params. The
+ * params are encoded to words via the canonical converter (exactly what
+ * CinterConvert stores and the Amiga then reads), then synthesized word-based.
+ */
 export function renderCinter4Sample(
   params: readonly number[],
   length: number,
   repeatStart: number | null = null,
   version: Cinter4Version = 4,
 ): Int8Array {
-  return new Cinter4Voice({ params, length, repeatStart, version }).render();
+  const words = cinter4ParamsToWords(params, version);
+  return new Cinter4Voice({ words, length, repeatStart }).render();
 }
