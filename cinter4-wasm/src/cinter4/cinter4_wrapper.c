@@ -42,6 +42,11 @@ extern uint32_t a2, a4, a6;
 
 static uint8_t  s_work[CINTER_WORK_SIZE];
 static uint8_t  s_inst[CINTER_INST_SIZE];
+/* Pristine tick-0 working memory captured right after CinterInit (music pointers +
+   tables, before any tick is played). player_seek restores this and replays ticks,
+   so seeking never re-synthesizes instruments (which live in s_inst, untouched). */
+static uint8_t  s_work_snapshot[CINTER_WORK_SIZE];
+static int      s_have_snapshot  = 0;
 
 static uint8_t* s_music_data     = NULL;
 static int      s_loaded         = 0;
@@ -91,6 +96,10 @@ int player_load(const uint8_t* data, int len) {
 
     CinterInit();
 
+    /* Capture the pristine tick-0 state (post-init, pre-play) for player_seek. */
+    memcpy(s_work_snapshot, s_work, sizeof(s_work));
+    s_have_snapshot = 1;
+
     /* Prime the first tick — program Paula registers so the very first
        paula_render() call produces audio instead of silence. */
     a6 = (uint32_t)(uintptr_t)s_work;
@@ -138,6 +147,25 @@ void player_stop(void) {
     paula_reset();
     s_loaded   = 0;
     s_finished = 1;
+}
+
+/* Seek to a 50 Hz tick: restore the pristine tick-0 state and replay the sequencer
+   up to `tick` so the note/period/volume state is correct at that point (no re-synth).
+   Used for Play Pattern / mid-song start — the Cinter player is otherwise linear. */
+int player_seek(int tick) {
+    if (!s_have_snapshot || !s_music_data || tick < 0) return 0;
+    memcpy(s_work, s_work_snapshot, sizeof(s_work));
+    paula_reset();
+    s_tick_accum = 0.0f;
+    s_finished   = 0;
+    s_loaded     = 1;
+    /* Replay ticks 0..tick so accumulated sequencer state (MusicPointer, per-track
+       period/volume, Paula register setup) matches normal playback at `tick`. */
+    for (int t = 0; t <= tick; t++) {
+        a6 = (uint32_t)(uintptr_t)s_work; CinterPlay1();
+        a6 = (uint32_t)(uintptr_t)s_work; CinterPlay2();
+    }
+    return 1;
 }
 
 int  player_is_finished(void)        { return s_finished ? 1 : 0; }
