@@ -299,3 +299,6 @@ third-party/demucs.cpp-main/
 
 # Local 3rd-party plugin bundles (large binaries — keep out of history)
 VST/
+
+# Derived from external Cinter reference code (assembled 68k blob + listing)
+tools/cinter-audit/reference/
