@@ -168,6 +168,28 @@ int player_seek(int tick) {
     return 1;
 }
 
+/* Song-level lock-test (task C): advance exactly one 50 Hz tick (CinterPlay1 +
+   CinterPlay2, no audio render) and read the Paula register state, to diff against
+   the Moira reference running the real Cinter4.S. player_load already primed tick 0,
+   so: load → read tick 0 → player_tick → read tick 1 → ... */
+void player_tick(void) {
+    if (!s_loaded) return;
+    a6 = (uint32_t)(uintptr_t)s_work; CinterPlay1();
+    a6 = (uint32_t)(uintptr_t)s_work; CinterPlay2();
+}
+int      player_paula_period(int ch) { return (int)paula_reg_period(ch); }
+int      player_paula_volume(int ch) { return (int)paula_reg_volume(ch); }
+int      player_paula_len(int ch)    { return (int)(paula_reg_len_bytes(ch) / 2); } /* words */
+int      player_dmacon(void)         { return (int)paula_last_dmacon(); }
+/* Sample offset within instrument space (−1 if the channel points nowhere). */
+int player_paula_sample_off(int ch) {
+    uintptr_t p = paula_reg_sample_ptr(ch);
+    if (!p) return -1;
+    uintptr_t base = (uintptr_t)s_inst;
+    if (p < base || p >= base + CINTER_INST_SIZE) return -1;
+    return (int)(p - base);
+}
+
 int  player_is_finished(void)        { return s_finished ? 1 : 0; }
 int  player_get_subsong_count(void)  { return 1; }
 void player_set_subsong(int n)       { (void)n; }
