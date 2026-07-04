@@ -934,6 +934,11 @@ export async function startNativeEngines(
     // backend, killing audio from the first start.
     if (_runningEngineKeys.has(desc.key)) {
       startedEngineKeys.add(desc.key);
+      // Still report suppression: the engine is playing this song, so the TS
+      // scheduler must NOT also voice the pattern notes. Missing this let a
+      // re-played/re-loaded Cinter4 (whose decompiled patterns carry real notes)
+      // double the WASM output through synth voices.
+      if (desc.suppressNotes) suppressNotes = true;
       continue;
     }
 
