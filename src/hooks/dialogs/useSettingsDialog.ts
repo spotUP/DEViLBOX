@@ -330,6 +330,9 @@ export function useSettingsDialog({ isOpen }: UseSettingsDialogOptions) {
     setStereoSeparation(v);
     getTrackerReplayer().setStereoSeparation(v);
     applyLibopenmptSeparation(v * 2);
+    // Cinter uses direct routing (bypasses the replayer separation node) — forward live.
+    const cinter = (globalThis as { __devilboxActiveCinter4Engine?: { setStereoSeparation(p: number): void } }).__devilboxActiveCinter4Engine;
+    if (cinter) cinter.setStereoSeparation(v);
     const djEng = getDJEngineIfActive();
     if (djEng) {
       djEng.deckA.replayer.setStereoSeparation(v);
