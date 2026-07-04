@@ -24,6 +24,7 @@ import { useDubStore } from '@stores/useDubStore';
 import { useTransportStore } from '@stores/useTransportStore';
 import { useHistoryStore } from '@stores/useHistoryStore';
 import { useFT2ToolbarActions } from '@stores/useFT2ToolbarActions';
+import { CinterShrinklerReadout } from '@components/tracker/FT2Toolbar/CinterShrinklerReadout';
 
 const NavBarComponent: React.FC = () => {
   const n = useNavBar();
@@ -305,9 +306,10 @@ const NavBarComponent: React.FC = () => {
                   autoFocus
                 />
               ) : (
-                <span>
+                <span className="flex items-center">
                   {tab.name || 'Untitled'}
                   {tab.isDirty && <span className="text-accent-primary ml-1">*</span>}
+                  {n.activeTabId === tab.id && <CinterShrinklerReadout />}
                 </span>
               )}
               {n.tabs.length > 1 && (
