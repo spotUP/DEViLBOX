@@ -2140,6 +2140,7 @@ export class FurnaceDispatchEngine implements IsolationCapableEngine {
       return { started: false };
     }
     const _log = console.log.bind(console);
+    _log(`[FurnaceDispatchEngine] startWithCoordinator called: initialized=${this.isInitialized} chips=${this.chips.size} audioRouted=${this._audioRouted}`);
     const cleanups: Array<() => void> = [];
 
     try {
@@ -2168,17 +2169,22 @@ export class FurnaceDispatchEngine implements IsolationCapableEngine {
       const chipIds = opts.song.furnaceNative.chipIds ?? [];
       const newChipSet = new Set(chipIds);
       const oldChipIds = [...(this as any).chips.keys() as IterableIterator<number>];
+      _log(`[FurnaceDispatchEngine] startWithCoordinator: chipIds=${JSON.stringify(chipIds)} oldChips=${JSON.stringify(oldChipIds)}`);
       for (const platformType of oldChipIds) {
         if (!newChipSet.has(platformType)) {
+          _log(`[FurnaceDispatchEngine] destroying old chip ${platformType}`);
           this.destroyChip(platformType);
         }
       }
       for (const chipId of chipIds) {
         if (!this.hasChip(chipId)) {
+          _log(`[FurnaceDispatchEngine] creating new chip ${chipId}`);
           await this.createChip(chipId);
-          if (!opts.isStillCurrent()) return { started: false };
+          if (!opts.isStillCurrent()) { _log('[FurnaceDispatchEngine] ABORTED: not current after createChip'); return { started: false }; }
           await this.waitForChipCreated(chipId);
-          if (!opts.isStillCurrent()) return { started: false };
+          if (!opts.isStillCurrent()) { _log('[FurnaceDispatchEngine] ABORTED: not current after waitForChipCreated'); return { started: false }; }
+        } else {
+          _log(`[FurnaceDispatchEngine] reusing existing chip ${chipId}`);
         }
       }
 
@@ -2205,6 +2211,7 @@ export class FurnaceDispatchEngine implements IsolationCapableEngine {
       // ── 4. Audio routing (one-shot) ────────────────────────────────────
       // routeNativeEngineOutput() handles this when a FurnaceDispatchSynth
       // is created, but in the WASM sequencer path we may not have one.
+      _log(`[FurnaceDispatchEngine] audio routing check: audioRouted=${this.audioRouted} hasSynthBus=${!!opts.synthBus} sharedGain=${!!this._sharedGain}`);
       if (!this.audioRouted && opts.synthBus) {
         const sharedGain = this.getOrCreateSharedGain();
         if (sharedGain) {
@@ -2280,7 +2287,8 @@ export class FurnaceDispatchEngine implements IsolationCapableEngine {
         },
       };
     } catch (err) {
-      console.warn('[FurnaceDispatchEngine] startWithCoordinator failed:', err);
+      console.error('[FurnaceDispatchEngine] startWithCoordinator FAILED:', err);
+      console.error('[FurnaceDispatchEngine] Stack:', (err as Error)?.stack);
       // Roll back any subscriptions we'd already wired
       for (const fn of cleanups) {
         try { fn(); } catch { /* best-effort */ }

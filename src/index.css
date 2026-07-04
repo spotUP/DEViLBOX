@@ -673,6 +673,7 @@
     font-weight: 500;
     text-transform: uppercase;
     letter-spacing: 0.05em;
+    white-space: nowrap; /* keep control labels on a single line app-wide */
   }
 
   .knob-body {
@@ -717,6 +718,7 @@
     font-weight: 600;
     min-width: 50px;
     text-align: center;
+    white-space: nowrap; /* keep value + unit on a single line app-wide */
   }
 
   /* TB303 Knob Panel - Compact layout */
@@ -2926,6 +2928,13 @@ html[data-theme="cyan-lineart"] #root > * {
 /* ═══════════════════════════════════════════════════════════════════════════════
    Theme-responsive button and control styles
    ═══════════════════════════════════════════════════════════════════════════════ */
+
+/* Keep button labels on a single line app-wide (covers the ~1800 raw <button>
+   elements as well as the shared <Button> component). Low specificity so a
+   `whitespace-normal` utility can opt back into wrapping where it's wanted. */
+button {
+  white-space: nowrap;
+}
 
 /* Theme button radius */
 .theme-button,
