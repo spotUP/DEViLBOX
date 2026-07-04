@@ -43,8 +43,32 @@ core**, with its Paula register writes captured.
 
 ## Build plan
 
-### 1. Reference side — Musashi 68k + Paula-register trap
-- Vendor Musashi (public-domain C 68k core, ~5 files) under `tools/cinter-audit/musashi/`.
+### 1. Reference side — Moira 68k WASM (ALREADY AVAILABLE) + Paula-register read
+
+**Update:** no need to vendor Musashi — a working **Moira 68k WASM** core exists at
+`/Users/spot/Code/amiexpress-web/web/backend/src/amiga-emulation/cpu/build/moira.{js,wasm}`
+(Embind, `module.MoiraCPU(memBytes)`). Confirmed it loads and executes 68k in node.
+API: `setMemoryByte/getMemoryByte`, `loadProgram(u8, addr)`, `resetCPU`,
+`executeInstruction`, `getRegister/setRegister`. Register indices (from
+MoiraEmulator.ts): D0-7 = 0-7, A0-7 = 8-15 (A7/SP = 15), PC = 16.
+
+Scaffold: `tools/cinter-audit/moira-reference.cjs` (WIP). Run the assembled
+`reference/Cinter4.bin` blob: place code / working mem / music / 2 MB instrument
+space / stack in the flat 16 MB space; set A2=music, A4=inst, A6=work; call
+`CinterInit` (PC=base+0x0, push a sentinel return addr, `executeInstruction` until
+PC==sentinel), then per 50 Hz tick call `CinterPlay1` (base+0x1D8) then `CinterPlay2`
+(base+0x22C). Cinter4.S writes Paula via `$dff000` base: DMACON at `$dff096`, audio
+regs (AUD0-3 LC/LEN/PER/VOL) in the `$dff0a0..$dff0d7` block — all land in flat RAM,
+read them back after each tick. `$dff006` (raster) stays constant → the CinterPlay2
+`.dmawait` (`cmp.w $006(a3),d1; bgt`) falls through (no infinite loop). `$bfe001`
+write (filter LED) is a harmless RAM write.
+
+OPEN BUG in the scaffold: execution diverges early (a6 looks wrong at the first
+CinterMakeSinus store; runs off into RAM). Debug the register/memory setup +
+resetCPU ordering first. The Moira build also prints debug WATCHPOINT lines — noise.
+
+Fallback if Moira proves unworkable: vendor Musashi (~5 C files) under
+`tools/cinter-audit/musashi/`.
 - Memory map: RAM for the `Cinter4.bin` blob (at a base addr), music data, a large
   instrument space, working memory. Map the Paula register block `$DFF0A0..$DFF0DF`
   (AUD0..3 LC/LEN/PER/VOL) + `$DFF096` (DMACON) to a write-trap that records
