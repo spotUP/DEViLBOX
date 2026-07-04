@@ -174,10 +174,21 @@ export function parse(tokens: Token[]): AstNode[] {
       if (labelNode?.kind === 'label') nodes.pop(); // remove the label node
       const sizeChar = lt[j + 1].value.slice(1).toUpperCase(); // B, W, L
       const elemSize = sizeChar === 'B' ? 1 : sizeChar === 'W' ? 2 : 4;
-      const countToken = lt[j + 2];
-      const count = countToken && (countToken.kind === 'NUMBER' || countToken.kind === 'IMMEDIATE')
-        ? parseNumber(countToken.value.replace(/^#/, ''))
-        : 0;
+      // Collect all remaining tokens on this line as the count expression (may span
+      // multiple tokens, e.g. `4*3`, `32*2`, `36+1` — all need arithmetic eval).
+      const countExprTokens: string[] = [];
+      let ci = j + 2;
+      while (lt[ci] && lt[ci].line === lt[j].line) {
+        countExprTokens.push(lt[ci].value.replace(/^#/, ''));
+        ci++;
+      }
+      const countExpr = countExprTokens.join('').replace(/\$([0-9A-Fa-f]+)/g, (_m, h) => parseInt(h, 16).toString());
+      let count = 0;
+      try {
+        if (/^[\d\s+\-*/()]+$/.test(countExpr)) {
+          count = Math.trunc((new Function(`"use strict"; return (${countExpr || '0'})`))() as number);
+        }
+      } catch { count = 0; }
       nodes.push({ kind: 'equ', name, value: rsOffset, line: startLine });
       rsOffset += elemSize * count;
       continue;

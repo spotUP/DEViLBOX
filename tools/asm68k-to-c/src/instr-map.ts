@@ -559,7 +559,12 @@ export function emitInstruction(node: InstructionNode): string {
     case 'EXT':
       if (s === 'W') return `${src} = (uint32_t)(int32_t)(int16_t)(int8_t)${src};`;
       return `${src} = (uint32_t)(int32_t)(int16_t)${src};`;
-    case 'SWAP': return `${src} = (${src} >> 16) | (${src} << 16);`;
+    case 'SWAP': {
+      // SWAP always operates on the full 32-bit register regardless of any size suffix.
+      // The .W suffix is assembler notation only; W(dn) would make shifts meaningless.
+      const reg = ops[0].kind === 'register' ? (ops[0] as any).name : src;
+      return `${reg} = (${reg} >> 16) | (${reg} << 16);`;
+    }
 
     case 'LSL':
       if (!dst) {

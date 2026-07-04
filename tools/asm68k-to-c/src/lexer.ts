@@ -590,6 +590,21 @@ function tokenizeLine(src: string, lineNum: number): Token[] {
       continue;
     }
 
+    // -- Multiply/divide between numbers: 4*3, 32*2, 36/3 → evaluate to single number --
+    if ((ch === '*' || ch === '/') && !isFirstToken && tokens.length > 0 &&
+        tokens[tokens.length - 1].kind === 'NUMBER' &&
+        i + 1 < src.length && isDigit(src[i + 1])) {
+      const prevTok = tokens[tokens.length - 1];
+      const prevVal = parseInt(prevTok.value);
+      const op = ch;
+      advance(); // consume '*' or '/'
+      const rhsStr = readDecimal();
+      const rhsVal = parseInt(rhsStr);
+      const result = op === '*' ? prevVal * rhsVal : Math.trunc(prevVal / rhsVal);
+      prevTok.value = `${result}`;
+      continue;
+    }
+
     // -- Numeric arithmetic in operands: 42+6(a3) → combine into single number --
     if ((ch === '+' || ch === '-') && !isFirstToken && tokens.length > 0 &&
         tokens[tokens.length - 1].kind === 'NUMBER') {

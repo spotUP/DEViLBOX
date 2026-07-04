@@ -9,6 +9,7 @@ import { resolve } from './resolver.js';
 import { emit } from './emitter.js';
 import { genWrapper, genCMake } from './gen-wrapper.js';
 import { restructure } from './restructure.js';
+import { preProcess } from './preprocess.js';
 
 const program = new Command();
 
@@ -26,17 +27,26 @@ program
   .option('--pass2', 'Enable Pass 2 restructuring (experimental)', false)
   .option('--no-func-split', 'Disable function splitting at RTS boundaries (for disassembled binaries)', false)
   .option('-P, --preamble <file>', 'Prepend ASM file before main source (repeatable)', (v: string, acc: string[]) => [...acc, v], [] as string[])
+  .option('--xdef <names>', 'Comma-separated list of labels to treat as exported (XDEF) — use when the ASM has no XDEF directives')
   .action((inputs: string[], opts) => {
     for (const inputPath of inputs) {
       // Build source: optional preamble files + main source
       const preambles = (opts.preamble as string[] | undefined) ?? [];
       const preambleSource = preambles.map(p => readFileSync(p, 'utf8')).join('\n');
       const mainSource = readFileSync(inputPath, 'utf8');
-      const source = preambleSource ? preambleSource + '\n' + mainSource : mainSource;
+      const rawSource = preambleSource ? preambleSource + '\n' + mainSource : mainSource;
+
+      // Inject explicit XDEF directives before preprocessing so the resolver
+      // marks those symbols as exported (non-static in the output).
+      const xdefNames: string[] = opts.xdef
+        ? (opts.xdef as string).split(',').map((s: string) => s.trim()).filter(Boolean)
+        : [];
+      const xdefBlock = xdefNames.map(n => `\txdef\t${n}`).join('\n');
+      const source = preProcess(xdefBlock ? xdefBlock + '\n' + rawSource : rawSource);
       const name   = opts.playerName ?? basename(inputPath, extname(inputPath));
       const outDir = join(opts.outputDir, name);
 
-      const tokens   = tokenize(source);
+      const tokens   = tokenize(source);  // source already preprocessed above
       const ast      = parse(tokens);
       const resolved = resolve(ast);
 
