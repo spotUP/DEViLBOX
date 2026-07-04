@@ -217,6 +217,7 @@ export function synthTypeToInstrumentType(synthType: string): InstrumentType | n
     case 'InStereo1Synth':
     case 'JamCrackerSynth':
     case 'PreTrackerSynth':
+    case 'Cinter4Synth':
     case 'FuturePlayerSynth':
     case 'OctaMEDSynth':
     case 'DavidWhittakerSynth':

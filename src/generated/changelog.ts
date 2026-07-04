@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-05-08T14:27:01.802Z
+ * Generated: 2026-07-03T19:47:09.110Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,10 +19,10 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.6441';
-export const BUILD_NUMBER = '6441';
-export const BUILD_HASH = '2e30ee5c4';
-export const BUILD_DATE = '2026-05-08';
+export const BUILD_VERSION = '1.0.6487';
+export const BUILD_NUMBER = '6487';
+export const BUILD_HASH = 'c6eacee88';
+export const BUILD_DATE = '2026-07-03';
 
 // Full version (patch IS the build number, so no need to append)
 export const FULL_VERSION = BUILD_VERSION;
@@ -30,7 +30,209 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.6441',
+    version: '1.0.6487',
+    date: '2026-07-02',
+    changes: [
+      {
+        type: 'fix',
+        "description": "Cinter voice monophonic — retrigger cuts previous note"
+      },
+      {
+        type: 'improvement',
+        "description": "Chore: commit Cinter WASM source + transpile provenance"
+      },
+      {
+        type: 'fix',
+        "description": "Commit complete Cinter feature to unbreak CI build"
+      },
+      {
+        type: 'feature',
+        "description": "Rip all Cinter songs' instruments into factory presets"
+      },
+      {
+        type: 'feature',
+        "description": "Cinter4 as a first-class synth voice"
+      },
+      {
+        type: 'feature',
+        "description": "Auto-harvest song synth voices into preset library"
+      },
+      {
+        type: 'fix',
+        "description": "Tracker worker watchdog false-alarm on slow startup"
+      },
+      {
+        type: 'improvement',
+        "description": "Cinter4 editability plan + UADE-only format inventory"
+      },
+      {
+        type: 'improvement',
+        "description": "Complete Cinter4 WASM player fixes handoff"
+      }
+    ]
+  },
+  {
+    version: '2026-05-09',
+    date: '2026-05-09',
+    changes: [
+      {
+        type: 'feature',
+        "description": "Add standalone Sammy Blammy pad preset (bank A samples only)"
+      },
+      {
+        type: 'fix',
+        "description": "MIDI pads now respect DEViLBOX bank selection"
+      },
+      {
+        type: 'fix',
+        "description": "Sammy Blammy bank B wrong offset + add load diagnostics"
+      },
+      {
+        type: 'fix',
+        "description": "Sammy Blammy bank B pads silent — fetch+decode samples on preset apply"
+      },
+      {
+        type: 'feature',
+        "description": "Wire Sammy Blammy samples as One-Shots Live bank B"
+      },
+      {
+        type: 'feature',
+        "description": "Add Sammy Blammy sample pack (17 DJ samples)"
+      },
+      {
+        type: 'fix',
+        "description": "MPK Mini mapping, CORS analysis cache, remote DB proxy"
+      },
+      {
+        type: 'fix',
+        "description": "Audio levels peaking red + playlist preview stop broken"
+      },
+      {
+        type: 'fix',
+        "description": "Fader range, DubBus insert race, deck 2 cached song data"
+      },
+      {
+        type: 'fix',
+        "description": "Auto DJ silence — scratch-buffer priming race with play()"
+      },
+      {
+        type: 'improvement',
+        "description": "DJ view regression fix session handoff"
+      },
+      {
+        type: 'fix',
+        "description": "Auto DJ transition sweep guard prevents premature completeTransition"
+      },
+      {
+        type: 'fix',
+        "description": "Crossfader animation, Auto DJ advancement, 200MB limit"
+      },
+      {
+        type: 'fix',
+        "description": "Crossfader animation + DJ echo prevention"
+      },
+      {
+        type: 'fix',
+        "description": "Pipeline cache hit returns 0-byte audio for stub entries"
+      },
+      {
+        type: 'fix',
+        "description": "TFMX/FRED analysis — download companions before render, route FRED locally"
+      },
+      {
+        type: 'fix',
+        "description": "Preview play await, smart sort on Auto DJ enable, remove duplicate case"
+      },
+      {
+        type: 'fix',
+        "description": "Auto DJ modal close-on-outside-click, snappier skip crossfade, analysis improvements"
+      },
+      {
+        type: 'fix',
+        "description": "IndexedDB getAll() OOM crash + analysis render limit + context menu analyze"
+      },
+      {
+        type: 'fix',
+        "description": "Wrap playlist rehydration in try-catch to prevent silent data loss"
+      },
+      {
+        type: 'fix',
+        "description": "Collapse action buttons width when not hovered to stop track name truncation"
+      },
+      {
+        type: 'fix',
+        "description": "Prevent Oh Snap crashes from Immer Draft proxy cloning"
+      },
+      {
+        type: 'fix',
+        "description": "Batch 3 — deck B pattern view, local file support, selector storms, FX release handlers"
+      },
+      {
+        type: 'fix',
+        "description": "Prevent Aw Snap OOM crashes in playlist panel and modal"
+      },
+      {
+        type: 'fix',
+        "description": "Reduce playlist panel re-render storms that crash Chrome"
+      },
+      {
+        type: 'fix',
+        "description": "Protect playlists from destructive migrations + cloud restore"
+      },
+      {
+        type: 'fix',
+        "description": "Always reset chips and clear stale samples between song loads"
+      },
+      {
+        type: 'fix',
+        "description": "Prevent Oh Snap crashes from playlist reorder and pipeline races"
+      },
+      {
+        type: 'fix',
+        "description": "Immediate crossfade on skip — no quantize delay"
+      },
+      {
+        type: 'fix',
+        "description": "Prevent preload race condition on second song load"
+      },
+      {
+        type: 'fix',
+        "description": "Fix multiple DJ view regressions"
+      },
+      {
+        type: 'fix',
+        "description": "Effect commands work for all WASM synths (DevilboxSynth)"
+      }
+    ]
+  },
+  {
+    version: '2026-05-08',
+    date: '2026-05-08',
+    changes: [
+      {
+        type: 'feature',
+        "description": "Bridge auto-start route and NKS browser updates"
+      },
+      {
+        type: 'feature',
+        "description": "Slot-aware MIDI routing and native GUI open"
+      },
+      {
+        type: 'feature',
+        "description": "Multi-slot TypeScript bridge protocol"
+      },
+      {
+        type: 'feature',
+        "description": "Add AUPlugin synthType and bridgeSlotId to instrument config"
+      },
+      {
+        type: 'improvement',
+        "description": "Multi-slot AU bridge — host multiple plugins simultaneously"
+      }
+    ]
+  },
+  {
+    version: '2026-05-07',
     date: '2026-05-07',
     changes: [
       {
@@ -48,196 +250,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'feature',
         "description": "Generalize AU bridge — enumerate and load any AU plugin"
-      },
-      {
-        type: 'fix',
-        "description": "Kontakt bridge crash — CFRunLoop + SIGPIPE hardening"
-      },
-      {
-        type: 'fix',
-        "description": "Fix unhandled rejections in Kontakt MIDI routing"
-      },
-      {
-        type: 'fix',
-        "description": "Fix Kontakt synth type init error when selecting instrument"
-      },
-      {
-        type: 'feature',
-        "description": "Add Kontakt synth type for NKS preset MIDI routing"
-      },
-      {
-        type: 'fix',
-        "description": "Fix Add Instrument dialog: all 4 tabs render inline"
-      },
-      {
-        type: 'feature',
-        "description": "Consolidate instrument toolbar into unified Add dialog"
-      },
-      {
-        type: 'fix',
-        "description": "Fix NKS preset loading with pending preset data pattern"
-      },
-      {
-        type: 'fix',
-        "description": "Fix NKS Library preset load + Kontakt bridge auto-connect"
-      },
-      {
-        type: 'fix',
-        "description": "Fix Load Preset: create instrument when none selected"
-      },
-      {
-        type: 'fix',
-        "description": "Fix preset dialog hidden behind nav bar"
-      },
-      {
-        type: 'feature',
-        "description": "Add Library tab to instrument preset browser"
-      },
-      {
-        type: 'fix',
-        "description": "Fix Vite proxy: forward /api/* to Express:3011 in dev"
-      },
-      {
-        type: 'feature',
-        "description": "Add Surge XT (2618), OB-Xf (330), Odin2 (260) to preset browser"
-      },
-      {
-        type: 'feature',
-        "description": "Add cross-platform Kontakt bridge (AU/VST3 host, WebSocket audio streaming)"
-      },
-      {
-        type: 'fix',
-        "description": "Fix NKS browser to read from Kontakt 8 database (568 presets)"
-      },
-      {
-        type: 'feature',
-        "description": "Add DevilBOX synth preset browser (Helm + Dexed)"
-      },
-      {
-        type: 'feature',
-        "description": "Add Maschine MK3 display support and Traktor controller profiles"
-      },
-      {
-        type: 'feature',
-        "description": "Add KK Light Guide, Focus Follow, and Light Guide settings panel"
-      },
-      {
-        type: 'feature',
-        "description": "Add NKS Library Browser UI"
-      },
-      {
-        type: 'feature',
-        "description": "Add KK DAW MIDI protocol integration for Komplete Kontrol keyboards"
-      },
-      {
-        type: 'fix',
-        "description": "Fix flaky test timeouts: bump to 60s for heavy imports"
-      },
-      {
-        type: 'improvement',
-        "description": "SongScreen: show position chain with slot mute counts"
-      },
-      {
-        type: 'fix',
-        "description": "Pattern matrix sizing, always-show blocks, pattern numbers"
-      },
-      {
-        type: 'fix',
-        "description": "Fix piano roll auto-scroll to center on actual notes"
-      },
-      {
-        type: 'feature',
-        "description": "Renoise-style Pattern Matrix view with per-slot muting"
-      },
-      {
-        type: 'feature',
-        "description": "Add piano roll view to pattern editor"
-      },
-      {
-        type: 'feature',
-        "description": "Separate main encoder from knobs, add context-aware scrolling"
-      },
-      {
-        type: 'feature',
-        "description": "Add default factory mappings for Maschine MK2 and MPK Mini MK3"
-      },
-      {
-        type: 'feature',
-        "description": "Add Akai MPK Mini MK3 layout to MIDI controller mapper"
-      },
-      {
-        type: 'feature',
-        "description": "Add Maschine MK2 layout to MIDI controller mapper"
-      }
-    ]
-  },
-  {
-    version: '2026-05-06',
-    date: '2026-05-06',
-    changes: [
-      {
-        type: 'fix',
-        "description": "MK2 knob mapping: fix index, wire page switching, hide NKS bar"
-      },
-      {
-        type: 'fix',
-        "description": "Motor fader init retry + cache clear on dub toggle"
-      },
-      {
-        type: 'improvement',
-        "description": "Expand drum pads to 8 groups (A-H, 128 pads) for MK2"
-      },
-      {
-        type: 'fix',
-        "description": "Clear motor fader cache on init flush and dub toggle"
-      },
-      {
-        type: 'fix',
-        "description": "Fix drum pad grid: show all 16 pads for MK2, hide bank selector"
-      },
-      {
-        type: 'improvement',
-        "description": "Move TD-3 Pattern Transfer to Export/Import dialog"
-      },
-      {
-        type: 'fix',
-        "description": "Wire all 48 MK2 buttons: fix name mapping, add grid/volume/nav handlers"
-      },
-      {
-        type: 'fix',
-        "description": "Fix MIDI dropdown clipped by toolbar overflow-hidden"
-      },
-      {
-        type: 'fix',
-        "description": "Fix Controller Mapper modal not opening"
-      },
-      {
-        type: 'fix',
-        "description": "Fix motor faders not matching app state after reload"
-      },
-      {
-        type: 'fix',
-        "description": "Fix MK2 playback display: always update currentRow in transport store"
-      },
-      {
-        type: 'fix',
-        "description": "Fix null crash in MIDIMapperModal when no user overrides exist"
-      },
-      {
-        type: 'fix',
-        "description": "Visual MIDI controller mapper + motor fader snap-back fix"
-      },
-      {
-        type: 'improvement',
-        "description": "MK2: show 16 pads in 4x4 grid, set controllerPadCount on connect"
-      },
-      {
-        type: 'improvement',
-        "description": "MK2 pad LEDs reflect drum pad bank colors"
-      },
-      {
-        type: 'feature',
-        "description": "Persist mixer state in .dbx + reset X-Touch controls on init"
       }
     ]
   }
