@@ -136,15 +136,19 @@ export function parseCinter4File(bytes: Uint8Array, filename: string): TrackerSo
     if (off + 22 > bytes.length) break; // need 11 uint16s = 22 bytes
     const length    = readU16BE();
     const replength = readU16BE();
-    const mpitch      = readI16BE();
-    const mod         = readI16BE();
-    const bpitch      = readI16BE();
-    const attack      = readI16BE();
-    const dist        = readI16BE();
-    const decay       = readI16BE();
-    const mpitchdecay = readI16BE();
-    const moddecay    = readI16BE();
-    const bpitchdecay = readI16BE();
+    // Synth words are unsigned 16-bit: pitch words for the top octave exceed
+    // 32767 (v4 pitchfun(100) ≈ 61798) and MUST NOT be sign-extended, or the
+    // high-pitched instruments read as negative and decode wrong. cinter4.c
+    // treats every stored word as unsigned (word << 16 into the pitch state).
+    const mpitch      = readU16BE();
+    const mod         = readU16BE();
+    const bpitch      = readU16BE();
+    const attack      = readU16BE();
+    const dist        = readU16BE();
+    const decay       = readU16BE();
+    const mpitchdecay = readU16BE();
+    const moddecay    = readU16BE();
+    const bpitchdecay = readU16BE();
     instruments.push({ index: i, length, replength, mpitch, mod, bpitch, attack, dist, decay, mpitchdecay, moddecay, bpitchdecay });
   }
 
@@ -167,6 +171,9 @@ export function parseCinter4File(bytes: Uint8Array, filename: string): TrackerSo
       lengthWords: inst.length,
       replenWords: inst.replength,
       version,
+      // Synthesize from the verbatim stored words — the params/version above are
+      // only a best-effort decode for editor display; the Amiga uses the words.
+      words,
     });
   });
 

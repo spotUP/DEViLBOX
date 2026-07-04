@@ -20,8 +20,8 @@
 import type { InstrumentConfig } from '@/types';
 import type { Pattern } from '@/types/tracker';
 import { cinter4ParseSampleName, cinter4ParamsToSampleName, type Cinter4Version } from '@/lib/import/formats/cinter4Params';
-import { renderCinter4Sample } from '@/engine/cinter4/cinter4SynthCore';
-import { readCinter4InstrumentParams } from '@/engine/cinter4/cinter4Instrument';
+import { renderCinter4Sample, renderCinter4SampleFromWords } from '@/engine/cinter4/cinter4SynthCore';
+import { readCinter4InstrumentParams, cinter4EffectiveWords } from '@/engine/cinter4/cinter4Instrument';
 
 const MOD_HEADER_SIZE = 1084; // title(20) + 31×30 sample headers + 2 + 128 order + 4 tag
 
@@ -114,7 +114,7 @@ export function buildCinterModFromOpenMPT(
       lengthWords = cp.lengthWords;
       if (cp.replenWords > 0) { loopLength = cp.replenWords; loopStart = cp.lengthWords - cp.replenWords; }
       const sampleBytes = Math.max(2, lengthWords * 2);
-      pcm = opts.stripCinter ? new Int8Array(sampleBytes) : renderCinter4Sample(cp.params, sampleBytes, null, cp.version);
+      pcm = opts.stripCinter ? new Int8Array(sampleBytes) : renderCinter4SampleFromWords(cinter4EffectiveWords(cp), sampleBytes, null);
     } else if (inst?.type === 'sample' && inst.sample) {
       name = inst.name;
       pcm = wavToInt8(inst.sample.audioBuffer);

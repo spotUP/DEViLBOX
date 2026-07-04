@@ -19,8 +19,8 @@ import {
   cinter4ParamsToSampleName,
   type Cinter4Version,
 } from '@/lib/import/formats/cinter4Params';
-import { renderCinter4Sample } from '@/engine/cinter4/cinter4SynthCore';
-import { readCinter4InstrumentParams } from '@/engine/cinter4/cinter4Instrument';
+import { renderCinter4SampleFromWords } from '@/engine/cinter4/cinter4SynthCore';
+import { cinter4EffectiveWords, readCinter4InstrumentParams } from '@/engine/cinter4/cinter4Instrument';
 
 export interface Cinter4ModExportOptions extends MODExportOptions {
   /**
@@ -113,7 +113,7 @@ export async function exportCinterMod(
       const repeatStart = cp.replenWords > 0 ? (cp.lengthWords - cp.replenWords) * 2 : null;
       const pcm = strip
         ? new Int8Array(lengthSamples)
-        : renderCinter4Sample(cp.params, lengthSamples, repeatStart, cp.version);
+        : renderCinter4SampleFromWords(cinter4EffectiveWords(cp), lengthSamples, repeatStart);
       const origName = (inst.parameters as Record<string, unknown> | undefined)?.sampleName as string | undefined;
       const name = cinterSampleName(cp.params, cp.version, origName);
       const volume = Math.round(Math.max(0, Math.min(64, 64 * Math.pow(10, (inst.volume ?? 0) / 20))));
