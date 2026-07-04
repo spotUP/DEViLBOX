@@ -16,9 +16,14 @@ typedef struct {
     float         step;         // samples-per-output-frame = freq / PAULA_RATE
     float         volume;       // 0.0 - 1.0
     int           dma_on;
+    // Raw register values, kept for the song-level lock-test trace (period is
+    // otherwise lost to `step`, volume to the 0-1 float). Not used by rendering.
+    uint16_t      reg_period;   // last AUDxPER written
+    uint8_t       reg_vol;      // last AUDxVOL written (0-64)
 } PaulaChannel;
 
 static PaulaChannel s_ch[PAULA_CHANNELS];
+static uint16_t     s_last_dmacon = 0; // last DMACON write (lock-test trace)
 static float        s_paula_clock = PAULA_CLOCK_PAL;
 /* Actual output sample rate (the worklet renders at the AudioContext rate, not the
    28150 Hz the step formula used to assume). Set via paula_set_output_rate(). */
@@ -48,6 +53,7 @@ void paula_set_length(int ch, uint16_t len_words) {
 
 void paula_set_period(int ch, uint16_t period) {
     if (ch < 0 || ch >= PAULA_CHANNELS || period == 0) return;
+    s_ch[ch].reg_period = period; // lock-test trace
     // freq = paula_clock / period
     // step = freq / output_rate = paula_clock / (period * actual_output_rate)
     s_ch[ch].step = s_paula_clock / ((float)period * s_output_rate);
@@ -56,10 +62,19 @@ void paula_set_period(int ch, uint16_t period) {
 void paula_set_volume(int ch, uint8_t vol) {
     if (ch < 0 || ch >= PAULA_CHANNELS) return;
     uint8_t v = vol > 64 ? 64 : vol;
+    s_ch[ch].reg_vol = v; // lock-test trace
     s_ch[ch].volume = (float)v / 64.0f;
 }
 
+/* Lock-test accessors — read the raw Paula register state (see moira-reference). */
+uint16_t paula_reg_period(int ch)   { return (ch >= 0 && ch < PAULA_CHANNELS) ? s_ch[ch].reg_period : 0; }
+uint8_t  paula_reg_volume(int ch)   { return (ch >= 0 && ch < PAULA_CHANNELS) ? s_ch[ch].reg_vol : 0; }
+uint32_t paula_reg_len_bytes(int ch){ return (ch >= 0 && ch < PAULA_CHANNELS) ? s_ch[ch].reg_len : 0; }
+uintptr_t paula_reg_sample_ptr(int ch){ return (ch >= 0 && ch < PAULA_CHANNELS) ? (uintptr_t)s_ch[ch].reg_sample : 0; }
+uint16_t paula_last_dmacon(void)    { return s_last_dmacon; }
+
 void paula_dma_write(uint16_t dmacon) {
+    s_last_dmacon = dmacon; // lock-test trace
     int enable = (dmacon & 0x8000) != 0;
     int i;
     for (i = 0; i < PAULA_CHANNELS; i++) {
