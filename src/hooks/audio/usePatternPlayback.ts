@@ -640,8 +640,12 @@ export const usePatternPlayback = () => {
             // If the position is out of bounds (e.g. pattern order shrunk), seekTo handles clamping.
             replayer.seekTo(currentSongPos, currentRow);
           }
+        } else if (isLooping) {
+          // Pattern-loop initial start: the song is a 1-entry list ([currentPattern]),
+          // so always loop it from the top (pos 00 / row 0) rather than the cursor.
+          replayer.seekTo(0, 0);
         } else {
-          // Initial start: seek to the current cursor position so playback
+          // Initial start (song mode): seek to the current cursor position so playback
           // begins where the user is looking, not from the top of the song.
           const startPos = currentPositionIndexRef.current;
           const startRow = useTransportStore.getState().currentRow;
