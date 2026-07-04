@@ -304,6 +304,12 @@ export interface TrackerSong {
   cinter4FileData?: ArrayBuffer;
   /** Companion raw-sample PCM (.raw) for Cinter4 songs that use raw instruments */
   cinter4RawData?: ArrayBuffer;
+  /**
+   * Decoded-music metadata for editable Cinter4 songs. The compiled note stream was
+   * decompiled into speed-1 patterns; these preserve the exact tick count and loop
+   * point so re-encoding through Cinter4Exporter.encodeFromStreams is lossless.
+   */
+  cinter4Music?: { ticksPerTrack: number; restartTick: number };
   /** Raw QSF (.qsf/.miniqsf) binary for QsfEngine WASM playback (Capcom QSound) */
   qsfFileData?: ArrayBuffer;
   /** Raw PMD (.m/.m2) binary for PmdminiEngine WASM playback (PC-98 YM2608) */

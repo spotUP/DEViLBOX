@@ -16,6 +16,9 @@
  */
 
 import { cinter4ParamsToWords, type Cinter4Version } from '../import/formats/cinter4Params';
+import { decodeCinter4Music, rebuildCinter4Streams } from '../import/formats/cinter4Music';
+import type { TrackerSong } from '@/engine/TrackerReplayer';
+import type { Pattern } from '@/types/tracker';
 
 // ── Parsed module model ──────────────────────────────────────────────────────
 
@@ -397,6 +400,68 @@ export function encodeCinter4FromMod(modBytes: Uint8Array): Cinter4ExportResult 
     if (pos >= module.songlength) pos = 0;
   }
 
+  return encodeFromStreams({
+    notedata, perioddata, volumedata, offsetdata, stopped, restart,
+    seedErrors: errors,
+    instrument: (i) => {
+      const minst = module.instruments[i]!;
+      return {
+        version: minst.version,
+        length: minst.length,
+        repoffset: minst.repoffset,
+        replen: minst.replen,
+        params: instParams[i],
+        samples: minst.samples,
+      };
+    },
+  });
+}
+
+// ── Stream → songdata (shared by the MOD compile path and the .cinter4 decode path) ──
+
+/**
+ * Per-instrument data needed to emit the instrument section. `params !== null` is a
+ * generated (synthesized) instrument whose 11 stored words are derived from the 12
+ * human params via `cinter4ParamsToWords`; `params === null` is a raw-sample instrument.
+ *
+ * `instWords`, when supplied, is used VERBATIM as the instrument's stored words
+ * (bypassing the param codec and the length/replength trim). The `.cinter4` decode path
+ * uses this so the re-encoded instrument section is byte-identical to the source file —
+ * the words→params→words round-trip of `cinter4Params` is not guaranteed lossless, so
+ * the decode path must never route through it.
+ */
+export interface StreamInstrument {
+  version: Cinter4Version | null; // null = raw (no synth params)
+  length: number;                 // sample length in words
+  repoffset: number;
+  replen: number;
+  params: number[] | null;        // 12 synth params, or null for raw
+  samples: Uint8Array;            // raw PCM (only used for raw instruments' blob)
+  instWords?: number[];           // verbatim stored words (decode path); overrides params/length calc
+}
+
+export interface EncodeFromStreamsInput {
+  notedata: number[][];   // [track][tick] = instrument index (0 = no trigger)
+  perioddata: number[][]; // [track][tick] = absolute Paula period
+  volumedata: number[][]; // [track][tick] = absolute volume 0..64
+  offsetdata: number[][]; // [track][tick] = 9xx sample offset (×128)
+  stopped: boolean;
+  restart: number;        // restart tick index (in stream space, pre-trim)
+  instrument: (i: number) => StreamInstrument; // lookup by the index stored in notedata
+  /**
+   * Emission + note-ID order of instruments. Omitted (MOD path): derived by note count,
+   * raw-first, matching CinterConvert.py. Supplied (decode path): the source file's own
+   * instrument order (raw-first, then generated, in file order) so re-encode is byte-exact.
+   */
+  instListOverride?: number[];
+  seedErrors?: string[];  // errors accumulated by the caller (MOD compile step)
+}
+
+export function encodeFromStreams(input: EncodeFromStreamsInput): Cinter4ExportResult {
+  const { notedata, perioddata, volumedata, offsetdata, stopped, instrument } = input;
+  const errors: string[] = input.seedErrors ? [...input.seedErrors] : [];
+  let restart = input.restart;
+
   // ── Note ranges and per-instrument note counts ──
   const minmaxNote = new Map<string, [number, number]>();
   const instCounts = new Array<number>(32).fill(0);
@@ -415,13 +480,18 @@ export function encodeCinter4FromMod(modBytes: Uint8Array): Cinter4ExportResult 
   }
 
   // ── Used-instrument list (raw first by descending index, then by note count) ──
-  const instList: number[] = [];
-  for (let i = 0; i < 32; i++) if (instCounts[i] !== 0) instList.push(i);
-  instList.sort((a, b) => {
-    const ka = instParams[a] === null ? 99999 - a : instCounts[a];
-    const kb = instParams[b] === null ? 99999 - b : instCounts[b];
-    return kb - ka; // reverse=True
-  });
+  let instList: number[];
+  if (input.instListOverride) {
+    instList = input.instListOverride;
+  } else {
+    instList = [];
+    for (let i = 0; i < 32; i++) if (instCounts[i] !== 0) instList.push(i);
+    instList.sort((a, b) => {
+      const ka = instrument(a).params === null ? 99999 - a : instCounts[a];
+      const kb = instrument(b).params === null ? 99999 - b : instCounts[b];
+      return kb - ka; // reverse=True
+    });
+  }
 
   // ── Note-ID mapping table ──
   let noteId = 0;
@@ -519,10 +589,17 @@ export function encodeCinter4FromMod(modBytes: Uint8Array): Cinter4ExportResult 
   // ── Instrument parameter records ──
   const instData: number[][] = [];
   const rawInstruments: number[] = [];
+  const trimmedLen = new Map<number, number>(); // trimmed sample length per instrument (for raw blob)
   for (let idx = 0; idx < instList.length; idx++) {
     const i = instList[idx];
-    const minst = module.instruments[i]!;
-    const params = instParams[i];
+    const minst = instrument(i);
+
+    if (minst.instWords) {
+      // Decode path: emit the source file's stored words verbatim.
+      instData.push(minst.instWords.slice());
+      if (minst.params === null) rawInstruments.push(i);
+      continue;
+    }
 
     // Length / replength (Python-3 behaviour: trailing-silence trim is a no-op)
     let length = minst.length;
@@ -534,10 +611,10 @@ export function encodeCinter4FromMod(modBytes: Uint8Array): Cinter4ExportResult 
       length = Math.min(length, minst.repoffset + minst.replen);
       replen = length - minst.repoffset;
     }
-    minst.length = length;
+    trimmedLen.set(i, length);
 
-    if (params !== null) {
-      const w = cinter4ParamsToWords(params, minst.version ?? 4);
+    if (minst.params !== null) {
+      const w = cinter4ParamsToWords(minst.params, minst.version ?? 4);
       instData.push([length, replen, w.mpitch, w.mod, w.bpitch, w.attack, w.dist, w.decay, w.mpitchdecay, w.moddecay, w.bpitchdecay]);
     } else {
       instData.push([length, replen]);
@@ -567,8 +644,9 @@ export function encodeCinter4FromMod(modBytes: Uint8Array): Cinter4ExportResult 
   // ── Raw sample blob ──
   const rawParts: Uint8Array[] = [];
   for (const i of rawInstruments) {
-    const minst = module.instruments[i]!;
-    rawParts.push(minst.samples.subarray(0, minst.length * 2));
+    const minst = instrument(i);
+    const lengthWords = minst.instWords ? minst.instWords[0] : (trimmedLen.get(i) ?? minst.length);
+    rawParts.push(minst.samples.subarray(0, lengthWords * 2));
   }
   let rawLen = 0;
   for (const part of rawParts) rawLen += part.length;
@@ -583,4 +661,62 @@ export function encodeCinter4FromMod(modBytes: Uint8Array): Cinter4ExportResult 
     noteIdCount: noteId,
     musicTicks: musiclength,
   };
+}
+
+// ── Re-export an edited Cinter4 song → .cinter4 songdata ──────────────────────
+
+/**
+ * Re-encode an editable (decompiled) Cinter4 `TrackerSong` back into `.cinter4`
+ * songdata. The instrument section is reproduced verbatim from the original file
+ * (`song.cinter4FileData`) — instrument-parameter editing is a separate concern — while
+ * the music section is rebuilt from the (possibly edited) patterns via
+ * `rebuildCinter4Streams` and re-encoded through `encodeFromStreams`. For an UNEDITED
+ * song this reproduces the imported file byte-for-byte (see cinter4Music.roundtrip.test.ts).
+ *
+ * Requires the fields the parser attaches on import: `cinter4FileData` (instrument
+ * section + provenance) and `cinter4Music` (exact tick count + loop point).
+ */
+export function encodeCinter4FromSong(song: TrackerSong): Cinter4ExportResult {
+  if (!song.cinter4FileData) throw new Error('encodeCinter4FromSong: song has no cinter4FileData');
+  if (!song.cinter4Music) throw new Error('encodeCinter4FromSong: song has no cinter4Music metadata');
+
+  const origBytes = new Uint8Array(song.cinter4FileData);
+  const d = decodeCinter4Music(origBytes);
+  if (!d) throw new Error('encodeCinter4FromSong: could not decode original instrument section');
+
+  // Pre-split the companion raw-sample blob into per-instrument slices (file order).
+  const rawBlob = song.cinter4RawData ? new Uint8Array(song.cinter4RawData) : new Uint8Array(0);
+  const rawSlices = new Map<number, Uint8Array>();
+  let rawCursor = 0;
+  for (const h of d.instHeaders) {
+    if (h.isRaw) {
+      const len = h.words[0] * 2;
+      rawSlices.set(h.index, rawBlob.subarray(rawCursor, rawCursor + len));
+      rawCursor += len;
+    }
+  }
+
+  const streams = rebuildCinter4Streams(
+    song.patterns as unknown as Pattern[],
+    song.songPositions,
+    song.cinter4Music.ticksPerTrack,
+  );
+
+  const instrument = (i: number): StreamInstrument => {
+    const h = d.instHeaders[i - 1];
+    return {
+      version: h.isRaw ? null : 4,
+      length: h.words[0], repoffset: 0, replen: h.words[1],
+      params: h.isRaw ? null : [], instWords: h.words,
+      samples: rawSlices.get(h.index) ?? new Uint8Array(0),
+    };
+  };
+
+  return encodeFromStreams({
+    ...streams,
+    stopped: false,
+    restart: song.cinter4Music.restartTick,
+    instrument,
+    instListOverride: d.instHeaders.map((_, idx) => idx + 1),
+  });
 }
