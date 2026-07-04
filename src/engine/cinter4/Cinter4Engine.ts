@@ -113,11 +113,23 @@ export class Cinter4Engine extends WASMSingletonBase {
     // forwards here (see useMixerStore.getActiveGainEngine). Global bypasses the
     // Vite module-duplication issue where hasInstance() can read false.
     (globalThis as { __devilboxActiveCinter4Engine?: Cinter4Engine }).__devilboxActiveCinter4Engine = this;
+
+    // Apply the DEViLBOX stereo separation (Cinter uses direct routing, so it
+    // bypasses the replayer's separation node — narrow the hard Amiga L/R here).
+    try {
+      const { useSettingsStore } = await import('@stores/useSettingsStore');
+      this.setStereoSeparation(useSettingsStore.getState().stereoSeparation);
+    } catch { /* settings not ready — worklet default (25%) applies */ }
   }
 
   /** Per-channel mute/solo (isolation UI): gain 0 = mute, 1 = play. Paula ch 0-3. */
   setChannelGain(channel: number, gain: number): void {
     this.workletNode?.port.postMessage({ type: 'setChannelGain', channel, gain });
+  }
+
+  /** DEViLBOX stereo separation 0-100 (%): 100 = full Amiga L/R, 0 = mono. */
+  setStereoSeparation(percent: number): void {
+    this.workletNode?.port.postMessage({ type: 'setStereoSeparation', value: percent });
   }
 
   play(): void {
