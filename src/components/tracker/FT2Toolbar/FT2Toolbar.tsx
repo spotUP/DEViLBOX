@@ -35,6 +35,7 @@ import { DropdownButton, type MenuItemType } from '@components/common/ContextMen
 import { ImportModuleDialog, type ImportOptions } from '@components/dialogs/ImportModuleDialog';
 import { FileBrowser } from '@components/dialogs/FileBrowser';
 import { exportSong, getOriginalModuleDataForExport } from '@lib/export/exporters';
+import { hasAnyConfirmedFormatViolation } from '@/lib/formatCompatibility';
 import { type ModuleInfo } from '@lib/import/ModuleLoader';
 import { useModuleImport } from '@hooks/tracker/useModuleImport';
 import { clearSavedProject, clearExplicitlySaved, saveProjectToStorage } from '@hooks/useProjectPersistence';
@@ -250,6 +251,43 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
     try {
       // Save to browser storage
       const saved = await saveProjectToStorage({ explicit: true });
+
+      // Format-aware download: if a ProTracker MOD is loaded and the user hasn't
+      // broken MOD compatibility, write the native .mod (Cinter or plain) instead
+      // of a .dbx. Other formats / broken compat fall through to the .dbx export.
+      const srcFmt = patterns[0]?.importMetadata?.sourceFormat as string | undefined;
+      const isCinterSong = instruments.some(
+        (i) => (i.parameters as Record<string, unknown> | undefined)?.cinter === 1,
+      );
+      const maxCh = Math.max(...patterns.map(p => p.channels.length));
+      if ((srcFmt === 'MOD' || isCinterSong) && !hasAnyConfirmedFormatViolation() && maxCh <= 4 && instruments.length <= 31) {
+        try {
+          const { speed: spd } = useTransportStore.getState();
+          const ord = useTrackerStore.getState().patternOrder;
+          const { exportCinterModFile, downloadBytes } = await import('@lib/export/Cinter4ModSave');
+          if (isCinterSong) {
+            // Save = a re-loadable working file: full MOD with the Cinter voices
+            // RENDERED (not stripped), so it re-imports as audible, editable
+            // instruments. The tiny crunched .cinter4 is an Export, not a Save.
+            const res = await exportCinterModFile(patterns, instruments, ord, {
+              stripCinter: false, moduleName: metadata.name || 'song', bpm, speed: spd,
+            });
+            downloadBytes(res.data, res.filename);
+          } else {
+            const { exportWithOpenMPT } = await import('@lib/export/OpenMPTExporter');
+            const res = await exportWithOpenMPT(patterns, instruments, ord, {
+              format: 'mod', moduleName: metadata.name || 'song', channelLimit: 4,
+              initialBPM: bpm, initialSpeed: spd,
+            });
+            downloadBytes(new Uint8Array(await res.data.arrayBuffer()),
+              `${(metadata.name || 'song').replace(/[^a-zA-Z0-9._-]/g, '_')}.mod`);
+          }
+          notify.success(saved ? `Saved & exported ${isCinterSong ? 'Cinter ' : ''}.mod!` : `Exported .mod!`, 2000);
+          return;
+        } catch (e) {
+          console.warn('[Save] native .mod export failed, falling back to .dbx:', e);
+        }
+      }
 
       // Also download as .dbx file
       const { patternOrder } = useTrackerStore.getState();
@@ -664,7 +702,7 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
                 <div className="ft2-section ft2-col-3">
                   <FT2NumericInput label="Song Len" value={songLength} onChange={handleSongLengthChange} min={1} max={256} />
                 </div>
-                <div className="ft2-section">
+                    <div className="ft2-section">
                   <InstrumentSelector />
                 </div>
               </div>

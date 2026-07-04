@@ -1,6 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { useTrackerStore, useInstrumentStore, useProjectStore, useTransportStore, notify } from '@stores';
 import { exportWithOpenMPT, type OpenMPTExportOptions } from './OpenMPTExporter';
+import { exportCinterModFile, downloadBytes } from './Cinter4ModSave';
+import { getOriginalModuleDataForExport, base64ToBuffer } from './exporters';
+
+/** The original imported .mod bytes (for byte-exact Cinter crunching), if any. */
+function originalModBytes(): Uint8Array | undefined {
+  const omd = getOriginalModuleDataForExport();
+  return omd?.format === 'MOD' ? new Uint8Array(base64ToBuffer(omd.base64)) : undefined;
+}
 
 interface ModuleExportPanelProps {
   handlerRef: React.MutableRefObject<(() => Promise<false | void>) | null>;
@@ -37,6 +45,17 @@ export const ModuleExportPanel: React.FC<ModuleExportPanelProps> = ({
   );
   const [exportWarnings, setExportWarnings] = useState<string[]>([]);
 
+  // Cinter MOD: any MOD export whose instruments carry Cinter synth params. The
+  // Cinter instruments themselves are the reliable signal — detect by them, not by
+  // libopenmpt bytes (a natively-parsed .mod has no libopenmptFileData).
+  const cinterCount = instruments.filter(
+    (i) => (i.parameters as Record<string, unknown> | undefined)?.cinter === 1,
+  ).length;
+  const isCinterMod = exportMode === 'mod' && cinterCount > 0;
+  // Default for Cinter songs: the small crunched .cinter4 (CinterConvert) format.
+  // Off → a full ProTracker .mod with rendered samples (plays anywhere).
+  const [crunched, setCrunched] = useState(true);
+
   const hasNotes = patterns.some(pat =>
     pat.channels.some(ch => ch.rows.some(row => row.note > 0)),
   );
@@ -59,6 +78,42 @@ export const ModuleExportPanel: React.FC<ModuleExportPanelProps> = ({
 
   // All four formats export via OpenMPT WASM (CSoundFile::SaveMod/SaveXM/SaveIT/SaveS3M)
   handlerRef.current = async () => {
+    // Cinter: crunched .cinter4 (CinterConvert — tiny, no PCM, Amiga regenerates)
+    // or a full rendered .mod that plays anywhere. Both reflect pattern edits.
+    if (isCinterMod) {
+      try {
+        if (!hasNotes) { notify.error('Cinter export: this song has no pattern notes to write.'); return false; }
+        if (crunched) {
+          const { exportCinterCrunched } = await import('./Cinter4ModSave');
+          const c = await exportCinterCrunched(patterns, instruments, patternOrder, {
+            moduleName: metadata.name || 'cinter', bpm, speed, originalModBytes: originalModBytes(),
+          });
+          downloadBytes(c.songdata, c.filename);
+          if (c.rawSamples.length > 0) downloadBytes(c.rawSamples, c.filename.replace(/\.cinter4$/, '.raw'));
+          const kb = ((c.songdata.length + c.rawSamples.length) / 1024).toFixed(1);
+          if (c.errors.length > 0) {
+            setExportWarnings(c.errors);
+            notify.warning(`Crunched "${c.filename}" (${kb} KB) — ${c.errors.length} unsupported-command warning(s).`);
+          } else {
+            notify.success(`Crunched "${c.filename}" (${kb} KB)${c.rawSamples.length ? ' + .raw samples' : ''}.`);
+          }
+        } else {
+          const res = await exportCinterModFile(patterns, instruments, patternOrder, {
+            stripCinter: false, moduleName: metadata.name || 'cinter',
+            bpm, speed, channels: Math.min(channelCount, maxChannels),
+          });
+          downloadBytes(res.data, res.filename);
+          notify.success(`MOD "${res.filename}" — ${res.cinterCount} Cinter voice(s), samples rendered.`);
+        }
+        onClose();
+        return;
+      } catch (err) {
+        console.error('[Cinter export] failed:', err);
+        notify.error(`Cinter export failed: ${err instanceof Error ? err.message : String(err)}`);
+        return false;
+      }
+    }
+
     if (!hasNotes) {
       notify.error('No playable note data — this format stores audio externally and cannot be exported.');
       return false;
@@ -95,10 +150,33 @@ export const ModuleExportPanel: React.FC<ModuleExportPanelProps> = ({
   return (
     <div className="bg-dark-bgSecondary border border-dark-border rounded-lg p-4 mb-4">
       <h3 className="text-sm font-mono font-bold text-accent-primary mb-3">
-        {FORMAT_LABELS[exportMode]} Export (.{exportMode})
+        {isCinterMod ? 'Cinter / ProTracker MOD' : FORMAT_LABELS[exportMode]} Export (.{exportMode})
       </h3>
 
-      {!hasNotes ? (
+      {isCinterMod && (
+        <div className="bg-accent-highlight/10 border border-accent-highlight/40 rounded-lg p-3 mb-3 space-y-2">
+          <p className="text-xs font-mono text-accent-highlight">
+            Cinter song detected ({cinterCount} synth voice{cinterCount === 1 ? '' : 's'}).
+          </p>
+          <label className="flex items-center gap-2 text-xs font-mono text-text-primary cursor-pointer">
+            <input
+              type="checkbox"
+              checked={crunched}
+              onChange={(e) => setCrunched(e.target.checked)}
+            />
+            <span>
+              Crunched Cinter format (.cinter4)
+              <span className="text-text-muted">
+                {' '}({crunched
+                  ? 'small; param words + compact music data, no PCM (Amiga regenerates)'
+                  : 'unchecked: full .mod with rendered samples — plays in any MOD player'})
+              </span>
+            </span>
+          </label>
+        </div>
+      )}
+
+      {!hasNotes && !isCinterMod ? (
         <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-3">
           <p className="text-xs font-mono text-red-300">
             No playable note data found. This format stores audio externally and cannot be exported to a tracker module.
