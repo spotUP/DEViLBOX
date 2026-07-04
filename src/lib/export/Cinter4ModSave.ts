@@ -19,9 +19,8 @@
 
 import type { InstrumentConfig } from '@/types';
 import type { Pattern } from '@/types/tracker';
-import { cinter4ParseSampleName, cinter4ParamsToSampleName, type Cinter4Version } from '@/lib/import/formats/cinter4Params';
-import { renderCinter4Sample, renderCinter4SampleFromWords } from '@/engine/cinter4/cinter4SynthCore';
-import { readCinter4InstrumentParams, cinter4EffectiveWords } from '@/engine/cinter4/cinter4Instrument';
+import { cinter4ParseSampleName, cinter4ParamsToSampleName, cinter4ParamsToWords, type Cinter4Version } from '@/lib/import/formats/cinter4Params';
+import { readCinter4InstrumentParams, cinter4EffectiveWords, renderCinterVoice } from '@/engine/cinter4/cinter4Instrument';
 
 const MOD_HEADER_SIZE = 1084; // title(20) + 31×30 sample headers + 2 + 128 order + 4 tag
 
@@ -114,7 +113,7 @@ export function buildCinterModFromOpenMPT(
       lengthWords = cp.lengthWords;
       if (cp.replenWords > 0) { loopLength = cp.replenWords; loopStart = cp.lengthWords - cp.replenWords; }
       const sampleBytes = Math.max(2, lengthWords * 2);
-      pcm = opts.stripCinter ? new Int8Array(sampleBytes) : renderCinter4SampleFromWords(cinter4EffectiveWords(cp), sampleBytes, null);
+      pcm = opts.stripCinter ? new Int8Array(sampleBytes) : renderCinterVoice(cinter4EffectiveWords(cp), sampleBytes, null, cp.version);
     } else if (inst?.type === 'sample' && inst.sample) {
       name = inst.name;
       pcm = wavToInt8(inst.sample.audioBuffer);
@@ -223,8 +222,9 @@ export function cinterPatchMod(
     if (opts.stripCinter) {
       for (let j = 0; j < sampleBytes && sampleStart + j < out.length; j++) out[sampleStart + j] = 0;
     } else if (edited) {
-      // MOD export of an edited voice → regenerate the PCM to match the new params.
-      const pcm = renderCinter4Sample(curParams, sampleBytes, null, version);
+      // MOD export of an edited voice → regenerate the PCM to match the new params
+      // (version-correct synth: v3 float / v4 fixed-point).
+      const pcm = renderCinterVoice(cinter4ParamsToWords(curParams, version), sampleBytes, null, version);
       for (let j = 0; j < sampleBytes && sampleStart + j < out.length; j++) out[sampleStart + j] = pcm[j] & 0xff;
     }
     // else (MOD export, unedited) → keep the original rendered PCM untouched.

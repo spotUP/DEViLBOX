@@ -26,9 +26,9 @@ import {
   readCinter4InstrumentParams,
   cinter4WordsConfigPatch,
   cinter4EffectiveWords,
+  renderCinterVoice,
   type Cinter4InstrumentParams,
 } from '@/engine/cinter4/cinter4Instrument';
-import { renderCinter4SampleFromWords } from '@/engine/cinter4/cinter4SynthCore';
 
 const PANEL_MIN_H = 150;
 const WAVE_H = 96;
@@ -38,7 +38,7 @@ const WAVE_POINTS = 900;
  *  whole sample, so the editor shows the full attack→decay envelope. */
 function previewWaveform(p: Cinter4InstrumentParams): number[] {
   const lengthSamples = Math.max(2, Math.min(p.lengthWords * 2, 32768));
-  const pcm = renderCinter4SampleFromWords(cinter4EffectiveWords(p), lengthSamples, null);
+  const pcm = renderCinterVoice(cinter4EffectiveWords(p), lengthSamples, null, p.version);
   const n = Math.min(WAVE_POINTS, pcm.length);
   const out = new Array<number>(n);
   for (let i = 0; i < n; i++) out[i] = pcm[Math.floor((i / n) * pcm.length)];

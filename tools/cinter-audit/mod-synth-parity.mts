@@ -5,21 +5,25 @@
  * Join is by sample LENGTH (CinterConvert preserves it; the .cinter4 packs
  * instruments raw-first while the .mod keeps original interleaved slots).
  *
- *   npx tsx tools/cinter-audit/mod-synth-parity.mts <base.cinter4> <base.mod>
+ *   npx tsx tools/cinter-audit/mod-synth-parity.mts <base.cinter4> <base.mod> [3|4]
  *
- * maxDiff==0 = byte-exact to the Amiga; <=3 = the ~1 LSB rounding of round(sin·N)
- * vs the Amiga integer sine polynomial (a hand-ported polynomial matched WORSE, so
- * cinter4SynthCore stays on Math.sin). LARGE diffs on the v3 fixtures are the v3
- * synth-fidelity gap: those baked samples were rendered by Cinter3, not Cinter4 —
- * the discrepancy correlates with nonzero pitch/mod decay (p3/p7) and is amplitude-
- * scaled (loudest at attack). Real .cinter4 files are v4 → synthesis is correct.
- * Validated pairs live in src/lib/export/__tests__/fixtures/cinter4/.
+ * The trailing 3|4 picks the synth (default 4). Most historical Cinter mods are v3,
+ * baked by the float Cinter3.lua synth — pass 3 to validate those (renderCinterVoice
+ * routes v3 → cinter3SynthCore). e.g. CurtCool-BackInSpace with `3`: 13/15 byte-exact.
+ *
+ * maxDiff==0 = byte-exact to the reference render; <=3 = ~1 LSB rounding. A residual
+ * of LARGE diffs remains on a minority of instruments (e.g. much of JazzCat) under
+ * BOTH synths — likely baked by yet another Cinter build; correlates with heavy
+ * distortion+mod+decay. Validated pairs live in src/lib/export/__tests__/fixtures/cinter4/.
  */
 import { readFileSync } from 'node:fs';
-import { renderCinter4SampleFromWords } from '../../src/engine/cinter4/cinter4SynthCore.ts';
-import type { Cinter4SynthWords } from '../../src/lib/import/formats/cinter4Params.ts';
+import { renderCinterVoice } from '../../src/engine/cinter4/cinter4Instrument.ts';
+import type { Cinter4SynthWords, Cinter4Version } from '../../src/lib/import/formats/cinter4Params.ts';
 
-const [cinterPath, modPath] = process.argv.slice(2);
+const [cinterPath, modPath, verArg] = process.argv.slice(2);
+// Version selects the synth: 3 = float Cinter3.lua (original v3 mods), 4 = fixed-point
+// Amiga (default). Most historical Cinter mods are v3 — pass 3 to validate those.
+const version: Cinter4Version = verArg === '3' ? 3 : 4;
 
 function parseCinter(bytes: Uint8Array) {
   const dv = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
@@ -77,7 +81,7 @@ console.log(`nRaw=${cin.nRaw} generated=${cin.gen.length} modBakedCinter=${modBa
 let worst = 0, checked = 0, exact = 0, near = 0;
 for (const g of cin.gen) {
   const lenBytes = g.lengthWords * 2;
-  const ts = renderCinter4SampleFromWords(g.words, lenBytes, null);
+  const ts = renderCinterVoice(g.words, lenBytes, null, version);
   // Best-match among unused baked samples of equal length (resolves same-length collisions).
   let mi = -1, maxDiff = 0, sumDiff = 0, nz = 0, bestMax = Infinity;
   for (let k = 0; k < modBaked.length; k++) {
