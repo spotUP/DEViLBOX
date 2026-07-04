@@ -1279,7 +1279,12 @@ _top: ;
   W(d2) &= (uint16_t)(63);  /* AND.W	#63,D2 */
   d2 = (d2 >> 16) | (d2 << 16);  /* SWAP.W	D2 */
   /* Adjust or set period */
-  W(d0) = (uint16_t)((uint32_t)((int32_t)W(d0) >> 7));  /* ASR.W	#7,D0 */
+  /* ASR.W #7,D0 — MUST sign-extend the 16-bit value: W(d0) is uint16_t, so
+     (int32_t)W(d0) zero-extends (0xFFFF -> 65535 -> >>7 = 511) instead of -1,
+     which turns a downward period slide (period-1) into period+511 (a wrong,
+     much lower pitch). Cast via (int16_t) to sign-extend before the arithmetic
+     shift. Found by the song-level lock-test (period 427 vs 939 on CurtCool). */
+  W(d0) = (uint16_t)((int16_t)W(d0) >> 7);  /* ASR.W	#7,D0 */
   {  /* ADD.W	D0,D2 */
       uint16_t _ar = (uint16_t)(W(d2) + W(d0));
       W(d2) = (uint16_t)((uint16_t)_ar);
