@@ -296,3 +296,6 @@ verify-start.yml
 
 # Demucs third-party source (built separately)
 third-party/demucs.cpp-main/
+
+# Local 3rd-party plugin bundles (large binaries — keep out of history)
+VST/
