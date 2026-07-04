@@ -33,3 +33,10 @@ int paula_render(float* buffer, int frames);
 
 // Debug: print all channel state to stdout
 void paula_debug_dump(void);
+
+// Song-level lock-test: read the raw per-channel Paula register state.
+uint16_t  paula_reg_period(int ch);
+uint8_t   paula_reg_volume(int ch);
+uint32_t  paula_reg_len_bytes(int ch);
+uintptr_t paula_reg_sample_ptr(int ch);
+uint16_t  paula_last_dmacon(void);
