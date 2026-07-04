@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html>
+<head><title>DEViLBOX Playlist Recovery</title></head>
+<body style="background:#1a1a2e;color:#eee;font-family:monospace;padding:20px;max-width:900px;margin:0 auto">
+<h2>🔍 DEViLBOX Playlist Recovery — Port <span id="port"></span></h2>
+<pre id="output" style="white-space:pre-wrap;background:#111;padding:15px;border-radius:8px;max-height:600px;overflow:auto">Checking...</pre>
+<div id="actions" style="margin-top:15px;display:none">
+  <button onclick="downloadJSON()" style="padding:8px 16px;background:#3b82f6;color:white;border:none;border-radius:4px;cursor:pointer;font-size:14px;margin-right:10px">
+    💾 Download Playlists JSON
+  </button>
+  <button onclick="copyJSON()" style="padding:8px 16px;background:#22c55e;color:white;border:none;border-radius:4px;cursor:pointer;font-size:14px">
+    📋 Copy to Clipboard
+  </button>
+</div>
+<script>
+document.getElementById('port').textContent = location.port || '(file)';
+const out = document.getElementById('output');
+const key = 'devilbox-dj-playlists';
+const raw = localStorage.getItem(key);
+let playlistData = null;
+
+if (!raw) {
+  out.textContent = '❌ No playlists found on port ' + (location.port || 'N/A') + 
+    '\n\nTry opening this page on other ports:\n' +
+    '  http://localhost:3001/playlist-recovery.html\n' +
+    '  http://localhost:5173/playlist-recovery.html\n' +
+    '  http://localhost:5174/playlist-recovery.html\n' +
+    '  http://localhost:6006/playlist-recovery.html';
+} else {
+  try {
+    const parsed = JSON.parse(raw);
+    const pls = parsed?.state?.playlists || [];
+    playlistData = pls;
+    let text = '✅ Found ' + pls.length + ' playlists on port ' + location.port + ':\n\n';
+    pls.forEach(pl => {
+      const dt = new Date(pl.createdAt).toLocaleDateString();
+      text += '  📋 "' + pl.name + '" (' + (pl.tracks?.length||0) + ' tracks, ' + dt + ')\n';
+    });
+    out.textContent = text;
+    document.getElementById('actions').style.display = 'block';
+  } catch(e) {
+    out.textContent = '⚠️ Parse error: ' + e.message + '\n\nRaw length: ' + raw.length;
+  }
+}
+
+function downloadJSON() {
+  if (!playlistData) return;
+  const blob = new Blob([JSON.stringify(playlistData, null, 2)], {type:'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'recovered-playlists-port-' + location.port + '.json';
+  a.click();
+}
+
+function copyJSON() {
+  if (!playlistData) return;
+  navigator.clipboard.writeText(JSON.stringify(playlistData, null, 2))
+    .then(() => out.textContent += '\n\n✅ Copied to clipboard!')
+    .catch(e => out.textContent += '\n\n❌ Copy failed: ' + e.message);
+}
+</script>
+</body>
+</html>
