@@ -113,8 +113,12 @@ uade-wasm/generated/
 Turntable/
 turntable.glb
 
-# Session context (never commit — personal/team working notes)
-thoughts/
+# Session context — split commit policy per ~/.claude/CLAUDE.md:
+# - thoughts/<username>/ is per-person scratch (GIT-IGNORED)
+# - thoughts/shared/      is research/plans/handoffs (COMMITTED)
+# - thoughts/searchable/  is search hard-links       (GIT-IGNORED)
+thoughts/spot/
+thoughts/searchable/
 
 # Backup files
 *.bak
