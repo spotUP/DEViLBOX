@@ -15,6 +15,9 @@ class Cinter4Processor extends AudioWorkletProcessor {
     this.bufferSize = 128;
     this.lastHeapBuffer = null;
     this.initializing = false;
+    // Stereo separation 0..1 (1 = full Amiga hard L/R, 0 = mono). DEViLBOX narrows
+    // the hard Amiga LRRL panning; default 25% matches useSettingsStore.
+    this.stereoSep = 0.25;
 
     this.port.onmessage = (event) => {
       this.handleMessage(event.data);
@@ -118,6 +121,11 @@ class Cinter4Processor extends AudioWorkletProcessor {
         if (this.module && typeof this.module._player_set_channel_gain === 'function') {
           this.module._player_set_channel_gain(data.channel | 0, +data.gain);
         }
+        break;
+
+      case 'setStereoSeparation':
+        // 0-100 (%) from the DEViLBOX setting → 0..1 narrowing factor.
+        this.stereoSep = Math.max(0, Math.min(1, (+data.value) / 100));
         break;
 
       case 'dispose':
@@ -255,9 +263,16 @@ class Cinter4Processor extends AudioWorkletProcessor {
       if (this.interleavedBuf) {
         const rendered = this.module._player_render(this.interleavedPtr, numSamples);
         if (rendered > 0) {
+          // Narrow the hard Amiga L/R panning toward mono per the DEViLBOX stereo
+          // separation setting (mid/side): sep 1 = full Amiga, 0 = mono.
+          const sep = this.stereoSep;
           for (let i = 0; i < rendered; i++) {
-            outputL[i] = this.interleavedBuf[i * 2];
-            outputR[i] = this.interleavedBuf[i * 2 + 1];
+            const L = this.interleavedBuf[i * 2];
+            const R = this.interleavedBuf[i * 2 + 1];
+            const mid = (L + R) * 0.5;
+            const side = (L - R) * 0.5 * sep;
+            outputL[i] = mid + side;
+            outputR[i] = mid - side;
           }
         }
         // Per-channel oscilloscope (the 4 Paula channels), throttled to ~60 fps.
