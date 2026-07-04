@@ -151,6 +151,12 @@ export class Cinter4Engine extends WASMSingletonBase {
     const cfg = this.posConfig;
     if (!cfg) return;
     const spd = cfg.spd || 6;
+    // player_get_tick is the RENDER position; what's audible now lags by the output
+    // buffer + hardware latency (large on Bluetooth). Subtract it so the scroll
+    // matches what's heard, not what's queued. 50 ticks/sec.
+    const ctx = this.audioContext;
+    const latencySec = (ctx?.outputLatency || 0) + (ctx?.baseLatency || 0);
+    tick = Math.max(0, tick - Math.round(latencySec * 50));
     let playTick = tick;
     const loopLen = cfg.ticksPerTrack - cfg.restartTick;
     if (cfg.ticksPerTrack > 0 && tick >= cfg.ticksPerTrack && loopLen > 0) {
