@@ -20,6 +20,9 @@ void paula_dma_write(uint16_t dmacon);            // $8xxx=enable, $0xxx=disable
 // Reset all channels
 void paula_reset(void);
 
+// Per-channel mute/solo for the isolation UI (gain 0 = mute, 1 = play).
+void paula_set_channel_gain(int ch, float gain);
+
 // Configure clock (call before render; default: PAL)
 void paula_set_clock(float paula_clock);
 

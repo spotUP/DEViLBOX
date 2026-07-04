@@ -113,6 +113,13 @@ class Cinter4Processor extends AudioWorkletProcessor {
         }
         break;
 
+      case 'setChannelGain':
+        // Per-channel mute/solo (isolation UI): gain 0 = mute, 1 = play.
+        if (this.module && typeof this.module._player_set_channel_gain === 'function') {
+          this.module._player_set_channel_gain(data.channel | 0, +data.gain);
+        }
+        break;
+
       case 'dispose':
         this.cleanup();
         break;
