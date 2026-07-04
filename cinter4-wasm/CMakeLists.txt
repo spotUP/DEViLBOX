@@ -25,7 +25,7 @@ if(EMSCRIPTEN)
         "_player_get_title" "_player_detect_duration"
         "_player_load_raw"
         "_player_set_channel_gain"
-        "_player_tick"
+        "_player_tick" "_player_get_tick"
         "_player_paula_period" "_player_paula_volume" "_player_paula_len"
         "_player_paula_sample_off" "_player_dmacon"
         "_player_get_debug"
