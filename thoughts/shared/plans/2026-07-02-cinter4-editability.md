@@ -2,10 +2,34 @@
 date: 2026-07-02
 topic: cinter4-editability
 tags: [cinter4, import, pattern-editor, decompile, wasm]
-status: draft
+status: revised
 ---
 
 # Plan: Make .cinter4 songs fully editable (decompile-to-MOD import)
+
+> **REVISION 2026-07-02 (Path A, user-approved).** Phase 0 verified the note stream is
+> **automation-dominated** (test-automatic.cinter4: 54.6% slide words, 22.2% absolute-note,
+> only 23% clean triggers — see `thoughts/shared/research/2026-07-02_cinter4-music-section-bytemap.md`).
+> Effects were pre-rendered into per-tick period/volume streams at compile time, so a
+> plain-note MOD decompile is impossible without massive loss, and the existing MOD-based
+> `Cinter4Exporter` (which re-derives slides from MOD effects) cannot round-trip real songs.
+>
+> **Approved approach:** lossless **tick-level** decode + **direct tick-stream exporter**.
+> - Decode note words → the four per-tick streams `{notedata, perioddata, volumedata, offsetdata}`
+>   per track by simulating the player's running state (accumulate slide/vol deltas to
+>   absolute period/volume). This is the exact intermediate `Cinter4Exporter` already builds.
+> - Re-encode by **extracting the exporter's back half** (`Cinter4Exporter.ts:400-586`, which
+>   is format-agnostic to how the streams were produced) into `encodeFromStreams(...)`. The
+>   MOD path keeps using it after its compile step; the decode path feeds decoded streams.
+>   Single source of truth for note-word encoding — no duplicate logic.
+> - **Playback is always the bit-exact WASM engine.** Untouched imports play the original
+>   bytes; after an edit the song is re-encoded via `encodeFromStreams` and the WASM engine
+>   reloads the new bytes. This resolves the old Phase 2 open question (no MOD-playback path).
+> - Correctness anchor: **decode → encodeFromStreams → byte-identical songdata**, automated
+>   on the real song, independent of the pattern-cell representation.
+>
+> The phases below are superseded by "## Phases (Path A)" further down; the "Verified format
+> facts" section remains valid.
 
 ## Goal
 
@@ -68,9 +92,84 @@ All words big-endian. File layout:
 7. Period table: 37 words at work+12; periods derived from note value at trigger
    time (`CinterComputePeriods`).
 
-## Phases
+## REVISION 2 — 2026-07-02 (Path B: decompile to MOD-like patterns)
 
-### Phase 0 — verify open details against CinterConvert.py (½ day)
+User goal clarified: importing `.cinter4` should yield **MOD-level editable patterns**
+(real notes + effect commands) with **realtime Cinter4Synth voices** (not samples), and
+DEViLBOX must **save/export `.cinter4`**. No original MOD needed at runtime; the mod↔cinter4
+pairs (upstream `examples/` MODs, basename-matched to the user's `~/Desktop/cinter-songs/*.cinter4`)
+are used only to DEVELOP/VALIDATE the decompiler.
+
+**Hard truth (told to user):** the compile is lossy — CinterConvert flattens effects into
+per-tick period/volume streams; different MOD effect sequences yield identical `.cinter4`.
+So no exact inverse. Notes+instruments+volume ARE exactly recoverable; effects are heuristic
+(musically equivalent, not byte-identical to the original MOD).
+
+**Analysis (Wasp-Octorubber pair, `scratchpad/pair.mts`):**
+- MOD speed 6; GCD of trigger-tick spacing in the `.cinter4` = 6 on all 4 tracks →
+  **speed is recoverable via GCD**; folding ticks→rows lands notes on rows.
+- 3877 ticks / 6 ≈ 646 rows ≈ 10 patterns (MOD has 11). Triggers align (all deltas ×6).
+- MOD effect usage: `Cxx` vol 1772, `Axy` volslide 355, `0xy` arp 70, `1xx/2xx` porta 41,
+  `Fxx` 2. Small, recognizable set.
+
+**Phase A (deterministic):** recover speed (GCD) → fold → clean note/instrument/volume cells
+on rows. Validate notes vs paired MODs.
+**Phase B (heuristic, validated on pairs):** recognize automation → `Cxx/Axy/0xy/1xx/2xx/7xx/4xx`.
+**Phase C (DONE via existing path):** instrument name encodes params at export — `Cinter4ModSave`
+derives it from live `parameters`; `Cinter4Controls` writes edits to `parameters`. No new work.
+**Phase D (mostly exists):** save/export `.cinter4` via `exportCinterCrunched → encodeCinter4FromMod`
+(byte-exact). Wire the export UI/menu for decompiled songs; confirm `ModuleExportPanel` (has
+pre-existing WIP — coordinate).
+
+**Supersedes:** the tick-level lossless round-trip (Path A). `decodeCinter4Music` /
+`encodeFromStreams` become analysis tools + orphan fallback; export pivots to the MOD compiler.
+The Path-A round-trip tests stay green but the *default* import switches to MOD-like folding.
+
+**Part 1 side-fix (in progress):** re-play doubling — `Cinter4Engine.stop()` posts `stop` to the
+worklet but the worklet keeps playing, so a stop→replay stacks a 2nd WASM instance (peak 3.4,
+`activeVoices=0`). Suppression itself works (probes: `suppressNotes=true` both plays). The real
+fix is the worklet honoring `stop`. User: "sounds almost perfect now, WASM issues later."
+
+## Phases (Path A — superseded by Revision 2, kept for reference)
+
+### Phase 1a — refactor Cinter4Exporter (extract encodeFromStreams)
+Extract the stream→songdata back half of `encodeCinter4FromMod` (lines ~400-586) into
+`encodeFromStreams({ notedata, perioddata, volumedata, offsetdata, instList, instParams,
+instruments, stopped, restart })`. The MOD path builds those (parse + compile + sort instList)
+then calls it. **Must NOT re-sort instList** inside encodeFromStreams (decode path supplies
+file-order instList). Add the missing byte-exact regression test for `encodeCinter4FromMod`
+first (guards the refactor): a real MOD → songdata compared byte-for-byte to a golden blob.
+
+### Phase 1b — static decoder cinter4Music.ts
+`decodeCinter4Music(bytes) → { streams[4], instList, restart, stopped, trackSize, noteRange }`.
+Simulate player running-state per track: for each tick word, resolve trigger/abs-note/slide,
+accumulate to absolute `period`/`volume`, populate `notedata` (inst index or 0), `perioddata`,
+`volumedata`, `offsetdata`. Instrument via the note-range walk (byte-map §walk, port 1:1).
+
+### Phase 1c — losslessness proof (the anchor)
+Test: `decodeCinter4Music(orig) → encodeFromStreams → songdata === orig` byte-for-byte, on
+`test-automatic.cinter4` (real song, automation-heavy). MUST pass. Wire into `test:ci`.
+
+### Phase 2 — TrackerSong representation + wire into Cinter4Parser
+Map decoded streams → 64-row patterns + songPositions + restartPosition:
+- trigger tick → cell `{ note: MODnote, instrument: idx+1, volume }` (fully editable).
+- non-trigger automation tick → carry the exact info in effect columns via app-internal
+  Cinter effect codes (period-slide / abs-period / vol-delta). Opaque in the editor but
+  visible and lossless. (These are carriers, not MOD effects — WASM playback never parses them.)
+- Replace placeholder block `Cinter4Parser.ts:174-208`; keep `cinter4FileData` for WASM playback.
+- Fix the `little-endian` docstring bug (`Cinter4Parser.ts:8`).
+Round-trip test at this layer: parse → rebuild streams from patterns → encodeFromStreams →
+byte-identical (proves the representation is lossless too).
+
+### Phase 3 — edit→re-encode→WASM reload wiring + manual proof
+On edit of a Cinter4 song: rebuild streams from patterns → `encodeFromStreams` → hand new
+bytes to the Cinter4 WASM engine (reload). Manual: load, edit one trigger note, hear the edit.
+
+---
+
+## Superseded phases (original draft — kept for reference)
+
+### Phase 0 — verify open details against CinterConvert.py (½ day) [DONE]
 
 Read the reference: `github.com/askeksa/Cinter` → `CinterConvert.py` + `Cinter4.S`
 (check for a local copy under `/Users/spot/Code/Reference Code/` first; clone if
