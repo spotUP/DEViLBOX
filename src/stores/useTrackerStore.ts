@@ -51,7 +51,7 @@ import * as OpenMPTEditBridge from '@engine/libopenmpt/OpenMPTEditBridge';
 // re-exporting the TrackerSong to native format and reloading the engine.
 let _wasmReexportTimer: ReturnType<typeof setTimeout> | null = null;
 
-function debouncedWasmEngineReexport(): void {
+export function debouncedWasmEngineReexport(): void {
   if (_wasmReexportTimer) clearTimeout(_wasmReexportTimer);
   _wasmReexportTimer = setTimeout(() => {
     _wasmReexportTimer = null;
@@ -104,6 +104,44 @@ function debouncedWasmEngineReexport(): void {
             await engine.loadSong(getDevilboxAudioContext(), playbackData);
           } catch (err) {
             console.warn('[TrackerStore] Symphonie re-export failed:', err);
+          }
+        })();
+      } else if (sourceFormat === 'Cinter4') {
+        void (async () => {
+          try {
+            // Phase D: recompile the (edited) MOD-like patterns → MOD → .cinter4 (the same
+            // path Save/Export uses). The OpenMPT MOD serialize runs here (fast); the heavy
+            // LZ crunch (encodeCinter4FromMod) runs in a worker so edits stay responsive.
+            // Update the store bytes so the Shrinkler-size readout recomputes, and reload the
+            // WASM engine so playback reflects the edits.
+            const { exportCinterModFile } = await import('@/lib/export/Cinter4ModSave');
+            // Read CURRENT patterns/instruments from the stores (not the replayer's cached
+            // song) so pattern edits AND instrument add/delete/edit all reflect in the export.
+            const tState = useTrackerStore.getState();
+            const iState = useInstrumentStore.getState();
+            const modRes = await exportCinterModFile(
+              tState.patterns as unknown as import('@/types/tracker').Pattern[],
+              iState.instruments,
+              tState.patternOrder,
+              { stripCinter: false, moduleName: song.name || 'cinter', bpm: song.initialBPM, speed: song.initialSpeed },
+            );
+            const { crunchModInWorker } = await import('@/lib/export/cinterCrunch');
+            const res = await crunchModInWorker(modRes.data);
+            const songBuf = res.songdata.buffer as ArrayBuffer;
+            const rawBuf = res.rawSamples.length > 0 ? (res.rawSamples.buffer as ArrayBuffer) : undefined;
+            song.cinter4FileData = songBuf;
+            if (rawBuf) song.cinter4RawData = rawBuf;
+            // Drive the Shrinkler readout (subscribes to useFormatStore.cinter4FileData).
+            useFormatStore.setState((rawBuf
+              ? { cinter4FileData: songBuf, cinter4RawData: rawBuf }
+              : { cinter4FileData: songBuf }) as Partial<ReturnType<typeof useFormatStore.getState>>);
+            // Reload playback so edits are audible.
+            const { Cinter4Engine } = await import('@/engine/cinter4/Cinter4Engine');
+            if (Cinter4Engine.hasInstance()) {
+              await Cinter4Engine.getInstance().loadTune(songBuf, rawBuf);
+            }
+          } catch (err) {
+            console.warn('[TrackerStore] Cinter4 live re-export failed:', err);
           }
         })();
       }
