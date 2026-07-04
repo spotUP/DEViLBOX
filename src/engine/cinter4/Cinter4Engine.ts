@@ -108,6 +108,16 @@ export class Cinter4Engine extends WASMSingletonBase {
 
     // Set up the 4 Paula channels for the per-channel oscilloscope.
     useOscilloscopeStore.getState().setChipInfo(4, 0, ['Channel 1', 'Channel 2', 'Channel 3', 'Channel 4']);
+
+    // Register as the active gain engine so the mixer's per-channel mute/solo
+    // forwards here (see useMixerStore.getActiveGainEngine). Global bypasses the
+    // Vite module-duplication issue where hasInstance() can read false.
+    (globalThis as { __devilboxActiveCinter4Engine?: Cinter4Engine }).__devilboxActiveCinter4Engine = this;
+  }
+
+  /** Per-channel mute/solo (isolation UI): gain 0 = mute, 1 = play. Paula ch 0-3. */
+  setChannelGain(channel: number, gain: number): void {
+    this.workletNode?.port.postMessage({ type: 'setChannelGain', channel, gain });
   }
 
   play(): void {
@@ -131,6 +141,8 @@ export class Cinter4Engine extends WASMSingletonBase {
 
   override dispose(): void {
     super.dispose();
+    const g = globalThis as { __devilboxActiveCinter4Engine?: Cinter4Engine | null };
+    if (g.__devilboxActiveCinter4Engine === this) g.__devilboxActiveCinter4Engine = null;
     if (Cinter4Engine.instance === this) {
       Cinter4Engine.instance = null;
     }

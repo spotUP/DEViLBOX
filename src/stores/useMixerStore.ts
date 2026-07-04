@@ -219,6 +219,7 @@ void (async () => {
     // cache.Engine.hasInstance() for these.
     import('../engine/hively/HivelyEngine').then(({ HivelyEngine }) => { _gainEngineCache.set('HivelyEngine', { Engine: HivelyEngine as unknown as GainEngine, maxCh: 16 }); }).catch(() => {}),
     import('../engine/klystrack/KlysEngine').then(({ KlysEngine }) => { _gainEngineCache.set('KlysEngine', { Engine: KlysEngine as unknown as GainEngine, maxCh: 32 }); }).catch(() => {}),
+    import('../engine/cinter4/Cinter4Engine').then(({ Cinter4Engine }) => { _gainEngineCache.set('Cinter4Engine', { Engine: Cinter4Engine as unknown as GainEngine, maxCh: 4 }); }).catch(() => {}),
 
     // ── Channel on/off engine ──────────────────────────────────────────────
     import('../engine/musicline/MusicLineEngine').then(({ MusicLineEngine }) => { _channelOnEngineCache.set('MusicLineEngine', { Engine: MusicLineEngine as unknown as ChannelOnEngine, maxCh: 8 }); }).catch(() => {}),
@@ -279,6 +280,7 @@ function forwardReplayerMuteMask(channels: MixerChannelState[], isSoloing: boole
   const g = globalThis as {
     __devilboxActiveHivelyEngine?: GainOnly | null;
     __devilboxActiveKlysEngine?: GainOnly | null;
+    __devilboxActiveCinter4Engine?: GainOnly | null;
   };
   const broadcasted = new Set<GainOnly>();
   const broadcast = (inst: GainOnly, maxCh: number) => {
@@ -291,6 +293,7 @@ function forwardReplayerMuteMask(channels: MixerChannelState[], isSoloing: boole
   };
   if (g.__devilboxActiveHivelyEngine) broadcast(g.__devilboxActiveHivelyEngine, 16);
   if (g.__devilboxActiveKlysEngine) broadcast(g.__devilboxActiveKlysEngine, 32);
+  if (g.__devilboxActiveCinter4Engine) broadcast(g.__devilboxActiveCinter4Engine, 4);
   for (const [, { Engine, maxCh }] of _gainEngineCache) {
     try {
       if (Engine.hasInstance()) {
@@ -449,9 +452,11 @@ export function getActiveGainEngine(): { setChannelGain(ch: number, gain: number
   const g = globalThis as {
     __devilboxActiveHivelyEngine?: { setChannelGain(ch: number, gain: number): void } | null;
     __devilboxActiveKlysEngine?: { setChannelGain(ch: number, gain: number): void } | null;
+    __devilboxActiveCinter4Engine?: { setChannelGain(ch: number, gain: number): void } | null;
   };
   if (g.__devilboxActiveHivelyEngine) return g.__devilboxActiveHivelyEngine;
   if (g.__devilboxActiveKlysEngine) return g.__devilboxActiveKlysEngine;
+  if (g.__devilboxActiveCinter4Engine) return g.__devilboxActiveCinter4Engine;
   if (!_engineCacheWarmedUp) return null;
   for (const [, { Engine }] of _gainEngineCache) {
     try {
