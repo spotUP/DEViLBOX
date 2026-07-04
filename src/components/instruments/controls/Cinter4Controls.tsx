@@ -149,6 +149,30 @@ export const Cinter4Controls: React.FC<Cinter4ControlsProps> = ({ instrument }) 
     bumpTick(); // redraw the waveform preview
   }, [updateInstrument]);
 
+  // Voice-struct fields (length / loop / version) — not synth params, but they shape
+  // the rendered voice and are part of the Cinter instrument, so the editor exposes them.
+  const handleMetaChange = useCallback(
+    (patch: Partial<Pick<Cinter4InstrumentParams, 'lengthWords' | 'replenWords' | 'version'>>) => {
+      const cur = cfgRef.current;
+      if (!cur) return;
+      const next: Cinter4InstrumentParams = { ...cur, ...patch };
+      if (next.replenWords > next.lengthWords) next.replenWords = next.lengthWords;
+      cfgRef.current = next;
+      const sample = buildCinter4SampleConfig(next);
+      updateInstrument(idRef.current, {
+        sample,
+        parameters: {
+          lengthWords: next.lengthWords,
+          replenWords: next.replenWords,
+          version: next.version,
+          sampleName: cinter4ParamsToSampleName(next.params),
+        } as Record<string, unknown>,
+      });
+      bumpTick();
+    },
+    [updateInstrument],
+  );
+
   const params = cfgRef.current;
   if (!params) {
     return (
@@ -198,6 +222,60 @@ export const Cinter4Controls: React.FC<Cinter4ControlsProps> = ({ instrument }) 
           </div>
         </div>
       ))}
+
+      {/* Voice struct fields — sample length, loop length, and synth version. */}
+      <div className={`rounded-lg border p-3 flex flex-col ${panelBg}`}
+        style={{ ...panelStyle, minHeight: PANEL_MIN_H }}>
+        <SectionLabel color={accent} label="Voice" />
+        <div className="flex-1 flex items-center gap-3 flex-wrap">
+          <Knob
+            value={params.lengthWords}
+            min={256} max={32768} step={256}
+            onChange={(v: number) => handleMetaChange({ lengthWords: Math.round(v) })}
+            color={knob} label="Length"
+            formatValue={() => `${params.lengthWords}w`}
+          />
+          <Knob
+            value={params.replenWords}
+            min={0} max={Math.max(1, params.lengthWords)} step={128}
+            onChange={(v: number) => handleMetaChange({ replenWords: Math.round(v) })}
+            color={knob} label="Loop Len"
+            formatValue={() => (params.replenWords > 0 ? `${params.replenWords}w` : 'off')}
+          />
+          <div className="flex flex-col items-center gap-1">
+            <div className="flex gap-1">
+              {([3, 4] as const).map((v) => (
+                <button
+                  key={v}
+                  onClick={() => handleMetaChange({ version: v })}
+                  className={`px-2 py-1 rounded text-[10px] font-mono border ${
+                    params.version === v
+                      ? 'bg-accent-primary/20 border-accent-primary text-accent-primary'
+                      : 'bg-dark-bgTertiary border-dark-borderLight text-text-secondary hover:bg-dark-bgHover'
+                  }`}
+                >
+                  v{v}
+                </button>
+              ))}
+            </div>
+            <span className="text-[9px] font-mono" style={{ color: dim }}>Version</span>
+          </div>
+        </div>
+      </div>
+
+      <div className={`rounded-lg border p-3 flex items-center justify-between gap-3 ${panelBg}`}
+        style={{ ...panelStyle }}>
+        <SectionLabel color={accent} label="Instrument Size" />
+        <div className="flex items-baseline gap-2 font-mono">
+          <span className="text-sm" style={{ color: knob }}>
+            {(params.lengthWords * 2).toLocaleString()}
+          </span>
+          <span className="text-[10px]" style={{ color: dim }}>bytes voice</span>
+          <span className="text-[9px]" style={{ color: dim }}>
+            ({params.lengthWords.toLocaleString()} words · 22 B params)
+          </span>
+        </div>
+      </div>
 
       <div className="text-[9px] font-mono px-1" style={{ color: dim }}>
         Live Cinter synth — params regenerate the voice and export as the sample
