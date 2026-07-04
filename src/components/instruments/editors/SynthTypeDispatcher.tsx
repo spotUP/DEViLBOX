@@ -1590,6 +1590,12 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
           onChange={handleChange}
           vizMode={vizMode}
           onVizModeChange={setVizMode}
+          showHelpButton={false}
+          onBake={handleBake}
+          onBakePro={handleBakePro}
+          onUnbake={handleUnbake}
+          isBaked={isBaked}
+          isBaking={isBaking}
         />
         <Suspense fallback={<LoadingControls />}>
           <Cinter4Controls instrument={instrument} />
