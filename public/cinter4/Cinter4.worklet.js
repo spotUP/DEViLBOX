@@ -84,6 +84,7 @@ class Cinter4Processor extends AudioWorkletProcessor {
             const free = this.module._free || this.module.free;
             if (free) free(wasmPtr);
 
+            this.playing = true; // gate process() — start rendering this module
             this.port.postMessage({ type: 'moduleLoaded' });
           } catch (error) {
             this.port.postMessage({ type: 'error', message: error.message });
@@ -92,6 +93,10 @@ class Cinter4Processor extends AudioWorkletProcessor {
         break;
 
       case 'stop':
+        // Gate process() FIRST so rendering halts immediately — otherwise the worklet
+        // keeps calling _player_render after stop, and a re-play stacks a 2nd playback
+        // on top of this one (the replay-doubling bug).
+        this.playing = false;
         if (this.module && typeof this.module._player_stop === 'function') {
           this.module._player_stop();
           this.port.postMessage({ type: 'stopped' });
@@ -219,7 +224,7 @@ class Cinter4Processor extends AudioWorkletProcessor {
   }
 
   process(inputs, outputs, parameters) {
-    if (!this.initialized || !this.module) return true;
+    if (!this.initialized || !this.module || !this.playing) return true;
     const output = outputs[0];
     if (!output || output.length < 2) return true;
     const outputL = output[0];
