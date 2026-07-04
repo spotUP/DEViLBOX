@@ -270,7 +270,31 @@ export function useExportDialog({ isOpen }: UseExportDialogOptions) {
   ) => {
     const { getTrackerReplayer } = await import('@engine/TrackerReplayer');
     const song = getTrackerReplayer().getSong();
-    if (!song) { notify.error('No song loaded'); return; }
+    if (!song) {
+      // No WASM-replayer song — but a Cinter MOD IS a native Cinter export.
+      const isCinter = instruments.some(
+        (i) => (i.parameters as Record<string, unknown> | undefined)?.cinter === 1,
+      );
+      if (isCinter) {
+        const { exportCinterCrunched, downloadBytes } = await import('@lib/export/Cinter4ModSave');
+        const { getOriginalModuleDataForExport, base64ToBuffer } = await import('@lib/export/exporters');
+        const omd = getOriginalModuleDataForExport();
+        const origBytes = omd?.format === 'MOD' ? new Uint8Array(base64ToBuffer(omd.base64)) : undefined;
+        const { patternOrder } = useTrackerStore.getState();
+        const { speed } = useTransportStore.getState();
+        const c = await exportCinterCrunched(patterns, instruments, patternOrder, {
+          moduleName: metadata.name || 'cinter', bpm, speed, originalModBytes: origBytes,
+        });
+        downloadBytes(c.songdata, c.filename);
+        if (c.rawSamples.length > 0) downloadBytes(c.rawSamples, c.filename.replace(/\.cinter4$/, '.raw'));
+        const kb = ((c.songdata.length + c.rawSamples.length) / 1024).toFixed(1);
+        if (c.errors.length > 0) notify.warning(`Crunched "${c.filename}" (${kb} KB) — ${c.errors.length} unsupported-command warning(s).`);
+        else notify.success(`Crunched "${c.filename}" (${kb} KB)${c.rawSamples.length ? ' + .raw samples' : ''}.`);
+        onClose();
+        return;
+      }
+      notify.error('No song loaded'); return;
+    }
 
     const format = song.format;
     const layoutFmtId = song.uadePatternLayout?.formatId || song.uadeVariableLayout?.formatId || '';

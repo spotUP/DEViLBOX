@@ -3,8 +3,9 @@
  * Uses chiptune3/libopenmpt for parsing and playback preview
  */
 
-import React, { useState, useRef, useCallback, useEffect } from 'react';
+import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { X, Music, FileAudio, AlertCircle, Folder } from 'lucide-react';
+import { countCinterModInstruments } from '@engine/cinter4/cinter4Recognize';
 import { Button } from '@components/ui/Button';
 import { CustomSelect } from '@components/common/CustomSelect';
 import {
@@ -168,6 +169,14 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
         nativeFmt?.family,
       )
     : null;
+
+  // Cinter detection: a Cinter song is a ProTracker MOD whose instruments carry
+  // their synth params in the sample names. Scan the header so the dialog can
+  // label it as a Cinter module before importing.
+  const cinterModCount = useMemo(() => {
+    if (!moduleInfo || !/mod/i.test(moduleInfo.metadata.type) || !moduleInfo.arrayBuffer) return 0;
+    try { return countCinterModInstruments(new Uint8Array(moduleInfo.arrayBuffer)); } catch { return 0; }
+  }, [moduleInfo]);
 
   // Formats that require companion files (e.g. external Instruments/ folder)
   // Shown as a warning when none were loaded alongside the module.
@@ -639,9 +648,21 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
                   <span className="font-medium text-text-primary">{moduleInfo.metadata.title}</span>
                 </div>
                 <span className="text-xs px-2 py-0.5 bg-accent-primary/20 text-accent-primary rounded">
-                  {uadeMetadata ? (uadeMetadata.formatName || 'UADE') : moduleInfo.metadata.type}
+                  {cinterModCount > 0
+                    ? `Cinter MOD`
+                    : (uadeMetadata ? (uadeMetadata.formatName || 'UADE') : moduleInfo.metadata.type)}
                 </span>
               </div>
+
+              {cinterModCount > 0 && (
+                <div className="flex items-center gap-2 text-[11px] font-mono px-2 py-1.5 rounded bg-accent-highlight/10 border border-accent-highlight/40 text-accent-highlight">
+                  <Music size={12} />
+                  <span>
+                    Cinter synth module — {cinterModCount} instrument{cinterModCount === 1 ? '' : 's'} will
+                    import as live, editable Cinter voices.
+                  </span>
+                </div>
+              )}
 
               <div className="grid grid-cols-2 gap-2 text-xs">
                 {uadeMetadata ? (
