@@ -37,8 +37,12 @@ import {
 
 // ── Shared sine table (16384 entries, ±16384) ────────────────────────────────
 // sine_table[i] = round(sin(i/16384 · 2π) · 16384), clamped to i16.
-// (The Amiga builds this via an integer cubic polynomial, CinterMakeSinus; that
-//  differs from Math.sin by ≤3 LSB — a faint timbre nuance, not a pitch error.)
+// NB: the Amiga builds this via an integer cubic polynomial (CinterMakeSinus).
+// Verified via the lock-test (tools/cinter-audit/mod-synth-parity.mts) that
+// round(Math.sin·16384) matches the Amiga-baked .mod sample PCM byte-exact where
+// a hand-ported polynomial did NOT — so this stays Math.sin. (Residual per-sample
+// diffs on some instruments are NOT the sine table — the polynomial swap left them
+// unchanged; see the audit notes.)
 
 let SINE_TABLE: Int16Array | null = null;
 
