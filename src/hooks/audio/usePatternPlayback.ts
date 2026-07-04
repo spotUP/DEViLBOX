@@ -242,7 +242,7 @@ export const usePatternPlayback = () => {
   // When in loop mode, track which pattern is being looped so that position
   // changes (clicking position buttons) trigger a reload with the new pattern.
   // In song mode this is -1 so it doesn't interfere with patternStructureKey.
-  const loopTargetKey = isLooping ? currentPatternIndex : -1;
+  const loopTargetKey = isLooping ? actualPatternIndex : -1;
 
   // Handle playback start/stop and structural changes (channel count, format, etc.)
   // NOTE: uses patternStructureKey instead of pattern/patterns to avoid full reloads
@@ -477,7 +477,9 @@ export const usePatternPlayback = () => {
         {
           // --- Pattern Order Mode ---
           const currentOrder = patternOrderRef.current;
-          const loopPatternOrder = isLooping ? [currentPatternIndex] : currentOrder;
+          // Loop the pattern at the CURRENT song position (not currentPatternIndex, which
+          // may lag when navigating by position) so Play Pattern loops what the user is on.
+          const loopPatternOrder = isLooping ? [actualPatternIndex] : currentOrder;
           effectiveSongPositions = loopPatternOrder;
           effectiveSongLength = isLooping ? 1 : (modData?.songLength ?? currentOrder.length);
         }
