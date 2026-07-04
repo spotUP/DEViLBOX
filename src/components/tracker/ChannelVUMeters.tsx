@@ -14,6 +14,7 @@ import { useShallow } from 'zustand/react/shallow';
 import { getToneEngine } from '@engine/ToneEngine';
 import { useTransportStore } from '@stores/useTransportStore';
 import { useThemeStore } from '@stores/useThemeStore';
+import { useOscilloscopeStore } from '@stores/useOscilloscopeStore';
 
 // VU meter timing constants - ProTracker style
 const DECAY_RATE = 0.92;       // per-frame decay at 60fps reference rate
@@ -157,6 +158,9 @@ export const ChannelVUMeters: React.FC<ChannelVUMetersProps> = memo(({ channelOf
       const offsets = channelOffsetsRef.current;
       const widths = channelWidthsRef.current;
       const isPlaying = useTransportStore.getState().isPlaying;
+      // Per-channel waveforms from a direct-routed WASM engine (Cinter, Furnace, …).
+      const oscChannelData = useOscilloscopeStore.getState().isActive
+        ? useOscilloscopeStore.getState().channelData : null;
       const swingEnabled = useSettingsStore.getState().vuMeterSwing;
       const mirrorEnabled = useSettingsStore.getState().vuMeterMirror;
       const vuStyle = useSettingsStore.getState().vuMeterStyle;
@@ -182,8 +186,10 @@ export const ChannelVUMeters: React.FC<ChannelVUMetersProps> = memo(({ channelOf
         // Skip collapsed channels
         if (widths[i] && widths[i] < 20) continue;
 
-        // When playback is stopped, kill meters instantly (no lingering bounce)
-        if (!isPlaying) {
+        // When playback is stopped, kill meters instantly (no lingering bounce).
+        // A direct-routed WASM engine can play with transport isPlaying still false,
+        // so keep metering while its oscilloscope is active.
+        if (!isPlaying && !oscChannelData) {
           meter.level = 0;
         } else {
           // Time-based decay — consistent across all frame rates
@@ -205,6 +211,17 @@ export const ChannelVUMeters: React.FC<ChannelVUMetersProps> = memo(({ channelOf
             if (target > meter.level) {
               meter.level = target;
             }
+          }
+
+          // WASM per-channel oscilloscope (Cinter, Furnace, Hively, …): those play
+          // via a direct-routed WASM engine so the ToneEngine channel meters above
+          // stay silent. Derive the level from the channel waveform peak instead.
+          const oscD = oscChannelData ? oscChannelData[i] : null;
+          if (oscD && oscD.length > 0) {
+            let peak = 0;
+            for (let k = 0; k < oscD.length; k++) { const a = Math.abs(oscD[k]); if (a > peak) peak = a; }
+            const target = peak / 32768;
+            if (target > meter.level) meter.level = target;
           }
         }
 
