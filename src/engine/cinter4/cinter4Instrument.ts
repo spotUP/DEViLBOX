@@ -20,6 +20,7 @@ import {
   type Cinter4SynthWords,
 } from '../../lib/import/formats/cinter4Params';
 import { renderCinter4SampleFromWords } from './cinter4SynthCore';
+import { renderCinter3SampleFromWords } from './cinter3SynthCore';
 
 /** The 9 stored synth words in the order the Amiga replayer reads them. */
 const CINTER4_WORD_KEYS: (keyof Cinter4SynthWords)[] = [
@@ -53,12 +54,30 @@ export function cinter4EffectiveWords(p: Cinter4InstrumentParams): Cinter4SynthW
   return p.words ?? cinter4ParamsToWords(p.params, p.version);
 }
 
+/**
+ * Render a Cinter voice from its stored words, choosing the synth that matches the
+ * instrument's version: Cinter 3 used the all-float Cinter3.lua synth (matches the
+ * baked samples of original v3 mods), Cinter 4 the fixed-point Amiga player. Wrong
+ * choice = audibly wrong decay/modulation. Single source of truth for every render
+ * site (baked sample, live voice, editor preview, MOD export).
+ */
+export function renderCinterVoice(
+  words: Cinter4SynthWords,
+  length: number,
+  repeatStart: number | null,
+  version: Cinter4Version,
+): Int8Array {
+  return version === 3
+    ? renderCinter3SampleFromWords(words, length, repeatStart)
+    : renderCinter4SampleFromWords(words, length, repeatStart);
+}
+
 /** Render the Cinter voice and wrap it as a playable SampleConfig. */
 export function buildCinter4SampleConfig(p: Cinter4InstrumentParams, baseNote = 'C4'): SampleConfig {
   const lengthSamples = Math.max(2, p.lengthWords * 2);
   const repeatStart = p.replenWords > 0 ? (p.lengthWords - p.replenWords) * 2 : null;
 
-  const pcm = renderCinter4SampleFromWords(cinter4EffectiveWords(p), lengthSamples, repeatStart);
+  const pcm = renderCinterVoice(cinter4EffectiveWords(p), lengthSamples, repeatStart, p.version);
 
   // 8-bit signed → 16-bit for the WAV container (same scaling as MOD sample import)
   const samples16 = new Int16Array(lengthSamples);

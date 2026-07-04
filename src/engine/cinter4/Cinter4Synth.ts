@@ -24,8 +24,7 @@
 import type { DevilboxSynth } from '@/types/synth';
 import type { InstrumentConfig } from '@typedefs/instrument';
 import { getDevilboxAudioContext, audioNow, noteToFrequency } from '@/utils/audio-context';
-import { renderCinter4SampleFromWords } from './cinter4SynthCore';
-import { readCinter4InstrumentParams, cinter4EffectiveWords, CINTER4_SAMPLE_RATE } from './cinter4Instrument';
+import { readCinter4InstrumentParams, cinter4EffectiveWords, renderCinterVoice, CINTER4_SAMPLE_RATE } from './cinter4Instrument';
 
 /** Base note the rendered buffer is tuned to (matches the sample-bridge baseNote). */
 const BASE_NOTE = 'C4';
@@ -71,8 +70,8 @@ export class Cinter4Synth implements DevilboxSynth {
     const lengthSamples = Math.max(2, p.lengthWords * 2);
     const repeatStart = p.replenWords > 0 ? (p.lengthWords - p.replenWords) * 2 : null;
     // Synthesize from the verbatim import words when present (else canonical
-    // params→words) — same source of truth the Amiga replayer uses.
-    const pcm = renderCinter4SampleFromWords(cinter4EffectiveWords(p), lengthSamples, repeatStart); // Int8Array
+    // params→words), with the version-correct synth (v3 float / v4 fixed-point).
+    const pcm = renderCinterVoice(cinter4EffectiveWords(p), lengthSamples, repeatStart, p.version); // Int8Array
 
     const buf = this.ctx.createBuffer(1, lengthSamples, CINTER4_SAMPLE_RATE);
     const data = buf.getChannelData(0);
