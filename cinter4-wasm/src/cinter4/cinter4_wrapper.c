@@ -54,6 +54,7 @@ static int      s_finished       = 0;
 static float    s_tick_accum     = 0.0f;
 static float    s_samples_per_tick = 0.0f;
 static int      s_sample_rate    = PAULA_RATE_PAL;
+static int      s_total_ticks    = 0;   /* 50 Hz ticks played since load (position feed) */
 
 void player_set_sample_rate(int sample_rate) {
     if (sample_rate <= 0) return;
@@ -110,6 +111,7 @@ int player_load(const uint8_t* data, int len) {
     s_loaded     = 1;
     s_finished   = 0;
     s_tick_accum = 0.0f;
+    s_total_ticks = 0;   /* primed tick 0 */
     return 1;
 }
 
@@ -138,6 +140,7 @@ int player_render(float* buffer, int frames) {
             CinterPlay1();
             a6 = (uint32_t)(uintptr_t)s_work;
             CinterPlay2();
+            s_total_ticks++;
         }
     }
     return frames;
@@ -165,6 +168,7 @@ int player_seek(int tick) {
         a6 = (uint32_t)(uintptr_t)s_work; CinterPlay1();
         a6 = (uint32_t)(uintptr_t)s_work; CinterPlay2();
     }
+    s_total_ticks = tick;
     return 1;
 }
 
@@ -176,7 +180,12 @@ void player_tick(void) {
     if (!s_loaded) return;
     a6 = (uint32_t)(uintptr_t)s_work; CinterPlay1();
     a6 = (uint32_t)(uintptr_t)s_work; CinterPlay2();
+    s_total_ticks++;
 }
+
+/* Total 50 Hz ticks played since load — for the position/scroll feed. The JS side
+   maps tick → (song position, row) using the decompiled speed + 64-row patterns. */
+int player_get_tick(void) { return s_total_ticks; }
 int      player_paula_period(int ch) { return (int)paula_reg_period(ch); }
 int      player_paula_volume(int ch) { return (int)paula_reg_volume(ch); }
 int      player_paula_len(int ch)    { return (int)(paula_reg_len_bytes(ch) / 2); } /* words */

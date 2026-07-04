@@ -293,6 +293,11 @@ class Cinter4Processor extends AudioWorkletProcessor {
             channels.push(out);
           }
           this.port.postMessage({ type: 'scope', channels });
+          // Report the WASM's real 50 Hz tick so the pattern scroll follows the
+          // audio (not the tracker scheduler). Same ~60 fps throttle as the scope.
+          if (typeof this.module._player_get_tick === 'function') {
+            this.port.postMessage({ type: 'position', tick: this.module._player_get_tick() });
+          }
         }
       }
     }

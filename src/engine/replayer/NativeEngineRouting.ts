@@ -418,7 +418,11 @@ const WASM_ENGINES: NativeEngineDescriptor[] = [
     fileDataKey: 'cinter4FileData',
     formats: ['Cinter4'],
     loadMethod: 'loadTune',
-    getLoadArgs: (song) => [song.cinter4RawData],
+    getLoadArgs: (song) => [song.cinter4RawData, {
+      spd: song.initialSpeed || 6,
+      ticksPerTrack: song.cinter4Music?.ticksPerTrack ?? 0,
+      restartTick: song.cinter4Music?.restartTick ?? 0,
+    }],
     supportsPause: false,
     supportsResume: false,
     needsDirectRouting: true,

@@ -7,6 +7,7 @@
 
 import { getDevilboxAudioContext } from "@/utils/audio-context";
 import { useOscilloscopeStore } from '@stores/useOscilloscopeStore';
+import { useWasmPositionStore } from '@stores/useWasmPositionStore';
 import {
   WASMSingletonBase,
   createWASMAssetsCache,
@@ -14,9 +15,13 @@ import {
   type WASMLoaderConfig,
 } from '@engine/wasm/WASMSingletonBase';
 
+/** Position config for mapping the WASM tick → decompiled (song position, row). */
+interface Cinter4PosConfig { spd: number; ticksPerTrack: number; restartTick: number }
+
 export class Cinter4Engine extends WASMSingletonBase {
   private static instance: Cinter4Engine | null = null;
   private static cache: WASMAssetsCache = createWASMAssetsCache();
+  private posConfig: Cinter4PosConfig | null = null;
 
   private constructor() {
     super();
@@ -77,6 +82,12 @@ export class Cinter4Engine extends WASMSingletonBase {
           useOscilloscopeStore.getState().updateChannelData(data.channels);
           break;
 
+        case 'position':
+          // The WASM's real 50 Hz tick → decompiled (song position, row) so the
+          // pattern scroll follows the audio, not the drifting tracker scheduler.
+          this.feedPosition(data.tick | 0);
+          break;
+
         case 'error':
           console.error('[Cinter4Engine]', data.message);
           break;
@@ -93,9 +104,10 @@ export class Cinter4Engine extends WASMSingletonBase {
     this.workletNode.connect(this.output);
   }
 
-  async loadTune(buffer: ArrayBuffer, rawData?: ArrayBuffer): Promise<void> {
+  async loadTune(buffer: ArrayBuffer, rawData?: ArrayBuffer, posConfig?: Cinter4PosConfig): Promise<void> {
     await this._initPromise;
     if (!this.workletNode) throw new Error('Cinter4Engine not initialized');
+    this.posConfig = posConfig ?? null;
 
     // Songs with raw (non-Cinter) instruments need their PCM in instrument space
     // BEFORE the module loads — CinterMakeInstruments reads it at synth time.
@@ -132,6 +144,22 @@ export class Cinter4Engine extends WASMSingletonBase {
     this.workletNode?.port.postMessage({ type: 'setStereoSeparation', value: percent });
   }
 
+  /** Map the WASM 50 Hz tick → decompiled (song position, row) and feed the store.
+   *  Decompiled Cinter is speed-recovered 64-row patterns; the song loops from
+   *  restartTick once it passes ticksPerTrack. */
+  private feedPosition(tick: number): void {
+    const cfg = this.posConfig;
+    if (!cfg) return;
+    const spd = cfg.spd || 6;
+    let playTick = tick;
+    const loopLen = cfg.ticksPerTrack - cfg.restartTick;
+    if (cfg.ticksPerTrack > 0 && tick >= cfg.ticksPerTrack && loopLen > 0) {
+      playTick = cfg.restartTick + ((tick - cfg.ticksPerTrack) % loopLen);
+    }
+    const rowInSong = Math.floor(playTick / spd);
+    useWasmPositionStore.getState().setPosition(rowInSong % 64, Math.floor(rowInSong / 64));
+  }
+
   play(): void {
     // Playback starts automatically on load for sequencer-based formats
   }
@@ -139,6 +167,7 @@ export class Cinter4Engine extends WASMSingletonBase {
   stop(): void {
     this.workletNode?.port.postMessage({ type: 'stop' });
     useOscilloscopeStore.getState().clear();
+    useWasmPositionStore.getState().clear();
   }
 
   /** Seek to a 50 Hz tick (Play Pattern / mid-song start). The player is linear, so
