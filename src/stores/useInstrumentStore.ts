@@ -88,6 +88,17 @@ function revokeInstrumentSampleUrls(sample: InstrumentConfig['sample']) {
 const bakingInstruments = new Set<number>();
 
 /**
+ * Nudge the WASM-engine re-export (debounced) after an instrument add/delete/edit. For
+ * Cinter4 songs this recompiles → .cinter4, refreshing the Shrinkler-size readout and
+ * WASM playback so instrument changes reflect like pattern edits do. No-op for formats
+ * without a live re-export (the debounce checks sourceFormat internally). Lazy-imported
+ * to avoid a static cycle with useTrackerStore.
+ */
+function triggerWasmReexport(): void {
+  void import('./useTrackerStore').then((m) => m.debouncedWasmEngineReexport()).catch(() => { /* store not ready */ });
+}
+
+/**
  * Check if adding/changing to a synth instrument breaks native format compatibility.
  * Returns true if the user confirmed (or no warning needed), false if cancelled.
  * Called from ALL store entry points that can change synthType.
@@ -267,6 +278,9 @@ export const useInstrumentStore = create<InstrumentStore>()(
     },
 
     updateInstrument: (id, updates) => {
+      // Refresh the live WASM re-export (Cinter4 Shrinkler size + playback). Debounced and
+      // format-gated, so no-op edits / non-Cinter songs coalesce or skip cheaply.
+      triggerWasmReexport();
       const currentInstrument = get().instruments.find((inst) => inst.id === id);
 
       // Format compat: synth type change — deferred to export-time validation
@@ -1193,9 +1207,10 @@ export const useInstrumentStore = create<InstrumentStore>()(
           engine.ensureInstrumentReady(savedConfig);
         });
       }
+      triggerWasmReexport();
     },
 
-    deleteInstrument: (id) =>
+    deleteInstrument: (id) => {
       set((state) => {
         const index = state.instruments.findIndex((inst) => inst.id === id);
         if (index !== -1 && state.instruments.length > 1) {
@@ -1206,7 +1221,9 @@ export const useInstrumentStore = create<InstrumentStore>()(
             state.currentInstrumentId = state.instruments[0].id;
           }
         }
-      }),
+      });
+      triggerWasmReexport();
+    },
 
     cloneInstrument: (id) => {
       const original = get().instruments.find((inst) => inst.id === id);
