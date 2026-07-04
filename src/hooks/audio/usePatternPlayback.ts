@@ -632,20 +632,35 @@ export const usePatternPlayback = () => {
         // Apply stored stereo separation (overrides format default from loadSong)
         replayer.setStereoSeparation(useSettingsStore.getState().stereoSeparation);
 
+        // The Cinter4 WASM player is linear (no tracker-driven position) — forward the
+        // target position to it as a 50 Hz tick so Play Pattern / mid-song start actually
+        // move the audio. tick = (patternIndex * 64 + row) * speed (decompiled Cinter is
+        // speed-recovered 64-row patterns). No-op for other formats.
+        const seekCinter4 = (patIdx: number, row: number): void => {
+          if ((format as string) !== 'Cinter4') return;
+          const spd = (modData?.initialSpeed ?? transportSpeed) || 6;
+          void import('@/engine/cinter4/Cinter4Engine').then(({ Cinter4Engine }) => {
+            if (Cinter4Engine.hasInstance()) Cinter4Engine.getInstance().seekTo((patIdx * 64 + row) * spd);
+          });
+        };
+
         if (needsReload) {
           if (isLooping) {
             // Loop-mode position change: the song is always a 1-entry list,
             // so start the new pattern from the top.
             replayer.seekTo(0, 0);
+            seekCinter4(actualPatternIndex, 0);
           } else {
             // Restore position after structural reload in song mode.
             // If the position is out of bounds (e.g. pattern order shrunk), seekTo handles clamping.
             replayer.seekTo(currentSongPos, currentRow);
+            seekCinter4(effectiveSongPositions[currentSongPos] ?? currentSongPos, currentRow);
           }
         } else if (isLooping) {
           // Pattern-loop initial start: the song is a 1-entry list ([currentPattern]),
           // so always loop it from the top (pos 00 / row 0) rather than the cursor.
           replayer.seekTo(0, 0);
+          seekCinter4(actualPatternIndex, 0);
         } else {
           // Initial start (song mode): seek to the current cursor position so playback
           // begins where the user is looking, not from the top of the song.
@@ -653,6 +668,7 @@ export const usePatternPlayback = () => {
           const startRow = useTransportStore.getState().currentRow;
           if (startPos > 0 || startRow > 0) {
             replayer.seekTo(startPos, startRow);
+            seekCinter4(effectiveSongPositions[startPos] ?? startPos, startRow);
           }
         }
 

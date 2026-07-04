@@ -103,6 +103,16 @@ class Cinter4Processor extends AudioWorkletProcessor {
         }
         break;
 
+      case 'seek':
+        // Jump to a 50 Hz tick (Play Pattern / mid-song start). The player is linear,
+        // so this replays the sequencer to the target tick, then resumes rendering.
+        if (this.module && typeof this.module._player_seek === 'function') {
+          this.module._player_seek((data.tick | 0) < 0 ? 0 : (data.tick | 0));
+          this.playing = true;
+          this.port.postMessage({ type: 'sought' });
+        }
+        break;
+
       case 'dispose':
         this.cleanup();
         break;

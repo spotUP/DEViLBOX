@@ -119,6 +119,12 @@ export class Cinter4Engine extends WASMSingletonBase {
     useOscilloscopeStore.getState().clear();
   }
 
+  /** Seek to a 50 Hz tick (Play Pattern / mid-song start). The player is linear, so
+   *  this replays the sequencer to the tick in the worklet, then resumes rendering. */
+  seekTo(tick: number): void {
+    this.workletNode?.port.postMessage({ type: 'seek', tick: Math.max(0, Math.floor(tick)) });
+  }
+
   pause(): void {
     this.workletNode?.port.postMessage({ type: 'stop' });
   }
