@@ -633,13 +633,17 @@ export function encodeFromStreams(input: EncodeFromStreamsInput): Cinter4ExportR
   for (let k = rawInstruments.length; k < instData.length; k++) for (const w of instData[k]) pushWordSigned(instsBytes, w);
 
   // ── Final songdata ──
+  // NB: append via loops, NOT `out.push(...bigArray)` — the note stream of a long
+  // Cinter track is tens of thousands of bytes, and spreading that many arguments
+  // overflows the call stack ("Maximum call stack size exceeded"), which broke the
+  // live re-export on every edit of a large song.
   const out: number[] = [];
-  out.push(...instsBytes);
+  for (let k = 0; k < instsBytes.length; k++) out.push(instsBytes[k]);
   const trackSizeWord = (notesBytes.length / 4) & 0xffff; // = len(notes_data)//4
   out.push((trackSizeWord >> 8) & 0xff, trackSizeWord & 0xff);
   out.push((noteRangeBytes.length >> 8) & 0xff, noteRangeBytes.length & 0xff);
-  out.push(...noteRangeBytes);
-  out.push(...notesBytes);
+  for (let k = 0; k < noteRangeBytes.length; k++) out.push(noteRangeBytes[k]);
+  for (let k = 0; k < notesBytes.length; k++) out.push(notesBytes[k]);
 
   // ── Raw sample blob ──
   const rawParts: Uint8Array[] = [];
