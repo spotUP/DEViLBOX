@@ -213,11 +213,33 @@ export const TrackScopesStrip: React.FC = memo(() => {
     return () => cancelAnimationFrame(animRef.current);
   }, [drawWaveform]);
 
+  // Click a channel scope to toggle its mute (solo with modifier). The strip is
+  // full-width with `numChannels` equal cells, so channel = floor(x / cellWidth).
+  const handleClick = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    const nc = numChRef.current;
+    if (nc <= 0 || rect.width <= 0) return;
+    const ch = Math.min(nc - 1, Math.max(0, Math.floor(((e.clientX - rect.left) / rect.width) * nc)));
+    const mixer = useMixerStore.getState();
+    if (e.altKey || e.metaKey) {
+      // Alt/Cmd-click = solo toggle (isolate this channel).
+      const soloed = mixer.channels[ch]?.soloed ?? false;
+      mixer.setChannelSolo(ch, !soloed);
+    } else {
+      const muted = mixer.channels[ch]?.muted ?? false;
+      mixer.setChannelMute(ch, !muted);
+    }
+  }, []);
+
   return (
     <div className="flex-shrink-0 border-b border-dark-border overflow-hidden" style={{ height: STRIP_HEIGHT }}>
       <canvas
         ref={canvasRef}
-        className="w-full h-full block"
+        onClick={handleClick}
+        title="Click a channel to mute · Alt/Cmd-click to solo"
+        className="w-full h-full block cursor-pointer"
       />
     </div>
   );
