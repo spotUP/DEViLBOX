@@ -622,6 +622,19 @@ export const useInstrumentStore = create<InstrumentStore>()(
               return; // Handled
             }
 
+            // Sonix — push edited synth params into the live WASM singleton so the
+            // playing song morphs immediately. Song playback is note-suppressed, so no
+            // SonixSynth voice is otherwise instantiated; getInstrument guarantees one,
+            // and its applyConfig calls SonixEngine.setSynthParams (set_wave rebuilds the
+            // filter bank). Must NOT invalidate — that would kill the running song.
+            if (updatedInstrument.synthType === 'SonixSynth' && updates.parameters) {
+              const instrument = engine.getInstrument(id, updatedInstrument);
+              if (instrument && typeof (instrument as unknown as { applyConfig?: unknown }).applyConfig === 'function') {
+                (instrument as unknown as { applyConfig: (c: InstrumentConfig) => void }).applyConfig(updatedInstrument);
+              }
+              return; // Handled
+            }
+
             // Furnace instruments - re-encode and re-upload when parameters change
             if (updatedInstrument.synthType?.startsWith('Furnace') && updatedInstrument.furnace && updates.furnace) {
               engine.updateFurnaceInstrument(id, updatedInstrument);
