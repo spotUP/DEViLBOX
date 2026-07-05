@@ -38,6 +38,9 @@ export interface SonixSynthParams {
   slideRate: number;
   wave: number[];     // 128 signed bytes
   envTable: number[]; // 128 signed bytes
+  lfoWave: number[];  // third 128-sample table @0x144 (Aegis "LFO" waveform tab)
+  egLevels: number[]; // 4-stage envelope generator targets
+  egRates: number[];  // 4-stage envelope generator speeds (raw u16, bit-packed base/shift)
 }
 
 export class SonixEngine extends WASMSingletonBase {
