@@ -12,6 +12,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Upload } from 'lucide-react';
 import { getFormatExtensions, isSupportedFormat } from '@lib/import/FormatRegistry';
+import { getDevilboxAudioContext } from '@/utils/audio-context';
 
 interface GlobalDragDropHandlerProps {
   onFileLoaded: (file: File) => Promise<void>;
@@ -120,6 +121,15 @@ export const GlobalDragDropHandler: React.FC<GlobalDragDropHandlerProps> = ({
     const handleDrop = async (e: DragEvent) => {
       e.preventDefault();
       setIsDragging(false);
+
+      // A drop is a user gesture — resume the AudioContext synchronously (before any await)
+      // so playback isn't blocked by the browser autoplay policy. Without this, dropping a
+      // song on a freshly-loaded page (context 'suspended') plays silent until you click
+      // elsewhere. Clicks unlock via a separate listener; drops did not.
+      try {
+        const ctx = getDevilboxAudioContext();
+        if (ctx.state !== 'running') void ctx.resume();
+      } catch { /* best-effort unlock */ }
 
       // If a child component (e.g. SampleEditor, DJ deck) has its own drop handler and
       // already processed this file, skip the app-level handler to avoid double-handling.
