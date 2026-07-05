@@ -184,7 +184,10 @@ function getEditorMode(synthType: SynthType): EditorMode {
   if (synthType === 'MusicAssemblerSynth') return 'wasm-param';
   if (synthType === 'BenDaglishSynth') return 'wasm-param';
   if (synthType === 'ArtOfNoiseSynth') return 'wasm-param';
-  if (synthType === 'SonixSynth') return 'wasm-info';
+  // Sonix synth instruments get the first-class SonixControls editor. Sample-based
+  // Sonix instruments keep synthType 'Sampler' (sample editor) — only the WASM-flagged
+  // synth instruments are promoted to 'SonixSynth' by the param bridge.
+  if (synthType === 'SonixSynth') return 'sonix';
   if (synthType === 'PxtoneSynth') return 'wasm-info';
   if (synthType === 'OrganyaSynth') return 'wasm-info';
   if (synthType === 'Sc68Synth') return 'wasm-info';

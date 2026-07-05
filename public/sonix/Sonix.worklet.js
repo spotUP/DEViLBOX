@@ -101,10 +101,16 @@ class SonixProcessor extends AudioWorkletProcessor {
             };
 
             this.port.postMessage({ type: 'moduleLoaded', meta });
+            // Read back the WASM-parsed synth params so the editor/store can mirror them.
+            this.postSynthParams();
           } catch (error) {
             this.port.postMessage({ type: 'error', message: error.message });
           }
         }
+        break;
+
+      case 'setSynthParams':
+        this.applySynthParams(data.params);
         break;
 
       case 'stop':
@@ -156,6 +162,71 @@ class SonixProcessor extends AudioWorkletProcessor {
     }
 
     if (free) { free(dataPtr); free(pathPtr); }
+  }
+
+  // Read a 128-byte signed int8 array from the WASM via getFn(index, ptr).
+  readInt8Array(getFn, i) {
+    const ptr = this.module._malloc(128);
+    if (!ptr) return null;
+    getFn(i, ptr);
+    const heap = this.getHeapU8();
+    const out = new Array(128);
+    for (let k = 0; k < 128; k++) { const b = heap[ptr + k]; out[k] = b < 128 ? b : b - 256; }
+    this.module._free(ptr);
+    return out;
+  }
+
+  // Write a 128-element signed array to the WASM via setFn(index, ptr).
+  writeInt8Array(setFn, i, arr) {
+    const ptr = this.module._malloc(128);
+    if (!ptr) return;
+    const heap = this.getHeapU8();
+    for (let k = 0; k < 128; k++) heap[ptr + k] = (arr[k] | 0) & 0xff;
+    setFn(i, ptr);
+    this.module._free(ptr);
+  }
+
+  // Read every synth instrument's params from the WASM and post to the engine.
+  postSynthParams() {
+    const m = this.module;
+    if (!m || typeof m._sonix_synth_is_synth !== 'function') return;
+    const instruments = [];
+    for (let i = 0; i < 64; i++) {
+      if (!m._sonix_synth_is_synth(i)) continue;
+      instruments.push({
+        index: i,
+        baseVol: m._sonix_synth_get_base_vol(i),
+        portFlag: m._sonix_synth_get_port_flag(i),
+        c2: m._sonix_synth_get_c2(i),
+        c4: m._sonix_synth_get_c4(i),
+        filterBase: m._sonix_synth_get_filter_base(i),
+        filterRange: m._sonix_synth_get_filter_range(i),
+        filterEnvSens: m._sonix_synth_get_filter_env_sens(i),
+        envScanRate: m._sonix_synth_get_env_scan_rate(i),
+        envLoopMode: m._sonix_synth_get_env_loop_mode(i),
+        envDelayInit: m._sonix_synth_get_env_delay_init(i),
+        envVolScale: m._sonix_synth_get_env_vol_scale(i),
+        envPitchScale: m._sonix_synth_get_env_pitch_scale(i),
+        slideRate: m._sonix_synth_get_slide_rate(i),
+        wave: this.readInt8Array(m._sonix_synth_get_wave.bind(m), i),
+        envTable: this.readInt8Array(m._sonix_synth_get_env_table.bind(m), i),
+      });
+    }
+    this.port.postMessage({ type: 'synthParams', instruments });
+  }
+
+  // Push edited synth params back into the WASM (live edit; set_wave recomputes filter bank).
+  applySynthParams(p) {
+    const m = this.module;
+    if (!m || !p || typeof m._sonix_synth_set_vol_params !== 'function') return;
+    const i = p.index;
+    m._sonix_synth_set_vol_params(i, p.baseVol | 0, p.portFlag | 0);
+    m._sonix_synth_set_blend_params(i, p.c2 | 0, p.c4 | 0);
+    m._sonix_synth_set_filter_params(i, p.filterBase | 0, p.filterRange | 0, p.filterEnvSens | 0);
+    m._sonix_synth_set_env_params(i, p.envScanRate | 0, p.envLoopMode | 0, p.envDelayInit | 0, p.envVolScale | 0, p.envPitchScale | 0);
+    m._sonix_synth_set_slide_rate(i, p.slideRate | 0);
+    if (Array.isArray(p.wave)) this.writeInt8Array(m._sonix_synth_set_wave.bind(m), i, p.wave);
+    if (Array.isArray(p.envTable)) this.writeInt8Array(m._sonix_synth_set_env_table.bind(m), i, p.envTable);
   }
 
   allocCString(str) {

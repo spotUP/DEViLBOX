@@ -20,11 +20,34 @@ export interface SonixMeta {
   numSamples: number;
 }
 
+/** Per-instrument SNX1 synth parameters, mirrored from the WASM for the editor. */
+export interface SonixSynthParams {
+  index: number;
+  baseVol: number;
+  portFlag: number;
+  c2: number;
+  c4: number;
+  filterBase: number;
+  filterRange: number;
+  filterEnvSens: number;
+  envScanRate: number;
+  envLoopMode: number;
+  envDelayInit: number;
+  envVolScale: number;
+  envPitchScale: number;
+  slideRate: number;
+  wave: number[];     // 128 signed bytes
+  envTable: number[]; // 128 signed bytes
+}
+
 export class SonixEngine extends WASMSingletonBase {
   private static instance: SonixEngine | null = null;
   private static cache: WASMAssetsCache = createWASMAssetsCache();
 
   private _meta: SonixMeta | null = null;
+  private _synthParams: SonixSynthParams[] = [];
+  /** Fired when the WASM reports its parsed synth params after a module loads. */
+  static onSynthParams: ((params: SonixSynthParams[]) => void) | null = null;
 
   private constructor() {
     super();
@@ -87,6 +110,11 @@ export class SonixEngine extends WASMSingletonBase {
           console.log('[SonixEngine] Module loaded:', this._meta);
           break;
 
+        case 'synthParams':
+          this._synthParams = (data.instruments as SonixSynthParams[]) || [];
+          SonixEngine.onSynthParams?.(this._synthParams);
+          break;
+
         case 'error':
           console.error('[SonixEngine]', data.message);
           break;
@@ -146,6 +174,16 @@ export class SonixEngine extends WASMSingletonBase {
   setMuteMask(mask: number): void {
     if (!this.workletNode) return;
     this.workletNode.port.postMessage({ type: 'setMuteMask', mask });
+  }
+
+  /** The synth params mirrored from the WASM after the current module loaded. */
+  get synthParams(): SonixSynthParams[] {
+    return this._synthParams;
+  }
+
+  /** Push an edited instrument's synth params into the live WASM (set_wave rebuilds the filter bank). */
+  setSynthParams(params: SonixSynthParams): void {
+    this.workletNode?.port.postMessage({ type: 'setSynthParams', params });
   }
 
   override dispose(): void {
