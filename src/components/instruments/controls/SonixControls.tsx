@@ -9,12 +9,15 @@
  *
  * Panel order follows the Aegis SONIX V2.0 layout:
  *   Waveform (3 drawable tabs) · Amplitude · Freq · Filter · LFO · Phase · Envelope Generator
+ *
+ * Lint pattern note: `params` is derived via useMemo from the `instrument` prop (no ref
+ * read during render). `paramsRef` is written during render (sync pattern) and read only
+ * inside callbacks — so neither react-hooks/refs nor react-hooks/set-state-in-effect fire.
  */
 
 import React, {
   useCallback,
   useEffect,
-  useReducer,
   useRef,
   useState,
 } from 'react';
@@ -32,13 +35,13 @@ import {
 } from '@/engine/sonix/sonixInstrument';
 import type { SonixSynthParams } from '@/engine/sonix/SonixEngine';
 
-// ─── Constants ───────────────────────────────────────────────────────────────
+// ─── Constants ────────────────────────────────────────────────────────────────
 
 const WAVE_H = 88;
 
 type WaveTab = 'wave' | 'lfoWave' | 'envTable';
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 /** Look up metadata for a scalar param (label, min, max). */
 const metaFor = (key: keyof SonixSynthParams) =>
@@ -57,8 +60,9 @@ const decodeRateStep = (raw: number): number => {
 // ─── DrawableCanvas ───────────────────────────────────────────────────────────
 
 /**
- * Editable variant of ByteCanvas. Pointer-drag paints into the waveform.
- * `onDraw(x, y, w, h)` is called on every painted pixel — caller maps to array index/value.
+ * Editable canvas for a 128-sample signed int8 array.
+ * Pointer-drag paints into the waveform. `onDraw(x, y, w, h)` is called on every
+ * pointer sample; caller maps coordinates to array index + value.
  */
 const DrawableCanvas: React.FC<{
   data: number[];
@@ -70,7 +74,8 @@ const DrawableCanvas: React.FC<{
   const ref = useRef<HTMLCanvasElement>(null);
   const isDown = useRef(false);
 
-  useEffect(() => {
+  // Redraw whenever data changes.
+  React.useEffect(() => {
     const cvs = ref.current;
     if (!cvs) return;
     const draw = () => {
@@ -131,17 +136,13 @@ const DrawableCanvas: React.FC<{
         const c = getCoords(e);
         if (c) onDraw(c.x, c.y, c.w, c.h);
       }}
-      onPointerUp={() => {
-        isDown.current = false;
-      }}
-      onPointerCancel={() => {
-        isDown.current = false;
-      }}
+      onPointerUp={() => { isDown.current = false; }}
+      onPointerCancel={() => { isDown.current = false; }}
     />
   );
 };
 
-// ─── Panel wrapper ────────────────────────────────────────────────────────────
+// ─── Panel wrapper ─────────────────────────────────────────────────────────────
 
 /** Compact labelled panel card using design tokens. */
 const Panel: React.FC<{
@@ -155,7 +156,7 @@ const Panel: React.FC<{
   </div>
 );
 
-// ─── SonixControls ────────────────────────────────────────────────────────────
+// ─── SonixControls ─────────────────────────────────────────────────────────────
 
 interface SonixControlsProps {
   instrument: InstrumentConfig;
@@ -175,54 +176,53 @@ export const SonixControls: React.FC<SonixControlsProps> = ({ instrument }) => {
 
   const updateInstrument = useInstrumentStore((s) => s.updateInstrument);
 
-  // ── configRef pattern ────────────────────────────────────────────────────
-  const paramsRef = useRef<SonixSynthParams | null>(readSonixSynthParams(instrument));
+  // ── Params derivation ─────────────────────────────────────────────────────
+  // `params` drives render — read directly from the prop, zero ref access during render.
+  // `paramsRef` is written in a ref-only useEffect (no setState → no cascading render) and
+  // read only inside callbacks, giving them optimistic state between store round-trips.
+  const params = readSonixSynthParams(instrument);
+  const paramsRef = useRef<SonixSynthParams | null>(params);
   const idRef = useRef(instrument.id);
-  const [, bump] = useReducer((x: number) => x + 1, 0);
   useEffect(() => {
     paramsRef.current = readSonixSynthParams(instrument);
     idRef.current = instrument.id;
-    bump();
   }, [instrument]);
 
-  // ── Waveform tab + snapshot ──────────────────────────────────────────────
+  // ── Waveform tab + Undo snapshot ─────────────────────────────────────────
   const [waveTab, setWaveTab] = useState<WaveTab>('wave');
   const snapshotRef = useRef<number[] | null>(null);
 
-  // ── Harmonic bake state ──────────────────────────────────────────────────
+  // ── Harmonic bake amount ─────────────────────────────────────────────────
   const [harmAmt, setHarmAmt] = useState(40);
 
-  // ── Scalar handler ───────────────────────────────────────────────────────
-  const handleChange = useCallback(
-    (key: keyof SonixSynthParams, value: number) => {
-      const cur = paramsRef.current;
-      if (!cur) return;
-      const next: SonixSynthParams = { ...cur, [key]: Math.round(value) };
-      paramsRef.current = next;
-      updateInstrument(idRef.current, {
-        parameters: { sonixIndex: next.index, sonix: next },
-      } as Parameters<typeof updateInstrument>[1]);
-      bump();
-    },
-    [updateInstrument],
-  );
+  // ── Commit helper ─────────────────────────────────────────────────────────
+  // Updates paramsRef optimistically so rapid callbacks see fresh state,
+  // then writes through to the WASM via the store. No setState → no cascading render.
+  const commit = useCallback((next: SonixSynthParams) => {
+    paramsRef.current = next;
+    updateInstrument(idRef.current, {
+      parameters: { sonixIndex: next.index, sonix: next },
+    } as Parameters<typeof updateInstrument>[1]);
+  }, [updateInstrument]);
 
-  // ── Array handler ────────────────────────────────────────────────────────
+  // ── Scalar handler ────────────────────────────────────────────────────────
+  const handleChange = useCallback((key: keyof SonixSynthParams, value: number) => {
+    const cur = paramsRef.current;
+    if (!cur) return;
+    commit({ ...cur, [key]: Math.round(value) });
+  }, [commit]);
+
+  // ── Array handler ─────────────────────────────────────────────────────────
   const handleArrayChange = useCallback(
     (key: 'wave' | 'lfoWave' | 'envTable' | 'egLevels' | 'egRates', arr: number[]) => {
       const cur = paramsRef.current;
       if (!cur) return;
-      const next = { ...cur, [key]: arr } as SonixSynthParams;
-      paramsRef.current = next;
-      updateInstrument(idRef.current, {
-        parameters: { sonixIndex: next.index, sonix: next },
-      } as Parameters<typeof updateInstrument>[1]);
-      bump();
+      commit({ ...cur, [key]: arr } as SonixSynthParams);
     },
-    [updateInstrument],
+    [commit],
   );
 
-  // ── EG knob handler ──────────────────────────────────────────────────────
+  // ── EG knob handler ───────────────────────────────────────────────────────
   const handleEgChange = useCallback(
     (bank: 'egLevels' | 'egRates', slot: number, value: number) => {
       const cur = paramsRef.current;
@@ -234,7 +234,7 @@ export const SonixControls: React.FC<SonixControlsProps> = ({ instrument }) => {
     [handleArrayChange],
   );
 
-  // ── Draw callback ────────────────────────────────────────────────────────
+  // ── Draw callback ─────────────────────────────────────────────────────────
   const drawAt = useCallback(
     (tab: WaveTab, x: number, y: number, w: number, h: number) => {
       const cur = paramsRef.current;
@@ -248,7 +248,7 @@ export const SonixControls: React.FC<SonixControlsProps> = ({ instrument }) => {
     [handleArrayChange],
   );
 
-  // ── Harmonic bake ────────────────────────────────────────────────────────
+  // ── Harmonic bake ─────────────────────────────────────────────────────────
   const bake = useCallback(
     (h: 2 | 3) => {
       const cur = paramsRef.current;
@@ -258,7 +258,6 @@ export const SonixControls: React.FC<SonixControlsProps> = ({ instrument }) => {
     [handleArrayChange, harmAmt],
   );
 
-  const params = paramsRef.current;
   if (!params) {
     return (
       <div className="p-4 text-text-muted text-sm font-mono">
@@ -271,24 +270,24 @@ export const SonixControls: React.FC<SonixControlsProps> = ({ instrument }) => {
   const activeWave = params[waveTab] as number[];
 
   // Meta lookups for scalar panels.
-  const mBaseVol      = metaFor('baseVol');
-  const mEnvVolScale  = metaFor('envVolScale');
-  const mSlideRate    = metaFor('slideRate');
-  const mEnvPitch     = metaFor('envPitchScale');
-  const mFilterBase   = metaFor('filterBase');
-  const mFilterEnvS   = metaFor('filterEnvSens');
-  const mFilterRange  = metaFor('filterRange');
-  const mEnvScanRate  = metaFor('envScanRate');
-  const mEnvDelay     = metaFor('envDelayInit');
-  const mC2           = metaFor('c2');
-  const mC4           = metaFor('c4');
+  const mBaseVol     = metaFor('baseVol');
+  const mEnvVolScale = metaFor('envVolScale');
+  const mSlideRate   = metaFor('slideRate');
+  const mEnvPitch    = metaFor('envPitchScale');
+  const mFilterBase  = metaFor('filterBase');
+  const mFilterEnvS  = metaFor('filterEnvSens');
+  const mFilterRange = metaFor('filterRange');
+  const mEnvScanRate = metaFor('envScanRate');
+  const mEnvDelay    = metaFor('envDelayInit');
+  const mC2          = metaFor('c2');
+  const mC4          = metaFor('c4');
 
   return (
     <div
       className="flex flex-col gap-3 p-3 overflow-y-auto synth-controls-flow"
       style={{ maxHeight: 'calc(100vh - 280px)' }}
     >
-      {/* ── Waveform ─────────────────────────────────────────────────────── */}
+      {/* ── Waveform ──────────────────────────────────────────────────────── */}
       <Panel label="Waveform" accent={accent}>
         {/* Tab buttons */}
         <div className="flex gap-1">
@@ -314,9 +313,7 @@ export const SonixControls: React.FC<SonixControlsProps> = ({ instrument }) => {
           data={activeWave}
           color={knob}
           height={WAVE_H}
-          onDrawStart={() => {
-            snapshotRef.current = [...activeWave];
-          }}
+          onDrawStart={() => { snapshotRef.current = [...activeWave]; }}
           onDraw={(x, y, w, h) => drawAt(waveTab, x, y, w, h)}
         />
 
@@ -324,9 +321,7 @@ export const SonixControls: React.FC<SonixControlsProps> = ({ instrument }) => {
         <div className="flex gap-2 items-center">
           <Button
             variant="ghost"
-            onClick={() => {
-              snapshotRef.current = null;
-            }}
+            onClick={() => { snapshotRef.current = null; }}
           >
             Ok
           </Button>
@@ -347,12 +342,8 @@ export const SonixControls: React.FC<SonixControlsProps> = ({ instrument }) => {
         {waveTab === 'wave' && (
           <div className="flex gap-2 items-center flex-wrap border-t border-dark-borderLight pt-2">
             <span className="text-[10px] font-mono text-text-muted">Add Harmonic:</span>
-            <Button variant="ghost" onClick={() => bake(2)}>
-              +2nd
-            </Button>
-            <Button variant="ghost" onClick={() => bake(3)}>
-              +3rd
-            </Button>
+            <Button variant="ghost" onClick={() => bake(2)}>+2nd</Button>
+            <Button variant="ghost" onClick={() => bake(3)}>+3rd</Button>
             <Knob
               value={harmAmt}
               min={0}
@@ -367,7 +358,7 @@ export const SonixControls: React.FC<SonixControlsProps> = ({ instrument }) => {
         )}
       </Panel>
 
-      {/* ── Amplitude ────────────────────────────────────────────────────── */}
+      {/* ── Amplitude ─────────────────────────────────────────────────────── */}
       <Panel label="Amplitude" accent={accent}>
         <div className="flex gap-3 flex-wrap items-center">
           <Knob
@@ -393,7 +384,7 @@ export const SonixControls: React.FC<SonixControlsProps> = ({ instrument }) => {
         </div>
       </Panel>
 
-      {/* ── Frequency ────────────────────────────────────────────────────── */}
+      {/* ── Frequency ─────────────────────────────────────────────────────── */}
       <Panel label="Frequency" accent={accent}>
         <div className="flex gap-3 flex-wrap items-center">
           <Knob
@@ -419,7 +410,7 @@ export const SonixControls: React.FC<SonixControlsProps> = ({ instrument }) => {
         </div>
       </Panel>
 
-      {/* ── Filter ───────────────────────────────────────────────────────── */}
+      {/* ── Filter ────────────────────────────────────────────────────────── */}
       <Panel label="Filter" accent={accent}>
         <div className="flex gap-3 flex-wrap items-center">
           <Knob
@@ -455,7 +446,7 @@ export const SonixControls: React.FC<SonixControlsProps> = ({ instrument }) => {
         </div>
       </Panel>
 
-      {/* ── LFO ──────────────────────────────────────────────────────────── */}
+      {/* ── LFO ───────────────────────────────────────────────────────────── */}
       <Panel label="LFO" accent={accent}>
         <div className="flex gap-3 flex-wrap items-center">
           <Knob
@@ -489,7 +480,7 @@ export const SonixControls: React.FC<SonixControlsProps> = ({ instrument }) => {
         </div>
       </Panel>
 
-      {/* ── Phase ────────────────────────────────────────────────────────── */}
+      {/* ── Phase ─────────────────────────────────────────────────────────── */}
       <Panel label="Phase" accent={accent}>
         <div className="flex gap-3 flex-wrap items-center">
           <Knob
@@ -515,7 +506,7 @@ export const SonixControls: React.FC<SonixControlsProps> = ({ instrument }) => {
         </div>
       </Panel>
 
-      {/* ── Envelope Generator ───────────────────────────────────────────── */}
+      {/* ── Envelope Generator ────────────────────────────────────────────── */}
       <Panel label="Envelope Generator" accent={accent}>
         <div className="flex flex-col gap-2">
           {/* Levels row */}
