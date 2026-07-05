@@ -971,8 +971,11 @@ CinterComputePeriods:
       flag_v = 0; flag_c = 0;
     }
   W(d1) = (uint16_t)((uint32_t)(W(d1)) >> 6);  /* LSR.W	#6,D1 */
-  {  /* ADD.L	D2,D2 */
+  {  /* ADD.L	D2,D2 — MUST set X (carry out of bit 31): the following SUBX.W reads
+        flag_x, and a stale X gives off-by-one c_PeriodTable entries (285 vs 286). */
+      uint32_t _old = d2;
       uint32_t _ar = (uint32_t)(d2 + d2);
+      flag_c = flag_x = (int)((_old >> 31) & 1u);
       d2 = (uint32_t)_ar;
       flag_z = ((int32_t)(_ar) == 0);
       flag_n = ((int32_t)(_ar) < 0);
