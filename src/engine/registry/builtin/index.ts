@@ -14,3 +14,4 @@ import './opl3';
 import './dx7';
 import './geonkick';
 import './cinter4';
+import './sonix';
