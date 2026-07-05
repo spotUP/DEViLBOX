@@ -154,7 +154,7 @@ app.get('/api/demo/:type/*', (req, res) => {
 app.use('/data/public', express.static(path.join(dataRoot, 'public')));
 
 // Serve ONNX-WASM files with broad CORS so Workers on the Vite dev server
-// (localhost:5173) can import them without Vite intercepting the URL.
+// (localhost:5174) can import them without Vite intercepting the URL.
 // Vite's module server adds ?import to dynamic imports which breaks
 // Emscripten's pthread sub-worker creation (import.meta.url gets mangled).
 // Serving from Express (port 3011) keeps URLs clean and threading works.

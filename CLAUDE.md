@@ -6,7 +6,7 @@
 
 | Action | Command |
 |--------|---------|
-| Start dev (Express :3011 + Vite :5173 + WS relay :4003) | `npm run dev` |
+| Start dev (Express :3011 + Vite :5174 + WS relay :4003) | `npm run dev` |
 | Stop dev | Ctrl-C in the terminal running `npm run dev` |
 | Type-check (strict) | `npm run type-check` (`tsc -b --force` — catches more than `tsc --noEmit`) |
 | Lint | `npm run lint` |
@@ -27,7 +27,7 @@ DEViLBOX upgrades the global "MCP preferred" rule to **MCP required**. Playwrigh
 Always debug via the DEViLBOX MCP (`get_console_errors`, `play_fur`, `load_file`, `get_audio_level`, `play` / `stop`). Prerequisites:
 
 1. `npm run dev` running.
-2. Browser open at `http://localhost:5173`.
+2. Browser open at `http://localhost:5174`.
 3. Click in the browser once to unlock the AudioContext.
 
 If MCP shows "No browser connected" — check `lsof -nP -iTCP:4003 -sTCP:LISTEN` to confirm Express owns port 4003, then reconnect Claude Code. Full troubleshooting: `docs/MCP_DEBUGGING_GUIDE.md`. ~130 tools grouped by category — call `get_mcp_help` for the live catalogue.

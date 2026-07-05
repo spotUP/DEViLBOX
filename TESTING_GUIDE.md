@@ -26,7 +26,7 @@ Open `test-buzzmachine.html` in your browser and:
 
 ## Test 2: Integration in DEViLBOX
 
-1. Open DEViLBOX in browser (`http://localhost:5173`)
+1. Open DEViLBOX in browser (`http://localhost:5174`)
 2. Navigate to **Instruments** panel
 3. Click **"Browse"** tab
 4. Scroll to **"Buzzmachines"** category
