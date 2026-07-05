@@ -31,4 +31,12 @@ describe.skipIf(!compiler || !haveFixture)('Sonix synth field parse', () => {
   it('parses the LFO waveform table @0x144 (128 bytes loaded)', () => {
     expect(out).toMatch(/LFO_SET 1/);
   });
+
+  it('exposes the 4-stage envelope generator levels and rates', () => {
+    const m = out.match(/EG_L (\d+) (\d+) (\d+) (\d+) EG_R (\d+) (\d+) (\d+) (\d+)/);
+    expect(m).toBeTruthy();
+    const nums = m!.slice(1).map(Number);
+    // At least one level or rate is non-zero for a real synth instrument.
+    expect(nums.some((n) => n > 0)).toBe(true);
+  });
 });
