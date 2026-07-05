@@ -160,7 +160,7 @@ The master registry is in `src/lib/import/FormatRegistry.ts`.
 
 ### Step 3: Test Loading
 
-1. Open DEViLBOX at `http://localhost:5173`
+1. Open DEViLBOX at `http://localhost:5174`
 2. Load a test file and observe: audio, patterns, instruments, sync
 3. Check browser console for errors
 

@@ -2,7 +2,7 @@
 
 ## Quick Test (Browser Console)
 
-Open http://localhost:5173 in your browser, then paste this into the console:
+Open http://localhost:5174 in your browser, then paste this into the console:
 
 ```javascript
 // 1. Create new song
@@ -90,7 +90,7 @@ if (!store) {
 ## How to Test
 
 1. **Start Dev Server**: `npm run dev` (should already be running)
-2. **Open Browser**: http://localhost:5173
+2. **Open Browser**: http://localhost:5174
 3. **Open Tracker View**: Click "Tracker" in the top nav
 4. **Create Song**: Use the console snippet above OR:
    - Click "New Song"
