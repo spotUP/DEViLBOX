@@ -17,15 +17,17 @@ import { emit } from '../../src/emitter.js';
 import type { AstNode } from '../../src/ast.js';
 import * as fs from 'fs';
 import * as path from 'path';
-import { fileURLToPath } from 'url';
 import { execSync } from 'child_process';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
+// Jest runs with cwd = package root (tools/asm68k-to-c). Deriving paths from
+// process.cwd() avoids `import.meta.url`, which ts-jest's ESM handling rejects
+// (TS1343) when it compiles the diagnostic pass under CommonJS.
+const PKG_ROOT = process.cwd();
 const SONIX_PATH = path.resolve(
-  __dirname,
-  '../../../../third-party/sonix-music-driver/SonixMusicDriver_v1.asm'
+  PKG_ROOT,
+  '../../third-party/sonix-music-driver/SonixMusicDriver_v1.asm'
 );
-const RUNTIME_DIR = path.resolve(__dirname, '../../runtime');
+const RUNTIME_DIR = path.resolve(PKG_ROOT, 'runtime');
 
 let ast: AstNode[];
 let resolved: ResolveResult;
