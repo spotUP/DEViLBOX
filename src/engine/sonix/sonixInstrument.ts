@@ -17,7 +17,25 @@ export function readSonixSynthParams(config: InstrumentConfig): SonixSynthParams
   const params = config.parameters as Record<string, unknown> | undefined;
   const sonix = params?.sonix as SonixSynthParams | undefined;
   if (!sonix || typeof sonix.index !== 'number' || !Array.isArray(sonix.wave)) return null;
-  return sonix;
+  return {
+    ...sonix,
+    lfoWave: Array.isArray(sonix.lfoWave) ? sonix.lfoWave : new Array(128).fill(0),
+    egLevels: Array.isArray(sonix.egLevels) ? sonix.egLevels : [0, 0, 0, 0],
+    egRates: Array.isArray(sonix.egRates) ? sonix.egRates : [0, 0, 0, 0],
+  };
+}
+
+/**
+ * Bake an additive harmonic partial into a 128-sample signed waveform (Aegis "2nd"/"3rd"
+ * Harm + Amt). `amt` is 0..1 of full i8 scale. Returns a new clamped copy.
+ */
+export function addHarmonic(wave: number[], harmonic: 2 | 3, amt: number): number[] {
+  if (amt === 0) return wave.slice();
+  const n = wave.length;
+  return wave.map((v, i) => {
+    const partial = Math.round(Math.sin((2 * Math.PI * harmonic * i) / n) * 127 * amt);
+    return Math.max(-128, Math.min(127, v + partial));
+  });
 }
 
 /** Metadata for one editable Sonix synth parameter (scalar knobs). */
@@ -75,6 +93,9 @@ export function getDefaultSonixParams(): SonixSynthParams {
     // Sawtooth ramp −128..127 across 128 samples (matches the Aegis default oscillator).
     wave: Array.from({ length: 128 }, (_, i) => Math.round((i / 127) * 255 - 128)),
     envTable: new Array(128).fill(0),
+    lfoWave: new Array(128).fill(0),
+    egLevels: [0, 0, 0, 0],
+    egRates: [0, 0, 0, 0],
   };
 }
 
