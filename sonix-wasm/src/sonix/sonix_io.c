@@ -1112,7 +1112,11 @@ int sonix_song_load_instruments(SonixSong* song, const char* song_file_path) {
     SonixSidecarDirs sd;
     collect_sidecar_dirs(song_file_path, &sd, read_fn, list_fn, ud);
 
-    SonixFileMap map;
+    // SonixFileMap is ~320 KB (512 entries x 640 B). A stack local overflows the
+    // 64 KB WASM stack (STACK_SIZE) — native's multi-MB stack hides it. Keep it in
+    // static storage: load_instruments is single-threaded and non-reentrant, and
+    // build_sidecar_file_map() resets count=0 on entry, so there is no stale state.
+    static SonixFileMap map;
     build_sidecar_file_map(&sd, &map, list_fn, ud);
 
     int loaded = 0;
