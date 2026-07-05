@@ -16,6 +16,15 @@ test('SUB.W d1,d0',  () => { expect(emit('SUB.W d1,d0')).toContain('W(d0)'); });
 test('MULS d0,d1',   () => { expect(emit('\tMULS d0,d1')).toContain('(int16_t)'); });
 test('LSR.L #2,d0',  () => { expect(emit('LSR.L #2,d0')).toBe('d0 >>= 2;'); });
 test('ASR.L #1,d0',  () => { expect(emit('ASR.L #1,d0')).toBe('d0 = (uint32_t)((int32_t)d0 >> 1);'); });
+// ASR is arithmetic — .W/.B MUST sign-extend (not (int32_t)W() which zero-extends
+// and detunes negative values). Regression for the Cinter period-slide bug.
+test('ASR.W #7,d0 sign-extends', () => { expect(emit('ASR.W #7,d0')).toContain('(int16_t)W(d0) >> 7'); });
+test('ASR.W #7,d0 not zero-extend', () => { expect(emit('ASR.W #7,d0')).not.toContain('(int32_t)W(d0)'); });
+test('ASR.B #2,d0 sign-extends', () => { expect(emit('ASR.B #2,d0')).toContain('(int8_t)B(d0) >> 2'); });
+// ADD/SUB must set X (carry/borrow) so a following ADDX/SUBX reads the right extend
+// bit (the Cinter period-table off-by-one).
+test('ADD.W d2,d2 sets flag_x', () => { expect(emit('ADD.W d2,d2')).toContain('flag_x ='); });
+test('SUB.W d3,d1 sets flag_x', () => { expect(emit('SUB.W d3,d1')).toContain('flag_x ='); });
 test('AND.W d1,d0',  () => { expect(emit('AND.W d1,d0')).toContain('&='); });
 test('OR.L d1,d0',   () => { expect(emit('OR.L d1,d0')).toContain('|='); });
 test('EOR.L d1,d0',  () => { expect(emit('EOR.L d1,d0')).toContain('^='); });
