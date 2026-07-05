@@ -1189,16 +1189,16 @@ int sonix_song_load_instruments(SonixSong* song, const char* song_file_path) {
                     sonix_song_set_synth_wave(song, (uint8_t)i, wave128);
                     sonix_song_set_synth_blend_params(song, (uint8_t)i, synth_c2, synth_c4);
                 }
-                if (instr_size >= 0x1F6) {
+                if (instr_size >= 0x1D0) {
                     uint16_t base_vol = sonix_read_be16(instr_data + 0x1CC);
                     uint16_t port_flag = sonix_read_be16(instr_data + 0x1CE);
                     sonix_song_set_synth_vol_params(song, (uint8_t)i, base_vol, port_flag);
-                    uint16_t targets[4], speeds[4];
-                    for (int j = 0; j < 4; j++) {
-                        targets[j] = sonix_read_be16(instr_data + 0x1E6 + j * 2);
-                        speeds[j] = sonix_read_be16(instr_data + 0x1EE + j * 2);
-                    }
-                    sonix_song_set_ss_envelope(song, (uint8_t)i, 0, targets, speeds);
+                }
+                if (instr_size >= 0x1E6) {
+                    uint16_t env_vscale = sonix_read_be16(instr_data + 0x1D0);
+                    uint16_t slide_rate = sonix_read_be16(instr_data + 0x1D2);
+                    uint16_t env_pscale = sonix_read_be16(instr_data + 0x1D4);
+                    sonix_song_set_synth_slide_rate(song, (uint8_t)i, slide_rate);
 
                     uint16_t filt_base = sonix_read_be16(instr_data + 0x1D6);
                     uint16_t filt_range = sonix_read_be16(instr_data + 0x1D8);
@@ -1208,15 +1208,16 @@ int sonix_song_load_instruments(SonixSong* song, const char* song_file_path) {
                     uint16_t env_rate = sonix_read_be16(instr_data + 0x1DC);
                     int16_t env_loop = (int16_t)sonix_read_be16(instr_data + 0x1DE);
                     uint16_t env_delay = sonix_read_be16(instr_data + 0x1E0);
-                    uint16_t env_vscale = sonix_read_be16(instr_data + 0x1D0);
-                    uint16_t env_pscale = sonix_read_be16(instr_data + 0x1D4);
                     sonix_song_set_synth_env_params(song, (uint8_t)i, env_rate, env_loop, env_delay, env_vscale,
                                                     env_pscale);
-
-                    if (instr_size >= 0x1D4) {
-                        uint16_t slide_rate = sonix_read_be16(instr_data + 0x1D2);
-                        sonix_song_set_synth_slide_rate(song, (uint8_t)i, slide_rate);
+                }
+                if (instr_size >= 0x1F6) {
+                    uint16_t targets[4], speeds[4];
+                    for (int j = 0; j < 4; j++) {
+                        targets[j] = sonix_read_be16(instr_data + 0x1E6 + j * 2);
+                        speeds[j] = sonix_read_be16(instr_data + 0x1EE + j * 2);
                     }
+                    sonix_song_set_ss_envelope(song, (uint8_t)i, 0, targets, speeds);
                 }
 
                 if (instr_size >= 0xC4 + 128) {
