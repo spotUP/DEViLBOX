@@ -61,6 +61,14 @@ export class SilenceDetector {
   private poll(): void {
     if (this.triggered) return;
 
+    // A suspended/interrupted AudioContext (no user gesture yet, tab backgrounded, iOS
+    // interrupt) reads pure silence — that is NOT song-end silence. Don't accumulate it,
+    // or the engine gets stopped before audio is even unlocked and never recovers.
+    if (this.analyser.context.state !== 'running') {
+      this.silentSamples = 0;
+      return;
+    }
+
     this.analyser.getFloatTimeDomainData(this.timeDomainData);
 
     // Compute RMS
