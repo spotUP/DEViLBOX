@@ -1371,7 +1371,7 @@ export function createMcpServer(): McpServer {
           // Sonix (IFF SMUS / SNX / TINY): external instrument files live in an
           // Instruments/ subdir (Modland layout: <song>.smus + Instruments/<name>.instr
           // + <name>.ss PCM). Ship them as companionFiles keyed "Instruments/<file>".
-          if (/\.(smus|snx|tiny)$/i.test(lowerFilename)) {
+          if (/\.(smus|snx|tiny)$|^(smus|snx|tiny)\./i.test(lowerFilename)) {
             const instrDir = dirFiles.find(f => f.toLowerCase() === 'instruments');
             if (instrDir) {
               try {
@@ -1740,7 +1740,7 @@ export function createMcpServer(): McpServer {
         // Sonix (IFF SMUS / SNX / TINY): external instruments in an Instruments/ subdir.
         // List the sibling Instruments/ folder on modland and download every .instr/.ss,
         // keyed "Instruments/<file>" to match the SonixMusicDriverParser sidecar mapping.
-        if (/\.(smus|snx|tiny)$/i.test(lowerFilename)) {
+        if (/\.(smus|snx|tiny)$|^(smus|snx|tiny)\./i.test(lowerFilename)) {
           try {
             const instrDir = `${dirPath}/Instruments`;
             const listResp = await fetch(`${API_BASE}/api/modland/list?dir=${encodeURIComponent(instrDir)}`);

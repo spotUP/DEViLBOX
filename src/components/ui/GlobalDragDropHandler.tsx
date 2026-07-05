@@ -47,6 +47,13 @@ function isSupportedFile(filename: string): boolean {
   return isSupportedFormat(lower);
 }
 
+// Sonix instrument files (.instr / .ss) are companions of a .smus/.snx/.tiny song, never
+// standalone modules. Never pick them as the main file or load them on their own — they'd
+// fail (e.g. UADE "Cannot play file: vibes.ss") and steal the load from the real song.
+function isCompanionOnly(filename: string): boolean {
+  return /\.(instr|ss)$/i.test(filename);
+}
+
 async function readFilesFromEntry(entry: FileSystemEntry): Promise<File[]> {
   if (entry.isFile) {
     return new Promise<File[]>((resolve, reject) => {
@@ -135,7 +142,8 @@ export const GlobalDragDropHandler: React.FC<GlobalDragDropHandlerProps> = ({
 
       if ((hasFolder || isMultiFile) && onFolderLoadedRef.current) {
         const allFiles: File[] = (await Promise.all(entries.map(readFilesFromEntry))).flat();
-        const mainFile = allFiles.find(f => isSupportedFile(f.name));
+        // Prefer a real module as main; companion-only files (.instr/.ss) can never be main.
+        const mainFile = allFiles.find(f => isSupportedFile(f.name) && !isCompanionOnly(f.name));
         if (mainFile) {
           const companions = allFiles.filter(f => f !== mainFile);
           try {
@@ -150,7 +158,8 @@ export const GlobalDragDropHandler: React.FC<GlobalDragDropHandlerProps> = ({
       const files = e.dataTransfer ? Array.from(e.dataTransfer.files) : [];
       if (files.length === 0) return;
 
-      const file = files.find(f => isSupportedFile(f.name));
+      // A real module is the main file; .instr/.ss are Sonix companions only.
+      const file = files.find(f => isSupportedFile(f.name) && !isCompanionOnly(f.name));
       if (!file) {
         console.warn('[DragDrop] No supported files found');
         return;
