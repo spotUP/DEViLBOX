@@ -230,15 +230,38 @@ export async function downloadUADECompanions(
     }
   }
 
-  // Sonix: scan for .ss and .instr companions with same base name
-  // These follow pattern: basename.ss, basename.instr
-  if (basenameLower.endsWith('.smus') || basenameLower.endsWith('.dum')) {
-    const nameNoExt = basename.slice(0, basename.lastIndexOf('.'));
-    await tryDownload(nameNoExt + '.ss');
-    await tryDownload(nameNoExt + '.instr');
+  // Sonix (IFF SMUS / SNX / TINY): external instruments live in a sibling Instruments/
+  // folder (Modland layout: <song>.smus + Instruments/<instrName>.instr + <name>.ss PCM) —
+  // NOT companions sharing the song's basename. List that folder and pull every .instr/.ss,
+  // keyed "Instruments/<file>" to match the SonixMusicDriverParser sidecar mapping.
+  if (/\.(smus|snx|tiny)$/i.test(basenameLower)) {
+    const instrDir = dir.replace(/\/+$/, '') + '/Instruments';
+    const files = await listModlandDir(instrDir);
+    for (const f of files) {
+      const base = f.full_path.split('/').pop() ?? '';
+      if (!/\.(instr|ss)$/i.test(base)) continue;
+      try {
+        const buffer = await downloadModlandFile(f.full_path);
+        companions.push({ filename: `Instruments/${base}`, buffer });
+      } catch {
+        // Per-file best-effort — a missing instrument shouldn't abort the load.
+      }
+    }
   }
 
   return companions;
+}
+
+/** List immediate files under a modland directory prefix (companion discovery). */
+export async function listModlandDir(dir: string): Promise<Array<{ full_path: string; filename: string }>> {
+  try {
+    const resp = await fetch(`${API_URL}/modland/list?dir=${encodeURIComponent(dir)}`);
+    if (!resp.ok) return [];
+    const data = await resp.json();
+    return Array.isArray(data.files) ? data.files : [];
+  } catch {
+    return [];
+  }
 }
 
 export async function getModlandStatus(): Promise<ModlandStatus> {
