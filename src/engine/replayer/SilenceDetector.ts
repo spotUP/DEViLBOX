@@ -20,6 +20,7 @@ export class SilenceDetector {
   private intervalId: ReturnType<typeof setInterval> | null = null;
   private silentSamples = 0;
   private triggered = false;
+  private hasSeenAudio = false;
   private onSilence: (() => void) | null = null;
   private gainNode: GainNode | null = null;
   private sampleRate: number;
@@ -41,6 +42,7 @@ export class SilenceDetector {
     this.onSilence = onSilence;
     this.silentSamples = 0;
     this.triggered = false;
+    this.hasSeenAudio = false;
 
     // Tap the source (analyser doesn't produce output, just monitors)
     source.connect(this.analyser);
@@ -80,6 +82,11 @@ export class SilenceDetector {
     const rms = Math.sqrt(sumSq / this.timeDomainData.length);
 
     if (rms < SILENCE_THRESHOLD) {
+      // Only treat silence as song-end if real audio has already been heard. Silence from
+      // the very start means the engine never actually played (autoplay-blocked context:
+      // state can be 'running' yet output muted until a user gesture) — stopping there
+      // would kill the engine before it's audible, and it never recovers.
+      if (!this.hasSeenAudio) return;
       this.silentSamples += (POLL_INTERVAL_MS / 1000) * this.sampleRate;
       const silentSeconds = this.silentSamples / this.sampleRate;
 
@@ -88,6 +95,7 @@ export class SilenceDetector {
         this.fadeOutAndStop();
       }
     } else {
+      this.hasSeenAudio = true;
       this.silentSamples = 0;
     }
   }
