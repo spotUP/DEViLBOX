@@ -1369,11 +1369,24 @@ export async function tryRouteFormat(
   // are handled by SonixMusicDriverParser when IffSmusParser does not detect IFF.
   if (matchesExt(filename, ['smus', 'snx', 'tiny'])) {
     if (prefs.iffSmus === 'native') {
+      // Genuine Sonix modules (FORM/SMUS carrying an SNX1 synth chunk, plus binary
+      // SNX/TINY) route to the Sonix WASM engine, which synthesizes instruments from
+      // the embedded SNX1 data. parseSonixFile still delegates to IffSmusParser for the
+      // editable pattern view and attaches sonixFileData for playback. IffSmusParser on
+      // its own produces only silent placeholder samplers for these and would fall back
+      // to UADE — which cannot play them (ret=-1 → silence).
+      try {
+        const { isSonixFormat, parseSonixFile } = await import('@lib/import/formats/SonixMusicDriverParser');
+        if (isSonixFormat(buffer)) return await parseSonixFile(buffer, originalFileName);
+      } catch (err) {
+        console.warn(`[SonixMusicDriverParser] Native parse failed for ${filename}, falling back:`, err);
+      }
+      // Plain IFF SMUS (Aegis/DeluxeMusic, no SNX1) with real companion .ss samples →
+      // native editable result.
       try {
         const { isIffSmusFormat, parseIffSmusFile } = await import('@lib/import/formats/IffSmusParser');
         if (isIffSmusFormat(buffer)) {
           const smusResult = await parseIffSmusFile(buffer, originalFileName, companionFiles);
-          // If any instruments have real audio (companion .ss files), use native result
           const hasAudio = smusResult.instruments.some(
             (inst: any) => inst.sample?.audioBuffer && inst.sample.audioBuffer.byteLength > 100,
           );
@@ -1382,12 +1395,6 @@ export async function tryRouteFormat(
         }
       } catch (err) {
         console.warn(`[IffSmusParser] Native parse failed for ${filename}, falling back to UADE:`, err);
-      }
-      try {
-        const { isSonixFormat, parseSonixFile } = await import('@lib/import/formats/SonixMusicDriverParser');
-        if (isSonixFormat(buffer)) return await parseSonixFile(buffer, originalFileName);
-      } catch (err) {
-        console.warn(`[SonixMusicDriverParser] Native parse failed for ${filename}, falling back to UADE:`, err);
       }
     }
     const { parseUADEFile: parseUADE_smus } = await import('@lib/import/formats/UADEParser');

@@ -221,7 +221,13 @@ const WASM_ENGINES: NativeEngineDescriptor[] = [
     synthType: 'SonixSynth',
     suppressNotes: true,
     fileDataKey: 'sonixFileData',
-    formats: ['Sonix'],
+    // Activate whenever sonixFileData exists. It is attached only by
+    // SonixMusicDriverParser.parseSonixFile for genuine Sonix modules (SNX, and
+    // FORM/SMUS carrying an SNX1 synth chunk). The SMUS path keeps song.format
+    // = 'IFF SMUS' for the editable view, so a formats:['Sonix'] gate would
+    // wrongly route those to UADE (which can't synth the external instruments)
+    // and play silence. The WASM C port synthesizes from the SNX1 chunk directly.
+    formats: null,
     loadMethod: 'loadTune',
     supportsPause: false,
     supportsResume: false,
