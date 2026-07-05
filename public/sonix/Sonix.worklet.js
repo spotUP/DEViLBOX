@@ -161,8 +161,17 @@ class SonixProcessor extends AudioWorkletProcessor {
   allocCString(str) {
     const malloc = this.module._malloc || this.module.malloc;
     if (!malloc) return 0;
-    const encoder = new TextEncoder();
-    const bytes = encoder.encode(str + '\0');
+    // AudioWorkletGlobalScope has no TextEncoder — encode UTF-8 by hand, else
+    // "TextEncoder is not defined" throws and every memfs path / songPath is lost
+    // (instruments never load → silence).
+    const bytes = [];
+    for (let i = 0; i < str.length; i++) {
+      const c = str.charCodeAt(i);
+      if (c < 0x80) bytes.push(c);
+      else if (c < 0x800) bytes.push(0xc0 | (c >> 6), 0x80 | (c & 0x3f));
+      else bytes.push(0xe0 | (c >> 12), 0x80 | ((c >> 6) & 0x3f), 0x80 | (c & 0x3f));
+    }
+    bytes.push(0); // NUL terminator
     const ptr = malloc(bytes.length);
     if (!ptr) return 0;
     const heapU8 = this.getHeapU8();

@@ -59,6 +59,7 @@ export class SonixEngine extends WASMSingletonBase {
       workletFile: 'Sonix.worklet.js',
       wasmFile: 'Sonix.wasm',
       jsFile: 'Sonix.js',
+      workletCacheBust: true,
     };
   }
 
