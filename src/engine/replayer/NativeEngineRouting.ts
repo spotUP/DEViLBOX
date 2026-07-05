@@ -229,6 +229,11 @@ const WASM_ENGINES: NativeEngineDescriptor[] = [
     // and play silence. The WASM C port synthesizes from the SNX1 chunk directly.
     formats: null,
     loadMethod: 'loadTune',
+    // Pass external instrument files + the memfs song path to loadTune so the WASM
+    // engine can load sample-based instruments (.instr/.ss) via memfs. 'sonix/song'
+    // must match SonixMusicDriverParser.SONIX_MEMFS_SONG_PATH (its parent 'sonix' is
+    // where sidecarFiles' Instruments/ dir lives).
+    getLoadArgs: (song) => [song.sonixSidecarFiles ?? [], 'sonix/song'],
     supportsPause: false,
     supportsResume: false,
     needsDirectRouting: true,

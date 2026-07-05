@@ -620,9 +620,33 @@ function parseSnxBinary(buf: Uint8Array, filename: string): TrackerSong {
  *   snx  → parseSnxBinary (basic binary parser; instruments are placeholders)
  *   tiny → throws (external .instr files required; UADE fallback handles it)
  */
+/** Virtual memfs song dir for the Sonix WASM engine (see sonixSidecarFiles). */
+export const SONIX_MEMFS_DIR = 'sonix';
+/** Path passed to sonix_song_load_instruments; its parent dir (SONIX_MEMFS_DIR) is walked for sidecars. */
+export const SONIX_MEMFS_SONG_PATH = `${SONIX_MEMFS_DIR}/song`;
+
+/**
+ * Map import companion files (.instr / .ss, keyed e.g. "Instruments/hihat.ss") to
+ * SonixEngine memfs sidecar entries under SONIX_MEMFS_DIR/Instruments/. Returns
+ * undefined when there are no usable instrument files (self-contained / none provided).
+ */
+export function buildSonixSidecarFiles(
+  companionFiles?: Map<string, ArrayBuffer>,
+): Array<{ path: string; data: ArrayBuffer }> | undefined {
+  if (!companionFiles) return undefined;
+  const out: Array<{ path: string; data: ArrayBuffer }> = [];
+  for (const [name, data] of companionFiles) {
+    if (!/\.(instr|ss)$/i.test(name)) continue;
+    const base = name.split('/').pop() ?? name; // strip any "Instruments/" prefix
+    out.push({ path: `${SONIX_MEMFS_DIR}/Instruments/${base}`, data });
+  }
+  return out.length > 0 ? out : undefined;
+}
+
 export async function parseSonixFile(
   buffer: ArrayBuffer,
   filename: string,
+  companionFiles?: Map<string, ArrayBuffer>,
 ): Promise<TrackerSong> {
   const buf = new Uint8Array(buffer);
   const subFormat = detectSonixFormat(buf);
@@ -631,8 +655,9 @@ export async function parseSonixFile(
   if (subFormat === 'smus') {
     // IFF SMUS: full implementation in IffSmusParser
     const { parseIffSmusFile } = await import('./IffSmusParser');
-    const song = await parseIffSmusFile(buffer, filename);
+    const song = await parseIffSmusFile(buffer, filename, companionFiles);
     song.sonixFileData = buffer.slice(0);
+    song.sonixSidecarFiles = buildSonixSidecarFiles(companionFiles);
     return song;
   }
 
@@ -648,5 +673,6 @@ export async function parseSonixFile(
   // SNX binary format: parse note streams, placeholder instruments
   const song = parseSnxBinary(buf, filename);
   song.sonixFileData = buffer.slice(0);
+  song.sonixSidecarFiles = buildSonixSidecarFiles(companionFiles);
   return song;
 }

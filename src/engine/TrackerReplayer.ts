@@ -274,6 +274,13 @@ export interface TrackerSong {
   hippelFileData?: ArrayBuffer;
   /** Raw Sonix Music Driver binary for loading into the SonixEngine WASM */
   sonixFileData?: ArrayBuffer;
+  /**
+   * External Sonix instrument files (.instr / .ss) for the SonixEngine WASM memfs.
+   * Paths are memfs-relative under the virtual song dir (e.g. "sonix/Instruments/hihat.ss")
+   * so sonix_song_load_instruments' sidecar-dir walk resolves them. Empty/absent for
+   * self-contained modules.
+   */
+  sonixSidecarFiles?: Array<{ path: string; data: ArrayBuffer }>;
   /** Raw PxTone Collage binary for loading into the PxtoneEngine WASM */
   pxtoneFileData?: ArrayBuffer;
   /** Raw Organya (.org) binary for loading into the OrganyaEngine WASM */

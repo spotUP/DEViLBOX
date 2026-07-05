@@ -1377,7 +1377,7 @@ export async function tryRouteFormat(
       // to UADE — which cannot play them (ret=-1 → silence).
       try {
         const { isSonixFormat, parseSonixFile } = await import('@lib/import/formats/SonixMusicDriverParser');
-        if (isSonixFormat(buffer)) return await parseSonixFile(buffer, originalFileName);
+        if (isSonixFormat(buffer)) return await parseSonixFile(buffer, originalFileName, companionFiles);
       } catch (err) {
         console.warn(`[SonixMusicDriverParser] Native parse failed for ${filename}, falling back:`, err);
       }
