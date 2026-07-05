@@ -8,7 +8,7 @@
 npm run dev
 ```
 
-Wait for: `Local: http://localhost:5173`
+Wait for: `Local: http://localhost:5174`
 
 Then open that URL in your browser.
 

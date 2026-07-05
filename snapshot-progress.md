@@ -1,4 +1,4 @@
-uid=29_0 RootWebArea "DEViLBOX Synth Tests (Browser)" url="http://localhost:5173/DEViLBOX/src/test-runner.html"
+uid=29_0 RootWebArea "DEViLBOX Synth Tests (Browser)" url="http://localhost:5174/DEViLBOX/src/test-runner.html"
   uid=29_1 heading "DEViLBOX Test Suite (Browser)" level="1"
   uid=29_2 StaticText "These tests run with real AudioContext to validate synths and sample packs."
   uid=29_3 heading "Synth Tests" level="2"

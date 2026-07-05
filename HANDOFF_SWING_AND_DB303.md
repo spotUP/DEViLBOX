@@ -180,7 +180,7 @@ npm run build
 Dev server ready:
 ```bash
 npm run dev
-# Vite server on http://localhost:5173
+# Vite server on http://localhost:5174
 ```
 
 ---

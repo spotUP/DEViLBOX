@@ -6,7 +6,7 @@
 ```bash
 npm run dev
 ```
-Starts only the Vite frontend server on port 5173.
+Starts only the Vite frontend server on port 5174.
 
 ### Full Stack (Frontend + Backend)
 ```bash
@@ -15,7 +15,7 @@ npm run dev:fullstack
 ./dev.sh
 ```
 Starts both servers:
-- Frontend (Vite) on port 5173
+- Frontend (Vite) on port 5174
 - Backend (Express API) on port 3001
 
 Logs are written to `logs/frontend.log` and `logs/backend.log`.

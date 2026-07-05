@@ -117,6 +117,11 @@ export default defineConfig({
   server: {
     // Listen on all interfaces so iPhone controller can connect over WiFi
     host: '0.0.0.0',
+    // Dedicated port. The Up_Rough maker app also defaults to Vite 5173 (strictPort),
+    // so DEViLBOX pins 5174 to avoid the silent-fallback clash where opening 5173 lands
+    // on maker instead of DEViLBOX. strictPort surfaces a conflict loudly instead.
+    port: 5174,
+    strictPort: true,
     // Cross-Origin Isolation headers required for SharedArrayBuffer (scsynth WASM pthreads)
     headers: {
       'Cross-Origin-Opener-Policy': 'same-origin',
