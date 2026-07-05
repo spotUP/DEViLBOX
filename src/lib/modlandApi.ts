@@ -232,14 +232,24 @@ export async function downloadUADECompanions(
 
   // Sonix (IFF SMUS / SNX / TINY): external instruments live in a sibling Instruments/
   // folder (Modland layout: <song>.smus + Instruments/<instrName>.instr + <name>.ss PCM) —
-  // NOT companions sharing the song's basename. List that folder and pull every .instr/.ss,
-  // keyed "Instruments/<file>" to match the SonixMusicDriverParser sidecar mapping.
+  // NOT companions sharing the song's basename. Keyed "Instruments/<file>" to match the
+  // SonixMusicDriverParser sidecar mapping.
+  //
+  // The Instruments/ folder is often shared at the AUTHOR level (100+ files across all the
+  // artist's songs); downloading all of them per song trips the rate limiter. So fetch ONLY
+  // the instruments this song references (INS1 names extracted from the .smus), matched to
+  // the folder listing by stem. Falls back to all files if names can't be read (SNX/TINY).
   if (/\.(smus|snx|tiny)$/i.test(basenameLower)) {
     const instrDir = dir.replace(/\/+$/, '') + '/Instruments';
     const files = await listModlandDir(instrDir);
+    const needed = mainBuffer ? extractSmusInstrumentNames(mainBuffer) : null;
     for (const f of files) {
       const base = f.full_path.split('/').pop() ?? '';
       if (!/\.(instr|ss)$/i.test(base)) continue;
+      if (needed) {
+        const stem = base.replace(/\.(instr|ss)$/i, '').toLowerCase();
+        if (!needed.has(stem)) continue;
+      }
       try {
         const buffer = await downloadModlandFile(f.full_path);
         companions.push({ filename: `Instruments/${base}`, buffer });
@@ -250,6 +260,43 @@ export async function downloadUADECompanions(
   }
 
   return companions;
+}
+
+/**
+ * Extract the instrument names an IFF SMUS song references, from its INS1 chunks, so we
+ * fetch only those instruments from a shared Instruments/ folder. Returns lowercased stems,
+ * or null if the buffer isn't FORM/SMUS or has no INS1 chunks. Mirrors IffSmusParser's INS1
+ * walk (IFF even-padded chunks).
+ */
+export function extractSmusInstrumentNames(buffer: ArrayBuffer): Set<string> | null {
+  const buf = new Uint8Array(buffer);
+  if (buf.length < 12) return null;
+  const fourcc = (o: number) => String.fromCharCode(buf[o], buf[o + 1], buf[o + 2], buf[o + 3]);
+  if (fourcc(0) !== 'FORM' || fourcc(8) !== 'SMUS') return null;
+  const names = new Set<string>();
+  let pos = 12;
+  while (pos + 8 <= buf.length) {
+    const id = fourcc(pos); pos += 4;
+    const size = ((buf[pos] << 24) | (buf[pos + 1] << 16) | (buf[pos + 2] << 8) | buf[pos + 3]) >>> 0;
+    pos += 4;
+    const start = pos;
+    if (id === 'INS1' && start + 4 <= buf.length) {
+      const type = buf[start + 1];
+      const nameLen = size - 4;
+      if (type === 0 && nameLen > 0 && start + 4 + nameLen <= buf.length) {
+        let s = '';
+        for (let i = 0; i < nameLen; i++) {
+          const c = buf[start + 4 + i];
+          if (c === 0) break;
+          s += String.fromCharCode(c);
+        }
+        s = s.trim();
+        if (s) names.add(s.toLowerCase());
+      }
+    }
+    pos = start + size + (size & 1); // IFF even-pad
+  }
+  return names.size > 0 ? names : null;
 }
 
 /** List immediate files under a modland directory prefix (companion discovery). */
