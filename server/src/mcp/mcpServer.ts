@@ -1368,6 +1368,26 @@ export function createMcpServer(): McpServer {
             } catch { /* instr dir might not be readable */ }
           }
 
+          // Sonix (IFF SMUS / SNX / TINY): external instrument files live in an
+          // Instruments/ subdir (Modland layout: <song>.smus + Instruments/<name>.instr
+          // + <name>.ss PCM). Ship them as companionFiles keyed "Instruments/<file>".
+          if (/\.(smus|snx|tiny)$/i.test(lowerFilename)) {
+            const instrDir = dirFiles.find(f => f.toLowerCase() === 'instruments');
+            if (instrDir) {
+              try {
+                const instrFiles = await readdir(join(dir, instrDir));
+                for (const f of instrFiles) {
+                  if (f.startsWith('.')) continue;
+                  if (!/\.(instr|ss)$/i.test(f)) continue;
+                  const p = join(dir, instrDir, f);
+                  try { if (!(await fsStat(p)).isFile()) continue; } catch { continue; }
+                  const data = await readFile(p);
+                  companionFiles[`Instruments/${f}`] = data.toString('base64');
+                }
+              } catch { /* Instruments dir might not be readable */ }
+            }
+          }
+
           // ZoundMonitor: look for Samples/ subdirectory with raw PCM sample files.
           // Samples may be in the same dir OR the parent dir (Modland layout:
           // artist/song.sng + Samples/ at the collection root).
