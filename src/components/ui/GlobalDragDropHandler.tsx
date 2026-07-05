@@ -48,11 +48,13 @@ function isSupportedFile(filename: string): boolean {
   return isSupportedFormat(lower);
 }
 
-// Sonix instrument files (.instr / .ss) are companions of a .smus/.snx/.tiny song, never
-// standalone modules. Never pick them as the main file or load them on their own — they'd
-// fail (e.g. UADE "Cannot play file: vibes.ss") and steal the load from the real song.
-function isCompanionOnly(filename: string): boolean {
-  return /\.(instr|ss)$/i.test(filename);
+// Sonix instrument (.instr / .ss) and tech-routine (.tech — FORM/MIDI/SampledSound/
+// Synthesis) files are companions of a .smus/.snx/.tiny song, never standalone modules.
+// Never pick them as the main file or load them on their own — they'd fail (e.g. UADE
+// "could not play: MIDI.tech") and steal the load from the real song. They still travel
+// as companions so the Sonix WASM memfs can resolve them.
+export function isCompanionOnly(filename: string): boolean {
+  return /\.(instr|ss|tech)$/i.test(filename);
 }
 
 async function readFilesFromEntry(entry: FileSystemEntry): Promise<File[]> {
