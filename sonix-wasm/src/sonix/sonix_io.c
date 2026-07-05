@@ -1222,6 +1222,8 @@ int sonix_song_load_instruments(SonixSong* song, const char* song_file_path) {
                 if (instr_size >= 0xC4 + 128) {
                     sonix_song_set_synth_env_table(song, (uint8_t)i, (const int8_t*)(instr_data + 0xC4));
                 }
+                if (instr_size >= 0x1C4)
+                    sonix_song_set_synth_lfo_wave(song, (uint8_t)i, (const int8_t*)(instr_data + 0x144));
 
                 free(pcm);
                 free(wave128);
