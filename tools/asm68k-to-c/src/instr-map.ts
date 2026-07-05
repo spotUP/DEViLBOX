@@ -444,6 +444,11 @@ export function emitInstruction(node: InstructionNode): string {
         const dstExpr = s === 'L' ? dst.name : emitRegSized(dst.name, s);
         return block([
           `${addType} _ar = (${addType})(${dstExpr} + ${srcRead});`,
+          // Carry → X: an unsigned sum wraps below the destination. A following
+          // ADDX/SUBX reads flag_x; without this it reads a stale extend bit (the
+          // Cinter period-table off-by-one). dstExpr is a register read (no side
+          // effect) taken before the write.
+          `flag_c = flag_x = (int)((${addType})_ar < (${addType})(${dstExpr}));`,
           regWrite(dst, `(${addType})_ar`, s),
           `flag_z = (${addSign}(_ar) == 0);`,
           `flag_n = (${addSign}(_ar) < 0);`,
@@ -475,6 +480,9 @@ export function emitInstruction(node: InstructionNode): string {
         const dstExpr = s === 'L' ? dst.name : emitRegSized(dst.name, s);
         return block([
           `${subType} _sr = (${subType})(${dstExpr} - ${srcExpr});`,
+          // Borrow → X: dst < src (the result wraps above dst). SUBX/ADDX reads
+          // flag_x; a stale X gives off-by-one results. dstExpr is a register read.
+          `flag_c = flag_x = (int)((${subType})_sr > (${subType})(${dstExpr}));`,
           regWrite(dst, `(${subType})_sr`, s),
           `flag_z = (${subSign}(_sr) == 0);`,
           `flag_n = (${subSign}(_sr) < 0);`,
@@ -585,13 +593,19 @@ export function emitInstruction(node: InstructionNode): string {
         return regWrite(ops[0], `${emitOperandRead(ops[0], s)} << 1`, s);
       }
       return regWrite(dst, `${emitOperandRead(dst, s)} << ${src}`, s);
-    case 'ASR':
-      if (!dst) {
-        if (ops[0].kind === 'register') return `${src} = (uint32_t)((int32_t)${src} >> 1);`;
-        return regWrite(ops[0], `(uint32_t)((int32_t)${emitOperandRead(ops[0], s)} >> 1)`, s);
+    case 'ASR': {
+      // ASR is an ARITHMETIC shift — the operand MUST be sign-extended by its size
+      // before shifting. `(int32_t)W(reg)` zero-extends (0xFFFF → 65535 >> n), which
+      // turns negative .W/.B values into large positives (a silent detune / wrong
+      // value bug). Sign-extend by size: (int16_t) for .W, (int8_t) for .B.
+      const sc = s === 'B' ? 'int8_t' : s === 'W' ? 'int16_t' : 'int32_t';
+      const cnt = dst ? src : '1';
+      const target = dst ?? ops[0];
+      if (target.kind === 'register' && s === 'L') {
+        return `${(target as { name: string }).name} = (uint32_t)((int32_t)${(target as { name: string }).name} >> ${cnt});`;
       }
-      if (dst.kind === 'register' && s === 'L') return `${dst.name} = (uint32_t)((int32_t)${dst.name} >> ${src});`;
-      return regWrite(dst, `(uint32_t)((int32_t)${emitOperandRead(dst, s)} >> ${src})`, s);
+      return regWrite(target, `(${sc})${emitOperandRead(target, s)} >> ${cnt}`, s);
+    }
     case 'ROL': return dst ? regWrite(dst, `ROL32(${emitOperandRead(dst, s)}, ${src})`, s) : ``;
     case 'ROR': return dst ? regWrite(dst, `ROR32(${emitOperandRead(dst, s)}, ${src})`, s) : ``;
 
