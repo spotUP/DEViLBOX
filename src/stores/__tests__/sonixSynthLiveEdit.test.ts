@@ -75,4 +75,13 @@ describe('SonixSynth live param edit routing', () => {
 
     expect(invalidateInstrument).not.toHaveBeenCalled();
   });
+
+  it('routes an egLevels edit through applyConfig (not invalidation)', () => {
+    const id = seedSonixSynth();
+    useInstrumentStore.getState().updateInstrument(id, {
+      parameters: { sonixIndex: 2, sonix: { index: 2, baseVol: 200, wave: new Array(128).fill(0), envTable: new Array(128).fill(0), lfoWave: new Array(128).fill(0), egLevels: [10, 20, 30, 40], egRates: [1, 2, 3, 4] } },
+    } as any);
+    expect(applyConfig).toHaveBeenCalledTimes(1);
+    expect(invalidateInstrument).not.toHaveBeenCalled();
+  });
 });
