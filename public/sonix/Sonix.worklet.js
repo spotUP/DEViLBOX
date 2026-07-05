@@ -210,6 +210,9 @@ class SonixProcessor extends AudioWorkletProcessor {
         slideRate: m._sonix_synth_get_slide_rate(i),
         wave: this.readInt8Array(m._sonix_synth_get_wave.bind(m), i),
         envTable: this.readInt8Array(m._sonix_synth_get_env_table.bind(m), i),
+        lfoWave: this.readInt8Array(m._sonix_synth_get_lfo_wave.bind(m), i),
+        egLevels: [0,1,2,3].map((j) => m._sonix_synth_get_eg_level(i, j)),
+        egRates: [0,1,2,3].map((j) => m._sonix_synth_get_eg_rate(i, j)),
       });
     }
     this.port.postMessage({ type: 'synthParams', instruments });
@@ -227,6 +230,9 @@ class SonixProcessor extends AudioWorkletProcessor {
     m._sonix_synth_set_slide_rate(i, p.slideRate | 0);
     if (Array.isArray(p.wave)) this.writeInt8Array(m._sonix_synth_set_wave.bind(m), i, p.wave);
     if (Array.isArray(p.envTable)) this.writeInt8Array(m._sonix_synth_set_env_table.bind(m), i, p.envTable);
+    if (Array.isArray(p.lfoWave)) this.writeInt8Array(m._sonix_synth_set_lfo_wave.bind(m), i, p.lfoWave);
+    if (Array.isArray(p.egLevels)) p.egLevels.forEach((v, j) => m._sonix_synth_set_eg_level(i, j, v | 0));
+    if (Array.isArray(p.egRates)) p.egRates.forEach((v, j) => m._sonix_synth_set_eg_rate(i, j, v | 0));
   }
 
   allocCString(str) {
