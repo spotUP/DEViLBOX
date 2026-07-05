@@ -102,12 +102,18 @@ export class SonixEngine extends WASMSingletonBase {
     this.workletNode.connect(this.output);
   }
 
-  async loadTune(buffer: ArrayBuffer, sidecarFiles?: Array<{ path: string; data: ArrayBuffer }>): Promise<void> {
+  async loadTune(
+    buffer: ArrayBuffer,
+    sidecarFiles?: Array<{ path: string; data: ArrayBuffer }>,
+    songPath?: string,
+  ): Promise<void> {
     await this._initPromise;
     if (!this.workletNode) throw new Error('SonixEngine not initialized');
 
+    // songPath drives the worklet's sonix_song_load_instruments() sidecar-dir walk;
+    // its parent dir must match the sidecarFiles' memfs paths (see SONIX_MEMFS_SONG_PATH).
     this.workletNode.port.postMessage(
-      { type: 'loadModule', moduleData: buffer, sidecarFiles: sidecarFiles || [] },
+      { type: 'loadModule', moduleData: buffer, sidecarFiles: sidecarFiles || [], songPath: songPath || 'sonix/song' },
     );
   }
 
