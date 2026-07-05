@@ -1737,6 +1737,30 @@ export function createMcpServer(): McpServer {
           } catch { /* best-effort */ }
         }
 
+        // Sonix (IFF SMUS / SNX / TINY): external instruments in an Instruments/ subdir.
+        // List the sibling Instruments/ folder on modland and download every .instr/.ss,
+        // keyed "Instruments/<file>" to match the SonixMusicDriverParser sidecar mapping.
+        if (/\.(smus|snx|tiny)$/i.test(lowerFilename)) {
+          try {
+            const instrDir = `${dirPath}/Instruments`;
+            const listResp = await fetch(`${API_BASE}/api/modland/list?dir=${encodeURIComponent(instrDir)}`);
+            if (listResp.ok) {
+              const listed = await listResp.json() as { files?: Array<{ full_path: string }> };
+              for (const f of listed.files ?? []) {
+                const base = f.full_path.split('/').pop() ?? '';
+                if (!/\.(instr|ss)$/i.test(base)) continue;
+                try {
+                  const dlResp = await fetch(`${API_BASE}/api/modland/download?path=${encodeURIComponent(f.full_path)}`);
+                  if (dlResp.ok) {
+                    const dlBuf = Buffer.from(await dlResp.arrayBuffer());
+                    companionFiles[`Instruments/${base}`] = dlBuf.toString('base64');
+                  }
+                } catch { /* per-file best-effort */ }
+              }
+            }
+          } catch { /* Instruments discovery is best-effort */ }
+        }
+
         // Kris Hatlelid: .kh + songplay companion
         if (lowerFilename.endsWith('.kh')) {
           const songplayPath = `${dirPath}/songplay`;
