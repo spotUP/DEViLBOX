@@ -9,6 +9,7 @@ import { Search, X } from 'lucide-react';
 import type { InstrumentConfig, SynthType } from '../../types/instrument';
 import { useInstrumentStore } from '../../stores';
 import { SYNTH_INFO, ALL_SYNTH_TYPES, getSynthInfo } from '@constants/synthCategories';
+import { getDefaultSonixParams, readSonixSynthParams } from '@engine/sonix/sonixInstrument';
 
 interface SynthTypeSelectorProps {
   instrument: InstrumentConfig;
@@ -44,6 +45,11 @@ export const SynthTypeSelector: React.FC<SynthTypeSelectorProps> = ({ instrument
       // Reset synth-specific configs when changing type
       tb303: type === 'TB303' ? instrument.tb303 : undefined,
       wavetable: type === 'Wavetable' ? instrument.wavetable : undefined,
+      // Seed default Sonix params for a from-scratch instrument so the editor opens
+      // populated (the WASM->store param bridge only fills these from a loaded song).
+      ...(type === 'SonixSynth' && !readSonixSynthParams(instrument)
+        ? { parameters: { sonixIndex: 0, sonix: getDefaultSonixParams() } }
+        : {}),
     });
   };
 
