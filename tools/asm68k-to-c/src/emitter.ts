@@ -900,6 +900,7 @@ export function emit(ast: AstNode[], resolved: ResolveResult, sourceFile?: strin
     for (const lbl of referencedLabels) {
       if (!resolved.labels.has(lbl)) continue;  // not a label in this file
       if (funcLabels.has(lbl)) continue;         // will get a function definition
+      if (isFunctionLabel.has(lbl)) continue;    // code label (fn or inline goto target), not external data
       if (packedLabels.has(lbl)) continue;       // will get a data #define
       if (resolved.symbols.has(lbl)) continue;   // EQU constant
       if (crossFuncGotos.has(lbl)) continue;     // promoted to function
@@ -1124,13 +1125,20 @@ export function emit(ast: AstNode[], resolved: ResolveResult, sourceFile?: strin
           lines.push(`  ${c}${branchSuffix}${asmComment}`);
         }
 
-        // After RTS or tail-call (JMP/BRA that emits `return;`): close the current
-        // function so the next label starts a new function. This prevents EaglePlayer
-        // labels (InitPlayer, InitSound, etc.) from being emitted as goto labels
-        // inside a parent function.
-        // After RTS, tail-call return, or indirect JMP: close the current function
-        // so the next label starts a new one. Don't close for BRA/JMP to local labels.
-        const isUnconditionalExit = mn === 'RTS' || c.includes('return;')
+        // After an UNCONDITIONAL exit (RTS, indirect JMP, or a BRA/JMP tail-call that
+        // emits `X(); return;`): close the current function so the next label starts a
+        // new one. This prevents EaglePlayer labels (InitPlayer, InitSound, etc.) from
+        // being emitted as goto labels inside a parent function.
+        //
+        // A CONDITIONAL branch to a cross-function target emits `if (cond) { X(); return; }`
+        // — that string contains `return;` but is NOT an unconditional exit: when the
+        // condition is false, execution falls through into the next label. Closing the
+        // function there wrongly splits a contiguous, mutually-branching block (e.g. Sonix
+        // SecPass<->OK1) into two C functions, breaking both fall-through and the local
+        // gotos/dbf between them. So gate on the mnemonic being unconditional, not on the
+        // presence of `return;` in the emitted text.
+        const isUnconditionalExit = mn === 'RTS'
+          || ((mn === 'BRA' || mn === 'JMP') && c.includes('return;'))  // tail-call → X(); return;
           || ((mn === 'JMP') && node.operands[0]?.kind === 'address');  // JMP (An)
         if (isUnconditionalExit && inFunction && !noFuncSplit) {
           // Peek ahead: if the next meaningful node is a label, close this function
