@@ -287,3 +287,9 @@ EXPORT void sonix_synth_set_slide_rate(int i, int slide_rate)             { if (
 /* set_wave recomputes the 64-band filter bank internally. */
 EXPORT void sonix_synth_set_wave(int i, const int8_t* wave128)      { if (SNX_OK(i) && wave128) sonix_song_set_synth_wave(g_song, (uint8_t)i, wave128); }
 EXPORT void sonix_synth_set_env_table(int i, const int8_t* table128){ if (SNX_OK(i) && table128) sonix_song_set_synth_env_table(g_song, (uint8_t)i, table128); }
+EXPORT void sonix_synth_get_lfo_wave(int i, int8_t* out)   { if (SNX_OK(i) && out) memcpy(out, g_song->synth_lfo_wave[i], 128); }
+EXPORT void sonix_synth_set_lfo_wave(int i, const int8_t* w){ if (SNX_OK(i) && w)   sonix_song_set_synth_lfo_wave(g_song, (uint8_t)i, w); }
+EXPORT int  sonix_synth_get_eg_level(int i, int j) { return (SNX_OK(i) && j >= 0 && j < 4) ? (int)g_song->ss_port_target[i][j] : 0; }
+EXPORT void sonix_synth_set_eg_level(int i, int j, int v) { if (SNX_OK(i) && j >= 0 && j < 4) g_song->ss_port_target[i][j] = (uint16_t)v; }
+EXPORT int  sonix_synth_get_eg_rate(int i, int j)  { return (SNX_OK(i) && j >= 0 && j < 4) ? (int)g_song->ss_port_speed[i][j] : 0; }
+EXPORT void sonix_synth_set_eg_rate(int i, int j, int v)  { if (SNX_OK(i) && j >= 0 && j < 4) g_song->ss_port_speed[i][j] = (uint16_t)v; }
