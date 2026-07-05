@@ -2,8 +2,38 @@
 date: 2026-07-05
 topic: sonix-cport-accuracy-lockstep
 tags: [sonix, replayer, lockstep, uade, accuracy]
-status: draft
+status: implemented
 ---
+
+## RESOLUTION (2026-07-05) — root cause was the Paula DAC scale, not LEN
+
+Lock-step measurement (native harness `tools/sonix-audit/render-native.c`, dump
+extended with per-channel `eff_vol`) **disproved** both original hypotheses and
+found the real bug:
+
+- **LEN — matches.** C-port distinct sample lengths per channel (bytes):
+  ch0 {416,832,1440}, ch1 {416,832}, ch2 {1440} = UADE words {208,416,720}.
+  Short-loop hypothesis was wrong; LEN is correct.
+- **PER — matches.** ch0 `smp_inc` 0.327 = Paula period 226, in UADE's PER set.
+- **VOL (register) — matches.** C-port `eff_vol` max = 47.0 = UADE VOL max 47.
+- **Root cause = per-channel output scale.** UADE (`third-party/uade-3.05/src/audio.c`
+  line 267 + 830) puts one channel at `sample*vol/32768`, max `127*64/32768 = 0.248`,
+  so four channels sum to ~1.0. The C port mixed `(pcm/128)*(vol/64)` — treating a
+  single channel's full-scale as **1.0** — so four channels summed to ~4.0 and
+  hard-clipped (native harness peak **1.95** pre-fix; the "~3x too loud / buzzy"
+  symptom). Fix: multiply each channel by **0.25** in `snx_mix_frames`
+  (`s *= vol * 0.25f`). ACE II peak 1.95 -> 0.49; smus.wait2 RMS 0.184 -> 0.046.
+
+**Regression:** `npm run test:sonix` (`tools/sonix-audit/lockstep.test.ts`) compiles
+the native harness, renders committed fixture `sonix-smus/ACE II`, asserts no clip
+(peak < 0.95) + per-channel VOL in [0,64]. Verified it fails on pre-fix code
+(peak 1.95). On-demand config like `test:furnace` (native compile, not push-gated CI).
+
+**Remaining (separate, finer):** waveform correlation vs the uade123 *stereo* WAV
+is 0.80 with a crest-factor gap (UADE 12.5 vs C-port 7.8) — C-port linear
+interpolation vs UADE BLEP/sinc + A500 filter. That is an interpolation-quality
+item, not a register or scale bug; the 0.25 scale is the song-independent Paula
+DAC constant and should not be re-tuned to curve-fit one song's RMS.
 
 # Sonix C-port accuracy — lock-step vs UADE
 
