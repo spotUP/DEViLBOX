@@ -68,7 +68,9 @@ static void memfs_list_visitor(const char *dir_prefix, int dir_len,
     /* Only direct children (no further slashes) */
     if (strchr(rest, '/') != NULL)
         return;
-    lctx->visitor(rest, lctx->ctx);
+    /* add_sidecar_dir() probes existence with a NULL visitor — count only, never call. */
+    if (lctx->visitor)
+        lctx->visitor(rest, lctx->ctx);
     lctx->count++;
 }
 
