@@ -51,6 +51,33 @@ export const SONIX_PARAM_META: SonixParamMeta[] = [
   { key: 'slideRate',     label: 'Slide Rate',     min: 0, max: 4095 },
 ];
 
+/**
+ * Default Sonix synth params for a from-scratch instrument (created via the synth
+ * browser, no loaded song to mirror from). A sawtooth base waveform (the Aegis default),
+ * a flat envelope table, and sensible scalar defaults so the editor opens fully populated.
+ */
+export function getDefaultSonixParams(): SonixSynthParams {
+  return {
+    index: 0,
+    baseVol: 128,
+    portFlag: 0,
+    c2: 0,
+    c4: 0,
+    filterBase: 32,
+    filterRange: 0,
+    filterEnvSens: 0,
+    envScanRate: 0,
+    envLoopMode: -1,
+    envDelayInit: 0,
+    envVolScale: 0,
+    envPitchScale: 0,
+    slideRate: 0,
+    // Sawtooth ramp −128..127 across 128 samples (matches the Aegis default oscillator).
+    wave: Array.from({ length: 128 }, (_, i) => Math.round((i / 127) * 255 - 128)),
+    envTable: new Array(128).fill(0),
+  };
+}
+
 /** Apply a scalar param edit to a params object, returning a new copy. */
 export function withSonixParam(
   params: SonixSynthParams,
