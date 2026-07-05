@@ -251,3 +251,39 @@ EXPORT int sonix_is_finished(void) {
     if (!g_song) return 1;
     return sonix_song_is_finished(g_song) ? 1 : 0;
 }
+
+/* ---- First-class synth: per-instrument parameter get/set ----
+ * The harness unity-includes sonix.c, so getters read struct fields directly.
+ * Setters wrap the sonix_song_set_synth_* API (set_wave recomputes the filter bank).
+ * All operate on the loaded g_song; index is the 0-63 instrument slot. */
+
+#define SNX_OK(i) (g_song && (i) >= 0 && (i) < 64)
+
+EXPORT int sonix_synth_is_synth(int i)         { return SNX_OK(i) ? (g_song->instrument_is_synth[i] ? 1 : 0) : 0; }
+EXPORT int sonix_synth_get_base_vol(int i)     { return SNX_OK(i) ? (int)g_song->synth_base_vol[i] : 0; }
+EXPORT int sonix_synth_get_port_flag(int i)    { return SNX_OK(i) ? (int)g_song->synth_port_flag[i] : 0; }
+EXPORT int sonix_synth_get_c2(int i)           { return SNX_OK(i) ? (int)g_song->synth_c2[i] : 0; }
+EXPORT int sonix_synth_get_c4(int i)           { return SNX_OK(i) ? (int)g_song->synth_c4[i] : 0; }
+EXPORT int sonix_synth_get_filter_base(int i)  { return SNX_OK(i) ? (int)g_song->synth_filter_base[i] : 0; }
+EXPORT int sonix_synth_get_filter_range(int i) { return SNX_OK(i) ? (int)g_song->synth_filter_range[i] : 0; }
+EXPORT int sonix_synth_get_filter_env_sens(int i){ return SNX_OK(i) ? (int)g_song->synth_filter_env_sens[i] : 0; }
+EXPORT int sonix_synth_get_env_scan_rate(int i){ return SNX_OK(i) ? (int)g_song->synth_env_scan_rate[i] : 0; }
+EXPORT int sonix_synth_get_env_loop_mode(int i){ return SNX_OK(i) ? (int)g_song->synth_env_loop_mode[i] : 0; }
+EXPORT int sonix_synth_get_env_delay_init(int i){ return SNX_OK(i) ? (int)g_song->synth_env_delay_init[i] : 0; }
+EXPORT int sonix_synth_get_env_vol_scale(int i){ return SNX_OK(i) ? (int)g_song->synth_env_vol_scale[i] : 0; }
+EXPORT int sonix_synth_get_env_pitch_scale(int i){ return SNX_OK(i) ? (int)g_song->synth_env_pitch_scale[i] : 0; }
+EXPORT int sonix_synth_get_slide_rate(int i)   { return SNX_OK(i) ? (int)g_song->synth_slide_rate[i] : 0; }
+
+/* Copy the 128-byte base waveform / filter-envelope table into out (int8[128]). */
+EXPORT void sonix_synth_get_wave(int i, int8_t* out)      { if (SNX_OK(i) && out) memcpy(out, g_song->synth_wave[i], 128); }
+EXPORT void sonix_synth_get_env_table(int i, int8_t* out) { if (SNX_OK(i) && out) memcpy(out, g_song->synth_env_table[i], 128); }
+
+EXPORT void sonix_synth_set_is_synth(int i, int v)        { if (SNX_OK(i)) sonix_song_set_instrument_synth(g_song, (uint8_t)i, v != 0); }
+EXPORT void sonix_synth_set_vol_params(int i, int base_vol, int port_flag) { if (SNX_OK(i)) sonix_song_set_synth_vol_params(g_song, (uint8_t)i, (uint16_t)base_vol, (uint16_t)port_flag); }
+EXPORT void sonix_synth_set_blend_params(int i, int c2, int c4)            { if (SNX_OK(i)) sonix_song_set_synth_blend_params(g_song, (uint8_t)i, (uint16_t)c2, (uint16_t)c4); }
+EXPORT void sonix_synth_set_filter_params(int i, int base, int range, int env_sens) { if (SNX_OK(i)) sonix_song_set_synth_filter_params(g_song, (uint8_t)i, (uint16_t)base, (uint16_t)range, (uint16_t)env_sens); }
+EXPORT void sonix_synth_set_env_params(int i, int scan_rate, int loop_mode, int delay_init, int vol_scale, int pitch_scale) { if (SNX_OK(i)) sonix_song_set_synth_env_params(g_song, (uint8_t)i, (uint16_t)scan_rate, (int16_t)loop_mode, (uint16_t)delay_init, (uint16_t)vol_scale, (uint16_t)pitch_scale); }
+EXPORT void sonix_synth_set_slide_rate(int i, int slide_rate)             { if (SNX_OK(i)) sonix_song_set_synth_slide_rate(g_song, (uint8_t)i, (uint16_t)slide_rate); }
+/* set_wave recomputes the 64-band filter bank internally. */
+EXPORT void sonix_synth_set_wave(int i, const int8_t* wave128)      { if (SNX_OK(i) && wave128) sonix_song_set_synth_wave(g_song, (uint8_t)i, wave128); }
+EXPORT void sonix_synth_set_env_table(int i, const int8_t* table128){ if (SNX_OK(i) && table128) sonix_song_set_synth_env_table(g_song, (uint8_t)i, table128); }
