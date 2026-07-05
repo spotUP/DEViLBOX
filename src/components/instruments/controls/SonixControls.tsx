@@ -5,25 +5,71 @@
  * envelope). The params are mirrored from the WASM into config.parameters.sonix by the
  * param bridge; editing a knob writes them back through updateInstrument, which re-routes
  * to the live SonixSynth voice (applyConfig → SonixEngine.setSynthParams), so the running
- * song and the preview morph immediately. The base waveform and filter-envelope table are
- * shown as 128-sample canvases.
+ * song and the preview morph immediately.
+ *
+ * Panel order follows the Aegis SONIX V2.0 layout:
+ *   Waveform (3 drawable tabs) · Amplitude · Freq · Filter · LFO · Phase · Envelope Generator
  */
 
-import React, { useCallback, useEffect, useReducer, useRef } from 'react';
+import React, {
+  useCallback,
+  useEffect,
+  useReducer,
+  useRef,
+  useState,
+} from 'react';
 import type { InstrumentConfig } from '@/types';
 import { Knob } from '@components/controls/Knob';
+import { Button } from '@components/ui/Button';
+import { CustomSelect } from '@components/common/CustomSelect';
 import { useInstrumentColors } from '@/hooks/useInstrumentColors';
 import { SectionLabel } from '@components/instruments/shared';
 import { useInstrumentStore } from '@/stores/useInstrumentStore';
-import { readSonixSynthParams, SONIX_PARAM_META } from '@/engine/sonix/sonixInstrument';
+import {
+  readSonixSynthParams,
+  addHarmonic,
+  SONIX_PARAM_META,
+} from '@/engine/sonix/sonixInstrument';
 import type { SonixSynthParams } from '@/engine/sonix/SonixEngine';
 
-const PANEL_MIN_H = 130;
+// ─── Constants ───────────────────────────────────────────────────────────────
+
 const WAVE_H = 88;
 
-/** Transparent canvas for a 128-sample signed int8 array (waveform or envelope). */
-const ByteCanvas: React.FC<{ data: number[]; color: string; height: number }> = ({ data, color, height }) => {
+type WaveTab = 'wave' | 'lfoWave' | 'envTable';
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+/** Look up metadata for a scalar param (label, min, max). */
+const metaFor = (key: keyof SonixSynthParams) =>
+  SONIX_PARAM_META.find((m) => m.key === key) ?? { key, label: String(key), min: 0, max: 255 };
+
+/**
+ * Decode a raw EG rate value into a human-readable tick count.
+ * Format: bits[4:0] = base index; bits[7:5] = shift; ticks = (base+0x21)*8 >> (shift^7).
+ */
+const decodeRateStep = (raw: number): number => {
+  const base = (raw & 0x1f) + 0x21;
+  const shift = (raw >> 5) & 0x7;
+  return (base * 8) >> (shift ^ 7);
+};
+
+// ─── DrawableCanvas ───────────────────────────────────────────────────────────
+
+/**
+ * Editable variant of ByteCanvas. Pointer-drag paints into the waveform.
+ * `onDraw(x, y, w, h)` is called on every painted pixel — caller maps to array index/value.
+ */
+const DrawableCanvas: React.FC<{
+  data: number[];
+  color: string;
+  height: number;
+  onDrawStart: () => void;
+  onDraw: (x: number, y: number, w: number, h: number) => void;
+}> = ({ data, color, height, onDrawStart, onDraw }) => {
   const ref = useRef<HTMLCanvasElement>(null);
+  const isDown = useRef(false);
+
   useEffect(() => {
     const cvs = ref.current;
     if (!cvs) return;
@@ -61,20 +107,75 @@ const ByteCanvas: React.FC<{ data: number[]; color: string; height: number }> = 
     ro.observe(cvs);
     return () => ro.disconnect();
   }, [data, color, height]);
-  return <canvas ref={ref} style={{ width: '100%', height: `${height}px`, display: 'block' }} />;
+
+  const getCoords = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    const cvs = ref.current;
+    if (!cvs) return null;
+    const rect = cvs.getBoundingClientRect();
+    return { x: e.clientX - rect.left, y: e.clientY - rect.top, w: rect.width, h: rect.height };
+  };
+
+  return (
+    <canvas
+      ref={ref}
+      style={{ width: '100%', height: `${height}px`, display: 'block', cursor: 'crosshair' }}
+      onPointerDown={(e) => {
+        isDown.current = true;
+        (e.currentTarget as HTMLCanvasElement).setPointerCapture(e.pointerId);
+        onDrawStart();
+        const c = getCoords(e);
+        if (c) onDraw(c.x, c.y, c.w, c.h);
+      }}
+      onPointerMove={(e) => {
+        if (!isDown.current) return;
+        const c = getCoords(e);
+        if (c) onDraw(c.x, c.y, c.w, c.h);
+      }}
+      onPointerUp={() => {
+        isDown.current = false;
+      }}
+      onPointerCancel={() => {
+        isDown.current = false;
+      }}
+    />
+  );
 };
+
+// ─── Panel wrapper ────────────────────────────────────────────────────────────
+
+/** Compact labelled panel card using design tokens. */
+const Panel: React.FC<{
+  label: string;
+  accent: string;
+  children: React.ReactNode;
+}> = ({ label, accent, children }) => (
+  <div className="bg-dark-bgSecondary rounded-lg border border-dark-borderLight p-3 flex flex-col gap-2">
+    <SectionLabel color={accent} label={label} />
+    {children}
+  </div>
+);
+
+// ─── SonixControls ────────────────────────────────────────────────────────────
 
 interface SonixControlsProps {
   instrument: InstrumentConfig;
 }
 
+const SYNC_OPTIONS = [
+  { value: '-1', label: 'Off' },
+  { value: '0', label: 'Once' },
+  { value: '1', label: 'On' },
+];
+
 export const SonixControls: React.FC<SonixControlsProps> = ({ instrument }) => {
-  const { accent, knob, panelBg, panelStyle } =
-    useInstrumentColors('#33cc99', { knob: '#66ddbb', dim: '#002419' });
+  const { accent, knob } = useInstrumentColors('#33cc99', {
+    knob: '#66ddbb',
+    dim: '#002419',
+  });
 
   const updateInstrument = useInstrumentStore((s) => s.updateInstrument);
 
-  // configRef pattern — knob callbacks read the current params without stale capture.
+  // ── configRef pattern ────────────────────────────────────────────────────
   const paramsRef = useRef<SonixSynthParams | null>(readSonixSynthParams(instrument));
   const idRef = useRef(instrument.id);
   const [, bump] = useReducer((x: number) => x + 1, 0);
@@ -84,16 +185,78 @@ export const SonixControls: React.FC<SonixControlsProps> = ({ instrument }) => {
     bump();
   }, [instrument]);
 
-  const handleChange = useCallback((key: keyof SonixSynthParams, value: number) => {
-    const cur = paramsRef.current;
-    if (!cur) return;
-    const next: SonixSynthParams = { ...cur, [key]: Math.round(value) };
-    paramsRef.current = next;
-    updateInstrument(idRef.current, {
-      parameters: { sonixIndex: next.index, sonix: next },
-    } as Parameters<typeof updateInstrument>[1]);
-    bump();
-  }, [updateInstrument]);
+  // ── Waveform tab + snapshot ──────────────────────────────────────────────
+  const [waveTab, setWaveTab] = useState<WaveTab>('wave');
+  const snapshotRef = useRef<number[] | null>(null);
+
+  // ── Harmonic bake state ──────────────────────────────────────────────────
+  const [harmAmt, setHarmAmt] = useState(40);
+
+  // ── Scalar handler ───────────────────────────────────────────────────────
+  const handleChange = useCallback(
+    (key: keyof SonixSynthParams, value: number) => {
+      const cur = paramsRef.current;
+      if (!cur) return;
+      const next: SonixSynthParams = { ...cur, [key]: Math.round(value) };
+      paramsRef.current = next;
+      updateInstrument(idRef.current, {
+        parameters: { sonixIndex: next.index, sonix: next },
+      } as Parameters<typeof updateInstrument>[1]);
+      bump();
+    },
+    [updateInstrument],
+  );
+
+  // ── Array handler ────────────────────────────────────────────────────────
+  const handleArrayChange = useCallback(
+    (key: 'wave' | 'lfoWave' | 'envTable' | 'egLevels' | 'egRates', arr: number[]) => {
+      const cur = paramsRef.current;
+      if (!cur) return;
+      const next = { ...cur, [key]: arr } as SonixSynthParams;
+      paramsRef.current = next;
+      updateInstrument(idRef.current, {
+        parameters: { sonixIndex: next.index, sonix: next },
+      } as Parameters<typeof updateInstrument>[1]);
+      bump();
+    },
+    [updateInstrument],
+  );
+
+  // ── EG knob handler ──────────────────────────────────────────────────────
+  const handleEgChange = useCallback(
+    (bank: 'egLevels' | 'egRates', slot: number, value: number) => {
+      const cur = paramsRef.current;
+      if (!cur) return;
+      const arr = (cur[bank] as number[]).slice();
+      arr[slot] = Math.round(value);
+      handleArrayChange(bank, arr);
+    },
+    [handleArrayChange],
+  );
+
+  // ── Draw callback ────────────────────────────────────────────────────────
+  const drawAt = useCallback(
+    (tab: WaveTab, x: number, y: number, w: number, h: number) => {
+      const cur = paramsRef.current;
+      if (!cur) return;
+      const arr = (cur[tab] as number[]).slice();
+      const idx = Math.max(0, Math.min(127, Math.floor((x / w) * 128)));
+      const val = Math.max(-128, Math.min(127, Math.round((0.5 - y / h) * 255)));
+      arr[idx] = val;
+      handleArrayChange(tab, arr);
+    },
+    [handleArrayChange],
+  );
+
+  // ── Harmonic bake ────────────────────────────────────────────────────────
+  const bake = useCallback(
+    (h: 2 | 3) => {
+      const cur = paramsRef.current;
+      if (!cur) return;
+      handleArrayChange('wave', addHarmonic(cur.wave, h, harmAmt / 127));
+    },
+    [handleArrayChange, harmAmt],
+  );
 
   const params = paramsRef.current;
   if (!params) {
@@ -104,44 +267,300 @@ export const SonixControls: React.FC<SonixControlsProps> = ({ instrument }) => {
     );
   }
 
+  // Current waveform array for the active tab.
+  const activeWave = params[waveTab] as number[];
+
+  // Meta lookups for scalar panels.
+  const mBaseVol      = metaFor('baseVol');
+  const mEnvVolScale  = metaFor('envVolScale');
+  const mSlideRate    = metaFor('slideRate');
+  const mEnvPitch     = metaFor('envPitchScale');
+  const mFilterBase   = metaFor('filterBase');
+  const mFilterEnvS   = metaFor('filterEnvSens');
+  const mFilterRange  = metaFor('filterRange');
+  const mEnvScanRate  = metaFor('envScanRate');
+  const mEnvDelay     = metaFor('envDelayInit');
+  const mC2           = metaFor('c2');
+  const mC4           = metaFor('c4');
+
   return (
-    <div className="flex flex-col gap-3 p-3 overflow-y-auto synth-controls-flow"
-      style={{ maxHeight: 'calc(100vh - 280px)' }}>
-      <div className={`rounded-lg border p-3 flex flex-col ${panelBg}`}
-        style={{ ...panelStyle, minHeight: PANEL_MIN_H }}>
-        <SectionLabel color={accent} label="Base Waveform" />
-        <div className="flex-1 flex items-center">
-          <ByteCanvas data={params.wave} color={knob} height={WAVE_H} />
-        </div>
-      </div>
-
-      <div className={`rounded-lg border p-3 flex flex-col ${panelBg}`}
-        style={{ ...panelStyle, minHeight: PANEL_MIN_H }}>
-        <SectionLabel color={accent} label="Filter Envelope" />
-        <div className="flex-1 flex items-center">
-          <ByteCanvas data={params.envTable} color={knob} height={WAVE_H} />
-        </div>
-      </div>
-
-      <div className={`rounded-lg border p-3 flex flex-col ${panelBg}`}
-        style={{ ...panelStyle, minHeight: PANEL_MIN_H }}>
-        <SectionLabel color={accent} label="Synth Parameters" />
-        <div className="flex-1 flex items-center gap-3 flex-wrap">
-          {SONIX_PARAM_META.map((m) => (
-            <Knob
-              key={m.key}
-              value={(params[m.key] as number) ?? 0}
-              min={m.min}
-              max={m.max}
-              step={1}
-              onChange={(v: number) => handleChange(m.key, v)}
-              color={knob}
-              label={m.label}
-              formatValue={() => String(params[m.key] ?? 0)}
-            />
+    <div
+      className="flex flex-col gap-3 p-3 overflow-y-auto synth-controls-flow"
+      style={{ maxHeight: 'calc(100vh - 280px)' }}
+    >
+      {/* ── Waveform ─────────────────────────────────────────────────────── */}
+      <Panel label="Waveform" accent={accent}>
+        {/* Tab buttons */}
+        <div className="flex gap-1">
+          {(
+            [
+              { id: 'wave' as WaveTab, label: 'Oscillator' },
+              { id: 'lfoWave' as WaveTab, label: 'LFO' },
+              { id: 'envTable' as WaveTab, label: 'Filter Envelope' },
+            ] as const
+          ).map(({ id, label }) => (
+            <Button
+              key={id}
+              variant={waveTab === id ? 'primary' : 'ghost'}
+              onClick={() => setWaveTab(id)}
+            >
+              {label}
+            </Button>
           ))}
         </div>
-      </div>
+
+        {/* Drawable canvas */}
+        <DrawableCanvas
+          data={activeWave}
+          color={knob}
+          height={WAVE_H}
+          onDrawStart={() => {
+            snapshotRef.current = [...activeWave];
+          }}
+          onDraw={(x, y, w, h) => drawAt(waveTab, x, y, w, h)}
+        />
+
+        {/* Ok / Undo */}
+        <div className="flex gap-2 items-center">
+          <Button
+            variant="ghost"
+            onClick={() => {
+              snapshotRef.current = null;
+            }}
+          >
+            Ok
+          </Button>
+          <Button
+            variant="ghost"
+            onClick={() => {
+              if (snapshotRef.current) {
+                handleArrayChange(waveTab, snapshotRef.current);
+                snapshotRef.current = null;
+              }
+            }}
+          >
+            Undo
+          </Button>
+        </div>
+
+        {/* Harmonic bake — Oscillator tab only */}
+        {waveTab === 'wave' && (
+          <div className="flex gap-2 items-center flex-wrap border-t border-dark-borderLight pt-2">
+            <span className="text-[10px] font-mono text-text-muted">Add Harmonic:</span>
+            <Button variant="ghost" onClick={() => bake(2)}>
+              +2nd
+            </Button>
+            <Button variant="ghost" onClick={() => bake(3)}>
+              +3rd
+            </Button>
+            <Knob
+              value={harmAmt}
+              min={0}
+              max={127}
+              step={1}
+              onChange={(v: number) => setHarmAmt(Math.round(v))}
+              color={knob}
+              label="Amt"
+              formatValue={(v: number) => String(Math.round(v))}
+            />
+          </div>
+        )}
+      </Panel>
+
+      {/* ── Amplitude ────────────────────────────────────────────────────── */}
+      <Panel label="Amplitude" accent={accent}>
+        <div className="flex gap-3 flex-wrap items-center">
+          <Knob
+            value={params.baseVol}
+            min={mBaseVol.min}
+            max={mBaseVol.max}
+            step={1}
+            onChange={(v: number) => handleChange('baseVol', v)}
+            color={knob}
+            label={mBaseVol.label}
+            formatValue={(v: number) => String(Math.round(v))}
+          />
+          <Knob
+            value={params.envVolScale}
+            min={mEnvVolScale.min}
+            max={mEnvVolScale.max}
+            step={1}
+            onChange={(v: number) => handleChange('envVolScale', v)}
+            color={knob}
+            label={mEnvVolScale.label}
+            formatValue={(v: number) => String(Math.round(v))}
+          />
+        </div>
+      </Panel>
+
+      {/* ── Frequency ────────────────────────────────────────────────────── */}
+      <Panel label="Frequency" accent={accent}>
+        <div className="flex gap-3 flex-wrap items-center">
+          <Knob
+            value={params.slideRate}
+            min={mSlideRate.min}
+            max={mSlideRate.max}
+            step={1}
+            onChange={(v: number) => handleChange('slideRate', v)}
+            color={knob}
+            label={mSlideRate.label}
+            formatValue={(v: number) => String(Math.round(v))}
+          />
+          <Knob
+            value={params.envPitchScale}
+            min={mEnvPitch.min}
+            max={mEnvPitch.max}
+            step={1}
+            onChange={(v: number) => handleChange('envPitchScale', v)}
+            color={knob}
+            label={mEnvPitch.label}
+            formatValue={(v: number) => String(Math.round(v))}
+          />
+        </div>
+      </Panel>
+
+      {/* ── Filter ───────────────────────────────────────────────────────── */}
+      <Panel label="Filter" accent={accent}>
+        <div className="flex gap-3 flex-wrap items-center">
+          <Knob
+            value={params.filterBase}
+            min={mFilterBase.min}
+            max={mFilterBase.max}
+            step={1}
+            onChange={(v: number) => handleChange('filterBase', v)}
+            color={knob}
+            label={mFilterBase.label}
+            formatValue={(v: number) => String(Math.round(v))}
+          />
+          <Knob
+            value={params.filterEnvSens}
+            min={mFilterEnvS.min}
+            max={mFilterEnvS.max}
+            step={1}
+            onChange={(v: number) => handleChange('filterEnvSens', v)}
+            color={knob}
+            label={mFilterEnvS.label}
+            formatValue={(v: number) => String(Math.round(v))}
+          />
+          <Knob
+            value={params.filterRange}
+            min={mFilterRange.min}
+            max={mFilterRange.max}
+            step={1}
+            onChange={(v: number) => handleChange('filterRange', v)}
+            color={knob}
+            label={mFilterRange.label}
+            formatValue={(v: number) => String(Math.round(v))}
+          />
+        </div>
+      </Panel>
+
+      {/* ── LFO ──────────────────────────────────────────────────────────── */}
+      <Panel label="LFO" accent={accent}>
+        <div className="flex gap-3 flex-wrap items-center">
+          <Knob
+            value={params.envScanRate}
+            min={mEnvScanRate.min}
+            max={mEnvScanRate.max}
+            step={1}
+            onChange={(v: number) => handleChange('envScanRate', v)}
+            color={knob}
+            label={mEnvScanRate.label}
+            formatValue={(v: number) => String(Math.round(v))}
+          />
+          <div className="flex flex-col gap-1">
+            <span className="text-[10px] font-mono text-text-muted">Sync</span>
+            <CustomSelect
+              value={String(params.envLoopMode)}
+              options={SYNC_OPTIONS}
+              onChange={(v: string) => handleChange('envLoopMode', parseInt(v, 10))}
+            />
+          </div>
+          <Knob
+            value={params.envDelayInit}
+            min={mEnvDelay.min}
+            max={mEnvDelay.max}
+            step={1}
+            onChange={(v: number) => handleChange('envDelayInit', v)}
+            color={knob}
+            label={mEnvDelay.label}
+            formatValue={(v: number) => String(Math.round(v))}
+          />
+        </div>
+      </Panel>
+
+      {/* ── Phase ────────────────────────────────────────────────────────── */}
+      <Panel label="Phase" accent={accent}>
+        <div className="flex gap-3 flex-wrap items-center">
+          <Knob
+            value={params.c2}
+            min={mC2.min}
+            max={mC2.max}
+            step={1}
+            onChange={(v: number) => handleChange('c2', v)}
+            color={knob}
+            label={mC2.label}
+            formatValue={(v: number) => String(Math.round(v))}
+          />
+          <Knob
+            value={params.c4}
+            min={mC4.min}
+            max={mC4.max}
+            step={1}
+            onChange={(v: number) => handleChange('c4', v)}
+            color={knob}
+            label={mC4.label}
+            formatValue={(v: number) => String(Math.round(v))}
+          />
+        </div>
+      </Panel>
+
+      {/* ── Envelope Generator ───────────────────────────────────────────── */}
+      <Panel label="Envelope Generator" accent={accent}>
+        <div className="flex flex-col gap-2">
+          {/* Levels row */}
+          <div className="flex flex-col gap-1">
+            <span className="text-[10px] font-mono text-text-secondary">Levels</span>
+            <div className="flex gap-3 flex-wrap items-center">
+              {([0, 1, 2, 3] as const).map((i) => (
+                <Knob
+                  key={`egLevel-${i}`}
+                  value={params.egLevels[i] ?? 0}
+                  min={0}
+                  max={255}
+                  step={1}
+                  onChange={(v: number) => handleEgChange('egLevels', i, v)}
+                  color={knob}
+                  label={`Level ${i + 1}`}
+                  formatValue={(v: number) => String(Math.round(v))}
+                />
+              ))}
+            </div>
+          </div>
+          {/* Rates row */}
+          <div className="flex flex-col gap-1">
+            <span className="text-[10px] font-mono text-text-secondary">Rates</span>
+            <div className="flex gap-3 flex-wrap items-center">
+              {([0, 1, 2, 3] as const).map((i) => {
+                const raw = params.egRates[i] ?? 0;
+                return (
+                  <Knob
+                    key={`egRate-${i}`}
+                    value={raw}
+                    min={0}
+                    max={255}
+                    step={1}
+                    onChange={(v: number) => handleEgChange('egRates', i, v)}
+                    color={knob}
+                    label={`Rate ${i + 1}`}
+                    formatValue={(v: number) => String(decodeRateStep(Math.round(v)))}
+                  />
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      </Panel>
     </div>
   );
 };
