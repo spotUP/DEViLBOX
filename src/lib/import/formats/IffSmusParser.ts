@@ -485,6 +485,11 @@ export async function parseIffSmusFile(
       silentPcm, 64, 8287, 0, 0,
     ));
   }
+  // Tag each instrument with its 0-based Sonix slot so the SonixEngine's WASM-parsed
+  // synth params (posted after load_instruments) can be matched back to the config.
+  instrConfigs.forEach((cfg, i) => {
+    cfg.parameters = { ...(cfg.parameters as Record<string, unknown> | undefined), sonixIndex: i };
+  });
   const channelFlat: TrackerCell[][] = [];
   for (let ch = 0; ch < numCh; ch++) {
     const track = ch < moduleInfo.tracks.length ? moduleInfo.tracks[ch] : null;
