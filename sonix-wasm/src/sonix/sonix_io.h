@@ -31,6 +31,7 @@ void sonix_song_set_synth_filter_params(SonixSong* song, uint8_t instrument_inde
 void sonix_song_set_synth_env_params(SonixSong* song, uint8_t instrument_index, uint16_t scan_rate, int16_t loop_mode,
                                      uint16_t delay_init, uint16_t vol_scale, uint16_t pitch_scale);
 void sonix_song_set_synth_env_table(SonixSong* song, uint8_t instrument_index, const int8_t* table128);
+void sonix_song_set_synth_lfo_wave(SonixSong* song, uint8_t instrument_index, const int8_t* wave128);
 void sonix_song_set_synth_slide_rate(SonixSong* song, uint8_t instrument_index, uint16_t slide_rate);
 bool sonix_song_add_instrument_zone(SonixSong* song, uint8_t instrument_index, const int8_t* pcm_data,
                                     uint32_t num_samples, uint32_t loop_start, uint32_t loop_len, uint8_t base_note,

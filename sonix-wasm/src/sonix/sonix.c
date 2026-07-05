@@ -91,6 +91,8 @@ struct SonixSong {
     // Assembly: OneFilter (line 2866) pre-computes these during instrument init.
     i8* synth_filter_bank[64];     // 64×128 = 8192 bytes per instrument, NULL if not synth
     i8 synth_env_table[64][128];   // filter envelope table (128 signed bytes, from $A4/file 0xC4)
+    i8 synth_lfo_wave[64][128];    // file 0x144: third full-cycle table (Aegis "LFO" waveform tab); data-faithful, not consumed by DSP
+    bool synth_lfo_wave_set[64];
     u16 synth_filter_base[64];     // $19A: filter base offset (XOR 0xFF)
     u16 synth_filter_range[64];    // $19C: portamento -> filter scaling
     u16 synth_filter_env_sens[64]; // $19E: envelope -> filter scaling
@@ -3419,6 +3421,12 @@ void sonix_song_set_synth_env_table(SonixSong* song, u8 instrument_index, const 
         return;
 
     memcpy(song->synth_env_table[instrument_index], table128, 128);
+}
+
+void sonix_song_set_synth_lfo_wave(SonixSong* song, u8 instrument_index, const int8_t* wave128) {
+    if (song == nullptr || instrument_index >= 64 || wave128 == nullptr) return;
+    memcpy(song->synth_lfo_wave[instrument_index], wave128, 128);
+    song->synth_lfo_wave_set[instrument_index] = true;
 }
 
 const SonixIoCallbacks* sonix_song_get_io_callbacks(const SonixSong* song) {
