@@ -38,10 +38,18 @@ describe('Cinter4 sequencer — period slide sign-extension (ASR.W)', () => {
     Module._free(ptr);
 
     for (let t = 1; t <= 6; t++) Module._player_tick(); // advance to tick 6
-    const period = Module._player_paula_period(2);
-    fs.unlinkSync(tmpGlue);
+    const period6 = Module._player_paula_period(2);
+    expect(period6).toBe(427);   // Amiga reference (was 939 before the ASR.W fix)
+    expect(period6 & 0x200).toBe(0); // the zero-extend bug set bit 9
 
-    expect(period).toBe(427);   // Amiga reference (was 939 before the ASR.W fix)
-    expect(period & 0x200).toBe(0); // the zero-extend bug set bit 9
+    // Tick 19 channel 2 takes a slide that hits the c_PeriodTable (add.b sets V →
+    // table lookup). The Amiga reads entry 19 = 285; the transpiled CinterComputePeriods
+    // built the table with a stale X flag (ADD.L D2,D2 didn't set carry for the
+    // following SUBX.W), giving 286 — an off-by-one pitch. Found via instruction-level
+    // lock-step against the real Cinter4.S in Moira.
+    for (let t = 7; t <= 19; t++) Module._player_tick();
+    const period19 = Module._player_paula_period(2);
+    fs.unlinkSync(tmpGlue);
+    expect(period19).toBe(285); // Amiga reference (was 286 before the ADD.L X-flag fix)
   });
 });
