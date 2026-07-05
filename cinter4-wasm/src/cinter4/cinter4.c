@@ -704,7 +704,7 @@ _fdist_in:
       flag_n = ((int16_t)(_sr) < 0);
     }
   }
-  W(d0) = (uint16_t)((uint32_t)((int32_t)W(d0) >> 8));  /* ASR.W	#8,D0 */
+  W(d0) = (uint16_t)((int16_t)W(d0) >> 8);  /* ASR.W	#8,D0 (sign-extend; MOVE.B masks it here but keep it correct) */
   {  /* MOVE.B	D0,(A4)+ */
       uint8_t _mv = (uint8_t)(B(d0));
       WRITE8_POST(a4, _mv);
