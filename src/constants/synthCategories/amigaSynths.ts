@@ -316,4 +316,13 @@ export const amigaSynthEntries: Record<string, SynthInfo> = {
     icon: 'Cpu',
     color: 'text-blue-400',
   },
+  SonixSynth: {
+    type: 'SonixSynth',
+    name: 'Sonix',
+    shortName: 'Sonix',
+    description: 'Aegis Sonix Amiga synth — blend/ring oscillator with a 64-band envelope-swept filter bank (transpiled 68k). Full SONIX V2.0 parameter set.',
+    bestFor: ['Amiga', 'IFF SMUS', 'Filter sweeps', 'Synth samples'],
+    icon: 'Cpu',
+    color: 'text-accent-highlight',
+  },
 };
