@@ -167,6 +167,27 @@ router.get('/search', (req: Request, res: Response) => {
   }
 });
 
+// ── GET /api/modland/list ───────────────────────────────────────────────────
+// Immediate files directly under a directory prefix (no recursion into subdirs).
+// Used to discover companion files such as a Sonix song's Instruments/ folder.
+router.get('/list', (req: Request, res: Response) => {
+  try {
+    const dir = (req.query.dir as string || '').trim().replace(/\/+$/, '');
+    if (!dir) return res.json({ files: [] });
+    const prefix = dir + '/';
+    const like = prefix.replace(/[%_\\]/g, '\\$&') + '%';
+    const rows = db.prepare(
+      `SELECT full_path, filename, extension FROM modland_files WHERE full_path LIKE ? ESCAPE '\\'`,
+    ).all(like) as Array<{ full_path: string; filename: string; extension: string }>;
+    // Keep only immediate children (nothing after the prefix contains a slash).
+    const files = rows.filter((r) => !r.full_path.slice(prefix.length).includes('/'));
+    res.json({ files });
+  } catch (err) {
+    console.error('[Modland] List error:', err);
+    res.status(500).json({ error: 'List failed' });
+  }
+});
+
 // ── GET /api/modland/download ───────────────────────────────────────────────
 
 router.get('/download', async (req: Request, res: Response) => {
