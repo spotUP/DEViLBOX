@@ -208,6 +208,7 @@ struct SonixSong {
     u32 debug_loop_resets;
     u32 debug_total_ticks;
     u32 noise_state;
+    f32 dbg_last_vol[SONIX_NUM_CHANNELS]; // effective per-channel vol, stashed during mix for lock-step trace
     FILE* dump_file;
     SonixIoCallbacks io;
 };
@@ -2787,6 +2788,8 @@ static void snx_mix_frames(SonixSong* song, f32* buffer, int num_frames) {
                 }
             }
 
+            song->dbg_last_vol[ch] = vol;
+
             if (vol < 0.00005f && !song->snx_note_on[ch] && !song->snx_use_sample[ch]) {
                 song->snx_phase_inc[ch] = 0.0;
                 continue;
@@ -2861,7 +2864,12 @@ static void snx_mix_frames(SonixSong* song, f32* buffer, int num_frames) {
                 }
             }
 
-            s *= vol;
+            // Paula DAC scale: a channel outputs sample(-128..127) * vol(0..64), max
+            // magnitude 127*64 = 8128 relative to the 32768 int16 full-scale. Here s is
+            // already normalized to +/-1 (pcm/128) and vol to +/-1 (eff/64), so the pair
+            // spans +/-1; multiply by 8192/32768 = 0.25 to land on Paula's real per-channel
+            // DAC scale. Verified 1:1 against UADE (ch0 peak 127*47 = 5969 = 0.182 fs).
+            s *= vol * 0.25f;
         mix_done_sample:
 
             bool left_chan = (ch == 0 || ch == 3);
@@ -2991,8 +2999,8 @@ static void snx_dump_tick_state(SonixSong* song) {
         u8 inst = song->snx_inst_index[ch] & 63u;
         fprintf(f, "T %u ch=%d inst=%u note_on=%d use_smp=%d", tick, ch, inst, song->snx_note_on[ch],
                 song->snx_use_sample[ch]);
-        fprintf(f, " hw_vol=%u ramp=%u ramp_tgt=%u", song->snx_hw_vol[ch], song->snx_ramp_current[ch],
-                song->snx_ramp_target[ch]);
+        fprintf(f, " hw_vol=%u ramp=%u ramp_tgt=%u eff_vol=%.1f", song->snx_hw_vol[ch], song->snx_ramp_current[ch],
+                song->snx_ramp_target[ch], song->dbg_last_vol[ch] * 64.0f);
         fprintf(f, " wait=%u pos=%u", song->snx_wait[ch], song->snx_track_pos[ch]);
 
         // Pitch state
