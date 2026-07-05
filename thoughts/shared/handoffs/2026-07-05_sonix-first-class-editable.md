@@ -21,12 +21,15 @@ Make Sonix a first-class editable format (synth + editable patterns) and get it 
   SonixControls editor (P5), editor-mode dispatch (P6). Editor SHOWS for synth instruments.
 
 ## Open bugs (next session)
-1. **C-port renders inaccurately** (chosen: full lock-step). Symptoms: ~3x loud, short-loop
-   timbre. Research + reference captured: `thoughts/shared/research/2026-07-05_sonix-cport-accuracy-lockstep.md`.
-   UADE reference decoded (`tools/sonix-audit/decode-uade-paula.mjs`); ch0 LEN up to 720
-   words, VOL<=47. NEXT: instrument `sonix.c` per-tick per-channel {period, active_pcm_len,
-   loop_len, hw_vol}, diff vs the UADE timeline, fix at the first-diverging register's level.
-   Regenerate dump: `uade123 -1 -w 8 --frequency 48000 --write-audio /tmp/sonix_paula.dump "<song>"`.
+1. **C-port renders inaccurately — RESOLVED (Paula DAC scale).** Lock-step measurement
+   disproved the short-loop hypothesis: LEN/PER/VOL registers all match UADE. Root cause was
+   per-channel output scale — C port summed 4 channels each at full-scale 1.0 -> ~4.0 -> clip
+   (native harness peak 1.95 pre-fix). Fix: `s *= vol * 0.25f` in `snx_mix_frames`
+   (Paula DAC: `sample*vol/32768`, single channel max 0.248). WASM rebuilt + copied to
+   `public/sonix/`. Regression `npm run test:sonix`. Full write-up in the research doc
+   (status: implemented). Remaining finer item: linear-vs-BLEP interpolation crest gap
+   (corr 0.80) — separate, not a scale/register bug. **In-browser MCP validation still
+   pending** (no browser connected this session; headless-validated only).
 2. **Editor knobs no-op** — SonixControls shows but turning a knob has no audible effect.
    Trace `SonixControls.handleChange → updateInstrument → SonixSynth.applyConfig →
    SonixEngine.setSynthParams → worklet applySynthParams → WASM setters` during song
