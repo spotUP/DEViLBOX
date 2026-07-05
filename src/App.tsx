@@ -809,6 +809,12 @@ function App() {
 
       if (result.success === 'pending-confirmation' || result.success === 'pending-import') {
         useUIStore.getState().setPendingModuleFile(result.file);
+        // loadFile deferred to the import-confirmation dialog, which re-imports from
+        // pendingCompanionFiles — but we consumed+cleared those above. Restore them so
+        // the dialog still gets the companions (e.g. a Sonix song's Instruments/ folder).
+        if (pendingCompanions.length > 0) {
+          useUIStore.getState().setPendingCompanionFiles(pendingCompanions);
+        }
       } else if (result.success === true) {
         notify.success(result.message);
       } else if (result.success === false) {
