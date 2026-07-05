@@ -10,9 +10,11 @@
  * Panel order follows the Aegis SONIX V2.0 layout:
  *   Waveform (3 drawable tabs) · Amplitude · Freq · Filter · LFO · Phase · Envelope Generator
  *
- * Lint pattern note: `params` is derived via useMemo from the `instrument` prop (no ref
- * read during render). `paramsRef` is written during render (sync pattern) and read only
- * inside callbacks — so neither react-hooks/refs nor react-hooks/set-state-in-effect fire.
+ * configRef pattern: `params` is read straight from the `instrument` prop each render via
+ * `readSonixSynthParams(instrument)` (no useMemo, no ref read during render). `paramsRef`
+ * mirrors it — synced in a ref-only `useEffect` and written optimistically inside `commit()`
+ * so rapid successive edits chain off the latest value; callbacks read `paramsRef.current`,
+ * never the captured `params`. Keeps react-hooks/refs and set-state-in-effect quiet.
  */
 
 import React, {
