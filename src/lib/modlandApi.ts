@@ -239,7 +239,8 @@ export async function downloadUADECompanions(
   // artist's songs); downloading all of them per song trips the rate limiter. So fetch ONLY
   // the instruments this song references (INS1 names extracted from the .smus), matched to
   // the folder listing by stem. Falls back to all files if names can't be read (SNX/TINY).
-  if (/\.(smus|snx|tiny)$/i.test(basenameLower)) {
+  // Match both extension form (song.smus) and prefix form (smus.song).
+  if (/\.(smus|snx|tiny)$|^(smus|snx|tiny)\./i.test(basenameLower)) {
     const instrDir = dir.replace(/\/+$/, '') + '/Instruments';
     const files = (await listModlandDir(instrDir)).filter((f) =>
       /\.(instr|ss)$/i.test(f.full_path.split('/').pop() ?? ''));
