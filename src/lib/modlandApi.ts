@@ -241,14 +241,22 @@ export async function downloadUADECompanions(
   // the folder listing by stem. Falls back to all files if names can't be read (SNX/TINY).
   if (/\.(smus|snx|tiny)$/i.test(basenameLower)) {
     const instrDir = dir.replace(/\/+$/, '') + '/Instruments';
-    const files = await listModlandDir(instrDir);
+    const files = (await listModlandDir(instrDir)).filter((f) =>
+      /\.(instr|ss)$/i.test(f.full_path.split('/').pop() ?? ''));
     const needed = mainBuffer ? extractSmusInstrumentNames(mainBuffer) : null;
+    // A .instr may reference a .ss whose name differs from the instrument (SampledSound /
+    // 32-byte TINY refs). Stem-matching alone misses those and leaves instruments silent.
+    // So for a small (per-song) folder, download the whole thing — cheap and complete. Only
+    // fall back to targeted INS1-name matching for a LARGE shared author-level Instruments/
+    // library (e.g. Ken Holland: 100+ files across all his songs), where downloading all
+    // would trip the modland proxy rate limiter (429).
+    const LARGE_SHARED_FOLDER = 40;
+    const targeted = needed !== null && files.length > LARGE_SHARED_FOLDER;
     for (const f of files) {
       const base = f.full_path.split('/').pop() ?? '';
-      if (!/\.(instr|ss)$/i.test(base)) continue;
-      if (needed) {
+      if (targeted) {
         const stem = base.replace(/\.(instr|ss)$/i, '').toLowerCase();
-        if (!needed.has(stem)) continue;
+        if (!needed!.has(stem)) continue;
       }
       try {
         const buffer = await downloadModlandFile(f.full_path);
