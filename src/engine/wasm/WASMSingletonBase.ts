@@ -108,9 +108,12 @@ export async function loadWASMAssets(
     const needsJs = !!config.jsFile && !cache.jsCode;
 
     if (needsWasm || needsJs) {
+      // When cache-busting is on (active dev on the WASM), bust the WASM + JS fetches too,
+      // not just the worklet — otherwise a stale HTTP-cached binary keeps running after a rebuild.
+      const bust = config.workletCacheBust ? `?v=${Date.now()}` : '';
       const fetches: Promise<Response>[] = [];
-      if (needsWasm) fetches.push(fetch(`${baseUrl}${config.dir}/${config.wasmFile}`));
-      if (needsJs) fetches.push(fetch(`${baseUrl}${config.dir}/${config.jsFile}`));
+      if (needsWasm) fetches.push(fetch(`${baseUrl}${config.dir}/${config.wasmFile}${bust}`));
+      if (needsJs) fetches.push(fetch(`${baseUrl}${config.dir}/${config.jsFile}${bust}`));
       const responses = await Promise.all(fetches);
       let idx = 0;
       if (needsWasm) {
