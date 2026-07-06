@@ -99,6 +99,67 @@ export function getDefaultSonixParams(): SonixSynthParams {
   };
 }
 
+/**
+ * Parse a standalone Sonix `.instr` synth voice file into SonixSynthParams.
+ *
+ * Mirrors the synthesis-instrument decode in sonix_io.c (`decode_synthesis_wave`) plus the
+ * `sonix_song_set_synth_*` setters — which store the raw big-endian u16 fields verbatim
+ * (no clamp/scale). Reading the fixed struct offsets directly here therefore yields params
+ * identical to the WASM decode, validated against the C oracle
+ * (`tools/sonix-audit/gen-presets.c`) in sonixInstrParser.test.ts.
+ *
+ * Returns null if the bytes are not a synth voice (SampledSound / 8SVX → use the sample
+ * path instead). MIDI-header voices resolve to the default sawtooth (as the WASM does).
+ */
+export function parseSonixSynthInstr(data: Uint8Array): SonixSynthParams | null {
+  const be16 = (o: number): number => ((data[o] << 8) | data[o + 1]) & 0xffff;
+  const be16s = (o: number): number => { const v = be16(o); return v >= 0x8000 ? v - 0x10000 : v; };
+  const i8 = (o: number): number => { const v = data[o]; return v >= 0x80 ? v - 256 : v; };
+  const read128 = (o: number): number[] => Array.from({ length: 128 }, (_, k) => i8(o + k));
+
+  const tagAt = (len: number) => String.fromCharCode(...data.slice(0, len));
+  const hasSynthHeader = data.length >= 9 && tagAt(9) === 'Synthesis';
+  const hasMidiHeader = data.length >= 4 && tagAt(4) === 'MIDI';
+  let hasZeroHeader = data.length >= 32;
+  for (let k = 0; k < 32 && hasZeroHeader; k++) if (data[k] !== 0) hasZeroHeader = false;
+
+  // MIDI voice: sawtooth default (matches the MIDI branch in gen-presets.c / sonix_io.c).
+  if (hasMidiHeader) {
+    const p = getDefaultSonixParams();
+    p.wave = Array.from({ length: 128 }, (_, k) => k * 2 - 128);
+    p.baseVol = 128;
+    p.portFlag = 0;
+    return p;
+  }
+
+  if (!hasSynthHeader && !hasZeroHeader) return null;
+  if (data.length < 0xc4 + 64) return null; // decode_synthesis_wave size floor
+
+  const p = getDefaultSonixParams();
+  if (data.length >= 0x44 + 128) p.wave = read128(0x44);
+  if (data.length >= 0xc4 + 128) p.envTable = read128(0xc4);
+  if (data.length >= 0x1c4) p.lfoWave = read128(0x144); // 0x144 + 128 = 0x1C4
+  if (data.length >= 0x1d0) { p.baseVol = be16(0x1cc); p.portFlag = be16(0x1ce); }
+  if (data.length >= 0x1e6) {
+    p.envVolScale = be16(0x1d0);
+    p.slideRate = be16(0x1d2);
+    p.envPitchScale = be16(0x1d4);
+    p.filterBase = be16(0x1d6);
+    p.filterRange = be16(0x1d8);
+    p.filterEnvSens = be16(0x1da);
+    p.envScanRate = be16(0x1dc);
+    p.envLoopMode = be16s(0x1de);
+    p.envDelayInit = be16(0x1e0);
+    p.c2 = be16(0x1e2);
+    p.c4 = be16(0x1e4);
+  }
+  if (data.length >= 0x1f6) {
+    p.egLevels = [0, 1, 2, 3].map((j) => be16(0x1e6 + j * 2));
+    p.egRates = [0, 1, 2, 3].map((j) => be16(0x1ee + j * 2));
+  }
+  return p;
+}
+
 /** Apply a scalar param edit to a params object, returning a new copy. */
 export function withSonixParam(
   params: SonixSynthParams,

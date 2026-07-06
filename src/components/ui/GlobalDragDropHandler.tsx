@@ -17,6 +17,8 @@ import { getDevilboxAudioContext } from '@/utils/audio-context';
 interface GlobalDragDropHandlerProps {
   onFileLoaded: (file: File) => Promise<void>;
   onFolderLoaded?: (mainFile: File, companions: File[]) => Promise<void>;
+  /** Called when a drop contains ONLY Sonix instrument companions (.instr/.ss) and no song. */
+  onStandaloneInstruments?: (files: File[]) => Promise<void>;
   children: React.ReactNode;
 }
 
@@ -93,6 +95,7 @@ async function readFilesFromEntry(entry: FileSystemEntry): Promise<File[]> {
 export const GlobalDragDropHandler: React.FC<GlobalDragDropHandlerProps> = ({
   onFileLoaded,
   onFolderLoaded,
+  onStandaloneInstruments,
   children,
 }) => {
   const [isDragging, setIsDragging] = useState(false);
@@ -102,6 +105,8 @@ export const GlobalDragDropHandler: React.FC<GlobalDragDropHandlerProps> = ({
   useEffect(() => { onFileLoadedRef.current = onFileLoaded; }, [onFileLoaded]);
   const onFolderLoadedRef = useRef(onFolderLoaded);
   useEffect(() => { onFolderLoadedRef.current = onFolderLoaded; }, [onFolderLoaded]);
+  const onStandaloneInstrumentsRef = useRef(onStandaloneInstruments);
+  useEffect(() => { onStandaloneInstrumentsRef.current = onStandaloneInstruments; }, [onStandaloneInstruments]);
 
   useEffect(() => {
     const handleDragEnter = (e: DragEvent) => {
@@ -165,6 +170,17 @@ export const GlobalDragDropHandler: React.FC<GlobalDragDropHandlerProps> = ({
           }
           return;
         }
+        // No song in the drop — but a folder of Sonix instrument companions (.instr/.ss)
+        // can be added straight to the instrument bank.
+        const instrOnly = allFiles.filter(f => isCompanionOnly(f.name));
+        if (instrOnly.length > 0 && onStandaloneInstrumentsRef.current) {
+          try {
+            await onStandaloneInstrumentsRef.current(instrOnly);
+          } catch (err) {
+            console.error('[DragDrop] Failed to add standalone instruments:', err);
+          }
+          return;
+        }
       }
 
       const files = e.dataTransfer ? Array.from(e.dataTransfer.files) : [];
@@ -173,6 +189,16 @@ export const GlobalDragDropHandler: React.FC<GlobalDragDropHandlerProps> = ({
       // A real module is the main file; .instr/.ss are Sonix companions only.
       const file = files.find(f => isSupportedFile(f.name) && !isCompanionOnly(f.name));
       if (!file) {
+        // No song file — but a lone Sonix instrument (.instr/.ss) goes to the bank.
+        const instrOnly = files.filter(f => isCompanionOnly(f.name));
+        if (instrOnly.length > 0 && onStandaloneInstrumentsRef.current) {
+          try {
+            await onStandaloneInstrumentsRef.current(instrOnly);
+          } catch (err) {
+            console.error('[DragDrop] Failed to add standalone instruments:', err);
+          }
+          return;
+        }
         console.warn('[DragDrop] No supported files found');
         return;
       }
