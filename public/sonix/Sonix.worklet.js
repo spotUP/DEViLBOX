@@ -21,6 +21,11 @@ class SonixProcessor extends AudioWorkletProcessor {
     this.numChannels = 0;
     this.scopePtr = 0;        // WASM scratch buffer (2048 int16) for scope reads
     this.scopeCap = 2048;
+    // Throttle scope posts: process() runs ~344x/s (128-sample quanta); the VU meters
+    // and scopes only need ~60-80fps. Posting every block floods the main thread
+    // (structured-clone of 4 Int16Arrays + oscilloscope store re-render) and spikes CPU.
+    this.scopePostDivider = 4; // ~86 posts/s at 44.1kHz
+    this.scopePostCounter = 0;
 
     this.port.onmessage = (event) => {
       this.handleMessage(event.data);
@@ -421,7 +426,10 @@ class SonixProcessor extends AudioWorkletProcessor {
             outputL[i] = this.interleavedBuf[i * 2];
             outputR[i] = this.interleavedBuf[i * 2 + 1];
           }
-          this.postChannelScopes();
+          if (++this.scopePostCounter >= this.scopePostDivider) {
+            this.scopePostCounter = 0;
+            this.postChannelScopes();
+          }
         }
       }
     }

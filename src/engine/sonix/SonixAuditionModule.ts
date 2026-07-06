@@ -59,15 +59,22 @@ function ensureModule(): Promise<SonixWasmModule | null> {
         fetch(`${baseUrl}sonix/Sonix.js`),
         fetch(`${baseUrl}sonix/Sonix.wasm`),
       ]);
-      if (!jsRes.ok || !wasmRes.ok) return null;
+      if (!jsRes.ok || !wasmRes.ok) {
+        console.warn('[SonixAudition] WASM fetch failed', jsRes.status, wasmRes.status);
+        return null;
+      }
       const rawJs = await jsRes.text();
       const wasmBinary = await wasmRes.arrayBuffer();
       const jsCode = defaultWASMTransform(rawJs);
       // Same load shape the worklet uses: wrap the Emscripten glue, return the factory.
       const factory = new Function(`${jsCode}\nreturn createSonix;`)() as SonixFactory | undefined;
-      if (typeof factory !== 'function') return null;
+      if (typeof factory !== 'function') {
+        console.warn('[SonixAudition] createSonix factory not found after transform');
+        return null;
+      }
       return await factory({ wasmBinary });
-    } catch {
+    } catch (err) {
+      console.warn('[SonixAudition] module load failed — fell back to base-waveform preview:', err);
       return null;
     }
   })();
