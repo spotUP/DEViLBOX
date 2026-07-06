@@ -178,6 +178,7 @@ export const SonixControls: React.FC<SonixControlsProps> = ({ instrument }) => {
   });
 
   const updateInstrument = useInstrumentStore((s) => s.updateInstrument);
+  const updateInstrumentRealtime = useInstrumentStore((s) => s.updateInstrumentRealtime);
 
   // ── Params derivation ─────────────────────────────────────────────────────
   // `params` drives render — read directly from the prop, zero ref access during render.
@@ -199,13 +200,34 @@ export const SonixControls: React.FC<SonixControlsProps> = ({ instrument }) => {
   const [harmAmt, setHarmAmt] = useState(40);
 
   // ── Commit helper ─────────────────────────────────────────────────────────
-  // Updates paramsRef optimistically so rapid callbacks see fresh state,
-  // then writes through to the WASM via the store. No setState → no cascading render.
+  // Updates paramsRef optimistically so rapid callbacks see fresh state, then routes to the
+  // audio engine via the REALTIME store path (rAF-batched state write, no WASM re-export, no
+  // cascading editor re-render). The heavy updateInstrument (immediate set + re-export +
+  // persistence) runs only once, debounced after the drag settles — otherwise it fired
+  // 60×/sec during a knob pull, re-rendering the editor and churning audio.
+  const persistTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const commit = useCallback((next: SonixSynthParams) => {
     paramsRef.current = next;
-    updateInstrument(idRef.current, {
+    const payload = {
       parameters: { sonixIndex: next.index, sonix: next },
-    } as Parameters<typeof updateInstrument>[1]);
+    } as Parameters<typeof updateInstrument>[1];
+    updateInstrumentRealtime(idRef.current, payload);
+    if (persistTimer.current) clearTimeout(persistTimer.current);
+    persistTimer.current = setTimeout(() => {
+      persistTimer.current = null;
+      updateInstrument(idRef.current, payload);
+    }, 250);
+  }, [updateInstrument, updateInstrumentRealtime]);
+
+  // Flush a pending persist on unmount so a change made just before closing isn't lost.
+  useEffect(() => () => {
+    if (persistTimer.current) {
+      clearTimeout(persistTimer.current);
+      persistTimer.current = null;
+      updateInstrument(idRef.current, {
+        parameters: { sonixIndex: paramsRef.current?.index ?? 0, sonix: paramsRef.current },
+      } as Parameters<typeof updateInstrument>[1]);
+    }
   }, [updateInstrument]);
 
   // ── Scalar handler ────────────────────────────────────────────────────────
