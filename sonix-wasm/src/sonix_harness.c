@@ -121,6 +121,32 @@ EXPORT void sonix_memfs_clear(void) {
     g_memfs_count = 0;
 }
 
+/* ---- Standalone single-note synth audition (no song file) ----
+ * The editor previews a synth instrument by rendering ONE note through the real
+ * Sonix synth path. sonix_init_scratch() allocates a bare g_song (no module);
+ * the caller then pushes the instrument's params via the sonix_synth_set_* API
+ * and calls sonix_render_synth_note() for an offline mono buffer. */
+EXPORT int sonix_init_scratch(int numInstruments) {
+    (void)numInstruments; /* all 64 instrument slots always exist in SonixSong */
+    if (g_song) {
+        sonix_song_destroy(g_song);
+        g_song = NULL;
+    }
+    if (g_song_buf) {
+        free(g_song_buf);
+        g_song_buf = NULL;
+    }
+    g_song = sonix_song_create_scratch();
+    if (!g_song) return -1;
+    sonix_song_set_sample_rate(g_song, g_sample_rate);
+    return 0;
+}
+
+EXPORT int sonix_render_synth_note(int inst, int note, int velocity, int num_frames, float *out) {
+    if (!g_song) return 0;
+    return sonix_song_render_synth_note(g_song, inst, note, velocity, num_frames, out);
+}
+
 EXPORT int sonix_init(const uint8_t *module_data, uint32_t module_size) {
     /* Clean up previous */
     if (g_song) {

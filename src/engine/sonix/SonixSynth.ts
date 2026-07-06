@@ -1,32 +1,47 @@
 /**
  * SonixSynth — first-class Sonix synth voice.
  *
- * Faithful Sonix synthesis (blend/ring + 64-band envelope-swept filter bank) runs in
- * the WASM engine during song playback. This voice provides:
- *   1. an editor preview/audition — the 128-byte base waveform looped as a tone, and
- *   2. live edit sync — applyConfig pushes edited params into the running WASM engine
- *      (SonixEngine.setSynthParams; set_wave rebuilds the filter bank) so the SONG
- *      reflects knob moves, exactly like Cinter4's live buffer swap.
+ * The editor audition now renders ONE note through the REAL Sonix synth path
+ * (blend/ring + 64-band envelope-swept filter + volume/pitch envelope) via the
+ * WASM `sonix_render_synth_note` entry (see SonixAuditionModule), so every knob
+ * audibly changes the preview. The rendered ~1.5 s note is cached as an
+ * AudioBuffer at a reference pitch and repitched per trigger via playbackRate.
  *
- * Params live in config.parameters.sonix (readSonixSynthParams), mirrored from the WASM
- * by the param bridge. The base-waveform preview is a timbre approximation — the true
- * per-note filter sweep is only heard in WASM song playback; a faithful per-note render
- * export (render-one-note) is a planned follow-up.
+ * Robustness: the WASM render is async (module load) and can fail; the voice
+ * always keeps a synchronous base-waveform buffer as an immediate fallback so
+ * the editor never blocks or crashes. When the faithful WASM buffer arrives it
+ * replaces the fallback and any held note re-triggers so the change is heard.
+ *
+ * Live sync: applyConfig also pushes edited params into the running SONG engine
+ * (SonixEngine.setSynthParams; set_wave rebuilds the filter bank) exactly like
+ * Cinter4's live buffer swap, so song playback morphs with knob moves too.
+ *
+ * Params live in config.parameters.sonix (readSonixSynthParams), mirrored from
+ * the WASM by the param bridge.
  */
 
 import type { DevilboxSynth } from '@/types/synth';
 import type { InstrumentConfig } from '@typedefs/instrument';
 import { getDevilboxAudioContext, audioNow, noteToFrequency } from '@/utils/audio-context';
 import { readSonixSynthParams } from './sonixInstrument';
-import { SonixEngine } from './SonixEngine';
+import { SonixEngine, type SonixSynthParams } from './SonixEngine';
+import { renderSonixNote } from './SonixAuditionModule';
 
 const BASE_NOTE = 'C3';
 const WAVE_LEN = 128;
+// Reference MIDI note the WASM buffer is rendered at; triggers repitch from here.
+const REFERENCE_MIDI = 60;
+const RENDER_SECONDS = 1.5;
+const RENDER_VELOCITY = 200; // near-max; per-trigger velocity scales playback gain
+// Makeup gain: the WASM render is at Paula per-channel DAC scale (~0.06 peak);
+// lift it to a comfortable audition level without clipping.
+const AUDITION_GAIN = 6;
 
 interface ActiveVoice {
   src: AudioBufferSourceNode;
   gain: GainNode;
   playbackRate: number;
+  gainVal: number;
 }
 
 export class SonixSynth implements DevilboxSynth {
@@ -37,32 +52,76 @@ export class SonixSynth implements DevilboxSynth {
   private ctx: AudioContext;
   private volNode: GainNode;
   private buffer: AudioBuffer | null = null;
+  /** True once buffer holds the faithful WASM render (vs the fallback loop). */
+  private bufferIsWasm = false;
   private baseFreq: number;
   private waveSampleRate = 32000;
   private active = new Set<ActiveVoice>();
+  /** Bumped on every re-render so a stale async render result is discarded. */
+  private renderToken = 0;
 
   constructor(config: InstrumentConfig) {
     this.ctx = getDevilboxAudioContext();
     this.volNode = this.ctx.createGain();
     this.volNode.gain.value = 1;
     this.output = this.volNode;
-    this.baseFreq = noteToFrequency(BASE_NOTE) || 130.81;
+    this.baseFreq = noteToFrequency(REFERENCE_MIDI) || noteToFrequency(BASE_NOTE) || 130.81;
     this.renderFromConfig(config);
   }
 
-  /** Build a looping single-cycle buffer from the 128-byte base waveform. */
+  /**
+   * Build the immediate base-waveform fallback buffer, then kick off the
+   * faithful WASM render which replaces it when ready.
+   */
   private renderFromConfig(config: InstrumentConfig): void {
     const p = readSonixSynthParams(config);
+    this.buildFallbackBuffer(p);
+    this.renderWasm(p);
+  }
+
+  /** Single-cycle looping buffer from the raw 128-byte base waveform (fallback). */
+  private buildFallbackBuffer(p: SonixSynthParams | null): void {
     if (!p || !p.wave || p.wave.length < WAVE_LEN) {
-      this.buffer = null;
+      if (!this.bufferIsWasm) this.buffer = null;
       return;
     }
-    // 128 samples = one cycle at baseFreq → sample rate = 128 * baseFreq (clamped valid).
+    // 128 samples = one cycle at the reference pitch → loop rate.
     this.waveSampleRate = Math.max(3000, Math.min(192000, Math.round(WAVE_LEN * this.baseFreq)));
     const buf = this.ctx.createBuffer(1, WAVE_LEN, this.waveSampleRate);
     const data = buf.getChannelData(0);
     for (let i = 0; i < WAVE_LEN; i++) data[i] = p.wave[i] / 128; // 8-bit signed → -1..1
-    this.buffer = buf;
+    // Only install the fallback if we don't already have a faithful WASM buffer.
+    if (!this.bufferIsWasm) {
+      this.buffer = buf;
+      this.bufferIsWasm = false;
+    }
+  }
+
+  /** Render the note through the real Sonix synth path and swap it in. */
+  private renderWasm(p: SonixSynthParams | null): void {
+    if (!p) return;
+    const token = ++this.renderToken;
+    const sampleRate = this.ctx.sampleRate;
+    const frames = Math.round(RENDER_SECONDS * sampleRate);
+    void renderSonixNote({ params: p, note: REFERENCE_MIDI, velocity: RENDER_VELOCITY, sampleRate, frames })
+      .then((pcm) => {
+        // Discard if a newer render started or the voice was disposed.
+        if (token !== this.renderToken || !pcm || pcm.length === 0) return;
+        let peak = 0;
+        for (let i = 0; i < pcm.length; i++) {
+          const a = pcm[i] < 0 ? -pcm[i] : pcm[i];
+          if (a > peak) peak = a;
+        }
+        if (peak <= 0) return; // silent render → keep fallback
+        const buf = this.ctx.createBuffer(1, pcm.length, sampleRate);
+        buf.getChannelData(0).set(pcm);
+        this.buffer = buf;
+        this.bufferIsWasm = true;
+        this.retriggerHeldVoices();
+      })
+      .catch(() => {
+        /* keep fallback */
+      });
   }
 
   private playbackRateFor(note?: string | number): number {
@@ -76,14 +135,23 @@ export class SonixSynth implements DevilboxSynth {
     const src = this.ctx.createBufferSource();
     src.buffer = this.buffer;
     src.playbackRate.value = playbackRate;
-    src.loop = true;
-    src.loopStart = 0;
-    src.loopEnd = WAVE_LEN / this.waveSampleRate;
+    if (this.bufferIsWasm) {
+      // Faithful ~1.5 s note: loop the whole buffer so held keys sustain.
+      src.loop = true;
+      src.loopStart = 0;
+      src.loopEnd = this.buffer.length / this.buffer.sampleRate;
+    } else {
+      // Single-cycle fallback: loop one cycle for a continuous tone.
+      src.loop = true;
+      src.loopStart = 0;
+      src.loopEnd = WAVE_LEN / this.waveSampleRate;
+    }
     const gain = this.ctx.createGain();
-    gain.gain.value = gainVal;
+    const g = gainVal * (this.bufferIsWasm ? AUDITION_GAIN : 1);
+    gain.gain.value = g;
     src.connect(gain);
     gain.connect(this.volNode);
-    const voice: ActiveVoice = { src, gain, playbackRate };
+    const voice: ActiveVoice = { src, gain, playbackRate, gainVal };
     this.active.add(voice);
     src.start(time);
   }
@@ -91,7 +159,12 @@ export class SonixSynth implements DevilboxSynth {
   private cleanup(voice: ActiveVoice): void {
     if (!this.active.has(voice)) return;
     this.active.delete(voice);
-    try { voice.src.disconnect(); voice.gain.disconnect(); } catch { /* already gone */ }
+    try {
+      voice.src.disconnect();
+      voice.gain.disconnect();
+    } catch {
+      /* already gone */
+    }
   }
 
   private stopActiveVoices(t: number, fadeSec: number): void {
@@ -101,9 +174,29 @@ export class SonixSynth implements DevilboxSynth {
         voice.gain.gain.setValueAtTime(voice.gain.gain.value, t);
         voice.gain.gain.linearRampToValueAtTime(0, t + fadeSec);
         voice.src.stop(t + fadeSec + 0.005);
-      } catch { /* already stopped */ }
+      } catch {
+        /* already stopped */
+      }
       const v = voice;
-      v.src.onended = () => { this.cleanup(v); };
+      v.src.onended = () => {
+        this.cleanup(v);
+      };
+    }
+  }
+
+  /** Swap the current buffer into any held voices (short crossfade). */
+  private retriggerHeldVoices(): void {
+    if (!this.buffer || this.active.size === 0) return;
+    const t = audioNow();
+    for (const voice of [...this.active]) {
+      const { playbackRate, gainVal } = voice;
+      try {
+        voice.src.stop(t);
+      } catch {
+        /* ok */
+      }
+      this.cleanup(voice);
+      this.startVoice(playbackRate, gainVal, t);
     }
   }
 
@@ -129,24 +222,24 @@ export class SonixSynth implements DevilboxSynth {
   }
 
   /**
-   * Live edit: re-render the preview buffer, swap it into held voices, and push the
-   * edited params into the running WASM engine so SONG playback morphs too.
+   * Live edit: re-render the audition buffer (WASM, param-accurate), swap it into
+   * held voices, and push the edited params into the running WASM engine so SONG
+   * playback morphs too.
    */
   applyConfig(config: InstrumentConfig): void {
     const p = readSonixSynthParams(config);
-    this.renderFromConfig(config);
-    const t = audioNow();
-    if (this.buffer) {
-      for (const voice of [...this.active]) {
-        const gainVal = voice.gain.gain.value;
-        try { voice.src.stop(t); } catch { /* ok */ }
-        this.cleanup(voice);
-        this.startVoice(voice.playbackRate, gainVal, t);
-      }
-    }
+    // A new edit invalidates the current WASM buffer; rebuild fallback + WASM.
+    this.bufferIsWasm = false;
+    this.buildFallbackBuffer(p);
+    this.renderWasm(p);
+    this.retriggerHeldVoices();
     // Sync the live WASM instrument so the playing song reflects the edit.
     if (p && SonixEngine.hasInstance()) {
-      try { SonixEngine.getInstance().setSynthParams(p); } catch { /* engine busy */ }
+      try {
+        SonixEngine.getInstance().setSynthParams(p);
+      } catch {
+        /* engine busy */
+      }
     }
   }
 
@@ -155,13 +248,20 @@ export class SonixSynth implements DevilboxSynth {
   }
 
   dispose(): void {
+    this.renderToken++; // discard any in-flight render
     for (const voice of [...this.active]) {
-      try { voice.src.stop(); } catch { /* ok */ }
+      try {
+        voice.src.stop();
+      } catch {
+        /* ok */
+      }
       this.cleanup(voice);
     }
     this.volNode.disconnect();
     this.buffer = null;
   }
 
-  get volume(): AudioParam { return this.volNode.gain; }
+  get volume(): AudioParam {
+    return this.volNode.gain;
+  }
 }
