@@ -13,6 +13,7 @@ import { useTrackerStore, useTransportStore, useInstrumentStore, useAudioStore, 
 import { useEditorStore } from '@stores/useEditorStore';
 import { getToneEngine } from '@engine/ToneEngine';
 import { setFormatPlaybackRow, setFormatPlaybackPlaying } from '@engine/FormatPlaybackState';
+import { useWasmPositionStore } from '@stores/useWasmPositionStore';
 import { getTrackerReplayer, type TrackerFormat } from '@engine/TrackerReplayer';
 import { getTrackerScratchController } from '@engine/TrackerScratchController';
 import type { UADEEngine } from '@engine/uade/UADEEngine';
@@ -683,6 +684,14 @@ export const usePatternPlayback = () => {
           // can follow playback via the transport store.
           const currentPatterns = patternsRef.current;
           setCurrentRowThrottled(row, currentPatterns[patternNum]?.length ?? 64, true);
+
+          // Sonix plays in its WASM (suppressNotes), so the replayer's getStateAtTime is
+          // stale (row 0, no notes scheduled) and the pattern editor's row cursor wouldn't
+          // scroll. Feed useWasmPositionStore (which the editor reads first) so the FT2
+          // pattern view follows playback, like other WASM engines.
+          if (sonixFileData) {
+            useWasmPositionStore.getState().setPosition(row, position);
+          }
 
           // During playback, the standard pattern editor RAF loop reads position
           // directly from getStateAtTime() — no React store updates needed for
