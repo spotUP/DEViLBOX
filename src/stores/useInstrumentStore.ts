@@ -890,7 +890,21 @@ export const useInstrumentStore = create<InstrumentStore>()(
           'PinkTrombone', 'DECtalk', 'Sam', 'V2', 'V2Speech', 'Synare',
           'TB303', 'Buzz3o3', 'DubSiren', 'SpaceLaser',
         ];
-        if (updatedInst && applyConfigSynthTypes.includes(updatedInst.synthType) && !synthTypeChanging && !isPresetLoad) {
+        if (updatedInst?.synthType === 'SonixSynth' && !synthTypeChanging) {
+          // SonixSynth (incl. preset loads): rebuild the audition voice IN PLACE with the
+          // fresh store params rather than invalidating + recreating lazily (which can
+          // rebuild from a stale config the caller passes on the next note). applyConfig
+          // re-derives the base-waveform buffer + baseVol gain so the preview updates now.
+          try {
+            const engine = getToneEngine();
+            const instrument = engine.getInstrument(id, updatedInst);
+            if (instrument && typeof (instrument as unknown as { applyConfig?: unknown }).applyConfig === 'function') {
+              (instrument as unknown as { applyConfig: (c: InstrumentConfig) => void }).applyConfig(updatedInst);
+            }
+          } catch (error) {
+            console.warn('[InstrumentStore] SonixSynth in-place rebuild failed:', error);
+          }
+        } else if (updatedInst && applyConfigSynthTypes.includes(updatedInst.synthType) && !synthTypeChanging && !isPresetLoad) {
           // Config-only change for an applyConfig synth — the real-time update path above
           // should have handled this. If it didn't (error/race), log and skip invalidation.
           console.warn(`[InstrumentStore] Skipping invalidation for ${updatedInst.synthType} id=${id} — applyConfig synth, config-only change`);
