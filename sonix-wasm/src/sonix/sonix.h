@@ -44,6 +44,12 @@ typedef struct SonixIoCallbacks {
 SonixSong* sonix_song_create(const uint8_t* data, uint32_t size, const SonixIoCallbacks* io);
 void sonix_song_destroy(SonixSong* song);
 
+// Standalone single-note synth audition (no song file). Create a bare song, set
+// an instrument's synth params via the sonix_song_set_synth_* API, then render one
+// note through the real synth path. Returns frames written (mono float `out`).
+SonixSong* sonix_song_create_scratch(void);
+int sonix_song_render_synth_note(SonixSong* song, int inst, int note, int velocity, int num_frames, float* out);
+
 void sonix_song_set_sample_rate(SonixSong* song, uint32_t rate);
 void sonix_song_set_solo_channel(SonixSong* song, int32_t channel);
 void sonix_song_set_channel_mute_mask(SonixSong* song, uint32_t mask);
