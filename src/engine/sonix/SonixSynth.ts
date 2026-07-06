@@ -26,7 +26,7 @@ import { getDevilboxAudioContext, audioNow, noteToFrequency } from '@/utils/audi
 import { readSonixSynthParams } from './sonixInstrument';
 import { SonixEngine, type SonixSynthParams } from './SonixEngine';
 import { renderSonixNoteSync, warmSonixAudition } from './SonixAuditionModule';
-import { findSustainLoop } from './sonixLoop';
+import { findSustainLoop, applyLoopCrossfade, type SustainLoop } from './sonixLoop';
 import { createTrailingThrottle, type TrailingThrottle } from '@/utils/trailingThrottle';
 
 // Re-rendering a held note through the WASM synth costs ~10ms on the main thread. A knob
@@ -39,7 +39,8 @@ const BASE_NOTE = 'C3';
 const WAVE_LEN = 128;
 // Reference MIDI note the WASM buffer is rendered at; triggers repitch from here.
 const REFERENCE_MIDI = 60;
-const RENDER_SECONDS = 2.0;
+// Long enough for the sustain loop to contain a full slow modulation cycle (see MAX_LOOP_SEC).
+const RENDER_SECONDS = 3.5;
 // A held key sustains by looping a short zero-crossing-aligned window at the settled tail
 // of the render (findSustainLoop) — seamless, no swell jump or phase click.
 const RENDER_VELOCITY = 200; // near-max; per-trigger velocity scales playback gain
@@ -118,6 +119,21 @@ export class SonixSynth implements DevilboxSynth {
     if (note === undefined) return 1;
     const hz = noteToFrequency(note);
     return hz > 0 && this.baseFreq > 0 ? hz / this.baseFreq : 1;
+  }
+
+  /**
+   * Build a playable AudioBuffer from a rendered note: find the sustain loop, crossfade its
+   * seam, and copy the (possibly seam-smoothed) PCM into a buffer. Shared by attack + morph.
+   */
+  private buildLoopedBuffer(pcm: Float32Array, note?: string | number): { buf: AudioBuffer; loop: SustainLoop | null } {
+    const sr = this.ctx.sampleRate;
+    const loop = findSustainLoop(pcm, sr, noteToFrequency(note ?? BASE_NOTE) || this.baseFreq);
+    if (loop) {
+      applyLoopCrossfade(pcm, Math.round(loop.loopStartSec * sr), Math.round(loop.loopEndSec * sr), sr);
+    }
+    const buf = this.ctx.createBuffer(1, pcm.length, sr);
+    buf.getChannelData(0).set(pcm);
+    return { buf, loop };
   }
 
   /** MIDI note number for a note name/number (falls back to the reference note). */
@@ -215,9 +231,7 @@ export class SonixSynth implements DevilboxSynth {
         params: this.curParams, note: this.midiOf(note), velocity: RENDER_VELOCITY, sampleRate: sr, frames,
       });
       if (!pcm || pcm.length === 0) continue; // render failed → leave the old voice playing
-      const buf = this.ctx.createBuffer(1, pcm.length, sr);
-      buf.getChannelData(0).set(pcm);
-      const loop = findSustainLoop(pcm, sr, noteToFrequency(note ?? BASE_NOTE) || this.baseFreq);
+      const { buf, loop } = this.buildLoopedBuffer(pcm, note);
       // Start the new voice in the sustain window (skip the attack) and crossfade over.
       this.startBuffer(
         buf, 1, old.gainTarget, note, t,
@@ -241,13 +255,10 @@ export class SonixSynth implements DevilboxSynth {
         params: this.curParams, note: this.midiOf(note), velocity: RENDER_VELOCITY, sampleRate: sr, frames,
       });
       if (pcm && pcm.length > 0) {
-        const buf = this.ctx.createBuffer(1, pcm.length, sr);
-        buf.getChannelData(0).set(pcm);
-        // Rendered at the played note → rate 1. For a held key, loop a short zero-crossing-
-        // aligned window at the settled tail so the sustain is seamless — a fixed sub-region
-        // loop jumps loud→quiet on swelling voices and clicks on phase mismatch. If no clean
+        // Rendered at the played note → rate 1. For a held key, loop a correlation-matched
+        // window at the settled tail (seam-crossfaded) so the sustain is seamless. If no clean
         // loop exists (silent/short render), play once.
-        const loop = findSustainLoop(pcm, sr, noteToFrequency(note ?? BASE_NOTE) || this.baseFreq);
+        const { buf, loop } = this.buildLoopedBuffer(pcm, note);
         this.startBuffer(buf, 1, v * AUDITION_GAIN, note, t, loop?.loopStartSec, loop?.loopEndSec);
         return;
       }
