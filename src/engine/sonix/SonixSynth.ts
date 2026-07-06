@@ -116,6 +116,7 @@ export class SonixSynth implements DevilboxSynth {
         const buf = this.ctx.createBuffer(1, pcm.length, sampleRate);
         buf.getChannelData(0).set(pcm);
         this.buffer = buf;
+        if (!this.bufferIsWasm) console.info('[SonixSynth] faithful WASM audition active (knobs live)');
         this.bufferIsWasm = true;
         this.retriggerHeldVoices();
       })
