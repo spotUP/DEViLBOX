@@ -623,16 +623,12 @@ export const useInstrumentStore = create<InstrumentStore>()(
               return; // Handled
             }
 
-            // Sonix — push edited synth params into the live WASM singleton so the
-            // playing song morphs immediately. Song playback is note-suppressed, so no
-            // SonixSynth voice is otherwise instantiated; getInstrument guarantees one,
-            // and its applyConfig calls SonixEngine.setSynthParams (set_wave rebuilds the
-            // filter bank). Must NOT invalidate — that would kill the running song.
+            // Sonix — re-render the audition voice live when params change. Mirrors
+            // Cinter4 (also a mono Paula voice): updateComplexSynthParameters applyConfigs
+            // EVERY instance for this id (shared + all per-channel voices), so cached voices
+            // don't get stuck on old params. applyConfig also pushes to the live WASM song.
             if (updatedInstrument.synthType === 'SonixSynth' && updates.parameters) {
-              const instrument = engine.getInstrument(id, updatedInstrument);
-              if (instrument && typeof (instrument as unknown as { applyConfig?: unknown }).applyConfig === 'function') {
-                (instrument as unknown as { applyConfig: (c: InstrumentConfig) => void }).applyConfig(updatedInstrument);
-              }
+              engine.updateComplexSynthParameters(id, updatedInstrument);
               return; // Handled
             }
 
@@ -890,21 +886,7 @@ export const useInstrumentStore = create<InstrumentStore>()(
           'PinkTrombone', 'DECtalk', 'Sam', 'V2', 'V2Speech', 'Synare',
           'TB303', 'Buzz3o3', 'DubSiren', 'SpaceLaser',
         ];
-        if (updatedInst?.synthType === 'SonixSynth' && !synthTypeChanging) {
-          // SonixSynth (incl. preset loads): rebuild the audition voice IN PLACE with the
-          // fresh store params rather than invalidating + recreating lazily (which can
-          // rebuild from a stale config the caller passes on the next note). applyConfig
-          // re-derives the base-waveform buffer + baseVol gain so the preview updates now.
-          try {
-            const engine = getToneEngine();
-            const instrument = engine.getInstrument(id, updatedInst);
-            if (instrument && typeof (instrument as unknown as { applyConfig?: unknown }).applyConfig === 'function') {
-              (instrument as unknown as { applyConfig: (c: InstrumentConfig) => void }).applyConfig(updatedInst);
-            }
-          } catch (error) {
-            console.warn('[InstrumentStore] SonixSynth in-place rebuild failed:', error);
-          }
-        } else if (updatedInst && applyConfigSynthTypes.includes(updatedInst.synthType) && !synthTypeChanging && !isPresetLoad) {
+        if (updatedInst && applyConfigSynthTypes.includes(updatedInst.synthType) && !synthTypeChanging && !isPresetLoad) {
           // Config-only change for an applyConfig synth — the real-time update path above
           // should have handled this. If it didn't (error/race), log and skip invalidation.
           console.warn(`[InstrumentStore] Skipping invalidation for ${updatedInst.synthType} id=${id} — applyConfig synth, config-only change`);
@@ -1028,6 +1010,10 @@ export const useInstrumentStore = create<InstrumentStore>()(
         // so this is keyed off updates.parameters. applyConfig re-renders the
         // buffer (and swaps it into a held looping note).
         else if (mergedInst.synthType === 'Cinter4Synth' && updates.parameters) {
+          engine.updateComplexSynthParameters(id, mergedInst);
+        }
+        // Sonix — same as Cinter4: re-render the audition voice (all instances) live.
+        else if (mergedInst.synthType === 'SonixSynth' && updates.parameters) {
           engine.updateComplexSynthParameters(id, mergedInst);
         }
         // Furnace
