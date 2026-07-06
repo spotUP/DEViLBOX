@@ -62,6 +62,7 @@ import { MAME_PRESETS } from './mame';
 import { ORGAN_PRESETS } from './organ';
 import { MODULE_PRESETS } from './module';
 import { CINTER_PRESETS } from '@generated/cinterPresets';
+import { SONIX_PRESETS } from '@generated/sonixPresets';
 
 // ============================================================================
 // COMBINED FACTORY PRESETS
@@ -105,6 +106,8 @@ export const FACTORY_PRESETS: InstrumentPreset['config'][] = [
   ...HIVELY_PRESETS,
   // Cinter4 voices ripped from bundled Cinter songs (generated)
   ...CINTER_PRESETS,
+  // Sonix synth voices ripped from .instr files (generated)
+  ...SONIX_PRESETS,
   // Player Init
   {
     type: 'synth' as const,
