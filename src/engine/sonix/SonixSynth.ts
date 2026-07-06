@@ -112,20 +112,23 @@ export class SonixSynth implements DevilboxSynth {
 
   /** Render the note through the real Sonix synth path and swap it in. */
   private renderWasm(p: SonixSynthParams | null): void {
-    if (!p) return;
+    if (!p) { console.info('[SonixSynth] renderWasm SKIP (no params)'); return; }
     const token = ++this.renderToken;
     const sampleRate = this.ctx.sampleRate;
     const frames = Math.round(RENDER_SECONDS * sampleRate);
+    console.info('[SonixSynth] renderWasm START token=%d baseVol=%d wave0=%d envScan=%d', token, p.baseVol, p.wave?.[0], p.envScanRate);
     void renderSonixNote({ params: p, note: REFERENCE_MIDI, velocity: RENDER_VELOCITY, sampleRate, frames })
       .then((pcm) => {
         // Discard if a newer render started or the voice was disposed.
-        if (token !== this.renderToken || !pcm || pcm.length === 0) return;
+        if (token !== this.renderToken) { console.info('[SonixSynth] renderWasm DISCARD stale token=%d cur=%d', token, this.renderToken); return; }
+        if (!pcm || pcm.length === 0) { console.info('[SonixSynth] renderWasm NULL pcm token=%d', token); return; }
         let peak = 0;
         for (let i = 0; i < pcm.length; i++) {
           const a = pcm[i] < 0 ? -pcm[i] : pcm[i];
           if (a > peak) peak = a;
         }
-        if (peak <= 0) return; // silent render → keep fallback
+        if (peak <= 0) { console.info('[SonixSynth] renderWasm SILENT token=%d', token); return; }
+        console.info('[SonixSynth] renderWasm SWAP token=%d peak=%s', token, peak.toFixed(4));
         const buf = this.ctx.createBuffer(1, pcm.length, sampleRate);
         buf.getChannelData(0).set(pcm);
         this.buffer = buf;
@@ -244,6 +247,7 @@ export class SonixSynth implements DevilboxSynth {
    */
   applyConfig(config: InstrumentConfig): void {
     const p = readSonixSynthParams(config);
+    console.info('[SonixSynth] applyConfig baseVol=%d wave0=%d envScan=%d', p?.baseVol, p?.wave?.[0], p?.envScanRate);
     this.buildFallbackBuffer(p); // rebuild base wave + baseGain from the edited params
     if (USE_WASM_AUDITION) this.renderWasm(p);
     this.retriggerHeldVoices();  // swap the updated buffer + gain into any held note
