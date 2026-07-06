@@ -55,9 +55,12 @@ function ensureModule(): Promise<SonixWasmModule | null> {
   modulePromise = (async () => {
     try {
       const baseUrl = import.meta.env.BASE_URL || '/';
+      // Cache-bust so a knob edit never renders through a stale cached wasm (the worklet
+      // does the same via ?v=Date.now()).
+      const bust = `?v=${Date.now()}`;
       const [jsRes, wasmRes] = await Promise.all([
-        fetch(`${baseUrl}sonix/Sonix.js`),
-        fetch(`${baseUrl}sonix/Sonix.wasm`),
+        fetch(`${baseUrl}sonix/Sonix.js${bust}`),
+        fetch(`${baseUrl}sonix/Sonix.wasm${bust}`),
       ]);
       if (!jsRes.ok || !wasmRes.ok) {
         console.warn('[SonixAudition] WASM fetch failed', jsRes.status, wasmRes.status);

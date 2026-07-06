@@ -112,6 +112,10 @@ export class SonixSynth implements DevilboxSynth {
           const a = pcm[i] < 0 ? -pcm[i] : pcm[i];
           if (a > peak) peak = a;
         }
+        console.info(
+          '[SonixSynth] render baseVol=%d filterBase=%d c2=%d wave0=%d envScan=%d → peak=%s',
+          p.baseVol, p.filterBase, p.c2, p.wave?.[0], p.envScanRate, peak.toFixed(4),
+        );
         if (peak <= 0) return; // silent render → keep fallback
         const buf = this.ctx.createBuffer(1, pcm.length, sampleRate);
         buf.getChannelData(0).set(pcm);
