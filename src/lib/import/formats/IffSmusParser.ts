@@ -47,7 +47,7 @@ import type { Pattern, ChannelData, TrackerCell, InstrumentConfig } from '@/type
 import type { UADEVariablePatternLayout } from '@/engine/uade/UADEPatternEncoder';
 import { iffSmusEncoder } from '@/engine/uade/encoders/IffSmusEncoder';
 import { createSamplerInstrument } from './AmigaUtils';
-import { getDefaultSonixParams } from '@engine/sonix/sonixInstrument';
+import { getDefaultSonixParams, parseSonixSynthInstr } from '@engine/sonix/sonixInstrument';
 
 // -- Utility functions -------------------------------------------------------
 
@@ -495,7 +495,10 @@ export async function parseIffSmusFile(
       );
       cfg.type = 'synth';
       cfg.synthType = 'SonixSynth';
-      const params = getDefaultSonixParams();
+      // Decode the real synth params from the .instr up front (offset-identical to the WASM
+      // decode). The WASM->store bridge still confirms them on play, but seeding them at load
+      // means the editor + audition show the true params immediately, not defaults-until-played.
+      const params = parseSonixSynthInstr(companion.instr) ?? getDefaultSonixParams();
       params.index = i;
       cfg.parameters = { sonixIndex: i, sonix: params };
       instrConfigs.push(cfg);
