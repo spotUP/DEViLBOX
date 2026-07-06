@@ -26,6 +26,13 @@ import { getDevilboxAudioContext, audioNow, noteToFrequency } from '@/utils/audi
 import { readSonixSynthParams } from './sonixInstrument';
 import { SonixEngine, type SonixSynthParams } from './SonixEngine';
 import { renderSonixNoteSync, warmSonixAudition } from './SonixAuditionModule';
+import { createTrailingThrottle, type TrailingThrottle } from '@/utils/trailingThrottle';
+
+// Re-rendering a held note through the WASM synth costs ~10ms on the main thread. A knob
+// drag fires batched edits ~60/sec; re-rendering on every one starves the audio callback
+// and stutters the sustained note. Throttle the held-note re-render (leading + trailing)
+// so at most ~1 render per interval runs while the final edit still applies.
+const HELD_RERENDER_THROTTLE_MS = 70;
 
 const BASE_NOTE = 'C3';
 const WAVE_LEN = 128;
@@ -67,6 +74,8 @@ export class SonixSynth implements DevilboxSynth {
   private fallbackBuffer: AudioBuffer | null = null;
   /** Voice gain from baseVol (0..1) for the base-wave fallback. */
   private baseGain = 1;
+  /** Rate-limited held-note re-render (see HELD_RERENDER_THROTTLE_MS). */
+  private reRenderHeld: TrailingThrottle;
 
   constructor(config: InstrumentConfig) {
     this.ctx = getDevilboxAudioContext();
@@ -74,6 +83,9 @@ export class SonixSynth implements DevilboxSynth {
     this.volNode.gain.value = 1;
     this.output = this.volNode;
     this.baseFreq = noteToFrequency(REFERENCE_MIDI) || noteToFrequency(BASE_NOTE) || 130.81;
+    this.reRenderHeld = createTrailingThrottle(
+      () => this.doRetriggerHeldVoices(), HELD_RERENDER_THROTTLE_MS,
+    );
     warmSonixAudition(); // preload the WASM so per-note sync render is ready when played
     this.setParams(config);
   }
@@ -169,7 +181,7 @@ export class SonixSynth implements DevilboxSynth {
   }
 
   /** Re-render + restart any held notes with the CURRENT params (after an edit). */
-  private retriggerHeldVoices(): void {
+  private doRetriggerHeldVoices(): void {
     if (this.active.size === 0) return;
     const notes = [...this.active].map((v) => v.note);
     const t = audioNow();
@@ -232,7 +244,7 @@ export class SonixSynth implements DevilboxSynth {
    */
   applyConfig(config: InstrumentConfig): void {
     this.setParams(config);      // update live params + base-wave fallback
-    this.retriggerHeldVoices();  // re-render held notes with the new params
+    this.reRenderHeld();         // re-render held notes with the new params (rate-limited)
     // Sync the live WASM instrument so the playing SONG reflects the edit too.
     if (this.curParams && SonixEngine.hasInstance()) {
       try {
@@ -248,6 +260,7 @@ export class SonixSynth implements DevilboxSynth {
   }
 
   dispose(): void {
+    this.reRenderHeld.cancel();
     for (const voice of [...this.active]) {
       try {
         voice.src.stop();
