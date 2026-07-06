@@ -47,8 +47,26 @@ import type { Pattern, ChannelData, TrackerCell, InstrumentConfig } from '@/type
 import type { UADEVariablePatternLayout } from '@/engine/uade/UADEPatternEncoder';
 import { iffSmusEncoder } from '@/engine/uade/encoders/IffSmusEncoder';
 import { createSamplerInstrument } from './AmigaUtils';
+import { getDefaultSonixParams } from '@engine/sonix/sonixInstrument';
 
 // -- Utility functions -------------------------------------------------------
+
+/**
+ * A Sonix `.instr` is a synth voice (not a sample) when it carries a "Synthesis" or
+ * "MIDI" header, or a zero header (the zero-header synth form). SampledSound / 8SVX
+ * instruments reference PCM and are handled as samplers instead.
+ */
+export function isSonixSynthInstr(instr: Uint8Array): boolean {
+  const tagAt = (len: number) => String.fromCharCode(...instr.slice(0, len));
+  if (instr.length >= 9 && tagAt(9) === 'Synthesis') return true;
+  if (instr.length >= 4 && tagAt(4) === 'MIDI') return true;
+  if (instr.length >= 32) {
+    let allZero = true;
+    for (let k = 0; k < 32; k++) if (instr[k] !== 0) { allZero = false; break; }
+    if (allZero) return true;
+  }
+  return false;
+}
 
 function readFourCC(buf: Uint8Array, off: number): string {
   return String.fromCharCode(buf[off], buf[off + 1], buf[off + 2], buf[off + 3]);
@@ -465,8 +483,26 @@ export async function parseIffSmusFile(
     const id = i + 1;
     const instrNameLower = instr.name.toLowerCase();
 
-    // Try to load PCM data from companion .ss file
     const companion = companionByBase.get(instrNameLower);
+
+    // Synthesis / MIDI / zero-header .instr files are Sonix synth voices, not samples —
+    // tag them SonixSynth up front so the editor and voice use the synth (not a silent
+    // PCM placeholder). The WASM->store param bridge fills real params on play; seed a
+    // default so the instrument is playable/editable immediately.
+    if (companion?.instr && isSonixSynthInstr(companion.instr)) {
+      const cfg = createSamplerInstrument(
+        id, instr.name || `Instrument ${id}`, new Uint8Array(2), 64, 8287, 0, 0,
+      );
+      cfg.type = 'synth';
+      cfg.synthType = 'SonixSynth';
+      const params = getDefaultSonixParams();
+      params.index = i;
+      cfg.parameters = { sonixIndex: i, sonix: params };
+      instrConfigs.push(cfg);
+      continue;
+    }
+
+    // Try to load PCM data from companion .ss file
     if (companion?.ss) {
       const parsed = parseSonixSampleFile(companion.ss);
       if (parsed && parsed.pcm.length > 2) {
