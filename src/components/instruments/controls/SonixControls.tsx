@@ -25,6 +25,7 @@ import React, {
 } from 'react';
 import type { InstrumentConfig } from '@/types';
 import { Knob } from '@components/controls/Knob';
+import { Toggle } from '@components/controls/Toggle';
 import { Button } from '@components/ui/Button';
 import { CustomSelect } from '@components/common/CustomSelect';
 import { useInstrumentColors } from '@/hooks/useInstrumentColors';
@@ -382,6 +383,11 @@ export const SonixControls: React.FC<SonixControlsProps> = ({ instrument }) => {
             color={knob}
             label={mEnvVolScale.label}
             formatValue={(v: number) => String(Math.round(v))}
+          />
+          <Toggle
+            label="Porta → Volume"
+            value={params.portFlag === 1}
+            onChange={(on: boolean) => handleChange('portFlag', on ? 1 : 0)}
           />
         </div>
       </Panel>
