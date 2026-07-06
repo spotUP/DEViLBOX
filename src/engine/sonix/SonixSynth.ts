@@ -36,6 +36,9 @@ const RENDER_VELOCITY = 200; // near-max; per-trigger velocity scales playback g
 // Makeup gain: the WASM render is at Paula per-channel DAC scale (~0.06 peak);
 // lift it to a comfortable audition level without clipping.
 const AUDITION_GAIN = 6;
+// The WASM render_synth_note audition over-filters into a beep (needs a lock-step DSP
+// fix). Until then, audition the base waveform (correct-sounding) with baseVol→gain.
+const USE_WASM_AUDITION = false;
 
 interface ActiveVoice {
   src: AudioBufferSourceNode;
@@ -52,8 +55,10 @@ export class SonixSynth implements DevilboxSynth {
   private ctx: AudioContext;
   private volNode: GainNode;
   private buffer: AudioBuffer | null = null;
-  /** True once buffer holds the faithful WASM render (vs the fallback loop). */
+  /** True once buffer holds the faithful WASM render (vs the base-waveform loop). */
   private bufferIsWasm = false;
+  /** Voice gain from baseVol (0..1), applied so the Volume knob is audible. */
+  private baseGain = 1;
   private baseFreq: number;
   private waveSampleRate = 32000;
   private active = new Set<ActiveVoice>();
@@ -70,27 +75,33 @@ export class SonixSynth implements DevilboxSynth {
   }
 
   /**
-   * Build the immediate base-waveform fallback buffer, then kick off the
-   * faithful WASM render which replaces it when ready.
+   * Build the base-waveform preview buffer from the current params.
+   *
+   * The faithful WASM render (render_synth_note) currently over-filters into a beep, so
+   * the audition uses the base waveform (which sounds correct) with baseVol driving the
+   * voice gain — wave-shape and volume edits are audible live. Enabling USE_WASM_AUDITION
+   * routes through the WASM synth once its filter/envelope sweep is fixed (lock-step task).
    */
   private renderFromConfig(config: InstrumentConfig): void {
     const p = readSonixSynthParams(config);
     this.buildFallbackBuffer(p);
-    this.renderWasm(p);
+    if (USE_WASM_AUDITION) this.renderWasm(p);
   }
 
-  /** Single-cycle looping buffer from the raw 128-byte base waveform (fallback). */
+  /** Single-cycle looping buffer from the raw 128-byte base waveform. */
   private buildFallbackBuffer(p: SonixSynthParams | null): void {
     if (!p || !p.wave || p.wave.length < WAVE_LEN) {
       if (!this.bufferIsWasm) this.buffer = null;
       return;
     }
+    // baseVol (0..255) drives the voice gain so the Volume knob is audible.
+    this.baseGain = Math.max(0, Math.min(1, (p.baseVol ?? 128) / 255));
     // 128 samples = one cycle at the reference pitch → loop rate.
     this.waveSampleRate = Math.max(3000, Math.min(192000, Math.round(WAVE_LEN * this.baseFreq)));
     const buf = this.ctx.createBuffer(1, WAVE_LEN, this.waveSampleRate);
     const data = buf.getChannelData(0);
     for (let i = 0; i < WAVE_LEN; i++) data[i] = p.wave[i] / 128; // 8-bit signed → -1..1
-    // Only install the fallback if we don't already have a faithful WASM buffer.
+    // Only install the base buffer if we don't already have a faithful WASM buffer.
     if (!this.bufferIsWasm) {
       this.buffer = buf;
       this.bufferIsWasm = false;
@@ -112,15 +123,10 @@ export class SonixSynth implements DevilboxSynth {
           const a = pcm[i] < 0 ? -pcm[i] : pcm[i];
           if (a > peak) peak = a;
         }
-        console.info(
-          '[SonixSynth] render baseVol=%d filterBase=%d c2=%d wave0=%d envScan=%d → peak=%s',
-          p.baseVol, p.filterBase, p.c2, p.wave?.[0], p.envScanRate, peak.toFixed(4),
-        );
         if (peak <= 0) return; // silent render → keep fallback
         const buf = this.ctx.createBuffer(1, pcm.length, sampleRate);
         buf.getChannelData(0).set(pcm);
         this.buffer = buf;
-        if (!this.bufferIsWasm) console.info('[SonixSynth] faithful WASM audition active (knobs live)');
         this.bufferIsWasm = true;
         this.retriggerHeldVoices();
       })
@@ -153,7 +159,7 @@ export class SonixSynth implements DevilboxSynth {
       src.loopEnd = WAVE_LEN / this.waveSampleRate;
     }
     const gain = this.ctx.createGain();
-    const g = gainVal * (this.bufferIsWasm ? AUDITION_GAIN : 1);
+    const g = gainVal * this.baseGain * (this.bufferIsWasm ? AUDITION_GAIN : 1);
     gain.gain.value = g;
     src.connect(gain);
     gain.connect(this.volNode);
@@ -208,8 +214,6 @@ export class SonixSynth implements DevilboxSynth {
 
   triggerAttack(note?: string | number, time?: number, velocity = 1): void {
     const t = time ?? audioNow();
-    console.info('[SonixSynth] triggerAttack note=%s bufferIsWasm=%s bufferLen=%d rate=%s',
-      String(note), this.bufferIsWasm, this.buffer?.length ?? -1, this.playbackRateFor(note).toFixed(3));
     // Sonix is a monophonic Paula voice: a new attack cuts the previous note.
     this.stopActiveVoices(t, 0.004);
     this.startVoice(this.playbackRateFor(note), Math.max(0, Math.min(1, velocity)), t);
@@ -230,18 +234,15 @@ export class SonixSynth implements DevilboxSynth {
   }
 
   /**
-   * Live edit: re-render the audition buffer (WASM, param-accurate), swap it into
-   * held voices, and push the edited params into the running WASM engine so SONG
-   * playback morphs too.
+   * Live edit: rebuild the base-waveform preview (reflecting wave + baseVol edits), swap
+   * it into held voices, and push the edited params into the running WASM song engine so
+   * SONG playback morphs too. (Faithful WASM audition is gated off — see USE_WASM_AUDITION.)
    */
   applyConfig(config: InstrumentConfig): void {
     const p = readSonixSynthParams(config);
-    // Re-render through the WASM synth with the edited params. Keep the CURRENT buffer
-    // playing until the new render lands — renderWasm swaps it in and retriggers held
-    // voices on completion. Dropping to the base-waveform fallback here (as before) made
-    // every edit stutter through the raw tone, masking the param-accurate render.
-    if (!this.buffer) this.buildFallbackBuffer(p); // only if we have nothing to play yet
-    this.renderWasm(p);
+    this.buildFallbackBuffer(p); // rebuild base wave + baseGain from the edited params
+    if (USE_WASM_AUDITION) this.renderWasm(p);
+    this.retriggerHeldVoices();  // swap the updated buffer + gain into any held note
     // Sync the live WASM instrument so the playing song reflects the edit.
     if (p && SonixEngine.hasInstance()) {
       try {
