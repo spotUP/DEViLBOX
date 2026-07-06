@@ -57,6 +57,7 @@ struct SonixSong {
     u32 size;
     u32 sample_rate;
     i32 solo_channel;
+    u32 channel_mute_mask; // bit N=1 => channel N audible; 0 => muted. Default all-audible.
     f32 stereo_mix;
     bool running;
     char error[128];
@@ -2686,6 +2687,12 @@ static void snx_mix_frames(SonixSong* song, f32* buffer, int num_frames) {
                 continue;
             }
 
+            // Per-channel mute (scope slot already zeroed above, so the VU meter
+            // still reports silence for a muted channel).
+            if (!(song->channel_mute_mask & (1u << ch))) {
+                continue;
+            }
+
             // Volume from ramp slot and hw_vol.
             // Assembly tech routines: paula_vol = ((ramp+1) * velocity) >> 8 ...
             // ramp_val is 8.8 fixed point; use the integer part (>> 8).
@@ -2941,6 +2948,7 @@ SonixSong* sonix_song_create(const u8* data, u32 size, const SonixIoCallbacks* i
     song->error[0] = '\0';
     song->sample_rate = 48000;
     song->solo_channel = -1;
+    song->channel_mute_mask = 0xFFFFFFFFu;
     song->stereo_mix = 0.0f;
     song->running = false;
     if (io) {
@@ -3003,6 +3011,15 @@ void sonix_song_set_solo_channel(SonixSong* song, i32 channel) {
         return;
     }
     song->solo_channel = channel;
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+void sonix_song_set_channel_mute_mask(SonixSong* song, u32 mask) {
+    if (song == nullptr) {
+        return;
+    }
+    song->channel_mute_mask = mask;
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

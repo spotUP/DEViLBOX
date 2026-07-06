@@ -1235,6 +1235,21 @@ int sonix_song_load_instruments(SonixSong* song, const char* song_file_path) {
             free(wave128);
         }
 
+        // MIDI instrument (header "MIDI"): the original plays via external MIDI hardware,
+        // which this WASM replayer cannot drive. Route it to a default synth voice (sawtooth
+        // + baseVol) so the song still makes sound — an approximation, not authentic MIDI-out.
+        if (instr_size >= 4 && memcmp(instr_data, "MIDI", 4) == 0) {
+            int8_t saw[128];
+            for (int s = 0; s < 128; s++)
+                saw[s] = (int8_t)(s * 2 - 128); // sawtooth ramp -128..127
+            sonix_song_set_instrument_synth(song, (uint8_t)i, true);
+            sonix_song_set_synth_wave(song, (uint8_t)i, saw);
+            sonix_song_set_synth_vol_params(song, (uint8_t)i, 128, 0);
+            loaded++;
+            free(instr_data);
+            continue;
+        }
+
         // Try 8SVX
         if (instr_size >= 12 && memcmp(instr_data + 8, "8SVX", 4) == 0) {
             SonixSvxOctaveZone svx_zones[8];

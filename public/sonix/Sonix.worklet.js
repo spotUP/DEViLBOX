@@ -139,6 +139,9 @@ class SonixProcessor extends AudioWorkletProcessor {
 
       case 'setMuteMask':
         this.muteMask = data.mask;
+        if (this.module && typeof this.module._sonix_set_mute_mask === 'function') {
+          this.module._sonix_set_mute_mask(data.mask >>> 0);
+        }
         break;
 
       case 'dispose':

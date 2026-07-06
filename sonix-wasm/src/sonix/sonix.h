@@ -46,6 +46,7 @@ void sonix_song_destroy(SonixSong* song);
 
 void sonix_song_set_sample_rate(SonixSong* song, uint32_t rate);
 void sonix_song_set_solo_channel(SonixSong* song, int32_t channel);
+void sonix_song_set_channel_mute_mask(SonixSong* song, uint32_t mask);
 void sonix_song_set_stereo_mix(SonixSong* song, float mix);
 void sonix_song_start(SonixSong* song);
 int sonix_song_decode(SonixSong* song, float* buffer, int num_frames);
