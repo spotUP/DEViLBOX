@@ -333,6 +333,10 @@ export function useSettingsDialog({ isOpen }: UseSettingsDialogOptions) {
     // Cinter uses direct routing (bypasses the replayer separation node) — forward live.
     const cinter = (globalThis as { __devilboxActiveCinter4Engine?: { setStereoSeparation(p: number): void } }).__devilboxActiveCinter4Engine;
     if (cinter) cinter.setStereoSeparation(v);
+    // Sonix mixes in its own WASM (bypasses the replayer separation node) — forward live.
+    void import('@engine/sonix/SonixEngine').then(({ SonixEngine }) => {
+      if (SonixEngine.hasInstance()) SonixEngine.getInstance().setStereoSeparation(v);
+    }).catch(() => { /* engine not loaded */ });
     const djEng = getDJEngineIfActive();
     if (djEng) {
       djEng.deckA.replayer.setStereoSeparation(v);

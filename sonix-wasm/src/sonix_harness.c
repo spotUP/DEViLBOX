@@ -201,6 +201,12 @@ EXPORT void sonix_set_solo_channel(int32_t channel) {
     }
 }
 
+EXPORT void sonix_set_mute_mask(uint32_t mask) {
+    if (g_song) {
+        sonix_song_set_channel_mute_mask(g_song, mask);
+    }
+}
+
 EXPORT void sonix_set_stereo_mix(float mix) {
     if (g_song) {
         sonix_song_set_stereo_mix(g_song, mix);

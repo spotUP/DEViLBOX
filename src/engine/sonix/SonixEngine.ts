@@ -120,6 +120,10 @@ export class SonixEngine extends WASMSingletonBase {
               Array.from({ length: numChannels }, (_, i) => `CH${i + 1}`),
             );
           }
+          // Apply the app's stereo separation to the freshly loaded song.
+          void import('@stores/useSettingsStore').then(({ useSettingsStore }) => {
+            this.setStereoSeparation(useSettingsStore.getState().stereoSeparation);
+          }).catch(() => { /* settings not ready */ });
           break;
         }
 
@@ -182,6 +186,15 @@ export class SonixEngine extends WASMSingletonBase {
 
   setSoloChannel(channel: number): void {
     this.workletNode?.port.postMessage({ type: 'setSoloChannel', channel });
+  }
+
+  /**
+   * Apply the app's stereo-separation setting (0–100%: 0 = mono, 100 = full stereo).
+   * Sonix's internal stereo_mix is inverted (0 = hard pan, 1 = mono), so map it.
+   */
+  setStereoSeparation(percent: number): void {
+    const sep = Math.max(0, Math.min(100, percent));
+    this.setStereoMix(1 - sep / 100);
   }
 
   setStereoMix(mix: number): void {
