@@ -48,6 +48,13 @@ interface SonixWasmModule {
 type SonixFactory = (config: Record<string, unknown>) => Promise<SonixWasmModule>;
 
 let modulePromise: Promise<SonixWasmModule | null> | null = null;
+/** Resolved module once ready — enables synchronous per-note rendering. */
+let moduleReady: SonixWasmModule | null = null;
+
+/** Kick module loading if not started; returns immediately. */
+export function warmSonixAudition(): void {
+  void ensureModule();
+}
 
 /** Lazily fetch + instantiate the Sonix WASM module on the main thread (once). */
 function ensureModule(): Promise<SonixWasmModule | null> {
@@ -75,7 +82,9 @@ function ensureModule(): Promise<SonixWasmModule | null> {
         console.warn('[SonixAudition] createSonix factory not found after transform');
         return null;
       }
-      return await factory({ wasmBinary });
+      const mod = await factory({ wasmBinary });
+      moduleReady = mod;
+      return mod;
     } catch (err) {
       console.warn('[SonixAudition] module load failed — fell back to base-waveform preview:', err);
       return null;
@@ -136,14 +145,12 @@ export interface SonixRenderRequest {
  * Returns a mono Float32Array of `frames` samples, or null if the module or
  * render failed (caller falls back to the base-waveform preview).
  */
-export async function renderSonixNote(req: SonixRenderRequest): Promise<Float32Array | null> {
-  const m = await ensureModule();
-  if (!m) return null;
+/** Core render — module must be ready. init_scratch → set params → render one note. */
+function renderCore(m: SonixWasmModule, req: SonixRenderRequest): Float32Array | null {
   try {
     m._sonix_set_sample_rate(req.sampleRate);
     if (m._sonix_init_scratch(1) !== 0) return null;
     applyParams(m, req.params);
-
     const outPtr = m._malloc(req.frames * 4);
     if (!outPtr) return null;
     const written = m._sonix_render_synth_note(0, req.note | 0, req.velocity | 0, req.frames, outPtr);
@@ -161,4 +168,21 @@ export async function renderSonixNote(req: SonixRenderRequest): Promise<Float32A
   } catch {
     return null;
   }
+}
+
+/**
+ * Synchronous render — returns audio only if the module is already loaded, else null (and
+ * kicks async loading so the next note works). Used by the audition voice so every note
+ * renders fresh from the CURRENT params (no async buffer swap / caching / stale state).
+ */
+export function renderSonixNoteSync(req: SonixRenderRequest): Float32Array | null {
+  if (!moduleReady) { void ensureModule(); return null; }
+  return renderCore(moduleReady, req);
+}
+
+/** Async render — awaits module load, then renders. */
+export async function renderSonixNote(req: SonixRenderRequest): Promise<Float32Array | null> {
+  const m = await ensureModule();
+  if (!m) return null;
+  return renderCore(m, req);
 }

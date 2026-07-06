@@ -25,7 +25,7 @@ import type { InstrumentConfig } from '@typedefs/instrument';
 import { getDevilboxAudioContext, audioNow, noteToFrequency } from '@/utils/audio-context';
 import { readSonixSynthParams } from './sonixInstrument';
 import { SonixEngine, type SonixSynthParams } from './SonixEngine';
-import { renderSonixNote } from './SonixAuditionModule';
+import { renderSonixNoteSync, warmSonixAudition } from './SonixAuditionModule';
 
 const BASE_NOTE = 'C3';
 const WAVE_LEN = 128;
@@ -45,8 +45,7 @@ const USE_WASM_AUDITION = true;
 interface ActiveVoice {
   src: AudioBufferSourceNode;
   gain: GainNode;
-  playbackRate: number;
-  gainVal: number;
+  note?: string | number;
 }
 
 export class SonixSynth implements DevilboxSynth {
@@ -56,16 +55,15 @@ export class SonixSynth implements DevilboxSynth {
 
   private ctx: AudioContext;
   private volNode: GainNode;
-  private buffer: AudioBuffer | null = null;
-  /** True once buffer holds the faithful WASM render (vs the base-waveform loop). */
-  private bufferIsWasm = false;
-  /** Voice gain from baseVol (0..1), applied so the Volume knob is audible. */
-  private baseGain = 1;
   private baseFreq: number;
   private waveSampleRate = 32000;
   private active = new Set<ActiveVoice>();
-  /** Bumped on every re-render so a stale async render result is discarded. */
-  private renderToken = 0;
+  /** Latest synth params — every note renders synchronously from these (no stale cache). */
+  private curParams: SonixSynthParams | null = null;
+  /** Single-cycle base-waveform buffer — fallback until the WASM module is loaded. */
+  private fallbackBuffer: AudioBuffer | null = null;
+  /** Voice gain from baseVol (0..1) for the base-wave fallback. */
+  private baseGain = 1;
 
   constructor(config: InstrumentConfig) {
     this.ctx = getDevilboxAudioContext();
@@ -73,71 +71,25 @@ export class SonixSynth implements DevilboxSynth {
     this.volNode.gain.value = 1;
     this.output = this.volNode;
     this.baseFreq = noteToFrequency(REFERENCE_MIDI) || noteToFrequency(BASE_NOTE) || 130.81;
-    this.renderFromConfig(config);
+    warmSonixAudition(); // preload the WASM so per-note sync render is ready when played
+    this.setParams(config);
   }
 
-  /**
-   * Build the base-waveform preview buffer from the current params.
-   *
-   * The faithful WASM render (render_synth_note) currently over-filters into a beep, so
-   * the audition uses the base waveform (which sounds correct) with baseVol driving the
-   * voice gain — wave-shape and volume edits are audible live. Enabling USE_WASM_AUDITION
-   * routes through the WASM synth once its filter/envelope sweep is fixed (lock-step task).
-   */
-  private renderFromConfig(config: InstrumentConfig): void {
-    const p = readSonixSynthParams(config);
-    this.buildFallbackBuffer(p);
-    if (USE_WASM_AUDITION) this.renderWasm(p);
+  /** Update the live params + base-wave fallback from a config. */
+  private setParams(config: InstrumentConfig): void {
+    this.curParams = readSonixSynthParams(config);
+    this.buildFallbackBuffer(this.curParams);
   }
 
-  /** Single-cycle looping buffer from the raw 128-byte base waveform. */
+  /** Single-cycle base-waveform buffer + baseGain (fallback when WASM isn't ready). */
   private buildFallbackBuffer(p: SonixSynthParams | null): void {
-    if (!p || !p.wave || p.wave.length < WAVE_LEN) {
-      if (!this.bufferIsWasm) this.buffer = null;
-      return;
-    }
-    // baseVol (0..255) drives the voice gain so the Volume knob is audible.
+    if (!p || !p.wave || p.wave.length < WAVE_LEN) { this.fallbackBuffer = null; return; }
     this.baseGain = Math.max(0, Math.min(1, (p.baseVol ?? 128) / 255));
-    // 128 samples = one cycle at the reference pitch → loop rate.
     this.waveSampleRate = Math.max(3000, Math.min(192000, Math.round(WAVE_LEN * this.baseFreq)));
     const buf = this.ctx.createBuffer(1, WAVE_LEN, this.waveSampleRate);
     const data = buf.getChannelData(0);
     for (let i = 0; i < WAVE_LEN; i++) data[i] = p.wave[i] / 128; // 8-bit signed → -1..1
-    // Only install the base buffer if we don't already have a faithful WASM buffer.
-    if (!this.bufferIsWasm) {
-      this.buffer = buf;
-      this.bufferIsWasm = false;
-    }
-  }
-
-  /** Render the note through the real Sonix synth path and swap it in. */
-  private renderWasm(p: SonixSynthParams | null): void {
-    if (!p) { console.info('[SonixSynth] renderWasm SKIP (no params)'); return; }
-    const token = ++this.renderToken;
-    const sampleRate = this.ctx.sampleRate;
-    const frames = Math.round(RENDER_SECONDS * sampleRate);
-    console.info('[SonixSynth] renderWasm START token=%d baseVol=%d wave0=%d envScan=%d', token, p.baseVol, p.wave?.[0], p.envScanRate);
-    void renderSonixNote({ params: p, note: REFERENCE_MIDI, velocity: RENDER_VELOCITY, sampleRate, frames })
-      .then((pcm) => {
-        // Discard if a newer render started or the voice was disposed.
-        if (token !== this.renderToken) { console.info('[SonixSynth] renderWasm DISCARD stale token=%d cur=%d', token, this.renderToken); return; }
-        if (!pcm || pcm.length === 0) { console.info('[SonixSynth] renderWasm NULL pcm token=%d', token); return; }
-        let peak = 0;
-        for (let i = 0; i < pcm.length; i++) {
-          const a = pcm[i] < 0 ? -pcm[i] : pcm[i];
-          if (a > peak) peak = a;
-        }
-        if (peak <= 0) { console.info('[SonixSynth] renderWasm SILENT token=%d', token); return; }
-        console.info('[SonixSynth] renderWasm SWAP token=%d peak=%s', token, peak.toFixed(4));
-        const buf = this.ctx.createBuffer(1, pcm.length, sampleRate);
-        buf.getChannelData(0).set(pcm);
-        this.buffer = buf;
-        this.bufferIsWasm = true;
-        this.retriggerHeldVoices();
-      })
-      .catch(() => {
-        /* keep fallback */
-      });
+    this.fallbackBuffer = buf;
   }
 
   private playbackRateFor(note?: string | number): number {
@@ -146,32 +98,32 @@ export class SonixSynth implements DevilboxSynth {
     return hz > 0 && this.baseFreq > 0 ? hz / this.baseFreq : 1;
   }
 
-  private startVoice(playbackRate: number, gainVal: number, time: number): void {
-    if (!this.buffer) return;
-    const src = this.ctx.createBufferSource();
-    src.buffer = this.buffer;
-    src.playbackRate.value = playbackRate;
-    if (this.bufferIsWasm) {
-      // The buffer is a faithful one-shot Sonix note (attack → envelope sweep → decay).
-      // Do NOT loop it — looping re-pulses the attack (a "beep") or loops the decayed
-      // tail (near-identical across presets). Play the whole note once per key press so
-      // each preset/edit auditions its actual synthesized note.
-      src.loop = false;
-    } else {
-      // Single-cycle fallback: loop one cycle for a continuous tone.
-      src.loop = true;
-      src.loopStart = 0;
-      src.loopEnd = WAVE_LEN / this.waveSampleRate;
+  /** MIDI note number for a note name/number (falls back to the reference note). */
+  private midiOf(note?: string | number): number {
+    if (typeof note === 'number') return note;
+    if (typeof note === 'string') {
+      const hz = noteToFrequency(note);
+      if (hz > 0) return Math.round(69 + 12 * Math.log2(hz / 440));
     }
+    return REFERENCE_MIDI;
+  }
+
+  /** Start a buffer as one voice, tracking its note for re-render on edits. */
+  private startBuffer(
+    buf: AudioBuffer, rate: number, loop: boolean, gainVal: number,
+    note: string | number | undefined, time: number,
+  ): void {
+    const src = this.ctx.createBufferSource();
+    src.buffer = buf;
+    src.playbackRate.value = rate;
+    if (loop) { src.loop = true; src.loopStart = 0; src.loopEnd = buf.length / buf.sampleRate; }
     const gain = this.ctx.createGain();
-    // WASM render already bakes baseVol → lift with AUDITION_GAIN only. Base-wave fallback
-    // has no volume applied → use baseGain (baseVol) so the Volume knob is audible.
-    const g = gainVal * (this.bufferIsWasm ? AUDITION_GAIN : this.baseGain);
-    gain.gain.value = g;
+    gain.gain.value = gainVal;
     src.connect(gain);
     gain.connect(this.volNode);
-    const voice: ActiveVoice = { src, gain, playbackRate, gainVal };
+    const voice: ActiveVoice = { src, gain, note };
     this.active.add(voice);
+    src.onended = () => this.cleanup(voice);
     src.start(time);
   }
 
@@ -203,27 +155,43 @@ export class SonixSynth implements DevilboxSynth {
     }
   }
 
-  /** Swap the current buffer into any held voices (short crossfade). */
+  /** Re-render + restart any held notes with the CURRENT params (after an edit). */
   private retriggerHeldVoices(): void {
-    if (!this.buffer || this.active.size === 0) return;
+    if (this.active.size === 0) return;
+    const notes = [...this.active].map((v) => v.note);
     const t = audioNow();
     for (const voice of [...this.active]) {
-      const { playbackRate, gainVal } = voice;
-      try {
-        voice.src.stop(t);
-      } catch {
-        /* ok */
-      }
+      try { voice.src.stop(t); } catch { /* ok */ }
       this.cleanup(voice);
-      this.startVoice(playbackRate, gainVal, t);
     }
+    for (const n of notes) this.triggerAttack(n, t);
   }
 
   triggerAttack(note?: string | number, time?: number, velocity = 1): void {
     const t = time ?? audioNow();
     // Sonix is a monophonic Paula voice: a new attack cuts the previous note.
     this.stopActiveVoices(t, 0.004);
-    this.startVoice(this.playbackRateFor(note), Math.max(0, Math.min(1, velocity)), t);
+    const v = Math.max(0, Math.min(1, velocity));
+    // Faithful path: render THIS note synchronously from the current params — no cached
+    // buffer, no async swap, so every key press / preset switch reflects the live params.
+    if (USE_WASM_AUDITION && this.curParams) {
+      const sr = this.ctx.sampleRate;
+      const frames = Math.round(RENDER_SECONDS * sr);
+      const pcm = renderSonixNoteSync({
+        params: this.curParams, note: this.midiOf(note), velocity: RENDER_VELOCITY, sampleRate: sr, frames,
+      });
+      if (pcm && pcm.length > 0) {
+        const buf = this.ctx.createBuffer(1, pcm.length, sr);
+        buf.getChannelData(0).set(pcm);
+        // Rendered at the played note → rate 1, no loop (one-shot Sonix note). baseVol baked in.
+        this.startBuffer(buf, 1, false, v * AUDITION_GAIN, note, t);
+        return;
+      }
+    }
+    // Fallback (WASM not ready): base-waveform repitched loop, baseVol → gain.
+    if (this.fallbackBuffer) {
+      this.startBuffer(this.fallbackBuffer, this.playbackRateFor(note), true, v * this.baseGain, note, t);
+    }
   }
 
   triggerRelease(_note?: string | number, time?: number): void {
@@ -246,15 +214,12 @@ export class SonixSynth implements DevilboxSynth {
    * SONG playback morphs too. (Faithful WASM audition is gated off — see USE_WASM_AUDITION.)
    */
   applyConfig(config: InstrumentConfig): void {
-    const p = readSonixSynthParams(config);
-    console.info('[SonixSynth] applyConfig baseVol=%d wave0=%d envScan=%d', p?.baseVol, p?.wave?.[0], p?.envScanRate);
-    this.buildFallbackBuffer(p); // rebuild base wave + baseGain from the edited params
-    if (USE_WASM_AUDITION) this.renderWasm(p);
-    this.retriggerHeldVoices();  // swap the updated buffer + gain into any held note
-    // Sync the live WASM instrument so the playing song reflects the edit.
-    if (p && SonixEngine.hasInstance()) {
+    this.setParams(config);      // update live params + base-wave fallback
+    this.retriggerHeldVoices();  // re-render held notes with the new params
+    // Sync the live WASM instrument so the playing SONG reflects the edit too.
+    if (this.curParams && SonixEngine.hasInstance()) {
       try {
-        SonixEngine.getInstance().setSynthParams(p);
+        SonixEngine.getInstance().setSynthParams(this.curParams);
       } catch {
         /* engine busy */
       }
@@ -266,7 +231,6 @@ export class SonixSynth implements DevilboxSynth {
   }
 
   dispose(): void {
-    this.renderToken++; // discard any in-flight render
     for (const voice of [...this.active]) {
       try {
         voice.src.stop();
@@ -276,7 +240,7 @@ export class SonixSynth implements DevilboxSynth {
       this.cleanup(voice);
     }
     this.volNode.disconnect();
-    this.buffer = null;
+    this.fallbackBuffer = null;
   }
 
   get volume(): AudioParam {
