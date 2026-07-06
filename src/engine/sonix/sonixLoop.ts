@@ -26,7 +26,10 @@ export interface SustainLoop {
 }
 
 const MIN_LOOP_SEC = 0.05; // ≥50ms → loop rate ≤20Hz, below the buzz range
-const MAX_LOOP_SEC = 0.6;
+// Long enough to contain a full slow modulation cycle (loop_mode=1 voices sweep over ~1.3s,
+// e.g. Synth1) so the loop endpoints land at the same modulation phase — a shorter cap wraps
+// mid-sweep and seams audibly. Bounded by the render length (findSustainLoop caps at n/2).
+const MAX_LOOP_SEC = 1.75;
 
 /** Index of the last falling zero-crossing (v[i-1] >= 0 && v[i] < 0) in (lo, hi). */
 function lastFallingCrossing(pcm: Float32Array, lo: number, hi: number): number {
@@ -75,4 +78,30 @@ export function findSustainLoop(
   if (best < 0) return null;
 
   return { loopStartSec: best / sampleRate, loopEndSec: loopEnd / sampleRate };
+}
+
+/**
+ * Smooth the loop seam in-place: over the last `fadeSec` before loopEnd, crossfade the
+ * approach-to-end toward the approach-to-start so the wrap (loopEnd → loopStart) has no
+ * derivative discontinuity (micro-click). Correlation already matches the regions; this
+ * removes the residual instantaneous step. Mutates `pcm`.
+ */
+export function applyLoopCrossfade(
+  pcm: Float32Array,
+  loopStartSamples: number,
+  loopEndSamples: number,
+  sampleRate: number,
+  fadeSec = 0.005,
+): void {
+  const x = Math.min(
+    Math.round(fadeSec * sampleRate),
+    Math.floor((loopEndSamples - loopStartSamples) / 2),
+    loopStartSamples,
+  );
+  if (x <= 0) return;
+  for (let j = 0; j < x; j++) {
+    const w = j / x; // 0 → 1 across the fade region ending at loopEnd
+    pcm[loopEndSamples - x + j] =
+      pcm[loopEndSamples - x + j] * (1 - w) + pcm[loopStartSamples - x + j] * w;
+  }
 }
