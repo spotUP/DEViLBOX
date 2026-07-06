@@ -43,7 +43,7 @@ const AUDITION_GAIN = 6;
 // envelope-swept filter). Verified faithful vs song playback — filter/blend/EG knobs are
 // audible live. baseVol is baked into the render, so it's NOT re-applied as voice gain
 // for the WASM path (see startVoice). The base-waveform loop remains the sync fallback.
-const USE_WASM_AUDITION = true;
+const USE_WASM_AUDITION = false;
 
 interface ActiveVoice {
   src: AudioBufferSourceNode;
