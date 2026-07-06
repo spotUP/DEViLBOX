@@ -252,6 +252,22 @@ EXPORT int sonix_is_finished(void) {
     return sonix_song_is_finished(g_song) ? 1 : 0;
 }
 
+/* ---- Per-channel scope capture for the oscilloscope / VU meters ---- */
+
+/* Number of valid frames captured in the last sonix_render() call. */
+EXPORT int sonix_get_scope_count(void) {
+    return g_song ? g_song->scope_count : 0;
+}
+
+/* Copy channel `ch`'s captured scope samples into `out` (int16), up to maxlen. */
+EXPORT void sonix_get_channel_scope(int ch, int16_t *out, int maxlen) {
+    if (g_song && out && ch >= 0 && ch < SONIX_NUM_CHANNELS) {
+        int n = g_song->scope_count;
+        if (n > maxlen) n = maxlen;
+        if (n > 0) memcpy(out, g_song->scope_buf[ch], (size_t)n * 2);
+    }
+}
+
 /* ---- First-class synth: per-instrument parameter get/set ----
  * The harness unity-includes sonix.c, so getters read struct fields directly.
  * Setters wrap the sonix_song_set_synth_* API (set_wave recomputes the filter bank).
