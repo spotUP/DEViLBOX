@@ -229,11 +229,12 @@ export class SonixSynth implements DevilboxSynth {
    */
   applyConfig(config: InstrumentConfig): void {
     const p = readSonixSynthParams(config);
-    // A new edit invalidates the current WASM buffer; rebuild fallback + WASM.
-    this.bufferIsWasm = false;
-    this.buildFallbackBuffer(p);
+    // Re-render through the WASM synth with the edited params. Keep the CURRENT buffer
+    // playing until the new render lands — renderWasm swaps it in and retriggers held
+    // voices on completion. Dropping to the base-waveform fallback here (as before) made
+    // every edit stutter through the raw tone, masking the param-accurate render.
+    if (!this.buffer) this.buildFallbackBuffer(p); // only if we have nothing to play yet
     this.renderWasm(p);
-    this.retriggerHeldVoices();
     // Sync the live WASM instrument so the playing song reflects the edit.
     if (p && SonixEngine.hasInstance()) {
       try {
