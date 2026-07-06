@@ -43,7 +43,7 @@ const AUDITION_GAIN = 6;
 // envelope-swept filter). Verified faithful vs song playback — filter/blend/EG knobs are
 // audible live. baseVol is baked into the render, so it's NOT re-applied as voice gain
 // for the WASM path (see startVoice). The base-waveform loop remains the sync fallback.
-const USE_WASM_AUDITION = false;
+const USE_WASM_AUDITION = true;
 
 interface ActiveVoice {
   src: AudioBufferSourceNode;
@@ -226,9 +226,9 @@ export class SonixSynth implements DevilboxSynth {
   }
 
   /**
-   * Live edit: rebuild the base-waveform preview (reflecting wave + baseVol edits), swap
-   * it into held voices, and push the edited params into the running WASM song engine so
-   * SONG playback morphs too. (Faithful WASM audition is gated off — see USE_WASM_AUDITION.)
+   * Live edit: update live params, re-render held notes through the faithful WASM synth
+   * path (so filter/blend/EG edits are audible), and push the edited params into the running
+   * WASM song engine so SONG playback morphs too.
    */
   applyConfig(config: InstrumentConfig): void {
     this.setParams(config);      // update live params + base-wave fallback
