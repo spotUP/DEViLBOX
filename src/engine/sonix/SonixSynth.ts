@@ -208,6 +208,8 @@ export class SonixSynth implements DevilboxSynth {
 
   triggerAttack(note?: string | number, time?: number, velocity = 1): void {
     const t = time ?? audioNow();
+    console.info('[SonixSynth] triggerAttack note=%s bufferIsWasm=%s bufferLen=%d rate=%s',
+      String(note), this.bufferIsWasm, this.buffer?.length ?? -1, this.playbackRateFor(note).toFixed(3));
     // Sonix is a monophonic Paula voice: a new attack cuts the previous note.
     this.stopActiveVoices(t, 0.004);
     this.startVoice(this.playbackRateFor(note), Math.max(0, Math.min(1, velocity)), t);
