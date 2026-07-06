@@ -250,14 +250,14 @@ export function isIffSmusFormat(buffer: ArrayBuffer): boolean {
 // and calibrate sampleRate so standard ProTracker periods produce correct pitch.
 const SS_HEADER_SIZE = 0x3E; // 62 bytes
 
-interface SonixSampleResult {
+export interface SonixSampleResult {
   pcm: Uint8Array;
   loopStart: number;
   loopEnd: number;
   sampleRate: number;
 }
 
-function parseSonixSampleFile(data: Uint8Array): SonixSampleResult | null {
+export function parseSonixSampleFile(data: Uint8Array): SonixSampleResult | null {
   if (data.length < SS_HEADER_SIZE + 4) return null;
 
   const lengthOfOctaveOne = u16BE(data, 0);

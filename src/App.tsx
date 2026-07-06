@@ -833,6 +833,30 @@ function App() {
     await handleFileDrop(mainFile);
   }, [handleFileDrop]);
 
+  // Standalone Sonix instrument drop — a lone .instr/.ss (or a folder of them) with no song.
+  // Decode each into an InstrumentConfig and append to the bank.
+  const handleStandaloneInstruments = useCallback(async (files: File[]) => {
+    const parsed = await Promise.all(
+      files.map(async (f) => ({ name: f.name, buffer: await f.arrayBuffer() })),
+    );
+    const [{ buildSonixInstrumentConfigs }, { useInstrumentStore: is }] = await Promise.all([
+      import('./lib/import/formats/SonixInstrumentImport'),
+      import('./stores/useInstrumentStore'),
+    ]);
+    const { configs, skipped } = buildSonixInstrumentConfigs(parsed);
+    const store = is.getState();
+    for (const cfg of configs) store.addInstrument(cfg);
+    if (configs.length > 0) {
+      notify.success(`Added ${configs.length} Sonix instrument${configs.length > 1 ? 's' : ''}`);
+    }
+    if (skipped.length > 0) {
+      notify.warning(`Skipped ${skipped.length} unsupported file${skipped.length > 1 ? 's' : ''}`);
+    }
+    if (configs.length === 0 && skipped.length === 0) {
+      notify.error('No Sonix instruments found in the drop');
+    }
+  }, []);
+
   // Handler to start audio context on user interaction
   const handleStartAudio = async () => {
     try {
@@ -994,7 +1018,7 @@ function App() {
 
   // Show main tracker interface
   return (
-    <GlobalDragDropHandler onFileLoaded={handleFileDrop} onFolderLoaded={handleFolderDrop}>
+    <GlobalDragDropHandler onFileLoaded={handleFileDrop} onFolderLoaded={handleFolderDrop} onStandaloneInstruments={handleStandaloneInstruments}>
       <AppLayout
         onShowExport={() => openModal('export')}
         onShowHelp={() => openModal('help')}
