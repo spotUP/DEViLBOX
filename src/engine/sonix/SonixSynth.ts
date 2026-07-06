@@ -31,7 +31,10 @@ const BASE_NOTE = 'C3';
 const WAVE_LEN = 128;
 // Reference MIDI note the WASM buffer is rendered at; triggers repitch from here.
 const REFERENCE_MIDI = 60;
-const RENDER_SECONDS = 1.5;
+const RENDER_SECONDS = 2.0;
+// Loop the rendered note from just past the attack to its end so a held key sustains
+// (avoids re-pulsing the attack, which sounds like a beep).
+const SUSTAIN_LOOP_START = 0.18;
 const RENDER_VELOCITY = 200; // near-max; per-trigger velocity scales playback gain
 // Makeup gain: the WASM render is at Paula per-channel DAC scale (~0.06 peak);
 // lift it to a comfortable audition level without clipping.
@@ -108,15 +111,25 @@ export class SonixSynth implements DevilboxSynth {
     return REFERENCE_MIDI;
   }
 
-  /** Start a buffer as one voice, tracking its note for re-render on edits. */
+  /**
+   * Start a buffer as one voice, tracking its note for re-render on edits.
+   * If loopStartSec is given, the voice loops [loopStartSec, loopEndSec ?? bufferEnd] so a
+   * held key sustains; otherwise it plays once.
+   */
   private startBuffer(
-    buf: AudioBuffer, rate: number, loop: boolean, gainVal: number,
+    buf: AudioBuffer, rate: number, gainVal: number,
     note: string | number | undefined, time: number,
+    loopStartSec?: number, loopEndSec?: number,
   ): void {
     const src = this.ctx.createBufferSource();
     src.buffer = buf;
     src.playbackRate.value = rate;
-    if (loop) { src.loop = true; src.loopStart = 0; src.loopEnd = buf.length / buf.sampleRate; }
+    if (loopStartSec !== undefined) {
+      const dur = buf.length / buf.sampleRate;
+      src.loop = true;
+      src.loopStart = Math.max(0, Math.min(loopStartSec, dur - 0.01));
+      src.loopEnd = loopEndSec !== undefined ? Math.min(loopEndSec, dur) : dur;
+    }
     const gain = this.ctx.createGain();
     gain.gain.value = gainVal;
     src.connect(gain);
@@ -183,14 +196,18 @@ export class SonixSynth implements DevilboxSynth {
       if (pcm && pcm.length > 0) {
         const buf = this.ctx.createBuffer(1, pcm.length, sr);
         buf.getChannelData(0).set(pcm);
-        // Rendered at the played note → rate 1, no loop (one-shot Sonix note). baseVol baked in.
-        this.startBuffer(buf, 1, false, v * AUDITION_GAIN, note, t);
+        // Rendered at the played note → rate 1. Loop the sustain body (past the attack →
+        // end) so a held key sustains instead of hard-cutting when the note buffer ends.
+        this.startBuffer(buf, 1, v * AUDITION_GAIN, note, t, SUSTAIN_LOOP_START);
         return;
       }
     }
-    // Fallback (WASM not ready): base-waveform repitched loop, baseVol → gain.
+    // Fallback (WASM not ready): base-waveform repitched, looped over a single cycle.
     if (this.fallbackBuffer) {
-      this.startBuffer(this.fallbackBuffer, this.playbackRateFor(note), true, v * this.baseGain, note, t);
+      this.startBuffer(
+        this.fallbackBuffer, this.playbackRateFor(note), v * this.baseGain, note, t,
+        0, WAVE_LEN / this.waveSampleRate,
+      );
     }
   }
 
