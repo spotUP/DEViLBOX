@@ -36,9 +36,11 @@ const RENDER_VELOCITY = 200; // near-max; per-trigger velocity scales playback g
 // Makeup gain: the WASM render is at Paula per-channel DAC scale (~0.06 peak);
 // lift it to a comfortable audition level without clipping.
 const AUDITION_GAIN = 6;
-// The WASM render_synth_note audition over-filters into a beep (needs a lock-step DSP
-// fix). Until then, audition the base waveform (correct-sounding) with baseVol→gain.
-const USE_WASM_AUDITION = false;
+// Faithful audition: render each note through the real Sonix synth (blend/ring + 64-band
+// envelope-swept filter). Verified faithful vs song playback — filter/blend/EG knobs are
+// audible live. baseVol is baked into the render, so it's NOT re-applied as voice gain
+// for the WASM path (see startVoice). The base-waveform loop remains the sync fallback.
+const USE_WASM_AUDITION = true;
 
 interface ActiveVoice {
   src: AudioBufferSourceNode;
@@ -159,7 +161,9 @@ export class SonixSynth implements DevilboxSynth {
       src.loopEnd = WAVE_LEN / this.waveSampleRate;
     }
     const gain = this.ctx.createGain();
-    const g = gainVal * this.baseGain * (this.bufferIsWasm ? AUDITION_GAIN : 1);
+    // WASM render already bakes baseVol → lift with AUDITION_GAIN only. Base-wave fallback
+    // has no volume applied → use baseGain (baseVol) so the Volume knob is audible.
+    const g = gainVal * (this.bufferIsWasm ? AUDITION_GAIN : this.baseGain);
     gain.gain.value = g;
     src.connect(gain);
     gain.connect(this.volNode);
