@@ -6,6 +6,7 @@
  */
 
 import { getDevilboxAudioContext } from '@/utils/audio-context';
+import { useOscilloscopeStore } from '@stores/useOscilloscopeStore';
 import {
   WASMSingletonBase,
   createWASMAssetsCache,
@@ -108,9 +109,22 @@ export class SonixEngine extends WASMSingletonBase {
           }
           break;
 
-        case 'moduleLoaded':
+        case 'moduleLoaded': {
           this._meta = data.meta || null;
           console.log('[SonixEngine] Module loaded:', this._meta);
+          const numChannels = this._meta?.numChannels ?? 0;
+          if (numChannels > 0) {
+            useOscilloscopeStore.getState().setChipInfo(
+              numChannels,
+              0,
+              Array.from({ length: numChannels }, (_, i) => `CH${i + 1}`),
+            );
+          }
+          break;
+        }
+
+        case 'channelData':
+          useOscilloscopeStore.getState().updateChannelData(data.channels);
           break;
 
         case 'synthParams':
@@ -159,6 +173,7 @@ export class SonixEngine extends WASMSingletonBase {
 
   stop(): void {
     this.workletNode?.port.postMessage({ type: 'stop' });
+    useOscilloscopeStore.getState().clear();
   }
 
   pause(): void {
@@ -190,6 +205,7 @@ export class SonixEngine extends WASMSingletonBase {
   }
 
   override dispose(): void {
+    useOscilloscopeStore.getState().clear();
     super.dispose();
     if (SonixEngine.instance === this) {
       SonixEngine.instance = null;

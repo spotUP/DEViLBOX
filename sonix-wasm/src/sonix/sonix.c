@@ -60,6 +60,12 @@ struct SonixSong {
     f32 stereo_mix;
     bool running;
     char error[128];
+    // Per-channel post-volume scope capture for the oscilloscope/VU meters.
+    // Filled during snx_mix_frames with the DAC-scaled mono sample per channel
+    // (READ-only capture — never feeds back into the audio path).
+    i16 scope_buf[SONIX_NUM_CHANNELS][2048];
+    int scope_count;      // number of valid frames in scope_buf (min(total, 2048))
+    int scope_write_pos;  // cumulative frame offset within the current decode call
     char instrument_names[64][64];
     i8* instrument_pcm[64];
     u32 instrument_pcm_len[64];
@@ -2662,6 +2668,16 @@ static void snx_mix_frames(SonixSong* song, f32* buffer, int num_frames) {
         f32 l = 0.0f;
         f32 r = 0.0f;
 
+        // Scope capture: zero every channel's slot for this frame up front so a
+        // solo-skipped / continued channel still reports a value; active channels
+        // overwrite at the mix_done_sample label below.
+        const int scope_pos = song->scope_write_pos + i;
+        if (scope_pos < 2048) {
+            for (int ch = 0; ch < SONIX_NUM_CHANNELS; ch++) {
+                song->scope_buf[ch][scope_pos] = 0;
+            }
+        }
+
         for (int ch = 0; ch < SONIX_NUM_CHANNELS; ch++) {
             f32 s;
             f32 vol;
@@ -2874,6 +2890,14 @@ static void snx_mix_frames(SonixSong* song, f32* buffer, int num_frames) {
             s *= vol * 0.25f;
         mix_done_sample:
 
+            // Scope capture (READ-only): the DAC-scaled mono sample for this
+            // channel, clamped into int16. Never modifies s / the audio path.
+            if (scope_pos < 2048) {
+                f32 sc = s * 32767.0f;
+                sc = fmaxf(-32768.0f, fminf(32767.0f, sc));
+                song->scope_buf[ch][scope_pos] = (i16)sc;
+            }
+
             bool left_chan = (ch == 0 || ch == 3);
             f32 hard_l = left_chan ? 1.0f : 0.0f;
             f32 hard_r = left_chan ? 0.0f : 1.0f;
@@ -2889,6 +2913,11 @@ static void snx_mix_frames(SonixSong* song, f32* buffer, int num_frames) {
         buffer[i * 2 + 1] += r;
     }
     song->debug_global_frame += (u32)num_frames;
+
+    // Advance the cumulative scope write position across chunks within one
+    // sonix_song_decode() call; scope_count tracks how much is valid to read.
+    song->scope_write_pos += num_frames;
+    song->scope_count = song->scope_write_pos < 2048 ? song->scope_write_pos : 2048;
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -3072,6 +3101,10 @@ int sonix_song_decode(SonixSong* song, f32* buffer, int num_frames) {
     }
 
     memset(buffer, 0, (size_t)num_frames * 2 * sizeof(f32));
+
+    // Reset per-decode scope capture (accumulates across mix chunks below).
+    song->scope_write_pos = 0;
+    song->scope_count = 0;
 
     if (!song->runtime_track_engine) {
         return num_frames;

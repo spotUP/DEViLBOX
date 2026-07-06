@@ -17,6 +17,10 @@ class SonixProcessor extends AudioWorkletProcessor {
     this.lastHeapBuffer = null;
     this.initializing = false;
     this.muteMask = 0xFFFFFFFF;
+    // Per-channel scope capture for the oscilloscope / VU meters.
+    this.numChannels = 0;
+    this.scopePtr = 0;        // WASM scratch buffer (2048 int16) for scope reads
+    this.scopeCap = 2048;
 
     this.port.onmessage = (event) => {
       this.handleMessage(event.data);
@@ -100,6 +104,7 @@ class SonixProcessor extends AudioWorkletProcessor {
               numSamples: this.module._sonix_get_num_samples(),
             };
 
+            this.numChannels = meta.numChannels | 0;
             this.port.postMessage({ type: 'moduleLoaded', meta });
             // Read back the WASM-parsed synth params so the editor/store can mirror them.
             this.postSynthParams();
@@ -352,6 +357,8 @@ class SonixProcessor extends AudioWorkletProcessor {
           this.port.postMessage({ type: 'error', message: 'malloc failed for output buffer' });
           return;
         }
+        // Scratch buffer for per-channel scope reads (2048 int16).
+        this.scopePtr = malloc(this.scopeCap * 2);
       }
 
       // Set sample rate
@@ -385,6 +392,7 @@ class SonixProcessor extends AudioWorkletProcessor {
     }
     const free = this.module?._free || this.module?.free;
     if (free && this.interleavedPtr) { free(this.interleavedPtr); this.interleavedPtr = 0; }
+    if (free && this.scopePtr) { free(this.scopePtr); this.scopePtr = 0; }
     this.interleavedBuf = null;
     this.module = null;
     this.initialized = false;
@@ -410,10 +418,35 @@ class SonixProcessor extends AudioWorkletProcessor {
             outputL[i] = this.interleavedBuf[i * 2];
             outputR[i] = this.interleavedBuf[i * 2 + 1];
           }
+          this.postChannelScopes();
         }
       }
     }
     return true;
+  }
+
+  // Read the per-channel scope samples captured during the last _sonix_render()
+  // and post them to the main thread for the oscilloscope / VU meters.
+  postChannelScopes() {
+    const m = this.module;
+    if (!m || !this.scopePtr || this.numChannels <= 0) return;
+    if (typeof m._sonix_get_scope_count !== 'function') return;
+
+    const count = m._sonix_get_scope_count();
+    if (count <= 0) return;
+    const n = count > this.scopeCap ? this.scopeCap : count;
+
+    const heapU8 = this.getHeapU8();
+    if (!heapU8) return;
+    const buffer = heapU8.buffer;
+
+    const channels = new Array(this.numChannels);
+    for (let ch = 0; ch < this.numChannels; ch++) {
+      m._sonix_get_channel_scope(ch, this.scopePtr, n);
+      // Copy out of the (growable) WASM heap into a standalone Int16Array.
+      channels[ch] = new Int16Array(buffer, this.scopePtr, n).slice();
+    }
+    this.port.postMessage({ type: 'channelData', channels });
   }
 }
 
