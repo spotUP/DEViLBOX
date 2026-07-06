@@ -141,10 +141,14 @@ export class SonixSynth implements DevilboxSynth {
     src.buffer = this.buffer;
     src.playbackRate.value = playbackRate;
     if (this.bufferIsWasm) {
-      // Faithful ~1.5 s note: loop the whole buffer so held keys sustain.
+      // The buffer is a full ~1.5 s note (attack → sweep → tail). Looping the WHOLE
+      // buffer re-plays the attack every cycle and pulses into a "beep". Loop only the
+      // developed SUSTAIN window (past the attack, before the tail) so held keys hold
+      // the actual timbre. The attack still plays once from t=0 before the loop point.
+      const dur = this.buffer.length / this.buffer.sampleRate;
       src.loop = true;
-      src.loopStart = 0;
-      src.loopEnd = this.buffer.length / this.buffer.sampleRate;
+      src.loopStart = Math.min(dur * 0.35, dur - 0.05);
+      src.loopEnd = Math.max(src.loopStart + 0.02, dur * 0.85);
     } else {
       // Single-cycle fallback: loop one cycle for a continuous tone.
       src.loop = true;
