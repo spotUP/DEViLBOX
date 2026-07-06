@@ -26,6 +26,7 @@ import { getDevilboxAudioContext, audioNow, noteToFrequency } from '@/utils/audi
 import { readSonixSynthParams } from './sonixInstrument';
 import { SonixEngine, type SonixSynthParams } from './SonixEngine';
 import { renderSonixNoteSync, warmSonixAudition } from './SonixAuditionModule';
+import { findSustainLoop } from './sonixLoop';
 import { createTrailingThrottle, type TrailingThrottle } from '@/utils/trailingThrottle';
 
 // Re-rendering a held note through the WASM synth costs ~10ms on the main thread. A knob
@@ -39,9 +40,8 @@ const WAVE_LEN = 128;
 // Reference MIDI note the WASM buffer is rendered at; triggers repitch from here.
 const REFERENCE_MIDI = 60;
 const RENDER_SECONDS = 2.0;
-// Loop the rendered note from just past the attack to its end so a held key sustains
-// (avoids re-pulsing the attack, which sounds like a beep).
-const SUSTAIN_LOOP_START = 0.18;
+// A held key sustains by looping a short zero-crossing-aligned window at the settled tail
+// of the render (findSustainLoop) — seamless, no swell jump or phase click.
 const RENDER_VELOCITY = 200; // near-max; per-trigger velocity scales playback gain
 // Makeup gain: the WASM render is at Paula per-channel DAC scale (~0.06 peak);
 // lift it to a comfortable audition level without clipping.
@@ -56,7 +56,12 @@ interface ActiveVoice {
   src: AudioBufferSourceNode;
   gain: GainNode;
   note?: string | number;
+  /** Target gain (velocity × AUDITION_GAIN) — reused when morphing the voice on an edit. */
+  gainTarget: number;
 }
+
+// Crossfade time when morphing a held voice to freshly-rendered params (no attack restart).
+const MORPH_FADE_SEC = 0.02;
 
 export class SonixSynth implements DevilboxSynth {
   readonly name = 'SonixSynth';
@@ -68,6 +73,8 @@ export class SonixSynth implements DevilboxSynth {
   private baseFreq: number;
   private waveSampleRate = 32000;
   private active = new Set<ActiveVoice>();
+  /** Voices fading out during a crossfade/stop — disconnected on their `ended` event. */
+  private dying = new Set<ActiveVoice>();
   /** Latest synth params — every note renders synchronously from these (no stale cache). */
   private curParams: SonixSynthParams | null = null;
   /** Single-cycle base-waveform buffer — fallback until the WASM module is loaded. */
@@ -84,7 +91,7 @@ export class SonixSynth implements DevilboxSynth {
     this.output = this.volNode;
     this.baseFreq = noteToFrequency(REFERENCE_MIDI) || noteToFrequency(BASE_NOTE) || 130.81;
     this.reRenderHeld = createTrailingThrottle(
-      () => this.doRetriggerHeldVoices(), HELD_RERENDER_THROTTLE_MS,
+      () => this.morphHeldVoices(), HELD_RERENDER_THROTTLE_MS,
     );
     warmSonixAudition(); // preload the WASM so per-note sync render is ready when played
     this.setParams(config);
@@ -124,15 +131,17 @@ export class SonixSynth implements DevilboxSynth {
   }
 
   /**
-   * Start a buffer as one voice, tracking its note for re-render on edits.
+   * Start a buffer as one voice, tracking its note (+ target gain) for morphing on edits.
    * If loopStartSec is given, the voice loops [loopStartSec, loopEndSec ?? bufferEnd] so a
-   * held key sustains; otherwise it plays once.
+   * held key sustains; otherwise it plays once. `startOffsetSec` begins playback partway in
+   * (used to skip the attack when morphing); `fadeInSec` ramps the gain up (crossfade in).
    */
   private startBuffer(
     buf: AudioBuffer, rate: number, gainVal: number,
     note: string | number | undefined, time: number,
     loopStartSec?: number, loopEndSec?: number,
-  ): void {
+    startOffsetSec = 0, fadeInSec = 0,
+  ): ActiveVoice {
     const src = this.ctx.createBufferSource();
     src.buffer = buf;
     src.playbackRate.value = rate;
@@ -143,18 +152,25 @@ export class SonixSynth implements DevilboxSynth {
       src.loopEnd = loopEndSec !== undefined ? Math.min(loopEndSec, dur) : dur;
     }
     const gain = this.ctx.createGain();
-    gain.gain.value = gainVal;
+    if (fadeInSec > 0) {
+      gain.gain.setValueAtTime(0, time);
+      gain.gain.linearRampToValueAtTime(gainVal, time + fadeInSec);
+    } else {
+      gain.gain.value = gainVal;
+    }
     src.connect(gain);
     gain.connect(this.volNode);
-    const voice: ActiveVoice = { src, gain, note };
+    const voice: ActiveVoice = { src, gain, note, gainTarget: gainVal };
     this.active.add(voice);
-    src.onended = () => this.cleanup(voice);
-    src.start(time);
+    src.onended = () => this.disposeVoice(voice);
+    src.start(time, startOffsetSec);
+    return voice;
   }
 
-  private cleanup(voice: ActiveVoice): void {
-    if (!this.active.has(voice)) return;
+  /** Disconnect + forget a voice (works whether it's active or dying). */
+  private disposeVoice(voice: ActiveVoice): void {
     this.active.delete(voice);
+    this.dying.delete(voice);
     try {
       voice.src.disconnect();
       voice.gain.disconnect();
@@ -163,33 +179,52 @@ export class SonixSynth implements DevilboxSynth {
     }
   }
 
-  private stopActiveVoices(t: number, fadeSec: number): void {
-    for (const voice of [...this.active]) {
-      try {
-        voice.gain.gain.cancelScheduledValues(t);
-        voice.gain.gain.setValueAtTime(voice.gain.gain.value, t);
-        voice.gain.gain.linearRampToValueAtTime(0, t + fadeSec);
-        voice.src.stop(t + fadeSec + 0.005);
-      } catch {
-        /* already stopped */
-      }
-      const v = voice;
-      v.src.onended = () => {
-        this.cleanup(v);
-      };
+  /** Fade a voice out over `fadeSec`, stop it, and retire it (moves active → dying). */
+  private retireVoice(voice: ActiveVoice, t: number, fadeSec: number): void {
+    this.active.delete(voice);
+    this.dying.add(voice);
+    try {
+      voice.gain.gain.cancelScheduledValues(t);
+      voice.gain.gain.setValueAtTime(voice.gain.gain.value, t);
+      voice.gain.gain.linearRampToValueAtTime(0, t + fadeSec);
+      voice.src.stop(t + fadeSec + 0.005);
+    } catch {
+      /* already stopped */
     }
+    voice.src.onended = () => this.disposeVoice(voice);
   }
 
-  /** Re-render + restart any held notes with the CURRENT params (after an edit). */
-  private doRetriggerHeldVoices(): void {
-    if (this.active.size === 0) return;
-    const notes = [...this.active].map((v) => v.note);
+  private stopActiveVoices(t: number, fadeSec: number): void {
+    for (const voice of [...this.active]) this.retireVoice(voice, t, fadeSec);
+  }
+
+  /**
+   * Morph held notes to the CURRENT params after an edit WITHOUT restarting the attack:
+   * render a fresh buffer, start it inside its sustain loop (skipping the attack) with a
+   * short crossfade in, and fade the old voice out. This is what makes a knob drag audibly
+   * sweep the sustained note instead of re-triggering it ~14×/sec (which stuttered).
+   */
+  private morphHeldVoices(): void {
+    if (!USE_WASM_AUDITION || !this.curParams || this.active.size === 0) return;
+    const sr = this.ctx.sampleRate;
+    const frames = Math.round(RENDER_SECONDS * sr);
     const t = audioNow();
-    for (const voice of [...this.active]) {
-      try { voice.src.stop(t); } catch { /* ok */ }
-      this.cleanup(voice);
+    for (const old of [...this.active]) {
+      const note = old.note;
+      const pcm = renderSonixNoteSync({
+        params: this.curParams, note: this.midiOf(note), velocity: RENDER_VELOCITY, sampleRate: sr, frames,
+      });
+      if (!pcm || pcm.length === 0) continue; // render failed → leave the old voice playing
+      const buf = this.ctx.createBuffer(1, pcm.length, sr);
+      buf.getChannelData(0).set(pcm);
+      const loop = findSustainLoop(pcm, sr, noteToFrequency(note ?? BASE_NOTE) || this.baseFreq);
+      // Start the new voice in the sustain window (skip the attack) and crossfade over.
+      this.startBuffer(
+        buf, 1, old.gainTarget, note, t,
+        loop?.loopStartSec, loop?.loopEndSec, loop?.loopStartSec ?? 0, MORPH_FADE_SEC,
+      );
+      this.retireVoice(old, t, MORPH_FADE_SEC);
     }
-    for (const n of notes) this.triggerAttack(n, t);
   }
 
   triggerAttack(note?: string | number, time?: number, velocity = 1): void {
@@ -208,9 +243,12 @@ export class SonixSynth implements DevilboxSynth {
       if (pcm && pcm.length > 0) {
         const buf = this.ctx.createBuffer(1, pcm.length, sr);
         buf.getChannelData(0).set(pcm);
-        // Rendered at the played note → rate 1. Loop the sustain body (past the attack →
-        // end) so a held key sustains instead of hard-cutting when the note buffer ends.
-        this.startBuffer(buf, 1, v * AUDITION_GAIN, note, t, SUSTAIN_LOOP_START);
+        // Rendered at the played note → rate 1. For a held key, loop a short zero-crossing-
+        // aligned window at the settled tail so the sustain is seamless — a fixed sub-region
+        // loop jumps loud→quiet on swelling voices and clicks on phase mismatch. If no clean
+        // loop exists (silent/short render), play once.
+        const loop = findSustainLoop(pcm, sr, noteToFrequency(note ?? BASE_NOTE) || this.baseFreq);
+        this.startBuffer(buf, 1, v * AUDITION_GAIN, note, t, loop?.loopStartSec, loop?.loopEndSec);
         return;
       }
     }
@@ -261,13 +299,13 @@ export class SonixSynth implements DevilboxSynth {
 
   dispose(): void {
     this.reRenderHeld.cancel();
-    for (const voice of [...this.active]) {
+    for (const voice of [...this.active, ...this.dying]) {
       try {
         voice.src.stop();
       } catch {
         /* ok */
       }
-      this.cleanup(voice);
+      this.disposeVoice(voice);
     }
     this.volNode.disconnect();
     this.fallbackBuffer = null;
