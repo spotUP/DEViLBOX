@@ -44,6 +44,7 @@ import { checkFormatViolation, getActiveFormatLimits, isViolationConfirmed } fro
 import { FurnaceParser } from '@/lib/import/formats/FurnaceParser';
 import { DefleMaskParser } from '@/lib/import/formats/DefleMaskParser';
 import { deepMerge, ensureCompleteInstrumentConfig } from '@/lib/migration';
+import { getDefaultSonixParams } from '@engine/sonix/sonixInstrument';
 import { WaveformProcessor } from '@/lib/audio/WaveformProcessor';
 
 // Extracted helper modules
@@ -1138,6 +1139,19 @@ export const useInstrumentStore = create<InstrumentStore>()(
         // Strip sample config from non-sample instruments
         if (newInstrument.synthType && newInstrument.synthType !== 'Sampler' && newInstrument.synthType !== 'Player') {
           delete newInstrument.sample;
+        }
+
+        // Seed Sonix synth params for a from-scratch SonixSynth so the editor opens
+        // populated and the voice is audible (the WASM->store bridge only fills these
+        // from a loaded song). Covers every creation path, not just the type switcher.
+        if (newInstrument.synthType === 'SonixSynth'
+          && !(newInstrument.parameters as Record<string, unknown> | undefined)?.sonix) {
+          newInstrument.type = 'synth';
+          newInstrument.parameters = {
+            ...(newInstrument.parameters as Record<string, unknown> | undefined),
+            sonixIndex: 0,
+            sonix: getDefaultSonixParams(),
+          };
         }
 
         // Auto-set monophonic flag for synths that are inherently monophonic
