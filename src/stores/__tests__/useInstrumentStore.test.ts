@@ -20,6 +20,19 @@ describe('useInstrumentStore — lifecycle', () => {
     expect(s.instruments[0].id).toBe(id);
   });
 
+  it('createInstrument seeds Sonix synth params for a from-scratch SonixSynth', () => {
+    // Regression: a fresh SonixSynth used to open with no parameters.sonix, so the editor
+    // showed "no Sonix synth parameters" and the voice was silent.
+    const id = useInstrumentStore.getState().createInstrument({ synthType: 'SonixSynth' } as any);
+    const inst = useInstrumentStore.getState().instruments.find((i) => i.id === id)!;
+    expect(inst.type).toBe('synth');
+    const sonix = (inst.parameters as any)?.sonix;
+    expect(sonix).toBeDefined();
+    expect(Array.isArray(sonix.wave)).toBe(true);
+    expect(sonix.wave).toHaveLength(128);
+    expect(Array.isArray(sonix.egLevels)).toBe(true);
+  });
+
   it('cloneInstrument produces a distinct id and grows the bank by one', () => {
     const sourceId = useInstrumentStore.getState().createInstrument();
     const cloneId = useInstrumentStore.getState().cloneInstrument(sourceId);
