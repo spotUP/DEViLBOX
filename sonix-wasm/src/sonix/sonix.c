@@ -3167,6 +3167,199 @@ int sonix_song_decode(SonixSong* song, f32* buffer, int num_frames) {
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Scratch song for standalone single-note synth audition (no song file loaded).
+//
+// The editor previews a synth instrument by rendering ONE note through the real
+// synth path (blend/ring + 64-band filter sweep + envelope), with no patterns
+// and no track engine. This allocates a bare SonixSong holding just enough state
+// for snx_start_note + the per-channel synth ticks + snx_mix_frames to run on
+// channel 0. Defaults mirror the SMUS synth path (the dominant real-world source,
+// e.g. ACE II): full score master volume, neutral pitch scaling, a mid tempo.
+SonixSong* sonix_song_create_scratch(void) {
+    SonixSong* song = (SonixSong*)calloc(1, sizeof(SonixSong));
+    if (song == nullptr) {
+        return nullptr;
+    }
+
+    song->data = nullptr;
+    song->size = 0;
+    song->metadata.num_channels = SONIX_NUM_CHANNELS;
+    song->metadata.format = SONIX_FORMAT_SMUS; // audition uses the SMUS synth volume/pitch path
+    song->metadata.has_form_header = false;
+    song->metadata.valid = true;
+    song->error[0] = '\0';
+    song->sample_rate = 48000;
+    song->solo_channel = 0;               // audition voice is channel 0
+    song->channel_mute_mask = 0xFFFFFFFFu; // all channels audible
+    song->stereo_mix = 0.0f;              // hard-pan → channel 0 (a left channel) lands fully in L
+    song->running = true;
+    song->runtime_track_engine = false;    // no patterns; channel 0 is driven by hand in the render fn
+
+    // SMUS synth-path scalars (normally parsed from SHDR / SNX1).
+    song->smus_ramp_target = 0xFFu;       // full score master volume
+    song->smus_pitch_scaling = 0x0080u;   // neutral pitch (pitch_adj = smus_pitch_scaling - 0x80 = 0)
+    song->snx_pitch_offset = 0x0080u;     // mid tempo-table index → a musical tick rate
+    song->smus_last_tempo_idx = 0xFFFFu;  // force smus_update_tempo to recompute
+
+    for (int ch = 0; ch < SONIX_NUM_CHANNELS; ch++) {
+        song->snx_cmd81[ch] = 0xFFu; // max channel volume → hw_vol at max
+        song->snx_cmd80[ch] = 0;
+        song->snx_cmd83[ch] = 0;
+        song->snx_track_ended[ch] = true; // guard snx_process_channel_tick into a no-op if ever called
+    }
+    for (int i = 0; i < 8; i++) {
+        song->snx_ramp_current[i] = 0xFF00u;
+        song->snx_ramp_target[i] = 0xFF00u;
+        song->snx_ramp_speed[i] = 0;
+    }
+    song->snx_ticks_per_beat = 1; // safe default until smus_update_tempo runs
+    song->noise_state = 0x12345678u;
+
+    // Derive tick timing (samples_per_tick, snx_ticks_per_beat, Bresenham split)
+    // from the default tempo at the default sample rate.
+    smus_update_tempo(song);
+    return song;
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Render ONE synth note of instrument `inst` playing MIDI `note` at `velocity`
+// (0-255) into `out` (mono float, up to num_frames). Returns frames written.
+//
+// Reuses the exact voice machinery of the song path — sonix_start_note sets up
+// channel 0's synth state, then each tick we advance ONLY channel 0's synth
+// ticks (envelope → render → pitch-modulate, plus ramp/vibrato/portamento) at
+// the song's tick cadence, WITHOUT snx_process_tick (which would advance patterns).
+// snx_mix_frames then mixes channel 0; with solo=0 and stereo_mix=0 the pre-pan
+// mono sample lands in the left column, which we copy out.
+int sonix_song_render_synth_note(SonixSong* song, int inst, int note, int velocity, int num_frames, float* out) {
+    if (song == nullptr || out == nullptr || num_frames <= 0) {
+        return 0;
+    }
+    if (inst < 0 || inst >= 64) {
+        return 0;
+    }
+    if (!song->instrument_is_synth[inst] || !song->synth_wave_set[inst]) {
+        return 0;
+    }
+
+    // Ensure the 64-band filter bank exists (built lazily from synth_wave).
+    if (song->synth_filter_bank[inst] == nullptr) {
+        snx_compute_filter_bank(song, inst);
+    }
+
+    // Solo channel 0 so only the audition voice sounds; restore afterwards.
+    i32 saved_solo = song->solo_channel;
+    f32 saved_mix = song->stereo_mix;
+    song->solo_channel = 0;
+    song->stereo_mix = 0.0f; // hard-pan: channel 0 (a left channel) → full signal in L
+
+    // (Re)compute tick timing for the current sample rate (SMUS tempo path).
+    // sonix_song_set_sample_rate skips this for a scratch song (runtime_track_engine
+    // is false), so do it here to honour any sample-rate change.
+    song->smus_last_tempo_idx = 0xFFFFu;
+    smus_update_tempo(song);
+    if (song->snx_ticks_per_beat == 0) {
+        song->snx_ticks_per_beat = 1;
+    }
+
+    // Reset channel-0 synth voice state (fields normally set by the loader /
+    // snx_process_tick). synth_cur_period=0 selects the first-note direct-set
+    // path (no slide); cleared portamento/blend give a clean note-on.
+    const int ch = 0;
+    song->snx_track_ended[ch] = true; // keep snx_process_channel_tick a no-op if ever reached
+    song->snx_use_sample[ch] = false;
+    song->snx_note_on[ch] = false;
+    song->snx_inst_index[ch] = (u8)inst;
+    song->snx_cmd80[ch] = (u8)inst; // sonix_start_note reads inst = cmd80 & 63
+    song->snx_cmd81[ch] = 0xFFu;
+    song->snx_cmd83[ch] = 0;
+    song->synth_cur_period[ch] = 0;
+    song->synth_blend_accum[ch] = 0;
+    song->synth_ring_dir[ch] = 1;
+    song->synth_env_accum[ch] = 0;
+    song->synth_env_delay_ctr[ch] = 0;
+    song->synth_env_value[ch] = 0;
+    song->ss_port_phase[ch] = 0;
+    song->ss_port_value[ch] = 0;
+    song->snx_sample_pos[ch] = 0.0;
+    song->snx_sample_inc[ch] = 0.0;
+
+    // Start the note: sets sample_inc, active_pcm=base wave, envelope + portamento.
+    sonix_start_note(song, ch, note, velocity);
+    if (!song->snx_use_sample[ch]) {
+        song->solo_channel = saved_solo;
+        song->stereo_mix = saved_mix;
+        return 0;
+    }
+
+    // Render the first synth output tick so the very first mix chunk already
+    // plays the swept waveform (mirrors render_tick at the note-start tick's end).
+    snx_synth_envelope_tick(song, ch);
+    snx_synth_render_tick(song, ch);
+    snx_synth_pitch_modulate(song, ch);
+
+    // snx_mix_frames writes interleaved stereo and ADDS into the buffer, so use a
+    // zeroed scratch buffer and pull channel 0's pre-pan mono from the left column.
+    f32* stereo = (f32*)calloc((size_t)num_frames * 2, sizeof(f32));
+    if (stereo == nullptr) {
+        song->solo_channel = saved_solo;
+        song->stereo_mix = saved_mix;
+        return 0;
+    }
+
+    static const u32 CIA_PAL = 709379u;
+    song->scope_write_pos = 0;
+    song->scope_count = 0;
+    song->tick_accumulator = song->samples_per_tick;
+    song->tick_frac_accum = 0;
+
+    int done = 0;
+    while (done < num_frames) {
+        int chunk = (int)song->tick_accumulator;
+        if (chunk <= 0) {
+            chunk = 1;
+        }
+        if (chunk > (num_frames - done)) {
+            chunk = num_frames - done;
+        }
+
+        snx_mix_frames(song, stereo + (size_t)done * 2, chunk);
+        done += chunk;
+        song->tick_accumulator -= (f64)chunk;
+
+        while (song->tick_accumulator <= 0.0) {
+            // Drive ONLY channel 0's synth voice — the same per-tick functions the
+            // song path calls at the end of snx_process_tick, minus the pattern
+            // advance. Order matters: update_sample_mod before pitch_modulate so the
+            // envelope-driven period has the final say on sample_inc.
+            snx_ramp_volume_tick(song);
+            snx_update_sample_mod_tick(song, ch);
+            snx_ss_portamento_tick(song, ch);
+            snx_synth_envelope_tick(song, ch);
+            snx_synth_render_tick(song, ch);
+            snx_synth_pitch_modulate(song, ch);
+
+            int next_tick = (int)song->tick_spt_int;
+            song->tick_frac_accum += song->tick_spt_frac;
+            if (song->tick_frac_accum >= CIA_PAL) {
+                next_tick += 1;
+                song->tick_frac_accum -= CIA_PAL;
+            }
+            song->tick_accumulator += (f64)next_tick;
+        }
+    }
+
+    for (int i = 0; i < num_frames; i++) {
+        out[i] = stereo[(size_t)i * 2];
+    }
+
+    free(stereo);
+    song->solo_channel = saved_solo;
+    song->stereo_mix = saved_mix;
+    return num_frames;
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 bool sonix_song_is_finished(const SonixSong* song) {
     (void)song;
