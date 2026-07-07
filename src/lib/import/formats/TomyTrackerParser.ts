@@ -18,9 +18,9 @@
  */
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
-import type { InstrumentConfig } from '@/types';
+import type { InstrumentConfig, TrackerCell } from '@/types';
 import type { UADEPatternLayout } from '@/engine/uade/UADEPatternEncoder';
-import { encodeMODCell, decodeMODCell } from '@/engine/uade/encoders/MODEncoder';
+import { decodeTomyCell, encodeTomyCell, TOMY_BYTES_PER_CELL } from '@/engine/uade/encoders/TomyTrackerEncoder';
 
 // ── Constants ─────────────────────────────────────────────────────────────
 
@@ -32,6 +32,17 @@ const MAX_SAMPLES = 30;
 
 /** Maximum value for the D1/D2 size field (2 MB). */
 const MAX_SIZE_FIELD = 0x200000;
+
+/** Non-pattern header size; pattern blocks start here. */
+const PATTERN_BASE = 704;
+/** One pattern = 64 rows x 4 channels x 4 bytes. */
+const PATTERN_SIZE = 1024;
+const ROWS_PER_PATTERN = 64;
+const NUM_CHANNELS = 4;
+/** Order-list count byte (positions in the song). */
+const ORDER_COUNT_OFFSET = 445;
+/** Order list: entry i pattern = byte[ORDER_LIST_OFFSET + 2*i] >> 2. */
+const ORDER_LIST_OFFSET = 448;
 
 // ── Binary helpers ─────────────────────────────────────────────────────────
 
@@ -95,12 +106,23 @@ export function parseTomyTrackerFile(buffer: ArrayBuffer, filename: string): Tra
   // Strip "SG." prefix (case-insensitive)
   const moduleName = baseName.replace(/^sg\./i, '') || baseName;
 
-  // ── Pattern count from header ─────────────────────────────────────────────
+  // ── Pattern count from the D2 pattern-section size ────────────────────────
 
   const d2 = u32BE(buf, 4);
-  const patternCount = (d2 - 704) / 1024;
+  const patternCount = (d2 - PATTERN_BASE) / PATTERN_SIZE;
 
-  // ── Instrument placeholders ──────────────────────────────────────────────
+  // ── Order list (song positions) ──────────────────────────────────────────
+  // Entry i's pattern number = byte[ORDER_LIST_OFFSET + 2*i] >> 2 (odd bytes are 0).
+  const orderCount = buf[ORDER_COUNT_OFFSET] ?? 0;
+  const songPositions: number[] = [];
+  for (let i = 0; i < orderCount; i++) {
+    const off = ORDER_LIST_OFFSET + i * 2;
+    const pat = off < buf.length ? (buf[off] >> 2) : 0;
+    songPositions.push(pat < patternCount ? pat : 0);
+  }
+  if (songPositions.length === 0) songPositions.push(0);
+
+  // ── Instrument placeholders (sample editing not yet decoded) ──────────────
 
   const instruments: InstrumentConfig[] = Array.from(
     { length: MAX_SAMPLES },
@@ -116,55 +138,54 @@ export function parseTomyTrackerFile(buffer: ArrayBuffer, filename: string): Tra
       }) as InstrumentConfig,
   );
 
-  // ── Empty pattern (placeholder — UADE handles actual audio) ──────────────
-
-  const emptyRows = Array.from({ length: 64 }, () => ({
-    note: 0,
-    instrument: 0,
-    volume: 0,
-    effTyp: 0,
-    eff: 0,
-    effTyp2: 0,
-    eff2: 0,
-  }));
-
-  const pattern = {
-    id: 'pattern-0',
-    name: 'Pattern 0',
-    length: 64,
-    channels: Array.from({ length: 4 }, (_, ch) => ({
-      id: `channel-${ch}`,
-      name: `Channel ${ch + 1}`,
-      muted: false,
-      solo: false,
-      collapsed: false,
-      volume: 100,
-      pan: ch === 0 || ch === 3 ? -50 : 50,
-      instrumentId: null,
-      color: null,
-      rows: emptyRows,
-    })),
-    importMetadata: {
-      sourceFormat: 'MOD' as const,
-      sourceFile: filename,
-      importedAt: new Date().toISOString(),
-      originalChannelCount: 4,
-      originalPatternCount: patternCount || 1,
-      originalInstrumentCount: 0,
-    },
-  };
+  // ── Decode every pattern block from the pattern data ─────────────────────
+  const patterns = Array.from({ length: Math.max(1, patternCount) }, (_, p) => {
+    const base = PATTERN_BASE + p * PATTERN_SIZE;
+    const channels = Array.from({ length: NUM_CHANNELS }, (_, ch) => {
+      const rows: TrackerCell[] = Array.from({ length: ROWS_PER_PATTERN }, (_, row) => {
+        const cellOff = base + row * NUM_CHANNELS * TOMY_BYTES_PER_CELL + ch * TOMY_BYTES_PER_CELL;
+        return decodeTomyCell(buf.subarray(cellOff, cellOff + TOMY_BYTES_PER_CELL));
+      });
+      return {
+        id: `channel-${ch}`,
+        name: `Channel ${ch + 1}`,
+        muted: false,
+        solo: false,
+        collapsed: false,
+        volume: 100,
+        pan: ch === 0 || ch === 3 ? -50 : 50,
+        instrumentId: null,
+        color: null,
+        rows,
+      };
+    });
+    return {
+      id: `pattern-${p}`,
+      name: `Pattern ${p}`,
+      length: ROWS_PER_PATTERN,
+      channels,
+      importMetadata: {
+        sourceFormat: 'MOD' as const,
+        sourceFile: filename,
+        importedAt: new Date().toISOString(),
+        originalChannelCount: NUM_CHANNELS,
+        originalPatternCount: patternCount || 1,
+        originalInstrumentCount: 0,
+      },
+    };
+  });
 
   const nameSuffix = patternCount > 0 ? ` (${patternCount} patt)` : '';
 
   return {
     name: `${moduleName} [TomyTracker]${nameSuffix}`,
     format: 'MOD' as TrackerFormat,
-    patterns: [pattern],
+    patterns,
     instruments,
-    songPositions: [0],
-    songLength: 1,
+    songPositions,
+    songLength: songPositions.length,
     restartPosition: 0,
-    numChannels: 4,
+    numChannels: NUM_CHANNELS,
     initialSpeed: 6,
     initialBPM: 125,
     linearPeriods: false,
@@ -172,14 +193,14 @@ export function parseTomyTrackerFile(buffer: ArrayBuffer, filename: string): Tra
     uadeEditableFileName: filename,
     uadePatternLayout: {
       formatId: 'tomyTracker',
-      patternDataFileOffset: 0,
-      bytesPerCell: 4,
-      rowsPerPattern: 64,
-      numChannels: 4,
-      numPatterns: 1,
+      patternDataFileOffset: PATTERN_BASE,
+      bytesPerCell: TOMY_BYTES_PER_CELL,
+      rowsPerPattern: ROWS_PER_PATTERN,
+      numChannels: NUM_CHANNELS,
+      numPatterns: patternCount || 1,
       moduleSize: buffer.byteLength,
-      encodeCell: encodeMODCell,
-      decodeCell: decodeMODCell,
+      encodeCell: encodeTomyCell,
+      decodeCell: decodeTomyCell,
     } as UADEPatternLayout,
   };
 }
