@@ -2141,12 +2141,17 @@ export async function tryRouteFormat(
     return parseUADEFile(buffer, originalFileName, prefs.uade ?? 'enhanced', subsong, preScannedMeta);
   }
 
-  // ── MaxTrax (.mxtx) ──────────────────────────────────────────────────────────
-  // MaxTrax is a synthesis-only Amiga format, completely different from Maximum Effect.
-  // Routes to UADE eagleplayer using prefix form.
+  // ── MaxTrax (.mxtx) — native (UADE can't play it: ret=-1) ─────────────────────
+  // MIDI-like event format; parsed natively into a quantized pattern view + lossless MXTX
+  // export (dispatched by the MXTX magic in nativeExportRouter). No DEViLBOX playback yet.
   if (matchesExt(filename, ['mxtx'])) {
-    const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
-    return parseUADEFile(buffer, toUADEPrefixName(originalFileName, ['mxtx']), prefs.uade ?? 'enhanced', subsong, preScannedMeta);
+    const { isMaxTraxFormat, parseMaxTraxFile } = await import('@lib/import/formats/MaxTraxParser');
+    if (isMaxTraxFormat(buffer)) {
+      // injectUADEPlayback wires uadeEditableFileData into the loaded song/store (so native
+      // MXTX export works). UADE can't actually play MaxTrax (ret=-1) → silent playback; the
+      // value here is native display + lossless export.
+      return injectUADEPlayback(parseMaxTraxFile(buffer, originalFileName), ctx);
+    }
   }
 
   // ── StarTrekker AM (.adsc) — native WASM engine ───────────────────────────────
