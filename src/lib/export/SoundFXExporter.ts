@@ -235,17 +235,16 @@ export async function exportSoundFX(
   const output = new Uint8Array(totalSize);
   const view = new DataView(output.buffer);
 
-  // -- Sample size table (offset 0, 16 x u32 BE) --
-  // Slot 0 is dummy (size = 0)
-  view.setUint32(0, 0, false); // slot 0
+  // -- Sample size table (offset 0, 15 x u32 BE: sample s at (s-1)*4) --
+  // Per Schism fmt/sfx.c the v1 size table holds 15 entries for samples 1-15
+  // starting at offset 0; the "SONG" tag follows at offset 60.
   for (let i = 0; i < MAX_SAMPLES; i++) {
     const slot = sampleSlots[i];
     const size = slot ? slot.pcm.length : 0;
-    view.setUint32((i + 1) * 4, size, false);
+    view.setUint32(i * 4, size, false);
   }
 
-  // -- Magic "SONG" at offset 60 --
-  // This overwrites the last entry of the sample size table (slot 15)
+  // -- Magic "SONG" at offset 60 (immediately after the 15-entry size table) --
   output[60] = 0x53; // 'S'
   output[61] = 0x4F; // 'O'
   output[62] = 0x4E; // 'N'

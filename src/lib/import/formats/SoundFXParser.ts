@@ -134,14 +134,22 @@ export async function parseSoundFXFile(
 
   // -- Detect version ---------------------------------------------------------
 
+  // Authoritative layout from Schism Tracker fmt/sfx.c (loader taken from XMP):
+  //   v1 "SONG"@60: 15 samples; size table = 15 u32 BE @0 (samples 1-15); tag@60;
+  //                 tempo u16@64; 14 reserved bytes; metadata 15*30 @80; songinfo@530;
+  //                 order table 128 bytes @532; pattern data @660.
+  //   v2 "SO31"@124: 31 samples; size table = 31 u32 BE @0; tag@124; tempo@128;
+  //                  metadata @144; songinfo@1074; pattern data @1208 (+4 "dunno").
   let version: 'v1' | 'v2';
-  let numSampleSlots: number;
-  let sampleTableOffset: number; // extra offset for v2.0 header
+  let numSamples: number;        // real sample count (15 for v1, 31 for v2)
+  let magicOffset: number;       // file offset of the format tag
+  let sampleTableOffset: number; // extra offset for v2.0 songinfo / pattern data
 
   const magic1 = readString(view, 60, 4);
   if (magic1 === 'SONG') {
     version = 'v1';
-    numSampleSlots = 16;
+    numSamples = 15;
+    magicOffset = 60;
     sampleTableOffset = 0;
   } else {
     if (buffer.byteLength < 2350) {
@@ -152,83 +160,63 @@ export async function parseSoundFXFile(
       throw new Error(`SoundFX: unrecognized magic bytes`);
     }
     version = 'v2';
-    numSampleSlots = 32;
+    numSamples = 31;
+    magicOffset = 124;
     sampleTableOffset = 544; // v2.0 header is 544 bytes larger
   }
+  // Slot count including the implicit dummy sample 0 (samples are stored 1-indexed).
+  const numSampleSlots = numSamples + 1;
 
-  // -- Sample table base file offset (for uadeChipRam.instrBase computation) --
-  // v1: 16 slots * 4 bytes + 20-byte skip = 84
-  // v2: 32 slots * 4 bytes + 20-byte skip = 148
-  const sampleTableBase = numSampleSlots * 4 + 20;
+  // -- Sample metadata block base (= tag(4) + tempo(2) + 14 reserved after size table) --
+  // v1: 60 + 20 = 80; v2: 124 + 20 = 144. Also the uadeChipRam.instrBase base.
+  const metadataBase = magicOffset + 20;
+  const sampleTableBase = metadataBase;
 
-  // -- Read tempo (2 bytes after magic) ---------------------------------------
-  // For v1: tempo at offset 64, for v2: tempo at offset 128
-  const tempoOffset = version === 'v1' ? 64 : 128;
+  // -- Read tempo (2 bytes after the format tag) ------------------------------
+  const tempoOffset = magicOffset + 4;
   const tempo = readUint16BE(view, tempoOffset);
 
-  // -- Read sample size table (at offset 0) -----------------------------------
-  // Sample index 0 is unused (dummy). Entries 1..(numSampleSlots-1) are 4-byte sizes.
-  let pos = 0;
-  const sampleSizes: number[] = [];
-
-  for (let i = 0; i < numSampleSlots; i++) {
-    const val = readUint32BE(view, pos);
-    sampleSizes.push(val);
-    pos += 4;
+  // -- Read sample size table (numSamples u32 BE at offset 0) ------------------
+  // smpsize[n] (0-based) is sample (n+1)'s length in BYTES (Schism: sample->length =
+  // bswapBE32(smpsize[n])). Stored here 1-indexed; index 0 is the dummy sample.
+  const sampleSizes: number[] = [0];
+  for (let s = 1; s <= numSamples; s++) {
+    sampleSizes.push(readUint32BE(view, (s - 1) * 4));
   }
 
-  // -- Skip 20 bytes after sample size table (FlodJS: stream.position += 20) --
-  pos += 20;
-
-  // -- Read sample metadata (30 bytes each per OpenMPT SFXSampleHeader) --
-  // Bytes: name[22] + oneshotLength(2) + finetune(1) + volume(1) + loopStart(2) + loopLength(2)
-  const samples: (SFXSample | null)[] = [];
-
-  // Reconstruct sample pointers from sizes (cumulative offset)
-  const samplePointers: number[] = [];
+  // Reconstruct sample pointers from sizes (cumulative offset into the PCM block).
+  const samplePointers: number[] = [0];
   let ptrAccum = 0;
-  for (let i = 0; i < numSampleSlots; i++) {
+  for (let s = 1; s <= numSamples; s++) {
     samplePointers.push(ptrAccum);
-    if (i > 0 && sampleSizes[i] > 0) {
-      ptrAccum += sampleSizes[i];
-    }
+    if (sampleSizes[s] > 0) ptrAccum += sampleSizes[s];
   }
 
-  for (let i = 0; i < numSampleSlots; i++) {
-    if (i === 0) {
-      // Sample 0 is a dummy (FlodJS creates an empty sample for it)
+  // -- Read sample metadata (30 bytes each: name[22] + oneshotWord(2) + finetune(1)
+  //    + volume(1) + loopStart(2) + loopLengthWord(2)). Length comes from the size table. --
+  const samples: (SFXSample | null)[] = [null]; // index 0 = dummy
+  for (let s = 1; s <= numSamples; s++) {
+    const mpos = metadataBase + (s - 1) * 30;
+    const name = readString(view, mpos, 22);
+    /* oneshot word */ readUint16BE(view, mpos + 22);  // read for correctness; length from size table
+    /* finetune */ readUint8(view, mpos + 24);
+    const volume = readUint8(view, mpos + 25);
+    const loop = readUint16BE(view, mpos + 26);
+    const repeat = readUint16BE(view, mpos + 28) << 1;
+
+    if (sampleSizes[s] === 0) {
       samples.push(null);
-      // FlodJS skips reading metadata for sample 0 (loop starts at i=1)
-      // but the first 30 bytes after +20 skip correspond to sample 1 in FlodJS
-      // Actually re-reading FlodJS: the loop starts at i=1 and reads metadata for
-      // samples 1..(numSampleSlots-1). Sample 0 has no metadata in the file.
       continue;
     }
-
-    if (sampleSizes[i] === 0) {
-      // No sample data for this slot
-      samples.push(null);
-      pos += 30;
-      continue;
-    }
-
-    const name = readString(view, pos, 22);
-    const length = readUint16BE(view, pos + 22) << 1;
-    /* finetune */ readUint8(view, pos + 24);          // not used, but read for correctness
-    const volume = readUint8(view, pos + 25);          // uint8 at +25 (not uint16 at +24)
-    const loop = readUint16BE(view, pos + 26);
-    const repeat = readUint16BE(view, pos + 28) << 1;
 
     samples.push({
       name,
-      length,
+      length: sampleSizes[s],
       volume: Math.min(volume, 64),
       loop,
       repeat,
-      pointer: samplePointers[i],
+      pointer: samplePointers[s],
     });
-
-    pos += 30;
   }
 
   // -- Read song length and positions -----------------------------------------
