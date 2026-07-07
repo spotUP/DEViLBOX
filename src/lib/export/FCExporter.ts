@@ -35,12 +35,27 @@ function writeU32BE(view: DataView, off: number, val: number): void {
   view.setUint32(off, val, false);
 }
 
-/** XM note (1-96) → FC note (1-72).  XM C-1=13, FC C-1=1. */
+/**
+ * XM note (1-96) → FC pattern note byte (period-table index).
+ *
+ * The FC parser is a replayer: it uses the pattern note byte directly as a
+ * period-table index and emits xmNote = fcPeriodIdxToXM(idx). For the standard
+ * FC period table (FCParser.FC_PERIODS) the first block is chromatic with
+ * xmNote = idx + 13 (idx 0 → period 1712 → XM 13; idx 24 → 428 → XM 37;
+ * idx 36 → 214 → XM 49). The inverse is therefore idx = xmNote - 13, NOT -12 —
+ * the old -12 shifted every reloaded note up a semitone. Only the first block
+ * (idx 1-47, xmNote 14-60) is representable without a transpose macro.
+ */
 function xmNoteToFC(xmNote: number): number {
   if (xmNote === 0) return 0;
   if (xmNote === 97) return 0x49; // note off
-  const fc = xmNote - 12;
-  return (fc < 1 || fc > 72) ? 0 : fc;
+  // First period block: idx 1-47 (period 1616..113) → xmNote 14-60.
+  if (xmNote >= 14 && xmNote <= 60) return xmNote - 13;
+  // Second period block: idx 60-72 (period 3424..1712) covers the low octave
+  // xmNote 1-13, which has no representation in the first block (idx 0 would be
+  // pattern byte 0 = "no note"). fcPeriodIdxToXM(N+59) === xmNote for 1..13.
+  if (xmNote >= 1 && xmNote <= 13) return xmNote + 59;
+  return 0; // xmNote > 60 is not representable without a transpose macro
 }
 
 export function exportFC(song: TrackerSong): ArrayBuffer {

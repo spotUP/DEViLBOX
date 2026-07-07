@@ -132,7 +132,7 @@
       "exporter": "FC (FCExporter)",
       "tier": "pattern-data",
       "status": "pattern-match",
-      "matchPct": 0.125,
+      "matchPct": 0.5024,
       "cells": 2048,
       "bytes": 13588
     },

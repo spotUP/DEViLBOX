@@ -138,6 +138,36 @@ describe('exporter round-trip regressions', () => {
     expect(matched).toBe(cells);
   });
 
+  it('FC export encodes note as period index xmNote-13 (was -12, shifting every note up a semitone)', async () => {
+    const { parseFCFile } = await import('@lib/import/formats/FCParser');
+    const { exportFC } = await import('../FCExporter');
+    const raw = fixture('public/data/songs/formats/anthrox.fc');
+    const song = await parseFCFile(raw, 'anthrox.fc');
+    const out = await toU8(exportFC(song));
+    const re = await parseFCFile(out.buffer.slice(0) as ArrayBuffer, 'anthrox.fc');
+    // Compare NOTE fidelity specifically: the -12/-13 bug moved every reloaded note
+    // up one semitone, so note-only match was ~0. Instrument/effect fidelity is
+    // separately bounded by the FC replayer parser (encounter-ordered instrument
+    // ids, macro-derived effects) and is not asserted here.
+    let notes = 0, notesMatched = 0;
+    const pN = Math.min(song.patterns.length, re.patterns.length);
+    for (let p = 0; p < pN; p++) {
+      for (let c = 0; c < 4; c++) {
+        const a = song.patterns[p].channels[c]?.rows ?? [];
+        const b = re.patterns[p].channels[c]?.rows ?? [];
+        const rN = Math.min(a.length, b.length);
+        for (let r = 0; r < rN; r++) {
+          if ((a[r].note ?? 0) > 0 && (a[r].note ?? 0) <= 60) {
+            notes++;
+            if (a[r].note === b[r].note) notesMatched++;
+          }
+        }
+      }
+    }
+    expect(notes).toBeGreaterThan(100);
+    expect(notesMatched / notes).toBeGreaterThan(0.95);
+  });
+
   it('MOD export round-trips note/instrument/effect cells through MODParser', async () => {
     const { parseMODFile } = await import('@lib/import/formats/MODParser');
     const { exportSongToMOD } = await import('../modExport');
