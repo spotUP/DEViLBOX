@@ -1,0 +1,470 @@
+{
+  "results": {
+    "actionamics": {
+      "exporter": "ActionamicsExporter.exportActionamics",
+      "tier": "pattern-data",
+      "status": "pattern-match",
+      "matchPct": 0.5534,
+      "cells": 768,
+      "bytes": 126054
+    },
+    "activisionPro": {
+      "exporter": "ActivisionProExporter.exportActivisionPro",
+      "tier": "pattern-data",
+      "status": "reparse-error",
+      "matchPct": 0,
+      "cells": 0,
+      "bytes": 106856
+    },
+    "adPlug": {
+      "exporter": "AdPlug (AdPlugExporter)",
+      "tier": "pattern-data",
+      "status": "missing-fixture",
+      "matchPct": 0,
+      "cells": 0,
+      "bytes": 0
+    },
+    "amosMusicBank": {
+      "exporter": "AMOSMusicBankExporter.exportAMOSMusicBank",
+      "tier": "pattern-data",
+      "status": "missing-fixture",
+      "matchPct": 0,
+      "cells": 0,
+      "bytes": 0
+    },
+    "c67": {
+      "exporter": "CDFM67Exporter.exportCDFM67",
+      "tier": "pattern-data",
+      "status": "reparse-error",
+      "matchPct": 0,
+      "cells": 0,
+      "bytes": 4210
+    },
+    "chuckBiscuits": {
+      "exporter": "ChuckBiscuitsExporter.exportChuckBiscuits",
+      "tier": "pattern-data",
+      "status": "missing-fixture",
+      "matchPct": 0,
+      "cells": 0,
+      "bytes": 0
+    },
+    "composer667": {
+      "exporter": "Composer667Exporter.exportComposer667",
+      "tier": "pattern-data",
+      "status": "parse-error",
+      "matchPct": 0,
+      "cells": 0,
+      "bytes": 0
+    },
+    "deltaMusic1": {
+      "exporter": "DeltaMusic1Exporter.exportDeltaMusic1",
+      "tier": "pattern-data",
+      "status": "pattern-match",
+      "matchPct": 0.4193,
+      "cells": 1536,
+      "bytes": 11716
+    },
+    "deltaMusic2": {
+      "exporter": "DeltaMusic2Exporter.exportDeltaMusic2",
+      "tier": "pattern-data",
+      "status": "pattern-match",
+      "matchPct": 0,
+      "cells": 7168,
+      "bytes": 21642
+    },
+    "digiBooster": {
+      "exporter": "DIGI (DigiBoosterExporter)",
+      "tier": "pattern-data",
+      "status": "pattern-match",
+      "matchPct": 0.9994,
+      "cells": 15360,
+      "bytes": 576960
+    },
+    "digiBoosterPro": {
+      "exporter": "DigiBoosterProExporter.exportDigiBoosterPro",
+      "tier": "pattern-data",
+      "status": "pattern-match",
+      "matchPct": 1,
+      "cells": 58752,
+      "bytes": 877488
+    },
+    "digitalMugician": {
+      "exporter": "DigitalMugicianExporter.exportDigitalMugician",
+      "tier": "pattern-data",
+      "status": "pattern-match",
+      "matchPct": 0.7791,
+      "cells": 2816,
+      "bytes": 17286
+    },
+    "digitalSymphony": {
+      "exporter": "DigitalSymphonyExporter.exportDigitalSymphony",
+      "tier": "pattern-data",
+      "status": "missing-fixture",
+      "matchPct": 0,
+      "cells": 0,
+      "bytes": 0
+    },
+    "dsm_dyn": {
+      "exporter": "DSMDynExporter.exportDSMDyn",
+      "tier": "pattern-data",
+      "status": "missing-fixture",
+      "matchPct": 0,
+      "cells": 0,
+      "bytes": 0
+    },
+    "earAche": {
+      "exporter": "EarAcheExporter.exportEarAche",
+      "tier": "pattern-data",
+      "status": "pattern-match",
+      "matchPct": 1,
+      "cells": 256,
+      "bytes": 1288
+    },
+    "faceTheMusic": {
+      "exporter": "FaceTheMusicExporter.exportFaceTheMusic",
+      "tier": "pattern-data",
+      "status": "pattern-match",
+      "matchPct": 0.6081,
+      "cells": 7552,
+      "bytes": 187688
+    },
+    "fc": {
+      "exporter": "FC (FCExporter)",
+      "tier": "pattern-data",
+      "status": "pattern-match",
+      "matchPct": 0.125,
+      "cells": 2048,
+      "bytes": 13588
+    },
+    "fredEditor": {
+      "exporter": "FredEditorExporter.exportFredEditor",
+      "tier": "pattern-data",
+      "status": "pattern-match",
+      "matchPct": 0.9994,
+      "cells": 65312,
+      "bytes": 11080
+    },
+    "futurePlayer": {
+      "exporter": "FuturePlayerExporter.exportAsFuturePlayer",
+      "tier": "byte-exact",
+      "status": "byte-exact",
+      "matchPct": 1,
+      "cells": 22716,
+      "bytes": 22716
+    },
+    "gameMusicCreator": {
+      "exporter": "GameMusicCreatorExporter.exportGameMusicCreator",
+      "tier": "pattern-data",
+      "status": "pattern-match",
+      "matchPct": 0.6341,
+      "cells": 768,
+      "bytes": 3516
+    },
+    "hippelCoSo": {
+      "exporter": "HippelCoSoExporter.exportAsHippelCoSo",
+      "tier": "pattern-data",
+      "status": "pattern-match",
+      "matchPct": 0.3219,
+      "cells": 1920,
+      "bytes": 2448
+    },
+    "hivelyAHX": {
+      "exporter": "AHX (HivelyExporter)",
+      "tier": "pattern-data",
+      "status": "pattern-match",
+      "matchPct": 1,
+      "cells": 2048,
+      "bytes": 3808
+    },
+    "hivelyHVL": {
+      "exporter": "HVL (HivelyExporter)",
+      "tier": "pattern-data",
+      "status": "pattern-match",
+      "matchPct": 1,
+      "cells": 46080,
+      "bytes": 39274
+    },
+    "iffSmus": {
+      "exporter": "IffSmusExporter.exportIffSmus",
+      "tier": "pattern-data",
+      "status": "pattern-match",
+      "matchPct": 0.8161,
+      "cells": 17688,
+      "bytes": 4490
+    },
+    "ims": {
+      "exporter": "IMSExporter.exportIMS",
+      "tier": "pattern-data",
+      "status": "pattern-match",
+      "matchPct": 1,
+      "cells": 256,
+      "bytes": 48532
+    },
+    "inStereo1": {
+      "exporter": "IS10 (InStereo1Exporter)",
+      "tier": "pattern-data",
+      "status": "pattern-match",
+      "matchPct": 1,
+      "cells": 13056,
+      "bytes": 117928
+    },
+    "inStereo2": {
+      "exporter": "InStereo2Exporter.exportInStereo2",
+      "tier": "pattern-data",
+      "status": "pattern-match",
+      "matchPct": 0.9971,
+      "cells": 5248,
+      "bytes": 31452
+    },
+    "jamCracker": {
+      "exporter": "JamCracker (JamCrackerExporter)",
+      "tier": "pattern-data",
+      "status": "pattern-match",
+      "matchPct": 1,
+      "cells": 1280,
+      "bytes": 48558
+    },
+    "klystrack": {
+      "exporter": "KT (KlysExporter)",
+      "tier": "byte-exact",
+      "status": "byte-exact",
+      "matchPct": 1,
+      "cells": 8144,
+      "bytes": 8144
+    },
+    "kris": {
+      "exporter": "KRISExporter.exportKRIS",
+      "tier": "pattern-data",
+      "status": "missing-fixture",
+      "matchPct": 0,
+      "cells": 0,
+      "bytes": 0
+    },
+    "mod": {
+      "exporter": "MOD bake (modExport)",
+      "tier": "pattern-data",
+      "status": "export-error",
+      "matchPct": 0,
+      "cells": 0,
+      "bytes": 0
+    },
+    "musicAssembler": {
+      "exporter": "MusicAssemblerExporter.exportAsMusicAssembler",
+      "tier": "byte-exact",
+      "status": "byte-exact",
+      "matchPct": 1,
+      "cells": 2864,
+      "bytes": 2864
+    },
+    "musicLine": {
+      "exporter": "MusicLineExporter.exportMusicLineFile",
+      "tier": "pattern-data",
+      "status": "pattern-match",
+      "matchPct": 0.7684,
+      "cells": 963,
+      "bytes": 68820
+    },
+    "nru": {
+      "exporter": "NRUExporter.exportNRU",
+      "tier": "pattern-data",
+      "status": "pattern-match",
+      "matchPct": 0.9336,
+      "cells": 256,
+      "bytes": 38486
+    },
+    "octaMED": {
+      "exporter": "OctaMED (MEDExporter)",
+      "tier": "pattern-data",
+      "status": "reparse-error",
+      "matchPct": 0,
+      "cells": 0,
+      "bytes": 74294
+    },
+    "oktalyzer": {
+      "exporter": "OKT (OktalyzerExporter)",
+      "tier": "pattern-data",
+      "status": "reparse-error",
+      "matchPct": 0,
+      "cells": 0,
+      "bytes": 238762
+    },
+    "preTracker": {
+      "exporter": "PreTracker (PreTrackerExporter, store-dependent)",
+      "tier": "pattern-data",
+      "status": "export-error",
+      "matchPct": 0,
+      "cells": 0,
+      "bytes": 0
+    },
+    "pumaTracker": {
+      "exporter": "PumaTracker (PumaTrackerExporter)",
+      "tier": "pattern-data",
+      "status": "pattern-match",
+      "matchPct": 0.9927,
+      "cells": 1920,
+      "bytes": 13838
+    },
+    "quadraComposer": {
+      "exporter": "QuadraComposerExporter.exportQuadraComposer",
+      "tier": "pattern-data",
+      "status": "pattern-match",
+      "matchPct": 0.4641,
+      "cells": 2064,
+      "bytes": 40992
+    },
+    "sawteeth": {
+      "exporter": "SawteethExporter.exportSawteeth",
+      "tier": "pattern-data",
+      "status": "pattern-match",
+      "matchPct": 1,
+      "cells": 1376,
+      "bytes": 4626
+    },
+    "scumm": {
+      "exporter": "SCUMMExporter.exportSCUMM",
+      "tier": "byte-exact",
+      "status": "byte-exact",
+      "matchPct": 1,
+      "cells": 51024,
+      "bytes": 51024
+    },
+    "sidmon1": {
+      "exporter": "SidMon1Exporter.exportSidMon1",
+      "tier": "pattern-data",
+      "status": "pattern-match",
+      "matchPct": 0.5247,
+      "cells": 1536,
+      "bytes": 4324
+    },
+    "sidMon2": {
+      "exporter": "SidMon2 (SidMon2Exporter)",
+      "tier": "byte-exact",
+      "status": "byte-exact",
+      "matchPct": 1,
+      "cells": 11408,
+      "bytes": 11408
+    },
+    "sonicArranger": {
+      "exporter": "SonicArrangerExporter.exportSonicArranger",
+      "tier": "pattern-data",
+      "status": "pattern-match",
+      "matchPct": 1,
+      "cells": 8320,
+      "bytes": 113990
+    },
+    "soundControl": {
+      "exporter": "SoundControlExporter.exportSoundControl",
+      "tier": "pattern-data",
+      "status": "pattern-match",
+      "matchPct": 0.9488,
+      "cells": 33396,
+      "bytes": 77536
+    },
+    "soundFactory": {
+      "exporter": "SoundFactoryExporter.exportSoundFactory",
+      "tier": "pattern-data",
+      "status": "pattern-match",
+      "matchPct": 0.9711,
+      "cells": 9840,
+      "bytes": 2938
+    },
+    "soundfx": {
+      "exporter": "SoundFXExporter.exportSoundFX",
+      "tier": "pattern-data",
+      "status": "reparse-error",
+      "matchPct": 0,
+      "cells": 0,
+      "bytes": 1684
+    },
+    "soundMon": {
+      "exporter": "SMON (SoundMonExporter)",
+      "tier": "pattern-data",
+      "status": "pattern-match",
+      "matchPct": 1,
+      "cells": 1024,
+      "bytes": 7574
+    },
+    "stp": {
+      "exporter": "STPExporter.exportSTP",
+      "tier": "pattern-data",
+      "status": "pattern-match",
+      "matchPct": 0.7722,
+      "cells": 4864,
+      "bytes": 278274
+    },
+    "symphoniePro": {
+      "exporter": "Symphonie (SymphonieProExporter)",
+      "tier": "pattern-data",
+      "status": "pattern-match",
+      "matchPct": 0.0368,
+      "cells": 17920,
+      "bytes": 666994
+    },
+    "synthesis": {
+      "exporter": "SynthesisExporter.exportSynthesis",
+      "tier": "pattern-data",
+      "status": "missing-fixture",
+      "matchPct": 0,
+      "cells": 0,
+      "bytes": 0
+    },
+    "synTracker": {
+      "exporter": "SynTracker (SynTrackerExporter)",
+      "tier": "byte-exact",
+      "status": "byte-exact",
+      "matchPct": 1,
+      "cells": 24804,
+      "bytes": 24804
+    },
+    "tcbTracker": {
+      "exporter": "TCBTrackerExporter.exportTCBTracker",
+      "tier": "pattern-data",
+      "status": "pattern-match",
+      "matchPct": 0.9961,
+      "cells": 4608,
+      "bytes": 245786
+    },
+    "tfmx": {
+      "exporter": "TFMXExporter.exportTFMX",
+      "tier": "pattern-data",
+      "status": "pattern-match",
+      "matchPct": 0.6154,
+      "cells": 7520,
+      "bytes": 26048
+    },
+    "unic": {
+      "exporter": "UNICExporter.exportUNIC",
+      "tier": "pattern-data",
+      "status": "pattern-match",
+      "matchPct": 1,
+      "cells": 5120,
+      "bytes": 100942
+    },
+    "xmf": {
+      "exporter": "XMFExporter.exportXMF",
+      "tier": "pattern-data",
+      "status": "missing-fixture",
+      "matchPct": 0,
+      "cells": 0,
+      "bytes": 0
+    },
+    "zoundMonitor": {
+      "exporter": "ZoundMonitorExporter.exportZoundMonitor",
+      "tier": "pattern-data",
+      "status": "pattern-match",
+      "matchPct": 1,
+      "cells": 1408,
+      "bytes": 6689
+    }
+  },
+  "missingFixture": [
+    "adPlug",
+    "amosMusicBank",
+    "chuckBiscuits",
+    "digitalSymphony",
+    "dsm_dyn",
+    "kris",
+    "synthesis",
+    "xmf"
+  ]
+}
