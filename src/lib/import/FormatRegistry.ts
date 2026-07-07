@@ -1186,6 +1186,19 @@ export const FORMAT_REGISTRY: FormatDefinition[] = [
     uadeFallback: true,
   },
   {
+    // MaxTrax: MIDI-like event format (MXTX magic). UADE can't play it (ret=-1), so it MUST
+    // route to the native parser — drag-drop's UnifiedFileLoader only uses parseModuleToSong
+    // when the matched format has a nativeParser. Placed before the uade-only prefix catch-all.
+    key: 'maxTrax',
+    label: 'MaxTrax',
+    description: 'MaxTrax (.mxtx, MXTX magic) — native event parser',
+    family: 'amiga-native',
+    matchMode: 'extension',
+    extRegex: /\.mxtx$/i,
+    nativeParser: { module: '@lib/import/formats/MaxTraxParser', parseFn: 'parseMaxTraxFile', detectFn: 'isMaxTraxFormat' },
+    uadeFallback: false,
+  },
+  {
     key: 'fashionTracker',
     label: 'Fashion Tracker',
     description: 'Fashion Tracker (ex.* prefix)',

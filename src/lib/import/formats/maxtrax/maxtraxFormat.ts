@@ -84,6 +84,52 @@ export function parseMaxTrax(buffer: ArrayBuffer | Uint8Array): MaxTraxData {
   return { tempo, flags, headerRaw, scores, tailRaw };
 }
 
+export interface MaxTraxSample {
+  number: number;
+  tune: number;
+  volume: number;
+  octaves: number;
+  attackLen: number;
+  sustainLen: number;
+  /** First-octave PCM (attack + sustain), raw 8-bit signed bytes. */
+  pcm: Uint8Array;
+}
+
+/**
+ * Decode the sample bank from tailRaw into playable PCM (for building Sampler instruments).
+ * Layout (big-endian): u16 numSamples, then per sample a 20-byte DiskSample header
+ * (Number, Tune, Volume, Octaves, AttackLength L, SustainLength L, AttackCount, ReleaseCount),
+ * AttackCount*4 + ReleaseCount*4 envelope bytes, then per octave (attack+sustain) PCM where
+ * both lengths DOUBLE each octave. We keep the first (lowest) octave for the sampler.
+ */
+export function decodeMaxTraxSamples(data: MaxTraxData): MaxTraxSample[] {
+  const b = data.tailRaw;
+  if (b.length < 2) return [];
+  const dv = new DataView(b.buffer, b.byteOffset, b.byteLength);
+  let p = 0;
+  const numSamples = dv.getUint16(p); p += 2;
+  const out: MaxTraxSample[] = [];
+  for (let s = 0; s < numSamples; s++) {
+    if (p + 20 > b.length) break;
+    const number = dv.getUint16(p);
+    const tune = dv.getInt16(p + 2);
+    const volume = dv.getUint16(p + 4);
+    const octaves = dv.getUint16(p + 6);
+    const attackLen = dv.getUint32(p + 8);
+    const sustainLen = dv.getUint32(p + 12);
+    const attackCount = dv.getUint16(p + 16);
+    const releaseCount = dv.getUint16(p + 18);
+    p += 20 + (attackCount + releaseCount) * 4;
+    // First octave PCM = attackLen + sustainLen bytes (raw signed 8-bit, as stored).
+    const firstLen = attackLen + sustainLen;
+    const pcm = b.slice(p, Math.min(p + firstLen, b.length));
+    // Advance past all octaves: (atk+sus)*(2^octaves - 1).
+    p += firstLen * (Math.pow(2, octaves) - 1);
+    out.push({ number, tune, volume, octaves, attackLen, sustainLen, pcm });
+  }
+  return out;
+}
+
 export function encodeMaxTrax(data: MaxTraxData): Uint8Array {
   let size = data.headerRaw.length + data.tailRaw.length;
   for (const score of data.scores) size += 4 + score.events.length * EVENT_SIZE;
