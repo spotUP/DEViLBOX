@@ -59,7 +59,7 @@ export const LAYOUT_FIXTURES: Record<string, string> = {
   soundControl: 'public/data/songs/soundcontrol/north sea inferno ongame1.sc',
   c67: 'public/data/songs/formats/amnesia_credits.c67',
   zoundMonitor: 'public/data/songs/zoundmonitor/sonjavanveen.sng',
-  composer667: 'public/data/songs/composer-667/sunset.667',
+  composer667: 'public/data/songs/composer-667/speed fighter.667',
   nru: 'public/data/songs/formats/howiedavies.nru',
   ims: 'public/data/songs/images-music-system/chip5.ims',
   stp: 'public/data/songs/formats/noname.stp',
