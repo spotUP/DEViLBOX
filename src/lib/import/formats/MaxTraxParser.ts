@@ -3,10 +3,11 @@
  *
  * MaxTrax is a MIDI-like event format (see maxtrax/maxtraxFormat.ts for the lossless codec).
  * UADE cannot play it in this build (ret=-1), so it's handled natively: this parser decodes
- * the scores into a QUANTIZED tracker-pattern view for display, and stores the raw file bytes
- * (uadeEditableFileData) so export round-trips byte-exactly via encodeMaxTrax (dispatched by
- * the MXTX magic in nativeExportRouter). No DEViLBOX playback yet — the event stream would
- * need a MaxTrax replayer.
+ * the scores into a QUANTIZED tracker-pattern view with real Sampler instruments (played by
+ * the native tracker engine), and stores the raw file bytes in maxTraxFileData so export
+ * round-trips byte-exactly via encodeMaxTrax (dispatched by the MXTX magic in
+ * nativeExportRouter). maxTraxFileData is deliberately NOT uadeEditableFileData — that field
+ * routes playback to UADEEditableSynth, which fails (ret=-1) and silences the song.
  *
  * Score events (6-byte CookedEvent): command 0x00-0x7F = MIDI note (data = velocity<<... | chan,
  * startTime/stopTime in ticks); 0x80 tempo, 0xA0 special, 0xB0 CC, 0xC0 prog, 0xE0 bend, 0xFF end.
@@ -62,28 +63,22 @@ export function parseMaxTraxFile(buffer: ArrayBuffer, filename: string): Tracker
       instrumentId: null, color: null,
       rows: Array.from({ length: ROWS_PER_PATTERN }, emptyCell),
     })),
+    // MOD (Amiga period) note math — without this, playback falls back to 'XM'
+    // which treats note > 96 as key-off and silences most MaxTrax MIDI notes.
+    importMetadata: {
+      sourceFormat: 'MOD' as const, sourceFile: filename,
+      importedAt: new Date().toISOString(),
+      originalChannelCount: numChannels, originalPatternCount: numPatterns,
+      originalInstrumentCount: 0,
+    },
   }));
-
-  // Walk events in order, tracking each channel's current program (0xC0) so notes get their
-  // real patch, and place notes on the quantized grid.
-  const channelPatch = new Array(16).fill(0);
-  for (const ev of score.events) {
-    const ch = ev.data & 0x0f;
-    if (ev.command === 0xc0) { channelPatch[ch] = ev.stopTime & 0xff; continue; } // program change
-    if (ev.command < 1 || ev.command >= 0x80) continue; // not a note
-    const absRow = Math.floor(ev.startTime / TICKS_PER_ROW);
-    const patIdx = Math.floor(absRow / ROWS_PER_PATTERN);
-    const row = absRow % ROWS_PER_PATTERN;
-    const cIdx = Math.min(numChannels - 1, ch);
-    const cell = patterns[patIdx]?.channels[cIdx]?.rows[row];
-    if (cell && cell.note === 0) {
-      cell.note = ev.command;                 // MIDI note number
-      cell.instrument = channelPatch[ch] + 1; // 1-based patch → instrument id
-    }
-  }
 
   // Real instruments from the sample bank (was: 16 identical placeholders → every note
   // sounded the same). Each MaxTrax sample becomes a Sampler with its first-octave PCM.
+  // Built BEFORE placing notes so cells can be mapped to instruments that actually exist:
+  // sample Numbers can be sparse (e.g. 1,9,10,11,12 with no 0), and a MaxTrax patch is the
+  // sample Number, so a note that plays before any program change (default patch 0) must
+  // fall back to a real sample instead of referencing a non-existent instrument (silent).
   const samples = decodeMaxTraxSamples(data);
   const instruments: InstrumentConfig[] = [];
   for (const smp of samples) {
@@ -101,6 +96,27 @@ export function parseMaxTraxFile(buffer: ArrayBuffer, filename: string): Tracker
   if (instruments.length === 0) {
     instruments.push({ id: 1, name: 'Sample 0', type: 'synth' as const, synthType: 'Synth' as const, effects: [], volume: 0, pan: 0 } as InstrumentConfig);
   }
+  const validIds = new Set(instruments.map((i) => i.id));
+  const firstId = instruments[0].id;
+  const patchToId = (patch: number): number => (validIds.has(patch + 1) ? patch + 1 : firstId);
+
+  // Walk events in order, tracking each channel's current program (0xC0) so notes get their
+  // real patch, and place notes on the quantized grid.
+  const channelPatch = new Array(16).fill(0);
+  for (const ev of score.events) {
+    const ch = ev.data & 0x0f;
+    if (ev.command === 0xc0) { channelPatch[ch] = ev.stopTime & 0xff; continue; } // program change
+    if (ev.command < 1 || ev.command >= 0x80) continue; // not a note
+    const absRow = Math.floor(ev.startTime / TICKS_PER_ROW);
+    const patIdx = Math.floor(absRow / ROWS_PER_PATTERN);
+    const row = absRow % ROWS_PER_PATTERN;
+    const cIdx = Math.min(numChannels - 1, ch);
+    const cell = patterns[patIdx]?.channels[cIdx]?.rows[row];
+    if (cell && cell.note === 0) {
+      cell.note = ev.command;                    // MIDI note number
+      cell.instrument = patchToId(channelPatch[ch]); // patch (=sample Number) → existing id
+    }
+  }
 
   return {
     name: `${baseName} [MaxTrax]`,
@@ -114,7 +130,13 @@ export function parseMaxTraxFile(buffer: ArrayBuffer, filename: string): Tracker
     initialSpeed: 6,
     initialBPM: data.tempo || 125,
     linearPeriods: false,
-    uadeEditableFileData: buffer.slice(0) as ArrayBuffer,
-    uadeEditableFileName: filename,
+    // Samples are quantized to a tracker grid with no WASM replayer, so the TS
+    // scheduler must trigger the Sampler instruments directly.
+    nativeSamplePlayback: true,
+    // Raw bytes for byte-exact export only. Deliberately NOT uadeEditableFileData:
+    // that field routes playback to UADEEditableSynth, but UADE cannot play MaxTrax
+    // (ret=-1) → silence. MaxTrax plays natively via the Sampler instruments below.
+    maxTraxFileData: buffer.slice(0) as ArrayBuffer,
+    maxTraxFileName: filename,
   };
 }
