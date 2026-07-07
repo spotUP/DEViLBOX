@@ -69,9 +69,6 @@ function extractPcm(inst: { sample?: { audioBuffer?: ArrayBuffer } }): Int8Array
 function buildChannelOpcodes(
   song: TrackerSong,
   channelIdx: number,
-  definedInstrSlots: Set<number>,
-  instrumentPcms: Map<number, Int8Array>,
-  instrumentPeriods: Map<number, number>,
   warnings: string[],
 ): Uint8Array {
   const chunks: Uint8Array[] = [];
@@ -93,27 +90,14 @@ function buildChannelOpcodes(
       const xmNote = cell.note ?? 0;
       const instrId = cell.instrument ?? 0;
 
-      // Instrument change: define it inline if first use, then select it
+      // Instrument change: select via UseInstrument. All instruments are pre-defined
+      // once, in id order, in the channel-0 preamble (see exportSoundFactory), so the
+      // parser's discovery-order id equals the original id and slot = id-1 round-trips.
       if (instrId > 0 && instrId !== currentInstrId) {
-        if (!definedInstrSlots.has(instrId)) {
-          // Emit DefineInstrument for this instrument
-          const defBytes = buildDefineInstrument(
-            instrId - 1, // slot is 0-based
-            instrumentPcms.get(instrId) ?? new Int8Array(0),
-            instrumentPeriods.get(instrId) ?? 214,
-            song.instruments[instrId - 1],
-          );
-          if (defBytes) {
-            chunks.push(defBytes);
-            definedInstrSlots.add(instrId);
-          }
-        } else {
-          // Already defined — emit UseInstrument
-          const useBytes = new Uint8Array(2);
-          useBytes[0] = Op.UseInstrument;
-          useBytes[1] = instrId - 1; // slot index (0-based)
-          chunks.push(useBytes);
-        }
+        const useBytes = new Uint8Array(2);
+        useBytes[0] = Op.UseInstrument;
+        useBytes[1] = (instrId - 1) & 0xFF; // slot index (0-based)
+        chunks.push(useBytes);
         currentInstrId = instrId;
       }
 
@@ -308,16 +292,42 @@ export async function exportSoundFactory(
     instrumentPeriods.set(id, period);
   }
 
-  // Build opcode streams for each channel
-  // Instruments are defined inline on first use per channel; subsequent channels reuse via UseInstrument
-  const definedInstrSlots = new Set<number>();
-  const channelOpcodes: Uint8Array[] = [];
-
-  for (let ch = 0; ch < NUM_CHANNELS; ch++) {
-    const opcodes = buildChannelOpcodes(
-      song, ch, definedInstrSlots, instrumentPcms, instrumentPeriods, warnings,
+  // Define EVERY instrument once, up front, in id order (slot 0..N-1), as a preamble
+  // to channel 0. The parser assigns instrument ids by the order DefineInstrument
+  // opcodes are discovered while walking channels 0..3 (SoundFactoryParser.ts:433-440),
+  // so emitting the full table in id order makes the re-parsed discovery id equal the
+  // original id — and UseInstrument's `slot+1` decode (bounded by the discovered count)
+  // then round-trips exactly. Inline first-use definition reordered the table and
+  // dropped references whose slot exceeded the shrunken discovered count.
+  const preambleChunks: Uint8Array[] = [];
+  for (let i = 0; i < song.instruments.length; i++) {
+    const def = buildDefineInstrument(
+      i, // slot is 0-based (= id-1)
+      instrumentPcms.get(i + 1) ?? new Int8Array(0),
+      instrumentPeriods.get(i + 1) ?? 214,
+      song.instruments[i],
     );
-    channelOpcodes.push(opcodes);
+    if (def) preambleChunks.push(def);
+  }
+  const preambleLen = preambleChunks.reduce((s, c) => s + c.length, 0);
+  const preamble = new Uint8Array(preambleLen);
+  {
+    let off = 0;
+    for (const c of preambleChunks) { preamble.set(c, off); off += c.length; }
+  }
+
+  // Build opcode streams for each channel (UseInstrument only; all defs are in preamble)
+  const channelOpcodes: Uint8Array[] = [];
+  for (let ch = 0; ch < NUM_CHANNELS; ch++) {
+    const opcodes = buildChannelOpcodes(song, ch, warnings);
+    if (ch === 0) {
+      const merged = new Uint8Array(preamble.length + opcodes.length);
+      merged.set(preamble, 0);
+      merged.set(opcodes, preamble.length);
+      channelOpcodes.push(merged);
+    } else {
+      channelOpcodes.push(opcodes);
+    }
   }
 
   // Calculate total opcode stream length
