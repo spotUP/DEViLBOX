@@ -177,18 +177,13 @@ function syncBulkEdit(patternIndex: number, pattern: import('@typedefs').Pattern
     const replayer = getTrackerReplayer();
     const song = replayer.getSong();
     if (song?.uadePatternLayout) {
-      import('@engine/uade/UADEChipEditor').then(({ UADEChipEditor }) => {
-        import('@engine/uade/UADEEngine').then(({ UADEEngine }) => {
-          if (UADEEngine.hasInstance()) {
-            const editor = new UADEChipEditor(UADEEngine.getInstance());
-            for (let ch = 0; ch < pattern.channels.length; ch++) {
-              const rows = pattern.channels[ch].rows;
-              for (let row = 0; row < rows.length; row++) {
-                editor.patchPatternCell(song.uadePatternLayout!, patternIndex, row, ch, rows[row]);
-              }
-            }
+      import('@engine/uade/writeCellToChipRam').then(({ writeCellToChipRam }) => {
+        for (let ch = 0; ch < pattern.channels.length; ch++) {
+          const rows = pattern.channels[ch].rows;
+          for (let row = 0; row < rows.length; row++) {
+            void writeCellToChipRam(song, patternIndex, row, ch, rows[row]);
           }
-        });
+        }
       });
     }
   } catch { /* UADE not active */ }
@@ -497,42 +492,21 @@ export const useTrackerStore = create<TrackerStore>()(
           OpenMPTEditBridge.syncCellEdit(patternIndex, channelIndex, rowIndex, cellUpdate, fullCell);
         }
       }
-      // Sync edit to UADE chip RAM if format has a pattern layout
+      // Sync edit to UADE chip RAM (fixed-length layout) and/or the TFMX
+      // mdat buffer (direct binary patch for WASM playback) via the unified
+      // single-cell chip-RAM write helper.
       try {
         const replayer = getTrackerReplayer();
         const song = replayer.getSong();
         if (song?.uadePatternLayout) {
           const fullCell = get().patterns[patternIndex]?.channels[channelIndex]?.rows[rowIndex];
           if (fullCell) {
-            import('@engine/uade/UADEChipEditor').then(({ UADEChipEditor }) => {
-              import('@engine/uade/UADEEngine').then(({ UADEEngine }) => {
-                if (UADEEngine.hasInstance()) {
-                  const editor = new UADEChipEditor(UADEEngine.getInstance());
-                  editor.patchPatternCell(song.uadePatternLayout!, patternIndex, rowIndex, channelIndex, fullCell);
-                }
-              });
+            import('@engine/uade/writeCellToChipRam').then(({ writeCellToChipRam }) => {
+              void writeCellToChipRam(song, patternIndex, rowIndex, channelIndex, fullCell);
             });
           }
         }
-      } catch { /* UADE not active */ }
-      // Sync edit to TFMX mdat buffer (direct binary patch for WASM playback)
-      try {
-        const fmt = require('./useFormatStore').useFormatStore.getState();
-        if (fmt.tfmxFileData && fmt.uadePatternLayout) {
-          const fullCell = get().patterns[patternIndex]?.channels[channelIndex]?.rows[rowIndex];
-          if (fullCell) {
-            const { getCellFileOffset } = require('@engine/uade/UADEPatternEncoder');
-            const offset = getCellFileOffset(fmt.uadePatternLayout, patternIndex, rowIndex, channelIndex);
-            if (offset >= 0) {
-              const encoded = fmt.uadePatternLayout.encodeCell(fullCell);
-              const buf = new Uint8Array(fmt.tfmxFileData);
-              for (let i = 0; i < encoded.length && offset + i < buf.length; i++) {
-                buf[offset + i] = encoded[i];
-              }
-            }
-          }
-        }
-      } catch { /* TFMX not active */ }
+      } catch { /* UADE / TFMX not active */ }
       // Sync edit to StarTrekker AM WASM engine (direct MOD pattern cell write)
       try {
         const fmt = require('./useFormatStore').useFormatStore.getState();
@@ -685,20 +659,17 @@ export const useTrackerStore = create<TrackerStore>()(
       if (OpenMPTEditBridge.isActive()) {
         OpenMPTEditBridge.syncCellClear(patternIndex, channelIndex, rowIndex);
       }
-      // Sync clear to UADE chip RAM if format has a pattern layout
+      // Sync clear to UADE chip RAM if format has a pattern layout. The cleared
+      // cell is the now-empty cell read back from the store, so the helper
+      // encodes and writes an empty/zero cell into chip RAM.
       try {
         const replayer = getTrackerReplayer();
         const song = replayer.getSong();
         if (song?.uadePatternLayout) {
           const clearedCell = get().patterns[patternIndex]?.channels[channelIndex]?.rows[rowIndex];
           if (clearedCell) {
-            import('@engine/uade/UADEChipEditor').then(({ UADEChipEditor }) => {
-              import('@engine/uade/UADEEngine').then(({ UADEEngine }) => {
-                if (UADEEngine.hasInstance()) {
-                  const editor = new UADEChipEditor(UADEEngine.getInstance());
-                  editor.patchPatternCell(song.uadePatternLayout!, patternIndex, rowIndex, channelIndex, clearedCell);
-                }
-              });
+            import('@engine/uade/writeCellToChipRam').then(({ writeCellToChipRam }) => {
+              void writeCellToChipRam(song, patternIndex, rowIndex, channelIndex, clearedCell);
             });
           }
         }
