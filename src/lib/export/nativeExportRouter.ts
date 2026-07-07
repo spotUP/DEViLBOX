@@ -136,6 +136,14 @@ export async function exportNativeSong(
       resolvedSong = { ...resolvedSong, uadeEditableFileData: fmtData } as TrackerSong;
     }
   }
+  // MaxTrax is native-played (not UADE-routed), so its bytes live in maxTraxFileData.
+  if (!resolvedSong.maxTraxFileData) {
+    const { useFormatStore } = await import('@stores/useFormatStore');
+    const fmtData = useFormatStore.getState().maxTraxFileData;
+    if (fmtData) {
+      resolvedSong = { ...resolvedSong, maxTraxFileData: fmtData } as TrackerSong;
+    }
+  }
 
   const raw = await dispatchNativeExport(resolvedSong);
   return raw ? normalize(raw) : null;
@@ -203,7 +211,7 @@ async function reconstructSongFromFormatStore(): Promise<TrackerSong | null> {
   // Magic-dispatched formats that never load into a replayer (e.g. MaxTrax — UADE can't play
   // it) still hold their editable bytes in the store. Rebuild a minimal song carrying them so
   // the magic exporters (isMaxTrax / isSynTracker) fire.
-  if (fmt.uadeEditableFileData &&
+  if ((fmt.uadeEditableFileData || fmt.maxTraxFileData) &&
       !(fmt.editorMode === 'hively' || fmt.editorMode === 'klystrack' || fmt.editorMode === 'jamcracker')) {
     const { useTrackerStore, useTransportStore, useProjectStore, useInstrumentStore } = await import('@stores');
     const ts = useTrackerStore.getState();
@@ -218,8 +226,10 @@ async function reconstructSongFromFormatStore(): Promise<TrackerSong | null> {
       numChannels: ts.patterns[0]?.channels?.length ?? 4,
       initialSpeed: useTransportStore.getState().speed ?? 6,
       initialBPM: useTransportStore.getState().bpm ?? 125,
-      uadeEditableFileData: fmt.uadeEditableFileData,
+      uadeEditableFileData: fmt.uadeEditableFileData ?? undefined,
       uadeEditableFileName: fmt.uadeEditableFileName ?? undefined,
+      maxTraxFileData: fmt.maxTraxFileData ?? undefined,
+      maxTraxFileName: fmt.maxTraxFileName ?? undefined,
     } as TrackerSong;
   }
 
@@ -262,7 +272,7 @@ function isSynTracker(song: TrackerSong): boolean {
 }
 
 function isMaxTrax(song: TrackerSong): boolean {
-  const d = song.uadeEditableFileData;
+  const d = song.maxTraxFileData;
   if (!d || new Uint8Array(d).length < 4) return false;
   const b = new Uint8Array(d);
   return b[0] === 0x4d && b[1] === 0x58 && b[2] === 0x54 && b[3] === 0x58; // 'MXTX'
@@ -290,7 +300,7 @@ async function dispatchNativeExport(song: TrackerSong): Promise<RawExportResult 
     // MaxTrax keeps format 'MOD'; dispatch on the MXTX magic. Re-encode the parsed scores
     // (byte-exact for unedited) into a copy preserving header + sample bank.
     const { parseMaxTrax, encodeMaxTrax } = await import('@lib/import/formats/maxtrax/maxtraxFormat');
-    const data = parseMaxTrax(new Uint8Array(song.uadeEditableFileData!));
+    const data = parseMaxTrax(new Uint8Array(song.maxTraxFileData!));
     result = { data: encodeMaxTrax(data), filename: `${baseName}.mxtx`, warnings: [] };
   } else if (format === 'MOD' && !layoutFormatId) {
     const { exportSongToMOD } = await import('./modExport');

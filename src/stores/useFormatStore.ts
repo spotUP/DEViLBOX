@@ -104,6 +104,12 @@ interface FormatStore {
   v2mFileData: ArrayBuffer | null;
   uadeEditableFileData: ArrayBuffer | null;
   uadeEditableFileName: string | null;
+  /** MaxTrax (MXTX) raw bytes — kept for byte-exact export only. NOT UADE-routed:
+   *  MaxTrax plays natively via Sampler instruments (UADE returns ret=-1 for it). */
+  maxTraxFileData: ArrayBuffer | null;
+  maxTraxFileName: string | null;
+  /** Song's Sampler instruments are driven by the TS scheduler (no WASM replayer). */
+  nativeSamplePlayback: boolean;
   adplugFileData: ArrayBuffer | null;
   adplugFileName: string | null;
   adplugTicksPerRow: number | null;
@@ -211,7 +217,7 @@ interface FormatStore {
   setSongDBInfo: (info: FormatStore['songDBInfo']) => void;
   setSidMetadata: (info: FormatStore['sidMetadata']) => void;
   setOriginalModuleData: (data: FormatStore['originalModuleData']) => void;
-  applyEditorMode: (song: { linearPeriods?: boolean; furnaceNative?: FurnaceNativeData; hivelyNative?: HivelyNativeData; hivelyFileData?: ArrayBuffer; klysNative?: KlysNativeData; klysFileData?: ArrayBuffer; musiclineFileData?: Uint8Array; c64SidFileData?: Uint8Array; jamCrackerFileData?: ArrayBuffer; futurePlayerFileData?: ArrayBuffer; preTrackerFileData?: ArrayBuffer; maFileData?: ArrayBuffer; hippelFileData?: ArrayBuffer; sonixFileData?: ArrayBuffer; sonixSidecarFiles?: Array<{ path: string; data: ArrayBuffer }>; pxtoneFileData?: ArrayBuffer; organyaFileData?: ArrayBuffer; eupFileData?: ArrayBuffer; ixsFileData?: ArrayBuffer; psycleFileData?: ArrayBuffer; sc68FileData?: ArrayBuffer; zxtuneFileData?: ArrayBuffer; pumaTrackerFileData?: ArrayBuffer; steveTurnerFileData?: ArrayBuffer; sidmon1WasmFileData?: ArrayBuffer; artOfNoiseFileData?: ArrayBuffer; cinter4FileData?: ArrayBuffer; bdFileData?: ArrayBuffer; sd2FileData?: ArrayBuffer; symphonieFileData?: ArrayBuffer; sawteethFileData?: ArrayBuffer; soundMonFileData?: ArrayBuffer; sonicArrangerFileData?: ArrayBuffer; robHubbardFileData?: ArrayBuffer; digMugFileData?: ArrayBuffer; coreDesignFileData?: ArrayBuffer; davidWhittakerFileData?: ArrayBuffer; uadeEditableFileData?: ArrayBuffer; uadeEditableFileName?: string; adplugFileData?: ArrayBuffer; adplugFileName?: string; adplugTicksPerRow?: number; libopenmptFileData?: ArrayBuffer; hivelyMeta?: { stereoMode: number; mixGain: number; speedMultiplier: number; version: number }; furnaceSubsongs?: FurnaceSubsongPlayback[]; furnaceActiveSubsong?: number; channelTrackTables?: number[][]; channelSpeeds?: number[]; channelGrooves?: number[]; musiclineMetadata?: { title: string; author: string; date: string; duration: string; infoText: string[] }; goatTrackerData?: Uint8Array; tfmxNative?: TFMXNativeData; sf2StoreData?: SF2LoadPayload; cheeseCutterStoreData?: import('@/stores/useCheeseCutterStore').CheeseCutterLoadPayload }) => void;
+  applyEditorMode: (song: { linearPeriods?: boolean; furnaceNative?: FurnaceNativeData; hivelyNative?: HivelyNativeData; hivelyFileData?: ArrayBuffer; klysNative?: KlysNativeData; klysFileData?: ArrayBuffer; musiclineFileData?: Uint8Array; c64SidFileData?: Uint8Array; jamCrackerFileData?: ArrayBuffer; futurePlayerFileData?: ArrayBuffer; preTrackerFileData?: ArrayBuffer; maFileData?: ArrayBuffer; hippelFileData?: ArrayBuffer; sonixFileData?: ArrayBuffer; sonixSidecarFiles?: Array<{ path: string; data: ArrayBuffer }>; pxtoneFileData?: ArrayBuffer; organyaFileData?: ArrayBuffer; eupFileData?: ArrayBuffer; ixsFileData?: ArrayBuffer; psycleFileData?: ArrayBuffer; sc68FileData?: ArrayBuffer; zxtuneFileData?: ArrayBuffer; pumaTrackerFileData?: ArrayBuffer; steveTurnerFileData?: ArrayBuffer; sidmon1WasmFileData?: ArrayBuffer; artOfNoiseFileData?: ArrayBuffer; cinter4FileData?: ArrayBuffer; bdFileData?: ArrayBuffer; sd2FileData?: ArrayBuffer; symphonieFileData?: ArrayBuffer; sawteethFileData?: ArrayBuffer; soundMonFileData?: ArrayBuffer; sonicArrangerFileData?: ArrayBuffer; robHubbardFileData?: ArrayBuffer; digMugFileData?: ArrayBuffer; coreDesignFileData?: ArrayBuffer; davidWhittakerFileData?: ArrayBuffer; uadeEditableFileData?: ArrayBuffer; uadeEditableFileName?: string; maxTraxFileData?: ArrayBuffer; maxTraxFileName?: string; nativeSamplePlayback?: boolean; adplugFileData?: ArrayBuffer; adplugFileName?: string; adplugTicksPerRow?: number; libopenmptFileData?: ArrayBuffer; hivelyMeta?: { stereoMode: number; mixGain: number; speedMultiplier: number; version: number }; furnaceSubsongs?: FurnaceSubsongPlayback[]; furnaceActiveSubsong?: number; channelTrackTables?: number[][]; channelSpeeds?: number[]; channelGrooves?: number[]; musiclineMetadata?: { title: string; author: string; date: string; duration: string; infoText: string[] }; goatTrackerData?: Uint8Array; tfmxNative?: TFMXNativeData; sf2StoreData?: SF2LoadPayload; cheeseCutterStoreData?: import('@/stores/useCheeseCutterStore').CheeseCutterLoadPayload }) => void;
   setFurnaceActiveSubsong: (index: number) => void;
   setActivisionProSubsongs: (count: number) => void;
   setActivisionProCurrentSubsong: (index: number) => void;
@@ -394,6 +400,9 @@ export const useFormatStore = create<FormatStore>()(
     sawteethFileData: null,
     v2mFileData: null,
     uadeEditableFileData: null,
+    maxTraxFileData: null,
+    maxTraxFileName: null,
+    nativeSamplePlayback: false,
     adplugFileData: null,
     adplugFileName: null,
     adplugTicksPerRow: null,
@@ -832,6 +841,9 @@ export const useFormatStore = create<FormatStore>()(
         state.v2mFileData = (song as any).v2mFileData ?? null;
         state.uadeEditableFileData = (song as any).uadeEditableFileData ?? null;
         state.uadeEditableFileName = (song as any).uadeEditableFileName ?? null;
+        state.maxTraxFileData = (song as any).maxTraxFileData ?? null;
+        state.maxTraxFileName = (song as any).maxTraxFileName ?? null;
+        state.nativeSamplePlayback = (song as any).nativeSamplePlayback ?? false;
         state.adplugFileData = (song as any).adplugFileData ?? null;
         state.adplugFileName = (song as any).adplugFileName ?? null;
         state.adplugTicksPerRow = (song as any).adplugTicksPerRow ?? null;
@@ -1118,6 +1130,9 @@ export const useFormatStore = create<FormatStore>()(
       state.v2mFileData = null;
       state.uadeEditableFileData = null;
       state.uadeEditableFileName = null;
+      state.maxTraxFileData = null;
+      state.maxTraxFileName = null;
+      state.nativeSamplePlayback = false;
       state.adplugFileData = null;
       state.adplugFileName = null;
       state.adplugTicksPerRow = null;

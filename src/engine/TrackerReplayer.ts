@@ -363,6 +363,16 @@ export interface TrackerSong {
   futureComposerFileData?: ArrayBuffer;
   inStereo2FileData?: ArrayBuffer;
   quadraComposerFileData?: ArrayBuffer;  uadeEditableFileData?: ArrayBuffer;
+  /** MaxTrax (MXTX) raw bytes for byte-exact export. NOT UADE-routed — MaxTrax
+   *  plays natively via Sampler instruments (UADE cannot play it, ret=-1). */
+  maxTraxFileData?: ArrayBuffer;
+  maxTraxFileName?: string;
+  /** Drive Sampler instruments from the TS scheduler (processRowForSynths /
+   *  triggerNote). Normally sample playback is delegated to a WASM replayer
+   *  (libopenmpt etc.) with _suppressNotes=true; formats that quantize to a
+   *  tracker grid but have no WASM replayer (MaxTrax) set this so their sample
+   *  instruments actually sound. */
+  nativeSamplePlayback?: boolean;
   ronKlarenFileData?: ArrayBuffer;
   actionamicsFileData?: ArrayBuffer;
   activisionProFileData?: ArrayBuffer;
@@ -1450,8 +1460,10 @@ export class TrackerReplayer {
         continue;
       }
 
-      // Trigger synth notes via processHybridRow
-      if (row.note > 0 && row.note < 97 && isSynth) {
+      // Trigger synth notes via processHybridRow. Sampler instruments are normally
+      // played by a WASM replayer, but nativeSamplePlayback songs (MaxTrax) drive
+      // their samplers from here too.
+      if (row.note > 0 && row.note < 97 && (isSynth || this.song?.nativeSamplePlayback)) {
         this.processHybridRow(ch, channel, row, time);
       }
     }
@@ -2267,7 +2279,8 @@ export class TrackerReplayer {
     // need the libopenmpt sequencer to drive note triggering and looping — they
     // are NOT whole-player synths.
     if (!this.song.libopenmptFileData && !this.useWasmSequencer && !this.song.furnaceNative
-        && !this._suppressNotes && !this.coordinator.hasActiveDispatch) {
+        && !this._suppressNotes && !this.coordinator.hasActiveDispatch
+        && !this.song.nativeSamplePlayback) {
       try {
         const osl = await import('@lib/import/wasm/OpenMPTSoundlib');
         if (gen !== this._playGeneration) return;
@@ -3177,8 +3190,25 @@ export class TrackerReplayer {
       return;
     }
 
-    // Non-synth sample-based playback is handled entirely by libopenmpt.
-    // No TS-side sample scheduling needed.
+    // Non-synth sample-based playback is normally handled entirely by libopenmpt
+    // (which sets _suppressNotes=true, so this method is never reached). For
+    // nativeSamplePlayback songs (MaxTrax) there is no WASM replayer, so drive the
+    // ToneEngine sampler directly. period carries the Amiga-style pitch.
+    if (this.song?.nativeSamplePlayback) {
+      const rowDuration = (2.5 / this.bpm) * this.speed;
+      engine.triggerNote(
+        ch.instrument.id,
+        noteName,
+        rowDuration,
+        safeTime,
+        velocity,
+        ch.instrument,
+        false,          // accent
+        false,          // slide
+        channelIndex,
+        ch.period,      // Amiga period for MOD-style pitch
+      );
+    }
   }
 
   private stopChannel(ch: ChannelState, channelIndex?: number, time?: number): void {
