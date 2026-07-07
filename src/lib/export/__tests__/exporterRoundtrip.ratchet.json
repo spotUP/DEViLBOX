@@ -68,7 +68,7 @@
       "exporter": "DeltaMusic2Exporter.exportDeltaMusic2",
       "tier": "pattern-data",
       "status": "pattern-match",
-      "matchPct": 0,
+      "matchPct": 1,
       "cells": 7168,
       "bytes": 21642
     },
