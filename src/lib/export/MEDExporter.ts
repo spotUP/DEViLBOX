@@ -20,19 +20,38 @@ function writeStr(view: DataView, off: number, str: string, len: number): void {
   }
 }
 
-// Amiga period table for note-to-period conversion
-const PERIODS = [
-  856,808,762,720,678,640,604,570,538,508,480,453,
-  428,404,381,360,339,320,302,285,269,254,240,226,
-  214,202,190,180,170,160,151,143,135,127,120,113,
-];
-
-function xmNoteToPeriod(xmNote: number): number {
-  if (xmNote === 0) return 0;
-  // XM C-1 = note 13. PT period table index 0 = C-1.
-  const idx = xmNote - 13;
-  if (idx < 0 || idx >= PERIODS.length) return 0;
-  return PERIODS[idx];
+/**
+ * Inverse of MEDParser.mapMEDEffect for MMD0 export: (effTyp, eff) → [medCmd, param].
+ *
+ * MED's forward mapping is lossy/many-to-one (several MED commands collapse to the same
+ * XM effTyp), so a perfect inverse is impossible. This inverts the unambiguous cases —
+ * which round-trip byte-exactly through MEDParser — and picks the MED command whose
+ * decode reproduces the XM effect for the rest. Commands whose forward decode is
+ * genuinely ambiguous (0x0C volume BCD/hex, 0x0F tempo conversion) are best-effort.
+ */
+function mapXMEffectToMED(effTyp: number, eff: number): [number, number] {
+  switch (effTyp) {
+    case 0x00: return [0x0, eff];          // arpeggio / none
+    case 0x01: return [0x1, eff];          // portamento up
+    case 0x02: return [0x2, eff];          // portamento down
+    case 0x03: return [0x3, eff];          // tone portamento
+    case 0x04: {                            // vibrato — MED depth is doubled on decode
+      const depth = Math.min(((eff & 0x0F) + 1) >> 1, 0x0F);
+      return [0x4, (eff & 0xF0) | depth];
+    }
+    case 0x05: return [0x5, eff];          // tone porta + vol slide
+    case 0x06: return [0x6, eff];          // vibrato + vol slide
+    case 0x07: return [0x7, eff];          // tremolo
+    case 0x08: return [0x8, eff];          // set panning
+    case 0x09: return [0x19, eff];         // sample offset (MED 0x19, not 0x09)
+    case 0x0A: return [0xA, eff];          // volume slide
+    case 0x0B: return [0xB, eff];          // position jump
+    case 0x0C: return [0xC, Math.min(eff, 64)]; // set volume (hex; volHex-dependent on decode)
+    case 0x0D: return [0x1D, eff];         // pattern break (MED 0x1D = hex param)
+    case 0x0E: return [0xE, eff];          // extended
+    case 0x0F: return [0xF, eff];          // speed/tempo (lossy — decode reconverts)
+    default:   return [0x0, 0];
+  }
 }
 
 export function exportMED(song: TrackerSong): ArrayBuffer {
@@ -68,10 +87,10 @@ export function exportMED(song: TrackerSong): ArrayBuffer {
   const SONG_SIZE     = INSTR_SIZE + SONG_MISC;
   const BLOCK_PTRS    = nBlocks * 4;   // Block pointer array
 
-  // Each block: 4-byte header + nChannels * (nLines+1) * 3 bytes
+  // Each MMD0 block: 2-byte header (u8 numtracks, u8 numlines-1) + numlines * nChannels * 3
   const blockSizes = song.patterns.map(p => {
     const lines = p.length;
-    return 4 + lines * nChannels * 3;
+    return 2 + lines * nChannels * 3;
   });
   const totalBlockBytes = blockSizes.reduce((a, b) => a + b, 0);
 
@@ -134,32 +153,40 @@ export function exportMED(song: TrackerSong): ArrayBuffer {
   }
 
   // ── Write block data ─────────────────────────────────────────────────────
+  // MMD0 note transpose: MEDParser reads note = rawNote + 24 (noteBaseTranspose) +
+  // playTranspose. We write playTranspose = 0, so the inverse is rawNote = note - 24
+  // (a 1-based 6-bit note index; 0 = no note).
+  const NOTE_BASE_TRANSPOSE = 24;
   let bpos = blockDataOff;
   for (const pattern of song.patterns) {
     const nLines = pattern.length;
-    writeU16BE(view, bpos, nChannels);
-    writeU16BE(view, bpos + 2, nLines - 1);  // MED stores numlines - 1
-    bpos += 4;
+    // MMD0 block header: u8 numtracks, u8 numlines-1; cell data follows at +2.
+    view.setUint8(bpos, nChannels);
+    view.setUint8(bpos + 1, Math.max(0, nLines - 1) & 0xFF);
+    bpos += 2;
 
     for (let row = 0; row < nLines; row++) {
       for (let ch = 0; ch < nChannels; ch++) {
         const cell = pattern.channels[ch]?.rows[row];
-        const period = xmNoteToPeriod(cell?.note ?? 0);
-        const inst   = cell?.instrument ?? 0;
-        const eff    = cell?.effTyp ?? 0;
-        const param  = cell?.eff ?? 0;
+        const noteVal = cell?.note ?? 0;
+        const inst    = (cell?.instrument ?? 0) & 0x3F;
+        const [cmd, param] = mapXMEffectToMED(cell?.effTyp ?? 0, cell?.eff ?? 0);
 
-        // MMD0 cell: 3 bytes
-        // byte0: inst[7:4] | period[11:8]
-        // byte1: period[7:0]
-        // byte2: inst[3:0] | eff[3:0]
-        // param byte (if 3-byte cell, param is in next byte — actually MMD0 is 4-byte cells!)
-        // Correction: MMD0 cells ARE 4 bytes: note, instr, command, param
-        output[bpos]     = ((inst >> 4) & 0xF) << 4 | ((period >> 8) & 0xF);
-        output[bpos + 1] = period & 0xFF;
-        output[bpos + 2] = ((inst & 0xF) << 4) | (eff & 0xF);
-        output[bpos + 3] = param;
-        bpos += 4;
+        // rawNote: 6-bit 1-based note index (0 = no note). note 97 (cut) has no MMD0
+        // encoding — emit no note.
+        let rawNote = 0;
+        if (noteVal > 0 && noteVal < 97) {
+          const r = noteVal - NOTE_BASE_TRANSPOSE;
+          rawNote = (r >= 1 && r <= 0x3F) ? r : 0;
+        }
+
+        // MMD0 cell (3 bytes), inverse of MEDParser:
+        //   byte0[5:0] = rawNote; byte0[7] = inst bit4; byte0[6] = inst bit5
+        //   byte1[7:4] = inst[3:0]; byte1[3:0] = command; byte2 = param
+        output[bpos]     = (rawNote & 0x3F) | (((inst >> 4) & 1) << 7) | (((inst >> 5) & 1) << 6);
+        output[bpos + 1] = ((inst & 0x0F) << 4) | (cmd & 0x0F);
+        output[bpos + 2] = param & 0xFF;
+        bpos += 3;
       }
     }
   }
