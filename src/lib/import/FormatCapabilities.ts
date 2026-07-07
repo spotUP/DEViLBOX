@@ -4,71 +4,64 @@
  * Used by the import dialog to show warnings about read-only formats,
  * non-exportable formats, and formats without pattern display.
  *
- * Keep these lists in sync with:
- *   - src/engine/uade/encoders/  (UADE chip RAM encoders → editable + exportable)
- *   - src/lib/export/            (native format exporters → exportable)
- *   - src/lib/import/FormatRegistry.ts  (format labels must match exactly)
+ * Editability / native-exportability are now DERIVED from the single
+ * {@link EditableFormatRegistry} source of truth (a registered pattern codec or
+ * synth voice ⇒ editable; a registered exporter or chip-RAM codec ⇒ exportable).
+ * The two hand-lists below have shrunk to only the SURVIVORS the registry cannot
+ * yet express — each group is annotated with why it survives. When you add a
+ * format's codec/exporter/synth to `EditableFormatRegistry.builtins`, its label
+ * should drop out of these lists (the parity test in
+ * `src/lib/formats/__tests__/editableFormatRegistry.parity.test.ts` guards that
+ * no format silently loses or gains a capability during that move).
  */
 
-// ── Editable format labels ───────────────────────────────────────────────────
-// Format labels (from FormatRegistry) that have pattern editors.
-// Must match FormatRegistry label strings exactly.
+import '@lib/formats/EditableFormatRegistry.builtins';
+import {
+  getRegistryEditableLabels,
+  getRegistryExportableLabels,
+} from '@lib/formats/EditableFormatRegistry';
+
+// Registry-derived label sets, computed once after builtins register.
+const REGISTRY_EDITABLE_LABELS = getRegistryEditableLabels();
+const REGISTRY_EXPORTABLE_LABELS = getRegistryExportableLabels();
+
+// ── Editable format labels (SURVIVORS ONLY) ──────────────────────────────────
+// Labels that are editable but that the registry does not (yet) cover. Must
+// match FormatRegistry label strings exactly. Everything the registry covers via
+// a pattern codec or synth voice is derived and intentionally absent here.
 
 const EDITABLE_FORMAT_LABELS = new Set([
-  // ── libopenmpt standard ──
-  'MOD', 'XM', 'IT', 'S3M',
+  // ── libopenmpt / pc-tracker aliases (editable via family + label parity;
+  //    no dedicated chip-RAM codec, so not registry-derived) ──
   'ProTracker MOD', 'FastTracker II XM', 'Impulse Tracker', 'ScreamTracker 3',
 
-  // ── Furnace ──
-  'Furnace', 'DefleMask / X-Tracker',
+  // ── Own-engine editors with no UADE pattern codec registered ──
+  'Furnace', 'DefleMask / X-Tracker', 'GoatTracker', 'PreTracker',
 
-  // ── Native editors (non-UADE) ──
-  'HivelyTracker', 'Klystrack', 'GoatTracker', 'MusicLine Editor', 'PreTracker',
+  // ── uade-only prefix aliases (family 'uade-only' ⇒ no fallback; kept explicit) ──
+  'InStereo!', 'Rob Hubbard ST', 'Core Design', 'Paul Summers', 'Ashley Hogg',
+  'TomyTracker', 'SynTracker',
 
-  // ── Amiga native with UADE chip RAM editing ──
-  'Oktalyzer', 'OctaMED', 'DigiBooster', 'DigiBooster Pro',
-  'Future Composer', 'Sound-FX', 'JamCracker Pro',
-  'SoundMon', 'SidMon 1', 'Quadra Composer', 'Sonic Arranger',
-  'InStereo! 2', 'InStereo! 1', 'InStereo!',
-  'Digital Mugician', 'Art of Noise', 'Fred Editor',
-  'Graoumf Tracker 2', 'Synthesis',
-  'Digital Sound Studio', 'Chuck Biscuits',
-  "Image's Music System", 'IceTracker',
-  'Game Music Creator', 'Sound Control',
-  'KRIS / ChipTracker', 'Delta Music', 'Delta Music 2',
-  'Magnetic Fields Packer', 'ProTracker 3.6',
-  'Zound Monitor', 'TCB Tracker', 'XMF', 'Composer 667',
-  'TFMX',
-
-  // ── Non-UADE with own WASM engine + edit/export ──
-  'Digital Symphony', 'Puma Tracker', 'Symphonie Pro',
-  'Future Player', 'SidMon II', 'Music Assembler',
-
-  // ── Native parsers with dedicated encoders ──
-  'AMOS Music Bank',
-
-  // ── Compiled 68k / packed Amiga with chip RAM pattern editing ──
-  'Rob Hubbard', 'Rob Hubbard ST', 'David Whittaker',
-  'Activision Pro', 'Ron Klaren', 'Richard Joseph',
-  'Mark Cooksey', 'Jeroen Tel', 'Sound Master', 'Sound Factory',
+  // ── Compiled-68k / packed Amiga formats editable via chip-RAM patching but
+  //    with NO registered pattern codec yet (export/edit wired ad-hoc, not via
+  //    the encoder registry) — genuine survivors until a codec descriptor lands ──
+  'Richard Joseph', 'Mark Cooksey', 'Jeroen Tel', 'Sound Master',
   'Jason Page', 'Jason Brooke', 'Laxity', 'Fred Gray',
   'Jochen Hippel ST', 'Jochen Hippel 7V', 'Special FX',
   'Time Tracker', 'Cinemaware', 'Fashion Tracker',
   'Tomy Tracker', 'Sean Conran', 'Thomas Hermann',
-  'Core Design', 'Janko Mrsic-Flogel', 'Sound Player',
-  'Wally Beben', 'Steve Barrett', 'Paul Summers',
+  'Janko Mrsic-Flogel', 'Sound Player',
+  'Wally Beben', 'Steve Barrett',
   'Paul Shields', 'Paul Robotham', 'Paul Tonge',
   'Pierre Adane', 'Andrew Parton', 'Custom Made',
   'Digital Sonix Chrome', 'Jesper Olsen', 'Kim Christensen',
-  'Ashley Hogg', 'Maximum Effect', 'MIDI Loriciel',
+  'Maximum Effect', 'MIDI Loriciel',
   'On Escapee', 'Maniacs of Noise', 'Martin Walker',
   'Desire', 'MultiMedia Sound', 'Synth Pack', 'MMDC',
   'Medley', 'Infogrames', 'Quartet',
   'NovoTrade Packer', 'Alcatraz Packer', 'Blade Packer',
   'Mosh Packer', 'Nick Pelling Packer', 'Peter Verswyvelen Packer',
-  'SunTronic', 'GlueMon', 'Sean Connolly',
-  'Art and Magic', 'Mike Davies', 'Mark II', 'Sonic Arranger SAS', 'A-Pro-Sys',
-  'TomyTracker', 'SynTracker',
+  'SunTronic', 'GlueMon',
 ]);
 
 /** Format families (from FormatRegistry) that are always editable */
@@ -76,67 +69,40 @@ const EDITABLE_FAMILIES = new Set([
   'libopenmpt', 'furnace', 'pc-tracker',
 ]);
 
-// ── Exportable format labels ─────────────────────────────────────────────────
-// Formats that can be exported to their native binary format (beyond .dbx).
-// UADE formats with encoders export via chip RAM dump (UADEChipEditor).
+// ── Exportable format labels (SURVIVORS ONLY) ────────────────────────────────
+// Labels that are natively exportable but that the registry does not (yet)
+// cover. Everything with a registered dedicated exporter or chip-RAM codec is
+// derived and intentionally absent here.
 
 const NATIVE_EXPORTABLE_LABELS = new Set([
-  // ── libopenmpt standard ──
-  'MOD', 'XM', 'IT', 'S3M',
+  // ── libopenmpt / pc-tracker aliases (also exportable via family) ──
   'ProTracker MOD', 'FastTracker II XM', 'Impulse Tracker', 'ScreamTracker 3',
 
-  // ── Furnace ──
+  // ── Furnace (family 'furnace' is NOT in NATIVE_EXPORTABLE_FAMILIES) ──
   'Furnace',
 
-  // ── Native editors with dedicated exporters ──
-  'HivelyTracker', 'Klystrack', 'MusicLine Editor', 'JamCracker Pro', 'PreTracker',
+  // ── uade-only prefix aliases ──
+  'InStereo!', 'Rob Hubbard ST', 'Core Design', 'Paul Summers', 'Ashley Hogg',
 
-  // ── Amiga native with UADE chip RAM export ──
-  'Oktalyzer', 'OctaMED', 'DigiBooster', 'DigiBooster Pro',
-  'Future Composer', 'Sound-FX',
-  'SoundMon', 'SidMon 1', 'Quadra Composer', 'Sonic Arranger',
-  'InStereo! 2', 'InStereo! 1', 'InStereo!',
-  'Digital Mugician', 'Art of Noise', 'Fred Editor',
-  'Graoumf Tracker 2', 'Synthesis',
-  'Digital Sound Studio', 'Chuck Biscuits',
-  "Image's Music System", 'IceTracker',
-  'Game Music Creator', 'Sound Control',
-  'KRIS / ChipTracker', 'Delta Music', 'Delta Music 2',
-  'Magnetic Fields Packer', 'ProTracker 3.6',
-  'Zound Monitor', 'TCB Tracker', 'XMF', 'Composer 667',
-  'TFMX',
-
-  // ── Non-UADE with dedicated exporters ──
-  'Digital Symphony', 'Puma Tracker', 'Symphonie Pro',
-  'Future Player', 'SidMon II', 'Music Assembler',
-
-  // ── Native parsers with dedicated exporters ──
-  'AMOS Music Bank',
-
-  // ── Compiled 68k / packed Amiga with chip RAM export ──
-  'Rob Hubbard', 'Rob Hubbard ST', 'David Whittaker',
-  'Activision Pro', 'Ron Klaren', 'Richard Joseph',
-  'Mark Cooksey', 'Jeroen Tel', 'Sound Master', 'Sound Factory',
+  // ── Compiled-68k / packed Amiga exportable via chip-RAM readback but with NO
+  //    registered pattern codec yet (genuine survivors) ──
+  'Richard Joseph', 'Mark Cooksey', 'Jeroen Tel', 'Sound Master',
   'Jason Page', 'Jason Brooke', 'Laxity', 'Fred Gray',
   'Jochen Hippel ST', 'Jochen Hippel 7V', 'Special FX',
   'Time Tracker', 'Cinemaware', 'Fashion Tracker',
   'Tomy Tracker', 'Sean Conran', 'Thomas Hermann',
-  'Core Design', 'Janko Mrsic-Flogel', 'Sound Player',
-  'Wally Beben', 'Steve Barrett', 'Paul Summers',
+  'Janko Mrsic-Flogel', 'Sound Player',
+  'Wally Beben', 'Steve Barrett',
   'Paul Shields', 'Paul Robotham', 'Paul Tonge',
   'Pierre Adane', 'Andrew Parton', 'Custom Made',
   'Digital Sonix Chrome', 'Jesper Olsen', 'Kim Christensen',
-  'Ashley Hogg', 'Maximum Effect', 'MIDI Loriciel',
+  'Maximum Effect', 'MIDI Loriciel',
   'On Escapee', 'Maniacs of Noise', 'Martin Walker',
   'Desire', 'MultiMedia Sound', 'Synth Pack', 'MMDC',
   'Medley', 'Infogrames', 'Quartet',
   'NovoTrade Packer', 'Alcatraz Packer', 'Blade Packer',
   'Mosh Packer', 'Nick Pelling Packer', 'Peter Verswyvelen Packer',
-  'SunTronic', 'GlueMon', 'Sean Connolly',
-  'Art and Magic', 'Mike Davies', 'Mark II', 'Sonic Arranger SAS', 'A-Pro-Sys',
-
-  // ── AdLib/OPL with OPL3 exporters (RAD, IMF, RAW) ──
-  'AdPlug',
+  'SunTronic', 'GlueMon',
 ]);
 
 /** Format families that can export via libopenmpt WASM (to IT/S3M) */
@@ -245,10 +211,12 @@ export function getFormatCapabilities(
   const ext = filename.slice(filename.lastIndexOf('.')).toLowerCase();
 
   // Editable?
-  // 1. Explicitly listed label
+  // 0. DERIVED: a pattern codec or synth voice is registered for this label.
+  // 1. Explicitly listed survivor label (registry can't express it yet)
   // 2. Editable family (libopenmpt, furnace, pc-tracker)
   // 3. Fallback: editable if has pattern data and not a WASM-only or uade-only format
   const isEditable =
+    REGISTRY_EDITABLE_LABELS.has(formatLabel) ||
     EDITABLE_FORMAT_LABELS.has(formatLabel) ||
     (formatFamily != null && EDITABLE_FAMILIES.has(formatFamily)) ||
     (formatFamily !== 'uade-only' &&
@@ -256,7 +224,9 @@ export function getFormatCapabilities(
      !NO_PATTERN_DISPLAY_EXTENSIONS.has(ext));
 
   // Exportable to native format?
+  // 0. DERIVED: a dedicated exporter or chip-RAM pattern codec is registered.
   const isNativeExportable =
+    REGISTRY_EXPORTABLE_LABELS.has(formatLabel) ||
     NATIVE_EXPORTABLE_LABELS.has(formatLabel) ||
     (formatFamily != null && NATIVE_EXPORTABLE_FAMILIES.has(formatFamily));
 
