@@ -74,9 +74,16 @@ const PT_PERIODS: number[] = [
 ];
 
 /**
- * Convert XM note (1-96) to SM1 note index (1-66).
- * Parser: SM1 note → SM1_PERIODS[note] → closest PT period → XM note = ptIdx + 13
- * Reverse: XM note - 13 → ptIdx → PT_PERIODS[ptIdx] → closest SM1 period index
+ * Convert XM note (1-96) to the SM1 stored pattern note byte.
+ * Parser: SM1 note → SM1_PERIODS[note] → closest PT period → XM note = ptIdx + 13.
+ * Reverse: XM note - 13 → ptIdx → PT_PERIODS[ptIdx] → closest SM1_PERIODS index.
+ *
+ * The parser reads the stored byte as 1-BASED — it computes
+ * `sm1NoteToXM(storedNote + transpose - 1)` (S1Player's 1-based note convention).
+ * The stored byte must therefore be `bestIdx + 1` so that (storedByte - 1)
+ * recovers the SM1_PERIODS index we picked. Omitting the +1 (the previous
+ * behaviour) decoded a semitone LOW for every note except those near the top of
+ * the PT range, where the reverse lookup saturates on PT_PERIODS[0].
  */
 function xmNoteToSM1(xmNote: number): number {
   if (xmNote <= 0 || xmNote > 96) return 0;
@@ -84,7 +91,7 @@ function xmNoteToSM1(xmNote: number): number {
   if (ptIdx < 0 || ptIdx >= PT_PERIODS.length) return 0;
   const period = PT_PERIODS[ptIdx];
 
-  let bestIdx = 0;
+  let bestIdx = 1;
   let bestDist = Infinity;
   for (let i = 1; i < SM1_PERIODS.length; i++) {
     const d = Math.abs(SM1_PERIODS[i] - period);
@@ -93,7 +100,7 @@ function xmNoteToSM1(xmNote: number): number {
       bestIdx = i;
     }
   }
-  return bestIdx;
+  return bestIdx + 1;
 }
 
 // ── Main export ───────────────────────────────────────────────────────────
