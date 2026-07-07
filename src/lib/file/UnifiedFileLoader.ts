@@ -922,7 +922,7 @@ async function loadSongFile(file: File, options: FileLoadOptions, preReadBuffer?
 
     // Restore native engine data (all WASM formats)
     const { restoreNativeEngineData } = await import('@lib/export/exporters');
-    restoreNativeEngineData(songData.nativeEngineData, songData.nativeEngineMeta, songData.linearPeriods);
+    restoreNativeEngineData(songData.nativeEngineData, songData.nativeEngineMeta, songData.linearPeriods, songData.nativeCompanionFiles);
 
     if (songData.originalModuleData?.base64) {
       useFormatStore.getState().setOriginalModuleData(songData.originalModuleData as any);
