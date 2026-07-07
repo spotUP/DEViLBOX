@@ -594,8 +594,9 @@ export async function exportActivisionPro(
   // Then finds 0x9b 0x70
   output[pos++] = 0x9b; output[pos++] = 0x70;
 
-  // Vibrato version 1: bytes[pos+4] == 0x53 && bytes[pos+5] == 0x31
-  output[pos++] = 0x00; output[pos++] = 0x00;
+  // Vibrato version 1: parser checks bytes[index+4]==0x53 && bytes[index+5]==0x31,
+  // where index is the offset of the 0x9b 0x70 match just written. So after 0x9b 0x70
+  // (index, index+1) exactly ONE padding word (index+2, index+3) then 0x53 0x31.
   output[pos++] = 0x00; output[pos++] = 0x00;
   output[pos++] = 0x53; output[pos++] = 0x31;
 
