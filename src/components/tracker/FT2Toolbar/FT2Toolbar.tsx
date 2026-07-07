@@ -264,15 +264,15 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
         try {
           const { speed: spd } = useTransportStore.getState();
           const ord = useTrackerStore.getState().patternOrder;
-          const { exportCinterModFile, downloadBytes } = await import('@lib/export/Cinter4ModSave');
+          const { downloadBytes } = await import('@lib/export/Cinter4ModSave');
           if (isCinterSong) {
             // Save = a re-loadable working file: full MOD with the Cinter voices
             // RENDERED (not stripped), so it re-imports as audible, editable
             // instruments. The tiny crunched .cinter4 is an Export, not a Save.
-            const res = await exportCinterModFile(patterns, instruments, ord, {
-              stripCinter: false, moduleName: metadata.name || 'song', bpm, speed: spd,
-            });
-            downloadBytes(res.data, res.filename);
+            // Routed through the shared native-export router (cinterMode:'save').
+            const { exportNativeSong } = await import('@lib/export/nativeExportRouter');
+            const res = await exportNativeSong(null, { cinterMode: 'save' });
+            if (res) downloadBytes(res.data, res.filename);
           } else {
             const { exportWithOpenMPT } = await import('@lib/export/OpenMPTExporter');
             const res = await exportWithOpenMPT(patterns, instruments, ord, {
