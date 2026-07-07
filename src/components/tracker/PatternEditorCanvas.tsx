@@ -53,6 +53,7 @@ import type {
 import TrackerWorkerFactory from '@/workers/tracker-render.worker.ts?worker';
 import type { ColumnDef, FormatChannel, OnCellChange } from '@/components/shared/format-editor-types';
 import { toColumnSpec, formatChannelsToSnapshot } from '@/components/shared/format-editor-types';
+import { transposeFormatNote } from './formatTranspose';
 import { TrackerCanvas2DRenderer } from '@engine/renderer/TrackerCanvas2DRenderer';
 import { TrackerVisualBackground } from './TrackerVisualBackground';
 
@@ -1012,6 +1013,34 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     }
   }, [formatColumns, formatChannels, formatCursor, formatSelection, onFormatCellChange]);
 
+  // ── Format mode: transpose note cells in the selection (or the current cell) ──
+  // The global transposeSelection command writes the TrackerStore pattern directly, which is
+  // only a VIEW of a format's WASM state — so it never reaches the module. This routes each
+  // affected note cell through onFormatCellChange (the format's WASM writeback), matching the
+  // single-cell (Ctrl+Arrow) and whole-channel (context menu) transpose paths.
+  const formatTransposeSelection = useCallback((semitones: number) => {
+    if (!formatColumns || !formatChannels || !onFormatCellChange) return;
+    const chIdx = formatCursor.channelIndex;
+    const ch = formatChannels[chIdx];
+    const chCols = ch?.columns ?? formatColumns;
+    const sel = formatSelection;
+    const startRow = sel ? sel.startRow : formatCursor.rowIndex;
+    const endRow = sel ? sel.endRow : formatCursor.rowIndex;
+    const startCol = sel ? sel.startCol : formatCursor.columnIndex;
+    const endCol = sel ? sel.endCol : formatCursor.columnIndex;
+    let changed = 0;
+    for (let r = startRow; r <= endRow; r++) {
+      for (let c = startCol; c <= endCol; c++) {
+        const colDef = chCols[c];
+        if (!colDef || colDef.type !== 'note') continue;
+        const note = ch?.rows[r]?.[colDef.key] ?? 0;
+        const newNote = transposeFormatNote(note, semitones);
+        if (newNote !== null) { onFormatCellChange(chIdx, r, colDef.key, newNote); changed++; }
+      }
+    }
+    if (changed > 0) useUIStore.getState().setStatusMessage(`TRANSPOSE ${semitones > 0 ? '+' : ''}${semitones}`);
+  }, [formatColumns, formatChannels, formatCursor, formatSelection, onFormatCellChange]);
+
   // ── Format mode: paste clipboard at cursor position ──
   const formatPasteClipboard = useCallback(() => {
     if (!formatColumns || !formatChannels || !onFormatCellChange) return;
@@ -1152,14 +1181,9 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     // Transpose: Ctrl+ArrowUp/Down = +/-1 semitone, Ctrl+Shift = +/-12
     if (isCtrlCmd && (e.key === 'ArrowUp' || e.key === 'ArrowDown') && !e.altKey) {
       e.preventDefault();
-      if (col && col.type === 'note') {
-        const curVal = formatChannels[formatCursor.channelIndex]?.rows[formatCursor.rowIndex]?.[col.key] ?? 0;
-        if (curVal > 0) { // Don't transpose empty/zero notes
-          const delta = e.key === 'ArrowUp' ? (e.shiftKey ? 12 : 1) : (e.shiftKey ? -12 : -1);
-          const newVal = Math.max(1, Math.min(95, curVal + delta));
-          onFormatCellChange?.(formatCursor.channelIndex, formatCursor.rowIndex, col.key, newVal);
-        }
-      }
+      // Transpose the marked block if there is one, else the cell under the cursor.
+      const delta = e.key === 'ArrowUp' ? (e.shiftKey ? 12 : 1) : (e.shiftKey ? -12 : -1);
+      formatTransposeSelection(delta);
       return;
     }
 
@@ -1272,7 +1296,8 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
       }
     }
   }, [isFormatMode, formatColumns, formatChannels, formatCursor, formatOctave,
-      onFormatCellChange, formatSelection, formatCopySelection, formatClearSelection, formatPasteClipboard]);
+      onFormatCellChange, formatSelection, formatCopySelection, formatClearSelection, formatPasteClipboard,
+      formatTransposeSelection]);
 
   // Handle tap on pattern canvas - move cursor to tapped cell
   const handlePatternTap = useCallback((tapX: number, tapY: number) => {
