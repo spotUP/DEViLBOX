@@ -119,6 +119,25 @@ describe('exporter round-trip regressions', () => {
     expect(re).not.toBeNull(); // was null: all-silent FM export failed the validator
   });
 
+  it('DeltaMusic2 export writes the instrument-table break marker and arpeggio tables so cells survive', async () => {
+    const { parseDeltaMusic2File } = await import('@lib/import/formats/DeltaMusic2Parser');
+    const { exportDeltaMusic2 } = await import('../DeltaMusic2Exporter');
+    const raw = fixture('public/data/songs/delta-music-2/asperity megademo 3.dm2');
+    const song = parseDeltaMusic2File(new Uint8Array(raw), 'asperity.dm2');
+    expect(song).not.toBeNull();
+    const out = await toU8(await exportDeltaMusic2(song as TrackerSong));
+    const re = parseDeltaMusic2File(out, 'asperity.dm2');
+    expect(re).not.toBeNull();
+    // Break marker at byte 254 was unwritten → parser matched offsets[0] and parsed
+    // zero instruments, dropping every cell's instrument on reload.
+    expect(re!.instruments.length).toBe((song as TrackerSong).instruments.length);
+    expect(re!.instruments.length).toBeGreaterThan(0);
+    const { cells, matched } = cellMatch(song as TrackerSong, re!);
+    expect(cells).toBeGreaterThan(1000);
+    // Instrument break + arpeggio-table reconstruction bring this to full cell fidelity.
+    expect(matched).toBe(cells);
+  });
+
   it('MOD export round-trips note/instrument/effect cells through MODParser', async () => {
     const { parseMODFile } = await import('@lib/import/formats/MODParser');
     const { exportSongToMOD } = await import('../modExport');
