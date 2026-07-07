@@ -232,6 +232,24 @@ describe('exporter round-trip regressions', () => {
     expect(matched / cells).toBeGreaterThan(0.99);
   });
 
+  it('SoundFactory export pre-defines the full instrument table in id order so instrument references survive (was remapping/dropping ids)', async () => {
+    const { parseSoundFactoryFile } = await import('@lib/import/formats/SoundFactoryParser');
+    const { exportSoundFactory } = await import('../SoundFactoryExporter');
+    const raw = fixture('public/data/songs/soundfactory/im maien.psf');
+    const song = parseSoundFactoryFile(new Uint8Array(raw), 'im maien.psf');
+    expect(song).not.toBeNull();
+    const out = await toU8(await exportSoundFactory(song as TrackerSong));
+    const re = parseSoundFactoryFile(out, 'im maien.psf');
+    expect(re).not.toBeNull();
+    // The parser assigns instrument ids by DefineInstrument discovery order and bounds
+    // UseInstrument's slot+1 by the discovered count. Inline first-use definition
+    // reordered the table (ch0 instr 3 -> re 1) and dropped out-of-range references
+    // (ch1 instr 3 -> re 0). Pre-defining every instrument in id order fixes both.
+    const { cells, matched } = cellMatch(song as TrackerSong, re as TrackerSong);
+    expect(cells).toBeGreaterThan(5000);
+    expect(matched).toBe(cells);
+  });
+
   it('NRU export writes the full 0..255 note byte and the 0x0C empty-effect slot (was dropping notes >72 and forcing tone-porta)', async () => {
     const { parseNRUFile } = await import('@lib/import/formats/NRUParser');
     const { exportNRU } = await import('../NRUExporter');

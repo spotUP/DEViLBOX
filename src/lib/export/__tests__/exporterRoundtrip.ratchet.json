@@ -364,9 +364,9 @@
       "exporter": "SoundFactoryExporter.exportSoundFactory",
       "tier": "pattern-data",
       "status": "pattern-match",
-      "matchPct": 0.9711,
+      "matchPct": 1,
       "cells": 9840,
-      "bytes": 2938
+      "bytes": 3492
     },
     "soundfx": {
       "exporter": "SoundFXExporter.exportSoundFX",
