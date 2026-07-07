@@ -396,9 +396,9 @@
       "exporter": "Symphonie (SymphonieProExporter)",
       "tier": "pattern-data",
       "status": "pattern-match",
-      "matchPct": 0.0368,
+      "matchPct": 1,
       "cells": 17920,
-      "bytes": 666994
+      "bytes": 669965
     },
     "synthesis": {
       "exporter": "SynthesisExporter.exportSynthesis",
