@@ -158,6 +158,21 @@ export class BuzzmachineSynth implements DevilboxSynth {
     }
   }
 
+  /**
+   * Live parameter dispatch used by the effect chains (updateEffectParameters calls
+   * node.setParam(key, value)). Buzzmachine params are indexed ('0','1',...), so map the
+   * numeric key straight to setParameter. Non-numeric keys (e.g. 'volume') fall through
+   * to set().
+   */
+  setParam(key: string, value: number): void {
+    const idx = Number(key);
+    if (Number.isInteger(idx) && key.trim() !== '') {
+      this.setParameter(idx, value);
+    } else {
+      this.set(key, value);
+    }
+  }
+
   get(param: string): number | undefined {
     switch (param) {
       case 'volume': return this.output.gain.value;
