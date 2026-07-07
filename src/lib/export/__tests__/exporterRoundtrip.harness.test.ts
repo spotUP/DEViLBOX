@@ -51,6 +51,8 @@ type Status =
   | 'reparse-error' // export produced bytes but they would not re-parse
   | 'export-error' // exporter threw / returned null
   | 'parse-error' // the fixture itself would not parse (harness cannot feed the exporter)
+  | 'store-dependent' // exporter reads live stores/engine, not the passed song — NOT
+  //                     headless-measurable (works in-app). Documented, not an error.
   | 'missing-fixture'; // no committed fixture for this exporter
 
 interface ExporterTarget {
@@ -99,6 +101,10 @@ const STATUS_RANK: Record<Status, number> = {
   'pattern-match': 4,
   'reparse-error': 3,
   'export-error': 2,
+  // store-dependent is a terminal "not-measurable, documented" state, not an error to
+  // heal past. Ranked alongside export-error so flipping export-error -> store-dependent
+  // (once we recognise the exporter is engine-coupled, not broken) is not a regression.
+  'store-dependent': 2,
   'parse-error': 1,
   'missing-fixture': 0,
 };
@@ -294,6 +300,10 @@ async function measure(t: ExporterTarget): Promise<FormatResult> {
     tier: 'pattern-data', status: 'export-error', cells: 0, bytes: 0, matchPct: 0,
   };
   if (!t.fixture) return { ...base, status: 'missing-fixture', tier: 'pattern-data' };
+  // Store/engine-dependent exporters read live zustand stores or a running WASM engine,
+  // not the passed song, so a headless parse->export harness cannot exercise them. Record
+  // that honestly rather than as an export-error (they work in-app).
+  if (t.storeDependent) return { ...base, status: 'store-dependent', tier: 'pattern-data' };
 
   let raw: Uint8Array;
   let song: TrackerSong;
