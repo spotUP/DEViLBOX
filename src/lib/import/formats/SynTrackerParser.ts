@@ -45,25 +45,6 @@ function readString(data: Uint8Array, offset: number, maxLen: number): string {
   return String.fromCharCode(...bytes).replace(/[\x00-\x1f]/g, '').trim();
 }
 
-/** Map SynTracker ASCII effect command → XM effect type + transformed value */
-function mapEffect(cmd: number, val: number): { effTyp: number; eff: number } {
-  switch (cmd) {
-    case 0x41: return { effTyp: 0, eff: val };       // A → arpeggio (XM 0xx)
-    case 0x42: return { effTyp: 0x0B, eff: val };    // B → position jump (XM Bxx)
-    case 0x44: return { effTyp: 2, eff: val };        // D → portamento down (XM 2xx)
-    case 0x45: return { effTyp: 0, eff: 0 };          // E → envelope (no XM equiv, suppress)
-    case 0x46: return { effTyp: 0x0E, eff: val ? 0x01 : 0x00 }; // F → filter (XM E0x)
-    case 0x47: return { effTyp: 3, eff: val };        // G → tone porta (XM 3xx)
-    case 0x4C: return { effTyp: 0x0C, eff: val };    // L → set volume (XM Cxx)
-    case 0x4D: return { effTyp: 4, eff: val };        // M → modulation/vibrato (XM 4xx)
-    case 0x4F: return { effTyp: 9, eff: val };        // O → sample offset (XM 9xx)
-    case 0x53: return { effTyp: 0x0F, eff: val };    // S → set speed (XM Fxx)
-    case 0x55: return { effTyp: 1, eff: val };        // U → portamento up (XM 1xx)
-    case 0x56: return { effTyp: 0x0C, eff: (val >> 4) * 4 }; // V → volume (hi nibble scaled)
-    default:   return { effTyp: 0, eff: 0 };
-  }
-}
-
 export function isSynTrackerFormat(buffer: ArrayBuffer | Uint8Array, filename?: string): boolean {
   // Check magic first
   const data = buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer);
@@ -139,26 +120,18 @@ export function parseSynTrackerFile(buffer: ArrayBuffer, filename: string): Trac
           continue;
         }
 
-        const noteVal = data[cellOff];
-        const instrVal = data[cellOff + 1];
-        const fxCmd = data[cellOff + 2];
-        const fxVal = data[cellOff + 3];
-
-        // Note mapping: 1-72 → XM note (direct), 0xFF instrument = note-off (XM 97)
-        let note = 0;
-        if (instrVal === 0xFF) {
-          note = 97; // XM note-off
-        } else if (noteVal >= 1 && noteVal <= 96) {
-          note = noteVal;
-        }
-
-        // Instrument: 1-based index, skip 0 and 0xFF
-        const instrument = (instrVal >= 1 && instrVal < 0xFF) ? instrVal : 0;
-
-        // Effects
-        const { effTyp, eff } = fxCmd ? mapEffect(fxCmd, fxVal) : { effTyp: 0, eff: 0 };
-
-        rows.push({ note, instrument, volume: 0, effTyp, eff, effTyp2: 0, eff2: 0 });
+        // Lossless raw SynTracker cell (bijective with the 4 file bytes) so editing + export
+        // round-trip byte-exactly. byte0 = note index, byte1 = instrument (0xFF = note-off),
+        // byte2 = effect command (ASCII), byte3 = effect value. See SynTrackerExporter.
+        rows.push({
+          note: data[cellOff],
+          instrument: data[cellOff + 1],
+          volume: 0,
+          effTyp: data[cellOff + 2],
+          eff: data[cellOff + 3],
+          effTyp2: 0,
+          eff2: 0,
+        });
       }
 
       channels.push({
