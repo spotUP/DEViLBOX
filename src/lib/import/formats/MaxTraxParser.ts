@@ -13,7 +13,8 @@
  */
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { InstrumentConfig, TrackerCell } from '@/types';
-import { parseMaxTrax, isMaxTraxFormat, type MaxTraxEvent } from './maxtrax/maxtraxFormat';
+import { parseMaxTrax, isMaxTraxFormat, decodeMaxTraxSamples, type MaxTraxEvent } from './maxtrax/maxtraxFormat';
+import { createSamplerInstrument } from './AmigaUtils';
 
 const ROWS_PER_PATTERN = 64;
 const MAX_CHANNELS = 8;
@@ -63,22 +64,43 @@ export function parseMaxTraxFile(buffer: ArrayBuffer, filename: string): Tracker
     })),
   }));
 
-  for (const ev of notes) {
+  // Walk events in order, tracking each channel's current program (0xC0) so notes get their
+  // real patch, and place notes on the quantized grid.
+  const channelPatch = new Array(16).fill(0);
+  for (const ev of score.events) {
+    const ch = ev.data & 0x0f;
+    if (ev.command === 0xc0) { channelPatch[ch] = ev.stopTime & 0xff; continue; } // program change
+    if (ev.command < 1 || ev.command >= 0x80) continue; // not a note
     const absRow = Math.floor(ev.startTime / TICKS_PER_ROW);
     const patIdx = Math.floor(absRow / ROWS_PER_PATTERN);
     const row = absRow % ROWS_PER_PATTERN;
-    const ch = Math.min(numChannels - 1, ev.data & 0x0f);
-    const cell = patterns[patIdx]?.channels[ch]?.rows[row];
+    const cIdx = Math.min(numChannels - 1, ch);
+    const cell = patterns[patIdx]?.channels[cIdx]?.rows[row];
     if (cell && cell.note === 0) {
-      cell.note = ev.command; // MIDI note number (display)
-      cell.instrument = 1;
+      cell.note = ev.command;                 // MIDI note number
+      cell.instrument = channelPatch[ch] + 1; // 1-based patch → instrument id
     }
   }
 
-  const instruments: InstrumentConfig[] = Array.from({ length: 16 }, (_, i) => ({
-    id: i + 1, name: `Patch ${i + 1}`, type: 'synth' as const, synthType: 'Synth' as const,
-    effects: [], volume: 0, pan: 0,
-  }) as InstrumentConfig);
+  // Real instruments from the sample bank (was: 16 identical placeholders → every note
+  // sounded the same). Each MaxTrax sample becomes a Sampler with its first-octave PCM.
+  const samples = decodeMaxTraxSamples(data);
+  const instruments: InstrumentConfig[] = [];
+  for (const smp of samples) {
+    const id = smp.number + 1;
+    const loopStart = smp.attackLen;
+    const loopEnd = smp.sustainLen > 0 ? smp.attackLen + smp.sustainLen : 0;
+    instruments.push(createSamplerInstrument(
+      id, `Sample ${smp.number}`, smp.pcm,
+      Math.min(64, Math.max(1, smp.volume >> 2)), // MaxTrax vol 0-256ish → 0-64
+      8287, // nominal Amiga C-3 rate; MaxTrax repitches per note
+      loopStart, loopEnd,
+    ));
+  }
+  // Fallback so the bank is never empty.
+  if (instruments.length === 0) {
+    instruments.push({ id: 1, name: 'Sample 0', type: 'synth' as const, synthType: 'Synth' as const, effects: [], volume: 0, pan: 0 } as InstrumentConfig);
+  }
 
   return {
     name: `${baseName} [MaxTrax]`,
