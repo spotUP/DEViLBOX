@@ -308,6 +308,14 @@ export function useExportDialog({ isOpen }: UseExportDialogOptions) {
     } else if (format === ('SMON' as string)) {
       const { exportAsSoundMon } = await import('@lib/export/SoundMonExporter');
       result = await exportAsSoundMon(song);
+    } else if (song.uadeEditableFileData && new Uint8Array(song.uadeEditableFileData).length >= 16 &&
+        String.fromCharCode(...new Uint8Array(song.uadeEditableFileData).slice(0, 16)) === 'SYNTRACKER-SONG:') {
+      // SynTracker keeps format 'MOD' (for UADE playback routing); dispatch on its magic so it
+      // doesn't fall through to the MOD exporter. exportSynTrackerFile writes the edited cells
+      // back into a copy of the original module (byte-exact for unedited data).
+      const { exportSynTrackerFile } = await import('@lib/export/SynTrackerExporter');
+      const buf = exportSynTrackerFile(song);
+      result = { data: new Blob([buf as unknown as Uint8Array<ArrayBuffer>], { type: blobType }), filename: `${baseName}.synmod`, warnings: [] };
     } else if (format === 'MOD' && !layoutFmtId) {
       const { exportSongToMOD } = await import('@lib/export/modExport');
       const modResult = await exportSongToMOD(song, { bakeSynths: true });
