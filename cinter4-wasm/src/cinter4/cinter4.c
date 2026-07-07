@@ -389,12 +389,9 @@ _instrumentloop:
       flag_n = ((int32_t)(_ar) < 0);
     }
   /* Init state */
-  {  /* MOVE.L	A6,A1 */
+  {  /* MOVE.L	A6,A1 --  MOVEA: destination is an address register, sets no CC */
       uint32_t _mv = (uint32_t)(a6);
       a1 = _mv;
-      flag_z = ((int32_t)(_mv) == 0);
-      flag_n = ((int32_t)(_mv) < 0);
-      flag_v = 0; flag_c = 0;
     }
   {  /* MOVE.W	(A2)+,(A1)+ */
       uint16_t _mv = (uint16_t)(READ16_POST(a2));
@@ -438,12 +435,9 @@ _instrumentloop:
   d6 = (uint32_t)(int32_t)(int8_t)(0);  /* MOVEQ.L	#0,D6 */
 _sampleloop:
   /* Distortion parameters */
-  {  /* MOVE.L	A2,A3 */
+  {  /* MOVE.L	A2,A3 --  MOVEA: destination is an address register, sets no CC */
       uint32_t _mv = (uint32_t)(a2);
       a3 = _mv;
-      flag_z = ((int32_t)(_mv) == 0);
-      flag_n = ((int32_t)(_mv) < 0);
-      flag_v = 0; flag_c = 0;
     }
   {  /* MOVE.W	(A3)+,D4 */
       uint16_t _mv = (uint16_t)(READ16_POST(a3));
@@ -453,12 +447,9 @@ _sampleloop:
       flag_v = 0; flag_c = 0;
     }
   /* Modulation wave */
-  {  /* MOVE.L	A6,A1 */
+  {  /* MOVE.L	A6,A1 --  MOVEA: destination is an address register, sets no CC */
       uint32_t _mv = (uint32_t)(a6);
       a1 = _mv;
-      flag_z = ((int32_t)(_mv) == 0);
-      flag_n = ((int32_t)(_mv) < 0);
-      flag_v = 0; flag_c = 0;
     }
   {  /* MOVE.W	D6,D2 */
       uint16_t _mv = (uint16_t)(W(d6));
@@ -749,12 +740,9 @@ _fdist_in:
   hw_write16(a1, 0);  /* CLR.W	(A1) */
   }
   /* Pitch and mod decays */
-  {  /* MOVE.L	A6,A1 */
+  {  /* MOVE.L	A6,A1 --  MOVEA: destination is an address register, sets no CC */
       uint32_t _mv = (uint32_t)(a6);
       a1 = _mv;
-      flag_z = ((int32_t)(_mv) == 0);
-      flag_n = ((int32_t)(_mv) < 0);
-      flag_v = 0; flag_c = 0;
     }
   {  /* MOVE.L	(A1),D0 */
       uint32_t _mv = (uint32_t)(READ32(a1));
@@ -935,12 +923,9 @@ _pc_off_01d8:
       flag_c = ((uint32_t)_lhs < (uint32_t)_rhs);
     }
   if (flag_n!=flag_v) goto _sampleloop;  /* less than (signed) */  /* BLT.W	.sampleloop */
-  {  /* MOVE.L	A3,A2 */
+  {  /* MOVE.L	A3,A2 --  MOVEA: destination is an address register, sets no CC */
       uint32_t _mv = (uint32_t)(a3);
       a2 = _mv;
-      flag_z = ((int32_t)(_mv) == 0);
-      flag_n = ((int32_t)(_mv) < 0);
-      flag_v = 0; flag_c = 0;
     }
   if ((int16_t)(--d7) >= 0) goto _instrumentloop;  /* DBF	D7,.instrumentloop */
 CinterComputePeriods:
@@ -1071,19 +1056,13 @@ _top: ;
       flag_n = ((int16_t)(_mv) < 0);
       flag_v = 0; flag_c = 0;
     }
-  {  /* MOVE.L	(A0)+,A2 */
+  {  /* MOVE.L	(A0)+,A2 --  MOVEA: destination is an address register, sets no CC */
       uint32_t _mv = (uint32_t)(READ32_POST(a0));
       a2 = _mv;
-      flag_z = ((int32_t)(_mv) == 0);
-      flag_n = ((int32_t)(_mv) < 0);
-      flag_v = 0; flag_c = 0;
     }
-  {  /* MOVE.L	(A0)+,A1 */
+  {  /* MOVE.L	(A0)+,A1 --  MOVEA: destination is an address register, sets no CC */
       uint32_t _mv = (uint32_t)(READ32_POST(a0));
       a1 = _mv;
-      flag_z = ((int32_t)(_mv) == 0);
-      flag_n = ((int32_t)(_mv) < 0);
-      flag_v = 0; flag_c = 0;
     }
   /* Loop when end is reached */
   {  /* CMP.L	(A0)+,A1 */
@@ -1095,12 +1074,9 @@ _top: ;
       flag_c = ((uint32_t)_lhs < (uint32_t)_rhs);
     }
   if (!(flag_c||flag_z)) {
-  {  /* MOVE.L	(A0),A1 */
+  {  /* MOVE.L	(A0),A1 --  MOVEA: destination is an address register, sets no CC */
       uint32_t _mv = (uint32_t)(READ32(a0));
       a1 = _mv;
-      flag_z = ((int32_t)(_mv) == 0);
-      flag_n = ((int32_t)(_mv) < 0);
-      flag_v = 0; flag_c = 0;
     }
   {  /* MOVE.L	A1,-8(A0) */
       uint32_t _mv = (uint32_t)(a1);
@@ -1214,19 +1190,13 @@ _top: ;
       flag_n = ((int16_t)(_mv) < 0);
       flag_v = 0; flag_c = 0;
     }
-  {  /* MOVE.L	(A0)+,A2 */
+  {  /* MOVE.L	(A0)+,A2 --  MOVEA: destination is an address register, sets no CC */
       uint32_t _mv = (uint32_t)(READ32_POST(a0));
       a2 = _mv;
-      flag_z = ((int32_t)(_mv) == 0);
-      flag_n = ((int32_t)(_mv) < 0);
-      flag_v = 0; flag_c = 0;
     }
-  {  /* MOVE.L	(A0),A1 */
+  {  /* MOVE.L	(A0),A1 --  MOVEA: destination is an address register, sets no CC */
       uint32_t _mv = (uint32_t)(READ32(a0));
       a1 = _mv;
-      flag_z = ((int32_t)(_mv) == 0);
-      flag_n = ((int32_t)(_mv) < 0);
-      flag_v = 0; flag_c = 0;
     }
   {  /* ADDQ.L	#2,(A0)+ */
       /* Fix: read-modify-write at SAME address, then increment once */
@@ -1248,12 +1218,9 @@ _top: ;
       flag_n = ((int32_t)(_mv) < 0);
       flag_v = 0; flag_c = 0;
     }
-  {  /* MOVE.L	(A0)+,A4 */
+  {  /* MOVE.L	(A0)+,A4 --  MOVEA: destination is an address register, sets no CC */
       uint32_t _mv = (uint32_t)(READ32_POST(a0));
       a4 = _mv;
-      flag_z = ((int32_t)(_mv) == 0);
-      flag_n = ((int32_t)(_mv) < 0);
-      flag_v = 0; flag_c = 0;
     }
   {  /* MOVE.L	(A0),D2 */
       uint32_t _mv = (uint32_t)(READ32(a0));
@@ -1327,12 +1294,9 @@ _top: ;
   d2 = (d2 >> 16) | (d2 << 16);  /* SWAP.W	D2 */
   /* Look up note */
   W(d0) = (uint16_t)((uint32_t)(W(d0)) >> 7);  /* LSR.W	#7,D0 */
-  {  /* MOVE.L	A2,A5 */
+  {  /* MOVE.L	A2,A5 --  MOVEA: destination is an address register, sets no CC */
       uint32_t _mv = (uint32_t)(a2);
       a5 = _mv;
-      flag_z = ((int32_t)(_mv) == 0);
-      flag_n = ((int32_t)(_mv) < 0);
-      flag_v = 0; flag_c = 0;
     }
   d3 = (uint32_t)(int32_t)(int8_t)(-8);  /* MOVEQ.L	#-8,D3 */
   d4 = (uint32_t)(int32_t)(int8_t)(0);  /* MOVEQ.L	#0,D4 */
@@ -1423,12 +1387,9 @@ _noteloop:
       flag_n = ((int16_t)(_mv) < 0);
       flag_v = 0; flag_c = 0;
     }
-  {  /* MOVE.L	(A5),A4 */
+  {  /* MOVE.L	(A5),A4 --  MOVEA: destination is an address register, sets no CC */
       uint32_t _mv = (uint32_t)(READ32(a5));
       a4 = _mv;
-      flag_z = ((int32_t)(_mv) == 0);
-      flag_n = ((int32_t)(_mv) < 0);
-      flag_v = 0; flag_c = 0;
     }
   if (!(flag_z)) {
   {  /* MOVE.W	D0,D6 */
@@ -1452,12 +1413,9 @@ _noteloop:
   WRITE32(a0 - 8, d6);
   WRITE32(a0 - 4, a4);
   /* Add offset to sample address */
-  {  /* MOVE.L	(A5),A4 */
+  {  /* MOVE.L	(A5),A4 --  MOVEA: destination is an address register, sets no CC */
       uint32_t _mv = (uint32_t)(READ32(a5));
       a4 = _mv;
-      flag_z = ((int32_t)(_mv) == 0);
-      flag_n = ((int32_t)(_mv) < 0);
-      flag_v = 0; flag_c = 0;
     }
   {  /* SUB.W	D5,D3 */
       uint16_t _sr = (uint16_t)(W(d3) - W(d5));

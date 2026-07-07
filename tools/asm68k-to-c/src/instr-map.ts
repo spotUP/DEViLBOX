@@ -313,9 +313,14 @@ export function emitInstruction(node: InstructionNode): string {
         // Address loads use LEA or immediate (#label).
         moveVal = `READ${sizeStr(s)}((uintptr_t)${src})`;
       }
-      // MOVEA does NOT affect condition codes.
+      // MOVEA does NOT affect condition codes. A plain `MOVE` whose destination is an
+      // address register is a MOVEA (the 68k assembler promotes it), so it must NOT set
+      // flags either — otherwise it clobbers the CC a following Bcc depends on (the Cinter
+      // one-shot-repeat bug: `move.l (a5),a4` between `move.w (a5)+,d0` and `beq`).
+      const isMoveAddrDst = !!dst && dst.kind === 'register' &&
+        (dst.name.toLowerCase().startsWith('a') || dst.name.toLowerCase() === 'sp');
       // For immediate label addresses (#label → load address), cast pointer to uint32_t.
-      if (mnemonic === 'MOVEA') {
+      if (mnemonic === 'MOVEA' || isMoveAddrDst) {
         if (ops[0].kind === 'immediate' && Number.isNaN(ops[0].value)) {
           moveVal = `(uint32_t)(uintptr_t)${moveVal}`;
         }
