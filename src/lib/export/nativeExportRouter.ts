@@ -126,6 +126,17 @@ export async function exportNativeSong(
     if (!resolvedSong) return null;
   }
 
+  // The replayer song can lack uadeEditableFileData when the format never loaded into a
+  // player (e.g. MaxTrax: UADE can't play it, so the editable bytes live only in the store).
+  // Backfill from the store so magic-dispatched exporters (SynTracker, MaxTrax) still fire.
+  if (!resolvedSong.uadeEditableFileData) {
+    const { useFormatStore } = await import('@stores/useFormatStore');
+    const fmtData = useFormatStore.getState().uadeEditableFileData;
+    if (fmtData) {
+      resolvedSong = { ...resolvedSong, uadeEditableFileData: fmtData } as TrackerSong;
+    }
+  }
+
   const raw = await dispatchNativeExport(resolvedSong);
   return raw ? normalize(raw) : null;
 }
@@ -188,6 +199,30 @@ async function exportCinterCrunchedFromStores(): Promise<RawExportResult | null>
 async function reconstructSongFromFormatStore(): Promise<TrackerSong | null> {
   const { useFormatStore } = await import('@stores/useFormatStore');
   const fmt = useFormatStore.getState();
+
+  // Magic-dispatched formats that never load into a replayer (e.g. MaxTrax — UADE can't play
+  // it) still hold their editable bytes in the store. Rebuild a minimal song carrying them so
+  // the magic exporters (isMaxTrax / isSynTracker) fire.
+  if (fmt.uadeEditableFileData &&
+      !(fmt.editorMode === 'hively' || fmt.editorMode === 'klystrack' || fmt.editorMode === 'jamcracker')) {
+    const { useTrackerStore, useTransportStore, useProjectStore, useInstrumentStore } = await import('@stores');
+    const ts = useTrackerStore.getState();
+    return {
+      name: useProjectStore.getState().metadata?.name ?? 'Untitled',
+      format: 'MOD',
+      patterns: ts.patterns,
+      instruments: useInstrumentStore.getState().instruments,
+      songPositions: ts.patternOrder ?? ts.patterns.map((_: unknown, i: number) => i),
+      songLength: ts.patternOrder?.length ?? ts.patterns.length,
+      restartPosition: 0,
+      numChannels: ts.patterns[0]?.channels?.length ?? 4,
+      initialSpeed: useTransportStore.getState().speed ?? 6,
+      initialBPM: useTransportStore.getState().bpm ?? 125,
+      uadeEditableFileData: fmt.uadeEditableFileData,
+      uadeEditableFileName: fmt.uadeEditableFileName ?? undefined,
+    } as TrackerSong;
+  }
+
   if (!(fmt.editorMode === 'hively' || fmt.editorMode === 'klystrack' || fmt.editorMode === 'jamcracker')) {
     return null;
   }
