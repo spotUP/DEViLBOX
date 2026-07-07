@@ -138,6 +138,25 @@ describe('exporter round-trip regressions', () => {
     expect(matched).toBe(cells);
   });
 
+  it('HippelCoSo export encodes empty rows as the -2 rest command (note byte 0 is a real note)', async () => {
+    const { parseHippelCoSoFile } = await import('@lib/import/formats/HippelCoSoParser');
+    const { exportAsHippelCoSo } = await import('../HippelCoSoExporter');
+    const raw = fixture('public/data/songs/formats/prehistoric_tale.hipc');
+    const song = await parseHippelCoSoFile(raw, 'prehistoric_tale.hipc');
+    expect(song).not.toBeNull();
+    const out = await toU8(await exportAsHippelCoSo(song as TrackerSong));
+    const re = await parseHippelCoSoFile(out.buffer.slice(0) as ArrayBuffer, 'prehistoric_tale.hipc');
+    expect(re).not.toBeNull();
+    // CoSo note byte 0 decodes to a real sub-bass note; encoding empty rows as [0,0]
+    // filled every silent pattern with note 13. Rests must be the -2 command.
+    const { cells, matched } = cellMatch(song as TrackerSong, re as TrackerSong);
+    expect(cells).toBeGreaterThan(1000);
+    // >99%: the only residual is note events that reference a volume-sequence slot
+    // beyond the instrument table (parser yields instrument 0), which cannot be
+    // reproduced without a deliberately out-of-range volseq index.
+    expect(matched / cells).toBeGreaterThan(0.99);
+  }, 30000); // HippelCoSo parser attempts a (failing) network fetch that is slow to reject
+
   it('SidMon1 export writes 1-based note bytes so notes do not decode a semitone low', async () => {
     const { parseSidMon1File } = await import('@lib/import/formats/SidMon1Parser');
     const { exportSidMon1 } = await import('../SidMon1Exporter');

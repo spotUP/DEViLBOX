@@ -164,7 +164,7 @@
       "exporter": "HippelCoSoExporter.exportAsHippelCoSo",
       "tier": "pattern-data",
       "status": "pattern-match",
-      "matchPct": 0.3219,
+      "matchPct": 0.9932,
       "cells": 1920,
       "bytes": 2448
     },
