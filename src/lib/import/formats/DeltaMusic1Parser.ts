@@ -724,16 +724,14 @@ export async function parseDeltaMusic1File(buffer: ArrayBuffer, filename: string
       // Simplified inverse of encoder: xmNote = noteRaw + 36
       const note = noteRaw > 0 ? noteRaw + 36 : 0;
 
-      let effTyp = 0, eff = 0;
-      switch (dm1Eff) {
-        case 0x01: if (dm1Arg !== 0) { effTyp = 0x0F; eff = dm1Arg; } break; // SetSpeed
-        case 0x02: effTyp = 0x01; eff = dm1Arg; break; // SlideUp → porta up
-        case 0x03: effTyp = 0x02; eff = dm1Arg; break; // SlideDown → porta down
-        case 0x09: effTyp = 0x03; eff = dm1Arg; break; // SetPortamento → tone porta
-        case 0x0A: effTyp = 0x0C; eff = Math.min(64, dm1Arg); break; // SetVolume
-      }
-
-      return { note, instrument, volume: 0, effTyp, eff, effTyp2: 0, eff2: 0 };
+      // Store the DM1 effect command + argument VERBATIM (native raw codes), exactly as
+      // encodeDeltaMusic1Cell writes them back (out[2]=effTyp, out[3]=eff). DM1's effect set
+      // is format-specific and several commands (e.g. 0x06, 0x17) have no XM equivalent, so a
+      // lossy DM1→XM remap here could not be inverted by the encoder and dropped those cells
+      // on write-back. This codec is played by the dedicated DeltaMusic1Engine (raw file
+      // bytes), not DEViLBOX's XM effect engine, so raw native codes are the correct
+      // representation — this makes decode↔encode a byte-exact inverse (Tomy Tracker model).
+      return { note, instrument, volume: 0, effTyp: dm1Eff, eff: dm1Arg, effTyp2: 0, eff2: 0 };
     },
     getCellFileOffset: (pattern: number, row: number, channel: number): number => {
       // pattern = TrackerSong pattern index (= song position)
