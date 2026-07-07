@@ -138,6 +138,22 @@ describe('exporter round-trip regressions', () => {
     expect(matched).toBe(cells);
   });
 
+  it('SidMon1 export writes 1-based note bytes so notes do not decode a semitone low', async () => {
+    const { parseSidMon1File } = await import('@lib/import/formats/SidMon1Parser');
+    const { exportSidMon1 } = await import('../SidMon1Exporter');
+    const raw = fixture('public/data/songs/formats/anarchy.sid1');
+    const song = parseSidMon1File(raw, 'anarchy.sid1');
+    expect(song).not.toBeNull();
+    const out = await toU8(await exportSidMon1(song as TrackerSong));
+    const re = parseSidMon1File(out.buffer.slice(0) as ArrayBuffer, 'anarchy.sid1');
+    expect(re).not.toBeNull();
+    // The parser reads the stored note byte as 1-based (storedNote - 1); without the
+    // exporter's compensating +1, mid-range notes decoded a semitone low.
+    const { cells, matched } = cellMatch(song as TrackerSong, re as TrackerSong);
+    expect(cells).toBeGreaterThan(1000);
+    expect(matched).toBe(cells);
+  });
+
   it('FC export encodes note as period index xmNote-13 (was -12, shifting every note up a semitone)', async () => {
     const { parseFCFile } = await import('@lib/import/formats/FCParser');
     const { exportFC } = await import('../FCExporter');

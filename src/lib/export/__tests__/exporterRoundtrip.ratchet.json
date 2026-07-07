@@ -332,7 +332,7 @@
       "exporter": "SidMon1Exporter.exportSidMon1",
       "tier": "pattern-data",
       "status": "pattern-match",
-      "matchPct": 0.5247,
+      "matchPct": 1,
       "cells": 1536,
       "bytes": 4324
     },
