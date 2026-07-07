@@ -237,3 +237,32 @@ export function registerVariableEncoder(encoder: VariableLengthEncoder): void {
 export function getVariableEncoder(formatId: string): VariableLengthEncoder | undefined {
   return variableEncoderRegistry.get(formatId);
 }
+
+// ─── Registry Introspection ───────────────────────────────────────────────────
+// Read-only accessors over the two encoder registries. Used by the mass
+// round-trip harness (src/engine/uade/__tests__/encoderRoundtrip.harness.test.ts)
+// to enumerate every registered codec and verify it against a real fixture.
+// These do not change registration behavior — they only list what is present.
+// NOTE: registration is a module side-effect; a caller must have imported the
+// encoder modules (directly or via a barrel) before these return a full list.
+
+/** List every formatId registered via registerPatternEncoder (fixed-length codecs). */
+export function listPatternEncoderFormatIds(): string[] {
+  return Array.from(encoderRegistry.keys()).sort();
+}
+
+/** List every formatId registered via registerVariableEncoder (variable-length codecs). */
+export function listVariableEncoderFormatIds(): string[] {
+  return Array.from(variableEncoderRegistry.keys()).sort();
+}
+
+/**
+ * List every registered encoder formatId across BOTH registries, tagged by kind.
+ * `fixed` = per-cell encodeCell codec; `variable` = whole-pattern encoder.
+ */
+export function listRegisteredEncoderFormatIds(): { formatId: string; kind: 'fixed' | 'variable' }[] {
+  const out: { formatId: string; kind: 'fixed' | 'variable' }[] = [];
+  for (const id of listPatternEncoderFormatIds()) out.push({ formatId: id, kind: 'fixed' });
+  for (const id of listVariableEncoderFormatIds()) out.push({ formatId: id, kind: 'variable' });
+  return out;
+}

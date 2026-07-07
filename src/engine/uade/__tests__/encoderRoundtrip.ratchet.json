@@ -1,0 +1,685 @@
+{
+  "results": {
+    "ashleyHogg": {
+      "kind": "fixed",
+      "method": "decode-encode",
+      "status": "lossy",
+      "byteExact": false,
+      "matchPct": 0.0859,
+      "cells": 256
+    },
+    "benDaglish": {
+      "kind": "variable",
+      "method": "encode-pattern",
+      "status": "lossy",
+      "byteExact": false,
+      "matchPct": 0,
+      "cells": 20
+    },
+    "coreDesign": {
+      "kind": "fixed",
+      "method": "decode-encode",
+      "status": "lossy",
+      "byteExact": false,
+      "matchPct": 0.3047,
+      "cells": 256
+    },
+    "customMade": {
+      "kind": "fixed",
+      "method": "decode-encode",
+      "status": "lossy",
+      "byteExact": false,
+      "matchPct": 0.0664,
+      "cells": 256
+    },
+    "daveLowe": {
+      "kind": "variable",
+      "method": "encode-pattern",
+      "status": "lossy",
+      "byteExact": false,
+      "matchPct": 0.0625,
+      "cells": 64
+    },
+    "davidWhittaker": {
+      "kind": "fixed",
+      "method": "decode-encode",
+      "status": "lossy",
+      "byteExact": false,
+      "matchPct": 0.0693,
+      "cells": 3650
+    },
+    "deltaMusic1": {
+      "kind": "fixed",
+      "method": "decode-encode",
+      "status": "lossy",
+      "byteExact": false,
+      "matchPct": 0.9957,
+      "cells": 1152
+    },
+    "desire": {
+      "kind": "fixed",
+      "method": "decode-encode",
+      "status": "lossy",
+      "byteExact": false,
+      "matchPct": 0.3125,
+      "cells": 256
+    },
+    "digitalMugician": {
+      "kind": "fixed",
+      "method": "decode-encode",
+      "status": "lossy",
+      "byteExact": false,
+      "matchPct": 0.0052,
+      "cells": 8448
+    },
+    "digitalSonixChrome": {
+      "kind": "fixed",
+      "method": "decode-encode",
+      "status": "lossy",
+      "byteExact": false,
+      "matchPct": 0.082,
+      "cells": 256
+    },
+    "earAche": {
+      "kind": "fixed",
+      "method": "decode-encode",
+      "status": "lossy",
+      "byteExact": false,
+      "matchPct": 0.3281,
+      "cells": 256
+    },
+    "faceTheMusic": {
+      "kind": "variable",
+      "method": "encode-pattern",
+      "status": "lossy",
+      "byteExact": false,
+      "matchPct": 0,
+      "cells": 8
+    },
+    "far": {
+      "kind": "fixed",
+      "method": "decode-encode",
+      "status": "lossy",
+      "byteExact": false,
+      "matchPct": 0.1017,
+      "cells": 262144
+    },
+    "fashionTracker": {
+      "kind": "fixed",
+      "method": "decode-encode",
+      "status": "lossy",
+      "byteExact": false,
+      "matchPct": 0.2249,
+      "cells": 16640
+    },
+    "format669": {
+      "kind": "fixed",
+      "method": "decode-encode",
+      "status": "lossy",
+      "byteExact": false,
+      "matchPct": 0.0026,
+      "cells": 7680
+    },
+    "fredEditor": {
+      "kind": "variable",
+      "method": "encode-pattern",
+      "status": "lossy",
+      "byteExact": false,
+      "matchPct": 0,
+      "cells": 12
+    },
+    "fredGray": {
+      "kind": "fixed",
+      "method": "decode-encode",
+      "status": "lossy",
+      "byteExact": false,
+      "matchPct": 0.2148,
+      "cells": 256
+    },
+    "futureComposer": {
+      "kind": "fixed",
+      "method": "decode-encode",
+      "status": "byte-exact",
+      "byteExact": true,
+      "matchPct": 1,
+      "cells": 512
+    },
+    "futurePlayer": {
+      "kind": "variable",
+      "method": "encode-pattern",
+      "status": "lossy",
+      "byteExact": false,
+      "matchPct": 0,
+      "cells": 4
+    },
+    "gameMusicCreator": {
+      "kind": "fixed",
+      "method": "decode-encode",
+      "status": "lossy",
+      "byteExact": false,
+      "matchPct": 0.6341,
+      "cells": 768
+    },
+    "gdm": {
+      "kind": "variable",
+      "method": "encode-pattern",
+      "status": "lossy",
+      "byteExact": false,
+      "matchPct": 0,
+      "cells": 8
+    },
+    "glueMon": {
+      "kind": "fixed",
+      "method": "decode-encode",
+      "status": "lossy",
+      "byteExact": false,
+      "matchPct": 0,
+      "cells": 171
+    },
+    "hippelCoSo": {
+      "kind": "variable",
+      "method": "encode-pattern",
+      "status": "lossy",
+      "byteExact": false,
+      "matchPct": 0,
+      "cells": 19
+    },
+    "hivelyAHX": {
+      "kind": "fixed",
+      "method": "encode-parsed",
+      "status": "lossy",
+      "byteExact": false,
+      "matchPct": 0.854,
+      "cells": 2048
+    },
+    "hivelyHVL": {
+      "kind": "variable",
+      "method": "encode-pattern",
+      "status": "lossy",
+      "byteExact": false,
+      "matchPct": 0.3037,
+      "cells": 191
+    },
+    "iffSmus": {
+      "kind": "variable",
+      "method": "encode-pattern",
+      "status": "lossy",
+      "byteExact": false,
+      "matchPct": 0,
+      "cells": 4
+    },
+    "infogrames": {
+      "kind": "fixed",
+      "method": "decode-encode",
+      "status": "lossy",
+      "byteExact": false,
+      "matchPct": 0.008,
+      "cells": 249
+    },
+    "it": {
+      "kind": "variable",
+      "method": "encode-pattern",
+      "status": "lossy",
+      "byteExact": false,
+      "matchPct": 0,
+      "cells": 42
+    },
+    "jamCracker": {
+      "kind": "fixed",
+      "method": "decode-encode",
+      "status": "lossy",
+      "byteExact": false,
+      "matchPct": 0.9469,
+      "cells": 1280
+    },
+    "jankoMrsicFlogel": {
+      "kind": "fixed",
+      "method": "decode-encode",
+      "status": "lossy",
+      "byteExact": false,
+      "matchPct": 0.2344,
+      "cells": 256
+    },
+    "jasonBrooke": {
+      "kind": "fixed",
+      "method": "decode-encode",
+      "status": "lossy",
+      "byteExact": false,
+      "matchPct": 0.3984,
+      "cells": 256
+    },
+    "jasonPage": {
+      "kind": "fixed",
+      "method": "decode-encode",
+      "status": "lossy",
+      "byteExact": false,
+      "matchPct": 0.1602,
+      "cells": 256
+    },
+    "jesperOlsen": {
+      "kind": "fixed",
+      "method": "decode-encode",
+      "status": "lossy",
+      "byteExact": false,
+      "matchPct": 0.2578,
+      "cells": 256
+    },
+    "klystrack": {
+      "kind": "fixed",
+      "method": "encode-parsed",
+      "status": "lossy",
+      "byteExact": false,
+      "matchPct": 0,
+      "cells": 1357
+    },
+    "maniacsOfNoise": {
+      "kind": "fixed",
+      "method": "decode-encode",
+      "status": "lossy",
+      "byteExact": false,
+      "matchPct": 0.0859,
+      "cells": 256
+    },
+    "markCooksey": {
+      "kind": "fixed",
+      "method": "decode-encode",
+      "status": "lossy",
+      "byteExact": false,
+      "matchPct": 0.207,
+      "cells": 256
+    },
+    "markII": {
+      "kind": "fixed",
+      "method": "decode-encode",
+      "status": "lossy",
+      "byteExact": false,
+      "matchPct": 0.168,
+      "cells": 256
+    },
+    "mdl": {
+      "kind": "variable",
+      "method": "encode-pattern",
+      "status": "lossy",
+      "byteExact": false,
+      "matchPct": 0,
+      "cells": 50
+    },
+    "midiLoriciel": {
+      "kind": "fixed",
+      "method": "decode-encode",
+      "status": "lossy",
+      "byteExact": false,
+      "matchPct": 0,
+      "cells": 256
+    },
+    "mod": {
+      "kind": "fixed",
+      "method": "encode-parsed",
+      "status": "lossy",
+      "byteExact": false,
+      "matchPct": 0.555,
+      "cells": 7168
+    },
+    "mtm": {
+      "kind": "fixed",
+      "method": "decode-encode",
+      "status": "lossy",
+      "byteExact": false,
+      "matchPct": 0.6691,
+      "cells": 40704
+    },
+    "musicLine": {
+      "kind": "variable",
+      "method": "encode-pattern",
+      "status": "lossy",
+      "byteExact": false,
+      "matchPct": 0,
+      "cells": 29
+    },
+    "nru": {
+      "kind": "fixed",
+      "method": "decode-encode",
+      "status": "lossy",
+      "byteExact": false,
+      "matchPct": 0.4414,
+      "cells": 256
+    },
+    "paulRobotham": {
+      "kind": "fixed",
+      "method": "decode-encode",
+      "status": "lossy",
+      "byteExact": false,
+      "matchPct": 0.082,
+      "cells": 256
+    },
+    "paulShields": {
+      "kind": "fixed",
+      "method": "decode-encode",
+      "status": "lossy",
+      "byteExact": false,
+      "matchPct": 0.3359,
+      "cells": 256
+    },
+    "plm": {
+      "kind": "fixed",
+      "method": "decode-encode",
+      "status": "lossy",
+      "byteExact": false,
+      "matchPct": 0,
+      "cells": 12288
+    },
+    "ptm": {
+      "kind": "variable",
+      "method": "encode-pattern",
+      "status": "lossy",
+      "byteExact": false,
+      "matchPct": 0,
+      "cells": 27
+    },
+    "pumaTracker": {
+      "kind": "variable",
+      "method": "encode-pattern",
+      "status": "lossy",
+      "byteExact": false,
+      "matchPct": 0.0263,
+      "cells": 38
+    },
+    "quadraComposer": {
+      "kind": "fixed",
+      "method": "decode-encode",
+      "status": "lossy",
+      "byteExact": false,
+      "matchPct": 0.3516,
+      "cells": 2304
+    },
+    "quartet": {
+      "kind": "fixed",
+      "method": "decode-encode",
+      "status": "lossy",
+      "byteExact": false,
+      "matchPct": 0.0625,
+      "cells": 256
+    },
+    "robHubbard": {
+      "kind": "fixed",
+      "method": "decode-encode",
+      "status": "lossy",
+      "byteExact": false,
+      "matchPct": 0.2188,
+      "cells": 1024
+    },
+    "rtm": {
+      "kind": "variable",
+      "method": "encode-pattern",
+      "status": "lossy",
+      "byteExact": false,
+      "matchPct": 0,
+      "cells": 9
+    },
+    "s3m": {
+      "kind": "variable",
+      "method": "encode-pattern",
+      "status": "lossy",
+      "byteExact": false,
+      "matchPct": 0,
+      "cells": 31
+    },
+    "scumm": {
+      "kind": "fixed",
+      "method": "decode-encode",
+      "status": "lossy",
+      "byteExact": false,
+      "matchPct": 0.1328,
+      "cells": 256
+    },
+    "seanConnolly": {
+      "kind": "fixed",
+      "method": "decode-encode",
+      "status": "lossy",
+      "byteExact": false,
+      "matchPct": 0.293,
+      "cells": 256
+    },
+    "sidmon1": {
+      "kind": "fixed",
+      "method": "decode-encode",
+      "status": "lossy",
+      "byteExact": false,
+      "matchPct": 0,
+      "cells": 1536
+    },
+    "sidMon2": {
+      "kind": "variable",
+      "method": "encode-pattern",
+      "status": "lossy",
+      "byteExact": false,
+      "matchPct": 0,
+      "cells": 16
+    },
+    "sonicArranger": {
+      "kind": "fixed",
+      "method": "decode-encode",
+      "status": "lossy",
+      "byteExact": false,
+      "matchPct": 0.6469,
+      "cells": 8448
+    },
+    "sonicArrangerSas": {
+      "kind": "fixed",
+      "method": "decode-encode",
+      "status": "lossy",
+      "byteExact": false,
+      "matchPct": 0.1289,
+      "cells": 256
+    },
+    "soundfx": {
+      "kind": "fixed",
+      "method": "decode-encode",
+      "status": "lossy",
+      "byteExact": false,
+      "matchPct": 0.9688,
+      "cells": 256
+    },
+    "soundMon": {
+      "kind": "fixed",
+      "method": "decode-encode",
+      "status": "lossy",
+      "byteExact": false,
+      "matchPct": 0.5137,
+      "cells": 1024
+    },
+    "soundPlayer": {
+      "kind": "fixed",
+      "method": "decode-encode",
+      "status": "lossy",
+      "byteExact": false,
+      "matchPct": 0.3945,
+      "cells": 256
+    },
+    "specialFX": {
+      "kind": "fixed",
+      "method": "decode-encode",
+      "status": "lossy",
+      "byteExact": false,
+      "matchPct": 0.4648,
+      "cells": 256
+    },
+    "steveBarrett": {
+      "kind": "fixed",
+      "method": "decode-encode",
+      "status": "lossy",
+      "byteExact": false,
+      "matchPct": 0.0898,
+      "cells": 256
+    },
+    "steveTurner": {
+      "kind": "variable",
+      "method": "encode-pattern",
+      "status": "lossy",
+      "byteExact": false,
+      "matchPct": 0,
+      "cells": 4
+    },
+    "stm": {
+      "kind": "fixed",
+      "method": "decode-encode",
+      "status": "lossy",
+      "byteExact": false,
+      "matchPct": 0.0017,
+      "cells": 8192
+    },
+    "stp": {
+      "kind": "fixed",
+      "method": "decode-encode",
+      "status": "lossy",
+      "byteExact": false,
+      "matchPct": 0.9599,
+      "cells": 4864
+    },
+    "stx": {
+      "kind": "variable",
+      "method": "encode-pattern",
+      "status": "lossy",
+      "byteExact": false,
+      "matchPct": 0,
+      "cells": 20
+    },
+    "sunTronic": {
+      "kind": "fixed",
+      "method": "decode-encode",
+      "status": "lossy",
+      "byteExact": false,
+      "matchPct": 0.1016,
+      "cells": 256
+    },
+    "tcbTracker": {
+      "kind": "fixed",
+      "method": "decode-encode",
+      "status": "lossy",
+      "byteExact": false,
+      "matchPct": 0.9182,
+      "cells": 4608
+    },
+    "tfmx": {
+      "kind": "fixed",
+      "method": "decode-encode",
+      "status": "lossy",
+      "byteExact": false,
+      "matchPct": 0.1469,
+      "cells": 143
+    },
+    "tfmx7v": {
+      "kind": "fixed",
+      "method": "decode-encode",
+      "status": "lossy",
+      "byteExact": false,
+      "matchPct": 0.9847,
+      "cells": 24640
+    },
+    "tomyTracker": {
+      "kind": "fixed",
+      "method": "decode-encode",
+      "status": "byte-exact",
+      "byteExact": true,
+      "matchPct": 1,
+      "cells": 2560
+    },
+    "ult": {
+      "kind": "variable",
+      "method": "encode-pattern",
+      "status": "lossy",
+      "byteExact": false,
+      "matchPct": 0,
+      "cells": 527
+    },
+    "unic": {
+      "kind": "fixed",
+      "method": "decode-encode",
+      "status": "lossy",
+      "byteExact": false,
+      "matchPct": 0.6537,
+      "cells": 5120
+    },
+    "wallyBeben": {
+      "kind": "fixed",
+      "method": "decode-encode",
+      "status": "lossy",
+      "byteExact": false,
+      "matchPct": 0.996,
+      "cells": 504
+    },
+    "xm": {
+      "kind": "variable",
+      "method": "encode-pattern",
+      "status": "lossy",
+      "byteExact": false,
+      "matchPct": 0,
+      "cells": 18
+    },
+    "zoundMonitor": {
+      "kind": "fixed",
+      "method": "decode-encode",
+      "status": "lossy",
+      "byteExact": false,
+      "matchPct": 0.4779,
+      "cells": 1536
+    }
+  },
+  "unexercisedRegistered": [
+    "aProSys",
+    "actionamics",
+    "activisionPro",
+    "amf",
+    "amosMusicBank",
+    "ams",
+    "aon",
+    "artAndMagic",
+    "c67",
+    "chuckBiscuits",
+    "composer667",
+    "deltaMusic2",
+    "digiBooster",
+    "digiBoosterPro",
+    "digitalSymphony",
+    "dmf",
+    "dsm_dyn",
+    "dss",
+    "dtm_204",
+    "dtm_pt",
+    "gmc",
+    "graoumfTracker2_gt2",
+    "graoumfTracker2_gtk4",
+    "graoumfTracker2_gtk5",
+    "ice",
+    "imf",
+    "ims",
+    "inStereo1",
+    "inStereo2",
+    "karlMorton",
+    "kris",
+    "leggless",
+    "med_mmd0",
+    "med_mmd1",
+    "mfp",
+    "mikeDavies",
+    "mt2",
+    "musicAssembler",
+    "octamed_mmd0",
+    "octamed_mmd1",
+    "oktalyzer",
+    "psm",
+    "pt36",
+    "ronKlaren",
+    "sawteeth",
+    "sonixMusicDriver",
+    "soundControl",
+    "soundFactory",
+    "soundFactoryStub",
+    "startrekkerAM",
+    "stk",
+    "symphoniePro",
+    "synthesis",
+    "wantedTeamDaveLowe",
+    "xmf"
+  ]
+}
