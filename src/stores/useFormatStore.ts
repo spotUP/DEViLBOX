@@ -71,6 +71,7 @@ interface FormatStore {
   fmplayerFileData: ArrayBuffer | null;
   qsfFileData: ArrayBuffer | null;
   startrekkerAMFileData: ArrayBuffer | null;
+  startrekkerAMNtData: ArrayBuffer | null;
   soundMonFileData: ArrayBuffer | null;
   sonicArrangerFileData: ArrayBuffer | null;
   robHubbardFileData: ArrayBuffer | null;
@@ -362,6 +363,7 @@ export const useFormatStore = create<FormatStore>()(
     fmplayerFileData: null,
     qsfFileData: null,
     startrekkerAMFileData: null,
+    startrekkerAMNtData: null,
     soundMonFileData: null,
     sonicArrangerFileData: null,
     robHubbardFileData: null,
@@ -800,6 +802,7 @@ export const useFormatStore = create<FormatStore>()(
         state.fmplayerFileData = (song as any).fmplayerFileData ?? null;
         state.qsfFileData = (song as any).qsfFileData ?? null;
         state.startrekkerAMFileData = (song as any).startrekkerAMFileData ?? null;
+        state.startrekkerAMNtData = (song as any).startrekkerAMNtData ?? null;
         state.soundMonFileData = (song as any).soundMonFileData ?? null;
         state.sonicArrangerFileData = (song as any).sonicArrangerFileData ?? null;
         state.robHubbardFileData = (song as any).robHubbardFileData ?? null;
@@ -1083,6 +1086,7 @@ export const useFormatStore = create<FormatStore>()(
       state.fmplayerFileData = null;
       state.qsfFileData = null;
       state.startrekkerAMFileData = null;
+      state.startrekkerAMNtData = null;
       state.soundMonFileData = null;
       state.sonicArrangerFileData = null;
       state.robHubbardFileData = null;

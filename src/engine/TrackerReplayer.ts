@@ -262,6 +262,8 @@ export interface TrackerSong {
   };
   /** Raw C64 SID binary for loading into the C64SIDEngine */
   c64SidFileData?: Uint8Array;
+  /** Raw GoatTracker .sng binary for the GoatTracker editor / SID engine */
+  goatTrackerData?: Uint8Array;
   /** Raw JamCracker .jam binary for loading into the JamCrackerEngine WASM */
   jamCrackerFileData?: ArrayBuffer;
   /** Raw Future Player .fp binary for loading into the FuturePlayerEngine WASM */
