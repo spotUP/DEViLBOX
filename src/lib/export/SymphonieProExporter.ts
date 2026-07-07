@@ -163,6 +163,11 @@ function writePackedChunk(data: Uint8Array): Uint8Array {
  */
 function encodeSymEvent(cell: TrackerCell): Uint8Array {
   const out = new Uint8Array(4);
+  // Note byte is a SIGNED int8: the parser treats note < 0 as "no note" and only
+  // reads a note (and its instrument) when 0 <= note <= 84. An all-zero event is
+  // therefore CMD_KEYON with note 0, which decodes to a real note (xmNote 25) with
+  // instrument 1 — so every empty/no-note row must carry note = -1 (0xFF), not 0.
+  out[1] = 0xFF;
   const note = cell.note ?? 0;
   const instrument = cell.instrument ?? 0;
   const effTyp = cell.effTyp ?? 0;

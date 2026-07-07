@@ -138,6 +138,22 @@ describe('exporter round-trip regressions', () => {
     expect(matched).toBe(cells);
   });
 
+  it('SymphoniePro export writes note -1 for empty rows (note 0 decoded as a real note+instrument)', async () => {
+    const { parseSymphonieProFile } = await import('@lib/import/formats/SymphonieProParser');
+    const { exportSymphonieProFile } = await import('../SymphonieProExporter');
+    const raw = fixture('public/data/songs/symphonie/pas 2 jade.symmod');
+    const song = await parseSymphonieProFile(new Uint8Array(raw), 'pas 2 jade.symmod');
+    expect(song).not.toBeNull();
+    const out = await toU8(exportSymphonieProFile(song as TrackerSong));
+    const re = await parseSymphonieProFile(out, 'pas 2 jade.symmod');
+    expect(re).not.toBeNull();
+    // The SymEvent note byte is signed; an all-zero event is CMD_KEYON note 0,
+    // which decodes to xmNote 25 / instrument 1. Empty rows must carry note -1.
+    const { cells, matched } = cellMatch(song as TrackerSong, re as TrackerSong);
+    expect(cells).toBeGreaterThan(10000);
+    expect(matched).toBe(cells);
+  }, 30000); // Symphonie parser attempts a (failing) network fetch that is slow to reject
+
   it('HippelCoSo export encodes empty rows as the -2 rest command (note byte 0 is a real note)', async () => {
     const { parseHippelCoSoFile } = await import('@lib/import/formats/HippelCoSoParser');
     const { exportAsHippelCoSo } = await import('../HippelCoSoExporter');
