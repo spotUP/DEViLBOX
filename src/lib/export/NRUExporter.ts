@@ -104,7 +104,11 @@ function reverseNRUFinetune(xmFinetune: number): number {
 // ── Reverse effect encoding (same as NRUEncoder) ─────────────────────────────
 
 function reverseNRUEffect(effTyp: number, eff: number): { d0: number; d1: number } {
-  if (effTyp === 0 && eff === 0) return { d0: 0, d1: 0 };
+  // No effect. The parser reads d0=0 as tone-portamento (modEffect 0x03) and, with
+  // d1=0, still applies it -> effTyp 3. To round-trip an effTyp-0 cell we must emit the
+  // 0x0C arpeggio slot with param 0: the parser maps 0x0C -> modEffect 0 and, because
+  // (modEffect !== 0 || d1 !== 0) is false, applies nothing -> effTyp 0 eff 0.
+  if (effTyp === 0 && eff === 0) return { d0: 0x0C, d1: 0 };
 
   let d0: number;
   switch (effTyp) {
@@ -324,10 +328,15 @@ export async function exportNRU(
         output[cellOff + 0] = d0;
         output[cellOff + 1] = d1;
 
-        // Note: (xmNote - 36) * 2, must be even and <= 72
-        if (note > 0 && note >= 37) {
-          const nruNote = ((note - 36) * 2) & 0xFF;
-          output[cellOff + 2] = nruNote <= 72 ? nruNote : 0;
+        // Note byte exactly reverses the parser's `xmNote = d2/2 + 36` decode
+        // (NRUParser.ts:375), so d2 = round((note - 36) * 2). The parser applies
+        // no upper bound and accepts odd d2 (yielding half-step notes like 36.5),
+        // so the full 0..255 range must round-trip — an earlier `<= 72` / `>= 37`
+        // clamp silently dropped every note whose d2 byte exceeded 72 (e.g. the
+        // 0xFD..0xFF command-note slots) or was odd. note <= 36 has no d2 encoding.
+        if (note > 36) {
+          const nruNote = Math.round((note - 36) * 2);
+          output[cellOff + 2] = Math.max(0, Math.min(255, nruNote));
         } else {
           output[cellOff + 2] = 0;
         }

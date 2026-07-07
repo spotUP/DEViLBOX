@@ -268,7 +268,7 @@
       "exporter": "NRUExporter.exportNRU",
       "tier": "pattern-data",
       "status": "pattern-match",
-      "matchPct": 0.9336,
+      "matchPct": 1,
       "cells": 256,
       "bytes": 38486
     },
