@@ -24,7 +24,21 @@ export interface EncoderFixture {
 }
 
 export const ENCODER_FIXTURES: EncoderFixture[] = [
+  { formatId: "activisionPro", fixture: "public/data/songs/activision-pro/gettysburg.avp", kind: "fixed" },
+  { formatId: "aon", fixture: "public/data/songs/art-of-noise/inside.blipp.aon", kind: "fixed" },
+  { formatId: "ams", fixture: "public/data/songs/velvet-studio/kernel.ams", kind: "variable" },
   { formatId: "ashleyHogg", fixture: "public/data/songs/ashley-hogg/ash.nobby the aardvark", kind: "fixed" },
+  { formatId: "deltaMusic2", fixture: "public/data/songs/delta-music-2/asperity megademo 3.dm2", kind: "fixed" },
+  { formatId: "digiBoosterPro", fixture: "public/data/songs/digibooster-pro/invisibility.dbm", kind: "variable" },
+  { formatId: "graoumfTracker2_gt2", fixture: "public/data/songs/graoumf-tracker-2/living-on-video.gt2", kind: "fixed" },
+  { formatId: "inStereo2", fixture: "public/data/songs/instereo!-2.0/spaceflight.is20", kind: "fixed" },
+  { formatId: "mikeDavies", fixture: "public/data/songs/mike-davies/strider.md", kind: "fixed" },
+  { formatId: "musicAssembler", fixture: "public/data/songs/music-assembler/thanatos.ma", kind: "variable" },
+  { formatId: "ronKlaren", fixture: "public/data/songs/ron-klaren/astra 2.rk", kind: "fixed" },
+  { formatId: "soundControl", fixture: "public/data/songs/soundcontrol/north sea inferno ongame1.sc", kind: "fixed" },
+  { formatId: "soundFactory", fixture: "public/data/songs/soundfactory/im maien.psf", kind: "fixed" },
+  { formatId: "symphoniePro", fixture: "public/data/songs/symphonie/pas 2 jade.symmod", kind: "fixed" },
+  { formatId: "synthesis", fixture: "public/data/songs/synthesis/space sound.syn", kind: "fixed" },
   { formatId: "benDaglish", fixture: "public/data/songs/ben-daglish/motorhead-titleandingame.bd", kind: "variable" },
   { formatId: "coreDesign", fixture: "public/data/songs/core-design/dynamite dux.core", kind: "fixed" },
   { formatId: "customMade", fixture: "public/data/songs/formats/cm.viking_child", kind: "fixed" },

@@ -94,11 +94,21 @@ async function parseFixture(rel: string, raw: Uint8Array): Promise<TrackerSong> 
   if (typeof fn !== 'function') throw new Error(`parseFn ${fmt.nativeParser.parseFn} missing`);
   const parse = fn as (b: ArrayBuffer | Uint8Array, n: string) => TrackerSong | Promise<TrackerSong>;
   const ab = raw.buffer.slice(raw.byteOffset, raw.byteOffset + raw.byteLength) as ArrayBuffer;
+  // Some native parsers accept only an ArrayBuffer (e.g. they `new DataView(buf)`),
+  // others accept only a Uint8Array, and several *return null* (rather than throwing)
+  // when handed the shape they don't want. Try the ArrayBuffer first, then fall back to
+  // the Uint8Array on EITHER a throw OR a null/undefined result, so a fixture whose
+  // parser is Uint8Array-only still gets exercised instead of silently unmeasured.
+  let parsed: TrackerSong | null | undefined;
   try {
-    return await Promise.resolve(parse(ab, name));
+    parsed = await Promise.resolve(parse(ab, name));
   } catch {
-    return await Promise.resolve(parse(raw, name));
+    parsed = null;
   }
+  if (!parsed) {
+    parsed = await Promise.resolve(parse(raw, name));
+  }
+  return parsed as TrackerSong;
 }
 
 function roundTripFixed(raw: Uint8Array, layout: UADEPatternLayout, song: TrackerSong): { cells: number; exact: number } {
