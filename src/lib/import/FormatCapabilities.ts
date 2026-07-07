@@ -68,6 +68,7 @@ const EDITABLE_FORMAT_LABELS = new Set([
   'Mosh Packer', 'Nick Pelling Packer', 'Peter Verswyvelen Packer',
   'SunTronic', 'GlueMon', 'Sean Connolly',
   'Art and Magic', 'Mike Davies', 'Mark II', 'Sonic Arranger SAS', 'A-Pro-Sys',
+  'TomyTracker',
 ]);
 
 /** Format families (from FormatRegistry) that are always editable */
