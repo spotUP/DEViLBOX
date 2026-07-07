@@ -520,30 +520,6 @@ export const AVAILABLE_EFFECTS: AvailableEffect[] = [
     description: `${model.fullName} - ${model.description}`,
   })),
 
-
-  // Buzzmachine effects (WASM, reuse BuzzmachineSynth) — see registry/effects/buzzmachine.ts
-  { category: 'wasm', type: 'ArguruDistortion', label: "Arguru Distortion", group: 'Distortion', description: 'Buzzmachine WASM effect' },
-  { category: 'wasm', type: 'ElakSVF', label: "Elak SVF Filter", group: 'Filter', description: 'Buzzmachine WASM effect' },
-  { category: 'wasm', type: 'ElakDist2', label: "Elak Dist2", group: 'Distortion', description: 'Buzzmachine WASM effect' },
-  { category: 'wasm', type: 'JeskolaDistortion', label: "Jeskola Distortion", group: 'Distortion', description: 'Buzzmachine WASM effect' },
-  { category: 'wasm', type: 'GeonikOverdrive', label: "Geonik Overdrive", group: 'Distortion', description: 'Buzzmachine WASM effect' },
-  { category: 'wasm', type: 'GraueSoftSat', label: "Graue SoftSat", group: 'Distortion', description: 'Buzzmachine WASM effect' },
-  { category: 'wasm', type: 'WhiteNoiseStereoDist', label: "WhiteNoise StereoDist", group: 'Distortion', description: 'Buzzmachine WASM effect' },
-  { category: 'wasm', type: 'CyanPhaseNotch', label: "CyanPhase Notch", group: 'Filter', description: 'Buzzmachine WASM effect' },
-  { category: 'wasm', type: 'QZfilter', label: "Q Zfilter", group: 'Filter', description: 'Buzzmachine WASM effect' },
-  { category: 'wasm', type: 'FSMPhilta', label: "FSM Philta", group: 'Filter', description: 'Buzzmachine WASM effect' },
-  { category: 'wasm', type: 'JeskolaDelay', label: "Jeskola Delay", group: 'Reverb & Delay', description: 'Buzzmachine WASM effect' },
-  { category: 'wasm', type: 'JeskolaCrossDelay', label: "Jeskola CrossDelay", group: 'Reverb & Delay', description: 'Buzzmachine WASM effect' },
-  { category: 'wasm', type: 'JeskolaFreeverb', label: "Jeskola Freeverb", group: 'Reverb & Delay', description: 'Buzzmachine WASM effect' },
-  { category: 'wasm', type: 'FSMPanzerDelay', label: "FSM PanzerDelay", group: 'Reverb & Delay', description: 'Buzzmachine WASM effect' },
-  { category: 'wasm', type: 'FSMChorus', label: "FSM Chorus", group: 'Modulation', description: 'Buzzmachine WASM effect' },
-  { category: 'wasm', type: 'FSMChorus2', label: "FSM Chorus2", group: 'Modulation', description: 'Buzzmachine WASM effect' },
-  { category: 'wasm', type: 'WhiteNoiseWhiteChorus', label: "WhiteNoise WhiteChorus", group: 'Reverb & Delay', description: 'Buzzmachine WASM effect' },
-  { category: 'wasm', type: 'BigyoFrequencyShifter', label: "Bigyo FrequencyShifter", group: 'Pitch', description: 'Buzzmachine WASM effect' },
-  { category: 'wasm', type: 'GeonikCompressor', label: "Geonik Compressor", group: 'Dynamics', description: 'Buzzmachine WASM effect' },
-  { category: 'wasm', type: 'LdSLimit', label: "Ld SLimit", group: 'Dynamics', description: 'Buzzmachine WASM effect' },
-  { category: 'wasm', type: 'OomekExciter', label: "Oomek Exciter", group: 'Distortion', description: 'Buzzmachine WASM effect' },
-  { category: 'wasm', type: 'DedaCodeStereoGain', label: "DedaCode StereoGain", group: 'Dynamics', description: 'Buzzmachine WASM effect' },
 ];
 
 /**

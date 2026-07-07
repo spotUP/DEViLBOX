@@ -73,30 +73,7 @@ export type AudioEffectType =
   | 'WAMPitchShifter'   // Csound Pitch Shifter
   | 'WAMGraphicEQ'      // Graphic Equalizer
   | 'WAMPedalboard'    // Pedalboard multi-FX
-  | 'Fil4EQ'          // fil4 8-band parametric EQ (HP+LoShelf+4xPara+HiShelf+LP)
-  // Buzzmachine effects (WASM, reuse BuzzmachineSynth) — ids match BuzzmachineType values
-  | 'ArguruDistortion'
-  | 'ElakSVF'
-  | 'ElakDist2'
-  | 'JeskolaDistortion'
-  | 'GeonikOverdrive'
-  | 'GraueSoftSat'
-  | 'WhiteNoiseStereoDist'
-  | 'CyanPhaseNotch'
-  | 'QZfilter'
-  | 'FSMPhilta'
-  | 'JeskolaDelay'
-  | 'JeskolaCrossDelay'
-  | 'JeskolaFreeverb'
-  | 'FSMPanzerDelay'
-  | 'FSMChorus'
-  | 'FSMChorus2'
-  | 'WhiteNoiseWhiteChorus'
-  | 'BigyoFrequencyShifter'
-  | 'GeonikCompressor'
-  | 'LdSLimit'
-  | 'OomekExciter'
-  | 'DedaCodeStereoGain';
+  | 'Fil4EQ';          // fil4 8-band parametric EQ (HP+LoShelf+4xPara+HiShelf+LP)
 
 export type EffectCategory = 'tonejs' | 'neural' | 'wasm' | 'wam';
 

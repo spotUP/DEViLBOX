@@ -28,15 +28,3 @@ EffectRegistry.registerLazy(
   ['Neural'],
   () => import('./neural').then(() => {}),
 );
-
-// ── Lazy: Buzzmachine effects (22 effects) — loads the buzz WASM engine on first use ──
-EffectRegistry.registerLazy(
-  [
-    'ArguruDistortion', 'ElakSVF', 'ElakDist2', 'JeskolaDistortion', 'GeonikOverdrive',
-    'GraueSoftSat', 'WhiteNoiseStereoDist', 'CyanPhaseNotch', 'QZfilter', 'FSMPhilta',
-    'JeskolaDelay', 'JeskolaCrossDelay', 'JeskolaFreeverb', 'FSMPanzerDelay', 'FSMChorus',
-    'FSMChorus2', 'WhiteNoiseWhiteChorus', 'BigyoFrequencyShifter', 'GeonikCompressor',
-    'LdSLimit', 'OomekExciter', 'DedaCodeStereoGain',
-  ],
-  () => import('./buzzmachine').then(() => {}),
-);
