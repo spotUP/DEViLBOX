@@ -125,15 +125,16 @@ export async function exportCDFM67(
   for (let i = 0; i < NUM_FM_INSTRS; i++) {
     const inst = song.instruments[NUM_PCM_INSTRS + i];
     fmNames.push((inst?.name ?? '').slice(0, 12));
-    // FM register data is not preserved in TrackerSong — write zeros
-    fmRegDumps.push(new Uint8Array(11));
-    if (inst?.name && inst.name.length > 0) {
-      // We have a named FM instrument but no OPL register data
-      // Only warn if it seems like a real instrument (not just "FM N")
-      if (!inst.name.match(/^FM \d+$/)) {
-        warnings.push(`FM instrument ${i + 1} "${inst.name}": OPL2 register data not preserved`);
-      }
+    // Restore the raw 11-byte OPL2 register dump captured on import (parameters.c67FmRegs).
+    // Without it an FM-only .c67 re-exports all-silent and fails the parser's validator.
+    const regs = (inst?.parameters as Record<string, unknown> | undefined)?.c67FmRegs;
+    const dump = new Uint8Array(11);
+    if (Array.isArray(regs)) {
+      for (let j = 0; j < 11 && j < regs.length; j++) dump[j] = Number(regs[j]) & 0xFF;
+    } else if (inst?.name && inst.name.length > 0 && !inst.name.match(/^FM \d+$/)) {
+      warnings.push(`FM instrument ${i + 1} "${inst.name}": OPL2 register data not preserved`);
     }
+    fmRegDumps.push(dump);
   }
 
   // ── Encode patterns ──────────────────────────────────────────────────────

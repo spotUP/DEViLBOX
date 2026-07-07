@@ -364,7 +364,12 @@ function parseInternal(bytes: Uint8Array, filename: string): TrackerSong | null 
   for (let smp = 0; smp < NUM_FM_INSTRS; smp++) {
     const fmNameBase = 930 + smp * 13;
     const fmName     = readString(bytes, fmNameBase, 13) || `FM ${smp + 1}`;
-    instruments.push(silentInstrument(NUM_PCM_INSTRS + smp + 1, fmName));
+    // Preserve the raw 11-byte OPL2 register dump (fmInstr[smp] at +1346) so it
+    // survives an export round-trip; an FM-only .c67 has no PCM and its instruments
+    // are otherwise all-silent, which the parser's validator rejects.
+    const fmRegBase = 1346 + smp * 11;
+    const fmRegs = Array.from(bytes.subarray(fmRegBase, fmRegBase + 11));
+    instruments.push(silentInstrument(NUM_PCM_INSTRS + smp + 1, fmName, fmRegs));
   }
 
   // ── Assemble TrackerSong ──────────────────────────────────────────────────
@@ -435,7 +440,7 @@ function makeEmptyPattern(idx: number, filename: string): Pattern {
   };
 }
 
-function silentInstrument(id: number, name: string): InstrumentConfig {
+function silentInstrument(id: number, name: string, c67FmRegs?: number[]): InstrumentConfig {
   return {
     id,
     name,
@@ -444,5 +449,6 @@ function silentInstrument(id: number, name: string): InstrumentConfig {
     effects:   [],
     volume:    0,
     pan:       0,
+    ...(c67FmRegs ? { parameters: { c67FmRegs } } : {}),
   } as InstrumentConfig;
 }
