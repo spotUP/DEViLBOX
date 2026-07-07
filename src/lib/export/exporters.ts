@@ -13,19 +13,26 @@ import type { DubBusSettings } from '@/types/dub';
 import { useDubStore, type AutoDubPersonaId } from '@/stores/useDubStore';
 import { useDrumPadStore } from '@/stores/useDrumPadStore';
 import { compressProject, decompressProject } from '@/lib/projectCompression';
+import { FILE_DATA_FIELDS } from '@engine/formatFileDataFields';
 
 // ── Binary FileData field names in useFormatStore ──
-// These are all the ArrayBuffer/Uint8Array fields that carry native engine data.
-const BINARY_FILE_DATA_FIELDS = [
-  'hivelyFileData', 'klysFileData', 'musiclineFileData', 'c64SidFileData',
-  'goatTrackerData', 'jamCrackerFileData', 'futurePlayerFileData', 'preTrackerFileData',
-  'maFileData', 'hippelFileData', 'sonixFileData', 'pxtoneFileData', 'organyaFileData', 'sawteethFileData',
-  'eupFileData', 'ixsFileData', 'psycleFileData', 'sc68FileData', 'zxtuneFileData',
-  'pumaTrackerFileData', 'steveTurnerFileData', 'sidmon1WasmFileData',
-  'fredEditorWasmFileData', 'artOfNoiseFileData', 'qsfFileData', 'startrekkerAMFileData',
-  'bdFileData', 'sd2FileData', 'symphonieFileData', 'uadeEditableFileData',
-  'libopenmptFileData', 'v2mFileData',
-] as const;
+// Single source of truth lives in `src/engine/formatFileDataFields.ts` and is
+// kept in sync with `TrackerSong` by a completeness ratchet test. Do NOT
+// re-hardcode a list here — extend FILE_DATA_FIELDS instead.
+const BINARY_FILE_DATA_FIELDS = FILE_DATA_FIELDS;
+
+/**
+ * Serialized shape of the two-file companion/sidecar collections that some
+ * UADE formats need (Sonix .instr/.ss, TFMX mdat+smpl, Richard Joseph, Jason
+ * Page). These are arrays/maps of buffers, not single buffers, so they are
+ * serialized separately from FILE_DATA_FIELDS.
+ */
+export interface SerializedCompanionFiles {
+  /** Sonix external instrument files, keyed by memfs-relative path. */
+  sonixSidecarFiles?: Array<{ path: string; data: string }>;
+  /** Generic two-file UADE companions, keyed by filename. */
+  uadeCompanionFiles?: Array<{ name: string; data: string }>;
+}
 
 /** Encode an ArrayBuffer or Uint8Array to base64 */
 function bufferToBase64(buf: ArrayBuffer | Uint8Array): string {
@@ -111,6 +118,30 @@ export function getNativeEngineMetaForExport(): Record<string, unknown> | null {
 }
 
 /**
+ * Collect the companion/sidecar files (two-file UADE formats) from the format
+ * store as base64. Returns null when the loaded song has no companions.
+ */
+export function getNativeCompanionFilesForExport(): SerializedCompanionFiles | null {
+  const state = useFormatStore.getState();
+  const result: SerializedCompanionFiles = {};
+
+  if (state.sonixSidecarFiles && state.sonixSidecarFiles.length > 0) {
+    result.sonixSidecarFiles = state.sonixSidecarFiles.map(({ path, data }) => ({
+      path,
+      data: bufferToBase64(data),
+    }));
+  }
+
+  if (state.uadeCompanionFiles && state.uadeCompanionFiles.size > 0) {
+    result.uadeCompanionFiles = Array.from(state.uadeCompanionFiles.entries()).map(
+      ([name, data]) => ({ name, data: bufferToBase64(data) }),
+    );
+  }
+
+  return result.sonixSidecarFiles || result.uadeCompanionFiles ? result : null;
+}
+
+/**
  * Restore native engine data into format store from saved .dbx data.
  * Decodes base64 binaries, reconstructs a song-like object, and calls applyEditorMode.
  */
@@ -118,8 +149,9 @@ export function restoreNativeEngineData(
   nativeEngineData: Record<string, string> | undefined,
   nativeEngineMeta: Record<string, unknown> | undefined,
   linearPeriods?: boolean,
+  companionFiles?: SerializedCompanionFiles | undefined,
 ): void {
-  if (!nativeEngineData && !nativeEngineMeta) return;
+  if (!nativeEngineData && !nativeEngineMeta && !companionFiles) return;
 
   // Build a song-like object for applyEditorMode
   const songObj: Record<string, unknown> = { linearPeriods: linearPeriods ?? false };
@@ -134,6 +166,23 @@ export function restoreNativeEngineData(
       } else {
         songObj[field] = buf;
       }
+    }
+  }
+
+  // Decode companion/sidecar files (applyEditorMode mirrors these into the store)
+  if (companionFiles) {
+    if (companionFiles.sonixSidecarFiles) {
+      songObj.sonixSidecarFiles = companionFiles.sonixSidecarFiles.map(({ path, data }) => ({
+        path,
+        data: base64ToBuffer(data),
+      }));
+    }
+    if (companionFiles.uadeCompanionFiles) {
+      const map = new Map<string, ArrayBuffer>();
+      for (const { name, data } of companionFiles.uadeCompanionFiles) {
+        map.set(name, base64ToBuffer(data));
+      }
+      songObj.uadeCompanionFiles = map;
     }
   }
 
@@ -174,6 +223,7 @@ export interface SongExport {
   originalModuleData?: { base64: string; format: string; sourceFile?: string }; // Original module for libopenmpt playback
   nativeEngineData?: Record<string, string>; // Base64-encoded binary FileData for native WASM engines
   nativeEngineMeta?: Record<string, unknown>; // JSON-serializable native engine metadata
+  nativeCompanionFiles?: SerializedCompanionFiles; // Two-file companions (Sonix .instr/.ss, TFMX smpl, …)
   replacedInstruments?: number[]; // Instrument IDs replaced with synths for hybrid playback
 
   /** Mixer state — channel volumes, pans, mutes, solos, dub sends, send buses.
@@ -267,6 +317,11 @@ export function exportSong(
     ...(() => {
       const nem = getNativeEngineMetaForExport();
       return nem ? { nativeEngineMeta: nem } : {};
+    })(),
+    // Companion/sidecar files for two-file UADE formats (Sonix .instr/.ss, TFMX smpl, …)
+    ...(() => {
+      const ncf = getNativeCompanionFilesForExport();
+      return ncf ? { nativeCompanionFiles: ncf } : {};
     })(),
     // Replaced instrument IDs for hybrid WASM/ToneEngine playback
     ...(() => {

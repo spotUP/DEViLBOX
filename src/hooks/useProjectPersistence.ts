@@ -13,7 +13,8 @@ import { useTrackerStore, useInstrumentStore, useProjectStore, useTransportStore
 import type { AutomationCurve } from '@typedefs/automation';
 import type { EffectConfig } from '@typedefs/instrument';
 import { needsMigration, migrateProject } from '@/lib/migration';
-import { getOriginalModuleDataForExport, getNativeEngineDataForExport, getNativeEngineMetaForExport, restoreNativeEngineData } from '@/lib/export/exporters';
+import { CURRENT_SCHEMA, MIN_LOADABLE_SCHEMA, migrateSavedProject } from '@/lib/persistence/migrations';
+import { getOriginalModuleDataForExport, getNativeEngineDataForExport, getNativeEngineMetaForExport, getNativeCompanionFilesForExport, restoreNativeEngineData, type SerializedCompanionFiles } from '@/lib/export/exporters';
 import { compressProject } from '@/lib/projectCompression';
 import { useMixerStore } from '@stores/useMixerStore';
 import { useDrumPadStore } from '@stores/useDrumPadStore';
@@ -124,8 +125,13 @@ const safeCancelIdleCallback = cancelIdleCallbackPolyfill;
  * - 21: Time-mode dub lanes for non-editable formats (raw SID, SC68). DubLane
  *       gains optional `kind: 'row' | 'time'` and `durationSec`; DubEvent gains
  *       optional `timeSec` and `durationSec`. Absence = row mode (back-compat).
+ * - 22: Companion/sidecar files for two-file UADE formats (Sonix .instr/.ss,
+ *       TFMX mdat+smpl, Richard Joseph, Jason Page) serialized as
+ *       `nativeCompanionFiles`. Purely additive AND forward-compatible: schema-21
+ *       projects load under 22 (they just have no companions), so this bump does
+ *       NOT hard-discard older data — see `src/lib/persistence/migrations/`.
  */
-const SCHEMA_VERSION = 21;
+const SCHEMA_VERSION = CURRENT_SCHEMA;
 
 interface SavedProject {
   version: string;
@@ -148,6 +154,7 @@ interface SavedProject {
   originalModuleData?: { base64: string; format: string; sourceFile?: string };
   nativeEngineData?: Record<string, string>;
   nativeEngineMeta?: Record<string, unknown>;
+  nativeCompanionFiles?: SerializedCompanionFiles;
   mixer?: import('@stores/useMixerStore').MixerSnapshot;
   dubBus?: Partial<import('@/types/dub').DubBusSettings>;
   autoDub?: { enabled: boolean; persona: string; intensity: number; moveBlacklist: string[] };
@@ -391,6 +398,10 @@ function buildSavedProject(): SavedProject {
       const nem = getNativeEngineMetaForExport();
       return nem ? { nativeEngineMeta: nem } : {};
     })(),
+    ...(() => {
+      const ncf = getNativeCompanionFilesForExport();
+      return ncf ? { nativeCompanionFiles: ncf } : {};
+    })(),
     // Save replaced instrument IDs for hybrid playback persistence
     ...(() => {
       try {
@@ -542,14 +553,19 @@ export async function loadProjectFromStorage(): Promise<boolean> {
       return false;
     }
 
-    // SCHEMA VERSION CHECK: Discard old data if schema is outdated
-    if (!project.schemaVersion || project.schemaVersion < SCHEMA_VERSION) {
+    // SCHEMA VERSION CHECK: only discard genuinely-incompatible schemas (below
+    // MIN_LOADABLE_SCHEMA). Schemas at or above the minimum are forward-migrated
+    // so additive bumps (e.g. 21→22 companion files) keep loading old projects.
+    if (!project.schemaVersion || project.schemaVersion < MIN_LOADABLE_SCHEMA) {
       console.warn(
-        `[Persistence] Discarding outdated data (schema ${project.schemaVersion || 1} < ${SCHEMA_VERSION}). ` +
+        `[Persistence] Discarding outdated data (schema ${project.schemaVersion || 1} < ${MIN_LOADABLE_SCHEMA}). ` +
         'This happens after app updates that fix data bugs.'
       );
       await idbDelete().catch(() => {});
       return false;
+    }
+    if (project.schemaVersion < SCHEMA_VERSION) {
+      migrateSavedProject(project, project.schemaVersion);
     }
 
     // Check if migration is needed (old format → new XM format)
@@ -609,7 +625,7 @@ export async function loadProjectFromStorage(): Promise<boolean> {
     }
 
     // Restore native engine data (all WASM formats)
-    restoreNativeEngineData(project.nativeEngineData, project.nativeEngineMeta, project.linearPeriods);
+    restoreNativeEngineData(project.nativeEngineData, project.nativeEngineMeta, project.linearPeriods, project.nativeCompanionFiles);
     if (project.originalModuleData?.base64) {
       useFormatStore.getState().setOriginalModuleData(project.originalModuleData as any);
     }
@@ -704,11 +720,14 @@ export async function loadProjectFromObject(data: unknown): Promise<boolean> {
       return false;
     }
 
-    if (!project.schemaVersion || project.schemaVersion < SCHEMA_VERSION) {
+    if (!project.schemaVersion || project.schemaVersion < MIN_LOADABLE_SCHEMA) {
       console.warn(
-        `[Persistence] Discarding outdated project file (schema ${project.schemaVersion ?? 1} < ${SCHEMA_VERSION}).`
+        `[Persistence] Discarding outdated project file (schema ${project.schemaVersion ?? 1} < ${MIN_LOADABLE_SCHEMA}).`
       );
       return false;
+    }
+    if (project.schemaVersion < SCHEMA_VERSION) {
+      migrateSavedProject(project, project.schemaVersion);
     }
 
     if (needsMigration(project.patterns, project.instruments)) {
@@ -754,7 +773,7 @@ export async function loadProjectFromObject(data: unknown): Promise<boolean> {
     }
 
     // Restore native engine data (all WASM formats)
-    restoreNativeEngineData(project.nativeEngineData, project.nativeEngineMeta, project.linearPeriods);
+    restoreNativeEngineData(project.nativeEngineData, project.nativeEngineMeta, project.linearPeriods, project.nativeCompanionFiles);
     if (project.originalModuleData?.base64) {
       useFormatStore.getState().setOriginalModuleData(project.originalModuleData as any);
     }
@@ -871,7 +890,7 @@ export async function loadLocalRevision(key: number): Promise<boolean> {
     }
 
     // Restore native engine data (all WASM formats)
-    restoreNativeEngineData(project.nativeEngineData, project.nativeEngineMeta, project.linearPeriods);
+    restoreNativeEngineData(project.nativeEngineData, project.nativeEngineMeta, project.linearPeriods, project.nativeCompanionFiles);
     if (project.originalModuleData?.base64) {
       useFormatStore.getState().setOriginalModuleData(project.originalModuleData as any);
     }
