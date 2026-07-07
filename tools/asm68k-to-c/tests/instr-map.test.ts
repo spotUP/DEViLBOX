@@ -11,6 +11,17 @@ function emit(asm: string): string {
 test('MOVE.L d0,d1', () => { expect(emit('MOVE.L d0,d1')).toContain('d1 = _mv;'); });
 test('MOVE.W d0,d1', () => { expect(emit('MOVE.W d0,d1')).toContain('W(d1) = (uint16_t)_mv;'); });
 test('MOVE.B d0,d1', () => { expect(emit('MOVE.B d0,d1')).toContain('B(d1) = (uint8_t)_mv;'); });
+// MOVE to an address register is a MOVEA — must NOT set condition codes (Cinter one-shot
+// repeat bug: `move.l (a5),a4` clobbered the Z that the following `beq` needed).
+test('MOVE.L (a5),a4 does not set flags (MOVEA)', () => {
+  const c = emit('MOVE.L (a5),a4');
+  expect(c).toContain('a4 =');
+  expect(c).not.toContain('flag_z');
+});
+test('MOVE.W d0,a0 does not set flags (MOVEA)', () => {
+  expect(emit('MOVE.W d0,a0')).not.toContain('flag_z');
+});
+test('MOVE.L d0,d1 still sets flags', () => { expect(emit('MOVE.L d0,d1')).toContain('flag_z'); });
 test('ADD.L d1,d0',  () => { expect(emit('ADD.L d1,d0')).toContain('d0 ='); });
 test('SUB.W d1,d0',  () => { expect(emit('SUB.W d1,d0')).toContain('W(d0)'); });
 test('MULS d0,d1',   () => { expect(emit('\tMULS d0,d1')).toContain('(int16_t)'); });
