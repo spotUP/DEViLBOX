@@ -97,10 +97,14 @@ export function exportOktalyzer(song: TrackerSong): ArrayBuffer {
     }
 
     samplePCMs.push(pcm);
+    // OKTSample fields (32-byte entry): name[20], length u32 @+20, loopStart u16 @+24
+    // (word units), loopLength u16 @+26 (words), volume u16 @+28, type u16 @+30.
+    const loopLenBytes = loopEnd > loopStart ? (loopEnd - loopStart) : 0;
     writeU32BE(sampView, base + 20, pcm.length);
-    writeU32BE(sampView, base + 24, loopStart);
-    writeU32BE(sampView, base + 28, loopEnd > loopStart ? loopEnd : 0);
-    writeU16BE(sampView, base + 30, 64); // volume
+    writeU16BE(sampView, base + 24, Math.floor(loopStart / 2));
+    writeU16BE(sampView, base + 26, Math.floor(loopLenBytes / 2));
+    writeU16BE(sampView, base + 28, 64); // volume
+    writeU16BE(sampView, base + 30, 0);  // type (0 = 8-bit sample)
   }
 
   chunks.push(iffChunkHeader('SAMP', sampData.length));
@@ -168,17 +172,16 @@ export function exportOktalyzer(song: TrackerSong): ArrayBuffer {
     if (pcm.length & 1) chunks.push(new Uint8Array(1));
   }
 
-  // ── Assemble FORM/OKTA container ─────────────────────────────────────────
+  // ── Assemble the file: raw 8-byte "OKTASONG" magic, then IFF-style chunks ──
+  // Oktalyzer is NOT a FORM-wrapped IFF file (OpenMPT Load_okt.cpp: ReadMagic
+  // "OKTASONG" at offset 0, chunks immediately after). No FORM/OKTA header.
   const totalChunkBytes = chunks.reduce((sum, c) => sum + c.byteLength, 0);
-  const formSize = 4 + totalChunkBytes; // 'OKTA' + chunks
-  const output = new Uint8Array(8 + formSize);
+  const output = new Uint8Array(8 + totalChunkBytes);
   const outView = new DataView(output.buffer);
 
-  writeStr(outView, 0, 'FORM');
-  writeU32BE(outView, 4, formSize);
-  writeStr(outView, 8, 'OKTA');
+  writeStr(outView, 0, 'OKTASONG');
 
-  let pos = 12;
+  let pos = 8;
   for (const chunk of chunks) {
     output.set(chunk, pos);
     pos += chunk.byteLength;
