@@ -13,7 +13,8 @@ import * as Tone from 'tone';
 import { SynthRegistry } from '../SynthRegistry';
 import type { SynthDescriptor } from '../SynthDescriptor';
 import { SonixSynth } from '../../sonix/SonixSynth';
-import { SonixEngine, type SonixSynthParams } from '../../sonix/SonixEngine';
+import { SonixEngine, SONIX_BRIDGE_SPEC, type SonixSynthParams } from '../../sonix/SonixEngine';
+import { mergeSynthParamsIntoDefaultStore } from '../../replayer/WasmSynthParamBridge';
 
 const sonixDesc: SynthDescriptor = {
   id: 'SonixSynth',
@@ -47,21 +48,8 @@ let bridgeRegistered = false;
 function registerSonixSynthParamBridge(): void {
   if (bridgeRegistered) return;
   bridgeRegistered = true;
-  SonixEngine.onSynthParams = async (params: SonixSynthParams[]) => {
-    if (!params.length) return;
-    const { useInstrumentStore } = await import('@/stores/useInstrumentStore');
-    const store = useInstrumentStore.getState();
-    for (const p of params) {
-      const inst = store.instruments.find(
-        (c) => (c.parameters as Record<string, unknown> | undefined)?.sonixIndex === p.index,
-      );
-      if (!inst) continue;
-      store.updateInstrument(inst.id, {
-        type: 'synth',
-        synthType: 'SonixSynth',
-        parameters: { sonixIndex: p.index, sonix: p },
-      } as Parameters<typeof store.updateInstrument>[1]);
-    }
+  SonixEngine.onSynthParams = (params: SonixSynthParams[]) => {
+    void mergeSynthParamsIntoDefaultStore(SONIX_BRIDGE_SPEC, params);
   };
 }
 

@@ -13,6 +13,10 @@ import {
   type WASMAssetsCache,
   type WASMLoaderConfig,
 } from '@engine/wasm/WASMSingletonBase';
+import {
+  WasmSynthParamBridge,
+  type WasmSynthParamBridgeSpec,
+} from '@engine/replayer/WasmSynthParamBridge';
 
 export interface SonixMeta {
   format: string;
@@ -42,14 +46,54 @@ export interface SonixSynthParams {
   lfoWave: number[];  // third 128-sample table @0x144 (Aegis "LFO" waveform tab)
   egLevels: number[]; // 4-stage envelope generator targets
   egRates: number[];  // 4-stage envelope generator speeds (raw u16, bit-packed base/shift)
+  [key: string]: unknown; // index-signature so the generic bridge can (de)serialize by field name
 }
+
+/**
+ * Bridge descriptor for the Sonix reflected synth — drives the shared WASM↔store param
+ * plumbing (see WasmSynthParamBridge). The worklet emits `synthParams` / consumes
+ * `setSynthParams` matching these message names and the schema below. Scalar widths follow the
+ * WASM field types (raw big-endian u16 fields; envLoopMode signed); the three 128-sample
+ * tables are signed i8; the 4-stage EG level/rate arrays are raw u16.
+ */
+export const SONIX_BRIDGE_SPEC: WasmSynthParamBridgeSpec<SonixSynthParams> = {
+  engineKey: 'Sonix',
+  synthType: 'SonixSynth',
+  matchKey: 'sonixIndex',
+  blobKey: 'sonix',
+  indexField: 'index',
+  reportMessage: 'synthParams',
+  setMessage: 'setSynthParams',
+  paramSchema: [
+    { name: 'index', kind: 'u8' },
+    { name: 'baseVol', kind: 'u16' },
+    { name: 'portFlag', kind: 'u16' },
+    { name: 'c2', kind: 'u16' },
+    { name: 'c4', kind: 'u16' },
+    { name: 'filterBase', kind: 'u16' },
+    { name: 'filterRange', kind: 'u16' },
+    { name: 'filterEnvSens', kind: 'u16' },
+    { name: 'envScanRate', kind: 'u16' },
+    { name: 'envLoopMode', kind: 'i16' },
+    { name: 'envDelayInit', kind: 'u16' },
+    { name: 'envVolScale', kind: 'u16' },
+    { name: 'envPitchScale', kind: 'u16' },
+    { name: 'slideRate', kind: 'u16' },
+    { name: 'wave', kind: 'i8[]', length: 128 },
+    { name: 'envTable', kind: 'i8[]', length: 128 },
+    { name: 'lfoWave', kind: 'i8[]', length: 128 },
+    { name: 'egLevels', kind: 'u16[]', length: 4 },
+    { name: 'egRates', kind: 'u16[]', length: 4 },
+  ],
+};
 
 export class SonixEngine extends WASMSingletonBase {
   private static instance: SonixEngine | null = null;
   private static cache: WASMAssetsCache = createWASMAssetsCache();
 
   private _meta: SonixMeta | null = null;
-  private _synthParams: SonixSynthParams[] = [];
+  /** Shared WASM↔store param bridge (mirror + setter), created with the worklet node. */
+  private _paramBridge: WasmSynthParamBridge<SonixSynthParams> | null = null;
   /** Fired when the WASM reports its parsed synth params after a module loads. */
   static onSynthParams: ((params: SonixSynthParams[]) => void) | null = null;
 
@@ -98,6 +142,15 @@ export class SonixEngine extends WASMSingletonBase {
       numberOfOutputs: 1,
     });
 
+    // Param bridge: normalizes reported params + posts edits back to this worklet. Its
+    // onParams delegates to the static callback the store bridge registers.
+    const node = this.workletNode;
+    this._paramBridge = new WasmSynthParamBridge<SonixSynthParams>(
+      SONIX_BRIDGE_SPEC,
+      (message) => node.port.postMessage(message),
+    );
+    this._paramBridge.onParams = (params) => SonixEngine.onSynthParams?.(params);
+
     this.workletNode.port.onmessage = (event) => {
       const data = event.data;
       switch (data.type) {
@@ -131,9 +184,8 @@ export class SonixEngine extends WASMSingletonBase {
           useOscilloscopeStore.getState().updateChannelData(data.channels);
           break;
 
-        case 'synthParams':
-          this._synthParams = (data.instruments as SonixSynthParams[]) || [];
-          SonixEngine.onSynthParams?.(this._synthParams);
+        case SONIX_BRIDGE_SPEC.reportMessage:
+          this._paramBridge?.handleReport(data as { instruments?: SonixSynthParams[] });
           break;
 
         case 'error':
@@ -209,12 +261,12 @@ export class SonixEngine extends WASMSingletonBase {
 
   /** The synth params mirrored from the WASM after the current module loaded. */
   get synthParams(): SonixSynthParams[] {
-    return this._synthParams;
+    return this._paramBridge?.params ?? [];
   }
 
   /** Push an edited instrument's synth params into the live WASM (set_wave rebuilds the filter bank). */
   setSynthParams(params: SonixSynthParams): void {
-    this.workletNode?.port.postMessage({ type: 'setSynthParams', params });
+    this._paramBridge?.setParams(params);
   }
 
   override dispose(): void {
