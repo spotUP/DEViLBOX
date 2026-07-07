@@ -268,263 +268,30 @@ export function useExportDialog({ isOpen }: UseExportDialogOptions) {
     downloadFn: (blob: Blob, filename: string) => void,
     onClose: () => void,
   ) => {
+    // All native-export dispatch lives in the shared router (single source of truth
+    // for the Export dialog, the MCP export_native tool, and the FT2 toolbar Save).
+    // This consumer keeps only UI concerns: blob download + toasts.
     const { getTrackerReplayer } = await import('@engine/TrackerReplayer');
     const song = getTrackerReplayer().getSong();
-    if (!song) {
-      // No WASM-replayer song — but a Cinter MOD IS a native Cinter export.
-      const isCinter = instruments.some(
-        (i) => (i.parameters as Record<string, unknown> | undefined)?.cinter === 1,
-      );
-      if (isCinter) {
-        const { exportCinterCrunched, downloadBytes } = await import('@lib/export/Cinter4ModSave');
-        const { getOriginalModuleDataForExport, base64ToBuffer } = await import('@lib/export/exporters');
-        const omd = getOriginalModuleDataForExport();
-        const origBytes = omd?.format === 'MOD' ? new Uint8Array(base64ToBuffer(omd.base64)) : undefined;
-        const { patternOrder } = useTrackerStore.getState();
-        const { speed } = useTransportStore.getState();
-        const c = await exportCinterCrunched(patterns, instruments, patternOrder, {
-          moduleName: metadata.name || 'cinter', bpm, speed, originalModBytes: origBytes,
-        });
-        downloadBytes(c.songdata, c.filename);
-        if (c.rawSamples.length > 0) downloadBytes(c.rawSamples, c.filename.replace(/\.cinter4$/, '.raw'));
-        const kb = ((c.songdata.length + c.rawSamples.length) / 1024).toFixed(1);
-        if (c.errors.length > 0) notify.warning(`Crunched "${c.filename}" (${kb} KB) — ${c.errors.length} unsupported-command warning(s).`);
-        else notify.success(`Crunched "${c.filename}" (${kb} KB)${c.rawSamples.length ? ' + .raw samples' : ''}.`);
-        onClose();
-        return;
-      }
-      notify.error('No song loaded'); return;
-    }
+    const { exportNativeSong } = await import('@lib/export/nativeExportRouter');
+    const result = await exportNativeSong(song, {});
 
-    const format = song.format;
-    const layoutFmtId = song.uadePatternLayout?.formatId || song.uadeVariableLayout?.formatId || '';
-    let result: { data: Blob; filename: string; warnings: string[] } | null = null;
-    const baseName = (song.name || 'untitled').replace(/[^a-zA-Z0-9_-]/g, '_');
-    const blobType = 'application/octet-stream';
-
-    if (format === 'JamCracker' as string) {
-      const { exportAsJamCracker } = await import('@lib/export/JamCrackerExporter');
-      result = await exportAsJamCracker(song);
-    } else if (format === ('SMON' as string)) {
-      const { exportAsSoundMon } = await import('@lib/export/SoundMonExporter');
-      result = await exportAsSoundMon(song);
-    } else if (song.uadeEditableFileData && new Uint8Array(song.uadeEditableFileData).length >= 16 &&
-        String.fromCharCode(...new Uint8Array(song.uadeEditableFileData).slice(0, 16)) === 'SYNTRACKER-SONG:') {
-      // SynTracker keeps format 'MOD' (for UADE playback routing); dispatch on its magic so it
-      // doesn't fall through to the MOD exporter. exportSynTrackerFile writes the edited cells
-      // back into a copy of the original module (byte-exact for unedited data).
-      const { exportSynTrackerFile } = await import('@lib/export/SynTrackerExporter');
-      const buf = exportSynTrackerFile(song);
-      result = { data: new Blob([buf as unknown as Uint8Array<ArrayBuffer>], { type: blobType }), filename: `${baseName}.synmod`, warnings: [] };
-    } else if (format === 'MOD' && !layoutFmtId) {
-      const { exportSongToMOD } = await import('@lib/export/modExport');
-      const modResult = await exportSongToMOD(song, { bakeSynths: true });
-      result = { data: modResult.blob, filename: modResult.filename, warnings: modResult.warnings };
-    } else if (format === 'FC' as string) {
-      const { exportFC } = await import('@lib/export/FCExporter');
-      const buf = exportFC(song);
-      result = { data: new Blob([buf], { type: blobType }), filename: `${baseName}.fc`, warnings: [] };
-    } else if (format === 'SidMon2' as string) {
-      const { exportSidMon2File } = await import('@lib/export/SidMon2Exporter');
-      const buf = await exportSidMon2File(song);
-      result = { data: new Blob([buf], { type: blobType }), filename: `${baseName}.sd2`, warnings: [] };
-    } else if (format === 'PumaTracker' as string) {
-      const { exportPumaTrackerFile } = await import('@lib/export/PumaTrackerExporter');
-      const buf = exportPumaTrackerFile(song);
-      result = { data: new Blob([buf as unknown as Uint8Array<ArrayBuffer>], { type: blobType }), filename: `${baseName}.puma`, warnings: [] };
-    } else if (format === 'OctaMED' as string) {
-      const { exportMED } = await import('@lib/export/MEDExporter');
-      const buf = exportMED(song);
-      result = { data: new Blob([buf], { type: blobType }), filename: `${baseName}.mmd0`, warnings: [] };
-    } else if (format === 'HVL' as string || format === 'AHX' as string || layoutFmtId === 'hivelyHVL' || layoutFmtId === 'hivelyAHX') {
-      const { exportAsHively } = await import('@lib/export/HivelyExporter');
-      const hvlFmt = (format === 'AHX' || layoutFmtId === 'hivelyAHX') ? 'ahx' : 'hvl';
-      result = exportAsHively(song, { format: hvlFmt, nativeOverride: useFormatStore.getState().hivelyNative });
-    } else if (format === 'DIGI' as string || layoutFmtId === 'digiBooster') {
-      const { exportDigiBooster } = await import('@lib/export/DigiBoosterExporter');
-      const buf = exportDigiBooster(song);
-      result = { data: new Blob([new Uint8Array(buf)], { type: blobType }), filename: `${baseName}.dbm`, warnings: [] };
-    } else if (format === 'OKT' as string || layoutFmtId === 'oktalyzer') {
-      const { exportOktalyzer } = await import('@lib/export/OktalyzerExporter');
-      const buf = exportOktalyzer(song);
-      result = { data: new Blob([new Uint8Array(buf)], { type: blobType }), filename: `${baseName}.okt`, warnings: [] };
-    } else if (format === 'KT' as string || layoutFmtId === 'klystrack') {
-      const { exportAsKlystrack } = await import('@lib/export/KlysExporter');
-      result = await exportAsKlystrack(song);
-    } else if (layoutFmtId === 'musicLine') {
-      const { exportMusicLineFile } = await import('@lib/export/MusicLineExporter');
-      const buf = exportMusicLineFile(song);
-      result = { data: new Blob([new Uint8Array(buf)], { type: blobType }), filename: `${baseName}.ml`, warnings: [] };
-    } else if (layoutFmtId === 'musicAssembler') {
-      const { exportAsMusicAssembler } = await import('@lib/export/MusicAssemblerExporter');
-      result = await exportAsMusicAssembler(song);
-    } else if (layoutFmtId === 'futurePlayer') {
-      const { exportAsFuturePlayer } = await import('@lib/export/FuturePlayerExporter');
-      result = await exportAsFuturePlayer(song);
-    } else if (layoutFmtId === 'digitalSymphony') {
-      const { exportDigitalSymphony } = await import('@lib/export/DigitalSymphonyExporter');
-      const buf = exportDigitalSymphony(song);
-      result = { data: new Blob([new Uint8Array(buf)], { type: blobType }), filename: `${baseName}.dsym`, warnings: [] };
-    } else if (layoutFmtId === 'amosMusicBank') {
-      const { exportAMOSMusicBank } = await import('@lib/export/AMOSMusicBankExporter');
-      const buf = exportAMOSMusicBank(song);
-      result = { data: new Blob([new Uint8Array(buf)], { type: blobType }), filename: `${baseName}.abk`, warnings: [] };
-    } else if (layoutFmtId === 'hippelCoSo') {
-      const { exportAsHippelCoSo } = await import('@lib/export/HippelCoSoExporter');
-      result = await exportAsHippelCoSo(song);
-    } else if (layoutFmtId === 'symphoniePro' || song.symphonieFileData) {
-      const { exportSymphonieProFile } = await import('@lib/export/SymphonieProExporter');
-      const buf = exportSymphonieProFile(song);
-      result = { data: new Blob([new Uint8Array(buf)], { type: blobType }), filename: `${baseName}.symmod`, warnings: [] };
-    } else if (format === 'IS10' as string || layoutFmtId === 'inStereo1') {
-      const { exportInStereo1 } = await import('@lib/export/InStereo1Exporter');
-      result = await exportInStereo1(song);
-    } else if (layoutFmtId === 'inStereo2') {
-      const { exportInStereo2 } = await import('@lib/export/InStereo2Exporter');
-      result = await exportInStereo2(song);
-    } else if (layoutFmtId === 'deltaMusic1') {
-      const { exportDeltaMusic1 } = await import('@lib/export/DeltaMusic1Exporter');
-      result = await exportDeltaMusic1(song);
-    } else if (layoutFmtId === 'deltaMusic2') {
-      const { exportDeltaMusic2 } = await import('@lib/export/DeltaMusic2Exporter');
-      result = await exportDeltaMusic2(song);
-    } else if (layoutFmtId === 'digitalMugician') {
-      const { exportDigitalMugician } = await import('@lib/export/DigitalMugicianExporter');
-      result = await exportDigitalMugician(song);
-    } else if (layoutFmtId === 'sidmon1') {
-      const { exportSidMon1 } = await import('@lib/export/SidMon1Exporter');
-      result = await exportSidMon1(song);
-    } else if (layoutFmtId === 'sonicArranger') {
-      const { exportSonicArranger } = await import('@lib/export/SonicArrangerExporter');
-      result = await exportSonicArranger(song);
-    } else if (layoutFmtId === 'tfmx') {
-      const { exportTFMX } = await import('@lib/export/TFMXExporter');
-      result = await exportTFMX(song);
-    } else if (layoutFmtId === 'fredEditor') {
-      const { exportFredEditor } = await import('@lib/export/FredEditorExporter');
-      result = await exportFredEditor(song);
-    } else if (layoutFmtId === 'soundfx') {
-      const { exportSoundFX } = await import('@lib/export/SoundFXExporter');
-      result = await exportSoundFX(song);
-    } else if (layoutFmtId === 'tcbTracker') {
-      const { exportTCBTracker } = await import('@lib/export/TCBTrackerExporter');
-      result = await exportTCBTracker(song);
-    } else if (layoutFmtId === 'gameMusicCreator') {
-      const { exportGameMusicCreator } = await import('@lib/export/GameMusicCreatorExporter');
-      result = await exportGameMusicCreator(song);
-    } else if (layoutFmtId === 'quadraComposer') {
-      const { exportQuadraComposer } = await import('@lib/export/QuadraComposerExporter');
-      result = await exportQuadraComposer(song);
-    } else if (layoutFmtId === 'activisionPro') {
-      const { exportActivisionPro } = await import('@lib/export/ActivisionProExporter');
-      result = await exportActivisionPro(song);
-    } else if (layoutFmtId === 'digiBoosterPro') {
-      const { exportDigiBoosterPro } = await import('@lib/export/DigiBoosterProExporter');
-      result = await exportDigiBoosterPro(song);
-    } else if (layoutFmtId === 'faceTheMusic') {
-      const { exportFaceTheMusic } = await import('@lib/export/FaceTheMusicExporter');
-      result = await exportFaceTheMusic(song);
-    } else if (layoutFmtId === 'sawteeth') {
-      const { exportSawteeth } = await import('@lib/export/SawteethExporter');
-      result = await exportSawteeth(song);
-    } else if (layoutFmtId === 'earAche') {
-      const { exportEarAche } = await import('@lib/export/EarAcheExporter');
-      result = await exportEarAche(song);
-    } else if (layoutFmtId === 'iffSmus') {
-      const { exportIffSmus } = await import('@lib/export/IffSmusExporter');
-      result = await exportIffSmus(song);
-    } else if (layoutFmtId === 'actionamics') {
-      const { exportActionamics } = await import('@lib/export/ActionamicsExporter');
-      result = await exportActionamics(song);
-    } else if (layoutFmtId === 'soundFactory') {
-      const { exportSoundFactory } = await import('@lib/export/SoundFactoryExporter');
-      result = await exportSoundFactory(song);
-    } else if (layoutFmtId === 'synthesis') {
-      const { exportSynthesis } = await import('@lib/export/SynthesisExporter');
-      result = await exportSynthesis(song);
-    } else if (layoutFmtId === 'soundControl') {
-      const { exportSoundControl } = await import('@lib/export/SoundControlExporter');
-      result = await exportSoundControl(song);
-    } else if (layoutFmtId === 'c67') {
-      const { exportCDFM67 } = await import('@lib/export/CDFM67Exporter');
-      result = await exportCDFM67(song);
-    } else if (layoutFmtId === 'zoundMonitor') {
-      const { exportZoundMonitor } = await import('@lib/export/ZoundMonitorExporter');
-      result = await exportZoundMonitor(song);
-    } else if (layoutFmtId === 'chuckBiscuits') {
-      const { exportChuckBiscuits } = await import('@lib/export/ChuckBiscuitsExporter');
-      result = await exportChuckBiscuits(song);
-    } else if (layoutFmtId === 'composer667') {
-      const { exportComposer667 } = await import('@lib/export/Composer667Exporter');
-      result = await exportComposer667(song);
-    } else if (layoutFmtId === 'kris') {
-      const { exportKRIS } = await import('@lib/export/KRISExporter');
-      result = await exportKRIS(song);
-    } else if (layoutFmtId === 'nru') {
-      const { exportNRU } = await import('@lib/export/NRUExporter');
-      result = await exportNRU(song);
-    } else if (layoutFmtId === 'ims') {
-      const { exportIMS } = await import('@lib/export/IMSExporter');
-      result = await exportIMS(song);
-    } else if (layoutFmtId === 'stp') {
-      const { exportSTP } = await import('@lib/export/STPExporter');
-      result = await exportSTP(song);
-    } else if (layoutFmtId === 'unic') {
-      const { exportUNIC } = await import('@lib/export/UNICExporter');
-      result = await exportUNIC(song);
-    } else if (layoutFmtId === 'dsm_dyn') {
-      const { exportDSMDyn } = await import('@lib/export/DSMDynExporter');
-      result = await exportDSMDyn(song);
-    } else if (layoutFmtId === 'scumm') {
-      const { exportSCUMM } = await import('@lib/export/SCUMMExporter');
-      result = await exportSCUMM(song);
-    } else if (layoutFmtId === 'xmf') {
-      const { exportXMF } = await import('@lib/export/XMFExporter');
-      result = await exportXMF(song);
-    } else if (format === 'AdPlug' as string) {
-      const { exportAdPlug } = await import('@lib/export/AdPlugExporter');
-      result = exportAdPlug(song, 'rad');
-    }
-
-    // Fallback: UADE chip RAM readback (works for any running UADE format)
     if (!result) {
-      try {
-        const { UADEChipEditor } = await import('@engine/uade/UADEChipEditor');
-        const { UADEEngine } = await import('@engine/uade/UADEEngine');
-        if (UADEEngine.hasInstance()) {
-          const chipEditor = new UADEChipEditor(UADEEngine.getInstance());
-          // Try uadeEditableFileData first, then fall back to chipRamInfo
-          const fmtUadeData = useFormatStore.getState().uadeEditableFileData;
-          const fmtUadeFileName = useFormatStore.getState().uadeEditableFileName;
-          let moduleSize = fmtUadeData?.byteLength ?? 0;
-          if (moduleSize === 0) {
-            const songInstruments = song.instruments || [];
-            const chipInfo = songInstruments.find(i => i.uadeChipRam)?.uadeChipRam;
-            moduleSize = chipInfo?.moduleSize ?? 0;
-          }
-          if (moduleSize > 0) {
-            const bytes = await chipEditor.readEditedModule(moduleSize);
-            const ext = (fmtUadeFileName || song.name || '').split('.').pop() || 'bin';
-            const fname = `${baseName}.${ext}`;
-            result = {
-              data: new Blob([new Uint8Array(bytes.buffer as ArrayBuffer, bytes.byteOffset, bytes.byteLength)], { type: blobType }),
-              filename: fname,
-              warnings: ['Exported via chip RAM readback — edits to pattern data are included'],
-            };
-          }
-        }
-      } catch { /* UADE engine not running */ }
+      notify.error(song ? 'No native exporter available for this format' : 'No song loaded');
+      onClose();
+      return;
     }
 
-    if (result) {
-      downloadFn(result.data, result.filename);
-      if (result.warnings.length > 0) {
-        notify.warning(`Exported with warnings: ${result.warnings.join('; ')}`);
-      } else {
-        notify.success(`Native format exported: ${result.filename}`);
-      }
+    const blobType = 'application/octet-stream';
+    downloadFn(new Blob([result.data as unknown as Uint8Array<ArrayBuffer>], { type: blobType }), result.filename);
+    result.companions?.forEach((c) => {
+      downloadFn(new Blob([c.data as unknown as Uint8Array<ArrayBuffer>], { type: blobType }), c.name);
+    });
+
+    if (result.warnings.length > 0) {
+      notify.warning(`Exported with warnings: ${result.warnings.join('; ')}`);
     } else {
-      notify.error('No native exporter available for this format');
+      notify.success(`Native format exported: ${result.filename}`);
     }
     onClose();
   }, []);
