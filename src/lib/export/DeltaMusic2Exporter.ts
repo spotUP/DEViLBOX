@@ -35,6 +35,7 @@ const DM2_PERIODS: number[] = [
 const PERIOD_TABLE_OFFSET = 0xAE2;
 const START_SPEED_OFFSET  = 0xBBB;
 const MAGIC_OFFSET        = 0xBC6;
+const ARPEGGIO_OFFSET     = 0xBCA; // 64 tables × 16 signed bytes
 const TRACK_HEADER_OFFSET = 0xFCA;
 const TRACK_DATA_OFFSET   = 0xFDA;
 
@@ -78,11 +79,39 @@ interface DM2Block {
   data: Uint8Array; // 64 bytes = 16 rows × 4 bytes
 }
 
+/**
+ * Collect every distinct XM arpeggio nibble-pair (effTyp 0, eff != 0) used in the
+ * song and assign each a DM2 arpeggio-table index (0..63). The parser resolves DM2
+ * arpeggio effect 0x08 by reading table[1]/table[2] as the two semitone offsets and
+ * emitting eff = (table[1] << 4) | table[2]; storing arp[1]=x, arp[2]=y therefore
+ * round-trips the exact eff value. DM2 has 64 arpeggio tables — extra distinct arps
+ * beyond 64 cannot be represented and are dropped (documented residual).
+ */
+function buildArpeggioMap(song: TrackerSong): Map<number, number> {
+  const map = new Map<number, number>();
+  for (const pattern of song.patterns) {
+    if (!pattern) continue;
+    for (const ch of pattern.channels) {
+      for (const cell of ch.rows) {
+        if (!cell) continue;
+        const vol = cell.volume ?? 0;
+        if (vol >= 0x10 && vol <= 0x50) continue; // volume cell, not arpeggio
+        if ((cell.effTyp ?? 0) === 0 && (cell.eff ?? 0) !== 0) {
+          const eff = cell.eff & 0xFF;
+          if (!map.has(eff) && map.size < 64) map.set(eff, map.size);
+        }
+      }
+    }
+  }
+  return map;
+}
+
 /** Serialize one channel of a pattern (16 rows) into a 64-byte DM2 block. */
 function buildBlock(
   song: TrackerSong,
   patternIndex: number,
   channel: number,
+  arpMap: Map<number, number>,
 ): Uint8Array {
   const block = new Uint8Array(64);
   const pattern = song.patterns[patternIndex];
@@ -140,10 +169,13 @@ function buildBlock(
           dm2Eff = 0x07;
           dm2Param = Math.round(Math.min(64, eff) / 64 * 63) & 0x3F;
           break;
-        case 0x00: // Arpeggio → DM2 0x08
+        case 0x00: // Arpeggio → DM2 0x08 (param = assigned arpeggio-table index)
           if (eff !== 0) {
-            dm2Eff = 0x08;
-            dm2Param = eff & 0x3F;
+            const arpIdx = arpMap.get(eff & 0xFF);
+            if (arpIdx !== undefined) {
+              dm2Eff = 0x08;
+              dm2Param = arpIdx & 0x3F;
+            }
           }
           break;
       }
@@ -185,11 +217,15 @@ export async function exportDeltaMusic2(
     [], [], [], [],
   ];
 
+  // Assign DM2 arpeggio-table indices for every distinct XM arpeggio used, so the
+  // parser can reconstruct the exact eff value on reload (arp tables written below).
+  const arpMap = buildArpeggioMap(song);
+
   for (let pos = 0; pos < songLen; pos++) {
     const patIdx = song.songPositions[pos] ?? pos;
 
     for (let ch = 0; ch < nChannels; ch++) {
-      const blockData = buildBlock(song, patIdx, ch);
+      const blockData = buildBlock(song, patIdx, ch, arpMap);
 
       // Find existing identical block
       let blockNum = -1;
@@ -436,7 +472,15 @@ export async function exportDeltaMusic2(
   output[MAGIC_OFFSET + 2] = 0x4E; // 'N'
   output[MAGIC_OFFSET + 3] = 0x4C; // 'L'
 
-  // Arpeggios at 0xBCA (64 × 16 bytes) — leave zeroed (no arpeggio data preserved)
+  // Arpeggios at 0xBCA (64 × 16 signed bytes). Reconstruct each assigned table so the
+  // parser recovers the exact XM arpeggio nibble-pair: it reads table[1]=x, table[2]=y
+  // and emits eff = (x << 4) | y. Store x/y from the eff key at those offsets.
+  for (const [eff, idx] of arpMap) {
+    const x = (eff >> 4) & 0x0F;
+    const y = eff & 0x0F;
+    output[ARPEGGIO_OFFSET + idx * 16 + 1] = x;
+    output[ARPEGGIO_OFFSET + idx * 16 + 2] = y;
+  }
 
   // Track header at 0xFCA: 4 × [loopPos u16, trackByteLen u16]
   for (let ch = 0; ch < 4; ch++) {
@@ -479,6 +523,12 @@ export async function exportDeltaMusic2(
       writeU16BE(view, off + (i - 1) * 2, breakOffset);
     }
   }
+  // The parser reads the break marker from the 128th u16 slot (byte 254) — the
+  // stop condition is `instrumentOffsets[i] === breakOffset`. Without this the
+  // slot stays 0, the parser matches instrumentOffsets[0] (implicit 0) on the
+  // first iteration and parses ZERO instruments, dropping every cell's
+  // instrument on reload. Write breakOffset into the terminating slot.
+  writeU16BE(view, off + 254, breakOffset);
   off += 256;
 
   // ── Instrument data ───────────────────────────────────────────────────
