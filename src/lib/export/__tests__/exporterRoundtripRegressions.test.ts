@@ -231,4 +231,20 @@ describe('exporter round-trip regressions', () => {
     expect(cells).toBeGreaterThan(0);
     expect(matched / cells).toBeGreaterThan(0.99);
   });
+
+  it('NRU export writes the full 0..255 note byte and the 0x0C empty-effect slot (was dropping notes >72 and forcing tone-porta)', async () => {
+    const { parseNRUFile } = await import('@lib/import/formats/NRUParser');
+    const { exportNRU } = await import('../NRUExporter');
+    const raw = fixture('public/data/songs/formats/howiedavies.nru');
+    const song = await parseNRUFile(raw, 'howiedavies.nru');
+    const out = await toU8(await exportNRU(song));
+    const re = await parseNRUFile(out.buffer.slice(0) as ArrayBuffer, 'howiedavies.nru');
+    // Two bugs: (1) the note byte was clamped to <= 72, dropping every note whose
+    // parser d2 byte exceeded 72 (parser decodes any d2 as d2/2 + 36); (2) an
+    // effTyp-0/eff-0 cell emitted d0=0, which the parser re-reads as tone-portamento
+    // (effTyp 3). Full 0..255 note encoding + the 0x0C arpeggio empty-slot fix both.
+    const { cells, matched } = cellMatch(song, re);
+    expect(cells).toBeGreaterThan(200);
+    expect(matched).toBe(cells);
+  });
 });
