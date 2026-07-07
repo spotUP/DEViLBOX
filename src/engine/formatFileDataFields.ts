@@ -86,6 +86,7 @@ export const FILE_DATA_FIELDS = [
   'symphonieFileData',
   'v2mFileData',
   'uadeEditableFileData',
+  'maxTraxFileData',
   'adplugFileData',
   'tfmxFileData',
   'tfmxSmplData',             // companion sample data for TFMX
