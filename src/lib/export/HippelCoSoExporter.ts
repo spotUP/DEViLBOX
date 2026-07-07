@@ -190,8 +190,12 @@ function buildCoSoFile(song: TrackerSong): { data: Uint8Array; warnings: string[
       for (let r = 0; r < (pat?.length ?? 16); r++) {
         const cell = rows[r];
         if (!cell || (cell.note ?? 0) <= 0) {
-          bytes.push(0);    // note 0
-          bytes.push(0);    // info 0
+          // Rest row. CoSo note byte 0 is a REAL sub-bass note (decodes to xmNote
+          // 13), so an empty cell must be the -2 "rest" command (parser: v===-2 →
+          // skip 2 bytes, emit an empty cell). One 2-byte event per row keeps the
+          // exporter's row grid aligned with the parser's note-event scan.
+          bytes.push(s8toByte(-2)); // rest command
+          bytes.push(0);            // param (ignored)
         } else {
           const cosoNote = xmNoteToCoSo(cell.note);
           bytes.push(s8toByte(cosoNote));
