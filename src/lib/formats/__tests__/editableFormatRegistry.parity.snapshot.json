@@ -1,0 +1,2648 @@
+{
+  "A-Pro-Sys|.xyz|amiga-native": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "ADPCM Mono|.xyz|amiga-native": [
+    1,
+    0,
+    1,
+    0
+  ],
+  "AHX/THX prefix|.xyz|uade-only": [
+    0,
+    0,
+    1,
+    0
+  ],
+  "AMOS Music Bank|.abk|amiga-native": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "AMOS Music Bank|.xyz|amiga-native": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "AMOS|.xyz|uade-only": [
+    0,
+    0,
+    1,
+    0
+  ],
+  "AMS / Velvet Studio|.ams|amiga-native": [
+    1,
+    0,
+    1,
+    0
+  ],
+  "AMS / Velvet Studio|.xyz|amiga-native": [
+    1,
+    0,
+    1,
+    0
+  ],
+  "ARP|.xyz|uade-only": [
+    0,
+    0,
+    1,
+    0
+  ],
+  "ASAP|.xyz|chip-dump": [
+    1,
+    0,
+    1,
+    0
+  ],
+  "AY|.ay|chip-dump": [
+    1,
+    0,
+    1,
+    0
+  ],
+  "AY|.xyz|chip-dump": [
+    1,
+    0,
+    1,
+    0
+  ],
+  "ActionAmics prefix|.xyz|uade-only": [
+    0,
+    0,
+    1,
+    0
+  ],
+  "Actionamics|.act|amiga-native": [
+    1,
+    0,
+    1,
+    0
+  ],
+  "Actionamics|.xyz|amiga-native": [
+    1,
+    0,
+    1,
+    0
+  ],
+  "Activision Pro|.xyz|amiga-native": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "AdPlug|.xyz|chip-dump": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "Advanced Music Format|.amf|pc-tracker": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "Advanced Music Format|.xyz|pc-tracker": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "Alcatraz Packer|.xyz|amiga-native": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "Amiga Format|.xyz|amiga-native": [
+    1,
+    0,
+    1,
+    0
+  ],
+  "Anders Øland|.hot|amiga-native": [
+    1,
+    0,
+    1,
+    0
+  ],
+  "Anders Øland|.xyz|amiga-native": [
+    1,
+    0,
+    1,
+    0
+  ],
+  "Andrew Parton|.xyz|amiga-native": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "Art and Magic|.xyz|amiga-native": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "Art of Noise|.xyz|amiga-native": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "Ashley Hogg|.xyz|amiga-native": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "Ashley Hogg|.xyz|uade-only": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "BSI|.xyz|uade-only": [
+    0,
+    0,
+    1,
+    0
+  ],
+  "Beathoeven Synthesizer|.xyz|uade-only": [
+    0,
+    0,
+    1,
+    0
+  ],
+  "Beathoven Synthesizer v2|.xyz|uade-only": [
+    0,
+    0,
+    1,
+    0
+  ],
+  "Ben Daglish SID|.xyz|amiga-native": [
+    1,
+    0,
+    1,
+    0
+  ],
+  "Ben Daglish|.bd|amiga-native": [
+    0,
+    0,
+    0,
+    0
+  ],
+  "Ben Daglish|.xyz|amiga-native": [
+    0,
+    0,
+    0,
+    0
+  ],
+  "Ben Daglish|.xyz|∅": [
+    0,
+    0,
+    0,
+    0
+  ],
+  "Blade Packer|.xyz|amiga-native": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "C64 SID|.sid|c64-chip": [
+    1,
+    0,
+    1,
+    0
+  ],
+  "C64 SID|.xyz|c64-chip": [
+    1,
+    0,
+    1,
+    0
+  ],
+  "CDFM Composer 670|.c67|pc-tracker": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "CDFM Composer 670|.xyz|pc-tracker": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "CheeseCutter|.ct|c64-chip": [
+    1,
+    0,
+    1,
+    0
+  ],
+  "CheeseCutter|.xyz|c64-chip": [
+    1,
+    0,
+    1,
+    0
+  ],
+  "ChipTracker Archive|.xyz|uade-only": [
+    0,
+    0,
+    1,
+    0
+  ],
+  "ChipTracker|.xyz|uade-only": [
+    0,
+    0,
+    1,
+    0
+  ],
+  "Chuck Biscuits|.cba|amiga-native": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "Chuck Biscuits|.xyz|amiga-native": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "Cinemaware|.xyz|amiga-native": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "Cinter4|.cinter4|amiga-native": [
+    1,
+    0,
+    1,
+    0
+  ],
+  "Cinter4|.xyz|amiga-native": [
+    1,
+    0,
+    1,
+    0
+  ],
+  "Composer 667|.667|pc-tracker": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "Composer 667|.xyz|pc-tracker": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "Composer 669|.669|pc-tracker": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "Composer 669|.xyz|pc-tracker": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "Core Design|.core|amiga-native": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "Core Design|.core|uade-only": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "Core Design|.xyz|amiga-native": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "Core Design|.xyz|uade-only": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "Custom Made|.cm|amiga-native": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "Custom Made|.xyz|amiga-native": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "Custom|.xyz|uade-only": [
+    0,
+    0,
+    1,
+    0
+  ],
+  "DSIK Sound Module|.dsm|pc-tracker": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "DSIK Sound Module|.xyz|pc-tracker": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "Darius Zendeh|.xyz|uade-only": [
+    0,
+    0,
+    1,
+    0
+  ],
+  "Dave Lowe WTD|.xyz|uade-only": [
+    0,
+    0,
+    1,
+    0
+  ],
+  "Dave Lowe|.xyz|amiga-native": [
+    1,
+    0,
+    1,
+    0
+  ],
+  "David Hanney|.xyz|uade-only": [
+    0,
+    0,
+    1,
+    0
+  ],
+  "David Whittaker|.xyz|amiga-native": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "DefleMask / X-Tracker|.dmf|furnace": [
+    1,
+    0,
+    1,
+    0
+  ],
+  "DefleMask / X-Tracker|.xyz|furnace": [
+    1,
+    0,
+    1,
+    0
+  ],
+  "Delta Music 2|.dm2|amiga-native": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "Delta Music 2|.xyz|amiga-native": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "Delta Music|.xyz|amiga-native": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "Desire|.dsr|amiga-native": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "Desire|.xyz|amiga-native": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "DigiBooster Pro|.dbm|amiga-native": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "DigiBooster Pro|.xyz|amiga-native": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "DigiBooster|.digi|amiga-native": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "DigiBooster|.xyz|amiga-native": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "DigiTrakker|.mdl|pc-tracker": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "DigiTrakker|.xyz|pc-tracker": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "Digital Mugician|.xyz|amiga-native": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "Digital Sonix Chrome|.xyz|amiga-native": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "Digital Sound Studio|.dss|amiga-native": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "Digital Sound Studio|.xyz|amiga-native": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "Digital Symphony|.dsym|amiga-native": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "Digital Symphony|.xyz|amiga-native": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "Digital Tracker|.dtm|pc-tracker": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "Digital Tracker|.xyz|pc-tracker": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "Disorder Tracker 2|.plm|pc-tracker": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "Disorder Tracker 2|.xyz|pc-tracker": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "Dynamic Synthesizer|.xyz|uade-only": [
+    0,
+    0,
+    1,
+    0
+  ],
+  "EMS v6|.xyz|uade-only": [
+    0,
+    0,
+    1,
+    0
+  ],
+  "EMS|.xyz|uade-only": [
+    0,
+    0,
+    1,
+    0
+  ],
+  "EUP|.eup|chip-dump": [
+    0,
+    0,
+    0,
+    1
+  ],
+  "EUP|.xyz|chip-dump": [
+    0,
+    0,
+    0,
+    0
+  ],
+  "EUP|.xyz|∅": [
+    0,
+    0,
+    0,
+    0
+  ],
+  "EarAche|.ea|amiga-native": [
+    1,
+    0,
+    1,
+    0
+  ],
+  "EarAche|.xyz|amiga-native": [
+    1,
+    0,
+    1,
+    0
+  ],
+  "EasyTrax|.etx|pc-tracker": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "EasyTrax|.xyz|pc-tracker": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "FC-BSI|.xyz|uade-only": [
+    0,
+    0,
+    1,
+    0
+  ],
+  "FM Tracker|.fmt|pc-tracker": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "FM Tracker|.xyz|pc-tracker": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "FMP (PLAY6)|.xyz|chip-dump": [
+    1,
+    0,
+    1,
+    0
+  ],
+  "Face the Music|.ftm|amiga-native": [
+    1,
+    0,
+    1,
+    0
+  ],
+  "Face the Music|.xyz|amiga-native": [
+    1,
+    0,
+    1,
+    0
+  ],
+  "Farandole Composer|.far|pc-tracker": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "Farandole Composer|.xyz|pc-tracker": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "Fashion Tracker|.xyz|amiga-native": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "FastTracker II XM|.xm|libopenmpt": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "FastTracker II XM|.xyz|libopenmpt": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "Forgotten Worlds|.xyz|uade-only": [
+    0,
+    0,
+    1,
+    0
+  ],
+  "Fred Editor Monitor|.xyz|uade-only": [
+    0,
+    0,
+    1,
+    0
+  ],
+  "Fred Editor|.fred|amiga-native": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "Fred Editor|.xyz|amiga-native": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "Fred Gray|.xyz|amiga-native": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "Furnace|.fur|furnace": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "Furnace|.xyz|furnace": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "Future Composer|.xyz|amiga-native": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "Future Player 2|.xyz|uade-only": [
+    0,
+    0,
+    1,
+    0
+  ],
+  "Future Player|.fp|amiga-native": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "Future Player|.xyz|amiga-native": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "FutureComposer-BSI|.xyz|uade-only": [
+    0,
+    0,
+    1,
+    0
+  ],
+  "GBS|.gbs|chip-dump": [
+    1,
+    0,
+    1,
+    0
+  ],
+  "GBS|.xyz|chip-dump": [
+    1,
+    0,
+    1,
+    0
+  ],
+  "Galaxy Sound System|.j2b|pc-tracker": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "Galaxy Sound System|.xyz|pc-tracker": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "Game Music Creator|.gmc|amiga-native": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "Game Music Creator|.xyz|amiga-native": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "General DigiMusic|.gdm|pc-tracker": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "General DigiMusic|.xyz|pc-tracker": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "GlueMon|.xyz|amiga-native": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "GoatTracker|.sng|c64-chip": [
+    1,
+    0,
+    1,
+    0
+  ],
+  "GoatTracker|.xyz|c64-chip": [
+    1,
+    0,
+    1,
+    0
+  ],
+  "Graoumf Tracker 2|.xyz|amiga-native": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "HES|.hes|chip-dump": [
+    1,
+    0,
+    1,
+    0
+  ],
+  "HES|.xyz|chip-dump": [
+    1,
+    0,
+    1,
+    0
+  ],
+  "HN|.xyz|uade-only": [
+    0,
+    0,
+    1,
+    0
+  ],
+  "Hippel ST|.xyz|∅": [
+    0,
+    0,
+    0,
+    0
+  ],
+  "Hippel-CoSo|.xyz|amiga-native": [
+    1,
+    0,
+    1,
+    0
+  ],
+  "HivelyTracker|.xyz|amiga-native": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "Howie Davies|.xyz|uade-only": [
+    0,
+    0,
+    1,
+    0
+  ],
+  "IFF SMUS|.xyz|amiga-native": [
+    1,
+    0,
+    1,
+    0
+  ],
+  "IT Project|.itp|pc-tracker": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "IT Project|.xyz|pc-tracker": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "IT|.xyz|∅": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "IXS|.ixs|chip-dump": [
+    0,
+    0,
+    0,
+    0
+  ],
+  "IXS|.xyz|chip-dump": [
+    0,
+    0,
+    0,
+    0
+  ],
+  "IXS|.xyz|∅": [
+    0,
+    0,
+    0,
+    0
+  ],
+  "IceTracker|.ice|amiga-native": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "IceTracker|.xyz|amiga-native": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "Image's Music System|.ims|amiga-native": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "Image's Music System|.xyz|amiga-native": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "Imago Orpheus|.imf|pc-tracker": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "Imago Orpheus|.xyz|pc-tracker": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "Impulse Tracker|.xyz|libopenmpt": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "InStereo! 1|.is10|amiga-native": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "InStereo! 1|.xyz|amiga-native": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "InStereo! 2|.is20|amiga-native": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "InStereo! 2|.xyz|amiga-native": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "InStereo!|.is|amiga-native": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "InStereo!|.is|uade-only": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "InStereo!|.xyz|amiga-native": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "InStereo!|.xyz|uade-only": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "Infogrames|.dum|amiga-native": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "Infogrames|.xyz|amiga-native": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "JamCracker Pro|.xyz|amiga-native": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "Janko Mrsic-Flogel|.xyz|amiga-native": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "Janne Salmijärvi|.xyz|amiga-native": [
+    1,
+    0,
+    1,
+    0
+  ],
+  "Jason Brooke|.xyz|amiga-native": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "Jason Page|.xyz|amiga-native": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "Jeroen Tel|.xyz|amiga-native": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "Jesper Olsen|.xyz|amiga-native": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "Jochen Hippel 7V|.hip7|amiga-native": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "Jochen Hippel 7V|.xyz|amiga-native": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "Jochen Hippel ST|.sog|amiga-native": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "Jochen Hippel ST|.xyz|amiga-native": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "Jochen Hippel base|.xyz|uade-only": [
+    0,
+    0,
+    1,
+    0
+  ],
+  "KRIS / ChipTracker|.kris|amiga-native": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "KRIS / ChipTracker|.xyz|amiga-native": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "KSS|.kss|chip-dump": [
+    1,
+    0,
+    1,
+    0
+  ],
+  "KSS|.xyz|chip-dump": [
+    1,
+    0,
+    1,
+    0
+  ],
+  "Karl Morton|.mus|pc-tracker": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "Karl Morton|.xyz|pc-tracker": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "Kim Christensen|.xyz|amiga-native": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "Klystrack|.xyz|amiga-native": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "Kris Hatlelid|.xyz|amiga-native": [
+    1,
+    0,
+    1,
+    0
+  ],
+  "LME|.lme|amiga-native": [
+    1,
+    0,
+    1,
+    0
+  ],
+  "LME|.xyz|amiga-native": [
+    1,
+    0,
+    1,
+    0
+  ],
+  "Laxity|.xyz|amiga-native": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "Lion|.xyz|uade-only": [
+    0,
+    0,
+    1,
+    0
+  ],
+  "MCMD|.xyz|uade-only": [
+    0,
+    0,
+    1,
+    0
+  ],
+  "MDX|.mdx|chip-dump": [
+    0,
+    0,
+    0,
+    1
+  ],
+  "MDX|.xyz|chip-dump": [
+    0,
+    0,
+    0,
+    0
+  ],
+  "MDX|.xyz|∅": [
+    0,
+    0,
+    0,
+    0
+  ],
+  "MG|.xyz|uade-only": [
+    0,
+    0,
+    1,
+    0
+  ],
+  "MIDI Loriciel|.xyz|amiga-native": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "MIDI|.xyz|midi": [
+    1,
+    0,
+    1,
+    0
+  ],
+  "MMDC|.xyz|amiga-native": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "MO3 Compressed|.mo3|pc-tracker": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "MO3 Compressed|.xyz|pc-tracker": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "MOD|.xyz|∅": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "MadTracker 2|.mt2|pc-tracker": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "MadTracker 2|.xyz|pc-tracker": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "Magnetic Fields Packer|.mfp|amiga-native": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "Magnetic Fields Packer|.xyz|amiga-native": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "MajorTom 2|.xyz|uade-only": [
+    0,
+    0,
+    1,
+    0
+  ],
+  "Maniacs of Noise|.xyz|amiga-native": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "Mark Cooksey|.xyz|amiga-native": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "Mark II (O)|.xyz|uade-only": [
+    0,
+    0,
+    1,
+    0
+  ],
+  "Mark II|.xyz|amiga-native": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "Martin Walker|.xyz|amiga-native": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "MaxTrax|.xyz|uade-only": [
+    0,
+    0,
+    1,
+    0
+  ],
+  "Maximum Effect|.xyz|amiga-native": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "Medley SO|.xyz|uade-only": [
+    0,
+    0,
+    1,
+    0
+  ],
+  "Medley|.ml|amiga-native": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "Medley|.xyz|amiga-native": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "Mike Davies|.xyz|amiga-native": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "Mod's Grave WOW|.wow|pc-tracker": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "Mod's Grave WOW|.xyz|pc-tracker": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "Mosh Packer|.xyz|amiga-native": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "MultiMedia Sound|.xyz|amiga-native": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "MultiTracker|.mtm|pc-tracker": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "MultiTracker|.xyz|pc-tracker": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "Music Assembler|.ma|amiga-native": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "Music Assembler|.xyz|amiga-native": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "Music Maker 4V|.xyz|amiga-native": [
+    1,
+    0,
+    1,
+    0
+  ],
+  "Music Maker 8V|.mm8|amiga-native": [
+    1,
+    0,
+    1,
+    0
+  ],
+  "Music Maker 8V|.xyz|amiga-native": [
+    1,
+    0,
+    1,
+    0
+  ],
+  "MusicLine Editor|.ml|amiga-native": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "MusicLine Editor|.xyz|amiga-native": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "NSF|.xyz|chip-dump": [
+    1,
+    0,
+    1,
+    0
+  ],
+  "NTSP|.xyz|amiga-native": [
+    1,
+    0,
+    1,
+    0
+  ],
+  "NTSP|.xyz|uade-only": [
+    0,
+    0,
+    1,
+    0
+  ],
+  "Nick Pelling Packer|.xyz|amiga-native": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "NoiseRunner|.nru|pc-tracker": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "NoiseRunner|.xyz|pc-tracker": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "NoiseTracker|.nst|pc-tracker": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "NoiseTracker|.nst|uade-only": [
+    0,
+    0,
+    1,
+    0
+  ],
+  "NoiseTracker|.xyz|pc-tracker": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "NoiseTracker|.xyz|uade-only": [
+    0,
+    0,
+    1,
+    0
+  ],
+  "NovoTrade Packer|.xyz|amiga-native": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "OctaMED|.xyz|amiga-native": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "Oktalyzer|.xyz|amiga-native": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "On Escapee|.xyz|amiga-native": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "Organya|.org|chip-dump": [
+    0,
+    0,
+    0,
+    0
+  ],
+  "Organya|.xyz|chip-dump": [
+    0,
+    0,
+    0,
+    0
+  ],
+  "Organya|.xyz|∅": [
+    0,
+    0,
+    0,
+    0
+  ],
+  "PMD|.xyz|chip-dump": [
+    0,
+    0,
+    0,
+    0
+  ],
+  "PMD|.xyz|∅": [
+    0,
+    0,
+    0,
+    0
+  ],
+  "PSM|.psm|pc-tracker": [
+    1,
+    1,
+    0,
+    1
+  ],
+  "PSM|.xyz|pc-tracker": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "Paul Robotham|.xyz|amiga-native": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "Paul Shields|.ps|amiga-native": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "Paul Shields|.xyz|amiga-native": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "Paul Summers|.snk|amiga-native": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "Paul Summers|.snk|uade-only": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "Paul Summers|.xyz|amiga-native": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "Paul Summers|.xyz|uade-only": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "Paul Tonge|.xyz|amiga-native": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "Peter Verswyvelen Packer|.xyz|amiga-native": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "Pierre Adane|.xyz|amiga-native": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "Pokeynoise|.xyz|uade-only": [
+    0,
+    0,
+    1,
+    0
+  ],
+  "PolyTracker|.ptm|pc-tracker": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "PolyTracker|.xyz|pc-tracker": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "ProTracker 3.6|.xyz|amiga-native": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "ProTracker MOD|.xyz|libopenmpt": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "Professional Sound Artists|.psa|amiga-native": [
+    1,
+    0,
+    1,
+    0
+  ],
+  "Professional Sound Artists|.xyz|amiga-native": [
+    1,
+    0,
+    1,
+    0
+  ],
+  "Psycle|.psy|chip-dump": [
+    0,
+    0,
+    0,
+    0
+  ],
+  "Psycle|.xyz|chip-dump": [
+    0,
+    0,
+    0,
+    0
+  ],
+  "Psycle|.xyz|∅": [
+    0,
+    0,
+    0,
+    0
+  ],
+  "Puma Tracker|.puma|amiga-native": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "Puma Tracker|.xyz|amiga-native": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "PxTone|.xyz|chip-dump": [
+    0,
+    0,
+    0,
+    0
+  ],
+  "PxTone|.xyz|∅": [
+    0,
+    0,
+    0,
+    0
+  ],
+  "QSF|.xyz|chip-dump": [
+    1,
+    0,
+    1,
+    0
+  ],
+  "Quadra Composer|.xyz|amiga-native": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "Quartet|.4v|amiga-native": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "Quartet|.xyz|amiga-native": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "Reality Tracker|.rtm|pc-tracker": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "Reality Tracker|.xyz|pc-tracker": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "Renoise|.xrns|pc-tracker": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "Renoise|.xyz|pc-tracker": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "Richard Joseph|.xyz|amiga-native": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "RiffRaff|.xyz|uade-only": [
+    0,
+    0,
+    1,
+    0
+  ],
+  "Rob Hubbard ST|.xyz|amiga-native": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "Rob Hubbard ST|.xyz|uade-only": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "Rob Hubbard|.xyz|amiga-native": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "Ron Klaren|.xyz|amiga-native": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "Ron Klaren|.xyz|uade-only": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "S3M|.xyz|∅": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "S98|.s98|chip-dump": [
+    1,
+    0,
+    1,
+    0
+  ],
+  "S98|.xyz|chip-dump": [
+    1,
+    0,
+    1,
+    0
+  ],
+  "SAP|.sap|chip-dump": [
+    1,
+    0,
+    1,
+    0
+  ],
+  "SAP|.xyz|chip-dump": [
+    1,
+    0,
+    1,
+    0
+  ],
+  "SCUMM|.scumm|amiga-native": [
+    1,
+    0,
+    1,
+    0
+  ],
+  "SCUMM|.xyz|amiga-native": [
+    1,
+    0,
+    1,
+    0
+  ],
+  "SID Factory II|.sf2|c64-chip": [
+    1,
+    0,
+    1,
+    0
+  ],
+  "SID Factory II|.xyz|c64-chip": [
+    1,
+    0,
+    1,
+    0
+  ],
+  "SNDH/SC68|.xyz|chip-dump": [
+    0,
+    0,
+    0,
+    0
+  ],
+  "SNDH/SC68|.xyz|∅": [
+    0,
+    0,
+    0,
+    0
+  ],
+  "SOG|.xyz|uade-only": [
+    0,
+    0,
+    1,
+    0
+  ],
+  "SPC|.spc|chip-dump": [
+    1,
+    0,
+    1,
+    0
+  ],
+  "SPC|.xyz|chip-dump": [
+    1,
+    0,
+    1,
+    0
+  ],
+  "SUN-Tronic|.xyz|uade-only": [
+    0,
+    0,
+    1,
+    0
+  ],
+  "Sawteeth|.st|amiga-native": [
+    1,
+    0,
+    1,
+    0
+  ],
+  "Sawteeth|.xyz|amiga-native": [
+    1,
+    0,
+    1,
+    0
+  ],
+  "ScreamTracker 2|.stm|pc-tracker": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "ScreamTracker 2|.xyz|pc-tracker": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "ScreamTracker 3|.s3m|libopenmpt": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "ScreamTracker 3|.xyz|libopenmpt": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "ScreamTracker STMIK|.stx|pc-tracker": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "ScreamTracker STMIK|.xyz|pc-tracker": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "Sean Connolly 2|.xyz|uade-only": [
+    0,
+    0,
+    1,
+    0
+  ],
+  "Sean Connolly|.xyz|amiga-native": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "Sean Conran|.xyz|amiga-native": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "SidMon 1|.sid1|amiga-native": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "SidMon 1|.xyz|amiga-native": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "SidMon II|.xyz|amiga-native": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "Sierra AGI|.xyz|uade-only": [
+    0,
+    0,
+    1,
+    0
+  ],
+  "Silmarils v2|.xyz|uade-only": [
+    0,
+    0,
+    1,
+    0
+  ],
+  "Silmarils|.xyz|uade-only": [
+    0,
+    0,
+    1,
+    0
+  ],
+  "Sonic Arranger Old|.xyz|uade-only": [
+    0,
+    0,
+    1,
+    0
+  ],
+  "Sonic Arranger P|.xyz|uade-only": [
+    0,
+    0,
+    1,
+    0
+  ],
+  "Sonic Arranger SAS|.xyz|amiga-native": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "Sonic Arranger|.xyz|amiga-native": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "Sonix Music Driver|.xyz|∅": [
+    0,
+    0,
+    0,
+    0
+  ],
+  "Sound Control|.xyz|amiga-native": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "Sound Factory|.psf|amiga-native": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "Sound Factory|.xyz|amiga-native": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "Sound Master|.xyz|amiga-native": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "Sound Player|.xyz|amiga-native": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "Sound Programming Language|.xyz|uade-only": [
+    0,
+    0,
+    1,
+    0
+  ],
+  "Sound-FX|.xyz|amiga-native": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "SoundMon|.xyz|amiga-native": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "SoundTracker Pro II|.stp|pc-tracker": [
+    1,
+    1,
+    0,
+    1
+  ],
+  "SoundTracker Pro II|.xyz|pc-tracker": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "SoundTracker prefix|.xyz|uade-only": [
+    0,
+    0,
+    1,
+    0
+  ],
+  "Special FX|.jd|amiga-native": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "Special FX|.xyz|amiga-native": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "Speedy System|.ss|amiga-native": [
+    1,
+    0,
+    1,
+    0
+  ],
+  "Speedy System|.xyz|amiga-native": [
+    1,
+    0,
+    1,
+    0
+  ],
+  "Steve Barrett|.xyz|amiga-native": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "Steve Turner|.xyz|amiga-native": [
+    1,
+    0,
+    1,
+    0
+  ],
+  "SunTronic|.xyz|amiga-native": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "Symphonie Pro|.symmod|amiga-native": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "Symphonie Pro|.xyz|amiga-native": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "SynTracker|.xyz|uade-only": [
+    1,
+    0,
+    1,
+    0
+  ],
+  "Synth Pack|.xyz|amiga-native": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "SynthDream|.xyz|uade-only": [
+    0,
+    0,
+    1,
+    0
+  ],
+  "Synthesis|.syn|amiga-native": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "Synthesis|.xyz|amiga-native": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "TCB Tracker|.tcb|amiga-native": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "TCB Tracker|.xyz|amiga-native": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "TFMX 1.5|.xyz|uade-only": [
+    0,
+    0,
+    1,
+    0
+  ],
+  "TFMX 7V|.xyz|uade-only": [
+    0,
+    0,
+    1,
+    0
+  ],
+  "TFMX HD 1.5|.xyz|uade-only": [
+    0,
+    0,
+    1,
+    0
+  ],
+  "TFMX HD 7V|.xyz|uade-only": [
+    0,
+    0,
+    1,
+    0
+  ],
+  "TFMX HD Pro|.xyz|uade-only": [
+    0,
+    0,
+    1,
+    0
+  ],
+  "TFMX Pro|.xyz|uade-only": [
+    0,
+    0,
+    1,
+    0
+  ],
+  "TFMX|.xyz|amiga-native": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "THN|.xyz|uade-only": [
+    0,
+    0,
+    1,
+    0
+  ],
+  "TME|.tme|amiga-native": [
+    1,
+    0,
+    1,
+    0
+  ],
+  "TME|.xyz|amiga-native": [
+    1,
+    0,
+    1,
+    0
+  ],
+  "TW|.xyz|uade-only": [
+    0,
+    0,
+    1,
+    0
+  ],
+  "Thomas Hermann|.xyz|amiga-native": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "Tim Follin|.xyz|uade-only": [
+    0,
+    0,
+    1,
+    0
+  ],
+  "Time Tracker|.xyz|amiga-native": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "Titanic's Packer|.xyz|amiga-native": [
+    1,
+    0,
+    1,
+    0
+  ],
+  "Tomy Tracker|.xyz|amiga-native": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "TomyTracker|.xyz|uade-only": [
+    1,
+    0,
+    1,
+    0
+  ],
+  "Tronic|.xyz|amiga-native": [
+    1,
+    0,
+    1,
+    0
+  ],
+  "UAX|.uax|pc-tracker": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "UAX|.xyz|pc-tracker": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "UFO|.ufo|amiga-native": [
+    1,
+    0,
+    1,
+    0
+  ],
+  "UFO|.xyz|amiga-native": [
+    1,
+    0,
+    1,
+    0
+  ],
+  "UNIC Tracker|.unic|pc-tracker": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "UNIC Tracker|.xyz|pc-tracker": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "Ultimate SoundTracker|.stk|pc-tracker": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "Ultimate SoundTracker|.xyz|pc-tracker": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "Ultra Tracker|.ult|pc-tracker": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "Ultra Tracker|.xyz|pc-tracker": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "V2M|.v2m|chip-dump": [
+    1,
+    0,
+    1,
+    0
+  ],
+  "V2M|.xyz|chip-dump": [
+    1,
+    0,
+    1,
+    0
+  ],
+  "VGM|.xyz|chip-dump": [
+    1,
+    0,
+    1,
+    0
+  ],
+  "Voodoo Supreme Synthesizer|.xyz|uade-only": [
+    0,
+    0,
+    1,
+    0
+  ],
+  "Wally Beben|.xyz|amiga-native": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "XMF|.xmf|pc-tracker": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "XMF|.xyz|pc-tracker": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "XM|.xyz|∅": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "YM|.xyz|chip-dump": [
+    1,
+    0,
+    1,
+    0
+  ],
+  "YM|.ym|chip-dump": [
+    1,
+    0,
+    1,
+    0
+  ],
+  "ZXTune|.xyz|chip-dump": [
+    0,
+    0,
+    0,
+    0
+  ],
+  "ZXTune|.xyz|∅": [
+    0,
+    0,
+    0,
+    0
+  ],
+  "Zound Monitor|.xyz|amiga-native": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "__PROBE__|.asc|∅": [
+    0,
+    0,
+    0,
+    1
+  ],
+  "__PROBE__|.ayc|∅": [
+    0,
+    0,
+    0,
+    1
+  ],
+  "__PROBE__|.chi|∅": [
+    0,
+    0,
+    0,
+    1
+  ],
+  "__PROBE__|.cop|∅": [
+    0,
+    0,
+    0,
+    1
+  ],
+  "__PROBE__|.dmm|∅": [
+    0,
+    0,
+    0,
+    1
+  ],
+  "__PROBE__|.dst|∅": [
+    0,
+    0,
+    0,
+    1
+  ],
+  "__PROBE__|.et1|∅": [
+    0,
+    0,
+    0,
+    1
+  ],
+  "__PROBE__|.eup|∅": [
+    0,
+    0,
+    0,
+    1
+  ],
+  "__PROBE__|.ftc|∅": [
+    0,
+    0,
+    0,
+    1
+  ],
+  "__PROBE__|.gtr|∅": [
+    0,
+    0,
+    0,
+    1
+  ],
+  "__PROBE__|.ixs|∅": [
+    0,
+    0,
+    0,
+    0
+  ],
+  "__PROBE__|.mdx|∅": [
+    0,
+    0,
+    0,
+    1
+  ],
+  "__PROBE__|.org|∅": [
+    0,
+    0,
+    0,
+    0
+  ],
+  "__PROBE__|.pdt|∅": [
+    0,
+    0,
+    0,
+    1
+  ],
+  "__PROBE__|.pmd|∅": [
+    0,
+    0,
+    0,
+    1
+  ],
+  "__PROBE__|.psc|∅": [
+    0,
+    0,
+    0,
+    1
+  ],
+  "__PROBE__|.psg|∅": [
+    0,
+    0,
+    0,
+    1
+  ],
+  "__PROBE__|.psm|∅": [
+    0,
+    0,
+    0,
+    1
+  ],
+  "__PROBE__|.psy|∅": [
+    0,
+    0,
+    0,
+    0
+  ],
+  "__PROBE__|.pt1|∅": [
+    0,
+    0,
+    0,
+    1
+  ],
+  "__PROBE__|.pt2|∅": [
+    0,
+    0,
+    0,
+    1
+  ],
+  "__PROBE__|.pt3|∅": [
+    0,
+    0,
+    0,
+    1
+  ],
+  "__PROBE__|.ptcop|∅": [
+    0,
+    0,
+    0,
+    0
+  ],
+  "__PROBE__|.pttune|∅": [
+    0,
+    0,
+    0,
+    0
+  ],
+  "__PROBE__|.sc68|∅": [
+    0,
+    0,
+    0,
+    1
+  ],
+  "__PROBE__|.sndh|∅": [
+    0,
+    0,
+    0,
+    1
+  ],
+  "__PROBE__|.sqt|∅": [
+    0,
+    0,
+    0,
+    1
+  ],
+  "__PROBE__|.st1|∅": [
+    0,
+    0,
+    0,
+    1
+  ],
+  "__PROBE__|.st3|∅": [
+    0,
+    0,
+    0,
+    1
+  ],
+  "__PROBE__|.stc|∅": [
+    0,
+    0,
+    0,
+    1
+  ],
+  "__PROBE__|.stp|∅": [
+    0,
+    0,
+    0,
+    1
+  ],
+  "__PROBE__|.str|∅": [
+    0,
+    0,
+    0,
+    1
+  ],
+  "__PROBE__|.tf0|∅": [
+    0,
+    0,
+    0,
+    1
+  ],
+  "__PROBE__|.tfc|∅": [
+    0,
+    0,
+    0,
+    1
+  ],
+  "__PROBE__|.tfd|∅": [
+    0,
+    0,
+    0,
+    1
+  ],
+  "__PROBE__|.vtx|∅": [
+    0,
+    0,
+    0,
+    1
+  ],
+  "__PROBE__|.xyz|amiga-native": [
+    1,
+    0,
+    1,
+    0
+  ],
+  "__PROBE__|.xyz|c64-chip": [
+    1,
+    0,
+    1,
+    0
+  ],
+  "__PROBE__|.xyz|chip-dump": [
+    1,
+    0,
+    1,
+    0
+  ],
+  "__PROBE__|.xyz|furnace": [
+    1,
+    0,
+    1,
+    0
+  ],
+  "__PROBE__|.xyz|libopenmpt": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "__PROBE__|.xyz|midi": [
+    1,
+    0,
+    1,
+    0
+  ],
+  "__PROBE__|.xyz|pc-tracker": [
+    1,
+    1,
+    1,
+    0
+  ],
+  "__PROBE__|.xyz|uade-only": [
+    0,
+    0,
+    1,
+    0
+  ],
+  "__PROBE__|.xyz|∅": [
+    1,
+    0,
+    1,
+    0
+  ]
+}

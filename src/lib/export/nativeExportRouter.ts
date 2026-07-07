@@ -24,6 +24,10 @@
  */
 
 import type { TrackerSong } from '@engine/TrackerReplayer';
+import '@lib/formats/EditableFormatRegistry.builtins';
+import { getLayoutExporters, type LayoutExporterEntry } from '@lib/formats/EditableFormatRegistry';
+
+export type { LayoutExporterEntry };
 
 // ── Public types ─────────────────────────────────────────────────────────────
 
@@ -56,65 +60,14 @@ export interface ExportNativeOptions {
 
 // ── layoutFormatId → dedicated exporter (the single dispatch map) ──────────────
 
-export interface LayoutExporterEntry {
-  /** Module file under `src/lib/export/` (no extension). */
-  module: string;
-  /** Named export in that module. */
-  fn: string;
-  /**
-   * Extension for exporters that return raw bytes (`Uint8Array`/`ArrayBuffer`).
-   * Omit for exporters that return a self-naming `{ data, filename, warnings }`.
-   */
-  ext?: string;
-}
-
 /**
  * Every format whose export is keyed purely on `uadePatternLayout.formatId`
- * (i.e. not on the coarse `song.format` tag). Exported so the round-trip harness
- * can assert each module import resolves and its `fn` exists.
+ * (i.e. not on the coarse `song.format` tag). Sourced from the single
+ * {@link EditableFormatRegistry} — the descriptors flagged `exporter.byLayout`.
+ * Exported (unchanged shape) so the round-trip harness can assert each module
+ * import resolves and its `fn` exists.
  */
-export const LAYOUT_EXPORTERS: Record<string, LayoutExporterEntry> = {
-  musicLine: { module: 'MusicLineExporter', fn: 'exportMusicLineFile', ext: 'ml' },
-  musicAssembler: { module: 'MusicAssemblerExporter', fn: 'exportAsMusicAssembler' },
-  futurePlayer: { module: 'FuturePlayerExporter', fn: 'exportAsFuturePlayer' },
-  digitalSymphony: { module: 'DigitalSymphonyExporter', fn: 'exportDigitalSymphony', ext: 'dsym' },
-  amosMusicBank: { module: 'AMOSMusicBankExporter', fn: 'exportAMOSMusicBank', ext: 'abk' },
-  hippelCoSo: { module: 'HippelCoSoExporter', fn: 'exportAsHippelCoSo' },
-  inStereo2: { module: 'InStereo2Exporter', fn: 'exportInStereo2' },
-  deltaMusic1: { module: 'DeltaMusic1Exporter', fn: 'exportDeltaMusic1' },
-  deltaMusic2: { module: 'DeltaMusic2Exporter', fn: 'exportDeltaMusic2' },
-  digitalMugician: { module: 'DigitalMugicianExporter', fn: 'exportDigitalMugician' },
-  sidmon1: { module: 'SidMon1Exporter', fn: 'exportSidMon1' },
-  sonicArranger: { module: 'SonicArrangerExporter', fn: 'exportSonicArranger' },
-  tfmx: { module: 'TFMXExporter', fn: 'exportTFMX' },
-  fredEditor: { module: 'FredEditorExporter', fn: 'exportFredEditor' },
-  soundfx: { module: 'SoundFXExporter', fn: 'exportSoundFX' },
-  tcbTracker: { module: 'TCBTrackerExporter', fn: 'exportTCBTracker' },
-  gameMusicCreator: { module: 'GameMusicCreatorExporter', fn: 'exportGameMusicCreator' },
-  quadraComposer: { module: 'QuadraComposerExporter', fn: 'exportQuadraComposer' },
-  activisionPro: { module: 'ActivisionProExporter', fn: 'exportActivisionPro' },
-  digiBoosterPro: { module: 'DigiBoosterProExporter', fn: 'exportDigiBoosterPro' },
-  faceTheMusic: { module: 'FaceTheMusicExporter', fn: 'exportFaceTheMusic' },
-  sawteeth: { module: 'SawteethExporter', fn: 'exportSawteeth' },
-  earAche: { module: 'EarAcheExporter', fn: 'exportEarAche' },
-  iffSmus: { module: 'IffSmusExporter', fn: 'exportIffSmus' },
-  actionamics: { module: 'ActionamicsExporter', fn: 'exportActionamics' },
-  soundFactory: { module: 'SoundFactoryExporter', fn: 'exportSoundFactory' },
-  synthesis: { module: 'SynthesisExporter', fn: 'exportSynthesis' },
-  soundControl: { module: 'SoundControlExporter', fn: 'exportSoundControl' },
-  c67: { module: 'CDFM67Exporter', fn: 'exportCDFM67' },
-  zoundMonitor: { module: 'ZoundMonitorExporter', fn: 'exportZoundMonitor' },
-  chuckBiscuits: { module: 'ChuckBiscuitsExporter', fn: 'exportChuckBiscuits' },
-  composer667: { module: 'Composer667Exporter', fn: 'exportComposer667' },
-  kris: { module: 'KRISExporter', fn: 'exportKRIS' },
-  nru: { module: 'NRUExporter', fn: 'exportNRU' },
-  ims: { module: 'IMSExporter', fn: 'exportIMS' },
-  stp: { module: 'STPExporter', fn: 'exportSTP' },
-  unic: { module: 'UNICExporter', fn: 'exportUNIC' },
-  dsm_dyn: { module: 'DSMDynExporter', fn: 'exportDSMDyn' },
-  scumm: { module: 'SCUMMExporter', fn: 'exportSCUMM' },
-  xmf: { module: 'XMFExporter', fn: 'exportXMF' },
-};
+export const LAYOUT_EXPORTERS: Record<string, LayoutExporterEntry> = getLayoutExporters();
 
 // ── Internal working shape (data may still be a Blob until normalized) ─────────
 
@@ -273,6 +226,13 @@ function isSynTracker(song: TrackerSong): boolean {
   return String.fromCharCode(...new Uint8Array(d).slice(0, 16)) === 'SYNTRACKER-SONG:';
 }
 
+function isMaxTrax(song: TrackerSong): boolean {
+  const d = song.uadeEditableFileData;
+  if (!d || new Uint8Array(d).length < 4) return false;
+  const b = new Uint8Array(d);
+  return b[0] === 0x4d && b[1] === 0x58 && b[2] === 0x54 && b[3] === 0x58; // 'MXTX'
+}
+
 async function dispatchNativeExport(song: TrackerSong): Promise<RawExportResult | null> {
   const format = song.format as string;
   const layoutFormatId = song.uadePatternLayout?.formatId || song.uadeVariableLayout?.formatId || '';
@@ -291,6 +251,12 @@ async function dispatchNativeExport(song: TrackerSong): Promise<RawExportResult 
     // edited cells back into a copy of the original module (byte-exact for unedited).
     const { exportSynTrackerFile } = await import('./SynTrackerExporter');
     result = { data: exportSynTrackerFile(song), filename: `${baseName}.synmod`, warnings: [] };
+  } else if (isMaxTrax(song)) {
+    // MaxTrax keeps format 'MOD'; dispatch on the MXTX magic. Re-encode the parsed scores
+    // (byte-exact for unedited) into a copy preserving header + sample bank.
+    const { parseMaxTrax, encodeMaxTrax } = await import('@lib/import/formats/maxtrax/maxtraxFormat');
+    const data = parseMaxTrax(new Uint8Array(song.uadeEditableFileData!));
+    result = { data: encodeMaxTrax(data), filename: `${baseName}.mxtx`, warnings: [] };
   } else if (format === 'MOD' && !layoutFormatId) {
     const { exportSongToMOD } = await import('./modExport');
     const modResult = await exportSongToMOD(song, { bakeSynths: true });
