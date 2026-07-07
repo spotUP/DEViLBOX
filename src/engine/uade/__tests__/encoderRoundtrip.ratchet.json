@@ -1,5 +1,29 @@
 {
   "results": {
+    "activisionPro": {
+      "kind": "fixed",
+      "method": "decode-encode",
+      "status": "lossy",
+      "byteExact": false,
+      "matchPct": 0.9192,
+      "cells": 1176
+    },
+    "ams": {
+      "kind": "variable",
+      "method": "encode-pattern",
+      "status": "lossy",
+      "byteExact": false,
+      "matchPct": 0.0286,
+      "cells": 35
+    },
+    "aon": {
+      "kind": "fixed",
+      "method": "decode-encode",
+      "status": "lossy",
+      "byteExact": false,
+      "matchPct": 0.4398,
+      "cells": 1280
+    },
     "ashleyHogg": {
       "kind": "fixed",
       "method": "decode-encode",
@@ -56,6 +80,14 @@
       "matchPct": 0.9957,
       "cells": 1152
     },
+    "deltaMusic2": {
+      "kind": "fixed",
+      "method": "decode-encode",
+      "status": "lossy",
+      "byteExact": false,
+      "matchPct": 0.998,
+      "cells": 7168
+    },
     "desire": {
       "kind": "fixed",
       "method": "decode-encode",
@@ -63,6 +95,14 @@
       "byteExact": false,
       "matchPct": 0.3125,
       "cells": 256
+    },
+    "digiBoosterPro": {
+      "kind": "variable",
+      "method": "encode-pattern",
+      "status": "lossy",
+      "byteExact": false,
+      "matchPct": 0,
+      "cells": 51
     },
     "digitalMugician": {
       "kind": "fixed",
@@ -176,6 +216,14 @@
       "matchPct": 0,
       "cells": 171
     },
+    "graoumfTracker2_gt2": {
+      "kind": "fixed",
+      "method": "decode-encode",
+      "status": "lossy",
+      "byteExact": false,
+      "matchPct": 0.9681,
+      "cells": 3072
+    },
     "hippelCoSo": {
       "kind": "variable",
       "method": "encode-pattern",
@@ -215,6 +263,14 @@
       "byteExact": false,
       "matchPct": 0.008,
       "cells": 249
+    },
+    "inStereo2": {
+      "kind": "fixed",
+      "method": "decode-encode",
+      "status": "lossy",
+      "byteExact": false,
+      "matchPct": 0.2319,
+      "cells": 5248
     },
     "it": {
       "kind": "variable",
@@ -312,6 +368,14 @@
       "matchPct": 0,
       "cells": 256
     },
+    "mikeDavies": {
+      "kind": "fixed",
+      "method": "decode-encode",
+      "status": "lossy",
+      "byteExact": false,
+      "matchPct": 0.2461,
+      "cells": 256
+    },
     "mod": {
       "kind": "fixed",
       "method": "encode-parsed",
@@ -327,6 +391,14 @@
       "byteExact": false,
       "matchPct": 0.6691,
       "cells": 40704
+    },
+    "musicAssembler": {
+      "kind": "variable",
+      "method": "encode-pattern",
+      "status": "lossy",
+      "byteExact": false,
+      "matchPct": 0,
+      "cells": 12
     },
     "musicLine": {
       "kind": "variable",
@@ -408,6 +480,14 @@
       "matchPct": 0.2188,
       "cells": 1024
     },
+    "ronKlaren": {
+      "kind": "fixed",
+      "method": "decode-encode",
+      "status": "lossy",
+      "byteExact": false,
+      "matchPct": 0,
+      "cells": 125
+    },
     "rtm": {
       "kind": "variable",
       "method": "encode-pattern",
@@ -471,6 +551,22 @@
       "byteExact": false,
       "matchPct": 0.1289,
       "cells": 256
+    },
+    "soundControl": {
+      "kind": "fixed",
+      "method": "decode-encode",
+      "status": "lossy",
+      "byteExact": false,
+      "matchPct": 0,
+      "cells": 2491
+    },
+    "soundFactory": {
+      "kind": "fixed",
+      "method": "decode-encode",
+      "status": "lossy",
+      "byteExact": false,
+      "matchPct": 0,
+      "cells": 398
     },
     "soundfx": {
       "kind": "fixed",
@@ -552,6 +648,22 @@
       "matchPct": 0.1016,
       "cells": 256
     },
+    "symphoniePro": {
+      "kind": "fixed",
+      "method": "decode-encode",
+      "status": "lossy",
+      "byteExact": false,
+      "matchPct": 0.993,
+      "cells": 20480
+    },
+    "synthesis": {
+      "kind": "fixed",
+      "method": "decode-encode",
+      "status": "lossy",
+      "byteExact": false,
+      "matchPct": 0.9861,
+      "cells": 144
+    },
     "tcbTracker": {
       "kind": "fixed",
       "method": "decode-encode",
@@ -628,18 +740,13 @@
   "unexercisedRegistered": [
     "aProSys",
     "actionamics",
-    "activisionPro",
     "amf",
     "amosMusicBank",
-    "ams",
-    "aon",
     "artAndMagic",
     "c67",
     "chuckBiscuits",
     "composer667",
-    "deltaMusic2",
     "digiBooster",
-    "digiBoosterPro",
     "digitalSymphony",
     "dmf",
     "dsm_dyn",
@@ -647,38 +754,29 @@
     "dtm_204",
     "dtm_pt",
     "gmc",
-    "graoumfTracker2_gt2",
     "graoumfTracker2_gtk4",
     "graoumfTracker2_gtk5",
     "ice",
     "imf",
     "ims",
     "inStereo1",
-    "inStereo2",
     "karlMorton",
     "kris",
     "leggless",
     "med_mmd0",
     "med_mmd1",
     "mfp",
-    "mikeDavies",
     "mt2",
-    "musicAssembler",
     "octamed_mmd0",
     "octamed_mmd1",
     "oktalyzer",
     "psm",
     "pt36",
-    "ronKlaren",
     "sawteeth",
     "sonixMusicDriver",
-    "soundControl",
-    "soundFactory",
     "soundFactoryStub",
     "startrekkerAM",
     "stk",
-    "symphoniePro",
-    "synthesis",
     "wantedTeamDaveLowe",
     "xmf"
   ]
