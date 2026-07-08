@@ -271,6 +271,7 @@ export const SYNTH_CATEGORIES: SynthCategory[] = [
       SYNTH_INFO.DeltaMusic1Synth,
       SYNTH_INFO.DeltaMusic2Synth,
       SYNTH_INFO.JamCrackerSynth,
+      SYNTH_INFO.MaxTraxSynth,
       SYNTH_INFO.FuturePlayerSynth,
     ],
   },

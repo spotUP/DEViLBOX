@@ -179,6 +179,7 @@ export const VOLUME_NORMALIZATION_OFFSETS: Record<string, number> = {
   'ModularSynth': 6,     // Measured: -15.5dB → target -10dB
   'HivelySynth': 1,     // Measured: -11.0dB → target -10dB
   'JamCrackerSynth': 0, // JamCracker WASM replayer — volume managed internally
+  'MaxTraxSynth': 0,    // MaxTrax WASM replayer — volume managed internally
   'OctaMEDSynth': 0,   // OctaMED synth instrument — volume managed internally
   'UADESynth': 0,       // UADE exotic Amiga player — volume managed internally
   'SunVoxSynth': 0,     // SunVox WASM patch player — volume managed internally
