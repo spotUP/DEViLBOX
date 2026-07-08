@@ -124,8 +124,51 @@ Roots: (1)(3) = arithmetic in address/displacement expressions; (2) = immediate
 expr with ~ and |; (4) = MULU mem-operand emission; (5) = repeated local labels.
 After these compile-clean, proceed to Phase 2 (audio.device shim + harness + WASM).
 
+## PHASE 1 COMPLETE (2026-07-08, commit 69e4f2501) — max.asm compiles clean (0 errors)
+All transpiler blockers fixed + committed + pushed (81 transpiler tests pass):
+- fc8312373 macro args / named lib calls / local-label scoping
+- 23c25ec2a STRUCTURE offset macros + maxtrax_defs.i
+- (immediate fix) symbolic/complement immediates + ADIOF_PERVOL
+- 69e4f2501 identifier-arithmetic operands + conditional assembly (evalConditionals)
+`cc -c` on the generated maxtrax.c = 0 errors. Transpile command unchanged (above).
+
+## PHASE 2 DESIGN (audio.device shim + exec shims + VBlank + harness + WASM)
+Drive sequence (from player.c — the reference loader):
+  InitMusic()            ; installs VBlank server (AddIntServer), allocs score space
+  LoadPerf(file,PERF_ALL); loads .mxtx (scores+samples) via DOS Open/Read/Close/Seek
+  SelectScore(scoreIdx)
+  PlaySong(songIdx)      ; opens audio.device, starts
+  <VBlank ISR @50Hz drives playback; audio.device CMD_WRITE plays samples>
+  poll maxtrax.Flags (MUSIC_PLAYING / MUSIC_SILENT)
+
+Shim surface (all called via the transpiler's now-NAMED _LVOxxx()/DEV_xxx()):
+  exec: AllocMem(d0=size,d1=flags->d0=ptr), FreeMem, CopyMem, TypeOfMem,
+        AddIntServer(a1=Interrupt node -> capture for 50Hz tick), RemIntServer,
+        Cause, Signal
+  device: OpenDevice(audio -> fake base w/ BEGINIO ptr), CloseDevice,
+        DEV_BEGINIO(a1=IOAudio -> paula_soft), GetMsg/ReplyMsg (audio reply port)
+  dos: Open/Read/Close/Seek backed by in-memory .mxtx buffer (memfs, like sonix)
+audio.device BEGINIO (CMD_WRITE): read IOAudio fields ioa_Data/Length/Period/
+  Volume/Cycles + IO_UNIT (channel mask) -> paula_set_sample_ptr/length/period/
+  volume + start; attack(Cycles=1 one-shot) then sustain(Cycles=0 loop) chaining.
+
+KEY ARCH DECISION (unresolved): shims need the transpiled 68k REGISTERS
+(static uint32_t d0..d7,a0..a7 in maxtrax.c) + _ds data section. Two options:
+  A. Unity build (harness #includes maxtrax.c) — but maxtrax.c emits the lib/device
+     symbols as `__attribute__((weak)) void _LVOxxx(void){}`; a strong def in the
+     same TU = redefinition error. So unity build needs the transpiler to emit these
+     as DECLARATIONS ONLY (not weak defs) under a flag.
+  B. Separate TU harness — needs registers/_ds/entry funcs NON-static (extern).
+  RECOMMEND: add transpiler flag (e.g. --os-calls-extern / --lib-mode) that (1) emits
+  extern decls instead of weak stubs for _LVO*/DEV_*, and (2) makes registers + _ds +
+  exported entry funcs non-static. Keep weak-stub default so standalone-compile tests
+  still link. Then harness = separate TU (or unity) providing the shims.
+Mirror sonix-wasm/{src/sonix_harness.c,CMakeLists.txt}; paula_soft.{c,h} in
+tools/asm68k-to-c/runtime/. Harness exports: load(mxtx bytes)->Init/LoadPerf/Select/
+Play; render(buf,frames)->run N vblank ticks + paula_render; stop.
+
 ## NEXT STEPS (ordered)
-0. Fix the 5 transpiler parser-bug classes above so max.asm compiles clean.
+0. [DONE 69e4f2501] max.asm compiles clean.
 1. **Transpiler: emit NAMED library/device calls.** [DONE fc8312373] Make JSRLIB/JSRDEV expand
    `_LVO<name>(a6)` → a call like `amiga_AllocMem(...)` (or a dispatch on the
    LVO offset). Look at parser/preprocess macro handling + the `jsr d(a6)`
