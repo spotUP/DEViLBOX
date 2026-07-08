@@ -300,7 +300,7 @@
       "exporter": "PumaTracker (PumaTrackerExporter)",
       "tier": "pattern-data",
       "status": "pattern-match",
-      "matchPct": 0.9927,
+      "matchPct": 1,
       "cells": 1920,
       "bytes": 13838
     },
