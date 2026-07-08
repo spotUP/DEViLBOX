@@ -67,8 +67,13 @@ function writeTag(buf: Uint8Array, off: number, tag: string): void {
  * noteExportOffset on the song is 36 (set by parser).
  */
 function xmNoteToIs20(xmNote: number): number {
-  if (xmNote === 0) return 0;
   if (xmNote === 97) return 0x7f; // note-off
+  // Uniform reverse of the parser's `xmNote = noteIndex - 36` (InStereo2Parser.ts:97):
+  // noteIndex = xmNote + 36. This deliberately maps xmNote 0 to raw index 36 (a REAL
+  // note that decodes back to xmNote 0), NOT to raw 0. Raw 0 is read by the parser as a
+  // fully-empty row (line 570) which drops the cell's instrument — so a note-0 cell that
+  // carries an instrument (e.g. an out-of-XM-range low note) would lose it. Genuinely
+  // empty cells (note+instrument+effect all zero) are filtered before this is called.
   const idx = xmNote + 36;
   return Math.max(1, Math.min(108, idx));
 }
