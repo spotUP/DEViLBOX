@@ -226,12 +226,16 @@ export function exportPumaTrackerFile(song: TrackerSong): Uint8Array {
     const pat = song.patterns[patIdx];
     const patternIndices: number[] = [];
 
-    // Extract speed from channel 0, row 0 set-speed effect
-    let speed = 6; // default
+    // Extract speed from the channel-0 row-0 set-speed effect. The parser injects
+    // F<speed> at ch0/row0 ONLY when the order entry's speed byte is > 0 (speed 0 =
+    // "no change, keep the previous order's speed"; PumaTrackerParser.ts:495). So a
+    // pattern whose ch0/row0 carries no 0x0F effect must write speed 0, not a default
+    // of 6 — defaulting to 6 injected a spurious F06 into every such pattern on reload.
+    let speed = 0;
     if (pat) {
       const ch0Row0 = pat.channels[0]?.rows[0];
       if (ch0Row0 && (ch0Row0.effTyp ?? 0) === 0x0F) {
-        speed = ch0Row0.eff ?? 6;
+        speed = ch0Row0.eff ?? 0;
       }
     }
 
