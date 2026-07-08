@@ -173,7 +173,10 @@ export async function exportFredEditor(
     const inst = song.instruments[i];
     const fred = inst.fred;
 
-    if (fred) {
+    // A PCM sampler now also carries a `fred` config (the parser attaches the sample's
+    // instrument-level vibrato / arpeggio / envelope so they survive export). Route by
+    // the presence of real PCM data first: only fred-WITHOUT-PCM is a PWM synth.
+    if (fred && !inst.sample?.audioBuffer) {
       // PWM synth instrument — reconstruct from FredConfig
       sampleDefs.push({
         pcmData: new Uint8Array(0),
@@ -237,21 +240,25 @@ export async function exportFredEditor(
         pcmData: pcm,
         loopPtr,
         length: pcm.length,
-        relative: 1024, // default tuning
-        vibratoDelay: 0,
-        vibratoSpeed: 0,
-        vibratoDepth: 0,
-        envelopeVol: 64,
-        attackSpeed: 1,
-        attackVol: 64,
-        decaySpeed: 0,
-        decayVol: 0,
-        sustainTime: 0,
-        releaseSpeed: 0,
-        releaseVol: 0,
-        arpeggio: new Array(16).fill(0),
-        arpeggioLimit: 0,
-        arpeggioSpeed: 0,
+        // Instrument-level synth params (vibrato / arpeggio / envelope / tuning) come
+        // from the fred config the parser attached to this sampler; the pattern decoder
+        // synthesises them into every sample note (vibrato -> effTyp 0x04, arpeggio ->
+        // effTyp 0x00). Falling back to the previous hardcoded zeros dropped them.
+        relative: fred?.relative ?? 1024, // default tuning
+        vibratoDelay: fred?.vibratoDelay ?? 0,
+        vibratoSpeed: fred?.vibratoSpeed ?? 0,
+        vibratoDepth: fred?.vibratoDepth ?? 0,
+        envelopeVol: fred?.envelopeVol ?? 64,
+        attackSpeed: fred?.attackSpeed ?? 1,
+        attackVol: fred?.attackVol ?? 64,
+        decaySpeed: fred?.decaySpeed ?? 0,
+        decayVol: fred?.decayVol ?? 0,
+        sustainTime: fred?.sustainTime ?? 0,
+        releaseSpeed: fred?.releaseSpeed ?? 0,
+        releaseVol: fred?.releaseVol ?? 0,
+        arpeggio: fred?.arpeggio ?? new Array(16).fill(0),
+        arpeggioLimit: fred?.arpeggioLimit ?? 0,
+        arpeggioSpeed: fred?.arpeggioSpeed ?? 0,
         type: 0, // regular PCM
         synchro: 0,
         pulseRateNeg: 0,
