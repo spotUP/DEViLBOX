@@ -5,11 +5,11 @@ import { resolve } from '../src/resolver.js';
 import { emit } from '../src/emitter.js';
 import { scopeLocalLabels } from '../src/scope-locals.js';
 
-function transpile(src: string): string {
+function transpile(src: string, libMode = false): string {
   const source = preProcess(src);
   const ast = parse(tokenize(source));
   scopeLocalLabels(ast);
-  return emit(ast, resolve(ast), 'test.asm');
+  return emit(ast, resolve(ast), 'test.asm', { libMode });
 }
 
 // Regression: macro argument substitution (\1) — JSRLIB AllocMem must expand
@@ -166,4 +166,58 @@ RoutineB:
   expect(out).toContain('RoutineB_L_loop');
   // The bare flattened name must not appear as a label definition.
   expect(out).not.toMatch(/^\s*_loop:/m);
+});
+
+// Regression: PEA return_label + MOVE.L fn_ptr_mem, -(SP) + RTS is an Amiga
+// indirect-call idiom (68k RTS pops and calls the fn ptr, returning to the label).
+// Must emit a C function-pointer call + goto/return, NOT stack pushes + bare return.
+test('PEA+MOVE.L fn,-(SP)+RTS emits indirect function call', () => {
+  const src = `
+fn_table\tequ\t0
+
+Callee:
+\tmoveq\t#42,d0
+\trts
+
+Routine:
+\tpea\tReturnHere
+\tmove.l\tfn_table,-(sp)
+\trts
+ReturnHere:
+\ttst.l\td0
+\trts
+`;
+  const out = transpile(src);
+  // Must contain the indirect call cast
+  expect(out).toMatch(/\(\(void\(\*\)\(void\)\)\(uintptr_t\)/);
+  // Must NOT contain the raw stack-push pattern (PEA → sp -= 4)
+  expect(out).not.toMatch(/sp -= 4.*WRITE32.*ReturnHere/s);
+  // ReturnHere must still be reachable as a label or called as a function
+  expect(out).toMatch(/ReturnHere/);
+});
+
+// Regression: --lib-mode emits extern decls (not weak stubs) for AmigaOS calls,
+// and makes the 68k register file non-static so a harness TU can access them.
+test('lib-mode: extern decls for OS calls, non-static registers', () => {
+  const src = `
+JSRLIB\tmacro
+\tjsr\t_LVO\\1(a6)
+\tendm
+JSRDEV\tmacro
+\tjsr\tDEV_\\1(a6)
+\tendm
+
+Routine:
+\tJSRLIB\tAllocMem
+\tJSRDEV\tBEGINIO
+\trts
+`;
+  const out = transpile(src, true);
+  // Extern decls instead of weak stubs
+  expect(out).toContain('extern void _LVOAllocMem(void);');
+  expect(out).toContain('extern void DEV_BEGINIO(void);');
+  expect(out).not.toMatch(/__attribute__\(\(weak\)\)/);
+  // Register file must be non-static (harness needs extern access)
+  expect(out).toContain('uint32_t d0,');
+  expect(out).not.toMatch(/static uint32_t d0/);
 });
