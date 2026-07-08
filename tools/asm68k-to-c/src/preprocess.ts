@@ -20,9 +20,12 @@
 export function preProcess(source: string): string {
   let lines = source.split('\n');
   lines = expandRept(lines);
-  lines = expandStructures(lines);
   const { macros, stripped } = collectMacros(lines);
   lines = expandMacros(stripped, macros);
+  // Conditionals run AFTER macro expansion (so macro-body `ifeq \1-N` resolve) and
+  // BEFORE STRUCTURE offsets (so fields inside inactive #if blocks don't shift offsets).
+  lines = evalConditionals(lines);
+  lines = expandStructures(lines);
   lines = expandEquDisplacements(lines);
   lines = resolveStarOffsets(lines);
   return lines.join('\n');
@@ -57,6 +60,72 @@ function expandRept(lines: string[]): string[] {
     }
   }
   return result;
+}
+
+// ── 1a. Conditional assembly (ifne/ifeq/ifd/… else/elseif/endc) ───────────
+//
+// Evaluate assembler conditionals against known EQU constants so inactive
+// branches are dropped. Without this, both arms of `ifne FASTSOUND` are kept,
+// producing duplicate labels / dead code. Symbols resolve from EQU/SET/= lines
+// collected during the scan (project constants live in the preamble includes).
+
+function evalConditionals(lines: string[]): string[] {
+  const out: string[] = [];
+  const consts = new Map<string, number>();
+  const stack: { parentActive: boolean; active: boolean; taken: boolean }[] = [];
+  const emitting = (): boolean => stack.every((s) => s.active);
+
+  for (const raw of lines) {
+    const code = stripComment(raw).trim();
+
+    const mIf = code.match(/^(ifne|ifeq|ifgt|iflt|ifge|ifle|ifd|ifnd)\b\s*(.*)$/i);
+    if (mIf) {
+      const parentActive = emitting();
+      const dir = mIf[1].toLowerCase();
+      const arg = mIf[2].trim();
+      let cond = false;
+      if (parentActive) {
+        if (dir === 'ifd' || dir === 'ifnd') {
+          const known = consts.has(arg);
+          cond = dir === 'ifd' ? known : !known;
+        } else {
+          const v = evalConst(arg, consts);
+          const n = Number.isNaN(v) ? 0 : v;
+          cond = dir === 'ifne' ? n !== 0 : dir === 'ifeq' ? n === 0
+               : dir === 'ifgt' ? n > 0 : dir === 'iflt' ? n < 0
+               : dir === 'ifge' ? n >= 0 : n <= 0;
+        }
+      }
+      stack.push({ parentActive, active: parentActive && cond, taken: parentActive && cond });
+      continue;
+    }
+    if (/^else\b/i.test(code) && !/^elseif\b/i.test(code)) {
+      const top = stack[stack.length - 1];
+      if (top) { top.active = top.parentActive && !top.taken; if (top.active) top.taken = true; }
+      continue;
+    }
+    const mElseif = code.match(/^elseif\b\s*(.*)$/i);
+    if (mElseif) {
+      const top = stack[stack.length - 1];
+      if (top) {
+        if (top.taken) { top.active = false; }
+        else {
+          const v = evalConst(mElseif[1].trim(), consts);
+          top.active = top.parentActive && !Number.isNaN(v) && v !== 0;
+          if (top.active) top.taken = true;
+        }
+      }
+      continue;
+    }
+    if (/^(endc|endif)\b/i.test(code)) { stack.pop(); continue; }
+
+    if (!emitting()) continue;
+
+    const mEqu = code.match(/^([A-Za-z_]\w*)\s+(?:equ|set)\s+(.+)$/i) || code.match(/^([A-Za-z_]\w*)\s*=\s*(.+)$/);
+    if (mEqu) { const v = evalConst(mEqu[2], consts); if (!Number.isNaN(v)) consts.set(mEqu[1], v); }
+    out.push(raw);
+  }
+  return out;
 }
 
 // ── 1b. Amiga STRUCTURE offset-macro expansion ───────────────────────────

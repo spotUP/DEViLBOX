@@ -314,10 +314,13 @@ export function parse(tokens: Token[]): AstNode[] {
           continue;
         }
         if (lt[j].kind === 'OPERATOR') { j++; continue; } // skip stray OPERATOR tokens
-        // IDENTIFIER OPERATOR IDENTIFIER/NUMBER ... DISP_REG: compound expression
-        // e.g. InfoBuffer+Length+2(PC) → IDENT OP IDENT OP NUMBER DISP_REG
-        if (lt[j].kind === 'IDENTIFIER' && lt[j + 1]?.kind === 'OPERATOR') {
-          // Scan ahead to find the end of the expression chain
+        // Compound operand expression: (IDENTIFIER|NUMBER) (OPERATOR (IDENTIFIER|NUMBER))+
+        // optionally followed by a register — (reg) [ADDRESS] or n(reg) [DISP_REG] —
+        // otherwise a bare compound address expression.
+        //   _voice+voice_Channel            → label_ref "_voice+voice_Channel"
+        //   3*NUM_VOICES*ioa_SIZEOF(a1)      → disp {offset:"3*NUM_VOICES*ioa_SIZEOF", base:a1}
+        //   InfoBuffer+Length+2(PC)          → pc_rel
+        if ((lt[j].kind === 'IDENTIFIER' || lt[j].kind === 'NUMBER') && lt[j + 1]?.kind === 'OPERATOR') {
           let expr = lt[j].value;
           let k = j + 1;
           while (k < lt.length && lt[k]?.kind === 'OPERATOR' &&
@@ -325,31 +328,38 @@ export function parse(tokens: Token[]): AstNode[] {
             expr += lt[k].value + lt[k + 1].value;
             k += 2;
           }
-          // If followed by OPERATOR + DISP_REG (e.g. "+2(PC)"), include the DISP_REG
+          // Trailing OPERATOR + DISP_REG (e.g. "+2(PC)")
           let hadOp = false;
           if (lt[k]?.kind === 'OPERATOR' && lt[k + 1]?.kind === 'DISP_REG') {
             expr += lt[k].value;
             k++;
             hadOp = true;
           }
-          // If followed by DISP_REG (e.g. "(PC)" or "2(PC)"), combine into pc_rel or disp
+          // Followed by DISP_REG (e.g. "2(PC)") → combine into pc_rel or disp
           if (lt[k]?.kind === 'DISP_REG') {
-            const dispRaw = lt[k].value;
-            const dm = dispRaw.match(/^(-?[^(]*)\((.+)\)$/);
+            const dm = lt[k].value.match(/^(-?[^(]*)\((.+)\)$/);
             if (dm) {
               const base = dm[2].toLowerCase();
               if (dm[1]) expr += (hadOp ? '' : (dm[1].startsWith('-') || dm[1].startsWith('+') ? '' : '+')) + dm[1];
-              if (base === 'pc') {
-                operands.push({ kind: 'pc_rel', label: expr });
-              } else {
-                operands.push({ kind: 'disp', offset: expr, base });
-              }
+              operands.push(base === 'pc' ? { kind: 'pc_rel', label: expr } : { kind: 'disp', offset: expr, base });
               j = k + 1;
               continue;
             }
           }
-          // If NOT followed by DISP_REG, just push IDENTIFIER and let OPERATOR tokens
-          // be handled individually (they'll be skipped or handled by other cases)
+          // Followed by ADDRESS indirect "(reg)" → disp with symbolic offset
+          // (e.g. 3*NUM_VOICES*ioa_SIZEOF(a1))
+          if (lt[k]?.kind === 'ADDRESS' && !lt[k].value.endsWith('+') && !lt[k].value.startsWith('-')) {
+            const areg = lt[k].value.match(/\((\w+)\)/)?.[1]?.toLowerCase();
+            if (areg && /^a[0-7]$|^sp$/.test(areg)) {
+              operands.push(areg === 'pc' ? { kind: 'pc_rel', label: expr } : { kind: 'disp', offset: expr, base: areg });
+              j = k + 1;
+              continue;
+            }
+          }
+          // No register → compound address expression (e.g. _voice+voice_Channel).
+          operands.push({ kind: 'label_ref', name: expr });
+          j = k;
+          continue;
         }
         // NUMBER + DISP_REG: combine displacement arithmetic, e.g. 12-12(A4) → 0(A4)
         if ((lt[j].kind === 'NUMBER' || lt[j].kind === 'IMMEDIATE') && lt[j + 1]?.kind === 'DISP_REG') {
