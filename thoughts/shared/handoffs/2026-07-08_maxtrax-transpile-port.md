@@ -65,8 +65,49 @@ GetMsg/WaitPort/PutMsg for audio reply ports. IOAudio struct offsets
 (ioa_Data/Length/Period/Volume/Cycles/AllocKey, IO_COMMAND, IO_UNIT,
 ioa_SIZEOF) are in the max_trax dir includes (driver.i / maxtrax.i / audio.i).
 
+## PROGRESS 2026-07-08 (session 2) — transpiler now handles the OS surface
+Committed transpiler improvements (all 80 transpiler tests pass):
+- fc8312373: macro-arg substitution (\1,\@), NAMED AmigaOS lib/device calls
+  (JSR _LVOname(a6)/DEV_name(a6) -> _LVOname()/DEV_name() + weak override stubs),
+  local-label scoping (.loop -> Routine_L_loop per enclosing global label).
+- 23c25ec2a: Amiga STRUCTURE offset macros (expandStructures: STRUCTURE/WORD/
+  BYTE/APTR/LONG/STRUCT/LABEL/ALIGN -> computed EQU offsets), evalConst widened
+  for << >> & | ^ ~. New maxtrax-wasm/src/maxtrax_defs.i (canonical Node/Message/
+  MsgPort/Interrupt/IORequest/IOStdReq/IOAudio layouts + CMD_*/MEMF_*/INTB_VERTB/
+  aud=$a0 constants) supplied as a preamble.
+
+### Current transpile command (7 compile errors left, down from 11)
+```
+M=third-party/uade-3.05/amigasrc/players/max_trax
+node tools/asm68k-to-c/dist/cli.js --no-wrapper -o maxtrax-wasm/src/generated -n maxtrax \
+  -P maxtrax-wasm/src/maxtrax_defs.i -P $M/driver.i -P $M/maxtrax.i -P $M/shared.asm $M/max.asm
+cc -c -I tools/asm68k-to-c/runtime -o /tmp/mxtx.o maxtrax-wasm/src/generated/maxtrax/maxtrax.c
+```
+(generated C is gitignored; maxtrax_defs.i IS committed.)
+
+### REMAINING 7 compile errors = distinct transpiler parser bugs (source lines)
+1. LEA with `*` in displacement expr: max.asm:292 `lea 3*NUM_VOICES*ioa_SIZEOF(a1),a1`
+   -> parser splits the multiplied displacement into bogus operands.
+2. AND.B with complement/or immediate: max.asm:1253 `and.b #~MUSIC_VELOCITY,glob_Flags(a4)`
+   and 1619 `and.b #~(MUSIC_PLAYING|MUSIC_SILENT|MUSIC_LOOP),mxtx_Flags(a5)` ->
+   `#~expr` / `#(a|b|c)` immediate dropped -> emits `& )` (empty). Needs ~ and | in
+   immediate-expression eval (evalConst now supports them; the IMMEDIATE parse path
+   must use it).
+3. LEA label+offset absolute: max.asm:2191 `lea _globaldata+glob_NoteOff,a0` ->
+   emits `glob_NoteOff = _globaldata` (treats it as 2 operands / wrong target).
+4. MULU.W memory-source form -> wrong assignment target (dst should be Dn, got the
+   struct-offset symbol). Generated comment `MULU.W _globaldata,glob_Frequency,D1`.
+5. Duplicate dot-local label in ONE scope: max.asm:2409 `.l40` AND 2526 `.l40` both
+   under the same global (no intervening non-local label) -> `redefinition of label`.
+   Assembler uses nearest-preceding/following-def semantics; transpiler needs
+   per-definition uniquification for repeated locals (like numeric 1:/1b locals).
+Roots: (1)(3) = arithmetic in address/displacement expressions; (2) = immediate
+expr with ~ and |; (4) = MULU mem-operand emission; (5) = repeated local labels.
+After these compile-clean, proceed to Phase 2 (audio.device shim + harness + WASM).
+
 ## NEXT STEPS (ordered)
-1. **Transpiler: emit NAMED library/device calls.** Make JSRLIB/JSRDEV expand
+0. Fix the 5 transpiler parser-bug classes above so max.asm compiles clean.
+1. **Transpiler: emit NAMED library/device calls.** [DONE fc8312373] Make JSRLIB/JSRDEV expand
    `_LVO<name>(a6)` → a call like `amiga_AllocMem(...)` (or a dispatch on the
    LVO offset). Look at parser/preprocess macro handling + the `jsr d(a6)`
    emitter path. Without names, no shim can hook. This is the gating fix.
