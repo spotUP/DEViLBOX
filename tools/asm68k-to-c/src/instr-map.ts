@@ -702,6 +702,14 @@ export function emitInstruction(node: InstructionNode): string {
     case 'BSR': case 'JSR': {
       // Simple identifier → direct call
       if (/^[A-Za-z_][A-Za-z0-9_]*$/.test(src)) return `${src}();`;
+      // AmigaOS library / device call: JSR _LVOname(a6) or JSR DEV_name(a6).
+      // Emit a DIRECT named call to a host shim (implemented in the harness, reading/
+      // writing the global 68k registers) instead of an unresolved jump-table read.
+      const disp0 = ops[0];
+      if (disp0?.kind === 'disp' && typeof disp0.offset === 'string'
+          && /^(_LVO|DEV_)[A-Za-z0-9_]+$/.test(disp0.offset)) {
+        return `${disp0.offset}();  /* ${mnemonic} ${disp0.offset}(${disp0.base}) */`;
+      }
       // JSR (An) — register indirect: the register IS the function address (no dereference).
       // JSR d(An)  — displacement: model library jump-tables as fn-ptr tables → READ32.
       const callTarget = ops[0]?.kind === 'address' && ops[0].mode === 'indirect'

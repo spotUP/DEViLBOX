@@ -495,17 +495,28 @@ export function emit(ast: AstNode[], resolved: ResolveResult, sourceFile?: strin
   const stubs = collectUnresolved(ast, resolved);
   // Split stubs: BSR/JSR targets become no-op function stubs, rest become #define 0.
   const callTargets = new Set<string>();
+  // AmigaOS library/device calls: JSR _LVOname(a6) / JSR DEV_name(a6). These are
+  // emitted as direct named calls (see instr-map JSR case), so they need WEAK no-op
+  // stubs — the WASM harness overrides them with real exec/audio.device shims.
+  const libCallTargets = new Set<string>();
   for (const node of ast) {
     if (node.kind !== 'instruction') continue;
     if (node.mnemonic !== 'BSR' && node.mnemonic !== 'JSR') continue;
     const t = node.operands[0];
     if (t?.kind === 'label_ref' && stubs.has(t.name)) callTargets.add(t.name);
     if (t?.kind === 'pc_rel' && stubs.has(t.label)) callTargets.add(t.label);
+    if (t?.kind === 'disp' && typeof t.offset === 'string' && /^(_LVO|DEV_)[A-Za-z0-9_]+$/.test(t.offset)) {
+      libCallTargets.add(t.offset);
+    }
   }
-  const valueStubs = new Set([...stubs].filter(n => !callTargets.has(n)));
-  if (valueStubs.size > 0 || callTargets.size > 0) {
+  const valueStubs = new Set([...stubs].filter(n => !callTargets.has(n) && !libCallTargets.has(n)));
+  if (valueStubs.size > 0 || callTargets.size > 0 || libCallTargets.size > 0) {
     lines.push('/* -- Unresolved Symbols -------------------------------------------- */');
     lines.push('/* These symbols come from include files not available to the transpiler. */');
+    // AmigaOS library/device call stubs — weak so a harness can override with real shims.
+    for (const name of libCallTargets) {
+      lines.push(`__attribute__((weak)) void ${name}(void) {} /* AmigaOS lib/device call — override in harness */`);
+    }
     // Function stubs (BSR/JSR targets)
     for (const name of callTargets) {
       lines.push(`static inline void ${name}(void) {} /* unresolved BSR target — no-op */`);

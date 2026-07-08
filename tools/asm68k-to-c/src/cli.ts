@@ -9,6 +9,7 @@ import { resolve } from './resolver.js';
 import { emit } from './emitter.js';
 import { genWrapper, genCMake } from './gen-wrapper.js';
 import { restructure } from './restructure.js';
+import { scopeLocalLabels } from './scope-locals.js';
 import { preProcess } from './preprocess.js';
 
 const program = new Command();
@@ -48,6 +49,7 @@ program
 
       const tokens   = tokenize(source);  // source already preprocessed above
       const ast      = parse(tokens);
+      scopeLocalLabels(ast);  // uniquify dot-local labels per enclosing global label
       const resolved = resolve(ast);
 
       if (opts.verbose) {
