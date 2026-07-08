@@ -13,7 +13,9 @@ import { emitInstruction, emitOperand, reconstructAsm } from './instr-map.js';
  *   - Rotation helpers ROL32/ROR32
  * ======================================================================== */
 
-const PREAMBLE = `\
+function makePreamble(libMode: boolean): string {
+  const q = libMode ? '' : 'static ';
+  return `\
 #include "paula_soft.h"
 #include <stdint.h>
 
@@ -23,12 +25,12 @@ const PREAMBLE = `\
  * SP (A7): stack pointer.  PC: program counter (unused in transpiled code).
  * Flags: Z (zero), N (negative), C (carry), V (overflow), X (extend).
  * -------------------------------------------------------------------- */
-static uint32_t d0,d1,d2,d3,d4,d5,d6,d7;
-static uint32_t a0,a1,a2,a3,a4,a5,a6,sp,pc;
+${q}uint32_t d0,d1,d2,d3,d4,d5,d6,d7;
+${q}uint32_t a0,a1,a2,a3,a4,a5,a6,sp,pc;
 #define a7 sp  /* A7 is the stack pointer */
-static int flag_z=0, flag_n=0, flag_c=0, flag_v=0, flag_x=0;
-static uint16_t ccr = 0;  /* condition code register (for MOVE SR/CCR) */
-static uint16_t sr = 0;   /* status register (interrupt mask bits etc.) */
+${q}int flag_z=0, flag_n=0, flag_c=0, flag_v=0, flag_x=0;
+${q}uint16_t ccr = 0;  /* condition code register (for MOVE SR/CCR) */
+${q}uint16_t sr = 0;   /* status register (interrupt mask bits etc.) */
 
 /* -- Sub-register Accessors -------------------------------------------
  * W(d0) -- access the low 16 bits of d0 (read/write).
@@ -130,7 +132,7 @@ static inline void hw_write32(uint32_t addr, uint32_t val) {
   if (addr >= 0xBF0000 && addr < 0xC00000) return; /* CIA writes */
   WRITE32(addr, val);
 }
-`;
+`; }
 
 const C_IDENT = /^[A-Za-z_][A-Za-z0-9_]*$/;
 
@@ -288,16 +290,18 @@ function emitPackedDataSection(
   bytes: number[],
   labelOffsets: Map<string, { offset: number; cType: string }>,
   labelPatches: { offset: number; targetLabel: string; elemSize: number }[],
-  isFunctionLabel: Set<string>
+  isFunctionLabel: Set<string>,
+  libMode = false
 ): string[] {
   const lines: string[] = [];
   if (bytes.length === 0) return lines;
 
+  const q = libMode ? '' : 'static ';
   lines.push('/* -- Packed Data Section -------------------------------------------- */');
   lines.push('/* All data labels packed into a single contiguous byte array matching');
   lines.push(' * 68k memory layout. Accessor macros provide typed pointer access. */');
   // Emit the byte array in rows of 16
-  lines.push(`static uint8_t _ds[${bytes.length}] = {`);
+  lines.push(`${q}uint8_t _ds[${bytes.length}] = {`);
   for (let i = 0; i < bytes.length; i += 16) {
     const row = bytes.slice(i, Math.min(i + 16, bytes.length));
     const hex = row.map(b => `0x${b.toString(16).padStart(2, '0')}`).join(',');
@@ -328,7 +332,8 @@ function emitDsInit(
   labelPatches: { offset: number; targetLabel: string; elemSize: number }[],
   isFunctionLabel: Set<string>,
   labelOffsets: Map<string, { offset: number; cType: string }>,
-  funcLabels: Set<string>
+  funcLabels: Set<string>,
+  libMode = false
 ): string[] {
   // Filter to only patches we can actually resolve: labels that are either
   // defined as C functions or exist as data labels in the _ds array.
@@ -341,9 +346,10 @@ function emitDsInit(
     return false;
   });
   if (patches.length === 0) return [];
+  const q = libMode ? '' : 'static ';
   const lines: string[] = [];
   lines.push('/* Patch DC.L label references with runtime addresses */');
-  lines.push('static void _ds_init(void) {');
+  lines.push(`${q}void _ds_init(void) {`);
   for (const p of patches) {
     const target = p.targetLabel;
     if (p.elemSize === 4) {
@@ -429,9 +435,14 @@ function collectUnresolved(ast: AstNode[], resolved: ResolveResult): Set<string>
 
 export interface EmitOptions {
   noFuncSplit?: boolean;
+  /** lib-mode: non-static registers/_ds/_ds_init + extern decls for AmigaOS calls.
+   *  Use when a separate harness TU provides the _LVOxxx/DEV_xxx shims and needs to
+   *  read/write the 68k register file directly (Amiga calling convention). */
+  libMode?: boolean;
 }
 export function emit(ast: AstNode[], resolved: ResolveResult, sourceFile?: string, options?: EmitOptions): string {
   const noFuncSplit = options?.noFuncSplit ?? false;
+  const libMode = options?.libMode ?? false;
   // ── Case-normalization pass ─────────────────────────────────────────────
   // The 68k assembler is case-insensitive, but C is not.  Build a map from
   // lowercase label/symbol name → actual casing as defined, then rewrite all
@@ -467,7 +478,7 @@ export function emit(ast: AstNode[], resolved: ResolveResult, sourceFile?: strin
   lines.push(' * Original ASM instructions appear as inline comments.');
   lines.push(' * ==================================================================== */');
   lines.push('');
-  lines.push(PREAMBLE);
+  lines.push(makePreamble(libMode));
 
   // EQU constants as #defines, grouped by prefix
   if (resolved.symbols.size > 0) {
@@ -513,9 +524,15 @@ export function emit(ast: AstNode[], resolved: ResolveResult, sourceFile?: strin
   if (valueStubs.size > 0 || callTargets.size > 0 || libCallTargets.size > 0) {
     lines.push('/* -- Unresolved Symbols -------------------------------------------- */');
     lines.push('/* These symbols come from include files not available to the transpiler. */');
-    // AmigaOS library/device call stubs — weak so a harness can override with real shims.
+    // AmigaOS library/device call stubs. In standalone mode: weak no-op stubs
+    // (override with the real exec/audio.device shims in a harness). In lib-mode:
+    // extern declarations only — the harness TU provides the definitions.
     for (const name of libCallTargets) {
-      lines.push(`__attribute__((weak)) void ${name}(void) {} /* AmigaOS lib/device call — override in harness */`);
+      if (libMode) {
+        lines.push(`extern void ${name}(void); /* AmigaOS lib/device call — defined in harness */`);
+      } else {
+        lines.push(`__attribute__((weak)) void ${name}(void) {} /* AmigaOS lib/device call — override in harness */`);
+      }
     }
     // Function stubs (BSR/JSR targets)
     for (const name of callTargets) {
@@ -580,7 +597,7 @@ export function emit(ast: AstNode[], resolved: ResolveResult, sourceFile?: strin
   // This guarantees correct relative addressing between data symbols (68k layout).
   const packed = collectPackedData(ast, isFunctionLabel, resolved.labels, resolved.symbols);
   const packedLabels = packed.labelOffsets;  // Map<name, { offset, cType }>
-  lines.push(...emitPackedDataSection(packed.bytes, packed.labelOffsets, packed.labelPatches, isFunctionLabel));
+  lines.push(...emitPackedDataSection(packed.bytes, packed.labelOffsets, packed.labelPatches, isFunctionLabel, libMode));
 
   // Labels that start real C functions: BSR/JSR call targets + XDEF exports.
   // Exports are entry points that external code calls directly -- they must be functions.
@@ -1083,9 +1100,42 @@ export function emit(ast: AstNode[], resolved: ResolveResult, sourceFile?: strin
         const xfLabel = xfOp?.kind === 'label_ref' ? xfOp.name
                       : xfOp?.kind === 'pc_rel'    ? xfOp.label
                       : null;
-        let c: string;
+        let c: string | undefined;
+        // Amiga indirect-call idiom: PEA return_label + MOVE.L fn_ptr, -(SP) + RTS.
+        // In 68k, RTS pops and jumps to the top of the stack (the fn_ptr), which then
+        // returns to return_label. Detect and emit as a proper C function-pointer call.
+        if (mn === 'PEA') {
+          const peaOp = node.operands[0];
+          const retLbl = peaOp?.kind === 'pc_rel'    ? peaOp.label
+                       : peaOp?.kind === 'label_ref' ? peaOp.name : null;
+          if (retLbl) {
+            let j = i + 1;
+            while (j < ast.length && ast[j].kind === 'comment') j++;
+            const nxt = j < ast.length ? ast[j] : null;
+            const nxtOps = nxt?.kind === 'instruction' ? (nxt as any).operands : null;
+            const isMoveLPreSP = nxt?.kind === 'instruction' && (nxt as any).mnemonic === 'MOVE'
+              && (nxt as any).size === 'L'
+              && nxtOps?.[1]?.kind === 'address' && nxtOps[1].mode === 'pre_dec' && nxtOps[1].reg === 'sp';
+            if (isMoveLPreSP) {
+              let k = j + 1;
+              while (k < ast.length && ast[k].kind === 'comment') k++;
+              const rtsNode = k < ast.length ? ast[k] : null;
+              if (rtsNode?.kind === 'instruction' && (rtsNode as any).mnemonic === 'RTS') {
+                // For label_ref/pc_rel sources, MOVE reads from memory — wrap in READ32.
+                const _fnPtrBase = emitOperand(nxtOps[0], 'L');
+                const fnPtrRead = (nxtOps[0].kind === 'label_ref' || nxtOps[0].kind === 'pc_rel')
+                  ? `READ32((uintptr_t)${_fnPtrBase})` : _fnPtrBase;
+                const safe = sanitizeLabel(retLbl);
+                const retPart = crossFuncGotos.has(retLbl) || funcLabels.has(retLbl)
+                  ? `${safe}(); return;` : `goto ${safe};`;
+                c = `((void(*)(void))(uintptr_t)(${fnPtrRead}))();\n  ${retPart}`;
+                i = k;  // consume MOVE + RTS — they are encoded in this one emit
+              }
+            }
+          }
+        }
         // Self-referencing branch: branch to the current function's own name → goto _top
-        if (xfLabel && xfLabel === currentFuncName) {
+        if (c === undefined && xfLabel && xfLabel === currentFuncName) {
           if (mn === 'BRA' || mn === 'JMP') {
             c = `goto _top;`;
           } else if (DBRANCH_MNEMS.has(mn)) {
@@ -1094,7 +1144,7 @@ export function emit(ast: AstNode[], resolved: ResolveResult, sourceFile?: strin
           } else {
             c = `if (${COND_BRANCH_CONDS[mn]}) goto _top;`;
           }
-        } else if (xfLabel && crossFuncGotos.has(xfLabel)) {
+        } else if (c === undefined && xfLabel && crossFuncGotos.has(xfLabel)) {
           const safe = sanitizeLabel(xfLabel);
           const cnt = node.operands[0] ? emitOperand(node.operands[0], 'W') : '';
           if (mn === 'BRA' || mn === 'JMP') {
@@ -1104,7 +1154,7 @@ export function emit(ast: AstNode[], resolved: ResolveResult, sourceFile?: strin
           } else {
             c = `if (${COND_BRANCH_CONDS[mn]}) { ${safe}(); return; }`;
           }
-        } else if (mn === 'JMP' && node.operands[0]?.kind === 'pc_rel' &&
+        } else if (c === undefined && mn === 'JMP' && node.operands[0]?.kind === 'pc_rel' &&
                    (node.operands[0] as any).index && !isFunctionLabel.has(node.operands[0].label)) {
           // JMP label(PC,Dn.W) where label is a data label — dc.w offset jump table.
           const jtLabel = node.operands[0].label;
@@ -1119,21 +1169,22 @@ export function emit(ast: AstNode[], resolved: ResolveResult, sourceFile?: strin
           } else {
             c = emitInstruction(node);  // fallback
           }
-        } else {
+        } else if (c === undefined) {
           c = emitInstruction(node);
         }
         // Add semantic branch comment for conditional branches
         const sem = BRANCH_SEMANTICS[mn];
         const branchSuffix = sem ? `  /* ${sem} */` : '';
+        const cStr = c ?? '';
         // For multi-line blocks, put ASM comment on the first line
-        if (c.includes('\n')) {
-          const cLines = c.split('\n');
+        if (cStr.includes('\n')) {
+          const cLines = cStr.split('\n');
           lines.push(`  ${cLines[0]}${asmComment}`);
           for (let k = 1; k < cLines.length; k++) {
             lines.push(`  ${cLines[k]}`);
           }
         } else {
-          lines.push(`  ${c}${branchSuffix}${asmComment}`);
+          lines.push(`  ${cStr}${branchSuffix}${asmComment}`);
         }
 
         // After an UNCONDITIONAL exit (RTS, indirect JMP, or a BRA/JMP tail-call that
@@ -1149,8 +1200,9 @@ export function emit(ast: AstNode[], resolved: ResolveResult, sourceFile?: strin
         // gotos/dbf between them. So gate on the mnemonic being unconditional, not on the
         // presence of `return;` in the emitted text.
         const isUnconditionalExit = mn === 'RTS'
-          || ((mn === 'BRA' || mn === 'JMP') && c.includes('return;'))  // tail-call → X(); return;
-          || ((mn === 'JMP') && node.operands[0]?.kind === 'address');  // JMP (An)
+          || ((mn === 'BRA' || mn === 'JMP') && cStr.includes('return;'))  // tail-call → X(); return;
+          || ((mn === 'JMP') && node.operands[0]?.kind === 'address')       // JMP (An)
+          || (mn === 'PEA' && cStr.includes('return;'));                     // PEA+MOVE+RTS indirect call
         if (isUnconditionalExit && inFunction && !noFuncSplit) {
           // Peek ahead: if the next meaningful node is a label, close this function
           // so the label becomes a new function.
@@ -1169,7 +1221,7 @@ export function emit(ast: AstNode[], resolved: ResolveResult, sourceFile?: strin
   if (inFunction) closeFunction();
 
   // Emit _ds_init at end of file (needs all function/data labels to be defined)
-  lines.push(...emitDsInit(packed.labelPatches, isFunctionLabel, packed.labelOffsets, funcLabels));
+  lines.push(...emitDsInit(packed.labelPatches, isFunctionLabel, packed.labelOffsets, funcLabels, libMode));
 
   if (resolved.warnings.length > 0) {
     lines.push('\n/* TRANSPILER WARNINGS:');
