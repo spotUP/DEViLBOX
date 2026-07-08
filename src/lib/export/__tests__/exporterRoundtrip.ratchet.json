@@ -212,7 +212,7 @@
       "exporter": "InStereo2Exporter.exportInStereo2",
       "tier": "pattern-data",
       "status": "pattern-match",
-      "matchPct": 0.9971,
+      "matchPct": 1,
       "cells": 5248,
       "bytes": 31452
     },
