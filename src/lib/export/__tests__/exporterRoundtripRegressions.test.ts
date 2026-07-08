@@ -297,6 +297,53 @@ describe('exporter round-trip regressions', () => {
     expect(matched).toBe(cells);
   });
 
+  it('DigiBooster export round-trips every representable cell; the only losses are octave -1 notes DBM0 cannot store', async () => {
+    const { parseDigiBoosterFile } = await import('@lib/import/formats/DigiBoosterParser');
+    const { exportDigiBooster } = await import('../DigiBoosterExporter');
+    const raw = fixture('public/data/songs/digibooster/the day after.digi');
+    const song = (await parseDigiBoosterFile(raw, 'the day after.digi')) as TrackerSong;
+    expect(song).not.toBeNull();
+    const out = await toU8(exportDigiBooster(song));
+    const re = (await parseDigiBoosterFile(out.buffer.slice(0) as ArrayBuffer, 'the day after.digi')) as TrackerSong;
+    expect(re).not.toBeNull();
+    // DBM0 (the export target) stores notes as `raw + 12`, so its lowest note is
+    // C-0 = app-note 13 (confirmed by OpenMPT Load_dbm.cpp: `note ... + 13`). App-notes
+    // 1..12 (octave -1) have no DBM0 encoding, so the exporter writes 0 for them and they
+    // re-parse as empty. Every other cell must round-trip exactly — a codec bug (wrong
+    // note offset, dropped instrument/effect) would corrupt cells whose note is >= 13 too.
+    let cells = 0, matched = 0, lostLowNote = 0, badMismatch = 0;
+    const pN = Math.min(song.patterns.length, re.patterns.length);
+    for (let p = 0; p < pN; p++) {
+      const ap = song.patterns[p], bp = re.patterns[p];
+      const cN = Math.min(ap.channels.length, bp.channels.length);
+      for (let c = 0; c < cN; c++) {
+        const ar = ap.channels[c]?.rows ?? [], br = bp.channels[c]?.rows ?? [];
+        const rN = Math.min(ar.length, br.length);
+        for (let r = 0; r < rN; r++) {
+          const x = ar[r] as TrackerCell, y = br[r] as TrackerCell;
+          if (!x || !y) continue;
+          cells++;
+          if (x.note === y.note && x.instrument === y.instrument && x.effTyp === y.effTyp && x.eff === y.eff) {
+            matched++;
+          } else if ((x.note ?? 0) >= 1 && (x.note ?? 0) <= 12 && (y.note ?? 0) === 0) {
+            // Sole permitted loss: an octave-(-1) note that DBM0 cannot represent.
+            lostLowNote++;
+          } else {
+            badMismatch++;
+          }
+        }
+      }
+    }
+    expect(cells).toBeGreaterThan(10000);
+    // No mismatch may be anything other than a dropped octave-(-1) note.
+    expect(badMismatch).toBe(0);
+    // The fixture has octave-(-1) bass notes, so this documents (not hides) the floor.
+    expect(lostLowNote).toBeGreaterThan(0);
+    // True max for this cross-format bake: everything except the unrepresentable notes.
+    expect(matched / cells).toBeGreaterThanOrEqual(0.9994);
+    expect(matched + lostLowNote).toBe(cells);
+  });
+
   it('NRU export writes the full 0..255 note byte and the 0x0C empty-effect slot (was dropping notes >72 and forcing tone-porta)', async () => {
     const { parseNRUFile } = await import('@lib/import/formats/NRUParser');
     const { exportNRU } = await import('../NRUExporter');
