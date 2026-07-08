@@ -232,6 +232,22 @@ describe('exporter round-trip regressions', () => {
     expect(matched / cells).toBeGreaterThan(0.99);
   });
 
+  it('FredEditor export preserves PCM-instrument vibrato/arpeggio so sample notes keep their synthesised effects (was dropping effTyp 4)', async () => {
+    const { parseFredEditorFile } = await import('@lib/import/formats/FredEditorParser');
+    const { exportFredEditor } = await import('../FredEditorExporter');
+    const raw = fixture('public/data/songs/formats/bomb jack.fred');
+    const song = await parseFredEditorFile(raw, 'bomb jack.fred');
+    const out = await toU8(await exportFredEditor(song));
+    const re = await parseFredEditorFile(out.buffer.slice(0) as ArrayBuffer, 'bomb jack.fred');
+    // Vibrato/arpeggio on sample notes are synthesised by the parser from the sample
+    // descriptor (effTyp 0x04 / 0x00). PCM instruments never carried those fields, so the
+    // exporter wrote zeros and every sample-note vibrato was lost on reload. The parser now
+    // attaches them via inst.fred and the exporter's PCM branch writes them back.
+    const { cells, matched } = cellMatch(song, re);
+    expect(cells).toBeGreaterThan(60000);
+    expect(matched).toBe(cells);
+  });
+
   it('InStereo2 export encodes xmNote 0 as raw note index 36 so note-0 cells keep their instrument (was writing raw 0 = empty row)', async () => {
     const { parseInStereo2File } = await import('@lib/import/formats/InStereo2Parser');
     const { exportInStereo2 } = await import('../InStereo2Exporter');

@@ -140,7 +140,7 @@
       "exporter": "FredEditorExporter.exportFredEditor",
       "tier": "pattern-data",
       "status": "pattern-match",
-      "matchPct": 0.9994,
+      "matchPct": 1,
       "cells": 65312,
       "bytes": 11080
     },
