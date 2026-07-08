@@ -208,6 +208,15 @@ export const amigaSynthEntries: Record<string, SynthInfo> = {
     icon: 'Disc',
     color: 'text-text-secondary',
   },
+  MaxTraxSynth: {
+    type: 'MaxTraxSynth',
+    name: 'MaxTrax',
+    shortName: 'MXTX',
+    description: 'Amiga MaxTrax — MIDI-like event format with PCM sample bank (transpiled 68k replayer + Paula emulation)',
+    bestFor: ['Amiga', 'MIDI', 'Tracker'],
+    icon: 'Disc',
+    color: 'text-text-secondary',
+  },
   FuturePlayerSynth: {
     type: 'FuturePlayerSynth',
     name: 'Future Player',

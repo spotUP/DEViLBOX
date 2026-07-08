@@ -212,7 +212,7 @@ const LOFI_SYNTHS = new Set([
   'ChipSynth','SidMonSynth','SidMon1Synth','FCSynth','FredSynth',
   'TFMXSynth','Furnace','ChiptuneModule','HippelCoSoSynth',
   'SoundMonSynth','DigMugSynth','DeltaMusic1Synth','DeltaMusic2Synth',
-  'SonicArrangerSynth','JamCrackerSynth','PreTrackerSynth','FuturePlayerSynth','OctaMEDSynth',
+  'SonicArrangerSynth','JamCrackerSynth','MaxTraxSynth','PreTrackerSynth','FuturePlayerSynth','OctaMEDSynth',
 ]);
 
 export function detectLoFiSources(

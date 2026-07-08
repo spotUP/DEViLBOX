@@ -255,6 +255,7 @@ export type SynthType =
   | 'InStereo2Synth'     // InStereo! 2.0 (wavetable synthesis + ADSR/LFO/EG tables)
   | 'InStereo1Synth'     // InStereo! 1.0 (wavetable synthesis + ADSR/EGC tables)
   | 'JamCrackerSynth' // JamCracker Pro (transpiled 68k replayer + Paula emulation WASM)
+  | 'MaxTraxSynth'   // MaxTrax (transpiled 68k replayer + Paula emulation WASM)
   | 'PreTrackerSynth' // PreTracker (transpiled 68k replayer + Paula emulation WASM)
   | 'FuturePlayerSynth' // Future Player (transpiled 68k replayer + Paula emulation WASM)
   | 'KlysSynth'       // Klystrack chiptune synth (klystron WASM engine)

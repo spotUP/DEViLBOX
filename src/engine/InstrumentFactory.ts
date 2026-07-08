@@ -16,6 +16,7 @@ import { HivelySynth } from './hively/HivelySynth';
 import { GTUltraSynth } from './gtultra/GTUltraSynth';
 import { KlysSynth } from './klystrack/KlysSynth';
 import { JamCrackerSynth } from './jamcracker/JamCrackerSynth';
+import { MaxTraxSynth } from './maxtrax/MaxTraxSynth';
 import { PreTrackerSynth } from './pretracker/PreTrackerSynth';
 import { SoundMonSynth } from './soundmon/SoundMonSynth';
 import { SidMonSynth } from './sidmon/SidMonSynth';
@@ -675,6 +676,10 @@ export class InstrumentFactory {
         instrument = jcSynth;
         break;
       }
+
+      case 'MaxTraxSynth':
+        instrument = new MaxTraxSynth();
+        break;
 
       case 'PreTrackerSynth':
         instrument = new PreTrackerSynth();
