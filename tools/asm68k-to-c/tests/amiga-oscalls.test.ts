@@ -55,6 +55,38 @@ Routine:
   expect(out).not.toContain('#define _LVOOpenDevice 0');
 });
 
+// Regression: Amiga STRUCTURE offset macros compute sequential field offsets
+// (and honor plain-EQU sizes in STRUCT expressions), so struct-field displacement
+// accesses resolve instead of leaving symbols undefined.
+test('expands STRUCTURE offset macros into EQU offsets', () => {
+  const src = `
+NVOICES\tequ\t2
+\tSTRUCTURE\tThing,0
+\tWORD\tt_count
+\tBYTE\tt_flag
+\tAPTR\tt_ptr
+\tSTRUCT\tt_buf,4*NVOICES
+\tLABEL\tt_SIZEOF
+
+Routine:
+\tmove.w\tt_count(a0),d0
+\tmove.b\tt_flag(a0),d1
+\tmove.l\tt_ptr(a0),a1
+\trts
+`;
+  const out = transpile(src);
+  // Sequential offsets (Amiga STRUCTURE does not auto-align): WORD@0, BYTE@2,
+  // APTR@3, STRUCT(4*NVOICES=8)@7, SIZEOF@15.
+  expect(out).toContain('#define t_count 0');
+  expect(out).toContain('#define t_flag 2');
+  expect(out).toContain('#define t_ptr 3');
+  expect(out).toContain('#define t_buf 7');
+  expect(out).toContain('#define t_SIZEOF 15');
+  // Field accesses resolve to displacement READs, not undefined symbols.
+  expect(out).toContain('READ16(a0 + (intptr_t)t_count)');
+  expect(out).toContain('READ32(a0 + (intptr_t)t_ptr)');
+});
+
 // Regression: dot-local labels are scoped to their enclosing global label, so
 // the same `.loop` in two routines does not collide into one C label.
 test('scopes dot-local labels per enclosing global label', () => {
