@@ -85,7 +85,26 @@ cc -c -I tools/asm68k-to-c/runtime -o /tmp/mxtx.o maxtrax-wasm/src/generated/max
 ```
 (generated C is gitignored; maxtrax_defs.i IS committed.)
 
-### REMAINING 7 compile errors = distinct transpiler parser bugs (source lines)
+### UPDATE (session 2 cont.): errors now 5. Committed since:
+- 23c25ec2a STRUCTURE + defs (11->7)
+- (immediate fix) symbolic/complement immediates #~FLAG / #~(A|B|C): lexer reads
+  full immediate expr, immValue translates NaN symbolic exprs to C; +ADIOF_PERVOL
+  in defs. (7->5)
+REMAINING 5 = two classes:
+- 4× "expression is not assignable" — IDENTIFIER arithmetic in an address/displacement
+  operand splits into extra operands (emitter treats the offset symbol as an lvalue):
+    max.asm:292  lea 3*NUM_VOICES*ioa_SIZEOF(a1),a1   (num*ident*ident displacement)
+    max.asm:1256 lea _voice+voice_Channel,a0          (ident+ident address)
+    max.asm:2191 lea _globaldata+glob_NoteOff,a0       (ident+ident address)
+    max.asm:2298 MULU.W (macro mulu.w #\1,\2 @ line 111) — verify macro expansion
+  FIX: lexer combines NUMBER∘NUMBER (lexer.ts ~606/621) but NOT identifiers — extend
+  to read a full symbolic operand expression (idents/nums/operators [+ - * / << >> & | ^]
+  and optional trailing (reg)) as ONE token; emit compound label refs via castOffsetExpr
+  (instr-map) which already casts identifiers for +/- address math.
+- 1× duplicate dot-local label `.l40` in ONE scope (max.asm:2409 + 2526, routine has no
+  intervening global): needs per-definition uniquification of repeated locals.
+
+### (historical) 7 compile errors at start of session 2 — parser bugs (source lines)
 1. LEA with `*` in displacement expr: max.asm:292 `lea 3*NUM_VOICES*ioa_SIZEOF(a1),a1`
    -> parser splits the multiplied displacement into bogus operands.
 2. AND.B with complement/or immediate: max.asm:1253 `and.b #~MUSIC_VELOCITY,glob_Flags(a4)`
