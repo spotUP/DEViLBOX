@@ -362,8 +362,21 @@ function tokenizeLine(src: string, lineNum: number): Token[] {
         if (i < src.length) i++; // consume closing backtick
         immVal = `#$${(fourcc >>> 0).toString(16).toUpperCase()}`;
       } else {
-        // #identifier (e.g. #DMACON)
-        immVal += readIdent();
+        // General expression immediate: identifiers + bitwise/arith operators +
+        // parens (e.g. #DMACON, #~MUSIC_VELOCITY, #~(A|B|C), #FLAG1|FLAG2).
+        // Read the full contiguous expression up to a top-level comma / whitespace
+        // / comment so operators like ~ | & ^ << >> don't split the operand.
+        let depth = 0;
+        const exprStart = i;
+        while (i < src.length) {
+          const c = src[i];
+          if (c === '(') { depth++; i++; continue; }
+          if (c === ')') { if (depth === 0) break; depth--; i++; continue; }
+          if (depth === 0 && (c === ',' || c === ' ' || c === '\t' || c === ';')) break;
+          if (!/[A-Za-z0-9_.$%~|&^+\-*/<>]/.test(c)) break;
+          i++;
+        }
+        immVal += src.slice(exprStart, i);
       }
       tokens.push(tok('IMMEDIATE', immVal, col));
       isFirstToken = false;

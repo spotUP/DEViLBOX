@@ -80,8 +80,16 @@ function immValue(op: { value: number; raw: string }): string {
   // Symbolic identifier (e.g. #EPR_CorruptModule) — value is NaN, use the name directly.
   // Compound expressions (#label+16, #label1-label2) need each identifier cast.
   if (Number.isNaN(op.value)) {
-    if (/[+\-]/.test(stripped) && /[A-Za-z_]/.test(stripped)) {
+    const hasBitwise = /[~|&^]/.test(stripped) || /<<|>>/.test(stripped);
+    // Address math with labels (#label+16, #a-b) needs pointer casts — but not
+    // when bitwise operators are present (those are plain integer flag exprs).
+    if (/[+\-]/.test(stripped) && /[A-Za-z_]/.test(stripped) && !hasBitwise) {
       return castOffsetExpr(stripped);
+    }
+    // General integer expression (flags: #~A, #A|B|C): translate 68k hex/bin
+    // literals to C; symbols are #defined ints, operators are shared with C.
+    if (hasBitwise) {
+      return '(' + stripped.replace(/\$([0-9A-Fa-f]+)/g, '0x$1').replace(/%([01]+)/g, '0b$1') + ')';
     }
     return stripped;
   }

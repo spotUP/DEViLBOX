@@ -87,6 +87,24 @@ Routine:
   expect(out).toContain('READ32(a0 + (intptr_t)t_ptr)');
 });
 
+// Regression: immediate operands with bitwise/complement expressions must not
+// split at the operator (#~FLAG lexed as `#` + `FLAG` dropped the value -> `& )`).
+test('handles complement/or immediates (#~FLAG, #~(A|B|C))', () => {
+  const src = `
+FLAG_A\tequ\t(1<<0)
+FLAG_B\tequ\t(1<<1)
+FLAG_C\tequ\t(1<<2)
+Routine:
+\tand.b\t#~FLAG_A,d0
+\tand.b\t#~(FLAG_A|FLAG_B|FLAG_C),d1
+\trts
+`;
+  const out = transpile(src);
+  expect(out).toContain('~FLAG_A');
+  expect(out).toContain('~(FLAG_A|FLAG_B|FLAG_C)');
+  expect(out).not.toMatch(/&\s*\)/); // no empty right-hand operand
+});
+
 // Regression: dot-local labels are scoped to their enclosing global label, so
 // the same `.loop` in two routines does not collide into one C label.
 test('scopes dot-local labels per enclosing global label', () => {
