@@ -653,6 +653,22 @@ function tokenizeLine(src: string, lineNum: number): Token[] {
       continue;
     }
 
+    // -- Preserve arithmetic/bitwise operators between operand tokens --
+    // Pure number∘number was already folded to a single NUMBER above. Symbolic
+    // expressions (e.g. _voice+voice_Channel, 3*NUM_VOICES*ioa_SIZEOF) must keep
+    // their operators as tokens so the parser can combine the chain into one
+    // compound operand instead of splitting it into several.
+    if ((ch === '+' || ch === '-' || ch === '*' || ch === '/' ||
+         ch === '&' || ch === '|' || ch === '^') &&
+        tokens.length > 0 &&
+        (tokens[tokens.length - 1].kind === 'IDENTIFIER' ||
+         tokens[tokens.length - 1].kind === 'NUMBER' ||
+         tokens[tokens.length - 1].kind === 'DISP_REG')) {
+      advance();
+      tokens.push(tok('OPERATOR', ch, col));
+      continue;
+    }
+
     // -- Unknown character: skip --
     advance();
   }
