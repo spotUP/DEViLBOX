@@ -2174,7 +2174,7 @@ export class TrackerReplayer {
     {
       const nativeWholePlayerTypes = new Set([
         'HivelySynth', 'UADESynth', 'UADEEditableSynth', 'SymphonieSynth',
-        'MusicLineSynth', 'JamCrackerSynth', 'PreTrackerSynth', 'FuturePlayerSynth',
+        'MusicLineSynth', 'JamCrackerSynth', 'MaxTraxSynth', 'PreTrackerSynth', 'FuturePlayerSynth',
         'TFMXSynth', 'FCSynth', 'C64SID',
         // OPL3: AdPlug streaming player handles audio when adplugFileData is present.
         // The replayer displays patterns and follows position — same as UADE editable.

@@ -1005,7 +1005,7 @@ export class ToneEngine {
     // Creating a standalone player per instrument exhausts the WASM player pool.
     const nativePlayerTypes = new Set([
       'HivelySynth', 'UADESynth', 'UADEEditableSynth', 'SymphonieSynth',
-      'MusicLineSynth', 'JamCrackerSynth', 'PreTrackerSynth', 'FuturePlayerSynth',
+      'MusicLineSynth', 'JamCrackerSynth', 'MaxTraxSynth', 'PreTrackerSynth', 'FuturePlayerSynth',
       'TFMXSynth', 'FCSynth', 'C64SID',
       // WASM player-pool synths — each has a fixed-size pool, must dedup
       'SoundMonSynth', 'SidMonSynth', 'SidMon1Synth', 'DigMugSynth',
@@ -1212,7 +1212,7 @@ export class ToneEngine {
        'SoundMonSynth', 'SidMonSynth', 'DigMugSynth', 'FCSynth', 'FredSynth', 'TFMXSynth',
        'OctaMEDSynth', 'SidMon1Synth', 'HippelCoSoSynth', 'RobHubbardSynth', 'SteveTurnerSynth', 'FredEditorReplayerSynth', 'DavidWhittakerSynth',
        'SonicArrangerSynth', 'InStereo2Synth', 'InStereo1Synth', 'DeltaMusic1Synth', 'DeltaMusic2Synth',
-       'StartrekkerAMSynth', 'SunVoxSynth', 'JamCrackerSynth', 'PreTrackerSynth', 'FuturePlayerSynth',
+       'StartrekkerAMSynth', 'SunVoxSynth', 'JamCrackerSynth', 'MaxTraxSynth', 'PreTrackerSynth', 'FuturePlayerSynth',
        'KlysSynth', 'WaveSabreSynth', 'OidosSynth', 'TunefishSynth', 'OPL3'].includes(c.synthType || '') ||
       c.synthType?.startsWith('Furnace')
     );
@@ -1223,7 +1223,7 @@ export class ToneEngine {
     // is a singleton that handles all channels internally.
     const seenNativePlayers = new Set<string>();
     const deduped = wasmConfigs.filter(c => {
-      if (c.synthType === 'HivelySynth' || c.synthType === 'UADESynth' || c.synthType === 'UADEEditableSynth' || c.synthType === 'SymphonieSynth' || c.synthType === 'MusicLineSynth' || c.synthType === 'JamCrackerSynth' || c.synthType === 'PreTrackerSynth' || c.synthType === 'FuturePlayerSynth' || c.synthType === 'TFMXSynth' || c.synthType === 'FCSynth' || c.synthType === 'C64SID'
+      if (c.synthType === 'HivelySynth' || c.synthType === 'UADESynth' || c.synthType === 'UADEEditableSynth' || c.synthType === 'SymphonieSynth' || c.synthType === 'MusicLineSynth' || c.synthType === 'JamCrackerSynth' || c.synthType === 'MaxTraxSynth' || c.synthType === 'PreTrackerSynth' || c.synthType === 'FuturePlayerSynth' || c.synthType === 'TFMXSynth' || c.synthType === 'FCSynth' || c.synthType === 'C64SID'
         || c.synthType === 'SoundMonSynth' || c.synthType === 'SidMonSynth' || c.synthType === 'SidMon1Synth' || c.synthType === 'DigMugSynth'
         || c.synthType === 'FredSynth' || c.synthType === 'FredEditorReplayerSynth' || c.synthType === 'OctaMEDSynth'
         || c.synthType === 'HippelCoSoSynth' || c.synthType === 'RobHubbardSynth' || c.synthType === 'SteveTurnerSynth'
@@ -1733,7 +1733,7 @@ export class ToneEngine {
       // to avoid exhausting fixed player-handle pools across channels.
       'TB303', 'Buzz3o3', 'V2', 'V2Speech', 'Sam', 'DECtalk', 'PinkTrombone', 'DubSiren', 'SpaceLaser', 'Synare', 'WAM',
       'TR808', 'TR909',
-      'SonicArrangerSynth', 'InStereo2Synth', 'InStereo1Synth', 'JamCrackerSynth', 'PreTrackerSynth', 'FuturePlayerSynth',
+      'SonicArrangerSynth', 'InStereo2Synth', 'InStereo1Synth', 'JamCrackerSynth', 'MaxTraxSynth', 'PreTrackerSynth', 'FuturePlayerSynth',
       'SoundMonSynth', 'SidMonSynth', 'SidMon1Synth',
       'DigMugSynth', 'DeltaMusic1Synth', 'DeltaMusic2Synth',
       'FCSynth', 'TFMXSynth', 'MusicLineSynth', 'SymphonieSynth', 'SunVoxSynth',
@@ -1811,7 +1811,7 @@ export class ToneEngine {
     // Singleton WASM engine synths: FuturePlayer and JamCracker engines are singletons.
     // Reuse any existing instance of the same synthType (just update the instrument pointer/index).
     // This avoids creating disconnected synth instances that can't route audio.
-    if (config.synthType === 'FuturePlayerSynth' || config.synthType === 'JamCrackerSynth' || config.synthType === 'PreTrackerSynth') {
+    if (config.synthType === 'FuturePlayerSynth' || config.synthType === 'JamCrackerSynth' || config.synthType === 'MaxTraxSynth' || config.synthType === 'PreTrackerSynth') {
       for (const [existingKey, existingSynth] of this.instruments) {
         const storedType = this.instrumentSynthTypes.get(existingKey);
         if (storedType === config.synthType && existingSynth) {
@@ -2488,6 +2488,7 @@ export class ToneEngine {
       case 'SymphonieSynth':
       case 'MusicLineSynth':
       case 'JamCrackerSynth':
+      case 'MaxTraxSynth':
       case 'PreTrackerSynth':
       case 'FuturePlayerSynth':
       // Klystrack chiptune synth

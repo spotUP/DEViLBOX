@@ -95,6 +95,10 @@ export function parseMaxTraxFile(buffer: ArrayBuffer, filename: string): Tracker
   if (instruments.length === 0) {
     instruments.push({ id: 1, name: 'Sample 0', type: 'synth' as const, synthType: 'Synth' as const, effects: [], volume: 0, pan: 0 } as InstrumentConfig);
   }
+
+  // MaxTraxSynth control instrument appended at end — gives NativeEngineRouting a handle to wire
+  // the WASM engine. High ID (255) avoids collision with sample IDs (which start at 1).
+  instruments.push({ id: 255, name: 'MaxTrax Engine', type: 'synth' as const, synthType: 'MaxTraxSynth' as const, effects: [], volume: 0, pan: 0 } as InstrumentConfig);
   const validIds = new Set(instruments.map((i) => i.id));
   const firstId = instruments[0].id;
   const patchToId = (patch: number): number => (validIds.has(patch + 1) ? patch + 1 : firstId);
