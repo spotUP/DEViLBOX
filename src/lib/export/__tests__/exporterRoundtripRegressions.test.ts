@@ -232,6 +232,20 @@ describe('exporter round-trip regressions', () => {
     expect(matched / cells).toBeGreaterThan(0.99);
   });
 
+  it('PumaTracker export writes order speed 0 for patterns without a set-speed effect (was injecting a spurious F06 on every pattern)', async () => {
+    const { parsePumaTrackerFile } = await import('@lib/import/formats/PumaTrackerParser');
+    const { exportPumaTrackerFile } = await import('../PumaTrackerExporter');
+    const raw = fixture('public/data/songs/pumatracker/liquid kids - lv1a.puma');
+    const song = await parsePumaTrackerFile(raw, 'liquid kids - lv1a.puma');
+    const out = await toU8(exportPumaTrackerFile(song));
+    const re = await parsePumaTrackerFile(out.buffer.slice(0) as ArrayBuffer, 'liquid kids - lv1a.puma');
+    // The parser injects F<speed> at ch0/row0 only when the order speed byte > 0.
+    // Defaulting missing speed to 6 injected F06 into every speed-less pattern.
+    const { cells, matched } = cellMatch(song, re);
+    expect(cells).toBeGreaterThan(1000);
+    expect(matched).toBe(cells);
+  });
+
   it('SoundFactory export pre-defines the full instrument table in id order so instrument references survive (was remapping/dropping ids)', async () => {
     const { parseSoundFactoryFile } = await import('@lib/import/formats/SoundFactoryParser');
     const { exportSoundFactory } = await import('../SoundFactoryExporter');
