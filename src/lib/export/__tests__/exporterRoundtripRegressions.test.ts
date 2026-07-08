@@ -232,6 +232,23 @@ describe('exporter round-trip regressions', () => {
     expect(matched / cells).toBeGreaterThan(0.99);
   });
 
+  it('InStereo2 export encodes xmNote 0 as raw note index 36 so note-0 cells keep their instrument (was writing raw 0 = empty row)', async () => {
+    const { parseInStereo2File } = await import('@lib/import/formats/InStereo2Parser');
+    const { exportInStereo2 } = await import('../InStereo2Exporter');
+    const raw = fixture('public/data/songs/instereo!-2.0/spaceflight.is20');
+    const song = parseInStereo2File(new Uint8Array(raw), 'spaceflight.is20');
+    expect(song).not.toBeNull();
+    const out = await toU8(await exportInStereo2(song as TrackerSong));
+    const re = parseInStereo2File(out, 'spaceflight.is20');
+    expect(re).not.toBeNull();
+    // The parser maps period-table index 36 to xmNote 0 (36-36) and only drops a row
+    // when the RAW note byte is 0. The exporter special-cased xmNote 0 -> raw 0, so a
+    // note-0 cell carrying an instrument re-parsed as a fully-empty row (instrument 0).
+    const { cells, matched } = cellMatch(song as TrackerSong, re as TrackerSong);
+    expect(cells).toBeGreaterThan(4000);
+    expect(matched).toBe(cells);
+  });
+
   it('PumaTracker export writes order speed 0 for patterns without a set-speed effect (was injecting a spurious F06 on every pattern)', async () => {
     const { parsePumaTrackerFile } = await import('@lib/import/formats/PumaTrackerParser');
     const { exportPumaTrackerFile } = await import('../PumaTrackerExporter');
