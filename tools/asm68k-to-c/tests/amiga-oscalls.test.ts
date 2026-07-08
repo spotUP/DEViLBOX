@@ -105,6 +105,46 @@ Routine:
   expect(out).not.toMatch(/&\s*\)/); // no empty right-hand operand
 });
 
+// Regression: identifier arithmetic in an address/displacement operand must be
+// combined into one operand (previously split -> emitter treated the offset
+// symbol as an lvalue -> "expression is not assignable").
+test('combines identifier arithmetic in address operands', () => {
+  const src = `
+NVOICES\tequ\t4
+\tSTRUCTURE\tVoice,0
+\tLONG\tv_chan
+\tLABEL\tv_sizeof
+_voice\tequ\t0
+Routine:
+\tlea\t_voice+v_chan,a0
+\tlea\t3*NVOICES*v_sizeof(a1),a1
+\trts
+`;
+  const out = transpile(src);
+  // Compound address expr resolves (no bare split operand, no assignment to a const).
+  expect(out).toContain('_voice+v_chan');
+  expect(out).not.toMatch(/v_chan\s*=/);   // v_chan (a #define) is never an lvalue
+});
+
+// Regression: conditional assembly (ifne/ifeq/else/endc) must drop inactive
+// branches — otherwise both arms are emitted (duplicate labels / dead code).
+test('evaluates ifne/ifeq conditional assembly', () => {
+  const src = `
+FEATURE\tequ\t0
+Routine:
+\tmoveq\t#1,d0
+\tifne\tFEATURE
+\tmoveq\t#99,d0
+\telse
+\tmoveq\t#42,d0
+\tendc
+\trts
+`;
+  const out = transpile(src);
+  expect(out).toContain('42');       // else branch (FEATURE=0) kept
+  expect(out).not.toContain('99');   // ifne branch dropped
+});
+
 // Regression: dot-local labels are scoped to their enclosing global label, so
 // the same `.loop` in two routines does not collide into one C label.
 test('scopes dot-local labels per enclosing global label', () => {
