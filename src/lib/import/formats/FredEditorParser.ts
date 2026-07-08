@@ -532,6 +532,34 @@ export async function parseFredEditorFile(
           loopEnd
         );
         instr.uadeChipRam = chipRam;
+        // PCM sample notes still carry instrument-level vibrato / arpeggio / envelope,
+        // which the pattern decoder synthesises into each note cell (effTyp 0x04 vibrato,
+        // effTyp 0x00 arpeggio; see the note-trigger block below). Preserve those raw
+        // sample-descriptor fields on the config so the exporter can write them back —
+        // otherwise the round-trip drops every vibrato/arpeggio effect on sample notes.
+        instr.fred = {
+          envelopeVol:   sample.envelopeVol,
+          attackSpeed:   sample.attackSpeed,
+          attackVol:     sample.attackVol,
+          decaySpeed:    sample.decaySpeed,
+          decayVol:      sample.decayVol,
+          sustainTime:   sample.sustainTime,
+          releaseSpeed:  sample.releaseSpeed,
+          releaseVol:    sample.releaseVol,
+          vibratoDelay:  sample.vibratoDelay,
+          vibratoSpeed:  sample.vibratoSpeed,
+          vibratoDepth:  sample.vibratoDepth,
+          arpeggio:      Array.from(sample.arpeggio),
+          arpeggioLimit: sample.arpeggioLimit,
+          arpeggioSpeed: sample.arpeggioSpeed,
+          pulseRateNeg:  sample.pulseRateNeg,
+          pulseRatePos:  sample.pulseRatePos,
+          pulseSpeed:    sample.pulseSpeed,
+          pulsePosL:     sample.pulsePosL,
+          pulsePosH:     sample.pulsePosH,
+          pulseDelay:    sample.pulseDelay,
+          relative:      sample.relative,
+        };
         instruments.push(instr);
       } else {
         const instr = makePlaceholderInstrument(instId, name);
