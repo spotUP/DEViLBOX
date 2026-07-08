@@ -2,12 +2,11 @@
  * MaxTraxParser.ts — MaxTrax (MXTX) native import.
  *
  * MaxTrax is a MIDI-like event format (see maxtrax/maxtraxFormat.ts for the lossless codec).
- * UADE cannot play it in this build (ret=-1), so it's handled natively: this parser decodes
- * the scores into a QUANTIZED tracker-pattern view with real Sampler instruments (played by
- * the native tracker engine), and stores the raw file bytes in maxTraxFileData so export
- * round-trips byte-exactly via encodeMaxTrax (dispatched by the MXTX magic in
- * nativeExportRouter). maxTraxFileData is deliberately NOT uadeEditableFileData — that field
- * routes playback to UADEEditableSynth, which fails (ret=-1) and silences the song.
+ * UADE cannot play it (ret=-1).  Audio is handled by the MaxTraxEngine WASM replayer, which
+ * is activated whenever maxTraxFileData is present (NativeEngineRouting entry, formats:null).
+ * The parser also decodes scores into a quantized tracker-pattern view with Sampler
+ * instruments so the pattern editor has something to display.
+ * maxTraxFileData is deliberately NOT uadeEditableFileData — that field routes to UADE.
  *
  * Score events (6-byte CookedEvent): command 0x00-0x7F = MIDI note (data = velocity<<... | chan,
  * startTime/stopTime in ticks); 0x80 tempo, 0xA0 special, 0xB0 CC, 0xC0 prog, 0xE0 bend, 0xFF end.
@@ -130,12 +129,9 @@ export function parseMaxTraxFile(buffer: ArrayBuffer, filename: string): Tracker
     initialSpeed: 6,
     initialBPM: data.tempo || 125,
     linearPeriods: false,
-    // Samples are quantized to a tracker grid with no WASM replayer, so the TS
-    // scheduler must trigger the Sampler instruments directly.
-    nativeSamplePlayback: true,
-    // Raw bytes for byte-exact export only. Deliberately NOT uadeEditableFileData:
-    // that field routes playback to UADEEditableSynth, but UADE cannot play MaxTrax
-    // (ret=-1) → silence. MaxTrax plays natively via the Sampler instruments below.
+    // Raw bytes for lossless export (dispatched on MXTX magic in nativeExportRouter)
+    // and for the WASM replayer (MaxTraxEngine) which drives all audio.
+    // Deliberately NOT uadeEditableFileData: UADE cannot play MaxTrax (ret=-1).
     maxTraxFileData: buffer.slice(0) as ArrayBuffer,
     maxTraxFileName: filename,
   };

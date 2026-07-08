@@ -241,6 +241,23 @@ const WASM_ENGINES: NativeEngineDescriptor[] = [
     dynamicResolver: async () => (await import('@/engine/sonix/SonixEngine')).SonixEngine as unknown as WASMSingletonStatic,
   },
   {
+    key: 'MaxTrax',
+    synthType: 'MaxTraxSynth',
+    suppressNotes: true,
+    fileDataKey: 'maxTraxFileData',
+    // Activate whenever maxTraxFileData exists (set by MaxTraxParser).
+    // The WASM replayer drives all audio; the tracker scheduler must not
+    // also trigger the Sampler instruments that the parser decoded for display.
+    formats: null,
+    loadMethod: 'loadTune',
+    getLoadArgs: () => [0], // score 0 = first sub-song
+    supportsPause: false,
+    supportsResume: false,
+    needsDirectRouting: true,
+    staticRef: null,
+    dynamicResolver: async () => (await import('@/engine/maxtrax/MaxTraxEngine')).MaxTraxEngine as unknown as WASMSingletonStatic,
+  },
+  {
     key: 'Pxtone',
     synthType: 'PxtoneSynth',
     suppressNotes: true,
