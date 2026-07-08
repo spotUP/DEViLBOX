@@ -92,6 +92,9 @@ ADCMD_WAITCYCLE		equ		14
 * IORequest / audio io flags
 IOF_QUICK			equ		(1<<0)
 IOF_PERVOL			equ		(1<<4)
+ADIOF_PERVOL		equ		(1<<4)
+ADIOF_SYNCCYCLE		equ		(1<<5)
+ADIOF_NOWAIT		equ		(1<<3)
 
 * exec/memory.i memory flags
 MEMF_PUBLIC			equ		(1<<0)
