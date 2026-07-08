@@ -20,6 +20,7 @@
 export function preProcess(source: string): string {
   let lines = source.split('\n');
   lines = expandRept(lines);
+  lines = expandStructures(lines);
   const { macros, stripped } = collectMacros(lines);
   lines = expandMacros(stripped, macros);
   lines = expandEquDisplacements(lines);
@@ -56,6 +57,84 @@ function expandRept(lines: string[]): string[] {
     }
   }
   return result;
+}
+
+// ── 1b. Amiga STRUCTURE offset-macro expansion ───────────────────────────
+//
+// The Amiga NDK defines struct offsets via a running SOFFSET counter (see
+// exec/types.i): `STRUCTURE name,start` seeds it, then WORD/BYTE/APTR/LONG/…
+// each emit `label EQU SOFFSET` and bump SOFFSET by the field size. We handle
+// these as built-in directives (converting them to plain EQUs) so struct-heavy
+// includes (driver.i, maxtrax.i, devices/audio.i) resolve without needing the
+// SET-based macro machinery. Runs before macro collection so the field
+// keywords are never treated as macro invocations or stray instructions.
+
+const STRUCT_FIELD_SIZE: Record<string, number> = {
+  FPTR: 4, APTR: 4, CPTR: 4, LONG: 4, ULONG: 4, FLOAT: 4,
+  BOOL: 2, WORD: 2, UWORD: 2, SHORT: 2, USHORT: 2, RPTR: 2,
+  BYTE: 1, UBYTE: 1, DOUBLE: 8,
+};
+
+function expandStructures(lines: string[]): string[] {
+  const out: string[] = [];
+  const consts = new Map<string, number>();
+  let soffset = 0;
+  for (const raw of lines) {
+    const code = stripComment(raw).trim();
+
+    // Track plain constants so STRUCT sizes / STRUCTURE starts referencing them resolve.
+    let m = code.match(/^([A-Za-z_]\w*)\s+(?:equ|set)\s+(.+)$/i)
+         || code.match(/^([A-Za-z_]\w*)\s*=\s*(.+)$/);
+    if (m) {
+      const v = evalConst(m[2], consts);
+      if (!isNaN(v)) consts.set(m[1], v);
+      out.push(raw);
+      continue;
+    }
+
+    // STRUCTURE name,startOffset  → base label = 0, seed SOFFSET
+    m = code.match(/^STRUCTURE\s+([A-Za-z_]\w*)\s*,\s*(.+)$/i);
+    if (m) {
+      const start = evalConst(m[2], consts);
+      soffset = isNaN(start) ? 0 : start;
+      consts.set(m[1], 0);
+      out.push(`${m[1]}\tequ\t0`);
+      continue;
+    }
+
+    // Fixed-size field directive:  DIR label
+    m = code.match(/^(FPTR|APTR|CPTR|LONG|ULONG|FLOAT|BOOL|WORD|UWORD|SHORT|USHORT|RPTR|BYTE|UBYTE|DOUBLE)\s+([A-Za-z_]\w*)\s*$/i);
+    if (m) {
+      consts.set(m[2], soffset);
+      out.push(`${m[2]}\tequ\t${soffset}`);
+      soffset += STRUCT_FIELD_SIZE[m[1].toUpperCase()];
+      continue;
+    }
+
+    // STRUCT label,size  (sub-structure; size may be an expression)
+    m = code.match(/^STRUCT\s+([A-Za-z_]\w*)\s*,\s*(.+)$/i);
+    if (m) {
+      const sz = evalConst(m[2], consts);
+      consts.set(m[1], soffset);
+      out.push(`${m[1]}\tequ\t${soffset}`);
+      soffset += isNaN(sz) ? 0 : sz;
+      continue;
+    }
+
+    // LABEL label  (mark current offset without bumping — e.g. xxx_SIZEOF)
+    m = code.match(/^LABEL\s+([A-Za-z_]\w*)\s*$/i);
+    if (m) {
+      consts.set(m[1], soffset);
+      out.push(`${m[1]}\tequ\t${soffset}`);
+      continue;
+    }
+
+    if (/^ALIGNWORD\b/i.test(code)) { soffset = (soffset + 1) & ~1; continue; }
+    if (/^ALIGNLONG\b/i.test(code)) { soffset = (soffset + 3) & ~3; continue; }
+
+    out.push(raw);
+  }
+  return out;
 }
 
 // ── 2. MACRO / ENDM collection ───────────────────────────────────────────
@@ -197,7 +276,8 @@ function evalConst(expr: string, equMap: Map<string, number>): number {
   e = e.replace(/\$([0-9A-Fa-f]+)/g, (_, h) => parseInt(h, 16).toString());
   e = e.replace(/%([01]+)/g, (_, b) => parseInt(b, 2).toString());
   try {
-    if (/^[\d\s+\-*/()]+$/.test(e)) {
+    // Allow arithmetic + 68k/C bitwise operators (<< >> & | ^ ~) used in flag/size exprs.
+    if (/^[\d\s+\-*/()<>&|^~]+$/.test(e)) {
       return Math.trunc((new Function(`"use strict"; return (${e})`))() as number);
     }
   } catch { /* ignore */ }
