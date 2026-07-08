@@ -29,6 +29,7 @@ program
   .option('--no-func-split', 'Disable function splitting at RTS boundaries (for disassembled binaries)', false)
   .option('-P, --preamble <file>', 'Prepend ASM file before main source (repeatable)', (v: string, acc: string[]) => [...acc, v], [] as string[])
   .option('--xdef <names>', 'Comma-separated list of labels to treat as exported (XDEF) — use when the ASM has no XDEF directives')
+  .option('--lib-mode', 'Emit extern decls for AmigaOS calls + non-static registers/_ds (harness provides shim definitions)', false)
   .action((inputs: string[], opts) => {
     for (const inputPath of inputs) {
       // Build source: optional preamble files + main source
@@ -61,7 +62,7 @@ program
         console.log(`[${name}] Paula writes: ${resolved.paulaWrites.length}`);
       }
 
-      const cOutput = emit(ast, resolved, basename(inputPath), { noFuncSplit: opts.noFuncSplit });
+      const cOutput = emit(ast, resolved, basename(inputPath), { noFuncSplit: opts.noFuncSplit, libMode: opts.libMode });
       const finalOutput = opts.pass2 ? restructure(cOutput) : cOutput;
 
       if (opts.dryRun) {
