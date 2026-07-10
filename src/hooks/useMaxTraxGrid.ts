@@ -22,20 +22,23 @@ export function useMaxTraxGrid(
     setEffectField(eventIndex: number, patch: Parameters<typeof setEffectField>[2]): void;
   };
 } {
-  // Subscribe to maxTraxData — Immer creates new references on every mutateMaxTraxScore
-  // call, so this selector re-runs the hook whenever the score is edited.
+  // Primary re-render signal: maxTraxRev increments on every mutateMaxTraxScore call.
+  void useFormatStore((s) => s.maxTraxRev);
+  // maxTraxData provides the score content for grid derivation.
   const data = useFormatStore((s) => s.maxTraxData);
   const mutate = useFormatStore((s) => s.mutateMaxTraxScore);
   const score: MaxTraxScore | null = data?.scores[scoreIndex] ?? null;
   const grid: MaxTraxGrid | null = score !== null ? deriveGrid(score, ticksPerRow) : null;
 
   /**
-   * Apply a pure-op result to the store and project ALL changed events to the WASM engine.
+   * Apply a pure-op result to the store and project ALL changed events to the WASM worklet.
    *
+   * The store is written EXACTLY ONCE per edit (one rev bump, one React re-render).
    * We diff `current.events` vs `next.events` to find every index changed by the op —
-   * `moveNote` changes TWO deltas (events[i] and events[i+1]), so a single-event push
+   * `moveNote` changes TWO indices (events[i] and events[i+1]), so a single-event push
    * would leave the live audio half-applied. The diff ensures every changed index gets
-   * its own `setEvent` worklet message, then a single `recook` rewinds the player.
+   * its own worklet message via `projectEventToWorklet` (worklet-only, no store write),
+   * then a single `recook` rewinds the player.
    */
   function apply(current: MaxTraxScore, next: MaxTraxScore): void {
     const changedIndices: number[] = [];
@@ -59,10 +62,11 @@ export function useMaxTraxGrid(
       s.events.push(...next.events);
     });
 
-    // Project each changed event to the live WASM engine for immediate audio update.
+    // Project each changed event to the live WASM worklet only — the store write above
+    // is the single authority update; projectEventToWorklet skips the store entirely.
     const engine = MaxTraxEngine.getInstance();
     for (const idx of changedIndices) {
-      engine.setEvent(scoreIndex, idx, next.events[idx]);
+      engine.projectEventToWorklet(scoreIndex, idx, next.events[idx]);
     }
     engine.recook(scoreIndex);
   }

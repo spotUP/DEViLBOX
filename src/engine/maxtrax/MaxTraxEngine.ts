@@ -109,6 +109,9 @@ export class MaxTraxEngine extends WASMSingletonBase {
    * Write one event into the live WASM cooked buffer and mirror into the store.
    * Store is the authority and always updates unconditionally; the worklet post
    * is the live-audio projection and only fires when a worklet exists.
+   *
+   * Use `projectEventToWorklet` when the caller already owns the store write
+   * (e.g. useMaxTraxGrid); use `setEvent` when the caller needs both.
    */
   setEvent(
     score: number,
@@ -120,6 +123,19 @@ export class MaxTraxEngine extends WASMSingletonBase {
       s.events[index] = { ...ev };
     });
     // Live-audio projection — only fires when the worklet is running.
+    this.workletNode?.port.postMessage({ type: 'setEvent', score, index, ev });
+  }
+
+  /**
+   * Project one event to the worklet ONLY — does NOT write the store.
+   * Use this when the caller already owns the store write (e.g. useMaxTraxGrid)
+   * to avoid N+1 store writes and spurious maxTraxRev bumps per edit.
+   */
+  projectEventToWorklet(
+    score: number,
+    index: number,
+    ev: { command: number; data: number; startTime: number; stopTime: number },
+  ): void {
     this.workletNode?.port.postMessage({ type: 'setEvent', score, index, ev });
   }
 

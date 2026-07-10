@@ -30,3 +30,18 @@ it('setEvent posts to the worklet and mirrors into the store', () => {
   expect(post).toHaveBeenCalledWith(expect.objectContaining({ type: 'setEvent', score: 0, index: 0, ev: expect.objectContaining({ command: 0x40, data: 0x11, startTime: 0, stopTime: 20 }) }));
   expect(useFormatStore.getState().maxTraxData!.scores[0].events[0].command).toBe(0x40);
 });
+
+it('projectEventToWorklet posts to the worklet and does NOT change the store', () => {
+  const initialEvent = { command: 0x3c, data: 0, startTime: 0, stopTime: 10 };
+  useFormatStore.getState().setMaxTraxData({ tempo:0, flags:0, headerRaw:new Uint8Array(), scores:[{events:[{ ...initialEvent }]}], tailRaw:new Uint8Array() });
+  const revBefore = useFormatStore.getState().maxTraxRev;
+  const eng = MaxTraxEngine.getInstance();
+  const post = vi.fn();
+  (eng as any).workletNode = { port: { postMessage: post } };
+  eng.projectEventToWorklet(0, 0, { command: 0x40, data: 0x11, startTime: 5, stopTime: 30 });
+  // Worklet receives the message.
+  expect(post).toHaveBeenCalledWith(expect.objectContaining({ type: 'setEvent', score: 0, index: 0, ev: expect.objectContaining({ command: 0x40, data: 0x11, startTime: 5, stopTime: 30 }) }));
+  // Store is unchanged — no rev bump, original event intact.
+  expect(useFormatStore.getState().maxTraxRev).toBe(revBefore);
+  expect(useFormatStore.getState().maxTraxData!.scores[0].events[0].command).toBe(initialEvent.command);
+});
