@@ -22,9 +22,13 @@ export function preProcess(source: string): string {
   lines = expandRept(lines);
   const { macros, stripped } = collectMacros(lines);
   lines = expandMacros(stripped, macros);
+  // Pre-extract struct/EQU constants so STRUCTURE-derived symbols (patch_sizeof, voice_sizeof,
+  // etc.) are known when evalConditionals evaluates SCALE macro expansions.  expandStructures
+  // must still run after evalConditionals so inactive-block fields don't skew running offsets.
+  const preConsts = collectPreConsts(lines);
   // Conditionals run AFTER macro expansion (so macro-body `ifeq \1-N` resolve) and
   // BEFORE STRUCTURE offsets (so fields inside inactive #if blocks don't shift offsets).
-  lines = evalConditionals(lines);
+  lines = evalConditionals(lines, preConsts);
   lines = expandStructures(lines);
   lines = expandEquDisplacements(lines);
   lines = resolveStarOffsets(lines);
@@ -62,6 +66,90 @@ function expandRept(lines: string[]): string[] {
   return result;
 }
 
+// ── 1a-pre. Pre-extract constants (EQU + STRUCTURE labels) ──────────────
+//
+// Scans the already-macro-expanded source for EQU/SET/= definitions and
+// STRUCTURE/LABEL blocks, returning a const map that evalConditionals can use
+// as initial seed.  This lets STRUCTURE-derived symbols (patch_sizeof,
+// voice_sizeof, etc.) resolve inside SCALE macro expansions before
+// evalConditionals runs, preventing NaN→0 which would make ifeq conditions
+// fire incorrectly.
+function collectPreConsts(lines: string[]): Map<string, number> {
+  const consts = new Map<string, number>();
+  let soffset = 0;
+  // Conditional-assembly stack: struct fields inside an inactive block (e.g.
+  // `ifne FASTSOUND` when FASTSOUND=0) must NOT advance the running offset,
+  // otherwise struct-size LABELs (voice_sizeof, …) come out wrong and skew
+  // downstream SCALE-macro power-of-2 tests. Mirror evalConditionals' logic,
+  // resolving conditions from the EQUs collected so far (feature flags are
+  // plain EQUs known before their guarded struct fields appear).
+  const stack: { parentActive: boolean; active: boolean; taken: boolean }[] = [];
+  const emitting = (): boolean => stack.every((s) => s.active);
+  for (const raw of lines) {
+    const code = stripComment(raw).trim();
+
+    const mIf = code.match(/^(ifne|ifeq|ifgt|iflt|ifge|ifle|ifd|ifnd)\b\s*(.*)$/i);
+    if (mIf) {
+      const parentActive = emitting();
+      const dir = mIf[1].toLowerCase();
+      const arg = mIf[2].trim();
+      let cond = false;
+      if (parentActive) {
+        if (dir === 'ifd' || dir === 'ifnd') {
+          const known = consts.has(arg);
+          cond = dir === 'ifd' ? known : !known;
+        } else {
+          const v = evalConst(arg, consts);
+          const n = Number.isNaN(v) ? 0 : v;
+          cond = dir === 'ifne' ? n !== 0 : dir === 'ifeq' ? n === 0
+               : dir === 'ifgt' ? n > 0 : dir === 'iflt' ? n < 0
+               : dir === 'ifge' ? n >= 0 : n <= 0;
+        }
+      }
+      stack.push({ parentActive, active: parentActive && cond, taken: parentActive && cond });
+      continue;
+    }
+    if (/^else\b/i.test(code) && !/^elseif\b/i.test(code)) {
+      const top = stack[stack.length - 1];
+      if (top) { top.active = top.parentActive && !top.taken; if (top.active) top.taken = true; }
+      continue;
+    }
+    const mElseif = code.match(/^elseif\b\s*(.*)$/i);
+    if (mElseif) {
+      const top = stack[stack.length - 1];
+      if (top) {
+        if (top.taken) { top.active = false; }
+        else {
+          const v = evalConst(mElseif[1].trim(), consts);
+          top.active = top.parentActive && !Number.isNaN(v) && v !== 0;
+          if (top.active) top.taken = true;
+        }
+      }
+      continue;
+    }
+    if (/^(endc|endif)\b/i.test(code)) { stack.pop(); continue; }
+    if (!emitting()) continue;
+
+    // EQU / SET / =
+    let m = code.match(/^([A-Za-z_]\w*)\s+(?:equ|set)\s+(.+)$/i)
+         || code.match(/^([A-Za-z_]\w*)\s*=\s*(.+)$/);
+    if (m) { const v = evalConst(m[2], consts); if (!isNaN(v)) consts.set(m[1], v); continue; }
+    // STRUCTURE name,start
+    m = code.match(/^STRUCTURE\s+([A-Za-z_]\w*)\s*,\s*(.+)$/i);
+    if (m) { const s = evalConst(m[2], consts); soffset = isNaN(s) ? 0 : s; consts.set(m[1], 0); continue; }
+    // Fixed-size field: DIR label
+    m = code.match(/^(FPTR|APTR|CPTR|LONG|ULONG|FLOAT|BOOL|WORD|UWORD|SHORT|USHORT|RPTR|BYTE|UBYTE|DOUBLE)\s+([A-Za-z_]\w*)\s*$/i);
+    if (m) { consts.set(m[2], soffset); soffset += STRUCT_FIELD_SIZE[m[1].toUpperCase()]; continue; }
+    // STRUCT label,size
+    m = code.match(/^STRUCT\s+([A-Za-z_]\w*)\s*,\s*(.+)$/i);
+    if (m) { const sz = evalConst(m[2], consts); consts.set(m[1], soffset); soffset += isNaN(sz) ? 0 : sz; continue; }
+    // LABEL label
+    m = code.match(/^LABEL\s+([A-Za-z_]\w*)\s*$/i);
+    if (m) { consts.set(m[1], soffset); }
+  }
+  return consts;
+}
+
 // ── 1a. Conditional assembly (ifne/ifeq/ifd/… else/elseif/endc) ───────────
 //
 // Evaluate assembler conditionals against known EQU constants so inactive
@@ -69,9 +157,9 @@ function expandRept(lines: string[]): string[] {
 // producing duplicate labels / dead code. Symbols resolve from EQU/SET/= lines
 // collected during the scan (project constants live in the preamble includes).
 
-function evalConditionals(lines: string[]): string[] {
+function evalConditionals(lines: string[], preConsts?: Map<string, number>): string[] {
   const out: string[] = [];
-  const consts = new Map<string, number>();
+  const consts: Map<string, number> = preConsts ? new Map(preConsts) : new Map();
   const stack: { parentActive: boolean; active: boolean; taken: boolean }[] = [];
   const emitting = (): boolean => stack.every((s) => s.active);
 

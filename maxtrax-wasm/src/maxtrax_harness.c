@@ -15,6 +15,23 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
+#include <stdio.h>
+
+/* -----------------------------------------------------------------------
+ * Debug instrumentation gate.
+ *
+ * The player's OS shims (BeginIO / ReadFunc / the VBlank driver / render)
+ * carry printf probes used to lock-step the transpiled replayer against the
+ * original 68k. They stay in the source for future debugging but compile out
+ * by default — when active they fire up to 50×/sec and each one round-trips
+ * through printErr → postMessage, which is not shippable. Build with
+ * -DMXTX_DEBUG (see CMakeLists.txt) to re-enable them.
+ * ---------------------------------------------------------------------- */
+#ifdef MXTX_DEBUG
+#define MXTX_DBG(...) fprintf(stderr, __VA_ARGS__)
+#else
+#define MXTX_DBG(...) ((void)0)
+#endif
 
 /* -----------------------------------------------------------------------
  * Fake exec base
@@ -78,10 +95,17 @@ static void ioa_enqueue(uint32_t addr) {
     if (next == g_ioa_head) return;   /* full — drop (should not happen)  */
     g_ioa_queue[g_ioa_tail] = addr;
     g_ioa_tail = next;
+    { static int _eq = 0;
+      if (_eq < 16) { _eq++; MXTX_DBG("[ioa] enqueue #%d addr=%u depth=%d\n",
+          _eq, addr, (g_ioa_tail - g_ioa_head + IOA_QUEUE_CAP) % IOA_QUEUE_CAP); } }
 }
 
 static uint32_t ioa_dequeue(void) {
-    if (g_ioa_head == g_ioa_tail) return 0;   /* empty */
+    if (g_ioa_head == g_ioa_tail) {
+        static int _emp = 0;
+        if (_emp < 8) { _emp++; MXTX_DBG("[ioa] GetMsg EMPTY #%d\n", _emp); }
+        return 0;   /* empty */
+    }
     uint32_t addr = g_ioa_queue[g_ioa_head];
     g_ioa_head = (g_ioa_head + 1) % IOA_QUEUE_CAP;
     return addr;
@@ -89,6 +113,13 @@ static uint32_t ioa_dequeue(void) {
 
 /* VBlank ISR function pointer captured by _LVOAddIntServer               */
 static uint32_t g_vblank_code = 0;
+
+/* Debug counters (cleared on each maxtrax_load call) */
+static int g_vblank_count = 0;
+static int g_beginio_count = 0;
+
+/* Samples rendered since last VBlank — fires ISR every VBLANK_SAMPLES    */
+static int g_vblank_accum = 0;
 
 /* 28150 / 50 = 563 samples per 50 Hz VBlank tick                         */
 #define VBLANK_SAMPLES (PAULA_RATE_PAL / 50)
@@ -102,6 +133,15 @@ static uint32_t g_vblank_code = 0;
 #else
 #  define EXPORT
 #endif
+
+/* Debug: trace indirect mxtx_*Func calls (LoadPerf file-IO callbacks).
+ * MXTX_CALL replaces the raw fn-ptr call in maxtrax.c via sed patch.      */
+static int g_mxtx_call_dbg = 0;
+#define MXTX_CALL(off) do { \
+    uint32_t _p = READ32((uintptr_t)_maxtrax + (off)); \
+    if (g_mxtx_call_dbg < 8) { g_mxtx_call_dbg++; \
+        MXTX_DBG("[mxtx] indirect " #off " ptr=%u\n", _p); } \
+    ((void(*)(void))(uintptr_t)_p)(); } while (0)
 
 /* -----------------------------------------------------------------------
  * Unity build: include the transpiled maxtrax.c
@@ -185,8 +225,21 @@ void _LVOSignal(void) {
     d0 = 0;
 }
 
-/* exec Cause(a1=interrupt)  — no-op                                       */
+/* exec Cause(a1=interrupt)  — invoke IS_CODE from the interrupt node
+ * AmigaOS convention: IS_CODE(a1=IS_DATA).  MusicVBlank calls
+ * Cause(_music_server) to schedule MusicServer; without this, no notes
+ * are ever triggered and all audio is silent.                             */
 void _LVOCause(void) {
+    typedef void (*ISRFn)(void);
+    uint32_t is_node = a1;
+    uint32_t is_code = READ32(is_node + 18u /* IS_CODE */);
+    if (is_code) {
+        uint32_t saved_a1 = a1;
+        a1 = READ32(is_node + 14u /* IS_DATA */);
+        ISRFn fn = (ISRFn)(uintptr_t)is_code;
+        fn();
+        a1 = saved_a1;
+    }
 }
 
 /* exec FindTask(a1=name)  — no task system                                */
@@ -245,14 +298,15 @@ void _LVOClose(void) {
 void _LVOSeek(void) {
     if (d1 != MXTX_FH) { d0 = (uint32_t)-1; return; }
     int32_t  offset = (int32_t)d2;
-    uint32_t mode   = d3;
+    int32_t  mode   = (int32_t)d3;
     uint32_t oldpos = g_file_pos;
     int64_t  np;
-    if (mode == 0 /* OFFSET_BEGINNING */) {
+    /* AmigaDOS Seek modes: OFFSET_BEGINNING=-1, OFFSET_CURRENT=0, OFFSET_END=1 */
+    if (mode == -1 /* OFFSET_BEGINNING */) {
         np = (int64_t)offset;
-    } else if (mode == 1 /* OFFSET_CURRENT */) {
+    } else if (mode == 0 /* OFFSET_CURRENT */) {
         np = (int64_t)g_file_pos + offset;
-    } else { /* OFFSET_END = -1 */
+    } else { /* OFFSET_END = 1 */
         np = (int64_t)g_file_size + offset;
     }
     if (np < 0) np = 0;
@@ -285,6 +339,7 @@ void _LVOSeek(void) {
  * the IOF_QUICK DMA-complete callback that returns the block to _play_port).
  * ---------------------------------------------------------------------- */
 void DEV_BEGINIO(void) {
+    g_beginio_count++;
     uint32_t blk = a1;
     uint16_t cmd     = (uint16_t)READ16(blk + 28u /* IO_COMMAND */);
     uint32_t io_unit = READ32(blk + 24u /* IO_UNIT */);
@@ -305,6 +360,10 @@ void DEV_BEGINIO(void) {
             uint16_t cycles    = (uint16_t)READ16(blk + 62u /* ioa_Cycles */);
             uint16_t len_words = (uint16_t)(len_bytes >> 1);
             const int8_t *data = (const int8_t *)(uintptr_t)data_addr;
+
+            if (g_beginio_count < 12)
+                MXTX_DBG("[BeginIO-W] ch=%d data=%u len_bytes=%u period=%u vol=%u cycles=%u\n",
+                        ch, data_addr, len_bytes, period, ioa_vol, cycles);
 
             if (cycles == 1u) {
                 /* Attack: start one-shot DMA immediately */
@@ -360,6 +419,9 @@ EXPORT int maxtrax_load(const uint8_t *data, uint32_t len, int score) {
     paula_reset();
     g_ioa_head = g_ioa_tail = 0;
     g_vblank_code = 0;
+    g_vblank_accum = 0;
+    g_vblank_count = 0;
+    g_beginio_count = 0;
     g_file_data = data;
     g_file_size = len;
     g_file_pos  = 0;
@@ -396,13 +458,19 @@ EXPORT int maxtrax_load(const uint8_t *data, uint32_t len, int score) {
     /* --- Init MaxTrax data segment ---
      * _ds_init() writes the IS_CODE pointers for VBlank/Music/Extra ISRs. */
     _ds_init();
+    MXTX_DBG("[mxtx] ds_init done (build: v8-renderprobe)\n");
 
-    /* --- NewInitMusic() ---
-     * Allocates the audio memory pool, sets up IOAudio/MsgPort structs,
-     * opens audio.device (→ _LVOOpenDevice), and registers the VBlank ISR
-     * (→ _LVOAddIntServer), setting g_vblank_code = MusicVBlank address.
-     * Also computes glob_FrameUnit and glob_ColorClocks from the fake exec. */
-    NewInitMusic();
+    /* --- InitMusic() ---
+     * Allocates the audio memory pool (NUM_SCORES=8 score slots), sets up
+     * IOAudio/MsgPort structs, and registers the VBlank ISR via
+     * _LVOAddIntServer, setting g_vblank_code = MusicVBlank address.
+     * InitMusic internally sets d0=NUM_SCORES before calling InitMusicTagList.
+     * We must NOT call NewInitMusic() without first setting d0=NUM_SCORES —
+     * doing so leaves scoremax=0, causing LoadPerf to skip score loading and
+     * PlaySong to read a score_Data pointer from past the calloc'd buffer. */
+    MXTX_DBG("[mxtx] calling InitMusic\n");
+    InitMusic();
+    MXTX_DBG("[mxtx] InitMusic done, vblank=%u\n", g_vblank_code);
 
     if (g_vblank_code == 0) {
         /* VBlank registration failed — init went wrong */
@@ -414,18 +482,24 @@ EXPORT int maxtrax_load(const uint8_t *data, uint32_t len, int score) {
      * because OpenMusic is called inside InitMusicTagList/OpenMusic path,
      * and CloseMusic checks _AudioDevice before doing anything real), then
      * opens the file via _LVOOpen/_LVORead and parses patches + score data. */
+    MXTX_DBG("[mxtx] calling LoadPerf\n");
     a0 = (uint32_t)(uintptr_t)"maxtrax.mxtx"; /* non-null filename sentinel */
     d0 = 0u;                                   /* unused score arg to LoadPerf */
     LoadPerf();
+    MXTX_DBG("[mxtx] LoadPerf done\n");
 
     /* --- Select score and begin playback ---
      * PlaySong() calls OpenMusic() which re-opens the audio device and
      * re-enqueues the 4 play-IOAudio blocks via _LVOReplyMsg.              */
+    MXTX_DBG("[mxtx] calling SelectScore(%d)\n", score);
     d0 = (uint32_t)(int32_t)score;
     SelectScore();
+    MXTX_DBG("[mxtx] SelectScore done\n");
 
+    MXTX_DBG("[mxtx] calling PlaySong\n");
     d0 = (uint32_t)(int32_t)score;
     PlaySong();
+    MXTX_DBG("[mxtx] PlaySong done\n");
 
     return 0;
 }
@@ -441,6 +515,11 @@ EXPORT int maxtrax_render(float *buffer, int frames) {
     typedef void (*VBlankFn)(void);
     VBlankFn vblank = (VBlankFn)(uintptr_t)g_vblank_code;
 
+    { static int rdbg = 0;
+      if (rdbg < 6) { rdbg++;
+        MXTX_DBG("[render] call frames=%d vblank_code=%u accum=%d count=%d\n",
+                frames, g_vblank_code, g_vblank_accum, g_vblank_count); } }
+
     if (!vblank) {
         memset(buffer, 0, (size_t)frames * 2u * sizeof(float));
         return frames;
@@ -449,15 +528,32 @@ EXPORT int maxtrax_render(float *buffer, int frames) {
     /* Set exec base register for any shims that might read a6-relative fields */
     a6 = READ32((uintptr_t)_SysBase);
 
+    /* VBlank fires at 50 Hz = every VBLANK_SAMPLES (563) rendered frames.
+     * g_vblank_accum persists across calls so the rate is correct even when
+     * the worklet requests small chunks (e.g. 77 frames per output block). */
     int written = 0;
     while (written < frames) {
-        /* Fire MusicVBlank once per tick */
-        vblank();
-        /* Render up to VBLANK_SAMPLES frames */
+        if (g_vblank_accum == 0) {
+            if (g_vblank_count < 5) {
+                uint32_t aud_dev = READ32((uintptr_t)_AudioDevice);
+                uint32_t tick_u  = READ32((uintptr_t)_globaldata + 12 /* glob_TickUnit */);
+                uint32_t ticks   = READ32((uintptr_t)_globaldata + 8  /* glob_Ticks */);
+                uint32_t freq    = (uint32_t)READ16((uintptr_t)_globaldata + 88 /* glob_Frequency */);
+                MXTX_DBG("[mxtx] vblank#%d AudioDev=%u TickUnit=%u Ticks=%u Freq=%u BeginIO=%d\n",
+                        g_vblank_count, aud_dev, tick_u, ticks, freq, g_beginio_count);
+            }
+            g_vblank_count++;
+            vblank(); /* fire MusicVBlank at start of each 563-sample tick */
+        }
+        int remaining = VBLANK_SAMPLES - g_vblank_accum;
         int chunk = frames - written;
-        if (chunk > VBLANK_SAMPLES) chunk = VBLANK_SAMPLES;
+        if (chunk > remaining) chunk = remaining;
         paula_render(buffer + written * 2, chunk);
         written += chunk;
+        g_vblank_accum += chunk;
+        if (g_vblank_accum >= VBLANK_SAMPLES) {
+            g_vblank_accum = 0;
+        }
     }
     return frames;
 }
@@ -475,6 +571,7 @@ EXPORT void maxtrax_stop(void) {
     }
     paula_reset();
     g_vblank_code = 0;
+    g_vblank_accum = 0;
     g_ioa_head = g_ioa_tail = 0;
     g_file_data = NULL;
     g_file_size = 0;
