@@ -3,14 +3,14 @@ import { renderHook, act } from '@testing-library/react';
 import { useFormatStore } from '@/stores/useFormatStore';
 
 // Hoist mock fns so the vi.mock factory can reference them before imports resolve.
-const { mockSetEvent, mockRecook } = vi.hoisted(() => ({
-  mockSetEvent: vi.fn(),
+const { mockProjectEventToWorklet, mockRecook } = vi.hoisted(() => ({
+  mockProjectEventToWorklet: vi.fn(),
   mockRecook: vi.fn(),
 }));
 
 vi.mock('@/engine/maxtrax/MaxTraxEngine', () => ({
   MaxTraxEngine: {
-    getInstance: () => ({ setEvent: mockSetEvent, recook: mockRecook }),
+    getInstance: () => ({ projectEventToWorklet: mockProjectEventToWorklet, recook: mockRecook }),
   },
 }));
 
@@ -40,6 +40,43 @@ it('derives a grid and pushes duration edits to store + engine', () => {
   // Store must reflect the new duration (single source of truth).
   expect(useFormatStore.getState().maxTraxData!.scores[0].events[0].stopTime).toBe(200);
 
-  // Engine must have received the event for live audio projection.
-  expect(mockSetEvent).toHaveBeenCalled();
+  // Worklet must have received the event for live audio projection.
+  expect(mockProjectEventToWorklet).toHaveBeenCalled();
+});
+
+it('moveNote dispatches projectEventToWorklet for BOTH changed indices (no extra store writes)', () => {
+  // Two note events: note A at tick 0 (dur=10), note B at tick 20 (dur=5).
+  useFormatStore.getState().setMaxTraxData({
+    tempo: 0,
+    flags: 0,
+    headerRaw: new Uint8Array(),
+    scores: [
+      {
+        events: [
+          { command: 0x3c, data: 0x40, startTime: 0, stopTime: 10 },
+          { command: 0x3c, data: 0x50, startTime: 20, stopTime: 25 },
+        ],
+      },
+    ],
+    tailRaw: new Uint8Array(),
+  });
+
+  const { result } = renderHook(() => useMaxTraxGrid(0, 24));
+
+  const revBefore = useFormatStore.getState().maxTraxRev;
+
+  // Move note 0 to tick 40.
+  act(() => result.current.edit.moveNote(0, 40));
+
+  // projectEventToWorklet must be called for each changed index (moveNote shifts
+  // both the moved note AND the next delta — 2 calls total).
+  expect(mockProjectEventToWorklet).toHaveBeenCalledTimes(2);
+  expect(mockProjectEventToWorklet).toHaveBeenCalledWith(0, 0, expect.objectContaining({ startTime: 40 }));
+  expect(mockProjectEventToWorklet).toHaveBeenCalledWith(0, 1, expect.anything());
+
+  // Store is written exactly once — rev bumps by exactly 1.
+  expect(useFormatStore.getState().maxTraxRev).toBe(revBefore + 1);
+
+  // Moved note has the new startTime in the store.
+  expect(useFormatStore.getState().maxTraxData!.scores[0].events[0].startTime).toBe(40);
 });
