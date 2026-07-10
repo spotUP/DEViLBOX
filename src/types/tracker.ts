@@ -549,7 +549,7 @@ export const NOTE_OFF: TrackerCell = {
 };
 
 // ── Editor Mode ─────────────────────────────────
-export type EditorMode = 'classic' | 'furnace' | 'hively' | 'musicline' | 'goattracker' | 'klystrack' | 'jamcracker' | 'sc68' | 'tfmx' | 'sidfactory2' | 'cheesecutter';
+export type EditorMode = 'classic' | 'furnace' | 'hively' | 'musicline' | 'goattracker' | 'klystrack' | 'jamcracker' | 'sc68' | 'tfmx' | 'sidfactory2' | 'cheesecutter' | 'maxtrax';
 
 // ── Furnace Native Data ─────────────────────────
 export interface FurnaceNativeData {
