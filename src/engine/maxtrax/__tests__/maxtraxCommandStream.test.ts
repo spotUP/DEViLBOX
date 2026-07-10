@@ -32,6 +32,12 @@ const RUNNER = join(HERE, 'maxtraxCommandStreamRunner.cjs');
 const JS_PATH = join(ROOT, 'public/maxtrax/Maxtrax.js');
 const WASM_PATH = join(ROOT, 'public/maxtrax/Maxtrax.wasm');
 const SONG_PATH = join(ROOT, 'public/data/songs/maxtrax/antmusic.mxtx');
+// darkseed sets the MaxTrax velocity flag (mxtx_Flags bit), which antmusic does
+// not. That flag path exposed a transpiler struct-offset collision: a BSET on
+// mxtx_Flags overwrote the adjacent mxtx_ReadFunc pointer (both mis-computed to
+// offset 4), so the next indirect ReadFunc call read a garbage function pointer
+// -> WASM "table index is out of bounds" at load -> the whole song was silent.
+const DARKSEED_PATH = join(ROOT, 'public/data/songs/maxtrax/darkseed (00).mxtx');
 
 interface Counts {
   loadResult: number;
@@ -44,10 +50,10 @@ interface Counts {
   seedPoolDepth: number;
 }
 
-function renderCommandHistogram(seconds: number): Counts {
+function renderCommandHistogram(seconds: number, songPath: string = SONG_PATH): Counts {
   const out = execFileSync(
     process.execPath,
-    [RUNNER, JS_PATH, WASM_PATH, SONG_PATH, String(seconds)],
+    [RUNNER, JS_PATH, WASM_PATH, songPath, String(seconds)],
     { encoding: 'utf8', timeout: 60_000 },
   );
   return JSON.parse(out) as Counts;
@@ -93,5 +99,28 @@ describe('MaxTrax transpile — audio.device command stream (UADE lockstep)', ()
     // the song plays as "random samples". The harness reports the pre-playback
     // seed-phase peak pool depth: correct=12, seed-bug=4. Require the full seed.
     expect(counts.seedPoolDepth).toBeGreaterThanOrEqual(12);
+  });
+});
+
+describe('MaxTrax transpile — velocity-flag song loads and renders (struct-offset regression)', () => {
+  // With the struct-offset collision, loading darkseed threw a WASM "table index
+  // is out of bounds" (garbage ReadFunc pointer), so execFileSync would fail.
+  // A correct build loads it (loadResult=0), renders audio, and — because the
+  // BSET no longer clobbers ReadFunc — emits a healthy, well-formed command
+  // stream (no "other"/garbage opcodes).
+  let counts: Counts;
+
+  beforeAll(() => {
+    counts = renderCommandHistogram(6, DARKSEED_PATH);
+  }, 60_000);
+
+  it('loads darkseed (velocity flag set) without a table-index crash', () => {
+    expect(counts.loadResult).toBe(0);
+    expect(counts.framesRendered).toBeGreaterThan(0);
+  });
+
+  it('renders a healthy PERVOL stream with no garbage opcodes', () => {
+    expect(counts.pervol).toBeGreaterThan(100);
+    expect(counts.other).toBe(0);
   });
 });

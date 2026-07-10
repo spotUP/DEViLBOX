@@ -83,3 +83,43 @@ test('SCALE by a non-power-of-2 struct size emits mulu (not a dropped power-of-2
   expect(out).not.toMatch(/add\.w\s+d2,d2/i);
   expect(out).not.toMatch(/lsl\.w/i);
 });
+
+// Regression: STRUCTURE fields annotated with C-style /* ... */ comments (as
+// maxtrax.i does) must still parse. stripComment used to strip only `;` line
+// comments, so `WORD mxtx_TotalScores /* total ... */` failed the field regex
+// (which requires end-of-line after the label) and did NOT advance SOFFSET.
+// The comment-less APTR func pointers (OpenFunc/ReadFunc/CloseFunc) then
+// computed their EQU from a stale offset of 0, so mxtx_ReadFunc collapsed to 4
+// — COLLIDING with mxtx_Flags (also 4). A BSET on mxtx_Flags (set when the
+// song's velocity flag is on, e.g. darkseed) then overwrote the ReadFunc
+// pointer, and the next indirect ReadFunc call read a garbage function pointer
+// -> WASM "table index is out of bounds" at load -> the song was silent.
+const MAXTRAX_INFO_STRUCT = `
+\tSTRUCTURE\tMaxTraxInfo,0
+\t\tWORD\tmxtx_TotalScores\t\t\t/* total number of scores\t*/
+\t\tBYTE\tmxtx_Volume\t\t\t\t\t/* programmatic volume\t\t*/
+\t\tBYTE\tmxtx_SyncValue\t\t\t\t/* last sync value\t\t\t*/
+\t\tBYTE\tmxtx_Flags\t\t\t\t\t/* communication flags\t\t*/
+\t\tBYTE\tmxtx_Changed\t\t\t\t/* set to 1 for change\t\t*/
+\t\tAPTR\tmxtx_OpenFunc
+\t\tAPTR\tmxtx_ReadFunc
+\t\tAPTR\tmxtx_CloseFunc
+\t\tSTRUCT\tmxtx_Priority,16\t\t\t; current priorities
+\t\tLABEL\tmxtx_sizeof
+`;
+
+test('STRUCTURE fields with C-style /* */ comments advance the offset (mxtx_ReadFunc=10, no collision)', () => {
+  const out = preProcess(MAXTRAX_INFO_STRUCT);
+  // Byte fields precede the func pointers.
+  expect(out).toMatch(/mxtx_Flags\s+equ\s+4/);
+  // The three APTR func pointers must land AFTER the 6 header bytes, 4 apart.
+  expect(out).toMatch(/mxtx_OpenFunc\s+equ\s+6/);
+  expect(out).toMatch(/mxtx_ReadFunc\s+equ\s+10/);
+  expect(out).toMatch(/mxtx_CloseFunc\s+equ\s+14/);
+  expect(out).toMatch(/mxtx_Priority\s+equ\s+18/);
+  expect(out).toMatch(/mxtx_sizeof\s+equ\s+34/);
+  // The collision the bug produced: ReadFunc must NOT alias Flags at offset 4.
+  expect(out).not.toMatch(/mxtx_ReadFunc\s+equ\s+4/);
+  // Comment words must not leak in as spurious EQU symbols (number/scores/flags/…).
+  expect(out).not.toMatch(/^\s*(number|scores|volume|sync|value|flags|change|for)\s+equ/im);
+});
