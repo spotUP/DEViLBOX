@@ -583,5 +583,9 @@ function resolveStarOffsets(lines: string[]): string[] {
 // ── Helpers ───────────────────────────────────────────────────────────────
 
 function stripComment(line: string): string {
-  return line.replace(/;.*$/, '');
+  // Strip C-style block comments (Amiga asm sources such as maxtrax.i annotate
+  // STRUCTURE fields with `/* ... */`) BEFORE the `;` line comment. The `.*?`
+  // is non-greedy and requires a closing `*/`, so an unclosed `/*` (never valid
+  // in these sources) and register-list slashes like `a0/a1` are left intact.
+  return line.replace(/\/\*.*?\*\//g, ' ').replace(/;.*$/, '');
 }
