@@ -1,6 +1,7 @@
 import type { AstNode, DataNode, Size } from './ast.js';
 import type { ResolveResult } from './resolver.js';
 import { emitInstruction, emitOperand, reconstructAsm } from './instr-map.js';
+import { evalConst } from './preprocess.js';
 
 /* ========================================================================
  * Preamble -- emitted at the top of every generated C file.
@@ -132,6 +133,31 @@ static inline void hw_write32(uint32_t addr, uint32_t val) {
   if (addr >= 0xBF0000 && addr < 0xC00000) return; /* CIA writes */
   WRITE32(addr, val);
 }
+
+/* -- Hardware Read Interception ---------------------------------------
+ * Symmetric to hw_write*: a MOVE.B $BFE001,D0 (read CIA-A control, e.g.
+ * GetAudioFilter probing the LED/audio-filter bit) must NOT dereference
+ * linear memory at 0xBFE001 — that address is a hardware register, not
+ * RAM, and reading it raw is a ~12.5 MB out-of-bounds access. Reads in
+ * the CIA ($BF0000-$BFFFFF) and custom-chip ($DFF000-$DFFFFF) ranges
+ * return a benign default (0); everything else falls through to real
+ * memory so genuine absolute RAM reads still work.
+ * -------------------------------------------------------------------- */
+static inline uint8_t hw_read8(uint32_t addr) {
+  if (addr >= 0xBF0000 && addr < 0xC00000) return 0; /* CIA read (e.g. $BFE001 filter bit) */
+  if (addr >= 0xDFF000 && addr < 0xE00000) return 0; /* custom chip read */
+  return READ8(addr);
+}
+static inline uint16_t hw_read16(uint32_t addr) {
+  if (addr >= 0xBF0000 && addr < 0xC00000) return 0; /* CIA read */
+  if (addr >= 0xDFF000 && addr < 0xE00000) return 0; /* custom chip read (DMACONR, INTREQR, ...) */
+  return READ16(addr);
+}
+static inline uint32_t hw_read32(uint32_t addr) {
+  if (addr >= 0xBF0000 && addr < 0xC00000) return 0; /* CIA read */
+  if (addr >= 0xDFF000 && addr < 0xE00000) return 0; /* custom chip read */
+  return READ32(addr);
+}
 `; }
 
 const C_IDENT = /^[A-Za-z_][A-Za-z0-9_]*$/;
@@ -217,6 +243,10 @@ function collectPackedData(
   const labelPatches: { offset: number; targetLabel: string; elemSize: number }[] = [];
   const typeStr: Record<string, string> = { B: 'uint8_t', W: 'uint16_t', L: 'uint32_t', S: 'uint16_t' };
 
+  // Numeric-only view of the symbol table for evaluating DS count expressions.
+  const numericSymbols = new Map<string, number>();
+  for (const [k, v] of symbols) if (typeof v === 'number') numericSymbols.set(k, v);
+
   let pendingLabel: string | undefined;
 
   for (const node of ast) {
@@ -240,8 +270,29 @@ function collectPackedData(
       if (label) labelOffsets.set(label, { offset, cType });
 
       if (dn.directive === 'DS') {
-        // Zero-initialized storage
-        const count = typeof dn.values[0] === 'number' ? dn.values[0] : 1;
+        // Zero-initialized storage. The count may be a symbolic expression
+        // (e.g. `ds.l NUM_SAMPLES`, `ds.b NUM_PATCHES*patch_sizeof`) — evaluate
+        // it against the resolved EQU/STRUCTURE symbol table. A silent fallback
+        // to 1 here undersizes the array and makes neighbouring data labels
+        // overlap (the MaxTrax `_asample`/`_patch` corruption bug).
+        const raw = dn.values[0];
+        let count: number;
+        if (typeof raw === 'number') {
+          count = raw;
+        } else {
+          const evaluated = evalConst(String(raw), numericSymbols);
+          if (Number.isNaN(evaluated)) {
+            process.stderr.write(
+              `[asm68k-to-c] WARNING: could not size DS reservation ` +
+              `'${dn.directive}.${dn.size ?? 'W'} ${raw}'` +
+              (label ? ` for '${label}'` : '') +
+              ` — reserving 1 element. Neighbouring data may overlap.\n`
+            );
+            count = 1;
+          } else {
+            count = evaluated;
+          }
+        }
         for (let j = 0; j < count * elemSize; j++) bytes.push(0);
       } else {
         // DC values -- store in big-endian byte order
@@ -419,6 +470,9 @@ function collectUnresolved(ast: AstNode[], resolved: ResolveResult): Set<string>
         if (op.kind === 'label_ref') checkAndStub(op.name);
         if (op.kind === 'pc_rel') checkAndStub(op.label);
         if (op.kind === 'disp' && typeof op.offset === 'string') checkAndStub(op.offset);
+        // Compound absolute address (e.g. `$00dff000+vhposr`): the symbolic term
+        // is folded into the raw string, so stub any unknown identifier part.
+        if (op.kind === 'abs_addr') checkAndStub(op.raw);
         if (op.kind === 'immediate' && op.raw.startsWith('#') && !op.raw.slice(1).match(/^[\$%0-9-]/)) {
           checkAndStub(op.raw.slice(1));
         }
@@ -700,7 +754,8 @@ export function emit(ast: AstNode[], resolved: ResolveResult, sourceFile?: strin
   // scope boundaries that expose additional cross-function gotos.
   const crossFuncGotos = new Set<string>();
   const BRANCH_MNEMS  = new Set(['BRA','JMP','BEQ','BNE','BMI','BPL','BCS','BCC',
-                                  'BVS','BVC','BGT','BGE','BLT','BLE','BHI','BLS']);
+                                  'BVS','BVC','BGT','BGE','BLT','BLE','BHI','BLS',
+                                  'BHS','BLO']);
   const DBRANCH_MNEMS = new Set(['DBRA','DBF','DBEQ','DBNE']);
 
   let cfgChanged = true;
@@ -988,6 +1043,7 @@ export function emit(ast: AstNode[], resolved: ResolveResult, sourceFile?: strin
     BGT: 'greater than (signed)', BGE: 'greater or equal (signed)',
     BLT: 'less than (signed)',    BLE: 'less or equal (signed)',
     BHI: 'higher (unsigned)',     BLS: 'lower or same (unsigned)',
+    BHS: 'higher or same (unsigned)', BLO: 'lower (unsigned)',
   };
 
   // Close the current function. If the last line is a bare goto label (ends with ':'),
@@ -1091,6 +1147,7 @@ export function emit(ast: AstNode[], resolved: ResolveResult, sourceFile?: strin
           BGT: '!flag_z && (flag_n==flag_v)', BGE: 'flag_n==flag_v',
           BLT: 'flag_n!=flag_v', BLE: 'flag_z||(flag_n!=flag_v)',
           BHI: '!flag_c&&!flag_z', BLS: 'flag_c||flag_z',
+          BHS: '!flag_c', BLO: 'flag_c',
         };
         const mn = node.mnemonic;
         // For Bcc/BRA/JMP the target is operands[0]; for DBRA/DBF/etc. it's operands[1].
