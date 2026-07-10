@@ -68,6 +68,23 @@ class MaxtraxProcessor extends AudioWorkletProcessor {
         this.writePos = 0;
         break;
 
+      case 'setEvent':
+        if (this.module && typeof this.module._maxtrax_set_event === 'function') {
+          try {
+            this.module._maxtrax_set_event(
+              data.score, data.index,
+              data.ev.command, data.ev.data, data.ev.startTime, data.ev.stopTime,
+            );
+          } catch { /* ignore — WASM not ready or bad index */ }
+        }
+        break;
+
+      case 'recook':
+        if (this.module && typeof this.module._maxtrax_recook === 'function') {
+          try { this.module._maxtrax_recook(data.score); } catch { /* ignore */ }
+        }
+        break;
+
       case 'dispose':
         if (this.module && typeof this.module._maxtrax_stop === 'function') {
           try { this.module._maxtrax_stop(); } catch { /* ignore */ }

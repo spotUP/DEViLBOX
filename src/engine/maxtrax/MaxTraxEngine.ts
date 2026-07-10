@@ -6,6 +6,7 @@
  */
 
 import { getDevilboxAudioContext } from '@/utils/audio-context';
+import { useFormatStore } from '@/stores/useFormatStore';
 import {
   WASMSingletonBase,
   createWASMAssetsCache,
@@ -102,6 +103,26 @@ export class MaxTraxEngine extends WASMSingletonBase {
     await this._initPromise;
     if (!this.workletNode) throw new Error('[MaxTraxEngine] not initialized');
     this.workletNode.port.postMessage({ type: 'load', buffer, score });
+  }
+
+  /**
+   * Write one event into the live WASM cooked buffer and mirror into the store.
+   * Store + audio stay in lockstep: both updates happen in the same call.
+   */
+  setEvent(
+    score: number,
+    index: number,
+    ev: { command: number; data: number; startTime: number; stopTime: number },
+  ): void {
+    this.workletNode?.port.postMessage({ type: 'setEvent', score, index, ev });
+    useFormatStore.getState().mutateMaxTraxScore(score, (s) => {
+      s.events[index] = { ...ev };
+    });
+  }
+
+  /** Re-cook the score in the WASM player (rewinds read cursor for re-render). */
+  recook(score: number): void {
+    this.workletNode?.port.postMessage({ type: 'recook', score });
   }
 
   /** Playback starts automatically after loadTune() — this is a no-op. */
