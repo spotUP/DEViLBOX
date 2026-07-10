@@ -16,7 +16,11 @@ typedef struct {
     const int8_t* next_sample;
     uint32_t      next_len;
     int           next_loop;
+    uint16_t      next_period;  // 0 = keep current period
+    uint8_t       next_vol;
+    int           next_has_vol; // apply next_vol on swap
     int           next_valid;
+    int           completed;    // one-shot buffer reached its end since last poll
 } PaulaChannel;
 
 static PaulaChannel s_ch[PAULA_CHANNELS];
@@ -59,17 +63,35 @@ void paula_set_loop(int ch, int loop) {
     s_ch[ch].loop = loop;
 }
 
-void paula_set_next(int ch, const int8_t* data, uint16_t len_words, int loop) {
+void paula_set_next(int ch, const int8_t* data, uint16_t len_words, int loop,
+                    uint16_t period, uint8_t vol) {
     if (ch < 0 || ch >= PAULA_CHANNELS) return;
-    s_ch[ch].next_sample = data;
-    s_ch[ch].next_len    = (uint32_t)len_words * 2;
-    s_ch[ch].next_loop   = loop;
-    s_ch[ch].next_valid  = 1;
+    s_ch[ch].next_sample  = data;
+    s_ch[ch].next_len     = (uint32_t)len_words * 2;
+    s_ch[ch].next_loop    = loop;
+    s_ch[ch].next_period  = period;
+    s_ch[ch].next_vol     = vol > 64 ? 64 : vol;
+    s_ch[ch].next_has_vol = 1;
+    s_ch[ch].next_valid   = 1;
 }
 
 int paula_is_active(int ch) {
     if (ch < 0 || ch >= PAULA_CHANNELS) return 0;
     return s_ch[ch].dma_on;
+}
+
+int paula_poll_completion(int ch) {
+    if (ch < 0 || ch >= PAULA_CHANNELS) return 0;
+    int c = s_ch[ch].completed;
+    s_ch[ch].completed = 0;
+    return c;
+}
+
+void paula_channel_dma_off(int ch) {
+    if (ch < 0 || ch >= PAULA_CHANNELS) return;
+    s_ch[ch].dma_on     = 0;
+    s_ch[ch].next_valid = 0;
+    s_ch[ch].completed  = 0;
 }
 
 void paula_dma_write(uint16_t dmacon) {
@@ -78,7 +100,7 @@ void paula_dma_write(uint16_t dmacon) {
     for (i = 0; i < PAULA_CHANNELS; i++) {
         if (dmacon & (1 << i)) {
             s_ch[i].dma_on = enable;
-            if (enable) s_ch[i].pos = 0.0f;
+            if (enable) { s_ch[i].pos = 0.0f; s_ch[i].completed = 0; }
         }
     }
 }
@@ -93,15 +115,24 @@ static float sample_channel(PaulaChannel* ch) {
             idx = (uint32_t)ch->pos;
             if (idx >= ch->sample_len) { ch->pos = 0.0f; idx = 0; }
         } else if (ch->next_valid) {
-            // Swap to the queued follow-on buffer (audio.device double-buffering)
+            // Swap to the queued follow-on buffer (audio.device double-buffering).
+            // The buffer that just ended is done — raise the completion signal so
+            // the harness can reply its IOAudio block.
             ch->sample      = ch->next_sample;
             ch->sample_len  = ch->next_len;
             ch->loop        = ch->next_loop;
+            if (ch->next_period > 0)
+                ch->step = s_paula_clock / ((float)ch->next_period * (float)PAULA_RATE_PAL);
+            if (ch->next_has_vol)
+                ch->volume = (float)ch->next_vol / 64.0f;
             ch->next_valid  = 0;
+            ch->next_has_vol = 0;
             ch->pos         = 0.0f;
+            ch->completed   = 1;
             idx             = 0;
         } else {
-            ch->dma_on = 0;
+            ch->dma_on    = 0;
+            ch->completed = 1;
             return 0.0f;
         }
     }

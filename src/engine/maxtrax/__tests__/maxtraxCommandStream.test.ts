@@ -41,6 +41,7 @@ interface Counts {
   flush: number;
   pervol: number;
   other: number;
+  seedPoolDepth: number;
 }
 
 function renderCommandHistogram(seconds: number): Counts {
@@ -81,5 +82,16 @@ describe('MaxTrax transpile — audio.device command stream (UADE lockstep)', ()
     // A clobbered IO_COMMAND would surface as garbage opcodes counted in
     // bucket 3. A clean stream is entirely WRITE/FLUSH/PERVOL.
     expect(counts.other).toBe(0);
+  });
+
+  it('seeds the OpenMusic free-block pool with 3*NUM_VOICES (=12) CMD_WRITE blocks', () => {
+    // OpenMusic seeds `3*NUM_VOICES` (=12) CMD_WRITE blocks into the _play_port
+    // free pool during init, all enqueued before the first note-on dequeues one.
+    // The seed count is `#3*NUM_VOICES-1` (=11 → 12 blocks). If the transpiler
+    // mis-evaluates that immediate to its leading digit (3 → 4 blocks), the
+    // starved pool drops note-ons that can't grab a free block: notes vanish and
+    // the song plays as "random samples". The harness reports the pre-playback
+    // seed-phase peak pool depth: correct=12, seed-bug=4. Require the full seed.
+    expect(counts.seedPoolDepth).toBeGreaterThanOrEqual(12);
   });
 });

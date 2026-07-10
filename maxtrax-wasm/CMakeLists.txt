@@ -25,7 +25,7 @@ if(EMSCRIPTEN)
         "SHELL:-s WASM=1"
         "SHELL:-s MODULARIZE=1"
         "SHELL:-s EXPORT_NAME='createMaxtrax'"
-        "SHELL:-s EXPORTED_FUNCTIONS=['_maxtrax_load','_maxtrax_render','_maxtrax_stop','_maxtrax_get_sample_rate','_maxtrax_get_cmd_count','_malloc','_free']"
+        "SHELL:-s EXPORTED_FUNCTIONS=['_maxtrax_load','_maxtrax_render','_maxtrax_stop','_maxtrax_get_sample_rate','_maxtrax_get_cmd_count','_maxtrax_get_seed_pool_depth','_malloc','_free']"
         "SHELL:-s EXPORTED_RUNTIME_METHODS=['ccall','cwrap','HEAPU8','HEAPF32']"
         "SHELL:-s ALLOW_MEMORY_GROWTH=1"
         "SHELL:-s INITIAL_MEMORY=16777216"
