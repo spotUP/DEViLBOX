@@ -17,6 +17,11 @@
 #include <stdint.h>
 #include <stdio.h>
 
+/* Paula emulator API + PAULA_CHANNELS / PAULA_RATE_PAL constants. Also
+ * #included (idempotently, #pragma once) from within maxtrax.c below, but
+ * pulled in here first so the per-channel write FIFO can size on PAULA_CHANNELS. */
+#include "paula_soft.h"
+
 /* -----------------------------------------------------------------------
  * Debug instrumentation gate.
  *
@@ -91,30 +96,96 @@ static uint32_t       g_file_pos  = 0;
  * _LVOGetMsg to dequeue one before starting a new note.  We maintain a
  * simple circular buffer of 68k-space block addresses.
  * ---------------------------------------------------------------------- */
+/* One FIFO pool per AmigaOS message port (keyed by port address).
+ *
+ * MaxTrax uses TWO distinct ports and a block returns ONLY to its own reply
+ * port (io_Message.mn_ReplyPort):
+ *   _play_port — the 3*NUM_VOICES CMD_WRITE blocks cycle here; note-on
+ *                GetMsg(_play_port) pulls a free one, sets CMD_WRITE, sends it,
+ *                and audio.device replies it here on DMA completion.
+ *   _temp_port — the single ADCMD_PERVOL _audio_env block (IOF_QUICK /
+ *                synchronous). MaxTrax owns it permanently via the _audio_env
+ *                pointer and NEVER GetMsg's it.
+ * A single shared ring collapses both ports, letting the env block leak into
+ * _play_port's pool where a later note-on GetMsg grabs it and overwrites its
+ * IO_COMMAND=ADCMD_PERVOL with CMD_WRITE — corrupting the entire volume-
+ * envelope stream. Keying the pool by reply port preserves audio.device port
+ * semantics so the env block can never be dequeued by a note-on. */
 #define IOA_QUEUE_CAP 32
-static uint32_t g_ioa_queue[IOA_QUEUE_CAP];
-static int g_ioa_head = 0;
-static int g_ioa_tail = 0;
+#define IOA_MAX_PORTS 4
+typedef struct { uint32_t port; uint32_t q[IOA_QUEUE_CAP]; int head, tail; } IoaRing;
+static IoaRing g_ioa_rings[IOA_MAX_PORTS];
+static int g_ioa_ring_count = 0;
 
-static void ioa_enqueue(uint32_t addr) {
-    int next = (g_ioa_tail + 1) % IOA_QUEUE_CAP;
-    if (next == g_ioa_head) return;   /* full — drop (should not happen)  */
-    g_ioa_queue[g_ioa_tail] = addr;
-    g_ioa_tail = next;
-    { static int _eq = 0;
-      if (_eq < 16) { _eq++; MXTX_DBG("[ioa] enqueue #%d addr=%u depth=%d\n",
-          _eq, addr, (g_ioa_tail - g_ioa_head + IOA_QUEUE_CAP) % IOA_QUEUE_CAP); } }
+/* Find (or lazily create) the FIFO for a given port address. */
+static IoaRing *ioa_ring_for(uint32_t port) {
+    int i = 0;
+    while (i < g_ioa_ring_count) { if (g_ioa_rings[i].port == port) return &g_ioa_rings[i]; i++; }
+    if (g_ioa_ring_count < IOA_MAX_PORTS) {
+        IoaRing *r = &g_ioa_rings[g_ioa_ring_count++];
+        r->port = port; r->head = r->tail = 0; return r;
+    }
+    return NULL;   /* more ports than expected — should not happen */
 }
 
-static uint32_t ioa_dequeue(void) {
-    if (g_ioa_head == g_ioa_tail) {
+/* Return an IOAudio block to a specific port's free pool (ReplyMsg to port). */
+static void ioa_enqueue_port(uint32_t port, uint32_t addr) {
+    IoaRing *r = ioa_ring_for(port);
+    if (!r) return;
+    int next = (r->tail + 1) % IOA_QUEUE_CAP;
+    if (next == r->head) return;   /* full — drop (should not happen)  */
+    r->q[r->tail] = addr;
+    r->tail = next;
+    { static int _eq = 0;
+      if (_eq < 16) { _eq++; MXTX_DBG("[ioa] enqueue #%d addr=%u port=%u depth=%d\n",
+          _eq, addr, port, (r->tail - r->head + IOA_QUEUE_CAP) % IOA_QUEUE_CAP); } }
+}
+
+/* Dequeue a free block from a specific port's pool (GetMsg(port)). */
+static uint32_t ioa_dequeue_port(uint32_t port) {
+    IoaRing *r = ioa_ring_for(port);
+    if (!r || r->head == r->tail) {
         static int _emp = 0;
-        if (_emp < 8) { _emp++; MXTX_DBG("[ioa] GetMsg EMPTY #%d\n", _emp); }
+        if (_emp < 8) { _emp++; MXTX_DBG("[ioa] GetMsg EMPTY port=%u #%d\n", port, _emp); }
         return 0;   /* empty */
     }
-    uint32_t addr = g_ioa_queue[g_ioa_head];
-    g_ioa_head = (g_ioa_head + 1) % IOA_QUEUE_CAP;
+    uint32_t addr = r->q[r->head];
+    r->head = (r->head + 1) % IOA_QUEUE_CAP;
     return addr;
+}
+
+static void ioa_reset(void) {
+    int i = 0;
+    while (i < g_ioa_ring_count) { g_ioa_rings[i].head = g_ioa_rings[i].tail = 0; i++; }
+    g_ioa_ring_count = 0;
+}
+
+/* -----------------------------------------------------------------------
+ * Per-channel CMD_WRITE FIFO — faithful port of audiodevice.c _write_msg_list.
+ *
+ * MaxTrax issues CMD_WRITE per channel: an attack (ioa_Cycles==1, one-shot)
+ * then a sustain (ioa_Cycles==0, loops). The audio.device starts the head
+ * write, queues the rest, and on DMA completion of a one-shot replies that
+ * block to the free pool and starts the next queued write. This queue holds
+ * the 68k-space IOAudio block addresses currently owned by the "device"
+ * (i.e. NOT yet replied). Distinct from the per-port free pools
+ * (g_ioa_rings), which MaxTrax reads via GetMsg.
+ * ---------------------------------------------------------------------- */
+#define WR_CAP 8
+static uint32_t g_wr[PAULA_CHANNELS][WR_CAP];
+static int      g_wr_head[PAULA_CHANNELS];
+static int      g_wr_count[PAULA_CHANNELS];
+
+static uint32_t wr_at(int ch, int i)   { return g_wr[ch][(g_wr_head[ch] + i) % WR_CAP]; }
+static uint32_t wr_head(int ch)        { return g_wr_count[ch] ? wr_at(ch, 0) : 0; }
+static void     wr_push(int ch, uint32_t blk) {
+    if (g_wr_count[ch] >= WR_CAP) return;   /* full — drop (should not happen) */
+    g_wr[ch][(g_wr_head[ch] + g_wr_count[ch]) % WR_CAP] = blk;
+    g_wr_count[ch]++;
+}
+static void     wr_pop(int ch)  { if (g_wr_count[ch]) { g_wr_head[ch] = (g_wr_head[ch] + 1) % WR_CAP; g_wr_count[ch]--; } }
+static void     wr_clear_all(void) {
+    for (int c = 0; c < PAULA_CHANNELS; c++) { g_wr_head[c] = 0; g_wr_count[c] = 0; }
 }
 
 /* VBlank ISR function pointer captured by _LVOAddIntServer               */
@@ -124,8 +195,20 @@ static uint32_t g_vblank_code = 0;
 static int g_vblank_count = 0;
 static int g_beginio_count = 0;
 
+/* Per-command BeginIO tallies — always on (cheap ints), exported for the
+ * lockstep regression test. Indexed: 0=CMD_WRITE, 1=CMD_FLUSH, 2=ADCMD_PERVOL,
+ * 3=other. A healthy render is PERVOL-dominant (the volume-envelope stream);
+ * if the _audio_env reply-port fix regresses, PERVOL collapses and CMD_WRITE
+ * dominates as the env block gets reused as a sample restart. Cleared on load. */
+static int g_cmd_count[4] = {0,0,0,0};
+
 /* Samples rendered since last VBlank — fires ISR every VBLANK_SAMPLES    */
 static int g_vblank_accum = 0;
+
+/* Total frames rendered since load — sample-time stamp for BeginIO diff.
+ * Advanced tick start in maxtrax_render before that tick's paula_render, so a
+ * BeginIO fired inside vblank() logs the start-of-tick sample index.         */
+long g_render_clock = 0;
 
 /* 28150 / 50 = 563 samples per 50 Hz VBlank tick                         */
 #define VBLANK_SAMPLES (PAULA_RATE_PAL / 50)
@@ -219,19 +302,21 @@ void _LVORemIntServer(void) {
     d0 = 0;
 }
 
-/* exec GetMsg(a0=port) → d0=msg|0  — dequeue a free IOAudio block        */
+/* exec GetMsg(a0=port) → d0=msg|0  — dequeue a free IOAudio block from the
+ * pool of the requested port (note-on passes _play_port; _temp_port is never
+ * GetMsg'd, so the _audio_env PERVOL block can never be pulled here).       */
 void _LVOGetMsg(void) {
-    d0 = ioa_dequeue();
+    d0 = ioa_dequeue_port(a0);
 }
 
-/* exec ReplyMsg(a1=msg)  — return an IOAudio block to the free pool      */
+/* exec ReplyMsg(a1=msg)  — return a block to ITS reply port (mn_ReplyPort). */
 void _LVOReplyMsg(void) {
-    ioa_enqueue((uint32_t)a1);
+    ioa_enqueue_port(READ32(a1 + MN_REPLYPORT), (uint32_t)a1);
 }
 
-/* exec PutMsg(a0=port, a1=msg)  — also enqueue (used by stop_audio path) */
+/* exec PutMsg(a0=port, a1=msg)  — enqueue to the named port (stop_audio path) */
 void _LVOPutMsg(void) {
-    ioa_enqueue((uint32_t)a1);
+    ioa_enqueue_port(a0, (uint32_t)a1);
 }
 
 /* exec Signal(a1=task, d0=sigmask)  — no-op in our single-threaded model */
@@ -358,69 +443,162 @@ void _LVOSeek(void) {
  * After DEV_BEGINIO, the block is immediately re-enqueued (simulates
  * the IOF_QUICK DMA-complete callback that returns the block to _play_port).
  * ---------------------------------------------------------------------- */
+/* audio.device command constants (from maxtrax.c / amiga-ndk devices/audio.i). */
+#define AD_CMD_WRITE   3u    /* CMD_WRITE     — start/queue a DMA buffer        */
+#define AD_CMD_STOP    6u    /* CMD_STOP                                        */
+#define AD_CMD_FLUSH   8u    /* CMD_FLUSH     — abort all queued writes (note-off) */
+#define AD_ADCMD_PERVOL 12u  /* ADCMD_PERVOL  — live period+volume, no restart  */
+#define AD_ADCMD_ALLOC 32u   /* ADCMD_ALLOCATE                                  */
+
+/* IOAudio bitmask → channel index (audiodevice.c uses the low set bit). */
+static int mtx_unit_channel(uint32_t io_unit) {
+    if      (io_unit & 1u) return 0;
+    else if (io_unit & 2u) return 1;
+    else if (io_unit & 4u) return 2;
+    else if (io_unit & 8u) return 3;
+    return -1;
+}
+
+/* Start a queued CMD_WRITE block on Paula (audiodevice.c start_audio_dma).
+ * cycles==0 ⟹ infinite loop (sustain, never DMA-completes); ==1 ⟹ one-shot. */
+static void mtx_start_write(int ch, uint32_t blk) {
+    uint32_t data_addr = READ32(blk + 50u /* ioa_Data   */);
+    uint32_t len_bytes = READ32(blk + 54u /* ioa_Length */);
+    uint16_t period    = (uint16_t)READ16(blk + 58u /* ioa_Period */);
+    uint8_t  vol       = (uint8_t) READ8 (blk + 61u /* ioa_Volume low byte */);
+    uint16_t cycles    = (uint16_t)READ16(blk + 62u /* ioa_Cycles */);
+    paula_set_sample_ptr(ch, (const int8_t *)(uintptr_t)data_addr);
+    paula_set_length(ch, (uint16_t)(len_bytes >> 1));
+    if (period > 0) paula_set_period(ch, period);
+    paula_set_volume(ch, vol);
+    paula_set_loop(ch, cycles == 0u ? 1 : 0);
+    paula_dma_write((uint16_t)(0x8000u | (1u << ch)));
+}
+
+/* Pre-load a queued block as Paula's follow-on buffer so it swaps in gaplessly
+ * when the current one-shot DMA completes (audio.device double-buffering). */
+static void mtx_preload_next(int ch, uint32_t blk) {
+    uint32_t data_addr = READ32(blk + 50u);
+    uint32_t len_bytes = READ32(blk + 54u);
+    uint16_t period    = (uint16_t)READ16(blk + 58u);
+    uint8_t  vol       = (uint8_t) READ8 (blk + 61u);
+    uint16_t cycles    = (uint16_t)READ16(blk + 62u);
+    paula_set_next(ch, (const int8_t *)(uintptr_t)data_addr,
+                   (uint16_t)(len_bytes >> 1), cycles == 0u ? 1 : 0, period, vol);
+}
+
+/* audiodevice.c add_write_command: queue the block; start it if the channel is
+ * idle, else pre-load it behind the head for a gapless swap. */
+static void mtx_add_write(int ch, uint32_t blk) {
+    wr_push(ch, blk);
+    if (g_wr_count[ch] == 1) {
+        mtx_start_write(ch, blk);       /* head — start immediately */
+    } else if (g_wr_count[ch] == 2) {
+        mtx_preload_next(ch, blk);      /* follow-on — arm the swap */
+    }
+}
+
 void DEV_BEGINIO(void) {
     g_beginio_count++;
     uint32_t blk = a1;
     uint16_t cmd     = (uint16_t)READ16(blk + 28u /* IO_COMMAND */);
     uint32_t io_unit = READ32(blk + 24u /* IO_UNIT */);
+    int ch = mtx_unit_channel(io_unit);
 
-    if (cmd == 3u /* CMD_WRITE */) {
-        /* Determine channel from IO_UNIT bitmask */
-        int ch = -1;
-        if      (io_unit & 1u) ch = 0;
-        else if (io_unit & 2u) ch = 1;
-        else if (io_unit & 4u) ch = 2;
-        else if (io_unit & 8u) ch = 3;
+    if (g_beginio_count < MXTX_BEGINIO_GATE)
+        MXTX_DBG("[cmd] t=%ld n=%d cmd=%u unit=%u ch=%d\n",
+                g_render_clock, g_beginio_count, cmd, io_unit, ch);
 
+    switch (cmd) {
+        case AD_CMD_WRITE:    g_cmd_count[0]++; break;
+        case AD_CMD_FLUSH:    g_cmd_count[1]++; break;
+        case AD_ADCMD_PERVOL: g_cmd_count[2]++; break;
+        default:              g_cmd_count[3]++; break;
+    }
+
+    switch (cmd) {
+    case AD_CMD_WRITE:
+        /* Queue per channel; the block is replied to the free pool only when its
+         * one-shot DMA completes (see maxtrax_render poll) — NOT here. */
         if (ch >= 0) {
-            uint32_t data_addr = READ32(blk + 50u /* ioa_Data   */);
-            uint32_t len_bytes = READ32(blk + 54u /* ioa_Length */);
-            uint16_t period    = (uint16_t)READ16(blk + 58u /* ioa_Period */);
-            uint8_t  ioa_vol   = (uint8_t) READ8 (blk + 61u /* ioa_Volume low byte */);
-            uint16_t cycles    = (uint16_t)READ16(blk + 62u /* ioa_Cycles */);
-            uint16_t len_words = (uint16_t)(len_bytes >> 1);
-            const int8_t *data = (const int8_t *)(uintptr_t)data_addr;
-
-            if (g_beginio_count < MXTX_BEGINIO_GATE)
-                MXTX_DBG("[BeginIO-W] n=%d ch=%d data=%u len_bytes=%u period=%u vol=%u cycles=%u\n",
-                        g_beginio_count, ch, data_addr, len_bytes, period, ioa_vol, cycles);
-
-            if (cycles == 1u) {
-                /* Attack: start one-shot DMA immediately */
-                paula_set_sample_ptr(ch, data);
-                paula_set_length(ch, len_words);
-                if (period > 0) paula_set_period(ch, period);
-                paula_set_volume(ch, ioa_vol);
-                paula_set_loop(ch, 0);
-                paula_dma_write((uint16_t)(0x8000u | (1u << ch)));
-            } else {
-                /* Sustain: queue as follow-on buffer (loops) */
-                paula_set_next(ch, data, len_words, 1 /* loop */);
+            if (g_beginio_count < MXTX_BEGINIO_GATE) {
+                uint16_t cyc = (uint16_t)READ16(blk + 62u);
+                MXTX_DBG("[BeginIO-W] t=%ld n=%d ch=%d data=%u len_bytes=%u period=%u vol=%u cycles=%u depth=%d\n",
+                        g_render_clock, g_beginio_count, ch, READ32(blk + 50u), READ32(blk + 54u),
+                        (uint16_t)READ16(blk + 58u), (uint8_t)READ8(blk + 61u), cyc, g_wr_count[ch]);
             }
+            mtx_add_write(ch, blk);
         }
-    } else if (cmd == 0x8009u /* ADCMD_PERVOL */ ||
-               cmd == 0x8008u /* ADCMD_PERSIZE */) {
-        /* Live period/volume update for an active voice */
-        int ch = -1;
-        if      (io_unit & 1u) ch = 0;
-        else if (io_unit & 2u) ch = 1;
-        else if (io_unit & 4u) ch = 2;
-        else if (io_unit & 8u) ch = 3;
+        WRITE8(blk + 31u /* IO_ERROR */, 0u);
+        break;
+
+    case AD_CMD_FLUSH:
+        /* Note-off: stop every channel in the unit bitmask and reply all its
+         * queued writes to the free pool (audiodevice.c CMD_FLUSH). */
+        int chn = 0;
+        while (chn < PAULA_CHANNELS) {   /* maxtrax.c #defines `for`, so use while */
+            if (io_unit & (1u << chn)) {
+                paula_channel_dma_off(chn);
+                while (g_wr_count[chn]) {
+                    uint32_t w = wr_head(chn);
+                    ioa_enqueue_port(READ32(w + MN_REPLYPORT), w);   /* → _play_port */
+                    wr_pop(chn);
+                }
+            }
+            chn++;
+        }
+        WRITE8(blk + 31u, 0u);
+        ioa_enqueue_port(READ32(blk + MN_REPLYPORT), (uint32_t)blk);  /* reply the flush block itself */
+        break;
+
+    case AD_ADCMD_PERVOL:
+        /* Live period/volume envelope update on the playing voice — no restart.
+         * Replies to _temp_port (the env block's own reply port), NOT the
+         * note-on GetMsg pool, so it can never be reused as a CMD_WRITE block. */
         if (ch >= 0) {
-            uint8_t  ioa_vol = (uint8_t)READ8 (blk + 61u /* ioa_Volume low byte */);
-            uint16_t period  = (uint16_t)READ16(blk + 58u /* ioa_Period */);
-            paula_set_volume(ch, ioa_vol);
+            uint8_t  vol    = (uint8_t) READ8 (blk + 61u);
+            uint16_t period = (uint16_t)READ16(blk + 58u);
+            paula_set_volume(ch, vol);
             if (period > 0) paula_set_period(ch, period);
         }
-    }
-    /* CMD_FLUSH, CMD_STOP, ADCMD_ALLOCATE etc. → no-op */
+        WRITE8(blk + 31u, 0u);
+        ioa_enqueue_port(READ32(blk + MN_REPLYPORT), (uint32_t)blk);  /* PERVOL replies immediately */
+        break;
 
-    /* Acknowledge success and immediately re-enqueue the block.
-     * This simulates IOF_QUICK DMA-complete: the audio.device returns
-     * the block to _play_port so MaxTrax can reuse it for the next note. */
-    WRITE8(blk + 31u /* IO_ERROR */, 0u);
+    default:
+        /* ADCMD_ALLOCATE, CMD_STOP, etc.: acknowledge and reclaim the block. */
+        WRITE8(blk + 31u, 0u);
+        ioa_enqueue_port(READ32(blk + MN_REPLYPORT), (uint32_t)blk);
+        break;
+    }
     d0 = 0u;
-    ioa_enqueue((uint32_t)blk);
+}
+
+/* -----------------------------------------------------------------------
+ * Per-channel DMA-completion poll — the software analogue of the Amiga
+ * audio-block-done interrupt (audiodevice.c audiodevice_DMA_signal).
+ * Called after every paula_render chunk: when a one-shot buffer has reached
+ * its end, reply its IOAudio block to MaxTrax's free pool and advance the
+ * per-channel write queue (starting/arming the next buffer). A cycles==0
+ * sustain loops forever and never completes — it is drained only by FLUSH.
+ * ---------------------------------------------------------------------- */
+static void mtx_poll_completions(void) {
+    int chn = 0;
+    while (chn < PAULA_CHANNELS) {   /* maxtrax.c #defines `for`, so use while */
+        int cur = chn++;
+        if (!paula_poll_completion(cur)) continue;
+        uint32_t done = wr_head(cur);
+        if (!done) continue;
+        ioa_enqueue_port(READ32(done + MN_REPLYPORT), done);  /* reply finished one-shot → _play_port */
+        wr_pop(cur);
+        uint32_t next = wr_head(cur);
+        if (!next) continue;
+        /* paula already swapped into the pre-loaded follow-on if it was armed;
+         * if the channel went idle (follow-on arrived after completion), start
+         * it now. Then arm the one behind it for the next gapless swap. */
+        if (!paula_is_active(cur)) mtx_start_write(cur, next);
+        if (g_wr_count[cur] >= 2) mtx_preload_next(cur, wr_at(cur, 1));
+    }
 }
 
 /* -----------------------------------------------------------------------
@@ -437,11 +615,14 @@ void DEV_BEGINIO(void) {
 EXPORT int maxtrax_load(const uint8_t *data, uint32_t len, int score) {
     /* --- Reset state --- */
     paula_reset();
-    g_ioa_head = g_ioa_tail = 0;
+    ioa_reset();
+    wr_clear_all();
     g_vblank_code = 0;
     g_vblank_accum = 0;
     g_vblank_count = 0;
     g_beginio_count = 0;
+    g_cmd_count[0] = g_cmd_count[1] = g_cmd_count[2] = g_cmd_count[3] = 0;
+    g_render_clock = 0;
     g_file_data = data;
     g_file_size = len;
     g_file_pos  = 0;
@@ -568,7 +749,9 @@ EXPORT int maxtrax_render(float *buffer, int frames) {
         int chunk = frames - written;
         if (chunk > remaining) chunk = remaining;
         paula_render(buffer + written * 2, chunk);
+        mtx_poll_completions();   /* reply finished one-shot blocks, advance queues */
         written += chunk;
+        g_render_clock += chunk;
         g_vblank_accum += chunk;
         if (g_vblank_accum >= VBLANK_SAMPLES) {
             g_vblank_accum = 0;
@@ -590,9 +773,10 @@ EXPORT void maxtrax_stop(void) {
         MXTX_DBG("[stop] done\n");
     }
     paula_reset();
+    wr_clear_all();
     g_vblank_code = 0;
     g_vblank_accum = 0;
-    g_ioa_head = g_ioa_tail = 0;
+    ioa_reset();
     g_file_data = NULL;
     g_file_size = 0;
     g_file_pos  = 0;
@@ -605,4 +789,17 @@ EXPORT void maxtrax_stop(void) {
  */
 EXPORT int maxtrax_get_sample_rate(void) {
     return PAULA_RATE_PAL;
+}
+
+/*
+ * maxtrax_get_cmd_count(which)
+ *
+ * BeginIO command tally since the last load, for the lockstep regression test.
+ * which: 0=CMD_WRITE, 1=CMD_FLUSH, 2=ADCMD_PERVOL, 3=other. A correct render is
+ * PERVOL-dominant; the _audio_env reply-port bug collapses PERVOL and inflates
+ * CMD_WRITE, so the test asserts count(2) >> count(0).
+ */
+EXPORT int maxtrax_get_cmd_count(int which) {
+    if (which < 0 || which > 3) return -1;
+    return g_cmd_count[which];
 }
