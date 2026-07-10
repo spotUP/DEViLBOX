@@ -401,6 +401,31 @@ function tokenizeLine(src: string, lineNum: number): Token[] {
       continue;
     }
 
+    // -- Negative displacement with a symbolic offset: -symbol(reg) --
+    // e.g. `lea -patch_sizeof(a3),a3`. Without this, the '-' would split off as
+    // a stray operator and the DISP_REG would drop the sign, turning a decrement
+    // into an increment (walks arrays off their end → OOB).
+    if (ch === '-' && i + 1 < src.length && isIdentStart(src[i + 1])) {
+      const save = i;
+      advance(); // consume '-'
+      let id = '';
+      while (i < src.length && isIdentContinue(src[i])) id += src[i++];
+      if (id.length > 0 && peek() === '(') {
+        const parenStart = i;
+        i++; // consume '('
+        let depth = 1;
+        while (i < src.length && depth > 0) {
+          if (src[i] === '(') depth++;
+          else if (src[i] === ')') depth--;
+          i++;
+        }
+        tokens.push(tok('DISP_REG', '-' + id + src.slice(parenStart, i), col));
+        isFirstToken = false;
+        continue;
+      }
+      i = save; // not `-symbol(reg)` — restore and let normal handling run
+    }
+
     // -- Indirect / plain paren: (reg), (reg)+, (reg,idx) --
     if (ch === '(') {
       tokens.push(readParenAddr(col));
@@ -588,6 +613,27 @@ function tokenizeLine(src: string, lineNum: number): Token[] {
     if (ch === '-' && !isFirstToken && tokens.length > 0 && tokens[tokens.length - 1].kind === 'REGISTER') {
       advance();
       tokens.push(tok('RANGE', '-', col));
+      continue;
+    }
+
+    // -- ABS_ADDR +/- symbol|number: compound absolute address (e.g. $00dff000+vhposr) --
+    // The '+' here is not an OPERATOR token — the ABS_ADDR was already pushed and
+    // neither the IDENTIFIER (623) nor NUMBER (647) fold matches ABS_ADDR. Without
+    // this, the trailing term splits off as a phantom operand, turning
+    // `move.w $00dff000+vhposr,d0` into a 3-operand instruction that emits a null
+    // WRITE16 to vhposr (which is #defined 0). Fold the term into the ABS_ADDR so
+    // it stays ONE operand → `hw_read16(0x00dff000+vhposr)`.
+    if ((ch === '+' || ch === '-') && tokens.length > 0 &&
+        tokens[tokens.length - 1].kind === 'ABS_ADDR' &&
+        i + 1 < src.length &&
+        (isIdentStart(src[i + 1]) || isDigit(src[i + 1]) || src[i + 1] === '$')) {
+      const prevTok = tokens[tokens.length - 1];
+      advance(); // consume '+' or '-'
+      let term = '';
+      if (src[i] === '$') { advance(); term = '$' + readHex(); }
+      else if (isDigit(src[i])) { term = readDecimal(); }
+      else { while (i < src.length && isIdentContinue(src[i])) term += src[i++]; }
+      prevTok.value += ch + term;
       continue;
     }
 

@@ -46,6 +46,19 @@ test('BEQ label',    () => { expect(emit('\tBEQ label')).toBe('if (flag_z) goto 
 test('BNE label',    () => { expect(emit('\tBNE label')).toBe('if (!flag_z) goto label;'); });
 test('BRA label',    () => { expect(emit('\tBRA label')).toBe('goto label;'); });
 test('DBRA d0,loop', () => { expect(emit('\tDBRA d0,loop')).toContain('(int16_t)(--d0) >= 0'); });
+// BHS/BLO are unsigned-branch aliases of BCC/BCS. Missing them silently dropped a
+// conditional branch in MaxTrax IntAlg (BHS.S) — the "sounds totally weird" bug.
+test('BHS label (alias of BCC)', () => { expect(emit('\tBHS label')).toBe('if (!flag_c) goto label;'); });
+test('BLO label (alias of BCS)', () => { expect(emit('\tBLO label')).toBe('if (flag_c) goto label;'); });
+test('BHS.S label with size suffix', () => { expect(emit('\tBHS.S label')).toBe('if (!flag_c) goto label;'); });
+// EXG exchanges two full 32-bit registers. Missing it left FreeSample freeing the wrong
+// pointer → double-free → maxtrax_stop() abort → the "plays once then needs reload" bug.
+test('EXG A1,A2 swaps both registers', () => {
+  expect(emit('\tEXG a1,a2')).toBe('{ uint32_t _exg = a1; a1 = a2; a2 = _exg; }');
+});
+test('EXG.L D3,A3 swaps data/address register', () => {
+  expect(emit('\tEXG.L d3,a3')).toBe('{ uint32_t _exg = d3; d3 = a3; a3 = _exg; }');
+});
 test('BSR func',     () => { expect(emit('\tBSR func')).toBe('func();'); });
 test('RTS',          () => { expect(emit('\tRTS')).toBe('return;'); });
 test('NOP',          () => { expect(emit('\tNOP')).toBe('/* NOP */'); });
