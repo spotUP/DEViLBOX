@@ -17,6 +17,10 @@ extern void customreset (void);
 extern int intlev (void);
 extern void dumpcustom (void);
 
+/* Fake audio.device support (see audiodevice.c). */
+extern void audiodevice_dmacon(uae_u16 v);
+extern void disable_audio_dma(int channel);
+
 extern void do_disk (void);
 
 extern void notice_new_xcolors (void);
