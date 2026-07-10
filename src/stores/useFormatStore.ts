@@ -928,6 +928,10 @@ export const useFormatStore = create<FormatStore>()(
           newEditorMode = 'sc68';
           state.editorMode = 'sc68';
           clearNative(state);
+        } else if ((song as any).maxTraxData) {
+          newEditorMode = 'maxtrax';
+          state.editorMode = 'maxtrax';
+          clearNative(state);
         } else {
           state.editorMode = 'classic';
         }
