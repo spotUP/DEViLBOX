@@ -297,10 +297,13 @@ async function dispatchNativeExport(song: TrackerSong): Promise<RawExportResult 
     const { exportSynTrackerFile } = await import('./SynTrackerExporter');
     result = { data: exportSynTrackerFile(song), filename: `${baseName}.synmod`, warnings: [] };
   } else if (isMaxTrax(song)) {
-    // MaxTrax keeps format 'MOD'; dispatch on the MXTX magic. Re-encode the parsed scores
-    // (byte-exact for unedited) into a copy preserving header + sample bank.
-    const { parseMaxTrax, encodeMaxTrax } = await import('@lib/import/formats/maxtrax/maxtraxFormat');
-    const data = parseMaxTrax(new Uint8Array(song.maxTraxFileData!));
+    // MaxTrax keeps format 'MOD'; dispatch on the MXTX magic. Use the live edited
+    // MaxTraxData from the store when present (preserves edits); fall back to
+    // re-parsing the original bytes only when no edited model exists.
+    const { encodeMaxTrax, parseMaxTrax } = await import('@lib/import/formats/maxtrax/maxtraxFormat');
+    const { useFormatStore } = await import('@stores/useFormatStore');
+    const live = useFormatStore.getState().maxTraxData;
+    const data = live ?? parseMaxTrax(new Uint8Array(song.maxTraxFileData!));
     result = { data: encodeMaxTrax(data), filename: `${baseName}.mxtx`, warnings: [] };
   } else if (format === 'MOD' && !layoutFormatId) {
     const { exportSongToMOD } = await import('./modExport');
