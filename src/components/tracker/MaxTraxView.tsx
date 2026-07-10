@@ -41,39 +41,27 @@ export const MaxTraxView: React.FC = () => {
     ? Array.from({ length: scoreCount }, (_, i) => ({ value: String(i), label: `Score ${i + 1}` }))
     : [{ value: '0', label: 'Score 1' }];
 
-  const handleSave = async () => {
+  const runExportDownload = async (verb: 'save' | 'export') => {
+    const capitalized = verb === 'save' ? 'Save' : 'Export';
+    const past = verb === 'save' ? 'Saved' : 'Exported';
     try {
       const { exportNativeSong } = await import('@lib/export/nativeExportRouter');
       const { downloadBytes } = await import('@lib/export/Cinter4ModSave');
       const res = await exportNativeSong(null);
       if (res) {
         downloadBytes(res.data, res.filename);
-        notify.success(`Saved ${res.filename}`, 2000);
+        notify.success(`${past} ${res.filename}`, 2000);
       } else {
-        notify.warning('Nothing to save — load a MaxTrax file first.', 3000);
+        notify.warning(`Nothing to ${verb} — load a MaxTrax file first.`, 3000);
       }
     } catch (err) {
-      console.error('[MaxTraxView] save error', err);
-      notify.error('Save failed — see console.', 3000);
+      console.error(`[MaxTraxView] ${verb} error`, err);
+      notify.error(`${capitalized} failed — see console.`, 3000);
     }
   };
 
-  const handleExport = async () => {
-    try {
-      const { exportNativeSong } = await import('@lib/export/nativeExportRouter');
-      const { downloadBytes } = await import('@lib/export/Cinter4ModSave');
-      const res = await exportNativeSong(null);
-      if (res) {
-        downloadBytes(res.data, res.filename);
-        notify.success(`Exported ${res.filename}`, 2000);
-      } else {
-        notify.warning('Nothing to export — load a MaxTrax file first.', 3000);
-      }
-    } catch (err) {
-      console.error('[MaxTraxView] export error', err);
-      notify.error('Export failed — see console.', 3000);
-    }
-  };
+  const handleSave = () => runExportDownload('save');
+  const handleExport = () => runExportDownload('export');
 
   return (
     <div className="flex flex-col flex-1 min-h-0 bg-dark-bg">
