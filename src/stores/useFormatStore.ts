@@ -224,6 +224,7 @@ interface FormatStore {
   setOriginalModuleData: (data: FormatStore['originalModuleData']) => void;
   setMaxTraxData: (data: MaxTraxData | null) => void;
   mutateMaxTraxScore: (scoreIndex: number, fn: (score: MaxTraxScore) => void) => void;
+  mutateMaxTraxSample: (sampleIndex: number, mutation: MaxTraxSampleMutation) => void;
   applyEditorMode: (song: { linearPeriods?: boolean; furnaceNative?: FurnaceNativeData; hivelyNative?: HivelyNativeData; hivelyFileData?: ArrayBuffer; klysNative?: KlysNativeData; klysFileData?: ArrayBuffer; musiclineFileData?: Uint8Array; c64SidFileData?: Uint8Array; jamCrackerFileData?: ArrayBuffer; futurePlayerFileData?: ArrayBuffer; preTrackerFileData?: ArrayBuffer; maFileData?: ArrayBuffer; hippelFileData?: ArrayBuffer; sonixFileData?: ArrayBuffer; sonixSidecarFiles?: Array<{ path: string; data: ArrayBuffer }>; pxtoneFileData?: ArrayBuffer; organyaFileData?: ArrayBuffer; eupFileData?: ArrayBuffer; ixsFileData?: ArrayBuffer; psycleFileData?: ArrayBuffer; sc68FileData?: ArrayBuffer; zxtuneFileData?: ArrayBuffer; pumaTrackerFileData?: ArrayBuffer; steveTurnerFileData?: ArrayBuffer; sidmon1WasmFileData?: ArrayBuffer; artOfNoiseFileData?: ArrayBuffer; cinter4FileData?: ArrayBuffer; bdFileData?: ArrayBuffer; sd2FileData?: ArrayBuffer; symphonieFileData?: ArrayBuffer; sawteethFileData?: ArrayBuffer; soundMonFileData?: ArrayBuffer; sonicArrangerFileData?: ArrayBuffer; robHubbardFileData?: ArrayBuffer; digMugFileData?: ArrayBuffer; coreDesignFileData?: ArrayBuffer; davidWhittakerFileData?: ArrayBuffer; uadeEditableFileData?: ArrayBuffer; uadeEditableFileName?: string; maxTraxFileData?: ArrayBuffer; maxTraxFileName?: string; nativeSamplePlayback?: boolean; adplugFileData?: ArrayBuffer; adplugFileName?: string; adplugTicksPerRow?: number; libopenmptFileData?: ArrayBuffer; hivelyMeta?: { stereoMode: number; mixGain: number; speedMultiplier: number; version: number }; furnaceSubsongs?: FurnaceSubsongPlayback[]; furnaceActiveSubsong?: number; channelTrackTables?: number[][]; channelSpeeds?: number[]; channelGrooves?: number[]; musiclineMetadata?: { title: string; author: string; date: string; duration: string; infoText: string[] }; goatTrackerData?: Uint8Array; tfmxNative?: TFMXNativeData; sf2StoreData?: SF2LoadPayload; cheeseCutterStoreData?: import('@/stores/useCheeseCutterStore').CheeseCutterLoadPayload }) => void;
   setFurnaceActiveSubsong: (index: number) => void;
   setActivisionProSubsongs: (count: number) => void;
@@ -339,6 +340,61 @@ const clearNative = (state: any) => {
   state.tfmxSelectedPattern = 0;
 };
 
+/** Mutation discriminated union for mutateMaxTraxSample. */
+export type MaxTraxSampleMutation =
+  | { kind: 'field'; field: 'number' | 'tune' | 'volume' | 'octaves' | 'attackLen' | 'sustainLen'; value: number }
+  | { kind: 'envField'; side: 'attack' | 'release'; pointIndex: number; field: 'duration' | 'volume'; value: number }
+  | { kind: 'addEnvPoint'; side: 'attack' | 'release'; duration: number; volume: number }
+  | { kind: 'removeEnvPoint'; side: 'attack' | 'release'; pointIndex: number };
+
+interface MaxTraxSampleByteLayout {
+  headerBase: number;
+  envBase: number;
+  pcmBase: number;
+  pcmSize: number;
+  sampleEnd: number;
+  attackCount: number;
+  releaseCount: number;
+  attackLen: number;
+  sustainLen: number;
+  octaves: number;
+}
+
+function locateMaxTraxSampleInTailRaw(tail: Uint8Array, sampleIndex: number): MaxTraxSampleByteLayout | null {
+  if (tail.length < 2) return null;
+  const dv = new DataView(tail.buffer, tail.byteOffset, tail.byteLength);
+  const numSamples = dv.getUint16(0);
+  if (sampleIndex >= numSamples) return null;
+  let p = 2; // skip numSamples
+  for (let s = 0; s <= sampleIndex; s++) {
+    if (p + 20 > tail.length) return null;
+    const ac = dv.getUint16(p + 16);
+    const rc = dv.getUint16(p + 18);
+    const al = dv.getUint32(p + 8);
+    const sl = dv.getUint32(p + 12);
+    const oc = dv.getUint16(p + 6);
+    const firstLen = al + sl;
+    const envBytes = (ac + rc) * 4;
+    const pcmSize = firstLen > 0 ? Math.round(firstLen * (Math.pow(2, oc) - 1)) : 0;
+    if (s === sampleIndex) {
+      return {
+        headerBase: p,
+        envBase: p + 20,
+        pcmBase: p + 20 + envBytes,
+        pcmSize,
+        sampleEnd: p + 20 + envBytes + pcmSize,
+        attackCount: ac,
+        releaseCount: rc,
+        attackLen: al,
+        sustainLen: sl,
+        octaves: oc,
+      };
+    }
+    p += 20 + envBytes + pcmSize;
+  }
+  return null;
+}
+
 export const useFormatStore = create<FormatStore>()(
   immer((set, get) => ({
     editorMode: 'classic' as EditorMode,
@@ -446,6 +502,75 @@ export const useFormatStore = create<FormatStore>()(
       const d = state.maxTraxData;
       if (!d || !d.scores[scoreIndex]) return;
       fn(d.scores[scoreIndex]);
+      state.maxTraxRev += 1;
+    }),
+    mutateMaxTraxSample: (sampleIndex, mutation) => set((state) => {
+      const d = state.maxTraxData;
+      if (!d) return;
+      let tail = d.tailRaw;
+      const layout = locateMaxTraxSampleInTailRaw(tail, sampleIndex);
+      if (!layout) return;
+
+      if (mutation.kind === 'field') {
+        // In-place write — no size change
+        const dv = new DataView(tail.buffer, tail.byteOffset, tail.byteLength);
+        const b = layout.headerBase;
+        switch (mutation.field) {
+          case 'number':    dv.setUint16(b, mutation.value); break;
+          case 'tune':      dv.setInt16(b + 2, mutation.value); break;
+          case 'volume':    dv.setUint16(b + 4, mutation.value); break;
+          case 'octaves':   dv.setUint16(b + 6, mutation.value); break;
+          case 'attackLen': dv.setUint32(b + 8, mutation.value); break;
+          case 'sustainLen':dv.setUint32(b + 12, mutation.value); break;
+        }
+        // tailRaw already mutated in-place (DataView writes through)
+      } else if (mutation.kind === 'envField') {
+        const { side, pointIndex, field, value } = mutation;
+        const dv = new DataView(tail.buffer, tail.byteOffset, tail.byteLength);
+        // attack points come first, then release
+        const absIndex = side === 'attack' ? pointIndex : layout.attackCount + pointIndex;
+        if (absIndex >= layout.attackCount + layout.releaseCount) return;
+        const envOffset = layout.envBase + absIndex * 4 + (field === 'volume' ? 2 : 0);
+        dv.setUint16(envOffset, value);
+      } else if (mutation.kind === 'addEnvPoint') {
+        const { side, duration, volume } = mutation;
+        const ac = layout.attackCount;
+        const rc = layout.releaseCount;
+        // Insert at end of attack array (if side='attack') or end of release array
+        const insertAt = side === 'attack'
+          ? layout.envBase + ac * 4
+          : layout.envBase + (ac + rc) * 4;
+        const newTail = new Uint8Array(tail.length + 4);
+        newTail.set(tail.slice(0, insertAt));
+        const dv = new DataView(newTail.buffer);
+        dv.setUint16(insertAt, duration);
+        dv.setUint16(insertAt + 2, volume);
+        newTail.set(tail.slice(insertAt), insertAt + 4);
+        // Update attackCount or releaseCount in new buffer
+        const countOffset = layout.headerBase + (side === 'attack' ? 16 : 18);
+        const newCount = (side === 'attack' ? ac : rc) + 1;
+        new DataView(newTail.buffer).setUint16(countOffset, newCount);
+        tail = newTail;
+        d.tailRaw = tail;
+      } else if (mutation.kind === 'removeEnvPoint') {
+        const { side, pointIndex } = mutation;
+        const ac = layout.attackCount;
+        const rc = layout.releaseCount;
+        const absIndex = side === 'attack' ? pointIndex : ac + pointIndex;
+        const maxIdx = (side === 'attack' ? ac : rc) - 1;
+        if (pointIndex < 0 || pointIndex > maxIdx) return;
+        const removeAt = layout.envBase + absIndex * 4;
+        const newTail = new Uint8Array(tail.length - 4);
+        newTail.set(tail.slice(0, removeAt));
+        newTail.set(tail.slice(removeAt + 4), removeAt);
+        // Update count
+        const countOffset = layout.headerBase + (side === 'attack' ? 16 : 18);
+        const newCount = (side === 'attack' ? ac : rc) - 1;
+        new DataView(newTail.buffer).setUint16(countOffset, newCount);
+        tail = newTail;
+        d.tailRaw = tail;
+      }
+
       state.maxTraxRev += 1;
     }),
     setFurnaceNative: (data) => set((state) => { state.furnaceNative = data; }),
