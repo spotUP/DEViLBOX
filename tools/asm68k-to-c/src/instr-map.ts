@@ -587,6 +587,15 @@ export function emitInstruction(node: InstructionNode): string {
       return `${reg} = (${reg} >> 16) | (${reg} << 16);`;
     }
 
+    case 'EXG': {
+      // EXG exchanges two registers in full (always 32-bit, size suffix is cosmetic).
+      // Both operands are always registers (Dn or An).
+      if (ops[0]?.kind !== 'register' || ops[1]?.kind !== 'register')
+        return `/* EXG invalid operands */`;
+      const r0 = (ops[0] as any).name, r1 = (ops[1] as any).name;
+      return `{ uint32_t _exg = ${r0}; ${r0} = ${r1}; ${r1} = _exg; }`;
+    }
+
     case 'LSL':
       if (!dst) {
         if (ops[0].kind === 'register') return `${src} <<= 1;`;
@@ -685,8 +694,8 @@ export function emitInstruction(node: InstructionNode): string {
     case 'BNE': return `if (!flag_z) goto ${src};`;
     case 'BMI': return `if (flag_n) goto ${src};`;
     case 'BPL': return `if (!flag_n) goto ${src};`;
-    case 'BCS': return `if (flag_c) goto ${src};`;
-    case 'BCC': return `if (!flag_c) goto ${src};`;
+    case 'BCS': case 'BLO': return `if (flag_c) goto ${src};`;   /* BLO = branch if lower (unsigned) = carry set */
+    case 'BCC': case 'BHS': return `if (!flag_c) goto ${src};`;  /* BHS = branch if higher-or-same (unsigned) = carry clear */
     case 'BVS': return `if (flag_v) goto ${src};`;
     case 'BVC': return `if (!flag_v) goto ${src};`;
     case 'BGT': return `if (!flag_z && (flag_n==flag_v)) goto ${src};`;

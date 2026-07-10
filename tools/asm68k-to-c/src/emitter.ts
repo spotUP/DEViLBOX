@@ -700,7 +700,8 @@ export function emit(ast: AstNode[], resolved: ResolveResult, sourceFile?: strin
   // scope boundaries that expose additional cross-function gotos.
   const crossFuncGotos = new Set<string>();
   const BRANCH_MNEMS  = new Set(['BRA','JMP','BEQ','BNE','BMI','BPL','BCS','BCC',
-                                  'BVS','BVC','BGT','BGE','BLT','BLE','BHI','BLS']);
+                                  'BVS','BVC','BGT','BGE','BLT','BLE','BHI','BLS',
+                                  'BHS','BLO']);
   const DBRANCH_MNEMS = new Set(['DBRA','DBF','DBEQ','DBNE']);
 
   let cfgChanged = true;
@@ -988,6 +989,7 @@ export function emit(ast: AstNode[], resolved: ResolveResult, sourceFile?: strin
     BGT: 'greater than (signed)', BGE: 'greater or equal (signed)',
     BLT: 'less than (signed)',    BLE: 'less or equal (signed)',
     BHI: 'higher (unsigned)',     BLS: 'lower or same (unsigned)',
+    BHS: 'higher or same (unsigned)', BLO: 'lower (unsigned)',
   };
 
   // Close the current function. If the last line is a bare goto label (ends with ':'),
@@ -1091,6 +1093,7 @@ export function emit(ast: AstNode[], resolved: ResolveResult, sourceFile?: strin
           BGT: '!flag_z && (flag_n==flag_v)', BGE: 'flag_n==flag_v',
           BLT: 'flag_n!=flag_v', BLE: 'flag_z||(flag_n!=flag_v)',
           BHI: '!flag_c&&!flag_z', BLS: 'flag_c||flag_z',
+          BHS: '!flag_c', BLO: 'flag_c',
         };
         const mn = node.mnemonic;
         // For Bcc/BRA/JMP the target is operands[0]; for DBRA/DBF/etc. it's operands[1].
