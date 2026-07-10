@@ -20,6 +20,7 @@ import type {
 } from '@typedefs';
 import type { TFMXNativeData } from '@/types/tfmxNative';
 import type { SF2LoadPayload } from './useSF2Store';
+import type { MaxTraxData, MaxTraxScore } from '@/lib/import/formats/maxtrax/maxtraxFormat';
 import { useSF2Store } from './useSF2Store';
 import { useCheeseCutterStore } from './useCheeseCutterStore';
 import { useEditorStore } from './useEditorStore';
@@ -110,6 +111,10 @@ interface FormatStore {
   maxTraxFileName: string | null;
   /** Song's Sampler instruments are driven by the TS scheduler (no WASM replayer). */
   nativeSamplePlayback: boolean;
+  /** Parsed MaxTrax event model — single source of truth for editing. Null when no MaxTrax song loaded. */
+  maxTraxData: MaxTraxData | null;
+  /** Incremented on every mutateMaxTraxScore call so subscribers re-render. */
+  maxTraxRev: number;
   adplugFileData: ArrayBuffer | null;
   adplugFileName: string | null;
   adplugTicksPerRow: number | null;
@@ -217,6 +222,8 @@ interface FormatStore {
   setSongDBInfo: (info: FormatStore['songDBInfo']) => void;
   setSidMetadata: (info: FormatStore['sidMetadata']) => void;
   setOriginalModuleData: (data: FormatStore['originalModuleData']) => void;
+  setMaxTraxData: (data: MaxTraxData | null) => void;
+  mutateMaxTraxScore: (scoreIndex: number, fn: (score: MaxTraxScore) => void) => void;
   applyEditorMode: (song: { linearPeriods?: boolean; furnaceNative?: FurnaceNativeData; hivelyNative?: HivelyNativeData; hivelyFileData?: ArrayBuffer; klysNative?: KlysNativeData; klysFileData?: ArrayBuffer; musiclineFileData?: Uint8Array; c64SidFileData?: Uint8Array; jamCrackerFileData?: ArrayBuffer; futurePlayerFileData?: ArrayBuffer; preTrackerFileData?: ArrayBuffer; maFileData?: ArrayBuffer; hippelFileData?: ArrayBuffer; sonixFileData?: ArrayBuffer; sonixSidecarFiles?: Array<{ path: string; data: ArrayBuffer }>; pxtoneFileData?: ArrayBuffer; organyaFileData?: ArrayBuffer; eupFileData?: ArrayBuffer; ixsFileData?: ArrayBuffer; psycleFileData?: ArrayBuffer; sc68FileData?: ArrayBuffer; zxtuneFileData?: ArrayBuffer; pumaTrackerFileData?: ArrayBuffer; steveTurnerFileData?: ArrayBuffer; sidmon1WasmFileData?: ArrayBuffer; artOfNoiseFileData?: ArrayBuffer; cinter4FileData?: ArrayBuffer; bdFileData?: ArrayBuffer; sd2FileData?: ArrayBuffer; symphonieFileData?: ArrayBuffer; sawteethFileData?: ArrayBuffer; soundMonFileData?: ArrayBuffer; sonicArrangerFileData?: ArrayBuffer; robHubbardFileData?: ArrayBuffer; digMugFileData?: ArrayBuffer; coreDesignFileData?: ArrayBuffer; davidWhittakerFileData?: ArrayBuffer; uadeEditableFileData?: ArrayBuffer; uadeEditableFileName?: string; maxTraxFileData?: ArrayBuffer; maxTraxFileName?: string; nativeSamplePlayback?: boolean; adplugFileData?: ArrayBuffer; adplugFileName?: string; adplugTicksPerRow?: number; libopenmptFileData?: ArrayBuffer; hivelyMeta?: { stereoMode: number; mixGain: number; speedMultiplier: number; version: number }; furnaceSubsongs?: FurnaceSubsongPlayback[]; furnaceActiveSubsong?: number; channelTrackTables?: number[][]; channelSpeeds?: number[]; channelGrooves?: number[]; musiclineMetadata?: { title: string; author: string; date: string; duration: string; infoText: string[] }; goatTrackerData?: Uint8Array; tfmxNative?: TFMXNativeData; sf2StoreData?: SF2LoadPayload; cheeseCutterStoreData?: import('@/stores/useCheeseCutterStore').CheeseCutterLoadPayload }) => void;
   setFurnaceActiveSubsong: (index: number) => void;
   setActivisionProSubsongs: (count: number) => void;
@@ -403,6 +410,8 @@ export const useFormatStore = create<FormatStore>()(
     maxTraxFileData: null,
     maxTraxFileName: null,
     nativeSamplePlayback: false,
+    maxTraxData: null,
+    maxTraxRev: 0,
     adplugFileData: null,
     adplugFileName: null,
     adplugTicksPerRow: null,
@@ -432,6 +441,13 @@ export const useFormatStore = create<FormatStore>()(
     hivelyRedoStack: [],
 
     setEditorMode: (mode) => set((state) => { state.editorMode = mode; }),
+    setMaxTraxData: (data) => set((state) => { state.maxTraxData = data; state.maxTraxRev = 0; }),
+    mutateMaxTraxScore: (scoreIndex, fn) => set((state) => {
+      const d = state.maxTraxData;
+      if (!d || !d.scores[scoreIndex]) return;
+      fn(d.scores[scoreIndex]);
+      state.maxTraxRev += 1;
+    }),
     setFurnaceNative: (data) => set((state) => { state.furnaceNative = data; }),
     setFurnaceOrderEntry: (channel, position, patternIndex) => set((state) => {
       if (!state.furnaceNative) return;
@@ -843,6 +859,7 @@ export const useFormatStore = create<FormatStore>()(
         state.uadeEditableFileName = (song as any).uadeEditableFileName ?? null;
         state.maxTraxFileData = (song as any).maxTraxFileData ?? null;
         state.maxTraxFileName = (song as any).maxTraxFileName ?? null;
+        console.error('[probe applyEditorMode] format=', (song as any).format, 'maxTraxFileData=', (song as any).maxTraxFileData ? (song as any).maxTraxFileData.byteLength : 'NULL');
         state.nativeSamplePlayback = (song as any).nativeSamplePlayback ?? false;
         state.adplugFileData = (song as any).adplugFileData ?? null;
         state.adplugFileName = (song as any).adplugFileName ?? null;
@@ -1133,6 +1150,8 @@ export const useFormatStore = create<FormatStore>()(
       state.maxTraxFileData = null;
       state.maxTraxFileName = null;
       state.nativeSamplePlayback = false;
+      state.maxTraxData = null;
+      state.maxTraxRev = 0;
       state.adplugFileData = null;
       state.adplugFileName = null;
       state.adplugTicksPerRow = null;
