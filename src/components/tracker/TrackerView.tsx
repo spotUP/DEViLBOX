@@ -63,6 +63,7 @@ import { SF2View } from '@components/sidfactory2/SF2View';
 import { CheeseCutterView } from '@components/cheesecut/CheeseCutterView';
 import { FurnaceView } from '@components/furnace/FurnaceView';
 import { Sc68Visualizer } from './Sc68Visualizer';
+import { MaxTraxView } from './MaxTraxView';
 import { TrackScopesStrip } from './TrackScopesStrip';
 import { PatternBottomBar } from './PatternBottomBar';
 import { DubDeckStrip } from '@components/dub/DubDeckStrip';
@@ -577,10 +578,10 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
           {viewMode === 'tracker' ? (
             (() => {
               // Determine if this is a custom format editor that can be popped out
-              const isCustomFormat = ['goattracker', 'hively', 'klystrack', 'jamcracker', 'sidfactory2', 'cheesecutter', 'musicline', 'furnace', 'tfmx'].includes(editorMode);
+              const isCustomFormat = ['goattracker', 'hively', 'klystrack', 'jamcracker', 'sidfactory2', 'cheesecutter', 'musicline', 'furnace', 'tfmx', 'maxtrax'].includes(editorMode);
               const formatLabels: Record<string, string> = {
                 goattracker: 'GoatTracker', hively: 'AHX / Hively', klystrack: 'Klystrack',
-                jamcracker: 'JamCracker', sidfactory2: 'SID Factory II', cheesecutter: 'CheeseCutter', musicline: 'MusicLine', furnace: 'Furnace', tfmx: 'TFMX',
+                jamcracker: 'JamCracker', sidfactory2: 'SID Factory II', cheesecutter: 'CheeseCutter', musicline: 'MusicLine', furnace: 'Furnace', tfmx: 'TFMX', maxtrax: 'MaxTrax',
               };
 
               // Build the editor content
@@ -600,6 +601,8 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
                 <FurnaceView />
               ) : editorMode === 'tfmx' ? (
                 <TFMXView />
+              ) : editorMode === 'maxtrax' ? (
+                <MaxTraxView />
               ) : editorMode === 'sc68' ? (
                 <Sc68Visualizer />
               ) : editorMode === 'musicline' ? (
