@@ -27,6 +27,6 @@ it('setEvent posts to the worklet and mirrors into the store', () => {
   const post = vi.fn();
   (eng as any).workletNode = { port: { postMessage: post } };
   eng.setEvent(0, 0, { command: 0x40, data: 0x11, startTime: 0, stopTime: 20 });
-  expect(post).toHaveBeenCalledWith(expect.objectContaining({ type: 'setEvent', score: 0, index: 0 }));
+  expect(post).toHaveBeenCalledWith(expect.objectContaining({ type: 'setEvent', score: 0, index: 0, ev: expect.objectContaining({ command: 0x40, data: 0x11, startTime: 0, stopTime: 20 }) }));
   expect(useFormatStore.getState().maxTraxData!.scores[0].events[0].command).toBe(0x40);
 });

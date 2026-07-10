@@ -107,17 +107,20 @@ export class MaxTraxEngine extends WASMSingletonBase {
 
   /**
    * Write one event into the live WASM cooked buffer and mirror into the store.
-   * Store + audio stay in lockstep: both updates happen in the same call.
+   * Store is the authority and always updates unconditionally; the worklet post
+   * is the live-audio projection and only fires when a worklet exists.
    */
   setEvent(
     score: number,
     index: number,
     ev: { command: number; data: number; startTime: number; stopTime: number },
   ): void {
-    this.workletNode?.port.postMessage({ type: 'setEvent', score, index, ev });
+    // Store is the authority — update unconditionally first.
     useFormatStore.getState().mutateMaxTraxScore(score, (s) => {
       s.events[index] = { ...ev };
     });
+    // Live-audio projection — only fires when the worklet is running.
+    this.workletNode?.port.postMessage({ type: 'setEvent', score, index, ev });
   }
 
   /** Re-cook the score in the WASM player (rewinds read cursor for re-render). */
