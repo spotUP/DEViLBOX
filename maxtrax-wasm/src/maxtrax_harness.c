@@ -833,3 +833,99 @@ EXPORT int maxtrax_get_cmd_count(int which) {
 EXPORT int maxtrax_get_seed_pool_depth(void) {
     return g_ioa_peak_depth;
 }
+
+/*
+ * maxtrax_get_event_count(score)
+ *
+ * Return the number of CookedEvents (cev_* format) in the given score.
+ * This is the same count that LoadPerf reads from the file (numEvents u32).
+ * Returns -1 if the score index is out of range or the player is not loaded.
+ *
+ * Layout: _scoreptr → score array; score struct (score_sizeof=8 bytes) holds
+ * score_Data (u32 ptr to cev buffer) at offset 0 and score_NumEvents (u32)
+ * at offset 4. _scoremax holds the total score count.
+ */
+EXPORT int maxtrax_get_event_count(int score) {
+    uint32_t sptr = READ32((uintptr_t)_scoreptr);
+    if (!sptr) return -1;
+    uint16_t n_scores = (uint16_t)READ16((uintptr_t)_scoremax);
+    if (score < 0 || (uint32_t)score >= (uint32_t)n_scores) return -1;
+    uint32_t score_struct = sptr + (uint32_t)(score) * (uint32_t)score_sizeof;
+    return (int)(uint32_t)READ32(score_struct + (uint32_t)score_NumEvents);
+}
+
+/*
+ * maxtrax_set_event(score, index, command, data, startTime, stopTime)
+ *
+ * Overwrite one CookedEvent in the score's cev buffer — the SAME buffer that
+ * MusicServer reads on every VBlank tick via READ8/READ16 (big-endian).
+ * Fields match the MaxTraxEvent TS interface:
+ *   command  u8  — 0x00-0x7F note; 0x80 tempo; 0xA0 special; 0xFF end
+ *   data     u8  — note: (velocity<<4)|channel; non-note: parameter
+ *   startTime u16 — delta ticks from previous event
+ *   stopTime  u16 — note duration in ticks; 0 for most non-note events
+ *
+ * How the edit reaches live playback: score_Data is the AllocMem'd buffer
+ * that LoadPerf populated; MusicServer reads cev_Command/Data/StartTime/
+ * StopTime from it using READ8/READ16 (big-endian) each tick via glob_Current.
+ * WRITE8/WRITE16 here use the identical byte-swap convention — the bytes land
+ * immediately in the buffer the running player reads. No shadow copy.
+ *
+ * Returns 0 on success, -1 if score or index is out of range.
+ *
+ * NOTE: maxtrax.c #defines `for` to 0 — use `while` for loops in this TU.
+ * Also avoid variable names: for, volume, value, flags, to, number.
+ */
+EXPORT int maxtrax_set_event(int score, int index,
+                             int command, int data,
+                             int startTime, int stopTime) {
+    uint32_t sptr = READ32((uintptr_t)_scoreptr);
+    if (!sptr) return -1;
+    uint16_t n_scores = (uint16_t)READ16((uintptr_t)_scoremax);
+    if (score < 0 || (uint32_t)score >= (uint32_t)n_scores) return -1;
+    uint32_t score_struct = sptr + (uint32_t)(score) * (uint32_t)score_sizeof;
+    uint32_t n_evts = READ32(score_struct + (uint32_t)score_NumEvents);
+    if (index < 0 || (uint32_t)index >= n_evts) return -1;
+    uint32_t ev_data_ptr = READ32(score_struct + (uint32_t)score_Data);
+    if (!ev_data_ptr) return -1;
+    uint32_t ev_addr = ev_data_ptr + (uint32_t)(index) * (uint32_t)cev_sizeof;
+    WRITE8 (ev_addr + (uint32_t)cev_Command,   (uint8_t) command);
+    WRITE8 (ev_addr + (uint32_t)cev_Data,      (uint8_t) data);
+    WRITE16(ev_addr + (uint32_t)cev_StartTime, (uint16_t)startTime);
+    WRITE16(ev_addr + (uint32_t)cev_StopTime,  (uint16_t)stopTime);
+    return 0;
+}
+
+/*
+ * maxtrax_recook(score)
+ *
+ * Reset the replay cursor so the edited cev buffer is re-read from the start
+ * on the next VBlank tick. Resets glob_Current to score_Data (top of the event
+ * array), clears the time/tick accumulators, and marks all per-voice note-off
+ * slots as empty (sev_Command=0xFF) so in-flight notes don't phantom-trigger
+ * after the rewind.
+ *
+ * The `score` parameter is accepted for API consistency but ignored: the cursor
+ * always rewinds to whatever score is currently selected in glob_CurrentScore.
+ */
+EXPORT void maxtrax_recook(int score) {
+    (void)score;
+    uint32_t cur_score = READ32((uintptr_t)_globaldata + (uint32_t)glob_CurrentScore);
+    if (!cur_score) return;
+    uint32_t score_data_start = READ32(cur_score + (uint32_t)score_Data);
+    /* Reset the event-stream read pointer to the start of the (edited) buffer. */
+    WRITE32((uintptr_t)_globaldata + (uint32_t)glob_Current,     score_data_start);
+    /* Clear time / tick / tempo-time accumulators. */
+    WRITE32((uintptr_t)_globaldata + (uint32_t)glob_CurrentTime, 0);
+    WRITE32((uintptr_t)_globaldata + (uint32_t)glob_Ticks,       0);
+    WRITE32((uintptr_t)_globaldata + (uint32_t)glob_TempoTime,   0);
+    /* Mark all 4 per-voice note-off table slots as empty (sev_Command=0xFF). */
+    int _vi = 0;
+    while (_vi < 4) {
+        WRITE8((uintptr_t)_globaldata + (uint32_t)glob_NoteOff
+               + (uint32_t)_vi * (uint32_t)sev_sizeof
+               + (uint32_t)sev_Command,
+               0xff);
+        _vi++;
+    }
+}
