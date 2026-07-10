@@ -142,6 +142,14 @@ class MaxtraxProcessor extends AudioWorkletProcessor {
       };
 
       const config = {};
+      config.printErr = (msg) => {
+        console.error('[MaxtraxWASM]', msg);
+        this.port.postMessage({ type: 'log', message: msg });
+      };
+      config.print = (msg) => {
+        console.log('[MaxtraxWASM]', msg);
+        this.port.postMessage({ type: 'log', message: msg });
+      };
       if (wasmBinary) config.wasmBinary = wasmBinary;
 
       try {
@@ -222,7 +230,13 @@ class MaxtraxProcessor extends AudioWorkletProcessor {
       let rendered = 0;
       try {
         rendered = this.module._maxtrax_render(this.wasmBufPtr, chunk);
-      } catch { break; }
+      } catch (e) {
+        if (!this._trapLogged) {
+          this._trapLogged = true;
+          this.port.postMessage({ type: 'log', message: 'render trap: ' + (e && e.stack || e) });
+        }
+        break;
+      }
       if (rendered <= 0) break;
 
       const heapF32 = this.getHeapF32();

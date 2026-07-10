@@ -28,7 +28,7 @@ if(EMSCRIPTEN)
         "SHELL:-s EXPORTED_FUNCTIONS=['_maxtrax_load','_maxtrax_render','_maxtrax_stop','_maxtrax_get_sample_rate','_malloc','_free']"
         "SHELL:-s EXPORTED_RUNTIME_METHODS=['ccall','cwrap','HEAPU8','HEAPF32']"
         "SHELL:-s ALLOW_MEMORY_GROWTH=1"
-        "SHELL:-s INITIAL_MEMORY=8388608"
+        "SHELL:-s INITIAL_MEMORY=16777216"
         "SHELL:-s STACK_SIZE=65536"
         -O2
     )

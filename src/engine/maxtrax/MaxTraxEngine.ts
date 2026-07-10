@@ -47,6 +47,7 @@ export class MaxTraxEngine extends WASMSingletonBase {
       workletFile: 'Maxtrax.worklet.js',
       wasmFile: 'Maxtrax.wasm',
       jsFile: 'Maxtrax.js',
+      workletCacheBust: true,
     };
   }
 
@@ -74,6 +75,10 @@ export class MaxTraxEngine extends WASMSingletonBase {
           break;
         case 'error':
           console.error('[MaxTraxEngine]', data.message);
+          break;
+        case 'log':
+          // WASM stderr/stdout — surface only in dev, not as an error.
+          if (import.meta.env?.DEV) console.debug('[MaxtraxWASM]', data.message);
           break;
       }
     };

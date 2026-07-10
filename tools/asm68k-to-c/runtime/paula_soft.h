@@ -17,6 +17,16 @@ void paula_set_period(int ch, uint16_t period);
 void paula_set_volume(int ch, uint8_t vol);       // 0-64
 void paula_dma_write(uint16_t dmacon);            // $8xxx=enable, $0xxx=disable
 
+// Loop mode: 0 = one-shot (stop at end), 1 = loop (Amiga DMA reload default)
+void paula_set_loop(int ch, int loop);
+
+// Pre-load a follow-on buffer that kicks in when the current one-shot ends.
+// Enables audio.device double-buffering (attack one-shot → sustain loop).
+void paula_set_next(int ch, const int8_t* data, uint16_t len_words, int loop);
+
+// Returns 1 if the channel's DMA is running, 0 if it stopped (one-shot ended).
+int paula_is_active(int ch);
+
 // Reset all channels
 void paula_reset(void);
 
