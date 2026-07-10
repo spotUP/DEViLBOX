@@ -22,10 +22,24 @@ void paula_set_loop(int ch, int loop);
 
 // Pre-load a follow-on buffer that kicks in when the current one-shot ends.
 // Enables audio.device double-buffering (attack one-shot → sustain loop).
-void paula_set_next(int ch, const int8_t* data, uint16_t len_words, int loop);
+// period (0 = keep current) and vol (0-64) are applied atomically on the swap
+// so the follow-on plays at its own pitch/level with no gap.
+void paula_set_next(int ch, const int8_t* data, uint16_t len_words, int loop,
+                    uint16_t period, uint8_t vol);
 
 // Returns 1 if the channel's DMA is running, 0 if it stopped (one-shot ended).
 int paula_is_active(int ch);
+
+// One-shot DMA-completion signal. Set once each time a one-shot buffer reaches
+// its end (whether it then swaps to the queued follow-on or stops). Mirrors the
+// Amiga audio-block-done interrupt that audio.device uses to reply the finished
+// IOAudio block and start the next queued write. Returns 1 and clears the flag
+// if the channel completed a one-shot since the last poll, else 0.
+int paula_poll_completion(int ch);
+
+// Stop one channel's DMA and drop any queued follow-on buffer (audio.device
+// disable_audio_dma, used by CMD_FLUSH note-off).
+void paula_channel_dma_off(int ch);
 
 // Reset all channels
 void paula_reset(void);

@@ -117,6 +117,17 @@ typedef struct { uint32_t port; uint32_t q[IOA_QUEUE_CAP]; int head, tail; } Ioa
 static IoaRing g_ioa_rings[IOA_MAX_PORTS];
 static int g_ioa_ring_count = 0;
 
+/* Free-pool depth reached during the pure SEED phase — before the first
+ * note-on GetMsg dequeues a block. OpenMusic seeds `3*NUM_VOICES` (=12)
+ * CMD_WRITE blocks into _play_port during init, all enqueued up front, so this
+ * equals the seed count: 12 when the seed immediate `#3*NUM_VOICES-1`
+ * transpiles correctly, ~4 when it collapses to its leading digit. Tracking is
+ * frozen at the first dequeue (g_ioa_dequeued) so ongoing block returns during
+ * playback — which otherwise saturate the ring — can't contaminate it.
+ * Exported as the seed-bug lockstep signal. */
+static int g_ioa_peak_depth = 0;
+static int g_ioa_dequeued = 0;
+
 /* Find (or lazily create) the FIFO for a given port address. */
 static IoaRing *ioa_ring_for(uint32_t port) {
     int i = 0;
@@ -136,6 +147,10 @@ static void ioa_enqueue_port(uint32_t port, uint32_t addr) {
     if (next == r->head) return;   /* full — drop (should not happen)  */
     r->q[r->tail] = addr;
     r->tail = next;
+    if (!g_ioa_dequeued) {
+      int depth = (r->tail - r->head + IOA_QUEUE_CAP) % IOA_QUEUE_CAP;
+      if (depth > g_ioa_peak_depth) g_ioa_peak_depth = depth;
+    }
     { static int _eq = 0;
       if (_eq < 16) { _eq++; MXTX_DBG("[ioa] enqueue #%d addr=%u port=%u depth=%d\n",
           _eq, addr, port, (r->tail - r->head + IOA_QUEUE_CAP) % IOA_QUEUE_CAP); } }
@@ -149,6 +164,7 @@ static uint32_t ioa_dequeue_port(uint32_t port) {
         if (_emp < 8) { _emp++; MXTX_DBG("[ioa] GetMsg EMPTY port=%u #%d\n", port, _emp); }
         return 0;   /* empty */
     }
+    g_ioa_dequeued = 1;   /* freeze seed-depth tracking: seed phase is over */
     uint32_t addr = r->q[r->head];
     r->head = (r->head + 1) % IOA_QUEUE_CAP;
     return addr;
@@ -622,6 +638,8 @@ EXPORT int maxtrax_load(const uint8_t *data, uint32_t len, int score) {
     g_vblank_count = 0;
     g_beginio_count = 0;
     g_cmd_count[0] = g_cmd_count[1] = g_cmd_count[2] = g_cmd_count[3] = 0;
+    g_ioa_peak_depth = 0;
+    g_ioa_dequeued = 0;
     g_render_clock = 0;
     g_file_data = data;
     g_file_size = len;
@@ -802,4 +820,16 @@ EXPORT int maxtrax_get_sample_rate(void) {
 EXPORT int maxtrax_get_cmd_count(int which) {
     if (which < 0 || which > 3) return -1;
     return g_cmd_count[which];
+}
+
+/*
+ * maxtrax_get_seed_pool_depth()
+ *
+ * Peak free-pool depth of any single audio.device reply port. OpenMusic seeds
+ * `3*NUM_VOICES` (=12) CMD_WRITE blocks into _play_port up front, so a correct
+ * transpile peaks at 12; the seed-immediate bug (`#3*NUM_VOICES-1` collapsing to
+ * the leading digit 3 → 4 blocks) peaks at ~4. The lockstep test asserts >= 12.
+ */
+EXPORT int maxtrax_get_seed_pool_depth(void) {
+    return g_ioa_peak_depth;
 }

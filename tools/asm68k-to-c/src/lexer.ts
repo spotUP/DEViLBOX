@@ -378,6 +378,26 @@ function tokenizeLine(src: string, lineNum: number): Token[] {
         }
         immVal += src.slice(exprStart, i);
       }
+      // Continue a compound arithmetic expression when a leading numeric/hex/bin
+      // value is followed by more operators, e.g. #3*NUM_VOICES-1 or #$8000/2.
+      // readDecimal/readHex/readBin stop at the first operator, so without this
+      // the '*' and trailing terms fragment into separate tokens (#3, NUM_VOICES,
+      // -1) and the operand is silently lost. The identifier/paren branches above
+      // already consume their whole expression, so their next char is a
+      // separator and this loop is a no-op for them.
+      if (i < src.length && /[*/+\-<>|&^]/.test(src[i])) {
+        let depth = 0;
+        const exprStart2 = i;
+        while (i < src.length) {
+          const c = src[i];
+          if (c === '(') { depth++; i++; continue; }
+          if (c === ')') { if (depth === 0) break; depth--; i++; continue; }
+          if (depth === 0 && (c === ',' || c === ' ' || c === '\t' || c === ';')) break;
+          if (!/[A-Za-z0-9_.$%~|&^+\-*/<>]/.test(c)) break;
+          i++;
+        }
+        immVal += src.slice(exprStart2, i);
+      }
       tokens.push(tok('IMMEDIATE', immVal, col));
       isFirstToken = false;
       continue;

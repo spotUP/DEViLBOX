@@ -60,6 +60,46 @@ test('unknown symbol inside a compound absolute address gets a #define stub', ()
   expect(out).toContain('#define vhposr 0');
 });
 
+// -- Regression: compound-arithmetic immediate `#3*NUM_VOICES-1` -------------
+// MaxTrax's OpenMusic seeds the audio.device free-block pool with
+// `moveq #3*NUM_VOICES-1,d2` (NUM_VOICES=4 → 11, so 12 blocks are ReplyMsg'd).
+// The lexer split the immediate at the first operator and parseNumber() then
+// parseInt'd the leading digit — `#3*NUM_VOICES-1` collapsed to the literal 3,
+// so d2=3 and the loop enqueued only 4 blocks. With a starved pool every note's
+// sustain (cyc=0) CMD_WRITE could not be issued: notes played as attack-only
+// blips ("random samples", too-short notes). The whole expression must survive
+// as one immediate and fold to 11 (via the #defined NUM_VOICES), not 3.
+test('compound-arithmetic immediate #3*NUM_VOICES-1 evaluates fully, not just the leading digit', () => {
+  const src = [
+    'NUM_VOICES\tEQU\t4',
+    'Seed:',
+    '\tmoveq\t#3*NUM_VOICES-1,d2',
+    '\trts',
+  ].join('\n');
+  const out = transpile(src);
+  // NUM_VOICES stays a #defined symbol so the expression folds to 11 in C.
+  expect(out).toContain('#define NUM_VOICES 4');
+  // The full expression must reach d2 (3*NUM_VOICES-1), NOT a truncated `(3)`.
+  expect(out).toMatch(/d2 = \(uint32_t\)\(int32_t\)\(int8_t\)\(\(?3\s*\*\s*NUM_VOICES\s*-\s*1\)?\)/);
+  // Must NOT collapse to the leading digit.
+  expect(out).not.toMatch(/d2 = \(uint32_t\)\(int32_t\)\(int8_t\)\(3\);/);
+});
+
+// A pure-numeric compound immediate must be folded arithmetically at transpile
+// time, not truncated to its leading integer (#16-1 → 15, not 16; #5+32 → 37).
+test('pure-numeric compound immediates fold arithmetically', () => {
+  const src = [
+    'Nums:',
+    '\tmove.l\t#16-1,d2',
+    '\tcmp.b\t#5+32,d0',
+    '\trts',
+  ].join('\n');
+  const out = transpile(src);
+  expect(out).toMatch(/\(uint32_t\)\(15\)/);   // #16-1 → 15
+  expect(out).toMatch(/\(int32_t\)\(37\)/);    // #5+32 → 37
+  expect(out).not.toMatch(/\(uint32_t\)\(16\)/);
+});
+
 // -- Regression: fall-through across a function boundary --------------------
 // MaxTrax's LoadPerf splits into many C functions (each PEA/RTS ReadFunc call is
 // a split point). `.l75` (a CheckRead landing) ends with `addq.w #n,a3` and then
