@@ -7,7 +7,7 @@
  * beyond cursor/selection and scroll).
  */
 
-import React, { useState, useCallback } from 'react';
+import React, { useState } from 'react';
 import type {
   MaxTraxGrid as MaxTraxGridType,
   GridNoteCell,
@@ -133,7 +133,7 @@ export const MaxTraxGrid: React.FC<MaxTraxGridProps> = ({ grid, edit }) => {
     return order.map(ch => ({ channel: ch, cols: groupMap.get(ch)! }));
   }, [columns]);
 
-  const commitCellEdit = useCallback(() => {
+  const commitCellEdit = () => {
     if (!cellEdit) return;
     const num = parseInt(cellEdit.value, 10);
     if (isNaN(num)) { setCellEdit(null); return; }
@@ -146,12 +146,12 @@ export const MaxTraxGrid: React.FC<MaxTraxGridProps> = ({ grid, edit }) => {
       edit.setNoteField(eventIndex, { offset: num });
     }
     setCellEdit(null);
-  }, [cellEdit, edit]);
+  };
 
-  const handleFieldKeyDown = useCallback((e: React.KeyboardEvent) => {
+  const handleFieldKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') { e.preventDefault(); commitCellEdit(); }
     if (e.key === 'Escape') { setCellEdit(null); }
-  }, [commitCellEdit]);
+  };
 
   const rows = Array.from({ length: rowCount }, (_, i) => i);
 
@@ -269,7 +269,7 @@ export const MaxTraxGrid: React.FC<MaxTraxGridProps> = ({ grid, edit }) => {
 
                         if (!cell) {
                           return (
-                            <React.Fragment key={`${col.channel}.${col.voice}.empty`}>
+                            <React.Fragment key={col.colIdx}>
                               <td className={`px-1 text-center text-text-muted border-l border-dark-borderLight ${tint} opacity-20`}>···</td>
                               <td className={`px-0.5 text-center text-text-muted ${tint} opacity-20`}>··</td>
                               <td className={`px-0.5 text-center text-text-muted ${tint} opacity-20`}>···</td>
@@ -280,7 +280,7 @@ export const MaxTraxGrid: React.FC<MaxTraxGridProps> = ({ grid, edit }) => {
 
                         if (cell.kind === 'noteOff') {
                           return (
-                            <React.Fragment key={`${col.channel}.${col.voice}.off`}>
+                            <React.Fragment key={col.colIdx}>
                               <td
                                 className={`px-1 text-center text-text-muted border-l border-dark-borderLight ${tint}`}
                                 colSpan={4}
@@ -297,7 +297,7 @@ export const MaxTraxGrid: React.FC<MaxTraxGridProps> = ({ grid, edit }) => {
                         const isEditingOff = cellEdit?.eventIndex === cell.eventIndex && cellEdit.field === 'offset';
 
                         return (
-                          <React.Fragment key={`${col.channel}.${col.voice}.on`}>
+                          <React.Fragment key={col.colIdx}>
                             {/* Pitch */}
                             <td className={`px-1 text-center border-l border-dark-borderLight ${tint} text-accent-highlight whitespace-nowrap`}>
                               {midiNoteName(cell.pitch)}
