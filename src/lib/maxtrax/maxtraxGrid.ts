@@ -1,4 +1,4 @@
-import type { MaxTraxScore } from '@/lib/import/formats/maxtrax/maxtraxFormat';
+import type { MaxTraxScore, MaxTraxEvent } from '@/lib/import/formats/maxtrax/maxtraxFormat';
 import type { GridColumn, GridNoteCell, GridEffectCell, MaxTraxGrid } from './maxtraxGrid.types';
 
 export type { GridColumn, GridNoteCell, GridEffectCell, MaxTraxGrid } from './maxtraxGrid.types';
@@ -71,4 +71,62 @@ export function deriveGrid(score: MaxTraxScore, ticksPerRow: number): MaxTraxGri
   for (const c of noteCells) c.column = remap.get(c.column)!;
 
   return { ticksPerRow: TPR, rowCount: maxRow + 1, columns: sortedColumns, noteCells, effectCells };
+}
+
+// ---------------------------------------------------------------------------
+// Edit ops — all pure: take a MaxTraxScore, return a NEW MaxTraxScore, never mutate input.
+// ---------------------------------------------------------------------------
+
+const clampU16 = (n: number) => Math.max(0, Math.min(0xffff, Math.round(n)));
+const cloneEvents = (score: MaxTraxScore): MaxTraxEvent[] => score.events.map((e) => ({ ...e }));
+
+/** Exported helper: accumulate startTime deltas into absolute ticks. */
+export function absoluteTicksOf(score: MaxTraxScore): number[] {
+  const t = new Array<number>(score.events.length);
+  let cur = 0;
+  for (let i = 0; i < score.events.length; i++) { cur += score.events[i].startTime; t[i] = cur; }
+  return t;
+}
+
+export function setNoteField(score: MaxTraxScore, eventIndex: number, patch: { pitch?: number; velocity?: number; channel?: number }): MaxTraxScore {
+  const events = cloneEvents(score);
+  const e = events[eventIndex];
+  if (patch.pitch !== undefined) e.command = patch.pitch & 0x7f;
+  const vel = patch.velocity ?? ((e.data >> 4) & 0x0f);
+  const ch = patch.channel ?? (e.data & 0x0f);
+  e.data = ((vel & 0x0f) << 4) | (ch & 0x0f);
+  return { events };
+}
+
+export function setNoteDuration(score: MaxTraxScore, eventIndex: number, durationTicks: number): MaxTraxScore {
+  const events = cloneEvents(score);
+  events[eventIndex].stopTime = Math.max(1, clampU16(durationTicks));
+  return { events };
+}
+
+export function setEffectField(score: MaxTraxScore, eventIndex: number, patch: { data?: number; stopTime?: number }): MaxTraxScore {
+  const events = cloneEvents(score);
+  const e = events[eventIndex];
+  if (patch.data !== undefined) e.data = patch.data & 0xff;
+  if (patch.stopTime !== undefined) e.stopTime = clampU16(patch.stopTime);
+  return { events };
+}
+
+/**
+ * Move one event to newAbsTick. Since startTime is a delta, changing event i's
+ * delta shifts every later event; to keep all OTHER absolute ticks fixed we also
+ * adjust event i+1's delta by the opposite amount. Deltas are clamped to [0, 0xffff];
+ * the moved event cannot precede the previous event.
+ */
+export function moveNote(score: MaxTraxScore, eventIndex: number, newAbsTick: number): MaxTraxScore {
+  const abs = absoluteTicksOf(score);
+  const events = cloneEvents(score);
+  const prevAbs = eventIndex > 0 ? abs[eventIndex - 1] : 0;
+  const target = Math.max(prevAbs, newAbsTick); // cannot precede the previous event
+  const delta = target - abs[eventIndex];
+  events[eventIndex].startTime = clampU16(events[eventIndex].startTime + delta);
+  if (eventIndex + 1 < events.length) {
+    events[eventIndex + 1].startTime = clampU16(events[eventIndex + 1].startTime - delta);
+  }
+  return { events };
 }
