@@ -75,6 +75,7 @@ mkdir -p "$OUT_DIR"
 # UADE core source files (68k emulator + Paula chip)
 UADE_CORE_SRCS=(
     "$UADE_SRC/src/audio.c"
+    "$UADE_SRC/src/audiodevice.c"   # fake audio.device (MaxTrax/A-Train/Kyrandia etc.)
     "$UADE_SRC/src/cfgfile.c"
     "$UADE_SRC/src/cia.c"
     "$UADE_SRC/src/compiler.c"
@@ -155,6 +156,7 @@ INCLUDES=(
     "-I$UADE_SRC/src/frontends/common"
     "-I$UADE_SRC/src"
     "-I$UADE_SRC/src/machdep"       # m68k.h, maccess.h
+    "-I$UADE_SRC/src/amiga-ndk"     # AmigaOS structs for fake audio.device (audiodevice.c)
 )
 
 # Compiler flags

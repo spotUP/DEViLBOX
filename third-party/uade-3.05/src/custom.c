@@ -27,6 +27,11 @@
 
 #include "uadectl.h"
 
+/* Fake audio.device (see audiodevice.c): the DMA state machine signals it
+ * when a buffer wraps, and audiodevice.c drives Paula via audiodevice_dmacon
+ * / disable_audio_dma below. */
+extern void audiodevice_DMA_signal(int nr);
+
 static unsigned int n_consecutive_skipped = 0;
 static unsigned int total_skipped = 0;
 
@@ -450,6 +455,29 @@ static void DMACON (uae_u16 v)
 		cdp->current_sample = 0;
 	    }
 	}
+    }
+
+    events_schedule();
+}
+
+/* Exported so the fake audio.device can turn Paula DMA on for a channel
+ * exactly the way a normal DMACON custom-register write would. */
+void audiodevice_dmacon(uae_u16 v)
+{
+    DMACON(v);
+}
+
+/* Stop the automatic buffer-loop of DMA playback on one channel. Mirrors the
+ * relevant tail of DMACON for a single channel being switched off. */
+void disable_audio_dma(int channel)
+{
+    dmacon &= ~(1 << channel);
+
+    struct audio_channel_data *cdp = audio_channel + channel;
+    cdp->dmaen = 0;
+    if (cdp->state == 1 || cdp->state == 5) {
+	cdp->state = 0;
+	cdp->current_sample = 0;
     }
 
     events_schedule();
@@ -1278,6 +1306,9 @@ static void hsync_handler (void)
 			    uade_write_audio_set_state(write_audio_state, nr,
 						       PET_START_BUFFER, 0);
 		    }
+		    /* fake audio.device: a WRITE buffer has looped; let it
+		     * count cycles / reply / start the next queued buffer. */
+		    audiodevice_DMA_signal(nr);
 		} else {
 		    cdp->wlen = (cdp->wlen - 1) & 0xFFFF;
 		}

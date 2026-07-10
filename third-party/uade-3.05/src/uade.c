@@ -32,6 +32,7 @@
 
 #include "uadectl.h"
 #include "amigamsg.h"
+#include "audiodevice.h"
 #include "state_detection.h"
 #include "uade_logging.h"
 
@@ -641,6 +642,23 @@ void uadecore_get_amiga_message(void)
 		uadecore_send_debug("Test message %d", amigamsg);
 		break;
 
+	/* fake audio.device: the score's OpenDevice/BeginIO/AbortIO vectors emit
+	 * these instead of touching Paula directly. audiodevice.c translates the
+	 * IOAudio requests into Paula register writes. The address at 0x204 is the
+	 * IOAudio request; 0x208 (BeginIO) is the score's synchronous reply-list
+	 * head. Wothke's "al_" convention wants the amiga address in little-endian
+	 * byte order, so swap32() the host-order value from amiga_get_u32(). */
+	case AMIGAMSG_AUDIO_DEV_OPEN:
+		audiodevice_open(swap32(amiga_get_u32(0x204)));
+		break;
+	case AMIGAMSG_AUDIO_DEV_BEGINIO:
+		audiodevice_beginIO(swap32(amiga_get_u32(0x204)),
+				    swap32(amiga_get_u32(0x208)));
+		break;
+	case AMIGAMSG_AUDIO_DEV_ABORTIO:
+		audiodevice_abortIO(swap32(amiga_get_u32(0x204)));
+		break;
+
 	case AMIGAMSG_STATE_DETECTION_INIT:
 		uade_state_detection_init(amiga_get_u32(0x204),
 					  amiga_get_u32(0x208));
@@ -975,6 +993,9 @@ void uadecore_reset(void)
   }
 
   invalidate_amiga_file_cache();
+
+  /* fake audio.device: drop any channel state from a previous song. */
+  audiodevice_reset();
 
  nextsong:
 
