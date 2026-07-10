@@ -192,8 +192,12 @@ export function emitOperand(op: Operand, size: Size = 'L'): string {
       return `READ${bits}(${addr})`;
     }
     case 'abs_addr': {
+      // Absolute-address reads may target Amiga hardware registers (CIA
+      // $BFxxxx, custom chips $DFFxxx). Route through hw_read* so those
+      // ranges return a benign default instead of dereferencing linear
+      // memory out of bounds; hw_read* falls through to READ* for real RAM.
       const addrC = op.raw.startsWith('$') ? `0x${op.raw.slice(1)}` : op.raw;
-      return `READ${sizeStr(size)}(${addrC})`;
+      return `hw_read${sizeStr(size)}(${addrC})`;
     }
     case 'label_ref': return sanitizeLabel(op.name);
     case 'pc_rel': {
@@ -587,6 +591,15 @@ export function emitInstruction(node: InstructionNode): string {
       return `${reg} = (${reg} >> 16) | (${reg} << 16);`;
     }
 
+    case 'EXG': {
+      // EXG exchanges two registers in full (always 32-bit, size suffix is cosmetic).
+      // Both operands are always registers (Dn or An).
+      if (ops[0]?.kind !== 'register' || ops[1]?.kind !== 'register')
+        return `/* EXG invalid operands */`;
+      const r0 = (ops[0] as any).name, r1 = (ops[1] as any).name;
+      return `{ uint32_t _exg = ${r0}; ${r0} = ${r1}; ${r1} = _exg; }`;
+    }
+
     case 'LSL':
       if (!dst) {
         if (ops[0].kind === 'register') return `${src} <<= 1;`;
@@ -685,8 +698,8 @@ export function emitInstruction(node: InstructionNode): string {
     case 'BNE': return `if (!flag_z) goto ${src};`;
     case 'BMI': return `if (flag_n) goto ${src};`;
     case 'BPL': return `if (!flag_n) goto ${src};`;
-    case 'BCS': return `if (flag_c) goto ${src};`;
-    case 'BCC': return `if (!flag_c) goto ${src};`;
+    case 'BCS': case 'BLO': return `if (flag_c) goto ${src};`;   /* BLO = branch if lower (unsigned) = carry set */
+    case 'BCC': case 'BHS': return `if (!flag_c) goto ${src};`;  /* BHS = branch if higher-or-same (unsigned) = carry clear */
     case 'BVS': return `if (flag_v) goto ${src};`;
     case 'BVC': return `if (!flag_v) goto ${src};`;
     case 'BGT': return `if (!flag_z && (flag_n==flag_v)) goto ${src};`;

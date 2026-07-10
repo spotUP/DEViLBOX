@@ -422,7 +422,7 @@ function expandEquDisplacements(lines: string[]): string[] {
 }
 
 /** Evaluate a constant expression (possibly referencing earlier EQU names). */
-function evalConst(expr: string, equMap: Map<string, number>): number {
+export function evalConst(expr: string, equMap: Map<string, number>): number {
   let e = expr.trim().replace(/;.*$/, '').trim();
   // Substitute known constants (longest names first to avoid partial matches)
   const names = [...equMap.keys()].sort((a, b) => b.length - a.length);
