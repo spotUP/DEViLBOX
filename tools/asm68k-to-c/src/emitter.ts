@@ -1101,7 +1101,23 @@ export function emit(ast: AstNode[], resolved: ResolveResult, sourceFile?: strin
           const startsFunction = funcLabels.has(node.name) || (!noFuncSplit && !inFunction);
 
           if (startsFunction) {
-            if (inFunction) closeFunction();
+            if (inFunction) {
+              // The previous block reached this label by FALL-THROUGH: an
+              // unconditional exit (RTS / BRA tail-call) immediately before a
+              // label would have already closed the function via the
+              // isUnconditionalExit peek-ahead below, leaving inFunction=false.
+              // So if we are still inside a function here, control falls off the
+              // end of it into this label. Since the label is promoted to its own
+              // C function, that fall-through must become an explicit tail call —
+              // otherwise the continuation code is silently unreachable (e.g.
+              // MaxTrax LoadPerf's `.l75` addq falling into `.l2`, which skipped
+              // all sample loading → patch_Sample=0 → silence).
+              if (!noFuncSplit) {
+                const tgt = sanitizeLabel(node.name);
+                lines.push(`  ${tgt}(); return;  /* fall-through to ${tgt} */`);
+              }
+              closeFunction();
+            }
             const isExported = resolved.exports.includes(node.name);
             const qualifier = isExported ? '' : 'static ';
             const safe = sanitizeLabel(node.name);

@@ -59,3 +59,39 @@ test('unknown symbol inside a compound absolute address gets a #define stub', ()
   const out = transpile(src);
   expect(out).toContain('#define vhposr 0');
 });
+
+// -- Regression: fall-through across a function boundary --------------------
+// MaxTrax's LoadPerf splits into many C functions (each PEA/RTS ReadFunc call is
+// a split point). `.l75` (a CheckRead landing) ends with `addq.w #n,a3` and then
+// FALLS THROUGH into `.l2`, which is a branch target from other split scopes and
+// so gets promoted to its own C function. The emitter closed `.l75` after the
+// addq WITHOUT emitting the tail call into `.l2` — so LoadPerf's entire sample-
+// loading section (past `.l2`) became unreachable: patch_Sample stayed 0, NoteOn
+// bailed at "no sample", and the song was SILENT. A non-terminator block that
+// falls into a promoted-function label must emit an explicit `Label(); return;`.
+test('non-terminator block falling into a cross-function label emits a tail call', () => {
+  const src = [
+    'score_sizeof\tEQU\t8',
+    'Loader:',
+    '\tpea\t.cont',                 // PEA/RTS idiom → forces a function split
+    '\tmove.l\t_readfn,-(sp)',
+    '\trts',
+    '.cont:',
+    '\taddq.w\t#score_sizeof,a3',   // non-terminator: MUST fall through to .loop
+    '.loop:',
+    '\tdbra\td5,.cont',
+    '\tmoveq\t#1,d0',
+    '\trts',
+    '.retry:',
+    '\tbra.s\t.loop',               // makes .loop a cross-function goto target
+    '_readfn:\tdc.l\t0',
+  ].join('\n');
+  const out = transpile(src, true);
+  // .loop is promoted to its own C function...
+  expect(out).toMatch(/static void Loader_L_loop\(void\)/);
+  // ...and .cont's addq must be followed by an explicit tail call into it, not a
+  // bare closing brace that silently drops the fall-through.
+  expect(out).toMatch(
+    /ADDQ\.W\s+#score_sizeof,A3 \*\/\s*\n\s*Loader_L_loop\(\); return;/,
+  );
+});
