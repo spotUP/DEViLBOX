@@ -91,6 +91,10 @@ export interface MaxTraxSample {
   octaves: number;
   attackLen: number;
   sustainLen: number;
+  attackCount: number;
+  releaseCount: number;
+  attack: { duration: number; volume: number }[];
+  release: { duration: number; volume: number }[];
   /** First-octave PCM (attack + sustain), raw 8-bit signed bytes. */
   pcm: Uint8Array;
 }
@@ -119,13 +123,23 @@ export function decodeMaxTraxSamples(data: MaxTraxData): MaxTraxSample[] {
     const sustainLen = dv.getUint32(p + 12);
     const attackCount = dv.getUint16(p + 16);
     const releaseCount = dv.getUint16(p + 18);
-    p += 20 + (attackCount + releaseCount) * 4;
+    p += 20;
+    const attack: { duration: number; volume: number }[] = [];
+    for (let i = 0; i < attackCount; i++) {
+      attack.push({ duration: dv.getUint16(p), volume: dv.getUint16(p + 2) });
+      p += 4;
+    }
+    const release: { duration: number; volume: number }[] = [];
+    for (let i = 0; i < releaseCount; i++) {
+      release.push({ duration: dv.getUint16(p), volume: dv.getUint16(p + 2) });
+      p += 4;
+    }
     // First octave PCM = attackLen + sustainLen bytes (raw signed 8-bit, as stored).
     const firstLen = attackLen + sustainLen;
     const pcm = b.slice(p, Math.min(p + firstLen, b.length));
     // Advance past all octaves: (atk+sus)*(2^octaves - 1).
     p += firstLen * (Math.pow(2, octaves) - 1);
-    out.push({ number, tune, volume, octaves, attackLen, sustainLen, pcm });
+    out.push({ number, tune, volume, octaves, attackLen, sustainLen, attackCount, releaseCount, attack, release, pcm });
   }
   return out;
 }

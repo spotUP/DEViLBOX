@@ -18,6 +18,8 @@ import { useMaxTraxGrid } from '@/hooks/useMaxTraxGrid';
 import { useFormatStore } from '@stores';
 import { MaxTraxGrid } from './MaxTraxGrid';
 import { notify } from '@stores/useNotificationStore';
+import { MaxTraxControls } from '@/components/instruments/controls/MaxTraxControls';
+import { decodeMaxTraxSamples } from '@/lib/import/formats/maxtrax/maxtraxFormat';
 
 const TPR_OPTIONS = [
   { value: '12', label: '12 ticks / row' },
@@ -32,6 +34,13 @@ export const MaxTraxView: React.FC = () => {
 
   const [scoreIndex, setScoreIndex] = useState(0);
   const [tpr, setTpr] = useState(24);
+  const [selectedSampleIndex, setSelectedSampleIndex] = useState(0);
+
+  // Subscribe to maxTraxRev so the sample list re-decodes after a sample-field edit.
+  const _maxTraxRev = useFormatStore(s => s.maxTraxRev);
+  void _maxTraxRev;
+  const samples = maxTraxData ? decodeMaxTraxSamples(maxTraxData) : [];
+  const sampleCount = samples.length;
 
   const { grid, edit } = useMaxTraxGrid(scoreIndex, tpr);
 
@@ -94,6 +103,21 @@ export const MaxTraxView: React.FC = () => {
           />
         </div>
 
+        {sampleCount > 0 && (
+          <div className="flex items-center gap-1">
+            <span className="text-[10px] font-mono text-text-muted">Sample</span>
+            <CustomSelect
+              value={String(selectedSampleIndex)}
+              onChange={v => setSelectedSampleIndex(Number(v))}
+              options={Array.from({ length: sampleCount }, (_, i) => ({
+                value: String(i),
+                label: `${i + 1}: #${samples[i]?.number ?? i}`,
+              }))}
+              placeholder="Sample"
+            />
+          </div>
+        )}
+
         <div className="ml-auto flex items-center gap-1">
           <Button variant="primary" onClick={handleSave}>
             Save
@@ -119,9 +143,9 @@ export const MaxTraxView: React.FC = () => {
           )}
         </div>
 
-        {/* Right panel — reserved for MaxTraxControls (Task 10) */}
-        <div className="w-56 flex-shrink-0 border-l border-dark-border bg-dark-bgSecondary flex flex-col min-h-0">
-          {/* MaxTraxControls — Task 10 */}
+        {/* Right panel — MaxTraxControls */}
+        <div className="w-56 flex-shrink-0 border-l border-dark-border bg-dark-bgSecondary flex flex-col min-h-0 overflow-hidden">
+          <MaxTraxControls sampleIndex={selectedSampleIndex} />
         </div>
       </div>
     </div>
