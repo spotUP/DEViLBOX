@@ -33,6 +33,12 @@
 #define MXTX_DBG(...) ((void)0)
 #endif
 
+/* Ceiling on BeginIO-W note-stream probe prints. Default keeps shipped WASM
+ * logs short; native trace driver overrides to dump the full stream. */
+#ifndef MXTX_BEGINIO_GATE
+#define MXTX_BEGINIO_GATE 12
+#endif
+
 /* -----------------------------------------------------------------------
  * Fake exec base
  *
@@ -174,12 +180,20 @@ static void store_ptr32(uint8_t *holder, const void *ptr) {
 
 /* exec AllocMem(d0=size, d1=flags) → d0=ptr|0                            */
 void _LVOAllocMem(void) {
+    uint32_t _sz = d0;
     void *p = calloc(1, (size_t)d0);
     d0 = (uint32_t)(uintptr_t)p;
+#ifdef MXTX_DEBUG
+    MXTX_DBG("[AllocMem] ptr=%u size=%u\n", d0, _sz);
+#endif
 }
 
 /* exec FreeMem(a1=ptr, d0=size)                                           */
 void _LVOFreeMem(void) {
+#ifdef MXTX_DEBUG
+    static int g_freemem_calls = 0;
+    MXTX_DBG("[FreeMem] #%d ptr=%u size=%u\n", ++g_freemem_calls, a1, d0);
+#endif
     free((void *)(uintptr_t)a1);
     d0 = 0;
 }
@@ -279,6 +293,12 @@ void _LVOOpen(void) {
 
 /* DOS Read(d1=fh, d2=buf, d3=len) → d0=bytes_read|-1                     */
 void _LVORead(void) {
+#ifdef MXTX_DEBUG
+    static int g_read_calls = 0;
+    if (++g_read_calls <= 40 || (g_read_calls % 1000) == 0)
+        MXTX_DBG("[Read] #%d fh=%u len=%u pos=%u size=%u\n", g_read_calls, d1, d3, g_file_pos, g_file_size);
+    if (g_read_calls > 200000) { MXTX_DBG("[Read] ABORT: >200k reads (infinite loop) pos=%u\n", g_file_pos); abort(); }
+#endif
     if (d1 != MXTX_FH || g_file_data == NULL) { d0 = (uint32_t)-1; return; }
     uint32_t remain = g_file_size - g_file_pos;
     uint32_t n = (d3 < remain) ? d3 : remain;
@@ -361,9 +381,9 @@ void DEV_BEGINIO(void) {
             uint16_t len_words = (uint16_t)(len_bytes >> 1);
             const int8_t *data = (const int8_t *)(uintptr_t)data_addr;
 
-            if (g_beginio_count < 12)
-                MXTX_DBG("[BeginIO-W] ch=%d data=%u len_bytes=%u period=%u vol=%u cycles=%u\n",
-                        ch, data_addr, len_bytes, period, ioa_vol, cycles);
+            if (g_beginio_count < MXTX_BEGINIO_GATE)
+                MXTX_DBG("[BeginIO-W] n=%d ch=%d data=%u len_bytes=%u period=%u vol=%u cycles=%u\n",
+                        g_beginio_count, ch, data_addr, len_bytes, period, ioa_vol, cycles);
 
             if (cycles == 1u) {
                 /* Attack: start one-shot DMA immediately */
@@ -499,7 +519,6 @@ EXPORT int maxtrax_load(const uint8_t *data, uint32_t len, int score) {
     MXTX_DBG("[mxtx] calling PlaySong\n");
     d0 = (uint32_t)(int32_t)score;
     PlaySong();
-    MXTX_DBG("[mxtx] PlaySong done\n");
 
     return 0;
 }
@@ -565,9 +584,10 @@ EXPORT int maxtrax_render(float *buffer, int frames) {
  */
 EXPORT void maxtrax_stop(void) {
     if (g_vblank_code) {
-        StopSong();
-        CloseMusic();
-        FreeMusic();
+        MXTX_DBG("[stop] StopSong...\n");   StopSong();
+        MXTX_DBG("[stop] CloseMusic...\n"); CloseMusic();
+        MXTX_DBG("[stop] FreeMusic...\n");  FreeMusic();
+        MXTX_DBG("[stop] done\n");
     }
     paula_reset();
     g_vblank_code = 0;
