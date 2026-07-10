@@ -22,6 +22,14 @@
 	include	lvo3.0/cia_lib.i
 	include	devices/timer.i
 
+* install a JMP-absolute vector into a library/device function table
+* \1 = negative LVO offset, \2 = target routine. a6 = library base. clobbers a0.
+LVO_JMP	macro
+	lea	\2(pc),a0
+	move.w	#$4ef9,\1(a6)
+	move.l	a0,\1+2(a6)
+	endm
+
 AMIGAMSG_SETSUBSONG	equ	1
 AMIGAMSG_SONG_END	equ	2
 AMIGAMSG_PLAYERNAME	equ	3
@@ -45,10 +53,14 @@ AMIGAMSG_STATE_DETECTION_STEP	equ	20
 AMIGAMSG_TEST_LOGGING	equ	21
 AMIGAMSG_DEBUG_U32_STRING	equ	22
 AMIGAMSG_DEBUG_U32_I32_STRING	equ	23
+AMIGAMSG_AUDIO_DEV_OPEN		equ	24
+AMIGAMSG_AUDIO_DEV_BEGINIO	equ	25
+AMIGAMSG_AUDIO_DEV_ABORTIO	equ	26
 
 * TODO: look at slack at the end of EXECBASE
 EXECBASE	equ	$0D00
 EXECENTRIES	equ	210
+IDNestCnt	equ	$126		* ExecBase interrupt-disable nest count (byte)
 
 TRAP_VECTOR_0	equ	$80
 TRAP_VECTOR_3	equ	$8c	* exec_cause uses this for software interrupt
@@ -236,8 +248,16 @@ zero_sample_l
 	move.l	a0,WaitIO+2(a6)
 	lea	myabortio(pc),a0
 	move.l	a0,AbortIO+2(a6)
-	lea	mygetmsg(pc),a0
+	lea	exec_getmsg(pc),a0
 	move.l	a0,GetMsg+2(a6)
+	lea	exec_replymsg(pc),a0
+	move.l	a0,ReplyMsg+2(a6)
+	lea	exec_putmsg(pc),a0
+	move.l	a0,PutMsg+2(a6)
+	lea	exec_copymem(pc),a0
+	move.l	a0,CopyMem+2(a6)
+	lea	exec_remove(pc),a0
+	move.l	a0,Remove+2(a6)
 	lea	exec_cause(pc),a0
 	move.l	a0,Cause+2(a6)
 	lea	exec_old_open_library(pc),a0
@@ -261,6 +281,8 @@ zero_sample_l
 
 	move.b	#$ff,$126(a6)	* fuck med player
 	move	#$0003,$128(a6)	* execbase processor flags to 68020+
+
+	bsr	audiodevice_init	* install fake audio.device LVO jump table
 
 	lea	dos_lib_base(pc),a6
 	lea	dos_loadseg(pc),a0
@@ -560,6 +582,11 @@ novolfunc
 playloop
 	bsr	waittrap		* wait for next frame
 
+	* catch fake audio.device DMA-completion replies queued by the host at
+	* $1fc (a WRITE buffer finished its cycles); feeds them back to the
+	* player so MaxTrax & co. keep scheduling notes.
+	bsr	handleDMAreplymsgs
+
 	* check input message
 	tst.l 	$300.w
 	beq.b	noinputmsgs
@@ -626,6 +653,10 @@ dontchangesubs
 	move	songendbit(pc),d0
 	bne.b	end_song
 nosongendcheck
+
+	* second audio.device reply drain, right before the player's interrupt
+	* function runs, to minimise WRITE-completion latency (see above).
+	bsr	handleDMAreplymsgs
 
 	* call dtp_interrupt if dtp_startint function hasn't been inited
 	move.l	useciatimer(pc),d0
@@ -2434,6 +2465,9 @@ isaudiodev	pull	d0/a1
 addone	lea	tdmsg1(pc),a0
 	bsr	put_string
 	pull	all
+	lea	audio_device_base(pc),a0	* MaxTrax captures IO_DEVICE into _AudioDevice
+	move.l	a0,IO_DEVICE(a1)	* then calls its BeginIO/AbortIO LVOs directly
+	bsr	adopen			* notify host of device open
 	clr.b	IO_ERROR(a1)		* no error
 	moveq	#0,d0
 	rts
@@ -3889,5 +3923,8 @@ intuition_lib_base
 * icon.library
 	dcb.b	108,0		* LVO table: see vectors in icon_lib.i
 icon_lib_base
+
+* fake audio.device + exec message-port routines (MaxTrax support)
+	include	devices/audio/audio_dev.s
 
 end
