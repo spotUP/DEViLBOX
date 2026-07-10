@@ -1,6 +1,8 @@
 // paula_soft.c — minimal Paula chip emulator for transpiled Amiga replayers
 #include "paula_soft.h"
 #include <string.h>
+#include <stdio.h>
+#include <stdint.h>
 
 typedef struct {
     const int8_t* sample;
@@ -9,6 +11,12 @@ typedef struct {
     float         step;         // samples-per-output-frame = freq / PAULA_RATE
     float         volume;       // 0.0 - 1.0
     int           dma_on;
+    int           loop;         // 0=one-shot, 1=loop
+    // Follow-on buffer loaded atomically when current one-shot ends
+    const int8_t* next_sample;
+    uint32_t      next_len;
+    int           next_loop;
+    int           next_valid;
 } PaulaChannel;
 
 static PaulaChannel s_ch[PAULA_CHANNELS];
@@ -46,6 +54,24 @@ void paula_set_volume(int ch, uint8_t vol) {
     s_ch[ch].volume = (float)v / 64.0f;
 }
 
+void paula_set_loop(int ch, int loop) {
+    if (ch < 0 || ch >= PAULA_CHANNELS) return;
+    s_ch[ch].loop = loop;
+}
+
+void paula_set_next(int ch, const int8_t* data, uint16_t len_words, int loop) {
+    if (ch < 0 || ch >= PAULA_CHANNELS) return;
+    s_ch[ch].next_sample = data;
+    s_ch[ch].next_len    = (uint32_t)len_words * 2;
+    s_ch[ch].next_loop   = loop;
+    s_ch[ch].next_valid  = 1;
+}
+
+int paula_is_active(int ch) {
+    if (ch < 0 || ch >= PAULA_CHANNELS) return 0;
+    return s_ch[ch].dma_on;
+}
+
 void paula_dma_write(uint16_t dmacon) {
     int enable = (dmacon & 0x8000) != 0;
     int i;
@@ -61,6 +87,30 @@ static float sample_channel(PaulaChannel* ch) {
     if (!ch->dma_on || ch->step <= 0.0f || !ch->sample || ch->sample_len == 0) return 0.0f;
     uint32_t idx = (uint32_t)ch->pos;
     if (idx >= ch->sample_len) {
+        if (ch->loop) {
+            // Wrap within the loop
+            ch->pos -= (float)ch->sample_len;
+            idx = (uint32_t)ch->pos;
+            if (idx >= ch->sample_len) { ch->pos = 0.0f; idx = 0; }
+        } else if (ch->next_valid) {
+            // Swap to the queued follow-on buffer (audio.device double-buffering)
+            ch->sample      = ch->next_sample;
+            ch->sample_len  = ch->next_len;
+            ch->loop        = ch->next_loop;
+            ch->next_valid  = 0;
+            ch->pos         = 0.0f;
+            idx             = 0;
+        } else {
+            ch->dma_on = 0;
+            return 0.0f;
+        }
+    }
+    uintptr_t memsize = (uintptr_t)__builtin_wasm_memory_size(0) * 65536u;
+    if ((uintptr_t)ch->sample + idx >= memsize || (uintptr_t)ch->sample < 1024u) {
+        static int dbg = 0;
+        if (dbg++ < 8)
+            fprintf(stderr, "[paula OOB] sample=%u idx=%u len=%u pos=%f step=%f loop=%d\n",
+                    (uint32_t)(uintptr_t)ch->sample, idx, ch->sample_len, ch->pos, ch->step, ch->loop);
         ch->dma_on = 0;
         return 0.0f;
     }
