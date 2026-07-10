@@ -1,5 +1,23 @@
 import type { Token } from './token.js';
 import type { AstNode, Operand, Size } from './ast.js';
+import { evalConst } from './preprocess.js';
+
+const EMPTY_EQU = new Map<string, number>();
+
+// Numeric value of an immediate operand's text (already stripped of '#').
+// A lone literal ($hex / %bin / octal / decimal, optional sign) parses directly.
+// A pure-numeric arithmetic expression (16-1, (709379-3)/64) is folded now.
+// An expression containing identifiers (3*NUM_VOICES-1, nt_sizeof*4) cannot be
+// resolved until the symbol table exists, so we return NaN and let the emitter
+// emit the raw expression verbatim (identifiers become #defined C constants).
+// parseInt() alone is wrong here: it silently returns the leading integer
+// (parseInt('3*NUM_VOICES-1') === 3), dropping the rest of the expression.
+function immediateValue(raw: string): number {
+  if (/^-?(\$[0-9A-Fa-f]+|%[01]+|\d+)$/.test(raw)) return parseNumber(raw);
+  if (!/[A-Za-z_]/.test(raw) && /[+\-*/()<>&|^~]/.test(raw.replace(/^-/, '')))
+    return evalConst(raw, EMPTY_EQU);
+  return NaN;
+}
 
 function tagAddress(addr: number): 'paula' | 'dmacon' | 'cia' | 'other' {
   if (addr >= 0xdff0a0 && addr <= 0xdff0df) return 'paula';
@@ -22,7 +40,7 @@ function parseOperand(t: Token): Operand {
       return { kind: 'register', name: t.value };
     case 'IMMEDIATE': {
       const raw = t.value.slice(1); // remove '#'
-      return { kind: 'immediate', value: parseNumber(raw), raw: t.value };
+      return { kind: 'immediate', value: immediateValue(raw), raw: t.value };
     }
     case 'ADDRESS': {
       if (t.value.startsWith('-')) {

@@ -73,6 +73,7 @@ async function main() {
     flush: mod._maxtrax_get_cmd_count(1),
     pervol: mod._maxtrax_get_cmd_count(2),
     other: mod._maxtrax_get_cmd_count(3),
+    seedPoolDepth: mod._maxtrax_get_seed_pool_depth(),
   };
   process.stdout.write(JSON.stringify(result));
 }
