@@ -859,7 +859,6 @@ export const useFormatStore = create<FormatStore>()(
         state.uadeEditableFileName = (song as any).uadeEditableFileName ?? null;
         state.maxTraxFileData = (song as any).maxTraxFileData ?? null;
         state.maxTraxFileName = (song as any).maxTraxFileName ?? null;
-        console.error('[probe applyEditorMode] format=', (song as any).format, 'maxTraxFileData=', (song as any).maxTraxFileData ? (song as any).maxTraxFileData.byteLength : 'NULL');
         state.nativeSamplePlayback = (song as any).nativeSamplePlayback ?? false;
         state.adplugFileData = (song as any).adplugFileData ?? null;
         state.adplugFileName = (song as any).adplugFileName ?? null;
