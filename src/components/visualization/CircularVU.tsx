@@ -121,7 +121,7 @@ export const CircularVU: React.FC<CircularVUProps> = ({ height = 100 }) => {
     return rms > 0;
   }, [width, height]);
 
-  useVisualizationAnimation({ onFrame, enabled: isPlaying, fps: 30 });
+  useVisualizationAnimation({ onFrame, enabled: isPlaying, fps: 60 });
 
   return (
     <div className="w-full h-full flex items-center justify-center">

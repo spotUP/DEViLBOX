@@ -205,7 +205,7 @@ export const TrackerVisualBackground: React.FC<TrackerVisualBackgroundProps> = R
   useVisualizationAnimation({
     onFrame,
     enabled: isPlaying && !isAMMode && width > 0 && height > 0,
-    fps: 30,
+    fps: 60,
   });
 
   // Cleanup WebGL on unmount

@@ -68,7 +68,7 @@ export const MusicLineWaveformVisualizer: React.FC = () => {
     return isPlaying;
   }, [isPlaying]);
 
-  useVisualizationAnimation({ onFrame, enabled: isPlaying, fps: 30 });
+  useVisualizationAnimation({ onFrame, enabled: isPlaying, fps: 60 });
 
   useEffect(() => {
     if (!MusicLineEngine.hasInstance()) return;

@@ -1,16 +1,16 @@
 /**
  * visualizerRafGating.ratchet.test.ts — heat regression guard.
  *
- * These 9 visualizer/scope components used to hand-roll a raw
+ * These 10 visualizer/scope components used to hand-roll a raw
  * `requestAnimationFrame` loop that self-rescheduled forever, never stopping
  * when playback was stopped or the tab was hidden. The browser batches every
  * rAF callback into one vsync, so all 9 ran in a single frame and pinned the
  * CPU/GPU regardless of playback state — the app got "almost unusable" hot.
  *
- * The fix migrated all 9 onto the shared, gated `useVisualizationAnimation`
+ * The fix migrated all 10 onto the shared, gated `useVisualizationAnimation`
  * hook, which fully cancels its rAF (0 CPU) when `enabled` is false or the tab
  * is hidden. This ratchet forbids raw `requestAnimationFrame` from creeping
- * back into any of the 9. Reverting a migration reintroduces the raw call and
+ * back into any of the 10. Reverting a migration reintroduces the raw call and
  * fails this test.
  *
  * Scope is an explicit allowlist (not a whole directory) on purpose: dozens of
@@ -35,6 +35,7 @@ const MIGRATED_FILES = [
   'src/components/automation/AutomationLaneStrip.tsx',
   'src/components/musicline/MusicLineWaveformVisualizer.tsx',
   'src/components/dialogs/sid/SIDScopeTab.tsx',
+  'src/components/dj/DeckVisualizer.tsx',
 ];
 
 describe('visualizer rAF gating ratchet', () => {

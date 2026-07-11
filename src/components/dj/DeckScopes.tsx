@@ -175,7 +175,7 @@ const ScopeCanvas: React.FC<ScopeCanvasProps> = ({ deckId, channel, size, muted,
   useEffect(() => { renderFrame(); }, [renderFrame]);
 
   // Continuous animation only while the deck plays (0 CPU otherwise).
-  useVisualizationAnimation({ onFrame: renderFrame, enabled: isPlaying, fps: 30 });
+  useVisualizationAnimation({ onFrame: renderFrame, enabled: isPlaying, fps: 60 });
 
   return (
     <canvas

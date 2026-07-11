@@ -135,7 +135,7 @@ export const ChannelSpectrums: React.FC<ChannelSpectrumsProps> = ({ height = 100
     return true;
   }, [width, height, channelCount, pattern]);
 
-  useVisualizationAnimation({ onFrame, enabled: isPlaying, fps: 30 });
+  useVisualizationAnimation({ onFrame, enabled: isPlaying, fps: 60 });
 
   return (
     <div className="w-full h-full flex items-center justify-center">
