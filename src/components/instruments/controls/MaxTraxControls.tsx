@@ -287,7 +287,7 @@ export const MaxTraxControls: React.FC<MaxTraxControlsProps> = ({ sampleIndex })
               onClick={() => removeEnvPoint('attack', i)}
               className="text-[9px] font-mono px-1 h-auto py-0"
             >
-              X
+              Remove
             </Button>
           </div>
         ))}
@@ -341,7 +341,7 @@ export const MaxTraxControls: React.FC<MaxTraxControlsProps> = ({ sampleIndex })
               onClick={() => removeEnvPoint('release', i)}
               className="text-[9px] font-mono px-1 h-auto py-0"
             >
-              X
+              Remove
             </Button>
           </div>
         ))}
