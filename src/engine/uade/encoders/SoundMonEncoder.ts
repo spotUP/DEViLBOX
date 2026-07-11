@@ -17,16 +17,20 @@ function encodeSoundMonCell(cell: TrackerCell): Uint8Array {
   const out = new Uint8Array(3);
   const note = cell.note ?? 0;
 
-  // Byte 0: note value (the parser maps via period table → XM note)
-  // We store the raw note index. Parser uses amigaNoteToXM which adds 36.
-  // Reverse: xmNote - 36 = amiga note index
-  if (note > 0 && note > 36) {
+  // Byte 0: note value. The parser maps the raw SoundMon note index through two tables
+  // (bpNoteToXM: index→PERIODS→nearest ProTracker period→XM note), which is not a simple
+  // additive offset — so it cannot be inverted from the XM note alone. Prefer the exact
+  // source note byte stashed by decodeCell in the `period` carrier; edited grid cells carry
+  // none and fall back to the (approximate) additive derivation.
+  if (cell.period !== undefined) {
+    out[0] = cell.period & 0xFF;
+  } else if (note > 36) {
     out[0] = (note - 36) & 0xFF;
   } else {
     out[0] = 0;
   }
 
-  // Byte 1: (sample << 4) | effect
+  // Byte 1: (sample << 4) | effect — both nibbles round-trip exactly
   const instr = cell.instrument ?? 0;
   out[1] = ((instr & 0x0F) << 4) | ((cell.effTyp ?? 0) & 0x0F);
 
