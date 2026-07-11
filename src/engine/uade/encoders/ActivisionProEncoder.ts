@@ -46,6 +46,14 @@ export function encodeActivisionProCell(cell: TrackerCell): Uint8Array {
   const instrField = (instr & 0x03) << 6;
   out[0] = instrField | (noteIdx & 0x3F);
 
+  // Byte-exact carrier restore. avpNoteToXM clamps xm to [1,96], collapsing all note
+  // indices below 24 onto xm 1, which reverses to idx 24 — a lossy lower-clamp. When
+  // decodeCell stashed the exact source byte in the invisible `period` carrier, reproduce
+  // it verbatim. Edited grid cells lack the carrier and keep the derivation above.
+  if (cell.period !== undefined) {
+    out[0] = cell.period & 0xFF;
+  }
+
   return out;
 }
 
