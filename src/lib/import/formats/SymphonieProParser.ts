@@ -1051,6 +1051,18 @@ function _parseSymphonieProFile(bytes: Uint8Array, filename: string): TrackerSon
         case 18: // CMD_ADD_HALFTONE
           cell.effTyp = 0x03; break;
       }
+
+      // Byte-exact carriers: the visible fields above are a lossy XM view of the
+      // 4-byte SymEvent (volume is round(param*0.64), the note byte on command
+      // events is discarded, param/inst are clamped). Stash the exact source
+      // bytes so encodeSymphonieProCell can reproduce them verbatim. These are
+      // private to the round-trip/chip-RAM codec path — the grid is built by
+      // _convertEvent and native export by SymphonieProExporter, neither of which
+      // reads them — so they never surface. An edited cell reaches the encoder via
+      // the carrier-less _convertEvent path and falls back to the XM derivation.
+      cell.pan    = raw[1]; // raw note byte
+      cell.period = param;  // raw param byte
+      cell.cutoff = inst;   // raw inst byte
       return cell;
     },
     getCellFileOffset(pattern: number, row: number, channel: number): number {
