@@ -35,6 +35,17 @@ function encodeMTMCell(cell: TrackerCell): Uint8Array {
   // Byte 2: param
   out[2] = (cell.eff ?? 0) & 0xFF;
 
+  // Byte-exact carrier restore. The note byte is lossy (decode adds 25 and clamps to
+  // 96) and mapMTMEffect is many-to-one, so the derivations above cannot reproduce the
+  // original 3 bytes. When decodeCell stashed the exact source bytes in the invisible
+  // period/pan/cutoff carriers, reproduce them verbatim. Edited grid cells lack the
+  // carriers and keep the canonical derivation above.
+  if (cell.period !== undefined && cell.pan !== undefined && cell.cutoff !== undefined) {
+    out[0] = cell.period & 0xFF;
+    out[1] = cell.pan & 0xFF;
+    out[2] = cell.cutoff & 0xFF;
+  }
+
   return out;
 }
 
