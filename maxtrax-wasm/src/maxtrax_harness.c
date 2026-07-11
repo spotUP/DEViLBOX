@@ -874,6 +874,143 @@ EXPORT int maxtrax_get_patch_scalar(int patchNumber, int field) {
     return -1;
 }
 
+/* big-endian readers over the raw dsample byte buffer */
+static uint16_t ds_r16(const uint8_t *b, int o) { return (uint16_t)((b[o] << 8) | b[o+1]); }
+static uint32_t ds_r32(const uint8_t *b, int o) {
+    return ((uint32_t)b[o] << 24) | ((uint32_t)b[o+1] << 16)
+         | ((uint32_t)b[o+2] << 8) | (uint32_t)b[o+3];
+}
+static uint32_t hshim_alloc(uint32_t size, uint32_t memflags) {
+    d0 = size; d1 = memflags; _LVOAllocMem(); return d0;
+}
+static void hshim_free(uint32_t ptr, uint32_t size) {
+    if (!ptr) return; a1 = ptr; d0 = size; _LVOFreeMem();
+}
+
+/*
+ * maxtrax_reload_patch(patchNumber, dsamplePtr, len)
+ *
+ * Tier-2 structural live edit. Tear down + rebuild one patch's in-memory
+ * buffers (env arrays + per-octave sample chain) from a tailRaw sample slice
+ * (header+env+PCM, big-endian) — the same bytes encodeMaxTrax exports. Reuses
+ * the LoadPerf allocation contract but sources PCM from the passed buffer
+ * instead of the DOS read stream. Takes effect on the next note-on for this
+ * patch; in-flight voices on it are drained first so freeing is safe.
+ * Returns 0 on success, -1 on bad args / short buffer / alloc failure.
+ */
+EXPORT int maxtrax_reload_patch(int patchNumber, uintptr_t dsamplePtr, int len) {
+    if (patchNumber < 0 || patchNumber >= NUM_PATCHES) return -1;
+    if (!dsamplePtr || len < 20) return -1;
+    const uint8_t *b = (const uint8_t *)dsamplePtr;
+
+    uint16_t oct        = ds_r16(b, 6);
+    uint32_t attackLen0 = ds_r32(b, 8);
+    uint32_t sustLen0   = ds_r32(b, 12);
+    uint16_t ac         = ds_r16(b, 16);
+    uint16_t rc         = ds_r16(b, 18);
+    uint32_t envBytes   = (uint32_t)(ac + rc) * (uint32_t)env_sizeof;
+    uint32_t firstLen   = attackLen0 + sustLen0;
+    /* PCM total = firstLen*(2^oct - 1); guard the buffer covers header+env+PCM. */
+    uint32_t pcmTotal = 0, tmp = firstLen; uint16_t k = 0;
+    while (k < oct) { pcmTotal += tmp; tmp += tmp; k++; }
+    if ((uint32_t)len < 20u + envBytes + pcmTotal) return -1;
+
+    uint32_t base = (uint32_t)(uintptr_t)_patch + (uint32_t)patchNumber * (uint32_t)patch_sizeof;
+
+    /* 1. Drain in-flight voices referencing this patch so freeing is safe. */
+    {
+        int vi = 0;
+        while (vi < NUM_VOICES) {
+            uint32_t vbase = (uint32_t)(uintptr_t)_voice + (uint32_t)vi * (uint32_t)voice_sizeof;
+            if (READ32(vbase + (uint32_t)voice_Patch) == base) {
+                uint8_t ch = (uint8_t)READ8(vbase + (uint32_t)voice_Number);
+                if (ch < PAULA_CHANNELS) paula_channel_dma_off(ch);
+                WRITE8(vbase + (uint32_t)voice_Status, 0 /* ENV_HALT idle */);
+                WRITE32(vbase + (uint32_t)voice_Patch, 0);
+            }
+            vi++;
+        }
+    }
+
+    /* 2. Free old buffers (sizes are advisory; free() ignores them). */
+    {
+        uint16_t oac = (uint16_t)READ16(base + (uint32_t)patch_AttackCount);
+        uint16_t orc = (uint16_t)READ16(base + (uint32_t)patch_ReleaseCount);
+        hshim_free(READ32(base + (uint32_t)patch_Attack),  (uint32_t)oac * (uint32_t)env_sizeof);
+        hshim_free(READ32(base + (uint32_t)patch_Release), (uint32_t)orc * (uint32_t)env_sizeof);
+        uint32_t s = READ32(base + (uint32_t)patch_Sample);
+        while (s) {
+            uint32_t next = READ32(s + (uint32_t)samp_NextSample);
+            uint32_t wf   = READ32(s + (uint32_t)samp_Waveform);
+            uint32_t wsz  = READ32(s + (uint32_t)samp_AttackSize) + READ32(s + (uint32_t)samp_SustainSize);
+            hshim_free(wf, wsz);
+            hshim_free(s, (uint32_t)samp_sizeof);
+            s = next;
+        }
+    }
+
+    /* 3. Scalars. */
+    WRITE8 (base + (uint32_t)patch_Number, (uint8_t)ds_r16(b, 0));
+    WRITE16(base + (uint32_t)patch_Tune,   ds_r16(b, 2));
+    WRITE16(base + (uint32_t)patch_Volume, ds_r16(b, 4));
+
+    /* 4. Env arrays (raw big-endian copy; READ16 swaps on read). */
+    uint32_t envSrc = 20;
+    {
+        uint32_t aBytes = (uint32_t)ac * (uint32_t)env_sizeof;
+        uint32_t rBytes = (uint32_t)rc * (uint32_t)env_sizeof;
+        uint32_t ap = aBytes ? hshim_alloc(aBytes, 0) : 0;
+        uint32_t rp = rBytes ? hshim_alloc(rBytes, 0) : 0;
+        if (aBytes && !ap) return -1;
+        if (rBytes && !rp) { hshim_free(ap, aBytes); return -1; }
+        if (ap) memcpy((void *)(uintptr_t)ap, b + envSrc, aBytes);
+        if (rp) memcpy((void *)(uintptr_t)rp, b + envSrc + aBytes, rBytes);
+        WRITE32(base + (uint32_t)patch_Attack,       ap);
+        WRITE32(base + (uint32_t)patch_Release,      rp);
+        WRITE16(base + (uint32_t)patch_AttackCount,  ac);
+        WRITE16(base + (uint32_t)patch_ReleaseCount, rc);
+    }
+
+    /* 5. Per-octave sample chain (lengths double each octave), PCM from buffer. */
+    {
+        uint32_t pcmSrc = 20 + envBytes;
+        uint32_t prev = 0, first = 0;
+        uint32_t aLen = attackLen0, sLen = sustLen0;
+        uint16_t o = 0;
+        while (o < oct) {
+            uint32_t wsz = aLen + sLen;
+            uint32_t sstruct = hshim_alloc((uint32_t)samp_sizeof, 0);
+            uint32_t wf = wsz ? hshim_alloc(wsz, MEMF_CHIP) : 0;
+            if (!sstruct || (wsz && !wf)) { hshim_free(sstruct, (uint32_t)samp_sizeof); return -1; }
+            if (wf) memcpy((void *)(uintptr_t)wf, b + pcmSrc, wsz);
+            WRITE32(sstruct + (uint32_t)samp_Waveform,   wf);
+            WRITE32(sstruct + (uint32_t)samp_AttackSize, aLen);
+            WRITE32(sstruct + (uint32_t)samp_SustainSize, sLen);
+            WRITE32(sstruct + (uint32_t)samp_NextSample, 0);
+            if (prev) WRITE32(prev + (uint32_t)samp_NextSample, sstruct);
+            else      first = sstruct;
+            prev = sstruct;
+            pcmSrc += wsz;
+            aLen += aLen; sLen += sLen;  /* double for next octave */
+            o++;
+        }
+        WRITE32(base + (uint32_t)patch_Sample, first);
+    }
+    return 0;
+}
+
+/* Read-back of a rebuilt env point for the Tier-2 regression test. */
+EXPORT int maxtrax_get_patch_env(int patchNumber, int isRelease, int pointIndex, int wantVolume) {
+    if (patchNumber < 0 || patchNumber >= NUM_PATCHES || pointIndex < 0) return -1;
+    uint32_t base = (uint32_t)(uintptr_t)_patch + (uint32_t)patchNumber * (uint32_t)patch_sizeof;
+    uint16_t cnt = (uint16_t)READ16(base + (uint32_t)(isRelease ? patch_ReleaseCount : patch_AttackCount));
+    if ((uint32_t)pointIndex >= cnt) return -1;
+    uint32_t arr = READ32(base + (uint32_t)(isRelease ? patch_Release : patch_Attack));
+    if (!arr) return -1;
+    uint32_t e = arr + (uint32_t)pointIndex * (uint32_t)env_sizeof;
+    return (int)(uint16_t)READ16(e + (uint32_t)(wantVolume ? env_Volume : env_Duration));
+}
+
 /*
  * maxtrax_get_event_count(score)
  *
