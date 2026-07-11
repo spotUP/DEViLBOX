@@ -167,6 +167,23 @@ export function encodeGT2Cell(cell: TrackerCell): Uint8Array {
     out[4] = Math.min(255, vol + 0x10);
   }
 
+  return applyGT2ByteExactCarriers(out, cell);
+}
+
+/**
+ * Byte-exact carriers set by GraoumfTracker2Parser's GT2 decodeCell hold the exact
+ * source effect/param/volume bytes that the lossy XM view cannot reconstruct: the
+ * effect+param pass through a many-to-one translateEffect (unmapped and 12-bit
+ * effects collapse to 0), and the volume byte's per-pattern codingVersion (÷4 vs
+ * −0x10) is unknown to a single-cell decoder. When present (round-trip / chip-RAM
+ * path) reproduce them verbatim. An edited cell reaches the encoder carrier-less and
+ * keeps the derivation above. Note/instrument (bytes 0-1) round-trip losslessly so
+ * are left to the derivation.
+ */
+function applyGT2ByteExactCarriers(out: Uint8Array, cell: TrackerCell): Uint8Array {
+  if (cell.period !== undefined) out[2] = cell.period & 0xFF; // raw effect byte
+  if (cell.pan    !== undefined) out[3] = cell.pan    & 0xFF; // raw param byte
+  if (cell.cutoff !== undefined) out[4] = cell.cutoff & 0xFF; // raw volume byte
   return out;
 }
 
