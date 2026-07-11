@@ -62,7 +62,23 @@ function encodeSTPCell(cell: TrackerCell): Uint8Array {
   out[2] = cmd & 0xFF;
   out[3] = param & 0xFF;
 
+  applySTPByteExactCarriers(cell, out);
+
   return out;
+}
+
+/**
+ * Byte-exact carrier restore. `convertSTPEffect` is many-to-one (e.g. STP 0x0C set-volume
+ * decodes to XM 0x0C, but reverseSTPEffect maps XM 0x0C back to STP 0x04; the tempo case
+ * decodes param>>4, dropping the low nibble). When decodeCell stashed the exact source
+ * command/param in the invisible `cutoff`/`pan` carriers, reproduce bytes 2/3 verbatim.
+ * Edited grid cells lack these carriers and keep the canonical derivation above.
+ */
+function applySTPByteExactCarriers(cell: TrackerCell, out: Uint8Array): void {
+  if (cell.cutoff !== undefined && cell.pan !== undefined) {
+    out[2] = cell.cutoff & 0xFF;
+    out[3] = cell.pan & 0xFF;
+  }
 }
 
 registerPatternEncoder('stp', () => encodeSTPCell);
