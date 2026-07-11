@@ -79,15 +79,13 @@ field; live param change audible without restart.
 Tabbing between channels can move the cursor outside the visible area. The
 horizontal scrollbar should follow the cursor on Tab. Small, self-contained.
 
-### 5. White boot flash
-Memory: `white_boot_flash_todo.md`. White screen during boot burns eyes in dark
-rooms — likely FOUC before the dark theme mounts. Fix html/body bg to a dark
-token so first paint is dark. Not started.
-
-### 6. UADE full editability — Phase 1
+### 5. UADE full editability — Phase 1
 Plan: `thoughts/shared/plans/2026-07-07-uade-full-native-editability.md`
 (7 phases; Phase 0 shipped `72700b0e`). Next = encoder round-trip harness.
 Larger, multi-session on its own.
+
+## Dropped
+- White boot flash — user decided 2026-07-11 it can be ignored. Not a work item.
 
 ## Lower priority / record-only (don't start without go-ahead)
 - Dub refinement — ongoing (AutoDub persona hints; Perry extFeedbackGain 0.06).
