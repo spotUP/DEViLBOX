@@ -375,7 +375,7 @@ function locateMaxTraxSampleInTailRaw(tail: Uint8Array, sampleIndex: number): Ma
     const oc = dv.getUint16(p + 6);
     const firstLen = al + sl;
     const envBytes = (ac + rc) * 4;
-    const pcmSize = firstLen > 0 ? Math.round(firstLen * (Math.pow(2, oc) - 1)) : 0;
+    const pcmSize = firstLen > 0 ? firstLen * (Math.pow(2, oc) - 1) : 0;
     if (s === sampleIndex) {
       return {
         headerBase: p,
