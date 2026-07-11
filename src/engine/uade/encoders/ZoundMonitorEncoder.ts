@@ -88,6 +88,19 @@ function encodeZoundMonitorCell(cell: TrackerCell): Uint8Array {
   out[2] = (word >>> 8) & 0xFF;
   out[3] = word & 0xFF;
 
+  // Byte-exact carrier restore. The ZoundMonitor word packs several fields the XM view
+  // cannot reconstruct (the DMA/reserved top bits, the context-dependent volAdd byte, and a
+  // many-to-one control-nibble→effect map), so the derivation above is lossy. decodeCell
+  // stashes the exact source word in the invisible period/pan/cutoff carriers (fields the
+  // ZM grid loop never sets); reproduce all 4 bytes verbatim. Edited grid cells lack the
+  // carriers and keep the canonical derivation.
+  if (cell.period !== undefined && cell.pan !== undefined && cell.cutoff !== undefined) {
+    out[0] = (cell.period >> 8) & 0xFF;
+    out[1] = cell.period & 0xFF;
+    out[2] = cell.pan & 0xFF;
+    out[3] = cell.cutoff & 0xFF;
+  }
+
   return out;
 }
 
