@@ -24,24 +24,23 @@ files — this is the index + acceptance criteria, not a re-dump.
 
 ## Ordered worklist
 
-### 1. MaxTrax pattern editing — wire the 3 missing links
-Plan: `thoughts/shared/plans/2026-07-11-maxtrax-inplace-sample-live-edit.md`
-Handoff detail: `thoughts/shared/handoffs/2026-07-11_maxtrax-finish-fully.md` (§C)
-
-Scaffolding + tests already exist (deriveGrid, maxtraxGrid inverse ops,
-MaxTraxEngine setEvent/recook, export prefers live `maxTraxData`). Missing:
-1. `useTrackerStore.setCell()` — add a MaxTrax branch (mirror the
-   Furnace/OpenMPT/UADE branches at ~lines 472-639) so cell edits reach
-   `maxTraxData`.
-2. From that branch, call `MaxTraxEngine.setEvent()` → live WASM playback update.
-3. Serialize `maxTraxData`: add to `getNativeEngineMetaForExport`
-   (exporters.ts:102-118) AND `FILE_DATA_FIELDS` (formatFileDataFields.ts) so
-   edits survive project save/reload.
-
-Acceptance: edit a MaxTrax cell → hear it change live → export byte-diff shows
-the edit → save project, reload, edit still present. Regression test (revert-
-checked, in test:ci) per link. Watch localStorage schema version bump if
-FILE_DATA_FIELDS change is breaking.
+### 1. MaxTrax pattern editing — DONE (2026-07-11)
+The "3 missing links" framing was stale — it assumed MaxTrax rides the generic
+`useTrackerStore.setCell()`. It does NOT: MaxTrax renders through its own
+`MaxTraxView`/`MaxTraxGrid` + `useMaxTraxGrid` hook.
+- Links 1+2 (cell edit → store + live WASM) were ALREADY live via the dedicated
+  grid: `MaxTraxGrid.tsx:178-182` → `edit.*` → `useMaxTraxGrid.apply()` writes
+  the store once, `projectEventToWorklet` per changed index, then `recook`.
+  `maxTraxFileData` was already in `FILE_DATA_FIELDS` (line 89).
+- Link 3 (edits survive save/reload) WAS missing and was actually two-part —
+  fixed in `src/lib/export/exporters.ts`:
+  - `getNativeEngineDataForExport` re-encodes live `maxTraxData` → the persisted
+    `maxTraxFileData` bytes (edits were being dropped for the pristine bytes).
+  - `restoreNativeEngineData` re-parses those bytes back into `maxTraxData`, so
+    `applyEditorMode`'s dispatch (keyed on `maxTraxData`, useFormatStore:1009)
+    enters `maxtrax` mode with a populated grid instead of `classic`.
+  Revert-checked round-trip test `maxtraxPersistenceRoundtrip.test.ts` in
+  test:ci. Committed. No localStorage schema bump needed (byte field unchanged).
 
 ### 2. MaxTrax synth / instrument editing — the big gap
 Handoff detail: `2026-07-11_maxtrax-finish-fully.md` (§D) — read the DiskSample
@@ -68,16 +67,28 @@ Sub-steps (each could be its own session):
 Acceptance per sub-step: round-trip test green; editor exposes every struct
 field; live param change audible without restart.
 
-### 3. MaxTrax loose ends (fold into item 1 or 2's commit)
-- Commit untracked: `public/data/songs/maxtrax/contraptionzack-funkfest.mxtx`,
-  `third-party/uade-3.05/players/MaxTrax` dir, the two 2026-07-11 handoffs +
-  the plan.
-- Check funkfest clipping: playback peaks at 1.0 (handoff §A). Confirm it's
-  not clipping vs UADE (lock-step, no WAV).
+### 3. MaxTrax loose ends — DONE (2026-07-11)
+- Committed untracked: `contraptionzack-funkfest.mxtx`,
+  `third-party/uade-3.05/players/MaxTrax` (the compiled UADE eagleplayer, an
+  8.6 KB file — not a dir), the two 2026-07-11 handoffs + the plan.
+- Funkfest clipping check: NOT clipping. The transpile engine's Paula mixer
+  (`tools/asm68k-to-c/runtime/paula_soft.c:157-160`) sums two hard-panned
+  voices per side (`int8/128 * vol` ∈ [-1,1], `-128/128 = -1.0` exactly) then
+  scales `* 0.5` — so output is bounded to exactly ±1.0 and can never overflow.
+  Measured over a 20 s funkfest render (563k frames): peak 1.0, but only 147
+  isolated full-scale samples out of 1.13M and `longestClipRun = 1` (zero
+  consecutive rail runs). Clipping = sustained flat-topped runs; this is a hot
+  but clean master touching full-scale at waveform tips. Matches UADE's
+  identical two-voice-per-side Paula sum. No code change.
 
-### 4. Pattern editor — Tab scroll-follow bug (user-flagged, unrelated)
-Tabbing between channels can move the cursor outside the visible area. The
-horizontal scrollbar should follow the cursor on Tab. Small, self-contained.
+### 4. Pattern editor — Tab scroll-follow bug — DONE (2026-07-11)
+The horizontal channel-follow scroll effect was gated on `isMobile`, so on
+desktop tabbing/arrowing to an off-screen channel left the cursor outside the
+viewport. Added a desktop follow effect keyed on the cursor's channel index
+(`PatternEditorCanvas.tsx`) that scrolls the minimum amount to keep the active
+channel visible, reusing the wheel handler's scroll-space math. Scroll math
+extracted to pure `computeChannelFollowScroll` (`src/lib/tracker/followScroll.ts`)
+with a revert-checked test in test:ci. Commit `204955f30`.
 
 ### 5. UADE full editability — Phase 1
 Plan: `thoughts/shared/plans/2026-07-07-uade-full-native-editability.md`
