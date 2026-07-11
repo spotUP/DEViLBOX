@@ -21,8 +21,18 @@
 import type { TrackerCell } from '@/types';
 import { registerPatternEncoder } from '../UADEPatternEncoder';
 import { xmNoteToPeriod } from './MODEncoder';
+import { periodToNoteIndex } from '@/lib/import/formats/AmigaUtils';
 
 const XM_NOTE_CUT = 97;
+
+/** True when `period` is the exact source period the parser decoded into `note`. */
+function periodMatchesNote(period: number, note: number): boolean {
+  if (period <= 0) return false;
+  // sfxPeriodToNote(period) = periodToNoteIndex(period) + 12 (0 when no table match).
+  const idx = periodToNoteIndex(period);
+  const decodedNote = idx === 0 ? 0 : idx + 12;
+  return decodedNote === note;
+}
 
 /**
  * Reverse-translate XM effect → SoundFX effect + param.
@@ -46,12 +56,19 @@ function encodeSoundFXCell(cell: TrackerCell): Uint8Array {
   const out = new Uint8Array(4);
   const note = cell.note ?? 0;
 
-  // Byte 0-1: period as signed int16 BE
+  // Byte 0-1: period as signed int16 BE.
+  // Prefer the exact source period (cell.period) when it still matches the note — this preserves
+  // raw Amiga periods that have no ProTracker-table note (which decode to note 0). An edited note
+  // invalidates the stale period, so fall back to the canonical note→period in that case.
+  const rawPeriod = cell.period ?? 0;
   let period = 0;
   if (note === XM_NOTE_CUT) {
     period = -2; // note off
   } else if (note > 0) {
-    period = xmNoteToPeriod(note);
+    period = periodMatchesNote(rawPeriod, note) ? rawPeriod : xmNoteToPeriod(note);
+  } else if (rawPeriod > 0) {
+    // Out-of-table period carried with no XM note — write it back verbatim.
+    period = rawPeriod;
   }
 
   // Write as signed int16 BE

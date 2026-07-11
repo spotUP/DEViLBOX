@@ -668,7 +668,14 @@ export async function parseSoundFXFile(
         }
       }
 
-      return { note, instrument: instr, volume: 0, effTyp, eff, effTyp2: 0, eff2: 0 };
+      // Preserve the exact Amiga period. SoundFX stores raw periods, some of which have no
+      // ProTracker-table match (sfxPeriodToNote returns 0 for those), so the note field alone
+      // cannot reconstruct them — keep the source period for a byte-exact round-trip. Matches
+      // the build path (which sets `period` on every note row) so display + write-back agree.
+      return {
+        note, instrument: instr, volume: 0, effTyp, eff, effTyp2: 0, eff2: 0,
+        period: signedPeriod > 0 ? signedPeriod : undefined,
+      };
     },
   };
 
