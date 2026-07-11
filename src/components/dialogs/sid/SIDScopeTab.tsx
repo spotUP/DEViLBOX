@@ -8,6 +8,8 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Layers, Eye, EyeOff } from 'lucide-react';
+import { useTransportStore } from '@stores';
+import { useVisualizationAnimation } from '@hooks/useVisualizationAnimation';
 
 /* ── Colours ── */
 const C_BG = '#0a0a1a';
@@ -59,7 +61,6 @@ function synthSample(phase: number, wf: number, pw: number): number {
 
 export const SIDScopeTab: React.FC<SIDScopeTabProps> = ({ className }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const animRef = useRef(0);
   const analyserRef = useRef<AnalyserNode | null>(null);
   const analyserBuf = useRef(new Float32Array(FFT_SIZE));
   const voicesRef = useRef<(VoiceSnapshot | null)[]>([null, null, null]);
@@ -68,6 +69,7 @@ export const SIDScopeTab: React.FC<SIDScopeTabProps> = ({ className }) => {
   const [muted, setMuted] = useState([false, false, false]);
   const [statusVoice, setStatusVoice] = useState<VoiceSnapshot | null>(null);
   const [hasSignal, setHasSignal] = useState(false);
+  const isPlaying = useTransportStore((s) => s.isPlaying);
 
   // Keep refs in sync for rAF loop
   const splitRef = useRef(splitView);
@@ -113,14 +115,13 @@ export const SIDScopeTab: React.FC<SIDScopeTabProps> = ({ className }) => {
     };
   }, []);
 
-  /* ── Animation loop ── */
-  useEffect(() => {
-    const tick = () => {
+  /* ── Frame render — driven by the shared gated hook (0 CPU when stopped) ── */
+  const renderFrame = useCallback((): boolean => {
       const canvas = canvasRef.current;
-      if (!canvas) { animRef.current = requestAnimationFrame(tick); return; }
+      if (!canvas) return false;
 
       const ctx = canvas.getContext('2d');
-      if (!ctx) { animRef.current = requestAnimationFrame(tick); return; }
+      if (!ctx) return false;
 
       const w = canvas.width;
       const h = canvas.height;
@@ -206,8 +207,7 @@ export const SIDScopeTab: React.FC<SIDScopeTabProps> = ({ className }) => {
         ctx.font = '12px monospace';
         ctx.textAlign = 'center';
         ctx.fillText('NO SIGNAL', w / 2, h / 2 + 4);
-        animRef.current = requestAnimationFrame(tick);
-        return;
+        return false;
       }
 
       // Draw synthesized voice waveforms
@@ -270,12 +270,15 @@ export const SIDScopeTab: React.FC<SIDScopeTabProps> = ({ className }) => {
         ctx.globalAlpha = 1;
       }
 
-      animRef.current = requestAnimationFrame(tick);
-    };
-
-    animRef.current = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(animRef.current);
+      return anyActive;
   }, []);
+
+  // Static render: draws current state once on mount and on view/mute changes,
+  // so the scope shows NO SIGNAL / last frame without any rAF when stopped.
+  useEffect(() => { renderFrame(); }, [renderFrame, splitView, muted]);
+
+  // Continuous animation only while playback runs (0 CPU otherwise).
+  useVisualizationAnimation({ onFrame: renderFrame, enabled: isPlaying, fps: 30 });
 
   /* ── Resize canvas to fill container ── */
   useEffect(() => {

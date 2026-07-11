@@ -14,6 +14,7 @@
 import React, { useRef, useEffect, useCallback } from 'react';
 import { useDJStore } from '@/stores/useDJStore';
 import { useDeckVisualizationData } from '@/hooks/dj/useDeckVisualizationData';
+import { useVisualizationAnimation } from '@hooks/useVisualizationAnimation';
 
 interface DeckScopesProps {
   deckId: 'A' | 'B' | 'C';
@@ -38,28 +39,16 @@ interface ScopeCanvasProps {
 
 const ScopeCanvas: React.FC<ScopeCanvasProps> = ({ deckId, channel, size, muted, fxTargeted, mode, onClick }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const rafRef = useRef<number>(0);
-  // Count consecutive idle frames so we can stop rAF when not playing
-  const idleFramesRef = useRef<number>(0);
   const isAll = channel === -1;
   const viz = useDeckVisualizationData(deckId);
-  // Subscribe to isPlaying so the rAF loop restarts when the deck starts playing
-  // (after having been stopped and idle for >60 frames)
+  // Gate the shared animation hook on deck playback: 0 CPU when the deck is
+  // stopped. The static-render effect below keeps the stopped-state frame
+  // (center line, label, mute overlay, fx ring) drawn without any rAF.
   const isPlaying = useDJStore((s) => s.decks[deckId]?.isPlaying ?? false);
 
-  const draw = useCallback(() => {
+  const renderFrame = useCallback((): boolean => {
     const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    // Idle guard: count frames since last play. After 60 frames (~1 sec at 60fps)
-    // the rAF loop stops (see reschedule logic at end of draw).
-    // isPlaying is subscribed above — when deck starts playing React re-renders,
-    // the draw callback changes identity, and useEffect restarts the loop.
-    if (!isPlaying) {
-      idleFramesRef.current++;
-    } else {
-      idleFramesRef.current = 0;
-    }
+    if (!canvas) return false;
 
     const dpr = window.devicePixelRatio || 1;
 
@@ -71,7 +60,7 @@ const ScopeCanvas: React.FC<ScopeCanvasProps> = ({ deckId, channel, size, muted,
     }
 
     const ctx = canvas.getContext('2d');
-    if (!ctx) return;
+    if (!ctx) return false;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
     const cs = getComputedStyle(canvas);
@@ -178,20 +167,15 @@ const ScopeCanvas: React.FC<ScopeCanvasProps> = ({ deckId, channel, size, muted,
       }
     }
 
-    // Keep scheduling only while playing or during the ~1s idle cool-down
-    if (isPlaying || idleFramesRef.current <= 60) {
-      rafRef.current = requestAnimationFrame(draw);
-    }
-    // When paused for >60 frames the loop stops. It restarts automatically
-    // whenever `draw` identity changes (muted / fxTargeted / mode / size) via the useEffect.
-  }, [deckId, channel, size, muted, isAll, isPlaying, viz, mode, fxTargeted]);
+    return isPlaying;
+  }, [channel, size, muted, isAll, isPlaying, viz, mode, fxTargeted]);
 
-  useEffect(() => {
-    // Reset idle counter so we always draw at least ~1s worth of frames on mount
-    idleFramesRef.current = 0;
-    rafRef.current = requestAnimationFrame(draw);
-    return () => cancelAnimationFrame(rafRef.current);
-  }, [draw]);
+  // Static render: draws the current (stopped) state once on mount and whenever
+  // a visual prop changes, so the scope is never blank when the deck isn't playing.
+  useEffect(() => { renderFrame(); }, [renderFrame]);
+
+  // Continuous animation only while the deck plays (0 CPU otherwise).
+  useVisualizationAnimation({ onFrame: renderFrame, enabled: isPlaying, fps: 30 });
 
   return (
     <canvas
