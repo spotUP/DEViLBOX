@@ -7,8 +7,10 @@
  * Connects to ToneEngine analysers on mount and tears down on unmount.
  */
 
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useCallback } from 'react';
 import { useSettingsStore } from '@stores/useSettingsStore';
+import { useTransportStore } from '@stores';
+import { useVisualizationAnimation } from '@hooks/useVisualizationAnimation';
 import { getToneEngine } from '@engine/ToneEngine';
 import {
   VISUALIZER_MODES,
@@ -123,10 +125,10 @@ export const TrackerVisualBackground: React.FC<TrackerVisualBackgroundProps> = R
   const glRef = useRef<WebGL2RenderingContext | null>(null);
   const cacheRef = useRef<RendererCache | null>(null);
   const stateRef = useRef(createVisualizerState());
-  const rafRef = useRef<number>(0);
   const startTimeRef = useRef(performance.now() / 1000);
 
   const modeIndex = useSettingsStore((s) => s.trackerVisualMode);
+  const isPlaying = useTransportStore((s) => s.isPlaying);
 
   const currentBg = BG_MODES[modeIndex % BG_MODES.length];
   const isAMMode = currentBg.type === 'am';
@@ -135,8 +137,9 @@ export const TrackerVisualBackground: React.FC<TrackerVisualBackgroundProps> = R
   const modeRef = useRef(currentBg);
   modeRef.current = currentBg;
 
-  // Single effect: connect analysers + WebGL init + RAF loop
-  // Only restarts when canvas size changes (not on mode change — mode is read via ref)
+  // WebGL init + canvas sizing — restarts only when canvas size changes.
+  // The animation loop itself is driven by the shared gated hook below so it
+  // fully stops (0 CPU) when playback is stopped or the tab is hidden.
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas || width === 0 || height === 0) return;
@@ -157,11 +160,6 @@ export const TrackerVisualBackground: React.FC<TrackerVisualBackgroundProps> = R
       cacheRef.current = createRendererCache(gl);
     }
 
-    const gl = glRef.current;
-    const cache = cacheRef.current!;
-    const vizState = stateRef.current;
-    let running = true;
-
     const dpr = Math.min(window.devicePixelRatio, 2);
     const drawW = Math.round(width * dpr);
     const drawH = Math.round(height * dpr);
@@ -172,40 +170,47 @@ export const TrackerVisualBackground: React.FC<TrackerVisualBackgroundProps> = R
       canvas.height = drawH;
     }
 
-    const frame = () => {
-      if (!running) return;
-
-      // Skip WebGL rendering when in audioMotion mode
-      const bg = modeRef.current;
-      if (bg.type === 'webgl') {
-        gl.viewport(0, 0, drawW, drawH);
-
-        const audio = getTrackerAudioData();
-        const time = performance.now() / 1000 - startTimeRef.current;
-
-        const renderer = RENDERERS[bg.mode];
-        if (renderer) {
-          renderer(cache, audio, vizState, time, drawW, drawH);
-        }
-      }
-
-      rafRef.current = requestAnimationFrame(frame);
-    };
-
-    rafRef.current = requestAnimationFrame(frame);
-
     return () => {
-      running = false;
-      cancelAnimationFrame(rafRef.current);
-      // Disconnect analysers
+      // Disconnect analysers when size effect re-runs / unmounts
       try { getToneEngine().disableAnalysers(); } catch { /* ignore */ }
     };
   }, [width, height]);
 
+  // Render one WebGL frame. Returns true when there was audio activity so the
+  // hook can drop to half-rate while idle. AudioMotion modes render via the
+  // <AudioMotionVisualizer> overlay, so this no-ops for them.
+  const onFrame = useCallback((): boolean => {
+    const gl = glRef.current;
+    const cache = cacheRef.current;
+    if (!gl || !cache) return false;
+
+    const bg = modeRef.current;
+    if (bg.type !== 'webgl') return false;
+
+    const dpr = Math.min(window.devicePixelRatio, 2);
+    const drawW = Math.round(width * dpr);
+    const drawH = Math.round(height * dpr);
+    gl.viewport(0, 0, drawW, drawH);
+
+    const audio = getTrackerAudioData();
+    const time = performance.now() / 1000 - startTimeRef.current;
+
+    const renderer = RENDERERS[bg.mode];
+    if (renderer) {
+      renderer(cache, audio, stateRef.current, time, drawW, drawH);
+    }
+    return audio.rms > 0.0001;
+  }, [width, height]);
+
+  useVisualizationAnimation({
+    onFrame,
+    enabled: isPlaying && !isAMMode && width > 0 && height > 0,
+    fps: 30,
+  });
+
   // Cleanup WebGL on unmount
   useEffect(() => {
     return () => {
-      cancelAnimationFrame(rafRef.current);
       if (cacheRef.current) {
         destroyRendererCache(cacheRef.current);
         cacheRef.current = null;

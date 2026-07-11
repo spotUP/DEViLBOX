@@ -8,6 +8,8 @@
 
 import React, { useRef, useEffect, useCallback } from 'react';
 import { MusicLineEngine } from '@/engine/musicline/MusicLineEngine';
+import { useVisualizationAnimation } from '@hooks/useVisualizationAnimation';
+import { useTransportStore } from '@stores';
 
 const WIDTH = 256;
 const HEIGHT = 64;
@@ -18,17 +20,17 @@ const CENTER_COLOR = '#1a3a1a';
 export const MusicLineWaveformVisualizer: React.FC = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
-  const rafRef = useRef<number>(0);
   const dataRef = useRef<Uint8Array | null>(null);
+  const isPlaying = useTransportStore((s) => s.isPlaying);
 
-  const draw = useCallback(() => {
+  const onFrame = useCallback((_timestamp: number): boolean => {
     const canvas = canvasRef.current;
     const analyser = analyserRef.current;
     const data = dataRef.current;
-    if (!canvas || !analyser || !data) return;
+    if (!canvas || !analyser || !data) return false;
 
     const ctx = canvas.getContext('2d');
-    if (!ctx) return;
+    if (!ctx) return false;
 
     analyser.getByteTimeDomainData(data as Uint8Array<ArrayBuffer>);
 
@@ -63,8 +65,10 @@ export const MusicLineWaveformVisualizer: React.FC = () => {
     }
     ctx.stroke();
 
-    rafRef.current = requestAnimationFrame(draw);
-  }, []);
+    return isPlaying;
+  }, [isPlaying]);
+
+  useVisualizationAnimation({ onFrame, enabled: isPlaying, fps: 30 });
 
   useEffect(() => {
     if (!MusicLineEngine.hasInstance()) return;
@@ -81,10 +85,7 @@ export const MusicLineWaveformVisualizer: React.FC = () => {
     // Connect engine output -> analyser (tap, not interrupting audio chain)
     engine.output.connect(analyser);
 
-    rafRef.current = requestAnimationFrame(draw);
-
     return () => {
-      cancelAnimationFrame(rafRef.current);
       try {
         engine.output.disconnect(analyser);
       } catch {
@@ -93,7 +94,7 @@ export const MusicLineWaveformVisualizer: React.FC = () => {
       analyserRef.current = null;
       dataRef.current = null;
     };
-  }, [draw]);
+  }, []);
 
   return (
     <canvas

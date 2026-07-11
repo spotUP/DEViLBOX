@@ -6,8 +6,10 @@
  * Throttled to ~15fps (sufficient for visual VU response).
  */
 
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useCallback } from 'react';
 import { useDeckVisualizationData } from '@/hooks/dj/useDeckVisualizationData';
+import { useVisualizationAnimation } from '@hooks/useVisualizationAnimation';
+import { useDJStore } from '@/stores/useDJStore';
 
 interface MixerVUMeterProps {
   deckId: 'A' | 'B' | 'C';
@@ -40,74 +42,62 @@ function getSegmentColor(index: number): string {
 
 export const MixerVUMeter: React.FC<MixerVUMeterProps> = ({ deckId, stretch }) => {
   const viz = useDeckVisualizationData(deckId);
+  const isPlaying = useDJStore((s) => s.decks[deckId]?.isPlaying ?? false);
   const containerRef = useRef<HTMLDivElement>(null);
-  const rafRef = useRef<number>(0);
-  const mountedRef = useRef(true);
+  const lastTimeRef = useRef(0);
   const peakRef = useRef(-1);
   const peakTimeRef = useRef(0);
   const prevSegmentsRef = useRef(-1);
   const prevPeakRef = useRef(-1);
 
-  useEffect(() => {
-    mountedRef.current = true;
-    let lastTime = performance.now();
+  const onFrame = useCallback((now: number): boolean => {
+    const dt = lastTimeRef.current ? (now - lastTimeRef.current) / 1000 : 0;
+    lastTimeRef.current = now;
 
-    const tick = (now: number) => {
-      if (!mountedRef.current) return;
+    let segments = 0;
+    let peak = -1;
 
-      const dt = (now - lastTime) / 1000;
-      lastTime = now;
+    try {
+      const dB = viz.getLevel();
+      const dbVal = typeof dB === 'number' ? dB : -Infinity;
+      segments = levelToSegments(dbVal);
 
-      let segments = 0;
-      let peak = -1;
-
-      try {
-        const dB = viz.getLevel();
-        const dbVal = typeof dB === 'number' ? dB : -Infinity;
-        segments = levelToSegments(dbVal);
-
-        // Peak hold logic
-        if (segments >= peakRef.current) {
-          peakRef.current = segments;
-          peakTimeRef.current = now;
-        } else if (now - peakTimeRef.current > PEAK_HOLD_MS) {
-          peakRef.current = Math.max(segments, peakRef.current - PEAK_DECAY_SEGMENTS_PER_SEC * dt);
-        }
-        peak = Math.round(peakRef.current);
-      } catch {
-        // Engine not ready
+      // Peak hold logic
+      if (segments >= peakRef.current) {
+        peakRef.current = segments;
+        peakTimeRef.current = now;
+      } else if (now - peakTimeRef.current > PEAK_HOLD_MS) {
+        peakRef.current = Math.max(segments, peakRef.current - PEAK_DECAY_SEGMENTS_PER_SEC * dt);
       }
+      peak = Math.round(peakRef.current);
+    } catch {
+      // Engine not ready
+    }
 
-      // Only update DOM if values changed
-      if (segments !== prevSegmentsRef.current || peak !== prevPeakRef.current) {
-        prevSegmentsRef.current = segments;
-        prevPeakRef.current = peak;
+    // Only update DOM if values changed
+    if (segments !== prevSegmentsRef.current || peak !== prevPeakRef.current) {
+      prevSegmentsRef.current = segments;
+      prevPeakRef.current = peak;
 
-        const container = containerRef.current;
-        if (container) {
-          const children = container.children;
-          for (let i = 0; i < VU_SEGMENTS; i++) {
-            const el = children[i] as HTMLElement;
-            if (!el) continue;
-            // Children are in reverse order (flex-col-reverse), so child 0 = segment 0 (bottom)
-            const isLit = i < segments;
-            const isPeak = !isLit && i === peak - 1 && peak > segments;
-            el.style.backgroundColor = isLit || isPeak ? getSegmentColor(i) : COLORS.off;
-            el.style.opacity = isPeak ? '0.85' : '1';
-          }
+      const container = containerRef.current;
+      if (container) {
+        const children = container.children;
+        for (let i = 0; i < VU_SEGMENTS; i++) {
+          const el = children[i] as HTMLElement;
+          if (!el) continue;
+          // Children are in reverse order (flex-col-reverse), so child 0 = segment 0 (bottom)
+          const isLit = i < segments;
+          const isPeak = !isLit && i === peak - 1 && peak > segments;
+          el.style.backgroundColor = isLit || isPeak ? getSegmentColor(i) : COLORS.off;
+          el.style.opacity = isPeak ? '0.85' : '1';
         }
       }
+    }
 
-      rafRef.current = requestAnimationFrame(tick);
-    };
+    return segments > 0;
+  }, [viz]);
 
-    rafRef.current = requestAnimationFrame(tick);
-
-    return () => {
-      mountedRef.current = false;
-      cancelAnimationFrame(rafRef.current);
-    };
-  }, [deckId]);
+  useVisualizationAnimation({ onFrame, enabled: isPlaying, fps: 30 });
 
   return (
     <div

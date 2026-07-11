@@ -7,9 +7,11 @@
  * Layout: Grid of per-channel Canvas oscilloscope windows with channel labels.
  */
 
-import { useEffect, useRef, useCallback, useMemo } from 'react';
+import { useRef, useCallback, useMemo } from 'react';
 import { useOscilloscopeStore } from '@stores/useOscilloscopeStore';
 import { useThemeStore } from '@stores/useThemeStore';
+import { useVisualizationAnimation } from '@hooks/useVisualizationAnimation';
+import { useTransportStore } from '@stores';
 
 /** Channel colors by type */
 const CHANNEL_COLORS: Record<string, string> = {
@@ -52,10 +54,9 @@ export function ChannelOscilloscope({
 }: ChannelOscilloscopeProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRefs = useRef<(HTMLCanvasElement | null)[]>([]);
-  const animFrameRef = useRef<number>(0);
-  const lastDrawTime = useRef(0);
 
   const { numChannels, isActive } = useOscilloscopeStore();
+  const isPlaying = useTransportStore((s) => s.isPlaying);
   const currentThemeId = useThemeStore((s) => s.currentThemeId);
   const isCyanTheme = currentThemeId === 'cyan-lineart';
 
@@ -160,35 +161,21 @@ export function ChannelOscilloscope({
     }
   }, [bgColor, gridColor, centerLineColor]);
 
-  // Animation loop
-  useEffect(() => {
-    const draw = (timestamp: number) => {
-      // 30fps throttle
-      if (timestamp - lastDrawTime.current < 33) {
-        animFrameRef.current = requestAnimationFrame(draw);
-        return;
-      }
-      lastDrawTime.current = timestamp;
+  // Animation loop (shared hook — cancels rAF fully when playback stops)
+  const onFrame = useCallback((_timestamp: number): boolean => {
+    const data = useOscilloscopeStore.getState().channelData;
 
-      const data = useOscilloscopeStore.getState().channelData;
+    for (let i = 0; i < canvasRefs.current.length; i++) {
+      const canvas = canvasRefs.current[i];
+      if (!canvas) continue;
+      const name = names[i] || `CH${i + 1}`;
+      drawChannel(canvas, data[i] || null, name);
+    }
 
-      for (let i = 0; i < canvasRefs.current.length; i++) {
-        const canvas = canvasRefs.current[i];
-        if (!canvas) continue;
-        const name = names[i] || `CH${i + 1}`;
-        drawChannel(canvas, data[i] || null, name);
-      }
-
-      animFrameRef.current = requestAnimationFrame(draw);
-    };
-
-    animFrameRef.current = requestAnimationFrame(draw);
-    return () => {
-      if (animFrameRef.current) {
-        cancelAnimationFrame(animFrameRef.current);
-      }
-    };
+    return data.length > 0;
   }, [drawChannel, names]);
+
+  useVisualizationAnimation({ onFrame, enabled: isPlaying, fps: 30 });
 
   // Calculate grid layout
   const cols = effectiveChannels <= 2 ? effectiveChannels : effectiveChannels <= 4 ? 2 : 3;
