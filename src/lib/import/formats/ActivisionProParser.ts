@@ -760,7 +760,12 @@ function parseInternal(bytes: Uint8Array, filename: string): TrackerSong | null 
       const instrField = (b >> 6) & 0x03;
       // avpNoteToXM: xm = 37 + (noteIdx - 60) = noteIdx - 23
       const note = noteIdx > 0 ? avpNoteToXM(noteIdx) : 0;
-      return { note, instrument: instrField, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 };
+      // Byte-exact carrier: avpNoteToXM clamps xm to [1,96], so note indices below 24
+      // all collapse to xm 1 and encode reverses them all to idx 24 (lossy lower-clamp).
+      // Stash the exact source note+instrument byte in the invisible `period` carrier so
+      // encodeActivisionProCell reproduces it verbatim on round-trip. Grid cells (built by
+      // decodeAvpTrack) carry no period, so an edited cell falls back to the derivation.
+      return { note, instrument: instrField, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0, period: b };
     },
     getCellFileOffset: (pattern: number, row: number, channel: number): number => {
       if (pattern < 0 || pattern >= cellOffsetMap.length) return -1;
