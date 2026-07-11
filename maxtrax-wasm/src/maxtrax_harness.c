@@ -835,6 +835,19 @@ EXPORT int maxtrax_get_seed_pool_depth(void) {
 }
 
 /*
+ * maxtrax_get_tick_unit()
+ *
+ * Current glob_TickUnit (offset 12) — the tempo-derived per-tick advance the
+ * MusicServer adds each VBlank. Exposed for the recook regression test: a mid-
+ * song tempo event (CMD 0x80) mutates this; after recook rewinds the cursor it
+ * must be reset to the score base-tempo value (SetTempo(glob_Tempo<<4)). The
+ * test asserts recook restores it, so a stale-tempo replay after edit is caught.
+ */
+EXPORT uint32_t maxtrax_get_tick_unit(void) {
+    return READ32((uintptr_t)_globaldata + 12 /* glob_TickUnit */);
+}
+
+/*
  * maxtrax_get_event_count(score)
  *
  * Return the number of CookedEvents (cev_* format) in the given score.
@@ -919,6 +932,24 @@ EXPORT void maxtrax_recook(int score) {
     WRITE32((uintptr_t)_globaldata + (uint32_t)glob_CurrentTime, 0);
     WRITE32((uintptr_t)_globaldata + (uint32_t)glob_Ticks,       0);
     WRITE32((uintptr_t)_globaldata + (uint32_t)glob_TempoTime,   0);
+    /* Re-derive glob_TickUnit from the score base tempo. A mid-song tempo event
+     * (CMD 0x80) mutates glob_TickUnit; a recook that rewinds the cursor past that
+     * event would otherwise keep replaying at the stale tempo until the event is
+     * hit again. Replicate the score-start init exactly (maxtrax.c ~6930): load
+     * glob_Tempo, shift left 4 (SetTempo takes 12.4 fixed-point and >>4s it back),
+     * then SetTempo() recomputes glob_TickUnit. Single source: glob_Tempo. */
+    d0 = (uint32_t)(uint16_t)READ16((uintptr_t)_globaldata + (uint32_t)glob_Tempo);
+    W(d0) = (uint16_t)(W(d0) << 4);
+    SetTempo();
+    /* Drain any in-flight Paula DMA so a note still sustaining at rewind time does
+     * not keep ringing and stack with the re-triggered note stream (phantom notes). */
+    {
+        int _pch = 0;
+        while (_pch < PAULA_CHANNELS) {
+            paula_channel_dma_off(_pch);
+            _pch++;
+        }
+    }
     /* Mark all 4 per-voice note-off table slots as empty (sev_Command=0xFF). */
     int _vi = 0;
     while (_vi < 4) {
