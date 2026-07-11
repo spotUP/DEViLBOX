@@ -170,9 +170,11 @@ function decodePhraseToRows(buf: Uint8Array, phraseOff: number): PhraseDecodeRes
     } else if (b >= 0x80) {
       // Other control command — no row generated
     } else {
-      // 0x24-0x7F: rest/hold — generate empty row
+      // 0x24-0x7F: rest/hold — generate empty row. The exact rest byte is opaque
+      // (the format lacks a public source; all values render identically as a rest),
+      // so preserve it verbatim in eff2 for a byte-exact round-trip. See decodeCell.
       rows.push({
-        note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0,
+        note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: b,
       });
       offsets.push(byteOff);
     }
@@ -392,15 +394,20 @@ export function parseWallyBebenFile(buffer: ArrayBuffer, filename: string): Trac
         const wbIdx = cell.note - 12 - 1;
         out[0] = (wbIdx >= 0 && wbIdx <= 0x23) ? wbIdx : 0x24;
       } else {
-        out[0] = 0x24; // rest
+        // Rest: restore the original rest byte preserved in eff2 (0x24-0x7F). Edited/new
+        // rest cells (eff2 outside that range) collapse to the canonical rest 0x24.
+        const rb = cell.eff2 ?? 0;
+        out[0] = (rb >= 0x24 && rb <= 0x7F) ? rb : 0x24;
       }
       return out;
     },
     decodeCell: (raw: Uint8Array): TrackerCell => {
       const b = raw[0];
-      // amigaNoteToXM(b + 1) = b + 13; values 0x24+ are rest
+      // amigaNoteToXM(b + 1) = b + 13; values 0x24-0x7F are rest/hold. The offset map only
+      // points at row-producing bytes (0x00-0x7F), so preserve the raw rest byte in eff2 —
+      // matches decodePhraseToRows so display + write-back share one representation.
       const note = (b < 0x24) ? amigaNoteToXM(b + 1) : 0;
-      return { note, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 };
+      return { note, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: (b >= 0x24 ? b : 0) };
     },
     getCellFileOffset: (pattern: number, row: number, channel: number): number => {
       return cellOffsetMap.get(`${pattern}-${channel}-${row}`) ?? -1;
