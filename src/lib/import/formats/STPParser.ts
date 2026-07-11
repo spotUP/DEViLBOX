@@ -496,7 +496,12 @@ export async function parseSTPFile(
       const note = noteRaw > 0 ? STP_NOTE_OFFSET + noteRaw : 0;
       const { effTyp, eff } = convertSTPEffect(command, param);
 
-      return { note, instrument: instr, volume: 0, effTyp, eff, effTyp2: 0, eff2: 0 };
+      // Byte-exact carrier: convertSTPEffect is many-to-one (0x0C→XM 0x0C but XM 0x0C
+      // reverses to STP 0x04; tempo param>>4 drops the low nibble). Stash the exact
+      // source command/param in invisible carriers so encodeSTPCell reproduces bytes
+      // 2/3 verbatim on round-trip. Grid cells (built by parsePatternChannels) carry
+      // no such fields, so an edited cell falls back to the lossy derivation.
+      return { note, instrument: instr, volume: 0, effTyp, eff, effTyp2: 0, eff2: 0, cutoff: command, pan: param };
     },
     getCellFileOffset: (pattern: number, row: number, channel: number): number => {
       const base = patternFileOffsets[pattern] ?? 0;
