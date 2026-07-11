@@ -668,18 +668,17 @@ export function parseDeltaMusic2File(bytes: Uint8Array, filename: string): Track
       const note = (noteRaw > 0 && noteRaw <= 96) ? noteRaw : 0;
       const instrument = instrRaw > 0 ? instrRaw + 1 : 0;
 
-      let effTyp = 0, eff = 0, volume = 0;
-      switch (dm2Eff) {
-        case 0x01: effTyp = 0x0F; eff = Math.max(1, dm2Arg & 0x0F); break;
-        case 0x03: effTyp = 0x01; eff = dm2Arg & 0xFF; break;
-        case 0x04: effTyp = 0x02; eff = dm2Arg & 0xFF; break;
-        case 0x05: effTyp = 0x03; eff = dm2Arg; break;
-        case 0x06: { const xmVol = Math.round((dm2Arg & 0x3F) / 63 * 64); volume = 0x10 + Math.min(64, xmVol); break; }
-        case 0x07: effTyp = 0x10; eff = Math.round((dm2Arg & 0x3F) / 63 * 64); break;
-        case 0x08: if (dm2Arg !== 0) { effTyp = 0x00; eff = dm2Arg & 0x3F; } break;
-      }
-
-      return { note, instrument, volume, effTyp, eff, effTyp2: 0, eff2: 0 };
+      // Store the DM2 effect command + argument VERBATIM (native raw codes), exactly as
+      // encodeDeltaMusic2Cell writes them back (out[2]=effTyp, out[3]=eff). DM2's effect set
+      // is format-specific and does not map cleanly onto XM: the previous lossy DM2→XM remap
+      // dropped arpeggio-table-0 selection (`08 00`, a real command in the deltamusic2-wasm
+      // replayer) and double-rounded the volume args, so those cells could not be inverted by
+      // the encoder and were mangled on chip-RAM write-back. This codec is played by the
+      // dedicated DeltaMusic2 WASM replayer (raw file bytes), not DEViLBOX's XM effect engine,
+      // so raw native codes are the correct representation — this makes decode↔encode a
+      // byte-exact inverse (DeltaMusic1 / Tomy Tracker model). The XM-mapped view used for the
+      // tracker display is built separately in the pattern loop above.
+      return { note, instrument, volume: 0, effTyp: dm2Eff, eff: dm2Arg, effTyp2: 0, eff2: 0 };
     },
     getCellFileOffset: (pattern: number, row: number, channel: number): number => {
       // Resolve track position with loop wrapping (same logic as pattern build)
