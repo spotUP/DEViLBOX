@@ -707,9 +707,9 @@
     "unic": {
       "kind": "fixed",
       "method": "decode-encode",
-      "status": "lossy",
-      "byteExact": false,
-      "matchPct": 0.6537,
+      "status": "byte-exact",
+      "byteExact": true,
+      "matchPct": 1,
       "cells": 5120
     },
     "wallyBeben": {
