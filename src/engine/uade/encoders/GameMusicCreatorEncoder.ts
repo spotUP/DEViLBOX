@@ -48,44 +48,51 @@ export function encodeGameMusicCreatorCell(cell: TrackerCell): Uint8Array {
   const effTyp = cell.effTyp ?? 0;
   const eff = cell.eff ?? 0;
 
-  // Note cut
   if (xmNote === 97) {
+    // Note cut
     out[0] = 0xFF;
     out[1] = 0xFE;
     out[2] = 0;
     out[3] = 0;
-    return out;
+  } else {
+    // Byte 0/1: (sample << 4) | (period >> 8), period low byte.
+    // The MOD period table is lossy (a raw off-table Amiga period decodes to the nearest
+    // note, whose canonical period differs), so prefer the exact source period stashed by
+    // decodeCell in the `period` carrier. Edited grid cells carry no period → derive it
+    // from the note.
+    const period = cell.period !== undefined ? (cell.period & 0x0FFF) : xmNoteToPeriod(xmNote);
+    out[0] = ((instr & 0x0F) << 4) | ((period >> 8) & 0x0F);
+    out[1] = period & 0xFF;
+
+    // Byte 2: GMC effect command (reverse XM→GMC mapping)
+    let gmcCmd = 0;
+    let gmcParam = eff;
+    switch (effTyp) {
+      case 0x01: gmcCmd = 0x01; break;                         // portamento up
+      case 0x02: gmcCmd = 0x02; break;                         // portamento down
+      case 0x0C: gmcCmd = 0x03; gmcParam = eff & 0x7F; break; // set volume
+      case 0x0D: gmcCmd = 0x04; break;                         // pattern break
+      case 0x0B: gmcCmd = 0x05; break;                         // position jump
+      case 0x0E:
+        if (eff === 0x00) gmcCmd = 0x06;                       // LED filter on
+        else if (eff === 0x01) gmcCmd = 0x07;                  // LED filter off
+        gmcParam = 0;
+        break;
+      case 0x0F: gmcCmd = 0x08; break;                         // set speed
+      default: gmcCmd = 0; gmcParam = 0; break;
+    }
+    out[2] = gmcCmd & 0x0F;
+    out[3] = gmcParam & 0xFF;
   }
 
-  const period = xmNoteToPeriod(xmNote);
-
-  // Byte 0: (sample << 4) | (period >> 8)
-  out[0] = ((instr & 0x0F) << 4) | ((period >> 8) & 0x0F);
-
-  // Byte 1: period low byte
-  out[1] = period & 0xFF;
-
-  // Byte 2: GMC effect command (reverse XM→GMC mapping)
-  let gmcCmd = 0;
-  let gmcParam = eff;
-
-  switch (effTyp) {
-    case 0x01: gmcCmd = 0x01; break;                         // portamento up
-    case 0x02: gmcCmd = 0x02; break;                         // portamento down
-    case 0x0C: gmcCmd = 0x03; gmcParam = eff & 0x7F; break; // set volume
-    case 0x0D: gmcCmd = 0x04; break;                         // pattern break
-    case 0x0B: gmcCmd = 0x05; break;                         // position jump
-    case 0x0E:
-      if (eff === 0x00) gmcCmd = 0x06;                       // LED filter on
-      else if (eff === 0x01) gmcCmd = 0x07;                  // LED filter off
-      gmcParam = 0;
-      break;
-    case 0x0F: gmcCmd = 0x08; break;                         // set speed
-    default: gmcCmd = 0; gmcParam = 0; break;
-  }
-
-  out[2] = gmcCmd & 0x0F;
-  out[3] = gmcParam & 0xFF;
+  // Byte-exact carrier restore. GMC's effect map is many-to-one (cmd 0 drops its param,
+  // byte2's high nibble and default cmds collapse to 0), so byte2/byte3 cannot always be
+  // reproduced from the XM view. decodeCell stashes the exact source bytes in the invisible
+  // pan/cutoff carriers (fields the GMC grid loop never sets) — reproduce them verbatim on
+  // every path (note-cut included). Edited grid cells lack the carriers and keep the
+  // canonical derivation above.
+  if (cell.pan !== undefined)    out[2] = cell.pan & 0xFF;
+  if (cell.cutoff !== undefined) out[3] = cell.cutoff & 0xFF;
 
   return out;
 }
