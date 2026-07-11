@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { useFormatStore } from '@/stores/useFormatStore';
 import {
   deriveGrid,
@@ -30,7 +31,14 @@ export function useMaxTraxGrid(
   const data = useFormatStore((s) => s.maxTraxData);
   const mutate = useFormatStore((s) => s.mutateMaxTraxScore);
   const score: MaxTraxScore | null = data?.scores[scoreIndex] ?? null;
-  const grid: MaxTraxGrid | null = score !== null ? deriveGrid(score, ticksPerRow) : null;
+  // deriveGrid rebuilds the entire grid model (rows x columns x cells) — expensive
+  // on large scores. An edit replaces `score` with a fresh immer object, so keying
+  // the memo on the score identity recomputes exactly when the content changes and
+  // reuses the model across unrelated re-renders (cursor moves, cell-edit typing).
+  const grid: MaxTraxGrid | null = useMemo(
+    () => (score !== null ? deriveGrid(score, ticksPerRow) : null),
+    [score, ticksPerRow],
+  );
 
   /**
    * Apply a pure-op result to the store and project ALL changed events to the WASM worklet.

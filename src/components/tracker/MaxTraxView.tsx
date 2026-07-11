@@ -11,7 +11,7 @@
  * Right panel reserved for MaxTraxControls (Task 10).
  */
 
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Button } from '@components/ui/Button';
 import { CustomSelect } from '@components/common/CustomSelect';
 import { useMaxTraxGrid } from '@/hooks/useMaxTraxGrid';
@@ -37,9 +37,13 @@ export const MaxTraxView: React.FC = () => {
   const [selectedSampleIndex, setSelectedSampleIndex] = useState(0);
 
   // Subscribe to maxTraxRev so the sample list re-decodes after a sample-field edit.
-  const _maxTraxRev = useFormatStore(s => s.maxTraxRev);
-  void _maxTraxRev;
-  const samples = maxTraxData ? decodeMaxTraxSamples(maxTraxData) : [];
+  const maxTraxRev = useFormatStore(s => s.maxTraxRev);
+  // decodeMaxTraxSamples walks the whole tailRaw sample table; recompute only when
+  // the data or a sample edit (rev bump) changes it, not on every unrelated render.
+  const samples = useMemo(
+    () => (maxTraxData ? decodeMaxTraxSamples(maxTraxData) : []),
+    [maxTraxData, maxTraxRev],
+  );
   const sampleCount = samples.length;
 
   const { grid, edit } = useMaxTraxGrid(scoreIndex, tpr);
