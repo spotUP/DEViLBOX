@@ -175,7 +175,7 @@ export function ChannelOscilloscope({
     return data.length > 0;
   }, [drawChannel, names]);
 
-  useVisualizationAnimation({ onFrame, enabled: isPlaying, fps: 30 });
+  useVisualizationAnimation({ onFrame, enabled: isPlaying, fps: 60 });
 
   // Calculate grid layout
   const cols = effectiveChannels <= 2 ? effectiveChannels : effectiveChannels <= 4 ? 2 : 3;

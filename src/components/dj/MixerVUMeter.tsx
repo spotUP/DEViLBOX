@@ -97,7 +97,7 @@ export const MixerVUMeter: React.FC<MixerVUMeterProps> = ({ deckId, stretch }) =
     return segments > 0;
   }, [viz]);
 
-  useVisualizationAnimation({ onFrame, enabled: isPlaying, fps: 30 });
+  useVisualizationAnimation({ onFrame, enabled: isPlaying, fps: 60 });
 
   return (
     <div

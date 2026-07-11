@@ -278,7 +278,7 @@ export const SIDScopeTab: React.FC<SIDScopeTabProps> = ({ className }) => {
   useEffect(() => { renderFrame(); }, [renderFrame, splitView, muted]);
 
   // Continuous animation only while playback runs (0 CPU otherwise).
-  useVisualizationAnimation({ onFrame: renderFrame, enabled: isPlaying, fps: 30 });
+  useVisualizationAnimation({ onFrame: renderFrame, enabled: isPlaying, fps: 60 });
 
   /* ── Resize canvas to fill container ── */
   useEffect(() => {
