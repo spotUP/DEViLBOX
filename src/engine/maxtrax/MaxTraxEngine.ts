@@ -144,6 +144,36 @@ export class MaxTraxEngine extends WASMSingletonBase {
     this.workletNode?.port.postMessage({ type: 'recook', score });
   }
 
+  /**
+   * Tier-1 live scalar edit: write Tune/Volume directly into the in-memory
+   * `_patch` struct. Tune is re-read every tick (audibly live on sustaining
+   * notes); Volume applies on the next sustain segment. `patchNumber` is the
+   * sample's MaxTrax patch Number (the WASM indexes patches by Number).
+   */
+  setSampleParam(patchNumber: number, field: 'tune' | 'volume', value: number): void {
+    this.workletNode?.port.postMessage({
+      type: 'setPatchScalar',
+      patchNumber,
+      field: field === 'tune' ? 0 : 1,
+      value: value | 0,
+    });
+  }
+
+  /**
+   * Tier-2 structural live edit: rebuild one patch's in-memory buffers from a
+   * `tailRaw` sample byte slice (header+env+PCM, big-endian — from
+   * `extractSampleDsampleSlice`). Takes effect on the next note-on for that
+   * patch. Transfers the buffer to the worklet.
+   */
+  reloadSample(patchNumber: number, dsampleBytes: Uint8Array): void {
+    // Copy into a fresh transferable buffer (worklet owns it after transfer).
+    const buf = dsampleBytes.slice();
+    this.workletNode?.port.postMessage(
+      { type: 'reloadPatch', patchNumber, bytes: buf.buffer, len: buf.length },
+      [buf.buffer],
+    );
+  }
+
   /** Playback starts automatically after loadTune() — this is a no-op. */
   play(): void {}
 

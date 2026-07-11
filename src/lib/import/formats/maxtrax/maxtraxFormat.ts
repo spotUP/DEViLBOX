@@ -144,6 +144,81 @@ export function decodeMaxTraxSamples(data: MaxTraxData): MaxTraxSample[] {
   return out;
 }
 
+/** Byte offsets/counts for one sample inside `tailRaw`. Single source for
+ *  both the store's in-place mutations and the live-edit byte-slice extractor. */
+export interface MaxTraxSampleByteLayout {
+  headerBase: number;
+  envBase: number;
+  pcmBase: number;
+  pcmSize: number;
+  sampleEnd: number;
+  attackCount: number;
+  releaseCount: number;
+  attackLen: number;
+  sustainLen: number;
+  octaves: number;
+}
+
+/**
+ * Walk `tailRaw` (u16 numSamples, then per-sample header+env+PCM) to the byte
+ * layout of one sample. PCM total = firstLen*(2^octaves - 1), firstLen =
+ * attackLen+sustainLen (per-octave lengths double). Returns null if the index
+ * is out of range or the buffer is truncated.
+ */
+export function locateMaxTraxSampleInTailRaw(
+  tail: Uint8Array,
+  sampleIndex: number,
+): MaxTraxSampleByteLayout | null {
+  if (tail.length < 2) return null;
+  const dv = new DataView(tail.buffer, tail.byteOffset, tail.byteLength);
+  const numSamples = dv.getUint16(0);
+  if (sampleIndex >= numSamples) return null;
+  let p = 2; // skip numSamples
+  for (let s = 0; s <= sampleIndex; s++) {
+    if (p + 20 > tail.length) return null;
+    const ac = dv.getUint16(p + 16);
+    const rc = dv.getUint16(p + 18);
+    const al = dv.getUint32(p + 8);
+    const sl = dv.getUint32(p + 12);
+    const oc = dv.getUint16(p + 6);
+    const firstLen = al + sl;
+    const envBytes = (ac + rc) * 4;
+    const pcmSize = firstLen > 0 ? firstLen * (Math.pow(2, oc) - 1) : 0;
+    if (s === sampleIndex) {
+      return {
+        headerBase: p,
+        envBase: p + 20,
+        pcmBase: p + 20 + envBytes,
+        pcmSize,
+        sampleEnd: p + 20 + envBytes + pcmSize,
+        attackCount: ac,
+        releaseCount: rc,
+        attackLen: al,
+        sustainLen: sl,
+        octaves: oc,
+      };
+    }
+    p += 20 + envBytes + pcmSize;
+  }
+  return null;
+}
+
+/**
+ * Extract a copy of the `tailRaw` bytes for one sample: the exact
+ * `[headerBase, sampleEnd)` slice (20-byte header + env array + per-octave
+ * PCM, big-endian). This is the byte contract consumed by the WASM
+ * `maxtrax_reload_patch` live-edit path — identical bytes to what
+ * `encodeMaxTrax` writes for this sample. Returns null on bad index.
+ */
+export function extractSampleDsampleSlice(
+  data: MaxTraxData,
+  sampleIndex: number,
+): Uint8Array | null {
+  const loc = locateMaxTraxSampleInTailRaw(data.tailRaw, sampleIndex);
+  if (!loc) return null;
+  return data.tailRaw.slice(loc.headerBase, loc.sampleEnd);
+}
+
 /**
  * Bytes to feed the WASM replayer on load: the edited store if present (single source of
  * truth, symmetric with export), else the original file bytes.

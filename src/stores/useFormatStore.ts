@@ -21,6 +21,7 @@ import type {
 import type { TFMXNativeData } from '@/types/tfmxNative';
 import type { SF2LoadPayload } from './useSF2Store';
 import type { MaxTraxData, MaxTraxScore } from '@/lib/import/formats/maxtrax/maxtraxFormat';
+import { locateMaxTraxSampleInTailRaw } from '@/lib/import/formats/maxtrax/maxtraxFormat';
 import { useSF2Store } from './useSF2Store';
 import { useCheeseCutterStore } from './useCheeseCutterStore';
 import { useEditorStore } from './useEditorStore';
@@ -346,54 +347,6 @@ export type MaxTraxSampleMutation =
   | { kind: 'envField'; side: 'attack' | 'release'; pointIndex: number; field: 'duration' | 'volume'; value: number }
   | { kind: 'addEnvPoint'; side: 'attack' | 'release'; duration: number; volume: number }
   | { kind: 'removeEnvPoint'; side: 'attack' | 'release'; pointIndex: number };
-
-interface MaxTraxSampleByteLayout {
-  headerBase: number;
-  envBase: number;
-  pcmBase: number;
-  pcmSize: number;
-  sampleEnd: number;
-  attackCount: number;
-  releaseCount: number;
-  attackLen: number;
-  sustainLen: number;
-  octaves: number;
-}
-
-function locateMaxTraxSampleInTailRaw(tail: Uint8Array, sampleIndex: number): MaxTraxSampleByteLayout | null {
-  if (tail.length < 2) return null;
-  const dv = new DataView(tail.buffer, tail.byteOffset, tail.byteLength);
-  const numSamples = dv.getUint16(0);
-  if (sampleIndex >= numSamples) return null;
-  let p = 2; // skip numSamples
-  for (let s = 0; s <= sampleIndex; s++) {
-    if (p + 20 > tail.length) return null;
-    const ac = dv.getUint16(p + 16);
-    const rc = dv.getUint16(p + 18);
-    const al = dv.getUint32(p + 8);
-    const sl = dv.getUint32(p + 12);
-    const oc = dv.getUint16(p + 6);
-    const firstLen = al + sl;
-    const envBytes = (ac + rc) * 4;
-    const pcmSize = firstLen > 0 ? firstLen * (Math.pow(2, oc) - 1) : 0;
-    if (s === sampleIndex) {
-      return {
-        headerBase: p,
-        envBase: p + 20,
-        pcmBase: p + 20 + envBytes,
-        pcmSize,
-        sampleEnd: p + 20 + envBytes + pcmSize,
-        attackCount: ac,
-        releaseCount: rc,
-        attackLen: al,
-        sustainLen: sl,
-        octaves: oc,
-      };
-    }
-    p += 20 + envBytes + pcmSize;
-  }
-  return null;
-}
 
 export const useFormatStore = create<FormatStore>()(
   immer((set, get) => ({
