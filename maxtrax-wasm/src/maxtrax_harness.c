@@ -848,6 +848,33 @@ EXPORT uint32_t maxtrax_get_tick_unit(void) {
 }
 
 /*
+ * maxtrax_set_patch_scalar(patchNumber, field, value)
+ *
+ * Tier-1 live scalar edit. Writes directly into the in-memory _patch struct
+ * (_patch = _ds + 516, patch_sizeof = 22, indexed by patch Number). field:
+ *   0 = Tune   (i16 @ patch_Tune = 18) — re-read every tick in CalcNote → live
+ *   1 = Volume (u16 @ patch_Volume = 16) — applies on next sustain segment
+ * Returns 0 on success, -1 on out-of-range patchNumber or unknown field.
+ */
+EXPORT int maxtrax_set_patch_scalar(int patchNumber, int field, int val) {
+    if (patchNumber < 0 || patchNumber >= NUM_PATCHES) return -1;
+    uint32_t base = (uint32_t)(uintptr_t)_patch + (uint32_t)patchNumber * (uint32_t)patch_sizeof;
+    if (field == 0)      WRITE16(base + (uint32_t)patch_Tune,   (uint16_t)val);
+    else if (field == 1) WRITE16(base + (uint32_t)patch_Volume, (uint16_t)val);
+    else return -1;
+    return 0;
+}
+
+/* Read-back companion for the regression test (and future UI reconciliation). */
+EXPORT int maxtrax_get_patch_scalar(int patchNumber, int field) {
+    if (patchNumber < 0 || patchNumber >= NUM_PATCHES) return -1;
+    uint32_t base = (uint32_t)(uintptr_t)_patch + (uint32_t)patchNumber * (uint32_t)patch_sizeof;
+    if (field == 0) return (int)(int16_t)READ16(base + (uint32_t)patch_Tune);
+    if (field == 1) return (int)(uint16_t)READ16(base + (uint32_t)patch_Volume);
+    return -1;
+}
+
+/*
  * maxtrax_get_event_count(score)
  *
  * Return the number of CookedEvents (cev_* format) in the given score.
