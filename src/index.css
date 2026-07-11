@@ -88,6 +88,9 @@
     height: 100%;
     overscroll-behavior: none;
     -webkit-overflow-scrolling: auto;
+    /* backdrop element must stay dark once the theme loads (matches body) so no
+       white ever shows through — see the inline boot style in index.html */
+    background-color: var(--color-bg);
   }
 
   body {
