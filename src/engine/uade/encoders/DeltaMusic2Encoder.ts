@@ -12,8 +12,9 @@
  *   Reverse: xmNote is the raw DM2 note index (1-based, 1-96 range)
  *
  * Effect mapping:
- *   Parser: DM2 effects → XM effects with specific mapping per effect type
- *   Reverse: XM effects → DM2 effect codes
+ *   decodeCell stores the DM2 effect command + argument VERBATIM (raw native codes), so
+ *   encode writes them straight back to bytes[2]/[3] — a byte-exact inverse. DM2 is played
+ *   by the dedicated deltamusic2-wasm replayer from these raw bytes, not the XM effect engine.
  */
 
 import type { TrackerCell } from '@/types';
@@ -37,60 +38,13 @@ function encodeDeltaMusic2Cell(cell: TrackerCell): Uint8Array {
   const instr = cell.instrument ?? 0;
   out[1] = instr > 0 ? (instr - 1) & 0xFF : 0;
 
-  // Bytes 2-3: effect type + param
-  // Reverse the XM → DM2 effect mapping
-  const effTyp = cell.effTyp ?? 0;
-  const eff = cell.eff ?? 0;
-  const vol = cell.volume ?? 0;
-
-  let dm2Effect = 0;
-  let dm2Param = 0;
-
-  // Check volume column first (effect 0x06 = SetVolume in DM2 stores via volume column)
-  if (vol >= 0x10 && vol <= 0x50) {
-    // Volume column: 0x10 + volValue → DM2 effect 0x06
-    const xmVol = vol - 0x10; // 0-64
-    dm2Effect = 0x06;
-    dm2Param = Math.round(xmVol / 64 * 63) & 0x3F;
-    out[2] = dm2Effect & 0xFF;
-    out[3] = dm2Param & 0xFF;
-    return out;
-  }
-
-  switch (effTyp) {
-    case 0x0F: // Set speed → DM2 effect 0x01
-      dm2Effect = 0x01;
-      dm2Param = eff & 0x0F;
-      break;
-    case 0x01: // Portamento up → DM2 effect 0x03
-      dm2Effect = 0x03;
-      dm2Param = eff;
-      break;
-    case 0x02: // Portamento down → DM2 effect 0x04
-      dm2Effect = 0x04;
-      dm2Param = eff;
-      break;
-    case 0x03: // Tone portamento → DM2 effect 0x05
-      dm2Effect = 0x05;
-      dm2Param = eff;
-      break;
-    case 0x10: // Global volume → DM2 effect 0x07
-      dm2Effect = 0x07;
-      dm2Param = Math.round(Math.min(64, eff) / 64 * 63) & 0x3F;
-      break;
-    case 0x00: // Arpeggio → DM2 effect 0x08
-      if (eff !== 0) {
-        dm2Effect = 0x08;
-        // The parser extracts arpeggio table index from effectArg & 0x3f
-        dm2Param = eff & 0x3F;
-      }
-      break;
-    default:
-      break;
-  }
-
-  out[2] = dm2Effect & 0xFF;
-  out[3] = dm2Param & 0xFF;
+  // Bytes 2-3: effect command + argument, written VERBATIM. decodeDeltaMusic2Cell stores the
+  // native DM2 effect/arg raw codes (not an XM remap), so encode is their exact inverse and
+  // the codec is byte-exact over real pattern data. DM2 is played by the dedicated
+  // deltamusic2-wasm replayer from these raw bytes; a lossy XM→DM2 remap here dropped
+  // arpeggio-table-0 (`08 00`) and rounded the volume args. See DeltaMusic2Parser.decodeCell.
+  out[2] = (cell.effTyp ?? 0) & 0xFF;
+  out[3] = (cell.eff ?? 0) & 0xFF;
 
   return out;
 }
