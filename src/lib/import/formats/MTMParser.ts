@@ -366,7 +366,13 @@ export async function parseMTMFile(
       const cmd     = instrCmd & 0x0F;
       const { effTyp, eff } = mapMTMEffect(cmd, par);
 
-      return { note, instrument: instr, volume: 0, effTyp, eff, effTyp2: 0, eff2: 0 };
+      // Byte-exact carriers: the note byte is lossy (decode adds 25 and clamps to 96,
+      // encode reverses with the XM note directly) and mapMTMEffect is many-to-one
+      // (0x0A nibble-filter, 0x08/0x0E sub-commands dropped). Stash all three source
+      // bytes in invisible carriers so encodeMTMCell reproduces them verbatim on
+      // round-trip. Grid cells (built by the parser's own track loop) carry no such
+      // fields, so an edited cell falls back to the canonical derivation.
+      return { note, instrument: instr, volume: 0, effTyp, eff, effTyp2: 0, eff2: 0, period: noteInstr, pan: instrCmd, cutoff: par };
     },
     getCellFileOffset: (pattern: number, row: number, channel: number): number => {
       const refs = patTrackTable[pattern];
