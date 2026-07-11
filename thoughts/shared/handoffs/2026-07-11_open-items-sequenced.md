@@ -90,10 +90,25 @@ channel visible, reusing the wheel handler's scroll-space math. Scroll math
 extracted to pure `computeChannelFollowScroll` (`src/lib/tracker/followScroll.ts`)
 with a revert-checked test in test:ci. Commit `204955f30`.
 
-### 5. UADE full editability — Phase 1
-Plan: `thoughts/shared/plans/2026-07-07-uade-full-native-editability.md`
-(7 phases; Phase 0 shipped `72700b0e`). Next = encoder round-trip harness.
-Larger, multi-session on its own.
+### 5. UADE full editability — Phase 1 ALREADY DONE (verified 2026-07-11)
+Plan: `thoughts/shared/plans/2026-07-07-uade-full-native-editability.md` (7 phases).
+The worklist's "next = encoder round-trip harness" was STALE — Phase 1 shipped
+2026-07-08:
+- Task 1.1 encoder harness `811e0c56d` — `encoderRoundtrip.harness.test.ts`
+  exercises all 92 registered encoders against real fixtures.
+- Task 1.3 fixture gap-fill `fc624f27c`.
+- Task 1.2 exporter harness — `exporterRoundtrip.harness.test.ts` (451 lines).
+- Ratchet `encoderRoundtrip.ratchet.json` committed; both harnesses in test:ci,
+  8/8 green as of 2026-07-11.
+
+Current ratchet: 92 encoders — 4 byte-exact, 88 lossy, 41 registered-but-
+unexercised. Many `0.0%` entries (xm/s3m/it/stx/ult/etc.) are libopenmpt/stub
+encoders that don't decode-encode via the chip-RAM path. THIS RATCHET IS THE
+PHASE 3 BACKLOG (one session per lossy format, byte-exact is the exit bar).
+
+Next real work = Phase 2 (descriptor registry unification) or Phase 3 (fix the
+lossy codecs, ratchet-driven). Each is its own fresh-context session per the
+plan's execution notes — not a quick tail.
 
 ## Dropped
 - White boot flash — user decided 2026-07-11 it can be ignored. Not a work item.
