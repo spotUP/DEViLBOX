@@ -730,7 +730,14 @@ export async function parseSoundMonFile(
       const param = raw[2];
 
       const note = bpNoteToXM(noteRaw, 0);
-      return { note, instrument: sample, volume: 0, effTyp: effect, eff: param, effTyp2: 0, eff2: 0 };
+      // Byte-exact carrier (a field the SoundMon grid loop never sets, so it stays private
+      // to the round-trip/chip-RAM path): the raw note byte, which bpNoteToXM's two-table
+      // mapping cannot reconstruct from the XM note. The sample|effect byte and param byte
+      // already round-trip exactly.
+      return {
+        note, instrument: sample, volume: 0, effTyp: effect, eff: param, effTyp2: 0, eff2: 0,
+        period: raw[0],
+      };
     },
     getCellFileOffset: (pattern: number, row: number, channel: number): number => {
       const step = tracks[pattern * 4 + channel];
