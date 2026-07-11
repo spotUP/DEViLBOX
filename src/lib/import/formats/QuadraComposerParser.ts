@@ -413,7 +413,17 @@ export async function parseQuadraComposerFile(
         eff    = 0;
       }
 
-      return { note: xmNote, instrument: ins, volume: volCol, effTyp, eff, effTyp2: 0, eff2: 0 };
+      // Byte-exact carriers: the XM view double-rounds the vibrato/offset params, masks
+      // b2's high nibble (&0x0F), forces the empty-note byte to 0xFF (any >35 source value
+      // is lost), and its note decode (note+13) is not inverted by the encoder's derivation,
+      // so the round-trip is lossy. Stash the exact source bytes in the invisible
+      // period/pan/cutoff carriers (fields the QC grid loop never sets); the encoder
+      // reproduces all 4 bytes verbatim. Edited grid cells lack the carriers and keep the
+      // canonical derivation.
+      return {
+        note: xmNote, instrument: ins, volume: volCol, effTyp, eff, effTyp2: 0, eff2: 0,
+        period: (bytes[0] << 8) | bytes[1], pan: bytes[2], cutoff: bytes[3],
+      };
     },
     getCellFileOffset: (pattern: number, row: number, channel: number): number => {
       const base = patternByteOffsets[pattern] ?? 0;
