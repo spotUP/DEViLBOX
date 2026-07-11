@@ -47,6 +47,18 @@ function encodeQCCell(cell: TrackerCell): Uint8Array {
   out[2] = effTyp & 0x0F;
   out[3] = eff & 0xFF;
 
+  // Byte-exact carrier restore. The XM view double-rounds vibrato/offset, masks b2's high
+  // nibble, forces the empty-note byte to 0xFF, and the note derivation does not invert
+  // decodeCell — so it is lossy. decodeCell stashes the exact source bytes in the invisible
+  // period/pan/cutoff carriers (fields the QC grid loop never sets); reproduce all 4 bytes
+  // verbatim. Edited grid cells lack the carriers and keep the derivation above.
+  if (cell.period !== undefined && cell.pan !== undefined && cell.cutoff !== undefined) {
+    out[0] = (cell.period >> 8) & 0xFF;
+    out[1] = cell.period & 0xFF;
+    out[2] = cell.pan & 0xFF;
+    out[3] = cell.cutoff & 0xFF;
+  }
+
   return out;
 }
 
