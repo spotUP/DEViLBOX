@@ -1,6 +1,7 @@
 import { useFormatStore } from '@/stores/useFormatStore';
 import {
   deriveGrid,
+  absoluteTicksOf,
   setNoteDuration,
   moveNote,
   setNoteField,
@@ -20,6 +21,7 @@ export function useMaxTraxGrid(
     moveNote(eventIndex: number, absTick: number): void;
     setNoteField(eventIndex: number, patch: Parameters<typeof setNoteField>[2]): void;
     setEffectField(eventIndex: number, patch: Parameters<typeof setEffectField>[2]): void;
+    setNoteOffset(eventIndex: number, newOffset: number): void;
   };
 } {
   // Primary re-render signal: maxTraxRev increments on every mutateMaxTraxScore call.
@@ -83,6 +85,13 @@ export function useMaxTraxGrid(
     },
     setEffectField: (eventIndex: number, patch: Parameters<typeof setEffectField>[2]) => {
       if (score !== null) apply(score, setEffectField(score, eventIndex, patch));
+    },
+    setNoteOffset: (i: number, newOffset: number) => {
+      if (!score) return;
+      const cur = absoluteTicksOf(score)[i];            // current absolute start tick of event i
+      const rowBase = cur - (cur % ticksPerRow);         // start tick of the row it sits in
+      const newAbs = rowBase + Math.max(0, newOffset);   // same row, new sub-row offset
+      apply(score, moveNote(score, i, newAbs));           // moveNote clamps + dispatches
     },
   };
 

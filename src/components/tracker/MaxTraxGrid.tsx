@@ -88,6 +88,7 @@ interface MaxTraxGridProps {
     moveNote(eventIndex: number, absTick: number): void;
     setNoteField(eventIndex: number, patch: { pitch?: number; velocity?: number; duration?: number; offset?: number }): void;
     setEffectField(eventIndex: number, patch: { command?: number; data?: number; stopTime?: number }): void;
+    setNoteOffset(eventIndex: number, newOffset: number): void;
   };
 }
 
@@ -178,7 +179,7 @@ export const MaxTraxGrid: React.FC<MaxTraxGridProps> = React.memo(({ grid, edit 
     } else if (field === 'velocity') {
       edit.setNoteField(eventIndex, { velocity: Math.max(0, Math.min(127, num)) });
     } else if (field === 'offset') {
-      edit.setNoteField(eventIndex, { offset: num });
+      edit.setNoteOffset(eventIndex, Math.max(0, num));
     }
     setCellEdit(null);
   };

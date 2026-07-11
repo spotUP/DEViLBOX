@@ -144,6 +144,22 @@ export function decodeMaxTraxSamples(data: MaxTraxData): MaxTraxSample[] {
   return out;
 }
 
+/**
+ * Bytes to feed the WASM replayer on load: the edited store if present (single source of
+ * truth, symmetric with export), else the original file bytes.
+ */
+export function resolveMaxTraxLoadBytes(
+  data: MaxTraxData | null,
+  rawFileData: ArrayBuffer | Uint8Array | null | undefined,
+): ArrayBuffer | undefined {
+  if (data) {
+    const enc = encodeMaxTrax(data);
+    return enc.slice().buffer; // exact-length ArrayBuffer copy
+  }
+  if (!rawFileData) return undefined;
+  return rawFileData instanceof Uint8Array ? rawFileData.slice().buffer : rawFileData;
+}
+
 export function encodeMaxTrax(data: MaxTraxData): Uint8Array {
   let size = data.headerRaw.length + data.tailRaw.length;
   for (const score of data.scores) size += 4 + score.events.length * EVENT_SIZE;
