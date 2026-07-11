@@ -30,8 +30,8 @@ describe('MaxTrax Tier-1 scalar setter writes Tune/Volume into _patch', () => {
       { encoding: 'utf8', timeout: 60_000 },
     );
 
-    const { pn, V0, V1, T0, T1, newVol, newTune, setVol, setTune } = JSON.parse(out) as {
-      pn: number; V0: number; V1: number; T0: number; T1: number;
+    const { pn, V0, V1, T1, newVol, newTune, setVol, setTune } = JSON.parse(out) as {
+      pn: number; V0: number; V1: number; T1: number;
       newVol: number; newTune: number; setVol: number; setTune: number;
     };
 
