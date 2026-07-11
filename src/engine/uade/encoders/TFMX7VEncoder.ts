@@ -31,7 +31,7 @@ export function encodeTFMX7VCell(cell: TrackerCell): Uint8Array {
   // XM note 0 means "empty" — both bytes stay zero so the replayer
   // skips the row (note & 0x7f === 0 → empty cell, see TFMX_processPattern
   // in libtfmxaudiodecoder/Jochen/TFMX.cpp:153).
-  if (!cell.note || cell.note <= 0) return buf;
+  if (!cell.note || cell.note <= 0) return applyByteExactCarriers(buf, cell);
 
   // XM 1..96 → TFMX 0..63 (clamp into the 6-bit note range; the period
   // table only has 64 entries so anything past that is silently clamped).
@@ -46,5 +46,18 @@ export function encodeTFMX7VCell(cell: TrackerCell): Uint8Array {
     buf[1] = cell.instrument & 0x1f;
   }
 
+  return applyByteExactCarriers(buf, cell);
+}
+
+/**
+ * Byte-exact carriers set by JochenHippel7VParser.decodeCell hold the exact source
+ * note/info bytes that the note/instrument view above cannot reconstruct (portamento
+ * bit, note sentinels, info high bits, note-0 rows carrying an info byte). When present
+ * (round-trip path) reproduce them verbatim; an edited cell reaches the encoder without
+ * carriers and keeps the derivation above.
+ */
+function applyByteExactCarriers(buf: Uint8Array, cell: TrackerCell): Uint8Array {
+  if (cell.period !== undefined) buf[0] = cell.period & 0xff; // raw note byte
+  if (cell.pan !== undefined)    buf[1] = cell.pan    & 0xff; // raw info byte
   return buf;
 }

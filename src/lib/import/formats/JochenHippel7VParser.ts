@@ -595,7 +595,17 @@ export function parseJochenHippel7VFile(buffer: ArrayBuffer, filename: string): 
       // tfmxNoteToXM(note, 0): note > 1 ? note + 1 : 0
       const note = (tfmxNote > 1) ? Math.min(96, tfmxNote + 1) : 0;
       const instrument = (infoByte & 0x1F) > 0 ? (infoByte & 0x1F) : 0;
-      return { note, instrument, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 };
+      // Byte-exact carriers: the note/instrument view above discards the portamento
+      // bit (noteByte bit7), the 0/1 note sentinels, and the info byte's high 3 bits;
+      // note-0 rows still carry an info byte the encoder would otherwise zero. Stash
+      // the exact source bytes so encodeTFMX7VCell reproduces them verbatim. Private to
+      // the round-trip codec — the grid is built by decodeTFMX7VPattern (with per-voice
+      // transpose) and tfmx7v has no chip-RAM edit / native export path — so an edited
+      // cell arrives carrier-less and keeps the derivation.
+      return {
+        note, instrument, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0,
+        period: noteByte, pan: infoByte,
+      };
     },
     getCellFileOffset: (pattern: number, row: number, channel: number): number => {
       if (pattern < 0 || pattern >= trackerPatterns.length) return -1;
