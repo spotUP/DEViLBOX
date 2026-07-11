@@ -20,10 +20,11 @@
  * configRef pattern: sampleRef mirrors the decoded sample and is read inside callbacks.
  */
 
-import React, { useRef, useEffect, useCallback } from 'react';
+import React, { useRef, useEffect } from 'react';
 import { useFormatStore } from '@/stores/useFormatStore';
 import { decodeMaxTraxSamples } from '@/lib/import/formats/maxtrax/maxtraxFormat';
 import { MaxTraxEngine } from '@/engine/maxtrax/MaxTraxEngine';
+import { Button } from '@/components/ui/Button';
 
 // ─── Waveform canvas ──────────────────────────────────────────────────────────
 
@@ -105,36 +106,24 @@ export const MaxTraxControls: React.FC<MaxTraxControlsProps> = ({ sampleIndex })
 
   // ── Field mutators ──────────────────────────────────────────────────────────
 
-  const setField = useCallback(
-    (field: 'number' | 'tune' | 'volume' | 'octaves' | 'attackLen' | 'sustainLen', value: number) => {
-      mutateMaxTraxSample(sampleIndex, { kind: 'field', field, value });
-      if (canLiveEdit) {
-        // Future: (MaxTraxEngine.getInstance() as any).setSampleParam(sampleIndex, field, value);
-      }
-    },
-    [mutateMaxTraxSample, sampleIndex, canLiveEdit],
-  );
+  const setField = (field: 'number' | 'tune' | 'volume' | 'octaves' | 'attackLen' | 'sustainLen', value: number) => {
+    mutateMaxTraxSample(sampleIndex, { kind: 'field', field, value });
+    if (canLiveEdit) {
+      // Future: (MaxTraxEngine.getInstance() as any).setSampleParam(sampleIndex, field, value);
+    }
+  };
 
-  const setEnvField = useCallback(
-    (side: 'attack' | 'release', pointIndex: number, field: 'duration' | 'volume', value: number) => {
-      mutateMaxTraxSample(sampleIndex, { kind: 'envField', side, pointIndex, field, value });
-    },
-    [mutateMaxTraxSample, sampleIndex],
-  );
+  const setEnvField = (side: 'attack' | 'release', pointIndex: number, field: 'duration' | 'volume', value: number) => {
+    mutateMaxTraxSample(sampleIndex, { kind: 'envField', side, pointIndex, field, value });
+  };
 
-  const addEnvPoint = useCallback(
-    (side: 'attack' | 'release') => {
-      mutateMaxTraxSample(sampleIndex, { kind: 'addEnvPoint', side, duration: 100, volume: 64 });
-    },
-    [mutateMaxTraxSample, sampleIndex],
-  );
+  const addEnvPoint = (side: 'attack' | 'release') => {
+    mutateMaxTraxSample(sampleIndex, { kind: 'addEnvPoint', side, duration: 100, volume: 64 });
+  };
 
-  const removeEnvPoint = useCallback(
-    (side: 'attack' | 'release', pointIndex: number) => {
-      mutateMaxTraxSample(sampleIndex, { kind: 'removeEnvPoint', side, pointIndex });
-    },
-    [mutateMaxTraxSample, sampleIndex],
-  );
+  const removeEnvPoint = (side: 'attack' | 'release', pointIndex: number) => {
+    mutateMaxTraxSample(sampleIndex, { kind: 'removeEnvPoint', side, pointIndex });
+  };
 
   // ── Empty state ─────────────────────────────────────────────────────────────
 
@@ -259,12 +248,13 @@ export const MaxTraxControls: React.FC<MaxTraxControlsProps> = ({ sampleIndex })
           <span className="text-[9px] font-mono text-text-muted uppercase tracking-wide">
             Attack Envelope
           </span>
-          <button
+          <Button
+            variant="ghost"
             onClick={() => addEnvPoint('attack')}
-            className="text-[9px] font-mono text-accent-primary hover:text-accent-highlight px-1"
+            className="text-[9px] font-mono px-1 h-auto py-0"
           >
             + Add
-          </button>
+          </Button>
         </div>
         <div className="flex items-center gap-1 mb-1">
           <span className="text-[10px] font-mono text-text-secondary">Attack Count</span>
@@ -292,12 +282,13 @@ export const MaxTraxControls: React.FC<MaxTraxControlsProps> = ({ sampleIndex })
               className="w-12 text-right bg-dark-bgTertiary border border-dark-borderLight rounded text-text-primary font-mono text-xs px-1 py-0.5"
               title="Volume"
             />
-            <button
+            <Button
+              variant="danger"
               onClick={() => removeEnvPoint('attack', i)}
-              className="text-[9px] font-mono text-accent-error hover:text-accent-error/80 px-1"
+              className="text-[9px] font-mono px-1 h-auto py-0"
             >
               X
-            </button>
+            </Button>
           </div>
         ))}
         {sample.attackCount === 0 && (
@@ -311,12 +302,13 @@ export const MaxTraxControls: React.FC<MaxTraxControlsProps> = ({ sampleIndex })
           <span className="text-[9px] font-mono text-text-muted uppercase tracking-wide">
             Release Envelope
           </span>
-          <button
+          <Button
+            variant="ghost"
             onClick={() => addEnvPoint('release')}
-            className="text-[9px] font-mono text-accent-primary hover:text-accent-highlight px-1"
+            className="text-[9px] font-mono px-1 h-auto py-0"
           >
             + Add
-          </button>
+          </Button>
         </div>
         <div className="flex items-center gap-1 mb-1">
           <span className="text-[10px] font-mono text-text-secondary">Release Count</span>
@@ -344,12 +336,13 @@ export const MaxTraxControls: React.FC<MaxTraxControlsProps> = ({ sampleIndex })
               className="w-12 text-right bg-dark-bgTertiary border border-dark-borderLight rounded text-text-primary font-mono text-xs px-1 py-0.5"
               title="Volume"
             />
-            <button
+            <Button
+              variant="danger"
               onClick={() => removeEnvPoint('release', i)}
-              className="text-[9px] font-mono text-accent-error hover:text-accent-error/80 px-1"
+              className="text-[9px] font-mono px-1 h-auto py-0"
             >
               X
-            </button>
+            </Button>
           </div>
         ))}
         {sample.releaseCount === 0 && (

@@ -11,7 +11,7 @@ it('renders a control for every DiskSample field', () => {
   render(<MaxTraxControls sampleIndex={0} />);
   // getByText throws if the label is missing, so a truthy element proves it rendered.
   // (jest-dom's toBeInTheDocument isn't wired into this project's vitest setup.)
-  for (const label of ['Tune','Volume','Octaves','Attack Length','Sustain Length','Attack Count','Release Count']) {
+  for (const label of ['Number','Tune','Volume','Octaves','Attack Length','Sustain Length','Attack Count','Release Count']) {
     expect(screen.getByText(label)).toBeTruthy();
   }
 });
