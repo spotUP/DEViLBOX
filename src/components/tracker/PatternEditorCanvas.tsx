@@ -11,6 +11,7 @@ import { useMixerStore } from '@stores/useMixerStore';
 import { useChannelTypeStore } from '@stores/useChannelTypeStore';
 import { useWasmPositionStore } from '@stores/useWasmPositionStore';
 import { channelLayout } from './channelLayout';
+import { computeChannelFollowScroll } from '@/lib/tracker/followScroll';
 import { AutomationLanes } from './AutomationLanes';
 import { GlobalLaneCurves } from './GlobalLaneCurves';
 import { MasterDubLane } from './MasterDubLane';
@@ -1581,6 +1582,41 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
       setScrollLeft(targetScroll);
     }
   }, [isMobile, mobileChannelIndex, pattern]);
+
+  // Desktop: follow the cursor horizontally when Tab / arrows move it to a
+  // channel that is currently off-screen. Without this the cursor can leave the
+  // visible area on Tab. Keyed on activeChannelIndex (the cursor's channel) so
+  // it fires on channel changes only, not on every wheel scroll.
+  useEffect(() => {
+    if (isMobile || allChannelsFit || !pattern) return;
+    const container = containerRef.current;
+    if (!container) return;
+    const ch = activeChannelIndex;
+    if (ch < 0 || ch >= channelOffsets.length) return;
+
+    const channelLeft = channelOffsets[ch] - LINE_NUMBER_WIDTH;
+    const channelWidth = channelWidths[ch] ?? 0;
+    const viewWidth = container.clientWidth - LINE_NUMBER_WIDTH;
+    const maxScroll = Math.max(0, LINE_NUMBER_WIDTH + totalChannelsWidth - container.clientWidth);
+
+    const next = computeChannelFollowScroll(
+      channelLeft,
+      channelWidth,
+      scrollLeftRef.current,
+      viewWidth,
+      maxScroll,
+    );
+    if (next === scrollLeftRef.current) return;
+
+    scrollLeftRef.current = next;
+    channelLayout.scrollLeft = next;
+    bridgeRef.current?.post({ type: 'scroll', x: next });
+    setScrollLeft(next);
+    if (headerScrollRef.current) headerScrollRef.current.scrollLeft = next;
+    if (bottomScrollRef.current) bottomScrollRef.current.scrollLeft = next;
+    // scrollLeftRef read (not scrollLeft state) to avoid re-firing on scroll.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeChannelIndex, isMobile, allChannelsFit, pattern, channelOffsets, channelWidths, totalChannelsWidth, dimensions.width]);
 
   // Snapshot helpers — produce serializable snapshots from stores for the worker
   const snapshotTheme = useCallback((): ThemeSnapshot => {
