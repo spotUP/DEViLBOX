@@ -683,9 +683,9 @@
     "tfmx7v": {
       "kind": "fixed",
       "method": "decode-encode",
-      "status": "lossy",
-      "byteExact": false,
-      "matchPct": 0.9847,
+      "status": "byte-exact",
+      "byteExact": true,
+      "matchPct": 1,
       "cells": 24640
     },
     "tomyTracker": {
