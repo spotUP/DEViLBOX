@@ -15,6 +15,8 @@ import {
 } from 'lucide-react';
 import { DeckPatternDisplay } from './DeckPatternDisplay';
 import { useDeckVisualizationData } from '@/hooks/dj/useDeckVisualizationData';
+import { useDJStore } from '@/stores/useDJStore';
+import { useVisualizationAnimation } from '@hooks/useVisualizationAnimation';
 import {
   VISUALIZER_MODES,
   MODE_LABELS,
@@ -46,6 +48,10 @@ interface DeckVisualizerProps {
 
 export const DeckVisualizer: React.FC<DeckVisualizerProps> = ({ deckId, resetKey = 0 }) => {
   const viz = useDeckVisualizationData(deckId);
+  // Gate both animation loops on deck playback: 0 CPU when the deck is stopped.
+  // Visualizers freeze on the last frame while stopped (acceptable) and the
+  // shared hook also fully pauses them when the tab is hidden.
+  const isPlaying = useDJStore((s) => s.decks[deckId]?.isPlaying ?? false);
 
   const [vizIndex, setVizIndex] = useState(0); // index into VIZ_MODES
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -57,49 +63,53 @@ export const DeckVisualizer: React.FC<DeckVisualizerProps> = ({ deckId, resetKey
   const glRef = useRef<WebGL2RenderingContext | null>(null);
   const cacheRef = useRef<RendererCache | null>(null);
   const stateRef = useRef(createVisualizerState());
-  const rafRef = useRef<number>(0);
   const startTimeRef = useRef(performance.now() / 1000);
   const slideshowTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const mode = VIZ_MODES[vizIndex % VIZ_MODES.length];
   const isAMMode = isAudioMotionMode(mode);
+  // Ref so the render loop reads the current mode without restarting the hook.
+  const modeRef = useRef(mode);
+  modeRef.current = mode;
 
-  // Beat flash state — border glow on each beat
+  // Beat flash state — border glow on each beat. Decay persists across frames
+  // in a ref so the gated hook can drive it without a self-restarting effect.
   const [beatFlashOpacity, setBeatFlashOpacity] = useState(0);
-  const beatFlashRafRef = useRef<number>(0);
+  const flashDecayRef = useRef(0);
   const prevBeatIdxRef = useRef(-1);
 
+  const beatFlashFrame = useCallback((): boolean => {
+    const phase = viz.getBeatPhase();
+    if (phase) {
+      // Detect beat transition (nearest beat index changed)
+      if (phase.nearestBeatIdx !== prevBeatIdxRef.current && prevBeatIdxRef.current >= 0) {
+        flashDecayRef.current = 1.0; // trigger flash
+      }
+      prevBeatIdxRef.current = phase.nearestBeatIdx;
+    }
+    // Decay the flash
+    if (flashDecayRef.current > 0.01) {
+      flashDecayRef.current *= 0.88; // exponential decay (~200ms to invisible)
+      setBeatFlashOpacity(flashDecayRef.current);
+      return true;
+    } else if (flashDecayRef.current > 0) {
+      flashDecayRef.current = 0;
+      setBeatFlashOpacity(0);
+    }
+    // Idle (no active flash) — still polls for the next beat at reduced rate.
+    return false;
+  }, [viz]);
+
+  // Beat-flash loop runs only while the deck plays. Clear any lingering glow
+  // and reset beat tracking when playback stops.
+  useVisualizationAnimation({ onFrame: beatFlashFrame, enabled: isPlaying, fps: 60 });
   useEffect(() => {
-    let mounted = true;
-    let flashDecay = 0;
-
-    const tick = () => {
-      if (!mounted) return;
-      const phase = viz.getBeatPhase();
-      if (phase) {
-        // Detect beat transition (nearest beat index changed)
-        if (phase.nearestBeatIdx !== prevBeatIdxRef.current && prevBeatIdxRef.current >= 0) {
-          flashDecay = 1.0; // trigger flash
-        }
-        prevBeatIdxRef.current = phase.nearestBeatIdx;
-      }
-      // Decay the flash
-      if (flashDecay > 0.01) {
-        flashDecay *= 0.88; // exponential decay (~200ms to invisible)
-        setBeatFlashOpacity(flashDecay);
-      } else if (flashDecay > 0) {
-        flashDecay = 0;
-        setBeatFlashOpacity(0);
-      }
-      beatFlashRafRef.current = requestAnimationFrame(tick);
-    };
-
-    beatFlashRafRef.current = requestAnimationFrame(tick);
-    return () => {
-      mounted = false;
-      cancelAnimationFrame(beatFlashRafRef.current);
-    };
-  }, [deckId]);
+    if (!isPlaying) {
+      flashDecayRef.current = 0;
+      prevBeatIdxRef.current = -1;
+      setBeatFlashOpacity(0);
+    }
+  }, [isPlaying]);
 
   const beatFlashColor = deckId === 'A' ? '59,130,246' : '249,115,22'; // blue / orange
 
@@ -176,12 +186,13 @@ export const DeckVisualizer: React.FC<DeckVisualizerProps> = ({ deckId, resetKey
 
   // ── WebGL render loop ────────────────────────────────────────────────────
 
+  // Init the WebGL context once (reused across mode changes). The animation
+  // loop itself is driven by the shared gated hook below so it fully stops
+  // (0 CPU) when the deck is stopped or the tab is hidden.
   useEffect(() => {
     if (isAMMode) return;
-
     const canvas = canvasRef.current;
     if (!canvas) return;
-
     if (!glRef.current) {
       const gl = canvas.getContext('webgl2', {
         alpha: false,
@@ -198,44 +209,48 @@ export const DeckVisualizer: React.FC<DeckVisualizerProps> = ({ deckId, resetKey
       glRef.current = gl;
       cacheRef.current = createRendererCache(gl);
     }
+  }, [isAMMode]);
 
-    const gl = glRef.current!;
-    const cache = cacheRef.current!;
-    const state = stateRef.current;
-    let running = true;
+  // Render one WebGL frame. Returns true when there was audio activity so the
+  // hook can drop to half-rate while idle. AudioMotion modes render via the
+  // <AudioMotionVisualizer> overlay, so this no-ops for them.
+  const renderFrame = useCallback((): boolean => {
+    if (isAMMode) return false;
+    const canvas = canvasRef.current;
+    const gl = glRef.current;
+    const cache = cacheRef.current;
+    const container = containerRef.current;
+    if (!canvas || !gl || !cache || !container) return false;
 
-    const frame = () => {
-      if (!running) return;
-      const container = containerRef.current;
-      if (container && canvas) {
-        const dpr = Math.min(window.devicePixelRatio, 2);
-        const w = container.clientWidth;
-        const h = container.clientHeight;
-        const drawW = Math.round(w * dpr);
-        const drawH = Math.round(h * dpr);
-        if (canvas.width !== drawW || canvas.height !== drawH) {
-          canvas.width = drawW;
-          canvas.height = drawH;
-          canvas.style.width = `${w}px`;
-          canvas.style.height = `${h}px`;
-        }
-        gl.viewport(0, 0, drawW, drawH);
-        const audio = buildAudioData(viz.getWaveform, viz.getFFT);
-        const time = performance.now() / 1000 - startTimeRef.current;
-        const renderer = RENDERERS[mode as WebGLVisualizerMode];
-        if (renderer) {
-          renderer(cache, audio, state, time, drawW, drawH);
-        } else {
-          gl.clearColor(0, 0, 0, 1);
-          gl.clear(gl.COLOR_BUFFER_BIT);
-        }
-      }
-      rafRef.current = requestAnimationFrame(frame);
-    };
+    const dpr = Math.min(window.devicePixelRatio, 2);
+    const w = container.clientWidth;
+    const h = container.clientHeight;
+    const drawW = Math.round(w * dpr);
+    const drawH = Math.round(h * dpr);
+    if (canvas.width !== drawW || canvas.height !== drawH) {
+      canvas.width = drawW;
+      canvas.height = drawH;
+      canvas.style.width = `${w}px`;
+      canvas.style.height = `${h}px`;
+    }
+    gl.viewport(0, 0, drawW, drawH);
+    const audio = buildAudioData(viz.getWaveform, viz.getFFT);
+    const time = performance.now() / 1000 - startTimeRef.current;
+    const renderer = RENDERERS[modeRef.current as WebGLVisualizerMode];
+    if (renderer) {
+      renderer(cache, audio, stateRef.current, time, drawW, drawH);
+    } else {
+      gl.clearColor(0, 0, 0, 1);
+      gl.clear(gl.COLOR_BUFFER_BIT);
+    }
+    return audio.rms > 0.0001;
+  }, [isAMMode, viz]);
 
-    rafRef.current = requestAnimationFrame(frame);
-    return () => { running = false; cancelAnimationFrame(rafRef.current); };
-  }, [deckId, mode, isAMMode]);
+  // Static render: repaint once when the mode changes while stopped so the
+  // frozen background reflects the current visualizer choice.
+  useEffect(() => { renderFrame(); }, [renderFrame, mode]);
+
+  useVisualizationAnimation({ onFrame: renderFrame, enabled: isPlaying && !isAMMode, fps: 60 });
 
   // Cleanup WebGL on unmount
   useEffect(() => {
@@ -245,7 +260,6 @@ export const DeckVisualizer: React.FC<DeckVisualizerProps> = ({ deckId, resetKey
         cacheRef.current = null;
       }
       glRef.current = null;
-      cancelAnimationFrame(rafRef.current);
     };
   }, []);
 
