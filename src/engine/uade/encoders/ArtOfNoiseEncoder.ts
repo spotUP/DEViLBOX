@@ -68,6 +68,18 @@ function encodeAONCell(cell: TrackerCell): Uint8Array {
   // Byte 3: effect argument
   out[3] = effectArg & 0xFF;
 
+  // Byte-exact carrier restore. Each AON byte carries two extra bits (b0's unused pair,
+  // b1/b2's arpeggio bits) that the XM view masks off, and the effect map is one-way, so
+  // the derivation above is lossy. decodeCell stashes the exact source bytes in the
+  // invisible period/pan/cutoff carriers (fields the AON grid loop never sets); reproduce
+  // all 4 bytes verbatim. Edited grid cells lack the carriers and keep the derivation.
+  if (cell.period !== undefined && cell.pan !== undefined && cell.cutoff !== undefined) {
+    out[0] = (cell.period >> 8) & 0xFF;
+    out[1] = cell.period & 0xFF;
+    out[2] = cell.pan & 0xFF;
+    out[3] = cell.cutoff & 0xFF;
+  }
+
   return out;
 }
 
