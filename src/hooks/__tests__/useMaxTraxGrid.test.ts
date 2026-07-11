@@ -44,6 +44,49 @@ it('derives a grid and pushes duration edits to store + engine', () => {
   expect(mockProjectEventToWorklet).toHaveBeenCalled();
 });
 
+it('setNoteOffset retimes the event to rowBase + newOffset via moveNote path', () => {
+  // ticksPerRow = 24. Place note A at absolute tick 25 (row=1, offset=1) and
+  // a following END event so moveNote has a next-event delta to adjust.
+  useFormatStore.getState().setMaxTraxData({
+    tempo: 0,
+    flags: 0,
+    headerRaw: new Uint8Array(),
+    scores: [
+      {
+        events: [
+          // note at startTime=25 (abs=25 → row=1, offset=1 within TPR=24)
+          { command: 0x3c, data: 0x40, startTime: 25, stopTime: 10 },
+          // END event after, startTime delta=10 → abs=35
+          { command: 0xff, data: 0x00, startTime: 10, stopTime: 0 },
+        ],
+      },
+    ],
+    tailRaw: new Uint8Array(),
+  });
+
+  const { result } = renderHook(() => useMaxTraxGrid(0, 24));
+
+  // Sanity: note is at offset 1 (abs 25 % 24 = 1).
+  const gridBefore = result.current.grid!;
+  const noteOnBefore = gridBefore.noteCells.find(c => c.kind === 'noteOn')!;
+  expect(noteOnBefore.offset).toBe(1);
+
+  // Set offset to 5 → expect abs tick = rowBase(24) + 5 = 29.
+  act(() => result.current.edit.setNoteOffset(0, 5));
+
+  const events = useFormatStore.getState().maxTraxData!.scores[0].events;
+  // Absolute tick of event 0 = events[0].startTime (prev=0, so abs=startTime).
+  expect(events[0].startTime).toBe(29); // rowBase(24) + newOffset(5)
+
+  // The grid must reflect the new offset.
+  const gridAfter = result.current.grid!;
+  const noteOnAfter = gridAfter.noteCells.find(c => c.kind === 'noteOn')!;
+  expect(noteOnAfter.offset).toBe(5);
+
+  // Engine must have been told about the change.
+  expect(mockProjectEventToWorklet).toHaveBeenCalled();
+});
+
 it('moveNote dispatches projectEventToWorklet for BOTH changed indices (no extra store writes)', () => {
   // Two note events: note A at tick 0 (dur=10), note B at tick 20 (dur=5).
   useFormatStore.getState().setMaxTraxData({

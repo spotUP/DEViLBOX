@@ -17,6 +17,7 @@ import { useWasmPositionStore } from '@stores/useWasmPositionStore';
 import { getTrackerReplayer, type TrackerFormat } from '@engine/TrackerReplayer';
 import { getTrackerScratchController } from '@engine/TrackerScratchController';
 import type { UADEEngine } from '@engine/uade/UADEEngine';
+import { resolveMaxTraxLoadBytes } from '@/lib/import/formats/maxtrax/maxtraxFormat';
 
 export const usePatternPlayback = () => {
   const { patterns, currentPatternIndex, setCurrentPattern, patternOrder, currentPositionIndex, setCurrentPosition, } = useTrackerStore(useShallow((s) => ({
@@ -574,7 +575,7 @@ export const usePatternPlayback = () => {
           soundFactoryFileData: soundFactoryFileData ?? undefined,
           faceTheMusicFileData: faceTheMusicFileData ?? undefined,
           klysFileData: klysFileData ?? undefined,
-          maxTraxFileData: maxTraxFileData ?? undefined,
+          maxTraxFileData: resolveMaxTraxLoadBytes(useFormatStore.getState().maxTraxData, maxTraxFileData),
           uadeEditableFileData: uadeEditableFileData ?? undefined,
           uadePatternLayout: uadePatternLayout ?? undefined,
           nativeSamplePlayback: nativeSamplePlayback ?? undefined,
