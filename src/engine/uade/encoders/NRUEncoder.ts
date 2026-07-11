@@ -48,6 +48,19 @@ function encodeNRUCell(cell: TrackerCell): Uint8Array {
   // d3: instrument in upper 5 bits
   out[3] = ((cell.instrument ?? 0) << 3) & 0xFF;
 
+  // Byte-exact carrier restore. Every NRU byte is lossy in the XM view (d0's
+  // effect map is many-to-one and drops its low 2 bits, d1 is remapped by
+  // convertModEffect, d2's odd bit is lost to /2, d3 keeps only the upper 5 bits).
+  // decodeCell stashes the exact source bytes in the invisible period/pan/cutoff
+  // carriers (fields the NRU grid loop never sets); reproduce all 4 bytes verbatim.
+  // Edited grid cells lack the carriers and keep the canonical derivation above.
+  if (cell.period !== undefined && cell.pan !== undefined && cell.cutoff !== undefined) {
+    out[0] = (cell.period >> 8) & 0xFF;
+    out[1] = cell.period & 0xFF;
+    out[2] = cell.pan & 0xFF;
+    out[3] = cell.cutoff & 0xFF;
+  }
+
   return out;
 }
 

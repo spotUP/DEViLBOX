@@ -547,7 +547,16 @@ export async function parseNRUFile(
         eff = converted.eff;
       }
 
-      return { note, instrument, volume: 0, effTyp, eff, effTyp2: 0, eff2: 0 };
+      // Byte-exact carriers: every NRU byte is lossy in the XM view (d0's effect map
+      // is many-to-one and drops its low 2 bits, d1 is remapped by convertModEffect,
+      // d2's odd bit is lost to /2, d3's instrument keeps only the upper 5 bits). Stash
+      // the exact source bytes in invisible period/pan/cutoff carriers (fields the NRU
+      // grid loop never sets); the encoder reproduces all 4 bytes verbatim. Edited grid
+      // cells lack the carriers and keep the canonical derivation.
+      return {
+        note, instrument, volume: 0, effTyp, eff, effTyp2: 0, eff2: 0,
+        period: (d0 << 8) | d1, pan: d2, cutoff: d3,
+      };
     },
   };
 
