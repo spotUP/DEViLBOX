@@ -530,7 +530,15 @@ export function parseGameMusicCreatorFile(bytes: Uint8Array, filename: string): 
         default:   effTyp = 0; eff = 0; break;
       }
 
-      return { note, instrument: sampleNum, volume: 0, effTyp, eff, effTyp2: 0, eff2: 0 };
+      // Byte-exact carriers (fields the GMC grid loop never sets, so they stay private to
+      // the round-trip/chip-RAM path): period holds the exact source Amiga period (the MOD
+      // period table is lossy for off-table periods), pan holds the raw byte2 (preserves
+      // its high nibble and cmd-0/default params the XM effect view collapses to 0), cutoff
+      // holds the raw byte3 param.
+      return {
+        note, instrument: sampleNum, volume: 0, effTyp, eff, effTyp2: 0, eff2: 0,
+        period: periodRaw, pan: bytes[2], cutoff: prm,
+      };
     },
   };
 
