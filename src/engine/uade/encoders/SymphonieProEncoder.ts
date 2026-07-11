@@ -68,7 +68,7 @@ export function encodeSymphonieProCell(cell: TrackerCell): Uint8Array {
         out[1] = 0;  // note (unused)
         out[2] = eff > 0 ? eff : 4;
         out[3] = 0;
-        return out;
+        return applyByteExactCarriers(out, cell);
 
       case 0x0A: { // Volume Slide
         const upVal = (eff >> 4) & 0x0F;
@@ -82,7 +82,7 @@ export function encodeSymphonieProCell(cell: TrackerCell): Uint8Array {
         }
         out[1] = 0;
         out[3] = 0;
-        return out;
+        return applyByteExactCarriers(out, cell);
       }
 
       case 0x01: // Portamento Up → CMD_PITCH_UP
@@ -90,14 +90,14 @@ export function encodeSymphonieProCell(cell: TrackerCell): Uint8Array {
         out[1] = 0;
         out[2] = eff & 0xFF;
         out[3] = 0;
-        return out;
+        return applyByteExactCarriers(out, cell);
 
       case 0x02: // Portamento Down → CMD_PITCH_DOWN
         out[0] = CMD_PITCH_DOWN;
         out[1] = 0;
         out[2] = eff & 0xFF;
         out[3] = 0;
-        return out;
+        return applyByteExactCarriers(out, cell);
 
       case 0x04: // Vibrato → CMD_VIBRATO
         out[0] = CMD_VIBRATO;
@@ -106,7 +106,7 @@ export function encodeSymphonieProCell(cell: TrackerCell): Uint8Array {
         // Reverse: param = eff & 0x0F, inst = (eff >> 4) << 3
         out[2] = eff & 0x0F;
         out[3] = ((eff >> 4) & 0x0F) << 3;
-        return out;
+        return applyByteExactCarriers(out, cell);
 
       case 0x07: // Tremolo → CMD_TREMOLO
         out[0] = CMD_TREMOLO;
@@ -115,25 +115,25 @@ export function encodeSymphonieProCell(cell: TrackerCell): Uint8Array {
         // Reverse: param = (eff & 0x0F) << 3, inst = (eff >> 4) << 3
         out[2] = ((eff & 0x0F) << 3) & 0xFF;
         out[3] = (((eff >> 4) & 0x0F) << 3) & 0xFF;
-        return out;
+        return applyByteExactCarriers(out, cell);
 
       case 0x09: // Sample Offset → CMD_REPLAY_FROM
         out[0] = CMD_REPLAY_FROM;
         out[1] = 0;
         out[2] = eff & 0xFF;
         out[3] = 0;
-        return out;
+        return applyByteExactCarriers(out, cell);
 
       case 0x03: // Tone Portamento → CMD_ADD_HALFTONE
         out[0] = CMD_ADD_HALFTONE;
         out[1] = 0;
         out[2] = 0;
         out[3] = 0;
-        return out;
+        return applyByteExactCarriers(out, cell);
 
       default:
         // Unknown effect — emit empty event
-        return out;
+        return applyByteExactCarriers(out, cell);
     }
   }
 
@@ -171,6 +171,20 @@ export function encodeSymphonieProCell(cell: TrackerCell): Uint8Array {
   // Effects on the same row as notes are encoded in the note-on's inst/param fields
   // for some commands (vibrato uses inst field). For simple encoding we keep the note.
 
+  return applyByteExactCarriers(out, cell);
+}
+
+/**
+ * Byte-exact carriers set by SymphonieProParser.decodeCell hold the exact source
+ * note/param/inst bytes that the lossy XM view above cannot reconstruct (double-
+ * rounded volume, discarded command note byte, clamped param/inst). When present
+ * (round-trip / chip-RAM read path) reproduce them verbatim; an edited cell comes
+ * from the carrier-less _convertEvent path and keeps the derivation above.
+ */
+function applyByteExactCarriers(out: Uint8Array, cell: TrackerCell): Uint8Array {
+  if (cell.pan !== undefined)    out[1] = cell.pan    & 0xFF; // raw note byte
+  if (cell.period !== undefined) out[2] = cell.period & 0xFF; // raw param byte
+  if (cell.cutoff !== undefined) out[3] = cell.cutoff & 0xFF; // raw inst byte
   return out;
 }
 

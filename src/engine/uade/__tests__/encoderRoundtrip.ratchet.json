@@ -651,9 +651,9 @@
     "symphoniePro": {
       "kind": "fixed",
       "method": "decode-encode",
-      "status": "lossy",
-      "byteExact": false,
-      "matchPct": 0.993,
+      "status": "byte-exact",
+      "byteExact": true,
+      "matchPct": 1,
       "cells": 20480
     },
     "synthesis": {
