@@ -962,7 +962,16 @@ export async function parseSonicArrangerFile(
       const instrument = b1;
       const effect = b2 & 0x0F;
       const { effTyp, eff, volCol } = saEffectToXM(effect, b3);
-      return { note, instrument, volume: volCol, effTyp, eff, effTyp2: 0, eff2: 0 };
+      // Byte-exact carriers (fields the SA grid loop never sets, so they stay private to
+      // the round-trip/chip-RAM path): cutoff holds the raw note byte (preserves the
+      // 0x80 release vs 0x7F force-quiet distinction and out-of-XM-range note bytes), pan
+      // holds the raw flags+arp+effect byte (preserves the disableST/disableNT flag bits).
+      // saEffectArg carries the exact effect-arg byte, which the encoder emits as byte3;
+      // the grid loop sets it too, so byte3 is exact for both round-trip and edited cells.
+      return {
+        note, instrument, volume: volCol, effTyp, eff, effTyp2: 0, eff2: 0,
+        cutoff: b0, pan: b2, saEffectArg: b3,
+      };
     },
     getCellFileOffset: (pattern: number, row: number, channel: number): number => {
       const posEntry = positions[pattern];
