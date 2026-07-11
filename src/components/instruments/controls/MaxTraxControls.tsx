@@ -13,16 +13,22 @@
  *   DiskSample +18 u16 ReleaseCount   → patch_ReleaseCount (number of release envelope segments)
  *   Then: (AttackCount + ReleaseCount) × EnvelopeData { u16 Duration, u16 Volume }
  *
- * Live-audio: sample-field edits persist to store+export but cannot hot-update sustained
- * audio yet (no setSampleParam on MaxTraxEngine). canLiveEdit will be false until a
- * future WASM export adds the setter. Edits are always store-authoritative.
+ * Live-audio: edits are store-authoritative AND hot-update the running WASM
+ * replayer in place. Scalars (Tune/Volume) write directly into the _patch
+ * struct (Tune is live on sustained notes); structural edits (Number, Octaves,
+ * Attack/Sustain lengths, envelope add/remove/edit) rebuild the patch's
+ * in-memory buffers from the fresh tailRaw slice, taking effect on the next
+ * note-on. No reload.
  *
  * configRef pattern: sampleRef mirrors the decoded sample and is read inside callbacks.
  */
 
 import React, { useRef, useEffect, useMemo } from 'react';
 import { useFormatStore } from '@/stores/useFormatStore';
-import { decodeMaxTraxSamples } from '@/lib/import/formats/maxtrax/maxtraxFormat';
+import {
+  decodeMaxTraxSamples,
+  extractSampleDsampleSlice,
+} from '@/lib/import/formats/maxtrax/maxtraxFormat';
 import { MaxTraxEngine } from '@/engine/maxtrax/MaxTraxEngine';
 import { Button } from '@/components/ui/Button';
 
@@ -100,32 +106,55 @@ export const MaxTraxControls: React.FC<MaxTraxControlsProps> = ({ sampleIndex })
   );
   const sample = samples[sampleIndex] ?? null;
 
-  // Live-audio capability check (honest — no faking)
-  // setSampleParam does not yet exist on MaxTraxEngine; this will be false until a
-  // future WASM export adds the setter. Edits are store-authoritative regardless.
+  // configRef: callbacks read sampleRef.current, not a stale closure over `sample`.
+  const sampleRef = useRef(sample);
+  useEffect(() => { sampleRef.current = sample; }, [sample]);
+
+  // Live-audio capability: the engine now exposes setSampleParam/reloadSample.
   const canLiveEdit =
     MaxTraxEngine.hasInstance() &&
     typeof (MaxTraxEngine.getInstance() as unknown as Record<string, unknown>).setSampleParam === 'function';
 
   // ── Field mutators ──────────────────────────────────────────────────────────
 
+  // Tier-2: rebuild the patch in the running WASM from the fresh (post-mutation)
+  // tailRaw slice. Keyed by the slice header's Number (@0) so a Number edit
+  // relocates the patch to its new slot.
+  const applyStructural = () => {
+    if (!canLiveEdit) return;
+    const data = useFormatStore.getState().maxTraxData;
+    if (!data) return;
+    const slice = extractSampleDsampleSlice(data, sampleIndex);
+    if (!slice) return;
+    const patchNumber = new DataView(slice.buffer, slice.byteOffset, slice.byteLength).getUint16(0);
+    MaxTraxEngine.getInstance().reloadSample(patchNumber, slice);
+  };
+
   const setField = (field: 'number' | 'tune' | 'volume' | 'octaves' | 'attackLen' | 'sustainLen', value: number) => {
     mutateMaxTraxSample(sampleIndex, { kind: 'field', field, value });
-    if (canLiveEdit) {
-      // Future: (MaxTraxEngine.getInstance() as any).setSampleParam(sampleIndex, field, value);
+    if (!canLiveEdit) return;
+    if (field === 'tune' || field === 'volume') {
+      // Tier-1 scalar fast-path — direct WRITE16 into _patch.
+      MaxTraxEngine.getInstance().setSampleParam(sampleRef.current?.number ?? 0, field, value);
+    } else {
+      // Number/Octaves/Attack+Sustain lengths are structural → full patch rebuild.
+      applyStructural();
     }
   };
 
   const setEnvField = (side: 'attack' | 'release', pointIndex: number, field: 'duration' | 'volume', value: number) => {
     mutateMaxTraxSample(sampleIndex, { kind: 'envField', side, pointIndex, field, value });
+    applyStructural();
   };
 
   const addEnvPoint = (side: 'attack' | 'release') => {
     mutateMaxTraxSample(sampleIndex, { kind: 'addEnvPoint', side, duration: 100, volume: 64 });
+    applyStructural();
   };
 
   const removeEnvPoint = (side: 'attack' | 'release', pointIndex: number) => {
     mutateMaxTraxSample(sampleIndex, { kind: 'removeEnvPoint', side, pointIndex });
+    applyStructural();
   };
 
   // ── Empty state ─────────────────────────────────────────────────────────────
@@ -353,10 +382,10 @@ export const MaxTraxControls: React.FC<MaxTraxControlsProps> = ({ sampleIndex })
         )}
       </div>
 
-      {/* Store-only note */}
+      {/* Store-only note — shown only when no replayer is running to hot-update. */}
       {!canLiveEdit && (
         <div className="px-2 py-1 text-[9px] font-mono text-text-muted border-t border-dark-border">
-          Store only — live audio update requires WASM sample setter.
+          Store only — start playback to hear edits live.
         </div>
       )}
 
