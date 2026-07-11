@@ -600,7 +600,15 @@ export async function parseZoundMonitorFile(
 
       const note = zmNoteToXM(zmNote);
       const { effTyp, eff } = zmEffectToXM(control, effectParam);
-      return { note, instrument: sample, volume: 0, effTyp, eff, effTyp2: 0, eff2: 0 };
+      // Byte-exact carriers (fields the ZM grid loop never sets, so they stay private to the
+      // round-trip/chip-RAM path): the packed word carries DMA/reserved bits, a
+      // context-dependent volAdd byte, and a many-to-one control nibble that the XM view
+      // cannot reconstruct, so stash the whole source word — bytes 0-1 in period, byte2 in
+      // pan, byte3 in cutoff.
+      return {
+        note, instrument: sample, volume: 0, effTyp, eff, effTyp2: 0, eff2: 0,
+        period: (raw[0] << 8) | raw[1], pan: raw[2], cutoff: raw[3],
+      };
     },
     getCellFileOffset: (pattern: number, row: number, channel: number): number => {
       // Each pattern = one table entry; each channel references a part via table[pattern][channel].partno
