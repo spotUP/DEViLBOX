@@ -20,7 +20,7 @@
  * configRef pattern: sampleRef mirrors the decoded sample and is read inside callbacks.
  */
 
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useMemo } from 'react';
 import { useFormatStore } from '@/stores/useFormatStore';
 import { decodeMaxTraxSamples } from '@/lib/import/formats/maxtrax/maxtraxFormat';
 import { MaxTraxEngine } from '@/engine/maxtrax/MaxTraxEngine';
@@ -88,13 +88,16 @@ export interface MaxTraxControlsProps {
 
 export const MaxTraxControls: React.FC<MaxTraxControlsProps> = ({ sampleIndex }) => {
   const maxTraxData = useFormatStore(s => s.maxTraxData);
-  const _maxTraxRev = useFormatStore(s => s.maxTraxRev);
+  const maxTraxRev = useFormatStore(s => s.maxTraxRev);
   const mutateMaxTraxSample = useFormatStore(s => s.mutateMaxTraxSample);
 
-  // Decode on every rev bump — the _maxTraxRev subscription forces this component to
-  // re-render (and re-decode) whenever a sample mutation bumps the revision counter.
-  void _maxTraxRev;
-  const samples = maxTraxData ? decodeMaxTraxSamples(maxTraxData) : [];
+  // Re-decode only when the data or a sample mutation (rev bump) changes it — the
+  // maxTraxRev dependency forces re-decode on every edit while skipping unrelated
+  // re-renders (e.g. envelope-input typing that only touches local component state).
+  const samples = useMemo(
+    () => (maxTraxData ? decodeMaxTraxSamples(maxTraxData) : []),
+    [maxTraxData, maxTraxRev],
+  );
   const sample = samples[sampleIndex] ?? null;
 
   // Live-audio capability check (honest — no faking)
