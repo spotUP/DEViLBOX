@@ -1144,7 +1144,17 @@ function parseGT2File(buf: Uint8Array, filename: string): TrackerSong | null {
         volume = Math.min(Math.trunc(data4 / 4), 64);
       }
 
-      return { note, instrument: data1, volume, effTyp, eff, effTyp2: 0, eff2: 0 };
+      // Byte-exact carriers (invisible; round-trip / chip-RAM only). The XM view
+      // above is lossy on three lanes: the effect+param bytes pass through a
+      // many-to-one translateEffect (unmapped/12-bit effects collapse), and the
+      // volume byte's codingVersion (÷4 vs −0x10) is not knowable here. Stash the
+      // raw source bytes so encodeCell reproduces them verbatim. An edited grid
+      // cell arrives carrier-less (patterns[] is built by the loop above, not this
+      // decoder) and keeps the lossy derivation.
+      return {
+        note, instrument: data1, volume, effTyp, eff, effTyp2: 0, eff2: 0,
+        period: data2, pan: data3, cutoff: data4,
+      };
     },
     getCellFileOffset: (pattern, row, channel) => {
       // TrackerSong pattern index maps through orders to raw pattern number
