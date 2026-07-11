@@ -15,6 +15,7 @@
 
 import type { TrackerSong } from '@/engine/TrackerReplayer';
 import type { TrackerCell } from '@/types';
+import { encodeJCCell } from '@/engine/uade/encoders/JamCrackerEncoder';
 
 export interface JamExportResult {
   data: Blob;
@@ -46,44 +47,17 @@ function writeString(buf: Uint8Array, off: number, str: string, len: number): vo
   }
 }
 
-// ── Note conversion ─────────────────────────────────────────────────────
-
-/** XM note → JamCracker note index (1-36). 0 = empty. */
-function xmNoteToJC(xmNote: number): number {
-  if (xmNote === 0 || xmNote === 97) return 0;
-  const jcNote = xmNote - 12;
-  if (jcNote < 1 || jcNote > 36) return 0;
-  return jcNote;
-}
-
 // ── Cell encoding ───────────────────────────────────────────────────────
 
-/** Encode TrackerCell → 8-byte JamCracker cell. */
+/**
+ * Encode TrackerCell → 8-byte JamCracker cell.
+ *
+ * Delegates to the single-source encoder (`encodeJCCell`) so native export and the
+ * chip-RAM round-trip codec stay byte-identical — no duplicated (and previously
+ * divergent, lossy) volume/effect logic.
+ */
 function encodeCell(cell: TrackerCell, buf: Uint8Array, off: number): void {
-  buf[off + 0] = xmNoteToJC(cell.note ?? 0);
-  buf[off + 1] = (cell.instrument ?? 0) & 0xFF;
-
-  // Effects: route XM effect type to the appropriate JC byte
-  const effTyp = cell.effTyp ?? 0;
-  const eff = cell.eff ?? 0;
-
-  // Bytes 2-5,7 default to 0 (already zero-filled)
-  if (effTyp === 0x0F && eff > 0) {
-    buf[off + 2] = eff;           // speed
-  } else if (effTyp === 0x00 && eff > 0) {
-    buf[off + 3] = eff;           // arpeggio
-  } else if (effTyp === 0x04 && eff > 0) {
-    buf[off + 4] = eff;           // vibrato
-  } else if (effTyp === 0x03 && eff > 0) {
-    buf[off + 7] = eff;           // portamento
-  }
-  // byte 5 = phase (no XM equivalent, always 0)
-
-  // Volume: XM 0x10-0x50 → JC 1-65
-  const vol = cell.volume ?? 0;
-  if (vol >= 0x10 && vol <= 0x50) {
-    buf[off + 6] = (vol - 0x10) + 1;
-  }
+  buf.set(encodeJCCell(cell), off);
 }
 
 // ── PCM extraction ──────────────────────────────────────────────────────

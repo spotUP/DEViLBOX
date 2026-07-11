@@ -59,6 +59,42 @@ interface JCNote {
   porta:    number;  // portamento speed
 }
 
+// -- Native cell → TrackerCell codec -----------------------------------------
+
+/**
+ * Convert one JamCracker native cell into a TrackerCell. Single source of truth for
+ * both the pattern-build (display) loop and the round-trip layout.decodeCell, so the
+ * editor cell and the codec agree byte-for-byte with encodeJCCell.
+ *
+ * Faithful mapping (verified against jamcracker-wasm/src/JamCrackerProReplay.c pp_nnt):
+ *   - nt_volume (byte 6) is stored VERBATIM in the volume column. Its meaning is
+ *     context-dependent — absolute volume when nt_speed bit7 is set, otherwise a signed
+ *     volume slide (bit7 = sign) — so there is no lossless XM set-volume mapping; the raw
+ *     byte round-trips exactly and a 0x8X slide renders as an XM fine-slide, which matches
+ *     the down-slide it encodes.
+ *   - nt_phase (byte 5) is an AM-synth modulation lane with no XM equivalent; it is
+ *     preserved in the second effect column (eff2) so it survives edit → export.
+ *   - speed / arpeggio / vibrato / porta map to a single XM effect column by priority.
+ */
+function jcFieldsToCell(n: JCNote): TrackerCell {
+  const note = n.period > 0 ? amigaNoteToXM(n.period) : 0;
+
+  // Effects: highest-priority non-zero effect → XM effect column.
+  let effTyp = 0, eff = 0;
+  if (n.speed > 0)         { effTyp = 0x0F; eff = n.speed; }     // set speed → Fxx
+  else if (n.arpeggio > 0) { effTyp = 0x00; eff = n.arpeggio; }  // arpeggio → 0xy
+  else if (n.vibrato > 0)  { effTyp = 0x04; eff = n.vibrato; }   // vibrato → 4xy
+  else if (n.porta > 0)    { effTyp = 0x03; eff = n.porta; }     // portamento → 3xx
+
+  return {
+    note,
+    instrument: n.instr,          // signed i8; &0xFF recovers the byte on encode
+    volume: n.volume & 0xFF,      // raw nt_volume (absolute or signed slide)
+    effTyp, eff,
+    effTyp2: 0, eff2: n.phase & 0xFF,  // nt_phase preserved (no XM equivalent)
+  };
+}
+
 // -- Format detection --------------------------------------------------------
 
 /**
@@ -274,45 +310,7 @@ export async function parseJamCrackerFile(
 
   const patterns: Pattern[] = patternData.map((pRows, pIdx) => {
     const channels: ChannelData[] = Array.from({ length: 4 }, (_, ch) => {
-      const rows: TrackerCell[] = pRows.map(rowNotes => {
-        const n = rowNotes[ch];
-
-        // Note: amigaNoteToXM(1) = 13 (C-1) through amigaNoteToXM(36) = 48 (B-3)
-        const xmNote    = n.period > 0 ? amigaNoteToXM(n.period) : 0;
-        const instrNum  = n.instr > 0 ? n.instr : 0;
-
-        // Volume column: 0x10..0x50 = set volume 0..64
-        const volCol = n.volume > 0
-          ? 0x10 + Math.min(n.volume - 1, 64)
-          : 0;
-
-        // Effects: map highest-priority non-zero effect to XM
-        let effTyp = 0, eff = 0;
-        if (n.speed > 0) {
-          // Set tempo/speed — XM Fxx
-          effTyp = 0x0F; eff = n.speed;
-        } else if (n.arpeggio > 0) {
-          // Arpeggio — XM 0xy
-          effTyp = 0x00; eff = n.arpeggio;
-        } else if (n.vibrato > 0) {
-          // Vibrato — XM 4xy (high nibble = speed, low = depth — same encoding)
-          effTyp = 0x04; eff = n.vibrato;
-        } else if (n.porta > 0) {
-          // Portamento to note — XM 3xx
-          effTyp = 0x03; eff = n.porta;
-        }
-        // nt_phase has no XM equivalent — ignored
-
-        return {
-          note: xmNote,
-          instrument: instrNum,
-          volume: volCol,
-          effTyp,
-          eff,
-          effTyp2: 0,
-          eff2: 0,
-        };
-      });
+      const rows: TrackerCell[] = pRows.map(rowNotes => jcFieldsToCell(rowNotes[ch]));
 
       return {
         id: `channel-${ch}`,
@@ -418,31 +416,16 @@ export async function parseJamCrackerFile(
     numPatterns: nop,
     moduleSize: buffer.byteLength,
     encodeCell: encodeJCCell,
-    decodeCell: (raw: Uint8Array): TrackerCell => {
-      const period   = raw[0]; // note index 1-36
-      const instr    = raw[1]; // signed int8 (1-based)
-      const speed    = raw[2];
-      const arpeggio = raw[3];
-      const vibrato  = raw[4];
-      // const phase = raw[5]; // no XM equivalent
-      const vol      = raw[6]; // 0=no change, 1-65 → vol 0-64
-      const porta    = raw[7];
-
-      const note = period > 0 ? amigaNoteToXM(period) : 0;
-      const instrument = instr;
-
-      // Volume column: 0x10..0x50 = set volume 0..64
-      const volume = vol > 0 ? 0x10 + Math.min(vol - 1, 64) : 0;
-
-      // Effects: priority order speed > arpeggio > vibrato > porta
-      let effTyp = 0, eff = 0;
-      if (speed > 0) { effTyp = 0x0F; eff = speed; }
-      else if (arpeggio > 0) { effTyp = 0x00; eff = arpeggio; }
-      else if (vibrato > 0) { effTyp = 0x04; eff = vibrato; }
-      else if (porta > 0) { effTyp = 0x03; eff = porta; }
-
-      return { note, instrument, volume, effTyp, eff, effTyp2: 0, eff2: 0 };
-    },
+    decodeCell: (raw: Uint8Array): TrackerCell => jcFieldsToCell({
+      period:   raw[0],
+      instr:    raw[1] < 128 ? raw[1] : raw[1] - 256, // signed int8 (1-based)
+      speed:    raw[2],
+      arpeggio: raw[3],
+      vibrato:  raw[4],
+      phase:    raw[5],
+      volume:   raw[6],
+      porta:    raw[7],
+    }),
     getCellFileOffset(pattern: number, row: number, channel: number): number {
       if (pattern < 0 || pattern >= nop) return -1;
       if (row < 0 || row >= jcPatterns[pattern].rows) return -1;

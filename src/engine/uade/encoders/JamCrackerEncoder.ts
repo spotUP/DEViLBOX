@@ -7,11 +7,11 @@
  *   speed:    set speed (0 = no change)
  *   arpeggio: arpeggio param (XY nibbles, 0 = no arpeggio)
  *   vibrato:  vibrato param (XY nibbles, 0 = no vibrato)
- *   phase:    phase shift (no XM equivalent; preserved if available)
- *   volume:   0 = no change, 1-65 → volume 0-64
+ *   phase:    AM-synth phase lane (no XM equivalent; preserved in eff2)
+ *   volume:   raw nt_volume byte (absolute or signed slide per nt_speed bit7)
  *   porta:    portamento speed (0 = no portamento)
  *
- * This is the exact reverse of JamCrackerParser's decode logic.
+ * This is the exact reverse of JamCrackerParser.jcFieldsToCell.
  */
 
 import type { TrackerCell } from '@/types';
@@ -61,15 +61,15 @@ function encodeJCCell(cell: TrackerCell): Uint8Array {
     // Portamento to note → JC porta byte
     out[7] = eff;
   }
-  // Byte 5 (phase): no XM equivalent, leave 0
 
-  // Byte 6: volume
-  // Parser: if (vol > 0) volCol = 0x10 + min(vol - 1, 64)
-  // Reverse: vol > 0 means JC vol = (volCol - 0x10) + 1
-  const volCol = cell.volume ?? 0;
-  if (volCol >= 0x10 && volCol <= 0x50) {
-    out[6] = (volCol - 0x10) + 1;  // 1-65
-  }
+  // Byte 5: phase (nt_phase). No XM equivalent — the parser preserves it in the second
+  // effect column (eff2), so write it straight back for a byte-exact round-trip.
+  out[5] = (cell.eff2 ?? 0) & 0xFF;
+
+  // Byte 6: volume (nt_volume), stored VERBATIM. Context-dependent in the replayer
+  // (absolute when nt_speed bit7 is set, else a signed volume slide), so the raw byte is
+  // the only byte-exact representation — see JamCrackerParser.jcFieldsToCell.
+  out[6] = (cell.volume ?? 0) & 0xFF;
 
   return out;
 }

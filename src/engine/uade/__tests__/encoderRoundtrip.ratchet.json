@@ -283,9 +283,9 @@
     "jamCracker": {
       "kind": "fixed",
       "method": "decode-encode",
-      "status": "lossy",
-      "byteExact": false,
-      "matchPct": 0.9469,
+      "status": "byte-exact",
+      "byteExact": true,
+      "matchPct": 1,
       "cells": 1280
     },
     "jankoMrsicFlogel": {
