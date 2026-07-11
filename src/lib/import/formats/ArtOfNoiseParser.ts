@@ -761,11 +761,18 @@ export function parseArtOfNoiseFile(bytes: Uint8Array, filename: string): Tracke
       const effectArg = raw[3];
       // aonNoteToXM: xmNote = 49 + ((aonNote - 1) - 24) = aonNote + 24
       const note = aonNote > 0 ? Math.max(1, Math.min(96, aonNote + 24)) : 0;
+      // Byte-exact carriers: the XM view drops the two unused/arpeggio bits packed in
+      // the top of each of b0/b1/b2 (masked off by &0x3F) and collapses the effect map
+      // one-way, so the derivation above is lossy. Stash the exact source bytes in the
+      // invisible period/pan/cutoff carriers (fields the AON grid loop never sets); the
+      // encoder reproduces all 4 bytes verbatim. Edited grid cells lack the carriers and
+      // keep the canonical derivation.
       return {
         note, instrument, volume: 0,
         effTyp: (effect !== 0 || effectArg !== 0) ? effect : 0,
         eff: (effect !== 0 || effectArg !== 0) ? effectArg : 0,
         effTyp2: 0, eff2: 0,
+        period: (raw[0] << 8) | raw[1], pan: raw[2], cutoff: raw[3],
       };
     },
   } : undefined;
