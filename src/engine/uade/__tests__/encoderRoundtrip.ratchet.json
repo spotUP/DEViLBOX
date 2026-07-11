@@ -571,9 +571,9 @@
     "soundfx": {
       "kind": "fixed",
       "method": "decode-encode",
-      "status": "lossy",
-      "byteExact": false,
-      "matchPct": 0.9688,
+      "status": "byte-exact",
+      "byteExact": true,
+      "matchPct": 1,
       "cells": 256
     },
     "soundMon": {
