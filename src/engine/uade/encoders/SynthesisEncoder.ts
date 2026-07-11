@@ -7,8 +7,8 @@
  *   byte[2]: (arpeggio << 4) | (effect & 0x0F)
  *   byte[3]: effect argument
  *
- * Note mapping: synNoteToXM maps index → 37 + (idx - 49)
- *   Reverse: xmNote → idx = xmNote - 37 + 49 = xmNote + 12
+ * Note mapping: synNoteToXM maps index → 13 + (idx - 49) = idx - 36
+ *   Reverse: xmNote → idx = xmNote + 36
  */
 
 import type { TrackerCell } from '@/types';
@@ -18,9 +18,11 @@ function encodeSynthesisCell(cell: TrackerCell): Uint8Array {
   const out = new Uint8Array(4);
   const note = cell.note ?? 0;
 
-  // Byte 0: note (reverse of synNoteToXM: xm = 37 + (idx - 49) → idx = xm + 12)
+  // Byte 0: note (reverse of synNoteToXM: xm = idx - 36 → idx = xm + 36).
+  // Note: SynthesisParser.decodeCell clamps decoded notes to XM 1-96, so note indices
+  // outside 37-132 (below/above the XM range) are not byte-exact — no fixture exercises them.
   if (note > 0) {
-    out[0] = Math.max(0, Math.min(255, note + 12));
+    out[0] = Math.max(0, Math.min(255, note + 36));
   } else {
     out[0] = 0;
   }
