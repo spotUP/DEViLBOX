@@ -14,6 +14,7 @@ import { useDubStore, type AutoDubPersonaId } from '@/stores/useDubStore';
 import { useDrumPadStore } from '@/stores/useDrumPadStore';
 import { compressProject, decompressProject } from '@/lib/projectCompression';
 import { FILE_DATA_FIELDS } from '@engine/formatFileDataFields';
+import { encodeMaxTrax, parseMaxTrax } from '@lib/import/formats/maxtrax/maxtraxFormat';
 
 // ── Binary FileData field names in useFormatStore ──
 // Single source of truth lives in `src/engine/formatFileDataFields.ts` and is
@@ -85,9 +86,18 @@ export function getOriginalModuleDataForExport(): { base64: string; format: stri
  * Returns a map of { fieldName: base64String } for all non-null FileData fields.
  */
 export function getNativeEngineDataForExport(): Record<string, string> | null {
-  const state = useFormatStore.getState() as unknown as Record<string, unknown>;
+  const store = useFormatStore.getState();
+  const state = store as unknown as Record<string, unknown>;
   const result: Record<string, string> = {};
   for (const field of BINARY_FILE_DATA_FIELDS) {
+    // MaxTrax: pattern/sample edits mutate the DECODED `maxTraxData` model, not
+    // the pristine `maxTraxFileData` bytes. Re-encode the live model through the
+    // same `encodeMaxTrax` the file-export router uses so saved projects carry
+    // edits (single source of truth — no shadow serialization).
+    if (field === 'maxTraxFileData' && store.maxTraxData) {
+      result[field] = bufferToBase64(encodeMaxTrax(store.maxTraxData));
+      continue;
+    }
     const val = state[field];
     if (val && (val instanceof ArrayBuffer || val instanceof Uint8Array)) {
       result[field] = bufferToBase64(val as ArrayBuffer | Uint8Array);
@@ -167,6 +177,15 @@ export function restoreNativeEngineData(
         songObj[field] = buf;
       }
     }
+  }
+
+  // MaxTrax: restore supplies only the `maxTraxFileData` bytes. The decoded
+  // `maxTraxData` model drives the editor-mode dispatch (applyEditorMode keys
+  // on it) and the grid/engine, so re-parse the bytes back into it here —
+  // mirroring the file-export router's fallback. Without this a restored
+  // MaxTrax project falls through to `classic` mode with an empty grid.
+  if (songObj.maxTraxFileData && !songObj.maxTraxData) {
+    songObj.maxTraxData = parseMaxTrax(songObj.maxTraxFileData as ArrayBuffer);
   }
 
   // Decode companion/sidecar files (applyEditorMode mirrors these into the store)
