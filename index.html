@@ -29,6 +29,12 @@
     <title>DEViLBOX</title>
     <style>
       /* Loading screen styles - shown before React mounts */
+      /* html painted dark too: it is the backdrop element and paints before the
+         module bundle loads src/index.css — without this the browser shows its
+         default white for the first frame (boot flash that burns eyes in dark rooms). */
+      html {
+        background-color: #0a0a0b;
+      }
       body {
         margin: 0;
         background-color: #0a0a0b;
