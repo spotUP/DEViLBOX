@@ -2,8 +2,10 @@
  * CircularVU - Circular/radial VU meter visualization
  */
 
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { getToneEngine } from '@engine/ToneEngine';
+import { useVisualizationAnimation } from '@hooks/useVisualizationAnimation';
+import { useTransportStore } from '@stores';
 
 interface CircularVUProps {
   height?: number;
@@ -11,10 +13,10 @@ interface CircularVUProps {
 
 export const CircularVU: React.FC<CircularVUProps> = ({ height = 100 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const animationRef = useRef<number | undefined>(undefined);
 
   const gradientCacheRef = useRef<CanvasGradient[]>([]);
   const [width, setWidth] = useState(300);
+  const isPlaying = useTransportStore((s) => s.isPlaying);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -61,65 +63,65 @@ export const CircularVU: React.FC<CircularVUProps> = ({ height = 100 }) => {
       gradient.addColorStop(1, '#00d4aa');
       gradientCacheRef.current.push(gradient);
     }
-
-    const animate = () => {
-      if (document.hidden) {
-        animationRef.current = requestAnimationFrame(animate);
-        return;
-      }
-
-      ctx.clearRect(0, 0, width, height);
-
-      const engine = getToneEngine();
-      const waveform = engine.getWaveform();
-
-      let level = 0;
-      if (waveform && waveform.length > 0) {
-        const rms = Math.sqrt(waveform.reduce((sum, val) => sum + val * val, 0) / waveform.length);
-        level = Math.min(1, rms * 10);
-      }
-
-      // Draw outer ring
-      ctx.strokeStyle = 'var(--color-border-light)';
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.arc(centerX, centerY, maxRadius, 0, Math.PI * 2);
-      ctx.stroke();
-
-      // Draw level arcs (multiple rings)
-      for (let i = 0; i < numRings; i++) {
-        const radius = maxRadius * (0.4 + (i * 0.2));
-        const intensity = Math.max(0, level - (i * 0.3));
-
-        if (intensity > 0) {
-          const angle = Math.PI * 2 * Math.min(intensity * 2, 1);
-
-          ctx.strokeStyle = gradientCacheRef.current[i];
-          ctx.lineWidth = 8;
-          ctx.lineCap = 'round';
-          ctx.beginPath();
-          ctx.arc(centerX, centerY, radius, -Math.PI / 2, -Math.PI / 2 + angle);
-          ctx.stroke();
-        }
-      }
-
-      // Draw center dot
-      ctx.fillStyle = level > 0.5 ? '#00ffff' : 'var(--color-border-light)';
-      ctx.beginPath();
-      ctx.arc(centerX, centerY, 4, 0, Math.PI * 2);
-      ctx.fill();
-
-      animationRef.current = requestAnimationFrame(animate);
-    };
-
-    animate();
-
-    return () => {
-      if (animationRef.current) {
-        cancelAnimationFrame(animationRef.current);
-      }
-    };
   }, [width, height]);
+
+  const onFrame = useCallback((): boolean => {
+    const canvas = canvasRef.current;
+    if (!canvas) return false;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return false;
+
+    const centerX = width / 2;
+    const centerY = height / 2;
+    const maxRadius = Math.min(width, height) * 0.4;
+    const numRings = 3;
+
+    ctx.clearRect(0, 0, width, height);
+
+    const engine = getToneEngine();
+    const waveform = engine.getWaveform();
+
+    let level = 0;
+    let rms = 0;
+    if (waveform && waveform.length > 0) {
+      rms = Math.sqrt(waveform.reduce((sum, val) => sum + val * val, 0) / waveform.length);
+      level = Math.min(1, rms * 10);
+    }
+
+    // Draw outer ring
+    ctx.strokeStyle = 'var(--color-border-light)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(centerX, centerY, maxRadius, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // Draw level arcs (multiple rings)
+    for (let i = 0; i < numRings; i++) {
+      const radius = maxRadius * (0.4 + (i * 0.2));
+      const intensity = Math.max(0, level - (i * 0.3));
+
+      if (intensity > 0) {
+        const angle = Math.PI * 2 * Math.min(intensity * 2, 1);
+
+        ctx.strokeStyle = gradientCacheRef.current[i];
+        ctx.lineWidth = 8;
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, radius, -Math.PI / 2, -Math.PI / 2 + angle);
+        ctx.stroke();
+      }
+    }
+
+    // Draw center dot
+    ctx.fillStyle = level > 0.5 ? '#00ffff' : 'var(--color-border-light)';
+    ctx.beginPath();
+    ctx.arc(centerX, centerY, 4, 0, Math.PI * 2);
+    ctx.fill();
+
+    return rms > 0;
+  }, [width, height]);
+
+  useVisualizationAnimation({ onFrame, enabled: isPlaying, fps: 30 });
 
   return (
     <div className="w-full h-full flex items-center justify-center">

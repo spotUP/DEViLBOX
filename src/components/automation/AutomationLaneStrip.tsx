@@ -6,6 +6,7 @@ import {
 } from '../../engine/automation/AutomationParams';
 import { getAutomationCapture, type CaptureEntry } from '../../engine/automation/AutomationCapture';
 import { useRegisterLaneStore } from '../../stores/useRegisterLaneStore';
+import { useVisualizationAnimation } from '@hooks/useVisualizationAnimation';
 
 interface AutomationLaneStripProps {
   format: AutomationFormat;
@@ -114,7 +115,6 @@ const LaneCurveCanvas: React.FC<{
 }> = ({ paramId, paramDef: _paramDef, patternLength, height, currentRow, isPlaying }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const animFrameRef = useRef<number>(0);
   const widthRef = useRef(800);
   const [dragIdx, setDragIdx] = useState<number | null>(null);
 
@@ -138,60 +138,60 @@ const LaneCurveCanvas: React.FC<{
     return () => obs.disconnect();
   }, [height]);
 
-  useEffect(() => {
-    let running = true;
-    const draw = () => {
-      if (!running) return;
-      const canvas = canvasRef.current;
-      if (!canvas) { animFrameRef.current = requestAnimationFrame(draw); return; }
-      const ctx = canvas.getContext('2d');
-      if (!ctx) { animFrameRef.current = requestAnimationFrame(draw); return; }
+  const renderFrame = useCallback((): boolean => {
+    const canvas = canvasRef.current;
+    if (!canvas) return false;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return false;
 
-      const w = canvas.width;
-      const h = canvas.height;
-      ctx.clearRect(0, 0, w, h);
+    const w = canvas.width;
+    const h = canvas.height;
+    ctx.clearRect(0, 0, w, h);
 
-      const capture = getAutomationCapture();
-      const entries = capture.getAll(paramId);
+    const capture = getAutomationCapture();
+    const entries = capture.getAll(paramId);
 
-      if (entries.length === 0) {
-        ctx.strokeStyle = 'rgba(255,255,255,0.08)';
-        ctx.lineWidth = 1;
-        ctx.setLineDash([6, 6]);
+    if (entries.length === 0) {
+      ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+      ctx.lineWidth = 1;
+      ctx.setLineDash([6, 6]);
+      ctx.beginPath();
+      ctx.moveTo(0, h / 2);
+      ctx.lineTo(w, h / 2);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    } else {
+      drawCurve(ctx, entries, w, h, patternLength);
+      const maxTick = Math.max(patternLength, entries[entries.length - 1].tick + 1);
+      for (let i = 0; i < entries.length; i++) {
+        const px = (entries[i].tick / maxTick) * w;
+        const py = (1 - entries[i].value) * h;
         ctx.beginPath();
-        ctx.moveTo(0, h / 2);
-        ctx.lineTo(w, h / 2);
-        ctx.stroke();
-        ctx.setLineDash([]);
-      } else {
-        drawCurve(ctx, entries, w, h, patternLength);
-        const maxTick = Math.max(patternLength, entries[entries.length - 1].tick + 1);
-        for (let i = 0; i < entries.length; i++) {
-          const px = (entries[i].tick / maxTick) * w;
-          const py = (1 - entries[i].value) * h;
-          ctx.beginPath();
-          ctx.arc(px, py, 3, 0, Math.PI * 2);
-          ctx.fillStyle = i === dragIdx ? 'rgba(255,255,255,0.9)' : 'rgba(96, 165, 250, 0.7)';
-          ctx.fill();
-        }
+        ctx.arc(px, py, 3, 0, Math.PI * 2);
+        ctx.fillStyle = i === dragIdx ? 'rgba(255,255,255,0.9)' : 'rgba(96, 165, 250, 0.7)';
+        ctx.fill();
       }
+    }
 
-      if (isPlaying && patternLength > 0) {
-        const px = (currentRow / patternLength) * w;
-        ctx.strokeStyle = 'rgba(255,255,255,0.4)';
-        ctx.lineWidth = 2;
-        ctx.setLineDash([]);
-        ctx.beginPath();
-        ctx.moveTo(px, 0);
-        ctx.lineTo(px, h);
-        ctx.stroke();
-      }
+    if (isPlaying && patternLength > 0) {
+      const px = (currentRow / patternLength) * w;
+      ctx.strokeStyle = 'rgba(255,255,255,0.4)';
+      ctx.lineWidth = 2;
+      ctx.setLineDash([]);
+      ctx.beginPath();
+      ctx.moveTo(px, 0);
+      ctx.lineTo(px, h);
+      ctx.stroke();
+    }
 
-      animFrameRef.current = requestAnimationFrame(draw);
-    };
-    draw();
-    return () => { running = false; cancelAnimationFrame(animFrameRef.current); };
+    return isPlaying && patternLength > 0;
   }, [paramId, patternLength, currentRow, isPlaying, dragIdx]);
+
+  // Draw once on mount / prop change so the static curve is visible when stopped.
+  useEffect(() => { renderFrame(); }, [renderFrame]);
+
+  // Continuous playhead animation only while playing (0 CPU when stopped).
+  useVisualizationAnimation({ onFrame: renderFrame, enabled: isPlaying, fps: 30 });
 
   const getMousePos = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;

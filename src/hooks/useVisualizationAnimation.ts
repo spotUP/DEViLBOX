@@ -79,7 +79,6 @@ export function useVisualizationAnimation({
       return;
     }
 
-    isAnimatingRef.current = true;
     idleFramesRef.current = 0;
     lastFrameTimeRef.current = 0;
 
@@ -116,14 +115,33 @@ export function useVisualizationAnimation({
       animationRef.current = requestAnimationFrame(tick);
     };
 
-    animationRef.current = requestAnimationFrame(tick);
-
-    return () => {
+    // Start/stop the rAF loop. Fully stops (0 CPU) when the tab is hidden and
+    // resumes when it becomes visible again — a backgrounded tab must not keep
+    // an audio visualizer spinning.
+    const startLoop = () => {
+      if (animationRef.current !== null) return;
+      isAnimatingRef.current = true;
+      lastFrameTimeRef.current = 0;
+      animationRef.current = requestAnimationFrame(tick);
+    };
+    const stopLoop = () => {
       isAnimatingRef.current = false;
       if (animationRef.current !== null) {
         cancelAnimationFrame(animationRef.current);
         animationRef.current = null;
       }
+    };
+    const onVisibility = () => {
+      if (document.hidden) stopLoop();
+      else startLoop();
+    };
+
+    document.addEventListener('visibilitychange', onVisibility);
+    if (!document.hidden) startLoop();
+
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibility);
+      stopLoop();
     };
   }, [enabled]);
 
