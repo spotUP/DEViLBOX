@@ -112,6 +112,41 @@ function decodeMODCell(buf: Uint8Array, off: number): TrackerCell {
   };
 }
 
+/**
+ * True when `period` still decodes (via the shared MOD table) to the same note the cell holds.
+ * An edited note invalidates a stale carried period, so the encoder then falls back to canonical.
+ */
+function ftPeriodMatchesNote(period: number, note: number): boolean {
+  if (period <= 0) return false;
+  const probe = decodeStdMODCell(Uint8Array.of((period >> 8) & 0x0f, period & 0xff, 0, 0));
+  return probe.note === note;
+}
+
+/**
+ * Round-trip-only codec for the UADE pattern layout (never called by the runtime editor, which
+ * builds cells via the local decodeMODCell grid loop above). Fashion Tracker stores raw Amiga
+ * periods, some wider than the ProTracker MOD table; the shared decodeMODCell picks the nearest
+ * table period and encodeMODCell rewrites it, so off-table periods never round-trip. Carry the
+ * exact source period in cell.period (a field the grid loop never sets) and write it back verbatim.
+ */
+function decodeFTCell(bytes: Uint8Array): TrackerCell {
+  const cell = decodeStdMODCell(bytes);
+  const rawPeriod = ((bytes[0] & 0x0f) << 8) | bytes[1];
+  if (rawPeriod > 0) cell.period = rawPeriod;
+  return cell;
+}
+
+function encodeFTCell(cell: TrackerCell): Uint8Array {
+  const out = encodeMODCell(cell);
+  const rawPeriod = cell.period ?? 0;
+  if (rawPeriod > 0 && ftPeriodMatchesNote(rawPeriod, cell.note ?? 0)) {
+    // Preserve the raw period nibbles; keep encodeMODCell's sample high-nibble in out[0].
+    out[0] = (out[0] & 0xf0) | ((rawPeriod >> 8) & 0x0f);
+    out[1] = rawPeriod & 0xff;
+  }
+  return out;
+}
+
 // ── Format detection ───────────────────────────────────────────────────────
 
 /**
@@ -282,8 +317,8 @@ export function parseFashionTrackerFile(buffer: ArrayBuffer, filename: string): 
     numChannels: NUM_CHANNELS,
     numPatterns: availablePatterns,
     moduleSize: buf.length,
-    encodeCell: encodeMODCell,
-    decodeCell: decodeStdMODCell,
+    encodeCell: encodeFTCell,
+    decodeCell: decodeFTCell,
     getCellFileOffset: (pattern: number, row: number, channel: number): number => {
       return PATTERN_DATA_OFF + pattern * PATTERN_SIZE + row * BYTES_PER_ROW + channel * 4;
     },
