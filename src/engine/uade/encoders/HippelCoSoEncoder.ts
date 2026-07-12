@@ -70,6 +70,22 @@ export const hippelCoSoEncoder: VariableLengthEncoder = {
   encodePattern(rows: TrackerCell[]): Uint8Array {
     const buf: number[] = [];
 
+    // Carrier path (byte-exact): rows decoded by HippelCoSoParser.decodeCoSoBlock
+    // carry each command's exact source bytes (cutoff=len, period=b0, pan=b1,
+    // resonance=b2). Concatenating them reproduces the pattern block verbatim,
+    // including its 0xFF terminator (which is itself a carrier cell).
+    if (rows.some(c => c.cutoff !== undefined)) {
+      for (const cell of rows) {
+        if (cell.cutoff === undefined) continue; // padding — emits nothing
+        buf.push(cell.period ?? 0);
+        if (cell.cutoff >= 2) buf.push(cell.pan ?? 0);
+        if (cell.cutoff >= 3) buf.push(cell.resonance ?? 0);
+      }
+      return new Uint8Array(buf);
+    }
+
+    // Fallback (carrier-less display grid): re-derive a CoSo stream from the
+    // editable cells. Lossy — used only if an edited grid is encoded directly.
     for (const cell of rows) {
       if (cell.note <= 0) {
         // Empty row — no note. CoSo has no "empty row" concept per se;

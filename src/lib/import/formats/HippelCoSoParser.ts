@@ -187,6 +187,54 @@ function extractVseq(buf: Uint8Array, offset: number, maxLen = 128): number[] {
   return result;
 }
 
+/**
+ * Length in bytes of one CoSo pattern-stream command at `pos` (see the pattern
+ * grammar in the decode loop below):
+ *   note (v >= 0)   : 2, or 3 when the info byte has any of bits 5-7 set (infoPrev)
+ *   -1 (0xFF)       : 1  (end-of-pattern terminator)
+ *   -2 / -3         : 2  (repeat / loop command + param)
+ *   any other byte  : 1  (unknown — consume one byte, never desync)
+ */
+function cosoCommandLen(buf: Uint8Array, pos: number): number {
+  const v = s8(buf, pos);
+  if (v >= 0) {
+    const info = pos + 1 < buf.length ? u8(buf, pos + 1) : 0;
+    return (info & 0xE0) !== 0 ? 3 : 2;
+  }
+  if (v === -2 || v === -3) return 2;
+  return 1;
+}
+
+/**
+ * Decode one CoSo pattern block [addr, addr+size) into carrier-bearing cells —
+ * one cell per stream command, each holding that command's exact source bytes
+ * (cutoff=len, period=b0, pan=b1, resonance=b2). These are the byte-exact source
+ * of truth for `hippelCoSoEncoder.encodePattern`; the display grid is decoded
+ * separately (and is carrier-less, so it is free to be edited). Every byte in the
+ * window is covered — a command that would overrun `size` is clamped so the
+ * concatenated carriers reproduce the block byte-for-byte.
+ */
+function decodeCoSoBlock(buf: Uint8Array, addr: number, size: number): TrackerCell[] {
+  const rows: TrackerCell[] = [];
+  const end = Math.min(buf.length, addr + size);
+  let pos = addr;
+  let guard = 0;
+  while (pos < end && guard++ < 8192) {
+    let len = cosoCommandLen(buf, pos);
+    if (pos + len > end) len = end - pos; // clamp to the block window
+    const cell: TrackerCell = {
+      note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0,
+      cutoff: len,
+      period: buf[pos] & 0xFF,
+    };
+    if (len >= 2) cell.pan = buf[pos + 1] & 0xFF;
+    if (len >= 3) cell.resonance = buf[pos + 2] & 0xFF;
+    rows.push(cell);
+    pos += len;
+  }
+  return rows;
+}
+
 // ── Main parser ──────────────────────────────────────────────────────────────
 
 /**
@@ -623,6 +671,16 @@ export async function parseHippelCoSoFile(
     filePatternSizes.push(Math.max(0, nextOff - off));
   }
 
+  // Byte-exact carrier rows per file-pattern: the CoSo pattern block is a variable
+  // command stream, so the editable display grid cannot losslessly reproduce it.
+  // decodeCoSoBlock captures each block's exact bytes; the encoder concatenates
+  // them to round-trip the file verbatim. (Display cells stay carrier-less and
+  // editable; edits export via buildCoSoFile, not this encoder.)
+  const blockRows: TrackerCell[][] = [];
+  for (let i = 0; i < numFilePatterns; i++) {
+    blockRows.push(decodeCoSoBlock(buf, filePatternAddrs[i], filePatternSizes[i]));
+  }
+
   const variableLayout: UADEVariablePatternLayout = {
     formatId: 'hippelCoSo',
     numChannels: 4,
@@ -633,6 +691,7 @@ export async function parseHippelCoSoFile(
     filePatternAddrs,
     filePatternSizes,
     trackMap,
+    blockRows,
   };
 
   const moduleName = filename.replace(/\.[^/.]+$/, '');
