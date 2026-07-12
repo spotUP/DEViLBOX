@@ -903,7 +903,16 @@ export async function parseDigitalMugicianFile(
         }
       }
 
-      return { note, instrument: sample, volume: 0, effTyp, eff, effTyp2: 0, eff2: 0 };
+      // Byte-exact carrier. The 4-byte DM cell is lossy in the XM view: the note
+      // index round-trips through a period-table nearest-match (and clamps at 96),
+      // the sample byte drops its top 2 bits (&0x3F), and the effect byte maps
+      // many-to-one onto XM effTyp/eff (most effect codes collapse to 0). Stash the
+      // raw 4 source bytes in the invisible period/pan/cutoff carriers (fields the
+      // channelRows grid loop never sets, so edited cells fall back to the derivation).
+      return {
+        note, instrument: sample, volume: 0, effTyp, eff, effTyp2: 0, eff2: 0,
+        period: (raw[0] << 8) | raw[1], pan: raw[2], cutoff: raw[3],
+      };
     },
     getCellFileOffset: (pattern: number, row: number, channel: number): number => {
       if (pattern < 0 || pattern >= patternChannelBaseRows.length) return patternDataStart;
