@@ -533,8 +533,16 @@ function buildRHVariablePatterns(
 
     for (let ch = 0; ch < numChannels; ch++) {
       const list = channelBlocks[ch];
-      if (step < list.length) {
-        const fp = fpFor(list[step]);
+      if (list.length > 0) {
+        // RH channels loop their block list independently: when a channel's
+        // track list reaches its null terminator the replayer restarts it from
+        // block 0. Channels have different list lengths (e.g. [152,1,75,39]), so
+        // wrap each one with `step % list.length` — otherwise a short channel
+        // goes silent after its last block instead of repeating, which is the
+        // "missing notes" defect. Reusing the same block address across steps is
+        // byte-exact-safe: fpFor() dedups addresses, so trackMap points at the
+        // existing filePattern and export rewrites the same block bytes.
+        const fp = fpFor(list[step % list.length]);
         stepTrackMap.push(fp);
         const rows = fpRows[fp].map(c => ({ ...c }));
         perChannelRows.push(rows);

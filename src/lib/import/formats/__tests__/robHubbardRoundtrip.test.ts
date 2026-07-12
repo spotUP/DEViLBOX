@@ -78,4 +78,61 @@ describe('Rob Hubbard pattern codec', () => {
     expect(checked, 'at least one block round-tripped').toBeGreaterThan(0);
     expect(sawCommands, 'fixture exercises multi-command blocks').toBe(true);
   });
+
+  // Regression: RH channels have DIFFERENT track-list lengths and each loops
+  // independently (the replayer restarts a channel from block 0 when its list
+  // hits the null terminator). The old builder truncated shorter channels —
+  // emitting empty rows past their block count — so those channels went silent
+  // partway through the song ("missing notes"). The fix wraps each channel with
+  // `step % list.length`. This asserts no channel is truncated: every channel
+  // that plays any note must still play notes in the final third of the song.
+  it('every channel loops for the full song (no channel goes silent)', async () => {
+    // skateordie.rh has strongly imbalanced channel track-lists ([152,1,75,39]),
+    // so it exercises the independent per-channel looping (centurion_battle.rh is
+    // a single-pattern module and would not).
+    const LOOP_FIXTURE = join(process.cwd(), 'public/data/songs/rob-hubbard/skateordie.rh');
+    const raw = new Uint8Array(readFileSync(LOOP_FIXTURE));
+    const song = await parseRobHubbardFile(
+      raw.buffer.slice(raw.byteOffset, raw.byteOffset + raw.byteLength),
+      'skateordie.rh',
+    );
+    const layout = (song as unknown as { uadeVariableLayout?: import('@/engine/uade/UADEPatternEncoder').UADEVariablePatternLayout }).uadeVariableLayout;
+    if (!layout) throw new Error('no variable layout');
+
+    const numPatterns = song.patterns.length;
+    const numChannels = song.patterns[0]?.channels.length ?? 0;
+    expect(numPatterns, 'multi-pattern song').toBeGreaterThan(1);
+
+    // A channel counts as "active" if it has ANY note anywhere in the song.
+    // Split the song into the first third and last third; an active channel
+    // that plays in the first third MUST still play in the last third once it
+    // loops. On the truncating bug, a short channel is empty in the last third.
+    const lastThirdStart = Math.floor((numPatterns * 2) / 3);
+    let checkedImbalanced = false;
+    for (let ch = 0; ch < numChannels; ch++) {
+      let notesEarly = 0;
+      let notesLate = 0;
+      for (let p = 0; p < numPatterns; p++) {
+        const rows = song.patterns[p].channels[ch].rows;
+        const n = rows.filter(r => r.note > 0).length;
+        if (p < lastThirdStart) notesEarly += n;
+        else notesLate += n;
+      }
+      // trackMap: does this channel loop (repeat a filePattern) within the song?
+      const fpsForCh = layout.trackMap.map(row => row[ch]).filter(v => v >= 0);
+      const distinct = new Set(fpsForCh).size;
+      const loops = fpsForCh.length > distinct; // channel repeated a block => it looped
+      if (loops && notesEarly > 0) {
+        checkedImbalanced = true;
+        expect(notesLate, `channel ${ch} loops but has no notes in the final third (truncated)`).toBeGreaterThan(0);
+      }
+      // No channel should ever be assigned -1 (silent) if it has any blocks.
+      const hasBlocks = layout.trackMap.some(row => row[ch] >= 0);
+      if (hasBlocks) {
+        const anyMinus1 = layout.trackMap.some(row => row[ch] === -1);
+        expect(anyMinus1, `channel ${ch} has silent (-1) steps despite having blocks`).toBe(false);
+      }
+    }
+    expect(checkedImbalanced, 'fixture exercises a looping (shorter) channel').toBe(true);
+  });
 });
