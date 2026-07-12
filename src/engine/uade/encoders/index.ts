@@ -51,6 +51,7 @@ import './KRISEncoder';
 import './MadTracker2Encoder';
 import './MDLEncoder';
 import './MEDEncoder';
+import './MIDILoricielEncoder';
 import './MODEncoder';
 import './MTMEncoder';
 import './MusicAssemblerEncoder';
