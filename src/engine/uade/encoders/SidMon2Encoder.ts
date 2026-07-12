@@ -61,6 +61,19 @@ export const sidMon2Encoder: VariableLengthEncoder = {
   encodePattern(rows: TrackerCell[]): Uint8Array {
     const buf: number[] = [];
 
+    // Carrier path (byte-exact): rows produced by SidMon2Parser's blockRows are
+    // per-byte carriers of the real command-stream block (cutoff=1, period=byte).
+    // SidMon II rows vary 1..4 bytes, so per-byte carriers cover any command
+    // length; concatenating the period bytes reproduces the block verbatim. The
+    // editable display grid stays carrier-less and re-derives via the grid path.
+    if (rows.some(c => c.cutoff !== undefined)) {
+      for (const cell of rows) {
+        if (cell.cutoff === undefined) continue; // padding — emits nothing
+        buf.push((cell.period ?? 0) & 0xFF);
+      }
+      return new Uint8Array(buf);
+    }
+
     for (const cell of rows) {
       const note = xmNoteToS2(cell.note);
       const sample = cell.instrument;
