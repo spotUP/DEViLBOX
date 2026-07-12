@@ -21,14 +21,20 @@
  */
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
-import type { InstrumentConfig } from '@/types';
+import type { InstrumentConfig, TrackerCell } from '@/types';
 import type { UADEPatternLayout } from '@/engine/uade/UADEPatternEncoder';
-import { encodeMODCell, decodeMODCell } from '@/engine/uade/encoders/MODEncoder';
+import { encodeInfogramesCell } from '@/engine/uade/encoders/InfogramesEncoder';
 
 // ── Binary helpers ─────────────────────────────────────────────────────────
 
 function u16BE(buf: Uint8Array, off: number): number {
   return ((buf[off] << 8) | buf[off + 1]) >>> 0;
+}
+
+/** Carrier decode: stash the exact source byte in the invisible `period` field. */
+function decodeInfoCell(raw: Uint8Array): TrackerCell {
+  const b = raw[0] ?? 0;
+  return { note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0, period: b };
 }
 
 // ── Format detection ───────────────────────────────────────────────────────
@@ -108,7 +114,12 @@ export function parseInfogramesFile(buffer: ArrayBuffer, filename: string): Trac
 
   // ── Empty pattern (placeholder — UADE handles actual audio) ──────────────
 
-  const emptyRows = Array.from({ length: 64 }, () => ({
+  // The whole .dum is song/sequence data (samples are external, loaded via LoadFiles),
+  // so the located score region is the entire file. Display grid: one 'Song' channel
+  // over those bytes, built WITHOUT the `period` carrier so edited rows fall back to
+  // canonical (zero) on write-back.
+  const songLen = buf.length;
+  const rows = Array.from({ length: songLen }, () => ({
     note: 0,
     instrument: 0,
     volume: 0,
@@ -121,24 +132,24 @@ export function parseInfogramesFile(buffer: ArrayBuffer, filename: string): Trac
   const pattern = {
     id: 'pattern-0',
     name: 'Pattern 0',
-    length: 64,
-    channels: Array.from({ length: 4 }, (_, ch) => ({
-      id: `channel-${ch}`,
-      name: `Channel ${ch + 1}`,
+    length: songLen,
+    channels: [{
+      id: 'channel-0',
+      name: 'Song',
       muted: false,
       solo: false,
       collapsed: false,
       volume: 100,
-      pan: ch === 0 || ch === 3 ? -50 : 50,
+      pan: 0,
       instrumentId: null,
       color: null,
-      rows: emptyRows,
-    })),
+      rows,
+    }],
     importMetadata: {
       sourceFormat: 'MOD' as const,
       sourceFile: filename,
       importedAt: new Date().toISOString(),
-      originalChannelCount: 4,
+      originalChannelCount: 1,
       originalPatternCount: 1,
       originalInstrumentCount: 0,
     },
@@ -152,7 +163,7 @@ export function parseInfogramesFile(buffer: ArrayBuffer, filename: string): Trac
     songPositions: [0],
     songLength: 1,
     restartPosition: 0,
-    numChannels: 4,
+    numChannels: 1,
     initialSpeed: 6,
     initialBPM: 125,
     linearPeriods: false,
@@ -161,13 +172,13 @@ export function parseInfogramesFile(buffer: ArrayBuffer, filename: string): Trac
     uadePatternLayout: {
       formatId: 'infogrames',
       patternDataFileOffset: 0,
-      bytesPerCell: 4,
-      rowsPerPattern: 64,
-      numChannels: 4,
+      bytesPerCell: 1,
+      rowsPerPattern: songLen,
+      numChannels: 1,
       numPatterns: 1,
       moduleSize: buffer.byteLength,
-      encodeCell: encodeMODCell,
-      decodeCell: decodeMODCell,
+      encodeCell: encodeInfogramesCell,
+      decodeCell: decodeInfoCell,
     } as UADEPatternLayout,
   };
 }
