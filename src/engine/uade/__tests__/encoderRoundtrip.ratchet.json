@@ -243,10 +243,10 @@
     "hivelyHVL": {
       "kind": "variable",
       "method": "encode-pattern",
-      "status": "lossy",
-      "byteExact": false,
-      "matchPct": 0.3037,
-      "cells": 191
+      "status": "byte-exact",
+      "byteExact": true,
+      "matchPct": 1,
+      "cells": 192
     },
     "iffSmus": {
       "kind": "variable",
