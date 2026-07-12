@@ -27,9 +27,9 @@
  */
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
-import type { InstrumentConfig } from '@/types';
+import type { InstrumentConfig, TrackerCell } from '@/types';
 import type { UADEPatternLayout } from '@/engine/uade/UADEPatternEncoder';
-import { encodeMODCell, decodeMODCell } from '@/engine/uade/encoders/MODEncoder';
+import { encodeMIDILoricielCell } from '@/engine/uade/encoders/MIDILoricielEncoder';
 
 const MIN_FILE_SIZE = 22;
 
@@ -45,6 +45,38 @@ function u32BE(buf: Uint8Array, off: number): number {
 const MAGIC_MTHD = (0x4D << 24 | 0x54 << 16 | 0x68 << 8 | 0x64) >>> 0;
 /** 'MTrk' as 32-bit big-endian */
 const MAGIC_MTRK = (0x4D << 24 | 0x54 << 16 | 0x72 << 8 | 0x6B) >>> 0;
+
+/**
+ * Locate the real track region: everything after the 14-byte MThd header up to the
+ * end of the last well-formed 'MTrk' chunk. A Standard MIDI File tiles MThd + N MTrk
+ * chunks (each 4-byte id + u32BE length + payload); the note data is that chunk stream.
+ * Returns [start, end) in file bytes, or [0, 0] if the chunk table is malformed.
+ */
+function findTrackRegion(buf: Uint8Array): [number, number] {
+  const start = 14; // 8-byte MThd header + 6-byte payload
+  if (buf.length < start + 8) return [0, 0];
+  let off = start;
+  let end = start;
+  while (off + 8 <= buf.length) {
+    if (u32BE(buf, off) !== MAGIC_MTRK) break;
+    const len = u32BE(buf, off + 4);
+    const next = off + 8 + len;
+    if (next > buf.length) break; // truncated final chunk — stop at last good one
+    end = next;
+    off = next;
+  }
+  if (end <= start) return [0, 0];
+  return [start, end];
+}
+
+/** Carrier decode: stash the exact source byte in the invisible `period` field. */
+function decodeMLCell(raw: Uint8Array): TrackerCell {
+  const b = raw[0] ?? 0;
+  return {
+    note: 0, instrument: 0, volume: 0,
+    effTyp: 0, eff: 0, effTyp2: 0, eff2: 0, period: b,
+  } as TrackerCell;
+}
 
 /**
  * Detect MIDI Loriciel format.
@@ -96,42 +128,47 @@ export function parseMIDILoricielFile(buffer: ArrayBuffer, filename: string): Tr
     synthType: 'Synth' as const, effects: [], volume: 0, pan: 0,
   } as InstrumentConfig];
 
-  const emptyRows = Array.from({ length: 64 }, () => ({
+  const [regionStart, regionEnd] = findTrackRegion(buf);
+  const hasRegion = regionEnd > regionStart;
+  const regionLen = hasRegion ? regionEnd - regionStart : 64;
+
+  // Display grid: one 'Track' channel over the MTrk stream bytes. Built WITHOUT the
+  // `period` carrier so edited rows fall back to canonical (zero) on write-back.
+  const rows = Array.from({ length: regionLen }, () => ({
     note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0,
   }));
 
   const pattern = {
-    id: 'pattern-0', name: 'Pattern 0', length: 64,
-    channels: Array.from({ length: 4 }, (_, ch) => ({
-      id: `channel-${ch}`, name: `Channel ${ch + 1}`, muted: false,
-      solo: false, collapsed: false, volume: 100,
-      pan: ch === 0 || ch === 3 ? -50 : 50,
-      instrumentId: null, color: null, rows: emptyRows,
-    })),
+    id: 'pattern-0', name: 'Pattern 0', length: regionLen,
+    channels: [{
+      id: 'channel-0', name: 'Track', muted: false,
+      solo: false, collapsed: false, volume: 100, pan: 0,
+      instrumentId: null, color: null, rows,
+    }],
     importMetadata: {
       sourceFormat: 'MOD' as const, sourceFile: filename,
       importedAt: new Date().toISOString(),
-      originalChannelCount: 4, originalPatternCount: 1, originalInstrumentCount: 0,
+      originalChannelCount: 1, originalPatternCount: 1, originalInstrumentCount: 0,
     },
   };
 
   return {
     name: `${moduleName} [MIDI Loriciel]`, format: 'MOD' as TrackerFormat,
     patterns: [pattern], instruments, songPositions: [0],
-    songLength: 1, restartPosition: 0, numChannels: 4,
+    songLength: 1, restartPosition: 0, numChannels: 1,
     initialSpeed: 6, initialBPM: 125, linearPeriods: false,
     uadeEditableFileData: buffer.slice(0) as ArrayBuffer,
     uadeEditableFileName: filename,
     uadePatternLayout: {
       formatId: 'midiLoriciel',
-      patternDataFileOffset: 1084,
-      bytesPerCell: 4,
-      rowsPerPattern: 64,
-      numChannels: 4,
+      patternDataFileOffset: hasRegion ? regionStart : 0,
+      bytesPerCell: 1,
+      rowsPerPattern: regionLen,
+      numChannels: 1,
       numPatterns: 1,
       moduleSize: buffer.byteLength,
-      encodeCell: encodeMODCell,
-      decodeCell: decodeMODCell,
+      encodeCell: encodeMIDILoricielCell,
+      decodeCell: decodeMLCell,
     } as UADEPatternLayout,
   };
 }
