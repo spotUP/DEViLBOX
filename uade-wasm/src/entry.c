@@ -95,6 +95,40 @@ void uade_wasm_log_paula_write(uint8_t channel, uint8_t reg, uint16_t value) {
     g_paula_log_write++;
 }
 
+/* ── Module-read trace ──────────────────────────────────────────────────── */
+/* Coverage bitmap of file offsets the 68k player reads inside the loaded module
+ * region during playback. One bit per module byte (2 MB max chip RAM => 256 KB
+ * bitmap). The frontend enables tracing after load, renders the song, then
+ * drains contiguous set-bit ranges — those ranges are the note/sequence data
+ * the player actually consumes (used as byte-exact carriers for opaque formats).
+ *
+ * Score struct longwords holding the module load base / size (see uade.c:62-63).
+ * NOTE: g_module_base is compared against the chip-RELATIVE address recorded in
+ * memory.c's getters. In UADE WASM chip RAM starts at 0, so modaddr (an Amiga
+ * chip address) equals its chip-relative offset. The Phase B oracle test
+ * validates this coordinate assumption against hand-located regions. */
+#define SCORE_MODULE_ADDR_WASM 0x100
+#define SCORE_MODULE_LEN_WASM  0x104
+#define MODULE_TRACE_MAX       (2u * 1024u * 1024u)   /* 2 MB chip RAM ceiling */
+
+static uint32_t g_module_base = 0;
+static uint32_t g_module_size = 0;
+static int      g_module_trace_enabled = 0;
+static uint8_t  g_mod_seen[MODULE_TRACE_MAX / 8];     /* 1 bit per module byte */
+
+/* Called from memory.c chipmem_{b,w,l}get (inside #ifdef UADE_WASM). Marks the
+ * `len` bytes at chip-relative `chipAddr` as read, if inside the module region. */
+void uade_wasm_log_module_read(uint32_t chipAddr, uint32_t len) {
+    if (!g_module_trace_enabled) return;
+    for (uint32_t k = 0; k < len; k++) {
+        uint32_t a = chipAddr + k;
+        if (a < g_module_base) continue;
+        uint32_t off = a - g_module_base;
+        if (off >= g_module_size) continue;
+        g_mod_seen[off >> 3] |= (uint8_t)(1u << (off & 7));
+    }
+}
+
 /* PCM ring buffer — interleaved int16 stereo */
 #define PCM_BUF_FRAMES  (8192)
 #define PCM_BUF_BYTES   (PCM_BUF_FRAMES * 4)   /* 2 channels * 2 bytes/sample */
@@ -856,6 +890,56 @@ int uade_wasm_get_paula_log(uint32_t *out, int maxEntries) {
         count++;
     }
     return count;
+}
+
+/* ── Module-read trace exports ──────────────────────────────────────────── */
+
+/*
+ * Enable/disable module-read tracing. On enable, captures the module load base
+ * and size from the score struct (longwords 0x100/0x104) and clears the coverage
+ * bitmap. MUST be called AFTER the module is loaded (base/size are zero before).
+ */
+EMSCRIPTEN_KEEPALIVE
+void uade_wasm_enable_module_trace(int enable) {
+    g_module_trace_enabled = enable ? 1 : 0;
+    if (enable) {
+        g_module_base = longget(SCORE_MODULE_ADDR_WASM);
+        g_module_size = longget(SCORE_MODULE_LEN_WASM);
+        if (g_module_size > MODULE_TRACE_MAX) g_module_size = MODULE_TRACE_MAX;
+        memset(g_mod_seen, 0, sizeof g_mod_seen);
+    }
+}
+
+/*
+ * Return the captured module bounds into out[0]=base (chip addr), out[1]=size.
+ * Valid after uade_wasm_enable_module_trace(1).
+ */
+EMSCRIPTEN_KEEPALIVE
+void uade_wasm_get_module_bounds(uint32_t *out) {
+    out[0] = g_module_base;
+    out[1] = g_module_size;
+}
+
+/*
+ * Drain the coverage bitmap as contiguous [start,end) FILE-offset pairs (offsets
+ * are module-relative, i.e. already file offsets). Writes up to maxPairs pairs
+ * (2 uint32 each) into `out`; returns the number of pairs written. A pair means
+ * every byte in [start,end) was read by the player during the trace window.
+ */
+EMSCRIPTEN_KEEPALIVE
+int uade_wasm_get_module_ranges(uint32_t *out, int maxPairs) {
+    int pairs = 0;
+    uint32_t i = 0, n = g_module_size;
+    while (i < n && pairs < maxPairs) {
+        while (i < n && !(g_mod_seen[i >> 3] & (1u << (i & 7)))) i++;
+        if (i >= n) break;
+        uint32_t start = i;
+        while (i < n && (g_mod_seen[i >> 3] & (1u << (i & 7)))) i++;
+        out[pairs * 2 + 0] = start;
+        out[pairs * 2 + 1] = i;   /* end exclusive */
+        pairs++;
+    }
+    return pairs;
 }
 
 /*

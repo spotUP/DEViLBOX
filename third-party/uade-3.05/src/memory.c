@@ -207,6 +207,7 @@ static uae_u32 REGPARAM2 chipmem_lget (uaecptr addr)
     addr &= chipmem_mask;
 #ifdef UADE_WASM
     g_uade_last_chip_read_addr = addr;
+    uade_wasm_log_module_read(addr, 4);
 #endif
     m = (uae_u32 *)(chipmemory + addr);
     return do_get_mem_long (m);
@@ -219,6 +220,7 @@ static uae_u32 REGPARAM2 chipmem_wget (uaecptr addr)
     addr &= chipmem_mask;
 #ifdef UADE_WASM
     g_uade_last_chip_read_addr = addr;
+    uade_wasm_log_module_read(addr, 2);
 #endif
     m = (uae_u16 *)(chipmemory + addr);
     return do_get_mem_word (m);
@@ -231,6 +233,7 @@ static uae_u32 REGPARAM2 chipmem_bget (uaecptr addr)
 #ifdef UADE_WASM
     g_uade_last_chip_read_addr = addr;
     uade_wasm_check_wp_read(addr, chipmemory[addr]);
+    uade_wasm_log_module_read(addr, 1);
 #endif
     return chipmemory[addr];
 }
