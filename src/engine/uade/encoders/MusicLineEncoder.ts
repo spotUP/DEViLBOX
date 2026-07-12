@@ -64,6 +64,21 @@ export const musicLineEncoder: VariableLengthEncoder = {
   formatId: 'musicLine',
 
   encodePattern(rows: TrackerCell[]): Uint8Array {
+    // Carrier path (byte-exact): rows produced by MusicLineParser's blockRows are
+    // per-byte carriers of the real ON-DISK PART block (cutoff=1, period=byte).
+    // MusicLine PARTs are RLE-compressed in the file, so the file block is NOT
+    // the decompressed 128×12 grid — concatenating the carrier bytes reproduces
+    // the compressed block verbatim. The editable display grid stays carrier-less
+    // and re-derives the decompressed PART via the grid path below.
+    if (rows.some(c => c.cutoff !== undefined)) {
+      const buf: number[] = [];
+      for (const cell of rows) {
+        if (cell.cutoff === undefined) continue; // padding — emits nothing
+        buf.push((cell.period ?? 0) & 0xFF);
+      }
+      return new Uint8Array(buf);
+    }
+
     // Always produce exactly 128 rows × 12 bytes = 1536 bytes (decompressed PART)
     const out = new Uint8Array(PART_ROWS * PART_ROW_BYTES);
 

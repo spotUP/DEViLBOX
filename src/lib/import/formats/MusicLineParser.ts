@@ -559,6 +559,25 @@ export function parseMusicLineFile(data: Uint8Array): TrackerSong | null {
     filePatternSizes.push(info?.fileSize ?? 0);
   }
 
+  // Per-byte carrier rows: a MusicLine PART is RLE-compressed on disk, so the
+  // file block is NOT the decompressed 128×12 grid. Per-byte carriers (cutoff=1,
+  // period=byte) let the encoder reproduce the compressed block verbatim; the
+  // editable display grid stays carrier-less (edits export via the whole-file
+  // builder, a separate path).
+  const blockRows: TrackerCell[][] = [];
+  for (let i = 0; i < filePatternAddrs.length; i++) {
+    const addr = filePatternAddrs[i];
+    const size = filePatternSizes[i];
+    const cells: TrackerCell[] = [];
+    for (let b = 0; b < size && addr + b < data.length; b++) {
+      cells.push({
+        note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0,
+        cutoff: 1, period: data[addr + b] & 0xFF,
+      });
+    }
+    blockRows.push(cells);
+  }
+
   // trackMap: each TrackerSong pattern is a single-channel PART.
   // trackMap[patIdx][0] = patIdx (identity — each pattern IS one file pattern).
   const trackMap: number[][] = sortedPartNumbers.map((_, idx) => [idx]);
@@ -573,6 +592,7 @@ export function parseMusicLineFile(data: Uint8Array): TrackerSong | null {
     filePatternAddrs,
     filePatternSizes,
     trackMap,
+    blockRows,
   };
 
   const song: TrackerSong = {
