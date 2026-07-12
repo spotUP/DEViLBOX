@@ -1006,6 +1006,18 @@ function parseAMS1(bytes: Uint8Array, filename: string): TrackerSong | null {
     trackMap.push(Array.from({ length: numChannels }, () => p < patFileAddrs.length ? p : -1));
   }
 
+  // Structural raw-block carrier: AMS (Velvet Studio / Extreme Tracker) packs
+  // rows with an event-mask compression that omits empty cells, a non-canonical
+  // encoding no from-scratch encoder reproduces. Stash each block's original
+  // packed bytes (blockRawBytes) plus a decoded baseline (blockRows, channel 0).
+  // Unedited block re-emits verbatim (byte-exact); edited block re-packs.
+  const blockRows: TrackerCell[][] = new Array(patFileAddrs.length);
+  const blockRawBytes: Uint8Array[] = new Array(patFileAddrs.length);
+  for (let fp = 0; fp < patFileAddrs.length; fp++) {
+    blockRows[fp] = (patterns[fp]?.channels[0]?.rows ?? []).map((c) => ({ ...c }));
+    blockRawBytes[fp] = bytes.slice(patFileAddrs[fp], patFileAddrs[fp] + patFileSizes[fp]);
+  }
+
   const uadeVariableLayout: UADEVariablePatternLayout = {
     formatId: 'ams',
     numChannels,
@@ -1016,6 +1028,8 @@ function parseAMS1(bytes: Uint8Array, filename: string): TrackerSong | null {
     filePatternAddrs: patFileAddrs,
     filePatternSizes: patFileSizes,
     trackMap,
+    blockRows,
+    blockRawBytes,
   };
 
   return {
@@ -1590,6 +1604,16 @@ function parseAMS2(bytes: Uint8Array, filename: string): TrackerSong | null {
     ams2TrackMap.push(Array.from({ length: NUM_CHANNELS }, () => p < ams2PatFileAddrs.length ? p : -1));
   }
 
+  // Structural raw-block carrier (see parseAMS1): AMS2 packs rows with the same
+  // event-mask compression, non-canonical. Stash original packed bytes + decoded
+  // baseline so unedited blocks re-emit verbatim, edited blocks re-pack.
+  const blockRows: TrackerCell[][] = new Array(ams2PatFileAddrs.length);
+  const blockRawBytes: Uint8Array[] = new Array(ams2PatFileAddrs.length);
+  for (let fp = 0; fp < ams2PatFileAddrs.length; fp++) {
+    blockRows[fp] = (patterns[fp]?.channels[0]?.rows ?? []).map((c) => ({ ...c }));
+    blockRawBytes[fp] = bytes.slice(ams2PatFileAddrs[fp], ams2PatFileAddrs[fp] + ams2PatFileSizes[fp]);
+  }
+
   const uadeVariableLayout: UADEVariablePatternLayout = {
     formatId: 'ams',
     numChannels: NUM_CHANNELS,
@@ -1600,6 +1624,8 @@ function parseAMS2(bytes: Uint8Array, filename: string): TrackerSong | null {
     filePatternAddrs: ams2PatFileAddrs,
     filePatternSizes: ams2PatFileSizes,
     trackMap: ams2TrackMap,
+    blockRows,
+    blockRawBytes,
   };
 
   return {
