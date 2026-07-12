@@ -234,10 +234,10 @@
     },
     "hivelyAHX": {
       "kind": "fixed",
-      "method": "encode-parsed",
-      "status": "lossy",
-      "byteExact": false,
-      "matchPct": 0.854,
+      "method": "decode-encode",
+      "status": "byte-exact",
+      "byteExact": true,
+      "matchPct": 1,
       "cells": 2048
     },
     "hivelyHVL": {

@@ -116,6 +116,17 @@ export function encodeAHXCell(cell: TrackerCell): Uint8Array {
   // byte[2]: fxParam
   out[2] = fxParam & 0xFF;
 
+  // Byte-exact carrier restore. The AHX grid cell folds per-position transpose into the note
+  // and maps the HVL effect to XM many-to-one, so the derivation above cannot rebuild the
+  // exact 3 source bytes. layout.decodeCell stashes them in the invisible period/pan carriers
+  // (fields the AHX grid loop never sets); reproduce all 3 bytes verbatim. Edited grid cells
+  // lack the carriers and keep the derivation above.
+  if (cell.period !== undefined && cell.pan !== undefined) {
+    out[0] = (cell.period >> 8) & 0xFF;
+    out[1] = cell.period & 0xFF;
+    out[2] = cell.pan & 0xFF;
+  }
+
   return out;
 }
 
