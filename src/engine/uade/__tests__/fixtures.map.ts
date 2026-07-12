@@ -88,7 +88,7 @@ export const ENCODER_FIXTURES: EncoderFixture[] = [
   { formatId: "pumaTracker", fixture: "public/data/songs/pumatracker/liquid kids - lv1a.puma", kind: "variable" },
   { formatId: "quadraComposer", fixture: "public/data/songs/formats/synth_corn.emod", kind: "fixed" },
   { formatId: "quartet", fixture: "public/data/songs/formats/warlock_the_avenger.sqt", kind: "fixed" },
-  { formatId: "robHubbard", fixture: "public/data/songs/formats/centurion_battle.rh", kind: "fixed" },
+  { formatId: "robHubbard", fixture: "public/data/songs/formats/centurion_battle.rh", kind: "variable" },
   { formatId: "rtm", fixture: "public/data/songs/formats/odyssey.rtm", kind: "variable" },
   { formatId: "s3m", fixture: "public/data/songs/formats/andante.s3m", kind: "variable" },
   { formatId: "scumm", fixture: "public/data/songs/formats/zaktitle.scumm", kind: "fixed" },

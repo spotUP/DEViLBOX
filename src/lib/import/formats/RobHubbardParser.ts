@@ -49,12 +49,11 @@
  */
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
-import type { InstrumentConfig, Pattern } from '@/types';
+import type { ChannelData, InstrumentConfig, Pattern, TrackerCell } from '@/types';
 import type { RobHubbardConfig, UADEChipRamInfo } from '@/types/instrument';
-import type { UADEPatternLayout } from '@/engine/uade/UADEPatternEncoder';
+import type { UADEVariablePatternLayout } from '@/engine/uade/UADEPatternEncoder';
 import { DEFAULT_ROB_HUBBARD } from '@/types/instrument';
-import { encodeRobHubbardCell } from '@/engine/uade/encoders/RobHubbardEncoder';
-import { decodeMODCell } from '@/engine/uade/encoders/MODEncoder';
+import { robHubbardEncoder } from '@/engine/uade/encoders/RobHubbardEncoder';
 
 // ── Constants ───────────────────────────────────────────────────────────────
 
@@ -290,14 +289,6 @@ interface RHSong {
   tracks: number[];  // per-channel file offsets to track lists (4 u32 pointers)
 }
 
-interface RHEvent {
-  tick: number;
-  note: number;       // tracker note (1-96), 0 = no note, 97 = note off
-  instrument: number; // 1-based, 0 = no change
-  effTyp: number;
-  eff: number;
-}
-
 /**
  * Scan the RH binary to find song headers (speed + per-channel track pointers).
  * Ported from FlodJS RHPlayer.js loader().
@@ -386,198 +377,200 @@ function findRHSongs(buf: Uint8Array): { songs: RHSong[]; samplesDataOffset: num
   return { songs, samplesDataOffset: samplesData };
 }
 
-const MAX_RH_EVENTS = 16384;
+// ── Byte-exact block decoding (variable-length command stream) ────────────────
+//
+// A RH "pattern" is not a fixed cell grid: each channel's track is an ordered list
+// of block addresses (u32), and each block is a contiguous run of variable-length
+// commands ending in the -124 end marker. To make the format losslessly editable
+// AND byte-exact, we decode each block into one TrackerCell per command, stashing
+// the command's EXACT source bytes in the cell carriers (cutoff=length, period=b0,
+// pan=b1). The variable encoder concatenates those carriers to reproduce the block.
 
 /**
- * Parse an RH pattern byte stream for a single channel.
- *
- * RH byte stream format (from FlodJS RHPlayer.js process()):
- *   Positive byte (0-127): Duration multiplier, followed by note byte
- *     ticks = song.speed * value
- *   -128: Sample change (next signed byte = sample index)
- *   -127: Portamento (next signed byte = speed)
- *   -126: Rest (next byte = duration multiplier, ticks = speed * value)
- *   -125: Sustain flag (variant 4)
- *   -124: End of pattern → next from track list
- *   -123: Song end
- *   -122: Volume set (variant 4, next byte)
- *   -121: Volume set (variant 3, next byte)
+ * Number of file bytes one RH stream command occupies, starting at `pos`.
+ * Mirrors the byte-consumption of the old parseRHChannelStream exactly so block
+ * spans and command boundaries line up with what the replayer reads.
  */
-function parseRHChannelStream(
-  buf: Uint8Array,
-  song: RHSong,
-  channelIdx: number,
-): RHEvent[] {
-  const events: RHEvent[] = [];
-  const trackPtr = song.tracks[channelIdx];
-  if (!trackPtr || trackPtr >= buf.length) return events;
-
-  const speed = song.speed;
-  let currentSample = 1;
-  let tick = 0;
-
-  // Read first pattern address from track list (u32)
-  let trackPos = 4;
-  let patternPos = u32BE(buf, trackPtr);
-  if (patternPos === 0 || patternPos >= buf.length) return events;
-
-  let safety = 0;
-  while (safety++ < MAX_RH_EVENTS) {
-    if (patternPos < 0 || patternPos >= buf.length) break;
-    const value = s8(buf, patternPos);
-    patternPos++;
-
-    if (value >= 0) {
-      // Note: value = duration multiplier, next byte = note
-      const duration = speed * value;
-      if (patternPos >= buf.length) break;
-      const noteIdx = s8(buf, patternPos);
-      patternPos++;
-
-      const trackerNote = rhNoteToTrackerNote(noteIdx);
-      if (trackerNote > 0) {
-        events.push({
-          tick,
-          note: trackerNote,
-          instrument: currentSample,
-          effTyp: 0,
-          eff: 0,
-        });
-      }
-      tick += duration || speed;
-    } else {
-      switch (value) {
-        case -128: {
-          // Sample change: next signed byte = sample index
-          if (patternPos >= buf.length) { safety = MAX_RH_EVENTS; break; }
-          let smpIdx = s8(buf, patternPos);
-          patternPos++;
-          if (smpIdx < 0) smpIdx = 0;
-          currentSample = smpIdx + 1;  // 1-based
-          break;
-        }
-        case -127:
-          // Portamento: next byte = speed
-          patternPos++;
-          break;
-        case -126: {
-          // Rest: next byte = duration multiplier
-          if (patternPos >= buf.length) { safety = MAX_RH_EVENTS; break; }
-          const durByte = s8(buf, patternPos);
-          patternPos++;
-          const duration = speed * (durByte > 0 ? durByte : 1);
-          events.push({
-            tick,
-            note: 97,  // note-off
-            instrument: 0,
-            effTyp: 0,
-            eff: 0,
-          });
-          tick += duration;
-          break;
-        }
-        case -125:
-          // Sustain flag — no extra bytes
-          break;
-        case -124: {
-          // End of pattern → read next pattern address from track list
-          if (trackPtr + trackPos >= buf.length) { safety = MAX_RH_EVENTS; break; }
-          const nextAddr = u32BE(buf, trackPtr + trackPos);
-          trackPos += 4;
-
-          if (!nextAddr) {
-            // 0 = loop to beginning → song loops, stop extraction
-            safety = MAX_RH_EVENTS;
-            break;
-          }
-          patternPos = nextAddr;
-          break;
-        }
-        case -123:
-          // Song end
-          safety = MAX_RH_EVENTS;
-          break;
-        case -122:
-        case -121:
-          // Volume set: next byte
-          patternPos++;
-          break;
-        default:
-          // Unknown command
-          safety = MAX_RH_EVENTS;
-          break;
-      }
-    }
+function rhCommandLen(buf: Uint8Array, pos: number): number {
+  const value = s8(buf, pos);
+  if (value >= 0) return 2;   // note: duration byte + note byte
+  switch (value) {
+    case -128: return 2;      // sample change (sample index byte)
+    case -127: return 2;      // portamento (speed byte)
+    case -126: return 2;      // rest (duration byte)
+    case -125: return 1;      // sustain flag
+    case -124: return 1;      // end of pattern (terminates block)
+    case -123: return 1;      // song end
+    case -122: return 2;      // volume set (variant 4)
+    case -121: return 2;      // volume set (variant 3)
+    default:   return 1;      // unknown — consume a single byte
   }
-
-  return events;
 }
 
 /**
- * Convert per-channel RH events into unified tracker patterns.
+ * Decode one contiguous block (from `startAddr` to and including its -124 marker)
+ * into one command-row per stream command. `sampleRef.cur` tracks the running
+ * 1-based instrument across the block (updated on sample-change commands).
  */
-function buildRHPatterns(channelEvents: RHEvent[][]): { patterns: Pattern[]; songPositions: number[] } {
-  const ROWS_PER_PATTERN = 64;
-  const NUM_CHANNELS = 4;
+function decodeRHBlock(
+  buf: Uint8Array,
+  startAddr: number,
+  sampleRef: { cur: number },
+): { rows: TrackerCell[]; byteSize: number } {
+  const rows: TrackerCell[] = [];
+  let pos = startAddr;
+  let safety = 0;
+  while (pos < buf.length && safety++ < 8192) {
+    const value = s8(buf, pos);
+    const len = rhCommandLen(buf, pos);
+    if (pos + len > buf.length) break;
 
-  let maxTick = 0;
-  for (const events of channelEvents) {
-    for (const ev of events) {
-      if (ev.tick > maxTick) maxTick = ev.tick;
+    // Display fields (carrier bytes below make the round-trip byte-exact regardless).
+    let note = 0;
+    let instrument = 0;
+    if (value >= 0) {
+      note = rhNoteToTrackerNote(s8(buf, pos + 1)) || 49;
+      instrument = sampleRef.cur;
+    } else if (value === -128) {
+      let smpIdx = s8(buf, pos + 1);
+      if (smpIdx < 0) smpIdx = 0;
+      sampleRef.cur = smpIdx + 1;
+      instrument = sampleRef.cur;
+    } else if (value === -126) {
+      note = 97; // rest / note-off
     }
+
+    const cell: TrackerCell = {
+      note, instrument, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0,
+      cutoff: len,
+      period: buf[pos] & 0xFF,
+    };
+    if (len >= 2) cell.pan = buf[pos + 1] & 0xFF;
+    rows.push(cell);
+
+    pos += len;
+    if (value === -124) break; // -124 terminates the block
+  }
+  return { rows, byteSize: pos - startAddr };
+}
+
+/**
+ * Read a channel's ordered list of block addresses from its track pointer.
+ * The track list is a run of u32 (absolute) entries terminated by a null entry.
+ */
+function enumerateRHChannelBlocks(buf: Uint8Array, trackPtr: number): number[] {
+  const addrs: number[] = [];
+  if (!trackPtr || trackPtr >= buf.length) return addrs;
+  let tp = trackPtr;
+  for (let i = 0; i < 512; i++) {
+    if (tp + 4 > buf.length) break;
+    const addr = u32BE(buf, tp);
+    tp += 4;
+    if (!addr) break; // null entry = loop / end
+    if (addr < 0 || addr >= buf.length) break;
+    addrs.push(addr);
+  }
+  return addrs;
+}
+
+interface RHVariableResult {
+  patterns: Pattern[];
+  songPositions: number[];
+  filePatternAddrs: number[];
+  filePatternSizes: number[];
+  trackMap: number[][];
+}
+
+/**
+ * Build the byte-exact variable pattern layout for one RH song.
+ *
+ * Each channel independently steps through an ordered list of block addresses.
+ * Blocks are deduplicated into file-patterns (filePatternAddrs/Sizes); one tracker
+ * "step" corresponds to one entry across all channels' block lists.
+ * trackMap[step][ch] resolves to the file-pattern index for that block (-1 if the
+ * channel's list is shorter). Each channel's rows carry the block's exact source
+ * bytes so the variable encoder reproduces the file byte-for-byte.
+ */
+function buildRHVariablePatterns(
+  buf: Uint8Array,
+  song: RHSong,
+  numChannels: number,
+): RHVariableResult | null {
+  const channelBlocks: number[][] = [];
+  for (let ch = 0; ch < numChannels; ch++) {
+    const trackPtr = ch < song.tracks.length ? song.tracks[ch] : 0;
+    channelBlocks.push(enumerateRHChannelBlocks(buf, trackPtr));
   }
 
-  const totalRows = maxTick + 1;
-  const numPatterns = Math.max(1, Math.ceil(totalRows / ROWS_PER_PATTERN));
-  const patternLimit = Math.min(numPatterns, 256);
+  const numSteps = channelBlocks.reduce((m, l) => Math.max(m, l.length), 0);
+  if (numSteps === 0) return null;
+
+  const addrToFp = new Map<number, number>();
+  const filePatternAddrs: number[] = [];
+  const filePatternSizes: number[] = [];
+  const fpRows: TrackerCell[][] = [];
+  const fpFor = (addr: number): number => {
+    let fp = addrToFp.get(addr);
+    if (fp === undefined) {
+      const { rows, byteSize } = decodeRHBlock(buf, addr, { cur: 1 });
+      fp = filePatternAddrs.length;
+      addrToFp.set(addr, fp);
+      filePatternAddrs.push(addr);
+      filePatternSizes.push(byteSize);
+      fpRows.push(rows);
+    }
+    return fp;
+  };
 
   const patterns: Pattern[] = [];
+  const songPositions: number[] = [];
+  const trackMap: number[][] = [];
 
-  for (let p = 0; p < patternLimit; p++) {
-    const startTick = p * ROWS_PER_PATTERN;
-    const channels: { id: string; name: string; muted: boolean; solo: boolean; collapsed: boolean; volume: number; pan: number; instrumentId: null; color: null; rows: { note: number; instrument: number; volume: number; effTyp: number; eff: number; effTyp2: number; eff2: number }[] }[] = [];
+  for (let step = 0; step < numSteps; step++) {
+    const stepTrackMap: number[] = [];
+    const perChannelRows: TrackerCell[][] = [];
+    let maxRows = 0;
 
-    for (let ch = 0; ch < NUM_CHANNELS; ch++) {
-      const rows: { note: number; instrument: number; volume: number; effTyp: number; eff: number; effTyp2: number; eff2: number }[] = [];
-      const events = channelEvents[ch] || [];
-
-      for (let r = 0; r < ROWS_PER_PATTERN; r++) {
-        const targetTick = startTick + r;
-        const ev = events.find(e => e.tick === targetTick);
-        rows.push({
-          note: ev?.note ?? 0,
-          instrument: ev?.instrument ?? 0,
-          volume: 0,
-          effTyp: ev?.effTyp ?? 0,
-          eff: ev?.eff ?? 0,
-          effTyp2: 0,
-          eff2: 0,
-        });
+    for (let ch = 0; ch < numChannels; ch++) {
+      const list = channelBlocks[ch];
+      if (step < list.length) {
+        const fp = fpFor(list[step]);
+        stepTrackMap.push(fp);
+        const rows = fpRows[fp].map(c => ({ ...c }));
+        perChannelRows.push(rows);
+        if (rows.length > maxRows) maxRows = rows.length;
+      } else {
+        stepTrackMap.push(-1);
+        perChannelRows.push([]);
       }
+    }
+    if (maxRows === 0) maxRows = 1;
 
+    const channels: ChannelData[] = [];
+    for (let ch = 0; ch < numChannels; ch++) {
+      const rows = perChannelRows[ch];
+      // Pad with carrier-less rows (cutoff undefined) — the encoder emits nothing
+      // for them, so padding does not affect byte-exactness.
+      while (rows.length < maxRows) {
+        rows.push({ note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 });
+      }
       channels.push({
         id: `channel-${ch}`,
         name: `Channel ${ch + 1}`,
-        muted: false,
-        solo: false,
-        collapsed: false,
-        volume: 100,
-        pan: (ch === 0 || ch === 3) ? -50 : 50,
-        instrumentId: null,
-        color: null,
-        rows,
+        muted: false, solo: false, collapsed: false,
+        volume: 100, pan: (ch === 0 || ch === 3) ? -50 : 50,
+        instrumentId: null, color: null, rows,
       });
     }
 
     patterns.push({
-      id: `pattern-${p}`,
-      name: `Pattern ${p}`,
-      length: ROWS_PER_PATTERN,
-      channels,
+      id: `pattern-${step}`, name: `Pattern ${step}`, length: maxRows, channels,
     });
+    songPositions.push(step);
+    trackMap.push(stepTrackMap);
   }
 
-  return { patterns, songPositions: patterns.map((_, i) => i) };
+  return { patterns, songPositions, filePatternAddrs, filePatternSizes, trackMap };
 }
 
 // ── Main parser ─────────────────────────────────────────────────────────────
@@ -669,36 +662,26 @@ export async function parseRobHubbardFile(
     }
   }
 
-  // ── Extract real patterns from binary ─────────────────────────────────────
+  // ── Extract real patterns as a byte-exact variable layout ─────────────────
   const NUM_CHANNELS = 4;
-  const ROWS = 64;
   let patterns: Pattern[] = [];
   let songPositions: number[] = [0];
   let initialSpeed = 6;
+  let variable: RHVariableResult | null = null;
 
   const songResult = findRHSongs(buf);
   if (songResult && songResult.songs.length > 0) {
     const song = songResult.songs[0];
     initialSpeed = song.speed || 6;
-
-    const channelEvents: RHEvent[][] = [];
-    for (let ch = 0; ch < NUM_CHANNELS; ch++) {
-      channelEvents.push(parseRHChannelStream(buf, song, ch));
-    }
-
-    let totalNotes = 0;
-    for (const events of channelEvents) {
-      totalNotes += events.filter(e => e.note > 0 && e.note < 97).length;
-    }
-
-    if (totalNotes > 0) {
-      const built = buildRHPatterns(channelEvents);
-      patterns = built.patterns;
-      songPositions = built.songPositions;
+    variable = buildRHVariablePatterns(buf, song, NUM_CHANNELS);
+    if (variable) {
+      patterns = variable.patterns;
+      songPositions = variable.songPositions;
     }
   }
 
-  // Fallback: empty pattern if extraction failed
+  // Fallback: empty pattern if extraction failed (no variable layout — an
+  // unfaithful grid must NOT claim byte-exactness).
   if (patterns.length === 0) {
     const emptyRows = Array.from({ length: 64 }, () => ({
       note: 0, instrument: 0, volume: 0,
@@ -725,23 +708,7 @@ export async function parseRobHubbardFile(
     ? ` (${extractedCount} smp, ${patterns.length} pat)`
     : ` (${MAX_INSTRUMENTS} smp)`;
 
-  const uadePatternLayout: UADEPatternLayout = {
-    formatId: 'robHubbard',
-    patternDataFileOffset: 0,
-    bytesPerCell: 4,
-    rowsPerPattern: ROWS,
-    numChannels: NUM_CHANNELS,
-    numPatterns: patterns.length,
-    moduleSize: buffer.byteLength,
-    encodeCell: encodeRobHubbardCell,
-    decodeCell: decodeMODCell,
-    getCellFileOffset: (pat: number, row: number, channel: number): number => {
-      const patternByteSize = ROWS * NUM_CHANNELS * 4;
-      return pat * patternByteSize + row * NUM_CHANNELS * 4 + channel * 4;
-    },
-  };
-
-  return {
+  const result: TrackerSong = {
     name: `${moduleName} [Rob Hubbard]${extractNote}`,
     format: 'MOD' as TrackerFormat,
     patterns,
@@ -755,6 +722,22 @@ export async function parseRobHubbardFile(
     linearPeriods: false,
     uadeEditableFileData: buffer.slice(0) as ArrayBuffer,
     uadeEditableFileName: filename,
-    uadePatternLayout,
   };
+
+  if (variable) {
+    const uadeVariableLayout: UADEVariablePatternLayout = {
+      formatId: 'robHubbard',
+      numChannels: NUM_CHANNELS,
+      numFilePatterns: variable.filePatternAddrs.length,
+      rowsPerPattern: patterns.map(p => p.length),
+      moduleSize: buffer.byteLength,
+      encoder: robHubbardEncoder,
+      filePatternAddrs: variable.filePatternAddrs,
+      filePatternSizes: variable.filePatternSizes,
+      trackMap: variable.trackMap,
+    };
+    (result as unknown as { uadeVariableLayout: UADEVariablePatternLayout }).uadeVariableLayout = uadeVariableLayout;
+  }
+
+  return result;
 }
