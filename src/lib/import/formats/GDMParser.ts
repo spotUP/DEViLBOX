@@ -753,6 +753,20 @@ export async function parseGDMFile(
     Array.from({ length: numChannels }, () => patIdx),
   );
 
+  // Structural raw-block carrier: GDM (General Digital Music) packs rows with an
+  // event-mask channel byte and omissible channels, a non-canonical encoding no
+  // from-scratch encoder reproduces. Stash each block's original packed bytes
+  // (blockRawBytes) plus a decoded baseline (blockRows, channel 0). Unedited block
+  // re-emits verbatim (byte-exact); edited block re-packs.
+  const blockRows: TrackerCell[][] = new Array(patterns.length);
+  const blockRawBytes: Uint8Array[] = new Array(patterns.length);
+  for (let fp = 0; fp < patterns.length; fp++) {
+    blockRows[fp] = patterns[fp].channels[0].rows.map((c) => ({ ...c }));
+    const a = filePatternAddrs[fp];
+    const s = filePatternSizes[fp];
+    blockRawBytes[fp] = bytes.slice(a, a + s);
+  }
+
   const uadeVariableLayout: UADEVariablePatternLayout = {
     formatId: 'gdm',
     numChannels,
@@ -763,6 +777,8 @@ export async function parseGDMFile(
     filePatternAddrs,
     filePatternSizes,
     trackMap,
+    blockRows,
+    blockRawBytes,
   };
 
   return {
