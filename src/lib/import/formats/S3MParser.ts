@@ -558,6 +558,20 @@ export function parseS3MFile(buffer: ArrayBuffer, filename: string): TrackerSong
     return Array.from({ length: numChannels }, () => arrIdx);
   });
 
+  // Structural raw-block carrier: S3M pattern packing is non-canonical (empty
+  // rows may be omitted or written explicitly), so no from-scratch encoder can
+  // reproduce a given file's bytes. Stash each block's original packed bytes
+  // (blockRawBytes) plus a decoded baseline (blockRows, channel 0). An unedited
+  // block re-emits verbatim (byte-exact); an edited block re-packs.
+  const blockRows: TrackerCell[][] = new Array(patterns.length);
+  const blockRawBytes: Uint8Array[] = new Array(patterns.length);
+  for (let fp = 0; fp < patterns.length; fp++) {
+    blockRows[fp] = patterns[fp].channels[0].rows.map((c) => ({ ...c }));
+    const a = filePatternAddrs[fp];
+    const s = filePatternSizes[fp];
+    blockRawBytes[fp] = raw.slice(a, a + s);
+  }
+
   const uadeVariableLayout: UADEVariablePatternLayout = {
     formatId: 's3m',
     numChannels,
@@ -568,6 +582,8 @@ export function parseS3MFile(buffer: ArrayBuffer, filename: string): TrackerSong
     filePatternAddrs,
     filePatternSizes,
     trackMap,
+    blockRows,
+    blockRawBytes,
   };
 
   return {
