@@ -781,6 +781,11 @@ export async function parseFredEditorFile(
   // Measure byte size of each pattern stream (scan to -128 end marker)
   const filePatternAddrs: number[] = [];
   const filePatternSizes: number[] = [];
+  // Per-byte carrier rows: a Fred Editor pattern is a variable-length command
+  // stream (note / duration / set-sample / set-speed / portamento / end), not a
+  // fixed grid. Per-byte carriers (cutoff=1, period=byte) let the encoder
+  // reproduce each stream verbatim; the editable display grid stays carrier-less.
+  const blockRows: TrackerCell[][] = [];
   for (const off of uniqueOffsets) {
     filePatternAddrs.push(patternStart + off); // absolute file offset
     let pos = off;
@@ -795,6 +800,14 @@ export async function parseFredEditorFile(
       // Note values (1-127) and note off (0x84), duration (other negative): no extra bytes
     }
     filePatternSizes.push(pos - off);
+    const cells: TrackerCell[] = [];
+    for (let b = off; b < pos; b++) {
+      cells.push({
+        note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0,
+        cutoff: 1, period: patternBytes[b] & 0xFF,
+      });
+    }
+    blockRows.push(cells);
   }
 
   // Build trackMap: trackerPatternIdx → [ch0 filePatIdx, ch1 filePatIdx, ...]
@@ -830,6 +843,7 @@ export async function parseFredEditorFile(
     filePatternAddrs,
     filePatternSizes,
     trackMap,
+    blockRows,
   };
 
   return {

@@ -44,6 +44,21 @@ export const fredEditorEncoder: VariableLengthEncoder = {
   formatId: 'fredEditor',
 
   encodePattern(rows: TrackerCell[]): Uint8Array {
+    // Carrier path (byte-exact): rows produced by FredEditorParser's blockRows
+    // are per-byte carriers of the real command-stream pattern (cutoff=1,
+    // period=byte). Fred Editor commands are variable-length (note / duration /
+    // set-sample / set-speed / portamento / end), so per-byte carriers cover any
+    // command length; concatenating them reproduces the stream verbatim. The
+    // editable display grid stays carrier-less and re-derives commands below.
+    if (rows.some(c => c.cutoff !== undefined)) {
+      const carried: number[] = [];
+      for (const cell of rows) {
+        if (cell.cutoff === undefined) continue; // padding — emits nothing
+        carried.push((cell.period ?? 0) & 0xFF);
+      }
+      return new Uint8Array(carried);
+    }
+
     const buf: number[] = [];
     let lastInstrument = 0;
     let emptyCount = 0;
