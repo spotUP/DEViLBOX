@@ -130,12 +130,40 @@ export function parseGlueMonFile(buffer: ArrayBuffer, filename: string): Tracker
     patternBase + (maxPat + 1) * patternLen <= buf.length;
   const numPatterns = regionValid ? maxPat + 1 : 1;
 
-  // decodeCell: best-effort display note; exact source byte rides in the invisible
-  // `period` carrier for byte-exact export. 0xFF/0xFE and command bytes → note 0.
+  // decodeCell: real chromatic note from the player's period table; exact source
+  // byte rides in the invisible `period` carrier for byte-exact export.
+  //
+  // Per the GlueMon replayer's note→period routine (code 0x536): the note byte n,
+  // masked even (n & 0xFE), indexes a 49-entry chromatic Amiga-period table (code
+  // 0x698, periods 3424..214, table idx 24 == period 856 == C-1). So the pitch is
+  // idx = (n & 0xFE) / 2; we display idx+1 (a valid, chromatically-correct XM note
+  // 1..49 — the low idx 0..23 are two octaves below the app's C-1 so a +1 origin
+  // keeps every note visible while preserving relative pitch). The masked LSB is a
+  // tie/portamento flag preserved only by the carrier.
+  //
+  // Sentinels: 0xFF = rest/hold, 0xFE = note-off → empty. In 3-voice modules the
+  // 4th (command) lane carries sample-select markers 0xC8-0xCF; surface these as an
+  // instrument so the channel shows activity instead of appearing empty.
+  const GLUE_NOTE_MAX = 0x60; // last table-covered note byte (idx 48)
   const decodeGlueCell = (raw: Uint8Array): TrackerCell => {
     const v = raw[0];
-    const note = v > 0 && v <= 96 ? v : 0;
-    return { note: note as TrackerCell['note'], instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0, period: v };
+    let note = 0;
+    let instrument = 0;
+    if (v <= GLUE_NOTE_MAX) {
+      note = ((v & 0xfe) >> 1) + 1; // chromatic table index → visible XM note
+    } else if (v >= 0xc8 && v <= 0xcf) {
+      instrument = v - 0xc7; // command lane: sample-select marker → instrument 1..8
+    }
+    return {
+      note: note as TrackerCell['note'],
+      instrument: instrument as TrackerCell['instrument'],
+      volume: 0,
+      effTyp: 0,
+      eff: 0,
+      effTyp2: 0,
+      eff2: 0,
+      period: v,
+    };
   };
   const emptyRow: TrackerCell = { note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 };
 
