@@ -626,6 +626,19 @@ export async function parseIffSmusFile(
     Array.from({ length: numCh }, (_, ch) => ch)
   );
 
+  // Structural raw-block carrier: SMUS TRAK chunks are variable-length event
+  // streams (note+duration/rest/instrument events, durations quantized through
+  // DURATION_TABLE on decode) — a non-canonical encoding no from-scratch encoder
+  // reproduces byte-exact. One block per TRAK = one channel; blockRows[fp] is that
+  // channel's full decoded timeline (channelFlat[fp]), blockRawBytes[fp] the raw
+  // TRAK bytes. Unedited channel re-emits verbatim, edited channel re-packs.
+  const blockRows: TrackerCell[][] = new Array(trackChunkOffsets.length);
+  const blockRawBytes: Uint8Array[] = new Array(trackChunkOffsets.length);
+  for (let fp = 0; fp < trackChunkOffsets.length; fp++) {
+    blockRows[fp] = (channelFlat[fp] ?? []).map((c) => ({ ...c }));
+    blockRawBytes[fp] = buf.slice(trackChunkOffsets[fp], trackChunkOffsets[fp] + trackChunkSizes[fp]);
+  }
+
   const uadeVariableLayout: UADEVariablePatternLayout = {
     formatId: 'iffSmus',
     numChannels: numCh,
@@ -636,6 +649,8 @@ export async function parseIffSmusFile(
     filePatternAddrs: trackChunkOffsets,
     filePatternSizes: trackChunkSizes,
     trackMap: smusTrackMap,
+    blockRows,
+    blockRawBytes,
   };
 
   return {
