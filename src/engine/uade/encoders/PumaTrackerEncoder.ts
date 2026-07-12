@@ -69,6 +69,20 @@ export const pumaTrackerEncoder: VariableLengthEncoder = {
   encodePattern(rows: TrackerCell[]): Uint8Array {
     if (rows.length === 0) return new Uint8Array(0);
 
+    // Carrier path (byte-exact): rows produced by PumaTrackerParser's blockRows
+    // are per-byte carriers of the real RLE pattern block (cutoff=1, period=byte).
+    // The on-disk RLE grouping is not recoverable from the expanded display grid,
+    // so concatenating the carrier bytes reproduces the block verbatim. The
+    // editable display grid stays carrier-less and re-derives RLE below.
+    if (rows.some(c => c.cutoff !== undefined)) {
+      const carried: number[] = [];
+      for (const cell of rows) {
+        if (cell.cutoff === undefined) continue; // padding — emits nothing
+        carried.push((cell.period ?? 0) & 0xFF);
+      }
+      return new Uint8Array(carried);
+    }
+
     // Run-length encode: merge consecutive identical entries
     const entries: Array<{ entry: PumaEntry; runLen: number }> = [];
     let current = cellToEntry(rows[0]);
