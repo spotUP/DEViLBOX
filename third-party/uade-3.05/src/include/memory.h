@@ -184,4 +184,9 @@ static inline int valid_address(uaecptr addr, uae_u32 size)
 extern uint32_t g_uade_last_chip_read_addr;
 extern void uade_wasm_check_wp_read(uint32_t addr, uint32_t value);
 extern void uade_wasm_check_wp_write(uint32_t addr, uint32_t value);
+/* Module-read trace: record chip-RAM reads that fall inside the loaded module
+ * region so the frontend can discover which file bytes the player consumes as
+ * note/sequence data. `chipAddr` is chip-relative (post chipmem_start subtract);
+ * `len` is the access width (1/2/4). No-op unless tracing is enabled. */
+extern void uade_wasm_log_module_read(uint32_t chipAddr, uint32_t len);
 #endif
