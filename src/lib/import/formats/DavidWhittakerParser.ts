@@ -25,10 +25,9 @@
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { Pattern, TrackerCell, ChannelData, InstrumentConfig } from '@/types';
 import type { DavidWhittakerConfig, UADEChipRamInfo } from '@/types/instrument';
-import type { UADEPatternLayout } from '@/engine/uade/UADEPatternEncoder';
+import type { UADEVariablePatternLayout } from '@/engine/uade/UADEPatternEncoder';
 import { DEFAULT_DAVID_WHITTAKER } from '@/types/instrument';
-import { encodeDavidWhittakerCell } from '@/engine/uade/encoders/DavidWhittakerEncoder';
-import { decodeMODCell } from '@/engine/uade/encoders/MODEncoder';
+import { davidWhittakerEncoder } from '@/engine/uade/encoders/DavidWhittakerEncoder';
 
 // ── Binary read helpers ───────────────────────────────────────────────────────
 
@@ -148,15 +147,6 @@ interface DWSong {
   speed: number;
   delay: number;
   tracks: number[];  // per-channel file offset to track list
-}
-
-/** An event parsed from the pattern byte stream */
-interface DWEvent {
-  tick: number;       // absolute tick offset from song start
-  note: number;       // tracker note (1-96), 0 = no note, 97 = note off
-  instrument: number; // 1-based instrument, 0 = no change
-  effTyp: number;
-  eff: number;
 }
 
 interface DWParseResult {
@@ -474,253 +464,215 @@ function scanDWStructures(buf: Uint8Array): DWParseResult | null {
   };
 }
 
-// ── Pattern byte stream extraction ────────────────────────────────────────────
-
-const MAX_PATTERN_EVENTS = 16384; // safety limit
+// ── Byte-exact block decoding (variable-length command stream) ─────────────────
+//
+// A DW "pattern" is not a fixed cell grid: each channel's track is an ordered list
+// of block addresses, and each block is a contiguous run of command bytes ending in
+// the -128 marker. To make the format losslessly editable AND byte-exact, we decode
+// each block into one TrackerCell per command, stashing the command's EXACT source
+// bytes in the cell carriers (cutoff=length, period=b0, pan=b1, resonance=b2). The
+// variable encoder concatenates those carriers back to reproduce the block verbatim.
 
 /**
- * Parse a DW pattern byte stream for a single channel, starting at `startPos`.
- * Returns events with absolute tick offsets, and the byte position where parsing stopped.
- *
- * The DW byte stream format (from FlodJS DWPlayer.js process()):
- *   Positive byte (0-127): Note value (period table index + finetune)
- *   -1 to -32: Speed change (speed = globalSpeed * (byte + 33))
- *   com2 to -33: Sample change (sample index = byte - com2)
- *   com3 to com2: Volume sequence select
- *   com4 to com3: Frequency sequence select
- *   -128: End of pattern → next pattern from track list
- *   -127: Portamento (2 param bytes)
- *   -126: Rest/note off
- *   -125: Channel enable
- *   -124: Song end
- *   -123: Transpose (1 param byte)
- *   -122: Vibrato (2 param bytes)
- *   -121: Vibrato off
- *   -120: Various per variant (may read 1 byte)
- *   -119: Track jump / halve off (may read 2 bytes)
- *   -118: Speed/delay change (read 1 byte)
- *   -117: Fade (read 1 byte)
- *   -116: Song vol (read 1 byte)
+ * Number of file bytes one DW stream command occupies, starting at `pos`.
+ * Mirrors the byte-consumption of parseDWChannelStream exactly so block spans and
+ * command boundaries line up with what the replayer reads.
  */
-function parseDWChannelStream(
-  buf: Uint8Array,
-  scan: DWParseResult,
-  song: DWSong,
-  channelIdx: number,
-): DWEvent[] {
-  const events: DWEvent[] = [];
-  const trackPtr = song.tracks[channelIdx];
-  if (!trackPtr || trackPtr >= buf.length) return events;
-
-  let globalSpeed = song.speed;
-  let speed = globalSpeed;
-  let currentSample = 1;  // 1-based instrument
-  let tick = 0;
-
-  // Read first pattern address from track list
-  let trackPos = scan.readLen;  // advance past first entry
-  let patternPos: number;
-  if (scan.readLen === 4) {
-    patternPos = u32BE(buf, trackPtr);
-  } else {
-    patternPos = scan.base + u16BE(buf, trackPtr);
+function dwCommandLen(buf: Uint8Array, scan: DWParseResult, pos: number): number {
+  const value = s8(buf, pos);
+  if (value >= 0) return 1;            // note
+  if (value >= -32) return 1;          // speed change
+  if (value >= scan.com2) return 1;    // sample change
+  if (value >= scan.com3) return 1;    // volume-sequence select
+  if (value >= scan.com4) return 1;    // frequency-sequence select
+  switch (value) {
+    case -128: return 1;  // end of pattern
+    case -127: return 3;  // portamento (2 param bytes)
+    case -126: return 1;  // rest / note-off
+    case -125: return 1;  // channel enable
+    case -124: return 1;  // song end
+    case -123: return 2;  // transpose (1 param byte)
+    case -122: return 3;  // vibrato (2 param bytes)
+    case -121: return 1;  // vibrato off
+    case -120: return (scan.variant >= 10 && scan.variant !== 21) ? 2 : 1;
+    case -119: return (scan.variant !== 21) ? 3 : 1;
+    case -118: return 2;  // speed/delay change (1 param byte)
+    case -117: return 2;  // fade (1 param byte)
+    case -116: return 2;  // song volume (1 param byte)
+    default:   return 1;  // unknown — consume a single byte and continue
   }
-
-  if (patternPos < 0 || patternPos >= buf.length) return events;
-
-  let safety = 0;
-  while (safety++ < MAX_PATTERN_EVENTS) {
-    if (patternPos < 0 || patternPos >= buf.length) break;
-    const value = s8(buf, patternPos);
-    patternPos++;
-
-    if (value >= 0) {
-      // Note: value is period table index
-      const trackerNote = amigaIndexToTrackerNote(value);
-      events.push({
-        tick,
-        note: trackerNote || 49,  // fallback to C-4
-        instrument: currentSample,
-        effTyp: 0,
-        eff: 0,
-      });
-      tick += speed;
-    } else if (value >= -32) {
-      // Speed change: speed = globalSpeed * (value + 33)
-      speed = globalSpeed * (value + 33);
-      if (speed <= 0) speed = globalSpeed;
-    } else if (value >= scan.com2) {
-      // Sample change
-      currentSample = (value - scan.com2) + 1;  // 1-based
-    } else if (value >= scan.com3) {
-      // Volume sequence select — skip (doesn't affect pattern display)
-    } else if (value >= scan.com4) {
-      // Frequency sequence select — skip
-    } else {
-      switch (value) {
-        case -128: {
-          // End of pattern → read next pattern address from track list
-          if (trackPtr + trackPos >= buf.length) { safety = MAX_PATTERN_EVENTS; break; }
-          let nextAddr: number;
-          if (scan.readLen === 4) {
-            nextAddr = u32BE(buf, trackPtr + trackPos);
-          } else {
-            nextAddr = u16BE(buf, trackPtr + trackPos);
-          }
-
-          if (!nextAddr) {
-            // Null entry = loop to beginning of track — song loops, stop extraction
-            safety = MAX_PATTERN_EVENTS;
-            break;
-          }
-          if (scan.readLen === 4) {
-            patternPos = nextAddr;
-          } else {
-            patternPos = scan.base + nextAddr;
-          }
-          trackPos += scan.readLen;
-          break;
-        }
-        case -127:
-          // Portamento: read 2 param bytes
-          patternPos += 2;
-          break;
-        case -126:
-          // Rest/note off — emit note-off event, advance ticks
-          events.push({
-            tick,
-            note: 97,  // XM note-off
-            instrument: 0,
-            effTyp: 0,
-            eff: 0,
-          });
-          tick += speed;
-          break;
-        case -125:
-          // Channel enable (variant > 0) — no extra bytes
-          break;
-        case -124:
-          // Song end
-          safety = MAX_PATTERN_EVENTS;
-          break;
-        case -123:
-          // Transpose: read 1 byte
-          patternPos++;
-          break;
-        case -122:
-          // Vibrato: read 2 bytes
-          patternPos += 2;
-          break;
-        case -121:
-          // Vibrato off — no extra bytes
-          break;
-        case -120:
-          // Various per variant — may read 1 byte in some variants
-          if (scan.variant >= 10 && scan.variant !== 21) patternPos++;
-          break;
-        case -119:
-          // Track jump (variant != 21): read 2 bytes (new track pointer)
-          if (scan.variant !== 21) patternPos += 2;
-          break;
-        case -118:
-          // Speed/delay change: read 1 byte
-          if (scan.variant !== 31) {
-            globalSpeed = u8(buf, patternPos);
-            speed = globalSpeed;
-          }
-          patternPos++;
-          break;
-        case -117:
-          // Fade: read 1 byte
-          patternPos++;
-          break;
-        case -116:
-          // Song vol: read 1 byte
-          patternPos++;
-          break;
-        default:
-          // Unknown command — stop to avoid corruption
-          safety = MAX_PATTERN_EVENTS;
-          break;
-      }
-    }
-  }
-
-  return events;
 }
 
 /**
- * Convert DW per-channel events into unified tracker patterns.
- * Groups events into 64-row patterns, aligned by tick count.
+ * Decode one contiguous block (from `startAddr` to and including its -128 marker)
+ * into one command-row per stream command. `sampleRef.cur` tracks the running
+ * 1-based instrument across the block (updated on sample-change commands).
  */
-function buildDWPatterns(
-  channelEvents: DWEvent[][],
-  numChannels: number,
-): Pattern[] {
-  const ROWS_PER_PATTERN = 64;
-  const patterns: Pattern[] = [];
+function decodeDWBlock(
+  buf: Uint8Array,
+  scan: DWParseResult,
+  startAddr: number,
+  sampleRef: { cur: number },
+): { rows: TrackerCell[]; byteSize: number } {
+  const rows: TrackerCell[] = [];
+  let pos = startAddr;
+  let safety = 0;
+  while (pos < buf.length && safety++ < 8192) {
+    const value = s8(buf, pos);
+    const len = dwCommandLen(buf, scan, pos);
+    if (pos + len > buf.length) break;
 
-  // Find total number of rows needed (max tick across channels / speed per row)
-  let maxTick = 0;
-  for (const events of channelEvents) {
-    for (const ev of events) {
-      if (ev.tick > maxTick) maxTick = ev.tick;
+    // Display fields (carrier bytes below make the round-trip byte-exact regardless).
+    let note = 0;
+    let instrument = 0;
+    if (value >= 0) {
+      note = amigaIndexToTrackerNote(value) || 49;
+      instrument = sampleRef.cur;
+    } else if (value >= scan.com2 && value < -32) {
+      sampleRef.cur = (value - scan.com2) + 1;
+      instrument = sampleRef.cur;
+    } else if (value === -126) {
+      note = 97; // rest / note-off
     }
+
+    const cell: TrackerCell = {
+      note, instrument, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0,
+      // Carrier: exact source bytes of this command.
+      cutoff: len,
+      period: buf[pos] & 0xFF,
+    };
+    if (len >= 2) cell.pan = buf[pos + 1] & 0xFF;
+    if (len >= 3) cell.resonance = buf[pos + 2] & 0xFF;
+    rows.push(cell);
+
+    pos += len;
+    if (value === -128) break; // -128 terminates the block
+  }
+  return { rows, byteSize: pos - startAddr };
+}
+
+/**
+ * Read a channel's ordered list of block addresses from its track pointer.
+ * The track list is a run of u16/u32 entries terminated by a null (loop) entry.
+ */
+function enumerateChannelBlocks(buf: Uint8Array, scan: DWParseResult, trackPtr: number): number[] {
+  const addrs: number[] = [];
+  if (!trackPtr || trackPtr >= buf.length) return addrs;
+  let tp = trackPtr;
+  for (let i = 0; i < 512; i++) {
+    if (tp + scan.readLen > buf.length) break;
+    const raw = scan.readLen === 4 ? u32BE(buf, tp) : u16BE(buf, tp);
+    tp += scan.readLen;
+    if (!raw) break; // null entry = loop to start
+    const addr = scan.readLen === 4 ? raw : scan.base + raw;
+    if (addr < 0 || addr >= buf.length) break;
+    addrs.push(addr);
+  }
+  return addrs;
+}
+
+interface DWVariableResult {
+  patterns: Pattern[];
+  songPositions: number[];
+  filePatternAddrs: number[];
+  filePatternSizes: number[];
+  trackMap: number[][];
+}
+
+/**
+ * Build the byte-exact variable pattern layout for one DW song.
+ *
+ * Each channel independently steps through an ordered list of block addresses.
+ * Blocks are deduplicated into file-patterns (filePatternAddrs/Sizes); one
+ * tracker "step" corresponds to one entry across all channels' block lists.
+ * trackMap[step][ch] resolves to the file-pattern index for that block (-1 if the
+ * channel's list is shorter). Each channel's rows carry the block's exact source
+ * bytes so the variable encoder reproduces the file byte-for-byte.
+ */
+function buildDWVariablePatterns(
+  buf: Uint8Array,
+  scan: DWParseResult,
+  song: DWSong,
+  numChannels: number,
+): DWVariableResult | null {
+  // Per-channel ordered block-address lists.
+  const channelBlocks: number[][] = [];
+  for (let ch = 0; ch < numChannels; ch++) {
+    const trackPtr = ch < song.tracks.length ? song.tracks[ch] : 0;
+    channelBlocks.push(enumerateChannelBlocks(buf, scan, trackPtr));
   }
 
-  // Each tick = 1 row in the pattern
-  const totalRows = maxTick + 1;
-  const numPatterns = Math.max(1, Math.ceil(totalRows / ROWS_PER_PATTERN));
+  const numSteps = channelBlocks.reduce((m, l) => Math.max(m, l.length), 0);
+  if (numSteps === 0) return null;
 
-  // Limit to reasonable number of patterns
-  const patternLimit = Math.min(numPatterns, 256);
+  // Deduplicate block addresses into file-patterns; decode each unique block once.
+  const addrToFp = new Map<number, number>();
+  const filePatternAddrs: number[] = [];
+  const filePatternSizes: number[] = [];
+  const fpRows: TrackerCell[][] = [];
+  const fpFor = (addr: number): number => {
+    let fp = addrToFp.get(addr);
+    if (fp === undefined) {
+      const { rows, byteSize } = decodeDWBlock(buf, scan, addr, { cur: 1 });
+      fp = filePatternAddrs.length;
+      addrToFp.set(addr, fp);
+      filePatternAddrs.push(addr);
+      filePatternSizes.push(byteSize);
+      fpRows.push(rows);
+    }
+    return fp;
+  };
 
-  for (let p = 0; p < patternLimit; p++) {
-    const startTick = p * ROWS_PER_PATTERN;
-    const channels: ChannelData[] = [];
+  const patterns: Pattern[] = [];
+  const songPositions: number[] = [];
+  const trackMap: number[][] = [];
+
+  for (let step = 0; step < numSteps; step++) {
+    const stepTrackMap: number[] = [];
+    const perChannelRows: TrackerCell[][] = [];
+    let maxRows = 0;
 
     for (let ch = 0; ch < numChannels; ch++) {
-      const rows: TrackerCell[] = [];
-      const events = channelEvents[ch] || [];
-
-      for (let r = 0; r < ROWS_PER_PATTERN; r++) {
-        const targetTick = startTick + r;
-        // Find event at this tick
-        const ev = events.find(e => e.tick === targetTick);
-        rows.push({
-          note: ev?.note ?? 0,
-          instrument: ev?.instrument ?? 0,
-          volume: 0,
-          effTyp: ev?.effTyp ?? 0,
-          eff: ev?.eff ?? 0,
-          effTyp2: 0,
-          eff2: 0,
-        });
+      const list = channelBlocks[ch];
+      if (step < list.length) {
+        const fp = fpFor(list[step]);
+        stepTrackMap.push(fp);
+        // Clone the decoded rows so per-step patterns don't share cell objects.
+        const rows = fpRows[fp].map(c => ({ ...c }));
+        perChannelRows.push(rows);
+        if (rows.length > maxRows) maxRows = rows.length;
+      } else {
+        stepTrackMap.push(-1);
+        perChannelRows.push([]);
       }
+    }
+    if (maxRows === 0) maxRows = 1;
 
+    const channels: ChannelData[] = [];
+    for (let ch = 0; ch < numChannels; ch++) {
+      const rows = perChannelRows[ch];
+      // Pad with carrier-less rows (cutoff undefined) — the encoder emits nothing
+      // for them, so padding does not affect byte-exactness.
+      while (rows.length < maxRows) {
+        rows.push({ note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 });
+      }
       channels.push({
         id: `channel-${ch}`,
         name: `Channel ${ch + 1}`,
-        muted: false,
-        solo: false,
-        collapsed: false,
-        volume: 100,
-        pan: (ch === 0 || ch === 3) ? -50 : 50,
-        instrumentId: null,
-        color: null,
-        rows,
+        muted: false, solo: false, collapsed: false,
+        volume: 100, pan: (ch === 0 || ch === 3) ? -50 : 50,
+        instrumentId: null, color: null, rows,
       });
     }
 
     patterns.push({
-      id: `pattern-${p}`,
-      name: `Pattern ${p}`,
-      length: ROWS_PER_PATTERN,
-      channels,
+      id: `pattern-${step}`, name: `Pattern ${step}`, length: maxRows, channels,
     });
+    songPositions.push(step);
+    trackMap.push(stepTrackMap);
   }
 
-  return patterns;
+  return { patterns, songPositions, filePatternAddrs, filePatternSizes, trackMap };
 }
 
 // ── Main parser ───────────────────────────────────────────────────────────────
@@ -837,42 +789,27 @@ export function parseDavidWhittakerFile(buffer: ArrayBuffer, filename: string, m
     } as InstrumentConfig);
   }
 
-  // ── Extract real patterns from binary or fall back to stub ──────────────
+  // ── Extract real patterns as a byte-exact variable layout ──────────────────
   const CHANNELS = scanResult?.channels || 4;
   const ROWS = 64;
 
   let patterns: Pattern[] = [];
   let songPositions: number[] = [0];
   let initialSpeed = 6;
+  let variable: DWVariableResult | null = null;
 
   if (scanResult && scanResult.songs.length > 0) {
-    // Use first song for pattern extraction
     const song = scanResult.songs[0];
     initialSpeed = song.speed || 6;
-
-    // Parse each channel's byte stream
-    const channelEvents: DWEvent[][] = [];
-    for (let ch = 0; ch < CHANNELS; ch++) {
-      if (ch < song.tracks.length) {
-        channelEvents.push(parseDWChannelStream(buf, scanResult, song, ch));
-      } else {
-        channelEvents.push([]);
-      }
-    }
-
-    // Count total notes extracted
-    let totalNotes = 0;
-    for (const events of channelEvents) {
-      totalNotes += events.filter(e => e.note > 0 && e.note < 97).length;
-    }
-
-    if (totalNotes > 0) {
-      patterns = buildDWPatterns(channelEvents, CHANNELS);
-      songPositions = patterns.map((_, i) => i);
+    variable = buildDWVariablePatterns(buf, scanResult, song, CHANNELS);
+    if (variable) {
+      patterns = variable.patterns;
+      songPositions = variable.songPositions;
     }
   }
 
-  // Fallback: if no patterns were extracted, create a stub
+  // Fallback: if no patterns were extracted, create a stub (no variable layout —
+  // an unfaithful grid must NOT claim byte-exactness).
   if (patterns.length === 0) {
     const channelData: ChannelData[] = [];
     for (let ch = 0; ch < CHANNELS; ch++) {
@@ -902,32 +839,11 @@ export function parseDavidWhittakerFile(buffer: ArrayBuffer, filename: string, m
     songPositions = [0];
   }
 
-  // ── Build uadePatternLayout for chip RAM editing ──────────────────────────
-  // DW modules are compiled 68k executables — pattern data is embedded in
-  // player code, so patternDataFileOffset is 0.  getCellFileOffset provides
-  // a standard row-major layout relative to the module base for potential
-  // chip RAM patching once the real data offset is resolved at runtime.
-  const uadePatternLayout: UADEPatternLayout = {
-    formatId: 'davidWhittaker',
-    patternDataFileOffset: 0,
-    bytesPerCell: 4,
-    rowsPerPattern: ROWS,
-    numChannels: CHANNELS,
-    numPatterns: patterns.length,
-    moduleSize: buffer.byteLength,
-    encodeCell: encodeDavidWhittakerCell,
-    decodeCell: decodeMODCell,
-    getCellFileOffset: (pat: number, row: number, channel: number): number => {
-      const patternByteSize = ROWS * CHANNELS * 4;
-      return pat * patternByteSize + row * CHANNELS * 4 + channel * 4;
-    },
-  };
-
   const extractInfo = patterns.length > 1
     ? ` (${patterns.length} patterns extracted)`
     : '';
 
-  return {
+  const result: TrackerSong = {
     name: `${baseName}${extractInfo}`,
     format: 'XM' as TrackerFormat,
     patterns,
@@ -939,7 +855,25 @@ export function parseDavidWhittakerFile(buffer: ArrayBuffer, filename: string, m
     initialSpeed,
     initialBPM: 125,
     davidWhittakerFileData: buffer.slice(0) as ArrayBuffer,
-    uadePatternLayout,
+    uadeEditableFileData: buffer.slice(0) as ArrayBuffer,
+    uadeEditableFileName: filename,
   };
+
+  if (variable) {
+    const uadeVariableLayout: UADEVariablePatternLayout = {
+      formatId: 'davidWhittaker',
+      numChannels: CHANNELS,
+      numFilePatterns: variable.filePatternAddrs.length,
+      rowsPerPattern: patterns.map(p => p.length),
+      moduleSize: buffer.byteLength,
+      encoder: davidWhittakerEncoder,
+      filePatternAddrs: variable.filePatternAddrs,
+      filePatternSizes: variable.filePatternSizes,
+      trackMap: variable.trackMap,
+    };
+    (result as unknown as { uadeVariableLayout: UADEVariablePatternLayout }).uadeVariableLayout = uadeVariableLayout;
+  }
+
+  return result;
 }
 
