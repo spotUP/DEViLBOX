@@ -555,6 +555,20 @@ export async function parsePTMFile(
     trackMap.push(Array.from({ length: numChannels }, () => p < patFileAddrs.length ? p : -1));
   }
 
+  // Structural raw-block carrier: PolyTracker (PTM) uses S3M-style non-canonical
+  // row packing, so no from-scratch encoder reproduces a file's bytes. Stash each
+  // block's original packed bytes (blockRawBytes) plus a decoded baseline
+  // (blockRows, channel 0). Unedited block re-emits verbatim (byte-exact); edited
+  // block re-packs.
+  const blockRows: TrackerCell[][] = new Array(patFileAddrs.length);
+  const blockRawBytes: Uint8Array[] = new Array(patFileAddrs.length);
+  for (let fp = 0; fp < patFileAddrs.length; fp++) {
+    blockRows[fp] = patterns[fp].channels[0].rows.map((c) => ({ ...c }));
+    const a = patFileAddrs[fp];
+    const s = patFileSizes[fp];
+    blockRawBytes[fp] = bytes.slice(a, a + s);
+  }
+
   const uadeVariableLayout: UADEVariablePatternLayout = {
     formatId: 'ptm',
     numChannels,
@@ -565,6 +579,8 @@ export async function parsePTMFile(
     filePatternAddrs: patFileAddrs,
     filePatternSizes: patFileSizes,
     trackMap,
+    blockRows,
+    blockRawBytes,
   };
 
   // ── Assemble TrackerSong ───────────────────────────────────────────────────
