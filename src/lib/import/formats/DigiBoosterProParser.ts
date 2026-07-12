@@ -874,6 +874,21 @@ function _parseDigiBoosterProFile(bytes: Uint8Array, filename: string): TrackerS
     trackMap.push(Array.from({ length: numChannels }, () => p < patFileAddrs.length ? p : -1));
   }
 
+  // Structural raw-block carrier: DBM (DigiBooster Pro) packs all channels into
+  // one per-pattern stream with an event-mask compression that omits empty cells,
+  // a non-canonical encoding no from-scratch encoder reproduces. Stash each
+  // block's original packed bytes (blockRawBytes) plus a decoded baseline
+  // (blockRows, channel 0). Unedited block re-emits verbatim (byte-exact); edited
+  // block re-packs.
+  const blockRows: TrackerCell[][] = new Array(patFileAddrs.length);
+  const blockRawBytes: Uint8Array[] = new Array(patFileAddrs.length);
+  for (let fp = 0; fp < patFileAddrs.length; fp++) {
+    blockRows[fp] = (patterns[fp]?.channels[0]?.rows ?? []).map((c) => ({ ...c }));
+    const a = patFileAddrs[fp];
+    const s = patFileSizes[fp];
+    blockRawBytes[fp] = bytes.slice(a, a + s);
+  }
+
   const uadeVariableLayout: UADEVariablePatternLayout = {
     formatId: 'digiBoosterPro',
     numChannels,
@@ -884,6 +899,8 @@ function _parseDigiBoosterProFile(bytes: Uint8Array, filename: string): TrackerS
     filePatternAddrs: patFileAddrs,
     filePatternSizes: patFileSizes,
     trackMap,
+    blockRows,
+    blockRawBytes,
   };
 
   return {
