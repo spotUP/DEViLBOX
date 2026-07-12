@@ -141,23 +141,34 @@ function roundTripVariable(raw: Uint8Array, layout: UADEVariablePatternLayout, s
   let blocks = 0;
   let exact = 0;
   for (let fp = 0; fp < filePatternAddrs.length; fp++) {
-    let mapped: { tp: number; ch: number } | null = null;
-    for (let tp = 0; tp < trackMap.length && !mapped; tp++) {
-      const row = trackMap[tp];
-      if (!row) continue;
-      for (let ch = 0; ch < row.length; ch++) {
-        if (row[ch] === fp) { mapped = { tp, ch }; break; }
+    // Prefer the layout's canonical per-block carrier rows when present: formats
+    // whose display grid is a shared tick timeline (e.g. Rob Hubbard) decouple the
+    // carriers from the display cells because a block straddles pattern boundaries,
+    // so the byte-exact truth lives on `blockRows[fp]`, not in one pattern's rows.
+    let rows: TrackerCell[] | undefined;
+    let ch = 0;
+    if (layout.blockRows) {
+      rows = layout.blockRows[fp];
+    } else {
+      let mapped: { tp: number; ch: number } | null = null;
+      for (let tp = 0; tp < trackMap.length && !mapped; tp++) {
+        const row = trackMap[tp];
+        if (!row) continue;
+        for (let c = 0; c < row.length; c++) {
+          if (row[c] === fp) { mapped = { tp, ch: c }; break; }
+        }
       }
+      if (!mapped) continue;
+      rows = song.patterns[mapped.tp]?.channels[mapped.ch]?.rows;
+      ch = mapped.ch;
     }
-    if (!mapped) continue;
-    const rows = song.patterns[mapped.tp]?.channels[mapped.ch]?.rows;
     if (!rows) continue;
     const addr = filePatternAddrs[fp];
     const size = filePatternSizes[fp];
     if (addr < 0 || size <= 0 || addr + size > raw.length) continue;
     const orig = raw.subarray(addr, addr + size);
     blocks++;
-    const re = encoder.encodePattern(rows, mapped.ch);
+    const re = encoder.encodePattern(rows, ch);
     if (bytesEqual(re, orig)) exact++;
   }
   return { cells: blocks, exact };

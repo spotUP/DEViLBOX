@@ -479,17 +479,54 @@ interface RHVariableResult {
   filePatternAddrs: number[];
   filePatternSizes: number[];
   trackMap: number[][];
+  /** Canonical carrier rows per unique block (byte-exact source of truth). */
+  blockRows: TrackerCell[][];
+}
+
+const RH_PATTERN_ROWS = 64;
+// Hard ceiling on the display timeline so a pathological loop can't allocate an
+// unbounded grid. 96 patterns × 64 ticks = 6144 rows is far longer than any real
+// RH song's single loop pass.
+const RH_MAX_DISPLAY_ROWS = RH_PATTERN_ROWS * 96;
+
+/**
+ * Tick length one decoded command occupies on the display timeline.
+ *   - note command (opcode byte < 128): byte0 IS the duration → cell.period
+ *   - rest command (-126 → unsigned 130): byte1 is the duration → cell.pan
+ *   - every other command (sample/portamento/sustain/volume/end): 0 ticks —
+ *     it mutates replay state without advancing time, so it is invisible on the
+ *     tick grid (its bytes still round-trip via the canonical block rows).
+ * Padding rows (cutoff undefined) are not real commands → 0 ticks.
+ */
+function rhCellTicks(cell: TrackerCell): number {
+  if (cell.cutoff === undefined) return 0;
+  const opcode = cell.period ?? 0;
+  if (opcode < 128) return Math.max(1, opcode);        // note: duration byte
+  if (opcode === 130) return Math.max(1, cell.pan ?? 0); // -126 rest: duration byte
+  return 0;                                             // control command
 }
 
 /**
- * Build the byte-exact variable pattern layout for one RH song.
+ * Build the tick-timeline display grid + byte-exact variable layout for one RH song.
  *
- * Each channel independently steps through an ordered list of block addresses.
- * Blocks are deduplicated into file-patterns (filePatternAddrs/Sizes); one tracker
- * "step" corresponds to one entry across all channels' block lists.
- * trackMap[step][ch] resolves to the file-pattern index for that block (-1 if the
- * channel's list is shorter). Each channel's rows carry the block's exact source
- * bytes so the variable encoder reproduces the file byte-for-byte.
+ * A RH channel is an INDEPENDENT command byte-stream, not a step in a shared grid:
+ * each channel walks its own ordered list of blocks at its own tick rate (channels
+ * loop their lists independently, with different lengths). Command-indexing the grid
+ * (one row per command) desynchronises the channels and collapses long/sustained
+ * notes into a few rows, so a sustained bass voice renders blank under the playhead
+ * even while it sounds ("hear bass, see no notes").
+ *
+ * Fix: lay every channel on ONE shared tick timeline — each note/rest occupies its
+ * `duration` ticks (note-on cell on the first tick row, blank continuation rows
+ * below), control commands take zero ticks — then slice the timeline into fixed
+ * 64-row patterns so row === real tick and the playhead sits on the sounding note.
+ *
+ * The display cells are carrier-less (they are for viewing/editing). Byte-exact
+ * export is driven by `blockRows[fp]` — the exact decoded carrier cells of each
+ * unique block — which the variable encoder concatenates to reproduce the file
+ * verbatim. Because a channel's block straddles pattern boundaries on the shared
+ * timeline, the block carriers CANNOT live inside one pattern's rows; keeping them
+ * on the layout (round-trip only) is the faithful representation.
  */
 function buildRHVariablePatterns(
   buf: Uint8Array,
@@ -502,13 +539,14 @@ function buildRHVariablePatterns(
     channelBlocks.push(enumerateRHChannelBlocks(buf, trackPtr));
   }
 
-  const numSteps = channelBlocks.reduce((m, l) => Math.max(m, l.length), 0);
-  if (numSteps === 0) return null;
+  if (channelBlocks.every(l => l.length === 0)) return null;
 
+  // Dedup blocks into file-patterns. blockRows[fp] holds the exact decoded carrier
+  // cells for that block (byte-exact source of truth for the encoder / round-trip).
   const addrToFp = new Map<number, number>();
   const filePatternAddrs: number[] = [];
   const filePatternSizes: number[] = [];
-  const fpRows: TrackerCell[][] = [];
+  const blockRows: TrackerCell[][] = [];
   const fpFor = (addr: number): number => {
     let fp = addrToFp.get(addr);
     if (fp === undefined) {
@@ -517,51 +555,85 @@ function buildRHVariablePatterns(
       addrToFp.set(addr, fp);
       filePatternAddrs.push(addr);
       filePatternSizes.push(byteSize);
-      fpRows.push(rows);
+      blockRows.push(rows);
     }
     return fp;
   };
 
+  // ── Pass 1: lay each channel on its own tick timeline ──────────────────────
+  // Walk the channel's block list (looping independently), placing each note/rest
+  // display cell at its cumulative tick and reserving its duration in continuation
+  // rows. `chFpByTick[ch][tick]` records which block covers each tick (for a valid
+  // trackMap). We first find the longest single-pass length, then fill every shorter
+  // channel by looping so no active voice ever goes silent mid-song.
+  const singlePassTicks = (list: number[]): number => {
+    let ticks = 0;
+    for (const addr of list) {
+      for (const cell of blockRows[fpFor(addr)]) ticks += rhCellTicks(cell);
+    }
+    return ticks;
+  };
+
+  let displayTicks = 0;
+  for (const list of channelBlocks) {
+    if (list.length > 0) displayTicks = Math.max(displayTicks, singlePassTicks(list));
+  }
+  if (displayTicks <= 0) displayTicks = RH_PATTERN_ROWS;
+  displayTicks = Math.min(displayTicks, RH_MAX_DISPLAY_ROWS);
+
+  const numPatterns = Math.max(1, Math.ceil(displayTicks / RH_PATTERN_ROWS));
+  const totalRows = numPatterns * RH_PATTERN_ROWS;
+
+  // Per-channel timeline of display cells + the fp covering each tick.
+  const chRows: TrackerCell[][] = [];
+  const chFpByTick: Int32Array[] = [];
+  for (let ch = 0; ch < numChannels; ch++) {
+    const timeline: TrackerCell[] = Array.from({ length: totalRows }, () => ({
+      note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0,
+    }));
+    const fpByTick = new Int32Array(totalRows).fill(-1);
+    const list = channelBlocks[ch];
+    if (list.length > 0) {
+      let tick = 0;
+      let blockIdx = 0;
+      let guard = 0;
+      while (tick < totalRows && guard++ < totalRows + list.length + 8) {
+        const fp = fpFor(list[blockIdx % list.length]);
+        blockIdx++;
+        let advanced = false;
+        for (const cell of blockRows[fp]) {
+          const dur = rhCellTicks(cell);
+          if (dur <= 0) continue;              // control command — no display row
+          if (tick >= totalRows) break;
+          timeline[tick] = {
+            note: cell.note, instrument: cell.instrument,
+            volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0,
+          };
+          const end = Math.min(totalRows, tick + dur);
+          for (let t = tick; t < end; t++) fpByTick[t] = fp;
+          tick = end;
+          advanced = true;
+        }
+        // A block of pure control commands advances 0 ticks; keep looping to the
+        // next block but never spin forever (guard covers the degenerate all-zero
+        // list where every block is control-only).
+        if (!advanced && blockIdx % list.length === 0 && singlePassTicks(list) === 0) break;
+      }
+    }
+    chRows.push(timeline);
+    chFpByTick.push(fpByTick);
+  }
+
+  // ── Pass 2: slice the timelines into fixed 64-row patterns ─────────────────
   const patterns: Pattern[] = [];
   const songPositions: number[] = [];
   const trackMap: number[][] = [];
-
-  for (let step = 0; step < numSteps; step++) {
-    const stepTrackMap: number[] = [];
-    const perChannelRows: TrackerCell[][] = [];
-    let maxRows = 0;
-
-    for (let ch = 0; ch < numChannels; ch++) {
-      const list = channelBlocks[ch];
-      if (list.length > 0) {
-        // RH channels loop their block list independently: when a channel's
-        // track list reaches its null terminator the replayer restarts it from
-        // block 0. Channels have different list lengths (e.g. [152,1,75,39]), so
-        // wrap each one with `step % list.length` — otherwise a short channel
-        // goes silent after its last block instead of repeating, which is the
-        // "missing notes" defect. Reusing the same block address across steps is
-        // byte-exact-safe: fpFor() dedups addresses, so trackMap points at the
-        // existing filePattern and export rewrites the same block bytes.
-        const fp = fpFor(list[step % list.length]);
-        stepTrackMap.push(fp);
-        const rows = fpRows[fp].map(c => ({ ...c }));
-        perChannelRows.push(rows);
-        if (rows.length > maxRows) maxRows = rows.length;
-      } else {
-        stepTrackMap.push(-1);
-        perChannelRows.push([]);
-      }
-    }
-    if (maxRows === 0) maxRows = 1;
-
+  for (let p = 0; p < numPatterns; p++) {
+    const base = p * RH_PATTERN_ROWS;
     const channels: ChannelData[] = [];
+    const patTrack: number[] = [];
     for (let ch = 0; ch < numChannels; ch++) {
-      const rows = perChannelRows[ch];
-      // Pad with carrier-less rows (cutoff undefined) — the encoder emits nothing
-      // for them, so padding does not affect byte-exactness.
-      while (rows.length < maxRows) {
-        rows.push({ note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 });
-      }
+      const rows = chRows[ch].slice(base, base + RH_PATTERN_ROWS);
       channels.push({
         id: `channel-${ch}`,
         name: `Channel ${ch + 1}`,
@@ -569,16 +641,16 @@ function buildRHVariablePatterns(
         volume: 100, pan: (ch === 0 || ch === 3) ? -50 : 50,
         instrumentId: null, color: null, rows,
       });
+      patTrack.push(channelBlocks[ch].length > 0 ? chFpByTick[ch][base] : -1);
     }
-
     patterns.push({
-      id: `pattern-${step}`, name: `Pattern ${step}`, length: maxRows, channels,
+      id: `pattern-${p}`, name: `Pattern ${p}`, length: RH_PATTERN_ROWS, channels,
     });
-    songPositions.push(step);
-    trackMap.push(stepTrackMap);
+    songPositions.push(p);
+    trackMap.push(patTrack);
   }
 
-  return { patterns, songPositions, filePatternAddrs, filePatternSizes, trackMap };
+  return { patterns, songPositions, filePatternAddrs, filePatternSizes, trackMap, blockRows };
 }
 
 // ── Main parser ─────────────────────────────────────────────────────────────
@@ -743,6 +815,7 @@ export async function parseRobHubbardFile(
       filePatternAddrs: variable.filePatternAddrs,
       filePatternSizes: variable.filePatternSizes,
       trackMap: variable.trackMap,
+      blockRows: variable.blockRows,
     };
     (result as unknown as { uadeVariableLayout: UADEVariablePatternLayout }).uadeVariableLayout = uadeVariableLayout;
   }
