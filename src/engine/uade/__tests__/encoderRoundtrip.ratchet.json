@@ -379,9 +379,9 @@
     "mod": {
       "kind": "fixed",
       "method": "encode-parsed",
-      "status": "lossy",
-      "byteExact": false,
-      "matchPct": 0.555,
+      "status": "byte-exact",
+      "byteExact": true,
+      "matchPct": 1,
       "cells": 7168
     },
     "mtm": {

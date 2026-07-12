@@ -5,8 +5,10 @@
  * sample headers, 1-byte songlength + 1-byte restart, 128-byte order table, "M.K." magic),
  * followed by 1024-byte patterns (64 rows × 4 channels × 4-byte cells) and concatenated
  * 8-bit signed PCM. It is the exact inverse of MODParser.parseMODFile:
- *   - note index → Amiga period uses MODParser's own C-0..B-3 table (period 856 = note 13),
- *     NOT the FT2 (note-37) convention in MODEncoder.
+ *   - note index → Amiga period uses MODParser's XM octave convention (period 856 = XM
+ *     note 37 = C-3), matching MODEncoder/decodeMODCell. The 48-entry table spans the
+ *     periods the parser can emit (1712 = XM note 25 = C-2 .. 113 = XM note 72 = B-5),
+ *     so period = PERIODS[note - 25].
  *   - MOD cell effTyp is the raw 0-F ProTracker effect nibble (MODParser assigns
  *     effTyp = rawEffect directly), so effTyp/eff round-trip verbatim.
  */
@@ -24,18 +26,19 @@ export interface ModExportResult {
   warnings: string[];
 }
 
-// MODParser's period table, C-0 (note 1) .. B-3 (note 48). period = PERIODS[note - 1].
+// MODParser's period table in XM octave labels, C-2 (XM note 25) .. B-5 (XM note 72).
+// period = PERIODS[note - 25], matching MODParser.periodToNote (856 = C-3 = XM note 37).
 const PERIODS = [
-  1712, 1616, 1525, 1440, 1357, 1281, 1209, 1141, 1077, 1017, 960, 907, // C-0..B-0
-  856, 808, 762, 720, 678, 640, 604, 570, 538, 508, 480, 453,           // C-1..B-1
-  428, 404, 381, 360, 339, 320, 302, 285, 269, 254, 240, 226,           // C-2..B-2
-  214, 202, 190, 180, 170, 160, 151, 143, 135, 127, 120, 113,           // C-3..B-3
+  1712, 1616, 1525, 1440, 1357, 1281, 1209, 1141, 1077, 1017, 960, 907, // C-2..B-2
+  856, 808, 762, 720, 678, 640, 604, 570, 538, 508, 480, 453,           // C-3..B-3
+  428, 404, 381, 360, 339, 320, 302, 285, 269, 254, 240, 226,           // C-4..B-4
+  214, 202, 190, 180, 170, 160, 151, 143, 135, 127, 120, 113,           // C-5..B-5
 ];
 
 function noteToPeriod(note: number): number {
   if (note <= 0 || note >= 97) return 0; // 0 = empty, 97 = note-cut (no MOD encoding)
-  const idx = note - 1;
-  return idx < PERIODS.length ? PERIODS[idx] : 0;
+  const idx = note - 25;
+  return idx >= 0 && idx < PERIODS.length ? PERIODS[idx] : 0;
 }
 
 /** Decode an instrument's stored 16-bit WAV back to 8-bit signed PCM (MOD sample format). */
