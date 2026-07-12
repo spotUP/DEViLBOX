@@ -28,6 +28,19 @@ function encodeTFMXCell(cell: TrackerCell): Uint8Array {
   const effTyp = cell.effTyp ?? 0;
   const eff = cell.eff ?? 0;
 
+  // Byte-exact carrier restore. TFMXParser.decodeCell stashes all 4 source bytes in the
+  // invisible period/pan/cutoff carriers (the note is a clamped lookup, the volume nibble is
+  // scaled, and pattern/wait/detune bytes collapse into the narrow XM view). Reproduce all 4
+  // verbatim for an unedited cell; edited grid cells lack the carriers and fall through to
+  // the derivation below.
+  if (cell.period !== undefined && cell.pan !== undefined && cell.cutoff !== undefined) {
+    out[0] = (cell.period >> 8) & 0xFF;
+    out[1] = cell.period & 0xFF;
+    out[2] = cell.pan & 0xFF;
+    out[3] = cell.cutoff & 0xFF;
+    return out;
+  }
+
   // Pattern commands: encode special effect types back to TFMX commands
   if (note === 0 && instr === 0) {
     if (effTyp === 0x0D) {
