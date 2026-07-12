@@ -89,6 +89,17 @@ export function encodeDigitalMugicianCell(cell: TrackerCell): Uint8Array {
     out[3] = 0;
   }
 
+  // Byte-exact carrier restore. DigitalMugicianParser.decodeCell stashes the exact 4
+  // source bytes in the invisible period/pan/cutoff carriers (fields the grid loop
+  // never sets); reproduce all 4 bytes verbatim for an unedited cell. Edited grid
+  // cells lack the carriers and keep the derivation above.
+  if (cell.period !== undefined && cell.pan !== undefined && cell.cutoff !== undefined) {
+    out[0] = (cell.period >> 8) & 0xFF;
+    out[1] = cell.period & 0xFF;
+    out[2] = cell.pan & 0xFF;
+    out[3] = cell.cutoff & 0xFF;
+  }
+
   return out;
 }
 
