@@ -107,6 +107,7 @@ Substantial implementation guides live in `docs/`:
 - [`docs/SYNTH_TB303.md`](docs/SYNTH_TB303.md) — DB303 / TB-303 emulation definitive reference.
 - [`docs/SYNTH_FURNACE.md`](docs/SYNTH_FURNACE.md) — Furnace synth integration patterns.
 - [`docs/HARDWARE_UI_PATTERN.md`](docs/HARDWARE_UI_PATTERN.md) — hardware UI WASM modules extraction pattern (PT2, FT2, etc.).
+- [`docs/FORMAT_COMMAND_STREAM_GRID.md`](docs/FORMAT_COMMAND_STREAM_GRID.md) — the "Rob Hubbard recipe": turn a compiled per-channel command-stream format into an editable tick-grid with byte-exact `blockRows` carriers (davidWhittaker/hippel/benDaglish class).
 - [`docs/MCP_DEBUGGING_GUIDE.md`](docs/MCP_DEBUGGING_GUIDE.md) — full MCP tool reference, debugging workflows, architecture.
 - [`docs/FORMAT_STATUS_TRACKER.md`](docs/FORMAT_STATUS_TRACKER.md) — `localhost:4444` format-audit dashboard, API, key conventions.
 
