@@ -9,10 +9,39 @@ import type { TrackerSong } from '@engine/TrackerReplayer';
 import type { Pattern, InstrumentConfig, TrackerCell } from '@/types';
 import type { UADEPatternLayout } from '@/engine/uade/UADEPatternEncoder';
 import { encodeEarAcheCell } from '@/engine/uade/encoders/EarAcheEncoder';
-import { decodeMODCell } from '@/engine/uade/encoders/MODEncoder';
 
 function emptyCell(): TrackerCell {
   return { note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 };
+}
+
+function u32BE(buf: Uint8Array, off: number): number {
+  return (((buf[off] << 24) | (buf[off + 1] << 16) | (buf[off + 2] << 8) | buf[off + 3]) >>> 0);
+}
+
+/**
+ * Locate the score command-stream region. The EASO header is a 6-entry u32 section
+ * offset table (relative to byte 4, i.e. post-magic); section[0] is the score, the
+ * remaining five are instrument / envelope / sample tables. The score spans
+ * [section[0], nextLowestSection). Returns [start, end) or [0, 0] if malformed.
+ */
+function findScoreRegion(buf: Uint8Array): [number, number] {
+  if (buf.length < 28) return [0, 0];
+  const offs: number[] = [];
+  for (let i = 0; i < 6; i++) offs.push(4 + u32BE(buf, 4 + i * 4));
+  const start = offs[0];
+  if (start < 28 || start >= buf.length) return [0, 0];
+  let end = buf.length;
+  for (let i = 1; i < offs.length; i++) {
+    if (offs[i] > start && offs[i] < end) end = offs[i];
+  }
+  if (end <= start || end > buf.length) return [0, 0];
+  return [start, end];
+}
+
+/** Carrier decode: stash the exact source byte in the invisible `period` field. */
+function decodeEACell(raw: Uint8Array): TrackerCell {
+  const b = raw[0] ?? 0;
+  return { note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0, period: b };
 }
 
 export function isEarAcheFormat(buffer: ArrayBuffer | Uint8Array): boolean {
@@ -22,25 +51,31 @@ export function isEarAcheFormat(buffer: ArrayBuffer | Uint8Array): boolean {
 }
 
 export function parseEarAcheFile(buffer: ArrayBuffer, filename: string): TrackerSong {
+  const buf = new Uint8Array(buffer);
   const name = filename.replace(/\.[^.]+$/, '').replace(/^[^.]+\./, '');
-  const NUM_CHANNELS = 4;
-  const ROWS = 64;
+
+  const [scoreStart, scoreEnd] = findScoreRegion(buf);
+  const hasScore = scoreEnd > scoreStart;
+  const scoreLen = hasScore ? scoreEnd - scoreStart : 64;
+
+  // Display grid: one 'Score' channel over the opcode-stream bytes. Built WITHOUT the
+  // `period` carrier so edited rows fall back to canonical (rest) on write-back.
   const pattern: Pattern = {
     id: 'pattern-0',
     name: 'Pattern 0',
-    length: ROWS,
-    channels: Array.from({ length: NUM_CHANNELS }, (_, ch) => ({
-      id: `channel-${ch}`,
-      name: `EarAche ${ch + 1}`,
+    length: scoreLen,
+    channels: [{
+      id: 'channel-0',
+      name: 'Score',
       muted: false,
       solo: false,
       collapsed: false,
       volume: 100,
-      pan: (ch === 0 || ch === 3) ? -50 : 50,
+      pan: 0,
       instrumentId: null,
       color: null,
-      rows: Array.from({ length: ROWS }, () => emptyCell()),
-    })),
+      rows: Array.from({ length: scoreLen }, () => emptyCell()),
+    }],
   };
   const instruments: InstrumentConfig[] = Array.from({ length: 4 }, (_, i) => ({
     id: i + 1,
@@ -52,22 +87,18 @@ export function parseEarAcheFile(buffer: ArrayBuffer, filename: string): Tracker
     pan: 0,
   } as InstrumentConfig));
 
-  // Build uadePatternLayout for chip RAM editing
-  // EarAche is a stub — pattern data offset is 0 until the format is fully parsed.
+  // Byte-exact codec: point the layout at the real located score command-stream and
+  // carry each source byte verbatim (1 byte/cell, single channel).
   const uadePatternLayout: UADEPatternLayout = {
     formatId: 'earAche',
-    patternDataFileOffset: 0,
-    bytesPerCell: 4,
-    rowsPerPattern: ROWS,
-    numChannels: NUM_CHANNELS,
+    patternDataFileOffset: hasScore ? scoreStart : 0,
+    bytesPerCell: 1,
+    rowsPerPattern: scoreLen,
+    numChannels: 1,
     numPatterns: 1,
     moduleSize: buffer.byteLength,
     encodeCell: encodeEarAcheCell,
-    decodeCell: decodeMODCell,
-    getCellFileOffset: (pat: number, row: number, channel: number): number => {
-      const patternByteSize = ROWS * NUM_CHANNELS * 4;
-      return pat * patternByteSize + row * NUM_CHANNELS * 4 + channel * 4;
-    },
+    decodeCell: decodeEACell,
   };
 
   return {
@@ -78,7 +109,7 @@ export function parseEarAcheFile(buffer: ArrayBuffer, filename: string): Tracker
     songPositions: [0],
     songLength: 1,
     restartPosition: 0,
-    numChannels: 4,
+    numChannels: 1,
     initialSpeed: 6,
     initialBPM: 125,
     uadePatternLayout,
