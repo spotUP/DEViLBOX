@@ -239,6 +239,20 @@ function eventsToRows(events: DLEvent[], sampleInfoBase: number): { rows: RowDat
  * Groups consecutive note rows, rest rows, etc. into commands.
  */
 function encodeRowsToStream(rows: TrackerCell[], _channel: number): Uint8Array {
+  // Carrier path (byte-exact): rows produced by the parser's blockRows are
+  // per-byte carriers of the real command-stream section (cutoff=1, period=byte).
+  // Dave Lowe commands are variable-length word pairs; concatenating the carrier
+  // bytes reproduces the section verbatim. The editable display grid stays
+  // carrier-less and re-derives period/duration via the grid path below.
+  if (rows.some(c => c.cutoff !== undefined)) {
+    const carried: number[] = [];
+    for (const cell of rows) {
+      if (cell.cutoff === undefined) continue; // padding — emits nothing
+      carried.push((cell.period ?? 0) & 0xFF);
+    }
+    return new Uint8Array(carried);
+  }
+
   const out: number[] = [];
   let i = 0;
 
@@ -554,6 +568,24 @@ export async function parseDaveLoweFile(
       filePatternSizes.push(sectionBytes.get(sectionPtr) ?? 0);
     }
 
+    // Per-byte carrier rows: a Dave Lowe section is a variable-length command
+    // stream, not a fixed grid. Per-byte carriers (cutoff=1, period=byte) let the
+    // encoder reproduce each section verbatim; the editable display grid stays
+    // carrier-less (edits export via the grid re-encode path).
+    const blockRows: TrackerCell[][] = [];
+    for (let i = 0; i < filePatternAddrs.length; i++) {
+      const addr = filePatternAddrs[i];
+      const size = filePatternSizes[i];
+      const cells: TrackerCell[] = [];
+      for (let b = 0; b < size && addr + b < buf.length; b++) {
+        cells.push({
+          note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0,
+          cutoff: 1, period: buf[addr + b] & 0xFF,
+        });
+      }
+      blockRows.push(cells);
+    }
+
     const variableLayout: UADEVariablePatternLayout = {
       formatId: 'daveLowe',
       numChannels: 4,
@@ -564,6 +596,7 @@ export async function parseDaveLoweFile(
       filePatternAddrs,
       filePatternSizes,
       trackMap,
+      blockRows,
     };
 
     // Assign to result (done below)

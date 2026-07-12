@@ -59,9 +59,9 @@
     "daveLowe": {
       "kind": "variable",
       "method": "encode-pattern",
-      "status": "lossy",
-      "byteExact": false,
-      "matchPct": 0.0625,
+      "status": "byte-exact",
+      "byteExact": true,
+      "matchPct": 1,
       "cells": 64
     },
     "davidWhittaker": {
