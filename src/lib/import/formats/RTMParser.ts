@@ -741,6 +741,21 @@ export async function parseRTMFile(
 
   // ── Assemble TrackerSong ───────────────────────────────────────────────────
 
+  // Structural raw-block carrier: RTM (Real Tracker) packs pattern rows with an
+  // event-mask/compression scheme, a non-canonical encoding no from-scratch
+  // encoder reproduces. Stash each block's original packed bytes (blockRawBytes)
+  // plus a decoded baseline (blockRows, channel 0). Unedited block re-emits
+  // verbatim (byte-exact); edited block re-packs.
+  const blockRows: TrackerCell[][] = new Array(numPatterns);
+  const blockRawBytes: Uint8Array[] = new Array(numPatterns);
+  for (let fp = 0; fp < numPatterns; fp++) {
+    const chRows = patterns[fp]?.channels[0]?.rows ?? [];
+    blockRows[fp] = chRows.map((c) => ({ ...c }));
+    const a = patternFileAddrs[fp] ?? 0;
+    const s = patternFileSizes[fp] ?? 0;
+    blockRawBytes[fp] = raw.slice(a, a + s);
+  }
+
   return {
     name:            songName,
     format:          'XM' as TrackerFormat,   // RTM effects are XM-compatible
@@ -765,6 +780,8 @@ export async function parseRTMFile(
       trackMap: Array.from({ length: numPatterns }, (_, p) =>
         Array.from({ length: numChannels }, (__, _ch) => p),
       ),
+      blockRows,
+      blockRawBytes,
     } satisfies UADEVariablePatternLayout,
   };
 }
