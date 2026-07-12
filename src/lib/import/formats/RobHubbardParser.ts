@@ -611,6 +611,18 @@ function buildRHVariablePatterns(
           };
           const end = Math.min(totalRows, tick + dur);
           for (let t = tick; t < end; t++) fpByTick[t] = fp;
+          // Release marker: on the note's LAST held row, drop a note-off (===) so
+          // a sustained voice shows where it releases instead of a bare blank run.
+          // RH is gapless (the next trigger lands on `end`), so the marker lives on
+          // `end - 1` — this note's own final row — which the next note-on never
+          // touches. Needs dur >= 2 (a 1-row note is only its attack). Rests
+          // (note 97) already are silence, so they get no extra release.
+          if (cell.note > 0 && cell.note !== 97 && end - 1 > tick) {
+            timeline[end - 1] = {
+              note: 97, instrument: 0,
+              volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0,
+            };
+          }
           tick = end;
           advanced = true;
         }
