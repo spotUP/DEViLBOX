@@ -536,7 +536,15 @@ export function parseSidMon1File(buffer: ArrayBuffer, filename: string, moduleBa
       const note = sm1NoteToXM(sm1Note);
       let effTyp = 0, eff = 0;
       if (speed > 0) { effTyp = 0x0F; eff = speed; }
-      return { note, instrument: sample, volume: 0, effTyp, eff, effTyp2: 0, eff2: 0 };
+      // Byte-exact carrier. The 5-byte SM1 cell is heavily lossy in the XM view: the
+      // note round-trips through a period-table nearest-match, and the effect/effectParam
+      // bytes have no XM mapping at all (decode drops them). Stash the raw 5 source bytes
+      // in the invisible period/pan/cutoff/resonance carriers (fields the grid loop never
+      // sets, so edited cells fall back to the canonical derivation).
+      return {
+        note, instrument: sample, volume: 0, effTyp, eff, effTyp2: 0, eff2: 0,
+        period: (raw[0] << 8) | raw[1], pan: raw[2], cutoff: raw[3], resonance: raw[4],
+      };
     },
     getCellFileOffset: (pattern: number, row: number, channel: number): number => {
       // pattern = TrackerSong pattern index (= song step index)

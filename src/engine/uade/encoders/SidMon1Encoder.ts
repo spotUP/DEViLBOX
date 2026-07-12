@@ -84,6 +84,22 @@ export function encodeSidMon1Cell(cell: TrackerCell): Uint8Array {
   // Byte 4: speed (0 = no change)
   out[4] = 0;
 
+  // Byte-exact carrier restore. SidMon1Parser.decodeCell stashes the exact 5 source
+  // bytes in the invisible period/pan/cutoff/resonance carriers (fields the grid loop
+  // never sets); reproduce all 5 bytes verbatim for an unedited cell. Edited grid cells
+  // lack the carriers and keep the derivation above (which zeroes the unmapped effect
+  // and speed bytes).
+  if (
+    cell.period !== undefined && cell.pan !== undefined &&
+    cell.cutoff !== undefined && cell.resonance !== undefined
+  ) {
+    out[0] = (cell.period >> 8) & 0xFF;
+    out[1] = cell.period & 0xFF;
+    out[2] = cell.pan & 0xFF;
+    out[3] = cell.cutoff & 0xFF;
+    out[4] = cell.resonance & 0xFF;
+  }
+
   return out;
 }
 
