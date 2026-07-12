@@ -617,7 +617,18 @@ export async function parseSTMFile(
         }
       }
 
-      return { note, instrument, volume, effTyp, eff, effTyp2: 0, eff2: 0 };
+      // Byte-exact carrier. The 4-byte STM cell collapses several distinct source
+      // bytes onto one XM view: the note sentinels 0xFB/0xFC (empty/continue) and
+      // 0xFD/0xFE (both note-cut) fold together, instruments >31 clamp to 0, volumes
+      // >64 clamp to 0, and convertSTMEffect is a many-to-one map (encode packs the
+      // set-speed param into the high nibble, dropping the low). None of that inverts
+      // exactly, so stash the raw 4 source bytes in the invisible period/pan/cutoff
+      // carriers (fields the parser's own channelRows grid loop never sets, so edited
+      // cells lack them and fall back to the canonical derivation).
+      return {
+        note, instrument, volume, effTyp, eff, effTyp2: 0, eff2: 0,
+        period: (noteByte << 8) | insVol, pan: volCmd, cutoff: cmdInf,
+      };
     },
   };
 

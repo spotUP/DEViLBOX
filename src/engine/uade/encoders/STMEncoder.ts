@@ -97,6 +97,17 @@ function encodeSTMCell(cell: TrackerCell): Uint8Array {
   // Byte 3: effect parameter
   out[3] = param & 0xFF;
 
+  // Byte-exact carrier restore. STMParser.decodeCell stashes the exact 4 source bytes
+  // in the invisible period/pan/cutoff carriers (fields the parser's grid loop never
+  // sets); reproduce all 4 bytes verbatim so an unedited cell round-trips exactly.
+  // Edited grid cells lack the carriers and keep the derivation above.
+  if (cell.period !== undefined && cell.pan !== undefined && cell.cutoff !== undefined) {
+    out[0] = (cell.period >> 8) & 0xFF;
+    out[1] = cell.period & 0xFF;
+    out[2] = cell.pan & 0xFF;
+    out[3] = cell.cutoff & 0xFF;
+  }
+
   return out;
 }
 
