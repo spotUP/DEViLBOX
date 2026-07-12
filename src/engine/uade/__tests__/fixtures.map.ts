@@ -43,7 +43,7 @@ export const ENCODER_FIXTURES: EncoderFixture[] = [
   { formatId: "coreDesign", fixture: "public/data/songs/core-design/dynamite dux.core", kind: "fixed" },
   { formatId: "customMade", fixture: "public/data/songs/formats/cm.viking_child", kind: "fixed" },
   { formatId: "daveLowe", fixture: "public/data/songs/dave-lowe/incredibleshrinkingsphere.dl", kind: "variable" },
-  { formatId: "davidWhittaker", fixture: "public/data/songs/david-whittaker/garfield2+.dw", kind: "fixed" },
+  { formatId: "davidWhittaker", fixture: "public/data/songs/david-whittaker/garfield2+.dw", kind: "variable" },
   { formatId: "deltaMusic1", fixture: "public/data/songs/delta-music/triplex1.dm", kind: "fixed" },
   { formatId: "desire", fixture: "public/data/songs/desire/batmanreturns.dsr", kind: "fixed" },
   { formatId: "digitalMugician", fixture: "public/data/songs/digital-mugician/believe.dmu", kind: "fixed" },
