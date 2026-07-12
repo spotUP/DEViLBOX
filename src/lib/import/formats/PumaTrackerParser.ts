@@ -645,6 +645,25 @@ export async function parsePumaTrackerFile(
     order.channels.map(ch => ch.pattern < numPatterns ? ch.pattern : -1),
   );
 
+  // Per-byte carrier rows: a PumaTracker pattern is an RLE command stream of
+  // 4-byte {noteX2, instrEffect, param, runLen} groups, not a fixed grid. The
+  // on-disk RLE grouping is not recoverable from the expanded display grid, so
+  // per-byte carriers (cutoff=1, period=byte) let the encoder reproduce each
+  // block verbatim; the editable display grid stays carrier-less.
+  const blockRows: TrackerCell[][] = [];
+  for (let i = 0; i < filePatternAddrs.length; i++) {
+    const addr = filePatternAddrs[i];
+    const size = filePatternSizes[i];
+    const cells: TrackerCell[] = [];
+    for (let b = 0; b < size && addr + b < buffer.byteLength; b++) {
+      cells.push({
+        note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0,
+        cutoff: 1, period: view.getUint8(addr + b) & 0xFF,
+      });
+    }
+    blockRows.push(cells);
+  }
+
   const variableLayout: UADEVariablePatternLayout = {
     formatId: 'pumaTracker',
     numChannels: 4,
@@ -655,6 +674,7 @@ export async function parsePumaTrackerFile(
     filePatternAddrs,
     filePatternSizes,
     trackMap,
+    blockRows,
   };
 
   return {
