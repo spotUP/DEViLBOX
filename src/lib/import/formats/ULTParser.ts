@@ -442,9 +442,6 @@ export async function parseULTFile(
   // (v<'3' reads no pan bytes — LRRL is synthesised above)
 
   // ── Pattern data — channel-interleaved RLE ─────────────────────────────────
-  // Track the start of pattern data section for UADE variable layout
-  const patternDataStart = pos;
-
   // Allocate: patterns[patIdx][chIdx][rowIdx] = TrackerCell
   // We fill channel-first, then pattern-first, then row-by-row.
   //
@@ -480,8 +477,15 @@ export async function parseULTFile(
     }
   }
 
+  // Real per-(ch,pat) block byte ranges captured straight from the RLE walk, so
+  // the variable layout points at the exact on-disk bytes of each block (not an
+  // averaged guess). Indexed by fp = ch * numPatterns + pat, matching trackMap.
+  const blockAddr: number[] = new Array(numChannels * numPatterns).fill(0);
+  const blockSize: number[] = new Array(numChannels * numPatterns).fill(0);
+
   for (let ch = 0; ch < numChannels; ch++) {
     for (let pat = 0; pat < numPatterns; pat++) {
+      const blockStart = pos;
       let row = 0;
       while (row < ROWS_PER_PATTERN) {
         if (pos >= buffer.byteLength) break;
@@ -552,6 +556,9 @@ export async function parseULTFile(
         }
         row += repeat;
       }
+      const fp = ch * numPatterns + pat;
+      blockAddr[fp] = blockStart;
+      blockSize[fp] = pos - blockStart;
     }
   }
 
@@ -618,8 +625,6 @@ export async function parseULTFile(
       }
     }
   }
-
-  const patternDataSize = pos - patternDataStart;
 
   // ── Sample PCM data ────────────────────────────────────────────────────────
   // Samples are stored sequentially. For each sample, the length in bytes is:
@@ -776,17 +781,25 @@ export async function parseULTFile(
   // Each (channel, pattern) block is one "file pattern" entry.
   // File patterns are ordered: ch0-pat0, ch0-pat1, ..., ch0-patN, ch1-pat0, ...
   const numFilePatterns = numChannels * numPatterns;
-  const ultPatFileAddrs: number[] = [];
-  const ultPatFileSizes: number[] = [];
+  // Real per-block offsets/sizes captured during the RLE walk (fp = ch*numPatterns+pat).
+  const ultPatFileAddrs: number[] = blockAddr.slice(0, numFilePatterns);
+  const ultPatFileSizes: number[] = blockSize.slice(0, numFilePatterns);
 
-  // We don't have exact per-(ch,pat) byte offsets from the interleaved RLE stream,
-  // so we store the entire pattern data section as one block per file pattern.
-  // This is approximate but sufficient — the variable encoder will re-encode
-  // the full channel data when editing.
-  const avgSize = numFilePatterns > 0 ? Math.floor(patternDataSize / numFilePatterns) : 0;
-  for (let i = 0; i < numFilePatterns; i++) {
-    ultPatFileAddrs.push(patternDataStart + i * avgSize);
-    ultPatFileSizes.push(avgSize);
+  // Structural raw-block carrier: keep the exact on-disk bytes of each block plus a
+  // baseline snapshot of the decoded rows (post speed-fix, so it matches the display
+  // grid). ULT's encoder emits uncompressed 5-byte rows and maps effects many-to-one,
+  // so it cannot reproduce the 0xFC-run-length source; the carrier makes an unedited
+  // module byte-exact while an edited block falls back to the packer.
+  const blockRows: TrackerCell[][] = new Array(numFilePatterns);
+  const blockRawBytes: Uint8Array[] = new Array(numFilePatterns);
+  for (let ch = 0; ch < numChannels; ch++) {
+    for (let pat = 0; pat < numPatterns; pat++) {
+      const fp = ch * numPatterns + pat;
+      blockRows[fp] = patternData[pat][ch].map((c) => ({ ...c }));
+      const a = ultPatFileAddrs[fp];
+      const s = ultPatFileSizes[fp];
+      blockRawBytes[fp] = bytes.slice(a, a + s);
+    }
   }
 
   // trackMap: (trackerPat, channel) → file pattern index
@@ -811,6 +824,8 @@ export async function parseULTFile(
     filePatternAddrs: ultPatFileAddrs,
     filePatternSizes: ultPatFileSizes,
     trackMap,
+    blockRows,
+    blockRawBytes,
   };
 
   // ── Assemble TrackerSong ───────────────────────────────────────────────────

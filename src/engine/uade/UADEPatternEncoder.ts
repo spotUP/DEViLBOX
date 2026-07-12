@@ -235,6 +235,69 @@ export interface UADEVariablePatternLayout {
    * (most variable formats) leave this undefined and encode grid rows directly.
    */
   blockRows?: TrackerCell[][];
+
+  /**
+   * Original packed bytes for each file-level block, parallel to `blockRows`
+   * (`blockRawBytes[fp]` covers `[filePatternAddrs[fp], +filePatternSizes[fp])`).
+   *
+   * The structural raw-block carrier: variable formats whose packer cannot
+   * byte-exactly reproduce the on-disk stream (RLE run choices, many-to-one
+   * effect maps, optional-field packing — e.g. UltraTracker's 0xFC repeat runs)
+   * stash the original block bytes here. {@link encodeVariableBlock} emits them
+   * VERBATIM when the block's rows still match the parsed baseline (`blockRows[fp]`)
+   * — so an UNEDITED module round-trips byte-for-byte — and falls back to the
+   * format's real packer the moment any cell in the block is edited. This is the
+   * per-cell carrier pattern (period/pan/cutoff) generalised to a whole variable
+   * block: the baseline is the decode, edits fall back, nothing is faked.
+   *
+   * Optional: leave undefined for formats whose encoder is already a byte-exact
+   * inverse (they encode `blockRows`/grid rows directly).
+   */
+  blockRawBytes?: Uint8Array[];
+}
+
+/** Compare the editable fields of two cells (ignores display-only / carrier data). */
+function cellFieldsEqual(a: TrackerCell, b: TrackerCell): boolean {
+  return (a.note ?? 0) === (b.note ?? 0)
+    && (a.instrument ?? 0) === (b.instrument ?? 0)
+    && (a.volume ?? 0) === (b.volume ?? 0)
+    && (a.effTyp ?? 0) === (b.effTyp ?? 0)
+    && (a.eff ?? 0) === (b.eff ?? 0)
+    && (a.effTyp2 ?? 0) === (b.effTyp2 ?? 0)
+    && (a.eff2 ?? 0) === (b.eff2 ?? 0);
+}
+
+/** True when `rows` is content-identical to the parsed baseline (block is unedited). */
+function rowsUnedited(rows: TrackerCell[], baseline: TrackerCell[]): boolean {
+  if (rows.length !== baseline.length) return false;
+  for (let i = 0; i < rows.length; i++) {
+    if (!cellFieldsEqual(rows[i], baseline[i])) return false;
+  }
+  return true;
+}
+
+/**
+ * Encode one variable-length block, preferring the structural raw-block carrier.
+ *
+ * When the layout carries original bytes for block `fp` AND `rows` still match the
+ * parsed baseline (`blockRows[fp]`), the original bytes are returned verbatim — an
+ * unedited block round-trips byte-for-byte even when the format's packer is lossy.
+ * Any edit makes `rows` diverge from the baseline, so the real packer runs instead.
+ *
+ * Used by BOTH the round-trip harness and the live chip-RAM rewrite path
+ * (`UADEChipEditor.rewriteVariablePattern`) so the measured behaviour and the
+ * exported behaviour are the same.
+ */
+export function encodeVariableBlock(
+  layout: UADEVariablePatternLayout,
+  fp: number,
+  rows: TrackerCell[],
+  channel: number,
+): Uint8Array {
+  const raw = layout.blockRawBytes?.[fp];
+  const baseline = layout.blockRows?.[fp];
+  if (raw && baseline && rowsUnedited(rows, baseline)) return raw;
+  return layout.encoder.encodePattern(rows, channel);
 }
 
 const variableEncoderRegistry = new Map<string, VariableLengthEncoder>();

@@ -33,6 +33,7 @@ import type { TrackerCell } from '@/types';
 import { detectFormat } from '@/lib/import/FormatRegistry';
 import {
   getCellFileOffset,
+  encodeVariableBlock,
   listPatternEncoderFormatIds,
   listVariableEncoderFormatIds,
   type UADEPatternLayout,
@@ -137,7 +138,7 @@ function roundTripFixed(raw: Uint8Array, layout: UADEPatternLayout, song: Tracke
 }
 
 function roundTripVariable(raw: Uint8Array, layout: UADEVariablePatternLayout, song: TrackerSong): { cells: number; exact: number } {
-  const { filePatternAddrs, filePatternSizes, trackMap, encoder } = layout;
+  const { filePatternAddrs, filePatternSizes, trackMap } = layout;
   let blocks = 0;
   let exact = 0;
   for (let fp = 0; fp < filePatternAddrs.length; fp++) {
@@ -168,7 +169,10 @@ function roundTripVariable(raw: Uint8Array, layout: UADEVariablePatternLayout, s
     if (addr < 0 || size <= 0 || addr + size > raw.length) continue;
     const orig = raw.subarray(addr, addr + size);
     blocks++;
-    const re = encoder.encodePattern(rows, ch);
+    // Route through encodeVariableBlock so the harness measures the SAME path the
+    // live chip-RAM rewrite uses: an unedited block prefers its raw-byte carrier
+    // (byte-exact), an edited block falls back to the format's packer.
+    const re = encodeVariableBlock(layout, fp, rows, ch);
     if (bytesEqual(re, orig)) exact++;
   }
   return { cells: blocks, exact };
