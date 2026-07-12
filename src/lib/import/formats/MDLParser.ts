@@ -918,6 +918,30 @@ export async function parseMDLFile(
 
   const clampedRestart = Math.min(restartPos, Math.max(0, finalPositions.length - 1));
 
+  // Structural raw-block carrier: MDL packs each track (one channel column) with
+  // run-length/copy compression (empty-run, repeat-previous, copy-from-row), a
+  // non-canonical encoding no from-scratch encoder reproduces. Each track's raw
+  // bytes are already captured in tracks[fp].data; pair them with a decoded
+  // baseline (the first pattern/channel column that references the track). An
+  // unedited track re-emits verbatim (byte-exact); an edited track re-packs.
+  const trackToRows = new Map<number, TrackerCell[]>();
+  for (let pat = 0; pat < patternTrackMap.length; pat++) {
+    const tm = patternTrackMap[pat];
+    for (let chn = 0; chn < tm.length; chn++) {
+      const tn = tm[chn];
+      if (tn > 0 && !trackToRows.has(tn) && patterns[pat]?.channels[chn]) {
+        trackToRows.set(tn, patterns[pat].channels[chn].rows);
+      }
+    }
+  }
+  const blockRows: TrackerCell[][] = new Array(tracks.length);
+  const blockRawBytes: Uint8Array[] = new Array(tracks.length);
+  for (let fp = 0; fp < tracks.length; fp++) {
+    const rows = trackToRows.get(fp);
+    blockRows[fp] = (rows ?? []).map((c) => ({ ...c }));
+    blockRawBytes[fp] = tracks[fp].data ?? new Uint8Array(0);
+  }
+
   return {
     name:            songTitle || filename.replace(/\.[^/.]+$/i, ''),
     format:          'MOD' as TrackerFormat,
@@ -940,6 +964,8 @@ export async function parseMDLFile(
       filePatternAddrs: trackFileAddrs,
       filePatternSizes: trackFileSizes,
       trackMap: patternTrackMap,
+      blockRows,
+      blockRawBytes,
     } satisfies UADEVariablePatternLayout,
   };
 }
