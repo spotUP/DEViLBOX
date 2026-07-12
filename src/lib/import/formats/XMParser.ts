@@ -690,6 +690,21 @@ export async function parseXMFile(buffer: ArrayBuffer, filename: string): Promis
     Array.from({ length: header.channelCount }, () => patIdx),
   );
 
+  // Structural raw-block carrier: XM's on-disk pattern packing is non-canonical
+  // (an empty cell may be 0x80 OR five zero bytes), so no from-scratch encoder can
+  // reproduce a given file's bytes. Stash each pattern block's original packed
+  // bytes (blockRawBytes) plus a decoded baseline (blockRows, channel 0). An
+  // unedited block re-emits verbatim (byte-exact); an edited block re-packs.
+  const fileBytes = new Uint8Array(buffer);
+  const blockRows: TrackerCell[][] = new Array(patterns.length);
+  const blockRawBytes: Uint8Array[] = new Array(patterns.length);
+  for (let fp = 0; fp < patterns.length; fp++) {
+    blockRows[fp] = patterns[fp].channels[0].rows.map((c) => ({ ...c }));
+    const a = filePatternAddrs[fp];
+    const s = filePatternSizes[fp];
+    blockRawBytes[fp] = fileBytes.slice(a, a + s);
+  }
+
   const uadeVariableLayout: UADEVariablePatternLayout = {
     formatId: 'xm',
     numChannels: header.channelCount,
@@ -700,6 +715,8 @@ export async function parseXMFile(buffer: ArrayBuffer, filename: string): Promis
     filePatternAddrs,
     filePatternSizes,
     trackMap,
+    blockRows,
+    blockRawBytes,
   };
 
   return {
