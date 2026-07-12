@@ -24,17 +24,30 @@ import { registerPatternEncoder } from '../UADEPatternEncoder';
 /** 0xFF = rest / hold (no change to the voice). */
 export const GLUE_REST = 0xff;
 
+/** Last note byte covered by the player's chromatic period table (idx 48). */
+const GLUE_NOTE_MAX = 0x60;
+
 function encodeGlueMonCell(cell: TrackerCell): Uint8Array {
   // Byte-exact carrier restore: reproduce the exact source byte when present.
   if (cell.period !== undefined) {
     return new Uint8Array([cell.period & 0xff]);
   }
 
-  // Edited cell: derive a note-index byte in [1,96], else a rest.
+  // Edited note: invert decodeCell's mapping — visible note (idx+1) → even byte
+  // (idx << 1), clamped to the table range. Inexact by the tie/portamento LSB the
+  // carrier would have preserved, but faithful for freshly-entered notes.
   const note = cell.note ?? 0;
-  if (note > 0 && note <= 96) {
-    return new Uint8Array([note & 0xff]);
+  if (note > 0) {
+    const byte = ((note - 1) << 1) & 0xfe;
+    return new Uint8Array([Math.min(byte, GLUE_NOTE_MAX)]);
   }
+
+  // Edited command-lane cell (sample-select): instrument 1..8 → marker 0xC8-0xCF.
+  const instr = cell.instrument ?? 0;
+  if (instr >= 1 && instr <= 8) {
+    return new Uint8Array([0xc7 + instr]);
+  }
+
   return new Uint8Array([GLUE_REST]);
 }
 
