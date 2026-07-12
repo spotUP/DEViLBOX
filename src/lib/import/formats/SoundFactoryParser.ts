@@ -786,13 +786,19 @@ export function parseSoundFactoryFile(bytes: Uint8Array, filename: string): Trac
     decodeCell: (raw: Uint8Array): TrackerCell => {
       // 3 bytes: opcode, durationHi, durationLo
       const opcode = raw[0];
+      // Byte-exact carriers: the note is a clamped lookup, the pause opcode flattens to an
+      // empty cell, and the uint16 duration (raw[1..2]) is dropped from the XM view, so none
+      // of the 3 bytes invert. Stash all three in the invisible period/pan carriers;
+      // encodeSoundFactoryCell reproduces them verbatim. Private to the round-trip path —
+      // the grid loop sets no period/pan, so edited cells fall back to the derivation.
+      const carriers = { period: (raw[0] << 8) | raw[1], pan: raw[2] };
       if (opcode >= 0x80) {
         // Pause/rest (0x80+)
-        return { note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 };
+        return { note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0, ...carriers };
       }
       // Note: psfNoteToXm = opcode + 13
       const note = Math.max(1, Math.min(96, opcode + 13));
-      return { note, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 };
+      return { note, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0, ...carriers };
     },
     getCellFileOffset: (pattern: number, row: number, channel: number): number => {
       const globalRow = pattern * ROWS_PER_PATTERN + row;

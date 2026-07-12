@@ -43,6 +43,16 @@ export function encodeSoundFactoryCell(cell: TrackerCell): Uint8Array {
     out[2] = 1;
   }
 
+  // Byte-exact carrier restore. SoundFactoryParser.decodeCell stashes all 3 source bytes in
+  // the invisible period/pan carriers (the note is a clamped lookup and the uint16 duration
+  // is dropped from the XM view). Reproduce all 3 verbatim for an unedited cell; edited grid
+  // cells lack the carriers and keep the derivation above.
+  if (cell.period !== undefined && cell.pan !== undefined) {
+    out[0] = (cell.period >> 8) & 0xFF;
+    out[1] = cell.period & 0xFF;
+    out[2] = cell.pan & 0xFF;
+  }
+
   return out;
 }
 
