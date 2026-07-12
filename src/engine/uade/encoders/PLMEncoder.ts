@@ -65,6 +65,21 @@ function encodePLMCell(cell: TrackerCell): Uint8Array {
   out[3] = cmd & 0xFF;
   out[4] = param & 0xFF;
 
+  // Byte-exact carrier restore. PLMParser.decodeCell stashes the exact 5 source bytes
+  // in the invisible period/pan/cutoff/resonance carriers (fields the grid loop never
+  // sets); reproduce all 5 bytes verbatim for an unedited cell. Edited grid cells lack
+  // the carriers and keep the derivation above.
+  if (
+    cell.period !== undefined && cell.pan !== undefined &&
+    cell.cutoff !== undefined && cell.resonance !== undefined
+  ) {
+    out[0] = (cell.period >> 8) & 0xFF;
+    out[1] = cell.period & 0xFF;
+    out[2] = cell.pan & 0xFF;
+    out[3] = cell.cutoff & 0xFF;
+    out[4] = cell.resonance & 0xFF;
+  }
+
   return out;
 }
 

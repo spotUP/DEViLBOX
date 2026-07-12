@@ -603,7 +603,15 @@ export async function parsePLMFile(
 
       const [effTyp, eff] = transformEffect(cmd, param);
 
-      return { note, instrument: instr, volume, effTyp, eff, effTyp2: 0, eff2: 0 };
+      // Byte-exact carrier. The 5-byte PLM cell is lossy in the XM view: the volume
+      // maps 0xFF->0 and clamps >64, and transformEffect is a many-to-one command map.
+      // Stash the raw 5 source bytes in the invisible period/pan/cutoff/resonance
+      // carriers (fields the grid loop never sets, so edited cells fall back to the
+      // canonical derivation).
+      return {
+        note, instrument: instr, volume, effTyp, eff, effTyp2: 0, eff2: 0,
+        period: (noteByte << 8) | instr, pan: volByte, cutoff: cmd, resonance: param,
+      };
     },
     getCellFileOffset: (pattern: number, row: number, channel: number): number => {
       // PLM uses a 2D canvas; resolve through the pre-built offset map
