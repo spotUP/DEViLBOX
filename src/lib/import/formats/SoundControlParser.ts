@@ -520,7 +520,15 @@ export function parseSoundControlFile(bytes: Uint8Array, filename: string): Trac
       const instrument = raw[1];
       const volume = raw[3] & 0x7F;
       const note = is40orHigher ? sc40NoteToXm(noteByte) : sc3xNoteToXm(noteByte);
-      return { note, instrument, volume, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 };
+      // Byte-exact carrier. The 4-byte note event is lossy in the XM view: the note maps
+      // through a nearest-match period table, the volume masks its top bit (&0x7F), and
+      // raw[2] (unused) is dropped. Stash the raw 4 source bytes in the invisible
+      // period/pan/cutoff carriers (fields the parser's grid loop never sets, so edited
+      // cells fall back to the canonical derivation).
+      return {
+        note, instrument, volume, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0,
+        period: (raw[0] << 8) | raw[1], pan: raw[2], cutoff: raw[3],
+      };
     },
     getCellFileOffset: (pattern: number, row: number, channel: number): number => {
       const pos = positions[pattern];
