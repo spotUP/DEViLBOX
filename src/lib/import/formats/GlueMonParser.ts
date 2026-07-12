@@ -29,9 +29,9 @@
  */
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
-import type { InstrumentConfig } from '@/types';
+import type { InstrumentConfig, TrackerCell } from '@/types';
 import type { UADEPatternLayout } from '@/engine/uade/UADEPatternEncoder';
-import { encodeMODCell, decodeMODCell } from '@/engine/uade/encoders/MODEncoder';
+import { encodeGlueMonCell } from '@/engine/uade/encoders/GlueMonEncoder';
 
 // ── Constants ──────────────────────────────────────────────────────────────
 
@@ -102,43 +102,97 @@ export function parseGlueMonFile(buffer: ArrayBuffer, filename: string): Tracker
 
   const moduleName = rawName || fileBaseName;
 
-  // ── Stub pattern (UADE handles audio) ─────────────────────────────────────
+  // ── Locate the real pattern-data region (from the GlueMon replayer) ────────
+  // GlueMon's InitSound (third-party/uade-3.05/players/GlueMon, code 0x544) sets
+  // up playback from a struct pointer a3 = module base + 8, so a3@(N) == file[8+N]:
+  //   rowsPerPattern = file[29]                 (a3@(21), ×4 = pattern byte length)
+  //   patternBase    = 8 + ((file[158]-105)&0xFF)  (a3@(150) → contiguous pattern data)
+  // and it builds 64 pattern pointers each patternBase + i*(rows*4). The order list
+  // at file[159] (0xFF-terminated) references the patterns actually used, so the
+  // real pattern count = max(order)+1. Each pattern is `rows` rows of 4 bytes —
+  // one byte per voice [v0,v1,v2,v3]; the v3 lane also carries command markers
+  // (0xC8-0xCF). No PCM: the 4 synth-waveform tables live in the header, so the
+  // pattern region runs to EOF.
+  const B = 8; // struct base offset: a3 = module base + 8
+  const rowsPerPattern = buf.length > B + 29 ? buf[B + 21] : 0;
+  const patternBase = B + ((buf[B + 150] - 105) & 0xff);
+  const patternLen = rowsPerPattern * NUM_CHANNELS; // bytes per pattern
 
-  const emptyRows = Array.from({ length: 64 }, () => ({
-    note: 0,
-    instrument: 0,
-    volume: 0,
-    effTyp: 0,
-    eff: 0,
-    effTyp2: 0,
-    eff2: 0,
-  }));
+  // Order list → highest referenced pattern number.
+  let maxPat = 0;
+  for (let o = 159; o < buf.length && buf[o] !== 0xff; o++) {
+    if (buf[o] > maxPat) maxPat = buf[o];
+  }
+  const regionValid =
+    rowsPerPattern > 0 &&
+    patternLen > 0 &&
+    patternBase >= B &&
+    patternBase + (maxPat + 1) * patternLen <= buf.length;
+  const numPatterns = regionValid ? maxPat + 1 : 1;
 
-  const pattern = {
-    id: 'pattern-0',
-    name: 'Pattern 0',
-    length: 64,
-    channels: Array.from({ length: NUM_CHANNELS }, (_, ch) => ({
-      id: `channel-${ch}`,
-      name: `Channel ${ch + 1}`,
-      muted: false,
-      solo: false,
-      collapsed: false,
-      volume: 100,
-      pan: CHANNEL_PANS[ch],
-      instrumentId: null,
-      color: null,
-      rows: emptyRows,
-    })),
-    importMetadata: {
-      sourceFormat: 'MOD' as const,
-      sourceFile: filename,
-      importedAt: new Date().toISOString(),
-      originalChannelCount: NUM_CHANNELS,
-      originalPatternCount: 1,
-      originalInstrumentCount: 0,
-    },
+  // decodeCell: best-effort display note; exact source byte rides in the invisible
+  // `period` carrier for byte-exact export. 0xFF/0xFE and command bytes → note 0.
+  const decodeGlueCell = (raw: Uint8Array): TrackerCell => {
+    const v = raw[0];
+    const note = v > 0 && v <= 96 ? v : 0;
+    return { note: note as TrackerCell['note'], instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0, period: v };
   };
+  const emptyRow: TrackerCell = { note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 };
+
+  const patterns = regionValid
+    ? Array.from({ length: numPatterns }, (_, p) => ({
+        id: `pattern-${p}`,
+        name: `Pattern ${p}`,
+        length: rowsPerPattern,
+        channels: Array.from({ length: NUM_CHANNELS }, (_, ch) => ({
+          id: `channel-${ch}`,
+          name: `Channel ${ch + 1}`,
+          muted: false,
+          solo: false,
+          collapsed: false,
+          volume: 100,
+          pan: CHANNEL_PANS[ch],
+          instrumentId: null,
+          color: null,
+          rows: Array.from({ length: rowsPerPattern }, (_, r) => {
+            const off = patternBase + p * patternLen + r * NUM_CHANNELS + ch;
+            return off < buf.length ? decodeGlueCell(buf.subarray(off, off + 1)) : { ...emptyRow };
+          }),
+        })),
+        importMetadata: {
+          sourceFormat: 'MOD' as const,
+          sourceFile: filename,
+          importedAt: new Date().toISOString(),
+          originalChannelCount: NUM_CHANNELS,
+          originalPatternCount: numPatterns,
+          originalInstrumentCount: 0,
+        },
+      }))
+    : [{
+        id: 'pattern-0',
+        name: 'Pattern 0',
+        length: 64,
+        channels: Array.from({ length: NUM_CHANNELS }, (_, ch) => ({
+          id: `channel-${ch}`,
+          name: `Channel ${ch + 1}`,
+          muted: false,
+          solo: false,
+          collapsed: false,
+          volume: 100,
+          pan: CHANNEL_PANS[ch],
+          instrumentId: null,
+          color: null,
+          rows: Array.from({ length: 64 }, () => ({ ...emptyRow })),
+        })),
+        importMetadata: {
+          sourceFormat: 'MOD' as const,
+          sourceFile: filename,
+          importedAt: new Date().toISOString(),
+          originalChannelCount: NUM_CHANNELS,
+          originalPatternCount: 1,
+          originalInstrumentCount: 0,
+        },
+      }];
 
   const instruments: InstrumentConfig[] = [
     {
@@ -155,10 +209,10 @@ export function parseGlueMonFile(buffer: ArrayBuffer, filename: string): Tracker
   return {
     name: `${moduleName} [GlueMon]`,
     format: 'MOD' as TrackerFormat,
-    patterns: [pattern],
+    patterns,
     instruments,
-    songPositions: [0],
-    songLength: 1,
+    songPositions: patterns.map((_, i) => i),
+    songLength: patterns.length,
     restartPosition: 0,
     numChannels: NUM_CHANNELS,
     initialSpeed: 6,
@@ -168,14 +222,14 @@ export function parseGlueMonFile(buffer: ArrayBuffer, filename: string): Tracker
     uadeEditableFileName: filename,
     uadePatternLayout: {
       formatId: 'glueMon',
-      patternDataFileOffset: 0,
-      bytesPerCell: 4,
-      rowsPerPattern: 64,
+      patternDataFileOffset: regionValid ? patternBase : 0,
+      bytesPerCell: 1,
+      rowsPerPattern: regionValid ? rowsPerPattern : 64,
       numChannels: NUM_CHANNELS,
-      numPatterns: 1,
+      numPatterns,
       moduleSize: buffer.byteLength,
-      encodeCell: encodeMODCell,
-      decodeCell: decodeMODCell,
+      encodeCell: encodeGlueMonCell,
+      decodeCell: decodeGlueCell,
     } as UADEPatternLayout,
   };
 }
