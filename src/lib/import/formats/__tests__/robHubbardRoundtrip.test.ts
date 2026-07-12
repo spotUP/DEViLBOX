@@ -41,27 +41,19 @@ describe('Rob Hubbard pattern codec', () => {
     if (!layout) throw new Error('no variable layout');
     expect(layout.formatId).toBe('robHubbard');
 
-    const { filePatternAddrs, filePatternSizes, trackMap, encoder } = layout;
+    const { filePatternAddrs, filePatternSizes, blockRows, encoder } = layout;
     expect(filePatternAddrs.length, 'has file-pattern blocks').toBeGreaterThan(0);
+    // The display grid is a shared tick timeline (a channel's block straddles
+    // pattern boundaries), so the byte-exact carriers live on the layout's
+    // per-block `blockRows`, NOT in the display cells. The encoder reproduces each
+    // block from those canonical carrier rows.
+    expect(blockRows, 'layout exposes per-block carrier rows').toBeTruthy();
+    if (!blockRows) throw new Error('no blockRows');
+    expect(blockRows.length, 'one carrier-row set per file-pattern').toBe(filePatternAddrs.length);
 
     let checked = 0;
     let sawCommands = false; // a block with real command bytes (not just a bare -124)
     for (let fp = 0; fp < filePatternAddrs.length; fp++) {
-      let mapped: { tp: number; ch: number } | null = null;
-      for (let tp = 0; tp < trackMap.length && !mapped; tp++) {
-        const row = trackMap[tp];
-        if (!row) continue;
-        for (let ch = 0; ch < row.length; ch++) {
-          if (row[ch] === fp) { mapped = { tp, ch }; break; }
-        }
-      }
-      expect(mapped, `file-pattern ${fp} is referenced by the trackMap`).toBeTruthy();
-      if (!mapped) continue;
-
-      const rows = song.patterns[mapped.tp]?.channels[mapped.ch]?.rows;
-      expect(rows, `rows for tp${mapped.tp} ch${mapped.ch}`).toBeTruthy();
-      if (!rows) continue;
-
       const addr = filePatternAddrs[fp];
       const size = filePatternSizes[fp];
       expect(addr).toBeGreaterThanOrEqual(0);
@@ -70,7 +62,7 @@ describe('Rob Hubbard pattern codec', () => {
 
       const orig = raw.subarray(addr, addr + size);
       if (size > 1) sawCommands = true;
-      const re = encoder.encodePattern(rows, mapped.ch);
+      const re = encoder.encodePattern(blockRows[fp], 0);
       expect([...re], `block fp${fp} @${addr} size ${size}`).toEqual([...orig]);
       checked++;
     }
@@ -79,13 +71,14 @@ describe('Rob Hubbard pattern codec', () => {
     expect(sawCommands, 'fixture exercises multi-command blocks').toBe(true);
   });
 
-  // Regression: RH channels have DIFFERENT track-list lengths and each loops
-  // independently (the replayer restarts a channel from block 0 when its list
-  // hits the null terminator). The old builder truncated shorter channels —
-  // emitting empty rows past their block count — so those channels went silent
-  // partway through the song ("missing notes"). The fix wraps each channel with
-  // `step % list.length`. This asserts no channel is truncated: every channel
-  // that plays any note must still play notes in the final third of the song.
+  // Regression: RH channels are INDEPENDENT command streams with different track
+  // lengths that each loop independently. The old builder command-indexed the grid
+  // (one row per command, one pattern per block-step), which (a) truncated shorter
+  // channels so they went silent ("missing notes") and (b) collapsed the grid so a
+  // sustained voice showed a few rows then blank under a tick-driven playhead
+  // ("hear bass, see no notes"). The tick-timeline builder lays every channel on a
+  // shared tick grid, looping each to fill the song, so no active voice ever goes
+  // silent in the final third.
   it('every channel loops for the full song (no channel goes silent)', async () => {
     // skateordie.rh has strongly imbalanced channel track-lists ([152,1,75,39]),
     // so it exercises the independent per-channel looping (centurion_battle.rh is
@@ -103,12 +96,11 @@ describe('Rob Hubbard pattern codec', () => {
     const numChannels = song.patterns[0]?.channels.length ?? 0;
     expect(numPatterns, 'multi-pattern song').toBeGreaterThan(1);
 
-    // A channel counts as "active" if it has ANY note anywhere in the song.
-    // Split the song into the first third and last third; an active channel
-    // that plays in the first third MUST still play in the last third once it
-    // loops. On the truncating bug, a short channel is empty in the last third.
+    // A channel counts as "active" if it plays any note anywhere. An active channel
+    // that plays in the first third MUST still play in the last third once it loops.
+    // On the truncating bug, a short channel is empty in the last third.
     const lastThirdStart = Math.floor((numPatterns * 2) / 3);
-    let checkedImbalanced = false;
+    let checkedActive = false;
     for (let ch = 0; ch < numChannels; ch++) {
       let notesEarly = 0;
       let notesLate = 0;
@@ -118,21 +110,53 @@ describe('Rob Hubbard pattern codec', () => {
         if (p < lastThirdStart) notesEarly += n;
         else notesLate += n;
       }
-      // trackMap: does this channel loop (repeat a filePattern) within the song?
-      const fpsForCh = layout.trackMap.map(row => row[ch]).filter(v => v >= 0);
-      const distinct = new Set(fpsForCh).size;
-      const loops = fpsForCh.length > distinct; // channel repeated a block => it looped
-      if (loops && notesEarly > 0) {
-        checkedImbalanced = true;
-        expect(notesLate, `channel ${ch} loops but has no notes in the final third (truncated)`).toBeGreaterThan(0);
-      }
-      // No channel should ever be assigned -1 (silent) if it has any blocks.
-      const hasBlocks = layout.trackMap.some(row => row[ch] >= 0);
-      if (hasBlocks) {
-        const anyMinus1 = layout.trackMap.some(row => row[ch] === -1);
-        expect(anyMinus1, `channel ${ch} has silent (-1) steps despite having blocks`).toBe(false);
+      if (notesEarly > 0) {
+        checkedActive = true;
+        expect(notesLate, `channel ${ch} plays early but is silent in the final third`).toBeGreaterThan(0);
       }
     }
-    expect(checkedImbalanced, 'fixture exercises a looping (shorter) channel').toBe(true);
+    expect(checkedActive, 'fixture exercises an active channel').toBe(true);
+  });
+
+  // Regression for "hear bass, see no notes": a sustained note must occupy its
+  // full duration on the tick grid (note-on cell then blank continuation rows),
+  // so the tick-driven playhead sweeps rows that sit under the sounding note. The
+  // old command-indexed grid packed notes into adjacent rows regardless of
+  // duration, so a long note showed one row then blank while it kept sounding.
+  it('lays notes on a real tick timeline (sustained notes span their duration)', async () => {
+    const LOOP_FIXTURE = join(process.cwd(), 'public/data/songs/rob-hubbard/skateordie.rh');
+    const raw = new Uint8Array(readFileSync(LOOP_FIXTURE));
+    const song = await parseRobHubbardFile(
+      raw.buffer.slice(raw.byteOffset, raw.byteOffset + raw.byteLength),
+      'skateordie.rh',
+    );
+    const layout = (song as unknown as { uadeVariableLayout?: import('@/engine/uade/UADEPatternEncoder').UADEVariablePatternLayout }).uadeVariableLayout;
+    if (!layout?.blockRows) throw new Error('no blockRows');
+
+    // Patterns are fixed 64-row slices of the shared timeline.
+    for (const p of song.patterns) {
+      expect(p.length, 'fixed tick-slice height').toBe(64);
+      for (const ch of p.channels) expect(ch.rows.length).toBe(64);
+    }
+
+    // Flatten one channel's whole timeline and find a note followed by at least one
+    // blank continuation row — proof that duration is honoured (not one-row-per-cmd).
+    // At least one block in the module must carry a multi-tick note.
+    const hasMultiTickNote = layout.blockRows.some(rows =>
+      rows.some(c => c.cutoff !== undefined && (c.period ?? 0) < 128 && (c.period ?? 0) > 1),
+    );
+    expect(hasMultiTickNote, 'fixture has a note longer than one tick').toBe(true);
+
+    let sawSustainGap = false;
+    for (let ch = 0; ch < song.patterns[0].channels.length && !sawSustainGap; ch++) {
+      const flat = song.patterns.flatMap(p => p.channels[ch].rows);
+      for (let i = 0; i < flat.length - 1; i++) {
+        if (flat[i].note > 0 && flat[i].note !== 97 && flat[i + 1].note === 0) {
+          sawSustainGap = true;
+          break;
+        }
+      }
+    }
+    expect(sawSustainGap, 'a note is followed by a blank continuation row (sustained)').toBe(true);
   });
 });
