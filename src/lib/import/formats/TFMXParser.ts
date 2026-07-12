@@ -794,18 +794,26 @@ export function parseTFMXFile(
     decodeCell: (raw: Uint8Array): TrackerCell => {
       const b0 = raw[0], b1 = raw[1], b2 = raw[2], b3 = raw[3];
 
+      // Byte-exact carriers: the note is a clamped table lookup, the relative volume nibble
+      // is scaled (b2>>4)*4 (lossy), and pattern/wait/detune bytes collapse into the narrow
+      // XM effect view, so none of the 4 bytes invert. Stash all 4 in the invisible
+      // period/pan/cutoff carriers; encodeTFMXCell reproduces them verbatim. Private to the
+      // round-trip path — the grid loop pushes cmds[row].cell (built separately, no carriers),
+      // so edited cells fall back to the canonical derivation.
+      const carriers = { period: (b0 << 8) | b1, pan: b2, cutoff: b3 };
+
       if (b0 >= 0xF0) {
         // Pattern commands (F0=end, F1=loop, F3=wait, F5=key-up, etc.)
-        if (b0 === 0xF5) return { note: 97, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 };
-        if (b0 === 0xF0) return { note: 0, instrument: 0, volume: 0, effTyp: 0x0D, eff: 0, effTyp2: 0, eff2: 0 };
-        if (b0 === 0xF3) return { note: 0, instrument: 0, volume: 0, effTyp: 0x0F, eff: (b1 + 1), effTyp2: 0, eff2: 0 };
-        return { note: 0, instrument: 0, volume: 0, effTyp: b0 & 0x0F, eff: b1, effTyp2: 0, eff2: 0 };
+        if (b0 === 0xF5) return { note: 97, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0, ...carriers };
+        if (b0 === 0xF0) return { note: 0, instrument: 0, volume: 0, effTyp: 0x0D, eff: 0, effTyp2: 0, eff2: 0, ...carriers };
+        if (b0 === 0xF3) return { note: 0, instrument: 0, volume: 0, effTyp: 0x0F, eff: (b1 + 1), effTyp2: 0, eff2: 0, ...carriers };
+        return { note: 0, instrument: 0, volume: 0, effTyp: b0 & 0x0F, eff: b1, effTyp2: 0, eff2: 0, ...carriers };
       }
       if (b0 >= 0xC0) {
         // Portamento
         const noteIdx = b0 & 0x3F;
         const xmNote = tfmxNoteToXM(noteIdx);
-        return { note: xmNote, instrument: b1 > 0 ? b1 + 1 : 0, volume: ((b2 >> 4) & 0x0F) * 4, effTyp: 0x03, eff: b3, effTyp2: 0, eff2: 0 };
+        return { note: xmNote, instrument: b1 > 0 ? b1 + 1 : 0, volume: ((b2 >> 4) & 0x0F) * 4, effTyp: 0x03, eff: b3, effTyp2: 0, eff2: 0, ...carriers };
       }
       // Note event (< 0xC0): < 0x80 = immediate, 0x80-0xBF = with wait
       const noteIdx = b0 & 0x3F;
@@ -815,6 +823,7 @@ export function parseTFMXFile(
         note: xmNote, instrument: b1 + 1, volume: ((b2 >> 4) & 0x0F) * 4,
         effTyp: hasWait ? 0x0F : 0, eff: hasWait ? b3 : 0,
         effTyp2: !hasWait && b3 !== 0 ? 0x0E : 0, eff2: !hasWait ? b3 : 0,
+        ...carriers,
       };
     },
     getCellFileOffset: (pattern: number, row: number, channel: number): number => {
