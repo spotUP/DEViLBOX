@@ -21,6 +21,23 @@ import type { TrackerCell } from '@/types';
 import { registerPatternEncoder } from '../UADEPatternEncoder';
 
 /**
+ * Byte-exact carrier restore. SoundControlParser.decodeCell stashes the exact 4 source
+ * bytes of a note event in the invisible period/pan/cutoff carriers (fields the parser's
+ * grid loop never sets); reproduce all 4 bytes verbatim for an unedited cell so the note
+ * round-trips (the parser drops the unused byte and masks the volume top bit, and the note
+ * maps through a nearest-match table — none of which the derivation inverts exactly).
+ * Edited grid cells lack the carriers and keep the derived encoding.
+ */
+function applySoundControlCarriers(out: Uint8Array, cell: TrackerCell): void {
+  if (cell.period !== undefined && cell.pan !== undefined && cell.cutoff !== undefined) {
+    out[0] = (cell.period >> 8) & 0xFF;
+    out[1] = cell.period & 0xFF;
+    out[2] = cell.pan & 0xFF;
+    out[3] = cell.cutoff & 0xFF;
+  }
+}
+
+/**
  * Reverse of sc40NoteToXm: XM note → SC 4.0+ period table index (1-based).
  * sc40NoteToXm does: idx + 37 → xmNote, so reverse: xmNote - 37 + 1 = xmNote - 36
  */
@@ -57,6 +74,7 @@ function encodeSoundControl40Cell(cell: TrackerCell): Uint8Array {
   out[1] = (cell.instrument ?? 0) & 0xFF;
   out[2] = 0; // unused byte (yy)
   out[3] = (cell.volume ?? 0) & 0x7F;
+  applySoundControlCarriers(out, cell);
   return out;
 }
 
@@ -69,6 +87,7 @@ function encodeSoundControl3xCell(cell: TrackerCell): Uint8Array {
   out[1] = (cell.instrument ?? 0) & 0xFF;
   out[2] = 0; // unused byte (yy)
   out[3] = (cell.volume ?? 0) & 0x7F;
+  applySoundControlCarriers(out, cell);
   return out;
 }
 
