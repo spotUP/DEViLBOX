@@ -512,7 +512,15 @@ export async function parseFARFile(
         eff = 0;
       }
 
-      return { note, instrument, volume, effTyp, eff, effTyp2: 0, eff2: 0 };
+      // Byte-exact carrier. The 4-byte FAR cell is lossy in the XM view: the volume
+      // double-rounds through a /15 scale (1-16 <-> 0-64), the instrument is offset by 1,
+      // and convertFAREffect is a many-to-one map (skipEffect drops the effect entirely).
+      // Stash the raw 4 source bytes in the invisible period/pan/cutoff carriers (fields
+      // the grid loop never sets, so edited cells fall back to the canonical derivation).
+      return {
+        note, instrument, volume, effTyp, eff, effTyp2: 0, eff2: 0,
+        period: (raw[0] << 8) | raw[1], pan: raw[2], cutoff: raw[3],
+      };
     },
     getCellFileOffset: (pattern: number, row: number, channel: number): number => {
       const cellDataStart = patternCellOffsets[pattern];
