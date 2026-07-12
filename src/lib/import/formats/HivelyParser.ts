@@ -100,6 +100,8 @@ export interface HivelyModule {
   trackFileOffsets: number[];
   /** Byte size of each track's data in the file (for variable-length HVL tracks) */
   trackFileSizes: number[];
+  /** Original module bytes — carrier source for byte-exact HVL track re-emit */
+  rawBytes?: Uint8Array;
 }
 
 // ── Text Decoder ─────────────────────────────────────────────────────────────
@@ -494,6 +496,7 @@ function parseHVL(buf: Uint8Array): HivelyModule {
     subsongs,
     trackFileOffsets,
     trackFileSizes,
+    rawBytes: buf,
   };
 }
 
@@ -799,6 +802,43 @@ function buildHivelyPatternLayout(mod: HivelyModule): {
     trackMap.push(pos.track.map(t => t));
   }
 
+  // Structural raw-block carrier: HVL packs each track with a variable-length
+  // run scheme (1-byte no-op vs 5-byte full step), a non-canonical encoding no
+  // from-scratch encoder reproduces byte-exact. numFilePatterns = one block per
+  // TRACK (positions share tracks via trackMap). Stash each track's original
+  // packed bytes plus a decoded baseline (transpose=0, canonical per-track view);
+  // unedited track re-emits verbatim, edited track re-packs via hivelyHVLEncoder.
+  const blockRows: TrackerCell[][] = new Array(mod.tracks.length);
+  const blockRawBytes: Uint8Array[] = new Array(mod.tracks.length);
+  const raw = mod.rawBytes;
+  for (let fp = 0; fp < mod.tracks.length; fp++) {
+    const track = mod.tracks[fp];
+    const rows: TrackerCell[] = [];
+    for (let row = 0; row < mod.trackLength; row++) {
+      const step = track?.[row] ?? { note: 0, instrument: 0, fx: 0, fxParam: 0, fxb: 0, fxbParam: 0 };
+      const fx1 = mapHvlEffect(step.fx, step.fxParam);
+      const fx2 = mapHvlEffect(step.fxb, step.fxbParam);
+      const cell: TrackerCell = {
+        note: step.note > 0 && step.note <= 60 ? step.note : 0,
+        instrument: step.instrument,
+        volume: fx1.volume ?? fx2.volume ?? 0,
+        effTyp: fx1.effTyp,
+        eff: fx1.eff,
+        effTyp2: fx2.effTyp,
+        eff2: fx2.eff,
+      };
+      if (fx1.flag1 !== undefined) cell.flag1 = fx1.flag1;
+      if (fx1.flag2 !== undefined) cell.flag2 = fx1.flag2;
+      if (fx2.flag1 !== undefined && cell.flag1 === undefined) cell.flag1 = fx2.flag1;
+      if (fx2.flag2 !== undefined && cell.flag2 === undefined) cell.flag2 = fx2.flag2;
+      rows.push(cell);
+    }
+    blockRows[fp] = rows;
+    const a = mod.trackFileOffsets[fp];
+    const s = mod.trackFileSizes[fp];
+    blockRawBytes[fp] = raw ? raw.slice(a, a + s) : new Uint8Array(0);
+  }
+
   const layout: UADEVariablePatternLayout = {
     formatId: 'hivelyHVL',
     numChannels: mod.channels,
@@ -809,6 +849,8 @@ function buildHivelyPatternLayout(mod: HivelyModule): {
     filePatternAddrs: mod.trackFileOffsets,
     filePatternSizes: mod.trackFileSizes,
     trackMap,
+    blockRows,
+    blockRawBytes,
   };
 
   return { type: 'variable', layout };
