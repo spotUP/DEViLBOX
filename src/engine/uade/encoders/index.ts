@@ -59,6 +59,7 @@ import './NRUEncoder';
 import './OctaMEDEncoder';
 import './OktalyzerEncoder';
 import './PaulRobothamEncoder';
+import './PaulShieldsEncoder';
 import './PLMEncoder';
 import './PSMEncoder';
 import './PTMEncoder';
