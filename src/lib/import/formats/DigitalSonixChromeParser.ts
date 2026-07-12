@@ -25,9 +25,9 @@
  */
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
-import type { InstrumentConfig } from '@/types';
+import type { InstrumentConfig, TrackerCell } from '@/types';
 import type { UADEPatternLayout } from '@/engine/uade/UADEPatternEncoder';
-import { encodeMODCell, decodeMODCell } from '@/engine/uade/encoders/MODEncoder';
+import { encodeDscCell } from '@/engine/uade/encoders/DigitalSonixChromeEncoder';
 import { createSamplerInstrument } from './AmigaUtils';
 
 // ── Constants ─────────────────────────────────────────────────────────────
@@ -245,42 +245,70 @@ export function parseDscFile(buffer: ArrayBuffer, filename: string): TrackerSong
     }
   }
 
-  const emptyRows = Array.from({ length: 64 }, () => ({
-    note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0,
-  }));
+  // ── Sequence table → editable grid ──────────────────────────────────────
+  // The 4-byte-per-entry sequence table at seqTableOff is the module's only
+  // on-disk song data (nothing sits between it and the sample info: seqTableOff
+  // + seqCount*4 === sampleInfoOff). The player walks it reading per-voice
+  // position bytes; the packed bytes are not a clean note/effect cell, so each
+  // grid cell carries its four source bytes verbatim (period/pan/cutoff carriers)
+  // and the encoder reproduces them byte-for-byte. Lay the linear entry stream
+  // out as 4-voice rows so the harness's linear getCellFileOffset covers exactly
+  // [seqTableOff, sampleInfoOff).
+  const NUM_CHANNELS = 4;
+  const ROWS_PER_PATTERN = 64;
+  const cellsPerPattern = ROWS_PER_PATTERN * NUM_CHANNELS;
+  const numPatterns = Math.max(1, Math.floor(seqCount / cellsPerPattern));
 
-  const pattern = {
-    id: 'pattern-0', name: 'Pattern 0', length: 64,
-    channels: Array.from({ length: 4 }, (_, ch) => ({
+  const decodeDscCell = (raw: Uint8Array): TrackerCell => {
+    const b0 = raw[0], b1 = raw[1], b2 = raw[2], b3 = raw[3];
+    // No documented note/effect packing (position/trigger stream); expose an
+    // empty editable cell and carry the exact source bytes for byte-exact export.
+    return {
+      note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0,
+      period: (b0 << 8) | b1, pan: b2, cutoff: b3,
+    };
+  };
+
+  const patterns = Array.from({ length: numPatterns }, (_, p) => ({
+    id: `pattern-${p}`, name: `Pattern ${p}`, length: ROWS_PER_PATTERN,
+    channels: Array.from({ length: NUM_CHANNELS }, (_, ch) => ({
       id: `channel-${ch}`, name: `Channel ${ch + 1}`, muted: false,
       solo: false, collapsed: false, volume: 100,
       pan: ch === 0 || ch === 3 ? -50 : 50,
-      instrumentId: null, color: null, rows: emptyRows,
+      instrumentId: null, color: null,
+      rows: Array.from({ length: ROWS_PER_PATTERN }, (_, r) => {
+        const off = seqTableOff + (p * cellsPerPattern + r * NUM_CHANNELS + ch) * 4;
+        return off + 4 <= buf.length
+          ? decodeDscCell(buf.subarray(off, off + 4))
+          : { note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 };
+      }),
     })),
     importMetadata: {
       sourceFormat: 'MOD' as const, sourceFile: filename,
       importedAt: new Date().toISOString(),
-      originalChannelCount: 4, originalPatternCount: 1, originalInstrumentCount: nLengths,
+      originalChannelCount: NUM_CHANNELS, originalPatternCount: numPatterns,
+      originalInstrumentCount: nLengths,
     },
-  };
+  }));
 
   return {
     name: `${moduleName} [Digital Sonix & Chrome]`, format: 'MOD' as TrackerFormat,
-    patterns: [pattern], instruments, songPositions: [0],
-    songLength: 1, restartPosition: 0, numChannels: 4,
+    patterns, instruments,
+    songPositions: patterns.map((_, i) => i),
+    songLength: numPatterns, restartPosition: 0, numChannels: NUM_CHANNELS,
     initialSpeed: 6, initialBPM: 125, linearPeriods: false,
     uadeEditableFileData: buffer.slice(0) as ArrayBuffer,
     uadeEditableFileName: filename,
     uadePatternLayout: {
       formatId: 'digitalSonixChrome',
-      patternDataFileOffset: 0,
+      patternDataFileOffset: seqTableOff,
       bytesPerCell: 4,
-      rowsPerPattern: 64,
-      numChannels: 4,
-      numPatterns: 1,
+      rowsPerPattern: ROWS_PER_PATTERN,
+      numChannels: NUM_CHANNELS,
+      numPatterns,
       moduleSize: buffer.byteLength,
-      encodeCell: encodeMODCell,
-      decodeCell: decodeMODCell,
+      encodeCell: encodeDscCell,
+      decodeCell: decodeDscCell,
     } as UADEPatternLayout,
   };
 }
