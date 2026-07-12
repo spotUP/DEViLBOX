@@ -950,7 +950,14 @@ function parseInternal(bytes: Uint8Array, filename: string): TrackerSong | null 
       const note = (noteIdx > 0 && noteIdx < RK_PERIODS.length)
         ? Math.max(1, Math.min(96, XM_REFERENCE_NOTE + (noteIdx - RK_REFERENCE_IDX)))
         : 0;
-      return { note, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 };
+      // Byte-exact carrier: the note is a lossy clamp and waitCount (raw[1]) is dropped
+      // entirely from the XM view, so neither byte inverts. Stash both source bytes in the
+      // invisible period carrier; encodeRonKlarenCell reproduces them verbatim. Private to
+      // the round-trip path — the grid loop sets no period, so edited cells fall back.
+      return {
+        note, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0,
+        period: (raw[0] << 8) | raw[1],
+      };
     },
     getCellFileOffset: (pattern: number, row: number, channel: number): number => {
       if (pattern < 0 || pattern >= cellOffsetMap.length) return -1;

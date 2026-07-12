@@ -50,6 +50,15 @@ export function encodeRonKlarenCell(cell: TrackerCell): Uint8Array {
     out[1] = 0;
   }
 
+  // Byte-exact carrier restore. RonKlarenParser.decodeCell stashes both source bytes in the
+  // invisible period carrier (the note is a lossy clamp and waitCount is dropped from the XM
+  // view). Reproduce both verbatim for an unedited cell; edited grid cells lack the carrier
+  // and keep the derivation above.
+  if (cell.period !== undefined) {
+    out[0] = (cell.period >> 8) & 0xFF;
+    out[1] = cell.period & 0xFF;
+  }
+
   return out;
 }
 
