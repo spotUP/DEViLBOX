@@ -41,6 +41,7 @@ import './HivelyEncoder';
 import './IffSmusEncoder';
 import './ImagoOrpheusEncoder';
 import './IMSEncoder';
+import './InfogramesEncoder';
 import './InStereo1Encoder';
 import './InStereo2Encoder';
 import './ITEncoder';
