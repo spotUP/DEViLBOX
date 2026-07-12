@@ -35,6 +35,21 @@ export const faceTheMusicEncoder: VariableLengthEncoder = {
   formatId: 'faceTheMusic',
 
   encodePattern(rows: TrackerCell[], _channel: number): Uint8Array {
+    // Carrier path (byte-exact): rows produced by FaceTheMusicParser's blockRows
+    // are per-byte carriers of the real per-channel event stream (cutoff=1,
+    // period=byte). FTM events are variable-length with spacing updates, so
+    // per-byte carriers cover the whole stream; concatenating them reproduces the
+    // channel chunk verbatim. The editable display grid stays carrier-less and
+    // re-derives the event stream below.
+    if (rows.some(c => c.cutoff !== undefined)) {
+      const carried: number[] = [];
+      for (const cell of rows) {
+        if (cell.cutoff === undefined) continue; // padding — emits nothing
+        carried.push((cell.period ?? 0) & 0xFF);
+      }
+      return new Uint8Array(carried);
+    }
+
     const buf: number[] = [];
 
     // FTM stores events as a stream with spacing between them.

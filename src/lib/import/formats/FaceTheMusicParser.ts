@@ -493,6 +493,24 @@ export function parseFaceTheMusicFile(bytes: Uint8Array, filename: string): Trac
     ));
   }
 
+  // Per-byte carrier rows: an FTM channel chunk is a variable-length event
+  // stream (spacing updates + note/instrument events), not a fixed grid.
+  // Per-byte carriers (cutoff=1, period=byte) let the encoder reproduce each
+  // chunk verbatim; the editable display grid stays carrier-less.
+  const blockRows: TrackerCell[][] = [];
+  for (let i = 0; i < channelStreamAddrs.length; i++) {
+    const addr = channelStreamAddrs[i];
+    const size = channelStreamSizes[i];
+    const cells: TrackerCell[] = [];
+    for (let b = 0; b < size && addr + b < bytes.byteLength; b++) {
+      cells.push({
+        note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0,
+        cutoff: 1, period: bytes[addr + b] & 0xFF,
+      });
+    }
+    blockRows.push(cells);
+  }
+
   const uadeVariableLayout: UADEVariablePatternLayout = {
     formatId: 'faceTheMusic',
     numChannels: NUM_CHANNELS,
@@ -503,6 +521,7 @@ export function parseFaceTheMusicFile(bytes: Uint8Array, filename: string): Trac
     filePatternAddrs: channelStreamAddrs,
     filePatternSizes: channelStreamSizes,
     trackMap,
+    blockRows,
   };
 
   return {
