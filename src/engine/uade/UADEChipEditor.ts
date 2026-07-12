@@ -8,7 +8,7 @@
 
 import { UADEEngine } from './UADEEngine';
 import type { UADEPatternLayout } from './UADEPatternEncoder';
-import { getCellFileOffset } from './UADEPatternEncoder';
+import { getCellFileOffset, encodeVariableBlock } from './UADEPatternEncoder';
 import type { TrackerCell } from '@/types';
 
 export class UADEChipEditor {
@@ -198,7 +198,9 @@ export class UADEChipEditor {
     if (fileOffset == null || originalSize == null) return false;
 
     const moduleBase = await this.getModuleBase();
-    const encoded = layout.encoder.encodePattern(rows, channel);
+    // Prefer the raw-block carrier: an unedited block writes back byte-for-byte
+    // (and always fits its slot); an edited block re-packs via the format encoder.
+    const encoded = encodeVariableBlock(layout, filePatIdx, rows, channel);
 
     if (encoded.length > originalSize) {
       console.warn(
