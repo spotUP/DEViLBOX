@@ -43,6 +43,21 @@ export const musicAssemblerEncoder: VariableLengthEncoder = {
   formatId: 'musicAssembler',
 
   encodePattern(rows: TrackerCell[]): Uint8Array {
+    // Carrier path (byte-exact): rows produced by MusicAssemblerParser's blockRows
+    // are per-byte carriers of the real command-stream track (cutoff=1,
+    // period=byte). Music Assembler events are variable-length (1..4 bytes), so
+    // per-byte carriers cover any event length; concatenating them reproduces the
+    // track verbatim, including its 0xff terminator. The editable display grid
+    // stays carrier-less and re-derives events below.
+    if (rows.some(c => c.cutoff !== undefined)) {
+      const carried: number[] = [];
+      for (const cell of rows) {
+        if (cell.cutoff === undefined) continue; // padding — emits nothing
+        carried.push((cell.period ?? 0) & 0xFF);
+      }
+      return new Uint8Array(carried);
+    }
+
     const buf: number[] = [];
     let lastInstrument = -1;
 

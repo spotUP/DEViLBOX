@@ -873,10 +873,27 @@ function parseMusicAssembler(bytes: Uint8Array, filename: string): TrackerSong |
   const filePatternAddrs: number[] = [];
   const filePatternSizes: number[] = [];
 
+  // Per-byte carrier rows: a Music Assembler track is a variable-length command
+  // stream (events run 1..4 bytes, 0xff terminator), not a fixed grid. tracks[i]
+  // holds the verbatim on-disk bytes, so per-byte carriers (cutoff=1, period=byte)
+  // let the encoder reproduce each track verbatim; the editable display grid stays
+  // carrier-less.
+  const blockRows: TrackerCell[][] = [];
   for (let i = 0; i < numberOfTracks; i++) {
     const trackOff = tracksStartOffset + trackOffsetTable[i];
     filePatternAddrs.push(trackOff >= 0 ? trackOff : 0);
-    filePatternSizes.push(tracks[i] ? tracks[i]!.length : 0);
+    const trk = tracks[i];
+    filePatternSizes.push(trk ? trk.length : 0);
+    const cells: TrackerCell[] = [];
+    if (trk) {
+      for (let b = 0; b < trk.length; b++) {
+        cells.push({
+          note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0,
+          cutoff: 1, period: trk[b] & 0xFF,
+        });
+      }
+    }
+    blockRows.push(cells);
   }
 
   // trackMap[trackerPatIdx][chIdx] = file-level track index
@@ -910,6 +927,7 @@ function parseMusicAssembler(bytes: Uint8Array, filename: string): TrackerSong |
     filePatternAddrs,
     filePatternSizes,
     trackMap,
+    blockRows,
   };
 
   return {
