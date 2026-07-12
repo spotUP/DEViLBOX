@@ -32,7 +32,8 @@
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { InstrumentConfig } from '@/types';
 import type { UADEPatternLayout } from '@/engine/uade/UADEPatternEncoder';
-import { encodeMODCell, decodeMODCell } from '@/engine/uade/encoders/MODEncoder';
+import type { TrackerCell } from '@/types';
+import { encodePaulRobothamCell, PR_NOTE_BASE, PR_XM_BASE } from '@/engine/uade/encoders/PaulRobothamEncoder';
 import { createSamplerInstrument } from './AmigaUtils';
 
 // Header is 8 bytes + variable tables. The FinalCheck reads 128 words = 256 bytes
@@ -229,25 +230,70 @@ export function parsePaulRobothamFile(buffer: ArrayBuffer, filename: string): Tr
     } as InstrumentConfig);
   }
 
-  const emptyRows = Array.from({ length: 64 }, () => ({
-    note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0,
-  }));
+  // ── Pattern streams → editable grid ─────────────────────────────────────
+  // Each pattern pointer addresses a fixed-length per-voice note/command stream
+  // (note indices 0x1c-0x3e, 0x3f = rest, plus high command bytes 0x80+). The
+  // pattern pointer table sits right after the voice + sequence pointer tables;
+  // the first entry (== instrTableEnd) begins the contiguous pattern-data region.
+  // Lay the streams out as a fixed 1-byte-per-cell grid so the harness's linear
+  // getCellFileOffset covers them exactly; each cell carries its source byte for
+  // byte-exact export.
+  const patPtrOff = 8 + D7 * 4 + D6 * 4;
+  const patPtrs: number[] = [];
+  for (let i = 0; i < D5; i++) patPtrs.push(safeU32(buf, patPtrOff + i * 4));
 
-  const pattern = {
-    id: 'pattern-0', name: 'Pattern 0', length: 64,
-    channels: Array.from({ length: D7 || 4 }, (_, ch) => ({
-      id: `channel-${ch}`, name: `Channel ${ch + 1}`, muted: false,
-      solo: false, collapsed: false, volume: 100,
-      pan: ch === 0 || ch === 3 ? -50 : 50,
-      instrumentId: null, color: null, rows: emptyRows,
-    })),
-    importMetadata: {
-      sourceFormat: 'MOD' as const, sourceFile: filename,
-      importedAt: new Date().toISOString(),
-      originalChannelCount: D7 || 4, originalPatternCount: D5,
-      originalInstrumentCount: D4,
-    },
+  const patternBase = patPtrs.length > 0 ? patPtrs[0] : instrTableEnd;
+  // Uniform pattern length (this player uses fixed-length pattern streams): the
+  // gap between the first two pattern pointers, else up to the next region.
+  const patternLen = patPtrs.length >= 2
+    ? patPtrs[1] - patPtrs[0]
+    : Math.max(0, instrTableEnd + 254 - patternBase);
+  const numPatterns = patPtrs.length > 0 && patternLen > 0 ? patPtrs.length : 0;
+
+  const decodePRCell = (raw: Uint8Array): TrackerCell => {
+    const v = raw[0];
+    // Best-effort display note; 0x3f = rest, high command bytes → empty. The exact
+    // source byte rides in the invisible `period` carrier for byte-exact export.
+    const note = v >= PR_NOTE_BASE && v <= 0x3e ? v - PR_NOTE_BASE + PR_XM_BASE : 0;
+    return { note, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0, period: v };
   };
+
+  const emptyRow = { note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 };
+
+  const patterns = numPatterns > 0
+    ? Array.from({ length: numPatterns }, (_, p) => ({
+        id: `pattern-${p}`, name: `Pattern ${p}`, length: patternLen,
+        channels: [{
+          id: 'channel-0', name: 'Channel 1', muted: false,
+          solo: false, collapsed: false, volume: 100, pan: 0,
+          instrumentId: null, color: null,
+          rows: Array.from({ length: patternLen }, (_, r) => {
+            const off = patternBase + p * patternLen + r;
+            return off < buf.length ? decodePRCell(buf.subarray(off, off + 1)) : { ...emptyRow };
+          }),
+        }],
+        importMetadata: {
+          sourceFormat: 'MOD' as const, sourceFile: filename,
+          importedAt: new Date().toISOString(),
+          originalChannelCount: 1, originalPatternCount: numPatterns,
+          originalInstrumentCount: D4,
+        },
+      }))
+    : [{
+        id: 'pattern-0', name: 'Pattern 0', length: 64,
+        channels: [{
+          id: 'channel-0', name: 'Channel 1', muted: false,
+          solo: false, collapsed: false, volume: 100, pan: 0,
+          instrumentId: null, color: null,
+          rows: Array.from({ length: 64 }, () => ({ ...emptyRow })),
+        }],
+        importMetadata: {
+          sourceFormat: 'MOD' as const, sourceFile: filename,
+          importedAt: new Date().toISOString(),
+          originalChannelCount: 1, originalPatternCount: 1,
+          originalInstrumentCount: D4,
+        },
+      }];
 
   const nameParts: string[] = [`${moduleName} [Paul Robotham]`];
   if (samplesExtracted) nameParts.push(`(${instruments.length} smp)`);
@@ -255,21 +301,22 @@ export function parsePaulRobothamFile(buffer: ArrayBuffer, filename: string): Tr
 
   return {
     name: nameParts.join(' '), format: 'MOD' as TrackerFormat,
-    patterns: [pattern], instruments, songPositions: [0],
-    songLength: 1, restartPosition: 0, numChannels: D7 || 4,
+    patterns, instruments,
+    songPositions: patterns.map((_, i) => i),
+    songLength: patterns.length, restartPosition: 0, numChannels: 1,
     initialSpeed: 6, initialBPM: 125, linearPeriods: false,
     uadeEditableFileData: buffer.slice(0) as ArrayBuffer,
     uadeEditableFileName: filename,
     uadePatternLayout: {
       formatId: 'paulRobotham',
-      patternDataFileOffset: 0,
-      bytesPerCell: 4,
-      rowsPerPattern: 64,
-      numChannels: D7 || 4,
-      numPatterns: 1,
+      patternDataFileOffset: patternBase,
+      bytesPerCell: 1,
+      rowsPerPattern: patternLen > 0 ? patternLen : 64,
+      numChannels: 1,
+      numPatterns: numPatterns > 0 ? numPatterns : 1,
       moduleSize: buffer.byteLength,
-      encodeCell: encodeMODCell,
-      decodeCell: decodeMODCell,
+      encodeCell: encodePaulRobothamCell,
+      decodeCell: decodePRCell,
     } as UADEPatternLayout,
   };
 }

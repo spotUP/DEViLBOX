@@ -58,6 +58,7 @@ import './MusicLineEncoder';
 import './NRUEncoder';
 import './OctaMEDEncoder';
 import './OktalyzerEncoder';
+import './PaulRobothamEncoder';
 import './PLMEncoder';
 import './PSMEncoder';
 import './PTMEncoder';
