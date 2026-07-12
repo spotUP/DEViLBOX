@@ -87,6 +87,17 @@ function encode669Cell(cell: TrackerCell): Uint8Array {
   // Byte 2: effect
   out[2] = reverseEffect(cell.effTyp ?? 0, cell.eff ?? 0);
 
+  // Byte-exact carrier restore. The 669 cell packs a 6-bit instrument split across both bytes,
+  // a 4-bit volume that the XM view round-trips through a /15 scale, and a many-to-one effect
+  // map — none of which the derivation above inverts exactly. layout.decodeCell stashes the exact
+  // 3 source bytes in the invisible period/pan carriers (fields the 669 grid loop never sets);
+  // reproduce all 3 bytes verbatim. Edited grid cells lack the carriers and keep the derivation.
+  if (cell.period !== undefined && cell.pan !== undefined) {
+    out[0] = (cell.period >> 8) & 0xFF;
+    out[1] = cell.period & 0xFF;
+    out[2] = cell.pan & 0xFF;
+  }
+
   return out;
 }
 

@@ -417,7 +417,15 @@ export async function parse669File(
         eff = mapped.eff;
       }
 
-      return { note, instrument, volume, effTyp, eff, effTyp2: 0, eff2: 0 };
+      // Carry the exact 3 source bytes so encode669Cell can reproduce them byte-exact — the
+      // 6-bit instrument, /15-scaled volume, and many-to-one effect map are all lossy above.
+      // period/pan are fields the grid loop (buildPattern) never sets, so edited cells fall back
+      // to the canonical derivation.
+      return {
+        note, instrument, volume, effTyp, eff, effTyp2: 0, eff2: 0,
+        period: (byte0 << 8) | byte1,
+        pan: byte2,
+      };
     },
   };
 
