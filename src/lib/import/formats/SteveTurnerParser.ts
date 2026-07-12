@@ -270,6 +270,10 @@ interface NoteEvent {
 interface ChannelBlock {
   events: NoteEvent[];
   rowCount: number;
+  /** Real file offset where this block's packed command bytes start. */
+  fileOffset: number;
+  /** Real byte length of the block (up to and including its terminator). */
+  fileSize: number;
 }
 
 function decodeChannel(
@@ -344,10 +348,37 @@ function decodeChannel(
       }
     }
 
-    blocks.push({ events, rowCount: row });
+    blocks.push({ events, rowCount: row, fileOffset: patBlockStart, fileSize: p - patBlockStart });
   }
 
   return blocks;
+}
+
+/**
+ * Expand one block's sparse NoteEvents into a dense row array — the decoded
+ * baseline that the structural raw-block carrier compares against (`blockRows`).
+ * Mirrors the placement logic in {@link buildPattern} for a single channel.
+ */
+function buildBlockRows(block: ChannelBlock): TrackerRow[] {
+  const numRows = Math.max(block.rowCount, 1);
+  const rows: TrackerRow[] = Array.from({ length: numRows }, () => ({
+    note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0,
+  }));
+  for (const ev of block.events) {
+    if (ev.row < 0 || ev.row >= numRows) continue;
+    const row = rows[ev.row];
+    if (ev.note > 0) {
+      row.note = ev.note;
+      row.instrument = ev.instrument;
+    } else if (ev.instrument > 0 && row.note === 0) {
+      row.instrument = ev.instrument;
+    }
+    if (ev.effTyp > 0) {
+      row.effTyp = ev.effTyp;
+      row.eff = ev.eff;
+    }
+  }
+  return rows;
 }
 
 // ── Instrument names ────────────────────────────────────────────────────────
@@ -546,6 +577,10 @@ export function parseSteveTurnerFile(buffer: ArrayBuffer, filename: string): Tra
   const patterns: ReturnType<typeof buildPattern>[] = [];
   const songPositions: number[] = [];
 
+  // Hoisted so the variable layout builder below can enumerate the real,
+  // shared pattern blocks (one carrier per distinct block file offset).
+  let subsongChannelBlocks: ChannelBlock[][] = [];
+
   // Only decode subsong 0 (the main song). Additional subsongs are SFX/alternate tunes.
   {
     const sub = subsongs[0] || { priority: 0, speed: 6, chanPosOffsets: [0, 0, 0, 0] };
@@ -591,6 +626,8 @@ export function parseSteveTurnerFile(buffer: ArrayBuffer, filename: string): Tra
       patterns.push(buildPattern(patterns.length, sub, channelEvents, numRows, filename));
       songPositions.push(patterns.length - 1);
     }
+
+    subsongChannelBlocks = channelBlocks;
   }
 
   // ── Build TrackerSong ─────────────────────────────────────────────────────
@@ -598,36 +635,43 @@ export function parseSteveTurnerFile(buffer: ArrayBuffer, filename: string): Tra
   // subsong 0 so the pattern cursor stays in sync with the audio. All patterns
   // remain available in the patterns array for the pattern list UI.
 
-  // ── Build uadeVariableLayout for chip RAM editing ─────────────────────────
-  // Steve Turner uses variable-length pattern blocks addressed via an offset
-  // table. Each channel decodes its own byte stream independently. We treat
-  // each channel's decoded event stream as a single file-level "pattern".
-  // The offset table provides per-pattern-block addresses but blocks are
-  // shared across channels via the position list, so we use placeholder
-  // addresses. Real chip RAM patching resolves at runtime.
+  // ── Build uadeVariableLayout: structural raw-block carrier ────────────────
+  // Steve Turner pattern data is a set of variable-length command BLOCKS, each
+  // addressed via the OFFTBL (pattern index → signed offset). A block is a REAL
+  // contiguous byte range: it starts at `fileOffset` and runs to its terminator
+  // (`fileSize` bytes). Channels/positions share blocks via the position list.
+  //
+  // So the honest carrier enumerates each DISTINCT block once (deduped by file
+  // offset), stores its real bytes + decoded baseline rows, and re-emits them
+  // verbatim when unedited (byte-exact) — falling back to the packer on edit.
+  // `numChannels = 1` because a block is not owned by one channel; the flat
+  // block list is the file-pattern dimension.
   const filePatternAddrs: number[] = [];
   const filePatternSizes: number[] = [];
-  for (let ch = 0; ch < 4; ch++) {
-    // Use the position list start as the file pattern address
-    const wordOffset = subsongs[0]?.chanPosOffsets[ch] ?? 0;
-    const posListStart = wordOffset > 0 ? hdr.seqOffset + wordOffset : 0;
-    filePatternAddrs.push(posListStart);
-    // Estimate size: number of events * ~3 bytes avg + overhead
-    const numEvents = patterns[0]?.channels[ch]?.rows.filter(
-      (r: TrackerRow) => r.note > 0 || r.instrument > 0
-    ).length ?? 0;
-    filePatternSizes.push(Math.max(numEvents * 4, 64));
+  const blockRawBytes: Uint8Array[] = [];
+  const blockRows: TrackerRow[][] = [];
+  const seenBlockOffsets = new Set<number>();
+  for (const chBlocks of subsongChannelBlocks) {
+    for (const block of chBlocks) {
+      if (block.fileSize <= 0) continue;
+      if (block.fileOffset < 0 || block.fileOffset + block.fileSize > buf.length) continue;
+      if (seenBlockOffsets.has(block.fileOffset)) continue;
+      seenBlockOffsets.add(block.fileOffset);
+      filePatternAddrs.push(block.fileOffset);
+      filePatternSizes.push(block.fileSize);
+      blockRawBytes.push(buf.slice(block.fileOffset, block.fileOffset + block.fileSize));
+      blockRows.push(buildBlockRows(block));
+    }
   }
 
-  const trackMap: number[][] = [];
-  for (let si = 0; si < patterns.length; si++) {
-    trackMap.push([0, 1, 2, 3]); // each tracker pattern maps to the 4 channel streams
-  }
+  // trackMap is unused when blockRows is present (harness reads blockRows), but
+  // the type requires it. One entry per tracker pattern is a harmless default.
+  const trackMap: number[][] = patterns.map(() => []);
 
   const uadeVariableLayout: UADEVariablePatternLayout = {
     formatId: 'steveTurner',
-    numChannels: 4,
-    numFilePatterns: 4,
+    numChannels: 1,
+    numFilePatterns: filePatternAddrs.length,
     rowsPerPattern: patterns[0]?.length ?? 64,
     moduleSize: buf.length,
     encoder: {
@@ -636,6 +680,8 @@ export function parseSteveTurnerFile(buffer: ArrayBuffer, filename: string): Tra
     },
     filePatternAddrs,
     filePatternSizes,
+    blockRawBytes,
+    blockRows,
     trackMap,
   };
 
