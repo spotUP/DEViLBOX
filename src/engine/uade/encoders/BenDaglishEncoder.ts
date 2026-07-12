@@ -23,6 +23,20 @@ import { registerVariableEncoder, type VariableLengthEncoder } from '../UADEPatt
  */
 function encodeBenDaglishPattern(rows: TrackerCell[], _channel: number): Uint8Array {
   const bytes: number[] = [];
+
+  // Carrier path (byte-exact): rows produced by BenDaglishParser's blockRows are
+  // per-byte carriers of the real track block (cutoff=1, period=byte). BD track
+  // commands vary from 1 to 4 bytes, so per-byte carriers cover any command
+  // length; concatenating the period bytes reproduces the track verbatim,
+  // including its 0xFF terminator. The editable display grid stays carrier-less.
+  if (rows.some(c => c.cutoff !== undefined)) {
+    for (const cell of rows) {
+      if (cell.cutoff === undefined) continue; // padding — emits nothing
+      bytes.push((cell.period ?? 0) & 0xFF);
+    }
+    return new Uint8Array(bytes);
+  }
+
   let r = 0;
 
   while (r < rows.length) {
