@@ -159,4 +159,37 @@ describe('Rob Hubbard pattern codec', () => {
     }
     expect(sawSustainGap, 'a note is followed by a blank continuation row (sustained)').toBe(true);
   });
+
+  // Regression for "channel 3 and 4 are missing most of their notes": the
+  // sustained bass/chord voices are genuinely sparse (a single note holds dozens
+  // of ticks), so on the tick grid they render as a bare note-on followed by a
+  // long blank run and read as empty. The builder now drops a note-off (===) on
+  // each held note's LAST row so every sustained note shows its release. RH is
+  // gapless (the next trigger lands on the note's `end`), so the marker lives on
+  // `end - 1` and is immediately followed by the next note-on — a
+  // release-kissing-attack signature that does NOT occur without the feature.
+  it('marks each sustained note release with a note-off (===)', async () => {
+    const LOOP_FIXTURE = join(process.cwd(), 'public/data/songs/rob-hubbard/skateordie.rh');
+    const raw = new Uint8Array(readFileSync(LOOP_FIXTURE));
+    const song = await parseRobHubbardFile(
+      raw.buffer.slice(raw.byteOffset, raw.byteOffset + raw.byteLength),
+      'skateordie.rh',
+    );
+
+    // Count "note-off immediately followed by a note-on" transitions across every
+    // channel. Each sustained (dur >= 2) note whose successor is a note-on
+    // produces exactly one. On revert (no release marker) held rows are blank, so
+    // this count collapses to ~0.
+    let releaseBeforeAttack = 0;
+    for (let ch = 0; ch < song.patterns[0].channels.length; ch++) {
+      const flat = song.patterns.flatMap(p => p.channels[ch].rows);
+      for (let i = 0; i < flat.length - 1; i++) {
+        if (flat[i].note === 97 && flat[i + 1].note >= 1 && flat[i + 1].note <= 96) {
+          releaseBeforeAttack++;
+        }
+      }
+    }
+    expect(releaseBeforeAttack, 'sustained notes emit a release marker before the next attack')
+      .toBeGreaterThan(20);
+  });
 });
