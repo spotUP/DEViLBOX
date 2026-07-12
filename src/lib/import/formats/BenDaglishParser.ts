@@ -790,6 +790,8 @@ interface BDExtractResult {
   trackFileSizes: number[];
   /** trackMap[patternIdx][channel] = file-level track index (or -1 if unused). */
   trackMap: number[][];
+  /** Per-track byte-exact carrier rows (one cell per source byte). */
+  blockRows: TrackerCell[][];
 }
 
 function bdBuildTrackAlignedPatterns(
@@ -808,10 +810,20 @@ function bdBuildTrackAlignedPatterns(
   const tablePos = offsets.trackOffsetTableOffset;
   const trackFileOffsets: number[] = [];
   const trackFileSizes: number[] = [];
+  // Byte-exact carrier rows: a BD track is a variable-length command stream
+  // (commands span 1-4 bytes), so the editable display grid cannot losslessly
+  // reproduce it. One carrier cell per source byte (cutoff=1, period=byte) is the
+  // byte-exact source of truth the encoder concatenates; tracks[i] is exactly the
+  // raw slice at [trackFileOffsets[i], +trackFileSizes[i]).
+  const blockRows: TrackerCell[][] = [];
   for (let i = 0; i < tracks.length; i++) {
     const trackOffset = u16BE(buf, tablePos + i * 2);
     trackFileOffsets.push(offsets.tracksOffset + trackOffset);
     trackFileSizes.push(tracks[i].length);
+    blockRows.push(Array.from(tracks[i], (b) => ({
+      note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0,
+      cutoff: 1, period: b & 0xFF,
+    })));
   }
 
   for (let step = 0; step < numSteps && patterns.length < MAX_PATTERNS; step++) {
@@ -867,7 +879,7 @@ function bdBuildTrackAlignedPatterns(
     trackMap.push(stepTrackMap);
   }
 
-  return { patterns, songPositions, trackFileOffsets, trackFileSizes, trackMap };
+  return { patterns, songPositions, trackFileOffsets, trackFileSizes, trackMap, blockRows };
 }
 
 // ── Main pattern extraction entry point ─────────────────────────────────────
@@ -1133,6 +1145,7 @@ export async function parseBenDaglishFile(
       filePatternAddrs: patternResult.trackFileOffsets,
       filePatternSizes: patternResult.trackFileSizes,
       trackMap: patternResult.trackMap,
+      blockRows: patternResult.blockRows,
     };
   } else {
     // Fallback: single empty pattern
