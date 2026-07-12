@@ -699,6 +699,20 @@ export function parseSTXFile(buffer: ArrayBuffer, filename: string): TrackerSong
     stxTrackMap.push(Array.from({ length: NUM_CHANNELS }, () => p < stxPatFileAddrs.length ? p : -1));
   }
 
+  // Structural raw-block carrier: STX (ScreamTracker Music Interface Kit) shares
+  // S3M's non-canonical row packing, so no from-scratch encoder reproduces a
+  // file's bytes. Stash each block's original packed bytes (blockRawBytes) plus a
+  // decoded baseline (blockRows, channel 0). Unedited block re-emits verbatim
+  // (byte-exact); edited block re-packs.
+  const blockRows: TrackerCell[][] = new Array(stxPatFileAddrs.length);
+  const blockRawBytes: Uint8Array[] = new Array(stxPatFileAddrs.length);
+  for (let fp = 0; fp < stxPatFileAddrs.length; fp++) {
+    blockRows[fp] = patterns[fp].channels[0].rows.map((c) => ({ ...c }));
+    const a = stxPatFileAddrs[fp];
+    const s = stxPatFileSizes[fp];
+    blockRawBytes[fp] = raw.slice(a, a + s);
+  }
+
   const uadeVariableLayout: UADEVariablePatternLayout = {
     formatId: 'stx',
     numChannels: NUM_CHANNELS,
@@ -709,6 +723,8 @@ export function parseSTXFile(buffer: ArrayBuffer, filename: string): TrackerSong
     filePatternAddrs: stxPatFileAddrs,
     filePatternSizes: stxPatFileSizes,
     trackMap: stxTrackMap,
+    blockRows,
+    blockRawBytes,
   };
 
   return {
