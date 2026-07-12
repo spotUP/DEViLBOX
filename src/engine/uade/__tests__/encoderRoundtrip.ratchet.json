@@ -267,9 +267,9 @@
     "inStereo2": {
       "kind": "fixed",
       "method": "decode-encode",
-      "status": "lossy",
-      "byteExact": false,
-      "matchPct": 0.2319,
+      "status": "byte-exact",
+      "byteExact": true,
+      "matchPct": 1,
       "cells": 5248
     },
     "it": {
