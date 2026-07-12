@@ -881,6 +881,26 @@ export async function parseSidMon2File(
     filePatternSizes.push(Math.max(0, nextOff - origPointerByteOffsets[i]));
   }
 
+  // Per-byte carrier rows: a SidMon II pattern is a variable-length command
+  // stream (rows run 1..4 bytes — see SidMon2Encoder), not a fixed grid, so the
+  // faithful byte-exact inverse is a whole-block carrier. Per-byte carriers
+  // (cutoff=1, period=byte) cover any command length; the encoder concatenates
+  // them to reproduce every block verbatim. The editable display grid stays
+  // carrier-less (edits export via the whole-file builder, a separate path).
+  const blockRows: TrackerCell[][] = [];
+  for (let i = 0; i < numPointers; i++) {
+    const addr = filePatternAddrs[i];
+    const size = filePatternSizes[i];
+    const cells: TrackerCell[] = [];
+    for (let b = 0; b < size && addr + b < data.length; b++) {
+      cells.push({
+        note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0,
+        cutoff: 1, period: data[addr + b] & 0xFF,
+      });
+    }
+    blockRows.push(cells);
+  }
+
   // Build trackMap: trackerPatternIdx → [ch0 filePatIdx, ch1 filePatIdx, ...]
   // trackerPatterns[trackPos] → for channel ch, track index = trackPos + ch * songLength
   const trackMap: number[][] = [];
@@ -904,6 +924,7 @@ export async function parseSidMon2File(
     filePatternAddrs,
     filePatternSizes,
     trackMap,
+    blockRows,
   };
 
   return {
