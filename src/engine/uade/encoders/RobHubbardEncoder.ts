@@ -1,24 +1,24 @@
 /**
- * RobHubbardEncoder — Encodes TrackerCell back to Rob Hubbard format.
+ * RobHubbardEncoder — variable-length whole-block encoder for Rob Hubbard.
  *
- * Rob Hubbard modules are compiled 68k Amiga executables. The pattern data
- * is embedded within the player code and cannot be directly addressed without
- * full 68k disassembly. The parser generates placeholder patterns rather than
- * parsing cells from binary.
+ * Rob Hubbard modules are compiled 68k Amiga executables whose "song" is a
+ * per-channel command BYTE STREAM, not a fixed cell grid. Each channel steps an
+ * ordered list of blocks; each block is a contiguous run of variable-length
+ * commands ending in the -124 end marker. There is no per-cell file offset, so a
+ * fixed-cell codec is meaningless here (the old placeholder round-tripped ~22% of
+ * fabricated offsets into player code).
  *
- * This encoder uses standard ProTracker MOD 4-byte cell encoding since RH is
- * a 4-channel Amiga format. When UADE loads the module and the chip RAM base
- * is resolved, cells can potentially be patched at the correct addresses.
- *
- * Cell encoding (4 bytes, standard MOD):
- *   byte[0] = (instrHi & 0xF0) | ((period >> 8) & 0x0F)
- *   byte[1] = period & 0xFF
- *   byte[2] = ((instrLo & 0x0F) << 4) | (effTyp & 0x0F)
- *   byte[3] = eff & 0xFF
+ * The parser (RobHubbardParser) decodes each block into ONE TrackerCell per stream
+ * command and stashes that command's exact source bytes in the cell carriers:
+ *   cell.cutoff = command byte length (1..2) — also the "real command" marker;
+ *                 padding rows leave it undefined
+ *   cell.period = source byte 0
+ *   cell.pan    = source byte 1 (when length >= 2)
+ * encodePattern concatenates those carrier bytes to reproduce the block verbatim.
  */
 
 import type { TrackerCell } from '@/types';
-import { registerPatternEncoder } from '../UADEPatternEncoder';
+import { registerVariableEncoder, type VariableLengthEncoder } from '../UADEPatternEncoder';
 
 // Standard ProTracker period table (finetune 0), 36 entries: C-1 to B-3
 const MOD_PERIODS = [
@@ -40,8 +40,10 @@ function xmNoteToPeriod(xmNote: number): number {
 }
 
 /**
- * Encode a TrackerCell to standard ProTracker MOD binary (4 bytes).
- * Used for Rob Hubbard format chip RAM patching.
+ * Best-effort ProTracker MOD 4-byte cell encoder — retained ONLY for the
+ * RobHubbardExporter's "no original binary" fallback path, which produces a
+ * non-playable stub file. It is NOT registered for round-trip; RH round-trips via
+ * the variable encoder below.
  */
 export function encodeRobHubbardCell(cell: TrackerCell): Uint8Array {
   const out = new Uint8Array(4);
@@ -58,4 +60,26 @@ export function encodeRobHubbardCell(cell: TrackerCell): Uint8Array {
   return out;
 }
 
-registerPatternEncoder('robHubbard', () => encodeRobHubbardCell);
+/**
+ * Encode one channel's block: concatenate each command row's carrier bytes.
+ * Rows without a carrier (cutoff === undefined) are grid padding and emit nothing.
+ * Reproduces the original block byte-for-byte for an unedited pattern.
+ */
+export function encodeRobHubbardPattern(rows: TrackerCell[]): Uint8Array {
+  const out: number[] = [];
+  for (const cell of rows) {
+    const len = cell.cutoff;
+    if (len === undefined) continue; // padding row — not a real stream command
+    out.push((cell.period ?? 0) & 0xFF);
+    if (len >= 2) out.push((cell.pan ?? 0) & 0xFF);
+    if (len >= 3) out.push((cell.resonance ?? 0) & 0xFF);
+  }
+  return new Uint8Array(out);
+}
+
+export const robHubbardEncoder: VariableLengthEncoder = {
+  formatId: 'robHubbard',
+  encodePattern: (rows: TrackerCell[]) => encodeRobHubbardPattern(rows),
+};
+
+registerVariableEncoder(robHubbardEncoder);
