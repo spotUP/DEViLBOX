@@ -748,6 +748,35 @@ function buildHivelyPatternLayout(mod: HivelyModule): {
 
       encodeCell: encodeAHXCell,
 
+      // Round-trip-only inverse of encodeAHXCell (never called by the runtime editor, which
+      // builds cells via the transpose-applying grid loop above). Reads the raw 3 AHX bytes and
+      // stashes them in the invisible period/pan carriers so encodeAHXCell can reproduce them
+      // byte-exact — the grid path folds per-position transpose into the note and maps the HVL
+      // effect to XM many-to-one, both uninvertible from the XM view alone.
+      decodeCell(bytes: Uint8Array): TrackerCell {
+        const b0 = bytes[0] ?? 0;
+        const b1 = bytes[1] ?? 0;
+        const b2 = bytes[2] ?? 0;
+        const note = (b0 >> 2) & 0x3f;
+        const instrument = ((b0 & 0x3) << 4) | (b1 >> 4);
+        const fx = b1 & 0xf;
+        const fxMap = mapHvlEffect(fx, b2);
+        const cell: TrackerCell = {
+          note: note > 0 && note <= 60 ? note : 0,
+          instrument,
+          volume: fxMap.volume ?? 0,
+          effTyp: fxMap.effTyp,
+          eff: fxMap.eff,
+          effTyp2: 0,
+          eff2: 0,
+          period: (b0 << 8) | b1,
+          pan: b2,
+        };
+        if (fxMap.flag1 !== undefined) cell.flag1 = fxMap.flag1;
+        if (fxMap.flag2 !== undefined) cell.flag2 = fxMap.flag2;
+        return cell;
+      },
+
       getCellFileOffset(pattern: number, row: number, channel: number): number {
         // pattern = posIdx in TrackerSong
         if (pattern >= mod.positions.length) return 0;
