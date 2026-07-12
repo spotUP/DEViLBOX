@@ -224,6 +224,17 @@ export interface UADEVariablePatternLayout {
    * -1 means no track assigned (empty channel).
    */
   trackMap: number[][];
+
+  /**
+   * Canonical carrier rows for each file-level pattern/block, byte-exact source
+   * of truth for the encoder. Used by formats whose display grid is decoupled from
+   * the on-disk command stream (e.g. Rob Hubbard: a channel's block straddles
+   * pattern boundaries on the shared tick timeline, so its carriers cannot live in
+   * one pattern's rows). `encoder.encodePattern(blockRows[fp], ch)` reproduces the
+   * block bytes verbatim. Optional: formats whose display cells ARE the carriers
+   * (most variable formats) leave this undefined and encode grid rows directly.
+   */
+  blockRows?: TrackerCell[][];
 }
 
 const variableEncoderRegistry = new Map<string, VariableLengthEncoder>();
