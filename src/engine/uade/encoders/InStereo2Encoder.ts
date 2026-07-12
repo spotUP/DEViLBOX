@@ -96,6 +96,19 @@ function encodeInStereo2Cell(cell: TrackerCell): Uint8Array {
     | (effect & 0x0F);
   out[3] = effectArg & 0xFF;
 
+  // Byte-exact carrier restore. byte2's top nibble (transpose flags + arpeggio) is not
+  // reconstructible from the XM view, the effect map is many-to-one, and the note byte is
+  // clamped — so the derivation above is lossy. decodeCell stashes the exact source bytes in
+  // the invisible period/pan/cutoff carriers (fields the IS20 grid loop never sets);
+  // reproduce all 4 bytes verbatim. Edited grid cells lack the carriers and keep the
+  // derivation above.
+  if (cell.period !== undefined && cell.pan !== undefined && cell.cutoff !== undefined) {
+    out[0] = (cell.period >> 8) & 0xFF;
+    out[1] = cell.period & 0xFF;
+    out[2] = cell.pan & 0xFF;
+    out[3] = cell.cutoff & 0xFF;
+  }
+
   return out;
 }
 

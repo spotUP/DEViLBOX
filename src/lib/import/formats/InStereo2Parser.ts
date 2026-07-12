@@ -676,7 +676,16 @@ export function parseInStereo2File(bytes: Uint8Array, filename: string): Tracker
       const effect = byt3 & 0x0F;
       const effectArg = byt4;
       const { effTyp, eff } = is20EffectToXm(effect, effectArg);
-      return { note, instrument, volume: 0, effTyp, eff, effTyp2: 0, eff2: 0 };
+      // Byte-exact carriers: byt3's top nibble (disableSoundTranspose/disableNoteTranspose
+      // flags + arpeggio index) is dropped by &0x0F, the effect map is many-to-one, and the
+      // note byte is clamped — so the round-trip is lossy. Stash the exact source bytes in
+      // the invisible period/pan/cutoff carriers (fields the IS20 grid loop never sets); the
+      // encoder reproduces all 4 bytes verbatim. Edited grid cells lack the carriers and keep
+      // the canonical derivation.
+      return {
+        note, instrument, volume: 0, effTyp, eff, effTyp2: 0, eff2: 0,
+        period: (raw[0] << 8) | raw[1], pan: raw[2], cutoff: raw[3],
+      };
     },
     getCellFileOffset: (pattern: number, row: number, channel: number): number => {
       // Each pattern maps to a position; each channel has a startTrackRow offset
