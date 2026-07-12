@@ -70,6 +70,18 @@ function encodeFARCell(cell: TrackerCell): Uint8Array {
   // Byte 3: effect byte (nibbles: type|param)
   out[3] = reverseFAREffect(cell.effTyp ?? 0, cell.eff ?? 0);
 
+  // Byte-exact carrier restore. FARParser.decodeCell stashes the exact 4 source bytes in
+  // the invisible period/pan/cutoff carriers (fields the grid loop never sets); reproduce
+  // all 4 bytes verbatim for an unedited cell (the volume double-rounds through a /15
+  // scale and convertFAREffect is a many-to-one map, neither of which inverts exactly).
+  // Edited grid cells lack the carriers and keep the derivation above.
+  if (cell.period !== undefined && cell.pan !== undefined && cell.cutoff !== undefined) {
+    out[0] = (cell.period >> 8) & 0xFF;
+    out[1] = cell.period & 0xFF;
+    out[2] = cell.pan & 0xFF;
+    out[3] = cell.cutoff & 0xFF;
+  }
+
   return out;
 }
 
