@@ -76,7 +76,7 @@ Synthesis (MEGAEFFECTS, per tick, 4 voices, output → voice+0x26 buffer,
 D1 = arpTable[voice+0x12] = interp weight, D4 = wave byte-len-1):
 - type 0 (CALC1)  : out = wave1 + ((wave2 - wave1) * D1 >> 7)   linear morph
 - type 1 (CALC2-6): pulse-width / -1=random-noise EOR gen / -2=hold
-- type 2 (CALC7)  : copy-splice wave2[0..D1] then wave1[D1..]    (splice mix)
+- type 2 (CALC7)  : copy-splice wave1[0..D1] then wave2[D1..]    (splice mix; head=wave1 tail=wave2 — corrected 2026-07-13 against P5 UADE wave-buffer oracle, was transcribed inverted)
 - type 3 (CALC10) : resample-stretch via 0x8000/(D1+0x40) fixed-point step
 - else  (CALC13)  : smoothed weighted interp (0xFFFE0/(D1+0x20) coeff)
 ME2: voice+0x12 arp index increments, wraps record+0x16 → record+0x18.
