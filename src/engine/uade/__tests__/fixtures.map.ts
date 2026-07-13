@@ -106,7 +106,7 @@ export const ENCODER_FIXTURES: EncoderFixture[] = [
   { formatId: "stm", fixture: "public/data/songs/formats/slideshow i.stm", kind: "fixed" },
   { formatId: "stp", fixture: "public/data/songs/formats/noname.stp", kind: "fixed" },
   { formatId: "stx", fixture: "public/data/songs/formats/futurebrain.stx", kind: "variable" },
-  { formatId: "sunTronic", fixture: "public/data/songs/formats/msx-cracktro 2.sun", kind: "fixed" },
+  { formatId: "sunTronic", fixture: "public/data/songs/formats/SUNTronicTunes/mule.src", kind: "variable" },
   { formatId: "tcbTracker", fixture: "public/data/songs/formats/cannonfodder.tcb", kind: "fixed" },
   { formatId: "tfmx", fixture: "public/data/songs/formats/mdat.rocknroll", kind: "fixed" },
   { formatId: "tfmx7v", fixture: "public/data/songs/formats/ghostbattle_gameover.hip7", kind: "fixed" },
