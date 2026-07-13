@@ -7,6 +7,87 @@ status: done
 
 # SunTronic native audition — instance-churn root cause fixed + VERIFIED + committed
 
+## UPDATE (2026-07-13, latest) — type-1 noise fixed + feedback mechanism nailed from disasm
+
+- **Type-1 PRNG noise fixed + committed `3b3a2e95b`** (LOCAL, unpushed). CALC5/6
+  middle-square had two transcription bugs: shift was `>>8` (must be `>>4`) and the
+  word was written AFTER stepping (must write BEFORE → `out[0] == seed`). Recovered
+  byte-exact from a real UADE chip-RAM noise buffer (mule.src, seed `0x6d77`) via
+  the P5 oracle: `d0_next = ((d0*d0) >>> 4 & 0xffff) ^ 0xac91`. Regression
+  `sunTronicNoiseOracle.test.ts` + golden `sunTronicNoiseOracle.golden.json`
+  (feeds the known seed → exact 128B; fails-on-revert, confirmed). The per-tick
+  seed CARRY stays unverified (workspace `rndnum` between ticks does not follow the
+  stream) — but it only picks which noise instance plays, not the timbre, so it
+  does NOT block audio correctness or the golden.
+
+- **Authoritative feedback mechanism read from the disasm** (`docs/formats/Replayers/
+  DeliPlayers/AndySilva/DP_Suntronic.s`, MEGAEFFECTS @594-763):
+  - `A2 = LEA $00A6(A0)` = the voice's **play buffer** (voice+0xA6) — both the output
+    destination AND the feedback source. Persists across ticks (not recomputed).
+  - **Feedback latch = bit1 of voice+0x14.** type-1 (CALC2 `MOVEA.L A2,A3`) and
+    type-else (CALC13 `MOVEA.L A2,A4`) switch their source from wave1 to the play
+    buffer once bit1 is set — i.e. every tick AFTER the first. Tick 0 (unlatched)
+    reads wave1; bit1 is set at CALC4/CALC15. This is the live-buffer feedback that
+    native currently FAKES with a constant wave1 → matches only tick 0.
+  - **type-3 (CALC10 resample) is NOT feedback** — reads only A3 (wave1). Earlier
+    "types 3/4/5/6 feedback" note was WRONG; only type-1 + type-else feed back.
+  - **Noise (CALC5) is source-independent** (uses RNDNUMBER) — noise fix stands.
+  - **Morph (CALC1) direction CONFIRMED correct**: measured real `wave1`
+    (record+0x1A = A3) = `0x7f…` = native's `wave1`; native `out=wave1+(wave2-wave1)*D1/128`
+    matches disasm `A3+(A4-A3)*D1/128`. No morph bug (no type-0 song exists to
+    oracle-check, so this measurement was the check).
+  - Splice stays byte-exact-locked by the golden (real chip RAM is the arbiter;
+    a CALC7 A3/A4 label ambiguity in the dump does NOT override 11/11 exact).
+
+- **gliders.src measured: feedback types 4/5/6 (all renderSmooth) reproduce 0/340.**
+  Confirms the wave1-approx is the last Gate-1 gap.
+
+- **NEXT UNIT (Gate-1 close): implement play-buffer feedback.**
+  1. Add a persistent `playBuffer: Int8Array` to `SunSynthVoiceState` (= voice+0xA6),
+     initialised to wave1-length zeros; on note-start bit1 is clear so tick 0 reads
+     wave1, then the tick's OUTPUT is copied into playBuffer and bit1 latched.
+  2. type-1 CALC3 path: when latched, read source from playBuffer (not wave1).
+  3. type-else CALC14 path: when latched, seed A4 reads (`out[i]`/`out[i-1]` initial
+     D0/D1) from playBuffer; A3 stream stays wave1.
+  4. **Prerequisite oracle work:** the current P5 oracle DEDUPS to a Set — cannot
+     validate a t→t recurrence. Extend it to capture the ORDERED per-tick buffer
+     sequence for ONE type-else voice on gliders (+ the arp D1[t] sequence), then
+     assert `buffer[t] == CALC14(playbuf=buffer[t-1], wave1, D1[t])`. Build that
+     ordered oracle FIRST (measure-first), then implement, then lock a golden.
+
+- **p7 ordered oracle BUILT** (`tools/suntronic-re/p7-feedback-oracle.ts`) + two
+  structural findings (NOT yet a working feedback port):
+  1. **TRIPLE-BUFFERING.** Each channel's AUDxLC rotates through 3 chip-RAM
+     addresses 0x80 (128B = one buffer) apart, e.g. gliders ch0 =
+     {0x26fc4, 0x27044, 0x270c4}. MEGAEFFECTS writes voice+0xA6 (A2, fixed), then
+     the play routine copies it into a 3-deep ring and re-points Paula so it never
+     reads a half-written buffer. CONSEQUENCE: consecutive ticks land at DIFFERENT
+     locs by design — any oracle that filters "consecutive same-loc" rejects every
+     real feedback step (my first p7 pass did this → 0 runs). The rotating
+     addresses ARE the ordered per-tick output sequence; capture is 1 tick / 882
+     frames (clean 3-cycle rotation confirms exactly one replayer tick per chunk).
+  2. **Steady-state convergence.** At a repeating loc the buffer content does NOT
+     change (0/55 same-loc steps changed) → the feedback contracts to a FIXED
+     POINT B where `B == CALC14(B, wave1, D1)`. A first-diff probe of
+     `calc14(B, wave1, D1)` vs captured 128B buffers gave best ham=122/128 (no
+     match) — BUT that probe filtered buffers by `Set(size)>3`, which catches the
+     TYPE-1 NOISE buffers (gliders has 2 type-1 insts), not the smooth feedback
+     outputs. Smooth type-else outputs are LOW-entropy/correlated.
+  - **REFINED NEXT UNIT (crisp):**
+    (a) In the oracle, isolate SMOOTH buffers by a small max-adjacent-delta filter
+        (reject noise) before matching — that yields real type-else feedback buffers.
+    (b) First-diff `calc14` (the faithful transcription in p7) against ONE such
+        smooth fixed-point buffer. Prime suspects in the CALC14 math: the final
+        `LSR.W #7` is LOGICAL (p7 tries both), the `MULU #-$4000` (0xC000) sign +
+        SWAP high-word extraction for D3, and the initial `SUB.B`→`EXT.W` diff.
+    (c) Once calc14 reproduces the fixed point, port it into `renderSmooth`
+        (SunTronicSynthVoice.ts) with a persistent `playBuffer` in
+        `SunSynthVoiceState` (= voice+0xA6, seeded from wave1 on note-start, bit1
+        latch), do the same for the type-1 CALC3 feedback path, then lock a golden
+        (ordered per-tick sequence) in test:ci. That CLOSES Gate 1.
+  - Morph/splice/noise are DONE; feedback (type-1 CALC3 + type-else CALC14) is the
+    only Gate-1 gap left.
+
 ## UPDATE (2026-07-13, later) — Phase 0 P5 oracle built, type-2 splice fixed
 
 - Built `tools/suntronic-re/p5-wavebuffer-oracle.ts`: per-1-tick chunked render +
