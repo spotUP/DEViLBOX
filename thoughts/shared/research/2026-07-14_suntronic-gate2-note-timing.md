@@ -175,6 +175,78 @@ tick) is the golden, and the native port is validated by diffing its timeline
 against p9a, which is the real end-to-end check. The formula above is
 disasm-authoritative (same basis as CALC3).
 
+## UPDATE 2026-07-14c — LOADED GETNEXTNOTE @0x2692a disassembled (authoritative)
+
+Dumped loaded 0x26900-0x26be0 (p8a) + capstone. Full decode below. Corrects the
+`.s`-derived opcode map in several places — the `.s` was NOT line-for-line.
+
+**Dispatch @0x2692a** (`a1 = $0(a0)` note-stream cursor; `d0 = (a1)+` byte):
+- `d0 == 0x00` → `$0(a0) = a1; rts` (END — store cursor, stop decode this tick).
+- `d0 > 0` (bpl) @0x26976 → `$22(a0) = d0; loop` (STAGE note/instr-select byte,
+  keep reading — the note-on trigger fires later from a PITCH opcode).
+- `0xb8 <= d0 <= 0xff` (`cmpi.b #$b8; bpl`) → PITCH @0x2697c.
+- `0x80 <= d0 <= 0xb7` → jump table: `neg.b; addi.b #$9c; lsl.b #1` → word index
+  into 6-entry table @0x2694c (`movea.w (pc,d0.w); adda.l a6; jmp`). Only opcodes
+  `-0x64..-0x69` produce valid even indices 0..10; targets = `a6 + tableWord`
+  (a6-relative CODE): 0x0586/0x059e/0x05b8/0x05c4/0x05d0/0x05ea.
+
+**PITCH @0x2697c** (opcode 0xb8..0xff = -72..-1):
+```
+tst.w $34(a0); bne loop          ; $34!=0 (mute/tie) → skip, re-read
+not.b d0
+sub.b $23(a0), d0                ; $23 = PER-CHANNEL TRANSPOSE (loaded uses $23, .s said $12E)
+move.b d0,$8(a0); clr.b $9(a0)   ; $8 hi byte = pitch; $8 = pitch<<8
+clr.w $a(a0)                     ; clear freq-slide
+tst.b (a1); bmi/beq skipStage    ; if next byte >0 → $22(a0)=(a1)+ (stage instr)
+move.b $22(a0),d0; beq loop      ; no staged instr → loop
+clr.b $37(a0)
+bclr #6,d0; beq typeB(0x26a16)   ; bit6 SET → type-A fallthrough; clear → type-B
+```
+IMPORTANT: `$23` is a per-channel TRANSPOSE, not synthType. Seq entry (20 bytes)
+= 4×u32 note-stream ptrs (offset 0x0,0x4,0x8,0xc) + 4 transpose bytes
+(0x10,0x11,0x12,0x13); GETNEXTNOTE reads `$23(a0)` which the tick handler set to
+`seqEntry[0x10 + chan]`. Synth type comes from the INSTRUMENT record ($4 ptr).
+
+**Type-A note-on @0x269ae** (bit6 of $22 was set; d0 = $22 with bit6 cleared):
+```
+a3 = 0x27732 + d0*0x24            ; instr table A (abs), stride 36
+$4(a0) = a3
+clr.b $e; clr.b $f; clr.w $10; clr.w $12; clr.w $24; clr.w $26
+$14(a0) = 1                      ; ACTIVE
+a4 = $3a(a0) + $a70(a6); $16(a0) = a4   ; sample/wave buffer ptr
+clr.w $1a; $1b(a0)=instr[$22]; clr.w $1c; clr.b $1e; $1f(a0)=instr[$22]
+clr.w $2a; $28(a0)=instr[$21]; clr.b $29
+loop
+```
+**Type-B note-on @0x26a16** (bit6 clear):
+```
+subq.b #1,d0                     ; index = $22 - 1
+a3 = 0x27996 + d0*0x1c           ; instr table B (abs), stride 28
+$4(a0)=a3; clr.b $e; clr.b $f; clr.w $10
+$14(a0) = 0 (clr.b!)             ; NOTE: type-B clears active flag, does NOT set 1
+clr.w $24; clr.w $26
+a4 = $12(a3); $16(a0)=a4         ; sample ptr from instr[$12]
+$1a(a0)=instr[$16]; $1c(a0)=instr[$18]; $1e(a0)=instr[$1a]
+loop
+```
+
+**Control opcodes** (jump-table targets, all `bra loop` after):
+- `-0x64` @a6+0x586 (0x26a62): if `$34!=0` skip+`addq #1,a1`; else `$e(a0)=(a1)+;
+  clr.b $f` (set wavetable-pos hi, clear lo).
+- `-0x65` @0x26a7a: freq-slide word. if `$34!=0` skip+`addq #2`; else
+  `$a(a0) = (a1)+<<8 | (a1)+`.
+- `-0x66` @0x26a94: `$d(a0)=(a1)+` (vol-slide step); `$32(a0)=(a1)+` (env reload).
+- `-0x67` @0x26aa0: `$c(a0)=(a1)+` (voice VOLUME, **NO <<1** — .s was wrong);
+  `clr.b $d` (clear vol-slide).
+- `-0x68` @0x26aac: `d0=(a1)+`; write d0 to `$30` of ALL 4 voices
+  (`$aae(a6)+0x30`, +0x1ea, +0x3a4, +0x55e = stride 0x1ba) = GLOBAL TEMPO set
+  (`.s` mislabeled "flg3").
+- `-0x69` @0x26ac6: `d1=(a1)+<<8|(a1)+`; `$a98(a6)=d1`; `$a9a(a6)=d1 ^ 0x7e28`
+  (PRNG seed pair).
+
+Also present (unreachable from this table but in range): 0x26adc clears $10 if
+$34==0, 0x26aec clears $12 if $34==0 — likely other opcode handlers.
+
 ## Next step
 1. Emit the p9a timeline as a committed wasm-free golden JSON over 2-3 modules
    (mirror `sunTronicSmoothOracle.golden.json`), covering note-on ticks + a run
