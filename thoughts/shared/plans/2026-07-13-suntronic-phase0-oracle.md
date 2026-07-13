@@ -163,7 +163,15 @@ Log-write call sites: `third-party/uade-3.05/src/audio.c:713-816`.
 REMAINING Gate-1 types on mule.src: 1 (PRNG noise), 4 and 5 (else-branch
 `renderSmooth`). Gate 1 is PARTIALLY closed (type-2 done).
 
-- **type 1 (noise) — oracle-confirmed WRONG, needs disassembly.** Brute-forced all
+- Cross-song sanity (oracle run on gliders/nebulus-two/ok-1): type-0 (morph),
+  type-2 (splice, fixed), and type-1 PULSE (CALC3, d1>=0) buffers DO match UADE
+  where they surface (`by producing type` shows 1: and 2: hits). So only the
+  type-1 NOISE path (below) is confirmed wrong among the exercised deterministic
+  types. types 3/4/5/6 (resample/`renderSmooth`) still unverified — they use the
+  live-voice-buffer feedback approximated by `wave1` (SunTronicSynthVoice.ts:141,
+  215); those need a per-tick feedback model, not a static generator, so validate
+  them last with a stateful oracle (carry the previous tick's buffer forward).
+- **type 1 (noise, d1=-1) — oracle-confirmed WRONG, needs disassembly.** Brute-forced all
   65536 seeds of the native PRNG (`renderType1` d1=-1: `d0=d0*d0; d0>>=8;
   d0^=0xac91; word=d0; final^=0x7fa3`) against UADE's first captured 128B noise
   buffer — NO seed reproduces it. So the transcribed constants/recurrence are
