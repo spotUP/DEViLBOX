@@ -392,6 +392,14 @@
       "cells": 4864,
       "bytes": 278274
     },
+    "sunTronic": {
+      "exporter": "SunTronicExporter.exportAsSunTronic",
+      "tier": "byte-exact",
+      "status": "byte-exact",
+      "matchPct": 1,
+      "cells": 9276,
+      "bytes": 9276
+    },
     "symphoniePro": {
       "exporter": "Symphonie (SymphonieProExporter)",
       "tier": "pattern-data",

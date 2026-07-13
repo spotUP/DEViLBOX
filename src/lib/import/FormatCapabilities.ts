@@ -61,7 +61,7 @@ const EDITABLE_FORMAT_LABELS = new Set([
   'Medley', 'Infogrames', 'Quartet',
   'NovoTrade Packer', 'Alcatraz Packer', 'Blade Packer',
   'Mosh Packer', 'Nick Pelling Packer', 'Peter Verswyvelen Packer',
-  'SunTronic', 'GlueMon',
+  'GlueMon',
 ]);
 
 /** Format families (from FormatRegistry) that are always editable */
@@ -102,7 +102,7 @@ const NATIVE_EXPORTABLE_LABELS = new Set([
   'Medley', 'Infogrames', 'Quartet',
   'NovoTrade Packer', 'Alcatraz Packer', 'Blade Packer',
   'Mosh Packer', 'Nick Pelling Packer', 'Peter Verswyvelen Packer',
-  'SunTronic', 'GlueMon',
+  'GlueMon',
 ]);
 
 /** Format families that can export via libopenmpt WASM (to IT/S3M) */

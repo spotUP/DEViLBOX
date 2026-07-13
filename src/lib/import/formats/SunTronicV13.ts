@@ -54,6 +54,8 @@ export function s8(buf: Uint8Array, off: number): number {
 export interface HunkBlock {
   /** hunk index */
   index: number;
+  /** hunk content type (HUNK_CODE / HUNK_DATA / HUNK_BSS) */
+  hunkType: number;
   /** memory flags from the size table (bits 30/31 of the size longword) */
   memFlags: number;
   /** declared size in bytes (size table entry * 4) */
@@ -70,15 +72,17 @@ export interface HunkBlock {
 
 export interface HunkFile {
   numHunks: number;
+  /** index of the first hunk (header `firstHunk` field, virtually always 0) */
+  firstHunk: number;
   hunks: HunkBlock[];
 }
 
-const HUNK_HEADER = 0x3f3;
-const HUNK_CODE = 0x3e9;
-const HUNK_DATA = 0x3ea;
-const HUNK_BSS = 0x3eb;
-const HUNK_RELOC32 = 0x3ec;
-const HUNK_END = 0x3f2;
+export const HUNK_HEADER = 0x3f3;
+export const HUNK_CODE = 0x3e9;
+export const HUNK_DATA = 0x3ea;
+export const HUNK_BSS = 0x3eb;
+export const HUNK_RELOC32 = 0x3ec;
+export const HUNK_END = 0x3f2;
 
 /** Parse an AmigaOS hunk executable. Throws on structural violations. */
 export function parseHunks(buf: Uint8Array): HunkFile {
@@ -105,7 +109,11 @@ export function parseHunks(buf: Uint8Array): HunkFile {
   const hunks: HunkBlock[] = [];
   let hunkIndex = 0;
   while (pos < buf.length && hunkIndex < numHunks) {
-    const type = u32BE(buf, pos) & 0x3fffffff; pos += 4;
+    // The type longword may carry MEMF_* flags in its top 2 bits (some linkers
+    // duplicate the size-table memflag here). Keep the RAW longword so the
+    // writer reproduces it byte-exact; mask only for the type comparison.
+    const rawType = u32BE(buf, pos); pos += 4;
+    const type = rawType & 0x3fffffff;
     if (type === HUNK_CODE || type === HUNK_DATA) {
       const longs = u32BE(buf, pos); pos += 4;
       const fileOffset = pos;
@@ -114,6 +122,7 @@ export function parseHunks(buf: Uint8Array): HunkFile {
       pos += length;
       hunks.push({
         index: hunkIndex,
+        hunkType: rawType,
         memFlags: sizeEntries[hunkIndex].memFlags,
         declaredSize: sizeEntries[hunkIndex].size,
         fileOffset,
@@ -125,6 +134,7 @@ export function parseHunks(buf: Uint8Array): HunkFile {
       pos += 4; // size longword, no payload
       hunks.push({
         index: hunkIndex,
+        hunkType: rawType,
         memFlags: sizeEntries[hunkIndex].memFlags,
         declaredSize: sizeEntries[hunkIndex].size,
         fileOffset: pos,
@@ -152,7 +162,52 @@ export function parseHunks(buf: Uint8Array): HunkFile {
       throw new Error(`unsupported hunk type 0x${type.toString(16)} at ${pos - 4}`);
     }
   }
-  return { numHunks, hunks };
+  return { numHunks, firstHunk, hunks };
+}
+
+/**
+ * Serialize a {@link HunkFile} back to an AmigaOS hunk executable — the exact
+ * byte-inverse of {@link parseHunks}. `writeHunks(parseHunks(buf))` reproduces
+ * `buf` byte-for-byte for the SunTronic V1.3 corpus (see the round-trip oracle
+ * in tools/suntronic-re/probe-hunk-writer.ts and sunTronicV13Template.test.ts).
+ *
+ * RELOC32 blocks are emitted in the reloc map's insertion order (which
+ * parseHunks builds in file order), one block per target, so a module whose
+ * targets appear once each (the V1.3 shape) round-trips exactly.
+ */
+export function writeHunks(hf: HunkFile): Uint8Array {
+  const out: number[] = [];
+  const w32 = (v: number): void => {
+    out.push((v >>> 24) & 0xff, (v >>> 16) & 0xff, (v >>> 8) & 0xff, v & 0xff);
+  };
+  w32(HUNK_HEADER);
+  w32(0); // resident library names: empty (null terminator)
+  w32(hf.numHunks); // table size
+  w32(hf.firstHunk); // first hunk
+  w32(hf.firstHunk + hf.numHunks - 1); // last hunk
+  for (const h of hf.hunks) {
+    w32(((h.memFlags & 0x3) << 30) | ((h.declaredSize >>> 2) & 0x3fffffff));
+  }
+  for (const h of hf.hunks) {
+    w32(h.hunkType);
+    if ((h.hunkType & 0x3fffffff) === HUNK_BSS) {
+      w32(h.declaredSize >>> 2); // size longword, no payload
+    } else {
+      w32(h.length >>> 2);
+      for (let i = 0; i < h.length; i++) out.push(h.data[i]);
+    }
+    if (h.reloc32.size > 0) {
+      w32(HUNK_RELOC32);
+      for (const [target, offs] of h.reloc32) {
+        w32(offs.length);
+        w32(target);
+        for (const o of offs) w32(o);
+      }
+      w32(0); // reloc block-list terminator
+    }
+    w32(HUNK_END);
+  }
+  return new Uint8Array(out);
 }
 
 // ── Detection ───────────────────────────────────────────────────────────────
