@@ -71,7 +71,7 @@ export const ENCODER_FIXTURES: EncoderFixture[] = [
   { formatId: "jasonBrooke", fixture: "public/data/songs/formats/Scott Johnston/sjs.jb", kind: "fixed" },
   { formatId: "jasonPage", fixture: "public/data/songs/formats/jpn.virocop-14", kind: "fixed" },
   { formatId: "jesperOlsen", fixture: "public/data/songs/formats/lollypop-subgame_01.jo", kind: "fixed" },
-  { formatId: "klystrack", fixture: "public/data/songs/klystrack/Ocean Loader III.kt", kind: "fixed" },
+  { formatId: "klystrack", fixture: "public/data/songs/klystrack/Ocean Loader III.kt", kind: "variable" },
   { formatId: "maniacsOfNoise", fixture: "public/data/songs/formats/gyroscope.mon", kind: "fixed" },
   { formatId: "markCooksey", fixture: "public/data/songs/formats/grand_national-title.mc", kind: "fixed" },
   { formatId: "markII", fixture: "public/data/songs/mark-ii/astarrsonix.mk2", kind: "fixed" },
