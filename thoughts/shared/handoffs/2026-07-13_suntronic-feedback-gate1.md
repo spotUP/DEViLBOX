@@ -349,3 +349,39 @@ morph/splice/noise/CALC14-smooth-feedback all DONE + golden-locked
 (`ad4c13150`). **CALC3 (type-1 pulse) feedback is the SOLE remaining Gate-1
 gap** — plumbing ported, needs the same PC-capture oracle lock. Then Gate 2
 (EFFECTS timing @415-496), then Phase 4 (native song playback, still GATED).
+
+## UPDATE 2026-07-14 — Gate 1 CLOSED, Gate 2 fully DECODED
+
+- **Gate 1 CLOSED.** CALC3 disasm-confirmed vs LOADED 0x26cc0-0x26ce0 (commit
+  955292810). All synth types byte-exact vs UADE.
+- **Gate 2 machinery fully disassembled** (commit d66d6e00c) — see
+  `research/2026-07-14_suntronic-gate2-note-timing.md` for the complete LIVE
+  decode: tick handler 0x2660e, 4 voices (voice[0]=a6+0xaae, stride 0x1ba),
+  master-vol fade $a8a-$a8d, 2-level tempo counter $2c/$30→$2d/$31→$2e(row idx),
+  seq table $aaa(a6) 20-byte entries → per-channel synthType $23 + note-stream
+  ptr $0, `bsr $2692a` GETNEXTNOTE + `bsr $267f6` EFFECTS, Paula writes
+  0x26746/0x26752, PERIODS=a6+0x11ae, drin=abs 0x2828b. Full EFFECTS period
+  formula in the doc.
+- **p9a-period-oracle.ts** (commit 2c3799495) reads voice $20/$08/$0c/$14 per
+  tick post-render — WORKS, gives the OUTPUT timeline that will be the Gate-2
+  golden. p9b (standalone period-formula probe) ABANDONED: period store 0x26896
+  uncapturable by the PC-capture ABI (first-hit-per-chunk); not needed — native
+  port diffs against p9a.
+- **Known port divergence flagged** in `SunTronicEffects.ts` (commit 56e2f0c2e):
+  LOADED volume path is env*vol>>6 + two master-scale multiplies ($a8d/$a8e),
+  not the .s's single >>7. Only affects final Paula $15 (not the p9a golden).
+
+### NEXT (native port phase — fresh context)
+1. Port GETNEXTNOTE row decoder (0x2692a; .s opcode map @498-592 in the doc) +
+   the song-level tick loop (4 voices, 2-level tempo, seq/synthType dispatch)
+   into the native engine, feeding the existing `SunTronicEffects.stepEffects`.
+2. Emit the p9a timeline as a committed wasm-free golden JSON (mirror
+   `sunTronicSmoothOracle.golden.json`), wire into test:ci fails-on-revert,
+   diff native $20/$08/$0c/$14 timeline vs golden. Do 1+2 together (golden needs
+   the native driver to diff against).
+3. Then Phase 4 native song playback — GATED until period+note timelines match.
+   Apply the >>6×3 master-scale volume for real audio.
+
+Scratch: `scratch-calc3.bin`, `scratch-disasm.txt` are regenerable temps (p8a),
+not committed. p9b deleted (ABI-blocked). p7*/probe-* under tools/suntronic-re/
+are untracked scratch from Gate-1.
