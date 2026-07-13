@@ -2163,10 +2163,10 @@ export const FORMAT_REGISTRY: FormatDefinition[] = [
   {
     key: 'suntronic',
     label: 'SunTronic',
-    description: 'SunTronic / TSM — The Sun Machine (Amiga synth exe, tsm.* prefix / .sun extension)',
+    description: 'SunTronic / TSM — The Sun Machine (Amiga synth exe, tsm.* prefix / .sun extension; V1.3 Delirium hunk exe .src/.pc)',
     family: 'amiga-native',
     matchMode: 'both',
-    extRegex: /\.(sun|tsm)$/i,
+    extRegex: /\.(sun|tsm|src|pc)$/i,
     prefixes: ['tsm.'],
     prefKey: 'suntronic',
     nativeParser: { module: '@lib/import/formats/SunTronicParser', parseFn: 'parseSunTronicFile', detectFn: 'isSunTronicFormat' },
