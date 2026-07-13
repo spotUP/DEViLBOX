@@ -93,7 +93,18 @@ export function stepEffects(
   st: SunVoicePitchState,
   drin: Int8Array = new Int8Array(0),
 ): SunEffectsOutput {
-  // ── Paula volume: volEnvTable[volEnvIndex] (unsigned) * voiceVolume >> 7 ──
+  // ── Paula volume ──
+  // NOTE (disasm 0x267f6-0x2684e, gliders.src, 2026-07-14): the LOADED replayer
+  // diverges from DP_Suntronic.s here. Loaded does THREE stages, not one >>7:
+  //   d1 = volEnvTable[volEnvIndex] * voiceVolume >> 6
+  //   d1 = d1 * masterVolA($a8d) >> 6        ; global fade level, 0..0x40
+  //   d1 = d1 * masterVolB($a8e) >> 6        ; second global scale word
+  // The two master-scale multiplies are absent from the .s. They only affect the
+  // final Paula AUDxVOL byte ($15), which the p9a golden does NOT capture (p9a
+  // reads voice-volume $0c, pre-scale). So this >>7 form is fine for the golden
+  // diff; but real native audio must apply the two master-scale stages (feed
+  // masterVolA/B from the handler's fade envelope $a8a-$a8d — see the Gate-2
+  // research doc). TODO(port): thread masterVolA/B in and use the >>6×3 form.
   const volEnvVal = u8(inst.volEnv[st.volEnvIndex] ?? 0);
   const outVolume = (volEnvVal * (st.volume & 0xff)) >> 7;
 
