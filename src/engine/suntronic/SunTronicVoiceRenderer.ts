@@ -25,6 +25,7 @@
  */
 
 import type { SunSynthInstrument } from '@/lib/import/formats/SunTronicV13';
+import type { SunTronicConfig } from '@typedefs/sunTronicInstrument';
 import {
   renderSynthTick,
   createVoiceState,
@@ -34,6 +35,52 @@ import { stepEffects, createPitchState } from './SunTronicEffects';
 
 /** PAL Paula clock (Hz). Period → sample rate = clock / period. */
 export const PAULA_CLOCK_PAL = 3546895;
+
+/**
+ * Serialize a runtime `SunSynthInstrument` to the plain, JSON-safe
+ * `SunTronicConfig` the editor persists. Drops the h1-relative pointer offsets
+ * (irrelevant once the tables are sliced) and mirrors the Int8Arrays as number[].
+ */
+export function sunSynthToConfig(inst: SunSynthInstrument): SunTronicConfig {
+  return {
+    sunTronic: 1,
+    synthType: inst.synthType,
+    waveWordLen: inst.waveWordLen,
+    arpLen: inst.arpLen,
+    arpLoop: inst.arpLoop,
+    volEnvLen: inst.volEnvLen,
+    volEnvLoop: inst.volEnvLoop,
+    freqEnvLen: inst.freqEnvLen,
+    freqEnvLoop: inst.freqEnvLoop,
+    freqEnvSpeed: inst.freqEnvSpeed,
+    wave1: Array.from(inst.wave1),
+    wave2: Array.from(inst.wave2),
+    arpTable: Array.from(inst.arpTable),
+    volEnv: Array.from(inst.volEnv),
+    vibDepth: Array.from(inst.vibDepth),
+  };
+}
+
+/**
+ * Reconstruct a render-ready `SunSynthInstrument` from a persisted config. The
+ * renderer only reads the tables + lengths + types, so the pointer-offset fields
+ * are filled with 0 (unused at render time).
+ */
+export function sunConfigToInstrument(cfg: SunTronicConfig): SunSynthInstrument {
+  return {
+    recordOff: 0,
+    volEnvOff: 0, volEnvLen: cfg.volEnvLen, volEnvLoop: cfg.volEnvLoop,
+    freqEnvOff: 0, freqEnvLen: cfg.freqEnvLen, freqEnvLoop: cfg.freqEnvLoop,
+    freqEnvSpeed: cfg.freqEnvSpeed,
+    arpTableOff: 0, arpLen: cfg.arpLen, arpLoop: cfg.arpLoop,
+    wave1Off: 0, wave2Off: 0, waveWordLen: cfg.waveWordLen, synthType: cfg.synthType,
+    wave1: Int8Array.from(cfg.wave1),
+    wave2: Int8Array.from(cfg.wave2),
+    arpTable: Int8Array.from(cfg.arpTable),
+    volEnv: Int8Array.from(cfg.volEnv),
+    vibDepth: Int8Array.from(cfg.vibDepth),
+  };
+}
 
 /** Replayer frame rate (default; command 0x98 can retune it per song). */
 export const DEFAULT_TICKS_PER_SECOND = 50;
