@@ -483,6 +483,12 @@ function walkV13Voice(
 
   for (const entry of sub.entries) {
     const ptr = entry.trackPtrs[voice];
+    // Per-voice note transpose is position metadata (sequence layer): the
+    // replayer computes displayed pitch as `(~byte) - transpose` (layout spec
+    // §4.2 / §5). The carrier in decodeSunBlock keeps the RAW byte so the
+    // round-trip stays byte-exact; this display walk must apply the transpose
+    // so the grid shows the pitches the module actually plays.
+    const transpose = entry.transposes[voice];
     const fp = score.blockIndexByOffset.get(ptr) ?? -1;
     if (fp < 0 || ptr >= h1.length) {
       for (let r = 0; r < rowsPerPos && cells.length < V13_MAX_TOTAL_ROWS; r++) {
@@ -506,7 +512,7 @@ function walkV13Voice(
             curInstr = sel >= 0x40 ? numSampled + (sel & 0x3f) + 1 : sel;
           }
           if (cell.note === 0) {
-            cell.note = sunPitchToNote((~b) & 0xff);
+            cell.note = sunPitchToNote(((~b) & 0xff) - transpose);
             cell.instrument = curInstr;
           }
         } else if (b >= 0x01 && b <= 0x7f) {
