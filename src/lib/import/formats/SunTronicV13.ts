@@ -573,13 +573,23 @@ function parseNameBlock(h1: Uint8Array): { names: string[]; nameBlockEnd: number
   return { names, nameBlockEnd: pos };
 }
 
-// ── Variable-length encoder (carrier concatenation) ─────────────────────────
+// ── Variable-length encoder (carrier concatenation + edited-note fallback) ──
 //
-// Pure carrier concatenation per the Rob Hubbard recipe §3: each carrier cell
-// re-emits its exact source bytes, so encodePattern(blockRows[fp]) reproduces
-// the block byte-for-byte. Defined here so the layout attached in Phase 2 is
-// complete; Phase 3 registers it in src/engine/uade/encoders/ (until then it
-// is NOT in the encoder registry, so the round-trip ratchet is untouched).
+// Carrier concatenation per the Rob Hubbard recipe §3: each UNEDITED carrier
+// cell re-emits its exact source bytes, so encodePattern(blockRows[fp])
+// reproduces the block byte-for-byte. An EDITED cell (its `note` no longer
+// matches what its carrier byte decodes to — decodeSunBlock always sets them
+// consistent, so any divergence is a user edit) is re-encoded canonically:
+// the note byte is the bijective inverse of sunPitchToNote (`~(note - 13)`),
+// and a valid instrument-select byte riding the item is preserved. This keeps
+// the byte-exact metric honest (edits fall through to a real re-encode, never
+// the verbatim carrier) without touching unedited bytes.
+// Registered in src/engine/uade/encoders/SunTronicEncoder.ts (Phase 3); this
+// file stays free of runtime imports so tools/suntronic-re/ can import it.
+
+/** Lowest/highest tracker note representable as a V1.3 pitch byte (raw 0x00-0x47). */
+const SUN_NOTE_MIN = 13;
+const SUN_NOTE_MAX = 13 + 0x47;
 
 export const sunTronicV13Encoder: VariableLengthEncoder = {
   formatId: 'sunTronic',
@@ -588,9 +598,25 @@ export const sunTronicV13Encoder: VariableLengthEncoder = {
     for (const cell of rows) {
       const len = cell.cutoff;
       if (len === undefined || len <= 0) continue; // padding row, not a stream item
-      out.push((cell.period ?? 0) & 0xff);
-      if (len >= 2) out.push((cell.pan ?? 0) & 0xff);
-      if (len >= 3) out.push((cell.resonance ?? 0) & 0xff);
+      const b0 = (cell.period ?? 0) & 0xff;
+      const carrierNote = b0 >= 0xb8 ? sunPitchToNote((~b0) & 0xff) : 0;
+      const note = cell.note ?? 0;
+      if (note === carrierNote) {
+        // unedited item: exact source bytes, verbatim
+        out.push(b0);
+        if (len >= 2) out.push((cell.pan ?? 0) & 0xff);
+        if (len >= 3) out.push((cell.resonance ?? 0) & 0xff);
+        continue;
+      }
+      // edited item: canonical re-encode of the cell's note lane
+      if (note >= SUN_NOTE_MIN && note <= SUN_NOTE_MAX) {
+        out.push((~(note - SUN_NOTE_MIN)) & 0xff);
+      }
+      // Preserve an instrument-select byte ONLY when the original item was a
+      // note item (its 2nd byte IS a select); an edited command item's old
+      // argument bytes are meaningless as stream items and are dropped.
+      const sel = (cell.pan ?? 0) & 0xff;
+      if (carrierNote > 0 && len >= 2 && sel >= 0x01 && sel <= 0x7f) out.push(sel);
     }
     return new Uint8Array(out);
   },

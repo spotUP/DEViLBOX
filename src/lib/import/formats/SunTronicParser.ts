@@ -26,8 +26,7 @@
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { InstrumentConfig } from '@/types';
-import type { UADEPatternLayout, UADEVariablePatternLayout } from '@/engine/uade/UADEPatternEncoder';
-import { encodeMODCell, decodeMODCell } from '@/engine/uade/encoders/MODEncoder';
+import type { UADEVariablePatternLayout } from '@/engine/uade/UADEPatternEncoder';
 import { createSamplerInstrument } from './AmigaUtils';
 import {
   isSunTronicV13Format,
@@ -365,19 +364,12 @@ export function parseSunTronicFile(
     initialSpeed: 6,
     initialBPM: 125,
     linearPeriods: false,
+    // Raw rips are honest play-only stubs: UADE plays the original bytes, the
+    // grid stays empty, and there is NO pattern layout — the previous fake
+    // fixed layout (generic MOD codec over 68k player code at offset 0) was
+    // the forbidden fake-grid class and was deleted in the V1.3 pilot Phase 3.
     uadeEditableFileData: buffer.slice(0) as ArrayBuffer,
     uadeEditableFileName: filename,
-    uadePatternLayout: {
-      formatId: 'sunTronic',
-      patternDataFileOffset: 0,
-      bytesPerCell: 4,
-      rowsPerPattern: 64,
-      numChannels: 4,
-      numPatterns: 1,
-      moduleSize: buffer.byteLength,
-      encodeCell: encodeMODCell,
-      decodeCell: decodeMODCell,
-    } as UADEPatternLayout,
   };
 
   // Smoke validation

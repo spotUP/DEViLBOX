@@ -88,6 +88,7 @@ import './SteveTurnerEncoder';
 import './STMEncoder';
 import './STPEncoder';
 import './STXEncoder';
+import './SunTronicEncoder';
 import './SymphonieProEncoder';
 import './SynthesisEncoder';
 import './TCBTrackerEncoder';
