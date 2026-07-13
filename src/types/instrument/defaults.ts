@@ -327,6 +327,8 @@ export interface InstrumentConfig {
   futurePlayer?: FuturePlayerConfig;
   symphonie?: SymphonieConfig;
   ronKlaren?: RonKlarenConfig;
+  // SunTronic V1.3 (native wavetable soft-synth, decoded from the embedded replayer)
+  sunTronic?: import('../sunTronicInstrument').SunTronicConfig;
   // Geonkick (percussion synthesizer; Quamplex GPL-3 WASM port)
   geonkick?: import('./exotic').GeonkickConfig;
   // SunVox WASM patch
