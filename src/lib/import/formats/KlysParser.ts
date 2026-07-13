@@ -11,8 +11,8 @@
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { Pattern, TrackerCell, ChannelData, InstrumentConfig, KlysNativeData } from '@/types';
-import type { UADEPatternLayout } from '@/engine/uade/UADEPatternEncoder';
-import { encodeKlysCell } from '@/engine/uade/encoders/KlysEncoder';
+import type { UADEPatternLayout, UADEVariablePatternLayout } from '@/engine/uade/UADEPatternEncoder';
+import { encodeKlysCell, klysVariableEncoder } from '@/engine/uade/encoders/KlysEncoder';
 
 const SONG_SIG = 'cyd!song';
 const INST_SIG = 'cyd!inst';
@@ -97,6 +97,272 @@ class BinaryReader {
 
   skip(n: number): void {
     this.pos += n;
+  }
+}
+
+// ─── Structural raw-block carrier (byte-exact round-trip) ─────────────────────
+//
+// klystrack's on-disk pattern packing (bit-packed presence nibbles + VOLUME in
+// the CTRL byte high bits) has no naive byte-exact inverse. To make an unedited
+// module re-export identically, we parse the whole .kt stream LINEARLY — mirroring
+// `mus_load_song_RW` in klystrack-wasm/common/music.c — to recover each pattern's
+// REAL [offset, size) in the file, carry the original bytes verbatim, and fall back
+// to the real packer (KlysEncoder.encodeKlysPattern) the moment a cell is edited.
+//
+// The parse is validated by a decisive oracle: after the trailing wavetable block
+// the cursor MUST equal the file length. Any misalignment (wrong field size in fx /
+// instrument / sequence skipping) fails that check, and we simply omit the carrier
+// rather than ship a wrong parse.
+
+const PAK_BIT_NOTE = 1;
+const PAK_BIT_INST = 2;
+const PAK_BIT_CTRL = 4;
+const PAK_BIT_CMD = 8;
+const PAK_BIT_VOLUME = 128;
+const KLYS_NOTE_NONE = 0xff;
+const KLYS_NO_INSTRUMENT = 0xff;
+const KLYS_NO_VOLUME = 0xff;
+const KLYS_INSTRUMENT_NAME_SIZE = 33; // MUS_INSTRUMENT_NAME_LEN + 1
+const KLYS_SONG_TITLE_SIZE = 65; // MUS_SONG_TITLE_LEN + 1
+
+/** Skip one serialized FX bus (inner_load_fx in music.c). */
+function skipKlysFx(r: BinaryReader, version: number): void {
+  if (version >= 22) {
+    const len = r.readU8();
+    if (len) r.skip(Math.min(len, 16)); // sizeof(fx->name) = 16
+  }
+  r.skip(4); // flags
+  r.skip(5); // crush.bit_drop, chr.rate, chr.min_delay, chr.max_delay, chr.sep
+  if (version < 27) r.skip(1); // spread (only steers computed taps 8..15, not read)
+  if (version < 21) r.skip(1); // padding
+  const taps = version < 27 ? 8 : 16; // CYDRVB_TAPS
+  for (let i = 0; i < taps; i++) {
+    r.skip(4); // delay (u16), gain (s16)
+    if (version >= 27) r.skip(2); // panning, flags
+  }
+  r.skip(1); // crushex.downsample
+  if (version >= 19) r.skip(1); // crushex.gain
+}
+
+/** Skip one serialized instrument (mus_load_instrument_RW, wavetable_entries = NULL). */
+function skipKlysInstrument(r: BinaryReader, version: number): void {
+  r.skip(4); // flags (u32)
+  r.skip(4); // cydflags (u32)
+  r.skip(4); // adsr (a,d,s,r u8)
+  r.skip(1); // sync_source
+  r.skip(1); // ring_mod
+  r.skip(2); // pw (u16)
+  r.skip(1); // volume
+  const progsteps = r.readU8();
+  r.skip(progsteps * 2); // program (u16 each)
+  r.skip(1); // prog_period
+  r.skip(5); // vibrato_speed, vibrato_depth, pwm_speed, pwm_depth, slide_speed
+  r.skip(1); // base_note
+  if (version >= 20) r.skip(1); // finetune (s8)
+  let len = 16;
+  if (version >= 11) len = r.readU8();
+  if (len) r.skip(Math.min(len, KLYS_INSTRUMENT_NAME_SIZE)); // name
+  if (version >= 1) {
+    r.skip(2); // cutoff (u16)
+    r.skip(1); // resonance
+    r.skip(1); // flttype
+  }
+  if (version >= 7) {
+    r.skip(1); // ym_env_shape
+    r.skip(2); // buzz_offset (s16)
+  }
+  if (version >= 10) r.skip(1); // fx_bus
+  if (version >= 11) {
+    r.skip(1); // vib_shape
+    r.skip(1); // vib_delay
+    r.skip(1); // pwm_shape
+  }
+  if (version >= 18) r.skip(1); // lfsr_type
+  if (version >= 12) r.skip(1); // wavetable_entry
+  if (version >= 23) {
+    r.skip(4); // fm_flags (u32)
+    r.skip(1); // fm_modulation
+    r.skip(1); // fm_feedback
+    r.skip(1); // fm_harmonic
+    r.skip(4); // fm_adsr
+  }
+  if (version >= 25) r.skip(1); // fm_attack_start
+  if (version >= 23) r.skip(1); // fm_wave
+}
+
+/** Skip one serialized wavetable entry (load_wavetable_entry in music.c, v>=12). */
+function skipKlysWavetable(r: BinaryReader, version: number): void {
+  // flags(u32), sample_rate(u32), samples(u32), loop_begin(u32), loop_end(u32), base_note(u16)
+  r.skip(4);
+  r.skip(4);
+  const samples = r.readU32LE();
+  r.skip(4);
+  r.skip(4);
+  r.skip(2);
+  if (samples > 0) {
+    if (version < 15) {
+      r.skip(samples * 2); // Sint16 PCM
+    } else {
+      const dataSizeBits = r.readU32LE();
+      r.skip((dataSizeBits + 7) >> 3); // compressed, data_size is in bits
+    }
+  }
+}
+
+/** Decode one klystrack pattern block into carrier rows; advances the reader. */
+function decodeKlysPatternBlock(r: BinaryReader, version: number): TrackerCell[] {
+  const steps = r.readU16LE();
+  if (version >= 24) r.readU8(); // color
+  const rows: TrackerCell[] = [];
+  if (version < 8) {
+    // Legacy fixed-size steps (pre-packing); not expected for modern fixtures.
+    const stepSize = version < 2 ? 3 : 3 + 2 + 1;
+    for (let s = 0; s < steps; s++) {
+      const note = r.readU8();
+      const instrument = r.readU8();
+      r.readU8(); // ctrl
+      const command = r.readU16LE();
+      let volume = KLYS_NO_VOLUME;
+      if (stepSize > 6) volume = r.readU8();
+      rows.push(makeKlysCell(note, instrument, volume, command));
+    }
+    return rows;
+  }
+  const nibbleLen = (steps >> 1) + (steps & 1);
+  const packed = r.readBytes(nibbleLen);
+  let ci = 0;
+  for (let s = 0; s < steps; s++) {
+    const isLow = (s & 1) !== 0 || s === steps - 1;
+    let bits = isLow ? packed[ci] & 0xf : packed[ci] >> 4;
+    let note = KLYS_NOTE_NONE;
+    let instrument = KLYS_NO_INSTRUMENT;
+    let command = 0;
+    let volume = KLYS_NO_VOLUME;
+    if (bits & PAK_BIT_NOTE) note = r.readU8();
+    if (bits & PAK_BIT_INST) instrument = r.readU8();
+    if (bits & PAK_BIT_CTRL) {
+      const ctrl = r.readU8();
+      if (version >= 14) bits |= ctrl & ~7;
+    }
+    if (bits & PAK_BIT_CMD) command = r.readU16LE();
+    if (bits & PAK_BIT_VOLUME) volume = r.readU8();
+    rows.push(makeKlysCell(note, instrument, volume, command));
+    if (s & 1) ci++;
+  }
+  return rows;
+}
+
+/** Build a carrier cell from raw klystrack step fields (0xFF = absent). */
+function makeKlysCell(note: number, instrument: number, volume: number, command: number): TrackerCell {
+  return {
+    note,
+    instrument,
+    volume,
+    effect: '',
+    effTyp: (command >> 8) & 0xff,
+    eff: command & 0xff,
+    effTyp2: 0,
+    eff2: 0,
+  };
+}
+
+interface KlysBlockCarrier {
+  numChannels: number;
+  numPatterns: number;
+  filePatternAddrs: number[];
+  filePatternSizes: number[];
+  blockRawBytes: Uint8Array[];
+  blockRows: TrackerCell[][];
+}
+
+/**
+ * Fully parse a .kt file linearly to recover each pattern's real file offset/size
+ * and decode its carrier rows. Returns null when the parse cannot be validated
+ * (cursor != EOF) so the caller omits the carrier rather than shipping a wrong parse.
+ */
+function parseKlysBlocks(buf: ArrayBuffer): KlysBlockCarrier | null {
+  try {
+    const bytes = new Uint8Array(buf);
+    const r = new BinaryReader(buf);
+    if (r.readString(8) !== SONG_SIG) return null;
+    const version = r.readU8();
+    if (version > MUS_VERSION) return null;
+
+    const numChannels = version >= 6 ? r.readU8() : version > 3 ? 4 : 3;
+    r.skip(2); // time_signature (u16)
+    if (version >= 17) r.skip(2); // sequence_step (u16)
+    const numInstruments = r.readU8();
+    const numPatterns = r.readU16LE();
+    const numSequences: number[] = [];
+    for (let i = 0; i < numChannels; i++) numSequences.push(r.readU16LE());
+    r.skip(2); // song_length
+    r.skip(2); // loop_point
+    if (version >= 12) r.skip(1); // master_volume
+    r.skip(1); // song_speed
+    r.skip(1); // song_speed2
+    r.skip(1); // song_rate (u8)
+    if (version > 2) r.skip(4); // flags (u32)
+    if (version >= 9) r.skip(1); // multiplex_period
+    if (version >= 16) r.skip(1); // pitch_inaccuracy
+    let titleLen = 17;
+    if (version >= 11) titleLen = r.readU8();
+    if (version >= 5) r.skip(Math.min(titleLen, KLYS_SONG_TITLE_SIZE)); // title
+
+    // FX buses. v>=10 stores an explicit count of serialized CydFxSerialized;
+    // pre-v10 reverb (MUS_ENABLE_REVERB) is not exercised by modern fixtures and
+    // would fail the EOF oracle below, safely omitting the carrier.
+    if (version >= 10) {
+      const nFx = r.readU8();
+      for (let i = 0; i < nFx; i++) skipKlysFx(r, version);
+    }
+
+    if (version >= 13) {
+      r.skip(numChannels); // default_volume
+      r.skip(numChannels); // default_panning
+    }
+
+    for (let i = 0; i < numInstruments; i++) skipKlysInstrument(r, version);
+
+    for (let i = 0; i < numChannels; i++) {
+      const n = numSequences[i];
+      if (n <= 0) continue;
+      if (version < 8) {
+        r.skip(n * 5); // position(u16)+pattern(u16)+note_offset(s8)
+      } else {
+        for (let s = 0; s < n; s++) r.skip(5);
+      }
+    }
+
+    const filePatternAddrs: number[] = [];
+    const filePatternSizes: number[] = [];
+    const blockRawBytes: Uint8Array[] = [];
+    const blockRows: TrackerCell[][] = [];
+    for (let i = 0; i < numPatterns; i++) {
+      const start = r.offset;
+      const rows = decodeKlysPatternBlock(r, version);
+      const size = r.offset - start;
+      filePatternAddrs.push(start);
+      filePatternSizes.push(size);
+      blockRawBytes.push(bytes.slice(start, start + size));
+      blockRows.push(rows);
+    }
+
+    if (version >= 12) {
+      const maxWt = r.readU8();
+      for (let i = 0; i < maxWt; i++) skipKlysWavetable(r, version);
+      if (version >= 26) {
+        for (let i = 0; i < maxWt; i++) {
+          const len = r.readU8();
+          r.skip(len);
+        }
+      }
+    }
+
+    // Decisive oracle: a correct linear parse ends exactly at EOF.
+    if (r.offset !== bytes.length) return null;
+    return { numChannels, numPatterns, filePatternAddrs, filePatternSizes, blockRawBytes, blockRows };
+  } catch {
+    return null;
   }
 }
 
@@ -315,6 +581,27 @@ export function parseKlystrack(buf: ArrayBuffer): TrackerSong {
     encodeCell: encodeKlysCell,
   };
 
+  // Structural raw-block carrier: a full linear parse recovers each pattern's real
+  // file [offset, size) so an unedited module re-exports byte-for-byte. Omitted
+  // (undefined) when the parse can't be validated to EOF.
+  const carrier = parseKlysBlocks(buf);
+  let uadeVariableLayout: UADEVariablePatternLayout | undefined;
+  if (carrier) {
+    uadeVariableLayout = {
+      formatId: 'klystrack',
+      numChannels: 1, // klystrack patterns are single-channel step lists
+      numFilePatterns: carrier.numPatterns,
+      rowsPerPattern: carrier.blockRows.map((rows) => rows.length),
+      moduleSize: buf.byteLength,
+      encoder: klysVariableEncoder,
+      filePatternAddrs: carrier.filePatternAddrs,
+      filePatternSizes: carrier.filePatternSizes,
+      trackMap: [],
+      blockRows: carrier.blockRows,
+      blockRawBytes: carrier.blockRawBytes,
+    };
+  }
+
   return {
     name: title || 'Untitled',
     format,
@@ -331,5 +618,6 @@ export function parseKlystrack(buf: ArrayBuffer): TrackerSong {
     klysNative,
     klysFileData: buf.slice(0), // copy for WASM
     uadePatternLayout,
+    uadeVariableLayout,
   };
 }
