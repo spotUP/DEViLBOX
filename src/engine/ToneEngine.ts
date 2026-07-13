@@ -511,7 +511,6 @@ export class ToneEngine {
    * Bridges the native → Tone.js boundary using getNativeAudioNode().
    */
   public connectNativeSynth(synthOutput: AudioNode, destination: Tone.ToneAudioNode): void {
-    console.log('[ToneEngine] connectNativeSynth called, synthOutput:', synthOutput.constructor?.name, 'destination:', destination.constructor?.name);
     const nativeDestination = getNativeAudioNode(destination as any);
     if (nativeDestination) {
       // Validate contexts match before connecting
@@ -537,7 +536,6 @@ export class ToneEngine {
 
       try {
         synthOutput.connect(nativeDestination);
-        console.log('[ToneEngine] connectNativeSynth: connected successfully');
       } catch (e) {
         console.error('[ToneEngine] connectNativeSynth failed:', e,
           'synthOutput context:', sourceCtx.constructor?.name,
@@ -1738,7 +1736,7 @@ export class ToneEngine {
       'DigMugSynth', 'DeltaMusic1Synth', 'DeltaMusic2Synth',
       'FCSynth', 'TFMXSynth', 'MusicLineSynth', 'SymphonieSynth', 'SunVoxSynth',
       'FredSynth', 'HippelCoSoSynth', 'RobHubbardSynth', 'SteveTurnerSynth', 'FredEditorReplayerSynth', 'StartrekkerAMSynth',
-      'OctaMEDSynth', 'DavidWhittakerSynth',
+      'OctaMEDSynth', 'DavidWhittakerSynth', 'SunTronicSynth',
       'HivelySynth', 'KlysSynth', 'MAMEVASynth', 'UADESynth', 'UADEEditableSynth',
       'WaveSabreSynth', 'OidosSynth', 'TunefishSynth', 'SunVoxModular',
       // Zynthian WASM synths — shared instances
