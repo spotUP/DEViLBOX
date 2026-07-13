@@ -2374,14 +2374,16 @@ export async function tryRouteFormat(
     const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
     return parseUADEFile(buffer, toUADEPrefixName(originalFileName, ['mok']), prefs.uade ?? 'enhanced', subsong, preScannedMeta);
   }
-  // ── SunTronic / TSM (.sun / .tsm / tsm.* prefix) ────────────────────────
-  // The Sun Machine — Amiga synthetic music exe. Native parser extracts
-  // sample data via 68k opcode scanning; UADE handles audio playback.
-  if (matchesExt(filename, ['sun', 'tsm'])) {
+  // ── SunTronic / TSM (.sun / .tsm / tsm.* prefix, V1.3 .src / .pc) ────────
+  // The Sun Machine — Amiga synthetic music exe. Raw rips (.sun/.tsm): native
+  // parser extracts sample data via 68k opcode scanning; UADE handles audio.
+  // V1.3 Delirium hunk executables (.src/.pc): real score decode with
+  // blockRows/blockRawBytes carriers + instr/*.x sample sidecars (companions).
+  if (matchesExt(filename, ['sun', 'tsm', 'src', 'pc'])) {
     const { isSunTronicFormat, parseSunTronicFile } = await import('@lib/import/formats/SunTronicParser');
     return withNativeThenUADE('suntronic', ctx,
       (buf: Uint8Array | ArrayBuffer, name: string) => {
-        if (isSunTronicFormat(buf)) return parseSunTronicFile(buf instanceof Uint8Array ? buf.buffer as ArrayBuffer : buf as ArrayBuffer, name);
+        if (isSunTronicFormat(buf)) return parseSunTronicFile(buf instanceof Uint8Array ? buf.buffer as ArrayBuffer : buf as ArrayBuffer, name, companionFiles);
         return null;
       },
       'SunTronicParser', { injectUADE: true });
