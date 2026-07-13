@@ -376,8 +376,15 @@ function normalizeLayoutOutput(raw: unknown, baseName: string, ext?: string): Ra
     return { data: raw, filename: `${baseName}.${ext ?? 'bin'}`, warnings: [] };
   }
   if (raw && typeof raw === 'object' && 'data' in raw) {
-    const r = raw as { data: Blob | Uint8Array | ArrayBuffer; filename: string; warnings?: string[] };
-    return { data: r.data, filename: r.filename, warnings: r.warnings ?? [] };
+    const r = raw as {
+      data: Blob | Uint8Array | ArrayBuffer;
+      filename: string;
+      warnings?: string[];
+      companions?: NativeExportCompanion[];
+    };
+    const out: RawExportResult = { data: r.data, filename: r.filename, warnings: r.warnings ?? [] };
+    if (r.companions && r.companions.length > 0) out.companions = r.companions;
+    return out;
   }
   return null;
 }

@@ -65,6 +65,7 @@ export const LAYOUT_FIXTURES: Record<string, string> = {
   stp: 'public/data/songs/formats/noname.stp',
   unic: 'public/data/songs/formats/african dreams.unic',
   scumm: 'public/data/songs/formats/zaktitle.scumm',
+  sunTronic: 'public/data/songs/formats/SUNTronicTunes/mule.src',
   // No committed fixture found (reported missing-fixture by the harness — Task 1.3):
   //   amosMusicBank, synthesis, chuckBiscuits, kris, dsm_dyn, xmf, digitalSymphony (.dsym)
 };
