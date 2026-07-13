@@ -117,6 +117,64 @@ t7, voice3 t13; flags flip ff→01 and acc loads the new pitch). **This empirica
 answers the open row-duration question** — inter-note tick spacing is now
 measurable per voice.
 
+## UPDATE 2026-07-14b — FULL live tick-handler decoded (disasm, gliders.src)
+
+The `.s`-shaped EFFECTS at 0x267f6-0x26928 is NOT dead — it is `bsr`'d per voice
+(from 0x266ce) and flows through 0x2680c-0x26896; it just never appears in a
+first-hit histogram because 0x2660e always precedes it in the chunk. All
+addresses below are LIVE + disasm-authoritative (same basis as CALC14/CALC3).
+
+**Live per-tick handler @0x2660e (RTS 0x266f6):**
+- 0x2660e-0x2663e: GLOBAL master-volume fade. `$a8a` = fade speed (0=off),
+  `$a8b` counter reload `$a8c`, `$a8d` = master level, stepped by `$a8a`, clamped
+  to 0x40. `$a8d` feeds the EFFECTS volume scaling. (`$a8e` = a second master
+  scale word at a6+0xa8e.)
+- Voice[0] = `lea $aae(a6),a0`; stride 0x1ba; `moveq #3,d7` (4 voices).
+- Per-voice seq/tempo loop 0x26668-0x266d6:
+  - `cmpi.b #$fe,$14(a0); beq next` — 0xfe = DMA-off/idle, skip voice.
+  - tempo = 2-level counter: `$2c++`; if `$2c==$30` reset + `$2d++`; if
+    `$2d==$31` reset + `$2e++` (0x2667a-0x2669e). `$2e` = ROW/sequence index.
+  - seq table `A1 = $aaa(a6)`; entry = `A1 + $2e*0x14` (20-byte entries).
+    `d1 = 3 - d7` = channel index. `tst.l (a1)`: 0 → clear voice; <0 → note-off
+    (writes DMACON `$dff096` + `$dff0a8`, sets `$14=0xfe`); >0 → live row:
+    `$23(a0) = seqEntry[$10 + d1]` (SYNTH TYPE per channel), and
+    `$0(a0) = seqEntry[d1*4]` (NOTE-STREAM ptr per channel).
+  - `bsr $2692a` = GETNEXTNOTE (decode note stream into voice state).
+  - `bsr $267f6` = EFFECTS (compute `$15` volume + `$20` period, advance state).
+- Paula-write loop 0x2673c-0x26776: `$38` gate → `$15`→AUDxVOL `$9(a1)`;
+  `$39` gate → `$20`→AUDxPER `$6(a1)` (a1 = `$dff0a0`). `$38/$39` = per-voice mute.
+- DMACON/audio-enable bookkeeping, then `bsr $26be4` (MEGAEFFECTS wave-gen).
+
+**EFFECTS @0x267f6 (period + volume), inputs A0=voice, A1=instr=$4(a0):**
+- guard: `$14<0` → return; `$37(a0)==1` → skip vol+period (jump 0x2689a).
+- VOLUME `$15`: `env = instrEnvTable[$10]` (A2=`$0(a1)`); `d1 = env*$c >> 6`;
+  `d1 = d1*$a8d >> 6`; `d1 = d1*$a8e(a6) >> 6`; `$15 = d1.b`. (The two extra
+  master-scale mulu/lsr#6 are LOADED-ONLY, absent from the `.s`.)
+- PERIOD `$20` (0x26850-0x26896): `d5 = ($e<<4)+$f` (drin index);
+  `d0 = $8` (u16 acc); vib: `d2 = instrVibTable[$26]` (A4=`$8(a1)`, zero-ext byte);
+  `d3 = |$24| - 0x4000`; `d3 = (d3*d2)>>12` (muls.w; lsl.l#4; swap);
+  `d0 += d3`; `note = ((d0>>8) - drin[d5]) & 0xff`; `p = PERIODS[note]`
+  (A2=`$11ae(a6)` words); if `d0&0xff`: `p += ((PERIODS[note+1]-p)&0xffff *
+  (d0&0xff))>>8`; `$20 = p`.
+- freq slide: `$8 += $a`; wrap into [0,0x4800). vol-env: gated by `$33` counter
+  (reload `$32`), `$c += $d`, clamp [0,0x40]. wave-pos: `$f=($f+1)&0xf`;
+  `$10++`; if `$10==instr[$4]` → `$10=instr[$6]` (wave loop). vib phase:
+  `$24 += instr[$10]`; `$26++`; if `$26==instr[$c]` → `$26=instr[$e]`.
+
+Tables: PERIODS = a6+0x11ae (256 words); drin = abs 0x2828b (256 bytes, pc-rel
+`lea (d16,pc),a3` @0x2683c, disp 6733). Both read live from chip RAM.
+
+**GETNEXTNOTE = 0x2692a** (row opcode decode — see the `.s` @498-592 opcode map
+above; re-confirm the loaded variant when porting).
+
+Standalone period-formula probe (p9b) was ABANDONED: the period store 0x26896
+cannot be PC-captured (first-hit-per-chunk lands on 0x2660e; register snapshots
+at the reachable 0x266ce don't hold period internals; post-render memory reads
+see advanced inputs). Not needed — the p9a OUTPUT timeline ($20/$8/$c/$14 per
+tick) is the golden, and the native port is validated by diffing its timeline
+against p9a, which is the real end-to-end check. The formula above is
+disasm-authoritative (same basis as CALC3).
+
 ## Next step
 1. Emit the p9a timeline as a committed wasm-free golden JSON over 2-3 modules
    (mirror `sunTronicSmoothOracle.golden.json`), covering note-on ticks + a run
