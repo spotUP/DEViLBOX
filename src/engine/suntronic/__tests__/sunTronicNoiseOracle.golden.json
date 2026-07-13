@@ -1,0 +1,9 @@
+{
+  "format": "suntronic-v13",
+  "module": "mule.src",
+  "synthType": 1,
+  "path": "CALC5/6 noise (d1=-1)",
+  "seed": 28023,
+  "note": "One UADE chip-RAM 128B noise buffer (type-1 d1=-1). Recovered PRNG: d0_next=((d0*d0>>4)&0xffff)^0xac91, output written BEFORE stepping. Captured via tools/suntronic-re/p5-wavebuffer-oracle.ts + PRNG recovery. Per-tick seed carry is NOT modelled (unverified) — golden feeds the known seed.",
+  "bufferHex": "6d774444efb00d013d31aaa78f1e84e9bd505f01b771876fc8b32e436ec9b90c891807b51ace4b4dcfc36279a142edc142293e385e55841285859be03cd186bb285815756ae698fb1cf0fa81afc13a6997608ad1f37b8740e591675392df9d7527e6d2bbd9d852f5b176eab79c7cd9502701b871868f0cafa16bd0ba40e38805"
+}
