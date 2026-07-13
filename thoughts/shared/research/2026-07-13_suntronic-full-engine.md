@@ -134,8 +134,41 @@ Command grammar (GETNEXTNOTE @498-592, negative opcodes 0x8B-0xFF):
      Paula period). Needs PERIODS + drin tables (extract from hunk#1 / source).
    - Oracle (2 exit): render one synth note, diff vs UADE
      `traceModuleReads`/audio sample buffer.
-3. **Route** SunTronic to native voices: add `sunTronicFileData` dedicated-engine
-   flag so withFallback.ts stops forcing UADEEditableSynth; sampler for sampled
-   records, native synth for 0x24 records. Single-note audition, no song leak.
+   - **3a DONE** (commit Phase 3a): `SunTronicVoiceRenderer.ts` —
+     `renderSunSynthPreview()` composes MEGAEFFECTS+EFFECTS into a Paula
+     wavetable voice (per-frame buffer regen + period/volume, resampled at
+     clock/period). Pure, 5 tests.
+   - **3b DONE** (commit Phase 3b): `SunTronicConfig` (plain number[]-mirror,
+     JSON-safe) on `InstrumentConfig.sunTronic`; converters
+     sunSynthToConfig/sunConfigToInstrument; `SunTronicSynth` (DevilboxSynth,
+     renders note PCM + loops for sustain, Cinter4Synth model). Round-trip test.
+     NOT yet reachable (no dispatch/routing).
+3. **Route** SunTronic (Phase 3c — NEXT). KEY DESIGN FINDINGS (measured this
+   session):
+   - ToneEngine delegates a native synthType (like `SoundMonSynth`) to
+     InstrumentFactory as a per-NOTE voice → a native synthType inherently
+     breaks the "audition plays whole song" leak (that leak is
+     `synthType==='UADEEditableSynth'` starting the whole UADE module on any
+     trigger). So the audition-bug fix = give synth instruments
+     `synthType='SunTronicSynth'` + `config.sunTronic`.
+   - `suppressNotes` (NativeEngineRouting.ts:59) suppresses SEQUENCER note
+     triggers so a WASM song engine plays un-doubled; manual audition
+     (InstrumentList.triggerNoteAttack) is a direct call, not suppressed.
+   - **CONFLICT**: SunTronic uses the `uadeEditableFileData` path, which has NO
+     suppressNotes equivalent — its model is "any trigger = whole module". So
+     mixing native per-note SunTronicSynth instruments INTO a uadeEditable song
+     would double audio during PLAY (native grid notes + UADE module).
+   - **DECISION: hybrid** — keep UADE as the SONG engine (accurate; native song
+     playback is premature — timbre types 1/3/else oracle-pending + note-row
+     model approximate, would regress accuracy), route only per-instrument
+     AUDITION to native voices. Full-native song = Phase 4, gated on the oracle.
+   - **BLOCKING SUB-TASK for clean hybrid**: register SunTronic as a suppressing
+     UADE-backed SONG engine so sequencer notes are suppressed (UADE plays)
+     while audition stays native. UADE is NOT in WASM_ENGINES today (separate
+     uadeEditable path). Next iteration: investigate the UADE song-playback path
+     (UADEEngine + how uadeEditableFileData drives playback) and either (a) add a
+     UADE descriptor to WASM_ENGINES with suppressNotes+fileDataKey, or (b) find
+     the existing UADE-editable suppression hook. THEN wire parser marking +
+     InstrumentFactory/ToneEngine `SunTronicSynth` case + withFallback.
 4. **Play grid** through native engine (no UADE audio); parity vs UADE render.
 5. **Authoring compiler** (unchanged from prior plan).
