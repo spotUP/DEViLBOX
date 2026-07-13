@@ -321,12 +321,12 @@
       "cells": 256
     },
     "klystrack": {
-      "kind": "fixed",
-      "method": "encode-parsed",
-      "status": "lossy",
-      "byteExact": false,
-      "matchPct": 0,
-      "cells": 1357
+      "kind": "variable",
+      "method": "encode-pattern",
+      "status": "byte-exact",
+      "byteExact": true,
+      "matchPct": 1,
+      "cells": 87
     },
     "maniacsOfNoise": {
       "kind": "fixed",
