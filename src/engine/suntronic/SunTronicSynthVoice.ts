@@ -98,13 +98,15 @@ export function renderSynthTick(
       break;
     }
     case 2: {
-      // CALC7: splice — first D1 bytes from wave2, remainder from wave1[D1..].
+      // CALC7: splice — first D1 bytes from wave1, remainder from wave2[D1..].
+      // (Corrected against the UADE chip-RAM wave-buffer oracle, P5: the head is
+      // wave1 and the tail is wave2 — the reverse of the original transcription.)
       const n = d1; // D1 (0..127 typical); negative would underflow — clamp.
       let o = 0;
-      const copyW2 = Math.max(0, Math.min(n, byteLen));
-      for (let i = 0; i < copyW2; i++) out[o++] = ((w2[i] ?? 0) << 24) >> 24;
+      const copyW1 = Math.max(0, Math.min(n, byteLen));
+      for (let i = 0; i < copyW1; i++) out[o++] = ((w1[i] ?? 0) << 24) >> 24;
       let src = Math.max(0, n);
-      while (o < byteLen) out[o++] = ((w1[src++] ?? 0) << 24) >> 24;
+      while (o < byteLen) out[o++] = ((w2[src++] ?? 0) << 24) >> 24;
       break;
     }
     case 3: {
