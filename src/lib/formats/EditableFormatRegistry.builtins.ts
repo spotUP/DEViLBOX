@@ -111,6 +111,7 @@ registerEditableFormat({ formatId: "stk", label: "", patternCodec: { kind: "fixe
 registerEditableFormat({ formatId: "stm", label: "", patternCodec: { kind: "fixed" } });
 registerEditableFormat({ formatId: "stp", label: "", patternCodec: { kind: "fixed" }, exporter: { module: "STPExporter", fn: "exportSTP", byLayout: true } });
 registerEditableFormat({ formatId: "stx", label: "", patternCodec: { kind: "variable" } });
+registerEditableFormat({ formatId: "sunTronic", label: "SunTronic", patternCodec: { kind: "variable" }, exporter: { module: "SunTronicExporter", fn: "exportAsSunTronic", byLayout: true, ext: "src" } });
 registerEditableFormat({ formatId: "symphoniePro", label: "Symphonie Pro", patternCodec: { kind: "fixed" } });
 registerEditableFormat({ formatId: "synthesis", label: "Synthesis", patternCodec: { kind: "fixed" }, exporter: { module: "SynthesisExporter", fn: "exportSynthesis", byLayout: true } });
 registerEditableFormat({ formatId: "tcbTracker", label: "TCB Tracker", patternCodec: { kind: "fixed" }, exporter: { module: "TCBTrackerExporter", fn: "exportTCBTracker", byLayout: true } });

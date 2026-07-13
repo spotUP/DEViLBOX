@@ -23,6 +23,14 @@ describe('nativeExportRouter — LAYOUT_EXPORTERS dispatch map', () => {
     expect(Object.keys(LAYOUT_EXPORTERS).length).toBeGreaterThanOrEqual(35);
   });
 
+  it('routes sunTronic byLayout to SunTronicExporter.exportAsSunTronic', () => {
+    const entry = LAYOUT_EXPORTERS['sunTronic'];
+    expect(entry, 'sunTronic must be a byLayout exporter').toBeDefined();
+    expect(entry.module).toBe('SunTronicExporter');
+    expect(entry.fn).toBe('exportAsSunTronic');
+    expect(entry.ext).toBe('src');
+  });
+
   for (const [formatId, entry] of Object.entries(LAYOUT_EXPORTERS)) {
     // Generous timeout: a few exporters pull a heavy WASM engine at import time.
     it(`resolves module + fn for layoutFormatId "${formatId}" (${entry.module}.${entry.fn})`, async () => {
