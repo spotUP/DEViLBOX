@@ -244,8 +244,15 @@ function renderType1(
     return false; // noise is source-independent — no feedback latch.
   }
 
-  // CALC3: recursive pulse smoothing. D3 = source[D4]; D0 = 0x80 - D1. Source is
-  // the feedback play buffer once latched, wave1 on the first pass (A3 select).
+  // CALC3: recursive pulse smoothing (arp >= 0). Verified byte-for-byte against the
+  // LOADED replayer disasm at 0x26cc0-0x26ce0 (NOT the DP_Suntronic.s variant, which
+  // differs): d1 = 0x80 - arp (byte sub; arp>=0 keeps high byte 0, coeff in [1,128]);
+  // d0 seeds source[last]; per sample d0 += ((source[i]-d0)*coeff) asr 7; out = d0.b.
+  // Source is the feedback play buffer once latched, wave1 on the first pass (A3 select).
+  // LIMIT: negative-arp variants (0x26d4a consecutive-delta, 0x26ce6 arp==-2 escape)
+  // are NOT ported. The corpus barely exercises the pulse path (~1 fire per 250 ticks,
+  // p8e histogram) so no oracle golden could be captured to lock them; the
+  // first-hit-per-render-chunk capture ABI cannot sample past the 0x26c8a entry.
   let d3 = toS8(fbSource[last] ?? 0);
   const d0 = (0x80 - d1) & 0xffff;
   for (let i = 0; i < byteLen; i++) {
