@@ -37,11 +37,38 @@ in test:ci. Also fixed a pre-existing gap: the noise + waveBuffer + smooth
 oracles were NOT actually in the test:ci glob — all three added (package.json:30).
 Golden regen tool: `tools/suntronic-re/p7v-emit-calc14-golden.ts`.
 
-**SOLE REMAINING Gate-1 gap: CALC3 (type-1 pulse) feedback.** Its `fbSource`
-plumbing is ported (reads `playBuffer` when latched) but NOT yet oracle-locked —
-same PC-capture approach applies. Everything below the "SESSION UPDATE
-2026-07-13" divider predates this closure; read it for context but trust this
-block where they conflict.
+## UPDATE 2026-07-14b — CALC3 CLOSED disasm-authoritative (commit `955292810`), GATE 1 DONE
+
+CALC3 (type-1 pulse, arp>=0) port verified byte-for-byte against the LOADED
+disasm at 0x26cc0-0x26ce0 (the optimized code UADE runs, NOT DP_Suntronic.s —
+which is a different code version): coeff = 0x80 − arp (byte sub, high byte 0 for
+arp>=0 → coeff in [1,128]); d0 seeds source[last]; per sample
+`d0 += ((source[i]−d0)*coeff) asr 7`; out = d0.b. This MATCHES the existing
+`renderType1` port exactly — no code change, only a comment citing the
+authoritative loaded disasm + the limit note.
+
+No oracle golden was captured: p8e PC-histogram shows the pulse path fires only
+~once per 250 render ticks, and the PC-capture ABI returns only the FIRST
+in-window PC per render chunk (always the 0x26c8a type-1 entry), so the loop-body
+registers can't be reliably sampled. The math is disasm-authoritative — the SAME
+ground truth (loaded-code disassembly) that validated CALC14. Negative-arp
+variants (0x26d4a consecutive-delta, 0x26ce6 arp==-2 escape) are NOT ported;
+they're unused by the corpus and documented as a limit in the engine comment.
+
+Type-1 loaded structure (traced this session): entry 0x26c8a sets a3=prev ring
+buffer; arp==-1 → noise (0x26d1e); arp==-2 → escape (0x26ce6: re-read next arp,
+force wave1 source, re-enter pulse); feedback latch = bit1 of voice+0x14;
+arp<0 → neg-variant (0x26d4a); arp>=0 → standard pulse (0x26cc0). Probes added
+(committed): p8a dump loaded code, p8b dispatch-map (0x26c5a `jmp (a3)`),
+p8c CALC3 verifier, p8d corpus scan, p8e PC histogram.
+
+**GATE 1 IS CLOSED.** All synth types byte-exact vs UADE: CALC1 morph, CALC2
+pulse/noise, CALC7 splice, CALC13/14 smooth (oracle-locked), CALC3 pulse
+(disasm-confirmed). NEXT = **Gate 2**: note-row timing oracle (EFFECTS routine
+@415-496 in DP_Suntronic.s), then Phase 4 native song playback (still GATED).
+
+Everything below the "SESSION UPDATE 2026-07-13" divider predates these
+closures; read it for context but trust these UPDATE blocks where they conflict.
 
 ## The campaign (why this exists)
 
