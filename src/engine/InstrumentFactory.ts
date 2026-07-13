@@ -19,6 +19,7 @@ import { JamCrackerSynth } from './jamcracker/JamCrackerSynth';
 import { MaxTraxSynth } from './maxtrax/MaxTraxSynth';
 import { PreTrackerSynth } from './pretracker/PreTrackerSynth';
 import { SoundMonSynth } from './soundmon/SoundMonSynth';
+import { SunTronicSynth } from './suntronic/SunTronicSynth';
 import { SidMonSynth } from './sidmon/SidMonSynth';
 import { DigMugSynth } from './digmug/DigMugSynth';
 import { FCSynth } from './fc/FCSynth';
@@ -704,6 +705,14 @@ export class InstrumentFactory {
           );
         }
         instrument = smSynth;
+        break;
+      }
+
+      case 'SunTronicSynth': {
+        // Native SunTronic V1.3 wavetable voice (SunTronicVoiceRenderer). The
+        // config carries the decoded synth record on config.sunTronic; the song
+        // itself still plays through UADE (uadeEditableFileData / suppressNotes).
+        instrument = new SunTronicSynth(config);
         break;
       }
 

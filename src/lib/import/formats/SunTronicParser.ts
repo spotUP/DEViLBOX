@@ -34,6 +34,7 @@ import {
   sunTronicV13Encoder,
   sunCommandLen,
   sunPitchToNote,
+  sunSynthToConfig,
 } from './SunTronicV13';
 import type { SunV13Score } from './SunTronicV13';
 
@@ -444,9 +445,16 @@ function buildV13Instruments(
 
   const numSampled = score.sampledInstruments.length;
   for (let i = 0; i < score.synthInstrumentCount; i++) {
+    const rec = score.synthInstruments[i];
+    // Decode the SunTronic synth record into a native SunTronicSynth voice so
+    // auditioning plays THIS instrument (SunTronicVoiceRenderer) rather than
+    // falling through to whole-module UADE playback. Song playback still routes
+    // to UADE via uadeEditableFileData (suppressNotes), so the two don't double.
     instruments.push({
       id: numSampled + i + 1, name: `Synth ${i + 1}`, type: 'synth' as const,
-      synthType: 'Synth' as const, effects: [], volume: 0, pan: 0,
+      synthType: rec ? ('SunTronicSynth' as const) : ('Synth' as const),
+      sunTronic: rec ? sunSynthToConfig(rec) : undefined,
+      effects: [], volume: 0, pan: 0,
     } as InstrumentConfig);
   }
 
