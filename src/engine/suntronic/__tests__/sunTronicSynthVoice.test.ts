@@ -58,13 +58,15 @@ describe('SunTronic native wavetable generator (MEGAEFFECTS port)', () => {
     expect(Array.from(out)).toEqual([50, -30, -50, 0]);
   });
 
-  it('type 2 splice: first D1 bytes from wave2, rest from wave1[D1..]', () => {
+  it('type 2 splice: first D1 bytes from wave1, rest from wave2[D1..]', () => {
+    // Head=wave1, tail=wave2 — corrected 2026-07-13 against the UADE chip-RAM
+    // wave-buffer oracle (P5); the earlier transcription had the roles inverted.
     const wave1 = new Int8Array([1, 2, 3, 4, 5, 6, 7, 8]);
     const wave2 = new Int8Array([-1, -2, -3, -4, -5, -6, -7, -8]);
     const inst = synth({ synthType: 2, waveWordLen: 4, wave1, wave2, arpTable: new Int8Array([3]) });
     const out = renderSynthTick(inst, createVoiceState(), createPrng());
-    // D1=3: out = wave2[0..2] ++ wave1[3..7 clamped to 8 samples]
-    expect(Array.from(out)).toEqual([-1, -2, -3, 4, 5, 6, 7, 8]);
+    // D1=3: out = wave1[0..2] ++ wave2[3..7] (seamless splice — tail keeps phase).
+    expect(Array.from(out)).toEqual([1, 2, 3, -4, -5, -6, -7, -8]);
   });
 
   it('arp index advances and wraps arpLen → arpLoop', () => {
