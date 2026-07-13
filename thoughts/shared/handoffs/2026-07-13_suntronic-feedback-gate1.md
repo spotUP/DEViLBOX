@@ -64,8 +64,15 @@ p8c CALC3 verifier, p8d corpus scan, p8e PC histogram.
 
 **GATE 1 IS CLOSED.** All synth types byte-exact vs UADE: CALC1 morph, CALC2
 pulse/noise, CALC7 splice, CALC13/14 smooth (oracle-locked), CALC3 pulse
-(disasm-confirmed). NEXT = **Gate 2**: note-row timing oracle (EFFECTS routine
-@415-496 in DP_Suntronic.s), then Phase 4 native song playback (still GATED).
+(disasm-confirmed). NEXT = **Gate 2**: note-row timing + period pipeline. Phase-1
+research done: `research/2026-07-14_suntronic-gate2-note-timing.md` — decodes the
+EFFECTS @415-496 period pipeline + GETNEXTNOTE @498-592 note-stream opcode map,
+flags the open row-duration question, and gives the oracle plan. FIRST Gate-2
+step: build the period-timeline oracle — read each voice's `$0020` (Paula period)
+directly after each 882-frame render tick (avoids the first-hit-per-chunk capture
+limit; no PC filter needed). Blocker to resolve first: find the LOADED voice-record
+base addresses + stride (the `.s` says $130; the loaded variant differs — the
+Gate-1 type-1 entry used `adda.w #$1ba,a0`). Then Phase 4 native playback (GATED).
 
 Everything below the "SESSION UPDATE 2026-07-13" divider predates these
 closures; read it for context but trust these UPDATE blocks where they conflict.
