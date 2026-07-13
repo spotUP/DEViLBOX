@@ -26,8 +26,7 @@
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { InstrumentConfig } from '@/types';
-import type { UADEPatternLayout, UADEVariablePatternLayout } from '@/engine/uade/UADEPatternEncoder';
-import { encodeMODCell, decodeMODCell } from '@/engine/uade/encoders/MODEncoder';
+import type { UADEVariablePatternLayout } from '@/engine/uade/UADEPatternEncoder';
 import { createSamplerInstrument } from './AmigaUtils';
 import {
   isSunTronicV13Format,
@@ -367,17 +366,11 @@ export function parseSunTronicFile(
     linearPeriods: false,
     uadeEditableFileData: buffer.slice(0) as ArrayBuffer,
     uadeEditableFileName: filename,
-    uadePatternLayout: {
-      formatId: 'sunTronic',
-      patternDataFileOffset: 0,
-      bytesPerCell: 4,
-      rowsPerPattern: 64,
-      numChannels: 4,
-      numPatterns: 1,
-      moduleSize: buffer.byteLength,
-      encodeCell: encodeMODCell,
-      decodeCell: decodeMODCell,
-    } as UADEPatternLayout,
+    // NO uadePatternLayout: a raw rip is a compiled 68k player with no
+    // on-disk score structure to decode — the grid above is an empty
+    // placeholder and UADE handles the audio. A fake offset-0 MOD-cell
+    // layout would only game the round-trip ratchet (carrier over garbage),
+    // which the honesty rule forbids. Editable score lives on the V1.3 path.
   };
 
   // Smoke validation
