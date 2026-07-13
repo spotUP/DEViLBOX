@@ -97,7 +97,33 @@ measure** — do NOT guess it.
 - capstone M68K `CS_MODE_BIG_ENDIAN|CS_MODE_M68K_040`.
 - Loaded MEGAEFFECTS/EFFECTS window is near 0x26c00-0x26e40 (Gate-1 dumps).
 
+## UPDATE 2026-07-14 — period oracle BUILT + working (`tools/suntronic-re/p9a-period-oracle.ts`)
+
+Loaded-code addresses confirmed by disasm + PC-capture of gliders.src:
+- The `.s`-shaped EFFECTS copy at 0x2680c-0x26896 is DEAD/relocated — never
+  executes (p8e histogram of 0x26000-0x27400 shows it absent). The LIVE per-tick
+  handler starts at **0x2660e** (fires 101/150 chunks, the earliest PC each tick).
+- Live period→Paula write: `0x26752 move.w $20(a0),$6(a1)` (A1=0xdff0e0 Paula).
+- **Voice records: voice[0] = 0x26f8a, stride 0x1ba** (captured A0 at 0x2660e,
+  D7=3 = 4-voice loop start). bases = 0x26f8a / 0x27144 / 0x272fe / 0x274b8.
+- Voice-record offsets unchanged from `.s`: $08 freq-acc, $0C volume, $14 flags
+  (bit0=active, 0xff=inactive), $20 Paula period.
+
+p9a reads $20/$08/$0C/$14 for all 4 voices after each 882-frame tick (no
+compute-store capture needed). Validated on gliders — output is clean and
+interpretable: vibrato = period oscillation (v0 ±5 around 253), volume envelope =
+v decay (40→20→10→…), and NOTE-ON TIMING is directly visible (voice2 activates
+t7, voice3 t13; flags flip ff→01 and acc loads the new pitch). **This empirically
+answers the open row-duration question** — inter-note tick spacing is now
+measurable per voice.
+
 ## Next step
-Locate the loaded EFFECTS routine + its `$0020` store PC (disasm the loaded blob
-around the pitch pipeline), then build the period oracle. That single measurement
-also answers the row-duration question (watch which tick GETNEXTNOTE fires).
+1. Emit the p9a timeline as a committed wasm-free golden JSON over 2-3 modules
+   (mirror `sunTronicSmoothOracle.golden.json`), covering note-on ticks + a run
+   of vibrato/envelope ticks. Wire into test:ci, fails-on-revert.
+2. Port the EFFECTS period pipeline (0x26850-0x26896: freq-acc + vibrato `>>12` +
+   PERIODS-table fractional interpolation via drin index) and GETNEXTNOTE row
+   decode into the native engine; diff its period+note-event timeline vs golden.
+   NOTE the loaded volume path adds master-volume scaling (globals $a8d/$a8e(a6),
+   two extra mulu/lsr#6) NOT in the `.s` — confirm against the oracle vol column.
+3. Then Phase 4 native song playback (GATED until the period+note timelines match).
