@@ -41,6 +41,13 @@ export interface SunSynthVoiceState {
   arpIndex: number;
   /** voice+0x14 bit1 — type-1 feedback latch (source becomes the play buffer). */
   feedbackLatched: boolean;
+  /**
+   * voice+0xA6 play buffer — the OUTPUT dest AND the feedback source for the
+   * live-buffer types (1-pulse CALC3, else CALC14). Persists across ticks; null
+   * until the first tick writes it. Cleared to null on note-start (GETNEXTNOTE
+   * clears the bit1 latch) so feedback restarts from wave1 each note.
+   */
+  playBuffer: Int8Array | null;
 }
 
 /** Global PRNG word (workspace `rndnum`, RNDNUMBER seed = 0), shared by voices. */
@@ -49,7 +56,7 @@ export interface SunSynthPrng {
 }
 
 export function createVoiceState(): SunSynthVoiceState {
-  return { arpIndex: 0, feedbackLatched: false };
+  return { arpIndex: 0, feedbackLatched: false, playBuffer: null };
 }
 
 export function createPrng(): SunSynthPrng {
@@ -58,6 +65,62 @@ export function createPrng(): SunSynthPrng {
 
 const toS8 = (b: number): number => (b << 24) >> 24;
 const asrW7 = (x: number): number => ((x << 16) >> 16) >> 7; // 16-bit signed ASR #7
+const toS16 = (x: number): number => (x << 16) >> 16;
+
+/** `muls.w a,b` — signed16 × signed16 → 32-bit (unsigned repr). */
+const muls16 = (a: number, b: number): number => (toS16(a) * toS16(b)) >>> 0;
+
+/**
+ * `swap Dn ; rol.l #1,Dn` on a 32-bit product, returning the resulting low word.
+ * SWAP exchanges the two 16-bit halves; ROL.L #1 rotates the 32-bit value left
+ * one (bit31 → bit0). The CALC14 loop then consumes only the low word (.w ops).
+ */
+const swapRol1 = (p32: number): number => {
+  let x = (((p32 << 16) | (p32 >>> 16)) >>> 0); // SWAP
+  x = (((x << 1) | (x >>> 31)) >>> 0); // ROL.L #1
+  return x & 0xffff; // low word
+};
+
+/**
+ * CALC14 kernel — the else-branch smoothed feedback integrator, transcribed
+ * BYTE-EXACT from the loaded replayer (loop @0x26dc8, verified via PC-filtered
+ * register capture + capstone disasm against all 7 corpus modules that execute
+ * it: kompo02/03, paradroid-synth, time0001/0002/1/2000).
+ *
+ *   d0   = s8(seed[last])          << 7        (16-bit accumulator)
+ *   d1w  = s8(seed[last]-seed[-1]) << 7        (16-bit velocity)
+ *   per sample i (0..byteLen-1):
+ *     d1w = swapRol1( muls(d3v, d1w) )               ; ×fbDepth term (d3v=0 here)
+ *     t   = swapRol1( muls(d2v, (s8(wave1[i])<<7) - d0) )
+ *     d1w = (d1w + t)  & 0xffff
+ *     d0  = (d0  + d1w) & 0xffff
+ *     out[i] = (d0 & 0xffff) >>> 7                    ; lsr.w #7 (logical) → move.b
+ *
+ * `wave1` is streamed via `(a3)+` every sample; `seed*` are the two initial-
+ * condition reads from A4 (= feedback play buffer when latched, wave1 on tick 0).
+ * `d2v`/`d3v` are the coefficients derived from the arp value (see renderSmooth).
+ */
+export function calc14Kernel(
+  seedLast: number,
+  seedPrev: number,
+  wave1: Int8Array | Uint8Array,
+  d2v: number,
+  d3v: number,
+  byteLen: number,
+): Int8Array {
+  const out = new Int8Array(byteLen);
+  let d0 = (toS8(seedLast) << 7) & 0xffff;
+  let d1w = (toS8((seedLast - seedPrev) & 0xff) << 7) & 0xffff;
+  for (let i = 0; i < byteLen; i++) {
+    d1w = swapRol1(muls16(d3v, d1w));
+    let t = ((toS8(wave1[i] ?? 0) << 7) - d0) & 0xffff;
+    t = swapRol1(muls16(d2v, t));
+    d1w = (d1w + t) & 0xffff;
+    d0 = (d0 + d1w) & 0xffff;
+    out[i] = (((d0 & 0xffff) >>> 7) << 24) >> 24;
+  }
+  return out;
+}
 
 /**
  * Generate one tick's play buffer for a synth voice and advance its arp index.
@@ -83,6 +146,12 @@ export function renderSynthTick(
   const w2 = inst.wave2;
   const last = byteLen - 1; // D4
 
+  // Feedback source (A4 for CALC14 seed, A3 for CALC3 stream): the voice's own
+  // previous-tick play buffer once latched, else wave1 on the first pass.
+  const fbSource: Int8Array | Uint8Array =
+    state.feedbackLatched && state.playBuffer ? state.playBuffer : w1;
+  let latch = false; // feedback types set this; commit to state after dispatch.
+
   switch (inst.synthType) {
     case 0: {
       // CALC1: linear morph wave1 → wave2 by D1/128.
@@ -94,7 +163,7 @@ export function renderSynthTick(
       break;
     }
     case 1: {
-      renderType1(out, w1, byteLen, d1, state, prng);
+      latch = renderType1(out, w1, fbSource, byteLen, d1, prng);
       break;
     }
     case 2: {
@@ -114,10 +183,16 @@ export function renderSynthTick(
       break;
     }
     default: {
-      renderSmooth(out, w1, byteLen, d1, state);
+      renderSmooth(out, w1, fbSource, inst.wave2Off, byteLen, d1);
+      latch = true; // CALC15 BSET #1 — the A4 source latches to the play buffer.
       break;
     }
   }
+
+  // voice+0xA6 is the play buffer for EVERY type; snapshot it so the next tick's
+  // feedback reads this tick's output. Latch the feedback source for types 1/else.
+  state.playBuffer = Int8Array.from(out);
+  if (latch) state.feedbackLatched = true;
 
   // ME2: advance arp index, wrap arpLen → arpLoop.
   state.arpIndex += 1;
@@ -127,21 +202,24 @@ export function renderSynthTick(
   return out;
 }
 
-/** CALC2-6: type-1 pulse / hold / PRNG noise. */
+/**
+ * CALC2-6: type-1 pulse / hold / PRNG noise. Returns whether the feedback latch
+ * should be set (BSET #1,voice+0x14) — true for the pulse path, false for noise
+ * (source-independent) so callers only latch when a live-buffer source was used.
+ *
+ * `fbSource` is A3 for the pulse path: the play buffer once latched, wave1 on the
+ * first pass. The pulse recurrence both seeds (source[last]) and streams
+ * (source[i]) from it — unlike CALC14, where the feedback source is seed-only.
+ */
 function renderType1(
   out: Int8Array,
   w1: Int8Array,
+  fbSource: Int8Array | Uint8Array,
   byteLen: number,
   d1: number,
-  state: SunSynthVoiceState,
   prng: SunSynthPrng,
-): void {
+): boolean {
   const last = byteLen - 1; // D4
-  // D1==-2 & !latched → source stays wave1 (CALC4 falls through). D1==-2 &
-  // latched → source is the play buffer (feedback). We model feedback by seeding
-  // from the previous out is impossible (fresh buffer); the replayer reuses the
-  // live voice buffer — approximated here by wave1 until the buffer oracle lands.
-  state.feedbackLatched = true; // BSET #1,voice+0x14
 
   if (d1 === -1) {
     // CALC5/6: PRNG noise, writes words (byteLen/2 iterations). The output word
@@ -163,19 +241,22 @@ function renderType1(
       d0 = (d0 ^ 0xac91) & 0xffff; // EORI.W #-$536F
     }
     prng.value = d0;
-    return;
+    return false; // noise is source-independent — no feedback latch.
   }
 
-  // CALC3: recursive pulse smoothing. D3 = wave1[D4]; D0 = 0x80 - D1.
-  let d3 = toS8(w1[last] ?? 0);
+  // CALC3: recursive pulse smoothing. D3 = source[D4]; D0 = 0x80 - D1. Source is
+  // the feedback play buffer once latched, wave1 on the first pass (A3 select).
+  let d3 = toS8(fbSource[last] ?? 0);
   const d0 = (0x80 - d1) & 0xffff;
   for (let i = 0; i < byteLen; i++) {
-    const d2v = toS8(w1[i] ?? 0);
+    const d2v = toS8(fbSource[i] ?? 0);
     const step = asrW7((d2v - d3) * ((d0 << 16) >> 16));
     d3 = (d3 + step) & 0xffff;
     d3 = (d3 << 16) >> 16;
     out[i] = (d3 << 24) >> 24;
   }
+  void w1;
+  return true; // CALC4 BSET #1 — pulse path latches the feedback source.
 }
 
 /** CALC10-12: type-3 two-segment rate-scaled resample of wave1. */
@@ -206,33 +287,38 @@ function renderType3(out: Int8Array, w1: Int8Array, byteLen: number, d1: number)
   }
 }
 
-/** CALC13-14: else-branch smoothed weighted crossfade. */
+/**
+ * CALC13-14: else-branch smoothed feedback integrator. Derives the two loop
+ * coefficients (d2v/d3v) from the arp value + the record's fbDepth byte, seeds
+ * from the feedback source's tail, then runs the verified `calc14Kernel`.
+ *
+ * Coefficient derivation (disasm @0x26de6):
+ *   divisor = (d1 & 0xff) + 0x20                                   ; addi.w #$20
+ *   d2v = (0xfffe0 / divisor) - (0x26 * extw(d1)) & 0xffff         ; divu / mulu / sub.w
+ *   d3v = ((0x7fff - d2v) & 0xffff) * fbDepth >> 8                 ; mulu d5 / lsr.l #8
+ *
+ * `fbDepth` = the `move.b $1e(a1),d5` byte = the TOP byte of the wave2 pointer
+ * (record+0x1e is the wave2 u32). Chip pointers are < 0x200000, so this byte is
+ * always 0 → d3v = 0 in practice (the velocity term is inert). Kept explicit so a
+ * non-chip layout would still port faithfully.
+ */
 function renderSmooth(
   out: Int8Array,
   w1: Int8Array,
+  fbSource: Int8Array | Uint8Array,
+  wave2Off: number,
   byteLen: number,
   d1: number,
-  state: SunSynthVoiceState,
 ): void {
   const last = byteLen - 1; // D4
-  state.feedbackLatched = true;
-  const d0div = (d1 & 0xff) + 0x20;
-  if (d0div === 0) return;
-  const d2 = Math.floor(0xfffe0 / d0div) & 0xffff;
-  const d3base = 0x26 * ((d1 << 16) >> 16);
-  const coeff = (0x7fff - ((d2 - d3base) & 0xffff)) & 0xffff;
-  const d3 = ((coeff * 0xc000) >>> 16) & 0xffff; // MULU #-$4000; SWAP → high word
-  // Source select: latched → play buffer (approx wave1) else wave1.
-  let d0 = toS8(w1[last] ?? 0) << 7;
-  let d1w = (toS8(w1[last] ?? 0) - toS8(w1[Math.max(0, last - 1)] ?? 0)) << 7;
-  let a3 = 0;
-  for (let i = 0; i <= last; i++) {
-    d1w = (((d1w * ((d3 << 16) >> 16)) / 0x10000) | 0) << 1;
-    const s5base = toS8(w1[a3++] ?? 0) << 7;
-    let d5 = (s5base - d0) & 0xffffffff;
-    d5 = (((d5 * ((d2 << 16) >> 16)) / 0x10000) | 0) << 1;
-    d1w = (d1w + d5) & 0xffffffff;
-    d0 = (d0 + d1w) & 0xffffffff;
-    out[i] = ((((d0 << 16) >> 16) >> 7) << 24) >> 24;
-  }
+  const divisor = (d1 & 0xff) + 0x20; // never 0 (>= 0x20)
+  const quotient = Math.floor(0xfffe0 / divisor) & 0xffff;
+  const term = (0x26 * (toS8(d1) & 0xffff)) & 0xffff; // 0x26 * ext.w(d1)
+  const d2v = (quotient - term) & 0xffff;
+  const fbDepth = (wave2Off >>> 24) & 0xff; // move.b $1e(a1),d5 — always 0 for chip ptrs
+  const d3v = (((0x7fff - d2v) & 0xffff) * fbDepth) >>> 8 & 0xffff;
+  const seedLast = fbSource[last] ?? 0;
+  const seedPrev = fbSource[Math.max(0, last - 1)] ?? 0;
+  const res = calc14Kernel(seedLast, seedPrev, w1, d2v, d3v, byteLen);
+  out.set(res);
 }
