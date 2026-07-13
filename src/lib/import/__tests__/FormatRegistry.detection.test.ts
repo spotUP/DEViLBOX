@@ -86,6 +86,17 @@ describe('FORMAT_REGISTRY — detection functions reject zero-filled buffers', (
     });
   }
 
+  it('suntronic detectFn accepts a SunTronic V1.3 Delirium hunk module (mule.src)', async () => {
+    // Regression for the V1.3 detection union: before Phase 2 the suntronic
+    // detector only matched raw rips (48E7FFFE...), so V1.3 hunk executables
+    // (.src/.pc, HUNK_HEADER + DELIRIUM wrapper) fell through to UADE and
+    // were never editable.
+    const { readFile } = await import('node:fs/promises');
+    const { isSunTronicFormat } = await import('@/lib/import/formats/SunTronicParser');
+    const data = await readFile('public/data/songs/formats/SUNTronicTunes/mule.src');
+    expect(isSunTronicFormat(new Uint8Array(data))).toBe(true);
+  });
+
   it('KNOWN_BROKEN allowlist stays synced — every entry must still be in the registry', () => {
     const registryKeys = new Set(formatsWithDetect.map((f) => f.key));
     const stale = Array.from(KNOWN_BROKEN.keys()).filter((k) => !registryKeys.has(k));
