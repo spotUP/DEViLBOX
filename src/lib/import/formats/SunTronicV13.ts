@@ -429,6 +429,83 @@ export interface SunSampledInstrument {
   loopLenWords: number;
 }
 
+/**
+ * Synth-instrument descriptor (0x24-byte record). Field semantics recovered
+ * from the Andy Silva replayer source
+ * (`docs/formats/Replayers/DeliPlayers/AndySilva/DP_Suntronic.s`):
+ * GNN2 synth-select @543-566, MEGAEFFECTS render @594-763, EFFECTS env @415-496.
+ * All pointer fields are hunk#1-relative (RELOC32 targets); resolved wave/arp/
+ * envelope byte arrays are sliced from hunk#1 for the native voice engine.
+ */
+export interface SunSynthInstrument {
+  /** hunk#1-relative offset of the 0x24-byte record */
+  recordOff: number;
+  /** volume-envelope table ptr + length/loop (EFFECTS 4(A1)/6(A1) wrap) */
+  volEnvOff: number;
+  volEnvLen: number;
+  volEnvLoop: number;
+  /** frequency-envelope table ptr + length/loop + speed */
+  freqEnvOff: number;
+  freqEnvLen: number;
+  freqEnvLoop: number;
+  freqEnvSpeed: number;
+  /** interp/arp table ptr + length/loop (MEGAEFFECTS A1+0x12, idx=voice+0x12) */
+  arpTableOff: number;
+  arpLen: number;
+  arpLoop: number;
+  /** waveform pointer 1 / 2 (MEGAEFFECTS A3 / A4) */
+  wave1Off: number;
+  wave2Off: number;
+  /** wave length in words (D4 = waveWordLen*2 - 1 bytes) */
+  waveWordLen: number;
+  /** synthesis type 0..3+ (MEGAEFFECTS branch selector at record+0x23) */
+  synthType: number;
+  /** resolved waveform bytes (signed 8-bit, waveWordLen*2 each) */
+  wave1: Int8Array;
+  wave2: Int8Array;
+  /** resolved interp/arp table bytes (signed 8-bit, arpLen entries) */
+  arpTable: Int8Array;
+}
+
+/**
+ * Decode one 0x24-byte synth record at `recordOff` into a descriptor and slice
+ * its wave/arp table data out of `h1`. Pointer/length fields are read verbatim;
+ * table slices are clamped to the hunk bounds (a corrupt/short pointer yields an
+ * empty slice rather than throwing — the record still round-trips byte-exactly).
+ */
+export function decodeSunSynthInstrument(h1: Uint8Array, recordOff: number): SunSynthInstrument {
+  const sliceI8 = (off: number, len: number): Int8Array => {
+    if (off <= 0 || len <= 0 || off >= h1.length) return new Int8Array(0);
+    const end = Math.min(off + len, h1.length);
+    return new Int8Array(h1.buffer.slice(h1.byteOffset + off, h1.byteOffset + end));
+  };
+  const waveWordLen = h1[recordOff + 0x22] ?? 0;
+  const arpLen = u16BE(h1, recordOff + 0x16);
+  const wave1Off = u32BE(h1, recordOff + 0x1a);
+  const wave2Off = u32BE(h1, recordOff + 0x1e);
+  const arpTableOff = u32BE(h1, recordOff + 0x12);
+  return {
+    recordOff,
+    volEnvOff: u32BE(h1, recordOff + 0x00),
+    volEnvLen: u16BE(h1, recordOff + 0x04),
+    volEnvLoop: u16BE(h1, recordOff + 0x06),
+    freqEnvOff: u32BE(h1, recordOff + 0x08),
+    freqEnvLen: u16BE(h1, recordOff + 0x0c),
+    freqEnvLoop: u16BE(h1, recordOff + 0x0e),
+    freqEnvSpeed: u16BE(h1, recordOff + 0x10),
+    arpTableOff,
+    arpLen,
+    arpLoop: u16BE(h1, recordOff + 0x18),
+    wave1Off,
+    wave2Off,
+    waveWordLen,
+    synthType: h1[recordOff + 0x23] ?? 0,
+    wave1: sliceI8(wave1Off, waveWordLen * 2),
+    wave2: sliceI8(wave2Off, waveWordLen * 2),
+    arpTable: sliceI8(arpTableOff, arpLen),
+  };
+}
+
 export interface SunSequenceEntry {
   /** per-voice track stream pointers (hunk1-relative) */
   trackPtrs: [number, number, number, number];
@@ -480,6 +557,8 @@ export interface SunV13Score {
   sampledInstruments: SunSampledInstrument[];
   /** number of synth records ((sampledTableOff - synthTableOff) / 0x24) */
   synthInstrumentCount: number;
+  /** decoded synth instrument records (0x24-byte, with resolved wave/arp data) */
+  synthInstruments: SunSynthInstrument[];
   /** subsongs (null-terminated table at REF_INSTR_TABLE + deltaB) */
   subsongs: SunSubsong[];
   /** deduplicated track stream blocks, sorted by h1Offset */
@@ -528,6 +607,13 @@ export function parseSunTronicV13Score(buf: Uint8Array): SunV13Score {
     throw new Error('SunTronic V1.3: instrument table offsets out of range');
   }
   const synthInstrumentCount = Math.floor((sampledTableOff - synthTableOff) / SYNTH_RECORD_SIZE);
+
+  const synthInstruments: SunSynthInstrument[] = [];
+  for (let i = 0; i < synthInstrumentCount; i++) {
+    const rec = synthTableOff + i * SYNTH_RECORD_SIZE;
+    if (rec + SYNTH_RECORD_SIZE > h1.length) break;
+    synthInstruments.push(decodeSunSynthInstrument(h1, rec));
+  }
 
   const sampledInstruments: SunSampledInstrument[] = [];
   for (let rec = sampledTableOff; rec + SAMPLED_RECORD_SIZE <= h1.length; rec += SAMPLED_RECORD_SIZE) {
@@ -598,6 +684,7 @@ export function parseSunTronicV13Score(buf: Uint8Array): SunV13Score {
     sampledTableOff,
     sampledInstruments,
     synthInstrumentCount,
+    synthInstruments,
     subsongs,
     blocks,
     blockIndexByOffset,

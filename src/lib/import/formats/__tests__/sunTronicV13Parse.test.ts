@@ -23,7 +23,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync } from 'fs';
 import { join } from 'path';
 import { parseSunTronicFile, isSunTronicFormat, isSunTronicRawRip } from '../SunTronicParser';
-import { isSunTronicV13Format, parseSunTronicV13Score, sunTronicV13Encoder } from '../SunTronicV13';
+import { isSunTronicV13Format, parseSunTronicV13Score, sunTronicV13Encoder, decodeSunSynthInstrument } from '../SunTronicV13';
 
 const CORPUS = join(process.cwd(), 'public/data/songs/formats/SUNTronicTunes');
 const INSTR = join(CORPUS, 'instr');
@@ -103,6 +103,44 @@ describe('SunTronic V1.3 score decode (Delirium hunk executables)', () => {
     const song = parseSunTronicFile(loadModule('mule.src'), 'mule.src', loadCompanions());
     const cell = song.patterns[2].channels[1].rows[0];
     expect(cell.note, 'voice-1 transposed cell shows +4 semitones from raw').toBe(64);
+  });
+
+  it('mule.src: decodes the 0x24 synth record into a full descriptor (replayer-verified fields)', () => {
+    // Field values recovered from the Andy Silva replayer source
+    // (docs/formats/Replayers/DeliPlayers/AndySilva/DP_Suntronic.s: GNN2 @543,
+    // MEGAEFFECTS @594, EFFECTS @415) and cross-checked byte-for-byte against
+    // mule.src synth[0]. Fails on revert: without decodeSunSynthInstrument the
+    // synth records are only COUNTED (bare placeholders, silent) — the whole
+    // native synth engine has no descriptor to build a voice from.
+    const score = parseSunTronicV13Score(new Uint8Array(loadModule('mule.src')));
+    expect(score.synthInstruments.length).toBe(score.synthInstrumentCount);
+    expect(score.synthInstruments.length).toBe(5);
+
+    const s0 = score.synthInstruments[0];
+    expect(s0.recordOff).toBe(score.synthTableOff);
+    expect(s0.volEnvOff).toBe(0x174a);
+    expect(s0.volEnvLen).toBe(6);
+    expect(s0.volEnvLoop).toBe(5);
+    expect(s0.freqEnvOff).toBe(0x171c);
+    expect(s0.freqEnvLen).toBe(1);
+    expect(s0.freqEnvSpeed).toBe(0x1f40);
+    expect(s0.arpTableOff).toBe(0x1801);
+    expect(s0.arpLen).toBe(0x3e);
+    expect(s0.arpLoop).toBe(0);
+    expect(s0.wave1Off).toBe(0x1cc5);
+    expect(s0.wave2Off).toBe(0x1d05);
+    expect(s0.waveWordLen).toBe(0x20);
+    expect(s0.synthType).toBe(2);
+
+    // resolved table data sliced to the right lengths from hunk#1
+    expect(s0.wave1.length).toBe(0x40); // waveWordLen * 2
+    expect(s0.wave2.length).toBe(0x40);
+    expect(s0.arpTable.length).toBe(0x3e);
+
+    // decoder is a pure function of (h1, recordOff): re-decoding matches
+    const again = decodeSunSynthInstrument(score.h1, score.synthTableOff);
+    expect(again.wave1Off).toBe(s0.wave1Off);
+    expect(again.synthType).toBe(s0.synthType);
   });
 
   for (const name of ['mule.src', 'kompo.pc']) {
