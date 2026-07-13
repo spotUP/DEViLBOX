@@ -160,10 +160,19 @@ Log-write call sites: `third-party/uade-3.05/src/audio.c:713-816`.
   Left as `w2[D1..]` (seamless-splice reading, matches the CALC7 "copy-splice"
   name). Revisit if a non-DC type-2 witness surfaces.
 
-REMAINING Gate-1 types on mule.src: 1 (PRNG noise — needs seed/state alignment),
-4 and 5 (else-branch `renderSmooth` — the `wave1`-approx feedback suspect). These
-did NOT match (339 unmatched = the type-1 noise voice, inherently random). Each is
-its own analysis unit. Gate 1 is PARTIALLY closed (type-2 done).
+REMAINING Gate-1 types on mule.src: 1 (PRNG noise), 4 and 5 (else-branch
+`renderSmooth`). Gate 1 is PARTIALLY closed (type-2 done).
+
+- **type 1 (noise) — oracle-confirmed WRONG, needs disassembly.** Brute-forced all
+  65536 seeds of the native PRNG (`renderType1` d1=-1: `d0=d0*d0; d0>>=8;
+  d0^=0xac91; word=d0; final^=0x7fa3`) against UADE's first captured 128B noise
+  buffer — NO seed reproduces it. So the transcribed constants/recurrence are
+  wrong, not merely phase-unaligned. Fix requires the real CALC5/6 68k routine
+  (disassemble `MEGAEFFECTS` noise path). A brute-force-seed probe is the ready
+  regression once the algorithm is corrected (chain-verify consecutive buffers).
+- **types 4/5 — not triggered in mule's window** (mule only sounds type-1 128B +
+  type-2 64B; no 16B/32B buffers ever appear). Validate on a song that plays them:
+  gliders.src has types {1:2 2:3 4:1 5:4 6:7} — also the only source of type 6.
 
 ## Resume pointer (2026-07-13 — where P5 build stopped)
 
