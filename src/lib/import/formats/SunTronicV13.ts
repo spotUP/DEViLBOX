@@ -26,6 +26,7 @@
 
 import type { TrackerCell } from '@/types';
 import type { VariableLengthEncoder } from '@/engine/uade/UADEPatternEncoder';
+import type { SunTronicConfig } from '@typedefs/sunTronicInstrument';
 
 // ── Binary helpers ──────────────────────────────────────────────────────────
 
@@ -511,6 +512,57 @@ export function decodeSunSynthInstrument(h1: Uint8Array, recordOff: number): Sun
     // (voice+0x24) runs 0..freqEnvLen-1. Slice one extra byte as a bounds guard.
     volEnv: sliceI8(u32BE(h1, recordOff + 0x00), u16BE(h1, recordOff + 0x04) + 1),
     vibDepth: sliceI8(u32BE(h1, recordOff + 0x08), u16BE(h1, recordOff + 0x0c) + 1),
+  };
+}
+
+/**
+ * Serialize a runtime `SunSynthInstrument` to the plain, JSON-safe
+ * `SunTronicConfig` the editor persists on `InstrumentConfig.sunTronic`. Drops
+ * the h1-relative pointer offsets (irrelevant once the tables are sliced) and
+ * mirrors the Int8Arrays as number[] (Int8Arrays corrupt to index-objects
+ * through JSON — localStorage/IDB — so the persisted shape is plain numbers).
+ *
+ * Lives in the lib layer (not the engine) so both the parser and the native
+ * synth voice consume it without a lib→engine import cycle.
+ */
+export function sunSynthToConfig(inst: SunSynthInstrument): SunTronicConfig {
+  return {
+    sunTronic: 1,
+    synthType: inst.synthType,
+    waveWordLen: inst.waveWordLen,
+    arpLen: inst.arpLen,
+    arpLoop: inst.arpLoop,
+    volEnvLen: inst.volEnvLen,
+    volEnvLoop: inst.volEnvLoop,
+    freqEnvLen: inst.freqEnvLen,
+    freqEnvLoop: inst.freqEnvLoop,
+    freqEnvSpeed: inst.freqEnvSpeed,
+    wave1: Array.from(inst.wave1),
+    wave2: Array.from(inst.wave2),
+    arpTable: Array.from(inst.arpTable),
+    volEnv: Array.from(inst.volEnv),
+    vibDepth: Array.from(inst.vibDepth),
+  };
+}
+
+/**
+ * Reconstruct a render-ready `SunSynthInstrument` from a persisted config. The
+ * renderer only reads the tables + lengths + types, so the pointer-offset fields
+ * are filled with 0 (unused at render time).
+ */
+export function sunConfigToInstrument(cfg: SunTronicConfig): SunSynthInstrument {
+  return {
+    recordOff: 0,
+    volEnvOff: 0, volEnvLen: cfg.volEnvLen, volEnvLoop: cfg.volEnvLoop,
+    freqEnvOff: 0, freqEnvLen: cfg.freqEnvLen, freqEnvLoop: cfg.freqEnvLoop,
+    freqEnvSpeed: cfg.freqEnvSpeed,
+    arpTableOff: 0, arpLen: cfg.arpLen, arpLoop: cfg.arpLoop,
+    wave1Off: 0, wave2Off: 0, waveWordLen: cfg.waveWordLen, synthType: cfg.synthType,
+    wave1: Int8Array.from(cfg.wave1),
+    wave2: Int8Array.from(cfg.wave2),
+    arpTable: Int8Array.from(cfg.arpTable),
+    volEnv: Int8Array.from(cfg.volEnv),
+    vibDepth: Int8Array.from(cfg.vibDepth),
   };
 }
 
