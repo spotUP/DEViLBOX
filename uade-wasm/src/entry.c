@@ -70,6 +70,39 @@ static uint32_t g_paula_log_write   = 0;
 static uint32_t g_paula_log_read    = 0;
 static uint8_t  g_paula_log_enabled = 0;
 
+/* --- Sequential byte-access trace (Gate-1 synth ground truth) ------------ *
+ * Records every chip-RAM byte read/write in order (addr + low byte value +
+ * r/w flag). Used offline to recover a synth voice's exact wave source stream
+ * (A3) and output write burst per tick, without knowing the live struct layout.
+ * Filled from uade_wasm_check_wp_{read,write} (chipmem_bget/bput hooks). */
+#define ACCTRACE_SIZE (1u << 17)          /* 128K entries (~64 ticks of reads) */
+#define ACCTRACE_MASK (ACCTRACE_SIZE - 1)
+static uint32_t g_acctrace_addr[ACCTRACE_SIZE];
+static uint8_t  g_acctrace_val[ACCTRACE_SIZE];
+static uint8_t  g_acctrace_wr[ACCTRACE_SIZE];
+static uint32_t g_acctrace_write   = 0;
+static uint32_t g_acctrace_read    = 0;
+static uint8_t  g_acctrace_enabled = 0;
+
+/* --- Register capture on first write to a target address ------------------ *
+ * When enabled, the FIRST chip-RAM write whose address == g_capture_addr in a
+ * render snapshots all 16 CPU registers (D0-D7, A0-A7) plus PC. Used to read
+ * the SunTronic synth's live A3=wave1 / A4=feedback pointers at the exact
+ * moment the output loop stores its first byte — zero struct-layout guessing.  */
+static uint32_t g_capture_addr    = 0;   /* 0 = disabled */
+static uint32_t g_capture_size    = 1;   /* range [addr, addr+size) */
+static uint32_t g_capture_regs[16];
+static uint32_t g_capture_pc      = 0;
+static uint8_t  g_capture_hit     = 0;
+static uint32_t g_capture_pc_lo   = 0;   /* 0 = no PC filter */
+static uint32_t g_capture_pc_hi   = 0;   /* accept only when pc_lo<=PC<pc_hi */
+
+/* Partial view of the UAE regstruct (real definition in newcpu.h, not included
+ * here). Layout: D0-D7,A0-A7 (16*4=64) then usp/isp/msp/sr/flags (24) then PC.
+ * Aliases the single extern `regs` symbol — same trick as get_register below. */
+struct _uade_regs_partial { uint32_t regs[16]; uint8_t _pad[24]; uint32_t pc; };
+extern struct _uade_regs_partial regs;
+
 /* --- CIA Tick Snapshot Buffer -------------------------------------------- */
 static UadeTickSnapshot g_tick_snaps[TICK_SNAP_SIZE];
 static uint32_t         g_tick_snap_write   = 0;
@@ -1052,6 +1085,12 @@ static uint32_t g_wp_hit_read  = 0;
  * Checks whether the read address falls within any active read watchpoint.
  */
 void uade_wasm_check_wp_read(uint32_t addr, uint32_t value) {
+    if (g_acctrace_enabled) {
+        uint32_t idx = g_acctrace_write++ & ACCTRACE_MASK;
+        g_acctrace_addr[idx] = addr;
+        g_acctrace_val[idx]  = (uint8_t)(value & 0xff);
+        g_acctrace_wr[idx]   = 0;
+    }
     for (int i = 0; i < WATCHPOINT_MAX; i++) {
         if (!g_watchpoints[i].enabled) continue;
         if (!(g_watchpoints[i].mode & WP_MODE_READ)) continue;
@@ -1071,6 +1110,21 @@ void uade_wasm_check_wp_read(uint32_t addr, uint32_t value) {
  * Checks whether the write address falls within any active write watchpoint.
  */
 void uade_wasm_check_wp_write(uint32_t addr, uint32_t value) {
+    if (g_acctrace_enabled) {
+        uint32_t idx = g_acctrace_write++ & ACCTRACE_MASK;
+        g_acctrace_addr[idx] = addr;
+        g_acctrace_val[idx]  = (uint8_t)(value & 0xff);
+        g_acctrace_wr[idx]   = 1;
+    }
+    if (g_capture_addr && !g_capture_hit &&
+        addr >= g_capture_addr && addr < g_capture_addr + g_capture_size &&
+        (g_capture_pc_hi == 0 ||
+         (regs.pc >= g_capture_pc_lo && regs.pc < g_capture_pc_hi))) {
+        for (int i = 0; i < 16; i++) g_capture_regs[i] = regs.regs[i];
+        g_capture_pc   = regs.pc;
+        g_capture_addr = addr;   /* report the exact hit address */
+        g_capture_hit  = 1;
+    }
     for (int i = 0; i < WATCHPOINT_MAX; i++) {
         if (!g_watchpoints[i].enabled) continue;
         if (!(g_watchpoints[i].mode & WP_MODE_WRITE)) continue;
@@ -1138,6 +1192,60 @@ int uade_wasm_get_watchpoint_hits(uint32_t *out, int maxHits) {
         count++;
     }
     return count;
+}
+
+/* ── Sequential byte-access trace exports ───────────────────────────────── */
+
+/* Enable/disable the sequential chip-RAM byte access trace. On enable, resets
+ * the ring read/write cursors so the next drain starts clean. */
+EMSCRIPTEN_KEEPALIVE
+void uade_wasm_enable_acctrace(int enable) {
+    g_acctrace_enabled = enable ? 1 : 0;
+    if (enable) { g_acctrace_read = 0; g_acctrace_write = 0; }
+}
+
+/* Drain up to maxEntries access records into `out` (2 uint32 per record):
+ *   [0] = addr
+ *   [1] = (is_write << 16) | (value & 0xff)
+ * Returns the number of records written. Drains in FIFO order. */
+EMSCRIPTEN_KEEPALIVE
+int uade_wasm_drain_acctrace(uint32_t *out, int maxEntries) {
+    int c = 0;
+    while (c < maxEntries && g_acctrace_read != g_acctrace_write) {
+        uint32_t i = g_acctrace_read++ & ACCTRACE_MASK;
+        out[c * 2 + 0] = g_acctrace_addr[i];
+        out[c * 2 + 1] = ((uint32_t)g_acctrace_wr[i] << 16) | (uint32_t)g_acctrace_val[i];
+        c++;
+    }
+    return c;
+}
+
+/* ── Register-capture-on-write exports ──────────────────────────────────── */
+
+/* Arm capture: the next first write to `addr` snapshots all CPU registers.
+ * addr==0 disarms. Resets the hit flag so each render can re-arm. */
+EMSCRIPTEN_KEEPALIVE
+void uade_wasm_arm_capture(uint32_t addr, uint32_t size) {
+    g_capture_addr = addr;
+    g_capture_size = size < 1 ? 1 : size;
+    g_capture_hit  = 0;
+}
+
+/* Optional PC filter: capture fires only when pc_lo <= PC < pc_hi. hi==0 disables. */
+EMSCRIPTEN_KEEPALIVE
+void uade_wasm_arm_capture_pc(uint32_t pc_lo, uint32_t pc_hi) {
+    g_capture_pc_lo = pc_lo;
+    g_capture_pc_hi = pc_hi;
+}
+
+/* Read the captured registers: out[0..15] = D0-D7,A0-A7, out[16] = PC,
+ * out[17] = exact hit address. Returns 1 if a capture fired, else 0. */
+EMSCRIPTEN_KEEPALIVE
+int uade_wasm_get_capture(uint32_t *out) {
+    for (int i = 0; i < 16; i++) out[i] = g_capture_regs[i];
+    out[16] = g_capture_pc;
+    out[17] = g_capture_addr;
+    return g_capture_hit ? 1 : 0;
 }
 
 /* ── String read from Amiga chip RAM ────────────────────────────────────── */
@@ -1209,16 +1317,8 @@ int uade_wasm_add_extra_file(const char *filename, const uint8_t *data, size_t l
 
 /* ── 68k Register Access ───────────────────────────────────────────────── */
 
-/* The regstruct is defined in newcpu.h with many dependencies.
- * We declare just the parts we need via the extern symbol 'regs'.
- * The first 16 uint32s are D0-D7,A0-A7. PC follows at a known offset.
- * We access it as raw memory to avoid header dependency issues. */
-struct _uade_regs_partial {
-    uint32_t regs[16];
-    /* After regs[16]: usp(4), isp(4), msp(4), sr(2), t1(1), t0(1), s(1), m(1), x(1), stopped(1), intmask(4) = 24 bytes */
-    /* Then: pc(4) at offset 16*4 + 24 = 88 */
-};
-extern struct _uade_regs_partial regs;
+/* The regstruct is defined in newcpu.h; `struct _uade_regs_partial regs` is
+ * forward-declared near the top of this file (aliases the extern symbol). */
 
 /*
  * Read a 68k register by index.

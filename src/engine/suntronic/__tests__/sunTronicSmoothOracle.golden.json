@@ -1,0 +1,49 @@
+{
+  "note": "CALC13/14 (else-branch smooth feedback) fixtures captured from UADE via PC-filtered register capture @0x26e08 (loop @0x26dc8). calc14Kernel(seedLast,seedPrev,wave1,d2v,d3v,byteLen) must reproduce outHex byte-exact. Seed = feedback predecessor A4[last]/A4[last-1] (directly read, or uniquely solved for buffer-rotated voices).",
+  "fixtures": [
+    {
+      "name": "kompo02.src",
+      "byteLen": 32,
+      "d2v": 1768,
+      "d3v": 0,
+      "arpD1": 127,
+      "seedLast": 23,
+      "seedPrev": 19,
+      "wave1Hex": "a0a6acb2b8bec4cad0d6dce2e8eef4fa00060c12181e242a30363c42484e545a",
+      "outHex": "100a0501fdf9f6f4f2f0efefeeeeeeeff0f1f3f4f6f8fbfd000306090c101317"
+    },
+    {
+      "name": "kompo03.src",
+      "byteLen": 32,
+      "d2v": 8490,
+      "d3v": 0,
+      "arpD1": 64,
+      "seedLast": 236,
+      "seedPrev": 228,
+      "wave1Hex": "00060c12181e242a30363c42484e545aa0a6acb2b8bec4cad0d6dce2e8eef4fa",
+      "outHex": "f1f6fc01070d13191f242a30363c42481dfee8dad1cccacacbced1d6dadfe4ea"
+    },
+    {
+      "name": "time0002.src",
+      "byteLen": 64,
+      "d2v": 4242,
+      "d3v": 0,
+      "arpD1": 99,
+      "seedLast": 183,
+      "seedPrev": 186,
+      "wave1Hex": "605d5a5754514e4b4845423f3c393633302d2a2724211e1b1815120f0c09060300fdfaf7f4f1eeebe8e5e2dfdcd9d6d3d0cdcac7c4c1bebbb8b5b2afaca9a6a3",
+      "outHex": "ccdfeffc0811191f24292c2e303132323131302f2d2c2a282623211f1c1a1714120f0c09070401fefbf8f5f2efece9e6e3e0dddbd8d5d2cfccc9c6c3c0bdbab7"
+    },
+    {
+      "name": "time2000.src",
+      "byteLen": 64,
+      "d2v": 4242,
+      "d3v": 0,
+      "arpD1": 99,
+      "seedLast": 183,
+      "seedPrev": 186,
+      "wave1Hex": "605d5a5754514e4b4845423f3c393633302d2a2724211e1b1815120f0c09060300fdfaf7f4f1eeebe8e5e2dfdcd9d6d3d0cdcac7c4c1bebbb8b5b2afaca9a6a3",
+      "outHex": "ccdfeffc0811191f24292c2e303132323131302f2d2c2a282623211f1c1a1714120f0c09070401fefbf8f5f2efece9e6e3e0dddbd8d5d2cfccc9c6c3c0bdbab7"
+    }
+  ]
+}
