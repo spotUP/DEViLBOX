@@ -89,6 +89,22 @@ describe('SunTronic V1.3 score decode (Delirium hunk executables)', () => {
     expect(totalNotes).toBeGreaterThan(0);
   });
 
+  it('mule.src: applies per-voice sequence transpose to displayed pitch', () => {
+    // Voice 1 (channel index 1) carries a −4 semitone sequence transpose from
+    // sequence entry 4 onward (entries 0–3 are transpose 0). The replayer
+    // computes pitch = (~byte) − transpose, so the grid must show the
+    // transposed note, NOT the raw decoded byte.
+    //
+    // Fixture witness: mule.src channel 1, pattern 2, row 0 (global row 128 =
+    // entry 4 at 32 rows/position) decodes raw pitch 47. With transpose −4 the
+    // displayed note is sunPitchToNote(47 − (−4)) = sunPitchToNote(51) = 64.
+    // Without the transpose (the reverted bug) it would be sunPitchToNote(47) =
+    // 60 — this assertion fails on revert.
+    const song = parseSunTronicFile(loadModule('mule.src'), 'mule.src', loadCompanions());
+    const cell = song.patterns[2].channels[1].rows[0];
+    expect(cell.note, 'voice-1 transposed cell shows +4 semitones from raw').toBe(64);
+  });
+
   for (const name of ['mule.src', 'kompo.pc']) {
     it(`${name}: layout carriers are HONEST — blockRawBytes equals the file slice and the encoder reproduces it`, () => {
       const buf = loadModule(name);
