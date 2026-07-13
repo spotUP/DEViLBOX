@@ -32,6 +32,8 @@ Always debug via the DEViLBOX MCP (`get_console_errors`, `play_fur`, `load_file`
 
 If MCP shows "No browser connected" — check `lsof -nP -iTCP:4003 -sTCP:LISTEN` to confirm Express owns port 4003, then reconnect Claude Code. Full troubleshooting: `docs/MCP_DEBUGGING_GUIDE.md`. ~130 tools grouped by category — call `get_mcp_help` for the live catalogue.
 
+**Always stop playback when done testing.** A playing song keeps the audio graph, WASM engines, and render loop hot — heat + battery drain. After any MCP test that started playback (`play`, `play_fur`, `load_file`+play, `trigger_note`), finish with `stop` (plus `release_all_notes` if notes were triggered) before ending the task.
+
 ### Deployment — Hetzner, NOT GitHub Pages
 
 Hosted at `devilbox.uprough.net`. Deploy is fully automatic on `git push origin main` — CI builds via `.github/workflows/deploy.yml`, creates a GitHub Release with `devilbox-dist.tar.gz`, webhook triggers the Hetzner server to pull and deploy.
