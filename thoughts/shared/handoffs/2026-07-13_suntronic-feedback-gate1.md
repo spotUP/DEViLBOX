@@ -64,15 +64,20 @@ p8c CALC3 verifier, p8d corpus scan, p8e PC histogram.
 
 **GATE 1 IS CLOSED.** All synth types byte-exact vs UADE: CALC1 morph, CALC2
 pulse/noise, CALC7 splice, CALC13/14 smooth (oracle-locked), CALC3 pulse
-(disasm-confirmed). NEXT = **Gate 2**: note-row timing + period pipeline. Phase-1
-research done: `research/2026-07-14_suntronic-gate2-note-timing.md` — decodes the
-EFFECTS @415-496 period pipeline + GETNEXTNOTE @498-592 note-stream opcode map,
-flags the open row-duration question, and gives the oracle plan. FIRST Gate-2
-step: build the period-timeline oracle — read each voice's `$0020` (Paula period)
-directly after each 882-frame render tick (avoids the first-hit-per-chunk capture
-limit; no PC filter needed). Blocker to resolve first: find the LOADED voice-record
-base addresses + stride (the `.s` says $130; the loaded variant differs — the
-Gate-1 type-1 entry used `adda.w #$1ba,a0`). Then Phase 4 native playback (GATED).
+(disasm-confirmed). NEXT = **Gate 2**: note-row timing + period pipeline. Research +
+oracle done: `research/2026-07-14_suntronic-gate2-note-timing.md`. Period-timeline
+oracle BUILT + validated (`tools/suntronic-re/p9a-period-oracle.ts`, commit
+`2c3799495`): live tick handler entry 0x2660e, period→Paula write 0x26752, voice[0]
+= 0x26f8a stride 0x1ba (the `.s`-shaped EFFECTS at 0x2680c is a DEAD relocated
+copy). p9a reads each voice's $20 period / $08 acc / $0C vol / $14 flags per tick;
+gliders shows vibrato, volume envelope, and note-on timing (voice2@t7, voice3@t13)
+cleanly — row-duration question answered empirically. NEXT Gate-2 units (do
+together — a golden needs the port to diff against): (1) port EFFECTS period
+pipeline (0x26850-0x26896: freq-acc + vibrato `>>12` + PERIODS-table fractional
+interp via drin index; NOTE loaded volume adds master-vol scaling globals
+$a8d/$a8e(a6) absent from `.s`) + GETNEXTNOTE row decode into the native engine;
+(2) emit p9a timeline as wasm-free golden JSON, wire test:ci, diff native vs
+golden. Then Phase 4 native playback (GATED until period+note timelines match).
 
 Everything below the "SESSION UPDATE 2026-07-13" divider predates these
 closures; read it for context but trust these UPDATE blocks where they conflict.
