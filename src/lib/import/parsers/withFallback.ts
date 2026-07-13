@@ -25,6 +25,14 @@ export interface FallbackContext {
   companionFiles?: Map<string, ArrayBuffer>;
 }
 
+/**
+ * Native per-note synth voices that coexist with UADE whole-song playback:
+ * the module still plays via UADE (uadeEditableFileData / suppressNotes), but
+ * auditioning one of these instruments plays that native voice instead of
+ * restarting the module. Kept out of the UADEEditableSynth clobber below.
+ */
+const NATIVE_AUDITION_SYNTHS = new Set(['SunTronicSynth']);
+
 type NativeParser = (buffer: ArrayBuffer, filename: string) => Promise<TrackerSong> | TrackerSong;
 type NativeParserWithBytes = (bytes: Uint8Array, filename: string) => Promise<TrackerSong | null> | TrackerSong | null;
 
@@ -137,6 +145,10 @@ export async function withNativeThenUADE(
             }];
           } else {
             for (const inst of result.instruments) {
+              // Preserve native audition voices (e.g. SunTronicSynth): the song
+              // still plays through UADE via uadeEditableFileData (suppressNotes),
+              // but auditioning the instrument plays THAT voice, not the module.
+              if (NATIVE_AUDITION_SYNTHS.has(inst.synthType)) continue;
               inst.synthType = 'UADEEditableSynth';
             }
           }

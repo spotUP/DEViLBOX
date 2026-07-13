@@ -235,6 +235,7 @@ export type SynthType =
   | 'UADEEditableSynth' // UADE editable (native pattern display + UADE audio streaming)
   // UADE Format-Specific Synths (native DSP via WASM)
   | 'SoundMonSynth'   // SoundMon II / Brian Postma (wavetable + ADSR)
+  | 'SunTronicSynth'  // SunTronic V1.3 (per-tick MEGAEFFECTS wavetable voice)
   | 'SidMonSynth'     // SidMon II (SID-like synthesis)
   | 'DigMugSynth'     // Digital Mugician (4-wave blending wavetable)
   | 'FCSynth'         // Future Composer 1.3/1.4 (47 waveforms + synth macro)

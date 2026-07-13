@@ -2513,6 +2513,8 @@ export class ToneEngine {
       case 'StartrekkerAMSynth':
       case 'DeltaMusic1Synth':
       case 'DeltaMusic2Synth':
+      // SunTronic V1.3 native wavetable voice (pure-JS render, no WASM pool)
+      case 'SunTronicSynth':
       // SunVox WASM patch player / modular editor
       case 'SunVoxSynth':
       case 'SunVoxModular':
