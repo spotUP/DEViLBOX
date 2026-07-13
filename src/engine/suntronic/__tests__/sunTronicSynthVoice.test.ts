@@ -31,6 +31,7 @@ function synth(partial: Partial<SunSynthInstrument> & { synthType: number }): Su
     waveWordLen: partial.waveWordLen ?? ((partial.wave1?.length ?? 2) >> 1),
     wave1: new Int8Array(0), wave2: new Int8Array(0),
     arpTable: new Int8Array([0]),
+    volEnv: new Int8Array([0x40]), vibDepth: new Int8Array([0]),
     ...partial,
   };
 }

@@ -465,6 +465,10 @@ export interface SunSynthInstrument {
   wave2: Int8Array;
   /** resolved interp/arp table bytes (signed 8-bit, arpLen entries) */
   arpTable: Int8Array;
+  /** volume-envelope table bytes (record+0x00, volEnvLen entries; read unsigned) */
+  volEnv: Int8Array;
+  /** vibrato-depth table bytes (record+0x08, freqEnvLen entries; signed) */
+  vibDepth: Int8Array;
 }
 
 /**
@@ -503,6 +507,10 @@ export function decodeSunSynthInstrument(h1: Uint8Array, recordOff: number): Sun
     wave1: sliceI8(wave1Off, waveWordLen * 2),
     wave2: sliceI8(wave2Off, waveWordLen * 2),
     arpTable: sliceI8(arpTableOff, arpLen),
+    // vol-env index (voice+0x10) runs 0..volEnvLen-1; vibrato-depth index
+    // (voice+0x24) runs 0..freqEnvLen-1. Slice one extra byte as a bounds guard.
+    volEnv: sliceI8(u32BE(h1, recordOff + 0x00), u16BE(h1, recordOff + 0x04) + 1),
+    vibDepth: sliceI8(u32BE(h1, recordOff + 0x08), u16BE(h1, recordOff + 0x0c) + 1),
   };
 }
 
