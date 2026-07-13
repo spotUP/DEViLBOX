@@ -16,7 +16,7 @@
  *   type 0  linear morph   out = wave1 + ((wave2 - wave1) * D1 >> 7)
  *   type 1  pulse/noise     D1=-1 PRNG noise, D1=-2 hold-feedback, else recursive
  *                           pulse smoothing; feedback source latches via flag bit1
- *   type 2  splice          first D1 bytes from wave2, remainder from wave1[D1..]
+ *   type 2  splice          first D1 bytes from wave1, remainder from wave2[D1..]
  *   type 3  resample        two-segment rate-scaled replay of wave1 (0x8000/(D1+k))
  *   else    smoothed interp weighted crossfade, 0xFFFE0/(D1+0x20) coefficient
  *
@@ -144,17 +144,25 @@ function renderType1(
   state.feedbackLatched = true; // BSET #1,voice+0x14
 
   if (d1 === -1) {
-    // CALC5/6: PRNG noise, writes words (byteLen/2 iterations).
+    // CALC5/6: PRNG noise, writes words (byteLen/2 iterations). The output word
+    // is written BEFORE the recurrence steps (out[0] == the incoming seed), and
+    // the middle-square is shifted right by 4, not 8 — both recovered byte-exact
+    // from UADE chip-RAM noise buffers (mule.src, seed 0x6d77) via the P5 wave-
+    // buffer oracle; the earlier transcription had >>8 and stepped-then-wrote.
+    //   d0_next = ((d0*d0) >>> 4 & 0xffff) ^ 0xac91   (EORI.W #-$536F)
+    // The per-tick seed carry is NOT byte-verified (the workspace `rndnum` value
+    // between ticks does not follow this stream continuation) — we continue the
+    // stream as the closest known model; it affects only which noise instance
+    // plays, not its spectral character.
     let d0 = prng.value & 0xffff;
     const words = byteLen >> 1;
     for (let i = 0; i < words; i++) {
-      d0 = (d0 * d0) & 0xffffffff;
-      d0 = (d0 >>> 8) & 0xffff;
-      d0 = (d0 ^ 0xac91) & 0xffff; // EORI.W #-$536F
       out[i * 2] = (d0 >> 8 << 24) >> 24;
       out[i * 2 + 1] = ((d0 & 0xff) << 24) >> 24;
+      d0 = ((d0 * d0) >>> 4) & 0xffff;
+      d0 = (d0 ^ 0xac91) & 0xffff; // EORI.W #-$536F
     }
-    prng.value = (d0 ^ 0x7fa3) & 0xffff;
+    prng.value = d0;
     return;
   }
 
