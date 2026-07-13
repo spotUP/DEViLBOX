@@ -125,9 +125,15 @@ Command grammar (GETNEXTNOTE @498-592, negative opcodes 0x8B-0xFF):
    (14 fields above + resolved envelope/arp/waveform table data, all
    h1-relative pointers → sliced byte arrays). Regression: decode mule.src
    synth[0..4], assert field values match the code-verified table.
-2. **Port MEGAEFFECTS + EFFECTS** to a native per-tick renderer (5 synth types,
-   vol/freq envelopes, arp). Oracle: render one synth note, diff vs UADE
-   `traceModuleReads`/audio oracle sample buffer.
+2. Port MEGAEFFECTS + EFFECTS to a native per-tick renderer.
+   - **2a DONE** (commit 5373b40d1): MEGAEFFECTS wavetable timbre generator
+     `src/engine/suntronic/SunTronicSynthVoice.ts` — 5 synth types + arp step +
+     PRNG. Types 0/2 pinned exact; 1/3/else oracle-pending.
+   - **2b NEXT**: EFFECTS pitch side (vol envelope voice+0x0C/0x15, freq env +
+     vibrato voice+0x22/0x24, arp-period via `drin`+`PERIODS` LUT → voice+0x20
+     Paula period). Needs PERIODS + drin tables (extract from hunk#1 / source).
+   - Oracle (2 exit): render one synth note, diff vs UADE
+     `traceModuleReads`/audio sample buffer.
 3. **Route** SunTronic to native voices: add `sunTronicFileData` dedicated-engine
    flag so withFallback.ts stops forcing UADEEditableSynth; sampler for sampled
    records, native synth for 0x24 records. Single-note audition, no song leak.
