@@ -73,8 +73,15 @@ export function describeVariableBlockCarrier(formatId: string, parse: ParseFn): 
       const rawBytes = layout.blockRawBytes!;
       const baseline = layout.blockRows!;
 
+      // Pick the first block with real bytes AND at least one editable row.
+      // Some formats (e.g. Future Player) carry pure command/call blocks with no
+      // note rows — those have real bytes but nothing a cell edit could change,
+      // so they are not valid subjects for the "edit diverges" assertion.
       let fp = 0;
-      while (fp < layout.numFilePatterns && (!rawBytes[fp] || rawBytes[fp].length === 0)) fp++;
+      while (
+        fp < layout.numFilePatterns &&
+        (!rawBytes[fp] || rawBytes[fp].length === 0 || !baseline[fp] || baseline[fp].length === 0)
+      ) fp++;
       expect(fp).toBeLessThan(layout.numFilePatterns);
 
       const edited: TrackerCell[] = baseline[fp].map((c) => ({ ...c }));

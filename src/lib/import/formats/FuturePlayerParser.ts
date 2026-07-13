@@ -276,6 +276,104 @@ function linearizeVoice(
   return rows;
 }
 
+// ── Per-block decode for the structural raw-block carrier ───────────────────
+//
+// Future Player voice data is not a single contiguous stream: a voice is a
+// call-GRAPH over shared command BLOCKS (subroutine bodies + top-level voice
+// sequences), each addressed by a code pointer. Every block IS a real
+// contiguous byte range that runs from its start to its terminator — cmd 0
+// (end / return-from-sub) or cmd 7 (unconditional jump). cmd 6 (call) does NOT
+// terminate: the replayer returns just after the 4-byte pointer, so the block
+// continues linearly. Notes are 2 bytes and continue.
+//
+// decodeBlock walks ONE block in isolation (never following calls/jumps),
+// returns its real byte size, its decoded baseline rows, and the call/jump
+// targets it references (so the parser can enumerate the whole reachable graph).
+
+interface DecodedBlock {
+  size: number;         // real byte length [start, start+size)
+  rows: FPRow[];        // decoded baseline rows (carrier truth)
+  targets: number[];    // cmd6/cmd7 target seq pointers (code-relative)
+}
+
+function decodeBlock(
+  code: Uint8Array,
+  start: number,
+  instrumentMap: Map<number, number>,
+): DecodedBlock {
+  const rows: FPRow[] = [];
+  const targets: number[] = [];
+  let p = start;
+  let currentInstr = 0;
+  let guard = 0;
+  const MAX = 100000;
+
+  while (p < code.length && guard < MAX) {
+    guard++;
+    const byte0 = rd8(code, p);
+    p++;
+
+    if (byte0 & 0x80) {
+      const cmdNum = byte0 & 0x3f;
+      p++; // arg byte (always consumed)
+
+      switch (cmdNum) {
+        case 0: // end voice / return — block terminator
+          return { size: p - start, rows, targets };
+        case 1: { // set instrument (4-byte ptr)
+          const instrPtr = rd32(code, p);
+          p += 4;
+          if (!instrumentMap.has(instrPtr)) {
+            instrumentMap.set(instrPtr, instrumentMap.size + 1);
+          }
+          currentInstr = instrumentMap.get(instrPtr)!;
+          break;
+        }
+        case 2: // set arpeggio table (4-byte ptr)
+          p += 4;
+          break;
+        case 4: // set portamento (2-byte word)
+          p += 2;
+          break;
+        case 6: { // call subroutine — continues linearly after the ptr
+          const targetPtr = rd32(code, p);
+          const seqData = rd32(code, targetPtr + 8);
+          targets.push(seqData);
+          p += 4;
+          break;
+        }
+        case 7: { // jump pattern — block terminator
+          const targetPtr = rd32(code, p);
+          const seqData = rd32(code, targetPtr + 8);
+          targets.push(seqData);
+          p += 4;
+          return { size: p - start, rows, targets };
+        }
+        default: // 3,5,8,9,10,11,12,13,14 — no extra operand
+          break;
+      }
+      continue;
+    }
+
+    // Note or rest + duration
+    const note = byte0;
+    const dur = rd8(code, p);
+    p++;
+    const duration = dur & 0x80 ? (dur & 0x7f) : dur;
+
+    rows.push({
+      note: fpNoteToXM(note),
+      instrument: note > 0 ? currentInstr : 0,
+      volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0,
+    });
+    for (let d = 1; d < duration; d++) {
+      rows.push({ note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 });
+    }
+  }
+
+  return { size: p - start, rows, targets };
+}
+
 // ── Extract strings from code section ──────────────────────────────────────
 
 function readCString(code: Uint8Array, ptr: number, maxLen = 64): string {
@@ -570,46 +668,58 @@ export function parseFuturePlayerFile(buffer: ArrayBuffer, filename: string): Tr
     ? `${moduleName} by ${authorName} [Future Player]`
     : `${moduleName} [Future Player]`;
 
-  // ── Build uadeVariableLayout for chip RAM editing ─────────────────────────
-  // FP stores 4 independent voice streams. Each voice stream is a single
-  // file-level "pattern". trackMap maps (trackerPatIdx, chIdx) -> voice index.
-  const voiceStreamAddrs = sub.voiceSeqPtrs.map(ptr => {
-    // Convert voice seq pointer (code-relative) back to raw file offset
-    // by finding the hunk header size
-    const hdrCode = stripHunkHeader(rawBuf);
-    const hdrOffset = rawBuf.length - hdrCode.length;
-    // The voiceSeqPtrs are code-relative offsets used during linearization
-    return hdrOffset + ptr;
-  });
+  // ── Build uadeVariableLayout: structural raw-block carrier ────────────────
+  // FP voice data is a call-GRAPH over shared command BLOCKS, each a REAL
+  // contiguous byte range (start -> cmd0/cmd7 terminator). Enumerate every
+  // reachable block (BFS from the voice sequence pointers, following cmd6/cmd7
+  // targets), dedupe by code offset, and carry each block's real bytes +
+  // decoded baseline rows. encodeVariableBlock re-emits them verbatim when
+  // unedited (byte-exact) and falls back to the packer on edit. numChannels=1
+  // because a block is not owned by one channel — the flat block list is the
+  // file-pattern dimension. Display patterns above are unchanged (carrier-only).
+  const hdrOffset = rawBuf.length - code.length; // code-relative ptr -> file offset
 
-  // Estimate voice stream sizes from linearized row counts
-  const voiceStreamSizes = voiceRows.map(rows => {
-    // Each note = 2 bytes (note + duration), plus command bytes
-    // Conservative estimate: 2 bytes per non-empty row + overhead
-    let nonEmpty = 0;
-    for (const r of rows) {
-      if (r.note > 0 || r.effTyp > 0) nonEmpty++;
+  const filePatternAddrs: number[] = [];
+  const filePatternSizes: number[] = [];
+  const blockRawBytes: Uint8Array[] = [];
+  const blockRows: FPRow[][] = [];
+  const seenBlocks = new Set<number>();
+  const queue: number[] = sub.voiceSeqPtrs.filter(p => p > 0);
+  while (queue.length > 0) {
+    const off = queue.shift()!;
+    if (off <= 0 || off >= code.length || seenBlocks.has(off)) continue;
+    seenBlocks.add(off);
+    const block = decodeBlock(code, off, instrumentMap);
+    if (block.size <= 0) continue;
+    const fileOff = hdrOffset + off;
+    if (fileOff < 0 || fileOff + block.size > rawBuf.length) continue;
+    filePatternAddrs.push(fileOff);
+    filePatternSizes.push(block.size);
+    blockRawBytes.push(rawBuf.slice(fileOff, fileOff + block.size));
+    blockRows.push(block.rows);
+    for (const t of block.targets) {
+      if (t > 0 && t < code.length && !seenBlocks.has(t)) queue.push(t);
     }
-    return Math.max(nonEmpty * 4, 64); // minimum 64 bytes
-  });
-
-  const trackMap: number[][] = [];
-  for (let pidx = 0; pidx < numPatterns; pidx++) {
-    trackMap.push([0, 1, 2, 3]); // all tracker patterns map to the 4 voice streams
   }
+
+  // trackMap is unused when blockRows is present (harness reads blockRows), but
+  // the type requires it. One empty entry per tracker pattern is a safe default.
+  const trackMap: number[][] = patterns.map(() => []);
 
   const uadeVariableLayout: UADEVariablePatternLayout = {
     formatId: 'futurePlayer',
-    numChannels: 4,
-    numFilePatterns: 4, // one file pattern per voice stream
+    numChannels: 1,
+    numFilePatterns: filePatternAddrs.length,
     rowsPerPattern: ROWS_PER_PATTERN,
     moduleSize: rawBuf.length,
     encoder: {
       formatId: 'futurePlayer',
       encodePattern: encodeFuturePlayerPattern,
     },
-    filePatternAddrs: voiceStreamAddrs,
-    filePatternSizes: voiceStreamSizes,
+    filePatternAddrs,
+    filePatternSizes,
+    blockRawBytes,
+    blockRows,
     trackMap,
   };
 
