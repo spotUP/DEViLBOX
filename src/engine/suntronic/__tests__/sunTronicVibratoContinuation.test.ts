@@ -1,21 +1,24 @@
 /**
  * Regression: SunTronic two-clock CIA vibrato model.
  *
- * The tick handler (0x2660e) fires uniformly every 1024 samples (= one golden
- * sample = one `tick()`); inside each fire an inner CIA accumulator (ciaTick ≈ 882)
- * steps the $24 vibrato phase 1-2× per fire and wraps a row every `speed` CIA ticks.
- * See SunTronicPlayer.ts header + tools/suntronic-re/probe-fire-aligned.ts.
+ * The golden samples uniformly every 1024 samples (= one golden sample = one
+ * `tick()`); the player-step runs on the faster emulated PAL vblank clock
+ * (ciaTick ≈ 883.73 samples), so an inner accumulator steps the $24 vibrato phase
+ * 1-2× per fire and wraps a row every `speed` steps. See SunTronicPlayer.ts header
+ * + tools/suntronic-re/probe-native-vs-golden.ts.
  *
  * Two assertions:
  *  1. Oracle-exact prefix — native tick i (i=1..5) matches the committed UADE
- *     fire-aligned oracle golden[i-1] (native lags one priming fire). These five
- *     fires are byte-exact in both period and pitch acc.
- *  2. Native-output snapshot ticks 0..11 — locks the CIA-clock model's deterministic
- *     output. The old single-advance audio-clock model diverges at tick 6 (it emits
- *     252 there; the CIA model emits 254), so this snapshot FAILS on revert to that
- *     model. Ticks 6..11 include the known constant-rate residual (t6 254 vs the
- *     oracle's 252) — the documented 14/632 floor; a byte-exact model needs UADE's
- *     integer E-clock CIA period, not this swept constant.
+ *     fire-aligned oracle golden[i-1] (native lags one priming fire). Byte-exact in
+ *     both period and pitch acc.
+ *  2. Native-output snapshot ticks 0..11 — locks the two-clock model's deterministic
+ *     output. The single-clock audio-clock model (one step/fire, never doubles)
+ *     diverges from tick 6 on (it emits 254; the two-clock model emits the
+ *     oracle-exact 252), so this snapshot FAILS on revert to that model. At the
+ *     constant-rate joint optimum (883.73) ticks 1..6 are all oracle-exact; the
+ *     remaining 12/632 residual (gliders 3 / ballblaser 9) lives at later
+ *     double-boundaries and needs UADE's exact per-frame vblank/CIA schedule, not
+ *     this swept constant.
  */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'fs';
@@ -55,10 +58,10 @@ describe('SunTronic two-clock CIA vibrato model', () => {
       periods.push(player.tick().voices[0].period);
       vibHex.push((player.debugVoice(0).vibPhase & 0xffff).toString(16));
     }
-    // oracle-exact fires 0..4 in ticks 1..5 (251,253,256,258,256); tick 6 = 254 is
-    // the CIA model's residual (the old audio-clock model emits 252 here → revert fails).
-    expect(periods).toEqual([249, 251, 253, 256, 258, 256, 254, 250, 251, 253, 255, 257]);
-    // $24 advances by 0x1f40 per CIA tick — doubling at tick 6 (bb80 → fa00, two steps).
+    // oracle-exact fires 0..5 in ticks 1..6 (251,253,256,258,256,252); the single-clock
+    // audio model emits 254 at tick 6 (one step/fire, no double) → revert fails here.
+    expect(periods).toEqual([249, 251, 253, 256, 258, 256, 252, 250, 251, 253, 255, 257]);
+    // $24 advances by 0x1f40 per step — doubling at tick 6 (bb80 → fa00, two steps).
     expect(vibHex[5]).toBe('bb80');
     expect(vibHex[6]).toBe('fa00');
   });
