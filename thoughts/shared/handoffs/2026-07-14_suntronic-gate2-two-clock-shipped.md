@@ -48,12 +48,28 @@ This session: implement + checkpoint the two-clock CIA-accumulator model under
 - No `0x8e` CIA-word opcode in the stream → CIA rate is a player default (must be
   read from the eagleplayer, not the module).
 
+## UPDATE (same day) — accumulator forks EXHAUSTED, floor is UADE jitter
+Commit `586ef82b9`. Two closure hypotheses disproven with decisive measurements:
+- `probe-fire-eclock` (1-sample res): handler fires EXACTLY every 1024 samples,
+  uniform (1024×52 both songs). `probe-fire-state`: each fire runs 1 or 2 CIA
+  sub-ticks ($2c +1 mostly, +2 periodically; row = 5-mostly-6 fires × 6).
+- `probe-eclock-sweep`: the principled INTEGER E-clock accumulator (per-fire
+  EPB=round(1024·709379/44100) eclocks vs integer CIA reload P) floors at 14
+  across the ENTIRE P×phase space — identical to the swept float. Residual is
+  NOT clock rate/phase.
+- Reordering the vibrato compute to lead (compute at once-advanced $24) fixes t6
+  but desyncs the depth index downstream → 40 (worse). NOT the compute order.
+
+So which fires double is JITTER in UADE's CIA-interrupt emulation (variable-chunk
+processing in the C emulator), not the module and not any constant rate. The
+14/632 (97.8%) checkpoint stands; golden stays skipped.
+
 ## Next steps (ordered)
-1. **NEXT FORK toward 0:** read UADE's exact INTEGER E-clock CIA period from the
-   real artifact (eagleplayer tempo setup / CIA reload value +
-   eclocks-per-1024-samples via a capture probe). Replace `ciaTick=881.5` with
-   that integer accumulator. Measure, do NOT guess. Then regen the fire-aligned
-   golden, un-skip `sunTronicNoteTimeline.golden.test.ts`, wire into test:ci.
+1. **NEXT FORK toward 0 (bigger — C-level spike, own research+plan phase):**
+   instrument UADE's CIA-interrupt scheduler in `uade-3.05` (C source) — log the
+   actual per-render-chunk interrupt timing / CIA-timer underflow vs the
+   1024-sample output buffer, to reproduce the exact double-fire schedule
+   bit-for-bit. Accumulator forks are exhausted — do NOT re-sweep rates/phases.
 2. v2/v3 voice activation (voices stay flags 0xff inert where UADE has 0x01).
 3. ±1-3 period rounding residuals.
 4. Phase 4 native playback.
