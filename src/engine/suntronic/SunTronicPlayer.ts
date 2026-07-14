@@ -37,11 +37,22 @@
  *     the golden worse (63). So 881.5 is genuinely the constant-per-fire optimum for the
  *     $20/golden clock — not a tuning miss.
  *   • Schedule injection (opts.subtickSchedule) proves the note/vibrato/period LOGIC is
- *     correct given a schedule; the residual is purely the sub-fire (128-chunk) timing of
- *     WHICH fire the period register lands on. A per-1024-fire model cannot reproduce it.
- * Closing to 0 needs a SUB-FIRE model: run the CIA accumulator at 128-sample granularity
- * and sample the period exactly as the emitter does (or regenerate the golden at a cleaner
- * chunk size). Not a per-fire tick() tweak. Golden test stays skipped meanwhile.
+ *     correct given a schedule; the residual is purely the sub-fire timing of WHICH fire —
+ *     and, more precisely, which intra-fire CHUNK — the period register is sampled on.
+ *   • DISPROVEN (2026-07-14, probe-chunk-fit): NO per-fire subtick-COUNT schedule can beat
+ *     14. A 128-chunk eclock accumulator swept over the ENTIRE (P eclocks, phase) space
+ *     (P∈[13680,14680]) floors at 14 (gliders 3, ballblaser 11) — identical to the per-fire
+ *     881.5 float. Both songs' residual is 100% clock-schedule (t6/t12 vibrato ±, t62/t78
+ *     row-drift); there is NO separate voice/note bug (the earlier "voice-2 activation" was
+ *     an injection-misalignment artifact, byte-exact under the real clock).
+ * Therefore the 14 residual cells are cases where UADE's CH=128 chunk-quantization samples
+ * $20 one vibrato step off the cycle-true value — an EMULATION ARTIFACT of the oracle, not
+ * replayer behaviour. Closing to 0 requires either (A) re-implementing UADE's chunked
+ * fire-detection + $20 sampling at 128-chunk granularity inside the player (reproducing the
+ * artifact — arguably the wrong abstraction for a "native" port), or (B) regenerating the
+ * golden at CH=1 (cycle-true = real Amiga, uniform $24, zero doubles) and matching with a
+ * uniform native model — the physically-correct oracle. Both are decisions above a tick()
+ * tweak; 97.8% is the per-fire ceiling. Golden test stays skipped meanwhile.
  *
  * Scope: this is the timing/period/volume-envelope machine. Actual waveform
  * synthesis (MEGAEFFECTS / the CALCn timbre generators) is Gate 1, already
