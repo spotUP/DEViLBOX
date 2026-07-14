@@ -409,6 +409,17 @@ const REF_SYNTH_LEA = 0x1b6;     // displacement word of `lea synthTable(pc),a0`
 const REF_SAMPLED_LEA = 0x1ba;   // displacement word of `lea sampledTable(pc),a1` (opcode 0x43FA at 0x1B8)
 const REF_ROWSPOS_OP = 0x386;    // `move.b #imm,$31(a2)` — imm byte at +3 is default rows/position
 
+// PERIODS is a replayer-CONSTANT 320-word ramp inside the player code block. That
+// block relocates by the score-data size, NOT by deltaA (the init-code shift), so
+// `REF_A6_BASE + deltaA + off` mislocates it on modules where the two deltas
+// diverge (e.g. ballblaser). Instead, locate PERIODS by its unique ramp signature
+// (identical bytes in every module); the match points at table[0x20].
+// (The drin note-transpose table is NOT a file constant — the eagleplayer allocates
+// + fills it in a runtime BSS hunk from each module's arp data, so it is generated
+// in the native player, not located here.)
+const REF_PERIODS_SIG = [428, 453, 480, 508, 538, 570, 604, 640];
+const REF_PERIODS_SIG_INDEX = 0x20;   // signature sits at PERIODS index 0x20
+
 const SAMPLED_RECORD_SIZE = 0x1c;
 const SYNTH_RECORD_SIZE = 0x24;
 const SEQ_ENTRY_SIZE = 0x14;
@@ -609,6 +620,8 @@ export interface SunV13Score {
   instrumentNames: string[];
   /** default rows per position (per-song code operand; runtime-mutable via 0x8C/0x8B) */
   rowsPerPositionDefault: number;
+  /** hunk#1-relative offset of the PERIODS table[0] (signature-located, reloc-safe) */
+  periodsOff: number;
   /** hunk#1-relative offset of the synth instrument table (0x24-byte records) */
   synthTableOff: number;
   /** hunk#1-relative offset of the sampled instrument table (0x1C-byte records) */
@@ -643,6 +656,17 @@ export function parseSunTronicV13Score(buf: Uint8Array): SunV13Score {
   if (ptrs.length !== 7) throw new Error(`SunTronic V1.3: expected 7 hunk#0 anchor pointers, got ${ptrs.length}`);
   const deltaA = ptrs[0] - REF_INIT;
   const deltaB = ptrs[6] - REF_INSTR_TABLE;
+
+  // ── PERIODS: signature-locate the replayer ramp (reloc-safe, see const) ──
+  let periodsOff = -1;
+  for (let o = 0; o + REF_PERIODS_SIG.length * 2 <= h1.length; o += 2) {
+    let ok = true;
+    for (let i = 0; i < REF_PERIODS_SIG.length; i++) {
+      if (((h1[o + i * 2] << 8) | h1[o + i * 2 + 1]) !== REF_PERIODS_SIG[i]) { ok = false; break; }
+    }
+    if (ok) { periodsOff = o - REF_PERIODS_SIG_INDEX * 2; break; }
+  }
+  if (periodsOff < 0) throw new Error('SunTronic V1.3: PERIODS table signature not found');
 
   // ── instrument name block at hunk#1+0 ──
   const { names, nameBlockEnd } = parseNameBlock(h1);
@@ -740,6 +764,7 @@ export function parseSunTronicV13Score(buf: Uint8Array): SunV13Score {
     nameBlockEnd,
     instrumentNames,
     rowsPerPositionDefault,
+    periodsOff,
     synthTableOff,
     sampledTableOff,
     sampledInstruments,
