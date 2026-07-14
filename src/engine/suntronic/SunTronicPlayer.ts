@@ -21,16 +21,18 @@
  * $2c → a row boundary → GETNEXTNOTE. This reproduces the measured song-independent
  * 5-mostly-6 fires/row row cadence with NO hardcoded table (see tick()).
  *
- * ── KNOWN GAP: constant-rate floor (14/632 cells, 97.8% exact) ──
- * A CONSTANT ciaTick cannot reproduce UADE's exact 5,5,5,5,5,6 row cadence AND its
- * 7,6,6,6 double-vib cadence simultaneously; the two imply slightly different rates
- * (881.8 vs 882.8), so by ~fire 62 the accumulator drifts one fire and a row boundary
- * lands early — desyncing the note (acc differs) and vibrato phase (period ±2). Best
- * fit ciaTick=881.5, offset −1: gliders 3, ballblaser 11 residual mismatches, all at
- * or after that drift point. The true fix is to accumulate in the SAME integer E-clock
- * units UADE's CIA emulation uses (read the eagleplayer's real CIA reload value +
- * eclocks-per-1024-samples, both integers) instead of a swept sample constant — then
- * the interrupt schedule is bit-identical. Until then the golden test stays skipped.
+ * ── KNOWN GAP: accumulator floor (14/632 cells, 97.8% exact) ──
+ * Each 1024-sample fire runs 1 OR 2 CIA sub-ticks (probe-fire-state: $2c increments
+ * +1 mostly, +2 periodically; a row = 5-mostly-6 fires × 6 sub-ticks). No constant-rate
+ * accumulator reproduces WHICH fires double: swept float ciaTick and the principled
+ * INTEGER E-clock accumulator (per-fire EPB=round(1024·709379/44100) eclocks vs integer
+ * CIA reload P, all P×phase) BOTH floor at 14 (probe-eclock-sweep). The reordered
+ * vibrato-lead compute is worse (40). So the residual is NOT clock rate/phase and NOT
+ * the vibrato compute order — it is JITTER in UADE's CIA-interrupt emulation (the
+ * double-fire schedule is set in the C emulator's variable-chunk interrupt processing,
+ * not the module). Best fit ciaTick=881.5, offset −1: gliders 3 (vib ±2 at t5/t11, note
+ * desync at t61), ballblaser 11. Closing to 0 needs instrumenting UADE's CIA scheduler
+ * in uade-3.05 (C-level research spike), not a tick() tweak. Golden test stays skipped.
  *
  * Scope: this is the timing/period/volume-envelope machine. Actual waveform
  * synthesis (MEGAEFFECTS / the CALCn timbre generators) is Gate 1, already
