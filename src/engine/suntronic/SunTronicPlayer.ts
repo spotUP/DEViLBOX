@@ -22,17 +22,26 @@
  * 5-mostly-6 fires/row row cadence with NO hardcoded table (see tick()).
  *
  * ── KNOWN GAP: accumulator floor (14/632 cells, 97.8% exact) ──
- * Each 1024-sample fire runs 1 OR 2 CIA sub-ticks (probe-fire-state: $2c increments
- * +1 mostly, +2 periodically; a row = 5-mostly-6 fires × 6 sub-ticks). No constant-rate
- * accumulator reproduces WHICH fires double: swept float ciaTick and the principled
- * INTEGER E-clock accumulator (per-fire EPB=round(1024·709379/44100) eclocks vs integer
- * CIA reload P, all P×phase) BOTH floor at 14 (probe-eclock-sweep). The reordered
- * vibrato-lead compute is worse (40). So the residual is NOT clock rate/phase and NOT
- * the vibrato compute order — it is JITTER in UADE's CIA-interrupt emulation (the
- * double-fire schedule is set in the C emulator's variable-chunk interrupt processing,
- * not the module). Best fit ciaTick=881.5, offset −1: gliders 3 (vib ±2 at t5/t11, note
- * desync at t61), ballblaser 11. Closing to 0 needs instrumenting UADE's CIA scheduler
- * in uade-3.05 (C-level research spike), not a tick() tweak. Golden test stays skipped.
+ * Each 1024-sample fire runs 1 OR 2 CIA sub-ticks. Best fit ciaTick=881.5, offset −1:
+ * gliders 3, ballblaser 11. Root cause is now precisely characterized (2026-07-14,
+ * probe-fire-order/subtick-timing/schedule-inject/chunk-accum):
+ *   • The golden compares the $20 PERIOD register sampled at note-handler-fire detection
+ *     under UADE's CH=128 chunked rendering. At CH=1 (cycle-true) the $24 vibrato phase
+ *     advances UNIFORMLY, exactly once per 1024 samples, ZERO doubles. The double-fires
+ *     are a UADE CH=128 chunk-quantization artifact, baked into the golden.
+ *   • The measured $24 sub-tick double schedule (gliders [6,13,19,25,31,38…]) is NOT the
+ *     same as the golden's effective $20-period schedule ([6,12,18,24,30,37…] ≈ what
+ *     ciaTick=881.5 emits) — there is a sub-fire phase offset between the $24 phase change
+ *     and the $20 period write within a chunk. Injecting the true $24 schedule scores 4
+ *     (WORSE than 3), and ciaTick=883.875 (which best reproduces the $24 schedule) makes
+ *     the golden worse (63). So 881.5 is genuinely the constant-per-fire optimum for the
+ *     $20/golden clock — not a tuning miss.
+ *   • Schedule injection (opts.subtickSchedule) proves the note/vibrato/period LOGIC is
+ *     correct given a schedule; the residual is purely the sub-fire (128-chunk) timing of
+ *     WHICH fire the period register lands on. A per-1024-fire model cannot reproduce it.
+ * Closing to 0 needs a SUB-FIRE model: run the CIA accumulator at 128-sample granularity
+ * and sample the period exactly as the emitter does (or regenerate the golden at a cleaner
+ * chunk size). Not a per-fire tick() tweak. Golden test stays skipped meanwhile.
  *
  * Scope: this is the timing/period/volume-envelope machine. Actual waveform
  * synthesis (MEGAEFFECTS / the CALCn timbre generators) is Gate 1, already
@@ -110,6 +119,12 @@ export interface SunPlayerOptions {
    *  the double-vib / row phase; the golden-optimal value is small (0). Exposed for the
    *  clock-ratio sweep — see tools/suntronic-re/probe-cia-sweep. */
   rowPhaseSamples?: number;
+  /** DIAGNOSTIC ONLY (not for production): force the CIA sub-tick count per fire from a
+   *  measured schedule (subticks[tickIndex]) instead of the ciaTick accumulator. Used by
+   *  tools/suntronic-re/probe-schedule-inject to separate "is the player logic correct
+   *  given the exact schedule?" from "can a constant clock generate the schedule?".
+   *  When set, ciaTickSamples/rowPhaseSamples are ignored. */
+  subtickSchedule?: number[];
 }
 
 /**
@@ -129,6 +144,8 @@ export class SunTronicPlayer {
   private readonly audioTick: number;
   private readonly ciaTick: number;
   private readonly rowPhase: number;
+  private readonly subtickSchedule: number[] | null;
+  private tickIndex = 0;
 
   constructor(score: SunV13Score, opts: SunPlayerOptions = {}) {
     this.audioTick = opts.audioTickSamples ?? 1024;
@@ -136,6 +153,7 @@ export class SunTronicPlayer {
     // (probe-cia-sweep, offset −1: 14/632 residual). ~882 = PAL 50 Hz.
     this.ciaTick = opts.ciaTickSamples ?? 881.5;
     this.rowPhase = opts.rowPhaseSamples ?? 0;
+    this.subtickSchedule = opts.subtickSchedule ?? null;
     this.h1 = score.h1;
     this.synthTableOff = score.synthTableOff;
     const sub = score.subsongs[opts.subsong ?? 0];
@@ -408,9 +426,12 @@ export class SunTronicPlayer {
       // table — the ratio is the ciaTick:audioTick clock ratio, validated vs golden.
       let runGNN = false;
       let moduleTicks = 0;
+      // DIAGNOSTIC: force the sub-tick count from a measured schedule if injected;
+      // otherwise the ciaTick accumulator generates it.
+      const forced = this.subtickSchedule ? (this.subtickSchedule[this.tickIndex] ?? 0) : -1;
       v.rowSampleAcc += this.audioTick;
-      while (v.rowSampleAcc >= this.ciaTick) {
-        v.rowSampleAcc -= this.ciaTick;
+      while (forced >= 0 ? moduleTicks < forced : v.rowSampleAcc >= this.ciaTick) {
+        if (forced < 0) v.rowSampleAcc -= this.ciaTick;
         moduleTicks++;
         v.tempoTick = u8(v.tempoTick + 1);
         if (v.tempoTick >= (v.speed & 0xff)) {
@@ -430,6 +451,7 @@ export class SunTronicPlayer {
       // vibrato steps once per CIA tick that elapsed this buffer (compute-then-advance).
       this.stepEffects(v, moduleTicks);
     }
+    this.tickIndex++;
     return {
       voices: this.voices.map((v) => ({
         period: v.period, acc: v.pitch & 0xffff, volume: v.volume & 0xff, flags: v.flags & 0xff,
