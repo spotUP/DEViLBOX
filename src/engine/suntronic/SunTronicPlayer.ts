@@ -11,23 +11,26 @@
  *   - $20 Paula period, $08 pitch accumulator, $0c voice volume, $14 flags
  * which is exactly the state the oracle reads from UADE.
  *
- * ── KNOWN GAP (2026-07-14d): TWO-CLOCK ARCHITECTURE, not modelled ──────────────
- * Measurement (tools/suntronic-re/probe-firecount + probe-vibcompare against
- * UADE-WASM) proved SunTronic runs TWO independent interrupt clocks:
- *   • EFFECTS / vibrato / period recompute → 50 Hz vblank  (~882 samples/fire)
- *   • Note / sequence fetch (handler 0x2660e) → module-tempo CIA-B timer
- *     (~1026 samples ≈ 43 Hz for gliders — NOT an integer division of 50 Hz).
- * `tick()` here conflates both into one call, so the vibrato phase ($24, advanced
- * by inst.freqEnvSpeed each `tick()`) drifts against UADE by a module-dependent
- * amount: it advances once per note-fetch where UADE advances it once per vblank
- * (~1.16× as often). Diff vs a correct per-vblank oracle: gliders 12/316,
- * ballblaser 18/316 samples — all at vibrato/slide extremes, acc identical.
- * FIX (real Gate-2 work, next session): split the loop — step EFFECTS on a 50 Hz
- * vblank grid, decrement the 3-level tempo counter + run GETNEXTNOTE on the CIA
- * grid, interleave by sample position. The oracle emitter must then sample per
- * vblank (the clock at which $20 is written), NOT per note-handler fire.
- * The 882-sample "one tick" assumption below is therefore only ~correct for the
- * EFFECTS clock and drifts (882 vs true PAL 880.77); see the emitter header.
+ * ── TWO-CLOCK MODEL (2026-07-14e): one fire clock + inner CIA accumulator ───────
+ * Fire-aligned measurement (tools/suntronic-re/probe-fire-aligned vs UADE-WASM)
+ * proved the tick handler (0x2660e) fires UNIFORMLY every 1024 output samples — one
+ * fire == one golden sample == one `tick()` call. Inside each fire an inner CIA
+ * accumulator (ciaTick ≈ 882 samples, i.e. 1024/882 ≈ 1.16 CIA ticks per fire) steps
+ * the note engine: each CIA tick advances the $24 vibrato phase (so per fire vibrato
+ * advances 1-2× — the measured "double" fires), and every `speed`-th CIA tick wraps
+ * $2c → a row boundary → GETNEXTNOTE. This reproduces the measured song-independent
+ * 5-mostly-6 fires/row row cadence with NO hardcoded table (see tick()).
+ *
+ * ── KNOWN GAP: constant-rate floor (14/632 cells, 97.8% exact) ──
+ * A CONSTANT ciaTick cannot reproduce UADE's exact 5,5,5,5,5,6 row cadence AND its
+ * 7,6,6,6 double-vib cadence simultaneously; the two imply slightly different rates
+ * (881.8 vs 882.8), so by ~fire 62 the accumulator drifts one fire and a row boundary
+ * lands early — desyncing the note (acc differs) and vibrato phase (period ±2). Best
+ * fit ciaTick=881.5, offset −1: gliders 3, ballblaser 11 residual mismatches, all at
+ * or after that drift point. The true fix is to accumulate in the SAME integer E-clock
+ * units UADE's CIA emulation uses (read the eagleplayer's real CIA reload value +
+ * eclocks-per-1024-samples, both integers) instead of a swept sample constant — then
+ * the interrupt schedule is bit-identical. Until then the golden test stays skipped.
  *
  * Scope: this is the timing/period/volume-envelope machine. Actual waveform
  * synthesis (MEGAEFFECTS / the CALCn timbre generators) is Gate 1, already
@@ -71,11 +74,12 @@ interface SunPlayerVoice {
   envCounter: number;   // $33 — vol-slide countdown
   tie: number;          // $34 — tie/portamento countdown (suppresses re-triggers)
   synthFlag: number;    // $37 — 1 → EFFECTS skips vol+period
-  tempoTick: number;    // $2c — ticks-within-note counter
+  tempoTick: number;    // $2c — ticks-within-note counter (audio ticks; debug only now)
   tempoNote: number;    // $2d — notes-within-position counter
   position: number;     // $2e — sequence position index
-  speed: number;        // $30 — ticks per note
+  speed: number;        // $30 — ticks per note (module ticks)
   rowsPerPos: number;   // $31 — notes per position
+  rowSampleAcc: number; // two-clock reconciler: audio-samples accrued in the current row
 }
 
 /** One snapshot row of the tick timeline (what the p9a golden compares). */
@@ -91,6 +95,19 @@ const u8 = (b: number): number => b & 0xff;
 export interface SunPlayerOptions {
   /** subsong index (default 0). */
   subsong?: number;
+  /** audio-buffer tick period in samples (UADE EFFECTS/period fires once per this;
+   *  measured 1024, uniform 39/39 both songs — probe-tick-rate). */
+  audioTickSamples?: number;
+  /** inner CIA tick period in samples. Each fire (audioTickSamples) accrues
+   *  audioTickSamples into a CIA accumulator; every ciaTickSamples crossed = one CIA
+   *  tick (vibrato advance), and every `speed` CIA ticks = one row (GETNEXTNOTE). PAL
+   *  ≈ 882 (best golden fit 881.5). Exposed so the clock ratio is validated against
+   *  the UADE golden, not hardcoded as a 5,5,5,6 table. */
+  ciaTickSamples?: number;
+  /** start-of-song seed of the CIA accumulator, in samples (0..ciaTickSamples). Places
+   *  the double-vib / row phase; the golden-optimal value is small (0). Exposed for the
+   *  clock-ratio sweep — see tools/suntronic-re/probe-cia-sweep. */
+  rowPhaseSamples?: number;
 }
 
 /**
@@ -107,8 +124,16 @@ export class SunTronicPlayer {
   private readonly voices: SunPlayerVoice[] = [];
   private readonly sequence: { trackPtrs: number[]; transposes: number[] }[];
   private readonly seqEndKind: 'restart' | 'stop';
+  private readonly audioTick: number;
+  private readonly ciaTick: number;
+  private readonly rowPhase: number;
 
   constructor(score: SunV13Score, opts: SunPlayerOptions = {}) {
+    this.audioTick = opts.audioTickSamples ?? 1024;
+    // 881.5 / phase 0 is the measured golden-optimal of the constant-rate model
+    // (probe-cia-sweep, offset −1: 14/632 residual). ~882 = PAL 50 Hz.
+    this.ciaTick = opts.ciaTickSamples ?? 881.5;
+    this.rowPhase = opts.rowPhaseSamples ?? 0;
     this.h1 = score.h1;
     this.synthTableOff = score.synthTableOff;
     const sub = score.subsongs[opts.subsong ?? 0];
@@ -149,7 +174,8 @@ export class SunTronicPlayer {
         flags: 0xff, outVolume: 0, period: 0,
         stagedSel: 0, transpose: entry ? s8(entry.transposes[ch]) : 0,
         vibPhase: 0, vibIndex: 0, envReload: 0, envCounter: 0, tie: 0, synthFlag: 0,
-        tempoTick: 5, tempoNote: 0xff, position: 0, speed: 6, rowsPerPos: 0x10,
+        tempoTick: 5, tempoNote: 0, position: 0, speed: 6, rowsPerPos: 0x10,
+        rowSampleAcc: this.rowPhase,
       });
     }
   }
@@ -287,20 +313,19 @@ export class SunTronicPlayer {
   }
 
   /** EFFECTS (loaded 0x267f6): compute period+volume, advance envelope state.
-   * extraVib: this is a *continuation* note-row tick (GNN fired but did not
-   * retrigger). UADE runs one EXTRA vibrato advance up front, so the period is
-   * computed from the once-advanced $24 and the trailing advance leaves $24 two
-   * steps on. Verified numerically: gliders tick6 pre=−17536 → compute at −9536
-   * (depth index 0) → period 252, then post-advance → −1536 (matches golden). */
-  private stepEffects(v: SunPlayerVoice, extraVib = false): void {
+   * vibAdvances: the number of CIA note-ticks that elapsed during this audio
+   * buffer — vibrato ($24) is stepped on the CIA clock (once per module tick),
+   * NOT the audio clock, so per audio buffer it advances 1-2× (1024/882 ≈ 1.16).
+   * The period is computed BEFORE the advances (compute-then-advance: at a note-on
+   * tick $24 was just cleared, so the note's period is the un-vibratoed value and
+   * the trailing advances carry $24 forward for the next buffer). */
+  private stepEffects(v: SunPlayerVoice, vibAdvances = 1): void {
     if ((v.flags & 0x80) !== 0) return;       // $14 < 0 (0xff/0xfe) → inert
     const inst = v.instr;
     if (v.synthFlag === 1 || !inst) {
       // $37==1 → skip vol+period; still nothing to advance without an instrument
       if (!inst) return;
     }
-    // continuation note-row: one extra vibrato advance before the period compute
-    if (extraVib && inst) this.advanceVib(v, inst);
 
     // ── volume $15 (pre master-scale; golden reads $0c not $15) ──
     const env = u8(inst.volEnv[v.volEnvIndex] ?? 0);
@@ -346,8 +371,9 @@ export class SunTronicPlayer {
     v.volEnvIndex = (v.volEnvIndex + 1) & 0xffff;
     if (v.volEnvIndex === inst.volEnvLen) v.volEnvIndex = inst.volEnvLoop;
 
-    // ── advance vibrato phase / depth index (wrap len→loop) ──
-    this.advanceVib(v, inst);
+    // ── advance vibrato phase / depth index on the CIA clock (1-2× per audio
+    //    buffer; see vibAdvances) ──
+    for (let k = 0; k < vibAdvances; k++) this.advanceVib(v, inst);
   }
 
   /** Advance the sequence position for one voice (tick handler row branch). */
@@ -369,23 +395,38 @@ export class SunTronicPlayer {
     for (const v of this.voices) {
       if (v.flags === 0xfe) continue; // DMA-off/idle
       if (v.tie !== 0) v.tie -= 1;
+      // ── two-clock model ──────────────────────────────────────────────────────
+      // UADE runs SunTronic on two independent interrupt clocks: EFFECTS/period is
+      // recomputed once per audio buffer (audioTick samples), while the note engine —
+      // the $2c tempo counter, GETNEXTNOTE, and the $24 vibrato phase — runs on the
+      // CIA timer (ciaTick samples, PAL ≈ 882). Per audio buffer, floor((phase+1024)/
+      // ciaTick) = 1-2 CIA ticks elapse (1024/882 ≈ 1.16); each is a vibrato advance,
+      // and every `speed`-th one wraps $2c → a row boundary → GETNEXTNOTE. This
+      // reproduces the measured 5-mostly-6 audio-ticks/row cadence with NO hardcoded
+      // table — the ratio is the ciaTick:audioTick clock ratio, validated vs golden.
       let runGNN = false;
-      v.tempoTick = u8(v.tempoTick + 1);
-      if (v.tempoTick >= (v.speed & 0xff)) {
-        v.tempoTick = 0;
-        v.tempoNote = u8(v.tempoNote + 1);
-        runGNN = true;
-        if (v.tempoNote >= (v.rowsPerPos & 0xff)) {
-          v.tempoNote = 0;
-          v.position += 1;
-          this.loadPosition(v);
-          if (v.flags === 0xfe) continue;
+      let moduleTicks = 0;
+      v.rowSampleAcc += this.audioTick;
+      while (v.rowSampleAcc >= this.ciaTick) {
+        v.rowSampleAcc -= this.ciaTick;
+        moduleTicks++;
+        v.tempoTick = u8(v.tempoTick + 1);
+        if (v.tempoTick >= (v.speed & 0xff)) {
+          v.tempoTick = 0;
+          v.tempoNote = u8(v.tempoNote + 1);
+          if (v.tempoNote >= (v.rowsPerPos & 0xff)) {
+            v.tempoNote = 0;
+            v.position += 1;
+            this.loadPosition(v);
+            if (v.flags === 0xfe) break;
+          }
+          runGNN = true;
         }
       }
-      // A GNN tick that does not retrigger the instrument is a continuation
-      // note-row → EFFECTS double-advances vibrato before computing the period.
-      const cont = runGNN ? !this.getNextNote(v) && !!v.instr : false;
-      this.stepEffects(v, cont);
+      if (v.flags === 0xfe) continue;
+      if (runGNN) this.getNextNote(v);
+      // vibrato steps once per CIA tick that elapsed this buffer (compute-then-advance).
+      this.stepEffects(v, moduleTicks);
     }
     return {
       voices: this.voices.map((v) => ({
