@@ -55,6 +55,7 @@ import { useGlobalPTT } from '@hooks/useGlobalPTT';
 import { GlobalDragDropHandler } from '@components/ui/GlobalDragDropHandler';
 import { notify } from '@stores/useNotificationStore';
 import { loadFile } from '@lib/file/UnifiedFileLoader';
+import { companionRelativeName } from '@lib/import/companionRelativeName';
 import { runPrefetchIfNeeded } from '@/lib/SamplePackPrefetcher';
 import { useCollaborationStore } from '@stores/useCollaborationStore';
 import { PeerMouseCursor } from '@components/collaboration/PeerMouseCursor';
@@ -799,7 +800,10 @@ function App() {
     if (pendingCompanions.length > 0) {
       companionFiles = new Map();
       for (const cf of pendingCompanions) {
-        companionFiles.set(cf.name, await cf.arrayBuffer());
+        // Key by the path relative to the module's dir (preserves subdirs like
+        // SunTronic's instr/ or Sonix's Instruments/) — a bare cf.name would
+        // collapse instr/perc1.x to perc1.x and the replayer's open would miss.
+        companionFiles.set(companionRelativeName(file, cf), await cf.arrayBuffer());
       }
       useUIStore.getState().setPendingCompanionFiles([]);
     }
