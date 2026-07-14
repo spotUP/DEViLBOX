@@ -174,14 +174,18 @@ export class SunTronicPlayer {
     return null;
   }
 
-  /** GETNEXTNOTE (loaded 0x2692a): decode one note's opcode group from cursor. */
-  private getNextNote(v: SunPlayerVoice): void {
+  /** GETNEXTNOTE (loaded 0x2692a): decode one note's opcode group from cursor.
+   * Returns true if this group retriggered an instrument (noteOn → clr $24/$26).
+   * A GNN tick that does NOT retrigger is a *continuation* note-row: EFFECTS then
+   * runs the double vibrato advance (see tick()). */
+  private getNextNote(v: SunPlayerVoice): boolean {
     const h1 = this.h1;
     let a1 = v.cursor;
+    let didReset = false;
     // guard against runaway loops on malformed streams
     for (let guard = 0; guard < 4096; guard++) {
       const d0 = h1[a1++] ?? 0;
-      if (d0 === 0x00) { v.cursor = a1; return; } // end of note group — store cursor
+      if (d0 === 0x00) { v.cursor = a1; return didReset; } // end of note group — store cursor
       if (d0 < 0x80) { v.stagedSel = d0; continue; } // positive → stage select byte
       if (d0 >= 0xb8) {
         // PITCH (0x2697c): $8 = (~d0 - transpose)<<8, clear finetune + slide
@@ -196,12 +200,14 @@ export class SunTronicPlayer {
         if (sel === 0) continue;
         v.synthFlag = 0;
         this.noteOn(v, sel);
+        didReset = true;
         continue;
       }
       // control opcode 0x80..0xb7 → dispatch (a1 already past opcode byte)
       a1 = this.controlOpcode(v, d0, a1);
     }
     v.cursor = a1;
+    return didReset;
   }
 
   /** Instrument retrigger (GNN type-A 0x269ae / type-B 0x26a16). */
@@ -272,14 +278,29 @@ export class SunTronicPlayer {
     return a1;
   }
 
-  /** EFFECTS (loaded 0x267f6): compute period+volume, advance envelope state. */
-  private stepEffects(v: SunPlayerVoice): void {
+  /** Advance the vibrato accumulator + depth index one step (0x2690c-0x26910:
+   * `move.w $10(a1),d0; add.w d0,$24(a0)` + depth index wrap len→loop). */
+  private advanceVib(v: SunPlayerVoice, inst: SunSynthInstrument): void {
+    v.vibPhase = s16((v.vibPhase + inst.freqEnvSpeed) & 0xffff);
+    v.vibIndex = (v.vibIndex + 1) & 0xffff;
+    if (v.vibIndex === inst.freqEnvLen) v.vibIndex = inst.freqEnvLoop;
+  }
+
+  /** EFFECTS (loaded 0x267f6): compute period+volume, advance envelope state.
+   * extraVib: this is a *continuation* note-row tick (GNN fired but did not
+   * retrigger). UADE runs one EXTRA vibrato advance up front, so the period is
+   * computed from the once-advanced $24 and the trailing advance leaves $24 two
+   * steps on. Verified numerically: gliders tick6 pre=−17536 → compute at −9536
+   * (depth index 0) → period 252, then post-advance → −1536 (matches golden). */
+  private stepEffects(v: SunPlayerVoice, extraVib = false): void {
     if ((v.flags & 0x80) !== 0) return;       // $14 < 0 (0xff/0xfe) → inert
     const inst = v.instr;
     if (v.synthFlag === 1 || !inst) {
       // $37==1 → skip vol+period; still nothing to advance without an instrument
       if (!inst) return;
     }
+    // continuation note-row: one extra vibrato advance before the period compute
+    if (extraVib && inst) this.advanceVib(v, inst);
 
     // ── volume $15 (pre master-scale; golden reads $0c not $15) ──
     const env = u8(inst.volEnv[v.volEnvIndex] ?? 0);
@@ -326,9 +347,7 @@ export class SunTronicPlayer {
     if (v.volEnvIndex === inst.volEnvLen) v.volEnvIndex = inst.volEnvLoop;
 
     // ── advance vibrato phase / depth index (wrap len→loop) ──
-    v.vibPhase = s16((v.vibPhase + inst.freqEnvSpeed) & 0xffff);
-    v.vibIndex = (v.vibIndex + 1) & 0xffff;
-    if (v.vibIndex === inst.freqEnvLen) v.vibIndex = inst.freqEnvLoop;
+    this.advanceVib(v, inst);
   }
 
   /** Advance the sequence position for one voice (tick handler row branch). */
@@ -363,8 +382,10 @@ export class SunTronicPlayer {
           if (v.flags === 0xfe) continue;
         }
       }
-      if (runGNN) this.getNextNote(v);
-      this.stepEffects(v);
+      // A GNN tick that does not retrigger the instrument is a continuation
+      // note-row → EFFECTS double-advances vibrato before computing the period.
+      const cont = runGNN ? !this.getNextNote(v) && !!v.instr : false;
+      this.stepEffects(v, cont);
     }
     return {
       voices: this.voices.map((v) => ({
