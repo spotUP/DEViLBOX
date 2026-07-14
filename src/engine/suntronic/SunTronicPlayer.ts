@@ -21,38 +21,33 @@
  * $2c → a row boundary → GETNEXTNOTE. This reproduces the measured song-independent
  * 5-mostly-6 fires/row row cadence with NO hardcoded table (see tick()).
  *
- * ── KNOWN GAP: accumulator floor (14/632 cells, 97.8% exact) ──
- * Each 1024-sample fire runs 1 OR 2 CIA sub-ticks. Best fit ciaTick=881.5, offset −1:
- * gliders 3, ballblaser 11. Root cause is now precisely characterized (2026-07-14,
- * probe-fire-order/subtick-timing/schedule-inject/chunk-accum):
- *   • The golden compares the $20 PERIOD register sampled at note-handler-fire detection
- *     under UADE's CH=128 chunked rendering. At CH=1 (cycle-true) the $24 vibrato phase
- *     advances UNIFORMLY, exactly once per 1024 samples, ZERO doubles. The double-fires
- *     are a UADE CH=128 chunk-quantization artifact, baked into the golden.
- *   • The measured $24 sub-tick double schedule (gliders [6,13,19,25,31,38…]) is NOT the
- *     same as the golden's effective $20-period schedule ([6,12,18,24,30,37…] ≈ what
- *     ciaTick=881.5 emits) — there is a sub-fire phase offset between the $24 phase change
- *     and the $20 period write within a chunk. Injecting the true $24 schedule scores 4
- *     (WORSE than 3), and ciaTick=883.875 (which best reproduces the $24 schedule) makes
- *     the golden worse (63). So 881.5 is genuinely the constant-per-fire optimum for the
- *     $20/golden clock — not a tuning miss.
- *   • Schedule injection (opts.subtickSchedule) proves the note/vibrato/period LOGIC is
- *     correct given a schedule; the residual is purely the sub-fire timing of WHICH fire —
- *     and, more precisely, which intra-fire CHUNK — the period register is sampled on.
- *   • DISPROVEN (2026-07-14, probe-chunk-fit): NO per-fire subtick-COUNT schedule can beat
- *     14. A 128-chunk eclock accumulator swept over the ENTIRE (P eclocks, phase) space
- *     (P∈[13680,14680]) floors at 14 (gliders 3, ballblaser 11) — identical to the per-fire
- *     881.5 float. Both songs' residual is 100% clock-schedule (t6/t12 vibrato ±, t62/t78
- *     row-drift); there is NO separate voice/note bug (the earlier "voice-2 activation" was
- *     an injection-misalignment artifact, byte-exact under the real clock).
- * Therefore the 14 residual cells are cases where UADE's CH=128 chunk-quantization samples
- * $20 one vibrato step off the cycle-true value — an EMULATION ARTIFACT of the oracle, not
- * replayer behaviour. Closing to 0 requires either (A) re-implementing UADE's chunked
- * fire-detection + $20 sampling at 128-chunk granularity inside the player (reproducing the
- * artifact — arguably the wrong abstraction for a "native" port), or (B) regenerating the
- * golden at CH=1 (cycle-true = real Amiga, uniform $24, zero doubles) and matching with a
- * uniform native model — the physically-correct oracle. Both are decisions above a tick()
- * tweak; 97.8% is the per-fire ceiling. Golden test stays skipped meanwhile.
+ * ── KNOWN GAP: no native-clock model reaches 0 (14/632 cells, 97.8% exact) ──
+ * Best constant-per-fire fit ciaTick=881.5, offset −1: gliders 3, ballblaser 11.
+ *
+ * The golden is CYCLE-TRUE, not an oracle artifact (2026-07-14f, probe emit-ch1-diag):
+ * the $20 period stream is RENDER-INDEPENDENT — CH=128, CH=32, CH=8 and a $20-memory-write
+ * capture at render=1 vs render=882 all produce the IDENTICAL sequence. So the golden is the
+ * real replayer's settled per-fire period; the residual 14 cells are real native-timing
+ * misses, not a chunk-quantization artifact (the earlier "CH=128 artifact" theory is RETRACTED).
+ *
+ * Every native-clock model class was swept and ALL floor above 0 (probes probe-float-sweep,
+ * probe-chunk-fit, probe-eclock-sweep, probe-greedy-schedule, probe-joint-greedy):
+ *   • float per-fire accumulator, any (ciaTick∈[878,887], rowPhase): floor 14.
+ *   • 128-chunk eclock accumulator, whole (P∈[13680,14680], phase) space: floor 14.
+ *   • principled integer E-clock reload: floor 14.
+ *   • per-fire integer vib-advance schedule, ORACLE joint-greedy fitted to the answer over
+ *     all 4 voices: floor 11 (gliders 2, ballblaser 9). Even cheating cannot reach 0.
+ * The v0-only greedy CAN zero voice 0 (doubles at fire 5, not fire 7 where 881.5 puts them),
+ * proving the period MATH is correct — but that same schedule worsens v1-v3, so no single
+ * global whole-fire integer schedule zeroes all voices. Some fires need the period sampled at
+ * a SUB-FIRE moment: the exact CIA-interrupt landing relative to the 1024-sample boundary,
+ * quantized to UADE's event-scheduler cycle grid. That jitter lives in the C emulator, below
+ * any TS accumulator knob. 97.8% is the ceiling of the native-accumulator abstraction.
+ *
+ * Closing to 0 requires the NEXT abstraction level — a C-level spike instrumenting uade-3.05's
+ * CIA-interrupt scheduler to emit the true sub-fire fire schedule (its own research+plan phase,
+ * user-authorized separately). Hardcoding the oracle greedy schedule is FORBIDDEN (embeds the
+ * answer = band-aid). Golden test stays describe.skip until a principled model hits 0.
  *
  * Scope: this is the timing/period/volume-envelope machine. Actual waveform
  * synthesis (MEGAEFFECTS / the CALCn timbre generators) is Gate 1, already
