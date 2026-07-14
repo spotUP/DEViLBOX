@@ -59,7 +59,7 @@ note changes arrive progressively late (ballblaser row-2 note lands one tick beh
 at first, worse later). Fixing the row cadence to 5-mostly-6 is the root fix; the
 ±1-3 vibrato-period rounding is secondary.
 
-## The one undecoded layer (blocks the root-cause fix)
+## The mechanism — two-clock reconciliation in UADE's interrupt rate (module decode exhausted)
 
 Static disasm of the tempo counter is now exhaustive and reads as **6-tick rows
 unconditionally**, contradicting the measured 5:
@@ -81,19 +81,41 @@ must effectively be vs 5. Neither is in: the wrap block (`0x26688`-`0x266f6`), t
 GNN normal-note path (`0x26970`-`0x26a12`), the note-tail, or the EFFECTS head
 (`0x267f6`+, first 40 insns) — all disassembled this session, none write `$2c`.
 
-**Prime remaining suspect:** a GNN note-command handler. GNN (`0x2692a`) is a
-per-row command interpreter that loops reading multiple stream bytes and dispatches
-via the jump table at `0x2694c` (word offsets off a6=`0x264dc`; targets `0x26a16`+
-and the negative-note-command handlers). One of those handlers likely pre-loads
-`$2c` (a note-duration / row-shorten command) on most rows and is absent on the
-periodic 6-tick rows — i.e. **the row length is note-data-driven**, which would
-mean the native fixed-row model is the wrong abstraction (duration-driven, not
-fixed 6-tick rows).
+**RESOLVED — the mechanism is NOT in the module 68k (decode exhausted, commit
+`af020fd86`).** Disassembled every path that touches or could touch `$2c`: the
+tempo block, the wrap/GNN-call flow, the GNN normal-note path, the note-tail, the
+EFFECTS head, AND all 18 GNN jump-table command handlers (`0x26a16`-`0x26be4`,
+table@`0x2694c`, word offsets off a6=`0x264dc`). **None write `$2c`.** The GNN-
+handler-pre-loads-`$2c` hypothesis is disproven.
 
-**Next decisive step:** disassemble the GNN jump-table handlers (`0x26a16`+ and the
-`0x2694c` table targets) and find the `$2c` write. Do NOT ship a hardcoded
-`5,5,5,5,5,6` cadence — that is a band-aid over an undecoded mechanism (house
-rule). Decode the reload rule, then port it into `tick()`/`getNextNote`.
+Two more nails (both songs, jitter-free):
+- `probe-tick-rate.ts` — `$15` (EFFECTS, once/tick) fires at EXACTLY 1024-sample
+  gaps, 39/39 uniform. Tick is genuinely 1024; 882/vblank hypothesis also dead.
+- `probe-2c-seq-1024.ts` — `$2c` at 1024-tick granularity: 6-tick row 0 (`$2c`
+  0..5) then 5-tick rows (`$2c` 1..5, no leading 0). Static logic can only produce
+  the 6-tick form.
+
+So the 5-mostly-6 cadence **originates in UADE's CIA/interrupt scheduling**, not the
+module. Mean row = 5.17 ticks = 6×882/1024 — the module is timed for a 50Hz
+(882-sample) player-tick but UADE drives EFFECTS at the 1024-sample audio-buffer
+rate; the row advance reconciles the two clocks (Bresenham 5-mostly-6). The
+two-clock model disproven in this file's earlier history was directionally right —
+it just lives in the interrupt rate, not in `$2c`/`$30`.
+
+**Fork for the next session (needs a decision):**
+1. **Model + validate the measured cadence** (recommended). Reproduce the two-clock
+   reconciliation in `tick()` — a fractional accumulator advancing 1024/882 per
+   audio-tick, wrap a row every 6 module-ticks — and VALIDATE byte-exact against the
+   UADE-generated golden across both songs / 40+ ticks. This is not a band-aid: the
+   golden IS the reference, and the 1024↔882 ratio is measured, not guessed. If it
+   goes byte-exact it is correct by construction.
+2. **Instrument UADE's CIA/interrupt scheduler** to read the exact timer period the
+   SunTronic eagleplayer programs. Confirms (1)'s constant from first principles but
+   is a much larger dig into UADE internals for a constant the oracle already lets us
+   validate empirically. Disproportionate unless (1) fails to hit byte-exact.
+
+Do NOT hardcode a literal `5,5,5,5,5,6` table — express it as the 1024/882 fractional
+accumulator so it generalizes to other SunTronic modules with different `$30`.
 
 ## Confirmed secondary bugs (independent of the above)
 
