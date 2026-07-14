@@ -24,18 +24,24 @@ for (const [name, samples] of Object.entries(golden.modules)) {
   const player = new SunTronicPlayer(score, { subsong: 0 });
   const mismatches: string[] = [];
   let total = 0;
-  for (let i = 0; i + 1 < samples.length; i++) {
-    const voices = player.tick().voices;
-    const g = samples[i + 1].voices;
+  // Alignment: native[i] == golden[i-1] (warmup=1; native tick 0 is a priming
+  // tick before golden's first captured fire). Proven best by probe-align-sweep.
+  const raw: Row[][] = [];
+  for (let i = 0; i < samples.length; i++) {
+    raw.push(player.tick().voices.map((v) => ({ period: v.period, acc: v.acc & 0xffff, vol: v.volume & 0xff, flags: v.flags & 0xff })));
+  }
+  for (let i = 1; i < samples.length; i++) {
+    const voices = raw[i];
+    const g = samples[i - 1].voices;
     for (let v = 0; v < 4; v++) {
       const gv = g[v], mv = voices[v];
       total++;
-      if (gv.period !== mv.period || gv.acc !== (mv.acc & 0xffff) || gv.flags !== mv.flags) {
+      if (gv.period !== mv.period || gv.acc !== mv.acc || gv.flags !== mv.flags) {
         const dP = mv.period - gv.period;
         mismatches.push(
           `t${i} v${v}: dPeriod=${dP >= 0 ? '+' : ''}${dP} ` +
           `golden{p${gv.period} a${gv.acc.toString(16)} f${gv.flags.toString(16)}} ` +
-          `native{p${mv.period} a${(mv.acc & 0xffff).toString(16)} f${mv.flags.toString(16)}}`,
+          `native{p${mv.period} a${mv.acc.toString(16)} f${mv.flags.toString(16)}}`,
         );
       }
     }
