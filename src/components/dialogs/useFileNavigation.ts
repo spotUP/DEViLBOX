@@ -42,6 +42,7 @@ import {
 } from '@/lib/serverFilesApi';
 import { getSupportedExtensions } from '@/lib/import/ModuleLoader';
 import { getSupportedMIDIExtensions } from '@/lib/import/MIDIImporter';
+import { sunTronicCompanionPaths } from '@/lib/import/formats/SunTronicV13';
 
 // Build comprehensive accept string for file inputs (400+ supported formats)
 export const ACCEPTED_FILE_FORMATS = [
@@ -145,31 +146,46 @@ const COMPANION_PREFIXES: [string, string][] = [
 async function fetchCompanionFiles(
   filename: string,
   filePath: string | undefined,
+  buffer?: ArrayBuffer,
 ): Promise<Map<string, ArrayBuffer>> {
   const companions = new Map<string, ArrayBuffer>();
   if (!filePath) return companions;
+
+  const dir = filePath.slice(0, filePath.lastIndexOf('/') + 1);
+
+  // Read a sibling file from the static bundle first, then the server API.
+  const readSibling = async (path: string): Promise<ArrayBuffer | null> => {
+    let buf: ArrayBuffer | null = null;
+    if (isManifestAvailable()) {
+      try { buf = await readStaticFile(path); } catch { /* not in bundle */ }
+    }
+    if (!buf) {
+      try { buf = await readServerFile(path); } catch { /* not on server */ }
+    }
+    return buf;
+  };
+
+  // Format-aware: SunTronic V1.3 loads external samples from an `instr/`
+  // subdir via dos.library. The prefix scheme below cannot express a subdir of
+  // module-named files, so parse the module for its exact sidecar paths and
+  // register them keyed by their relative path (UADE writes them at
+  // /uade/<relpath>, matching the replayer's dos.library open).
+  if (buffer) {
+    const sunPaths = sunTronicCompanionPaths(buffer);
+    for (const rel of sunPaths) {
+      const buf = await readSibling(dir + rel);
+      if (buf) companions.set(rel, buf);
+    }
+    if (companions.size > 0) return companions;
+  }
 
   const lower = filename.toLowerCase();
   for (const [mainPrefix, companionPrefix] of COMPANION_PREFIXES) {
     if (!lower.startsWith(mainPrefix)) continue;
     const songname = filename.slice(mainPrefix.length);
     const companionName = companionPrefix + songname;
-    const dir = filePath.slice(0, filePath.lastIndexOf('/') + 1);
-    const companionPath = dir + companionName;
-
-    try {
-      // Try static bundle first, then server API
-      let buf: ArrayBuffer | null = null;
-      if (isManifestAvailable()) {
-        try { buf = await readStaticFile(companionPath); } catch { /* not in bundle */ }
-      }
-      if (!buf) {
-        try { buf = await readServerFile(companionPath); } catch { /* not on server */ }
-      }
-      if (buf) {
-        companions.set(companionName, buf);
-      }
-    } catch { /* companion not found — proceed without it */ }
+    const buf = await readSibling(dir + companionName);
+    if (buf) companions.set(companionName, buf);
     break;
   }
   return companions;
@@ -676,8 +692,9 @@ export function useFileNavigation({
           throw new Error('Cannot read tracker module');
         }
 
-        // Auto-discover companion files (e.g. mdat.* → smpl.*, mfp.* → smp.*)
-        const companions = await fetchCompanionFiles(selectedFile.name, selectedFile.path);
+        // Auto-discover companion files (e.g. mdat.* → smpl.*, mfp.* → smp.*,
+        // or a SunTronic module's external instr/ samples).
+        const companions = await fetchCompanionFiles(selectedFile.name, selectedFile.path, buffer);
         await onLoadTrackerModule(buffer, selectedFile.name, companions.size > 0 ? companions : undefined);
         onClose();
         return;
