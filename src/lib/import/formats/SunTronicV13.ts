@@ -244,6 +244,63 @@ export function isSunTronicV13Format(buffer: ArrayBuffer | Uint8Array): boolean 
   return findAscii(buf, V13_VER_MARKER, 0x24, 0x120) >= 0;
 }
 
+/**
+ * The AmigaDOS directory the replayer prepends to sampled-instrument
+ * basenames, read from the module's embedded path constant (e.g. `instr/`).
+ * The module stores exactly one null-terminated printable string ending in
+ * `/` — a directory, distinct from the sample basenames (which have no `/`)
+ * and from `dos.library`. Verified across the whole V1.3 corpus (100/100
+ * sampled modules carry a single `instr/` prefix). Returns '' if none is
+ * present (a module with no external samples).
+ */
+function sunTronicSampleDir(buf: Uint8Array): string {
+  let s = '';
+  for (let i = 0; i < buf.length; i++) {
+    const c = buf[i];
+    if (c >= 0x20 && c <= 0x7e) {
+      s += String.fromCharCode(c);
+      if (s.length > 40) s = ''; // runaway — not a short path constant
+      continue;
+    }
+    if (c === 0 && s.length >= 2 && s.endsWith('/') &&
+        !s.includes(':') && !s.includes(' ') && !s.toLowerCase().endsWith('.library/')) {
+      return s;
+    }
+    s = '';
+  }
+  return '';
+}
+
+/**
+ * Relative paths of the external sampled-instrument files a V1.3 module opens
+ * at runtime via dos.library, e.g. `['instr/perc1.x', 'instr/perc2.x']`.
+ *
+ * The module stores the sample basenames in its name block and the containing
+ * directory as a separate embedded path constant; the replayer opens
+ * `<dir><basename>`. `dos.library` is already excluded from `instrumentNames`
+ * (it is an OS library, not a companion). Returns [] for non-V1.3 buffers or
+ * modules with no external samples.
+ *
+ * SINGLE SOURCE OF TRUTH for which sidecars the in-app UADE virtual FS must be
+ * pre-populated with (UADE writes them at `/uade/<relpath>`, matching the
+ * replayer's open) so the sampled channels are audible — the built-in/server
+ * file browser has no prefix-based companion scheme for the SunTronic `instr/`
+ * subdir (see fetchCompanionFiles).
+ */
+export function sunTronicCompanionPaths(buffer: ArrayBuffer | Uint8Array): string[] {
+  if (!isSunTronicV13Format(buffer)) return [];
+  const buf = buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer);
+  let score: SunV13Score;
+  try {
+    score = parseSunTronicV13Score(buf);
+  } catch {
+    return [];
+  }
+  if (score.instrumentNames.length === 0) return [];
+  const dir = sunTronicSampleDir(buf);
+  return score.instrumentNames.map((name) => dir + name);
+}
+
 // ── Track command-stream grammar ────────────────────────────────────────────
 //
 // One stream per (position, voice). The replayer fetches bytes once per row
