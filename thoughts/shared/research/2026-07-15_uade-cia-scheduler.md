@@ -167,6 +167,54 @@ carrier (vs. a live TS scheduler) is the open decision for the plan.
 4. What is the CIA period register value SunTronic writes at init, read from the
    loaded module (per "no guessing constants")? Confirms the 881.5 = 50 Hz.
 
+## 9. CORRECTION (2026-07-15b) — CIA-scheduler premise FALSIFIED by measurement
+
+**The entire "CIA cycle scheduler / sub-fire jitter" premise of this doc and the
+companion plan is WRONG.** Direct whole-song measurement overturns it. Keep §1-8
+only as a record of the discarded hypothesis.
+
+### What was measured (tools/suntronic-re/probe-fullsong-fires.ts, probe-fire-eclock.ts)
+
+1-sample-step the real UADE render over the whole song, capturing the tick-handler
+write-PC fire and the `$24` vibrato update:
+- **gliders**: 661/661 inter-fire gaps = **exactly 1024 samples**. Zero non-1024 gaps.
+- **ballblaser**: 330/330 gaps = **exactly 1024**. Zero anomalies.
+- The note-fetch PC fire and the `$24` update are in **lockstep at the same sample
+  indices** — ONE clock, not two. No tempo change, no fractional/sub-sample jitter.
+
+Consequences:
+- `SunTronic does NOT use CIA-A Timer-A in UADE` — `tick_count=0`,
+  `uade_wasm_on_cia_a_tick` never fires (proven; the CIA fire-log oracle returned 0
+  fires). The whole §5-§7 CIA-period model is inapplicable.
+- The clock is a constant **1024 samples/tick (43.07 Hz)**, NOT 881.5 (fitted
+  `ciaTickSamples`) and NOT 882 (vblank). The player's TWO-CLOCK model
+  (`SunTronicPlayer.ts:14-50, 424-458`, `ciaTick=881.5`) is chasing a phantom —
+  its `moduleTicks` oscillates 1/2 per fire when the real answer is a constant 1.
+
+### Where the residual actually lives (probe-native-vs-golden.ts)
+
+Committed player (881.5) vs golden: **130/316 mismatches (gliders)**. Two classes,
+BOTH per-tick arithmetic — no timing/scheduler involved:
+1. **Vibrato depth/phase arithmetic** — dominant. Active voices (v0/v1) wobble
+   `±1..7` in `$20` period with oscillating sign while `$08` acc matches exactly.
+   Present under 881.5 AND under a corrected single-1024 clock (141/316) — so it is
+   NOT a clock knob. Root is in `stepEffects()` vibrato math (`SunTronicPlayer.ts:361-374`,
+   `advanceVib` 335-339) vs the EFFECTS disasm (0x267f6) — depth-table index / phase
+   seeding / compute-then-advance ordering.
+2. **Small note-on / row-timing offset** — v2 sounds `p214` at golden t4 but native
+   t6 (2-tick lag under 881.5); v3 similar. GETNEXTNOTE (0x2692a) reaches `noteOn`
+   one row late for later-starting voices. Decode/sequencing, not fractional timing.
+
+### Corrected fix direction
+
+- Set the clock to a **single constant 1024 samples/tick, `moduleTicks==1` every
+  fire** (delete the `ciaTick`/`rowPhase`/`subtickSchedule` two-clock apparatus).
+- Then fix the two arithmetic bugs against the loaded disasm (EFFECTS vibrato,
+  GETNEXTNOTE note-on row timing). NO WASM change, NO CIA scheduler port, NO
+  committed schedule table needed. The golden is a valid per-tick oracle (render-
+  independent, sampled at the fire instant == the vibrato-update instant).
+- The plan `2026-07-15-suntronic-cia-scheduler-port.md` is SUPERSEDED by this.
+
 ## 8. File:line reference index
 
 | What | Where |

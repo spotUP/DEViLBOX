@@ -2,10 +2,21 @@
 date: 2026-07-15
 topic: SunTronic Gate-2 byte-exact — port the uade CIA cycle scheduler to TS
 tags: [suntronic, uade, cia, timing, gate-2, native-port, plan]
-status: draft
+status: SUPERSEDED
 ---
 
-# Plan: byte-exact SunTronic via a cycle-accurate CIA clock in TS
+> **SUPERSEDED 2026-07-15b — premise falsified. DO NOT IMPLEMENT.**
+> Whole-song measurement (probe-fullsong-fires / probe-fire-eclock) proved the
+> SunTronic clock is a **single constant 1024 samples/tick** (gliders 661/661,
+> ballblaser 330/330 gaps = 1024, zero variance; CIA-A Timer-A never fires,
+> tick_count=0). There is NO sub-fire CIA jitter and NO two-clock split. This plan
+> ports a scheduler for a problem that does not exist. The real residual (130/316
+> mismatches) is per-tick ARITHMETIC — vibrato depth/phase math + a small note-on
+> row-timing offset — fixable entirely in `SunTronicPlayer.tick()` with no WASM
+> change. See the corrected direction in
+> `thoughts/shared/research/2026-07-15_uade-cia-scheduler.md` §9.
+
+# Plan: byte-exact SunTronic via a cycle-accurate CIA clock in TS  [SUPERSEDED]
 
 Research: `thoughts/shared/research/2026-07-15_uade-cia-scheduler.md`.
 Decision (2026-07-15): user chose **port the CIA scheduler to TS as a live
