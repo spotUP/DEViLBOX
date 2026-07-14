@@ -5,12 +5,17 @@ tags: [suntronic, gate2, native-port, uade, tempo, note-timing]
 status: final
 ---
 
-# SunTronic V1.3 Gate-2 — fractional-tempo theory DISPROVEN, note-one-tick-late is the real bug
+# SunTronic V1.3 Gate-2 — row cadence is 5-mostly-6, not flat-6; mechanism one layer undecoded
 
 Supersedes `2026-07-14_suntronic-gate2-vibrato-solved.md`. **The "fractional
 6.25 ticks/row (7,6,6,6)" root cause in that handoff is WRONG — discard it.**
+**Also correct the earlier framing in this file's own history: the "note one tick
+late" is a SYMPTOM of a row-length mismatch, not an ordering bug** (see below).
 The vibrato-continuation fix (commit `348d3386a`, pushed) still stands: gliders
 v0 is byte-exact t0-t10 and the regression test passes / fails-on-revert.
+
+Probes for the corrected model committed `e6cfce43f` (`probe-count-15-per-row.ts`,
+`probe-speed-per-row.ts`, `probe-count-ticks-per-row.ts`, + supporting).
 
 ## What the prior handoff got wrong
 
@@ -31,38 +36,64 @@ The old "7,6,6,6" pattern was an **artifact of the `$24`-poll double-detector**:
 `vibΔ=-57536` values are just the s16 sign-wrap of a normal `+8000` advance
 (crossing +32767), which the `abs>12000` threshold misread as a double.
 
-## The real bug — note trigger one tick late (CONFIRMED on a clean clock)
+## The real bug — native rows are flat-6, UADE rows are 5-mostly-6 (ROOT CAUSE, measured)
 
-Both oracles — `probe-lockstep-poll.ts` (`$24`-gated) and `probe-lockstep-clean.ts`
-(`$15`-gated, one clean write per CIA tick) — agree on ballblaser warmup=1:
+The "note one tick late" symptom is NOT an ordering bug — it is progressive drift
+from a row-length mismatch. Jitter-free measurement this session (2026-07-14, late):
+
+- `probe-count-15-per-row.ts` — counts `$15` writes (EFFECTS runs once/voice/tick,
+  no double-write artifact) between `$2d` increments. **Rows are 5 handler-ticks
+  mostly, 6 periodically** (6-tick rows at `$2d`-index 0,6,11,17...). Clean, no
+  jitter, and **gliders == ballblaser byte-identical** cadence → song-independent,
+  intrinsic to the timer.
+- `probe-speed-per-row.ts` — reads `$30/$34` at every row boundary: `$30(speed)=6`
+  STATIC, `$34(delay)=0` always, `$2e(pos)=0` (position doesn't advance in the
+  window — GNN re-reads the track each row). Sample gaps: `5120 (=5×1024)` mostly,
+  `6144 (=6×1024)` on the periodic rows. Handler period uniformly **1024
+  samples/tick**.
+- Global groove blocks confirmed inert: `$a8a`=0 (block at `0x2660e` skipped),
+  `$a9e`=0 (block at `0x26644` skipped) — `probe-groove.ts`.
+
+Native `tick()` does flat 6-tick rows → every row 6144 samples → it runs slow, so
+note changes arrive progressively late (ballblaser row-2 note lands one tick behind
+at first, worse later). Fixing the row cadence to 5-mostly-6 is the root fix; the
+±1-3 vibrato-period rounding is secondary.
+
+## The one undecoded layer (blocks the root-cause fix)
+
+Static disasm of the tempo counter is now exhaustive and reads as **6-tick rows
+unconditionally**, contradicting the measured 5:
 
 ```
-t10 v0: G{p710} N{p1088}     <- UADE new note at tick 10
-t11 v0: G{p719} N{p710}      <- native gets the same note one tick later
+0x2667a addq.b #1,$2c          ; $2c++  (every tick, per voice)
+0x2667e move.b $2c,d0
+0x26682 cmp.b  $30,d0          ; $30 = 6 (static)
+0x26686 bmi    $266ce          ; $2c < 6  -> EFFECTS only (no wrap)  = non-wrap tick
+0x26688 clr.b  $2c             ; $2c >= 6 -> clr to 0
+0x2668c addq.b #1,$2d          ;            $2d++  (row boundary)
+        ... GNN (0x2692a), EFFECTS (0x267f6)
 ```
 
-`ballblaser.src` changes note at row-2; UADE applies `p710` at CIA tick 10,
-native at tick 11 (== native raw t12, warmup=1). gliders masks this because it is
-one sustained note (GNN keeps hitting end-of-group; cursor barely moves), so its
-only diffs are small ±1-3 period rounding at later rows + the v3 activation bug.
+`$2c` is written ONLY here (`addq`) and by the `clr→0`. With `clr→0` + wrap-at-6,
+a row is 0→1→2→3→4→5→6 = **6 ticks**, always. To get the measured 5-tick row, `$2c`
+must either start at 1 after a wrap (i.e. something reloads `$2c=1`) or the compare
+must effectively be vs 5. Neither is in: the wrap block (`0x26688`-`0x266f6`), the
+GNN normal-note path (`0x26970`-`0x26a12`), the note-tail, or the EFFECTS head
+(`0x267f6`+, first 40 insns) — all disassembled this session, none write `$2c`.
 
-## The unresolved paradox (decisive next experiment)
+**Prime remaining suspect:** a GNN note-command handler. GNN (`0x2692a`) is a
+per-row command interpreter that loops reading multiple stream bytes and dispatches
+via the jump table at `0x2694c` (word offsets off a6=`0x264dc`; targets `0x26a16`+
+and the negative-note-command handlers). One of those handlers likely pre-loads
+`$2c` (a note-duration / row-shorten command) on most rows and is absent on the
+periodic 6-tick rows — i.e. **the row length is note-data-driven**, which would
+mean the native fixed-row model is the wrong abstraction (duration-driven, not
+fixed 6-tick rows).
 
-`$30=6` (memory) says rows are 6 CIA ticks → UADE row-2 boundary should be at CIA
-tick 12, matching native. But the clean `$15`-gated oracle puts UADE's `p710`
-first appearance at gold-index 10 (= CIA tick 10 from frame 0), and the gliders
-continuation-boundaries sit ~7 clean-ticks apart. **6 (memory) vs ~10/7 (oracle
-tick-index) is the contradiction to resolve.** Likely a GNN/EFFECTS *ordering*
-issue within a tick or a warmup/first-row-length offset — NOT a speed value.
-
-**Do the one decisive measurement first (analyse-first):** arm the capture on the
-GNN-entry PC (loaded `0x2692a`) and on the EFFECTS PC (`0x267f6`) and count how
-many EFFECTS passes occur between consecutive GNN fires, indexed to CIA tick from
-frame 0. That directly reads ticks-per-row and the exact CIA tick of each note-on
-with zero polling ambiguity — resolves the 6-vs-10 paradox and tells you whether
-native's GNN fires a tick too late or applies the note a tick too late. Only then
-touch `tick()`/`getNextNote` ordering. Do NOT guess a tempo constant — there
-isn't one; `$30=6` is confirmed.
+**Next decisive step:** disassemble the GNN jump-table handlers (`0x26a16`+ and the
+`0x2694c` table targets) and find the `$2c` write. Do NOT ship a hardcoded
+`5,5,5,5,5,6` cadence — that is a band-aid over an undecoded mechanism (house
+rule). Decode the reload rule, then port it into `tick()`/`getNextNote`.
 
 ## Confirmed secondary bugs (independent of the above)
 
