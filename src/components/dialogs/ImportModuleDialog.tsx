@@ -25,6 +25,7 @@ import { SIDInfoPanel } from './SIDInfoPanel';
 import { getFormatCapabilities, type FormatCapabilityInfo } from '@lib/import/FormatCapabilities';
 import { Info } from 'lucide-react';
 import { useModalClose } from '@hooks/useDialogKeyboard';
+import { companionRelativeName } from '@lib/import/companionRelativeName';
 
 export interface ImportOptions {
   useLibopenmpt: boolean;     // Use libopenmpt for sample-accurate playback
@@ -68,40 +69,6 @@ const isChipDumpFormat = (filename: string): boolean => {
   const fmt = detectFormat(filename);
   return fmt?.family === 'chip-dump' || fmt?.family === 'c64-chip';
 };
-
-/**
- * Compute the companion file name relative to the main file's directory.
- * When files come from a directory picker (webkitRelativePath is set), we
- * preserve subdirectory structure (e.g. "Samples/electom" for ZoundMonitor).
- * When files come from a flat file picker, we fall back to just the filename.
- */
-function companionRelativeName(mainFile: File, companion: File): string {
-  const mainRel = (mainFile as any).webkitRelativePath as string | undefined;
-  const compRel = (companion as any).webkitRelativePath as string | undefined;
-  if (mainRel && compRel) {
-    // Both have relative paths from directory picker.
-    // Main: "Zoundmonitor/AJ/hittheroad.sng" → dir = "Zoundmonitor/AJ"
-    // Companion: "Zoundmonitor/Samples/electom" → relative from main's dir = "Samples/electom"
-    const mainDir = mainRel.substring(0, mainRel.lastIndexOf('/'));
-    if (compRel.startsWith(mainDir + '/')) {
-      return compRel.substring(mainDir.length + 1);
-    }
-    // Companion is in a different subtree — find common ancestor
-    const mainParts = mainDir.split('/');
-    const compParts = compRel.split('/');
-    let common = 0;
-    while (common < mainParts.length && common < compParts.length && mainParts[common] === compParts[common]) {
-      common++;
-    }
-    return compParts.slice(common).join('/');
-  }
-  // Only companion has relative path (e.g. auto-prompted Samples/ folder for a single .sng)
-  // webkitRelativePath: "Samples/electom" → use it as-is
-  if (compRel && compRel.includes('/')) {
-    return compRel;
-  }
-  return companion.name;
-}
 
 /**
  * For two-file Amiga formats, derive the expected companion filename from the main file.
