@@ -92,8 +92,14 @@ interface SunPlayerVoice {
 
 /** One snapshot row of the tick timeline (what the p9a golden compares). */
 export interface SunPlayerTick {
-  /** per-voice [period($20), acc($08), volume($0c), flags($14)]. */
-  voices: Array<{ period: number; acc: number; volume: number; flags: number }>;
+  /** per-voice [period($20), acc($08), volume($0c), flags($14), outVolume($15), instrOff].
+   * `outVolume` is the post-envelope Paula volume ($15 = volEnv*$0c>>6) — the
+   * gain the audio renderer applies (the golden compares $0c, not this). `instrOff`
+   * is the h1-relative record offset of the voice's ACTIVE synth instrument ($4
+   * recordOff), or -1 when none/inert or a type-B (sampled) select (which the
+   * sequencer leaves null). The native audio renderer maps it back to
+   * `score.synthInstruments[k].recordOff` to pick the timbre. */
+  voices: Array<{ period: number; acc: number; volume: number; flags: number; outVolume: number; instrOff: number }>;
 }
 
 const s8 = (b: number): number => (b << 24) >> 24;
@@ -489,6 +495,8 @@ export class SunTronicPlayer {
     return {
       voices: this.voices.map((v) => ({
         period: v.period, acc: v.pitch & 0xffff, volume: v.volume & 0xff, flags: v.flags & 0xff,
+        outVolume: v.outVolume & 0xff,
+        instrOff: v.instr ? v.instr.recordOff : -1,
       })),
     };
   }
@@ -538,5 +546,6 @@ function decodeSynthAt(h1: Uint8Array, rec: number): SunSynthInstrument | null {
     wave1: new Int8Array(0), wave2: new Int8Array(0), arpTable: new Int8Array(0),
     volEnv: sliceI8(u32(rec + 0x00), volEnvLen + 1),
     vibDepth: sliceI8(u32(rec + 0x08), freqEnvLen + 1),
+    sampleData: new Int8Array(0), sampleZero: 0,
   };
 }

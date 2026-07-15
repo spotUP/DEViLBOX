@@ -48,6 +48,17 @@ export interface SunSynthVoiceState {
    * clears the bit1 latch) so feedback restarts from wave1 each note.
    */
   playBuffer: Int8Array | null;
+  /**
+   * voice+0x28 type-6 sweep phase (u16). The damped-resonator generator sweeps
+   * this by ±(record+0x1a/0x1c) each tick; the segment split (attack vs decay
+   * lengths) is derived from it. Persists across ticks; reset to 0 on note-start.
+   */
+  resonPhase: number;
+  /**
+   * voice+0x2a type-6 sweep counter (s16). Counts up to record+0x1f then latches
+   * -1 to flip the sweep delta from +0x1a to +0x1c. Reset to 0 on note-start.
+   */
+  resonCnt: number;
 }
 
 /** Global PRNG word (workspace `rndnum`, RNDNUMBER seed = 0), shared by voices. */
@@ -56,7 +67,7 @@ export interface SunSynthPrng {
 }
 
 export function createVoiceState(): SunSynthVoiceState {
-  return { arpIndex: 0, feedbackLatched: false, playBuffer: null };
+  return { arpIndex: 0, feedbackLatched: false, playBuffer: null, resonPhase: 0, resonCnt: 0 };
 }
 
 export function createPrng(): SunSynthPrng {
@@ -182,6 +193,25 @@ export function renderSynthTick(
       renderType3(out, w1, byteLen, d1);
       break;
     }
+    case 5: {
+      // Handler @0x26f2e — stored PCM sample, pointer-played (NO regeneration).
+      //   a2 = *(record+0x1a) + 2*arp ;  play buffer = a2, length record+0x22 words.
+      // The arp value scans the sample as a byte offset. `sampleData` is the h1
+      // window from wave1Off; `sampleZero` maps arp=0 to its byte index.
+      const base = inst.sampleZero + 2 * d1;
+      const src = inst.sampleData;
+      for (let i = 0; i < byteLen; i++) {
+        const k = base + i;
+        out[i] = k >= 0 && k < src.length ? ((src[k] << 24) >> 24) : 0;
+      }
+      break;
+    }
+    case 6: {
+      // Handler @0x26e6c — damped harmonic resonator, GENERATES its wave (no
+      // stored samples). record+0x1a/0x1c are s16 sweep deltas, not pointers.
+      renderType6(out, d1, state, inst.wave1Off, inst.wave2Off, byteLen);
+      break;
+    }
     default: {
       renderSmooth(out, w1, fbSource, inst.wave2Off, byteLen, d1);
       latch = true; // CALC15 BSET #1 — the A4 source latches to the play buffer.
@@ -292,6 +322,96 @@ function renderType3(out: Int8Array, w1: Int8Array, byteLen: number, d1: number)
     out[o++] = ((w1[idx] ?? 0) << 24) >> 24;
     acc = (acc + step2) & 0xffffffff;
   }
+}
+
+/**
+ * Type-6 handler @0x26e6c — damped harmonic resonator. GENERATES its wave each
+ * tick (no stored samples): a critically-under-damped second-order oscillator
+ * springs toward a constant target, seeded fresh (y=0xf00, v=0) every tick and
+ * split into two segments (attack toward 0xf100, decay toward 0x0f00) whose
+ * lengths come from a per-voice phase sweep. record+0x1a/0x1c are s16 sweep
+ * deltas (NOT wave pointers — the field is un-relocated, hence read as zeros by
+ * the pointer path); record+0x1e/0x1f/0x20 are damping amp / counter target /
+ * sweep scale, all packed into the wave1/wave2 u32 record fields.
+ *
+ * Validated byte-exact against the live UADE chip-RAM play buffer for every
+ * fully-written buffer captured (`tools/suntronic-re/probe-t6-brute.ts`,
+ * gliders lead: 16/16 settled buffers = 128/128 bytes).
+ *
+ * Kernel (transcribed from the m68k disasm at 0x26e6c-0x26f28):
+ *   counter (u16 cnt @voice+0x2a): if cnt>=0 { cnt++; if cnt>=p1f cnt=-1 }
+ *   delta = cnt>=0 ? s16(p1a) : s16(p1c)
+ *   phase (u16 @voice+0x28) += delta
+ *   sw   = (abs(s16 phase) * p20) >> 8
+ *   d2hi = (sw * byteLen) >> 16                    ; mulu ; swap
+ *   seg2 = (byteLen>>1) + d2hi - 1  (decay len-1)  ; seg1 = byteLen-2 - seg2 (attack len-1)
+ *   spring = (0xfffe0/(arp&0xff+0x20)) - 0x26*s16(arp)          ; d2 coeff
+ *   damp   = ((0x7fff - spring) * p1e) >> 8                     ; d3 coeff
+ *   y=0xf00, v=0; per sample: v=(damp*v)>>15; v+=(spring*(target-y))>>15;
+ *                             y+=v; out=(y>>7)&0xff
+ *   attack seg1+1 samples (target 0xf100), decay seg2+1 samples (target 0x0f00).
+ * `(x)>>15` = the `swap ; rol.l #1` idiom (reuses swapRol1). Both segment loops
+ * carry v and y forward — the decay continues the attack's state.
+ */
+export function renderType6(
+  out: Int8Array,
+  arp: number, // D0 = arpTable[arpIndex] (signed byte), the pitch coefficient
+  state: SunSynthVoiceState,
+  wave1Off: number, // record+0x1a u32 = (p1a<<16)|p1c
+  wave2Off: number, // record+0x1e u32 = (p1e<<24)|(p1f<<16)|(p20<<8)|...
+  byteLen: number,
+): void {
+  const p1a = (wave1Off >>> 16) & 0xffff; // record+0x1a s16 sweep delta A
+  const p1c = wave1Off & 0xffff; // record+0x1c s16 sweep delta B
+  const p1e = (wave2Off >>> 24) & 0xff; // record+0x1e damping amplitude
+  const p1f = (wave2Off >>> 16) & 0xff; // record+0x1f counter target
+  const p20 = (wave2Off >>> 8) & 0xff; // record+0x20 sweep scale
+  const d6total = byteLen - 1;
+
+  // counter/sweep (26e6c..26e96); cnt & phase persist in voice state.
+  let cnt = toS16(state.resonCnt);
+  if (cnt >= 0) {
+    cnt = toS16((cnt + 1) & 0xffff);
+    if (cnt >= p1f) cnt = -1;
+  }
+  const delta = cnt >= 0 ? toS16(p1a) : toS16(p1c);
+  const phase = toS16((state.resonPhase + delta) & 0xffff);
+  state.resonCnt = cnt & 0xffff;
+  state.resonPhase = phase & 0xffff;
+
+  // segment split from the swept phase (26e96..26eb8).
+  let sw = Math.abs(phase) & 0xffff;
+  sw = ((sw * p20) >>> 0) >>> 8; // mulu.w ; lsr.l #8
+  const d2hi = (((sw * ((d6total + 1) & 0xffff)) >>> 0) >>> 16) & 0xffff; // mulu ; swap
+  let d5 = ((d6total + 1) >>> 1) & 0xffff; // lsr.w #1
+  d5 = (d5 + d2hi - 1) & 0xffff; // add ; subq #1  → decay len-1
+  const d5s = toS16(d5);
+  const d6s = toS16((d6total - d5 - 1) & 0xffff); // sub ; subq #1 → attack len-1
+
+  // spring / damp coefficients from the arp value (26ec0..26ee2), matching the
+  // renderSmooth CALC13/14 derivation (verified byte pattern).
+  const divisor = (arp & 0xff) + 0x20; // move.b d0,d1 ; addi.w #$20
+  const quotient = Math.floor(0xfffe0 / divisor) & 0xffff; // divu.w
+  const term = (0x26 * (toS8(arp) & 0xffff)) & 0xffff; // ext.w ; mulu #$26
+  const springW = (quotient - term) & 0xffff; // sub.w  → d2
+  const d2v = toS16(springW);
+  const dampW = ((((0x7fff - springW) & 0xffff) * p1e) >>> 8) & 0xffff; // mulu ; lsr.l #8 → d3
+  const d3v = toS16(dampW);
+
+  // oscillator (26ee4..26f26): fresh seed each tick, two carried segments.
+  let y = 0x0f00;
+  let v = 0;
+  let o = 0;
+  const step = (target: number): void => {
+    v = toS16(swapRol1(muls16(d3v, v))); // v = (damp*v) >> 15
+    const t = toS16(swapRol1(muls16(d2v, toS16((target - y) & 0xffff)))); // (spring*(target-y))>>15
+    v = toS16((v + t) & 0xffff);
+    y = toS16((y + v) & 0xffff);
+    out[o++] = (((y & 0xffff) >>> 7) << 24) >> 24; // lsr.w #7 ; move.b
+  };
+  for (let i = 0; i <= d6s && o < byteLen; i++) step(0xf100);
+  for (let i = 0; i <= d5s && o < byteLen; i++) step(0x0f00);
+  while (o < byteLen) out[o++] = 0; // guard (segment math totals byteLen)
 }
 
 /**

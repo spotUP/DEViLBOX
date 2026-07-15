@@ -35,4 +35,7 @@ export interface SunTronicConfig {
   arpTable: number[];
   volEnv: number[];
   vibDepth: number[];
+  /** type-5 scannable sample window + arp=0 byte index (see SunSynthInstrument). */
+  sampleData?: number[];
+  sampleZero?: number;
 }

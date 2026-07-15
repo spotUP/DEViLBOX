@@ -32,6 +32,7 @@ function synth(partial: Partial<SunSynthInstrument> & { synthType: number }): Su
     wave1: new Int8Array(0), wave2: new Int8Array(0),
     arpTable: new Int8Array([0]),
     volEnv: new Int8Array([0x40]), vibDepth: new Int8Array([0]),
+    sampleData: new Int8Array(0), sampleZero: 0,
     ...partial,
   };
 }
@@ -93,6 +94,77 @@ describe('SunTronic native wavetable generator (MEGAEFFECTS port)', () => {
     const a = renderSynthTick(inst, createVoiceState(), createPrng());
     const b = renderSynthTick(inst, createVoiceState(), createPrng());
     expect(Array.from(a)).toEqual(Array.from(b));
+  });
+
+  it('type 6 resonator: reproduces the gliders lead play buffer byte-exact', () => {
+    // The type-6 damped-resonator generator (@0x26e6c) GENERATES its wave — no
+    // stored samples. Golden = the live UADE chip-RAM play buffer for the gliders
+    // lead voice (arp=127, generation sweep phase 23131), captured byte-exact via
+    // tools/suntronic-re/probe-t6-brute.ts (16/16 settled buffers matched 128/128).
+    // Params packed into the record's wave1/wave2 u32 fields:
+    //   wave1Off = (p1a<<16)|p1c = (0<<16)|15000 = 15000  (s16 sweep deltas)
+    //   wave2Off = (p1e<<24)|(p1f<<16)|(p20<<8) = 0xff00ff00  (damp/cntTarget/scale)
+    // resonPhase pre-set to 8131 so this tick sweeps +p1c(15000) → phase 23131.
+    const GOLDEN =
+      '1a140c01f6eaded4cac2bdbab9babdc3c9d0d8e4f10010202f3c464e5254524e473f352a20160c05' +
+      'fffbf9f9fbff040b121920262c313436363533302c27221d1915120f0e0d0d0e101316191c1f2224' +
+      '2628282828272523211f1d1b1918171616161718191a1c1d1e202122222222222221201f1e1d1c1b' +
+      '1b1a1a1a1a1a1b1b';
+    const inst = synth({
+      synthType: 6, waveWordLen: 64,
+      wave1Off: 15000, wave2Off: 0xff00ff00,
+      arpTable: new Int8Array([127]),
+    });
+    const st = createVoiceState();
+    st.resonPhase = 8131;
+    const out = renderSynthTick(inst, st, createPrng());
+    expect(out.length).toBe(128);
+    const hex = Array.from(out).map((v) => (v & 0xff).toString(16).padStart(2, '0')).join('');
+    expect(hex).toBe(GOLDEN);
+  });
+
+  it('type 5 stored sample: scans the analgestic2 sample by 2*arp byte-exact', () => {
+    // Handler @0x26f2e plays a stored PCM sample at *(record+0x1a) + 2*arp, length
+    // record+0x22 words — NOT a generated wave. The analgestic2 type-5 record at
+    // 0x15c0 (wwl=16, wave1Off=0x27d1) scans a 0x7f→0x81 transition; the arp value
+    // slides the 32-byte window 2 bytes deeper each step. This golden is the arp=3
+    // window, confirmed byte-exact against the live UADE chip-RAM play buffer
+    // (tools/suntronic-re/verify-t5-all.ts: 189/228 windows matched, 0 mismatches).
+    // Fails on revert: dropping case 5 to the renderSmooth default produces an
+    // integrator wave, not this sample slice.
+    const buf = new Uint8Array(readFileSync(join(process.cwd(), 'public/data/songs/formats/SUNTronicTunes/analgestic2.src')));
+    const score = parseSunTronicV13Score(buf);
+    const inst = score.synthInstruments.find((s) => s.recordOff === 0x15c0);
+    expect(inst?.synthType).toBe(5);
+    const st = createVoiceState();
+    const prng = createPrng();
+    let out = renderSynthTick(inst!, st, prng); // arp 1
+    out = renderSynthTick(inst!, st, prng); // arp 2
+    out = renderSynthTick(inst!, st, prng); // arp 3
+    const hex = Array.from(out).map((v) => (v & 0xff).toString(16).padStart(2, '0')).join('');
+    expect(hex).toBe('7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f818181818181');
+  });
+
+  it('type 3 resample: reproduces the ox.src record byte-exact vs UADE chip-RAM', () => {
+    // Handler @0x26d96 (CALC10-12) — a two-segment rate-scaled resample of wave1
+    // driven by D1=arp. Golden = the live UADE chip-RAM play buffer for ox.src
+    // type-3 record 0x15e2 at arp value 61, captured byte-exact via the P5
+    // wave-buffer oracle (tools/suntronic-re/t3-golden.ts: both ox.src type-3
+    // records matched at d1=61, 0 contradictions). renderType3 is a pure function
+    // of (wave1, byteLen, D1) — no feedback state — so forcing arpTable=[61]
+    // selects d1=61 on the first tick. Fails on revert: any drift in the segment
+    // split, step fixed-point (0x8000/div), or index accumulator changes a byte.
+    const buf = new Uint8Array(readFileSync(join(process.cwd(), 'public/data/songs/formats/SUNTronicTunes/ox.src')));
+    const score = parseSunTronicV13Score(buf);
+    const rec = score.synthInstruments.find((s) => s.recordOff === 0x15e2);
+    expect(rec?.synthType).toBe(3);
+    const inst: SunSynthInstrument = { ...rec!, arpTable: new Int8Array([61]), arpLen: 1, arpLoop: 0 };
+    const out = renderSynthTick(inst, createVoiceState(), createPrng());
+    const hex = Array.from(out).map((v) => (v & 0xff).toString(16).padStart(2, '0')).join('');
+    expect(hex).toBe(
+      '7f5a00a681a6005a7f5a00a681a6005a7f5a00a681a6005a7f5a00a681a6005a' +
+      '7f5a00a681a6005a7f5a0081a6005a7f5a00a681a6005a7f5a00a681a6005a00',
+    );
   });
 
   it('mule.src synth[0] (type 2): renders a full 0x40-byte buffer', () => {
