@@ -189,6 +189,12 @@ export class SunTronicPlayer {
     }
 
     // ── per-voice init (loaded 0x2650e) ──
+    // rowsPerPos ($31) = the module's default position length in rows, read by the
+    // parser from the `move.b #imm,$31(a2)` init opcode (both pilot songs = 16). A
+    // control opcode (0x8b/0x8c) can override it per-voice/globally at runtime. This is
+    // the single source of truth — do NOT hardcode; the wrap count drives the position
+    // boundary the note-stream's 16 groups are decoded against.
+    const rowsPerPos = score.rowsPerPositionDefault & 0xff;
     for (let ch = 0; ch < 4; ch++) {
       const entry = this.sequence[0];
       this.voices.push({
@@ -200,7 +206,7 @@ export class SunTronicPlayer {
         flags: 0xff, outVolume: 0, period: 0,
         stagedSel: 0, transpose: entry ? s8(entry.transposes[ch]) : 0,
         vibPhase: 0, vibIndex: 0, envReload: 0, envCounter: 0, tie: 0, synthFlag: 0,
-        tempoTick: 5, tempoNote: 0, position: 0, speed: 6, rowsPerPos: 0x10,
+        tempoTick: 5, tempoNote: 0, position: 0, speed: 6, rowsPerPos,
       });
     }
   }
@@ -433,14 +439,23 @@ export class SunTronicPlayer {
         v.tempoTick = 0;
         v.tempoNote = u8(v.tempoNote + 1);
         runGNN = true;
+      }
+      if (runGNN) {
+        // Read the CURRENT row's group FIRST — the cursor streams through all
+        // rowsPerPos (16) groups of the position, including the final bare-0x00 hold
+        // group (g15). ONLY THEN advance to the next position. Loading the next
+        // position before this read would skip the position's last group and fire the
+        // next position's note one row early (ballblaser t78/t79 position 0->1). The
+        // real driver's tempo counter advances the position index for the NEXT row,
+        // not the row it is currently decoding.
+        this.getNextNote(v);
         if (v.tempoNote >= (v.rowsPerPos & 0xff)) {
           v.tempoNote = 0;
           v.position += 1;
           this.loadPosition(v);
-          if (v.flags === 0xfe) continue;
+          if (v.flags === 0xfe) continue; // new position idles this voice
         }
       }
-      if (runGNN) this.getNextNote(v);
       this.stepEffects(v, false);
     }
   }
@@ -462,7 +477,7 @@ export class SunTronicPlayer {
       // step at bucket round(k*di), di = ciaTick/(audioTick-ciaTick) = the beat period
       // of the two clocks. Reproduces UADE's exact fire schedule (gliders 0/316) with
       // NO hardcoded table — the double buckets fall out of the single fire-period
-      // constant. A plain floor/round accumulator misplaces the first double (7/316).
+      // constant. A plain floor/round accumulator misplaces the doubles (gliders 7/316).
       this.stepAll();
       const di = this.ciaTick / (this.audioTick - this.ciaTick);
       if (this.tickIndex === Math.round(this.doubleK * di)) {
