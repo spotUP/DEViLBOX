@@ -244,6 +244,8 @@ function readRatchet(): Ratchet {
 }
 
 describe('UADE encoder round-trip harness (real fixtures)', () => {
+  // 30s timeout: this harness scans every real fixture — the default 5s trips under
+  // full-suite CPU contention even though it runs in <2s isolated.
   it('runs every fixture and prints the result table', async () => {
     await runAll;
     const rows = [...results].sort((a, b) => a.formatId.localeCompare(b.formatId));
@@ -282,14 +284,14 @@ describe('UADE encoder round-trip harness (real fixtures)', () => {
 
     expect(rows.length).toBeGreaterThan(0);
     expect(existsSync(RATCHET_PATH), 'ratchet file must be committed').toBe(true);
-  });
+  }, 30000);
 
   it('every fixtures.map entry has a ratchet baseline (no undocumented format)', async () => {
     await runAll;
     const ratchet = readRatchet();
     const missing = results.map((r) => r.formatId).filter((id) => !(id in ratchet.results));
     expect(missing, `add these to the ratchet (regenerate with DEVILBOX_GEN_RATCHET=1): ${missing.join(', ')}`).toEqual([]);
-  });
+  }, 30000);
 
   it('no round-trip regression vs the ratchet (byte-exact stays, matchPct only improves)', async () => {
     await runAll;
@@ -311,7 +313,7 @@ describe('UADE encoder round-trip harness (real fixtures)', () => {
       }
     }
     expect(regressions, `round-trip regressions:\n  ${regressions.join('\n  ')}`).toEqual([]);
-  });
+  }, 30000);
 
   it('the set of unexercised registered encoders only shrinks', async () => {
     await runAll;
@@ -322,5 +324,5 @@ describe('UADE encoder round-trip harness (real fixtures)', () => {
     // fixture stopped exercising one. Either way, add a fixture or fix wiring.
     const added = current.filter((id) => !baseline.has(id));
     expect(added, `newly-unexercised registered encoders (add a real fixture to fixtures.map.ts): ${added.join(', ')}`).toEqual([]);
-  });
+  }, 30000);
 });
