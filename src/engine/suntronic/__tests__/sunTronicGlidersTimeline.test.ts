@@ -17,8 +17,9 @@
  *
  * Alignment: the ctor folds UADE's one priming load-tick, so native render bucket i
  * (renderTimeline()[i]) maps to golden[i-1] (warmup 1). The full two-song golden test
- * (sunTronicNoteTimeline.golden.test.ts) stays describe.skip until ballblaser's 5
- * note-CHANGE residuals (t12/t78/t79, a separate GNN/tempo-opcode gap) also reach 0.
+ * (sunTronicNoteTimeline.golden.test.ts) stays describe.skip until ballblaser's last
+ * residual (t12 v0, a sub-fire double-placement phase artifact — see the ballblaser
+ * regression) also reaches 0.
  */
 
 import { describe, it, expect } from 'vitest';
