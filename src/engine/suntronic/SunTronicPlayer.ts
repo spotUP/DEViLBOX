@@ -11,48 +11,35 @@
  *   - $20 Paula period, $08 pitch accumulator, $0c voice volume, $14 flags
  * which is exactly the state the oracle reads from UADE.
  *
- * ── TWO-CLOCK MODEL (2026-07-14e): one fire clock + inner CIA accumulator ───────
- * Fire-aligned measurement (tools/suntronic-re/probe-fire-aligned vs UADE-WASM)
- * proved the tick handler (0x2660e) fires UNIFORMLY every 1024 output samples — one
- * fire == one golden sample == one `tick()` call. Inside each fire an inner
- * accumulator (ciaTick ≈ 883.73 samples = the emulated PAL vblank period, ~49.92 Hz,
- * i.e. 1024/883.73 ≈ 1.16 player-steps per fire) steps the note engine: each step
- * advances the $24 vibrato phase (so per fire vibrato advances 1-2× — the measured
- * "double" fires), and every `speed`-th step wraps $2c → a row boundary → GETNEXTNOTE.
- * This reproduces the measured song-independent 5-mostly-6 fires/row row cadence with
- * NO hardcoded table (see tick()). NOTE: the two-clock model is CONFIRMED (probe-pc-
- * control: 29 $24-advances over 26 fires = doubles are real); the 2026-07-15
- * "premise falsified / single-clock 1024" handoff was WRONG — it measured $24 at
- * fire boundaries only and could not see the twice-per-bucket advances.
+ * ── DOUBLE-POSITION CLOCK (2026-07-15g): gliders BYTE-EXACT (0/316) ─────────────
+ * The player fires on the emulated PAL vblank; the golden latches once per 1024-sample
+ * bucket. The fire period is 882.759 samples = 1024*25/29 (44100/882.759 = 49.957 Hz).
+ * The beat of the two clocks gives di = ciaTick/(audioTick-ciaTick) = 6.25 EXACTLY (29
+ * fires per 25 buckets), so one base player-step runs every bucket PLUS one extra
+ * ("double") step at bucket round(k*6.25) = 6,13,19,25,31,38,44,50,… Each step advances
+ * the $24 vibrato phase and the tempo counters; the double buckets are where vibrato
+ * advances twice (the measured 7,6,6,6 doubles) and the row cadence (~5.17 buckets)
+ * falls out of the SAME single ratio. NO hardcoded schedule — the double buckets are
+ * computed from the one fire-period constant (see tick()).
  *
- * ── KNOWN GAP: no constant-rate model reaches 0 (12/632 cells, 98.1% exact) ──
- * Joint constant-per-fire optimum ciaTick=883.73, phase 0 (probe-ratio-fine full
- * grid): gliders 3, ballblaser 9. 881.5 gave 3/11; 883.73 improves ballblaser to 9.
+ * This was PROVED decisive by probe-measured-schedule: feeding UADE's exact per-bucket
+ * step count into stepAll() gives gliders 0/316 — so the period/vibrato ARITHMETIC is
+ * byte-exact and the residual was ENTIRELY the step schedule. The generator that
+ * reproduces the measured schedule is doubles-at-round(k*6.25) (NOT floor/round of the
+ * cumulative b*1024/P, which misplaces the first double by one bucket → 7/316). Ceiling
+ * reached: gliders 0/316 with the shipped clock (probe-player-golden, WASM-free).
  *
- * The golden is CYCLE-TRUE, not an oracle artifact (2026-07-14f, probe emit-ch1-diag):
- * the $20 period stream is RENDER-INDEPENDENT — CH=128, CH=32, CH=8 and a $20-memory-write
- * capture at render=1 vs render=882 all produce the IDENTICAL sequence. So the golden is the
- * real replayer's settled per-fire period; the residual 14 cells are real native-timing
- * misses, not a chunk-quantization artifact (the earlier "CH=128 artifact" theory is RETRACTED).
- *
- * Every constant-rate model class was swept and ALL floor above 0 (probes probe-float-sweep,
- * probe-chunk-fit, probe-eclock-sweep, probe-greedy-schedule, probe-joint-greedy, probe-ratio-fine):
- *   • float per-fire accumulator, best (ciaTick=883.73, phase 0): floor 12.
- *   • 128-chunk eclock accumulator, whole (P∈[13680,14680], phase) space: floor 14.
- *   • principled integer E-clock reload: floor 14.
- *   • per-fire integer vib-advance schedule, ORACLE joint-greedy fitted to the answer over
- *     all 4 voices: floor 11 (gliders 2, ballblaser 9). Even cheating cannot reach 0.
- * The v0-only greedy CAN zero voice 0 (doubles at fire 5, not fire 7 where 881.5 puts them),
- * proving the period MATH is correct — but that same schedule worsens v1-v3, so no single
- * global whole-fire integer schedule zeroes all voices. Some fires need the period sampled at
- * a SUB-FIRE moment: the exact CIA-interrupt landing relative to the 1024-sample boundary,
- * quantized to UADE's event-scheduler cycle grid. That jitter lives in the C emulator, below
- * any TS accumulator knob. 98.1% is the ceiling of the constant-rate accumulator abstraction.
- *
- * Closing to 0 requires the NEXT abstraction level — a C-level spike instrumenting uade-3.05's
- * CIA-interrupt scheduler to emit the true sub-fire fire schedule (its own research+plan phase,
- * user-authorized separately). Hardcoding the oracle greedy schedule is FORBIDDEN (embeds the
- * answer = band-aid). Golden test stays describe.skip until a principled model hits 0.
+ * ── REMAINING GAP: ballblaser 5/316, note-CHANGE cells (NOT timing) ─────────────
+ * The schedule is song-INDEPENDENT (same di for both songs) so it can't be the cause:
+ * ballblaser's 5 are at note-change events — t12 v0 (dP=-5, a one-advance vibrato-phase
+ * glitch on the first tick after a note-onset) and t78/t79 v0+v3 (native fires the
+ * note-change ~2 buckets EARLY on both voices: acc jumps 2600→3000 while golden holds
+ * the old note). Both are GNN/tempo arithmetic gaps — the prime suspect is the ignored
+ * tempo control opcodes 0x8e (CIA tempo word) / 0x8d (tempo slide) in controlOpcode(),
+ * which would shift ballblaser's row-length near t78. gliders has no note changes on its
+ * held-note voices, so it never exercises this path. Golden test (both songs) stays
+ * describe.skip until ballblaser also reaches 0; gliders is locked by its own byte-exact
+ * regression (sunTronicGlidersTimeline.test.ts, in test:ci, fails-on-revert).
  *
  * Scope: this is the timing/period/volume-envelope machine. Actual waveform
  * synthesis (MEGAEFFECTS / the CALCn timbre generators) is Gate 1, already
@@ -101,7 +88,6 @@ interface SunPlayerVoice {
   position: number;     // $2e — sequence position index
   speed: number;        // $30 — ticks per note (module ticks)
   rowsPerPos: number;   // $31 — notes per position
-  rowSampleAcc: number; // two-clock reconciler: audio-samples accrued in the current row
 }
 
 /** One snapshot row of the tick timeline (what the p9a golden compares). */
@@ -126,9 +112,9 @@ export interface SunPlayerOptions {
    *  ≈ 882 (best golden fit 881.5). Exposed so the clock ratio is validated against
    *  the UADE golden, not hardcoded as a 5,5,5,6 table. */
   ciaTickSamples?: number;
-  /** start-of-song seed of the CIA accumulator, in samples (0..ciaTickSamples). Places
-   *  the double-vib / row phase; the golden-optimal value is small (0). Exposed for the
-   *  clock-ratio sweep — see tools/suntronic-re/probe-cia-sweep. */
+  /** IGNORED by the shipped double-position clock (kept only so the historical
+   *  constant-rate sweep probes under tools/suntronic-re/ still type-check). The
+   *  golden-optimal phase is 0 and is fixed. */
   rowPhaseSamples?: number;
   /** DIAGNOSTIC ONLY (not for production): force the CIA sub-tick count per fire from a
    *  measured schedule (subticks[tickIndex]) instead of the ciaTick accumulator. Used by
@@ -154,24 +140,25 @@ export class SunTronicPlayer {
   private readonly seqEndKind: 'restart' | 'stop';
   private readonly audioTick: number;
   private readonly ciaTick: number;
-  private readonly rowPhase: number;
   private readonly subtickSchedule: number[] | null;
   private tickIndex = 0;
-  /** two-clock reconciler: audio samples accrued toward the next CIA step. */
-  private clockAcc: number;
+  /** double-position clock: index of the next extra ("double") player-step. The k-th
+   *  extra step lands at bucket round(k*di), di = ciaTick/(audioTick-ciaTick). */
+  private doubleK = 1;
 
   constructor(score: SunV13Score, opts: SunPlayerOptions = {}) {
     this.audioTick = opts.audioTickSamples ?? 1024;
-    // 883.73 / phase 0 = joint golden-optimal of the constant-rate model over BOTH
-    // songs (probe-ratio-fine full grid: gliders 3, ballblaser 9 → 12/632 floor).
-    // The player-step clock is the emulated PAL vblank (~49.92 Hz → 44100/49.92 ≈
-    // 883.4 samples/frame), NOT an even 882 = 50 Hz. A single constant rate CANNOT
-    // reach 0 — the last 12 are UADE's exact per-frame integer-sample jitter, which
-    // needs the real vblank/CIA schedule read from uade-3.05 C (gated spike). This
-    // is the best constant-rate approximation, not a hardcoded oracle schedule.
-    this.ciaTick = opts.ciaTickSamples ?? 883.73;
-    this.rowPhase = opts.rowPhaseSamples ?? 0;
-    this.clockAcc = this.rowPhase;
+    // 882.759 = 1024*25/29 = the emulated PAL vblank fire period in samples (44100/
+    // 882.759 = 49.957 Hz). The player fires once per vblank; the golden latches once
+    // per audioTick (1024). The beat of the two clocks gives di = ciaTick/(audioTick-
+    // ciaTick) = 6.25 exactly (29 fires / 25 buckets) → an extra player-step lands at
+    // bucket round(k*6.25) = 6,13,19,25,31,38,44,50,… This DOUBLE-POSITION schedule is
+    // byte-exact on gliders (0/316, probe-measured-schedule --formula=882.759 --phase=0);
+    // ballblaser's residual 5 are note-CHANGE cells (t12,t78,t79), a separate GNN/tie
+    // arithmetic gap, NOT a timing miss (its schedule is identical — song-independent).
+    // NOT a hardcoded array: doubles are computed from the one fire-period constant.
+    // (A plain floor/round accumulator misplaces the first double by one bucket → 7/316.)
+    this.ciaTick = opts.ciaTickSamples ?? 882.759;
     this.subtickSchedule = opts.subtickSchedule ?? null;
     this.h1 = score.h1;
     this.synthTableOff = score.synthTableOff;
@@ -214,7 +201,6 @@ export class SunTronicPlayer {
         stagedSel: 0, transpose: entry ? s8(entry.transposes[ch]) : 0,
         vibPhase: 0, vibIndex: 0, envReload: 0, envCounter: 0, tie: 0, synthFlag: 0,
         tempoTick: 5, tempoNote: 0, position: 0, speed: 6, rowsPerPos: 0x10,
-        rowSampleAcc: this.rowPhase,
       });
     }
   }
@@ -460,21 +446,28 @@ export class SunTronicPlayer {
   }
 
   /** One timeline row = one audio-buffer bucket (audioTick, 1024 samples — the rate
-   * the UADE golden latches $20/$08 at). Two-clock reconciler: the player step runs
-   * on the faster CIA clock (ciaTick ≈ 882.76 samples), so 1–2 steps elapse per
-   * bucket (1024/882.76 ≈ 1.16). On a 2-step bucket the vibrato ($24) advances twice
-   * → the golden's "double" (measured 7,6,6,6 = 4 doubles/25 buckets, probe-player-
-   * period). The row cadence (~5.17 buckets, measured 5,5,5,5,6) emerges from the
-   * SAME ratio — tempo also runs on the CIA clock. Both fall out of one constant. */
+   * the UADE golden latches $20/$08 at). Double-position clock: one base player-step
+   * per bucket, plus an extra step at bucket round(k*di), di = ciaTick/(audioTick-
+   * ciaTick) = 6.25 (the beat of the 882.759-sample fire clock against the 1024-sample
+   * bucket). On a 2-step bucket the vibrato ($24) advances twice → the golden's "double"
+   * (measured 7,6,6,6 = 4 doubles/25 buckets). The row cadence (~5.17 buckets) emerges
+   * from the SAME single ratio — tempo counters also step per player-step. Byte-exact on
+   * gliders (0/316); no hardcoded table (see ctor header). */
   tick(): SunPlayerTick {
     if (this.subtickSchedule) {
       const n = this.subtickSchedule[this.tickIndex] ?? 1;
       for (let i = 0; i < n; i++) this.stepAll();
     } else {
-      this.clockAcc += this.audioTick;
-      while (this.clockAcc >= this.ciaTick) {
-        this.clockAcc -= this.ciaTick;
+      // Double-position clock: one base player-step per audio bucket, plus one extra
+      // step at bucket round(k*di), di = ciaTick/(audioTick-ciaTick) = the beat period
+      // of the two clocks. Reproduces UADE's exact fire schedule (gliders 0/316) with
+      // NO hardcoded table — the double buckets fall out of the single fire-period
+      // constant. A plain floor/round accumulator misplaces the first double (7/316).
+      this.stepAll();
+      const di = this.ciaTick / (this.audioTick - this.ciaTick);
+      if (this.tickIndex === Math.round(this.doubleK * di)) {
         this.stepAll();
+        this.doubleK += 1;
       }
     }
     this.tickIndex++;
