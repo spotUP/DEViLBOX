@@ -64,6 +64,7 @@ function noiseInstrument(waveWordLen: number): SunSynthInstrument {
     arpTable: new Int8Array([-1]),
     volEnv: new Int8Array([0x40]),
     vibDepth: new Int8Array([0]),
+    sampleData: new Int8Array(0), sampleZero: 0,
   };
 }
 

@@ -82,6 +82,7 @@ function smoothInstrument(f: Fixture): SunSynthInstrument {
     arpTable: new Int8Array([(f.arpD1 << 24) >> 24]),
     volEnv: new Int8Array([0x40]),
     vibDepth: new Int8Array([0]),
+    sampleData: new Int8Array(0), sampleZero: 0,
   };
 }
 

@@ -24,6 +24,7 @@ function inst(p: Partial<SunSynthInstrument> = {}): SunSynthInstrument {
     wave1Off: 0, wave2Off: 0, waveWordLen: 1, synthType: 0,
     wave1: new Int8Array(0), wave2: new Int8Array(0), arpTable: new Int8Array([0]),
     volEnv: new Int8Array([0x40]), vibDepth: new Int8Array([0]),
+    sampleData: new Int8Array(0), sampleZero: 0,
     ...p,
   };
 }

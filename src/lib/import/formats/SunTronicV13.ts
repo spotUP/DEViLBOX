@@ -532,6 +532,17 @@ export interface SunSynthInstrument {
   /** resolved waveform bytes (signed 8-bit, waveWordLen*2 each) */
   wave1: Int8Array;
   wave2: Int8Array;
+  /**
+   * Type-5 scannable sample window (handler @0x26f2e: play buffer =
+   * `*(record+0x1a) + 2*arp`, length record+0x22 words). Unlike types 0/2/3 the
+   * type-5 wave is a longer PCM sample the arp value scans as a byte offset, so
+   * `wave1` (the arp=0 window only) is insufficient. `sampleData` holds the full
+   * window covering every arp in this record's table; `sampleZero` is the byte
+   * index within it corresponding to arp=0 (>0 when negative arps reach back).
+   * Empty for non-type-5 records (wave1Off is packed params for type 6).
+   */
+  sampleData: Int8Array;
+  sampleZero: number;
   /** resolved interp/arp table bytes (signed 8-bit, arpLen entries) */
   arpTable: Int8Array;
   /** volume-envelope table bytes (record+0x00, volEnvLen entries; read unsigned) */
@@ -557,6 +568,23 @@ export function decodeSunSynthInstrument(h1: Uint8Array, recordOff: number): Sun
   const wave1Off = u32BE(h1, recordOff + 0x1a);
   const wave2Off = u32BE(h1, recordOff + 0x1e);
   const arpTableOff = u32BE(h1, recordOff + 0x12);
+  const synthType = h1[recordOff + 0x23] ?? 0;
+
+  // Type-5 scannable sample: window h1 from wave1Off covering every arp offset
+  // (2*arp bytes) this record's table can reach, plus the wwl*2 play window.
+  let sampleData = new Int8Array(0);
+  let sampleZero = 0;
+  if (synthType === 5 && wave1Off > 0 && wave1Off < h1.length) {
+    const arps = arpLen > 0 ? Array.from(sliceI8(arpTableOff, arpLen)) : [0];
+    const minArp = arps.length ? Math.min(...arps) : 0;
+    const maxArp = arps.length ? Math.max(...arps) : 0;
+    const byteLen = waveWordLen * 2;
+    const lo = Math.max(0, wave1Off + 2 * Math.min(0, minArp));
+    const hi = Math.min(h1.length, wave1Off + 2 * Math.max(0, maxArp) + byteLen);
+    sampleData = Int8Array.from(h1.subarray(lo, hi));
+    sampleZero = wave1Off - lo;
+  }
+
   return {
     recordOff,
     volEnvOff: u32BE(h1, recordOff + 0x00),
@@ -572,9 +600,11 @@ export function decodeSunSynthInstrument(h1: Uint8Array, recordOff: number): Sun
     wave1Off,
     wave2Off,
     waveWordLen,
-    synthType: h1[recordOff + 0x23] ?? 0,
+    synthType,
     wave1: sliceI8(wave1Off, waveWordLen * 2),
     wave2: sliceI8(wave2Off, waveWordLen * 2),
+    sampleData,
+    sampleZero,
     arpTable: sliceI8(arpTableOff, arpLen),
     // vol-env index (voice+0x10) runs 0..volEnvLen-1; vibrato-depth index
     // (voice+0x24) runs 0..freqEnvLen-1. Slice one extra byte as a bounds guard.
@@ -610,6 +640,8 @@ export function sunSynthToConfig(inst: SunSynthInstrument): SunTronicConfig {
     arpTable: Array.from(inst.arpTable),
     volEnv: Array.from(inst.volEnv),
     vibDepth: Array.from(inst.vibDepth),
+    sampleData: Array.from(inst.sampleData),
+    sampleZero: inst.sampleZero,
   };
 }
 
@@ -631,6 +663,8 @@ export function sunConfigToInstrument(cfg: SunTronicConfig): SunSynthInstrument 
     arpTable: Int8Array.from(cfg.arpTable),
     volEnv: Int8Array.from(cfg.volEnv),
     vibDepth: Int8Array.from(cfg.vibDepth),
+    sampleData: Int8Array.from(cfg.sampleData ?? []),
+    sampleZero: cfg.sampleZero ?? 0,
   };
 }
 
