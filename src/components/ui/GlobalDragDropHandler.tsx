@@ -11,7 +11,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { Upload } from 'lucide-react';
-import { getFormatExtensions, isSupportedFormat } from '@lib/import/FormatRegistry';
+import { getFormatExtensions, isSupportedFormat, isSupportedByHeader } from '@lib/import/FormatRegistry';
 import { getDevilboxAudioContext } from '@/utils/audio-context';
 
 interface GlobalDragDropHandlerProps {
@@ -48,6 +48,25 @@ function isSupportedFile(filename: string): boolean {
   if (SUPPORTED_EXTENSIONS.has(ext)) return true;
   // Also check prefix-based formats (e.g. sog.*, mcmd.*, hip.*)
   return isSupportedFormat(lower);
+}
+
+/**
+ * Pick the main song file from a drop. Name-based support first; then a header
+ * fallback for extensionless Amiga rips (SunTronic V1.3 "Delirium" songs ship as
+ * `newest_play`, `paradroid.final`, etc. — the name reveals nothing, the DELIRIUM
+ * magic is unambiguous). Reads only the header of each name-rejected candidate.
+ */
+async function pickMainFile(files: File[]): Promise<File | undefined> {
+  const byName = files.find((f) => isSupportedFile(f.name) && !isCompanionOnly(f.name));
+  if (byName) return byName;
+  for (const f of files) {
+    if (isCompanionOnly(f.name)) continue;
+    try {
+      const head = new Uint8Array(await f.slice(0, 0x200).arrayBuffer());
+      if (isSupportedByHeader(head)) return f;
+    } catch { /* unreadable candidate — skip */ }
+  }
+  return undefined;
 }
 
 // Sonix instrument (.instr / .ss) and tech-routine (.tech — FORM/MIDI/SampledSound/
@@ -160,7 +179,7 @@ export const GlobalDragDropHandler: React.FC<GlobalDragDropHandlerProps> = ({
       if ((hasFolder || isMultiFile) && onFolderLoadedRef.current) {
         const allFiles: File[] = (await Promise.all(entries.map(readFilesFromEntry))).flat();
         // Prefer a real module as main; companion-only files (.instr/.ss) can never be main.
-        const mainFile = allFiles.find(f => isSupportedFile(f.name) && !isCompanionOnly(f.name));
+        const mainFile = await pickMainFile(allFiles);
         if (mainFile) {
           const companions = allFiles.filter(f => f !== mainFile);
           try {
@@ -187,7 +206,7 @@ export const GlobalDragDropHandler: React.FC<GlobalDragDropHandlerProps> = ({
       if (files.length === 0) return;
 
       // A real module is the main file; .instr/.ss are Sonix companions only.
-      const file = files.find(f => isSupportedFile(f.name) && !isCompanionOnly(f.name));
+      const file = await pickMainFile(files);
       if (!file) {
         // No song file — but a lone Sonix instrument (.instr/.ss) goes to the bank.
         const instrOnly = files.filter(f => isCompanionOnly(f.name));
