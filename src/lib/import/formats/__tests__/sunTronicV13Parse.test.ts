@@ -143,6 +143,33 @@ describe('SunTronic V1.3 score decode (Delirium hunk executables)', () => {
     expect(again.synthType).toBe(s0.synthType);
   });
 
+  it('analgestic2.src: decodes the 0x1c sampled record env/vib front + slot/length/loop', () => {
+    // Gate D (plans/2026-07-16-suntronic-gateD-sampled-dma.md): the sampled
+    // record's front 0x00-0x11 is a synth-shaped env/vib block that the SHARED
+    // EFFECTS reads (DP_Suntronic.s: GNN8 @0x26a16 sets $14=0 → EFFECTS runs).
+    // Before Gate D the parser decoded only slot/length/loop, so a native
+    // sampled voice had no envelope to drive stepEffects → period/vol frozen →
+    // native silence. Fails on revert: without the env/vib front decode the
+    // volEnv slice is empty and freqEnv* are undefined.
+    const score = parseSunTronicV13Score(new Uint8Array(loadModule('analgestic2.src')));
+    expect(score.sampledInstruments.length).toBe(3);
+    expect(score.instrumentNames).toEqual(['perc1.x', 'perc2.x', 'bio']);
+
+    const [r0, , r2] = score.sampledInstruments;
+    // slot = instrumentNames order; length = companion file bytes / 2
+    expect(r0.slotIndex).toBe(0);
+    expect(r0.lengthWords).toBe(2362);   // perc1.x = 4724 bytes
+    expect(r0.loopLenWords).toBe(1);     // one-shot (2-byte silent loop tail)
+    expect(r2.slotIndex).toBe(2);
+    expect(r2.lengthWords).toBe(2938);   // bio = 5876 bytes
+    expect(r2.loopLenWords).toBe(2938);  // full loop
+
+    // env/vib front decoded (drives the SHARED EFFECTS for a sampled voice)
+    expect(r0.volEnvOff).toBeGreaterThan(0);
+    expect(r0.volEnv.length).toBe(r0.volEnvLen + 1);
+    expect(r0.vibDepth.length).toBe(r0.freqEnvLen + 1);
+  });
+
   for (const name of ['mule.src', 'kompo.pc']) {
     it(`${name}: layout carriers are HONEST — blockRawBytes equals the file slice and the encoder reproduces it`, () => {
       const buf = loadModule(name);
