@@ -220,6 +220,7 @@ void (async () => {
     import('../engine/hively/HivelyEngine').then(({ HivelyEngine }) => { _gainEngineCache.set('HivelyEngine', { Engine: HivelyEngine as unknown as GainEngine, maxCh: 16 }); }).catch(() => {}),
     import('../engine/klystrack/KlysEngine').then(({ KlysEngine }) => { _gainEngineCache.set('KlysEngine', { Engine: KlysEngine as unknown as GainEngine, maxCh: 32 }); }).catch(() => {}),
     import('../engine/cinter4/Cinter4Engine').then(({ Cinter4Engine }) => { _gainEngineCache.set('Cinter4Engine', { Engine: Cinter4Engine as unknown as GainEngine, maxCh: 4 }); }).catch(() => {}),
+    import('../engine/suntronic/SunTronicSongEngine').then(({ SunTronicSongEngine }) => { _gainEngineCache.set('SunTronicSongEngine', { Engine: SunTronicSongEngine as unknown as GainEngine, maxCh: 4 }); }).catch(() => {}),
 
     // ── Channel on/off engine ──────────────────────────────────────────────
     import('../engine/musicline/MusicLineEngine').then(({ MusicLineEngine }) => { _channelOnEngineCache.set('MusicLineEngine', { Engine: MusicLineEngine as unknown as ChannelOnEngine, maxCh: 8 }); }).catch(() => {}),

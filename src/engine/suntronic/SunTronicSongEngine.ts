@@ -21,7 +21,12 @@
 
 import { getDevilboxAudioContext } from '@/utils/audio-context';
 import { parseSunTronicV13Score, type SunV13Score } from '@/lib/import/formats/SunTronicV13';
-import { SunTronicNativeRenderer, NATIVE_SAMPLE_RATE } from './SunTronicNativeRender';
+import { SunTronicNativeRenderer, NATIVE_SAMPLE_RATE, type RenderChannels } from './SunTronicNativeRender';
+import { useOscilloscopeStore } from '@stores/useOscilloscopeStore';
+
+/** Per-channel scope window pushed to the visualizer (VU meters + scopes read
+ *  the same store). 256 = the store's documented per-channel length. */
+const SCOPE_SAMPLES = 256;
 
 /** Companion PCM sidecars, as delivered by the import dialog / project restore. */
 export type SunTronicCompanions =
@@ -70,6 +75,11 @@ export class SunTronicSongEngine {
   private score: SunV13Score | null = null;
   private slotPcm: (Int8Array | null)[] = [];
   private renderer: SunTronicNativeRenderer | null = null;
+
+  // Per-voice mixer gain (mute/solo/volume from useMixerStore, forwarded via the
+  // _gainEngineCache broadcast like Cinter4). Persisted here so a renderer rebuild
+  // (startFromTop) re-applies the user's current mute/solo state.
+  private readonly voiceGains = [1, 1, 1, 1];
 
   // Pump bookkeeping (44100-sample domain).
   private pump: ReturnType<typeof setInterval> | null = null;
@@ -156,6 +166,12 @@ export class SunTronicSongEngine {
     this.stopPump();
     this.workletNode.port.postMessage({ type: 'reset' });
     this.renderer = new SunTronicNativeRenderer(this.score, this.slotPcm);
+    // Re-apply the user's mute/solo/volume to the fresh renderer.
+    for (let ch = 0; ch < 4; ch++) this.renderer.setVoiceGain(ch, this.voiceGains[ch]);
+    // Wire the per-channel oscilloscope/VU visualizer (4 Paula voices), matching
+    // the display pan (voices 0,3 hard-left, 1,2 hard-right — the Paula law).
+    useOscilloscopeStore.getState().setChipInfo(
+      4, 0, ['SunTronic 0', 'SunTronic 1', 'SunTronic 2', 'SunTronic 3']);
     this.generated = 0;
     this.consumed = 0;
     // Prefill the lookahead so the ring has audio before transport starts.
@@ -169,10 +185,18 @@ export class SunTronicSongEngine {
   private produceUntilLookahead(): void {
     if (!this.renderer || !this.workletNode) return;
     let chunks = 0;
+    let lastCh: RenderChannels['ch'] | null = null;
     while (this.generated - this.consumed < LOOKAHEAD && chunks < MAX_CHUNKS_PER_PUMP) {
       const left = new Float32Array(CHUNK);
       const right = new Float32Array(CHUNK);
-      this.renderer.renderInto(left, right);
+      // Capture the per-voice mono buffers for the visualizer (fresh so inactive
+      // voices read 0). Cheap vs the render itself; only the LAST chunk is shown.
+      const ch: RenderChannels['ch'] = [
+        new Float32Array(CHUNK), new Float32Array(CHUNK),
+        new Float32Array(CHUNK), new Float32Array(CHUNK),
+      ];
+      this.renderer.renderInto(left, right, { ch });
+      lastCh = ch;
       this.workletNode.port.postMessage(
         { type: 'chunk', left, right },
         [left.buffer, right.buffer],
@@ -180,6 +204,33 @@ export class SunTronicSongEngine {
       this.generated += CHUNK;
       chunks++;
     }
+    // Push one scope window per pump tick (~40 ms → ~25 fps) — VU meters, track
+    // scopes, and channel visualizers all read useOscilloscopeStore.
+    if (lastCh) this.pushScope(lastCh);
+  }
+
+  /** Convert the first SCOPE_SAMPLES of each voice buffer to Int16 and publish. */
+  private pushScope(ch: RenderChannels['ch']): void {
+    const out: (Int16Array | null)[] = [];
+    for (let v = 0; v < 4; v++) {
+      const src = ch[v];
+      const dst = new Int16Array(SCOPE_SAMPLES);
+      for (let i = 0; i < SCOPE_SAMPLES; i++) {
+        const s = src[i];
+        dst[i] = s >= 1 ? 32767 : s <= -1 ? -32768 : Math.round(s * 32767);
+      }
+      out.push(dst);
+    }
+    useOscilloscopeStore.getState().updateChannelData(out);
+  }
+
+  /** Mixer forwarding (mute/solo/volume) — registered in useMixerStore's
+   *  _gainEngineCache like Cinter4. gain 0 = muted. Applies live to the current
+   *  renderer AND persists for the next renderer rebuild. */
+  setChannelGain(channel: number, gain: number): void {
+    if (channel < 0 || channel >= 4) return;
+    this.voiceGains[channel] = gain < 0 ? 0 : gain;
+    this.renderer?.setVoiceGain(channel, this.voiceGains[channel]);
   }
 
   private startPump(): void {
@@ -207,6 +258,7 @@ export class SunTronicSongEngine {
     this.renderer = null;
     this.generated = 0;
     this.consumed = 0;
+    useOscilloscopeStore.getState().clear();
   }
 
   pause(): void {

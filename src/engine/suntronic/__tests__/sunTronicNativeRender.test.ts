@@ -159,4 +159,58 @@ describe('SunTronic native render core', () => {
     }
     expect(off).toBe(ztotal);
   });
+
+  // Regression: per-voice mixer gain (mute/solo/volume). The native engine has no
+  // per-voice audio nodes — the whole song is one pre-mixed stereo buffer — so
+  // mute/solo/VU is only possible if the render core itself scales each Paula
+  // voice from the mixer state (setVoiceGain, forwarded from useMixerStore's
+  // _gainEngineCache like Cinter4). Two invariants pinned here, both fail on
+  // revert of the vUserGain path in renderInto:
+  //   (1) muting a voice (gain 0) zeroes that voice's scope tap AND drops its
+  //       energy from the correct stereo side (0,3 -> L; 1,2 -> R).
+  //   (2) default gain (1) leaves the mix BYTE-IDENTICAL to the oracle
+  //       renderSunTronicMix — the offline golden path must not move.
+  function renderWithGains(gains: [number, number, number, number]) {
+    const renderer = new SunTronicNativeRenderer(score, slotPcm);
+    for (let v = 0; v < 4; v++) renderer.setVoiceGain(v, gains[v]);
+    const ch = [0, 1, 2, 3].map(() => new Float32Array(total)) as
+      [Float32Array, Float32Array, Float32Array, Float32Array];
+    const left = new Float32Array(total);
+    const right = new Float32Array(total);
+    renderer.renderInto(left, right, { ch });
+    return { ch, left, right };
+  }
+  const energy = (b: Float32Array) => { let e = 0; for (const s of b) e += s * s; return e; };
+
+  it('default per-voice gain (1) is byte-identical to the oracle whole-song render', () => {
+    const whole = renderSunTronicMix(score, slotPcm, { seconds });
+    const g1 = renderWithGains([1, 1, 1, 1]);
+    for (let i = 0; i < total; i++) {
+      if (g1.left[i] !== whole.left[i] || g1.right[i] !== whole.right[i]) {
+        throw new Error(`unity-gain diverged from oracle at ${i}`);
+      }
+    }
+  });
+
+  it('muting a voice zeroes its scope tap and drops its energy from the correct stereo side', () => {
+    const base = renderWithGains([1, 1, 1, 1]);
+    // Pick an active voice on each stereo side: 0,3 -> L; 1,2 -> R.
+    const active = [0, 1, 2, 3].filter((v) => energy(base.ch[v]) > 0);
+    expect(active.length, 'need >=1 active voice to test muting').toBeGreaterThan(0);
+    for (const v of active) {
+      const gains: [number, number, number, number] = [1, 1, 1, 1];
+      gains[v] = 0;
+      const muted = renderWithGains(gains);
+      // Muted voice's scope tap is fully silent.
+      expect(energy(muted.ch[v]), `voice ${v} scope not silenced`).toBe(0);
+      // Its energy left the correct side; the opposite side is untouched.
+      const onLeft = v === 0 || v === 3;
+      const mixSide = onLeft ? energy(muted.left) : energy(muted.right);
+      const baseSide = onLeft ? energy(base.left) : energy(base.right);
+      const otherMix = onLeft ? energy(muted.right) : energy(muted.left);
+      const otherBase = onLeft ? energy(base.right) : energy(base.left);
+      expect(mixSide, `voice ${v} energy did not drop from its side`).toBeLessThan(baseSide);
+      expect(otherMix, `voice ${v} mute leaked to the other side`).toBeCloseTo(otherBase, 6);
+    }
+  });
 });
