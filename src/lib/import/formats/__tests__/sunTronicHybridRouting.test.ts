@@ -20,6 +20,8 @@ import { readFileSync } from 'fs';
 import { join } from 'path';
 import { parseSunTronicFile } from '@/lib/import/formats/SunTronicParser';
 import { withNativeThenUADE, type FallbackContext } from '@/lib/import/parsers/withFallback';
+import { tryRouteFormat } from '@/lib/import/parsers/AmigaFormatParsers';
+import type { FormatEnginePreferences } from '@/stores/useSettingsStore';
 
 function muleBuffer(): ArrayBuffer {
   const bytes = new Uint8Array(
@@ -63,5 +65,21 @@ describe('SunTronic V1.3 hybrid routing', () => {
     const synths = song.instruments.filter((i) => i.synthType === 'SunTronicSynth');
     expect(synths.length).toBeGreaterThan(0);
     expect(synths.every((s) => s.sunTronic?.sunTronic === 1)).toBe(true);
+  });
+
+  // Many V1.3 "Delirium" songs ship without a .src/.sun/.tsm/.pc extension
+  // (Lightforce, tank, paradroid.final, mule.10…). Routing must fall back to the
+  // DELIRIUM header magic so those still reach the native engine. Reverting the
+  // suntronicByHeader gate in tryRouteFormat routes an extensionless V13 file to
+  // null (no branch matches) and this fails.
+  it('routes an EXTENSIONLESS V1.3 song by header magic (no .src)', async () => {
+    const prefs = { suntronic: 'native' } as FormatEnginePreferences;
+    // Same bytes, no extension in the filename — the extension gate must miss.
+    const song = await tryRouteFormat(muleBuffer(), 'mule', 'mule', prefs, 0);
+    expect(song).toBeTruthy();
+    expect(
+      (song as unknown as { sunTronicSongFileData?: ArrayBuffer }).sunTronicSongFileData,
+    ).toBeTruthy();
+    expect(song!.instruments.some((i) => i.synthType === 'SunTronicSynth')).toBe(true);
   });
 });
