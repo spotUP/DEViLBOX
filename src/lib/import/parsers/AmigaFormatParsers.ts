@@ -2379,9 +2379,16 @@ export async function tryRouteFormat(
   // parser extracts sample data via 68k opcode scanning; UADE handles audio.
   // V1.3 Delirium hunk executables (.src/.pc): real score decode with
   // blockRows/blockRawBytes carriers + instr/*.x sample sidecars (companions).
-  if (matchesExt(filename, ['sun', 'tsm', 'src', 'pc'])) {
+  // Header fallback: many V1.3 "Delirium" songs ship WITHOUT a recognised
+  // extension (Lightforce, tank, paradroid.final, mule.10, suntronic-mega…).
+  // The DELIRIUM hunk magic is unambiguous — across the 199-file corpus every
+  // real song matches and no non-song does — so route by content when the
+  // extension gate misses. Raw .sun/.tsm rips still route purely by extension.
+  const { isSunTronicV13Format } = await import('@lib/import/formats/SunTronicV13');
+  const suntronicByExt = matchesExt(filename, ['sun', 'tsm', 'src', 'pc']);
+  const suntronicByHeader = !suntronicByExt && isSunTronicV13Format(new Uint8Array(buffer));
+  if (suntronicByExt || suntronicByHeader) {
     const { isSunTronicFormat, parseSunTronicFile } = await import('@lib/import/formats/SunTronicParser');
-    const { isSunTronicV13Format } = await import('@lib/import/formats/SunTronicV13');
     // Native browser playback (Gate B.2): only for V1.3 "Delirium" score
     // executables (the byte-exact native player supports these; raw .sun/.tsm
     // rips are not V1.3 and stay on UADE), and only when the user opted into
