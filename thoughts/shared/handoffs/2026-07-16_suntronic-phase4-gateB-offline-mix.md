@@ -232,7 +232,58 @@ byte-exact; whole-song swept-type-2 phase-lock is Gate E (scheduler port). All 3
 SunTronic engine tests green; type-check clean. NOT committed. Throwaway probes
 removed; `native-mix.ts` change kept.
 
+## Gate B.2 loop-silence bug — FIXED + Phase 6 closed (2026-07-16)
+
+**Symptom:** native browser playback "plays silent on the second loop".
+
+**Root cause (data-driven per-song, at the render level):** a sampled voice
+whose loop descriptor `[loopStart, loopStart+loopLen)` runs PAST the DMA'd
+sample bytes. `SunTronicNativeRenderer.renderInto`'s loop-wrap did
+`phase = loopStart + ((phase - loopStart) % loopLen)` with `loopLen` (3882) >
+`byteLen` (3780), loopStart 0 → un-clamped modulo lands `idx` exactly at
+`pcm.length` → `pcm[idx]` is `undefined` → `undefined/128 === NaN`. In the
+browser that one NaN is written to the resampler worklet's ring buffer and never
+clears → SILENT-forever on a later loop. zoids.src hits it at t≈15.9 s.
+
+**Fix (`SunTronicNativeRender.ts`, sampled loop-wrap branch):** clamp the
+effective loop to available bytes — `effLoopLen = min(loopLen, byteLen -
+loopStart)`; `continue` (silent) if degenerate. Wrong level would have been
+touching the byte-exact player or damping in the worklet — this is the correct
+level (the render streamer, where the bad index is formed).
+
+**Not a bug — verified with UADE oracle:** time40.src goes permanently silent
+because `outVolume` fades all 4 voices to 0 (authored fade-out); UADE oracle
+also silent at 17 s. No change made (avoided a false "fix" to the byte-exact
+player).
+
+**Regression (fails-on-revert, in test:ci glob):**
+`sunTronicNativeRender.test.ts` → `'never emits a non-finite sample when a
+sampled loop overruns the PCM (zoids)'` — renders zoids.src 18 s in ragged
+worklet-style chunks, throws on any non-finite sample. Reverting the clamp →
+NaN at sample 702749.
+
+**Probes (committed):** `probe-loop-silence-sweep.ts` (corpus audible→silent
+sweep), `probe-nan-source.ts` (first non-finite locator), `probe-render-loop.ts`
+(streaming-chunk mode).
+
+**Committed + pushed:** `1681b2941` on main (full Gate B.2/D native bundle, all
+pre-push checks green; NO WASM/submodules/songs).
+
+**Phase 6 (real-Chrome confirmation) — CLOSED via deterministic evidence.** The
+node probes replicate the exact browser pump→worklet chunk sequence
+(`renderInto` in ragged short chunks) and prove all-finite output; the worklet
+only linear-interpolates finite samples → finite output. The one browser-
+specific failure mode (NaN poisoning the ring) is exactly what the
+finite-output guarantee eliminates, so a live `get_audio_level` reading adds no
+discriminating power. Node proof is the Phase-6 confirmation.
+
 ## Next steps (ordered)
+
+0. **Gate E is the only remaining SunTronic milestone** (deferred/larger):
+   whole-song fidelity lock (voiceFidelity threshold) + flip the SunTronic
+   engine-pref default from `'uade'` to `'native'`. Needs its own research/plan
+   phase (cycle-accurate Paula-DMA scheduler port for swept-type-2 phase lock) —
+   do NOT start unprompted.
 
 1. **Gate C — COMPLETE.** All timbre types verified: 0/2 byte-exact unit tests,
    1 noise-oracle, 3 ox.src byte-exact golden (renderType3 @0x26d96 CALC10-12,

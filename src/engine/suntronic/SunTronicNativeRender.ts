@@ -48,7 +48,6 @@ import { PAULA_CLOCK_PAL } from './SunTronicVoiceRenderer';
 
 /** The fixed native render rate — the golden timeline is calibrated here. */
 export const NATIVE_SAMPLE_RATE = 44100;
-const BUCKET = 1024; // audioTick samples per player tick (calibrated at 44100)
 const MAX_VOLUME = 0x40;
 // Emulated PAL vblank period in samples (1024*25/29 = 882.759). MEGAEFFECTS
 // regenerates every voice's play buffer ONCE per vblank (~50 Hz), NOT once per
@@ -107,10 +106,11 @@ export class SunTronicNativeRenderer {
   private readonly prng = createPrng(); // shared workspace rndnum across voices
   private readonly vr: VoiceRender[];
 
-  // Absolute sample position (44100 grid) — drives the bucket + vblank clocks.
+  // Absolute sample position (44100 grid) — drives the vblank clock. The player
+  // is stepped once per vblank (pos=0 fires the first step: nextVblank starts 0).
   private pos = 0;
-  private nextVblank = VBLANK;
-  private buckets = 0;
+  private nextVblank = 0;
+  private buckets = 0; // count of vblank steps (== player stepAll calls)
   private readonly offCount: Array<Map<number, number>>;
   private readonly activeCount = [0, 0, 0, 0];
 
@@ -141,12 +141,14 @@ export class SunTronicNativeRenderer {
   }
 
   /**
-   * Refresh the per-bucket voice state from one player tick. Called at every
-   * 1024-sample boundary (the golden clock resolves note/period/volume at bucket
-   * granularity — constant across the bucket).
+   * Refresh the per-voice state from one physical PAL-vblank player step. Called
+   * on the 882.759-sample vblank grid (NOT the 1024 audio bucket) so Paula period
+   * ($20) + vibrato ($24) updates — and therefore the resampler increment vInc —
+   * land at vblank granularity, matching UADE. The old 1024-bucket refresh ran a
+   * stale period for up to ~142 samples/bucket → whole-song sample-phase drift.
    */
-  private deriveBucket(): void {
-    const tick = this.player.tick();
+  private deriveVblank(): void {
+    const tick = this.player.stepVblank();
     this.buckets++;
     for (let v = 0; v < 4; v++) {
       const vd = tick.voices[v];
@@ -202,9 +204,13 @@ export class SunTronicNativeRenderer {
     const count = left.length;
     const ch = chans?.ch;
     for (let i = 0; i < count; i++) {
-      if (this.pos % BUCKET === 0) this.deriveBucket();
+      // Single clock: step the player + refresh period/volume/instrument state
+      // on the vblank grid, then regen synth timbre for the same step below.
       const vblankNow = this.pos >= this.nextVblank;
-      if (vblankNow) this.nextVblank += VBLANK;
+      if (vblankNow) {
+        this.nextVblank += VBLANK;
+        this.deriveVblank();
+      }
 
       let s0 = 0, s1 = 0, s2 = 0, s3 = 0;
       for (let v = 0; v < 4; v++) {

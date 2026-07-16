@@ -86,6 +86,7 @@ export const FILE_DATA_FIELDS = [
   'symphonieFileData',
   'v2mFileData',
   'uadeEditableFileData',
+  'sunTronicSongFileData',    // SunTronic V1.3 native-engine module bytes
   'maxTraxFileData',
   'adplugFileData',
   'tfmxFileData',

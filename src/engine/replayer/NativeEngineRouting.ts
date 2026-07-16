@@ -812,6 +812,26 @@ const WASM_ENGINES: NativeEngineDescriptor[] = [
     dynamicResolver: async () => (await import('@/engine/sonic-arranger/SonicArrangerEngine')).SonicArrangerEngine as unknown as WASMSingletonStatic,
   },
   {
+    key: 'SunTronicSong',
+    // MUST precede UADEEditable: both are formats:null wildcards and the dispatch
+    // loop keeps only the FIRST wildcard that activates (skips later ones once one
+    // engine started). sunTronicSongFileData is attached ONLY when the user picks
+    // the 'native' engine pref, so ordering it first makes native win over the
+    // generic UADE-editable fallback for exactly those songs. Default pref leaves
+    // the key unset → this descriptor is inert → UADEEditable still handles the song.
+    synthType: 'SunTronicSongSynth',
+    suppressNotes: true,
+    fileDataKey: 'sunTronicSongFileData',
+    formats: null,
+    loadMethod: 'loadTune',
+    getLoadArgs: (song) => [song.sunTronicCompanionPcm ?? []],
+    supportsPause: false,
+    supportsResume: false,
+    needsDirectRouting: true,
+    staticRef: null,
+    dynamicResolver: async () => (await import('@/engine/suntronic/SunTronicSongEngine')).SunTronicSongEngine as unknown as WASMSingletonStatic,
+  },
+  {
     key: 'UADEEditable',
     synthType: 'UADEEditableSynth',
     suppressNotes: true,
@@ -854,24 +874,6 @@ const WASM_ENGINES: NativeEngineDescriptor[] = [
     needsDirectRouting: true,
     staticRef: null,
     dynamicResolver: async () => (await import('@/engine/v2m/V2MEngine')).V2MEngine as unknown as WASMSingletonStatic,
-  },
-  {
-    key: 'SunTronicSong',
-    synthType: 'SunTronicSongSynth',
-    suppressNotes: true,
-    // Attached ONLY by SunTronicParser when the engine pref is 'native' (Gate B.2).
-    // Default pref keeps this unset so SunTronic plays via UADE. Whenever it is
-    // present, the native byte-exact player + Paula render + resampler worklet
-    // drive audio directly (no UADE at runtime).
-    fileDataKey: 'sunTronicSongFileData',
-    formats: null,
-    loadMethod: 'loadTune',
-    getLoadArgs: (song) => [song.sunTronicCompanionPcm ?? []],
-    supportsPause: false,
-    supportsResume: false,
-    needsDirectRouting: true,
-    staticRef: null,
-    dynamicResolver: async () => (await import('@/engine/suntronic/SunTronicSongEngine')).SunTronicSongEngine as unknown as WASMSingletonStatic,
   },
 ];
 

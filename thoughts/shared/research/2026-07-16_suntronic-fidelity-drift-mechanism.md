@@ -1,0 +1,161 @@
+---
+date: 2026-07-16
+topic: suntronic-fidelity-drift-mechanism
+tags: [suntronic, gate-e, fidelity, paula, resampler, phase-drift]
+status: final
+---
+
+# SunTronic Gate E — the whole-song fidelity drift is resampler period-update granularity, NOT the 0/0 control-timeline scheduler port
+
+## Why this doc exists
+
+Gate E (whole-song native fidelity lock + default engine-pref flip `uade`→`native`)
+was framed as blocked on "the cycle-accurate Paula-DMA scheduler port". Corpus
+fidelity measurement + a 3-way code/RE investigation shows that framing conflates
+**two independent problems**. The one that actually gates the flip is smaller and
+different from the deferred 0/0 port.
+
+## Measurement that started this (probe-corpus-fidelity.ts)
+
+Windowed best-lag correlation (native vs UADE per-voice oracle), maxLag 640,
+6 s window, 8-song smoke:
+
+- 0/8 flip-ready (minFid ≥ 0.90).
+- Weakest active-voice fidelity dominated by phase, not timbre.
+
+Decisive discriminator — escalate maxLag on analgestic2 (Gate-C byte-exact golden):
+
+```
+v0  maxLag[640 1500 3000 6000 12000] = 0.69  0.74  0.82  0.82  0.85
+v2  maxLag[640 1500 3000 6000 12000] = 0.07  0.13  0.20  0.18  0.23
+v3  maxLag[640 1500 3000 6000 12000] = 0.69  0.75  0.82  0.83  0.84
+```
+
+- **v0/v3 (synth voices): monotonic lift → phase drift, timbre correct.**
+- **v2 (sampled voice): no recovery → genuine content mismatch (separate — see §5).**
+
+## Three clocks — do not conflate them
+
+| Clock | Rate | What it drives | Status |
+|---|---|---|---|
+| Golden/position latch ("bucket") | **exactly 1024 samples** (measured: gliders 661/661, ballblaser 330/330 inter-fire gaps = 1024) | note/position/instrument reads, per-bucket latched voice state | shipped byte-exact |
+| EFFECTS/vibrato ("vblank") | **~880.57 samples** (~50 Hz; `VBLANK = 1024*25/29 = 882.759`) | `$20` period + `$24` vibrato advances *within* a bucket via the double-position clock | shipped, 1/632 residual on the discrete timeline |
+| Paula audio resampler phase | continuous, `inc = PAULA_CLOCK_PAL / period / 44100` | per-voice waveform read pointer → the actual audio samples | **drifts — this doc** |
+
+The 2026-07-15 CIA-jitter hypothesis was **falsified**: UADE's note-handler fires
+on a constant 1024-sample grid, no sub-sample jitter
+(`thoughts/shared/research/2026-07-15_uade-cia-scheduler.md` §9 CORRECTION,
+`probe-fullsong-fires.ts`).
+
+## The fidelity drift mechanism (root cause)
+
+`SunTronicNativeRender.ts`:
+
+- `deriveBucket()` (line 148) calls `player.tick()` **once per 1024-sample bucket**
+  and sets `this.vInc[v] = PAULA_CLOCK_PAL / vd.period / NATIVE_SAMPLE_RATE`
+  (line 177) from the **bucket-latched** period.
+- `renderInto` (line 205) recomputes nothing about period between bucket
+  boundaries. `vInc[v]` is held constant for all 1024 samples of the bucket.
+- But UADE/Paula changes period on the **~880-sample vblank cadence** (the
+  EFFECTS/vibrato clock), i.e. **mid-bucket**. The player already computes those
+  sub-bucket vibrato advances internally (double-position clock), but `tick()`
+  exposes only the final bucket-latched period.
+
+Consequence: for any voice whose period moves under vibrato/`$20`, the native
+resampler advances its read phase with a **stale period for up to ~142 samples per
+bucket**, and the error accumulates as whole-song sample-phase drift. This exactly
+predicts the observed pattern:
+
+- **gliders** (static arp/period): no mid-bucket period change → no drift →
+  byte-exact.
+- **ballblaser / analgestic2 synth voices** (sweeping vibrato): mid-bucket period
+  changes never applied until the next bucket → monotonic phase drift, recoverable
+  only by widening maxLag.
+
+This is the correct **level**: the mismatch is in the **resampler's period-update
+granularity** (bucket vs vblank), not in the byte-exact player, not in the timbre
+kernels (Gate C, byte-exact golden), and not maskable in the worklet.
+
+## Why this is NOT the deferred 0/0 scheduler port
+
+The authorized "cycle-accurate scheduler port" (handoff
+`2026-07-15_suntronic-gate2-scheduler-port-authorized.md`) chases the last
+**1/632 discrete-event residual** on the *control timeline* — the exact bucket at
+which vibrato double-steps (gliders wants it at bucket 13, ballblaser at 12; one
+deterministic constant can't satisfy both). Its audio-DMA hypothesis is about
+*which interrupt drives the note clock*.
+
+That work removes a single mis-timed cell in the discrete event stream. It does
+**not** touch the resampler's period-update granularity, so it will **not** move
+the fidelity numbers. The fidelity gate and the 0/0 gate are orthogonal:
+
+- Fidelity flip gate → **resampler applies period on the vblank sub-grid** (this doc).
+- 0/0 timeline gate → last 1/632 double-position constant (deferred, separate).
+
+## Proposed fix abstraction (for the plan, not yet built)
+
+Make the resampler update `vInc[v]` on the **vblank sub-grid** using the player's
+**per-vblank** period, instead of once per 1024 bucket.
+
+Dependency: `player.tick()` must expose the per-voice period **trajectory within a
+bucket** (the sequence of period values at each vblank advance the double-position
+clock already computes), e.g. return per voice an ordered list
+`{ sampleOffsetInBucket, period }[]`. `renderInto` then re-derives `vInc[v]` when
+`pos` crosses each sub-event offset (it already computes `vblankNow` at line 206).
+
+Two sub-questions the plan must answer:
+1. Does the double-position clock's internal vibrato advance already produce the
+   exact per-vblank period UADE writes, or only the bucket-latched endpoint? (Read
+   `SunTronicPlayer.ts` tick()/stepAll() lines 487–555.)
+2. Sampled voices (type-B) also read at a period-driven rate — same fix applies to
+   their `vInc`.
+
+## Decisive experiment (run FIRST in the plan, before the real port)
+
+Cheap validation that period-update granularity is the whole story:
+
+1. In a **probe** (not production), render ballblaser/analgestic2 with `vInc`
+   recomputed at every vblank from a **linearly-interpolated** period between
+   consecutive bucket-latched periods (crude stand-in for the true per-vblank
+   value).
+2. Re-measure `voiceFidelity` at maxLag 640.
+3. **Predicted:** ballblaser v0/v3 and analgestic2 v0/v3 jump substantially at
+   maxLag 640 (drift shrinks below the window). If they do, the mechanism is
+   confirmed and the real fix (exact per-vblank period) does at least as well.
+   If they don't, phase drift has another source and the plan reassesses.
+
+## Sampled-voice mismatch (v2) — separate residual (§5)
+
+analgestic2 v2 (sampled slot) does **not** recover with maxLag (0.07→0.23). That is
+content, not phase. Candidates: native sampled resampler wrong, or the oracle's
+per-voice isolation for that channel (memory: "oracle muddled"). The UADE-oracle
+investigation found the per-channel capture is clean at the WASM boundary
+(`_uade_wasm_read_channel_samples` samples each Paula channel independently), so the
+mismatch is more likely native-side sampled render. Track as Gate-D whole-song lock,
+**after** the synth-voice phase clock is trustworthy (can't judge a sampled voice's
+phase while the reference synth voices are drifting).
+
+## Key constants (verbatim, for the plan)
+
+- `PAULA_CLOCK_PAL = 3546895` (SunTronicVoiceRenderer.ts:40)
+- `NATIVE_SAMPLE_RATE = 44100`, `BUCKET = 1024`, `VBLANK = 1024*25/29 = 882.759`
+- resampler inc: `PAULA_CLOCK_PAL / period / 44100` (SunTronicNativeRender.ts:177)
+- UADE Paula phaseInc reference: `PAL_CLOCK / (2 * period * sampleRate)`
+- double-position ratio `di = 882.759/(1024-882.759) = 6.25`; doubles at
+  `round(k*6.25)` buckets
+- per-song vblank phase φ_v: gliders 355, ballblaser 881 samples (init-cycle state,
+  not yet score-derivable — only matters for the 0/0 timeline gate, not fidelity)
+
+## Artifacts
+
+- `tools/suntronic-re/probe-corpus-fidelity.ts` — corpus fidelity buckets (new, uncommitted).
+- `tools/suntronic-re/native-mix.ts` — `voiceFidelity` windowed best-lag metric.
+- `tools/suntronic-re/audio-oracle.ts` — `renderUADEPerVoice` (ground truth).
+- `src/engine/suntronic/SunTronicNativeRender.ts` — the resampler to fix.
+- `src/engine/suntronic/SunTronicPlayer.ts` — double-position clock (must expose sub-bucket period).
+
+## Next step
+
+Run the decisive experiment (interpolated per-vblank period probe). If confirmed,
+write the plan: expose per-vblank period from the player → resampler applies it on
+the vblank sub-grid → re-measure corpus fidelity → set flip threshold + regression.
