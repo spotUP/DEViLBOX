@@ -16,6 +16,7 @@ import { useUIStore } from '../../stores/useUIStore';
 import { useAudioStore } from '../../stores/useAudioStore';
 import { useMixerStore } from '../../stores/useMixerStore';
 import { useHistoryStore } from '../../stores/useHistoryStore';
+import { useSettingsStore } from '../../stores/useSettingsStore';
 import { useProjectStore } from '../../stores/useProjectStore';
 import { useOscilloscopeStore } from '../../stores/useOscilloscopeStore';
 import { useInstrumentTypeStore } from '../../stores/useInstrumentTypeStore';
@@ -771,6 +772,7 @@ export function getFormatState(): Record<string, unknown> {
     sidMetadata: format.sidMetadata,
     hasOriginalModuleData: !!format.originalModuleData,
     originalModuleFormat: format.originalModuleData?.format ?? null,
+    sunTronicEnginePref: useSettingsStore.getState().formatEngine.suntronic,
     // Which WASM engine file data is loaded
     loadedWasmEngines: [
       format.hivelyFileData && 'hively',

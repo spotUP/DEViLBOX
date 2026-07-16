@@ -179,6 +179,27 @@ describe('NativeEngineRouting.WASM_ENGINES — structural contract', () => {
     expect(missing, `engines missing loader: ${JSON.stringify(missing)}`).toEqual([]);
   });
 
+  it('SunTronicSong wildcard precedes UADEEditable — native pref wins over UADE fallback', () => {
+    // Regression: a SunTronic V1.3 song parsed with the 'native' engine pref
+    // carries BOTH sunTronicSongFileData AND uadeEditableFileData (the editable
+    // grid always attaches the latter). Both descriptors are formats:null
+    // wildcards, and the dispatch loop keeps only the FIRST wildcard that
+    // activates (later wildcards are skipped once one engine started). So
+    // SunTronicSong MUST come before UADEEditable — otherwise UADE-editable
+    // claims the song, the native engine never runs, and playback goes silent
+    // ~3s in (the UADE audio.device drain-out) with no native audio at all.
+    const sunIdx = descriptors.findIndex(d => d.key === 'SunTronicSong');
+    const uadeIdx = descriptors.findIndex(d => d.key === 'UADEEditable');
+    expect(sunIdx, 'SunTronicSong descriptor present').toBeGreaterThanOrEqual(0);
+    expect(uadeIdx, 'UADEEditable descriptor present').toBeGreaterThanOrEqual(0);
+    expect(descriptors[sunIdx].formats, 'SunTronicSong is a wildcard').toBe('null');
+    expect(descriptors[uadeIdx].formats, 'UADEEditable is a wildcard').toBe('null');
+    expect(
+      sunIdx,
+      'SunTronicSong must be ordered before UADEEditable in WASM_ENGINES',
+    ).toBeLessThan(uadeIdx);
+  });
+
   it('every fileDataKey appears as a property on TrackerSong', () => {
     const missing: Array<{ engine: string; key: string }> = [];
     for (const d of descriptors) {

@@ -28,7 +28,7 @@ export const usePatternPlayback = () => {
     currentPositionIndex: s.currentPositionIndex,
     setCurrentPosition: s.setCurrentPosition,
     })));
-  const { channelTrackTables, channelSpeeds, channelGrooves, hivelyNative, hivelyFileData, hivelyMeta, musiclineFileData, c64SidFileData, c64MemPatches, cheeseCutterFileData, jamCrackerFileData, futurePlayerFileData, preTrackerFileData, maFileData, hippelFileData, sonixFileData, pxtoneFileData, organyaFileData, sawteethFileData, eupFileData, ixsFileData, psycleFileData, sc68FileData, zxtuneFileData, pumaTrackerFileData, steveTurnerFileData, sidmon1WasmFileData, fredEditorWasmFileData, artOfNoiseFileData, cinter4FileData, cinter4RawData, fmplayerFileData, qsfFileData, bdFileData, sd2FileData, symphonieFileData, v2mFileData, sonicArrangerFileData, soundMonFileData, digMugFileData, davidWhittakerFileData, soundControlFileData, deltaMusic1FileData, deltaMusic2FileData, soundFxFileData, gmcFileData, voodooFileData, fredReplayerFileData, oktalyzerFileData, futureComposerFileData, quadraComposerFileData, ronKlarenFileData, actionamicsFileData, activisionProFileData, synthesisFileData, dssFileData, soundFactoryFileData, faceTheMusicFileData, klysFileData, maxTraxFileData, uadeEditableFileData, uadePatternLayout, nativeSamplePlayback, adplugFileData, adplugFileName, adplugTicksPerRow, libopenmptFileData, tfmxFileData, tfmxSmplData, furnaceNative, furnaceActiveSubsong, tfmxTimingTable, sonixSidecarFiles } = useFormatStore(useShallow((s) => ({
+  const { channelTrackTables, channelSpeeds, channelGrooves, hivelyNative, hivelyFileData, hivelyMeta, musiclineFileData, c64SidFileData, c64MemPatches, cheeseCutterFileData, jamCrackerFileData, futurePlayerFileData, preTrackerFileData, maFileData, hippelFileData, sonixFileData, pxtoneFileData, organyaFileData, sawteethFileData, eupFileData, ixsFileData, psycleFileData, sc68FileData, zxtuneFileData, pumaTrackerFileData, steveTurnerFileData, sidmon1WasmFileData, fredEditorWasmFileData, artOfNoiseFileData, cinter4FileData, cinter4RawData, fmplayerFileData, qsfFileData, bdFileData, sd2FileData, symphonieFileData, v2mFileData, sonicArrangerFileData, soundMonFileData, digMugFileData, davidWhittakerFileData, soundControlFileData, deltaMusic1FileData, deltaMusic2FileData, soundFxFileData, gmcFileData, voodooFileData, fredReplayerFileData, oktalyzerFileData, futureComposerFileData, quadraComposerFileData, ronKlarenFileData, actionamicsFileData, activisionProFileData, synthesisFileData, dssFileData, soundFactoryFileData, faceTheMusicFileData, klysFileData, maxTraxFileData, uadeEditableFileData, uadePatternLayout, nativeSamplePlayback, adplugFileData, adplugFileName, adplugTicksPerRow, libopenmptFileData, tfmxFileData, tfmxSmplData, furnaceNative, furnaceActiveSubsong, tfmxTimingTable, sonixSidecarFiles, sunTronicSongFileData, sunTronicCompanionPcm } = useFormatStore(useShallow((s) => ({
     channelTrackTables: s.channelTrackTables,
     channelSpeeds: s.channelSpeeds,
     channelGrooves: s.channelGrooves,
@@ -91,6 +91,8 @@ export const usePatternPlayback = () => {
     klysFileData: s.klysFileData,
     maxTraxFileData: s.maxTraxFileData,
     uadeEditableFileData: s.uadeEditableFileData,
+    sunTronicSongFileData: s.sunTronicSongFileData,
+    sunTronicCompanionPcm: s.sunTronicCompanionPcm,
     uadePatternLayout: s.uadePatternLayout,
     nativeSamplePlayback: s.nativeSamplePlayback,
     adplugFileData: s.adplugFileData,
@@ -577,6 +579,8 @@ export const usePatternPlayback = () => {
           klysFileData: klysFileData ?? undefined,
           maxTraxFileData: resolveMaxTraxLoadBytes(useFormatStore.getState().maxTraxData, maxTraxFileData),
           uadeEditableFileData: uadeEditableFileData ?? undefined,
+          sunTronicSongFileData: sunTronicSongFileData ?? undefined,
+          sunTronicCompanionPcm: sunTronicCompanionPcm ?? undefined,
           uadePatternLayout: uadePatternLayout ?? undefined,
           nativeSamplePlayback: nativeSamplePlayback ?? undefined,
           v2mFileData: v2mFileData ?? undefined,
