@@ -624,6 +624,17 @@ export async function loadFile(
       return await loadAudioSample(file);
     }
 
+    // Content fallback: extensionless Amiga song rips (SunTronic V1.3 "Delirium"
+    // songs like `newest_play`, `paradroid.final`) reveal nothing by name. Sniff
+    // the header before giving up — the DELIRIUM magic is unambiguous.
+    try {
+      const buf = await file.arrayBuffer();
+      const { isSupportedByHeader } = await import('../import/FormatRegistry');
+      if (isSupportedByHeader(new Uint8Array(buf))) {
+        return await loadSongFile(file, options, buf);
+      }
+    } catch { /* fall through to unsupported */ }
+
     return { success: false, error: `Unsupported file format: ${file.name}` };
 
   } catch (error) {
