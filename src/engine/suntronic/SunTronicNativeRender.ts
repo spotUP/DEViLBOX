@@ -50,6 +50,21 @@ import { PAULA_CLOCK_PAL } from './SunTronicVoiceRenderer';
 export const NATIVE_SAMPLE_RATE = 44100;
 const BUCKET = 1024; // audioTick samples per player tick (calibrated at 44100)
 const MAX_VOLUME = 0x40;
+
+/**
+ * Paula per-voice output sample, matching UADE's audio.c exactly:
+ *   output = current_sample * vol   (audio.c:267)
+ *   float  = output / 32768         (uade_audio_read_channel_samples scale)
+ * `byte` is the signed-8-bit chip sample (-128..127), `vol` the Paula linear
+ * volume (0..64). Full scale = 128*64/32768 = 0.25 — the true single-channel
+ * ceiling. The earlier `(byte/128)*(vol/64)` normalizer divided by 8192 instead
+ * of 32768, making every native voice 4x too loud (railing to ~1.0 and clipping
+ * the 4-voice mix). This is the single source of truth for voice scaling.
+ */
+export function paulaVoiceSample(byte: number, vol: number): number {
+  return (byte * vol) / 32768;
+}
+
 // Emulated PAL vblank period in samples (1024*25/29 = 882.759). MEGAEFFECTS
 // regenerates every voice's play buffer ONCE per vblank (~50 Hz), NOT once per
 // 1024 output bucket — for a swept-arp timbre (type-2 splice whose D1=arp
@@ -183,7 +198,7 @@ export class SunTronicNativeRenderer {
       }
 
       this.vInc[v] = vd.period > 0 ? PAULA_CLOCK_PAL / vd.period / NATIVE_SAMPLE_RATE : 0;
-      this.vGain[v] = Math.min(1, (vd.outVolume & 0xff) / MAX_VOLUME);
+      this.vGain[v] = Math.min(MAX_VOLUME, vd.outVolume & 0xff); // Paula linear vol 0..64
 
       if (sampled) {
         // Paula streams the whole PCM once, then loops [loopStart, +loopLen].
@@ -248,7 +263,7 @@ export class SunTronicNativeRenderer {
             }
           }
           const idx = Math.floor(phase);
-          sample = (pcm[idx] / 128) * this.vGain[v];
+          sample = paulaVoiceSample(pcm[idx], this.vGain[v]);
           r.phase = phase + this.vInc[v];
         } else {
           // ── Synth (type-A): regenerate the play buffer on each vblank (advances
@@ -261,7 +276,7 @@ export class SunTronicNativeRenderer {
           if (byteLen <= 0) continue;
           let phase = r.phase;
           const idx = Math.floor(phase) % byteLen;
-          sample = (buf[idx] / 128) * this.vGain[v];
+          sample = paulaVoiceSample(buf[idx], this.vGain[v]);
           phase += this.vInc[v];
           if (phase >= byteLen) phase -= byteLen * Math.floor(phase / byteLen);
           r.phase = phase;
