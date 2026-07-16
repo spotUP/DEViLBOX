@@ -359,7 +359,7 @@ export const useSettingsStore = create<SettingsStore>()(
         chuckBiscuits: 'uade',    // ChuckBiscuitsParser — dedicated Chuck Biscuits / Black Artist support
         speedySystem: 'uade',       // SpeedySystemParser — prefer UADE (DOC RAM samples required)
         tronic: 'uade',             // TronicParser — no native parser; always UADE
-        suntronic: 'uade',          // SunTronic/TSM — UADE only
+        suntronic: 'native',        // SunTronicV13Parser — native editable engine (V1.3); UADE = offline oracle only
         digiBoosterPro: 'native',   // DigiBoosterProParser — dedicated DigiBooster Pro (.dbm) support
         gameMusicCreator: 'uade',   // GameMusicCreatorParser — prefer UADE (complex synthesis)
         faceTheMusic: 'native',     // FaceTheMusicParser — native parser available
@@ -690,7 +690,7 @@ export const useSettingsStore = create<SettingsStore>()(
     })),
     {
       name: 'devilbox-settings',
-      version: 6,
+      version: 8,
       migrate: (persistedState: unknown, version: number) => {
         const s = (persistedState ?? {}) as Record<string, unknown>;
         if (version < 3) {
@@ -713,6 +713,12 @@ export const useSettingsStore = create<SettingsStore>()(
           // Migrate users still at old v5 default (50/100).
           if (s.stereoSeparation === 50) s.stereoSeparation = 25;
           if (s.modplugSeparation === 100) s.modplugSeparation = 50;
+        }
+        if (version < 8) {
+          // v8: SunTronic default changed from 'uade' to 'native' (native
+          // editable SunTronicV13 engine). Only flip users still at old default.
+          const fe = s.formatEngine as Record<string, unknown> | undefined;
+          if (fe && fe.suntronic === 'uade') fe.suntronic = 'native';
         }
         return s;
       },

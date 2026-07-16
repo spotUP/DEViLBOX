@@ -541,6 +541,12 @@ export class SunTronicPlayer {
       }
     }
     this.tickIndex++;
+    return this.snapshot();
+  }
+
+  /** Current per-voice register snapshot (period/acc/volume/flags/… as the audio
+   *  renderer + the golden read them). Shared by tick() and stepVblank(). */
+  private snapshot(): SunPlayerTick {
     return {
       voices: this.voices.map((v) => ({
         period: v.period, acc: v.pitch & 0xffff, volume: v.volume & 0xff, flags: v.flags & 0xff,
@@ -552,6 +558,29 @@ export class SunTronicPlayer {
         loopLenWords: v.sampled ? v.sampled.loopLenWords : 0,
       })),
     };
+  }
+
+  /**
+   * One physical PAL-vblank step — the player's REAL clock. Runs a single
+   * stepAll() (tempo/GNN/EFFECTS: $20 period + $24 vibrato advance) and returns
+   * the post-step snapshot.
+   *
+   * The AUDIO renderer drives THIS on its 882.759-sample vblank grid so Paula
+   * period/vibrato updates land at vblank granularity — matching UADE, which
+   * writes period on the ~880-sample vblank cadence, not the 1024 audio-buffer
+   * boundary. Updating vInc only once per 1024-bucket (the old deriveBucket path)
+   * ran a stale period for up to ~142 samples/bucket → accumulating whole-song
+   * sample-phase drift on any vibrato voice.
+   *
+   * tick()/renderTimeline keep the double-position clock (it reconciles the
+   * per-vblank steps against the 1024-sample GOLDEN latch and is byte-exact on
+   * gliders). Do NOT route the golden through stepVblank — see
+   * thoughts/shared/research/2026-07-16_suntronic-fidelity-drift-mechanism.md.
+   */
+  stepVblank(): SunPlayerTick {
+    this.stepAll();
+    this.tickIndex++;
+    return this.snapshot();
   }
 
   /** Debug: internal envelope + tempo state of one voice. */

@@ -36,12 +36,10 @@ const EXCLUDED_FIELDS = new Set<string>([
   'pmdFileData',     // PMD (PC-98 YM2608) — not carried in useFormatStore
   'mdxminiFileData', // MDX (X68000 YM2151) — not carried in useFormatStore
   'asapFileData',    // ASAP (Atari POKEY) — not carried in useFormatStore
-  // SunTronic native browser playback (Gate B.2). Set by SunTronicParser only
-  // when the engine pref is 'native'; the standalone SunTronicSongEngine reads it
-  // at load. NOT mirrored into useFormatStore, so a saved .dbx re-imports the
-  // module rather than round-tripping this buffer — persistence wiring is Gate E
-  // scope (which also flips the default), not playback.
-  'sunTronicSongFileData',
+  // NOTE: sunTronicSongFileData WAS excluded here (Gate B.2, before it was wired
+  // into useFormatStore). Gate E mirrors it through applyEditorMode so it now
+  // round-trips like the other native-engine buffers — it belongs in
+  // FILE_DATA_FIELDS, not this exclusion set.
 ]);
 
 describe('FILE_DATA_FIELDS completeness ratchet', () => {
