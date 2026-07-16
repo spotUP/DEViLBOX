@@ -217,3 +217,70 @@ gate. Sampled voices (v2) + dead voices (v1) are tracked SEPARATELY (Gate-D
 content), after the synth phase clock is trustworthy.
 
 Plan: `thoughts/shared/plans/2026-07-16-suntronic-resampler-phase-port.md`.
+
+---
+
+## UPDATE 2026-07-16 (later) — ok-2-class pulse songs are a SECOND, distinct gap; the CALC3 kernel is CONFIRMED byte-correct by disasm
+
+The phase-drift conclusion above was measured on analgestic2/ballblaser (vibrato
+synth voices). Testing **ok-2** — 4×type-1 always-latched pulse instruments —
+exposes a *different* failure that phase-recovery does NOT explain:
+
+```
+probe-fidelity-ceiling.ts ok-2 (8s) — voiceFidelity vs maxLag[640..48000]:
+  v0 -0.13 … -0.07   v1 -0.12 … -0.03   v2 0.01 … 0.28   v3 -0.16 … -0.00
+  ALL flat/negative at maxLag 48000 → NOT phase drift (which recovers, cf analgestic2→0.93).
+```
+
+### What was ruled OUT (do not re-chase)
+
+- **The CALC3 pulse kernel is NOT wrong.** Dumped the loaded replayer bytes at
+  `0x26c80–0x26dc0` (UADE `_uade_wasm_read_memory` after 4 render chunks) and
+  hand-disassembled the positive-arp pulse loop `0x26cc8–0x26ce4`:
+  `D1=0x80-arp` (coeff); `D0=ext.w(source[last])` (seed); loop
+  `D2=ext.w(*A3++); D2-=D0; D2=MULS.W D1,D2; ASR.W #7,D2; D0+=D2; *A2++=D0.b`.
+  This is **byte-identical** to `SunTronicSynthVoice.ts renderType1` CALC3
+  (`asrW7` word-truncates before the shift, matching `MULS.W`+`ASR.W`). Kernel
+  confirmed. The `0x80-d1` coefficient is correct (NOT the `~66` I mis-measured
+  from misaligned chunk snapshots).
+- **Chunk-granularity per-tick probes are INVALID for the pulse.** A probe that
+  pairs consecutive 882-sample render-chunk `loc` snapshots as prev→cur feedback
+  (`_p7t1`, deleted) matches ~0 ticks — but that is a **capture artifact**, not a
+  kernel bug: the pulse fires on the **1024 bucket** clock (not the 882 chunk),
+  and the feedback source is not index-aligned to the previous `loc` (see next).
+
+### The actual ok-2 mechanism (candidate root cause, not yet fixed)
+
+Disasm of the pulse **setup** `0x26c8e–0x26ca8` shows the feedback source pointer
+is **not** the previous output buffer read index-aligned. It is:
+
+```
+A3 = A2                       ; MOVEA.L A2,A3
+ph = $a70(A6)                 ; per-voice phase/pitch accumulator
+A3 = A3 - ph                  ; SUBA.L D1,A3
+t  = ph - 0x80                ; SUBI.L #$80,D1 ; BPL
+if t < 0: t = 0x100           ; MOVE.L #$100,D1
+A3 = A3 + t                   ; ADDA.L D1,A3
+  => ph>=0x80: A3 = A2 - 0x80
+     ph< 0x80: A3 = A2 + (0x100 - ph)
+```
+
+So the latched pulse reads its feedback source from a buffer **offset from the
+output by a pitch-dependent ±0x80/0x100 amount** (a rotating buffer pool in the
+A6 workspace), and `renderType1` currently feeds `state.playBuffer` (the plain
+immediately-previous output) with no such offset. That unmodeled source-pointer
+selection is the likely ok-2 content gap.
+
+### Status / next (needs its own research+plan, NOT a one-turn fix)
+
+- ok-2-class (always-latched pulse) fidelity is a **separate gate** from the
+  vibrato phase-drift port. Both are real; both need the multi-session RE cycle.
+- To fix ok-2 correctly: PC-trigger capture at the pulse loop (e.g. `0x26cca`
+  post-dispatch, both latched+unlatched paths — p8c's `0x26cc0` arm only catches
+  the unlatched path, hence its `0/0` on ok-2), read A2 **and** A3 buffers +
+  `$a70(A6)`, confirm `calc3(bufAt(A3)) == bufAt(A2)` byte-exact, then model the
+  A6 buffer-pool source select in `renderType1`/the voice state.
+- Independent, already-landed win this session: the Paula voice **gain 4×
+  over-scale** bug (`paulaVoiceSample = byte*vol/32768`, was `/8192`), committed
+  `c8c0efb4f` with fails-on-revert regression — that clipped every voice mix and
+  is orthogonal to both fidelity gates.
