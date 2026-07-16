@@ -10,6 +10,7 @@
 
 import type { FormatEnginePreferences } from '@/stores/useSettingsStore';
 import { isUADEFormat } from './formats/UADEParser';
+import { isSunTronicV13Format } from './formats/SunTronicV13';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -2424,6 +2425,17 @@ export function isSupportedFormat(filename: string): boolean {
   // Fallback: check UADE extension/prefix list (covers ~80 PTK-Prowiz packed
   // format variants and other UADE-only formats not in the FORMAT_REGISTRY)
   return isUADEFormat(lower);
+}
+
+/**
+ * Content-magic fallback for files whose NAME reveals nothing (extensionless
+ * Amiga rips like `newest_play`, `paradroid.final`). Reads only the header, so
+ * it's cheap to run on the handful of files a name-based check rejected. Keep the
+ * checks here unambiguous (strong magics only) so this never steals a drop from
+ * another format. Currently: SunTronic V1.3 "Delirium" hunk executables.
+ */
+export function isSupportedByHeader(bytes: Uint8Array): boolean {
+  return isSunTronicV13Format(bytes);
 }
 
 /**
