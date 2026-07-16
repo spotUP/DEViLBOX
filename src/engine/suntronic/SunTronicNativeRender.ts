@@ -148,6 +148,18 @@ export class SunTronicNativeRenderer {
   // streaming the last buffer written).
   private readonly curBuf: Array<Int8Array | null> = [null, null, null, null];
 
+  // Per-voice USER gain (mute/solo/volume from the mixer). 1 = unity (the
+  // default the byte-exact oracle uses — renderSunTronicMix never touches these,
+  // so the fidelity path is bit-identical). 0 = muted. Applied AFTER the Paula
+  // voice sample so it scales what is audible and what the scope/VU show, never
+  // the timbre math itself.
+  private readonly vUserGain = [1, 1, 1, 1];
+
+  /** Set a voice's mixer gain (0 = muted). ch out of range is ignored. */
+  setVoiceGain(ch: number, gain: number): void {
+    if (ch >= 0 && ch < 4) this.vUserGain[ch] = gain < 0 ? 0 : gain;
+  }
+
   constructor(score: SunV13Score, slotPcm: (Int8Array | null)[]) {
     this.slotPcm = slotPcm;
     this.player = new SunTronicPlayer(score, { sampleData: slotPcm });
@@ -282,15 +294,21 @@ export class SunTronicNativeRenderer {
           r.phase = phase;
         }
 
+        // Mixer gain (mute/solo/volume) — unity by default so the oracle path
+        // is unchanged; scales the audible mix AND the per-voice scope/VU tap.
+        const ug = this.vUserGain[v];
+        if (ug !== 1) sample *= ug;
         if (v === 0) s0 = sample; else if (v === 1) s1 = sample;
         else if (v === 2) s2 = sample; else s3 = sample;
-        if (ch) ch[v][this.pos] = sample;
+        // Chunk-local index (== absolute pos in the oracle's single full-length
+        // call, so renderSunTronicMix is unchanged; correct for the streaming
+        // pump's fixed CHUNK buffers, where `this.pos` grows past the buffer).
+        if (ch) ch[v][i] = sample;
       }
 
       // Paula stereo law (matches entry.c / the oracle): ch0+ch3 -> L, ch1+ch2 -> R.
-      const g = i; // write at the chunk-local index; ch[] uses absolute pos above
-      left[g] = (s0 + s3) * 0.5;
-      right[g] = (s1 + s2) * 0.5;
+      left[i] = (s0 + s3) * 0.5;
+      right[i] = (s1 + s2) * 0.5;
       this.pos++;
     }
   }
