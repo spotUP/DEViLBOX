@@ -309,6 +309,15 @@ export interface TrackerSong {
   fredEditorWasmFileData?: ArrayBuffer;
   /** Raw Art of Noise (.aon) binary for ArtOfNoiseEngine WASM playback */
   artOfNoiseFileData?: ArrayBuffer;
+  /**
+   * Raw SunTronic V1.3 module bytes for native browser playback (Gate B.2).
+   * Attached ONLY when the SunTronic engine pref is 'native'; the byte-exact
+   * player + Paula render + resampler worklet drive audio (no UADE at runtime).
+   * Absent by default so SunTronic routes through UADE.
+   */
+  sunTronicSongFileData?: ArrayBuffer;
+  /** Companion instrument PCM sidecars (.x etc.) for native SunTronic sampled voices. */
+  sunTronicCompanionPcm?: Array<{ name: string; data: ArrayBuffer | Uint8Array }>;
   /** Raw Cinter4 (.cinter4) binary for Cinter4Engine WASM playback */
   cinter4FileData?: ArrayBuffer;
   /** Companion raw-sample PCM (.raw) for Cinter4 songs that use raw instruments */
