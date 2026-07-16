@@ -1,0 +1,131 @@
+/**
+ * Regression: SunTronic native render core — streaming == whole-song.
+ *
+ * Gate B.2 (plans/2026-07-16-suntronic-gateB2-native-song-playback.md) drives
+ * browser playback by calling `SunTronicNativeRenderer.renderInto` in SHORT
+ * chunks (the worklet pump with lookahead) instead of one whole-song pass. That
+ * only produces correct audio if a chunk boundary NEVER perturbs the 1024-sample
+ * player-tick bucket clock or the 882.759-sample vblank regen grid — both are
+ * driven off the renderer's absolute `pos`, not the chunk length.
+ *
+ * This pins that invariant: rendering analgestic2 in a ragged sequence of chunk
+ * sizes (1, 883, 1023, 1025, 2048, 7, ... — deliberately crossing bucket AND
+ * vblank boundaries mid-chunk) produces byte-identical stereo to the single
+ * whole-song `renderSunTronicMix`. It also confirms Gate D still holds through
+ * the core (voice 2 = sampled slot 0, not silent).
+ *
+ * Fails on revert: reintroduce any chunk-length dependence in the bucket/vblank
+ * clock (e.g. resetting nextVblank per call, or ticking per chunk instead of per
+ * 1024 absolute samples) and the chunked stereo diverges from whole-song.
+ */
+import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'fs';
+import { join } from 'path';
+import { parseSunTronicV13Score } from '@/lib/import/formats/SunTronicV13';
+import {
+  renderSunTronicMix,
+  SunTronicNativeRenderer,
+  NATIVE_SAMPLE_RATE,
+} from '../SunTronicNativeRender';
+
+const CORPUS = join(process.cwd(), 'public/data/songs/formats/SUNTronicTunes');
+
+function loadSampleData(names: string[]): (Int8Array | null)[] {
+  return names.map((n) => {
+    try {
+      return new Int8Array(readFileSync(join(CORPUS, 'instr', n)));
+    } catch {
+      return null;
+    }
+  });
+}
+
+describe('SunTronic native render core', () => {
+  const buf = new Uint8Array(readFileSync(join(CORPUS, 'analgestic2.src')));
+  const score = parseSunTronicV13Score(buf);
+  const slotPcm = loadSampleData(score.instrumentNames);
+  const seconds = 4;
+  const total = Math.floor(seconds * NATIVE_SAMPLE_RATE);
+
+  it('streams byte-identical to the whole-song render across ragged chunks', () => {
+    const whole = renderSunTronicMix(score, slotPcm, { seconds });
+
+    const streamL = new Float32Array(total);
+    const streamR = new Float32Array(total);
+    const renderer = new SunTronicNativeRenderer(score, slotPcm);
+    // Ragged sizes that straddle the 1024 bucket AND 882.759 vblank grids.
+    const sizes = [1, 883, 1023, 1025, 2048, 7, 512, 4096, 100];
+    let off = 0;
+    let k = 0;
+    while (off < total) {
+      const n = Math.min(sizes[k % sizes.length], total - off);
+      const l = new Float32Array(n);
+      const r = new Float32Array(n);
+      renderer.renderInto(l, r);
+      streamL.set(l, off);
+      streamR.set(r, off);
+      off += n;
+      k++;
+    }
+
+    expect(off).toBe(total);
+    // Byte-identical — no tolerance. Any drift = broken chunk invariant.
+    for (let i = 0; i < total; i++) {
+      if (streamL[i] !== whole.left[i] || streamR[i] !== whole.right[i]) {
+        throw new Error(
+          `chunked != whole at sample ${i}: L ${streamL[i]} vs ${whole.left[i]}, ` +
+          `R ${streamR[i]} vs ${whole.right[i]}`,
+        );
+      }
+    }
+  });
+
+  it('renders the sampled voice (Gate D) through the core — voice 2 not silent', () => {
+    const whole = renderSunTronicMix(score, slotPcm, { seconds });
+    // voice 2 = sampled slot 0 (perc1.x); dominant key -2-slot = -2.
+    expect(whole.info[2].dominantOff).toBe(-2);
+    expect(whole.info[2].silent).toBe(false);
+    let peak = 0;
+    for (const s of whole.ch[2]) if (Math.abs(s) > peak) peak = Math.abs(s);
+    expect(peak).toBeGreaterThan(0);
+  });
+
+  // Regression: a sampled voice whose loop descriptor [loopStart, loopStart+
+  // loopLen) runs PAST the DMA'd sample bytes produced a NaN sample — the loop
+  // wrap did `phase = loopStart + ((phase - loopStart) % loopLen)` with loopLen
+  // (3882) > byteLen (3780), landing idx exactly at pcm.length so `pcm[idx]` was
+  // `undefined` and `undefined / 128 === NaN`. In the browser that one NaN is
+  // written to the resampler worklet's ring buffer and never clears, so the song
+  // goes SILENT-forever on a later loop ("silent on the second loop"). zoids.src
+  // hits it at t≈15.9 s. The fix clamps the effective loop to the available bytes.
+  it('never emits a non-finite sample when a sampled loop overruns the PCM (zoids)', () => {
+    const zbuf = new Uint8Array(readFileSync(join(CORPUS, 'zoids.src')));
+    const zscore = parseSunTronicV13Score(zbuf);
+    const zslot = loadSampleData(zscore.instrumentNames);
+    // Render past the known NaN point (15.9 s) in ragged worklet-style chunks so
+    // the loop-wrap branch is exercised exactly as the pump drives it.
+    const zseconds = 18;
+    const ztotal = Math.floor(zseconds * NATIVE_SAMPLE_RATE);
+    const renderer = new SunTronicNativeRenderer(zscore, zslot);
+    const sizes = [2048, 883, 1025, 7, 4096];
+    let off = 0;
+    let k = 0;
+    while (off < ztotal) {
+      const n = Math.min(sizes[k % sizes.length], ztotal - off);
+      const l = new Float32Array(n);
+      const r = new Float32Array(n);
+      renderer.renderInto(l, r);
+      for (let i = 0; i < n; i++) {
+        if (!Number.isFinite(l[i]) || !Number.isFinite(r[i])) {
+          throw new Error(
+            `non-finite output at sample ${off + i} (t=${((off + i) / NATIVE_SAMPLE_RATE).toFixed(3)}s): ` +
+            `L=${l[i]} R=${r[i]} — sampled loop overran the PCM and poisoned the ring`,
+          );
+        }
+      }
+      off += n;
+      k++;
+    }
+    expect(off).toBe(ztotal);
+  });
+});

@@ -16,8 +16,12 @@
  *    (~50 Hz chip frame), matching how MEGAEFFECTS rewrites each voice's play
  *    buffer per frame. (Superseded the earlier once-per-1024-bucket regen, which
  *    froze swept timbres — type-2 splice with a moving D1=arp, type-6 resonator.)
- *  - Type-B (sampled) instruments are `instrOff = -1` in the player (the
- *    sequencer leaves them null) -> those voices render silent here. Gate D.
+ *  - Type-B (sampled) voices (Gate D): the player now resolves the 0x1c record
+ *    (sampleSlot/length/loop) AND runs the SHARED EFFECTS (period/vol). The
+ *    companion PCM (instr/* sidecar, raw signed-8-bit) is streamed through the
+ *    Paula resampler at the EFFECTS period with loop [loopStart, +loopLen] words
+ *    (one-shot when loopLenWords<=1). No per-vblank regen — the whole PCM is the
+ *    voice buffer, exactly like Paula DMA off chip RAM.
  *  - RESIDUAL phase drift on SWEPT timbres (ballblaser type-2, arp=[32,33,34,…]):
  *    the moving splice content-shifts every frame, and the interaction of that
  *    shift with the continuous Paula read pointer is only bit-exact under a
@@ -28,190 +32,48 @@
  *    — the kernel math is proven byte-exact in sunTronicSynthVoice.test.ts.
  */
 
-import { readFileSync, writeFileSync } from 'fs';
+import { readFileSync, writeFileSync, existsSync } from 'fs';
 import { join } from 'path';
+import { parseSunTronicV13Score } from '../../src/lib/import/formats/SunTronicV13';
 import {
-  parseSunTronicV13Score,
-  type SunSynthInstrument,
-} from '../../src/lib/import/formats/SunTronicV13';
-import { SunTronicPlayer } from '../../src/engine/suntronic/SunTronicPlayer';
-import {
-  renderSynthTick,
-  createVoiceState,
-  createPrng,
-  type SunSynthVoiceState,
-} from '../../src/engine/suntronic/SunTronicSynthVoice';
-import { PAULA_CLOCK_PAL } from '../../src/engine/suntronic/SunTronicVoiceRenderer';
-import { CORPUS_DIR } from './suntronicLib';
+  renderSunTronicMix,
+  type NativeMix,
+  type VoiceInfo,
+} from '../../src/engine/suntronic/SunTronicNativeRender';
+import { CORPUS_DIR, INSTR_DIR } from './suntronicLib';
 import { renderUADEPerVoice, peak, writeMonoWav } from './audio-oracle';
 
-const BUCKET = 1024; // audioTick samples per player tick (calibrated at 44100)
-const MAX_VOLUME = 0x40;
-// Emulated PAL vblank period in samples (1024*25/29 = 882.759). The MEGAEFFECTS
-// synth engine regenerates every voice's play buffer ONCE per vblank (~50 Hz),
-// NOT once per 1024 output bucket — for a swept-arp timbre (type-2 splice whose
-// D1=arp slides, type-6 whose resonator sweeps) the buffer content changes every
-// frame, so regen must ride the vblank grid or the timbre freezes and beats
-// against the real sweep. This is the same 882.759 clock the player's
-// double-position schedule is built on (SunTronicPlayer.tick).
-const VBLANK = (1024 * 25) / 29;
+// Re-export the shared render types so existing tool consumers keep importing
+// them from here (the render core is now src/engine/suntronic/SunTronicNativeRender).
+export type { NativeMix, VoiceInfo };
 
-/** Per-voice diagnostic summary for the fidelity report. */
-export interface VoiceInfo {
-  /** most-active instrument's record offset (-1 = idle/sampled). */
-  dominantOff: number;
-  /** that instrument's synthType, or -1 if none / sampled. */
-  synthType: number;
-  /** fraction of buckets the voice was active (flags==0x01). */
-  activeFrac: number;
-  /** true when the voice produced no audio (empty wave / sampled / idle). */
-  silent: boolean;
-}
-
-export interface NativeMix {
-  /** per-Paula-voice mono float PCM (index 0..3). */
-  ch: [Float32Array, Float32Array, Float32Array, Float32Array];
-  left: Float32Array;
-  right: Float32Array;
-  sampleRate: number;
-  frames: number;
-  info: [VoiceInfo, VoiceInfo, VoiceInfo, VoiceInfo];
-}
-
-/** Per-voice mutable render state (timbre gen + resampler phase). */
-interface VoiceRender {
-  state: SunSynthVoiceState;
-  phase: number;     // float index into the current frame buffer
-  lastInstrOff: number;
+/**
+ * Resolve the companion PCM for each sampled slot, in `instrumentNames` order.
+ * Slot N -> instrumentNames[N] -> instr/<name> sidecar (raw signed-8-bit Amiga
+ * PCM, whole file = sample). Missing sidecar -> null (voice runs EFFECTS but
+ * renders silent, exactly the "companion absent" contract the player enforces).
+ */
+function loadSlotPcm(names: string[]): (Int8Array | null)[] {
+  return names.map((n) => {
+    const p = join(INSTR_DIR, n);
+    if (!existsSync(p)) return null;
+    return new Int8Array(readFileSync(p));
+  });
 }
 
 /**
  * Render `name` (a corpus .src) to a native per-voice mix by driving the
- * byte-exact player timeline. Fixed 44100 Hz / 1024-sample buckets so the tick
- * schedule matches the golden timeline the player is locked to.
+ * byte-exact player timeline through the shared render core. fs wrapper: read
+ * corpus + companion sidecars, then delegate to `renderSunTronicMix`.
  */
 export function renderSunTronicNative(
   name: string,
   opts: { seconds?: number } = {},
 ): NativeMix {
-  const sampleRate = 44100;
-  const seconds = opts.seconds ?? 10;
   const data = new Uint8Array(readFileSync(join(CORPUS_DIR, name)));
   const score = parseSunTronicV13Score(data);
-  const player = new SunTronicPlayer(score);
-
-  const byOff = new Map<number, SunSynthInstrument>();
-  for (const inst of score.synthInstruments) byOff.set(inst.recordOff, inst);
-
-  const totalSamples = Math.floor(seconds * sampleRate);
-  const buckets = Math.ceil(totalSamples / BUCKET);
-  const ch: Float32Array[] = [0, 1, 2, 3].map(() => new Float32Array(totalSamples));
-
-  const prng = createPrng(); // shared PRNG (workspace rndnum) across voices
-  const vr: VoiceRender[] = [0, 1, 2, 3].map(() => ({
-    state: createVoiceState(),
-    phase: 0,
-    lastInstrOff: -1,
-  }));
-  const offCount: Array<Map<number, number>> = [0, 1, 2, 3].map(() => new Map());
-  const activeCount = [0, 0, 0, 0];
-
-  // Current play buffer per voice (rewritten on each vblank while the voice is
-  // active — Paula keeps streaming the last buffer written).
-  const curBuf: Array<Int8Array | null> = [null, null, null, null];
-  // Absolute sample index of the next vblank (free-running chip frame clock).
-  let nextVblank = VBLANK;
-
-  for (let b = 0; b < buckets; b++) {
-    const tick = player.tick();
-    const base = b * BUCKET;
-    const n = Math.min(BUCKET, totalSamples - base);
-
-    // Per-voice per-bucket sequencer state (constant across the bucket — the
-    // byte-exact golden clock resolves note/period/volume at bucket granularity).
-    const vActive = [false, false, false, false];
-    const vInst: Array<SunSynthInstrument | undefined> = [undefined, undefined, undefined, undefined];
-    const vInc = [0, 0, 0, 0];
-    const vGain = [0, 0, 0, 0];
-    for (let v = 0; v < 4; v++) {
-      const vd = tick.voices[v];
-      const active = (vd.flags & 0xff) === 0x01;
-      const inst = vd.instrOff >= 0 ? byOff.get(vd.instrOff) : undefined;
-      const r = vr[v];
-      if (active) activeCount[v]++;
-      offCount[v].set(vd.instrOff, (offCount[v].get(vd.instrOff) ?? 0) + 1);
-
-      // Note-on / instrument change: restart the timbre feedback + arp (matches
-      // GETNEXTNOTE clearing the voice's play buffer + latch on a retrigger).
-      if (vd.instrOff !== r.lastInstrOff) {
-        r.state = createVoiceState();
-        r.phase = 0;
-        r.lastInstrOff = vd.instrOff;
-        curBuf[v] = null; // force regen on the next sample
-      }
-
-      vActive[v] = active && !!inst && vd.period > 0;
-      vInst[v] = inst;
-      vInc[v] = vd.period > 0 ? PAULA_CLOCK_PAL / vd.period / sampleRate : 0;
-      vGain[v] = Math.min(1, (vd.outVolume & 0xff) / MAX_VOLUME);
-    }
-
-    // Sample-outer loop so the shared vblank grid crosses at the right absolute
-    // sample for every voice at once (one chip frame clock, four play buffers).
-    for (let i = 0; i < n; i++) {
-      const gs = base + i;
-      const vblankNow = gs >= nextVblank;
-      if (vblankNow) nextVblank += VBLANK;
-      for (let v = 0; v < 4; v++) {
-        if (!vActive[v]) continue;
-        const r = vr[v];
-        // Regenerate the play buffer on each vblank (advances arp) — and lazily
-        // on the very first active sample after a note-on.
-        if (vblankNow || curBuf[v] === null) {
-          curBuf[v] = renderSynthTick(vInst[v]!, r.state, prng);
-        }
-        const buf = curBuf[v]!;
-        const byteLen = buf.length;
-        if (byteLen <= 0) continue;
-        let phase = r.phase;
-        const idx = Math.floor(phase) % byteLen;
-        ch[v][gs] = (buf[idx] / 128) * vGain[v];
-        phase += vInc[v];
-        if (phase >= byteLen) phase -= byteLen * Math.floor(phase / byteLen);
-        r.phase = phase;
-      }
-    }
-  }
-
-  // Paula stereo law (matches entry.c / the oracle): ch0+ch3 -> L, ch1+ch2 -> R.
-  const left = new Float32Array(totalSamples);
-  const right = new Float32Array(totalSamples);
-  for (let i = 0; i < totalSamples; i++) {
-    left[i] = (ch[0][i] + ch[3][i]) * 0.5;
-    right[i] = (ch[1][i] + ch[2][i]) * 0.5;
-  }
-
-  const info = [0, 1, 2, 3].map((v): VoiceInfo => {
-    let dom = -1, domN = -1;
-    for (const [off, cnt] of offCount[v]) if (off >= 0 && cnt > domN) { dom = off; domN = cnt; }
-    let silent = true;
-    for (let i = 0; i < totalSamples; i++) if (ch[v][i] !== 0) { silent = false; break; }
-    return {
-      dominantOff: dom,
-      synthType: dom >= 0 ? (byOff.get(dom)?.synthType ?? -1) : -1,
-      activeFrac: buckets > 0 ? activeCount[v] / buckets : 0,
-      silent,
-    };
-  }) as NativeMix['info'];
-
-  return {
-    ch: ch as NativeMix['ch'],
-    left,
-    right,
-    sampleRate,
-    frames: totalSamples,
-    info,
-  };
+  const slotPcm = loadSlotPcm(score.instrumentNames);
+  return renderSunTronicMix(score, slotPcm, { seconds: opts.seconds ?? 10 });
 }
 
 /** Best-lag normalized cross-correlation of `a[off..off+win)` against `b`. */
@@ -280,9 +142,11 @@ async function main(): Promise<void> {
       const ov = oracle.ch[v];
       const fid = voiceFidelity(nv, ov);
       const inf = native.info[v];
-      const tag = inf.dominantOff < 0
-        ? 'SAMPLED/idle (Gate D)'
-        : `off${inf.dominantOff} synthType${inf.synthType}`;
+      const tag = inf.dominantOff <= -2
+        ? `SAMPLED slot${-2 - inf.dominantOff}`
+        : inf.dominantOff < 0
+          ? 'idle'
+          : `off${inf.dominantOff} synthType${inf.synthType}`;
       const flag = inf.silent && peak(ov) > 0.01 ? '  <-- NATIVE SILENT (wave unresolved)' : '';
       console.log(
         `  voice ${v}: fidelity=${fid.median.toFixed(3)} (${fid.windows} win)` +

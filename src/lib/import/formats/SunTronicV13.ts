@@ -483,19 +483,40 @@ const SEQ_ENTRY_SIZE = 0x14;
 const MAX_SUBSONGS = 52;         // fixed 52-slot subsong table area
 const MAX_SEQ_ENTRIES = 4096;
 
+/**
+ * Sampled (type-B) instrument descriptor (0x1C-byte record). The front 0x00-0x11
+ * is byte-identical in structure to a synth record's env/vib block (proven from
+ * the Andy Silva replayer source — EFFECTS reads 4(A1)/6(A1)/8(A1)/… the same for
+ * both record types, and GNN8 @0x26a16 sets $14=0 so the SHARED EFFECTS runs).
+ * Field names MIRROR `SunSynthInstrument` (volEnv/freqEnv + `vibDepth`) so one
+ * structural type drives `stepEffects` for both. Offsets 0x12-0x1B are the
+ * sampled-only fields (sample slot + length/loop) that Paula plays directly.
+ */
 export interface SunSampledInstrument {
   /** hunk#1-relative offset of the 0x1C-byte record */
   recordOff: number;
-  /** volume-envelope pointer (hunk1-relative file value, RELOC32-covered) */
-  envelopeOff: number;
+  /** volume-envelope table ptr ($00, RELOC32) */
+  volEnvOff: number;
+  /** volume-envelope length/loop ($04/$06; EFFECTS 4(A1)/6(A1) wrap) */
+  volEnvLen: number;
+  volEnvLoop: number;
+  /** vibrato-depth table ptr + length/loop + speed ($08/$0c/$0e/$10) */
+  freqEnvOff: number;
+  freqEnvLen: number;
+  freqEnvLoop: number;
+  freqEnvSpeed: number;
   /** index into the 50-slot external sample table (on-disk value at +0x12) */
   slotIndex: number;
-  /** sample length in words */
+  /** sample length in words ($16) */
   lengthWords: number;
-  /** loop start in words */
+  /** loop start in words ($18) */
   loopStartWords: number;
-  /** loop length in words */
+  /** loop length in words ($1a); 1 word = one-shot, >= length = full loop */
   loopLenWords: number;
+  /** vol-env table bytes (volEnvLen+1, read unsigned) */
+  volEnv: Int8Array;
+  /** vibrato-depth table bytes (freqEnvLen+1, signed) */
+  vibDepth: Int8Array;
 }
 
 /**
@@ -791,15 +812,36 @@ export function parseSunTronicV13Score(buf: Uint8Array): SunV13Score {
   }
 
   const sampledInstruments: SunSampledInstrument[] = [];
+  // Slice an env/vib table out of hunk#1, clamped (a short/corrupt ptr yields an
+  // empty slice rather than throwing — same guard as decodeSunSynthInstrument).
+  const sliceSampledI8 = (off: number, len: number): Int8Array => {
+    if (off <= 0 || len <= 0 || off >= h1.length) return new Int8Array(0);
+    const end = Math.min(off + len, h1.length);
+    return new Int8Array(h1.buffer.slice(h1.byteOffset + off, h1.byteOffset + end));
+  };
   for (let rec = sampledTableOff; rec + SAMPLED_RECORD_SIZE <= h1.length; rec += SAMPLED_RECORD_SIZE) {
     if (u32BE(h1, rec) === 0) break; // null-long terminator
+    const volEnvOff = u32BE(h1, rec);
+    const volEnvLen = u16BE(h1, rec + 0x04);
+    const freqEnvOff = u32BE(h1, rec + 0x08);
+    const freqEnvLen = u16BE(h1, rec + 0x0c);
     sampledInstruments.push({
       recordOff: rec,
-      envelopeOff: u32BE(h1, rec),
+      volEnvOff,
+      volEnvLen,
+      volEnvLoop: u16BE(h1, rec + 0x06),
+      freqEnvOff,
+      freqEnvLen,
+      freqEnvLoop: u16BE(h1, rec + 0x0e),
+      freqEnvSpeed: u16BE(h1, rec + 0x10),
       slotIndex: u32BE(h1, rec + 0x12),
       lengthWords: u16BE(h1, rec + 0x16),
       loopStartWords: u16BE(h1, rec + 0x18),
       loopLenWords: u16BE(h1, rec + 0x1a),
+      // vol-env index (voice+0x10) runs 0..volEnvLen-1; vib-depth index
+      // (voice+0x24) runs 0..freqEnvLen-1. Slice one extra byte as a bounds guard.
+      volEnv: sliceSampledI8(volEnvOff, volEnvLen + 1),
+      vibDepth: sliceSampledI8(freqEnvOff, freqEnvLen + 1),
     });
     if (sampledInstruments.length >= 0x3f) break; // select byte range 0x01-0x3F
   }

@@ -855,6 +855,24 @@ const WASM_ENGINES: NativeEngineDescriptor[] = [
     staticRef: null,
     dynamicResolver: async () => (await import('@/engine/v2m/V2MEngine')).V2MEngine as unknown as WASMSingletonStatic,
   },
+  {
+    key: 'SunTronicSong',
+    synthType: 'SunTronicSongSynth',
+    suppressNotes: true,
+    // Attached ONLY by SunTronicParser when the engine pref is 'native' (Gate B.2).
+    // Default pref keeps this unset so SunTronic plays via UADE. Whenever it is
+    // present, the native byte-exact player + Paula render + resampler worklet
+    // drive audio directly (no UADE at runtime).
+    fileDataKey: 'sunTronicSongFileData',
+    formats: null,
+    loadMethod: 'loadTune',
+    getLoadArgs: (song) => [song.sunTronicCompanionPcm ?? []],
+    supportsPause: false,
+    supportsResume: false,
+    needsDirectRouting: true,
+    staticRef: null,
+    dynamicResolver: async () => (await import('@/engine/suntronic/SunTronicSongEngine')).SunTronicSongEngine as unknown as WASMSingletonStatic,
+  },
 ];
 
 /** Synth types routed through the stereo separation chain */
