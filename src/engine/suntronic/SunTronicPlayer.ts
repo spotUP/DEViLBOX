@@ -544,8 +544,23 @@ export class SunTronicPlayer {
     return this.snapshot();
   }
 
+  /** Gate-E audio clock: run EXACTLY one internal player step (one PAL vblank
+   *  fire) and return the snapshot. `tick()` bundles the double-position schedule
+   *  so the golden latches byte-exactly on the 1024 bucket; the audio resampler
+   *  instead drives the raw ~882.76 vblank grid, so each period/volume write lands
+   *  at its true sub-bucket sample offset (the residual synth-voice phase drift is
+   *  bucket-quantized period application — see
+   *  thoughts/shared/plans/2026-07-16-suntronic-resampler-phase-port.md). One
+   *  stepAll per vblank == the same 29 steps / 25 buckets the double schedule
+   *  emits, just placed at the true vblank offsets. Does NOT touch tickIndex/
+   *  doubleK (those are the 1024-clock's state). */
+  stepVblankOnce(): SunPlayerTick {
+    this.stepAll();
+    return this.snapshot();
+  }
+
   /** Current per-voice register snapshot (period/acc/volume/flags/… as the audio
-   *  renderer + the golden read them). Shared by tick() and stepVblank(). */
+   *  renderer + the golden read them). Shared by tick() and stepVblankOnce(). */
   private snapshot(): SunPlayerTick {
     return {
       voices: this.voices.map((v) => ({

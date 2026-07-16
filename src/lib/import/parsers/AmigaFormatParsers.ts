@@ -2381,6 +2381,34 @@ export async function tryRouteFormat(
   // blockRows/blockRawBytes carriers + instr/*.x sample sidecars (companions).
   if (matchesExt(filename, ['sun', 'tsm', 'src', 'pc'])) {
     const { isSunTronicFormat, parseSunTronicFile } = await import('@lib/import/formats/SunTronicParser');
+    const { isSunTronicV13Format } = await import('@lib/import/formats/SunTronicV13');
+    // Native browser playback (Gate B.2): only for V1.3 "Delirium" score
+    // executables (the byte-exact native player supports these; raw .sun/.tsm
+    // rips are not V1.3 and stay on UADE), and only when the user opted into
+    // 'native'. Default keeps SunTronic on UADE until Gate E locks whole-song
+    // fidelity. When native, a dedicated engine drives audio (no UADE at runtime).
+    if (prefs.suntronic === 'native' && isSunTronicV13Format(new Uint8Array(buffer))) {
+      try {
+        const result = await parseSunTronicFile(buffer, originalFileName, companionFiles);
+        if (result) {
+          (result as any).sunTronicSongFileData = buffer.slice(0);
+          if (companionFiles && companionFiles.size > 0) {
+            (result as any).sunTronicCompanionPcm = Array.from(companionFiles.entries())
+              .map(([name, data]) => ({ name, data }));
+          }
+          // Dedicated native engine handles all audio. Keep SunTronicSynth
+          // audition voices; tag the rest 'Sampler' so ToneEngine doesn't try to
+          // instantiate unknown synth types (matches the sonix dedicated path).
+          for (const inst of result.instruments) {
+            if (inst.synthType === 'SunTronicSynth') continue;
+            inst.synthType = 'Sampler';
+          }
+          return result;
+        }
+      } catch (err) {
+        console.warn('[SunTronicParser] native playback parse failed, falling back to UADE:', err);
+      }
+    }
     return withNativeThenUADE('suntronic', ctx,
       (buf: Uint8Array | ArrayBuffer, name: string) => {
         if (isSunTronicFormat(buf)) return parseSunTronicFile(buf instanceof Uint8Array ? buf.buffer as ArrayBuffer : buf as ArrayBuffer, name, companionFiles);
