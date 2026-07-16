@@ -21,6 +21,7 @@ import type { InstrumentConfig } from '@/types/instrument';
 import { PatternAccessor } from './PatternAccessor';
 import { getToneEngine } from './ToneEngine';
 import { StereoSeparationNode } from './StereoSeparationNode';
+import { resolvePt2NodeSeparation } from './stereoSeparationPolicy';
 // getNativeAudioNode used in audio-context utilities
 import { getAutomationPlayer } from './AutomationPlayer';
 import { syncCaptureToStore, resetCaptureSync } from './automation/AutomationCaptureSync';
@@ -1619,11 +1620,14 @@ export class TrackerReplayer {
       for (const ch of this.channels) {
         this.applyChannelPan(ch);
       }
-      // When libopenmpt handles mixing, per-channel panning has no effect.
-      // Route through the StereoSeparationNode instead (0-100 → 0-200 scale).
-      if (this.useLibopenmptPlayback) {
-        this.separationNode.setSeparation(this.stereoSeparation * 2);
-      }
+      // Pre-mixed native output — libopenmpt AND direct-routed native engines
+      // (UADE / Hively / SunTronic / …) whose finished stereo flows through
+      // separationNode.inputTone — never passes the per-channel Tone panners, so
+      // the PT2 pan-scaling loop above can't separate it. The policy drives the
+      // post-mix StereoSeparationNode for those and leaves it at identity for
+      // pure-Tone songs (so pan scaling isn't double-applied).
+      this.separationNode.setSeparation(resolvePt2NodeSeparation(
+        this.stereoSeparation, this.useLibopenmptPlayback, this.routedNativeEngines.size));
     }
   }
 
@@ -1639,12 +1643,13 @@ export class TrackerReplayer {
   setStereoSeparationMode(mode: 'pt2' | 'modplug'): void {
     this.stereoMode = mode;
     if (mode === 'pt2') {
-      // When libopenmpt handles mixing, use the StereoSeparationNode (0-100 → 0-200)
-      // instead of per-channel pan scaling (which libopenmpt ignores).
-      if (this.useLibopenmptPlayback) {
-        this.separationNode.setSeparation(this.stereoSeparation * 2);
-      } else {
-        this.separationNode.setSeparation(100); // identity — pan scaling handles it
+      // When mixing is pre-mixed native (libopenmpt or a direct-routed native
+      // engine), the policy drives the StereoSeparationNode (0-100 → 0-200); for
+      // pure-Tone songs it returns identity and per-channel pan scaling handles it.
+      const nodeSep = resolvePt2NodeSeparation(
+        this.stereoSeparation, this.useLibopenmptPlayback, this.routedNativeEngines.size);
+      this.separationNode.setSeparation(nodeSep);
+      if (nodeSep === 100) {
         for (const ch of this.channels) {
           this.applyChannelPan(ch);
         }

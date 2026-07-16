@@ -516,6 +516,19 @@ function walkV13Voice(
             cell.note = sunPitchToNote(((~b) & 0xff) - transpose);
             cell.instrument = curInstr;
           }
+        } else if (b === 0x94) {
+          // 0x94 = "set pitch, no retrigger" (tone portamento / legato): the
+          // replayer sets `v.pitch = (~arg - transpose) << 8` WITHOUT a note-on
+          // (SunTronicPlayer.controlOpcode case 0x94). It carries real melody —
+          // ox.src is almost entirely 0x94, snake has 64 of them — so a walk that
+          // only shows retrigger bytes (>= 0xB8) renders those lines as blank rows.
+          // Show the pitch (same `~byte - transpose` mapping as a note byte) and
+          // flag tone-portamento (effTyp 3) so it reads as a glide, not a retrigger.
+          if (cell.note === 0 && len >= 2) {
+            cell.note = sunPitchToNote(((~h1[pos + 1]) & 0xff) - transpose);
+            cell.instrument = curInstr;
+            cell.effTyp = 3;
+          }
         } else if (b >= 0x01 && b <= 0x7f) {
           curInstr = b >= 0x40 ? numSampled + (b & 0x3f) + 1 : b;
         } else if (b === 0x8c || b === 0x8b) {
