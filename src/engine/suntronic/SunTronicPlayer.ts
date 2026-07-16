@@ -51,7 +51,21 @@
  * EFFECTS 0x267f6, per-voice init 0x2650e. Voice stride 0x1ba.
  */
 
-import type { SunSynthInstrument, SunV13Score } from '@/lib/import/formats/SunTronicV13';
+import type { SunSampledInstrument, SunSynthInstrument, SunV13Score } from '@/lib/import/formats/SunTronicV13';
+
+/** A sampled (type-B) instrument bound to its companion PCM (sliced to
+ *  lengthWords*2; empty when the instr/ sidecar was not supplied). The front
+ *  env/vib fields drive the SHARED EFFECTS exactly like a synth record. */
+export interface SunSampledDescriptor extends SunSampledInstrument {
+  sample: Int8Array;
+}
+
+/** The env/vib surface EFFECTS reads — satisfied by both a synth record and a
+ *  sampled descriptor (the sampled record's front 0x00-0x11 is the same block). */
+type SunEffectsSource = Pick<
+  SunSynthInstrument,
+  'volEnv' | 'vibDepth' | 'volEnvLen' | 'volEnvLoop' | 'freqEnvLen' | 'freqEnvLoop' | 'freqEnvSpeed'
+>;
 
 // PERIODS (`lea $11ae(a6),a2` @0x26838, guardless — index 0 = note 0 = period
 // 0x3e) is a byte-identical replayer constant, relocation-safe located in
@@ -64,7 +78,8 @@ import type { SunSynthInstrument, SunV13Score } from '@/lib/import/formats/SunTr
 interface SunPlayerVoice {
   channel: number;      // 0..3
   cursor: number;       // $0  — hunk#1 index of the note-stream read pointer
-  instr: SunSynthInstrument | null; // $4  — current instrument record
+  instr: SunSynthInstrument | null; // $4  — current synth instrument record (type-A)
+  sampled: SunSampledDescriptor | null; // $4 alt — current sampled instrument (type-B)
   pitch: number;        // $8  — u16 accumulator, hi byte = note index
   pitchSlide: number;   // $a  — s16 slide added to pitch each tick
   volume: number;       // $c  — voice volume 0..0x40
@@ -99,7 +114,17 @@ export interface SunPlayerTick {
    * recordOff), or -1 when none/inert or a type-B (sampled) select (which the
    * sequencer leaves null). The native audio renderer maps it back to
    * `score.synthInstruments[k].recordOff` to pick the timbre. */
-  voices: Array<{ period: number; acc: number; volume: number; flags: number; outVolume: number; instrOff: number }>;
+  voices: Array<{
+    period: number; acc: number; volume: number; flags: number; outVolume: number;
+    instrOff: number;
+    /** type-B sampled voice: external sample slot index, or -1 for a synth/inert
+     *  voice. When >= 0 the audio renderer plays companion PCM (not a wavetable)
+     *  at `period` with loop [loopStartWords, +loopLenWords] words. */
+    sampleSlot: number;
+    sampleLenWords: number;
+    loopStartWords: number;
+    loopLenWords: number;
+  }>;
 }
 
 const s8 = (b: number): number => (b << 24) >> 24;
@@ -128,6 +153,11 @@ export interface SunPlayerOptions {
    *  given the exact schedule?" from "can a constant clock generate the schedule?".
    *  When set, ciaTickSamples/rowPhaseSamples are ignored. */
   subtickSchedule?: number[];
+  /** Raw signed-8-bit companion PCM per external sample slot (index = a sampled
+   *  record's slotIndex = instrumentNames order). Absent/short entries render
+   *  silent (missing instr/ sidecar). Required for type-B (sampled) voices; the
+   *  synth voices ignore it. */
+  sampleData?: (Int8Array | null)[];
 }
 
 /**
@@ -141,6 +171,9 @@ export class SunTronicPlayer {
   private readonly drin: Int8Array;
   private readonly synthTableOff: number;
   private readonly synthRecordSize = 0x24;
+  /** sampled (type-B) descriptors, indexed by (select byte - 1). Each binds the
+   *  0x1c record to its companion PCM (from opts.sampleData[slotIndex]). */
+  private readonly sampledTable: SunSampledDescriptor[];
   private readonly voices: SunPlayerVoice[] = [];
   private readonly sequence: { trackPtrs: number[]; transposes: number[] }[];
   private readonly seqEndKind: 'restart' | 'stop';
@@ -168,6 +201,17 @@ export class SunTronicPlayer {
     this.subtickSchedule = opts.subtickSchedule ?? null;
     this.h1 = score.h1;
     this.synthTableOff = score.synthTableOff;
+
+    // ── sampled (type-B) descriptors: bind each 0x1c record to its companion PCM
+    //    (raw s8, whole file = sample, sliced to lengthWords*2). slotIndex indexes
+    //    opts.sampleData (= instrumentNames order). A missing sidecar → empty
+    //    sample → the voice runs EFFECTS (period/vol) but renders silent. ──
+    this.sampledTable = score.sampledInstruments.map((s) => {
+      const pcm = opts.sampleData?.[s.slotIndex] ?? null;
+      const byteLen = s.lengthWords * 2;
+      const sample = pcm ? pcm.subarray(0, Math.min(byteLen, pcm.length)) : new Int8Array(0);
+      return { ...s, sample };
+    });
     const sub = score.subsongs[opts.subsong ?? 0];
     if (!sub) throw new Error('SunTronicPlayer: subsong out of range');
     this.sequence = sub.entries.map((e) => ({
@@ -207,6 +251,7 @@ export class SunTronicPlayer {
         channel: ch,
         cursor: entry ? entry.trackPtrs[ch] : 0,
         instr: null,
+        sampled: null,
         pitch: 0, pitchSlide: 0, volume: 0x40, volumeSlide: 0,
         arpSel: 0, arpPhase: 0, volEnvIndex: 0,
         flags: 0xff, outVolume: 0, period: 0,
@@ -223,18 +268,19 @@ export class SunTronicPlayer {
     return this.periods[i] & 0xffff;
   }
 
-  /** Resolve the instrument record a note-select byte points at (GNN 0x269a8). */
-  private selectInstrument(sel: number): SunSynthInstrument | null {
-    // bit6 set → type-A synth table (stride 0x24, index = sel & ~0x40).
-    // bit6 clear → type-B sampled table (stride 0x1c, index = sel - 1).
-    // Only the type-A (synth) path is modelled; a type-B select yields null,
-    // which EFFECTS treats as an inert record (period/vol frozen).
+  /** Resolve the instrument record a note-select byte points at (GNN 0x269a8).
+   *  bit6 set → type-A synth table (stride 0x24, index = sel & ~0x40); GNN2 @543.
+   *  bit6 clear → type-B sampled table (stride 0x1c, index = sel - 1); GNN8 @568.
+   *  BOTH set voice+$4 to the record and clear $14 to an ACTIVE value, so the
+   *  SHARED EFFECTS runs for either (period/vol/vib). */
+  private selectInstrument(sel: number): { synth: SunSynthInstrument | null; sampled: SunSampledDescriptor | null } {
     if ((sel & 0x40) !== 0) {
       const idx = sel & 0xbf;
       const rec = this.synthTableOff + idx * this.synthRecordSize;
-      return decodeSynthAt(this.h1, rec);
+      return { synth: decodeSynthAt(this.h1, rec), sampled: null };
     }
-    return null;
+    const idx = (sel - 1) & 0xff;
+    return { synth: null, sampled: this.sampledTable[idx] ?? null };
   }
 
   /** GETNEXTNOTE (loaded 0x2692a): decode one note's opcode group from cursor.
@@ -276,7 +322,8 @@ export class SunTronicPlayer {
   /** Instrument retrigger (GNN type-A 0x269ae / type-B 0x26a16). */
   private noteOn(v: SunPlayerVoice, sel: number): void {
     const inst = this.selectInstrument(sel);
-    v.instr = inst;
+    v.instr = inst.synth;
+    v.sampled = inst.sampled;
     v.arpSel = 0; v.arpPhase = 0; v.volEnvIndex = 0;
     // Type-A note-on clears the vibrato accumulator + depth index (disasm
     // 0x269ae: clr.w $24; clr.w $26). EFFECTS then computes the note-on-tick
@@ -343,7 +390,7 @@ export class SunTronicPlayer {
 
   /** Advance the vibrato accumulator + depth index one step (0x2690c-0x26910:
    * `move.w $10(a1),d0; add.w d0,$24(a0)` + depth index wrap len→loop). */
-  private advanceVib(v: SunPlayerVoice, inst: SunSynthInstrument): void {
+  private advanceVib(v: SunPlayerVoice, inst: SunEffectsSource): void {
     v.vibPhase = s16((v.vibPhase + inst.freqEnvSpeed) & 0xffff);
     v.vibIndex = (v.vibIndex + 1) & 0xffff;
     if (v.vibIndex === inst.freqEnvLen) v.vibIndex = inst.freqEnvLoop;
@@ -362,7 +409,9 @@ export class SunTronicPlayer {
    * compute at vibPhase −9536 → period 252 == UADE. */
   private stepEffects(v: SunPlayerVoice, extraVib = false): void {
     if ((v.flags & 0x80) !== 0) return;       // $14 < 0 (0xff/0xfe) → inert
-    const inst = v.instr;
+    // EFFECTS is SHARED: a synth record (type-A) OR a sampled descriptor (type-B)
+    // supplies the env/vib block ($4 points at either; both front layouts match).
+    const inst: SunEffectsSource | null = v.instr ?? v.sampled;
     if (v.synthFlag === 1 || !inst) {
       // $37==1 → skip vol+period; still nothing to advance without an instrument
       if (!inst) return;
@@ -497,6 +546,10 @@ export class SunTronicPlayer {
         period: v.period, acc: v.pitch & 0xffff, volume: v.volume & 0xff, flags: v.flags & 0xff,
         outVolume: v.outVolume & 0xff,
         instrOff: v.instr ? v.instr.recordOff : -1,
+        sampleSlot: v.sampled ? v.sampled.slotIndex : -1,
+        sampleLenWords: v.sampled ? v.sampled.lengthWords : 0,
+        loopStartWords: v.sampled ? v.sampled.loopStartWords : 0,
+        loopLenWords: v.sampled ? v.sampled.loopLenWords : 0,
       })),
     };
   }
