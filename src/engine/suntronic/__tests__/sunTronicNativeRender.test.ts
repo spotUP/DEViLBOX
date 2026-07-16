@@ -26,6 +26,7 @@ import {
   renderSunTronicMix,
   SunTronicNativeRenderer,
   NATIVE_SAMPLE_RATE,
+  paulaVoiceSample,
 } from '../SunTronicNativeRender';
 
 const CORPUS = join(process.cwd(), 'public/data/songs/formats/SUNTronicTunes');
@@ -88,6 +89,36 @@ describe('SunTronic native render core', () => {
     let peak = 0;
     for (const s of whole.ch[2]) if (Math.abs(s) > peak) peak = Math.abs(s);
     expect(peak).toBeGreaterThan(0);
+  });
+
+  // Regression: native voice scaling must match Paula/UADE exactly. UADE's
+  // audio.c does `output = current_sample * vol` (s8 * 0..64) then reads it as
+  // `output / 32768`, so a single channel maxes at 128*64/32768 = 0.25. The old
+  // native path normalized with `(byte/128)*(vol/64)` = byte*vol/8192 — a 4x
+  // over-gain that railed every voice to ~1.0 and clipped the mix. These pin the
+  // correct 1/32768 scale; both fail on revert to the /8192 form.
+  it('scales a voice sample exactly like Paula/UADE (full scale = 0.25, not 1.0)', () => {
+    // Full-volume peak sample: 127 * 64 / 32768 = 0.248; NOT (127/128)*(64/64)=0.99.
+    expect(paulaVoiceSample(127, 64)).toBeCloseTo(127 * 64 / 32768, 6);
+    expect(paulaVoiceSample(127, 64)).toBeLessThan(0.25);
+    expect(paulaVoiceSample(-128, 64)).toBeCloseTo(-0.25, 6);
+    // Half volume halves the sample; silence is silent.
+    expect(paulaVoiceSample(127, 32)).toBeCloseTo(paulaVoiceSample(127, 64) / 2, 6);
+    expect(paulaVoiceSample(127, 0)).toBe(0);
+  });
+
+  it('never rails a per-voice buffer past the Paula ±0.25 ceiling (ballblaser)', () => {
+    const bbuf = new Uint8Array(readFileSync(join(CORPUS, 'ballblaser.src')));
+    const bscore = parseSunTronicV13Score(bbuf);
+    const bslot = loadSampleData(bscore.instrumentNames);
+    const mix = renderSunTronicMix(bscore, bslot, { seconds: 8 });
+    for (let v = 0; v < 4; v++) {
+      let peak = 0;
+      for (const s of mix.ch[v]) if (Math.abs(s) > peak) peak = Math.abs(s);
+      // Paula single-channel ceiling is 0.25; allow a hair for rounding. The old
+      // 4x-hot code peaked at ~0.99 here, so this fails on revert.
+      expect(peak, `voice ${v} peak ${peak} exceeds Paula ceiling`).toBeLessThanOrEqual(0.2551);
+    }
   });
 
   // Regression: a sampled voice whose loop descriptor [loopStart, loopStart+
