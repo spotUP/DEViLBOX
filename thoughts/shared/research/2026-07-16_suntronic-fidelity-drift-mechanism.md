@@ -159,3 +159,61 @@ phase while the reference synth voices are drifting).
 Run the decisive experiment (interpolated per-vblank period probe). If confirmed,
 write the plan: expose per-vblank period from the player → resampler applies it on
 the vblank sub-grid → re-measure corpus fidelity → set flip threshold + regression.
+
+---
+
+## UPDATE 2026-07-16 — decisive experiment RUN (probe-fidelity-ceiling.ts)
+
+The committed vblank single-clock fix (`stepVblank`) was measured INERT on corpus
+fidelity, so before building the port we ran the ceiling discriminator: escalate
+maxLag and watch whether synth-voice fidelity climbs toward 1.0 (phase) or
+plateaus <0.90 (timbre). Result (8 s window):
+
+```
+ballblaser  v0  maxLag[640 1500 3000 6000 12000 24000 48000] = 0.49 0.49 0.60 0.67 0.76 0.82 0.80
+ballblaser  v3  = 0.43 0.48 0.57 0.71 0.75 0.83 0.85   (still climbing at 48000)
+analgestic2 v0  = 0.60 0.71 0.79 0.85 0.87 0.88 0.93   PHASE — recoverable to flip threshold
+analgestic2 v3  = 0.60 0.73 0.80 0.85 0.88 0.88 0.93   PHASE — recoverable
+analgestic2 v1  = breaks down (dead/near-silent voice — separate)
+analgestic2 v2  = 0.06→0.26  (sampled slot — Gate-D content, separate)
+```
+
+**Verdict: synth voices are PURE PHASE DRIFT, NOT timbre-capped.** analgestic2
+v0/v3 reach 0.93 once ~48000 samples (~1.1 s) of lag are allowed — the timbre is
+correct, the resampler read-pointer accumulates ~1 s of phase over 8 s.
+
+### Two facts that pin the mechanism
+
+1. **The period trajectory EXISTS and is byte-exact at bucket granularity.**
+   `SunTronicPlayer.stepAll()` (line 487) rewrites `v.period` in `stepEffects`
+   ($24 vibrato) on every step; `tick()` runs 1–2 `stepAll` per 1024 bucket
+   (double-position clock). The ballblaser golden timeline is 1/316 → the
+   *discrete per-bucket* period sequence matches UADE. So the drift is NOT wrong
+   period values and NOT wrong stepAll rate (bucket path and vblank path have the
+   same 1.16 stepAll/bucket average — that is exactly why `stepVblank` was inert).
+
+2. **The drift is sub-bucket resampler PHASE.** Both native and UADE update
+   period only at discrete steps, but the native resampler applies the
+   bucket-latched (or vblank-latched) period as a flat `vInc` across the whole
+   interval and starts its vblank grid at `pos=0`, whereas UADE's Paula begins its
+   vibrato phase at the per-song offset φ_v (gliders 355, ballblaser 881 samples)
+   and advances period on the true CIA sub-grid. A constant φ_v offset alone would
+   be killed by best-lag; the *accumulation* to ~1 s means the sub-bucket period
+   application points drift out of step with UADE's over the song.
+
+### Why `stepVblank` (committed) is right-rate but wrong-granularity
+
+It advances the player once per 882.759-sample vblank and latches ONE period per
+step — same average rate as the old bucket path, so ~inert. The real fix must
+apply, within each render step, the period that is current at each UADE vblank
+boundary **at the correct sample offset (φ_v-phased)**, not one flat latched value.
+
+### Port is CONFIRMED worth building (user authorized full port 2026-07-16)
+
+Target: analgestic2 already reaches 0.93 with phase compensation → the phase port
+can cross the 0.90 flip threshold for synth voices. ballblaser needs the most
+(still climbing at 48000) → it is the hardest synth-voice case and the port's
+gate. Sampled voices (v2) + dead voices (v1) are tracked SEPARATELY (Gate-D
+content), after the synth phase clock is trustworthy.
+
+Plan: `thoughts/shared/plans/2026-07-16-suntronic-resampler-phase-port.md`.
