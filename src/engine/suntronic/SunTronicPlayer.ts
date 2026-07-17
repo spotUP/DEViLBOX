@@ -83,7 +83,7 @@ interface SunPlayerVoice {
   pitch: number;        // $8  — u16 accumulator, hi byte = note index
   pitchSlide: number;   // $a  — s16 slide added to pitch each tick
   volume: number;       // $c  — voice volume 0..0x40
-  volumeSlide: number;  // $d  — s8 slide, gated by $33 counter
+  volumeSlide: number;  // $d  — s8 slide, added to $c every tick
   arpSel: number;       // $e  — arp/interp selector (drin row *16)
   arpPhase: number;     // $f  — arp phase 0..15
   volEnvIndex: number;  // $10 — volume-envelope index
@@ -94,8 +94,6 @@ interface SunPlayerVoice {
   transpose: number;    // $23 — per-channel transpose (s8, from seq entry)
   vibPhase: number;     // $24 — s16 vibrato phase accumulator
   vibIndex: number;     // $26 — vibrato-depth table index
-  envReload: number;    // $32 — vol-slide counter reload
-  envCounter: number;   // $33 — vol-slide countdown
   tie: number;          // $34 — tie/portamento countdown (suppresses re-triggers)
   synthFlag: number;    // $37 — 1 → EFFECTS skips vol+period
   retrig: boolean;      // latched by noteOn, consumed by snapshot(): a note was
@@ -277,7 +275,7 @@ export class SunTronicPlayer {
         arpSel: 0, arpPhase: 0, volEnvIndex: 0,
         flags: 0xff, outVolume: 0, period: 0,
         stagedSel: 0, transpose: entry ? s8(entry.transposes[ch]) : 0,
-        vibPhase: 0, vibIndex: 0, envReload: 0, envCounter: 0, tie: 0, synthFlag: 0,
+        vibPhase: 0, vibIndex: 0, tie: 0, synthFlag: 0,
         retrig: false,
         tempoTick: 5, tempoNote: 0, position: 0, speed: 6, rowsPerPos,
       });
@@ -373,8 +371,10 @@ export class SunTronicPlayer {
       case 0x9b: // -0x65: pitch slide $a (word)
         if (v.tie !== 0) { a1 += 2; break; }
         v.pitchSlide = s16((rd() << 8) | rd()); break;
-      case 0x9a: // -0x66: vol slide $d + reload $32
-        v.volumeSlide = s8(rd()); v.envReload = rd(); break;
+      case 0x9a: // -0x66: vol slide $d (ONE byte — disasm GNN5 `MOVE.B (A1)+,$0D`;
+        // the earlier 2nd read into a fabricated $32 ate the following 0x9b pitch-slide
+        // opcode, freezing pitch on slide voices like multi-arp-long v1)
+        v.volumeSlide = s8(rd()); break;
       case 0x99: // -0x67: volume $c, clr $d
         v.volume = rd(); v.volumeSlide = 0; break;
       case 0x98: // -0x68: global speed $30 (all voices)
@@ -470,16 +470,15 @@ export class SunTronicPlayer {
     else if (np >= 0x4800) np -= 0x4800;
     v.pitch = np & 0xffff;
 
-    // ── advance volume (gated by $33 counter, clamp [0,0x40]) ──
-    if (v.volumeSlide !== 0) {
-      v.envCounter = (v.envCounter - 1) & 0xff;
-      if (s8(v.envCounter) < 0) {
-        v.envCounter = v.envReload & 0xff;
-        let c = u8(v.volume + v.volumeSlide);
-        if (s8(c) < 0) { v.volumeSlide = 0; c = 0; }
-        if (c >= 0x41) { v.volumeSlide = 0; c = 0x40; }
-        v.volume = c;
-      }
+    // ── advance volume (disasm EFF1/EFF2: ungated every tick, clamp [0,0x80]) ──
+    // d1 = volume + s8(slide); <0 → 0; >=0x81 → 0x80; store $0C. No counter and no
+    // slide-zeroing at the limits — the earlier $32/$33 gate + `volumeSlide=0` were
+    // fabricated (the real replayer keeps sliding once the clamp is hit).
+    {
+      let c = (v.volume & 0xff) + s8(v.volumeSlide);
+      if (c < 0) c = 0;
+      else if (c >= 0x81) c = 0x80;
+      v.volume = c;
     }
 
     // ── advance arp phase / vol-env index (wrap len→loop) ──
