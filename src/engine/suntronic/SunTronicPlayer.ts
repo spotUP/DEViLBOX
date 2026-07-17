@@ -376,6 +376,11 @@ export class SunTronicPlayer {
         // opcode, freezing pitch on slide voices like multi-arp-long v1)
         v.volumeSlide = s8(rd()); break;
       case 0x99: // -0x67: volume $c, clr $d
+        // NOTE: the .s disasm's GNN6 doubles the param (`LSL.B #1`) and EFFECTS uses
+        // `LSR.W #7` — but the LOADED binary does NEITHER (no double, EFFECTS >>6).
+        // Verified 2026-07-17 by a validated-base RAM read (myplay9 v3: UADE $0C=64,
+        // env[0]=64, $15=64 = 64*64>>6; >>7 would give 32). Adding the ×2+>>7 pair
+        // regressed the corpus (perfect voices 625→615). Keep the raw byte + >>6.
         v.volume = rd(); v.volumeSlide = 0; break;
       case 0x98: // -0x68: global speed $30 (all voices)
         { const s = rd(); for (const w of this.voices) w.speed = s; } break;
@@ -444,6 +449,9 @@ export class SunTronicPlayer {
     if (extraVib && inst) this.advanceVib(v, inst);
 
     // ── volume $15 (pre master-scale; golden reads $0c not $15) ──
+    // env*$0c>>6. The .s EFFECTS shows `LSR.W #7` (>>7) but the LOADED binary uses
+    // >>6 — proven 2026-07-17: myplay9 v3 UADE $15=64=64*64>>6 (>>7 → 32). Do NOT
+    // change to >>7 (see the 0x99 note above; it regresses the corpus).
     const env = u8(inst.volEnv[v.volEnvIndex] ?? 0);
     v.outVolume = u8((env * (v.volume & 0xff)) >> 6);
 
