@@ -196,6 +196,12 @@ export class SunTronicNativeRenderer {
   private readonly vSamByteLen = [0, 0, 0, 0];
   private readonly vLoopStartBytes = [0, 0, 0, 0];
   private readonly vLoopLenBytes = [0, 0, 0, 0]; // <=2 (one word) = one-shot
+  // Paula volume-attach (ADKCON): vAttach[V] === true means voice V modulates voice
+  // V+1's volume. Hardware mutes V (adk_mask=0, audio.c:269) and overwrites (V+1)->vol
+  // with V's current DMA word every fetch (custom.c:508, audio.c:506) → carrier output
+  // = carrier_sample × modulator_word (amplitude modulation, no 6-bit vol clamp).
+  private readonly vAttach = [false, false, false, false];
+  private readonly datWord = [0, 0, 0, 0]; // per-sample scratch: each voice's DMA word
   // Current play buffer per synth voice (rewritten each vblank; Paula keeps
   // streaming the last buffer written).
   private readonly curBuf: Array<Int8Array | null> = [null, null, null, null];
@@ -272,6 +278,7 @@ export class SunTronicNativeRenderer {
 
       this.vInc[v] = vd.period > 0 ? PAULA_CLOCK_PAL / vd.period / NATIVE_SAMPLE_RATE : 0;
       this.vGain[v] = paulaAudxVol(vd.outVolume & 0xff); // Paula AUDxVOL clamp (64→63)
+      this.vAttach[v] = vd.attachModulator;
 
       if (sampled) {
         // Paula streams the whole PCM once, then loops [loopStart, +loopLen].
@@ -311,16 +318,23 @@ export class SunTronicNativeRenderer {
       }
 
       let s0 = 0, s1 = 0, s2 = 0, s3 = 0;
+      // Per-voice raw DMA word this sample (unsigned 16), for volume-attach: a
+      // carrier reads its modulator's word (audio.c:506). Ascending v means the
+      // modulator (v-1) is always resolved before its carrier (v).
+      const datWord = this.datWord;
       for (let v = 0; v < 4; v++) {
         if (!this.vActive[v]) continue;
         const r = this.vr[v];
-        let sample = 0;
+        let curByte = 0;
+        let buf: Int8Array | null = null;
+        let idx = 0;
+        let byteLen = 0;
 
         const pcm = this.vSamPcm[v];
         if (pcm) {
           // ── Sampled (type-B): stream the whole PCM off "chip RAM", loop the
           //    [loopStart,+loopLen] region (one-shot when loopLen<=one word).
-          const byteLen = this.vSamByteLen[v];
+          byteLen = this.vSamByteLen[v];
           let phase = r.phase;
           if (phase >= byteLen) {
             const loopLen = this.vLoopLenBytes[v];
@@ -341,8 +355,9 @@ export class SunTronicNativeRenderer {
               continue; // one-shot exhausted -> silent
             }
           }
-          const idx = Math.floor(phase);
-          sample = paulaVoiceSample(pcm[idx], this.vGain[v]);
+          idx = Math.floor(phase);
+          buf = pcm;
+          curByte = pcm[idx];
           r.phase = phase + this.vInc[v];
         } else {
           // ── Synth (type-A): regenerate the play buffer on each vblank (advances
@@ -350,16 +365,37 @@ export class SunTronicNativeRenderer {
           if (vblankNow || this.curBuf[v] === null) {
             this.curBuf[v] = renderSynthTick(this.vInst[v]!, r.state, this.prng);
           }
-          const buf = this.curBuf[v]!;
-          const byteLen = buf.length;
+          buf = this.curBuf[v]!;
+          byteLen = buf.length;
           if (byteLen <= 0) continue;
           let phase = r.phase;
-          const idx = Math.floor(phase) % byteLen;
-          sample = paulaVoiceSample(buf[idx], this.vGain[v]);
+          idx = Math.floor(phase) % byteLen;
+          curByte = buf[idx];
           phase += this.vInc[v];
           if (phase >= byteLen) phase -= byteLen * Math.floor(phase / byteLen);
           r.phase = phase;
         }
+
+        // Paula fetches sample bytes a word (2 bytes) at a time; the DMA word
+        // register `dat` holds that word-aligned pair. A volume-attach modulator
+        // hands this whole unsigned word to its carrier as the carrier's volume.
+        const w0 = idx & ~1;
+        datWord[v] = (((buf[w0 % byteLen] & 0xff) << 8) | (buf[(w0 + 1) % byteLen] & 0xff)) & 0xffff;
+
+        let sample: number;
+        if (v > 0 && this.vAttach[v - 1]) {
+          // ── Volume-attach carrier: vol = modulator's raw DMA word (unsigned,
+          //    NOT the 6-bit clamp). output = carrier_sample * word, clamped to
+          //    int16 then /32768 — byte-exact vs audio.c:267 + write_channel_samples.
+          const o = curByte * datWord[v - 1];
+          const c = o > 32767 ? 32767 : o < -32768 ? -32768 : o;
+          sample = c / 32768;
+        } else {
+          sample = paulaVoiceSample(curByte, this.vGain[v]);
+        }
+        // Volume-attach modulator: DMA still runs (word above feeds the carrier)
+        // but adk_mask forces the channel's own output to 0 (audio.c:269).
+        if (this.vAttach[v]) sample = 0;
 
         // Mixer gain (mute/solo/volume) — unity by default so the oracle path
         // is unchanged; scales the audible mix AND the per-voice scope/VU tap.

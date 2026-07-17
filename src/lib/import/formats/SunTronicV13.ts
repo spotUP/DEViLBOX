@@ -747,6 +747,18 @@ export interface SunV13Score {
   drinOff: number;
   /** arp index shift: 4 = Main (256-byte drin, phase&0x0f), 3 = Version-A (128-byte, &0x07) */
   arpShift: number;
+  /**
+   * 0x9a vol-slide operand width, INDEPENDENT of arpShift (both variants exist at
+   * arpShift=4). Signature-located from the 0x9a handler in the embedded player:
+   *   `11 59 00 0d 11 59 00 32` (MOVE.B (A1)+,$0D; MOVE.B (A1)+,$32) → 2 stream bytes,
+   *      slide rate ($32) read from the stream. → volSlideRateFromStream = true.
+   *   `11 59 00 0d 11 7c 00 01 00 32` (MOVE.B (A1)+,$0D; MOVE.B #$1,$32) → 1 stream byte,
+   *      slide rate hardwired to 1. → volSlideRateFromStream = false.
+   * The rate gates a per-voice $32/$33 counter so the slide advances only every
+   * (rate+1) ticks (embedded EFFECTS @kompo04.dis 0x6f4 / myplay9.dis 0x6ea).
+   * Corpus: 74 modules 2-byte, 125 modules 1-byte, 0 ambiguous, 0 uncovered.
+   */
+  volSlideRateFromStream: boolean;
   /** sliced drin table (2^arpShift rows × 16 phases, s8 transpose per (arpSel,phase)) */
   drin: Int8Array;
   /** hunk#1-relative offset of the synth instrument table (0x24-byte records) */
@@ -820,6 +832,17 @@ export function parseSunTronicV13Score(buf: Uint8Array): SunV13Score {
   // high indices are only reachable where h1 is longer, matching UADE's raw read).
   const drin = new Int8Array(256 << arpShift); // 2048 Version-A / 4096 Main
   for (let i = 0; i < drin.length && drinOff + i < h1.length; i++) drin[i] = s8(h1, drinOff + i);
+
+  // ── 0x9a vol-slide operand width: signature-locate the handler in the player code ──
+  // Both handlers start MOVE.B (A1)+,$0D = `11 59 00 0d`; the next word distinguishes:
+  //   11 59 (MOVE.B (A1)+,$32) → rate from a 2nd stream byte; 11 7c (MOVE.B #imm,$32) → rate=1.
+  let volSlideRateFromStream = false;
+  for (let i = 0; i + 6 <= h1.length; i += 2) {
+    if (h1[i] === 0x11 && h1[i + 1] === 0x59 && h1[i + 2] === 0x00 && h1[i + 3] === 0x0d) {
+      volSlideRateFromStream = h1[i + 4] === 0x11 && h1[i + 5] === 0x59;
+      break;
+    }
+  }
 
   // ── instrument name block at hunk#1+0 ──
   const { names, nameBlockEnd } = parseNameBlock(h1);
@@ -941,6 +964,7 @@ export function parseSunTronicV13Score(buf: Uint8Array): SunV13Score {
     periodsOff,
     drinOff,
     arpShift,
+    volSlideRateFromStream,
     drin,
     synthTableOff,
     sampledTableOff,
