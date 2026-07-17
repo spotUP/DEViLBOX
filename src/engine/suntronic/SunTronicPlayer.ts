@@ -98,6 +98,11 @@ interface SunPlayerVoice {
   envCounter: number;   // $33 — vol-slide countdown
   tie: number;          // $34 — tie/portamento countdown (suppresses re-triggers)
   synthFlag: number;    // $37 — 1 → EFFECTS skips vol+period
+  retrig: boolean;      // latched by noteOn, consumed by snapshot(): a note was
+                        // (re)triggered this tick — even on the SAME instrument.
+                        // The audio renderer keys its timbre/phase/envelope restart
+                        // on this, since instrOff-diffing misses same-instrument
+                        // retriggers (every new note must reset the synth voice).
   tempoTick: number;    // $2c — ticks-within-note counter (audio ticks; debug only now)
   tempoNote: number;    // $2d — notes-within-position counter
   position: number;     // $2e — sequence position index
@@ -117,6 +122,12 @@ export interface SunPlayerTick {
   voices: Array<{
     period: number; acc: number; volume: number; flags: number; outVolume: number;
     instrOff: number;
+    /** true when a note (re)triggered during this tick — even on the SAME
+     *  instrument. The audio renderer must restart the synth voice (timbre
+     *  feedback, resampler phase, envelope) whenever this is set, because an
+     *  unchanged instrOff otherwise hides same-instrument note repeats (which
+     *  would then play on from the previous note's decayed tail). */
+    retrig: boolean;
     /** type-B sampled voice: external sample slot index, or -1 for a synth/inert
      *  voice. When >= 0 the audio renderer plays companion PCM (not a wavetable)
      *  at `period` with loop [loopStartWords, +loopLenWords] words. */
@@ -158,6 +169,10 @@ export interface SunPlayerOptions {
    *  silent (missing instr/ sidecar). Required for type-B (sampled) voices; the
    *  synth voices ignore it. */
   sampleData?: (Int8Array | null)[];
+  /** EXPERIMENTAL: external 256-byte drin (arp note-transpose) table, indexed by
+   *  d5 = (arpSel<<4)+phase. Overrides the zero-filled default. Used to validate
+   *  the arp/drin port against a UADE-RAM oracle before the parser builds it. */
+  drin?: Int8Array;
 }
 
 /**
@@ -232,6 +247,7 @@ export class SunTronicPlayer {
     // remaining Gate-2 port step (modules like darkness/energy that drive nonzero d5
     // are not yet byte-exact). Zero base = the correct row-0 semantics meanwhile.
     this.drin = new Int8Array(256); // zero-filled; arp rows unported (see above)
+    if (opts.drin && opts.drin.length >= 256) this.drin.set(opts.drin.subarray(0, 256));
     this.periods = new Int16Array(320);
     for (let i = 0; i < 320; i++) {
       const o = this.periodsOff + i * 2;
@@ -257,6 +273,7 @@ export class SunTronicPlayer {
         flags: 0xff, outVolume: 0, period: 0,
         stagedSel: 0, transpose: entry ? s8(entry.transposes[ch]) : 0,
         vibPhase: 0, vibIndex: 0, envReload: 0, envCounter: 0, tie: 0, synthFlag: 0,
+        retrig: false,
         tempoTick: 5, tempoNote: 0, position: 0, speed: 6, rowsPerPos,
       });
     }
@@ -325,6 +342,9 @@ export class SunTronicPlayer {
     v.instr = inst.synth;
     v.sampled = inst.sampled;
     v.arpSel = 0; v.arpPhase = 0; v.volEnvIndex = 0;
+    v.retrig = true; // signal the audio renderer to restart the synth voice
+                     // (envelope/phase/sample position) — a new note fired even if
+                     // the instrument offset is unchanged from the previous note.
     // Type-A note-on clears the vibrato accumulator + depth index (disasm
     // 0x269ae: clr.w $24; clr.w $26). EFFECTS then computes the note-on-tick
     // period with $24=0 and advances afterwards (compute-then-advance).
@@ -563,15 +583,23 @@ export class SunTronicPlayer {
    *  renderer + the golden read them). Shared by tick() and stepVblankOnce(). */
   private snapshot(): SunPlayerTick {
     return {
-      voices: this.voices.map((v) => ({
-        period: v.period, acc: v.pitch & 0xffff, volume: v.volume & 0xff, flags: v.flags & 0xff,
-        outVolume: v.outVolume & 0xff,
-        instrOff: v.instr ? v.instr.recordOff : -1,
-        sampleSlot: v.sampled ? v.sampled.slotIndex : -1,
-        sampleLenWords: v.sampled ? v.sampled.lengthWords : 0,
-        loopStartWords: v.sampled ? v.sampled.loopStartWords : 0,
-        loopLenWords: v.sampled ? v.sampled.loopLenWords : 0,
-      })),
+      voices: this.voices.map((v) => {
+        // Consume the retrigger latch: report it once, then clear so the next
+        // tick without a fresh noteOn reads false. noteOn may fire on any of the
+        // 1–2 internal steps this bucket ran; the latch survives to here.
+        const retrig = v.retrig;
+        v.retrig = false;
+        return {
+          period: v.period, acc: v.pitch & 0xffff, volume: v.volume & 0xff, flags: v.flags & 0xff,
+          outVolume: v.outVolume & 0xff,
+          instrOff: v.instr ? v.instr.recordOff : -1,
+          retrig,
+          sampleSlot: v.sampled ? v.sampled.slotIndex : -1,
+          sampleLenWords: v.sampled ? v.sampled.lengthWords : 0,
+          loopStartWords: v.sampled ? v.sampled.loopStartWords : 0,
+          loopLenWords: v.sampled ? v.sampled.loopLenWords : 0,
+        };
+      }),
     };
   }
 
