@@ -94,17 +94,16 @@ export function stepEffects(
   drin: Int8Array = new Int8Array(0),
 ): SunEffectsOutput {
   // ── Paula volume ──
-  // NOTE (disasm 0x267f6-0x2684e, gliders.src, 2026-07-14): the LOADED replayer
-  // diverges from DP_Suntronic.s here. Loaded does THREE stages, not one >>7:
-  //   d1 = volEnvTable[volEnvIndex] * voiceVolume >> 6
-  //   d1 = d1 * masterVolA($a8d) >> 6        ; global fade level, 0..0x40
-  //   d1 = d1 * masterVolB($a8e) >> 6        ; second global scale word
-  // The two master-scale multiplies are absent from the .s. They only affect the
-  // final Paula AUDxVOL byte ($15), which the p9a golden does NOT capture (p9a
-  // reads voice-volume $0c, pre-scale). So this >>7 form is fine for the golden
-  // diff; but real native audio must apply the two master-scale stages (feed
-  // masterVolA/B from the handler's fade envelope $a8a-$a8d — see the Gate-2
-  // research doc). TODO(port): thread masterVolA/B in and use the >>6×3 form.
+  // NOTE (2026-07-17): the disasm's speculative "THREE stages, ×masterVolA/B>>6"
+  // theory was REFUTED by measurement. probe-mastervol.ts diffed native $15 vs the
+  // UADE AUD{n}VOL oracle across the corpus: mean ratio ≈1.0 (the master words are
+  // identity — no dynamic global fade), and the ONLY systematic native/UADE delta
+  // was full-scale voices reading 64 where Paula caps AUDxVOL at 63. That is the
+  // Paula 6-bit register clamp (audio.c:808 `v & 64 ? 63 : v & 63`), applied at the
+  // Paula boundary via paulaAudxVol() in SunTronicNativeRender — NOT a master
+  // multiply here. This standalone preview path is single-note audition (empty drin,
+  // no song master state); its >>7 vs the player's >>6 only shifts preview loudness,
+  // not the corpus render. No masterVolA/B port is warranted.
   const volEnvVal = u8(inst.volEnv[st.volEnvIndex] ?? 0);
   const outVolume = (volEnvVal * (st.volume & 0xff)) >> 7;
 
