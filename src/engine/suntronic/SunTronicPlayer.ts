@@ -184,6 +184,8 @@ export class SunTronicPlayer {
   private readonly periods: Int16Array; // guardless period LUT (word signed→unsigned read)
   private readonly periodsOff: number;
   private readonly drin: Int8Array;
+  private readonly arpShift: number;      // 4 = Main (256-byte drin), 3 = Version-A (128-byte)
+  private readonly arpPhaseMask: number;  // (1<<arpShift)-1 — 0x0f Main / 0x07 Version-A
   private readonly synthTableOff: number;
   private readonly synthRecordSize = 0x24;
   /** sampled (type-B) descriptors, indexed by (select byte - 1). Each binds the
@@ -238,16 +240,19 @@ export class SunTronicPlayer {
     // ── PERIODS: signature-located in the parser (a byte-identical replayer-constant
     //    320-word ramp, reloc-independent — see SunTronicV13). ──
     this.periodsOff = score.periodsOff;
-    // drin (note-transpose table, indexed d5=(arpSel<<4)+phase): NOT a file
-    // constant. It lives in a runtime BSS hunk the eagleplayer allocates + fills at
-    // init from each module's arp/vibrato definitions (gliders' drin sits at abs
-    // 0x2828b = file offset 0x8003, ~0x59a7 bytes PAST the 0x265c-byte module image).
-    // Row 0 (d5 0..15, no arp) is all zeros, so non-arp voices need no transpose and
-    // are byte-exact with a zero table. Per-module arp/vibrato drin generation is the
-    // remaining Gate-2 port step (modules like darkness/energy that drive nonzero d5
-    // are not yet byte-exact). Zero base = the correct row-0 semantics meanwhile.
-    this.drin = new Int8Array(256); // zero-filled; arp rows unported (see above)
-    if (opts.drin && opts.drin.length >= 256) this.drin.set(opts.drin.subarray(0, 256));
+    // drin (note-transpose table, indexed d5=(arpSel<<arpShift)+phase): plain hunk#1
+    // module data, signature-located in the parser (NOT runtime BSS-generated — an
+    // earlier port comment claimed that; refuted by per-tick Paula-log lockstep on
+    // `ready`, where the located drin reproduces UADE's arp pitch set 112/119 windows).
+    // arpShift/mask are driver-version-dependent: Main = ×16/256-byte/phase&0x0f,
+    // Version-A = ×8/128-byte/phase&0x07. opts.drin overrides (probe injection).
+    this.arpShift = score.arpShift || 4;
+    // phase wrap is coupled to the shift: Main ANDI.B #$0f (16 phases/row), Version-A
+    // ANDI.B #7 (8 phases/row) — see DP_Suntronic.s:483 vs :1000.
+    this.arpPhaseMask = (1 << this.arpShift) - 1;
+    this.drin = new Int8Array((1 << this.arpShift) * 16);
+    if (score.drin && score.drin.length >= this.drin.length) this.drin.set(score.drin.subarray(0, this.drin.length));
+    if (opts.drin && opts.drin.length >= this.drin.length) this.drin.set(opts.drin.subarray(0, this.drin.length));
     this.periods = new Int16Array(320);
     for (let i = 0; i < 320; i++) {
       const o = this.periodsOff + i * 2;
@@ -443,7 +448,7 @@ export class SunTronicPlayer {
     v.outVolume = u8((env * (v.volume & 0xff)) >> 6);
 
     // ── period $20 ──
-    const d5 = ((v.arpSel & 0xff) << 4) + (v.arpPhase & 0x0f);
+    const d5 = ((v.arpSel & 0xff) << this.arpShift) + (v.arpPhase & this.arpPhaseMask);
     let d0 = v.pitch & 0xffff;
     const vibDepth = s8(inst.vibDepth[v.vibIndex] ?? 0);
     let d3 = v.vibPhase < 0 ? -s16(v.vibPhase) : s16(v.vibPhase);
@@ -478,7 +483,7 @@ export class SunTronicPlayer {
     }
 
     // ── advance arp phase / vol-env index (wrap len→loop) ──
-    v.arpPhase = (v.arpPhase + 1) & 0x0f;
+    v.arpPhase = (v.arpPhase + 1) & this.arpPhaseMask;
     v.volEnvIndex = (v.volEnvIndex + 1) & 0xffff;
     if (v.volEnvIndex === inst.volEnvLen) v.volEnvIndex = inst.volEnvLoop;
 

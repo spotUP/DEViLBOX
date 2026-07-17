@@ -50,7 +50,20 @@ import { PAULA_CLOCK_PAL } from './SunTronicVoiceRenderer';
 /** The fixed native render rate — the golden timeline is calibrated here. */
 export const NATIVE_SAMPLE_RATE = 44100;
 const BUCKET = 1024; // audioTick samples per player tick (calibrated at 44100)
-const MAX_VOLUME = 0x40;
+
+/**
+ * Paula AUDxVOL 6-bit register clamp, byte-exact vs audio.c:808
+ *   int v2 = v & 64 ? 63 : v & 63;
+ * The $15 volume the driver computes (env*voiceVol>>6) can reach 0x40 (64); real
+ * Paula caps the AUDxVOL register at 63 (bit 6 = "max"), so a full-scale voice
+ * plays at 63, not 64. Native previously used min(64,v), leaving loud voices one
+ * LSB too hot vs UADE. This is the hardware clamp, applied at the Paula-register
+ * boundary — the player's $15 value stays raw (golden reads $0c/$15 pre-clamp).
+ * (The disasm's speculative masterVolA/B ×3 stages are NOT this: measurement shows
+ * the corpus master words are identity — the only systematic native/UADE VOL delta
+ * was exactly this missing 64→63 clamp, no dynamic global fade observed.)
+ */
+export const paulaAudxVol = (v: number): number => (v & 64 ? 63 : v & 63);
 
 /**
  * Paula per-voice output sample, matching UADE's audio.c exactly:
@@ -258,7 +271,7 @@ export class SunTronicNativeRenderer {
       }
 
       this.vInc[v] = vd.period > 0 ? PAULA_CLOCK_PAL / vd.period / NATIVE_SAMPLE_RATE : 0;
-      this.vGain[v] = Math.min(MAX_VOLUME, vd.outVolume & 0xff); // Paula linear vol 0..64
+      this.vGain[v] = paulaAudxVol(vd.outVolume & 0xff); // Paula AUDxVOL clamp (64→63)
 
       if (sampled) {
         // Paula streams the whole PCM once, then loops [loopStart, +loopLen].
