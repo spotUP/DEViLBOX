@@ -100,7 +100,7 @@ export function voiceScopeToInt16(src: Float32Array, count: number): Int16Array 
 // slides, type-6 whose resonator sweeps) the buffer content changes every frame,
 // so regen must ride the vblank grid or the timbre freezes. Same 882.759 clock
 // the player's double-position schedule is built on (SunTronicPlayer.tick).
-const VBLANK = (1024 * 25) / 29;
+const VBLANK = (BUCKET * 25) / 29;
 
 /** Per-voice diagnostic summary for the fidelity report. */
 export interface VoiceInfo {
@@ -127,6 +127,10 @@ export interface NativeMix {
 /** Optional per-voice destination for whole-song / oscilloscope callers. */
 export interface RenderChannels {
   ch: [Float32Array, Float32Array, Float32Array, Float32Array];
+  /** Test-only sink: absolute `pos` of every note-latch (one PAL vblank). When
+   *  supplied, renderInto appends each latch sample offset — proves notes are
+   *  latched on the ~882.76 vblank grid, not quantized to the 1024 bucket. */
+  latchPos?: number[];
 }
 
 /** Per-voice mutable render state (timbre gen + resampler phase). */
@@ -152,15 +156,21 @@ export class SunTronicNativeRenderer {
   private readonly vr: VoiceRender[];
 
   // Absolute sample position (44100 grid) — drives the bucket + vblank clocks.
-  // TWO clocks by design: notes/period latch on the byte-exact 1024 bucket (the
-  // double-position tick()); synth timbre regenerates on the ~882.76 vblank
-  // (MEGAEFFECTS). Do NOT collapse them — stepping notes on the vblank grid moves
-  // note timing off the golden double-position schedule for no fidelity gain (the
-  // whole-song synth-voice drift is sub-bucket resampler phase, see
-  // thoughts/shared/plans/2026-07-16-suntronic-resampler-phase-port.md).
+  // SINGLE vblank clock: notes/period AND synth timbre both advance once per PAL
+  // vblank (~882.76 samples), exactly as the UADE replayer fires — one stepAll per
+  // vblank via player.stepVblankOnce(). This places every note ONSET at its true
+  // sub-bucket sample offset. The old dual clock latched notes on the 1024 bucket
+  // (double-position tick()), which quantized onsets to bucket boundaries: measured
+  // mean 10.5 ms / max 21.6 ms onset jitter (onset-schedule-diff.ts), audible as
+  // "notes off" rhythmically. That error was invisible to the voiceFidelity xcorr
+  // metric (it re-aligns each window), which is why the earlier Gate-E pass wrongly
+  // judged the vblank grid inert. 29 vblank steps over 25 buckets == the same 29
+  // stepAlls tick() bundles via 4 doubles, so the period VALUES stay byte-exact vs
+  // the golden (which still tests tick() directly). The residual sub-sample synth
+  // drift on swept voices is the separate deferred Paula-DMA scheduler.
   private pos = 0;
-  private nextVblank = VBLANK;
-  private buckets = 0;
+  private nextVblank = 0; // first sample latches the priming step (was VBLANK)
+  private buckets = 0;    // counts vblank latches now (report denominator only)
   private readonly offCount: Array<Map<number, number>>;
   private readonly activeCount = [0, 0, 0, 0];
 
@@ -203,14 +213,15 @@ export class SunTronicNativeRenderer {
   }
 
   /**
-   * Refresh the per-bucket voice state from one player tick. Called at every
-   * 1024-sample boundary (the golden clock resolves note/period/volume at bucket
-   * granularity — constant across the bucket). The residual sub-bucket period
-   * drift on vibrato voices is the Gate-E resampler-phase port, NOT a reason to
-   * step the player on the vblank grid (that was measured inert).
+   * Refresh the per-voice state from one player step, on the true PAL vblank grid.
+   * Called at every ~882.76-sample vblank boundary — one stepAll per vblank, which
+   * is how the UADE replayer fires. This resolves note/period/volume at the moment
+   * UADE would, so onsets are not quantized to the 1024 bucket. The period sequence
+   * is identical to tick()'s (29 stepAlls / 25 buckets either way), so it stays
+   * byte-exact vs the golden.
    */
-  private deriveBucket(): void {
-    const tick = this.player.tick();
+  private deriveVblank(): void {
+    const tick = this.player.stepVblankOnce();
     this.buckets++;
     for (let v = 0; v < 4; v++) {
       const vd = tick.voices[v];
@@ -273,12 +284,18 @@ export class SunTronicNativeRenderer {
   renderInto(left: Float32Array, right: Float32Array, chans?: RenderChannels): void {
     const count = left.length;
     const ch = chans?.ch;
+    const latchSink = chans?.latchPos;
     for (let i = 0; i < count; i++) {
-      // Two clocks: notes/period on the byte-exact 1024 bucket; synth timbre
-      // (curBuf/arp) on the ~882.76 vblank below.
-      if (this.pos % BUCKET === 0) this.deriveBucket();
-      const vblankNow = this.pos >= this.nextVblank;
-      if (vblankNow) this.nextVblank += VBLANK;
+      // Single clock: notes/period AND synth timbre (curBuf/arp) both advance once
+      // per ~882.76-sample vblank — the UADE fire cadence. Latch note state first so
+      // the timbre regen below uses the freshly-fired period/instrument.
+      let vblankNow = false;
+      if (this.pos >= this.nextVblank) {
+        this.deriveVblank();
+        this.nextVblank += VBLANK;
+        vblankNow = true;
+        if (latchSink) latchSink.push(this.pos);
+      }
 
       let s0 = 0, s1 = 0, s2 = 0, s3 = 0;
       for (let v = 0; v < 4; v++) {

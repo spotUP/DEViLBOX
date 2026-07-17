@@ -4,19 +4,19 @@
  * Gate B.2 (plans/2026-07-16-suntronic-gateB2-native-song-playback.md) drives
  * browser playback by calling `SunTronicNativeRenderer.renderInto` in SHORT
  * chunks (the worklet pump with lookahead) instead of one whole-song pass. That
- * only produces correct audio if a chunk boundary NEVER perturbs the 1024-sample
- * player-tick bucket clock or the 882.759-sample vblank regen grid — both are
- * driven off the renderer's absolute `pos`, not the chunk length.
+ * only produces correct audio if a chunk boundary NEVER perturbs the
+ * ~882.759-sample vblank clock (notes/period AND synth timbre both advance on it)
+ * — it is driven off the renderer's absolute `pos`, not the chunk length.
  *
  * This pins that invariant: rendering analgestic2 in a ragged sequence of chunk
- * sizes (1, 883, 1023, 1025, 2048, 7, ... — deliberately crossing bucket AND
- * vblank boundaries mid-chunk) produces byte-identical stereo to the single
- * whole-song `renderSunTronicMix`. It also confirms Gate D still holds through
- * the core (voice 2 = sampled slot 0, not silent).
+ * sizes (1, 883, 1023, 1025, 2048, 7, ... — deliberately crossing vblank
+ * boundaries mid-chunk) produces byte-identical stereo to the single whole-song
+ * `renderSunTronicMix`. It also confirms Gate D still holds through the core
+ * (voice 2 = sampled slot 0, not silent).
  *
- * Fails on revert: reintroduce any chunk-length dependence in the bucket/vblank
- * clock (e.g. resetting nextVblank per call, or ticking per chunk instead of per
- * 1024 absolute samples) and the chunked stereo diverges from whole-song.
+ * Fails on revert: reintroduce any chunk-length dependence in the vblank clock
+ * (e.g. resetting nextVblank per call, or ticking per chunk instead of per
+ * absolute `pos`) and the chunked stereo diverges from whole-song.
  */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'fs';
