@@ -248,9 +248,13 @@ export class SunTronicPlayer {
     // phase wrap is coupled to the shift: Main ANDI.B #$0f (16 phases/row), Version-A
     // ANDI.B #7 (8 phases/row) — see DP_Suntronic.s:483 vs :1000.
     this.arpPhaseMask = (1 << this.arpShift) - 1;
-    this.drin = new Int8Array((1 << this.arpShift) * 16);
-    if (score.drin && score.drin.length >= this.drin.length) this.drin.set(score.drin.subarray(0, this.drin.length));
-    if (opts.drin && opts.drin.length >= this.drin.length) this.drin.set(opts.drin.subarray(0, this.drin.length));
+    // drin is byte-arpSel-indexed: d5 = (arpSel<<shift)+phase, arpSel a full byte, so
+    // the table spans 256 selectors (2048 Version-A / 4096 Main). The parser extracts
+    // that full span; the old (1<<shift)*16 = 128/256-byte copy truncated arpSel>15
+    // (suntronic-k3/k4 arpSel=17 → index 136) to zero → the arp sweep vanished. Use the
+    // parser/probe table verbatim; only fabricate a zero minimum if neither is present.
+    const drinLen = 256 << this.arpShift;
+    this.drin = opts.drin ?? score.drin ?? new Int8Array(drinLen);
     this.periods = new Int16Array(320);
     for (let i = 0; i < 320; i++) {
       const o = this.periodsOff + i * 2;
@@ -368,9 +372,18 @@ export class SunTronicPlayer {
       case 0x9c: // -0x64: arp selector $e, clr $f
         if (v.tie !== 0) { a1 += 1; break; }
         v.arpSel = rd(); v.arpPhase = 0; break;
-      case 0x9b: // -0x65: pitch slide $a (word)
-        if (v.tie !== 0) { a1 += 2; break; }
-        v.pitchSlide = s16((rd() << 8) | rd()); break;
+      case 0x9b: { // -0x65: pitch slide $a — operand WIDTH is driver-version-dependent.
+        // Main (GNN4 @DP_Suntronic.s:510) reads a big-endian WORD (2 bytes).
+        // Version-A (GNN4a @1034) reads ONE sign-extended byte (`MOVE.B; EXT.W`).
+        // Same arpShift split that governs the drin table governs this. Reading a
+        // word on a Version-A stream both scales the slide ~256x (byte 0x3c → 0x3C00,
+        // making a gentle glide an octave-per-tick sweep) AND swallows the following
+        // byte, desyncing the group — the whole-corpus Version-A pitch-slide bug.
+        const wide = this.arpShift >= 4;
+        if (v.tie !== 0) { a1 += wide ? 2 : 1; break; }
+        v.pitchSlide = wide ? s16((rd() << 8) | rd()) : s8(rd());
+        break;
+      }
       case 0x9a: // -0x66: vol slide $d (ONE byte — disasm GNN5 `MOVE.B (A1)+,$0D`;
         // the earlier 2nd read into a fabricated $32 ate the following 0x9b pitch-slide
         // opcode, freezing pitch on slide voices like multi-arp-long v1)

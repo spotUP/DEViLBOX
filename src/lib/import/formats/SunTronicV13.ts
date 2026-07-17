@@ -811,8 +811,15 @@ export function parseSunTronicV13Score(buf: Uint8Array): SunV13Score {
     drinOff = off; arpShift = shift; break;
   }
   if (drinOff < 0) throw new Error('SunTronic V1.3: drin arp table signature not found');
-  const drin = new Int8Array((1 << arpShift) * 16);
-  for (let i = 0; i < drin.length; i++) drin[i] = s8(h1, drinOff + i);
+  // arpSel is a full byte — the 0x9c opcode reads a raw operand (0..255) — and the
+  // replayer raw-indexes module RAM at d5 = (arpSel<<shift)+phase with NO bound.
+  // Songs DO use arpSel > 15 (suntronic-k3/k4 arpSel=17 → index 136..143), so the
+  // old 16-selector slice ((1<<shift)*16 = 128/256 bytes) truncated those indices
+  // to out-of-range → zero arp offset → the arp sweep silently vanished. Extract the
+  // full byte-arpSel span (256 selectors), bounded by hunk#1 (zero past the end —
+  // high indices are only reachable where h1 is longer, matching UADE's raw read).
+  const drin = new Int8Array(256 << arpShift); // 2048 Version-A / 4096 Main
+  for (let i = 0; i < drin.length && drinOff + i < h1.length; i++) drin[i] = s8(h1, drinOff + i);
 
   // ── instrument name block at hunk#1+0 ──
   const { names, nameBlockEnd } = parseNameBlock(h1);
