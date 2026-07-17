@@ -41,6 +41,7 @@ import { SunTronicPlayer } from './SunTronicPlayer';
 import {
   renderSynthTick,
   createVoiceState,
+  retriggerVoiceState,
   createPrng,
   type SunSynthVoiceState,
 } from './SunTronicSynthVoice';
@@ -160,9 +161,9 @@ export class SunTronicNativeRenderer {
     if (ch >= 0 && ch < 4) this.vUserGain[ch] = gain < 0 ? 0 : gain;
   }
 
-  constructor(score: SunV13Score, slotPcm: (Int8Array | null)[]) {
+  constructor(score: SunV13Score, slotPcm: (Int8Array | null)[], drin?: Int8Array) {
     this.slotPcm = slotPcm;
-    this.player = new SunTronicPlayer(score, { sampleData: slotPcm });
+    this.player = new SunTronicPlayer(score, { sampleData: slotPcm, drin });
     for (const inst of score.synthInstruments) this.byOff.set(inst.recordOff, inst);
     this.vr = [0, 1, 2, 3].map(() => ({
       state: createVoiceState(),
@@ -201,8 +202,16 @@ export class SunTronicNativeRenderer {
       // Note-on / instrument change: restart the timbre feedback + arp (matches
       // GETNEXTNOTE clearing the play buffer + latch on a retrigger). Sampled
       // voices carry instrOff=-1, so key the retrigger on the slot too.
-      if (vd.instrOff !== r.lastInstrOff || vd.sampleSlot !== r.lastSlot) {
-        r.state = createVoiceState();
+      // `vd.retrig` covers the case instrOff-diffing misses: a NEW note on the
+      // SAME instrument. Without it, repeated same-instrument notes play on from
+      // the previous note's decayed envelope tail (audibly: volume degrades per
+      // note and note attacks vanish = "skipped" notes).
+      if (vd.retrig || vd.instrOff !== r.lastInstrOff || vd.sampleSlot !== r.lastSlot) {
+        // Note-on: FULL synth voice restart (equivalent to createVoiceState) —
+        // clears the play-buffer/feedback latch, the type-6 sweep, AND the
+        // arp/interp index ($12). Oracle-verified: preserving arpIndex flattens
+        // the bass + over-moves other voices vs UADE. See retriggerVoiceState.
+        retriggerVoiceState(r.state);
         r.phase = 0;
         r.lastInstrOff = vd.instrOff;
         r.lastSlot = vd.sampleSlot;
@@ -336,7 +345,7 @@ export class SunTronicNativeRenderer {
 export function renderSunTronicMix(
   score: SunV13Score,
   slotPcm: (Int8Array | null)[],
-  opts: { seconds?: number } = {},
+  opts: { seconds?: number; drin?: Int8Array } = {},
 ): NativeMix {
   const sampleRate = NATIVE_SAMPLE_RATE;
   const seconds = opts.seconds ?? 10;
@@ -345,7 +354,7 @@ export function renderSunTronicMix(
   const left = new Float32Array(totalSamples);
   const right = new Float32Array(totalSamples);
 
-  const renderer = new SunTronicNativeRenderer(score, slotPcm);
+  const renderer = new SunTronicNativeRenderer(score, slotPcm, opts.drin);
   renderer.renderInto(left, right, { ch });
 
   const info = renderer.getInfo();

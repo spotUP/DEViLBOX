@@ -74,6 +74,28 @@ export function createPrng(): SunSynthPrng {
   return { value: 0 };
 }
 
+/**
+ * Apply a GNN note-on / instrument retrigger to a synth voice state IN PLACE —
+ * a FULL restart, equivalent to createVoiceState() applied in place. A note-on
+ * (GNN retrigger 0x269ae) restarts the whole synth voice: the $14 bit1 feedback
+ * latch (play buffer restarts from wave1), the type-6 sweep ($28/$2a), AND the
+ * arp/interp index ($12).
+ *
+ * NOTE: an earlier attempt preserved arpIndex across the retrigger (theory: only
+ * opcode 0x95 clears $12). The UADE oracle disproves it — matching the per-voice
+ * envelope/level of every `ready` voice REQUIRES the full reset (preserving
+ * arpIndex over-moves voice 0, flattens the bass on voice 1, and runs voice 3
+ * ~11% hot). Ground-truth measurement beats disasm inference. Do NOT re-add
+ * arpIndex preservation without an oracle A/B that shows it closer.
+ */
+export function retriggerVoiceState(state: SunSynthVoiceState): void {
+  state.arpIndex = 0;
+  state.feedbackLatched = false;
+  state.playBuffer = null;
+  state.resonPhase = 0;
+  state.resonCnt = 0;
+}
+
 const toS8 = (b: number): number => (b << 24) >> 24;
 const asrW7 = (x: number): number => ((x << 16) >> 16) >> 7; // 16-bit signed ASR #7
 const toS16 = (x: number): number => (x << 16) >> 16;
