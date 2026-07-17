@@ -225,6 +225,11 @@ export class SunTronicPlayer {
   /** double-position clock: index of the next extra ("double") player-step. The k-th
    *  extra step lands at bucket round(k*di), di = ciaTick/(audioTick-ciaTick). */
   private doubleK = 1;
+  /** Optional fire-time hook: invoked inside getNextNote at each note-on with the
+   *  authoritative (channel, position, rowWithinPosition=tempoNote, note). Null =
+   *  no effect on audio. Used to build the editable grid from the real player
+   *  decode (single source of truth) and to measure grid/player divergence. */
+  rowRecorder: ((channel: number, position: number, row: number, note: number) => void) | null = null;
 
   constructor(score: SunV13Score, opts: SunPlayerOptions = {}) {
     this.audioTick = opts.audioTickSamples ?? 1024;
@@ -361,6 +366,7 @@ export class SunTronicPlayer {
         v.synthFlag = 0;
         this.noteOn(v, sel);
         didReset = true;
+        if (this.rowRecorder) this.rowRecorder(v.channel, v.position, v.tempoNote, note);
         continue;
       }
       // control opcode 0x80..0xb7 → dispatch (a1 already past opcode byte)
@@ -568,8 +574,14 @@ export class SunTronicPlayer {
   /** Advance the sequence position for one voice (tick handler row branch). */
   private loadPosition(v: SunPlayerVoice): void {
     let entry = this.sequence[v.position];
-    if (!entry) { // past end → loop restart
-      if (this.seqEndKind !== 'restart') return;
+    if (!entry) { // past end
+      // 'stop' songs have no loop point: the sequence simply ends. The old code
+      // returned here WITHOUT idling the voice, so it kept its stale end-of-song
+      // cursor and getNextNote streamed whatever bytes followed in h1 — firing
+      // phantom retriggers (audible garbage + ghost notes with no grid row) for
+      // the rest of playback. Idle the voice (DMA off) = silence at song end,
+      // matching UADE. 6 corpus stop-songs affected (nebulus*, time0003/50/60).
+      if (this.seqEndKind !== 'restart') { v.flags = 0xfe; return; }
       v.position = 0;
       entry = this.sequence[0];
       if (!entry) return;

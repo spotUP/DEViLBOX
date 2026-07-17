@@ -474,6 +474,10 @@ function walkV13Voice(
   voice: number,
 ): { cells: V13DisplayCell[]; fpPerRow: number[] } {
   const h1 = score.h1;
+  // Variant-dependent operand widths — MUST match the audio player's controlOpcode,
+  // or this walk desyncs from the stream and drops later notes (invisible "ghost"
+  // notes: they play but no grid cell). See SunCmdWidths.
+  const widths = { arpShift: score.arpShift, volSlideRateFromStream: score.volSlideRateFromStream };
   const cells: V13DisplayCell[] = [];
   const fpPerRow: number[] = [];
   let rowsPerPos = score.rowsPerPositionDefault;
@@ -505,7 +509,7 @@ function walkV13Voice(
       for (;;) {
         if (pos >= h1.length) break;
         const b = h1[pos];
-        const len = sunCommandLen(h1, pos);
+        const len = sunCommandLen(h1, pos, widths);
         if (b === 0x00) { pos += len; break; }
         if (b >= 0xb8) {
           if (len >= 2) {

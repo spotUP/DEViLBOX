@@ -313,11 +313,15 @@ export function sunTronicCompanionPaths(buffer: ArrayBuffer | Uint8Array): strin
 //               instrument byte (0x01-0x7F)
 //   others      invalid — never emitted (0 occurrences in 199 modules)
 
-/** Command byte → argument byte count (disassembly of handlers hunk1+0x89E-0xA1A). */
+/** Command byte → argument byte count (disassembly of handlers hunk1+0x89E-0xA1A).
+ *  NOTE: 0x9a and 0x9b widths here are the DEFAULT (Main-variant) values; the real
+ *  width is driver-variant-dependent and is overridden in sunCommandLen from the
+ *  per-score {@link SunCmdWidths}. Do NOT read these two entries directly for length
+ *  — always go through sunCommandLen so the variant override applies. */
 export const SUN_CMD_ARGC: Record<number, number> = {
   0x9c: 1, // set effect/arpeggio selector (voice+0x0E)
-  0x9b: 2, // pitch offset word (voice+0x0A)
-  0x9a: 1, // volume slide (voice+0x0D, flag +0x32)
+  0x9b: 2, // pitch offset — WORD (Main) or 1 sign-ext byte (Version-A); see SunCmdWidths
+  0x9a: 1, // volume slide — 1 byte, +1 rate byte when volSlideRateFromStream; see SunCmdWidths
   0x99: 1, // set volume (voice+0x0C)
   0x98: 1, // set speed (ticks/row), ALL voices
   0x97: 2, // filter/control word (a6+0xA7C, eor #$7E28)
@@ -335,18 +339,38 @@ export const SUN_CMD_ARGC: Record<number, number> = {
   0x8b: 1, // rows/position, THIS voice
 };
 
+/** Driver-variant-dependent operand widths. Two control opcodes read a different
+ *  number of stream bytes depending on which SunTronic player variant compiled the
+ *  module — the SAME split the audio player applies in controlOpcode. Getting these
+ *  wrong desyncs the grid decode from the player mid-stream (grid stops a group
+ *  early → misses later notes = invisible "ghost" notes). Single source of truth
+ *  for length: the grid walk (SunTronicParser) and the carrier decoder (decodeSunBlock)
+ *  BOTH consume the stream through sunCommandLen with these widths. */
+export interface SunCmdWidths {
+  /** 0x9b pitch-slide operand: WORD (2 bytes) when arpShift>=4 (Main variant),
+   *  else 1 sign-extended byte (Version-A). Mirrors controlOpcode 0x9b. */
+  arpShift: number;
+  /** 0x9a vol-slide: reads a 2nd stream byte (slide rate $32) when true; when false
+   *  the rate is hardwired to 1 and no 2nd byte is read. Mirrors controlOpcode 0x9a. */
+  volSlideRateFromStream: boolean;
+}
+
 /**
  * Number of stream bytes the item starting at `pos` occupies.
  * The ONLY place the wire grammar's byte-consumption lives.
  * `default: 1` — an unknown byte consumes itself, never desyncs.
+ * `widths` supplies the two variant-dependent operand widths (0x9a/0x9b); it must
+ * match the audio player's controlOpcode for the grid and player to stay in sync.
  */
-export function sunCommandLen(buf: Uint8Array, pos: number): number {
+export function sunCommandLen(buf: Uint8Array, pos: number, widths: SunCmdWidths): number {
   const b = buf[pos];
   if (b >= 0xb8) {
     // note byte; MAY be followed by one instrument byte (0x01-0x7F)
     const nxt = pos + 1 < buf.length ? buf[pos + 1] : 0;
     return (nxt >= 0x01 && nxt <= 0x7f) ? 2 : 1;
   }
+  if (b === 0x9b) return 1 + (widths.arpShift >= 4 ? 2 : 1);   // WORD (Main) vs 1 byte (Version-A)
+  if (b === 0x9a) return 1 + (widths.volSlideRateFromStream ? 2 : 1); // +rate byte variant
   if (b >= 0x8b && b <= 0x9c) return 1 + SUN_CMD_ARGC[b];
   return 1; // 0x00 terminator, instrument selects 0x01-0x7F, unknown bytes
 }
@@ -387,7 +411,7 @@ export interface SunBlockDecode {
  * alias the previous stream's final byte — observed corpus-wide, always <= 1
  * byte); the final row is completed so blocks always cover whole rows.
  */
-export function decodeSunBlock(h1: Uint8Array, start: number, limit: number): SunBlockDecode {
+export function decodeSunBlock(h1: Uint8Array, start: number, limit: number, widths: SunCmdWidths): SunBlockDecode {
   const rows: TrackerCell[] = [];
   let pos = start;
   let noteCount = 0;
@@ -398,7 +422,7 @@ export function decodeSunBlock(h1: Uint8Array, start: number, limit: number): Su
     for (;;) {
       if (pos >= h1.length) return { rows, byteSize: pos - start, noteCount, rowCount };
       const b = h1[pos];
-      const len = sunCommandLen(h1, pos);
+      const len = sunCommandLen(h1, pos, widths);
       if (pos + len > h1.length) return { rows, byteSize: h1.length - start, noteCount, rowCount };
 
       let note = 0;
@@ -948,7 +972,7 @@ export function parseSunTronicV13Score(buf: Uint8Array): SunV13Score {
   for (let i = 0; i < sortedStarts.length; i++) {
     const start = sortedStarts[i];
     const limit = i + 1 < sortedStarts.length ? sortedStarts[i + 1] : h1.length;
-    const { rows, byteSize, noteCount, rowCount } = decodeSunBlock(h1, start, limit);
+    const { rows, byteSize, noteCount, rowCount } = decodeSunBlock(h1, start, limit, { arpShift, volSlideRateFromStream });
     blockIndexByOffset.set(start, blocks.length);
     blocks.push({ h1Offset: start, byteSize, rows, rowCount, noteCount });
   }
