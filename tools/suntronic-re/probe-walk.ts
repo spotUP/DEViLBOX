@@ -5,6 +5,7 @@ const buf = new Uint8Array(readFileSync('/Users/spot/Code/DEViLBOX/public/data/s
 const score = parseSunTronicV13Score(buf);
 const h1 = score.h1;
 const sub = score.subsongs[0];
+const widths = { arpShift: score.arpShift, volSlideRateFromStream: score.volSlideRateFromStream };
 
 function walk(voice: number, applyTranspose: boolean){
   let rowsPerPos = score.rowsPerPositionDefault;
@@ -18,7 +19,7 @@ function walk(voice: number, applyTranspose: boolean){
     for (let r=0;r<rowsPerPos;r++){
       for(;;){
         if(pos>=h1.length) break;
-        const b=h1[pos]; const len=sunCommandLen(h1,pos);
+        const b=h1[pos]; const len=sunCommandLen(h1,pos,widths);
         if(b===0x00){pos+=len;break;}
         if(b>=0xb8){
           const raw=(~b)&0xff;
