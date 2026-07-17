@@ -66,6 +66,34 @@ export function paulaVoiceSample(byte: number, vol: number): number {
   return (byte * vol) / 32768;
 }
 
+/**
+ * Full-scale ceiling of a single Paula voice sample: 128*64/32768 = 0.25.
+ * The audible mix and the oracle fidelity path keep this raw scaling (four
+ * voices sum to ~1.0). Per-voice DISPLAY taps (scope/VU) must divide by it to
+ * read full-scale — a lone voice at chip max is 0.25 here, quarter-height on a
+ * scope, so the visualizer normalizes by 1/PAULA_VOICE_CEILING. Presentation
+ * only; never scale the mix by this.
+ */
+export const PAULA_VOICE_CEILING = 0.25;
+
+/**
+ * Convert a raw per-voice Paula tap (ceiling PAULA_VOICE_CEILING) to a
+ * full-scale Int16 scope window: normalize by 1/PAULA_VOICE_CEILING, clamp to
+ * [-1,1], quantize. `count` samples from `src`. A single voice at chip max
+ * (0.25) maps to Int16 full scale; without the normalize it would read
+ * quarter-height (~8191). Display-only helper — the oracle/mix path never
+ * calls this.
+ */
+export function voiceScopeToInt16(src: Float32Array, count: number): Int16Array {
+  const gain = 1 / PAULA_VOICE_CEILING;
+  const dst = new Int16Array(count);
+  for (let i = 0; i < count; i++) {
+    const s = src[i] * gain;
+    dst[i] = s >= 1 ? 32767 : s <= -1 ? -32768 : Math.round(s * 32767);
+  }
+  return dst;
+}
+
 // Emulated PAL vblank period in samples (1024*25/29 = 882.759). MEGAEFFECTS
 // regenerates every voice's play buffer ONCE per vblank (~50 Hz), NOT once per
 // 1024 output bucket — for a swept-arp timbre (type-2 splice whose D1=arp

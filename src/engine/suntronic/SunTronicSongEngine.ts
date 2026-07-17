@@ -21,7 +21,7 @@
 
 import { getDevilboxAudioContext } from '@/utils/audio-context';
 import { parseSunTronicV13Score, type SunV13Score } from '@/lib/import/formats/SunTronicV13';
-import { SunTronicNativeRenderer, NATIVE_SAMPLE_RATE, type RenderChannels } from './SunTronicNativeRender';
+import { SunTronicNativeRenderer, NATIVE_SAMPLE_RATE, voiceScopeToInt16, type RenderChannels } from './SunTronicNativeRender';
 import { useOscilloscopeStore } from '@stores/useOscilloscopeStore';
 
 /** Per-channel scope window pushed to the visualizer (VU meters + scopes read
@@ -209,18 +209,13 @@ export class SunTronicSongEngine {
     if (lastCh) this.pushScope(lastCh);
   }
 
-  /** Convert the first SCOPE_SAMPLES of each voice buffer to Int16 and publish. */
+  /** Convert the first SCOPE_SAMPLES of each voice buffer to Int16 and publish.
+   *  voiceScopeToInt16 normalizes the raw Paula per-voice tap (ceiling 0.25) to
+   *  full-scale so scope/VU don't read quarter-height. Display only; the audible
+   *  mix and the oracle path keep the raw scaling. */
   private pushScope(ch: RenderChannels['ch']): void {
     const out: (Int16Array | null)[] = [];
-    for (let v = 0; v < 4; v++) {
-      const src = ch[v];
-      const dst = new Int16Array(SCOPE_SAMPLES);
-      for (let i = 0; i < SCOPE_SAMPLES; i++) {
-        const s = src[i];
-        dst[i] = s >= 1 ? 32767 : s <= -1 ? -32768 : Math.round(s * 32767);
-      }
-      out.push(dst);
-    }
+    for (let v = 0; v < 4; v++) out.push(voiceScopeToInt16(ch[v], SCOPE_SAMPLES));
     useOscilloscopeStore.getState().updateChannelData(out);
   }
 
