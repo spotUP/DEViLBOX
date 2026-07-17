@@ -81,6 +81,12 @@ export default defineConfig({
     include: ['src/**/*.{test,spec}.{ts,tsx}'],
     exclude: ['node_modules', 'Reference Code/**', 'dist', 'src/__tests__/ci/**'],
     environment: 'happy-dom',
+    // Cap worker pool. The suite has memory-heavy WASM / audio / IndexedDB
+    // tests; on multi-core dev machines Vitest's default (cores-1) workers
+    // over-subscribe RAM and the heavy tests spuriously time out (30s/60s)
+    // under load — the pre-commit `test:ci` gate flakes as a result. CI
+    // runners have <=4 cores so this cap never lowers their parallelism.
+    maxWorkers: 4,
     server: {
       deps: {
         inline: ['tone'], // Tone.js uses extensionless ESM imports that Node can't resolve without bundling
