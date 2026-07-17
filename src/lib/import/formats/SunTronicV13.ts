@@ -471,11 +471,20 @@ const REF_ROWSPOS_OP = 0x386;    // `move.b #imm,$31(a2)` — imm byte at +3 is 
 // `REF_A6_BASE + deltaA + off` mislocates it on modules where the two deltas
 // diverge (e.g. ballblaser). Instead, locate PERIODS by its unique ramp signature
 // (identical bytes in every module); the match points at table[0x20].
-// (The drin note-transpose table is NOT a file constant — the eagleplayer allocates
-// + fills it in a runtime BSS hunk from each module's arp data, so it is generated
-// in the native player, not located here.)
 const REF_PERIODS_SIG = [428, 453, 480, 508, 538, 570, 604, 640];
 const REF_PERIODS_SIG_INDEX = 0x20;   // signature sits at PERIODS index 0x20
+
+// The drin note-transpose (arp) table IS plain module data in hunk#1 — NOT runtime
+// BSS-generated (an earlier comment claimed the eagleplayer allocates it; that was
+// wrong, proven by per-tick Paula-log lockstep). The EFFECTS arp handler reaches it
+// with `lea drin(pc),a3` (opcode 0x47FA) immediately followed by `clr.w d5;
+// move.b 0x0e(a0),d5` = bytes 42 45 1A 28 00 0E, then the index shift `lsl.w #n,d5`.
+// drinOff = (siteOff+2) + s16BE(siteOff+2). The shift word 5 words on selects the
+// driver version: 0xE94D = lsl.w #4 (256-byte drin, phase&0x0f, "Main"); 0xE74D =
+// lsl.w #3 (128-byte drin, phase&0x07, "Version-A"). Verified 321/321 modules.
+const REF_DRIN_SIG = [0x42, 0x45, 0x1a, 0x28, 0x00, 0x0e]; // clr.w d5; move.b 0x0e(a0),d5
+const DRIN_SHIFT_MAIN = 0xe94d;   // lsl.w #4,d5  → 256-byte drin, phase mask 0x0f
+const DRIN_SHIFT_VERSA = 0xe74d;  // lsl.w #3,d5  → 128-byte drin, phase mask 0x07
 
 const SAMPLED_RECORD_SIZE = 0x1c;
 const SYNTH_RECORD_SIZE = 0x24;
@@ -734,6 +743,12 @@ export interface SunV13Score {
   rowsPerPositionDefault: number;
   /** hunk#1-relative offset of the PERIODS table[0] (signature-located, reloc-safe) */
   periodsOff: number;
+  /** hunk#1-relative offset of the drin arp note-transpose table (signature-located) */
+  drinOff: number;
+  /** arp index shift: 4 = Main (256-byte drin, phase&0x0f), 3 = Version-A (128-byte, &0x07) */
+  arpShift: number;
+  /** sliced drin table (2^arpShift rows × 16 phases, s8 transpose per (arpSel,phase)) */
+  drin: Int8Array;
   /** hunk#1-relative offset of the synth instrument table (0x24-byte records) */
   synthTableOff: number;
   /** hunk#1-relative offset of the sampled instrument table (0x1C-byte records) */
@@ -779,6 +794,25 @@ export function parseSunTronicV13Score(buf: Uint8Array): SunV13Score {
     if (ok) { periodsOff = o - REF_PERIODS_SIG_INDEX * 2; break; }
   }
   if (periodsOff < 0) throw new Error('SunTronic V1.3: PERIODS table signature not found');
+
+  // ── drin arp table: signature-locate the EFFECTS `lea drin(pc),a3` site ──
+  let drinOff = -1, arpShift = 0;
+  for (let i = 0; i + 12 <= h1.length; i += 2) {
+    if (h1[i] !== 0x47 || h1[i + 1] !== 0xfa) continue; // lea d16(pc),a3
+    let ok = true;
+    for (let k = 0; k < REF_DRIN_SIG.length; k++) {
+      if (h1[i + 4 + k] !== REF_DRIN_SIG[k]) { ok = false; break; }
+    }
+    if (!ok) continue;
+    const off = (i + 2) + s16BE(h1, i + 2);
+    const shiftWord = u16BE(h1, i + 10);
+    const shift = shiftWord === DRIN_SHIFT_MAIN ? 4 : shiftWord === DRIN_SHIFT_VERSA ? 3 : 0;
+    if (shift === 0 || off < 0 || off + (1 << shift) * 16 > h1.length) continue;
+    drinOff = off; arpShift = shift; break;
+  }
+  if (drinOff < 0) throw new Error('SunTronic V1.3: drin arp table signature not found');
+  const drin = new Int8Array((1 << arpShift) * 16);
+  for (let i = 0; i < drin.length; i++) drin[i] = s8(h1, drinOff + i);
 
   // ── instrument name block at hunk#1+0 ──
   const { names, nameBlockEnd } = parseNameBlock(h1);
@@ -898,6 +932,9 @@ export function parseSunTronicV13Score(buf: Uint8Array): SunV13Score {
     instrumentNames,
     rowsPerPositionDefault,
     periodsOff,
+    drinOff,
+    arpShift,
+    drin,
     synthTableOff,
     sampledTableOff,
     sampledInstruments,
