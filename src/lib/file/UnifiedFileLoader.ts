@@ -1334,6 +1334,34 @@ async function loadSongFile(file: File, options: FileLoadOptions, preReadBuffer?
     return { success: 'pending-import', file };
   }
 
+  // Content fallback: extensionless Amiga song rips (SunTronic V1.3 "Delirium"
+  // songs like `newest_play`, `paradroid.final`) reveal nothing by name, so every
+  // name-based gate above rejects them. Detect by header and import DIRECTLY via
+  // the canonical apply path — importTrackerModule routes an unknown-name file
+  // through parseModuleToSong, which sends V1.3 to the native engine — bypassing
+  // the name-gated import dialog entirely (matching the dedicated GoatTracker /
+  // SunVox direct-load branches above).
+  try {
+    const detectBuf = preReadBuffer ?? await file.arrayBuffer();
+    const { isSupportedByHeader } = await import('../import/FormatRegistry');
+    if (isSupportedByHeader(new Uint8Array(detectBuf))) {
+      const info: ModuleInfo = {
+        metadata: { title: file.name, type: 'Amiga', channels: 4, patterns: 0, orders: 0, instruments: 0, samples: 0, duration: 0 },
+        arrayBuffer: detectBuf,
+        file,
+      };
+      await importTrackerModule(info, {
+        useLibopenmpt: false,
+        subsong: options.subsong ?? 0,
+        companionFiles: options.companionFiles,
+      });
+      return { success: true, message: `Loaded ${file.name}` };
+    }
+  } catch (err) {
+    console.warn('[UnifiedFileLoader] header-detected import failed:', err);
+    return { success: false, error: `Failed to load ${file.name}: ${err instanceof Error ? err.message : String(err)}` };
+  }
+
   return { success: false, error: `Unsupported song format: ${file.name}` };
 }
 
