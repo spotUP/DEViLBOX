@@ -28,13 +28,18 @@ async function one(mod:AnyMod,name:string,nSteps:number){
   const score=parseSunTronicV13Score(data);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const player:any=new (SunTronicPlayer as any)(score);
-  const np:number[][]=[[],[],[],[]],nv:number[][]=[[],[],[],[]];
-  for(let c=0;c<nSteps;c++){const vs=player.stepVblankOnce().voices;for(let v=0;v<4;v++){np[v].push(vs[v].period);nv[v].push(paulaAudxVol(vs[v].outVolume&0xff));}}
-  const res:{pm:number,vm:number,n:number,vbs:number}[]=[];
+  const np:number[][]=[[],[],[],[]],nv:number[][]=[[],[],[],[]],na:boolean[][]=[[],[],[],[]];
+  for(let c=0;c<nSteps;c++){const vs=player.stepVblankOnce().voices;for(let v=0;v<4;v++){np[v].push(vs[v].period);nv[v].push(paulaAudxVol(vs[v].outVolume&0xff));na[v].push(vs[v].attachModulator);}}
+  const res:{pm:number,vm:number,n:number,vn:number,vbs:number}[]=[];
   for(let v=0;v<4;v++){let pm=0,t=0;for(let c=0;c<nSteps;c++){if(c>=per[v].length)break;t++;if(np[v][c]===per[v][c])pm++;}
-    // VOL: best shift in -2..2 of UADE vol vs native
-    let vm=0,vbs=0;for(let s=-2;s<=2;s++){let m=0;for(let c=0;c<t;c++){const ui=c+s;if(ui<0||ui>=vol[v].length)continue;if(nv[v][c]===vol[v][ui])m++;}if(m>vm){vm=m;vbs=s;}}
-    res.push({pm,vm,n:t,vbs});}
+    // VOL: best shift in -2..2 of UADE vol vs native. A Paula volume-attach CARRIER
+    // (voice v with modulator v-1 latched) has its volume driven per-sample off the
+    // modulator's DMA word (audio.c:506) — UADE never writes its AUDxVOL register, so
+    // there is NO REG_VOL oracle for it. Skip those ticks (they are covered by the
+    // per-sample attach model + its own isolated-channel test, not this register probe).
+    let vm=0,vbs=0,vn=0;
+    for(let s=-2;s<=2;s++){let m=0,cn=0;for(let c=0;c<t;c++){if(v>0&&na[v-1][c])continue;const ui=c+s;if(ui<0||ui>=vol[v].length)continue;cn++;if(nv[v][c]===vol[v][ui])m++;}if(m>vm||(m===vm&&cn>vn)){vm=m;vbs=s;vn=cn;}}
+    res.push({pm,vm,n:t,vn,vbs});}
   return res;
 }
 async function main(){
@@ -50,9 +55,9 @@ async function main(){
     if(!r){fail++;continue;}
     ok++;
     let songPerBad=false,songVolBad=false;
-    for(let v=0;v<4;v++){if(r[v].n>0){volMissTicks+=r[v].n-r[v].vm;volTotTicks+=r[v].n;totVoices++;if(r[v].vm===r[v].n)perfectVoices++;}}
-    for(let v=0;v<4;v++){if(r[v].n>0&&r[v].pm<r[v].n)songPerBad=true;if(r[v].n>0&&r[v].vm<r[v].n)songVolBad=true;}
-    if(songPerBad){perBad++;perFails.push(f+' ['+r.map((x,v)=>x.pm<x.n?`v${v}:${x.pm}/${x.n}`:'').filter(Boolean).join(' ')+']');} if(songVolBad){volBad++;volFails.push(f+' ['+r.map((x,v)=>x.vm<x.n?`v${v}:${x.vm}/${x.n}@${x.vbs}`:'').filter(Boolean).join(' ')+']');}
+    for(let v=0;v<4;v++){if(r[v].vn>0){volMissTicks+=r[v].vn-r[v].vm;volTotTicks+=r[v].vn;totVoices++;if(r[v].vm===r[v].vn)perfectVoices++;}}
+    for(let v=0;v<4;v++){if(r[v].n>0&&r[v].pm<r[v].n)songPerBad=true;if(r[v].vn>0&&r[v].vm<r[v].vn)songVolBad=true;}
+    if(songPerBad){perBad++;perFails.push(f+' ['+r.map((x,v)=>x.pm<x.n?`v${v}:${x.pm}/${x.n}`:'').filter(Boolean).join(' ')+']');} if(songVolBad){volBad++;volFails.push(f+' ['+r.map((x,v)=>x.vm<x.vn?`v${v}:${x.vm}/${x.vn}@${x.vbs}`:'').filter(Boolean).join(' ')+']');}
   }
   console.log(`parsed=${ok} failload=${fail}  songs-with-PER-mismatch=${perBad}  songs-with-VOL-mismatch=${volBad}`);
   console.log(`VOL mismatch ticks=${volMissTicks}/${volTotTicks}  perfect voices=${perfectVoices}/${totVoices}`);

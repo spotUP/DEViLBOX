@@ -83,7 +83,9 @@ interface SunPlayerVoice {
   pitch: number;        // $8  — u16 accumulator, hi byte = note index
   pitchSlide: number;   // $a  — s16 slide added to pitch each tick
   volume: number;       // $c  — voice volume 0..0x40
-  volumeSlide: number;  // $d  — s8 slide, added to $c every tick
+  volumeSlide: number;  // $d  — s8 slide, added to $c every (slideRate+1) ticks
+  slideRate: number;    // $32 — vol-slide rate: reload value for slideCounter
+  slideCounter: number; // $33 — down-counter; slide applies when it goes negative
   arpSel: number;       // $e  — arp/interp selector (drin row *16)
   arpPhase: number;     // $f  — arp phase 0..15
   volEnvIndex: number;  // $10 — volume-envelope index
@@ -133,6 +135,11 @@ export interface SunPlayerTick {
     sampleLenWords: number;
     loopStartWords: number;
     loopLenWords: number;
+    /** Paula volume-attach: this voice modulates voice+1's volume and is itself
+     *  muted (ADKCON low-nibble bit, opcode 0x91). The renderer, when set, silences
+     *  this voice and replaces voice+1's per-sample volume with this voice's sample
+     *  data (audio.c:506 `(cdp+1)->vol = cdp->dat`, output = carrier×modulator AM). */
+    attachModulator: boolean;
   }>;
 }
 
@@ -184,6 +191,25 @@ export class SunTronicPlayer {
   private readonly drin: Int8Array;
   private readonly arpShift: number;      // 4 = Main (256-byte drin), 3 = Version-A (128-byte)
   private readonly arpPhaseMask: number;  // (1<<arpShift)-1 — 0x0f Main / 0x07 Version-A
+  private readonly volSlideRateFromStream: boolean; // 0x9a reads a 2nd rate byte vs rate=1
+  // ── Global master-volume fade ($a71 + fade engine @0x438). Master folds into every
+  //    voice's $15 (AUDxVOL): `$15 = env*$c>>6 * $a71>>6 * $a72>>6`. $a71/$a72 init 0x40
+  //    (identity `*64>>6`), so songs that never touch 0x92/0x93 are unaffected — that is
+  //    why the corpus matched with master unmodelled. play11 sets $a71=0 (0x92) then
+  //    fades it up (0x93) → v0 AUDxVOL 0→1→2. $a72 is never written in the corpus (static
+  //    identity), so only $a71 is modelled. ──
+  private masterVol = 0x40;   // $a71
+  private fadeSpeed = 0;      // $a6e — signed add per fade step; 0 = fade inactive
+  private fadeCounter = 0;    // $a6f — down-counter
+  private fadeRate = 0;       // $a70 — reload for $a6f
+  // Paula volume-attach (ADKCON low nibble). attachEnabled[V] === true means voice V
+  // is the MODULATOR of voice V+1: hardware mutes V (adk_mask=0) and overwrites
+  // (V+1)->vol with V's current sample word every modulator DMA fetch (audio.c:506,
+  // custom.c:508). Opcode 0x91 on voice V latches this to (OP & 1); the frame ADKCON
+  // machine (@0x602: write $a7a clear-mask then $a78 set-mask, both reset each frame)
+  // leaves the bit unchanged on frames 0x91 does not fire, so this is a persistent
+  // per-voice latch, NOT a per-frame pulse.
+  private readonly attachEnabled: boolean[] = [false, false, false, false];
   private readonly synthTableOff: number;
   private readonly synthRecordSize = 0x24;
   /** sampled (type-B) descriptors, indexed by (select byte - 1). Each binds the
@@ -248,6 +274,7 @@ export class SunTronicPlayer {
     // phase wrap is coupled to the shift: Main ANDI.B #$0f (16 phases/row), Version-A
     // ANDI.B #7 (8 phases/row) — see DP_Suntronic.s:483 vs :1000.
     this.arpPhaseMask = (1 << this.arpShift) - 1;
+    this.volSlideRateFromStream = score.volSlideRateFromStream ?? false;
     // drin is byte-arpSel-indexed: d5 = (arpSel<<shift)+phase, arpSel a full byte, so
     // the table spans 256 selectors (2048 Version-A / 4096 Main). The parser extracts
     // that full span; the old (1<<shift)*16 = 128/256-byte copy truncated arpSel>15
@@ -275,7 +302,7 @@ export class SunTronicPlayer {
         cursor: entry ? entry.trackPtrs[ch] : 0,
         instr: null,
         sampled: null,
-        pitch: 0, pitchSlide: 0, volume: 0x40, volumeSlide: 0,
+        pitch: 0, pitchSlide: 0, volume: 0x40, volumeSlide: 0, slideRate: 0, slideCounter: 0,
         arpSel: 0, arpPhase: 0, volEnvIndex: 0,
         flags: 0xff, outVolume: 0, period: 0,
         stagedSel: 0, transpose: entry ? s8(entry.transposes[ch]) : 0,
@@ -384,10 +411,17 @@ export class SunTronicPlayer {
         v.pitchSlide = wide ? s16((rd() << 8) | rd()) : s8(rd());
         break;
       }
-      case 0x9a: // -0x66: vol slide $d (ONE byte — disasm GNN5 `MOVE.B (A1)+,$0D`;
-        // the earlier 2nd read into a fabricated $32 ate the following 0x9b pitch-slide
-        // opcode, freezing pitch on slide voices like multi-arp-long v1)
-        v.volumeSlide = s8(rd()); break;
+      case 0x9a: // -0x66: vol slide $d + rate $32. Operand width is VARIANT-dependent
+        // (independent of arpShift — both exist at arpShift=4; parser signature-locates
+        // the handler): 2-byte variant reads `MOVE.B (A1)+,$0D; MOVE.B (A1)+,$32`, 1-byte
+        // variant reads `MOVE.B (A1)+,$0D; MOVE.B #$1,$32` (rate hardwired to 1). The rate
+        // gates the per-voice $33 down-counter in stepEffects so the slide advances only
+        // every (rate+1) ticks (embedded EFFECTS @kompo04.dis 0x6f4 / myplay9.dis 0x6ea).
+        // Reading the wrong width desyncs the group (2 bytes on a 1-byte stream swallows
+        // the next opcode — that was the multi-arp-long pitch freeze).
+        v.volumeSlide = s8(rd());
+        v.slideRate = this.volSlideRateFromStream ? (rd() & 0xff) : 1;
+        break;
       case 0x99: // -0x67: volume $c, clr $d
         // NOTE: the .s disasm's GNN6 doubles the param (`LSL.B #1`) and EFFECTS uses
         // `LSR.W #7` — but the LOADED binary does NEITHER (no double, EFFECTS >>6).
@@ -406,12 +440,18 @@ export class SunTronicPlayer {
       case 0x94: // -0x6c: set pitch, no retrigger
         if (v.tie !== 0) { a1 += 1; break; }
         { const note = u8(~rd() - v.transpose); v.pitch = (note << 8) & 0xffff; v.pitchSlide = 0; } break;
-      case 0x93: // -0x6d: global fade speed+reload (master vol, no golden effect)
-        a1 += 2; break;
-      case 0x92: // -0x6e: master vol (no golden effect)
-        a1 += 1; break;
-      case 0x91: // -0x6f: per-voice DMA/mute flags (no golden effect on $20/$c)
-        a1 += 1; break;
+      case 0x93: // -0x6d: master fade — @0x954 `move.b (a1)+,$a6e; move.b (a1)+,$a70`
+        this.fadeSpeed = s8(rd()); this.fadeRate = rd() & 0xff; break;
+      case 0x92: // -0x6e: master vol — @0x960 `move.b (a1)+,$a71; clr.b $a6e`
+        this.masterVol = rd() & 0xff; this.fadeSpeed = 0; break;
+      case 0x91: { // -0x6f: Paula volume-attach latch (ADKCON via $a78/$a7a @0x9bc).
+        // `$a78 |= OP<<V; $a7a |= 0x11<<V` → adkcon volume-attach bit V := (OP & 1).
+        // Bit V set ⟺ voice V modulates voice V+1's volume (V muted). Persistent latch.
+        const op91 = rd();
+        const vi = this.voices.indexOf(v);
+        if (vi >= 0 && vi < 3) this.attachEnabled[vi] = (op91 & 1) !== 0;
+        break;
+      }
       case 0x90: // -0x70: finetune → $9 (low byte of pitch acc)
         if (v.tie !== 0) { a1 += 1; break; }
         v.pitch = (v.pitch & 0xff00) | rd(); break;
@@ -465,8 +505,12 @@ export class SunTronicPlayer {
     // env*$0c>>6. The .s EFFECTS shows `LSR.W #7` (>>7) but the LOADED binary uses
     // >>6 — proven 2026-07-17: myplay9 v3 UADE $15=64=64*64>>6 (>>7 → 32). Do NOT
     // change to >>7 (see the 0x99 note above; it regresses the corpus).
+    // $15 = env*$c>>6 * $a71(master)>>6 * $a72>>6 (@0x628). $a72 is never written in
+    // the corpus (static 0x40 = identity), so only the $a71 master fold is modelled;
+    // masterVol init 0x40 keeps `*0x40>>6` identity for songs without a 0x92/0x93 fade.
     const env = u8(inst.volEnv[v.volEnvIndex] ?? 0);
-    v.outVolume = u8((env * (v.volume & 0xff)) >> 6);
+    const base = u8((env * (v.volume & 0xff)) >> 6);
+    v.outVolume = u8((base * this.masterVol) >> 6);
 
     // ── period $20 ──
     const d5 = ((v.arpSel & 0xff) << this.arpShift) + (v.arpPhase & this.arpPhaseMask);
@@ -491,15 +535,25 @@ export class SunTronicPlayer {
     else if (np >= 0x4800) np -= 0x4800;
     v.pitch = np & 0xffff;
 
-    // ── advance volume (disasm EFF1/EFF2: ungated every tick, clamp [0,0x80]) ──
-    // d1 = volume + s8(slide); <0 → 0; >=0x81 → 0x80; store $0C. No counter and no
-    // slide-zeroing at the limits — the earlier $32/$33 gate + `volumeSlide=0` were
-    // fabricated (the real replayer keeps sliding once the clamp is hit).
-    {
-      let c = (v.volume & 0xff) + s8(v.volumeSlide);
-      if (c < 0) c = 0;
-      else if (c >= 0x81) c = 0x80;
-      v.volume = c;
+    // ── advance volume — RATE-GATED slide (embedded EFFECTS @kompo04.dis 0x6f4 /
+    // myplay9.dis 0x6ea, identical in both variants):
+    //   tst.b $d; beq skip                 — slide 0 → do nothing (counter frozen)
+    //   subq.b #1,$33; bpl skip            — advance only when counter goes negative
+    //   move.b $32,$33                     — reload counter = rate ($32)
+    //   add.b $d,$c                        — byte add
+    //   bpl .; clr $d; clr $c              — signed-byte < 0 (underflow) → stop+zero
+    //   cmpi.b #$41,$c; bmi .; clr $d; move #$40,$c  — >= 0x41 (overflow) → stop+clamp 0x40
+    // rate=1 (1-byte variant) → slide every 2 ticks; the ungated every-tick advance was
+    // 2x too fast (sound2.s: native +1/tick vs UADE +1/2ticks) and drove decays to 0 that
+    // UADE holds (kompo05: rate from stream is large → slide fires ~once).
+    if ((v.volumeSlide & 0xff) !== 0) {
+      if (--v.slideCounter < 0) {
+        v.slideCounter = v.slideRate & 0xff;
+        const r = ((v.volume & 0xff) + (v.volumeSlide & 0xff)) & 0xff;
+        if (r & 0x80) { v.volumeSlide = 0; v.volume = 0; }          // add.b negative → stop, vol 0
+        else if (r >= 0x41) { v.volumeSlide = 0; v.volume = 0x40; } // >= 0x41 → stop, clamp 0x40
+        else v.volume = r;
+      }
     }
 
     // ── advance arp phase / vol-env index (wrap len→loop) ──
@@ -541,7 +595,23 @@ export class SunTronicPlayer {
    * This is the CIA-clock step (fires every ciaTick ≈ 882.76 samples). The whole
    * step — tempo counters, GETNEXTNOTE, EFFECTS ($24 vibrato advance) — runs on
    * this fast clock, NOT the audio-buffer clock. */
+  /** Master-volume fade engine — port of @0x440 (runs once per player interrupt,
+   *  before the per-voice EFFECTS). Identical counter+signed-add+clamp shape as the
+   *  voice vol-slide gate: advance $a71 by $a6e once every ($a70+1) interrupts,
+   *  underflow → stop+0, overflow(≥0x41) → stop+0x40. Inactive while $a6e==0, so the
+   *  corpus (which never sets a fade) is untouched. */
+  private stepMasterFade(): void {
+    if (this.fadeSpeed === 0) return;                 // tst.b $a6e; beq
+    if (--this.fadeCounter >= 0) return;              // subq.b #1,$a6f; bpl
+    this.fadeCounter = this.fadeRate & 0xff;          // move.b $a70,$a6f
+    const r = (this.masterVol + this.fadeSpeed) & 0xff; // add.b $a6e,$a71
+    if (r & 0x80) { this.fadeSpeed = 0; this.masterVol = 0; }          // negative → stop, 0
+    else if (r >= 0x41) { this.fadeSpeed = 0; this.masterVol = 0x40; } // ≥0x41 → stop, clamp
+    else this.masterVol = r;
+  }
+
   private stepAll(): void {
+    this.stepMasterFade();
     for (const v of this.voices) {
       if (v.flags === 0xfe) continue; // DMA-off/idle
       if (v.tie !== 0) v.tie -= 1;
@@ -620,7 +690,7 @@ export class SunTronicPlayer {
    *  renderer + the golden read them). Shared by tick() and stepVblankOnce(). */
   private snapshot(): SunPlayerTick {
     return {
-      voices: this.voices.map((v) => {
+      voices: this.voices.map((v, i) => {
         // Consume the retrigger latch: report it once, then clear so the next
         // tick without a fresh noteOn reads false. noteOn may fire on any of the
         // 1–2 internal steps this bucket ran; the latch survives to here.
@@ -635,6 +705,7 @@ export class SunTronicPlayer {
           sampleLenWords: v.sampled ? v.sampled.lengthWords : 0,
           loopStartWords: v.sampled ? v.sampled.loopStartWords : 0,
           loopLenWords: v.sampled ? v.sampled.loopLenWords : 0,
+          attachModulator: this.attachEnabled[i],
         };
       }),
     };
