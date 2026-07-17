@@ -513,13 +513,25 @@ export class SunTronicPlayer {
 
   /** Advance the sequence position for one voice (tick handler row branch). */
   private loadPosition(v: SunPlayerVoice): void {
-    const entry = this.sequence[v.position];
-    if (!entry) { // past end
-      if (this.seqEndKind === 'restart') { v.position = 0; }
-      return;
+    let entry = this.sequence[v.position];
+    if (!entry) { // past end → loop restart
+      if (this.seqEndKind !== 'restart') return;
+      v.position = 0;
+      entry = this.sequence[0];
+      if (!entry) return;
     }
+    if ((entry.trackPtrs[0] >>> 0) === 0) {                 // entry[0]==0 → restart marker
+      v.position = 0;
+      entry = this.sequence[0];
+      if (!entry) return;
+    }
+    // On BOTH restart paths above, fall through and (re)load position 0's per-voice
+    // cursor + transpose — mirroring the ctor init (line 275/281). The prior code
+    // reset the index to 0 but returned WITHOUT reloading the cursor, so after the
+    // loop each voice streamed a stale end-of-song cursor for one whole position
+    // (audible: wrong-octave lead + collapsed voices on the 2nd loop only; skip-to-
+    // position rebuilds fresh state so it never showed there).
     const first = entry.trackPtrs[0] >>> 0;
-    if (first === 0) { v.position = 0; return; }            // entry[0]==0 → restart
     if ((first & 0x80000000) !== 0) { v.flags = 0xfe; return; } // <0 → note-off
     v.transpose = s8(entry.transposes[v.channel]);
     v.cursor = entry.trackPtrs[v.channel];
