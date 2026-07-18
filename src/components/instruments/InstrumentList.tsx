@@ -613,6 +613,17 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
                   {instrument.metadata?.displayType || synthInfo?.shortName || instrument.synthType}
                 </span>
 
+                {/* Load-failure badge — the sample/patch data could not be read,
+                    so this instrument is a silent placeholder. */}
+                {instrument.loadError && (
+                  <span
+                    className="text-[10px] px-1.5 py-0.5 rounded font-bold border shrink-0 bg-accent-error/15 text-accent-error border-accent-error/40"
+                    title={instrument.loadError}
+                  >
+                    Load Failed
+                  </span>
+                )}
+
                 {/* Channel Type Badge (hardware affinity) */}
                 {(() => {
                   const badge = getSynthBadge(instrument.synthType);
