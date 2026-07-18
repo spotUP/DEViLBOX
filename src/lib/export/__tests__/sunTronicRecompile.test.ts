@@ -39,8 +39,15 @@ describe('SunTronic recompile on length change', () => {
     const editedEffTyp = nd.blocks[fp][row].effTyp;
     const editedEff = nd.blocks[fp][row].eff;
     // Baseline a note in a DIFFERENT block that must survive the round-trip.
-    const otherBlock = fp === 0 ? nd.blocks.length - 1 : 0;
-    const otherRow = 0;
+    expect(nd.blocks.length).toBeGreaterThan(1);
+    let otherBlock = -1, otherRow = -1;
+    for (let b = 0; b < nd.blocks.length && otherBlock < 0; b++) {
+      if (b === fp) continue;
+      for (let r = 0; r < nd.blocks[b].length; r++) {
+        if (nd.blocks[b][r].note > 0) { otherBlock = b; otherRow = r; break; }
+      }
+    }
+    expect(otherBlock).toBeGreaterThanOrEqual(0);
     const otherNote = nd.blocks[otherBlock][otherRow].note;
 
     // applySunNoteEdit takes the DISPLAY note at a position and stores the raw
