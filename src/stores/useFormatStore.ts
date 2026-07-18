@@ -19,6 +19,7 @@ import type {
   FurnaceSubsongPlayback,
 } from '@typedefs';
 import type { TFMXNativeData } from '@/types/tfmxNative';
+import type { SunTronicNativeData } from '@/lib/import/formats/sunNativeData';
 import type { SF2LoadPayload } from './useSF2Store';
 import type { MaxTraxData, MaxTraxScore } from '@/lib/import/formats/maxtrax/maxtraxFormat';
 import { locateMaxTraxSampleInTailRaw } from '@/lib/import/formats/maxtrax/maxtraxFormat';
@@ -43,6 +44,7 @@ interface FormatStore {
   hivelyNative: HivelyNativeData | null;
   hivelyFileData: ArrayBuffer | null;
   klysNative: KlysNativeData | null;
+  sunTronicNative: SunTronicNativeData | null;
   klysFileData: ArrayBuffer | null;
   musiclineFileData: Uint8Array | null;
   c64SidFileData: Uint8Array | null;
@@ -161,6 +163,8 @@ interface FormatStore {
   setHivelyNative: (data: HivelyNativeData | null) => void;
   /** Update a single track or transpose value in the Hively position matrix */
   setHivelyPositionCell: (pos: number, ch: number, field: 'track' | 'transpose', value: number) => void;
+  /** Update a single blockIndex or transpose value in the SunTronic position matrix */
+  setSunTronicPositionCell: (pos: number, ch: number, field: 'blockIndex' | 'transpose', value: number) => void;
   /** Insert a new position (copy of current, or blank) at the given index */
   insertHivelyPosition: (pos: number) => void;
   /** Delete a position */
@@ -231,7 +235,7 @@ interface FormatStore {
   setMaxTraxData: (data: MaxTraxData | null) => void;
   mutateMaxTraxScore: (scoreIndex: number, fn: (score: MaxTraxScore) => void) => void;
   mutateMaxTraxSample: (sampleIndex: number, mutation: MaxTraxSampleMutation) => void;
-  applyEditorMode: (song: { linearPeriods?: boolean; furnaceNative?: FurnaceNativeData; hivelyNative?: HivelyNativeData; hivelyFileData?: ArrayBuffer; klysNative?: KlysNativeData; klysFileData?: ArrayBuffer; musiclineFileData?: Uint8Array; c64SidFileData?: Uint8Array; jamCrackerFileData?: ArrayBuffer; futurePlayerFileData?: ArrayBuffer; preTrackerFileData?: ArrayBuffer; maFileData?: ArrayBuffer; hippelFileData?: ArrayBuffer; sonixFileData?: ArrayBuffer; sonixSidecarFiles?: Array<{ path: string; data: ArrayBuffer }>; pxtoneFileData?: ArrayBuffer; organyaFileData?: ArrayBuffer; eupFileData?: ArrayBuffer; ixsFileData?: ArrayBuffer; psycleFileData?: ArrayBuffer; sc68FileData?: ArrayBuffer; zxtuneFileData?: ArrayBuffer; pumaTrackerFileData?: ArrayBuffer; steveTurnerFileData?: ArrayBuffer; sidmon1WasmFileData?: ArrayBuffer; artOfNoiseFileData?: ArrayBuffer; cinter4FileData?: ArrayBuffer; bdFileData?: ArrayBuffer; sd2FileData?: ArrayBuffer; symphonieFileData?: ArrayBuffer; sawteethFileData?: ArrayBuffer; soundMonFileData?: ArrayBuffer; sonicArrangerFileData?: ArrayBuffer; robHubbardFileData?: ArrayBuffer; digMugFileData?: ArrayBuffer; coreDesignFileData?: ArrayBuffer; davidWhittakerFileData?: ArrayBuffer; uadeEditableFileData?: ArrayBuffer; uadeEditableFileName?: string; sunTronicSongFileData?: ArrayBuffer; sunTronicCompanionPcm?: Array<{ name: string; data: ArrayBuffer | Uint8Array }>; maxTraxFileData?: ArrayBuffer; maxTraxFileName?: string; nativeSamplePlayback?: boolean; adplugFileData?: ArrayBuffer; adplugFileName?: string; adplugTicksPerRow?: number; libopenmptFileData?: ArrayBuffer; hivelyMeta?: { stereoMode: number; mixGain: number; speedMultiplier: number; version: number }; furnaceSubsongs?: FurnaceSubsongPlayback[]; furnaceActiveSubsong?: number; channelTrackTables?: number[][]; channelSpeeds?: number[]; channelGrooves?: number[]; musiclineMetadata?: { title: string; author: string; date: string; duration: string; infoText: string[] }; goatTrackerData?: Uint8Array; tfmxNative?: TFMXNativeData; sf2StoreData?: SF2LoadPayload; cheeseCutterStoreData?: import('@/stores/useCheeseCutterStore').CheeseCutterLoadPayload }) => void;
+  applyEditorMode: (song: { linearPeriods?: boolean; furnaceNative?: FurnaceNativeData; hivelyNative?: HivelyNativeData; hivelyFileData?: ArrayBuffer; klysNative?: KlysNativeData; klysFileData?: ArrayBuffer; musiclineFileData?: Uint8Array; c64SidFileData?: Uint8Array; jamCrackerFileData?: ArrayBuffer; futurePlayerFileData?: ArrayBuffer; preTrackerFileData?: ArrayBuffer; maFileData?: ArrayBuffer; hippelFileData?: ArrayBuffer; sonixFileData?: ArrayBuffer; sonixSidecarFiles?: Array<{ path: string; data: ArrayBuffer }>; pxtoneFileData?: ArrayBuffer; organyaFileData?: ArrayBuffer; eupFileData?: ArrayBuffer; ixsFileData?: ArrayBuffer; psycleFileData?: ArrayBuffer; sc68FileData?: ArrayBuffer; zxtuneFileData?: ArrayBuffer; pumaTrackerFileData?: ArrayBuffer; steveTurnerFileData?: ArrayBuffer; sidmon1WasmFileData?: ArrayBuffer; artOfNoiseFileData?: ArrayBuffer; cinter4FileData?: ArrayBuffer; bdFileData?: ArrayBuffer; sd2FileData?: ArrayBuffer; symphonieFileData?: ArrayBuffer; sawteethFileData?: ArrayBuffer; soundMonFileData?: ArrayBuffer; sonicArrangerFileData?: ArrayBuffer; robHubbardFileData?: ArrayBuffer; digMugFileData?: ArrayBuffer; coreDesignFileData?: ArrayBuffer; davidWhittakerFileData?: ArrayBuffer; uadeEditableFileData?: ArrayBuffer; uadeEditableFileName?: string; sunTronicSongFileData?: ArrayBuffer; sunTronicCompanionPcm?: Array<{ name: string; data: ArrayBuffer | Uint8Array }>; sunTronicNative?: SunTronicNativeData; maxTraxFileData?: ArrayBuffer; maxTraxFileName?: string; nativeSamplePlayback?: boolean; adplugFileData?: ArrayBuffer; adplugFileName?: string; adplugTicksPerRow?: number; libopenmptFileData?: ArrayBuffer; hivelyMeta?: { stereoMode: number; mixGain: number; speedMultiplier: number; version: number }; furnaceSubsongs?: FurnaceSubsongPlayback[]; furnaceActiveSubsong?: number; channelTrackTables?: number[][]; channelSpeeds?: number[]; channelGrooves?: number[]; musiclineMetadata?: { title: string; author: string; date: string; duration: string; infoText: string[] }; goatTrackerData?: Uint8Array; tfmxNative?: TFMXNativeData; sf2StoreData?: SF2LoadPayload; cheeseCutterStoreData?: import('@/stores/useCheeseCutterStore').CheeseCutterLoadPayload }) => void;
   setFurnaceActiveSubsong: (index: number) => void;
   setActivisionProSubsongs: (count: number) => void;
   setActivisionProCurrentSubsong: (index: number) => void;
@@ -332,6 +336,7 @@ const clearNative = (state: any) => {
   state.hivelyNative = null;
   state.hivelyFileData = null;
   state.klysNative = null;
+  state.sunTronicNative = null;
   state.klysFileData = null;
   state.musiclineFileData = null;
   state.hivelyMeta = null;
@@ -360,6 +365,7 @@ export const useFormatStore = create<FormatStore>()(
     hivelyNative: null,
     hivelyFileData: null,
     klysNative: null,
+    sunTronicNative: null,
     klysFileData: null,
     musiclineFileData: null,
     c64SidFileData: null,
@@ -571,6 +577,16 @@ export const useFormatStore = create<FormatStore>()(
       if (!p) return;
       if (field === 'track') {
         p.track[ch] = Math.max(0, Math.min(value, state.hivelyNative.tracks.length - 1));
+      } else {
+        p.transpose[ch] = Math.max(-128, Math.min(127, value));
+      }
+    }),
+    setSunTronicPositionCell: (pos, ch, field, value) => set((state) => {
+      if (!state.sunTronicNative) return;
+      const p = state.sunTronicNative.positions[pos];
+      if (!p || ch < 0 || ch > 3) return;
+      if (field === 'blockIndex') {
+        p.blockIndex[ch] = Math.max(0, Math.min(value, state.sunTronicNative.blocks.length - 1));
       } else {
         p.transpose[ch] = Math.max(-128, Math.min(127, value));
       }
@@ -943,6 +959,7 @@ export const useFormatStore = create<FormatStore>()(
         state.uadeEditableFileData = (song as any).uadeEditableFileData ?? null;
         state.sunTronicSongFileData = (song as any).sunTronicSongFileData ?? null;
         state.sunTronicCompanionPcm = (song as any).sunTronicCompanionPcm ?? null;
+        state.sunTronicNative = song.sunTronicNative ?? null;
         state.uadeEditableFileName = (song as any).uadeEditableFileName ?? null;
         state.maxTraxFileData = (song as any).maxTraxFileData ?? null;
         state.maxTraxFileName = (song as any).maxTraxFileName ?? null;
@@ -1241,6 +1258,7 @@ export const useFormatStore = create<FormatStore>()(
       state.uadeEditableFileName = null;
       state.sunTronicSongFileData = null;
       state.sunTronicCompanionPcm = null;
+      state.sunTronicNative = null;
       state.maxTraxFileData = null;
       state.maxTraxFileName = null;
       state.nativeSamplePlayback = false;
