@@ -3,6 +3,7 @@ import { parseSunTronicFile, readFixture } from './sunTestUtil';
 import { applySunNoteEdit } from '../sunReproject';
 import { decodeSunGroup } from '../sunGroupCodec';
 import { parseSunTronicV13Score } from '../SunTronicV13';
+import type { SunTronicNativeData } from '../sunNativeData';
 
 describe('SunTronic edited block re-encodes (writeback)', () => {
   it('an edited note produces different bytes that decode back to the new note', () => {
@@ -57,6 +58,27 @@ describe('SunTronic edited block re-encodes (writeback)', () => {
 
     expect(decodedNote).toBe(expectedPoolNote);
   });
+  it('rest edit under nonzero transpose stores pool note 0 (not negative)', () => {
+    // Regression: old code stored editedNote - transpose = 0 - 5 = -5 (negative),
+    // which encodeSunGroup silently drops. New code maps editedNote<=0 -> rawNote=0.
+    const nd: SunTronicNativeData = {
+      blocks: [[{ note: 40, instrument: 1, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 }]],
+      positions: [{ blockIndex: [0, 0, 0, 0], transpose: [5, 5, 5, 5] }],
+    };
+    applySunNoteEdit(nd, 0, 0, 0, 0, 0); // rest edit (editedNote=0) under transpose 5
+    expect(nd.blocks[0][0].note).toBe(0); // must be 0 (rest), not -5
+  });
+
+  it('real note edit below transpose floor clamps to pool note 1 (not non-positive)', () => {
+    // Regression: old code stored 3 - 5 = -2 (dropped by encoder); new code clamps to max(1, -2)=1.
+    const nd: SunTronicNativeData = {
+      blocks: [[{ note: 40, instrument: 1, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 }]],
+      positions: [{ blockIndex: [0, 0, 0, 0], transpose: [5, 5, 5, 5] }],
+    };
+    applySunNoteEdit(nd, 0, 0, 0, 3, 0); // editedNote=3, transpose=5 -> raw would be -2
+    expect(nd.blocks[0][0].note).toBe(1); // clamped to 1, not -2
+  });
+
   it('unedited blocks still encode byte-exact (verbatim path intact)', () => {
     const song = parseSunTronicFile(readFixture('ready'), 'ready');
     const L = song.uadeVariableLayout!;
