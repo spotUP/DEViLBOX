@@ -51,6 +51,7 @@ export function decodeSunGroup(
   curInstr: number,
   numSampled: number,
   widths: SunCmdWidths,
+  limit: number = h1.length,
 ): SunGroup & { curInstr: number } {
   // Initialise with all required fields (mirrors emptyV13Cell + TrackerCell shape).
   const cell: TrackerCell = {
@@ -78,11 +79,17 @@ export function decodeSunGroup(
     fxSlot++;
   }
 
-  // Walk all items in this grammar group until the 0x00 terminator.
+  // Walk all items in this grammar group until the 0x00 terminator or limit.
   for (;;) {
-    if (pos >= h1.length) break;
+    if (pos >= limit) break;
     const b = h1[pos];
     const len = sunCommandLen(h1, pos, widths);
+
+    // Truncate consumption at the block boundary — do not read bytes at/after limit.
+    if (pos + len > limit) {
+      pos = limit;
+      break;
+    }
 
     if (b === 0x00) {
       // Terminator — consume and stop.
@@ -141,8 +148,9 @@ export function decodeSunGroup(
         // Slice the arg bytes (everything after the opcode byte).
         const argCount = len - 1;
         const argBytes: number[] = [];
+        const readEnd = Math.min(h1.length, limit);
         for (let i = 1; i <= argCount; i++) {
-          argBytes.push(pos + i < h1.length ? h1[pos + i] : 0);
+          argBytes.push(pos + i < readEnd ? h1[pos + i] : 0);
         }
 
         const { effTyp, param } = def.decode(argBytes);
@@ -163,7 +171,7 @@ export function decodeSunGroup(
   }
 
   // Capture exact source bytes for byte-exact round-trip (sunRaw carrier).
-  cell.sunRaw = Array.from(h1.subarray(groupStart, pos));
+  cell.sunRaw = Array.from(h1.subarray(groupStart, Math.min(pos, limit)));
 
   return { cell, nextPos: pos, curInstr };
 }
@@ -228,7 +236,7 @@ export function encodeSunGroup(
   // -------------------------------------------------------------------------
   if (cell.sunRaw && cell.sunRaw.length > 0) {
     const raw = new Uint8Array(cell.sunRaw);
-    const redecoded = decodeSunGroup(raw, 0, transpose, curInstr, numSampled, widths).cell;
+    const redecoded = decodeSunGroup(raw, 0, transpose, curInstr, numSampled, widths, raw.length).cell;
 
     const fieldsMatch =
       redecoded.note       === cell.note       &&
