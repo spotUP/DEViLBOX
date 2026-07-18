@@ -19,7 +19,7 @@
 import type { TrackerCell } from '@/types';
 import { sunCommandLen, sunPitchToNote } from './SunTronicV13';
 import type { SunCmdWidths } from './SunTronicV13';
-import { SUN_EFFECT_BY_OP } from './sunEffectMap';
+import { SUN_EFFECT_BY_OP, sunEncodeEffect } from './sunEffectMap';
 
 // ---------------------------------------------------------------------------
 // Public interface
@@ -158,4 +158,130 @@ export function decodeSunGroup(
   cell.sunRaw = Array.from(h1.subarray(groupStart, pos));
 
   return { cell, nextPos: pos, curInstr };
+}
+
+// ---------------------------------------------------------------------------
+// encodeSunGroup — display cell → group bytes
+// ---------------------------------------------------------------------------
+
+/**
+ * Inverse of sunPitchToNote.
+ *
+ * sunPitchToNote(raw) = raw + 13  (valid when 1 <= raw+13 <= 96)
+ * noteToSunPitch(note) = note - 13  (inverse; caller must pass note in 13..96)
+ */
+export function noteToSunPitch(note: number): number {
+  return note - 13;
+}
+
+/**
+ * FX columns in TrackerCell order (slot 0→4).
+ * Returns {effTyp, param} for each occupied slot (effTyp > 0).
+ */
+function fxColumns(cell: TrackerCell): Array<{ effTyp: number; param: number }> {
+  return [
+    { effTyp: cell.effTyp  ?? 0, param: cell.eff  ?? 0 },
+    { effTyp: cell.effTyp2 ?? 0, param: cell.eff2 ?? 0 },
+    { effTyp: cell.effTyp3 ?? 0, param: cell.eff3 ?? 0 },
+    { effTyp: cell.effTyp4 ?? 0, param: cell.eff4 ?? 0 },
+    { effTyp: cell.effTyp5 ?? 0, param: cell.eff5 ?? 0 },
+  ].filter(c => c.effTyp !== 0);
+}
+
+/**
+ * Encode one SunTronic V1.3 grammar group from a display TrackerCell.
+ *
+ * **Verbatim path:** if `cell.sunRaw` is present AND re-decoding it with the
+ * same `transpose`/`numSampled`/`widths` produces display fields that match
+ * `cell` (note, instrument, effTyp1-5 / eff1-5), the raw bytes are returned
+ * unchanged — preserving the exact byte sequence from the original file.
+ *
+ * **Re-encode path:** FX opcodes (column order, via sunEncodeEffect, with
+ * effTyp-40 rate paired onto 0x9a) → note byte (+select byte) → 0x00.
+ *
+ * @param cell       Display cell to encode (may carry a sunRaw carrier).
+ * @param transpose  Per-voice per-position transpose (must match the decode call).
+ * @param numSampled Number of sampled instruments in this module.
+ * @param widths     Variant-dependent operand widths.
+ * @returns          Array of bytes for this grammar group (includes terminator).
+ */
+export function encodeSunGroup(
+  cell: TrackerCell,
+  transpose: number,
+  numSampled: number,
+  widths: SunCmdWidths,
+): number[] {
+  // -------------------------------------------------------------------------
+  // Verbatim path: re-decode sunRaw and compare display fields.
+  // -------------------------------------------------------------------------
+  if (cell.sunRaw && cell.sunRaw.length > 0) {
+    const raw = new Uint8Array(cell.sunRaw);
+    const redecoded = decodeSunGroup(raw, 0, transpose, 0, numSampled, widths).cell;
+
+    const fieldsMatch =
+      redecoded.note       === cell.note       &&
+      redecoded.instrument === cell.instrument &&
+      (redecoded.effTyp  ?? 0) === (cell.effTyp  ?? 0) && (redecoded.eff  ?? 0) === (cell.eff  ?? 0) &&
+      (redecoded.effTyp2 ?? 0) === (cell.effTyp2 ?? 0) && (redecoded.eff2 ?? 0) === (cell.eff2 ?? 0) &&
+      (redecoded.effTyp3 ?? 0) === (cell.effTyp3 ?? 0) && (redecoded.eff3 ?? 0) === (cell.eff3 ?? 0) &&
+      (redecoded.effTyp4 ?? 0) === (cell.effTyp4 ?? 0) && (redecoded.eff4 ?? 0) === (cell.eff4 ?? 0) &&
+      (redecoded.effTyp5 ?? 0) === (cell.effTyp5 ?? 0) && (redecoded.eff5 ?? 0) === (cell.eff5 ?? 0);
+
+    if (fieldsMatch) {
+      return [...cell.sunRaw];
+    }
+  }
+
+  // -------------------------------------------------------------------------
+  // Re-encode path: emit FX opcodes → note (+select) → 0x00 terminator.
+  // -------------------------------------------------------------------------
+  const out: number[] = [];
+
+  // Gather all FX slots.
+  const cols = fxColumns(cell);
+
+  // Emit FX opcodes in column order (slot 0→4).
+  // effTyp-40 (volSlide rate) has no independent opcode — it is paired onto
+  // the preceding 0x9a when widths.volSlideRateFromStream is true.
+  for (const col of cols) {
+    if (col.effTyp === 40) {
+      // No standalone opcode for rate — handled as 0x9a second byte above.
+      continue;
+    }
+
+    const enc = sunEncodeEffect(col.effTyp, col.param, widths);
+    if (!enc) continue; // unknown / unencodable
+
+    if (enc.op === 0x9a && widths.volSlideRateFromStream) {
+      // Pair with effTyp-40 sibling: find the first effTyp-40 column.
+      const rateSibling = cols.find(c => c.effTyp === 40);
+      out.push(enc.op);
+      out.push(...enc.argBytes); // amount byte
+      if (rateSibling !== undefined) {
+        out.push(rateSibling.param & 0xff); // rate byte
+      }
+    } else {
+      out.push(enc.op);
+      out.push(...enc.argBytes);
+    }
+  }
+
+  // Emit note byte (+ optional instrument-select byte).
+  if (cell.note && cell.note > 0) {
+    const raw = noteToSunPitch(cell.note);
+    const noteByte = (~(raw + transpose)) & 0xff;
+    out.push(noteByte);
+
+    // Emit instrument select when instrument is non-zero.
+    if (cell.instrument && cell.instrument > 0) {
+      const id = cell.instrument;
+      const sel = id > numSampled ? (0x40 | (id - numSampled - 1)) : id;
+      out.push(sel);
+    }
+  }
+
+  // Terminator.
+  out.push(0x00);
+
+  return out;
 }
