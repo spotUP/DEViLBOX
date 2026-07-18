@@ -29,6 +29,9 @@ import { useEditorStore } from './useEditorStore';
 import { useUIStore } from './useUIStore';
 import { reprojectSunGrid } from '../lib/import/formats/sunReproject';
 import { getTrackerStoreRef } from './storeAccess';
+// Type-only — erased at build time, no runtime cycle. Mirrors useCursorStore.ts
+// pattern so getState() can be cast without `any`.
+import type { useTrackerStore as _TrackerStoreType } from './useTrackerStore';
 
 /** Undo entry for a single Hively track step edit */
 export interface HivelyTrackStepUndoEntry {
@@ -584,31 +587,43 @@ export const useFormatStore = create<FormatStore>()(
       }
     }),
     setSunTronicPositionCell: (pos, ch, field, value) => {
-      // 1. Mutate the native data atomically inside immer.
+      // blockIndex changes require a full per-voice re-linearization (re-running
+      // the block-walk that builds the display grid from scratch). reprojectSunGrid
+      // only re-bakes transpose; it cannot remap provenance from a different block.
+      // Until a grid-rebuild subsystem is implemented, blockIndex is display-only.
+      if (field === 'blockIndex') return;
+
+      // 1. Mutate the native data atomically inside immer (transpose only).
       set((state) => {
         if (!state.sunTronicNative) return;
         const p = state.sunTronicNative.positions[pos];
         if (!p || ch < 0 || ch > 3) return;
-        if (field === 'blockIndex') {
-          p.blockIndex[ch] = Math.max(0, Math.min(value, state.sunTronicNative.blocks.length - 1));
-        } else {
-          p.transpose[ch] = Math.max(-128, Math.min(127, value));
-        }
+        p.transpose[ch] = Math.max(-128, Math.min(127, value));
       });
       // 2. Re-project display grid so every cell backed by this pool reflects the
-      // updated blockIndex or transpose. Called after the immer set() commits so
-      // get() returns the fresh native data. getTrackerStoreRef() uses the same
-      // late-binding registry as the Editor/Cursor store cycle (storeAccess.ts).
+      // updated transpose. Called after the immer set() commits so get() returns
+      // the fresh native data. getTrackerStoreRef() uses the same late-binding
+      // registry as the Editor/Cursor store cycle (storeAccess.ts).
       try {
         const trackerStore = getTrackerStoreRef();
         const native = get().sunTronicNative;
         if (native) {
-          const trackerState = trackerStore.getState() as { patterns: import('@/types/tracker').Pattern[] };
+          const trackerState = trackerStore.getState() as ReturnType<typeof _TrackerStoreType.getState>;
           const patterns = trackerState.patterns.slice();
           reprojectSunGrid(patterns, native);
           trackerStore.setState({ patterns });
         }
-      } catch { /* not yet registered — no-op during store module initialisation */ }
+      } catch (err) {
+        // getTrackerStoreRef() throws with a known sentinel when the store has
+        // not yet registered (during module initialisation). Any other error is
+        // an unexpected reprojection failure — surface it rather than hiding it.
+        if (
+          !(err instanceof Error) ||
+          !err.message.includes('[storeAccess] useTrackerStore accessed before registration')
+        ) {
+          console.warn('[setSunTronicPositionCell] unexpected reprojection error', err);
+        }
+      }
     },
     insertHivelyPosition: (pos) => set((state) => {
       if (!state.hivelyNative) return;

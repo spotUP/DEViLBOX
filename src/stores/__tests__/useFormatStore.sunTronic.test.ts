@@ -16,9 +16,26 @@ describe('setSunTronicPositionCell', () => {
     useFormatStore.getState().setSunTronicPositionCell(0, 1, 'transpose', 200);
     expect(useFormatStore.getState().sunTronicNative!.positions[0].transpose[1]).toBe(127);
   });
-  it('clamps blockIndex to the pool size', () => {
-    useFormatStore.getState().setSunTronicPositionCell(0, 0, 'blockIndex', 99);
-    expect(useFormatStore.getState().sunTronicNative!.positions[0].blockIndex[0]).toBe(0);
+  // blockIndex is display-only: changing it requires a full grid re-linearization
+  // that reprojectSunGrid cannot perform. The action is a no-op for blockIndex so
+  // the display grid never gets out of sync with the pool. This test FAILS ON REVERT
+  // if blockIndex mutation is re-enabled without also wiring a grid-rebuild path.
+  it('blockIndex edit is a no-op — column is display-only pending grid-rebuild', () => {
+    const before = useFormatStore.getState().sunTronicNative!.positions[0].blockIndex[0];
+    // Use a value different from the initial (0) — if the action mutates, it
+    // would clamp to max-valid (0, since there is 1 block), but the assertion
+    // below catches any write attempt with a two-block pool.
+    const ndTwoBlocks: SunTronicNativeData = {
+      blocks: [
+        [{ note: 40, instrument: 1, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 }],
+        [{ note: 50, instrument: 1, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 }],
+      ],
+      positions: [{ blockIndex: [0, 0, 0, 0], transpose: [0, 0, 0, 0] }],
+    };
+    useFormatStore.setState({ sunTronicNative: JSON.parse(JSON.stringify(ndTwoBlocks)) });
+    useFormatStore.getState().setSunTronicPositionCell(0, 0, 'blockIndex', 1);
+    // Must remain 0 (no-op); would be 1 if mutation were re-enabled.
+    expect(useFormatStore.getState().sunTronicNative!.positions[0].blockIndex[0]).toBe(before);
   });
 });
 
