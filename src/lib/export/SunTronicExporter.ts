@@ -254,15 +254,18 @@ function recompileWithLengthChange(
   // pool is repacked; anything the pool used to occupy is replaced by the new pool.
   const hf = parseHunks(origBytes);
   const oldH1 = hf.hunks[1].data;
-  const tailStart = oldPoolEnd; // bytes in h1 after the old pool (0 for `ready`)
-  const tailLen = oldH1.length - tailStart;
-  const rawNewH1Len = poolStart + newPoolLen + tailLen;
-  const newH1 = new Uint8Array(alignUp4(rawNewH1Len));
+  const tailLen = oldH1.length - oldPoolEnd;
+  if (tailLen > 0) {
+    throw new Error(
+      `SunTronic recompile: pool is not the last h1 structure (${tailLen} bytes follow); ` +
+      'relaying trailing structures is unsupported',
+    );
+  }
+  const newH1 = new Uint8Array(alignUp4(poolStart + newPoolLen));
   newH1.set(oldH1.subarray(0, poolStart), 0); // pre-pool structures verbatim
   for (let i = 0; i < blocks.length; i++) {
     newH1.set(encoded[i], newOffsetOf.get(blocks[i].h1Offset)!);
   }
-  if (tailLen > 0) newH1.set(oldH1.subarray(tailStart), poolStart + newPoolLen);
 
   // (c) Rewrite each sequence-entry trackPtr longword to the block's NEW offset.
   const writeU32BE = (buf: Uint8Array, off: number, v: number): void => {
