@@ -111,8 +111,9 @@ export function decodeSunGroup(
       if (cell.note === 0 && len >= 2) {
         cell.note = sunPitchToNote(((~h1[pos + 1]) & 0xff) - transpose);
         cell.instrument = curInstr;
-        cell.effTyp = 3;
-        fxSlot = Math.max(fxSlot, 1); // slot 0 is now occupied by glide
+        // Use pushFx so the glide lands in the next free slot and does not
+        // clobber any prior effect already written to slot 0.
+        pushFx(3, 0);
       }
       pos += len;
       continue;
@@ -125,8 +126,8 @@ export function decodeSunGroup(
       continue;
     }
 
-    // Control opcode range: 0x8b..0x9c and 0x97 (all covered by SUN_EFFECT_BY_OP).
-    if ((b >= 0x8b && b <= 0x9c) || b === 0x97) {
+    // Control opcode range: 0x8b..0x9c (0x97 = 151 is already within this range).
+    if (b >= 0x8b && b <= 0x9c) {
       const def = SUN_EFFECT_BY_OP.get(b);
       if (def) {
         // Slice the arg bytes (everything after the opcode byte).
