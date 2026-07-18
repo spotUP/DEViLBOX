@@ -64,6 +64,7 @@ import { CheeseCutterView } from '@components/cheesecut/CheeseCutterView';
 import { FurnaceView } from '@components/furnace/FurnaceView';
 import { Sc68Visualizer } from './Sc68Visualizer';
 import { MaxTraxView } from './MaxTraxView';
+import { SunTronicView } from '@components/suntronic/SunTronicView';
 import { TrackScopesStrip } from './TrackScopesStrip';
 import { PatternBottomBar } from './PatternBottomBar';
 import { DubDeckStrip } from '@components/dub/DubDeckStrip';
@@ -578,10 +579,10 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
           {viewMode === 'tracker' ? (
             (() => {
               // Determine if this is a custom format editor that can be popped out
-              const isCustomFormat = ['goattracker', 'hively', 'klystrack', 'jamcracker', 'sidfactory2', 'cheesecutter', 'musicline', 'furnace', 'tfmx', 'maxtrax'].includes(editorMode);
+              const isCustomFormat = ['goattracker', 'hively', 'klystrack', 'jamcracker', 'sidfactory2', 'cheesecutter', 'musicline', 'furnace', 'tfmx', 'maxtrax', 'suntronic'].includes(editorMode);
               const formatLabels: Record<string, string> = {
                 goattracker: 'GoatTracker', hively: 'AHX / Hively', klystrack: 'Klystrack',
-                jamcracker: 'JamCracker', sidfactory2: 'SID Factory II', cheesecutter: 'CheeseCutter', musicline: 'MusicLine', furnace: 'Furnace', tfmx: 'TFMX', maxtrax: 'MaxTrax',
+                jamcracker: 'JamCracker', sidfactory2: 'SID Factory II', cheesecutter: 'CheeseCutter', musicline: 'MusicLine', furnace: 'Furnace', tfmx: 'TFMX', maxtrax: 'MaxTrax', suntronic: 'SunTronic',
               };
 
               // Build the editor content
@@ -603,6 +604,8 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
                 <TFMXView />
               ) : editorMode === 'maxtrax' ? (
                 <MaxTraxView />
+              ) : editorMode === 'suntronic' ? (
+                <SunTronicView />
               ) : editorMode === 'sc68' ? (
                 <Sc68Visualizer />
               ) : editorMode === 'musicline' ? (

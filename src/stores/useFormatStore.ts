@@ -1025,6 +1025,15 @@ export const useFormatStore = create<FormatStore>()(
           state.hivelyNative = song.hivelyNative;
           state.hivelyFileData = song.hivelyFileData ?? null;
           state.hivelyMeta = song.hivelyMeta ?? null;
+        } else if (song.sunTronicNative) {
+          // SunTronic V1.3 editable native path. sunTronicNative is produced
+          // ONLY by parseSunTronicV13File (SunTronicParser.ts) — the raw-rip /
+          // non-V1.3 paths never build it — so its presence already gates on
+          // V1.3, keeping non-V1.3 SunTronic modules play-only.
+          newEditorMode = 'suntronic';
+          state.editorMode = 'suntronic';
+          clearNative(state);
+          state.sunTronicNative = song.sunTronicNative;
         } else if (song.klysNative) {
           newEditorMode = 'klystrack';
           state.editorMode = 'klystrack';
