@@ -257,14 +257,20 @@ export interface UADEVariablePatternLayout {
 }
 
 /** Compare the editable fields of two cells (ignores display-only / carrier data). */
-function cellFieldsEqual(a: TrackerCell, b: TrackerCell): boolean {
+export function cellFieldsEqual(a: TrackerCell, b: TrackerCell): boolean {
   return (a.note ?? 0) === (b.note ?? 0)
     && (a.instrument ?? 0) === (b.instrument ?? 0)
     && (a.volume ?? 0) === (b.volume ?? 0)
     && (a.effTyp ?? 0) === (b.effTyp ?? 0)
     && (a.eff ?? 0) === (b.eff ?? 0)
     && (a.effTyp2 ?? 0) === (b.effTyp2 ?? 0)
-    && (a.eff2 ?? 0) === (b.eff2 ?? 0);
+    && (a.eff2 ?? 0) === (b.eff2 ?? 0)
+    && (a.effTyp3 ?? 0) === (b.effTyp3 ?? 0)
+    && (a.eff3 ?? 0) === (b.eff3 ?? 0)
+    && (a.effTyp4 ?? 0) === (b.effTyp4 ?? 0)
+    && (a.eff4 ?? 0) === (b.eff4 ?? 0)
+    && (a.effTyp5 ?? 0) === (b.effTyp5 ?? 0)
+    && (a.eff5 ?? 0) === (b.eff5 ?? 0);
 }
 
 /** True when `rows` is content-identical to the parsed baseline (block is unedited). */
