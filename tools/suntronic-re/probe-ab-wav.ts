@@ -21,7 +21,7 @@ function sumMono(chs: Float32Array[]): Float32Array {
 async function main(): Promise<void> {
   const song = process.argv[2] || 'ballblaser.src';
   const seconds = Number(process.argv[3] || 8);
-  const outDir = '/private/tmp/claude-501/-Users-spot-Code-DEViLBOX/70f95479-1b00-487b-a882-d4b7203ba577/scratchpad';
+  const outDir = process.env.OUT || '.';
   const native = renderSunTronicNative(song, { seconds });
   const oracle = await renderUADEPerVoice(song, { seconds });
   const base = song.replace(/\.src$/, '');

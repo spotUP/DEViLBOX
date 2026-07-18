@@ -1,0 +1,24 @@
+import { readFileSync } from 'fs';
+import { join } from 'path';
+import { CORPUS_DIR } from './suntronicLib';
+import { parseSunTronicV13Score } from '../../src/lib/import/formats/SunTronicV13';
+import { SunTronicPlayer } from '../../src/engine/suntronic/SunTronicPlayer';
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type A=any;
+const NAME=process.argv[2]??'kompo05.src',V=parseInt(process.argv[3]??'1',10);
+const data=new Uint8Array(readFileSync(join(CORPUS_DIR,NAME)));
+const score=parseSunTronicV13Score(data);
+const player:A=new (SunTronicPlayer as A)(score);
+const h1:Uint8Array=player.h1;
+console.log('synthTableOff=0x'+(player.synthTableOff>>>0).toString(16),'recordSize=0x'+(player.synthRecordSize>>>0).toString(16),'h1.len=0x'+h1.length.toString(16));
+const orig=player.noteOn.bind(player);let done=false;
+player.noteOn=(v:A,sel:number)=>{orig(v,sel);
+  if(v.channel===V&&v.instr&&!done){done=true;const i=v.instr;
+    console.log(`v${V} sel=0x${(sel&0xff).toString(16)} recordOff=0x${i.recordOff.toString(16)} synthType=${i.synthType}`);
+    console.log(`  volEnvOff=0x${i.volEnvOff.toString(16)} volEnvLen=${i.volEnvLen} volEnvLoop=${i.volEnvLoop}`);
+    const hex=(off:number,n:number)=>Array.from(h1.slice(off,off+n)).map(b=>b.toString(16).padStart(2,'0')).join(' ');
+    console.log('  record[0x00..0x30]:',hex(i.recordOff,0x30));
+    console.log('  volEnv table[0x00..0x20] @volEnvOff:',hex(i.volEnvOff,0x20));
+    console.log('  volEnv signed:',Array.from(h1.slice(i.volEnvOff,i.volEnvOff+0x20)).map(b=>b<128?b:b-256).join(','));
+  }};
+for(let c=0;c<20;c++)player.stepVblankOnce();
