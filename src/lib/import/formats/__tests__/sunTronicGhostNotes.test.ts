@@ -32,9 +32,14 @@ import {
   type SunV13Score,
 } from '../SunTronicV13';
 import { SunTronicPlayer } from '../../../../engine/suntronic/SunTronicPlayer';
+import { parseSunTronicFile } from '../SunTronicParser';
 
 const CORPUS = join(process.cwd(), 'public/data/songs/formats/SUNTronicTunes');
 const load = (name: string): Uint8Array => new Uint8Array(readFileSync(join(CORPUS, name)));
+function readFixture(name: string): ArrayBuffer {
+  const raw = new Uint8Array(readFileSync(join(CORPUS, name)));
+  return raw.buffer.slice(raw.byteOffset, raw.byteOffset + raw.byteLength) as ArrayBuffer;
+}
 
 /** Set of `voice:position:rowWithinPosition` keys the editable grid shows a note
  * for. Mirrors walkV13Voice's per-position stream consumption — crucially it goes
@@ -136,5 +141,38 @@ describe('SunTronic stop-song tail — no phantom notes past song end', () => {
     };
     for (let t = 0; t < 20000; t++) player.stepVblankOnce();
     expect(pastEndFires).toBe(0);
+  });
+});
+
+describe('SunTronic ghost-gate — arp/effect opcodes surface as grid cells', () => {
+  it('ready voice 1: arp/effect opcodes surface as effect cells (no invisible arp)', () => {
+    // Before this fix: walkV13Voice emitted emptyV13Cell with no FX columns, so
+    // arps/glides/effects played under the native player but were invisible in the
+    // grid. After: decodeSunGroup populates effTyp/effTyp2/… for every control
+    // opcode, so fxCells.length > 0.
+    const song = parseSunTronicFile(readFixture('ready'), 'ready');
+    const ch1 = song.patterns.flatMap(p => p.channels[1].rows);
+    const fxCells = ch1.filter(c => c.effTyp !== 0 || (c.effTyp2 ?? 0) !== 0);
+    expect(fxCells.length).toBeGreaterThan(0); // arp/effect opcodes are now visible
+  });
+});
+
+describe('SunTronic pool byte-exact — blockRows sunRaw concatenation matches blockRawBytes', () => {
+  it('concat(sunRaw) === blockRawBytes for ready, ballblaser.src, snake.src', () => {
+    // Fixture 'snake' does not exist; use 'snake.src' (present in corpus).
+    for (const name of ['ready', 'ballblaser.src', 'snake.src']) {
+      const song = parseSunTronicFile(readFixture(name), name);
+      const L = song.uadeVariableLayout;
+      expect(L, `${name}: variable layout present`).toBeTruthy();
+      if (!L) throw new Error(`${name}: no variable layout`);
+      expect(L.blockRows, `${name}: blockRows present`).toBeTruthy();
+      expect(L.blockRawBytes, `${name}: blockRawBytes present`).toBeTruthy();
+      for (let fp = 0; fp < L.numFilePatterns; fp++) {
+        const bytes = L.blockRows![fp].flatMap(c => c.sunRaw ?? []);
+        expect(bytes, `${name} fp=${fp}: sunRaw concat matches blockRawBytes`).toEqual(
+          Array.from(L.blockRawBytes![fp]),
+        );
+      }
+    }
   });
 });
