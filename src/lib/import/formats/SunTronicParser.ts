@@ -35,7 +35,7 @@ import {
 } from './SunTronicV13';
 import type { SunV13Score, SunCmdWidths } from './SunTronicV13';
 import { decodeSunGroup, encodeSunGroup } from './sunGroupCodec';
-import { decodeSunBlockPool, buildSunTronicNativeData } from './sunNativeData';
+import { decodeSunBlockPool, buildSunTronicNativeData, buildPoolRowIndex } from './sunNativeData';
 
 // ── Binary helpers ──────────────────────────────────────────────────────────
 
@@ -523,6 +523,7 @@ function buildV13Instruments(
 function walkV13Voice(
   score: SunV13Score,
   voice: number,
+  poolRowIndex: Map<number, { blockIndex: number; rowInBlock: number }>,
 ): { cells: TrackerCell[]; fpPerRow: number[] } {
   const h1 = score.h1;
   // Variant-dependent operand widths — MUST match the audio player's controlOpcode,
@@ -552,6 +553,9 @@ function walkV13Voice(
     }
     let pos = ptr;
     for (let r = 0; r < rowsPerPos && cells.length < V13_MAX_TOTAL_ROWS; r++) {
+      // Cursor offset at the START of this group — the byte the pool row-index
+      // is keyed on. Capture before decodeSunGroup advances `pos`.
+      const groupStart = pos;
       // Delegate the per-group item walk to decodeSunGroup (single source of
       // truth for note/instrument/FX decode). Thread curInstr forward across
       // groups within this position; transpose and numSampled are position-level.
@@ -574,12 +578,17 @@ function walkV13Voice(
         }
       }
 
-      // Stamp provenance so later tasks can route edits back to the pool block.
-      // fp >= 0 means ptr IS a block start (blockIndexByOffset only stores starts),
-      // so r is the grammar-row index within the block directly.
-      if (fp >= 0 && r < score.blocks[fp].rowCount) {
-        decoded.cell.sunBlockIndex = fp;
-        decoded.cell.sunRowInBlock = r;
+      // Stamp provenance so edits route back to the pool block. A position can
+      // reuse a SHORT block (e.g. rowCount=1) yet play `rowsPerPos` rows: the
+      // cursor flows past the block end into the FOLLOWING pool blocks. The old
+      // guard `r < blocks[fp].rowCount` stamped only the rows inside the start
+      // block, leaving every overflow row unprovenanced → played + visible but
+      // uneditable/un-reprojectable (the "ghost note" gap). Resolve the TRUE
+      // owning (block, row) from the cursor offset via the pool row-index.
+      const prov = poolRowIndex.get(groupStart);
+      if (prov) {
+        decoded.cell.sunBlockIndex = prov.blockIndex;
+        decoded.cell.sunRowInBlock = prov.rowInBlock;
         decoded.cell.sunPosition = positionIndex;
       }
 
@@ -605,7 +614,11 @@ function parseSunTronicV13File(
   const instruments = buildV13Instruments(score, companionFiles);
 
   // ── display grid: independent per-voice walks of subsong 0 ──
-  const voices = [0, 1, 2, 3].map((v) => walkV13Voice(score, v));
+  // Pool row-index maps each group-start offset → its owning (block, row) so a
+  // voice that flows past a short block into following blocks still stamps the
+  // correct provenance on every played row (SunTronic ghost-note fix).
+  const poolRowIndex = buildPoolRowIndex(score);
+  const voices = [0, 1, 2, 3].map((v) => walkV13Voice(score, v, poolRowIndex));
   const maxRows = Math.max(1, ...voices.map((v) => v.cells.length));
 
   // SunTronic groups stack up to 5 effects per row (effTyp..effTyp5). The grid

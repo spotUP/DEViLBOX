@@ -10,7 +10,7 @@
  */
 
 import type { TrackerCell } from '@/types';
-import type { SunV13Score } from './SunTronicV13';
+import type { SunV13Score, SunCmdWidths } from './SunTronicV13';
 import { decodeSunGroup } from './sunGroupCodec';
 
 // ── Exported interfaces ──────────────────────────────────────────────────────
@@ -27,6 +27,11 @@ export interface SunTronicNativeData {
   blocks: TrackerCell[][];
   /** Song arrangement (subsong 0). */
   positions: SunPosition[];
+  /** Command widths for this score — needed to re-decode a pool cell's sunRaw at
+   *  a position transpose (reprojectSunGrid). Same object decodeSunBlockPool used. */
+  widths: SunCmdWidths;
+  /** Sampled-instrument count — the decodeSunGroup instrument-select boundary. */
+  numSampled: number;
 }
 
 // ── Pool decode (single source of truth) ────────────────────────────────────
@@ -69,6 +74,39 @@ export function decodeSunBlockPool(score: SunV13Score): TrackerCell[][] {
   });
 }
 
+/**
+ * Map every pool group-start offset (hunk#1-relative) to the (blockIndex,
+ * rowInBlock) pair that owns it. The pool blocks partition h1 on group
+ * boundaries, so a display-grid cursor that flows past a short block into the
+ * following blocks can resolve its TRUE owning block per row — which the naive
+ * "r is a row index into the position's start block" assumption cannot.
+ *
+ * Mirrors decodeSunBlockPool's walk exactly (same widths, same blockLimit,
+ * same group advance) so the offsets line up cell-for-cell with `blocks[bi][ri]`.
+ * First writer wins: a terminator that overhangs from a previous block must not
+ * overwrite the next block's genuine row-start.
+ */
+export function buildPoolRowIndex(
+  score: SunV13Score,
+): Map<number, { blockIndex: number; rowInBlock: number }> {
+  const widths = { arpShift: score.arpShift, volSlideRateFromStream: score.volSlideRateFromStream };
+  const numSampled = score.sampledInstruments.length;
+  const map = new Map<number, { blockIndex: number; rowInBlock: number }>();
+
+  score.blocks.forEach((b, blockIndex) => {
+    const blockLimit = Math.min(b.h1Offset + b.byteSize, score.h1.length);
+    let pos = b.h1Offset;
+    let curInstr = 0;
+    for (let rowInBlock = 0; rowInBlock < b.rowCount; rowInBlock++) {
+      if (!map.has(pos)) map.set(pos, { blockIndex, rowInBlock });
+      const decoded = decodeSunGroup(score.h1, pos, 0, curInstr, numSampled, widths, blockLimit);
+      curInstr = decoded.curInstr;
+      pos = decoded.nextPos;
+    }
+  });
+  return map;
+}
+
 // ── Native data builder ──────────────────────────────────────────────────────
 
 /**
@@ -94,5 +132,7 @@ export function buildSunTronicNativeData(
   return {
     blocks: blockRows,
     positions,
+    widths: { arpShift: score.arpShift, volSlideRateFromStream: score.volSlideRateFromStream },
+    numSampled: score.sampledInstruments.length,
   };
 }

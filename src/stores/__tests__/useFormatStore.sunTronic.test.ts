@@ -8,6 +8,8 @@ import type { Pattern } from '@/types/tracker';
 const nd: SunTronicNativeData = {
   blocks: [[{ note: 40, instrument: 1, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 }]],
   positions: [{ blockIndex: [0, 0, 0, 0], transpose: [0, 0, 0, 0] }],
+  widths: { arpShift: 4, volSlideRateFromStream: false },
+  numSampled: 0,
 };
 
 describe('setSunTronicPositionCell', () => {
@@ -31,6 +33,8 @@ describe('setSunTronicPositionCell', () => {
         [{ note: 50, instrument: 1, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 }],
       ],
       positions: [{ blockIndex: [0, 0, 0, 0], transpose: [0, 0, 0, 0] }],
+      widths: { arpShift: 4, volSlideRateFromStream: false },
+      numSampled: 0,
     };
     useFormatStore.setState({ sunTronicNative: JSON.parse(JSON.stringify(ndTwoBlocks)) });
     useFormatStore.getState().setSunTronicPositionCell(0, 0, 'blockIndex', 1);
@@ -41,7 +45,8 @@ describe('setSunTronicPositionCell', () => {
 
 // ── Reprojection regression ──────────────────────────────────────────────────
 // Asserts that setSunTronicPositionCell re-projects the display grid atomically:
-// pool note 40 + new transpose 5 = 45 must appear in the tracker store patterns.
+// displayNote = poolNote - transpose (pool decoded at transpose 0), so pool note
+// 40 with new transpose 5 = 35 must appear in the tracker store patterns.
 // This test FAILS before reprojectSunGrid is wired into the action (fails-on-revert).
 
 describe('setSunTronicPositionCell re-projects display grid', () => {
@@ -57,7 +62,7 @@ describe('setSunTronicPositionCell re-projects display grid', () => {
     channels: [
       makeChannel([
         {
-          // Display note = pool note 40 + transpose 0 (initial state)
+          // Display note = pool note 40 - transpose 0 (initial state)
           note: 40,
           instrument: 0,
           volume: -1,
@@ -82,13 +87,13 @@ describe('setSunTronicPositionCell re-projects display grid', () => {
     useTrackerStore.setState({ patterns: [makeDisplayPattern()] });
   });
 
-  it('re-projects cell note after transpose edit (pool 40 + tr 5 = 45)', () => {
+  it('re-projects cell note after transpose edit (pool 40 - tr 5 = 35)', () => {
     useFormatStore.getState().setSunTronicPositionCell(0, 0, 'transpose', 5);
 
     // Transpose stored correctly
     expect(useFormatStore.getState().sunTronicNative!.positions[0].transpose[0]).toBe(5);
-    // Display note re-projected: 40 + 5 = 45
+    // Display note re-projected: 40 - 5 = 35
     const note = useTrackerStore.getState().patterns[0].channels[0].rows[0].note;
-    expect(note).toBe(45);
+    expect(note).toBe(35);
   });
 });

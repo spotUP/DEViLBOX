@@ -206,3 +206,52 @@ describe('SunTronic pool byte-exact — blockRows sunRaw concatenation matches b
     }
   });
 });
+
+describe('SunTronic provenance coverage — every played row is editable (short-block reuse)', () => {
+  // Bug 3: a position can reuse a SHORT pool block (e.g. rowCount=1) yet play
+  // `rowsPerPos` rows — the per-voice cursor flows past the block end into the
+  // FOLLOWING pool blocks. The old stamp guard `r < blocks[fp].rowCount` only
+  // stamped rows inside the START block, so every overflow row was decoded,
+  // displayed and PLAYED but carried no provenance → uneditable / skipped by
+  // reprojectSunGrid (the "hear notes, grid row blank/frozen" ghost). The fix
+  // resolves each row's TRUE owning (block,row) from the cursor offset via
+  // buildPoolRowIndex. analgestic2 pos 72-83 reuse a rowCount=1 block across
+  // 16-row positions — reverting the fix leaves ~200 noted cells unprovenanced.
+  it('analgestic2.src — every noted grid cell carries provenance resolving to its pool cell', () => {
+    const song = parseSunTronicFile(readFixture('analgestic2.src'), 'analgestic2.src');
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const native = (song as any).sunTronicNative;
+    expect(native, 'sunTronicNative present').toBeTruthy();
+
+    let unprovenanced = 0;
+    let poolMismatch = 0;
+    for (const pat of song.patterns) {
+      for (let ch = 0; ch < 4; ch++) {
+        for (const cell of pat.channels[ch].rows) {
+          if (!cell || !cell.note || cell.note <= 0) continue;
+          const bi = cell.sunBlockIndex;
+          const ri = cell.sunRowInBlock;
+          const pos = cell.sunPosition;
+          if (bi === undefined || bi < 0 || ri === undefined || pos === undefined) {
+            unprovenanced++;
+            continue;
+          }
+          const block = native.blocks[bi];
+          if (!block || ri >= block.length) { unprovenanced++; continue; }
+          // Pool decodes at transpose 0; display subtracts the position transpose.
+          const poolNote: number = block[ri].note;
+          const t: number = native.positions[pos].transpose[ch];
+          const expected = poolNote === 0 ? 0 : sunPitchToNote(poolNote - 13 - t);
+          // Only count as a mismatch when neither side clamps to a rest (0):
+          // near the 1..96 boundary the raw-domain clamp legitimately diverges.
+          if (expected !== 0 && cell.note !== 0 && expected !== cell.note) poolMismatch++;
+        }
+      }
+    }
+    // Every played/displayed note must be routable back to the pool. Reverting
+    // the buildPoolRowIndex stamp restores hundreds of unprovenanced cells here.
+    expect(unprovenanced, 'noted cells with no pool provenance').toBe(0);
+    // And the provenance must point at the CORRECT pool cell (raw pitch matches).
+    expect(poolMismatch, 'noted cells whose provenance resolves to a different pitch').toBe(0);
+  });
+});
