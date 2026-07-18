@@ -274,6 +274,10 @@ sonic-arranger-wasm/test_sa.c
 # Test songs (deployed separately to Hetzner)
 public/data/songs/test-songs/
 
+# Python bytecode (RE tooling)
+__pycache__/
+*.pyc
+
 # Debug/snapshot YAML artifacts (state captures for troubleshooting)
 after-fix.yml
 before-load.yml
