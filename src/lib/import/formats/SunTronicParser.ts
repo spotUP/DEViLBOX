@@ -603,11 +603,21 @@ function parseSunTronicV13File(
   const widths = { arpShift: score.arpShift, volSlideRateFromStream: score.volSlideRateFromStream };
   const numSampled = score.sampledInstruments.length;
   const blockRows: TrackerCell[][] = score.blocks.map((b) => {
+    // Compute the exclusive block end for the over-read guard.
+    // decodeSunBlock (SunTronicV13.ts:420-452) walks past sortedStarts[i+1] to
+    // find the 0x00 terminator of the last group; b.byteSize therefore already
+    // includes any terminator that overhangs into the next block's nominal start.
+    // Use b.h1Offset + b.byteSize (the authoritative end measured by
+    // decodeSunBlock), clamped to h1.length.  This mirrors the sortedStarts[i+1]
+    // computation at SunTronicV13.ts:974 in spirit — both bound the walk at the
+    // true end of this block's content.
+    const blockLimit = Math.min(b.h1Offset + b.byteSize, score.h1.length);
+
     const blockCells: TrackerCell[] = [];
     let pos = b.h1Offset;
     let curInstr = 0;
     for (let r = 0; r < b.rowCount; r++) {
-      const decoded = decodeSunGroup(score.h1, pos, 0, curInstr, numSampled, widths);
+      const decoded = decodeSunGroup(score.h1, pos, 0, curInstr, numSampled, widths, blockLimit);
       curInstr = decoded.curInstr;
       pos = decoded.nextPos;
       blockCells.push(decoded.cell);

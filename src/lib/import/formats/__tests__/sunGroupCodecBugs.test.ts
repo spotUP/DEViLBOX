@@ -40,6 +40,22 @@ describe('0x94 setPitchNoRetrig single-carrier', () => {
   });
 });
 
+describe('decodeSunGroup respects block limit', () => {
+  it('stops at limit when the group lacks a 0x00 terminator', () => {
+    // no terminator; two note-ish bytes then next block would start at index 2
+    const h1 = new Uint8Array([0xc7, 0xc5, 0xc3]);
+    const g = decodeSunGroup(h1, 0, 0, 0, 0, W, 2); // limit = 2
+    expect(g.nextPos).toBe(2);                       // did NOT read index 2
+    expect(g.cell.sunRaw).toEqual([0xc7, 0xc5]);     // exactly the block's bytes
+  });
+  it('default limit (omitted) preserves prior behaviour', () => {
+    const h1 = new Uint8Array([0xc7, 0x00]);
+    const g = decodeSunGroup(h1, 0, 0, 0, 0, W);
+    expect(g.nextPos).toBe(2);
+    expect(g.cell.sunRaw).toEqual([0xc7, 0x00]);
+  });
+});
+
 describe('Fxx opcode-identity split (0x98 speed vs 0x8e ciaTempo)', () => {
   const W = { arpShift: 4, volSlideRateFromStream: false };
 
