@@ -36,6 +36,7 @@ import {
 } from './SunTronicV13';
 import type { SunV13Score } from './SunTronicV13';
 import { decodeSunGroup } from './sunGroupCodec';
+import { decodeSunBlockPool } from './sunNativeData';
 
 // ── Binary helpers ──────────────────────────────────────────────────────────
 
@@ -596,34 +597,9 @@ function parseSunTronicV13File(
   const blockRawBytes = score.blocks.map((b) =>
     buf.slice(score.h1FileOffset + b.h1Offset, score.h1FileOffset + b.h1Offset + b.byteSize));
 
-  // Decode each block at transpose=0 (raw pitch) so blockRows[fp] is independent
-  // of any position-level transpose. Concatenating sunRaw on each cell reproduces
-  // the original block bytes exactly (pool byte-exact property). Separate from the
-  // 4-ch grid walks (which bake transpose for display) — this is the Hively model.
-  const widths = { arpShift: score.arpShift, volSlideRateFromStream: score.volSlideRateFromStream };
-  const numSampled = score.sampledInstruments.length;
-  const blockRows: TrackerCell[][] = score.blocks.map((b) => {
-    // Compute the exclusive block end for the over-read guard.
-    // decodeSunBlock (SunTronicV13.ts:420-452) walks past sortedStarts[i+1] to
-    // find the 0x00 terminator of the last group; b.byteSize therefore already
-    // includes any terminator that overhangs into the next block's nominal start.
-    // Use b.h1Offset + b.byteSize (the authoritative end measured by
-    // decodeSunBlock), clamped to h1.length.  This mirrors the sortedStarts[i+1]
-    // computation at SunTronicV13.ts:974 in spirit — both bound the walk at the
-    // true end of this block's content.
-    const blockLimit = Math.min(b.h1Offset + b.byteSize, score.h1.length);
-
-    const blockCells: TrackerCell[] = [];
-    let pos = b.h1Offset;
-    let curInstr = 0;
-    for (let r = 0; r < b.rowCount; r++) {
-      const decoded = decodeSunGroup(score.h1, pos, 0, curInstr, numSampled, widths, blockLimit);
-      curInstr = decoded.curInstr;
-      pos = decoded.nextPos;
-      blockCells.push(decoded.cell);
-    }
-    return blockCells;
-  });
+  // Decode each block at transpose=0 (raw pitch). Single source of truth —
+  // decodeSunBlockPool owns the pool decode logic (sunNativeData.ts).
+  const blockRows: TrackerCell[][] = decodeSunBlockPool(score);
   const trackMap = Array.from({ length: numPatterns }, (_, p) =>
     [0, 1, 2, 3].map((ch) => voices[ch].fpPerRow[p * V13_ROWS_PER_PATTERN] ?? -1));
 
