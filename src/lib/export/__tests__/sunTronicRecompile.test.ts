@@ -51,12 +51,13 @@ describe('SunTronic recompile on length change', () => {
     const otherNote = nd.blocks[otherBlock][otherRow].note;
 
     // applySunNoteEdit takes the DISPLAY note at a position and stores the raw
-    // pool note (raw = displayNote - position transpose). The pool is decoded at
-    // transpose 0, so to land `newRaw` in the pool we pass the display note for
-    // position 0 = newRaw + positions[0].transpose[voice]. (`ready`'s position-0
+    // pool note. Proven convention: display = poolNote - transpose, so the edit
+    // inverse ADDS transpose (raw = displayNote + transpose). The pool is decoded
+    // at transpose 0, so to land `newRaw` in the pool we pass the display note for
+    // position 0 = newRaw - positions[0].transpose[voice]. (`ready`'s position-0
     // transpose is non-zero, so a literal 0 would shift the stored raw.)
     const pos0Transpose = nd.positions[0].transpose[0];
-    applySunNoteEdit(nd, fp, row, 0, newRaw + pos0Transpose, 0); // -> raw = newRaw
+    applySunNoteEdit(nd, fp, row, 0, newRaw - pos0Transpose, 0); // -> raw = newRaw
     song.uadeVariableLayout!.blockRows![fp][row] = nd.blocks[fp][row];
 
     const res = exportAsSunTronic(song);

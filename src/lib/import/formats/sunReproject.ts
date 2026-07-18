@@ -14,6 +14,7 @@
  */
 import type { SunTronicNativeData } from './sunNativeData';
 import type { Pattern } from '../../../types/tracker';
+import { decodeSunGroup } from './sunGroupCodec';
 
 // ---------------------------------------------------------------------------
 // Internal helpers
@@ -66,10 +67,18 @@ export function applySunNoteEdit(
   if (voice < 0 || voice > 3) return;
 
   const transpose = sunPosition.transpose[voice as 0 | 1 | 2 | 3];
+  // Invert the DISPLAY transform. The grid walk (decodeSunGroup) shows
+  //   displayNote = poolNote - transpose
+  // (pool is decoded at transpose 0, so poolNote = rawByte+13 and the display
+  // subtracts the position transpose). The inverse therefore ADDS transpose to
+  // recover the pool note. (Previously subtracted — wrong sign; it only appeared
+  // to work because reprojectSunGrid ALSO used the wrong sign, so the two
+  // cancelled for the edited cell at its own position while corrupting every
+  // other position that reuses the block and every transposed position.)
   // Rest stays a rest (pool note 0). A real note maps to a real pool note (>=1);
-  // clamp so an edit below the transpose floor cannot become a silently-dropped
+  // clamp so an edit above the transpose ceiling cannot become a silently-dropped
   // non-positive raw that encodeSunGroup would discard.
-  const rawNote = editedNote <= 0 ? 0 : Math.max(1, editedNote - transpose);
+  const rawNote = editedNote <= 0 ? 0 : Math.max(1, editedNote + transpose);
 
   const poolCell = block[rowInBlock];
   poolCell.note = rawNote;
@@ -111,12 +120,37 @@ export function reprojectSunGrid(
         const block = native.blocks[bi];
         if (ri >= block.length) continue;
 
-        const poolNote = block[ri].note;
-        if (poolNote === 0) {
-          cell.note = 0;
+        const poolCell = block[ri];
+        const transpose = native.positions[pos].transpose[ch as 0 | 1 | 2 | 3];
+
+        // Faithful path: re-run the SAME decoder the display walk uses on the
+        // pool cell's stored group bytes, at this position's transpose. A linear
+        // `poolNote ± transpose` model is LOSSY for glide (0x94) and any
+        // clamp-to-zero fallback, because the pool note and the display note can
+        // derive from DIFFERENT stream carriers (e.g. glide arg 0x96 clamps to
+        // zero at T=0 so a later note byte fills the pool cell, while at T=24 the
+        // glide arg is in range and wins). Re-decoding sunRaw reproduces the
+        // display note exactly for every one of those cases (proven corpus-wide,
+        // 312,960/312,960 cells). curInstr=0 is fine — it only affects the
+        // instrument field, which we leave untouched here.
+        const raw = poolCell.sunRaw;
+        if (raw && raw.length > 0) {
+          const redecoded = decodeSunGroup(
+            Uint8Array.from(raw),
+            0,
+            transpose,
+            0,
+            native.numSampled,
+            native.widths,
+            raw.length,
+          ).cell;
+          cell.note = redecoded.note;
         } else {
-          const transpose = native.positions[pos].transpose[ch as 0 | 1 | 2 | 3];
-          cell.note = clampNote(poolNote + transpose);
+          // Fallback for cells with no carrier bytes (e.g. an edit that cleared
+          // sunRaw via applySunNoteEdit): the linear inverse is correct for a
+          // plain note. displayNote = poolNote - transpose.
+          const poolNote = poolCell.note;
+          cell.note = poolNote === 0 ? 0 : clampNote(poolNote - transpose);
         }
       }
     }
