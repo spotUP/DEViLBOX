@@ -84,7 +84,7 @@ describe('encodeSunGroup', () => {
       const h1 = new Uint8Array([0xc7, 0x00]); // arbitrary note group (note=69)
       const { cell: base } = decodeSunGroup(h1, 0, 0, 0, 0, W);
       const edited = { ...base, note: n as typeof base.note };
-      const bytes = encodeSunGroup(edited, 0, 0, W);
+      const bytes = encodeSunGroup(edited, 0, 0, 0, W);
       const back = decodeSunGroup(new Uint8Array(bytes), 0, 0, 0, 0, W);
       expect(back.cell.note).toBe(n);
     }
@@ -93,14 +93,14 @@ describe('encodeSunGroup', () => {
   it('re-emits unedited group verbatim from sunRaw', () => {
     const h1 = new Uint8Array([0x9c, 0x04, 0xc7, 0x00]);
     const { cell } = decodeSunGroup(h1, 0, 0, 0, 0, W); // transpose=0, curInstr=0, numSampled=0
-    expect(encodeSunGroup(cell, 0, 0, W)).toEqual([0x9c, 0x04, 0xc7, 0x00]);
+    expect(encodeSunGroup(cell, 0, 0, 0, W)).toEqual([0x9c, 0x04, 0xc7, 0x00]);
   });
 
   it('re-encodes when the note is edited (decodes back to the new note)', () => {
     const h1 = new Uint8Array([0xc7, 0x00]);
     const { cell } = decodeSunGroup(h1, 0, 0, 0, 0, W);
     const edited = { ...cell, note: (cell.note + 2) as typeof cell.note };
-    const bytes = encodeSunGroup(edited, 0, 0, W);
+    const bytes = encodeSunGroup(edited, 0, 0, 0, W);
     const back = decodeSunGroup(new Uint8Array(bytes), 0, 0, 0, 0, W);
     expect(back.cell.note).toBe(edited.note);
   });
@@ -111,7 +111,7 @@ describe('encodeSunGroup', () => {
     const { cell } = decodeSunGroup(h1, 0, 0, 0, 0, W);
     // Edit the note so verbatim path is skipped
     const edited = { ...cell, note: (cell.note + 2) as typeof cell.note };
-    const bytes = encodeSunGroup(edited, 0, 0, W);
+    const bytes = encodeSunGroup(edited, 0, 0, 0, W);
     const back = decodeSunGroup(new Uint8Array(bytes), 0, 0, 0, 0, W);
     expect(back.cell.note).toBe(edited.note);
     expect(back.cell.effTyp).toBe(39); // arp-select effect preserved
@@ -121,7 +121,7 @@ describe('encodeSunGroup', () => {
   it('handles empty group (sustain cell) — re-emits verbatim [0x00]', () => {
     const h1 = new Uint8Array([0x00]);
     const { cell } = decodeSunGroup(h1, 0, 0, 0, 0, W);
-    expect(encodeSunGroup(cell, 0, 0, W)).toEqual([0x00]);
+    expect(encodeSunGroup(cell, 0, 0, 0, W)).toEqual([0x00]);
   });
 
   it('re-encodes volSlide with rate (effTyp-10 + effTyp-40) → 0x9a two-byte', () => {
@@ -130,10 +130,10 @@ describe('encodeSunGroup', () => {
     const h1 = new Uint8Array([0x9a, 0x30, 0x02, 0x00]);
     const { cell } = decodeSunGroup(h1, 0, 0, 0, 0, W2);
     // Verbatim path: unedited → returns sunRaw verbatim
-    expect(encodeSunGroup(cell, 0, 0, W2)).toEqual([0x9a, 0x30, 0x02, 0x00]);
+    expect(encodeSunGroup(cell, 0, 0, 0, W2)).toEqual([0x9a, 0x30, 0x02, 0x00]);
     // Edit note (note=0 on this group, so add a note to force re-encode)
     const edited = { ...cell, note: 20 as typeof cell.note };
-    const bytes = encodeSunGroup(edited, 0, 0, W2);
+    const bytes = encodeSunGroup(edited, 0, 0, 0, W2);
     const back = decodeSunGroup(new Uint8Array(bytes), 0, 0, 0, 0, W2);
     const cols = [
       { typ: back.cell.effTyp,  val: back.cell.eff  },
@@ -144,5 +144,51 @@ describe('encodeSunGroup', () => {
     const rate   = cols.find(c => c.typ === 40);
     expect(amount?.val).toBe(0x30);
     expect(rate?.val).toBe(0x02);
+  });
+
+  // -------------------------------------------------------------------------
+  // Finding 1 regression tests — cursor-inherited instrument
+  // -------------------------------------------------------------------------
+
+  it('[finding-1] cursor-inherited instrument round-trips verbatim', () => {
+    // Group has a note byte and NO in-group select: [0xC7, 0x00]
+    // Decoded with curInstr=7 → cell.instrument should be 7.
+    const h1 = new Uint8Array([0xc7, 0x00]);
+    const { cell } = decodeSunGroup(h1, 0, 0, /*curInstr*/7, /*numSampled*/0, W);
+    expect(cell.instrument).toBe(7);
+    // Encode with curInstr=7 must return the original bytes verbatim (no spurious select byte).
+    const encoded = encodeSunGroup(cell, 0, /*curInstr*/7, /*numSampled*/0, W);
+    expect(encoded).toEqual([0xc7, 0x00]);
+  });
+
+  it('[finding-1] editing instrument on cursor-inherited cell re-encodes with select byte', () => {
+    // Same decoded cell (instrument 7 from cursor, no in-group select).
+    const h1 = new Uint8Array([0xc7, 0x00]);
+    const { cell } = decodeSunGroup(h1, 0, 0, /*curInstr*/7, /*numSampled*/0, W);
+    // Change instrument to 3 (different from curInstr=7).
+    const edited = { ...cell, instrument: 3 as typeof cell.instrument };
+    const encoded = encodeSunGroup(edited, 0, /*curInstr*/7, /*numSampled*/0, W);
+    // Must differ from original (has a select byte).
+    expect(encoded).not.toEqual([0xc7, 0x00]);
+    // Must round-trip back to instrument 3 when decoded with curInstr=7.
+    const back = decodeSunGroup(new Uint8Array(encoded), 0, 0, /*curInstr*/7, /*numSampled*/0, W);
+    expect(back.cell.instrument).toBe(3);
+  });
+
+  // -------------------------------------------------------------------------
+  // Finding 2 regression test — unrepresentable note throws
+  // -------------------------------------------------------------------------
+
+  it('[finding-2] unrepresentable note (85, transpose=0) throws', () => {
+    // note 85 at transpose 0: raw = 85-13=72, byte = (~72)&0xff = 0xB7 < 0xB8 → unrepresentable.
+    // Build a minimal cell without sunRaw so it takes the re-encode path.
+    const cell = {
+      note: 85 as any,
+      instrument: 0,
+      volume: 0,
+      effTyp: 0, eff: 0,
+      effTyp2: 0, eff2: 0,
+    };
+    expect(() => encodeSunGroup(cell, 0, 0, 0, W)).toThrow();
   });
 });
