@@ -28,6 +28,8 @@ const makeNative = (): SunTronicNativeData => ({
     [{ note: 30, instrument: 2, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 }],
   ],
   positions: [{ blockIndex: [0, 1, 0, 0], transpose: [0, 0, 0, 0] }],
+  widths: { arpShift: 4, volSlideRateFromStream: false },
+  numSampled: 0,
 });
 
 const makeChannel = (rows: Pattern['channels'][0]['rows']): Pattern['channels'][0] => ({

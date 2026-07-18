@@ -843,7 +843,13 @@ export function parseSunTronicV13Score(buf: Uint8Array): SunV13Score {
     const off = (i + 2) + s16BE(h1, i + 2);
     const shiftWord = u16BE(h1, i + 10);
     const shift = shiftWord === DRIN_SHIFT_MAIN ? 4 : shiftWord === DRIN_SHIFT_VERSA ? 3 : 0;
-    if (shift === 0 || off < 0 || off + (1 << shift) * 16 > h1.length) continue;
+    // Accept when the table START is in-bounds. Do NOT require the full selector
+    // span to fit hunk#1: the arp table is legitimately allowed to run short (high
+    // arpSel indices are only reachable where module RAM is longer — see the
+    // zero-fill extraction below, which matches UADE's raw read past the hunk end).
+    // The old `off + (1<<shift)*16 > h1.length` bound rejected every song whose drin
+    // table sits near the end of hunk#1 → 22 files threw "drin signature not found".
+    if (shift === 0 || off < 0 || off >= h1.length) continue;
     drinOff = off; arpShift = shift; break;
   }
   if (drinOff < 0) throw new Error('SunTronic V1.3: drin arp table signature not found');
