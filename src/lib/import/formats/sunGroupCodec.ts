@@ -192,15 +192,18 @@ function fxColumns(cell: TrackerCell): Array<{ effTyp: number; param: number }> 
  * Encode one SunTronic V1.3 grammar group from a display TrackerCell.
  *
  * **Verbatim path:** if `cell.sunRaw` is present AND re-decoding it with the
- * same `transpose`/`numSampled`/`widths` produces display fields that match
- * `cell` (note, instrument, effTyp1-5 / eff1-5), the raw bytes are returned
- * unchanged — preserving the exact byte sequence from the original file.
+ * same `transpose`/`curInstr`/`numSampled`/`widths` produces display fields
+ * that match `cell` (note, instrument, effTyp1-5 / eff1-5), the raw bytes are
+ * returned unchanged — preserving the exact byte sequence from the original
+ * file.
  *
  * **Re-encode path:** FX opcodes (column order, via sunEncodeEffect, with
  * effTyp-40 rate paired onto 0x9a) → note byte (+select byte) → 0x00.
  *
  * @param cell       Display cell to encode (may carry a sunRaw carrier).
  * @param transpose  Per-voice per-position transpose (must match the decode call).
+ * @param curInstr   Running instrument cursor (caller maintains across groups,
+ *                   mirrors decodeSunGroup's curInstr param).
  * @param numSampled Number of sampled instruments in this module.
  * @param widths     Variant-dependent operand widths.
  * @returns          Array of bytes for this grammar group (includes terminator).
@@ -208,6 +211,7 @@ function fxColumns(cell: TrackerCell): Array<{ effTyp: number; param: number }> 
 export function encodeSunGroup(
   cell: TrackerCell,
   transpose: number,
+  curInstr: number,
   numSampled: number,
   widths: SunCmdWidths,
 ): number[] {
@@ -216,7 +220,7 @@ export function encodeSunGroup(
   // -------------------------------------------------------------------------
   if (cell.sunRaw && cell.sunRaw.length > 0) {
     const raw = new Uint8Array(cell.sunRaw);
-    const redecoded = decodeSunGroup(raw, 0, transpose, 0, numSampled, widths).cell;
+    const redecoded = decodeSunGroup(raw, 0, transpose, curInstr, numSampled, widths).cell;
 
     const fieldsMatch =
       redecoded.note       === cell.note       &&
@@ -268,13 +272,20 @@ export function encodeSunGroup(
 
   // Emit note byte (+ optional instrument-select byte).
   if (cell.note && cell.note > 0) {
-    const raw = noteToSunPitch(cell.note);
-    const noteByte = (~(raw + transpose)) & 0xff;
+    const pitch = noteToSunPitch(cell.note) + transpose;
+    if (pitch < 0 || pitch > 71) {
+      throw new Error(
+        `encodeSunGroup: note ${cell.note} at transpose ${transpose} is unrepresentable ` +
+        `in SunTronic's note range (raw ${pitch} is outside 0..71; ` +
+        `byte would be 0x${((~pitch) & 0xff).toString(16).toUpperCase().padStart(2, '0')} < 0xB8)`,
+      );
+    }
+    const noteByte = (~pitch) & 0xff;
     out.push(noteByte);
 
-    // Emit instrument select when instrument is non-zero.
-    if (cell.instrument && cell.instrument > 0) {
-      const id = cell.instrument;
+    // Emit instrument select only when instrument changed from the running cursor.
+    const id = cell.instrument ?? 0;
+    if (id > 0 && id !== curInstr) {
       const sel = id > numSampled ? (0x40 | (id - numSampled - 1)) : id;
       out.push(sel);
     }
