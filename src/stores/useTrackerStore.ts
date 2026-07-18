@@ -534,6 +534,21 @@ export const useTrackerStore = create<TrackerStore>()(
           }
         }
       } catch { /* StarTrekker AM not active */ }
+      // Sync note edit to SunTronic pool block and re-project display grid
+      try {
+        const fmt = require('./useFormatStore').useFormatStore.getState();
+        if (fmt.sunTronicNative && cellUpdate.note !== undefined) {
+          const fullCell = get().patterns[patternIndex]?.channels[channelIndex]?.rows[rowIndex];
+          if (fullCell) {
+            const bi = fullCell.sunBlockIndex;
+            const ri = fullCell.sunRowInBlock;
+            const pos = fullCell.sunPosition;
+            if (bi !== undefined && bi >= 0 && ri !== undefined && pos !== undefined) {
+              fmt.applySunTronicGridNote(bi, ri, channelIndex, fullCell.note, pos);
+            }
+          }
+        }
+      } catch { /* SunTronic not active */ }
       // Sync edit to SunVox WASM sequencer if active
       try {
         const synthMod = require('../engine/sunvox-modular/SunVoxModularSynth');
@@ -641,6 +656,12 @@ export const useTrackerStore = create<TrackerStore>()(
     clearCell: (channelIndex, rowIndex) => {
       const patternIndex = get().currentPatternIndex;
       const beforePattern = get().patterns[patternIndex];
+      // Capture SunTronic provenance BEFORE the clear — clearCellInPattern replaces
+      // the cell with EMPTY_CELL which loses sunBlockIndex/sunRowInBlock/sunPosition.
+      const preClearCell = get().patterns[patternIndex]?.channels[channelIndex]?.rows[rowIndex];
+      const sunClearBi = preClearCell?.sunBlockIndex;
+      const sunClearRi = preClearCell?.sunRowInBlock;
+      const sunClearPos = preClearCell?.sunPosition;
       set((state) => {
         clearCellInPattern(state.patterns[state.currentPatternIndex], channelIndex, rowIndex);
       });
@@ -685,6 +706,17 @@ export const useTrackerStore = create<TrackerStore>()(
           });
         }
       } catch { /* SunVox not active */ }
+      // Sync note clear to SunTronic pool block and re-project display grid.
+      // A cleared note is note 0 (rest); applySunNoteEdit maps editedNote<=0 → pool 0.
+      // Provenance captured before the clear (clearCellInPattern discards those fields).
+      try {
+        const fmt = require('./useFormatStore').useFormatStore.getState();
+        if (fmt.sunTronicNative) {
+          if (sunClearBi !== undefined && sunClearBi >= 0 && sunClearRi !== undefined && sunClearPos !== undefined) {
+            fmt.applySunTronicGridNote(sunClearBi, sunClearRi, channelIndex, 0, sunClearPos);
+          }
+        }
+      } catch { /* SunTronic not active */ }
       // Sync clear to MusicLine WASM engine (debounced re-export)
       debouncedWasmEngineReexport();
     },

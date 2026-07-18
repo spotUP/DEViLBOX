@@ -27,7 +27,7 @@ import { useSF2Store } from './useSF2Store';
 import { useCheeseCutterStore } from './useCheeseCutterStore';
 import { useEditorStore } from './useEditorStore';
 import { useUIStore } from './useUIStore';
-import { reprojectSunGrid } from '../lib/import/formats/sunReproject';
+import { applySunNoteEdit, reprojectSunGrid } from '../lib/import/formats/sunReproject';
 import { getTrackerStoreRef } from './storeAccess';
 // Type-only — erased at build time, no runtime cycle. Mirrors useCursorStore.ts
 // pattern so getState() can be cast without `any`.
@@ -170,6 +170,8 @@ interface FormatStore {
   setHivelyPositionCell: (pos: number, ch: number, field: 'track' | 'transpose', value: number) => void;
   /** Update a single blockIndex or transpose value in the SunTronic position matrix */
   setSunTronicPositionCell: (pos: number, ch: number, field: 'blockIndex' | 'transpose', value: number) => void;
+  /** Write an edited display note back to the pool and re-project the display grid */
+  applySunTronicGridNote: (blockIndex: number, rowInBlock: number, voice: number, displayNote: number, position: number) => void;
   /** Insert a new position (copy of current, or blank) at the given index */
   insertHivelyPosition: (pos: number) => void;
   /** Delete a position */
@@ -355,6 +357,43 @@ const clearNative = (state: any) => {
   state.tfmxNative = null;
   state.tfmxSelectedPattern = 0;
 };
+
+/**
+ * Shared helper: re-project the SunTronic display grid after any pool mutation
+ * (transpose edit OR note edit). Reads the fresh native data from `get()` and
+ * pushes the updated patterns into the tracker store via getTrackerStoreRef().
+ *
+ * Callers pass `context` (the action name) for error-log attribution.
+ * Swallows the known sentinel thrown before the tracker store registers; re-
+ * throws any other unexpected error as a console warning (same policy as the
+ * former inline block in setSunTronicPositionCell).
+ */
+function runSunTronicReproject(
+  get: () => FormatStore,
+  context: string,
+): void {
+  try {
+    const trackerStore = getTrackerStoreRef();
+    const native = get().sunTronicNative;
+    if (native) {
+      const trackerState = trackerStore.getState() as ReturnType<typeof _TrackerStoreType.getState>;
+      // Deep-clone patterns before passing to reprojectSunGrid so it can mutate cell
+      // notes freely. trackerState.patterns may be frozen immer proxies when accessed
+      // immediately after a setCell/clearCell immer mutation — a shallow slice() is not
+      // enough to unfreeze the inner cell objects.
+      const patterns = JSON.parse(JSON.stringify(trackerState.patterns)) as ReturnType<typeof _TrackerStoreType.getState>['patterns'];
+      reprojectSunGrid(patterns, native);
+      trackerStore.setState({ patterns });
+    }
+  } catch (err) {
+    if (
+      !(err instanceof Error) ||
+      !err.message.includes('[storeAccess] useTrackerStore accessed before registration')
+    ) {
+      console.warn(`${context} unexpected reprojection error`, err);
+    }
+  }
+}
 
 /** Mutation discriminated union for mutateMaxTraxSample. */
 export type MaxTraxSampleMutation =
@@ -600,30 +639,20 @@ export const useFormatStore = create<FormatStore>()(
         if (!p || ch < 0 || ch > 3) return;
         p.transpose[ch] = Math.max(-128, Math.min(127, value));
       });
-      // 2. Re-project display grid so every cell backed by this pool reflects the
-      // updated transpose. Called after the immer set() commits so get() returns
-      // the fresh native data. getTrackerStoreRef() uses the same late-binding
-      // registry as the Editor/Cursor store cycle (storeAccess.ts).
-      try {
-        const trackerStore = getTrackerStoreRef();
-        const native = get().sunTronicNative;
-        if (native) {
-          const trackerState = trackerStore.getState() as ReturnType<typeof _TrackerStoreType.getState>;
-          const patterns = trackerState.patterns.slice();
-          reprojectSunGrid(patterns, native);
-          trackerStore.setState({ patterns });
-        }
-      } catch (err) {
-        // getTrackerStoreRef() throws with a known sentinel when the store has
-        // not yet registered (during module initialisation). Any other error is
-        // an unexpected reprojection failure — surface it rather than hiding it.
-        if (
-          !(err instanceof Error) ||
-          !err.message.includes('[storeAccess] useTrackerStore accessed before registration')
-        ) {
-          console.warn('[setSunTronicPositionCell] unexpected reprojection error', err);
-        }
-      }
+      // 2. Re-project display grid via shared helper.
+      runSunTronicReproject(get, '[setSunTronicPositionCell]');
+    },
+    applySunTronicGridNote: (blockIndex, rowInBlock, voice, displayNote, position) => {
+      // 1. Mutate pool block inside the immer set() so the store's frozen proxy is
+      //    correctly updated. applySunNoteEdit handles all range guards (no-ops on
+      //    out-of-range indices). Using get() outside set() returns a frozen draft
+      //    which silently rejects direct property writes.
+      set((state) => {
+        if (!state.sunTronicNative) return;
+        applySunNoteEdit(state.sunTronicNative, blockIndex, rowInBlock, voice, displayNote, position);
+      });
+      // 2. Re-project display grid so every position sharing this block reflects the update.
+      runSunTronicReproject(get, '[applySunTronicGridNote]');
     },
     insertHivelyPosition: (pos) => set((state) => {
       if (!state.hivelyNative) return;
