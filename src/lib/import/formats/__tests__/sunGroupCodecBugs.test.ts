@@ -2,6 +2,7 @@
 import { describe, it, expect } from 'vitest';
 import { decodeSunGroup, encodeSunGroup } from '../sunGroupCodec';
 import { SUN_EFFECT_BY_OP, sunEncodeEffect } from '../sunEffectMap';
+import { SUN_FX } from '../sunEffectGlyphs';
 import { parseSunTronicFile, readFixture } from './sunTestUtil';
 
 const W = { arpShift: 4, volSlideRateFromStream: false };
@@ -64,9 +65,9 @@ describe('Fxx opcode-identity split (0x98 speed vs 0x8e ciaTempo)', () => {
     expect(sunEncodeEffect(15, 0x20, W)).toEqual({ op: 0x98, argBytes: [0x20] });
   });
 
-  it('0x8e ciaTempo is effTyp 51 for all params (tempo < 0x20 stays 0x8e word)', () => {
-    expect(SUN_EFFECT_BY_OP.get(0x8e)!.decode([0x00, 0x10])).toEqual({ effTyp: 51, param: 0x0010 });
-    expect(sunEncodeEffect(51, 0x0010, W)).toEqual({ op: 0x8e, argBytes: [0x00, 0x10] });
+  it('0x8e ciaTempo is SUN_FX.ciaTempo for all params (tempo < 0x20 stays 0x8e word)', () => {
+    expect(SUN_EFFECT_BY_OP.get(0x8e)!.decode([0x00, 0x10])).toEqual({ effTyp: SUN_FX.ciaTempo, param: 0x0010 });
+    expect(sunEncodeEffect(SUN_FX.ciaTempo, 0x0010, W)).toEqual({ op: 0x8e, argBytes: [0x00, 0x10] });
   });
 
   it('corpus: every block with 0x98 or 0x8e round-trips byte-exact', () => {

@@ -1,6 +1,7 @@
 // sunEffectMap.test.ts
 import { describe, it, expect } from 'vitest';
 import { SUN_EFFECT_BY_OP, sunEncodeEffect } from '../sunEffectMap';
+import { SUN_FX } from '../sunEffectGlyphs';
 import type { SunCmdWidths } from '../SunTronicV13';
 
 const MAIN: SunCmdWidths = { arpShift: 4, volSlideRateFromStream: false };   // 0x9b = 2-byte word
@@ -32,11 +33,11 @@ describe('sunEffectMap', () => {
     }
   });
 
-  it('Fxx split: speed (<0x20) -> 0x98 effTyp 15, tempo (>=0x20 word) -> 0x8e effTyp 51', () => {
+  it('Fxx split: speed (<0x20) -> 0x98 effTyp 15, tempo (>=0x20 word) -> 0x8e ciaTempo', () => {
     expect(SUN_EFFECT_BY_OP.get(0x98)!.decode([0x06])).toEqual({ effTyp: 15, param: 0x06 });
-    expect(SUN_EFFECT_BY_OP.get(0x8e)!.decode([0x01, 0x40])).toEqual({ effTyp: 51, param: 0x0140 });
+    expect(SUN_EFFECT_BY_OP.get(0x8e)!.decode([0x01, 0x40])).toEqual({ effTyp: SUN_FX.ciaTempo, param: 0x0140 });
     expect(sunEncodeEffect(15, 0x06, MAIN)).toEqual({ op: 0x98, argBytes: [0x06] });
-    expect(sunEncodeEffect(51, 0x0140, MAIN)).toEqual({ op: 0x8e, argBytes: [0x01, 0x40] });
+    expect(sunEncodeEffect(SUN_FX.ciaTempo, 0x0140, MAIN)).toEqual({ op: 0x8e, argBytes: [0x01, 0x40] });
   });
 
   it('pitchSlide 0x9b: sign -> effTyp 1/2, variant width on encode', () => {
@@ -49,8 +50,8 @@ describe('sunEffectMap', () => {
     expect(sunEncodeEffect(2, 0x05, MAIN)).toEqual({ op: 0x9b, argBytes: [0xff, 0xfb] });
   });
 
-  it('volSlide rate (effTyp 40) is not independently encodable', () => {
+  it('volSlide rate (SUN_FX.volSlideRate) is not independently encodable', () => {
     expect(SUN_EFFECT_BY_OP.get(0x9a)!.decode([0x30])).toEqual({ effTyp: 10, param: 0x30 });
-    expect(sunEncodeEffect(40, 0x02, MAIN)).toBeNull();
+    expect(sunEncodeEffect(SUN_FX.volSlideRate, 0x02, MAIN)).toBeNull();
   });
 });

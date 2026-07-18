@@ -8,13 +8,20 @@
  * share an effTyp id (0x98 / 0x8e both use effTyp 15 for "Fxx") and one def may
  * own two effTyp ids (0x9b owns effTyp 1 = pitch up / effTyp 2 = pitch down).
  *
- * volSlide rate (effTyp 40) is NOT independently encodable:
- *   sunEncodeEffect(40, …) returns null.
+ * volSlide rate (SUN_FX.volSlideRate) is NOT independently encodable:
+ *   sunEncodeEffect(SUN_FX.volSlideRate, …) returns null.
  *   Task 4's group encoder supplies the second byte of a 0x9a opcode by reading
- *   a sibling effTyp-40 column — no standalone opcode exists for the rate.
+ *   a sibling volSlideRate column — no standalone opcode exists for the rate.
+ *
+ * All SunTronic *private* control effTyp ids live in the reserved 0x40..0x4F
+ * block defined by SUN_FX (see sunEffectGlyphs.ts). They used to squat ids
+ * 39-51, which collided with dub (36-40) and OPL (0x30-0x3F) in the shared
+ * grid renderers and showed "?00" / bogus glyphs. Do NOT hardcode these ids —
+ * reference SUN_FX so the id and its display glyph stay in one place.
  */
 
 import type { SunCmdWidths } from './SunTronicV13';
+import { SUN_FX } from './sunEffectGlyphs';
 
 // ---------------------------------------------------------------------------
 // Public interfaces
@@ -53,8 +60,8 @@ export const SUN_EFFECT_BY_OP: Map<number, SunEffectDef> = new Map();
  * Encode-side resolver: scan SUN_EFFECT_BY_OP for the first def whose
  * owns(effTyp, param) is true, return { op, argBytes }.
  *
- * Returns null when no def owns the effTyp — in particular effTyp 40 (the
- * volSlide rate) has no independent opcode and always returns null.
+ * Returns null when no def owns the effTyp — in particular SUN_FX.volSlideRate
+ * has no independent opcode and always returns null.
  */
 export function sunEncodeEffect(
   effTyp: number,
@@ -187,8 +194,8 @@ function register(def: SunEffectDef): void {
   SUN_EFFECT_BY_OP.set(def.op, def);
 }
 
-// 0x9c  arpSelect    1 byte    effTyp 39   custom Z arp-table
-register(def1(0x9c, 'arpSelect', false, 39));
+// 0x9c  arpSelect    1 byte    SUN_FX.arpSelect   custom arp-table
+register(def1(0x9c, 'arpSelect', false, SUN_FX.arpSelect));
 
 // 0x9b  pitchSlide   1 or 2 bytes (variant-width)
 //   effTyp 1 = pitch up (param >= 0), effTyp 2 = pitch down (param < 0 in native)
@@ -227,8 +234,8 @@ register({
 });
 
 // 0x9a  volSlide     1 byte (+1 rate byte in variant)
-//   decode: effTyp 10 (amount only); the rate byte (effTyp 40) is NOT an
-//   independent opcode — sunEncodeEffect(40,…) returns null.
+//   decode: effTyp 10 (amount only); the rate byte (SUN_FX.volSlideRate) is NOT
+//   an independent opcode — sunEncodeEffect(SUN_FX.volSlideRate,…) returns null.
 register({
   op: 0x9a,
   name: 'volSlide',
@@ -236,11 +243,11 @@ register({
   decode(argBytes): { effTyp: number; param: number } {
     // Always decode only the amount byte as effTyp 10.
     // When argBytes has 2 bytes (volSlideRateFromStream variant), the rate
-    // byte is handled by Task 3's group decoder which also emits effTyp 40.
+    // byte is handled by the group decoder which also emits SUN_FX.volSlideRate.
     return { effTyp: 10, param: argBytes[0] & 0xff };
   },
   owns(effTyp): boolean {
-    // effTyp 40 (rate) is NOT independently encodable — return false for it.
+    // SUN_FX.volSlideRate is NOT independently encodable — return false for it.
     return effTyp === 10;
   },
   encode(_effTyp, param): number[] {
@@ -262,51 +269,51 @@ register({
   encode: encode1,
 });
 
-// 0x8f  speedVoice   1 byte    effTyp 46   custom
-register(def1(0x8f, 'speedVoice', false, 46));
+// 0x8f  speedVoice   1 byte    SUN_FX.speedVoice   custom
+register(def1(0x8f, 'speedVoice', false, SUN_FX.speedVoice));
 
-// 0x96  restartVolEnv  0 bytes  effTyp 41   custom
-register(def0(0x96, 'restartVolEnv', false, 41));
+// 0x96  restartVolEnv  0 bytes  SUN_FX.restartVolEnv   custom
+register(def0(0x96, 'restartVolEnv', false, SUN_FX.restartVolEnv));
 
-// 0x95  restartFreqEnv 0 bytes  effTyp 42   custom
-register(def0(0x95, 'restartFreqEnv', false, 42));
+// 0x95  restartFreqEnv 0 bytes  SUN_FX.restartFreqEnv   custom
+register(def0(0x95, 'restartFreqEnv', false, SUN_FX.restartFreqEnv));
 
 // 0x94  setPitchNoRetrig  1 byte  effTyp 3   note cell + PT 3xx glide
 register(def1(0x94, 'setPitchNoRetrig', true, 3));
 
-// 0x93  masterFade   2 bytes   effTyp 43   custom
-register(def2(0x93, 'masterFade', false, 43));
+// 0x93  masterFade   2 bytes   SUN_FX.masterFade   custom
+register(def2(0x93, 'masterFade', false, SUN_FX.masterFade));
 
-// 0x92  masterVol    1 byte    effTyp 44   custom
-register(def1(0x92, 'masterVol', false, 44));
+// 0x92  masterVol    1 byte    SUN_FX.masterVol   custom
+register(def1(0x92, 'masterVol', false, SUN_FX.masterVol));
 
-// 0x91  paulaAttach  1 byte    effTyp 45   custom
-register(def1(0x91, 'paulaAttach', false, 45));
+// 0x91  paulaAttach  1 byte    SUN_FX.paulaAttach   custom
+register(def1(0x91, 'paulaAttach', false, SUN_FX.paulaAttach));
 
 // 0x90  finetune     1 byte    effTyp 14   PT E5x
 //   decode: param = b0 (the x nibble); the E5 prefix is implied by effTyp 14.
 //   Brief says "emit as E5x — high nibble 5": the param IS the x nibble value.
 register(def1(0x90, 'finetune', true, 14));
 
-// 0x8e  ciaTempo     2 bytes   effTyp 51   custom (private range ≥39)
-//   Identified by opcode; dedicated effTyp 51 avoids value-split ambiguity with 0x98.
+// 0x8e  ciaTempo     2 bytes   SUN_FX.ciaTempo   custom (private 0x40..0x4F block)
+//   Identified by opcode; dedicated effTyp avoids value-split ambiguity with 0x98.
 register({
   op: 0x8e,
   name: 'ciaTempo',
   ptStyle: false,
-  decode: (argBytes) => decode2(argBytes, 51),
-  owns: (effTyp) => effTyp === 51,
+  decode: (argBytes) => decode2(argBytes, SUN_FX.ciaTempo),
+  owns: (effTyp) => effTyp === SUN_FX.ciaTempo,
   encode: encode2,
 });
 
-// 0x8d  tempoSlide   2 bytes   effTyp 47   custom
-register(def2(0x8d, 'tempoSlide', false, 47));
+// 0x8d  tempoSlide   2 bytes   SUN_FX.tempoSlide   custom
+register(def2(0x8d, 'tempoSlide', false, SUN_FX.tempoSlide));
 
-// 0x8c  rowsGlobal   1 byte    effTyp 48   custom
-register(def1(0x8c, 'rowsGlobal', false, 48));
+// 0x8c  rowsGlobal   1 byte    SUN_FX.rowsGlobal   custom
+register(def1(0x8c, 'rowsGlobal', false, SUN_FX.rowsGlobal));
 
-// 0x8b  rowsVoice    1 byte    effTyp 49   custom
-register(def1(0x8b, 'rowsVoice', false, 49));
+// 0x8b  rowsVoice    1 byte    SUN_FX.rowsVoice   custom
+register(def1(0x8b, 'rowsVoice', false, SUN_FX.rowsVoice));
 
-// 0x97  prngSeed     2 bytes   effTyp 50   custom (carry verbatim)
-register(def2(0x97, 'prngSeed', false, 50));
+// 0x97  prngSeed     2 bytes   SUN_FX.prngSeed   custom (carry verbatim)
+register(def2(0x97, 'prngSeed', false, SUN_FX.prngSeed));

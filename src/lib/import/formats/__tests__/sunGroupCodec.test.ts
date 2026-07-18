@@ -1,6 +1,7 @@
 // sunGroupCodec.test.ts
 import { describe, it, expect } from 'vitest';
 import { decodeSunGroup, encodeSunGroup } from '../sunGroupCodec';
+import { SUN_FX } from '../sunEffectGlyphs';
 import { sunPitchToNote } from '../SunTronicV13';
 
 const W = { arpShift: 4, volSlideRateFromStream: false };
@@ -38,13 +39,13 @@ describe('decodeSunGroup', () => {
     expect(g.cell.effTyp2).toBe(3);
   });
 
-  it('0x9a two-byte variant emits amount (effTyp 10) AND rate (effTyp 40)', () => {
+  it('0x9a two-byte variant emits amount (effTyp 10) AND rate (volSlideRate)', () => {
     // volSlideRateFromStream=true → sunCommandLen gives 0x9a 2 arg bytes
     const W2 = { arpShift: 4, volSlideRateFromStream: true };
     // 0x9a 0x30 0x02 = volSlide amount=0x30, rate=0x02 ; 0x00 = terminator
     const h1 = new Uint8Array([0x9a, 0x30, 0x02, 0x00]);
     const g = decodeSunGroup(h1, 0, 0, 0, 0, W2);
-    // Find effTyp 10 and effTyp 40 across all fx columns
+    // Find effTyp 10 and volSlideRate across all fx columns
     const cols = [
       { typ: g.cell.effTyp,  val: g.cell.eff  },
       { typ: g.cell.effTyp2, val: g.cell.eff2 },
@@ -53,7 +54,7 @@ describe('decodeSunGroup', () => {
       { typ: g.cell.effTyp5, val: g.cell.eff5 },
     ];
     const amount = cols.find(c => c.typ === 10);
-    const rate   = cols.find(c => c.typ === 40);
+    const rate   = cols.find(c => c.typ === SUN_FX.volSlideRate);
     expect(amount).toBeDefined();
     expect(amount?.val).toBe(0x30);
     expect(rate).toBeDefined();
@@ -112,7 +113,7 @@ describe('encodeSunGroup', () => {
   });
 
   it('re-encodes group with FX when edited (FX survives round-trip)', () => {
-    // 0x9c 0x04 = arp select (effTyp 39, param 4); 0xc7 = note; 0x00 = term
+    // 0x9c 0x04 = arp select (SUN_FX.arpSelect, param 4); 0xc7 = note; 0x00 = term
     // curInstr=1: note is gated on a staged instrument (player note-on gate).
     const h1 = new Uint8Array([0x9c, 0x04, 0xc7, 0x00]);
     const { cell } = decodeSunGroup(h1, 0, 0, 1, 0, W);
@@ -121,7 +122,7 @@ describe('encodeSunGroup', () => {
     const bytes = encodeSunGroup(edited, 0, 1, 0, W);
     const back = decodeSunGroup(new Uint8Array(bytes), 0, 0, 1, 0, W);
     expect(back.cell.note).toBe(edited.note);
-    expect(back.cell.effTyp).toBe(39); // arp-select effect preserved
+    expect(back.cell.effTyp).toBe(SUN_FX.arpSelect); // arp-select effect preserved
     expect(back.cell.eff).toBe(4);
   });
 
@@ -131,7 +132,7 @@ describe('encodeSunGroup', () => {
     expect(encodeSunGroup(cell, 0, 0, 0, W)).toEqual([0x00]);
   });
 
-  it('re-encodes volSlide with rate (effTyp-10 + effTyp-40) → 0x9a two-byte', () => {
+  it('re-encodes volSlide with rate (effTyp-10 + volSlideRate) → 0x9a two-byte', () => {
     const W2 = { arpShift: 4, volSlideRateFromStream: true };
     // 0x9a 0x30 0x02 = volSlide amount=0x30, rate=0x02; 0x00 = term
     const h1 = new Uint8Array([0x9a, 0x30, 0x02, 0x00]);
@@ -148,7 +149,7 @@ describe('encodeSunGroup', () => {
       { typ: back.cell.effTyp3, val: back.cell.eff3 },
     ];
     const amount = cols.find(c => c.typ === 10);
-    const rate   = cols.find(c => c.typ === 40);
+    const rate   = cols.find(c => c.typ === SUN_FX.volSlideRate);
     expect(amount?.val).toBe(0x30);
     expect(rate?.val).toBe(0x02);
   });

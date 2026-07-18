@@ -11,6 +11,7 @@
  */
 
 import { buildGlyphAtlas, parseColor, parseRgba, type GlyphAtlas, type GlyphInfo } from './glyph-atlas';
+import { SUN_EFFECT_GLYPH } from '@/lib/import/formats/sunEffectGlyphs';
 import type {
   PatternSnapshot,
   CursorSnapshot,
@@ -856,6 +857,9 @@ export class TrackerGLRenderer {
                 // OPL native effects: ~F=feedback, ~C=carrier vol, ~M=mod vol, ~V=inst vol
                 const OPL_CHARS = ['F', 'C', 'M', 'V'];
                 effStr = '~' + (OPL_CHARS[colEffTyp - 0x30] ?? '?') + ((colEff & 0xF).toString(16).toUpperCase());
+              } else if (SUN_EFFECT_GLYPH[colEffTyp] !== undefined) {
+                // SunTronic private control effects (reserved block 0x40..0x4F)
+                effStr = SUN_EFFECT_GLYPH[colEffTyp] + HEX_TABLE[colEff & 0xFF];
               } else {
                 effStr = (EFFECT_CHARS[colEffTyp] ?? '?') + HEX_TABLE[colEff & 0xFF];
               }

@@ -20,6 +20,7 @@ import type { TrackerCell } from '@/types';
 import { sunCommandLen, sunPitchToNote } from './SunTronicV13';
 import type { SunCmdWidths } from './SunTronicV13';
 import { SUN_EFFECT_BY_OP, sunEncodeEffect } from './sunEffectMap';
+import { SUN_FX } from './sunEffectGlyphs';
 
 // ---------------------------------------------------------------------------
 // Public interface
@@ -158,9 +159,9 @@ export function decodeSunGroup(
         pushFx(effTyp, param);
 
         // 0x9a with 2 arg bytes (volSlideRateFromStream variant): also emit the
-        // rate as a sibling effTyp-40 column.
+        // rate as a sibling volSlideRate column.
         if (b === 0x9a && argBytes.length === 2) {
-          pushFx(40, argBytes[1]);
+          pushFx(SUN_FX.volSlideRate, argBytes[1]);
         }
       }
       pos += len;
@@ -262,10 +263,10 @@ export function encodeSunGroup(
   const cols = fxColumns(cell);
 
   // Emit FX opcodes in column order (slot 0→4).
-  // effTyp-40 (volSlide rate) has no independent opcode — it is paired onto
-  // the preceding 0x9a when widths.volSlideRateFromStream is true.
+  // volSlideRate has no independent opcode — it is paired onto the preceding
+  // 0x9a when widths.volSlideRateFromStream is true.
   for (const col of cols) {
-    if (col.effTyp === 40) {
+    if (col.effTyp === SUN_FX.volSlideRate) {
       // No standalone opcode for rate — handled as 0x9a second byte above.
       continue;
     }
@@ -274,8 +275,8 @@ export function encodeSunGroup(
     if (!enc) continue; // unknown / unencodable
 
     if (enc.op === 0x9a && widths.volSlideRateFromStream) {
-      // Pair with effTyp-40 sibling: find the first effTyp-40 column.
-      const rateSibling = cols.find(c => c.effTyp === 40);
+      // Pair with the volSlideRate sibling: find the first such column.
+      const rateSibling = cols.find(c => c.effTyp === SUN_FX.volSlideRate);
       out.push(enc.op);
       out.push(...enc.argBytes); // amount byte
       if (rateSibling !== undefined) {
