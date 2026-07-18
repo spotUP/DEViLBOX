@@ -27,6 +27,8 @@ import { useSF2Store } from './useSF2Store';
 import { useCheeseCutterStore } from './useCheeseCutterStore';
 import { useEditorStore } from './useEditorStore';
 import { useUIStore } from './useUIStore';
+import { reprojectSunGrid } from '../lib/import/formats/sunReproject';
+import { getTrackerStoreRef } from './storeAccess';
 
 /** Undo entry for a single Hively track step edit */
 export interface HivelyTrackStepUndoEntry {
@@ -581,16 +583,33 @@ export const useFormatStore = create<FormatStore>()(
         p.transpose[ch] = Math.max(-128, Math.min(127, value));
       }
     }),
-    setSunTronicPositionCell: (pos, ch, field, value) => set((state) => {
-      if (!state.sunTronicNative) return;
-      const p = state.sunTronicNative.positions[pos];
-      if (!p || ch < 0 || ch > 3) return;
-      if (field === 'blockIndex') {
-        p.blockIndex[ch] = Math.max(0, Math.min(value, state.sunTronicNative.blocks.length - 1));
-      } else {
-        p.transpose[ch] = Math.max(-128, Math.min(127, value));
-      }
-    }),
+    setSunTronicPositionCell: (pos, ch, field, value) => {
+      // 1. Mutate the native data atomically inside immer.
+      set((state) => {
+        if (!state.sunTronicNative) return;
+        const p = state.sunTronicNative.positions[pos];
+        if (!p || ch < 0 || ch > 3) return;
+        if (field === 'blockIndex') {
+          p.blockIndex[ch] = Math.max(0, Math.min(value, state.sunTronicNative.blocks.length - 1));
+        } else {
+          p.transpose[ch] = Math.max(-128, Math.min(127, value));
+        }
+      });
+      // 2. Re-project display grid so every cell backed by this pool reflects the
+      // updated blockIndex or transpose. Called after the immer set() commits so
+      // get() returns the fresh native data. getTrackerStoreRef() uses the same
+      // late-binding registry as the Editor/Cursor store cycle (storeAccess.ts).
+      try {
+        const trackerStore = getTrackerStoreRef();
+        const native = get().sunTronicNative;
+        if (native) {
+          const trackerState = trackerStore.getState() as { patterns: import('@/types/tracker').Pattern[] };
+          const patterns = trackerState.patterns.slice();
+          reprojectSunGrid(patterns, native);
+          trackerStore.setState({ patterns });
+        }
+      } catch { /* not yet registered — no-op during store module initialisation */ }
+    },
     insertHivelyPosition: (pos) => set((state) => {
       if (!state.hivelyNative) return;
       const positions = state.hivelyNative.positions;
