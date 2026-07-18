@@ -70,17 +70,36 @@ export function sunEncodeEffect(
 }
 
 /**
+ * Static arg-count map for all control opcodes.
+ * Mirrors SUN_CMD_ARGC (except 0x9a/0x9b which are variant-dependent).
+ */
+const OP_ARG_COUNT: Record<number, number> = {
+  0x9c: 1, // arpSelect
+  0x99: 1, // setVolume
+  0x98: 1, // speedGlobal
+  0x97: 2, // prngSeed
+  0x96: 0, // restartVolEnv
+  0x95: 0, // restartFreqEnv
+  0x94: 1, // setPitchNoRetrig
+  0x93: 2, // masterFade
+  0x92: 1, // masterVol
+  0x91: 1, // paulaAttach
+  0x90: 1, // finetune
+  0x8f: 1, // speedVoice
+  0x8e: 2, // ciaTempo
+  0x8d: 2, // tempoSlide
+  0x8c: 1, // rowsGlobal
+  0x8b: 1, // rowsVoice
+};
+
+/**
  * Arg-byte count for `op` under `widths`.
  * Mirrors sunCommandLen (minus the leading opcode byte) — NOT a new width authority.
  */
 export function opcodeParamBytes(op: number, widths: SunCmdWidths): number {
   if (op === 0x9b) return pitchSlideByteCount(widths);
   if (op === 0x9a) return widths.volSlideRateFromStream ? 2 : 1;
-  // All other opcodes have a fixed arg count driven by SUN_CMD_ARGC:
-  const def = SUN_EFFECT_BY_OP.get(op);
-  if (!def) return 0;
-  // Derive from a zero-arg encode to get the byte count:
-  return def.encode(def.decode([0, 0]).effTyp, def.decode([0, 0]).param, widths).length;
+  return OP_ARG_COUNT[op] ?? 0;
 }
 
 // ---------------------------------------------------------------------------
