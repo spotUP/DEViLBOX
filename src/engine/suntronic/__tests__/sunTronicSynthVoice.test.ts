@@ -96,6 +96,45 @@ describe('SunTronic native wavetable generator (MEGAEFFECTS port)', () => {
     expect(Array.from(a)).toEqual(Array.from(b));
   });
 
+  it('type 1 negative arp: runs the consecutive-delta body @0x26d4a (mag = -arp)', () => {
+    // arp = -3 is neither -1 (noise) nor -2 (escape), so it dispatches straight to
+    // the delta body with magnitude 3. Hand-computed byte-for-byte from the LOADED
+    // replayer disasm (fbSource = wave1 on the first pass; s16 accumulator carries):
+    //   mag=3, acc=prev=src[3]=-40
+    //   i0 d2=50  sum=10  asrW7(10*3=30)=0     -> 0
+    //   i1 d2=-30 sum=-30 asrW7(-30*3=-90)=-1  -> -1
+    //   i2 d2=50  sum=49  asrW7(49*3=147)=1    -> 1
+    //   i3 d2=-70 sum=-69 asrW7(-69*3=-207)=-2 -> -2
+    // Fails on revert: dropping the delta body sends arp<0 into CALC3 (coeff 0x80-arp),
+    // whose first sample is 11, not 0.
+    const wave1 = new Int8Array([10, -20, 30, -40]);
+    const inst = synth({ synthType: 1, waveWordLen: 2, wave1, arpTable: new Int8Array([-3]) });
+    const out = renderSynthTick(inst, createVoiceState(), createPrng());
+    expect(Array.from(out)).toEqual([0, -1, 1, -2]);
+  });
+
+  it('type 1 arp == -2: escapes to arpTable[1] and re-dispatches PAST the noise test', () => {
+    // arp == -2 is the table escape @0x26ce6: it reads arpTable[1] (stable-phase
+    // resolution) and re-dispatches at 0x26cb6, PAST the -1/-2 tests — so an escaped
+    // -1 runs the delta body (mag 1), NOT noise. Same wave1 as above:
+    //   mag=1, acc=prev=-40
+    //   i0 sum=10  asrW7(10)=0    -> 0
+    //   i1 sum=-30 asrW7(-30)=-1  -> -1
+    //   i2 sum=49  asrW7(49)=0    -> 0
+    //   i3 sum=-70 asrW7(-70)=-1  -> -1
+    // Fails on revert two ways: without escape resolution arp=-2 hits the delta body
+    // at mag 2 (different bytes); without the `escaped` skip the resolved -1 would run
+    // PRNG noise (non-delta words). Deterministic here because delta needs no PRNG.
+    const wave1 = new Int8Array([10, -20, 30, -40]);
+    const inst = synth({
+      synthType: 1, waveWordLen: 2, wave1,
+      arpTable: new Int8Array([-2, -1]), arpLoop: 0,
+    });
+    (inst as { arpLen: number }).arpLen = 2;
+    const out = renderSynthTick(inst, createVoiceState(), createPrng());
+    expect(Array.from(out)).toEqual([0, -1, 0, -1]);
+  });
+
   it('type 6 resonator: reproduces the gliders lead play buffer byte-exact', () => {
     // The type-6 damped-resonator generator (@0x26e6c) GENERATES its wave — no
     // stored samples. Golden = the live UADE chip-RAM play buffer for the gliders
