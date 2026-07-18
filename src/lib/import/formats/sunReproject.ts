@@ -66,7 +66,10 @@ export function applySunNoteEdit(
   if (voice < 0 || voice > 3) return;
 
   const transpose = sunPosition.transpose[voice as 0 | 1 | 2 | 3];
-  const rawNote = editedNote - transpose;
+  // Rest stays a rest (pool note 0). A real note maps to a real pool note (>=1);
+  // clamp so an edit below the transpose floor cannot become a silently-dropped
+  // non-positive raw that encodeSunGroup would discard.
+  const rawNote = editedNote <= 0 ? 0 : Math.max(1, editedNote - transpose);
 
   const poolCell = block[rowInBlock];
   poolCell.note = rawNote;

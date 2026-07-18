@@ -22,7 +22,7 @@ export const SUNTRONIC_MATRIX_COLLAPSED_HEIGHT = MATRIX_COLLAPSED_HEIGHT;
 
 function makeBlockColumn(): ColumnDef {
   return {
-    key: 'blockIndex', label: 'Blk', charWidth: 2, type: 'hex', hexDigits: 2,
+    key: 'blockIndex', label: 'Block', charWidth: 5, type: 'hex', hexDigits: 2,
     color: '#e0e0e0', emptyColor: '#444', emptyValue: undefined,
     formatter: (v: number) => v.toString(16).toUpperCase().padStart(2, '0'),
   };
@@ -30,7 +30,7 @@ function makeBlockColumn(): ColumnDef {
 
 function makeTransposeColumn(): ColumnDef {
   return {
-    key: 'transpose', label: 'Tr', charWidth: 3, type: 'hex', hexDigits: 2,
+    key: 'transpose', label: 'Transpose', charWidth: 9, type: 'hex', hexDigits: 2,
     color: '#88ff88', emptyColor: '#808080', emptyValue: undefined,
     formatter: (v: number) => {
       const sign = v >= 0 ? '+' : '-';
