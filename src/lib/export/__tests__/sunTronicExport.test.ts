@@ -53,10 +53,11 @@ describe('SunTronic V1.3 native export', () => {
     const layout = song.uadeVariableLayout!;
     expect(layout.formatId).toBe('sunTronic');
 
-    // Find the first note carrier (byte 0 is a note byte >= 0xB8) in any block and
-    // compute its file offset (sum of preceding item lengths). Changing byte 0
-    // (cell.period) keeps the item length (cell.cutoff) fixed, so the splice is
-    // in-place regardless of whether the note carries a trailing instrument byte.
+    // Each pool cell carries its exact source group bytes in `sunRaw` (set by
+    // decodeSunGroup). Find the first cell whose group starts with a note byte
+    // (sunRaw[0] >= 0xB8) and compute its file offset (sum of preceding groups'
+    // sunRaw lengths). Changing sunRaw[0] to another note byte keeps the group
+    // length fixed, so the export splice is in-place.
     let editBlock = -1;
     let itemIdx = -1;
     let byteOffInBlock = 0;
@@ -64,9 +65,9 @@ describe('SunTronic V1.3 native export', () => {
       const rows = layout.blockRows![fp];
       let off = 0;
       for (let i = 0; i < rows.length; i++) {
-        const len = rows[i].cutoff ?? 0;
-        if (len >= 1 && (rows[i].period ?? 0) >= 0xb8) { editBlock = fp; itemIdx = i; byteOffInBlock = off; break; }
-        off += len;
+        const raw = rows[i].sunRaw ?? [];
+        if (raw.length >= 1 && raw[0] >= 0xb8) { editBlock = fp; itemIdx = i; byteOffInBlock = off; break; }
+        off += raw.length;
       }
       if (editBlock >= 0) break;
     }
@@ -75,10 +76,10 @@ describe('SunTronic V1.3 native export', () => {
 
     const editedFileOff = layout.filePatternAddrs[editBlock] + byteOffInBlock;
     const origByte = bytes[editedFileOff];
-    // A different note byte, still in the note range and still a single-byte item
-    // (next byte is not an instrument select 0x01-0x7F), so length stays 1.
+    // A different note byte, still in the note range (>= 0xB8) so the group
+    // length is unchanged and the module re-parses cleanly.
     const newByte = origByte === 0xff ? 0xfe : origByte + 1;
-    rows[itemIdx].period = newByte;
+    rows[itemIdx].sunRaw![0] = newByte;
 
     const result = exportAsSunTronic(song);
     expect(result.data.length).toBe(bytes.length);
