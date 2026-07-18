@@ -26,16 +26,15 @@
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { InstrumentConfig, TrackerCell } from '@/types';
-import type { UADEVariablePatternLayout } from '@/engine/uade/UADEPatternEncoder';
+import type { UADEVariablePatternLayout, VariableLengthEncoder } from '@/engine/uade/UADEPatternEncoder';
 import { createSamplerInstrument } from './AmigaUtils';
 import {
   isSunTronicV13Format,
   parseSunTronicV13Score,
-  sunTronicV13Encoder,
   sunSynthToConfig,
 } from './SunTronicV13';
-import type { SunV13Score } from './SunTronicV13';
-import { decodeSunGroup } from './sunGroupCodec';
+import type { SunV13Score, SunCmdWidths } from './SunTronicV13';
+import { decodeSunGroup, encodeSunGroup } from './sunGroupCodec';
 import { decodeSunBlockPool, buildSunTronicNativeData } from './sunNativeData';
 
 // ── Binary helpers ──────────────────────────────────────────────────────────
@@ -51,6 +50,59 @@ function u32BE(buf: Uint8Array, off: number): number {
 function s16BE(buf: Uint8Array, off: number): number {
   const v = (buf[off] << 8) | buf[off + 1];
   return v < 0x8000 ? v : v - 0x10000;
+}
+
+// ── Encoder factory ─────────────────────────────────────────────────────────
+
+/**
+ * Build a VariableLengthEncoder for SunTronic V1.3 block pools.
+ *
+ * Two paths per cell:
+ *
+ *   Verbatim (sunRaw present): emit the exact bytes from `cell.sunRaw`.
+ *   Covers unedited cells AND byte-splice edits (direct sunRaw mutation).
+ *   The exporter uses this path for in-place note-byte mutations.
+ *
+ *   Re-encode (sunRaw undefined/null): `applySunNoteEdit` clears sunRaw when
+ *   it writes a new note into a pool cell. `encodeSunGroup` is then called to
+ *   synthesise fresh group bytes from the display cell fields.
+ *
+ * Cursor threading: the running `curInstr` is mirrored by re-decoding the
+ * emitted bytes through `decodeSunGroup` after each group. This is the single
+ * source of truth for the cursor-advance rule (note+select OR standalone
+ * instrument-select), matching what `decodeSunGroup` computes when the player
+ * reads the stream. Pool cells are always processed at transpose 0.
+ */
+export function makeSunTronicV13Encoder(
+  widths: SunCmdWidths,
+  numSampled: number,
+): VariableLengthEncoder {
+  return {
+    formatId: 'sunTronic',
+    encodePattern(rows: TrackerCell[]): Uint8Array {
+      const out: number[] = [];
+      let curInstr = 0;
+      for (const cell of rows) {
+        let bytes: number[];
+        if (cell.sunRaw != null && cell.sunRaw.length > 0) {
+          // Verbatim path: sunRaw is present — emit as-is (covers unedited cells
+          // and byte-splice edits where the caller mutated sunRaw in place).
+          bytes = cell.sunRaw;
+        } else {
+          // Re-encode path: sunRaw cleared by applySunNoteEdit — synthesise from
+          // display fields via encodeSunGroup.
+          bytes = encodeSunGroup(cell, 0, curInstr, numSampled, widths);
+        }
+        for (const b of bytes) out.push(b);
+        // Re-decode the emitted bytes to advance curInstr exactly as decodeSunGroup
+        // does when the player reads the stream (mirrors decodeSunGroup's rule for
+        // note+select AND standalone instrument-select groups).
+        const u8 = new Uint8Array(bytes);
+        curInstr = decodeSunGroup(u8, 0, 0, curInstr, numSampled, widths, u8.length).curInstr;
+      }
+      return new Uint8Array(out);
+    },
+  };
 }
 
 // ── Format detection ────────────────────────────────────────────────────────
@@ -612,13 +664,23 @@ function parseSunTronicV13File(
   const trackMap = Array.from({ length: numPatterns }, (_, p) =>
     [0, 1, 2, 3].map((ch) => voices[ch].fpPerRow[p * V13_ROWS_PER_PATTERN] ?? -1));
 
+  // Build encoder with this song's variant-dependent widths and sampled count.
+  // Unedited cells (sunRaw intact) round-trip verbatim; edited cells (sunRaw
+  // cleared by applySunNoteEdit) are re-encoded via encodeSunGroup.
+  const layoutWidths: SunCmdWidths = {
+    arpShift: score.arpShift,
+    volSlideRateFromStream: score.volSlideRateFromStream,
+  };
+  const layoutNumSampled = score.sampledInstruments.length;
+  const layoutEncoder = makeSunTronicV13Encoder(layoutWidths, layoutNumSampled);
+
   const uadeVariableLayout: UADEVariablePatternLayout = {
     formatId: 'sunTronic',
     numChannels: 4,
     numFilePatterns: score.blocks.length,
     rowsPerPattern: V13_ROWS_PER_PATTERN,
     moduleSize: buffer.byteLength,
-    encoder: sunTronicV13Encoder,
+    encoder: layoutEncoder,
     filePatternAddrs,
     filePatternSizes,
     trackMap,
