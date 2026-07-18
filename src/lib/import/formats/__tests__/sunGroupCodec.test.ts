@@ -8,8 +8,10 @@ const W = { arpShift: 4, volSlideRateFromStream: false };
 describe('decodeSunGroup', () => {
   it('decodes arp-select + note + terminator into one cell', () => {
     // 0x9c 0x04 = arp select 4 ; 0xC7 = note (~0xC7=0x38) ; 0x00 term
+    // curInstr=1: a note byte fires (and shows) only when an instrument has been
+    // staged — the player gates note-on on stagedSel!=0 (curInstr!=0 here).
     const h1 = new Uint8Array([0x9c, 0x04, 0xc7, 0x00]);
-    const g = decodeSunGroup(h1, 0, 0, 0, 0, W);      // transpose=0, curInstr=0, numSampled=0
+    const g = decodeSunGroup(h1, 0, 0, 1, 0, W);      // transpose=0, curInstr=1, numSampled=0
     expect(g.nextPos).toBe(4);
     expect(g.cell.note).toBeGreaterThan(0);          // note present
     expect(g.cell.effTyp).not.toBe(0);               // arp effect present
@@ -81,11 +83,14 @@ describe('encodeSunGroup', () => {
       // Verify the algebraic inverse: sunPitchToNote(noteToSunPitch(n)) === n
       expect(sunPitchToNote(n - 13)).toBe(n);
       // Verify the byte-level round-trip through encodeSunGroup/decodeSunGroup
+      // curInstr=1 throughout: a note is only decoded/encoded against a staged
+      // instrument (the player note-on gate). Threading it consistently keeps
+      // the note round-trip intact without a spurious select byte.
       const h1 = new Uint8Array([0xc7, 0x00]); // arbitrary note group (note=69)
-      const { cell: base } = decodeSunGroup(h1, 0, 0, 0, 0, W);
+      const { cell: base } = decodeSunGroup(h1, 0, 0, 1, 0, W);
       const edited = { ...base, note: n as typeof base.note };
-      const bytes = encodeSunGroup(edited, 0, 0, 0, W);
-      const back = decodeSunGroup(new Uint8Array(bytes), 0, 0, 0, 0, W);
+      const bytes = encodeSunGroup(edited, 0, 1, 0, W);
+      const back = decodeSunGroup(new Uint8Array(bytes), 0, 0, 1, 0, W);
       expect(back.cell.note).toBe(n);
     }
   });
@@ -97,22 +102,24 @@ describe('encodeSunGroup', () => {
   });
 
   it('re-encodes when the note is edited (decodes back to the new note)', () => {
+    // curInstr=1: note is gated on a staged instrument (player note-on gate).
     const h1 = new Uint8Array([0xc7, 0x00]);
-    const { cell } = decodeSunGroup(h1, 0, 0, 0, 0, W);
+    const { cell } = decodeSunGroup(h1, 0, 0, 1, 0, W);
     const edited = { ...cell, note: (cell.note + 2) as typeof cell.note };
-    const bytes = encodeSunGroup(edited, 0, 0, 0, W);
-    const back = decodeSunGroup(new Uint8Array(bytes), 0, 0, 0, 0, W);
+    const bytes = encodeSunGroup(edited, 0, 1, 0, W);
+    const back = decodeSunGroup(new Uint8Array(bytes), 0, 0, 1, 0, W);
     expect(back.cell.note).toBe(edited.note);
   });
 
   it('re-encodes group with FX when edited (FX survives round-trip)', () => {
     // 0x9c 0x04 = arp select (effTyp 39, param 4); 0xc7 = note; 0x00 = term
+    // curInstr=1: note is gated on a staged instrument (player note-on gate).
     const h1 = new Uint8Array([0x9c, 0x04, 0xc7, 0x00]);
-    const { cell } = decodeSunGroup(h1, 0, 0, 0, 0, W);
+    const { cell } = decodeSunGroup(h1, 0, 0, 1, 0, W);
     // Edit the note so verbatim path is skipped
     const edited = { ...cell, note: (cell.note + 2) as typeof cell.note };
-    const bytes = encodeSunGroup(edited, 0, 0, 0, W);
-    const back = decodeSunGroup(new Uint8Array(bytes), 0, 0, 0, 0, W);
+    const bytes = encodeSunGroup(edited, 0, 1, 0, W);
+    const back = decodeSunGroup(new Uint8Array(bytes), 0, 0, 1, 0, W);
     expect(back.cell.note).toBe(edited.note);
     expect(back.cell.effTyp).toBe(39); // arp-select effect preserved
     expect(back.cell.eff).toBe(4);

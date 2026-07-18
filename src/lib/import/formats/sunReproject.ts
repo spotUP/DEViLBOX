@@ -97,62 +97,89 @@ export function reprojectSunGrid(
   patterns: Pattern[],
   native: SunTronicNativeData,
 ): void {
-  for (const pattern of patterns) {
-    for (let ch = 0; ch < pattern.channels.length; ch++) {
+  // Iterate PER VOICE across all patterns in grid-row order — this reconstructs
+  // `voices[ch].cells` exactly (SunTronicParser slices that flat array into
+  // pattern rows). walkV13Voice threads a running `curInstr` (the staged select)
+  // across the whole voice; decodeSunGroup's note emission is GATED on it (a
+  // pitch byte with no instrument ever staged fires no note-on in the player, so
+  // the grid shows no note). To reproduce those gated notes, reproject must
+  // thread the SAME curInstr — passing 0 per cell suppresses every bare
+  // `[note,0x00]` melody group that reuses a previously-staged instrument.
+  for (let ch = 0; ch < 4; ch++) {
+    let curInstr = 0;
+    for (const pattern of patterns) {
       const channel = pattern.channels[ch];
+      if (!channel) continue;
       for (const cell of channel.rows) {
         const bi = cell.sunBlockIndex;
         const ri = cell.sunRowInBlock;
         const pos = cell.sunPosition;
 
-        // Skip cells with no provenance.
-        if (bi === undefined || bi < 0 || ri === undefined || pos === undefined) {
+        // Non-provenanced cells (padding / empty positions) still advance the
+        // running select if they carry group bytes, so later provenanced cells
+        // decode against the correct curInstr.
+        const provenanced =
+          bi !== undefined && bi >= 0 && ri !== undefined && pos !== undefined &&
+          bi < native.blocks.length && pos < native.positions.length &&
+          ri < native.blocks[bi].length;
+
+        if (!provenanced) {
+          curInstr = advanceCurInstr(cell.sunRaw, curInstr, native);
           continue;
         }
 
-        // Guard against stale provenance pointing out of range.
-        if (
-          bi >= native.blocks.length ||
-          pos >= native.positions.length
-        ) {
-          continue;
-        }
-        const block = native.blocks[bi];
-        if (ri >= block.length) continue;
-
-        const poolCell = block[ri];
-        const transpose = native.positions[pos].transpose[ch as 0 | 1 | 2 | 3];
+        const poolCell = native.blocks[bi!][ri!];
+        const transpose = native.positions[pos!].transpose[ch as 0 | 1 | 2 | 3];
 
         // Faithful path: re-run the SAME decoder the display walk uses on the
-        // pool cell's stored group bytes, at this position's transpose. A linear
-        // `poolNote ± transpose` model is LOSSY for glide (0x94) and any
-        // clamp-to-zero fallback, because the pool note and the display note can
-        // derive from DIFFERENT stream carriers (e.g. glide arg 0x96 clamps to
-        // zero at T=0 so a later note byte fills the pool cell, while at T=24 the
-        // glide arg is in range and wins). Re-decoding sunRaw reproduces the
-        // display note exactly for every one of those cases (proven corpus-wide,
-        // 312,960/312,960 cells). curInstr=0 is fine — it only affects the
-        // instrument field, which we leave untouched here.
+        // pool cell's stored group bytes, at this position's transpose AND the
+        // threaded curInstr. A linear `poolNote ± transpose` model is LOSSY for
+        // glide (0x94) and any clamp-to-zero fallback, because the pool note and
+        // the display note can derive from DIFFERENT stream carriers. Re-decoding
+        // sunRaw reproduces the display note exactly (proven corpus-wide).
         const raw = poolCell.sunRaw;
         if (raw && raw.length > 0) {
-          const redecoded = decodeSunGroup(
+          const decoded = decodeSunGroup(
             Uint8Array.from(raw),
             0,
             transpose,
-            0,
+            curInstr,
             native.numSampled,
             native.widths,
             raw.length,
-          ).cell;
-          cell.note = redecoded.note;
+          );
+          cell.note = decoded.cell.note;
+          curInstr = decoded.curInstr;
         } else {
           // Fallback for cells with no carrier bytes (e.g. an edit that cleared
           // sunRaw via applySunNoteEdit): the linear inverse is correct for a
-          // plain note. displayNote = poolNote - transpose.
+          // plain note. displayNote = poolNote - transpose. Advance curInstr from
+          // the grid cell's original group bytes so later cells stay in sync.
           const poolNote = poolCell.note;
           cell.note = poolNote === 0 ? 0 : clampNote(poolNote - transpose);
+          curInstr = advanceCurInstr(cell.sunRaw, curInstr, native);
         }
       }
     }
   }
+}
+
+/** Advance the running select cursor by decoding a group's raw bytes. curInstr
+ *  update is transpose-independent (selects map the same regardless of pitch), so
+ *  transpose 0 is used. Returns curInstr unchanged when there are no bytes. */
+function advanceCurInstr(
+  raw: number[] | undefined,
+  curInstr: number,
+  native: SunTronicNativeData,
+): number {
+  if (!raw || raw.length === 0) return curInstr;
+  return decodeSunGroup(
+    Uint8Array.from(raw),
+    0,
+    0,
+    curInstr,
+    native.numSampled,
+    native.widths,
+    raw.length,
+  ).curInstr;
 }
