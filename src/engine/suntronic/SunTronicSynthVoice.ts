@@ -196,7 +196,21 @@ export function renderSynthTick(
       break;
     }
     case 1: {
-      latch = renderType1(out, w1, fbSource, byteLen, d1, prng);
+      // arp == -2 is a table escape @0x26ce6: `move.b $1(a4,d1.w),d0; bra 0x26cb6`.
+      // a4 = arpTable ptr; d1 was clobbered to the feedback double-buffer phase global
+      // ($a70(a6), ∈ {0,0x80}) at 0x26c8c. In the STABLE phase (0x80 → d1=0) it reads
+      // arpTable[1] and re-dispatches PAST the -1/-2 tests (so an escaped -1/-2 runs
+      // the delta body, not noise). The phase-0 frame reads OOB arpTable[0x101]; that
+      // per-frame alternation is coupled to the cycle-accurate Paula-DMA double-buffer
+      // (deferred scheduler #4) — the native engine models the stable-phase resolution
+      // and leaves the OOB frame to that residual.
+      let sel = d1;
+      let escaped = false;
+      if (d1 === -2) {
+        sel = inst.arpTable.length > 1 ? inst.arpTable[1] : 0;
+        escaped = true;
+      }
+      latch = renderType1(out, w1, fbSource, byteLen, sel, prng, escaped);
       break;
     }
     case 2: {
@@ -270,10 +284,11 @@ function renderType1(
   byteLen: number,
   d1: number,
   prng: SunSynthPrng,
+  escaped = false,
 ): boolean {
   const last = byteLen - 1; // D4
 
-  if (d1 === -1) {
+  if (!escaped && d1 === -1) {
     // CALC5/6: PRNG noise, writes words (byteLen/2 iterations). The output word
     // is written BEFORE the recurrence steps (out[0] == the incoming seed), and
     // the middle-square is shifted right by 4, not 8 — both recovered byte-exact
@@ -296,15 +311,52 @@ function renderType1(
     return false; // noise is source-independent — no feedback latch.
   }
 
+  if (d1 < 0) {
+    // CALC-delta @0x26d4a — negative-arp consecutive-delta body. Transcribed
+    // byte-for-byte from the LOADED replayer disasm:
+    //   d1w = ext.w(neg.b(arp))                 ; magnitude (positive for arp<0)
+    //   d0  = ext.w(src[last]) ; prev = src[last]  ; seed acc + prev from tail
+    //   for i: d2 = src[i] - prev ; prev = src[i]
+    //          d0 = asr.w((d0 + d2) * d1w, 7)   ; low-word signed accumulator carries
+    //          out[i] = d0 & 0xff
+    // muls.w yields a 32-bit product but the following asr.w/add.w operate on the
+    // low word only, so the accumulator is an s16 that carries across samples.
+    // Source is A3 — the same feedback play buffer / wave1 select as CALC3.
+    //
+    // Reached by: (a) any raw arp in [-128,-3] (never occurs in the SHIPPED
+    // corpus — measured type-1 arp domain is [-2,127]: p9g/p9h — but the editable
+    // grid admits negatives, so this covers user-edited arps), and (b) an ESCAPED
+    // selector (arp == -2 re-dispatches here at the replayer's 0x26cb6, PAST the
+    // -1/-2 tests) that resolves negative: escaped -1 → mag 1, escaped -2 → mag 2.
+    // `escaped` selectors skip the noise branch above precisely so -1 lands here.
+    let d1w = (-d1) & 0xff; // neg.b (byte negate)
+    d1w = (d1w << 24) >> 24; // signed byte (arp=-128 → stays -128)
+    d1w = (d1w << 16) >> 16; // ext.w
+    let acc = toS8(fbSource[last] ?? 0); // ext.w(src[last])
+    let prev = toS8(fbSource[last] ?? 0);
+    for (let i = 0; i < byteLen; i++) {
+      const cur = toS8(fbSource[i] ?? 0);
+      const d2v = cur - prev; // sub.w
+      prev = cur;
+      const sum = ((acc + d2v) << 16) >> 16; // add.w, word
+      acc = asrW7(Math.imul(sum, d1w)); // muls.w then asr.w #7 (low word)
+      out[i] = (acc << 24) >> 24;
+    }
+    void w1;
+    return true; // shares the CALC4 BSET #1 feedback latch.
+  }
+
   // CALC3: recursive pulse smoothing (arp >= 0). Verified byte-for-byte against the
   // LOADED replayer disasm at 0x26cc0-0x26ce0 (NOT the DP_Suntronic.s variant, which
   // differs): d1 = 0x80 - arp (byte sub; arp>=0 keeps high byte 0, coeff in [1,128]);
   // d0 seeds source[last]; per sample d0 += ((source[i]-d0)*coeff) asr 7; out = d0.b.
   // Source is the feedback play buffer once latched, wave1 on the first pass (A3 select).
-  // LIMIT: negative-arp variants (0x26d4a consecutive-delta, 0x26ce6 arp==-2 escape)
-  // are NOT ported. The corpus barely exercises the pulse path (~1 fire per 250 ticks,
-  // p8e histogram) so no oracle golden could be captured to lock them; the
-  // first-hit-per-render-chunk capture ABI cannot sample past the 0x26c8a entry.
+  // NOTE: arp == -2 is an arp-table escape @0x26ce6 — it does NOT reach here as a raw
+  // -2 (the corpus DOES store -2: 32 bytes across 9 files, all in type-1 noise tables,
+  // per p9f/p9i). renderSynthTick resolves the escape upstream to arpTable[1] and
+  // re-enters with `escaped=true`, so the resolved selector dispatches here (>=0) or
+  // to the delta body (<0). See renderSynthTick case 1 for the escape resolution and
+  // the deferred phase-alternating OOB frame (Paula-DMA double-buffer, scheduler #4).
   let d3 = toS8(fbSource[last] ?? 0);
   const d0 = (0x80 - d1) & 0xffff;
   for (let i = 0; i < byteLen; i++) {

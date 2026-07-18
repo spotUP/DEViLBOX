@@ -34,12 +34,18 @@
  * ballblaser's 5 are at note-change events — t12 v0 (dP=-5, a one-advance vibrato-phase
  * glitch on the first tick after a note-onset) and t78/t79 v0+v3 (native fires the
  * note-change ~2 buckets EARLY on both voices: acc jumps 2600→3000 while golden holds
- * the old note). Both are GNN/tempo arithmetic gaps — the prime suspect is the ignored
- * tempo control opcodes 0x8e (CIA tempo word) / 0x8d (tempo slide) in controlOpcode(),
- * which would shift ballblaser's row-length near t78. gliders has no note changes on its
+ * the old note). Both are GNN/tempo arithmetic gaps. gliders has no note changes on its
  * held-note voices, so it never exercises this path. Golden test (both songs) stays
  * describe.skip until ballblaser also reaches 0; gliders is locked by its own byte-exact
  * regression (sunTronicGlidersTimeline.test.ts, in test:ci, fails-on-revert).
+ *
+ * UPDATE 2026-07-18: the earlier "prime suspect = ignored tempo opcodes 0x8e (CIA tempo
+ * word) / 0x8d (tempo slide)" hypothesis is REFUTED. A corpus scan shows 0x8e/0x8d are
+ * dead no-ops (never emitted by any shipped module), so they cannot shift ballblaser's
+ * row length — implementing them would change nothing. t78/t79 were separately closed to
+ * byte-exact. The one remaining residual is the t12 v0 clock-phase advance (a one-tick
+ * vibrato-phase glitch on the first tick after a note onset), which belongs to the
+ * deferred cycle-accurate Paula-DMA scheduler, NOT to any missing control opcode.
  *
  * Scope: this is the timing/period/volume-envelope machine. Actual waveform
  * synthesis (MEGAEFFECTS / the CALCn timbre generators) is Gate 1, already
