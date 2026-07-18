@@ -251,14 +251,14 @@ register({
 // 0x99  setVolume    1 byte    effTyp 12   PT Cxx
 register(def1(0x99, 'setVolume', true, 12));
 
-// 0x98  speedGlobal  1 byte    effTyp 15   PT Fxx (≤0x1F)
-//   owns only when param < 0x20 (distinguishes from 0x8e ciaTempo)
+// 0x98  speedGlobal  1 byte    effTyp 15   PT Fxx
+//   Identified by opcode; no param-value guard needed (0x8e ciaTempo is effTyp 51).
 register({
   op: 0x98,
   name: 'speedGlobal',
   ptStyle: true,
   decode: (argBytes) => decode1(argBytes, 15),
-  owns: (effTyp, param) => effTyp === 15 && param < 0x20,
+  owns: (effTyp) => effTyp === 15,
   encode: encode1,
 });
 
@@ -288,14 +288,14 @@ register(def1(0x91, 'paulaAttach', false, 45));
 //   Brief says "emit as E5x — high nibble 5": the param IS the x nibble value.
 register(def1(0x90, 'finetune', true, 14));
 
-// 0x8e  ciaTempo     2 bytes   effTyp 15   PT Fxx (≥0x20 word)
-//   owns only when param >= 0x20 (distinguishes from 0x98 speedGlobal)
+// 0x8e  ciaTempo     2 bytes   effTyp 51   custom (private range ≥39)
+//   Identified by opcode; dedicated effTyp 51 avoids value-split ambiguity with 0x98.
 register({
   op: 0x8e,
   name: 'ciaTempo',
-  ptStyle: true,
-  decode: (argBytes) => decode2(argBytes, 15),
-  owns: (effTyp, param) => effTyp === 15 && param >= 0x20,
+  ptStyle: false,
+  decode: (argBytes) => decode2(argBytes, 51),
+  owns: (effTyp) => effTyp === 51,
   encode: encode2,
 });
 
