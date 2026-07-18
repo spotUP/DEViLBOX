@@ -108,12 +108,20 @@ export function decodeSunGroup(
     if (b === 0x94) {
       // setPitchNoRetrig: note (same mapping) + effTyp 3 (glide), no retrigger.
       // Mirror: walkV13Voice case 0x94 (SunTronicParser.ts:523-535).
+      // The raw pitch byte is the single carrier for this group — it is stored
+      // as the glide param (effTyp 3) so encodeSunGroup can round-trip it as
+      // one 0x94 opcode without also emitting a standalone note byte.
       if (cell.note === 0 && len >= 2) {
-        cell.note = sunPitchToNote(((~h1[pos + 1]) & 0xff) - transpose);
+        // The arg byte is the raw stream byte for the pitch (used as-is by the
+        // player: `note = u8(~argByte - v.transpose)`).
+        // We carry argByte verbatim as the effTyp-3 param so encodeSunGroup can
+        // reconstruct the exact [0x94, argByte] without a separate note byte.
+        const argByte = h1[pos + 1];
+        cell.note = sunPitchToNote(((~argByte) & 0xff) - transpose);
         cell.instrument = curInstr;
         // Use pushFx so the glide lands in the next free slot and does not
         // clobber any prior effect already written to slot 0.
-        pushFx(3, 0);
+        pushFx(3, argByte);
       }
       pos += len;
       continue;
@@ -271,7 +279,13 @@ export function encodeSunGroup(
   }
 
   // Emit note byte (+ optional instrument-select byte).
-  if (cell.note && cell.note > 0) {
+  // EXCEPTION: when an effTyp-3 (0x94 setPitchNoRetrig) column is present,
+  // the pitch is already carried as the 0x94 arg byte — do NOT also emit a
+  // standalone note byte (that would produce a double-carrier and corrupt the
+  // stream). The instrument-select byte still emits after the 0x94 opcode(s).
+  const noteCarriedByGlide = cols.some(c => c.effTyp === 3);
+
+  if (!noteCarriedByGlide && cell.note && cell.note > 0) {
     const pitch = noteToSunPitch(cell.note) + transpose;
     if (pitch < 0 || pitch > 71) {
       throw new Error(
@@ -282,8 +296,12 @@ export function encodeSunGroup(
     }
     const noteByte = (~pitch) & 0xff;
     out.push(noteByte);
+  }
 
-    // Emit instrument select only when instrument changed from the running cursor.
+  // Emit instrument select only when instrument changed from the running cursor.
+  // This applies regardless of whether the note was carried by 0x94 or emitted
+  // as a standalone note byte.
+  if (cell.note && cell.note > 0) {
     const id = cell.instrument ?? 0;
     if (id > 0 && id !== curInstr) {
       const sel = id > numSampled ? (0x40 | (id - numSampled - 1)) : id;
