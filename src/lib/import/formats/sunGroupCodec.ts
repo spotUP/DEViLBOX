@@ -103,8 +103,14 @@ export function decodeSunGroup(
         const sel = h1[pos + 1];
         curInstr = sel >= 0x40 ? numSampled + (sel & 0x3f) + 1 : sel;
       }
-      if (cell.note === 0) {
-        // First note wins (walkV13Voice behaviour).
+      // Player gate (SunTronicPlayer.getNextNote:370-371): a pitch byte fires a
+      // note-on ONLY when a select has been staged (`stagedSel != 0`). Because a
+      // select byte in 0x01..0x7f always maps to a non-zero instrument, that gate
+      // is exactly `curInstr != 0` here. A pitch byte with no instrument ever
+      // staged sets the Paula period only (silent glide target) — the player does
+      // NOT retrigger, so the grid must NOT show a note there (that was a phantom
+      // "ghost note"). First qualifying note wins (walkV13Voice behaviour).
+      if (cell.note === 0 && curInstr !== 0) {
         cell.note = sunPitchToNote(((~b) & 0xff) - transpose);
         cell.instrument = curInstr;
       }
@@ -113,19 +119,14 @@ export function decodeSunGroup(
     }
 
     if (b === 0x94) {
-      // setPitchNoRetrig: note (same mapping) + effTyp 3 (glide), no retrigger.
-      // Mirror: walkV13Voice case 0x94 (SunTronicParser.ts:523-535).
-      // The raw pitch byte is the single carrier for this group — it is stored
-      // as the glide param (effTyp 3) so encodeSunGroup can round-trip it as
-      // one 0x94 opcode without also emitting a standalone note byte.
-      if (cell.note === 0 && len >= 2) {
-        // The arg byte is the raw stream byte for the pitch (used as-is by the
-        // player: `note = u8(~argByte - v.transpose)`).
-        // We carry argByte verbatim as the effTyp-3 param so encodeSunGroup can
-        // reconstruct the exact [0x94, argByte] without a separate note byte.
+      // setPitchNoRetrig (player controlOpcode 0x94, SunTronicPlayer.ts:452-454):
+      // sets the Paula pitch WITHOUT retriggering the instrument — the player
+      // fires NO note-on. So this is a pure glide EFFECT, never a note column;
+      // emitting a note here produced a phantom "ghost note" the player never
+      // plays. Carry the raw pitch byte verbatim as the effTyp-3 (glide) param so
+      // encodeSunGroup reconstructs the exact [0x94, argByte] with no note byte.
+      if (len >= 2) {
         const argByte = h1[pos + 1];
-        cell.note = sunPitchToNote(((~argByte) & 0xff) - transpose);
-        cell.instrument = curInstr;
         // Use pushFx so the glide lands in the next free slot and does not
         // clobber any prior effect already written to slot 0.
         pushFx(3, argByte);
