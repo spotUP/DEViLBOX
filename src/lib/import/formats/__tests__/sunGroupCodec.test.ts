@@ -175,6 +175,28 @@ describe('encodeSunGroup', () => {
     expect(back.cell.instrument).toBe(3);
   });
 
+  it('[finding-1] re-encode omits the select byte when instrument equals the cursor', () => {
+    // This is the fail-on-revert witness for the select-emit condition change
+    // (`instrument > 0` → `instrument !== curInstr`). Force the RE-ENCODE path by
+    // editing the note while leaving instrument == curInstr: no select byte must
+    // be emitted, because the running cursor already carries that instrument.
+    // Pre-fix code (`instrument > 0`) emits a spurious select byte (0x07 here).
+    const h1 = new Uint8Array([0xc7, 0x00]);
+    const { cell } = decodeSunGroup(h1, 0, 0, /*curInstr*/7, /*numSampled*/0, W);
+    expect(cell.instrument).toBe(7);
+    // Edit only the note (instrument stays 7 == curInstr) → re-encode path.
+    const edited = { ...cell, note: (cell.note + 2) as typeof cell.note };
+    const encoded = encodeSunGroup(edited, 0, /*curInstr*/7, /*numSampled*/0, W);
+    // No instrument-select byte: exactly [noteByte, 0x00], and 0x07 absent.
+    expect(encoded.length).toBe(2);
+    expect(encoded).not.toContain(0x07);
+    expect(encoded[encoded.length - 1]).toBe(0x00);
+    // Decoded with the same cursor, the note round-trips and instrument stays 7.
+    const back = decodeSunGroup(new Uint8Array(encoded), 0, 0, /*curInstr*/7, /*numSampled*/0, W);
+    expect(back.cell.note).toBe(edited.note);
+    expect(back.cell.instrument).toBe(7);
+  });
+
   // -------------------------------------------------------------------------
   // Finding 2 regression test — unrepresentable note throws
   // -------------------------------------------------------------------------
