@@ -115,6 +115,12 @@ export interface TrackerCell {
   saEffect?: number;
   saEffectArg?: number;
 
+  /** SunTronic V1.3 only: exact source bytes of this grammar group (opcode
+   *  stream until 0x00 terminator). Carrier for byte-exact round-trip: when the
+   *  cell's decoded note/instrument/effects still match this, export emits it
+   *  verbatim; otherwise the group is re-encoded. Ignored by cellFieldsEqual. */
+  sunRaw?: number[];
+
   // ── Renoise-style multi-note columns (up to 4 notes per cell) ──
   // Extra note columns for chord support. Column 1 uses the primary
   // note/instrument/volume fields above. Columns 2-4 are optional.
