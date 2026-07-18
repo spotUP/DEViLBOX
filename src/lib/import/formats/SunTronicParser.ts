@@ -486,6 +486,7 @@ function buildV13Instruments(
       instruments.push({
         id: i + 1, name, type: 'synth' as const,
         synthType: 'Synth' as const, effects: [], volume: 0, pan: 0,
+        loadError: `sample file missing: ${name}`,
       } as InstrumentConfig);
     }
   }
@@ -502,6 +503,9 @@ function buildV13Instruments(
       synthType: rec ? ('SunTronicSynth' as const) : ('Synth' as const),
       sunTronic: rec ? sunSynthToConfig(rec) : undefined,
       effects: [], volume: 0, pan: 0,
+      // A synth slot with no decodable record is a silent placeholder — flag it
+      // the same way as a missing sample so the list shows why it makes no sound.
+      loadError: rec ? undefined : `synth instrument ${i + 1} could not be decoded`,
     } as InstrumentConfig);
   }
 

@@ -374,6 +374,13 @@ export interface InstrumentConfig {
   bridgeSlotId?: number;
   /** AU plugin name to load in the bridge (e.g. "ABL3", "Kontakt") */
   auPluginName?: string;
+  /** Set when the instrument's sample/patch data could not be read at import
+   *  (e.g. a SunTronic sampled instrument whose `instr/` companion file is
+   *  absent). The instrument is a silent placeholder; the UI surfaces this so
+   *  the user knows the note plays nothing because the sample never loaded, not
+   *  because of a decode bug. Human-readable reason, e.g. "sample file missing:
+   *  perc1.x". */
+  loadError?: string;
 }
 
 export interface InstrumentPreset {
