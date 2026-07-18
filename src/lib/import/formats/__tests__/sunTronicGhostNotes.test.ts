@@ -32,9 +32,14 @@ import {
   type SunV13Score,
 } from '../SunTronicV13';
 import { SunTronicPlayer } from '../../../../engine/suntronic/SunTronicPlayer';
+import { parseSunTronicFile } from '../SunTronicParser';
 
 const CORPUS = join(process.cwd(), 'public/data/songs/formats/SUNTronicTunes');
 const load = (name: string): Uint8Array => new Uint8Array(readFileSync(join(CORPUS, name)));
+function readFixture(name: string): ArrayBuffer {
+  const raw = new Uint8Array(readFileSync(join(CORPUS, name)));
+  return raw.buffer.slice(raw.byteOffset, raw.byteOffset + raw.byteLength) as ArrayBuffer;
+}
 
 /** Set of `voice:position:rowWithinPosition` keys the editable grid shows a note
  * for. Mirrors walkV13Voice's per-position stream consumption — crucially it goes
@@ -136,5 +141,14 @@ describe('SunTronic stop-song tail — no phantom notes past song end', () => {
     };
     for (let t = 0; t < 20000; t++) player.stepVblankOnce();
     expect(pastEndFires).toBe(0);
+  });
+});
+
+describe('SunTronic ghost-gate — arp/effect opcodes surface as grid cells', () => {
+  it('ready voice 1: arp opcodes surface as effect cells (no invisible arp)', () => {
+    const song = parseSunTronicFile(readFixture('ready'), 'ready');
+    const ch1 = song.patterns.flatMap(p => p.channels[1].rows);
+    const arpCells = ch1.filter(c => c.effTyp !== 0 || (c.effTyp2 ?? 0) !== 0);
+    expect(arpCells.length).toBeGreaterThan(0); // arp is visible, was invisible before
   });
 });

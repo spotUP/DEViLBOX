@@ -25,18 +25,17 @@
  */
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
-import type { InstrumentConfig } from '@/types';
+import type { InstrumentConfig, TrackerCell } from '@/types';
 import type { UADEVariablePatternLayout } from '@/engine/uade/UADEPatternEncoder';
 import { createSamplerInstrument } from './AmigaUtils';
 import {
   isSunTronicV13Format,
   parseSunTronicV13Score,
   sunTronicV13Encoder,
-  sunCommandLen,
-  sunPitchToNote,
   sunSynthToConfig,
 } from './SunTronicV13';
 import type { SunV13Score } from './SunTronicV13';
+import { decodeSunGroup } from './sunGroupCodec';
 
 // ── Binary helpers ──────────────────────────────────────────────────────────
 
@@ -392,13 +391,9 @@ const V13_ROWS_PER_PATTERN = 64;
 const V13_MAX_TOTAL_ROWS = 64 * 128;
 const V13_SAMPLE_RATE = 8287;
 
-interface V13DisplayCell {
-  note: number; instrument: number; volume: number;
-  effTyp: number; eff: number; effTyp2: number; eff2: number;
-}
-
-const emptyV13Cell = (): V13DisplayCell => ({
+const emptyV13Cell = (): TrackerCell => ({
   note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0,
+  sunTranspose: 0,
 });
 
 /** Case-insensitive basename lookup: try `name` then `name.x`. */
@@ -468,17 +463,21 @@ function buildV13Instruments(
  * Display approximation (carriers unaffected): rows/position mutations via
  * 0x8C/0x8B apply to THIS voice immediately (the real 0x8C hits all voices at
  * its playback tick — cross-voice timing is not simulated for display).
+ *
+ * Each cell is a full TrackerCell produced by decodeSunGroup (note, instrument,
+ * up to 5 FX columns, sunRaw carrier, sunTranspose). The same cell objects are
+ * later shared into blockRows (decision 4) so grid edits are visible to export.
  */
 function walkV13Voice(
   score: SunV13Score,
   voice: number,
-): { cells: V13DisplayCell[]; fpPerRow: number[] } {
+): { cells: TrackerCell[]; fpPerRow: number[] } {
   const h1 = score.h1;
   // Variant-dependent operand widths — MUST match the audio player's controlOpcode,
   // or this walk desyncs from the stream and drops later notes (invisible "ghost"
   // notes: they play but no grid cell). See SunCmdWidths.
   const widths = { arpShift: score.arpShift, volSlideRateFromStream: score.volSlideRateFromStream };
-  const cells: V13DisplayCell[] = [];
+  const cells: TrackerCell[] = [];
   const fpPerRow: number[] = [];
   let rowsPerPos = score.rowsPerPositionDefault;
   let curInstr = 0;
@@ -504,43 +503,33 @@ function walkV13Voice(
     }
     let pos = ptr;
     for (let r = 0; r < rowsPerPos && cells.length < V13_MAX_TOTAL_ROWS; r++) {
-      const cell = emptyV13Cell();
-      // parse one grammar row
-      for (;;) {
-        if (pos >= h1.length) break;
-        const b = h1[pos];
-        const len = sunCommandLen(h1, pos, widths);
-        if (b === 0x00) { pos += len; break; }
-        if (b >= 0xb8) {
-          if (len >= 2) {
-            const sel = h1[pos + 1];
-            curInstr = sel >= 0x40 ? numSampled + (sel & 0x3f) + 1 : sel;
-          }
-          if (cell.note === 0) {
-            cell.note = sunPitchToNote(((~b) & 0xff) - transpose);
-            cell.instrument = curInstr;
-          }
-        } else if (b === 0x94) {
-          // 0x94 = "set pitch, no retrigger" (tone portamento / legato): the
-          // replayer sets `v.pitch = (~arg - transpose) << 8` WITHOUT a note-on
-          // (SunTronicPlayer.controlOpcode case 0x94). It carries real melody —
-          // ox.src is almost entirely 0x94, snake has 64 of them — so a walk that
-          // only shows retrigger bytes (>= 0xB8) renders those lines as blank rows.
-          // Show the pitch (same `~byte - transpose` mapping as a note byte) and
-          // flag tone-portamento (effTyp 3) so it reads as a glide, not a retrigger.
-          if (cell.note === 0 && len >= 2) {
-            cell.note = sunPitchToNote(((~h1[pos + 1]) & 0xff) - transpose);
-            cell.instrument = curInstr;
-            cell.effTyp = 3;
-          }
-        } else if (b >= 0x01 && b <= 0x7f) {
-          curInstr = b >= 0x40 ? numSampled + (b & 0x3f) + 1 : b;
-        } else if (b === 0x8c || b === 0x8b) {
-          const arg = h1[pos + 1];
-          if (arg >= 1) rowsPerPos = arg;
+      // Delegate the per-group item walk to decodeSunGroup (single source of
+      // truth for note/instrument/FX decode). Thread curInstr forward across
+      // groups within this position; transpose and numSampled are position-level.
+      const decoded = decodeSunGroup(h1, pos, transpose, curInstr, numSampled, widths);
+      curInstr = decoded.curInstr;
+      pos = decoded.nextPos;
+
+      // Stamp the position-level transpose onto the cell so the encoder can
+      // re-derive the exact note byte without needing the sequence table.
+      const cell: TrackerCell = { ...decoded.cell, sunTranspose: transpose };
+
+      // 0x8c (rowsGlobal, effTyp 48) and 0x8b (rowsVoice, effTyp 49) mutate the
+      // row-cadence for this position. Apply whichever was decoded (if any).
+      // We check all 5 FX slots since decodeSunGroup may place them anywhere.
+      const rowsEffTyps = new Set([48, 49]);
+      for (const [eTyp, eVal] of [
+        [cell.effTyp  ?? 0, cell.eff  ?? 0],
+        [cell.effTyp2 ?? 0, cell.eff2 ?? 0],
+        [cell.effTyp3 ?? 0, cell.eff3 ?? 0],
+        [cell.effTyp4 ?? 0, cell.eff4 ?? 0],
+        [cell.effTyp5 ?? 0, cell.eff5 ?? 0],
+      ] as [number, number][]) {
+        if (rowsEffTyps.has(eTyp) && eVal >= 1) {
+          rowsPerPos = eVal;
         }
-        pos += len;
       }
+
       cells.push(cell);
       fpPerRow.push(fp);
     }
@@ -597,9 +586,50 @@ function parseSunTronicV13File(
   // ── variable layout: honest REAL file offsets + byte-exact carriers ──
   const filePatternAddrs = score.blocks.map((b) => score.h1FileOffset + b.h1Offset);
   const filePatternSizes = score.blocks.map((b) => b.byteSize);
-  const blockRows = score.blocks.map((b) => b.rows);
   const blockRawBytes = score.blocks.map((b) =>
     buf.slice(score.h1FileOffset + b.h1Offset, score.h1FileOffset + b.h1Offset + b.byteSize));
+
+  // Rebuild blockRows as shared references to display cells from the walks.
+  // Each blockRows[fp] is the array of TrackerCell objects produced by
+  // walkV13Voice for the first (voice, position) pair that references block fp.
+  // Sharing the same objects as song.patterns means grid edits are visible to
+  // the encoder without a separate decode pass. Old carrier-cell packing
+  // (cutoff/period/pan/resonance) is removed — sunRaw on each cell is the
+  // byte-exact carrier, and sunTranspose carries the decode-time transpose.
+  //
+  // IMPORTANT: we only collect score.blocks[fp].rowCount grammar rows per block,
+  // not all rows in an fpPerRow run. A position's rowsPerPos can exceed the
+  // block's actual grammar row count — after the block's rows are consumed the
+  // walk reads into the next block. fpPerRow always shows the ENTRY's block fp,
+  // so a run of fp in fpPerRow may be longer than the block. Capping at rowCount
+  // ensures blockRows[fp] produces exactly the block's bytes when sunRaw fields
+  // are concatenated.
+  const numFilePatterns = score.blocks.length;
+  const blockRows: TrackerCell[][] = Array.from({ length: numFilePatterns }, () => []);
+  // First-occurrence wins: once a block has been collected from any voice, skip
+  // all later references to the same fp.
+  const fpSeen = new Set<number>();
+  for (let ch = 0; ch < 4; ch++) {
+    const { cells: vCells, fpPerRow: vFpPerRow } = voices[ch];
+    let r = 0;
+    while (r < vCells.length) {
+      const fp = vFpPerRow[r];
+      if (fp < 0 || fpSeen.has(fp)) {
+        r++;
+        continue;
+      }
+      // Collect exactly rowCount grammar rows for this block (not the full fpPerRow run,
+      // which may span multiple grammar positions re-using the same block or extend into
+      // the next block's territory when rowsPerPos > block.rowCount).
+      const rowCount = score.blocks[fp].rowCount;
+      const runStart = r;
+      const runEnd = Math.min(runStart + rowCount, vCells.length);
+      for (let i = runStart; i < runEnd; i++) blockRows[fp].push(vCells[i]);
+      fpSeen.add(fp);
+      // Advance past the full fpPerRow run (not just rowCount) to avoid re-processing.
+      while (r < vCells.length && vFpPerRow[r] === fp) r++;
+    }
+  }
   const trackMap = Array.from({ length: numPatterns }, (_, p) =>
     [0, 1, 2, 3].map((ch) => voices[ch].fpPerRow[p * V13_ROWS_PER_PATTERN] ?? -1));
 

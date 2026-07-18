@@ -121,6 +121,13 @@ export interface TrackerCell {
    *  verbatim; otherwise the group is re-encoded. Ignored by cellFieldsEqual. */
   sunRaw?: number[];
 
+  /** SunTronic V1.3 only: the order-entry transpose in effect when this group
+   *  was decoded (`entry.transposes[voice]`). Carrier for byte-exact re-encode:
+   *  encodeSunGroup re-decodes sunRaw with this transpose to detect edits and to
+   *  reproduce the exact note byte. Default 0 for from-scratch cells. Ignored by
+   *  cellFieldsEqual. */
+  sunTranspose?: number;
+
   // ── Renoise-style multi-note columns (up to 4 notes per cell) ──
   // Extra note columns for chord support. Column 1 uses the primary
   // note/instrument/volume fields above. Columns 2-4 are optional.
