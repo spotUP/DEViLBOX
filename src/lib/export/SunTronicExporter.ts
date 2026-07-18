@@ -39,7 +39,11 @@ import type { TrackerSong } from '@/engine/TrackerReplayer';
 import type { InstrumentConfig } from '@/types';
 import type { NativeExportResult, NativeExportCompanion } from './nativeExportRouter';
 import { SUNTRONIC_V13_TEMPLATE } from '@generated/sunTronicV13Template';
-import { parseHunks, writeHunks } from '@/lib/import/formats/SunTronicV13';
+import {
+  parseHunks,
+  writeHunks,
+  parseSunTronicV13Score,
+} from '@/lib/import/formats/SunTronicV13';
 
 // ── Small binary helpers ─────────────────────────────────────────────────────
 
@@ -175,6 +179,154 @@ function exportFromScratch(song: TrackerSong): NativeExportResult {
   return result;
 }
 
+// ── Variable-length recompile (Phase 2, Task 9) ────────────────────────────────
+
+/** Longword-align a byte count upward (Amiga hunk payloads are longword-sized). */
+function alignUp4(n: number): number {
+  return (n + 3) & ~3;
+}
+
+/**
+ * Recompile path — an edit changed at least one pool block's byte length, so the
+ * whole pool region is re-laid and every sequence-entry trackPtr that points into
+ * the pool is recomputed to the block's new h1 offset.
+ *
+ * Layout facts (measured from the corpus, e.g. the `ready` fixture — pool span
+ * [0x1b1c, 0x211c), 51 blocks, contiguous, ending exactly at h1 end):
+ *   - The pool is the LAST structure in hunk#1; every fixed table (synth, sampled,
+ *     subsong, sequences) precedes `poolStart`. Growing the pool therefore grows
+ *     hunk#1 at its tail; nothing after it moves.
+ *   - The only RELOC32 entries whose stored VALUE points into the pool are the
+ *     128 sequence-entry trackPtr longwords — and those values are rewritten here
+ *     (step c). No RELOC32 LOCATION falls inside the pool span, so no reloc offset
+ *     needs to shift. We assert both invariants before proceeding; if a future
+ *     module violates them we throw rather than emit a corrupt module.
+ *
+ * @param origBytes the original module bytes (`uadeEditableFileData`)
+ * @param encoded   per-block re-encoded bytes (index parallel to `score.blocks`)
+ */
+function recompileWithLengthChange(
+  origBytes: Uint8Array,
+  encoded: Uint8Array[],
+): Uint8Array {
+  const score = parseSunTronicV13Score(origBytes);
+  const blocks = score.blocks; // sorted ascending by h1Offset (== layout index order)
+  if (blocks.length !== encoded.length) {
+    throw new Error(
+      `SunTronic recompile: block count mismatch (score ${blocks.length} vs encoded ${encoded.length})`,
+    );
+  }
+
+  const poolStart = blocks[0].h1Offset;
+  const oldPoolEnd = blocks[blocks.length - 1].h1Offset + blocks[blocks.length - 1].byteSize;
+
+  // (b) Lay blocks contiguously from poolStart, in ascending original-offset order.
+  const newOffsetOf = new Map<number, number>(); // oldOffset -> newOffset
+  let cursor = poolStart;
+  for (let i = 0; i < blocks.length; i++) {
+    newOffsetOf.set(blocks[i].h1Offset, cursor);
+    cursor += encoded[i].length;
+  }
+  const newPoolEnd = cursor;
+  const newPoolLen = newPoolEnd - poolStart;
+
+  // Overflow guard: the pool may only fill the span up to the next fixed structure
+  // after poolStart. Gather every fixed anchor and find the closest one > poolStart.
+  const fixedAnchors: number[] = [score.synthTableOff, score.sampledTableOff];
+  for (const sub of score.subsongs) fixedAnchors.push(sub.sequenceOff);
+  const nextFixed = fixedAnchors
+    .filter((o) => o > poolStart)
+    .reduce((m, o) => (o < m ? o : m), Number.POSITIVE_INFINITY);
+  if (Number.isFinite(nextFixed)) {
+    const capacity = nextFixed - poolStart;
+    if (newPoolLen > capacity) {
+      throw new Error(
+        `SunTronic recompile: repacked pool overflows its span — ${newPoolLen} bytes needed but ` +
+        `only ${capacity} available before the next fixed structure at h1+0x${nextFixed.toString(16)}. ` +
+        'The edit adds more stream bytes than the pool region can hold.',
+      );
+    }
+  }
+  // If no fixed structure follows the pool, it is the last thing in h1 and may grow
+  // the hunk freely (validated below by the self-reparse).
+
+  // Build the new h1 payload. Everything before poolStart is copied verbatim; the
+  // pool is repacked; anything the pool used to occupy is replaced by the new pool.
+  const hf = parseHunks(origBytes);
+  const oldH1 = hf.hunks[1].data;
+  const tailStart = oldPoolEnd; // bytes in h1 after the old pool (0 for `ready`)
+  const tailLen = oldH1.length - tailStart;
+  const rawNewH1Len = poolStart + newPoolLen + tailLen;
+  const newH1 = new Uint8Array(alignUp4(rawNewH1Len));
+  newH1.set(oldH1.subarray(0, poolStart), 0); // pre-pool structures verbatim
+  for (let i = 0; i < blocks.length; i++) {
+    newH1.set(encoded[i], newOffsetOf.get(blocks[i].h1Offset)!);
+  }
+  if (tailLen > 0) newH1.set(oldH1.subarray(tailStart), poolStart + newPoolLen);
+
+  // (c) Rewrite each sequence-entry trackPtr longword to the block's NEW offset.
+  const writeU32BE = (buf: Uint8Array, off: number, v: number): void => {
+    buf[off] = (v >>> 24) & 0xff;
+    buf[off + 1] = (v >>> 16) & 0xff;
+    buf[off + 2] = (v >>> 8) & 0xff;
+    buf[off + 3] = v & 0xff;
+  };
+  for (const sub of score.subsongs) {
+    for (let ei = 0; ei < sub.entries.length; ei++) {
+      const entryOff = sub.sequenceOff + ei * 0x14;
+      for (let v = 0; v < 4; v++) {
+        const tp = sub.entries[ei].trackPtrs[v];
+        if (tp <= 0) continue; // 0 / not-in-pool ptr stays as-is
+        const newTp = newOffsetOf.get(tp);
+        if (newTp === undefined) continue; // not a pool block start — leave verbatim
+        writeU32BE(newH1, entryOff + v * 4, newTp);
+      }
+    }
+  }
+
+  // (d) Adjust hunk length + declaredSize; validate reloc invariants and rebase any
+  // reloc VALUE that points into the pool (== the trackPtrs, already rewritten in the
+  // payload; here we assert no reloc LOCATION moved so the offset list is unchanged).
+  const relocBlock = hf.hunks[1].reloc32;
+  for (const [, offs] of relocBlock) {
+    for (const o of offs) {
+      if (o >= poolStart && o < oldPoolEnd) {
+        throw new Error(
+          `SunTronic recompile: RELOC32 location h1+0x${o.toString(16)} falls inside the pool span; ` +
+          'block-internal relocations are not supported.',
+        );
+      }
+    }
+  }
+  hf.hunks[1].data = newH1;
+  hf.hunks[1].length = newH1.length;
+  hf.hunks[1].declaredSize = newH1.length;
+
+  const out = writeHunks(hf);
+
+  // (e) Self-validate: re-parse must not throw, block count preserved, and every
+  // entry trackPtr must resolve to a block. A failure here means the recompile is
+  // wrong — surface it instead of shipping a corrupt module.
+  const check = parseSunTronicV13Score(out);
+  if (check.blocks.length !== blocks.length) {
+    throw new Error(
+      `SunTronic recompile: reparse block count ${check.blocks.length} != ${blocks.length}`,
+    );
+  }
+  for (const sub of check.subsongs) {
+    for (const e of sub.entries) {
+      for (const tp of e.trackPtrs) {
+        if (tp > 0 && !check.blockIndexByOffset.has(tp)) {
+          throw new Error(
+            `SunTronic recompile: reparsed trackPtr h1+0x${tp.toString(16)} resolves to no block`,
+          );
+        }
+      }
+    }
+  }
+  return out;
+}
+
 // ── Public entry point ─────────────────────────────────────────────────────────
 
 /**
@@ -196,23 +348,25 @@ export function exportAsSunTronic(song: TrackerSong): NativeExportResult {
   const out = orig.slice();
   const warnings: string[] = [];
   let edited = false;
+  let lengthChanged = false;
 
+  // Re-encode every block. Blocks come from `sunTronicNative.blocks` (the live pool
+  // the editor mutates) when present, else from the layout's carrier rows. The two
+  // are kept in sync (the editor writes both); we drive off `blockRows` because that
+  // is what the encoder consumes and the pool-index order matches `score.blocks`.
+  const encodedBlocks: Uint8Array[] = [];
   for (let fp = 0; fp < layout.numFilePatterns; fp++) {
     const rows = layout.blockRows[fp];
     const raw = layout.blockRawBytes[fp];
-    if (!rows || !raw) continue;
     // sunTronicV13Encoder is a pure carrier re-emitter and ignores the channel
     // argument (blocks are per-(position,voice) streams, not per-channel grids).
-    const encoded = layout.encoder.encodePattern(rows, 0);
+    const encoded = rows ? layout.encoder.encodePattern(rows, 0) : (raw ?? new Uint8Array(0));
+    encodedBlocks.push(encoded);
+    if (!rows || !raw) continue;
     if (bytesEqual(encoded, raw)) continue;
-    if (encoded.length !== raw.length) {
-      throw new Error(
-        `SunTronic export: block ${fp} changed length (${raw.length} -> ${encoded.length}); ` +
-        'row insert/delete needs score shift + RELOC32 rebuild (Phase 5). Note-only edits are supported.',
-      );
-    }
-    out.set(encoded, layout.filePatternAddrs[fp]);
     edited = true;
+    if (encoded.length !== raw.length) lengthChanged = true;
+    else out.set(encoded, layout.filePatternAddrs[fp]);
   }
 
   if (!edited) {
@@ -220,8 +374,15 @@ export function exportAsSunTronic(song: TrackerSong): NativeExportResult {
     return { data: orig, filename, warnings };
   }
 
+  // Outcome 3: at least one block changed length → re-lay the pool + rebuild the
+  // sequence trackPtrs (and grow the hunk if the pool grew). Outcome 2 (all edits
+  // same length) already spliced in-place above.
+  const data = lengthChanged
+    ? recompileWithLengthChange(orig, encodedBlocks)
+    : out;
+
   const companions = buildCompanions(song);
-  const result: NativeExportResult = { data: out, filename, warnings };
+  const result: NativeExportResult = { data, filename, warnings };
   if (companions.length > 0) result.companions = companions;
   return result;
 }
