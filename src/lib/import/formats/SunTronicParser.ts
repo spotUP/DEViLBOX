@@ -545,6 +545,21 @@ function parseSunTronicV13File(
   // ── display grid: independent per-voice walks of subsong 0 ──
   const voices = [0, 1, 2, 3].map((v) => walkV13Voice(score, v));
   const maxRows = Math.max(1, ...voices.map((v) => v.cells.length));
+
+  // SunTronic groups stack up to 5 effects per row (effTyp..effTyp5). The grid
+  // renders `channelMeta.effectCols` columns per channel — without it the editor
+  // shows a single effect column and every extra FX is invisible/uneditable.
+  // Size each voice to the highest effect slot it actually uses (min 1).
+  const voiceEffectCols = voices.map((v) => {
+    let cols = 1;
+    for (const c of v.cells) {
+      if ((c.effTyp5 ?? 0) !== 0) { cols = 5; break; }
+      if ((c.effTyp4 ?? 0) !== 0) cols = Math.max(cols, 4);
+      else if ((c.effTyp3 ?? 0) !== 0) cols = Math.max(cols, 3);
+      else if ((c.effTyp2 ?? 0) !== 0) cols = Math.max(cols, 2);
+    }
+    return cols;
+  });
   const numPatterns = Math.max(1, Math.ceil(maxRows / V13_ROWS_PER_PATTERN));
 
   const patterns = Array.from({ length: numPatterns }, (_, p) => ({
@@ -561,6 +576,7 @@ function parseSunTronicV13File(
       pan: ch === 0 || ch === 3 ? -50 : 50,
       instrumentId: null,
       color: null,
+      channelMeta: { importedFromMOD: false, effectCols: voiceEffectCols[ch] },
       rows: Array.from({ length: V13_ROWS_PER_PATTERN }, (_, r) =>
         voices[ch].cells[p * V13_ROWS_PER_PATTERN + r] ?? emptyV13Cell()),
     })),

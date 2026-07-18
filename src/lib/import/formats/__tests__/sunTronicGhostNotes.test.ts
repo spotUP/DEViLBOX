@@ -157,6 +157,36 @@ describe('SunTronic ghost-gate — arp/effect opcodes surface as grid cells', ()
   });
 });
 
+describe('SunTronic effect columns — channelMeta.effectCols exposes every stacked FX slot', () => {
+  it('ready: each channel renders as many effect columns as its rows actually use (>1 somewhere)', () => {
+    // A SunTronic group stacks up to 5 effects (effTyp..effTyp5). The grid draws
+    // channelMeta.effectCols columns per channel; without it only ONE column
+    // renders and every extra FX is invisible/uneditable. Assert each channel is
+    // sized to the highest effect slot it uses, and at least one voice exceeds 1.
+    const song = parseSunTronicFile(readFixture('ready'), 'ready');
+    const cols = [0, 1, 2, 3].map((ch) => {
+      // Highest 1-based effect slot populated anywhere in this channel.
+      let used = 1;
+      for (const p of song.patterns) {
+        for (const c of p.channels[ch].rows) {
+          if ((c.effTyp5 ?? 0) !== 0) used = Math.max(used, 5);
+          else if ((c.effTyp4 ?? 0) !== 0) used = Math.max(used, 4);
+          else if ((c.effTyp3 ?? 0) !== 0) used = Math.max(used, 3);
+          else if ((c.effTyp2 ?? 0) !== 0) used = Math.max(used, 2);
+        }
+      }
+      const meta = song.patterns[0].channels[ch].channelMeta;
+      expect(meta, `channel ${ch} has channelMeta`).toBeTruthy();
+      const declared = meta?.effectCols ?? 0;
+      // The grid must render at least as many columns as the channel actually uses.
+      expect(declared, `channel ${ch}: effectCols covers used FX slots`).toBeGreaterThanOrEqual(used);
+      return declared;
+    });
+    // Fails-on-revert: drop channelMeta and every effectCols is undefined → 0.
+    expect(Math.max(...cols), 'at least one channel exposes multiple FX columns').toBeGreaterThan(1);
+  });
+});
+
 describe('SunTronic pool byte-exact — blockRows sunRaw concatenation matches blockRawBytes', () => {
   it('concat(sunRaw) === blockRawBytes for ready, ballblaser.src, snake.src', () => {
     // Fixture 'snake' does not exist; use 'snake.src' (present in corpus).
