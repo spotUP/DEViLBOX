@@ -31,7 +31,7 @@ import { useResponsiveSafe } from '@/contexts/ResponsiveContext';
 
 const TOOLBAR_H = 36;
 
-export const SunTronicView: React.FC<{ width?: number; height?: number }> = () => {
+export const SunTronicView: React.FC = () => {
   const { isMobile } = useResponsiveSafe();
   const nativeData = useFormatStore(s => s.sunTronicNative);
   const currentPositionIndex = useTrackerStore(s => s.currentPositionIndex);
@@ -102,7 +102,7 @@ export const SunTronicView: React.FC<{ width?: number; height?: number }> = () =
         backgroundColor: 'var(--color-bg-tertiary)',
         flexShrink: 0,
       }}>
-        <span style={{ fontWeight: 'bold', color: '#fde047', fontSize: '12px' }}>SunTronic</span>
+        <span className="text-accent-highlight" style={{ fontWeight: 'bold', fontSize: '12px' }}>SunTronic</span>
         <span style={{ color: 'var(--color-text-muted)' }}>|</span>
         <span style={{ fontSize: '11px', color: 'var(--color-text-muted)', flex: 1 }}>{toolbarInfo}</span>
       </div>

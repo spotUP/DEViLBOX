@@ -1034,6 +1034,8 @@ export const useFormatStore = create<FormatStore>()(
           state.editorMode = 'suntronic';
           clearNative(state);
           state.sunTronicNative = song.sunTronicNative;
+          state.sunTronicSongFileData = song.sunTronicSongFileData ?? null;
+          state.sunTronicCompanionPcm = song.sunTronicCompanionPcm ?? null;
         } else if (song.klysNative) {
           newEditorMode = 'klystrack';
           state.editorMode = 'klystrack';
