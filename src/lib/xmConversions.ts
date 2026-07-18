@@ -4,6 +4,8 @@
  * Conversion between DEViLBOX formats and XM binary formats
  */
 
+import { sunEffectToString } from './import/formats/sunEffectGlyphs';
+
 /**
  * Note names for XM encoding
  */
@@ -243,6 +245,10 @@ export function xmEffectToString(effTyp: number, eff: number): string {
   if (effTyp >= 36 && effTyp <= 38) {
     return `Z${HEX_BYTE[eff] ?? '00'}`;
   }
+
+  // SunTronic private control effects (reserved block 0x40..0x4F).
+  const sun = sunEffectToString(effTyp, eff);
+  if (sun !== null) return sun;
 
   const typeChar = EFFECT_CHAR_MAP[effTyp] ?? '0';
   return `${typeChar}${HEX_BYTE[eff] ?? '00'}`;
