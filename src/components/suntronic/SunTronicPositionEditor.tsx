@@ -1,8 +1,14 @@
 /**
  * SunTronicPositionEditor — Editable position matrix for SunTronic V1.3.
- * Mirrors HivelyPositionEditor exactly.
+ * Mirrors HivelyPositionEditor in structure.
  *
- * Each of 4 voices has: block index (2 hex digits) + signed transpose.
+ * Each of 4 voices has: block index (display-only) + signed transpose (editable).
+ *
+ * blockIndex is DISPLAY-ONLY. Changing which block a voice uses at a position
+ * requires a full per-voice re-linearization of the display grid (re-running the
+ * block-walk that produces provenance-tagged cells). reprojectSunGrid only re-bakes
+ * transpose; it cannot remap cell provenance to a different block. Grid-rebuild
+ * support is deferred to a follow-up task.
  */
 
 import React, { useMemo, useCallback } from 'react';
@@ -69,8 +75,9 @@ export const SunTronicPositionEditor: React.FC<Props> = ({
   }, [nativeData, numPos]);
 
   const handleCellChange = useCallback<OnCellChange>((channelIdx, rowIdx, columnKey, value) => {
-    if (columnKey === 'blockIndex') setCell(rowIdx, channelIdx, 'blockIndex', value);
-    else if (columnKey === 'transpose') setCell(rowIdx, channelIdx, 'transpose', value);
+    // blockIndex is display-only — editing it requires a full grid rebuild that
+    // is not yet implemented. Only transpose is writable via reprojectSunGrid.
+    if (columnKey === 'transpose') setCell(rowIdx, channelIdx, 'transpose', value);
   }, [setCell]);
 
   return (
