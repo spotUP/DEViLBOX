@@ -23,7 +23,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync } from 'fs';
 import { join } from 'path';
 import { parseSunTronicFile, isSunTronicFormat, isSunTronicRawRip } from '../SunTronicParser';
-import { isSunTronicV13Format, parseSunTronicV13Score, sunTronicV13Encoder, decodeSunSynthInstrument } from '../SunTronicV13';
+import { isSunTronicV13Format, parseSunTronicV13Score, decodeSunSynthInstrument } from '../SunTronicV13';
 
 const CORPUS = join(process.cwd(), 'public/data/songs/formats/SUNTronicTunes');
 const INSTR = join(CORPUS, 'instr');
@@ -197,7 +197,7 @@ describe('SunTronic V1.3 score decode (Delirium hunk executables)', () => {
         // carrier completeness: encoder concatenation reproduces the block
         // byte-for-byte from blockRows alone (fails if decodeSunBlock stops
         // stashing period/pan/resonance carriers)
-        const encoded = sunTronicV13Encoder.encodePattern(layout.blockRows![fp], 0);
+        const encoded = layout.encoder.encodePattern(layout.blockRows![fp], 0);
         expect(Buffer.from(encoded).equals(Buffer.from(slice)),
           `fp ${fp} encoder(blockRows) == block bytes`).toBe(true);
       }

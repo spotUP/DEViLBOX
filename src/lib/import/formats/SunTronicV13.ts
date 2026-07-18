@@ -1027,22 +1027,25 @@ function parseNameBlock(h1: Uint8Array): { names: string[]; nameBlockEnd: number
 
 // ── Variable-length encoder (carrier concatenation) ─────────────────────────
 //
-// Pure carrier concatenation per the Rob Hubbard recipe §3: each carrier cell
-// re-emits its exact source bytes, so encodePattern(blockRows[fp]) reproduces
-// the block byte-for-byte. Defined here so the layout attached in Phase 2 is
-// complete; Phase 3 registers it in src/engine/uade/encoders/ (until then it
-// is NOT in the encoder registry, so the round-trip ratchet is untouched).
+// Legacy verbatim-only encoder: concatenates each cell's sunRaw carrier bytes.
+// Retained for direct tooling use (scripts, tests that compare the raw verbatim
+// path in isolation). The UADEVariablePatternLayout attached by parseSunTronicFile
+// uses makeSunTronicV13Encoder (SunTronicParser.ts) — that factory-built encoder
+// also handles edited cells (sunRaw cleared by applySunNoteEdit) by re-encoding
+// them via encodeSunGroup with the correct song-level widths and numSampled.
+// This const is NOT the re-encode path; do not use it to validate exported blocks.
 
 export const sunTronicV13Encoder: VariableLengthEncoder = {
   formatId: 'sunTronic',
   encodePattern(rows: TrackerCell[]): Uint8Array {
+    // Verbatim path only: emit each cell's sunRaw carrier bytes verbatim.
+    // Cells with sunRaw cleared (edited) produce zero bytes here — use the
+    // factory encoder (makeSunTronicV13Encoder) for layouts that include edits.
     const out: number[] = [];
     for (const cell of rows) {
-      const len = cell.cutoff;
-      if (len === undefined || len <= 0) continue; // padding row, not a stream item
-      out.push((cell.period ?? 0) & 0xff);
-      if (len >= 2) out.push((cell.pan ?? 0) & 0xff);
-      if (len >= 3) out.push((cell.resonance ?? 0) & 0xff);
+      if (cell.sunRaw && cell.sunRaw.length > 0) {
+        for (const b of cell.sunRaw) out.push(b);
+      }
     }
     return new Uint8Array(out);
   },
