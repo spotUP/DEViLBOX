@@ -121,6 +121,11 @@ export interface TrackerCell {
    *  verbatim; otherwise the group is re-encoded. Ignored by cellFieldsEqual. */
   sunRaw?: number[];
 
+  /** SunTronic V1.3 only: pool block index this display cell derives from (-1 = none). */
+  sunBlockIndex?: number;
+  /** SunTronic V1.3 only: 0-based grammar-row index within that pool block. */
+  sunRowInBlock?: number;
+
   // ── Renoise-style multi-note columns (up to 4 notes per cell) ──
   // Extra note columns for chord support. Column 1 uses the primary
   // note/instrument/volume fields above. Columns 2-4 are optional.

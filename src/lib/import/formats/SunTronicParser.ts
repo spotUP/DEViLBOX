@@ -36,7 +36,7 @@ import {
 } from './SunTronicV13';
 import type { SunV13Score } from './SunTronicV13';
 import { decodeSunGroup } from './sunGroupCodec';
-import { decodeSunBlockPool } from './sunNativeData';
+import { decodeSunBlockPool, buildSunTronicNativeData } from './sunNativeData';
 
 // ── Binary helpers ──────────────────────────────────────────────────────────
 
@@ -522,6 +522,14 @@ function walkV13Voice(
         }
       }
 
+      // Stamp provenance so later tasks can route edits back to the pool block.
+      // fp >= 0 means ptr IS a block start (blockIndexByOffset only stores starts),
+      // so r is the grammar-row index within the block directly.
+      if (fp >= 0 && r < score.blocks[fp].rowCount) {
+        decoded.cell.sunBlockIndex = fp;
+        decoded.cell.sunRowInBlock = r;
+      }
+
       cells.push(decoded.cell);
       fpPerRow.push(fp);
     }
@@ -632,6 +640,7 @@ function parseSunTronicV13File(
     uadeEditableFileData: buffer.slice(0) as ArrayBuffer,
     uadeEditableFileName: filename,
     uadeVariableLayout,
+    sunTronicNative: buildSunTronicNativeData(score, blockRows),
   };
 
   if (song.patterns.length === 0) console.warn('[SunTronic V1.3] no patterns extracted');
