@@ -470,6 +470,11 @@ export interface TrackerSong {
    *  Used by CheeseCutter: the PSID driver overwrites $C000-$CFFF with its shim,
    *  but the CheeseCutter player may have music data there. These patches restore it. */
   c64MemPatches?: Array<{ addr: number; data: Uint8Array }>;
+
+  /** SunTronic V1.3 native data — block pool + order list for live editing.
+   *  Attached by parseSunTronicV13File; used by Tasks 7+ to route cell edits back
+   *  to the shared pool and reproject transpose changes across all display rows. */
+  sunTronicNative?: import('@/lib/import/formats/sunNativeData').SunTronicNativeData;
 }
 
 // ============================================================================
