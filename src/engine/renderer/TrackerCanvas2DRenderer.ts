@@ -15,6 +15,7 @@ import type {
   UIStateSnapshot,
   ChannelLayoutSnapshot,
 } from './worker-types';
+import { SUN_EFFECT_GLYPH } from '@/lib/import/formats/sunEffectGlyphs';
 
 const ROW_HEIGHT   = 24;
 const CHAR_WIDTH   = 10;
@@ -354,7 +355,10 @@ export class TrackerCanvas2DRenderer {
           const eff  = cell?.effTyp ?? 0;
           const effp = cell?.eff    ?? 0;
           ctx.fillStyle = isPlayRow ? '#ffffff' : eff === 0 && effp === 0 ? theme.textMuted : theme.textEffect;
-          const effStr = eff === 0 && effp === 0 ? '···' : `${EFFECT_CHARS_2D[eff] ?? '?'}${hex2(effp)}`;
+          const effStr = eff === 0 && effp === 0
+            ? '···'
+            // SunTronic private control effects (reserved block 0x40..0x4F)
+            : `${SUN_EFFECT_GLYPH[eff] ?? EFFECT_CHARS_2D[eff] ?? '?'}${hex2(effp)}`;
           ctx.fillText(effStr, effBaseX, y);
         }
       }
