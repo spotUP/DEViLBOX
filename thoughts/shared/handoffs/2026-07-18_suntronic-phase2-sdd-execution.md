@@ -35,22 +35,15 @@ or genuine ambiguity.
 - **Task 1 (0x94 double pitch-carrier): IMPLEMENTED, commit `04dc56755`**
   `fix(suntronic): 0x94 single pitch-carrier…`. 3/3 new + 32/32 SunTronic suite
   green, type-check clean. NOT pushed.
-- **Task-1 REVIEWER dispatched (background) at end of session — verdict NOT yet
-  seen.** agentId a4cfd51e50e3eef45. FIRST ACTION next session: get its verdict.
-
-## Task-1 deviation to adjudicate (reviewer is judging this)
-Implementer deviated from brief: brief said 0x94 glide param =
-`(~h1[pos+1]) & 0xff`; implementer carried raw `argByte = h1[pos+1]` directly.
-Rationale = byte-exact round-trip (encode reproduces `[0x94,0x24,0x00]`) +
-matches test `cell.eff = 0x24`. Likely correct (glide-param carrier must be the
-raw arg byte, transpose-independent, so re-encode is exact). Confirm via
-reviewer verdict; if reviewer flags Critical/Important, dispatch fix subagent.
+- **Task-1 REVIEWER: APPROVED (review CLEAN).** No Critical/Important. Reviewer
+  confirmed the brief's prose formula `(~h1[pos+1])&0xff` was self-contradictory
+  (its own test asserted raw `0x24`); implementer correctly carried raw arg byte.
+  Verified: byte-exact round-trip, display note unchanged, no other opcodes
+  touched. Task 1 marked complete in ledger. **START NEXT SESSION AT TASK 2.**
 
 ## Next steps (ordered)
-1. **Check Task-1 reviewer verdict** (SendMessage to a4cfd51e50e3eef45 if still
-   running, or it will have notified). If Approved → mark Task 1 complete in
-   ledger (`Task 1: complete (commit 04dc56755, review clean)`), TaskUpdate.
-   If findings → dispatch ONE fix subagent (all findings), re-review.
+1. **Start at Task 2** (0x98/0x8e width split → effTyp 51). `task-brief PLAN 2`.
+   BASE for its review-package = `04dc56755` (Task-1 head), not fad0bc485.
 2. **Continue SDD for Tasks 2-13** (see plan). Per task: `task-brief PLAN N` →
    dispatch implementer (background, model sonnet for codec/logic, cheaper for
    mechanical, opus for the final whole-branch review) with brief path + context
@@ -64,7 +57,7 @@ reviewer verdict; if reviewer flags Critical/Important, dispatch fix subagent.
    type-check green — NOT per task (avoids 13 CI deploys). Then PushNotification.
 
 ## Task summary (plan Tasks 1-13)
-1. 0x94 double pitch-carrier — DONE (04dc56755, review pending).
+1. 0x94 double pitch-carrier — DONE + review CLEAN (04dc56755).
 2. 0x98/0x8e width split → give 0x8e ciaTempo its own effTyp **51**; opcode-identity `owns`.
 3. decodeSunGroup block `limit` param (over-read guard).
 4. cellFieldsEqual → compare FX slots 3-5.
