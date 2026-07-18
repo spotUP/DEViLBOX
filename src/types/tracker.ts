@@ -125,6 +125,8 @@ export interface TrackerCell {
   sunBlockIndex?: number;
   /** SunTronic V1.3 only: 0-based grammar-row index within that pool block. */
   sunRowInBlock?: number;
+  /** SunTronic V1.3 only: order position (subsong-0 entry index) this display cell belongs to. */
+  sunPosition?: number;
 
   // ── Renoise-style multi-note columns (up to 4 notes per cell) ──
   // Extra note columns for chord support. Column 1 uses the primary

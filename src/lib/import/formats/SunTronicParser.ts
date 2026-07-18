@@ -484,7 +484,7 @@ function walkV13Voice(
   const sub = score.subsongs[0];
   if (!sub) return { cells, fpPerRow };
 
-  for (const entry of sub.entries) {
+  sub.entries.forEach((entry, positionIndex) => {
     const ptr = entry.trackPtrs[voice];
     // Per-voice note transpose is position metadata (sequence layer): the
     // replayer computes displayed pitch as `(~byte) - transpose` (layout spec
@@ -496,7 +496,7 @@ function walkV13Voice(
         cells.push(emptyV13Cell());
         fpPerRow.push(-1);
       }
-      continue;
+      return;
     }
     let pos = ptr;
     for (let r = 0; r < rowsPerPos && cells.length < V13_MAX_TOTAL_ROWS; r++) {
@@ -528,12 +528,13 @@ function walkV13Voice(
       if (fp >= 0 && r < score.blocks[fp].rowCount) {
         decoded.cell.sunBlockIndex = fp;
         decoded.cell.sunRowInBlock = r;
+        decoded.cell.sunPosition = positionIndex;
       }
 
       cells.push(decoded.cell);
       fpPerRow.push(fp);
     }
-  }
+  });
   return { cells, fpPerRow };
 }
 
