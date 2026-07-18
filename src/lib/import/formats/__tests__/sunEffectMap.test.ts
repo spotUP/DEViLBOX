@@ -32,11 +32,11 @@ describe('sunEffectMap', () => {
     }
   });
 
-  it('Fxx split: speed (<0x20) -> 0x98, tempo (>=0x20 word) -> 0x8e; both effTyp 15', () => {
+  it('Fxx split: speed (<0x20) -> 0x98 effTyp 15, tempo (>=0x20 word) -> 0x8e effTyp 51', () => {
     expect(SUN_EFFECT_BY_OP.get(0x98)!.decode([0x06])).toEqual({ effTyp: 15, param: 0x06 });
-    expect(SUN_EFFECT_BY_OP.get(0x8e)!.decode([0x01, 0x40])).toEqual({ effTyp: 15, param: 0x0140 });
+    expect(SUN_EFFECT_BY_OP.get(0x8e)!.decode([0x01, 0x40])).toEqual({ effTyp: 51, param: 0x0140 });
     expect(sunEncodeEffect(15, 0x06, MAIN)).toEqual({ op: 0x98, argBytes: [0x06] });
-    expect(sunEncodeEffect(15, 0x0140, MAIN)).toEqual({ op: 0x8e, argBytes: [0x01, 0x40] });
+    expect(sunEncodeEffect(51, 0x0140, MAIN)).toEqual({ op: 0x8e, argBytes: [0x01, 0x40] });
   });
 
   it('pitchSlide 0x9b: sign -> effTyp 1/2, variant width on encode', () => {
