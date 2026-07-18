@@ -30,11 +30,16 @@ Make Sonix a first-class editable format (synth + editable patterns) and get it 
    (status: implemented). Remaining finer item: linear-vs-BLEP interpolation crest gap
    (corr 0.80) — separate, not a scale/register bug. **In-browser MCP validation still
    pending** (no browser connected this session; headless-validated only).
-2. **Editor knobs no-op** — SonixControls shows but turning a knob has no audible effect.
-   Trace `SonixControls.handleChange → updateInstrument → SonixSynth.applyConfig →
-   SonixEngine.setSynthParams → worklet applySynthParams → WASM setters` during song
-   playback. Likely the playing WASM song only re-reads scalar params on the next note, or
-   no live SonixSynth voice exists for the suppressNotes engine so applyConfig never fires.
+2. **Editor knobs no-op — RESOLVED (commit 710d0fe4e).** Root cause: `updateInstrument`
+   had no dispatch branch for synthType 'SonixSynth', so knob edits fell through to the
+   invalidation path (invalidate + replayer map update) and never called
+   `SonixSynth.applyConfig → SonixEngine.setSynthParams`. Added a branch mirroring
+   Cinter4/Hively (`engine.getInstrument` → `applyConfig`, no invalidate). Regression in
+   `src/stores/__tests__/sonixSynthLiveEdit.test.ts` (in test:ci; fails pre-fix). Note: the
+   param bridge tags instruments as SonixSynth on **play** (loadTune fires onSynthParams),
+   not on load — the editor is empty until the song has played once. Live audible-delta not
+   directly driven via MCP (store not on window); routing is unit-test-proven + worklet path
+   confirmed (reads params.index, calls all WASM setters).
 3. **P7 not done:** save edited synth params back to native .instr (round-trip).
 4. Faithful per-note audition (render-one-note WASM export) — voice preview is base-waveform only.
 
