@@ -2153,6 +2153,25 @@
   white-space: nowrap;
 }
 
+.ft2-numeric-value-clickable {
+  cursor: text;
+}
+
+.ft2-numeric-value-clickable:hover {
+  border-color: var(--color-accent);
+}
+
+/* Editing input reuses .ft2-numeric-value box so it stays the same size. */
+.ft2-numeric-value-input {
+  width: 44px;
+  box-sizing: border-box;
+  outline: none;
+}
+
+.ft2-numeric-value-input:focus {
+  border-color: var(--color-accent);
+}
+
 .ft2-numeric-arrows {
   display: flex;
   flex-direction: column;

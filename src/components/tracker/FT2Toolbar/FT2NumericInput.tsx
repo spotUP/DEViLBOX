@@ -6,6 +6,7 @@
 
 import React, { useRef, useCallback, useEffect, useState } from 'react';
 import { useClickOutside } from '@hooks/useClickOutside';
+import { parseFT2NumericInput } from '@lib/tracker/ft2NumericInput';
 
 interface PresetOption {
   label: string;
@@ -47,6 +48,11 @@ export const FT2NumericInput: React.FC<FT2NumericInputProps> = ({
   // State for presets menu
   const [showPresets, setShowPresets] = useState(false);
   const [presetMenuPos, setPresetMenuPos] = useState({ x: 0, y: 0 });
+
+  // State for direct type-in editing of the value field (FT2 click-to-type)
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState('');
+  const editInputRef = useRef<HTMLInputElement>(null);
 
   // Keep valueRef in sync — must be synchronous (not in useEffect)
   // to avoid stale reads when the prop changes between render and click
@@ -130,6 +136,44 @@ export const FT2NumericInput: React.FC<FT2NumericInputProps> = ({
     return val.toString().padStart(3, '0');
   };
 
+  // Enter type-in mode: seed the draft with the raw current value (no zero
+  // padding) and focus/select so the user can immediately overtype it.
+  const beginEditing = useCallback(() => {
+    setDraft(format === 'hex' ? value.toString(16).toUpperCase() : value.toString());
+    setEditing(true);
+  }, [value, format]);
+
+  useEffect(() => {
+    if (editing && editInputRef.current) {
+      editInputRef.current.focus();
+      editInputRef.current.select();
+    }
+  }, [editing]);
+
+  // Commit the typed value through the shared parser, or discard if invalid.
+  const commitEditing = useCallback(() => {
+    const parsed = parseFT2NumericInput(draft, format, min, max);
+    if (parsed !== null) {
+      valueRef.current = parsed;
+      onChange(parsed);
+    }
+    setEditing(false);
+  }, [draft, format, min, max, onChange]);
+
+  const cancelEditing = useCallback(() => {
+    setEditing(false);
+  }, []);
+
+  const handleEditKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      commitEditing();
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      cancelEditing();
+    }
+  }, [commitEditing, cancelEditing]);
+
   return (
     <div
       ref={containerRef}
@@ -138,9 +182,26 @@ export const FT2NumericInput: React.FC<FT2NumericInputProps> = ({
       title={presets ? `Right-click for presets` : undefined}
     >
       <span className="ft2-numeric-label">{label}:</span>
-      <span className="ft2-numeric-value">
-        {formatValue(value)}
-      </span>
+      {editing ? (
+        <input
+          ref={editInputRef}
+          className="ft2-numeric-value ft2-numeric-value-input"
+          value={draft}
+          inputMode={format === 'hex' ? 'text' : 'numeric'}
+          onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={handleEditKeyDown}
+          onBlur={commitEditing}
+          aria-label={`Edit ${label}`}
+        />
+      ) : (
+        <span
+          className="ft2-numeric-value ft2-numeric-value-clickable"
+          onClick={beginEditing}
+          title={`Click to type ${label}`}
+        >
+          {formatValue(value)}
+        </span>
+      )}
       <div className="ft2-numeric-arrows">
         <button
           className="ft2-arrow ft2-arrow-up"
