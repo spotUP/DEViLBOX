@@ -702,25 +702,38 @@ function parseTinyVoiceStream(
 /**
  * Read the fixed 4-byte ASCII instrument-name table at file offset 0x40.
  * Entries are the base names of the external .instr companion files
- * (e.g. "CE01" → CE01.instr). Stops at the first all-zero entry.
+ * (e.g. "CE01" → CE01.instr).
+ *
+ * The table runs from 0x40 up to the first voice-stream pointer (`tableEnd`).
+ * Slot i maps to instrument i+1 (the stream's 0x81nn opcode sets instrument
+ * nn+1). Empty (all-zero) slots are index GAPS, not a terminator — some modules
+ * pad unused registers with zeros between named entries (e.g. maintitle:
+ * WT15,----,WT20,----,WT13,WT18,...). Reading must NOT stop at the first zero
+ * slot (the old bug: only "WT15" survived). Gaps become `Sample N` placeholders;
+ * trailing empty slots are trimmed so the table length tracks the last real name.
  */
-function readTinyInstrumentNames(buf: Uint8Array): string[] {
-  const names: string[] = [];
+function readTinyInstrumentNames(buf: Uint8Array, tableEnd: number): string[] {
   const TABLE_OFF = 0x40;
   const ENTRY = 4;
-  for (let i = 0; TABLE_OFF + i * ENTRY + ENTRY <= buf.length && i < 63; i++) {
+  const end = Math.min(tableEnd, buf.length);
+  const names: string[] = [];
+  let lastNamed = -1;
+  for (let i = 0; TABLE_OFF + i * ENTRY + ENTRY <= end; i++) {
     const off = TABLE_OFF + i * ENTRY;
     let name = '';
-    let allZero = true;
     for (let b = 0; b < ENTRY; b++) {
       const c = buf[off + b];
-      if (c !== 0) allZero = false;
       if (c >= 0x20 && c < 0x7F) name += String.fromCharCode(c);
     }
-    if (allZero) break;
-    names.push(name || `Sample ${i + 1}`);
+    if (name.trim().length > 0) {
+      names.push(name);
+      lastNamed = i;
+    } else {
+      names.push(`Sample ${i + 1}`);
+    }
   }
-  return names;
+  // Trim trailing placeholder slots — keep only up to the last real name.
+  return names.slice(0, lastNamed + 1);
 }
 
 /** Scan a TINY voice stream from ptr, returning its byte length up to and
@@ -774,7 +787,11 @@ function parseTinyBinary(buf: Uint8Array, filename: string): TrackerSong {
   }
 
   // Instruments named from the 0x40 table; ensure at least the used registers.
-  const tableNames = readTinyInstrumentNames(buf);
+  // The table ends where the first voice stream begins (smallest valid pointer).
+  const tableEnd = ptrs
+    .filter((p) => p > 0x40 && p <= fileSize)
+    .reduce((min, p) => Math.min(min, p), fileSize);
+  const tableNames = readTinyInstrumentNames(buf, tableEnd);
   let maxRegister = 0;
   for (const cells of channelFlat) {
     for (const cell of cells) {
