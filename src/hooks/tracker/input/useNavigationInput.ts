@@ -13,6 +13,7 @@ import * as Tone from 'tone';
 import { getToneEngine } from '@engine/ToneEngine';
 import { xmNoteToString } from '@lib/xmConversions';
 import { ALT_TRACK_MAP_1, ALT_TRACK_MAP_2, type TrackerInputRefs } from './inputConstants';
+import { isKeyHandled } from '@lib/tracker/keyHandledSentinel';
 
 export const useNavigationInput = (refs: TrackerInputRefs) => {
   const { cursorRef, selectionRef } = refs;
@@ -82,7 +83,7 @@ export const useNavigationInput = (refs: TrackerInputRefs) => {
   const handleKeyDown = useCallback(
     (e: KeyboardEvent): boolean => {
       // Skip if already handled by the global keyboard handler (capture-phase)
-      if ((e as any).__handled) return false;
+      if (isKeyHandled(e)) return false;
 
       // Format modes handle arrows/tab/page in PatternEditorCanvas.handleFormatKeyDown.
       // Skip when that div has focus to avoid double-move.
