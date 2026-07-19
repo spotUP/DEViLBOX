@@ -332,7 +332,7 @@ export const useNavigationInput = (refs: TrackerInputRefs) => {
           ? (e.altKey || e.shiftKey)   // FT2: Alt+arrows select (also allow Shift for convenience)
           : e.shiftKey;                // IT/Renoise: Shift+arrows select
         if (selecting && !selectionRef.current) startSelection();
-        moveCursor(dir);
+        moveCursor(dir, { preserveSelection: selecting });
         previewNoteAtCursor();
         if (selecting) endSelection();
         // Start RAF-driven scroll (time-based throttle — refresh-rate independent)
@@ -350,12 +350,12 @@ export const useNavigationInput = (refs: TrackerInputRefs) => {
               if (now - keyDownTime >= INITIAL_DELAY) {
                 initialDelayPassed = true;
                 lastMoveTime = now;
-                moveCursorRef.current(held.dir);
+                moveCursorRef.current(held.dir, { preserveSelection: held.selecting });
                 if (held.selecting) endSelectionRef.current();
               }
             } else if (now - lastMoveTime >= MOVE_INTERVAL) {
               lastMoveTime = now;
-              moveCursorRef.current(held.dir);
+              moveCursorRef.current(held.dir, { preserveSelection: held.selecting });
               if (held.selecting) endSelectionRef.current();
             }
             arrowRafRef.current = requestAnimationFrame(tick);
@@ -381,7 +381,7 @@ export const useNavigationInput = (refs: TrackerInputRefs) => {
         }
         const selecting = behavior.selectionModifier === 'alt' ? e.altKey : e.shiftKey;
         if (selecting && !selectionRef.current) startSelection();
-        moveCursor('left');
+        moveCursor('left', { preserveSelection: selecting });
         if (selecting) endSelection();
         heldArrowRef.current = { dir: 'left', selecting };
         if (!arrowRafRef.current) {
@@ -397,12 +397,12 @@ export const useNavigationInput = (refs: TrackerInputRefs) => {
               if (now - keyDownTime >= INITIAL_DELAY) {
                 initialDelayPassed = true;
                 lastMoveTime = now;
-                moveCursorRef.current(held.dir);
+                moveCursorRef.current(held.dir, { preserveSelection: held.selecting });
                 if (held.selecting) endSelectionRef.current();
               }
             } else if (now - lastMoveTime >= MOVE_INTERVAL) {
               lastMoveTime = now;
-              moveCursorRef.current(held.dir);
+              moveCursorRef.current(held.dir, { preserveSelection: held.selecting });
               if (held.selecting) endSelectionRef.current();
             }
             arrowRafRef.current = requestAnimationFrame(tick);
@@ -428,7 +428,7 @@ export const useNavigationInput = (refs: TrackerInputRefs) => {
         }
         const selecting = behavior.selectionModifier === 'alt' ? e.altKey : e.shiftKey;
         if (selecting && !selectionRef.current) startSelection();
-        moveCursor('right');
+        moveCursor('right', { preserveSelection: selecting });
         if (selecting) endSelection();
         heldArrowRef.current = { dir: 'right', selecting };
         if (!arrowRafRef.current) {
@@ -444,12 +444,12 @@ export const useNavigationInput = (refs: TrackerInputRefs) => {
               if (now - keyDownTime >= INITIAL_DELAY) {
                 initialDelayPassed = true;
                 lastMoveTime = now;
-                moveCursorRef.current(held.dir);
+                moveCursorRef.current(held.dir, { preserveSelection: held.selecting });
                 if (held.selecting) endSelectionRef.current();
               }
             } else if (now - lastMoveTime >= MOVE_INTERVAL) {
               lastMoveTime = now;
-              moveCursorRef.current(held.dir);
+              moveCursorRef.current(held.dir, { preserveSelection: held.selecting });
               if (held.selecting) endSelectionRef.current();
             }
             arrowRafRef.current = requestAnimationFrame(tick);
