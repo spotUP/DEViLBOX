@@ -518,8 +518,11 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
         setIsLooping(true);
         return;
       }
-      // Already looping a pattern → this button acts as Stop (brake).
-      getTrackerScratchController().triggerElectronicBrake();
+      // Already looping — Play Pattern NEVER stops. Restart the current pattern
+      // from the top. (Explicit stop is Shift+click / context menu / Stop Song.)
+      const replayer = getTrackerReplayer();
+      replayer.forcePosition(replayer.getSongPos(), 0);
+      setCurrentRow(0);
       return;
     }
     setIsLooping(true);
@@ -615,7 +618,7 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
         }}
         title={isPlayingSong ? 'Click: Stop (spindown) · Alt+click: Restart · Shift+click: Power off' : 'Play Song'}
         className="min-w-[72px]">{isPlayingSong ? 'Stop Song' : 'Play Song'}</Button>
-      <Button variant={isPlayingPattern ? 'danger' : 'primary'} size="sm"
+      <Button variant="primary" size="sm"
         onClick={(e) => {
           if (isPlayingPattern && e.shiftKey) { e.preventDefault(); getTrackerScratchController().triggerPowerCut(); }
           else if (isPlaying && (e.altKey || e.metaKey)) {
@@ -629,8 +632,8 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
         onContextMenu={(e) => {
           if (isPlayingPattern) { e.preventDefault(); getTrackerScratchController().triggerPowerCut(); }
         }}
-        title={isPlayingPattern ? 'Click: Stop (spindown) · Alt+click: Restart · Shift+click: Power off' : 'Play Pattern'}
-        className="min-w-[88px]">{isPlayingPattern ? 'Stop Pattern' : 'Play Pattern'}</Button>
+        title={isPlayingPattern ? 'Click: Restart pattern · Shift+click: Power off' : 'Play Pattern'}
+        className="min-w-[88px]">Play Pattern</Button>
       <Button variant="ghost" size="sm" onClick={() => setShowFileBrowser(true)} disabled={isLoading} loading={isLoading}>Load</Button>
       <Button variant="ghost" size="sm" onClick={handleSave} title="Save to browser & download .dbx (Ctrl+S)">Save</Button>
       <Button variant="ghost" size="sm" onClick={handleUndo} disabled={!canUndo()} title="Undo (Ctrl+Z)">Undo</Button>
