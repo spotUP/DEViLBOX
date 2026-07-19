@@ -27,6 +27,7 @@ import { readFileSync } from 'fs';
 import { join } from 'path';
 import { parseSunTronicV13Score } from '@/lib/import/formats/SunTronicV13';
 import { SunTronicPlayer } from '../SunTronicPlayer';
+import { renderSunTronicMix } from '../SunTronicNativeRender';
 
 const CORPUS = join(process.cwd(), 'public/data/songs/formats/SUNTronicTunes');
 
@@ -77,5 +78,30 @@ describe('SunTronic native sampled (type-B) voices', () => {
     expect(tl[0].voices[2].sampleSlot).toBe(0);
     expect(tl[0].voices[2].period).toBeGreaterThan(0);
     expect(tl[0].voices[2].outVolume).toBeGreaterThan(0);
+  });
+
+  it('globe.src channel 4 (sampled voice 3) renders audible PCM — not silent', () => {
+    // User-reported symptom: globe.src shows notes in channel 4 but that channel
+    // played SILENT. Channel 4 (voice index 3) is a sampled (type-B) voice —
+    // dominated by slot 1 (popsnare2.x). This drives the FULL render core
+    // (companion resolution -> Paula DMA stream) and asserts the voice produces
+    // real audio, not just a non-frozen player tick. Confirmed live in-app: with
+    // channels 0-2 muted, the capture's ch0+ch3->L bus carries voice 3 (L_rms
+    // ~0.024) while ch1+ch2->R is fully silent.
+    //
+    // Fails on revert of the Gate D sampled fix: selectInstrument -> null leaves
+    // voice 3 with sampleSlot -1 / period 0, the render core skips it, ch[3] is
+    // all zeros -> info.silent true and peak 0.
+    const buf = new Uint8Array(readFileSync(join(CORPUS, 'globe.src')));
+    const score = parseSunTronicV13Score(buf);
+    const slotPcm = loadSampleData(score.instrumentNames);
+    const mix = renderSunTronicMix(score, slotPcm, { seconds: 8 });
+
+    const v3 = mix.ch[3];
+    let peak = 0;
+    for (let i = 0; i < v3.length; i++) { const a = Math.abs(v3[i]); if (a > peak) peak = a; }
+
+    expect(mix.info[3].silent).toBe(false);
+    expect(peak).toBeGreaterThan(0.05);
   });
 });
