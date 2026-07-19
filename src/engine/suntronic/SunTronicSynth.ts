@@ -21,6 +21,7 @@
 import type { DevilboxSynth } from '@/types/synth';
 import type { InstrumentConfig } from '@typedefs/instrument';
 import type { SunTronicConfig } from '@typedefs/sunTronicInstrument';
+import { resolveSunTronicConfig } from '@/lib/suntronic/config';
 import { getDevilboxAudioContext, audioNow, noteToMidi } from '@/utils/audio-context';
 import { SUN_PERIODS } from './SunTronicEffects';
 import { renderSunSynthPreview, sunConfigToInstrument } from './SunTronicVoiceRenderer';
@@ -57,7 +58,7 @@ export class SunTronicSynth implements DevilboxSynth {
     this.ctx = getDevilboxAudioContext();
     this.output = this.ctx.createGain();
     this.output.gain.value = 1;
-    this.cfg = config.sunTronic ?? null;
+    this.cfg = resolveSunTronicConfig(config);
   }
 
   /** Render the note's PCM buffer from the native engine at the note's pitch. */
@@ -129,12 +130,17 @@ export class SunTronicSynth implements DevilboxSynth {
     this.triggerRelease(undefined, audioNow());
   }
 
-  /** Live update: swap the config; next attack renders from it. */
-  applyConfig(config: InstrumentConfig): void {
-    this.cfg = config.sunTronic ?? null;
+  /**
+   * Live update: swap the config; next attack renders from it. Accepts EITHER
+   * a full `InstrumentConfig` (whose `.sunTronic` is the SunTronicConfig — the
+   * constructor/create path) OR a bare `SunTronicConfig` (its own marker field
+   * `sunTronic === 1` — what the editor's `updateNativeSynthConfig` path sends).
+   */
+  applyConfig(config: InstrumentConfig | SunTronicConfig): void {
+    this.cfg = resolveSunTronicConfig(config);
   }
 
-  updateConfig(config: InstrumentConfig): void {
+  updateConfig(config: InstrumentConfig | SunTronicConfig): void {
     this.applyConfig(config);
   }
 

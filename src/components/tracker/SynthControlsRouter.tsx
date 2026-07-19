@@ -119,6 +119,9 @@ const HivelyControls = lazy(() =>
 const JamCrackerControls = lazy(() =>
   import('@components/instruments/controls/JamCrackerControls').then(m => ({ default: m.JamCrackerControls }))
 );
+const SunTronicSynthControls = lazy(() =>
+  import('@components/instruments/controls/SunTronicSynthControls').then(m => ({ default: m.SunTronicSynthControls }))
+);
 const SoundMonControls = lazy(() =>
   import('@components/instruments/controls/SoundMonControls').then(m => ({ default: m.SoundMonControls }))
 );
@@ -415,6 +418,11 @@ export const SynthControlsRouter: React.FC<SynthControlsRouterProps> = ({ instru
     if (synthType === 'JamCrackerSynth') {
       const cfg = deepMerge(DEFAULT_JAMCRACKER, instrument.jamCracker || {});
       return <JamCrackerControls config={cfg} onChange={(u) => onUpdateLive('jamCracker', cfg, u)} />;
+    }
+
+    if (synthType === 'SunTronicSynth' && instrument.sunTronic) {
+      const cfg = instrument.sunTronic;
+      return <SunTronicSynthControls config={cfg} instrumentId={instrument.id} onChange={(u) => onUpdateLive('sunTronic', cfg, u)} />;
     }
 
     // ── UADE tracker synths ─────────────────────────────────
