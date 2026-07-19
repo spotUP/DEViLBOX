@@ -28,6 +28,70 @@
  */
 
 import type { TrackerSong } from '@/engine/TrackerReplayer';
+import type { InstrumentConfig } from '@typedefs/instrument';
+import { isSonixSynthInstr } from '@lib/import/formats/IffSmusParser';
+import { readSonixSynthParams, serializeSonixSynthInstr } from '@engine/sonix/sonixInstrument';
+
+/** One extra file emitted alongside the `.smus` (e.g. an updated `Instruments/*.instr`). */
+export interface IffSmusCompanion {
+  /** Relative name under the song folder, e.g. `Instruments/Ace2leed.instr`. */
+  name: string;
+  data: Uint8Array;
+}
+
+/** Strip the `sonix/` memfs prefix from a sidecar path → `Instruments/<file>`. */
+function sidecarRelName(path: string): string {
+  return path.replace(/^sonix\//, '');
+}
+
+/** Basename without extension, lowercased — used to pair a sidecar with an instrument name. */
+function baseKey(pathOrName: string): string {
+  const file = pathOrName.split('/').pop() ?? pathOrName;
+  const dot = file.lastIndexOf('.');
+  return (dot > 0 ? file.slice(0, dot) : file).toLowerCase();
+}
+
+/**
+ * Build the `.instr` / `.ss` companions the exported `.smus` needs to re-import faithfully.
+ *
+ * The `.smus` body carries NO synth parameters — only instrument NAMES and the note streams.
+ * A re-import reads each synth voice's params from its `.instr` binary companion (see
+ * IffSmusParser → parseSonixSynthInstr). So to make store edits survive a round-trip, every
+ * edited SonixSynth instrument's params must be written back into its `.instr`.
+ *
+ * For each original sidecar (kept in `sonixSidecarFiles`): a synth `.instr` whose params were
+ * edited in the store is re-serialized (edits applied, all other bytes preserved verbatim);
+ * every other sidecar (sample `.ss`, un-edited `.instr`) is copied byte-for-byte, so the
+ * exported folder is a complete, re-loadable song. Pure + injectable for unit tests.
+ */
+export function buildSonixInstrCompanions(
+  sidecarFiles: Array<{ path: string; data: ArrayBuffer }> | undefined | null,
+  instruments: InstrumentConfig[],
+): IffSmusCompanion[] {
+  if (!sidecarFiles || sidecarFiles.length === 0) return [];
+
+  // Index the edited synth params by instrument name (that is how the parser paired a
+  // `.instr` file with its INS1 name → the SonixSynth instrument in the store).
+  const paramsByName = new Map<string, ReturnType<typeof readSonixSynthParams>>();
+  for (const inst of instruments) {
+    if (inst.synthType !== 'SonixSynth') continue;
+    const params = readSonixSynthParams(inst);
+    if (params) paramsByName.set((inst.name || '').toLowerCase(), params);
+  }
+
+  const companions: IffSmusCompanion[] = [];
+  for (const { path, data } of sidecarFiles) {
+    const bytes = new Uint8Array(data);
+    const name = sidecarRelName(path);
+    const isInstr = /\.instr$/i.test(path);
+    const edited = isInstr && isSonixSynthInstr(bytes) ? paramsByName.get(baseKey(path)) : undefined;
+    companions.push({
+      name,
+      data: edited ? serializeSonixSynthInstr(bytes, edited) : bytes.slice(),
+    });
+  }
+  return companions;
+}
 
 // -- Duration table (from IffSmusParser) ----------------------------------------
 
@@ -177,7 +241,7 @@ function makeChunk(id: string, data: Uint8Array): Uint8Array {
 
 export async function exportIffSmus(
   song: TrackerSong,
-): Promise<{ data: Blob; filename: string; warnings: string[] }> {
+): Promise<{ data: Blob; filename: string; warnings: string[]; companions?: IffSmusCompanion[] }> {
   const warnings: string[] = [];
   const numChannels = Math.max(1, Math.min(4, song.numChannels));
 
@@ -362,6 +426,17 @@ export async function exportIffSmus(
     output.set(trk, pos); pos += trk.length;
   }
 
+  // -- Build instrument companions (synth params round-trip) --------------------
+  // Synth params live ONLY in the `.instr` companions, never in the `.smus` body. Pull the
+  // current (edited) params from the instrument store — the single source of truth the
+  // SonixControls editor writes to (the SonixSynth updateInstrument branch never syncs them
+  // back into the replayer song, so song.instruments would be stale). The original `.instr`
+  // bytes come from the song's sidecar collection (fallback: the format store).
+  const companions = await buildSonixCompanionsFromStores(song);
+  if (companions.length > 0) {
+    warnings.push(`${companions.length} instrument companion file(s) emitted (Instruments/)`);
+  }
+
   // -- Generate filename --------------------------------------------------------
   const baseName = songName.replace(/[^a-zA-Z0-9_\- ]/g, '').trim() || 'untitled';
   const filename = `${baseName}.smus`;
@@ -370,5 +445,34 @@ export async function exportIffSmus(
     data: new Blob([output], { type: 'application/octet-stream' }),
     filename,
     warnings,
+    ...(companions.length > 0 ? { companions } : {}),
   };
+}
+
+/**
+ * Resolve the sidecar `.instr`/`.ss` bytes + the live edited instruments, then build the
+ * export companions. Sidecars come from the loaded song (fallback: the format store, since a
+ * reconstructed song may omit them); edited params come from the instrument store.
+ */
+async function buildSonixCompanionsFromStores(song: TrackerSong): Promise<IffSmusCompanion[]> {
+  let sidecars = song.sonixSidecarFiles;
+  if (!sidecars || sidecars.length === 0) {
+    try {
+      const { useFormatStore } = await import('@stores/useFormatStore');
+      sidecars = useFormatStore.getState().sonixSidecarFiles ?? undefined;
+    } catch {
+      sidecars = undefined;
+    }
+  }
+  if (!sidecars || sidecars.length === 0) return [];
+
+  let instruments = song.instruments;
+  try {
+    const { useInstrumentStore } = await import('@stores/useInstrumentStore');
+    const storeInstruments = useInstrumentStore.getState().instruments;
+    if (storeInstruments.length > 0) instruments = storeInstruments;
+  } catch {
+    // store unavailable (e.g. a bare unit test) — fall back to the song's instruments
+  }
+  return buildSonixInstrCompanions(sidecars, instruments);
 }
