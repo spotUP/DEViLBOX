@@ -11,6 +11,7 @@
 import { create } from 'zustand';
 import type { CursorPosition, BlockSelection } from '@typedefs';
 import { getTrackerReplayer } from '@engine/TrackerReplayer';
+import { computeNibbleAdvance } from '@/lib/tracker/nibbleAdvance';
 // Cross-store access goes through the late-bound storeAccess registry,
 // NOT through direct static imports. The previous cycle between these
 // three stores caused a production TDZ when Rollup froze the aggregator
@@ -53,6 +54,7 @@ interface CursorStore {
 
   moveCursor: (direction: 'up' | 'down' | 'left' | 'right') => void;
   moveCursorToRow: (row: number) => void;
+  applyEntryAdvance: (columnType: CursorPosition['columnType'], digitIndex: number) => void;
   moveCursorToChannel: (channel: number) => void;
   moveCursorToColumn: (columnType: CursorPosition['columnType']) => void;
   moveCursorToChannelAndColumn: (channel: number, columnType: CursorPosition['columnType'], noteColumnIndex?: number) => void;
@@ -237,6 +239,40 @@ export const useCursorStore = create<CursorStore>()((set, get) => ({
       if (replayer.isPlaying()) {
         replayer.seekTo(replayer.getCurrentPosition(), row);
       }
+    }
+  },
+
+  // FT2 post-keystroke cursor move after a value/effect entry. Delegates the
+  // decision to the pure computeNibbleAdvance decider, then applies it.
+  applyEntryAdvance: (columnType, digitIndex) => {
+    const ts = getTrackerState();
+    const es = getEditorState();
+    const pattern = ts.patterns[ts.currentPatternIndex];
+    const behavior = es.activeBehavior;
+    const cur = get().cursor;
+    const adv = computeNibbleAdvance({
+      columnType,
+      digitIndex,
+      editStep: es.editStep,
+      isPlaying: getTrackerReplayer().isPlaying(),
+      currentRow: cur.rowIndex,
+      patternLength: pattern.length,
+      advanceOnInstrument: behavior.advanceOnInstrument,
+      advanceOnVolume: behavior.advanceOnVolume,
+      advanceOnEffect: behavior.advanceOnEffect,
+    });
+    switch (adv.kind) {
+      case 'nibble':
+        set({ cursor: { ...cur, digitIndex: adv.digitIndex } });
+        break;
+      case 'column':
+        set({ cursor: { ...cur, columnType: adv.columnType, digitIndex: 0 } });
+        break;
+      case 'row':
+        get().moveCursorToRow(adv.rowIndex);
+        break;
+      case 'none':
+        break;
     }
   },
 
