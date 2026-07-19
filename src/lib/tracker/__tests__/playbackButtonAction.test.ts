@@ -11,11 +11,11 @@ describe('computePlayButtonAction — Play Pattern never stops; Play Song toggle
     expect(computePlayButtonAction('pattern', true, false)).toBe('switch');
   });
 
-  it('Play Song during pattern-loop playback SWITCHES (does not stop)', () => {
-    expect(computePlayButtonAction('song', true, true)).toBe('switch');
+  it('Play Song is the master Stop — it STOPs during a pattern loop', () => {
+    expect(computePlayButtonAction('song', true, true)).toBe('stop');
   });
 
-  it('Play Song pressed during full-song playback stops it', () => {
+  it('Play Song STOPs during full-song playback', () => {
     expect(computePlayButtonAction('song', true, false)).toBe('stop');
   });
 
