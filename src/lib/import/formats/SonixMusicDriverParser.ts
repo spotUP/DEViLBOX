@@ -565,10 +565,20 @@ function parseSnxBinary(buf: Uint8Array, filename: string): TrackerSong {
   const voiceStreamStart = 20;
   const filePatternAddrs: number[] = [];
   const filePatternSizes: number[] = [];
+  // Structural raw-block carrier: each voice stream is a single contiguous command
+  // stream that buildPatterns splits across many display patterns (shared via
+  // trackMap). The whole-stream inverse can't be reconstructed from one display
+  // pattern's rows, so stash the original bytes + the full decoded per-channel
+  // baseline. encodeVariableBlock emits the raw bytes verbatim when a stream is
+  // unedited (byte-exact) and only runs sonixEncoder.encodePattern once edited.
+  const blockRawBytes: Uint8Array[] = [];
+  const blockRows: TrackerCell[][] = [];
   let streamOffset = voiceStreamStart;
   for (let ch = 0; ch < NUM_CHANNELS; ch++) {
     filePatternAddrs.push(streamOffset);
     filePatternSizes.push(sectionLengths[ch]);
+    blockRawBytes.push(buf.subarray(streamOffset, streamOffset + sectionLengths[ch]));
+    blockRows.push(channelFlat[ch]);
     streamOffset += sectionLengths[ch];
   }
 
@@ -590,6 +600,8 @@ function parseSnxBinary(buf: Uint8Array, filename: string): TrackerSong {
     filePatternAddrs,
     filePatternSizes,
     trackMap,
+    blockRows,
+    blockRawBytes,
   };
 
   return {
