@@ -48,9 +48,18 @@ describe('Sonix TINY sub-format', () => {
     }
     expect(noteCells, 'grid contains decoded notes').toBeGreaterThan(0);
 
-    // Instrument names come from the 0x40 table (external .instr basenames, e.g. "CE01").
-    expect(song.instruments.length).toBeGreaterThan(0);
-    expect(song.instruments.some((i) => /^[A-Za-z]/.test(i.name))).toBe(true);
+    // Instrument names come from the 0x40 table (external .instr basenames, e.g. "WT15").
+    // The table is 4-byte slots with EMPTY-slot gaps between named entries — the reader
+    // must skip gaps, not stop at the first zero slot. maintitle's layout is
+    // WT15,-,WT20,-,WT13,WT18,-,WT03,-,-,-,WT05, so names appear at slots 0/2/4/5/7/11.
+    // On revert (stop-at-first-zero) only slot 0 survives and every assertion past it fails.
+    expect(song.instruments.length).toBeGreaterThanOrEqual(12);
+    expect(song.instruments[0].name).toBe('WT15');
+    expect(song.instruments[2].name).toBe('WT20');
+    expect(song.instruments[4].name).toBe('WT13');
+    expect(song.instruments[5].name).toBe('WT18');
+    expect(song.instruments[7].name).toBe('WT03');
+    expect(song.instruments[11].name).toBe('WT05');
 
     // Native playback: file + sidecar wiring rides the same sonixFileData path as SNX.
     expect(song.sonixFileData, 'attaches sonixFileData for the WASM engine').toBeTruthy();
