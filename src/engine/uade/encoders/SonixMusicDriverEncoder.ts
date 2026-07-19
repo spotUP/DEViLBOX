@@ -130,4 +130,76 @@ const sonixEncoder: VariableLengthEncoder = {
 
 registerVariableEncoder(sonixEncoder);
 
-export { encodeSnxVoiceStream, sonixEncoder };
+/**
+ * Encode a single channel's pattern rows back to a TINY voice event stream.
+ *
+ * TINY opcodes differ from SNX (0x80/0x81 swapped, note low byte = duration):
+ *   0xFFFF       end of track
+ *   0x81nn       instrument change to register nn (0-based)
+ *   0x80nn       rest for nn ticks (nn = 1..255)
+ *   0xNNdd       note on: high = note index (1-127), low = duration in ticks
+ *
+ * Inverse of parseTinyVoiceStream. Since the raw-block carrier emits unedited
+ * streams verbatim, this only runs on edited channels; each note is emitted as
+ * a 1-tick event and trailing empty rows collapse to rest opcodes (edit-path
+ * fidelity, not byte-exact reproduction of the original durations).
+ */
+function encodeTinyVoiceStream(rows: TrackerCell[], _channel: number): Uint8Array {
+  const words: number[] = [];
+  let lastInstr = 1; // 1-based, matching parser default
+
+  let i = 0;
+  while (i < rows.length) {
+    const cell = rows[i];
+    const note = cell.note ?? 0;
+    const instr = cell.instrument ?? 0;
+    const vol = cell.volume ?? 0;
+    const isEmpty = note === 0 && instr === 0 && vol === 0;
+
+    if (isEmpty) {
+      let count = 0;
+      while (i < rows.length) {
+        const r = rows[i];
+        if ((r.note ?? 0) === 0 && (r.instrument ?? 0) === 0 && (r.volume ?? 0) === 0) {
+          count++; i++;
+        } else break;
+      }
+      // Rest opcode 0x80nn caps nn at 255; chunk longer rests.
+      while (count > 0) {
+        const chunk = Math.min(255, count);
+        words.push(0x8000 | chunk);
+        count -= chunk;
+      }
+      continue;
+    }
+
+    if (instr > 0 && instr !== lastInstr) {
+      words.push(0x8100 | ((instr - 1) & 0xFF)); // instrument change (0-based)
+      lastInstr = instr;
+    }
+
+    if (note > 0) {
+      const noteIndex = Math.max(1, Math.min(127, note));
+      words.push((noteIndex << 8) | 0x01); // duration 1 tick (rests carry the hold)
+    }
+    i++;
+  }
+
+  words.push(0xFFFF);
+
+  const out = new Uint8Array(words.length * 2);
+  for (let w = 0; w < words.length; w++) {
+    out[w * 2] = (words[w] >> 8) & 0xFF;
+    out[w * 2 + 1] = words[w] & 0xFF;
+  }
+  return out;
+}
+
+const sonixTinyEncoder: VariableLengthEncoder = {
+  formatId: 'sonixMusicDriverTiny',
+  encodePattern: encodeTinyVoiceStream,
+};
+
+registerVariableEncoder(sonixTinyEncoder);
+
+export { encodeSnxVoiceStream, sonixEncoder, encodeTinyVoiceStream, sonixTinyEncoder };
