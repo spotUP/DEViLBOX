@@ -52,7 +52,7 @@ interface CursorStore {
   cursor: CursorPosition;
   selection: BlockSelection | null;
 
-  moveCursor: (direction: 'up' | 'down' | 'left' | 'right') => void;
+  moveCursor: (direction: 'up' | 'down' | 'left' | 'right', opts?: { preserveSelection?: boolean }) => void;
   moveCursorToRow: (row: number) => void;
   applyEntryAdvance: (columnType: CursorPosition['columnType'], digitIndex: number) => void;
   moveCursorToChannel: (channel: number) => void;
@@ -81,7 +81,7 @@ export const useCursorStore = create<CursorStore>()((set, get) => ({
   cursor: { channelIndex: 0, rowIndex: 0, noteColumnIndex: 0, columnType: 'note', digitIndex: 0 },
   selection: null,
 
-  moveCursor: (direction) => {
+  moveCursor: (direction, opts) => {
     const cur = get().cursor;
     const ts = getTrackerState();
     const pattern = ts.patterns[ts.currentPatternIndex];
@@ -226,6 +226,12 @@ export const useCursorStore = create<CursorStore>()((set, get) => ({
       digitIndex === cur.digitIndex &&
       noteColumnIndex === (cur.noteColumnIndex ?? 0)
     ) return;
+
+    // FT2: an unmodified cursor move discards the block mark. Shift/Alt+move
+    // (which builds a selection) passes preserveSelection so the mark survives.
+    if (!opts?.preserveSelection && get().selection) {
+      set({ selection: null });
+    }
 
     set({ cursor: { channelIndex, rowIndex, noteColumnIndex, columnType, digitIndex } });
   },
