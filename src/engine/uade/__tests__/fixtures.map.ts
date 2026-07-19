@@ -21,6 +21,16 @@ export interface EncoderFixture {
   fixture: string;
   /** Which layout kind the parser attaches for this fixture. */
   kind: 'fixed' | 'variable';
+  /**
+   * Optional explicit parser override for fixtures whose extension resolves to a
+   * DISPATCHER in FormatRegistry rather than their own parser. Example: `.snx`/`.tiny`
+   * share the `iffSmus` registry entry (parseFn `parseIffSmusFile`, which only handles
+   * the FORM/SMUS sub-format); the real app routes binary SNX to `parseSonixFile`
+   * (SonixMusicDriverParser) via customDispatch. This override names that real parser so
+   * the harness measures the same codec the app uses — it points at existing app code,
+   * it does not duplicate routing logic.
+   */
+  parser?: { module: string; parseFn: string };
 }
 
 export const ENCODER_FIXTURES: EncoderFixture[] = [
@@ -35,6 +45,7 @@ export const ENCODER_FIXTURES: EncoderFixture[] = [
   { formatId: "mikeDavies", fixture: "public/data/songs/mike-davies/strider.md", kind: "fixed" },
   { formatId: "musicAssembler", fixture: "public/data/songs/music-assembler/thanatos.ma", kind: "variable" },
   { formatId: "ronKlaren", fixture: "public/data/songs/ron-klaren/astra 2.rk", kind: "fixed" },
+  { formatId: "sonixMusicDriver", fixture: "public/data/songs/sonix/snx/A-10 Tank Killer/winning.snx", kind: "variable", parser: { module: "@lib/import/formats/SonixMusicDriverParser", parseFn: "parseSonixFile" } },
   { formatId: "soundControl", fixture: "public/data/songs/soundcontrol/north sea inferno ongame1.sc", kind: "fixed" },
   { formatId: "soundFactory", fixture: "public/data/songs/soundfactory/im maien.psf", kind: "fixed" },
   { formatId: "symphoniePro", fixture: "public/data/songs/symphonie/pas 2 jade.symmod", kind: "fixed" },

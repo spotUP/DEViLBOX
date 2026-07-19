@@ -552,6 +552,14 @@
       "matchPct": 0.1289,
       "cells": 256
     },
+    "sonixMusicDriver": {
+      "kind": "variable",
+      "method": "encode-pattern",
+      "status": "byte-exact",
+      "byteExact": true,
+      "matchPct": 1,
+      "cells": 4
+    },
     "soundControl": {
       "kind": "fixed",
       "method": "decode-encode",
@@ -773,7 +781,6 @@
     "psm",
     "pt36",
     "sawteeth",
-    "sonixMusicDriver",
     "soundFactoryStub",
     "startrekkerAM",
     "stk",

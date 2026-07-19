@@ -85,14 +85,24 @@ function readFixture(rel: string): Uint8Array {
   return new Uint8Array(b.buffer, b.byteOffset, b.byteLength);
 }
 
-/** Parse a fixture through the app's FormatRegistry detection + native parser. */
-async function parseFixture(rel: string, raw: Uint8Array): Promise<TrackerSong> {
+/** Parse a fixture through the app's FormatRegistry detection + native parser.
+ *  An explicit `override` (fixtures.map `parser` field) names the real dispatcher
+ *  parser for sub-formats whose extension resolves to a different registry entry. */
+async function parseFixture(rel: string, raw: Uint8Array, override?: { module: string; parseFn: string }): Promise<TrackerSong> {
   const name = rel.split('/').pop() ?? rel;
-  const fmt = detectFormat(name);
-  if (!fmt?.nativeParser?.parseFn) throw new Error(`no native parser for ${name}`);
-  const mod = (await import(/* @vite-ignore */ fmt.nativeParser.module)) as Record<string, unknown>;
-  const fn = mod[fmt.nativeParser.parseFn];
-  if (typeof fn !== 'function') throw new Error(`parseFn ${fmt.nativeParser.parseFn} missing`);
+  let moduleId: string, parseFnName: string;
+  if (override) {
+    moduleId = override.module;
+    parseFnName = override.parseFn;
+  } else {
+    const fmt = detectFormat(name);
+    if (!fmt?.nativeParser?.parseFn) throw new Error(`no native parser for ${name}`);
+    moduleId = fmt.nativeParser.module;
+    parseFnName = fmt.nativeParser.parseFn;
+  }
+  const mod = (await import(/* @vite-ignore */ moduleId)) as Record<string, unknown>;
+  const fn = mod[parseFnName];
+  if (typeof fn !== 'function') throw new Error(`parseFn ${parseFnName} missing`);
   const parse = fn as (b: ArrayBuffer | Uint8Array, n: string) => TrackerSong | Promise<TrackerSong>;
   const ab = raw.buffer.slice(raw.byteOffset, raw.byteOffset + raw.byteLength) as ArrayBuffer;
   // Some native parsers accept only an ArrayBuffer (e.g. they `new DataView(buf)`),
@@ -188,7 +198,7 @@ async function measure(entry: EncoderFixture): Promise<FormatResult> {
   let song: TrackerSong;
   try {
     raw = readFixture(entry.fixture);
-    song = await parseFixture(entry.fixture, raw);
+    song = await parseFixture(entry.fixture, raw, entry.parser);
   } catch (e) {
     return { ...base, status: 'error', error: (e as Error).message };
   }
