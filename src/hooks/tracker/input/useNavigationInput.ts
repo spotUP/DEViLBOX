@@ -14,6 +14,7 @@ import { getToneEngine } from '@engine/ToneEngine';
 import { xmNoteToString } from '@lib/xmConversions';
 import { ALT_TRACK_MAP_1, ALT_TRACK_MAP_2, type TrackerInputRefs } from './inputConstants';
 import { isKeyHandled } from '@lib/tracker/keyHandledSentinel';
+import { isManualRowNavAllowed } from '@lib/tracker/playbackNavigation';
 
 export const useNavigationInput = (refs: TrackerInputRefs) => {
   const { cursorRef, selectionRef } = refs;
@@ -111,7 +112,7 @@ export const useNavigationInput = (refs: TrackerInputRefs) => {
         const behavior = useEditorStore.getState().activeBehavior;
         if (!behavior.ptEffectMacros) {
           if (key === 'F9') {
-            if (isPlaying) return false;
+            if (!isManualRowNavAllowed(isPlaying, useEditorStore.getState().followPlayback)) return false;
             e.preventDefault();
             if (e.shiftKey) {
               setPtnJumpPos(0, cursorRef.current.rowIndex);
@@ -126,7 +127,7 @@ export const useNavigationInput = (refs: TrackerInputRefs) => {
             return true;
           }
           if (key === 'F10') {
-            if (isPlaying) return false;
+            if (!isManualRowNavAllowed(isPlaying, useEditorStore.getState().followPlayback)) return false;
             e.preventDefault();
             if (e.shiftKey) {
               setPtnJumpPos(1, cursorRef.current.rowIndex);
@@ -141,7 +142,7 @@ export const useNavigationInput = (refs: TrackerInputRefs) => {
             return true;
           }
           if (key === 'F11') {
-            if (isPlaying) return false;
+            if (!isManualRowNavAllowed(isPlaying, useEditorStore.getState().followPlayback)) return false;
             e.preventDefault();
             if (e.shiftKey) {
               setPtnJumpPos(2, cursorRef.current.rowIndex);
@@ -156,7 +157,7 @@ export const useNavigationInput = (refs: TrackerInputRefs) => {
             return true;
           }
           if (key === 'F12') {
-            if (isPlaying) return false;
+            if (!isManualRowNavAllowed(isPlaying, useEditorStore.getState().followPlayback)) return false;
             e.preventDefault();
             if (e.shiftKey) {
               setPtnJumpPos(3, cursorRef.current.rowIndex);
@@ -175,7 +176,7 @@ export const useNavigationInput = (refs: TrackerInputRefs) => {
 
       // PageUp: Jump N lines up (N = behavior.pageJumpSize) — disabled during playback
       if (key === 'PageUp') {
-        if (isPlaying) return false;
+        if (!isManualRowNavAllowed(isPlaying, useEditorStore.getState().followPlayback)) return false;
         e.preventDefault();
         const jump = useEditorStore.getState().activeBehavior.pageJumpSize;
         moveCursorToRow(Math.max(0, cursorRef.current.rowIndex - jump));
@@ -184,7 +185,7 @@ export const useNavigationInput = (refs: TrackerInputRefs) => {
 
       // PageDown: Jump N lines down (N = behavior.pageJumpSize) — disabled during playback
       if (key === 'PageDown') {
-        if (isPlaying) return false;
+        if (!isManualRowNavAllowed(isPlaying, useEditorStore.getState().followPlayback)) return false;
         e.preventDefault();
         const jump = useEditorStore.getState().activeBehavior.pageJumpSize;
         moveCursorToRow(Math.min(pattern.length - 1, cursorRef.current.rowIndex + jump));
@@ -193,7 +194,7 @@ export const useNavigationInput = (refs: TrackerInputRefs) => {
 
       // Home: behavior-aware (row-jump vs double-press)
       if (key === 'Home') {
-        if (isPlaying) return false;
+        if (!isManualRowNavAllowed(isPlaying, useEditorStore.getState().followPlayback)) return false;
         e.preventDefault();
         const behavior = useEditorStore.getState().activeBehavior;
         if (behavior.homeEndBehavior === 'double-press') {
@@ -211,7 +212,7 @@ export const useNavigationInput = (refs: TrackerInputRefs) => {
 
       // End: behavior-aware (row-jump vs double-press)
       if (key === 'End') {
-        if (isPlaying) return false;
+        if (!isManualRowNavAllowed(isPlaying, useEditorStore.getState().followPlayback)) return false;
         e.preventDefault();
         const behavior = useEditorStore.getState().activeBehavior;
         if (behavior.homeEndBehavior === 'double-press') {
@@ -320,7 +321,7 @@ export const useNavigationInput = (refs: TrackerInputRefs) => {
 
       // Arrow keys (up/down) — disabled during playback and in format modes
       if (key === 'ArrowUp' || key === 'ArrowDown') {
-        if (isPlaying) return false;
+        if (!isManualRowNavAllowed(isPlaying, useEditorStore.getState().followPlayback)) return false;
         e.preventDefault();
         const dir = key === 'ArrowUp' ? 'up' as const : 'down' as const;
         if (e.repeat) {

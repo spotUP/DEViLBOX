@@ -163,7 +163,11 @@ export const useEditorStore = create<EditorStore>()(
     multiChannelRecord: false,
     linearPeriods: false,
 
-    followPlayback: false,
+    // Default ON: the pattern view rides the play head while playing (the
+    // long-standing behaviour). Toggling Follow off engages FT2 scroll-lock —
+    // the view freezes on the edit cursor so rows can be repositioned/edited
+    // live while the song plays (see resolveScrollRow / isManualRowNavAllowed).
+    followPlayback: true,
     showGhostPatterns: true,
     columnVisibility: { ...DEFAULT_COLUMN_VISIBILITY },
     bookmarks: [],
