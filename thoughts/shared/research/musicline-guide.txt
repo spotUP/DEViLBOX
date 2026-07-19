@@ -1,0 +1,1748 @@
+@database Musicline Editor English Documentary
+
+$VER: Musicline Editor English Doc 1.14 (02.10.95)
+
+@node "MAIN" "Manual for Musicline Editor"
+                    Manual for Musicline Editor V1.14+
+_____________________________________________________________________________
+
+                       @{" Introduction             " link "Intro" 0}
+                       @{" System requirements      " link "SysReq" 0}
+                       @{" Features                 " link "Features" 0}
+                       @{" Numbers & Figures        " link "NumFigs" 0}
+                       @{" Screen layout & buttons  " link "Layout" 0}
+                       @{" Seq & Part Structures    " link "Structures" 0}
+                       @{" Keyboard Commands        " link "KeyComMain" 0}
+                       @{" Instrument Structure F/X " link "InstStrFX" 0}
+                       @{" Part Effect Commands     " link "PartFX" 0}
+
+                       @{" How to contact us!       " link "Contact" 0}
+                       @{" How to register          " link "Register" 0}
+                       @{" How to get new versions  " link "Update" 0}
+
+                       @{" Future plans             " link "Future" 0}
+                       @{" Program History          " link "History" 0}
+
+@endnode
+@node "Intro" "Introduction"
+
+Welcome to a new era in music-making!
+
+Here you've got it! The result of almost 4 years of hard coding, idea-testing
+& bugfixing:
+
+ Musicline Editor!
+
+What we've come up with is a flexible, powerful & easy-to-use musiceditor
+for the Commodore Amiga systems which, we're sure, will KILL the competition
+and change the way Amigamusic sounds forever!
+Well, let's not brag about this proggy too long and get to the important
+stuff instead.
+
+For starters, this is NOT any Sound-, Noise-, Pro-, Spin-, Cyber-, Melon-
+and whateverelse-tracker clone, it IS a completely different type of music
+editor! Therefor, contrary to some peoples belief, it will NEVER be alike
+'ProTracker'. Not in the editor looks, nor in the instrument effects and
+approximately everything else!
+
+
+DISCLAIMER:
+YOU WILL USE MUSICLINE EDITOR AT YOUR OWN RISK!
+WE WILL NOT BE RESPONSIBLE FOR ANYTHING THAT MIGHT HAPPEN
+WHILE OR AFTER USING MUSICLINE EDITOR!
+IF SOMETHING OF YOUR HARD- OR SOFTWARE BECOMES BROKEN, THEN WE WILL NOT BE
+RESPONSIBLE FOR ANY REPLACEMENTS OR COSTS CONCERNING REPAIR OR NEW PURCHASE!
+
+This program is tested alot, so we doubt that anything will go wrong.
+But, if it does, please let us know!
+
+[END]
+@endnode
+@node "SysReq" "System requirements"
+
+System requirements:
+
+A Commodore Amiga based system with at least Kickstart v2.0.
+
+Preferred hardware:
+
+At least an A1200 with fastmem and a processor upgrade (to be able to use
+all effects at the same time in all channels, you'll need a pretty quick
+machine...) to get it to run at full speed.
+
+[END]
+@endnode
+@node "Features" "Features"
+
+Features:
+
+ 4/8 channels
+ 5 octaves
+ 1024 parts
+ 128 steps maximum part length (flexible)
+ 256 sequencer steps
+ 255 instruments
+ 255 wavesamples
+ Separate sequencelist for each channel
+ Realtime part transpose
+ Separate speed/groove in each channel
+ 127kb maximum sample-size
+ 5 effects per notestep
+ 256 subtunes per module
+ Flexible instrument structure:
+  Each wavesample can be used in multiple instruments
+  16/32/64/128/256 bytes waveform length for realtime effects
+  Volume
+  Semitone
+  Finetune
+  Auto glide
+  Transposable on/off
+  Envelope (ADSR; Attack, Decay, Sustain, Release)
+  Vibrato
+  Tremolo
+  Arpeggio (with multiple subeffects)
+ Realtime waveform effects:
+  Transform
+  Phasing
+  Mix (can be used as a Chorus)
+  Resonance
+  Filter (resonance & normal)
+ Animation (create a sample of your synthetic sound)
+  Playloop (put realtime effects on samples, like phasing & timestretch etc.)
+  Sample start & end offset
+  Loop (multiple directions)
+ Protracker module loading compatible
+ Info page
+
+[END]
+@endnode
+@node "NumFigs" "Numbers & Figures"
+
+As most of you probably have noticed, all numbers except the BPM value are
+shown in hexadecimal figures. This is because of the lack of space. It may
+be a bit strange to work with if you're not used to it, but you will soon
+realize that it's not that hard to work with it once you get the hang of it.
+To explain this briefly: The big difference between the decimal(#) & the
+hexadecimal($) system is that while the decimal system has the base of 10
+(0-9 and then it starts over, but with a 1 in front of the other figures
+(10-19, 20-29 etc...)), the hexadecimal system has the base of 16 and uses
+A-F to extend before it restarts (0-9,A,B,C,D,E,F and 10-1F, 20-2F and so
+on...).
+F ex: to get the hex value if the dec value is #10, then it's $0A, #11=$0B,
+#32=$20 etc. You see, it's not that hard!
+On some occasions, we use the numbers to produce both positive & negative
+results, like in the transpose column for instance. If you want to transpose
+a part up by 5 steps, just type 05 in the transpose column and if you want
+to transpose a part down by 5 steps, type FB.
+Ex:   FB,FC,FD,FE,FF,00,01,02,03,04,05
+    = -5,-4,-3,-2,-1,00,+1,+2,+3,+4,+5 and so on.
+Therefor, in some effects, $80 will respond to -128 and $7F to +127.
+
+[END]
+@endnode
+***********************************************
+*       Instrument Structure F/X              *
+***********************************************
+
+@node "InstStrFX" "Instrument Structure F/X"
+
+                         Instrument Structure F/X
+
+                           @{" Explanations      " link "Expl" 0}
+
+                           @{" Envelope          " link "Envelope" 0}
+                           @{" Vibrato           " link "Vibrato" 0}
+                           @{" Tremolo           " link "Tremolo" 0}
+                           @{" Arpeggio          " link "Arpeggio" 0}
+                           @{" TransForm         " link "TransForm" 0}
+                           @{" Phase             " link "Phase" 0}
+                           @{" Mix               " link "Mix" 0}
+                           @{" Resonance         " link "Resonance" 0}
+                           @{" Filter            " link "Filter" 0}
+                           @{" PlayLoop          " link "PlayLoop" 0}
+
+@endnode
+@node "Expl" "Explanations"
+
+The number within brackets ([]) show possible values for that variable.
+When we state '..the amount of frames...' you can calculate like this: if
+the speed is set to 6 then it takes 6 frames to complete one step, the Tempo
+value is how long one frame should be ($7D=50 frames/second).
+F.ex if you set a [D len]-value to $0C and the tune speed is 6 then it takes
+two note steps to reach the Decay value from the Attack value.
+
+In almost all effects, these three variables, will pop up:
+Start, Repeat & RepEnd.
+They work in all cases like this:
+First, FROM the Start value, TO Repeat, TO RepEnd & then it loops between
+Repeat & RepEnd forever unless there is a 'Turns' value, then it will loop
+that amount of times. These effects are all BiDirectional (that means, the
+counters will go from one point and then backwards to the next) except the
+Mix effect, which also can be used Oneway.
+
+*-----*-----*
+
+These effects are very complex, so it's not easy to explain them completely.
+Therefor, these explanations will be short, but as thorough as possible. The
+most effective way to get used to the effects is, as always, to try them out
+for yourselves. Look out in some magazines (both paper- & diskmags!) for
+tutorials about the program. We will also try to include such tutorials on
+this disk, when we've got the time.
+
+[END]
+@endnode
+*-----*-----*
+@node "Envelope" "Envelope"
+
+Envelope:
+
+    Envelope consists of four elements: Attack, Decay, Sustain & Release
+    (ADSR). When you play a sound, it goes through all the four of these
+    elements like this: NoteOn -> fade to [A vol] with the speed of [A len]
+    -> fade to [D vol] with the speed of [D len] -> fade to [S vol] with the
+    speed of [S len] -> fade to [R vol] with the speed of [R len]. If you
+    have [Hold Sustain] turned on then it goes like this: NoteOn ->
+    [A vol]/[A len] -> [D vol]/[D len] -> [S vol]/[S len] -> hold at [S vol]
+    until key is released (in keyboard play mode) or part effect 4600 is
+    used.
+
+
+     [Normal Sustain/Hold Sustain]
+     A vol: [00-40] = The volume which the Attack will reach.
+     D vol: [00-40] = The volume which the Decay will reach.
+     S vol: [00-40] = The volume which the Sustain will reach.
+     R vol: [00-40] = The volume which the Release will reach.
+     A len: [01-FF] = # of frames it takes to reach the value in [A vol].
+     D len: [01-FF] = # of frames it takes to reach the value in [D vol].
+     S len: [01-FF] = # of frames it takes to reach the value in [S vol].
+     R len: [01-FF] = # of frames it takes to reach the value in [R vol].
+
+   An example of how a sound envelope can look like:
+
+     [Normal Sustain]
+     A vol: [40]       40   +---+
+     D vol: [40]       30   |   |\\
+     S vol: [20]       20   |   | +--
+     R vol: [00]       10   |   | |  \\      (each char equals $10 units)
+     A len: [01]       00   |   | |   --+
+     D len: [30]        |   |   | |     |
+     S len: [10]       vol  A   D S     R
+     R len: [50]
+
+[END]
+@endnode
+*-----*-----*
+@node "Vibrato" "Vibrato"
+
+Vibrato:
+
+    Vibrato is a slight pitch shift which makes the sound tremble.
+
+     Speed: [00-FF] = The Speed of the Vibrato (how fast it should vibrate).
+     Depth: [00-FF] = The Depth (how much it should vibrate).
+    Attack: [00-FF] = # of frames it takes to reach the value in [Depth].
+     Delay: [00-FF] = # of frames it should wait before starting the Vibrato.
+ Wave Type: [Sine/RampDown/SawTooth/Square] = Vibrato Type.
+ Direction: [Downward/Upward] = Vibrato Direction.
+
+[END]
+@endnode
+
+*-----*-----*
+@node "Tremolo" "Tremolo"
+
+Tremolo:
+
+    Tremolo is a slight volume shift which makes the sound tremble.
+
+     Speed: [00-FF] = The Speed of the Tremolo (how fast it should vibrate).
+     Depth: [00-FF] = The Depth (how much it should vibrate).
+    Attack: [00-FF] = # of frames it takes to reach the value in [Depth].
+     Delay: [00-FF] = # of frames it should wait before starting the Tremolo.
+ Wave Type: [Sine/RampDown/SawTooth/Square] = Tremolo Type.
+ Direction: [Downward/Upward] = Tremolo Direction.
+
+[END]
+@endnode
+
+*-----*-----*
+@node "Arpeggio" "Arpeggio"
+
+Arpeggio:
+
+    Arpeggio is a sort of 'sub-part' in which you can create a sequence of
+    effects which should modify the sound of an instrument. F ex, you can use
+    the arpeggio to play complex scales with just one note and transpose them
+    just by playing another note.
+
+       Table: [00-FF] = Which ArpList to use.
+       Speed: [00-1F] = The Speed of the ArpList (Same values as in the seq.)
+      Groove: [00-1F] = The Groove of the ArpList (Same values as in the seq)
+       Edit: [On/Off] = Editing On/Off. Edit must be Off to play the ArpList.
+  [Transpose/FixNote] = Edit a Transpose value or a Fixed note.
+Zero Note: [C-1->B-5] = The base note to be used while editing the ArpList.
+
+
+    00  --- 00 0xy 0xy
+     \\   \\ \\ \\  \\See zeros before...
+      \\   \\ \\ \\Effect parameters
+       \\   \\ \\ Effect number
+        \\   \\  WaveSample
+         \\    Transpose value/FixNote/Note command
+           Position
+
+   Note commands
+
+    JMP: Jump to a position, used like this:
+
+    00   00 00 0xy 0xy
+    01   03 00 0xy 0xy
+    02   05 00 0xy 0xy
+    03   07 00 0xy 0xy
+    04   0C 00 0xy 0xy
+    05  J01 05 0xy 0xy
+    06  END 00 0xy 0xy
+
+        J01 05
+          \\ \\
+           \\  Repeat 5 times then go on...
+             Jump to step 01
+
+    END: End the ArpList
+
+   Arpeggio Effect Commands
+
+    1xx SlideUp          : speed  [00-FF] = Slide pitch Up with selected
+                         :                  speed.
+    2xx SlideDown        : speed  [00-FF] = Slide pitch Down with selected
+                         :                  speed.
+    3xx SetVolume        : volume [00-40] = Set Volume to selected value.
+    4xx VolumeSlideUp    : speed  [00-FF] = Slide Volume Up with selected
+                         :                  speed.
+    5xx VolumeSlideDown  : speed  [00-FF] = Slide Volume Down with selected
+                         :                  speed.
+    6xx Restart          : 00 = Restart all instrument effects, including the
+                         :      WaveSample. (Mainly here for ProTracker
+                         :      'retrig'-compatibility, but it is also
+                         :      possible to use it for own purposes)
+
+[END]
+@endnode
+*-----*-----*
+@node "TransForm" "TransForm"
+
+TransForm:
+
+    TransForm is used to morph between up to 6 WaveForms.
+    Notice that no matter which waveform length you use, these values
+    will always refer to the full length ($100=#256 bytes) of the wave.
+    The Start/Repeat/RepEnd values will change according to how many
+    waves you have chosen to transform through. The sound will transform
+    FROM the Start position TO the RepEnd position just to continue to the
+    Repeat and loop between Repeat & RepEnd as many times as you have set
+    in Turns.
+
+    Start: [000-500] = The start position (different depending on how many
+                       TransForm waves selected).
+   Repeat: [000-500] = The repeat from position (see above).
+   RepEnd: [000-500] = The repeat to position (see above).
+    Speed: [000-0FF] = The speed of the TransFormation.
+    Delay: [000-0FF] = # of frames to wait before starting the TransFormation
+Turns/Spd: [000-0FF] = When set to Turns (Step:Off), it is the amount of
+                       times the TransFormation will turn between Repeat &
+                       RepEnd. The TransFormation will start counting with
+                       the travel from Start to repeat and take the value 1.
+                       Then it will add one each turn it takes. This means,
+                       that a setting of 2 will make the TransFormation go
+                       FROM Start TO Repeat and then TO Repend, while 4 will
+                       do the same + an additional turn between RepEnd &
+                       Repeat and back again. Setting Turns to 0 will make
+                       the TransFormation loop between Repeat & RepEnd
+                       forever.
+                       When set to Speed (Step:On), it will function as a
+                       second Speed counter which is invoked whenever you
+                       play a new note. If the Speed value is between 00-7F,
+                       then the TransFormation will continue from the current
+                       value up to the max value possible (i.e. if you've got
+                       5 TransForm waves, the max value will be 500 and if
+                       you've got 1 TransForm wave, the max value will be 100
+                       just like you have no wave to TransForm to at all.).
+                       If the Speed value is between FF-80, the TransForm
+                       will ofcourse continue from the current value down to
+                       the min value (which, ofcourse, always is 0).
+     Init: [On/Off] = If On, start from beginning of TransFormation when a
+                      new note is played. If Off, it will continue from the
+                      current value.
+     Step: [On/Off] = If On, Turns will shift to Speed and the effect will
+                      not update as usual. When you play a note and the
+                      speed is set to 0, the TransFormation will hold at
+                      that position until you play the next note. If the
+                      Speed value (Turns/Speed that is...) is set to 0, the
+                      current wavepart is played, but if there is any value
+                      set, the second Speed counter is invoked and starts
+                      its way towards its destination until you play the next
+                      note just to return to the place where the first
+                      counter is.
+      Add: Choose which WaveForms which shall be used in the TransFormation.
+      Clr: Clear Waves 1-5.
+Waves 1-5: [Any one of the WaveForms loaded] = Waves used in TransFormation.
+
+[END]
+@endnode
+*-----*-----*
+@node "Phase" "Phase"
+
+Phase:
+
+    Phase creates a more 'alive' sound by modulating the WaveForm.
+
+     Start: [00-FF] = The start position.
+    Repeat: [00-FF] = The repeat from position.
+    RepEnd: [00-FF] = The repeat to position.
+     Speed: [00-FF] = The speed of the Phase.
+     Delay: [00-FF] = # of frames it should wait before starting the Phase.
+ Turns/Spd: [00-FF] = When set to Turns (Step:Off), it is the # of times the
+                      Phase will go between the three points, Start, Repeat
+                      & RepEnd. 0 will repeat forever.
+                      When set to Speed (Step:On), it will function as a
+                      second Speed counter which is invoked whenever you
+                      play a new note. If the Speed value is between 00-7F,
+                      then the Phase will continue from the current value up
+                      to the max value possible (FF) and if the Speed value
+                      is between FF-80, the Phase will ofcourse continue from
+                      the current value down to the min value (0).
+      Type: [Low/Med/High/Old] = Different strength of the Phase effect.
+      Init: [On/Off] = If On, start from beginning of Phase when a new note
+                       is played. If Off, it will continue from the current
+                       value.
+      Step: [On/Off] = If On, Turns will shift to Speed and the effect will
+                       not update as usual. When you play a note and the
+                       speed is set to 0, the Phase will hold at that
+                       position until you play the next note. If the Speed
+                       value (Turns/Speed that is...) is set to 0, the
+                       current wavepart is played, but if there is any value
+                       set, the second Speed counter is invoked and starts
+                       its way towards its destination until you play the
+                       next note just to return to the place where the first
+                       counter is.
+      Fill: [On/Off] = Instead of just compressing the WaveForm and fill the
+                       rest of it with zero, this option will fill out the
+                       rest with the WaveForm itself.
+
+[END]
+@endnode
+*-----*-----*
+@node "Mix" "Mix"
+
+Mix:
+
+    Mix is used to mix two WaveForms, but can also be used as a Chorus.
+
+     Start: [00-FF] = The start position.
+    Repeat: [00-FF] = The repeat from position.
+    RepEnd: [00-FF] = The repeat to position.
+     Speed: [00-FF] = The speed of the Mix.
+     Delay: [00-FF] = # of frames it should wait before starting the Mix.
+ Turns/Spd: [00-FF] = # of times the Mix will go between the three points,
+                      Start, Repeat & RepEnd. 0 will repeat forever.
+      Init: [On/Off] = If On, start from beginning of Mix when a new note
+                       is played. If Off, it will continue from the current
+                       value.
+      Step: [On/Off] = If On, Turns will shift to Speed and the effect will
+                       not update as usual. When you play a note and the
+                       speed is set to 0, the Mix will hold at that position
+                       until you play the next note. If the Speed value
+                       (Turns/Speed that is...) is set to 0, the current
+                       wavepart is played, but if there is any value set, the
+                       second Speed counter is invoked and starts its way
+                       towards its destination until you play the next note
+                       just to return to the place where the first counter
+                       is.
+      Buff: [On/Off] = Takes the value in the last buffer and remixes it into
+                       the current buffer.
+   Counter: [One-Way/Two-Way] = What way the counter will choose when it
+                                reaches the end position.
+                                One-Way: Start over.
+                                Two-Way: Go back the other direction.
+       Set: Choose which WaveForm which shall be used to Mix the WaveSample.
+            If there isn't any WaveForm selected, it will Mix with itself.
+       Clr: Clear Mix Wave.
+  Mix Wave: [Any one of the WaveForms loaded] = What wave to Mix with.
+     Boost: [On/Off] = Will enhance the waveform amplitude (NOTE! This option
+                       has no overshoot check (if it would have, it would
+                       take a LOT more CPU-time). This means that on some
+                       occasions, there can be sudden distortions of the
+                       sound when it peaks over the edges.).
+
+[END]
+@endnode
+*-----*-----*
+@node "Resonance" "Resonance"
+
+Resonance:
+
+       Amp: [00-FF] = The Resonance amplitude.
+     Start: [00-FF] = The start position.
+    Repeat: [00-FF] = The repeat from position.
+    RepEnd: [00-FF] = The repeat to position.
+     Speed: [00-FF] = The speed of the Phase.
+     Delay: [00-FF] = # of frames it should wait before starting the
+                      Resonance
+ Turns/Spd: [00-FF] = # of times the Resonance will go between the three
+                      points, Start, Repeat & RepEnd. 0 will repeat forever.
+      Init: [On/Off] = If On, start from beginning of Resonance when a new
+                       note is played. If Off, it will continue from the
+                       current value.
+      Step: [On/Off] = If On, Turns will shift to Speed and the effect will
+                       not update as usual. When you play a note and the
+                       speed is set to 0, the Resonance will hold at that
+                       position until you play the next note. If the Speed
+                       value (Turns/Speed that is...) is set to 0, the
+                       current wavepart is played, but if there is any value
+                       set, the second Speed counter is invoked and starts
+                       its way towards its destination until you play the
+                       next note just to return to the place where the first
+                       counter is.
+     Boost: [On/Off] = Will enhance the waveform amplitude (NOTE! This option
+                       has no overshoot check (if it would have, it would
+                       take a LOT more CPU-time). This means that on some
+                       occasions, there can be sudden distortions of the
+                       sound when it peaks over the edges.)
+
+[END]
+@endnode
+*-----*-----*
+@node "Filter" "Filter"
+
+Filter:
+
+    Filter can be used either as a normal Lowpass or a Resonance filter.
+
+     Start: [00-FF] = The start position.
+    Repeat: [00-FF] = The repeat from position.
+    RepEnd: [00-FF] = The repeat to position.
+     Speed: [00-FF] = The speed of the Filter.
+     Delay: [00-FF] = # of frames it will wait before starting the Filter.
+ Turns/Spd: [00-FF] = # of times the Filter will go between the three points,
+                      Start, Repeat & RepEnd. 0 will repeat forever.
+      Type: [Normal/Resonance] = Will switch between Lowpass & Resonance
+                                 filter type.
+      Init: [On/Off] = If On, start from beginning of Filter when a new note
+                       is played. If Off, it will continue from the current
+                       value.
+      Step: [On/Off] = If On, Turns will shift to Speed and the effect will
+                       not update as usual. When you play a note and the
+                       speed is set to 0, the Filter will hold at that
+                       position until you play the next note. If the Speed
+                       value (Turns/Speed that is...) is set to 0, the
+                       current wavepart is played, but if there is any value
+                       set, the second Speed counter is invoked and starts
+                       its way towards its destination until you play the
+                       next note just to return to the place where the first
+                       counter is.
+     Boost: [On/Off] = Will enhance the waveform amplitude (NOTE! This option
+                       has no overshoot check (if it would have, it would
+                       take a LOT more CPU-time). This means that on some
+                       occasions, there can be sudden distortions of the
+                       sound when it peaks over the edges.)
+
+[END]
+@endnode
+*-----*-----*
+@node "PlayLoop" "PlayLoop"
+
+PlayLoop:
+
+    PlayLoop is a powerful command to move a little loop inside your sample
+    to be able to do realtime effects on large samples. This command can also
+    be used in conjunction with the MakeAnim effect when you want to calc-
+    ulate a synthesized instrument to a sample to save valuable CPU-time but
+    not affect the flexibility of the instrument.
+
+     Start: [00000-1FFFE] = The start position.
+    Repeat: [00000-1FFFE] = The repeat from Position.
+    RepEnd: [00000-1FFFE] = The repeat to position.
+    LopLen: [00000-1FFFE] = The length of the loop (to be able to use real-
+                            time effects on large samples, this must be set
+                            to 16/32/64/128 or 256 (i.e. the WaveForm
+                            length)).
+    LpStep: [000-680] = How long the loop will jump after each play-through.
+      Wait: [00-FF] = # of frames it will wait before jumping to next LpStep.
+     Delay: [00-FF] = # of frames to wait before the PlayLoop is executed.
+ Turns/Spd: [00-FF] = # of times the PlayLoop will go between the three
+                      points, Start, Repeat & RepEnd. 0 will repeat forever.
+      Init: [On/Off] = If On, start from beginning of PlayLoop when a new
+                       note is played. If Off, it will continue from the
+                       current value.
+      Step: [On/Off] = If On, Turns will shift to Speed and the effect will
+                       not update as usual. When you play a note and the
+                       speed is set to 0, the PlayLoop will hold at that
+                       position until you play the next note. If the Speed
+                       value (Turns/Speed that is...) is set to 0, the
+                       current wavepart is played, but if there is any value
+                       set, the second Speed counter is invoked and starts
+                       its way towards its destination until you play the
+                       next note just to return to the place where the first
+                       counter is.
+      Stop: [On/Off] = If there is any value in Turns, the WaveSample
+                       playback will stop after the last turn is played,
+                       otherwise it will continue to play the last loop
+                       forever.
+
+[END]
+@endnode
+***********************************************
+*       MusicLine Editor Commands             *
+***********************************************
+@node "KeyComMain" "Keyboard Commands"
+
+           RightMouseButton breaks playtune if it loops forever!
+
+
+                      Keyboard Commands and Shortcuts:
+
+                            @{" Sequence Window   " link "KeyComs1" 0}
+                            @{" Sequence Editor   " link "KeyComs3" 0}
+                            @{" Part Editor       " link "KeyComs4" 0}
+                            @{" Instrument Window " link "KeyComs2" 0}
+                            @{" Arpeggio Editor   " link "KeyComs5" 0}
+
+@endnode
+@node "KeyComs1" "Keyboard Commands in Sequence Window"
+   Keyboard Commands in Sequence Window:
+
+       RAmiga+E = Erase All
+       RAmiga+L = Load Module
+       RAmiga+S = Save Module
+       RAmiga+A = Save Module As
+       RAmiga+Q = Quit Musicline Editor
+       RAmiga+T = Add Tune
+RAmiga+RShift+T = Remove Tune
+         RAlt+T = Clear Tune
+
+              ~ = Toggle Sequence Window <-> Instrument Window
+            Tab = Toggle Part <-> Tune
+      Shift+Tab = Edit Cursor Selected Part & Toggle Part <-> Tune
+          Space = Stop Tune,Part,Instrument = Total Silence
+
+             F1 = Octave 1-2/2-3/3-4/4-5
+       Shift+F1 = Keyboard Mono/Poly
+             F2 = Edit On/Off (When in Instr.Ed. toggle ArpList edit On/Off)
+       Shift+F2 = EditMode Vertical/Horizontal/Column
+             F6 = Play Tune From Cursor Position
+       Shift+F6 = Play Tune From Beginning
+             F7 = Play Part
+
+[END]
+@endnode
+@node "KeyComs2" "Keyboard Commands in Instrument Window"
+   Keyboard Commands in Instrument Window:
+
+       RAmiga+Q = Quit Musicline Editor
+       RAmiga+I = Add Instrument
+RAmiga+RSHIFT+I = Remove Instrument
+RAmiga+RSHIFT+W = Remove WaveSample
+         RAlt+I = Remove UnusedInstruments
+         RAlt+W = Remove UnusedWaveSamples
+         RAlt+E = Remove EqualWaveSamples
+
+              ~ = Toggle Sequence Window <-> Instrument Window
+          Space = Stop Tune,Part,Instrument = Total Silence
+
+             F1 = Octave 1-2/2-3/3-4/4-5
+       Shift+F1 = Keyboard Mono/Poly
+             F2 = Edit Arpeggio List On/Off
+       Shift+F2 = Arpeggio EditMode Vertical/Horizontal/Column
+             F6 = Play Tune
+       Shift+F6 = Play Tune From Beginning
+             F7 = Play Pattern
+
+[END]
+@endnode
+***********************************************
+*       Sequencer                             *
+***********************************************
+@node "KeyComs3" "Keyboard Commands in Sequence Editor"
+   Keyboard Commands in Sequence Editor:
+
+         Escape = Exit mark mode
+
+       RAmiga+B = Mark block in tune (mark mode)
+       RAmiga+V = Paste buffer to current channel
+       RAmiga+C = Copy current channel to buffer
+       RAmiga+X = Cut current channel to buffer
+       RAmiga+Z = Swap current channel with buffer
+
+If you are in mark mode:
+       RAmiga+C = Copy block to buffer
+       RAmiga+X = Cut block to buffer (selected block is cleared)
+ Shift+RAmiga+X = Cut block to buffer (selected block is removed)
+
+If you have a block in buffer:
+       RAmiga+V = Paste block in buffer to tune at cursorpos (overstr. mode)
+ Shift+RAmiga+V = Paste block in buffer to tune at cursorpos (insert mode)
+
+   RAmiga+Minus = Subs one from part or transpose column
+   RAmiga+Plus  = Adds one to part or transpose column
+
+             F8 = Wait
+             F9 = Jump
+            F10 = End
+
+         Return = Insert line in current channel
+   Return+Shift = Insert line in all channels
+      Backspace = Remove line in current channel
+Backspace+Shift = Remove line in all channels
+         Delete = Delete line in current channel
+   Delete+Shift = Delete line in all channels
+
+[END]
+@endnode
+***********************************************
+*       Part Editor                           *
+***********************************************
+@node "KeyComs4" "Keyboard Commands in Part Editor"
+   Keyboard Commands in Part Editor:
+
+         Escape = Exit mark mode
+
+       RAmiga+B = Mark block in part (mark mode)
+       RAmiga+V = Paste buffer to part
+       RAmiga+C = Copy part to buffer
+       RAmiga+X = Cut part to buffer
+       RAmiga+Z = Swap part with buffer
+
+If you are in mark mode:
+       RAmiga+C = Copy block to buffer
+       RAmiga+X = Cut block to buffer (selected block is cleared)
+ Shift+RAmiga+X = Cut block to buffer (selected block is removed)
+
+If you have a block in buffer:
+       RAmiga+V = Paste block in buffer to part at cursorpos (overstr. mode)
+ Shift+RAmiga+V = Paste block in buffer to part at cursorpos (insert mode)
+
+       RAmiga+U = Transpose all instruments in part note up
+       RAmiga+D = Transpose all instruments in part note down
+RAmiga+RShift+U = Transpose all instruments in part octave up
+RAmiga+RShift+D = Transpose all instruments in part octave down
+         RAlt+U = Transpose selected instruments in pattern note up
+         RAlt+D = Transpose selected instruments in pattern note down
+  RAlt+RShift+U = Transpose selected instruments in pattern octave up
+  RAlt+RShift+D = Transpose selected instruments in pattern octave down
+
+             F9 = Jump
+            F10 = End
+
+         Return = Insert column
+   Return+Shift = Insert line
+      Backspace = Remove column
+Backspace+Shift = Remove line
+         Delete = Delete column
+   Delete+Shift = Delete line
+
+[END]
+@endnode
+***********************************************
+*       Arpeggio Editor                       *
+***********************************************
+@node "KeyComs5" "Keyboard Commands in Arpeggio Editor"
+   Keyboard Commands in Arpeggio Editor:
+
+         Escape = Exit mark mode
+
+       RAmiga+B = Mark block in part (mark mode)
+       RAmiga+V = Paste buffer to table
+       RAmiga+C = Copy table to buffer
+       RAmiga+X = Cut table to buffer
+       RAmiga+Z = Swap table with buffer
+
+If you are in mark mode:
+       RAmiga+C = Copy block to buffer
+       RAmiga+X = Cut block to buffer (selected block is cleared)
+ Shift+RAmiga+X = Cut block to buffer (selected block is removed)
+
+If you have a block in buffer:
+       RAmiga+V = Paste block in buffer to arpg at cursorpos (overstr. mode)
+ Shift+RAmiga+V = Paste block in buffer to arpg at cursorpos (insert mode)
+
+             F2 = Edit On/Off
+             F9 = Jump
+            F10 = End
+
+         Return = Insert Line
+      Backspace = Remove Line
+         Delete = Delete Column
+   Delete+Shift = Delete Line
+
+[END]
+@endnode
+@node "PartFX" "Part Effect Commands"
+
+                           Part Effect Commands
+
+                   @{" 00-0F Pitch Commands              " link "Pitch" 0}
+                   @{" 10-1F Instrument Volume Commands  " link "InstVol" 0}
+                   @{" 20-2F Channel Volume Commands     " link "ChanVol" 0}
+                   @{" 30-3F Master Volume Commands      " link "MastVol" 0}
+                   @{" 40-4F Miscellanous Commands       " link "Misc" 0}
+                   @{" E0-EF ProTracker Commands         " link "ProT" 0}
+
+@endnode
+@node "Pitch" "Pitch Commands"
+ ---------------------------
+ 0x   Pitch                : Commands affecting the pitch of the sound
+ ---------------------------
+ 01xx SlideUp              : xx = speed
+                      Usage: 0105 = Slide up with speed 5
+
+ 02xx SlideDown            : xx = speed
+                      Usage: 0205 = Slide down with speed 5
+
+ 03xx Glide                : xx = speed
+                      Usage: 00 F-3 01 0000 = Note to glide from
+                           : 01 G-4 01 0305 = Note to glide to with speed 5
+                           : 02 --- 00 0308 = Continue glide with speed 8
+
+ 04xx InitInstrumentGlide  : xx = 00
+                      Usage: 0400 = Init instrument if Glide is used
+
+ 05xx PitchAdd             : add xx to pitch
+                      Usage: 0505 = Add 5 finetune-steps to note
+
+ 06xx PitchSub             : sub xx from pitch
+                      Usage: 0605 = Sub 5 finetune-steps to note
+
+ 07xx VibratoSpeed         : xx = speed
+                           :      Used either in conjunction to commands
+                           :      08-0A or to change instruments vibrato-
+                           :      settings
+                      Usage: 0704 = Set VibratoSpeed to 4
+
+ 08xx VibratoUp            : xx = depth 00-40
+                      Usage: 0812 = Set VibratoDepth to 12 and run an UpWard
+                           :        Vibrato
+                           : 0800 = Continue to do an UpWard Vibrato with
+                           :        existing values
+
+ 09xx VibratoDown          : xx = depth 00-40
+                      Usage: 0912 = Set VibratoDepth to 12 and run a DownWard
+                           :        Vibrato
+                           : 0900 = Continue to do a DownWard Vibrato with
+                           :        existing values
+
+ 0Axx VibratoWave          : xx = 00 - Sine
+                           :      01 - RampDown
+                           :      02 - SawTooth
+                           :      03 - Square
+                      Usage: 0A02 = Set Vibrato WaveForm to SawTooth
+
+ 0Bxx SetFineTune          : xx = E1-1F
+                      Usage: 0B05 = Set FineTune value to +5
+                           : 
+
+[END]
+@endnode
+@node "InstVol" "Instrument Volume Commands"
+ ---------------------------
+ 1x   Instrument Volume    : Commands affecting the volume of the instruments
+ ---------------------------
+ 10xx SetVolume            : xx = volume 00-40
+                      Usage: 1015 = Set Volume to 15
+
+ 11xx VolumeSlideUp        : xx = speed
+                      Usage: 1105 = Slide Volume up with speed 5
+
+ 12xx VolumeSlideDown      : xx = speed
+                      Usage: 1205 = Slide Volume down with speed 5
+
+ 13xx SetSlideToVolume     : xx = volume 00-40
+                      Usage: 1320 = Set SlideTo Volume to 20
+
+ 14xx SlideToVolume        : xx = speed
+                      Usage: 00 F-3 01 1010.. = Set Instrument Volume to 10
+                           : 01 --- 00 1335.. = Set SlideToVolume to 35
+                           : 02 --- 00 1408.. = Continue slide with speed 8
+                           : 03 --- 00 1400.. = Continue slide with previous
+                           :                    speed
+
+ 15xx VolumeAdd            : add xx to volume 00-40
+                      Usage: 1510 = Add 10 to current Volume
+
+ 16xx VolumeSub            : sub xx from volume 00-40
+                      Usage: 1612 = Sub 12 from current Volume
+
+ 17xx TremoloSpeed         : xx = speed
+                           :      Used either in conjunction to commands
+                           :      18-1A or to change instruments Tremolo-
+                           :      settings
+                      Usage: 0704 = Set TremoloSpeed to 4
+
+ 18xx TremoloUp            : xx = depth 00-40
+                      Usage: 1812 = Set TremoloDepth to 12 and run an UpWard
+                           :        Tremolo
+                           : 1800 = Continue to do an UpWard Tremolo with
+                           :        existing values
+
+ 19xx TremoloDown          : xx = depth 00-40
+                      Usage: 1912 = Set TremoloDepth to 12 and run a DownWard
+                           :        Tremolo
+                           : 1900 = Continue to do a DownWard Tremolo with
+                           :        existing values
+
+ 1Axx TremoloWave          : xx = 00 - sine
+                           :      01 - rampdown
+                           :      02 - sawtooth
+                           :      03 - square
+                      Usage: 1A02 = Set Tremolo WaveForm to SawTooth
+
+[END]
+@endnode
+@node "ChanVol" "Channel Volume Commands"
+ ---------------------------
+ 2x   Channel Volume       : Commands affecting the volume in one channel
+ ---------------------------
+ 20xx SetVolume            : xx = volume 00-40
+                      Usage: 2020 = Set Channel Volume to 20. When making
+                           :        echoes, use the Channel Volume commands
+                           :        since they are proportional so changing
+                           :        the echo volume afterwards is very easy.
+                           :        F ex: If an Instrument has the volume of
+                           :        20 and the Channel Volume is set to 20,
+                           :        then the Instrument is played at volume
+                           :        10.
+
+ 21xx VolumeSlideUp        : xx = speed
+                      Usage: 2105 = Slide Channel Volume up with speed 5
+
+ 22xx VolumeSlideDown      : xx = speed
+                      Usage: 2205 = Slide Channel Volume down with speed 5
+
+ 23xx SetSlideToVolume     : xx = volume 00-40
+                      Usage: 2320 = Set SlideTo Volume to 20
+
+ 24xx SlideToVolume        : xx = speed
+                      Usage: 00 F-3 01 2010.. = Set Channel Volume to 10
+                           : 01 --- 00 2335.. = Set SlideToVolume to 35
+                           : 02 --- 00 2408.. = Continue slide with speed 8
+                           : 03 --- 00 2400.. = Continue slide with previous
+                           :                    speed
+
+ 25xx VolumeAdd            : add xx to volume 00-40
+                      Usage: 2510 = Add 10 to current Channel Volume
+
+ 26xx VolumeSub            : sub xx from volume 00-40
+                      Usage: 2612 = Sub 12 from current Channel Volume
+
+ 27xx SetVolumeAllChannels : xx = volume 00-40
+                      Usage: 2740 = Set all channels Channel Volume to 40
+
+[END]
+@endnode
+@node "MastVol" "Master Volume Commands"
+ ---------------------------
+ 3x   Master Volume        : Commands affecting the volume of all channels
+ ---------------------------
+ 30xx SetVolume            : xx = volume 00-40
+                      Usage: 3040 = Set Master Volume to 40
+
+ 31xx VolumeSlideUp        : xx = speed
+                      Usage: 3105 = Slide Master Volume up with speed 5
+
+ 32xx VolumeSlideDown      : xx = speed
+                      Usage: 3205 = Slide Master Volume up with speed 5
+
+ 33xx SetSlideToVolume     : xx = volume 00-40
+                      Usage: 3320 = Set SlideTo Volume to 20
+
+ 34xx SlideToVolume        : xx = speed
+                      Usage: 00 F-3 01 3010.. = Set Master Volume to 10
+                           : 01 --- 00 3335.. = Set SlideToVolume to 35
+                           : 02 --- 00 3408.. = Continue slide with speed 8
+                           : 03 --- 00 3400.. = Continue slide with previous
+                           :                    speed
+
+ 35xx VolumeAdd            : add xx to volume 00-40
+                      Usage: 3510 = Add 10 to current Master Volume
+
+ 36xx VolumeSub            : sub xx from volume 00-40
+                      Usage: 3610 = Sub 10 from current Master Volume
+
+[END]
+@endnode
+@node "Misc" "Miscellanous Commands"
+ ---------------------------
+ 4x   Miscellanous         : Miscellanous commands
+ ---------------------------
+ 40xx SpeedOneChannel      : xx = speed 00-1F
+                      Usage: 4005 = Set Speed in current channel to 5
+                           :        NOTE! When the next part is played, it
+                           :        will go back to the default Speed.
+
+ 41xx GrooveOneChannel     : xx = speed 00-1F
+                      Usage: 4108 = Set Groove in current channel to 8
+                           :        NOTE! When the next part is played, it
+                           :        will go back to the default Groove.
+
+ 42xx SpeedAllChannels     : xx = speed 00-1F / tempo 20-FF
+                      Usage: 4208 = Set all channels Speed to 6
+
+ 43xx GrooveAllChannels    : xx = speed 00-1F
+                      Usage: 4305 = Set all channels Groove to 5
+
+ 44xx ArpeggioList         : xx = ArpListnumber
+                      Usage: 4402 = Set current ArpList number to 02
+
+ 45xx ArpeggioListOneStep  : xx = ArpListnumber
+                      Usage: 4503 = Play ArpList 03 one step
+
+ 46xx Sustain              : xx = 00 - release / 01 - hold
+                      Usage: 4600 = If the Instrument is using [Hold Sustain]
+                           :        then release it.
+                           : 4601 = If the Instrument is using [Normal
+                           :        Sustain] then hold it.
+
+ 47xx Filter               : xx = 00 - off / 01 - on
+                      Usage: 4700 = Turn the Amiga's hardware filter off
+
+ 48xx SampleOffset         : xx = offset
+                      Usage: 4813 = Start playing sample from position 1300
+
+ 4900 RestartNoVolume      : 00 = The only value possible
+                      Usage: 4900 = Restarting the instrument without
+                                    restoring the volume
+
+ 4Axx WaveSample           : xx = WaveSample number
+                      Usage: 4A12 = Use WaveSample nr 12
+
+ 4Bxx InitInstrument       : 00 = The only value possible
+                      Usage: 4B00 = Restart all instrument effects, but not
+                           :        the WaveSample
+
+[END]
+@endnode
+@node "ProT" "ProTracker Commands"
+ ---------------------------
+ Ex   ProTracker           : ProTracker commands (Just for compatibility, do
+                           : not use! Our commands are better performed.)
+                           : There will not be any closer explanation of
+                           : these commands.
+ ---------------------------
+ E1xx SlideUp              : xx = speed
+ E2xx SlideDown            : xx = speed
+ E3xx Portamento           : xx = speed
+ E40x FineSlideUp          : x = value
+ E50x FineSlideDown        : x = value
+ E6xx VolumeSlideUp        : xx = speed
+ E7xx VolumeSlideDown      : xx = speed
+ E8xy Tremolo              : x - speed / y - depth
+ E9xx TremoloWave          : xx = 00 - sine
+                           :      01 - rampdown
+                           :      02 - square
+ EAxy Vibrato              : x - speed / y - depth
+ EBxx VibratoWave          : xx = 00 - sine
+                                  01 - rampdown
+                                  02 - square
+[END]
+@endnode
+@node "Contact" "How to contact us!"
+
+ Write to:
+
+  Christian Cyréus
+  Fregattvägen 9
+  181 37 Lidingö
+  Sweden
+
+ Phone: +46-70-5233146  (John Carehag)
+
+ Call our BBS:
+
+  Groove Central +46-8-6369089
+  (This is also where you will get your updates of MusiclineEditor!)
+
+
+  E-Mail:                 WWW:
+
+  Mline@kuai.se           http://www.kuai.se/~mline
+
+
+ The latest SW-version of Mline will also be available at
+                          http://www.kuai.se/~mline
+[END]
+@endnode
+@node "Register" "How to register"
+
+ Run Musicline Editor.
+ Select 'Register...' in the Project menu to fill in the registration form,
+  then save the form to a DISK.
+ Send the disk with the file 'Mline.Reg' along with bills, NO CHEQUES.
+ You can also send the registration file as E-Mail or upload it as a
+ private message to the SysOp on Musicline BBS or use the door 'MLU' at
+ Groove Central and create this file online. If you don't send the
+ registration file together with the money, don't forget to send your
+ name and birth date with the money.
+
+ To get the address and BBS number see 'How To Contact Us'!
+
+  (Om du är svensk så är PostGiro att föredra. Skriv namn,
+  födelsedatum och Musicline på blanketten och glöm ej att skicka disken!)
+
+ The PG number are only for Swedes!
+ Christian:
+ PGnr: 600 40 82-1
+
+ Registration fees:    Sweden : 160 SKR
+                       Norway : 160 NOK
+                       Denmark: 140 DKK
+		       Finland: 110 FMK
+                       U.K.   :  16 UK£
+                       U.S.A. :  25 US$
+                       Germany:  35 DEM
+                       France : 130 FFR
+
+ If you don´t live in one of the above mentioned countries,
+ please send the money in either one of the currencies
+ (preferably in SKR).
+
+[END]
+@endnode
+@node "Update" "How to get new versions"
+
+How to get new versions:
+
+There are three ways of getting the new versions:
+
+ 1 - DL from Groove Central (this is the most preferable way for us!)
+     There is a door that creates your version online. Type 'MLU' on GC!
+     (You will need your full name and your program/update password.)
+ 2 - Get it by personal E-mail from us.
+ 3 - Send a letter with money (and a disk) and we will mail it to you.
+     Don't forget to write your name, ID Number and your current
+     version of MusiclineEditor.
+     (The first version is ofcourse free of postal charges!)
+-------------------------------------------------------------
+ If you send us money and a disk.
+ We mail the disk with the latest version of MusiclineEditor.
+
+ Fees:    Sweden: 20 SKR
+          Norway: 20 NOK
+         Denmark: 20 DKK
+         Finland: 15 FMK
+            U.K.:  3 UK£
+          U.S.A.:  4 US$
+         Germany:  5 DEM
+          France: 20 FFR
+-----------------------------------------------------------
+ If you send us money.
+ We mail a disk with the latest version of MusiclineEditor.
+
+ Fees:    Sweden: 30 SKR
+          Norway: 30 NOK
+         Denmark: 30 DKK
+         Finland: 25 FMK
+            U.K.:  4 UK£
+          U.S.A.:  6 US$
+         Germany:  8 DEM
+          France: 20 FFR
+--------------------------------------------------
+  If you don't live in any of the above mentioned countries, please send
+the money in either one of the currencies (preferably in SKR).
+
+[END]
+@endnode
+@node "Layout" "Screen layout & buttons"
+
+ It is not easy to explain everything about a screen and its buttons, but
+ we'll give it a try...
+
+ Since this is a true systemfriendly program, the layout is also - system
+ friendly! That means, an own screen with some windows on it. There are
+ of course also some menus, but we will check them out later.
+
+
+                          @{" Sequence Editor   " link "SeqLayout" 0}
+                          @{" Sequencer menus   " link "SeqMenus" 0}
+                          @{" Instrument Editor " link "InstLayout" 0}
+                          @{" InstrEd menus     " link "InstMenus" 0}
+
+@endnode
+@node "SeqLayout" "Sequence Editor Layout"
+
+ On the top left of the window is the sequencer area. Here you have all the
+ data for all of the eight tracks.
+ Highest to the left are four texts: Seq.Pos, Part, Prt.Pos, Transp.
+  To the right of each word, you can see some figures. They show the current
+  value of just that variable. F.ex, if the Seq.Pos shows 09, then the
+  current step played in the sequencer is step 09. These values are shown
+  to let you get a grip over where you are in the song.
+  To the right of the Seq.Pos nr is the Channel On/Off button. This is easy
+  to use. If it's empty, then it's off. If there is a mark in it, it's On!
+  Below the On/Off button, you have a VU-meter to indicate your instruments
+  playing. This can be turned On or Off with the button named - that's right
+  - VU at the far right part of the screen.
+  Below all these figures, you've got the sequencer editor. It looks
+  something like this:
+
+  00  000 00  000 00  000 00  000 00  000 00  000 00  000 00  000 00
+  01  000 00  000 00...and so on...
+   \\  \\  \\   \\     \\       \\ 
+    \\  \\  \\    Next channel. Same values as the first and so on...
+     \\  \\  Transpose value
+      \\   Part number or sequencer command
+       Sequencer step
+
+  A closer description of what you can write here is found at the
+  @{" Structures " link "Structures" 0} section in this Guide-file.
+
+  You will also notice som horizontal lines underscoring some steps in both
+  the sequencer and the part. They are showing the currently playing step/
+  note,
+
+  To the right of the VU On/Off button, you've got the Edit On/Off button.
+  It works just like the VU and channel buttons. This can also be in- &
+  revoked with the F2 key.
+
+  Below that button, there are six other buttons:
+
+   PlayMode: Choose between Four and Eight channels.
+     Octave: Choose between Low/Med/High/Lame octave. You can also use F1.
+   Keyboard: Choose between Mono and Poly mode. You can also use Shift+F1.
+   EditMode: Choose between Down and Column mode.
+     Scroll: Choose between Off/Part/Seq/Seq&Part. It selects what to scroll
+     Follow: Choose between Off and Channel mode. It means that the part-
+             editor will show the current part in the current track.
+
+  Beneath the Sequencer area, you will find four other buttons:
+
+          ?: Brings up the Info Window. Here you can write something about
+             your excellent work.
+       Tune: Plays the tune from current step. If used with Shift it will
+             restart the tune. You can also use F6 & Shift+F6.
+       Part: Plays the current part. You can also use F7.
+       Stop: Stop all sound activity. You can also use Space.
+
+  To the right of the Stop button, there is a text stating 'Part' and there
+  is a small box and two arrows beside it. This is where you select which
+  part to watch/edit. 
+
+  The next bevelbox below, is the Part Editor. Here you can edit your parts
+  to use in the sequencer.
+
+  A closer description of what you can write here is found at the
+  @{" Structures " link "Structures" 0} section in this Guide-file.
+
+  To the right of the Part Editor are two windows. Instruments and Tunes.
+  They contain just the things they say they do - Instruments and Tunes.
+  Just point'n'click on the object you want and it's selected.
+
+  Below the Tunes window, there are some settings.
+
+      Tempo: The base tempo setting. Defaults to $7D (#125)
+      Speed: The base speed of the tune.
+     Groove: The base groove of the tune. This is a second speed counter,
+             which only executes at every odd step of the tune. If you f.ex
+             set the speed to 9 and the groove to 5, you will get a more
+             'live' feeling in your tune.
+     Volume: The master volume of the tune.
+
+   The small bevelbox to the left of Tempo show the base BPM of the tune.
+   (calulated on 4/4).
+
+[END]
+@endnode
+@node "SeqMenus" "Sequencer menus"
+
+   If a menu item has a keyboard shortcut, it will be shown to the right of
+   the item in the program. If a command has an asterisk (*) in front of it,
+   it's configurable in the Mline.config file. The Load/Save standard
+   directorys are configurable in that file.
+
+   Project:
+     Erase...                : Erases all current data from memory
+   * Load...                 : Loads a new Mline or PT-module
+   * Save...                 : Saves current module to current name
+   * Save as...              : Saves current module to a selected name
+     Delete...               : Delete file from disk
+     Help
+       Part Commands         : Short help with all Part Effects
+       Hotkeys & Structures  : Help for all keyboard shortcuts
+     How to contact us...    : A contact page...
+     Register...             : To load and save regforms
+     About...                : Woow! We made it!
+     Quit...                 : Hasta la Vista...
+
+   Window
+     Instrument Editor       : Swap to Instrument Editor
+
+   Note: If we state 'current region', we mean the currently marked region
+         or, if none selected, the current part or track.
+
+   Edit
+     Swap                    : Swap current region with buffer  
+     Cut                     : Cut current region and put into buffer
+     Copy                    : Copy current region into buffer
+     Paste                   : Paste from buffer to current position
+     Mark                    : Select a region to edit
+     Add
+       Tune                  : Add a new Subtune
+     Clear
+       Tune...               : Clear current Subtune
+       All Parts...          : Clear all parts
+     Remove
+       Tune...               : Remove current tune
+       All Tunes...          : Remove all tunes
+       Unused Parts...       : Remove all unused parts
+
+   Note: All Transpose commands reflects on current part.
+
+   Transpose
+     Instrument
+       Note Up               : Transpose current instrument one note up
+       Note Down             : Transpose current instrument one note up
+       Octave Up             : Transpose current instrument one octave up
+       Octave Down           : Transpose current instrument one octave down
+     All Instruments
+       Note Up               : Transpose all instruments one note up
+       Note Down             : Transpose all instruments one note up
+       Octave Up             : Transpose all instruments one octave up
+       Octave Down           : Transpose all instruments one octave down
+
+   Options
+     Toggle filter           : Toggle the Amiga's HW-filter On/Off
+   * Pack WaveSamples        : Pack all WaveSamples when saving module
+   * Keyboard
+       Europe                : Use this to enhance keyboard to use <-Q
+                               octave step
+       USA                   : Use this to get a standard Z-Q octave step
+   * PlayPosition
+       True                  : If the Tune-command shall play through all
+                               effects quietly to start the song just as it
+                               would sound after normal listening to this
+                               position (not recommended to use in 8-channel
+                               mode if you haven't got a very fast computer!)
+       Fast                  : Just step through the most important effects
+                               like length & speed and get to the selected
+                               position as fast as possible
+   * Configuration
+       Save                  : Save configuration
+                               pack wavesamples on/off
+                               keyboard europe/usa
+                               play position true/fast
+                               screenmode, windows coords
+                               vumeter on/off
+                               editmode, arpeggio editmode
+                               info, help windows open/close
+                               scroll part, seq, seq&prt
+                               follow channel on/off
+                               load project path
+                               load instrument path
+                               load samples path
+                               load waves path
+                               save project path
+                               save instrument path
+                               save samples path
+                               save waves path
+       Default               : Set default configuration
+       Last Saved            : Set last saved configuration
+
+   * ScreenMode              : Brings up a screenmode requester and change
+                               screenmode if you select one.
+
+[END]
+@endnode
+@node "InstLayout" "Instrument Editor Layout"
+
+ On the top left you have three buttons:
+
+ Tuningtone: Generates a tone played at 440Hz to use to tune your instruments
+     Octave: Choose between Low/Med/High/Lame octave. You can also use F1.
+   Keyboard: Choose between Mono and Poly mode. You can also use Shift+F1.
+
+ Below them are some Instrument parameters:
+
+Wave Length: 10/20/40/80/100 hex-bytes length of the waveform. (The longer
+             waveform you've got, the deeper sound you'll get)
+     Volume: [00-40] The volume of the instrument.
+   Finetune: [E1-1F] Finetuning one note up, one down (one step left)
+   Semitone: [F5-0B] This can be used if you have two samples, which are
+             sampled on different frequencies and want to use them on the
+             same note. F.ex, if a lead plays a C when you press C-3 and
+             a chord plays an F when pressing the same note, you can down-
+             tune the chord to play a C by setting the Semitone value to FB.
+             The same procedure, but reverse, can be used if you want the
+             lead to play an F by setting Semitone to 5. It can transpose
+             one octave up, one down.
+      Glide: [00-FF] A nice little effect used in a lot of synthesizers.
+             When you play a note followed by another, the pitch will 'glide'
+             to the second note (and the rest that follows..) with the
+             selected speed.
+Transposable: [On/Off] If setting is On, the instrument will transpose if you
+              use it in a part that is transposed in the sequencer. If it's
+              Off, it won't.
+
+ In the middle of the screen you have the Instrument Effects. The variables
+ used in these effects are presented in the @{" Instrument Structure Effects " link "InstStrFX" 0}
+ chapter in this Guide.
+
+ The buttons next right of the effect names are used to choose which effect
+ that shall be edited. The next boxes are used to switch an effect On/Off.
+ The upper right part of the screen is used to display the effect variables
+ of the currently selected effect.
+
+ On the lower right, there are two buttons:
+
+  Wavesample Parameters: Uses the following variables
+
+    Start: Where in the sample the playback should start.
+     Loop: Where in the sample the loop should start.
+      End: Where the playback and loop should end.
+  Loop Length: The length of the loop.
+    Ws Length: The length of the wavesample.          Loop On/Off button
+
+    Waveform Visualizer: A scope that shows the current state of the wave-
+                         form. This is not a 'Sample-shower', because it
+                         will only show waveforms that are $10/20/40/80/100
+                         bytes and also if the loop is any of these lengths.
+                         It is mainly here to let you see what is happening
+                         to the waveform when you put effects on it, but also
+                         as an ImpFactor! ;)
+
+ On the lower left and middle part of the screen is the Instrument and Wave-
+ sample selection windows. Choose an Instrument and the wavesample used in it
+ will be selected in the other window.
+
+[END]
+@endnode
+@node "InstMenus" "Instrument Editor Menus"
+
+   If a menu item has a keyboard shortcut, it will be shown to the right of
+   the item in the program. If a command has an asterisk (*) in front of it,
+   it's configurable in the Mline.config file.
+
+   Project
+     Load
+   *   Instrument...         : Load instrument
+   *   Sample(s)...          : Load sample(s)
+   *   Wave(s)...            : Load waveform(s)
+     Save
+   *   Instrument...         : Save current instrument
+   *   IFF Wavesample...     : Save current wavesample as IFF
+   *   RAW Wavesample...     : Save current wavesample as RAW
+     Help
+       Arpeggio Editor       : Arpeggio Editor commands
+       Hotkeys & Structures  : Help for all keyboard shortcuts
+     Quit...
+
+   Window
+     Sequencer               : Swap to Sequencer window
+
+   Edit
+     Swap                    : Swap current instrument or region with buffer  
+     Cut                     : Cut current instrument or region and put
+                             : into buffer
+     Copy                    : Copy current instrument or region into buffer
+     Paste                   : Paste from buffer to current position or
+                             : instrument
+     Mark                    : Select a region to edit
+     Add
+       Instrument            : Add a new instrument
+     Remove
+       Instrument...         : Remove current instrument
+       Wavesample...         : Remove current wavesample
+       Unused Instruments... : Remove unused instruments
+       Ununse Wavesamples... : Remove unused wavesamples
+       Unused Instruments & Wavesamples...  : Remove both unused instruments
+                                              & wavesamples at the same time
+       EqualWavesamples      : Remove equal wavesamples
+
+     MakeAnim...             : Precalculate a synthetic instrument. Brings up
+                               a small window containing:
+                            Frames: How many frames to precalculate. Set a
+                                    number and play the instrument to hear
+                                    how long the sound will be. You can also
+                                    calculate how many frames to use by
+                                    dividing the values used in the effects,
+                                    but we will not go any further on this
+                                    subject here.
+                      MakeInstAnim: Press to create a precalculated sample.
+
+  NOTE! Not all instruments are possible to make anims out of. If some of
+        the values are odd, they may create an instrument that won't sound
+        the same ever and is impossible to loop. When you use MakeAnim,
+        consider that if you f.ex calculate a $100-waveform with 32 frames,
+        then it will take 32*256 bytes=8kb. When you press MakeInstAnim it
+        will also calculate a PlayLoop structure for you which you maybe
+        will have to redefine a little to make it suit your needs. This
+        effect is best to utilize if you use the Resonance and Filter
+        effects, since they are the ones that takes most CPU-time. It is
+        of course also possible to put realtime effects on the precalculated
+        sample afterwards, and remake the MakeAnim command as many times as
+        you like. This saves a lot of CPU-time, since each much more time-
+        consuming to calculate the effects in realtime than playing pre-
+        calculated waveforms, of course! The only negative effect is, that
+        the sounds takes more memory and are not always possible to animate.
+        It will not affect the flexibility of the instrument, as it uses the
+        waveforms like they should be realtime calculated. Of course, you
+        don't need to save the original instrument after you have animated
+        it, since this method makes a completely new instrument structure
+        and wavesample.
+
+[END]
+@endnode
+@node "Structures" "Structures"
+
+                                Structures
+
+                          @{" Sequencer Structure  " link "SeqStruct" 0}
+                          @{" Part Structure       " link "PartStruct" 0}
+
+@endnode
+@node "SeqStruct" "Sequencer Structure"
+
+   Channel Data
+        000 00
+          \\ \\
+           \\  Transpose
+             Part
+
+   Wait (F8)
+        W00 00
+        \\ \\ \\
+         \\ \\  Speed (00 = current speed)
+          \\ Length
+            Wait
+
+        From version 1.10 and upwards, the W is changed to a graphical mark
+        that looks like a Pause sign on a VCR, CD or taperecorder.
+
+
+   Jump backward (F9)
+        J00 00
+        \\ \\ \\
+         \\ \\  Number of jumps (00 = jump always)
+          \\ Position
+            Jump backward to channel position
+
+        From version 1.10 and upwards, the J is changed to a graphical mark
+        that looks like an upwards arrow.
+
+   End of Voice (F10)
+        E00 00
+        \\ \\ \\
+         \\ Unused
+           End of Voice
+
+        From version 1.10 and upwards, the E is changed to a graphical mark
+        that looks like a Stop sign on a VCR, CD or taperecorder.
+
+[END]
+@endnode
+@node "Future" "Future Plans"
+ Future plans and work in progress
+-----------------------------------
+
+ At the moment, we are working on a stand-alone player for both Amiga and PC.
+
+ Future plans are many...  Most of them will be made only if we see that a
+lot of people likes to use Mline and that we get feedback on our ideas and
+improvements. Things which probably will be implemented in the future is:
+
+Interpolation
+16 bits samples and mixing
+A Sample/Waveform editor
+More channels
+Midi
+A lot of new effect commands (one will make it possible for you to control
+almost all effect values right from the part)
+More keyboard shortcuts
+An 'see-more-channels-at-the-same-time'-mode (ideas of how to do it would
+be very appreciated)
+
+Well, if there are any questions/ideas, just contact us at the given adresses
+and we'll see what we can do!
+
+[END]
+@endnode
+@node "PartStruct" "Part Effects Structure"
+ Part Effects Structure
+
+ Part Data            Also Effect nrs & parameters.
+                      /    /    /    /
+    00  --- 00 00xy 0000 0000 0000 0000
+     \\   \\ \\ \\\\
+      \\   \\ \\ \\ Effect Parameter
+       \\   \\ \\  Effect Number
+        \\   \\  Instrument
+         \\    Note
+           Position
+
+[END]
+@endnode
+@node "History" "Program History"
+		History Since Version 1.00 of Musicline Editor
+	       ¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯
+
+V1.01: Release date 950331
+¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯
+	·Fatal bug when removing a tune in some cases.
+	·HDInstaller + some other scripts fixed to work correctly.
+	·Having a delayed note in the arpeggio didn't work as we wanted.
+	·Toggle between the Sequencer and Instrument Editor,
+	 inserted in the menu.
+	·The annoying Register Me Requesters
+	 changed to pop up only on startup and when quitting.
+
+
+V1.02: Release date 950401
+¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯
+	·Online Hotkey & Structure Help.
+	·Waveform length gadget changed into hexadecimal.
+
+
+V1.03: Release date 950406
+¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯
+	·FixedNote in the Arpeggio was transposed in the sequencer.
+	·If you started Musicline Editor two times from WB then
+	 the 'Musicline is already running'
+	 didn't appear and the window couldn't be removed.
+	·The arpeggio was interrupted if you pressed
+	 the Arpeggio Editor button.
+	·The PC.MOD files now loadable correctly.
+	·Adding a tune when the Tune listview gadget was scrolled horizontal,
+	 the new tune text was
+	 printed at the current horizontal position.
+
+
+V1.04: Release date 950515
+¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯
+	·Save Instrument filled out the text string to 20 digits
+	 with spaces when a ProTracker module was loaded.
+	·HotKey for Edit On/Off in the Arpeggio Editor added to F2.
+	·Some PlayLoop bugs removed.
+	·Remove Unused Wavesamples now renumbers
+	 the WaveSample command in the Parts.
+	·Large samples made the Wavesample Parameters bug.
+	·A bug in the Arpeggio keyboard replayer removed.
+	·Make Anim of a Wavesample caused the computer a system failure.
+
+
+V1.05: Release date 950605
+¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯
+	·Prefix "Ml.#?" added to Load Module and Save Module As.
+	·Separate pathes for Waveforms and Samples concerning Load and Save.
+	·Version string added for the Version command.
+	·The HD Installer is now replaced with Commodores installer!
+
+V1.06: Release date 950622
+¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯
+	·Load module pattern is now (Ml.#?|Mod.#?).
+	·The path to commodores installer is now ok.
+	·Bug fixed in the installer script,
+	 musicline.font will now be installed.
+
+V1.07: Release date 950713
+¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯
+	·Registration fee has been lowered to $20 (160 SEK)
+	·Load module pattern is now (Ml.#?|Mod.#?|#?.Mod).
+	 Ml. replaces Mod. and .Mod when saving the Module.
+	·ProTracker import has been improved to cut duplicate Parts and
+	 remove unused Instruments + some bugs fixed.
+	·An Info Page is now added to the program and will be saved in the
+	 Module structure.
+	·Remove Unused Parts function applied to the menu.
+	·Cut/Copy/Paste and Swap in the Arpeggio Editor had a bug which has
+	 been removed.
+
+V1.08: Release date 950718
+¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯
+	·Sequencer layout has been changed to a smaller font due to lack of
+	 space.
+	·A bug in the renumbering of the Parts in the ProTracker import
+	 duplicate Part routine fixed.
+	·The Info Page has been made larger.
+
+V1.09: Release date 950720
+¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯
+	·A bug in Remove Instrument removed, it didn't renumber the Instruments
+	 in the Parts correctly.
+	·When removing a Tune with 4Ch PlayMode and then it selected a Tune
+	 with 8Ch PlayMode it didn't change the PlayMode to 8Ch.
+	·Pressing return in the Part number gadget will now result in that the
+	 cursor will be placed in the Part editor.
+	·You can now play Instruments on the keyboard while Caps Lock is
+	 activated.
+	·If Musicline fonts can't be opened, then a message will popup.
+	·A requester when trying to load a PowerPacked ProTracker file will pop
+	 up.
+
+V1.10: Release date 950726
+¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯
+	·You can now watch where the Tune is playing, which Part it plays,
+	 where in the Part it's playing and which Transpose it plays with.
+	·White underlines now follows the Tune and Part performance during
+	 Tune play or Part play.
+	·Two white vertical lines will show which Channel beeing used when
+	 playing a Part or an Instrument on the keyboard.
+	·Scroll routines have been improved to be faster.
+	·Cursors, Marks and White underlines fixed so it doesn't flicker when
+	 scrolling the Sequencer or the Part.
+	·Scroll Part or Sequencer or Sequencer & Part together along with
+	 performance has been implemented.
+	·You can now follow the Tune in a singel Voice/Channel, and that will
+	 be shown in the Part.
+	·An real sample sensitive VU meter (bar type) has been implemented.
+
+V1.11: Release date 950809
+¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯
+	·Set mix wave window bug removed.
+	·The arpeggio editor now works on 68000 machines.
+	·The help windows are now smaller and has a dragbar.
+	·Tune, Instrument, Wavesample string gadgets now resets to zero
+	 position when enter is pressed.
+
+V1.12: Release date 950910
+¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯
+	·Help windows don´t block input in other windows.
+	·Column editmode has been fixed in the arpeggio editor.
+	·The editmodes are now vertical,horizontal,column.
+	·A editmode gadget has been added in the arpeggio editor.
+	·The octave cycle gadget text (low/med/high/lame) has changed
+	 to (1-2/2-3/3-4/4-5)
+	·Multiselect has been added to load instrument.
+	·The waveform f/x visualizer code has been 100% system friendly.
+	·Remove wavesample(s) bug now removed.
+	·Remove equal wavesamples has been added.
+	·Screenmode requester has been added.
+	·Configuration (save/default/last saved) has been added.
+	·A registration editor has been added to the shareware version.
+	·A bug in the info page save routine has been removed.
+
+V1.13: Release date 950913
+¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯
+	·A bug in the wavesample parameters slider gadgets has been removed.
+	·A bug in the waveform f/x visualizer has been removed.
+
+V1.14: Release date 951002
+¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯
+	·If you removed all the chars in one of the string gadgets
+	 tune, instrument, wavesample name, then the guru showed up!
+	 Now it's fixed.
+	·The shortname has been changed from MlEd to Mline. Read readme.txt
+	 to get to know the exact reasons. This also affects the MlEd: assign
+	 which is now changed to Mline:.
+	·One press on the Joybutton now starts the tune and another stops it.
+	 Implemented on demand from a liveplaying user.
+
+V1.15: Release date 960829
+¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯
+	·The play routine is now much faster on amigas with fastmem.
+	·The joybutton function has been removed.
+	·A bug in the scroll sequence function has been removed.
+	 Scrolling beyond $7f is now possible.
+	·A bug in the show wich part number was playing has been removed.
+	 Showing part numbers beyond $ff is now possible.
+	·The format of the Mline.reg file has beeen changed.
+	 So now E-Mailing the Mline.reg file should work just fine.
+
+[END]
+@endnode

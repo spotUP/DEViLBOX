@@ -307,3 +307,7 @@ VST/
 # Derived from external Cinter reference code (assembled 68k blob + listing)
 tools/cinter-audit/reference/
 maxtrax-wasm/src/generated/
+
+# Build artifacts / scratch
+tools/kontakt-bridge/build/
+scratch-calc3.bin
