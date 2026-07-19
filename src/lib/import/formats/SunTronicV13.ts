@@ -893,7 +893,12 @@ export function parseSunTronicV13Score(buf: Uint8Array): SunV13Score {
   }
   const synthTableOff = synthLea + s16BE(h1, synthLea);
   const sampledTableOff = sampledLea + s16BE(h1, sampledLea);
-  if (synthTableOff < 0 || sampledTableOff <= synthTableOff || sampledTableOff >= h1.length) {
+  // Both LEAs may point at the SAME address on an all-sampled module (no synth
+  // records) — e.g. suntronic-donner.src, whose synth and sampled `lea`s both
+  // target 0x15b8. That is a valid 0-synth build, so accept `sampledTableOff ===
+  // synthTableOff` (count 0); only a sampled table BEFORE the synth table, a
+  // negative synth offset, or an out-of-hunk sampled offset is structurally bad.
+  if (synthTableOff < 0 || sampledTableOff < synthTableOff || sampledTableOff >= h1.length) {
     throw new Error('SunTronic V1.3: instrument table offsets out of range');
   }
   const synthInstrumentCount = Math.floor((sampledTableOff - synthTableOff) / SYNTH_RECORD_SIZE);

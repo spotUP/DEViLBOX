@@ -170,6 +170,32 @@ describe('SunTronic V1.3 score decode (Delirium hunk executables)', () => {
     expect(r0.vibDepth.length).toBe(r0.freqEnvLen + 1);
   });
 
+  it('suntronic-donner.src: all-sampled build (0 synth) whose synth/sampled LEAs coincide still decodes', () => {
+    // donner is the sole 0-synth module in the corpus: its `lea synthTable,a0`
+    // and `lea sampledTable,a1` both target the SAME hunk#1 address (0x15b8),
+    // so synthTableOff === sampledTableOff and the synth count is 0. The old
+    // guard `sampledTableOff <= synthTableOff` treated the equal case as
+    // structurally broken and THREW, dropping donner to a UADE path that
+    // mis-renders its build variant as noise. Fails on revert: with the `<=`
+    // guard parseSunTronicV13Score throws 'instrument table offsets out of
+    // range' and never reaches these assertions.
+    const score = parseSunTronicV13Score(new Uint8Array(loadModule('suntronic-donner.src')));
+    expect(score.synthInstrumentCount).toBe(0);
+    expect(score.synthInstruments.length).toBe(0);
+    expect(score.sampledInstruments.length).toBe(14);
+    expect(score.subsongs.length).toBeGreaterThan(0);
+    expect(score.blocks.length).toBeGreaterThan(0);
+
+    // Full parse loads all 14 sampled instruments as sample-type from the
+    // module's own name table + instr/ sidecars, and lays real notes into the grid.
+    const song = parseSunTronicFile(loadModule('suntronic-donner.src'), 'suntronic-donner.src', loadCompanions());
+    expect(song.instruments.length).toBe(14);
+    expect(song.instruments.every((i) => i.type === 'sample')).toBe(true);
+    const totalNotes = song.patterns.reduce((n, p) =>
+      n + p.channels.reduce((m, c) => m + c.rows.filter((r) => r.note > 0).length, 0), 0);
+    expect(totalNotes).toBeGreaterThan(0);
+  });
+
   for (const name of ['mule.src', 'kompo.pc']) {
     it(`${name}: layout carriers are HONEST — blockRawBytes equals the file slice and the encoder reproduces it`, () => {
       const buf = loadModule(name);
