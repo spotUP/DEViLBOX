@@ -34,6 +34,7 @@ import {
   sunSynthToConfig,
 } from './SunTronicV13';
 import type { SunV13Score, SunCmdWidths } from './SunTronicV13';
+import { sunSynthDescriptiveName } from '@/lib/suntronic/synthName';
 import { decodeSunGroup, encodeSunGroup } from './sunGroupCodec';
 import { decodeSunBlockPool, buildSunTronicNativeData, buildPoolRowIndex } from './sunNativeData';
 
@@ -499,7 +500,12 @@ function buildV13Instruments(
     // falling through to whole-module UADE playback. Song playback still routes
     // to UADE via uadeEditableFileData (suppressNotes), so the two don't double.
     instruments.push({
-      id: numSampled + i + 1, name: `Synth ${i + 1}`, type: 'synth' as const,
+      id: numSampled + i + 1,
+      // Derive a descriptive name from the decoded synthesis type + arp/vibrato
+      // presence (the format stores no name for synth records). Falls back to a
+      // bare `Synth N` for slots that don't decode.
+      name: rec ? sunSynthDescriptiveName(sunSynthToConfig(rec), i) : `Synth ${i + 1}`,
+      type: 'synth' as const,
       synthType: rec ? ('SunTronicSynth' as const) : ('Synth' as const),
       sunTronic: rec ? sunSynthToConfig(rec) : undefined,
       effects: [], volume: 0, pan: 0,
