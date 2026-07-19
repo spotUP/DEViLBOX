@@ -44,6 +44,8 @@ import type { Pattern, ChannelData, TrackerCell, InstrumentConfig } from '@/type
 import type { UADEVariablePatternLayout } from '@/engine/uade/UADEPatternEncoder';
 import { idGenerator } from '@utils/idGenerator';
 import { sonixEncoder, sonixTinyEncoder } from '@/engine/uade/encoders/SonixMusicDriverEncoder';
+import { createSamplerInstrument } from './AmigaUtils';
+import { parseSonixSynthInstr } from '@/engine/sonix/sonixInstrument';
 
 // ── Constants ─────────────────────────────────────────────────────────────
 
@@ -495,6 +497,109 @@ function buildPatterns(
   return patterns;
 }
 
+// ── Instrument classification (synth vs sample) ─────────────────────────────
+//
+// Every Sonix voice slot USED to be stamped synthType 'SonixSynth', so clicking
+// "Edit" on a sample-based instrument dead-ended at "no Sonix synth parameters".
+// The real type lives in the companion .instr header — the WASM loader keys off
+// the same instrument NAME to find <name>.instr / <name>.ss (sonix_io.c ~1144).
+// We mirror that here so sample voices route to the normal sample editor.
+
+// Amiga C-3 baseline. Sonix plays natively (period-driven), so this only sets the
+// Sampler's editor base pitch; the grid note drives real playback frequency.
+const SONIX_SAMPLE_RATE = 8287;
+
+/** Basename(lowercase) → bytes, for case-insensitive .instr/.ss companion lookup. */
+function buildSonixCompanionLookup(
+  companionFiles?: Map<string, ArrayBuffer>,
+): Map<string, Uint8Array> {
+  const lut = new Map<string, Uint8Array>();
+  if (!companionFiles) return lut;
+  for (const [key, data] of companionFiles) {
+    const base = (key.split('/').pop() ?? key).toLowerCase();
+    lut.set(base, new Uint8Array(data));
+  }
+  return lut;
+}
+
+/**
+ * Read SNX tail instrument names (C: sonix.c ~675). After the 4 voice streams the
+ * file stores NUL-separated printable-ASCII names, one per register slot (e.g.
+ * ORGAN,FLUTESYN,BASS,SNAREBIG,CRASHCYM). Mirrors the loader: skip NULs, read
+ * printable ASCII until NUL/non-printable, stop on an empty run.
+ */
+function readSnxTailNames(buf: Uint8Array, streamsEnd: number): string[] {
+  const names: string[] = [];
+  let pos = Math.max(0, streamsEnd);
+  while (pos < buf.length && names.length < 64) {
+    while (pos < buf.length && buf[pos] === 0) pos++;
+    if (pos >= buf.length) break;
+    let name = '';
+    while (pos < buf.length && buf[pos] !== 0 && name.length < 63) {
+      const c = buf[pos++];
+      if (c < 0x20 || c > 0x7e) break;
+      name += String.fromCharCode(c);
+    }
+    while (pos < buf.length && buf[pos] !== 0) pos++; // skip rest of a truncated token
+    if (name.length === 0) break;
+    names.push(name);
+  }
+  return names;
+}
+
+/**
+ * Resolve the raw .ss PCM for a sample-based Sonix instrument, mirroring the WASM
+ * loader (sonix_io.c ~1163/1334). Two .instr sample shapes apply:
+ *   - 32-byte type-2 reference: be16(@2)==2, 4-char .ss basename at @4 (e.g. cu01 → USA1)
+ *   - "SampledSound" header (or a bare .ss): the .ss shares the instrument basename
+ * Returns null when no companion PCM is resolvable.
+ */
+function resolveSonixSamplePcm(name: string, lut: Map<string, Uint8Array>): Uint8Array | null {
+  const lower = name.toLowerCase();
+  const instr = lut.get(`${lower}.instr`);
+  if (instr && instr.length === 32 && u16BE(instr, 2) === 2) {
+    let ref = '';
+    for (let i = 4; i < 8 && instr[i] >= 0x20 && instr[i] <= 0x7e; i++) {
+      ref += String.fromCharCode(instr[i]);
+    }
+    const ss = lut.get(`${ref.trim().toLowerCase()}.ss`);
+    if (ss && ss.length > 0) return ss;
+  }
+  const direct = lut.get(`${lower}.ss`);
+  return direct && direct.length > 0 ? direct : null;
+}
+
+function placeholderSonixSynth(id: number, name: string): InstrumentConfig {
+  return {
+    id, name, type: 'synth' as const, synthType: 'SonixSynth' as const,
+    effects: [], volume: 0, pan: 0,
+  } as InstrumentConfig;
+}
+
+/**
+ * Build Sonix instruments with correct per-slot typing so the editor routes each
+ * to the right panel:
+ *   - synth voice (.instr decodes as Synthesis/MIDI) → SonixSynth (synth-params editor)
+ *   - sample voice (SampledSound / type-2 ref / bare .ss) → Sampler w/ decoded PCM,
+ *     so the normal sample editor opens (was a dead-end: all slots forced SonixSynth)
+ *   - unresolved (self-contained module, no companions) → SonixSynth placeholder
+ * Slot index i is the 0-based register; id = i+1 matches cell.instrument.
+ */
+function buildSonixInstruments(
+  names: string[],
+  count: number,
+  lut: Map<string, Uint8Array>,
+): InstrumentConfig[] {
+  return Array.from({ length: count }, (_, i) => {
+    const name = names[i]?.trim() || `Sample ${i + 1}`;
+    const instr = lut.get(`${name.toLowerCase()}.instr`);
+    if (instr && parseSonixSynthInstr(instr)) return placeholderSonixSynth(i + 1, name);
+    const pcm = resolveSonixSamplePcm(name, lut);
+    if (pcm) return createSamplerInstrument(i + 1, name, pcm, 64, SONIX_SAMPLE_RATE, 0, 0);
+    return placeholderSonixSynth(i + 1, name);
+  });
+}
+
 /**
  * Parse SNX binary format (snx.* prefix).
  *
@@ -507,7 +612,11 @@ function buildPatterns(
  * Instruments are placeholder Samplers — actual samples live in external files
  * (.instr / .ss) that UADE loads separately.
  */
-function parseSnxBinary(buf: Uint8Array, filename: string): TrackerSong {
+function parseSnxBinary(
+  buf: Uint8Array,
+  filename: string,
+  companionFiles?: Map<string, ArrayBuffer>,
+): TrackerSong {
   const fileSize = buf.length;
   if (fileSize < 22) throw new Error('SNX file too small');
 
@@ -535,24 +644,20 @@ function parseSnxBinary(buf: Uint8Array, filename: string): TrackerSong {
     offset += sectionLengths[ch];
   }
 
-  // Build placeholder instruments (1 per used register, up to 16)
-  const usedRegisters = new Set<number>();
+  // Instruments are named from the tail name-table (after the 4 voice streams) and
+  // typed per-slot from their .instr companion (synth vs sample). cell.instrument is
+  // 1-based (register+1), so slot i (name-table index) → id i+1 keeps the grid aligned.
+  const streamsEnd = 20 + sectionLengths.reduce((a, b) => a + b, 0);
+  const tailNames = readSnxTailNames(buf, streamsEnd);
+  let maxInstr = 0;
   for (const cells of channelFlat) {
     for (const cell of cells) {
-      if (cell.instrument > 0) usedRegisters.add(cell.instrument);
+      if (cell.instrument > maxInstr) maxInstr = cell.instrument;
     }
   }
-  const instruments: InstrumentConfig[] = Array.from(
-    { length: Math.max(1, usedRegisters.size) },
-    (_, i) => ({
-      id:         i + 1,
-      name:       `Sample ${i + 1}`,
-      type:       'synth' as const,
-      synthType:  'SonixSynth' as const,
-      effects:    [],
-      volume:     0,
-      pan:        0,
-    }) as InstrumentConfig,
+  const instrCount = Math.max(1, tailNames.length, maxInstr);
+  const instruments = buildSonixInstruments(
+    tailNames, instrCount, buildSonixCompanionLookup(companionFiles),
   );
 
   const baseName = (filename.split('/').pop() ?? filename).replace(/^snx\./i, '');
@@ -760,7 +865,11 @@ function tinyStreamLength(buf: Uint8Array, ptr: number): number {
  * Instruments are placeholder Samplers named from the 0x40 table — actual PCM
  * lives in external .instr/.ss files the Sonix WASM engine loads via sidecars.
  */
-function parseTinyBinary(buf: Uint8Array, filename: string): TrackerSong {
+function parseTinyBinary(
+  buf: Uint8Array,
+  filename: string,
+  companionFiles?: Map<string, ArrayBuffer>,
+): TrackerSong {
   const NUM_CHANNELS = 4;
   const fileSize = buf.length;
   if (fileSize < 64) throw new Error('TINY file too small');
@@ -799,17 +908,8 @@ function parseTinyBinary(buf: Uint8Array, filename: string): TrackerSong {
     }
   }
   const instrCount = Math.max(1, tableNames.length, maxRegister);
-  const instruments: InstrumentConfig[] = Array.from(
-    { length: instrCount },
-    (_, i) => ({
-      id:         i + 1,
-      name:       tableNames[i] ?? `Sample ${i + 1}`,
-      type:       'synth' as const,
-      synthType:  'SonixSynth' as const,
-      effects:    [],
-      volume:     0,
-      pan:        0,
-    }) as InstrumentConfig,
+  const instruments = buildSonixInstruments(
+    tableNames, instrCount, buildSonixCompanionLookup(companionFiles),
   );
 
   const baseName = (filename.split('/').pop() ?? filename).replace(/^tiny\./i, '');
@@ -926,14 +1026,14 @@ export async function parseSonixFile(
     // TINY binary format: decode the 4 voice command streams to an editable grid
     // (byte-exact via raw-block carrier) and attach the file + companion sidecars
     // so the Sonix WASM engine renders synthesis from the external .instr/.ss.
-    const song = parseTinyBinary(buf, filename);
+    const song = parseTinyBinary(buf, filename, companionFiles);
     song.sonixFileData = buffer.slice(0);
     song.sonixSidecarFiles = buildSonixSidecarFiles(companionFiles);
     return song;
   }
 
-  // SNX binary format: parse note streams, placeholder instruments
-  const song = parseSnxBinary(buf, filename);
+  // SNX binary format: parse note streams, tail-named + typed instruments
+  const song = parseSnxBinary(buf, filename, companionFiles);
   song.sonixFileData = buffer.slice(0);
   song.sonixSidecarFiles = buildSonixSidecarFiles(companionFiles);
   return song;
