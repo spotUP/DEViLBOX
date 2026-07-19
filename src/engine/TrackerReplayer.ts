@@ -789,6 +789,12 @@ export class TrackerReplayer {
    *  Set by forcePosition, cleared after one React render cycle. */
   public skipNextReload = false;
 
+  /** One-shot request: force the next usePatternPlayback effect run to RELOAD the
+   *  song even during natural playback. Used for live Play Song <-> Play Pattern
+   *  mode switches, where the loop set must be rebuilt without stopping (no brake).
+   *  Consumed (reset to false) by the effect on the next run. */
+  public forceReloadOnce = false;
+
   /** Track whether play() has completed at least once (audio infra is set up). */
   private _hasPlayedOnce = false;
 
