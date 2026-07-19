@@ -6,7 +6,7 @@
 
 import { useCallback, useMemo } from 'react';
 import { useShallow } from 'zustand/react/shallow';
-import { useTrackerStore, useCursorStore, useTransportStore } from '@stores';
+import { useTrackerStore, useCursorStore } from '@stores';
 import { useEditorStore } from '@stores/useEditorStore';
 import {
   HEX_DIGITS_ALL,
@@ -28,29 +28,14 @@ export const useEffectInput = (refs: TrackerInputRefs) => {
   })));
 
   const recordMode = useEditorStore((state) => state.recordMode);
-  const editStep = useEditorStore((state) => state.editStep);
 
   const setCell = useTrackerStore((state) => state.setCell);
-  const moveCursorToRow = useCursorStore((state) => state.moveCursorToRow);
-
-  const isPlaying = useTransportStore((state) => state.isPlaying);
+  // FT2 nibble-cursor post-entry move: writes a nibble then advances one nibble
+  // right within the cell, jumps effTyp→effParam, or drops a row on the last
+  // nibble (per edit step + behavior gate). Single source of truth in the store.
+  const applyEntryAdvance = useCursorStore((state) => state.applyEntryAdvance);
 
   const pattern = patterns[currentPatternIndex];
-
-  // Advance cursor by editStep — only if the behavior says so for this column type
-  const advanceIfAllowed = useCallback((columnType: 'instrument' | 'volume' | 'effTyp' | 'effParam' | 'effTyp2' | 'effParam2' | 'flag1' | 'flag2' | 'probability') => {
-    if (editStep <= 0 || isPlaying) return;
-    const behavior = useEditorStore.getState().activeBehavior;
-    // Determine whether this column type should trigger advancement
-    let shouldAdvance = true;
-    if (columnType === 'instrument') shouldAdvance = behavior.advanceOnInstrument;
-    else if (columnType === 'volume') shouldAdvance = behavior.advanceOnVolume;
-    else if (columnType.startsWith('eff')) shouldAdvance = behavior.advanceOnEffect;
-    // flag/probability always advance (DEViLBOX-specific columns)
-    if (shouldAdvance) {
-      moveCursorToRow((cursorRef.current.rowIndex + editStep) % pattern.length);
-    }
-  }, [editStep, isPlaying, moveCursorToRow, cursorRef, pattern]);
 
   // Handle effect/data entry keydown events. Returns true if handled.
   const handleKeyDown = useCallback(
@@ -81,7 +66,7 @@ export const useEffectInput = (refs: TrackerInputRefs) => {
 
         if (newValue > 128) newValue = 128;
         setCell(cursorRef.current.channelIndex, cursorRef.current.rowIndex, { instrument: newValue });
-        advanceIfAllowed("instrument");
+        applyEntryAdvance(cursorRef.current.columnType, cursorRef.current.digitIndex);
         return true;
       }
 
@@ -99,7 +84,7 @@ export const useEffectInput = (refs: TrackerInputRefs) => {
             let newValue = (vol1Key << 4) | (currentValue & 0x0F);
             if (newValue >= 0x51 && newValue <= 0x5F) newValue = 0x50;
             setCell(cursorRef.current.channelIndex, cursorRef.current.rowIndex, { volume: newValue });
-            advanceIfAllowed("volume");
+            applyEntryAdvance(cursorRef.current.columnType, cursorRef.current.digitIndex);
             return true;
           }
         } else {
@@ -116,7 +101,7 @@ export const useEffectInput = (refs: TrackerInputRefs) => {
 
             if (newValue >= 0x51 && newValue <= 0x5F) newValue = 0x50;
             setCell(cursorRef.current.channelIndex, cursorRef.current.rowIndex, { volume: newValue });
-            advanceIfAllowed("volume");
+            applyEntryAdvance(cursorRef.current.columnType, cursorRef.current.digitIndex);
             return true;
           }
         }
@@ -134,7 +119,7 @@ export const useEffectInput = (refs: TrackerInputRefs) => {
             effTyp: effKey,
             effect: effectString
           });
-          advanceIfAllowed("effTyp");
+          applyEntryAdvance(cursorRef.current.columnType, cursorRef.current.digitIndex);
           return true;
         }
       }
@@ -160,7 +145,7 @@ export const useEffectInput = (refs: TrackerInputRefs) => {
           eff: newValue,
           effect: effectString
         });
-        advanceIfAllowed("effParam");
+        applyEntryAdvance(cursorRef.current.columnType, cursorRef.current.digitIndex);
         return true;
       }
 
@@ -176,7 +161,7 @@ export const useEffectInput = (refs: TrackerInputRefs) => {
             effTyp2: effKey,
             effect2: effectString
           });
-          advanceIfAllowed("effTyp2");
+          applyEntryAdvance(cursorRef.current.columnType, cursorRef.current.digitIndex);
           return true;
         }
       }
@@ -188,31 +173,31 @@ export const useEffectInput = (refs: TrackerInputRefs) => {
         if (keyLower === 'a') {
           e.preventDefault();
           setCell(cursorRef.current.channelIndex, cursorRef.current.rowIndex, { [flagField]: 1 });
-          advanceIfAllowed("flag1");
+          applyEntryAdvance(cursorRef.current.columnType, cursorRef.current.digitIndex);
           return true;
         }
         if (keyLower === 's') {
           e.preventDefault();
           setCell(cursorRef.current.channelIndex, cursorRef.current.rowIndex, { [flagField]: 2 });
-          advanceIfAllowed("flag1");
+          applyEntryAdvance(cursorRef.current.columnType, cursorRef.current.digitIndex);
           return true;
         }
         if (keyLower === 'm') {
           e.preventDefault();
           setCell(cursorRef.current.channelIndex, cursorRef.current.rowIndex, { [flagField]: 3 });
-          advanceIfAllowed("flag1");
+          applyEntryAdvance(cursorRef.current.columnType, cursorRef.current.digitIndex);
           return true;
         }
         if (keyLower === 'h') {
           e.preventDefault();
           setCell(cursorRef.current.channelIndex, cursorRef.current.rowIndex, { [flagField]: 4 });
-          advanceIfAllowed("flag1");
+          applyEntryAdvance(cursorRef.current.columnType, cursorRef.current.digitIndex);
           return true;
         }
         if (key === '0' || key === '.') {
           e.preventDefault();
           setCell(cursorRef.current.channelIndex, cursorRef.current.rowIndex, { [flagField]: 0 });
-          advanceIfAllowed("flag1");
+          applyEntryAdvance(cursorRef.current.columnType, cursorRef.current.digitIndex);
           return true;
         }
       }
@@ -238,7 +223,7 @@ export const useEffectInput = (refs: TrackerInputRefs) => {
           eff2: newValue,
           effect2: effectString
         });
-        advanceIfAllowed("effParam2");
+        applyEntryAdvance(cursorRef.current.columnType, cursorRef.current.digitIndex);
         return true;
       }
 
@@ -258,13 +243,13 @@ export const useEffectInput = (refs: TrackerInputRefs) => {
         newValue = Math.min(99, Math.max(0, newValue));
 
         setCell(cursorRef.current.channelIndex, cursorRef.current.rowIndex, { probability: newValue });
-        advanceIfAllowed("probability");
+        applyEntryAdvance(cursorRef.current.columnType, cursorRef.current.digitIndex);
         return true;
       }
 
       return false;
     },
-    [recordMode, pattern, setCell, advanceIfAllowed, cursorRef]
+    [recordMode, pattern, setCell, applyEntryAdvance, cursorRef]
   );
 
   return useMemo(() => ({ handleKeyDown }), [handleKeyDown]);
