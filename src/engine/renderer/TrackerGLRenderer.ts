@@ -14,6 +14,7 @@ import { buildGlyphAtlas, parseColor, parseRgba, type GlyphAtlas, type GlyphInfo
 import { SUN_EFFECT_GLYPH } from '@/lib/import/formats/sunEffectGlyphs';
 import { SNX_EFFECT_GLYPH } from '@/lib/import/formats/sonixEffectGlyphs';
 import { computeCaretRect } from '@/lib/tracker/caretGeometry';
+import { anySoloActive, isChannelDimmed } from '@/lib/tracker/channelDim';
 import type {
   PatternSnapshot,
   CursorSnapshot,
@@ -486,7 +487,7 @@ export class TrackerGLRenderer {
     const numChannels = pattern.channels.length;
 
     // Mute / solo dimming — compute once per frame
-    const anySolo = pattern.channels.some(ch => ch.solo);
+    const anySolo = anySoloActive(pattern.channels);
     const MUTED_ALPHA = 0.3;
 
     // Selection ranges
@@ -513,7 +514,7 @@ export class TrackerGLRenderer {
         this.addRect(colX, 0, chW, height, [c[0], c[1], c[2], 0.03]);
       }
       // Muted / non-solo darkening overlay
-      const isDimmed = chData.muted || (anySolo && !chData.solo);
+      const isDimmed = isChannelDimmed(!!chData.muted, !!chData.solo, anySolo);
       if (isDimmed) {
         this.addRect(colX, 0, chW, height, [0, 0, 0, 0.45]);
       }
@@ -719,7 +720,7 @@ export class TrackerGLRenderer {
         if (!cell) continue;
 
         // Combined alpha: ghost dimming × mute/solo dimming
-        const chDimmed = chData.muted || (anySolo && !chData.solo);
+        const chDimmed = isChannelDimmed(!!chData.muted, !!chData.solo, anySolo);
         const cellAlpha = ghostAlpha * (chDimmed ? MUTED_ALPHA : 1.0);
 
         const isCollapsed = chData.collapsed;

@@ -18,6 +18,7 @@ import type {
 import { SUN_EFFECT_GLYPH } from '@/lib/import/formats/sunEffectGlyphs';
 import { SNX_EFFECT_GLYPH } from '@/lib/import/formats/sonixEffectGlyphs';
 import { computeCaretRect } from '@/lib/tracker/caretGeometry';
+import { anySoloActive, isChannelDimmed } from '@/lib/tracker/channelDim';
 
 const ROW_HEIGHT   = 24;
 const CHAR_WIDTH   = 10;
@@ -188,7 +189,7 @@ export class TrackerCanvas2DRenderer {
     const numChan = pattern.channels.length;
 
     // Mute / solo dimming
-    const anySolo = pattern.channels.some(ch => ch.solo);
+    const anySolo = anySoloActive(pattern.channels);
     const MUTED_ALPHA = 0.3;
 
     // ── Row backgrounds ─────────────────────────────────────────────────────
@@ -274,7 +275,7 @@ export class TrackerCanvas2DRenderer {
       if (!chan) continue;
 
       // Muted / non-solo darkening overlay
-      const isDimmed = chan.muted || (anySolo && !chan.solo);
+      const isDimmed = isChannelDimmed(!!chan.muted, !!chan.solo, anySolo);
       if (isDimmed) {
         const chW = chanWidths[ch] ?? cw * 9;
         ctx.fillStyle = 'rgba(0,0,0,0.45)';
