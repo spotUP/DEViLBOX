@@ -35,3 +35,37 @@ describe('useCursorStore — moveCursor selection clearing (M1)', () => {
     expect(useCursorStore.getState().selection).not.toBeNull();
   });
 });
+
+/**
+ * FT2 rule: a keyboard Shift+select must build the same multi-column span as a
+ * mouse drag over the same cells. endSelection used to update only end
+ * row/channel/column and leave `columnTypes` frozen at the start column, so
+ * Shift-selecting note->volume yielded a 1-column clipboard shape while
+ * dragging the same span yielded 3 columns.
+ */
+describe('useCursorStore — keyboard selection spans columns like the mouse (M4)', () => {
+  beforeEach(() => {
+    resetStore(useTrackerStore);
+    useCursorStore.setState({
+      cursor: { channelIndex: 0, rowIndex: 2, noteColumnIndex: 0, columnType: 'note', digitIndex: 0 },
+      selection: null,
+    });
+  });
+
+  it('endSelection recomputes columnTypes across the note->instrument->volume span', () => {
+    // Mark at the note column, then extend the cursor to the volume column.
+    useCursorStore.getState().startSelection();
+    expect(useCursorStore.getState().selection?.columnTypes).toEqual(['note']);
+
+    useCursorStore.setState({
+      cursor: { channelIndex: 0, rowIndex: 5, noteColumnIndex: 0, columnType: 'volume', digitIndex: 0 },
+    });
+    useCursorStore.getState().endSelection();
+
+    const sel = useCursorStore.getState().selection;
+    expect(sel?.endRow).toBe(5);
+    expect(sel?.endColumn).toBe('volume');
+    // Same span the mouse-drag path (updateSelection) produces.
+    expect(sel?.columnTypes).toEqual(['note', 'instrument', 'volume']);
+  });
+});
