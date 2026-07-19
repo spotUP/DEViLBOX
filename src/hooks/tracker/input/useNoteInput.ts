@@ -16,6 +16,7 @@ import { NOTE_MAP, type HeldNote, type TrackerInputRefs } from './inputConstants
 import { validateEdit } from '@/lib/import/formatConstraints';
 import { notify } from '@/stores/useNotificationStore';
 import type { TrackerFormat } from '@/engine/TrackerReplayer';
+import { isKeyHandled } from '@lib/tracker/keyHandledSentinel';
 
 // XM note values for IT-style note types
 const XM_NOTE_OFF = 97;
@@ -279,7 +280,7 @@ export const useNoteInput = (refs: TrackerInputRefs) => {
   // Handle note-related keydown events. Returns true if handled.
   const handleKeyDown = useCallback(
     (e: KeyboardEvent): boolean => {
-      if ((e as any).__handled) return false;
+      if (isKeyHandled(e)) return false;
       const key = e.key;
       const keyLower = key.toLowerCase();
       const behavior = useEditorStore.getState().activeBehavior;

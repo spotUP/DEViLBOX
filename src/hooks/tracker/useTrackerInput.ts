@@ -20,6 +20,7 @@ import { xmNoteToString } from '@lib/xmConversions';
 import { useNoteInput, useEffectInput, useNavigationInput } from './input';
 import { amplifySelectionHelper } from '@stores/tracker/patternEditActions';
 import { resolveFt2BlockKey } from '@lib/tracker/blockKeymap';
+import { isKeyHandled } from '@lib/tracker/keyHandledSentinel';
 import type { EditorBehavior } from '@engine/keyboard/EditorBehavior';
 
 /** Get the cell field names for a given note column index (0-3) */
@@ -228,7 +229,7 @@ export const useTrackerInput = () => {
       }
 
       // Skip if already handled by the global keyboard handler
-      if ((e as any).__handled) return;
+      if (isKeyHandled(e)) return;
 
       // Ignore if typing in input field or operating a dropdown
       if (

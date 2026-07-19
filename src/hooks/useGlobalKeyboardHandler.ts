@@ -17,6 +17,7 @@ import { KeyboardNormalizer } from '@engine/keyboard/KeyboardNormalizer';
 import { KeyComboFormatter } from '@engine/keyboard/KeyComboFormatter';
 import type { PlatformType, CommandContext, Command } from '@engine/keyboard/types';
 import { useVocoderStore } from '@stores/useVocoderStore';
+import { markKeyHandled } from '@lib/tracker/keyHandledSentinel';
 
 // Import command implementations
 import { playRow } from '@engine/keyboard/commands/playRow';
@@ -1967,7 +1968,7 @@ export function useGlobalKeyboardHandler(options: UseGlobalKeyboardHandlerOption
           e.preventDefault();
           e.stopPropagation();
           useVocoderStore.getState().setPTT(true);
-          (e as any).__handled = true;
+          markKeyHandled(e);
           return;
         }
       }
@@ -2042,7 +2043,7 @@ export function useGlobalKeyboardHandler(options: UseGlobalKeyboardHandlerOption
         // Mark event as handled so React-level handlers (useTrackerInput,
         // useNavigationInput) don't double-execute the same action.
         // stopPropagation doesn't help because both are capture-phase on window.
-        (e as any).__handled = true;
+        markKeyHandled(e);
       }
     };
 
