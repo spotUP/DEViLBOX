@@ -27,6 +27,13 @@ class SonixProcessor extends AudioWorkletProcessor {
     this.scopePostDivider = 4; // ~86 posts/s at 44.1kHz
     this.scopePostCounter = 0;
 
+    // Playback-position feedback: poll the driver's current grid row and post it so
+    // the editor cursor follows the native audio instead of a free-running TS clock.
+    // Same cadence as the scopes; only post when the row actually changed.
+    this.posPostDivider = 4;
+    this.posPostCounter = 0;
+    this.lastPostedRow = -1;
+
     this.port.onmessage = (event) => {
       this.handleMessage(event.data);
     };
@@ -430,6 +437,10 @@ class SonixProcessor extends AudioWorkletProcessor {
             this.scopePostCounter = 0;
             this.postChannelScopes();
           }
+          if (++this.posPostCounter >= this.posPostDivider) {
+            this.posPostCounter = 0;
+            this.postDisplayRow();
+          }
         }
       }
     }
@@ -458,6 +469,17 @@ class SonixProcessor extends AudioWorkletProcessor {
       channels[ch] = new Int16Array(buffer, this.scopePtr, n).slice();
     }
     this.port.postMessage({ type: 'channelData', channels });
+  }
+
+  // Post the driver's current grid row so the main thread can drive the editor
+  // cursor from the real playback position (see SonixEngine.onPositionUpdate).
+  postDisplayRow() {
+    const m = this.module;
+    if (!m || typeof m._sonix_get_display_row !== 'function') return;
+    const row = m._sonix_get_display_row();
+    if (row === this.lastPostedRow) return;
+    this.lastPostedRow = row;
+    this.port.postMessage({ type: 'position', row });
   }
 }
 
