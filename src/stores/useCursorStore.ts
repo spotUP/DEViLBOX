@@ -57,7 +57,7 @@ interface CursorStore {
   applyEntryAdvance: (columnType: CursorPosition['columnType'], digitIndex: number) => void;
   moveCursorToChannel: (channel: number) => void;
   moveCursorToColumn: (columnType: CursorPosition['columnType']) => void;
-  moveCursorToChannelAndColumn: (channel: number, columnType: CursorPosition['columnType'], noteColumnIndex?: number) => void;
+  moveCursorToChannelAndColumn: (channel: number, columnType: CursorPosition['columnType'], noteColumnIndex?: number, digitIndex?: number) => void;
   getColumnsForChannel: (channelIndex: number) => Array<{ type: CursorPosition['columnType']; nci: number }> | null;
 
   startSelection: () => void;
@@ -291,13 +291,13 @@ export const useCursorStore = create<CursorStore>()((set, get) => ({
     set({ cursor: { ...get().cursor, columnType, digitIndex: 0 } });
   },
 
-  moveCursorToChannelAndColumn: (channel, columnType, noteColumnIndex) => {
+  moveCursorToChannelAndColumn: (channel, columnType, noteColumnIndex, digitIndex) => {
     const ts = getTrackerState();
     const pattern = ts.patterns[ts.currentPatternIndex];
     if (channel >= 0 && channel < pattern.channels.length) {
       const maxNci = (pattern.channels[channel]?.channelMeta?.noteCols ?? 1) - 1;
       const nci = Math.min(noteColumnIndex ?? 0, maxNci);
-      set({ cursor: { ...get().cursor, channelIndex: channel, columnType, digitIndex: 0, noteColumnIndex: nci } });
+      set({ cursor: { ...get().cursor, channelIndex: channel, columnType, digitIndex: digitIndex ?? 0, noteColumnIndex: nci } });
     }
   },
 

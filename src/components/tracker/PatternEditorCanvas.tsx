@@ -12,6 +12,7 @@ import { useChannelTypeStore } from '@stores/useChannelTypeStore';
 import { useWasmPositionStore } from '@stores/useWasmPositionStore';
 import { channelLayout } from './channelLayout';
 import { computeChannelFollowScroll } from '@/lib/tracker/followScroll';
+import { resolveCellColumn } from '@/lib/tracker/cellHitTest';
 import { AutomationLanes } from './AutomationLanes';
 import { GlobalLaneCurves } from './GlobalLaneCurves';
 import { MasterDubLane } from './MasterDubLane';
@@ -571,9 +572,6 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     const isCollapsed = pattern.channels[channelIndex]?.collapsed;
     if (isCollapsed) return { rowIndex: Math.max(0, Math.min(rowIndex, pattern.length - 1)), channelIndex, columnType: 'note' };
 
-    let columnType: CursorPosition['columnType'] = 'note';
-    let noteColumnIndex = 0;
-
     // Match the GL renderer's centering: content is centered within channel width
     const noteWidth = CHAR_WIDTH * 3 + 4;
     const cell = pattern.channels[channelIndex]?.rows[0];
@@ -590,39 +588,22 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     const centeringOffset = Math.floor((chW - chContentWidth) / 2);
     const localX = Math.max(0, relativeX - (channelOffsets[channelIndex] ?? 0) - centeringOffset);
 
-    // Column boundaries matching the GL renderer's layout:
-    // note(noteWidth) → 4px gap → inst(CW*2) → 4px gap → vol(CW*2) → 4px gap → effects...
-    const paramBase = noteWidth + 4; // where inst starts
-    const allNoteColsEnd = NOTE_COL_GROUP_W * totalNoteCols;
-
-    if (localX < allNoteColsEnd) {
-      // Inside a note column group
-      noteColumnIndex = Math.min(totalNoteCols - 1, Math.max(0, Math.floor(localX / NOTE_COL_GROUP_W)));
-      const xInGroup = localX - noteColumnIndex * NOTE_COL_GROUP_W;
-      if (xInGroup < paramBase) columnType = 'note';
-      else if (xInGroup < paramBase + CHAR_WIDTH * 2 + 4) columnType = 'instrument';
-      else columnType = 'volume';
-    } else {
-      // After all note columns — effects, flags, probability
-      const xInParams = localX - allNoteColsEnd;
-      const effectWidth = effectCols * (CHAR_WIDTH * 3 + 4);
-      if (xInParams < effectWidth) {
-        const effCol = Math.floor(xInParams / (CHAR_WIDTH * 3 + 4));
-        columnType = effCol === 0 ? 'effTyp' : 'effTyp2';
-      } else if (hasAcid && xInParams < effectWidth + CHAR_WIDTH * 2 + 8) {
-        columnType = xInParams < effectWidth + CHAR_WIDTH + 4 ? 'flag1' : 'flag2';
-      } else if (hasProb) {
-        columnType = 'probability';
-      } else {
-        columnType = 'effTyp';
-      }
-    }
+    // Pure decider resolves the exact column AND nibble (see cellHitTest.ts).
+    const hit = resolveCellColumn({
+      localX,
+      charWidth: CHAR_WIDTH,
+      totalNoteCols,
+      effectCols,
+      hasAcid,
+      hasProb,
+    });
 
     return {
       rowIndex: Math.max(0, Math.min(rowIndex, pattern.length - 1)),
       channelIndex,
-      noteColumnIndex,
-      columnType
+      noteColumnIndex: hit.noteColumnIndex,
+      columnType: hit.columnType as CursorPosition['columnType'],
+      digitIndex: hit.digitIndex,
     };
   }, [pattern, dimensions.height, scrollLeft, channelOffsets, channelWidths, numChannels]);
 
@@ -783,7 +764,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
       cursorStore.updateSelection(cell.channelIndex, cell.rowIndex);
     } else {
       cursorStore.moveCursorToRow(cell.rowIndex);
-      cursorStore.moveCursorToChannelAndColumn(cell.channelIndex, cell.columnType as any, cell.noteColumnIndex);
+      cursorStore.moveCursorToChannelAndColumn(cell.channelIndex, cell.columnType as any, cell.noteColumnIndex, cell.digitIndex);
       cursorStore.startSelection();
     }
 
