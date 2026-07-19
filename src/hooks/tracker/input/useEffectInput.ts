@@ -15,6 +15,7 @@ import {
   EFFECT_TYPE_KEY_MAP,
   type TrackerInputRefs,
 } from './inputConstants';
+import { isKeyHandled } from '@lib/tracker/keyHandledSentinel';
 
 export const useEffectInput = (refs: TrackerInputRefs) => {
   const { cursorRef } = refs;
@@ -40,7 +41,7 @@ export const useEffectInput = (refs: TrackerInputRefs) => {
   // Handle effect/data entry keydown events. Returns true if handled.
   const handleKeyDown = useCallback(
     (e: KeyboardEvent): boolean => {
-      if ((e as any).__handled) return false;
+      if (isKeyHandled(e)) return false;
       if (!recordMode) return false;
       // Suppress key repeat on all data entry columns (matches note input behavior)
       if (e.repeat) return false;
