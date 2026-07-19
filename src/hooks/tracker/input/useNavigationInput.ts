@@ -15,6 +15,7 @@ import { xmNoteToString } from '@lib/xmConversions';
 import { ALT_TRACK_MAP_1, ALT_TRACK_MAP_2, type TrackerInputRefs } from './inputConstants';
 import { isKeyHandled } from '@lib/tracker/keyHandledSentinel';
 import { isManualRowNavAllowed } from '@lib/tracker/playbackNavigation';
+import { nextTabChannel } from '@lib/tracker/tabNavigation';
 
 export const useNavigationInput = (refs: TrackerInputRefs) => {
   const { cursorRef, selectionRef } = refs;
@@ -274,22 +275,11 @@ export const useNavigationInput = (refs: TrackerInputRefs) => {
             }
           }
         } else {
-          // FT2/PT: Tab jumps to next/prev channel note column
-          if (e.shiftKey) {
-            if (cursorRef.current.columnType === 'note') {
-              if (cursorRef.current.channelIndex > 0) {
-                moveCursorToChannel(cursorRef.current.channelIndex - 1);
-              } else {
-                moveCursorToChannel(pattern.channels.length - 1);
-              }
-            }
-          } else {
-            if (cursorRef.current.channelIndex < pattern.channels.length - 1) {
-              moveCursorToChannel(cursorRef.current.channelIndex + 1);
-            } else {
-              moveCursorToChannel(0);
-            }
-          }
+          // FT2/PT: Tab and Shift+Tab both jump to the next/prev channel's note
+          // column, wrapping — symmetric, never gated on the current column.
+          moveCursorToChannel(
+            nextTabChannel(cursorRef.current.channelIndex, pattern.channels.length, e.shiftKey),
+          );
           moveCursorToColumn('note');
         }
         return true;
