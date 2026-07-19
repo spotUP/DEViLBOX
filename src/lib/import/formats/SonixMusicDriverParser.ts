@@ -43,7 +43,7 @@ import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { Pattern, ChannelData, TrackerCell, InstrumentConfig } from '@/types';
 import type { UADEVariablePatternLayout } from '@/engine/uade/UADEPatternEncoder';
 import { idGenerator } from '@utils/idGenerator';
-import { sonixEncoder } from '@/engine/uade/encoders/SonixMusicDriverEncoder';
+import { sonixEncoder, sonixTinyEncoder } from '@/engine/uade/encoders/SonixMusicDriverEncoder';
 
 // ── Constants ─────────────────────────────────────────────────────────────
 
@@ -622,6 +622,238 @@ function parseSnxBinary(buf: Uint8Array, filename: string): TrackerSong {
   };
 }
 
+// ── TINY binary parser ─────────────────────────────────────────────────────
+
+/**
+ * Parse a single TINY voice event stream into TrackerCells.
+ *
+ * TINY opcodes DIFFER from SNX (verified against SonixMusicDriver_v1 ASM +
+ * byte-probe of a real module — 0x80/0x81 are SWAPPED vs SNX and the note
+ * low byte is DURATION not volume):
+ *
+ *   0xFFFF          end of track (stop parsing)
+ *   0x0000          skip (zero duration — no-op, used as stream warm-up padding)
+ *   0x81nn          instrument change (nn = table index 0–63 → 1-based)
+ *   0x80nn          rest for nn ticks
+ *   0x00–0x7Fnn     note on: high byte = note index (semitone), low byte = DURATION in ticks
+ *
+ * Note index is a direct pitch offset used by the TINY synth against the
+ * instrument's base frequency; without running the type-1 synth we map it
+ * directly (grid pitch = raw index, clamp 1–96), same convention as SNX.
+ * One tracker row = one player tick, so a note of duration d occupies its
+ * on-row plus (d-1) hold rows (matching how SNX rests expand).
+ */
+function parseTinyVoiceStream(
+  buf: Uint8Array,
+  startOff: number,
+  length: number,
+): TrackerCell[] {
+  const cells: TrackerCell[] = [];
+  const endOff = Math.min(startOff + length, buf.length);
+  let pos = startOff;
+  let currentInstr = 1;
+
+  while (pos + 2 <= endOff) {
+    const word = u16BE(buf, pos);
+    pos += 2;
+
+    if (word === 0xFFFF) break;   // end of track
+    if (word === 0x0000) continue; // skip (zero duration)
+
+    const hi = (word >> 8) & 0xFF;
+    const lo = word & 0xFF;
+
+    if (hi === 0x81) {
+      // Instrument change: table index → 1-based instrument
+      currentInstr = lo + 1;
+      continue;
+    }
+    if (hi === 0x80) {
+      // Rest for lo ticks
+      const ticks = Math.max(1, lo);
+      for (let t = 0; t < ticks; t++) cells.push(emptyCell());
+      continue;
+    }
+    if (hi >= 0x82) {
+      // Unknown control (detection admits bytes up to 0x82) — ignore, no rows
+      continue;
+    }
+
+    // Note on: high byte = note index, low byte = duration in ticks
+    const noteIndex = hi;
+    const dur = Math.max(1, lo);
+    if (noteIndex === 0) {
+      for (let t = 0; t < dur; t++) cells.push(emptyCell());
+    } else {
+      const xmNote = Math.max(1, Math.min(96, noteIndex));
+      cells.push({
+        note: xmNote,
+        instrument: currentInstr,
+        volume: 0,
+        effTyp: 0, eff: 0, effTyp2: 0, eff2: 0,
+      });
+      for (let t = 1; t < dur; t++) cells.push(emptyCell()); // hold rows
+    }
+  }
+
+  return cells;
+}
+
+/**
+ * Read the fixed 4-byte ASCII instrument-name table at file offset 0x40.
+ * Entries are the base names of the external .instr companion files
+ * (e.g. "CE01" → CE01.instr). Stops at the first all-zero entry.
+ */
+function readTinyInstrumentNames(buf: Uint8Array): string[] {
+  const names: string[] = [];
+  const TABLE_OFF = 0x40;
+  const ENTRY = 4;
+  for (let i = 0; TABLE_OFF + i * ENTRY + ENTRY <= buf.length && i < 63; i++) {
+    const off = TABLE_OFF + i * ENTRY;
+    let name = '';
+    let allZero = true;
+    for (let b = 0; b < ENTRY; b++) {
+      const c = buf[off + b];
+      if (c !== 0) allZero = false;
+      if (c >= 0x20 && c < 0x7F) name += String.fromCharCode(c);
+    }
+    if (allZero) break;
+    names.push(name || `Sample ${i + 1}`);
+  }
+  return names;
+}
+
+/** Scan a TINY voice stream from ptr, returning its byte length up to and
+ *  including the terminating 0xFFFF word (falls back to file end). */
+function tinyStreamLength(buf: Uint8Array, ptr: number): number {
+  let pos = ptr;
+  while (pos + 2 <= buf.length) {
+    const w = u16BE(buf, pos);
+    pos += 2;
+    if (w === 0xFFFF) return pos - ptr;
+  }
+  return buf.length - ptr;
+}
+
+/**
+ * Parse TINY binary format (tiny.* prefix). Synthesis-engine variant of Sonix.
+ *
+ * Layout (verified against a real module + isTinyFormat detection):
+ *   Bytes  0–47:  header (volume, tempo, tuning — not yet mapped to BPM)
+ *   Bytes 48–63:  4 × u32BE voice-stream pointers (first == 0x140)
+ *   Byte  0x40+:  4-byte ASCII instrument name table (.instr companion basenames)
+ *   Stream bytes: 4 packed voice event streams, each terminated by 0xFFFF
+ *
+ * Instruments are placeholder Samplers named from the 0x40 table — actual PCM
+ * lives in external .instr/.ss files the Sonix WASM engine loads via sidecars.
+ */
+function parseTinyBinary(buf: Uint8Array, filename: string): TrackerSong {
+  const NUM_CHANNELS = 4;
+  const fileSize = buf.length;
+  if (fileSize < 64) throw new Error('TINY file too small');
+
+  // 4 voice-stream pointers at bytes 48/52/56/60 (C engine authority — the
+  // 0x140 the detector treats as a marker IS voice-0's pointer).
+  const ptrs: number[] = [];
+  for (let ch = 0; ch < NUM_CHANNELS; ch++) {
+    ptrs.push(u32BE(buf, 48 + ch * 4));
+  }
+
+  const channelFlat: TrackerCell[][] = [];
+  const streamSizes: number[] = [];
+  for (let ch = 0; ch < NUM_CHANNELS; ch++) {
+    const ptr = ptrs[ch];
+    if (ptr <= 0 || ptr >= fileSize) {
+      channelFlat.push([]);
+      streamSizes.push(0);
+      continue;
+    }
+    const len = tinyStreamLength(buf, ptr);
+    channelFlat.push(parseTinyVoiceStream(buf, ptr, len));
+    streamSizes.push(len);
+  }
+
+  // Instruments named from the 0x40 table; ensure at least the used registers.
+  const tableNames = readTinyInstrumentNames(buf);
+  let maxRegister = 0;
+  for (const cells of channelFlat) {
+    for (const cell of cells) {
+      if (cell.instrument > maxRegister) maxRegister = cell.instrument;
+    }
+  }
+  const instrCount = Math.max(1, tableNames.length, maxRegister);
+  const instruments: InstrumentConfig[] = Array.from(
+    { length: instrCount },
+    (_, i) => ({
+      id:         i + 1,
+      name:       tableNames[i] ?? `Sample ${i + 1}`,
+      type:       'synth' as const,
+      synthType:  'SonixSynth' as const,
+      effects:    [],
+      volume:     0,
+      pan:        0,
+    }) as InstrumentConfig,
+  );
+
+  const baseName = (filename.split('/').pop() ?? filename).replace(/^tiny\./i, '');
+  const patterns = buildPatterns(channelFlat, filename, NUM_CHANNELS);
+
+  // Structural raw-block carrier (see parseSnxBinary): each voice stream is one
+  // contiguous command stream buildPatterns splits across many display patterns,
+  // so the whole-stream inverse can't be rebuilt from one pattern's rows. Stash
+  // the raw bytes + full decoded baseline so encodeVariableBlock emits the raw
+  // bytes verbatim when unedited (byte-exact) and only runs the TINY packer once
+  // a cell diverges.
+  const filePatternAddrs: number[] = [];
+  const filePatternSizes: number[] = [];
+  const blockRawBytes: Uint8Array[] = [];
+  const blockRows: TrackerCell[][] = [];
+  for (let ch = 0; ch < NUM_CHANNELS; ch++) {
+    const ptr = ptrs[ch];
+    const len = streamSizes[ch];
+    filePatternAddrs.push(ptr);
+    filePatternSizes.push(len);
+    blockRawBytes.push(buf.subarray(ptr, ptr + len));
+    blockRows.push(channelFlat[ch]);
+  }
+
+  const trackMap: number[][] = patterns.map(() =>
+    Array.from({ length: NUM_CHANNELS }, (_, ch) => ch),
+  );
+  const rowsPerPattern = patterns.map(p => p.length);
+
+  const uadeVariableLayout: UADEVariablePatternLayout = {
+    formatId: 'sonixMusicDriverTiny',
+    numChannels: NUM_CHANNELS,
+    numFilePatterns: NUM_CHANNELS,
+    rowsPerPattern,
+    moduleSize: fileSize,
+    encoder: sonixTinyEncoder,
+    filePatternAddrs,
+    filePatternSizes,
+    trackMap,
+    blockRows,
+    blockRawBytes,
+  };
+
+  return {
+    name:           `${baseName} [TINY]`,
+    format:         'MOD' as TrackerFormat,
+    patterns,
+    instruments,
+    songPositions:  patterns.map((_, i) => i),
+    songLength:     patterns.length,
+    restartPosition: 0,
+    numChannels:    NUM_CHANNELS,
+    initialSpeed:   6,
+    initialBPM:     125,
+    linearPeriods:  false,
+    uadeEditableFileData: buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer,
+    uadeEditableFileName: filename,
+    uadeVariableLayout,
+  };
+}
+
 // ── Main export ───────────────────────────────────────────────────────────
 
 /**
@@ -674,12 +906,13 @@ export async function parseSonixFile(
   }
 
   if (subFormat === 'tiny') {
-    // TINY binary format references external instrument files (.instr/.ss).
-    // Without those files the note-to-pitch mapping is impossible to recover
-    // statically.  Throw so UADE (via CIA tick reconstruction) handles this.
-    throw new Error(
-      'Sonix TINY binary format requires external instrument files; use UADE for playback',
-    );
+    // TINY binary format: decode the 4 voice command streams to an editable grid
+    // (byte-exact via raw-block carrier) and attach the file + companion sidecars
+    // so the Sonix WASM engine renders synthesis from the external .instr/.ss.
+    const song = parseTinyBinary(buf, filename);
+    song.sonixFileData = buffer.slice(0);
+    song.sonixSidecarFiles = buildSonixSidecarFiles(companionFiles);
+    return song;
   }
 
   // SNX binary format: parse note streams, placeholder instruments
