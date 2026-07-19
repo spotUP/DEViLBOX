@@ -46,6 +46,7 @@ export const ENCODER_FIXTURES: EncoderFixture[] = [
   { formatId: "musicAssembler", fixture: "public/data/songs/music-assembler/thanatos.ma", kind: "variable" },
   { formatId: "ronKlaren", fixture: "public/data/songs/ron-klaren/astra 2.rk", kind: "fixed" },
   { formatId: "sonixMusicDriver", fixture: "public/data/songs/sonix/snx/A-10 Tank Killer/winning.snx", kind: "variable", parser: { module: "@lib/import/formats/SonixMusicDriverParser", parseFn: "parseSonixFile" } },
+  { formatId: "sonixMusicDriverTiny", fixture: "public/data/songs/sonix/tiny/It Came From The Desert/maintitle.tiny", kind: "variable", parser: { module: "@lib/import/formats/SonixMusicDriverParser", parseFn: "parseSonixFile" } },
   { formatId: "soundControl", fixture: "public/data/songs/soundcontrol/north sea inferno ongame1.sc", kind: "fixed" },
   { formatId: "soundFactory", fixture: "public/data/songs/soundfactory/im maien.psf", kind: "fixed" },
   { formatId: "symphoniePro", fixture: "public/data/songs/symphonie/pas 2 jade.symmod", kind: "fixed" },

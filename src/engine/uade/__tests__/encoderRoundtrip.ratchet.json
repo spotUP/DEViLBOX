@@ -560,6 +560,14 @@
       "matchPct": 1,
       "cells": 4
     },
+    "sonixMusicDriverTiny": {
+      "kind": "variable",
+      "method": "encode-pattern",
+      "status": "byte-exact",
+      "byteExact": true,
+      "matchPct": 1,
+      "cells": 4
+    },
     "soundControl": {
       "kind": "fixed",
       "method": "decode-encode",
