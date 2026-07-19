@@ -216,6 +216,13 @@ struct SonixSong {
     u32 debug_wait_commands;
     u32 debug_loop_resets;
     u32 debug_total_ticks;
+    // Display cursor: grid-row index the driver is currently playing, in the SAME
+    // row space the parser builds (SonixMusicDriverParser: one grid row per SNX CIA
+    // tick / per SMUS-TINY note-step). Incremented once per grid row; reset to 0 on
+    // song loop-restart so it stays in [0, song_row_length). The worklet exports it
+    // and the editor maps it to (songPos = row/64, patternRow = row%64) — closes the
+    // open-loop display drift where the TS scheduler free-ran at a hardcoded tempo.
+    u32 display_row;
     u32 noise_state;
     f32 dbg_last_vol[SONIX_NUM_CHANNELS]; // effective per-channel vol, stashed during mix for lock-step trace
     FILE* dump_file;
@@ -2377,6 +2384,7 @@ static void smus_process_tick(SonixSong* song) {
 
         // Increment tick count (assembly lines 6970-6971)
         song->smus_tick_count++;
+        song->display_row++; // one SMUS note-step == one parser grid row
 
         // Check song end conditions (assembly lines 6975-6982)
         if (song->smus_max_ticks < 0) {
@@ -2391,6 +2399,7 @@ static void smus_process_tick(SonixSong* song) {
 
         // Song ended: restart (assembly lines 6990-6995)
         song->debug_loop_resets++;
+        song->display_row = 0; // song looped: wrap the display cursor back to row 0
         smus_scan_tracks(song, 0);
         smus_init_channels(song);
     }
@@ -2571,6 +2580,7 @@ static void tiny_process_tick(SonixSong* song) {
         }
 
         song->smus_tick_count++;
+        song->display_row++; // one TINY note-step == one parser grid row
 
         if (song->smus_max_ticks < 0) {
             if (ended_count < 4)
@@ -2593,6 +2603,7 @@ static void tiny_process_tick(SonixSong* song) {
             song->snx_track_ended[ch] = false;
         }
         song->smus_tick_count = 0;
+        song->display_row = 0; // song looped: wrap the display cursor back to row 0
     }
 
 instrument_ticks:
@@ -2643,6 +2654,7 @@ static void snx_process_tick(SonixSong* song) {
             break;
 
         song->debug_loop_resets++;
+        song->display_row = 0; // song looped: wrap the display cursor back to row 0
         for (int ch = 0; ch < SONIX_NUM_CHANNELS; ch++) {
             song->snx_track_pos[ch] = song->snx_track_start[ch];
             song->snx_track_ended[ch] = false;
@@ -2660,6 +2672,8 @@ static void snx_process_tick(SonixSong* song) {
         snx_synth_pitch_modulate(song, ch);
     }
     song->debug_total_ticks++;
+    // One SNX CIA tick == one parser grid row (note+waitN spans N+1 ticks == N+1 rows).
+    song->display_row++;
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
