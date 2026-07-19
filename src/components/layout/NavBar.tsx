@@ -114,7 +114,13 @@ const NavBarComponent: React.FC = () => {
   return (
     <div className="bg-dark-bgSecondary border-b border-dark-border relative z-40">
       {/* Top Bar: Title and Volume */}
-      <nav className="grid grid-cols-3 items-center px-4 py-2 border-b border-dark-border">
+      {/* Track template is [auto_1fr_auto], NOT three equal 1fr columns: the left
+          group (title + badges + Desktop App + Tips + Tour) is intrinsically wider
+          than a 1fr third and grid tracks do not clip overflow, so with grid-cols-3
+          it bled into the centered transport and the Tour button overlapped Play
+          Song. auto side tracks size to their content and never overflow; the 1fr
+          middle absorbs the slack and centers the transport in the gap. */}
+      <nav className="grid grid-cols-[auto_1fr_auto] items-center px-4 py-2 border-b border-dark-border">
         {/* Left: App Title */}
         <div className="flex items-center gap-4">
           <h1 className="font-bold text-lg tracking-tight">
@@ -159,8 +165,10 @@ const NavBarComponent: React.FC = () => {
           )}
         </div>
 
-        {/* Center: FT2 transport — visible when dub deck is expanded */}
-        <div className="flex items-center justify-center gap-1">
+        {/* Center: FT2 transport — visible when dub deck is expanded.
+            min-w-0 lets the 1fr track shrink below content width on narrow
+            viewports so the side groups are never pushed/overlapped. */}
+        <div className="flex items-center justify-center gap-1 min-w-0 overflow-x-auto no-scrollbar">
         {dubDeckTransportActive && (<>
             <Button
               variant={isPlayingSong ? 'danger' : 'primary'}
