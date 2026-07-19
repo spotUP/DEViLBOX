@@ -20,6 +20,7 @@ import { notify } from '@stores/useNotificationStore';
 import { getToneEngine } from '@engine/ToneEngine';
 import { getTrackerReplayer } from '@engine/TrackerReplayer';
 import { getTrackerScratchController } from '@engine/TrackerScratchController';
+import { computePlayButtonAction } from '@/lib/tracker/playbackButtonAction';
 import { useFormatStore } from '@stores/useFormatStore';
 import { useGTUltraStore } from '@stores/useGTUltraStore';
 import { setFormatPlaybackPlaying, resetFormatPlaybackState } from '@engine/FormatPlaybackState';
@@ -423,9 +424,10 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
       return;
     }
 
-    // If already playing, stop with turntable brake
+    // If already playing, either Stop (same mode) or SWITCH to song mode (from
+    // pattern-loop) without stopping. See computePlayButtonAction.
     if (isPlaying) {
-      // WASM singleton engines: stop directly (no scratch buffer support)
+      // WASM singleton engines: stop directly (no live mode switch / scratch support)
       if (editorMode === 'jamcracker' || editorMode === 'musicline') {
         const wasmPos = useWasmPositionStore.getState();
         if (wasmPos.active) {
@@ -441,7 +443,15 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
         engine.stop();
         return;
       }
-      // Standard formats: turntable-style electronic brake spindown
+      const action = computePlayButtonAction('song', isPlaying, isLooping);
+      if (action === 'switch') {
+        // Was looping a pattern → resume the full song without stopping.
+        // Force a warm reload so the effect rebuilds the full song order.
+        getTrackerReplayer().forceReloadOnce = true;
+        setIsLooping(false);
+        return;
+      }
+      // Already playing the full song → this button acts as Stop (brake).
       getTrackerScratchController().triggerElectronicBrake();
       return;
     }
@@ -491,7 +501,8 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
       return;
     }
 
-    // If already playing, stop with turntable brake
+    // If already playing, either Stop (same mode) or SWITCH to pattern-loop (from
+    // song mode) without stopping. See computePlayButtonAction.
     if (isPlaying) {
       if (editorMode2 === 'jamcracker') {
         getTrackerReplayer().stop();
@@ -499,7 +510,15 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
         engine.stop();
         return;
       }
-      // Standard formats: turntable-style electronic brake spindown
+      const action = computePlayButtonAction('pattern', isPlaying, isLooping);
+      if (action === 'switch') {
+        // Was playing the full song → loop the current pattern without stopping.
+        // Force a warm reload so the effect rebuilds the 1-entry loop list.
+        getTrackerReplayer().forceReloadOnce = true;
+        setIsLooping(true);
+        return;
+      }
+      // Already looping a pattern → this button acts as Stop (brake).
       getTrackerScratchController().triggerElectronicBrake();
       return;
     }

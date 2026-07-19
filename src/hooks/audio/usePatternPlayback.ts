@@ -18,6 +18,7 @@ import { getTrackerReplayer, type TrackerFormat } from '@engine/TrackerReplayer'
 import { getTrackerScratchController } from '@engine/TrackerScratchController';
 import type { UADEEngine } from '@engine/uade/UADEEngine';
 import { resolveMaxTraxLoadBytes } from '@/lib/import/formats/maxtrax/maxtraxFormat';
+import { computePlaybackFollow } from '@/lib/tracker/playbackFollow';
 
 export const usePatternPlayback = () => {
   const { patterns, currentPatternIndex, setCurrentPattern, patternOrder, currentPositionIndex, setCurrentPosition, } = useTrackerStore(useShallow((s) => ({
@@ -277,7 +278,12 @@ export const usePatternPlayback = () => {
                                    replayer.isPlaying() &&
                                    (wasReplayerAdvanced || replayer.isSuppressNotes);
 
-      const needsReload = hasStartedRef.current && !isNaturalAdvancement;
+      // A live Play Song <-> Play Pattern switch must rebuild the loop set even
+      // mid-playback (where isNaturalAdvancement would otherwise suppress reload).
+      const forceReload = replayer.forceReloadOnce;
+      replayer.forceReloadOnce = false;
+
+      const needsReload = hasStartedRef.current && (forceReload || !isNaturalAdvancement);
 
       // Per-channel formats (MusicLine etc.) have no importMetadata.sourceFormat on their
       // single-voice PART patterns. Fall back to 'MOD' (Amiga period math) not 'XM'.
@@ -710,9 +716,15 @@ export const usePatternPlayback = () => {
             lastPosition = position;
             replayerAdvancedRef.current++;
             setTimeout(() => {
+              // In pattern-loop (Play Pattern) the replayer's song is a 1-entry
+              // list, so `position` is always 0 — feeding it to setCurrentPosition
+              // rewrites currentPatternIndex = patternOrder[0], yanking the editor
+              // to song pos 000 and restarting the loop on pattern 0. Follow the
+              // pattern only when looping; follow both in full-song playback.
+              const follow = computePlaybackFollow(isLooping, patternNum, position);
               startTransition(() => {
-                setCurrentPattern(patternNum, true);
-                setCurrentPosition(position, true);
+                setCurrentPattern(follow.pattern, true);
+                if (follow.position !== null) setCurrentPosition(follow.position, true);
               });
               const globalRow = position * 64 + row;
               useTransportStore.getState().setCurrentGlobalRow(globalRow);
