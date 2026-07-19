@@ -10,7 +10,39 @@
  */
 
 import type { InstrumentConfig } from '@typedefs/instrument';
-import type { SonixSynthParams } from './SonixEngine';
+import { SONIX_BRIDGE_SPEC, type SonixSynthParams } from './sonixSynthSpec';
+import { normalizeSynthParams } from '@engine/replayer/WasmSynthParamBridge';
+
+/**
+ * Byte offsets of each synth-param field inside a Sonix `.instr` binary (SNX1 synthesis
+ * voice). The SINGLE source of truth for the format layout — both `parseSonixSynthInstr`
+ * (read) and `serializeSonixSynthInstr` (write) walk SONIX_BRIDGE_SPEC.paramSchema and
+ * look each field's position up here, so the two are provably exact inverses. Scalars are
+ * 2 big-endian bytes; `wave`/`envTable`/`lfoWave` are 128 signed bytes each; `egLevels`/
+ * `egRates` are 4 big-endian u16 each. Offsets validated against the C oracle
+ * (tools/sonix-audit/gen-presets.c) in sonixInstrParser.test.ts. `index` is not stored in
+ * the file (it is the instrument's slot), so it has no offset.
+ */
+export const SONIX_INSTR_OFFSETS: Record<string, number> = {
+  wave: 0x44,
+  envTable: 0xc4,
+  lfoWave: 0x144,
+  baseVol: 0x1cc,
+  portFlag: 0x1ce,
+  envVolScale: 0x1d0,
+  slideRate: 0x1d2,
+  envPitchScale: 0x1d4,
+  filterBase: 0x1d6,
+  filterRange: 0x1d8,
+  filterEnvSens: 0x1da,
+  envScanRate: 0x1dc,
+  envLoopMode: 0x1de,
+  envDelayInit: 0x1e0,
+  c2: 0x1e2,
+  c4: 0x1e4,
+  egLevels: 0x1e6,
+  egRates: 0x1ee,
+};
 
 /** Read the mirrored Sonix synth params from an instrument config (null if absent). */
 export function readSonixSynthParams(config: InstrumentConfig): SonixSynthParams | null {
@@ -135,29 +167,78 @@ export function parseSonixSynthInstr(data: Uint8Array): SonixSynthParams | null 
   if (!hasSynthHeader && !hasZeroHeader) return null;
   if (data.length < 0xc4 + 64) return null; // decode_synthesis_wave size floor
 
+  const O = SONIX_INSTR_OFFSETS;
   const p = getDefaultSonixParams();
-  if (data.length >= 0x44 + 128) p.wave = read128(0x44);
-  if (data.length >= 0xc4 + 128) p.envTable = read128(0xc4);
-  if (data.length >= 0x1c4) p.lfoWave = read128(0x144); // 0x144 + 128 = 0x1C4
-  if (data.length >= 0x1d0) { p.baseVol = be16(0x1cc); p.portFlag = be16(0x1ce); }
-  if (data.length >= 0x1e6) {
-    p.envVolScale = be16(0x1d0);
-    p.slideRate = be16(0x1d2);
-    p.envPitchScale = be16(0x1d4);
-    p.filterBase = be16(0x1d6);
-    p.filterRange = be16(0x1d8);
-    p.filterEnvSens = be16(0x1da);
-    p.envScanRate = be16(0x1dc);
-    p.envLoopMode = be16s(0x1de);
-    p.envDelayInit = be16(0x1e0);
-    p.c2 = be16(0x1e2);
-    p.c4 = be16(0x1e4);
+  if (data.length >= O.wave + 128) p.wave = read128(O.wave);
+  if (data.length >= O.envTable + 128) p.envTable = read128(O.envTable);
+  if (data.length >= O.lfoWave + 128) p.lfoWave = read128(O.lfoWave); // 0x144 + 128 = 0x1C4
+  if (data.length >= O.envVolScale) { p.baseVol = be16(O.baseVol); p.portFlag = be16(O.portFlag); }
+  if (data.length >= O.egLevels) {
+    p.envVolScale = be16(O.envVolScale);
+    p.slideRate = be16(O.slideRate);
+    p.envPitchScale = be16(O.envPitchScale);
+    p.filterBase = be16(O.filterBase);
+    p.filterRange = be16(O.filterRange);
+    p.filterEnvSens = be16(O.filterEnvSens);
+    p.envScanRate = be16(O.envScanRate);
+    p.envLoopMode = be16s(O.envLoopMode);
+    p.envDelayInit = be16(O.envDelayInit);
+    p.c2 = be16(O.c2);
+    p.c4 = be16(O.c4);
   }
-  if (data.length >= 0x1f6) {
-    p.egLevels = [0, 1, 2, 3].map((j) => be16(0x1e6 + j * 2));
-    p.egRates = [0, 1, 2, 3].map((j) => be16(0x1ee + j * 2));
+  if (data.length >= O.egRates + 8) {
+    p.egLevels = [0, 1, 2, 3].map((j) => be16(O.egLevels + j * 2));
+    p.egRates = [0, 1, 2, 3].map((j) => be16(O.egRates + j * 2));
   }
   return p;
+}
+
+/**
+ * Serialize edited SonixSynthParams back into a `.instr` synth-voice binary — the exact
+ * inverse of {@link parseSonixSynthInstr}. Clones the ORIGINAL bytes and overwrites only the
+ * synth-param fields at their SONIX_INSTR_OFFSETS positions, so every byte the parser never
+ * read (the "Synthesis" header, reserved fields, trailing data) is preserved verbatim.
+ *
+ * The field set + numeric kinds come from SONIX_BRIDGE_SPEC (single source of truth); params
+ * are first normalized through the same bridge core the live WASM setter uses, so out-of-range
+ * scalars and mis-sized tables can never corrupt the file. Returns a fresh Uint8Array; the
+ * `original` is not mutated. `index` carries no file offset (it is the instrument slot), so
+ * it is skipped.
+ */
+export function serializeSonixSynthInstr(
+  original: Uint8Array,
+  params: SonixSynthParams,
+): Uint8Array {
+  const out = original.slice();
+  const norm = normalizeSynthParams(SONIX_BRIDGE_SPEC, params);
+  const put16 = (o: number, v: number): void => {
+    if (o + 1 >= out.length) return;
+    out[o] = (v >>> 8) & 0xff;
+    out[o + 1] = v & 0xff;
+  };
+
+  for (const field of SONIX_BRIDGE_SPEC.paramSchema) {
+    const off = SONIX_INSTR_OFFSETS[field.name];
+    if (off === undefined) continue; // 'index' — not stored in the file
+    const value = norm[field.name];
+
+    if (field.kind === 'i8[]') {
+      const arr = value as number[];
+      const len = field.length ?? arr.length;
+      for (let k = 0; k < len; k++) {
+        if (off + k < out.length) out[off + k] = (arr[k] ?? 0) & 0xff;
+      }
+    } else if (field.kind === 'u16[]') {
+      const arr = value as number[];
+      const len = field.length ?? arr.length;
+      for (let k = 0; k < len; k++) put16(off + k * 2, (arr[k] ?? 0) & 0xffff);
+    } else {
+      // Every scalar Sonix synth field is stored as 2 big-endian bytes (u16, or signed i16
+      // for envLoopMode — two's-complement round-trips through the & 0xffff mask).
+      put16(off, (value as number) & 0xffff);
+    }
+  }
+  return out;
 }
 
 /** Apply a scalar param edit to a params object, returning a new copy. */
