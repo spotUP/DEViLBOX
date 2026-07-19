@@ -13,6 +13,7 @@
 import { buildGlyphAtlas, parseColor, parseRgba, type GlyphAtlas, type GlyphInfo } from './glyph-atlas';
 import { SUN_EFFECT_GLYPH } from '@/lib/import/formats/sunEffectGlyphs';
 import { SNX_EFFECT_GLYPH } from '@/lib/import/formats/sonixEffectGlyphs';
+import { computeCaretRect } from '@/lib/tracker/caretGeometry';
 import type {
   PatternSnapshot,
   CursorSnapshot,
@@ -604,30 +605,20 @@ export class TrackerGLRenderer {
           + (showAcid ? CHAR_WIDTH * 2 + 8 : 0) + (showProb ? CHAR_WIDTH * 2 + 4 : 0);
         cursorX = colX + Math.floor((chW - cursorContentWidth) / 2);
 
-        // Cursor noteColumnIndex determines which note group the cursor is in
-        const cursorNoteCol = cursor.noteColumnIndex ?? 0;
-        const noteColOffset = cursorNoteCol * CURSOR_NOTE_COL_GROUP_W;
-        const paramBase = noteWidth + 4;
         const hasAcidC  = chData?.rows[0]?.flag1 !== undefined
                        || chData?.rows[0]?.flag2 !== undefined;
-        // Effects base offset — after all note column groups
-        const effBase = cursorNoteCols * CURSOR_NOTE_COL_GROUP_W;
-        const acidOff = effBase + cursorEffectCols * (CHAR_WIDTH * 3 + 4);
-        const probOff = acidOff + (hasAcidC ? CHAR_WIDTH * 2 + 8 : 0);
-
-        switch (cursor.columnType) {
-          case 'note':       caretOffX = noteColOffset;                                                    caretW = noteWidth; break;
-          case 'instrument': caretOffX = noteColOffset + paramBase + cursor.digitIndex * CHAR_WIDTH;       break;
-          case 'volume':     caretOffX = noteColOffset + paramBase + (CHAR_WIDTH * 2 + 4) + cursor.digitIndex * CHAR_WIDTH; break;
-          case 'effTyp':     caretOffX = effBase;                                                          break;
-          case 'effParam':   caretOffX = effBase + CHAR_WIDTH + cursor.digitIndex * CHAR_WIDTH;            break;
-          case 'effTyp2':    caretOffX = effBase + (CHAR_WIDTH * 3 + 4);                                   break;
-          case 'effParam2':  caretOffX = effBase + (CHAR_WIDTH * 3 + 4) + CHAR_WIDTH + cursor.digitIndex * CHAR_WIDTH; break;
-          case 'flag1':      caretOffX = acidOff;                                                          break;
-          case 'flag2':      caretOffX = acidOff + CHAR_WIDTH + 4;                                         break;
-          case 'probability':caretOffX = probOff + cursor.digitIndex * CHAR_WIDTH;                         break;
-          default:           caretOffX = effBase;                                                           break;
-        }
+        // Per-nibble caret geometry — shared with the Canvas2D fallback.
+        const rect = computeCaretRect({
+          columnType: cursor.columnType,
+          digitIndex: cursor.digitIndex,
+          noteColumnIndex: cursor.noteColumnIndex ?? 0,
+          charWidth: CHAR_WIDTH,
+          noteCols: cursorNoteCols,
+          effectCols: cursorEffectCols,
+          hasAcid: hasAcidC,
+        });
+        caretOffX = rect.offX;
+        caretW = rect.width;
       }
 
       const caretX = cursorX + caretOffX;
