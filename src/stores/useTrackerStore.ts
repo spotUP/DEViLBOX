@@ -273,6 +273,14 @@ interface TrackerStore {
   reverseBlock: (channelIndex: number, startRow: number, endRow: number) => void;
   doubleBlock: (channelIndex: number, startRow: number, endRow: number) => void;
   halveBlock: (channelIndex: number, startRow: number, endRow: number) => void;
+  /**
+   * Apply a whole-block mutation as ONE atomic, single-undo edit. `mutate`
+   * receives the live pattern draft and may rewrite any number of cells; the
+   * store snapshots before/after, pushes a single history action, and does one
+   * bulk live-engine resync. Multi-cell toolbar block ops route through this so
+   * a single Reverse/Expand/etc. is one Ctrl+Z, not ~256.
+   */
+  bulkBlockEdit: (label: string, mutate: (pattern: import('@typedefs').Pattern) => void) => void;
 
   // FT2: Pattern operations (all channels)
   copyPattern: () => void;
@@ -988,6 +996,15 @@ export const useTrackerStore = create<TrackerStore>()(
         halveBlockHelper(state.patterns[state.currentPatternIndex], channelIndex, startRow, endRow);
       });
       useHistoryStore.getState().pushAction('HALVE_BLOCK', 'Halve block', patternIndex, beforePattern, get().patterns[patternIndex]);
+      syncBulkEdit(patternIndex, get().patterns[patternIndex]);
+    },
+    bulkBlockEdit: (label, mutate) => {
+      const patternIndex = get().currentPatternIndex;
+      const beforePattern = get().patterns[patternIndex];
+      set((state) => {
+        mutate(state.patterns[state.currentPatternIndex]);
+      });
+      useHistoryStore.getState().pushAction('BULK_BLOCK_EDIT', label, patternIndex, beforePattern, get().patterns[patternIndex]);
       syncBulkEdit(patternIndex, get().patterns[patternIndex]);
     },
 
