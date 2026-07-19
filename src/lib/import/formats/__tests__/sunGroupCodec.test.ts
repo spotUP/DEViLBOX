@@ -39,6 +39,27 @@ describe('decodeSunGroup', () => {
     expect(g.cell.effTyp2).toBe(3);
   });
 
+  it('transpose underflow wraps to a blank note, matching the player (no phantom)', () => {
+    // Regression for SunTronic "ghost notes": the player computes the pitch as
+    // u8(~noteByte - transpose) BEFORE the pitch-table lookup (68k MOVE.B). At a
+    // transpose that underflows, that byte-wrap lands out of range and the
+    // replayer sounds NOTHING. The old grid decode masked ~b first and subtracted
+    // after, leaving a small negative that sunPitchToNote mapped to a REAL note —
+    // a note shown in the grid that never plays.
+    //
+    // noteByte 0xB8, transpose 80: u8(~0xB8 - 80) = 247 -> out of range -> note 0.
+    // The buggy `((~b)&0xff) - transpose` = 71 - 80 = -9 -> sunPitchToNote(-9) = 4,
+    // a phantom. Assert the grid matches the player (blank) and the byte-wrap.
+    const h1 = new Uint8Array([0x05, 0xb8, 0x00]); // select 5, note 0xB8, terminator
+    const g = decodeSunGroup(h1, 0, 80, 0, 0, W);  // transpose=80
+    expect(g.cell.note).toBe(0);                                   // blank — matches player
+    expect(g.cell.note).toBe(sunPitchToNote((~0xb8 - 80) & 0xff)); // exact player byte-wrap
+    // Sanity: with no transpose the same note byte is a real, shown note.
+    const g0 = decodeSunGroup(h1, 0, 0, 0, 0, W);
+    expect(g0.cell.note).toBeGreaterThan(0);
+    expect(g0.cell.note).toBe(sunPitchToNote((~0xb8 - 0) & 0xff));
+  });
+
   it('0x9a two-byte variant emits amount (effTyp 10) AND rate (volSlideRate)', () => {
     // volSlideRateFromStream=true → sunCommandLen gives 0x9a 2 arg bytes
     const W2 = { arpShift: 4, volSlideRateFromStream: true };
