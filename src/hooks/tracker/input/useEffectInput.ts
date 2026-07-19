@@ -16,6 +16,7 @@ import {
   type TrackerInputRefs,
 } from './inputConstants';
 import { isKeyHandled } from '@lib/tracker/keyHandledSentinel';
+import { applyVolumeHighNibble, applyVolumeLowNibble } from '@lib/tracker/volumeColumnEdit';
 
 export const useEffectInput = (refs: TrackerInputRefs) => {
   const { cursorRef } = refs;
@@ -82,8 +83,7 @@ export const useEffectInput = (refs: TrackerInputRefs) => {
           const vol1Key = volKeyMap[keyLower];
           if (vol1Key !== undefined) {
             e.preventDefault();
-            let newValue = (vol1Key << 4) | (currentValue & 0x0F);
-            if (newValue >= 0x51 && newValue <= 0x5F) newValue = 0x50;
+            const newValue = applyVolumeHighNibble(currentValue, vol1Key);
             setCell(cursorRef.current.channelIndex, cursorRef.current.rowIndex, { volume: newValue });
             applyEntryAdvance(cursorRef.current.columnType, cursorRef.current.digitIndex);
             return true;
@@ -92,15 +92,9 @@ export const useEffectInput = (refs: TrackerInputRefs) => {
           if (HEX_DIGITS_ALL.includes(key)) {
             e.preventDefault();
             const hexDigit = parseInt(key, 16);
-            let newValue: number;
-
-            if (currentValue < 0x10) {
-              newValue = 0x10 + hexDigit;
-            } else {
-              newValue = (currentValue & 0xF0) | hexDigit;
-            }
-
-            if (newValue >= 0x51 && newValue <= 0x5F) newValue = 0x50;
+            // FT2: the 2nd nibble replaces ONLY the value nibble and preserves
+            // the existing high-nibble command class (never fabricates 0x1x).
+            const newValue = applyVolumeLowNibble(currentValue, hexDigit);
             setCell(cursorRef.current.channelIndex, cursorRef.current.rowIndex, { volume: newValue });
             applyEntryAdvance(cursorRef.current.columnType, cursorRef.current.digitIndex);
             return true;
