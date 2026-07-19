@@ -8,7 +8,7 @@
  * reads use getState() at call time instead.
  */
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { useTrackerStore, useCursorStore } from '@stores';
 import { xmNoteToMidi, midiToXMNote } from '@/lib/xmConversions';
 import type { TrackerCell } from '@typedefs';
@@ -466,105 +466,10 @@ export const useBlockOperations = () => {
 
   }, [getBlockBounds]);
 
-  /**
-   * Handle keyboard shortcuts
-   */
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      // Ignore if typing in input field
-      if (
-        e.target instanceof HTMLInputElement ||
-        e.target instanceof HTMLTextAreaElement
-      ) {
-        return;
-      }
-
-      // Alt+B - Mark block start
-      if (e.altKey && e.key.toLowerCase() === 'b') {
-        e.preventDefault();
-        markBlockStart();
-        return;
-      }
-
-      // Alt+E - Mark block end
-      if (e.altKey && e.key.toLowerCase() === 'e') {
-        e.preventDefault();
-        markBlockEnd();
-        return;
-      }
-
-      // Alt+C - Copy block
-      if (e.altKey && e.key.toLowerCase() === 'c') {
-        e.preventDefault();
-        copyBlock();
-        return;
-      }
-
-      // Alt+V or Alt+P - Paste block
-      if (e.altKey && (e.key.toLowerCase() === 'v' || e.key.toLowerCase() === 'p')) {
-        e.preventDefault();
-        pasteBlock();
-        return;
-      }
-
-      // Alt+X - Cut block
-      if (e.altKey && e.key.toLowerCase() === 'x') {
-        e.preventDefault();
-        cutBlock();
-        return;
-      }
-
-      // Escape - Clear block selection
-      if (e.key === 'Escape' && useCursorStore.getState().selection) {
-        e.preventDefault();
-        clearBlock();
-        return;
-      }
-
-      // Alt+T - Transpose block up
-      if (e.altKey && e.key.toLowerCase() === 't') {
-        e.preventDefault();
-        transposeBlock(1);
-        return;
-      }
-
-      // Alt+Shift+T - Transpose block down
-      if (e.altKey && e.shiftKey && e.key.toLowerCase() === 't') {
-        e.preventDefault();
-        transposeBlock(-1);
-        return;
-      }
-
-      // Alt+R - Reverse block
-      if (e.altKey && e.key.toLowerCase() === 'r' && !e.shiftKey && !e.ctrlKey) {
-        e.preventDefault();
-        reverseBlock();
-        return;
-      }
-
-      // Alt+D - Duplicate block
-      if (e.altKey && e.key.toLowerCase() === 'd' && !e.shiftKey && !e.ctrlKey) {
-        e.preventDefault();
-        duplicateBlock();
-        return;
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [
-    markBlockStart,
-    markBlockEnd,
-    copyBlock,
-    pasteBlock,
-    cutBlock,
-    clearBlock,
-    transposeBlock,
-    reverseBlock,
-    duplicateBlock,
-  ]);
+  // NOTE: FT2 Alt block shortcuts (Alt+B/E/C/V/P/X/T/Shift+T/R) are owned by the
+  // single keyboard pipeline in useTrackerInput (via resolveFt2BlockKey). This
+  // hook exposes only the operation FUNCTIONS below, consumed by the block
+  // toolbar; it deliberately installs NO window keydown listener of its own.
 
   return {
     blockState,

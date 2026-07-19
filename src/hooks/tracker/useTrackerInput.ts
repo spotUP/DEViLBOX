@@ -19,6 +19,7 @@ import { parseMPTClipboard } from '@lib/import/MPTClipboardParser';
 import { xmNoteToString } from '@lib/xmConversions';
 import { useNoteInput, useEffectInput, useNavigationInput } from './input';
 import { amplifySelectionHelper } from '@stores/tracker/patternEditActions';
+import { resolveFt2BlockKey } from '@lib/tracker/blockKeymap';
 import type { EditorBehavior } from '@engine/keyboard/EditorBehavior';
 
 /** Get the cell field names for a given note column index (0-3) */
@@ -1272,6 +1273,69 @@ export const useTrackerInput = () => {
         if (isIT && keyLower === 'n' && !e.shiftKey) {
           e.preventDefault();
           useUIStore.getState().setStatusMessage('MULTICHANNEL: NOT YET IMPLEMENTED');
+          return;
+        }
+
+        // ============================================
+        // FT2 (non-IT) Alt block operations
+        // ============================================
+        // Single authoritative pipeline for FT2 block shortcuts. Formerly these
+        // lived in a third window-level keydown listener in useBlockOperations
+        // that double-fired in IT mode and had a dead Alt+Shift+T branch; the
+        // mapping is now resolved by the pure resolveFt2BlockKey decider.
+        // (Alt+D=duplicate was dropped — it collided with IT Alt+D=double and is
+        // not a real FT2 key; Duplicate remains on the block toolbar.)
+        const ft2Block = resolveFt2BlockKey({
+          key: e.key,
+          altKey: e.altKey,
+          ctrlKey: e.ctrlKey,
+          metaKey: e.metaKey,
+          shiftKey: e.shiftKey,
+          isIT,
+        });
+        if (ft2Block) {
+          e.preventDefault();
+          switch (ft2Block.kind) {
+            case 'markStart':
+              useCursorStore.getState().startSelection();
+              useUIStore.getState().setStatusMessage('BLOCK START');
+              break;
+            case 'markEnd':
+              useCursorStore.getState().endSelection();
+              useUIStore.getState().setStatusMessage('BLOCK END');
+              break;
+            case 'copy':
+              if (selectionRef.current) {
+                copySelection();
+                useUIStore.getState().setStatusMessage('COPY BLOCK');
+              }
+              break;
+            case 'paste':
+              paste();
+              useUIStore.getState().setStatusMessage('PASTE BLOCK');
+              break;
+            case 'cut':
+              if (selectionRef.current) {
+                cutSelection();
+                useUIStore.getState().setStatusMessage('CUT BLOCK');
+              }
+              break;
+            case 'transpose':
+              transposeSelection(ft2Block.semitones);
+              useUIStore.getState().setStatusMessage(
+                `TRANSPOSE ${ft2Block.semitones > 0 ? '+' : ''}${ft2Block.semitones}`,
+              );
+              break;
+            case 'reverse': {
+              const sel = selectionRef.current;
+              const ch = sel ? Math.min(sel.startChannel, sel.endChannel) : cursorRef.current.channelIndex;
+              const sr = sel ? Math.min(sel.startRow, sel.endRow) : 0;
+              const er = sel ? Math.max(sel.startRow, sel.endRow) : pattern.length - 1;
+              reverseBlock(ch, sr, er);
+              useUIStore.getState().setStatusMessage('REVERSE BLOCK');
+              break;
+            }
+          }
           return;
         }
       }
