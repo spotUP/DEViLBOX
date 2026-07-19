@@ -1926,6 +1926,12 @@ export const useTrackerStore = create<TrackerStore>()(
           }));
           state.patterns = normalizedPatterns;
           state.currentPatternIndex = 0;
+          // Loading a new song is a full replacement — playback must begin at the
+          // song's start, not the previous song's leftover cursor. Resetting only
+          // currentPatternIndex left currentPositionIndex (the song-order position)
+          // stale, so Play Song started mid-song (e.g. "song pos 8" after loading a
+          // fresh module). Reset the song-order position here too.
+          state.currentPositionIndex = 0;
           useCursorStore.setState({
             cursor: { channelIndex: 0, rowIndex: 0, noteColumnIndex: 0, columnType: 'note', digitIndex: 0 },
             selection: null,
@@ -1935,6 +1941,9 @@ export const useTrackerStore = create<TrackerStore>()(
       });
       // Reset mixer mute/solo AFTER set() completes to avoid nested setState
       if (patterns.length > 0) {
+        // The play-start seek reads the transport row; clear it so a new song
+        // begins at row 0 rather than the previous song's leftover row.
+        useTransportStore.getState().setCurrentRow(0);
         useMixerStore.getState().resetMuteState();
         // Auto-name channels after the import chain settles. Fires on
         // every loadPatterns call but is safely idempotent — the helper

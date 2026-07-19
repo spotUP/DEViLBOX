@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { useTrackerStore } from '../useTrackerStore';
+import { useTransportStore } from '../useTransportStore';
 import { resetStore } from './_harness';
 
 describe('useTrackerStore — pattern lifecycle', () => {
@@ -41,6 +42,21 @@ describe('useTrackerStore — pattern lifecycle', () => {
     const before = useTrackerStore.getState().patterns.length;
     useTrackerStore.getState().clonePattern(999);
     expect(useTrackerStore.getState().patterns.length).toBe(before);
+  });
+
+  it('loadPatterns resets the song-order position and row (fresh load starts at song start, not the previous song pos)', () => {
+    const store = useTrackerStore.getState();
+    // Simulate leftover playback cursor from a previously-loaded song.
+    useTrackerStore.setState({ currentPositionIndex: 8 });
+    useTransportStore.getState().setCurrentRow(5);
+    expect(useTrackerStore.getState().currentPositionIndex).toBe(8);
+
+    // Loading a new module must snap back to the song start.
+    const patterns = store.patterns.map((p) => ({ ...p }));
+    store.loadPatterns(patterns);
+
+    expect(useTrackerStore.getState().currentPositionIndex).toBe(0);
+    expect(useTransportStore.getState().currentRow).toBe(0);
   });
 
   // Note: the happy-path clonePattern test is covered by the Puppeteer UI
