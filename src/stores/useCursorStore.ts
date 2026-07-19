@@ -381,7 +381,12 @@ export const useCursorStore = create<CursorStore>()((set, get) => ({
     const sel = get().selection;
     if (!sel) return;
     const c = get().cursor;
-    set({ selection: { ...sel, endChannel: c.channelIndex, endRow: c.rowIndex, endColumn: c.columnType } });
+    // Delegate to updateSelection so a keyboard Shift+select computes the SAME
+    // multi-column span (`columnTypes`) that a mouse drag does. Setting only
+    // endChannel/endRow/endColumn here left columnTypes stale at the start
+    // column, so keyboard selection across note->inst->vol produced a different
+    // clipboard shape than dragging the same span with the mouse.
+    get().updateSelection(c.channelIndex, c.rowIndex, c.columnType);
   },
 
   clearSelection: () => set({ selection: null }),
