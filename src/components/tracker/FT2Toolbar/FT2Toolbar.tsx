@@ -424,8 +424,7 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
       return;
     }
 
-    // If already playing, either Stop (same mode) or SWITCH to song mode (from
-    // pattern-loop) without stopping. See computePlayButtonAction.
+    // If already playing (song OR pattern loop), Play Song acts as Stop.
     if (isPlaying) {
       // WASM singleton engines: stop directly (no live mode switch / scratch support)
       if (editorMode === 'jamcracker' || editorMode === 'musicline') {
@@ -443,15 +442,8 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
         engine.stop();
         return;
       }
-      const action = computePlayButtonAction('song', isPlaying, isLooping);
-      if (action === 'switch') {
-        // Was looping a pattern → resume the full song without stopping.
-        // Force a warm reload so the effect rebuilds the full song order.
-        getTrackerReplayer().forceReloadOnce = true;
-        setIsLooping(false);
-        return;
-      }
-      // Already playing the full song → this button acts as Stop (brake).
+      // Play Song is the master Stop while anything plays (song OR pattern loop).
+      // computePlayButtonAction('song', playing, *) === 'stop' in both modes.
       getTrackerScratchController().triggerElectronicBrake();
       return;
     }
@@ -536,7 +528,10 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
     // Position restore handled by usePatternPlayback (seekTo before replayer.play)
   };
 
-  const isPlayingSong = isGT ? gtPlaying : (isPlaying && !isLooping);
+  // Play Song doubles as the master Stop: it reads "Stop Song" and brakes
+  // whenever anything is playing, including a pattern loop (Play Pattern never
+  // stops, so the song button is the only stop control on the transport row).
+  const isPlayingSong = isGT ? gtPlaying : isPlaying;
   const isPlayingPattern = isGT ? false : (isPlaying && isLooping);
 
   const stripCollapsed = useDubStore((s) => s.stripCollapsed);
