@@ -47,6 +47,7 @@ import { sonixEncoder, sonixTinyEncoder } from '@/engine/uade/encoders/SonixMusi
 import { createSamplerInstrument } from './AmigaUtils';
 import { parseSonixSynthInstr } from '@/engine/sonix/sonixInstrument';
 import { SNX_TICKS_PER_ROW } from '@/engine/sonix/sonixPosition';
+import { SNX_FX } from './sonixEffectGlyphs';
 
 // ── Constants ─────────────────────────────────────────────────────────────
 
@@ -351,20 +352,30 @@ function emptyCell(): TrackerCell {
 /**
  * Parse a single SNX voice event stream into TrackerCells.
  *
- * SNX event format (16-bit words, big-endian):
+ * SNX event format (16-bit words, big-endian). Opcode semantics are the driver's
+ * ground truth (sonix-wasm/src/sonix/sonix.c snx_process_channel_tick):
  *   0xFFFF          end of track (stop parsing)
- *   0xC000–0xFFFE   rest for (word & 0x3FFF) ticks
- *   0x83nn          volume set to nn
- *   0x82nn          tempo change to nn (ignored — apply in initialBPM)
- *   0x81nn          loop control (ignored)
- *   0x80nn          instrument change (nn = register 0–63, map to 1-based index)
- *   0x0000          rest for 1 tick
- *   0x0Nnn          note on: high byte = note index (1–127), low byte = volume
+ *   0xC000–0xFFFE   WAIT (word & 0x3FFF) CIA ticks — the ONLY time-advancing opcode
+ *   0x80nn          instrument select (nn = register & 63, mapped to 1-based index)
+ *   0x81nn          channel volume set (hw_vol = (nn+1)*(vel*2+1)>>8, 0xFF = max)
+ *   0x82nn          tempo change to nn (nn>0)
+ *   0x83nn          detune / pitch-mod (signed i8; nn!=0 applies)
+ *   0x0000          0-tick no-op
+ *   0x0Nnn–0x7Fnn   note on: high byte = note index (1–127), low byte = velocity
+ *
+ * Each control that is not note/instrument gets its own display slot so the grid
+ * is fully editable (see docs/superpowers/specs/2026-07-19-sonix-effect-columns-design.md):
+ *   note velocity  -> volume column
+ *   0x81 chan vol  -> effect column, effTyp SNX_FX.chanVol
+ *   0x82 tempo     -> effect column, effTyp SNX_FX.tempo
+ *   0x83 detune    -> effect column, effTyp SNX_FX.detune
  *
  * Note index → XM note: note indices are a direct pitch offset used by the SNX player
  * against the instrument's base frequency. Without instrument data we map index
  * directly: xmNote = clamp(noteIndex, 1, 96).
  */
+type SnxEffType = 'chanVol' | 'tempo' | 'detune';
+
 export function parseSnxVoiceStream(
   buf: Uint8Array,
   startOff: number,
@@ -373,18 +384,18 @@ export function parseSnxVoiceStream(
   const endOff = Math.min(startOff + length, buf.length);
   let pos = startOff;
   let currentInstr = 1;
-  let currentVol = 0; // 0 = not set (leave empty in cell)
 
   // Tick-clock walk (matches the SNX driver exactly, sonix.c snx_process_channel_tick):
-  // the driver ADVANCES TIME only on a WAIT opcode. Note-on, instrument, volume, tempo and
-  // 0x0000 are read within the current CIA tick and spend 0 ticks. We record each note-on
-  // at its onset TICK, then quantize the tick timeline to display rows of SNX_TICKS_PER_ROW
-  // ticks each (the tracker `speed` convention — see sonixPosition.ts). One CIA tick per row
-  // scrolls ~49 rows/s; SNX_TICKS_PER_ROW ticks per row scrolls at a readable ~8 rows/s while
-  // the native cursor stays in sync via the same divisor. Playback is unaffected: the raw
-  // byte carrier reproduces unedited streams verbatim.
+  // the driver ADVANCES TIME only on a WAIT opcode. Note-on, instrument, volume, tempo,
+  // detune and 0x0000 are read within the current CIA tick and spend 0 ticks. We record
+  // note-ons AND effect changes at their onset TICK, then quantize the tick timeline to
+  // display rows of SNX_TICKS_PER_ROW ticks each (the tracker `speed` convention — see
+  // sonixPosition.ts). One CIA tick per row scrolls ~49 rows/s; SNX_TICKS_PER_ROW ticks per
+  // row scrolls at a readable ~8 rows/s while the native cursor stays in sync via the same
+  // divisor. Playback is unaffected: the raw byte carrier reproduces unedited streams verbatim.
   let tick = 0;
-  const events: Array<{ tick: number; cell: TrackerCell }> = [];
+  const notes: Array<{ tick: number; note: number; instr: number; vel: number }> = [];
+  const effects: Array<{ tick: number; type: SnxEffType; value: number }> = [];
 
   while (pos + 2 <= endOff) {
     const word = u16BE(buf, pos);
@@ -403,26 +414,25 @@ export function parseSnxVoiceStream(
       const param = word & 0xFF;
       switch (cmd) {
         case 0x80:
-          // Instrument change: register param maps to 1-based instrument index
-          currentInstr = param + 1;
+          // Instrument select: register & 63 maps to 1-based instrument index.
+          currentInstr = (param & 0x3F) + 1;
+          break;
+        case 0x81:
+          // Channel volume: independent per-channel loudness (0xFF = max).
+          effects.push({ tick, type: 'chanVol', value: param });
+          break;
+        case 0x82:
+          // Tempo change (driver ignores nn == 0).
+          if (param > 0) effects.push({ tick, type: 'tempo', value: param });
           break;
         case 0x83:
-          // Volume set: 0–127 → XM volume column 0x10–0x50
-          currentVol = param > 0
-            ? 0x10 + Math.min(64, Math.round((param / 127) * 64))
-            : 0x10; // explicit mute
+          // Detune / pitch-mod (signed; driver treats 0 as no-op).
+          if (param !== 0) effects.push({ tick, type: 'detune', value: param });
           break;
-        // 0x81 loop, 0x82 tempo: no visual representation needed
         default:
           break;
       }
-      // Commands spend 0 ticks — fold into a note-on already recorded at this exact tick.
-      const last = events.length > 0 ? events[events.length - 1] : null;
-      if (last && last.tick === tick) {
-        last.cell.instrument = currentInstr;
-        if (currentVol !== 0) last.cell.volume = currentVol;
-      }
-      continue;
+      continue; // commands spend 0 ticks
     }
 
     if (word === 0x0000) {
@@ -437,20 +447,10 @@ export function parseSnxVoiceStream(
     const velByte   = word & 0xFF;
     if (noteIndex === 0) continue; // note 0 / release: 0 ticks, no trigger
 
-    const xmVol = currentVol !== 0
-      ? currentVol
-      : velByte > 0
-        ? 0x10 + Math.min(64, Math.round((velByte / 127) * 64))
-        : 0; // no explicit volume column
-    const cell: TrackerCell = {
-      note: Math.max(1, Math.min(96, noteIndex)),
-      instrument: currentInstr,
-      volume: xmVol,
-      effTyp: 0, eff: 0, effTyp2: 0, eff2: 0,
-    };
-    const last = events.length > 0 ? events[events.length - 1] : null;
-    if (last && last.tick === tick) events[events.length - 1] = { tick, cell };
-    else events.push({ tick, cell });
+    const nn = { tick, note: Math.max(1, Math.min(96, noteIndex)), instr: currentInstr, vel: velByte };
+    const last = notes.length > 0 ? notes[notes.length - 1] : null;
+    if (last && last.tick === tick) notes[notes.length - 1] = nn;
+    else notes.push(nn);
   }
 
   // Quantize the tick timeline to SNX_TICKS_PER_ROW-tick display rows. Row count is the
@@ -458,11 +458,26 @@ export function parseSnxVoiceStream(
   // shares the same tick span so all four channels land on the same row axis.
   const totalRows = Math.max(1, Math.ceil(tick / SNX_TICKS_PER_ROW));
   const cells: TrackerCell[] = Array.from({ length: totalRows }, emptyCell);
-  for (const ev of events) {
-    const row = Math.min(totalRows - 1, Math.floor(ev.tick / SNX_TICKS_PER_ROW));
-    // First onset in a row wins; a later same-row grace note is dropped from the display
-    // (sub-row detail belongs in an effect column — see the Sonix effect-columns TODO).
-    if ((cells[row].note ?? 0) === 0) cells[row] = ev.cell;
+  const rowOf = (t: number) => Math.min(totalRows - 1, Math.floor(t / SNX_TICKS_PER_ROW));
+
+  // Notes: first onset in a row wins (a later same-row grace note is dropped from display).
+  for (const ev of notes) {
+    const row = rowOf(ev.tick);
+    if ((cells[row].note ?? 0) !== 0) continue;
+    cells[row].note = ev.note;
+    cells[row].instrument = ev.instr;
+    // Volume column carries the per-note velocity (0–127 → XM 0x10–0x50).
+    cells[row].volume = ev.vel > 0 ? 0x10 + Math.min(64, Math.round((ev.vel / 127) * 64)) : 0;
+  }
+
+  // Effects: each control type has a fixed effect column; last value in a row wins.
+  // effTyp/eff = chanVol, effTyp2/eff2 = tempo, effTyp3/eff3 = detune (mirrors the encoder).
+  for (const ev of effects) {
+    const row = rowOf(ev.tick);
+    const c = cells[row];
+    if (ev.type === 'chanVol') { c.effTyp = SNX_FX.chanVol; c.eff = ev.value & 0xFF; }
+    else if (ev.type === 'tempo') { c.effTyp2 = SNX_FX.tempo; c.eff2 = ev.value & 0xFF; }
+    else { c.effTyp3 = SNX_FX.detune; c.eff3 = ev.value & 0xFF; }
   }
 
   return cells;
@@ -487,6 +502,19 @@ function buildPatterns(
   const patterns: Pattern[] = [];
   const AMIGA_PAN = [-50, 50, 50, -50];
 
+  // SNX stacks up to three per-cell control effects (chanVol/tempo/detune) in the
+  // effTyp/effTyp2/effTyp3 columns. The grid renders `channelMeta.effectCols` columns per
+  // channel — without it the editor shows a single effect column and the rest are hidden.
+  // Size each voice to the highest effect slot it actually uses (min 1).
+  const voiceEffectCols = channelFlat.map((cells) => {
+    let cols = 1;
+    for (const c of cells) {
+      if ((c.effTyp3 ?? 0) !== 0) { cols = 3; break; }
+      if ((c.effTyp2 ?? 0) !== 0) cols = Math.max(cols, 2);
+    }
+    return cols;
+  });
+
   for (let p = 0; p < numPatterns; p++) {
     const startRow = p * PATTERN_LENGTH;
     const endRow = Math.min(startRow + PATTERN_LENGTH, totalRows);
@@ -502,6 +530,7 @@ function buildPatterns(
       pan:        AMIGA_PAN[ch % 4] ?? 0,
       instrumentId: null,
       color:      null,
+      channelMeta: { importedFromMOD: false, effectCols: voiceEffectCols[ch] },
       rows:       cells.slice(startRow, endRow),
     }));
 

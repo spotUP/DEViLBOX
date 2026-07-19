@@ -21,6 +21,7 @@ import { join } from 'path';
 import { parseSnxVoiceStream } from '../SonixMusicDriverParser';
 import { encodeSnxVoiceStream } from '@/engine/uade/encoders/SonixMusicDriverEncoder';
 import { SNX_TICKS_PER_ROW } from '@/engine/sonix/sonixPosition';
+import { SNX_FX } from '../sonixEffectGlyphs';
 import type { TrackerCell } from '@/types';
 
 const FIXTURE = join(
@@ -117,6 +118,54 @@ describe('SNX tick-grid semantics', () => {
         expect(reparsed[r].instrument ?? 0, `ch${ch} row${r} instr`).toBe(grid[r].instrument ?? 0);
       }
     }
+  });
+
+  it('maps 0x81/0x82/0x83 to the chanVol/tempo/detune effect columns + velocity to volume', () => {
+    // NOTE(vel 64) with channel-vol 0x81=0x40, tempo 0x82=0x06, detune 0x83=0xFF, all at
+    // tick 0 -> one row carrying velocity in the volume column and the three effect columns.
+    // On revert to the mislabeled parser (0x83=volume, 0x81/0x82 dropped) these fail.
+    const stream = u16be([
+      0x8140, // channel volume = 0x40
+      0x8206, // tempo = 6
+      0x83ff, // detune = -1 (signed)
+      (36 << 8) | 64, // note 36, velocity 64
+      0xc000 | SNX_TICKS_PER_ROW,
+      0xffff,
+    ]);
+    const cells = parseSnxVoiceStream(stream, 0, stream.length);
+
+    expect(cells.length).toBe(1);
+    const c = cells[0];
+    expect(c.note).toBe(36);
+    // Velocity 64/127 -> XM volume 0x10 + round(64/127*64) = 0x10 + 32 = 0x30.
+    expect(c.volume).toBe(0x10 + Math.round((64 / 127) * 64));
+    expect(c.effTyp).toBe(SNX_FX.chanVol);
+    expect(c.eff).toBe(0x40);
+    expect(c.effTyp2).toBe(SNX_FX.tempo);
+    expect(c.eff2).toBe(0x06);
+    expect(c.effTyp3).toBe(SNX_FX.detune);
+    expect(c.eff3).toBe(0xff);
+  });
+
+  it('round-trips the effect columns: parse -> encode -> parse preserves chanVol/tempo/detune', () => {
+    const stream = u16be([
+      0x8155,
+      0x820a,
+      0x8380, // detune -128
+      (48 << 8) | 100,
+      0xc000 | SNX_TICKS_PER_ROW,
+      0xffff,
+    ]);
+    const grid = parseSnxVoiceStream(stream, 0, stream.length);
+    const encoded = encodeSnxVoiceStream(grid, 0);
+    const reparsed = parseSnxVoiceStream(encoded, 0, encoded.length);
+    expect(reparsed.length).toBe(grid.length);
+    expect(reparsed[0].effTyp).toBe(SNX_FX.chanVol);
+    expect(reparsed[0].eff).toBe(0x55);
+    expect(reparsed[0].effTyp2).toBe(SNX_FX.tempo);
+    expect(reparsed[0].eff2).toBe(0x0a);
+    expect(reparsed[0].effTyp3).toBe(SNX_FX.detune);
+    expect(reparsed[0].eff3).toBe(0x80);
   });
 
   it('0x0000 is a 0-tick no-op — it advances neither the clock nor a row', () => {
