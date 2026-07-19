@@ -46,6 +46,7 @@ import { idGenerator } from '@utils/idGenerator';
 import { sonixEncoder, sonixTinyEncoder } from '@/engine/uade/encoders/SonixMusicDriverEncoder';
 import { createSamplerInstrument } from './AmigaUtils';
 import { parseSonixSynthInstr } from '@/engine/sonix/sonixInstrument';
+import { SNX_TICKS_PER_ROW } from '@/engine/sonix/sonixPosition';
 
 // ── Constants ─────────────────────────────────────────────────────────────
 
@@ -364,16 +365,26 @@ function emptyCell(): TrackerCell {
  * against the instrument's base frequency. Without instrument data we map index
  * directly: xmNote = clamp(noteIndex, 1, 96).
  */
-function parseSnxVoiceStream(
+export function parseSnxVoiceStream(
   buf: Uint8Array,
   startOff: number,
   length: number,
 ): TrackerCell[] {
-  const cells: TrackerCell[] = [];
   const endOff = Math.min(startOff + length, buf.length);
   let pos = startOff;
   let currentInstr = 1;
   let currentVol = 0; // 0 = not set (leave empty in cell)
+
+  // Tick-clock walk (matches the SNX driver exactly, sonix.c snx_process_channel_tick):
+  // the driver ADVANCES TIME only on a WAIT opcode. Note-on, instrument, volume, tempo and
+  // 0x0000 are read within the current CIA tick and spend 0 ticks. We record each note-on
+  // at its onset TICK, then quantize the tick timeline to display rows of SNX_TICKS_PER_ROW
+  // ticks each (the tracker `speed` convention — see sonixPosition.ts). One CIA tick per row
+  // scrolls ~49 rows/s; SNX_TICKS_PER_ROW ticks per row scrolls at a readable ~8 rows/s while
+  // the native cursor stays in sync via the same divisor. Playback is unaffected: the raw
+  // byte carrier reproduces unedited streams verbatim.
+  let tick = 0;
+  const events: Array<{ tick: number; cell: TrackerCell }> = [];
 
   while (pos + 2 <= endOff) {
     const word = u16BE(buf, pos);
@@ -382,9 +393,8 @@ function parseSnxVoiceStream(
     if (word === 0xFFFF) break; // end of track
 
     if (word >= 0xC000) {
-      // Rest/delay for N ticks
-      const ticks = Math.max(1, word & 0x3FFF);
-      for (let t = 0; t < ticks; t++) cells.push(emptyCell());
+      // WAIT n: spend n CIA ticks. This is the ONLY opcode that advances the clock.
+      tick += word & 0x3FFF;
       continue;
     }
 
@@ -406,36 +416,53 @@ function parseSnxVoiceStream(
         default:
           break;
       }
-      // Commands don't advance pattern rows; continue
+      // Commands spend 0 ticks — fold into a note-on already recorded at this exact tick.
+      const last = events.length > 0 ? events[events.length - 1] : null;
+      if (last && last.tick === tick) {
+        last.cell.instrument = currentInstr;
+        if (currentVol !== 0) last.cell.volume = currentVol;
+      }
       continue;
     }
 
     if (word === 0x0000) {
-      // Rest for one tick
-      cells.push(emptyCell());
+      // Driver reads 0x0000 as a 0-tick no-op (continue) — no event.
       continue;
     }
 
-    // Note on: high byte = note index (1–127), low byte = volume
+    // Note on: high byte = note index (1–127), low byte = velocity. Spends 0 ticks; the
+    // following WAIT provides its duration. A later note-on at the same tick overwrites this
+    // one (only the last note in a tick actually sounds — driver start_note overrides).
     const noteIndex = (word >> 8) & 0x7F;
     const velByte   = word & 0xFF;
+    if (noteIndex === 0) continue; // note 0 / release: 0 ticks, no trigger
 
-    if (noteIndex === 0) {
-      cells.push(emptyCell());
-    } else {
-      const xmNote = Math.max(1, Math.min(96, noteIndex));
-      const xmVol = currentVol !== 0
-        ? currentVol
-        : velByte > 0
-          ? 0x10 + Math.min(64, Math.round((velByte / 127) * 64))
-          : 0; // no explicit volume column
-      cells.push({
-        note: xmNote,
-        instrument: currentInstr,
-        volume: xmVol,
-        effTyp: 0, eff: 0, effTyp2: 0, eff2: 0,
-      });
-    }
+    const xmVol = currentVol !== 0
+      ? currentVol
+      : velByte > 0
+        ? 0x10 + Math.min(64, Math.round((velByte / 127) * 64))
+        : 0; // no explicit volume column
+    const cell: TrackerCell = {
+      note: Math.max(1, Math.min(96, noteIndex)),
+      instrument: currentInstr,
+      volume: xmVol,
+      effTyp: 0, eff: 0, effTyp2: 0, eff2: 0,
+    };
+    const last = events.length > 0 ? events[events.length - 1] : null;
+    if (last && last.tick === tick) events[events.length - 1] = { tick, cell };
+    else events.push({ tick, cell });
+  }
+
+  // Quantize the tick timeline to SNX_TICKS_PER_ROW-tick display rows. Row count is the
+  // driver's cycle length (`tick` at end-of-track) collapsed by the divisor — every voice
+  // shares the same tick span so all four channels land on the same row axis.
+  const totalRows = Math.max(1, Math.ceil(tick / SNX_TICKS_PER_ROW));
+  const cells: TrackerCell[] = Array.from({ length: totalRows }, emptyCell);
+  for (const ev of events) {
+    const row = Math.min(totalRows - 1, Math.floor(ev.tick / SNX_TICKS_PER_ROW));
+    // First onset in a row wins; a later same-row grace note is dropped from the display
+    // (sub-row detail belongs in an effect column — see the Sonix effect-columns TODO).
+    if ((cells[row].note ?? 0) === 0) cells[row] = ev.cell;
   }
 
   return cells;

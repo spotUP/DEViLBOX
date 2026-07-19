@@ -13,7 +13,13 @@
  *   0x0000          rest for 1 tick
  *   0x0Nnn          note on: high byte = note index (1-127), low byte = volume
  *
- * This encoder is the exact inverse of parseSnxVoiceStream in SonixMusicDriverParser.
+ * This encoder is the exact inverse of parseSnxVoiceStream in SonixMusicDriverParser,
+ * which quantizes the driver's CIA-tick timeline to display rows of SNX_TICKS_PER_ROW ticks
+ * each (the tracker `speed` convention). So one grid row emits SNX_TICKS_PER_ROW ticks of
+ * WAIT: a note row is NOTE word + WAIT(SNX_TICKS_PER_ROW); an empty row is a bare WAIT of
+ * the same span (runs of empties coalesce into one WAIT). Re-parsing the emitted stream
+ * lands every note back on its original row. NB: never 0x0000 — under the parser 0x0000 is a
+ * 0-tick no-op that would drop the row.
  *
  * Reverse mappings:
  *   xmNote -> noteIndex: noteIndex = clamp(xmNote, 1, 127) (parser: xmNote = clamp(noteIndex, 1, 96))
@@ -27,17 +33,31 @@
 import type { TrackerCell } from '@/types';
 import type { VariableLengthEncoder } from '../UADEPatternEncoder';
 import { registerVariableEncoder } from '../UADEPatternEncoder';
+import { SNX_TICKS_PER_ROW } from '@/engine/sonix/sonixPosition';
+
+/** Push a WAIT covering `ticks` CIA ticks, chunked to the 0x3FFF opcode ceiling. */
+function pushWait(words: number[], ticks: number): void {
+  let remaining = ticks;
+  while (remaining > 0) {
+    const chunk = Math.min(remaining, 0x3FFF);
+    words.push(0xC000 | chunk);
+    remaining -= chunk;
+  }
+}
+
+/** True when a row carries no trigger and no state change (a pure hold/rest tick). */
+function isEmptyRow(cell: TrackerCell): boolean {
+  return (cell.note ?? 0) === 0 && (cell.instrument ?? 0) === 0 && (cell.volume ?? 0) === 0;
+}
 
 /**
- * Encode a single channel's pattern rows back to an SNX voice event stream.
+ * Encode a single channel's pattern rows back to an SNX voice event stream (row-grid inverse).
  *
- * Strategy:
- * - Empty rows (no note, no instrument, no volume) -> 0x0000 (rest 1 tick)
- * - Consecutive empty rows are RLE-compressed into rest opcodes (0xC000 | count)
- * - Instrument changes emit 0x80nn before the note
- * - Volume changes emit 0x83nn before the note
- * - Note-on rows emit high=noteIndex, low=velByte
- * - Stream ends with 0xFFFF
+ * Strategy — every row spans SNX_TICKS_PER_ROW CIA ticks:
+ * - A run of empty rows -> one WAIT of (run length * SNX_TICKS_PER_ROW), chunked to 0x3FFF.
+ * - A non-empty (trigger) row emits its instrument/volume change words, the NOTE word, then a
+ *   WAIT(SNX_TICKS_PER_ROW) for that single row. Re-parsing lands the note back on the same row.
+ * - Stream ends with 0xFFFF.
  */
 function encodeSnxVoiceStream(rows: TrackerCell[], _channel: number): Uint8Array {
   const words: number[] = [];
@@ -46,68 +66,41 @@ function encodeSnxVoiceStream(rows: TrackerCell[], _channel: number): Uint8Array
   let i = 0;
   while (i < rows.length) {
     const cell = rows[i];
+
+    if (isEmptyRow(cell)) {
+      // Rest run -> single WAIT covering every empty row at SNX_TICKS_PER_ROW ticks each.
+      let count = 0;
+      while (i < rows.length && isEmptyRow(rows[i])) { count++; i++; }
+      pushWait(words, count * SNX_TICKS_PER_ROW);
+      continue;
+    }
+
     const note = cell.note ?? 0;
     const instr = cell.instrument ?? 0;
     const vol = cell.volume ?? 0;
 
-    // Check if this is an empty row (no note, no instrument, no volume)
-    const isEmpty = note === 0 && instr === 0 && vol === 0;
-
-    if (isEmpty) {
-      // Count consecutive empty rows for RLE compression
-      let count = 0;
-      while (i < rows.length) {
-        const r = rows[i];
-        if ((r.note ?? 0) !== 0 || (r.instrument ?? 0) !== 0 || (r.volume ?? 0) !== 0) break;
-        count++;
-        i++;
-      }
-      if (count === 1) {
-        // Single empty row -> 0x0000 (rest 1 tick)
-        words.push(0x0000);
-      } else {
-        // Multiple empty rows -> rest/delay opcode: 0xC000 | count
-        // Max value per opcode is 0x3FFF ticks
-        let remaining = count;
-        while (remaining > 0) {
-          const chunk = Math.min(remaining, 0x3FFF);
-          words.push(0xC000 | chunk);
-          remaining -= chunk;
-        }
-      }
-      continue;
-    }
-
-    // Emit instrument change if needed
+    // Emit instrument change if needed (spends 0 ticks; folds into the following note).
     if (instr > 0 && instr !== lastInstr) {
       const register = instr - 1; // reverse: parser does instrument = register + 1
       words.push(0x8000 | (register & 0xFF));
       lastInstr = instr;
     }
 
-    // Emit volume change if volume column is set (XM volume format 0x10-0x50)
+    // Emit volume change if the volume column is set (XM volume format 0x10-0x50).
     if (vol >= 0x10) {
       const snxVol = Math.round(((Math.min(vol, 0x50) - 0x10) / 64) * 127);
       words.push(0x8300 | (snxVol & 0xFF));
     }
 
-    // Emit note or rest
     if (note > 0 && note <= 96) {
-      // Note on: high byte = note index, low byte = velocity
       const noteIndex = Math.max(1, Math.min(127, note));
-      // Velocity from volume column, or default 100
-      let velByte: number;
-      if (vol >= 0x10) {
-        velByte = Math.round(((Math.min(vol, 0x50) - 0x10) / 64) * 127);
-      } else {
-        velByte = 100; // default velocity when no volume set
-      }
+      const velByte = vol >= 0x10
+        ? Math.round(((Math.min(vol, 0x50) - 0x10) / 64) * 127)
+        : 100; // default velocity when no volume set
       words.push(((noteIndex & 0x7F) << 8) | (velByte & 0xFF));
-    } else {
-      // No note but has instrument or volume change — emit rest
-      words.push(0x0000);
     }
-
+    // This display row consumes SNX_TICKS_PER_ROW ticks.
+    pushWait(words, SNX_TICKS_PER_ROW);
     i++;
   }
 
