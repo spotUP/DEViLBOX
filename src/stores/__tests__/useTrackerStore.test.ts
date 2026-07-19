@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { useTrackerStore } from '../useTrackerStore';
 import { useTransportStore } from '../useTransportStore';
 import { useHistoryStore } from '../useHistoryStore';
+import { useCursorStore } from '../useCursorStore';
 import { resetStore } from './_harness';
 
 describe('useTrackerStore — pattern lifecycle', () => {
@@ -100,5 +101,46 @@ describe('useTrackerStore — bulkBlockEdit atomic undo', () => {
     // Single undo returns the whole pre-edit pattern, not just the last cell.
     expect(restored!.channels[0].rows[0].note).toBe(originalNote);
     expect(restored!.channels[0].rows[7].note).toBe(originalNote);
+  });
+});
+
+describe('useTrackerStore — resizePattern undo + cursor clamp', () => {
+  beforeEach(() => resetStore(useTrackerStore));
+
+  it('shrinking a pattern is a single undoable action that restores the discarded rows', () => {
+    const startLen = useTrackerStore.getState().patterns[0].length;
+    expect(startLen).toBeGreaterThan(8);
+
+    // Put a marker note in a row that a shrink to 8 rows would discard.
+    useTrackerStore.getState().bulkBlockEdit('seed', (pattern) => {
+      pattern.channels[0].rows[startLen - 1].note = 61;
+    });
+
+    const before = useHistoryStore.getState().undoStack.length;
+    useTrackerStore.getState().resizePattern(0, 8);
+    const after = useHistoryStore.getState().undoStack.length;
+
+    // Exactly one undo entry — not a silent, non-undoable splice.
+    expect(after - before).toBe(1);
+    expect(useTrackerStore.getState().patterns[0].length).toBe(8);
+
+    // Undo must give back the pre-shrink pattern with the discarded row intact.
+    const restored = useHistoryStore.getState().undo();
+    expect(restored).not.toBeNull();
+    expect(restored!.length).toBe(startLen);
+    expect(restored!.channels[0].rows[startLen - 1].note).toBe(61);
+  });
+
+  it('clamps the edit cursor when a shrink leaves it past the new pattern end', () => {
+    const startLen = useTrackerStore.getState().patterns[0].length;
+    // Park the cursor on the last row.
+    useCursorStore.setState({
+      cursor: { ...useCursorStore.getState().cursor, rowIndex: startLen - 1 },
+    });
+
+    useTrackerStore.getState().resizePattern(0, 8);
+
+    // Cursor may not dangle past the end — FT2 clamps to the last valid row.
+    expect(useCursorStore.getState().cursor.rowIndex).toBe(7);
   });
 });
