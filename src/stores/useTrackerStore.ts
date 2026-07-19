@@ -192,6 +192,47 @@ function syncBulkEdit(patternIndex: number, pattern: import('@typedefs').Pattern
   debouncedWasmEngineReexport();
 }
 
+/**
+ * Resize a single pattern with FULL editor semantics: push one undo action
+ * (so a shrink that discards trailing rows is recoverable), resync the live
+ * engines, and clamp the edit cursor so it never points past the new end.
+ *
+ * Historically resizePattern/resizeAllPatterns did a bare `rows.splice(newLength)`
+ * — silent, non-undoable data loss with a cursor left dangling past the pattern
+ * end (FT2's resize is undoable and clamps). This is the shared core both public
+ * resize actions route through.
+ */
+function resizeOne(index: number, newLength: number): void {
+  const state0 = useTrackerStore.getState();
+  if (index < 0 || index >= state0.patterns.length || newLength <= 0) return;
+  const beforePattern = state0.patterns[index];
+
+  useTrackerStore.setState((state) => {
+    const pattern = state.patterns[index];
+    const oldLength = pattern.length;
+    pattern.length = newLength;
+    pattern.channels.forEach((channel) => {
+      if (newLength > oldLength) {
+        for (let i = oldLength; i < newLength; i++) channel.rows.push({ ...EMPTY_CELL });
+      } else {
+        channel.rows.splice(newLength);
+      }
+    });
+  });
+
+  const afterPattern = useTrackerStore.getState().patterns[index];
+  useHistoryStore.getState().pushAction('RESIZE_PATTERN', 'Resize pattern', index, beforePattern, afterPattern);
+  syncBulkEdit(index, afterPattern);
+
+  // Clamp the cursor if it is editing this pattern and now sits past the end.
+  if (index === useTrackerStore.getState().currentPatternIndex) {
+    const cursor = useCursorStore.getState().cursor;
+    if (cursor.rowIndex >= newLength) {
+      useCursorStore.setState({ cursor: { ...cursor, rowIndex: newLength - 1 } });
+    }
+  }
+}
+
 // Extracted helper modules
 import {
   setCellInPattern, clearCellInPattern, clearChannelInPattern, clearPatternCells,
@@ -1399,48 +1440,24 @@ export const useTrackerStore = create<TrackerStore>()(
         ).then((ok) => { if (ok) get().resizePattern(index, newLength); });
         return;
       }
-      set((state) => {
-        if (index >= 0 && index < state.patterns.length && newLength > 0) {
-          const pattern = state.patterns[index];
-          const oldLength = pattern.length;
-          pattern.length = newLength;
-
-          pattern.channels.forEach((channel) => {
-            if (newLength > oldLength) {
-              // Add empty rows
-              for (let i = oldLength; i < newLength; i++) {
-                channel.rows.push({ ...EMPTY_CELL });
-              }
-            } else {
-              // Trim rows
-              channel.rows.splice(newLength);
-            }
-          });
-        }
-      });
+      resizeOne(index, newLength);
     },
 
-    resizeAllPatterns: (newLength) =>
-      set((state) => {
-        if (newLength > 0) {
-          state.patterns.forEach((pattern) => {
-            const oldLength = pattern.length;
-            pattern.length = newLength;
-
-            pattern.channels.forEach((channel) => {
-              if (newLength > oldLength) {
-                // Add empty rows
-                for (let i = oldLength; i < newLength; i++) {
-                  channel.rows.push({ ...EMPTY_CELL });
-                }
-              } else {
-                // Trim rows
-                channel.rows.splice(newLength);
-              }
-            });
-          });
-        }
-      }),
+    resizeAllPatterns: (newLength) => {
+      if (newLength <= 0) return;
+      const limits = getActiveFormatLimits();
+      if (limits && newLength > limits.maxPatternLength && !isViolationConfirmed('patternLength')) {
+        void checkFormatViolation('patternLength',
+          `Resizing all patterns to ${newLength} rows exceeds ${limits.name} limit of ${limits.maxPatternLength} rows.`,
+        ).then((ok) => { if (ok) get().resizeAllPatterns(newLength); });
+        return;
+      }
+      // One undo action per pattern — the history model is single-pattern, so a
+      // resize-all is reverted with one Ctrl+Z per pattern, but no rows are ever
+      // silently lost and the cursor is clamped.
+      const count = get().patterns.length;
+      for (let i = 0; i < count; i++) resizeOne(i, newLength);
+    },
 
     duplicatePattern: (index) =>
       set((state) => {
