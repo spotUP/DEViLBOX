@@ -1,13 +1,20 @@
 #!/usr/bin/env bash
-# DEViLBOX pre-push — full gate (~50 s).
+# DEViLBOX pre-push — full gate (~125 s, deterministic).
 #
 # Push to `main` triggers Hetzner deploy + GitHub Actions. Block here
 # before the slow remote path fails.
 #
-# Runs in parallel where safe:
-#   - `npm run type-check`    (tsc -b --force)  ~40 s   ◂ dominant
-#   - `npm run test:ci`       (fast vitest)     ~10 s
-#   - `npm run test:compliance` (tracker fx)    ~5 s
+# Runs SERIALLY, fail-fast. The jobs used to run in parallel, but on an
+# 8-core box type-check (tsc) and test:ci (vitest) EACH spawn ~8 worker
+# threads — 16+ threads thrashing 8 cores oversubscribes the CPU so badly
+# that a 65 s job can balloon past 5 min or hang. Those false timeouts were
+# the "pushing takes forever" retries. Serial is slower on paper (~125 s vs
+# a 65 s happy path) but deterministic and never retries, so it wins in
+# practice. Fail-fast: type-check first (cheap signal), then the suites.
+#
+#   - `npm run type-check`      (tsc -b --force)   ~58 s
+#   - `npm run test:ci`         (vitest)           ~65 s
+#   - `npm run test:compliance` (tracker fx)       ~2 s
 #
 # Bypass in emergencies with `git push --no-verify`. Don't make a habit
 # of it — this is the same gate CI runs.
@@ -22,44 +29,26 @@ else
   RED=''; GRN=''; YLW=''; RST=''
 fi
 
-echo "${YLW}[pre-push] type-check + test:ci + test:compliance in parallel…${RST}" >&2
-
-# Log files per job so mixed output from parallel runs doesn't interleave.
-TMP="$(mktemp -d)"
-trap 'rm -rf "$TMP"' EXIT
-
-(npm run --silent type-check       > "$TMP/type.log"   2>&1; echo $? > "$TMP/type.exit")   &
-PID_TYPE=$!
-(npm run --silent test:ci          > "$TMP/ci.log"     2>&1; echo $? > "$TMP/ci.exit")     &
-PID_CI=$!
-(npm run --silent test:compliance  > "$TMP/comp.log"   2>&1; echo $? > "$TMP/comp.exit")   &
-PID_COMP=$!
-
-wait $PID_TYPE $PID_CI $PID_COMP || true
-
-TYPE_EXIT=$(cat "$TMP/type.exit" 2>/dev/null || echo 1)
-CI_EXIT=$(cat "$TMP/ci.exit"     2>/dev/null || echo 1)
-COMP_EXIT=$(cat "$TMP/comp.exit" 2>/dev/null || echo 1)
-
-failed=0
-report() {
-  local name=$1 exit_code=$2 log=$3
-  if [ "$exit_code" != "0" ]; then
-    echo "${RED}[pre-push] $name failed (exit $exit_code):${RST}" >&2
-    cat "$log" >&2
-    failed=1
+# Run one job; on failure print its captured log and abort the push.
+run_step() {
+  local name=$1; shift
+  echo "${YLW}[pre-push] ${name}…${RST}" >&2
+  local log; log="$(mktemp)"
+  if "$@" > "$log" 2>&1; then
+    echo "${GRN}[pre-push] ${name} ok${RST}" >&2
+    rm -f "$log"
   else
-    echo "${GRN}[pre-push] $name ok${RST}" >&2
+    local code=$?
+    echo "${RED}[pre-push] ${name} failed (exit ${code}):${RST}" >&2
+    cat "$log" >&2
+    rm -f "$log"
+    echo "${RED}[pre-push] blocked — fix the failures above or push with --no-verify.${RST}" >&2
+    exit 1
   fi
 }
 
-report "type-check"      "$TYPE_EXIT" "$TMP/type.log"
-report "test:ci"         "$CI_EXIT"   "$TMP/ci.log"
-report "test:compliance" "$COMP_EXIT" "$TMP/comp.log"
-
-if [ "$failed" = "1" ]; then
-  echo "${RED}[pre-push] blocked — fix the failures above or push with --no-verify.${RST}" >&2
-  exit 1
-fi
+run_step "type-check"      npm run --silent type-check
+run_step "test:ci"         npm run --silent test:ci
+run_step "test:compliance" npm run --silent test:compliance
 
 echo "${GRN}[pre-push] all checks passed${RST}" >&2
