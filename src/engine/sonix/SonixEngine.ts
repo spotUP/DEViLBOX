@@ -17,6 +17,14 @@ import {
   WasmSynthParamBridge,
   type WasmSynthParamBridgeSpec,
 } from '@engine/replayer/WasmSynthParamBridge';
+import { sonixGlobalRowToPosition, SNX_TICKS_PER_ROW } from './sonixPosition';
+
+/** Playback-position update consumed by NativeEngineRouting's generic sync path. */
+export interface SonixPositionUpdate {
+  row: number;
+  songPos: number;
+}
+type SonixPositionCallback = (update: SonixPositionUpdate) => void;
 
 export interface SonixMeta {
   format: string;
@@ -94,6 +102,8 @@ export class SonixEngine extends WASMSingletonBase {
   private _meta: SonixMeta | null = null;
   /** Shared WASM↔store param bridge (mirror + setter), created with the worklet node. */
   private _paramBridge: WasmSynthParamBridge<SonixSynthParams> | null = null;
+  /** Playback-position listeners (wired by NativeEngineRouting to the cursor store). */
+  private _positionCallbacks: Set<SonixPositionCallback> = new Set();
   /** Fired when the WASM reports its parsed synth params after a module loads. */
   static onSynthParams: ((params: SonixSynthParams[]) => void) | null = null;
 
@@ -184,6 +194,16 @@ export class SonixEngine extends WASMSingletonBase {
           useOscilloscopeStore.getState().updateChannelData(data.channels);
           break;
 
+        case 'position': {
+          // The worklet reports the driver's native playback counter. Its unit is per-tick
+          // for SNX (a display row spans SNX_TICKS_PER_ROW ticks) but per-row for SMUS/TINY,
+          // so divide by the sub-format's ticks-per-row before mapping to (row, songPos).
+          const ticksPerRow = this._meta?.format === 'SNX' ? SNX_TICKS_PER_ROW : 1;
+          const pos = sonixGlobalRowToPosition(data.row, ticksPerRow);
+          for (const cb of this._positionCallbacks) cb(pos);
+          break;
+        }
+
         case SONIX_BRIDGE_SPEC.reportMessage:
           this._paramBridge?.handleReport(data as { instruments?: SonixSynthParams[] });
           break;
@@ -269,8 +289,20 @@ export class SonixEngine extends WASMSingletonBase {
     this._paramBridge?.setParams(params);
   }
 
+  /**
+   * Register a playback-position listener. NativeEngineRouting's generic sync path
+   * detects this method and feeds updates into useWasmPositionStore, which makes the
+   * editor cursor follow the native audio (see PatternEditorCanvas wasmPos branch).
+   * Returns an unsubscribe function.
+   */
+  onPositionUpdate(cb: SonixPositionCallback): () => void {
+    this._positionCallbacks.add(cb);
+    return () => this._positionCallbacks.delete(cb);
+  }
+
   override dispose(): void {
     useOscilloscopeStore.getState().clear();
+    this._positionCallbacks.clear();
     super.dispose();
     if (SonixEngine.instance === this) {
       SonixEngine.instance = null;
