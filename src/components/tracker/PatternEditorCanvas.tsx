@@ -14,6 +14,7 @@ import { channelLayout } from './channelLayout';
 import { computeChannelFollowScroll } from '@/lib/tracker/followScroll';
 import { resolveCellColumn } from '@/lib/tracker/cellHitTest';
 import { resolveScrollRow } from '@/lib/tracker/playbackNavigation';
+import { recordModeBorderClass } from '@/lib/tracker/patternEditorChrome';
 import { AutomationLanes } from './AutomationLanes';
 import { GlobalLaneCurves } from './GlobalLaneCurves';
 import { MasterDubLane } from './MasterDubLane';
@@ -283,6 +284,8 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
 
   const trackerVisualBg = useSettingsStore(s => s.trackerVisualBg);
   const channelColorBlend = useSettingsStore(s => s.channelColorBlend);
+  // FT2 frames the pattern view in red while record (edit) mode is active.
+  const recordMode = useEditorStore(s => s.recordMode);
   // Convert blend % (0-100) to 2-digit hex alpha for CSS color suffix
   const blendHex = Math.round(channelColorBlend * 2.55).toString(16).padStart(2, '0');
   const showChannelNames = useUIStore(s => s.showChannelNames);
@@ -3559,7 +3562,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
                 {/* Canvas Pattern Grid */}
                 <div
                   ref={containerRef}
-                  className={`flex-1 relative overflow-hidden touch-none focus:outline-none focus:ring-1 focus:ring-accent-primary/30 ${trackerVisualBg ? 'bg-transparent' : 'bg-dark-bg'}`}
+                  className={`flex-1 relative overflow-hidden touch-none focus:outline-none focus:ring-1 focus:ring-accent-primary/30 ${trackerVisualBg ? 'bg-transparent' : 'bg-dark-bg'} ${recordModeBorderClass(recordMode)}`}
                   data-pattern-editor="true"
         style={{ minHeight: 200 }}
         tabIndex={0}
