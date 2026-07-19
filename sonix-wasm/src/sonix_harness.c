@@ -284,6 +284,14 @@ EXPORT int sonix_is_finished(void) {
     return sonix_song_is_finished(g_song) ? 1 : 0;
 }
 
+/* Current grid-row the driver is playing, in the parser's row space (one row per
+ * SNX CIA tick / SMUS-TINY note-step, wrapped to [0, row_length) on loop). The
+ * worklet polls this to drive the editor's playback cursor via onPositionUpdate,
+ * replacing the free-running TS scheduler clock that drifted at a hardcoded tempo. */
+EXPORT int sonix_get_display_row(void) {
+    return g_song ? (int)g_song->display_row : 0;
+}
+
 /* ---- Per-channel scope capture for the oscilloscope / VU meters ---- */
 
 /* Number of valid frames captured in the last sonix_render() call. */
