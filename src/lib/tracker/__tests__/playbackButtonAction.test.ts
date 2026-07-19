@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { computePlayButtonAction } from '../playbackButtonAction';
 
-describe('computePlayButtonAction — play buttons switch mode, they do not stop the song', () => {
+describe('computePlayButtonAction — Play Pattern never stops; Play Song toggles', () => {
   it('starts when stopped', () => {
     expect(computePlayButtonAction('song', false, false)).toBe('start');
     expect(computePlayButtonAction('pattern', false, false)).toBe('start');
@@ -15,8 +15,11 @@ describe('computePlayButtonAction — play buttons switch mode, they do not stop
     expect(computePlayButtonAction('song', true, true)).toBe('switch');
   });
 
-  it('pressing the button for the mode already playing stops it', () => {
+  it('Play Song pressed during full-song playback stops it', () => {
     expect(computePlayButtonAction('song', true, false)).toBe('stop');
-    expect(computePlayButtonAction('pattern', true, true)).toBe('stop');
+  });
+
+  it('Play Pattern pressed during pattern-loop RESTARTS — it never stops', () => {
+    expect(computePlayButtonAction('pattern', true, true)).toBe('restart');
   });
 });
