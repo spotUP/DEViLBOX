@@ -13,6 +13,7 @@ import { useWasmPositionStore } from '@stores/useWasmPositionStore';
 import { channelLayout } from './channelLayout';
 import { computeChannelFollowScroll } from '@/lib/tracker/followScroll';
 import { resolveCellColumn } from '@/lib/tracker/cellHitTest';
+import { resolveScrollRow } from '@/lib/tracker/playbackNavigation';
 import { AutomationLanes } from './AutomationLanes';
 import { GlobalLaneCurves } from './GlobalLaneCurves';
 import { MasterDubLane } from './MasterDubLane';
@@ -544,7 +545,12 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     
     const transportState = useTransportStore.getState();
     const cursor = cursorRef.current;
-    const currentRow = transportState.isPlaying ? transportState.currentRow : cursor.rowIndex;
+    const currentRow = resolveScrollRow(
+      transportState.isPlaying,
+      useEditorStore.getState().followPlayback,
+      transportState.currentRow,
+      cursor.rowIndex,
+    );
     const rowIndex = currentRow + rowOffset;
 
     let channelIndex = 0;
@@ -2693,7 +2699,10 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
           activePatternIdx = patternOrder[wasmPos.songPos] ?? wasmPos.songPos;
           songPosition = wasmPos.songPos;
         }
-      } else if (isPlaying) {
+      } else if (isPlaying && useEditorStore.getState().followPlayback) {
+        // Follow ON: ride the play head. Follow OFF (scroll-lock): currentRow
+        // stays on the edit cursor (init above) so the view freezes while the
+        // song plays and rows can be repositioned/edited live (FT2).
         // Check if scratch is active — use scratch position instead of replayer
         const scratch = getTrackerScratchController();
         if (scratch.isActive) {
