@@ -17,6 +17,7 @@ import type {
 } from './worker-types';
 import { SUN_EFFECT_GLYPH } from '@/lib/import/formats/sunEffectGlyphs';
 import { SNX_EFFECT_GLYPH } from '@/lib/import/formats/sonixEffectGlyphs';
+import { computeCaretRect } from '@/lib/tracker/caretGeometry';
 
 const ROW_HEIGHT   = 24;
 const CHAR_WIDTH   = 10;
@@ -368,17 +369,45 @@ export class TrackerCanvas2DRenderer {
       ctx.globalAlpha = 1;
     }
 
-    // ── Cursor rect ─────────────────────────────────────────────────────────
+    // ── Cursor rect (per-nibble, matches the GL renderer) ────────────────────
     const curY = (cursor.rowIndex - scrollRow) * rowH;
     if (curY >= -rowH && curY < H) {
       const ch = cursor.channelIndex;
-      const curX = lnw + (chanOffsets[ch] ?? 0);
-      // Clamp cursor width to canvas bounds (channel may be wider than viewport on mobile)
-      const rawCurW = (chanWidths[ch] ?? cw * 9) - 2;
-      const curW = Math.min(rawCurW, W - curX - 2);
+      const chanX = lnw + (chanOffsets[ch] ?? 0);
+      const chan = pattern.channels[ch];
+      const chColumns = chan?.columnSpecs ?? ui.columns;
+      const colIdx = parseInt(cursor.columnType, 10);
+
+      let caretX: number;
+      let caretW: number;
+      if (!isNaN(colIdx) && chColumns) {
+        // DATA-DRIVEN column caret — span the numeric column.
+        let offX = 0;
+        for (let ci = 0; ci < colIdx && ci < chColumns.length; ci++) {
+          offX += chColumns[ci].charWidth * cw + colGap;
+        }
+        caretX = chanX + 2 + offX;
+        caretW = (chColumns[colIdx]?.charWidth ?? 1) * cw;
+      } else {
+        // FIXED-COLUMN per-nibble caret from the shared geometry helper.
+        const hasAcid = chan?.rows[0]?.flag1 !== undefined || chan?.rows[0]?.flag2 !== undefined;
+        const rect = computeCaretRect({
+          columnType: cursor.columnType,
+          digitIndex: cursor.digitIndex,
+          noteColumnIndex: cursor.noteColumnIndex ?? 0,
+          charWidth: cw,
+          noteCols: chan?.noteCols ?? 1,
+          effectCols: chan?.effectCols ?? 2,
+          hasAcid,
+        });
+        caretX = chanX + 2 + rect.offX;
+        caretW = rect.width;
+      }
+      // Clamp caret to canvas bounds (channel may be wider than viewport on mobile)
+      const clampedW = Math.min(caretW, W - caretX - 2);
       ctx.strokeStyle = theme.accent;
       ctx.lineWidth   = this.mobile ? 3 : 2;
-      ctx.strokeRect(curX + 1, curY + 1, curW, rowH - 2);
+      ctx.strokeRect(caretX + 1, curY + 1, clampedW, rowH - 2);
     }
 
     // ── Center line ─────────────────────────────────────────────────────────
