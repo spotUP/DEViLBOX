@@ -12,6 +12,7 @@
 
 import { buildGlyphAtlas, parseColor, parseRgba, type GlyphAtlas, type GlyphInfo } from './glyph-atlas';
 import { SUN_EFFECT_GLYPH } from '@/lib/import/formats/sunEffectGlyphs';
+import { SNX_EFFECT_GLYPH } from '@/lib/import/formats/sonixEffectGlyphs';
 import type {
   PatternSnapshot,
   CursorSnapshot,
@@ -860,6 +861,9 @@ export class TrackerGLRenderer {
               } else if (SUN_EFFECT_GLYPH[colEffTyp] !== undefined) {
                 // SunTronic private control effects (reserved block 0x40..0x4F)
                 effStr = SUN_EFFECT_GLYPH[colEffTyp] + HEX_TABLE[colEff & 0xFF];
+              } else if (SNX_EFFECT_GLYPH[colEffTyp] !== undefined) {
+                // SNX (Sonix Music Driver) private control effects (block 0x60..0x62)
+                effStr = SNX_EFFECT_GLYPH[colEffTyp] + HEX_TABLE[colEff & 0xFF];
               } else {
                 effStr = (EFFECT_CHARS[colEffTyp] ?? '?') + HEX_TABLE[colEff & 0xFF];
               }

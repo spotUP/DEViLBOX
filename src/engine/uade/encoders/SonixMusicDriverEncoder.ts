@@ -5,13 +5,13 @@
  * Each voice channel is an independent stream of opcodes:
  *
  *   0xFFFF          end of track
- *   0xC000-0xFFFE   rest/delay for (word & 0x3FFF) ticks
- *   0x83nn          volume set to nn (0-127)
- *   0x82nn          tempo change to nn
- *   0x81nn          loop control
- *   0x80nn          instrument change to register nn (0-based)
- *   0x0000          rest for 1 tick
- *   0x0Nnn          note on: high byte = note index (1-127), low byte = volume
+ *   0xC000-0xFFFE   WAIT (word & 0x3FFF) CIA ticks
+ *   0x80nn          instrument select to register nn (& 63, 0-based)
+ *   0x81nn          channel volume set (0xFF = max)
+ *   0x82nn          tempo change to nn (nn>0)
+ *   0x83nn          detune / pitch-mod (signed)
+ *   0x0000          0-tick no-op
+ *   0x0Nnn          note on: high byte = note index (1-127), low byte = velocity
  *
  * This encoder is the exact inverse of parseSnxVoiceStream in SonixMusicDriverParser,
  * which quantizes the driver's CIA-tick timeline to display rows of SNX_TICKS_PER_ROW ticks
@@ -34,6 +34,7 @@ import type { TrackerCell } from '@/types';
 import type { VariableLengthEncoder } from '../UADEPatternEncoder';
 import { registerVariableEncoder } from '../UADEPatternEncoder';
 import { SNX_TICKS_PER_ROW } from '@/engine/sonix/sonixPosition';
+import { SNX_FX } from '@/lib/import/formats/sonixEffectGlyphs';
 
 /** Push a WAIT covering `ticks` CIA ticks, chunked to the 0x3FFF opcode ceiling. */
 function pushWait(words: number[], ticks: number): void {
@@ -45,9 +46,31 @@ function pushWait(words: number[], ticks: number): void {
   }
 }
 
-/** True when a row carries no trigger and no state change (a pure hold/rest tick). */
+/**
+ * Read the three SNX control effects (chanVol/tempo/detune) from a cell, matching by effTyp
+ * value across all three effect columns so it is robust to which column the user placed them
+ * in. Returns the raw opcode param byte for each present effect, or null when absent.
+ */
+function readSnxEffects(cell: TrackerCell): { chanVol: number | null; tempo: number | null; detune: number | null } {
+  const slots: Array<[number | undefined, number | undefined]> = [
+    [cell.effTyp, cell.eff],
+    [cell.effTyp2, cell.eff2],
+    [cell.effTyp3, cell.eff3],
+  ];
+  const out = { chanVol: null as number | null, tempo: null as number | null, detune: null as number | null };
+  for (const [typ, val] of slots) {
+    if (typ === SNX_FX.chanVol) out.chanVol = (val ?? 0) & 0xFF;
+    else if (typ === SNX_FX.tempo) out.tempo = (val ?? 0) & 0xFF;
+    else if (typ === SNX_FX.detune) out.detune = (val ?? 0) & 0xFF;
+  }
+  return out;
+}
+
+/** True when a row carries no trigger and no control change (a pure hold/rest tick). */
 function isEmptyRow(cell: TrackerCell): boolean {
-  return (cell.note ?? 0) === 0 && (cell.instrument ?? 0) === 0 && (cell.volume ?? 0) === 0;
+  if ((cell.note ?? 0) !== 0 || (cell.instrument ?? 0) !== 0 || (cell.volume ?? 0) !== 0) return false;
+  const fx = readSnxEffects(cell);
+  return fx.chanVol === null && fx.tempo === null && fx.detune === null;
 }
 
 /**
@@ -55,8 +78,10 @@ function isEmptyRow(cell: TrackerCell): boolean {
  *
  * Strategy — every row spans SNX_TICKS_PER_ROW CIA ticks:
  * - A run of empty rows -> one WAIT of (run length * SNX_TICKS_PER_ROW), chunked to 0x3FFF.
- * - A non-empty (trigger) row emits its instrument/volume change words, the NOTE word, then a
- *   WAIT(SNX_TICKS_PER_ROW) for that single row. Re-parsing lands the note back on the same row.
+ * - A non-empty row emits its control opcodes (instrument 0x80, chanVol 0x81, tempo 0x82,
+ *   detune 0x83), then the NOTE word (with velocity from the volume column) when a note is
+ *   present, then a WAIT(SNX_TICKS_PER_ROW) for that single row. Effect-only rows emit their
+ *   opcodes + WAIT with no note word. Re-parsing lands every control back on the same row.
  * - Stream ends with 0xFFFF.
  */
 function encodeSnxVoiceStream(rows: TrackerCell[], _channel: number): Uint8Array {
@@ -78,22 +103,23 @@ function encodeSnxVoiceStream(rows: TrackerCell[], _channel: number): Uint8Array
     const note = cell.note ?? 0;
     const instr = cell.instrument ?? 0;
     const vol = cell.volume ?? 0;
+    const fx = readSnxEffects(cell);
 
     // Emit instrument change if needed (spends 0 ticks; folds into the following note).
     if (instr > 0 && instr !== lastInstr) {
       const register = instr - 1; // reverse: parser does instrument = register + 1
-      words.push(0x8000 | (register & 0xFF));
+      words.push(0x8000 | (register & 0x3F));
       lastInstr = instr;
     }
 
-    // Emit volume change if the volume column is set (XM volume format 0x10-0x50).
-    if (vol >= 0x10) {
-      const snxVol = Math.round(((Math.min(vol, 0x50) - 0x10) / 64) * 127);
-      words.push(0x8300 | (snxVol & 0xFF));
-    }
+    // Emit the per-cell control effects (each spends 0 ticks) in opcode order.
+    if (fx.chanVol !== null) words.push(0x8100 | fx.chanVol);
+    if (fx.tempo !== null && fx.tempo > 0) words.push(0x8200 | fx.tempo);
+    if (fx.detune !== null && fx.detune !== 0) words.push(0x8300 | fx.detune);
 
     if (note > 0 && note <= 96) {
       const noteIndex = Math.max(1, Math.min(127, note));
+      // Velocity rides the note word's low byte; volume column 0x10-0x50 -> 0-127.
       const velByte = vol >= 0x10
         ? Math.round(((Math.min(vol, 0x50) - 0x10) / 64) * 127)
         : 100; // default velocity when no volume set

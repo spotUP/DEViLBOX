@@ -16,6 +16,7 @@ import type {
   ChannelLayoutSnapshot,
 } from './worker-types';
 import { SUN_EFFECT_GLYPH } from '@/lib/import/formats/sunEffectGlyphs';
+import { SNX_EFFECT_GLYPH } from '@/lib/import/formats/sonixEffectGlyphs';
 
 const ROW_HEIGHT   = 24;
 const CHAR_WIDTH   = 10;
@@ -357,8 +358,8 @@ export class TrackerCanvas2DRenderer {
           ctx.fillStyle = isPlayRow ? '#ffffff' : eff === 0 && effp === 0 ? theme.textMuted : theme.textEffect;
           const effStr = eff === 0 && effp === 0
             ? '···'
-            // SunTronic private control effects (reserved block 0x40..0x4F)
-            : `${SUN_EFFECT_GLYPH[eff] ?? EFFECT_CHARS_2D[eff] ?? '?'}${hex2(effp)}`;
+            // SunTronic (0x40..0x4F) / SNX (0x60..0x62) private control effects
+            : `${SUN_EFFECT_GLYPH[eff] ?? SNX_EFFECT_GLYPH[eff] ?? EFFECT_CHARS_2D[eff] ?? '?'}${hex2(effp)}`;
           ctx.fillText(effStr, effBaseX, y);
         }
       }

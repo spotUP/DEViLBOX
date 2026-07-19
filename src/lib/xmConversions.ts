@@ -5,6 +5,7 @@
  */
 
 import { sunEffectToString } from './import/formats/sunEffectGlyphs';
+import { sonixEffectToString } from './import/formats/sonixEffectGlyphs';
 
 /**
  * Note names for XM encoding
@@ -249,6 +250,10 @@ export function xmEffectToString(effTyp: number, eff: number): string {
   // SunTronic private control effects (reserved block 0x40..0x4F).
   const sun = sunEffectToString(effTyp, eff);
   if (sun !== null) return sun;
+
+  // SNX (Sonix Music Driver) private control effects (reserved block 0x60..0x62).
+  const snx = sonixEffectToString(effTyp, eff);
+  if (snx !== null) return snx;
 
   const typeChar = EFFECT_CHAR_MAP[effTyp] ?? '0';
   return `${typeChar}${HEX_BYTE[eff] ?? '00'}`;
