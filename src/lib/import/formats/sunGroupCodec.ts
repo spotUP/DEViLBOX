@@ -112,7 +112,15 @@ export function decodeSunGroup(
       // NOT retrigger, so the grid must NOT show a note there (that was a phantom
       // "ghost note"). First qualifying note wins (walkV13Voice behaviour).
       if (cell.note === 0 && curInstr !== 0) {
-        cell.note = sunPitchToNote(((~b) & 0xff) - transpose);
+        // Pitch decode MUST mirror the player byte-for-byte (SunTronicPlayer
+        // getNextNote:364 `u8(~d0 - v.transpose)`): the 68k does `MOVE.B`, so the
+        // transpose subtraction wraps to 8 bits BEFORE the pitch-table lookup.
+        // Masking `~b` first and subtracting after (the old `((~b)&0xff)-transpose`)
+        // leaves a negative operand at transpose underflow, which sunPitchToNote
+        // maps to a VALID note where the real replayer wraps out of range and
+        // sounds nothing — a phantom "ghost note" (comming0 ch0, tank-special
+        // ch1/ch3). Wrap-then-lookup makes the grid show exactly what plays.
+        cell.note = sunPitchToNote((~b - transpose) & 0xff);
         cell.instrument = curInstr;
       }
       pos += len;
