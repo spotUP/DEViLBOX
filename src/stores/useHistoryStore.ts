@@ -49,7 +49,8 @@ export type ActionType =
   | 'KILL_TO_START'
   | 'REVERSE_BLOCK'
   | 'DOUBLE_BLOCK'
-  | 'HALVE_BLOCK';
+  | 'HALVE_BLOCK'
+  | 'BULK_BLOCK_EDIT';
 
 export interface HistoryAction {
   id: string;
@@ -379,6 +380,7 @@ export const getActionTypeName = (type: ActionType): string => {
     REVERSE_BLOCK: 'Reverse Block',
     DOUBLE_BLOCK: 'Double Block',
     HALVE_BLOCK: 'Halve Block',
+    BULK_BLOCK_EDIT: 'Block Edit',
   };
   return names[type] || type;
 };

@@ -11,7 +11,7 @@
 import { useCallback, useState } from 'react';
 import { useTrackerStore, useCursorStore } from '@stores';
 import { xmNoteToMidi, midiToXMNote } from '@/lib/xmConversions';
-import type { TrackerCell } from '@typedefs';
+import { EMPTY_CELL, type TrackerCell } from '@typedefs';
 
 /** Which cell columns block operations should affect */
 export interface ContentMask {
@@ -136,23 +136,25 @@ export const useBlockOperations = () => {
       const bounds = getBlockBounds();
       if (!bounds) return;
 
-      const { patterns, currentPatternIndex, setCell } = useTrackerStore.getState();
-      const pattern = patterns[currentPatternIndex];
-
-      for (let ch = bounds.startChannel; ch <= bounds.endChannel; ch++) {
-        for (let row = bounds.startRow; row <= bounds.endRow; row++) {
-          const cell = pattern.channels[ch].rows[row];
-          if (cell.note && cell.note !== 0 && cell.note !== 97) {
-            const midiNote = xmNoteToMidi(cell.note);
-            if (midiNote !== null) {
-              const newMidiNote = midiNote + semitones;
-              if (newMidiNote >= 12 && newMidiNote <= 107) {
-                setCell(ch, row, { note: midiToXMNote(newMidiNote) });
+      useTrackerStore.getState().bulkBlockEdit(
+        `Transpose ${semitones > 0 ? '+' : ''}${semitones}`,
+        (pattern) => {
+          for (let ch = bounds.startChannel; ch <= bounds.endChannel; ch++) {
+            for (let row = bounds.startRow; row <= bounds.endRow; row++) {
+              const cell = pattern.channels[ch].rows[row];
+              if (cell.note && cell.note !== 0 && cell.note !== 97) {
+                const midiNote = xmNoteToMidi(cell.note);
+                if (midiNote !== null) {
+                  const newMidiNote = midiNote + semitones;
+                  if (newMidiNote >= 12 && newMidiNote <= 107) {
+                    cell.note = midiToXMNote(newMidiNote);
+                  }
+                }
               }
             }
           }
-        }
-      }
+        },
+      );
     },
     [getBlockBounds]
   );
@@ -165,19 +167,16 @@ export const useBlockOperations = () => {
       const bounds = getBlockBounds();
       if (!bounds) return;
 
-      const { patterns, currentPatternIndex, setCell } = useTrackerStore.getState();
-      const pattern = patterns[currentPatternIndex];
-
-      for (let ch = bounds.startChannel; ch <= bounds.endChannel; ch++) {
-        for (let row = bounds.startRow; row <= bounds.endRow; row++) {
-          const cell = pattern.channels[ch].rows[row];
-          if (cell.volume !== null) {
-            const newVolume = Math.min(0x40, Math.max(0, Math.round(cell.volume * factor)));
-            setCell(ch, row, { volume: newVolume });
+      useTrackerStore.getState().bulkBlockEdit('Amplify block', (pattern) => {
+        for (let ch = bounds.startChannel; ch <= bounds.endChannel; ch++) {
+          for (let row = bounds.startRow; row <= bounds.endRow; row++) {
+            const cell = pattern.channels[ch].rows[row];
+            if (cell.volume !== null) {
+              cell.volume = Math.min(0x40, Math.max(0, Math.round(cell.volume * factor)));
+            }
           }
         }
-      }
-
+      });
     },
     [getBlockBounds]
   );
@@ -190,27 +189,25 @@ export const useBlockOperations = () => {
       const bounds = getBlockBounds();
       if (!bounds) return;
 
-      const { patterns, currentPatternIndex, setCell } = useTrackerStore.getState();
-      const pattern = patterns[currentPatternIndex];
+      useTrackerStore.getState().bulkBlockEdit('Interpolate block', (pattern) => {
+        for (let ch = bounds.startChannel; ch <= bounds.endChannel; ch++) {
+          const startCell = pattern.channels[ch].rows[bounds.startRow];
+          const endCell = pattern.channels[ch].rows[bounds.endRow];
 
-      for (let ch = bounds.startChannel; ch <= bounds.endChannel; ch++) {
-        const startCell = pattern.channels[ch].rows[bounds.startRow];
-        const endCell = pattern.channels[ch].rows[bounds.endRow];
+          const startValue = (startCell[columnType] as number) || 0;
+          const endValue = (endCell[columnType] as number) || 0;
 
-        const startValue = (startCell[columnType] as number) || 0;
-        const endValue = (endCell[columnType] as number) || 0;
+          const rowCount = bounds.endRow - bounds.startRow;
+          if (rowCount <= 1) continue;
 
-        const rowCount = bounds.endRow - bounds.startRow;
-        if (rowCount <= 1) continue;
-
-        for (let i = 1; i < rowCount; i++) {
-          const t = i / rowCount;
-          const interpolatedValue = Math.round(startValue + (endValue - startValue) * t);
-          const row = bounds.startRow + i;
-          setCell(ch, row, { [columnType]: interpolatedValue });
+          for (let i = 1; i < rowCount; i++) {
+            const t = i / rowCount;
+            const interpolatedValue = Math.round(startValue + (endValue - startValue) * t);
+            const row = bounds.startRow + i;
+            pattern.channels[ch].rows[row][columnType] = interpolatedValue;
+          }
         }
-      }
-
+      });
     },
     [getBlockBounds]
   );
@@ -222,41 +219,29 @@ export const useBlockOperations = () => {
     const bounds = getBlockBounds();
     if (!bounds) return;
 
-    const { patterns, currentPatternIndex, setCell } = useTrackerStore.getState();
-    const pattern = patterns[currentPatternIndex];
-
     const rowCount = bounds.endRow - bounds.startRow + 1;
     if (rowCount < 2) return;
 
-    // Collect all cells in the block
-    const snapshot: TrackerCell[][] = [];
-    for (let ch = bounds.startChannel; ch <= bounds.endChannel; ch++) {
-      const channelCells: TrackerCell[] = [];
-      for (let row = bounds.startRow; row <= bounds.endRow; row++) {
-        channelCells.push({ ...pattern.channels[ch].rows[row] });
+    useTrackerStore.getState().bulkBlockEdit('Reverse block', (pattern) => {
+      // Collect all cells in the block
+      const snapshot: TrackerCell[][] = [];
+      for (let ch = bounds.startChannel; ch <= bounds.endChannel; ch++) {
+        const channelCells: TrackerCell[] = [];
+        for (let row = bounds.startRow; row <= bounds.endRow; row++) {
+          channelCells.push({ ...pattern.channels[ch].rows[row] });
+        }
+        snapshot.push(channelCells);
       }
-      snapshot.push(channelCells);
-    }
 
-    // Write back in reverse order
-    for (let ch = bounds.startChannel; ch <= bounds.endChannel; ch++) {
-      const chIdx = ch - bounds.startChannel;
-      for (let i = 0; i < rowCount; i++) {
-        const srcCell = snapshot[chIdx][rowCount - 1 - i];
-        setCell(ch, bounds.startRow + i, {
-          note: srcCell.note,
-          instrument: srcCell.instrument,
-          volume: srcCell.volume,
-          effTyp: srcCell.effTyp,
-          eff: srcCell.eff,
-          effTyp2: srcCell.effTyp2,
-          eff2: srcCell.eff2,
-          flag1: srcCell.flag1,
-          flag2: srcCell.flag2,
-        });
+      // Write back in reverse order
+      for (let ch = bounds.startChannel; ch <= bounds.endChannel; ch++) {
+        const chIdx = ch - bounds.startChannel;
+        for (let i = 0; i < rowCount; i++) {
+          const srcCell = snapshot[chIdx][rowCount - 1 - i];
+          pattern.channels[ch].rows[bounds.startRow + i] = { ...srcCell };
+        }
       }
-    }
-
+    });
   }, [getBlockBounds]);
 
   /**
@@ -267,60 +252,31 @@ export const useBlockOperations = () => {
     const bounds = getBlockBounds();
     if (!bounds) return;
 
-    const { patterns, currentPatternIndex, setCell } = useTrackerStore.getState();
-    const pattern = patterns[currentPatternIndex];
+    useTrackerStore.getState().bulkBlockEdit('Expand block', (pattern) => {
+      const rowCount = bounds.endRow - bounds.startRow + 1;
+      const patternLength = pattern.channels[0]?.rows.length || 64;
 
-    const rowCount = bounds.endRow - bounds.startRow + 1;
-    const patternLength = pattern.channels[0]?.rows.length || 64;
-
-    // Snapshot the block
-    const snapshot: TrackerCell[][] = [];
-    for (let ch = bounds.startChannel; ch <= bounds.endChannel; ch++) {
-      const channelCells: TrackerCell[] = [];
-      for (let row = bounds.startRow; row <= bounds.endRow; row++) {
-        channelCells.push({ ...pattern.channels[ch].rows[row] });
+      // Snapshot the block
+      const snapshot: TrackerCell[][] = [];
+      for (let ch = bounds.startChannel; ch <= bounds.endChannel; ch++) {
+        const channelCells: TrackerCell[] = [];
+        for (let row = bounds.startRow; row <= bounds.endRow; row++) {
+          channelCells.push({ ...pattern.channels[ch].rows[row] });
+        }
+        snapshot.push(channelCells);
       }
-      snapshot.push(channelCells);
-    }
 
-    // Write expanded: original rows at even positions, clear odd positions
-    for (let ch = bounds.startChannel; ch <= bounds.endChannel; ch++) {
-      const chIdx = ch - bounds.startChannel;
-      for (let i = 0; i < rowCount * 2; i++) {
-        const destRow = bounds.startRow + i;
-        if (destRow >= patternLength) break;
-
-        if (i % 2 === 0) {
-          // Original row
-          const srcCell = snapshot[chIdx][i / 2];
-          setCell(ch, destRow, {
-            note: srcCell.note,
-            instrument: srcCell.instrument,
-            volume: srcCell.volume,
-            effTyp: srcCell.effTyp,
-            eff: srcCell.eff,
-            effTyp2: srcCell.effTyp2,
-            eff2: srcCell.eff2,
-            flag1: srcCell.flag1,
-            flag2: srcCell.flag2,
-          });
-        } else {
-          // Empty row
-          setCell(ch, destRow, {
-            note: 0,
-            instrument: 0,
-            volume: 0,
-            effTyp: 0,
-            eff: 0,
-            effTyp2: 0,
-            eff2: 0,
-            flag1: 0,
-            flag2: 0,
-          });
+      // Write expanded: original rows at even positions, clear odd positions
+      for (let ch = bounds.startChannel; ch <= bounds.endChannel; ch++) {
+        const chIdx = ch - bounds.startChannel;
+        for (let i = 0; i < rowCount * 2; i++) {
+          const destRow = bounds.startRow + i;
+          if (destRow >= patternLength) break;
+          pattern.channels[ch].rows[destRow] =
+            i % 2 === 0 ? { ...snapshot[chIdx][i / 2] } : { ...EMPTY_CELL };
         }
       }
-    }
-
+    });
   }, [getBlockBounds]);
 
   /**
@@ -330,58 +286,31 @@ export const useBlockOperations = () => {
     const bounds = getBlockBounds();
     if (!bounds) return;
 
-    const { patterns, currentPatternIndex, setCell } = useTrackerStore.getState();
-    const pattern = patterns[currentPatternIndex];
-
     const rowCount = bounds.endRow - bounds.startRow + 1;
     if (rowCount < 2) return;
 
-    // Snapshot the block
-    const snapshot: TrackerCell[][] = [];
-    for (let ch = bounds.startChannel; ch <= bounds.endChannel; ch++) {
-      const channelCells: TrackerCell[] = [];
-      for (let row = bounds.startRow; row <= bounds.endRow; row++) {
-        channelCells.push({ ...pattern.channels[ch].rows[row] });
+    useTrackerStore.getState().bulkBlockEdit('Shrink block', (pattern) => {
+      // Snapshot the block
+      const snapshot: TrackerCell[][] = [];
+      for (let ch = bounds.startChannel; ch <= bounds.endChannel; ch++) {
+        const channelCells: TrackerCell[] = [];
+        for (let row = bounds.startRow; row <= bounds.endRow; row++) {
+          channelCells.push({ ...pattern.channels[ch].rows[row] });
+        }
+        snapshot.push(channelCells);
       }
-      snapshot.push(channelCells);
-    }
 
-    // Write shrunk: take every other row, clear the rest
-    for (let ch = bounds.startChannel; ch <= bounds.endChannel; ch++) {
-      const chIdx = ch - bounds.startChannel;
-      for (let i = 0; i < rowCount; i++) {
-        const destRow = bounds.startRow + i;
-        const srcIdx = i * 2;
-        if (srcIdx < rowCount) {
-          const srcCell = snapshot[chIdx][srcIdx];
-          setCell(ch, destRow, {
-            note: srcCell.note,
-            instrument: srcCell.instrument,
-            volume: srcCell.volume,
-            effTyp: srcCell.effTyp,
-            eff: srcCell.eff,
-            effTyp2: srcCell.effTyp2,
-            eff2: srcCell.eff2,
-            flag1: srcCell.flag1,
-            flag2: srcCell.flag2,
-          });
-        } else {
-          // Clear remaining rows
-          setCell(ch, destRow, {
-            note: 0,
-            instrument: 0,
-            volume: 0,
-            effTyp: 0,
-            eff: 0,
-            effTyp2: 0,
-            eff2: 0,
-            flag1: 0,
-            flag2: 0,
-          });
+      // Write shrunk: take every other row, clear the rest
+      for (let ch = bounds.startChannel; ch <= bounds.endChannel; ch++) {
+        const chIdx = ch - bounds.startChannel;
+        for (let i = 0; i < rowCount; i++) {
+          const destRow = bounds.startRow + i;
+          const srcIdx = i * 2;
+          pattern.channels[ch].rows[destRow] =
+            srcIdx < rowCount ? { ...snapshot[chIdx][srcIdx] } : { ...EMPTY_CELL };
         }
       }
-    }
-
+    });
   }, [getBlockBounds]);
 
   /**
@@ -392,29 +321,26 @@ export const useBlockOperations = () => {
       const bounds = getBlockBounds();
       if (!bounds) return;
 
-      const { patterns, currentPatternIndex, setCell } = useTrackerStore.getState();
-      const pattern = patterns[currentPatternIndex];
+      useTrackerStore.getState().bulkBlockEdit('Math block', (pattern) => {
+        for (let ch = bounds.startChannel; ch <= bounds.endChannel; ch++) {
+          for (let row = bounds.startRow; row <= bounds.endRow; row++) {
+            const cell = pattern.channels[ch].rows[row];
+            const current = cell[column] as number;
+            if (current === 0 && column === 'volume') continue; // skip empty volume
 
-      for (let ch = bounds.startChannel; ch <= bounds.endChannel; ch++) {
-        for (let row = bounds.startRow; row <= bounds.endRow; row++) {
-          const cell = pattern.channels[ch].rows[row];
-          const current = cell[column] as number;
-          if (current === 0 && column === 'volume') continue; // skip empty volume
+            let result: number;
+            switch (op) {
+              case 'add': result = current + value; break;
+              case 'sub': result = current - value; break;
+              case 'mul': result = Math.round(current * value); break;
+              case 'div': result = value !== 0 ? Math.round(current / value) : current; break;
+            }
 
-          let result: number;
-          switch (op) {
-            case 'add': result = current + value; break;
-            case 'sub': result = current - value; break;
-            case 'mul': result = Math.round(current * value); break;
-            case 'div': result = value !== 0 ? Math.round(current / value) : current; break;
+            const max = column === 'volume' ? 0x50 : 0xFF;
+            cell[column] = Math.max(0, Math.min(max, result));
           }
-
-          const max = column === 'volume' ? 0x50 : 0xFF;
-          result = Math.max(0, Math.min(max, result));
-          setCell(ch, row, { [column]: result });
         }
-      }
-
+      });
     },
     [getBlockBounds]
   );
@@ -426,44 +352,31 @@ export const useBlockOperations = () => {
     const bounds = getBlockBounds();
     if (!bounds) return;
 
-    const { patterns, currentPatternIndex, setCell } = useTrackerStore.getState();
-    const pattern = patterns[currentPatternIndex];
+    useTrackerStore.getState().bulkBlockEdit('Duplicate block', (pattern) => {
+      const rowCount = bounds.endRow - bounds.startRow + 1;
+      const patternLength = pattern.channels[0]?.rows.length || 64;
 
-    const rowCount = bounds.endRow - bounds.startRow + 1;
-    const patternLength = pattern.channels[0]?.rows.length || 64;
-
-    // Snapshot the block
-    const snapshot: TrackerCell[][] = [];
-    for (let ch = bounds.startChannel; ch <= bounds.endChannel; ch++) {
-      const channelCells: TrackerCell[] = [];
-      for (let row = bounds.startRow; row <= bounds.endRow; row++) {
-        channelCells.push({ ...pattern.channels[ch].rows[row] });
-      }
-      snapshot.push(channelCells);
-    }
-
-    // Repeat from end of block to end of pattern
-    let writeRow = bounds.endRow + 1;
-    while (writeRow < patternLength) {
+      // Snapshot the block
+      const snapshot: TrackerCell[][] = [];
       for (let ch = bounds.startChannel; ch <= bounds.endChannel; ch++) {
-        const chIdx = ch - bounds.startChannel;
-        const srcIdx = (writeRow - bounds.endRow - 1) % rowCount;
-        const srcCell = snapshot[chIdx][srcIdx];
-        setCell(ch, writeRow, {
-          note: srcCell.note,
-          instrument: srcCell.instrument,
-          volume: srcCell.volume,
-          effTyp: srcCell.effTyp,
-          eff: srcCell.eff,
-          effTyp2: srcCell.effTyp2,
-          eff2: srcCell.eff2,
-          flag1: srcCell.flag1,
-          flag2: srcCell.flag2,
-        });
+        const channelCells: TrackerCell[] = [];
+        for (let row = bounds.startRow; row <= bounds.endRow; row++) {
+          channelCells.push({ ...pattern.channels[ch].rows[row] });
+        }
+        snapshot.push(channelCells);
       }
-      writeRow++;
-    }
 
+      // Repeat from end of block to end of pattern
+      let writeRow = bounds.endRow + 1;
+      while (writeRow < patternLength) {
+        for (let ch = bounds.startChannel; ch <= bounds.endChannel; ch++) {
+          const chIdx = ch - bounds.startChannel;
+          const srcIdx = (writeRow - bounds.endRow - 1) % rowCount;
+          pattern.channels[ch].rows[writeRow] = { ...snapshot[chIdx][srcIdx] };
+        }
+        writeRow++;
+      }
+    });
   }, [getBlockBounds]);
 
   // NOTE: FT2 Alt block shortcuts (Alt+B/E/C/V/P/X/T/Shift+T/R) are owned by the
