@@ -47,6 +47,7 @@ import { ImportDBXDialog } from '@components/dialogs/ImportDBXDialog';
 import { ImportInstrumentDialog } from '@components/dialogs/ImportInstrumentDialog';
 import { ImportTD3Dialog } from '@components/dialogs/ImportTD3Dialog';
 import { Button } from '@components/ui/Button';
+import { Modal } from '@components/ui/Modal';
 import { useVersionCheck } from '@hooks/useVersionCheck';
 import { useDevServerStatus } from '@hooks/useDevServerStatus';
 import { DevServerDownBanner } from '@components/ui/DevServerDownBanner';
@@ -407,7 +408,7 @@ function App() {
     applyAutoCompact();
   }, [applyAutoCompact]);
 
-  const { save: saveProject } = useProjectPersistence();
+  const { save: saveProject, recoverySnapshot, restoreRecovery, discardRecovery } = useProjectPersistence();
 
   // Initialize KeyboardRouter once at app startup
   useEffect(() => {
@@ -1397,6 +1398,22 @@ function App() {
 
       {/* Guided Tour overlay — subtitles + controls */}
       <TourOverlay />
+
+      {/* Crash-recovery prompt — shown on boot when unsaved work was recovered */}
+      {recoverySnapshot && (
+        <Modal isOpen onClose={discardRecovery} size="sm" onConfirm={restoreRecovery}>
+          <div className="p-4 space-y-3">
+            <h2 className="text-sm font-mono text-text-primary">Recover unsaved work</h2>
+            <p className="text-[11px] font-mono text-text-secondary">
+              Unsaved work from your last session was recovered. Restore it, or discard and start fresh?
+            </p>
+            <div className="flex justify-end gap-2 pt-1">
+              <Button variant="ghost" onClick={discardRecovery}>Discard</Button>
+              <Button variant="primary" onClick={restoreRecovery}>Restore</Button>
+            </div>
+          </div>
+        </Modal>
+      )}
     </AppLayout>
     </GlobalDragDropHandler>
   );
