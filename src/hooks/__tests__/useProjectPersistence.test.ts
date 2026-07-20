@@ -208,3 +208,30 @@ describe('useProjectPersistence — IDB round-trip', () => {
     }
   }, SLOW_MS);
 });
+
+describe('crash-recovery IDB slot', () => {
+  beforeEach(async () => {
+    // Close the module-level cached connection before deleting the DB so
+    // fake-indexeddb doesn't block the delete and the next test opens
+    // a fresh connection instead of reusing a stale one.
+    const mod = await import('../useProjectPersistence');
+    if (typeof mod.closeCachedDBForTest === 'function') mod.closeCachedDBForTest();
+    await resetIDB();
+  });
+
+  it('round-trips the recovery record independently of the explicit-save record', async () => {
+    const mod = await import('../useProjectPersistence');
+    // The recovery helpers are internal; assert via the exported behavior the
+    // boot flow relies on — a written recovery record is retrievable and the
+    // explicit-save slot stays empty (never-saved invariant).
+    expect(typeof mod.getRecoverySnapshotForTest).toBe('function');
+    const sample = mod.makeEmptyTestSnapshot();
+    await mod.putRecoverySnapshotForTest(sample);
+    const got = await mod.getRecoverySnapshotForTest();
+    expect(got?.schemaVersion).toBe(sample.schemaVersion);
+    // Explicit slot untouched.
+    expect(await mod.hasSavedProject()).toBe(false);
+    await mod.deleteRecoverySnapshotForTest();
+    expect(await mod.getRecoverySnapshotForTest()).toBeUndefined();
+  }, SLOW_MS);
+});

@@ -61,6 +61,7 @@ const IDB_VERSION = 2;
 const IDB_STORE = 'project';
 const IDB_REVISIONS_STORE = 'revisions';
 const IDB_PROJECT_KEY = 'current';
+const IDB_RECOVERY_KEY = 'recovery';
 const MAX_REVISIONS = 50;
 
 // Safari fallback for requestIdleCallback
@@ -222,6 +223,33 @@ function idbHas(): Promise<boolean> {
     const req = tx.objectStore(IDB_STORE).count(IDB_PROJECT_KEY);
     req.onsuccess = () => resolve(req.result > 0);
     req.onerror = () => reject(req.error);
+  }));
+}
+
+function idbPutRecovery(project: SavedProject): Promise<void> {
+  return getDB().then(db => new Promise((resolve, reject) => {
+    const tx = db.transaction(IDB_STORE, 'readwrite');
+    tx.objectStore(IDB_STORE).put(project, IDB_RECOVERY_KEY);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  }));
+}
+
+function idbGetRecovery(): Promise<SavedProject | undefined> {
+  return getDB().then(db => new Promise((resolve, reject) => {
+    const tx = db.transaction(IDB_STORE, 'readonly');
+    const req = tx.objectStore(IDB_STORE).get(IDB_RECOVERY_KEY);
+    req.onsuccess = () => resolve(req.result as SavedProject | undefined);
+    req.onerror = () => reject(req.error);
+  }));
+}
+
+function idbDeleteRecovery(): Promise<void> {
+  return getDB().then(db => new Promise((resolve, reject) => {
+    const tx = db.transaction(IDB_STORE, 'readwrite');
+    tx.objectStore(IDB_STORE).delete(IDB_RECOVERY_KEY);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
   }));
 }
 
@@ -528,6 +556,138 @@ export function migrateDubLaneEvents(pattern: { id: string; dubLane?: { events: 
 }
 
 /**
+ * Validate, migrate, and hydrate all stores from a SavedProject. Shared by the
+ * normal boot load (from the explicit-save slot) and crash-recovery restore
+ * (from the recovery slot). Returns false if the snapshot is structurally
+ * invalid or too old to load.
+ */
+export function applySavedProject(project: SavedProject): boolean {
+  // Validate structure
+  if (!project.version || !project.patterns || !project.instruments) {
+    console.warn('[Persistence] Invalid saved project structure');
+    return false;
+  }
+
+  // SCHEMA VERSION CHECK: only discard genuinely-incompatible schemas (below
+  // MIN_LOADABLE_SCHEMA). Schemas at or above the minimum are forward-migrated
+  // so additive bumps (e.g. 21→22 companion files) keep loading old projects.
+  if (!project.schemaVersion || project.schemaVersion < MIN_LOADABLE_SCHEMA) {
+    console.warn(
+      `[Persistence] Discarding outdated data (schema ${project.schemaVersion || 1} < ${MIN_LOADABLE_SCHEMA}). ` +
+      'This happens after app updates that fix data bugs.'
+    );
+    idbDelete().catch(() => {});
+    return false;
+  }
+  if (project.schemaVersion < SCHEMA_VERSION) {
+    migrateSavedProject(project, project.schemaVersion);
+  }
+
+  // Check if migration is needed (old format → new XM format)
+  if (needsMigration(project.patterns, project.instruments)) {
+    const migrated = migrateProject(project.patterns, project.instruments);
+    project.patterns = migrated.patterns;
+    project.instruments = migrated.instruments;
+  }
+
+  // Load data into stores
+  const trackerStore = useTrackerStore.getState();
+  const instrumentStore = useInstrumentStore.getState();
+  const projectStore = useProjectStore.getState();
+  const transportStore = useTransportStore.getState();
+  const automationStore = useAutomationStore.getState();
+  const audioStore = useAudioStore.getState();
+
+  trackerStore.loadPatterns(project.patterns);
+
+  if (project.patternOrder && project.patternOrder.length > 0) {
+    trackerStore.setPatternOrder(project.patternOrder);
+  }
+
+  instrumentStore.loadInstruments(project.instruments);
+  projectStore.setMetadata(project.metadata);
+  transportStore.setBPM(project.bpm);
+  if (project.speed) transportStore.setSpeed(project.speed);
+
+  if (project.linearPeriods != null) {
+    useEditorStore.getState().setLinearPeriods(project.linearPeriods);
+  }
+
+  if (project.automation) {
+    automationStore.loadCurves(project.automation);
+  }
+
+  // Migrate old dubLane.events[] → automation curves (one-time conversion)
+  for (const pattern of project.patterns) {
+    migrateDubLaneEvents(pattern as Parameters<typeof migrateDubLaneEvents>[0]);
+  }
+
+  if (project.masterEffects) {
+    audioStore.setMasterEffects(project.masterEffects);
+  }
+
+  transportStore.setGrooveTemplate(project.grooveTemplateId || 'straight');
+
+  // arrangement data ignored — arrangement view removed
+
+  // Tag first pattern with sourceFormat so TrackerReplayer gets correct format
+  if (project.trackerFormat && project.patterns.length > 0 && !project.patterns[0].importMetadata?.sourceFormat) {
+    const p0 = project.patterns[0];
+    p0.importMetadata = {
+      ...p0.importMetadata,
+      sourceFormat: project.trackerFormat,
+    } as typeof p0.importMetadata;
+  }
+
+  // Restore native engine data (all WASM formats)
+  restoreNativeEngineData(project.nativeEngineData, project.nativeEngineMeta, project.linearPeriods, project.nativeCompanionFiles);
+  if (project.originalModuleData?.base64) {
+    useFormatStore.getState().setOriginalModuleData(project.originalModuleData as any);
+  }
+
+  instrumentStore.autoBakeInstruments();
+
+  // Restore replaced instruments for hybrid playback
+  if (project.replacedInstruments?.length) {
+    setTimeout(() => {
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
+        const { getTrackerReplayer } = require('@engine/TrackerReplayer');
+        const replayer = getTrackerReplayer();
+        replayer.restoreReplacedInstruments(project.replacedInstruments!);
+      } catch (e) {
+        console.warn('[Persistence] Failed to restore replaced instruments:', e);
+      }
+    }, 500);
+  }
+
+  projectStore.markAsSaved();
+
+  // Restore mixer state (channel volumes, pans, mutes, solos, dub sends, send buses)
+  if (project.mixer) {
+    useMixerStore.getState().loadMixerState(project.mixer);
+  }
+
+  // Restore dub bus tuning
+  if (project.dubBus) {
+    useDrumPadStore.getState().setDubBus(project.dubBus as any);
+  }
+
+  // Restore Auto Dub state
+  if (project.autoDub) {
+    const s = useDubStore.getState();
+    s.setAutoDubPersona(project.autoDub.persona as any);
+    s.setAutoDubIntensity(project.autoDub.intensity);
+    s.setAutoDubMoveBlacklist(project.autoDub.moveBlacklist ?? []);
+    s.setAutoDubEnabled(project.autoDub.enabled);
+  }
+
+  // Restoring user's own saved project — auto-save is safe
+  explicitlySaved = true;
+  return true;
+}
+
+/**
  * Load project from IndexedDB.
  * Pass ?reset in the URL to skip restore and clear stored data (emergency recovery).
  */
@@ -537,6 +697,7 @@ export async function loadProjectFromStorage(): Promise<boolean> {
     if (typeof window !== 'undefined' && window.location.search.includes('reset')) {
       console.warn('[Persistence] ?reset detected — clearing stored project data');
       await idbDelete().catch(() => {});
+      await idbDeleteRecovery().catch(() => {}); // also clear recovery on reset
       // Remove the ?reset param so subsequent reloads work normally
       const url = new URL(window.location.href);
       url.searchParams.delete('reset');
@@ -546,133 +707,28 @@ export async function loadProjectFromStorage(): Promise<boolean> {
 
     const project = await idbGet();
     if (!project) return false;
-
-    // Validate structure
-    if (!project.version || !project.patterns || !project.instruments) {
-      console.warn('[Persistence] Invalid saved project structure');
-      return false;
-    }
-
-    // SCHEMA VERSION CHECK: only discard genuinely-incompatible schemas (below
-    // MIN_LOADABLE_SCHEMA). Schemas at or above the minimum are forward-migrated
-    // so additive bumps (e.g. 21→22 companion files) keep loading old projects.
-    if (!project.schemaVersion || project.schemaVersion < MIN_LOADABLE_SCHEMA) {
-      console.warn(
-        `[Persistence] Discarding outdated data (schema ${project.schemaVersion || 1} < ${MIN_LOADABLE_SCHEMA}). ` +
-        'This happens after app updates that fix data bugs.'
-      );
-      await idbDelete().catch(() => {});
-      return false;
-    }
-    if (project.schemaVersion < SCHEMA_VERSION) {
-      migrateSavedProject(project, project.schemaVersion);
-    }
-
-    // Check if migration is needed (old format → new XM format)
-    if (needsMigration(project.patterns, project.instruments)) {
-      const migrated = migrateProject(project.patterns, project.instruments);
-      project.patterns = migrated.patterns;
-      project.instruments = migrated.instruments;
-    }
-
-    // Load data into stores
-    const trackerStore = useTrackerStore.getState();
-    const instrumentStore = useInstrumentStore.getState();
-    const projectStore = useProjectStore.getState();
-    const transportStore = useTransportStore.getState();
-    const automationStore = useAutomationStore.getState();
-    const audioStore = useAudioStore.getState();
-
-    trackerStore.loadPatterns(project.patterns);
-
-    if (project.patternOrder && project.patternOrder.length > 0) {
-      trackerStore.setPatternOrder(project.patternOrder);
-    }
-
-    instrumentStore.loadInstruments(project.instruments);
-    projectStore.setMetadata(project.metadata);
-    transportStore.setBPM(project.bpm);
-    if (project.speed) transportStore.setSpeed(project.speed);
-
-    if (project.linearPeriods != null) {
-      useEditorStore.getState().setLinearPeriods(project.linearPeriods);
-    }
-
-    if (project.automation) {
-      automationStore.loadCurves(project.automation);
-    }
-
-    // Migrate old dubLane.events[] → automation curves (one-time conversion)
-    for (const pattern of project.patterns) {
-      migrateDubLaneEvents(pattern as Parameters<typeof migrateDubLaneEvents>[0]);
-    }
-
-    if (project.masterEffects) {
-      audioStore.setMasterEffects(project.masterEffects);
-    }
-
-    transportStore.setGrooveTemplate(project.grooveTemplateId || 'straight');
-
-    // arrangement data ignored — arrangement view removed
-
-    // Tag first pattern with sourceFormat so TrackerReplayer gets correct format
-    if (project.trackerFormat && project.patterns.length > 0 && !project.patterns[0].importMetadata?.sourceFormat) {
-      const p0 = project.patterns[0];
-      p0.importMetadata = {
-        ...p0.importMetadata,
-        sourceFormat: project.trackerFormat,
-      } as typeof p0.importMetadata;
-    }
-
-    // Restore native engine data (all WASM formats)
-    restoreNativeEngineData(project.nativeEngineData, project.nativeEngineMeta, project.linearPeriods, project.nativeCompanionFiles);
-    if (project.originalModuleData?.base64) {
-      useFormatStore.getState().setOriginalModuleData(project.originalModuleData as any);
-    }
-
-    instrumentStore.autoBakeInstruments();
-
-    // Restore replaced instruments for hybrid playback
-    if (project.replacedInstruments?.length) {
-      setTimeout(() => {
-        try {
-          // eslint-disable-next-line @typescript-eslint/no-var-requires
-          const { getTrackerReplayer } = require('@engine/TrackerReplayer');
-          const replayer = getTrackerReplayer();
-          replayer.restoreReplacedInstruments(project.replacedInstruments!);
-        } catch (e) {
-          console.warn('[Persistence] Failed to restore replaced instruments:', e);
-        }
-      }, 500);
-    }
-
-    projectStore.markAsSaved();
-
-    // Restore mixer state (channel volumes, pans, mutes, solos, dub sends, send buses)
-    if (project.mixer) {
-      useMixerStore.getState().loadMixerState(project.mixer);
-    }
-
-    // Restore dub bus tuning
-    if (project.dubBus) {
-      useDrumPadStore.getState().setDubBus(project.dubBus as any);
-    }
-
-    // Restore Auto Dub state
-    if (project.autoDub) {
-      const s = useDubStore.getState();
-      s.setAutoDubPersona(project.autoDub.persona as any);
-      s.setAutoDubIntensity(project.autoDub.intensity);
-      s.setAutoDubMoveBlacklist(project.autoDub.moveBlacklist ?? []);
-      s.setAutoDubEnabled(project.autoDub.enabled);
-    }
-
-    // Restoring user's own saved project — auto-save is safe
-    explicitlySaved = true;
-    return true;
+    return applySavedProject(project);
   } catch (error) {
     console.error('[Persistence] Failed to load project:', error);
     return false;
+  }
+}
+
+// Test-only shims — keep IDB helpers internal to app code while letting the
+// suite exercise the recovery slot round-trip. Not used by the app.
+export const putRecoverySnapshotForTest = idbPutRecovery;
+export const getRecoverySnapshotForTest = idbGetRecovery;
+export const deleteRecoverySnapshotForTest = idbDeleteRecovery;
+export function makeEmptyTestSnapshot(): SavedProject {
+  return buildSavedProject();
+}
+/** Close and evict the module-level IDB connection. Call this in test teardown
+ *  after `indexedDB.deleteDatabase('devilbox')` so the next test opens a fresh
+ *  connection rather than reusing a stale cached one. */
+export function closeCachedDBForTest(): void {
+  if (cachedDB) {
+    try { cachedDB.close(); } catch { /* ignore */ }
+    cachedDB = null;
   }
 }
 
