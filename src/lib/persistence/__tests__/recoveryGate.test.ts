@@ -3,6 +3,7 @@ import {
   shouldWriteRecovery,
   hasProjectContent,
   shouldPromptRestore,
+  postLoadFlags,
 } from '../recoveryGate';
 
 /**
@@ -59,5 +60,24 @@ describe('recoveryGate — shouldPromptRestore', () => {
 
   it('does NOT prompt when there is no recovery record', () => {
     expect(shouldPromptRestore({ hasRecoveryRecord: false, everExplicitlySaved: false })).toBe(false);
+  });
+});
+
+describe('recoveryGate — postLoadFlags', () => {
+  it('recovery restore stays never-saved AND dirty so the scheduler re-arms', () => {
+    // The core of the restore-then-crash-again guarantee: after a Restore the
+    // project must remain in the never-saved window and dirty, or the recovery
+    // scheduler disarms and a second crash silently drops all post-restore work.
+    // Teeth: make postLoadFlags ignore fromRecovery (always return the saved
+    // tail {explicitlySaved:true, dirty:false}) and both assertions fail.
+    expect(postLoadFlags({ fromRecovery: true })).toEqual({ explicitlySaved: false, dirty: true });
+  });
+
+  it('default (explicit-slot) load marks the project saved and clean', () => {
+    expect(postLoadFlags({ fromRecovery: false })).toEqual({ explicitlySaved: true, dirty: false });
+  });
+
+  it('treats a missing fromRecovery flag as a normal saved load', () => {
+    expect(postLoadFlags({})).toEqual({ explicitlySaved: true, dirty: false });
   });
 });

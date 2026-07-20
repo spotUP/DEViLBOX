@@ -40,3 +40,22 @@ export function shouldPromptRestore(args: {
 }): boolean {
   return args.hasRecoveryRecord && !args.everExplicitlySaved;
 }
+
+/**
+ * Post-load flag transition after hydrating stores from a SavedProject.
+ *
+ * The default (explicit-save slot) load marks the project SAVED and arms
+ * explicit auto-save. A recovery restore must instead stay in the never-saved
+ * window — `explicitlySaved:false` AND `dirty:true` — so the recovery scheduler
+ * re-arms and a SECOND crash after Restore is still covered (spec:
+ * restore-then-crash-again). Reusing the default (saved) tail for recovery
+ * permanently disarms recovery and silently drops all post-restore work.
+ */
+export function postLoadFlags(args: { fromRecovery?: boolean }): {
+  explicitlySaved: boolean;
+  dirty: boolean;
+} {
+  return args.fromRecovery
+    ? { explicitlySaved: false, dirty: true }
+    : { explicitlySaved: true, dirty: false };
+}

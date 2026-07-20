@@ -216,6 +216,9 @@ describe('crash-recovery IDB slot', () => {
     // a fresh connection instead of reusing a stale one.
     const mod = await import('../useProjectPersistence');
     if (typeof mod.closeCachedDBForTest === 'function') mod.closeCachedDBForTest();
+    // Reset the module-level explicit-save flag — leaked state from a prior
+    // describe block would make the gate-dependent tests order-dependent.
+    mod.clearExplicitlySaved();
     await resetIDB();
   });
 
@@ -240,6 +243,7 @@ describe('crash-recovery clear-on-save', () => {
   beforeEach(async () => {
     const mod = await import('../useProjectPersistence');
     if (typeof mod.closeCachedDBForTest === 'function') mod.closeCachedDBForTest();
+    mod.clearExplicitlySaved();
     await resetIDB();
   });
 
@@ -254,3 +258,4 @@ describe('crash-recovery clear-on-save', () => {
     expect(await mod.getRecoverySnapshotForTest()).toBeUndefined();
   }, SLOW_MS);
 });
+
