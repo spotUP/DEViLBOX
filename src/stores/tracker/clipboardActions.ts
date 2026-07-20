@@ -24,6 +24,8 @@ import {
 } from '../editorMasks';
 export { MASK_NOTE, MASK_INSTRUMENT, MASK_VOLUME, MASK_EFFECT, MASK_EFFECT2 };
 
+import { isFullCellSelection, isSparseColumnSelection } from '@/lib/tracker/clipboardSelectionScope';
+
 const hasMaskBit = (mask: number, bit: number): boolean => (mask & bit) !== 0;
 
 // ---------------------------------------------------------------------------
@@ -63,7 +65,7 @@ export function copySelectionHelper(
   const maxRow = Math.max(startRow, endRow);
 
   const copiedData: TrackerCell[][] = [];
-  const isFullCell = !columnTypes || columnTypes.length === 0 || columnTypes.length > 8;
+  const isFullCell = isFullCellSelection(columnTypes);
 
   for (let ch = minChannel; ch <= maxChannel; ch++) {
     const channelData: TrackerCell[] = [];
@@ -134,7 +136,7 @@ export function cutSelectionHelper(
   const maxRow = Math.max(startRow, endRow);
 
   const copiedData: TrackerCell[][] = [];
-  const isFullCell = !columnTypes || columnTypes.length === 0 || columnTypes.length > 8;
+  const isFullCell = isFullCellSelection(columnTypes);
 
   for (let ch = minChannel; ch <= maxChannel; ch++) {
     const channelData: TrackerCell[] = [];
@@ -226,7 +228,7 @@ export function pasteHelper(
 ): void {
   const { channelIndex, rowIndex } = cursor;
   const { data, columnTypes } = clipboard;
-  const isSparse = !!(columnTypes && columnTypes.length > 0 && columnTypes.length <= 8);
+  const isSparse = isSparseColumnSelection(columnTypes);
 
   for (let ch = 0; ch < data.length; ch++) {
     const targetChannel = channelIndex + ch;
