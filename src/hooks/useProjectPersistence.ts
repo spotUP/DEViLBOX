@@ -9,7 +9,7 @@
  */
 
 import { useEffect, useCallback, useRef, useState } from 'react';
-import { shouldWriteRecovery, hasProjectContent, shouldPromptRestore } from '@/lib/persistence/recoveryGate';
+import { shouldWriteRecovery, hasProjectContent, shouldPromptRestore, postLoadFlags } from '@/lib/persistence/recoveryGate';
 import { useTrackerStore, useInstrumentStore, useProjectStore, useTransportStore, useAutomationStore, useAudioStore, useEditorStore, useFormatStore } from '@stores';
 import type { AutomationCurve } from '@typedefs/automation';
 import type { EffectConfig } from '@typedefs/instrument';
@@ -570,8 +570,14 @@ export function migrateDubLaneEvents(pattern: { id: string; dubLane?: { events: 
  * normal boot load (from the explicit-save slot) and crash-recovery restore
  * (from the recovery slot). Returns false if the snapshot is structurally
  * invalid or too old to load.
+ *
+ * `opts.fromRecovery` restores a recovery snapshot: the project must stay in the
+ * never-saved window (explicitlySaved=false, dirty=true) so the recovery
+ * scheduler keeps writing and a second crash after Restore is still covered.
+ * The default path (explicit-save slot) marks the project saved and arms
+ * explicit auto-save.
  */
-export function applySavedProject(project: SavedProject): boolean {
+export function applySavedProject(project: SavedProject, opts?: { fromRecovery?: boolean }): boolean {
   // Validate structure
   if (!project.version || !project.patterns || !project.instruments) {
     console.warn('[Persistence] Invalid saved project structure');
@@ -658,6 +664,7 @@ export function applySavedProject(project: SavedProject): boolean {
   instrumentStore.autoBakeInstruments();
 
   // Restore replaced instruments for hybrid playback
+  // (markAsSaved is applied at the end, gated on opts.fromRecovery)
   if (project.replacedInstruments?.length) {
     setTimeout(() => {
       try {
@@ -671,7 +678,9 @@ export function applySavedProject(project: SavedProject): boolean {
     }, 500);
   }
 
-  projectStore.markAsSaved();
+  if (!opts?.fromRecovery) {
+    projectStore.markAsSaved();
+  }
 
   // Restore mixer state (channel volumes, pans, mutes, solos, dub sends, send buses)
   if (project.mixer) {
@@ -692,8 +701,12 @@ export function applySavedProject(project: SavedProject): boolean {
     s.setAutoDubEnabled(project.autoDub.enabled);
   }
 
-  // Restoring user's own saved project — auto-save is safe
-  explicitlySaved = true;
+  // Recovery restore must stay never-saved + dirty so the scheduler re-arms;
+  // the default (explicit-slot) load marks saved. Decision is the pure
+  // postLoadFlags() so it is unit-testable without the audio engine.
+  const flags = postLoadFlags({ fromRecovery: opts?.fromRecovery });
+  explicitlySaved = flags.explicitlySaved;
+  if (flags.dirty) projectStore.markAsModified();
   return true;
 }
 
@@ -1197,9 +1210,10 @@ export function useProjectPersistence() {
 
   const restoreRecovery = useCallback(() => {
     if (!recoverySnapshot) return;
-    applySavedProject(recoverySnapshot); // hydrate stores; stays never-saved
+    // fromRecovery keeps the project never-saved + dirty so the scheduler
+    // re-arms — a second crash after Restore is still covered (spec).
+    applySavedProject(recoverySnapshot, { fromRecovery: true });
     setRecoverySnapshot(null);
-    // Recovery keeps writing (still never explicitly saved) → repeat crashes covered.
   }, [recoverySnapshot]);
 
   const discardRecovery = useCallback(() => {
