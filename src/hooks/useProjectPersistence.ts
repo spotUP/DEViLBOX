@@ -1152,17 +1152,21 @@ export function useProjectPersistence() {
   const recoveryIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const writeRecoveryNow = useCallback(() => {
+    const isDirty = useProjectStore.getState().isDirty;
     const instrumentCount = useInstrumentStore.getState().instruments.length;
     const patternCount = useTrackerStore.getState().patterns.length;
     const hasContent = hasProjectContent({ instrumentCount, patternCount });
     if (!shouldWriteRecovery({ explicitlySaved, isDirty, hasContent })) return;
     try {
-      void idbPutRecovery(buildSavedProject());
+      idbPutRecovery(buildSavedProject()).catch((err) => {
+        // IDB write rejected (quota / abort) — best-effort net, swallow.
+        console.warn('[Persistence] recovery snapshot write failed:', err);
+      });
     } catch (err) {
-      // Best-effort net — never let a recovery write crash the editor.
+      // buildSavedProject threw synchronously — never crash the editor.
       console.warn('[Persistence] recovery snapshot skipped:', err);
     }
-  }, [isDirty]);
+  }, []);
 
   // Debounced recovery write — coalesces edit bursts, never writes mid-drag.
   useEffect(() => {
