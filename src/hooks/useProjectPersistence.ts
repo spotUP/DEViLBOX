@@ -8,7 +8,8 @@
  * bump SCHEMA_VERSION to invalidate old cached data.
  */
 
-import { useEffect, useCallback, useRef } from 'react';
+import { useEffect, useCallback, useRef, useState } from 'react';
+import { shouldWriteRecovery, hasProjectContent, shouldPromptRestore } from '@/lib/persistence/recoveryGate';
 import { useTrackerStore, useInstrumentStore, useProjectStore, useTransportStore, useAutomationStore, useAudioStore, useEditorStore, useFormatStore } from '@stores';
 import type { AutomationCurve } from '@typedefs/automation';
 import type { EffectConfig } from '@typedefs/instrument';
@@ -22,6 +23,12 @@ import { useDubStore } from '@stores/useDubStore';
 
 
 const AUTO_SAVE_INTERVAL = 300000; // 5 minutes
+
+// Recovery snapshots must bound continuous-edit loss to seconds. The 5-minute
+// AUTO_SAVE_INTERVAL is far too coarse (the ~5s debounce never idles during
+// continuous editing), so recovery uses its own short floor.
+const RECOVERY_INTERVAL = 20000; // 20 seconds
+const RECOVERY_DEBOUNCE = 5000; // 5 seconds after edits settle
 
 // ============================================================================
 // EXPLICIT SAVE TRACKING
@@ -494,6 +501,9 @@ export async function saveProjectToStorage(options?: { explicit?: boolean }): Pr
       .then(() => idbPruneRevisions(MAX_REVISIONS))
       .catch(err => console.warn('[Persistence] Failed to save revision:', err));
     useProjectStore.getState().markAsSaved();
+    // First explicit save ends the never-saved window — hand off to explicit
+    // auto-save and drop the crash-recovery record.
+    idbDeleteRecovery().catch(() => {});
     return true;
   } catch (error) {
     console.error('[Persistence] Failed to save project:', error);
@@ -1015,15 +1025,29 @@ export function useProjectPersistence() {
   const { isDirty, markAsModified } = useProjectStore();
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const initialLoadRef = useRef(true);
+  const [recoverySnapshot, setRecoverySnapshot] = useState<SavedProject | null>(null);
 
   // Load on mount (only once per page session — module-level guard survives HMR remounts)
   useEffect(() => {
-    if (!hasLoadedFromStorage) {
-      hasLoadedFromStorage = true;
-      hasSavedProject().then(has => {
-        if (has) loadProjectFromStorage();
-      });
-    }
+    if (hasLoadedFromStorage) return;
+    hasLoadedFromStorage = true;
+    void (async () => {
+      const everExplicitlySaved = await hasSavedProject();
+      if (everExplicitlySaved) {
+        await loadProjectFromStorage();
+        await idbDeleteRecovery().catch(() => {}); // explicit slot is authoritative
+        return;
+      }
+      const rec = await idbGetRecovery();
+      const hasRecoveryRecord =
+        !!rec && hasProjectContent({
+          instrumentCount: rec.instruments?.length ?? 0,
+          patternCount: rec.patterns?.length ?? 0,
+        });
+      if (shouldPromptRestore({ hasRecoveryRecord, everExplicitlySaved })) {
+        setRecoverySnapshot(rec!);
+      }
+    })();
   }, []);
 
   // Subscribe to tracker store changes to mark as dirty
@@ -1123,8 +1147,64 @@ export function useProjectPersistence() {
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, [isDirty]);
 
+  // ── Crash-recovery snapshot scheduler ─────────────────────────────────────
+  const recoveryDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const recoveryIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const writeRecoveryNow = useCallback(() => {
+    const instrumentCount = useInstrumentStore.getState().instruments.length;
+    const patternCount = useTrackerStore.getState().patterns.length;
+    const hasContent = hasProjectContent({ instrumentCount, patternCount });
+    if (!shouldWriteRecovery({ explicitlySaved, isDirty, hasContent })) return;
+    try {
+      void idbPutRecovery(buildSavedProject());
+    } catch (err) {
+      // Best-effort net — never let a recovery write crash the editor.
+      console.warn('[Persistence] recovery snapshot skipped:', err);
+    }
+  }, [isDirty]);
+
+  // Debounced recovery write — coalesces edit bursts, never writes mid-drag.
+  useEffect(() => {
+    if (!isDirty || explicitlySaved) return;
+    if (recoveryDebounceRef.current) clearTimeout(recoveryDebounceRef.current);
+    recoveryDebounceRef.current = setTimeout(writeRecoveryNow, RECOVERY_DEBOUNCE);
+    return () => {
+      if (recoveryDebounceRef.current) clearTimeout(recoveryDebounceRef.current);
+    };
+  }, [isDirty, writeRecoveryNow]);
+
+  // Interval floor — guarantees a write during continuous editing when the
+  // debounce never idles.
+  useEffect(() => {
+    recoveryIntervalRef.current = setInterval(writeRecoveryNow, RECOVERY_INTERVAL);
+    return () => {
+      if (recoveryIntervalRef.current) clearInterval(recoveryIntervalRef.current);
+    };
+  }, [writeRecoveryNow]);
+
+  // Best-effort flush on backgrounding (does NOT fire on a hard crash, but
+  // catches tab hide / mobile). Cheap: gated by writeRecoveryNow's own checks.
+  useEffect(() => {
+    const onHidden = () => { if (document.visibilityState === 'hidden') writeRecoveryNow(); };
+    document.addEventListener('visibilitychange', onHidden);
+    return () => document.removeEventListener('visibilitychange', onHidden);
+  }, [writeRecoveryNow]);
+
+  const restoreRecovery = useCallback(() => {
+    if (!recoverySnapshot) return;
+    applySavedProject(recoverySnapshot); // hydrate stores; stays never-saved
+    setRecoverySnapshot(null);
+    // Recovery keeps writing (still never explicitly saved) → repeat crashes covered.
+  }, [recoverySnapshot]);
+
+  const discardRecovery = useCallback(() => {
+    setRecoverySnapshot(null);
+    void idbDeleteRecovery().catch(() => {});
+  }, []);
+
   const save = useCallback(() => saveProjectToStorage({ explicit: true }), []);
   const load = useCallback(() => loadProjectFromStorage(), []);
 
-  return { save, load, clear: clearSavedProject, isDirty };
+  return { save, load, clear: clearSavedProject, isDirty, recoverySnapshot, restoreRecovery, discardRecovery };
 }

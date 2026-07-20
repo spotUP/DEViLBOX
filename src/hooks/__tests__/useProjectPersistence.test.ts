@@ -235,3 +235,22 @@ describe('crash-recovery IDB slot', () => {
     expect(await mod.getRecoverySnapshotForTest()).toBeUndefined();
   }, SLOW_MS);
 });
+
+describe('crash-recovery clear-on-save', () => {
+  beforeEach(async () => {
+    const mod = await import('../useProjectPersistence');
+    if (typeof mod.closeCachedDBForTest === 'function') mod.closeCachedDBForTest();
+    await resetIDB();
+  });
+
+  it('deletes the recovery record after the first explicit save', async () => {
+    const mod = await import('../useProjectPersistence');
+    await mod.putRecoverySnapshotForTest(mod.makeEmptyTestSnapshot());
+    expect(await mod.getRecoverySnapshotForTest()).toBeDefined();
+
+    // Explicit save ends the never-saved scope and must clear recovery.
+    // Teeth: removing the clear line leaves the record and this fails.
+    await mod.saveProjectToStorage({ explicit: true });
+    expect(await mod.getRecoverySnapshotForTest()).toBeUndefined();
+  }, SLOW_MS);
+});
