@@ -1,13 +1,20 @@
 #!/usr/bin/env bash
-# DEViLBOX pre-commit — fast gate (~10 s).
+# DEViLBOX pre-commit — affected-only fast gate.
 #
-# Runs `npm run test:ci` only. Type-check lives in pre-push because it
-# takes ~40 s on this project (tsc composite build) and commits tend to
-# happen in tight loops during active work.
+# Runs ONLY the test suites that sit next to the staged files (a source file's
+# sibling `__tests__` suite, plus any staged `*.test.ts` directly). This keeps
+# tight-loop commits fast — seconds, not the ~2 min the full `test:ci` glob
+# takes. The FULL suite still runs at pre-push and in CI, so nothing that
+# proximity misses can reach a pushed branch unchecked.
 #
-# Activated by `npm install` (postinstall sets core.hooksPath) or
-# manually via `npm run setup:hooks`. Bypass in emergencies with
-# `git commit --no-verify`.
+# Why not `vitest related` (module-graph affected set)? Measured: this repo's
+# store/type barrels make the graph hyper-connected, so `related` on a single
+# leaf drags in hundreds of unrelated suites (~2.5 min) — no win. A file's
+# sibling test suite is the true fast relevance signal. See
+# scripts/git-hooks/affected-tests.mjs.
+#
+# Activated by `npm install` (postinstall sets core.hooksPath) or manually via
+# `npm run setup:hooks`. Bypass in emergencies with `git commit --no-verify`.
 
 set -euo pipefail
 
@@ -30,11 +37,38 @@ else
   RED=''; GRN=''; YLW=''; RST=''
 fi
 
-echo "${YLW}[pre-commit] test:ci…${RST}" >&2
-if ! npm run --silent test:ci; then
-  echo "${RED}[pre-commit] test:ci failed — commit aborted.${RST}" >&2
+# Resolve the proximity-affected test set for the staged changes.
+# (Kept portable — no `mapfile`, so this works on macOS system bash 3.2 too.)
+FILES_RAW="$(node scripts/git-hooks/affected-tests.mjs || true)"
+
+# CRITICAL: an empty list must NEVER reach `vitest run` — with no path args
+# vitest runs the ENTIRE default suite. Bail before that can happen.
+if [ -z "${FILES_RAW//[[:space:]]/}" ]; then
+  echo "${YLW}[pre-commit] no test suites sit next to the staged files — the full suite runs at pre-push.${RST}" >&2
+  exit 0
+fi
+
+# Split the newline-separated list into an array without globbing.
+OLD_IFS=$IFS
+IFS=$'\n'
+set -f
+# shellcheck disable=SC2206
+FILES=($FILES_RAW)
+set +f
+IFS=$OLD_IFS
+
+if [ "${#FILES[@]}" -eq 0 ]; then
+  echo "${YLW}[pre-commit] no test suites sit next to the staged files — the full suite runs at pre-push.${RST}" >&2
+  exit 0
+fi
+
+echo "${YLW}[pre-commit] running ${#FILES[@]} affected test suite(s):${RST}" >&2
+printf '  %s\n' "${FILES[@]}" >&2
+
+if ! npx vitest run --config vite.config.ts "${FILES[@]}"; then
+  echo "${RED}[pre-commit] affected tests failed — commit aborted.${RST}" >&2
   echo "${RED}  Fix the failures above, or bypass with 'git commit --no-verify'.${RST}" >&2
   exit 1
 fi
 
-echo "${GRN}[pre-commit] ok${RST}" >&2
+echo "${GRN}[pre-commit] ok (affected only — full suite gates at pre-push)${RST}" >&2
