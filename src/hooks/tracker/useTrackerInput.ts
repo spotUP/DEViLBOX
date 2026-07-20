@@ -21,6 +21,7 @@ import { useNoteInput, useEffectInput, useNavigationInput } from './input';
 import { amplifySelectionHelper } from '@stores/tracker/patternEditActions';
 import { resolveFt2BlockKey } from '@lib/tracker/blockKeymap';
 import { isKeyHandled } from '@lib/tracker/keyHandledSentinel';
+import { formatModeOwnsEditKey } from '@lib/tracker/formatModeKeyOwnership';
 import type { EditorBehavior } from '@engine/keyboard/EditorBehavior';
 
 /** Get the cell field names for a given note column index (0-3) */
@@ -249,16 +250,22 @@ export const useTrackerInput = () => {
       const key = e.key;
       const keyLower = key.toLowerCase();
 
-      // In format mode (Hively, Furnace, etc.), let the format-specific handler
-      // in PatternEditorCanvas handle edit operations (undo, redo, transpose).
-      // Classic navigation (F-keys, transport) still handled below.
+      // In format mode (Hively, Furnace, etc.), the format-specific handler in
+      // PatternEditorCanvas owns edit operations (undo/redo, transpose, and the
+      // whole clipboard set: copy/cut/paste/select-all, Ctrl+key or F3/F4/F5).
+      // It preventDefaults but does not stop propagation, so this window handler
+      // must delegate those keys itself or they double-fire against the tracker
+      // store. Classic navigation (arrows, transport) still handled below.
       const editorMode = useFormatStore.getState().editorMode;
-      if (editorMode !== 'classic') {
-        const isCtrlCmd = e.ctrlKey || e.metaKey;
-        // Bail on Ctrl+Z/Y (undo/redo) — format handler owns these
-        if (isCtrlCmd && (keyLower === 'z' || keyLower === 'y') && !e.altKey) return;
-        // Bail on Ctrl+Arrow (transpose) — format handler owns these
-        if (isCtrlCmd && (key === 'ArrowUp' || key === 'ArrowDown') && !e.altKey) return;
+      if (
+        formatModeOwnsEditKey(editorMode, {
+          key,
+          ctrlOrMeta: e.ctrlKey || e.metaKey,
+          shift: e.shiftKey,
+          alt: e.altKey,
+        })
+      ) {
+        return;
       }
 
       // ── Delegate to sub-hooks (order matters) ──
