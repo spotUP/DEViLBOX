@@ -114,7 +114,7 @@ jobs:
 
   # Create a GitHub Release with all desktop app binaries + trigger pull-based deploy
   release:
-    needs: [build-server]
+    needs: [build-server, electron]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
