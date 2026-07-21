@@ -26,7 +26,7 @@ const WAM_HOSTS = [
 const APP_SHELL_PATTERNS = [
   /\.(js|css|wasm|html)(\?.*)?$/,
   /\/assets\//,
-  /\/(uade|db303|ft2|pt2|furnace|vocoder|sc|chiptune3)\//,  // WASM engines
+  /\/(uade|db303|ft2|pt2|furnace|vocoder|sc|chiptune3|flac)\//,  // WASM engines + FLAC encoder
   /\/fonts\//,
   /\/manifest\.json$/,
   // Demo songs + instruments: stale-while-revalidate means any song the user
