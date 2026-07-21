@@ -10,6 +10,9 @@ import { useSettingsStore } from '@stores/useSettingsStore';
 import { useDJStore } from '@/stores/useDJStore';
 import { useCollaborationStore } from '@/stores/useCollaborationStore';
 import { useDrumPadStore } from '@/stores/useDrumPadStore';
+import { LoudnessMeterPanel } from '@/components/audio/LoudnessMeterPanel';
+import { useOnlineStatus } from '@/hooks/useOnlineStatus';
+import { WifiOff } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
 import type { KnobAssignment } from '@/midi/knobBanks';
 import { getKnobBankForSynth, getKnobPageName } from '@/midi/knobBanks';
@@ -378,6 +381,8 @@ export const StatusBar: React.FC<StatusBarProps> = React.memo(() => {
 
   // Local pagination for NKS2/generic banks that exceed 8 knobs
   const [knobPage, setKnobPage] = useReactState(0);
+  const [showLoudness, setShowLoudness] = useReactState(false);
+  const online = useOnlineStatus();
   const localTotalPages = Math.max(1, Math.ceil(contextKnobs.length / 8));
 
   // Effective page state — curated banks use MIDI store, others use local
@@ -519,6 +524,32 @@ export const StatusBar: React.FC<StatusBarProps> = React.memo(() => {
               </button>
               <div className="w-px h-3 bg-border opacity-50"></div>
             </>
+          )}
+
+          {/* Global offline indicator — online-only features degrade */}
+          {!online && (
+            <>
+              <span className="flex items-center gap-1.5 text-accent-warning" title="Offline — editing, playback and export work; Modland/HVSC browsing, CSDb, YouTube and collab need a connection">
+                <WifiOff size={11} />
+                <span className="font-bold uppercase text-[10px]">Offline</span>
+              </span>
+              <div className="w-px h-3 bg-border opacity-50"></div>
+            </>
+          )}
+
+          {/* Loudness meter toggle (EBU R128) — measures only while open */}
+          <button
+            onClick={() => setShowLoudness(v => !v)}
+            className={`flex items-center gap-1.5 text-[10px] transition-colors ${showLoudness ? 'text-accent-primary' : 'text-text-muted hover:text-accent-primary'}`}
+            title={showLoudness ? 'Hide loudness meter' : 'Show loudness meter (EBU R128)'}
+          >
+            <span className="font-bold uppercase">LUFS</span>
+          </button>
+          <div className="w-px h-3 bg-border opacity-50"></div>
+          {showLoudness && (
+            <div className="fixed bottom-10 right-3 z-50">
+              <LoudnessMeterPanel />
+            </div>
           )}
 
           {/* Collab connected badge */}

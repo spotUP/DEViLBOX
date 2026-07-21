@@ -1,6 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
 /* Drum machine theme fonts — loaded on demand via Google Fonts */
-@import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=IBM+Plex+Mono:wght@400;500;600&family=Orbitron:wght@400;500;700&family=VT323&family=Share+Tech+Mono&family=Chakra+Petch:wght@400;500;600;700&family=Rajdhani:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap');
 
 @tailwind base;
 @tailwind components;
