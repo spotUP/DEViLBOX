@@ -703,8 +703,8 @@ export async function exportLiveCaptureToMp3(
 }
 
 /**
- * Shared orchestration: estimate duration, start the replayer from bar 1,
- * real-time capture into an AudioBuffer. Caller picks the encoding.
+ * Shared orchestration: estimate duration, start transport playback from
+ * bar 1, real-time capture into an AudioBuffer. Caller picks the encoding.
  *
  * The captured buffer is trimmed of leading silence before return — the
  * replayer's async play() path means audio typically doesn't flow for
@@ -735,29 +735,57 @@ async function captureLiveSong(options: {
     durationSec = Math.max(5, totalRows * secPerRow + 2);
   }
 
-  const { getTrackerReplayer } = await import('@/engine/TrackerReplayer');
-  const replayer = getTrackerReplayer();
-  try { replayer.stop(false); } catch { /* not playing */ }
+  const { useTransportStore } = await import('@/stores/useTransportStore');
+  const restore = startTransportForCapture(useTransportStore.getState, useTransportStore.getState);
   try {
-    const { useTransportStore } = await import('@/stores/useTransportStore');
-    useTransportStore.getState().setCurrentRow(0);
-    useTransportStore.getState().setCurrentPattern(0);
-  } catch { /* store not ready */ }
-  try {
-    // Connect the capture tap FIRST (so nothing is missed), then AWAIT play().
-    // Previously this fire-and-forget `void replayer.play()`d and immediately
-    // captured — for native engines whose worklet starts asynchronously
-    // (libopenmpt sample MODs especially) the tap could run its whole window
-    // before audio ever flowed, producing a fully-SILENT export. Awaiting play
-    // guarantees the engine is running, mirroring the (working) MCP export path.
-    // Extend capture by 1 s so the leading-silence trim has headroom.
+    // Connect the capture tap FIRST (so nothing is missed), then AWAIT play()
+    // so the engine is confirmed running before the window elapses. Extend
+    // capture by 1 s so the leading-silence trim has headroom.
     const capturePromise = captureAudioLiveToBuffer(durationSec + 1, { onProgress, unmuteAll });
-    await replayer.play();
+    await useTransportStore.getState().play();
     const buffer = await capturePromise;
     return trimLeadingSilence(buffer);
   } finally {
-    try { replayer.stop(); } catch { /* ok */ }
+    restore();
   }
+}
+
+/** Minimal slice of the transport store that capture orchestration needs. */
+export interface CaptureTransport {
+  isLooping: boolean;
+  stop(): void;
+  play(): Promise<void> | void;
+  setCurrentRow(row: number): void;
+  setCurrentPattern(pattern: number): void;
+  setIsLooping(looping: boolean): void;
+}
+
+/**
+ * Prepare the transport for a full-song live capture and return a restore
+ * function to call when the capture finishes.
+ *
+ * Playback MUST go through the TRANSPORT STORE — the same entry point the
+ * play button and the (working) MCP export path use. It routes to whichever
+ * engine actually plays this song (internal TrackerReplayer OR a native
+ * engine: libopenmpt, UADE, Hively, ...). Calling TrackerReplayer.play()
+ * directly silently no-ops for native-engine songs (resolves immediately,
+ * isPlaying stays false, no audio) — every such export captured pure
+ * silence. Regression 2026-07-22.
+ */
+export function startTransportForCapture(
+  getState: () => CaptureTransport,
+  getFreshState: () => CaptureTransport = getState,
+): () => void {
+  const transport = getState();
+  try { transport.stop(); } catch { /* not playing */ }
+  transport.setCurrentRow(0);
+  transport.setCurrentPattern(0);
+  const wasLooping = getFreshState().isLooping;
+  transport.setIsLooping(false); // song mode: advance through all patterns
+  return () => {
+    try { getFreshState().stop(); } catch { /* ok */ }
+    try { getFreshState().setIsLooping(wasLooping); } catch { /* ok */ }
+  };
 }
 
 /**
