@@ -201,3 +201,52 @@ function normalizeKeyName(raw: string): string | null {
 export function camelotToKeyName(display: string): string | null {
   return CAMELOT_TO_KEY[display] ?? null;
 }
+
+// ── Camelot wheel model (for the harmonic-mix wheel widget) ───────────────────
+
+export type DeckId = 'A' | 'B' | 'C';
+
+export interface CamelotSegment {
+  display: string;                                   // e.g. "8B"
+  number: number;                                    // 1-12
+  ring: 'A' | 'B';                                   // A = inner/minor, B = outer/major
+  relation: ReturnType<typeof keyCompatibility>;     // relation to the focus key
+  color: string;                                     // the segment's own Camelot colour
+  decks: DeckId[];                                   // which decks currently sit on this segment
+}
+
+/**
+ * Build the full 24-segment model of the Camelot wheel for rendering.
+ *
+ * `focusKey` is the key we measure harmonic compatibility against (usually the
+ * master / Deck A key). Each segment carries its relation to that focus so the
+ * widget can colour compatible neighbours. `deckKeys` places per-deck markers
+ * on their matching segments.
+ *
+ * Order: outer ring (B/major) 1..12, then inner ring (A/minor) 1..12 — 24 total.
+ * Pure + deterministic; safe to unit-test without rendering.
+ */
+export function buildCamelotWheel(
+  focusKey: string | null | undefined,
+  deckKeys: { deckId: DeckId; key: string | null | undefined }[] = [],
+): CamelotSegment[] {
+  const hasFocus = toCamelot(focusKey) !== null;
+  const segments: CamelotSegment[] = [];
+
+  for (const ring of ['B', 'A'] as const) {
+    for (let number = 1; number <= 12; number++) {
+      const display = `${number}${ring}`;
+      const keyName = camelotToKeyName(display);
+      const relation = hasFocus ? keyCompatibility(focusKey, keyName) : 'clash';
+      const decks = deckKeys
+        .filter((d) => {
+          const c = toCamelot(d.key);
+          return c !== null && c.display === display;
+        })
+        .map((d) => d.deckId);
+      segments.push({ display, number, ring, relation, color: camelotColor(keyName), decks });
+    }
+  }
+
+  return segments;
+}
