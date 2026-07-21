@@ -19,6 +19,22 @@ export type FlacBitDepth = 16 | 24;
 interface FlacApi {
   isReady(): boolean;
   on(event: string, cb: () => void): void;
+  create_libflac_encoder(
+    sampleRate: number,
+    channels: number,
+    bitsPerSample: number,
+    compression: number,
+    totalSamples: number,
+    verify: boolean,
+  ): number;
+  init_encoder_stream(
+    id: number,
+    onWrite: (data: Uint8Array) => void,
+    onMetadata: (m: unknown) => void,
+  ): number;
+  FLAC__stream_encoder_process(id: number, channels: Int32Array[], numSamples: number): number;
+  FLAC__stream_encoder_finish(id: number): number;
+  FLAC__stream_encoder_delete(id: number): void;
 }
 
 let flacReadyPromise: Promise<FlacApi> | null = null;
@@ -90,7 +106,6 @@ export async function encodeFlac(
     throw new Error('encodeFlac: no audio data');
   }
   const Flac = await loadFlac();
-  const { Encoder } = await import('libflacjs/lib/encoder');
 
   const numChannels = Math.min(channels.length, 2);
   const numSamples = channels[0].length;
@@ -107,22 +122,27 @@ export async function encodeFlac(
     intChannels.push(dst);
   }
 
-  const encoder = new Encoder(Flac as never, {
-    sampleRate,
-    channels: numChannels,
-    bitsPerSample: bitDepth,
-    compression: 5,
-    totalSamples: numSamples,
-    verify: false,
-  });
+  // Drive the low-level libflac stream API directly. The npm package's
+  // Encoder wrapper (libflacjs/lib/encoder) is a UMD/CJS module whose
+  // require() Vite cannot statically resolve in the browser — regression
+  // 2026-07-21: 'Dynamic require of "./utils/data-utils" is not supported'.
+  const id = Flac.create_libflac_encoder(sampleRate, numChannels, bitDepth, 5, numSamples, false);
+  if (id === 0) throw new Error('FLAC encoder creation failed');
   try {
-    if (!encoder.encode(intChannels, numSamples, false)) {
+    const parts: Uint8Array[] = [];
+    if (Flac.init_encoder_stream(id, (data) => parts.push(data), () => {}) !== 0) {
+      throw new Error('FLAC encoder init failed');
+    }
+    if (!Flac.FLAC__stream_encoder_process(id, intChannels, numSamples)) {
       throw new Error('FLAC encode failed');
     }
-    encoder.encode(); // finish
-    return encoder.getSamples();
+    Flac.FLAC__stream_encoder_finish(id);
+    const merged = new Uint8Array(parts.reduce((s, p) => s + p.byteLength, 0));
+    let off = 0;
+    for (const p of parts) { merged.set(p, off); off += p.length; }
+    return merged;
   } finally {
-    encoder.destroy();
+    Flac.FLAC__stream_encoder_delete(id);
   }
 }
 
