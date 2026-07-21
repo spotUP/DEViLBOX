@@ -15,6 +15,7 @@ import { MixerFilterKnob, MixerEQBandKnob } from '@/components/dj/MixerEQ';
 import { MixerVUMeter } from '@/components/dj/MixerVUMeter';
 import { MixerChannelStrip } from '@/components/dj/MixerChannelStrip';
 import { MixerCrossfader } from '@/components/dj/MixerCrossfader';
+import { CamelotWheel } from '@/components/dj/CamelotWheel';
 import { MixerTransition } from '@/components/dj/MixerTransition';
 import { MixerMaster } from '@/components/dj/MixerMaster';
 import { MixerCueSection } from '@/components/dj/MixerCueSection';
@@ -88,6 +89,11 @@ export const DJMixer: React.FC = () => {
       {/* Row 2: Crossfader (A↔B only; Deck C is thru) */}
       <div className="w-full border-b border-dark-border pb-2">
         <MixerCrossfader />
+      </div>
+
+      {/* Row 2.5: Camelot harmonic-mix wheel */}
+      <div className="flex items-center justify-center w-full border-b border-dark-border pb-2">
+        <CamelotWheel />
       </div>
 
       {/* Row 3: Transition controls */}
