@@ -5,6 +5,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { ExternalLink, Users, Award, Loader2, Database } from 'lucide-react';
+import { useOnlineStatus } from '@/hooks/useOnlineStatus';
+import { OfflineNotice } from '@components/common/OfflineNotice';
 
 interface SIDCSDbTabProps {
   csdbId: number | null;
@@ -36,6 +38,7 @@ export const SIDCSDbTab: React.FC<SIDCSDbTabProps> = ({
   composerName,
   className,
 }) => {
+  const online = useOnlineStatus();
   const [scener, setScener] = useState<CSDbScener | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -97,6 +100,10 @@ export const SIDCSDbTab: React.FC<SIDCSDbTabProps> = ({
         <p className="text-xs mt-1">Composer has no linked CSDb profile</p>
       </div>
     );
+  }
+
+  if (!online) {
+    return <OfflineNotice feature="CSDb lookup" hint="Scener metadata comes from csdb.dk." />;
   }
 
   if (loading) {

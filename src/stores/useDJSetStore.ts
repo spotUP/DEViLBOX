@@ -124,10 +124,12 @@ export const useDJSetStore = create<DJSetState & DJSetActions>()((set, get) => (
         if (source.type === 'embedded') {
           arrayBuffer = await downloadBlob(source.blobId);
         } else if (source.type === 'modland') {
+          if (!navigator.onLine) throw new Error(`Offline — "${source.fullPath}" streams from Modland. Reconnect, or re-save the set with embedded tracks for offline playback.`);
           const resp = await fetch(`https://modland.com/pub/modules/${source.fullPath}`);
           if (!resp.ok) throw new Error(`Modland fetch failed: ${source.fullPath}`);
           arrayBuffer = await resp.arrayBuffer();
         } else if (source.type === 'hvsc') {
+          if (!navigator.onLine) throw new Error(`Offline — "${source.path}" streams from HVSC. Reconnect, or re-save the set with embedded tracks for offline playback.`);
           const resp = await fetch(`https://hvsc.c64.org/${source.path}`);
           if (!resp.ok) throw new Error(`HVSC fetch failed: ${source.path}`);
           arrayBuffer = await resp.arrayBuffer();

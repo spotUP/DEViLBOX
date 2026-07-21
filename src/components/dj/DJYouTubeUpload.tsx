@@ -8,6 +8,8 @@ import React, { useState, useCallback } from 'react';
 import { useYouTubeStore } from '@/stores/useYouTubeStore';
 import { authenticate, disconnect, uploadVideo } from '@/lib/youtubeApi';
 import { CustomSelect } from '@components/common/CustomSelect';
+import { useOnlineStatus } from '@/hooks/useOnlineStatus';
+import { OfflineNotice } from '@components/common/OfflineNotice';
 
 interface DJYouTubeUploadProps {
   videoBlob: Blob | null;
@@ -22,6 +24,7 @@ export const DJYouTubeUpload: React.FC<DJYouTubeUploadProps> = ({
   defaultDescription = '',
   onClose,
 }) => {
+  const online = useOnlineStatus();
   const isAuthenticated = useYouTubeStore(s => s.isAuthenticated);
   const channelName = useYouTubeStore(s => s.channelName);
   const uploading = useYouTubeStore(s => s.uploading);
@@ -65,8 +68,10 @@ export const DJYouTubeUpload: React.FC<DJYouTubeUploadProps> = ({
         </div>
 
         <div className="p-4 space-y-4">
-          {/* Auth section */}
-          {!isAuthenticated ? (
+          {/* Offline gate — OAuth + upload both need the network */}
+          {!online ? (
+            <OfflineNotice feature="YouTube upload" hint="Your recorded video stays on this machine — upload when you're back online." />
+          ) : !isAuthenticated ? (
             <div className="text-center space-y-3">
               <p className="text-xs text-text-muted">Connect your YouTube account to upload videos directly.</p>
               <button
