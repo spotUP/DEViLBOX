@@ -23,17 +23,55 @@ interface FlacApi {
 
 let flacReadyPromise: Promise<FlacApi> | null = null;
 
+const isNode = typeof process !== 'undefined' && !!process.versions?.node;
+
+/** Browser path: load the self-contained wasm UMD build from /flac/ (public
+ * static asset). The libflacjs npm entry point is a NODE factory (uses
+ * __dirname/path.resolve) and crashes in the browser — regression 2026-07-21:
+ * "Export failed: ReferenceError: __dirname is not defined". */
+function loadFlacBrowser(): Promise<FlacApi> {
+  return new Promise((resolve, reject) => {
+    const w = window as unknown as { Flac?: FlacApi; FLAC_SCRIPT_LOCATION?: string };
+    const finish = () => {
+      const Flac = w.Flac!;
+      if (Flac.isReady()) resolve(Flac);
+      else Flac.on('ready', () => resolve(Flac));
+    };
+    if (w.Flac) { finish(); return; }
+    w.FLAC_SCRIPT_LOCATION = '/flac/'; // where the UMD finds its .wasm
+    const script = document.createElement('script');
+    script.src = '/flac/libflac.min.wasm.js';
+    script.onload = () => (w.Flac ? finish() : reject(new Error('libflac.min.wasm.js loaded but window.Flac missing')));
+    script.onerror = () => reject(new Error('Failed to load /flac/libflac.min.wasm.js'));
+    document.head.appendChild(script);
+  });
+}
+
+/** node/vitest path: the npm factory works (asm.js 'min' variant). */
+async function loadFlacNode(): Promise<FlacApi> {
+  const factoryMod = await import('libflacjs');
+  const factory = (factoryMod as unknown as { default?: (v: string) => FlacApi }).default
+    ?? (factoryMod as unknown as (v: string) => FlacApi);
+  const Flac = factory('min');
+  if (!Flac.isReady()) {
+    await new Promise<void>((resolve) => Flac.on('ready', () => resolve()));
+  }
+  return Flac;
+}
+
 async function loadFlac(): Promise<FlacApi> {
   if (!flacReadyPromise) {
     flacReadyPromise = (async () => {
-      const factoryMod = await import('libflacjs');
-      const factory = (factoryMod as unknown as { default?: (v: string) => FlacApi }).default
-        ?? (factoryMod as unknown as (v: string) => FlacApi);
-      const Flac = factory('min');
-      if (!Flac.isReady()) {
-        await new Promise<void>((resolve) => Flac.on('ready', () => resolve()));
+      if (isNode) {
+        // vitest runs jsdom (window exists), so detect node by process, and in
+        // ambiguous environments fall back to the browser loader on throw.
+        try {
+          return await loadFlacNode();
+        } catch {
+          return loadFlacBrowser();
+        }
       }
-      return Flac;
+      return loadFlacBrowser();
     })();
   }
   return flacReadyPromise;
