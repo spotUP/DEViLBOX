@@ -36,6 +36,8 @@ jobs:
 
       - name: CI regression gate
         run: npm run test:ci
+        env:
+          VITEST_MAX_WORKERS: '4'
 
       - name: Effects compliance
         run: npm run test:compliance
