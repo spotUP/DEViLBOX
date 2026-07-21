@@ -32,6 +32,8 @@ const deckCaches = new Map<string, DeckCacheEntry>();
 
 function startLoop(deckId: DeckId, entry: DeckCacheEntry): void {
   const tick = () => {
+    // Perf: skip work while the tab is hidden; loop stays armed.
+    if (document.hidden) { entry.rafId = requestAnimationFrame(tick); return; }
     if (entry.refCount <= 0) {
       // Don't schedule another frame — loop is done
       return;

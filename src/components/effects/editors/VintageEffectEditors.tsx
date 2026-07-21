@@ -757,7 +757,10 @@ export const KissOfShameEditor: React.FC<VisualEffectEditorProps> = ({
 
   // Animate reels at ~20fps
   useEffect(() => {
-    const id = setInterval(() => setReelFrame(f => (f + 1) % 31), 50);
+    const id = setInterval(() => {
+      if (document.hidden) return; // pause reel animation in a hidden tab
+      setReelFrame(f => (f + 1) % 31);
+    }, 50);
     return () => clearInterval(id);
   }, []);
 

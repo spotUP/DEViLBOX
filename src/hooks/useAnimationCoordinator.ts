@@ -69,6 +69,11 @@ class AnimationCoordinator {
   }
 
   private animate = () => {
+    // Perf: skip all subscriber callbacks while the tab is hidden.
+    if (document.hidden) {
+      if (this.isRunning) this.rafId = requestAnimationFrame(this.animate);
+      return;
+    }
     const currentTime = performance.now();
 
     // PERF: Limit to target FPS (60fps) - skip frame if too soon

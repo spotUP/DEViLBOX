@@ -1001,6 +1001,8 @@ export const NibblesGame: React.FC<NibblesGameProps> = ({ height = 120, onExit }
     let renderFrameId: number | null = null;
 
     const render = () => {
+      // Perf: skip work while the tab is hidden; loop stays armed.
+      if (document.hidden) { renderFrameId = requestAnimationFrame(render); return; }
       if (!isRunning) return;
       ctx.fillStyle = '#000';
       ctx.fillRect(0, 0, canvas.width, canvas.height);

@@ -320,6 +320,8 @@ export const ProjectMCanvas = React.forwardRef<VJCanvasHandle, ProjectMCanvasPro
       let cancelled = false;
 
       const render = () => {
+        // Perf: skip work while the tab is hidden; loop stays armed.
+        if (document.hidden) { rafRef.current = requestAnimationFrame(render); return; }
         if (cancelled) return;
         if (visibleRef.current) {
           const engine = engineRef.current;

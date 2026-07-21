@@ -33,6 +33,7 @@ export const DeckCssTurntable: React.FC<DeckCssTurntableProps> = ({ deckId }) =>
   const rafIdRef = useRef<number | null>(null);
   const lastTickRef = useRef(0);
   const angleRef = useRef(0); // radians
+  const lastAppliedRef = useRef({ angle: Infinity, arm: Infinity }); // change-gate for DOM writes (Infinity → first frame always applies)
 
   // Scratch state
   const isScratchActiveRef = useRef(false);
@@ -78,6 +79,13 @@ export const DeckCssTurntable: React.FC<DeckCssTurntableProps> = ({ deckId }) =>
 
     const tick = (now: number) => {
       if (!containerRef.current || !platterRef.current) {
+        rafIdRef.current = requestAnimationFrame(tick);
+        return;
+      }
+      // Perf: skip all physics + DOM work while the tab is hidden. Angle
+      // re-syncs from the engine position on the next visible tick.
+      if (document.hidden) {
+        lastTickRef.current = 0;
         rafIdRef.current = requestAnimationFrame(tick);
         return;
       }
@@ -145,9 +153,14 @@ export const DeckCssTurntable: React.FC<DeckCssTurntableProps> = ({ deckId }) =>
         }
       }
 
-      // Apply CSS rotation
+      // Apply CSS rotation — change-gated: a stationary platter (stopped, not
+      // scratching) produces identical values every frame, so skip the DOM
+      // writes entirely. Seek-while-paused still updates (values change).
       const angleDeg = (angleRef.current * 180) / Math.PI;
-      applyRotation(angleDeg);
+      if (Math.abs(angleDeg - lastAppliedRef.current.angle) > 0.01) {
+        lastAppliedRef.current.angle = angleDeg;
+        applyRotation(angleDeg);
+      }
 
       // Tonearm: track from outer groove to inner groove
       // START_DEG = needle at outer groove edge of record
@@ -172,7 +185,11 @@ export const DeckCssTurntable: React.FC<DeckCssTurntableProps> = ({ deckId }) =>
       const wobble = playing && !isScratchActiveRef.current
         ? Math.sin(now * 0.001) * 0.15
         : 0;
-      applyTonearm(ARM_START_DEG + progress * (ARM_END_DEG - ARM_START_DEG) + wobble);
+      const armDeg = ARM_START_DEG + progress * (ARM_END_DEG - ARM_START_DEG) + wobble;
+      if (Math.abs(armDeg - lastAppliedRef.current.arm) > 0.005) {
+        lastAppliedRef.current.arm = armDeg;
+        applyTonearm(armDeg);
+      }
 
       rafIdRef.current = requestAnimationFrame(tick);
     };

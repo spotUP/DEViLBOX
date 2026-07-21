@@ -122,6 +122,10 @@ export const ChannelLevelsCompact: React.FC<ChannelLevelsCompactProps> = ({
     }
 
     const tick = () => {
+      // Perf: no draw work while the tab is hidden; loop stays armed and
+      // resumes on the next visible frame.
+      if (document.hidden) { animationRef.current = requestAnimationFrame(tick); return; }
+
       const canvas = canvasRef.current;
       const container = containerRef.current;
       if (!canvas || !container) {

@@ -30,8 +30,11 @@ export const DeckTrackInfo: React.FC<DeckTrackInfoProps> = ({ deckId }) => {
       const d = s.decks[deckId];
       return {
         trackName: d.trackName, trackAuthor: d.trackAuthor, fileName: d.fileName,
-        effectiveBPM: d.effectiveBPM, detectedBPM: d.detectedBPM,
-        elapsedMs: d.elapsedMs, playbackMode: d.playbackMode, durationMs: d.durationMs,
+        // Perf: quantize per-frame fields to their display resolution so the
+        // 50 ms deck-sync writes don't re-render this subtree 20×/s.
+        // BPM shows one decimal; time shows whole seconds.
+        effectiveBPM: Math.round(d.effectiveBPM * 10) / 10, detectedBPM: d.detectedBPM,
+        elapsedMs: Math.floor(d.elapsedMs / 1000) * 1000, playbackMode: d.playbackMode, durationMs: d.durationMs,
         musicalKey: d.musicalKey, seratoKey: d.seratoKey,
         analysisState: d.analysisState, analysisProgress: d.analysisProgress,
         analysisBPM: d.beatGrid?.bpm ?? 0, pitchOffset: d.pitchOffset,
@@ -44,7 +47,8 @@ export const DeckTrackInfo: React.FC<DeckTrackInfoProps> = ({ deckId }) => {
   const otherDeckId = deckId === 'A' ? 'B' : deckId === 'B' ? 'A' : 'A';
   const { otherBPM, otherKey } = useDJStore(
     useShallow((s) => ({
-      otherBPM: s.decks[otherDeckId].effectiveBPM,
+      // Quantized like effectiveBPM above — avoids per-frame re-renders.
+      otherBPM: Math.round(s.decks[otherDeckId].effectiveBPM * 10) / 10,
       otherKey: s.decks[otherDeckId].musicalKey ?? s.decks[otherDeckId].seratoKey,
     })),
   );

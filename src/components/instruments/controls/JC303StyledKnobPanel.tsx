@@ -9,6 +9,7 @@ import { getToneEngine } from '@engine/ToneEngine';
 import { useMIDIStore } from '@stores';
 import { clsx } from 'clsx';
 import { CustomSelect } from '@components/common/CustomSelect';
+import { useVisualizationAnimation } from '@/hooks/useVisualizationAnimation';
 import { CURRENT_VERSION } from '@generated/changelog';
 
 interface JC303StyledKnobPanelProps {
@@ -186,22 +187,10 @@ const DB303Scope: React.FC<{ config: TB303Config; instrumentId: number }> = memo
     return hasAudio;
   }, [instrumentId, logicalWidth]);
 
-  // 30fps animation
-  useEffect(() => {
-    let running = true;
-    let lastFrame = 0;
-    let raf: number;
-    const loop = (ts: number) => {
-      if (!running) return;
-      if (ts - lastFrame >= 33) { // ~30fps
-        lastFrame = ts;
-        onFrame();
-      }
-      raf = requestAnimationFrame(loop);
-    };
-    raf = requestAnimationFrame(loop);
-    return () => { running = false; cancelAnimationFrame(raf); };
-  }, [onFrame]);
+  // 30fps animation via the shared gated hook — pauses when the tab is hidden
+  // and backs off when onFrame reports no audio activity (idle scope shows the
+  // static filter curve; no need to redraw it every frame).
+  useVisualizationAnimation({ onFrame, fps: 30 });
 
   return (
     <div ref={containerRef} className="w-full" style={{ height: `${HEIGHT}px` }}>

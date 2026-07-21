@@ -33,19 +33,28 @@ export const DJOscilloscope: React.FC<DJOscilloscopeProps> = ({
     const bus = AudioDataBus.getShared();
     busRef.current = bus;
 
+    // Perf: silence-gate — a silent signal draws the same flat line every
+    // frame, so render it once and skip until audio (or size) changes.
+    let wasSilent = false;
+
     const render = () => {
       const canvas = canvasRef.current;
       const container = containerRef.current;
       if (!canvas) { rafRef.current = requestAnimationFrame(render); return; }
 
+      // Perf: no work while the tab is hidden.
+      if (document.hidden) { rafRef.current = requestAnimationFrame(render); return; }
+
       const w = width ?? container?.clientWidth ?? 300;
       const h = height ?? container?.clientHeight ?? 80;
       const dpr = devicePixelRatio;
+      let resized = false;
       if (canvas.width !== w * dpr || canvas.height !== h * dpr) {
         canvas.width = w * dpr;
         canvas.height = h * dpr;
         canvas.style.width = `${w}px`;
         canvas.style.height = `${h}px`;
+        resized = true;
       }
 
       const ctx = canvas.getContext('2d');
@@ -54,6 +63,19 @@ export const DJOscilloscope: React.FC<DJOscilloscopeProps> = ({
       bus.update();
       const frame = bus.getFrame();
       const waveform = frame.waveform;
+
+      // Silence detection: cheap strided peak scan.
+      let peak = 0;
+      for (let i = 0; i < waveform.length; i += 8) {
+        const a = Math.abs(waveform[i]);
+        if (a > peak) peak = a;
+      }
+      const silent = peak < 0.001;
+      if (silent && wasSilent && !resized) {
+        rafRef.current = requestAnimationFrame(render);
+        return; // flat line already on screen — nothing new to draw
+      }
+      wasSilent = silent;
 
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 

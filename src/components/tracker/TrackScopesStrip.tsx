@@ -99,6 +99,10 @@ export const TrackScopesStrip: React.FC = memo(() => {
     const FPS_INTERVAL = 1000 / 30;
 
     const tick = (now: number) => {
+      // Perf: no draw work while the tab is hidden; loop stays armed and
+      // resumes on the next visible frame.
+      if (document.hidden) { animRef.current = requestAnimationFrame(tick); return; }
+
       animRef.current = requestAnimationFrame(tick);
 
       if (now - lastTime < FPS_INTERVAL) return;
