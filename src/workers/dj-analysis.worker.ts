@@ -13,6 +13,8 @@
  *   Worker → Main:  { type: 'ready' }
  */
 
+import { analyzeKey } from './analyzeKey';
+
 // ── Types ────────────────────────────────────────────────────────────────────
 
 /** Instrument presence hints derived from CED neural + spectral analysis. */
@@ -167,38 +169,9 @@ function analyzeRhythm(
   }
 }
 
-function analyzeKey(
-  mono: Float32Array,
-  sampleRate: number,
-  essentia: typeof essentiaInstance,
-): { key: string; confidence: number } {
-  try {
-    const signal = essentia.arrayToVector(mono);
-    const result = essentia.KeyExtractor(
-      signal,
-      true,   // averageDetuningCorrection
-      4096,   // frameSize
-      4096,   // hopSize
-      36,     // hpcpSize
-      5000,   // maxFrequency
-      60,     // maximumSpectralPeaks
-      25,     // minFrequency
-      0.2,    // pcpThreshold
-      'bgate', // profileType (Bgate — good for electronic/dance music)
-      sampleRate,
-    );
-
-    const key = `${result.key ?? 'Unknown'} ${result.scale ?? ''}`.trim();
-    const confidence: number = result.strength ?? 0;
-
-    try { signal.delete(); } catch { /* ignore */ }
-
-    return { key, confidence };
-  } catch (err) {
-    console.warn('[DJAnalysisWorker] KeyExtractor failed:', err);
-    return { key: 'Unknown', confidence: 0 };
-  }
-}
+// analyzeKey moved to ./analyzeKey.ts (extracted so the essentia.js KeyExtractor
+// 15-arg binding contract is unit-testable and can't silently regress to the
+// under-filled 11-arg call that made every key resolve to 'Unknown').
 
 /**
  * Detect downbeats from beat positions by grouping into bars.
