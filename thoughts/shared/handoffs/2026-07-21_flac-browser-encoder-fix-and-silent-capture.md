@@ -66,7 +66,25 @@ Next steps:
    edit; re-test on clean reload before deep-diving, but the 78 s onset was
    measured post-reload, so it looks real.
 
-## OPEN — Firefox boot crash (task 4, user report, investigation started)
+## UPDATE (later same session) — Firefox crash ROOT-CAUSED + FIXED (unverified in Firefox)
+
+Static analysis nailed it: `ToneEngine.ts` does `Tone.setContext(new
+AudioContext(...))` — raw native context, standardized-audio-context shims
+bypassed. Tone's `Listener` (constructed per-context via onContextInit) wraps
+the nine `AudioListener` AudioParams (`positionX`..`upZ`); Firefox has never
+implemented them (bugzilla 1283029) → `undefined` → `Param.js:26` assertion →
+ErrorBoundary at boot for EVERY Firefox user. Chrome/Safari have the params.
+
+Fix committed `b263225a1` (unpushed): `src/engine/tone/firefoxAudioListenerShim.ts`
+feature-detects missing listener params and donates ConstantSourceNode.offset
+params (same technique SAC itself uses); called before `Tone.setContext`.
+Unit tests 3/3 green (Firefox-like / Chrome-like / partial fake contexts),
+wired into test:ci + test:all + test:ci:fast, type-check clean.
+
+REMAINING: launch Firefox.app against dev server, confirm boot + audio, then
+push (both unpushed commits ride the same deploy).
+
+## Original investigation notes — Firefox boot crash (superseded by update above)
 
 Report: devilbox.uprough.net in Firefox 152/Win64, boot-time critical error
 `Error: param must be an AudioParam`, minified stack RWe/FWe/Bne/OWe in
