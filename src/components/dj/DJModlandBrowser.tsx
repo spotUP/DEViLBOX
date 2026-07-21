@@ -24,6 +24,8 @@ import {
   type HVSCEntry,
 } from '@/lib/hvscApi';
 import { useDJStore, useThirdDeckActive } from '@/stores/useDJStore';
+import { useOnlineStatus } from '@/hooks/useOnlineStatus';
+import { OfflineNotice } from '@components/common/OfflineNotice';
 import { getDJEngine } from '@/engine/dj/DJEngine';
 import { detectBPM, estimateSongDuration } from '@/engine/dj/DJBeatDetector';
 import { parseModuleToSong } from '@/lib/import/parseModuleToSong';
@@ -74,6 +76,7 @@ interface DJModlandBrowserProps {
 }
 
 export const DJModlandBrowser: React.FC<DJModlandBrowserProps> = ({ onClose, variant = 'popover' }) => {
+  const online = useOnlineStatus();
   const [query, setQuery] = useState('');
   const [source, setSource] = useState<SearchSource>('all');
   const [format, setFormat] = useState('');
@@ -691,6 +694,15 @@ export const DJModlandBrowser: React.FC<DJModlandBrowserProps> = ({ onClose, var
   // ── Render ──────────────────────────────────────────────────────────────
 
   const isDownloading = (key: string) => downloadingPaths.has(key);
+
+  if (!online) {
+    return (
+      <OfflineNotice
+        feature="Modland / HVSC browsing"
+        hint="Search and downloads need the internet. Previously downloaded songs stay available in your library and playlists."
+      />
+    );
+  }
 
   return (
     <>

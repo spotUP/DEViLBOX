@@ -29,6 +29,11 @@ const APP_SHELL_PATTERNS = [
   /\/(uade|db303|ft2|pt2|furnace|vocoder|sc|chiptune3)\//,  // WASM engines
   /\/fonts\//,
   /\/manifest\.json$/,
+  // Demo songs + instruments: stale-while-revalidate means any song the user
+  // has played once replays offline. (Only visited files are cached — this
+  // does not bulk-download the library.)
+  /\/data\/songs\//,
+  /\/data\/instruments\//,
 ];
 
 function isAppShellRequest(url) {
