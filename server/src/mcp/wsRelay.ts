@@ -51,6 +51,15 @@ export function startRelay(): void {
   wss.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
     const isMcpClient = req.url?.startsWith('/mcp');
     const isController = req.url?.startsWith('/controller');
+    const isProbe = req.url?.startsWith('/probe');
+
+    if (isProbe) {
+      // Health-check probe (ServerStatusBadges). Must NOT claim the browser
+      // slot — a bare-path probe used to kick the real MCPBridge connection
+      // every poll, causing a perpetual connect/kick/reconnect flap.
+      ws.close();
+      return;
+    }
 
     if (isController) {
       // iPhone controller connection — forward requests to browser, route responses back
