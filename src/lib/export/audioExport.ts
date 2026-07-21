@@ -623,6 +623,67 @@ export async function exportLiveCaptureToWav(
 }
 
 /**
+ * Encode an AudioBuffer to a FLAC Blob (lossless). Lazy-loads the encoder —
+ * the FLAC payload never touches the main bundle.
+ */
+export async function audioBufferToFlac(buffer: AudioBuffer, bitDepth: 16 | 24 = 16): Promise<Blob> {
+  const { encodeFlac } = await import('./audioEncoders');
+  const channels: Float32Array[] = [];
+  for (let c = 0; c < Math.min(buffer.numberOfChannels, 2); c++) {
+    channels.push(buffer.getChannelData(c));
+  }
+  const bytes = await encodeFlac(channels, buffer.sampleRate, bitDepth);
+  return new Blob([bytes as unknown as BlobPart], { type: 'audio/flac' });
+}
+
+/**
+ * Encode an AudioBuffer to an OGG Vorbis Blob. Lazy-loads the encoder.
+ * `quality` is Vorbis VBR -1..10 (q3/q5/q7 ≈ 112/160/224 kbps); default 5.
+ */
+export async function audioBufferToOgg(buffer: AudioBuffer, quality = 5): Promise<Blob> {
+  const { encodeOgg } = await import('./audioEncoders');
+  const channels: Float32Array[] = [];
+  for (let c = 0; c < Math.min(buffer.numberOfChannels, 2); c++) {
+    channels.push(buffer.getChannelData(c));
+  }
+  const bytes = await encodeOgg(channels, buffer.sampleRate, quality);
+  return new Blob([bytes as unknown as BlobPart], { type: 'audio/ogg' });
+}
+
+/**
+ * Live-capture siblings that emit FLAC / OGG instead of WAV.
+ */
+export async function exportLiveCaptureToFlac(
+  options: {
+    durationSec?: number;
+    unmuteAll?: boolean;
+    onProgress?: (progress: number) => void;
+    filename?: string;
+    bitDepth?: 16 | 24;
+  } = {},
+): Promise<Blob> {
+  const buffer = await captureLiveSong(options);
+  const blob = await audioBufferToFlac(buffer, options.bitDepth ?? 16);
+  maybeDownload(blob, options.filename, 'flac');
+  return blob;
+}
+
+export async function exportLiveCaptureToOgg(
+  options: {
+    durationSec?: number;
+    unmuteAll?: boolean;
+    onProgress?: (progress: number) => void;
+    filename?: string;
+    quality?: number;
+  } = {},
+): Promise<Blob> {
+  const buffer = await captureLiveSong(options);
+  const blob = await audioBufferToOgg(buffer, options.quality ?? 5);
+  maybeDownload(blob, options.filename, 'ogg');
+  return blob;
+}
+
+/**
  * Live-capture sibling of `exportLiveCaptureToWav` that emits MP3 instead
  * of WAV. `kbps` defaults to 192 — pass 320 for archival or 128 for smaller.
  */
@@ -742,7 +803,7 @@ export function trimLeadingSilence(
   return out;
 }
 
-function maybeDownload(blob: Blob, filename: string | undefined, ext: 'wav' | 'mp3'): void {
+function maybeDownload(blob: Blob, filename: string | undefined, ext: 'wav' | 'mp3' | 'flac' | 'ogg'): void {
   if (!filename) return;
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -762,7 +823,7 @@ export interface StemResult {
   channelIndex: number;
   channelName: string;
   blob: Blob;
-  format: 'wav' | 'mp3';
+  format: 'wav' | 'mp3' | 'flac' | 'ogg';
 }
 
 /**
@@ -783,7 +844,7 @@ export interface StemResult {
  */
 export async function exportLiveCaptureStems(options: {
   durationSec?: number;
-  format?: 'wav' | 'mp3';
+  format?: 'wav' | 'mp3' | 'flac' | 'ogg';
   kbps?: number;
   /** (stemIndex, totalStems, percentOfCurrentStem) */
   onProgress?: (stemIndex: number, totalStems: number, stemPercent: number) => void;
@@ -830,7 +891,11 @@ export async function exportLiveCaptureStems(options: {
       });
       const blob = format === 'mp3'
         ? audioBufferToMp3(buffer, kbps)
-        : audioBufferToWav(buffer);
+        : format === 'flac'
+          ? await audioBufferToFlac(buffer)
+          : format === 'ogg'
+            ? await audioBufferToOgg(buffer)
+            : audioBufferToWav(buffer);
       const channelName = refPattern.channels[ch]?.name || `Channel ${ch + 1}`;
       results.push({ channelIndex: ch, channelName, blob, format });
     }
