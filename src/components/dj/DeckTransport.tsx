@@ -22,11 +22,13 @@ export const DeckTransport: React.FC<DeckTransportProps> = ({ deckId }) => {
       cuePoint: s.decks[deckId].cuePoint,
       keyLockEnabled: s.decks[deckId].keyLockEnabled,
       pendingAction: s.decks[deckId].pendingAction,
-      thisBPM: s.decks[deckId].effectiveBPM,
+      // Perf: quantize to 0.1 BPM (sync threshold is 0.5) so per-frame deck-sync
+      // writes don't re-render the transport 20×/s in tracker mode.
+      thisBPM: Math.round(s.decks[deckId].effectiveBPM * 10) / 10,
     })),
   );
   const otherDeckId = deckId === 'A' ? 'B' : deckId === 'B' ? 'A' : 'A';
-  const otherBPM = useDJStore((s) => s.decks[otherDeckId].effectiveBPM);
+  const otherBPM = useDJStore((s) => Math.round(s.decks[otherDeckId].effectiveBPM * 10) / 10);
   const isSynced = Math.abs(thisBPM - otherBPM) < 0.5;
 
   const [qMode, setQMode] = useState<QuantizeMode>(getQuantizeMode);

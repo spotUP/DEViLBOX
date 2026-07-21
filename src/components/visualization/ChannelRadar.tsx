@@ -66,6 +66,10 @@ export const ChannelRadar: React.FC<ChannelRadarProps> = ({ height = 100 }) => {
     }
 
     const animate = () => {
+      // Perf: no draw work while the tab is hidden; loop stays armed and
+      // resumes on the next visible frame.
+      if (document.hidden) { animationRef.current = requestAnimationFrame(animate); return; }
+
       if (!mounted) return;
       
       ctx.fillStyle = '#000';

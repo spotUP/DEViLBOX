@@ -128,6 +128,10 @@ export const Oscilloscope: React.FC<OscilloscopeProps> = ({
     }
 
     const draw = (timestamp: number) => {
+      // Perf: no draw work while the tab is hidden; loop stays armed and
+      // resumes on the next visible frame.
+      if (document.hidden) { animationRef.current = requestAnimationFrame(draw); return; }
+
       if (!isRunning || !canvas || !ctx) return;
 
       // PERF: Limit to target FPS

@@ -92,6 +92,10 @@ const LogoAnimationComponent: React.FC<LogoAnimationProps> = ({
   // Start/stop animation loop - defined inside effect to avoid self-referencing
   useEffect(() => {
     const tick = () => {
+      // Perf: no draw work while the tab is hidden; loop stays armed and
+      // resumes on the next visible frame.
+      if (document.hidden) { animationRef.current = requestAnimationFrame(tick); return; }
+
       if (!svgContainerRef.current) {
         animationRef.current = requestAnimationFrame(tick);
         return;

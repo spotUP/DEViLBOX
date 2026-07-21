@@ -183,6 +183,8 @@ export const VJCanvas = React.forwardRef<VJCanvasHandle, VJCanvasProps>(
       if (!ready) return;
       let cancelled = false;
       const render = () => {
+        // Perf: skip work while the tab is hidden; loop stays armed.
+        if (document.hidden) { rafRef.current = requestAnimationFrame(render); return; }
         if (cancelled) return;
         if (visibleRef.current) {
           visualizerRef.current?.render();

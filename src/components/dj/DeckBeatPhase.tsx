@@ -38,13 +38,15 @@ export const DeckBeatPhase: React.FC<DeckBeatPhaseProps> = ({ deckId }) => {
 
     const tick = () => {
       if (!mountedRef.current) return;
+      rafRef.current = requestAnimationFrame(tick);
+      // Perf: no polling while the tab is hidden.
+      if (document.hidden) return;
       const newPhase = viz.getBeatPhase();
       // Only update state when beat index changes to reduce re-renders
       if (newPhase?.nearestBeatIdx !== prevBeatIdxRef.current) {
         prevBeatIdxRef.current = newPhase?.nearestBeatIdx ?? -1;
         setPhase(newPhase);
       }
-      rafRef.current = requestAnimationFrame(tick);
     };
 
     rafRef.current = requestAnimationFrame(tick);

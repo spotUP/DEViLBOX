@@ -254,7 +254,10 @@ export const DubDeckStrip: React.FC = () => {
   // reflects what the classifier currently thinks even while it's running.
   const [autoRoles, setAutoRoles] = useState<readonly string[]>([]);
   useEffect(() => {
-    const t = setInterval(() => setAutoRoles(getAutoDubCurrentRoles()), 500);
+    const t = setInterval(() => {
+      if (document.hidden) return; // no UI to update in a hidden tab
+      setAutoRoles(getAutoDubCurrentRoles());
+    }, 500);
     return () => clearInterval(t);
   }, []);
 

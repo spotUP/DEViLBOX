@@ -37,7 +37,9 @@ export const MixerChannelStrip: React.FC<MixerChannelStripProps> = ({ deckId, st
     useShallow((s) => ({
       volume: s.decks[deckId].volume,
       trimGain: s.decks[deckId].trimGain,
-      scratchFaderGain: s.decks[deckId].scratchFaderGain,
+      // Perf: quantize to 1% — scratch-pattern writes land every 50 ms; sub-
+      // percent changes are invisible on the fader thumb.
+      scratchFaderGain: Math.round(s.decks[deckId].scratchFaderGain * 100) / 100,
       activePatternName: s.decks[deckId].activePatternName,
       faderLFOActive: s.decks[deckId].faderLFOActive,
     }))

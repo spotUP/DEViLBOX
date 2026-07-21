@@ -68,6 +68,10 @@ export function MAMEOscilloscope({
 
     // Animation loop defined inside effect to avoid self-referencing
     const tick = () => {
+      // Perf: no draw work while the tab is hidden; loop stays armed and
+      // resumes on the next visible frame.
+      if (document.hidden) { animFrameRef.current = requestAnimationFrame(tick); return; }
+
       const canvas = canvasRef.current;
       if (!canvas) {
         animFrameRef.current = requestAnimationFrame(tick);
