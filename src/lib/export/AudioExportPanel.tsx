@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useTrackerStore, useInstrumentStore, useProjectStore, useTransportStore, notify , useFormatStore } from '@stores';
-import { exportLiveCaptureToWav, exportLiveCaptureToMp3, exportUADEAsWav, getUADEInstrument, downloadLiveCaptureStems } from './audioExport';
+import { exportLiveCaptureToWav, exportLiveCaptureToMp3, exportLiveCaptureToFlac, exportLiveCaptureToOgg, exportUADEAsWav, getUADEInstrument, downloadLiveCaptureStems } from './audioExport';
 
 type AudioExportScope = 'pattern' | 'song';
-type AudioExportFormat = 'wav' | 'mp3';
+type AudioExportFormat = 'wav' | 'mp3' | 'flac' | 'ogg';
 
 interface AudioExportPanelProps {
   handlerRef: React.MutableRefObject<(() => Promise<false | void>) | null>;
@@ -142,7 +142,11 @@ export const AudioExportPanel: React.FC<AudioExportPanelProps> = ({
         return;
       }
 
-      const exportFn = fmt === 'mp3' ? exportLiveCaptureToMp3 : exportLiveCaptureToWav;
+      const exportFn =
+        fmt === 'mp3' ? exportLiveCaptureToMp3
+        : fmt === 'flac' ? exportLiveCaptureToFlac
+        : fmt === 'ogg' ? exportLiveCaptureToOgg
+        : exportLiveCaptureToWav;
 
       // Default path — live capture. Handles every song type uniformly.
       if (audioExportScope === 'pattern') {
@@ -239,6 +243,32 @@ export const AudioExportPanel: React.FC<AudioExportPanelProps> = ({
           >
             MP3 (192 kbps)
           </button>
+          <button
+            onClick={() => setFormat('flac')}
+            disabled={isRendering}
+            className={`
+              flex-1 px-3 py-2 rounded-lg text-sm font-mono transition-all
+              ${format === 'flac'
+                ? 'bg-accent-primary text-text-inverse'
+                : 'bg-dark-bg text-text-secondary hover:bg-dark-bgHover border border-dark-border'
+              }
+            `}
+          >
+            FLAC (lossless)
+          </button>
+          <button
+            onClick={() => setFormat('ogg')}
+            disabled={isRendering}
+            className={`
+              flex-1 px-3 py-2 rounded-lg text-sm font-mono transition-all
+              ${format === 'ogg'
+                ? 'bg-accent-primary text-text-inverse'
+                : 'bg-dark-bg text-text-secondary hover:bg-dark-bgHover border border-dark-border'
+              }
+            `}
+          >
+            OGG (q5)
+          </button>
         </div>
 
         {/* Pattern selector (only shown for single pattern mode) */}
@@ -286,7 +316,7 @@ export const AudioExportPanel: React.FC<AudioExportPanelProps> = ({
 
         <div className="text-sm font-mono text-text-secondary space-y-1">
           <div>Format: <span className="text-accent-primary">
-            {format === 'mp3' ? 'MP3 (192 kbps, 44.1 kHz)' : 'WAV (16-bit, 44.1 kHz)'}
+            {format === 'mp3' ? 'MP3 (192 kbps, 44.1 kHz)' : format === 'flac' ? 'FLAC (16-bit lossless, 44.1 kHz)' : format === 'ogg' ? 'OGG Vorbis (q5 ≈ 160 kbps, 44.1 kHz)' : 'WAV (16-bit, 44.1 kHz)'}
           </span></div>
           <div>Method: <span className="text-accent-primary">
             {rawRender ? 'Raw UADE offline (always WAV)' : 'Live capture (real-time)'}
