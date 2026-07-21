@@ -743,12 +743,17 @@ async function captureLiveSong(options: {
     useTransportStore.getState().setCurrentRow(0);
     useTransportStore.getState().setCurrentPattern(0);
   } catch { /* store not ready */ }
-  void replayer.play();
-
   try {
-    // Extend capture by 1 s so the leading-silence trim has headroom
-    // without shortening the user's actual song content.
-    const buffer = await captureAudioLiveToBuffer(durationSec + 1, { onProgress, unmuteAll });
+    // Connect the capture tap FIRST (so nothing is missed), then AWAIT play().
+    // Previously this fire-and-forget `void replayer.play()`d and immediately
+    // captured — for native engines whose worklet starts asynchronously
+    // (libopenmpt sample MODs especially) the tap could run its whole window
+    // before audio ever flowed, producing a fully-SILENT export. Awaiting play
+    // guarantees the engine is running, mirroring the (working) MCP export path.
+    // Extend capture by 1 s so the leading-silence trim has headroom.
+    const capturePromise = captureAudioLiveToBuffer(durationSec + 1, { onProgress, unmuteAll });
+    await replayer.play();
+    const buffer = await capturePromise;
     return trimLeadingSilence(buffer);
   } finally {
     try { replayer.stop(); } catch { /* ok */ }
