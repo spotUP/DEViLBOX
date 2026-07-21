@@ -97,6 +97,12 @@ Corrections to the diagnosis:
 Design rule adopted: never drop frames that differ; only skip pixel-identical frames
 (stationary platter, silent scope, hidden tab). Visualizers stay 60 fps while animating.
 
+RESOLVED 2026-07-21 (same session, later): the "move playhead out of the reactive
+store" item is closed by an equivalent root fix — selector-level quantization to
+display resolution removed the 20 Hz re-render storm (the actual harm). The 50 ms
+store writes remain but are cheap zustand sets with no re-render fanout. No further
+structural refactor warranted.
+
 Remaining (need live profiling before/after):
 - Verify with get_frame_stats + DevTools Performance (blocked on single clean tab for MCP).
 - Possibly: getComputedStyle per rendered frame in renderVinyl (cache theme colors).
