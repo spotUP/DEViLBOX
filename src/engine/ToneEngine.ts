@@ -13,6 +13,7 @@ import { MAMEBaseSynth } from './mame/MAMEBaseSynth';
 import { InstrumentFactory } from './InstrumentFactory';
 import { periodToNoteIndex, getPeriodExtended, _registerToneEngineRef } from './effects/PeriodTables';
 import { AmigaFilter } from './effects/AmigaFilter';
+import { shimAudioListenerParams } from './tone/firefoxAudioListenerShim';
 import { TrackerEnvelope } from './TrackerEnvelope';
 import { InstrumentAnalyser } from './InstrumentAnalyser';
 import { FurnaceChipEngine } from './chips/FurnaceChipEngine';
@@ -375,6 +376,10 @@ export class ToneEngine {
     // forcing 44100 can cause silent output or context creation failure.
     // Let the browser pick the optimal rate for the device hardware.
     this._nativeContext = new AudioContext({ latencyHint: 'interactive' });
+    // Firefox lacks the AudioListener AudioParams Tone's Listener wraps —
+    // without this shim Tone.setContext throws "param must be an AudioParam"
+    // and the whole app crashes at boot on Firefox.
+    shimAudioListenerParams(this._nativeContext);
     Tone.setContext(this._nativeContext);
     // Register globally so WAM/WASM synths can access it without importing ToneEngine
     setDevilboxAudioContext(this._nativeContext);
