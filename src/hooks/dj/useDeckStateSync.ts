@@ -22,6 +22,8 @@ export function useDeckStateSync(deckId: DeckId): void {
     const POLL_INTERVAL = 50; // 50ms = 20fps — sufficient for position display
 
     const poll = () => {
+      // Perf: skip work while the tab is hidden; loop stays armed.
+      if (document.hidden) { animFrameRef.current = requestAnimationFrame(poll); return; }
       if (!running) return;
 
       // Throttle: skip frames to reduce store broadcasts

@@ -262,6 +262,8 @@ export const VJPatternOverlay: React.FC<VJPatternOverlayProps> = React.memo(({ s
     const layoutBuf: Array<{ xBase: number; sectionW: number; numChannels: number }> = [];
 
     const render = (timestamp: number) => {
+      // Perf: skip work while the tab is hidden; loop stays armed.
+      if (document.hidden) { rafRef.current = requestAnimationFrame(render); return; }
       const dt = Math.min((timestamp - (lastTimeRef.current || timestamp)) / 1000, 0.05);
       lastTimeRef.current = timestamp;
       const anim = animRef.current;

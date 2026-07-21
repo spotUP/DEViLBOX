@@ -419,6 +419,7 @@ export const GTUltraControls: React.FC<GTUltraControlsProps> = ({
     useGTUltraStore.getState().refreshSidRegisters();
     // Poll at ~15 Hz (every 66ms)
     const id = setInterval(() => {
+      if (document.hidden) return; // skip register reads + store writes in a hidden tab
       useGTUltraStore.getState().refreshSidRegisters();
     }, 66);
     return () => clearInterval(id);

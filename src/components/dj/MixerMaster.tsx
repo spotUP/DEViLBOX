@@ -46,29 +46,43 @@ export const MixerMaster: React.FC = () => {
     DJActions.setMasterVolume(value);
   }, []);
 
-  // Animate stereo VU meter via requestAnimationFrame
+  // Animate stereo VU meter via requestAnimationFrame.
+  // Perf: this loop used to setState L/R/limiter EVERY frame (60fps) even when
+  // the tab was hidden or the level hadn't changed — forcing a full re-render of
+  // the master strip 60×/s. Now it (a) pauses when the tab is hidden, (b) polls
+  // at ~30fps (plenty for a VU meter), and (c) only setState when a value
+  // actually changed enough to move a segment — so a silent/steady master costs
+  // zero re-renders.
+  const lastLRef = useRef(-Infinity);
+  const lastRRef = useRef(-Infinity);
+  const lastLimRef = useRef(false);
   useEffect(() => {
     mountedRef.current = true;
+    const EPSILON_DB = 0.25;      // ignore sub-segment jitter (below visible resolution)
 
     const tick = () => {
       if (!mountedRef.current) return;
+      rafRef.current = requestAnimationFrame(tick);
+
+      // Skip all work while the tab is hidden. Visible = full 60 fps polling.
+      if (document.hidden) return;
+
       try {
         const raw = getDJEngine().mixer.getMasterLevel();
+        let l: number, r: number;
         if (Array.isArray(raw) && raw.length >= 2) {
-          setLevelL(raw[0]);
-          setLevelR(raw[1]);
-          // Limiter compressing when either channel exceeds -1 dB
-          setLimiterActive(raw[0] > -1 || raw[1] > -1);
+          l = raw[0]; r = raw[1];
         } else {
-          const mono = typeof raw === 'number' ? raw : -Infinity;
-          setLevelL(mono);
-          setLevelR(mono);
-          setLimiterActive(mono > -1);
+          l = r = typeof raw === 'number' ? raw : -Infinity;
         }
+        const lim = l > -1 || r > -1;
+
+        if (Math.abs(l - lastLRef.current) >= EPSILON_DB) { lastLRef.current = l; setLevelL(l); }
+        if (Math.abs(r - lastRRef.current) >= EPSILON_DB) { lastRRef.current = r; setLevelR(r); }
+        if (lim !== lastLimRef.current) { lastLimRef.current = lim; setLimiterActive(lim); }
       } catch {
         // Engine not ready yet
       }
-      rafRef.current = requestAnimationFrame(tick);
     };
 
     rafRef.current = requestAnimationFrame(tick);

@@ -74,6 +74,10 @@ export const Sc68Visualizer: React.FC = () => {
     const peaks = peaksRef.current;
 
     const draw = () => {
+      // Perf: no draw work while the tab is hidden; loop stays armed and
+      // resumes on the next visible frame.
+      if (document.hidden) { rafRef.current = requestAnimationFrame(draw); return; }
+
       const { width: w, height: h } = canvas;
       ctx.fillStyle = YM_BG;
       ctx.fillRect(0, 0, w, h);

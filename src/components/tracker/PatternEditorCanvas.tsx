@@ -2299,6 +2299,11 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     let needsRender = true; // Force first frame
 
     const tick = (now: number) => {
+      // Perf: no editor rendering while the tab is hidden; loop stays armed.
+      if (document.hidden) {
+        mainThreadRafRef.current = requestAnimationFrame(tick);
+        return;
+      }
       if (now - lastFrame < MIN_FRAME_MS) {
         mainThreadRafRef.current = requestAnimationFrame(tick);
         return;
@@ -2564,6 +2569,8 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     let prevPlaying = false;
 
     const tick = () => {
+      // Perf: no worker feeding while the tab is hidden; loop stays armed.
+      if (document.hidden) { rafId = requestAnimationFrame(tick); return; }
       // FORMAT MODE: use format engine's playback state (skip all tracker store reads)
       if (isFormatModeRef.current) {
         const bridge = bridgeRef.current;

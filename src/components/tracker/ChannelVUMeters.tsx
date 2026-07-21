@@ -114,6 +114,10 @@ export const ChannelVUMeters: React.FC<ChannelVUMetersProps> = memo(({ channelOf
     let lastTickTime = 0;
 
     const tick = () => {
+      // Perf: no draw work while the tab is hidden; loop stays armed and
+      // resumes on the next visible frame.
+      if (document.hidden) { animationRef.current = requestAnimationFrame(tick); return; }
+
       const canvas = canvasRef.current;
       if (!canvas) {
         animationRef.current = requestAnimationFrame(tick);

@@ -36,6 +36,7 @@ export const DeckVinylView: React.FC<DeckVinylViewProps> = ({ deckId, size = DEF
   const rafIdRef = useRef<number | null>(null);
   const lastTickRef = useRef(0);
   const angleRef = useRef(0);
+  const lastRenderedAngleRef = useRef(Infinity); // change-gate for canvas redraws (Infinity → first frame always renders)
 
   // Scratch state
   const isScratchActiveRef = useRef(false);
@@ -62,6 +63,15 @@ export const DeckVinylView: React.FC<DeckVinylViewProps> = ({ deckId, size = DEF
     let scratchIntegrating = false;
 
     const tick = (now: number) => {
+      // Perf: pause all physics + canvas work while the tab is hidden. When it
+      // becomes visible again, angle re-syncs from the authoritative store
+      // position on the next tick, so nothing drifts.
+      if (document.hidden) {
+        lastTickRef.current = 0; // force dt=0 on resume so we don't integrate a huge gap
+        rafIdRef.current = requestAnimationFrame(tick);
+        return;
+      }
+
       const dt = lastTickRef.current > 0 ? (now - lastTickRef.current) / 1000 : 0;
       lastTickRef.current = now;
 
@@ -124,8 +134,12 @@ export const DeckVinylView: React.FC<DeckVinylViewProps> = ({ deckId, size = DEF
       }
       // When not playing (and not scratching), platter is stationary
 
-      // Render
-      renderVinyl();
+      // Render — change-gated: a stationary platter draws identical frames, so
+      // skip the full canvas redraw until the angle moves again (seek included).
+      if (Math.abs(angleRef.current - lastRenderedAngleRef.current) > 0.0005) {
+        lastRenderedAngleRef.current = angleRef.current;
+        renderVinyl();
+      }
       rafIdRef.current = requestAnimationFrame(tick);
     };
 

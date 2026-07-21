@@ -28,6 +28,7 @@ export const MAMERSAVoiceMatrix: React.FC<MAMERSAVoiceMatrixProps> = ({
     if (handle === 0) return;
 
     const interval = setInterval(() => {
+      if (document.hidden) return; // skip WASM polling + setState in a hidden tab
       const newActivity = [];
       for (let i = 0; i < 16; i++) {
         const mem_offset = i * 0x100 + 0 * 0x10;
