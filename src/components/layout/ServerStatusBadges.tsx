@@ -45,7 +45,10 @@ function checkWebSocket(): Promise<ServiceState> {
   return new Promise((resolve) => {
     try {
       const host = window.location.hostname || 'localhost';
-      const ws = new WebSocket(`ws://${host}:${WS_PORT}`);
+      // /probe path: the relay answers without claiming the single browser
+      // slot. A bare-path probe used to kick the real MCPBridge connection on
+      // every health poll (perpetual connect/kick/reconnect flap).
+      const ws = new WebSocket(`ws://${host}:${WS_PORT}/probe`);
       const timeout = setTimeout(() => {
         ws.close();
         resolve({ label: 'WS', status: 'error', detail: 'WebSocket relay timeout' });
@@ -128,7 +131,10 @@ export const ServerStatusBadges: React.FC = () => {
   // Initial check + polling
   useEffect(() => {
     runChecks();
-    pollRef.current = setInterval(runChecks, POLL_INTERVAL);
+    pollRef.current = setInterval(() => {
+      if (document.hidden) return; // no network polling from a hidden tab
+      runChecks();
+    }, POLL_INTERVAL);
     return () => { if (pollRef.current) clearInterval(pollRef.current); };
   }, [runChecks]);
 
