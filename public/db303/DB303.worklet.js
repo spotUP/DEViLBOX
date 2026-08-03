@@ -9,6 +9,251 @@
 // Performance: Disable note event logging (causes severe slowdown if true)
 const DEBUG_NOTE_EVENTS = false;
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Post-synth drive stage — port of schwung-303 drive.h (GPL-3.0-or-later).
+//   Model 0 "Soft": tilt-EQ + 2x-oversampled asymmetric tanh. Warm softclip.
+//   Model 1 "RAT":  ProCo RAT port (davemollen/dm-Rat, GPL-3.0):
+//                   distortion-modulated 3rd-order op-amp IIR → algebraic
+//                   waveshaper x/(1+x^4)^(1/4) around 2x oversampling →
+//                   fixed-mid tone stack.
+// drive amount 0 fully bypasses; mix is dry/wet.
+// ─────────────────────────────────────────────────────────────────────────────
+
+class DriveBiquad {
+  constructor() { this.b0 = 1; this.b1 = 0; this.b2 = 0; this.a1 = 0; this.a2 = 0; this.z1 = 0; this.z2 = 0; }
+  reset() { this.z1 = 0; this.z2 = 0; }
+  process(x) {
+    const y = this.b0 * x + this.z1;
+    this.z1 = this.b1 * x - this.a1 * y + this.z2;
+    this.z2 = this.b2 * x - this.a2 * y;
+    return y;
+  }
+  setLowpass(fc, fs) {
+    const q = 0.7071067811865476;
+    const w0 = 2 * Math.PI * fc / fs;
+    const cs = Math.cos(w0), sn = Math.sin(w0);
+    const alpha = sn / (2 * q);
+    const b0 = (1 - cs) * 0.5, b1 = 1 - cs, b2 = (1 - cs) * 0.5;
+    const a0 = 1 + alpha, a1 = -2 * cs, a2 = 1 - alpha;
+    this.b0 = b0 / a0; this.b1 = b1 / a0; this.b2 = b2 / a0;
+    this.a1 = a1 / a0; this.a2 = a2 / a0;
+  }
+  setLowShelf(fc, gainDb, fs) {
+    const A = Math.pow(10, gainDb / 40);
+    const w0 = 2 * Math.PI * fc / fs;
+    const cs = Math.cos(w0), sn = Math.sin(w0);
+    const S = 1.0;
+    const alpha = sn * 0.5 * Math.sqrt((A + 1 / A) * (1 / S - 1) + 2);
+    const sqrtA2alpha = 2 * Math.sqrt(A) * alpha;
+    const b0 = A * ((A + 1) - (A - 1) * cs + sqrtA2alpha);
+    const b1 = 2 * A * ((A - 1) - (A + 1) * cs);
+    const b2 = A * ((A + 1) - (A - 1) * cs - sqrtA2alpha);
+    const a0 = (A + 1) + (A - 1) * cs + sqrtA2alpha;
+    const a1 = -2 * ((A - 1) + (A + 1) * cs);
+    const a2 = (A + 1) + (A - 1) * cs - sqrtA2alpha;
+    this.b0 = b0 / a0; this.b1 = b1 / a0; this.b2 = b2 / a0;
+    this.a1 = a1 / a0; this.a2 = a2 / a0;
+  }
+}
+
+// One-pole LPF with cutoff re-tuning (dm-Rat's OnePoleFilter shape).
+class DriveOnePoleLP {
+  constructor(fs) { this.tNegTau = -2 * Math.PI / fs; this.z = 0; this.prevFreq = -1; this.b1 = 0; }
+  reset() { this.z = 0; this.prevFreq = -1; }
+  process(x, freq) {
+    if (freq !== this.prevFreq) {
+      this.b1 = Math.exp(freq * this.tNegTau);
+      this.prevFreq = freq;
+    }
+    this.z = x * (1 - this.b1) + this.z * this.b1;
+    return this.z;
+  }
+}
+
+const SOFT_TANH_BIAS = 0.15;
+const SOFT_TANH_BIAS_OUT = Math.tanh(SOFT_TANH_BIAS);
+function softAsymTanh(x) { return Math.tanh(x + SOFT_TANH_BIAS) - SOFT_TANH_BIAS_OUT; }
+
+class SoftDriveChannel {
+  constructor(fs) {
+    this.preShelf = new DriveBiquad();
+    this.postShelf = new DriveBiquad();
+    this.upLp = new DriveBiquad();
+    this.downLp = new DriveBiquad();
+    const fs2 = fs * 2;
+    this.preShelf.setLowShelf(400, 6, fs);
+    this.postShelf.setLowShelf(400, -6, fs);
+    this.upLp.setLowpass(19000, fs2);
+    this.downLp.setLowpass(19000, fs2);
+    this.dcX1 = 0; this.dcY1 = 0;
+  }
+  reset() {
+    this.preShelf.reset(); this.postShelf.reset();
+    this.upLp.reset(); this.downLp.reset();
+    this.dcX1 = 0; this.dcY1 = 0;
+  }
+  process(buf, frames, driveAmt, mix) {
+    const preGain = Math.pow(10, driveAmt * 24 / 20);
+    const invPre = 1 / preGain;
+    const wet = mix, dry = 1 - mix;
+    for (let n = 0; n < frames; n++) {
+      const x = buf[n];
+      const v = this.preShelf.process(x) * preGain;
+      const up0 = 2 * this.upLp.process(v);
+      const up1 = 2 * this.upLp.process(0);
+      const sat0 = softAsymTanh(up0);
+      const sat1 = softAsymTanh(up1);
+      this.downLp.process(sat0);
+      let y = this.downLp.process(sat1);
+      y *= invPre;
+      y = this.postShelf.process(y);
+      const yHp = y - this.dcX1 + 0.9996 * this.dcY1;
+      this.dcX1 = y; this.dcY1 = yHp;
+      buf[n] = dry * x + wet * yHp;
+    }
+  }
+}
+
+// RAT op-amp circuit constants (dm-Rat op_amp.rs / clipper.rs / tone.rs).
+const RAT_R1 = 100000.0;
+const RAT_C1 = 1e-10;
+const RAT_Z1_B0 = 2.72149e-7;
+const RAT_Z1_B1 = 0.0027354;
+const RAT_Z1_A0 = 6.27638e-9;
+const RAT_Z1_A1 = 0.0000069;
+const RAT_MAX_GAIN_AT_1HZ = 1119360.558108;
+const RAT_MIN_DIST_GAIN = 1.0;
+const RAT_MAX_DIST_GAIN = 2307.231003;
+const RAT_CLIP_PRE_GAIN = 1.877;
+const RAT_CLIP_POST_GAIN = 0.3204805;
+const RAT_TONE_R1 = 100000.0;
+const RAT_TONE_R2 = 1500.0;
+const RAT_TONE_C1 = 3.3e-9;
+
+function ratClip(x) {
+  const x2 = x * x;
+  return x / Math.sqrt(Math.sqrt(1 + x2 * x2));
+}
+
+function ratToneCutoff(tone) {
+  const R = tone * RAT_TONE_R1 + RAT_TONE_R2;
+  return 1 / (2 * Math.PI * R * RAT_TONE_C1);
+}
+
+class RatDriveChannel {
+  constructor(fs) {
+    // 3rd-order IIR (direct-form-2 transposed) state; coeffs shared via stage.
+    this.z0 = 0; this.z1 = 0; this.z2 = 0;
+    this.correction = new DriveOnePoleLP(fs);
+    this.tone = new DriveOnePoleLP(fs);
+    this.upLp = new DriveBiquad();
+    this.downLp = new DriveBiquad();
+    const fs2 = fs * 2;
+    this.upLp.setLowpass(19000, fs2);
+    this.downLp.setLowpass(19000, fs2);
+    this.dcX1 = 0; this.dcY1 = 0;
+  }
+  reset() {
+    this.z0 = 0; this.z1 = 0; this.z2 = 0;
+    this.correction.reset(); this.tone.reset();
+    this.upLp.reset(); this.downLp.reset();
+    this.dcX1 = 0; this.dcY1 = 0;
+  }
+  process(buf, frames, coeffB, coeffA, correctionCutoff, toneFreq, mix) {
+    const wet = mix, dry = 1 - mix;
+    for (let n = 0; n < frames; n++) {
+      const x = buf[n];
+      // Op-amp stage — distortion-modulated 3rd-order IIR.
+      const y0 = x * coeffB[0] + this.z0;
+      this.z0 = x * coeffB[1] - y0 * coeffA[1] + this.z1;
+      this.z1 = x * coeffB[2] - y0 * coeffA[2] + this.z2;
+      this.z2 = x * coeffB[3] - y0 * coeffA[3];
+      let v = this.correction.process(y0, correctionCutoff);
+      v *= RAT_CLIP_PRE_GAIN;
+      // 2x oversampling around the clipper.
+      const up0 = 2 * this.upLp.process(v);
+      const up1 = 2 * this.upLp.process(0);
+      const sat0 = ratClip(up0);
+      const sat1 = ratClip(up1);
+      this.downLp.process(sat0);
+      let y = this.downLp.process(sat1);
+      y *= RAT_CLIP_POST_GAIN;
+      y = this.tone.process(y, toneFreq);
+      const yHp = y - this.dcX1 + 0.9996 * this.dcY1;
+      this.dcX1 = y; this.dcY1 = yHp;
+      buf[n] = dry * x + wet * yHp;
+    }
+  }
+}
+
+class DriveStage {
+  constructor(fs) {
+    this.fs = fs;
+    this.model = 0;   // 0=Soft, 1=RAT
+    this.amount = 0;  // 0..1, 0 = bypass
+    this.mix = 1;     // dry/wet
+    this.soft = [new SoftDriveChannel(fs), new SoftDriveChannel(fs)];
+    this.rat = [new RatDriveChannel(fs), new RatDriveChannel(fs)];
+    // Bilinear-transform scale factors (dm-Rat BilinearTransform).
+    const t = 1 / fs;
+    this.blS0 = t * 0.5;
+    this.blS1 = t * t * 0.25;
+    this.blS2 = t * t * t * 0.125;
+    this.ratB = [1, 0, 0, 0];
+    this.ratA = [1, 0, 0, 0];
+  }
+  setModel(m) {
+    const next = m === 1 ? 1 : 0;
+    if (next !== this.model) {
+      // Reset destination state so we don't hear stale filter history.
+      (next === 1 ? this.rat : this.soft).forEach((c) => c.reset());
+      this.model = next;
+    }
+  }
+  // Transforms s-domain polynomial [x0..x3] into z-domain [y0..y3].
+  bilinear(x, out) {
+    const x0 = x[0], x1 = x[1] * this.blS0, x2 = x[2] * this.blS1, x3 = x[3] * this.blS2;
+    out[0] = x0 + x1 + x2 + x3;
+    out[1] = -3 * x0 - x1 + x2 + 3 * x3;
+    out[2] = 3 * x0 - x1 - x2 + 3 * x3;
+    out[3] = -x0 + x1 - x2 + x3;
+  }
+  updateRatCoeffs(distortion) {
+    const z2b0 = Math.max(distortion * RAT_R1, 1);
+    const z2a0 = z2b0 * RAT_C1;
+    const a0 = RAT_Z1_B0 * z2a0;
+    const a1 = RAT_Z1_B0 + RAT_Z1_B1 * z2a0;
+    const a2 = RAT_Z1_B1 + z2a0;
+    const b0 = a0;
+    const b1 = a1 + RAT_Z1_A0 * z2b0;
+    const b2 = RAT_Z1_A1 * z2b0 + RAT_Z1_B1 + z2a0;
+    const numZ = [0, 0, 0, 0], denZ = [0, 0, 0, 0];
+    this.bilinear([b0, b1, b2, 1], numZ);
+    this.bilinear([a0, a1, a2, 1], denZ);
+    const invA0 = 1 / denZ[0];
+    for (let i = 0; i < 4; i++) {
+      this.ratB[i] = numZ[i] * invA0;
+      this.ratA[i] = denZ[i] * invA0;
+    }
+  }
+  process(bufL, bufR, frames) {
+    if (this.amount <= 0 || this.mix <= 0) return;
+    const stereo = bufR !== bufL;
+    if (this.model === 0) {
+      this.soft[0].process(bufL, frames, this.amount, this.mix);
+      if (stereo) this.soft[1].process(bufR, frames, this.amount, this.mix);
+    } else {
+      const distortion = Math.max(this.amount, 0.001);
+      this.updateRatCoeffs(distortion);
+      const correctionCutoff = RAT_MAX_GAIN_AT_1HZ /
+        (distortion * (RAT_MAX_DIST_GAIN - RAT_MIN_DIST_GAIN) + RAT_MIN_DIST_GAIN);
+      const toneFreq = ratToneCutoff(0.5);
+      this.rat[0].process(bufL, frames, this.ratB, this.ratA, correctionCutoff, toneFreq, this.mix);
+      if (stereo) this.rat[1].process(bufR, frames, this.ratB, this.ratA, correctionCutoff, toneFreq, this.mix);
+    }
+  }
+}
+
 class DB303Processor extends AudioWorkletProcessor {
   constructor() {
     super();
@@ -28,6 +273,10 @@ class DB303Processor extends AudioWorkletProcessor {
     this.eventQueue = []; // Queue for sample-accurate events
     this.lastPeakL = 0; // Track peak from actual process() output
     this.processPath = 'unknown'; // Which process branch is used
+
+    // Post-synth drive stage (Soft/RAT) — runs on worklet output, independent
+    // of WASM init state. Params: overdrive, overdriveModel, overdriveMix.
+    this.drive = new DriveStage(sampleRate);
 
     // Shadow state: track values sent to WASM setters (since getParameter may not exist)
     this.paramState = {
@@ -74,6 +323,23 @@ class DB303Processor extends AudioWorkletProcessor {
   }
 
   async handleMessage(data) {
+    // Drive-stage params live in the worklet (not WASM) — handle them before
+    // any init queueing so they are never lost while WASM loads.
+    if (data.type === 'setParameter') {
+      if (data.paramId === 'overdrive') {
+        this.drive.amount = Math.max(0, Math.min(1, parseFloat(data.value) || 0));
+        return;
+      }
+      if (data.paramId === 'overdriveModel') {
+        this.drive.setModel(parseInt(data.value, 10) || 0);
+        return;
+      }
+      if (data.paramId === 'overdriveMix') {
+        this.drive.mix = Math.max(0, Math.min(1, parseFloat(data.value) || 0));
+        return;
+      }
+    }
+
     // Queue non-init messages while WASM is still loading
     if (data.type !== 'init' && data.type !== 'dispose' && !this.synth && this.initializing) {
       if (data.type === 'setParameter') {
@@ -722,6 +988,9 @@ class DB303Processor extends AudioWorkletProcessor {
         break; // No more events, done with this block
       }
     }
+
+    // Post-synth drive stage (bypassed at amount 0)
+    this.drive.process(outputL, outputR, numSamples);
 
     return true;
   }

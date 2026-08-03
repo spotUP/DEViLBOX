@@ -13,9 +13,10 @@
 import { getMIDIManager } from './MIDIManager';
 import { midiToTrackerNote } from './types';
 import type { MIDIMessage } from './types';
+import { LIVE_ACCENT_VELOCITY_THRESHOLD } from './liveNoteFlags';
 
-// Velocity threshold for accent (0-127)
-const ACCENT_VELOCITY_THRESHOLD = 100;
+// Velocity threshold for accent (0-127) — single source in liveNoteFlags.ts
+const ACCENT_VELOCITY_THRESHOLD = LIVE_ACCENT_VELOCITY_THRESHOLD;
 
 export interface MIDINoteHandlerOptions {
   // Callback when note is triggered
