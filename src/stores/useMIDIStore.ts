@@ -10,6 +10,7 @@ import { getMIDIManager } from '../midi/MIDIManager';
 import { getCCMapManager } from '../midi/CCMapManager';
 import { getButtonMapManager } from '../midi/ButtonMapManager';
 import { midiToTrackerNote } from '../midi/types';
+import { deriveLiveNoteFlags } from '../midi/liveNoteFlags';
 import { getToneEngine } from '../engine/ToneEngine';
 import { useInstrumentStore } from './useInstrumentStore';
 import { useSettingsStore } from './useSettingsStore';
@@ -472,25 +473,36 @@ export const useMIDIStore = create<MIDIStore>()(
                   // Also ensure minimum velocity of 0.5 so soft notes are still audible
                   const velocity = Math.max(0.5, Math.sqrt(rawVelocity));
 
+                  // 303 conventions (TB-3PO / schwung-303): velocity >= 100 = accent,
+                  // legato overlap = slide. Held count must be read BEFORE tracking
+                  // the new note.
+                  const heldBefore = activeMidiNotes.size - (activeMidiNotes.has(message.note) ? 1 : 0);
+                  const { accent, slide } = deriveLiveNoteFlags(message.velocity, heldBefore, midiPolyphonic);
+
                   activeMidiNotes.set(message.note, toneNote);
 
                   if (midiPolyphonic) {
                     // POLYPHONIC MODE: Each note gets its own voice channel
-                    engine.triggerPolyNoteAttack(targetInstrument.id, toneNote, velocity, targetInstrument);
+                    engine.triggerPolyNoteAttack(targetInstrument.id, toneNote, velocity, targetInstrument, accent);
                   } else {
-                    // MONOPHONIC MODE: Release previous notes first
+                    // MONOPHONIC MODE
                     if (activeMidiNotes.size > 1) {
-                      for (const [midiNote, activeNote] of activeMidiNotes.entries()) {
-                        if (midiNote !== message.note) {
-                          engine.triggerPolyNoteRelease(targetInstrument.id, activeNote, targetInstrument);
+                      // Slide keeps the previous gate held (engine glides, no
+                      // retrigger); non-slide releases previous notes first.
+                      if (!slide) {
+                        for (const [midiNote, activeNote] of activeMidiNotes.entries()) {
+                          if (midiNote !== message.note) {
+                            engine.triggerPolyNoteRelease(targetInstrument.id, activeNote, targetInstrument);
+                          }
                         }
                       }
-                      // Keep only the current note
+                      // Keep only the current note either way, so stale key-offs
+                      // can't kill the currently sounding note.
                       const currentNote = activeMidiNotes.get(message.note);
                       activeMidiNotes.clear();
                       if (currentNote) activeMidiNotes.set(message.note, currentNote);
                     }
-                    engine.triggerPolyNoteAttack(targetInstrument.id, toneNote, velocity, targetInstrument);
+                    engine.triggerPolyNoteAttack(targetInstrument.id, toneNote, velocity, targetInstrument, accent, slide);
                   }
                 } else {
                   console.warn('[useMIDIStore] No instruments available for MIDI playback');

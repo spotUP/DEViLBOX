@@ -231,7 +231,7 @@ const PARAMETER_ROUTES: Record<string, ParameterRoute> = {
   'envMod':       { type: 'config', path: 'tb303.filterEnvelope.envMod' },
   'decay':        { type: 'config', path: 'tb303.filterEnvelope.decay' },
   'accent':       { type: 'config', path: 'tb303.accent.amount' },
-  'overdrive':    { type: 'config', path: 'tb303.overdrive.amount' },
+  'overdrive':    { type: 'config', path: 'tb303.overdrive.amount', transform: n => n * 100 },
   'slideTime':    { type: 'config', path: 'tb303.slide.time' },
 
   // ── 303 Oscillator ──────────────────────────────────────────────
