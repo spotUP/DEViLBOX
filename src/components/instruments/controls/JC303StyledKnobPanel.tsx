@@ -756,9 +756,8 @@ export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = memo(({
                   <span className="text-[9px] font-bold text-green-400/60 tracking-wider">OVERDRIVE</span>
                   {([
                     { label: 'Amount', key: 'amount', min: 0, max: 100, step: 1, value: config.overdrive?.amount ?? 0, fmt: (v: number) => `${Math.round(v)}%` },
-                    { label: 'Drive', key: 'drive', min: 0, max: 100, step: 1, value: config.overdrive?.drive ?? 0, fmt: (v: number) => `${Math.round(v)}%` },
-                    { label: 'Dry/Wet', key: 'dryWet', min: 0, max: 100, step: 1, value: config.overdrive?.dryWet ?? 0, fmt: (v: number) => `${Math.round(v)}%` },
-                    { label: 'Model', key: 'modelIndex', min: 0, max: 10, step: 1, value: config.overdrive?.modelIndex ?? 0, fmt: (v: number) => `${Math.round(v)}` },
+                    { label: 'Dry/Wet', key: 'dryWet', min: 0, max: 100, step: 1, value: config.overdrive?.dryWet ?? 100, fmt: (v: number) => `${Math.round(v)}%` },
+                    { label: 'Model', key: 'modelIndex', min: 0, max: 1, step: 1, value: config.overdrive?.modelIndex ?? 0, fmt: (v: number) => (v >= 1 ? 'RAT' : 'Soft') },
                   ] as const).map(s => (
                     <div key={s.key} className="flex items-center gap-2">
                       <span className="text-[9px] text-text-secondary w-14 flex-shrink-0">{s.label}</span>

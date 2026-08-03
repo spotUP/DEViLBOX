@@ -6,6 +6,7 @@ import {
   loadWASMAssets,
   type WASMAssetsCache,
 } from '@/engine/wasm/WASMSingletonBase';
+import { tb303OverdriveToParams } from './overdriveParams';
 
 /**
  * DB303 Parameter Names
@@ -77,7 +78,11 @@ const DB303Param = {
   VOLUME: 'volume',
   LFO_WAVEFORM: 'lfoWaveform',
   CHORUS_MODE: 'chorusMode',
-  OVERSAMPLING_ORDER: 'oversamplingOrder'
+  OVERSAMPLING_ORDER: 'oversamplingOrder',
+  // Worklet-side drive stage (not WASM setters — handled in DB303.worklet.js)
+  OVERDRIVE: 'overdrive',
+  OVERDRIVE_MODEL: 'overdriveModel',
+  OVERDRIVE_MIX: 'overdriveMix'
 } as const;
 
 /** Signal chain trace logging — enable via `window.DB303_TRACE = true` in browser console */
@@ -93,11 +98,6 @@ export class DB303Synth implements DevilboxSynth {
   // Shared WASM asset cache (binary + JS glue, keyed per AudioContext).
   private static cache: WASMAssetsCache = createWASMAssetsCache();
 
-  // Native overdrive nodes — created lazily when amount > 0
-  private overdrive: WaveShaperNode | null = null;
-  private overdriveGain: GainNode | null = null;
-  private overdriveAmount: number = 0;
-  
   // Soft limiter to prevent clipping on accents
   private limiter: DynamicsCompressorNode | null = null;
 
@@ -426,6 +426,8 @@ export class DB303Synth implements DevilboxSynth {
       case 'waveform':      this.setWaveform(value); break;
       case 'slideTime':     this.setSlideTime(value); break;
       case 'overdrive':     this.setOverdrive(value); break;
+      case 'overdriveModel': this.setOverdriveModel(value); break;
+      case 'overdriveMix':  this.setOverdriveMix(value); break;
       case 'pulseWidth':    this.setPulseWidth(value); break;
       case 'subOscGain':    this.setSubOscGain(value); break;
       case 'subOscBlend':   this.setSubOscBlend(value); break;
@@ -862,57 +864,23 @@ export class DB303Synth implements DevilboxSynth {
     this.setParameterByName(DB303Param.DELAY_SPREAD, value);
   }
 
-  // --- Missing methods for compatibility ---
+  // --- Drive stage (worklet-side Soft/RAT saturation, port of schwung-303 drive.h) ---
+
+  /** Drive amount, 0-1 normalized. 0 fully bypasses the stage. */
   setOverdrive(amount: number): void {
-    if (this._disposed || !this.workletNode) return;
-    this.overdriveAmount = Math.max(0, Math.min(1, amount));
+    const clamped = Math.max(0, Math.min(1, amount));
+    this.setParameterByName(DB303Param.OVERDRIVE, clamped);
+  }
 
-    const now = this.audioContext.currentTime;
-    const RAMP = 0.03; // 30ms smooth transition
-    
-    // Determine final output node (limiter or direct output)
-    const finalNode = this.limiter || this.output;
+  /** Drive model: 0 = Soft (asymmetric tanh), 1 = RAT (ProCo RAT port). */
+  setOverdriveModel(model: number): void {
+    this.setParameterByName(DB303Param.OVERDRIVE_MODEL, model >= 1 ? 1 : 0);
+  }
 
-    if (this.overdriveAmount > 0) {
-      // Lazy-create native overdrive nodes
-      if (!this.overdrive || !this.overdriveGain) {
-        this.overdriveGain = this.audioContext.createGain();
-        this.overdrive = this.audioContext.createWaveShaper();
-      }
-
-      // Generate tanh distortion curve
-      const curve = new Float32Array(4096);
-      const drive = 1 + this.overdriveAmount * 8;
-      for (let i = 0; i < 4096; i++) {
-        const x = (i / 4096) * 2 - 1;
-        curve[i] = Math.tanh(x * drive) / Math.tanh(drive);
-      }
-      this.overdrive.curve = curve;
-      this.overdriveGain.gain.linearRampToValueAtTime(1 + this.overdriveAmount * 2, now + RAMP);
-
-      // Rewire: worklet → overdriveGain → overdrive → limiter → output
-      try {
-        this.workletNode.disconnect(finalNode);
-      } catch { /* not connected */ }
-      try {
-        this.workletNode.connect(this.overdriveGain);
-        this.overdriveGain.connect(this.overdrive);
-        this.overdrive.connect(finalNode);
-      } catch { /* already connected */ }
-    } else {
-      // Bypass: worklet → limiter → output (or worklet → output if no limiter)
-      if (this.overdrive && this.overdriveGain) {
-        try {
-          this.workletNode.disconnect(this.overdriveGain);
-          this.overdriveGain.disconnect(this.overdrive);
-          this.overdrive.disconnect(finalNode);
-        } catch { /* not connected */ }
-        this.overdriveGain.gain.linearRampToValueAtTime(1, now + RAMP);
-      }
-      try {
-        this.workletNode.connect(finalNode);
-      } catch { /* already connected */ }
-    }
+  /** Drive dry/wet mix, 0-1 normalized. */
+  setOverdriveMix(mix: number): void {
+    const clamped = Math.max(0, Math.min(1, mix));
+    this.setParameterByName(DB303Param.OVERDRIVE_MIX, clamped);
   }
 
   // VEG (Volume Envelope Generator) decay
@@ -1053,9 +1021,12 @@ export class DB303Synth implements DevilboxSynth {
       this.setSlideTime(tb.slide.time);
     }
 
-    // Overdrive (0-1 normalized)
+    // Overdrive — config is 0-100 (%) + modelIndex; worklet takes 0-1
     if (tb.overdrive) {
-      this.setOverdrive(tb.overdrive.amount);
+      const od = tb303OverdriveToParams(tb.overdrive);
+      this.setOverdrive(od.amount);
+      this.setOverdriveModel(od.model);
+      this.setOverdriveMix(od.mix);
     }
 
     // --- Oscillator ---
@@ -1203,14 +1174,6 @@ export class DB303Synth implements DevilboxSynth {
     if (this.workletNode) {
       this.workletNode.disconnect();
       this.workletNode = null;
-    }
-    if (this.overdrive) {
-      this.overdrive.disconnect();
-      this.overdrive = null;
-    }
-    if (this.overdriveGain) {
-      this.overdriveGain.disconnect();
-      this.overdriveGain = null;
     }
     if (this.limiter) {
       this.limiter.disconnect();
