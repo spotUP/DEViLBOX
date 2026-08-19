@@ -230,165 +230,120 @@ export function parseLPCFramesFromPosition(romData: Uint8Array, startBit: number
 }
 
 /**
- * Full Speak & Spell (US) vocabulary list.
- * Letters A-Z followed by ~200 spelling words from the 1978-1980 US models.
- * Order matches the VSM ROM address table layout.
+ * The Speak & Spell VSM directory.
+ *
+ * The ROM is self-describing; nothing has to be guessed, and nothing has to be read out
+ * of the MCU. Layout (confirmed against the ti_lpc reference implementation and by
+ * decoding the shipped ROM):
+ *
+ *   byte 0-3     entry-byte count of each of the four spelling lists
+ *   byte 4-11    16-bit LE start address of each of the four spelling lists
+ *   byte 0x0C..  the system phrase table: one 16-bit LE address per entry
+ *   list entries each word: 6-bit ASCII spelling (bit 0x40 marks the last letter)
+ *                followed by the 16-bit LE address of its LPC recording
+ *
+ * The catch that made entries past the prompts play as noise: part of the system table
+ * is INDIRECT. Those slots hold the address of a slot that holds the recording address,
+ * so reading them as recording addresses lands in the middle of unrelated speech data.
  */
-export const SPEAK_AND_SPELL_VOCABULARY: string[] = [
-  // Letters A-Z (first 26 entries in the ROM address table)
-  'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M',
-  'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z',
-  // Vocabulary words (alphabetical as stored in the ROM)
-  'ABOUT', 'AFTER', 'AGAIN', 'ANSWER', 'BEAUTY', 'BETWEEN', 'BOY', 'BUILT',
-  'BUSY', 'BUY', 'CEILING', 'CIRCLE', 'CLOWN', 'COME', 'COULD', 'COUNTRY',
-  'COUSIN', 'DOES', 'DOUBLE', 'ENOUGH', 'EVER', 'EYE', 'FRIEND', 'FROM',
-  'GHOST', 'GIRL', 'GOES', 'GONE', 'GOOD', 'GREAT', 'GUARD', 'GUESS',
-  'GYM', 'HALF', 'HAVE', 'HEART', 'HERE', 'HIDDEN', 'HOUR', 'IDEA',
-  'ISLE', 'JOIN', 'KEY', 'KNOW', 'LAUGH', 'LEARN', 'LISTEN', 'LOVE',
-  'MACHINE', 'MANY', 'MEANT', 'MOVE', 'NONE', 'OCEAN', 'OF', 'ONE',
-  'ONLY', 'OTHER', 'OVEN', 'OUTSIDE', 'PEOPLE', 'PERIOD', 'PHONE', 'PIECE',
-  'PRETTY', 'PROMISE', 'PSYCHOLOGY', 'QUIET', 'READY', 'RIGHT', 'ROUGH',
-  'SAID', 'SAYS', 'SCHOOL', 'SCIENCE', 'SCISSORS', 'SECRET', 'SHOULD',
-  'SIGN', 'SOME', 'SPECIAL', 'SQUARE', 'STRAIGHT', 'SUGAR', 'SURE',
-  'THEIR', 'THERE', 'THEY', 'THOUGH', 'THOUGHT', 'THROUGH', 'TOGETHER',
-  'TROUBLE', 'TWO', 'UPON', 'USUAL', 'VERY', 'WAS', 'WATCH', 'WATER',
-  'WEAR', 'WEIRD', 'WHAT', 'WHERE', 'WHO', 'WOMEN', 'WON', 'WORD',
-  'WORK', 'WOULD', 'WRITE', 'WRONG', 'YOU', 'YOUR', 'ZERO',
+interface SystemEntry {
+  name: string;
+  indirect: boolean;
+}
+
+const SYSTEM_TABLE_START = 0x0c;
+
+const SYSTEM_ENTRIES: SystemEntry[] = [
+  ...'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').map(name => ({ name, indirect: false })),
+  { name: '(beep)', indirect: false },
+  ...['ZERO', 'ONE', 'TWO', 'THREE', 'FOUR', 'FIVE', 'SIX', 'SEVEN', 'EIGHT', 'NINE', 'TEN']
+    .map(name => ({ name, indirect: false })),
+  { name: '"that is correct"', indirect: false },
+  { name: '"you are correct"', indirect: false },
+  { name: '"that is right"', indirect: false },
+  { name: '"you are right"', indirect: false },
+  { name: '"wrong"', indirect: true },
+  { name: '"that is incorrect"', indirect: true },
+  { name: '"spell"', indirect: true },
+  { name: '"now spell"', indirect: true },
+  { name: '"next spell"', indirect: true },
+  { name: '"now try"', indirect: true },
+  { name: '"try"', indirect: true },
+  { name: '"say it"', indirect: false },
+  { name: '"I win"', indirect: false },
+  { name: '"you win"', indirect: false },
+  { name: '"here is your score"', indirect: true },
+  { name: '"perfect score"', indirect: false },
+  { name: '(tones 1)', indirect: false },
+  { name: '(tones 2)', indirect: false },
+  { name: '(tones 3)', indirect: false },
+  { name: '(tones 4)', indirect: false },
 ];
 
-/**
- * Build word table by parsing the VSM ROM address table.
- *
- * The VSM ROM begins with a table of 16-bit little-endian byte addresses
- * used by the TMS6100 Read-and-Branch protocol. Each address has:
- * - Bits 13-0: byte address within a 16KB VSM chip
- * - Bits 15-14: chip select (0=first chip, 1=second chip)
- *
- * The MCU ROM parameter is reserved for future cross-referencing;
- * the primary address data is extracted from the VSM ROM itself.
- *
- * @param _mcuRom - MCU ROM data (reserved, not currently used)
- * @param vsmRom - Combined VSM ROM data (TMC0351 + TMC0352, 32KB)
- */
-export function buildWordTableFromMCU(_mcuRom: Uint8Array, vsmRom: Uint8Array): VSMWord[] {
-  const totalBytes = vsmRom.length;
-  const words: VSMWord[] = [];
+const SPELLING_LIST_COUNT = 4;
+const LETTER_BASE = 0x41;      // spelling bytes are ASCII minus 'A', six bits wide
+const LAST_LETTER_FLAG = 0x40; // set on the final letter of a spelling
+const MAX_SPELLING_LENGTH = 12;
 
-  // Scan the beginning of the VSM ROM for the address table.
-  // Read 16-bit LE values and convert to combined byte offsets.
-  // Each entry is a 14-bit byte address + 2-bit chip select.
-  // Allow gaps (some entries may point to invalid data) — only stop after
-  // several consecutive invalid entries.
-  const maxTableBytes = Math.min(1024, totalBytes);
-  const addresses: Array<{ byteOffset: number; tableOffset: number }> = [];
-  let consecutiveInvalid = 0;
+/** Read a 16-bit little-endian value. */
+function readAddress(rom: Uint8Array, at: number): number {
+  return rom[at] | (rom[at + 1] << 8);
+}
 
-  for (let off = 0; off < maxTableBytes; off += 2) {
-    const raw = vsmRom[off] | (vsmRom[off + 1] << 8);
-    const chip = (raw >> 14) & 3;
-    const addr = raw & 0x3FFF;
-    const combinedByte = chip * 16384 + addr;
-
-    if (combinedByte >= totalBytes) {
-      consecutiveInvalid++;
-      if (consecutiveInvalid > 5) break;
-      continue;
-    }
-
-    // Validate: try to parse LPC frames at this byte address
-    const frames = parseLPCFramesFromPosition(vsmRom, combinedByte * 8);
-    // A valid word needs 3+ frames and should end with a stop frame
-    const hasStop = frames.length > 0 && frames[frames.length - 1].energy === 15;
-    if (frames.length >= 3 || (frames.length >= 1 && hasStop)) {
-      addresses.push({ byteOffset: combinedByte, tableOffset: off });
-      consecutiveInvalid = 0;
-    } else {
-      consecutiveInvalid++;
-      if (addresses.length > 20 && consecutiveInvalid > 5) {
-        // After finding many valid entries, 5+ consecutive failures = table end
-        break;
-      }
+/** Decode one spelling-list entry: its spelled name and the address of its recording. */
+function readSpellingEntry(rom: Uint8Array, wordPointer: number): { name: string; address: number } | null {
+  let name = '';
+  for (let i = 0; i < MAX_SPELLING_LENGTH; i++) {
+    const byte = rom[wordPointer + i];
+    if (byte === undefined) return null;
+    const code = (byte & 0x3f) + LETTER_BASE;
+    // 'A' + 0x1a lands on '[', which the ROM uses for the apostrophe in COULDN'T.
+    name += String.fromCharCode(code === 0x5b ? 0x27 : code);
+    if (byte & LAST_LETTER_FLAG) {
+      return { name, address: readAddress(rom, wordPointer + i + 1) };
     }
   }
-
-  // Detect header/metadata entries at the start of the address table.
-  // The ROM typically has: far-off pointers (module headers), then system
-  // prompts (e.g. "say it", "try again"), then the actual A-Z letters +
-  // vocabulary words. We detect these in two phases:
-  //
-  // Phase 1: Skip entries with non-monotonic addresses (far-off pointers).
-  // Phase 2: Among the remaining entries, find the largest byte-address gap
-  //          in the first ~15 entries. The Speak & Spell stores system prompts
-  //          contiguously near the ROM start, then letters A-Z in a separate
-  //          region — creating a large gap between the two groups.
-  let skipCount = 0;
-  if (addresses.length > 15) {
-    // Phase 1: find where addresses become monotonically increasing
-    const RUN_LENGTH = 10;
-    for (let start = 0; start <= Math.min(10, addresses.length - RUN_LENGTH); start++) {
-      let increasing = true;
-      for (let j = start; j < start + RUN_LENGTH - 1; j++) {
-        if (addresses[j + 1].byteOffset <= addresses[j].byteOffset) {
-          increasing = false;
-          break;
-        }
-      }
-      if (increasing) {
-        skipCount = start;
-        break;
-      }
-    }
-
-    // Phase 2: detect system prompts before the actual letter recordings.
-    // Look for the largest byte-address gap among the first entries —
-    // this separates system prompts (near ROM start) from letter data.
-    const searchEnd = Math.min(skipCount + 15, addresses.length - 1);
-    let maxGap = 0;
-    let maxGapIdx = skipCount;
-    const gaps: number[] = [];
-
-    for (let i = skipCount; i < searchEnd; i++) {
-      const gap = addresses[i + 1].byteOffset - addresses[i].byteOffset;
-      gaps.push(gap);
-      if (gap > maxGap) {
-        maxGap = gap;
-        maxGapIdx = i + 1;
-      }
-    }
-
-    if (gaps.length > 3) {
-      const sorted = [...gaps].sort((a, b) => a - b);
-      const median = sorted[Math.floor(sorted.length / 2)];
-      if (maxGap > median * 3 && maxGapIdx > skipCount) {
-        skipCount = maxGapIdx;
-      }
-    }
-  }
-
-  if (skipCount > 0) {
-    console.log(`[VSMROMParser] Skipping ${skipCount} header/prompt entries → letter "A" at entry [${skipCount}] byte ${addresses[skipCount]?.byteOffset}`);
-  }
-
-  // Name words from the vocabulary list, skipping header entries
-  for (let i = skipCount; i < addresses.length; i++) {
-    const vocabIdx = i - skipCount;
-    const name = vocabIdx < SPEAK_AND_SPELL_VOCABULARY.length
-      ? SPEAK_AND_SPELL_VOCABULARY[vocabIdx]
-      : `Word ${vocabIdx}`;
-    const startBit = addresses[i].byteOffset * 8;
-    const frames = parseLPCFramesFromPosition(vsmRom, startBit);
-    words.push({ name, startBit, frames });
-  }
-
-  return words;
+  return null;
 }
 
 /**
- * @deprecated Use buildWordTableFromMCU or scanVSMForWords instead.
- * Kept for backwards compatibility.
+ * Read every recording the ROM declares: the system phrases first (letters, digits and
+ * spoken prompts, in hardware order), then the four spelling lists with their real names.
  */
-export const SPEAK_AND_SPELL_WORDS: Array<{ name: string; offset: number }> =
-  SPEAK_AND_SPELL_VOCABULARY.slice(0, 26).map((name, i) => ({
-    name,
-    offset: 0x0010 + i * 0x0090, // Approximate offsets for A-Z
-  }));
+export function parseVSMDirectory(vsmRom: Uint8Array): VSMWord[] {
+  const words: VSMWord[] = [];
+  const inRom = (address: number) => address > 0 && address < vsmRom.length;
+
+  SYSTEM_ENTRIES.forEach((entry, index) => {
+    const slot = SYSTEM_TABLE_START + index * 2;
+    if (slot + 1 >= vsmRom.length) return;
+    let address = readAddress(vsmRom, slot);
+    if (entry.indirect) {
+      if (!inRom(address)) return;
+      address = readAddress(vsmRom, address);
+    }
+    if (!inRom(address)) return;
+    words.push({ name: entry.name, startBit: address * 8, frames: parseLPCFramesFromPosition(vsmRom, address * 8) });
+  });
+
+  for (let list = 0; list < SPELLING_LIST_COUNT; list++) {
+    const entryBytes = vsmRom[list];
+    const listAddress = readAddress(vsmRom, 4 + list * 2);
+    if (!inRom(listAddress)) continue;
+    for (let offset = 0; offset < entryBytes; offset += 2) {
+      const wordPointer = readAddress(vsmRom, listAddress + offset);
+      if (!inRom(wordPointer)) continue;
+      const entry = readSpellingEntry(vsmRom, wordPointer);
+      if (!entry || !inRom(entry.address)) continue;
+      words.push({
+        name: entry.name,
+        startBit: entry.address * 8,
+        frames: parseLPCFramesFromPosition(vsmRom, entry.address * 8),
+      });
+    }
+  }
+
+  console.log(`[VSMROMParser] Directory: ${words.length} recordings (${SYSTEM_ENTRIES.length} system entries + spelling lists)`);
+  return words;
+}
+

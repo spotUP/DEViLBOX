@@ -2,10 +2,9 @@
 import { MAMEBaseSynth } from '@engine/mame/MAMEBaseSynth';
 import { textToPhonemes, parsePhonemeString } from '@engine/speech/Reciter';
 import { type TMS5220Frame, phonemesToTMS5220Frames, samToTMS5220 } from '@engine/speech/tms5220PhonemeMap';
-import { type VSMWord, buildWordTableFromMCU, scanVSMForWords } from '@engine/speech/VSMROMParser';
+import { type VSMWord, parseVSMDirectory, scanVSMForWords } from '@engine/speech/VSMROMParser';
 import { extractPhonemeLibrary, buildFramesFromROMLibrary } from '@engine/speech/ROMPhonemeExtractor';
 import { loadTMS5220ROMs } from '@engine/mame/MAMEROMLoader';
-import { normalizeUrl } from '@/utils/urlUtils';
 import { SpeechChain } from '@engine/speech/SpeechChain';
 
 /**
@@ -15,6 +14,7 @@ import { SpeechChain } from '@engine/speech/SpeechChain';
  */
 const _romWordRegistry = new Map<string, string[]>();
 let _romWordVersion = 0;
+const _romWordListeners = new Set<() => void>();
 
 export function getRomWordNames(chipName: string): string[] | undefined {
   return _romWordRegistry.get(chipName);
@@ -22,6 +22,19 @@ export function getRomWordNames(chipName: string): string[] | undefined {
 
 export function getRomWordVersion(): number {
   return _romWordVersion;
+}
+
+/**
+ * Subscribe to ROM word table changes, for useSyncExternalStore.
+ *
+ * ROMs load asynchronously well after the editor first renders, so a component that
+ * merely reads getRomWordNames() at mount sees nothing and falls back to the static
+ * option list in chipParameters.ts — which is where the wrong dropdown labels came
+ * from. This lets the UI re-read once the real table exists.
+ */
+export function subscribeRomWords(listener: () => void): () => void {
+  _romWordListeners.add(listener);
+  return () => { _romWordListeners.delete(listener); };
 }
 
 const TMS5220Param = {
@@ -43,6 +56,7 @@ const TMS5220Param = {
   K9_INDEX: 15,
   K10_INDEX: 16,
   SPEECH_PITCH_OFFSET: 17,
+  CABINET: 18,
 } as const;
 
 /**
@@ -142,15 +156,10 @@ export class TMS5220Synth extends MAMEBaseSynth {
         return;
       }
 
-      // Try to build word table from VSM ROM address table
-      try {
-        const mcuResponse = await fetch(normalizeUrl('/roms/snspell/tmc0271h-n2l'));
-        if (!mcuResponse.ok) throw new Error(`MCU ROM not found (${mcuResponse.status})`);
-        const mcuBuffer = await mcuResponse.arrayBuffer();
-        this._romWords = buildWordTableFromMCU(new Uint8Array(mcuBuffer), this._romData);
-        console.log(`[TMS5220] Built word table from ROM: ${this._romWords.length} words`);
-      } catch {
-        // Fall back to heuristic scanning
+      // The VSM carries its own directory: system phrases plus four spelling lists.
+      this._romWords = parseVSMDirectory(this._romData);
+      if (this._romWords.length < 26) {
+        // Not a Speak & Spell VSM — fall back to heuristic scanning.
         this._romWords = scanVSMForWords(this._romData);
         console.log(`[TMS5220] Heuristic scan: ${this._romWords.length} words found`);
       }
@@ -203,6 +212,7 @@ export class TMS5220Synth extends MAMEBaseSynth {
     if (this._romWords.length === 0) return;
     _romWordRegistry.set(this.chipName, this._romWords.map(w => w.name));
     _romWordVersion++;
+    for (const listener of _romWordListeners) listener();
   }
 
   /** Override message handler to send ROM when WASM is ready */
@@ -357,6 +367,16 @@ export class TMS5220Synth extends MAMEBaseSynth {
   speakText(text: string): void {
     if (!this._isReady || !this.workletNode) {
       this._pendingCalls.push({ method: 'speakText', args: [text] });
+      return;
+    }
+
+    // A ROM word selected in the ROM Speech list takes precedence: the list labels 0
+    // as "(Text-to-Speech)", so a non-zero selection means "play this recording".
+    // Without this the editor could select a word but never audition it — Speak always
+    // read the text field, and the only other way to hear a ROM word was a note-on.
+    if (this._currentRomSpeech > 0 && this._romSentToWasm) {
+      this.stopSpeaking();
+      this.speakWord(this._currentRomSpeech - 1);
       return;
     }
 
@@ -675,6 +695,7 @@ export class TMS5220Synth extends MAMEBaseSynth {
       noise_mode: TMS5220Param.NOISE_MODE,
       stereo_width: TMS5220Param.STEREO_WIDTH,
       brightness: TMS5220Param.BRIGHTNESS,
+      cabinet: TMS5220Param.CABINET,
     };
 
     const paramId = paramMap[param];
