@@ -241,6 +241,39 @@ static const PhonemePreset phoneme_presets[8] = {
 // ============================================================================
 // Main TMS5220 Synth Class
 // ============================================================================
+/**
+ * Two-pole Butterworth lowpass. Band-limits the 8 kHz chip output when it is
+ * interpolated up to the host sample rate: without it the reconstruction images land
+ * in the ear's most sensitive region and make speech sound thin and nasal.
+ */
+class Biquad {
+public:
+    void setLowpass(double cutoffHz, double sampleRate) {
+        if (sampleRate <= 0.0) return;
+        const double fc = std::min(cutoffHz, sampleRate * 0.45);
+        const double w0 = 2.0 * 3.14159265358979323846 * fc / sampleRate;
+        const double cosw0 = std::cos(w0);
+        const double alpha = std::sin(w0) / (2.0 * 0.70710678118654752440); // Q = 1/sqrt(2)
+        const double b0 = (1.0 - cosw0) * 0.5, b1 = 1.0 - cosw0, b2 = (1.0 - cosw0) * 0.5;
+        const double a0 = 1.0 + alpha, a1 = -2.0 * cosw0, a2 = 1.0 - alpha;
+        b0_ = (float)(b0 / a0); b1_ = (float)(b1 / a0); b2_ = (float)(b2 / a0);
+        a1_ = (float)(a1 / a0); a2_ = (float)(a2 / a0);
+    }
+
+    void reset() { x1_ = x2_ = y1_ = y2_ = 0.0f; }
+
+    float process(float x) {
+        const float y = b0_ * x + b1_ * x1_ + b2_ * x2_ - a1_ * y1_ - a2_ * y2_;
+        x2_ = x1_; x1_ = x;
+        y2_ = y1_; y1_ = y;
+        return y;
+    }
+
+private:
+    float b0_ = 1.0f, b1_ = 0.0f, b2_ = 0.0f, a1_ = 0.0f, a2_ = 0.0f;
+    float x1_ = 0.0f, x2_ = 0.0f, y1_ = 0.0f, y2_ = 0.0f;
+};
+
 class TMS5220Synth {
 public:
     static constexpr int NUM_VOICES = 4;
@@ -266,13 +299,21 @@ public:
     void initialize(float sampleRate) {
         sampleRate_ = sampleRate;
         rateRatio_ = (double)INTERNAL_RATE / sampleRate;
+        // The TMS voice band tops out around 3.4 kHz; everything above that in the
+        // upsampled signal is reconstruction image, not speech.
+        for (auto& stage : speechLowpass_) {
+            stage.setLowpass(3400.0, sampleRate);
+            stage.reset();
+        }
         volume_ = 0.8f;
         stereoWidth_ = 0.5f;
         brightness_ = 1.0f;
         currentPreset_ = 0;
         pitchBendFactor_ = 1.0f;
         speechPhaseAcc_ = 0.0;
-        lastSpeechSample_ = 0;
+        prevSpeechSample_ = 0.0f;
+        nextSpeechSample_ = 0.0f;
+        for (auto& stage : speechLowpass_) stage.reset();
 
         // Reset parameter overrides (no overrides by default)
         for (int i = 0; i < NUM_K; i++) {
@@ -345,7 +386,9 @@ public:
 
         // Phase accumulator for rate conversion
         speechPhaseAcc_ = 0.0;
-        lastSpeechSample_ = 0;
+        prevSpeechSample_ = 0.0f;
+        nextSpeechSample_ = 0.0f;
+        for (auto& stage : speechLowpass_) stage.reset();
 
         speech_active_ = true;
     }
@@ -417,7 +460,9 @@ public:
         memset(new_frame_k_idx_, 0, sizeof(new_frame_k_idx_));
 
         speechPhaseAcc_ = 0.0;
-        lastSpeechSample_ = 0;
+        prevSpeechSample_ = 0.0f;
+        nextSpeechSample_ = 0.0f;
+        for (auto& stage : speechLowpass_) stage.reset();
 
         speech_active_ = true;
     }
@@ -673,20 +718,32 @@ public:
         float* outR = reinterpret_cast<float*>(outputPtrR);
 
         if (speech_active_) {
-            // ROM speech mode: MAME-accurate mono output
+            // ROM speech mode: MAME-accurate mono output, band-limited to host rate.
+            //
+            // The chip runs at 8 kHz; the host is typically 44.1/48 kHz. The previous
+            // code overwrote lastSpeechSample_ on EVERY output sample, so both
+            // interpolation endpoints held the same value except on the ~1-in-5.5
+            // samples that generated a new chip sample: sample-and-hold in disguise.
+            // Its images at 8k+-f and 16k+-f are inharmonic and read as a thin, edgy,
+            // "nasal" voice. ti_lpc, the reference implementation, renders at 8 kHz
+            // and converts with a windowed-sinc FIR for exactly this reason.
             for (int i = 0; i < numSamples; i++) {
                 speechPhaseAcc_ += rateRatio_;
-                float sample = lastSpeechSample_;
 
                 while (speechPhaseAcc_ >= 1.0) {
                     speechPhaseAcc_ -= 1.0;
-                    sample = generateSpeechSample();
+                    prevSpeechSample_ = nextSpeechSample_;
+                    nextSpeechSample_ = generateSpeechSample();
                 }
 
-                // Simple interpolation
-                float interp = lastSpeechSample_ + (sample - lastSpeechSample_) * (float)speechPhaseAcc_;
-                lastSpeechSample_ = sample;
+                // True linear interpolation across the whole gap between chip samples.
+                const float frac = (float)speechPhaseAcc_;
+                float interp = prevSpeechSample_ + (nextSpeechSample_ - prevSpeechSample_) * frac;
 
+                // Remove what linear interpolation leaves behind. The chip's own voice
+                // band tops out near 3.4 kHz, so anything above that is reconstruction
+                // image rather than speech.
+                for (auto& stage : speechLowpass_) interp = stage.process(interp);
                 float out = interp * volume_;
                 outL[i] = out;
                 outR[i] = out;
@@ -1197,6 +1254,16 @@ private:
     // Global parameters
     float sampleRate_ = 44100.0f;
     double rateRatio_ = 0.0;
+    /** Two consecutive chip samples bracketing the current output position. */
+    float prevSpeechSample_ = 0.0f;
+    float nextSpeechSample_ = 0.0f;
+    /**
+     * Reconstruction filter for the 8 kHz -> host-rate conversion. Three cascaded
+     * biquads (6th order): the first image of a 1 kHz component sits at 7 kHz, barely
+     * an octave above cutoff, so a single 12 dB/octave section leaves most of it
+     * audible.
+     */
+    Biquad speechLowpass_[3];
     float volume_ = 0.8f;
     float stereoWidth_ = 0.5f;
     float brightness_ = 1.0f;
