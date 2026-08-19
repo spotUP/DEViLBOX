@@ -2305,6 +2305,9 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
           vizMode={vizMode}
           onVizModeChange={setVizMode}
           showHelpButton={false}
+          // The MAME synths render their own scope (MAMEOscilloscope) or a hardware UI.
+          // The shared header analyser reads zero for this engine, so its row is dead pixels.
+          hideVisualization={true}
           customHeaderControls={
             hasHardware ? (
               <button
