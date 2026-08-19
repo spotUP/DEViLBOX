@@ -17,7 +17,11 @@ set -uo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 UADE_SRC="$HERE/../../third-party/uade-3.05"
 TARGET="${1:-$UADE_SRC/src/audiodevice.c}"
-BIN="$(mktemp -t audiodevice_harness)"
+# mktemp -t differs between GNU (needs a XXXXXX template) and BSD (takes a bare
+# prefix); mktemp -d takes neither, so use a temp directory on both.
+WORKDIR="$(mktemp -d)"
+BIN="$WORKDIR/harness"
+trap 'rm -rf "$WORKDIR"' EXIT
 
 CASES=(
     write_no_channel
@@ -71,8 +75,6 @@ for name in "${CASES[@]}"; do
         failures=$((failures + 1))
     fi
 done
-
-rm -f "$BIN"
 
 if [ $failures -ne 0 ]; then
     echo "$failures/${#CASES[@]} audio.device safety cases failed" >&2
