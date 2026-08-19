@@ -226,3 +226,67 @@ Pre-existing dirt NOT ours: `.serena/project.yml`, `src/generated/*`, submodule 
   add sub-300 Hz because the source has none.
 - Do not re-attempt ROM phoneme mining without solving segmentation properly. The payoff
   is real (41 phonemes vs 16) but proportional splitting produced unusable audio.
+
+---
+
+## 8. Session 2 (2026-08-20) — the 44-199 mystery, solved
+
+### What the ROM actually is
+The bit-alignment test in step 2 came back negative: offset 0 wins 122 entries and the
+other seven offsets score 82-109 each, which is the noise floor. Recordings are byte
+addressed. The table was the problem, not the addressing.
+
+`ti_lpc`'s `build_rom_word_addr_list()` (`~/Downloads/ti_lpc-1.04/ti_lpc.cpp:6327`) reads
+the VSM as a self-describing directory, and the shipped ROM decodes cleanly under it:
+
+```
+byte 0-3     entry-byte count of each of the four spelling lists
+byte 4-11    start address of each of those lists      <- NOT recordings
+byte 0x0C..  the system phrase table, one address per entry
+list entry   6-bit ASCII spelling (bit 0x40 = last letter), then the LPC address
+```
+
+The 4 "pre-letter entries" (130, 228, 326, 448) previously skipped are the four spelling
+list pointers. And part of the system table is INDIRECT — "wrong", "that is incorrect",
+"spell", "now spell", "next spell", "now try", "try" and "here is your score" hold the
+address of a slot that holds the recording address. Reading those as recording addresses
+lands mid-word in unrelated speech, which is exactly the chirping the 43rd entry played,
+and every entry after it was shifted onto spelling-list bytes.
+
+Result: **175 recordings with real names** — 58 system entries plus the 117 spelled
+vocabulary words (COLOR, ISLE, ANGEL, QUESTION, COULDN'T, RHYTHM, ...) — replacing 239
+entries of which 40 decoded straight past their neighbour. The MCU ROM is not fetched any
+more; it never held the table.
+
+`vsmWordTable.test.ts` is rewritten against the real structure and wired into `test:ci`.
+Its overrun check is the discriminator: the old table failed it 40 times, the directory
+passes for every entry.
+
+### Also done
+- Header `VisualizationRow` suppressed for the MAME editors (`SynthTypeDispatcher.tsx`),
+  keeping `MAMEOscilloscope` — the measured-live one.
+- `.github/workflows/mame-chips.yml` + `tools/mame-wasm-staleness.py`: every chip is now
+  compiled from committed sources on CI, and a source change without an artifact rebuild
+  fails the build. No byte-diff of the wasm — emcc -O3 is not reproducible across
+  toolchains, so that gate would go red on emsdk bumps instead of on staleness.
+- `mame-wasm/ymopq/CMakeLists.txt` resolved `ymfm` and its output directory relative to
+  its own directory, so `emcmake cmake -S mame-wasm` failed to configure at all. Fixed;
+  the aggregate project builds.
+
+### New finding — two dead chips
+MSM5232 and TIA have sources, a CMake target, chip parameters and a slot in the instrument
+picker, but no worklet glue, no engine class and no committed wasm. Selecting either falls
+through `InstrumentFactory`'s default branch to a plain Tone.js synth with a console
+warning. Their wasm builds fine (parked at the session scratchpad, not committed — an
+artifact nothing can load is not worth shipping). Wiring them is real work:
+`MSM5232Synth.ts` / `TIASynth.ts`, the worklet glue, factory and `ToneEngine` cases.
+
+### Still open
+1. **The listening test** (was step 3): play entry 1 ("A") and a spelling word such as
+   COLOR. If ROM words sound right, the remaining pitch work belongs in the phoneme
+   frames; if they also sound high, the decode path is at fault. Needs a page reload —
+   HMR left the tab's audio graph on a stale AudioContext.
+2. **The squash decision** on `d3beb83f9` + `dd9f214db`, then push (8 commits + the
+   working tree).
+3. Working tree still carries the cabinet stage (cpp + wasm), the `MAMEBaseSynth.set()`
+   delegation and the phoneme pitch retarget, all type-checked, none committed.
