@@ -3,6 +3,7 @@ import { MAMEBaseSynth } from '@engine/mame/MAMEBaseSynth';
 import { textToPhonemes, parsePhonemeString } from '@engine/speech/Reciter';
 import { type TMS5220Frame, phonemesToTMS5220Frames, samToTMS5220 } from '@engine/speech/tms5220PhonemeMap';
 import { type VSMWord, parseVSMDirectory, scanVSMForWords } from '@engine/speech/VSMROMParser';
+import { shouldAuditionRomSelection } from '@engine/speech/romSpeechRouting';
 import { extractPhonemeLibrary, buildFramesFromROMLibrary } from '@engine/speech/ROMPhonemeExtractor';
 import { loadTMS5220ROMs } from '@engine/mame/MAMEROMLoader';
 import { SpeechChain } from '@engine/speech/SpeechChain';
@@ -134,6 +135,7 @@ export class TMS5220Synth extends MAMEBaseSynth {
   private _singMode = true;  // When true, MIDI note shifts speech pitch
   private _speechText = 'HELLO WORLD';
   private _currentRomSpeech = 0;  // 0 = TTS mode, 1+ = ROM word index + 1
+  private _romSpeechRestored = false; // first romSpeech write is the stored value, not a pick
 
   // Vowel sequence state
   private _vowelSequence: string[] = [];
@@ -367,16 +369,6 @@ export class TMS5220Synth extends MAMEBaseSynth {
   speakText(text: string): void {
     if (!this._isReady || !this.workletNode) {
       this._pendingCalls.push({ method: 'speakText', args: [text] });
-      return;
-    }
-
-    // A ROM word selected in the ROM Speech list takes precedence: the list labels 0
-    // as "(Text-to-Speech)", so a non-zero selection means "play this recording".
-    // Without this the editor could select a word but never audition it — Speak always
-    // read the text field, and the only other way to hear a ROM word was a note-on.
-    if (this._currentRomSpeech > 0 && this._romSentToWasm) {
-      this.stopSpeaking();
-      this.speakWord(this._currentRomSpeech - 1);
       return;
     }
 
@@ -708,7 +700,26 @@ export class TMS5220Synth extends MAMEBaseSynth {
     if (param === 'energy_index') this._speechEnergyIndex = value;
     if (param === 'sing_mode') this._singMode = value >= 1;
     if (param === 'vowelLoopSingle') this._vowelLoopSingle = value >= 1;
-    if (param === 'romSpeech') this._currentRomSpeech = Math.round(value);
+    if (param === 'romSpeech') {
+      const selection = Math.round(value);
+      const previous = this._currentRomSpeech;
+      this._currentRomSpeech = selection;
+      // Auditioning belongs to the list, not to the Speak button: giving a stale list
+      // selection precedence over the text field left typed text unspeakable until the
+      // list was set back to "(Text-to-Speech)". The first application after load is the
+      // stored value being restored, so it stays silent; later changes are the user
+      // picking a word and are played straight away.
+      if (shouldAuditionRomSelection({
+        previous,
+        next: selection,
+        romReady: this._romSentToWasm,
+        restored: this._romSpeechRestored,
+      })) {
+        this.stopSpeaking();
+        this.speakWord(selection - 1);
+      }
+      this._romSpeechRestored = true;
+    }
   }
 
   /** Store speech text for use in Speech mode noteOn */
