@@ -6,6 +6,7 @@ import { type VSMWord, buildWordTableFromMCU, scanVSMForWords } from '@engine/sp
 import { extractPhonemeLibrary, buildFramesFromROMLibrary } from '@engine/speech/ROMPhonemeExtractor';
 import { loadTMS5220ROMs } from '@engine/mame/MAMEROMLoader';
 import { normalizeUrl } from '@/utils/urlUtils';
+import { SpeechChain } from '@engine/speech/SpeechChain';
 
 /**
  * Global registry for ROM word names — avoids instrument store updates
@@ -105,6 +106,12 @@ export class TMS5220Synth extends MAMEBaseSynth {
   private _speakingChain: (() => void) | null = null;
   private _phonemeSpeechActive = false;
   private _phonemeSpeechTimer: ReturnType<typeof setTimeout> | null = null;
+  /**
+   * Guards multi-word playback. `_speakingChain` alone cannot distinguish "no chain"
+   * from "a NEWER chain", so a pending timer from the previous utterance used to
+   * resume the old word list on top of the new one — two voices at once.
+   */
+  private _chain = new SpeechChain();
 
   // Speech parameter state (applied as offsets to TTS frames)
   private _speechPitchIndex = 32;   // default center (chipParameters default)
@@ -363,10 +370,26 @@ export class TMS5220Synth extends MAMEBaseSynth {
     this._speakPhonemeText(text);
   }
 
+  /**
+   * Schedule the next step of a word chain, tagged with the generation the chain
+   * started in. Stale steps are dropped instead of playing over the new utterance.
+   */
+  private _scheduleChainStep(generation: number, step: () => void, delayMs: number): void {
+    this._chain.schedule(generation, step, delayMs);
+  }
+
+  /** Begin a new utterance: invalidates every pending step of the previous one. */
+  private _beginChain(): number {
+    this.stopSpeaking();
+    return this._chain.begin();
+  }
+
   /** Stop current speech playback */
   stopSpeaking(): void {
     this._speakingChain = null;
     this._phonemeSpeechActive = false;
+    // Invalidate in-flight chain steps and drop their timers.
+    this._chain.cancel();
     if (this._phonemeSpeechTimer !== null) {
       clearTimeout(this._phonemeSpeechTimer);
       this._phonemeSpeechTimer = null;
@@ -389,13 +412,13 @@ export class TMS5220Synth extends MAMEBaseSynth {
 
   /** Spell out text letter-by-letter using authentic ROM recordings */
   spellText(text: string): void {
-    this.stopSpeaking();
+    const generation = this._beginChain();
     const letters = text.toUpperCase().split('').filter(c => /[A-Z]/.test(c));
     if (letters.length === 0) return;
 
     let idx = 0;
     const playNext = () => {
-      if (idx >= letters.length || !this._speakingChain) return;
+      if (idx >= letters.length || !this._chain.isCurrent(generation)) return;
       const wordIdx = this._romWords.findIndex(w => w.name === letters[idx]);
       idx++;
       if (wordIdx >= 0) {
@@ -403,9 +426,9 @@ export class TMS5220Synth extends MAMEBaseSynth {
         // Wait for word duration (~25ms * frames) then play next
         const word = this._romWords[wordIdx];
         const durationMs = word.frames.length * 25 + 100;
-        setTimeout(playNext, durationMs);
+        this._scheduleChainStep(generation, playNext, durationMs);
       } else {
-        setTimeout(playNext, 300);
+        this._scheduleChainStep(generation, playNext, 300);
       }
     };
     this._speakingChain = playNext;
@@ -421,7 +444,7 @@ export class TMS5220Synth extends MAMEBaseSynth {
    * the ROM version, so we route those through the phoneme pipeline instead.
    */
   speakTextHybrid(text: string): void {
-    this.stopSpeaking();
+    const generation = this._beginChain();
 
     const words = text.trim().split(/\s+/).filter(Boolean);
     if (words.length === 0) return;
@@ -429,7 +452,8 @@ export class TMS5220Synth extends MAMEBaseSynth {
     let wordIndex = 0;
 
     const playNext = () => {
-      if (wordIndex >= words.length || !this._speakingChain) {
+      if (!this._chain.isCurrent(generation)) return; // a newer utterance took over
+      if (wordIndex >= words.length) {
         this._speakingChain = null;
         return;
       }
@@ -451,11 +475,11 @@ export class TMS5220Synth extends MAMEBaseSynth {
         this._playROMWordDirect(romIdx);
         const romWord = this._romWords[romIdx];
         const durationMs = romWord.frames.length * 25 + 200;
-        setTimeout(playNext, durationMs);
+        this._scheduleChainStep(generation, playNext, durationMs);
       } else {
         // All other words: SAM phoneme synthesis
         this._speakPhonemeWord(word, () => {
-          setTimeout(playNext, 200);
+          this._scheduleChainStep(generation, playNext, 200);
         });
       }
     };
