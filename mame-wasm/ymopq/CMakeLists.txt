@@ -3,7 +3,7 @@ cmake_minimum_required(VERSION 3.10)
 # Based on Aaron Giles' ymfm library (BSD-3-Clause)
 # 8-channel 4-operator FM synthesis
 
-set(YMFM_DIR ${CMAKE_SOURCE_DIR}/../ymfm)
+set(YMFM_DIR ${CMAKE_SOURCE_DIR}/ymfm)
 
 set(YMOPQ_SOURCES
     YMOPQSynth.cpp
@@ -25,7 +25,7 @@ set_source_files_properties(${YMOPQ_SOURCES} PROPERTIES COMPILE_FLAGS
 set_target_properties(YMOPQ_WASM PROPERTIES
     OUTPUT_NAME "YMOPQ"
     SUFFIX ".js"
-    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/../../public/mame"
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/../public/mame"
 )
 
 target_link_options(YMOPQ_WASM PRIVATE
