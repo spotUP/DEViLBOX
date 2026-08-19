@@ -1,0 +1,89 @@
+name: UADE core
+
+# The UADE 68k core is not covered by the web build: nothing in `npm run build`
+# compiles third-party/uade-3.05 or uade-wasm, so a source change there can sit
+# broken on main indefinitely. That is exactly what happened with the fake
+# audio.device work — uade.c switched on AMIGAMSG_AUDIO_DEV_* enumerators that
+# amigamsg.h never declared, and the shipped wasm kept working because it had
+# been built out of tree.
+#
+# This workflow compiles the core from the committed sources on every change to
+# it, and checks the artifacts that are committed alongside those sources still
+# match them.
+
+on:
+  push:
+    branches: ['main']
+    paths:
+      - 'third-party/uade-3.05/**'
+      - 'uade-wasm/**'
+      - '.github/workflows/uade-core.yml'
+  pull_request:
+    paths:
+      - 'third-party/uade-3.05/**'
+      - 'uade-wasm/**'
+      - '.github/workflows/uade-core.yml'
+  workflow_dispatch:
+
+jobs:
+  uade-core:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Verify score.s and amigamsg.h agree on message ids
+        run: python3 uade-wasm/verify_amigamsg.py
+
+      - name: Verify the committed score binary is not stale
+        run: |
+          set -euo pipefail
+          BASE="${{ github.event.pull_request.base.sha || github.event.before }}"
+          if [ -z "$BASE" ] || ! git cat-file -e "$BASE^{commit}" 2>/dev/null; then
+            echo "No usable base commit — skipping stale-score check."
+            exit 0
+          fi
+          CHANGED=$(git diff --name-only "$BASE" HEAD -- \
+            third-party/uade-3.05/amigasrc/score/)
+          echo "$CHANGED"
+          # score.s is assembled into the committed `score` binary, which
+          # generate_registry.py embeds. Touching the source without
+          # regenerating the binary ships a no-op change.
+          if echo "$CHANGED" | grep -qx 'third-party/uade-3.05/amigasrc/score/score.s' \
+             && ! echo "$CHANGED" | grep -qx 'third-party/uade-3.05/amigasrc/score/score'; then
+            echo "::error::score.s changed but the assembled score binary did not."
+            echo "Run: cd third-party/uade-3.05/amigasrc/score && vasmm68k_mot -no-opt -o score -Fbin score.s"
+            exit 1
+          fi
+
+      - name: Run the audio.device memory-safety harness
+        run: uade-wasm/tests/run_audiodevice_tests.sh
+
+      - name: Install Emscripten
+        run: |
+          set -euo pipefail
+          git clone --depth 1 https://github.com/emscripten-core/emsdk.git ~/emsdk
+          ~/emsdk/emsdk install latest
+          ~/emsdk/emsdk activate latest
+
+      - name: Build UADE WASM from committed sources
+        run: |
+          set -euo pipefail
+          source ~/emsdk/emsdk_env.sh
+          cd uade-wasm && ./build.sh
+
+      - name: Verify generated sources are in sync
+        run: |
+          set -euo pipefail
+          # build.sh regenerates player_registry.c / basedir_data.c from
+          # players/, eagleplayer.conf and the score binary. Any tracked file it
+          # rewrites means a committed artifact had drifted from its inputs.
+          DIRTY=$(git status --porcelain -- third-party/uade-3.05 uade-wasm)
+          if [ -n "$DIRTY" ]; then
+            echo "::error::Building rewrote tracked files — a committed artifact is stale:"
+            echo "$DIRTY"
+            git diff --stat -- third-party/uade-3.05 uade-wasm
+            exit 1
+          fi
