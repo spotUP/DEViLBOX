@@ -1,13 +1,18 @@
-ossupport.c
-uadeipc.c
-uadeutils.c
-unixatomic.c
-sd-sound.[ch]
-gencpu
-uadecore
-compat.[ch]
-cpudefs.c
-cpuemu.c
-cpustbl.c
-cputbl.h
-build68k
+# Anchored to this directory. Upstream wrote these unanchored, so patterns like
+# `uadeutils.c` also matched src/frontends/common/uadeutils.c — real source that
+# is a build input — and it silently never got committed. The UADE core then
+# could not be built from a clean checkout.
+
+/ossupport.c
+/uadeipc.c
+/uadeutils.c
+/unixatomic.c
+/sd-sound.[ch]
+/gencpu
+/uadecore
+/compat.[ch]
+/cpudefs.c
+/cpuemu.c
+/cpustbl.c
+/cputbl.h
+/build68k

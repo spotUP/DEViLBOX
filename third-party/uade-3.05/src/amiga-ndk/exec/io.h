@@ -43,6 +43,13 @@ struct  __attribute__((__packed__)) IOStdReq {
 
 /* io_Flags defined bits */
 #define IOB_QUICK	0
+/* standard exec device error codes (exec/errors.h) */
+#define IOERR_OPENFAIL		-1
+#define IOERR_ABORTED		-2
+#define IOERR_NOCMD		-3
+#define IOERR_BADLENGTH		-4
+#define IOERR_BADADDRESS	-5
+
 #define IOF_QUICK	(1<<0)
 
 

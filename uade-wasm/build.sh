@@ -26,6 +26,30 @@ echo "=== UADE WASM Build ==="
 echo "UADE source: $UADE_SRC"
 echo "Output:      $OUT_DIR"
 
+# ── Step 0: Verify the 68k score and the host agree ──────────────────────
+echo ""
+echo "Step 0: Verifying score.s <-> amigamsg.h message ids..."
+python3 verify_amigamsg.py
+
+# The score binary is committed so the wasm can be built without a 68k
+# assembler, but when vasm is available we check it still matches its source
+# instead of trusting a stale artifact.
+SCORE_DIR="$UADE_SRC/amigasrc/score"
+if command -v vasmm68k_mot >/dev/null 2>&1; then
+    echo "  Re-assembling score.s to verify the committed binary..."
+    vasmm68k_mot -no-opt -o "$SCORE_DIR/score.verify" -Fbin "$SCORE_DIR/score.s" >/dev/null
+    if ! cmp -s "$SCORE_DIR/score.verify" "$SCORE_DIR/score"; then
+        rm -f "$SCORE_DIR/score.verify"
+        echo "ERROR: amigasrc/score/score is stale — score.s assembles to something else." >&2
+        echo "       Run: cd $SCORE_DIR && vasmm68k_mot -no-opt -o score -Fbin score.s" >&2
+        exit 1
+    fi
+    rm -f "$SCORE_DIR/score.verify"
+    echo "  score binary matches score.s."
+else
+    echo "  vasmm68k_mot not found — using the committed score binary as-is."
+fi
+
 # ── Step 1: Generate player registry ─────────────────────────────────────
 echo ""
 echo "Step 1: Generating player registry..."
