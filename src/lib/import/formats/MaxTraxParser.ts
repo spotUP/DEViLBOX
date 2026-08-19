@@ -139,7 +139,8 @@ export function parseMaxTraxFile(buffer: ArrayBuffer, filename: string): Tracker
     linearPeriods: false,
     // Raw bytes for lossless export (dispatched on MXTX magic in nativeExportRouter)
     // and for the WASM replayer (MaxTraxEngine) which drives all audio.
-    // Deliberately NOT uadeEditableFileData: UADE cannot play MaxTrax (ret=-1).
+    // Deliberately NOT uadeEditableFileData: MaxTraxEngine is the playback authority
+    // here, so the raw bytes must not be claimed by the UADE path.
     maxTraxFileData: buffer.slice(0) as ArrayBuffer,
     maxTraxFileName: filename,
   } as TrackerSong;

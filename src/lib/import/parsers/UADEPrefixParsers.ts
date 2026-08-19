@@ -46,8 +46,8 @@ const UADE_ONLY_PREFIXES = [
   'hip.', 'mcmd.', 'sog.',
   // MarkII, MusiclineEditor (MikeDavies handled by AmigaFormatParsers with classic mode)
   'mk2.', 'mkii.', 'ml.',
-  // MaxTrax
-  'mxt.',
+  // MaxTrax — Modland ships these as MXTX.<tune>; 'mxt.' is a legacy spelling
+  'mxtx.', 'mxt.',
   // Silmarils
   'mok.', 'sil.',
   // NoiseTracker/ProTracker variant
@@ -130,7 +130,8 @@ const EXT_TO_UADE_PREFIX: Record<string, string> = {
   'dlw':      'dl',        // Dave Lowe WTD → "dl" (DaveLowe)
   'fp2':      'fp',        // Future Player 2 → "fp" (FuturePlayer)
   'fredmon':  'fred',      // Fred Editor Monitor → "fred"
-  'mxt':      'mxt',       // MaxTrax (no eagleplayer — uses content detection)
+  'mxt':      'mxtx',      // MaxTrax legacy spelling → eagleplayer prefix "mxtx"
+  'mxtx':     'mxtx',      // MaxTrax (players/MaxTrax, `prefixes=mxtx`)
   'nt':       'mod',       // NoiseTracker → "mod" (PTK-Prowiz)
   'ntsp':     'two',       // NTSP → "two" (NTSP-system)
   'psum':     'snk',       // Paul Summers → "snk"
@@ -163,6 +164,7 @@ export async function tryUADEPrefixParse(
   prefs: FormatEnginePreferences,
   subsong: number,
   preScannedMeta?: UADEMetadata,
+  companionFiles?: Map<string, ArrayBuffer>,
 ): Promise<TrackerSong | null> {
   const base = getBasename(filename);
 
@@ -182,14 +184,18 @@ export async function tryUADEPrefixParse(
         uadeFileName = `${uadePrefix}.${namePart}`;
       }
     }
+    // Companions must reach UADE's virtual FS: split-file formats (MaxTrax
+    // MXTX.<tune> + SMPL.<tune>, TFMX mdat/smpl, ...) load their sample bank
+    // from a sibling file through AMIGAMSG_LOADFILE, and without it the
+    // replayer renders silence or garbage instruments.
     const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
-    return parseUADEFile(buffer, uadeFileName, prefs.uade ?? 'enhanced', subsong, preScannedMeta);
+    return parseUADEFile(buffer, uadeFileName, prefs.uade ?? 'enhanced', subsong, preScannedMeta, companionFiles);
   }
 
   // ── UADE catch-all: 130+ exotic Amiga formats ───────────────────────────
   const { isUADEFormat, parseUADEFile } = await import('@lib/import/formats/UADEParser');
   if (isUADEFormat(filename)) {
-    return await parseUADEFile(buffer, originalFileName, prefs.uade ?? 'enhanced', subsong, preScannedMeta);
+    return await parseUADEFile(buffer, originalFileName, prefs.uade ?? 'enhanced', subsong, preScannedMeta, companionFiles);
   }
 
   return null;

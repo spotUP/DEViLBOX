@@ -220,7 +220,7 @@ const AMIGA_PREFIXES = new Set([
   // MarkII, MusiclineEditor
   'mk2', 'mkii', 'ml',
   // MaxTrax, Silmarils
-  'mxt', 'mok', 'sil',
+  'mxt', 'mxtx', 'mok', 'sil',
   // NoiseTracker, NTSP, PaulSummers, Pokeynoise
   'nt', 'ntsp', 'psum', 'pn',
   // RiffRaff, SeanConnolly, RobHubbardST, RonKlaren
