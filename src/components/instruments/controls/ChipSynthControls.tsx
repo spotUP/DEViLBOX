@@ -5,12 +5,12 @@
  * (knobs, selects, toggles) grouped by section. Supports operator tabs for FM synths.
  */
 
-import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
+import React, { useState, useCallback, useMemo, useRef, useEffect, useSyncExternalStore } from 'react';
 import { getChipSynthDef, type ChipParameterDef } from '@constants/chipParameters';
 import { Knob } from '@components/controls/Knob';
 import { CustomSelect } from '@components/common/CustomSelect';
 import { useInstrumentColors } from '@/hooks/useInstrumentColors';
-import { getRomWordNames } from '@engine/tms5220/TMS5220Synth';
+import { getRomWordNames, getRomWordVersion, subscribeRomWords } from '@engine/tms5220/TMS5220Synth';
 import type { SynthType } from '@typedefs/instrument';
 import type JSZipType from 'jszip';
 import { VowelEditor } from './VowelEditor';
@@ -40,6 +40,10 @@ export const ChipSynthControls: React.FC<ChipSynthControlsProps> = ({
   const chipDef = useMemo(() => getChipSynthDef(synthType), [synthType]);
   const { isCyan: isCyanTheme, accent: accentColor, knob: knobColor } = useInstrumentColors(chipDef?.color ?? '#ffcc33');
   const [activeOpTab, setActiveOpTab] = useState(0); // 0 = Global, 1-N = Operators
+  // ROMs load asynchronously after this component first renders. Without subscribing,
+  // the ROM Speech list keeps the static labels from chipParameters.ts instead of the
+  // names actually parsed out of the ROM.
+  useSyncExternalStore(subscribeRomWords, getRomWordVersion, getRomWordVersion);
   
   // Use ref to prevent stale closures in callbacks
   const parametersRef = useRef(parameters);
@@ -286,6 +290,8 @@ export const ChipSynthControls: React.FC<ChipSynthControlsProps> = ({
     }
 
     if (param.type === 'select' && param.options) {
+      // romWordVersion is read via useSyncExternalStore at the top of this component so
+      // the option list rebuilds when the ROM table finishes loading.
       // Dynamic ROM word names from global registry (avoids store re-render loop)
       let selectOptions = param.options.map(opt => ({ value: String(opt.value), label: opt.label }));
       if (param.key === 'romSpeech') {
