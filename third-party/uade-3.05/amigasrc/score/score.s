@@ -2451,25 +2451,23 @@ exec_open_device
 	bra	dontplay
 
 isaudiodev	pull	d0/a1
-	cmp	#32,IO_COMMAND(a1)	* ACMD_ALLOCATE ?
-	bne.b	addone
-	tst.l	IO_LENGTH(a1)
-	beq.b	addone
-	moveq	#0,d0			* cook up a valid result
-	move.l	IO_DATA(a1),a0
-	move.b	(a0),d0			* first chan mask succeeds ;)
-	move.l	d0,IO_UNIT(a1)
-	tst.l	32(a1)		* give it a "unique" IOA_ALLOCKEY if needed
-	bne.b	addone
-	move.l	#'uniq',32(a1)
-addone	lea	tdmsg1(pc),a0
+* Do NOT fabricate an allocation result here.  The host's audiodevice_open()
+* is the single source of truth for channel allocation: it reads ioa_Data /
+* ioa_Length through the real struct IOAudio and writes io_Unit, ioa_AllocKey
+* and io_Error itself.  The 68k code used IOStdReq offsets (IO_LENGTH=36,
+* IO_DATA=40) against an IOAudio request, whose fields are ioa_AllocKey@32
+* (WORD), ioa_Data@34 and ioa_Length@38 -- so it read a spliced half of
+* ioa_Data/ioa_Length, dereferenced ioa_Length's low half as a pointer, and
+* clobbered ioa_Data's high half with a LONG write to the WORD ioa_AllocKey.
+	lea	tdmsg1(pc),a0
 	bsr	put_string
 	pull	all
 	lea	audio_device_base(pc),a0	* MaxTrax captures IO_DEVICE into _AudioDevice
 	move.l	a0,IO_DEVICE(a1)	* then calls its BeginIO/AbortIO LVOs directly
-	bsr	adopen			* notify host of device open
-	clr.b	IO_ERROR(a1)		* no error
-	moveq	#0,d0
+	bsr	adopen			* host allocates channels and sets io_Error
+	move.b	IO_ERROR(a1),d0		* propagate the host's verdict; clearing it
+	ext.w	d0			* unconditionally hid ADIOERR_ALLOCFAILED and
+	ext.l	d0			* let players write to a bogus io_Unit
 	rts
 
 istimerdev	pull	d0/a1

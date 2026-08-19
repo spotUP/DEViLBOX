@@ -1,4 +1,3 @@
-/*
 /* Poor man's audio.device implementation.
  *
  * Copyright 2022, Juergen Wothke
@@ -27,6 +26,16 @@ static int _use_audio_device = 0;
 
 static void start_write_command(int8_t targetchnl, uint32_t al_msg_addr);
 
+uint16_t swap16(uint16_t in) {
+	return (in >> 8) | (in << 8);
+}
+uint32_t swap32(uint32_t in) {
+	return((in>>24)&0xff) |
+			((in<<8)&0xff0000) |
+			((in>>8)&0xff00) |
+			((in<<24)&0xff000000);
+}
+
 
 // just a simple list to keep try of pending "WRITE" commands (per audio channel)
 struct MsgNode {
@@ -34,9 +43,33 @@ struct MsgNode {
 	uint32_t al_msg_addr;		// little-endian Message address in amiga mem
 };
 
-struct MsgNode* _write_msg_list[4];
+#define AUDIO_CHANNELS 4
+
+struct MsgNode* _write_msg_list[AUDIO_CHANNELS];
+
+/* ---- Amiga-memory boundary ------------------------------------------------
+ * Every value below this line may be driven by module data.  These three
+ * helpers are the ONLY place where an Amiga address becomes a host pointer or
+ * a unit bitmask becomes an array index, so validation lives here instead of
+ * being sprinkled over each use site.  "al_" addresses are amiga addresses in
+ * little-endian byte order (Wothke's convention), hence the swap32().
+ */
+static void* resolve_amiga(uint32_t al_addr, uint32_t size) {
+	uaecptr addr = swap32(al_addr);
+	if (addr == 0 || !valid_address(addr, size)) return 0;
+	return get_real_address(addr);
+}
+
+static struct IOAudio* resolve_request(uint32_t al_msg_addr) {
+	return (struct IOAudio*) resolve_amiga(al_msg_addr, sizeof(struct IOAudio));
+}
+
+static int valid_channel(int8_t channel) {
+	return channel >= 0 && channel < AUDIO_CHANNELS;
+}
 
 static struct MsgNode* get_write_message(int channel) {
+	if (!valid_channel(channel)) return 0;
 	return _write_msg_list[channel];
 }
 static struct MsgNode* new_node() {
@@ -54,6 +87,8 @@ static struct MsgNode* get_last_node(struct MsgNode* n) {
 }
 
 static void add_write_message(int channel, uint32_t al_msg_addr) {
+	if (!valid_channel(channel)) return;
+
 	struct MsgNode*n = new_node();
 	n->al_msg_addr = al_msg_addr;
 
@@ -65,6 +100,8 @@ static void add_write_message(int channel, uint32_t al_msg_addr) {
 }
 
 static void remove_write_message(int channel) {
+	if (!valid_channel(channel)) return;
+
 	if (_write_msg_list[channel] != 0) {
 		struct MsgNode* n = _write_msg_list[channel];
 		_write_msg_list[channel] = n->next;
@@ -80,16 +117,6 @@ static void reset_channel(int channel) {
 	while (get_write_message(channel)) {
 		remove_write_message(channel);
 	}
-}
-
-uint16_t swap16(uint16_t in) {
-	return (in >> 8) | (in << 8);
-}
-uint32_t swap32(uint32_t in) {
-	return((in>>24)&0xff) |
-			((in<<8)&0xff0000) |
-			((in>>8)&0xff00) |
-			((in<<24)&0xff000000);
 }
 
 static const char* cmd_labels[] = {
@@ -129,26 +156,43 @@ static int8_t get_target_channel(uint32_t unit) {
 
 static const uint32_t SCORE_HAVE_REPLYMSG  = 0x1fc;	// duplicated from uade.c
 
+/* Upper bound for the pending-reply chain walk.  Real players queue a handful
+ * of requests; anything beyond this is a corrupt or cyclic list. */
+#define MAX_REPLY_LIST_HOPS 1024
+
 // send a ReplyMsg back to the associated message port
 void reply_message(uint32_t al_msg_addr, uint32_t al_dst_addr) {
 
-	uint32_t* msgBuf = (uint32_t*) get_real_address(swap32(al_msg_addr));
-	msgBuf[0] = msgBuf[1] = 0; 			// reset next/pred pointers just in case
+	uint32_t* msgBuf = (uint32_t*) resolve_amiga(al_msg_addr, 2 * sizeof(uint32_t));
+	uint32_t* ptr    = (uint32_t*) resolve_amiga(al_dst_addr, sizeof(uint32_t));
+	if (!msgBuf || !ptr) {
+		fprintf(stderr, "audio.device error: ReplyMsg with invalid message address\n");
+		return;
+	}
 
-	uint32_t* ptr= (uint32_t*)get_real_address(swap32(al_dst_addr));
+	msgBuf[0] = msgBuf[1] = 0; 			// reset next/pred pointers just in case
 
 	if (*ptr == 0) {
 		*ptr = al_msg_addr;
 	} else {
 		// there already is a backlog.. add new entry to the end of this list
-		uint32_t* node= (uint32_t*) get_real_address(swap32(*ptr));
+		uint32_t* node= (uint32_t*) resolve_amiga(*ptr, sizeof(uint32_t));
 
-		while (node != msgBuf) {			// avoid duplicates
+		// The chain lives in module-writable memory, so it may be malformed or
+		// cyclic.  Bound the walk: the list can never legitimately hold more
+		// entries than there are pending requests, and an unbounded loop here
+		// would hang the render thread (this runs from the audio callback).
+		unsigned int hops = 0;
+		while (node && node != msgBuf) {			// avoid duplicates
+			if (++hops > MAX_REPLY_LIST_HOPS) {
+				fprintf(stderr, "audio.device error: ReplyMsg list too long or cyclic\n");
+				return;
+			}
 			if (node[0] == 0) {
 				node[0] = al_msg_addr;
 				break;
 			}
-			node = (uint32_t*) get_real_address(swap32(node[0]));
+			node = (uint32_t*) resolve_amiga(node[0], sizeof(uint32_t));
 		}
 	}
 }
@@ -167,7 +211,12 @@ void audiodevice_DMA_signal(int audioChannel) {
 
 	struct MsgNode* msg_node = get_write_message(audioChannel);
 	if (msg_node) {
-		struct IOAudio *req = (struct IOAudio*) get_real_address(swap32(msg_node->al_msg_addr));
+		struct IOAudio *req = resolve_request(msg_node->al_msg_addr);
+		if (!req) {
+			fprintf(stderr, "audio.device error: pending WRITE with invalid request address\n");
+			remove_write_message(audioChannel);
+			return;
+		}
 		uint16_t   ioa_Cycles = swap16(req->ioa_Cycles);	// 0  thru 65535, 0 for infinite
 
 		if (ioa_Cycles == 1) {
@@ -212,10 +261,14 @@ void audiodevice_reset() {
 	alloc_write_lists();
 }
 
-uint8_t alloc_channels(uint8_t *prefs, int prefs_len) {
+uint8_t alloc_channels(uint8_t *prefs, uint32_t prefs_len) {
 	// flawed impl: Request's prio (req->ioa_Request.mn_Node.ln_Pri) allows to potentially
 	// steal channels -> but that would be rather braindead in a standalone song scenario...
-	for (int i= 0; i<prefs_len; i++) {
+	// prefs/prefs_len are module-supplied; the caller has already checked that the
+	// whole [prefs, prefs+prefs_len) range is readable Amiga memory.
+	if (!prefs) return 0;
+
+	for (uint32_t i= 0; i<prefs_len; i++) {
 		uint8_t chnmask= prefs[i] & 0xf;	// only lower four bits are considered for channel alloc
 
 		if (chnmask && ((_allocated_channels & chnmask) == 0)) {
@@ -230,13 +283,22 @@ uint8_t alloc_channels(uint8_t *prefs, int prefs_len) {
 // "al_" prefix signifies that the var contains an original amiga memory
 // address in little endian byte order
 void audiodevice_open(uint32_t al_msg_addr) {
-	struct IOAudio *req = (struct IOAudio*) get_real_address(swap32(al_msg_addr));
-	struct Library *lib = (struct Library*)get_real_address(swap32((uint32_t)req->ioa_Request.io_Device));
+	struct IOAudio *req = resolve_request(al_msg_addr);
+	if (!req) {
+		fprintf(stderr, "audio.device error: OpenDevice with invalid request address\n");
+		return;
+	}
 
-	// unclear which additional fields might need to be initialized
-	lib->lib_OpenCnt = swap16(1);	// just mark as "in use".. could track open/close if needed
-	lib->lib_Version = swap16(39);	// MaxTrax uses this to act differently depending on OS version
-	lib->lib_NegSize = swap16(36);	// see audio.device's function vectors
+	struct Library *lib = (struct Library*) resolve_amiga((uint32_t)req->ioa_Request.io_Device,
+							      sizeof(struct Library));
+	if (lib) {
+		// unclear which additional fields might need to be initialized
+		lib->lib_OpenCnt = swap16(1);	// just mark as "in use".. could track open/close if needed
+		lib->lib_Version = swap16(39);	// MaxTrax uses this to act differently depending on OS version
+		lib->lib_NegSize = swap16(36);	// see audio.device's function vectors
+	} else {
+		fprintf(stderr, "audio.device error: OpenDevice with invalid io_Device pointer\n");
+	}
 
 
 	uint16_t cmd = swap16(req->ioa_Request.io_Command);
@@ -247,8 +309,8 @@ void audiodevice_open(uint32_t al_msg_addr) {
 		// channel combination array, e.g. [0xf, 0xf]
 		// note: seems this garbage API later reuses the same ioa_Data field to
 		// pass the audio buffer.. everything to save a byte..
-	uint8_t* ioa_Data = (uint8_t*)get_real_address(swap32((uint32_t)req->ioa_Data));
 	uint32_t ioa_Length = swap32(req->ioa_Length);
+	uint8_t* ioa_Data = (uint8_t*) resolve_amiga((uint32_t)req->ioa_Data, ioa_Length);
 
 //	req->io_Error = IOERR_OPENFAIL; 	// if ioa_AllocKey and io_Device could not be set
 
@@ -278,7 +340,7 @@ void audiodevice_open(uint32_t al_msg_addr) {
 				allo = 0;
 			}
 		} else {
-			fprintf(stderr, "audio.device error: Open without reply message port\n", allo);
+			fprintf(stderr, "audio.device error: Open without reply message port\n");
 		}
 
 		if (allo) {
@@ -305,11 +367,15 @@ void audiodevice_open(uint32_t al_msg_addr) {
 
 static void start_write_command(int8_t targetchnl, uint32_t al_msg_addr) {
 
-	struct IOAudio* req = (struct IOAudio*) get_real_address(swap32(al_msg_addr));
+	struct IOAudio* req = resolve_request(al_msg_addr);
+	if (!req) {
+		fprintf(stderr, "audio.device CMD_WRITE - error: invalid request address\n");
+		return;
+	}
 
 	req->ioa_Request.io_Flags = req->ioa_Request.io_Flags & ~IOF_QUICK;	// only clear if no error
 
-	if (targetchnl == -1) {
+	if (!valid_channel(targetchnl)) {
 		fprintf(stderr, "audio.device CMD_WRITE - error: no target channel\n");
 		return;
 	}
@@ -331,17 +397,22 @@ static void start_write_command(int8_t targetchnl, uint32_t al_msg_addr) {
 	}
 
 
-	int8_t* ioa_Data = (uint8_t *)get_real_address(swap32((uint32_t)req->ioa_Data));
+	uint32_t ioa_Length = swap32(req->ioa_Length);	// 2 thru 131072 must be even number!!!
 
-	int8_t* ioa_Data_amiga = (uint8_t *)(swap32((uint32_t)req->ioa_Data));
+	if (!resolve_amiga((uint32_t)req->ioa_Data, ioa_Length)) {
+		fprintf(stderr, "audio.device CMD_WRITE - error: sample buffer outside valid memory\n");
+		req->ioa_Request.io_Error = IOERR_BADADDRESS;
+		return;
+	}
 
-	int8_t* data = ioa_Data_amiga;	// seems the below calls need the original amiga address for their chipmem logic
+	// the register pokes below need the original amiga address, not the host one,
+	// for their chipmem logic
+	uint32_t data = swap32((uint32_t)req->ioa_Data);
 
 	// UADE's semantics of these regs seem to be different from the original!
-	AUDxLCL(targetchnl, (uint32_t)data & 0xffff);	// 16-bit instead of 15
-	AUDxLCH(targetchnl, (uint32_t)data >> 16);		// 16-bit instead of 5
+	AUDxLCL(targetchnl, data & 0xffff);	// 16-bit instead of 15
+	AUDxLCH(targetchnl, data >> 16);		// 16-bit instead of 5
 
-	uint32_t ioa_Length = swap32(req->ioa_Length);	// 2 thru 131072 must be even number!!!
 	AUDxLEN(targetchnl, ioa_Length >> 1);	// in words? or did UADE also change these semantics?
 
 #ifdef TRACE_AD_CALLS
@@ -367,6 +438,14 @@ static void start_write_command(int8_t targetchnl, uint32_t al_msg_addr) {
 
 
 static void add_write_command(int8_t targetchnl, uint32_t al_msg_addr) {
+
+	if (!valid_channel(targetchnl)) {
+		// io_Unit carries no channel bit: nothing was allocated (or the player
+		// ignored an ADIOERR_ALLOCFAILED).  Dropping the request keeps the -1
+		// out of _write_msg_list[] and audio_channel[].
+		fprintf(stderr, "audio.device CMD_WRITE - error: no channel allocated\n");
+		return;
+	}
 
 #ifdef TRACE_AD_CALLS
 	struct IOAudio* req = (struct IOAudio*) get_real_address(swap32(al_msg_addr));
@@ -402,7 +481,7 @@ static void handle_flush_command(uint32_t al_msg_addr, uint32_t al_dst_addr, str
 			if (msg_node) {
 				disable_audio_dma(i);
 			}
-			while (msg_node = get_write_message(i)) {
+			while ((msg_node = get_write_message(i)) != 0) {
 				reply_message(msg_node->al_msg_addr, al_dst_addr);	// return them to their MessagePort
 				remove_write_message(i);
 			}
@@ -447,9 +526,8 @@ static void handle_allocate_command(struct IOAudio *req) {
 		// channel combination array, e.g. [0xf, 0xf]
 		// note: seems this garbage API later reuses the same ioa_Data field to
 		// pass the audio buffer.. fucking morons..
-	uint8_t* ioa_Data = (uint8_t*)get_real_address(swap32((uint32_t)req->ioa_Data));
 	uint32_t ioa_Length = swap32(req->ioa_Length);
-
+	uint8_t* ioa_Data = (uint8_t*) resolve_amiga((uint32_t)req->ioa_Data, ioa_Length);
 
 	if (ioa_Length > 0) {
 		uint8_t allo= alloc_channels(ioa_Data, ioa_Length);
@@ -480,6 +558,11 @@ static void handle_allocate_command(struct IOAudio *req) {
 
 static void handle_PERVOL_command(int8_t targetchnl, struct IOAudio *req) {
 	// see http://amigadev.elowar.com/read/ADCD_2.1/Includes_and_Autodocs_2._guide/node04AA.html
+
+	if (!valid_channel(targetchnl)) {
+		fprintf(stderr, "audio.device ADCMD_PERVOL - error: no channel allocated\n");
+		return;
+	}
 
 	uint8_t flags = req->ioa_Request.io_Flags;
 
@@ -515,7 +598,11 @@ static void handle_PERVOL_command(int8_t targetchnl, struct IOAudio *req) {
 
 
 void audiodevice_abortIO(uint32_t al_msg_addr) {
-	struct IOAudio* req = (struct IOAudio*) get_real_address(swap32(al_msg_addr));
+	struct IOAudio* req = resolve_request(al_msg_addr);
+	if (!req) {
+		fprintf(stderr, "audio.device error: AbortIO with invalid request address\n");
+		return;
+	}
 
 	uint32_t unit = swap32((uint32_t)req->ioa_Request.io_Unit);	// channel bit map
 	int8_t targetchnl= get_target_channel(unit);	// if more than 1 channel is selected get the "LOWEST" channel used!
@@ -527,14 +614,18 @@ void audiodevice_abortIO(uint32_t al_msg_addr) {
 			fprintf(stderr, "audio.device warning: AbortIO for channel %d not implemented\n", targetchnl);
 			break;
 		default:
-			fprintf(stderr, "audio.device warning: ignoring attempt to AbortIO for %s\n", cmd_labels[cmd]);
+			fprintf(stderr, "audio.device warning: ignoring attempt to AbortIO for %s\n", get_cmd_label(req));
 			break;
 	}
 }
 
 void audiodevice_beginIO(uint32_t al_msg_addr, uint32_t al_dst_addr) {
 
-	struct IOAudio* req = (struct IOAudio*) get_real_address(swap32(al_msg_addr));
+	struct IOAudio* req = resolve_request(al_msg_addr);
+	if (!req) {
+		fprintf(stderr, "audio.device error: BeginIO with invalid request address\n");
+		return;
+	}
 
 	uint32_t unit = swap32((uint32_t)req->ioa_Request.io_Unit);	// channel bit map
 	int8_t targetchnl= get_target_channel(unit);	// if more than 1 channel is selected get the "LOWEST" channel used!
@@ -557,7 +648,7 @@ void audiodevice_beginIO(uint32_t al_msg_addr, uint32_t al_dst_addr) {
 		case ADCMD_SETPREC:		// 10
 		case ADCMD_LOCK:		// 13
 		case ADCMD_WAITCYCLE:	// 14
-			fprintf(stderr, "audio.device error: %s not implemented\n", cmd_labels[cmd]);
+			fprintf(stderr, "audio.device error: %s not implemented\n", get_cmd_label(req));
 			break;
 
 		case CMD_WRITE:			// 3 queues up requests; asynchronous; only replies if flag (IOF_QUICK) is clear
