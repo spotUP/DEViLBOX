@@ -4,6 +4,7 @@ import { textToPhonemes, parsePhonemeString } from '@engine/speech/Reciter';
 import { type TMS5220Frame, phonemesToTMS5220Frames, samToTMS5220 } from '@engine/speech/tms5220PhonemeMap';
 import { type VSMWord, parseVSMDirectory, scanVSMForWords } from '@engine/speech/VSMROMParser';
 import { shouldAuditionRomSelection } from '@engine/speech/romSpeechRouting';
+import { buildRomWordIndex, lookupRomWord } from '@engine/speech/romWordLookup';
 import { extractPhonemeLibrary, buildFramesFromROMLibrary } from '@engine/speech/ROMPhonemeExtractor';
 import { loadTMS5220ROMs } from '@engine/mame/MAMEROMLoader';
 import { SpeechChain } from '@engine/speech/SpeechChain';
@@ -115,6 +116,7 @@ export class TMS5220Synth extends MAMEBaseSynth {
 
   private _romData: Uint8Array | null = null;
   private _romWords: VSMWord[] = [];
+  private _romWordIndex = new Map<string, number>();
   private _romLoaded = false;
   private _romSentToWasm = false;
   private _romPhonemes: Map<string, TMS5220Frame[]> | null = null;
@@ -165,6 +167,8 @@ export class TMS5220Synth extends MAMEBaseSynth {
         this._romWords = scanVSMForWords(this._romData);
         console.log(`[TMS5220] Heuristic scan: ${this._romWords.length} words found`);
       }
+
+      this._romWordIndex = buildRomWordIndex(this._romWords);
 
       // Extract authentic phonemes from A-Z letter recordings
       if (this._romWords.length >= 26) {
@@ -472,15 +476,10 @@ export class TMS5220Synth extends MAMEBaseSynth {
 
       const word = words[wordIndex++];
 
-      // Only match single letters against ROM (first 26 entries are verified A-Z)
-      let romIdx = -1;
-      if (word.length === 1 && /^[A-Za-z]$/.test(word)) {
-        romIdx = this._romWords.findIndex(
-          (w, i) => i < 26 && w.name.toLowerCase() === word.toLowerCase()
-        );
-      }
-
-      console.log(`[TMS5220] hybrid: word="${word}" → romIdx=${romIdx}`);
+      // Every recording the ROM names — the letters, the digits and the 117 spelled
+      // vocabulary words — is fair game. A real TI recording of the typed word beats
+      // synthesising it from the hand-authored coefficient table every time.
+      const romIdx = lookupRomWord(this._romWordIndex, word);
 
       if (romIdx >= 0) {
         // Single letter: play via ROM (verified A-Z mapping)
