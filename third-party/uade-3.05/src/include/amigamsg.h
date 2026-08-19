@@ -25,6 +25,9 @@ enum amigamsg {
 	AMIGAMSG_TEST_LOGGING, /* 21 */
 	AMIGAMSG_DEBUG_U32_STRING, /* 22 */
 	AMIGAMSG_DEBUG_U32_I32_STRING, /* 23 */
+	AMIGAMSG_AUDIO_DEV_OPEN,    /* 24: fake audio.device OpenDevice */
+	AMIGAMSG_AUDIO_DEV_BEGINIO, /* 25: fake audio.device BeginIO (CMD_WRITE etc) */
+	AMIGAMSG_AUDIO_DEV_ABORTIO, /* 26: fake audio.device AbortIO */
 };
 
 #endif
