@@ -28,6 +28,8 @@ An ultra review of the first two commits found 15 issues. All 15 are fixed here 
 | `b9b0ad5f9` | MaxTrax prefix routing + companion-file forwarding |
 | `6dec06399` | CI builds the UADE core; stop committing generated blobs |
 | `76c47c884` | rebuild UADE.js/UADE.wasm from committed sources |
+| `eb1cda3b1` | portable mktemp in the safety harness |
+| `9a711eb0a` | commit frontend sources an unanchored .gitignore was hiding |
 
 ## Memory safety (`audiodevice.c`)
 
@@ -52,7 +54,20 @@ Fixed at the boundary, not per use site: `resolve_amiga()` / `resolve_request()`
 - [x] `score.s` reassembles byte-identically with `vasmm68k_mot`
 - [x] `maxtraxPlayback.render.test.ts` — antmusic.mxtx still renders non-silent in both windows after the score.s and audiodevice.c changes
 - [x] New `uadeMaxTraxWiring.test.ts` — 3 of its 5 assertions fail on the pre-fix code
+- [x] `uade-core` CI: green on a clean checkout — message-id check, score staleness check, sanitizer harness, full emcc build, generated-sources sync
 - [ ] Manual: drop a Modland `MXTX.<tune>` + `SMPL.<tune>` pair and confirm the sample bank loads (no split-file fixture in the repo)
+
+## What CI found that local builds could not
+
+The first clean-checkout build failed:
+
+```
+emcc: error: .../src/frontends/common/uadeutils.c: No such file or directory
+```
+
+`uadeutils.c` is listed in `build.sh`'s `UADE_FRONTEND_SRCS` and had never been committed — upstream's `src/.gitignore` lists `uadeutils.c` unanchored, and git matches such patterns at any depth, so the rule meant for the `src/uadeutils.c` build symlink also swallowed the real source two directories down. Every local build worked because the file sits in the working tree. Same failure class as the unreproducible wasm, one layer deeper. Patterns are now anchored and the hidden sources committed.
+
+Scope note on the sync check: it covers `third-party/uade-3.05` and `uade-wasm`, not `public/uade`. Cross-machine emcc output is not byte-identical, so CI verifies the wasm *builds* from committed sources rather than diffing the binary.
 
 ## Notes for reviewers
 
