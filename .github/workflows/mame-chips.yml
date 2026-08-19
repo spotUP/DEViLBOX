@@ -1,0 +1,69 @@
+name: MAME chips
+
+# Nothing in `npm run build` compiles mame-wasm/, so the per-chip wasm in public/mame is
+# hand-built and committed. Two artifacts shipped for months built from sources that had
+# since moved on: the TMS5220 one ran 2x hot and clipped every word, and Votrax was in the
+# same state. Both were found by accident.
+#
+# This workflow compiles every chip from the committed sources, so a source change that no
+# longer builds cannot sit on main, and fails when a chip's sources changed without its
+# artifact being rebuilt. It deliberately does NOT diff the built wasm against the
+# committed one: emcc -O3 output is not reproducible across toolchain versions, so that
+# check would fail on every emsdk bump instead of on real staleness.
+
+on:
+  push:
+    branches: ['main']
+    paths:
+      - 'mame-wasm/**'
+      - 'tools/mame-wasm-staleness.py'
+      - '.github/workflows/mame-chips.yml'
+  pull_request:
+    paths:
+      - 'mame-wasm/**'
+      - 'tools/mame-wasm-staleness.py'
+      - '.github/workflows/mame-chips.yml'
+  workflow_dispatch:
+
+jobs:
+  mame-chips:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Verify committed artifacts are not stale
+        run: |
+          set -euo pipefail
+          BASE="${{ github.event.pull_request.base.sha || github.event.before }}"
+          if [ -z "$BASE" ] || ! git cat-file -e "$BASE^{commit}" 2>/dev/null; then
+            echo "No usable base commit — checking the artifact inventory only."
+            python3 tools/mame-wasm-staleness.py --files
+            exit 0
+          fi
+          python3 tools/mame-wasm-staleness.py "$BASE" HEAD
+
+      - name: Install Emscripten
+        run: |
+          set -euo pipefail
+          git clone --depth 1 https://github.com/emscripten-core/emsdk.git ~/emsdk
+          ~/emsdk/emsdk install latest
+          ~/emsdk/emsdk activate latest
+
+      - name: Build every chip from committed sources
+        run: |
+          set -euo pipefail
+          source ~/emsdk/emsdk_env.sh
+          emcmake cmake -S mame-wasm -B "$RUNNER_TEMP/mame-build"
+          cmake --build "$RUNNER_TEMP/mame-build" -j"$(nproc)"
+
+      - name: Report which chips the build refreshed
+        # The build writes into public/mame, so the diff shows exactly which artifacts a
+        # rebuild would change. Toolchain drift alone can produce a diff, so this reports
+        # rather than fails — the staleness gate above is the one that blocks.
+        run: |
+          set -euo pipefail
+          git status --porcelain -- public/mame || true
+          git checkout -- public/mame || true
