@@ -2141,15 +2141,17 @@ export async function tryRouteFormat(
     return parseUADEFile(buffer, originalFileName, prefs.uade ?? 'enhanced', subsong, preScannedMeta);
   }
 
-  // ── MaxTrax (.mxtx) — native (UADE can't play it: ret=-1) ─────────────────────
+  // ── MaxTrax (.mxtx) — native parser, native engine ────────────────────────────
   // MIDI-like event format; parsed natively into a quantized pattern view + lossless MXTX
-  // export (dispatched by the MXTX magic in nativeExportRouter). No DEViLBOX playback yet.
+  // export (dispatched by the MXTX magic in nativeExportRouter). Audio comes from
+  // MaxTraxEngine, not UADE — UADE can play MaxTrax (fake audio.device + the
+  // `MaxTrax prefixes=mxtx` eagleplayer entry) but gives no editable pattern data.
   if (matchesExt(filename, ['mxtx'])) {
     const { isMaxTraxFormat, parseMaxTraxFile } = await import('@lib/import/formats/MaxTraxParser');
     if (isMaxTraxFormat(buffer)) {
       // injectUADEPlayback wires uadeEditableFileData into the loaded song/store (so native
-      // MXTX export works). UADE can't actually play MaxTrax (ret=-1) → silent playback; the
-      // value here is native display + lossless export.
+      // MXTX export works). Playback is driven by MaxTraxEngine; the value here is native
+      // display + lossless export.
       return injectUADEPlayback(parseMaxTraxFile(buffer, originalFileName), ctx);
     }
   }
@@ -2662,7 +2664,7 @@ export async function tryRouteFormat(
   }
 
   // ── UADE-only prefix formats + catch-all ─────────────────────────────────
-  { const uadeResult = await tryUADEPrefixParse(buffer, filename, originalFileName, prefs, subsong, preScannedMeta);
+  { const uadeResult = await tryUADEPrefixParse(buffer, filename, originalFileName, prefs, subsong, preScannedMeta, companionFiles);
     if (uadeResult) return uadeResult; }
 
   // ── PC tracker formats (S3M, IT, XM, MOD) — native then libopenmpt ──────

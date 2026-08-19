@@ -458,9 +458,11 @@ export const FORMAT_REGISTRY: FormatDefinition[] = [
     label: 'Cinter4',
     description: 'Cinter4 Amiga synthesizer format — native WASM playback',
     family: 'amiga-native',
-    matchMode: 'both',
+    // Extension only: .cinter4 files carry no filename prefix, and declaring
+    // matchMode 'both' with an empty prefixes array made the registry-integrity
+    // test ("prefix-matched formats have prefixes array") fail.
+    matchMode: 'extension',
     extRegex: /\.cinter4$/i,
-    prefixes: [],
     nativeParser: { module: '@lib/import/formats/Cinter4Parser', parseFn: 'parseCinter4File', detectFn: 'isCinter4Format' },
     uadeFallback: false,
   },
@@ -1187,9 +1189,12 @@ export const FORMAT_REGISTRY: FormatDefinition[] = [
     uadeFallback: true,
   },
   {
-    // MaxTrax: MIDI-like event format (MXTX magic). UADE can't play it (ret=-1), so it MUST
-    // route to the native parser — drag-drop's UnifiedFileLoader only uses parseModuleToSong
-    // when the matched format has a nativeParser. Placed before the uade-only prefix catch-all.
+    // MaxTrax: MIDI-like event format (MXTX magic). Routed to the native parser because
+    // MaxTraxEngine gives editable patterns + lossless MXTX export; drag-drop's
+    // UnifiedFileLoader only uses parseModuleToSong when the matched format has a
+    // nativeParser. Placed before the uade-only prefix catch-all.
+    // (UADE *can* play MaxTrax since the fake audio.device port — see
+    // maxtraxPlayback.render.test.ts — it just isn't the in-app path.)
     key: 'maxTrax',
     label: 'MaxTrax',
     description: 'MaxTrax (.mxtx, MXTX magic) — native event parser',
@@ -2357,7 +2362,7 @@ export const FORMAT_REGISTRY: FormatDefinition[] = [
     ['cba', 'ChipTracker Archive'], ['chip', 'ChipTracker'],
     ['cd', 'Core Design'], ['dlw', 'Dave Lowe WTD'],
     ['fp2', 'Future Player 2'], ['fredmon', 'Fred Editor Monitor'],
-    ['mxt', 'MaxTrax'], ['nt', 'NoiseTracker'],
+    ['mxt', 'MaxTrax'], ['mxtx', 'MaxTrax'], ['nt', 'NoiseTracker'],
     ['ntsp', 'NTSP'], ['psum', 'Paul Summers'],
     ['rhst', 'Rob Hubbard ST'], ['rkl', 'Ron Klaren'],
     ['sc2', 'Sean Connolly 2'], ['sil', 'Silmarils v2'],
