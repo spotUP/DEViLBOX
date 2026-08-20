@@ -273,7 +273,7 @@ export function parsePhonemeString(str: string): PhonemeToken[] {
 }
 
 /** Set of all known SAM 2-char phoneme codes */
-const KNOWN_PHONEMES = new Set<string>([
+export const KNOWN_PHONEMES = new Set<string>([
   'IY', 'IH', 'EH', 'AE', 'AA', 'AH', 'AO', 'UH', 'AX', 'IX',
   'ER', 'UX', 'OH', 'RX', 'LX', 'WX', 'YX', 'WH',
   'R*', 'L*', 'W*', 'Y*', 'M*', 'N*', 'NX', 'DX', 'Q*',

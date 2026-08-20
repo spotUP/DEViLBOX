@@ -71,8 +71,11 @@ class BitReader {
 /**
  * Parse a single LPC frame from a bitstream.
  * Returns null if the frame is a stop frame (energy=15).
+ *
+ * pitchBits selects the chip family: 5 for TMC0281/TMS5100/TMS5110 (0-31),
+ * 6 for TMS5200/TMS5220 (0-63). The frame layout is identical otherwise.
  */
-function parseLPCFrame(reader: BitReader): LPCFrame | null {
+function parseLPCFrame(reader: BitReader, pitchBits = 5): LPCFrame | null {
   const energy = reader.readBits(4);
 
   // Silent frame (energy=0)
@@ -92,7 +95,7 @@ function parseLPCFrame(reader: BitReader): LPCFrame | null {
   }
 
   const repeat = reader.readBits(1) === 1;
-  const pitch = reader.readBits(5); // TMC0281 uses 5-bit pitch (0-31), not 6-bit TMS5220
+  const pitch = reader.readBits(pitchBits); // TMC0281 uses 5-bit pitch (0-31), not 6-bit TMS5220
   const unvoiced = pitch === 0;
 
   if (repeat) {
@@ -137,7 +140,7 @@ function parseLPCFrame(reader: BitReader): LPCFrame | null {
  * The approach: scan through the ROM bit-by-bit looking for valid frame sequences.
  * This is a heuristic since we don't have the address table from the MCU ROM.
  */
-export function scanVSMForWords(romData: Uint8Array, maxWords = 256): VSMWord[] {
+export function scanVSMForWords(romData: Uint8Array, maxWords = 256, pitchBits = 5): VSMWord[] {
   const words: VSMWord[] = [];
   const reader = new BitReader(romData);
   const totalBits = romData.length * 8;
@@ -160,7 +163,7 @@ export function scanVSMForWords(romData: Uint8Array, maxWords = 256): VSMWord[] 
         break;
       }
 
-      const frame = parseLPCFrame(reader);
+      const frame = parseLPCFrame(reader, pitchBits);
 
       if (frame === null) {
         // Stop frame - end of word
@@ -214,14 +217,17 @@ export function scanVSMForWords(romData: Uint8Array, maxWords = 256): VSMWord[] 
 /**
  * Parse LPC frames starting at a specific bit position.
  * Used for direct word address playback.
+ *
+ * pitchBits selects the chip family: 5 for TMC0281/TMS5100/TMS5110,
+ * 6 for TMS5200/TMS5220.
  */
-export function parseLPCFramesFromPosition(romData: Uint8Array, startBit: number): LPCFrame[] {
+export function parseLPCFramesFromPosition(romData: Uint8Array, startBit: number, pitchBits = 5): LPCFrame[] {
   const reader = new BitReader(romData, startBit);
   const frames: LPCFrame[] = [];
   const totalBits = romData.length * 8;
 
   while (reader.position < totalBits - 10 && frames.length < 300) {
-    const frame = parseLPCFrame(reader);
+    const frame = parseLPCFrame(reader, pitchBits);
     if (frame === null) break; // Stop frame
     frames.push(frame);
   }
@@ -343,7 +349,6 @@ export function parseVSMDirectory(vsmRom: Uint8Array): VSMWord[] {
     }
   }
 
-  console.log(`[VSMROMParser] Directory: ${words.length} recordings (${SYSTEM_ENTRIES.length} system entries + spelling lists)`);
   return words;
 }
 
