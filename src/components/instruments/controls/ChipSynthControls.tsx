@@ -14,6 +14,7 @@ import { getRomWordNames, getRomWordVersion, subscribeRomWords } from '@engine/t
 import type { SynthType } from '@typedefs/instrument';
 import type JSZipType from 'jszip';
 import { VowelEditor } from './VowelEditor';
+import { LexiconBrowser } from './LexiconBrowser';
 import { ScrollLockContainer } from '@components/ui/ScrollLockContainer';
 
 interface ChipSynthControlsProps {
@@ -286,6 +287,19 @@ export const ChipSynthControls: React.FC<ChipSynthControlsProps> = ({
             accentColor={accentColor}
           />
         </div>
+      );
+    }
+
+    if (param.type === 'lexicon') {
+      return (
+        <LexiconBrowser
+          key={paramKey}
+          accentColor={accentColor}
+          mutedColor={mutedColor}
+          panelBorder={panelBorder}
+          isCyanTheme={isCyanTheme}
+          onSpeak={(text) => onSpeak?.(text)}
+        />
       );
     }
 

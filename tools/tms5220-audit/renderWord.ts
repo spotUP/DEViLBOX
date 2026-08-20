@@ -24,6 +24,8 @@ interface ChipModule {
     initialize(sampleRate: number): void;
     loadROM(ptr: number, size: number): void;
     speakAtByte(byteAddr: number): void;
+    loadFrameBuffer(ptr: number, numFrames: number): void;
+    speakFrameBuffer(): void;
     isSpeaking(): boolean;
     process(ptrL: number, ptrR: number, numSamples: number): void;
   };
@@ -100,7 +102,7 @@ async function loadChip(): Promise<ChipModule> {
   return Module;
 }
 
-function writeWav(path: string, samples: Float32Array, sampleRate: number): void {
+export function writeWav(path: string, samples: Float32Array, sampleRate: number): void {
   const n = samples.length;
   const buf = Buffer.alloc(44 + n * 2);
   buf.write('RIFF', 0);
@@ -128,59 +130,109 @@ function writeWav(path: string, samples: Float32Array, sampleRate: number): void
  * Returns the samples plus level statistics.
  */
 export async function renderRomWord(byteAddr: number, seconds = 2): Promise<RomWordRender> {
-const Module = await loadChip();
-const synth = new Module.TMS5220Synth();
-synth.initialize(SAMPLE_RATE);
+  const Module = await loadChip();
+  const synth = new Module.TMS5220Synth();
+  synth.initialize(SAMPLE_RATE);
 
-// Both VSM ROMs, concatenated exactly as MAMEROMLoader does (rom0 then rom1).
-const rom = Buffer.concat([
-  readFileSync(join(ROOT, 'public/roms/snspell/tmc0351n2l.vsm')),
-  readFileSync(join(ROOT, 'public/roms/snspell/tmc0352n2l.vsm')),
-]);
-const romPtr = Module._malloc(rom.length);
-Module.heapU8().set(rom, romPtr);
-synth.loadROM(romPtr, rom.length);
+  const rom = loadVsmRom();
+  const romPtr = Module._malloc(rom.length);
+  Module.heapU8().set(rom, romPtr);
+  synth.loadROM(romPtr, rom.length);
 
-synth.speakAtByte(byteAddr);
-
-const total = Math.floor(seconds * SAMPLE_RATE);
-const block = 512;
-const ptrL = Module._malloc(block * 4);
-const ptrR = Module._malloc(block * 4);
-const out = new Float32Array(total);
-
-let speakingBlocks = 0;
-for (let done = 0; done < total; done += block) {
-  const n = Math.min(block, total - done);
-  synth.process(ptrL, ptrR, n);
-  const view = Module.heapF32().subarray(ptrL / 4, ptrL / 4 + n);
-  out.set(view, done);
-  if (synth.isSpeaking()) speakingBlocks++;
+  synth.speakAtByte(byteAddr);
+  const { out, speakingBlocks } = collectSamples(Module, synth, seconds);
+  const stats = computeStats(out, synth.isSpeaking(), speakingBlocks);
+  return { samples: out, sampleRate: SAMPLE_RATE, byteAddr: '0x' + byteAddr.toString(16), romBytes: rom.length, seconds, ...stats };
 }
 
-let peak = 0, sum = 0, nonzero = 0, lastNonzero = -1;
-for (let i = 0; i < out.length; i++) {
-  const a = Math.abs(out[i]);
-  if (a > peak) peak = a;
-  sum += out[i] * out[i];
-  if (a > 1e-4) { nonzero++; lastNonzero = i; }
+/**
+ * Render a packed frame buffer (phoneme TTS) from the shipped chip bundle.
+ * The buffer must be in the 12-byte format produced by packFrameBuffer.
+ * Returns the samples plus level statistics.
+ */
+export async function renderFrameBuffer(
+  packed: { data: Uint8Array; numFrames: number },
+  seconds = 2,
+): Promise<RomWordRender> {
+  const Module = await loadChip();
+  const synth = new Module.TMS5220Synth();
+  synth.initialize(SAMPLE_RATE);
+
+  const rom = loadVsmRom();
+  const romPtr = Module._malloc(rom.length);
+  Module.heapU8().set(rom, romPtr);
+  synth.loadROM(romPtr, rom.length);
+
+  const bufPtr = Module._malloc(packed.data.length);
+  Module.heapU8().set(packed.data, bufPtr);
+  synth.loadFrameBuffer(bufPtr, packed.numFrames);
+  synth.speakFrameBuffer();
+
+  const { out, speakingBlocks } = collectSamples(Module, synth, seconds);
+  const stats = computeStats(out, synth.isSpeaking(), speakingBlocks);
+  return {
+    samples: out,
+    sampleRate: SAMPLE_RATE,
+    byteAddr: `frames:${packed.numFrames}`,
+    romBytes: rom.length,
+    seconds,
+    ...stats,
+  };
 }
-const rms = Math.sqrt(sum / out.length);
 
-const stats = {
-  byteAddr: '0x' + byteAddr.toString(16),
-  romBytes: rom.length,
-  seconds,
-  peak: +peak.toFixed(4),
-  rms: +rms.toFixed(5),
-  peakDbfs: peak > 0 ? +(20 * Math.log10(peak)).toFixed(2) : null,
-  nonzeroFraction: +(nonzero / out.length).toFixed(4),
-  speechEndsAtSec: lastNonzero >= 0 ? +(lastNonzero / SAMPLE_RATE).toFixed(3) : null,
-  stillSpeaking: synth.isSpeaking(),
-  blocksWhileSpeaking: speakingBlocks,
-};
+function loadVsmRom(): Buffer {
+  return Buffer.concat([
+    readFileSync(join(ROOT, 'public/roms/snspell/tmc0351n2l.vsm')),
+    readFileSync(join(ROOT, 'public/roms/snspell/tmc0352n2l.vsm')),
+  ]);
+}
 
-  return { samples: out, sampleRate: SAMPLE_RATE, ...stats };
+function collectSamples(
+  Module: ChipModule,
+  synth: InstanceType<ChipModule['TMS5220Synth']>,
+  seconds: number,
+): { out: Float32Array; speakingBlocks: number } {
+  const total = Math.floor(seconds * SAMPLE_RATE);
+  const block = 512;
+  const ptrL = Module._malloc(block * 4);
+  const ptrR = Module._malloc(block * 4);
+  const out = new Float32Array(total);
+
+  let speakingBlocks = 0;
+  for (let done = 0; done < total; done += block) {
+    const n = Math.min(block, total - done);
+    synth.process(ptrL, ptrR, n);
+    const view = Module.heapF32().subarray(ptrL / 4, ptrL / 4 + n);
+    out.set(view, done);
+    if (synth.isSpeaking()) speakingBlocks++;
+  }
+
+  return { out, speakingBlocks };
+}
+
+function computeStats(
+  out: Float32Array,
+  stillSpeaking: boolean,
+  blocksWhileSpeaking: number,
+) {
+  let peak = 0, sum = 0, nonzero = 0, lastNonzero = -1;
+  for (let i = 0; i < out.length; i++) {
+    const a = Math.abs(out[i]);
+    if (a > peak) peak = a;
+    sum += out[i] * out[i];
+    if (a > 1e-4) { nonzero++; lastNonzero = i; }
+  }
+  const rms = Math.sqrt(sum / out.length);
+
+  return {
+    peak: +peak.toFixed(4),
+    rms: +rms.toFixed(5),
+    peakDbfs: peak > 0 ? +(20 * Math.log10(peak)).toFixed(2) : null,
+    nonzeroFraction: +(nonzero / out.length).toFixed(4),
+    speechEndsAtSec: lastNonzero >= 0 ? +(lastNonzero / SAMPLE_RATE).toFixed(3) : null,
+    stillSpeaking,
+    blocksWhileSpeaking,
+  };
 }
 
 // CLI: node tools/tms5220-audit/renderWord.mjs <byteAddr> [seconds] [out.wav]

@@ -43,7 +43,7 @@ kill_port() {
   pids=$(lsof -ti tcp:"$port" 2>/dev/null || true)
   if [ -z "$pids" ]; then return; fi
   for pid in $pids; do
-    cwd=$(lsof -p "$pid" 2>/dev/null | awk '$4=="cwd"{print $NF; exit}')
+    cwd=$(lsof -p "$pid" 2>/dev/null | awk '$4=="cwd"{print $NF; exit}') || true
     if [ -n "$cwd" ] && [[ "$cwd" == "$SCRIPT_DIR"* ]]; then
       warn "Killing DEViLBOX process on port $port (PID: $pid, cwd: $cwd)"
       kill -9 "$pid" 2>/dev/null || true
@@ -69,7 +69,7 @@ kill_project_tsx_orphans() {
   local pids pid cwd
   pids=$(pgrep -f 'tsx' 2>/dev/null || true)
   for pid in $pids; do
-    cwd=$(lsof -p "$pid" 2>/dev/null | awk '$4=="cwd"{print $NF; exit}')
+    cwd=$(lsof -p "$pid" 2>/dev/null | awk '$4=="cwd"{print $NF; exit}') || true
     if [ -n "$cwd" ] && [[ "$cwd" == "$SCRIPT_DIR"* ]]; then
       warn "Killing orphan tsx process $pid (cwd: $cwd)"
       kill -9 "$pid" 2>/dev/null || true

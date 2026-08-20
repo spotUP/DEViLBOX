@@ -5,7 +5,9 @@ import { type TMS5220Frame, phonemesToTMS5220Frames, samToTMS5220 } from '@engin
 import { type VSMWord, parseVSMDirectory, scanVSMForWords } from '@engine/speech/VSMROMParser';
 import { shouldAuditionRomSelection } from '@engine/speech/romSpeechRouting';
 import { buildRomWordIndex, lookupRomWord } from '@engine/speech/romWordLookup';
-import { extractPhonemeLibrary, buildFramesFromROMLibrary } from '@engine/speech/ROMPhonemeExtractor';
+import { buildCompletePhonemeLibrary, buildFramesFromROMLibrary } from '@engine/speech/ROMPhonemeExtractor';
+import { packFrameBuffer } from '@engine/speech/tms5220FrameBuffer';
+import { IMPORTED_RECORDINGS } from '@generated/tms5220Recordings';
 import { loadTMS5220ROMs } from '@engine/mame/MAMEROMLoader';
 import { SpeechChain } from '@engine/speech/SpeechChain';
 
@@ -37,6 +39,17 @@ export function getRomWordVersion(): number {
 export function subscribeRomWords(listener: () => void): () => void {
   _romWordListeners.add(listener);
   return () => { _romWordListeners.delete(listener); };
+}
+
+/** Case-insensitive lookup of an imported authentic recording by word. */
+export function lookupImportedRecording(word: string) {
+  const key = word.trim().toUpperCase();
+  return IMPORTED_RECORDINGS.find(r => r.word === key) ?? null;
+}
+
+/** Names of every imported authentic recording (for UI badges). */
+export function getImportedRecordingNames(): string[] {
+  return IMPORTED_RECORDINGS.map(r => r.word);
 }
 
 const TMS5220Param = {
@@ -170,9 +183,19 @@ export class TMS5220Synth extends MAMEBaseSynth {
 
       this._romWordIndex = buildRomWordIndex(this._romWords);
 
-      // Extract authentic phonemes from A-Z letter recordings
+      // Extract authentic phonemes: hand-verified letter path plus aligner-mined
+      // vocabulary words, digits and phrases, with derivations for the codes no
+      // recording exercises.
       if (this._romWords.length >= 26) {
-        this._romPhonemes = extractPhonemeLibrary(this._romWords.slice(0, 26));
+        const result = buildCompletePhonemeLibrary(this._romWords);
+        this._romPhonemes = result.library;
+        const count = (src: string) =>
+          [...result.provenance.values()].filter(p => p.source === src).length;
+        console.log(
+          `[TMS5220] Phoneme library: ${result.library.size} codes ` +
+          `(letter ${count('letter')}, word ${count('word')}, phrase ${count('phrase')}, ` +
+          `derived ${count('derived')}), ${result.droppedWords.length} recordings rejected`
+        );
       }
 
       this._romLoaded = true;
@@ -369,10 +392,19 @@ export class TMS5220Synth extends MAMEBaseSynth {
   // Text-to-Speech
   // ===========================================================================
 
-  /** Speak English text - uses ROM words when available, SAM phonemes as fallback */
+  /** Speak English text - uses imported recordings, ROM words when available, SAM phonemes as fallback */
   speakText(text: string): void {
     if (!this._isReady || !this.workletNode) {
       this._pendingCalls.push({ method: 'speakText', args: [text] });
+      return;
+    }
+
+    // Single-word authentic recordings (ti_lpc/QBoxPro) play directly; for
+    // multi-word text the hybrid chain routes each word through them anyway.
+    const recording = lookupImportedRecording(text);
+    if (recording) {
+      this.stopSpeaking();
+      this._sendFrameBufferAndSpeak(recording.frames);
       return;
     }
 
@@ -481,7 +513,17 @@ export class TMS5220Synth extends MAMEBaseSynth {
       // synthesising it from the hand-authored coefficient table every time.
       const romIdx = lookupRomWord(this._romWordIndex, word);
 
-      if (romIdx >= 0) {
+      // Authentic imported recordings (ti_lpc/QBoxPro) beat ROM words and
+      // phoneme synthesis — a real TI recording of the typed word is the best
+      // possible render. ISLE/COLOR/NEIGHBOR/YOUR SCORE are byte-identical to
+      // the ROM copies, so this never regresses ROM playback.
+      const recording = lookupImportedRecording(word);
+
+      if (recording) {
+        this._sendFrameBufferAndSpeak(recording.frames);
+        const totalMs = recording.frames.reduce((sum, f) => sum + f.durationMs, 0) + 200;
+        this._scheduleChainStep(generation, playNext, totalMs);
+      } else if (romIdx >= 0) {
         // Single letter: play via ROM (verified A-Z mapping)
         this._playROMWordDirect(romIdx);
         const romWord = this._romWords[romIdx];
@@ -505,44 +547,7 @@ export class TMS5220Synth extends MAMEBaseSynth {
    * Frames are expanded based on durationMs (25ms per MAME frame).
    */
   private _packFrameBuffer(frames: TMS5220Frame[]): { data: Uint8Array; numFrames: number } {
-    // First pass: count total MAME frames needed
-    let totalFrames = 0;
-    for (const frame of frames) {
-      const count = Math.max(1, Math.round(frame.durationMs / 25));
-      totalFrames += count;
-    }
-
-    // Add a silence frame at the end so the engine ramps down cleanly
-    totalFrames += 1;
-
-    const data = new Uint8Array(totalFrames * 12);
-    let offset = 0;
-
-    // K index max values per coefficient (from KBITS: 5,5,4,4,4,4,4,3,3,3)
-    const kMax = [31, 31, 15, 15, 15, 15, 15, 7, 7, 7];
-
-    for (const frame of frames) {
-      const count = Math.max(1, Math.round(frame.durationMs / 25));
-      // Clamp to valid table ranges: energy [1,14] (0=silence, 15=stop), pitch [0,31]
-      const energyIdx = Math.min(Math.max(frame.energy, 1), 14);
-      const pitchIdx = frame.unvoiced ? 0 : Math.min(Math.max(frame.pitch, 0), 31);
-      const k = frame.k;
-
-      for (let i = 0; i < count; i++) {
-        data[offset] = energyIdx;
-        data[offset + 1] = pitchIdx;
-        for (let ki = 0; ki < 10; ki++) {
-          data[offset + 2 + ki] = Math.min(Math.max(k[ki] ?? 0, 0), kMax[ki]);
-        }
-        offset += 12;
-      }
-    }
-
-    // Final silence frame (energy=0) to end speech cleanly
-    data[offset] = 0; // energy 0 = silence
-    // pitch and K default to 0 (already zeroed)
-
-    return { data, numFrames: totalFrames };
+    return packFrameBuffer(frames);
   }
 
   /** Apply pitch/energy knob offsets to TTS frames before sending to WASM */
