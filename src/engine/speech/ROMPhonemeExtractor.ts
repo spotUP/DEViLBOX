@@ -20,49 +20,20 @@
 
 import type { LPCFrame, VSMWord } from './VSMROMParser';
 import type { TMS5220Frame } from './tms5220PhonemeMap';
+import { textToPhonemes, parsePhonemeString } from './Reciter';
+import {
+  alignPhonemesToFrames,
+  getPhonemeClass,
+  kIndexDistance,
+  resolveRepeatFrames,
+  trimSilence,
+  K_MAX,
+  type PhonemeClass,
+} from './ROMWordAligner';
 
-// ============================================================================
-// Phoneme Classification
-// ============================================================================
-
-type PhonemeClass = 'vowel' | 'diphthong' | 'stop' | 'fricative' | 'affricate' | 'nasal' | 'liquid' | 'glide' | 'pause' | 'other';
-
-const PHONEME_CLASS: Record<string, PhonemeClass> = {
-  // Vowels
-  'IY': 'vowel', 'IH': 'vowel', 'EH': 'vowel', 'AE': 'vowel',
-  'AA': 'vowel', 'AH': 'vowel', 'AO': 'vowel', 'UH': 'vowel',
-  'AX': 'vowel', 'IX': 'vowel', 'ER': 'vowel', 'UX': 'vowel', 'OH': 'vowel',
-  // Diphthongs
-  'EY': 'diphthong', 'AY': 'diphthong', 'OY': 'diphthong',
-  'AW': 'diphthong', 'OW': 'diphthong', 'UW': 'diphthong',
-  // Liquids
-  'R*': 'liquid', 'RX': 'liquid', 'L*': 'liquid', 'LX': 'liquid',
-  // Glides
-  'W*': 'glide', 'WX': 'glide', 'WH': 'glide', 'Y*': 'glide', 'YX': 'glide',
-  // Nasals
-  'M*': 'nasal', 'N*': 'nasal', 'NX': 'nasal',
-  // Fricatives (unvoiced)
-  'S*': 'fricative', 'SH': 'fricative', 'F*': 'fricative', 'TH': 'fricative',
-  '/H': 'fricative', '/X': 'fricative',
-  // Fricatives (voiced)
-  'Z*': 'fricative', 'ZH': 'fricative', 'V*': 'fricative', 'DH': 'fricative',
-  // Affricates
-  'CH': 'affricate', 'J*': 'affricate',
-  // Stops (unvoiced)
-  'P*': 'stop', 'T*': 'stop', 'K*': 'stop', 'KX': 'stop',
-  // Stops (voiced)
-  'B*': 'stop', 'D*': 'stop', 'G*': 'stop', 'GX': 'stop',
-  // Flap
-  'DX': 'stop',
-  // Glottal stop
-  'Q*': 'stop',
-  // Pause
-  ' ': 'pause',
-};
-
-function getPhonemeClass(code: string): PhonemeClass {
-  return PHONEME_CLASS[code] ?? 'other';
-}
+// resolveRepeatFrames was this module's public API before the aligner existed —
+// keep the name importable from here.
+export { resolveRepeatFrames } from './ROMWordAligner';
 
 // ============================================================================
 // Letter → Phoneme Decomposition
@@ -114,53 +85,6 @@ export const LETTER_PHONEME_MAP: Record<string, LetterDecomposition> = {
 // ============================================================================
 
 /**
- * Resolve repeat frames by carrying forward K coefficients from the previous
- * non-repeat frame. This makes every frame self-contained for extraction.
- */
-export function resolveRepeatFrames(frames: LPCFrame[]): LPCFrame[] {
-  const resolved: LPCFrame[] = [];
-  let lastK: number[] = [8, 8, 8, 8, 8, 8, 8, 4, 4, 4]; // Default middle values
-  let lastUnvoiced = false;
-
-  for (const frame of frames) {
-    if (frame.energy === 0) {
-      // Silent frame — pass through as-is
-      resolved.push({ ...frame });
-      continue;
-    }
-
-    if (frame.repeat) {
-      // Repeat frame — carry forward K values from last non-repeat frame
-      resolved.push({
-        energy: frame.energy,
-        repeat: false,
-        pitch: frame.pitch,
-        k: [...lastK],
-        unvoiced: lastUnvoiced,
-      });
-    } else {
-      // Full frame — update last K values
-      lastK = [...frame.k];
-      lastUnvoiced = frame.unvoiced;
-      resolved.push({ ...frame, k: [...frame.k] });
-    }
-  }
-
-  return resolved;
-}
-
-/**
- * Trim leading/trailing silent frames (energy=0) from a frame array.
- */
-function trimSilence(frames: LPCFrame[]): LPCFrame[] {
-  let start = 0;
-  while (start < frames.length && frames[start].energy === 0) start++;
-  let end = frames.length - 1;
-  while (end >= start && frames[end].energy === 0) end--;
-  return frames.slice(start, end + 1);
-}
-
-/**
  * Find the boundary between consonant and vowel in a CV (consonant-vowel) sequence.
  * Returns the index of the first frame that is voiced with energy above threshold.
  */
@@ -204,8 +128,7 @@ function extractMiddle(frames: LPCFrame[]): LPCFrame[] {
 // Frame Interpolation & Manipulation
 // ============================================================================
 
-/** K index clamping ranges: K1-K2 (0-31), K3-K7 (0-15), K8-K10 (0-7) */
-const K_MAX = [31, 31, 15, 15, 15, 15, 15, 7, 7, 7];
+/** K index clamping ranges live in ROMWordAligner (imported as K_MAX). */
 
 function clampK(k: number[], i: number): number {
   return Math.min(Math.max(Math.round(k[i] ?? 0), 0), K_MAX[i]);
@@ -438,6 +361,8 @@ interface PhonemeSegment {
   code: string;
   pClass: PhonemeClass;
   frames: TMS5220Frame[];
+  /** True when frames came from the ROM library (authentic, no synthetic shaping). */
+  romSourced: boolean;
 }
 
 /**
@@ -449,6 +374,11 @@ function getTransitionCount(prev: PhonemeSegment, next: PhonemeSegment): number 
 
   // Pause boundaries: no transitions
   if (pc === 'pause' || nc === 'pause') return 0;
+
+  // Two authentic ROM segments abut at a splice between recordings — there is
+  // no natural transition there (each segment carries its own recording's
+  // context). A light bridge smooths the discontinuity instead of letting it
+  // click; the class rules below decide how heavy it should be.
 
   // Stop → anything: no transitions (stops have natural bursts)
   if (pc === 'stop') return 0;
@@ -693,10 +623,6 @@ export function extractPhonemeLibrary(
     }
   }
 
-  console.log(
-    `[ROMPhonemeExtractor] Extracted ${library.size} phonemes from ROM: [${[...library.keys()].sort().join(', ')}]`
-  );
-
   return library;
 }
 
@@ -725,19 +651,36 @@ export function buildFramesFromROMLibrary(
   romLibrary: Map<string, TMS5220Frame[]>,
   staticFallback: (code: string) => TMS5220Frame | null
 ): TMS5220Frame[] {
+  // SAM emits a pause token for every word boundary and punctuation mark, so a
+  // single space in the input becomes two or three consecutive ' ' tokens.
+  // Collapse those into one word-boundary pause and drop leading/trailing ones —
+  // otherwise every inter-word gap and the sentence lead-in drag on for 100ms+.
+  const collapsed: typeof tokens = [];
+  for (const token of tokens) {
+    if (token.code === ' ') {
+      if (collapsed.length > 0 && collapsed[collapsed.length - 1].code !== ' ') collapsed.push(token);
+    } else {
+      collapsed.push(token);
+    }
+  }
+  while (collapsed.length > 0 && collapsed[0].code === ' ') collapsed.shift();
+  while (collapsed.length > 0 && collapsed[collapsed.length - 1].code === ' ') collapsed.pop();
+
   const segments: PhonemeSegment[] = [];
 
-  for (const token of tokens) {
+  for (const token of collapsed) {
     const pClass = getPhonemeClass(token.code);
     const romFrames = romLibrary.get(token.code);
 
     let frames: TMS5220Frame[];
+    let romSourced = false;
 
     if (romFrames && romFrames.length > 0) {
-      // Step 1a: Use ROM-extracted frames (authentic LPC data)
+      // Step 1a: Use ROM-extracted frames (authentic LPC data). These already
+      // carry the speaker's real envelope, pitch movement and coarticulation,
+      // so none of the synthetic static-table compensation below may touch them.
       frames = romFrames.map(f => ({ ...f, k: [...f.k] }));
-      // Step 2: Compress ROM frames to conversational pace
-      frames = compressROMFrames(frames);
+      romSourced = true;
     } else {
       // Step 1b: Generate multi-frame static sequence
       const staticFrame = staticFallback(token.code);
@@ -760,15 +703,270 @@ export function buildFramesFromROMLibrary(
       }));
     }
 
-    // Step 5: Apply energy envelope
-    frames = applyEnergyEnvelope(frames, pClass);
+    if (romSourced) {
+      // Authentic frames: no compression, no synthetic envelope, no synthetic
+      // pitch contour — they already have the real ones.
+    } else {
+      // Static frames: compensate for the flat table so they read as speech.
+      frames = compressROMFrames(frames);
+      frames = applyEnergyEnvelope(frames, pClass);
+      frames = applyPitchContour(frames, pClass);
+    }
 
-    // Step 6: Apply pitch contour
-    frames = applyPitchContour(frames, pClass);
-
-    segments.push({ code: token.code, pClass, frames });
+    segments.push({ code: token.code, pClass, frames, romSourced });
   }
 
-  // Step 7: Insert coarticulation transitions between phoneme pairs
+  // Step 7: Insert coarticulation transitions between phoneme pairs. Only
+  // bridge pairs that involve a static-sourced segment — authentic ROM frames
+  // already contain the real transition into their neighbours.
   return insertTransitions(segments);
+}
+
+// ============================================================================
+// Word & Phrase Mining (aligner-based, 2026-08-20)
+// ============================================================================
+//
+// The letter recordings alone cover 16 phonemes. The VSM's 117 spelled words, 11
+// digits and 16 phrases cover the rest — but only if each recording's frames are
+// assigned to its phonemes correctly. The reverted attempt (d3beb83f9) split
+// proportionally and produced alien chatter; this pipeline force-aligns the G2P
+// phoneme sequence onto frame-domain evidence (ROMWordAligner) and drops any
+// recording whose best alignment is unconvincing.
+
+export interface PhonemeProvenance {
+  source: 'letter' | 'word' | 'phrase' | 'derived';
+  /** Recordings the exemplar was mined from, or a derivation note. */
+  words: string[];
+}
+
+export interface PhonemeLibraryResult {
+  library: Map<string, TMS5220Frame[]>;
+  provenance: Map<string, PhonemeProvenance>;
+  /** Speakable recordings whose alignment was rejected by the cost ceiling. */
+  droppedWords: string[];
+}
+
+interface MinedCandidate {
+  frames: TMS5220Frame[];
+  word: string;
+  cost: number;
+}
+
+/** Cluster compactness gate: mean run-distance to the medoid above which a
+ *  mined cluster is coarticulation mush, not a phoneme. */
+export const CLUSTER_TOLERANCE = 0.35;
+
+/** Strip the phrase-table quoting and decide whether a name is speakable text. */
+function speakableText(name: string): string | null {
+  const cleaned = name.replace(/"/g, '').toUpperCase().trim();
+  return cleaned.length > 0 && /^[A-Z' ]+$/.test(cleaned) ? cleaned : null;
+}
+
+/**
+ * Distance between two exemplar frame runs: resampled to a common length, then
+ * mean per-frame K distance with energy and voicing disagreement folded in.
+ */
+export function runDistance(a: TMS5220Frame[], b: TMS5220Frame[]): number {
+  const len = Math.min(a.length, b.length);
+  if (len === 0) return 1;
+  const ra = resampleFrames(a, len);
+  const rb = resampleFrames(b, len);
+  let sum = 0;
+  for (let i = 0; i < len; i++) {
+    sum += kIndexDistance(ra[i].k, rb[i].k)
+      + 0.5 * Math.abs(ra[i].energy - rb[i].energy) / 14
+      + (ra[i].unvoiced !== rb[i].unvoiced ? 0.5 : 0);
+  }
+  return sum / len;
+}
+
+/** The candidate minimizing total distance to all others — a real recorded
+ *  frame run, never an average. */
+function pickMedoid(candidates: MinedCandidate[]): MinedCandidate | null {
+  if (candidates.length === 0) return null;
+  if (candidates.length === 1) return candidates[0];
+  let best: MinedCandidate | null = null;
+  let bestSum = Infinity;
+  for (const c of candidates) {
+    let sum = 0;
+    for (const o of candidates) {
+      if (o !== c) sum += runDistance(c.frames, o.frames);
+    }
+    if (sum < bestSum) { bestSum = sum; best = c; }
+  }
+  return best;
+}
+
+/**
+ * Mine every speakable ROM recording through the forced aligner.
+ * Letters are included — their aligner-mined segments feed the oracle
+ * cross-check against the hand-verified letter path.
+ */
+export function extractWordPhonemeLibrary(
+  romWords: VSMWord[],
+): { candidates: Map<string, MinedCandidate[]>; dropped: string[] } {
+  const candidates = new Map<string, MinedCandidate[]>();
+  const dropped: string[] = [];
+
+  for (const word of romWords) {
+    const text = speakableText(word.name);
+    if (!text) continue;
+
+    const phonemeStr = textToPhonemes(text);
+    if (!phonemeStr) { dropped.push(text); continue; }
+
+    const tokens = parsePhonemeString(phonemeStr);
+    const alignment = alignPhonemesToFrames(tokens, word.frames);
+    if (!alignment) { dropped.push(text); continue; }
+
+    for (const seg of alignment.segments) {
+      if (seg.code === ' ') continue;
+      const segFrames = alignment.frames.slice(seg.start, seg.end);
+      // Sonorants keep their steady-state middle; stops/fricatives keep the
+      // whole (short) segment, burst included.
+      const cls = getPhonemeClass(seg.code);
+      const steady = cls === 'vowel' || cls === 'diphthong' || cls === 'nasal'
+        || cls === 'liquid' || cls === 'glide';
+      const use = steady ? extractMiddle(segFrames) : segFrames;
+      const tmsFrames = lpcToTMS5220Frames(use);
+      if (tmsFrames.length === 0) continue;
+
+      const list = candidates.get(seg.code) ?? [];
+      list.push({ frames: tmsFrames, word: text, cost: alignment.perPhonemeCost });
+      candidates.set(seg.code, list);
+    }
+  }
+
+  return { candidates, dropped };
+}
+
+/**
+ * Fill the codes no recording exercises (13 for the snspell ROM) from mined
+ * bases. A transformed real frame beats an invented one; anything still open
+ * after this falls back to the static table at synthesis time.
+ */
+export function completeLibrary(
+  library: Map<string, TMS5220Frame[]>,
+  provenance: Map<string, PhonemeProvenance>,
+): void {
+  const cloneRun = (frames: TMS5220Frame[]): TMS5220Frame[] =>
+    frames.map(f => ({ ...f, k: [...f.k] }));
+
+  // Allophone aliases — acoustically near-identical to their base phoneme.
+  const ALIAS: Record<string, string> = {
+    'IX': 'IH', 'UX': 'UW', 'RX': 'R*', 'LX': 'L*', 'WX': 'W*', 'YX': 'Y*',
+    'KX': 'K*', '/X': '/H',
+  };
+  for (const [dst, src] of Object.entries(ALIAS)) {
+    if (library.has(dst) || !library.has(src)) continue;
+    library.set(dst, cloneRun(library.get(src)!));
+    provenance.set(dst, { source: 'derived', words: [`alias of ${src}`] });
+  }
+
+  // DX (flap) — a truncated voiced stop.
+  if (!library.has('DX') && library.has('D*')) {
+    library.set('DX', cloneRun(library.get('D*')!).slice(0, 2));
+    provenance.set('DX', { source: 'derived', words: ['truncated D*'] });
+  }
+
+  // WH — unvoiced W (SAM's /hw/).
+  if (!library.has('WH') && library.has('W*')) {
+    library.set('WH', library.get('W*')!.map(f => ({
+      ...f, k: [...f.k], pitch: 0, unvoiced: true, energy: Math.max(1, f.energy - 3),
+    })));
+    provenance.set('WH', { source: 'derived', words: ['unvoiced W*'] });
+  }
+
+  // OY — the one diphthong no recording holds; glide mined AO into mined IY.
+  if (!library.has('OY') && library.has('AO') && library.has('IY')) {
+    library.set('OY', [...cloneRun(library.get('AO')!), ...cloneRun(library.get('IY')!)]);
+    provenance.set('OY', { source: 'derived', words: ['AO+IY glide'] });
+  }
+
+  // Q* (glottal stop) — a brief closure, not a spectrum.
+  if (!library.has('Q*')) {
+    library.set('Q*', [
+      { k: [8, 8, 8, 8, 8, 8, 8, 4, 4, 4], energy: 1, pitch: 0, unvoiced: true, durationMs: 25 },
+      { k: [8, 8, 8, 8, 8, 8, 8, 4, 4, 4], energy: 1, pitch: 0, unvoiced: true, durationMs: 25 },
+    ]);
+    provenance.set('Q*', { source: 'derived', words: ['closure silence'] });
+  }
+
+  // Pause token — used by phrase alignment and synthesis transitions.
+  if (!library.has(' ')) {
+    library.set(' ', [
+      { k: [8, 8, 8, 8, 8, 8, 8, 4, 4, 4], energy: 1, pitch: 0, unvoiced: false, durationMs: 25 },
+      { k: [8, 8, 8, 8, 8, 8, 8, 4, 4, 4], energy: 1, pitch: 0, unvoiced: false, durationMs: 25 },
+    ]);
+    provenance.set(' ', { source: 'derived', words: ['pause silence'] });
+  }
+
+  // G* (voiced velar stop) — no recording holds it; derive from mined K* (unvoiced velar).
+  if (!library.has('G*') && library.has('K*')) {
+    library.set('G*', library.get('K*')!.map(f => ({
+      ...f, k: [...f.k], pitch: Math.max(1, f.pitch), unvoiced: false, energy: Math.min(14, f.energy + 1),
+    })));
+    provenance.set('G*', { source: 'derived', words: ['voiced K*'] });
+  }
+  // GX is the allophone of G*; the static table gives both identical coefficients.
+  if (!library.has('GX') && library.has('G*')) {
+    library.set('GX', library.get('G*')!.map(f => ({ ...f, k: [...f.k] })));
+    provenance.set('GX', { source: 'derived', words: ['G* allophone'] });
+  }
+
+  // J* (voiced affricate) — no recording holds it; derive from mined CH (unvoiced affricate).
+  if (!library.has('J*') && library.has('CH')) {
+    library.set('J*', library.get('CH')!.map(f => ({
+      ...f, k: [...f.k], pitch: Math.max(1, f.pitch), unvoiced: false, energy: Math.min(14, f.energy + 1),
+    })));
+    provenance.set('J*', { source: 'derived', words: ['voiced CH'] });
+  }
+}
+
+/**
+ * Build the full phoneme library for a parsed VSM: hand-verified letter
+ * extraction first (authoritative), then aligner-mined words/phrases for
+ * everything the letters don't cover, then derivations for the rest.
+ */
+export function buildCompletePhonemeLibrary(romWords: VSMWord[]): PhonemeLibraryResult {
+  const library = new Map<string, TMS5220Frame[]>();
+  const provenance = new Map<string, PhonemeProvenance>();
+
+  // 1. Letters via the hand-verified decomposition path.
+  const letterLib = extractPhonemeLibrary(romWords.slice(0, 26));
+  const letterSources = new Map<string, string[]>();
+  for (const [letter, decomp] of Object.entries(LETTER_PHONEME_MAP)) {
+    for (const code of decomp.segments) {
+      const list = letterSources.get(code) ?? [];
+      list.push(letter);
+      letterSources.set(code, list);
+    }
+  }
+  for (const [code, frames] of letterLib) {
+    library.set(code, frames);
+    provenance.set(code, { source: 'letter', words: letterSources.get(code) ?? [] });
+  }
+
+  // 2. Aligner-mined words, digits and phrases fill the gaps.
+  const { candidates, dropped } = extractWordPhonemeLibrary(romWords);
+  for (const [code, cand] of candidates) {
+    if (library.has(code)) continue; // letter-derived stays authoritative
+    const medoid = pickMedoid(cand);
+    if (!medoid) continue;
+    if (cand.length >= 3) {
+      const meanDist = cand.reduce((s, c) => s + runDistance(c.frames, medoid.frames), 0) / cand.length;
+      if (meanDist > CLUSTER_TOLERANCE) continue; // mush cluster — fall through to derived/static
+    }
+    library.set(code, medoid.frames);
+    const isPhrase = medoid.word.includes(' ');
+    provenance.set(code, {
+      source: isPhrase ? 'phrase' : 'word',
+      words: cand.map(c => c.word).slice(0, 6),
+    });
+  }
+
+  // 3. Derivations for codes no recording exercises.
+  completeLibrary(library, provenance);
+
+  return { library, provenance, droppedWords: dropped };
 }
