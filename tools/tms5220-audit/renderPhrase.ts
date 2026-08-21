@@ -18,10 +18,15 @@ import { buildCompletePhonemeLibrary, buildFramesFromROMLibrary } from '../../sr
 import { phonemesToTMS5220Frames, samToTMS5220 } from '../../src/engine/speech/tms5220PhonemeMap';
 import { packFrameBuffer } from '../../src/engine/speech/tms5220FrameBuffer';
 import { parseVSMDirectory } from '../../src/engine/speech/VSMROMParser';
+import { calibratedStaticMap } from './calibratedStaticMap';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(HERE, '../..');
 const ROMS = join(ROOT, 'public/roms/snspell');
+
+function calibratedFallback(code: string) {
+  return calibratedStaticMap[code] ?? samToTMS5220(code);
+}
 
 function loadWords() {
   const rom = Buffer.concat([
@@ -31,7 +36,7 @@ function loadWords() {
   return parseVSMDirectory(new Uint8Array(rom));
 }
 
-async function renderOne(text: string, mode: 'library' | 'static', outPath: string) {
+async function renderOne(text: string, mode: 'library' | 'static' | 'calibrated', outPath: string) {
   const phonemeStr = textToPhonemes(text);
   if (!phonemeStr) throw new Error(`no phoneme mapping for "${text}"`);
   const tokens = parsePhonemeString(phonemeStr);
@@ -44,6 +49,12 @@ async function renderOne(text: string, mode: 'library' | 'static', outPath: stri
     provenanceCount = [...provenance.values()].filter(p => p.source !== 'derived').length;
     // Mirror the browser synth exactly: same pipeline, same fallback.
     frames = buildFramesFromROMLibrary(tokens, library, samToTMS5220);
+  } else if (mode === 'calibrated') {
+    // Calibrated static table only (same pipeline as library but with calibrated map)
+    const words = loadWords();
+    const { library, provenance } = buildCompletePhonemeLibrary(words);
+    provenanceCount = [...provenance.values()].filter(p => p.source !== 'derived').length;
+    frames = buildFramesFromROMLibrary(tokens, library, calibratedFallback);
   } else {
     // Mirror the browser synth's no-ROM path exactly.
     frames = phonemesToTMS5220Frames(tokens);
@@ -66,7 +77,9 @@ async function renderOne(text: string, mode: 'library' | 'static', outPath: stri
 if (process.argv[1] && import.meta.url.endsWith(process.argv[1].split('/').pop()!)) {
   const text = process.argv[2] ?? 'HELLO WORLD';
   const outPath = process.argv[3] ?? join(ROOT, 'tms5220-phrase.wav');
-  const mode: 'library' | 'static' = process.argv.includes('--static') ? 'static' : 'library';
+  const isStatic = process.argv.includes('--static');
+  const isCalibrated = process.argv.includes('--calibrated');
+  const mode: 'library' | 'static' | 'calibrated' = isStatic ? 'static' : isCalibrated ? 'calibrated' : 'library';
 
   const info = await renderOne(text, mode, outPath);
   console.log(JSON.stringify(info, null, 2));
@@ -78,5 +91,11 @@ if (process.argv[1] && import.meta.url.endsWith(process.argv[1].split('/').pop()
     console.log('\n=== static-table comparison ===');
     console.log(JSON.stringify(staticInfo, null, 2));
     console.log('wrote', staticPath);
+
+    const calibratedPath = outPath.replace(/\.wav$/, '-calibrated.wav');
+    const calibratedInfo = await renderOne(text, 'calibrated', calibratedPath);
+    console.log('\n=== calibrated-table comparison ===');
+    console.log(JSON.stringify(calibratedInfo, null, 2));
+    console.log('wrote', calibratedPath);
   }
 }

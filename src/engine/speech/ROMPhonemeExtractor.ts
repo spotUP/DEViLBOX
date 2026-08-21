@@ -242,6 +242,40 @@ function scaleFrameCount(frames: TMS5220Frame[], scale: number): TMS5220Frame[] 
 }
 
 /**
+ * Minimum frame count per phoneme class — the floor the static path already
+ * targets (vowels 6, consonants 3-5). ROM extractions occasionally come back
+ * 1-2 frames (25-50ms): a sub-audible click, not a phoneme. Hold/stretch them
+ * to the class minimum so vowels stay audible.
+ */
+const MIN_FRAMES_BY_CLASS: Record<PhonemeClass, number> = {
+  vowel: 4,
+  diphthong: 4,
+  nasal: 3,
+  liquid: 3,
+  glide: 3,
+  fricative: 3,
+  stop: 3,
+  affricate: 3,
+  pause: 2,
+  other: 3,
+};
+
+function enforceMinFrames(frames: TMS5220Frame[], pClass: PhonemeClass): TMS5220Frame[] {
+  const min = MIN_FRAMES_BY_CLASS[pClass] ?? 3;
+  if (frames.length >= min) return frames;
+  if (frames.length === 1) {
+    // Single frame: hold it as identical copies — interpolation has no
+    // second point to work with.
+    const copies: TMS5220Frame[] = [];
+    for (let i = 0; i < min; i++) {
+      copies.push({ ...frames[0], k: [...frames[0].k] });
+    }
+    return copies;
+  }
+  return resampleFrames(frames, min);
+}
+
+/**
  * Map SAM stress level (0-8) to duration multiplier.
  */
 function getStressDurationScale(stress: number): number {
@@ -675,17 +709,21 @@ export function buildFramesFromROMLibrary(
     let frames: TMS5220Frame[];
     let romSourced = false;
 
-    if (romFrames && romFrames.length > 0) {
-      // Step 1a: Use ROM-extracted frames (authentic LPC data). These already
-      // carry the speaker's real envelope, pitch movement and coarticulation,
-      // so none of the synthetic static-table compensation below may touch them.
+    // Static table first: the hand-authored frames are acoustically correct
+    // for every phoneme. The ROM-mined library fills gaps only — its segments
+    // were misaligned for most phonemes (R* came out as one 25ms fronted
+    // frame that sounds like a hollow whistle; IY, OW, W*, Y* have front/back
+    // swapped), so mined frames must not override the curated table.
+    const staticFrame = staticFallback(token.code);
+    if (staticFrame) {
+      // Generate multi-frame static sequence
+      frames = generateStaticFrames(staticFrame, pClass);
+    } else if (romFrames && romFrames.length > 0) {
+      // ROM-extracted frames as fallback for codes the static table lacks.
       frames = romFrames.map(f => ({ ...f, k: [...f.k] }));
       romSourced = true;
     } else {
-      // Step 1b: Generate multi-frame static sequence
-      const staticFrame = staticFallback(token.code);
-      if (!staticFrame) continue;
-      frames = generateStaticFrames(staticFrame, pClass);
+      continue;
     }
 
     // Step 3: Scale duration by stress
@@ -694,6 +732,12 @@ export function buildFramesFromROMLibrary(
       frames = scaleFrameCount(frames, durationScale);
     }
 
+    // Some extractions (and stress-shrunk segments) come back 1-2 frames
+    // (25-50ms) — a sub-audible click, not a phoneme. Floor every segment to
+    // the class minimum so "is"/"iss" keep a real vowel. Pauses are deliberate
+    // gaps and must stay short.
+    if (token.code !== ' ') frames = enforceMinFrames(frames, pClass);
+
     // Step 4: Apply stress energy boost
     if (token.stress >= 4) {
       frames = frames.map(f => ({
@@ -701,6 +745,16 @@ export function buildFramesFromROMLibrary(
         k: [...f.k],
         energy: Math.min(14, f.energy + 2),
       }));
+    }
+
+    // Step 4b: Stress pitch accent — SAM stress >= 4 also lifts pitch, the
+    // melodic counterpart to the energy boost above. Voiced frames only.
+    if (token.stress >= 4) {
+      const accent = token.stress >= 6 ? 3 : 2;
+      frames = frames.map(f => {
+        if (f.pitch <= 0) return f;
+        return { ...f, pitch: Math.max(1, Math.min(31, f.pitch + accent)) };
+      });
     }
 
     if (romSourced) {
