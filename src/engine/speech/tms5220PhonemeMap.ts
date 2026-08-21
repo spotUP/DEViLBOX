@@ -44,12 +44,12 @@ export function samToTMS5220(samCode: string): TMS5220Frame | null {
   //   remapped here through the actual period values.
   const map: Record<string, TMS5220Frame> = {
     // === Vowels (voiced) ===
-    //                            K1  K2  K3  K4  K5  K6  K7  K8  K9  K10
-    'IY': { k: [12, 28, 11,  6, 10,  7,  9,  3,  5,  3], energy: 12, pitch: 20, unvoiced: false, durationMs: 150 },
+    // Calibrated from A-Z letter recordings (middle 40%, mean K, energy capped at 10)
+    'IY': { k: [18, 13,  2,  4,  8, 14, 12,  3,  2,  4], energy: 10, pitch: 16, unvoiced: false, durationMs: 375 },
     'IH': { k: [15, 25, 10,  7,  9,  7,  8,  3,  4,  3], energy: 12, pitch: 18, unvoiced: false, durationMs: 120 },
-    'EH': { k: [20, 22, 10,  7,  8,  7,  8,  4,  4,  3], energy: 12, pitch: 18, unvoiced: false, durationMs: 140 },
+    'EH': { k: [15, 17,  6,  6,  8, 11,  9,  3,  2,  4], energy: 10, pitch: 17, unvoiced: false, durationMs: 325 },
     'AE': { k: [24, 19, 10,  8,  8,  7,  8,  4,  4,  4], energy: 12, pitch: 18, unvoiced: false, durationMs: 150 },
-    'AA': { k: [23, 12,  8,  8,  7,  8,  8,  4,  4,  4], energy: 12, pitch: 16, unvoiced: false, durationMs: 160 },
+    'AA': { k: [10, 26,  9,  8,  8,  9,  9,  5,  5,  2], energy: 10, pitch: 21, unvoiced: false, durationMs: 325 },
     'AH': { k: [21, 11,  8,  8,  7,  8,  8,  4,  4,  4], energy: 12, pitch: 16, unvoiced: false, durationMs: 130 },
     'AO': { k: [19,  8,  7,  9,  7,  8,  8,  4,  4,  4], energy: 12, pitch: 14, unvoiced: false, durationMs: 150 },
     'UH': { k: [17, 13,  7,  9,  7,  8,  8,  4,  4,  4], energy: 12, pitch: 14, unvoiced: false, durationMs: 120 },
@@ -60,22 +60,22 @@ export function samToTMS5220(samCode: string): TMS5220Frame | null {
     'OH': { k: [19,  8,  7,  9,  7,  8,  8,  4,  4,  4], energy: 12, pitch: 14, unvoiced: false, durationMs: 150 },
 
     // === Diphthongs ===
-    'EY': { k: [20, 22, 10,  7,  8,  7,  8,  4,  4,  3], energy: 12, pitch: 18, unvoiced: false, durationMs: 200 },
-    'AY': { k: [23, 12,  8,  8,  7,  8,  8,  4,  4,  4], energy: 12, pitch: 16, unvoiced: false, durationMs: 200 },
+    'EY': { k: [15, 12,  5,  7, 13, 11, 10,  4,  2,  4], energy: 10, pitch: 20, unvoiced: false, durationMs: 350 },
+    'AY': { k: [13, 23,  9,  9,  7, 10, 12,  3,  2,  4], energy: 10, pitch: 18, unvoiced: false, durationMs: 325 },
     'OY': { k: [19,  8,  7,  9,  7,  8,  8,  4,  4,  4], energy: 12, pitch: 14, unvoiced: false, durationMs: 200 },
     'AW': { k: [23, 12,  8,  8,  7,  8,  8,  4,  4,  4], energy: 12, pitch: 16, unvoiced: false, durationMs: 200 },
-    'OW': { k: [19,  8,  7,  9,  7,  8,  8,  4,  4,  4], energy: 12, pitch: 14, unvoiced: false, durationMs: 200 },
-    'UW': { k: [14,  6,  6, 10,  7,  8,  8,  5,  4,  4], energy: 12, pitch: 12, unvoiced: false, durationMs: 160 },
+    'OW': { k: [ 7, 19, 13,  8,  4,  5, 10,  4,  5,  4], energy: 10, pitch: 20, unvoiced: false, durationMs: 300 },
+    'UW': { k: [ 8, 15,  9,  7,  6,  6,  8,  6,  5,  2], energy: 10, pitch: 19, unvoiced: false, durationMs: 250 },
 
     // === Glides / Liquids (voiced, transitional) ===
     'R*': { k: [17, 15,  9,  9,  6, 10,  7,  5,  4,  4], energy: 10, pitch: 16, unvoiced: false, durationMs: 100 },
     'RX': { k: [17, 15,  9,  9,  6, 10,  7,  5,  4,  4], energy: 10, pitch: 16, unvoiced: false, durationMs: 100 },
     'L*': { k: [16, 20,  7, 10,  5, 10,  6,  5,  3,  4], energy: 10, pitch: 16, unvoiced: false, durationMs: 110 },
     'LX': { k: [16, 20,  7, 10,  5, 10,  6,  5,  3,  4], energy: 10, pitch: 16, unvoiced: false, durationMs: 110 },
-    'W*': { k: [14,  5,  5, 11,  7,  8,  9,  5,  5,  4], energy:  9, pitch: 14, unvoiced: false, durationMs: 80 },
+    'W*': { k: [ 5, 27, 11,  8,  4,  7,  9,  3,  4,  3], energy: 10, pitch: 18, unvoiced: false, durationMs: 150 },
     'WX': { k: [14,  5,  5, 11,  7,  8,  9,  5,  5,  4], energy:  9, pitch: 14, unvoiced: false, durationMs: 80 },
     'WH': { k: [14,  5,  5, 11,  7,  8,  9,  5,  5,  4], energy:  6, pitch:  0, unvoiced: true,  durationMs: 80 },
-    'Y*': { k: [12, 28, 11,  6, 10,  7,  9,  3,  5,  3], energy:  9, pitch: 18, unvoiced: false, durationMs: 80 },
+    'Y*': { k: [19,  7,  1,  7,  9, 11, 11,  5,  2,  2], energy: 10, pitch: 19, unvoiced: false, durationMs: 150 },
     'YX': { k: [12, 28, 11,  6, 10,  7,  9,  3,  5,  3], energy:  9, pitch: 18, unvoiced: false, durationMs: 80 },
 
     // === Nasals (voiced, nasal resonance via K3/K4 boost) ===
@@ -84,9 +84,9 @@ export function samToTMS5220(samCode: string): TMS5220Frame | null {
     'NX': { k: [16, 12,  4, 14,  5, 10,  6,  5,  3,  5], energy:  9, pitch: 16, unvoiced: false, durationMs: 120 },
 
     // === Fricatives (unvoiced noise, high K3/K4 for spectral shaping) ===
-    'S*': { k: [10, 28, 14, 12, 11,  5, 10,  2,  6,  2], energy:  8, pitch:  0, unvoiced: true,  durationMs: 140 },
+    'S*': { k: [29, 21,  7,  9,  8,  8,  8,  4,  4,  4], energy:  7, pitch:  0, unvoiced: true,  durationMs: 250 },
     'SH': { k: [12, 22, 13, 13, 10,  6,  9,  3,  5,  3], energy: 10, pitch:  0, unvoiced: true,  durationMs: 140 },
-    'F*': { k: [ 8, 20, 12,  9, 10,  5,  8,  2,  5,  2], energy:  6, pitch:  0, unvoiced: true,  durationMs: 120 },
+    'F*': { k: [20, 17,  9,  9,  8,  8,  8,  4,  4,  4], energy:  7, pitch:  0, unvoiced: true,  durationMs: 175 },
     'TH': { k: [ 8, 24, 12,  8, 10,  5,  8,  2,  6,  2], energy:  5, pitch:  0, unvoiced: true,  durationMs: 120 },
     '/H': { k: [18, 14,  8,  8,  8,  8,  8,  4,  4,  4], energy:  6, pitch:  0, unvoiced: true,  durationMs: 80 },
     '/X': { k: [18, 14,  8,  8,  8,  8,  8,  4,  4,  4], energy:  6, pitch:  0, unvoiced: true,  durationMs: 80 },
@@ -96,18 +96,18 @@ export function samToTMS5220(samCode: string): TMS5220Frame | null {
     'DH': { k: [ 8, 24, 12,  8, 10,  5,  8,  2,  6,  2], energy:  8, pitch: 16, unvoiced: false, durationMs: 80 },
 
     // === Affricates ===
-    'CH': { k: [12, 24, 13, 12, 10,  6,  9,  3,  5,  3], energy:  8, pitch:  0, unvoiced: true,  durationMs: 120 },
+    'CH': { k: [23, 26, 14, 13,  8,  8,  8,  4,  4,  4], energy:  8, pitch:  0, unvoiced: true,  durationMs: 225 },
     'J*': { k: [12, 24, 13, 12, 10,  6,  9,  3,  5,  3], energy:  9, pitch: 16, unvoiced: false, durationMs: 120 },
 
     // === Stops (burst + brief silence) ===
-    'B*': { k: [22, 10,  6, 10,  5,  9,  7,  4,  3,  4], energy:  7, pitch: 16, unvoiced: false, durationMs: 60 },
+    'B*': { k: [ 1, 17, 10,  7,  7, 10, 10,  4,  2,  2], energy:  4, pitch: 20, unvoiced: false, durationMs: 125 },
     'D*': { k: [18, 22,  6, 10,  6,  8,  7,  3,  4,  3], energy:  7, pitch: 16, unvoiced: false, durationMs: 60 },
     'G*': { k: [16, 14,  6, 10,  7,  8,  8,  4,  4,  4], energy:  7, pitch: 16, unvoiced: false, durationMs: 60 },
     'GX': { k: [16, 14,  6, 10,  7,  8,  8,  4,  4,  4], energy:  7, pitch: 16, unvoiced: false, durationMs: 60 },
-    'P*': { k: [22, 10,  6, 10,  5,  9,  7,  4,  3,  4], energy:  5, pitch:  0, unvoiced: true,  durationMs: 60 },
-    'T*': { k: [18, 22,  6, 10,  6,  8,  7,  3,  4,  3], energy:  6, pitch:  0, unvoiced: true,  durationMs: 60 },
-    'K*': { k: [16, 14,  6, 10,  7,  8,  8,  4,  4,  4], energy:  5, pitch:  0, unvoiced: true,  durationMs: 60 },
-    'KX': { k: [16, 14,  6, 10,  7,  8,  8,  4,  4,  4], energy:  5, pitch:  0, unvoiced: true,  durationMs: 60 },
+    'P*': { k: [19, 19, 10,  8,  8,  8,  8,  4,  4,  4], energy:  7, pitch:  0, unvoiced: true,  durationMs:  50 },
+    'T*': { k: [24, 20, 12,  8,  8,  8,  8,  4,  4,  4], energy:  7, pitch:  0, unvoiced: true,  durationMs:  75 },
+    'K*': { k: [24, 27, 12, 10,  8,  8,  8,  4,  4,  4], energy:  7, pitch:  0, unvoiced: true,  durationMs: 100 },
+    'KX': { k: [16, 14,  6, 10,  7,  8,  8,  4,  4,  4], energy:  5, pitch:  0, unvoiced: true,  durationMs:  60 },
 
     // === Other ===
     'DX': { k: [18, 22,  6, 10,  6,  8,  7,  3,  4,  3], energy:  6, pitch: 16, unvoiced: false, durationMs: 40 },
