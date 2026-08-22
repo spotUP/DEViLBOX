@@ -1,6 +1,6 @@
 
 import { MAMEBaseSynth } from '@engine/mame/MAMEBaseSynth';
-import { textToTokensSmart, isQuestion } from '@engine/speech/Reciter';
+import { textToTokensSmart, isQuestion, textToPhonemes, parsePhonemeString } from '@engine/speech/Reciter';
 import { type TMS5220Frame, samToTMS5220 } from '@engine/speech/tms5220PhonemeMap';
 import { type VSMWord, parseVSMDirectory, scanVSMForWords } from '@engine/speech/VSMROMParser';
 import { shouldAuditionRomSelection } from '@engine/speech/romSpeechRouting';
@@ -76,6 +76,7 @@ const TMS5220Param = {
   SPEECH_PITCH_OFFSET: 17,
   CABINET: 18,
   USE_ROM_WORDS: 19,
+  ROM_KNOBS: 20,
 } as const;
 
 /**
@@ -158,6 +159,7 @@ export class TMS5220Synth extends MAMEBaseSynth {
   private _currentRomSpeech = 0;  // 0 = TTS mode, 1+ = ROM word index + 1
   private _romSpeechRestored = false; // first romSpeech write is the stored value, not a pick
   private _useRomWords = true; // When false, use only static/calibrated table (consistent sound)
+  private _romKnobs = false; // When true, apply knob offsets to ROM words
 
   // Vowel sequence state
   private _vowelSequence: string[] = [];
@@ -293,6 +295,17 @@ export class TMS5220Synth extends MAMEBaseSynth {
 
     console.log(`[TMS5220] speakWord: "${word.name}" at byte ${byteAddr} (via frame buffer)`);
 
+    // If ROM words are disabled, fall back to TTS for this word
+    if (!this._useRomWords) {
+      const phonemeStr = textToPhonemes(word.name);
+      if (phonemeStr) {
+        const tokens = parsePhonemeString(phonemeStr);
+        const frames = this._buildPhonemeFrames(tokens);
+        this._sendFrameBufferAndSpeak(frames);
+      }
+      return;
+    }
+
     // Stop the engine first: a previous frame-buffer utterance leaves the chip
     // in frame_buffer_mode.
     this.workletNode.port.postMessage({ type: 'stopSpeaking' });
@@ -305,8 +318,8 @@ export class TMS5220Synth extends MAMEBaseSynth {
       unvoiced: f.unvoiced,
       durationMs: 25,
     }));
-    // Authentic ROM word: play byte-exact without knob offsets
-    this._sendFrameBufferAndSpeak(frames, undefined, false);
+    // Apply knob offsets when rom_knobs is enabled
+    this._sendFrameBufferAndSpeak(frames, undefined, this._romKnobs);
   }
 
   // ===========================================================================
@@ -732,6 +745,7 @@ export class TMS5220Synth extends MAMEBaseSynth {
       brightness: TMS5220Param.BRIGHTNESS,
       cabinet: TMS5220Param.CABINET,
       use_rom_words: TMS5220Param.USE_ROM_WORDS,
+      rom_knobs: TMS5220Param.ROM_KNOBS,
     };
 
     const paramId = paramMap[param];
@@ -749,6 +763,7 @@ export class TMS5220Synth extends MAMEBaseSynth {
     if (param === 'sing_mode') this._singMode = value >= 1;
     if (param === 'vowelLoopSingle') this._vowelLoopSingle = value >= 1;
     if (param === 'use_rom_words') this._useRomWords = value >= 1;
+    if (param === 'rom_knobs') this._romKnobs = value >= 1;
     if (param === 'romSpeech') {
       const selection = Math.round(value);
       const previous = this._currentRomSpeech;
