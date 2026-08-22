@@ -49,7 +49,7 @@ export function samToTMS5220(samCode: string): TMS5220Frame | null {
     'IH': { k: [15, 25, 10,  7,  9,  7,  8,  3,  4,  3], energy: 12, pitch: 18, unvoiced: false, durationMs: 120 },
     'EH': { k: [15, 17,  6,  6,  8, 11,  9,  3,  2,  4], energy: 10, pitch: 17, unvoiced: false, durationMs: 325 },
     'AE': { k: [24, 19, 10,  8,  8,  7,  8,  4,  4,  4], energy: 12, pitch: 18, unvoiced: false, durationMs: 150 },
-    'AA': { k: [10, 26,  9,  8,  8,  9,  9,  5,  5,  2], energy: 10, pitch: 21, unvoiced: false, durationMs: 325 },
+    'AA': { k: [11, 22, 10, 11,  5,  8,  9,  5,  5,  2], energy: 10, pitch: 20, unvoiced: false, durationMs: 250 },
     'AH': { k: [21, 11,  8,  8,  7,  8,  8,  4,  4,  4], energy: 12, pitch: 16, unvoiced: false, durationMs: 130 },
     'AO': { k: [19,  8,  7,  9,  7,  8,  8,  4,  4,  4], energy: 12, pitch: 14, unvoiced: false, durationMs: 150 },
     'UH': { k: [17, 13,  7,  9,  7,  8,  8,  4,  4,  4], energy: 12, pitch: 14, unvoiced: false, durationMs: 120 },
@@ -68,9 +68,9 @@ export function samToTMS5220(samCode: string): TMS5220Frame | null {
     'UW': { k: [ 8, 15,  9,  7,  6,  6,  8,  6,  5,  2], energy: 10, pitch: 19, unvoiced: false, durationMs: 250 },
 
     // === Glides / Liquids (voiced, transitional) ===
-    'R*': { k: [17, 15,  9,  9,  6, 10,  7,  5,  4,  4], energy: 10, pitch: 16, unvoiced: false, durationMs: 100 },
+    'R*': { k: [13, 17, 10,  4,  9, 12,  5,  4,  6,  1], energy: 10, pitch: 14, unvoiced: false, durationMs: 125 },
     'RX': { k: [17, 15,  9,  9,  6, 10,  7,  5,  4,  4], energy: 10, pitch: 16, unvoiced: false, durationMs: 100 },
-    'L*': { k: [16, 20,  7, 10,  5, 10,  6,  5,  3,  4], energy: 10, pitch: 16, unvoiced: false, durationMs: 110 },
+    'L*': { k: [ 8, 14, 11, 10,  1,  6, 11,  3,  4,  2], energy: 10, pitch: 12, unvoiced: false, durationMs: 75 },
     'LX': { k: [16, 20,  7, 10,  5, 10,  6,  5,  3,  4], energy: 10, pitch: 16, unvoiced: false, durationMs: 110 },
     'W*': { k: [ 5, 27, 11,  8,  4,  7,  9,  3,  4,  3], energy: 10, pitch: 18, unvoiced: false, durationMs: 150 },
     'WX': { k: [14,  5,  5, 11,  7,  8,  9,  5,  5,  4], energy:  9, pitch: 14, unvoiced: false, durationMs: 80 },

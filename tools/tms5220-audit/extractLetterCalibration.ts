@@ -53,6 +53,14 @@ function mode<T>(arr: T[]): T {
   return best;
 }
 
+/** Take the middle `pct` of frames (e.g., 0.4 = middle 40%) to avoid transitions. */
+function middleFrames<T>(frames: T[], pct: number): T[] {
+  if (frames.length <= 2) return frames;
+  const keep = Math.max(1, Math.floor(frames.length * pct));
+  const start = Math.floor((frames.length - keep) / 2);
+  return frames.slice(start, start + keep);
+}
+
 function emitModule(entries: Array<[string, TMS5220Frame]>): string {
   const lines: string[] = [];
   lines.push(`/**
@@ -89,17 +97,21 @@ const calibrated: Array<[string, TMS5220Frame]> = [];
 for (const [code, frames] of letterLib) {
   if (frames.length === 0) continue;
 
-  // K1-K10: median per coefficient
+  // Use middle 40% to avoid coarticulation at edges
+  const coreFrames = middleFrames(frames, 0.4);
+
+  // K1-K10: mean per coefficient (smoother than median for formants)
   const k: number[] = [];
   for (let i = 0; i < 10; i++) {
-    k.push(Math.round(median(frames, f => f.k[i] ?? 0)));
+    k.push(Math.round(mean(coreFrames.map(f => f.k[i] ?? 0))));
   }
 
-  // Energy: mean
-  const energy = Math.round(mean(frames.map(f => f.energy)));
+  // Energy: mean, capped at 10 for voiced (lower than hand-authored 12 to match library loudness)
+  const rawEnergy = Math.round(mean(coreFrames.map(f => f.energy)));
+  const energy = coreFrames[0]?.unvoiced ? rawEnergy : Math.min(10, rawEnergy);
 
   // Pitch: mean over voiced frames only
-  const voicedPitches = frames.filter(f => f.pitch > 0).map(f => f.pitch);
+  const voicedPitches = coreFrames.filter(f => f.pitch > 0).map(f => f.pitch);
   const pitch = voicedPitches.length > 0
     ? Math.round(mean(voicedPitches))
     : 0;
@@ -108,7 +120,7 @@ for (const [code, frames] of letterLib) {
   const durationMs = Math.round(median([frames], f => f.length) * 25);
 
   // Unvoiced: mode
-  const unvoiced = mode(frames.map(f => f.unvoiced));
+  const unvoiced = mode(coreFrames.map(f => f.unvoiced));
 
   calibrated.push([code, { k, energy, pitch, unvoiced, durationMs }]);
 }
