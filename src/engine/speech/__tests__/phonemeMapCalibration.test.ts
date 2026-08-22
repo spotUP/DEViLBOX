@@ -13,12 +13,12 @@ describe('samToTMS5220 calibrated static map', () => {
   // Phonemes calibrated from A-Z letter recordings (middle 40%, mean K, energy capped at 10)
   const CALIBRATED_PHONEMES = new Set([
     'AA', 'AY', 'B*', 'CH', 'EH', 'EY', 'F*', 'IY',
-    'K*', 'OW', 'P*', 'S*', 'T*', 'UW', 'W*', 'Y*',
+    'K*', 'L*', 'OW', 'P*', 'R*', 'S*', 'T*', 'UW', 'W*', 'Y*',
   ]);
 
   // Expected calibrated values (from tools/tms5220-audit/calibratedStaticMap.ts)
   const expectedCalibrated: Record<string, Partial<TMS5220Frame>> = {
-    'AA': { k: [10, 26, 9, 8, 8, 9, 9, 5, 5, 2], energy: 10, pitch: 21, unvoiced: false, durationMs: 325 },
+    'AA': { k: [11, 22, 10, 11, 5, 8, 9, 5, 5, 2], energy: 10, pitch: 20, unvoiced: false, durationMs: 250 },
     'AY': { k: [13, 23, 9, 9, 7, 10, 12, 3, 2, 4], energy: 10, pitch: 18, unvoiced: false, durationMs: 325 },
     'B*': { k: [1, 17, 10, 7, 7, 10, 10, 4, 2, 2], energy: 4, pitch: 20, unvoiced: false, durationMs: 125 },
     'CH': { k: [23, 26, 14, 13, 8, 8, 8, 4, 4, 4], energy: 8, pitch: 0, unvoiced: true, durationMs: 225 },
@@ -27,8 +27,10 @@ describe('samToTMS5220 calibrated static map', () => {
     'F*': { k: [20, 17, 9, 9, 8, 8, 8, 4, 4, 4], energy: 7, pitch: 0, unvoiced: true, durationMs: 175 },
     'IY': { k: [18, 13, 2, 4, 8, 14, 12, 3, 2, 4], energy: 10, pitch: 16, unvoiced: false, durationMs: 375 },
     'K*': { k: [24, 27, 12, 10, 8, 8, 8, 4, 4, 4], energy: 7, pitch: 0, unvoiced: true, durationMs: 100 },
+    'L*': { k: [8, 14, 11, 10, 1, 6, 11, 3, 4, 2], energy: 10, pitch: 12, unvoiced: false, durationMs: 75 },
     'OW': { k: [7, 19, 13, 8, 4, 5, 10, 4, 5, 4], energy: 10, pitch: 20, unvoiced: false, durationMs: 300 },
     'P*': { k: [19, 19, 10, 8, 8, 8, 8, 4, 4, 4], energy: 7, pitch: 0, unvoiced: true, durationMs: 50 },
+    'R*': { k: [13, 17, 10, 4, 9, 12, 5, 4, 6, 1], energy: 10, pitch: 14, unvoiced: false, durationMs: 125 },
     'S*': { k: [29, 21, 7, 9, 8, 8, 8, 4, 4, 4], energy: 7, pitch: 0, unvoiced: true, durationMs: 250 },
     'T*': { k: [24, 20, 12, 8, 8, 8, 8, 4, 4, 4], energy: 7, pitch: 0, unvoiced: true, durationMs: 75 },
     'UW': { k: [8, 15, 9, 7, 6, 6, 8, 6, 5, 2], energy: 10, pitch: 19, unvoiced: false, durationMs: 250 },

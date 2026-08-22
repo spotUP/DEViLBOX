@@ -103,8 +103,27 @@ function findCVBoundary(frames: LPCFrame[]): number {
  * Find the boundary between vowel and consonant in a VC (vowel-consonant) sequence.
  * Returns the index of the last voiced frame with energy above threshold.
  */
-function findVCBoundary(frames: LPCFrame[]): number {
-  // Scan from end to find where voiced frames stop
+function findVCBoundary(frames: LPCFrame[], nextPhonemeCode?: string): number {
+  // For liquids/glides (R*, L*, W*, Y*), the consonant maintains voicing
+  // but formants shift. Detect spectral change instead of just voiced/energy.
+  const isLiquidOrGlide = nextPhonemeCode && ['R*', 'RX', 'L*', 'LX', 'W*', 'WX', 'Y*', 'YX'].includes(nextPhonemeCode);
+
+  if (isLiquidOrGlide) {
+    // Scan from middle toward end: find where K1/K2 shift significantly
+    // (vowel -> liquid formant transition)
+    const mid = Math.floor(frames.length * 0.5);
+    for (let i = mid; i < frames.length - 1; i++) {
+      if (frames[i].energy === 0 || frames[i + 1].energy === 0) continue;
+      const kDist = kIndexDistance(frames[i].k, frames[i + 1].k);
+      if (kDist > 0.15) { // Significant formant shift
+        return i + 1;
+      }
+    }
+    // Fallback: last third
+    return Math.floor(frames.length * 0.67);
+  }
+
+  // Standard VC: scan from end for last voiced frame with good energy
   for (let i = frames.length - 1; i >= 0; i--) {
     if (!frames[i].unvoiced && frames[i].energy >= 6 && frames[i].pitch > 0) {
       return i + 1; // Boundary is AFTER this frame
@@ -537,7 +556,7 @@ export function segmentLetterFrames(
 
     case 'VC': {
       // Vowel-consonant (e.g. F=EH+F*, L=EH+L*, R=AA+R*)
-      const boundary = findVCBoundary(trimmed);
+      const boundary = findVCBoundary(trimmed, decomp.segments[1]);
       const vowelFrames = trimmed.slice(0, boundary);
       const consonantFrames = trimmed.slice(boundary);
 

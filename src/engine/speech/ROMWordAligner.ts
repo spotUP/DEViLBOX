@@ -195,20 +195,20 @@ export function dtwFrameDistance(a: FrameLike[], b: FrameLike[]): number {
 interface DurationPrior { min: number; max: number; expected: number; tolerance: number }
 
 const DURATION_PRIOR: Record<PhonemeClass, DurationPrior> = {
-  vowel:     { min: 2, max: 28, expected: 7, tolerance: 5 },
-  diphthong: { min: 3, max: 36, expected: 9, tolerance: 6 },
-  stop:      { min: 1, max: 14, expected: 4, tolerance: 3 },
-  fricative: { min: 2, max: 24, expected: 6, tolerance: 4 },
-  affricate: { min: 2, max: 18, expected: 5, tolerance: 3 },
-  nasal:     { min: 2, max: 22, expected: 6, tolerance: 4 },
-  liquid:    { min: 2, max: 22, expected: 5, tolerance: 4 },
-  glide:     { min: 1, max: 16, expected: 4, tolerance: 3 },
-  pause:     { min: 0, max: 30, expected: 2, tolerance: 2 },
-  other:     { min: 1, max: 20, expected: 4, tolerance: 3 },
+  vowel:     { min: 2, max: 20, expected: 7, tolerance: 4 },
+  diphthong: { min: 3, max: 28, expected: 9, tolerance: 5 },
+  stop:      { min: 1, max: 10, expected: 4, tolerance: 2 },
+  fricative: { min: 2, max: 18, expected: 6, tolerance: 3 },
+  affricate: { min: 2, max: 14, expected: 5, tolerance: 2 },
+  nasal:     { min: 2, max: 16, expected: 6, tolerance: 3 },
+  liquid:    { min: 2, max: 16, expected: 5, tolerance: 3 },
+  glide:     { min: 1, max: 12, expected: 4, tolerance: 2 },
+  pause:     { min: 0, max: 20, expected: 2, tolerance: 2 },
+  other:     { min: 1, max: 14, expected: 4, tolerance: 3 },
 };
 
 const W_VOICING = 1.6;
-const W_COMPACT = 1.0;
+const W_COMPACT = 1.5;
 const W_DURATION = 0.15;
 const W_BOUNDARY = 0.25;
 
@@ -219,7 +219,7 @@ const W_BOUNDARY = 0.25;
 const STOP_VOICING_WEIGHT = 0.35;
 
 /** A word whose best alignment costs more than this per phoneme is dropped. */
-export const ALIGN_COST_CEILING = 0.55;
+export const ALIGN_COST_CEILING = 0.45;
 
 function expectedVoiced(code: string): boolean {
   const frame = samToTMS5220(code);
