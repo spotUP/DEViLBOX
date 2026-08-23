@@ -87,10 +87,12 @@ describe('buildFramesFromROMLibrary synthesis path', () => {
 
   it('bridges a splice between two authentic ROM segments', () => {
     // Two ROM-sourced sonorant vowels: the class rule gives 2 transition
-    // frames between them. The second AA is phrase-final and stretches 1.3x
-    // (4 -> 5). Output = 4 + 2 + 5 = 11 frames.
+    // frames between them. Each 4-frame run compresses to conversational
+    // tempo (MINED_TEMPO 0.7 -> 3) and the vowel floor brings it back to 4;
+    // the final AA additionally stretches 1.3x on the compressed run and
+    // still floors at 4. Output = 4 + 2 + 4 = 10 frames.
     const frames = buildFramesFromROMLibrary([token('AA', 4), token('AA', 4)], library(), fallback);
-    expect(frames.length).toBe(11);
+    expect(frames.length).toBe(10);
   });
 
   it('floors sub-audible extractions: 2-frame vowels stretch to the class minimum', () => {
