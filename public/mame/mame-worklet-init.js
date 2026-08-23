@@ -31,6 +31,7 @@ globalThis.OscilloscopeMixin = {
   init(processor) {
     processor.oscEnabled = false;
     processor.oscBuffer = new Float32Array(this.OSC_BUFFER_SIZE);
+    processor.oscFill = 0;
     processor.oscFrameCount = 0;
   },
 
@@ -41,19 +42,23 @@ globalThis.OscilloscopeMixin = {
   capture(processor, outputBuffer) {
     if (!processor.oscEnabled) return;
 
-    processor.oscFrameCount++;
-    if (processor.oscFrameCount < this.OSC_SEND_INTERVAL) return;
-    processor.oscFrameCount = 0;
-
-    // Copy samples to oscilloscope buffer
-    const copyLen = Math.min(outputBuffer.length, this.OSC_BUFFER_SIZE);
-    for (let i = 0; i < copyLen; i++) {
-      processor.oscBuffer[i] = outputBuffer[i];
-    }
-
-    // Zero-pad if output is smaller than osc buffer
-    for (let i = copyLen; i < this.OSC_BUFFER_SIZE; i++) {
-      processor.oscBuffer[i] = 0;
+    // Accumulate across render quanta. A quantum is 128 samples but the scope
+    // buffer is 256, so copying one quantum and zero-padding the rest wired
+    // the right half of every MAME oscilloscope to silence — the display was
+    // faithfully drawing the zero-fill. Send only complete buffers.
+    if (processor.oscFill === undefined) processor.oscFill = 0;
+    let read = 0;
+    while (read < outputBuffer.length) {
+      const n = Math.min(outputBuffer.length - read, this.OSC_BUFFER_SIZE - processor.oscFill);
+      processor.oscBuffer.set(outputBuffer.subarray(read, read + n), processor.oscFill);
+      processor.oscFill += n;
+      read += n;
+      if (processor.oscFill < this.OSC_BUFFER_SIZE) return;
+      processor.oscFill = 0;
+      processor.oscFrameCount++;
+      if (processor.oscFrameCount < this.OSC_SEND_INTERVAL) continue;
+      processor.oscFrameCount = 0;
+      break;
     }
 
     // Send to main thread (transfer buffer copy for performance)
