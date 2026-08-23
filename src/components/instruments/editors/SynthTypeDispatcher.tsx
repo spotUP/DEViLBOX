@@ -510,11 +510,15 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
     const params = instrument.parameters || {};
     const prev = prevChipParamsRef.current;
     prevChipParamsRef.current = params;
-    if (!prev) return; // first render: creation path already applied them
+    // First render sends EVERYTHING, not nothing: after a session restore the
+    // recreated synth can diverge from the store (the restore path constructs
+    // the synth twice), so "creation already applied them" is not a safe
+    // assumption. The sync is idempotent — worst case is a dozen redundant
+    // setParam messages on editor open.
     try {
       const engine = getToneEngine();
       for (const [key, value] of Object.entries(params)) {
-        if (prev[key] === value) continue;
+        if (prev && prev[key] === value) continue;
         if (key === '_program' && typeof value === 'number') {
           engine.loadMAMEChipPreset(instrument.id, value);
         } else if (typeof value === 'number') {
