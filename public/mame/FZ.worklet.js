@@ -28,16 +28,27 @@ if (!globalThis.initMAMEWasmModule) {
 if (!globalThis.OscilloscopeMixin) {
   globalThis.OscilloscopeMixin = {
     OSC_BUFFER_SIZE: 256, OSC_SEND_INTERVAL: 3,
-    init(p) { p.oscEnabled = false; p.oscBuffer = new Float32Array(256); p.oscFrameCount = 0; },
+    init(p) { p.oscEnabled = false; p.oscBuffer = new Float32Array(256); p.oscFill = 0; p.oscFrameCount = 0; },
     capture(p, buf) {
       if (!p.oscEnabled) return;
-      if (++p.oscFrameCount < 3) return;
-      p.oscFrameCount = 0;
-      const len = Math.min(buf.length, 256);
-      for (let i = 0; i < len; i++) p.oscBuffer[i] = buf[i];
-      for (let i = len; i < 256; i++) p.oscBuffer[i] = 0;
-      const copy = p.oscBuffer.slice().buffer;
-      p.port.postMessage({ type: 'oscData', buffer: copy }, [copy]);
+      // Accumulate across render quanta: a quantum is 128 samples but the
+      // scope buffer is 256, so copying one quantum and zero-filling the rest
+      // hardwired the right half of every MAME oscilloscope to silence.
+      if (p.oscFill === undefined) p.oscFill = 0;
+      let i = 0;
+      while (i < buf.length) {
+        const n = Math.min(buf.length - i, 256 - p.oscFill);
+        p.oscBuffer.set(buf.subarray(i, i + n), p.oscFill);
+        p.oscFill += n; i += n;
+        if (p.oscFill >= 256) {
+          p.oscFill = 0;
+          if (++p.oscFrameCount >= 3) {
+            p.oscFrameCount = 0;
+            const copy = p.oscBuffer.slice().buffer;
+            p.port.postMessage({ type: 'oscData', buffer: copy }, [copy]);
+          }
+        }
+      }
     }
   };
 }
