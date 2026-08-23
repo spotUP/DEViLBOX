@@ -660,13 +660,9 @@ export class TMS5220Synth extends MAMEBaseSynth {
 
   /** Build TMS5220 frames for phoneme tokens, using ROM data when available */
   private _buildPhonemeFrames(tokens: Array<{ code: string; stress: number }>): TMS5220Frame[] {
-    // When useRomWords is false, use only the static/calibrated table for consistent sound
-    if (!this._useRomWords) {
-      return buildFramesFromROMLibrary(tokens, new Map(), samToTMS5220);
-    }
-    // Runtime-mined library (ROM loaded) beats the generated one (no ROM) —
-    // both carry the same authentic TI segments; the hand-authored static
-    // table is the last-resort fallback for unmapped codes.
+    // Always use the authentic multi-frame library (AUTHENTIC_PHONEMES or runtime-mined)
+    // for natural prosody. The _useRomWords flag controls ROM *word* playback only,
+    // not the phoneme library quality.
     const library = this._romPhonemes && this._romPhonemes.size > 0
       ? this._romPhonemes
       : new Map(Object.entries(AUTHENTIC_PHONEMES));
