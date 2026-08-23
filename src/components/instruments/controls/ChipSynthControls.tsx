@@ -15,7 +15,6 @@ import { IMPORTED_RECORDING_WORDS } from '@generated/tms5220Recordings';
 import type { SynthType } from '@typedefs/instrument';
 import type JSZipType from 'jszip';
 import { VowelEditor } from './VowelEditor';
-import { LexiconBrowser } from './LexiconBrowser';
 import { TMS5220_VOICE_PRESETS, resolvePresetParams } from '@engine/tms5220/voicePresets';
 import { ScrollLockContainer } from '@components/ui/ScrollLockContainer';
 
@@ -396,19 +395,6 @@ export const ChipSynthControls: React.FC<ChipSynthControlsProps> = ({
             accentColor={accentColor}
           />
         </div>
-      );
-    }
-
-    if (param.type === 'lexicon') {
-      return (
-        <LexiconBrowser
-          key={paramKey}
-          accentColor={accentColor}
-          mutedColor={mutedColor}
-          panelBorder={panelBorder}
-          isCyanTheme={isCyanTheme}
-          onSpeak={(text) => onSpeak?.(text)}
-        />
       );
     }
 
