@@ -31,6 +31,20 @@ describe('TMS5220 voice presets', () => {
     expect(preset('whisper').noise_mode).toBe(1);
   });
 
+  it('ships the Twin Peaks garble preset', () => {
+    // This preset was "committed" once without ever landing in the file: the
+    // edit silently no-op'd and the exemption below (skip twinpeaks) let the
+    // suite pass with it absent. Require it to EXIST, not merely tolerate it.
+    const tp = TMS5220_VOICE_PRESETS.find(p => p.id === 'twinpeaks');
+    expect(tp, 'Twin Peaks preset missing').toBeDefined();
+    expect(tp!.name).toBe('Twin Peaks');
+    // Its whole point is the formant garble the other presets must never do.
+    expect(tp!.params.k1_index).toBeDefined();
+    expect(tp!.params.k2_index).toBeDefined();
+    const resolved = resolvePresetParams('twinpeaks')!;
+    expect(resolved.k2_index).toBe(tp!.params.k2_index);
+  });
+
   it('no VOICE preset bends K1-K3 — formant-index offsets garble the liquids', () => {
     // K indices are reflection-coefficient table positions — shifting them
     // relocates formants, and W/ER/L collapse first: every preset that
@@ -81,10 +95,12 @@ describe('TMS5220 voice presets', () => {
     }
     expect(params.speechText).toBe('HELLO WORLD');
     // Every factory voice is a full resolved set — no residue, no K bending.
+    // Twin Peaks is the deliberate exception (see the garble preset test).
     for (const p of tms) {
       const pp = p.parameters as Record<string, number | string>;
-      expect(pp.k1_index, `${p.name} K1`).toBe(NEUTRAL_VOICE_PARAMS.k1_index);
       expect(pp.pitch_index, `${p.name} carries a pitch`).toBeDefined();
+      if (p.name === 'Twin Peaks') continue;
+      expect(pp.k1_index, `${p.name} K1`).toBe(NEUTRAL_VOICE_PARAMS.k1_index);
     }
   });
 });

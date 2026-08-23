@@ -26,10 +26,20 @@ function extractMixin(source: string): string | null {
   return source.slice(start, end + 2);
 }
 
-function loadMixin(): { init: (p: object) => void; capture: (p: object, buf: Float32Array) => void } {
-  const source = readFileSync(join(MAME_DIR, 'TMS5220.worklet.js'), 'utf8');
+/**
+ * The mixin the browser ACTUALLY runs. mame-wasm-loader loads
+ * mame-worklet-init.js BEFORE any chip worklet, so its definition wins and
+ * every chip's inline copy is skipped by the `if (!globalThis.Oscilloscope-
+ * Mixin)` guard. Fixing only the 32 inline fallbacks changed nothing on
+ * screen — this loads the authoritative file.
+ */
+function loadMixin(file = 'mame-worklet-init.js'): {
+  init: (p: object) => void;
+  capture: (p: object, buf: Float32Array) => void;
+} {
+  const source = readFileSync(join(MAME_DIR, file), 'utf8');
   const block = extractMixin(source);
-  expect(block).not.toBeNull();
+  expect(block, `${file} defines no OscilloscopeMixin`).not.toBeNull();
   const holder: { OscilloscopeMixin?: object } = {};
   // eslint-disable-next-line no-new-func
   new Function('globalThis', block!)(holder);
@@ -44,8 +54,9 @@ interface ScopeProc {
 }
 
 describe('worklet OscilloscopeMixin', () => {
-  it('accumulates 128-sample quanta into a full 256-sample buffer', () => {
-    const mixin = loadMixin();
+  it.each(['mame-worklet-init.js', 'TMS5220.worklet.js'])(
+    '%s accumulates 128-sample quanta into a full 256-sample buffer', (file) => {
+    const mixin = loadMixin(file);
     const posted: Float32Array[] = [];
     const p: ScopeProc = { oscEnabled: false, port: { postMessage: (m) => posted.push(new Float32Array(m.buffer)) } };
     mixin.init(p);
@@ -72,6 +83,16 @@ describe('worklet OscilloscopeMixin', () => {
     mixin.init(p);
     for (let q = 0; q < 12; q++) mixin.capture(p, new Float32Array(128).fill(1));
     expect(posted.length).toBe(0);
+  });
+
+  it('the loader-served mixin and the inline fallbacks agree on accumulation', () => {
+    // Not textually identical (the init file is the documented long form), but
+    // both must accumulate rather than zero-pad.
+    for (const file of ['mame-worklet-init.js', 'TMS5220.worklet.js']) {
+      const block = extractMixin(readFileSync(join(MAME_DIR, file), 'utf8'))!;
+      expect(block, `${file} still zero-pads the scope buffer`).not.toMatch(/= 0;\s*\n\s*}\s*\n\s*\/\/ Send/);
+      expect(block, `${file} does not accumulate`).toContain('oscFill');
+    }
   });
 
   it('every worklet inlines the identical mixin', () => {
