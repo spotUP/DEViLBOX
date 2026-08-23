@@ -291,6 +291,16 @@ const MIN_FRAMES_BY_CLASS: Record<PhonemeClass, number> = {
 function enforceMinFrames(frames: TMS5220Frame[], pClass: PhonemeClass): TMS5220Frame[] {
   const min = MIN_FRAMES_BY_CLASS[pClass] ?? 3;
   if (frames.length >= min) return frames;
+  // A run carrying closure silence (mined stops) must not be resampled:
+  // interpolating silence into the burst manufactures half-loud "closure"
+  // frames, which un-does the closure. Lengthen the closure itself instead.
+  if (frames.some(f => f.energy === 0)) {
+    const padded = frames.map(f => ({ ...f, k: [...f.k] }));
+    while (padded.length < min) {
+      padded.unshift({ ...frames[0], k: [...frames[0].k] });
+    }
+    return padded;
+  }
   if (frames.length === 1) {
     // Single frame: hold it as identical copies — interpolation has no
     // second point to work with.
@@ -484,6 +494,27 @@ function insertTransitions(segments: PhonemeSegment[]): TMS5220Frame[] {
       const next = segments[s + 1];
       if (next.frames.length === 0) continue;
 
+      // Stop/affricate closure: a plosive is closure silence followed by a
+      // burst. The old code interpolated an audible frame here and called it a
+      // "brief closure" — at energy >= 1 there is no closure, which is why
+      // P/T/K/B/D/G came out mushy. Insert real silence (the packer and the
+      // MAME core both handle mid-utterance energy 0) unless the segment
+      // already begins with its own mined closure. Pauses provide the gap
+      // themselves.
+      const nextClass = next.pClass;
+      if ((nextClass === 'stop' || nextClass === 'affricate')
+          && seg.pClass !== 'pause'
+          && next.frames[0].energy > 0) {
+        result.push({
+          k: [...next.frames[0].k], // irrelevant during silence; preps the burst
+          energy: 0,
+          pitch: 0,
+          unvoiced: true,
+          durationMs: 25,
+        });
+        continue;
+      }
+
       const count = getTransitionCount(seg, next);
       if (count === 0) continue;
 
@@ -632,10 +663,15 @@ export function segmentLetterFrames(
 /**
  * Convert LPCFrame[] (ROM format) to TMS5220Frame[] (synth format).
  * Adds durationMs=25 per frame and drops the repeat field.
+ *
+ * Silent frames (energy 0) are dropped by default — for vowels and other
+ * continuants they are dead air between recordings. Stop and affricate
+ * segments pass keepSilence=true: their closure silence IS the consonant
+ * (a /p/ with no closure is just a puff), so it must survive mining.
  */
-export function lpcToTMS5220Frames(lpcFrames: LPCFrame[]): TMS5220Frame[] {
+export function lpcToTMS5220Frames(lpcFrames: LPCFrame[], keepSilence = false): TMS5220Frame[] {
   return lpcFrames
-    .filter(f => f.energy > 0) // Skip silent frames
+    .filter(f => keepSilence || f.energy > 0)
     .map(f => ({
       k: f.k.length >= 10 ? [...f.k] : [...f.k, ...Array(10 - f.k.length).fill(0)],
       energy: f.energy,
@@ -769,9 +805,11 @@ export function buildFramesFromROMLibrary(
       continue;
     }
 
-    // Step 3: Scale duration by stress
+    // Step 3: Scale duration by stress. Runs carrying closure silence (mined
+    // stops) are exempt — resampling would interpolate the silence into the
+    // burst, and a stop's duration does not stretch with stress anyway.
     const durationScale = getStressDurationScale(token.stress);
-    if (durationScale !== 1.0) {
+    if (durationScale !== 1.0 && !frames.some(f => f.energy === 0)) {
       frames = scaleFrameCount(frames, durationScale);
     }
 
@@ -861,8 +899,14 @@ function speakableText(name: string): string | null {
 /**
  * Distance between two exemplar frame runs: resampled to a common length, then
  * mean per-frame K distance with energy and voicing disagreement folded in.
+ *
+ * Silence frames (energy 0) are excluded from both sides first: a closure
+ * carries no spectrum, so comparing a closure-bearing stop against a burst-only
+ * cut of the same phoneme must not read as a spectral mismatch.
  */
-export function runDistance(a: TMS5220Frame[], b: TMS5220Frame[]): number {
+export function runDistance(rawA: TMS5220Frame[], rawB: TMS5220Frame[]): number {
+  const a = rawA.filter(f => f.energy > 0);
+  const b = rawB.filter(f => f.energy > 0);
   const len = Math.min(a.length, b.length);
   if (len === 0) return 1;
   const ra = resampleFrames(a, len);
@@ -924,8 +968,12 @@ export function extractWordPhonemeLibrary(
       const steady = cls === 'vowel' || cls === 'diphthong' || cls === 'nasal'
         || cls === 'liquid' || cls === 'glide';
       const use = steady ? extractMiddle(segFrames) : segFrames;
-      const tmsFrames = lpcToTMS5220Frames(use);
-      if (tmsFrames.length === 0) continue;
+      // Stops/affricates keep their closure silence — it is part of the sound.
+      const keepSilence = cls === 'stop' || cls === 'affricate';
+      let tmsFrames = lpcToTMS5220Frames(use, keepSilence);
+      // Trailing silence is the join to the next phoneme, not the consonant.
+      while (tmsFrames.length > 0 && tmsFrames[tmsFrames.length - 1].energy === 0) tmsFrames.pop();
+      if (tmsFrames.length === 0 || tmsFrames.every(f => f.energy === 0)) continue;
 
       const list = candidates.get(seg.code) ?? [];
       list.push({ frames: tmsFrames, word: text, cost: alignment.perPhonemeCost });
@@ -979,20 +1027,23 @@ export function completeLibrary(
     provenance.set('OY', { source: 'derived', words: ['AO+IY glide'] });
   }
 
-  // Q* (glottal stop) — a brief closure, not a spectrum.
+  // Q* (glottal stop) — a brief closure, not a spectrum. Real silence: the
+  // packer passes energy 0 through (the old energy-1 was the packer's floor).
   if (!library.has('Q*')) {
     library.set('Q*', [
-      { k: [8, 8, 8, 8, 8, 8, 8, 4, 4, 4], energy: 1, pitch: 0, unvoiced: true, durationMs: 25 },
-      { k: [8, 8, 8, 8, 8, 8, 8, 4, 4, 4], energy: 1, pitch: 0, unvoiced: true, durationMs: 25 },
+      { k: [8, 8, 8, 8, 8, 8, 8, 4, 4, 4], energy: 0, pitch: 0, unvoiced: true, durationMs: 25 },
+      { k: [8, 8, 8, 8, 8, 8, 8, 4, 4, 4], energy: 0, pitch: 0, unvoiced: true, durationMs: 25 },
     ]);
     provenance.set('Q*', { source: 'derived', words: ['closure silence'] });
   }
 
-  // Pause token — used by phrase alignment and synthesis transitions.
+  // Pause token — used by phrase alignment and synthesis transitions. Real
+  // silence, not the quiet hum the old packer floor turned it into. A pause
+  // also serves as the closure for a following word-initial stop.
   if (!library.has(' ')) {
     library.set(' ', [
-      { k: [8, 8, 8, 8, 8, 8, 8, 4, 4, 4], energy: 1, pitch: 0, unvoiced: false, durationMs: 25 },
-      { k: [8, 8, 8, 8, 8, 8, 8, 4, 4, 4], energy: 1, pitch: 0, unvoiced: false, durationMs: 25 },
+      { k: [8, 8, 8, 8, 8, 8, 8, 4, 4, 4], energy: 0, pitch: 0, unvoiced: false, durationMs: 25 },
+      { k: [8, 8, 8, 8, 8, 8, 8, 4, 4, 4], energy: 0, pitch: 0, unvoiced: false, durationMs: 25 },
     ]);
     provenance.set(' ', { source: 'derived', words: ['pause silence'] });
   }

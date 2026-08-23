@@ -47,9 +47,11 @@ function loadWords(): VSMWord[] {
   return parseVSMDirectory(rom);
 }
 
-/** The recording itself, prepared the same way the miner prepares its input. */
+/** The recording itself, prepared the same way the miner prepares its input.
+ *  Interior silence (stop closures) is kept: real recordings contain it, and a
+ *  reconstruction that reproduces it must be rewarded, not penalized. */
 function targetFrames(word: VSMWord): TMS5220Frame[] {
-  return lpcToTMS5220Frames(trimSilence(resolveRepeatFrames(word.frames)));
+  return lpcToTMS5220Frames(trimSilence(resolveRepeatFrames(word.frames)), true);
 }
 
 function tokensFor(name: string) {

@@ -39,8 +39,13 @@ export function packFrameBuffer(frames: TMS5220Frame[]): PackedFrameBuffer {
 
   for (const frame of frames) {
     const count = frameCountForDuration(frame.durationMs);
-    // Clamp to valid table ranges: energy [1,14] (0=silence, 15=stop), pitch [0,31]
-    const energyIdx = Math.min(Math.max(frame.energy, 1), 14);
+    // Energy 0 is real silence and must survive packing: stop consonants are
+    // closure silence + burst, and the MAME core handles mid-utterance silence
+    // frames with the correct interpolation inhibit (old_silence/new_silence in
+    // TMS5220Synth.cpp). Clamping 0 up to 1 made plosives mushy — there was no
+    // way to be quiet between the vowel and the burst. Sounding frames clamp to
+    // [1,14] as before (15 is the stop code, which ends the utterance).
+    const energyIdx = frame.energy <= 0 ? 0 : Math.min(frame.energy, 14);
     const pitchIdx = frame.unvoiced ? 0 : Math.min(Math.max(frame.pitch, 0), 31);
     const k = frame.k.length > 0 ? frame.k : (lastK ?? []);
 
