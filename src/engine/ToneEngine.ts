@@ -4955,6 +4955,7 @@ export class ToneEngine {
       getInstrumentKey: (id: number, ch: number) => this.getInstrumentKey(id, ch),
       invalidateInstrument: (id: number) => this.invalidateInstrument(id),
       getInstrument: (id: number, config: InstrumentConfig) => this.getInstrument(id, config),
+      awaitEffectChain: (key: number) => this.pendingEffectChains.get(key) ?? Promise.resolve(),
     };
   }
 
@@ -4967,7 +4968,7 @@ export class ToneEngine {
   public updateMAMEParameters(instrumentId: number, config: Partial<import('@typedefs/instrument').MAMEConfig>): void { _updateMAMEParameters(this._synthCtx, instrumentId, config); }
   public updateMAMEChipParam(instrumentId: number, key: string, value: number): void { _updateMAMEChipParam(this._synthCtx, instrumentId, key, value); }
   public loadMAMEChipPreset(instrumentId: number, program: number): void { _loadMAMEChipPreset(this._synthCtx, instrumentId, program); }
-  public updateMAMEChipTextParam(instrumentId: number, key: string, value: string): void { _updateMAMEChipTextParam(this._synthCtx, instrumentId, key, value); }
+  public async updateMAMEChipTextParam(instrumentId: number, key: string, value: string): Promise<void> { return _updateMAMEChipTextParam(this._synthCtx, instrumentId, key, value); }
   public async speakMAMEChipText(instrumentId: number, text: string): Promise<void> { return _speakMAMEChipText(this._synthCtx, instrumentId, text); }
   public loadSynthROM(instrumentId: number, synthType: string, bank: number, data: Uint8Array): void { _loadSynthROM(this._synthCtx, instrumentId, synthType, bank, data); }
   public updateDubSirenParameters(instrumentId: number, config: NonNullable<InstrumentConfig['dubSiren']>): void { _updateDubSirenParameters(this._synthCtx, instrumentId, config); }

@@ -15,6 +15,8 @@ export interface SynthUpdateContext {
   getInstrumentKey: (instrumentId: number, channel: number) => number;
   invalidateInstrument: (instrumentId: number) => void;
   getInstrument: (instrumentId: number, config: InstrumentConfig) => any;
+  /** Resolves when the instrument's effect chain (kicked off by getInstrument) is connected. */
+  awaitEffectChain?: (key: number) => Promise<unknown>;
   buildInstrumentEffectChain?: (key: number, effects: EffectConfig[], instrument: any) => Promise<void>;
 }
 
@@ -204,13 +206,59 @@ export function loadMAMEChipPreset(ctx: SynthUpdateContext, instrumentId: number
   }
 }
 
+interface LazyInitializable {
+  ensureInitialized?: () => Promise<void>;
+}
+
+/**
+ * Create an instrument on demand from the instrument store and wait until it
+ * can actually be heard: worklet initialized AND its effect chain connected.
+ * The chain connect used to be papered over with a 50 ms sleep — the engine
+ * tracks the chain promise (pendingEffectChains) precisely so callers can
+ * await it, so wait on the real signal instead of a guess.
+ */
+async function lazyCreateInstrument(
+  ctx: SynthUpdateContext,
+  instrumentId: number,
+  instrumentKey: number,
+  caller: string,
+): Promise<unknown> {
+  try {
+    const { useInstrumentStore } = await import('@/stores/useInstrumentStore');
+    const config = useInstrumentStore.getState().instruments.find(
+      (i: InstrumentConfig) => i.id === instrumentId
+    );
+    if (!config) return undefined;
+    const instrument = ctx.getInstrument(instrumentId, config) ?? undefined;
+    const init = (instrument as LazyInitializable | undefined)?.ensureInitialized;
+    if (instrument && typeof init === 'function') {
+      await init.call(instrument);
+    }
+    await ctx.awaitEffectChain?.(instrumentKey);
+    return instrument;
+  } catch (err) {
+    console.warn(`[ToneEngine] ${caller}: failed to lazy-create instrument:`, err);
+    return undefined;
+  }
+}
+
 /**
  * Update a text parameter on a MAME chip synth instrument (e.g. speech text).
+ * Lazily creates the instrument if it hasn't been preloaded into the engine yet.
  */
-export function updateMAMEChipTextParam(ctx: SynthUpdateContext, instrumentId: number, key: string, value: string): void {
+export async function updateMAMEChipTextParam(ctx: SynthUpdateContext, instrumentId: number, key: string, value: string): Promise<void> {
   const instrumentKey = ctx.getInstrumentKey(instrumentId, -1);
-  const instrument = ctx.instruments.get(instrumentKey);
-  if (!instrument) return;
+  let instrument = ctx.instruments.get(instrumentKey);
+
+  if (!instrument) {
+    instrument = await lazyCreateInstrument(ctx, instrumentId, instrumentKey, 'updateMAMEChipTextParam');
+  }
+
+  if (!instrument) {
+    console.warn(`[ToneEngine] updateMAMEChipTextParam: no instrument config found for id=${instrumentId}`);
+    return;
+  }
+
   const inst = instrument as unknown as { setTextParam?: (key: string, value: string) => void; applyConfig?: (config: Record<string, string>) => void };
   if (typeof inst.setTextParam === 'function') {
     inst.setTextParam(key, value);
@@ -229,23 +277,7 @@ export async function speakMAMEChipText(ctx: SynthUpdateContext, instrumentId: n
 
   // If instrument not in engine map, create it on-demand from the instrument store
   if (!instrument) {
-    try {
-      const { useInstrumentStore } = await import('@/stores/useInstrumentStore');
-      const config = useInstrumentStore.getState().instruments.find(
-        (i: InstrumentConfig) => i.id === instrumentId
-      );
-      if (config) {
-        instrument = ctx.getInstrument(instrumentId, config) ?? undefined;
-        // Wait for WASM synth to initialize (ensures worklet is ready before speakText)
-        if (instrument && typeof (instrument as any).ensureInitialized === 'function') {
-          await (instrument as any).ensureInitialized();
-        }
-        // Also wait for async effect chain to connect (buildInstrumentEffectChain is fire-and-forget in getInstrument)
-        await new Promise(resolve => setTimeout(resolve, 50));
-      }
-    } catch (_err) {
-      console.warn('[ToneEngine] speakMAMEChipText: failed to lazy-create instrument:', _err);
-    }
+    instrument = await lazyCreateInstrument(ctx, instrumentId, instrumentKey, 'speakMAMEChipText');
   }
 
   if (!instrument) {
