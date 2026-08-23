@@ -114,7 +114,8 @@ export function samToTMS5220(samCode: string): TMS5220Frame | null {
     'Q*': { k: [ 8,  8,  8,  8,  8,  8,  8,  4,  4,  4], energy:  1, pitch:  0, unvoiced: true,  durationMs:  20 },
 
     // === Pause ===
-    ' ':  { k: [ 8,  8,  8,  8,  8,  8,  8,  4,  4,  4], energy:  1, pitch:  0, unvoiced: false, durationMs: 120 },
+    // Real silence — the old energy-1 existed only because the packer floored energy at 1.
+    ' ':  { k: [ 8,  8,  8,  8,  8,  8,  8,  4,  4,  4], energy:  0, pitch:  0, unvoiced: false, durationMs: 120 },
   };
 
   return map[samCode] ?? null;
