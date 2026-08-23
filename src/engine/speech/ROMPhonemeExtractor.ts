@@ -765,7 +765,13 @@ export function buildFramesFromROMLibrary(
 
   const segments: PhonemeSegment[] = [];
 
-  for (const token of collapsed) {
+  // Phrase-final lengthening (Klatt): the last syllable before a pause or the
+  // end of the utterance stretches — the final vowel most, its coda a little.
+  // Flat rhythm with a hard stop is one of the strongest "machine" tells.
+  const finalScale = buildFinalLengthening(collapsed.map(t => t.code));
+
+  for (let ti = 0; ti < collapsed.length; ti++) {
+    const token = collapsed[ti];
     const pClass = getPhonemeClass(token.code);
     const romFrames = romLibrary.get(token.code);
 
@@ -805,10 +811,11 @@ export function buildFramesFromROMLibrary(
       continue;
     }
 
-    // Step 3: Scale duration by stress. Runs carrying closure silence (mined
-    // stops) are exempt — resampling would interpolate the silence into the
-    // burst, and a stop's duration does not stretch with stress anyway.
-    const durationScale = getStressDurationScale(token.stress);
+    // Step 3: Scale duration by stress and phrase-final position. Runs
+    // carrying closure silence (mined stops) are exempt — resampling would
+    // interpolate the silence into the burst, and a stop's duration does not
+    // stretch with stress anyway.
+    const durationScale = getStressDurationScale(token.stress) * finalScale[ti];
     if (durationScale !== 1.0 && !frames.some(f => f.energy === 0)) {
       frames = scaleFrameCount(frames, durationScale);
     }
@@ -1116,4 +1123,37 @@ export function buildCompletePhonemeLibrary(romWords: VSMWord[]): PhonemeLibrary
   completeLibrary(library, provenance);
 
   return { library, provenance, droppedWords: dropped };
+}
+
+// ============================================================================
+// Phrase-final lengthening (Q5 of the 2026-08-23 phoneme-quality plan)
+// ============================================================================
+
+/** Stretch on the last vowel/diphthong before a pause or the utterance end. */
+export const FINAL_VOWEL_SCALE = 1.3;
+/** Stretch on the consonants between that vowel and the boundary. */
+export const FINAL_CODA_SCALE = 1.15;
+
+/**
+ * Per-token duration multipliers implementing phrase-final lengthening: for
+ * each pause (and the end of the stream), the last vowel/diphthong before it
+ * takes FINAL_VOWEL_SCALE and the tokens after that vowel up to the boundary
+ * take FINAL_CODA_SCALE. Everything else stays 1.
+ */
+export function buildFinalLengthening(codes: string[]): number[] {
+  const scales = codes.map(() => 1);
+  for (let i = codes.length; i >= 0; i--) {
+    const atBoundary = i === codes.length || codes[i] === ' ';
+    if (!atBoundary) continue;
+    // Scan back from the boundary to the last vowel of the word before it.
+    for (let j = i - 1; j >= 0 && codes[j] !== ' '; j--) {
+      const cls = getPhonemeClass(codes[j]);
+      if (cls === 'vowel' || cls === 'diphthong') {
+        scales[j] = FINAL_VOWEL_SCALE;
+        for (let c = j + 1; c < i; c++) scales[c] = FINAL_CODA_SCALE;
+        break;
+      }
+    }
+  }
+  return scales;
 }
