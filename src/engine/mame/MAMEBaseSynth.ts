@@ -209,6 +209,11 @@ export abstract class MAMEBaseSynth implements DevilboxSynth, MAMEEffectTarget {
           this.processPendingCall(call);
         }
         this._pendingCalls = [];
+        // Replay the oscilloscope enable for subscribers that arrived while
+        // the worklet was still loading (see onOscData).
+        if (this.oscCallbacks.size > 0 && this.workletNode) {
+          this.workletNode.port.postMessage({ type: 'enableOsc', enabled: true });
+        }
         break;
 
       case 'oscData':
@@ -948,7 +953,10 @@ export abstract class MAMEBaseSynth implements DevilboxSynth, MAMEEffectTarget {
   onOscData(callback: OscDataCallback): () => void {
     this.oscCallbacks.add(callback);
 
-    // Request oscilloscope data from worklet
+    // Request oscilloscope data from worklet. The scope component usually
+    // mounts BEFORE the worklet finishes loading, so the enable must also be
+    // replayed when the worklet reports ready — sending it only here left the
+    // scope permanently idle whenever the subscription won the race.
     if (this.workletNode && this._isReady) {
       this.workletNode.port.postMessage({ type: 'enableOsc', enabled: true });
     }
