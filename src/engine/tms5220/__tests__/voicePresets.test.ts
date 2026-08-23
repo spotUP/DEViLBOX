@@ -8,6 +8,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { TMS5220_VOICE_PRESETS, NEUTRAL_VOICE_PARAMS, resolvePresetParams } from '../voicePresets';
+import { MAME_CHIP_PRESETS } from '../../../constants/mameChipPresets';
 
 const preset = (id: string) =>
   TMS5220_VOICE_PRESETS.find(p => p.id === id)!.params;
@@ -60,5 +61,27 @@ describe('TMS5220 voice presets', () => {
     expect(muffled.chirp_type).toBe(0);
     // And Default is exactly the neutral chip.
     expect(resolvePresetParams('default')).toEqual(NEUTRAL_VOICE_PARAMS);
+  });
+
+  it('the first TMS5220 factory preset is Speak & Spell with a full voice', () => {
+    // createTempInstrument auto-applies the FIRST factory preset to a fresh
+    // instrument. The old hand-typed list led with "TMS Spell It" carrying
+    // stale parameters and no voice values — a fresh editor spoke with
+    // broken settings until a preset was picked.
+    const tms = MAME_CHIP_PRESETS.filter(p => p.synthType === 'MAMETMS5220');
+    expect(tms.length).toBe(TMS5220_VOICE_PRESETS.length);
+    const first = tms[0];
+    expect(first.name).toBe('Speak & Spell');
+    const params = first.parameters as Record<string, number | string>;
+    for (const [key, value] of Object.entries(resolvePresetParams('speakandspell')!)) {
+      expect(params[key], key).toBe(value);
+    }
+    expect(params.speechText).toBe('HELLO WORLD');
+    // Every factory voice is a full resolved set — no residue, no K bending.
+    for (const p of tms) {
+      const pp = p.parameters as Record<string, number | string>;
+      expect(pp.k1_index, `${p.name} K1`).toBe(NEUTRAL_VOICE_PARAMS.k1_index);
+      expect(pp.pitch_index, `${p.name} carries a pitch`).toBeDefined();
+    }
   });
 });
