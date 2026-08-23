@@ -655,7 +655,13 @@ private:
         for (int i = 4; i > 0; i--, voi++) {
             int ch_out2 = 0, ch_out4 = 0, ch_out8 = 0, ch_out16 = 0;
 
-            if (voi->mode == 0) { // Tone mode
+            // A voice with no programmed pitch has TG_count_period == 0 (the
+            // memset default; pitch = -1 until a note arrives). The catch-up
+            // loop below adds the period until TG_count goes positive, so a
+            // zero period spins forever — the chip hung the audio thread on
+            // the very first process() call after initialize(). MAME never
+            // renders such a voice; neither do we.
+            if (voi->mode == 0 && voi->TG_count_period > 0) { // Tone mode
                 int left = 1 << STEP_SH;
                 do {
                     int nextevent = left;

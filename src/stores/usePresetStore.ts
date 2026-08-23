@@ -311,7 +311,25 @@ export const usePresetStore = create<PresetStore>()(
     })),
     {
       name: 'devilbox-user-presets',
-      version: 1,
+      version: 2,
+      // v1 -> v2: drop auto-harvested rips of the retired hand-typed TMS5220
+      // factory presets. Songs saved while those presets existed re-harvested
+      // them ("TMS Whisper" was flat silent, "TMS Deep Drone" carried stale
+      // parameters), and they shadowed the real preset list in the dropdown.
+      migrate: (persisted: unknown, version: number) => {
+        const state = persisted as { rippedPresets?: UserPreset[] } | undefined;
+        if (version < 2 && state?.rippedPresets) {
+          const retired = new Set([
+            'TMS Spell It', 'TMS Robot Voice', 'TMS Bright Chirp',
+            'TMS Deep Drone', 'TMS TI99 Mode', 'TMS Whisper',
+          ]);
+          state.rippedPresets = state.rippedPresets.filter(
+            (p) => !(p.synthType === 'MAMETMS5220'
+              && retired.has(p.name.replace(/ \([^)]*\)$/, ''))),
+          );
+        }
+        return state;
+      },
     }
   )
 );
