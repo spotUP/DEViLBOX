@@ -1,6 +1,6 @@
 
 import { MAMEBaseSynth } from '@engine/mame/MAMEBaseSynth';
-import { textToTokensSmart, isQuestion, textToPhonemes, parsePhonemeString } from '@engine/speech/Reciter';
+import { textToTokensSmart, isQuestion, isPhonemeNotation, splitSpeechSegments, textToPhonemes, parsePhonemeString } from '@engine/speech/Reciter';
 import { type TMS5220Frame, samToTMS5220 } from '@engine/speech/tms5220PhonemeMap';
 import { type VSMWord, parseVSMDirectory, scanVSMForWords } from '@engine/speech/VSMROMParser';
 import { shouldAuditionRomSelection } from '@engine/speech/romSpeechRouting';
@@ -544,7 +544,8 @@ export class TMS5220Synth extends MAMEBaseSynth {
   speakTextHybrid(text: string): void {
     const generation = this._beginChain();
 
-    const words = text.trim().split(/\s+/).filter(Boolean);
+    // Bracketed phoneme spans are one unit, spaces and all — see splitSpeechSegments.
+    const words = splitSpeechSegments(text);
     if (words.length === 0) return;
 
     const isQuestionText = isQuestion(text);
@@ -561,6 +562,16 @@ export class TMS5220Synth extends MAMEBaseSynth {
 
       const wi = wordIndex;
       const word = words[wordIndex++];
+
+      // Bracketed phonemes are an explicit instruction to synthesise this exact
+      // sequence — never a word to look up. [SIHKS] must not resolve to the ROM
+      // recording of SIX.
+      if (isPhonemeNotation(word)) {
+        this._speakPhonemeWord(word, wordPitchOffsets[wi], () => {
+          this._scheduleChainStep(generation, playNext, 90);
+        });
+        return;
+      }
 
       // Every recording the ROM names — the letters, the digits and the 117 spelled
       // vocabulary words — is fair game. A real TI recording of the typed word beats
