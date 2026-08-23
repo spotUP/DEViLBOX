@@ -43,7 +43,7 @@ async function ensureInitialized(): Promise<void> {
       // Self-test in its own try/catch — Emscripten abort() can be hard to catch
       try {
         const worker = new espeakModule.eSpeakNGWorker();
-        worker.set_voice('en');
+        worker.set_voice('en-us');
         worker.convert_to_phonemes('hi', true);
         espeakWorker = worker;
         console.log(`[eSpeak-NG] Initialized in ${(performance.now() - t0).toFixed(0)}ms`);
@@ -81,7 +81,7 @@ function readCString(ptr: number): string {
  * Returns underscore-separated IPA with stress markers (ˈ ˌ).
  * Returns null if eSpeak-NG is not available.
  */
-export async function espeakTextToIPA(text: string, voice = 'en'): Promise<string | null> {
+export async function espeakTextToIPA(text: string, voice = 'en-us'): Promise<string | null> {
   await ensureInitialized();
   if (!espeakWorker) return null;
 
@@ -120,7 +120,7 @@ const IPA_TO_SAM: Record<string, string> = {
   'æ': 'AE', 'ɑː': 'AA', 'ɑ': 'AA', 'ʌ': 'AH', 'ɐ': 'AH',
   'ɒ': 'AO', 'ɔː': 'AO', 'ɔ': 'AO',
   'ʊ': 'UH', 'uː': 'UX', 'u': 'UX',
-  'ə': 'AX', 'ɜː': 'ER', 'ɜ': 'ER',
+  'ə': 'AX', 'ɜː': 'ER', 'ɜ': 'ER', 'ɚ': 'ER', 'a': 'AE',
 
   // Diphthongs
   'eɪ': 'EY', 'aɪ': 'AY', 'ɔɪ': 'OY',

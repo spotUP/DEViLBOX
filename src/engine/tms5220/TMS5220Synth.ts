@@ -45,6 +45,45 @@ export function subscribeRomWords(listener: () => void): () => void {
   return () => { _romWordListeners.delete(listener); };
 }
 
+/**
+ * Module-level memo of the mined phoneme library. Mining runs the DP aligner
+ * over all 175 recordings (~300ms of main-thread work); a session restore
+ * constructs the synth more than once, and every instance was paying it again
+ * during the restore itself — a visible freeze. One build per ROM, shared.
+ */
+let _minedLibraryCache: {
+  key: string;
+  library: Map<string, TMS5220Frame[]>;
+} | null = null;
+
+function _romCacheKey(romWords: VSMWord[]): string {
+  return `${romWords.length}:${romWords.map(w => w.startBit).slice(0, 8).join(',')}`;
+}
+
+function getMinedLibrary(romWords: VSMWord[]): Map<string, TMS5220Frame[]> {
+  const key = _romCacheKey(romWords);
+  if (_minedLibraryCache?.key === key) return _minedLibraryCache.library;
+  const result = buildCompletePhonemeLibrary(romWords);
+  const count = (src: string) =>
+    [...result.provenance.values()].filter(p => p.source === src).length;
+  console.log(
+    `[TMS5220] Phoneme library: ${result.library.size} codes ` +
+    `(letter ${count('letter')}, word ${count('word')}, phrase ${count('phrase')}, ` +
+    `derived ${count('derived')}), ${result.droppedWords.length} recordings rejected`
+  );
+  _minedLibraryCache = { key, library: result.library };
+  return result.library;
+}
+
+/** Run work when the main thread is free; restore must not wait on it. */
+function whenIdle(work: () => void): void {
+  if (typeof requestIdleCallback === 'function') {
+    requestIdleCallback(() => work(), { timeout: 5000 });
+  } else {
+    setTimeout(work, 1500);
+  }
+}
+
 /** Case-insensitive lookup of an imported authentic recording by word. */
 export function lookupImportedRecording(word: string) {
   const key = word.trim().toUpperCase();
@@ -176,8 +215,9 @@ export class TMS5220Synth extends MAMEBaseSynth {
     this.initSynth();
     this._loadROMs();
     // eSpeak-NG is the primary G2P for typed text (SAM rules are the fallback).
-    // Loading is async and slow-ish; start it now so the first Speak is ready.
-    preloadEspeak();
+    // Its wasm compiles on the main thread, so preload only when idle — during
+    // a session restore this stacked on top of everything else.
+    whenIdle(() => preloadEspeak());
   }
 
   /** Try to load Speak & Spell VSM ROMs on init */
@@ -200,19 +240,15 @@ export class TMS5220Synth extends MAMEBaseSynth {
 
       this._romWordIndex = buildRomWordIndex(this._romWords);
 
-      // Extract authentic phonemes: hand-verified letter path plus aligner-mined
-      // vocabulary words, digits and phrases, with derivations for the codes no
-      // recording exercises.
+      // Mine the phoneme library when the thread is idle (memoized across
+      // instances). Until then _buildPhonemeFrames serves from the bundled
+      // AUTHENTIC_PHONEMES, which is this same library exported for the stock
+      // ROMs — first Speak sounds identical either way.
       if (this._romWords.length >= 26) {
-        const result = buildCompletePhonemeLibrary(this._romWords);
-        this._romPhonemes = result.library;
-        const count = (src: string) =>
-          [...result.provenance.values()].filter(p => p.source === src).length;
-        console.log(
-          `[TMS5220] Phoneme library: ${result.library.size} codes ` +
-          `(letter ${count('letter')}, word ${count('word')}, phrase ${count('phrase')}, ` +
-          `derived ${count('derived')}), ${result.droppedWords.length} recordings rejected`
-        );
+        whenIdle(() => {
+          if (this._disposed) return;
+          this._romPhonemes = getMinedLibrary(this._romWords);
+        });
       }
 
       this._romLoaded = true;
