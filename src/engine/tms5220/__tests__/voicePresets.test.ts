@@ -7,7 +7,7 @@
  * "chipmunk sounds like a dark angry robot".
  */
 import { describe, it, expect } from 'vitest';
-import { TMS5220_VOICE_PRESETS } from '../voicePresets';
+import { TMS5220_VOICE_PRESETS, NEUTRAL_VOICE_PARAMS, resolvePresetParams } from '../voicePresets';
 
 const preset = (id: string) =>
   TMS5220_VOICE_PRESETS.find(p => p.id === id)!.params;
@@ -28,5 +28,38 @@ describe('TMS5220 voice presets', () => {
 
   it('Whisper forces noise excitation', () => {
     expect(preset('whisper').noise_mode).toBe(1);
+  });
+
+  it('Bright and Muffled shape tone with brightness, never with K offsets', () => {
+    // K indices are reflection-coefficient table positions — shifting them
+    // relocates formants and garbles the vowels ("bright and muffled sounds
+    // wrong"). Tone belongs on the brightness tilt: 0.5 is neutral.
+    for (const id of ['bright', 'muffled']) {
+      const p = preset(id);
+      expect(p.k1_index, `${id} must not bend K1`).toBeUndefined();
+      expect(p.k2_index, `${id} must not bend K2`).toBeUndefined();
+      expect(p.k3_index, `${id} must not bend K3`).toBeUndefined();
+    }
+    expect(preset('bright').brightness).toBeGreaterThan(0.5);
+    expect(preset('muffled').brightness).toBeLessThan(0.5);
+  });
+
+  it('Speak & Spell is the neutral chip plus the toy cabinet', () => {
+    const resolved = resolvePresetParams('speakandspell')!;
+    expect(resolved.cabinet).toBeGreaterThan(0);
+    for (const [key, value] of Object.entries(NEUTRAL_VOICE_PARAMS)) {
+      if (key === 'cabinet') continue;
+      expect(resolved[key], key).toBe(value);
+    }
+  });
+
+  it('resolvePresetParams fills every neutral value so presets leave no residue', () => {
+    // Picking Muffled after Alien must clear Alien's formant shifts.
+    const muffled = resolvePresetParams('muffled')!;
+    expect(muffled.k1_index).toBe(NEUTRAL_VOICE_PARAMS.k1_index);
+    expect(muffled.k2_index).toBe(NEUTRAL_VOICE_PARAMS.k2_index);
+    expect(muffled.chirp_type).toBe(0);
+    // And Default is exactly the neutral chip.
+    expect(resolvePresetParams('default')).toEqual(NEUTRAL_VOICE_PARAMS);
   });
 });
