@@ -16,17 +16,20 @@ import type { SynthType } from '@typedefs/instrument';
 import type JSZipType from 'jszip';
 import { VowelEditor } from './VowelEditor';
 import { LexiconBrowser } from './LexiconBrowser';
-import { TMS5220_VOICE_PRESETS } from '@engine/tms5220/voicePresets';
+import { TMS5220_VOICE_PRESETS, resolvePresetParams } from '@engine/tms5220/voicePresets';
 import { ScrollLockContainer } from '@components/ui/ScrollLockContainer';
 
 /** TMS5220 preset names (chipParameters) → SAM phoneme codes for audition. */
 const TMS5220_PRESET_PHONEMES = ['AH', 'IY', 'IH', 'OW', 'UW', 'AE', 'UH', 'ER'];
 
-/** Apply a bundled voice preset: write every parameter through the normal path. */
+/**
+ * Apply a bundled voice preset: the FULL resolved parameter set through the
+ * normal path, so switching presets never keeps the previous one's residue.
+ */
 function applyVoicePreset(presetId: string, onParamChange: (key: string, value: number) => void): void {
-  const preset = TMS5220_VOICE_PRESETS.find(p => p.id === presetId);
-  if (!preset) return;
-  for (const [key, value] of Object.entries(preset.params)) {
+  const params = resolvePresetParams(presetId);
+  if (!params) return;
+  for (const [key, value] of Object.entries(params)) {
     onParamChange(key, value);
   }
 }
