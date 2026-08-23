@@ -5,6 +5,27 @@
  */
 
 import type { InstrumentPreset } from '@typedefs/instrument';
+import { TMS5220_VOICE_PRESETS, resolvePresetParams } from '@engine/tms5220/voicePresets';
+
+/** Speak & Spell first (auto-applied to fresh instruments), then the rest. */
+const TMS5220_FACTORY_PRESETS: InstrumentPreset['config'][] = [...TMS5220_VOICE_PRESETS]
+  .sort((a, b) => (a.id === 'speakandspell' ? -1 : 0) - (b.id === 'speakandspell' ? -1 : 0))
+  .map((preset) => ({
+    type: 'synth' as const,
+    name: preset.id === 'speakandspell' ? 'Speak & Spell' : preset.name,
+    synthType: 'MAMETMS5220' as const,
+    parameters: {
+      ...resolvePresetParams(preset.id)!,
+      sing_mode: 1,
+      use_rom_words: 1,
+      rom_knobs: 1,
+      volume: 0.8,
+      speechText: 'HELLO WORLD',
+    },
+    effects: [],
+    volume: -8,
+    pan: 0,
+  }));
 
 export const MAME_CHIP_PRESETS: InstrumentPreset['config'][] = [
   // ============================================
@@ -605,60 +626,13 @@ export const MAME_CHIP_PRESETS: InstrumentPreset['config'][] = [
   // ============================================
   // TMS5220 - TI Speak & Spell (LPC Speech)
   // ============================================
-  {
-    type: 'synth',
-    name: 'TMS Spell It',
-    synthType: 'MAMETMS5220',
-    parameters: { _program: 0, mode: 1, sing_mode: 1, volume: 0.85, speechText: 'SPELL IT' },
-    effects: [],
-    volume: -8,
-    pan: 0,
-  },
-  {
-    type: 'synth',
-    name: 'TMS Robot Voice',
-    synthType: 'MAMETMS5220',
-    parameters: { _program: 0, mode: 1, sing_mode: 0, volume: 0.9, speechText: 'THAT IS CORRECT' },
-    effects: [],
-    volume: -10,
-    pan: 0,
-  },
-  {
-    type: 'synth',
-    name: 'TMS Bright Chirp',
-    synthType: 'MAMETMS5220',
-    parameters: { _program: 0, mode: 0, volume: 0.8, chirp_type: 0, k1_index: 25, k2_index: 20, energy_index: 12, pitch_index: 40 },
-    effects: [],
-    volume: -10,
-    pan: 0,
-  },
-  {
-    type: 'synth',
-    name: 'TMS Deep Drone',
-    synthType: 'MAMETMS5220',
-    parameters: { _program: 3, mode: 0, volume: 0.8, chirp_type: 1, k1_index: 8, k2_index: 5, energy_index: 14, pitch_index: 55 },
-    effects: [],
-    volume: -10,
-    pan: 0,
-  },
-  {
-    type: 'synth',
-    name: 'TMS TI99 Mode',
-    synthType: 'MAMETMS5220',
-    parameters: { _program: 0, mode: 0, volume: 0.85, chirp_type: 2, energy_index: 10, pitch_index: 32, stereo_width: 0.5 },
-    effects: [],
-    volume: -10,
-    pan: 0,
-  },
-  {
-    type: 'synth',
-    name: 'TMS Whisper',
-    synthType: 'MAMETMS5220',
-    parameters: { _program: 7, mode: 0, volume: 0.6, energy_index: 5, pitch_index: 0, brightness: 0.3 },
-    effects: [],
-    volume: -6,
-    pan: 0,
-  },
+  // Generated from the voice presets (single source of truth in
+  // src/engine/tms5220/voicePresets.ts) via the spread below. Speak & Spell
+  // comes FIRST: createTempInstrument auto-applies the first factory preset,
+  // so it is what a fresh TMS5220 instrument sounds like. The old hand-typed
+  // "TMS ..." presets carried stale parameters (mode, K-index offsets) that
+  // left a fresh editor with broken speech until a preset was picked.
+  ...TMS5220_FACTORY_PRESETS,
 
   // ============================================
   // S14001A - SSi TSI Berzerk Speech (Delta Mod)

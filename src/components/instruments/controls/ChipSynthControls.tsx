@@ -15,23 +15,62 @@ import { IMPORTED_RECORDING_WORDS } from '@generated/tms5220Recordings';
 import type { SynthType } from '@typedefs/instrument';
 import type JSZipType from 'jszip';
 import { VowelEditor } from './VowelEditor';
-import { TMS5220_VOICE_PRESETS, resolvePresetParams } from '@engine/tms5220/voicePresets';
 import { ScrollLockContainer } from '@components/ui/ScrollLockContainer';
 
 /** TMS5220 preset names (chipParameters) → SAM phoneme codes for audition. */
 const TMS5220_PRESET_PHONEMES = ['AH', 'IY', 'IH', 'OW', 'UW', 'AE', 'UH', 'ER'];
 
 /**
- * Apply a bundled voice preset: the FULL resolved parameter set through the
- * normal path, so switching presets never keeps the previous one's residue.
+ * Plain speech-text input. Local draft state makes typing instant — driving
+ * the input from the store round-trip made the caret fight the async prop
+ * update. The previous version also painted the text on a transparent
+ * overlay div (per-word highlight) with an invisible input on top; the two
+ * layers desynced on scroll and re-rendered the whole editor per keystroke —
+ * "weird, slow, lives its own life". One visible input, nothing layered.
  */
-function applyVoicePreset(presetId: string, onParamChange: (key: string, value: number) => void): void {
-  const params = resolvePresetParams(presetId);
-  if (!params) return;
-  for (const [key, value] of Object.entries(params)) {
-    onParamChange(key, value);
+const SpeechTextInput: React.FC<{
+  value: string;
+  placeholder: string;
+  accent: string;
+  border: string;
+  isCyan: boolean;
+  onCommit: (text: string) => void;
+  onSpeak: (text: string) => void;
+}> = ({ value, placeholder, accent, border, isCyan, onCommit, onSpeak }) => {
+  const [draft, setDraft] = useState(value);
+  const lastPropRef = useRef(value);
+  // Adopt external changes (phoneme toggle, preset restore) without fighting typing.
+  if (value !== lastPropRef.current) {
+    lastPropRef.current = value;
+    if (value !== draft) setDraft(value);
   }
-}
+  return (
+    <input
+      type="text"
+      value={draft}
+      onChange={(e) => {
+        setDraft(e.target.value);
+        onCommit(e.target.value);
+      }}
+      onKeyDown={(e) => {
+        e.stopPropagation();
+        if (e.key === 'Enter') onSpeak(draft);
+      }}
+      placeholder={placeholder}
+      style={{
+        background: isCyan ? '#041010' : '#0d1117',
+        color: isCyan ? '#00ffff' : accent,
+        border: `1px solid ${border}`,
+        borderRadius: 6,
+        padding: '8px 12px',
+        fontSize: 13,
+        fontFamily: 'Monaco, Menlo, monospace',
+        outline: 'none',
+        flex: 1,
+      }}
+    />
+  );
+};
 
 interface ChipSynthControlsProps {
   synthType: SynthType;
@@ -83,9 +122,6 @@ export const ChipSynthControls: React.FC<ChipSynthControlsProps> = ({
   // Phoneme toggle state for text params (must be top-level, not inside renderParam)
   const [phonemeMode, setPhonemeMode] = useState<Record<string, { active: boolean; original: string } | undefined>>({});
 
-  // Last-applied voice preset id (TMS5220 bundled parameter voices)
-  const [voicePresetId, setVoicePresetId] = useState('default');
-
   // Words the TTS speaks authentically: ROM words (loaded async — the ROM-word
   // version bumps re-render this memo) and the imported QBoxPro recordings.
   const romWordNames = useMemo(() => {
@@ -94,25 +130,6 @@ export const ChipSynthControls: React.FC<ChipSynthControlsProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [synthType, getRomWordVersion()]);
   const recordingWordNames = useMemo(() => new Set<string>(IMPORTED_RECORDING_WORDS), []);
-
-  // Backdrop ref for the known-word highlight overlay (scrolls in sync with the input)
-  const highlightRef = useRef<HTMLDivElement | null>(null);
-
-  /** Split text into word runs + separators, highlighting words the chip speaks authentically. */
-  const renderHighlightedText = useCallback((text: string) => {
-    if (!text) return null;
-    const parts = text.split(/([A-Za-z0-9']+)/g).filter(Boolean);
-    return parts.map((part, i) => {
-      const bare = part.toUpperCase();
-      if (recordingWordNames.has(bare)) {
-        return <span key={i} style={{ color: '#a855f7', fontWeight: 700 }}>{part}</span>;
-      }
-      if (romWordNames.has(bare)) {
-        return <span key={i} style={{ color: '#3b82f6', fontWeight: 700 }}>{part}</span>;
-      }
-      return <span key={i} style={{ color: isCyanTheme ? '#00ffff' : accentColor }}>{part}</span>;
-    });
-  }, [recordingWordNames, romWordNames, isCyanTheme, accentColor]);
 
   // Group parameters by their group field (must be before conditional return)
   const grouped = useMemo(() => {
@@ -260,79 +277,19 @@ export const ChipSynthControls: React.FC<ChipSynthControlsProps> = ({
         }
       };
 
-      const inputTextStyle: React.CSSProperties = {
-        background: isCyanTheme ? '#041010' : '#0d1117',
-        color: isCyanTheme ? '#00ffff' : accentColor,
-        border: `1px solid ${showPhonemes ? '#ff6b00' : panelBorder}`,
-        borderRadius: 6,
-        padding: '8px 12px',
-        fontSize: 13,
-        fontFamily: 'Monaco, Menlo, monospace',
-        outline: 'none',
-        flex: 1,
-      };
-
       return (
         <div key={paramKey} style={{ display: 'flex', flexDirection: 'column', gap: 4, flex: '1 1 100%' }}>
           <span style={{ fontSize: 10, color: mutedColor, textTransform: 'uppercase', fontWeight: 600 }}>{param.label}</span>
           <div style={{ display: 'flex', gap: 6 }}>
-            {isSpeechText ? (
-              <div style={{ position: 'relative', flex: 1 }}>
-                <div
-                  ref={highlightRef}
-                  aria-hidden="true"
-                  style={{
-                    ...inputTextStyle,
-                    position: 'absolute',
-                    inset: 0,
-                    background: 'transparent',
-                    border: '1px solid transparent',
-                    whiteSpace: 'pre',
-                    overflow: 'hidden',
-                    pointerEvents: 'none',
-                  }}
-                >
-                  {renderHighlightedText(textValue)}
-                </div>
-                <input
-                  type="text"
-                  value={textValue}
-                  onChange={(e) => onTextChange?.(paramKey, e.target.value)}
-                  onScroll={(e) => {
-                    if (highlightRef.current) highlightRef.current.scrollLeft = e.currentTarget.scrollLeft;
-                  }}
-                  onKeyDown={(e) => {
-                    e.stopPropagation();
-                    if (e.key === 'Enter') {
-                      onSpeak?.(textValue);
-                    }
-                  }}
-                  placeholder={param.placeholder || (showPhonemes ? 'Phonemes: [HEH4LOW] [WERLD] ...' : 'Enter text to speak')}
-                  style={{
-                    ...inputTextStyle,
-                    position: 'relative',
-                    background: 'transparent',
-                    color: 'transparent',
-                    caretColor: isCyanTheme ? '#00ffff' : accentColor,
-                    borderColor: showPhonemes ? '#ff6b00' : panelBorder,
-                  }}
-                />
-              </div>
-            ) : (
-              <input
-                type="text"
-                value={textValue}
-                onChange={(e) => onTextChange?.(paramKey, e.target.value)}
-                onKeyDown={(e) => {
-                  e.stopPropagation();
-                  if (e.key === 'Enter' && isSpeechText) {
-                    onSpeak!(textValue);
-                  }
-                }}
-                placeholder={param.placeholder || (showPhonemes ? 'Phonemes: [HEH4LOW] [WERLD] ...' : 'Enter text to speak')}
-                style={inputTextStyle}
-              />
-            )}
+            <SpeechTextInput
+              value={textValue}
+              placeholder={param.placeholder || (showPhonemes ? 'Phonemes: [HEH4LOW] [WERLD] ...' : 'Enter text to speak')}
+              accent={accentColor}
+              border={showPhonemes ? '#ff6b00' : panelBorder}
+              isCyan={isCyanTheme}
+              onCommit={(text) => onTextChange?.(paramKey, text)}
+              onSpeak={(text) => { if (isSpeechText) onSpeak?.(text); }}
+            />
             {isSpeechText && (
               <>
                 <button
@@ -624,48 +581,6 @@ export const ChipSynthControls: React.FC<ChipSynthControlsProps> = ({
               </button>
             ))}
           </div>
-        </div>
-      )}
-
-      {/* Voice Presets — bundled parameter voices (TMS5220 only) */}
-      {synthType === 'MAMETMS5220' && (
-        <div style={{
-          background: bgColor,
-          border: `1px solid ${panelBorder}`,
-          borderRadius: 8,
-          padding: '8px 12px',
-          marginBottom: 8,
-        }}>
-          <div style={{
-            fontSize: 10, fontWeight: 600,
-            color: accentColor,
-            textTransform: 'uppercase',
-            letterSpacing: '0.05em',
-            marginBottom: 2,
-          }}>
-            Voice Presets
-          </div>
-          <div style={{ fontSize: 9, color: mutedColor, marginBottom: 6 }}>
-            Sets formants, pitch, excitation and noise in one click. Shapes synthesized speech, sung notes and — while ROM Knobs is on — the built-in ROM words and recordings.
-          </div>
-          <CustomSelect
-            value={voicePresetId}
-            onChange={(v) => {
-              setVoicePresetId(v);
-              applyVoicePreset(v, onParamChange);
-            }}
-            options={TMS5220_VOICE_PRESETS.map(p => ({ value: p.id, label: p.name }))}
-            style={{
-              width: '100%',
-              background: isCyanTheme ? '#041010' : '#0d1117',
-              color: accentColor,
-              border: `1px solid ${panelBorder}`,
-              borderRadius: 4,
-              padding: '4px 8px',
-              fontSize: 12,
-              cursor: 'pointer',
-            }}
-          />
         </div>
       )}
 
