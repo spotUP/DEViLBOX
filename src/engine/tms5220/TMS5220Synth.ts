@@ -1,6 +1,7 @@
 
 import { MAMEBaseSynth } from '@engine/mame/MAMEBaseSynth';
-import { textToTokensSmart, isQuestion, isPhonemeNotation, splitSpeechSegments, textToPhonemes, parsePhonemeString } from '@engine/speech/Reciter';
+import { textToTokensSmartAsync, isQuestion, isPhonemeNotation, splitSpeechSegments, textToPhonemes, parsePhonemeString } from '@engine/speech/Reciter';
+import { preloadEspeak } from '@engine/speech/EspeakNG';
 import { type TMS5220Frame, samToTMS5220 } from '@engine/speech/tms5220PhonemeMap';
 import { type VSMWord, parseVSMDirectory, scanVSMForWords } from '@engine/speech/VSMROMParser';
 import { shouldAuditionRomSelection } from '@engine/speech/romSpeechRouting';
@@ -174,6 +175,9 @@ export class TMS5220Synth extends MAMEBaseSynth {
     super();
     this.initSynth();
     this._loadROMs();
+    // eSpeak-NG is the primary G2P for typed text (SAM rules are the fallback).
+    // Loading is async and slow-ish; start it now so the first Speak is ready.
+    preloadEspeak();
   }
 
   /** Try to load Speak & Spell VSM ROMs on init */
@@ -567,7 +571,7 @@ export class TMS5220Synth extends MAMEBaseSynth {
       // sequence — never a word to look up. [SIHKS] must not resolve to the ROM
       // recording of SIX.
       if (isPhonemeNotation(word)) {
-        this._speakPhonemeWord(word, wordPitchOffsets[wi], () => {
+        this._speakPhonemeWord(word, wordPitchOffsets[wi], generation, () => {
           this._scheduleChainStep(generation, playNext, 90);
         });
         return;
@@ -599,7 +603,7 @@ export class TMS5220Synth extends MAMEBaseSynth {
         this._scheduleChainStep(generation, playNext, durationMs);
       } else {
         // All other words: SAM phoneme synthesis
-        this._speakPhonemeWord(word, wordPitchOffsets[wi], () => {
+        this._speakPhonemeWord(word, wordPitchOffsets[wi], generation, () => {
           this._scheduleChainStep(generation, playNext, 90);
         });
       }
@@ -682,33 +686,38 @@ export class TMS5220Synth extends MAMEBaseSynth {
 
   /** Speak full text via SAM phonemes through MAME engine frame buffer */
   private _speakPhonemeText(text: string): void {
-    this.stopSpeaking();
+    // G2P is async (eSpeak-NG worker). The chain generation guards the gap:
+    // if a newer utterance starts while we await, this one must not speak.
+    const generation = this._beginChain();
+    void textToTokensSmartAsync(text).then((tokens) => {
+      if (!this._chain.isCurrent(generation) || !tokens) return;
 
-    const tokens = textToTokensSmart(text);
-    if (!tokens) return;
+      const frames = this._buildPhonemeFrames(tokens);
+      if (frames.length === 0) return;
 
-    const frames = this._buildPhonemeFrames(tokens);
-    if (frames.length === 0) return;
-
-    this._sendFrameBufferAndSpeak(frames, () => {
-      this._phonemeSpeechActive = false;
+      this._sendFrameBufferAndSpeak(frames, () => {
+        this._phonemeSpeechActive = false;
+      });
     });
   }
 
   /** Synthesize a single word using SAM phoneme-to-LPC mapping through MAME engine */
-  private _speakPhonemeWord(word: string, pitchOffset: number, onDone: () => void): void {
-    const tokens = textToTokensSmart(word);
-    if (!tokens) { onDone(); return; }
+  private _speakPhonemeWord(word: string, pitchOffset: number, generation: number, onDone: () => void): void {
+    // G2P is async (eSpeak-NG worker); the utterance generation guards the gap.
+    void textToTokensSmartAsync(word).then((tokens) => {
+      if (!this._chain.isCurrent(generation)) return;
+      if (!tokens) { onDone(); return; }
 
-    const frames = offsetFramesPitch(this._buildPhonemeFrames(tokens), pitchOffset);
-    if (frames.length === 0) { onDone(); return; }
+      const frames = offsetFramesPitch(this._buildPhonemeFrames(tokens), pitchOffset);
+      if (frames.length === 0) { onDone(); return; }
 
-    // Stop any current WASM speech first
-    if (this.workletNode) {
-      this.workletNode.port.postMessage({ type: 'stopSpeaking' });
-    }
+      // Stop any current WASM speech first
+      if (this.workletNode) {
+        this.workletNode.port.postMessage({ type: 'stopSpeaking' });
+      }
 
-    this._sendFrameBufferAndSpeak(frames, onDone);
+      this._sendFrameBufferAndSpeak(frames, onDone);
+    });
   }
 
   // ===========================================================================
