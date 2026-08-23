@@ -39,8 +39,21 @@ export const PresetDropdown: React.FC<PresetDropdownProps> = ({
   // factory presets use, so they slot straight into the list.
   const presets = useMemo(() => {
     const factory = FACTORY_PRESETS.filter(p => p.synthType === synthType);
-    const ripped = rippedPresets
-      .filter(p => p.synthType === synthType)
+    // Ripped presets are auto-harvested snapshots of song instruments, so the
+    // same instrument re-harvested across sessions piles up near-identical
+    // entries ("Speak & Spell", "Speak & Spell (song)", ...). Collapse by
+    // display name: factory names win outright, and among ripped entries with
+    // the same base name only the NEWEST survives.
+    const factoryNames = new Set(factory.map(p => (p.name ?? '').toUpperCase()));
+    const newestByName = new Map<string, (typeof rippedPresets)[number]>();
+    for (const p of rippedPresets) {
+      if (p.synthType !== synthType) continue;
+      const base = (p.name ?? '').replace(/ \([^)]*\)$/, '').toUpperCase();
+      if (factoryNames.has(base)) continue;
+      const prev = newestByName.get(base);
+      if (!prev || p.createdAt > prev.createdAt) newestByName.set(base, p);
+    }
+    const ripped = [...newestByName.values()]
       .map(p => p.config as InstrumentPreset['config']);
     return [...factory, ...ripped];
   }, [synthType, rippedPresets]);
