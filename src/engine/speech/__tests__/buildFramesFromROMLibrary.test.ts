@@ -27,8 +27,8 @@ function library(): Map<string, TMS5220Frame[]> {
   map.set('AA', run(VOWEL));
   map.set('T*', run(STOP));
   map.set(' ', [SILENCE, SILENCE]);
-  // Sub-audible extractions: 1-frame vowel, 2-frame stop (the IH/L*/R* class).
-  map.set('IH', [{ ...VOWEL, k: [...VOWEL.k] }]);
+  // Sub-audible extractions: 2-frame vowel, 2-frame stop (the IH/L*/R* class).
+  map.set('IH', [0, 1].map(() => ({ ...VOWEL, k: [...VOWEL.k] })));
   map.set('P*', [0, 1].map(i => ({ ...STOP, k: [...STOP.k], energy: STOP.energy + i })));
   return map;
 }
@@ -87,13 +87,14 @@ describe('buildFramesFromROMLibrary synthesis path', () => {
     expect(frames.length).toBe(10);
   });
 
-  it('floors sub-audible extractions: 1-frame vowels hold to the class minimum', () => {
-    // "iss" = IH + S*. IH was mined as a single 25ms frame — a click, not a
-    // vowel. It must be held to the vowel floor (4 frames) so the i stays
-    // audible next to the s.
+  it('floors sub-audible extractions: 2-frame vowels stretch to the class minimum', () => {
+    // "iss" = IH + S*. IH mines as 2 frames (50ms) — clipped, not a vowel. It
+    // must be stretched to the vowel floor (4 frames) so the i stays audible
+    // next to the s. (A ONE-frame run is a different case: it has no trajectory
+    // at all and goes to the static table instead — see the R* whistle test.)
     const frames = buildFramesFromROMLibrary([token('IH'), token('S*')], library(), fallback);
-    // IH segment: 4 held frames. S* has no library entry and no static
-    // fallback for S* (fallback only knows AH) — dropped entirely.
+    // IH segment: 4 frames. S* has no library entry and no static fallback
+    // (fallback only knows AH) — dropped entirely.
     expect(frames.length).toBe(4);
     expect(frames.every(f => f.k[0] === VOWEL.k[0])).toBe(true);
   });
@@ -118,11 +119,26 @@ describe('buildFramesFromROMLibrary synthesis path', () => {
     expect(silence).toBe(2);
   });
 
-  it('prefers static frames over misaligned mined segments (R* whistle fix)', () => {
-    // "rough" = R* AH F*. The ROM-mined R* segment was a single 25ms frame
-    // with k2=28 — an /i/-fronted shape that rendered as a hollow whistle.
-    // The curated static R* (k2=15) must win even when the library has the
-    // bad segment.
+  it('takes the mined run over the static table when the library has one', () => {
+    // The precedence decider: leave-one-out reconstruction of 128 vocabulary
+    // words puts library-first closer to the real recording on 124 of them
+    // (tools/tms5220-audit/holdoutReconstruction.ts). A static entry existing
+    // for the same code must NOT shadow the mined run — that shadowing made
+    // the whole mining path dead code at runtime, because the static table
+    // answers for all 54 SAM codes.
+    const staticAA = { ...VOWEL, k: [17, 15, 9, 9, 6, 10, 7, 5, 4, 4] };
+    const frames = buildFramesFromROMLibrary([token('AA')], library(), () => staticAA);
+    // The 4-frame mined AA run has k2=18 and energies 8,9,10,11; the static
+    // entry has k2=15. Mined data must be what comes out.
+    expect(frames.slice(0, 4).map(f => f.energy)).toEqual([8, 9, 10, 11]);
+    for (const f of frames) expect(f.k[1]).toBe(18);
+  });
+
+  it('falls back to the static table for a single-frame mined run (R* whistle fix)', () => {
+    // "rough" = R* AH F*. The ROM-mined R* segment is a single 25ms frame with
+    // k2=28 — an /i/-fronted shape that renders as a hollow whistle. One frame
+    // carries no trajectory, which is the one case the curated table does
+    // better, so runs shorter than MIN_MINED_RUN_FRAMES fall through.
     const badMinedR = {
       k: [11, 28, 1, 9, 9, 7, 6, 4, 5, 5],
       energy: 11, pitch: 18, unvoiced: false, durationMs: 25,

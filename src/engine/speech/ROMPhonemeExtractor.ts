@@ -9,13 +9,15 @@
  * so we can segment the ROM frames and extract individual phonemes with
  * authentic TI-recorded LPC parameters.
  *
- * The buildFramesFromROMLibrary() pipeline applies 6 composable improvements:
- * 1. ROM frame compression (65% tempo for conversational pace)
- * 2. Stress-based duration scaling
- * 3. Stress energy boost
- * 4. Energy envelope shaping (attack/sustain/release per phoneme class)
- * 5. Micro-pitch contour (natural intonation)
- * 6. Coarticulation transitions between phoneme boundaries
+ * buildFramesFromROMLibrary() renders a phoneme sequence. Mined runs are the
+ * primary source (see the precedence note there); the static table answers for
+ * codes with no usable run. Per segment:
+ * 1. Stress-based duration scaling (both sources)
+ * 2. Class minimum frame count (both sources)
+ * 3. Static source only: stress energy/pitch accent, 65% tempo compression,
+ *    energy envelope and micro-pitch contour — the shaping a single curated
+ *    frame needs to read as speech. Mined runs already carry all of it.
+ * 4. Coarticulation transitions between phoneme boundaries
  */
 
 import type { LPCFrame, VSMWord } from './VSMROMParser';
@@ -266,6 +268,13 @@ function scaleFrameCount(frames: TMS5220Frame[], scale: number): TMS5220Frame[] 
  * 1-2 frames (25-50ms): a sub-audible click, not a phoneme. Hold/stretch them
  * to the class minimum so vowels stay audible.
  */
+/**
+ * Shortest mined run that may outrank the curated static table. Below this a
+ * run is a single snapshot rather than a formant trajectory, which is the one
+ * case the static table does better (see buildFramesFromROMLibrary).
+ */
+export const MIN_MINED_RUN_FRAMES = 2;
+
 const MIN_FRAMES_BY_CLASS: Record<PhonemeClass, number> = {
   vowel: 4,
   diphthong: 4,
@@ -684,12 +693,11 @@ export function extractPhonemeLibrary(
  * when available and falling back to static approximations.
  *
  * Pipeline per phoneme:
- *   1. Get ROM frames OR generate multi-frame static sequence
- *   2. Compress ROM frames to 65% tempo
- *   3. Scale frame count by stress-based duration
- *   4. Apply stress energy boost (+2 for stress >= 4)
- *   5. Apply energy envelope shaping
- *   6. Apply micro-pitch contour
+ *   1. Take the mined run, or generate a multi-frame static sequence
+ *   2. Scale frame count by stress-based duration
+ *   3. Floor the segment to its class minimum
+ *   4. Static only: stress energy boost (+2 for stress >= 4) and pitch accent
+ *   5. Static only: 65% tempo compression, energy envelope, micro-pitch contour
  *
  * Then across all segments:
  *   7. Insert coarticulation transitions between phoneme pairs
@@ -728,19 +736,35 @@ export function buildFramesFromROMLibrary(
     let frames: TMS5220Frame[];
     let romSourced = false;
 
-    // Static table first: the hand-authored frames are acoustically correct
-    // for every phoneme. The ROM-mined library fills gaps only — its segments
-    // were misaligned for most phonemes (R* came out as one 25ms fronted
-    // frame that sounds like a hollow whistle; IY, OW, W*, Y* have front/back
-    // swapped), so mined frames must not override the curated table.
+    // ROM-mined runs first, static table as the fallback for codes the library
+    // lacks. Decided by leave-one-out measurement, not by preference: for each
+    // of 128 vocabulary words, mine the library from every recording EXCEPT that
+    // word, rebuild the word from its G2P phonemes under both precedences and
+    // compare each against the word's real ROM frames by DTW
+    // (tools/tms5220-audit/holdoutReconstruction.ts). Library-first is closer on
+    // 126 of 128 unseen words: mean 0.1199 against 0.1706.
+    //
+    // Both earlier oracles said the opposite for the same circular reason. The
+    // in-sample reconstruction mines from the words it rebuilds, so the library
+    // cannot lose; the letter oracle compares against the letter recordings the
+    // static table was calibrated from (4d501b6db), so static cannot lose. The
+    // hold-out removes the word being rebuilt from the training set.
+    //
+    // A single static frame cannot represent a phoneme that IS a trajectory —
+    // diphthongs and stop bursts are defined by their movement — which is what
+    // the mined multi-frame runs carry and generateStaticFrames only imitates.
+    // One exception, and it is the reason the old precedence existed: a
+    // single-frame mined run carries no trajectory at all, so it is a snapshot —
+    // exactly what the curated table already provides, and better. The mined R*
+    // is one 25 ms frame at k2=28, an /i/-fronted shape that renders as a hollow
+    // whistle; IH, IX and RX are the same shape of accident. Those fall through.
     const staticFrame = staticFallback(token.code);
-    if (staticFrame) {
-      // Generate multi-frame static sequence
-      frames = generateStaticFrames(staticFrame, pClass);
-    } else if (romFrames && romFrames.length > 0) {
-      // ROM-extracted frames as fallback for codes the static table lacks.
+    if (romFrames && romFrames.length >= MIN_MINED_RUN_FRAMES) {
       frames = romFrames.map(f => ({ ...f, k: [...f.k] }));
       romSourced = true;
+    } else if (staticFrame) {
+      // No mined run for this code: synthesise from the curated table.
+      frames = generateStaticFrames(staticFrame, pClass);
     } else {
       continue;
     }

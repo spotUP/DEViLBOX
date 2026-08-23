@@ -11,8 +11,9 @@
  *    library is mined FROM those recordings), so it measures fidelity to the
  *    source, not phoneme correctness. Correctness comes from the static table,
  *    which is the primary source in buildFramesFromROMLibrary.
- * 4. Reachability: the static table (primary source) resolves every covered
- *    code; the mined library fills only the codes static lacks.
+ * 4. Reachability: mined runs reach the rendered output. They were shadowed by
+ *    the static table for a long stretch of commits, which made every test
+ *    below decorative — the code they measured never ran in the product.
  */
 import { describe, it, expect, beforeAll } from 'vitest';
 import { readFileSync, existsSync } from 'fs';
@@ -26,6 +27,7 @@ import {
   extractPhonemeLibrary,
   buildFramesFromROMLibrary,
   runDistance,
+  MIN_MINED_RUN_FRAMES,
 } from '../ROMPhonemeExtractor';
 import { resolveRepeatFrames, trimSilence, kIndexDistance, dtwFrameDistance } from '../ROMWordAligner';
 
@@ -206,28 +208,46 @@ describe.skipIf(!present)('ROM phoneme library', () => {
     expect(libSum / staticSum).toBeLessThanOrEqual(0.86);
   });
 
-  it('is reachable: the static table resolves every covered code (static-first priority)', () => {
-    const spyCalls: string[] = [];
-    const staticSpy = (code: string) => {
-      spyCalls.push(code);
-      return samToTMS5220(code);
-    };
-    for (const text of ['HELLO WORLD', 'ZEBRA QUICK VEX BOY JUDGE', 'THE LAZY DOG']) {
+  it('is reachable: mined runs actually reach the output, they are not shadowed', () => {
+    // The mining path was dead at runtime for a year of commits: the static
+    // table answers for all 54 SAM codes, and it was consulted first, so no
+    // mined frame ever left this function. Assert the opposite directly —
+    // every multi-frame mined code must appear verbatim in the output.
+    const SENTENCES = ['HELLO WORLD', 'ZEBRA QUICK VEX BOY JUDGE', 'THE LAZY DOG'];
+    let checkedCodes = 0;
+
+    for (const text of SENTENCES) {
       const phonemeStr = textToPhonemes(text);
       expect(phonemeStr).not.toBe(false);
       const tokens = parsePhonemeString(phonemeStr as string);
-      const frames = buildFramesFromROMLibrary(tokens, library, staticSpy);
+      const frames = buildFramesFromROMLibrary(tokens, library, samToTMS5220);
       expect(frames.length).toBeGreaterThan(0);
+
+      for (const t of tokens) {
+        const run = library.get(t.code);
+        if (t.code === ' ' || !run || run.length < MIN_MINED_RUN_FRAMES) continue;
+        // The run's own K vectors must be present in the rendered stream. The
+        // static path would have replaced them with generateStaticFrames output.
+        const wanted = JSON.stringify(run[0].k);
+        expect(
+          frames.some(f => JSON.stringify(f.k) === wanted),
+          `${t.code} mined frames missing from "${text}"`,
+        ).toBe(true);
+        checkedCodes++;
+      }
     }
-    // Static is the primary source: every phoneme code the table knows must
-    // resolve through it (the mined library only fills gaps).
-    const expected = new Set<string>();
-    for (const text of ['HELLO WORLD', 'ZEBRA QUICK VEX BOY JUDGE', 'THE LAZY DOG']) {
-      const tokens = parsePhonemeString(textToPhonemes(text) as string);
-      for (const t of tokens) if (t.code !== ' ') expected.add(t.code);
-    }
-    for (const code of expected) {
-      expect(spyCalls).toContain(code);
+    expect(checkedCodes).toBeGreaterThanOrEqual(10);
+  });
+
+  it('routes single-frame mined runs to the static table instead', () => {
+    // R*, IH, IX and RX mine as one frame — a snapshot, not a trajectory.
+    const shortCodes = [...library.entries()]
+      .filter(([, run]) => run.length < MIN_MINED_RUN_FRAMES)
+      .map(([code]) => code);
+    console.log(`[precedence] static-served (mined run too short): ${shortCodes.join(', ') || '(none)'}`);
+    for (const code of shortCodes) {
+      // Every such code must have a static entry, or it would drop out silently.
+      expect(samToTMS5220(code), `${code} has no static entry to fall back to`).not.toBeNull();
     }
   });
 });
