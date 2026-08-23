@@ -1101,10 +1101,22 @@ export function buildCompletePhonemeLibrary(romWords: VSMWord[]): PhonemeLibrary
     provenance.set(code, { source: 'letter', words: letterSources.get(code) ?? [] });
   }
 
-  // 2. Aligner-mined words, digits and phrases fill the gaps.
+  // 2. Aligner-mined words, digits and phrases fill the gaps — and REPLACE the
+  // letter cuts for stops and affricates. A letter name puts its consonant
+  // before one fixed front vowel ("pee", "tee", "kay"), and a stop's burst and
+  // aspiration are filtered through the FOLLOWING vowel's tract shape, so the
+  // letter cut is maximally context-coloured: the letter P* glides k2 16->21
+  // toward /i/ (typed PETER read as "pweeter"), K* sits at k2=27 (the "kay"
+  // palatal), B* is closure murmur with no burst at all. The medoid over
+  // 17-44 word contexts is the context-neutral exemplar. Vowels, nasals and
+  // liquids keep the letter cuts — their steady states are clean.
   const { candidates, dropped } = extractWordPhonemeLibrary(romWords);
+  const preferWordMined = (code: string): boolean => {
+    const cls = getPhonemeClass(code);
+    return cls === 'stop' || cls === 'affricate';
+  };
   for (const [code, cand] of candidates) {
-    if (library.has(code)) continue; // letter-derived stays authoritative
+    if (library.has(code) && !(preferWordMined(code) && cand.length >= 3)) continue;
     const medoid = pickMedoid(cand);
     if (!medoid) continue;
     if (cand.length >= 3) {

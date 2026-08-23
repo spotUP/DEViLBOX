@@ -657,7 +657,7 @@ export const ChipSynthControls: React.FC<ChipSynthControlsProps> = ({
             Voice Presets
           </div>
           <div style={{ fontSize: 9, color: mutedColor, marginBottom: 6 }}>
-            Sets formants, pitch, excitation and noise in one click. Shapes synthesized speech and sung notes — authentic ROM words and recordings keep their original sound.
+            Sets formants, pitch, excitation and noise in one click. Shapes synthesized speech, sung notes and — while ROM Knobs is on — the built-in ROM words and recordings.
           </div>
           <CustomSelect
             value={voicePresetId}

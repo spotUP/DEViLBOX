@@ -61,8 +61,10 @@ export function offsetFramesPitch(frames: TMS5220Frame[], offset: number): TMS52
 // Segment-relative pitch contour (2026-08-23, Q3 of the phoneme-quality plan)
 // ============================================================================
 
-/** Micro-prosody band: how far a frame may deviate from its run's median. */
-export const CONTOUR_DELTA_CLAMP = 3;
+/** Micro-prosody band: how far a frame may deviate from its run's median.
+ * Tightened 3 -> 2 after listening: at 3 the inherited source-word melody read
+ * as an exaggerated bend on top of the contour. */
+export const CONTOUR_DELTA_CLAMP = 2;
 /** Declination inside one word, in pitch indices. */
 export const WORD_DECLINATION = 1;
 
@@ -130,7 +132,13 @@ export function applyPitchContour(
     for (let i = run.start; i < run.end; i++) {
       const t = i / denom;
       let base = streamMedian + baseOffset - Math.round(declination * t);
-      if (run === lastRun) base += finalAdjust;
+      // The final fall/rise is a glide, not a step: ramp it across the last
+      // run so the boundary into that run carries no sudden jump. A whole-run
+      // step was heard as an exaggerated bend.
+      if (run === lastRun) {
+        const runLen = Math.max(1, run.end - run.start - 1);
+        base += Math.round(finalAdjust * ((i - run.start) / runLen));
+      }
       const delta = Math.max(-CONTOUR_DELTA_CLAMP,
         Math.min(CONTOUR_DELTA_CLAMP, out[i].pitch - run.median));
       const pitch = Math.max(1, Math.min(31, base + delta));
