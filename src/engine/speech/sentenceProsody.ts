@@ -62,9 +62,12 @@ export function offsetFramesPitch(frames: TMS5220Frame[], offset: number): TMS52
 // ============================================================================
 
 /** Micro-prosody band: how far a frame may deviate from its run's median.
- * Tightened 3 -> 2 after listening: at 3 the inherited source-word melody read
- * as an exaggerated bend on top of the contour. */
-export const CONTOUR_DELTA_CLAMP = 2;
+ * Tightened 3 -> 2 -> 1 by ear: a contiguous voiced stretch spans several
+ * spliced segments, each dragging the pitch toward its own source melody, and
+ * at 2 the alternation between them still read as nervous sliding. Pitch
+ * micro-contour is naturalness, not intelligibility — vowel identity lives in
+ * the K trajectory — so it flattens safely. */
+export const CONTOUR_DELTA_CLAMP = 1;
 /** Declination inside one word, in pitch indices. */
 export const WORD_DECLINATION = 1;
 
@@ -129,6 +132,23 @@ export function applyPitchContour(
 
   const out = frames.map(f => ({ ...f, k: f.k }));
   for (const run of runs) {
+    // Smooth each run's micro-contour before applying it. Every mined run
+    // carries its source recording's own frame-to-frame pitch wiggle, and the
+    // chip glides between frames, so raw deltas read as a nervous up-down-up
+    // slide. A centred 3-frame average keeps the run's slow movement (a rise
+    // stays a rise) and removes the per-frame alternation.
+    const deltas: number[] = [];
+    for (let i = run.start; i < run.end; i++) {
+      deltas.push(Math.max(-CONTOUR_DELTA_CLAMP,
+        Math.min(CONTOUR_DELTA_CLAMP, out[i].pitch - run.median)));
+    }
+    const smoothed = deltas.map((_, j) => {
+      const a = deltas[Math.max(0, j - 1)];
+      const b = deltas[j];
+      const c = deltas[Math.min(deltas.length - 1, j + 1)];
+      return Math.round((a + b + c) / 3);
+    });
+
     for (let i = run.start; i < run.end; i++) {
       const t = i / denom;
       let base = streamMedian + baseOffset - Math.round(declination * t);
@@ -139,9 +159,7 @@ export function applyPitchContour(
         const runLen = Math.max(1, run.end - run.start - 1);
         base += Math.round(finalAdjust * ((i - run.start) / runLen));
       }
-      const delta = Math.max(-CONTOUR_DELTA_CLAMP,
-        Math.min(CONTOUR_DELTA_CLAMP, out[i].pitch - run.median));
-      const pitch = Math.max(1, Math.min(31, base + delta));
+      const pitch = Math.max(1, Math.min(31, base + smoothed[i - run.start]));
       if (pitch !== out[i].pitch) out[i] = { ...out[i], k: [...out[i].k], pitch };
     }
   }
