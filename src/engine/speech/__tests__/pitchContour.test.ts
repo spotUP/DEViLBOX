@@ -47,12 +47,18 @@ describe('applyPitchContour', () => {
     expect(out[2].pitch).toBe(0);
   });
 
-  it('applies the question rise to the last voiced run only', () => {
-    const frames = [voiced(15), voiced(15), noise, voiced(15), voiced(15)];
+  it('ramps the question rise across the last voiced run only', () => {
+    const frames = [voiced(15), voiced(15), noise, voiced(15), voiced(15), voiced(15)];
     const rise = applyPitchContour(frames, { baseOffset: 0, declination: 0, finalAdjust: 4 });
     const flat = applyPitchContour(frames, { baseOffset: 0, declination: 0, finalAdjust: 0 });
+    // Earlier runs untouched; the last run GLIDES to +4 — its first frame
+    // starts at the baseline (no step at the run boundary), its last lands +4.
     expect(rise[0].pitch).toBe(flat[0].pitch);
-    expect(rise[4].pitch).toBe(flat[4].pitch + 4);
+    expect(rise[3].pitch).toBe(flat[3].pitch);
+    expect(rise[5].pitch).toBe(flat[5].pitch + 4);
+    // Monotonic glide in between.
+    expect(rise[4].pitch).toBeGreaterThanOrEqual(rise[3].pitch);
+    expect(rise[4].pitch).toBeLessThanOrEqual(rise[5].pitch);
   });
 
   it('drifts down across the stream by the declination', () => {

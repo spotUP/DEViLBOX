@@ -160,7 +160,7 @@ export class TMS5220Synth extends MAMEBaseSynth {
   private _currentRomSpeech = 0;  // 0 = TTS mode, 1+ = ROM word index + 1
   private _romSpeechRestored = false; // first romSpeech write is the stored value, not a pick
   private _useRomWords = true; // When false, use only static/calibrated table (consistent sound)
-  private _romKnobs = false; // When true, apply knob offsets to ROM words
+  private _romKnobs = true; // When true, apply knob offsets to ROM words (matches chipParameters default)
 
   // Vowel sequence state
   private _vowelSequence: string[] = [];
@@ -457,8 +457,10 @@ export class TMS5220Synth extends MAMEBaseSynth {
     const recording = lookupImportedRecording(text);
     if (recording) {
       this.stopSpeaking();
-      // Authentic imported recording: play byte-exact without knob offsets
-      this._sendFrameBufferAndSpeak(recording.frames, undefined, false);
+      // Authentic imported recording. ROM Knobs decides whether the voice
+      // knobs (and so the Voice Presets) shape it — hardcoding false here left
+      // preset changes inaudible on every built-in word.
+      this._sendFrameBufferAndSpeak(recording.frames, undefined, this._romKnobs);
       return;
     }
 
@@ -590,8 +592,9 @@ export class TMS5220Synth extends MAMEBaseSynth {
 
       if (recording) {
         const frames = offsetFramesPitch(recording.frames, wordPitchOffsets[wi]);
-        // Authentic imported recording: play byte-exact without knob offsets
-        this._sendFrameBufferAndSpeak(frames, undefined, false);
+        // Authentic imported recording; ROM Knobs decides whether the voice
+        // knobs (Voice Presets) shape it.
+        this._sendFrameBufferAndSpeak(frames, undefined, this._romKnobs);
         const totalMs = frames.reduce((sum, f) => sum + f.durationMs, 0) + 120;
         this._scheduleChainStep(generation, playNext, totalMs);
       } else if (romIdx >= 0) {
