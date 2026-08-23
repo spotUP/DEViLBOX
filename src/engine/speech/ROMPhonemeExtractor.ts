@@ -757,34 +757,33 @@ export function buildFramesFromROMLibrary(
     // gaps and must stay short.
     if (token.code !== ' ') frames = enforceMinFrames(frames, pClass);
 
-    // Step 4: Apply stress energy boost
-    if (token.stress >= 4) {
-      frames = frames.map(f => ({
-        ...f,
-        k: [...f.k],
-        energy: Math.min(14, f.energy + 2),
-      }));
-    }
+    if (!romSourced) {
+      // Static frames: apply stress boosts and synthetic prosody
+      // Step 4: Apply stress energy boost
+      if (token.stress >= 4) {
+        frames = frames.map(f => ({
+          ...f,
+          k: [...f.k],
+          energy: Math.min(14, f.energy + 2),
+        }));
+      }
 
-    // Step 4b: Stress pitch accent — SAM stress >= 4 also lifts pitch, the
-    // melodic counterpart to the energy boost above. Voiced frames only.
-    if (token.stress >= 4) {
-      const accent = token.stress >= 6 ? 3 : 2;
-      frames = frames.map(f => {
-        if (f.pitch <= 0) return f;
-        return { ...f, pitch: Math.max(1, Math.min(31, f.pitch + accent)) };
-      });
-    }
+      // Step 4b: Stress pitch accent — SAM stress >= 4 also lifts pitch, the
+      // melodic counterpart to the energy boost above. Voiced frames only.
+      if (token.stress >= 4) {
+        const accent = token.stress >= 6 ? 3 : 2;
+        frames = frames.map(f => {
+          if (f.pitch <= 0) return f;
+          return { ...f, pitch: Math.max(1, Math.min(31, f.pitch + accent)) };
+        });
+      }
 
-    if (romSourced) {
-      // Authentic frames: no compression, no synthetic envelope, no synthetic
-      // pitch contour — they already have the real ones.
-    } else {
       // Static frames: compensate for the flat table so they read as speech.
       frames = compressROMFrames(frames);
       frames = applyEnergyEnvelope(frames, pClass);
       frames = applyPitchContour(frames, pClass);
     }
+    // romSourced frames: keep authentic prosody — no stress boosts, no synthetic envelope/contour
 
     segments.push({ code: token.code, pClass, frames, romSourced });
   }
