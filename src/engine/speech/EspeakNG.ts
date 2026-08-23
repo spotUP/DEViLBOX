@@ -33,16 +33,17 @@ async function ensureInitialized(): Promise<void> {
 
       // Race against a timeout — WASM compilation can block the main thread
       const timeoutMs = 5000;
-      // @ts-expect-error -- no type declarations for this WASM package
-      const moduleImport = import('@echogarden/espeak-ng-emscripten')
+      // Import the bundle from public/, NOT from node_modules: Vite's dev
+      // server does not watch node_modules, so after the bundle is repacked a
+      // long-running dev session keeps serving the OLD espeak-ng.js (with the
+      // old file manifest) against the NEW data file — offsets land in the
+      // wrong files and the wasm dies with "Wrong version of espeak-ng-data".
+      // public/ files are served verbatim with no module cache, and both URLs
+      // carry the repack tag so the js/data pair can never split. The plain
+      // ESM file has no bare imports, so the browser can import it directly.
+      const moduleImport = import(/* @vite-ignore */ `/espeak-ng.js?repack=${ESPEAK_DATA_TAG}`)
         .then(({ default: EspeakModule }: { default: (opts?: object) => Promise<any> }) =>
           EspeakModule({
-            // Cache-bust the .data fetch: the manifest (inside the JS, which
-            // Vite versions) and the data file MUST come from the same repack.
-            // A browser serving a cached March data file against the current
-            // manifest reads a lang file where phontab should be and dies with
-            // "Wrong version of espeak-ng-data". Bump the tag when
-            // tools/espeak-repack.mjs output changes.
             locateFile: (path: string, prefix: string) =>
               `${prefix}${path}${path.endsWith('.data') ? `?repack=${ESPEAK_DATA_TAG}` : ''}`,
           }));
