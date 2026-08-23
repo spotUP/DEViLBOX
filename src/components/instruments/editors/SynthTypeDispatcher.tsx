@@ -5,7 +5,7 @@
  * Contains all synth-specific change handlers and the editor mode dispatch logic.
  */
 
-import React, { useCallback, useEffect, useState, lazy, Suspense } from 'react';
+import React, { useCallback, useEffect, useRef, useState, lazy, Suspense } from 'react';
 import { useGTUltraStore } from '@stores/useGTUltraStore';
 import type { InstrumentConfig, EffectConfig } from '@typedefs/instrument';
 import type { GTUltraConfig } from '@typedefs/instrument/exotic';
@@ -497,6 +497,35 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
   }, [instrument.mame, instrument.synthType, instrument.id, handleChange]);
 
   // Handle MAME chip synth parameter changes
+  // Push external parameter changes (the header PresetDropdown replaces the
+  // whole parameters object) into the running synth. The knobs and the old
+  // in-page preset panel called updateMAMEChipParam per edit, but a preset
+  // applied from the dropdown only lands in the (temp) instrument config —
+  // without this sync the engine never hears it and every preset sounds
+  // identical. Diffed per key so knob edits (which already sent their value)
+  // are a no-op here.
+  const prevChipParamsRef = useRef<Record<string, unknown> | undefined>(undefined);
+  useEffect(() => {
+    if (!instrument.synthType?.startsWith('MAME')) return;
+    const params = instrument.parameters || {};
+    const prev = prevChipParamsRef.current;
+    prevChipParamsRef.current = params;
+    if (!prev) return; // first render: creation path already applied them
+    try {
+      const engine = getToneEngine();
+      for (const [key, value] of Object.entries(params)) {
+        if (prev[key] === value) continue;
+        if (key === '_program' && typeof value === 'number') {
+          engine.loadMAMEChipPreset(instrument.id, value);
+        } else if (typeof value === 'number') {
+          engine.updateMAMEChipParam(instrument.id, key, value);
+        } else if (typeof value === 'string') {
+          engine.updateMAMEChipTextParam(instrument.id, key, value);
+        }
+      }
+    } catch { /* engine not ready */ }
+  }, [instrument.parameters, instrument.id, instrument.synthType]);
+
   const handleChipParamChange = useCallback((key: string, value: number) => {
     const currentParams = instrument.parameters || {};
     const newParams = { ...currentParams, [key]: value };

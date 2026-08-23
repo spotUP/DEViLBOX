@@ -135,6 +135,13 @@ const IPA_TO_SAM: Record<string, string> = {
   'ɒ': 'AO', 'ɔː': 'AO', 'ɔ': 'AO',
   'ʊ': 'UH', 'uː': 'UX', 'u': 'UX',
   'ə': 'AX', 'ɜː': 'ER', 'ɜ': 'ER', 'ɚ': 'ER', 'a': 'AE',
+  // American r-colored vowels and espeak-specific symbols. en-us writes the
+  // NURSE vowel as ɝ/ɜ˞ (WORLD, BIRD, HER) and reduction as ᵻ — unmapped
+  // symbols are dropped silently, which cost WORLD its vowel entirely.
+  'ɝ': 'ER', 'ɜ˞': 'ER', 'ə˞': 'ER', 'ɑ˞': 'AA', 'ɔ˞': 'AO',
+  'ᵻ': 'IX', 'ɵ': 'AX', 'oː': 'AO',
+  // Syllabic consonants (espeak marks them with a combining vertical line).
+  'l̩': 'L*', 'n̩': 'N*', 'm̩': 'M*',
 
   // Diphthongs
   'eɪ': 'EY', 'aɪ': 'AY', 'ɔɪ': 'OY',
@@ -228,8 +235,11 @@ export function parseEspeakIPA(ipa: string): PhonemeToken[] {
         }
       }
 
-      if (!matched && remaining !== 'ː' && remaining !== 'ˑ') {
-        // Unknown IPA symbol — skip silently
+      if (!matched && remaining !== 'ː' && remaining !== 'ˑ' && remaining !== '˞') {
+        // Unknown IPA symbol — dropping it silently loses a phoneme, and a
+        // lost vowel garbles the word (WORLD without its nucleus). Log so a
+        // mapping gap is visible instead of audible-only.
+        console.warn(`[eSpeak-NG] unmapped IPA symbol "${remaining}" — phoneme dropped`);
       }
 
       nextStress = 1; // reset for next phoneme
