@@ -1117,12 +1117,19 @@ export abstract class MAMEBaseSynth implements DevilboxSynth, MAMEEffectTarget {
   // Cleanup
   // ===========================================================================
 
+  /**
+   * Generic setter used by callers that do not know the chip's parameter table
+   * (the MCP bridge, automation). Only 'volume' is handled here — it drives the
+   * output GainNode rather than a chip register. EVERYTHING else must fall through
+   * to setParam(), which owns the per-chip mapping; dropping it silently made
+   * `set('romSpeech', 27)` report success while doing nothing at all.
+   */
   set(param: string, value: number): void {
-    switch (param) {
-      case 'volume':
-        this.output.gain.setValueAtTime(value, this.output.context.currentTime);
-        break;
+    if (param === 'volume') {
+      this.output.gain.setValueAtTime(value, this.output.context.currentTime);
+      return;
     }
+    this.setParam(param, value);
   }
 
   get(param: string): number | undefined {

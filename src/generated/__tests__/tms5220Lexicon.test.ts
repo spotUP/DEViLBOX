@@ -28,7 +28,7 @@ describe('TMS5220 lexicon', () => {
     const entries = loadLexicon();
     expect(entries.length).toBeGreaterThan(100000);
     for (const e of entries) {
-      expect(e.word).toMatch(/^[A-Z]{2,14}$/);
+      expect(e.word).toMatch(/^[A-Z]{1,14}$/);
       expect(e.phonemes.length).toBeGreaterThan(0);
       expect([0, 1, 2, 3]).toContain(e.tier);
       expect(typeof e.rom).toBe('boolean');
@@ -52,6 +52,17 @@ describe('TMS5220 lexicon', () => {
       expect(e, `${w} missing`).toBeDefined();
       expect(e!.rom, `${w} rom flag`).toBe(true);
       expect(e!.tier, `${w} tier`).toBe(0);
+    }
+  });
+
+  it('contains the common English words at constructible quality', () => {
+    const entries = loadLexicon();
+    const common = 'THE AND A OF TO IN IS YOU THAT IT HE WAS FOR ON ARE AS WITH HIS THEY AT BE THIS HAVE FROM OR ONE HAD BY WORD BUT NOT WHAT ALL WERE WE WHEN YOUR CAN SAID THERE USE AN EACH WHICH SHE DO HOW THEIR IF WILL UP OTHER ABOUT OUT MANY THEN THEM THESE SO SOME HER WOULD MAKE LIKE HIM INTO TIME HAS LOOK TWO MORE WRITE GO SEE NUMBER NO WAY COULD PEOPLE MY THAN FIRST WATER BEEN CALL WHO OIL ITS NOW FIND LONG DOWN DAY DID GET COME MADE MAY PART'.split(' ');
+    for (const w of common) {
+      const e = entries.find((x) => x.word === w);
+      expect(e, `${w} missing`).toBeDefined();
+      expect(e!.tier, `${w} quality`).toBeLessThan(3);
+      expect(e!.phonemes.length, `${w} phonemes`).toBeGreaterThan(0);
     }
   });
 

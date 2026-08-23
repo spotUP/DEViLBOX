@@ -1,3 +1,4 @@
+A	AH	0	1
 ONE	W* AH N*	0	1
 SIX	S* IH K* S*	0	1
 TEN	T* EH N*	0	1
@@ -591,6 +592,7 @@ HAM	/H AE M*	0	0
 HAN	/H AE N*	0	0
 HAO	/H AE OW	0	0
 HAP	/H AE P*	0	0
+HAS	/H AE Z*	0	0
 HAT	/H AE T*	0	0
 HAU	/H AO	0	0
 HAW	/H AO	0	0
