@@ -819,7 +819,12 @@ export class TMS5220Synth extends MAMEBaseSynth {
 
     const paramId = paramMap[param];
     if (paramId !== undefined) {
-      this.setParameterById(paramId, value);
+      // Brightness: UI knob is 0..1 with 0.5 in the middle; the chip treats
+      // 1.0 as bit-exact neutral (range 0..2). Without the remap every saved
+      // instrument's default 0.5 reads as a tilt CUT — speech and MIDI both
+      // darker than the real chip by default.
+      const chipValue = param === 'brightness' ? value * 2 : value;
+      this.setParameterById(paramId, chipValue);
     }
 
     // Track speech-relevant params locally for TTS frame modification

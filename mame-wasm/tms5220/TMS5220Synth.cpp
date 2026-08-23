@@ -335,6 +335,8 @@ public:
         cabinetBody_.setPeaking(320.0, 0.9, 9.0, sampleRate);
         cabinetPresence_.setPeaking(900.0, 1.2, 3.0, sampleRate);
         cabinetHp_.reset(); cabinetBody_.reset(); cabinetPresence_.reset();
+        brightnessHp_.setHighpass(1000.0, sampleRate);
+        brightnessHp_.reset();
         volume_ = 0.8f;
         stereoWidth_ = 0.5f;
         brightness_ = 1.0f;
@@ -775,6 +777,7 @@ public:
                 // band tops out near 3.4 kHz, so anything above that is reconstruction
                 // image rather than speech.
                 for (auto& stage : speechLowpass_) interp = stage.process(interp);
+                interp = applyBrightness(interp);
                 interp = applyCabinet(interp);
                 float out = interp * volume_;
                 outL[i] = out;
@@ -805,6 +808,22 @@ private:
     // ========================================================================
     // MAME-Accurate Speech Engine
     // ========================================================================
+
+    /**
+     * Spectral tilt for SPEECH output, driven by the same PARAM_BRIGHTNESS the
+     * MIDI voices use (there it scales target_k). Speech had no tone control
+     * at all, which pushed the UI presets into K-index offsets — but K indices
+     * are reflection-coefficient table positions, and shifting them relocates
+     * the formants and garbles the vowels. A first-order tilt keeps the vowel
+     * identity: brightness 1 is bit-exact bypass, above 1 adds the highs back,
+     * below 1 pulls them out.
+     */
+    float applyBrightness(float x) {
+        if (brightness_ == 1.0f) return x;
+        // One-pole highpass at ~1 kHz splits the band; brightness blends it.
+        const float hp = brightnessHp_.process(x);
+        return x + (brightness_ - 1.0f) * hp;
+    }
 
     /** Speaker + enclosure colouring, mixed in by amount. Bypassed at amount 0. */
     float applyCabinet(float x) {
@@ -1317,6 +1336,8 @@ private:
      */
     Biquad cabinetHp_, cabinetBody_, cabinetPresence_;
     float cabinetAmount_ = 0.0f;
+    /** Brightness tilt for the speech path (see applyBrightness). */
+    Biquad brightnessHp_;
     float volume_ = 0.8f;
     float stereoWidth_ = 0.5f;
     float brightness_ = 1.0f;
