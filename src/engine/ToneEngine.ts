@@ -1259,6 +1259,11 @@ export class ToneEngine {
    * Call this before triggerNoteAttack for FurnaceDispatch and other WASM synths.
    */
   public async ensureInstrumentReady(config: InstrumentConfig): Promise<void> {
+    // Lazily-registered synths (all MAME chips) are invisible to the sync
+    // SynthRegistry.get inside getInstrument until their loader has run —
+    // without this await, a cold-created instrument silently falls back to a
+    // plain Tone.js Synth ("Unknown synth type" warning).
+    await SynthRegistry.ensure(config.synthType);
     const instrument = this.getInstrument(config.id, config);
     if (instrument && typeof (instrument as any).ensureInitialized === 'function') {
       await (instrument as any).ensureInitialized();

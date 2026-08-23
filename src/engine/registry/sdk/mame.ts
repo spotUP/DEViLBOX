@@ -20,6 +20,8 @@ import { SN76477Synth } from '../../sn76477/SN76477Synth';
 import { SNKWaveSynth } from '../../snkwave/SNKWaveSynth';
 import { SP0250Synth } from '../../sp0250/SP0250Synth';
 import { TMS36XXSynth } from '../../tms36xx/TMS36XXSynth';
+import { MSM5232Synth } from '../../msm5232/MSM5232Synth';
+import { TIASynth } from '../../tia/TIASynth';
 import { TMS5220Synth } from '../../tms5220/TMS5220Synth';
 import { TR707Synth } from '../../tr707/TR707Synth';
 import { UPD931Synth } from '../../upd931/UPD931Synth';
@@ -44,6 +46,7 @@ const VOLUME_OFFSETS: Record<string, number> = {
   MAMEASC: 11, MAMEAstrocade: 18, MAMEC352: 17, MAMEES5503: 62,
   MAMEICS2115: 35, MAMEK054539: 22, MAMEMEA8000: 12, MAMERF5C400: 0,
   MAMESN76477: 5, MAMESNKWave: 8, MAMESP0250: 26, MAMETMS36XX: 6,
+  MAMEMSM5232: 6, MAMETIA: 4,
   MAMETMS5220: 37, MAMETR707: 22, MAMEUPD931: 23, MAMEUPD933: 28,
   MAMEVotrax: 20, MAMEYMF271: 15, MAMEYMOPQ: 19, MAMEVASynth: 20,
   MAMECMI: 0,       // TBD — needs calibration once WASM is compiled
@@ -80,6 +83,7 @@ const SYNTH_CLASSES: Record<string, new () => any> = {
   ASCSynth, AstrocadeSynth, C352Synth, ES5503Synth, ICS2115Synth,
   K054539Synth, MEA8000Synth, RF5C400Synth, SN76477Synth, SNKWaveSynth,
   SP0250Synth, TMS36XXSynth, TMS5220Synth, TR707Synth, UPD931Synth,
+  MSM5232Synth, TIASynth,
   UPD933Synth, VotraxSynth, YMF271Synth, YMOPQSynth, VASynthSynth, CMISynth,
   FZSynth, PS1SPUSynth, ZSG2Synth, KS0164Synth,
   SWP00Synth, SWP20Synth, RolandGPSynth,
@@ -105,6 +109,8 @@ const MAME_CHIPS: MAMEChipDef[] = [
   { id: 'MAMESNKWave', name: 'SNK Wavetable', className: 'SNKWaveSynth' },
   { id: 'MAMESP0250', name: 'GI SP0250', className: 'SP0250Synth' },
   { id: 'MAMETMS36XX', name: 'TI TMS36XX', className: 'TMS36XXSynth' },
+  { id: 'MAMEMSM5232', name: 'OKI MSM5232', className: 'MSM5232Synth' },
+  { id: 'MAMETIA', name: 'Atari TIA', className: 'TIASynth' },
   { id: 'MAMETMS5220', name: 'TI TMS5220', className: 'TMS5220Synth' },
   { id: 'MAMETR707', name: 'Roland TR-707', className: 'TR707Synth' },
   { id: 'MAMEUPD931', name: 'NEC uPD931', className: 'UPD931Synth' },
