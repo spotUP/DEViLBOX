@@ -1153,3 +1153,35 @@ export function isMAMEChipType(synthType: string): boolean {
 export function getChipSynthDef(synthType: string): ChipSynthDef | undefined {
   return CHIP_SYNTH_DEFS[synthType];
 }
+
+/**
+ * Complete numeric parameter set for a chip: every parameter the chip DECLARES,
+ * at its declared default, overridden by whatever the instrument has stored.
+ *
+ * Why this exists: applying only the stored keys left every unstored parameter
+ * at the C++ constructor's value while the UI displayed the declared default —
+ * a chip half-configured by nobody. A fresh instrument therefore played with
+ * settings no control reflected until the user picked a preset (which writes a
+ * full set and made it "fix itself"). The declared default is the UI's truth,
+ * so it must also be the chip's starting state.
+ *
+ * Text-ish parameters (speech text, vowel grid) are excluded: they are not
+ * numeric chip registers and travel through setTextParam.
+ */
+export function resolveChipParameters(
+  synthType: string,
+  stored: Record<string, unknown> | undefined,
+): Record<string, number> {
+  const def = CHIP_SYNTH_DEFS[synthType];
+  const resolved: Record<string, number> = {};
+  if (!def) return resolved;
+
+  for (const param of def.parameters) {
+    if (param.type === 'text' || param.type === 'vowelEditor') continue;
+    if (typeof param.default === 'number') resolved[param.key] = param.default;
+  }
+  for (const [key, value] of Object.entries(stored ?? {})) {
+    if (typeof value === 'number' && key !== '_program') resolved[key] = value;
+  }
+  return resolved;
+}
