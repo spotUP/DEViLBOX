@@ -269,6 +269,13 @@ function scaleFrameCount(frames: TMS5220Frame[], scale: number): TMS5220Frame[] 
  * to the class minimum so vowels stay audible.
  */
 /**
+ * Tempo for mined runs at synthesis: fraction of the recording's own frame
+ * count. The static path has always compressed to 0.65; mined runs read
+ * slightly clearer, so they keep a bit more.
+ */
+export const MINED_TEMPO = 0.7;
+
+/**
  * Shortest mined run that may outrank the curated static table. Below this a
  * run is a single snapshot rather than a formant trajectory, which is the one
  * case the static table does better (see buildFramesFromROMLibrary).
@@ -804,6 +811,16 @@ export function buildFramesFromROMLibrary(
     if (romFrames && romFrames.length >= MIN_MINED_RUN_FRAMES) {
       frames = romFrames.map(f => ({ ...f, k: [...f.k] }));
       romSourced = true;
+      // Conversational tempo: the recordings are the toy's deliberate
+      // teaching voice — a single mined vowel runs up to 13 frames (325 ms),
+      // so unshaped playback talks in slow motion. Resampling changes tempo
+      // only (shape and endpoints survive); the class-minimum floor below
+      // still guarantees audibility. Closure-bearing stop runs stay untouched
+      // — resampling would interpolate the silence into the burst, and stops
+      // are short anyway.
+      if (!frames.some(f => f.energy === 0)) {
+        frames = compressROMFrames(frames, MINED_TEMPO);
+      }
     } else if (staticFrame) {
       // No mined run for this code: synthesise from the curated table.
       frames = generateStaticFrames(staticFrame, pClass);
