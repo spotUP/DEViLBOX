@@ -8,8 +8,8 @@ import type { TMS5220Frame } from '../engine/speech/tms5220PhonemeMap';
 
 export const AUTHENTIC_PHONEMES: Record<string, TMS5220Frame[]> = {
   " ": [
-    { k: [8,8,8,8,8,8,8,4,4,4], energy: 1, pitch: 0, unvoiced: false, durationMs: 25 },
-    { k: [8,8,8,8,8,8,8,4,4,4], energy: 1, pitch: 0, unvoiced: false, durationMs: 25 },
+    { k: [8,8,8,8,8,8,8,4,4,4], energy: 0, pitch: 0, unvoiced: false, durationMs: 25 },
+    { k: [8,8,8,8,8,8,8,4,4,4], energy: 0, pitch: 0, unvoiced: false, durationMs: 25 },
   ],
   "/H": [
     { k: [16,15,9,10,8,8,8,4,4,4], energy: 4, pitch: 0, unvoiced: true, durationMs: 25 },
@@ -22,6 +22,7 @@ export const AUTHENTIC_PHONEMES: Record<string, TMS5220Frame[]> = {
     { k: [16,15,9,10,8,8,8,4,4,4], energy: 8, pitch: 0, unvoiced: true, durationMs: 25 },
   ],
   "AA": [
+    { k: [10,21,12,12,3,9,7,5,4,3], energy: 14, pitch: 17, unvoiced: false, durationMs: 25 },
     { k: [11,18,11,13,3,8,9,4,5,3], energy: 14, pitch: 17, unvoiced: false, durationMs: 25 },
     { k: [11,18,11,13,3,8,9,4,5,3], energy: 14, pitch: 19, unvoiced: false, durationMs: 25 },
     { k: [11,18,11,13,3,8,9,4,5,3], energy: 14, pitch: 19, unvoiced: false, durationMs: 25 },
@@ -31,10 +32,6 @@ export const AUTHENTIC_PHONEMES: Record<string, TMS5220Frame[]> = {
     { k: [10,27,9,7,7,10,9,5,5,1], energy: 14, pitch: 21, unvoiced: false, durationMs: 25 },
     { k: [10,27,9,7,7,10,9,5,5,1], energy: 14, pitch: 21, unvoiced: false, durationMs: 25 },
     { k: [12,26,8,5,12,8,7,5,6,3], energy: 14, pitch: 21, unvoiced: false, durationMs: 25 },
-    { k: [12,28,5,7,11,8,9,5,5,6], energy: 14, pitch: 20, unvoiced: false, durationMs: 25 },
-    { k: [12,28,5,7,11,8,9,5,5,6], energy: 14, pitch: 18, unvoiced: false, durationMs: 25 },
-    { k: [13,17,10,4,9,12,5,4,6,1], energy: 14, pitch: 16, unvoiced: false, durationMs: 25 },
-    { k: [13,17,10,4,9,12,5,4,6,1], energy: 14, pitch: 14, unvoiced: false, durationMs: 25 },
   ],
   "AE": [
     { k: [14,16,7,8,8,11,10,4,1,4], energy: 14, pitch: 8, unvoiced: false, durationMs: 25 },
@@ -43,16 +40,14 @@ export const AUTHENTIC_PHONEMES: Record<string, TMS5220Frame[]> = {
     { k: [15,19,6,9,7,10,12,3,2,4], energy: 14, pitch: 9, unvoiced: false, durationMs: 25 },
   ],
   "AH": [
-    { k: [11,20,11,8,5,10,8,5,3,2], energy: 14, pitch: 9, unvoiced: false, durationMs: 25 },
-    { k: [11,20,11,8,5,10,8,5,3,2], energy: 14, pitch: 10, unvoiced: false, durationMs: 25 },
-    { k: [11,20,11,8,5,10,8,5,3,2], energy: 14, pitch: 11, unvoiced: false, durationMs: 25 },
-    { k: [11,20,11,8,5,10,8,5,3,2], energy: 14, pitch: 12, unvoiced: false, durationMs: 25 },
-    { k: [11,20,11,8,5,10,8,5,3,2], energy: 14, pitch: 14, unvoiced: false, durationMs: 25 },
-    { k: [11,20,11,8,5,10,8,5,3,2], energy: 14, pitch: 16, unvoiced: false, durationMs: 25 },
+    { k: [12,15,11,8,6,12,8,5,3,2], energy: 14, pitch: 8, unvoiced: false, durationMs: 25 },
   ],
   "AO": [
-    { k: [9,25,6,9,6,9,3,5,6,4], energy: 12, pitch: 9, unvoiced: false, durationMs: 25 },
-    { k: [9,25,6,9,6,9,3,5,6,4], energy: 13, pitch: 11, unvoiced: false, durationMs: 25 },
+    { k: [7,27,7,7,7,4,10,5,4,2], energy: 11, pitch: 17, unvoiced: false, durationMs: 25 },
+    { k: [7,25,9,8,6,5,9,5,6,2], energy: 11, pitch: 20, unvoiced: false, durationMs: 25 },
+    { k: [10,11,11,12,8,5,5,3,7,6], energy: 11, pitch: 23, unvoiced: false, durationMs: 25 },
+    { k: [8,19,12,9,6,6,6,4,7,4], energy: 11, pitch: 24, unvoiced: false, durationMs: 25 },
+    { k: [8,19,12,9,6,6,6,4,7,4], energy: 10, pitch: 24, unvoiced: false, durationMs: 25 },
   ],
   "AW": [
     { k: [15,20,10,6,7,8,11,4,2,5], energy: 14, pitch: 12, unvoiced: false, durationMs: 25 },
@@ -108,10 +103,14 @@ export const AUTHENTIC_PHONEMES: Record<string, TMS5220Frame[]> = {
     { k: [17,17,9,5,5,6,7,3,2,3], energy: 8, pitch: 21, unvoiced: false, durationMs: 25 },
   ],
   "DH": [
-    { k: [11,19,7,5,8,12,8,4,4,2], energy: 13, pitch: 20, unvoiced: false, durationMs: 25 },
-    { k: [11,19,7,5,8,12,8,4,4,2], energy: 13, pitch: 21, unvoiced: false, durationMs: 25 },
-    { k: [11,19,7,5,8,12,8,4,4,2], energy: 13, pitch: 23, unvoiced: false, durationMs: 25 },
-    { k: [11,19,7,5,8,12,8,4,4,2], energy: 12, pitch: 24, unvoiced: false, durationMs: 25 },
+    { k: [13,13,6,6,5,2,9,4,4,4], energy: 9, pitch: 19, unvoiced: false, durationMs: 25 },
+    { k: [13,13,6,6,5,2,9,4,4,4], energy: 9, pitch: 19, unvoiced: false, durationMs: 25 },
+    { k: [12,15,6,7,7,7,13,4,2,3], energy: 14, pitch: 13, unvoiced: false, durationMs: 25 },
+    { k: [11,18,6,10,7,12,13,3,2,3], energy: 14, pitch: 13, unvoiced: false, durationMs: 25 },
+    { k: [15,14,9,8,9,8,12,6,1,4], energy: 14, pitch: 13, unvoiced: false, durationMs: 25 },
+    { k: [17,15,9,7,8,7,12,5,1,4], energy: 14, pitch: 13, unvoiced: false, durationMs: 25 },
+    { k: [17,15,9,7,8,7,12,5,1,4], energy: 14, pitch: 12, unvoiced: false, durationMs: 25 },
+    { k: [17,15,9,7,8,7,12,5,1,4], energy: 14, pitch: 12, unvoiced: false, durationMs: 25 },
   ],
   "DX": [
     { k: [6,12,7,7,12,12,9,3,2,1], energy: 4, pitch: 21, unvoiced: false, durationMs: 25 },
@@ -224,12 +223,14 @@ export const AUTHENTIC_PHONEMES: Record<string, TMS5220Frame[]> = {
     { k: [25,24,9,8,8,8,8,4,4,4], energy: 8, pitch: 0, unvoiced: true, durationMs: 25 },
   ],
   "L*": [
-    { k: [11,9,10,11,5,5,5,6,6,1], energy: 12, pitch: 13, unvoiced: false, durationMs: 25 },
-    { k: [11,9,10,11,5,5,5,6,6,1], energy: 11, pitch: 16, unvoiced: false, durationMs: 25 },
+    { k: [8,14,11,10,1,6,11,3,4,2], energy: 11, pitch: 12, unvoiced: false, durationMs: 25 },
+    { k: [8,14,11,10,1,6,11,3,4,2], energy: 10, pitch: 12, unvoiced: false, durationMs: 25 },
+    { k: [8,14,11,10,1,6,11,3,4,2], energy: 7, pitch: 12, unvoiced: false, durationMs: 25 },
   ],
   "LX": [
-    { k: [11,9,10,11,5,5,5,6,6,1], energy: 12, pitch: 13, unvoiced: false, durationMs: 25 },
-    { k: [11,9,10,11,5,5,5,6,6,1], energy: 11, pitch: 16, unvoiced: false, durationMs: 25 },
+    { k: [8,14,11,10,1,6,11,3,4,2], energy: 11, pitch: 12, unvoiced: false, durationMs: 25 },
+    { k: [8,14,11,10,1,6,11,3,4,2], energy: 10, pitch: 12, unvoiced: false, durationMs: 25 },
+    { k: [8,14,11,10,1,6,11,3,4,2], energy: 7, pitch: 12, unvoiced: false, durationMs: 25 },
   ],
   "M*": [
     { k: [6,12,5,10,10,6,9,5,3,5], energy: 9, pitch: 16, unvoiced: false, durationMs: 25 },
@@ -243,7 +244,6 @@ export const AUTHENTIC_PHONEMES: Record<string, TMS5220Frame[]> = {
     { k: [16,12,4,7,8,3,12,4,4,5], energy: 10, pitch: 26, unvoiced: false, durationMs: 25 },
   ],
   "NX": [
-    { k: [16,16,0,13,6,9,7,3,3,4], energy: 9, pitch: 26, unvoiced: false, durationMs: 25 },
     { k: [16,16,0,13,6,9,7,3,3,4], energy: 10, pitch: 27, unvoiced: false, durationMs: 25 },
     { k: [14,13,3,9,12,5,8,2,2,4], energy: 11, pitch: 27, unvoiced: false, durationMs: 25 },
     { k: [14,13,3,9,12,5,8,2,2,4], energy: 10, pitch: 30, unvoiced: false, durationMs: 25 },
@@ -269,8 +269,11 @@ export const AUTHENTIC_PHONEMES: Record<string, TMS5220Frame[]> = {
     { k: [6,19,13,8,4,3,8,5,6,3], energy: 11, pitch: 17, unvoiced: false, durationMs: 25 },
   ],
   "OY": [
-    { k: [9,25,6,9,6,9,3,5,6,4], energy: 12, pitch: 9, unvoiced: false, durationMs: 25 },
-    { k: [9,25,6,9,6,9,3,5,6,4], energy: 13, pitch: 11, unvoiced: false, durationMs: 25 },
+    { k: [7,27,7,7,7,4,10,5,4,2], energy: 11, pitch: 17, unvoiced: false, durationMs: 25 },
+    { k: [7,25,9,8,6,5,9,5,6,2], energy: 11, pitch: 20, unvoiced: false, durationMs: 25 },
+    { k: [10,11,11,12,8,5,5,3,7,6], energy: 11, pitch: 23, unvoiced: false, durationMs: 25 },
+    { k: [8,19,12,9,6,6,6,4,7,4], energy: 11, pitch: 24, unvoiced: false, durationMs: 25 },
+    { k: [8,19,12,9,6,6,6,4,7,4], energy: 10, pitch: 24, unvoiced: false, durationMs: 25 },
     { k: [15,8,7,6,5,6,7,4,5,4], energy: 10, pitch: 20, unvoiced: false, durationMs: 25 },
     { k: [15,8,7,6,5,6,7,4,5,4], energy: 9, pitch: 20, unvoiced: false, durationMs: 25 },
     { k: [17,11,4,4,7,9,8,4,4,2], energy: 9, pitch: 19, unvoiced: false, durationMs: 25 },
@@ -292,14 +295,22 @@ export const AUTHENTIC_PHONEMES: Record<string, TMS5220Frame[]> = {
     { k: [17,21,10,7,8,8,8,4,4,4], energy: 6, pitch: 0, unvoiced: true, durationMs: 25 },
   ],
   "Q*": [
-    { k: [8,8,8,8,8,8,8,4,4,4], energy: 1, pitch: 0, unvoiced: true, durationMs: 25 },
-    { k: [8,8,8,8,8,8,8,4,4,4], energy: 1, pitch: 0, unvoiced: true, durationMs: 25 },
+    { k: [8,8,8,8,8,8,8,4,4,4], energy: 0, pitch: 0, unvoiced: true, durationMs: 25 },
+    { k: [8,8,8,8,8,8,8,4,4,4], energy: 0, pitch: 0, unvoiced: true, durationMs: 25 },
   ],
   "R*": [
-    { k: [11,28,1,9,9,7,6,4,5,5], energy: 11, pitch: 18, unvoiced: false, durationMs: 25 },
+    { k: [13,17,10,4,9,12,5,4,6,1], energy: 14, pitch: 16, unvoiced: false, durationMs: 25 },
+    { k: [13,17,10,4,9,12,5,4,6,1], energy: 14, pitch: 14, unvoiced: false, durationMs: 25 },
+    { k: [13,17,10,4,9,12,5,4,6,1], energy: 12, pitch: 13, unvoiced: false, durationMs: 25 },
+    { k: [13,17,10,4,9,12,5,4,6,1], energy: 10, pitch: 12, unvoiced: false, durationMs: 25 },
+    { k: [13,17,10,4,9,12,5,4,6,1], energy: 8, pitch: 12, unvoiced: false, durationMs: 25 },
   ],
   "RX": [
-    { k: [11,28,1,9,9,7,6,4,5,5], energy: 11, pitch: 18, unvoiced: false, durationMs: 25 },
+    { k: [13,17,10,4,9,12,5,4,6,1], energy: 14, pitch: 16, unvoiced: false, durationMs: 25 },
+    { k: [13,17,10,4,9,12,5,4,6,1], energy: 14, pitch: 14, unvoiced: false, durationMs: 25 },
+    { k: [13,17,10,4,9,12,5,4,6,1], energy: 12, pitch: 13, unvoiced: false, durationMs: 25 },
+    { k: [13,17,10,4,9,12,5,4,6,1], energy: 10, pitch: 12, unvoiced: false, durationMs: 25 },
+    { k: [13,17,10,4,9,12,5,4,6,1], energy: 8, pitch: 12, unvoiced: false, durationMs: 25 },
   ],
   "S*": [
     { k: [25,14,8,9,8,8,8,4,4,4], energy: 8, pitch: 0, unvoiced: true, durationMs: 25 },
@@ -337,7 +348,6 @@ export const AUTHENTIC_PHONEMES: Record<string, TMS5220Frame[]> = {
     { k: [14,14,7,7,8,8,8,4,4,4], energy: 8, pitch: 0, unvoiced: true, durationMs: 25 },
   ],
   "UH": [
-    { k: [10,13,7,6,9,10,3,5,5,3], energy: 13, pitch: 8, unvoiced: false, durationMs: 25 },
     { k: [8,15,9,9,8,8,3,4,6,4], energy: 12, pitch: 8, unvoiced: false, durationMs: 25 },
     { k: [7,19,9,10,8,5,3,5,7,6], energy: 11, pitch: 9, unvoiced: false, durationMs: 25 },
     { k: [7,19,9,10,8,5,3,5,7,6], energy: 12, pitch: 11, unvoiced: false, durationMs: 25 },
@@ -370,11 +380,15 @@ export const AUTHENTIC_PHONEMES: Record<string, TMS5220Frame[]> = {
     { k: [5,24,9,5,5,4,9,6,4,4], energy: 9, pitch: 13, unvoiced: false, durationMs: 25 },
   ],
   "V*": [
-    { k: [12,18,8,6,6,9,5,6,4,2], energy: 14, pitch: 12, unvoiced: false, durationMs: 25 },
-    { k: [12,17,7,6,7,6,3,3,5,5], energy: 11, pitch: 15, unvoiced: false, durationMs: 25 },
-    { k: [12,17,7,6,7,6,3,3,5,5], energy: 10, pitch: 17, unvoiced: false, durationMs: 25 },
-    { k: [11,20,9,5,7,6,6,3,3,2], energy: 10, pitch: 17, unvoiced: false, durationMs: 25 },
-    { k: [11,20,9,5,7,6,6,3,3,2], energy: 12, pitch: 16, unvoiced: false, durationMs: 25 },
+    { k: [12,12,7,5,6,8,7,5,3,2], energy: 9, pitch: 20, unvoiced: false, durationMs: 25 },
+    { k: [12,12,7,5,6,8,7,5,3,2], energy: 9, pitch: 20, unvoiced: false, durationMs: 25 },
+    { k: [12,12,7,5,6,8,7,5,3,2], energy: 9, pitch: 20, unvoiced: false, durationMs: 25 },
+    { k: [12,12,7,5,6,8,7,5,3,2], energy: 8, pitch: 20, unvoiced: false, durationMs: 25 },
+    { k: [15,8,7,6,5,6,7,4,5,4], energy: 10, pitch: 20, unvoiced: false, durationMs: 25 },
+    { k: [15,8,7,6,5,6,7,4,5,4], energy: 9, pitch: 20, unvoiced: false, durationMs: 25 },
+    { k: [17,11,4,4,7,9,8,4,4,2], energy: 9, pitch: 19, unvoiced: false, durationMs: 25 },
+    { k: [17,11,4,4,7,9,8,4,4,2], energy: 12, pitch: 17, unvoiced: false, durationMs: 25 },
+    { k: [14,9,3,6,10,13,11,4,1,3], energy: 13, pitch: 14, unvoiced: false, durationMs: 25 },
   ],
   "W*": [
     { k: [4,26,11,6,4,6,9,3,4,2], energy: 6, pitch: 19, unvoiced: false, durationMs: 25 },
@@ -417,9 +431,9 @@ export const AUTHENTIC_PHONEMES: Record<string, TMS5220Frame[]> = {
     { k: [18,7,2,6,7,11,11,5,3,2], energy: 12, pitch: 17, unvoiced: false, durationMs: 25 },
   ],
   "Z*": [
-    { k: [26,9,5,3,7,7,6,3,5,3], energy: 12, pitch: 17, unvoiced: false, durationMs: 25 },
-    { k: [26,9,5,3,7,7,6,3,5,3], energy: 12, pitch: 17, unvoiced: false, durationMs: 25 },
-    { k: [26,9,5,3,7,7,6,3,5,3], energy: 13, pitch: 17, unvoiced: false, durationMs: 25 },
+    { k: [16,8,8,6,6,5,9,7,5,1], energy: 14, pitch: 14, unvoiced: false, durationMs: 25 },
+    { k: [16,8,8,6,6,5,9,7,5,1], energy: 14, pitch: 13, unvoiced: false, durationMs: 25 },
+    { k: [16,8,8,6,6,5,9,7,5,1], energy: 13, pitch: 13, unvoiced: false, durationMs: 25 },
   ],
   "ZH": [
     { k: [19,18,9,8,3,5,3,3,5,6], energy: 14, pitch: 17, unvoiced: false, durationMs: 25 },
