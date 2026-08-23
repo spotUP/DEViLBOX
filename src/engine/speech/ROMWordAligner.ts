@@ -153,7 +153,9 @@ export interface FrameLike {
 
 function paddedK(k: number[]): number[] {
   if (k.length >= 10) return k;
-  return [...k, ...[8, 8, 8, 8, 8, 8, 4, 4, 4].slice(k.length)];
+  // Ten defaults for ten slots — this array was 9 long, so every default
+  // landed one K-slot early for short vectors.
+  return [...k, ...[8, 8, 8, 8, 8, 8, 8, 4, 4, 4].slice(k.length)];
 }
 
 function frameLikeDistance(a: FrameLike, b: FrameLike): number {
