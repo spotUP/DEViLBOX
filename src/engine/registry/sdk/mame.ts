@@ -8,6 +8,7 @@
 import * as Tone from 'tone';
 import { SynthRegistry } from '../SynthRegistry';
 import type { InstrumentConfig } from '@typedefs/instrument';
+import { resolveChipParameters } from '@constants/chipParameters';
 import { ASCSynth } from '../../asc/ASCSynth';
 import { AstrocadeSynth } from '../../astrocade/AstrocadeSynth';
 import { C352Synth } from '../../c352/C352Synth';
@@ -66,14 +67,24 @@ function getNormalizedVolume(synthType: string, configVolume: number | undefined
   return (configVolume ?? -12) + (VOLUME_OFFSETS[synthType] ?? 0);
 }
 
-function applyChipParameters(synth: { setParam: (key: string, value: number) => void; loadPreset?: (index: number) => void }, config: InstrumentConfig): void {
+/**
+ * Bring a freshly created chip to the state the UI claims it is in.
+ *
+ * Sends EVERY declared parameter, defaults included — not just the stored
+ * keys. A sparse stored set (the normal case: only what the user has touched)
+ * used to leave the rest at the C++ constructor's values while the editor
+ * displayed the declared defaults, so a fresh instrument played with settings
+ * no control reflected until a preset was picked.
+ */
+export function applyChipParameters(synth: { setParam: (key: string, value: number) => void; loadPreset?: (index: number) => void }, config: InstrumentConfig): void {
   const params = config.parameters;
-  if (!params) return;
-  if (typeof params._program === 'number' && typeof synth.loadPreset === 'function') {
+  // A chip preset (_program) reprograms the chip wholesale, so it goes first
+  // and the parameter writes below layer on top of it.
+  if (typeof params?._program === 'number' && typeof synth.loadPreset === 'function') {
     synth.loadPreset(params._program);
   }
-  for (const [key, value] of Object.entries(params)) {
-    if (key === '_program' || typeof value !== 'number') continue;
+  const resolved = resolveChipParameters(config.synthType, params);
+  for (const [key, value] of Object.entries(resolved)) {
     synth.setParam(key, value);
   }
 }
