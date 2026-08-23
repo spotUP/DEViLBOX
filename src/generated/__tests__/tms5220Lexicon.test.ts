@@ -74,10 +74,16 @@ describe('TMS5220 lexicon', () => {
   it('is sorted: ROM built-ins first, then by tier, then by length', () => {
     const entries = loadLexicon();
     const key = (e: LexiconEntry) => [e.rom ? 0 : 1, e.tier, e.word.length];
-    for (let i = 1; i < entries.length; i++) {
+    // One assertion, not 221k expect() calls in a loop — per-expect overhead
+    // took ~5s locally and blew the 5s default timeout on the slower CI
+    // runner, which read as a mysterious CI-only "sort failure".
+    const violations: string[] = [];
+    for (let i = 1; i < entries.length && violations.length < 5; i++) {
       const a = key(entries[i - 1]);
       const b = key(entries[i]);
-      expect(a[0] <= b[0] && (a[0] !== b[0] || a[1] <= b[1]) && (a[0] !== b[0] || a[1] !== b[1] || a[2] <= b[2])).toBe(true);
+      const ok = a[0] < b[0] || (a[0] === b[0] && (a[1] < b[1] || (a[1] === b[1] && a[2] <= b[2])));
+      if (!ok) violations.push(`${entries[i - 1].word} -> ${entries[i].word} at ${i}`);
     }
-  });
+    expect(violations).toEqual([]);
+  }, 30000);
 });
