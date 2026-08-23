@@ -27,6 +27,9 @@ function library(): Map<string, TMS5220Frame[]> {
   map.set('AA', run(VOWEL));
   map.set('T*', run(STOP));
   map.set(' ', [SILENCE, SILENCE]);
+  // Sub-audible extractions: 1-frame vowel, 2-frame stop (the IH/L*/R* class).
+  map.set('IH', [{ ...VOWEL, k: [...VOWEL.k] }]);
+  map.set('P*', [0, 1].map(i => ({ ...STOP, k: [...STOP.k], energy: STOP.energy + i })));
   return map;
 }
 
@@ -47,8 +50,8 @@ describe('buildFramesFromROMLibrary synthesis path', () => {
       library(),
       fallback,
     );
-    // 4 vowel frames + 4 static AH frames + 2 pause frames = 10, with 0 or 1
-    // transition frames between segments. The two pause frames are the whole
+    // 4 mined AA frames + static pause + 4 static AH frames, with 0 or 1
+    // transition frames between segments. The pause frames are the whole
     // gap — a single collapsed pause, not three.
     const silence = frames.filter(f => f.energy <= 1).length;
     expect(silence).toBe(2);
@@ -66,15 +69,15 @@ describe('buildFramesFromROMLibrary synthesis path', () => {
     expect(frames[frames.length - 1].energy).toBeGreaterThan(1);
   });
 
-  it('does not impose a synthetic energy envelope on authentic ROM frames', () => {
-    // The 4-frame AA run has energies 8,9,10,11; the stress-4 boost adds +2,
-    // landing on 10,11,12,13. The old pipeline applied applyEnergyEnvelope
-    // which forced a 0.6→1.0 attack — flattening real dynamics. Authentic
-    // frames must pass through with only the stress boost, no envelope.
-    // Stress 4 maps to a 1.0 duration scale so no stress scaling interferes.
+  it('does not impose a synthetic energy envelope or stress boost on authentic ROM frames', () => {
+    // The 4-frame AA run has energies 8,9,10,11; authentic ROM frames must pass
+    // through UNCHANGED — no stress energy boost (+2), no pitch accent, no
+    // synthetic envelope. The old pipeline applied stress boost + envelope,
+    // which flattened real dynamics. Authentic frames must pass through raw.
     const frames = buildFramesFromROMLibrary([token('AA', 4)], library(), fallback);
     const energies = frames.slice(0, 4).map(f => f.energy);
-    expect(energies).toEqual([10, 11, 12, 13]);
+    // Original energies 8,9,10,11 pass through unchanged (no +2 stress boost)
+    expect(energies).toEqual([8, 9, 10, 11]);
   });
 
   it('bridges a splice between two authentic ROM segments', () => {
@@ -82,5 +85,59 @@ describe('buildFramesFromROMLibrary synthesis path', () => {
     // frames between them. Output = 4 + 4 + 2 = 10 frames.
     const frames = buildFramesFromROMLibrary([token('AA', 4), token('AA', 4)], library(), fallback);
     expect(frames.length).toBe(10);
+  });
+
+  it('floors sub-audible extractions: 1-frame vowels hold to the class minimum', () => {
+    // "iss" = IH + S*. IH was mined as a single 25ms frame — a click, not a
+    // vowel. It must be held to the vowel floor (4 frames) so the i stays
+    // audible next to the s.
+    const frames = buildFramesFromROMLibrary([token('IH'), token('S*')], library(), fallback);
+    // IH segment: 4 held frames. S* has no library entry and no static
+    // fallback for S* (fallback only knows AH) — dropped entirely.
+    expect(frames.length).toBe(4);
+    expect(frames.every(f => f.k[0] === VOWEL.k[0])).toBe(true);
+  });
+
+  it('floors sub-audible extractions: 2-frame stops stretch to the class minimum', () => {
+    // P* was mined as 2 frames (50ms) — clipped. Floor is 3 for stops.
+    const frames = buildFramesFromROMLibrary([token('P*')], library(), fallback);
+    expect(frames.length).toBeGreaterThanOrEqual(3);
+    expect(frames[0].energy).toBe(STOP.energy); // no synthetic envelope added
+    expect(frames[0].pitch).toBe(STOP.pitch);   // stays unvoiced
+  });
+
+  it('does not floor the inter-word pause', () => {
+    // "AA  AA": the collapsed pause must stay short — flooring pauses would
+    // widen the gap the user complained about.
+    const frames = buildFramesFromROMLibrary(
+      [token('AA'), token(' '), token('AA')],
+      library(),
+      fallback,
+    );
+    const silence = frames.filter(f => f.energy <= 1).length;
+    expect(silence).toBe(2);
+  });
+
+  it('prefers static frames over misaligned mined segments (R* whistle fix)', () => {
+    // "rough" = R* AH F*. The ROM-mined R* segment was a single 25ms frame
+    // with k2=28 — an /i/-fronted shape that rendered as a hollow whistle.
+    // The curated static R* (k2=15) must win even when the library has the
+    // bad segment.
+    const badMinedR = {
+      k: [11, 28, 1, 9, 9, 7, 6, 4, 5, 5],
+      energy: 11, pitch: 18, unvoiced: false, durationMs: 25,
+    };
+    const lib = library();
+    lib.set('R*', [badMinedR]);
+    const staticR = { ...VOWEL, k: [17, 15, 9, 9, 6, 10, 7, 5, 4, 4] };
+    const rFallback = (code: string) => (code === 'R*' ? staticR : null);
+
+    const frames = buildFramesFromROMLibrary([token('R*')], lib, rFallback);
+    // Static R* (liquid): 5 generated frames, compression keeps 3.
+    expect(frames.length).toBeGreaterThanOrEqual(3);
+    // All frames carry the static R* k2 (15 ±1 oscillation), never the bad 28.
+    for (const f of frames) {
+      expect(Math.abs(f.k[1] - 15)).toBeLessThanOrEqual(1);
+    }
   });
 });
