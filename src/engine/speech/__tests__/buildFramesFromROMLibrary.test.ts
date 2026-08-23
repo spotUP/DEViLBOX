@@ -74,7 +74,12 @@ describe('buildFramesFromROMLibrary synthesis path', () => {
     // through UNCHANGED — no stress energy boost (+2), no pitch accent, no
     // synthetic envelope. The old pipeline applied stress boost + envelope,
     // which flattened real dynamics. Authentic frames must pass through raw.
-    const frames = buildFramesFromROMLibrary([token('AA', 4)], library(), fallback);
+    // The trailing AA keeps the first AA off the phrase-final position: the
+    // final NUCLEUS is the one segment that legitimately stretches
+    // (phrase-final lengthening), and a following consonant alone does not
+    // shield the previous vowel — it becomes that vowel's coda.
+    const frames = buildFramesFromROMLibrary(
+      [token('AA', 4), token('T*', 0), token('AA', 0)], library(), fallback);
     const energies = frames.slice(0, 4).map(f => f.energy);
     // Original energies 8,9,10,11 pass through unchanged (no +2 stress boost)
     expect(energies).toEqual([8, 9, 10, 11]);
@@ -82,9 +87,10 @@ describe('buildFramesFromROMLibrary synthesis path', () => {
 
   it('bridges a splice between two authentic ROM segments', () => {
     // Two ROM-sourced sonorant vowels: the class rule gives 2 transition
-    // frames between them. Output = 4 + 4 + 2 = 10 frames.
+    // frames between them. The second AA is phrase-final and stretches 1.3x
+    // (4 -> 5). Output = 4 + 2 + 5 = 11 frames.
     const frames = buildFramesFromROMLibrary([token('AA', 4), token('AA', 4)], library(), fallback);
-    expect(frames.length).toBe(10);
+    expect(frames.length).toBe(11);
   });
 
   it('floors sub-audible extractions: 2-frame vowels stretch to the class minimum', () => {
