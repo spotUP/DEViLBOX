@@ -6,12 +6,68 @@
 import type { TMS5220Frame } from '../engine/speech/tms5220PhonemeMap';
 
 export const calibratedStaticMap: Record<string, TMS5220Frame> = {
+  " ": {
+    k: [8,8,8,8,8,8,8,4,4,4],
+    energy: 1,
+    pitch: 0,
+    unvoiced: false,
+    durationMs: 120
+  },
+  "/H": {
+    k: [18,14,8,8,8,8,8,4,4,4],
+    energy: 6,
+    pitch: 0,
+    unvoiced: true,
+    durationMs: 80
+  },
+  "/X": {
+    k: [18,14,8,8,8,8,8,4,4,4],
+    energy: 6,
+    pitch: 0,
+    unvoiced: true,
+    durationMs: 80
+  },
   "AA": {
     k: [11,22,10,11,5,8,9,5,5,2],
     energy: 10,
     pitch: 20,
     unvoiced: false,
     durationMs: 250
+  },
+  "AE": {
+    k: [24,19,10,8,8,7,8,4,4,4],
+    energy: 12,
+    pitch: 18,
+    unvoiced: false,
+    durationMs: 150
+  },
+  "AH": {
+    k: [21,11,8,8,7,8,8,4,4,4],
+    energy: 12,
+    pitch: 16,
+    unvoiced: false,
+    durationMs: 130
+  },
+  "AO": {
+    k: [19,8,7,9,7,8,8,4,4,4],
+    energy: 12,
+    pitch: 14,
+    unvoiced: false,
+    durationMs: 150
+  },
+  "AW": {
+    k: [23,12,8,8,7,8,8,4,4,4],
+    energy: 12,
+    pitch: 16,
+    unvoiced: false,
+    durationMs: 200
+  },
+  "AX": {
+    k: [18,14,8,8,8,8,8,4,4,4],
+    energy: 10,
+    pitch: 16,
+    unvoiced: false,
+    durationMs: 90
   },
   "AY": {
     k: [13,23,9,9,7,10,12,3,2,4],
@@ -34,12 +90,33 @@ export const calibratedStaticMap: Record<string, TMS5220Frame> = {
     unvoiced: true,
     durationMs: 225
   },
+  "D*": {
+    k: [18,22,6,10,6,8,7,3,4,3],
+    energy: 8,
+    pitch: 16,
+    unvoiced: false,
+    durationMs: 60
+  },
+  "DX": {
+    k: [18,22,6,10,6,8,7,3,4,3],
+    energy: 8,
+    pitch: 16,
+    unvoiced: false,
+    durationMs: 40
+  },
   "EH": {
     k: [15,17,6,6,8,11,9,3,2,4],
     energy: 10,
     pitch: 17,
     unvoiced: false,
     durationMs: 325
+  },
+  "ER": {
+    k: [18,16,9,9,6,10,7,5,4,4],
+    energy: 12,
+    pitch: 16,
+    unvoiced: false,
+    durationMs: 160
   },
   "EY": {
     k: [15,12,5,7,13,11,10,4,2,4],
@@ -55,6 +132,34 @@ export const calibratedStaticMap: Record<string, TMS5220Frame> = {
     unvoiced: true,
     durationMs: 175
   },
+  "G*": {
+    k: [16,14,6,10,7,8,8,4,4,4],
+    energy: 8,
+    pitch: 1,
+    unvoiced: false,
+    durationMs: 60
+  },
+  "GX": {
+    k: [16,14,6,10,7,8,8,4,4,4],
+    energy: 8,
+    pitch: 1,
+    unvoiced: false,
+    durationMs: 60
+  },
+  "IH": {
+    k: [15,25,10,7,9,7,8,3,4,3],
+    energy: 12,
+    pitch: 18,
+    unvoiced: false,
+    durationMs: 120
+  },
+  "IX": {
+    k: [14,23,9,7,9,7,8,3,4,3],
+    energy: 10,
+    pitch: 18,
+    unvoiced: false,
+    durationMs: 90
+  },
   "IY": {
     k: [18,13,2,4,8,14,12,3,2,4],
     energy: 10,
@@ -62,7 +167,21 @@ export const calibratedStaticMap: Record<string, TMS5220Frame> = {
     unvoiced: false,
     durationMs: 375
   },
+  "J*": {
+    k: [23,26,14,13,8,8,8,4,4,4],
+    energy: 9,
+    pitch: 16,
+    unvoiced: false,
+    durationMs: 225
+  },
   "K*": {
+    k: [24,27,12,10,8,8,8,4,4,4],
+    energy: 7,
+    pitch: 0,
+    unvoiced: true,
+    durationMs: 100
+  },
+  "KX": {
     k: [24,27,12,10,8,8,8,4,4,4],
     energy: 7,
     pitch: 0,
@@ -76,12 +195,54 @@ export const calibratedStaticMap: Record<string, TMS5220Frame> = {
     unvoiced: false,
     durationMs: 75
   },
+  "LX": {
+    k: [8,14,11,10,1,6,11,3,4,2],
+    energy: 10,
+    pitch: 12,
+    unvoiced: false,
+    durationMs: 75
+  },
+  "M*": {
+    k: [20,10,4,14,5,10,6,5,3,5],
+    energy: 9,
+    pitch: 16,
+    unvoiced: false,
+    durationMs: 120
+  },
+  "N*": {
+    k: [18,19,4,14,5,10,6,5,3,5],
+    energy: 9,
+    pitch: 16,
+    unvoiced: false,
+    durationMs: 100
+  },
+  "NX": {
+    k: [16,12,4,14,5,10,6,5,3,5],
+    energy: 9,
+    pitch: 16,
+    unvoiced: false,
+    durationMs: 120
+  },
+  "OH": {
+    k: [19,8,7,9,7,8,8,4,4,4],
+    energy: 12,
+    pitch: 14,
+    unvoiced: false,
+    durationMs: 150
+  },
   "OW": {
     k: [7,19,13,8,4,5,10,4,5,4],
     energy: 10,
     pitch: 20,
     unvoiced: false,
     durationMs: 300
+  },
+  "OY": {
+    k: [19,8,7,9,7,8,8,4,4,4],
+    energy: 12,
+    pitch: 14,
+    unvoiced: false,
+    durationMs: 200
   },
   "P*": {
     k: [19,19,10,8,8,8,8,4,4,4],
@@ -90,7 +251,21 @@ export const calibratedStaticMap: Record<string, TMS5220Frame> = {
     unvoiced: true,
     durationMs: 50
   },
+  "Q*": {
+    k: [8,8,8,8,8,8,8,4,4,4],
+    energy: 1,
+    pitch: 0,
+    unvoiced: true,
+    durationMs: 20
+  },
   "R*": {
+    k: [13,17,10,4,9,12,5,4,6,1],
+    energy: 10,
+    pitch: 14,
+    unvoiced: false,
+    durationMs: 125
+  },
+  "RX": {
     k: [13,17,10,4,9,12,5,4,6,1],
     energy: 10,
     pitch: 14,
@@ -104,12 +279,33 @@ export const calibratedStaticMap: Record<string, TMS5220Frame> = {
     unvoiced: true,
     durationMs: 250
   },
+  "SH": {
+    k: [12,22,13,13,10,6,9,3,5,3],
+    energy: 10,
+    pitch: 0,
+    unvoiced: true,
+    durationMs: 140
+  },
   "T*": {
     k: [24,20,12,8,8,8,8,4,4,4],
     energy: 7,
     pitch: 0,
     unvoiced: true,
     durationMs: 75
+  },
+  "TH": {
+    k: [8,24,12,8,10,5,8,2,6,2],
+    energy: 5,
+    pitch: 0,
+    unvoiced: true,
+    durationMs: 120
+  },
+  "UH": {
+    k: [17,13,7,9,7,8,8,4,4,4],
+    energy: 12,
+    pitch: 14,
+    unvoiced: false,
+    durationMs: 120
   },
   "UW": {
     k: [8,15,9,7,6,6,8,6,5,2],
@@ -118,7 +314,35 @@ export const calibratedStaticMap: Record<string, TMS5220Frame> = {
     unvoiced: false,
     durationMs: 250
   },
+  "UX": {
+    k: [8,15,9,7,6,6,8,6,5,2],
+    energy: 10,
+    pitch: 19,
+    unvoiced: false,
+    durationMs: 250
+  },
+  "V*": {
+    k: [20,17,9,9,8,8,8,4,4,4],
+    energy: 8,
+    pitch: 16,
+    unvoiced: false,
+    durationMs: 175
+  },
   "W*": {
+    k: [5,27,11,8,4,7,9,3,4,3],
+    energy: 10,
+    pitch: 18,
+    unvoiced: false,
+    durationMs: 150
+  },
+  "WH": {
+    k: [5,27,11,8,4,7,9,3,4,3],
+    energy: 7,
+    pitch: 0,
+    unvoiced: true,
+    durationMs: 150
+  },
+  "WX": {
     k: [5,27,11,8,4,7,9,3,4,3],
     energy: 10,
     pitch: 18,
@@ -131,5 +355,19 @@ export const calibratedStaticMap: Record<string, TMS5220Frame> = {
     pitch: 19,
     unvoiced: false,
     durationMs: 150
+  },
+  "YX": {
+    k: [19,7,1,7,9,11,11,5,2,2],
+    energy: 10,
+    pitch: 19,
+    unvoiced: false,
+    durationMs: 150
+  },
+  "Z*": {
+    k: [29,21,7,9,8,8,8,4,4,4],
+    energy: 9,
+    pitch: 16,
+    unvoiced: false,
+    durationMs: 250
   },
 };

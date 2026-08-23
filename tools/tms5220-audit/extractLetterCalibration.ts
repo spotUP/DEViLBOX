@@ -127,9 +127,168 @@ for (const [code, frames] of letterLib) {
 
 calibrated.sort(([a], [b]) => a.localeCompare(b));
 
+// Derive missing consonants from calibrated bases (like completeLibrary does)
+const calMap = new Map(calibrated);
+
+function deriveVoicedFromUnvoiced(voicedCode: string, unvoicedCode: string, energyBoost = 1, pitchBase = 16) {
+  if (calMap.has(voicedCode) || !calMap.has(unvoicedCode)) return;
+  const base = calMap.get(unvoicedCode)!;
+  calMap.set(voicedCode, {
+    k: [...base.k],
+    energy: Math.min(14, base.energy + energyBoost),
+    pitch: pitchBase,
+    unvoiced: false,
+    durationMs: base.durationMs,
+  });
+}
+
+function deriveUnvoicedFromVoiced(unvoicedCode: string, voicedCode: string, energyCut = 3) {
+  if (calMap.has(unvoicedCode) || !calMap.has(voicedCode)) return;
+  const base = calMap.get(voicedCode)!;
+  calMap.set(unvoicedCode, {
+    k: [...base.k],
+    energy: Math.max(1, base.energy - energyCut),
+    pitch: 0,
+    unvoiced: true,
+    durationMs: base.durationMs,
+  });
+}
+
+// Derive missing phonemes from letter-calibrated bases
+// Stops: D* from T*, G* from K*, P* from T* (adjust K1/K2 for place)
+if (!calMap.has('D*') && calMap.has('T*')) {
+  const t = calMap.get('T*')!;
+  calMap.set('D*', {
+    k: [18, 22, 6, 10, 6, 8, 7, 3, 4, 3], // Alveolar voiced stop
+    energy: Math.min(14, t.energy + 1),
+    pitch: 16,
+    unvoiced: false,
+    durationMs: 60,
+  });
+}
+if (!calMap.has('G*') && calMap.has('K*')) {
+  const k = calMap.get('K*')!;
+  calMap.set('G*', {
+    k: [16, 14, 6, 10, 7, 8, 8, 4, 4, 4], // Velar voiced stop
+    energy: Math.min(14, k.energy + 1),
+    pitch: Math.max(1, k.pitch),
+    unvoiced: false,
+    durationMs: 60,
+  });
+}
+if (!calMap.has('GX') && calMap.has('G*')) {
+  calMap.set('GX', { ...calMap.get('G*')! });
+}
+
+// P* - bilabial unvoiced stop (distinct from T*/K*)
+if (!calMap.has('P*') && calMap.has('T*')) {
+  const t = calMap.get('T*')!;
+  calMap.set('P*', {
+    k: [19, 19, 10, 8, 8, 8, 8, 4, 4, 4],
+    energy: 7,
+    pitch: 0,
+    unvoiced: true,
+    durationMs: 50,
+  });
+}
+
+// Fricatives: V* from F*, Z* from S*, ZH from SH, DH from TH
+deriveVoicedFromUnvoiced('V*', 'F*', 1, 16);
+deriveVoicedFromUnvoiced('Z*', 'S*', 2, 16);
+deriveVoicedFromUnvoiced('ZH', 'SH', 2, 16);
+deriveVoicedFromUnvoiced('DH', 'TH', 3, 16);
+
+// Affricate: J* from CH
+if (!calMap.has('J*') && calMap.has('CH')) {
+  const ch = calMap.get('CH')!;
+  calMap.set('J*', {
+    k: [...ch.k],
+    energy: Math.min(14, ch.energy + 1),
+    pitch: 16,
+    unvoiced: false,
+    durationMs: ch.durationMs,
+  });
+}
+
+// DX from D* (flap)
+if (!calMap.has('DX') && calMap.has('D*')) {
+  calMap.set('DX', { ...calMap.get('D*')!, durationMs: 40 });
+}
+
+// WH from W* (unvoiced glide)
+if (!calMap.has('WH') && calMap.has('W*')) {
+  const w = calMap.get('W*')!;
+  calMap.set('WH', {
+    k: [...w.k],
+    energy: Math.max(1, w.energy - 3),
+    pitch: 0,
+    unvoiced: true,
+    durationMs: w.durationMs,
+  });
+}
+
+// Aliases
+const ALIASES: Record<string, string> = {
+  'IX': 'IH', 'UX': 'UW', 'RX': 'R*', 'LX': 'L*', 'WX': 'W*', 'YX': 'Y*',
+  'KX': 'K*', '/X': '/H',
+};
+for (const [dst, src] of Object.entries(ALIASES)) {
+  if (!calMap.has(dst) && calMap.has(src)) {
+    calMap.set(dst, { ...calMap.get(src)! });
+  }
+}
+
+// Q* and pause
+if (!calMap.has('Q*')) {
+  calMap.set('Q*', { k: [8,8,8,8,8,8,8,4,4,4], energy: 1, pitch: 0, unvoiced: true, durationMs: 20 });
+}
+if (!calMap.has(' ')) {
+  calMap.set(' ', { k: [8,8,8,8,8,8,8,4,4,4], energy: 1, pitch: 0, unvoiced: false, durationMs: 120 });
+}
+
+// OH, OY, AW, UW - keep hand-authored (not in letter recordings)
+const HAND_AUTHORED_FALLBACKS: Record<string, TMS5220Frame> = {
+  'SH': { k: [12, 22, 13, 13, 10, 6, 9, 3, 5, 3], energy: 10, pitch: 0, unvoiced: true, durationMs: 140 },
+  'TH': { k: [8, 24, 12, 8, 10, 5, 8, 2, 6, 2], energy: 5, pitch: 0, unvoiced: true, durationMs: 120 },
+  '/H': { k: [18, 14, 8, 8, 8, 8, 8, 4, 4, 4], energy: 6, pitch: 0, unvoiced: true, durationMs: 80 },
+  '/X': { k: [18, 14, 8, 8, 8, 8, 8, 4, 4, 4], energy: 6, pitch: 0, unvoiced: true, durationMs: 80 },
+  'OY': { k: [19, 8, 7, 9, 7, 8, 8, 4, 4, 4], energy: 12, pitch: 14, unvoiced: false, durationMs: 200 },
+  'AW': { k: [23, 12, 8, 8, 7, 8, 8, 4, 4, 4], energy: 12, pitch: 16, unvoiced: false, durationMs: 200 },
+  'OH': { k: [19, 8, 7, 9, 7, 8, 8, 4, 4, 4], energy: 12, pitch: 14, unvoiced: false, durationMs: 150 },
+  'UX': { k: [14, 6, 6, 10, 7, 8, 8, 5, 4, 4], energy: 12, pitch: 12, unvoiced: false, durationMs: 130 },
+  'IX': { k: [14, 23, 9, 7, 9, 7, 8, 3, 4, 3], energy: 10, pitch: 18, unvoiced: false, durationMs: 90 },
+  'ER': { k: [18, 16, 9, 9, 6, 10, 7, 5, 4, 4], energy: 12, pitch: 16, unvoiced: false, durationMs: 160 },
+  'AH': { k: [21, 11, 8, 8, 7, 8, 8, 4, 4, 4], energy: 12, pitch: 16, unvoiced: false, durationMs: 130 },
+  'AO': { k: [19, 8, 7, 9, 7, 8, 8, 4, 4, 4], energy: 12, pitch: 14, unvoiced: false, durationMs: 150 },
+  'UH': { k: [17, 13, 7, 9, 7, 8, 8, 4, 4, 4], energy: 12, pitch: 14, unvoiced: false, durationMs: 120 },
+  'AX': { k: [18, 14, 8, 8, 8, 8, 8, 4, 4, 4], energy: 10, pitch: 16, unvoiced: false, durationMs: 90 },
+  'AE': { k: [24, 19, 10, 8, 8, 7, 8, 4, 4, 4], energy: 12, pitch: 18, unvoiced: false, durationMs: 150 },
+  'EY': { k: [20, 22, 10, 7, 8, 7, 8, 4, 4, 3], energy: 12, pitch: 18, unvoiced: false, durationMs: 200 },
+  'AY': { k: [23, 12, 8, 8, 7, 8, 8, 4, 4, 4], energy: 12, pitch: 16, unvoiced: false, durationMs: 200 },
+  'IH': { k: [15, 25, 10, 7, 9, 7, 8, 3, 4, 3], energy: 12, pitch: 18, unvoiced: false, durationMs: 120 },
+  'RX': { k: [17, 15, 9, 9, 6, 10, 7, 5, 4, 4], energy: 10, pitch: 16, unvoiced: false, durationMs: 100 },
+  'LX': { k: [16, 20, 7, 10, 5, 10, 6, 5, 3, 4], energy: 10, pitch: 16, unvoiced: false, durationMs: 110 },
+  'WX': { k: [14, 5, 5, 11, 7, 8, 9, 5, 5, 4], energy: 9, pitch: 14, unvoiced: false, durationMs: 80 },
+  'YX': { k: [12, 28, 11, 6, 10, 7, 9, 3, 5, 3], energy: 9, pitch: 18, unvoiced: false, durationMs: 80 },
+  'NX': { k: [16, 12, 4, 14, 5, 10, 6, 5, 3, 5], energy: 9, pitch: 16, unvoiced: false, durationMs: 120 },
+  'M*': { k: [20, 10, 4, 14, 5, 10, 6, 5, 3, 5], energy: 9, pitch: 16, unvoiced: false, durationMs: 120 },
+  'N*': { k: [18, 19, 4, 14, 5, 10, 6, 5, 3, 5], energy: 9, pitch: 16, unvoiced: false, durationMs: 100 },
+  'L*': { k: [16, 20, 7, 10, 5, 10, 6, 5, 3, 4], energy: 10, pitch: 16, unvoiced: false, durationMs: 110 },
+  'W*': { k: [14, 5, 5, 11, 7, 8, 9, 5, 5, 4], energy: 9, pitch: 14, unvoiced: false, durationMs: 80 },
+  'Y*': { k: [12, 28, 11, 6, 10, 7, 9, 3, 5, 3], energy: 9, pitch: 18, unvoiced: false, durationMs: 80 },
+  'R*': { k: [17, 15, 9, 9, 6, 10, 7, 5, 4, 4], energy: 10, pitch: 16, unvoiced: false, durationMs: 100 },
+};
+
+for (const [code, frame] of Object.entries(HAND_AUTHORED_FALLBACKS)) {
+  if (!calMap.has(code)) calMap.set(code, frame);
+}
+
+const finalEntries = [...calMap.entries()].sort(([a], [b]) => a.localeCompare(b));
+
 const outPath = join(ROOT, 'tools/tms5220-audit/calibratedStaticMap.ts');
-writeFileSync(outPath, emitModule(calibrated));
-console.log(`wrote ${outPath} (${calibrated.length} phonemes calibrated from letters)`);
-for (const [code, f] of calibrated) {
-  console.log(`  ${code}: K=[${f.k.join(',')}], energy=${f.energy}, pitch=${f.pitch}, unvoiced=${f.unvoiced}, dur=${f.durationMs}ms`);
+writeFileSync(outPath, emitModule(finalEntries));
+console.log(`wrote ${outPath} (${finalEntries.length} phonemes: ${calibrated.length} calibrated + ${finalEntries.length - calibrated.length} derived)`);
+for (const [code, f] of finalEntries) {
+  const src = calibrated.some(([c]) => c === code) ? 'CAL' : 'DERIVED';
+  console.log(`  ${code}: K=[${f.k.join(',')}], energy=${f.energy}, pitch=${f.pitch}, unvoiced=${f.unvoiced}, dur=${f.durationMs}ms [${src}]`);
 }

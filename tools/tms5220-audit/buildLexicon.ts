@@ -69,6 +69,18 @@ const dictWords = readFileSync(dictPath, 'utf8')
   .map((w) => w.trim().toUpperCase())
   .filter((w) => /^[A-Z]{2,14}$/.test(w));
 
+// The most common English words, curated: the system dictionary is dated and
+// drops short words (A) and common forms (HAS). Sentences only sound good if
+// the small words are guaranteed present, so they merge in regardless.
+const COMMON_WORDS = (
+  'THE AND A OF TO IN IS YOU THAT IT HE WAS FOR ON ARE AS WITH HIS THEY AT BE THIS HAVE ' +
+  'FROM OR ONE HAD BY WORD BUT NOT WHAT ALL WERE WE WHEN YOUR CAN SAID THERE USE AN EACH ' +
+  'WHICH SHE DO HOW THEIR IF WILL UP OTHER ABOUT OUT MANY THEN THEM THESE SO SOME HER ' +
+  'WOULD MAKE LIKE HIM INTO TIME HAS LOOK TWO MORE WRITE GO SEE NUMBER NO WAY COULD ' +
+  'PEOPLE MY THAN FIRST WATER BEEN CALL WHO OIL ITS NOW FIND LONG DOWN DAY DID GET COME ' +
+  'MADE MAY PART'
+).split(' ');
+
 const entries: LexiconEntry[] = [];
 const seen = new Set<string>();
 let noPhonemes = 0;
@@ -76,7 +88,7 @@ let emptyAfterSpace = 0;
 const tierCounts = [0, 0, 0, 0];
 const romCount = new Set<string>();
 
-for (const word of dictWords) {
+for (const word of new Set([...COMMON_WORDS, ...dictWords])) {
   const phonemeStr = textToPhonemes(word);
   if (!phonemeStr) { noPhonemes++; continue; }
   const codes = parsePhonemeString(phonemeStr).map((t) => t.code).filter((c) => c !== ' ');
@@ -101,14 +113,6 @@ for (const word of dictWords) {
     entries.push({ word, phonemes: codes.join(' '), tier, rom: isRom });
   }
 }
-
-// ROM built-ins first (native quality), then by tier, then by length.
-entries.sort((a, b) => {
-  if (a.rom !== b.rom) return a.rom ? -1 : 1;
-  if (a.tier !== b.tier) return a.tier - b.tier;
-  if (a.word.length !== b.word.length) return a.word.length - b.word.length;
-  return a.word.localeCompare(b.word);
-});
 
 // ROM built-ins first (native quality), then by tier, then by length.
 entries.sort((a, b) => {
