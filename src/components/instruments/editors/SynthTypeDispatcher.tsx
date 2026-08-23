@@ -41,7 +41,7 @@ import { VisualizerFrame } from '@components/visualization/VisualizerFrame';
 import { PresetDropdown } from '../presets/PresetDropdown';
 import { ChannelOscilloscope } from '../../visualization/ChannelOscilloscope';
 import { getToneEngine } from '@engine/ToneEngine';
-import { getChipSynthDef } from '@constants/chipParameters';
+import { getChipSynthDef, resolveChipParameters } from '@constants/chipParameters';
 import { getChipCapabilities } from '@engine/mame/MAMEMacroTypes';
 import { Radio, MessageSquare, Music, Mic, Monitor, Cpu, SlidersHorizontal } from 'lucide-react';
 import { HardwareUIWrapper, hasHardwareUI } from '../hardware/HardwareUIWrapper';
@@ -510,15 +510,27 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
     const params = instrument.parameters || {};
     const prev = prevChipParamsRef.current;
     prevChipParamsRef.current = params;
-    // First render sends EVERYTHING, not nothing: after a session restore the
-    // recreated synth can diverge from the store (the restore path constructs
-    // the synth twice), so "creation already applied them" is not a safe
-    // assumption. The sync is idempotent — worst case is a dozen redundant
-    // setParam messages on editor open.
     try {
       const engine = getToneEngine();
+      if (!prev) {
+        // First render: push the COMPLETE declared set, not just the stored
+        // keys. Stored parameters are sparse (only what the user touched), so
+        // anything unstored would otherwise sit at the chip's own constructor
+        // value while the editor shows the declared default — the "broken
+        // preset" a fresh instrument played with until one was picked.
+        for (const [key, value] of Object.entries(
+          resolveChipParameters(instrument.synthType, params),
+        )) {
+          engine.updateMAMEChipParam(instrument.id, key, value);
+        }
+        if (typeof params._program === 'number') {
+          engine.loadMAMEChipPreset(instrument.id, params._program);
+        }
+        return;
+      }
+      // Later renders: forward only what changed (preset picks, knob edits).
       for (const [key, value] of Object.entries(params)) {
-        if (prev && prev[key] === value) continue;
+        if (prev[key] === value) continue;
         if (key === '_program' && typeof value === 'number') {
           engine.loadMAMEChipPreset(instrument.id, value);
         } else if (typeof value === 'number') {
@@ -530,12 +542,6 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
     } catch { /* engine not ready */ }
   }, [instrument.parameters, instrument.id, instrument.synthType]);
 
-  // Send the CHANGED KEY ONLY and let the store merge it. Rebuilding the whole
-  // parameters object from `instrument.parameters` wrote back a stale snapshot:
-  // the store write is batched to the next animation frame, so right after a
-  // preset change the prop still held the previous preset's values, and any
-  // knob drag resurrected them wholesale — picking Whisper, switching preset,
-  // then touching any knob turned Noise Mode back on.
   const handleChipParamChange = useCallback((key: string, value: number) => {
     handleChange({ parameters: { [key]: value } });
     try {
