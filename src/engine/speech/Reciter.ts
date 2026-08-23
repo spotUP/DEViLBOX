@@ -288,46 +288,90 @@ function isKnownPhoneme(code: string): boolean {
 }
 
 /**
- * True when the string is already a SAM phoneme string — every non-space
- * character parses as a known phoneme code or stress digit.
+ * Phoneme notation is marked, never guessed: [SIHKS] is phonemes, SIX is a word.
  *
- * Guards the speak path against running SAM text→phoneme conversion on input
- * that is already phonemes ("DH* AH N*" converts to garbage like
- * " D AE4STERIHSK AE EH4N AE4STERIHSK"). Word tokens ("MACHINE") fail the
- * per-token parse, so mixed word+phoneme strings still route as text.
+ * The speak path must not run SAM text→phoneme conversion on input that is
+ * already phonemes ("DH* AH N*" converts to garbage like " D AE4STERIHSK AE
+ * EH4N AE4STERIHSK"), so it has to know which it holds. It cannot tell by
+ * looking: an English word tiles into phoneme codes just as well as a phoneme
+ * string does. Measured on the first 4000 lexicon words, spelling-shaped
+ * detection claims WAX (as W* AX, a schwa — plainly wrong), SIX, MIX, NIX, SAY
+ * and OH, and a converted word carries no distinguishing mark to key off either:
+ * 2858 of those 4000 SAM outputs contain no '*' and no stress digit at all
+ * (SIX -> SIHKS), so requiring a mark would instead double-convert most
+ * already-converted text.
+ *
+ * The brackets are written by the phoneme toggle, are visible in the text field
+ * and persist with the instrument, so the string states its own type wherever it
+ * travels — no parallel mode flag to fall out of sync with the text.
  */
-export function looksLikePhonemeString(str: string): boolean {
-  if (!str || str.trim().length === 0) return false;
-  const tokens = str.trim().split(/\s+/);
-  for (const token of tokens) {
-    if (!token) continue;
-    let i = 0;
-    while (i < token.length) {
-      // Stress digits and manual stars (users write DH*, the parser emits DH).
-      if ((token[i] >= '0' && token[i] <= '8') || token[i] === '*') { i++; continue; }
-      if (i + 1 < token.length && isKnownPhoneme(token[i] + token[i + 1])) { i += 2; continue; }
-      if (isKnownPhoneme(token[i] + '*')) { i++; continue; }
-      return false;
-    }
+export const PHONEME_OPEN = '[';
+export const PHONEME_CLOSE = ']';
+
+/** True for one bracketed token, or for legacy notation carrying a '*' code. */
+export function isPhonemeNotation(token: string): boolean {
+  const t = token.trim();
+  if (t.length === 0) return false;
+  if (t.startsWith(PHONEME_OPEN) && t.endsWith(PHONEME_CLOSE) && t.length > 2) return true;
+  // No English word contains '*', so DH* AH N* stays unambiguous unbracketed.
+  return t.includes('*') && stripPhonemeMarks(t).split(/\s+/).every(isPhonemeRun);
+}
+
+/** Remove the notation brackets from a token, if present. */
+export function stripPhonemeMarks(token: string): string {
+  const t = token.trim();
+  return t.startsWith(PHONEME_OPEN) && t.endsWith(PHONEME_CLOSE) && t.length > 2
+    ? t.slice(1, -1)
+    : t;
+}
+
+/** Wrap a converted phoneme string in the notation brackets. */
+export function markPhonemes(phonemes: string): string {
+  return `${PHONEME_OPEN}${phonemes.trim()}${PHONEME_CLOSE}`;
+}
+
+/** True when every character of the run parses as a phoneme code or stress digit. */
+function isPhonemeRun(token: string): boolean {
+  let i = 0;
+  while (i < token.length) {
+    // Stress digits and manual stars (users write DH*, the parser emits DH).
+    if ((token[i] >= '0' && token[i] <= '8') || token[i] === '*') { i++; continue; }
+    if (i + 1 < token.length && isKnownPhoneme(token[i] + token[i + 1])) { i += 2; continue; }
+    if (isKnownPhoneme(token[i] + '*')) { i++; continue; }
+    return false;
   }
-  return true;
+  return token.length > 0;
 }
 
 /**
- * Parse text into phoneme tokens, tolerating input that mixes plain words and
- * already-converted SAM phoneme strings (the mixed form the phoneme toggle
- * produces when a word is a known ROM/recording word). Word pauses separate
+ * Split speech input into the units the speak path renders one at a time: a
+ * bracketed phoneme span counts as ONE unit even though it contains spaces
+ * ("[DH* AH N*]"), everything else splits on whitespace as usual.
+ *
+ * Every caller that walks the text word by word must split with this, or a
+ * multi-word span is torn into "[DH*", "AH", "N*]" and each piece is judged
+ * separately — the closing bracket lands on a different piece than the opening
+ * one, so neither reads as notation.
+ */
+export function splitSpeechSegments(text: string): string[] {
+  return text.match(/\[[^\]]*\]|\S+/g) ?? [];
+}
+
+/**
+ * Parse text into phoneme tokens, tolerating input that mixes plain words with
+ * bracketed phoneme notation (the mixed form the phoneme toggle produces when a
+ * word is a known ROM/recording word and stays literal). Word pauses separate
  * the tokens. Returns null when nothing parses.
  */
 export function textToTokensSmart(text: string): PhonemeToken[] | null {
-  const words = text.trim().split(/\s+/).filter(Boolean);
+  const words = splitSpeechSegments(text);
   if (words.length === 0) return null;
 
   const tokens: PhonemeToken[] = [];
   for (const word of words) {
     let parsed: PhonemeToken[];
-    if (looksLikePhonemeString(word)) {
-      parsed = parsePhonemeString(word);
+    if (isPhonemeNotation(word)) {
+      parsed = parsePhonemeString(stripPhonemeMarks(word));
     } else {
       const phonemeStr = textToPhonemes(word);
       if (!phonemeStr) continue;
