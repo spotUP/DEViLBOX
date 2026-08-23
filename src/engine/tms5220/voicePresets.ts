@@ -55,6 +55,12 @@ export const TMS5220_VOICE_PRESETS: TMS5220VoicePreset[] = [
   { id: 'whisper', name: 'Whisper', params: { noise_mode: 1, energy_index: 9 } },
   { id: 'bright', name: 'Bright', params: { pitch_index: 28, energy_index: 11, brightness: 0.8 } },
   { id: 'muffled', name: 'Muffled', params: { pitch_index: 36, energy_index: 9, brightness: 0.2 } },
+  // Deliberate formant garble — the ONE preset allowed to bend K1-K3.
+  // Relocating the reflection coefficients makes speech eerily
+  // wrong-but-speechlike, the way the Black Lodge dialogue in Twin Peaks
+  // (spoken reversed, then played reversed) sits just outside language.
+  // Named by the user after hearing it.
+  { id: 'twinpeaks', name: 'Twin Peaks', params: { pitch_index: 30, energy_index: 10, k1_index: 6, k2_index: 24, k3_index: 12, brightness: 0.45, cabinet: 0.3 } },
 ];
 
 /**
