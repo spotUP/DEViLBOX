@@ -31,11 +31,14 @@ describe('TMS5220 voice presets', () => {
     expect(preset('whisper').noise_mode).toBe(1);
   });
 
-  it('NO preset bends K1-K3 — formant-index offsets garble the liquids', () => {
+  it('no VOICE preset bends K1-K3 — formant-index offsets garble the liquids', () => {
     // K indices are reflection-coefficient table positions — shifting them
     // relocates formants, and W/ER/L collapse first: every preset that
     // carried K offsets said "hello frrzzll" instead of "hello world".
+    // Twin Peaks is the one deliberate exception: it garbles ON PURPOSE
+    // (Black Lodge backwards-talk) and is named for exactly that.
     for (const { id, params } of TMS5220_VOICE_PRESETS) {
+      if (id === 'twinpeaks') continue;
       expect(params.k1_index, `${id} must not bend K1`).toBeUndefined();
       expect(params.k2_index, `${id} must not bend K2`).toBeUndefined();
       expect(params.k3_index, `${id} must not bend K3`).toBeUndefined();
