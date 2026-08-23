@@ -9,6 +9,9 @@
 
 import type { PhonemeToken } from './Reciter';
 
+/** Bump when public/espeak-ng.data is regenerated (tools/espeak-repack.mjs). */
+const ESPEAK_DATA_TAG = '2026-08-23';
+
 let espeakModule: any = null;
 let espeakWorker: any = null;
 let initPromise: Promise<void> | null = null;
@@ -32,7 +35,17 @@ async function ensureInitialized(): Promise<void> {
       const timeoutMs = 5000;
       // @ts-expect-error -- no type declarations for this WASM package
       const moduleImport = import('@echogarden/espeak-ng-emscripten')
-        .then(({ default: EspeakModule }: { default: () => Promise<any> }) => EspeakModule());
+        .then(({ default: EspeakModule }: { default: (opts?: object) => Promise<any> }) =>
+          EspeakModule({
+            // Cache-bust the .data fetch: the manifest (inside the JS, which
+            // Vite versions) and the data file MUST come from the same repack.
+            // A browser serving a cached March data file against the current
+            // manifest reads a lang file where phontab should be and dies with
+            // "Wrong version of espeak-ng-data". Bump the tag when
+            // tools/espeak-repack.mjs output changes.
+            locateFile: (path: string, prefix: string) =>
+              `${prefix}${path}${path.endsWith('.data') ? `?repack=${ESPEAK_DATA_TAG}` : ''}`,
+          }));
 
       const timeoutPromise = new Promise<never>((_, reject) =>
         setTimeout(() => reject(new Error('eSpeak-NG init timed out')), timeoutMs)
