@@ -115,8 +115,6 @@ const TMS5220Param = {
   K10_INDEX: 16,
   SPEECH_PITCH_OFFSET: 17,
   CABINET: 18,
-  USE_ROM_WORDS: 19,
-  ROM_KNOBS: 20,
 } as const;
 
 /**
@@ -813,8 +811,8 @@ export class TMS5220Synth extends MAMEBaseSynth {
       stereo_width: TMS5220Param.STEREO_WIDTH,
       brightness: TMS5220Param.BRIGHTNESS,
       cabinet: TMS5220Param.CABINET,
-      use_rom_words: TMS5220Param.USE_ROM_WORDS,
-      rom_knobs: TMS5220Param.ROM_KNOBS,
+      // use_rom_words / rom_knobs are JS-side routing flags — the wasm defines
+      // no parameter 19/20, so posting them just hit the chip's default case.
     };
 
     const paramId = paramMap[param];
