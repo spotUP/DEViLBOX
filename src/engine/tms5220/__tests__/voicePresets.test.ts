@@ -30,15 +30,14 @@ describe('TMS5220 voice presets', () => {
     expect(preset('whisper').noise_mode).toBe(1);
   });
 
-  it('Bright and Muffled shape tone with brightness, never with K offsets', () => {
+  it('NO preset bends K1-K3 — formant-index offsets garble the liquids', () => {
     // K indices are reflection-coefficient table positions — shifting them
-    // relocates formants and garbles the vowels ("bright and muffled sounds
-    // wrong"). Tone belongs on the brightness tilt: 0.5 is neutral.
-    for (const id of ['bright', 'muffled']) {
-      const p = preset(id);
-      expect(p.k1_index, `${id} must not bend K1`).toBeUndefined();
-      expect(p.k2_index, `${id} must not bend K2`).toBeUndefined();
-      expect(p.k3_index, `${id} must not bend K3`).toBeUndefined();
+    // relocates formants, and W/ER/L collapse first: every preset that
+    // carried K offsets said "hello frrzzll" instead of "hello world".
+    for (const { id, params } of TMS5220_VOICE_PRESETS) {
+      expect(params.k1_index, `${id} must not bend K1`).toBeUndefined();
+      expect(params.k2_index, `${id} must not bend K2`).toBeUndefined();
+      expect(params.k3_index, `${id} must not bend K3`).toBeUndefined();
     }
     expect(preset('bright').brightness).toBeGreaterThan(0.5);
     expect(preset('muffled').brightness).toBeLessThan(0.5);

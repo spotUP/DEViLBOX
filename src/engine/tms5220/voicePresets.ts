@@ -43,10 +43,15 @@ export const TMS5220_VOICE_PRESETS: TMS5220VoicePreset[] = [
   // The chip is already a Speak & Spell; what the toy added is a small driver
   // in a resonant plastic case — the cabinet stage.
   { id: 'speakandspell', name: 'Speak & Spell', params: { cabinet: 0.5 } },
-  { id: 'chipmunk', name: 'Chipmunk', params: { pitch_index: 16, energy_index: 11, k1_index: 20, k2_index: 18 } },
+  // No preset touches K1-K3: shifting reflection-coefficient indices
+  // relocates formants and collapses the liquids first — W/ER/L live in
+  // extreme K1/K2 territory, so "WORLD" came out "frrzzll" on every preset
+  // that carried K offsets while "HELLO" survived. Character comes from
+  // pitch, excitation, noise, brightness and cabinet only.
+  { id: 'chipmunk', name: 'Chipmunk', params: { pitch_index: 14, energy_index: 11, brightness: 0.65 } },
   { id: 'deep', name: 'Deep', params: { pitch_index: 46, energy_index: 12, brightness: 0.4 } },
-  { id: 'robot', name: 'Robot', params: { pitch_index: 32, energy_index: 9, k1_index: 16, k2_index: 16, k3_index: 8, chirp_type: 2 } },
-  { id: 'alien', name: 'Alien', params: { pitch_index: 24, energy_index: 10, k1_index: 6, k2_index: 24, k3_index: 12, chirp_type: 1 } },
+  { id: 'robot', name: 'Robot', params: { pitch_index: 32, energy_index: 9, chirp_type: 2, brightness: 0.6 } },
+  { id: 'alien', name: 'Alien', params: { pitch_index: 22, energy_index: 10, chirp_type: 1, brightness: 0.7 } },
   { id: 'whisper', name: 'Whisper', params: { noise_mode: 1, energy_index: 9 } },
   { id: 'bright', name: 'Bright', params: { pitch_index: 28, energy_index: 11, brightness: 0.8 } },
   { id: 'muffled', name: 'Muffled', params: { pitch_index: 36, energy_index: 9, brightness: 0.2 } },
