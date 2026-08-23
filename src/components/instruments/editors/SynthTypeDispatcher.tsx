@@ -530,15 +530,19 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
     } catch { /* engine not ready */ }
   }, [instrument.parameters, instrument.id, instrument.synthType]);
 
+  // Send the CHANGED KEY ONLY and let the store merge it. Rebuilding the whole
+  // parameters object from `instrument.parameters` wrote back a stale snapshot:
+  // the store write is batched to the next animation frame, so right after a
+  // preset change the prop still held the previous preset's values, and any
+  // knob drag resurrected them wholesale — picking Whisper, switching preset,
+  // then touching any knob turned Noise Mode back on.
   const handleChipParamChange = useCallback((key: string, value: number) => {
-    const currentParams = instrument.parameters || {};
-    const newParams = { ...currentParams, [key]: value };
-    handleChange({ parameters: newParams });
+    handleChange({ parameters: { [key]: value } });
     try {
       const engine = getToneEngine();
       engine.updateMAMEChipParam(instrument.id, key, value);
     } catch { /* ignored */ }
-  }, [instrument.parameters, instrument.id, handleChange]);
+  }, [instrument.id, handleChange]);
 
   // Handle MAME chip synth text parameter changes (e.g. speech text).
   // Uses onChange directly instead of handleChange to avoid triggering
@@ -548,19 +552,16 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
   // stale temp copy. The engine hears the text live via
   // updateMAMEChipTextParam either way, so Speak works while editing.
   const handleChipTextChange = useCallback((key: string, value: string) => {
-    const currentParams = instrument.parameters || {};
-    const newParams = { ...currentParams, [key]: value };
-    onChange({ parameters: newParams });
+    onChange({ parameters: { [key]: value } });
     try {
       const engine = getToneEngine();
       engine.updateMAMEChipTextParam(instrument.id, key, value);
     } catch { /* ignored */ }
-  }, [instrument.parameters, instrument.id, onChange]);
+  }, [instrument.id, onChange]);
 
   // Handle MAME chip synth preset load
   const handleChipPresetLoad = useCallback((program: number) => {
-    const currentParams = instrument.parameters || {};
-    handleChange({ parameters: { ...currentParams, _program: program } });
+    handleChange({ parameters: { _program: program } });
     try {
       const engine = getToneEngine();
       engine.loadMAMEChipPreset(instrument.id, program);
