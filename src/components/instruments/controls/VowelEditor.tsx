@@ -69,6 +69,9 @@ export const VowelEditor: React.FC<VowelEditorProps> = ({
       }}>
         Vowel Sequence
       </span>
+      <span style={{ fontSize: 9, color: mutedColor }}>
+        Sing Mode: each key press speaks the next vowel, pitched to the note. Hold the key to sustain it (Sustain / Loop).
+      </span>
 
       {/* Vowel Grid */}
       <div style={{

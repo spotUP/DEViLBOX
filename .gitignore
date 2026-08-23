@@ -42,6 +42,7 @@ juce-wasm/build/
 juce-wasm/*/build/
 juce-wasm/**/build/
 mame-wasm/build/
+mame-wasm/*/build/
 furnace-wasm/build/
 hively-wasm/build/
 hively-insed-wasm/build/

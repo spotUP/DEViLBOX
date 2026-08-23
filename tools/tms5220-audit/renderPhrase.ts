@@ -75,8 +75,12 @@ async function renderOne(text: string, mode: 'library' | 'static' | 'calibrated'
 }
 
 if (process.argv[1] && import.meta.url.endsWith(process.argv[1].split('/').pop()!)) {
-  const text = process.argv[2] ?? 'HELLO WORLD';
-  const outPath = process.argv[3] ?? join(ROOT, 'tms5220-phrase.wav');
+  // Flags must not be mistaken for the output path: "renderPhrase.ts TEXT
+  // --static" used to write a WAV literally named "--static" into the repo
+  // root, because argv[3] was taken as outPath unconditionally.
+  const positional = process.argv.slice(2).filter(a => !a.startsWith('--'));
+  const text = positional[0] ?? 'HELLO WORLD';
+  const outPath = positional[1] ?? join(ROOT, 'tms5220-phrase.wav');
   const isStatic = process.argv.includes('--static');
   const isCalibrated = process.argv.includes('--calibrated');
   const mode: 'library' | 'static' | 'calibrated' = isStatic ? 'static' : isCalibrated ? 'calibrated' : 'library';

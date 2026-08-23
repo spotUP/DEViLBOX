@@ -22,9 +22,13 @@ const PITCH_TABLE_5100 = [
 ];
 const INTERNAL_RATE = 8000;
 
-// Generous bounds: deep male voice to high female/child.
-const F0_MIN_HZ = 85;
-const F0_MAX_HZ = 300;
+// Bounds taken from the ROM itself: 6305 voiced frames across the 272 Speak & Spell
+// words span indices 1-31 (195 Hz down to 52 Hz) with a median of index 16 (101 Hz).
+// The synthesised phonemes must sit inside the voice the hardware actually speaks in,
+// not merely inside "some human range" — pitched at the top of it, it stops sounding
+// like a Speak & Spell.
+const F0_MIN_HZ = 80;
+const F0_MAX_HZ = 135;
 
 function phonemePitchIndices(): Array<{ phoneme: string; pitch: number }> {
   const src = readFileSync(
@@ -42,7 +46,7 @@ describe('phoneme pitch indices', () => {
     expect(phonemePitchIndices().length).toBeGreaterThan(20);
   });
 
-  it('places every voiced phoneme inside the human F0 range', () => {
+  it('places every voiced phoneme inside the voice range the ROM actually uses', () => {
     const offenders = phonemePitchIndices()
       .filter(p => p.pitch > 0) // 0 = unvoiced, no pitch
       .map(p => ({ ...p, hz: INTERNAL_RATE / PITCH_TABLE_5100[p.pitch] }))
