@@ -506,7 +506,10 @@ export const CHIP_SYNTH_DEFS: Record<string, ChipSynthDef> = {
     parameters: [
       { key: 'sing_mode', label: 'Sing Mode', group: 'Speech', type: 'toggle', min: 0, max: 1, default: 1 },
       { key: 'use_rom_words', label: 'Use ROM Words', group: 'Speech', type: 'toggle', min: 0, max: 1, default: 1 },
-      { key: 'rom_knobs', label: 'ROM Knobs', group: 'Speech', type: 'toggle', min: 0, max: 1, default: 0 },
+      // Default ON: with it off, the voice knobs and Voice Presets are inaudible
+      // on ROM words and imported recordings, which reads as "presets do nothing".
+      // Turn it off for byte-exact authentic playback.
+      { key: 'rom_knobs', label: 'ROM Knobs', group: 'Speech', type: 'toggle', min: 0, max: 1, default: 1 },
       { key: 'speechText', label: 'Speech Text', group: 'Speech', type: 'text', default: 0, defaultText: 'HELLO WORLD', placeholder: 'Type text and press Speak' },
       { key: 'vowelSequence', label: 'Vowel Editor', group: 'Speech', type: 'vowelEditor', default: 0 },
       { key: 'lexicon', label: 'Word Lexicon', group: 'Lexicon', type: 'lexicon', default: 0 },
