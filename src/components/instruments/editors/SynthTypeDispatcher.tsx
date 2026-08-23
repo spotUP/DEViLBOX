@@ -507,8 +507,13 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
     } catch { /* ignored */ }
   }, [instrument.parameters, instrument.id, handleChange]);
 
-  // Handle MAME chip synth text parameter changes (e.g. speech text)
-  // Uses onChange directly instead of handleChange to avoid triggering auto-preview
+  // Handle MAME chip synth text parameter changes (e.g. speech text).
+  // Uses onChange directly instead of handleChange to avoid triggering
+  // auto-preview. It must go through onChange, not the store: the edit modal
+  // works on a TEMP instrument that is applied on Save — a direct store write
+  // sidesteps Save/Cancel, and Save then overwrites the typed text with the
+  // stale temp copy. The engine hears the text live via
+  // updateMAMEChipTextParam either way, so Speak works while editing.
   const handleChipTextChange = useCallback((key: string, value: string) => {
     const currentParams = instrument.parameters || {};
     const newParams = { ...currentParams, [key]: value };
