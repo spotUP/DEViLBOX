@@ -25,7 +25,6 @@ set_target_properties(MSM5232_WASM PROPERTIES
 
 target_link_options(MSM5232_WASM PRIVATE
     "SHELL:-s WASM=1"
-    "SHELL:-s EXPORT_ES6=1"
     "SHELL:-s MODULARIZE=1"
     "SHELL:-s EXPORT_NAME='createMSM5232Module'"
     "SHELL:-s ALLOW_MEMORY_GROWTH=1"

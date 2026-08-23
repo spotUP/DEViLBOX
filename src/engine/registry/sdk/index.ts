@@ -17,6 +17,7 @@ SynthRegistry.registerLazy(
     'MAMESN76477', 'MAMESNKWave', 'MAMESP0250', 'MAMETMS36XX',
     'MAMETMS5220', 'MAMETR707', 'MAMEUPD931', 'MAMEUPD933',
     'MAMEVotrax', 'MAMEYMF271', 'MAMEYMOPQ', 'MAMEVASynth',
+    'MAMEMSM5232', 'MAMETIA',
     // Standalone WASM engines (CMI + 8 PCM/sampler chips)
     'MAMECMI', 'MAMEFZPCM', 'MAMEPS1SPU', 'MAMEMultiPCM',
     'MAMEZSG2', 'MAMEKS0164', 'MAMESWP00', 'MAMESWP20', 'MAMERolandGP',
