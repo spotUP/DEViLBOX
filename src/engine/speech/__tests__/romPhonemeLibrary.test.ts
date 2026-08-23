@@ -14,7 +14,7 @@
  * 4. Reachability: the static table (primary source) resolves every covered
  *    code; the mined library fills only the codes static lacks.
  */
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeAll } from 'vitest';
 import { readFileSync, existsSync } from 'fs';
 import { join } from 'path';
 import { parseVSMDirectory, type VSMWord } from '../VSMROMParser';
@@ -82,9 +82,22 @@ function libraryReconstruction(
 }
 
 describe.skipIf(!present)('ROM phoneme library', () => {
-  const words = loadWords();
-  const result = buildCompletePhonemeLibrary(words);
-  const { library, provenance, droppedWords } = result;
+  // The VSM binaries are gitignored (TI copyright), so CI runs without them.
+  // describe.skipIf still EXECUTES this callback — it only marks the collected
+  // tests skipped — so reading the ROM here would fail collection on every
+  // ROM-less machine. beforeAll does not run for a skipped suite.
+  let words: VSMWord[];
+  let library: ReturnType<typeof buildCompletePhonemeLibrary>['library'];
+  let provenance: ReturnType<typeof buildCompletePhonemeLibrary>['provenance'];
+  let droppedWords: string[];
+
+  beforeAll(() => {
+    words = loadWords();
+    const result = buildCompletePhonemeLibrary(words);
+    library = result.library;
+    provenance = result.provenance;
+    droppedWords = result.droppedWords;
+  });
 
   it('mines the expected recordings and rejects few', () => {
     const minedCount = [...provenance.values()].filter(p => p.source !== 'derived').length;
