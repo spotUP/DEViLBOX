@@ -1091,8 +1091,15 @@ export const useInstrumentStore = create<InstrumentStore>()(
         // Engine not ready — store write still happens below
       }
 
-      // Batched store write — one Immer produce per animation frame
-      batch(`inst-${id}`, (state) => {
+      // Batched store write — one Immer produce per animation frame.
+      // The key must distinguish DIFFERENT parameters: batching dedupes by key
+      // (latest wins), so a single `inst-<id>` key made two controls moved in
+      // the same frame clobber each other. Same control during a drag keeps a
+      // stable key and still dedupes to one write per frame.
+      const paramKeys = updates.parameters
+        ? `-p:${Object.keys(updates.parameters as Record<string, unknown>).sort().join(',')}`
+        : '';
+      batch(`inst-${id}${paramKeys}`, (state) => {
         const inst = state.instruments.find((i: InstrumentConfig) => i.id === id);
         if (!inst) return;
         for (const [key, value] of Object.entries(updates as Record<string, unknown>)) {
