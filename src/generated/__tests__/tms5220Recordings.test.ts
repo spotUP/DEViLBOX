@@ -8,11 +8,27 @@
  * must remain byte-identical to the same words in the shipped VSM ROMs.
  */
 import { describe, expect, it } from 'vitest';
+import { existsSync } from 'fs';
+import { join } from 'path';
 import { IMPORTED_RECORDINGS, IMPORTED_RECORDING_WORDS } from '../tms5220Recordings';
-import { pitch6To5, diffVsRom } from '../../../tools/tms5220-audit/importQBox';
-import { parseLPCFramesFromPosition } from '../../engine/speech/VSMROMParser';
+import { pitch6To5, diffVsRom, lpcFramesToTMS5220 } from '../../../tools/tms5220-audit/importQBox';
+import { parseLPCFramesFromPosition, type LPCFrame } from '../../engine/speech/VSMROMParser';
 import { packFrameBuffer } from '../../engine/speech/tms5220FrameBuffer';
 import { QBOX_RECORDINGS } from '../../../tools/tms5220-audit/qboxStrings';
+
+function parseRecordingFrames(word: string): LPCFrame[] {
+  const rec = QBOX_RECORDINGS.find(r => r.label === word);
+  expect(rec, word).toBeDefined();
+  const bytes = Uint8Array.from(
+    (rec!.hex.match(/0x[0-9A-Fa-f]+/g) ?? []).map(s => parseInt(s.slice(2), 16)),
+  );
+  return parseLPCFramesFromPosition(bytes, 0, 5);
+}
+
+// The VSM binaries are gitignored (TI copyright): the two cases that decode a
+// word out of the ROM to compare against it only run where the ROMs are present.
+const ROMS = join(process.cwd(), 'public/roms/snspell');
+const romsPresent = ['tmc0351n2l.vsm', 'tmc0352n2l.vsm'].every(f => existsSync(join(ROMS, f)));
 
 describe('imported tms5220 recordings', () => {
   it('word list matches the recordings list, one per recording', () => {
@@ -44,7 +60,41 @@ describe('imported tms5220 recordings', () => {
     }
   });
 
-  it('tms5100 strings decode byte-identical to the same words in the VSM ROMs', () => {
+  it('repeat frames expand to the previous frame K coefficients, never zeros', () => {
+    const repeatRec = IMPORTED_RECORDINGS.find(r => r.frames.some(f => f.k.length === 0));
+    expect(repeatRec, 'expected at least one recording with repeat frames').toBeDefined();
+    const rec = repeatRec!;
+
+    const packed = packFrameBuffer(rec.frames);
+    const bytes = (f: number) => Array.from(packed.data.slice(f * 12 + 2, f * 12 + 12));
+
+    let expectedK = rec.frames[0].k;
+    for (let i = 0; i < rec.frames.length; i++) {
+      const f = rec.frames[i];
+      if (f.k.length > 0) {
+        expectedK = f.k;
+      } else {
+        expect(bytes(i), `${rec.word} frame ${i} repeats previous K`).toEqual(expectedK);
+        expect(bytes(i).some(v => v !== 0), `${rec.word} frame ${i} not zeroed`).toBe(true);
+      }
+    }
+  });
+
+  it.skipIf(!romsPresent)('packed imported recordings are byte-identical to the packed ROM stream for ROM words', () => {
+    for (const word of ['ISLE', 'COLOR', 'NEIGHBOR', 'YOUR SCORE']) {
+      const rec = IMPORTED_RECORDINGS.find(r => r.word === word);
+      expect(rec, word).toBeDefined();
+      const romCheck = diffVsRom(parseRecordingFrames(word));
+      expect(romCheck, `${word}: recording not found in ROM`).not.toBeNull();
+      const romPacked = packFrameBuffer(lpcFramesToTMS5220(romCheck!.romFrames, 5));
+      const recPacked = packFrameBuffer(rec!.frames);
+      expect(Array.from(romPacked.data), `${word} packed stream`).toEqual(
+        Array.from(recPacked.data),
+      );
+    }
+  });
+
+  it.skipIf(!romsPresent)('tms5100 strings decode byte-identical to the same words in the VSM ROMs', () => {
     // Words we know are in the ROM: ISLE, COLOR, NEIGHBOR, YOUR SCORE.
     const known = ['ISLE', 'COLOR', 'NEIGHBOR', 'YOUR SCORE'];
     for (const word of known) {

@@ -286,3 +286,55 @@ export const KNOWN_PHONEMES = new Set<string>([
 function isKnownPhoneme(code: string): boolean {
   return KNOWN_PHONEMES.has(code);
 }
+
+/**
+ * True when the string is already a SAM phoneme string — every non-space
+ * character parses as a known phoneme code or stress digit.
+ *
+ * Guards the speak path against running SAM text→phoneme conversion on input
+ * that is already phonemes ("DH* AH N*" converts to garbage like
+ * " D AE4STERIHSK AE EH4N AE4STERIHSK"). Word tokens ("MACHINE") fail the
+ * per-token parse, so mixed word+phoneme strings still route as text.
+ */
+export function looksLikePhonemeString(str: string): boolean {
+  if (!str || str.trim().length === 0) return false;
+  const tokens = str.trim().split(/\s+/);
+  for (const token of tokens) {
+    if (!token) continue;
+    let i = 0;
+    while (i < token.length) {
+      // Stress digits and manual stars (users write DH*, the parser emits DH).
+      if ((token[i] >= '0' && token[i] <= '8') || token[i] === '*') { i++; continue; }
+      if (i + 1 < token.length && isKnownPhoneme(token[i] + token[i + 1])) { i += 2; continue; }
+      if (isKnownPhoneme(token[i] + '*')) { i++; continue; }
+      return false;
+    }
+  }
+  return true;
+}
+
+/**
+ * Parse text into phoneme tokens, tolerating input that mixes plain words and
+ * already-converted SAM phoneme strings (the mixed form the phoneme toggle
+ * produces when a word is a known ROM/recording word). Word pauses separate
+ * the tokens. Returns null when nothing parses.
+ */
+export function textToTokensSmart(text: string): PhonemeToken[] | null {
+  const words = text.trim().split(/\s+/).filter(Boolean);
+  if (words.length === 0) return null;
+
+  const tokens: PhonemeToken[] = [];
+  for (const word of words) {
+    let parsed: PhonemeToken[];
+    if (looksLikePhonemeString(word)) {
+      parsed = parsePhonemeString(word);
+    } else {
+      const phonemeStr = textToPhonemes(word);
+      if (!phonemeStr) continue;
+      parsed = parsePhonemeString(phonemeStr);
+    }
+    if (tokens.length > 0 && parsed.length > 0) tokens.push({ code: ' ', stress: 0 });
+    tokens.push(...parsed);
+  }
+  return tokens.length > 0 ? tokens : null;
+}

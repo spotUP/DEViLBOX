@@ -33,12 +33,16 @@ export function packFrameBuffer(frames: TMS5220Frame[]): PackedFrameBuffer {
   const data = new Uint8Array(totalFrames * 12);
   let offset = 0;
 
+  // Repeat frames (k: []) reuse the previous frame's K coefficients — the
+  // packed 12-byte format has no repeat bit, so expansion happens here.
+  let lastK: number[] | null = null;
+
   for (const frame of frames) {
     const count = frameCountForDuration(frame.durationMs);
     // Clamp to valid table ranges: energy [1,14] (0=silence, 15=stop), pitch [0,31]
     const energyIdx = Math.min(Math.max(frame.energy, 1), 14);
     const pitchIdx = frame.unvoiced ? 0 : Math.min(Math.max(frame.pitch, 0), 31);
-    const k = frame.k;
+    const k = frame.k.length > 0 ? frame.k : (lastK ?? []);
 
     for (let i = 0; i < count; i++) {
       data[offset] = energyIdx;
@@ -48,6 +52,8 @@ export function packFrameBuffer(frames: TMS5220Frame[]): PackedFrameBuffer {
       }
       offset += 12;
     }
+
+    if (frame.k.length > 0) lastK = frame.k;
   }
 
   // Final silence frame (energy=0) to end speech cleanly
