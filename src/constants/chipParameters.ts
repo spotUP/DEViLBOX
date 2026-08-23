@@ -202,11 +202,6 @@ export const CHIP_SYNTH_DEFS: Record<string, ChipSynthDef> = {
     presetNames: ['AH', 'EE', 'IH', 'OH', 'OO', 'AE', 'UH', 'ER'],
     parameters: [
       { key: 'sing_mode', label: 'Sing Mode', group: 'Speech', type: 'toggle', min: 0, max: 1, default: 1 },
-      // Speaker and enclosure colouring, not chip behaviour. The TMS output has almost
-      // no energy below 300 Hz — that is inherent to 8 kHz LPC, and the real ROM words
-      // measure the same. The body people remember from the toy comes from a small
-      // driver in a resonant plastic case. 0 = raw chip.
-      { key: 'cabinet', label: 'Cabinet', group: 'Output', type: 'knob', min: 0, max: 1, step: 0.01, default: 0, formatValue: 'percent' },
       { key: 'speechText', label: 'Speech Text', group: 'Speech', type: 'text', default: 0, defaultText: 'HELLO WORLD', placeholder: 'Type text and press Speak' },
       { key: 'vowelSequence', label: 'Vowel Editor', group: 'Speech', type: 'vowelEditor', default: 0 },
       { key: 'volume', label: 'Volume', group: 'Output', type: 'knob', min: 0, max: 1, step: 0.01, default: 0.8, formatValue: 'percent' },
@@ -516,6 +511,12 @@ export const CHIP_SYNTH_DEFS: Record<string, ChipSynthDef> = {
       { key: 'vowelSequence', label: 'Vowel Editor', group: 'Speech', type: 'vowelEditor', default: 0 },
       { key: 'lexicon', label: 'Word Lexicon', group: 'Lexicon', type: 'lexicon', default: 0 },
       { key: 'volume', label: 'Volume', group: 'Output', type: 'knob', min: 0, max: 1, step: 0.01, default: 0.8, formatValue: 'percent' },
+      // Speaker and enclosure colouring, not chip behaviour. The TMS output has almost
+      // no energy below 300 Hz — that is inherent to 8 kHz LPC, and the real ROM words
+      // measure the same. The body people remember from the toy comes from a small
+      // driver in a resonant plastic case. 0 = raw chip. Implemented by PARAM_CABINET
+      // in mame-wasm/tms5220/TMS5220Synth.cpp.
+      { key: 'cabinet', label: 'Cabinet', group: 'Output', type: 'knob', min: 0, max: 1, step: 0.01, default: 0, formatValue: 'percent' },
       { key: 'chirp_type', label: 'Chirp Type', group: 'Excitation', type: 'select', min: 0, max: 2, default: 0, formatValue: 'int', options: [
         { value: 0, label: 'TMS5220' }, { value: 1, label: 'TMS5200' }, { value: 2, label: 'TI99' },
       ]},

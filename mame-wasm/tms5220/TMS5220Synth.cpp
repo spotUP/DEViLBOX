@@ -181,6 +181,7 @@ enum TMS5220ParamId {
     PARAM_K9_INDEX = 15,
     PARAM_K10_INDEX = 16,
     PARAM_SPEECH_PITCH_OFFSET = 17,  // Signed offset for frame-buffer speech pitch (sing mode)
+    PARAM_CABINET = 18,              // 0..1 dry/wet for the toy's speaker + case colouring
 };
 
 // ============================================================================
@@ -260,6 +261,31 @@ public:
         a1_ = (float)(a1 / a0); a2_ = (float)(a2 / a0);
     }
 
+    void setHighpass(double cutoffHz, double sampleRate) {
+        if (sampleRate <= 0.0) return;
+        const double fc = std::min(cutoffHz, sampleRate * 0.45);
+        const double w0 = 2.0 * 3.14159265358979323846 * fc / sampleRate;
+        const double cosw0 = std::cos(w0);
+        const double alpha = std::sin(w0) / (2.0 * 0.70710678118654752440);
+        const double b0 = (1.0 + cosw0) * 0.5, b1 = -(1.0 + cosw0), b2 = (1.0 + cosw0) * 0.5;
+        const double a0 = 1.0 + alpha, a1 = -2.0 * cosw0, a2 = 1.0 - alpha;
+        b0_ = (float)(b0 / a0); b1_ = (float)(b1 / a0); b2_ = (float)(b2 / a0);
+        a1_ = (float)(a1 / a0); a2_ = (float)(a2 / a0);
+    }
+
+    void setPeaking(double centreHz, double q, double gainDb, double sampleRate) {
+        if (sampleRate <= 0.0) return;
+        const double fc = std::min(centreHz, sampleRate * 0.45);
+        const double A = std::pow(10.0, gainDb / 40.0);
+        const double w0 = 2.0 * 3.14159265358979323846 * fc / sampleRate;
+        const double cosw0 = std::cos(w0);
+        const double alpha = std::sin(w0) / (2.0 * std::max(0.0001, q));
+        const double b0 = 1.0 + alpha * A, b1 = -2.0 * cosw0, b2 = 1.0 - alpha * A;
+        const double a0 = 1.0 + alpha / A, a1 = -2.0 * cosw0, a2 = 1.0 - alpha / A;
+        b0_ = (float)(b0 / a0); b1_ = (float)(b1 / a0); b2_ = (float)(b2 / a0);
+        a1_ = (float)(a1 / a0); a2_ = (float)(a2 / a0);
+    }
+
     void reset() { x1_ = x2_ = y1_ = y2_ = 0.0f; }
 
     float process(float x) {
@@ -305,6 +331,10 @@ public:
             stage.setLowpass(3400.0, sampleRate);
             stage.reset();
         }
+        cabinetHp_.setHighpass(130.0, sampleRate);
+        cabinetBody_.setPeaking(320.0, 0.9, 9.0, sampleRate);
+        cabinetPresence_.setPeaking(900.0, 1.2, 3.0, sampleRate);
+        cabinetHp_.reset(); cabinetBody_.reset(); cabinetPresence_.reset();
         volume_ = 0.8f;
         stereoWidth_ = 0.5f;
         brightness_ = 1.0f;
@@ -615,6 +645,7 @@ public:
             }
             case PARAM_STEREO_WIDTH: stereoWidth_ = std::clamp(value, 0.0f, 1.0f); break;
             case PARAM_BRIGHTNESS: brightness_ = std::clamp(value, 0.0f, 2.0f); break;
+            case PARAM_CABINET: cabinetAmount_ = std::clamp(value, 0.0f, 1.0f); break;
             case PARAM_SPEECH_PITCH_OFFSET:
                 speech_pitch_offset_target_ = (int)value;  // signed: -31 to +31
                 break;
@@ -744,6 +775,7 @@ public:
                 // band tops out near 3.4 kHz, so anything above that is reconstruction
                 // image rather than speech.
                 for (auto& stage : speechLowpass_) interp = stage.process(interp);
+                interp = applyCabinet(interp);
                 float out = interp * volume_;
                 outL[i] = out;
                 outR[i] = out;
@@ -773,6 +805,15 @@ private:
     // ========================================================================
     // MAME-Accurate Speech Engine
     // ========================================================================
+
+    /** Speaker + enclosure colouring, mixed in by amount. Bypassed at amount 0. */
+    float applyCabinet(float x) {
+        if (cabinetAmount_ <= 0.0f) return x;
+        float wet = cabinetHp_.process(x);
+        wet = cabinetBody_.process(wet);
+        wet = cabinetPresence_.process(wet);
+        return x + (wet - x) * cabinetAmount_;
+    }
 
     /** Read N bits from VSM ROM (LSB first from each byte, MSB first in result).
      *  Exactly matches MAME's read_bits() + new_int_read() via TMS6100 */
@@ -1264,6 +1305,18 @@ private:
      * audible.
      */
     Biquad speechLowpass_[3];
+
+    /**
+     * Cabinet colouring — NOT part of the chip. The TMS output itself has almost no
+     * energy below 300 Hz (measured: a real ROM word is 0.1% under 150 Hz), which is
+     * inherent to 8 kHz LPC. The body people remember from a Speak & Spell comes from
+     * the physical object: a small driver in a resonant plastic case, which rolls the
+     * bottom off and pushes a broad resonance through the low mids. Modelled as
+     * highpass 130 Hz -> peaking +9 dB at 320 Hz -> peaking +3 dB at 900 Hz, mixed
+     * dry/wet by PARAM_CABINET so it can be dialled out entirely (0 = bypassed).
+     */
+    Biquad cabinetHp_, cabinetBody_, cabinetPresence_;
+    float cabinetAmount_ = 0.0f;
     float volume_ = 0.8f;
     float stereoWidth_ = 0.5f;
     float brightness_ = 1.0f;
