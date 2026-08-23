@@ -57,3 +57,85 @@ export function offsetFramesPitch(frames: TMS5220Frame[], offset: number): TMS52
     return pitch === f.pitch ? f : { ...f, pitch };
   });
 }
+// ============================================================================
+// Segment-relative pitch contour (2026-08-23, Q3 of the phoneme-quality plan)
+// ============================================================================
+
+/** Micro-prosody band: how far a frame may deviate from its run's median. */
+export const CONTOUR_DELTA_CLAMP = 3;
+/** Declination inside one word, in pitch indices. */
+export const WORD_DECLINATION = 1;
+
+export interface PitchContourOptions {
+  /** Whole-stream base shift (the per-word declination offset in the hybrid chain). */
+  baseOffset: number;
+  /** Total downward drift across this stream, in pitch indices. */
+  declination: number;
+  /** Extra adjustment applied to the LAST voiced run: negative = final fall, positive = question rise. */
+  finalAdjust: number;
+}
+
+interface VoicedRun { start: number; end: number; median: number }
+
+function median(values: number[]): number {
+  const sorted = [...values].sort((a, b) => a - b);
+  return sorted[Math.floor(sorted.length / 2)];
+}
+
+function findVoicedRuns(frames: TMS5220Frame[]): VoicedRun[] {
+  const runs: VoicedRun[] = [];
+  let start = -1;
+  for (let i = 0; i <= frames.length; i++) {
+    const voiced = i < frames.length && frames[i].pitch > 0 && !frames[i].unvoiced;
+    if (voiced && start < 0) start = i;
+    if (!voiced && start >= 0) {
+      const pitches = frames.slice(start, i).map(f => f.pitch);
+      runs.push({ start, end: i, median: median(pitches) });
+      start = -1;
+    }
+  }
+  return runs;
+}
+
+/**
+ * Re-anchor every voiced run to one utterance baseline while preserving each
+ * run's own micro-contour.
+ *
+ * Why: mined phoneme runs keep the ABSOLUTE pitch of whatever recording they
+ * came from — one segment sits at index 20, its neighbour at 8 — so spliced
+ * speech leaps around arbitrarily. Shifting whole words (offsetFramesPitch)
+ * cannot fix jumps INSIDE a word. Here each contiguous voiced run is moved to
+ * a shared baseline (the stream's median + baseOffset, drifting down by
+ * `declination` across the stream), and a frame keeps only its delta from its
+ * own run's median, clamped to ±CONTOUR_DELTA_CLAMP — the recording's melody
+ * survives in miniature, the source-word register does not.
+ *
+ * The last voiced run additionally takes `finalAdjust` — the statement fall or
+ * the question rise. Unvoiced and silent frames pass through untouched.
+ */
+export function applyPitchContour(
+  frames: TMS5220Frame[],
+  { baseOffset, declination, finalAdjust }: PitchContourOptions,
+): TMS5220Frame[] {
+  const runs = findVoicedRuns(frames);
+  if (runs.length === 0) return frames;
+
+  const streamMedian = median(runs.flatMap(r =>
+    frames.slice(r.start, r.end).map(f => f.pitch)));
+  const lastRun = runs[runs.length - 1];
+  const denom = Math.max(1, frames.length - 1);
+
+  const out = frames.map(f => ({ ...f, k: f.k }));
+  for (const run of runs) {
+    for (let i = run.start; i < run.end; i++) {
+      const t = i / denom;
+      let base = streamMedian + baseOffset - Math.round(declination * t);
+      if (run === lastRun) base += finalAdjust;
+      const delta = Math.max(-CONTOUR_DELTA_CLAMP,
+        Math.min(CONTOUR_DELTA_CLAMP, out[i].pitch - run.median));
+      const pitch = Math.max(1, Math.min(31, base + delta));
+      if (pitch !== out[i].pitch) out[i] = { ...out[i], k: [...out[i].k], pitch };
+    }
+  }
+  return out;
+}
