@@ -382,3 +382,53 @@ export function textToTokensSmart(text: string): PhonemeToken[] | null {
   }
   return tokens.length > 0 ? tokens : null;
 }
+
+/** How textToTokensSmartAsync turns one plain word into tokens. */
+export type WordConverter = (word: string) => Promise<PhonemeToken[] | null>;
+
+/**
+ * Default word converter: eSpeak-NG when its worker is loaded (dictionary +
+ * modern letter-to-sound rules, real stress marks), SAM rules otherwise.
+ * eSpeak's IPA maps into the same SAM code space via parseEspeakIPA, so the
+ * downstream phoneme library needs no change.
+ */
+async function defaultWordConverter(word: string): Promise<PhonemeToken[] | null> {
+  if (isEspeakAvailable()) {
+    const ipa = await espeakTextToIPA(preprocessText(word));
+    if (ipa) {
+      const tokens = parseEspeakIPA(ipa);
+      if (tokens.length > 0) return tokens;
+    }
+  }
+  const phonemeStr = textToPhonemes(word);
+  return phonemeStr ? parsePhonemeString(phonemeStr) : null;
+}
+
+/**
+ * Async twin of textToTokensSmart: bracketed notation parses literally, plain
+ * words go through the best available G2P — eSpeak-NG when loaded, SAM rules
+ * as the fallback. SAM's 1980s letter-to-sound rules are the weakest link for
+ * typed text ("colonel", "Wednesday", most irregular spellings); eSpeak has a
+ * real pronunciation dictionary. Callers preload via preloadEspeak().
+ */
+export async function textToTokensSmartAsync(
+  text: string,
+  convertWord: WordConverter = defaultWordConverter,
+): Promise<PhonemeToken[] | null> {
+  const words = splitSpeechSegments(text);
+  if (words.length === 0) return null;
+
+  const tokens: PhonemeToken[] = [];
+  for (const word of words) {
+    let parsed: PhonemeToken[] | null;
+    if (isPhonemeNotation(word)) {
+      parsed = parsePhonemeString(stripPhonemeMarks(word));
+    } else {
+      parsed = await convertWord(word);
+    }
+    if (!parsed || parsed.length === 0) continue;
+    if (tokens.length > 0) tokens.push({ code: ' ', stress: 0 });
+    tokens.push(...parsed);
+  }
+  return tokens.length > 0 ? tokens : null;
+}
