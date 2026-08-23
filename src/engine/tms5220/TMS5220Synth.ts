@@ -7,7 +7,7 @@ import { type VSMWord, parseVSMDirectory, scanVSMForWords } from '@engine/speech
 import { shouldAuditionRomSelection } from '@engine/speech/romSpeechRouting';
 import { buildRomWordIndex, lookupRomWord } from '@engine/speech/romWordLookup';
 import { buildCompletePhonemeLibrary, buildFramesFromROMLibrary } from '@engine/speech/ROMPhonemeExtractor';
-import { buildWordPitchOffsets, offsetFramesPitch } from '@engine/speech/sentenceProsody';
+import { buildWordPitchOffsets, offsetFramesPitch, applyPitchContour, WORD_DECLINATION } from '@engine/speech/sentenceProsody';
 import { packFrameBuffer } from '@engine/speech/tms5220FrameBuffer';
 import { applySpeechParamOffsets } from '@engine/tms5220/speechParamOffsets';
 import { IMPORTED_RECORDINGS } from '@generated/tms5220Recordings';
@@ -692,8 +692,15 @@ export class TMS5220Synth extends MAMEBaseSynth {
     void textToTokensSmartAsync(text).then((tokens) => {
       if (!this._chain.isCurrent(generation) || !tokens) return;
 
-      const frames = this._buildPhonemeFrames(tokens);
-      if (frames.length === 0) return;
+      const built = this._buildPhonemeFrames(tokens);
+      if (built.length === 0) return;
+      // Whole-utterance contour: declination plus a statement fall or a
+      // question rise on the last voiced run.
+      const frames = applyPitchContour(built, {
+        baseOffset: 0,
+        declination: 2,
+        finalAdjust: isQuestion(text) ? 4 : -2,
+      });
 
       this._sendFrameBufferAndSpeak(frames, () => {
         this._phonemeSpeechActive = false;
@@ -708,7 +715,14 @@ export class TMS5220Synth extends MAMEBaseSynth {
       if (!this._chain.isCurrent(generation)) return;
       if (!tokens) { onDone(); return; }
 
-      const frames = offsetFramesPitch(this._buildPhonemeFrames(tokens), pitchOffset);
+      // Segment-relative contour: mined runs keep their source recording's
+      // absolute pitch, so a flat offset leaves leaps inside the word. The
+      // word-level declination/final-fall arrives as baseOffset.
+      const frames = applyPitchContour(this._buildPhonemeFrames(tokens), {
+        baseOffset: pitchOffset,
+        declination: WORD_DECLINATION,
+        finalAdjust: 0,
+      });
       if (frames.length === 0) { onDone(); return; }
 
       // Stop any current WASM speech first
