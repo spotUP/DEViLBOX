@@ -33,6 +33,7 @@ import { useCursorStore } from '@/stores/useCursorStore';
 import { useWasmPositionStore } from '@/stores/useWasmPositionStore';
 import { useOscilloscopeStore } from '@/stores/useOscilloscopeStore';
 import { unlockIOSAudio } from '@utils/ios-audio-unlock';
+import { shouldSeekBackToLoop } from '@/lib/tracker/playbackOrder';
 import { ft2NoteToPeriod, ft2Period2Hz, ft2GetSampleC4Rate } from './effects/FT2Tables';
 // HivelyEngine used via dynamic import
 // MusicLineEngine used via dynamic import
@@ -974,6 +975,30 @@ export class TrackerReplayer {
       this.slipSongPos = this.songPos;
       this.slipPattPos = this.pattPos;
     }
+  }
+
+  /**
+   * Keep a self-sequencing engine inside the Play Pattern loop.
+   *
+   * The TS scheduler honours `patternLoopStartPos/EndPos` itself, but engines
+   * that drive their own sequencer (libopenmpt and friends) do not — they walk
+   * the module's real order and just report where they are. Seek them back
+   * when they leave the range.
+   *
+   * Only engines that can actually be seeked qualify. For the rest this returns
+   * false and playback simply carries on through the song: the displayed
+   * pattern then still matches what is audible, which is the lesser of the two
+   * wrongs. Making Play Pattern loop for those needs per-engine work.
+   *
+   * @returns true when the engine was seeked and this position should be dropped.
+   */
+  private enforcePatternLoopOnEngine(position: number): boolean {
+    if (!this.useLibopenmptPlayback) return false;
+    if (!shouldSeekBackToLoop(
+      position, this.patternLoopActive, this.patternLoopStartPos, this.patternLoopEndPos,
+    )) return false;
+    this.seekTo(this.patternLoopStartPos, 0);
+    return true;
   }
 
   /** Clear pattern loop */
@@ -3056,6 +3081,7 @@ export class TrackerReplayer {
     this.coordinator.context.triggerVUMeters = (time) => this.triggerVUMetersForRow(time);
     this.coordinator.context.applyAutomation = () => this.applyAutomationForRow();
     this.coordinator.context.audioContext = Tone.context.rawContext as AudioContext;
+    this.coordinator.context.enforceLoop = (position) => this.enforcePatternLoopOnEngine(position);
     // songPos / pattPos already live on coordinator (mirrored via accessor)
   }
 
