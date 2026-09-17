@@ -51,6 +51,7 @@ import { useTrackerAnalysisStore } from '@/stores/useTrackerAnalysisStore';
 import { useFormatStore } from '@/stores/useFormatStore';
 import { useInstrumentStore } from '@/stores/useInstrumentStore';
 import { useNotificationStore } from '@/stores/useNotificationStore';
+import { resolveVinylLevel } from '@/lib/dub/vinylLevel';
 
 const DECK_IDS: DeckId[] = ['A', 'B', 'C'];
 
@@ -1263,7 +1264,11 @@ export class DubBus {
   // JA Press vinyl — DSP is applied POST-MASTER so vinyl noise processes the
   // complete mix (dry signal + reverb return). vinylOutputNode is the final
   // output that DrumPadEngine connects to context.destination / DJ master.
-  private vinylLevel = 0;  // 0..1 (0..10 scaled)
+  private vinylLevel = 0;  // 0..1 (0..10 scaled) — level currently APPLIED
+  // Level the user asked for (0..10). Kept separate from the applied level so
+  // disabling the bus can silence the post-master vinyl chain without losing
+  // the user's setting, and re-enabling restores it.
+  private _desiredVinylLevel = 0;
   // vinylOutputNode: sits after this.master. DrumPadEngine connects it to
   // the actual output destination so vinyl sees dry + wet together.
   private vinylOutputNode!: GainNode;
@@ -3231,6 +3236,9 @@ export class DubBus {
     this.settings = merged;
     if (typeof settings.enabled === 'boolean') {
       this.enabled = settings.enabled;
+      // Post-master vinyl chain follows the bus. Off means off — see
+      // _applyVinylLevel(); the JA slider is unreachable while disabled.
+      this._applyVinylLevel();
       // Reset "bus disabled" warn latch so the user gets a fresh warning if
       // they later toggle back off without re-enabling — helpful during
       // soundcheck when knobs move around.
@@ -5855,6 +5863,25 @@ export class DubBus {
    * and 7-10 is SEVERE shit pressing. Live-updatable; 20 ms smoothing.
    */
   setVinylLevel(level10: number): void {
+    this._desiredVinylLevel = Math.max(0, Math.min(10, level10));
+    this._applyVinylLevel();
+  }
+
+  /**
+   * Apply the vinyl chain at the level the bus state actually allows.
+   *
+   * The vinyl chain is wired POST-MASTER (`this.master -> vinylEffect ->
+   * vinylOutputNode`), so it is not silenced by the input gate, the echo /
+   * spring zeroing, or `return_.gain` that the disable path uses. Left to
+   * itself it keeps colouring and generating after the bus is switched off —
+   * and the JA slider is disabled while the bus is off, so the user has no way
+   * to turn it down. Disabling the bus must silence everything the bus makes.
+   */
+  private _applyVinylLevel(): void {
+    this._writeVinylLevel(resolveVinylLevel(this.enabled, this._desiredVinylLevel));
+  }
+
+  private _writeVinylLevel(level10: number): void {
     const l = Math.max(0, Math.min(10, level10));
     this.vinylLevel = l / 10;
     const lin = this.vinylLevel;
