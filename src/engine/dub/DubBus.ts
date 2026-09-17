@@ -2227,7 +2227,9 @@ export class DubBus {
         const next = supportsChannelIsolation(mode);
         if (next === this._preferChannelIsolation) return;
         this._preferChannelIsolation = next;
-        console.log(`[DubBus] channel isolation ${next ? 'preferred' : 'unavailable'} for editorMode="${mode}" — whole-mix fallback ${next ? 'disabled' : 'active'}`);
+        // A tap registered before the flip is already open at max-of-sliders.
+        if (next) this._silenceWholeMixTaps();
+        console.log(`[DubBus] channel isolation ${next ? 'preferred' : 'unavailable'} for editorMode="${mode}" — whole-mix fallback ${next ? 'silenced' : 'active'}`);
       };
       apply(useFormatStore.getState().editorMode);
       this._unsubIsolation = useFormatStore.subscribe((state) => {
@@ -4023,7 +4025,9 @@ export class DubBus {
     this.unregisterWholeMixTap(key);
 
     const busGain = this.context.createGain();
-    busGain.gain.value = this.getWholeMixTargetForBaseline(Math.max(0, Math.min(1, baseline)));
+    busGain.gain.value = this._preferChannelIsolation
+      ? 0
+      : this.getWholeMixTargetForBaseline(Math.max(0, Math.min(1, baseline)));
     try {
       source.connect(busGain);
       busGain.connect(this.input);
@@ -4044,6 +4048,19 @@ export class DubBus {
     console.log(`[DubBus] whole-mix tap registered: ${key}`);
   }
 
+  /** Ramp every whole-mix tap to silence. Used when the active engine exposes
+   *  real per-channel outputs, so the shared fallback must not contribute. */
+  private _silenceWholeMixTaps(): void {
+    const now = this.context.currentTime;
+    for (const entry of this.wholeMixTaps.values()) {
+      try {
+        entry.busGain.gain.cancelScheduledValues(now);
+        entry.busGain.gain.setValueAtTime(entry.busGain.gain.value, now);
+        entry.busGain.gain.linearRampToValueAtTime(0, now + 0.02);
+      } catch { /* ok */ }
+    }
+  }
+
   unregisterWholeMixTap(key: string): void {
     const entry = this.wholeMixTaps.get(key);
     if (!entry) return;
@@ -4054,9 +4071,18 @@ export class DubBus {
   }
 
   setWholeMixDubSend(channelId: number, amount: number): boolean {
-    // Returning false tells the caller the whole-mix path did not handle this
-    // send, so the per-channel routing it already invoked is the only writer.
-    if (!shouldFallBackToWholeMix(this._preferChannelIsolation, this.wholeMixTaps.size)) return false;
+    if (this.wholeMixTaps.size === 0) return false;
+
+    // Isolation-capable engine: the whole-mix tap must be SILENT, not merely
+    // unwritten. `registerWholeMixTap` opens a new tap at max-of-sliders, so
+    // an early return here left it stuck at whatever it registered with and
+    // no fader could close it again — the entire mix fed the bus forever.
+    // Drive it to zero and report unhandled, so the per-channel routing the
+    // caller already invoked stays the only writer.
+    if (this._preferChannelIsolation) {
+      this._silenceWholeMixTaps();
+      return false;
+    }
     const idx = Math.max(0, channelId | 0);
     if (idx >= this.wholeMixChannelDubSends.length) {
       this.wholeMixChannelDubSends.length = idx + 1;

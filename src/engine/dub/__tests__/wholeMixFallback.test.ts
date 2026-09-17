@@ -26,6 +26,9 @@
  */
 
 import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'fs';
+import { resolve, dirname } from 'path';
+import { fileURLToPath } from 'url';
 import { shouldFallBackToWholeMix } from '../DubBus';
 import { supportsChannelIsolation } from '@engine/tone/ChannelRoutedEffects';
 
@@ -67,5 +70,50 @@ describe('supportsChannelIsolation', () => {
     expect(supportsChannelIsolation('suntronic')).toBe(false);
     expect(supportsChannelIsolation('jamcracker')).toBe(false);
     expect(supportsChannelIsolation('musicline')).toBe(false);
+  });
+});
+
+// ── Silenced, not frozen ────────────────────────────────────────────────────
+// The first cut of this fix made setWholeMixDubSend return early when
+// isolation was preferred. That stopped the fallback being RAISED but also
+// stopped it being LOWERED: registerWholeMixTap opens a new tap at
+// max-of-sliders, so a tap registered while any fader was up stayed open and
+// no fader could close it. The whole mix fed the bus permanently — on the
+// Perry preset (ext-feedback loop, springEcho, dattorro "infinite" plate,
+// tape stack) that is a rumble that grows and then ducks everything else.
+//
+// The correct semantic is that an isolation-capable engine leaves the shared
+// tap SILENT, not unwritable. Source-contract assertions, because no test
+// here can construct a DubBus (it needs a live AudioContext).
+const DUBBUS_SRC = readFileSync(
+  resolve(dirname(fileURLToPath(import.meta.url)), '../DubBus.ts'),
+  'utf8',
+);
+
+describe('whole-mix tap is silenced rather than frozen', () => {
+  it('setWholeMixDubSend drives the tap to zero instead of returning early', () => {
+    const body = DUBBUS_SRC.match(/setWholeMixDubSend\([\s\S]*?\n  }/)?.[0] ?? '';
+    expect(body).not.toBe('');
+    expect(body).toContain('_silenceWholeMixTaps');
+  });
+
+  it('registerWholeMixTap opens at zero when isolation is preferred', () => {
+    const body = DUBBUS_SRC.match(/registerWholeMixTap\([\s\S]*?\n  }/)?.[0] ?? '';
+    expect(body).not.toBe('');
+    // Must not unconditionally open at max-of-sliders.
+    expect(body).toContain('_preferChannelIsolation');
+    expect(body).toContain('getWholeMixTargetForBaseline');
+  });
+
+  it('flipping the capability flag on silences taps already registered', () => {
+    const body = DUBBUS_SRC.match(/private _watchIsolationCapability\(\): void \{[\s\S]*?\n  \}/)?.[0] ?? '';
+    expect(body).not.toBe('');
+    expect(body).toContain('_silenceWholeMixTaps');
+  });
+
+  it('the silencing helper ramps rather than steps (no click)', () => {
+    const body = DUBBUS_SRC.match(/private _silenceWholeMixTaps\(\): void \{[\s\S]*?\n  \}/)?.[0] ?? '';
+    expect(body).not.toBe('');
+    expect(body).toContain('linearRampToValueAtTime');
   });
 });
