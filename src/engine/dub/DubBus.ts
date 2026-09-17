@@ -4097,6 +4097,27 @@ export class DubBus {
     return this.wholeMixTaps.size > 0;
   }
 
+  /**
+   * Is the whole-mix fallback actually carrying audio?
+   *
+   * `hasWholeMixTap()` only says a tap object is registered — and one is
+   * registered unconditionally at DrumPadEngine construction
+   * ('tracker-master-input'), so it is effectively always true. Callers that
+   * use it to decide "there is already a fallback, so per-channel activation
+   * is not worth retrying" need this instead: on an isolation-capable engine
+   * the fallback is deliberately silenced, so abandoning activation leaves the
+   * channel with no audio at all rather than a degraded path.
+   *
+   * That distinction is why AHX had registeredChannelTaps: 0 — Hively resolves
+   * through a dynamic import, so the first fader move can arrive before the
+   * engine is ready, and the bailout turned a transient race into a permanent
+   * state. libopenmpt wins the same race because it is already instantiated as
+   * the main playback engine, which is why MOD was unaffected.
+   */
+  hasUsableWholeMixFallback(): boolean {
+    return this.wholeMixTaps.size > 0 && !this._preferChannelIsolation;
+  }
+
   private getWholeMixTargetForBaseline(baseline: number): number {
     const sliderMax = applyDubSendCurve(Math.max(0, ...this.wholeMixChannelDubSends));
     return Math.max(baseline, sliderMax);
