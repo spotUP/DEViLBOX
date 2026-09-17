@@ -382,6 +382,30 @@ this bug.
       preset to 'custom' and silently destroy the user's voicing — see
       dubBusCharacterCoherence.test.ts).
 
+- [ ] **X7** **Dub lane visuals: static, and shown on every pattern.** Reported
+      2026-09-18. Two separate faults.
+      (a) *Not following scroll.* The machinery exists — `masterDubLaneRef`
+      has its `style.top` written imperatively at PatternEditorCanvas.ts:2686
+      and :2813, and the wrapper renders at `top: scrollYRef.current` with the
+      inner MasterDubLane at `top={0}`. So it is wired but not firing. Needs
+      live debug (does the handler run? is the ref attached when it does?),
+      NOT more source reading.
+      (b) *Appearing on all patterns.* Curves are stored per pattern
+      (`getCurvesForPattern(patternId, channelIndex)`) and the lane is passed
+      `pattern.id`, so the scoping looks right on paper. Prime suspect is
+      `DubRecorder` reading `tracker.currentPatternIndex`: that value is known
+      NOT to update on libopenmpt/WASM-driven engines — AutoDub carries the
+      same workaround and comment. On AHX every recording would then land under
+      one pattern id. Verify what id is actually written before changing
+      anything.
+
+- [ ] **X8** **Stale MCP tool metadata.** `fire_dub_move`'s description still
+      lists 27 valid moveIds from the April era — no skankEchoThrow,
+      skankFloatThrow, versionDrop, riddimSection, combSweep, hpfRise,
+      madProfPingPong. It accepts them fine (the router takes any registered
+      id) but an agent reading the tool description would not know they exist.
+      Same staleness class as the manual chapters in X-notes.
+
 - [ ] **X3** `extFeedbackEqDb` is a +1 dB boost inside the ext loop with no
       mirror. Harmless now the limiter is in place and the tap moved, but it is
       the same class of defect as the hpfResonance mirror. Low priority.
