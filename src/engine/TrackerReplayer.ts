@@ -978,6 +978,10 @@ export class TrackerReplayer {
 
   /** Clear pattern loop */
   clearPatternLoop(): void {
+    // No-op when no loop is set. Callers clear unconditionally on every
+    // song-mode start; without this guard that would fire the slip-mode
+    // seekTo below and yank playback back to the ghost position.
+    if (!this.patternLoopActive) return;
     this.patternLoopActive = false;
     this.patternLoopStartPos = -1;
     this.patternLoopEndPos = -1;

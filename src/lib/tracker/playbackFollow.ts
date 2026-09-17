@@ -2,15 +2,15 @@
  * Decide which tracker-store cursors the pattern editor should follow when the
  * replayer advances during playback.
  *
- * In pattern-loop mode (Play Pattern) the replayer is loaded with a 1-entry song
- * list — just the looped pattern — so the position it reports is ALWAYS 0.
- * Writing that back via setCurrentPosition(0) rewrites currentPatternIndex to
- * patternOrder[0] (setCurrentPosition keeps the pattern in sync with the order),
- * which yanks the editor off the looped pattern back to song position 000 and,
- * because loopTargetKey then changes, makes the loop itself restart on pattern 0.
+ * History: Play Pattern used to load the replayer with a 1-entry song list, so
+ * the position it reported was always 0 and writing that back yanked the editor
+ * to song position 000. The fix for that was to skip the position write while
+ * looping — which left the pos counter frozen at 000 for the whole song.
  *
- * So Play Pattern must follow the PATTERN only and leave the song position
- * untouched. Full-song playback follows both.
+ * The order is no longer truncated (see `computeEffectiveSongOrder`): the
+ * replayer always holds the song's real order and Play Pattern is a loop RANGE
+ * over it. Reported positions are therefore real in both modes, and both
+ * cursors follow them.
  */
 export interface PlaybackFollowUpdate {
   /** Pattern index the editor should display. */
@@ -20,9 +20,9 @@ export interface PlaybackFollowUpdate {
 }
 
 export function computePlaybackFollow(
-  isLooping: boolean,
+  _isLooping: boolean,
   patternNum: number,
   position: number,
 ): PlaybackFollowUpdate {
-  return { pattern: patternNum, position: isLooping ? null : position };
+  return { pattern: patternNum, position };
 }

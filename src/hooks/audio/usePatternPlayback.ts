@@ -19,6 +19,7 @@ import { getTrackerScratchController } from '@engine/TrackerScratchController';
 import type { UADEEngine } from '@engine/uade/UADEEngine';
 import { resolveMaxTraxLoadBytes } from '@/lib/import/formats/maxtrax/maxtraxFormat';
 import { computePlaybackFollow } from '@/lib/tracker/playbackFollow';
+import { computeEffectiveSongOrder } from '@/lib/tracker/playbackOrder';
 
 export const usePatternPlayback = () => {
   const { patterns, currentPatternIndex, setCurrentPattern, patternOrder, currentPositionIndex, setCurrentPosition, } = useTrackerStore(useShallow((s) => ({
@@ -479,23 +480,26 @@ export const usePatternPlayback = () => {
         if ((window as any).PLAYBACK_DEBUG) console.log(`[Playback] ${needsReload ? 'Reloading' : 'Starting'} real-time playback (${format})`);
 
         let effectivePatterns = patterns;
-        let effectiveSongPositions: number[];
-        let effectiveSongLength: number;
         // For per-channel formats (MusicLine etc.), each PART pattern has only 1 channel,
         // but the song has N channels (one per track table). Use the track table count.
         let effectiveNumChannels = (channelTrackTables && channelTrackTables.length > 0)
           ? channelTrackTables.length
           : pattern.channels.length;
 
-        {
-          // --- Pattern Order Mode ---
-          const currentOrder = patternOrderRef.current;
-          // Loop the pattern at the CURRENT song position (not currentPatternIndex, which
-          // may lag when navigating by position) so Play Pattern loops what the user is on.
-          const loopPatternOrder = isLooping ? [actualPatternIndex] : currentOrder;
-          effectiveSongPositions = loopPatternOrder;
-          effectiveSongLength = isLooping ? 1 : (modData?.songLength ?? currentOrder.length);
-        }
+        // --- Pattern Order Mode ---
+        // The order handed to the replayer is ALWAYS the song's real order: the
+        // coordinator resolves the displayed pattern through it, and every
+        // engine-driven format reports positions into the real order regardless
+        // of what we load. Play Pattern is a loop RANGE over that order, applied
+        // below once the song is loaded.
+        const effectiveOrder = computeEffectiveSongOrder(
+          isLooping,
+          patternOrderRef.current,
+          currentPositionIndexRef.current,
+          modData?.songLength,
+        );
+        const effectiveSongPositions = effectiveOrder.songPositions;
+        const effectiveSongLength = effectiveOrder.songLength;
 
         // Save current replayer state if reloading
         const currentSongPos = replayer.getCurrentPosition();
@@ -662,11 +666,20 @@ export const usePatternPlayback = () => {
           });
         };
 
+        // Play Pattern is a loop over one song position of the real order, not
+        // a truncated order. Applied on every (re)start so the range follows
+        // the position the user is on.
+        if (effectiveOrder.loopRange) {
+          replayer.setPatternLoop(effectiveOrder.loopRange.start, effectiveOrder.loopRange.end);
+        } else {
+          replayer.clearPatternLoop();
+        }
+
         if (needsReload) {
           if (isLooping) {
-            // Loop-mode position change: the song is always a 1-entry list,
-            // so start the new pattern from the top.
-            replayer.seekTo(0, 0);
+            // Loop-mode position change: restart at the top of the looped
+            // position — which is a real index into the song order now.
+            replayer.seekTo(effectiveOrder.loopRange?.start ?? 0, 0);
             seekCinter4(actualPatternIndex, 0);
           } else {
             // Restore position after structural reload in song mode.
@@ -675,9 +688,9 @@ export const usePatternPlayback = () => {
             seekCinter4(effectiveSongPositions[currentSongPos] ?? currentSongPos, currentRow);
           }
         } else if (isLooping) {
-          // Pattern-loop initial start: the song is a 1-entry list ([currentPattern]),
-          // so always loop it from the top (pos 00 / row 0) rather than the cursor.
-          replayer.seekTo(0, 0);
+          // Pattern-loop initial start: begin at the top of the looped song
+          // position rather than at the cursor row.
+          replayer.seekTo(effectiveOrder.loopRange?.start ?? 0, 0);
           seekCinter4(actualPatternIndex, 0);
         } else {
           // Initial start (song mode): seek to the current cursor position so playback
