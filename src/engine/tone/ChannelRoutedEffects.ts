@@ -375,7 +375,7 @@ export class ChannelRoutedEffectsManager {
     if (!engine?.isAvailable()) {
       try {
         const { getActiveDubBus } = await import('../dub/DubBus');
-        if (getActiveDubBus()?.hasWholeMixTap()) {
+        if (getActiveDubBus()?.hasUsableWholeMixFallback()) {
           return;
         }
       } catch { /* ok */ }
@@ -392,7 +392,7 @@ export class ChannelRoutedEffectsManager {
     if (!worklet) {
       try {
         const { getActiveDubBus } = await import('../dub/DubBus');
-        if (getActiveDubBus()?.hasWholeMixTap()) {
+        if (getActiveDubBus()?.hasUsableWholeMixFallback()) {
           return;
         }
       } catch { /* ok */ }

@@ -28,7 +28,23 @@ describe('native dub routing contracts', () => {
 
   it('falls back to whole-mix taps instead of retrying dead isolation routes forever', () => {
     const source = read('engine/tone/ChannelRoutedEffects.ts');
-    expect(source).toContain('if (getActiveDubBus()?.hasWholeMixTap()) {');
+    // Gated on a USABLE fallback, not merely a registered tap object.
+    //
+    // The original intent holds: an engine that will never expose per-channel
+    // outputs should stop trying and let the shared tap carry the send.
+    // `hasWholeMixTap()` could not express that, because a tap is registered
+    // unconditionally at DrumPadEngine construction ('tracker-master-input'),
+    // so it is effectively always true — every engine hit the bailout, and a
+    // transient "not ready yet" became permanent. That is why AHX reported
+    // registeredChannelTaps: 0 while Hively is fully isolation-capable
+    // (37 worklet outputs); libopenmpt only escaped it by already being
+    // instantiated as the main playback engine when the first fader moved.
+    //
+    // On an isolation-capable engine the shared tap is deliberately silenced,
+    // so bailing out leaves the channel with NO audio rather than a degraded
+    // path — activation must retry instead.
+    expect(source).toContain('if (getActiveDubBus()?.hasUsableWholeMixFallback()) {');
+    expect(source).not.toContain('if (getActiveDubBus()?.hasWholeMixTap()) {');
     expect(source).toContain('if (TFMXEngine.hasInstance()) return null;');
   });
 
