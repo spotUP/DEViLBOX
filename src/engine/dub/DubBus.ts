@@ -4437,7 +4437,18 @@ export class DubBus {
           entry.busGain.gain.setValueAtTime(entry.busGain.gain.value, release);
           entry.busGain.gain.linearRampToValueAtTime(baseline, release + 0.08);
         }
-        fireParamLiveSubscribers(`dub.channelSend.ch${channelId}`, Math.max(0, ...this.wholeMixChannelDubSends));
+        // This channel's OWN slider, not the max across all of them.
+        //
+        // The shared tap's GAIN is legitimately max-of-all — there is one tap
+        // carrying every channel, so it has to follow the loudest. A channel's
+        // FADER is a different question, and using the same number for both
+        // ratcheted faders upward: with ch1 at 0.8, a throw on ch2 told ch2's
+        // fader "0.8" on release. Throw on ch3 and it climbs too. Across a
+        // session every fader touched ends up pinned at the highest one, and
+        // at full send each channel feeds the echo continuously — which turns
+        // a throw into a permanent reverb wash. Reported 2026-09-17 as "all my
+        // faders was at max for some reason".
+        fireParamLiveSubscribers(`dub.channelSend.ch${channelId}`, this.wholeMixChannelDubSends[channelId] ?? 0);
       };
     }
 
