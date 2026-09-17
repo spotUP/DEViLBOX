@@ -265,3 +265,72 @@ copy/paste (`TrackerCell[]` whole objects), `.dbx` save/load (patterns serialize
 - Phase-0 audit: `thoughts/shared/plans/2026-09-17-dub-studio-gap-reconciliation.md`
 - System reference sent for review: `~/Desktop/devilbox-dub-system.zip` → `DUB_SYSTEM.md`
 - Commits proving completed work: *(record here as items close)*
+
+---
+
+## Session log — 2026-09-17 (dub bus runaway)
+
+Six commits, none pushed. The skank fix is still **unheard**; the session was
+consumed by a pre-existing feedback runaway that surfaced the moment the dub
+bus was driven in anger.
+
+### Shipped
+
+| commit | what |
+|---|---|
+| `00bfd0a6b` | skankEchoThrow reshaped hold -> capture; skankFloatThrow added as a first-class move; persona weights per the reviewer's ruling |
+| `63e6b3d97` | whole-mix tap no longer shadows per-channel dub sends (Hively IS isolation-capable; stale docstring said otherwise) |
+| `eda2aed88` | hpfResonance mirror in the feedback path; dubPanic no longer zeroes the bass mirror; drainEchoContent wired to sends-hit-zero |
+| `0666843d0` | feedback-ring gain stages + `window.__dubBus()` dev handle in the diagnostic snapshot |
+| `873c72c77` | whole-mix tap SILENCED rather than frozen — fixes a regression in 63e6b3d97 |
+| `16dcfe9ed` | **root cause**: external feedback loop retapped off the plate/fader + persona-independent limiter |
+
+### Root cause (confirmed live, not inferred)
+
+The external feedback loop was tapped at `return_`, placing the dattorro plate
+("infinite" tail), ring mod, lo-fi AND the user's return fader inside a
+feedback path. Loop gain = extFeedbackGain x chain gain; Perry is the only
+preset with a non-zero loop (0.035) and the chain behind `return_` runs near
+30, so it sat just over unity — a slow crawl, Perry-only, triggerable from the
+master fader. Now taps `stereoMerge` (core wet chain only) behind a tanh
+ceiling no setting can disable.
+
+### Process lesson — the expensive one
+
+Four commits landed on rings that were **not running**. The snapshot showed
+`feedbackGain: 0` — the siren tap was idle the whole time. One of those commits
+(`63e6b3d97`) actively made things worse by freezing the whole-mix tap open.
+
+The house rule "measure before coding — one decisive measurement beats three
+plausible patches" was skipped in favour of reading source and inferring. The
+diagnostic that solved it (`window.__dubBus().getDiagnosticSnapshot()`) took
+minutes to build and should have been step one. **Build the instrument before
+the fix, for anything involving the audio graph.**
+
+The two mirror fixes are real defects and worth keeping — they were just not
+this bug.
+
+### Still open from this session
+
+- [ ] **X1** `registeredChannelTaps: 0` while `preferChannelIsolation: true` on
+      AHX. Per-channel taps are not being created, so dub sends there may now be
+      SILENT rather than wrong. Silencing the fallback was correct; the
+      registration path is the gap. Blocks any per-channel work on Hively.
+- [ ] **X2** The skank capture (`00bfd0a6b`) has never been heard. amanda.ahx
+      cannot validate it — no per-channel isolation in practice (see X1), and
+      AHX is monophonic per channel so the "skank" is a single-note stab.
+      Needs a `classic` (MOD/XM/IT) reggae tune — the modland "jah cometh in
+      dub" download is the intended vehicle.
+- [ ] **X3** `extFeedbackEqDb` is a +1 dB boost inside the ext loop with no
+      mirror. Harmless now the limiter is in place and the tap moved, but it is
+      the same class of defect as the hpfResonance mirror. Low priority.
+- [ ] **X4** Six commits unpushed. Nothing verified by ear yet, so nothing has
+      gone live. Push after X2 passes a listening test.
+
+### Reusable
+
+`window.__dubBus()` (dev builds only) exposes the live bus.
+`__dubBus().getDiagnosticSnapshot()` now reports every boosting stage next to
+its mirror, plus `inputRms` / `returnRms` level probes and the actual tap gain
+values. This is the tool for any future runaway — and it is what the
+reviewer's safety governor (plan AI-20 / Gate G) should be built on.
