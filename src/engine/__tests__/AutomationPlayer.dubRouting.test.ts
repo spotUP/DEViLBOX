@@ -25,6 +25,19 @@ vi.mock('@/midi/performance/parameterRouter', () => ({
   routeParameterToEngine: (param: string, value: number) => {
     routeParameterSpy(param, value);
   },
+  // AutomationPlayer reads this to decide whether a dub parameter is a MOVE
+  // (which takes a `.chN` channel suffix) or a bus-wide continuous param
+  // (which must not). Omitting it made every dub write throw inside the
+  // dispatcher's try/catch and vanish.
+  // Mirrors the real registry's channel-requiring moves plus a couple of
+  // bus-wide ones, so the sweep below covers every move that BREAKS when the
+  // channel is dropped.
+  DUB_MOVE_KINDS: {
+    echoThrow: 'trigger', dubStab: 'trigger', channelThrow: 'trigger',
+    echoBuildUp: 'trigger', skankEchoThrow: 'trigger', skankFloatThrow: 'trigger',
+    channelMute: 'hold',
+    springSlam: 'trigger', filterDrop: 'hold',
+  } as Record<string, 'trigger' | 'hold'>,
 }));
 
 // Also stub ManualOverrideManager so `isOverridden` doesn't accidentally
@@ -125,7 +138,12 @@ describe('AutomationPlayer — dub.* parameter routing', () => {
     // tick and do its own upward-crossing detection — we just assert the
     // forwarding is unconditional.
     for (let r = 0; r <= 8; r++) player.processPatternRow(r);
-    const calls = routeParameterSpy.mock.calls.filter(([p]) => p === 'dub.echoThrow');
+    // Addressed as `.ch0` because the curve lives in channel 0's lane and
+    // echoThrow is channel-scoped. Dispatching the plain name dropped the
+    // channel, so the move fired with channelId undefined and every
+    // channel-scoped move bailed on its first line — a recorded lane replayed
+    // as silence. Fixed 2026-09-17.
+    const calls = routeParameterSpy.mock.calls.filter(([p]) => p === 'dub.echoThrow.ch0');
     expect(calls.length, 'every processed row should forward the dub.* curve value').toBe(9);
     // First tick is 0, middle tick is 1 (peak).
     expect(calls[0][1]).toBe(0);
@@ -174,5 +192,67 @@ describe('AutomationPlayer — dub.* parameter routing', () => {
 
     player.processPatternRow(4);
     expect(routeParameterSpy).toHaveBeenCalledWith('dub.echoThrow.ch2', 1);
+  });
+});
+
+// ── Every channel-scoped move, not just the one that was reported ──────────
+// The dropped-channel bug was never specific to skank. These seven moves bail
+// on their first line when channelId is undefined, so a recorded lane of any
+// of them replayed as complete silence:
+//
+//   channelThrow  channelMute  dubStab  echoBuildUp  echoThrow
+//   skankEchoThrow  skankFloatThrow
+describe('AutomationPlayer — every dub move carries its lane channel', () => {
+  const CHANNEL_SCOPED = [
+    'echoThrow', 'dubStab', 'channelThrow', 'echoBuildUp',
+    'skankEchoThrow', 'skankFloatThrow', 'channelMute',
+  ];
+
+  function play(parameter: string, channelIndex: number): void {
+    const player = new AutomationPlayer();
+    const curve = { ...mkCurve(parameter, [
+      { row: 0, value: 0 },
+      { row: 2, value: 1 },
+    ]), channelIndex };
+    player.setAutomationData({ p0: { [channelIndex]: { [parameter]: curve } } });
+    player.setPattern({
+      id: 'p0', name: 'Test', length: 8,
+      channels: [0, 1, 2, 3].map((i) => ({
+        id: `ch${i}`, name: `Ch ${i + 1}`,
+        rows: Array.from({ length: 8 }, () => ({
+          note: 0, instrument: 1, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0,
+        })),
+      })),
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any);
+    for (let r = 0; r <= 2; r++) player.processPatternRow(r);
+  }
+
+  it.each(CHANNEL_SCOPED)('%s is addressed to its lane channel', (moveId) => {
+    routeParameterSpy.mockClear();
+    play(`dub.${moveId}`, 2);
+    const addressed = routeParameterSpy.mock.calls.filter(([p]) => p === `dub.${moveId}.ch2`);
+    expect(addressed.length, `${moveId} must reach ch2`).toBeGreaterThan(0);
+    // Never both — the bare form fires with no channel and the move bails.
+    const bare = routeParameterSpy.mock.calls.filter(([p]) => p === `dub.${moveId}`);
+    expect(bare.length, `${moveId} must not also dispatch unaddressed`).toBe(0);
+  });
+
+  it('leaves an authored .chN alone rather than stacking another', () => {
+    routeParameterSpy.mockClear();
+    play('dub.echoThrow.ch1', 3);
+    const calls = routeParameterSpy.mock.calls.map(([p]) => p);
+    expect(calls).toContain('dub.echoThrow.ch1');
+    expect(calls.every((p) => p !== 'dub.echoThrow.ch1.ch3')).toBe(true);
+  });
+
+  it('leaves bus-wide continuous params unaddressed', () => {
+    // dub.echoWet belongs to the shared bus; a channel suffix would break its
+    // lookup and silently drop the automation.
+    routeParameterSpy.mockClear();
+    play('dub.echoWet', 2);
+    const calls = routeParameterSpy.mock.calls.filter(([p]) => String(p).startsWith('dub.echoWet'));
+    expect(calls.length).toBeGreaterThan(0);
+    expect(calls.every(([p]) => p === 'dub.echoWet')).toBe(true);
   });
 });
