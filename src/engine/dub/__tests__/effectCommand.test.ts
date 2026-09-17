@@ -112,6 +112,9 @@ describe('decodeDubParamStep', () => {
 const stubBus = {
   // Every router-fired move touches one of these; stubbing the commonest
   // ones is enough for most paths to reach subscribers before they throw.
+  getSettings: () => ({ throwQuantize: 'off' }),
+  beginRateOverride: () => () => {},
+  isRateOverridden: () => false,
   openChannelTap: () => () => {},
   modulateFeedback: () => {},
   setSirenFeedback: () => () => {},

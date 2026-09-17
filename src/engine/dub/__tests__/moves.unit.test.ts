@@ -125,6 +125,9 @@ function buildFakeBus() {
     backwardReverb: vi.fn().mockResolvedValue(undefined),
     setEchoRate: vi.fn(),
     getEchoRateMs: vi.fn().mockReturnValue(300),
+    // Moves that drive the echo rate claim it against BPM-sync.
+    beginRateOverride: vi.fn().mockReturnValue(vi.fn()),
+    isRateOverridden: vi.fn().mockReturnValue(false),
     setSettings: vi.fn(),
   };
   return { bus, release };

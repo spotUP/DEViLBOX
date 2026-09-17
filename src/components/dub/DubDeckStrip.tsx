@@ -86,6 +86,15 @@ function inferRoleFromName(name: string): 'percussion' | 'bass' | 'lead' | 'chor
 }
 
 // ─── Per-channel ops ────────────────────────────────────────────────────────
+// Strip space is scarce, so a control earns its place only if it is worth
+// PLAYING — something you fire in time with the music. `echoBuildUp` is not:
+// it runs a ~6 s timeline (ramp the send over 2 bars, mute the dry at the
+// peak, restore) that you fire and then wait out, and its visible effect is
+// the send fader moving on its own, which the fader already does under your
+// hand. It stays in the registry — it is Scientist's signature move, AutoDub
+// weights it, and keyboard / MIDI / MCP all still reach it — it just does not
+// need a button here.
+//
 // Each channel strip shows these buttons alongside the hold-toggle + send
 // knob. Label/title/moveId tuple keeps the rendering loop tight.
 const CHANNEL_OPS: Array<{ label: string; title: string; moveId: string; color: string; kind: 'trigger' | 'hold' }> = [
@@ -95,7 +104,6 @@ const CHANNEL_OPS: Array<{ label: string; title: string; moveId: string; color: 
   { label: 'Skank', title: 'Skank Echo — catch ONE offbeat stab and throw it into a dotted-eighth echo (0.75 × beat), so the repeats land in the gaps before the next stab. The defining offbeat dub gesture.', moveId: 'skankEchoThrow', color: 'accent-highlight/70', kind: 'trigger' },
   { label: 'Float', title: 'Skank Float — same capture at a dotted quarter (1.5 × beat). The repeats drift 3:2 against the pulse so the echo floats at two-thirds tempo.', moveId: 'skankFloatThrow', color: 'accent-highlight/40', kind: 'trigger' },
   { label: '✦',    title: 'Dub Stab — short-sharp echo kiss',                 moveId: 'dubStab',         color: 'accent-highlight',  kind: 'trigger' },
-  { label: 'Build', title: 'Build — ramp send up over 2 bars, mute dry, let echoes carry (offbeat-guitar gesture)', moveId: 'echoBuildUp', color: 'accent-warning', kind: 'trigger' },
 ];
 
 // ─── Global moves ──────────────────────────────────────────────────────────
@@ -519,7 +527,13 @@ export const DubDeckStrip: React.FC = () => {
         const beatMs = 60000 / safeBpm;
         // When a RATE preset is active, treat division as 'off' so the preset
         // rate is preserved and doesn't drift with BPM changes.
-        const effectiveDivision = activeRatePresetRef.current ? 'off' : dubBusSettings.echoSyncDivision;
+        // A RATE preset button (UI) or an in-flight move (engine) is driving
+        // the rate — either way BPM-sync must not overwrite it.
+        let moveDrivingRate = false;
+        try { moveDrivingRate = ensureDrumPadEngine().getDubBus().isRateOverridden(); } catch { /* bus not ready */ }
+        const effectiveDivision = (activeRatePresetRef.current || moveDrivingRate)
+          ? 'off'
+          : dubBusSettings.echoSyncDivision;
         const synced = bpmSyncedEchoRate(bpm, effectiveDivision, dubBusSettings.echoRateMs);
         // Mad Professor ping-pong BPM sync — 3/8 note L, 1/2 note R.
         const patch: typeof dubBusSettings = { ...dubBusSettings, echoRateMs: synced };

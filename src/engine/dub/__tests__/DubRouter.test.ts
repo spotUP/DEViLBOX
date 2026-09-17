@@ -58,6 +58,12 @@ function makeMockBus() {
       log('soloChannelTap', ch);
       return () => log('soloRelease', ch);
     }),
+    // DubRouter reads throwQuantize to decide whether to grid-snap a live
+    // fire; 'off' keeps these assertions synchronous. The rate-override claim
+    // is what keeps BPM-sync off a move's delay time.
+    getSettings: vi.fn(() => ({ throwQuantize: 'off' })),
+    beginRateOverride: vi.fn(() => () => {}),
+    isRateOverridden: vi.fn(() => false),
     inputNode: {
       context: {
         createGain: () => ({
