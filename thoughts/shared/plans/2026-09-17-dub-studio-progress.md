@@ -333,6 +333,26 @@ this bug.
       AHX is monophonic per channel so the "skank" is a single-note stab.
       Needs a `classic` (MOD/XM/IT) reggae tune — the modland "jah cometh in
       dub" download is the intended vehicle.
+- [ ] **X5** **Dub-send fader moves are not recorded.** Reported 2026-09-17.
+      Discrete moves record fine; a continuous fader ride captures nothing.
+      Verified: `DubRecorder` subscribes ONLY to `subscribeDubRouter` /
+      `subscribeDubRelease` (discrete fires -> `dub.<moveId>` step curves);
+      `useMixerStore` contains no automation references at all, so
+      `setChannelDubSend` writes audio + zustand state and stops there; and
+      `dub.channelSend.ch<N>` is not a routable or automatable parameter — it
+      exists only as a `fireParamLiveSubscribers` key that animates the UI
+      fader. There is no capture path.
+      Why it matters beyond the immediate report: riding the send IS a dub
+      gesture — arguably the primary one, ahead of any named move. It also
+      blocks the reviewer's **Gate M** (record/replay reproduces the
+      performance) and **AI-08** (gesture engine), since a performer that rides
+      a fader would be unrecordable and its takes unreplayable.
+      Shape of the fix: make `dub.channelSend.ch<N>` a first-class automatable
+      parameter and have the recorder capture continuous writes as curve points
+      (rAF-batched — the setter already batches at ~60/s for exactly this
+      reason), rather than bolting a second recording path next to DubRecorder.
+      Check `AutomationBaker` and the `.dbx` round-trip cover it before closing.
+
 - [ ] **X3** `extFeedbackEqDb` is a +1 dB boost inside the ext loop with no
       mirror. Harmless now the limiter is in place and the tap moved, but it is
       the same class of defect as the hpfResonance mirror. Low priority.
