@@ -806,8 +806,18 @@ const ISOLATION_CAPABLE_MODES = new Set(['classic', 'furnace', 'hively', 'tfmx']
 
 /**
  * Check if the current format/editor mode supports per-channel isolation.
- * Returns true for formats with multi-output worklet engines (LibOpenMPT, Furnace).
- * Returns false for single-output WASM engines (SID, Hively, UADE, etc.).
+ * Returns true for formats with multi-output worklet engines.
+ *
+ * `hively` IS capable and has been since the Hively worklet grew multi-output
+ * support: it renders 37 stereo outputs (main mix + 4 isolation slots + 32 dub
+ * sends) and HivelyEngine implements IsolationCapableEngine. This comment used
+ * to list Hively as single-output, which is how a whole-mix tap ended up
+ * registered for it and shadowed the per-channel dub path entirely — see
+ * `shouldFallBackToWholeMix` in DubBus.ts.
+ *
+ * Single-output engines (SID's ScriptProcessor path, most UADE replayers) are
+ * the ones that genuinely have no per-channel audio to tap; they are absent
+ * from the set and fall back to the whole-mix tap.
  */
 export function supportsChannelIsolation(editorMode: string): boolean {
   return ISOLATION_CAPABLE_MODES.has(editorMode);

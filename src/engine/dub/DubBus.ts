@@ -149,6 +149,37 @@ function makePinkNoiseBuffer(ctx: AudioContext, durationSec: number): AudioBuffe
   return buffer;
 }
 
+/**
+ * Should a channel-scoped dub send fall back to the whole-mix tap?
+ *
+ * The whole-mix tap exists for engines that render a single stereo output
+ * (SID's ScriptProcessor path, most UADE replayers): there is no per-channel
+ * audio to tap, so a channel's dub send raises one shared tap instead. Its
+ * level is `max()` of every channel slider, which is why raising one channel
+ * appears to move a master control — there IS only one control.
+ *
+ * That fallback must NOT engage for engines which really do expose
+ * per-channel outputs. Hively/AHX is the case that exposed this: its worklet
+ * carries 37 stereo outputs (main mix + 4 isolation slots + 32 dub sends) and
+ * the engine implements IsolationCapableEngine, but a whole-mix tap was
+ * registered for it unconditionally by NativeEngineRouting. In
+ * `openChannelTap` the whole-mix branch is tested BEFORE the cold-channel
+ * activation branch, so the per-channel path was permanently shadowed — every
+ * "throw channel 1" threw the entire mix, and the throw's release restored to
+ * max-of-sliders rather than silence, so the mix kept feeding the echo and
+ * the bus rang indefinitely.
+ *
+ * Pure so it can be tested without constructing a DubBus (which needs a live
+ * AudioContext).
+ */
+export function shouldFallBackToWholeMix(
+  preferChannelIsolation: boolean,
+  wholeMixTapCount: number,
+): boolean {
+  if (preferChannelIsolation) return false;
+  return wholeMixTapCount > 0;
+}
+
 // ── Singleton accessor for synchronous DubBus access ────────────────────────
 // The mixer store needs synchronous access to route SID voice dub sends
 // without async import chains. Set by DubBus constructor, cleared by dispose.
@@ -1263,6 +1294,11 @@ export class DubBus {
   // wrapping in Tone.Gain would add an unnecessary node without buying
   // anything (all the methods we use are native AudioParam APIs).
   private channelTaps: Map<number, GainNode> = new Map();
+  /** True when the active engine exposes real per-channel outputs, so the
+   *  whole-mix fallback must stay out of the way. Kept in sync with the
+   *  format store's editorMode by `_watchIsolationCapability()`. */
+  private _preferChannelIsolation = false;
+  private _unsubIsolation: (() => void) | null = null;
 
   // Deck-scoped per-channel taps — DJ view registers these via
   // registerDeckChannelTap(deckId, ch, sourceGain) so two decks with a
@@ -2105,6 +2141,7 @@ export class DubBus {
     // the 800ms warmup hold. After pre-heat, modules are cached and worklet
     // boot is ~50ms.
     void this._preheatWASMModules();
+    this._watchIsolationCapability();
 
     // Auto EQ: subscribe to analysis store — fires when analysis completes
     this._autoEQUnsub = useTrackerAnalysisStore.subscribe(
@@ -2145,6 +2182,34 @@ export class DubBus {
       console.warn('[DubBus] WASM pre-heat partial failure (non-fatal)');
     }
   }
+
+  /**
+   * Keep `_preferChannelIsolation` in sync with the active editor mode.
+   *
+   * `supportsChannelIsolation()` owns the list of modes whose engines expose
+   * real per-channel outputs. Lazily imported and subscribed (rather than a
+   * static import) so DubBus keeps no load-time dependency on the format
+   * store — the same pattern `setEchoRate` uses for useDrumPadStore.
+   */
+  private _watchIsolationCapability(): void {
+    void Promise.all([
+      import('@stores/useFormatStore'),
+      import('@engine/tone/ChannelRoutedEffects'),
+    ]).then(([{ useFormatStore }, { supportsChannelIsolation }]) => {
+      if (this._disposed) return;
+      const apply = (mode: string): void => {
+        const next = supportsChannelIsolation(mode);
+        if (next === this._preferChannelIsolation) return;
+        this._preferChannelIsolation = next;
+        console.log(`[DubBus] channel isolation ${next ? 'preferred' : 'unavailable'} for editorMode="${mode}" — whole-mix fallback ${next ? 'disabled' : 'active'}`);
+      };
+      apply(useFormatStore.getState().editorMode);
+      this._unsubIsolation = useFormatStore.subscribe((state) => {
+        apply(state.editorMode);
+      });
+    }).catch(() => { /* format store unavailable (tests) — stay on fallback */ });
+  }
+
 
   /** Whether the bus is currently enabled (return gain > 0). */
   get isEnabled(): boolean { return this.enabled; }
@@ -3920,7 +3985,9 @@ export class DubBus {
   }
 
   setWholeMixDubSend(channelId: number, amount: number): boolean {
-    if (this.wholeMixTaps.size === 0) return false;
+    // Returning false tells the caller the whole-mix path did not handle this
+    // send, so the per-channel routing it already invoked is the only writer.
+    if (!shouldFallBackToWholeMix(this._preferChannelIsolation, this.wholeMixTaps.size)) return false;
     const idx = Math.max(0, channelId | 0);
     if (idx >= this.wholeMixChannelDubSends.length) {
       this.wholeMixChannelDubSends.length = idx + 1;
@@ -4151,7 +4218,7 @@ export class DubBus {
       };
     }
 
-    if (this.wholeMixTaps.size > 0) {
+    if (shouldFallBackToWholeMix(this._preferChannelIsolation, this.wholeMixTaps.size)) {
       const now = this.context.currentTime;
       const baselines = new Map<string, number>();
       for (const [key, entry] of this.wholeMixTaps) {
@@ -5870,6 +5937,8 @@ export class DubBus {
 
   /** Dispose and release all bus resources. */
   dispose(): void {
+    try { this._unsubIsolation?.(); } catch { /* ok */ }
+    this._unsubIsolation = null;
     this._disposed = true;
     this._autoEQUnsub?.();
     this._autoEQUnsub = null;
