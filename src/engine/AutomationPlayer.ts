@@ -13,7 +13,7 @@ import { isDevilboxSynth } from '@typedefs/synth';
 import type { TrackerCell, Pattern } from '@typedefs';
 import { interpolateAutomationValue } from '@typedefs/automation';
 import type { AutomationCurve } from '@typedefs/automation';
-import { routeParameterToEngine } from '@/midi/performance/parameterRouter';
+import { routeParameterToEngine, DUB_MOVE_KINDS } from '@/midi/performance/parameterRouter';
 
 interface AutomationData {
   [patternId: string]: {
@@ -184,7 +184,31 @@ export class AutomationPlayer {
     //    string itself (also router-parsed).
     if (parameter.startsWith('dub.')) {
       try {
-        routeParameterToEngine(parameter, value);
+        // Carry the curve's channel through to the move.
+        //
+        // DubRecorder stores a per-channel move's target in the curve's
+        // `channelIndex` (that is also which lane it is drawn in) and names the
+        // parameter plainly as `dub.<moveId>`. The router addresses per-channel
+        // moves through the parameter STRING — `dub.<moveId>.ch<N>` — so
+        // dispatching the plain name dropped the channel and the move fired
+        // with channelId undefined. Channel-scoped moves bail immediately on
+        // that, so a recorded lane full of skank throws replayed as nothing at
+        // all: no audio, no fader movement. Reported 2026-09-17.
+        //
+        // Only MOVES take a channel suffix. The continuous bus params
+        // (dub.echoWet, dub.hpfCutoff, …) are bus-wide, and appending a
+        // channel to those would break their lookup — so this is gated on
+        // DUB_MOVE_KINDS, and on the parameter not already carrying its own
+        // explicit `.chN`.
+        const shortDubName = parameter.slice('dub.'.length);
+        const addressed =
+          channelIndex !== undefined
+          && channelIndex >= 0
+          && !/\.ch\d+$/.test(parameter)
+          && DUB_MOVE_KINDS?.[shortDubName] !== undefined
+            ? `${parameter}.ch${channelIndex}`
+            : parameter;
+        routeParameterToEngine(addressed, value);
       } catch (error) {
         console.error(`Failed to apply dub automation for ${parameter}:`, error);
       }
