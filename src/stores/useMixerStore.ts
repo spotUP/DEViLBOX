@@ -1043,6 +1043,20 @@ export const useMixerStore = create<MixerStore>()(
         } catch { /* whole-mix fallback not active */ }
       }
 
+      // Last send closing → drain the delay lines. DubBus.drainEchoContent()
+      // was written for exactly this transition ("drain within one cycle
+      // instead of sustaining indefinitely") but had no caller, so pulling
+      // every send back to zero left whatever was circulating to circulate.
+      // Read against the live store and treat `ch` as already written, since
+      // the state update below is rAF-batched.
+      try {
+        if (clamped <= 0) {
+          const chans = get().channels;
+          const allClosed = chans.every((c, i) => i === ch || (c?.dubSend ?? 0) <= 0);
+          if (allClosed) getActiveDubBus()?.drainEchoContent();
+        }
+      } catch { /* dub bus not ready */ }
+
       // State update — rAF-batched so drag doesn't cause 60 re-renders/sec.
       scheduleDubSendStoreWrite(ch, clamped, set);
     },

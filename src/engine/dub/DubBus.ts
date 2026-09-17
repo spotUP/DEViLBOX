@@ -235,6 +235,17 @@ export class DubBus {
   // iteration (shelf boost → saturator clips to 1.0 → feedback sends
   // back → shelf boosts again → stable full-amplitude bass drone).
   private feedbackShelfComp: BiquadFilterNode;
+  /** Inverse of `hpfResonance` for the feedback path.
+   *
+   *  `bassShelf` has always had `feedbackShelfComp` mirroring it as a cut so a
+   *  trip round the loop is unity. `hpfResonance` — the Altec 9069B T-network
+   *  hump, a Q-2.0 peak sitting on the HPF cutoff — had no such mirror, so its
+   *  gain multiplied on EVERY pass. At hpfResonanceDb 2.5 that is x1.33 per
+   *  pass; with feedback pushed toward 0.95 by a throw the loop exceeds unity
+   *  at the resonant frequency and grows without bound. Since the cutoff sits
+   *  low, that frequency is in the bass — the "slow bass crawl" report of
+   *  2026-09-17. Tracks hpfResonance's frequency/Q with negated gain. */
+  private feedbackResonanceComp: BiquadFilterNode;
   /** Ext-feedback variant of feedbackShelfComp. The external return loop
    *  recirculates post-return audio back into the bus input, so it needs the
    *  same bass compensation as the internal feedback path. */
@@ -586,7 +597,8 @@ export class DubBus {
     try { Tone.disconnect(echoOut, this.feedback as unknown as Tone.InputNode); } catch { /* ok */ }
     try { this.feedback.disconnect(this._feedbackScrubber); } catch { /* ok */ }
     try { this._feedbackScrubber.disconnect(this.feedbackShelfComp); } catch { /* ok */ }
-    try { this.feedbackShelfComp.disconnect(this.input); } catch { /* ok */ }
+    try { this.feedbackShelfComp.disconnect(this.feedbackResonanceComp); } catch { /* ok */ }
+    try { this.feedbackResonanceComp.disconnect(this.input); } catch { /* ok */ }
   }
 
   /**
@@ -686,7 +698,8 @@ export class DubBus {
     Tone.connect(echoOut, this.feedback as unknown as Tone.InputNode);
     this.feedback.connect(this._feedbackScrubber);
     this._feedbackScrubber.connect(this.feedbackShelfComp);
-    this.feedbackShelfComp.connect(this.input);
+    this.feedbackShelfComp.connect(this.feedbackResonanceComp);
+    this.feedbackResonanceComp.connect(this.input);
   }
 
   /** Async splice path for the ECHO→SPRING scrubber. Mirror of
@@ -1936,6 +1949,12 @@ export class DubBus {
     this.feedbackShelfComp.frequency.value = this.settings.bassShelfFreqHz;
     this.feedbackShelfComp.Q.value = this.settings.bassShelfQ;
     this.feedbackShelfComp.gain.value = -Math.max(-12, Math.min(12, this.settings.bassShelfGainDb));
+
+    this.feedbackResonanceComp = this.context.createBiquadFilter();
+    this.feedbackResonanceComp.type = 'peaking';
+    this.feedbackResonanceComp.frequency.value = this.hpfResonance.frequency.value;
+    this.feedbackResonanceComp.Q.value = 2.0;
+    this.feedbackResonanceComp.gain.value = -(this.settings.hpfResonanceDb ?? 0);
     this.extFeedbackShelfComp = this.context.createBiquadFilter();
     this.extFeedbackShelfComp.type = 'lowshelf';
     this.extFeedbackShelfComp.frequency.value = this.settings.bassShelfFreqHz;
@@ -2885,8 +2904,19 @@ export class DubBus {
     try {
       this.feedback.gain.cancelScheduledValues(now);
       this.feedback.gain.setValueAtTime(0, now);
+      // Leave the compensation filters MATCHED, not zeroed. They are cuts
+      // that cancel bassShelf / hpfResonance on each trip round the loop, and
+      // `this.feedback.gain = 0` above has already broken the loop, so they do
+      // no harm sitting correct. Zeroing them used to persist after panic —
+      // setSettings restores them but short-circuits on an equality check, and
+      // moving a channel fader changes no DubBusSetting — so the next time
+      // feedback came back the bass was uncompensated and grew on every pass.
+      // The panic button armed the next runaway (2026-09-17).
+      const safeBassDb = Math.max(-12, Math.min(12, this.settings.bassShelfGainDb));
       this.feedbackShelfComp.gain.cancelScheduledValues(now);
-      this.feedbackShelfComp.gain.setValueAtTime(0, now);
+      this.feedbackShelfComp.gain.setValueAtTime(-safeBassDb, now);
+      this.feedbackResonanceComp.gain.cancelScheduledValues(now);
+      this.feedbackResonanceComp.gain.setValueAtTime(-Math.max(0, Math.min(12, this.settings.hpfResonanceDb ?? 0)), now);
       this.lpf.frequency.cancelScheduledValues(now);
       this.lpf.frequency.setValueAtTime(20000, now);
     } catch { /* ok */ }
@@ -3310,6 +3340,14 @@ export class DubBus {
     rampBiquadParam(this.feedbackShelfComp.frequency, merged.bassShelfFreqHz, now);
     rampBiquadParam(this.feedbackShelfComp.Q, merged.bassShelfQ, now);
     rampBiquadParam(this.feedbackShelfComp.gain, -safeBassGain, now);
+    // Mirror the Altec resonance peak as a cut in the feedback path so the
+    // round trip stays unity no matter how the hump is dialled.
+    {
+      const resDb = Math.max(0, Math.min(12, merged.hpfResonanceDb ?? 0));
+      rampBiquadParam(this.feedbackResonanceComp.frequency, this.hpfResonance.frequency.value, now);
+      rampBiquadParam(this.feedbackResonanceComp.Q, this.hpfResonance.Q.value, now);
+      rampBiquadParam(this.feedbackResonanceComp.gain, -resDb, now);
+    }
     rampBiquadParam(this.extFeedbackShelfComp.frequency, merged.bassShelfFreqHz, now);
     rampBiquadParam(this.extFeedbackShelfComp.Q, merged.bassShelfQ, now);
     rampBiquadParam(this.extFeedbackShelfComp.gain, -safeBassGain, now);
