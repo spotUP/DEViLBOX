@@ -75,6 +75,7 @@ import { voltageStarve } from '../moves/voltageStarve';
 import { ringMod } from '../moves/ringMod';
 import { hpfRise } from '../moves/hpfRise';
 import { madProfPingPong } from '../moves/madProfPingPong';
+import { skankEchoThrow } from '../moves/skankEchoThrow';
 
 /**
  * A `DubBus` stub where every method under test is a spy. Methods that
@@ -660,5 +661,77 @@ describe('madProfPingPong', () => {
     expect(handle).not.toBeNull();
     handle!.dispose();
     expect(releaseFn).toHaveBeenCalled();
+  });
+});
+
+// ── skankEchoThrow ──────────────────────────────────────────────────────────
+// Regression guard for the 2026-09-17 reshape. The move used to be a
+// `hold` that pinned the skank channel's tap open for the whole hold
+// (AutoDub fires it with holdBars:2 — 4 s at 120 BPM, ~8 offbeat stabs all
+// thrown at once, over the top of the dry). That is patching the channel
+// through the delay, not throwing one stab into it.
+//
+// The gesture is: catch ONE stab, send it hard, let the feedback speak into
+// the spaces after it, get out. `echoThrow` already has that shape; this
+// move now matches it, with the reggae dotted-EIGHTH delay time.
+describe('skankEchoThrow', () => {
+  it('returns null without touching the bus when channelId is undefined', () => {
+    const { bus } = buildFakeBus();
+    expect(skankEchoThrow.execute(ctx(bus))).toBeNull();
+    expect(bus.openChannelTap).not.toHaveBeenCalled();
+  });
+
+  it('sets the echo to a dotted EIGHTH, not a dotted quarter', () => {
+    const { bus } = buildFakeBus();
+    skankEchoThrow.execute(ctx(bus, { channelId: 1, bpm: 120 }));
+    // beat = 500 ms. Dotted eighth = 0.75 beat = 375 ms.
+    // The old implementation used 1.5 beats = 750 ms (that is skankFloatThrow).
+    expect(bus.setEchoRate).toHaveBeenCalledWith(375);
+  });
+
+  it('is a capture, not a hold — the tap closes on its own', () => {
+    const { bus, release } = buildFakeBus();
+    skankEchoThrow.execute(ctx(bus, { channelId: 1, bpm: 120 }));
+    expect(release.channelTap).not.toHaveBeenCalled();
+    // Default capture is 0.5 beat = 250 ms at 120 BPM.
+    vi.advanceTimersByTime(260);
+    expect(release.channelTap).toHaveBeenCalledTimes(1);
+  });
+
+  it('bounds the feedback boost to the gesture instead of a fixed 8 s window', () => {
+    const { bus } = buildFakeBus();
+    skankEchoThrow.execute(ctx(bus, { channelId: 1, bpm: 120 }));
+    const [, windowMs] = bus.modulateFeedback.mock.calls[0];
+    // capture 250 ms + 2-beat tail 1000 ms = 1250 ms.
+    expect(windowMs).toBe(1250);
+    // The old fixed 8000 ms left feedback hot long after the gesture ended,
+    // so whatever fired next inherited it.
+    expect(windowMs).toBeLessThan(8000);
+  });
+
+  it('restores the prior echo rate once the tail has rung out', () => {
+    const { bus } = buildFakeBus();
+    bus.getEchoRateMs.mockReturnValue(300);
+    skankEchoThrow.execute(ctx(bus, { channelId: 1, bpm: 120 }));
+    expect(bus.setEchoRate).toHaveBeenLastCalledWith(375);
+    // Not restored while the repeats are still speaking...
+    vi.advanceTimersByTime(300);
+    expect(bus.setEchoRate).toHaveBeenLastCalledWith(375);
+    // ...restored after capture + tail.
+    vi.advanceTimersByTime(1000);
+    expect(bus.setEchoRate).toHaveBeenLastCalledWith(300);
+  });
+
+  it('dispose cancels pending timers and restores immediately (panic-safe)', () => {
+    const { bus, release } = buildFakeBus();
+    bus.getEchoRateMs.mockReturnValue(300);
+    const disp = skankEchoThrow.execute(ctx(bus, { channelId: 1, bpm: 120 }));
+    disp!.dispose();
+    expect(release.channelTap).toHaveBeenCalledTimes(1);
+    expect(bus.setEchoRate).toHaveBeenLastCalledWith(300);
+    // No double-close, no second restore, from the cancelled timers.
+    vi.runAllTimers();
+    expect(release.channelTap).toHaveBeenCalledTimes(1);
+    expect(bus.setEchoRate).toHaveBeenCalledTimes(2);
   });
 });

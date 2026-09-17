@@ -275,6 +275,7 @@ const DEFAULT_CC_MAPPINGS: CCMapping[] = [
   { ccNumber: 72, parameter: 'dub.versionDrop',        min: 0, max: 1, curve: 'linear' },
   { ccNumber: 73, parameter: 'dub.skankEchoThrow',    min: 0, max: 1, curve: 'linear' },
   { ccNumber: 76, parameter: 'dub.riddimSection',     min: 0, max: 1, curve: 'linear' },
+  { ccNumber: 77, parameter: 'dub.skankFloatThrow',   min: 0, max: 1, curve: 'linear' },
 
   // Dub bus continuous params — min/max are documentary; the actual
   // normalisation is handled by DUB_BUS_PARAMS transforms in
