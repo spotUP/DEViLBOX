@@ -69,3 +69,38 @@ describe('PlaybackCoordinator — engine position to displayed pattern', () => {
     expect(warn).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('PlaybackCoordinator — Play Pattern loop enforcement on self-sequencing engines', () => {
+  it('drops the position update when the engine was seeked back', () => {
+    const c = makeCoordinator([0, 1, 2, 3]);
+    const seen: number[] = [];
+    c.onRowChange = (_row, _pattern, position) => { seen.push(position); };
+    c.context.enforceLoop = (position) => position !== 2; // only position 2 is in the loop
+
+    c.dispatchEnginePosition(0, 3, undefined, false); // out of loop → seeked, dropped
+    c.dispatchEnginePosition(0, 2, undefined, false); // in loop → dispatched
+
+    expect(seen).toEqual([2]);
+  });
+
+  it('leaves songPos untouched for a dropped update', () => {
+    const c = makeCoordinator([0, 1, 2, 3]);
+    c.onRowChange = () => {};
+    c.context.enforceLoop = (position) => position !== 1;
+
+    c.dispatchEnginePosition(0, 1, undefined, false);
+    expect(c.songPos).toBe(1);
+
+    c.dispatchEnginePosition(0, 3, undefined, false); // dropped
+    expect(c.songPos).toBe(1);
+  });
+
+  it('dispatches normally when no enforcement hook is wired', () => {
+    const c = makeCoordinator([0, 1, 2, 3]);
+    const seen: number[] = [];
+    c.onRowChange = (_row, _pattern, position) => { seen.push(position); };
+
+    c.dispatchEnginePosition(0, 3, undefined, false);
+    expect(seen).toEqual([3]);
+  });
+});

@@ -41,3 +41,23 @@ export function computeEffectiveSongOrder(
   const pos = Math.max(0, Math.min(positionIndex, songPositions.length - 1));
   return { songPositions, songLength, loopRange: { start: pos, end: pos } };
 }
+
+/**
+ * Whether an engine-reported song position has left the Play Pattern loop and
+ * must be seeked back.
+ *
+ * Engine-driven formats sequence themselves and do not honour the replayer's
+ * loop range, so the range has to be enforced from outside by seeking the
+ * engine. Only meaningful for engines that can actually be seeked — enforcing
+ * it on one that cannot would pin the display at the loop start while the
+ * audio carries on elsewhere, which is the bug this whole area just fixed.
+ */
+export function shouldSeekBackToLoop(
+  position: number,
+  loopActive: boolean,
+  loopStart: number,
+  loopEnd: number,
+): boolean {
+  if (!loopActive || loopStart < 0) return false;
+  return position < loopStart || position > loopEnd;
+}
