@@ -236,6 +236,16 @@ export class PlaybackCoordinator {
     audioContext: null,
   };
 
+  /**
+   * Last pattern index that `context.songPositions` actually resolved. Held so
+   * an unresolvable engine position never silently reports pattern 0 — that
+   * pointed the pattern editor and the pos/pattern counters at the wrong
+   * pattern for the rest of playback.
+   */
+  private lastResolvedPattern = 0;
+  /** One warning per desync, not one per row. */
+  private warnedUnresolvedPosition = false;
+
   // ── UI position callbacks ────────────────────────────────────────────────
   onRowChange: RowChangeCallback | null = null;
   onChannelRowChange: ChannelRowChangeCallback | null = null;
@@ -281,6 +291,34 @@ export class PlaybackCoordinator {
     this.hasActiveDispatch = true;
   }
 
+  /**
+   * Map an engine-reported song position onto the pattern the editor shows.
+   *
+   * When the order the replayer was loaded with disagrees with the order the
+   * engine is actually sequencing, the lookup misses. Returning 0 there is
+   * wrong and invisible: the editor renders pattern 0 for every row of the
+   * song while a different pattern plays, which reads as "the pattern lost its
+   * notes". Hold the last pattern that did resolve and warn once instead.
+   */
+  private resolvePatternForPosition(position: number): number {
+    const mapped = this.context.songPositions[position];
+    if (mapped != null) {
+      this.lastResolvedPattern = mapped;
+      this.warnedUnresolvedPosition = false;
+      return mapped;
+    }
+    if (!this.warnedUnresolvedPosition) {
+      this.warnedUnresolvedPosition = true;
+      console.warn(
+        `[PlaybackCoordinator] engine reported song position ${position}, outside the ` +
+        `loaded order (length ${this.context.songPositions.length}). Holding display ` +
+        `pattern ${this.lastResolvedPattern} — the order given to the replayer disagrees ` +
+        `with the one the engine is sequencing.`,
+      );
+    }
+    return this.lastResolvedPattern;
+  }
+
   dispatchEnginePosition(
     row: number,
     position: number,
@@ -291,7 +329,7 @@ export class PlaybackCoordinator {
     const ctx = this.context;
     this.songPos = position;
     this.pattPos = row;
-    const patternNum = ctx.songPositions[position] ?? 0;
+    const patternNum = this.resolvePatternForPosition(position);
     let time: number;
     if (audioTime != null && ctx.audioContext) {
       const latency = ctx.audioContext.outputLatency ?? ctx.audioContext.baseLatency ?? 0;
