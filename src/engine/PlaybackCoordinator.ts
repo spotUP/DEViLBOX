@@ -201,6 +201,17 @@ export interface PlaybackContext {
    * If null, no latency compensation is applied.
    */
   audioContext: AudioContext | null;
+  /**
+   * Optional hook that enforces the Play Pattern loop on a self-sequencing
+   * engine. Engine-driven formats ignore the replayer's loop range, so the
+   * range is enforced by seeking the engine back when it leaves it.
+   *
+   * Returns true when it seeked — the coordinator then drops that position
+   * update rather than showing the out-of-range row for a frame. Engines that
+   * cannot be seeked must leave this null: pinning the display while the audio
+   * keeps moving is worse than following it.
+   */
+  enforceLoop: ((position: number) => boolean) | null;
 }
 
 export class PlaybackCoordinator {
@@ -234,6 +245,7 @@ export class PlaybackCoordinator {
     triggerVUMeters: null,
     applyAutomation: null,
     audioContext: null,
+    enforceLoop: null,
   };
 
   /**
@@ -327,6 +339,10 @@ export class PlaybackCoordinator {
   ): void {
     if (!this.stateRing.playing) return;
     const ctx = this.context;
+    // Play Pattern on a self-sequencing engine: if it has wandered out of the
+    // loop range, seek it back and drop this update rather than flashing the
+    // out-of-range row.
+    if (ctx.enforceLoop && ctx.enforceLoop(position)) return;
     this.songPos = position;
     this.pattPos = row;
     const patternNum = this.resolvePatternForPosition(position);

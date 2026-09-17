@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { computeEffectiveSongOrder } from '../playbackOrder';
+import { computeEffectiveSongOrder, shouldSeekBackToLoop } from '../playbackOrder';
 
 const ORDER = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14];
 
@@ -46,5 +46,28 @@ describe('computeEffectiveSongOrder — the order the editor resolves patterns t
     const { songPositions, loopRange } = computeEffectiveSongOrder(true, [], 0);
     expect(songPositions).toEqual([0]);
     expect(loopRange).toEqual({ start: 0, end: 0 });
+  });
+});
+
+describe('shouldSeekBackToLoop — keeping a self-sequencing engine inside Play Pattern', () => {
+  it('seeks back when the engine wandered past the loop', () => {
+    expect(shouldSeekBackToLoop(11, true, 3, 3)).toBe(true);
+  });
+
+  it('seeks back when the engine is before the loop', () => {
+    expect(shouldSeekBackToLoop(1, true, 3, 3)).toBe(true);
+  });
+
+  it('leaves the engine alone inside the range', () => {
+    expect(shouldSeekBackToLoop(3, true, 3, 3)).toBe(false);
+    expect(shouldSeekBackToLoop(4, true, 3, 6)).toBe(false);
+  });
+
+  it('never seeks when no loop is active — full-song playback must run through', () => {
+    expect(shouldSeekBackToLoop(11, false, 3, 3)).toBe(false);
+  });
+
+  it('never seeks on an unset loop range', () => {
+    expect(shouldSeekBackToLoop(11, true, -1, -1)).toBe(false);
   });
 });
