@@ -53,51 +53,11 @@ import { riddimSection } from './moves/riddimSection';
 import type { DubMove, DubMoveContext } from './moves/_types';
 import type { DubBus } from './DubBus';
 import { useTransportStore } from '@/stores/useTransportStore';
-import { useWasmPositionStore } from '@/stores/useWasmPositionStore';
 import { useDubStore } from '@/stores/useDubStore';
-import { getTrackerReplayer } from '@/engine/TrackerReplayer';
 import { decodeDubEffect, decodeDubParamStep, DUB_EFFECT_PARAM_STEP, isDubMoveEffectSlot } from './moveTable';
 import { routeParameterToEngine } from '@/midi/performance/parameterRouter';
 import { getSongTimeSec } from './songTime';
-import * as Tone from 'tone';
-
-/**
- * Resolve the current pattern-row position. Prefers the active replayer's
- * audio-synced state (works for libopenmpt / UADE / Hively / Furnace where
- * the transport store isn't driven), falls back to useTransportStore for
- * Tone.js-only sessions.
- */
-function currentRow(): number {
-  try {
-    const replayer = getTrackerReplayer();
-    if (replayer) {
-      const state = replayer.getStateAtTime(Tone.now(), true /* peek */);
-      if (state && typeof state.row === 'number') {
-        const ts = useTransportStore.getState();
-        const duration = state.duration;
-        if (duration > 0) {
-          const progress = Math.min(Math.max((Tone.now() - state.time) / duration, 0), 1);
-          return state.row + progress;
-        }
-        return state.row;
-        // `ts` kept live for a future "if replayer stale, fall back" branch.
-        void ts;
-      }
-    }
-  } catch { /* replayer not ready */ }
-  // WASM engines (Hively/AHX, JamCracker, PreTracker, etc.) push position
-  // updates to useWasmPositionStore from their worklet — they don't drive
-  // useTransportStore.currentRow. Read here BEFORE falling back so AutoDub
-  // fires get the correct row, not 0. Without this every fire stacked on
-  // row 0 and overwrote the previous one.
-  try {
-    const wasmStore = useWasmPositionStore.getState();
-    if (wasmStore.active && typeof wasmStore.row === 'number') {
-      return wasmStore.row;
-    }
-  } catch { /* store not ready */ }
-  return useTransportStore.getState().currentRow ?? 0;
-}
+import { getCurrentRow as currentRow, msToNextGridBoundary } from './dubGrid';
 
 const MOVES: Record<string, DubMove> = {
   echoThrow,
@@ -242,6 +202,70 @@ export function fire(
 
   const merged = { ...move.defaults, ...params };
   const bpm = useTransportStore.getState().bpm || 120;
+
+  // Grid-snap a live performance to the next subdivision when the user has
+  // asked for it. A throw's capture window is short — half a beat by default,
+  // 250 ms at 120 BPM — so hand-timing it against offbeat stabs is luck, and a
+  // press that lands slightly off captures silence and appears to do nothing.
+  //
+  // `throwQuantize` was written for exactly this but only ever reached the DJ
+  // deck path in DubActions; tracker channel throws ignored it entirely.
+  // Default is 'off', so this changes nothing until the setting is engaged
+  // (the Perry preset ships 'offbeat', the King Tubby placement).
+  //
+  // Lane playback is never re-quantized: those events already carry the timing
+  // they were recorded with, and snapping them again would drift a performance
+  // away from what was captured.
+  const throwQuantize = _bus.getSettings().throwQuantize;
+  if (source === 'live' && throwQuantize !== 'off') {
+    const waitMs = msToNextGridBoundary(throwQuantize, bpm);
+    if (waitMs > 0) return deferFire(moveId, move, channelId, merged, bpm, source, opts, waitMs);
+  }
+
+  return executeNow(moveId, move, channelId, merged, bpm, source, opts);
+}
+
+/**
+ * Fire after `waitMs`, returning a handle immediately so a hold released
+ * before the boundary arrives cancels cleanly rather than firing an orphan.
+ */
+function deferFire(
+  moveId: string,
+  move: DubMove,
+  channelId: number | undefined,
+  merged: Record<string, number>,
+  bpm: number,
+  source: 'live' | 'lane',
+  opts: { deckId?: import('../dj/DeckEngine').DeckId } | undefined,
+  waitMs: number,
+): { dispose(): void } {
+  let landed: { dispose(): void } | null = null;
+  let cancelled = false;
+  const timer = setTimeout(() => {
+    if (cancelled) return;
+    landed = executeNow(moveId, move, channelId, merged, bpm, source, opts);
+  }, waitMs);
+  return {
+    dispose() {
+      cancelled = true;
+      clearTimeout(timer);
+      try { landed?.dispose(); } catch { /* ok */ }
+    },
+  };
+}
+
+/** Execute the move and publish the fire event. Row is read HERE, not at press
+ *  time, so a recorded lane matches the moment the audio actually happened. */
+function executeNow(
+  moveId: string,
+  move: DubMove,
+  channelId: number | undefined,
+  merged: Record<string, number>,
+  bpm: number,
+  source: 'live' | 'lane',
+  opts: { deckId?: import('../dj/DeckEngine').DeckId } | undefined,
+): { dispose(): void } | null {
+  if (!_bus) return null;
   const rawRow = currentRow();
   const quantize = useDubStore.getState().quantize;
   const row = quantize ? Math.round(rawRow) : rawRow;

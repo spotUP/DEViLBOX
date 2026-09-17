@@ -1321,6 +1321,9 @@ export class DubBus {
    *  whole-mix fallback must stay out of the way. Kept in sync with the
    *  format store's editorMode by `_watchIsolationCapability()`. */
   private _preferChannelIsolation = false;
+  /** Ref-counted: how many in-flight moves are currently driving the echo
+   *  rate. While non-zero, BPM-sync must leave `echoRateMs` alone. */
+  private _rateOverrideDepth = 0;
   /** Level probes. A runaway is diagnosed by where signal actually IS, not by
    *  which gains look wrong in source — reading node values alone sent three
    *  fixes at rings that were not running (2026-09-17). */
@@ -5142,6 +5145,40 @@ export class DubBus {
    * No `enabled` guard — presets should change the rate even while the
    * bus return is silent so the rate is ready when a send is opened.
    */
+  /**
+   * Claim the echo rate for the duration of a gesture. Returns a release fn.
+   *
+   * A move that sets its own delay time — the skank throws, the delayPreset
+   * family — is fighting the BPM-sync effect, which re-derives `echoRateMs`
+   * from `echoSyncDivision` roughly 100 ms after any settings change and
+   * discards whatever the move wrote. On the Perry preset (echoSyncDivision
+   * '1/4T') a skank throw's dotted eighth survived about a tenth of a second
+   * before being yanked to a quarter triplet — and re-pitching a tape delay
+   * mid-tail reads as a sweep rather than as repeats, which is why the gesture
+   * sounded like a filter rather than an echo.
+   *
+   * The strip UI already had this idea as `activeRatePresetRef`, but that is
+   * React-local: a move fired from the keyboard, MIDI, MCP or AutoDub got no
+   * protection. The rate lives here, so the claim does too.
+   *
+   * Ref-counted because throws overlap — the last release restores sync, not
+   * the first.
+   */
+  beginRateOverride(): () => void {
+    this._rateOverrideDepth += 1;
+    let released = false;
+    return () => {
+      if (released) return;
+      released = true;
+      this._rateOverrideDepth = Math.max(0, this._rateOverrideDepth - 1);
+    };
+  }
+
+  /** True while any move is driving the echo rate — BPM-sync must stand off. */
+  isRateOverridden(): boolean {
+    return this._rateOverrideDepth > 0;
+  }
+
   setEchoRate(ms: number): void {
     const clamped = Math.max(10, Math.min(1500, ms));
     try { this.echo.setRate(clamped); } catch { /* ok */ }

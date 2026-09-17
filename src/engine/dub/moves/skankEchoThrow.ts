@@ -59,6 +59,9 @@ export function makeSkankThrow(id: string, division: number): DubMove {
       // it back once the repeats have rung out. Restoring it mid-tail would
       // re-pitch the repeats still in flight, so the restore waits for them.
       const priorRate = bus.getEchoRateMs();
+      // Hold the rate against BPM-sync for the life of the gesture, or the
+      // sync effect re-derives echoRateMs ~100 ms in and discards ours.
+      const releaseRate = bus.beginRateOverride();
       bus.setEchoRate(Math.round(beat * division));
 
       const close = deckId
@@ -71,6 +74,7 @@ export function makeSkankThrow(id: string, division: number): DubMove {
       const restoreTimer = setTimeout(() => {
         done = true;
         bus.setEchoRate(priorRate);
+        releaseRate();
       }, captureMs + tailMs);
 
       return {
@@ -82,6 +86,7 @@ export function makeSkankThrow(id: string, division: number): DubMove {
             done = true;
             bus.setEchoRate(priorRate);
           }
+          releaseRate();
         },
       };
     },

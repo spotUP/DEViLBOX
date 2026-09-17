@@ -31,6 +31,9 @@ import type { DubBus } from '../../../engine/dub/DubBus';
 function makeMockBus() {
   const bus = {
     get isEnabled() { return true; },
+    getSettings: () => ({ throwQuantize: 'off' }),
+    beginRateOverride: () => () => {},
+    isRateOverridden: () => false,
     openChannelTap: vi.fn(() => () => {}),
     closeChannelTap: vi.fn(),
     modulateFeedback: vi.fn(),

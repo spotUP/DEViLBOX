@@ -36,6 +36,13 @@ function makeMockBus(): DubBus {
     backwardReverb: vi.fn(async () => {}),
     tapeStop: vi.fn(),
     soloChannelTap: vi.fn(() => () => {}),
+    // DubRouter reads throwQuantize to decide whether to grid-snap a live
+    // fire. 'off' keeps these tests firing synchronously.
+    getSettings: vi.fn(() => ({ throwQuantize: 'off' })),
+    beginRateOverride: vi.fn(() => () => {}),
+    isRateOverridden: vi.fn(() => false),
+    setEchoRate: vi.fn(),
+    getEchoRateMs: vi.fn(() => 300),
     inputNode: { context: {} as AudioContext } as unknown as GainNode,
   } as unknown as DubBus;
 }
