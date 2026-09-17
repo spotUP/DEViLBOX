@@ -353,6 +353,35 @@ this bug.
       reason), rather than bolting a second recording path next to DubRecorder.
       Check `AutomationBaker` and the `.dbx` round-trip cover it before closing.
 
+- [ ] **X6** **Bus audition mode — a solo button for the send.** Raised
+      2026-09-17 while writing skank test instructions that began "first switch
+      off Perry", which is a smell: the user should not have to dismantle their
+      voicing to hear what a gesture is doing.
+      User-invoked, reversible, momentary: temporarily bypass the PARALLEL
+      colour stages — plate, ring mod, lo-fi, phaser/comb sweep, external
+      feedback — leaving the core wet chain (echo -> spring -> sidechain -> glue
+      -> EQ) audible, then drop back into full character on release. Standard
+      desk behaviour: solo the send to hear what you are actually sending.
+
+      **Explicitly NOT automatic.** The engine must never disable colour because
+      a gesture is hard to pick out — Perry's wash is Perry working, and a
+      competent engineer chooses it on purpose. The dividing line: would someone
+      plausibly want this on purpose? Muddy tail yes; unbounded feedback never.
+      Safety stays automatic and persona-independent (the tanh ceiling in the
+      ext loop); musical masking stays the user's call.
+
+      The intelligent half of this belongs to the performer, not the engine —
+      reviewer's **AI-11 consequence model**: notice the return is already
+      dense, and choose a smaller gesture or rest, rather than switching the
+      character off. Engine offers the ear; the AI supplies the judgement.
+
+      Implementation note: every stage listed is already gated by an existing
+      wet/dry or send gain, so this is a snapshot-and-restore of those gains
+      with a short ramp — no graph surgery. Must be safe to toggle during
+      playback, and must not touch `characterPreset` (that would flip the
+      preset to 'custom' and silently destroy the user's voicing — see
+      dubBusCharacterCoherence.test.ts).
+
 - [ ] **X3** `extFeedbackEqDb` is a +1 dB boost inside the ext loop with no
       mirror. Harmless now the limiter is in place and the tap moved, but it is
       the same class of defect as the hpfResonance mirror. Low priority.
