@@ -312,10 +312,22 @@ this bug.
 
 ### Still open from this session
 
-- [ ] **X1** `registeredChannelTaps: 0` while `preferChannelIsolation: true` on
-      AHX. Per-channel taps are not being created, so dub sends there may now be
-      SILENT rather than wrong. Silencing the fallback was correct; the
-      registration path is the gap. Blocks any per-channel work on Hively.
+- [x] **X1** AHX per-channel taps — FIXED + VERIFIED LIVE. `_activateDubChannel`
+      bailed out on `hasWholeMixTap()`, which is effectively always true because
+      a tap is registered unconditionally at DrumPadEngine construction. Any
+      engine not ready on the first fader move gave up permanently; libopenmpt
+      only escaped it by already being instantiated. Now gated on
+      `hasUsableWholeMixFallback()` so single-output engines still stop retrying
+      while capable ones retry. MCP verified: amanda.ahx
+      `registeredChannelTaps` went `0` -> `[1]`, no console errors.
+      **AHX was never short of capability** — 37 worklet outputs, implements
+      IsolationCapableEngine — it simply never reached the code that uses them.
+
+      Method note: this is the SECOND time a whole-mix change broke AHX. Both
+      times the cause was identical — the whole-mix tap is both an audio path
+      AND a flag other code reads, and I changed the audio side without
+      grepping its consumers. `grep hasWholeMixTap` before the first edit would
+      have caught both. Audit consumers before changing shared state.
 - [ ] **X2** The skank capture (`00bfd0a6b`) has never been heard. amanda.ahx
       cannot validate it — no per-channel isolation in practice (see X1), and
       AHX is monophonic per channel so the "skank" is a single-note stab.
