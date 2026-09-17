@@ -328,6 +328,9 @@ export class DubBus {
   // One-block delay ensures the ext-feedback cycle contains a native
   // DelayNode so the Web Audio renderer can topologically sort it.
   private extFeedbackDelay: DelayNode;
+  /** Hard ceiling on the external feedback loop. Persona-independent: no
+   *  musical setting may disable it. tanh soft-clip, unity asymptote. */
+  private extFeedbackLimit: WaveShaperNode;
 
   // ─── Club simulation (ConvolverNode on master output) ─────────────────
   private clubConvolver: ConvolverNode;
@@ -1318,6 +1321,11 @@ export class DubBus {
    *  whole-mix fallback must stay out of the way. Kept in sync with the
    *  format store's editorMode by `_watchIsolationCapability()`. */
   private _preferChannelIsolation = false;
+  /** Level probes. A runaway is diagnosed by where signal actually IS, not by
+   *  which gains look wrong in source — reading node values alone sent three
+   *  fixes at rings that were not running (2026-09-17). */
+  private _inputProbe: AnalyserNode | null = null;
+  private _returnProbe: AnalyserNode | null = null;
   private _unsubIsolation: (() => void) | null = null;
 
   // Deck-scoped per-channel taps — DJ view registers these via
@@ -1957,6 +1965,26 @@ export class DubBus {
     this.feedbackShelfComp.Q.value = this.settings.bassShelfQ;
     this.feedbackShelfComp.gain.value = -Math.max(-12, Math.min(12, this.settings.bassShelfGainDb));
 
+    try {
+      this._inputProbe = this.context.createAnalyser();
+      this._inputProbe.fftSize = 1024;
+      this.input.connect(this._inputProbe);
+      this._returnProbe = this.context.createAnalyser();
+      this._returnProbe.fftSize = 1024;
+      this.return_.connect(this._returnProbe);
+    } catch { /* probes are diagnostics only — never fail construction */ }
+
+    this.extFeedbackLimit = this.context.createWaveShaper();
+    {
+      const n = 2048;
+      const curve = new Float32Array(new ArrayBuffer(n * 4));
+      for (let i = 0; i < n; i++) {
+        const x = (i / (n - 1)) * 2 - 1;
+        curve[i] = Math.tanh(x);
+      }
+      this.extFeedbackLimit.curve = curve;
+    }
+
     this.feedbackResonanceComp = this.context.createBiquadFilter();
     this.feedbackResonanceComp.type = 'peaking';
     this.feedbackResonanceComp.frequency.value = this.hpfResonance.frequency.value;
@@ -2117,10 +2145,41 @@ export class DubBus {
     // gaining mixer coloration each pass. Capped at 0.85 to prevent
     // runaway self-oscillation. The DelayNode ensures the cycle is legal
     // for Web Audio's topological sort.
-    this.return_.connect(this.extFeedbackEq);
+    // Tapped at `stereoMerge` — the end of the CORE wet chain (echo → spring
+    // → sidechain → glue → midScoop → returnEQ → lpf → M/S) — NOT at
+    // `return_`.
+    //
+    // Tapping return_ put four things inside the loop that must not be there:
+    //
+    //   plate stage   dattorro's tail is documented as "infinite"; an
+    //                 unbounded tail inside a feedback path is unbounded by
+    //                 construction, and it was the dominant gain source
+    //   ring mod      adds inharmonic partials that recirculate
+    //   lo-fi         quantisation noise that recirculates
+    //   returnGain    the user's return fader multiplied the loop gain, so
+    //                 raising it pushed the loop over unity — the reported
+    //                 "I can repro it with the master fader as well"
+    //
+    // Loop gain is extFeedbackGain × chain gain, and the chain gain behind
+    // return_ is large: the echo runs its own internal feedback (0.45 ≈ 1.8×
+    // steady state), the spring sustains, and the plate does not decay. Perry
+    // is the only preset with extFeedbackGain above zero (0.035), which is why
+    // this only ever appeared there — 0.035 against a chain gain near 30 is
+    // over unity, and over unity by a hair is exactly a slow crawl rather than
+    // an instant howl. Confirmed 2026-09-17 by setting extFeedbackGain to 0
+    // mid-rumble, which stopped it.
+    //
+    // Tapping the core chain also matches the technique being modelled:
+    // Messian Dread loops the ECHO RETURN back through a mixer channel to pick
+    // up its coloration — not the whole wet bus including every parallel tail.
+    this.stereoMerge.connect(this.extFeedbackEq);
     this.extFeedbackEq.connect(this.extFeedbackShelfComp);
     this.extFeedbackShelfComp.connect(this.extFeedbackGain);
-    this.extFeedbackGain.connect(this.extFeedbackDelay);
+    // Hard safety governor, independent of preset and of any musical setting:
+    // a soft clip that cannot pass more than unity no matter what the chain in
+    // front of it does. The loop may sustain; it cannot grow without bound.
+    this.extFeedbackGain.connect(this.extFeedbackLimit);
+    this.extFeedbackLimit.connect(this.extFeedbackDelay);
     this.extFeedbackDelay.connect(this.input);
 
     // Optional plate-stage insert — branches from stereoMerge into the
@@ -3949,6 +4008,20 @@ export class DubBus {
   }
 
   /** Lightweight live snapshot for AutoDub / MCP diagnostics. */
+  /** RMS of an analyser's current time-domain block. 0 when absent. */
+  private static _probeRms(node: AnalyserNode | null): number {
+    if (!node) return 0;
+    try {
+      const buf = new Float32Array(node.fftSize);
+      node.getFloatTimeDomainData(buf);
+      let sum = 0;
+      for (let i = 0; i < buf.length; i++) sum += buf[i] * buf[i];
+      return Math.sqrt(sum / buf.length);
+    } catch {
+      return 0;
+    }
+  }
+
   getDiagnosticSnapshot(): Record<string, number | boolean | string | null> {
     const round = (value: number): number => +value.toFixed(4);
     return {
@@ -3973,6 +4046,14 @@ export class DubBus {
       activeWobbles: this.wobbleHandles.size,
       registeredChannelTaps: this.channelTaps.size,
       sidMode: this._sidMode,
+      // ── Where is the signal, actually? ───────────────────────────────
+      // If inputRms is non-zero while every injecting gain below reads 0,
+      // something is feeding the ring that this list does not cover.
+      inputRms: round(DubBus._probeRms(this._inputProbe)),
+      returnRms: round(DubBus._probeRms(this._returnProbe)),
+      wholeMixTapGainMax: round(Math.max(0, ...Array.from(this.wholeMixTaps.values()).map(e => e.busGain.gain.value))),
+      channelTapGainMax: round(Math.max(0, ...Array.from(this.channelTaps.values()).map(t => t.gain.value))),
+      deckTapGainMax: round(Math.max(0, ...Array.from(this.deckTaps.values()).map(t => t.gain.value))),
       // ── Feedback-ring gain stages ────────────────────────────────────
       // Every boosting stage inside the ring multiplies on each pass, so a
       // runaway is diagnosed by reading these together rather than guessing

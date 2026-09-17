@@ -35,7 +35,15 @@
  */
 
 import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'fs';
+import { resolve, dirname } from 'path';
+import { fileURLToPath } from 'url';
 import { DEFAULT_DUB_BUS, DUB_CHARACTER_PRESETS } from '@/types/dub';
+
+const DUBBUS_SRC = readFileSync(
+  resolve(dirname(fileURLToPath(import.meta.url)), '../DubBus.ts'),
+  'utf8',
+);
 
 const dbToLinear = (db: number): number => Math.pow(10, db / 20);
 
@@ -120,5 +128,49 @@ describe('feedback ring stays below unity', () => {
       expect(res, `${name} hpfResonanceDb`).toBeLessThanOrEqual(12);
       expect(res, `${name} hpfResonanceDb`).toBeGreaterThanOrEqual(0);
     }
+  });
+});
+
+// ── External feedback loop contents ─────────────────────────────────────────
+// Confirmed live on 2026-09-17: setting extFeedbackGain to 0 mid-rumble
+// stopped it. The loop was tapped at `return_`, which placed the dattorro
+// plate (documented "infinite" tail), the ring mod, the lo-fi stage and the
+// user's return fader inside it. An unbounded tail inside a feedback path is
+// unbounded by construction; the fader being in there is why the rumble could
+// also be triggered from the master.
+//
+// Perry is the only preset with extFeedbackGain above zero, which is why it
+// only ever appeared on Perry.
+describe('external feedback loop contents', () => {
+  it('taps the core wet chain, not the full return', () => {
+    expect(DUBBUS_SRC).toContain('this.stereoMerge.connect(this.extFeedbackEq)');
+    expect(DUBBUS_SRC).not.toContain('this.return_.connect(this.extFeedbackEq)');
+  });
+
+  it('routes through the hard limiter before re-entering the input', () => {
+    expect(DUBBUS_SRC).toContain('this.extFeedbackGain.connect(this.extFeedbackLimit)');
+    expect(DUBBUS_SRC).toContain('this.extFeedbackLimit.connect(this.extFeedbackDelay)');
+    // The old direct edge must be gone, or the limiter can be bypassed.
+    expect(DUBBUS_SRC).not.toContain('this.extFeedbackGain.connect(this.extFeedbackDelay)');
+  });
+
+  it('keeps the limiter a plain waveshaper no setting can disable', () => {
+    expect(DUBBUS_SRC).toContain('this.extFeedbackLimit = this.context.createWaveShaper()');
+    // tanh asymptotes at unity — the loop may sustain, never grow unbounded.
+    const ctor = DUBBUS_SRC.match(/this\.extFeedbackLimit = this\.context\.createWaveShaper\(\);[\s\S]*?\n    \}/)?.[0] ?? '';
+    expect(ctor).toContain('Math.tanh');
+  });
+
+  it('only Perry ships a non-zero external feedback gain', () => {
+    const withLoop = Object.entries(DUB_CHARACTER_PRESETS)
+      .filter(([, p]) => (p.overrides.extFeedbackGain ?? 0) > 0)
+      .map(([name]) => name);
+    expect(withLoop).toEqual(['perry']);
+    // And it stays small — the chain behind it already has large gain.
+    expect(DUB_CHARACTER_PRESETS.perry.overrides.extFeedbackGain).toBeLessThanOrEqual(0.05);
+  });
+
+  it('default has the loop off entirely', () => {
+    expect(DEFAULT_DUB_BUS.extFeedbackGain).toBe(0);
   });
 });
