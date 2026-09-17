@@ -165,6 +165,8 @@ const MOVE_COOLDOWNS: Record<string, number> = {
   channelMute:         2,
   combSweep:           3,
   channelThrow:        2,
+  skankEchoThrow:      2,
+  skankFloatThrow:     4,
 };
 const DEFAULT_COOLDOWN_BARS = 6;
 /** Cap on wet moves (echo/reverb-contributing) per bar, regardless of total
@@ -587,19 +589,31 @@ const RULES: Rule[] = [
     condition: (c) => hasTransientForRole(c, 'percussion') && c.barPos < 0.15,
     baseWeight: 0.18, holdBars: 1, wet: true },
   // ── Skank echo throw ─────────────────────────────────────────────────────
-  // The defining offbeat dub move: throw the upbeat chord/skank channel into
-  // a dotted-delay echo so repeats float at 2/3 tempo. Fires on bar 1 and 3
-  // of each 4-bar phrase (strong phrase positions for the chord change feel),
-  // plus transient-reactive on chord hits.
+  // The defining offbeat dub move: catch ONE upbeat chord stab and throw it
+  // into a dotted-eighth echo so the repeats land in the spaces between the
+  // following stabs. Fires on bar 1 and 3 of each 4-bar phrase (strong phrase
+  // positions for the chord change feel), plus transient-reactive on the stab
+  // itself — which is the musically correct trigger, since the gesture is
+  // "that chord just hit, that's the one I want".
+  //
+  // These are trigger-kind rules: the move owns its own capture window and
+  // closes itself. `holdBars` is deliberately absent — an AutoDub hold would
+  // pin the channel tap open across many stabs, which is the exact 2026-09-17
+  // regression the reshape fixed.
   { moveId: 'skankEchoThrow', channelRole: 'skank',
     condition: (c) => c.isNewBar && c.bar % 4 === 1,
-    baseWeight: 0.28, holdBars: 2, wet: true },
+    baseWeight: 0.28, wet: true },
   { moveId: 'skankEchoThrow', channelRole: 'chord',
     condition: (c) => c.isNewBar && c.bar % 4 === 3,
-    baseWeight: 0.20, holdBars: 1, wet: true },
+    baseWeight: 0.20, wet: true },
   { moveId: 'skankEchoThrow', channelRole: 'skank',
     condition: (c) => hasTransientForRole(c, 'skank') && c.barPos > 0.25 && c.barPos < 0.5,
-    baseWeight: 0.22, holdBars: 1, wet: true },
+    baseWeight: 0.22, wet: true },
+  // The 3:2 floating variant. Low base weight — personas that like it
+  // (Perry, Mad Professor) multiply it up; the rest reach it only rarely.
+  { moveId: 'skankFloatThrow', channelRole: 'skank',
+    condition: (c) => c.isNewBar && c.bar % 8 === 5,
+    baseWeight: 0.14, wet: true },
 
   // oscBass and crushBass are intentionally excluded from AutoDub:
   // both are self-oscillating generators that stomp on the mix when

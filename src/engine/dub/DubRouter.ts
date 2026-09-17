@@ -48,6 +48,7 @@ import { eqSweep } from './moves/eqSweep';
 import { combSweep } from './moves/combSweep';
 import { versionDrop } from './moves/versionDrop';
 import { skankEchoThrow } from './moves/skankEchoThrow';
+import { skankFloatThrow } from './moves/skankFloatThrow';
 import { riddimSection } from './moves/riddimSection';
 import type { DubMove, DubMoveContext } from './moves/_types';
 import type { DubBus } from './DubBus';
@@ -141,6 +142,7 @@ const MOVES: Record<string, DubMove> = {
   combSweep,
   versionDrop,
   skankEchoThrow,
+  skankFloatThrow,
   riddimSection,
 };
 

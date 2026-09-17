@@ -124,7 +124,8 @@ export const dubHpfRise:       MoveHandler = holdCommand('hpfRise',        'HPF 
 export const dubMadProfPingPong: MoveHandler = holdCommand('madProfPingPong', 'Mad Prof Ping-Pong');
 export const dubCombSweep:      MoveHandler = holdCommand('combSweep',      'Liquid Comb Sweep');
 export const dubVersionDrop:       MoveHandler = holdCommand('versionDrop',    'Version Drop');
-export const dubSkankEchoThrow:    MoveHandler = holdCommand('skankEchoThrow', 'Skank Echo Throw');
+export function dubSkankEchoThrow():  boolean { return fireTrigger('skankEchoThrow',  'Skank Echo Throw'); }
+export function dubSkankFloatThrow(): boolean { return fireTrigger('skankFloatThrow', 'Skank Float Throw'); }
 export const dubRiddimSection:     MoveHandler = holdCommand('riddimSection',   'Riddim Section');
 
 // ── Panic — release everything ────────────────────────────────────────────

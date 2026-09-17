@@ -52,7 +52,8 @@ export const MOVE_COLOR: Record<string, string> = {
   ringMod:             'bg-accent-secondary/40', // metallic ring mod
   combSweep:           'bg-accent-secondary/80', // liquid comb sweep — same family as sweep controls
   versionDrop:         'bg-accent-error',         // full melodic drop — same as channelMute (dramatic)
-  skankEchoThrow:      'bg-accent-highlight/60',  // floating offbeat echo — highlight family, semi-transparent
+  skankEchoThrow:      'bg-accent-highlight/60',  // offbeat skank capture — highlight family, semi-transparent
+  skankFloatThrow:     'bg-accent-highlight/40',  // 3:2 floating variant — same family, lighter
   riddimSection:       'bg-accent-error/70',      // bass+drums breakdown — dramatic drop, lighter than full versionDrop
 };
 
@@ -67,6 +68,5 @@ export const HOLD_KINDS = new Set([
   // New moves
   'hpfRise', 'madProfPingPong', 'combSweep', 'tapeStop', 'transportTapeStop',
   'versionDrop',
-  'skankEchoThrow',
   'riddimSection',
 ]);

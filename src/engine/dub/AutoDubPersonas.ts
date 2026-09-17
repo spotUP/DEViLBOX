@@ -91,6 +91,8 @@ export const AUTO_DUB_PERSONAS: Record<AutoDubPersonaId, AutoDubPersona> = {
     phraseArcShape: 'standard',     // gradual build, sustained peak, gentle decay
     minBarsBetweenFires: 1.5,       // deliberate — waits between each move
     weights: {
+      skankEchoThrow:    1.5,   // the offbeat capture is core Tubby vocabulary
+      skankFloatThrow:   0.3,   // the 3:2 float is available but rarely his choice
       hpfRise:           2.0,   // research: Tubby's PRIMARY move — stepping the Altec filter up
       tubbyScream:       1.8,
       delayPreset380:    1.7,   // 380ms — THE Tubby canonical chord delay
@@ -138,6 +140,8 @@ export const AUTO_DUB_PERSONAS: Record<AutoDubPersonaId, AutoDubPersona> = {
     phraseArcShape: 'sharp',        // fast attack, long sustained peak
     minBarsBetweenFires: 1.0,
     weights: {
+      skankEchoThrow:    1.2,
+      skankFloatThrow:   0.6,   // occasional — the float suits his experimental streak
       echoBuildUp:       2.0,   // THE Scientist move — slow feedback swell
       reverseEcho:       1.6,   // backward sounds are very Scientist
       backwardReverb:    1.5,   // backward reverb — signature reverse effect
@@ -182,6 +186,8 @@ export const AUTO_DUB_PERSONAS: Record<AutoDubPersonaId, AutoDubPersona> = {
     phraseArcShape: 'flat',         // constant chaos — no arc, always at peak
     minBarsBetweenFires: 0.25,      // rapid-fire — Perry fired effects constantly
     weights: {
+      skankFloatThrow:   1.6,   // strong access — the 3:2 drift sits with his triplet echoes
+      skankEchoThrow:    0.9,
       springKick:        2.4,   // research: Perry physically kicked the spring tank
       springSlam:        2.0,   // spring crashes are Perry's primary texture
       reverseEcho:       1.8,   // backward sounds throughout
@@ -226,6 +232,8 @@ export const AUTO_DUB_PERSONAS: Record<AutoDubPersonaId, AutoDubPersona> = {
     phraseArcShape: 'slow',         // very gradual build, patient — no decay
     minBarsBetweenFires: 2.0,       // unhurried — waits for the right moment
     weights: {
+      skankFloatThrow:   1.5,   // strong access — pairs with the asymmetric Ariwa timings
+      skankEchoThrow:    1.0,
       ghostReverb:       2.2,   // THE Mad Professor signature
       madProfPingPong:   2.0,   // Ariwa SDE-3000 L/R asymmetric stereo
       echoBuildUp:       1.6,   // patient slow builds
@@ -270,6 +278,8 @@ export const AUTO_DUB_PERSONAS: Record<AutoDubPersonaId, AutoDubPersona> = {
     budgetCap: 1,
     weights: {
       tapeStop:          2.0,
+      skankEchoThrow:    0.8,   // tight and grid-locked when he uses it at all
+      skankFloatThrow:   0.15,  // very rare — drifting against the grid is not his idiom
       versionDrop:       1.6,   // Jammy's digital drop is iconic
       channelMute:       1.6,
       masterDrop:        1.5,   // digital downbeat cut

@@ -116,7 +116,8 @@ export const DUB_MOVE_KINDS: Record<string, 'trigger' | 'hold'> = {
   madProfPingPong:     'hold',   // Ariwa SDE-3000 asymmetric L/R ping-pong
   combSweep:           'hold',   // bus.startCombSweep(...)
   versionDrop:         'hold',   // mute melodic channels, keep riddim
-  skankEchoThrow:      'hold',   // dotted-delay floating echo on upbeat chord
+  skankEchoThrow:      'trigger', // dotted-eighth capture of one skank stab
+  skankFloatThrow:     'trigger', // dotted-quarter 3:2 floating variant
   riddimSection:       'hold',   // bass+drums breakdown with skank echo return
 };
 
