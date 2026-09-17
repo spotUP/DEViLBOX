@@ -186,6 +186,13 @@ export function shouldFallBackToWholeMix(
 let _activeDubBus: DubBus | null = null;
 export function getActiveDubBus(): DubBus | null { return _activeDubBus; }
 
+// Dev-only console handle. Lets a runaway be read live:
+//   __dubBus().getDiagnosticSnapshot()
+// Stripped from production builds by the import.meta.env.DEV guard.
+if (typeof window !== 'undefined' && (import.meta as { env?: { DEV?: boolean } }).env?.DEV) {
+  (window as unknown as Record<string, unknown>).__dubBus = () => _activeDubBus;
+}
+
 export class DubBus {
   // ─── Shared Dub Bus — Vintage King Tubby / Scientist chain ─────────────────
   // Sources fanning into `input`:
@@ -3964,6 +3971,30 @@ export class DubBus {
       activeWobbles: this.wobbleHandles.size,
       registeredChannelTaps: this.channelTaps.size,
       sidMode: this._sidMode,
+      // ── Feedback-ring gain stages ────────────────────────────────────
+      // Every boosting stage inside the ring multiplies on each pass, so a
+      // runaway is diagnosed by reading these together rather than guessing
+      // which loop is live. Each boost should have a matching negative
+      // mirror; a mismatch is an over-unity ring.
+      preferChannelIsolation: this._preferChannelIsolation,
+      wholeMixTaps: this.wholeMixTaps.size,
+      bassShelfDb: round(this.bassShelf.gain.value),
+      bassShelfMirrorDb: round(this.feedbackShelfComp.gain.value),
+      hpfResonanceDb: round(this.hpfResonance.gain.value),
+      hpfResonanceMirrorDb: round(this.feedbackResonanceComp.gain.value),
+      extFeedbackGain: round(this.extFeedbackGain.gain.value),
+      extFeedbackMirrorDb: round(this.extFeedbackShelfComp.gain.value),
+      extFeedbackEqDb: round(this.extFeedbackEq.gain.value),
+      sweepAmount: round(this.settings.sweepAmount),
+      sweepFeedback: round(this.settings.sweepFeedback),
+      sweepMode: this.settings.sweepMode,
+      tapeSatMode: this.settings.tapeSatMode,
+      tapeStackMix: round(this.tapeStackMix.gain.value),
+      tapeSatBypass: round(this.tapeSatBypass.gain.value),
+      chainOrder: this._chainOrder,
+      postEchoSatWet: round(this.postEchoSatWet.gain.value),
+      ringModAmount: round(this.settings.ringModAmount),
+      plateStage: this.settings.plateStage,
     };
   }
 
