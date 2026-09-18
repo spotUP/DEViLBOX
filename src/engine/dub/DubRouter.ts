@@ -58,6 +58,7 @@ import { decodeDubEffect, decodeDubParamStep, DUB_EFFECT_PARAM_STEP, isDubMoveEf
 import { routeParameterToEngine } from '@/midi/performance/parameterRouter';
 import { getSongTimeSec } from './songTime';
 import { getCurrentRow as currentRow, msToNextGridBoundary } from './dubGrid';
+import { LiveEchoGuard } from '@/lib/dub/liveEcho';
 
 const MOVES: Record<string, DubMove> = {
   echoThrow,
@@ -168,6 +169,9 @@ function nextInvocationId(): string {
 }
 
 let _bus: DubBus | null = null;
+
+/** Recognises a lane fire that is the replay of a press that just happened. */
+const _liveEcho = new LiveEchoGuard();
 
 /** Set by the TrackerView mount effect. Null when no tracker view is active. */
 export function setDubBusForRouter(bus: DubBus | null): void {
@@ -294,6 +298,19 @@ function executeNow(
   const rawRow = currentRow();
   const quantize = useDubStore.getState().quantize;
   const row = quantize ? Math.round(rawRow) : rawRow;
+
+  // A press writes its automation point at the row currently playing, and the
+  // replayer rebuilds the automation table from the store every row — so the
+  // point is read back and fired as playback on the next tick. One press, two
+  // sounds. Drop the echo; a genuine replay on a later pass is far outside the
+  // window. See `liveEcho.ts`.
+  const echoKey = { moveId, channelId, row };
+  const nowMs = performance.now();
+  if (source === 'lane') {
+    if (_liveEcho.isEcho(echoKey, nowMs)) return null;
+  } else {
+    _liveEcho.noteLive(echoKey, nowMs);
+  }
 
   const ctx: DubMoveContext = { bus: _bus, channelId, deckId: opts?.deckId, params: merged, bpm, source };
   const disposer = move.execute(ctx);

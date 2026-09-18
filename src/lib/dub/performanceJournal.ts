@@ -32,8 +32,17 @@ export interface JournalEntry {
   row: number;
   /** Song time in seconds, for time-mode songs. */
   timeSec: number;
-  /** Row it released on, once it has. */
+  /** Row it released on, once it has. Pattern-relative, like `row`. */
   releasedRow?: number;
+  /**
+   * Song time at release.
+   *
+   * Held duration is computed from this rather than from the rows, because
+   * `row` is PATTERN-relative: a move held across a pattern boundary released
+   * at a lower row than it fired on, and the subtraction printed "held -39
+   * rows". Time is monotonic and needs no pattern length to interpret.
+   */
+  releasedTimeSec?: number;
   origin: MoveOrigin;
   /** What the performer wanted. Absent for a move the user made by hand. */
   intention?: Intention;
@@ -80,10 +89,11 @@ export class PerformanceJournalRecorder {
   }
 
   /** Stamp the release row onto the entry that fired it. */
-  noteRelease(invocationId: string, row: number): void {
+  noteRelease(invocationId: string, row: number, timeSec?: number): void {
     for (let i = this.entries.length - 1; i >= 0; i--) {
       if (this.entries[i].invocationId === invocationId) {
         this.entries[i].releasedRow = row;
+        if (timeSec !== undefined) this.entries[i].releasedTimeSec = timeSec;
         return;
       }
     }
@@ -134,11 +144,34 @@ function isEntry(value: unknown): value is JournalEntry {
 export function formatJournal(journal: PerformanceJournal, limit = 80): string {
   return journal.entries.slice(-limit).map(e => {
     const where = e.bar !== undefined ? `bar ${String(e.bar).padStart(3)}` : `row ${String(Math.round(e.row)).padStart(5)}`;
-    const held = e.releasedRow !== undefined ? ` held ${(e.releasedRow - e.row).toFixed(0)} rows` : '';
+    const held = formatHeld(e);
     const who = e.origin === 'ai' ? 'AI ' : e.origin === 'lane' ? 'LANE' : 'YOU';
     const what = `${e.moveId}${e.channelId !== undefined ? ` ch${e.channelId}` : ''}`;
     const why = e.reason ? ` — ${e.reason}` : '';
     const intent = e.intention ? ` [${e.intention}]` : '';
     return `${where} ${who} ${what.padEnd(22)}${intent}${held}${why}`;
   }).join('\n');
+}
+
+/**
+ * How long a move was held, in words.
+ *
+ * Seconds, from the release time, because `row` is PATTERN-relative: a hold
+ * that crossed a pattern boundary released at a LOWER row than it fired on and
+ * the row subtraction printed "held -39 rows" (observed live 2026-09-18 on a
+ * skank throw fired at row 56 and released at row 17).
+ *
+ * Rows are still used when that is all an older journal has, and only when the
+ * arithmetic is meaningful — a negative difference means the take wrapped, and
+ * saying nothing is better than saying something false.
+ */
+function formatHeld(e: JournalEntry): string {
+  if (e.releasedTimeSec !== undefined && e.releasedTimeSec >= e.timeSec) {
+    return ` held ${(e.releasedTimeSec - e.timeSec).toFixed(1)}s`;
+  }
+  if (e.releasedRow !== undefined && e.releasedRow >= e.row) {
+    return ` held ${(e.releasedRow - e.row).toFixed(0)} rows`;
+  }
+  if (e.releasedRow !== undefined) return ' released';
+  return '';
 }

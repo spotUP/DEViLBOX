@@ -72,7 +72,7 @@ export function attachPerformanceJournal(recorder: PerformanceJournalRecorder): 
     });
   });
   const offRelease = subscribeDubRelease(event => {
-    recorder.noteRelease(event.invocationId, event.row);
+    recorder.noteRelease(event.invocationId, event.row, event.timeSec);
   });
   const detach = () => { offFire(); offRelease(); };
   _detach = detach;
