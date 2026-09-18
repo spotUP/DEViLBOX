@@ -52,6 +52,7 @@ import { useFormatStore } from '@/stores/useFormatStore';
 import { useInstrumentStore } from '@/stores/useInstrumentStore';
 import { useNotificationStore } from '@/stores/useNotificationStore';
 import { resolveVinylLevel } from '@/lib/dub/vinylLevel';
+import { ChannelTapBaselines } from '@/lib/dub/channelTapBaseline';
 
 const DECK_IDS: DeckId[] = ['A', 'B', 'C'];
 
@@ -1322,6 +1323,11 @@ export class DubBus {
   // wrapping in Tone.Gain would add an unnecessary node without buying
   // anything (all the methods we use are native AudioParam APIs).
   private channelTaps: Map<number, GainNode> = new Map();
+  // The fader value behind each channel tap. Transient moves (throws, solos)
+  // restore to THIS, never to a sampled `tap.gain.value` — the node may be
+  // mid-transient from another move, and restoring a sampled transient
+  // ratchets the tap toward 1.0. See ChannelTapBaselines.
+  private channelTapBaselines = new ChannelTapBaselines();
   /** True when the active engine exposes real per-channel outputs, so the
    *  whole-mix fallback must stay out of the way. Kept in sync with the
    *  format store's editorMode by `_watchIsolationCapability()`. */
@@ -2486,6 +2492,8 @@ export class DubBus {
         tap.gain.cancelScheduledValues(now);
         tap.gain.setValueAtTime(tap.gain.value, now);
         tap.gain.linearRampToValueAtTime(curved, now + 0.02);
+        // Same contract as tracker channels: a move restores to the fader.
+        this.channelTapBaselines.set(voiceIndex, curved);
         return true;
       }
     }
@@ -2526,6 +2534,7 @@ export class DubBus {
       if (tap) {
         try { tap.disconnect(); } catch { /* ok */ }
         this.channelTaps.delete(i);
+        this.channelTapBaselines.delete(i);
       }
     }
   }
@@ -4094,14 +4103,26 @@ export class DubBus {
 
   // ─── Tracker Channel Tap API ───────────────────────────────────────────────
 
-  /** Called by ChannelRoutedEffects when a per-channel tap is created. */
-  registerChannelTap(channelId: number, tap: GainNode): void {
+  /**
+   * Called by ChannelRoutedEffects when a per-channel tap is created.
+   * `baseline` is the fader's current curve-mapped gain; without it we fall
+   * back to the node's value, which is only right if no move is in flight.
+   */
+  registerChannelTap(channelId: number, tap: GainNode, baseline?: number): void {
     this.channelTaps.set(channelId, tap);
+    this.channelTapBaselines.set(channelId, baseline ?? tap.gain.value);
+  }
+
+  /** Called by ChannelRoutedEffects on every fader write, so a move that
+   *  releases later restores to where the fader IS, not where it was. */
+  setChannelTapBaseline(channelId: number, gain: number): void {
+    this.channelTapBaselines.set(channelId, gain);
   }
 
   /** Called by ChannelRoutedEffects when a tap is torn down (dubSend → 0). */
   unregisterChannelTap(channelId: number): void {
     this.channelTaps.delete(channelId);
+    this.channelTapBaselines.delete(channelId);
   }
 
   hasWholeMixTap(): boolean {
@@ -4383,13 +4404,20 @@ export class DubBus {
     const tap = this.channelTaps.get(channelId);
 
     if (tap) {
-      const baseline = tap.gain.value;
+      // Fallback only — used if no fader write has reached us for this tap.
+      // Never the restore target by itself: when a second throw lands inside
+      // this one's hold or its 80 ms release ramp, or a solo move snapshots
+      // mid-throw, the node reads a transient, and restoring a transient
+      // ratchets the tap toward 1.0 ("stuck firing" bass, 2026-09-18).
+      const sampledAtOpen = tap.gain.value;
       const now = this.context.currentTime;
       tap.gain.cancelScheduledValues(now);
       tap.gain.setValueAtTime(tap.gain.value, now);
       tap.gain.linearRampToValueAtTime(clamped, now + attackSec);
       fireParamLiveSubscribers(`dub.channelSend.ch${channelId}`, clamped);
       return () => {
+        // Resolved at RELEASE time so a fader moved during the hold is honoured.
+        const baseline = this.channelTapBaselines.resolve(channelId, sampledAtOpen);
         const release = this.context.currentTime;
         tap.gain.cancelScheduledValues(release);
         tap.gain.setValueAtTime(tap.gain.value, release);
@@ -4532,13 +4560,17 @@ export class DubBus {
     }
     return () => {
       const release = this.context.currentTime;
-      for (const [id, gain] of snapshot) {
+      for (const [id, sampled] of snapshot) {
         const tap = this.channelTaps.get(id);
         if (!tap) continue;
+        // Restore to the FADER, not the snapshot. A solo fired during a
+        // throw snapshots that channel at 1.0 and would pin it there after
+        // the throw's own release — the second route to a stuck tap.
+        const baseline = this.channelTapBaselines.resolve(id, sampled);
         try {
           tap.gain.cancelScheduledValues(release);
           tap.gain.setValueAtTime(tap.gain.value, release);
-          tap.gain.linearRampToValueAtTime(gain, release + 0.08);
+          tap.gain.linearRampToValueAtTime(baseline, release + 0.08);
         } catch { /* ok */ }
       }
     };
@@ -6226,6 +6258,7 @@ export class DubBus {
     // Channel taps are owned by ChannelEffectsManager — just clear our registry.
     // The actual Tone.Gain nodes are disposed by ChannelEffectsManager.disposeAll().
     this.channelTaps.clear();
+    this.channelTapBaselines.clear();
     for (const entry of this.wholeMixTaps.values()) {
       try { entry.disposeSource(); } catch { /* ok */ }
       try { entry.busGain.disconnect(); } catch { /* ok */ }
