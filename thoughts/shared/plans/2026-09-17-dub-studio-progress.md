@@ -12,7 +12,7 @@ analysis: thoughts/shared/plans/2026-09-17-dub-studio-gap-reconciliation.md
 Durable todo list. Survives compaction, crashes, `/clear`. **Re-read this before trusting
 recollection or any earlier summary in a conversation.**
 
-Running count: **43 of 56 done.**
+Running count: **44 of 57 done.**
 
 **The denominator was wrong until 2026-09-18.** The header said "of 36" from the day this file
 was written and was never updated as sub-items (F1a, F1c, F2a-F2e, T1-T3, the X series) were
@@ -33,7 +33,7 @@ recount — do not trust this sentence either.
 | G — wet energy | **closed** | G1 |
 | H-L — musical behaviour | **closed** | H1, I1, J1, K1-K4, L1, L2, AE1 |
 | M-O — record, verify, release | N1-N4, O1 done; M1 partial | M1 persistence, O2 (human) |
-| X — user-reported open threads | 5 of 16 | X1, X11, X12, X13, X15 closed |
+| X — user-reported open threads | 6 of 17 | X1, X11, X12, X13, X15, X16 closed |
 
 ### Debt carried, not hidden
 
@@ -998,6 +998,19 @@ this bug.
       recorded intent and abandon a send that has since closed, and closing a send cancels
       the deferred 500 ms activation retry. 10 behaviour tests (4 fail against the old
       single-flag model) plus a wiring contract. Commit `aa7693b69`.
+
+- [x] **X16** **Car Bluetooth: silent unless Music.app played, and the car kept
+      launching Music.** Reported 2026-09-18 on a Mac. One cause behind all of it: Web
+      Audio makes the page something that makes noise, not something the OS considers a
+      media player. Head units gate the A2DP stream until AVRCP reports PLAYING, and that
+      comes from a media session; with no session of ours, the car's PLAY on connect goes
+      to whatever macOS does consider the media app, and there is no metadata to show.
+      `src/lib/audio/mediaSession.ts` holds a silent looping element (the MediaSession API
+      only takes effect while a media ELEMENT plays) built in memory, not fetched — a
+      session that needs the network fails exactly where it is needed. `useMediaSession`
+      follows the transport and project metadata and routes the car's transport buttons
+      back into the store. 20 tests including a wiring contract. Commit `d3e3d3a74`.
+      **Needs the user's car to confirm** — no automated check can.
 
 - [ ] **X10** **Dub bus clips and distorts most of the time.** Reported
       2026-09-18. Not yet investigated. Measure before touching anything:
