@@ -958,3 +958,37 @@ describe('chooseMove — intention decides before the move', () => {
     }
   });
 });
+
+// ── Gate G: energy accounting gates layering ───────────────────────────────
+
+describe('chooseMove — energy accounting', () => {
+  it('skips moves the energy ledger refuses', () => {
+    const refused = new Set<string>();
+    const result = chooseMove(
+      baseCtx({
+        intensity: 1,
+        admitsMove: (moveId: string) => {
+          // Refuse every throw; anything else is fine.
+          if (moveId.toLowerCase().includes('throw')) { refused.add(moveId); return false; }
+          return true;
+        },
+      }),
+      seededRng(3),
+    );
+    if (result) expect(result.moveId.toLowerCase()).not.toContain('throw');
+  });
+
+  it('fires nothing when the ledger refuses everything', () => {
+    for (let seed = 1; seed <= 50; seed++) {
+      const result = chooseMove(
+        baseCtx({ intensity: 1, admitsMove: () => false }),
+        seededRng(seed),
+      );
+      expect(result).toBeNull();
+    }
+  });
+
+  it('leaves the pre-Gate-G behaviour untouched when no ledger is supplied', () => {
+    expect(chooseMove(baseCtx({ intensity: 1 }), seededRng(11))).not.toBeNull();
+  });
+});

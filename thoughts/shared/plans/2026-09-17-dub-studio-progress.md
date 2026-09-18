@@ -12,7 +12,7 @@ analysis: thoughts/shared/plans/2026-09-17-dub-studio-gap-reconciliation.md
 Durable todo list. Survives compaction, crashes, `/clear`. **Re-read this before trusting
 recollection or any earlier summary in a conversation.**
 
-Running count: **21 of 51 done.**
+Running count: **22 of 51 done.**
 
 **The denominator was wrong until 2026-09-18.** The header said "of 36" from the day this file
 was written and was never updated as sub-items (F1a, F1c, F2a-F2e, T1-T3, the X series) were
@@ -30,7 +30,7 @@ recount — do not trust this sentence either.
 | D — performance context | **closed** | D1 |
 | E — intention + REST | **closed** | E1, E2, E3 |
 | F — gesture engine | partial | F4: shapes + lifecycle shipped; param-automation shapes need a move update API |
-| G — wet energy | open | G1 |
+| G — wet energy | **closed** | G1 |
 | H-L — musical behaviour | open | H1, I1, J1, K1-K4, L1, L2, AE1 |
 | M-O — record, verify, release | open | M1, N1-N4, O1, O2 |
 | X — user-reported open threads | 1 of 11 | X1 closed |
@@ -347,9 +347,25 @@ copy/paste (`TrackerCell[]` whole objects), `.dbx` save/load (patterns serialize
 
 ## GATE G — WET ENERGY
 
-- [ ] **G1** Per-move metadata `wetCost` / `duration` / `feedbackCost` / `spectralDensity` /
+- [x] **G1** Per-move metadata `wetCost` / `duration` / `feedbackCost` / `spectralDensity` /
       `lowFrequencyRisk`; runtime accounting with decay. Compatible gestures may layer; dense
       combinations restrained. **Hard safety governor retained, persona-independent.**
+      `src/lib/dub/moveEnergy.ts` — costs for every move the router can fire (a test
+      asserts none is missing), plus `EnergyLedger`: a held move contributes in full,
+      a released one fades across its own `decaySec`, and `admits()` answers whether
+      another move may layer, naming the axis that refused it.
+      Decay is LINEAR on purpose: an exponential never reaches zero, so a session would
+      accumulate a permanent floor of imaginary energy and the performer would grow
+      quieter all evening.
+      A move is judged only on the axes it contributes to — otherwise a mix already over
+      budget would refuse `channelMute`, which is exactly backwards: when it is too loud,
+      the silencing moves are the ones you want available. A test caught that.
+      `duration` is modelled as the TAIL (`decaySec`), not the hold length: a throw is
+      short to press and long to disappear, which is the asymmetry the old bar counter
+      missed entirely. Wired into `tickImpl` and the rule filter; the `wet` flag and its
+      one-fire-per-bar counter remain as the pre-Gate-G fallback for callers that supply
+      no ledger. Personas scale the budget via `scaleBudget` (clamped 0.25-1.5x); the hard
+      ceiling is not theirs to move. 19 tests in `test:ci`.
 
 ## GATE H–L — musical behaviour
 
