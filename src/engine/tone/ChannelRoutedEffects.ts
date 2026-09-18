@@ -81,6 +81,18 @@ const chainConnect = (src: any, dst: any) => {
   }
 };
 
+/**
+ * Fader position (0-1) → tap gain. Soft-compression curve matching
+ * DubBus.applyDubSendCurve — keeps low/mid slider travel nearly linear but
+ * caps the top at 0.7 so max send doesn't drown the dry signal in reverb.
+ * Identity at 0, 0.7 at 1.0. One definition: the same number is written to
+ * the tap AND reported to DubBus as the channel's restore baseline.
+ */
+function dubSendToGain(fader: number): number {
+  const clamped = Math.max(0, Math.min(1, fader));
+  return clamped <= 0 ? 0 : clamped >= 1 ? 0.7 : clamped * (1 - 0.3 * clamped * clamped);
+}
+
 export class ChannelRoutedEffectsManager {
   private slots: (IsolationSlot | null)[] = [null, null, null, null];
   private masterEffectsInput: Tone.Gain;
@@ -336,10 +348,14 @@ export class ChannelRoutedEffectsManager {
     if (channelIndex < 0 || channelIndex >= MAX_DUB_CHANNELS) return;
     const clamped = Math.max(0, Math.min(1, amount));
     this.channelDubSendValues[channelIndex] = clamped;
-    // Soft-compression curve matching DubBus.applyDubSendCurve — keeps low/mid
-    // slider travel nearly linear but caps the top at 0.7 so max send doesn't
-    // drown the dry signal in reverb. Identity at 0, 0.7 at 1.0.
-    const curved = clamped <= 0 ? 0 : clamped >= 1 ? 0.7 : clamped * (1 - 0.3 * clamped * clamped);
+    const curved = dubSendToGain(clamped);
+
+    // Tell the bus where the fader now rests. A throw or solo that releases
+    // later restores to this, never to a sampled tap value — sampling picks
+    // up other moves' transients and ratchets the tap toward 1.0.
+    void import('../dub/DubBus')
+      .then(({ getActiveDubBus }) => getActiveDubBus()?.setChannelTapBaseline(channelIndex, curved))
+      .catch(() => { /* bus not built yet — registration carries the baseline */ });
 
     const gain = this.channelDubGains[channelIndex];
     if (!gain || !this.dubBusInput) {
@@ -418,11 +434,13 @@ export class ChannelRoutedEffectsManager {
     this.channelDubActive[channelIndex] = true;
     this.channelDubPendingActivation.delete(channelIndex);
 
-    // Register with DubBus so echoThrow can find the tap.
+    // Register with DubBus so echoThrow can find the tap — with the fader's
+    // gain as the baseline, so a release lands on the fader, not on
+    // whatever the node reads at the time.
     try {
       const { getDrumPadEngine } = await import('../../hooks/drumpad/useMIDIPadRouting');
       const bus = getDrumPadEngine()?.getDubBus();
-      bus?.registerChannelTap(channelIndex, gain);
+      bus?.registerChannelTap(channelIndex, gain, dubSendToGain(this.channelDubSendValues[channelIndex]));
     } catch { /* DubBus not available */ }
     console.log(`[ChannelRoutedEffects] Dub channel ${channelIndex} activated`);
   }
@@ -477,7 +495,7 @@ export class ChannelRoutedEffectsManager {
         // Re-register with DubBus (channelTaps map is cleared on bus dispose)
         try {
           const { getDrumPadEngine } = await import('../../hooks/drumpad/useMIDIPadRouting');
-          getDrumPadEngine()?.getDubBus()?.registerChannelTap(ch, gain);
+          getDrumPadEngine()?.getDubBus()?.registerChannelTap(ch, gain, dubSendToGain(this.channelDubSendValues[ch]));
         } catch { /* ok */ }
       } catch (e) {
         console.warn(`[ChannelRoutedEffects] rebuildDubConnections: ch${ch} connect failed:`, e);
