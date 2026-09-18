@@ -12,7 +12,7 @@ analysis: thoughts/shared/plans/2026-09-17-dub-studio-gap-reconciliation.md
 Durable todo list. Survives compaction, crashes, `/clear`. **Re-read this before trusting
 recollection or any earlier summary in a conversation.**
 
-Running count: **44 of 57 done.**
+Running count: **45 of 57 done.**
 
 **The denominator was wrong until 2026-09-18.** The header said "of 36" from the day this file
 was written and was never updated as sub-items (F1a, F1c, F2a-F2e, T1-T3, the X series) were
@@ -29,7 +29,7 @@ recount — do not trust this sentence either.
 | C — event model | **closed** | C1, C2, C3. DJ adapter for C1 deliberately not written |
 | D — performance context | **closed** | D1 |
 | E — intention + REST | **closed** | E1, E2, E3 |
-| F — gesture engine | partial | F4: shapes + lifecycle shipped; param-automation shapes need a move update API |
+| F — gesture engine | **closed** | F4 |
 | G — wet energy | **closed** | G1 |
 | H-L — musical behaviour | **closed** | H1, I1, J1, K1-K4, L1, L2, AE1 |
 | M-O — record, verify, release | N1-N4, O1 done; M1 partial | M1 persistence, O2 (human) |
@@ -349,7 +349,7 @@ copy/paste (`TrackerCell[]` whole objects), `.dbx` save/load (patterns serialize
 
 ## GATE F — GESTURE ENGINE
 
-- [~] **F4** `beginGesture` / `updateGesture` / `endGesture` / `cancelGesture` with attack, hold,
+- [x] **F4** `beginGesture` / `updateGesture` / `endGesture` / `cancelGesture` with attack, hold,
       release, ramp, sweep, rebound, quantized start + release. Transport stop cancels; seek
       cancels stale gestures. DubRouter stays the execution layer.
       `src/engine/dub/GestureEngine.ts`. Shipped: begin/update/end/cancel, quantized start
@@ -358,14 +358,28 @@ copy/paste (`TrackerCell[]` whole objects), `.dbx` save/load (patterns serialize
       there is now ONE notion of a held move, and the user's holds are as cancellable as
       the AI's. `DubRouter.fire` gained `preQuantized` so the engine's grid wait and the
       router's own cannot stack into a whole grid step of lateness.
-      **NOT shipped, and not faked: `ramp` and `sweep`.** They describe a parameter moving
-      while the gesture is held, and `DubMove.execute` returns `{ dispose }` with no way to
-      update params mid-flight. The engine calls an optional `handle.update(params)` when a
-      move offers one; no move does yet, so such a gesture is marked `degraded` with the
-      reason instead of silently behaving as a plain hold. Closing F4 means giving moves an
-      update path — that is the remaining work, and `attack` likewise belongs to the move's
-      own envelope rather than to the scheduler.
-      20 tests in `test:ci` (router mocked, fake timers).
+      **`ramp` and `sweep` CLOSED 2026-09-18, commit `5c7eeff00`.** They were declared and
+      deliberately left unimplemented rather than faked, because no move could take a
+      parameter mid-flight. Now three pieces at the levels they belong to:
+      `src/lib/dub/gestureShape.ts` (pure) holds the curve — a ramp travels once and stays,
+      a sweep travels and comes back, triangular rather than sinusoidal because a hand on a
+      knob moves evenly and stops at the turn, and frequencies interpolate in log space;
+      `GestureEngine` drives it on a 25 ms timer rather than one scheduled AudioParam curve,
+      because the hold can be extended or cut short at any moment; `moveAutomation.ts` says
+      which moves have a parameter worth moving and between what values, so no caller
+      invents a range.
+      Two things the tests forced out, both real: the final value is **pinned on release,
+      before the move is disposed** (ticks run every 25 ms, so the last one is up to a tick
+      short of where the player aimed), and extending a hold **re-anchors instead of
+      restarting** — the shape keeps the position it reached and spreads the remaining
+      travel over the remaining time, so a sweep slows rather than jumping backwards. A
+      CANCELLED gesture is not landed: cancel means abandon.
+      `DubMoveHandle.update` is now a declared contract, `filterDrop` implements it against
+      a new `DubBus.setLpfCutoffNow`, and AutoDub traces the shape whenever the chosen move
+      has an entry and a hold to travel over. 62 tests across the three files; 6 of the
+      engine's fail against the previous behaviour.
+      `attack` remains out of scope by design — it belongs to the move's own envelope
+      rather than to the scheduler.
 
 ## GATE G — WET ENERGY
 
