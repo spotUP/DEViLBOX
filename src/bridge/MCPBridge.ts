@@ -158,6 +158,7 @@ import {
   setAutoEffect,
   cancelAutoEffect,
   dismissModal,
+  resolveRecoveryPrompt,
   getModalState,
   runFormatTest,
   runRegressionSuite,
@@ -403,6 +404,7 @@ const handlers: Record<string, Handler> = {
 
   // ─── Modal Control ────────────────────────────────────────────────────────
   dismiss_modal: dismissModal,
+  resolve_recovery_prompt: resolveRecoveryPrompt,
   get_modal_state: getModalState,
 
   // ─── Format Regression Testing ──────────────────────────────────────────

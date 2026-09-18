@@ -25,6 +25,7 @@ import { useGlobalKeyboardHandler } from './hooks/useGlobalKeyboardHandler';
 import { initKeyboardRouter, destroyKeyboardRouter } from './engine/keyboard/KeyboardRouter';
 import { useCloudSync } from './hooks/useCloudSync';
 import { useMediaSession } from './hooks/useMediaSession';
+import { setRecoveryPrompt } from './lib/persistence/recoveryPrompt';
 import { setupCloudSyncSubscribers } from './lib/cloudSyncSubscribers';
 import { getToneEngine } from '@engine/ToneEngine';
 import { getJingleEngine } from '@engine/jingle/JingleEngine';
@@ -414,6 +415,26 @@ function App() {
   }, [applyAutoCompact]);
 
   const { save: saveProject, recoverySnapshot, restoreRecovery, discardRecovery } = useProjectPersistence();
+
+  // Publish the crash-recovery prompt while it is on screen.
+  //
+  // It is driven by `useProjectPersistence`'s own state, so `get_modal_state`
+  // — which reads `useUIStore.modalOpen` — reported no dialog while this one
+  // was sitting in front of the user. Registering it makes the UI answerable
+  // from outside React; see `recoveryPrompt.ts` for why resolving it stays an
+  // explicit choice rather than something `dismiss_modal` may do.
+  useEffect(() => {
+    if (!recoverySnapshot) { setRecoveryPrompt(null); return; }
+    setRecoveryPrompt({
+      restore: () => restoreRecovery(),
+      discard: () => discardRecovery(),
+      describe: () => ({
+        name: recoverySnapshot.metadata?.name,
+        savedAt: recoverySnapshot.metadata?.modifiedAt,
+      }),
+    });
+    return () => setRecoveryPrompt(null);
+  }, [recoverySnapshot, restoreRecovery, discardRecovery]);
 
   // Initialize KeyboardRouter once at app startup
   useEffect(() => {
