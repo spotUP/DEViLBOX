@@ -6,12 +6,19 @@
  * prior mute state. Classic "hole in the mix" move — punch out a hihat
  * for a bar, drop the bass on the breakdown, etc.
  *
- * Per-channel. If the channel was already muted before the move fired,
- * the release won't un-mute it (we save the original state).
+ * Per-channel. Release hands the channel back to the user's own mute state,
+ * so a channel the user had muted stays muted — and, when moves nest, only
+ * the last one out restores. Reading the live mute here and writing it back
+ * is what left channels muted after AutoDub ran; see
+ * `src/lib/dub/channelSendBaseline.ts`.
  */
 
 import type { DubMove } from './_types';
-import { useMixerStore } from '@/stores/useMixerStore';
+import {
+  beginDubTransient,
+  setDubTransient,
+  endDubTransient,
+} from '@/lib/dub/dubChannelTransient';
 
 export const channelMute: DubMove = {
   id: 'channelMute',
@@ -21,16 +28,16 @@ export const channelMute: DubMove = {
   execute({ channelId }) {
     if (channelId === undefined) return null;
 
-    const store = useMixerStore.getState();
-    const wasMuted = store.channels[channelId]?.muted ?? false;
-    if (!wasMuted) store.setChannelMute(channelId, true);
+    beginDubTransient(channelId);
+    setDubTransient(channelId, { muted: true });
 
+    let released = false;
     return {
       dispose() {
-        if (!wasMuted) {
-          try { useMixerStore.getState().setChannelMute(channelId, false); }
-          catch (err) { console.error(`[channelMute] restore failed ch${channelId}:`, err); }
-        }
+        if (released) return;
+        released = true;
+        try { endDubTransient(channelId); }
+        catch (err) { console.error(`[channelMute] restore failed ch${channelId}:`, err); }
       },
     };
   },

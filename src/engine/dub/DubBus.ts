@@ -4347,9 +4347,13 @@ export class DubBus {
   // whole move library (Echo Throw, Dub Stab, Channel Throw, Spring Slam,
   // etc.) was silent on cold channels because the tap only exists after
   // setChannelDubSend's async worklet activation.
-  private channelActivate: ((channelId: number, amount: number) => void) | null = null;
+  // `amount === null` means RELEASE: hand the channel back to whatever the
+  // user's fader says. Passing 0 here used to be the release value, which
+  // silently overwrote a user's non-zero send with 0 (and, paired with the
+  // moves that snapshot the store, ratcheted sends to 1.0 the other way).
+  private channelActivate: ((channelId: number, amount: number | null) => void) | null = null;
 
-  setChannelActivationCallback(cb: ((channelId: number, amount: number) => void) | null): void {
+  setChannelActivationCallback(cb: ((channelId: number, amount: number | null) => void) | null): void {
     this.channelActivate = cb;
   }
 
@@ -4363,7 +4367,8 @@ export class DubBus {
    * Warm path: tap already registered (fader > 0) — ramp existing gain.
    * Cold path: tap not yet registered — drive the mixer store's dubSend
    * via activation callback so the worklet spins up its dub slot, then on
-   * release drive it back to the prior value.
+   * release hand the channel back to the user's fader (the callback owns
+   * that restore; see `src/lib/dub/channelSendBaseline.ts`).
    */
   openChannelTap(
     channelId: number,
@@ -4497,7 +4502,7 @@ export class DubBus {
     if (!this.channelActivate) return () => {};
     this.channelActivate(channelId, clamped);
     return () => {
-      try { this.channelActivate?.(channelId, 0); } catch { /* ok */ }
+      try { this.channelActivate?.(channelId, null); } catch { /* ok */ }
     };
   }
 

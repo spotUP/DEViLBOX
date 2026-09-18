@@ -14,6 +14,11 @@
 
 import type { DubMove } from './_types';
 import { useMixerStore } from '@/stores/useMixerStore';
+import {
+  beginDubTransient,
+  setDubTransient,
+  endDubTransient,
+} from '@/lib/dub/dubChannelTransient';
 import { useTrackerStore } from '@/stores/useTrackerStore';
 import { useInstrumentStore } from '@/stores/useInstrumentStore';
 import { classifySongRoles } from '@/bridge/analysis/ChannelNaming';
@@ -55,13 +60,14 @@ export const riddimSection: DubMove = {
       if (!ch) continue;
       const effectiveRole: ChannelRole = (ch.dubRole as ChannelRole | null) ?? roles[i] ?? 'empty';
       if (!MELODIC_ROLES.has(effectiveRole)) continue;
-      if (!(ch.muted ?? false)) {
-        mixer.setChannelMute(i, true);
-        muted.push(i);
-        // Pick the first skank/chord channel for the delayed echo return
-        if (skankIdx === null && SKANK_ROLES.has(effectiveRole)) {
-          skankIdx = i;
-        }
+      // Borrowed, not set: the release hands the channel back to the user's
+      // own mute state, and nested moves each close their own transient.
+      beginDubTransient(i);
+      setDubTransient(i, { muted: true });
+      muted.push(i);
+      // Pick the first skank/chord channel for the delayed echo return
+      if (skankIdx === null && SKANK_ROLES.has(effectiveRole)) {
+        skankIdx = i;
       }
     }
 
@@ -82,8 +88,9 @@ export const riddimSection: DubMove = {
       const ch = skankIdx;
       skankTimer = setTimeout(() => {
         try {
-          useMixerStore.getState().setChannelMute(ch, false);
-          // Pull ch back out of muted so dispose() doesn't double-unmute it
+          // Skank comes back early — close ITS transient, not the whole move's.
+          endDubTransient(ch);
+          // Pull ch back out of muted so dispose() doesn't double-release it
           const pos = muted.indexOf(ch);
           if (pos !== -1) muted.splice(pos, 1);
           fire('echoThrow', ch, { intensity: 0.85 }, 'live');
@@ -92,15 +99,17 @@ export const riddimSection: DubMove = {
       }, skankReturnMs);
     }
 
+    let released = false;
     return {
       dispose() {
+        if (released) return;
+        released = true;
         if (skankTimer !== null) {
           clearTimeout(skankTimer);
           skankTimer = null;
         }
-        const m = useMixerStore.getState();
         for (const i of muted) {
-          try { m.setChannelMute(i, false); } catch { /* ok */ }
+          try { endDubTransient(i); } catch { /* ok */ }
         }
       },
     };

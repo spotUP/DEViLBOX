@@ -12,11 +12,11 @@ analysis: thoughts/shared/plans/2026-09-17-dub-studio-gap-reconciliation.md
 Durable todo list. Survives compaction, crashes, `/clear`. **Re-read this before trusting
 recollection or any earlier summary in a conversation.**
 
-Running count: **17 of 49 done.**
+Running count: **17 of 51 done.**
 
 **The denominator was wrong until 2026-09-18.** The header said "of 36" from the day this file
 was written and was never updated as sub-items (F1a, F1c, F2a-F2e, T1-T3, the X series) were
-added. Counted from the checkboxes: 17 ticked, 32 open, 49 total. If you change the item list,
+added. Counted from the checkboxes: 17 ticked, 34 open, 51 total (X9 and X10 added 2026-09-18). If you change the item list,
 recount — do not trust this sentence either.
 
 ### Gate status
@@ -33,7 +33,7 @@ recount — do not trust this sentence either.
 | G — wet energy | open | G1 |
 | H-L — musical behaviour | open | H1, I1, J1, K1-K4, L1, L2, AE1 |
 | M-O — record, verify, release | open | M1, N1-N4, O1, O2 |
-| X — user-reported open threads | 1 of 9 | X1 closed |
+| X — user-reported open threads | 1 of 11 | X1 closed |
 
 ### Debt carried, not hidden
 
@@ -508,6 +508,58 @@ this bug.
       madProfPingPong. It accepts them fine (the router takes any registered
       id) but an agent reading the tool description would not know they exist.
       Same staleness class as the manual chapters in X-notes.
+
+- [~] **X9** **Store-level dub sends ratchet to 1.0 and stay there.** FIXED in code,
+      NOT yet verified live by ear. Reported
+      2026-09-18 as "auto dub pushed the master up to 100% and stayed there".
+      The Dub Deck master fader is `max(channel dubSend)` (`DubDeckStrip.tsx:620`),
+      so one pinned channel reads as a pinned master.
+      **Confirmed live by measurement, not reasoning** — with AutoDub having run,
+      `get_dub_bus_state` showed channels 0, 1 and 3 at `dubSend: 1` exactly while
+      `get_mixer_state` showed those same three channels muted. That pairing is
+      `ghostReverb`'s signature (mute dry + send to 1.0), left applied.
+      Same bug CLASS as the tap ratchet (`20771d1c5`) and the whole-mix fader
+      ratchet (2026-09-17), but on the path neither fix covered: the moves that
+      write `useMixerStore.channels[].dubSend` directly — `ghostReverb.ts` and
+      `echoBuildUp.ts`. Both snapshot the live store value at `execute()` time,
+      which is another move's transient whenever moves overlap (AutoDub interleaves
+      them; `ghostReverb` global also snapshots channels a per-channel `ghostReverb`
+      is currently holding). Their restore then writes that transient back as the
+      resting value.
+      Root cause is one level up from either move: `dubSend` and `muted` conflate
+      "what the user set" with "what a move is applying right now". Fix is a
+      baseline separated from the applied value and resolved at RELEASE time —
+      the `ChannelTapBaselines` idea (`src/lib/dub/channelTapBaseline.ts`), which
+      exists for the audio-node path only, brought to the store path.
+      Likely also the mechanism behind the §5 audio death: `ghostReverb` global
+      mutes every sending channel, and a failed restore leaves the module muting
+      every channel at the source, which is exactly `effectiveMainMask`
+      rendering silence.
+      **Fix shipped:** `src/lib/dub/channelSendBaseline.ts` (ref-counted
+      baselines — store transients NEST, unlike node taps) and
+      `dubChannelTransient.ts` (the only way a move may touch a channel's send
+      or mute). `setChannelDubSend` / `setChannelMute` take
+      `{ transient: true }`; a write without it is the user's and defines the
+      baseline. Converted: `ghostReverb`, `echoBuildUp`, `channelMute`,
+      `versionDrop`, `riddimSection`, and the cold-path activation callback in
+      `DrumPadEngine` (`openChannelTap` now releases with `null`, not `0`,
+      which had been overwriting a user's non-zero send with 0).
+      `channelMute`/`versionDrop`/`riddimSection` were found by the test that
+      forbids a move writing the store directly — a grep for `dubSend` alone
+      had missed the mute-only moves.
+      Regression test `src/engine/dub/__tests__/dubSendRatchet.test.ts` (18
+      cases, in `test:ci`): 6 fail on the pre-fix code, all pass after.
+      **Open: a human still has to hear it** — run AutoDub for a few minutes and
+      confirm the Dub Deck master fader does not walk to 100%.
+
+- [ ] **X10** **Dub bus clips and distorts most of the time.** Reported
+      2026-09-18. Not yet investigated. Measure before touching anything:
+      `__dubBus().getDiagnosticSnapshot()` reports every boosting stage next to
+      its mirror plus `inputRms` / `returnRms`, and the handoff records peaks of
+      1.00-1.03 at master 0 dB on the Perry preset (`returnGain 0.9`,
+      `extFeedbackGain 0.035`, `masterBassPunchDb 8`). Note X9 makes this worse
+      while it stands — pinned sends feed the echo continuously — so re-measure
+      after X9 lands before concluding anything about gain staging.
 
 - [ ] **X3** `extFeedbackEqDb` is a +1 dB boost inside the ext loop with no
       mirror. Harmless now the limiter is in place and the tap moved, but it is

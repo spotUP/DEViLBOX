@@ -13,6 +13,11 @@
 
 import type { DubMove } from './_types';
 import { useMixerStore } from '@/stores/useMixerStore';
+import {
+  beginDubTransient,
+  setDubTransient,
+  endDubTransient,
+} from '@/lib/dub/dubChannelTransient';
 import { useTrackerStore } from '@/stores/useTrackerStore';
 import { useInstrumentStore } from '@/stores/useInstrumentStore';
 import { classifySongRoles } from '@/bridge/analysis/ChannelNaming';
@@ -43,8 +48,9 @@ export const versionDrop: DubMove = {
     }
 
     // Mute every melodic channel; respect user dubRole overrides
+    // Every muted channel is a transient: the move never decides what the
+    // channel's resting mute is, it only borrows it (channelSendBaseline.ts).
     const channels = mixer.channels;
-    const prevMuted: boolean[] = [];
     const muted: number[] = [];
 
     for (let i = 0; i < channels.length; i++) {
@@ -54,18 +60,18 @@ export const versionDrop: DubMove = {
       const effectiveRole: ChannelRole = (ch.dubRole as ChannelRole | null) ?? roles[i] ?? 'empty';
       if (!MELODIC_ROLES.has(effectiveRole)) continue;
 
-      prevMuted[i] = ch.muted ?? false;
-      if (!prevMuted[i]) {
-        mixer.setChannelMute(i, true);
-        muted.push(i);
-      }
+      beginDubTransient(i);
+      setDubTransient(i, { muted: true });
+      muted.push(i);
     }
 
+    let released = false;
     return {
       dispose() {
-        const m = useMixerStore.getState();
+        if (released) return;
+        released = true;
         for (const i of muted) {
-          try { m.setChannelMute(i, false); } catch (err) {
+          try { endDubTransient(i); } catch (err) {
             console.error(`[versionDrop] RESTORE failed ch${i}:`, err);
           }
         }

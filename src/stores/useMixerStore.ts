@@ -17,6 +17,19 @@ import { createBatchedSet } from '@/utils/batchedSet';
 import { getSendBusManager } from '../engine/SendBusManager';
 import { getChannelRoutedEffectsManager } from '../engine/tone/ChannelRoutedEffects';
 import { getActiveDubBus } from '../engine/dub/DubBus';
+import { dubSendBaselines } from '@/lib/dub/channelSendBaseline';
+
+/**
+ * Who is writing a channel's dub send / mute.
+ *
+ * Default (omitted) is the user — a fader, a MIDI control, an MCP call — and
+ * that write defines the resting value a dub move must hand the channel back
+ * at. `transient: true` is a dub move borrowing the control; it changes what
+ * you hear without changing what the channel rests at.
+ */
+export interface DubWriteOrigin {
+  transient?: boolean;
+}
 
 // Rebuild WASM per-channel effect routing after any insert-effect mutation
 // or when a master effect's selectedChannels changes.
@@ -736,7 +749,7 @@ interface MixerStoreState {
 interface MixerStoreActions {
   setChannelVolume: (ch: number, vol: number) => void;
   setChannelPan: (ch: number, pan: number) => void;
-  setChannelMute: (ch: number, muted: boolean) => void;
+  setChannelMute: (ch: number, muted: boolean, opts?: DubWriteOrigin) => void;
   setChannelSolo: (ch: number, soloed: boolean) => void;
   setChannelEffect: (ch: number, slot: 0 | 1, type: string | null) => void;
   setMasterVolume: (vol: number) => void;
@@ -751,7 +764,7 @@ interface MixerStoreActions {
   updateChannelInsertEffect: (ch: number, effectIndex: number, updates: Partial<EffectConfig>) => void;
 
   // Dub bus send
-  setChannelDubSend: (ch: number, amount: number) => void;
+  setChannelDubSend: (ch: number, amount: number, opts?: DubWriteOrigin) => void;
 
   // Manual dub role override (null = auto, string = ChannelRole)
   setChannelDubRole: (ch: number, role: string | null) => void;
@@ -840,7 +853,10 @@ export const useMixerStore = create<MixerStore>()(
       });
     },
 
-    setChannelMute(ch: number, muted: boolean): void {
+    setChannelMute(ch: number, muted: boolean, opts?: DubWriteOrigin): void {
+      // A move borrows the mute; the user OWNS it. Only a user write moves the
+      // baseline a dub transient will restore to (see channelSendBaseline.ts).
+      if (!opts?.transient) dubSendBaselines.noteUserMute(ch, muted);
       set((state) => {
         state.channels[ch].muted = muted;
       });
@@ -1019,8 +1035,14 @@ export const useMixerStore = create<MixerStore>()(
     // write is rAF-batched so rapid drag (60 calls/sec) produces at most
     // one React re-render per frame — prevents main-thread stalls that
     // cause SID ScriptProcessor audio stutter during slider drag.
-    setChannelDubSend(ch: number, amount: number): void {
+    setChannelDubSend(ch: number, amount: number, opts?: DubWriteOrigin): void {
       const clamped = Math.max(0, Math.min(1, amount));
+
+      // Same rule as the mute above: a transient write is a move borrowing the
+      // send, so it must not become the value the next move restores to. This
+      // is what stopped sends ratcheting to 1.0 and pinning the Dub Deck's
+      // master fader (which reads max-of-sends) at 100%.
+      if (!opts?.transient) dubSendBaselines.noteUserSend(ch, clamped);
 
       // Audio update FIRST — immediate, never deferred.
       // SID mode: route to per-voice taps on the dub bus directly.
