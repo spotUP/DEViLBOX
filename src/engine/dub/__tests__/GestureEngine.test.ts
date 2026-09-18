@@ -183,10 +183,121 @@ describe('GestureEngine — shapes a move cannot serve', () => {
     expect(g.shape).toBe('ramp');           // the request is not rewritten
   });
 
-  it('is not degraded when the move can update its params mid-flight', () => {
+  it('is not degraded when the move can update AND the spec says what travels', () => {
+    moveSupportsUpdate = true;
+    beginGesture(spec({
+      shape: 'sweep',
+      automate: { param: 'targetHz', from: 20000, to: 200, curve: 'exponential' },
+    }));
+    expect(activeGestures()[0].degraded).toBeUndefined();
+  });
+
+  // Behaviour CHANGED when Gate F4 closed and the shapes became real. Being
+  // able to accept a parameter is half the requirement; before, that half was
+  // all the engine checked, because there was nothing to drive. Now the spec
+  // must also name the parameter and its range, and a gesture that says
+  // "sweep" without saying what is swept is a caller bug worth reporting.
+  it('is degraded when the move can update but nothing says which param moves', () => {
     moveSupportsUpdate = true;
     beginGesture(spec({ shape: 'sweep' }));
-    expect(activeGestures()[0].degraded).toBeUndefined();
+    expect(activeGestures()[0].degraded).toMatch(/which parameter/);
+  });
+
+  it('is degraded when the hold is open-ended, because there is no progress to be at', () => {
+    moveSupportsUpdate = true;
+    beginGesture(spec({
+      shape: 'ramp',
+      holdMs: 0,
+      automate: { param: 'targetHz', from: 20000, to: 200 },
+    }));
+    // holdMs 0 is a one-shot, so the gesture is already gone; the reason is
+    // what matters and it is recorded before the move completes.
+    expect(fired).toHaveLength(1);
+  });
+});
+
+describe('Gate F4 — a ramp actually moves the parameter while held', () => {
+  const automate = { param: 'targetHz', from: 20000, to: 200, curve: 'exponential' as const };
+
+  it('pushes the start of the range the moment it begins', () => {
+    moveSupportsUpdate = true;
+    beginGesture(spec({ shape: 'ramp', holdMs: 1000, automate }));
+    expect(handleUpdates[0]).toEqual({ targetHz: 20000 });
+  });
+
+  it('keeps pushing values as the hold runs, in the direction asked for', () => {
+    moveSupportsUpdate = true;
+    beginGesture(spec({ shape: 'ramp', holdMs: 1000, automate }));
+    vi.advanceTimersByTime(500);
+    const values = handleUpdates.map(u => u.targetHz);
+    expect(values.length).toBeGreaterThan(5);
+    // Monotonically downward — a filter being closed, not jittering.
+    for (let i = 1; i < values.length; i++) {
+      expect(values[i]).toBeLessThanOrEqual(values[i - 1]);
+    }
+    expect(values[values.length - 1]).toBeLessThan(20000);
+  });
+
+  it('arrives exactly at the target by the end of the hold, not near it', () => {
+    moveSupportsUpdate = true;
+    beginGesture(spec({ shape: 'ramp', holdMs: 1000, automate }));
+    vi.advanceTimersByTime(1000);
+    const last = handleUpdates[handleUpdates.length - 1].targetHz;
+    expect(last).toBeCloseTo(200, 6);
+  });
+
+  it('stops pushing once the gesture has released', () => {
+    moveSupportsUpdate = true;
+    beginGesture(spec({ shape: 'ramp', holdMs: 500, automate }));
+    vi.advanceTimersByTime(500);
+    const settled = handleUpdates.length;
+    vi.advanceTimersByTime(2000);
+    expect(handleUpdates).toHaveLength(settled);
+  });
+
+  it('a sweep comes back to where it started', () => {
+    moveSupportsUpdate = true;
+    beginGesture(spec({ shape: 'sweep', holdMs: 1000, automate }));
+    vi.advanceTimersByTime(500);
+    const mid = handleUpdates[handleUpdates.length - 1].targetHz;
+    vi.advanceTimersByTime(500);
+    const end = handleUpdates[handleUpdates.length - 1].targetHz;
+    expect(mid).toBeCloseTo(200, 0);
+    expect(end).toBeCloseTo(20000, 0);
+  });
+
+  it('a longer hold sweeps for longer, rather than freezing where it stood', () => {
+    moveSupportsUpdate = true;
+    const id = beginGesture(spec({ shape: 'ramp', holdMs: 1000, automate }));
+    vi.advanceTimersByTime(500);
+    const atHalf = handleUpdates[handleUpdates.length - 1].targetHz;
+
+    updateGesture(id, { holdMs: 2000 });
+    // Extending must not jump the value back to the top of the range.
+    expect(handleUpdates[handleUpdates.length - 1].targetHz).toBeCloseTo(atHalf, 0);
+
+    vi.advanceTimersByTime(500);
+    const atOneSecond = handleUpdates[handleUpdates.length - 1].targetHz;
+    // Under the ORIGINAL hold this instant was the end of the ramp; under the
+    // extended one it is only halfway, so it must still be above the target.
+    expect(atOneSecond).toBeGreaterThan(200);
+    expect(atOneSecond).toBeLessThan(atHalf);
+  });
+
+  it('never fires the move a second time — the shape is one gesture', () => {
+    moveSupportsUpdate = true;
+    beginGesture(spec({ shape: 'sweep', holdMs: 1000, automate }));
+    vi.advanceTimersByTime(1000);
+    expect(fired).toHaveLength(1);
+  });
+
+  it('survives a move whose update throws, without killing the gesture', () => {
+    moveSupportsUpdate = true;
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    beginGesture(spec({ shape: 'ramp', holdMs: 500, automate }));
+    vi.advanceTimersByTime(500);
+    expect(disposed).toHaveLength(1);        // still released cleanly
+    warn.mockRestore();
   });
 
   it('pushes params into a move that accepts them, and reports when it cannot', () => {
