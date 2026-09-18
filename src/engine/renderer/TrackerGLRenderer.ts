@@ -152,7 +152,10 @@ function getNoteTable(displayOffset: number): string[] {
 const COL_GAP = 4; // Gap between columns in data-driven mode
 
 // Effect type char lookup (0-35 → '0'-'9','A'-'Z', 36-40 → dub 'Z')
-const EFFECT_CHARS: string[] = new Array(41);
+// Sized to cover the highest declared dub slot (42). Literal, not an import:
+// this module is bundled into the render worker and must not pull in the dub
+// engine. The dub-slot ratchet test asserts coverage of DUB_EFFECT_TYPE_MAX.
+const EFFECT_CHARS: string[] = new Array(43);
 for (let i = 0; i < 10; i++) EFFECT_CHARS[i] = i.toString();
 for (let i = 10; i < 36; i++) EFFECT_CHARS[i] = String.fromCharCode(55 + i);
 EFFECT_CHARS[36] = 'Z';  // DUB_EFFECT_GLOBAL
@@ -160,6 +163,8 @@ EFFECT_CHARS[37] = 'Z';  // DUB_EFFECT_PERCHANNEL
 EFFECT_CHARS[38] = 'Z';  // DUB_EFFECT_PARAM_STEP
 EFFECT_CHARS[39] = 'Z';  // DUB_EFFECT_GLOBAL_X — extended slot for moves 16-31
 EFFECT_CHARS[40] = 'Z';  // DUB_EFFECT_PERCHANNEL_X — extended slot for moves 16-31
+EFFECT_CHARS[41] = 'Z';  // DUB_EFFECT_GLOBAL_X2 — third pair, moves 32-47
+EFFECT_CHARS[42] = 'Z';  // DUB_EFFECT_PERCHANNEL_X2 — third pair, moves 32-47
 
 // Pre-parsed probability colors
 const PROB_COLORS: [number, number, number, number][] = [

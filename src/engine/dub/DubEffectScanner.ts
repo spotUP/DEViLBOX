@@ -4,9 +4,9 @@
  * normal DubRouter path. Runs AFTER DubLanePlayer, so lane events fire
  * before the same row's cell-level triggers — deterministic ordering.
  *
- * Scope: primary effect columns only (`effTyp`, `effTyp2`). Slots 3-8 are
- * Furnace import-only and never dispatched by the replayer today — if we
- * ever wire them, add here.
+ * Scope: all eight effect columns. The replayer dispatches effTyp2..effTyp8
+ * for ordinary effects, so a dub cell in any of them must fire too — scanning
+ * only columns 1-2 made a visible Zxx cell silently do nothing (plan F2b).
  *
  * Row dedupe: the tick fires once per unique integer row. If the transport
  * floats and calls us twice for the same row (jitter, precision wobble),
@@ -17,16 +17,22 @@
 
 import { fireFromEffectCommand } from './DubRouter';
 import { useTrackerStore } from '@/stores/useTrackerStore';
-import { DUB_EFFECT_GLOBAL, DUB_EFFECT_PERCHANNEL_X } from './moveTable';
-
-const DUB_EFFECT_MIN = DUB_EFFECT_GLOBAL;          // 36
-const DUB_EFFECT_MAX = DUB_EFFECT_PERCHANNEL_X;    // 40 (covers 36-40: base moves, param step, extended moves)
+import { isDubEffectTypeForDisplay } from './moveTable';
 
 let _lastRowFired = -1;
 
+/**
+ * Which effTyp values this scanner dispatches.
+ *
+ * Deliberately the SAME range the display paths use: a cell that renders as
+ * `Zxx` must also fire. This used to be a local `36..40` constant and was an
+ * independent ceiling — declaring a slot pair without also editing this file
+ * produced cells that drew correctly and silently never fired. Sourcing the
+ * range from moveTable removes that failure mode.
+ */
 function isDubEffTyp(effTyp: number | undefined): boolean {
   if (effTyp === undefined) return false;
-  return effTyp >= DUB_EFFECT_MIN && effTyp <= DUB_EFFECT_MAX;
+  return isDubEffectTypeForDisplay(effTyp);
 }
 
 /**
@@ -47,13 +53,22 @@ export function scanDubEffectsForRow(row: number): void {
     for (let ch = 0; ch < pattern.channels.length; ch++) {
       const cell = pattern.channels[ch].rows[row];
       if (!cell) continue;
-      // Primary slot
-      if (isDubEffTyp(cell.effTyp)) {
-        fireFromEffectCommand(cell.effTyp, cell.eff ?? 0, ch);
-      }
-      // Secondary slot — classic trackers support two effect columns
-      if (isDubEffTyp(cell.effTyp2)) {
-        fireFromEffectCommand(cell.effTyp2!, cell.eff2 ?? 0, ch);
+      // All eight effect columns, in column order so firing is deterministic.
+      //
+      // Plan item F2b, decided on evidence 2026-09-18: this used to scan only
+      // columns 1-2, documented as "slots 3-8 are Furnace import-only and never
+      // dispatched by the replayer". That is not true — TrackerReplayer
+      // dispatches effTyp2..effTyp8 (see its per-row effect loop), so a dub
+      // move typed into column 3 rendered as Zxx, sat in a column the replayer
+      // honours for every other effect, and silently never fired. Consistency
+      // with the replayer is the rule; a visible cell must do something.
+      for (const [eTyp, eVal] of [
+        [cell.effTyp,  cell.eff],  [cell.effTyp2, cell.eff2],
+        [cell.effTyp3, cell.eff3], [cell.effTyp4, cell.eff4],
+        [cell.effTyp5, cell.eff5], [cell.effTyp6, cell.eff6],
+        [cell.effTyp7, cell.eff7], [cell.effTyp8, cell.eff8],
+      ] as const) {
+        if (isDubEffTyp(eTyp)) fireFromEffectCommand(eTyp!, eVal ?? 0, ch);
       }
     }
   } catch {
