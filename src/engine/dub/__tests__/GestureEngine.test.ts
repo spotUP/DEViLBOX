@@ -261,3 +261,21 @@ describe('GestureEngine — cancellation', () => {
     spy.mockRestore();
   });
 });
+
+describe('GestureEngine — a hold with no fixed length', () => {
+  it('stays in flight until it is ended, which is what a held pad needs', () => {
+    const id = beginGesture(spec({ holdMs: 0 }));
+    vi.advanceTimersByTime(60_000);
+    expect(gestureCount()).toBe(1);          // still held a minute later
+    expect(disposed).toHaveLength(0);
+    endGesture(id);
+    expect(disposed).toEqual(['echoThrow']);
+  });
+
+  it('is reachable by a panic, unlike a disposer closed over in a component', () => {
+    beginGesture(spec({ moveId: 'dubSiren', holdMs: 0 }));
+    beginGesture(spec({ moveId: 'crushBass', holdMs: 0 }));
+    expect(cancelAllGestures('stopped')).toBe(2);
+    expect(disposed.sort()).toEqual(['crushBass', 'dubSiren']);
+  });
+});
