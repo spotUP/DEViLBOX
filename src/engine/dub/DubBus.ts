@@ -54,6 +54,7 @@ import { useNotificationStore } from '@/stores/useNotificationStore';
 import { resolveVinylLevel } from '@/lib/dub/vinylLevel';
 import { ChannelTapBaselines } from '@/lib/dub/channelTapBaseline';
 import { makeSoftClipCurve } from '@/lib/dub/softClipCurve';
+import { generatedPeak } from './programmeReference';
 
 /** Where the master insert's safety clipper starts to saturate. */
 const MASTER_CLIP_THRESHOLD = 0.9;
@@ -2821,6 +2822,8 @@ export class DubBus {
    */
   private _sirenSynth: import('./DubSirenSynth').DubSirenSynth | null = null;
   private _sirenSynthConnected = false;
+  /** Level gain for the siren, referenced to the programme (X11). */
+  private _sirenLevelGain: GainNode | null = null;
   async _ensureSirenSynth(): Promise<import('./DubSirenSynth').DubSirenSynth | null> {
     if (this._sirenSynth) return this._sirenSynth;
     try {
@@ -2868,11 +2871,25 @@ export class DubBus {
       if (!synth || released) return;
       if (!this._sirenSynthConnected) {
         try {
-          synth.output.connect(this.input);
+          // X11: the siren goes through a level gain referenced to the
+          // programme, not straight into the bus at whatever the synth
+          // produces. A generated tone at a fixed amplitude is a level
+          // relative to FULL SCALE, and a tracker mix plays nowhere near it.
+          if (!this._sirenLevelGain) {
+            this._sirenLevelGain = this.context.createGain();
+            this._sirenLevelGain.connect(this.input);
+          }
+          synth.output.connect(this._sirenLevelGain);
           this._sirenSynthConnected = true;
         } catch (err) {
           console.warn('[DubBus] siren synth connect failed:', err);
         }
+      }
+      // Set per attack: the programme's level now is what matters, not what it
+      // was when the siren was first connected.
+      if (this._sirenLevelGain) {
+        const peak = generatedPeak('siren');
+        this._sirenLevelGain.gain.setTargetAtTime(peak, this.context.currentTime, 0.01);
       }
       try { synth.triggerAttack(undefined, midiNote, 1.0); } catch { /* ok */ }
       release = () => { try { synth.triggerRelease(); } catch { /* ok */ } };
@@ -5353,7 +5370,9 @@ export class DubBus {
       const env = ctx.createGain();
       env.gain.value = 0;
       osc.connect(env);
-      const peak = Math.max(0, Math.min(1.0, level));
+      // X11: referenced to the music, not to full scale. A flat 0.8 peak sat
+      // 15-20 dB over a tracker mix that plays at 0.05-0.15 RMS.
+      const peak = generatedPeak('sonarPing', level);
       env.gain.setValueAtTime(0, now);
       env.gain.linearRampToValueAtTime(peak, now + 0.005);
       env.gain.exponentialRampToValueAtTime(Math.max(0.0001, peak * 0.01), now + durationMs / 1000);
@@ -5406,7 +5425,7 @@ export class DubBus {
       // Rising envelope
       const env = ctx.createGain();
       env.gain.value = 0;
-      const peak = Math.max(0, Math.min(1.0, level));
+      const peak = generatedPeak('radioRiser', level);
       env.gain.setValueAtTime(0, now);
       env.gain.linearRampToValueAtTime(peak, now + dur);
       env.gain.linearRampToValueAtTime(0, now + dur + 0.05);
@@ -5451,7 +5470,7 @@ export class DubBus {
       const env = ctx.createGain();
       env.gain.value = 0;
       osc.connect(env);
-      const peak = Math.max(0, Math.min(1.0, level));
+      const peak = generatedPeak('subSwell', level);
       const dur = durationMs / 1000;
       env.gain.setValueAtTime(0, now);
       env.gain.linearRampToValueAtTime(peak, now + 0.02);
@@ -5516,7 +5535,7 @@ export class DubBus {
       // a song at baseline 0.86 pushed peak to 1.066 in the 2026-04-20 sweep.
       // Clamp at 0.55 leaves enough headroom that even in-phase summation
       // with a loud song stays below full scale.
-      const peak = Math.max(0, Math.min(0.55, level));
+      const peak = generatedPeak('subHarmonic', level);
       env.gain.setValueAtTime(0, now);
       env.gain.linearRampToValueAtTime(peak, now + 0.01);
       env.gain.exponentialRampToValueAtTime(0.0001, now + 0.2);
@@ -5589,7 +5608,7 @@ export class DubBus {
     // end — measured peak 1.004 in the 2026-04-20 sweep at level 0.75 over
     // baseline 0.75. Clamp at 0.55 keeps it under unity while still sounding
     // aggressive against the mix.
-    const peak = Math.max(0, Math.min(0.55, level));
+    const peak = generatedPeak('crushBass', level);
     env.gain.setValueAtTime(0, now);
     env.gain.linearRampToValueAtTime(peak, now + 0.05);
     osc.start(now);
@@ -5656,7 +5675,7 @@ export class DubBus {
     filt.connect(env);
     env.connect(softClip);
     softClip.connect(this.return_);
-    const peak = Math.max(0, Math.min(0.6, level));
+    const peak = generatedPeak('oscBass', level);
     env.gain.setValueAtTime(0, now);
     env.gain.linearRampToValueAtTime(peak, now + 0.08);
     osc.start(now);
@@ -6187,7 +6206,7 @@ export class DubBus {
       const env = ctx.createGain();
       env.gain.value = 0;
       hp.connect(env);
-      const peak = Math.min(1.5, Math.max(0, level));
+      const peak = generatedPeak('noiseBurst', level);
       const now = ctx.currentTime;
       env.gain.setValueAtTime(0, now);
       env.gain.linearRampToValueAtTime(peak, now + 0.001);

@@ -12,7 +12,7 @@ analysis: thoughts/shared/plans/2026-09-17-dub-studio-gap-reconciliation.md
 Durable todo list. Survives compaction, crashes, `/clear`. **Re-read this before trusting
 recollection or any earlier summary in a conversation.**
 
-Running count: **32 of 52 done.**
+Running count: **33 of 52 done.**
 
 **The denominator was wrong until 2026-09-18.** The header said "of 36" from the day this file
 was written and was never updated as sub-items (F1a, F1c, F2a-F2e, T1-T3, the X series) were
@@ -33,7 +33,7 @@ recount — do not trust this sentence either.
 | G — wet energy | **closed** | G1 |
 | H-L — musical behaviour | **closed** | H1, I1, J1, K1-K4, L1, L2, AE1 |
 | M-O — record, verify, release | open | M1, N1-N4, O1, O2 |
-| X — user-reported open threads | 1 of 12 | X1 closed |
+| X — user-reported open threads | 2 of 12 | X1, X11 closed (X11 needs a listening check) |
 
 ### Debt carried, not hidden
 
@@ -766,7 +766,8 @@ this bug.
       **Open: a human still has to hear it** — run AutoDub for a few minutes and
       confirm the Dub Deck master fader does not walk to 100%.
 
-- [ ] **X11** **Generated effects are far louder than the music.** Reported 2026-09-18:
+- [x] **X11** **Generated effects are far louder than the music.** FIXED in code, NOT yet
+      verified by ear. Reported 2026-09-18:
       "some effects like the siren etc are MUCH louder than the music". The synthesised
       moves — `dubSiren` (`DubSirenSynth`), `sonarPing`, `toast`, `tubbyScream`,
       `oscBass`, `subHarmonic` — generate their own audio at a fixed level instead of one
@@ -781,6 +782,24 @@ this bug.
       constant per move — that is the same class of mistake as the master insert's
       uncompensated shelf (X10). Related: X10's trim work changed overall level, so
       re-measure after it is verified by ear.
+      **Fixed:** `src/lib/dub/programmeLevel.ts` (pure) + `src/engine/dub/programmeReference.ts`
+      (the live smoothed reading). Measured cause: `firePing` fired a sine at peak 0.8
+      ABSOLUTE straight into the bus while the programme played at 0.05-0.15 RMS —
+      15-20 dB over the music, exactly as reported.
+      A smaller constant would be wrong for the next song in the other direction, so
+      generated peaks are now a fraction of the PROGRAMME'S OWN measured peak. Not of its
+      RMS: a listener judges "as loud as the music" against what the music peaks at, and
+      a tracker mix's ~12 dB crest factor would put an RMS-referenced level about four
+      times too loud. Relative presence per move survives as musical intent (a scream is
+      louder than a ping), and the move's own `level` parameter now SCALES that presence
+      instead of replacing it.
+      Silence has no reference, so it falls back to a modest fixed peak — audible when
+      auditioning with nothing loaded, not painful. The reading is smoothed with a fast
+      attack and slow release so the reference describes the tune rather than a transient.
+      Converted: sonarPing, radioRiser, subSwell, subHarmonic, crushBass, oscBass,
+      noiseBurst, and the siren (behind its own level gain rather than straight into the
+      bus). 17 tests, including a contract test that no generated source is left on a raw
+      full-scale clamp.
 
 - [ ] **X10** **Dub bus clips and distorts most of the time.** Reported
       2026-09-18. Not yet investigated. Measure before touching anything:
