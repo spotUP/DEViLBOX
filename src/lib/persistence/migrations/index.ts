@@ -29,7 +29,7 @@ export const MIN_LOADABLE_SCHEMA = 21;
  * every save and gates loads against it. Kept here so the migration chain and
  * the writer share one source of truth.
  */
-export const CURRENT_SCHEMA = 22;
+export const CURRENT_SCHEMA = 23;
 
 /**
  * Forward-migrate a saved project in place from `fromVersion` up to the current
@@ -47,6 +47,11 @@ export function migrateSavedProject(
   //          Joseph, Jason Page) added. Purely additive — a v21 project simply
   //          has no companions, so there is nothing to transform. Future
   //          migrations chain below, guarded by `if (fromVersion < N)`.
+  // 22 → 23: `performanceJournal` (Gate M1) — what the dub performer played
+  //          and why. Purely additive AND forward-compatible: a v22 project
+  //          simply has no journal, and a v23 project loads in a build that
+  //          has never heard of the field, because it is commentary rather
+  //          than anything replay depends on.
   void fromVersion;
 
   // Stamp the project at the current schema so a subsequent save is not
