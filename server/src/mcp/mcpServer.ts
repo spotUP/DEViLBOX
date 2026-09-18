@@ -7,10 +7,36 @@
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
+import { config as loadEnv } from 'dotenv';
 import { readFile, readdir, stat as fsStat } from 'fs/promises';
-import { basename, dirname, join } from 'path';
+import { basename, dirname, join, resolve } from 'path';
 import { callBrowser } from './wsRelay';
 
+/**
+ * Load the REPO ROOT `.env`, not whatever `.env` the cwd happens to have.
+ *
+ * The MCP server is a separate process from the Express API, started by the
+ * harness with `cwd: server/`. `dotenv/config` resolves against the cwd, so it
+ * looked for `server/.env` — which does not exist — while the API process is
+ * started from the repo root and does find `.env` there.
+ *
+ * The consequence was not a crash but something worse: `.env` sets PORT=3011,
+ * the API listened on 3011, and this process fell back to 3001 where an
+ * unrelated service happens to be listening. So every modland tool got a
+ * perfectly valid 404 from the wrong server, and read as "the modland index is
+ * broken" rather than "we asked the wrong door". Reported 2026-09-18 as
+ * search_modland and load_modland both returning 404 while the same query
+ * answered fine over curl.
+ *
+ * Resolved from this file's own location so it holds whatever the cwd is.
+ * `__dirname` rather than `import.meta` because this package compiles as
+ * CommonJS — the same idiom `server/src/index.ts` and `routes/ai.ts` use.
+ */
+loadEnv({ path: resolve(__dirname, '..', '..', '..', '.env') });
+
+/**
+ * Where the Express API lives. One port truth, read after the env is loaded.
+ */
 const API_BASE = `http://localhost:${process.env.PORT || 3001}`;
 
 // Helper: wrap callBrowser result as MCP text content
@@ -646,7 +672,7 @@ export function createMcpServer(): McpServer {
 
   server.tool(
     'fire_dub_move',
-    'Fire a dub move by id through DubRouter. Returns heldHandle for hold-kind moves (pass to release_dub_move to stop). Trigger-kind moves return heldHandle:null. Requires bus enabled (see set_dub_bus_enabled). Processors need channel sends > 0 to be audible. Valid moveIds: echoThrow, dubStab, filterDrop, dubSiren, springSlam, channelMute, channelThrow, delayTimeThrow, tapeWobble, masterDrop, snareCrack, tapeStop, backwardReverb, toast, transportTapeStop, tubbyScream, stereoDoubler, reverseEcho, sonarPing, radioRiser, subSwell, oscBass, echoBuildUp, delayPreset380, delayPresetDotted, crushBass, subHarmonic.',
+    'Fire a dub move by id through DubRouter. Returns heldHandle for hold-kind moves (pass to release_dub_move to stop). Trigger-kind moves return heldHandle:null. Requires bus enabled (see set_dub_bus_enabled). Processors need channel sends > 0 to be audible. Channel-scoped moves do nothing without channelId. Valid moveIds (all 44, kept in step with DubRouter.MOVES by moveRegistryContract.test.ts): backwardReverb, channelMute, channelThrow, combSweep, crushBass, delayPreset16th, delayPreset380, delayPreset8th, delayPresetDotted, delayPresetDoubler, delayPresetQuarter, delayPresetTriplet, delayTimeThrow, dubSiren, dubStab, echoBuildUp, echoThrow, eqSweep, filterDrop, ghostReverb, hpfRise, madProfPingPong, masterDrop, oscBass, radioRiser, reverseEcho, riddimSection, ringMod, skankEchoThrow, skankFloatThrow, snareCrack, sonarPing, springKick, springSlam, stereoDoubler, subHarmonic, subSwell, tapeStop, tapeWobble, toast, transportTapeStop, tubbyScream, versionDrop, voltageStarve.',
     {
       moveId: z.string().describe('Move id (e.g. "echoThrow", "tubbyScream")'),
       channelId: z.number().int().optional().describe('Tracker channel index when the move is channel-scoped'),
