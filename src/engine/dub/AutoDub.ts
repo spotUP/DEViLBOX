@@ -55,12 +55,7 @@ import {
   gestureCount,
   activeGestures,
 } from './GestureEngine';
-import {
-  EnergyLedger,
-  DEFAULT_ENERGY_BUDGET,
-  scaleBudget,
-  type EnergyBudget,
-} from '@/lib/dub/moveEnergy';
+import { EnergyLedger, type EnergyBudget } from '@/lib/dub/moveEnergy';
 import {
   buildPerformanceContext,
   readWetEnergy,
@@ -77,6 +72,11 @@ import {
 import { trackerEventSources } from '@/lib/dub/musicalEvents';
 import { buildMusicalChannelProfile, type MusicalChannelProfile } from '@/lib/dub/musicalChannelProfile';
 import { pickTarget } from '@/lib/dub/musicalTargeting';
+import {
+  behaviourFor,
+  intentionPolicyFor,
+  energyBudgetFor,
+} from '@/lib/dub/personaBehaviour';
 
 /** Live analysis context injected into every tick. Null until analysis has run. */
 export interface EQSnapshot {
@@ -1060,6 +1060,9 @@ const ALL_CHANNELS: readonly number[] = Object.freeze(
  */
 const _energyLedger = new EnergyLedger();
 
+/** Persona whose behaviour is currently applied to the planner (Gate K1). */
+let _appliedBehaviourFor: string | null = null;
+
 /** Live energy reading, for MCP diagnostics and the fire log. */
 export function getAutoDubEnergy(): ReturnType<EnergyLedger['read']> {
   return _energyLedger.read(performance.now() / 1000);
@@ -1489,6 +1492,17 @@ function tickImpl(): void {
   triggerSidVoiceClassificationIfNew();
 
   const persona = getPersona(dub.autoDubPersona);
+
+  // Gate K1: the persona's behavioural profile drives the intention policy and
+  // the energy budget. `intensity` used to do all of this at once — how often
+  // anything fired, how many moves a bar could hold, and how bold they were —
+  // so "restless but gentle" was unsayable. These are separate axes now.
+  const behaviour = behaviourFor(persona.id);
+  if (_appliedBehaviourFor !== persona.id) {
+    _intentionPlanner.setPolicy(intentionPolicyFor(behaviour));
+    _appliedBehaviourFor = persona.id;
+  }
+
   const bundle = getCurrentPatternBundle();
 
   // Apply user-set channel role overrides (highest priority — overrides
@@ -1595,10 +1609,7 @@ function tickImpl(): void {
   // Gate G: the ledger decides what may layer, from what is actually in the
   // air. Personas scale the budget; none of them scale the hard ceiling.
   const nowSec = performance.now() / 1000;
-  const budget: EnergyBudget = scaleBudget(
-    DEFAULT_ENERGY_BUDGET,
-    persona.budgetCap !== undefined ? Math.max(0.5, persona.budgetCap / 2) : 1,
-  );
+  const budget: EnergyBudget = energyBudgetFor(behaviour);
 
   const choice = chooseMove({
     bar, barPos, isNewBar,
@@ -1769,6 +1780,7 @@ export function stopAutoDub(): void {
   // Gate E/E3: commitments and gesture state do not survive a stop. A rest
   // committed until bar 40 means nothing once the transport has left.
   _intentionPlanner.reset();
+  _appliedBehaviourFor = null;
   _performanceState = 'LISTEN';
   _recordAutoDubFire({
     kind: 'stop',
