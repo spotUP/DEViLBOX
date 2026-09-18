@@ -708,6 +708,34 @@ export function createMcpServer(): McpServer {
   );
 
   server.tool(
+    'get_channel_roles',
+    "Return the channel role table Auto Dub's rules target - what it believes each channel IS (kick, snare, bass, skank, lead, pad...) and how it decided. Merges the offline classifier, runtime audio votes and any CED timeline roles. Use it when the performer seems idle or keeps ignoring a channel: a rule that targets the snare cannot fire if nothing is classified as a snare, and a tune whose channels all come back as one role leaves most role-targeted rules with nothing to match.",
+    {},
+    () => call('get_channel_roles'),
+  );
+
+  server.tool(
+    'route_parameter',
+    'Route a normalized 0-1 value to any mappable parameter, exactly as a MIDI CC would (synth params, dub bus, DJ, master FX). Use it to drive a control that has no dedicated tool.',
+    { param: z.string(), value: z.number(), instrumentId: z.number().optional() },
+    (p) => call('route_parameter', p),
+  );
+
+  server.tool(
+    'set_master_effects',
+    'Replace the master effect chain with the given configs.',
+    { effects: z.array(z.record(z.string(), z.unknown())) },
+    (p) => call('set_master_effects', p),
+  );
+
+  server.tool(
+    'test_tone',
+    'Play a test tone through the audio graph - for checking routing and levels without loading a song.',
+    { frequency: z.number().optional(), durationMs: z.number().optional(), gain: z.number().optional() },
+    (p) => call('test_tone', p),
+  );
+
+  server.tool(
     'get_auto_dub_fire_log',
     'Return { moves: string[] } — the ring buffer (last 200 entries) of move IDs chosen by the Auto Dub tick loop since the last clear_auto_dub_fire_log call. Use to verify specific moves fired during a test window.',
     {},
