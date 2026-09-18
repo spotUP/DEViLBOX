@@ -16,6 +16,7 @@
  */
 
 import { subscribeDubRouter, subscribeDubRelease } from './DubRouter';
+import { subscribeChannelSend } from '@/lib/dub/channelSendStream';
 import { scheduleDubStoreSync } from '@/stores/useDubStore';
 import { useTrackerStore } from '@/stores/useTrackerStore';
 import { useFormatStore } from '@/stores/useFormatStore';
@@ -44,10 +45,43 @@ function songRendersFromNativeData(): boolean {
   }
 }
 
+/**
+ * The parameter a fader ride is recorded as.
+ *
+ * Named like a move (`dub.<something>`) so it lands in the same lane, replays
+ * through the same dispatch, and saves in the same curves. The channel it
+ * belongs to lives in the curve's `channelIndex`, exactly as a per-channel
+ * move's does.
+ */
+const CHANNEL_SEND_PARAM = 'channelSend';
+
+/**
+ * How much the fader must move before a point is written.
+ *
+ * A ride arrives at roughly 60 writes a second. Recording every one produces
+ * thousands of points describing a curve that three would describe as well,
+ * and a lane nobody can edit afterwards. A hundredth of the fader's travel is
+ * below what anyone can hear as a step.
+ */
+const SEND_POINT_EPSILON = 0.01;
+
+/**
+ * Rows between forced points during a slow ride.
+ *
+ * Without this, a fader creeping across a bar writes nothing until it has
+ * moved a whole hundredth, and the curve between two distant points is a
+ * straight line that did not happen. An eighth of a row is fine enough that
+ * the line never strays from the gesture.
+ */
+const SEND_POINT_MAX_ROW_GAP = 0.125;
+
 /** Width of the 0→1→0 spike written to a curve for trigger-kind moves.
  *  AutomationPlayer's upward-edge detection re-fires the move once per pass
  *  on replay. Small so the spike doesn't bleed into the next row. */
 const TRIGGER_SPIKE_WIDTH_ROWS = 0.05;
+
+/** Last point written per channel, so a ride is thinned rather than transcribed. */
+const lastSendPoint = new Map<number, { row: number; value: number }>();
 
 /** Find or create an automation curve for (patternId, channelIndex, 'dub.moveId').
  *  Returns '' if addCurve triggers a format-violation dialog (deferred). */
@@ -186,11 +220,73 @@ export function startDubRecorder(): () => void {
     }
   });
 
+  /**
+   * X5 — the fader ride.
+   *
+   * Discrete moves recorded fine and a continuous send ride captured nothing,
+   * because nothing published the writes. Now the mixer store does, and this
+   * is a third subscription alongside fire and release rather than a second
+   * recording mechanism bolted next to them.
+   *
+   * Riding the send is a dub gesture in its own right — arguably the primary
+   * one — so a take without it is half a performance, and the M1
+   * replay-reproduces check could only ever agree with the half that existed.
+   */
+  const unsubSend = subscribeChannelSend((write) => {
+    if (write.source !== 'live') return;          // playback, not a hand
+    if (currentSongIsTimeBasedLane()) return;     // no automation rows to write on
+    if (write.channelId < 0) return;
+
+    const previous = lastSendPoint.get(write.channelId);
+    if (previous) {
+      const moved = Math.abs(write.value - previous.value);
+      const waited = write.row - previous.row;
+      // Thin the stream, but never let a slow ride become a straight line
+      // between two far-apart points.
+      if (moved < SEND_POINT_EPSILON && waited < SEND_POINT_MAX_ROW_GAP) return;
+      // A backwards row means the song looped or the user seeked; the gap
+      // rule cannot reason across that, so take the point.
+    }
+    lastSendPoint.set(write.channelId, { row: write.row, value: write.value });
+
+    scheduleDubStoreSync(() => {
+      const tracker = useTrackerStore.getState();
+      const pattern = tracker.patterns[tracker.currentPatternIndex];
+      if (!pattern) return;
+      const curveId = ensureSendCurve(pattern.id, write.channelId);
+      if (!curveId) return;
+      useAutomationStore.getState().addPoint(curveId, write.row, write.value);
+      if (!useUIStore.getState().showAutomationLanes) {
+        useUIStore.getState().toggleAutomationLanes();
+      }
+    });
+  });
+
   return () => {
     unsubFire();
     unsubRelease();
+    unsubSend();
     pendingHolds.clear();
+    lastSendPoint.clear();
   };
+}
+
+/**
+ * The send curve for a channel.
+ *
+ * A `curve` with linear interpolation, rather than the `steps` mode the moves
+ * use: a fader ride is a continuous movement, and stepping between the thinned
+ * points would replay a smooth gesture as a staircase.
+ */
+function ensureSendCurve(patternId: string, channelIndex: number): string {
+  const store = useAutomationStore.getState();
+  const param = `dub.${CHANNEL_SEND_PARAM}` as AutomationParameter;
+  const existing = store.getCurvesForPattern(patternId, channelIndex)
+    .find(c => c.parameter === param);
+  if (existing) return existing.id;
+  const id = store.addCurve(patternId, channelIndex, param);
+  if (id) store.updateCurve(id, { mode: 'curve', interpolation: 'linear' });
+  return id;
 }
 
 /** Clear all dub.* automation curves for the current pattern.
