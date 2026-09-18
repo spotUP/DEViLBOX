@@ -12,8 +12,8 @@ analysis: thoughts/shared/plans/2026-09-17-dub-studio-gap-reconciliation.md
 Durable todo list. Survives compaction, crashes, `/clear`. **Re-read this before trusting
 recollection or any earlier summary in a conversation.**
 
-Running count: **14 of 36 done** (Gate A closed; F1/F1a/F1c shipped 2026-09-17; F2c and the whole F2 chunk 2026-09-18).
-Pre-work complete except F3. **Gate B closed 2026-09-18** — Gate C (MusicalEventProvider) is next.
+Running count: **15 of 36 done** (Gate A closed; F1/F1a/F1c shipped 2026-09-17; F2c and the whole F2 chunk 2026-09-18).
+Pre-work complete except F3. **Gate B closed 2026-09-18.** Gate C in progress: C2 done, C1 + C3 next.
 
 **Reconciled against the code 2026-09-18** — the ledger had drifted: F1, F1a and F1c were
 implemented the same night the plan was written but never ticked. Verify before trusting a count.
@@ -218,7 +218,15 @@ copy/paste (`TrackerCell[]` whole objects), `.dbx` save/load (patterns serialize
 - [ ] **C1** `MusicalEventProvider` — unified semantic event stream; tracker implementation
       (pattern look-ahead) + DJ implementation (beat grid / stems). Unifies semantic output, not
       data sources.
-- [ ] **C2** `MusicalChannelProfile` — the orthogonal taxonomy above, with confidence. User
+- [x] **C2** DONE 2026-09-18. `src/lib/dub/musicalChannelProfile.ts` — four orthogonal axes,
+      each an `AxisEstimate` carrying confidence AND the source that decided it, so nothing is
+      asserted as an absolute role. User overrides win outright at confidence 1 and are never
+      blended. Consumes the three classifiers that already exist (`ChannelAnalysis`,
+      `InstrumentClassification`, `RuntimeRoleHint`) rather than adding a fourth. Timbre-blind
+      legacy roles ('lead'/'chord'/'skank') are capped at 0.4 family confidence — the classifier
+      may be sure it is a lead without that being evidence it is a synth. Rhythm is classified
+      against the grid MusicalClock supplies, which is placement, not metre inference.
+      24 assertions. Original item text: `MusicalChannelProfile` — the orthogonal taxonomy above, with confidence. User
       override authoritative. Unblocks per-source mix hygiene (revision 1 DSP-09).
 - [ ] **C3** Look-ahead queries: what happens in the next 1/16, 1/8, 1/4, beat, bar, phrase.
       Seek must reset prediction state.
