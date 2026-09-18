@@ -50,6 +50,15 @@ import {
 } from '@/lib/dub/musicalClock';
 import type { MusicalPosition } from '@/lib/dub/musicalClock';
 import { getPerformanceMemory } from './performanceMemoryBridge';
+import {
+  buildPerformanceContext,
+  readWetEnergy,
+  type ArrangementSnapshot,
+  type Intention,
+} from '@/lib/dub/performanceContext';
+import { IntentionPlanner, type IntentionDecision } from '@/lib/dub/intention';
+import { moveServes } from '@/lib/dub/moveIntentions';
+import { trackerEventSources } from '@/lib/dub/musicalEvents';
 
 /** Live analysis context injected into every tick. Null until analysis has run. */
 export interface EQSnapshot {
@@ -735,6 +744,12 @@ export interface AutoDubTickCtx {
   eqSnapshot: EQSnapshot | null;
   /** True while a riddimSection hold is active — restricts channel picks to bass/percussion. */
   inRiddimSection: boolean;
+  /** Gate E: what the performer decided it wants, chosen before the move.
+   *  Undefined leaves the rule engine in its pre-Gate-E behaviour. */
+  intention?: Intention;
+  /** Channel the intention is aimed at, when it named one. Role-targeted
+   *  rules prefer it over a random pick from their matching channels. */
+  intentionChannel?: number;
 }
 
 export interface AutoDubChoice {
@@ -796,6 +811,11 @@ export function chooseMove(ctx: AutoDubTickCtx, rng: () => number): AutoDubChoic
 
   for (const rule of RULES) {
     if (ctx.blacklist.has(rule.moveId)) continue;
+    // Gate E: the intention was chosen before the move, so only moves that can
+    // express it are eligible. Without an intention (older callers, tests that
+    // drive the rule engine directly) every move stays eligible and the
+    // behaviour is the pre-Gate-E one.
+    if (ctx.intention && !moveServes(rule.moveId, ctx.intention)) continue;
     if (shouldSuppressAutoDubSparseDrop(rule.moveId, ctx.channelCount)) continue;
     if (shouldSuppressAutoDubStartupMove(rule.moveId, ctx.bar)) continue;
     // Per-bar wet cap: once a wet move has fired this bar, skip every
@@ -938,7 +958,14 @@ export function chooseMove(ctx: AutoDubTickCtx, rng: () => number): AutoDubChoic
 
   let channelId: number | undefined;
   if (picked.rule.channelRole) {
-    if (picked.matchingChannels.length > 0) {
+    // Gate E: the intention named a channel — an ACCENT on the snare about to
+    // sound, an ANSWER on the channel the player just threw. Honour it when
+    // the rule's own role filter agrees; a rule that wants percussion does not
+    // get pointed at the pad just because the intention did.
+    if (ctx.intentionChannel !== undefined
+        && picked.matchingChannels.includes(ctx.intentionChannel)) {
+      channelId = ctx.intentionChannel;
+    } else if (picked.matchingChannels.length > 0) {
       // User-rename boost: if the user explicitly renamed a candidate
       // channel (name is non-generic — not "Channel N" / "CH N"), weight
       // it 1.5× higher when picking the target. That respects "I cared
@@ -981,6 +1008,20 @@ const ALL_CHANNELS: readonly number[] = Object.freeze(
 );
 
 // ───────────────────────── Module-local runtime state ─────────────────────────
+
+/**
+ * Gate E: the performer's intention planner. One per process, like the
+ * memory it reads — a second planner would keep its own rest commitments and
+ * the two would take turns resting.
+ */
+const _intentionPlanner = new IntentionPlanner();
+let _lastIntention: IntentionDecision | null = null;
+
+/** The intention behind the most recent tick — read by MCP diagnostics and
+ *  by the fire log, so a fire can be explained rather than just listed. */
+export function getAutoDubIntention(): IntentionDecision | null {
+  return _lastIntention;
+}
 
 let _timer: ReturnType<typeof setInterval> | null = null;
 let _enableTimeMs = 0;
@@ -1442,8 +1483,53 @@ function tickImpl(): void {
     _eqSnapshot = null;
   }
 
+  // ── Gate E: decide what the performer WANTS, before choosing a move ──
+  //
+  // Built from the Gate D context so the decision sees the same music the
+  // rules do: what is about to sound, what just sounded, what the player just
+  // did by hand, and how much wet is already in the air.
+  const decision = decideIntention(bundle, transport, bpm);
+  _lastIntention = decision;
+  try {
+    getPerformanceMemory().setIntention(decision.intention, decision.target);
+  } catch { /* memory optional */ }
+
+  // REST is an action. It is why nothing fires for the next bars, and it is
+  // recorded as a decision rather than showing up as an unexplained gap.
+  if (decision.intention === 'REST') {
+    if (isNewBar) {
+      _recordAutoDubFire({
+        kind: 'fire',
+        timeMs: performance.now(),
+        bar, barPos,
+        moveId: 'REST',
+        holdBars: decision.holdBars,
+        activeHolds: _heldDisposers.size,
+        audio: null,
+        bus: null,
+      });
+    }
+    return;
+  }
+
+  // RESET means let go, not press something else: a mix whose feedback is at
+  // the ceiling does not need another move thrown at it. Releasing the held
+  // gestures lets the tail decay, which is the actual remedy.
+  if (decision.intention === 'RESET') {
+    for (const d of _heldDisposers) {
+      const timer = _heldTimers.get(d);
+      if (timer !== undefined) clearTimeout(timer);
+      try { d.dispose(); } catch { /* ok */ }
+    }
+    _heldDisposers.clear();
+    _heldTimers.clear();
+    return;
+  }
+
   const choice = chooseMove({
     bar, barPos, isNewBar,
+    intention: decision.intention,
+    intentionChannel: decision.target.kind === 'channel' ? decision.target.channelId : undefined,
     intensity: dub.autoDubIntensity,
     persona,
     blacklist: new Set(dub.autoDubMoveBlacklist),
@@ -1667,6 +1753,91 @@ function sampleAutoDubAudio(): AutoDubAudioSnapshot | null {
 function sampleDubBusDiagnostics(): Record<string, number | boolean | string | null> | null {
   try {
     return getActiveDubBus()?.getDiagnosticSnapshot() ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Gate E entry point: assemble the Gate D context and ask the planner what
+ * the performer wants.
+ *
+ * Event rows are lifted to ABSOLUTE rows with the same offset the clock uses,
+ * so "an onset an eighth away" is measured against the same timeline the bar
+ * position came from. Getting that wrong would put the look-ahead in a
+ * different song than the decision.
+ */
+function decideIntention(
+  bundle: { pattern: Pattern | null; currentRow: number },
+  transport: { currentGlobalRow?: number; speed?: number },
+  bpm: number,
+): IntentionDecision {
+  const globalRow = Number.isFinite(transport.currentGlobalRow) && (transport.currentGlobalRow ?? 0) > 0
+    ? (transport.currentGlobalRow as number)
+    : bundle.currentRow;
+  const ticksPerRow = transport.speed || 6;
+
+  const sources = bundle.pattern
+    ? trackerEventSources(bundle.pattern.channels, {
+        rowOffset: globalRow - bundle.currentRow,
+      })
+    : [];
+
+  // Wet energy from the settings that actually produce it. No bus (tracker
+  // view not mounted) means nothing is wet, which is true.
+  let energyInputs = {
+    returnGain: 0, echoWet: 0, springWet: 0, echoIntensity: 0, extFeedbackGain: 0,
+  };
+  try {
+    const bus = getActiveDubBus();
+    if (bus) {
+      const st = bus.getSettings();
+      energyInputs = {
+        returnGain: st.returnGain,
+        echoWet: st.echoWet,
+        springWet: st.springWet,
+        echoIntensity: st.echoIntensity,
+        extFeedbackGain: st.extFeedbackGain ?? 0,
+      };
+    }
+  } catch { /* no bus */ }
+
+  const ctx = buildPerformanceContext(getPerformanceMemory(), {
+    row: globalRow,
+    ticksPerRow,
+    bpm,
+    sources,
+    arrangement: readArrangementSnapshot(),
+    energy: readWetEnergy(energyInputs, _heldDisposers.size),
+  });
+
+  return _intentionPlanner.decide(ctx);
+}
+
+/** Where the song is in its own order. Null when no song is loaded. */
+function readArrangementSnapshot(): ArrangementSnapshot | null {
+  try {
+    const tracker = useTrackerStore.getState();
+    const order: number[] = tracker.patternOrder ?? [];
+    if (order.length === 0) return null;
+    // Playback writes the tracker store's index, not the transport's — the
+    // transport copy is known to stay at 0 on engine-driven formats. The
+    // order index is the FIRST occurrence of that pattern: a pattern used
+    // twice in the order is ambiguous from the index alone, and the only
+    // consequence here is which of the two seams "isLastInOrder" reports.
+    const patternIndex = tracker.currentPatternIndex ?? 0;
+    const found = order.indexOf(patternIndex);
+    const orderIndex = found >= 0 ? found : 0;
+    const pattern = tracker.patterns?.[patternIndex] ?? null;
+    const nextPattern = orderIndex + 1 < order.length ? order[orderIndex + 1] : null;
+    return {
+      orderIndex,
+      orderLength: order.length,
+      patternIndex,
+      patternRows: pattern?.channels?.[0]?.rows?.length ?? 64,
+      isLastInOrder: orderIndex === order.length - 1,
+      patternChangesNext: nextPattern !== null && nextPattern !== patternIndex,
+    };
   } catch {
     return null;
   }
