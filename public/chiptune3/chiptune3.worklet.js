@@ -86,7 +86,14 @@ class MPT extends AudioWorkletProcessor {
 	}
 
 	process(inputList, outputList, parameters) {
-		if (!this.modulePtr || !this.leftPtr || !this.rightPtr || this.paused) return true	//silence
+		// Why-silent bookkeeping. A hard-zero master with the transport still
+		// ticking has cost two debugging sessions: every gain downstream reads
+		// sane, so the answer is in here, and there was no way to ask. One
+		// integer per render, read back via 'diagState'.
+		this._renderCount = (this._renderCount || 0) + 1
+		if (!this.modulePtr) { this._silentReason = 'no-module'; return true }
+		if (!this.leftPtr || !this.rightPtr) { this._silentReason = 'no-buffers'; return true }
+		if (this.paused) { this._silentReason = 'paused'; return true }
 
 		// Re-apply main mute + volume every render to guard against loop/seek resets
 		if (this.isolatedBits && this.muteFunc) {
@@ -112,6 +119,17 @@ class MPT extends AudioWorkletProcessor {
 
 		left.set(libopenmpt.HEAPF32.subarray(this.leftPtr / 4, this.leftPtr / 4 + actualFramesPerChunk))
 		right.set(libopenmpt.HEAPF32.subarray(this.rightPtr / 4, this.rightPtr / 4 + actualFramesPerChunk))
+
+		// Sampled RMS of what the module actually produced. Distinguishes
+		// "rendering silence" (mask killed every channel at the source) from
+		// "rendering audio that something downstream swallowed" — the two
+		// cases look identical from the main thread. Every 16th render.
+		if ((this._renderCount & 15) === 0) {
+			let acc = 0
+			for (let i = 0; i < left.length; i++) acc += left[i] * left[i]
+			this._lastRenderRms = Math.sqrt(acc / left.length)
+			this._silentReason = this._lastRenderRms > 1e-7 ? null : 'module-rendered-silence'
+		}
 
 		// post progress
 		// 	openmpt_module_get_current_order
@@ -384,6 +402,25 @@ class MPT extends AudioWorkletProcessor {
 				break
 			case 'dubChannelDisableAll':
 				this.teardownAllDubSlots_()
+				break
+			case 'diagState':
+				// On-demand answer to "why is the master silent?". The main
+				// thread can read every gain in the graph but none of this.
+				this.port.postMessage({
+					cmd: 'diagState',
+					hasModule: !!this.modulePtr,
+					hasExt: !!this.extPtr,
+					paused: !!this.paused,
+					channels: this.channels,
+					userMuteMask: this.userMuteMask,
+					isolatedBits: this.isolatedBits,
+					effectiveMainMask: this.userMuteMask & ~this.isolatedBits,
+					activeIsolationSlots: this.isolationSlots.filter(Boolean).length,
+					activeDubSlots: this.dubSlots.filter(Boolean).length,
+					lastRenderRms: Number((this._lastRenderRms ?? 0).toFixed(6)),
+					renderCount: this._renderCount ?? 0,
+					silentReason: this._silentReason ?? null,
+				})
 				break
 			case 'diagDub':
 				// Diagnostic: report dub slot state. Mirrors diagIsolation's shape.
