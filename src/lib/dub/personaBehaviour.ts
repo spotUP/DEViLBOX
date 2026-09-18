@@ -163,6 +163,8 @@ export function intentionPolicyFor(behaviour: PersonaBehaviour): IntentionPolicy
     // How often it accents — its own dial, from ACTIVITY and restraint rather
     // than falling out of the look-ahead window.
     accentSpacingRows: Math.round(lerp(40, 6, behaviour.activity * 0.7 + (1 - behaviour.restraint) * 0.3)),
+    // Jammy drops; Scientist rarely does. Straight from the appetite.
+    dropAppetite: behaviour.appetite.drop,
   };
 }
 
