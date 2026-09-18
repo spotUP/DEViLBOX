@@ -26,6 +26,11 @@ const AUTODUB_SRC = readFileSync(
   'utf8',
 );
 
+const AUTOEQ_DRIVER_SRC = readFileSync(
+  resolve(dirname(fileURLToPath(import.meta.url)), '../AutoEQDriver.ts'),
+  'utf8',
+);
+
 /** Deterministic linear-congruential RNG. xorshift would be nicer but this
  *  is plenty for "roll the same sequence twice in a test." */
 function seededRng(seed: number): () => number {
@@ -93,8 +98,26 @@ describe('AutoDub chooseMove', () => {
   });
 
   it('reuses a single improv ramp timer when stopping repeatedly', () => {
-    expect(AUTODUB_SRC).toMatch(/let _improvRampTimer/);
-    expect(AUTODUB_SRC).toMatch(/clearInterval\(_improvRampTimer\)/);
+    // Gate AE1 moved the technical-assistive EQ driver out of the performer's
+    // brain. The guarantee is unchanged — one ramp timer, cleared before a new
+    // one starts — only its address is.
+    expect(AUTOEQ_DRIVER_SRC).toMatch(/let _improvRampTimer/);
+    expect(AUTOEQ_DRIVER_SRC).toMatch(/clearInterval\(_improvRampTimer\)/);
+  });
+
+  it('keeps the spectral driver out of the performer\'s tick', () => {
+    // The brain may START and STOP it and hand it a snapshot; it must not own
+    // its timers or reach into its band deltas.
+    expect(AUTODUB_SRC).not.toMatch(/_improvBandDeltas/);
+    expect(AUTODUB_SRC).not.toMatch(/setInterval\(improvTick/);
+    expect(AUTODUB_SRC).toMatch(/startAutoEqDriver\(\)/);
+    expect(AUTODUB_SRC).toMatch(/setAutoEqSnapshot\(/);
+  });
+
+  it('keeps EQ GESTURES in the brain, where the decisions are', () => {
+    // eqSweep and hpfRise are moves the performer chooses, not corrections.
+    expect(AUTODUB_SRC).toMatch(/adaptEQParams\(/);
+    expect(AUTODUB_SRC).toMatch(/'eqSweep'/);
   });
 
   it('returns null when intensity is 0 (per-tick roll always fails)', () => {

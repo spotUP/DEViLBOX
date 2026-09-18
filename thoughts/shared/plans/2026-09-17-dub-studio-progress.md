@@ -12,11 +12,11 @@ analysis: thoughts/shared/plans/2026-09-17-dub-studio-gap-reconciliation.md
 Durable todo list. Survives compaction, crashes, `/clear`. **Re-read this before trusting
 recollection or any earlier summary in a conversation.**
 
-Running count: **31 of 51 done.**
+Running count: **32 of 52 done.**
 
 **The denominator was wrong until 2026-09-18.** The header said "of 36" from the day this file
 was written and was never updated as sub-items (F1a, F1c, F2a-F2e, T1-T3, the X series) were
-added. Counted from the checkboxes: 17 ticked, 34 open, 51 total (X9 and X10 added 2026-09-18). If you change the item list,
+added. Counted from the checkboxes: 17 ticked, 34 open, 51 total (X9 and X10 added 2026-09-18; X11 added later the same day, making 52). If you change the item list,
 recount — do not trust this sentence either.
 
 ### Gate status
@@ -31,9 +31,9 @@ recount — do not trust this sentence either.
 | E — intention + REST | **closed** | E1, E2, E3 |
 | F — gesture engine | partial | F4: shapes + lifecycle shipped; param-automation shapes need a move update API |
 | G — wet energy | **closed** | G1 |
-| H-L — musical behaviour | H1, I1, J1, K1-K4, L1, L2 done | AE1 |
+| H-L — musical behaviour | **closed** | H1, I1, J1, K1-K4, L1, L2, AE1 |
 | M-O — record, verify, release | open | M1, N1-N4, O1, O2 |
-| X — user-reported open threads | 1 of 11 | X1 closed |
+| X — user-reported open threads | 1 of 12 | X1 closed |
 
 ### Debt carried, not hidden
 
@@ -505,8 +505,18 @@ copy/paste (`TrackerCell[]` whole objects), `.dbx` save/load (patterns serialize
       five arc shapes are unchanged; only what feeds them moved. A value >= 1 is still
       accepted as a legacy bar index so an unmigrated caller degrades to the old
       behaviour instead of pinning the arc at its start. 4 tests.
-- [ ] **AE1** Split Auto EQ into technical-assistive vs musical-gesture; spectral driver leaves
+- [x] **AE1** Split Auto EQ into technical-assistive vs musical-gesture; spectral driver leaves
       the core brain.
+      `src/engine/dub/AutoEQDriver.ts`. Auto EQ was doing two unrelated jobs from inside
+      AutoDub: a corrective curve plus a spectral/beat-sync improv loop (engineering — no
+      opinion about bars or phrases, identical whichever persona is loaded), and `eqSweep`
+      / `hpfRise` (moves the performer CHOOSES, with an intention, timed against the
+      phrase). Only the second belongs to the brain.
+      The split is structural: the driver owns its own timers, deltas, flat baseline and
+      reset; AutoDub only starts it, stops it, and hands it the snapshot it already reads
+      once per tick — reading the analysis twice would be two answers about one instant.
+      Contract tests now assert the boundary in both directions: the brain must not own
+      the driver's timers or band deltas, and the EQ GESTURES must stay in the brain.
 
 ## GATE M–O — record, verify, release
 
@@ -738,6 +748,22 @@ this bug.
       cases, in `test:ci`): 6 fail on the pre-fix code, all pass after.
       **Open: a human still has to hear it** — run AutoDub for a few minutes and
       confirm the Dub Deck master fader does not walk to 100%.
+
+- [ ] **X11** **Generated effects are far louder than the music.** Reported 2026-09-18:
+      "some effects like the siren etc are MUCH louder than the music". The synthesised
+      moves — `dubSiren` (`DubSirenSynth`), `sonarPing`, `toast`, `tubbyScream`,
+      `oscBass`, `subHarmonic` — generate their own audio at a fixed level instead of one
+      referenced to the programme material, so they sit on top of a quiet tune and
+      dominate it.
+      Root question before touching a gain: are they referenced to ANYTHING? A fixed
+      amplitude is a level relative to full scale, not relative to the mix, and a mix
+      that peaks at -12 dBFS will be buried by any move that assumes -3.
+      Measure first: `get_audio_level` / the `AudioDataBus` frame for the programme RMS,
+      then each synth's own output, and compare. The fix is a reference level the
+      generated moves are scaled against (the running programme RMS), not a hand-tuned
+      constant per move — that is the same class of mistake as the master insert's
+      uncompensated shelf (X10). Related: X10's trim work changed overall level, so
+      re-measure after it is verified by ear.
 
 - [ ] **X10** **Dub bus clips and distorts most of the time.** Reported
       2026-09-18. Not yet investigated. Measure before touching anything:
