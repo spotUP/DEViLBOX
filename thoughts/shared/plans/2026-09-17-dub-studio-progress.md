@@ -12,7 +12,7 @@ analysis: thoughts/shared/plans/2026-09-17-dub-studio-gap-reconciliation.md
 Durable todo list. Survives compaction, crashes, `/clear`. **Re-read this before trusting
 recollection or any earlier summary in a conversation.**
 
-Running count: **23 of 51 done.**
+Running count: **24 of 51 done.**
 
 **The denominator was wrong until 2026-09-18.** The header said "of 36" from the day this file
 was written and was never updated as sub-items (F1a, F1c, F2a-F2e, T1-T3, the X series) were
@@ -31,7 +31,7 @@ recount — do not trust this sentence either.
 | E — intention + REST | **closed** | E1, E2, E3 |
 | F — gesture engine | partial | F4: shapes + lifecycle shipped; param-automation shapes need a move update API |
 | G — wet energy | **closed** | G1 |
-| H-L — musical behaviour | H1 done | I1, J1, K1-K4, L1, L2, AE1 |
+| H-L — musical behaviour | H1, L2 done | I1, J1, K1-K4, L1, AE1 |
 | M-O — record, verify, release | open | M1, N1-N4, O1, O2 |
 | X — user-reported open threads | 1 of 11 | X1 closed |
 
@@ -401,8 +401,14 @@ copy/paste (`TrackerCell[]` whole objects), `.dbx` save/load (patterns serialize
       repetition.
 - [ ] **L1** Musical return quantization — `riddimSection`'s 60%-of-hold becomes next beat /
       eighth / bar / phrase boundary / next relevant event, chosen by intention (Gate L).
-- [ ] **L2** Phrase intelligence: normalized `phrasePosition` from `MusicalClock`; persona arcs
+- [x] **L2** Phrase intelligence: normalized `phrasePosition` from `MusicalClock`; persona arcs
       keep their shapes but stop depending on `bar % 16`.
+      `getPhraseIntensityMult` now takes a 0..1 position. `bar % 16` was two assumptions
+      in one — that a phrase is sixteen bars, and that a bar is what the transport's
+      counter says — and neither holds at a user-set phrase length or outside 4/4. The
+      five arc shapes are unchanged; only what feeds them moved. A value >= 1 is still
+      accepted as a legacy bar index so an unmigrated caller degrades to the old
+      behaviour instead of pinning the arc at its start. 4 tests.
 - [ ] **AE1** Split Auto EQ into technical-assistive vs musical-gesture; spectral driver leaves
       the core brain.
 
