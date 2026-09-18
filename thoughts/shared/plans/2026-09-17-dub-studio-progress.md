@@ -12,8 +12,8 @@ analysis: thoughts/shared/plans/2026-09-17-dub-studio-gap-reconciliation.md
 Durable todo list. Survives compaction, crashes, `/clear`. **Re-read this before trusting
 recollection or any earlier summary in a conversation.**
 
-Running count: **12 of 36 done** (Gate A closed; F1/F1a/F1c shipped 2026-09-17; F2c and the whole F2 chunk 2026-09-18).
-Pre-work is complete except F3 — Gate B (MusicalClock) is next.
+Running count: **14 of 36 done** (Gate A closed; F1/F1a/F1c shipped 2026-09-17; F2c and the whole F2 chunk 2026-09-18).
+Pre-work complete except F3. **Gate B closed 2026-09-18** — Gate C (MusicalEventProvider) is next.
 
 **Reconciled against the code 2026-09-18** — the ledger had drifted: F1, F1a and F1c were
 implemented the same night the plan was written but never ticked. Verify before trusting a count.
@@ -194,13 +194,23 @@ copy/paste (`TrackerCell[]` whole objects), `.dbx` save/load (patterns serialize
 
 ## GATE B — MUSICAL CLOCK
 
-- [ ] **B1** `MusicalClock` — `beatsPerBar`, `rowsPerBeat`, `phraseBars`, `currentBar`,
+- [x] **B1** DONE 2026-09-18. `src/lib/dub/musicalClock.ts` — pure, no state, no timing: the
+      caller passes a row and the transport's ticks-per-row, so it is a view of transport by
+      construction. Models `beatUnit` alongside `beatsPerBar` from the start (7/8 vs 7/4), and
+      does NOT round fractional grids (speed 5 = 4.8 rows/beat) because rounding would place bar
+      edges on rows the transport never lands on. Wired into `getAutoDubBarClock`, both the
+      row-aligned and the wall-clock fallback path, so a bar means the same thing on both.
+      Original item text: `MusicalClock` — `beatsPerBar`, `rowsPerBeat`, `phraseBars`, `currentBar`,
       `currentBeat`, position-within beat/bar/phrase, `nextBeat`/`nextBar`/`nextPhraseBoundary`.
       Defaults 4/4, 4 rows/beat, 16-bar phrase so current behaviour is bit-identical.
       Constraint: view of transport, never a second transport. Rows/beat is derivable as
       `24 / ticksPerRow` (speed 6 → 4 rows/beat → 16 rows/bar, today's hardcoded value).
       Replaces the `bar = floor(row/16)` hardcode in `AutoDub.getAutoDubBarClock()`.
-- [ ] **T3** Speed-6 song produces identical bar edges to today; speed-3 song puts bar edges at
+- [x] **T3** DONE 2026-09-18 — `musicalClock.test.ts`, 21 assertions: speed 6 reproduces the old
+      arithmetic for every probed row, speed 3 puts bar edges at row 32 (row 16 is mid-bar, which
+      the hardcode called bar 1), 3/4 + 6/8 + 7/8-vs-7/4, phrase maths, boundary look-ahead,
+      and a source contract that AutoDub actually calls the clock — 3 of those fail if the
+      hardcode returns. Original item text: Speed-6 song produces identical bar edges to today; speed-3 song puts bar edges at
       row 32. Must fail before B1.
 
 ## GATE C — MUSICAL EVENT MODEL

@@ -42,6 +42,12 @@ import type { Pattern } from '@/types/tracker';
 import type { InstrumentConfig } from '@/types/instrument/defaults';
 import { useTrackerAnalysisStore } from '@/stores/useTrackerAnalysisStore';
 import { getActiveDubBus } from '@/engine/dub/DubBus';
+import {
+  computeMusicalPosition,
+  computeMusicalPositionFromBeats,
+  DEFAULT_MUSICAL_CLOCK_SETTINGS,
+  type MusicalClockSettings,
+} from '@/lib/dub/musicalClock';
 
 /** Live analysis context injected into every tick. Null until analysis has run. */
 export interface EQSnapshot {
@@ -1668,17 +1674,29 @@ function getAutoDubBarClock(): { bar: number; barPos: number; isRowAligned: bool
     ? globalRow
     : (Number.isFinite(row) && row > 0 ? row : null);
   if (rowLike !== null) {
-    const bar = Math.floor(rowLike / 16);
-    const barPos = (rowLike % 16) / 16;
-    return { bar, barPos, isRowAligned: true };
+    // Plan B1: was `floor(row / 16)`, true only for 4/4 at speed 6. At speed 3
+    // a bar is 32 rows, so every `bar % N` phrase rule below drifted against
+    // the music. MusicalClock derives the grid from the real transport speed.
+    const pos = computeMusicalPosition(rowLike, transport.speed, getMusicalClockSettings());
+    return { bar: pos.bar, barPos: pos.positionInBar, isRowAligned: true };
   }
+  // No row information yet (enabled before playback started) — count beats off
+  // the wall clock. Same metre, so a bar means the same thing on both paths.
   const bpm = transport.bpm || 120;
   const beats = ((performance.now() - _enableTimeMs) / 1000) * (bpm / 60);
-  return {
-    bar: Math.floor(beats / 4),
-    barPos: (beats % 4) / 4,
-    isRowAligned: false,
-  };
+  const pos = computeMusicalPositionFromBeats(beats, getMusicalClockSettings());
+  return { bar: pos.bar, barPos: pos.positionInBar, isRowAligned: false };
+}
+
+/**
+ * Clock settings in force. Metre and phrase length are user/song-level
+ * metadata the reviewer ruled must never be inferred from pattern length or
+ * note onsets, so this returns the documented defaults (4/4, 16-bar phrase)
+ * until a settings surface exists. Centralised here so both clock paths and
+ * the future settings UI read one source.
+ */
+function getMusicalClockSettings(): MusicalClockSettings {
+  return DEFAULT_MUSICAL_CLOCK_SETTINGS;
 }
 
 export function getAutoDubCurrentRoles(): readonly ChannelRole[] {
