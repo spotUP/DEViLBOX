@@ -58,6 +58,11 @@ import {
 import type { MusicalPosition } from '@/lib/dub/musicalClock';
 import { getPerformanceMemory } from './performanceMemoryBridge';
 import {
+  setPerformanceAnnotator,
+  getPerformanceJournalRecorder,
+  clearPerformanceJournal,
+} from './performanceJournalBridge';
+import {
   releaseAllDubTransients,
   reapOrphanedDubTransients,
 } from '@/lib/dub/dubChannelTransient';
@@ -1178,6 +1183,8 @@ export function getAutoDubPerformanceState(): PerformanceState {
 }
 
 let _lastIntention: IntentionDecision | null = null;
+/** Bar position of the last cycle, so a journal entry reads musically. */
+let _lastPosition: { bar: number; barInPhrase: number } | null = null;
 
 /** The intention behind the most recent tick — read by MCP diagnostics and
  *  by the fire log, so a fire can be explained rather than just listed. */
@@ -1530,6 +1537,10 @@ function tickImpl(): void {
   const performanceCtx = cycle.context;
   const step = cycle.step;
   _lastIntention = decision;
+  _lastPosition = {
+    bar: Math.floor(performanceCtx.position.bar),
+    barInPhrase: Math.floor(performanceCtx.position.barInPhrase),
+  };
   _performanceState = cycle.state;
 
   if (step.shouldRelease) {
@@ -1746,6 +1757,19 @@ export function startAutoDub(): void {
   resetRuntimeChannelClassifier();
   resetAutoEqDriver();
   _timer = setInterval(tickImpl, TICK_MS);
+  // Gate M1: the journal records every fire; this is how the AI's own get a
+  // reason attached. Registered here rather than imported by the journal, so
+  // the journal works when the performer is not running at all.
+  getPerformanceJournalRecorder();
+  setPerformanceAnnotator(() => _lastIntention === null ? null : {
+    intention: _lastIntention.intention,
+    target: _lastIntention.target,
+    reason: _lastIntention.reason,
+    state: _performanceState,
+    bar: _lastPosition?.bar,
+    barInPhrase: _lastPosition?.barInPhrase,
+  });
+  clearPerformanceJournal();
   startAutoEqDriver();
   const { bar, barPos } = getAutoDubBarClock();
   _recordAutoDubFire({
@@ -1782,6 +1806,10 @@ export function stopAutoDub(): void {
   _intentionPlanner.reset();
   _appliedBehaviourFor = null;
   _performanceState = 'LISTEN';
+  _lastPosition = null;
+  // The journal itself survives a stop — it is the record of what was just
+  // played, and throwing it away on stop would delete the take.
+  setPerformanceAnnotator(null);
   _recordAutoDubFire({
     kind: 'stop',
     timeMs: performance.now(),
