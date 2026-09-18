@@ -12,7 +12,7 @@ analysis: thoughts/shared/plans/2026-09-17-dub-studio-gap-reconciliation.md
 Durable todo list. Survives compaction, crashes, `/clear`. **Re-read this before trusting
 recollection or any earlier summary in a conversation.**
 
-Running count: **25 of 51 done.**
+Running count: **26 of 51 done.**
 
 **The denominator was wrong until 2026-09-18.** The header said "of 36" from the day this file
 was written and was never updated as sub-items (F1a, F1c, F2a-F2e, T1-T3, the X series) were
@@ -31,7 +31,7 @@ recount — do not trust this sentence either.
 | E — intention + REST | **closed** | E1, E2, E3 |
 | F — gesture engine | partial | F4: shapes + lifecycle shipped; param-automation shapes need a move update API |
 | G — wet energy | **closed** | G1 |
-| H-L — musical behaviour | H1, L1, L2 done | I1, J1, K1-K4, AE1 |
+| H-L — musical behaviour | H1, K1, L1, L2 done | I1, J1, K2-K4, AE1 |
 | M-O — record, verify, release | open | M1, N1-N4, O1, O2 |
 | X — user-reported open threads | 1 of 11 | X1 closed |
 
@@ -390,10 +390,25 @@ copy/paste (`TrackerCell[]` whole objects), `.dbx` save/load (patterns serialize
       protects foundation, supports throw-then-mute, arrangement-aware restoration (Gate I).
 - [ ] **J1** Consequence model: `targetAudibility` / `contrast` / `masking` / `wetEnergyChange` /
       `feedbackChange` / `structuralImpact` feeding the next decision (Gate J).
-- [ ] **K1** Personas as behavioural profiles — activity / depth / risk / restraint, anticipation,
+- [x] **K1** Personas as behavioural profiles — activity / depth / risk / restraint, anticipation,
       patience, target + intention preference, gesture length, release style, feedback/filter/drop
       appetite, timing variance, novelty vs repetition preference. Replaces the single overloaded
       `intensity` scalar (Gate K).
+      `src/lib/dub/personaBehaviour.ts`. `intensity` set how often anything fired, how many
+      moves a bar could hold, AND how bold they were, so turning Perry up made him more
+      frequent and more extreme and less patient at once — and "restless but gentle" could
+      not be said at all. Each axis now says one thing, and the file DERIVES the numbers the
+      other gates already take (`intentionPolicyFor` → Gate E policy, `energyBudgetFor` →
+      Gate G budget, `holdBarsFor`, `intentionAffinity`), so a persona stays one description
+      instead of being re-stated per gate.
+      Two rules held to: the feedback CEILING is only allowed to move in a narrow 0.8-0.9
+      band whatever the appetite, because that is the safety edge and taste does not get a
+      vote on runaway feedback; and intention preference is a multiplier, not a filter — a
+      hard filter would leave four of five personas unable to use half the vocabulary.
+      A test asserts no persona is high on everything, which is just the loud setting.
+      Wired into the tick: policy applied on persona change, budget every tick. 17 tests.
+      Still pending for full K1: `intensityDefault` and the per-move weight tables remain
+      the firing-rate mechanism; migrating those onto `activity`/`novelty` is the rest.
 - [ ] **K2** Contextual variance replacing `rng() < variance * 0.1` — Perry surprises *because the
       musical situation allows it*.
 - [ ] **K3** Call and response over musical time.
