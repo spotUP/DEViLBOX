@@ -6,6 +6,8 @@ import {
   beginDubTransient,
   setDubTransient,
   endDubTransient,
+  releaseAllDubTransients,
+  reapOrphanedDubTransients,
 } from '@/lib/dub/dubChannelTransient';
 import { useMixerStore } from '@/stores/useMixerStore';
 import { ghostReverb } from '../moves/ghostReverb';
@@ -261,5 +263,56 @@ describe('wiring contract — moves and the cold path go through the transient h
         /\.setChannelDubSend\(|\.setChannelMute\(/,
       );
     }
+  });
+});
+
+describe('safety nets — nothing stays held for ever', () => {
+  beforeEach(resetMixer);
+
+  it('hands every held channel back on a transport stop', () => {
+    const store = useMixerStore.getState();
+    store.setChannelDubSend(0, 0.3);
+    store.setChannelDubSend(1, 0.2);
+
+    // Two gestures holding two channels, neither released.
+    ghostReverb.execute(ctx(0));
+    ghostReverb.execute(ctx(1));
+    expect(useMixerStore.getState().channels[0].muted).toBe(true);
+
+    expect(releaseAllDubTransients()).toBe(2);
+    expect(useMixerStore.getState().channels[0].muted).toBe(false);
+    expect(useMixerStore.getState().channels[0].dubSend).toBe(0.3);
+    expect(useMixerStore.getState().channels[1].dubSend).toBe(0.2);
+  });
+
+  it('reaps a transient whose closer was lost', () => {
+    let now = 0;
+    dubSendBaselines.setClock(() => now);
+    useMixerStore.getState().setChannelDubSend(2, 0.4);
+
+    ghostReverb.execute(ctx(2));           // holds channel 2 muted at send 1.0
+    expect(reapOrphanedDubTransients()).toBe(0);   // not orphaned yet
+
+    now = 31_000;                          // the closer never came
+    expect(reapOrphanedDubTransients()).toBe(1);
+    expect(useMixerStore.getState().channels[2].muted).toBe(false);
+    expect(useMixerStore.getState().channels[2].dubSend).toBe(0.4);
+
+    dubSendBaselines.setClock(() => Date.now());
+  });
+
+  it('a reaped channel is genuinely free — a later release cannot re-mute it', () => {
+    let now = 0;
+    dubSendBaselines.setClock(() => now);
+    useMixerStore.getState().setChannelDubSend(3, 0.5);
+    const handle = ghostReverb.execute(ctx(3));
+
+    now = 31_000;
+    reapOrphanedDubTransients();
+    handle?.dispose();                     // the lost closer turning up late
+
+    expect(useMixerStore.getState().channels[3].muted).toBe(false);
+    expect(useMixerStore.getState().channels[3].dubSend).toBe(0.5);
+    dubSendBaselines.setClock(() => Date.now());
   });
 });

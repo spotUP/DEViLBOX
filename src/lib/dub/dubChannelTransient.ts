@@ -46,3 +46,50 @@ export function endDubTransient(channelId: number): void {
   store.setChannelMute(channelId, baseline.muted, { transient: true });
   store.setChannelDubSend(channelId, baseline.dubSend, { transient: true });
 }
+
+/**
+ * Hand every held channel back to the user, whatever is holding it.
+ *
+ * Transport stop, AutoDub disable, panic. A gesture is a shape in time; after
+ * a stop there is no time it belongs to, and a channel left muted or fully
+ * sent outlives the performance that did it.
+ */
+export function releaseAllDubTransients(): number {
+  const restored = dubSendBaselines.releaseAll();
+  const store = useMixerStore.getState();
+  for (const { channelId, baseline } of restored) {
+    try {
+      store.setChannelMute(channelId, baseline.muted, { transient: true });
+      store.setChannelDubSend(channelId, baseline.dubSend, { transient: true });
+    } catch (err) {
+      console.error(`[dubTransient] release-all failed ch${channelId}:`, err);
+    }
+  }
+  return restored.length;
+}
+
+/**
+ * Close transients that have been open too long to be real.
+ *
+ * The failure this exists for is not hypothetical: on 2026-09-18 every channel
+ * sat muted at the source with the song rendering silence, because the code
+ * that would have closed the transients was gone. Cheap to run, and it only
+ * ever acts on state that is already wrong.
+ */
+export function reapOrphanedDubTransients(): number {
+  const reaped = dubSendBaselines.reapOrphans();
+  if (reaped.length === 0) return 0;
+  const store = useMixerStore.getState();
+  for (const { channelId, baseline } of reaped) {
+    console.warn(
+      `[dubTransient] ch${channelId} was held for too long — restoring the user's state`,
+    );
+    try {
+      store.setChannelMute(channelId, baseline.muted, { transient: true });
+      store.setChannelDubSend(channelId, baseline.dubSend, { transient: true });
+    } catch (err) {
+      console.error(`[dubTransient] reap failed ch${channelId}:`, err);
+    }
+  }
+  return reaped.length;
+}

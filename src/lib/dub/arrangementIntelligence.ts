@@ -49,7 +49,24 @@ export interface DropPlanOptions {
   minConfidence?: number;
   /** Channels the caller already knows must survive (user-muted, soloed…). */
   exclude?: ReadonlySet<number>;
+  /** Largest share of the arrangement a drop may take. */
+  maxDropShare?: number;
 }
+
+/**
+ * A drop must never take the whole arrangement.
+ *
+ * The protections above all read the channel PROFILE, and a profile is only as
+ * good as its evidence: an untitled module with no instrument names produces
+ * four channels of `unknown`, none of which look like foundation, so every one
+ * of them qualifies to be dropped and "just the riddim" becomes silence with
+ * reverb on it. Measured live on 2026-09-18 — every channel muted at the
+ * source, `silentReason: "module-rendered-silence"`.
+ *
+ * So the plan keeps a core whatever the evidence says. This is a floor, not a
+ * preference: it applies precisely when the performer knows least.
+ */
+const DEFAULT_MAX_DROP_SHARE = 0.75;
 
 /**
  * What a drop should do to each channel.
@@ -105,6 +122,23 @@ export function planDrop(
       restoreOrder: 0,
       reason,
     });
+  }
+
+  // Keep a core, whatever the evidence said. When nothing looks like a
+  // foundation — an untitled module, no instrument names, every axis
+  // unconfident — the rules above would happily take every channel.
+  const maxShare = options.maxDropShare ?? DEFAULT_MAX_DROP_SHARE;
+  const maxDroppable = Math.max(0, Math.floor(plans.length * maxShare));
+  const droppable = plans.filter(p => p.behavior !== 'protect');
+  if (droppable.length > maxDroppable) {
+    // Promote the most important back to protected until the core survives:
+    // if the performer must keep something, it keeps what the arrangement
+    // leans on hardest.
+    const byImportance = [...droppable].sort((a, b) => b.importance - a.importance);
+    for (const plan of byImportance.slice(0, droppable.length - maxDroppable)) {
+      plan.behavior = 'protect';
+      plan.reason = 'kept so the drop does not take the whole arrangement';
+    }
   }
 
   // Restoration order: most important first, so the riddim re-forms under the
