@@ -32,7 +32,7 @@ recount — do not trust this sentence either.
 | F — gesture engine | partial | F4: shapes + lifecycle shipped; param-automation shapes need a move update API |
 | G — wet energy | **closed** | G1 |
 | H-L — musical behaviour | **closed** | H1, I1, J1, K1-K4, L1, L2, AE1 |
-| M-O — record, verify, release | N1-N4 done | M1, O1, O2 |
+| M-O — record, verify, release | N1-N4 done; M1 partial | M1 persistence, O1, O2 |
 | X — user-reported open threads | 4 of 14 | X1, X11, X12, X13 closed |
 
 ### Debt carried, not hidden
@@ -520,8 +520,26 @@ copy/paste (`TrackerCell[]` whole objects), `.dbx` save/load (patterns serialize
 
 ## GATE M–O — record, verify, release
 
-- [ ] **M1** Performance recording with intention/target/gesture metadata, additive only —
+- [~] **M1** Performance recording with intention/target/gesture metadata, additive only —
       save/load compatibility preserved, replay reproduces the performance. Depends on F2.
+      `src/lib/dub/performanceJournal.ts` + `performanceJournalBridge.ts`, exposed over MCP
+      as `get_performance_journal` / `clear_performance_journal`.
+      The recorder already captured WHAT was played (cells + automation curves); the
+      journal captures WHY. "echoThrow ch1 at row 44" and "answering the horn phrase that
+      ended at row 40, on the channel that made it" replay identically and mean different
+      things, and only the second can be read back or argued with.
+      Additive in BOTH directions, deliberately: the journal sits BESIDE the lanes, so a
+      project saved without one loads exactly as before and one saved with it loads in a
+      build that has never heard of it. It never affects replay — the lanes stay the source
+      of truth, so a journal that drifts from an edited lane degrades into stale commentary
+      rather than a performance that plays back wrong. A malformed journal parses to an
+      empty one: commentary must never stop a song loading.
+      It records from the ROUTER, so the user's moves and the AI's sit in one document in
+      the order they happened, and only the AI's fires are annotated — a hand on a pad had
+      an intention too, but not one this program should guess at. 14 tests.
+      **Remaining for the tick:** persisting the journal into the project file itself (the
+      save/load path), and the replay-reproduces check. The in-memory record, its format,
+      its parser and its read path are done.
 - [x] **N1** Deterministic offline performance simulator (project, BPM, metre, phrase length,
       persona, seed, duration → bar-by-bar decision log). Primary tuning environment.
       `src/lib/dub/simulator.ts`, driving `src/lib/dub/performanceCycle.ts` — the decision

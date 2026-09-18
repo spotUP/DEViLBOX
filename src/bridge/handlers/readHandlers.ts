@@ -755,6 +755,37 @@ export async function getAutoDubFireLog(): Promise<Record<string, unknown>> {
   };
 }
 
+/**
+ * The performance journal (Gate M1): what was played, by whom, and why.
+ *
+ * Distinct from the fire log, which is a ring buffer of move ids for CI
+ * assertions. This is the readable record — the AI's moves carry the intention
+ * and the reason behind them, the user's carry no invented ones, and both are
+ * in one document in the order they happened.
+ */
+export async function getPerformanceJournal(
+  params: Record<string, unknown> = {},
+): Promise<Record<string, unknown>> {
+  const { getPerformanceJournal: read } = await import('../../engine/dub/performanceJournalBridge');
+  const { formatJournal } = await import('../../lib/dub/performanceJournal');
+  const journal = read();
+  const limit = typeof params.limit === 'number' ? Math.max(1, Math.min(500, params.limit)) : 60;
+  const entries = journal.entries.slice(-limit);
+  return {
+    version: journal.version,
+    total: journal.entries.length,
+    entries,
+    text: formatJournal({ ...journal, entries }, limit),
+  };
+}
+
+/** Start a clean take — the journal only, leaving lanes and cells alone. */
+export async function clearPerformanceJournal(): Promise<Record<string, unknown>> {
+  const { clearPerformanceJournal: clear } = await import('../../engine/dub/performanceJournalBridge');
+  clear();
+  return { ok: true };
+}
+
 /** Clears the Auto Dub fire log ring buffer. */
 export async function clearAutoDubFireLog(): Promise<Record<string, unknown>> {
   const { clearAutoDubFireLog: clear } = await import('../../engine/dub/AutoDub');
