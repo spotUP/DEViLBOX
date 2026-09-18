@@ -6,6 +6,7 @@
 
 import { sunEffectToString } from './import/formats/sunEffectGlyphs';
 import { sonixEffectToString } from './import/formats/sonixEffectGlyphs';
+import { isDubEffectTypeForDisplay } from '@/engine/dub/moveTable';
 
 /**
  * Note names for XM encoding
@@ -242,8 +243,9 @@ export function xmEffectToString(effTyp: number, eff: number): string {
     return `~${ch}${(eff & 0xF).toString(16).toUpperCase()}`;
   }
 
-  // Dub effect commands (36/37/38) → display as Zxx
-  if (effTyp >= 36 && effTyp <= 38) {
+  // Dub effect commands (36-40) → display as Zxx. Range owned by moveTable so
+  // declaring a new slot pair cannot leave this path behind again.
+  if (isDubEffectTypeForDisplay(effTyp)) {
     return `Z${HEX_BYTE[eff] ?? '00'}`;
   }
 

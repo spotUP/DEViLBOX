@@ -86,6 +86,25 @@ export const DUB_EFFECT_PARAM_STEP   = 38;
 export const DUB_EFFECT_GLOBAL_X     = 39;
 export const DUB_EFFECT_PERCHANNEL_X = 40;
 
+/**
+ * Inclusive effTyp range reserved for dub slots. Display paths render every
+ * value in here as `Z`; `isDubEffect` above is narrower on purpose (it answers
+ * "is this a MOVE", so it excludes the param-step slot).
+ *
+ * Exists because the range was duplicated as a literal in each display path and
+ * they drifted: slots 39/40 shipped, both grid renderers were updated, and
+ * `xmEffectToString` was left at `36..38` — so moves 16-31 authored in a cell
+ * rendered a wrong character in the DOM cell and in Find/Replace. Widen HERE
+ * when a slot pair is declared, never at a call site.
+ */
+export const DUB_EFFECT_TYPE_MIN = DUB_EFFECT_GLOBAL;        // 36
+export const DUB_EFFECT_TYPE_MAX = DUB_EFFECT_PERCHANNEL_X;  // 40
+
+/** True for any effTyp that a pattern display should render as `Zxx`. */
+export function isDubEffectTypeForDisplay(effTyp: number): boolean {
+  return effTyp >= DUB_EFFECT_TYPE_MIN && effTyp <= DUB_EFFECT_TYPE_MAX;
+}
+
 /** True when effTyp is any of the four dub move-trigger slots (not the param-step slot). */
 export function isDubMoveEffectSlot(effTyp: number): boolean {
   return effTyp === DUB_EFFECT_GLOBAL

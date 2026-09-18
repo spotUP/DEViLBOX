@@ -12,7 +12,10 @@ analysis: thoughts/shared/plans/2026-09-17-dub-studio-gap-reconciliation.md
 Durable todo list. Survives compaction, crashes, `/clear`. **Re-read this before trusting
 recollection or any earlier summary in a conversation.**
 
-Running count: **1 of 36 done** (Gate A closed).
+Running count: **5 of 36 done** (Gate A closed; F1/F1a/F1c shipped 2026-09-17, F2c 2026-09-18).
+
+**Reconciled against the code 2026-09-18** — the ledger had drifted: F1, F1a and F1c were
+implemented the same night the plan was written but never ticked. Verify before trusting a count.
 
 Legend: `[ ]` open · `[~]` in progress · `[x]` done+verified · `[?]` blocked
 
@@ -112,7 +115,9 @@ Paths that are index-agnostic and need NO change (verified): MIDI (string-keyed 
 lane serialization (`DubEvent.moveId` is a string), undo/redo (whole-pattern snapshots),
 copy/paste (`TrackerCell[]` whole objects), `.dbx` save/load (patterns serialized whole).
 
-- [ ] **F1** **Reshape `skankEchoThrow` from a hold into a capture.** Root cause of the user's
+- [x] **F1** **Reshape `skankEchoThrow` from a hold into a capture.** *(Shipped: `kind:'trigger'`,
+      capture window, feedback window == capture+tail, echo rate borrowed and restored rather than
+      clobbered. Verified in `moves/skankEchoThrow.ts` 2026-09-18.)* Root cause of the user's
       "skanks don't echo like a dub record" report — confirmed at line level 2026-09-17. Four
       concrete defects vs. `echoThrow`, which already implements the correct gesture:
       1. **No auto-close.** `echoThrow` is `kind:'trigger'` and does
@@ -134,8 +139,9 @@ copy/paste (`TrackerCell[]` whole objects), `.dbx` save/load (patterns serialize
       darkens each repeat — CHACK / chak / chuk / chk).
       **Fixable now, independent of the AI performer** — the primitive itself is mis-shaped, so the
       gesture is wrong under manual control too.
-- [ ] **F1a** `skankFloatThrow` = the 3:2 / 1.5-beat float, same capture shape, kept as a colour.
-- [ ] **F1c** Dry-duck composition: use the existing `DubMoveChain` (throw + brief `channelMute`)
+- [x] **F1a** `skankFloatThrow` = the 3:2 / 1.5-beat float, same capture shape, kept as a colour.
+      *(Shipped: `moves/skankFloatThrow.ts`, registry entry, strip button. Verified 2026-09-18.)*
+- [x] **F1c** Dry-duck composition: use the existing `DubMoveChain` (throw + brief `channelMute`)
       rather than building dry reduction into the move. No new mechanism.
 - [ ] **T1** Regression: `skankEchoThrow`'s principal repeat lands at beat+0.75, `skankFloatThrow`
       at beat+1.5. Must fail before the fix.
@@ -148,11 +154,15 @@ copy/paste (`TrackerCell[]` whole objects), `.dbx` save/load (patterns serialize
 - [ ] **F2b** Scanner only reads `effTyp` and `effTyp2`, but `TrackerCell` carries `effTyp3`..
       `effTyp8`. A dub effect authored in columns 3-8 never fires. Decide: scan all 8, or document
       columns 1-2 as the supported surface.
-- [ ] **F2c** **Live display bug, pre-existing:** `lib/xmConversions.ts:246` checks
-      `effTyp >= 36 && effTyp <= 38`, missing slots **39/40 that already ship** — moves 16-31 in
-      cells render as a wrong character instead of `Z`. Fix to cover 36-42. (Both renderers,
-      `TrackerCanvas2DRenderer:71-75` and `TrackerGLRenderer:158-162`, map 36-40 correctly and need
-      41/42 appending.)
+- [x] **F2c** **Live display bug, pre-existing:** FIXED 2026-09-18. `xmEffectToString` covered
+      36-38 while slots 39/40 already shipped, so moves 16-31 authored in a cell rendered a wrong
+      character in `EffectCell` and in Find/Replace (both grid renderers were already correct —
+      that asymmetry is what let it hide). Root fix: the range now lives in `moveTable` as
+      `DUB_EFFECT_TYPE_MIN/MAX` + `isDubEffectTypeForDisplay()`, so it cannot drift per call site
+      again. Regression `xmConversions.dubEffect.test.ts` includes a ratchet that walks the whole
+      declared range, so the next slot pair is covered automatically; 3 of 8 assertions fail on
+      the old literal. **Still open for F2:** the two grid renderers hardcode 36-40 in their own
+      `EFFECT_CHARS` arrays and need 41/42 appended when the slot pair lands.
 - [ ] **F2d** `.xm` export silently drops every dub cell — `XMExporter` reads the legacy
       `cell.effect` string field, never `effTyp`. Correct behaviour (XM has no dub slot) but
       undocumented. Document it; do not "fix" it.
