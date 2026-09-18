@@ -5675,7 +5675,12 @@ export class DubBus {
     filt.connect(env);
     env.connect(softClip);
     softClip.connect(this.return_);
-    const peak = generatedPeak('oscBass', level);
+    // X11 references the level to the programme; the 0.6 ceiling stays on top
+    // of it. That clamp is not about loudness, it is headroom: this branch
+    // feeds a Q=18 self-oscillating lowpass whose ringing does not scale
+    // linearly with post-filter gain, so the ceiling and the soft-clip below
+    // are both load-bearing (2026-04-20 untested-FX sweep).
+    const peak = Math.min(0.6, generatedPeak('oscBass', level));
     env.gain.setValueAtTime(0, now);
     env.gain.linearRampToValueAtTime(peak, now + 0.08);
     osc.start(now);

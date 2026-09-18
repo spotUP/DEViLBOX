@@ -43,9 +43,12 @@ describe('startOscBass — headroom clamp', () => {
 
   it('clamps `peak` at most 0.6 before envelope scheduling', () => {
     // Match a literal that says "the envelope peak cannot exceed 0.6".
-    // We deliberately write the clamp as `Math.min(0.6, level)` so this
-    // test can lock it down without parsing AST.
-    const clampMatch = body.match(/Math\.min\(\s*(0\.\d+)\s*,\s*level\s*\)/);
+    // The clamp is written as `Math.min(0.6, <level expression>)` so this
+    // test can lock it down without parsing AST. X11 made the level itself
+    // programme-referenced — `generatedPeak('oscBass', level)` — which bounds
+    // it further, but the ceiling stays because it is about the resonant
+    // filter's ringing rather than about loudness.
+    const clampMatch = body.match(/Math\.min\(\s*(0\.\d+)\s*,\s*[^)]*level[^)]*\)/);
     expect(clampMatch, 'should have an upper-bound clamp on `level`').not.toBeNull();
     const clampedMax = Number(clampMatch![1]);
     expect(clampedMax).toBeLessThanOrEqual(0.6);
