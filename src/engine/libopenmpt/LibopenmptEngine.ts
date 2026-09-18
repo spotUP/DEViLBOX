@@ -417,7 +417,7 @@ export class LibopenmptEngine {
    * outside. Resolves null if the worklet does not answer (no worklet, or it
    * is wedged), which is itself the answer.
    */
-  getWorkletDiag(timeoutMs = 300): Promise<Record<string, unknown> | null> {
+  getWorkletDiag(timeoutMs = 1500): Promise<Record<string, unknown> | null> {
     if (!this.workletNode) return Promise.resolve(null);
     return new Promise((resolve) => {
       let settled = false;
