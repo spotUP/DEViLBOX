@@ -20,6 +20,8 @@ import {
   endDubTransient,
 } from '@/lib/dub/dubChannelTransient';
 import { useTrackerStore } from '@/stores/useTrackerStore';
+import { useTransportStore } from '@/stores/useTransportStore';
+import { msUntilMusicalReturn } from '@/lib/dub/musicalReturn';
 import { useInstrumentStore } from '@/stores/useInstrumentStore';
 import { classifySongRoles } from '@/bridge/analysis/ChannelNaming';
 import { fire } from '../DubRouter';
@@ -75,12 +77,27 @@ export const riddimSection: DubMove = {
       return { dispose() {} };
     }
 
-    // Schedule skank return at 60% of the hold duration
-    // barMs = one bar in ms. holdBars comes from persona config via adaptedParams.
+    // Gate L1: the skank comes back on a MUSICAL boundary, not at 60% of the
+    // hold. Sixty percent of four bars at 143 BPM is 4.03 s — the middle of a
+    // bar, and wrong by an amount that changes with tempo. The mix returning
+    // mid-bar is the difference between a move and a mistake.
     const bpm = ctx.bpm || 120;
     const barMs = (60000 / bpm) * 4;
     const holdBars = (typeof ctx.params?.holdBars === 'number') ? ctx.params.holdBars : 4;
-    const skankReturnMs = barMs * holdBars * 0.6; // 60% of hold duration
+    const transport = useTransportStore.getState();
+    const row = Number.isFinite(transport.currentGlobalRow) && transport.currentGlobalRow > 0
+      ? transport.currentGlobalRow
+      : transport.currentRow;
+    // The intention behind the return: bringing one part back inside a section
+    // that is still held is a SPACE gesture, so it resolves on the next bar.
+    // The ceiling keeps it inside the section it belongs to.
+    const { ms: skankReturnMs } = msUntilMusicalReturn(
+      row,
+      transport.speed || 6,
+      bpm,
+      'SPACE',
+      barMs * holdBars * 0.75,
+    );
 
     let skankTimer: ReturnType<typeof setTimeout> | null = null;
 
