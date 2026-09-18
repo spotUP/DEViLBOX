@@ -12,8 +12,35 @@ analysis: thoughts/shared/plans/2026-09-17-dub-studio-gap-reconciliation.md
 Durable todo list. Survives compaction, crashes, `/clear`. **Re-read this before trusting
 recollection or any earlier summary in a conversation.**
 
-Running count: **17 of 36 done** (Gate A closed; F1/F1a/F1c shipped 2026-09-17; F2c and the whole F2 chunk 2026-09-18).
-Pre-work complete except F3. **Gates A, B, C closed 2026-09-18.** Gate D (PerformanceContext) is next.
+Running count: **17 of 49 done.**
+
+**The denominator was wrong until 2026-09-18.** The header said "of 36" from the day this file
+was written and was never updated as sub-items (F1a, F1c, F2a-F2e, T1-T3, the X series) were
+added. Counted from the checkboxes: 17 ticked, 32 open, 49 total. If you change the item list,
+recount — do not trust this sentence either.
+
+### Gate status
+
+| Gate | State | Notes |
+|---|---|---|
+| A — baseline lock | **closed** | A1 |
+| Pre-work — cell encoding + skank | **closed bar T1 and F3** | F1, F1a, F1c, F2, F2a-e, T2 done |
+| B — musical clock | **closed** | B1, T3 |
+| C — event model | **closed** | C1, C2, C3. DJ adapter for C1 deliberately not written |
+| D — performance context | open | D1. Next milestone; B and C supply most of its inputs |
+| E — intention + REST | open | E1, E2, E3 |
+| F — gesture engine | open | F4 |
+| G — wet energy | open | G1 |
+| H-L — musical behaviour | open | H1, I1, J1, K1-K4, L1, L2, AE1 |
+| M-O — record, verify, release | open | M1, N1-N4, O1, O2 |
+| X — user-reported open threads | 1 of 9 | X1 closed |
+
+### Debt carried, not hidden
+
+- **T1 is open while F1 and F1a are shipped.** The skank reshape went in without its regression
+  test, against the house rule that a bug fix ships with a test that fails before and passes
+  after. Write it before Gate D, or accept it knowingly.
+- **X2 — the skank has still never been heard.** Shipped and tested by measurement only.
 
 **Reconciled against the code 2026-09-18** — the ledger had drifted: F1, F1a and F1c were
 implemented the same night the plan was written but never ticked. Verify before trusting a count.
@@ -322,7 +349,25 @@ copy/paste (`TrackerCell[]` whole objects), `.dbx` save/load (patterns serialize
 - Superseded revision 1: `thoughts/shared/plans/2026-09-17-dub-studio-master-implementation-plan.md`
 - Phase-0 audit: `thoughts/shared/plans/2026-09-17-dub-studio-gap-reconciliation.md`
 - System reference sent for review: `~/Desktop/devilbox-dub-system.zip` → `DUB_SYSTEM.md`
-- Commits proving completed work: *(record here as items close)*
+- Session handoff 2026-09-18: `thoughts/shared/handoffs/2026-09-18_pattern-display-dub-slots-and-gates-abc.md`
+
+### Commits proving completed work
+
+| Items | Commit | What |
+|---|---|---|
+| F1, F1a, F1c | `00bfd0a6b` | skank reshaped hold → capture; `skankFloatThrow` added (2026-09-17) |
+| F2c | `19fe7ab54` | slots 39/40 render as `Z`; range moved into `moveTable` |
+| F2, F2a, F2b, F2d, F2e, T2 | `d25da796c` | slot pair 41/42; seven moves appended; scanner reads all 8 columns |
+| B1, T3 | `33a686886` | `MusicalClock`; `floor(row/16)` hardcode removed from AutoDub |
+| C2 | `fa03f3e1d` | `MusicalChannelProfile` — axes + confidence + source |
+| C1, C3 | `6baa5acc8` | `ChannelEventSource`, look-ahead windows from the clock |
+
+Verified against the code 2026-09-18, not from memory: `skankEchoThrow` is
+`kind:'trigger'`; `skankFloatThrow.ts` exists; `DUB_EFFECT_GLOBAL_X2 = 41` and
+`DUB_MOVE_TABLE_VERSION = 44`; `DubEffectScanner` calls
+`isDubEffectTypeForDisplay` and reads `cell.effTyp8`; `xmConversions` calls it too;
+`musicalClock.ts` / `musicalChannelProfile.ts` / `musicalEvents.ts` exist and
+`AutoDub` calls `computeMusicalPosition`.
 
 ---
 
