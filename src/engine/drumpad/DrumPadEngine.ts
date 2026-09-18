@@ -16,7 +16,11 @@ import { setDubBusForRouter } from '../dub/DubRouter';
 import { getToneEngine } from '../ToneEngine';
 import { getChannelRoutedEffectsManager } from '../tone/ChannelRoutedEffects';
 import { getNativeAudioNode } from '../../utils/audio-context';
-import { useMixerStore } from '../../stores/useMixerStore';
+import {
+  beginDubTransient,
+  setDubTransient,
+  endDubTransient,
+} from '../../lib/dub/dubChannelTransient';
 
 
 interface VoiceState {
@@ -101,8 +105,18 @@ export class DrumPadEngine {
       if (trackerMix) {
         this.dubBus.registerWholeMixTap('tracker-master-input', trackerMix);
       }
+      // Cold-path throw activation. This drives the MIXER STORE, so it is a
+      // transient like any move: `amt` opens it, `null` closes it and the
+      // channel returns to the user's send/mute. Writing the store directly
+      // here made every throw look like a user fader move, which is how
+      // ghostReverb later snapshotted 1.0 and pinned it.
       this.dubBus.setChannelActivationCallback((ch, amt) => {
-        useMixerStore.getState().setChannelDubSend(ch, amt);
+        if (amt === null) {
+          endDubTransient(ch);
+          return;
+        }
+        beginDubTransient(ch);
+        setDubTransient(ch, { dubSend: amt });
       });
     } catch (e) {
       console.warn('[DrumPadEngine] dub routing bootstrap failed:', e);

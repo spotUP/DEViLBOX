@@ -45,6 +45,7 @@ vi.mock('@/stores/useMixerStore', () => ({
   },
 }));
 
+import { dubSendBaselines } from '@/lib/dub/channelSendBaseline';
 import { echoThrow } from '../moves/echoThrow';
 import { dubStab } from '../moves/dubStab';
 import { channelThrow } from '../moves/channelThrow';
@@ -232,21 +233,24 @@ describe('channelMute', () => {
 
   it('mutes the channel on fire and un-mutes on dispose when it was previously unmuted', () => {
     const { bus } = buildFakeBus();
+    dubSendBaselines.clear();
     mixerChannels[2] = { muted: false, dubSend: 0 };
     const disp = channelMute.execute(ctx(bus, { channelId: 2 }));
-    expect(mixerMutations.setChannelMute).toHaveBeenCalledWith(2, true);
+    expect(mixerMutations.setChannelMute).toHaveBeenCalledWith(2, true, { transient: true });
     mixerMutations.setChannelMute.mockClear();
     disp!.dispose();
-    expect(mixerMutations.setChannelMute).toHaveBeenCalledWith(2, false);
+    expect(mixerMutations.setChannelMute).toHaveBeenCalledWith(2, false, { transient: true });
   });
 
-  it('does NOT un-mute a channel that was already muted before the move fired', () => {
+  it('leaves a channel that was already muted before the move fired muted', () => {
     const { bus } = buildFakeBus();
+    dubSendBaselines.clear();
     mixerChannels[0] = { muted: true, dubSend: 0 };
     const disp = channelMute.execute(ctx(bus, { channelId: 0 }));
-    expect(mixerMutations.setChannelMute).not.toHaveBeenCalled();
+    mixerMutations.setChannelMute.mockClear();
     disp!.dispose();
-    expect(mixerMutations.setChannelMute).not.toHaveBeenCalled();
+    // The release hands the channel back to the user's own state, not to false.
+    expect(mixerMutations.setChannelMute).toHaveBeenLastCalledWith(0, true, { transient: true });
   });
 });
 
@@ -515,6 +519,7 @@ describe('delayPresetDoubler', () => {
 
 describe('ghostReverb', () => {
   beforeEach(() => {
+    dubSendBaselines.clear();
     mixerChannels.length = 0;
     mixerChannels.push({ muted: false, dubSend: 0.3 });
     mixerMutations.setChannelMute.mockClear();
@@ -526,8 +531,8 @@ describe('ghostReverb', () => {
     // mixerChannels[0] has dubSend: 0.3 (non-zero) — should be ghosted
     const result = ghostReverb.execute(ctx(bus, {}));
     expect(result).not.toBeNull();
-    expect(mixerMutations.setChannelMute).toHaveBeenCalledWith(0, true);
-    expect(mixerMutations.setChannelDubSend).toHaveBeenCalledWith(0, 1.0);
+    expect(mixerMutations.setChannelMute).toHaveBeenCalledWith(0, true, { transient: true });
+    expect(mixerMutations.setChannelDubSend).toHaveBeenCalledWith(0, 1.0, { transient: true });
   });
 
   it('returns null when no channels have a send (nothing to ghost globally)', () => {
@@ -540,8 +545,8 @@ describe('ghostReverb', () => {
   it('mutes dry channel and cranks dub send to 1.0', () => {
     const { bus } = buildFakeBus();
     ghostReverb.execute(ctx(bus, { channelId: 0 }));
-    expect(mixerMutations.setChannelMute).toHaveBeenCalledWith(0, true);
-    expect(mixerMutations.setChannelDubSend).toHaveBeenCalledWith(0, 1.0);
+    expect(mixerMutations.setChannelMute).toHaveBeenCalledWith(0, true, { transient: true });
+    expect(mixerMutations.setChannelDubSend).toHaveBeenCalledWith(0, 1.0, { transient: true });
   });
 
   it('dispose restores original mute state and dub send', () => {
@@ -550,8 +555,8 @@ describe('ghostReverb', () => {
     expect(handle).not.toBeNull();
     handle!.dispose();
     // Restores to original: muted=false, dubSend=0.3
-    expect(mixerMutations.setChannelMute).toHaveBeenLastCalledWith(0, false);
-    expect(mixerMutations.setChannelDubSend).toHaveBeenLastCalledWith(0, 0.3);
+    expect(mixerMutations.setChannelMute).toHaveBeenLastCalledWith(0, false, { transient: true });
+    expect(mixerMutations.setChannelDubSend).toHaveBeenLastCalledWith(0, 0.3, { transient: true });
   });
 });
 
