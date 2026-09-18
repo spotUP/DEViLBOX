@@ -12,7 +12,7 @@ analysis: thoughts/shared/plans/2026-09-17-dub-studio-gap-reconciliation.md
 Durable todo list. Survives compaction, crashes, `/clear`. **Re-read this before trusting
 recollection or any earlier summary in a conversation.**
 
-Running count: **33 of 52 done.**
+Running count: **34 of 53 done.**
 
 **The denominator was wrong until 2026-09-18.** The header said "of 36" from the day this file
 was written and was never updated as sub-items (F1a, F1c, F2a-F2e, T1-T3, the X series) were
@@ -33,7 +33,7 @@ recount — do not trust this sentence either.
 | G — wet energy | **closed** | G1 |
 | H-L — musical behaviour | **closed** | H1, I1, J1, K1-K4, L1, L2, AE1 |
 | M-O — record, verify, release | open | M1, N1-N4, O1, O2 |
-| X — user-reported open threads | 2 of 12 | X1, X11 closed (X11 needs a listening check) |
+| X — user-reported open threads | 3 of 13 | X1, X11, X12 closed |
 
 ### Debt carried, not hidden
 
@@ -814,6 +814,21 @@ this bug.
       level-tuning pass is owed once the plan closes, covering `GENERATED_PRESENCE`,
       `SILENT_PROGRAMME_PEAK`, and the X10 master-insert trim (which moves overall level
       and therefore what "as loud as the music" means). Do not tune them mid-plan.
+
+- [x] **X12** **Held moves from the Dub Deck lingered for ever.** Reported 2026-09-18:
+      "the siren and lots of other noise is lingering now", with eight
+      `holdStart dubSiren` and a `crushBass` in the log and no matching release.
+      Measured first: the AutoDub fire log showed 22 fires / 18 releases and never more
+      than ONE hold in flight, so the performer was not the source — the deck was.
+      Cause: `DubDeckStrip` kept each hold's releaser as a closure in a component ref.
+      When the component unmounted or hot-reloaded, every releaser went with it and the
+      sound kept going with nothing able to stop it. Same orphan class as X9's transients,
+      in a different place.
+      Fixed by giving the deck's holds to the GestureEngine (Gate F4's whole point: ONE
+      notion of a held move). `holdMs: 0` means held until released; the engine outlives
+      the component, so a transport stop, a panic or the new unmount cleanup can always
+      let go, and the hold appears in `activeGestures()` where a disposer in a ref never
+      could. 2 tests.
 
 - [ ] **X10** **Dub bus clips and distorts most of the time.** Reported
       2026-09-18. Not yet investigated. Measure before touching anything:

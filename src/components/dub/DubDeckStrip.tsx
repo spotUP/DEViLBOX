@@ -23,6 +23,7 @@ import { useUIStore } from '@/stores/useUIStore';
 import { useTransportStore } from '@/stores/useTransportStore';
 import { bpmSyncedEchoRate, getActiveBpm } from '@/engine/dub/DubActions';
 import { subscribeDubRouter, subscribeDubRelease, fire as fireDub } from '@/engine/dub/DubRouter';
+import { beginGesture, endGesture, cancelGesture } from '@/engine/dub/GestureEngine';
 import { getAutoDubCurrentRoles } from '@/engine/dub/AutoDub';
 import { startDubRecorder, clearDubCurvesForCurrentPattern } from '@/engine/dub/DubRecorder';
 import { dubLanePlayer } from '@/engine/dub/DubLanePlayer';
@@ -302,7 +303,19 @@ export const DubDeckStrip: React.FC = () => {
   // (e.g. channelMute per channel) AND global holds (filterDrop, dubSiren,
   // tapeWobble, masterDrop, toast). Keyed by `${moveId}:${channelId ?? 'g'}`
   // so a single pointer press/release cycle maps cleanly to fire → dispose.
-  const activeHolds = useRef<Map<string, () => void>>(new Map());
+  /**
+   * Held moves are owned by the GestureEngine, not by this component.
+   *
+   * These used to be disposer closures in a ref: when the component unmounted
+   * or hot-reloaded, every releaser went with it and whatever was held — a
+   * siren, a crush bass — kept sounding with nothing able to stop it. Reported
+   * 2026-09-18 as "the siren and lots of other noise is lingering now", with
+   * eight `holdStart dubSiren` in the log and no release.
+   *
+   * The engine outlives this component, so a transport stop, a panic, or the
+   * unmount cleanup below can always let go. The map now holds gesture IDS.
+   */
+  const activeHolds = useRef<Map<string, string>>(new Map());
 
   const [heldMoves, setHeldMoves] = useState<Set<string>>(new Set());
 
@@ -352,8 +365,9 @@ export const DubDeckStrip: React.FC = () => {
     }
     heldReleasers.current.clear();
     setHeldChannels(new Set());
-    for (const release of activeHolds.current.values()) {
-      try { release(); } catch { /* ok */ }
+    // Held moves are gesture IDs now — the engine owns their lifetime.
+    for (const id of activeHolds.current.values()) {
+      try { endGesture(id); } catch { /* ok */ }
     }
     activeHolds.current.clear();
     setHeldMoves(new Set());
@@ -781,21 +795,40 @@ export const DubDeckStrip: React.FC = () => {
     if (!busEnabled) { console.warn(`[DubDeck] holdStart ${moveId} ignored — bus disabled`); return; }
     const key = `${moveId}:${channelId ?? 'g'}`;
     if (activeHolds.current.has(key)) { console.warn(`[DubDeck] holdStart ${moveId} ignored — already active in map`); return; }
-    const disp = fireDub(moveId, channelId);
-    console.log(`[DubDeck] holdStart ${moveId} fired → disposer=${!!disp}`);
-    if (disp) {
-      activeHolds.current.set(key, () => disp.dispose());
-      setHeldMoves(prev => new Set(prev).add(key));
-    }
+    // holdMs 0 = held until released. The engine keeps it in flight and it
+    // shows up in `activeGestures()`, so a panic or a transport stop can reach
+    // it — which a disposer closed over in this component never could.
+    const id = beginGesture({
+      moveId,
+      channelId,
+      holdMs: 0,
+      bpm: getActiveBpm(),
+      source: 'live',
+    });
+    console.log(`[DubDeck] holdStart ${moveId} → gesture ${id}`);
+    activeHolds.current.set(key, id);
+    setHeldMoves(prev => new Set(prev).add(key));
   }, [busEnabled]);
 
   const holdEnd = useCallback((moveId: string, channelId?: number) => {
     const key = `${moveId}:${channelId ?? 'g'}`;
-    const release = activeHolds.current.get(key);
-    if (!release) return;
+    const id = activeHolds.current.get(key);
+    if (!id) return;
     activeHolds.current.delete(key);
     setHeldMoves(prev => { const n = new Set(prev); n.delete(key); return n; });
-    try { release(); } catch { /* ok */ }
+    try { endGesture(id); } catch { /* ok */ }
+  }, []);
+
+  // Nothing this deck is holding may outlive the deck. Without this, a view
+  // change or a hot reload left the held move sounding for ever.
+  useEffect(() => {
+    const held = activeHolds.current;
+    return () => {
+      for (const id of held.values()) {
+        try { cancelGesture(id, 'cancelled'); } catch { /* ok */ }
+      }
+      held.clear();
+    };
   }, []);
 
   // Toggle handler — click once to activate, click again to deactivate.
