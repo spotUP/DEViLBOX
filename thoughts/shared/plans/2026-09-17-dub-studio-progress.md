@@ -12,7 +12,7 @@ analysis: thoughts/shared/plans/2026-09-17-dub-studio-gap-reconciliation.md
 Durable todo list. Survives compaction, crashes, `/clear`. **Re-read this before trusting
 recollection or any earlier summary in a conversation.**
 
-Running count: **24 of 51 done.**
+Running count: **25 of 51 done.**
 
 **The denominator was wrong until 2026-09-18.** The header said "of 36" from the day this file
 was written and was never updated as sub-items (F1a, F1c, F2a-F2e, T1-T3, the X series) were
@@ -31,7 +31,7 @@ recount — do not trust this sentence either.
 | E — intention + REST | **closed** | E1, E2, E3 |
 | F — gesture engine | partial | F4: shapes + lifecycle shipped; param-automation shapes need a move update API |
 | G — wet energy | **closed** | G1 |
-| H-L — musical behaviour | H1, L2 done | I1, J1, K1-K4, L1, AE1 |
+| H-L — musical behaviour | H1, L1, L2 done | I1, J1, K1-K4, AE1 |
 | M-O — record, verify, release | open | M1, N1-N4, O1, O2 |
 | X — user-reported open threads | 1 of 11 | X1 closed |
 
@@ -399,8 +399,19 @@ copy/paste (`TrackerCell[]` whole objects), `.dbx` save/load (patterns serialize
 - [ ] **K3** Call and response over musical time.
 - [ ] **K4** Repetition vs novelty: distinguish intentional repetition from algorithmic
       repetition.
-- [ ] **L1** Musical return quantization — `riddimSection`'s 60%-of-hold becomes next beat /
+- [x] **L1** Musical return quantization — `riddimSection`'s 60%-of-hold becomes next beat /
       eighth / bar / phrase boundary / next relevant event, chosen by intention (Gate L).
+      `src/lib/dub/musicalReturn.ts`. 60% of four bars at 143 BPM is 4.03 s — the middle
+      of a bar, wrong by an amount that changes with tempo. Returns now land on a
+      boundary chosen from the intention: DROP and TRANSITION resolve on the phrase,
+      BUILD and SPACE on the bar, ACCENT and ANSWER on the beat.
+      Two details that matter: the boundary is STRICTLY after the current row, so a
+      gesture fired on a downbeat does not "return" in the same instant it started; and
+      a ceiling falls back to the largest seam that fits, because a drop that holds
+      fifteen bars just because the phrase edge is that far away is not a musical
+      decision either. `riddimSection` uses it for the skank return. 13 tests.
+      Remaining for the item's full scope: "next relevant event" as a boundary — that
+      wants the Gate C look-ahead threaded into the move, not just the grid.
 - [x] **L2** Phrase intelligence: normalized `phrasePosition` from `MusicalClock`; persona arcs
       keep their shapes but stop depending on `bar % 16`.
       `getPhraseIntensityMult` now takes a 0..1 position. `bar % 16` was two assumptions
