@@ -200,15 +200,26 @@ export class AutomationPlayer {
         // channel to those would break their lookup — so this is gated on
         // DUB_MOVE_KINDS, and on the parameter not already carrying its own
         // explicit `.chN`.
+        //
+        // `dub.channelSend` is addressed the same way for the same reason: it
+        // is per-channel and continuous, so it is neither a move nor a bus
+        // param, and without the suffix a recorded fader ride would replay on
+        // whichever channel the router guessed (X5).
         const shortDubName = parameter.slice('dub.'.length);
+        const perChannel =
+          DUB_MOVE_KINDS?.[shortDubName] !== undefined || shortDubName === 'channelSend';
         const addressed =
           channelIndex !== undefined
           && channelIndex >= 0
           && !/\.ch\d+$/.test(parameter)
-          && DUB_MOVE_KINDS?.[shortDubName] !== undefined
+          && perChannel
             ? `${parameter}.ch${channelIndex}`
             : parameter;
-        routeParameterToEngine(addressed, value);
+        // Tagged as playback, like the global curves below already were.
+        // Without it a per-channel dub curve replayed as a LIVE gesture, and
+        // the recorder — which only skips 'lane' — captured it again on every
+        // pass, so one take grew a copy of itself each time round the pattern.
+        routeParameterToEngine(addressed, value, undefined, 'lane');
       } catch (error) {
         console.error(`Failed to apply dub automation for ${parameter}:`, error);
       }

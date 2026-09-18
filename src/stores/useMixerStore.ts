@@ -29,6 +29,11 @@ import { dubSendBaselines } from '@/lib/dub/channelSendBaseline';
  */
 export interface DubWriteOrigin {
   transient?: boolean;
+  /**
+   * 'lane' when automation is replaying this write. The recorder ignores
+   * those, or a take would re-capture itself on every pass.
+   */
+  source?: 'live' | 'lane';
 }
 
 // Rebuild WASM per-channel effect routing after any insert-effect mutation
@@ -1085,6 +1090,25 @@ export const useMixerStore = create<MixerStore>()(
           if (allClosed) getActiveDubBus()?.drainEchoContent();
         }
       } catch { /* dub bus not ready */ }
+
+      // Announce the write so the recorder can capture a fader ride.
+      //
+      // Only the user's own writes. A transient is a move BORROWING the send
+      // and is already recorded as that move; recording it again here would
+      // write a second, contradictory account of the same gesture (X5).
+      if (!opts?.transient) {
+        void import('@/lib/dub/channelSendStream').then(async ({ publishChannelSend }) => {
+          // Same clock the router stamps its fires with, so a ride and the
+          // moves around it line up on one timeline.
+          const { getCurrentRow } = await import('@/engine/dub/dubGrid');
+          publishChannelSend({
+            channelId: ch,
+            value: clamped,
+            row: getCurrentRow(),
+            source: opts?.source ?? 'live',
+          });
+        }).catch(() => { /* dub subsystem not loaded — nothing is listening */ });
+      }
 
       // State update — rAF-batched so drag doesn't cause 60 re-renders/sec.
       scheduleDubSendStoreWrite(ch, clamped, set);

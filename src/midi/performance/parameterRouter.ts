@@ -152,7 +152,31 @@ function parseDubMoveParam(param: string): { moveId: string; channelId?: number 
   return { moveId };
 }
 
+/**
+ * `dub.channelSend.ch<N>` — a channel's dub send as an automatable parameter.
+ *
+ * X5: riding the send is a dub gesture, and until this existed it was the one
+ * gesture that could be performed but not recorded or replayed. It is
+ * per-channel and continuous, so it matches neither the bus-wide continuous
+ * params nor the move table, and gets its own branch.
+ */
+const CHANNEL_SEND_PREFIX = 'dub.channelSend.ch';
+
 function routeDubParameter(param: string, value: number, source: 'live' | 'lane' = 'live'): void {
+  // 0. Per-channel dub send — handled before the move parser, which does not
+  //    know 'channelSend' and would reject it.
+  if (param.startsWith(CHANNEL_SEND_PREFIX)) {
+    const ch = parseInt(param.slice(CHANNEL_SEND_PREFIX.length), 10);
+    if (!Number.isFinite(ch) || ch < 0) return;
+    void import('../../stores/useMixerStore').then(({ useMixerStore }) => {
+      // `source` carries through so a replayed ride is not recorded again as
+      // a fresh one. NOT transient: automation replaying a ride is setting
+      // where the fader rests, the same as the hand that recorded it.
+      useMixerStore.getState().setChannelDubSend(ch, value, { source });
+    });
+    return;
+  }
+
   // 1. Continuous bus settings
   const busDef = DUB_BUS_PARAMS[param];
   if (busDef) {
