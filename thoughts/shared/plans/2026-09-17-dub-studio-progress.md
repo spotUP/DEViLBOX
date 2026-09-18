@@ -12,7 +12,7 @@ analysis: thoughts/shared/plans/2026-09-17-dub-studio-gap-reconciliation.md
 Durable todo list. Survives compaction, crashes, `/clear`. **Re-read this before trusting
 recollection or any earlier summary in a conversation.**
 
-Running count: **41 of 54 done.**
+Running count: **42 of 55 done.**
 
 **The denominator was wrong until 2026-09-18.** The header said "of 36" from the day this file
 was written and was never updated as sub-items (F1a, F1c, F2a-F2e, T1-T3, the X series) were
@@ -24,7 +24,7 @@ recount — do not trust this sentence either.
 | Gate | State | Notes |
 |---|---|---|
 | A — baseline lock | **closed** | A1 |
-| Pre-work — cell encoding + skank | **closed bar F3** | F1, F1a, F1c, F2, F2a-e, T1, T2 done |
+| Pre-work — cell encoding + skank | **closed** | F1, F1a, F1c, F2, F2a-e, F3, T1, T2 |
 | B — musical clock | **closed** | B1, T3 |
 | C — event model | **closed** | C1, C2, C3. DJ adapter for C1 deliberately not written |
 | D — performance context | **closed** | D1 |
@@ -33,7 +33,7 @@ recount — do not trust this sentence either.
 | G — wet energy | **closed** | G1 |
 | H-L — musical behaviour | **closed** | H1, I1, J1, K1-K4, L1, L2, AE1 |
 | M-O — record, verify, release | N1-N4, O1 done; M1 partial | M1 persistence, O2 (human) |
-| X — user-reported open threads | 4 of 14 | X1, X11, X12, X13 closed |
+| X — user-reported open threads | 4 of 15 | X1, X11, X12, X13 closed |
 
 ### Debt carried, not hidden
 
@@ -225,8 +225,21 @@ copy/paste (`TrackerCell[]` whole objects), `.dbx` save/load (patterns serialize
       Both wired into test:ci. Original item text: Round-trip every move: encode -> decode -> same moveId + channel; append-only ratchet
       (`DUB_MOVE_TABLE.length === DUB_MOVE_TABLE_VERSION`); and a save/load/replay regression
       covering all seven newly-encodable moves. **Gate M does not close until this passes.**
-- [ ] **F3** Label persona parameter values with evidence level (L1/L2/L3) in `types/dub.ts`
+- [x] **F3** Label persona parameter values with evidence level (L1/L2/L3) in `types/dub.ts`
       comments and in `DUB_SYSTEM.md` §3.2. Documentation-only; no audio change.
+      `DUB_SYSTEM.md` does not exist in this repo, and `docs/` is GITIGNORED — the manual
+      is local-only. So the tracked home for this is `src/types/dub.ts` (committed) and
+      this ledger; the manual chapter
+      `docs/manual/src/part-9-advanced/66-dub-bus-auto-dub.md` also gained the section
+      locally, but it will not travel with the repo.
+      The point of the labels is practical rather than academic: an L3 number is free to be
+      retuned by ear the moment it stops sounding right in THIS system, because it was
+      chosen for this signal path; changing an L1 or L2 decision means the preset has
+      stopped representing the engineer whose name is on it. Anyone tuning these should
+      know which they are touching — which matters directly for the deferred level pass.
+      Header comment on `DUB_CHARACTER_PRESETS` states the default (everything numeric is
+      L3 unless said otherwise) and Tubby's entry is labelled line by line as the worked
+      example.
 
 ## GATE B — MUSICAL CLOCK
 
@@ -948,6 +961,20 @@ this bug.
       on. The trim now follows the measured share of energy below the bass/mid split
       (`lowShare`, smoothed), so a bass-heavy tune pays more than a thin one. Floored and
       capped so it neither disappears nor swallows the tune.
+
+- [ ] **X14** **The siren fires far too often, then got stuck.** Reported 2026-09-18:
+      "the siren fires super often now it fired over and over until it got stuck".
+      **Suspected regression from this session's own work** — the Gate E intention gating
+      filters the rule table to moves that serve the current intention, and `dubSiren` is
+      tagged `['ACCENT', 'TRANSITION']`. TRANSITION comes round at every phrase edge and
+      has few moves serving it, so the siren can win that draw repeatedly where the old
+      weighted roll spread it out. The consecutive-repeat bar (K4) allows three in a row
+      before it bites, which for a sustained siren is already too many.
+      "Until it got stuck" is the second half: a siren whose release was lost, which is
+      the X12/X13 failure shape again.
+      Measure before changing anything: `get_auto_dub_fire_log` for dubSiren fire/release
+      pairing and spacing, and `get_performance_journal` for the intentions that led to
+      them — that is what the journal was built for.
 
 - [ ] **X10** **Dub bus clips and distorts most of the time.** Reported
       2026-09-18. Not yet investigated. Measure before touching anything:
