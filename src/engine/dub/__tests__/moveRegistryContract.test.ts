@@ -54,6 +54,32 @@ function parseKeys(src: string, constName: string): string[] {
   return keys;
 }
 
+/**
+ * X8, reported 2026-09-18: `fire_dub_move`'s description listed 27 moveIds
+ * from the April era — no skankEchoThrow, skankFloatThrow, versionDrop,
+ * riddimSection, combSweep, hpfRise or madProfPingPong. The router accepts any
+ * registered id, so they all WORKED; an agent reading the tool description
+ * simply had no way to know they existed. Same staleness class as the manual
+ * chapters.
+ *
+ * A tool description has to be a literal string — the MCP protocol hands it to
+ * the client before any of this code runs — so it cannot be generated from the
+ * registry. Making it impossible to go stale is the next best thing, and that
+ * is what this is: the description is now part of the same bidirectional
+ * contract as DUB_MOVE_KINDS and MOVE_COLOR.
+ */
+function parseToolMoveIds(serverSrc: string): string[] {
+  const m = serverSrc.match(/Valid moveIds \(all \d+[^)]*\):\s*([^']*?)\.'/);
+  if (!m) {
+    throw new Error(
+      "Could not find the moveId list in fire_dub_move's description. " +
+      'If you reworded it, keep the "Valid moveIds (all N, ...): a, b, c." shape ' +
+      'so this contract can still read it.',
+    );
+  }
+  return m[1].split(',').map(x => x.trim()).filter(Boolean);
+}
+
 describe('dub move registry contract', () => {
   const router = read('engine/dub/DubRouter.ts');
   const paramRouter = read('midi/performance/parameterRouter.ts');
@@ -65,6 +91,36 @@ describe('dub move registry contract', () => {
 
   it('DubRouter.MOVES has more than one entry (smoke)', () => {
     expect(moveIds.length).toBeGreaterThanOrEqual(15);
+  });
+
+  // ── X8: the MCP tool description is part of the contract ───────────────
+  const mcpServer = readFileSync(
+    resolve(ROOT, '..', 'server', 'src', 'mcp', 'mcpServer.ts'), 'utf8',
+  );
+  const toolMoveIds = parseToolMoveIds(mcpServer).sort();
+
+  it('fire_dub_move lists every move the router can actually fire', () => {
+    const missing = moveIds.filter(id => !toolMoveIds.includes(id));
+    expect(
+      missing,
+      'Moves registered in DubRouter.MOVES but absent from fire_dub_move\'s description. ' +
+      'Consequence: the move works, but an agent reading the tool has no way to know it exists. ' +
+      'Add them to the description in server/src/mcp/mcpServer.ts.',
+    ).toEqual([]);
+  });
+
+  it('fire_dub_move does not advertise moves that do not exist', () => {
+    const phantom = toolMoveIds.filter(id => !moveIds.includes(id));
+    expect(
+      phantom,
+      'Listed in fire_dub_move\'s description but not in DubRouter.MOVES — ' +
+      'an agent would call these and get an error.',
+    ).toEqual([]);
+  });
+
+  it('states the count, and states it correctly', () => {
+    const declared = Number(/Valid moveIds \(all (\d+)/.exec(mcpServer)?.[1]);
+    expect(declared).toBe(moveIds.length);
   });
 
   it('every DubRouter.MOVES entry has a DUB_MOVE_KINDS entry', () => {

@@ -12,7 +12,7 @@ analysis: thoughts/shared/plans/2026-09-17-dub-studio-gap-reconciliation.md
 Durable todo list. Survives compaction, crashes, `/clear`. **Re-read this before trusting
 recollection or any earlier summary in a conversation.**
 
-Running count: **49 of 57 done.**
+Running count: **50 of 57 done.**
 
 **The denominator was wrong until 2026-09-18.** The header said "of 36" from the day this file
 was written and was never updated as sub-items (F1a, F1c, F2a-F2e, T1-T3, the X series) were
@@ -33,7 +33,7 @@ recount — do not trust this sentence either.
 | G — wet energy | **closed** | G1 |
 | H-L — musical behaviour | **closed** | H1, I1, J1, K1-K4, L1, L2, AE1 |
 | M-O — record, verify, release | M1, N1-N4, O1 done | O2 (human) |
-| X — user-reported open threads | 9 of 17 | X1, X5, X6, X7, X11, X12, X13, X15, X16 closed |
+| X — user-reported open threads | 10 of 17 | X1, X5, X6, X7, X8, X11, X12, X13, X15, X16 closed |
 
 ### Debt carried, not hidden
 
@@ -788,14 +788,22 @@ this bug.
       0.30, so the wet return carries. `registeredChannelTaps: [1]`.
       **Still open — it has to be HEARD.** Nothing above says it sounds like a skank.
 
-      Two tooling faults found while setting this up, both worth fixing with X8:
-      - `modlandApi.ts`'s `API_URL` falls back to `https://devilbox.uprough.net/api`
-        when `VITE_API_URL` is unset, so every modland call from a dev browser goes to the
-        LIVE host (whose deploy is stale) and 404s, while the local server on :3011 answers
-        the same query fine. That is why `search_modland` / `load_modland` looked broken.
-      - `export_pattern_text` IGNORES its `pattern` argument and always exports the
-        current pattern. Asking for pattern 4 returned `patternIndex: 0`. Seek first, or
-        the output silently describes a different pattern than the one requested.
+      One tooling fault found while setting this up — **and two wrong diagnoses of it that
+      are corrected here, because the commit message `f9b4ce234` carries both.**
+      - **WRONG:** "`modlandApi.ts`'s `API_URL` falls back to the live host". It does have
+        that fallback, but `.env` already sets `VITE_API_URL=http://localhost:3011/api`,
+        so the browser was never affected. Not the cause.
+      - **WRONG:** "`export_pattern_text` ignores its `pattern` argument". The tool
+        declares `patternIndex`; the call passed `pattern`. Caller error, not a defect.
+      - **ACTUAL CAUSE (verified):** `server/src/mcp/mcpServer.ts` computed
+        `API_BASE` from `process.env.PORT || 3001`, but the MCP server is a SEPARATE
+        process started with `cwd: server/`, where `dotenv/config` looks for `server/.env`
+        and finds nothing. `.env` (repo root) sets `PORT=3011`; the API listens there;
+        the MCP process fell back to 3001, where an unrelated service is listening — which
+        is why it answered with a valid 404 rather than a connection error, and why the
+        failure read as "modland is broken" instead of "we asked the wrong door".
+        Fixed in X8 by loading the repo-root `.env` from `__dirname`, before `API_BASE` is
+        computed.
 - [x] **X5** **Dub-send fader moves are not recorded.** Reported 2026-09-17.
       Discrete moves record fine; a continuous fader ride captures nothing.
       Verified: `DubRecorder` subscribes ONLY to `subscribeDubRouter` /
@@ -921,12 +929,28 @@ this bug.
       entirely, so a recorded ride was in the file, replayed correctly, and could never be
       selected or seen. Added per-channel, kept off the global lane. 13 tests.
 
-- [ ] **X8** **Stale MCP tool metadata.** `fire_dub_move`'s description still
+- [x] **X8** **Stale MCP tool metadata.** `fire_dub_move`'s description still
       lists 27 valid moveIds from the April era — no skankEchoThrow,
       skankFloatThrow, versionDrop, riddimSection, combSweep, hpfRise,
       madProfPingPong. It accepts them fine (the router takes any registered
       id) but an agent reading the tool description would not know they exist.
       Same staleness class as the manual chapters in X-notes.
+
+      **CLOSED 2026-09-18.** The router registers **44** moves; the description listed 27.
+      A tool description must be a literal string — MCP hands it to the client before any
+      app code runs — so it cannot be generated from the registry. Making staleness
+      IMPOSSIBLE is the next best thing: the description is now part of the same
+      bidirectional contract as `DUB_MOVE_KINDS` and `MOVE_COLOR` in
+      `moveRegistryContract.test.ts`, which fails if a move is registered without being
+      advertised, if a phantom move is advertised, or if the stated count drifts.
+      **Second fault, found while testing X2 and initially misdiagnosed twice
+      (see X2's note):** every modland tool returned 404 because the MCP server is a
+      separate process started with `cwd: server/`, so `dotenv/config` looked for
+      `server/.env` and found nothing; `.env` at the repo root sets `PORT=3011`, the API
+      listens there, and the MCP process fell back to 3001 where an unrelated service is
+      listening — a valid 404 from the wrong server. Now loads the repo-root `.env` from
+      `__dirname` (CommonJS here, as `server/src/index.ts` and `routes/ai.ts` already do)
+      before `API_BASE` is computed. 7 + 3 tests; both fail against the old code.
 
 - [~] **X9** **Store-level dub sends ratchet to 1.0 and stay there.** FIXED in code,
       NOT yet verified live by ear. Reported
