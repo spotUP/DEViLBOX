@@ -12,7 +12,7 @@ analysis: thoughts/shared/plans/2026-09-17-dub-studio-gap-reconciliation.md
 Durable todo list. Survives compaction, crashes, `/clear`. **Re-read this before trusting
 recollection or any earlier summary in a conversation.**
 
-Running count: **38 of 53 done.**
+Running count: **39 of 54 done.**
 
 **The denominator was wrong until 2026-09-18.** The header said "of 36" from the day this file
 was written and was never updated as sub-items (F1a, F1c, F2a-F2e, T1-T3, the X series) were
@@ -33,7 +33,7 @@ recount — do not trust this sentence either.
 | G — wet energy | **closed** | G1 |
 | H-L — musical behaviour | **closed** | H1, I1, J1, K1-K4, L1, L2, AE1 |
 | M-O — record, verify, release | N1-N4 done | M1, O1, O2 |
-| X — user-reported open threads | 3 of 13 | X1, X11, X12 closed |
+| X — user-reported open threads | 4 of 14 | X1, X11, X12, X13 closed |
 
 ### Debt carried, not hidden
 
@@ -888,6 +888,23 @@ this bug.
       the component, so a transport stop, a panic or the new unmount cleanup can always
       let go, and the hold appears in `activeGestures()` where a disposer in a ref never
       could. 2 tests.
+
+- [x] **X13** **A siren kept sounding with nothing holding it, and the bus on/off level
+      jump was huge.** Both reported 2026-09-18, both the same root shape: something that
+      GENERATES sound was treated as something that merely passes through.
+      Measured first — the AutoDub fire log showed no siren at all this session (13 of 13
+      fires released, max one hold), so it was a leftover from the earlier X12 presses
+      whose releaser had been lost.
+      (a) Panic cancelled every timer, tap and feedback path but never told the siren
+      SYNTH to stop, and disabling the bus only HID it by cutting its input. Both paths
+      now call `silenceGeneratedSynths()`. SID mode deliberately gets no equivalent: its
+      generators hand back a releaser per call and already run through `actionReleasers`,
+      so inventing a global stop would be a second way to do one thing.
+      (b) The X10 trim subtracted the FULL shelf gain, which assumes the whole mix is
+      being lifted when only the low end is — up to 9 dB of drop the moment the bus came
+      on. The trim now follows the measured share of energy below the bass/mid split
+      (`lowShare`, smoothed), so a bass-heavy tune pays more than a thin one. Floored and
+      capped so it neither disappears nor swallows the tune.
 
 - [ ] **X10** **Dub bus clips and distorts most of the time.** Reported
       2026-09-18. Not yet investigated. Measure before touching anything:
