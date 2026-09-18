@@ -48,6 +48,8 @@ import {
   DEFAULT_MUSICAL_CLOCK_SETTINGS,
   type MusicalClockSettings,
 } from '@/lib/dub/musicalClock';
+import type { MusicalPosition } from '@/lib/dub/musicalClock';
+import { getPerformanceMemory } from './performanceMemoryBridge';
 
 /** Live analysis context injected into every tick. Null until analysis has run. */
 export interface EQSnapshot {
@@ -1593,6 +1595,10 @@ export function stopAutoDub(): void {
   }
   _heldDisposers.clear();
   _heldTimers.clear();
+  // Gate D: nothing is in flight once the disposers have run, and the open
+  // phrase is over. History of what was played survives — that is the part
+  // the next session's decisions are allowed to learn from.
+  try { getPerformanceMemory().reset(); } catch { /* memory optional */ }
   _recordAutoDubFire({
     kind: 'stop',
     timeMs: performance.now(),
@@ -1667,6 +1673,13 @@ function sampleDubBusDiagnostics(): Record<string, number | boolean | string | n
 }
 
 function getAutoDubBarClock(): { bar: number; barPos: number; isRowAligned: boolean } {
+  // Gate D: the performer's memory follows the same clock the rules do, so
+  // phrase history closes on real phrase turns rather than on tick count.
+  // Fires and releases reach it from the DubRouter subscription — including
+  // the user's own, which is the point of listening to the router.
+  const notePosition = (pos: MusicalPosition) => {
+    try { getPerformanceMemory().observePosition(pos); } catch { /* memory optional */ }
+  };
   const transport = useTransportStore.getState();
   const globalRow = transport.currentGlobalRow;
   const row = transport.currentRow;
@@ -1678,6 +1691,7 @@ function getAutoDubBarClock(): { bar: number; barPos: number; isRowAligned: bool
     // a bar is 32 rows, so every `bar % N` phrase rule below drifted against
     // the music. MusicalClock derives the grid from the real transport speed.
     const pos = computeMusicalPosition(rowLike, transport.speed, getMusicalClockSettings());
+    notePosition(pos);
     return { bar: pos.bar, barPos: pos.positionInBar, isRowAligned: true };
   }
   // No row information yet (enabled before playback started) — count beats off
@@ -1685,6 +1699,10 @@ function getAutoDubBarClock(): { bar: number; barPos: number; isRowAligned: bool
   const bpm = transport.bpm || 120;
   const beats = ((performance.now() - _enableTimeMs) / 1000) * (bpm / 60);
   const pos = computeMusicalPositionFromBeats(beats, getMusicalClockSettings());
+  // Deliberately NOT fed to the performance memory: this path counts bars off
+  // the wall clock and carries no phrase index, so it cannot say when a phrase
+  // turned. Phrase history accumulates only while the transport is running,
+  // which is the only time it means anything.
   return { bar: pos.bar, barPos: pos.positionInBar, isRowAligned: false };
 }
 

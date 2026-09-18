@@ -12,7 +12,7 @@ analysis: thoughts/shared/plans/2026-09-17-dub-studio-gap-reconciliation.md
 Durable todo list. Survives compaction, crashes, `/clear`. **Re-read this before trusting
 recollection or any earlier summary in a conversation.**
 
-Running count: **17 of 51 done.**
+Running count: **18 of 51 done.**
 
 **The denominator was wrong until 2026-09-18.** The header said "of 36" from the day this file
 was written and was never updated as sub-items (F1a, F1c, F2a-F2e, T1-T3, the X series) were
@@ -27,7 +27,7 @@ recount — do not trust this sentence either.
 | Pre-work — cell encoding + skank | **closed bar T1 and F3** | F1, F1a, F1c, F2, F2a-e, T2 done |
 | B — musical clock | **closed** | B1, T3 |
 | C — event model | **closed** | C1, C2, C3. DJ adapter for C1 deliberately not written |
-| D — performance context | open | D1. Next milestone; B and C supply most of its inputs |
+| D — performance context | **closed** | D1 |
 | E — intention + REST | open | E1, E2, E3 |
 | F — gesture engine | open | F4 |
 | G — wet energy | open | G1 |
@@ -273,9 +273,20 @@ copy/paste (`TrackerCell[]` whole objects), `.dbx` save/load (patterns serialize
 
 ## GATE D — PERFORMANCE CONTEXT
 
-- [ ] **D1** `PerformanceContext` — clock, upcoming + recent events, channel profiles,
+- [x] **D1** `PerformanceContext` — clock, upcoming + recent events, channel profiles,
       arrangement state, recent moves, active gestures, wet/feedback/spectral energy, current
       intention + target, time since last action, phrase history. This is the performer's memory.
+      `src/lib/dub/performanceContext.ts` (pure: `PerformanceMemory` + the frozen
+      `buildPerformanceContext` snapshot) and `src/engine/dub/performanceMemoryBridge.ts`
+      (the one place that knows the memory and the router share a program).
+      **Memory listens to `DubRouter`, not to AutoDub** — the router is the single
+      execution path, so the performer's memory includes the moves the USER just
+      fired by hand. An AI-only log would have made it deaf to its own player.
+      `spectralDensity` is `null`, not a plausible number: nothing measures it yet,
+      and Gate G owns that accounting. Phrase history is fed only from the
+      row-aligned clock; the pre-playback wall-clock path carries no phrase index,
+      so feeding it would invent phrase turns. Wired live into `getAutoDubBarClock`
+      and cleared in `stopAutoDub`. 25 tests in `test:ci`.
 
 ## GATE E — INTENTION + REST
 
