@@ -537,9 +537,13 @@ copy/paste (`TrackerCell[]` whole objects), `.dbx` save/load (patterns serialize
       It records from the ROUTER, so the user's moves and the AI's sit in one document in
       the order they happened, and only the AI's fires are annotated — a hand on a pad had
       an intention too, but not one this program should guess at. 14 tests.
-      **Remaining for the tick:** persisting the journal into the project file itself (the
-      save/load path), and the replay-reproduces check. The in-memory record, its format,
-      its parser and its read path are done.
+      **Persistence landed** (schema 22 → 23): saved beside the project, restored through
+      the forgiving parser, and only written when it has something in it — an empty
+      journal in every project file is noise. `MIN_LOADABLE_SCHEMA` stays 21, because a
+      purely additive field must never make an older project unloadable.
+      **Remaining for the tick:** the replay-reproduces check — proving a saved
+      performance plays back as the journal describes. The record, its format, its parser,
+      its read path and its persistence are done.
 - [x] **N1** Deterministic offline performance simulator (project, BPM, metre, phrase length,
       persona, seed, duration → bar-by-bar decision log). Primary tuning environment.
       `src/lib/dub/simulator.ts`, driving `src/lib/dub/performanceCycle.ts` — the decision

@@ -137,3 +137,35 @@ describe('M1 wiring contract', () => {
     expect(bridge).not.toContain("from './AutoDub'");
   });
 });
+
+describe('M1 persistence — additive in both directions', () => {
+  const persistence = readFileSync(
+    join(__dirname, '..', '..', '..', 'hooks', 'useProjectPersistence.ts'), 'utf8',
+  );
+  const migrations = readFileSync(
+    join(__dirname, '..', '..', 'persistence', 'migrations', 'index.ts'), 'utf8',
+  );
+
+  it('saves the journal beside the project, not inside the lanes', () => {
+    expect(persistence).toContain('performanceJournal?: import(');
+    expect(persistence).toContain('performanceJournal: (() => {');
+  });
+
+  it('does not write an empty journal into every project file', () => {
+    expect(persistence).toContain('journal.entries.length > 0 ? journal : undefined');
+  });
+
+  it('restores through the forgiving parser, so bad notes cannot break a load', () => {
+    expect(persistence).toContain('loadPerformanceJournal(parseJournal(project.performanceJournal))');
+  });
+
+  it('bumps the schema without raising the minimum loadable version', () => {
+    expect(migrations).toContain('export const CURRENT_SCHEMA = 23;');
+    // A purely additive field must NOT make older projects unloadable.
+    expect(migrations).toContain('export const MIN_LOADABLE_SCHEMA = 21;');
+  });
+
+  it('documents the migration as additive and forward-compatible', () => {
+    expect(migrations).toMatch(/22 → 23[\s\S]*performanceJournal/);
+  });
+});
