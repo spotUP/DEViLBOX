@@ -114,9 +114,22 @@ const MOVES: Record<string, DubMove> = {
  * with the same id is published when the returned disposer is called
  * (only for hold-kind moves that actually return a disposer).
  */
+/**
+ * WHO fired a move.
+ *
+ * `source` already distinguished live performance from lane playback, but not
+ * the USER from the AI — both were 'live'. The performer's memory therefore
+ * read its own fires as the player's and kept answering itself, which is why
+ * its accents clustered on whichever channel it had just used. Measured with
+ * the Gate N1 simulator.
+ */
+export type DubFireOrigin = 'user' | 'ai' | 'lane';
+
 export interface DubFireEvent {
   invocationId: string;
   moveId: string;
+  /** Who fired it. Defaults to the user — an unlabelled fire is a hand. */
+  origin: DubFireOrigin;
   channelId?: number;
   params: Record<string, number>;
   row: number;
@@ -194,6 +207,8 @@ export function fire(
      *  router's own quantize so two quantizers in series cannot push the
      *  gesture a whole grid step late. */
     preQuantized?: boolean;
+    /** Who is firing. Defaults to 'lane' for lane playback, else 'user'. */
+    origin?: DubFireOrigin;
   },
 ): { dispose(): void } | null {
   const move = MOVES[moveId];
@@ -269,7 +284,11 @@ function executeNow(
   merged: Record<string, number>,
   bpm: number,
   source: 'live' | 'lane',
-  opts: { deckId?: import('../dj/DeckEngine').DeckId } | undefined,
+  opts: {
+    deckId?: import('../dj/DeckEngine').DeckId;
+    preQuantized?: boolean;
+    origin?: DubFireOrigin;
+  } | undefined,
 ): { dispose(): void } | null {
   if (!_bus) return null;
   const rawRow = currentRow();
@@ -280,7 +299,12 @@ function executeNow(
   const disposer = move.execute(ctx);
 
   const invocationId = nextInvocationId();
-  const event: DubFireEvent = { invocationId, moveId, channelId, params: merged, row, timeSec: getSongTimeSec(), source, isHold: !!disposer };
+  // An unlabelled fire is a hand: the user's surfaces (pads, keys, MIDI, MCP)
+  // do not pass an origin, and treating them as the user is the safe default —
+  // the AI is the one that must declare itself, because mislabelling ITS moves
+  // as the player's makes it answer itself.
+  const origin: DubFireOrigin = opts?.origin ?? (source === 'lane' ? 'lane' : 'user');
+  const event: DubFireEvent = { invocationId, moveId, channelId, params: merged, row, timeSec: getSongTimeSec(), source, origin, isHold: !!disposer };
   for (const fn of subscribers) {
     try {
       fn(event);

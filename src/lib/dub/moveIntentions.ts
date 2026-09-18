@@ -68,9 +68,15 @@ export const MOVE_INTENTIONS: Readonly<Record<string, readonly Intention[]>> = {
   transportTapeStop:  ['TRANSITION', 'DROP'],
   channelMute:        ['SPACE', 'DROP', 'ANSWER'],
 
-  // Space — clearing room rather than filling it.
-  ghostReverb:        ['SPACE', 'TEXTURE'],
-  sonarPing:          ['SPACE', 'TEXTURE'],
+  // Space is made by TAKING SOMETHING AWAY, and most often by firing nothing
+  // at all. `ghostReverb` and `sonarPing` were tagged SPACE and neither
+  // creates any: the ghost replaces a dry channel with a full wash (wet cost
+  // 0.75) and the ping adds a sound. With them listed, a performer that
+  // decided it wanted space went and fired something — the Gate N1 simulator
+  // measured the restrained persona firing MORE than the restless one because
+  // of it. They are texture, which is what they sound like.
+  ghostReverb:        ['TEXTURE'],
+  sonarPing:          ['TEXTURE'],
 
   // Texture — colouring what is already playing.
   madProfPingPong:    ['TEXTURE'],

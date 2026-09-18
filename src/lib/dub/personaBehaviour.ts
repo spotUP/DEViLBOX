@@ -160,6 +160,9 @@ export function intentionPolicyFor(behaviour: PersonaBehaviour): IntentionPolicy
     feedbackCeiling: lerp(0.8, 0.9, behaviour.appetite.feedback),
     // Patience: how long it will leave silence before deciding to fill it.
     textureAfterRows: Math.round(lerp(16, 64, behaviour.patience)),
+    // How often it accents — its own dial, from ACTIVITY and restraint rather
+    // than falling out of the look-ahead window.
+    accentSpacingRows: Math.round(lerp(40, 6, behaviour.activity * 0.7 + (1 - behaviour.restraint) * 0.3)),
   };
 }
 

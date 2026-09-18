@@ -3,6 +3,8 @@ import {
   classifyRepetition,
   repetitionWeight,
   atMotifPosition,
+  consecutiveRun,
+  barredForRepetition,
 } from '../repetition';
 import type { RecentMove } from '../performanceContext';
 
@@ -11,7 +13,7 @@ const ROWS_PER_PHRASE = 256;      // 16 bars
 const OPTS = { rowsPerBar: ROWS_PER_BAR, rowsPerPhrase: ROWS_PER_PHRASE };
 
 function move(moveId: string, row: number): RecentMove {
-  return { invocationId: `${moveId}-${row}`, moveId, row, timeSec: row / 8, source: 'live' };
+  return { invocationId: `${moveId}-${row}`, moveId, row, timeSec: row / 8, source: 'live', origin: 'ai' };
 }
 
 describe('classifyRepetition — a motif is not a rut', () => {
@@ -125,5 +127,47 @@ describe('atMotifPosition', () => {
     expect(atMotifPosition(
       ROWS_PER_PHRASE + 4, ROWS_PER_PHRASE - 4, ROWS_PER_PHRASE, ROWS_PER_BAR,
     )).toBe(true);
+  });
+});
+
+describe('consecutiveRun and the repetition bar', () => {
+  const verdict = classifyRepetition([3, 19, 40, 57, 70].map(r => move('echoThrow', r)), OPTS);
+
+  it('counts how many times the latest move fired in a row', () => {
+    const moves = [
+      move('dubStab', 0), move('echoThrow', 8), move('echoThrow', 16), move('echoThrow', 24),
+    ];
+    expect(consecutiveRun(moves)).toEqual({ moveId: 'echoThrow', count: 3 });
+  });
+
+  it('resets the run when something else fires', () => {
+    const moves = [move('echoThrow', 0), move('echoThrow', 8), move('dubStab', 16)];
+    expect(consecutiveRun(moves)).toEqual({ moveId: 'dubStab', count: 1 });
+  });
+
+  it('bars a move that has just fired three times running', () => {
+    const moves = [0, 8, 16].map(r => move('echoThrow', r));
+    expect(barredForRepetition('echoThrow', moves, verdict)).toBe(true);
+    expect(barredForRepetition('dubStab', moves, verdict)).toBe(false);
+  });
+
+  it('does not bar it before the limit', () => {
+    const moves = [0, 8].map(r => move('echoThrow', r));
+    expect(barredForRepetition('echoThrow', moves, verdict)).toBe(false);
+  });
+
+  it('exempts a motif at its own place in the phrase', () => {
+    const motif = classifyRepetition(
+      [0, 1, 2].map(p => move('hpfRise', p * ROWS_PER_PHRASE + 2 * ROWS_PER_BAR)),
+      OPTS,
+    );
+    const moves = [0, 1, 2].map(p => move('hpfRise', p * ROWS_PER_PHRASE + 2 * ROWS_PER_BAR));
+    expect(barredForRepetition('hpfRise', moves, motif, true)).toBe(false);
+    // Away from its place, the bar applies like anything else.
+    expect(barredForRepetition('hpfRise', moves, motif, false)).toBe(true);
+  });
+
+  it('reports nothing for an empty history', () => {
+    expect(consecutiveRun([])).toBeNull();
   });
 });
