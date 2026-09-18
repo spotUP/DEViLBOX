@@ -1244,6 +1244,17 @@ export function getPerformanceSnapshot(): PerformanceSnapshot {
   if (energy.wet > 0.6) why.push(`wet ${energy.wet.toFixed(2)} — little room left`);
   if (energy.feedback > 0.7) why.push(`feedback ${energy.feedback.toFixed(2)}`);
 
+  // Why it CANNOT be heard, which is a different question from why it chose to
+  // rest and the one that actually gets asked.
+  //
+  // A performer can be running, hearing the tune, and deciding perfectly well
+  // while the bus receives nothing at all — no channel is sending to it, so
+  // every move lands in silence. Measured 2026-09-18 chasing "King Tubby is
+  // mostly idle": `registeredChannelTaps: 0`, `inputRms: 0`, `returnRms: 0`,
+  // and every decision REST. Nothing in the product said so, which is exactly
+  // the question this monitor exists to answer.
+  for (const reason of inaudibilityReasons()) why.push(reason);
+
   return {
     running: _timer !== null,
     persona: _appliedBehaviourFor ?? useDubStore.getState().autoDubPersona,
@@ -1970,6 +1981,41 @@ function sampleAutoDubAudio(): AutoDubAudioSnapshot | null {
   } catch {
     return null;
   }
+}
+
+/**
+ * Reasons the performer would not be heard, whatever it decides.
+ *
+ * Deliberately separate from the musical `why`: "I am resting because the
+ * phrase wants space" and "nothing I play can reach the speakers" are
+ * different answers, and conflating them is how an hour goes into the wrong
+ * one. Empty when the signal path is fine.
+ */
+function inaudibilityReasons(): string[] {
+  const reasons: string[] = [];
+  try {
+    const bus = getActiveDubBus();
+    if (!bus) {
+      reasons.push('no dub bus — nothing to perform through');
+      return reasons;
+    }
+    const diag = bus.getDiagnosticSnapshot() as Record<string, unknown> | null;
+    if (!diag) return reasons;
+
+    if (diag.enabled === false) {
+      reasons.push('the dub bus is OFF — moves would be inaudible');
+      return reasons;
+    }
+    // A registered tap is how a channel's audio reaches the bus at all. With
+    // none, and no whole-mix fallback carrying anything, the return is silent
+    // however good the decisions are.
+    const taps = typeof diag.registeredChannelTaps === 'number' ? diag.registeredChannelTaps : 0;
+    const wholeMixGain = typeof diag.wholeMixTapGainMax === 'number' ? diag.wholeMixTapGainMax : 0;
+    if (taps === 0 && wholeMixGain <= 0) {
+      reasons.push('no channel is sending to the dub bus — raise a channel send');
+    }
+  } catch { /* diagnostics must never break the snapshot */ }
+  return reasons;
 }
 
 function sampleDubBusDiagnostics(): Record<string, number | boolean | string | null> | null {
