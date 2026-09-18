@@ -12,7 +12,7 @@ analysis: thoughts/shared/plans/2026-09-17-dub-studio-gap-reconciliation.md
 Durable todo list. Survives compaction, crashes, `/clear`. **Re-read this before trusting
 recollection or any earlier summary in a conversation.**
 
-Running count: **30 of 51 done.**
+Running count: **31 of 51 done.**
 
 **The denominator was wrong until 2026-09-18.** The header said "of 36" from the day this file
 was written and was never updated as sub-items (F1a, F1c, F2a-F2e, T1-T3, the X series) were
@@ -31,7 +31,7 @@ recount — do not trust this sentence either.
 | E — intention + REST | **closed** | E1, E2, E3 |
 | F — gesture engine | partial | F4: shapes + lifecycle shipped; param-automation shapes need a move update API |
 | G — wet energy | **closed** | G1 |
-| H-L — musical behaviour | H1, I1, K1-K4, L1, L2 done | J1, AE1 |
+| H-L — musical behaviour | H1, I1, J1, K1-K4, L1, L2 done | AE1 |
 | M-O — record, verify, release | open | M1, N1-N4, O1, O2 |
 | X — user-reported open threads | 1 of 11 | X1 closed |
 
@@ -404,8 +404,25 @@ copy/paste (`TrackerCell[]` whole objects), `.dbx` save/load (patterns serialize
       Profiles now live in `src/engine/dub/channelProfiles.ts`, shared by the performer's
       targeting and the moves: two copies of "what is this channel" would eventually
       disagree. 12 tests.
-- [ ] **J1** Consequence model: `targetAudibility` / `contrast` / `masking` / `wetEnergyChange` /
+- [x] **J1** Consequence model: `targetAudibility` / `contrast` / `masking` / `wetEnergyChange` /
       `feedbackChange` / `structuralImpact` feeding the next decision (Gate J).
+      `src/lib/dub/consequence.ts`. The performer had no idea whether anything it did
+      worked: a throw at a channel that turned out to be silent, a drop that removed
+      nothing because the part had already stopped, and a wash that buried the thing it
+      meant to lift all looked identical to a success from the inside.
+      Every field is MEASURED from a reading before and a reading after — per-channel
+      levels from the engine's own meters for `targetAudibility`, whole-mix RMS for
+      `contrast`, band growth without level growth for `masking`, the Gate G ledger for
+      wet and feedback, audible channel count for `structuralImpact`. Nothing is inferred
+      from the move's own metadata: that only says what it was SUPPOSED to do, which is
+      the assumption this gate replaces.
+      The after-reading waits 700 ms — an echo throw is not in the mix on the frame it
+      fired, and measuring on the spot would report every move as inaudible.
+      The feedback into selection is gentle and ASYMMETRIC: a no-op is pushed down hard
+      (repeating one wastes a bar), a muddying move less (it did something, just not
+      here), and success is NOT rewarded — rewarding it is how a rule engine ends up
+      playing its favourite move for ever, and K4 already tells a motif from a rut.
+      15 tests.
 - [x] **K1** Personas as behavioural profiles — activity / depth / risk / restraint, anticipation,
       patience, target + intention preference, gesture length, release style, feedback/filter/drop
       appetite, timing variance, novelty vs repetition preference. Replaces the single overloaded
