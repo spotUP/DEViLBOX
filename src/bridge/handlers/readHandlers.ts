@@ -707,6 +707,12 @@ export async function getDubBusState(): Promise<Record<string, unknown>> {
         // The engine's own output gain: stop() writes 0, resume() writes 1.
         insertProbe.libopenmptOutputGain = g(eng.gainNode);
         insertProbe.libopenmptHasWorklet = !!eng.workletNode;
+        // The decisive one: what the worklet itself is doing. `silentReason`
+        // and `lastRenderRms` separate "the module rendered silence" (a mute
+        // or isolation mask killed every channel at the source, which nothing
+        // downstream can undo) from "audio was produced and swallowed later".
+        // null means the worklet did not answer within the timeout.
+        insertProbe.workletDiag = await LibopenmptEngine.getInstance().getWorkletDiag();
       }
     } catch { /* engine module not loaded */ }
   }
