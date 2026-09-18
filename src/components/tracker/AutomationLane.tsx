@@ -139,8 +139,17 @@ export const AutomationLane: React.FC<AutomationLaneProps> = ({
     const curveColor = getComputedColor(canvas, resolvedColor);
 
     if (activeCurve && activeCurve.points.length > 0) {
-      // dub.* parameters always use steps mode regardless of stored curve.mode
-      const effectiveMode = activeCurve.parameter.startsWith('dub.') ? 'steps' : activeCurve.mode;
+      // Dub MOVES are steps whatever the stored mode says: a move is on, then
+      // off, and drawing a slope between those two states would show a gesture
+      // that cannot happen.
+      //
+      // A dub SEND is the opposite — a fader ride is one continuous movement,
+      // and forcing it to steps drew a recorded ride as a staircase while it
+      // replayed as the smooth curve it was (X5/X7). So the send honours its
+      // stored mode, like any other continuous parameter.
+      const isDubMove = activeCurve.parameter.startsWith('dub.')
+        && !activeCurve.parameter.startsWith('dub.channelSend');
+      const effectiveMode = isDubMove ? 'steps' : activeCurve.mode;
 
       ctx.strokeStyle = curveColor;
       ctx.lineWidth = 2;
