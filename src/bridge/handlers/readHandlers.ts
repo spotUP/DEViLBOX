@@ -623,7 +623,7 @@ export function getAudioState(): Record<string, unknown> {
 // channels have registered taps (i.e. have received audio from the multi-output
 // worklet). Returns null fields when the bus hasn't been created yet.
 
-export function getDubBusState(): Record<string, unknown> {
+export async function getDubBusState(): Promise<Record<string, unknown>> {
   // DrumPadEngine owns the DubBus; it may not exist yet if the user never
   // mounted tracker/drumpad/DJ view.
   const dpEngine = getDrumPadEngine();
@@ -643,11 +643,80 @@ export function getDubBusState(): Record<string, unknown> {
     registeredChannelTaps = Array.from(busAny.channelTaps.keys()).sort((a, b) => a - b);
   }
 
+  // Dry-path probe — every gain the master signal passes through when the
+  // bus's master insert is spliced in (masterEffectsInput → insert → blepInput).
+  // A hard-zero master with the transport ticking means one of these is 0 or
+  // the splice is broken; this is how that gets located without a debugger.
+  // Bracket access on purpose: reads the LIVE instance, survives HMR of this
+  // file, and never becomes a production dependency on DubBus internals.
+  const g = (node: unknown): number | null => {
+    const p = (node as { gain?: { value?: number } } | null | undefined)?.gain;
+    return typeof p?.value === 'number' ? Number(p.value.toFixed(4)) : null;
+  };
+  let insertProbe: Record<string, unknown> | null = null;
+  if (bus) {
+    const b = bus as unknown as Record<string, unknown>;
+    const ta = b.toneArmEffect as { wet?: number; wetGain?: unknown; dryGain?: unknown } | null;
+    const vn = b.vinylEffect as { wet?: number; wetGain?: unknown; dryGain?: unknown } | null;
+    let toneMaster: Record<string, unknown> = {};
+    try {
+      const te = getToneEngine() as unknown as Record<string, unknown>;
+      const mc = te.masterChannel as { volume?: { value?: number }; mute?: boolean } | undefined;
+      toneMaster = {
+        masterChannelVolumeDb: mc?.volume?.value ?? null,
+        masterChannelMute: mc?.mute ?? null,
+        masterVolumeDbTarget: te._masterVolumeDb ?? null,
+        masterEffectsInputGain: g(te.masterEffectsInput),
+        blepInputGain: g(te.blepInput),
+      };
+    } catch { /* engine not ready */ }
+    insertProbe = {
+      masterInsertActive: b.masterInsertActive ?? null,
+      masterInsertPending: b.masterInsertPending != null,
+      hasSource: !!b.masterInsertSource,
+      hasDest: !!b.masterInsertDest,
+      envelope: g(b.masterInsertEnvelope),
+      masterMid: g(b.masterMid),
+      masterSide: g(b.masterSide),
+      masterInvertR: g(b.masterInvertR),
+      masterBassShelfDb: (b.masterBassShelf as { gain?: { value?: number } } | undefined)?.gain?.value ?? null,
+      masterHpfHz: (b.masterHpf as { frequency?: { value?: number } } | undefined)?.frequency?.value ?? null,
+      convolverDry: g(b.masterConvolverDry),
+      convolverWet: g(b.masterConvolverWet),
+      chorusWet: g(b.masterChorusWet),
+      vinylDirect: g(b.vinylDirect),
+      vinylOutput: g(b.vinylOutputNode),
+      toneArmWet: ta?.wet ?? null,
+      toneArmWetGain: g(ta?.wetGain),
+      toneArmDryGain: g(ta?.dryGain),
+      vinylWet: vn?.wet ?? null,
+      vinylWetGain: g(vn?.wetGain),
+      vinylDryGain: g(vn?.dryGain),
+      busInput: g(b.input),
+      busReturn: g(b.return_),
+      ...toneMaster,
+    };
+    // Engine-side main-mix masks: an isolation slot removes its channels from
+    // the main module (worklet recomputeMainMask_), so a stale slot mutes them
+    // at the source — nothing downstream can bring that back.
+    try {
+      const { LibopenmptEngine } = await import('../../engine/libopenmpt/LibopenmptEngine');
+      if (LibopenmptEngine.hasInstance()) {
+        const eng = LibopenmptEngine.getInstance() as unknown as Record<string, unknown>;
+        insertProbe.libopenmptIsolationSlotMasks = eng._isolationSlotMasks ?? null;
+        // The engine's own output gain: stop() writes 0, resume() writes 1.
+        insertProbe.libopenmptOutputGain = g(eng.gainNode);
+        insertProbe.libopenmptHasWorklet = !!eng.workletNode;
+      }
+    } catch { /* engine module not loaded */ }
+  }
+
   return {
     hasBus: !!bus,
     storeSettings,
     channelDubSends,
     registeredChannelTaps,
+    insertProbe,
   };
 }
 
