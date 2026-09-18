@@ -12,7 +12,7 @@ analysis: thoughts/shared/plans/2026-09-17-dub-studio-gap-reconciliation.md
 Durable todo list. Survives compaction, crashes, `/clear`. **Re-read this before trusting
 recollection or any earlier summary in a conversation.**
 
-Running count: **42 of 55 done.**
+Running count: **43 of 56 done.**
 
 **The denominator was wrong until 2026-09-18.** The header said "of 36" from the day this file
 was written and was never updated as sub-items (F1a, F1c, F2a-F2e, T1-T3, the X series) were
@@ -33,7 +33,7 @@ recount — do not trust this sentence either.
 | G — wet energy | **closed** | G1 |
 | H-L — musical behaviour | **closed** | H1, I1, J1, K1-K4, L1, L2, AE1 |
 | M-O — record, verify, release | N1-N4, O1 done; M1 partial | M1 persistence, O2 (human) |
-| X — user-reported open threads | 4 of 15 | X1, X11, X12, X13 closed |
+| X — user-reported open threads | 5 of 16 | X1, X11, X12, X13, X15 closed |
 
 ### Debt carried, not hidden
 
@@ -975,6 +975,29 @@ this bug.
       Measure before changing anything: `get_auto_dub_fire_log` for dubSiren fire/release
       pairing and spacing, and `get_performance_journal` for the intentions that led to
       them — that is what the journal was built for.
+      **Measured 2026-09-18, 50-entry log spanning ~7 minutes of performance:** `dubSiren`
+      fired ONCE (bar 1, t+7.3 s) and released 1.9 s later. No repeat, no unreleased fire,
+      and no `versionDrop` / `riddimSection` in the whole window. Every fire in the log has
+      its matching release and `activeHolds` returns to 0 each time. So on the code as it
+      now stands the over-firing is not reproduced — but this log was taken after the
+      X12/X13 fixes and a reload, so it does not clear the build the user heard it on.
+      Still open pending a listening pass on a fresh page; if it recurs, capture the log
+      BEFORE reloading.
+
+- [x] **X15** **A short throw leaked its dub slot.** Found 2026-09-18 while reading the
+      fire log for X14: `registeredChannelTaps` climbed 0 -> 1 -> 2 -> 3 -> 4 across one
+      session and never fell, although every fire had a matching release. One leaked tap
+      is one leaked libopenmpt module instance plus its buffers, held for the life of the
+      page. Opening a cold channel's send is async and a throw is short, so the close
+      routinely arrives mid-activation; it read a single `channelDubActive` flag that
+      activation only sets at the END of its work, saw false, and dropped itself. The
+      activation then finished into a slot nobody would ever close.
+      Fixed by separating intent from reality: `src/lib/dub/dubChannelLifecycle.ts` tracks
+      wanted / actual / in-flight, records a mid-flight request instead of dispatching it,
+      and lets whoever finishes last reconcile. Activation's async steps now poll the
+      recorded intent and abandon a send that has since closed, and closing a send cancels
+      the deferred 500 ms activation retry. 10 behaviour tests (4 fail against the old
+      single-flag model) plus a wiring contract. Commit `aa7693b69`.
 
 - [ ] **X10** **Dub bus clips and distorts most of the time.** Reported
       2026-09-18. Not yet investigated. Measure before touching anything:
