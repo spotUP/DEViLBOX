@@ -12,7 +12,7 @@ analysis: thoughts/shared/plans/2026-09-17-dub-studio-gap-reconciliation.md
 Durable todo list. Survives compaction, crashes, `/clear`. **Re-read this before trusting
 recollection or any earlier summary in a conversation.**
 
-Running count: **39 of 54 done.**
+Running count: **40 of 54 done.**
 
 **The denominator was wrong until 2026-09-18.** The header said "of 36" from the day this file
 was written and was never updated as sub-items (F1a, F1c, F2a-F2e, T1-T3, the X series) were
@@ -32,7 +32,7 @@ recount — do not trust this sentence either.
 | F — gesture engine | partial | F4: shapes + lifecycle shipped; param-automation shapes need a move update API |
 | G — wet energy | **closed** | G1 |
 | H-L — musical behaviour | **closed** | H1, I1, J1, K1-K4, L1, L2, AE1 |
-| M-O — record, verify, release | N1-N4 done; M1 partial | M1 persistence, O1, O2 |
+| M-O — record, verify, release | N1-N4, O1 done; M1 partial | M1 persistence, O2 (human) |
 | X — user-reported open threads | 4 of 14 | X1, X11, X12, X13 closed |
 
 ### Debt carried, not hidden
@@ -609,8 +609,20 @@ copy/paste (`TrackerCell[]` whole objects), `.dbx` save/load (patterns serialize
          intention is COMMITTED until it is carried out or its window passes (the release
          takes a decision, and without the commitment the intention had moved on by the
          next one). 32 drops per half hour now, one per two phrases.
-- [ ] **O1** Performance monitor UI — persona / state / intention / target / phrase / wet energy /
+- [x] **O1** Performance monitor UI — persona / state / intention / target / phrase / wet energy /
       last move / next event + concise `WHY?` factors.
+      `src/components/dub/PerformanceMonitor.tsx`, mounted in the Auto Dub panel where the
+      performer is configured. Without it the only way to understand a decision is to read
+      the fire log afterwards and guess, and "why did it go quiet there" is the question
+      people actually ask.
+      Two deliberate constraints. It reads ONE assembled snapshot per frame
+      (`getPerformanceSnapshot()` in the engine) rather than polling five getters — five
+      reads of a moving performer can show five different instants, which makes the
+      monitor lie in exactly the situations it is needed for. And it is READ-ONLY: a
+      monitor with controls becomes a second control surface that disagrees with the
+      first. Both are asserted by contract tests, along with the design-token rule.
+      Levels are drawn as bars rather than numbers, because the question is "is there room
+      left", which a shape answers at a glance. 8 tests.
 - [ ] **O2** Human listening review. **Never self-certify.** Ask: does it leave space, recognize
       the important event, arrive musically, know when to stop, create contrast, do drops feel
       intentional, does each intervention relate to the last, does it develop over phrases.

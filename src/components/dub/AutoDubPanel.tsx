@@ -21,6 +21,7 @@ import type { InstrumentConfig } from '@/types/instrument/defaults';
 import { supportsChannelIsolation } from '@engine/tone/ChannelRoutedEffects';
 import { useNotificationStore } from '@/stores/useNotificationStore';
 import { useMixerStore } from '@/stores/useMixerStore';
+import { PerformanceMonitor } from './PerformanceMonitor';
 
 // ─── Driver Badge ────────────────────────────────────────────────────────────
 
@@ -353,6 +354,11 @@ export const AutoDubPanel: React.FC<AutoDubPanelProps> = ({ busEnabled, open: op
           })}
         </div>
       </div>
+
+      {/* Gate O1: what the performer is doing and why, while it does it. Read
+          only — a monitor with controls becomes a second surface that
+          disagrees with the first. */}
+      <PerformanceMonitor />
     </div>,
     document.body
   ) : null;
