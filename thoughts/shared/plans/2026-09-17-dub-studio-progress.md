@@ -12,7 +12,7 @@ analysis: thoughts/shared/plans/2026-09-17-dub-studio-gap-reconciliation.md
 Durable todo list. Survives compaction, crashes, `/clear`. **Re-read this before trusting
 recollection or any earlier summary in a conversation.**
 
-Running count: **51 of 57 done.**
+Running count: **52 of 57 done.**
 
 **The denominator was wrong until 2026-09-18.** The header said "of 36" from the day this file
 was written and was never updated as sub-items (F1a, F1c, F2a-F2e, T1-T3, the X series) were
@@ -1208,7 +1208,23 @@ this bug.
       the worst case stays at 0.85 however the EQ is set, and recomputes when EITHER
       control moves. Only boosts count — a cut quietens one frequency, and spending that
       as extra feedback would hand back headroom everywhere else. 12 tests.
-- [ ] **X4** Six commits unpushed. Nothing verified by ear yet, so nothing has
+- [x] **X4** **PUSHED 2026-09-18** — 28 commits, `a3e529d68..a2d26356c`. The full pre-push
+      gate passed (type-check, test:ci, test:compliance).
+      **The DEPLOY did not land, and the cause is not code.** Live is still
+      `buildHash 41dd4756`, timestamped 2026-08-23 — 26 days stale. Every GitHub Actions
+      run since has failed in under 10 seconds with:
+      *"The job was not started because recent account payments have failed or your
+      spending limit needs to be increased."*
+      So the pipeline has been dead on BILLING since August, and every "deploy" in that
+      window was a no-op. Nothing in the repo can fix it: it needs the account's
+      Billing & plans page. Until then, `git push` stores the work safely on GitHub and
+      changes nothing about what `devilbox.uprough.net` serves.
+      Note for whoever checks next: `gh` was authenticated as `johanBMS`, which has no
+      access to `spotUP/DEViLBOX` and returns a bare 404 for every runs query — that is
+      what made this look like missing permissions rather than a billing stop. Switched
+      the active account to `spotUP`.
+
+- [ ] **X4 (original entry)** Six commits unpushed. Nothing verified by ear yet, so nothing has
       gone live. Push after X2 passes a listening test.
 
 ### Reusable
