@@ -12,7 +12,7 @@ analysis: thoughts/shared/plans/2026-09-17-dub-studio-gap-reconciliation.md
 Durable todo list. Survives compaction, crashes, `/clear`. **Re-read this before trusting
 recollection or any earlier summary in a conversation.**
 
-Running count: **26 of 51 done.**
+Running count: **27 of 51 done.**
 
 **The denominator was wrong until 2026-09-18.** The header said "of 36" from the day this file
 was written and was never updated as sub-items (F1a, F1c, F2a-F2e, T1-T3, the X series) were
@@ -31,7 +31,7 @@ recount — do not trust this sentence either.
 | E — intention + REST | **closed** | E1, E2, E3 |
 | F — gesture engine | partial | F4: shapes + lifecycle shipped; param-automation shapes need a move update API |
 | G — wet energy | **closed** | G1 |
-| H-L — musical behaviour | H1, K1, L1, L2 done | I1, J1, K2-K4, AE1 |
+| H-L — musical behaviour | H1, K1, K2, L1, L2 done | I1, J1, K3, K4, AE1 |
 | M-O — record, verify, release | open | M1, N1-N4, O1, O2 |
 | X — user-reported open threads | 1 of 11 | X1 closed |
 
@@ -409,8 +409,20 @@ copy/paste (`TrackerCell[]` whole objects), `.dbx` save/load (patterns serialize
       Wired into the tick: policy applied on persona change, budget every tick. 17 tests.
       Still pending for full K1: `intensityDefault` and the per-move weight tables remain
       the firing-rate mechanism; migrating those onto `activity`/`novelty` is the rest.
-- [ ] **K2** Contextual variance replacing `rng() < variance * 0.1` — Perry surprises *because the
+- [x] **K2** Contextual variance replacing `rng() < variance * 0.1` — Perry surprises *because the
       musical situation allows it*.
+      `src/lib/dub/contextualVariance.ts`. The old roll was flat, per rule, every tick, so
+      Perry's unpredictability landed inside builds and on top of washes as readily as
+      anywhere useful — and the only way to make him less annoying was to make him less
+      surprising. The situation now gates it and the persona takes it: refused while a
+      gesture is in flight (that is a mess, not a surprise), refused into a wet mix (it
+      reads as noise), refused at a phrase seam (the arrangement is already saying
+      something), refused too soon after the last move, with the settle time itself
+      scaled by risk. Repetition RAISES the chance — the longer it has been doing the same
+      thing, the more a departure is worth — bounded at 0.6.
+      Computed once per tick rather than once per rule: whether the performer may depart
+      is a question about the moment, not about which rule is being considered. Every
+      refusal names itself for the fire log. 13 tests.
 - [ ] **K3** Call and response over musical time.
 - [ ] **K4** Repetition vs novelty: distinguish intentional repetition from algorithmic
       repetition.

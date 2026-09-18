@@ -59,6 +59,7 @@ import { EnergyLedger, type EnergyBudget } from '@/lib/dub/moveEnergy';
 import {
   buildPerformanceContext,
   readWetEnergy,
+  type PerformanceContext,
   type ArrangementSnapshot,
   type Intention,
 } from '@/lib/dub/performanceContext';
@@ -77,6 +78,7 @@ import {
   intentionPolicyFor,
   energyBudgetFor,
 } from '@/lib/dub/personaBehaviour';
+import { allowSurprise, varianceInputsFrom } from '@/lib/dub/contextualVariance';
 
 /** Live analysis context injected into every tick. Null until analysis has run. */
 export interface EQSnapshot {
@@ -784,6 +786,10 @@ export interface AutoDubTickCtx {
   /** Gate G: may this move be added to what is already in the air? Undefined
    *  leaves the pre-Gate-G behaviour (the `wet` flag and its bar counter). */
   admitsMove?: (moveId: string) => boolean;
+  /** Gate K2: the music is settled enough for a departure from the rules, and
+   *  the persona took the chance. Undefined falls back to the flat
+   *  `variance * 0.1` roll. */
+  surpriseAllowed?: boolean;
 }
 
 export interface AutoDubChoice {
@@ -839,6 +845,9 @@ export function chooseMove(ctx: AutoDubTickCtx, rng: () => number): AutoDubChoic
   const rollProb = ctx.intensity * 0.3 * rollDensityMult * ctx.phraseIntensityMult;
   if (rng() > rollProb) return null;
 
+  // Gate K2: a surprise is only a surprise when the situation is otherwise
+  // settled. The flat `variance * 0.1` roll below is the pre-K2 fallback for
+  // callers (and tests) that do not supply a contextual verdict.
   const variance = ctx.persona.variance ?? 0;
   const hasRoles = ctx.roles.length > 0;
   const eligible: Array<{ rule: Rule; weight: number; matchingChannels: readonly number[] }> = [];
@@ -866,7 +875,8 @@ export function chooseMove(ctx: AutoDubTickCtx, rng: () => number): AutoDubChoic
     // hold at slow BPM can't have a new wet move fire while it's still active.
     if (rule.wet && performance.now() < ctx.nextWetAllowedMs) continue;
 
-    const condOk = rule.condition(ctx) || (variance > 0 && rng() < variance * 0.1);
+    const surprise = ctx.surpriseAllowed ?? (variance > 0 && rng() < variance * 0.1);
+    const condOk = rule.condition(ctx) || surprise;
     if (!condOk) continue;
 
     // Resolve channel candidates for role-targeted rules:
@@ -1558,7 +1568,8 @@ function tickImpl(): void {
   // Built from the Gate D context so the decision sees the same music the
   // rules do: what is about to sound, what just sounded, what the player just
   // did by hand, and how much wet is already in the air.
-  const { decision, row: contextRow, rowsPerBeat } = decideIntention(bundle, transport, bpm);
+  const { decision, row: contextRow, rowsPerBeat, ctx: performanceCtx } =
+    decideIntention(bundle, transport, bpm);
   _lastIntention = decision;
   try {
     getPerformanceMemory().setIntention(decision.intention, decision.target);
@@ -1610,10 +1621,16 @@ function tickImpl(): void {
   // air. Personas scale the budget; none of them scale the hard ceiling.
   const nowSec = performance.now() / 1000;
   const budget: EnergyBudget = energyBudgetFor(behaviour);
+  // Gate K2: contextual variance replaces the flat per-rule roll. Computed
+  // once per tick, not once per rule — the question "may the performer depart
+  // from the rules right now" is about the moment, not about which rule is
+  // being considered.
+  const surprise = allowSurprise(varianceInputsFrom(performanceCtx), behaviour, _rng);
 
   const choice = chooseMove({
     bar, barPos, isNewBar,
     admitsMove: (moveId: string) => _energyLedger.admits(moveId, nowSec, budget).ok,
+    surpriseAllowed: surprise.allowed,
     intention: decision.intention,
     intentionChannel: decision.target.kind === 'channel' ? decision.target.channelId : undefined,
     intensity: dub.autoDubIntensity,
@@ -1917,7 +1934,7 @@ function decideIntention(
   bundle: { pattern: Pattern | null; currentRow: number; names: readonly (string | null | undefined)[] },
   transport: { currentGlobalRow?: number; speed?: number },
   bpm: number,
-): { decision: IntentionDecision; row: number; rowsPerBeat: number } {
+): { decision: IntentionDecision; row: number; rowsPerBeat: number; ctx: PerformanceContext } {
   const globalRow = Number.isFinite(transport.currentGlobalRow) && (transport.currentGlobalRow ?? 0) > 0
     ? (transport.currentGlobalRow as number)
     : bundle.currentRow;
@@ -1986,6 +2003,7 @@ function decideIntention(
         },
         row: ctx.row,
         rowsPerBeat: ctx.position.rowsPerBeat,
+        ctx,
       };
     }
   }
@@ -1994,6 +2012,7 @@ function decideIntention(
     decision,
     row: ctx.row,
     rowsPerBeat: ctx.position.rowsPerBeat,
+    ctx,
   };
 }
 
