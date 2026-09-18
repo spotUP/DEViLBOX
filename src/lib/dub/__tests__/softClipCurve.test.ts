@@ -73,8 +73,12 @@ describe('master insert gain staging', () => {
     expect(bus).not.toContain('Math.tanh(x * 1.2) / Math.tanh(1.2)');
   });
 
-  it('trims the insert input by whatever the tone stage boosts', () => {
-    expect(bus).toContain('const trimDb = masterActive ? -Math.max(0, safeMasterShelfGain) : 0;');
+  it('trims the insert input for what the tone stage actually costs', () => {
+    // The trim used to be the full shelf gain, which assumed the whole mix was
+    // being lifted when only the low end is — audibly a huge level drop when
+    // the bus came on. It now follows the measured share of low-frequency
+    // energy in the programme.
+    expect(bus).toContain('const trimDb = masterActive ? shelfTrimForProgramme(safeMasterShelfGain) : 0;');
     expect(bus).toContain('this.masterToneTrim.gain.setTargetAtTime(Math.pow(10, trimDb / 20), now, 0.02);');
   });
 

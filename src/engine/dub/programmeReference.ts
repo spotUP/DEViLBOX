@@ -17,6 +17,7 @@ import { AudioDataBus } from '@/engine/vj/AudioDataBus';
 import {
   smoothProgrammeLevel,
   generatedPeakFor,
+  shelfTrimDb,
   type ProgrammeLevel,
 } from '@/lib/dub/programmeLevel';
 
@@ -42,13 +43,19 @@ export function getProgrammeLevel(): ProgrammeLevel {
       const bus = AudioDataBus.getShared();
       bus.update();
       const frame = bus.getFrame();
-      _level = smoothProgrammeLevel(_level, { rms: frame.rms, peak: frame.peak });
+      const low = frame.subEnergy + frame.bassEnergy;
+      const total = low + frame.midEnergy + frame.highEnergy;
+      _level = smoothProgrammeLevel(_level, {
+        rms: frame.rms,
+        peak: frame.peak,
+        lowShare: total > 0 ? low / total : undefined,
+      });
     } catch {
       // No analyser yet. Leave the previous reading; `generatedPeakFor` falls
       // back to a modest fixed peak when there is nothing valid.
     }
   }
-  return _level ?? { rms: 0, peak: 0, valid: false };
+  return _level ?? { rms: 0, peak: 0, lowShare: 0.4, valid: false };
 }
 
 /**
@@ -65,4 +72,16 @@ export function generatedPeak(moveId: string, intent = 1): number {
 export function resetProgrammeReference(): void {
   _level = null;
   _lastSampleMs = -Infinity;
+}
+
+/**
+ * Trim for a master-insert shelf boost, measured against the programme.
+ *
+ * Trimming by the full shelf gain assumed the whole mix was being lifted; only
+ * the low end is. On a Perry preset that meant a 9 dB drop when the bus came
+ * on, which is what "the volume difference between dub bus on/off is huge"
+ * was describing.
+ */
+export function shelfTrimForProgramme(shelfGainDb: number): number {
+  return shelfTrimDb(shelfGainDb, getProgrammeLevel());
 }

@@ -44,7 +44,10 @@ describe('DubBus wiring contract', () => {
 
   it('re-applies the vinyl level whenever the bus enabled flag changes', () => {
     const toggle = src.slice(src.indexOf("if (typeof settings.enabled === 'boolean') {"));
-    expect(toggle.slice(0, 500)).toContain('this._applyVinylLevel()');
+    // Window rather than an exact offset: the guarantee is that the enabled
+    // toggle re-applies the vinyl level, not that it does so within N
+    // characters — a comment above the call should not fail this.
+    expect(toggle.slice(0, 1200)).toContain('this._applyVinylLevel()');
   });
 
   it('resolves the applied level through resolveVinylLevel, not an inline ternary', () => {
