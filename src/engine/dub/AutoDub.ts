@@ -14,7 +14,6 @@
  * the rule engine deterministically without faking the tick loop.
  */
 
-import { fire } from './DubRouter';
 import { getPersona, type AutoDubPersona } from './AutoDubPersonas';
 import { useDubStore } from '@/stores/useDubStore';
 import { useTransportStore } from '@/stores/useTransportStore';
@@ -50,6 +49,12 @@ import {
 } from '@/lib/dub/musicalClock';
 import type { MusicalPosition } from '@/lib/dub/musicalClock';
 import { getPerformanceMemory } from './performanceMemoryBridge';
+import {
+  beginGesture,
+  cancelAllGestures,
+  gestureCount,
+  activeGestures,
+} from './GestureEngine';
 import {
   buildPerformanceContext,
   readWetEnergy,
@@ -1046,12 +1051,13 @@ let _wetFiredThisBar = 0;
  *  Set to: holdMs + WET_DECAY_EXTRA_MS after a hold-based wet fire so new
  *  wet moves can't stack on top of an active hold. -Infinity = no block. */
 let _nextWetAllowedMs = -Infinity;
-const _heldDisposers = new Set<{ dispose(): void }>();
-/** Timers paired with held disposers. When a force-dispose fires on transport
- *  stop / autoDub disable, the disposer is called immediately and its timer
- *  must be cancelled so the timer-driven dispose path doesn't run a second
- *  time after the audio state has already been restored. */
-const _heldTimers = new Map<{ dispose(): void }, ReturnType<typeof setTimeout>>();
+/**
+ * Held moves live in the GestureEngine (Gate F4), not in a Set and a Map here.
+ * AutoDub used to keep its own disposer set with paired timers, which meant the
+ * AI's holds were cancellable and the user's were not, and "how many gestures
+ * are in flight" had two answers. The engine owns the shape — start, hold,
+ * release, cancel — and still fires everything through DubRouter.
+ */
 const _moveLastFiredBar = new Map<string, number>();
 let _rng: () => number = Math.random;
 /** Per-channel rolling peak history for transient detection. Grown lazily. */
@@ -1408,15 +1414,7 @@ function tickImpl(): void {
   const transport = useTransportStore.getState();
   if (!transport.isPlaying) {
     // Release all held auto-dub moves so effects don't linger after stop.
-    if (_heldDisposers.size > 0) {
-      for (const d of _heldDisposers) {
-        const timer = _heldTimers.get(d);
-        if (timer !== undefined) clearTimeout(timer);
-        try { d.dispose(); } catch { /* ok */ }
-      }
-      _heldDisposers.clear();
-      _heldTimers.clear();
-    }
+    cancelAllGestures('stopped');
     _inRiddimSection = false;
     return;
   }
@@ -1518,7 +1516,7 @@ function tickImpl(): void {
     targetRow: decision.targetRow ?? null,
     row: contextRow,
     leadRows: defaultLeadRows(rowsPerBeat),
-    gesturesInFlight: _heldDisposers.size,
+    gesturesInFlight: gestureCount(),
     holdExpired: false,
     energyCritical: decision.intention === 'RESET',
     canFire: true,
@@ -1526,13 +1524,7 @@ function tickImpl(): void {
   _performanceState = step.state;
 
   if (step.shouldRelease) {
-    for (const d of _heldDisposers) {
-      const timer = _heldTimers.get(d);
-      if (timer !== undefined) clearTimeout(timer);
-      try { d.dispose(); } catch { /* ok */ }
-    }
-    _heldDisposers.clear();
-    _heldTimers.clear();
+    cancelAllGestures('cancelled');
   }
 
   if (!step.shouldFire) {
@@ -1547,7 +1539,7 @@ function tickImpl(): void {
         bar, barPos,
         moveId: 'REST',
         holdBars: decision.holdBars,
-        activeHolds: _heldDisposers.size,
+        activeHolds: gestureCount(),
         audio: null,
         bus: null,
       });
@@ -1595,7 +1587,41 @@ function tickImpl(): void {
     const holdBars = persona.riddimConfig?.holdBars ?? 4;
     adaptedParams = { ...adaptedParams, holdBars };
   }
-  const disposer = fire(choice.moveId, choice.channelId, adaptedParams, 'live');
+  // Gate F4: the gesture engine owns the shape — fire, hold, release — and
+  // still executes through DubRouter, so nothing bypasses the single path.
+  const holdMsForGesture = choice.holdBars > 0 ? (60000 / bpm) * 4 * choice.holdBars : 0;
+  const chStrForLog = choice.channelId !== undefined ? ` ch${choice.channelId}` : '';
+  const gestureId = beginGesture({
+    moveId: choice.moveId,
+    channelId: choice.channelId,
+    params: adaptedParams,
+    holdMs: holdMsForGesture,
+    bpm,
+    source: 'live',
+    onEnd: (_g, reason) => {
+      if (choice.moveId === 'riddimSection') _inRiddimSection = false;
+      if (holdMsForGesture <= 0) return;   // one-shots have nothing to report
+      console.log(`[AutoDub] ◀ RELEASE ${choice.moveId}${chStrForLog} (${reason})`);
+      _recordAutoDubFire({
+        kind: 'release',
+        timeMs: performance.now(),
+        bar,
+        barPos,
+        moveId: choice.moveId,
+        channelId: choice.channelId,
+        holdBars: choice.holdBars,
+        holdMs: Math.round(holdMsForGesture),
+        wet: choice.wet,
+        activeHolds: gestureCount(),
+        audio: sampleAutoDubAudio(),
+        bus: sampleDubBusDiagnostics(),
+      });
+    },
+  });
+  // Held means THIS gesture is still in flight — not that some gesture is.
+  // `gestureCount() > 0` would call a one-shot a hold whenever anything else
+  // happened to be running.
+  const isHeld = activeGestures().some(g => g.id === gestureId);
   _movesFiredThisBar += 1;
   if (choice.wet) {
     _wetFiredThisBar += 1;
@@ -1608,8 +1634,8 @@ function tickImpl(): void {
   _moveLastFiredBar.set(choice.moveId, bar);
   _lastGlobalFireBar = bar;
 
-  const chStr = choice.channelId !== undefined ? ` ch${choice.channelId}` : '';
-  const holdMs = (60000 / bpm) * 4 * choice.holdBars;
+  const chStr = chStrForLog;
+  const holdMs = holdMsForGesture;
   _recordAutoDubFire({
     kind: 'fire',
     timeMs: performance.now(),
@@ -1620,42 +1646,13 @@ function tickImpl(): void {
     holdBars: choice.holdBars,
     holdMs: Math.round(holdMs),
     wet: choice.wet,
-    activeHolds: _heldDisposers.size + (disposer ? 1 : 0),
+    activeHolds: gestureCount(),
     audio: sampleAutoDubAudio(),
     bus: sampleDubBusDiagnostics(),
   });
-  if (disposer) {
-    _heldDisposers.add(disposer);
-    if (choice.moveId === 'riddimSection') {
-      _inRiddimSection = true;
-    }
-    console.log(`[AutoDub] ▶ HOLD ${choice.moveId}${chStr} holdBars=${choice.holdBars} (${holdMs.toFixed(0)}ms) heldTotal=${_heldDisposers.size}`);
-    const timer = setTimeout(() => {
-      console.log(`[AutoDub] ◀ RELEASE ${choice.moveId}${chStr}`);
-      try { disposer.dispose(); } catch (err) {
-        console.error(`[AutoDub] disposer threw for ${choice.moveId}${chStr}:`, err);
-      }
-      _heldDisposers.delete(disposer);
-      _heldTimers.delete(disposer);
-      if (choice.moveId === 'riddimSection') {
-        _inRiddimSection = false;
-      }
-      _recordAutoDubFire({
-        kind: 'release',
-        timeMs: performance.now(),
-        bar,
-        barPos,
-        moveId: choice.moveId,
-        channelId: choice.channelId,
-        holdBars: choice.holdBars,
-        holdMs: Math.round(holdMs),
-        wet: choice.wet,
-        activeHolds: _heldDisposers.size,
-        audio: sampleAutoDubAudio(),
-        bus: sampleDubBusDiagnostics(),
-      });
-    }, holdMs);
-    _heldTimers.set(disposer, timer);
+  if (isHeld) {
+    if (choice.moveId === 'riddimSection') _inRiddimSection = true;
+    console.log(`[AutoDub] ▶ HOLD ${choice.moveId}${chStr} holdBars=${choice.holdBars} (${holdMs.toFixed(0)}ms) heldTotal=${gestureCount()} id=${gestureId}`);
   } else {
     console.log(`[AutoDub] ▶ ONESHOT ${choice.moveId}${chStr}`);
   }
@@ -1688,7 +1685,7 @@ export function startAutoDub(): void {
     timeMs: performance.now(),
     bar,
     barPos,
-    activeHolds: _heldDisposers.size,
+    activeHolds: gestureCount(),
     audio: sampleAutoDubAudio(),
     bus: sampleDubBusDiagnostics(),
   });
@@ -1703,13 +1700,7 @@ export function stopAutoDub(): void {
     _timer = null;
   }
   _inRiddimSection = false;
-  for (const d of _heldDisposers) {
-    const timer = _heldTimers.get(d);
-    if (timer !== undefined) clearTimeout(timer);
-    try { d.dispose(); } catch { /* ok */ }
-  }
-  _heldDisposers.clear();
-  _heldTimers.clear();
+  cancelAllGestures('stopped');
   // Gate D: nothing is in flight once the disposers have run, and the open
   // phrase is over. History of what was played survives — that is the part
   // the next session's decisions are allowed to learn from.
@@ -1841,7 +1832,7 @@ function decideIntention(
     bpm,
     sources,
     arrangement: readArrangementSnapshot(),
-    energy: readWetEnergy(energyInputs, _heldDisposers.size),
+    energy: readWetEnergy(energyInputs, gestureCount()),
   });
 
   return {

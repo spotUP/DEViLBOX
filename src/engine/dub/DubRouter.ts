@@ -188,7 +188,13 @@ export function fire(
   channelId: number | undefined,
   params: Record<string, number> = {},
   source: 'live' | 'lane' = 'live',
-  opts?: { deckId?: import('../dj/DeckEngine').DeckId },
+  opts?: {
+    deckId?: import('../dj/DeckEngine').DeckId;
+    /** Caller already placed this fire on the grid (GestureEngine). Skips the
+     *  router's own quantize so two quantizers in series cannot push the
+     *  gesture a whole grid step late. */
+    preQuantized?: boolean;
+  },
 ): { dispose(): void } | null {
   const move = MOVES[moveId];
   if (!move) {
@@ -217,7 +223,7 @@ export function fire(
   // they were recorded with, and snapping them again would drift a performance
   // away from what was captured.
   const throwQuantize = _bus.getSettings().throwQuantize;
-  if (source === 'live' && throwQuantize !== 'off') {
+  if (source === 'live' && throwQuantize !== 'off' && !opts?.preQuantized) {
     const waitMs = msToNextGridBoundary(throwQuantize, bpm);
     if (waitMs > 0) return deferFire(moveId, move, channelId, merged, bpm, source, opts, waitMs);
   }
