@@ -14,6 +14,7 @@ import {
   chooseMove, detectTransients, hasTransientForRole,
   channelHasNoteInWindow, computeDensityByRole, shouldSuppressAutoDubSparseDrop,
   shouldSuppressAutoDubStartupMove,
+  getPhraseIntensityMult,
   type AutoDubTickCtx,
 } from '../AutoDub';
 import { getPersona } from '../AutoDubPersonas';
@@ -990,5 +991,36 @@ describe('chooseMove — energy accounting', () => {
 
   it('leaves the pre-Gate-G behaviour untouched when no ledger is supplied', () => {
     expect(chooseMove(baseCtx({ intensity: 1 }), seededRng(11))).not.toBeNull();
+  });
+});
+
+// ── Gate L2: phrase arcs follow the clock, not bar % 16 ────────────────────
+
+describe('getPhraseIntensityMult — normalized phrase position', () => {
+  it('takes a 0..1 position through the phrase', () => {
+    const start = getPhraseIntensityMult(0, 'standard');
+    const middle = getPhraseIntensityMult(0.5, 'standard');
+    const end = getPhraseIntensityMult(0.99, 'standard');
+    expect(middle).toBeGreaterThan(start);
+    expect(middle).toBeGreaterThan(end);
+  });
+
+  it('keeps each persona arc its own shape', () => {
+    // Flat stays flat; inverted starts high and falls.
+    expect(getPhraseIntensityMult(0.1, 'flat')).toBeCloseTo(getPhraseIntensityMult(0.9, 'flat'), 6);
+    expect(getPhraseIntensityMult(0.05, 'inverted'))
+      .toBeGreaterThan(getPhraseIntensityMult(0.95, 'inverted'));
+  });
+
+  it('still accepts a legacy bar index rather than pinning the arc at its start', () => {
+    // 8 of 16 bars is halfway through the phrase — same as 0.5.
+    expect(getPhraseIntensityMult(8, 'standard')).toBeCloseTo(
+      getPhraseIntensityMult(0.5, 'standard'), 6,
+    );
+  });
+
+  it('survives nonsense input', () => {
+    expect(Number.isFinite(getPhraseIntensityMult(NaN, 'standard'))).toBe(true);
+    expect(Number.isFinite(getPhraseIntensityMult(-5, 'sharp'))).toBe(true);
   });
 });
