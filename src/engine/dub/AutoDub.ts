@@ -15,6 +15,7 @@
  */
 
 import { getPersona, type AutoDubPersona } from './AutoDubPersonas';
+import { getToneEngine } from '../ToneEngine';
 import { useDubStore } from '@/stores/useDubStore';
 import { useTransportStore } from '@/stores/useTransportStore';
 import { useMixerStore } from '@/stores/useMixerStore';
@@ -84,6 +85,12 @@ import {
   repetitionWeight,
   atMotifPosition,
 } from '@/lib/dub/repetition';
+import {
+  measureConsequence,
+  consequenceWeight,
+  type Consequence,
+  type MixReading,
+} from '@/lib/dub/consequence';
 
 /** Live analysis context injected into every tick. Null until analysis has run. */
 export interface EQSnapshot {
@@ -223,6 +230,10 @@ const WET_FIRES_PER_BAR_CAP = 1;
 const WET_DECAY_EXTRA_MS = 2000;
 /** Minimum wet block duration for oneshot (non-hold) wet fires (ms). */
 const WET_ONESHOT_BLOCK_MS = 3500;
+/** How long after a fire the consequence is measured. Long enough for an echo
+ *  throw's first repeat to be in the mix, short enough to still be about THIS
+ *  move rather than about whatever came next. */
+const CONSEQUENCE_DELAY_MS = 700;
 /** Sparse tracker songs (classic 4-channel modules especially) do not tolerate
  *  autonomous full-mix drops well — a "version drop" or "master drop" wipes
  *  most of the arrangement and feels random rather than musical. Keep these
@@ -1084,6 +1095,59 @@ const _energyLedger = new EnergyLedger();
 /** Persona whose behaviour is currently applied to the planner (Gate K1). */
 let _appliedBehaviourFor: string | null = null;
 
+/**
+ * Gate J: how each move went last time it fired. The performer used to make
+ * every decision in the same state of ignorance as the last one — a throw at a
+ * silent channel and a throw that lifted the snare looked identical from the
+ * inside.
+ */
+const _consequences = new Map<string, Consequence>();
+
+/** The last consequence measured, for MCP diagnostics and the fire log. */
+let _lastConsequence: { moveId: string; consequence: Consequence } | null = null;
+
+export function getAutoDubConsequences(): ReadonlyMap<string, Consequence> {
+  return _consequences;
+}
+
+export function getAutoDubLastConsequence(): { moveId: string; consequence: Consequence } | null {
+  return _lastConsequence;
+}
+
+/**
+ * Read the mix as it is right now.
+ *
+ * Per-channel levels come from the engine's own meters, which is what makes
+ * `targetAudibility` a measurement rather than an assumption: a throw aimed at
+ * a channel that was not playing shows up as the no-op it was.
+ */
+function readMix(channelCount: number): MixReading | null {
+  const audio = sampleAutoDubAudio();
+  if (!audio) return null;
+  const channelLevels = new Map<number, number>();
+  let audibleChannels = 0;
+  try {
+    const levels = getToneEngine().getChannelLevels(Math.max(1, channelCount));
+    levels.forEach((level, index) => {
+      channelLevels.set(index, level);
+      if (level > 0.01) audibleChannels++;
+    });
+  } catch { /* engine not ready — the whole-mix half of the reading still works */ }
+
+  const energy = _energyLedger.read(performance.now() / 1000);
+  return {
+    rms: audio.rms,
+    sub: audio.sub,
+    bass: audio.bass,
+    mid: audio.mid,
+    high: audio.high,
+    channelLevels,
+    audibleChannels,
+    wet: energy.wet,
+    feedback: energy.feedback,
+  };
+}
+
 /** Live energy reading, for MCP diagnostics and the fire log. */
 export function getAutoDubEnergy(): ReturnType<EnergyLedger['read']> {
   return _energyLedger.read(performance.now() / 1000);
@@ -1660,7 +1724,10 @@ function tickImpl(): void {
     admitsMove: (moveId: string) => _energyLedger.admits(moveId, nowSec, budget).ok,
     surpriseAllowed: surprise.allowed,
     repetitionWeightFor: (moveId: string) =>
-      repetitionWeight(moveId, repetition, behaviour.novelty, atMotif),
+      repetitionWeight(moveId, repetition, behaviour.novelty, atMotif)
+      // Gate J: what happened last time this move fired. A move that did
+      // nothing measurable is pushed down hard; one that muddied the mix, less.
+      * consequenceWeight(_consequences.get(moveId)),
     intention: decision.intention,
     intentionChannel: decision.target.kind === 'channel' ? decision.target.channelId : undefined,
     intensity: dub.autoDubIntensity,
@@ -1714,6 +1781,22 @@ function tickImpl(): void {
       // Gate G: what this move puts in the air starts counting when it starts,
       // and starts decaying when it is released — not when a bar turns over.
       _energyLedger.add(g.id, choice.moveId, performance.now() / 1000, holdMsForGesture > 0);
+
+      // Gate J: measure what it actually did. The reading has to be taken
+      // AFTER the move has arrived — an echo throw is not in the mix on the
+      // frame it fired — so the comparison waits out the tail's onset rather
+      // than being taken on the spot and reporting every move as inaudible.
+      const before = readMix(channelCount);
+      if (!before) return;
+      setTimeout(() => {
+        const after = readMix(channelCount);
+        if (!after) return;
+        const consequence = measureConsequence(before, after, {
+          targetChannel: choice.channelId,
+        });
+        _consequences.set(choice.moveId, consequence);
+        _lastConsequence = { moveId: choice.moveId, consequence };
+      }, CONSEQUENCE_DELAY_MS);
     },
     onEnd: (g, reason) => {
       _energyLedger.release(g.id, performance.now() / 1000);
@@ -1820,6 +1903,8 @@ export function stopAutoDub(): void {
   _inRiddimSection = false;
   cancelAllGestures('stopped');
   _energyLedger.clear();
+  _consequences.clear();
+  _lastConsequence = null;
   // Gate D: nothing is in flight once the disposers have run, and the open
   // phrase is over. History of what was played survives — that is the part
   // the next session's decisions are allowed to learn from.
