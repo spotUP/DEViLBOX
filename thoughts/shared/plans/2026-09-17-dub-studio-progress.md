@@ -12,7 +12,7 @@ analysis: thoughts/shared/plans/2026-09-17-dub-studio-gap-reconciliation.md
 Durable todo list. Survives compaction, crashes, `/clear`. **Re-read this before trusting
 recollection or any earlier summary in a conversation.**
 
-Running count: **20 of 51 done.**
+Running count: **21 of 51 done.**
 
 **The denominator was wrong until 2026-09-18.** The header said "of 36" from the day this file
 was written and was never updated as sub-items (F1a, F1c, F2a-F2e, T1-T3, the X series) were
@@ -28,7 +28,7 @@ recount — do not trust this sentence either.
 | B — musical clock | **closed** | B1, T3 |
 | C — event model | **closed** | C1, C2, C3. DJ adapter for C1 deliberately not written |
 | D — performance context | **closed** | D1 |
-| E — intention + REST | E1, E2 done | E3 (state machine) open |
+| E — intention + REST | **closed** | E1, E2, E3 |
 | F — gesture engine | open | F4 |
 | G — wet energy | open | G1 |
 | H-L — musical behaviour | open | H1, I1, J1, K1-K4, L1, L2, AE1 |
@@ -309,8 +309,21 @@ copy/paste (`TrackerCell[]` whole objects), `.dbx` save/load (patterns serialize
       comes from the Gate D phrase history, and a rest requires a whole phrase of playing
       since the last one. `if (rng() > rollProb) return null` no longer decides whether
       the performer plays.
-- [ ] **E3** Performance state machine `LISTEN → ANTICIPATE → PREPARE → ACT → RIDE → RELEASE →
+- [x] **E3** Performance state machine `LISTEN → ANTICIPATE → PREPARE → ACT → RIDE → RELEASE →
       LISTEN` + `BUILD`/`DROP`/`RECOVER`. One machine shared by all personas.
+      `src/lib/dub/performanceState.ts` — a pure reducer; nothing in it fires anything.
+      BUILD and DROP are INTENTIONS (Gate E), not states: the plan listed them beside
+      the state names, but what the performer wants and where it is inside a gesture
+      are different questions, and merging them would give every intention its own
+      state. RECOVER is a state, because it is a place the machine sits until the
+      tail decays. Wired into `tickImpl`: ANTICIPATE/PREPARE wait for the target row
+      instead of firing on whichever 250 ms tick first had an opinion (a tick is most
+      of an eighth note at 140 BPM), and the machine owns the release that no timer
+      covers — energy at the ceiling.
+      `holdExpired` is deliberately false from AutoDub: its own per-hold timers already
+      release at the intended length, and reporting expiry twice would release twice.
+      A test caught the machine walking ACT → ACT — it fired, saw its own gesture in
+      flight, and fired again. 16 tests in `test:ci`.
 
 ## GATE F — GESTURE ENGINE
 
