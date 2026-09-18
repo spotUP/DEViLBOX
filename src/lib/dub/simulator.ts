@@ -170,9 +170,16 @@ export function simulatePerformance(
       clockSettings: project.clockSettings,
       sources: project.sources,
       channelProfiles: project.channelProfiles,
+      // `EnergyState` is a 0..1 READING of what is in the air — the live
+      // system fills it from the bus settings, which are bounded by
+      // definition. The ledger's numbers are COSTS, and several layered moves
+      // legitimately sum past 1. Handing a raw sum to the cycle would make the
+      // safety ceiling mean something different here than it does in the
+      // product, which is precisely the drift this shared cycle exists to
+      // prevent. The budget still compares against the raw sums.
       energy: {
-        wet: energyNow.wet,
-        feedback: energyNow.feedback,
+        wet: Math.min(1, energyNow.wet),
+        feedback: Math.min(1, energyNow.feedback),
         spectralDensity: null,
         gesturesInFlight: inFlight.length,
       },

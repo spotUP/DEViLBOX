@@ -104,6 +104,14 @@ export function nextPerformanceState(
       : step('LISTEN', 'resting');
   }
 
+  // A DROP interrupts. Riding through one is how the drop never happens: the
+  // Gate N4 soak counted 32 drop decisions and zero drops, every one of them
+  // sitting in RIDE because a build was still held. Letting go IS the gesture,
+  // so the release comes first and the drop lands on the next decision.
+  if (input.intention === 'DROP' && input.gesturesInFlight > 0) {
+    return step('RELEASE', 'dropping — letting go of what is held', { release: true });
+  }
+
   // Something is in flight and still wanted: ride it.
   //
   // No exception for the tick that just fired. An earlier version excused
