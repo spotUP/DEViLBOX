@@ -12,7 +12,7 @@ analysis: thoughts/shared/plans/2026-09-17-dub-studio-gap-reconciliation.md
 Durable todo list. Survives compaction, crashes, `/clear`. **Re-read this before trusting
 recollection or any earlier summary in a conversation.**
 
-Running count: **40 of 54 done.**
+Running count: **41 of 54 done.**
 
 **The denominator was wrong until 2026-09-18.** The header said "of 36" from the day this file
 was written and was never updated as sub-items (F1a, F1c, F2a-F2e, T1-T3, the X series) were
@@ -24,7 +24,7 @@ recount — do not trust this sentence either.
 | Gate | State | Notes |
 |---|---|---|
 | A — baseline lock | **closed** | A1 |
-| Pre-work — cell encoding + skank | **closed bar T1 and F3** | F1, F1a, F1c, F2, F2a-e, T2 done |
+| Pre-work — cell encoding + skank | **closed bar F3** | F1, F1a, F1c, F2, F2a-e, T1, T2 done |
 | B — musical clock | **closed** | B1, T3 |
 | C — event model | **closed** | C1, C2, C3. DJ adapter for C1 deliberately not written |
 | D — performance context | **closed** | D1 |
@@ -37,9 +37,8 @@ recount — do not trust this sentence either.
 
 ### Debt carried, not hidden
 
-- **T1 is open while F1 and F1a are shipped.** The skank reshape went in without its regression
-  test, against the house rule that a bug fix ships with a test that fails before and passes
-  after. Write it before Gate D, or accept it knowingly.
+- **T1 debt CLEARED 2026-09-18.** The skank reshape's regression test is written and verified
+  to fail on the pre-fix shape. It went in late, which is the thing to avoid rather than repeat.
 - **X2 — the skank has still never been heard.** Shipped and tested by measurement only.
 
 **Reconciled against the code 2026-09-18** — the ledger had drifted: F1, F1a and F1c were
@@ -171,8 +170,18 @@ copy/paste (`TrackerCell[]` whole objects), `.dbx` save/load (patterns serialize
       *(Shipped: `moves/skankFloatThrow.ts`, registry entry, strip button. Verified 2026-09-18.)*
 - [x] **F1c** Dry-duck composition: use the existing `DubMoveChain` (throw + brief `channelMute`)
       rather than building dry reduction into the move. No new mechanism.
-- [ ] **T1** Regression: `skankEchoThrow`'s principal repeat lands at beat+0.75, `skankFloatThrow`
+- [x] **T1** Regression: `skankEchoThrow`'s principal repeat lands at beat+0.75, `skankFloatThrow`
       at beat+1.5. Must fail before the fix.
+      `src/engine/dub/__tests__/skankThrowTiming.test.ts`, 10 tests. Written late, and the
+      ledger carried the debt openly until now.
+      **Verified in both directions**: reverting the move to its pre-fix shape (a `hold`,
+      a fixed 8000 ms feedback window, no close timer) fails 3 of the 10; the fixed
+      version passes all 10.
+      It pins the SHAPE as well as the numbers, because the shape is what actually broke —
+      the original bug was not a wrong constant but a tap left open for four seconds,
+      throwing eight stabs at once over the dry channel. Rates are asserted against the
+      TEMPO rather than in milliseconds, and the echo/float relationship allows a
+      millisecond of independent rounding.
 - [x] **F2** DONE 2026-09-18. Slot pair 41/42 declared, seven moves appended (indices 37-43),
       guard raised to `DUB_MAX_ENCODABLE_MOVES` (48), version 37 -> 44. Both grid renderers
       extended and their glyph arrays resized (they were `new Array(41)`, so 41/42 would have
