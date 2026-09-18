@@ -810,6 +810,10 @@ this bug.
       deliberately in NEITHER table: it routes a live microphone and ducks the music while
       it plays, so referencing it to a level its own ducking pushes down would be a
       feedback loop.
+      **The numbers are PROVISIONAL.** Confirmed working by ear 2026-09-18; a deliberate
+      level-tuning pass is owed once the plan closes, covering `GENERATED_PRESENCE`,
+      `SILENT_PROGRAMME_PEAK`, and the X10 master-insert trim (which moves overall level
+      and therefore what "as loud as the music" means). Do not tune them mid-plan.
 
 - [ ] **X10** **Dub bus clips and distorts most of the time.** Reported
       2026-09-18. Not yet investigated. Measure before touching anything:
