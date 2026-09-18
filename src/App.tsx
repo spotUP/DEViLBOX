@@ -24,6 +24,7 @@ import { useProjectPersistence } from './hooks/useProjectPersistence';
 import { useGlobalKeyboardHandler } from './hooks/useGlobalKeyboardHandler';
 import { initKeyboardRouter, destroyKeyboardRouter } from './engine/keyboard/KeyboardRouter';
 import { useCloudSync } from './hooks/useCloudSync';
+import { useMediaSession } from './hooks/useMediaSession';
 import { setupCloudSyncSubscribers } from './lib/cloudSyncSubscribers';
 import { getToneEngine } from '@engine/ToneEngine';
 import { getJingleEngine } from '@engine/jingle/JingleEngine';
@@ -277,6 +278,10 @@ function App() {
 
   // Cloud sync: pull on login, push on local mutations
   useCloudSync();
+
+  // Tell the OS we are a media player, so Bluetooth car kits open the audio
+  // stream for us and the dashboard shows the tune instead of nothing.
+  useMediaSession();
   useEffect(() => { setupCloudSyncSubscribers(); }, []);
 
   // Auto-reconnect SID hardware (WebUSB/ASID) from saved settings
