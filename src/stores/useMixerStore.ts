@@ -130,18 +130,57 @@ const _channelOnEngineCache = new Map<string, { Engine: ChannelOnEngine; maxCh: 
 // per frame. Last value per channel wins within a frame.
 const _pendingDubSends = new Map<number, number>();
 let _pendingDubRaf = 0;
+let _pendingDubTimer: ReturnType<typeof setTimeout> | null = null;
+/**
+ * Whether a flush is already on its way.
+ *
+ * A separate flag rather than "is either handle set", because a frame callback
+ * can run SYNCHRONOUSLY — that is exactly what `dubSendRatchet.test.ts` does to
+ * assert the store right after a write — and then `flush` finishes before the
+ * handles it is supposed to clear have even been assigned. Tracking the
+ * intention separately makes the ordering irrelevant.
+ */
+let _dubFlushScheduled = false;
+/**
+ * Backstop for the frame callback.
+ *
+ * A browser suspends `requestAnimationFrame` in a hidden tab, and the flush
+ * below is the only thing that moves a dub send from the audio graph into the
+ * store. So with the tab in the background the sends changed what you HEARD
+ * and never reached the state: the Dub Deck faders read stale on return, and a
+ * project saved in the meantime recorded the wrong send positions. Measured
+ * 2026-09-18 — channel 1 had a live tap in the bus while the store still said
+ * `dubSend: 0`.
+ *
+ * Long enough that a foreground drag still coalesces on the frame callback
+ * (which wins the race at ~16 ms), short enough that a backgrounded session
+ * stays honest.
+ */
+const DUB_SEND_FLUSH_BACKSTOP_MS = 250;
 function scheduleDubSendStoreWrite(
   ch: number,
   amount: number,
   setter: (fn: (state: any) => void) => void,
 ): void {
   _pendingDubSends.set(ch, amount);
-  if (_pendingDubRaf) return;
-  _pendingDubRaf = (typeof requestAnimationFrame !== 'undefined')
-    ? requestAnimationFrame(flush)
-    : (setTimeout(flush, 16) as unknown as number);
+  if (_dubFlushScheduled) return;
+  _dubFlushScheduled = true;
+  // Arm the backstop FIRST, so a frame callback that runs inline still finds
+  // it and clears it.
+  _pendingDubTimer = setTimeout(flush, DUB_SEND_FLUSH_BACKSTOP_MS);
+  if (typeof requestAnimationFrame !== 'undefined') {
+    const id = requestAnimationFrame(flush);
+    // Only keep the handle if the frame has not already been served.
+    if (_dubFlushScheduled) _pendingDubRaf = id;
+  }
   function flush(): void {
+    _dubFlushScheduled = false;
+    if (_pendingDubRaf && typeof cancelAnimationFrame !== 'undefined') {
+      cancelAnimationFrame(_pendingDubRaf);
+    }
+    if (_pendingDubTimer !== null) clearTimeout(_pendingDubTimer);
     _pendingDubRaf = 0;
+    _pendingDubTimer = null;
     if (_pendingDubSends.size === 0) return;
     const updates = Array.from(_pendingDubSends.entries());
     _pendingDubSends.clear();
