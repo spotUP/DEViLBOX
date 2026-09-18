@@ -55,6 +55,7 @@ import { resolveVinylLevel } from '@/lib/dub/vinylLevel';
 import { ChannelTapBaselines } from '@/lib/dub/channelTapBaseline';
 import { makeSoftClipCurve } from '@/lib/dub/softClipCurve';
 import { AuditionHold } from '@/lib/dub/auditionHold';
+import { clampExtFeedback } from '@/lib/dub/extFeedbackCeiling';
 import { generatedPeak, shelfTrimForProgramme } from './programmeReference';
 
 /** Where the master insert's safety clipper starts to saturate. */
@@ -1806,7 +1807,13 @@ export class DubBus {
     // repeat. Distinct from the internal echo feedback — this path adds
     // mixer coloration to each recirculation.
     this.extFeedbackGain = this.context.createGain();
-    this.extFeedbackGain.gain.value = Math.min(0.85, this.settings.extFeedbackGain);
+    // The EQ below sits INSIDE this loop, so any boost it applies multiplies
+    // the round trip. Its headroom comes out of the fader's ceiling rather
+    // than being added on top of it — see `extFeedbackCeiling.ts` (X3).
+    this.extFeedbackGain.gain.value = clampExtFeedback(
+      this.settings.extFeedbackGain,
+      this.settings.extFeedbackEqGain,
+    );
     this.extFeedbackEq = this.context.createBiquadFilter();
     this.extFeedbackEq.type = 'peaking';
     this.extFeedbackEq.frequency.value = this.settings.extFeedbackEqFreq;
@@ -3809,8 +3816,11 @@ export class DubBus {
     }
 
     // ─── External feedback loop ───────────────────────────────────────────
-    if (settings.extFeedbackGain !== undefined) {
-      const clamped = Math.min(0.85, Math.max(0, merged.extFeedbackGain));
+    // Recomputed when EITHER the fader or the loop's EQ moves: raising the EQ
+    // boost lowers the ceiling, so a fader already at the old limit has to come
+    // down with it.
+    if (settings.extFeedbackGain !== undefined || settings.extFeedbackEqGain !== undefined) {
+      const clamped = clampExtFeedback(merged.extFeedbackGain, merged.extFeedbackEqGain);
       this._setColourStageGain(this.extFeedbackGain.gain, clamped, 0.02);
     }
     if (settings.extFeedbackEqFreq !== undefined) {
