@@ -1983,7 +1983,7 @@ function decideIntention(
     energy: readWetEnergy(energyInputs, gestureCount()),
   });
 
-  const decision = _intentionPlanner.decide(ctx);
+  const decision = _intentionPlanner.decide(ctx, sources);
 
   // Gate H: the planner names a channel only when the music pointed at one —
   // the snare about to sound, the channel the player just used. Everything

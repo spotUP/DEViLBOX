@@ -31,7 +31,8 @@ import type {
 } from './performanceContext';
 import { NO_TARGET } from './performanceContext';
 import { axisOr } from './musicalChannelProfile';
-import type { LookAheadWindow, MusicalEvent } from './musicalEvents';
+import type { ChannelEventSource, LookAheadWindow, MusicalEvent } from './musicalEvents';
+import { findCallToAnswer, responseRow } from './callResponse';
 
 /** What the performer decided, and why. The reason reaches the fire log. */
 export interface IntentionDecision {
@@ -75,6 +76,9 @@ export interface IntentionPolicy {
   answerWithinRows: number;
   /** Rows of doing nothing after which TEXTURE is allowed to fill. */
   textureAfterRows: number;
+  /** Rows of silence after a melodic phrase before it counts as a call the
+   *  performer may answer (Gate K3). */
+  callGapRows: number;
 }
 
 export const DEFAULT_INTENTION_POLICY: IntentionPolicy = {
@@ -86,6 +90,7 @@ export const DEFAULT_INTENTION_POLICY: IntentionPolicy = {
   feedbackCeiling: 0.85,
   answerWithinRows: 8,
   textureAfterRows: 32,
+  callGapRows: 4,
 };
 
 /** A REST the performer has committed to, with the bar it runs until. */
@@ -137,7 +142,7 @@ export class IntentionPlanner {
    * outranks something that already did; and filling silence is the last
    * resort, not the default.
    */
-  decide(ctx: PerformanceContext): IntentionDecision {
+  decide(ctx: PerformanceContext, sources?: readonly ChannelEventSource[]): IntentionDecision {
     const p = this.policy;
     const bar = Math.floor(ctx.position.bar);
     const phrase = Math.floor(ctx.position.phrase);
@@ -185,6 +190,26 @@ export class IntentionPlanner {
         `the player fired ${userMove.moveId} ${ctx.row - userMove.row} rows ago`,
         1,
       );
+    }
+
+    // 5b. The MUSIC just said something and left a gap. Answering a phrase in
+    //     the space behind it is the oldest conversation in dub — and it is
+    //     the gap that matters: answering while the call is still sounding is
+    //     talking over it.
+    if (sources && sources.length > 0) {
+      const call = findCallToAnswer(sources, ctx.row, {
+        gapRows: p.callGapRows,
+        profiles: ctx.channelProfiles,
+      });
+      if (call) {
+        return decision(
+          'ANSWER',
+          { kind: 'channel', channelId: call.channel, reason: call.reason },
+          `answering the phrase on channel ${call.channel}`,
+          1,
+          responseRow(call),
+        );
+      }
     }
 
     // 6. A seam in the arrangement, or the end of a phrase: mark it.

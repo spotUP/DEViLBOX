@@ -260,3 +260,33 @@ describe('IntentionPlanner — lifecycle', () => {
     expect(planner.getPolicy().restEveryPhrases).toBe(2);   // untouched default
   });
 });
+
+describe('IntentionPlanner — answering the music (Gate K3)', () => {
+  const PHRASE = [{ channel: 1, onsets: [{ row: 0 }, { row: 2 }, { row: 4 }, { row: 6 }] }];
+
+  it('answers a phrase once its gap has opened, aimed at the caller', () => {
+    const planner = new IntentionPlanner({ callGapRows: 4 });
+    const d = planner.decide(ctx({ row: 11 }), PHRASE);
+    expect(d.intention).toBe('ANSWER');
+    expect(d.target).toMatchObject({ kind: 'channel', channelId: 1 });
+    expect(d.targetRow).toBeGreaterThan(10);
+  });
+
+  it('does not answer while the phrase is still sounding', () => {
+    const planner = new IntentionPlanner({ callGapRows: 4 });
+    expect(planner.decide(ctx({ row: 4 }), PHRASE).intention).not.toBe('ANSWER');
+  });
+
+  it('still prefers answering the PLAYER over answering the music', () => {
+    const planner = new IntentionPlanner({ callGapRows: 4, answerWithinRows: 8 });
+    const d = planner.decide(ctx({ row: 11, memory: memoryWithUserMove(10) }), PHRASE);
+    expect(d.intention).toBe('ANSWER');
+    expect(d.target).toMatchObject({ channelId: 2 });   // the user's channel, not the caller
+  });
+
+  it('safety still outranks the conversation', () => {
+    const planner = new IntentionPlanner({ callGapRows: 4 });
+    const d = planner.decide(ctx({ row: 11, bus: RUNAWAY }), PHRASE);
+    expect(d.intention).toBe('RESET');
+  });
+});

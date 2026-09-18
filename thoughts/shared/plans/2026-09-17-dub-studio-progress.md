@@ -12,7 +12,7 @@ analysis: thoughts/shared/plans/2026-09-17-dub-studio-gap-reconciliation.md
 Durable todo list. Survives compaction, crashes, `/clear`. **Re-read this before trusting
 recollection or any earlier summary in a conversation.**
 
-Running count: **27 of 51 done.**
+Running count: **28 of 51 done.**
 
 **The denominator was wrong until 2026-09-18.** The header said "of 36" from the day this file
 was written and was never updated as sub-items (F1a, F1c, F2a-F2e, T1-T3, the X series) were
@@ -31,7 +31,7 @@ recount — do not trust this sentence either.
 | E — intention + REST | **closed** | E1, E2, E3 |
 | F — gesture engine | partial | F4: shapes + lifecycle shipped; param-automation shapes need a move update API |
 | G — wet energy | **closed** | G1 |
-| H-L — musical behaviour | H1, K1, K2, L1, L2 done | I1, J1, K3, K4, AE1 |
+| H-L — musical behaviour | H1, K1-K3, L1, L2 done | I1, J1, K4, AE1 |
 | M-O — record, verify, release | open | M1, N1-N4, O1, O2 |
 | X — user-reported open threads | 1 of 11 | X1 closed |
 
@@ -423,7 +423,19 @@ copy/paste (`TrackerCell[]` whole objects), `.dbx` save/load (patterns serialize
       Computed once per tick rather than once per rule: whether the performer may depart
       is a question about the moment, not about which rule is being considered. Every
       refusal names itself for the fire log. 13 tests.
-- [ ] **K3** Call and response over musical time.
+- [x] **K3** Call and response over musical time.
+      `src/lib/dub/callResponse.ts` + an `ANSWER` branch in the planner. Gate E answered
+      the PLAYER; this answers the MUSIC — a melodic phrase finishes, a gap opens behind
+      it, and the engineer fills the gap. That is what makes a version sound like two
+      musicians instead of a player and an effects unit.
+      The GAP is the subject, not the phrase: a call is only a call once it has stopped,
+      the window opens after the gap (answering into the decay is still talking over it),
+      and it closes when the caller starts again — so the response never collides with the
+      next phrase. A single hit is not a phrase, and a drum pattern is not a call awaiting
+      an answer: only voices call, decided by profile with confidence respected.
+      The response lands a third of the way into the window rather than at its opening.
+      Answering the player still outranks answering the music, and safety outranks both.
+      12 + 4 tests.
 - [ ] **K4** Repetition vs novelty: distinguish intentional repetition from algorithmic
       repetition.
 - [x] **L1** Musical return quantization — `riddimSection`'s 60%-of-hold becomes next beat /
