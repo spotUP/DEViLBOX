@@ -58,6 +58,11 @@ import {
 } from '@/lib/dub/performanceContext';
 import { IntentionPlanner, type IntentionDecision } from '@/lib/dub/intention';
 import { moveServes } from '@/lib/dub/moveIntentions';
+import {
+  nextPerformanceState,
+  defaultLeadRows,
+  type PerformanceState,
+} from '@/lib/dub/performanceState';
 import { trackerEventSources } from '@/lib/dub/musicalEvents';
 
 /** Live analysis context injected into every tick. Null until analysis has run. */
@@ -1015,6 +1020,14 @@ const ALL_CHANNELS: readonly number[] = Object.freeze(
  * the two would take turns resting.
  */
 const _intentionPlanner = new IntentionPlanner();
+/** Gate E3: where the performer is in a gesture. One machine, all personas. */
+let _performanceState: PerformanceState = 'LISTEN';
+
+/** The state machine's view of the last tick — MCP diagnostics read it. */
+export function getAutoDubPerformanceState(): PerformanceState {
+  return _performanceState;
+}
+
 let _lastIntention: IntentionDecision | null = null;
 
 /** The intention behind the most recent tick — read by MCP diagnostics and
@@ -1488,16 +1501,46 @@ function tickImpl(): void {
   // Built from the Gate D context so the decision sees the same music the
   // rules do: what is about to sound, what just sounded, what the player just
   // did by hand, and how much wet is already in the air.
-  const decision = decideIntention(bundle, transport, bpm);
+  const { decision, row: contextRow, rowsPerBeat } = decideIntention(bundle, transport, bpm);
   _lastIntention = decision;
   try {
     getPerformanceMemory().setIntention(decision.intention, decision.target);
   } catch { /* memory optional */ }
 
-  // REST is an action. It is why nothing fires for the next bars, and it is
-  // recorded as a decision rather than showing up as an unexplained gap.
-  if (decision.intention === 'REST') {
-    if (isNewBar) {
+  // ── Gate E3: where the performer is inside a gesture ──
+  //
+  // `holdExpired` stays false here because AutoDub's own per-hold timers
+  // already schedule each release at its intended length; reporting expiry to
+  // the machine as well would release twice. The machine still owns the OTHER
+  // reason to let go — energy at the ceiling — which no timer covers.
+  const step = nextPerformanceState(_performanceState, {
+    intention: decision.intention,
+    targetRow: decision.targetRow ?? null,
+    row: contextRow,
+    leadRows: defaultLeadRows(rowsPerBeat),
+    gesturesInFlight: _heldDisposers.size,
+    holdExpired: false,
+    energyCritical: decision.intention === 'RESET',
+    canFire: true,
+  });
+  _performanceState = step.state;
+
+  if (step.shouldRelease) {
+    for (const d of _heldDisposers) {
+      const timer = _heldTimers.get(d);
+      if (timer !== undefined) clearTimeout(timer);
+      try { d.dispose(); } catch { /* ok */ }
+    }
+    _heldDisposers.clear();
+    _heldTimers.clear();
+  }
+
+  if (!step.shouldFire) {
+    // Silence with a reason. A committed REST is logged once per bar so the
+    // fire log shows the decision rather than an unexplained gap; the other
+    // non-firing states (ANTICIPATE, PREPARE, RIDE) are the performer waiting
+    // on purpose and would only fill the log.
+    if (decision.intention === 'REST' && isNewBar) {
       _recordAutoDubFire({
         kind: 'fire',
         timeMs: performance.now(),
@@ -1509,20 +1552,6 @@ function tickImpl(): void {
         bus: null,
       });
     }
-    return;
-  }
-
-  // RESET means let go, not press something else: a mix whose feedback is at
-  // the ceiling does not need another move thrown at it. Releasing the held
-  // gestures lets the tail decay, which is the actual remedy.
-  if (decision.intention === 'RESET') {
-    for (const d of _heldDisposers) {
-      const timer = _heldTimers.get(d);
-      if (timer !== undefined) clearTimeout(timer);
-      try { d.dispose(); } catch { /* ok */ }
-    }
-    _heldDisposers.clear();
-    _heldTimers.clear();
     return;
   }
 
@@ -1685,6 +1714,10 @@ export function stopAutoDub(): void {
   // phrase is over. History of what was played survives — that is the part
   // the next session's decisions are allowed to learn from.
   try { getPerformanceMemory().reset(); } catch { /* memory optional */ }
+  // Gate E/E3: commitments and gesture state do not survive a stop. A rest
+  // committed until bar 40 means nothing once the transport has left.
+  _intentionPlanner.reset();
+  _performanceState = 'LISTEN';
   _recordAutoDubFire({
     kind: 'stop',
     timeMs: performance.now(),
@@ -1771,7 +1804,7 @@ function decideIntention(
   bundle: { pattern: Pattern | null; currentRow: number },
   transport: { currentGlobalRow?: number; speed?: number },
   bpm: number,
-): IntentionDecision {
+): { decision: IntentionDecision; row: number; rowsPerBeat: number } {
   const globalRow = Number.isFinite(transport.currentGlobalRow) && (transport.currentGlobalRow ?? 0) > 0
     ? (transport.currentGlobalRow as number)
     : bundle.currentRow;
@@ -1811,7 +1844,11 @@ function decideIntention(
     energy: readWetEnergy(energyInputs, _heldDisposers.size),
   });
 
-  return _intentionPlanner.decide(ctx);
+  return {
+    decision: _intentionPlanner.decide(ctx),
+    row: ctx.row,
+    rowsPerBeat: ctx.position.rowsPerBeat,
+  };
 }
 
 /** Where the song is in its own order. Null when no song is loaded. */
