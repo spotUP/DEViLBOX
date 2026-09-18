@@ -69,26 +69,24 @@ import {
 } from './GestureEngine';
 import { EnergyLedger, type EnergyBudget } from '@/lib/dub/moveEnergy';
 import {
-  buildPerformanceContext,
   readWetEnergy,
-  type PerformanceContext,
   type ArrangementSnapshot,
   type Intention,
 } from '@/lib/dub/performanceContext';
 import { IntentionPlanner, type IntentionDecision } from '@/lib/dub/intention';
 import { moveServes } from '@/lib/dub/moveIntentions';
+import type { PerformanceState } from '@/lib/dub/performanceState';
 import {
-  nextPerformanceState,
-  defaultLeadRows,
-  type PerformanceState,
-} from '@/lib/dub/performanceState';
+  runPerformanceCycle,
+  type PerformanceCycleInput,
+} from '@/lib/dub/performanceCycle';
 import { trackerEventSources } from '@/lib/dub/musicalEvents';
-import { pickTarget } from '@/lib/dub/musicalTargeting';
 import { getChannelProfiles } from './channelProfiles';
 import {
   behaviourFor,
   intentionPolicyFor,
   energyBudgetFor,
+  type PersonaBehaviour,
 } from '@/lib/dub/personaBehaviour';
 import { allowSurprise, varianceInputsFrom } from '@/lib/dub/contextualVariance';
 import {
@@ -820,6 +818,10 @@ export interface AutoDubTickCtx {
   /** Gate K4: weight multiplier per move — above 1 where a motif belongs,
    *  below 1 for a move the performer is stuck in. Undefined = no adjustment. */
   repetitionWeightFor?: (moveId: string) => number;
+  /** Gate K4: moves barred outright for having just fired too many times in a
+   *  row. Weighting alone was too gentle — measured live, 18 of 22 fires were
+   *  the same move. Undefined = nothing barred. */
+  barredForRepetition?: (moveId: string) => boolean;
 }
 
 export interface AutoDubChoice {
@@ -893,6 +895,8 @@ export function chooseMove(ctx: AutoDubTickCtx, rng: () => number): AutoDubChoic
     // rationing. A cheap move may still layer over a cheap one; a wash on top
     // of a wash is refused on the axis that refused it.
     if (ctx.admitsMove && !ctx.admitsMove(rule.moveId)) continue;
+    // Nothing musical needs the same move four times running.
+    if (ctx.barredForRepetition?.(rule.moveId)) continue;
     if (shouldSuppressAutoDubSparseDrop(rule.moveId, ctx.channelCount)) continue;
     if (shouldSuppressAutoDubStartupMove(rule.moveId, ctx.bar)) continue;
     // Per-bar wet cap: once a wet move has fired this bar, skip every
@@ -1453,6 +1457,7 @@ function tickImpl(): void {
   const behaviour = behaviourFor(persona.id);
   if (_appliedBehaviourFor !== persona.id) {
     _intentionPlanner.setPolicy(intentionPolicyFor(behaviour));
+    _intentionPlanner.setRng(_rng);
     _appliedBehaviourFor = persona.id;
   }
 
@@ -1515,30 +1520,17 @@ function tickImpl(): void {
   // Built from the Gate D context so the decision sees the same music the
   // rules do: what is about to sound, what just sounded, what the player just
   // did by hand, and how much wet is already in the air.
-  const { decision, row: contextRow, rowsPerBeat, ctx: performanceCtx } =
-    decideIntention(bundle, transport, bpm);
+  // ── One decision cycle — the same function the offline simulator runs ──
+  const cycle = runPerformanceCycle(
+    getPerformanceMemory(),
+    _intentionPlanner,
+    buildCycleInput(bundle, transport, bpm, behaviour, _performanceState),
+  );
+  const decision = cycle.decision;
+  const performanceCtx = cycle.context;
+  const step = cycle.step;
   _lastIntention = decision;
-  try {
-    getPerformanceMemory().setIntention(decision.intention, decision.target);
-  } catch { /* memory optional */ }
-
-  // ── Gate E3: where the performer is inside a gesture ──
-  //
-  // `holdExpired` stays false here because AutoDub's own per-hold timers
-  // already schedule each release at its intended length; reporting expiry to
-  // the machine as well would release twice. The machine still owns the OTHER
-  // reason to let go — energy at the ceiling — which no timer covers.
-  const step = nextPerformanceState(_performanceState, {
-    intention: decision.intention,
-    targetRow: decision.targetRow ?? null,
-    row: contextRow,
-    leadRows: defaultLeadRows(rowsPerBeat),
-    gesturesInFlight: gestureCount(),
-    holdExpired: false,
-    energyCritical: decision.intention === 'RESET',
-    canFire: true,
-  });
-  _performanceState = step.state;
+  _performanceState = cycle.state;
 
   if (step.shouldRelease) {
     cancelAllGestures('cancelled');
@@ -1595,6 +1587,7 @@ function tickImpl(): void {
     bar, barPos, isNewBar,
     admitsMove: (moveId: string) => _energyLedger.admits(moveId, nowSec, budget).ok,
     surpriseAllowed: surprise.allowed,
+    barredForRepetition: cycle.barredFor,
     repetitionWeightFor: (moveId: string) =>
       repetitionWeight(moveId, repetition, behaviour.novelty, atMotif)
       // Gate J: what happened last time this move fired. A move that did
@@ -1649,6 +1642,10 @@ function tickImpl(): void {
     holdMs: holdMsForGesture,
     bpm,
     source: 'live',
+    // The performer declares itself. Without this the router labels the fire
+    // as the user's, the memory believes it, and the performer answers its own
+    // last move for ever.
+    origin: 'ai',
     onStart: g => {
       // Gate G: what this move puts in the air starts counting when it starts,
       // and starts decaying when it is released — not when a bar turns over.
@@ -1868,11 +1865,26 @@ function sampleDubBusDiagnostics(): Record<string, number | boolean | string | n
  * different song than the decision.
  */
 
-function decideIntention(
+/**
+ * Assemble the cycle input from the live stores.
+ *
+ * Everything past this point — intention, targeting, state machine, variance,
+ * repetition — happens in `runPerformanceCycle`, which the offline simulator
+ * (Gate N1) also calls. A tick that decided things its own way would be a
+ * second performer that merely resembles this one, and the simulator's results
+ * would describe that second performer rather than this one.
+ *
+ * Event rows are lifted to ABSOLUTE rows with the same offset the clock uses,
+ * so "an onset an eighth away" is measured against the timeline the bar
+ * position came from.
+ */
+function buildCycleInput(
   bundle: { pattern: Pattern | null; currentRow: number; names: readonly (string | null | undefined)[] },
   transport: { currentGlobalRow?: number; speed?: number },
   bpm: number,
-): { decision: IntentionDecision; row: number; rowsPerBeat: number; ctx: PerformanceContext } {
+  behaviour: PersonaBehaviour,
+  state: PerformanceState,
+): PerformanceCycleInput {
   const globalRow = Number.isFinite(transport.currentGlobalRow) && (transport.currentGlobalRow ?? 0) > 0
     ? (transport.currentGlobalRow as number)
     : bundle.currentRow;
@@ -1911,46 +1923,24 @@ function decideIntention(
     gridPos.rowsPerBar,
   );
 
-  const ctx = buildPerformanceContext(getPerformanceMemory(), {
+  return {
     row: globalRow,
     ticksPerRow,
     bpm,
+    clockSettings: getMusicalClockSettings(),
     sources,
     channelProfiles: profiles,
     arrangement: readArrangementSnapshot(),
     energy: readWetEnergy(energyInputs, gestureCount()),
-  });
-
-  const decision = _intentionPlanner.decide(ctx, sources);
-
-  // Gate H: the planner names a channel only when the music pointed at one —
-  // the snare about to sound, the channel the player just used. Everything
-  // else gets a target chosen for what the move is FOR, from the profiles,
-  // rather than from a role label and a coin toss.
-  if (decision.target.kind !== 'channel') {
-    const target = pickTarget(decision.intention, profiles);
-    if (target) {
-      return {
-        decision: {
-          ...decision,
-          target: {
-            kind: 'channel',
-            channelId: target.channelId,
-            reason: target.reason,
-          },
-        },
-        row: ctx.row,
-        rowsPerBeat: ctx.position.rowsPerBeat,
-        ctx,
-      };
-    }
-  }
-
-  return {
-    decision,
-    row: ctx.row,
-    rowsPerBeat: ctx.position.rowsPerBeat,
-    ctx,
+    state,
+    gesturesInFlight: gestureCount(),
+    canFire: true,
+    // How far the transport moves between ticks. The commit window must be at
+    // least this wide or a target lands between two ticks and is never acted
+    // on — which is what the simulator caught.
+    rowsPerCycle: (TICK_MS / 1000) / ((60 / Math.max(30, bpm)) * (ticksPerRow / 24)),
+    behaviour,
+    rng: _rng,
   };
 }
 

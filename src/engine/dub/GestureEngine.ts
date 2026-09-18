@@ -53,6 +53,8 @@ export interface GestureSpec {
   reboundMs?: number;
   bpm: number;
   source?: 'live' | 'lane';
+  /** Who is firing. Omitted means the user — the AI declares itself. */
+  origin?: 'user' | 'ai' | 'lane';
   /** Called when the gesture actually starts (after any quantize wait). */
   onStart?: (gesture: ActiveGestureRecord) => void;
   /** Called after the final release, whatever ended it. */
@@ -139,7 +141,10 @@ function startNow(gesture: LiveGesture): void {
     spec.channelId,
     spec.params ?? {},
     spec.source ?? 'live',
-    { preQuantized: spec.quantizeStart !== undefined && spec.quantizeStart !== 'off' },
+    {
+      preQuantized: spec.quantizeStart !== undefined && spec.quantizeStart !== 'off',
+      origin: spec.origin,
+    },
   ) as MoveHandle | null;
 
   gesture.handle = handle;

@@ -12,7 +12,7 @@ analysis: thoughts/shared/plans/2026-09-17-dub-studio-gap-reconciliation.md
 Durable todo list. Survives compaction, crashes, `/clear`. **Re-read this before trusting
 recollection or any earlier summary in a conversation.**
 
-Running count: **34 of 53 done.**
+Running count: **35 of 53 done.**
 
 **The denominator was wrong until 2026-09-18.** The header said "of 36" from the day this file
 was written and was never updated as sub-items (F1a, F1c, F2a-F2e, T1-T3, the X series) were
@@ -32,7 +32,7 @@ recount — do not trust this sentence either.
 | F — gesture engine | partial | F4: shapes + lifecycle shipped; param-automation shapes need a move update API |
 | G — wet energy | **closed** | G1 |
 | H-L — musical behaviour | **closed** | H1, I1, J1, K1-K4, L1, L2, AE1 |
-| M-O — record, verify, release | open | M1, N1-N4, O1, O2 |
+| M-O — record, verify, release | N1 done | M1, N2-N4, O1, O2 |
 | X — user-reported open threads | 3 of 13 | X1, X11, X12 closed |
 
 ### Debt carried, not hidden
@@ -522,8 +522,37 @@ copy/paste (`TrackerCell[]` whole objects), `.dbx` save/load (patterns serialize
 
 - [ ] **M1** Performance recording with intention/target/gesture metadata, additive only —
       save/load compatibility preserved, replay reproduces the performance. Depends on F2.
-- [ ] **N1** Deterministic offline performance simulator (project, BPM, metre, phrase length,
+- [x] **N1** Deterministic offline performance simulator (project, BPM, metre, phrase length,
       persona, seed, duration → bar-by-bar decision log). Primary tuning environment.
+      `src/lib/dub/simulator.ts`, driving `src/lib/dub/performanceCycle.ts` — the decision
+      chain extracted as a pure function that the LIVE TICK now calls too. That sharing is
+      the whole point: a simulator with its own copy would tune a second performer that
+      merely resembles the real one, and its results would look authoritative while being
+      about something else.
+      It does not simulate audio, so it answers questions about DECISIONS and cannot say
+      whether the result sounds good — which is why O2 exists.
+      **It paid for itself immediately, finding four real bugs in the live performer:**
+      1. *The performer almost never acted.* 250 of 256 cycles sat in ANTICIPATE: the
+         commit window was a quarter beat (1 row at speed 6) while each decision advances
+         ~2.3 rows, so it stepped OVER its own target every time. The window is now at
+         least as wide as the gap between decisions.
+      2. *It answered itself.* `source: 'live'` meant live-not-lane, not user-not-AI, so
+         the performer read its own fires as the player's and replied to them for ever.
+         Fires now carry an ORIGIN (`user` / `ai` / `lane`); an unlabelled fire is a hand,
+         and the AI declares itself.
+      3. *SPACE made it busier.* `ghostReverb` (wet cost 0.75) and `sonarPing` were tagged
+         as serving SPACE, so deciding to leave room made it fire something. Space is made
+         by taking away, and most often by firing nothing.
+      4. *Restraint was inverted.* Anticipation set the accent WINDOW, and a wider window
+         always contains an upcoming onset — so the personas that look furthest ahead
+         accented constantly. Jammy, the most restrained persona there is, accented 221
+         times against Perry's none. How OFTEN it accents is now its own dial
+         (`accentSpacingRows`, from activity and restraint); anticipation decides how
+         EARLY it commits, which is what it always meant.
+      12 tests. One assertion was REPLACED rather than tuned to pass: "a restrained
+      persona fires fewer times" is not something the system guarantees (a fire count
+      mixes accents with builds and transitions), so it now asserts what does hold — every
+      persona leaves the music alone for more than half the run, and accents are spaced.
 - [ ] **N2** AI performance tests: REST, TARGET, PREDICTION, WET-ENERGY, CONSEQUENCE, DROP, SEEK,
       PERSONA.
 - [ ] **N3** Musical regression scenes A–G (sparse roots riddim, dense digital dancehall,

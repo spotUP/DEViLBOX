@@ -79,6 +79,17 @@ export interface IntentionPolicy {
   /** Rows of silence after a melodic phrase before it counts as a call the
    *  performer may answer (Gate K3). */
   callGapRows: number;
+  /**
+   * Rows the performer waits between accents.
+   *
+   * How OFTEN it accents has to be its own dial. It was an accident of the
+   * look-ahead window: a wider window always contains an upcoming onset, so
+   * the personas that look furthest ahead accented every single cycle. The
+   * Gate N1 simulator measured Jammy — the most restrained persona there is —
+   * accenting 221 times against Perry's none, which is exactly backwards.
+   * Anticipation decides how EARLY it commits; this decides how often.
+   */
+  accentSpacingRows: number;
 }
 
 export const DEFAULT_INTENTION_POLICY: IntentionPolicy = {
@@ -91,6 +102,7 @@ export const DEFAULT_INTENTION_POLICY: IntentionPolicy = {
   answerWithinRows: 8,
   textureAfterRows: 32,
   callGapRows: 4,
+  accentSpacingRows: 12,
 };
 
 /** A REST the performer has committed to, with the bar it runs until. */
@@ -107,12 +119,22 @@ interface RestCommitment {
  */
 export class IntentionPlanner {
   private policy: IntentionPolicy;
+  /**
+   * Injected randomness, so a run is reproducible from a seed and the
+   * simulator measures the same performer the product runs.
+   */
+  private rng: () => number = Math.random;
   private rest: RestCommitment | null = null;
   /** Phrase index of the last phrase the performer rested in. */
   private lastRestPhrase: number | null = null;
 
-  constructor(policy: Partial<IntentionPolicy> = {}) {
+  constructor(policy: Partial<IntentionPolicy> = {}, rng?: () => number) {
     this.policy = { ...DEFAULT_INTENTION_POLICY, ...policy };
+    if (rng) this.rng = rng;
+  }
+
+  setRng(rng: () => number): void {
+    this.rng = rng;
   }
 
   setPolicy(policy: Partial<IntentionPolicy>): void {
@@ -221,7 +243,11 @@ export class IntentionPlanner {
     // 7. Something strong about to sound: accent it. This is the one that
     //    needs look-ahead — by the time a snare has sounded, accenting it is
     //    late.
-    const accent = this.accentCandidate(ctx);
+    // Accents are spaced. Marking every hit is not accenting, it is doubling
+    // the drummer.
+    const accent = ctx.rowsSinceLastAction >= p.accentSpacingRows
+      ? this.accentCandidate(ctx)
+      : null;
     if (accent) {
       return decision(
         'ACCENT',
@@ -277,12 +303,19 @@ export class IntentionPlanner {
     return busyRun >= Math.max(1, this.policy.restEveryPhrases);
   }
 
+  /**
+   * The last move the PLAYER made, if it is recent enough to answer.
+   *
+   * `origin`, not `source`: the AI's own fires are 'live' too, so filtering on
+   * source made the performer answer itself — measured with the Gate N1
+   * simulator as accents clustering on whichever channel it had just used.
+   */
   private lastUserMove(ctx: PerformanceContext) {
     const floor = ctx.row - this.policy.answerWithinRows;
     for (let i = ctx.recentMoves.length - 1; i >= 0; i--) {
       const m = ctx.recentMoves[i];
       if (m.row <= floor) break;
-      if (m.source === 'live') return m;
+      if (m.origin === 'user') return m;
     }
     return null;
   }
@@ -305,8 +338,16 @@ export class IntentionPlanner {
    */
   private accentCandidate(ctx: PerformanceContext): MusicalEvent | null {
     const events = ctx.upcoming[this.policy.accentWindow];
+    // The channel the performer aimed at last time. Scoring alone is
+    // deterministic, so the highest-scoring channel wins every single accent:
+    // the Gate N1 simulator measured 57 of 82 accents landing on one snare.
+    // An engineer accents the backbeat OFTEN, not exclusively, so the channel
+    // just used gives way when something else is close behind it.
+    const lastTarget = [...ctx.recentMoves].reverse()
+      .find(m => m.channelId !== undefined)?.channelId;
     let best: MusicalEvent | null = null;
     let bestScore = 0;
+    const scored: Array<{ event: MusicalEvent; score: number }> = [];
     for (const event of events) {
       if (event.strength < this.policy.accentStrength) continue;
       const profile = event.profile ?? ctx.channelProfiles.get(event.channel);
@@ -317,8 +358,28 @@ export class IntentionPlanner {
       const bonus =
         (rhythm === 'backbeat' ? 0.4 : rhythm === 'downbeat' ? 0.2 : 0) +
         (family === 'drums' || family === 'percussion' ? 0.2 : 0);
-      const score = event.strength + bonus;
+      const repeatPenalty = event.channel === lastTarget ? 0.3 : 0;
+      const score = event.strength + bonus - repeatPenalty;
       if (score > bestScore) { bestScore = score; best = event; }
+      scored.push({ event, score });
+    }
+    if (!best) return null;
+
+    // Among the candidates that are nearly as good as the best, choose rather
+    // than always taking the top.
+    //
+    // Scoring alone is deterministic, and fires land at a similar phase in
+    // every bar, so the same hit was next every time: the Gate N1 simulator
+    // measured 57 of 82 accents on ONE channel. An engineer accents the
+    // backbeat often, not exclusively — and "often" is a distribution, which a
+    // maximum cannot express.
+    const contenders = scored.filter(c => c.score >= bestScore * 0.8);
+    if (contenders.length <= 1) return best;
+    const total = contenders.reduce((sum, c) => sum + c.score, 0);
+    let roll = this.rng() * total;
+    for (const candidate of contenders) {
+      roll -= candidate.score;
+      if (roll <= 0) return candidate.event;
     }
     return best;
   }
