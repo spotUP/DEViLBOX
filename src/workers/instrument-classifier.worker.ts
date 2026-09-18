@@ -30,11 +30,24 @@ import {
 import type { InstrumentType } from '@/bridge/analysis/AudioSetInstrumentMap';
 
 // ── ONNX Runtime WASM path ────────────────────────────────────────────────────
-// Serve ONNX files from Express (port 3011), NOT from Vite (port 5173).
-// Vite's module server adds ?import to dynamic imports which breaks
-// Emscripten's pthread sub-worker creation (import.meta.url gets mangled,
-// nested Workers fail). Express serves the .mjs files with clean URLs.
-ort.env.wasm.wasmPaths = 'http://localhost:3011/onnx-wasm/';
+// Serve ONNX files from Express, NOT from Vite. Vite's module server adds
+// ?import to dynamic imports, which breaks Emscripten's pthread sub-worker
+// creation (import.meta.url gets mangled, nested Workers fail). Express serves
+// the .mjs files with clean URLs.
+//
+// Derived from the API URL rather than hardcoded. This was
+// `http://localhost:3011/onnx-wasm/` as a literal, which is right in
+// development — Express is on 3011 while the app is on Vite's 5174 — and wrong
+// everywhere else: the deployed site told every visitor's browser to fetch the
+// ONNX runtime from their own machine, so the instrument classifier could
+// never load in production. Unlike the API URL that shipped broken the same
+// day, this one was baked into CI builds too, so it had been failing live for
+// as long as it has existed. Found 2026-09-18 while auditing a manual deploy.
+//
+// `/onnx-wasm` is mounted on the same Express app that serves `/api`
+// (server/src/index.ts), so the API base is the right thing to follow.
+const API_URL = import.meta.env.VITE_API_URL || 'https://devilbox.uprough.net/api';
+ort.env.wasm.wasmPaths = `${API_URL.replace(/\/api\/?$/, '')}/onnx-wasm/`;
 
 // ── Model URLs — own server first, HuggingFace CDN fallback ──────────────────
 const MODEL_URL_PRIMARY  = '/models/ced/model.onnx';
