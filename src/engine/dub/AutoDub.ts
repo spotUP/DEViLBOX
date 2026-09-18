@@ -58,6 +58,10 @@ import {
 import type { MusicalPosition } from '@/lib/dub/musicalClock';
 import { getPerformanceMemory } from './performanceMemoryBridge';
 import {
+  releaseAllDubTransients,
+  reapOrphanedDubTransients,
+} from '@/lib/dub/dubChannelTransient';
+import {
   beginGesture,
   cancelAllGestures,
   gestureCount,
@@ -1400,6 +1404,11 @@ function tickImpl(): void {
   if (!transport.isPlaying) {
     // Release all held auto-dub moves so effects don't linger after stop.
     cancelAllGestures('stopped');
+    // And hand back anything still held at the mixer. A cancelled gesture
+    // normally closes its own transient; this covers the case where the closer
+    // was lost, which is how every channel ended up muted with the song
+    // rendering silence on 2026-09-18.
+    releaseAllDubTransients();
     _inRiddimSection = false;
     return;
   }
@@ -1409,6 +1418,9 @@ function tickImpl(): void {
 
   const isNewBar = bar !== _lastBar;
   if (isNewBar) {
+    // Once a bar, close any transient that has been open far too long to be
+    // real. Cheap, and it only ever acts on state that is already wrong.
+    reapOrphanedDubTransients();
     _lastBar = bar;
     _movesFiredThisBar = 0;
     _wetFiredThisBar = 0;
@@ -1760,6 +1772,7 @@ export function stopAutoDub(): void {
   }
   _inRiddimSection = false;
   cancelAllGestures('stopped');
+  releaseAllDubTransients();
   _energyLedger.clear();
   _consequences.clear();
   _lastConsequence = null;
