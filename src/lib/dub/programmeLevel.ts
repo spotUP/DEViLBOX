@@ -27,6 +27,16 @@ export interface ProgrammeLevel {
   rms: number;
   /** Smoothed peak of the programme, 0..1. */
   peak: number;
+  /**
+   * Share of the programme's energy below the bass/mid split, 0..1.
+   *
+   * What a low shelf actually costs in broadband level: boosting 80 Hz by
+   * 9 dB does NOT make the mix 9 dB louder, it makes it louder in proportion
+   * to how much of the music lives down there. Trimming by the full shelf gain
+   * therefore overcorrects badly — reported 2026-09-18 as "the volume
+   * difference between dub bus on/off is huge".
+   */
+  lowShare: number;
   /** False when nothing is playing, so callers can tell quiet from absent. */
   valid: boolean;
 }
@@ -147,20 +157,40 @@ export function generatedPeakFor(
  */
 export function smoothProgrammeLevel(
   previous: ProgrammeLevel | null,
-  reading: { rms: number; peak: number },
+  reading: { rms: number; peak: number; lowShare?: number },
 ): ProgrammeLevel {
   const valid = reading.peak > SILENCE_THRESHOLD || reading.rms > SILENCE_THRESHOLD;
+  const lowShare = clamp01(reading.lowShare ?? previous?.lowShare ?? DEFAULT_LOW_SHARE);
   if (!previous || !previous.valid) {
-    return { rms: reading.rms, peak: reading.peak, valid };
+    return { rms: reading.rms, peak: reading.peak, lowShare, valid };
   }
   const rising = reading.peak > previous.peak;
   const alpha = rising ? 0.3 : 0.05;
   return {
     rms: previous.rms + (reading.rms - previous.rms) * alpha,
     peak: previous.peak + (reading.peak - previous.peak) * alpha,
+    // The spectral balance of a tune moves slowly; follow it slowly.
+    lowShare: previous.lowShare + (lowShare - previous.lowShare) * 0.05,
     valid: valid || previous.valid,
   };
 }
+
+/**
+ * How much of a low-shelf boost shows up in broadband level.
+ *
+ * `lowShare` is the fraction of energy the shelf is lifting, so that fraction
+ * of the boost lands in the overall level. The floor keeps the trim from
+ * disappearing on a thin mix; the ceiling keeps it from swallowing the tune on
+ * a bass-only passage.
+ */
+export function shelfTrimDb(shelfGainDb: number, programme: ProgrammeLevel): number {
+  if (shelfGainDb <= 0) return 0;
+  const share = programme.valid ? clamp01(programme.lowShare) : DEFAULT_LOW_SHARE;
+  return -shelfGainDb * Math.max(0.15, Math.min(0.7, share));
+}
+
+/** Typical share of energy below the bass/mid split for programme material. */
+const DEFAULT_LOW_SHARE = 0.4;
 
 function clamp01(v: number): number {
   return Math.max(0, Math.min(1, Number.isFinite(v) ? v : 0));

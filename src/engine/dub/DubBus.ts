@@ -54,7 +54,7 @@ import { useNotificationStore } from '@/stores/useNotificationStore';
 import { resolveVinylLevel } from '@/lib/dub/vinylLevel';
 import { ChannelTapBaselines } from '@/lib/dub/channelTapBaseline';
 import { makeSoftClipCurve } from '@/lib/dub/softClipCurve';
-import { generatedPeak } from './programmeReference';
+import { generatedPeak, shelfTrimForProgramme } from './programmeReference';
 
 /** Where the master insert's safety clipper starts to saturate. */
 const MASTER_CLIP_THRESHOLD = 0.9;
@@ -2844,6 +2844,23 @@ export class DubBus {
     }
   }
 
+  /**
+   * Stop everything the bus GENERATES, as opposed to processes.
+   *
+   * The siren is a synth with its own envelope: it plays until told to stop,
+   * and nothing in the disable or panic paths was telling it. Safe to call at
+   * any time — releasing a synth that is not sounding does nothing.
+   */
+  silenceGeneratedSynths(): void {
+    try { this._sirenSynth?.releaseAll(); } catch (err) {
+      console.error('[DubBus] siren release failed:', err);
+    }
+    // SID mode has no equivalent: its generators hand back a releaser per
+    // call rather than exposing a global stop, and inventing one here would be
+    // a second way to do the same thing. Its releasers already run through
+    // `actionReleasers` above.
+  }
+
   startSiren(): () => void {
     if (!this.enabled) return () => {};
     // SID mode: use real SID chip siren
@@ -3098,6 +3115,12 @@ export class DubBus {
     //    `store.setDubBus({enabled:false})` flow through normally; its
     //    engine-side write will find `settings.enabled=true` !== false
     //    and run the full disable path (noise gate, sync the flag, etc.).
+    // Generated synths keep sounding on their own. Panic cancelled every
+    // timer, tap and feedback path but never told the siren to stop, so a
+    // siren left holding kept going and disabling the bus only HID it by
+    // cutting its input. Reported 2026-09-18 as "a siren is stuck".
+    this.silenceGeneratedSynths();
+
     const wasEnabled = this.enabled;
     this.enabled = false;
     if (wasEnabled) {
@@ -3281,6 +3304,10 @@ export class DubBus {
     } catch { /* logging never breaks the setter */ }
     this.settings = merged;
     if (typeof settings.enabled === 'boolean') {
+      // Turning the bus off must STOP what it is generating, not just
+      // disconnect it. Cutting the input leaves the synth running, which is
+      // how a siren survived the bus being switched off.
+      if (!settings.enabled) this.silenceGeneratedSynths();
       this.enabled = settings.enabled;
       // Post-master vinyl chain follows the bus. Off means off — see
       // _applyVinylLevel(); the JA slider is unreachable while disabled.
@@ -3495,7 +3522,10 @@ export class DubBus {
     // Pay for the boost before applying it. A +9 dB shelf with no trim put
     // the mix 9 dB over the limiter's -1 dB threshold; at ratio 4 that still
     // leaves +1.25 dB at the destination, which clips.
-    const trimDb = masterActive ? -Math.max(0, safeMasterShelfGain) : 0;
+    // Pay for the boost — but only for what it actually costs. A low shelf
+    // lifts the low end, not the whole mix, so the trim follows the share of
+    // energy that lives down there rather than the shelf's dB figure.
+    const trimDb = masterActive ? shelfTrimForProgramme(safeMasterShelfGain) : 0;
     this.masterToneTrim.gain.setTargetAtTime(Math.pow(10, trimDb / 20), now, 0.02);
     rampBiquadParam(this.masterMidScoop.frequency, merged.midScoopFreqHz, now);
     rampBiquadParam(this.masterMidScoop.Q, merged.midScoopQ, now);

@@ -3,15 +3,16 @@ import { readFileSync } from 'fs';
 import { join } from 'path';
 import {
   generatedPeakFor,
+  shelfTrimDb,
   smoothProgrammeLevel,
   GENERATED_PRESENCE,
   SILENT_PROGRAMME_PEAK,
   type ProgrammeLevel,
 } from '../programmeLevel';
 
-const QUIET: ProgrammeLevel = { rms: 0.05, peak: 0.2, valid: true };
-const LOUD: ProgrammeLevel = { rms: 0.25, peak: 0.9, valid: true };
-const SILENT: ProgrammeLevel = { rms: 0, peak: 0, valid: false };
+const QUIET: ProgrammeLevel = { rms: 0.05, peak: 0.2, lowShare: 0.4, valid: true };
+const LOUD: ProgrammeLevel = { rms: 0.25, peak: 0.9, lowShare: 0.4, valid: true };
+const SILENT: ProgrammeLevel = { rms: 0, peak: 0, lowShare: 0.4, valid: false };
 
 describe('generatedPeakFor — referenced to the music, not to full scale', () => {
   it('is quieter on a quiet tune and louder on a loud one', () => {
@@ -72,7 +73,7 @@ describe('generatedPeakFor — referenced to the music, not to full scale', () =
   });
 
   it('treats a programme reading of near-silence as silence', () => {
-    const almost: ProgrammeLevel = { rms: 0.001, peak: 0.002, valid: true };
+    const almost: ProgrammeLevel = { rms: 0.001, peak: 0.002, lowShare: 0.4, valid: true };
     expect(generatedPeakFor('siren', almost)).toBeCloseTo(generatedPeakFor('siren', SILENT), 6);
     expect(generatedPeakFor('sonarPing', almost))
       .toBeCloseTo(generatedPeakFor('sonarPing', SILENT), 6);
@@ -85,7 +86,7 @@ describe('generatedPeakFor — referenced to the music, not to full scale', () =
   });
 
   it('never returns a peak that would clip on its own, or one that is inaudible', () => {
-    const blaring: ProgrammeLevel = { rms: 1, peak: 1, valid: true };
+    const blaring: ProgrammeLevel = { rms: 1, peak: 1, lowShare: 0.4, valid: true };
     expect(generatedPeakFor('tubbyScream', blaring)).toBeLessThanOrEqual(0.95);
     expect(generatedPeakFor('sonarPing', QUIET, 0)).toBeGreaterThan(0);
   });
@@ -103,14 +104,14 @@ describe('smoothProgrammeLevel — describes the tune, not the transient', () =>
   });
 
   it('rises faster than it falls', () => {
-    const start: ProgrammeLevel = { rms: 0.1, peak: 0.4, valid: true };
+    const start: ProgrammeLevel = { rms: 0.1, peak: 0.4, lowShare: 0.4, valid: true };
     const up = smoothProgrammeLevel(start, { rms: 0.1, peak: 0.9 });
     const down = smoothProgrammeLevel(start, { rms: 0.1, peak: 0.0 });
     expect(up.peak - start.peak).toBeGreaterThan(start.peak - down.peak);
   });
 
   it('does not chase a single loud frame all the way up', () => {
-    const start: ProgrammeLevel = { rms: 0.1, peak: 0.3, valid: true };
+    const start: ProgrammeLevel = { rms: 0.1, peak: 0.3, lowShare: 0.4, valid: true };
     expect(smoothProgrammeLevel(start, { rms: 0.1, peak: 1 }).peak).toBeLessThan(0.6);
   });
 
@@ -119,7 +120,7 @@ describe('smoothProgrammeLevel — describes the tune, not the transient', () =>
   });
 
   it('keeps following a tune through a momentary gap', () => {
-    const playing: ProgrammeLevel = { rms: 0.2, peak: 0.7, valid: true };
+    const playing: ProgrammeLevel = { rms: 0.2, peak: 0.7, lowShare: 0.4, valid: true };
     expect(smoothProgrammeLevel(playing, { rms: 0, peak: 0 }).valid).toBe(true);
   });
 });
@@ -144,5 +145,33 @@ describe('wiring contract — generated moves reference the programme', () => {
 
   it('puts the siren behind its own level gain rather than straight into the bus', () => {
     expect(bus).toContain('synth.output.connect(this._sirenLevelGain)');
+  });
+});
+
+describe('shelfTrimDb — pay for what the boost actually costs', () => {
+  it('trims far less than the shelf gain, because only the low end is lifted', () => {
+    const trim = shelfTrimDb(9, LOUD);            // lowShare 0.4
+    expect(trim).toBeGreaterThan(-9);             // not the full 9 dB
+    expect(trim).toBeCloseTo(-3.6, 6);
+  });
+
+  it('trims more on a bass-heavy tune than on a thin one', () => {
+    const heavy = shelfTrimDb(9, { ...LOUD, lowShare: 0.7 });
+    const thin = shelfTrimDb(9, { ...LOUD, lowShare: 0.1 });
+    expect(heavy).toBeLessThan(thin);
+  });
+
+  it('never disappears entirely, and never swallows the tune', () => {
+    expect(shelfTrimDb(9, { ...LOUD, lowShare: 0 })).toBeLessThan(0);
+    expect(shelfTrimDb(9, { ...LOUD, lowShare: 1 })).toBeGreaterThan(-9);
+  });
+
+  it('does nothing when the shelf is flat or cutting', () => {
+    expect(shelfTrimDb(0, LOUD)).toBe(0);
+    expect(shelfTrimDb(-4, LOUD)).toBe(0);
+  });
+
+  it('falls back to a typical share when nothing is playing', () => {
+    expect(shelfTrimDb(9, SILENT)).toBeCloseTo(-3.6, 6);
   });
 });
