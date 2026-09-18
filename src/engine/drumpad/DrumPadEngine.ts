@@ -130,6 +130,25 @@ export class DrumPadEngine {
     // registered — … ignored (tracker view not mounted?)" and silently
     // dropped the move. 2026-04-20 fix.
     setDubBusForRouter(this.dubBus);
+
+    // Gate M1: start the performance journal here, with the router, rather
+    // than leaving it to whoever happens to read it first.
+    //
+    // It used to be attached only inside `startAutoDub`, which made its own
+    // documented promise false: "the journal works when the performer is not
+    // running at all". With AutoDub off, nothing subscribed, and a user
+    // performing by hand recorded nothing — the journal was empty until
+    // something read it, and reading it is what attached the listener, by
+    // which time the fires had already happened. Caught 2026-09-18 by firing
+    // two moves and finding an empty journal.
+    //
+    // Here it covers the whole session: the router exists, so the document
+    // does, whatever view is open and whoever is playing.
+    try {
+      void import('../dub/performanceJournalBridge').then(({ getPerformanceJournalRecorder }) => {
+        getPerformanceJournalRecorder();
+      });
+    } catch { /* the journal is commentary; it must never break the engine */ }
   }
 
   /**
