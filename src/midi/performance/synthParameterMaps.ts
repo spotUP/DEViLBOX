@@ -1427,8 +1427,27 @@ function buildDubMoveParams(): NKSParameter[] {
   }));
 }
 
+/**
+ * The channel's own dub send, as an automatable parameter.
+ *
+ * Per-CHANNEL, unlike everything in DUB_CONTINUOUS_PARAMS, which is bus-wide.
+ * It is kept out of that array for exactly that reason and appended here, so
+ * the global lane can leave it out (see `useChannelAutomationParams`) while
+ * every channel lane offers it.
+ *
+ * Without it a fader ride recorded by X5 existed in the file, replayed
+ * correctly, and could never be selected or seen in a lane.
+ */
+export const DUB_CHANNEL_SEND_PARAM: NKSParameter = {
+  id: 'dub.channelSend', name: 'Dub Send', section: NKSSection.EFFECTS,
+  type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0,
+  unit: '%', formatString: '%.0f%%', page: 0, index: 7, isAutomatable: true,
+  accessibilityName: "This channel's send level into the dub bus",
+};
+
 export const DUB_NKS_PARAMETERS: NKSParameter[] = [
   ...DUB_CONTINUOUS_PARAMS,
+  DUB_CHANNEL_SEND_PARAM,
   ...buildDubMoveParams(),
 ];
 

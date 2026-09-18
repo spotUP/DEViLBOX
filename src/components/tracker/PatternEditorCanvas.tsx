@@ -190,6 +190,23 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
   // The canvas render loop updates these every frame — React state would cause 60Hz re-renders.
   // Overlay elements (MacroLanes) are positioned via direct DOM manipulation.
   const scrollYRef = useRef(0);
+  /**
+   * Where the overlays' row 0 belongs, in container pixels.
+   *
+   * Separate from `scrollYRef` (which holds the CANVAS's baseY) because they
+   * are different quantities: the canvas draws row r at `baseY + (r - vStart) * rh`,
+   * while an overlay holds row r at its own internal `r * rh`, so its top must
+   * be `overlayTop`. The two differ by `(currentRow - topLines) * rh`.
+   *
+   * X7, reported 2026-09-18 as "the dub lane does not follow scroll": the RAF
+   * loop wrote `overlayTop` imperatively while React re-rendered the same
+   * elements declaring `top: scrollYRef.current` — the wrong quantity, and one
+   * the idle branch never updated at all. Whichever wrote last won. The dub
+   * lane lost most often because `AutomationLane` subscribes to the whole
+   * automation store, so it re-renders far more than its neighbours and kept
+   * snapping back to a stale number. One property, two owners, two answers.
+   */
+  const overlayTopRef = useRef(0);
   const visibleStartRef = useRef(0);
   const macroOverlayRef = useRef<HTMLDivElement>(null);
   const automationOverlayRef = useRef<HTMLDivElement>(null);
@@ -2667,6 +2684,9 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
         const rh = rowHeightRef.current;
         const centerLineTop = Math.floor(h / 2) - rh / 2;
         const overlayTop = centerLineTop - cursorRow * rh;
+        // Keep the value React renders from in step with what we write here,
+        // so a re-render lands on the same pixel instead of snapping back.
+        overlayTopRef.current = overlayTop;
         if (macroOverlayRef.current) {
           macroOverlayRef.current.style.top = `${overlayTop}px`;
         }
@@ -2789,6 +2809,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
       const overlayTop   = centerLineTop - currentRow * rh - smoothOffset;
 
       scrollYRef.current       = baseY;
+      overlayTopRef.current    = overlayTop;
       visibleStartRef.current  = vStart;
       if (macroOverlayRef.current) {
         macroOverlayRef.current.style.top = `${overlayTop}px`;
@@ -3623,7 +3644,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
                 ref={masterDubLaneRef}
                 style={{
                   position: 'absolute',
-                  top: scrollYRef.current,
+                  top: overlayTopRef.current,
                   left: LNW,
                   pointerEvents: 'auto',
                   zIndex: 4,
@@ -3669,7 +3690,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
                 ref={automationOverlayRef}
                 style={{
                   position: 'absolute',
-                  top: scrollYRef.current - prevLen * rowHeight,
+                  top: overlayTopRef.current - prevLen * rowHeight,
                   left: 0,
                   right: 0,
                   height: (prevLen + pattern.length + nextLen) * rowHeight,
@@ -3724,7 +3745,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
                 ref={macroOverlayRef}
                 style={{
                   position: 'absolute',
-                  top: scrollYRef.current,
+                  top: overlayTopRef.current,
                   left: 0,
                   right: 0,
                   height: pattern.length * rowHeight,

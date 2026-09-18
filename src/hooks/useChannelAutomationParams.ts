@@ -8,7 +8,7 @@ import { useMemo } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { useTrackerStore, useInstrumentStore } from '@stores';
 import { useFormatStore } from '@/stores/useFormatStore';
-import { getNKSParametersForSynth, MIXER_NKS_PARAMETERS, GLOBAL_NKS_PARAMETERS, DUB_NKS_PARAMETERS } from '@/midi/performance/synthParameterMaps';
+import { getNKSParametersForSynth, MIXER_NKS_PARAMETERS, GLOBAL_NKS_PARAMETERS, DUB_NKS_PARAMETERS, DUB_CHANNEL_SEND_PARAM } from '@/midi/performance/synthParameterMaps';
 import { NKSSection } from '@/midi/performance/types';
 import type { NKSParameter } from '@/midi/performance/types';
 import type { SynthType } from '@typedefs/instrument';
@@ -211,7 +211,11 @@ export function useChannelAutomationParams(channelIndex: number): {
     // pattern-editor Global Lane row. No instrument lookup; the picker
     // only surfaces things that make sense at pattern / bus level.
     if (channelIndex === -1) {
-      const dubParams = nksToAutomatable(DUB_NKS_PARAMETERS);
+      // The channel send is the one per-channel entry in the dub list, and
+      // there is no channel here to send. A curve drawn on this lane would
+      // dispatch without a channel and silently do nothing.
+      const dubParams = nksToAutomatable(DUB_NKS_PARAMETERS)
+        .filter(p => p.key !== DUB_CHANNEL_SEND_PARAM.id);
       const globalParams = nksToAutomatable(GLOBAL_NKS_PARAMETERS);
       const params = [...globalParams, ...dubParams];
       return {
