@@ -68,6 +68,8 @@ export class LibopenmptEngine {
   static readonly MAX_DUB_CHANNELS = 32;
   static readonly DUB_OUTPUT_BASE = 1 + LibopenmptEngine.MAX_ISOLATION_SLOTS; // = 5
   private _isolationSlotMasks: (number | null)[] = new Array(LibopenmptEngine.MAX_ISOLATION_SLOTS).fill(null);
+  /** Pending getWorkletDiag() resolvers, settled by the 'diagState' reply. */
+  private _diagStateWaiters: ((v: Record<string, unknown> | null) => void)[] = [];
 
   /** Subscribe to transport events (seek, pause, unpause, stop) for syncing isolation nodes. */
   set onTransportEvent(cb: ((event: 'seek' | 'pause' | 'unpause' | 'stop', order?: number, row?: number) => void) | null) {
@@ -230,6 +232,12 @@ export class LibopenmptEngine {
           this._playing = false;
         }
         break;
+      case 'diagState': {
+        const pending = this._diagStateWaiters;
+        this._diagStateWaiters = [];
+        for (const resolve of pending) resolve(msg.data as Record<string, unknown>);
+        break;
+      }
       case 'isolationReady':
         console.log(`[LibopenmptEngine] Isolation slot ${msg.data.slotIndex} ready:`, {
           channelMask: '0x' + (msg.data.channelMask ?? 0).toString(16),
@@ -398,6 +406,37 @@ export class LibopenmptEngine {
   hotReload(data: ArrayBuffer): void {
     if (!this.workletNode) return;
     this.workletNode.port.postMessage({ cmd: 'hotReload', val: data });
+  }
+
+  /**
+   * Ask the worklet what it is actually doing — module present, paused, the
+   * mute/isolation masks it is applying, and the RMS of its last render.
+   *
+   * The main thread can read every gain downstream of the worklet but none of
+   * this, so a silent master with a ticking transport was undiagnosable from
+   * outside. Resolves null if the worklet does not answer (no worklet, or it
+   * is wedged), which is itself the answer.
+   */
+  getWorkletDiag(timeoutMs = 300): Promise<Record<string, unknown> | null> {
+    if (!this.workletNode) return Promise.resolve(null);
+    return new Promise((resolve) => {
+      let settled = false;
+      const done = (v: Record<string, unknown> | null) => {
+        if (settled) return;
+        settled = true;
+        resolve(v);
+      };
+      this._diagStateWaiters.push(done);
+      setTimeout(() => {
+        this._diagStateWaiters = this._diagStateWaiters.filter(w => w !== done);
+        done(null);
+      }, timeoutMs);
+      try {
+        this.workletNode!.port.postMessage({ cmd: 'diagState' });
+      } catch {
+        done(null);
+      }
+    });
   }
 
   /** Set channel mute mask (bit N=1 means channel N is ACTIVE). */
