@@ -12,7 +12,7 @@ analysis: thoughts/shared/plans/2026-09-17-dub-studio-gap-reconciliation.md
 Durable todo list. Survives compaction, crashes, `/clear`. **Re-read this before trusting
 recollection or any earlier summary in a conversation.**
 
-Running count: **48 of 57 done.**
+Running count: **49 of 57 done.**
 
 **The denominator was wrong until 2026-09-18.** The header said "of 36" from the day this file
 was written and was never updated as sub-items (F1a, F1c, F2a-F2e, T1-T3, the X series) were
@@ -33,7 +33,7 @@ recount — do not trust this sentence either.
 | G — wet energy | **closed** | G1 |
 | H-L — musical behaviour | **closed** | H1, I1, J1, K1-K4, L1, L2, AE1 |
 | M-O — record, verify, release | M1, N1-N4, O1 done | O2 (human) |
-| X — user-reported open threads | 8 of 17 | X1, X5, X7, X11, X12, X13, X15, X16 closed |
+| X — user-reported open threads | 9 of 17 | X1, X5, X6, X7, X11, X12, X13, X15, X16 closed |
 
 ### Debt carried, not hidden
 
@@ -808,7 +808,7 @@ this bug.
       take growing a copy of itself each time round the pattern. Fixed in the same commit.
       20 tests.
 
-- [ ] **X6** **Bus audition mode — a solo button for the send.** Raised
+- [x] **X6** **Bus audition mode — a solo button for the send.** Raised
       2026-09-17 while writing skank test instructions that began "first switch
       off Perry", which is a smell: the user should not have to dismantle their
       voicing to hear what a gesture is doing.
@@ -836,6 +836,26 @@ this bug.
       playback, and must not touch `characterPreset` (that would flip the
       preset to 'custom' and silently destroy the user's voicing — see
       dubBusCharacterCoherence.test.ts).
+
+      **CLOSED 2026-09-18, commit `368514846`,** to exactly that shape.
+      `src/lib/dub/auditionHold.ts` holds the bookkeeping, pure and free of Web Audio —
+      it is not about audio but about who owns a value while someone else borrows it, the
+      same question the dub sends answer with their baselines. (It is pure for a second
+      reason: importing `DubBus` into a test drags in the whole WASM effect chain and
+      times out at 10 s. That is why the sibling bus tests read source text.)
+      Two non-obvious things it gets right: pressing twice must not snapshot the DUCKED
+      values as if they were the user's — one stuck press would otherwise leave a
+      permanently colourless bus — and a stage changed WHILE held must land on the
+      restore, so the six runtime colour setters route through the hold. Restores the
+      REMEMBERED values, not `settings`, so a stage left part-way down comes back
+      part-way down. The lo-fi bypass is handled as the other half of a crossfade, not a
+      stage of its own.
+      Panic ends an audition rather than leaving a stale snapshot to hand back pre-panic
+      levels. Momentary deck button with pointer capture (a finger sliding off still
+      hands the colour back; an unmount mid-hold cannot leave the bus colourless), plus
+      `set_dub_bus_audition` over MCP. 23 tests.
+      **Still not automatic, by design** — the AI half stays with AI-11 (notice the
+      return is already dense and choose a smaller gesture), not with the engine.
 
 - [x] **X7** **Dub lane visuals: static, and shown on every pattern.** Reported
       2026-09-18. Two separate faults.
