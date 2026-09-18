@@ -71,6 +71,9 @@ export interface ActiveGesture {
   source: 'live' | 'lane';
 }
 
+/** Who fired a move. See `DubRouter`'s `DubFireOrigin`. */
+export type MoveOrigin = 'user' | 'ai' | 'lane';
+
 /** A move that has fired, whether or not it has released. */
 export interface RecentMove {
   invocationId: string;
@@ -79,6 +82,13 @@ export interface RecentMove {
   row: number;
   timeSec: number;
   source: 'live' | 'lane';
+  /**
+   * Who fired it. `source` says live-or-lane, which is NOT the same question:
+   * the AI's own fires were 'live' too, so the performer read them as the
+   * player's and answered itself. Defaults to 'user' when unstated, because an
+   * unlabelled fire is a hand.
+   */
+  origin: MoveOrigin;
   /** Present once the hold released. One-shots never get one. */
   releasedRow?: number;
   releasedTimeSec?: number;
@@ -227,6 +237,7 @@ export interface RouterFireLike {
   row: number;
   timeSec: number;
   source: 'live' | 'lane';
+  origin?: MoveOrigin;
   isHold?: boolean;
 }
 
@@ -276,6 +287,8 @@ export class PerformanceMemory {
       row: event.row,
       timeSec: event.timeSec,
       source: event.source,
+      // Lane playback is never the player's hand, whatever the caller omits.
+      origin: event.origin ?? (event.source === 'lane' ? 'lane' : 'user'),
     };
     this.moves.push(move);
     if (this.moves.length > this.recentMoveCap) this.moves.shift();
@@ -295,7 +308,7 @@ export class PerformanceMemory {
     this.lastActionRow = event.row;
     if (this.openPhrase) {
       this.openPhrase.moves++;
-      if (event.source === 'live') this.openPhrase.liveMoves++;
+      if (move.origin !== 'lane') this.openPhrase.liveMoves++;
     }
   }
 

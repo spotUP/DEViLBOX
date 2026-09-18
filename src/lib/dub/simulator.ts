@@ -124,6 +124,7 @@ export function simulatePerformance(
   const ledger = new EnergyLedger();
   const budget = options.budget ?? energyBudgetFor(behaviour) ?? DEFAULT_ENERGY_BUDGET;
   const rng = seededRng(options.seed);
+  planner.setRng(rng);
 
   const cyclesPerBar = options.cyclesPerBar ?? 8;
   const grid = computeMusicalPosition(0, project.ticksPerRow, project.clockSettings);
@@ -178,6 +179,7 @@ export function simulatePerformance(
       state,
       gesturesInFlight: inFlight.length,
       canFire: true,
+      rowsPerCycle,
       behaviour,
       rng,
     });
@@ -194,7 +196,10 @@ export function simulatePerformance(
     }
 
     if (result.step.shouldFire) {
-      const moveId = chooseSimulatedMove(result.decision.intention, ledger, nowSec, budget, result.repetitionWeightFor);
+      const moveId = chooseSimulatedMove(
+        result.decision.intention, ledger, nowSec, budget,
+        result.repetitionWeightFor, result.barredFor,
+      );
       if (moveId) {
         const id = `sim${nextGestureId++}`;
         const holdRows = grid.rowsPerBar * Math.max(0.25, result.decision.holdBars);
@@ -206,6 +211,7 @@ export function simulatePerformance(
           row,
           timeSec: nowSec,
           source: 'live',
+          origin: 'ai',
           isHold: true,
         });
         inFlight.push({ id, releaseRow: row + holdRows, moveId });
@@ -279,8 +285,9 @@ function chooseSimulatedMove(
   nowSec: number,
   budget: EnergyBudget,
   repetitionWeightFor: (moveId: string) => number,
+  barredFor: (moveId: string) => boolean,
 ): string | null {
-  const candidates = movesForIntention(intention);
+  const candidates = movesForIntention(intention).filter(id => !barredFor(id));
   if (candidates.length === 0) return null;
   // Prefer moves the repetition verdict has not pushed down, so a rut breaks
   // here the same way it breaks in the live selection.

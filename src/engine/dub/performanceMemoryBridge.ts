@@ -41,6 +41,7 @@ export function attachPerformanceMemory(memory: PerformanceMemory): () => void {
       row: event.row,
       timeSec: event.timeSec,
       source: event.source,
+      origin: event.origin,
       isHold: event.isHold,
     });
   });

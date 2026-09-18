@@ -126,3 +126,23 @@ describe('holdBarsFor and intentionAffinity', () => {
       .toBeGreaterThan(intentionAffinity(b, b.intentionPreference[1]));
   });
 });
+
+describe('accent spacing is its own dial', () => {
+  it('makes a sparse persona wait longer between accents than a busy one', () => {
+    const jammy = intentionPolicyFor(PERSONA_BEHAVIOUR.jammy);       // activity 0.3
+    const perry = intentionPolicyFor(PERSONA_BEHAVIOUR.perry);       // activity 0.8
+    expect(jammy.accentSpacingRows).toBeGreaterThan(perry.accentSpacingRows);
+  });
+
+  it('does not let the look-ahead window decide how often it accents', () => {
+    // The bug this replaced: anticipation set the accent WINDOW, a wider window
+    // always contains an upcoming onset, so the personas that looked furthest
+    // ahead accented constantly. Tubby looks further ahead than Perry AND is
+    // more restrained — both must hold at once.
+    const tubby = intentionPolicyFor(PERSONA_BEHAVIOUR.tubby);
+    const perry = intentionPolicyFor(PERSONA_BEHAVIOUR.perry);
+    expect(tubby.accentWindow).toBe('1/4');                    // looks further ahead
+    expect(perry.accentWindow).toBe('1/16');
+    expect(tubby.accentSpacingRows).toBeGreaterThan(perry.accentSpacingRows);  // acts less often
+  });
+});

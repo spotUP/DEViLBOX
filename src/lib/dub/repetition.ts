@@ -203,3 +203,47 @@ function median(values: readonly number[]): number {
   const mid = Math.floor(sorted.length / 2);
   return sorted.length % 2 === 0 ? (sorted[mid - 1] + sorted[mid]) / 2 : sorted[mid];
 }
+
+/**
+ * How many times in a row the most recent move has just fired.
+ *
+ * Weighting a rut down proved too gentle in practice: measured live on
+ * 2026-09-18, eighteen of AutoDub's twenty-two fires were `echoThrow`, each
+ * one bumping echo feedback, so the bus never got back to baseline and the
+ * tail never decayed. A 0.55 multiplier does not stop a move that several
+ * rules offer and the persona weights at 1.5 from winning the draw again.
+ *
+ * Some things are better as a rule than as a preference. Nothing musical
+ * needs the same move four times running.
+ */
+export function consecutiveRun(moves: readonly RecentMove[]): { moveId: string; count: number } | null {
+  if (moves.length === 0) return null;
+  const moveId = moves[moves.length - 1].moveId;
+  let count = 0;
+  for (let i = moves.length - 1; i >= 0; i--) {
+    if (moves[i].moveId !== moveId) break;
+    count++;
+  }
+  return { moveId, count };
+}
+
+/** Consecutive fires of one move before it is barred from the next draw. */
+export const CONSECUTIVE_LIMIT = 3;
+
+/**
+ * Is this move barred right now for having just been played too many times?
+ *
+ * A MOTIF at its own place in the phrase is exempt: repetition there is the
+ * point, and it is spaced a phrase apart rather than back to back — which is
+ * what `classifyRepetition` distinguishes and a raw counter cannot.
+ */
+export function barredForRepetition(
+  moveId: string,
+  moves: readonly RecentMove[],
+  verdict: RepetitionVerdict,
+  atMotifPositionNow = false,
+): boolean {
+  if (verdict.kind === 'motif' && verdict.moveId === moveId && atMotifPositionNow) return false;
+  const run = consecutiveRun(moves);
+  return run !== null && run.moveId === moveId && run.count >= CONSECUTIVE_LIMIT;
+}

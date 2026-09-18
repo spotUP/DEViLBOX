@@ -39,6 +39,7 @@ import {
   classifyRepetition,
   repetitionWeight,
   atMotifPosition,
+  barredForRepetition,
   type RepetitionVerdict,
 } from './repetition';
 import { pickTarget } from './musicalTargeting';
@@ -60,6 +61,16 @@ export interface PerformanceCycleInput {
   gesturesInFlight: number;
   /** False when budgets, cooldowns or the caller's own rules forbid firing. */
   canFire: boolean;
+  /**
+   * How many rows the transport advances between decisions.
+   *
+   * The commit window has to be at least this wide or the performer steps
+   * OVER its own target: a quarter-beat window is one row at speed 6, while a
+   * 250 ms tick at 140 BPM advances about 2.3 rows, so an accent target was
+   * "2 rows away" on every single cycle and ACT was never reached. Found by
+   * the Gate N1 simulator — 250 of 256 cycles stuck in ANTICIPATE.
+   */
+  rowsPerCycle?: number;
   behaviour: PersonaBehaviour;
   /** Injected so a cycle is reproducible from a seed. */
   rng: () => number;
@@ -73,6 +84,9 @@ export interface PerformanceCycleResult {
   repetition: RepetitionVerdict;
   /** Weight multiplier per move from the repetition verdict. */
   repetitionWeightFor: (moveId: string) => number;
+  /** True when a move has just fired too many times running to be offered
+   *  again. A hard rule rather than a weight — see `repetition.ts`. */
+  barredFor: (moveId: string) => boolean;
   /** Where the performer now is. The caller stores it for the next cycle. */
   state: PerformanceState;
 }
@@ -123,7 +137,11 @@ export function runPerformanceCycle(
     intention: decision.intention,
     targetRow: decision.targetRow ?? null,
     row: context.row,
-    leadRows: defaultLeadRows(context.position.rowsPerBeat),
+    // Wide enough that a target cannot fall between two decisions.
+    leadRows: Math.max(
+      defaultLeadRows(context.position.rowsPerBeat),
+      input.rowsPerCycle ?? 0,
+    ),
     gesturesInFlight: input.gesturesInFlight,
     // The caller's own timers own hold expiry; reporting it here as well would
     // release twice.
@@ -156,6 +174,8 @@ export function runPerformanceCycle(
     repetition,
     repetitionWeightFor: (moveId: string) =>
       repetitionWeight(moveId, repetition, input.behaviour.novelty, atMotif),
+    barredFor: (moveId: string) =>
+      barredForRepetition(moveId, context.recentMoves, repetition, atMotif),
     state: step.state,
   };
 }
