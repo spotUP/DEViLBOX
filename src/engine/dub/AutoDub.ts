@@ -388,11 +388,24 @@ export type PhraseArcShape = 'standard' | 'sharp' | 'flat' | 'inverted' | 'slow'
 
 function lerp(a: number, b: number, t: number): number { return a + (b - a) * t; }
 
-/** Returns 0..1.5 multiplier on rollProb based on position within a 16-bar phrase.
- *  @param phraseBar  integer bar count modulo 16 (0..15)
- *  @param arc        persona arc shape */
-export function getPhraseIntensityMult(phraseBar: number, arc: PhraseArcShape): number {
-  const t = Math.max(0, Math.min(1, (phraseBar % 16) / 16));
+/**
+ * Returns a 0..1.5 multiplier on rollProb from where we are in the PHRASE.
+ *
+ * Gate L2: the position is a normalized 0..1 from `MusicalClock`, not
+ * `bar % 16`. The modulo was two assumptions in one: that a phrase is sixteen
+ * bars, and that a bar is what the transport's bar counter says — neither of
+ * which holds at a phrase length the user has set, or in a metre that is not
+ * 4/4. The arcs keep their shapes exactly; only what feeds them changed.
+ *
+ * @param phrasePosition 0..1 through the current phrase.
+ * @param arc            persona arc shape
+ */
+export function getPhraseIntensityMult(phrasePosition: number, arc: PhraseArcShape): number {
+  const raw = Number.isFinite(phrasePosition) ? phrasePosition : 0;
+  // Accept a legacy bar index (>= 1) as well as a 0..1 position, so a caller
+  // that has not been migrated degrades to the old behaviour rather than
+  // silently pinning the arc at its start.
+  const t = raw > 1 ? Math.max(0, Math.min(1, (raw % 16) / 16)) : Math.max(0, Math.min(1, raw));
   switch (arc) {
     case 'standard': // Tubby — gradual build, sustained peak, gentle decay
       if (t < 0.25)  return lerp(0.30, 0.90, t / 0.25);
@@ -1494,8 +1507,12 @@ function tickImpl(): void {
   // upcoming passage" means.
   const densityByRole = computeDensityByRole(bundle.pattern, bundle.currentRow, roles, 16);
 
-  const phraseBar = bar % 16;
-  const phraseIntensityMult = getPhraseIntensityMult(phraseBar, persona.phraseArcShape ?? 'standard');
+  // Gate L2: normalized phrase position from the clock. `bar % 16` assumed a
+  // 16-bar phrase in 4/4; the clock knows the song's actual phrase length and
+  // metre, so a persona's arc now lines up with the music rather than with a
+  // constant.
+  const phrasePosition = getPhrasePosition(transport, bundle.currentRow);
+  const phraseIntensityMult = getPhraseIntensityMult(phrasePosition, persona.phraseArcShape ?? 'standard');
 
   // Beat phase within current beat (0–1)
   const beatInBar = barPos * 4; // 4 beats per bar
@@ -1995,6 +2012,25 @@ function readArrangementSnapshot(): ArrangementSnapshot | null {
   } catch {
     return null;
   }
+}
+
+/**
+ * Where we are through the current phrase, 0..1, from the musical clock.
+ *
+ * Falls back to 0 when there is no row information yet (AutoDub enabled before
+ * playback): the arc then starts at the beginning of a phrase, which is the
+ * honest reading of "we have not started".
+ */
+function getPhrasePosition(
+  transport: { currentGlobalRow?: number; speed?: number },
+  currentRow: number,
+): number {
+  const globalRow = Number.isFinite(transport.currentGlobalRow) && (transport.currentGlobalRow ?? 0) > 0
+    ? (transport.currentGlobalRow as number)
+    : currentRow;
+  if (!Number.isFinite(globalRow) || globalRow < 0) return 0;
+  const pos = computeMusicalPosition(globalRow, transport.speed || 6, getMusicalClockSettings());
+  return pos.positionInPhrase;
 }
 
 function getAutoDubBarClock(): { bar: number; barPos: number; isRowAligned: boolean } {
