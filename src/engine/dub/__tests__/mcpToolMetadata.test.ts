@@ -76,3 +76,49 @@ describe('X8(a) — every modland tool asks the API, not a guess', () => {
     expect(hardcoded).toEqual([]);
   });
 });
+
+/**
+ * Every handler the bridge routes should be declared by the MCP server.
+ *
+ * `get_performance_journal` and `clear_performance_journal` had routes and no
+ * declarations, so neither was reachable. Auditing for others turned up
+ * `get_channel_roles` — the very diagnostic the dub ledger tells you to reach
+ * for when the performer seems to be ignoring a channel — plus
+ * `route_parameter`, `set_master_effects` and `test_tone`.
+ */
+describe('X8 — no handler is left unreachable', () => {
+  const bridge = readFileSync(resolve(ROOT, 'src/bridge/MCPBridge.ts'), 'utf8');
+
+  /**
+   * The DJ tools are deliberately funnelled through `dj_vj_action` rather than
+   * declared one by one, so they are not gaps.
+   */
+  const INTENTIONALLY_INDIRECT = /^dj_/;
+
+  /**
+   * Arbitrary script evaluation is a capability decision for the repo's owner,
+   * not something to expose in passing. Listed here so it stays a CHOICE
+   * rather than drifting back into being an oversight.
+   */
+  const DELIBERATELY_UNDECLARED = new Set(['evaluate_script']);
+
+  it('declares every routed tool, or names why not', () => {
+    const routed = [...bridge.matchAll(/^  ([a-z_]+): [a-zA-Z]+,$/gm)].map(m => m[1]);
+    expect(routed.length).toBeGreaterThan(50);
+    const missing = routed.filter(name =>
+      !INTENTIONALLY_INDIRECT.test(name)
+      && !DELIBERATELY_UNDECLARED.has(name)
+      && !mcpServer.includes(`'${name}'`),
+    );
+    expect(
+      missing,
+      'Routed by MCPBridge but never declared by the MCP server, so unreachable '
+      + 'from outside. Declare them, or add them to one of the exemptions above '
+      + 'with a reason.',
+    ).toEqual([]);
+  });
+
+  it('keeps the diagnostic the dub ledger points at reachable', () => {
+    expect(mcpServer).toContain("'get_channel_roles'");
+  });
+});
