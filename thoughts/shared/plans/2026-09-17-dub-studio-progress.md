@@ -12,7 +12,7 @@ analysis: thoughts/shared/plans/2026-09-17-dub-studio-gap-reconciliation.md
 Durable todo list. Survives compaction, crashes, `/clear`. **Re-read this before trusting
 recollection or any earlier summary in a conversation.**
 
-Running count: **45 of 57 done.**
+Running count: **46 of 57 done.**
 
 **The denominator was wrong until 2026-09-18.** The header said "of 36" from the day this file
 was written and was never updated as sub-items (F1a, F1c, F2a-F2e, T1-T3, the X series) were
@@ -32,7 +32,7 @@ recount — do not trust this sentence either.
 | F — gesture engine | **closed** | F4 |
 | G — wet energy | **closed** | G1 |
 | H-L — musical behaviour | **closed** | H1, I1, J1, K1-K4, L1, L2, AE1 |
-| M-O — record, verify, release | N1-N4, O1 done; M1 partial | M1 persistence, O2 (human) |
+| M-O — record, verify, release | M1, N1-N4, O1 done | O2 (human) |
 | X — user-reported open threads | 6 of 17 | X1, X11, X12, X13, X15, X16 closed |
 
 ### Debt carried, not hidden
@@ -556,7 +556,7 @@ copy/paste (`TrackerCell[]` whole objects), `.dbx` save/load (patterns serialize
 
 ## GATE M–O — record, verify, release
 
-- [~] **M1** Performance recording with intention/target/gesture metadata, additive only —
+- [x] **M1** Performance recording with intention/target/gesture metadata, additive only —
       save/load compatibility preserved, replay reproduces the performance. Depends on F2.
       `src/lib/dub/performanceJournal.ts` + `performanceJournalBridge.ts`, exposed over MCP
       as `get_performance_journal` / `clear_performance_journal`.
@@ -577,9 +577,20 @@ copy/paste (`TrackerCell[]` whole objects), `.dbx` save/load (patterns serialize
       the forgiving parser, and only written when it has something in it — an empty
       journal in every project file is noise. `MIN_LOADABLE_SCHEMA` stays 21, because a
       purely additive field must never make an older project unloadable.
-      **Remaining for the tick:** the replay-reproduces check — proving a saved
-      performance plays back as the journal describes. The record, its format, its parser,
-      its read path and its persistence are done.
+      **Replay-reproduces CLOSED 2026-09-18, commit `659f62851`.** `journalReplay.ts`
+      compares what a replay fires against what the journal claims, and names the
+      difference rather than returning a pass/fail: MISSING (described, not played),
+      UNEXPLAINED (played, nothing says why), MISPLACED (right move, wrong row — a nudged
+      lane). Row tolerance is half a row, because the journal records the row a move fired
+      on live while the lane stores it quantized; entries pair with their NEAREST unclaimed
+      fire so two throws on one channel in the same bar do not collapse into one.
+      `firesFromLane` reads a lane WITHOUT firing it, so asking during a take makes no
+      sound — and that shortcut is licensed by tests that drive the real `DubLanePlayer`
+      over the same lanes and assert both produce the same list, out-of-order and disabled
+      cases included. Exposed as `verify_performance_journal`.
+      **Found while wiring it:** `get_performance_journal` and `clear_performance_journal`
+      had handlers and bridge routes but were never declared by the MCP server, so neither
+      was reachable from outside. Both are declared now. 22 tests.
 - [x] **N1** Deterministic offline performance simulator (project, BPM, metre, phrase length,
       persona, seed, duration → bar-by-bar decision log). Primary tuning environment.
       `src/lib/dub/simulator.ts`, driving `src/lib/dub/performanceCycle.ts` — the decision
