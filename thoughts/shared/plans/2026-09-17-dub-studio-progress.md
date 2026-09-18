@@ -12,7 +12,7 @@ analysis: thoughts/shared/plans/2026-09-17-dub-studio-gap-reconciliation.md
 Durable todo list. Survives compaction, crashes, `/clear`. **Re-read this before trusting
 recollection or any earlier summary in a conversation.**
 
-Running count: **29 of 51 done.**
+Running count: **30 of 51 done.**
 
 **The denominator was wrong until 2026-09-18.** The header said "of 36" from the day this file
 was written and was never updated as sub-items (F1a, F1c, F2a-F2e, T1-T3, the X series) were
@@ -31,7 +31,7 @@ recount — do not trust this sentence either.
 | E — intention + REST | **closed** | E1, E2, E3 |
 | F — gesture engine | partial | F4: shapes + lifecycle shipped; param-automation shapes need a move update API |
 | G — wet energy | **closed** | G1 |
-| H-L — musical behaviour | H1, K1-K4, L1, L2 done | I1, J1, AE1 |
+| H-L — musical behaviour | H1, I1, K1-K4, L1, L2 done | J1, AE1 |
 | M-O — record, verify, release | open | M1, N1-N4, O1, O2 |
 | X — user-reported open threads | 1 of 11 | X1 closed |
 
@@ -386,8 +386,24 @@ copy/paste (`TrackerCell[]` whole objects), `.dbx` save/load (patterns serialize
       context — which closes C2's loop into D. Confidence is respected throughout:
       `axisOr` falls back rather than guessing, so "probably percussion" never steers a
       move. 18 tests in `test:ci`.
-- [ ] **I1** Arrangement intelligence: `arrangementImportance` → `dropBehavior`; version drop
+- [x] **I1** Arrangement intelligence: `arrangementImportance` → `dropBehavior`; version drop
       protects foundation, supports throw-then-mute, arrangement-aware restoration (Gate I).
+      `src/lib/dub/arrangementIntelligence.ts` (`planDrop`) + a rewritten `versionDrop`.
+      Three audible faults in the old move, all from treating role as importance:
+      a pad nobody could hear and the hook the tune rests on were dropped alike;
+      everything left at once, making the drop a cut rather than a dub; and everything
+      returned at once, which is the same fault in reverse.
+      Now: the riddim is protected (foundation, sub register, bass, and a groove the
+      arrangement leans on — a drop drops INTO the groove); audible parts get
+      THROW-THEN-MUTE, into the echo first so the tail carries them out and the listener
+      hears the part leave instead of vanishing; quiet parts simply go. The mix thins from
+      the edges inward, and returns most-important-first so the riddim re-forms under the
+      melody. A channel the USER had muted is theirs and never comes back on release.
+      `planDrop` reports every channel including the protected ones, so "nothing to drop"
+      is distinguishable from "everything is protected" — those want different behaviour.
+      Profiles now live in `src/engine/dub/channelProfiles.ts`, shared by the performer's
+      targeting and the moves: two copies of "what is this channel" would eventually
+      disagree. 12 tests.
 - [ ] **J1** Consequence model: `targetAudibility` / `contrast` / `masking` / `wetEnergyChange` /
       `feedbackChange` / `structuralImpact` feeding the next decision (Gate J).
 - [x] **K1** Personas as behavioural profiles — activity / depth / risk / restraint, anticipation,

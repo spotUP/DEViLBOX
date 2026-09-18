@@ -1,14 +1,23 @@
 /**
- * versionDrop — hold all melodic channels silent, leave percussion + bass.
+ * versionDrop — "just the riddim": take the arrangement away, leave the pulse.
  *
- * The defining dub technique: "just the riddim." Mutes every channel whose
- * detected role is lead / chord / arpeggio / pad / skank, leaving drums and
- * bass untouched so the dub bus echo + spring tail plays over the raw rhythm.
+ * Gate I. This used to mute every channel whose legacy role was melodic and
+ * unmute them all together on release. Three things were wrong with that, and
+ * all three were audible:
  *
- * Uses the same classifySongRoles() call AutoDub uses (cached on the pattern
- * set, O(1) on repeated calls). User dubRole overrides in the mixer are
- * respected. If no role data is available (no patterns loaded), fires as a
- * graceful no-op — no channels muted.
+ *  1. Role is not importance. A pad nobody can hear and the hook the tune
+ *     rests on were treated the same.
+ *  2. Everything left at once, so the drop was a cut rather than a dub. The
+ *     classic move is throw-then-mute: the channel goes into the echo FIRST,
+ *     then mutes, and the tail carries the part out of the mix — the listener
+ *     hears it leave instead of vanishing.
+ *  3. Everything came back at once too. Restoring most-important-first lets
+ *     the riddim re-form under the melody rather than the mix reappearing like
+ *     a switch being flipped.
+ *
+ * The plan comes from `planDrop`, which reads the same channel profiles the
+ * performer's targeting uses, so what a drop considers expendable and what a
+ * throw considers worth aiming at cannot disagree.
  */
 
 import type { DubMove } from './_types';
@@ -19,50 +28,72 @@ import {
   endDubTransient,
 } from '@/lib/dub/dubChannelTransient';
 import { useTrackerStore } from '@/stores/useTrackerStore';
-import { useInstrumentStore } from '@/stores/useInstrumentStore';
-import { classifySongRoles } from '@/bridge/analysis/ChannelNaming';
-import type { InstrumentConfig } from '@/types/instrument';
-import type { ChannelRole } from '@/bridge/analysis/MusicAnalysis';
+import { useTransportStore } from '@/stores/useTransportStore';
+import { getChannelProfiles } from '../channelProfiles';
+import {
+  planDrop,
+  droppedChannels,
+  restoreDelayMs,
+  type ChannelDropPlan,
+} from '@/lib/dub/arrangementIntelligence';
+import { computeMusicalPosition } from '@/lib/dub/musicalClock';
 
-const MELODIC_ROLES = new Set<ChannelRole>(['lead', 'chord', 'arpeggio', 'pad', 'skank']);
+/** How long the echo gets the channel before the mute lands, in ms. */
+const THROW_LEAD_MS = 90;
+/** Gap between channels returning. */
+const RESTORE_STEP_MS = 180;
+const RESTORE_MAX_MS = 700;
 
 export const versionDrop: DubMove = {
   id: 'versionDrop',
   kind: 'hold',
   defaults: {},
 
-  execute(_ctx) {
+  execute({ bus }) {
     const mixer = useMixerStore.getState();
     const tracker = useTrackerStore.getState();
-    const patterns = tracker.patterns;
+    const transport = useTransportStore.getState();
 
-    // Resolve roles — fall back to empty if no song is loaded
-    let roles: ChannelRole[] = [];
-    if (Array.isArray(patterns) && patterns.length > 0) {
-      const insts = useInstrumentStore.getState().instruments;
-      const lookup = new Map<number, InstrumentConfig>();
-      for (const inst of insts) {
-        if (inst && typeof inst.id === 'number') lookup.set(inst.id, inst);
+    const pattern = tracker.patterns?.[tracker.currentPatternIndex ?? 0] ?? null;
+    if (!pattern?.channels?.length) return { dispose() {} };
+
+    const grid = computeMusicalPosition(
+      transport.currentGlobalRow ?? 0,
+      transport.speed || 6,
+    );
+    const profiles = getChannelProfiles(
+      pattern,
+      mixer.channels.map(c => c?.name ?? null),
+      grid.rowsPerBeat,
+      grid.rowsPerBar,
+    );
+
+    // A channel the user has already muted is theirs, not ours: it must not
+    // come back just because the drop released.
+    const alreadyMuted = new Set<number>();
+    mixer.channels.forEach((ch, i) => { if (ch?.muted) alreadyMuted.add(i); });
+
+    const plans = planDrop(profiles, { exclude: alreadyMuted });
+    const taking = droppedChannels(plans);
+    if (taking.length === 0) return { dispose() {} };
+
+    const timers: Array<ReturnType<typeof setTimeout>> = [];
+    const held: ChannelDropPlan[] = [];
+
+    for (const plan of taking) {
+      beginDubTransient(plan.channel);
+      held.push(plan);
+
+      if (plan.behavior === 'throwThenMute') {
+        // Into the echo first, then out of the mix: the tail carries it.
+        setDubTransient(plan.channel, { dubSend: 1.0 });
+        try { bus.modulateFeedback(0.15, THROW_LEAD_MS + 600); } catch { /* bus optional */ }
+        timers.push(setTimeout(() => {
+          setDubTransient(plan.channel, { muted: true });
+        }, THROW_LEAD_MS));
+      } else {
+        setDubTransient(plan.channel, { muted: true });
       }
-      roles = classifySongRoles(patterns, lookup);
-    }
-
-    // Mute every melodic channel; respect user dubRole overrides
-    // Every muted channel is a transient: the move never decides what the
-    // channel's resting mute is, it only borrows it (channelSendBaseline.ts).
-    const channels = mixer.channels;
-    const muted: number[] = [];
-
-    for (let i = 0; i < channels.length; i++) {
-      const ch = channels[i];
-      if (!ch) continue;
-      // User override beats offline classifier
-      const effectiveRole: ChannelRole = (ch.dubRole as ChannelRole | null) ?? roles[i] ?? 'empty';
-      if (!MELODIC_ROLES.has(effectiveRole)) continue;
-
-      beginDubTransient(i);
-      setDubTransient(i, { muted: true });
-      muted.push(i);
     }
 
     let released = false;
@@ -70,9 +101,20 @@ export const versionDrop: DubMove = {
       dispose() {
         if (released) return;
         released = true;
-        for (const i of muted) {
-          try { endDubTransient(i); } catch (err) {
-            console.error(`[versionDrop] RESTORE failed ch${i}:`, err);
+        for (const t of timers) clearTimeout(t);
+
+        // Most important first, staggered — the riddim re-forms under the
+        // melody instead of the whole mix snapping back.
+        for (const plan of held) {
+          const delay = restoreDelayMs(plan, RESTORE_STEP_MS, RESTORE_MAX_MS);
+          if (delay <= 0) {
+            endDubTransient(plan.channel);
+          } else {
+            setTimeout(() => {
+              try { endDubTransient(plan.channel); } catch (err) {
+                console.error(`[versionDrop] restore failed ch${plan.channel}:`, err);
+              }
+            }, delay);
           }
         }
       },
