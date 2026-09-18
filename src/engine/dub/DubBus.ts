@@ -53,6 +53,10 @@ import { useInstrumentStore } from '@/stores/useInstrumentStore';
 import { useNotificationStore } from '@/stores/useNotificationStore';
 import { resolveVinylLevel } from '@/lib/dub/vinylLevel';
 import { ChannelTapBaselines } from '@/lib/dub/channelTapBaseline';
+import { makeSoftClipCurve } from '@/lib/dub/softClipCurve';
+
+/** Where the master insert's safety clipper starts to saturate. */
+const MASTER_CLIP_THRESHOLD = 0.9;
 
 const DECK_IDS: DeckId[] = ['A', 'B', 'C'];
 
@@ -1242,6 +1246,22 @@ export class DubBus {
   private masterHpf!: BiquadFilterNode;       // full-mix HPF — swept by hpfRise so Rise is audible on dry mix
   private masterBassShelf!: BiquadFilterNode;
   private masterMidScoop!: BiquadFilterNode;
+  /**
+   * Input trim for the master insert, ahead of every boosting stage.
+   *
+   * The insert's tone controls only ever ADD level — the character presets
+   * ask for up to +9 dB of low shelf (Perry: bassShelfGainDb 2 + a
+   * masterBassPunchDb of 8) — and nothing compensated for it. The master
+   * safety limiter is a ratio-4 compressor at -1 dB, so a +9 dB over leaves
+   * it at +1.25 dB: above full scale, clipped at the destination. Reported
+   * 2026-09-18 as "the dub bus clipping and disting most of the time".
+   *
+   * Trimming here rather than at the tail means the shelf, the clipper and
+   * the biquads downstream never see the boosted level in the first place.
+   * The insert can now colour the mix but never raise its peak: punch is
+   * relative, and the master fader stays the thing that sets level.
+   */
+  private masterToneTrim!: GainNode;
   private masterLpf!: BiquadFilterNode;
   // Safety soft-clip between bass shelf and the rest of the master insert
   // chain. Prevents extreme low-shelf boosts (±18 dB at 200 Hz) from
@@ -1527,21 +1547,16 @@ export class DubBus {
     this.masterLpf.type = 'lowpass';
     this.masterLpf.frequency.value = 18000;
     this.masterLpf.Q.value = 0.707;
-    // Safety clipper — tanh curve that's effectively linear up to ±0.9
-    // and softly saturates beyond. Prevents extreme bass-shelf boosts
-    // (up to +18 dB) from producing overflow peaks that break downstream
-    // worklets.
+    // Safety clipper — transparent below ±0.9, soft knee above, ceiling 1.0.
+    // Prevents extreme bass-shelf boosts (up to +18 dB) from producing
+    // overflow peaks that break downstream worklets, WITHOUT colouring the
+    // mix on the way past: this node sees the whole signal, dry and wet,
+    // whenever the bus is enabled. The previous curve
+    // (`tanh(1.2x) / tanh(1.2)`) had a gain of 1.43 at 0.1 and 1.29 at 0.5,
+    // so it added ~3 dB of makeup plus third-harmonic distortion to
+    // everything and pushed the result into the master limiter.
     this.masterSafetyClip = this.context.createWaveShaper();
-    {
-      const n = 2048;
-      const curve = new Float32Array(n);
-      for (let i = 0; i < n; i++) {
-        const x = (i / (n - 1)) * 2 - 1;  // -1..1
-        // Gentle tanh: linear below ~0.8, smooth soft-clip above
-        curve[i] = Math.tanh(x * 1.2) / Math.tanh(1.2);
-      }
-      this.masterSafetyClip.curve = curve;
-    }
+    this.masterSafetyClip.curve = makeSoftClipCurve(8192, MASTER_CLIP_THRESHOLD);
     this.masterSafetyClip.oversample = '2x';
     // Master Chorus — two detuned delays (L/R) with slow LFOs, crossfaded
     // via masterChorusWet. Dry at 1.0 always; wet ramps in/out on toggle.
@@ -1645,7 +1660,12 @@ export class DubBus {
     this.vinylDirect = this.context.createGain();
     this.vinylDirect.gain.value = 1;
     this.masterHpf.connect(this.masterBassShelf);
-    this.masterInsertHead = this.masterHpf;
+    // Trim → hpf → shelf → clipper → …: the boost is paid for before it is
+    // applied, so no stage in the insert ever runs hot.
+    this.masterToneTrim = this.context.createGain();
+    this.masterToneTrim.gain.value = 1;
+    this.masterToneTrim.connect(this.masterHpf);
+    this.masterInsertHead = this.masterToneTrim;
     this.masterInsertEnvelope = this.context.createGain();
     this.masterInsertEnvelope.gain.value = 1;
     // Use native connect (not Tone.connect) for Tone→native boundary so the
@@ -3455,6 +3475,11 @@ export class DubBus {
     rampBiquadParam(this.masterBassShelf.frequency, merged.bassShelfFreqHz, now);
     rampBiquadParam(this.masterBassShelf.Q, merged.bassShelfQ, now);
     rampBiquadParam(this.masterBassShelf.gain, masterActive ? safeMasterShelfGain : 0, now);
+    // Pay for the boost before applying it. A +9 dB shelf with no trim put
+    // the mix 9 dB over the limiter's -1 dB threshold; at ratio 4 that still
+    // leaves +1.25 dB at the destination, which clips.
+    const trimDb = masterActive ? -Math.max(0, safeMasterShelfGain) : 0;
+    this.masterToneTrim.gain.setTargetAtTime(Math.pow(10, trimDb / 20), now, 0.02);
     rampBiquadParam(this.masterMidScoop.frequency, merged.midScoopFreqHz, now);
     rampBiquadParam(this.masterMidScoop.Q, merged.midScoopQ, now);
     rampBiquadParam(this.masterMidScoop.gain, masterActive ? merged.midScoopGainDb : 0, now);
@@ -3991,6 +4016,7 @@ export class DubBus {
     }, (FADE_SEC * 1000) + 5);
     // Reset master-side gains to neutral so even a dangling reference is silent.
     rampBiquadParam(this.masterBassShelf.gain, 0, now);
+    this.masterToneTrim.gain.setTargetAtTime(1, now, 0.02);
     rampBiquadParam(this.masterMidScoop.gain, 0, now);
     try {
       this.masterMid.gain.setTargetAtTime(1, now, 0.02);
