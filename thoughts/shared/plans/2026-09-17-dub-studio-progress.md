@@ -800,6 +800,16 @@ this bug.
       noiseBurst, and the siren (behind its own level gain rather than straight into the
       bus). 17 tests, including a contract test that no generated source is left on a raw
       full-scale clamp.
+      **Corrected the same day, from the user's ear:** "the sonar was not annoyingly high"
+      but the siren was still "at least twice as loud as everything else". The first pass
+      referenced EVERYTHING to the programme's PEAK, which is right for a transient and
+      wrong for a drone: loudness for anything continuous follows RMS, so a siren held at
+      0.75 of peak sits three to four times above the level the mix averages — exactly
+      what was reported. Sustained sources (siren, oscBass, subHarmonic, crushBass) now
+      reference the programme's RMS; transients keep the peak reference. `toast` is
+      deliberately in NEITHER table: it routes a live microphone and ducks the music while
+      it plays, so referencing it to a level its own ducking pushes down would be a
+      feedback loop.
 
 - [ ] **X10** **Dub bus clips and distorts most of the time.** Reported
       2026-09-18. Not yet investigated. Measure before touching anything:
