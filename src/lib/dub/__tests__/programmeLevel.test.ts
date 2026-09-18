@@ -26,27 +26,56 @@ describe('generatedPeakFor — referenced to the music, not to full scale', () =
     expect(peak).toBeGreaterThan(0.01);        // still audible
   });
 
-  it('keeps the musical ranking between generated moves', () => {
-    const scream = generatedPeakFor('tubbyScream', LOUD);
-    const siren = generatedPeakFor('siren', LOUD);
-    const ping = generatedPeakFor('sonarPing', LOUD);
-    expect(scream).toBeGreaterThan(siren);
-    expect(siren).toBeGreaterThan(ping);
+  it('keeps the musical ranking among transients', () => {
+    expect(generatedPeakFor('tubbyScream', LOUD))
+      .toBeGreaterThan(generatedPeakFor('sonarPing', LOUD));
   });
 
   it('keeps the low end more conservative than the mids', () => {
     expect(GENERATED_PRESENCE.subHarmonic).toBeLessThan(GENERATED_PRESENCE.siren);
   });
 
-  it('falls back to a modest fixed peak when nothing is playing', () => {
-    const peak = generatedPeakFor('siren', SILENT);
-    expect(peak).toBeCloseTo(SILENT_PROGRAMME_PEAK * GENERATED_PRESENCE.siren, 6);
-    expect(peak).toBeLessThan(0.3);
+  it('references a SUSTAINED source to RMS, not to peak', () => {
+    // The reported bug: a drone at 0.75 of the programme's PEAK sits three to
+    // four times above the level the mix averages. The siren must land near
+    // the programme's RMS instead.
+    const siren = generatedPeakFor('siren', LOUD);
+    expect(siren).toBeLessThan(LOUD.peak / 2);
+    expect(siren).toBeGreaterThan(LOUD.rms);          // still audible over it
+    expect(siren).toBeLessThan(LOUD.rms * 1.5);       // but only just
+  });
+
+  it('keeps a transient referenced to peak', () => {
+    expect(generatedPeakFor('sonarPing', LOUD)).toBeGreaterThan(LOUD.rms);
+    expect(generatedPeakFor('sonarPing', LOUD)).toBeCloseTo(LOUD.peak * 0.45, 6);
+  });
+
+  it('puts the siren well below where the peak reference put it', () => {
+    // What the first pass produced, for the record.
+    const oldBehaviour = LOUD.peak * 0.75;
+    expect(generatedPeakFor('siren', LOUD)).toBeLessThan(oldBehaviour / 2);
+  });
+
+  it('holds a sustained low end under the mix rather than over it', () => {
+    expect(generatedPeakFor('oscBass', LOUD)).toBeLessThan(LOUD.rms);
+  });
+
+  it('falls back to a modest fixed level when nothing is playing', () => {
+    // A transient falls back to the fixed peak; a sustained source falls back
+    // to the RMS that peak implies, so it stays quiet in the same proportion
+    // it would be against real music.
+    expect(generatedPeakFor('sonarPing', SILENT))
+      .toBeCloseTo(SILENT_PROGRAMME_PEAK * GENERATED_PRESENCE.sonarPing, 6);
+    const siren = generatedPeakFor('siren', SILENT);
+    expect(siren).toBeLessThan(0.1);
+    expect(siren).toBeGreaterThan(0.01);
   });
 
   it('treats a programme reading of near-silence as silence', () => {
     const almost: ProgrammeLevel = { rms: 0.001, peak: 0.002, valid: true };
     expect(generatedPeakFor('siren', almost)).toBeCloseTo(generatedPeakFor('siren', SILENT), 6);
+    expect(generatedPeakFor('sonarPing', almost))
+      .toBeCloseTo(generatedPeakFor('sonarPing', SILENT), 6);
   });
 
   it('scales the caller intent instead of being replaced by it', () => {

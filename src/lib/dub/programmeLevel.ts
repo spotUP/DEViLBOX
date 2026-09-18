@@ -32,28 +32,59 @@ export interface ProgrammeLevel {
 }
 
 /**
- * Peak level a generated sound should reach, as a fraction of the programme's
- * own peak.
+ * How loud a generated sound should be, relative to the programme.
  *
- * Not of full scale, and not of the programme's RMS: a listener judges "as
- * loud as the music" against what the music PEAKS at, and the crest factor of
- * a tracker mix (roughly 12 dB) means anything referenced to RMS lands about
- * four times too loud.
+ * WHICH reference depends on whether the sound is a transient or sustained,
+ * and getting that wrong is audible: a first pass referenced everything to the
+ * programme's PEAK, and the sonar ping came out right while the siren was
+ * still reported as "at least twice as loud as everything else".
+ *
+ * The ping is right because a transient is judged against peaks — it lands in
+ * the same instant as a hit, and the ear compares it with that hit. A siren is
+ * a continuous tone, and loudness for anything continuous follows RMS: a drone
+ * held at 0.75 of the programme's PEAK sits three or four times above the
+ * level the mix actually averages, which is precisely what it sounded like.
+ *
+ * So sustained sources reference the programme's RMS and transient ones its
+ * peak. The numbers below are relative presence within whichever reference
+ * applies, not across the two.
  */
+/**
+ * Generated sources that HOLD. These reference the programme's RMS.
+ *
+ * The test is whether the sound is still going a second later, not whether the
+ * move is a `hold` kind: a `subSwell` is a hold that swells and decays like a
+ * hit, while the siren simply keeps sounding.
+ */
+/**
+ * NOT here, deliberately: `toast`. It routes a live MICROPHONE rather than
+ * generating a tone, and it ducks the music while it plays — so referencing it
+ * to a programme level that its own ducking is pushing down would be a
+ * feedback loop, with the mic fading as the duck deepened. Mic gain stays the
+ * user's to set.
+ */
+export const SUSTAINED_SOURCES: ReadonlySet<string> = new Set([
+  'siren',
+  'oscBass',
+  'subHarmonic',
+  'crushBass',
+]);
+
 export const GENERATED_PRESENCE: Readonly<Record<string, number>> = {
-  /** Sits on top of the mix, unmistakably — but not over it. */
-  siren: 0.75,
+  /** Sustained: relative to programme RMS. Just above the mix's own average
+   *  level — present and unmistakable, not dominating. */
+  siren: 1.15,
   /** A marker, not an event. */
   sonarPing: 0.45,
-  /** A voice: present, conversational. */
-  toast: 0.6,
   /** A shriek — the loudest thing here by design, still bounded. */
   tubbyScream: 0.8,
   /** Felt more than heard; the low end has the least headroom. */
   subSwell: 0.5,
-  subHarmonic: 0.4,
-  oscBass: 0.4,
-  crushBass: 0.4,
+  /** Sustained low end — referenced to RMS, and kept under it: the low end
+   *  has the least headroom and is felt as much as heard. */
+  subHarmonic: 0.8,
+  oscBass: 0.8,
+  crushBass: 0.8,
   /** Rises into the mix rather than over it. */
   radioRiser: 0.55,
   noiseBurst: 0.5,
@@ -74,6 +105,14 @@ export const SILENT_PROGRAMME_PEAK = 0.25;
 const SILENCE_THRESHOLD = 0.005;
 
 /**
+ * RMS as a fraction of peak for typical programme material — about -12 dB.
+ *
+ * Only used for the silent fallback, so a sustained source with nothing to
+ * reference is quiet in the same proportion it would be against real music.
+ */
+const TYPICAL_CREST_RATIO = 0.25;
+
+/**
  * Peak gain for a generated sound.
  *
  * `intent` is the caller's musical level, 0..1, where 1 means "as loud as this
@@ -87,9 +126,12 @@ export function generatedPeakFor(
   intent = 1,
 ): number {
   const presence = GENERATED_PRESENCE[moveId] ?? 0.5;
-  const reference = programme.valid && programme.peak > SILENCE_THRESHOLD
-    ? programme.peak
+  const sustained = SUSTAINED_SOURCES.has(moveId);
+  const measured = sustained ? programme.rms : programme.peak;
+  const fallback = sustained
+    ? SILENT_PROGRAMME_PEAK * TYPICAL_CREST_RATIO
     : SILENT_PROGRAMME_PEAK;
+  const reference = programme.valid && measured > SILENCE_THRESHOLD ? measured : fallback;
   const scaled = reference * presence * clamp01(intent);
   // Never silent enough to be a no-op, never loud enough to clip on its own.
   return Math.max(0.01, Math.min(0.95, scaled));
