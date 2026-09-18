@@ -53,11 +53,22 @@ export const DUB_MOVE_TABLE: readonly string[] = [
   'ghostReverb',         // 34
   'voltageStarve',       // 35
   'ringMod',             // 36
+  // Appended 2026-09-18 (plan F2). All seven were already live registry moves
+  // with their own modules — they simply had no table index, so they could not
+  // be written into a cell and `encodeDubEffect` returned null for them.
+  // Reachable only because slot pair 41/42 now covers indices 32-47.
+  'hpfRise',             // 37
+  'madProfPingPong',     // 38
+  'combSweep',           // 39
+  'versionDrop',         // 40
+  'skankEchoThrow',      // 41
+  'riddimSection',       // 42
+  'skankFloatThrow',     // 43
 ];
 
 /** Ratchet: tests assert `DUB_MOVE_TABLE.length === DUB_MOVE_TABLE_VERSION`
  *  so any append forces a one-line bump here — a cheap review signal. */
-export const DUB_MOVE_TABLE_VERSION = 37;
+export const DUB_MOVE_TABLE_VERSION = 44;
 
 /**
  * Dub effect-command slots. Picked at 36-38 to sit BEYOND the existing
@@ -85,6 +96,18 @@ export const DUB_EFFECT_PERCHANNEL   = 37;
 export const DUB_EFFECT_PARAM_STEP   = 38;
 export const DUB_EFFECT_GLOBAL_X     = 39;
 export const DUB_EFFECT_PERCHANNEL_X = 40;
+/** Third slot pair, added 2026-09-18 (plan F2). Covers move indices 32-47:
+ *  high nibble = (move index - 32). Declared because the table had grown past
+ *  32 entries, leaving moves 32+ live in the registry but impossible to write
+ *  into a cell. Effect-type space checked before claiming these: 41-47 were
+ *  free, OPL starts at 48 (0x30), SunTronic at 64 (0x40), Sonix at 96 (0x60). */
+export const DUB_EFFECT_GLOBAL_X2     = 41;
+export const DUB_EFFECT_PERCHANNEL_X2 = 42;
+
+/** Moves addressable per slot pair: the high nibble is 4 bits. */
+export const DUB_MOVES_PER_SLOT_PAIR = 16;
+/** Ceiling on encodable move indices — three declared pairs × 16. */
+export const DUB_MAX_ENCODABLE_MOVES = 3 * DUB_MOVES_PER_SLOT_PAIR; // 48
 
 /**
  * Inclusive effTyp range reserved for dub slots. Display paths render every
@@ -98,7 +121,7 @@ export const DUB_EFFECT_PERCHANNEL_X = 40;
  * when a slot pair is declared, never at a call site.
  */
 export const DUB_EFFECT_TYPE_MIN = DUB_EFFECT_GLOBAL;        // 36
-export const DUB_EFFECT_TYPE_MAX = DUB_EFFECT_PERCHANNEL_X;  // 40
+export const DUB_EFFECT_TYPE_MAX = DUB_EFFECT_PERCHANNEL_X2; // 42
 
 /** True for any effTyp that a pattern display should render as `Zxx`. */
 export function isDubEffectTypeForDisplay(effTyp: number): boolean {
@@ -110,7 +133,9 @@ export function isDubMoveEffectSlot(effTyp: number): boolean {
   return effTyp === DUB_EFFECT_GLOBAL
       || effTyp === DUB_EFFECT_PERCHANNEL
       || effTyp === DUB_EFFECT_GLOBAL_X
-      || effTyp === DUB_EFFECT_PERCHANNEL_X;
+      || effTyp === DUB_EFFECT_PERCHANNEL_X
+      || effTyp === DUB_EFFECT_GLOBAL_X2
+      || effTyp === DUB_EFFECT_PERCHANNEL_X2;
 }
 
 /**
@@ -134,6 +159,8 @@ export function decodeDubEffect(effTyp: number, eff: number): {
     case DUB_EFFECT_PERCHANNEL:   moveIdx = nibble;       perChannel = true;  break;
     case DUB_EFFECT_GLOBAL_X:     moveIdx = nibble + 16;  perChannel = false; break;
     case DUB_EFFECT_PERCHANNEL_X: moveIdx = nibble + 16;  perChannel = true;  break;
+    case DUB_EFFECT_GLOBAL_X2:     moveIdx = nibble + 32; perChannel = false; break;
+    case DUB_EFFECT_PERCHANNEL_X2: moveIdx = nibble + 32; perChannel = true;  break;
     default: return null;
   }
   if (moveIdx >= DUB_MOVE_TABLE.length) return null;
@@ -152,18 +179,21 @@ export function encodeDubEffect(
   channelId?: number,
 ): { effTyp: number; eff: number } | null {
   const moveIdx = DUB_MOVE_TABLE.indexOf(moveId);
-  if (moveIdx < 0 || moveIdx >= 32) return null;
-  const isExtended = moveIdx >= 16;
-  const nibble = moveIdx & 0x0f;
+  if (moveIdx < 0 || moveIdx >= DUB_MAX_ENCODABLE_MOVES) return null;
+  // Which declared pair covers this index: 0 → 36/37, 1 → 39/40, 2 → 41/42.
+  const pair = Math.floor(moveIdx / DUB_MOVES_PER_SLOT_PAIR);
+  const nibble = moveIdx % DUB_MOVES_PER_SLOT_PAIR;
+  const GLOBAL_SLOTS     = [DUB_EFFECT_GLOBAL, DUB_EFFECT_GLOBAL_X, DUB_EFFECT_GLOBAL_X2];
+  const PERCHANNEL_SLOTS = [DUB_EFFECT_PERCHANNEL, DUB_EFFECT_PERCHANNEL_X, DUB_EFFECT_PERCHANNEL_X2];
   if (channelId !== undefined) {
     if (channelId < 0 || channelId > 15) return null;
     return {
-      effTyp: isExtended ? DUB_EFFECT_PERCHANNEL_X : DUB_EFFECT_PERCHANNEL,
+      effTyp: PERCHANNEL_SLOTS[pair],
       eff: (nibble << 4) | (channelId & 0x0f),
     };
   }
   return {
-    effTyp: isExtended ? DUB_EFFECT_GLOBAL_X : DUB_EFFECT_GLOBAL,
+    effTyp: GLOBAL_SLOTS[pair],
     eff: nibble << 4,
   };
 }

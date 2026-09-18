@@ -12,7 +12,8 @@ analysis: thoughts/shared/plans/2026-09-17-dub-studio-gap-reconciliation.md
 Durable todo list. Survives compaction, crashes, `/clear`. **Re-read this before trusting
 recollection or any earlier summary in a conversation.**
 
-Running count: **5 of 36 done** (Gate A closed; F1/F1a/F1c shipped 2026-09-17, F2c 2026-09-18).
+Running count: **12 of 36 done** (Gate A closed; F1/F1a/F1c shipped 2026-09-17; F2c and the whole F2 chunk 2026-09-18).
+Pre-work is complete except F3 — Gate B (MusicalClock) is next.
 
 **Reconciled against the code 2026-09-18** — the ledger had drifted: F1, F1a and F1c were
 implemented the same night the plan was written but never ticked. Verify before trusting a count.
@@ -145,13 +146,21 @@ copy/paste (`TrackerCell[]` whole objects), `.dbx` save/load (patterns serialize
       rather than building dry reduction into the move. No new mechanism.
 - [ ] **T1** Regression: `skankEchoThrow`'s principal repeat lands at beat+0.75, `skankFloatThrow`
       at beat+1.5. Must fail before the fix.
-- [ ] **F2** Add slot pair 41/42 (`DUB_EFFECT_GLOBAL_X2` / `_PERCHANNEL_X2`); append `hpfRise`,
+- [x] **F2** DONE 2026-09-18. Slot pair 41/42 declared, seven moves appended (indices 37-43),
+      guard raised to `DUB_MAX_ENCODABLE_MOVES` (48), version 37 -> 44. Both grid renderers
+      extended and their glyph arrays resized (they were `new Array(41)`, so 41/42 would have
+      landed past the end). Original item text: Add slot pair 41/42 (`DUB_EFFECT_GLOBAL_X2` / `_PERCHANNEL_X2`); append `hpfRise`,
       `madProfPingPong`, `combSweep`, `versionDrop`, `skankEchoThrow`, `riddimSection`,
       `skankFloatThrow` to `DUB_MOVE_TABLE`; raise `encodeDubEffect`'s guard 32 -> 48; bump
       `DUB_MOVE_TABLE_VERSION`. **Append only, never reorder** — index is the on-disk contract.
-- [ ] **F2a** Extend `DubEffectScanner` range (`DUB_EFFECT_MAX` 40 -> 42). **Independent limit —
+- [x] **F2a** DONE 2026-09-18 — and removed as a separate limit: the scanner now sources the
+      range from `isDubEffectTypeForDisplay`, so it cannot lag a slot declaration again.
+      Original item text: Extend `DubEffectScanner` range (`DUB_EFFECT_MAX` 40 -> 42). **Independent limit —
       new slots do not fire until this changes.**
-- [ ] **F2b** Scanner only reads `effTyp` and `effTyp2`, but `TrackerCell` carries `effTyp3`..
+- [x] **F2b** DECIDED + DONE 2026-09-18: **scan all eight columns.** The premise in the item was
+      wrong — `TrackerReplayer` DOES dispatch effTyp2..effTyp8 for ordinary effects, so a dub cell
+      in column 3 rendered as Zxx, sat in a column the replayer honours, and silently never fired.
+      Consistency with the replayer wins. Original item text: Scanner only reads `effTyp` and `effTyp2`, but `TrackerCell` carries `effTyp3`..
       `effTyp8`. A dub effect authored in columns 3-8 never fires. Decide: scan all 8, or document
       columns 1-2 as the supported surface.
 - [x] **F2c** **Live display bug, pre-existing:** FIXED 2026-09-18. `xmEffectToString` covered
@@ -163,13 +172,21 @@ copy/paste (`TrackerCell[]` whole objects), `.dbx` save/load (patterns serialize
       declared range, so the next slot pair is covered automatically; 3 of 8 assertions fail on
       the old literal. **Still open for F2:** the two grid renderers hardcode 36-40 in their own
       `EFFECT_CHARS` arrays and need 41/42 appended when the slot pair lands.
-- [ ] **F2d** `.xm` export silently drops every dub cell — `XMExporter` reads the legacy
+- [x] **F2d** DONE 2026-09-18 — documented in the manual's dub-slot section (correct behaviour,
+      XM has no dub slot; save `.dbx` to keep moves). Original item text: `.xm` export silently drops every dub cell — `XMExporter` reads the legacy
       `cell.effect` string field, never `effTyp`. Correct behaviour (XM has no dub slot) but
       undocumented. Document it; do not "fix" it.
-- [ ] **F2e** Manual documentation is stale: `data/manualChapters.ts` still describes slots as
+- [x] **F2e** DONE 2026-09-18 — slot table now lists 36-42 with the three pairs, the false
+      "moves 16+ cannot be encoded" paragraph is replaced, and Prince Jammy is `jammy` not
+      `gatedFlanger`. The 33/34/35 mention is kept: it is accurate history explaining the move.
+      Original item text: Manual documentation is stale: `data/manualChapters.ts` still describes slots as
       33/34/35, claims moves 16+ "cannot be encoded", and lists Prince Jammy's voicing as
       `gatedFlanger`. Update to 36-42, 43+1 moves, `jammy`.
-- [ ] **T2** Round-trip every move: encode -> decode -> same moveId + channel; append-only ratchet
+- [x] **T2** DONE 2026-09-18 — `dubMoveTableSlots.test.ts` (13) round-trips every move global and
+      per-channel, freezes the 37-entry historical prefix, asserts no duplicates/collisions, and
+      checks every display path covers the declared range; `dubEffectScannerColumns.test.ts` (8)
+      drives the real scanner per column. 4 and 3 assertions respectively fail on the old code.
+      Both wired into test:ci. Original item text: Round-trip every move: encode -> decode -> same moveId + channel; append-only ratchet
       (`DUB_MOVE_TABLE.length === DUB_MOVE_TABLE_VERSION`); and a save/load/replay regression
       covering all seven newly-encodable moves. **Gate M does not close until this passes.**
 - [ ] **F3** Label persona parameter values with evidence level (L1/L2/L3) in `types/dub.ts`
