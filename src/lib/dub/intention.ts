@@ -39,6 +39,13 @@ export interface IntentionDecision {
   target: IntentionTarget;
   reason: string;
   /**
+   * Absolute row of the event this intention is aimed at, when it is aimed at
+   * one. Gate E3's machine waits for it instead of firing on the tick that
+   * happened to notice — a tick is up to 250 ms wide, which at 140 BPM is most
+   * of an eighth note away from the hit it meant to mark.
+   */
+  targetRow?: number;
+  /**
    * Bars this decision is committed for. REST uses it to stay silent across a
    * span instead of re-deciding every 250 ms tick; the others are free to be
    * revisited next tick.
@@ -196,6 +203,7 @@ export class IntentionPlanner {
         { kind: 'channel', channelId: accent.channel, reason: 'strong onset approaching' },
         `onset on channel ${accent.channel} in ${(accent.row - ctx.row).toFixed(2)} rows`,
         1,
+        accent.row,
       );
     }
 
@@ -296,6 +304,7 @@ function decision(
   target: IntentionTarget,
   reason: string,
   holdBars: number,
+  targetRow?: number,
 ): IntentionDecision {
-  return { intention, target, reason, holdBars: Math.max(1, holdBars) };
+  return { intention, target, reason, holdBars: Math.max(1, holdBars), targetRow };
 }
