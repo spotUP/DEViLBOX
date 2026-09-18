@@ -56,6 +56,12 @@ import {
   activeGestures,
 } from './GestureEngine';
 import {
+  EnergyLedger,
+  DEFAULT_ENERGY_BUDGET,
+  scaleBudget,
+  type EnergyBudget,
+} from '@/lib/dub/moveEnergy';
+import {
   buildPerformanceContext,
   readWetEnergy,
   type ArrangementSnapshot,
@@ -760,6 +766,9 @@ export interface AutoDubTickCtx {
   /** Channel the intention is aimed at, when it named one. Role-targeted
    *  rules prefer it over a random pick from their matching channels. */
   intentionChannel?: number;
+  /** Gate G: may this move be added to what is already in the air? Undefined
+   *  leaves the pre-Gate-G behaviour (the `wet` flag and its bar counter). */
+  admitsMove?: (moveId: string) => boolean;
 }
 
 export interface AutoDubChoice {
@@ -826,6 +835,10 @@ export function chooseMove(ctx: AutoDubTickCtx, rng: () => number): AutoDubChoic
     // drive the rule engine directly) every move stays eligible and the
     // behaviour is the pre-Gate-E one.
     if (ctx.intention && !moveServes(rule.moveId, ctx.intention)) continue;
+    // Gate G: energy accounting replaces the wet flag's blunt one-per-bar
+    // rationing. A cheap move may still layer over a cheap one; a wash on top
+    // of a wash is refused on the axis that refused it.
+    if (ctx.admitsMove && !ctx.admitsMove(rule.moveId)) continue;
     if (shouldSuppressAutoDubSparseDrop(rule.moveId, ctx.channelCount)) continue;
     if (shouldSuppressAutoDubStartupMove(rule.moveId, ctx.bar)) continue;
     // Per-bar wet cap: once a wet move has fired this bar, skip every
@@ -1024,6 +1037,19 @@ const ALL_CHANNELS: readonly number[] = Object.freeze(
  * memory it reads — a second planner would keep its own rest commitments and
  * the two would take turns resting.
  */
+/**
+ * Gate G: what the performer has put in the air, with decay. Replaces the
+ * `wet: true` boolean plus one-fire-per-bar counter as the thing that decides
+ * whether another move may layer — a flag could not tell a sonarPing from a
+ * springSlam, so it rationed the cheap move like the expensive one.
+ */
+const _energyLedger = new EnergyLedger();
+
+/** Live energy reading, for MCP diagnostics and the fire log. */
+export function getAutoDubEnergy(): ReturnType<EnergyLedger['read']> {
+  return _energyLedger.read(performance.now() / 1000);
+}
+
 const _intentionPlanner = new IntentionPlanner();
 /** Gate E3: where the performer is in a gesture. One machine, all personas. */
 let _performanceState: PerformanceState = 'LISTEN';
@@ -1547,8 +1573,17 @@ function tickImpl(): void {
     return;
   }
 
+  // Gate G: the ledger decides what may layer, from what is actually in the
+  // air. Personas scale the budget; none of them scale the hard ceiling.
+  const nowSec = performance.now() / 1000;
+  const budget: EnergyBudget = scaleBudget(
+    DEFAULT_ENERGY_BUDGET,
+    persona.budgetCap !== undefined ? Math.max(0.5, persona.budgetCap / 2) : 1,
+  );
+
   const choice = chooseMove({
     bar, barPos, isNewBar,
+    admitsMove: (moveId: string) => _energyLedger.admits(moveId, nowSec, budget).ok,
     intention: decision.intention,
     intentionChannel: decision.target.kind === 'channel' ? decision.target.channelId : undefined,
     intensity: dub.autoDubIntensity,
@@ -1598,7 +1633,13 @@ function tickImpl(): void {
     holdMs: holdMsForGesture,
     bpm,
     source: 'live',
-    onEnd: (_g, reason) => {
+    onStart: g => {
+      // Gate G: what this move puts in the air starts counting when it starts,
+      // and starts decaying when it is released — not when a bar turns over.
+      _energyLedger.add(g.id, choice.moveId, performance.now() / 1000, holdMsForGesture > 0);
+    },
+    onEnd: (g, reason) => {
+      _energyLedger.release(g.id, performance.now() / 1000);
       if (choice.moveId === 'riddimSection') _inRiddimSection = false;
       if (holdMsForGesture <= 0) return;   // one-shots have nothing to report
       console.log(`[AutoDub] ◀ RELEASE ${choice.moveId}${chStrForLog} (${reason})`);
@@ -1701,6 +1742,7 @@ export function stopAutoDub(): void {
   }
   _inRiddimSection = false;
   cancelAllGestures('stopped');
+  _energyLedger.clear();
   // Gate D: nothing is in flight once the disposers have run, and the open
   // phrase is over. History of what was played survives — that is the part
   // the next session's decisions are allowed to learn from.
