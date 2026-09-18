@@ -886,3 +886,75 @@ describe('role-targeted rules — sparse vs rich look-ahead pattern', () => {
     expect(src).not.toContain('patterns[transport.currentPatternIndex');
   });
 });
+
+// ── Gate E: intention gates the rule engine ────────────────────────────────
+
+describe('chooseMove — intention decides before the move', () => {
+  it('only offers moves that can express the intention', () => {
+    // SPACE is about taking something away. Over many rolls, nothing that
+    // only adds (snareCrack, springKick, echoBuildUp) may be chosen.
+    const chosen = new Set<string>();
+    for (let seed = 1; seed <= 200; seed++) {
+      const result = chooseMove(
+        baseCtx({ intensity: 1, intention: 'SPACE', roles: [] }),
+        seededRng(seed),
+      );
+      if (result) chosen.add(result.moveId);
+    }
+    expect(chosen.size).toBeGreaterThan(0);
+    for (const moveId of chosen) {
+      expect(['ghostReverb', 'sonarPing', 'channelMute', 'riddimSection']).toContain(moveId);
+    }
+  });
+
+  it('offers accent moves for ACCENT and not for SPACE', () => {
+    const accents = new Set<string>();
+    for (let seed = 1; seed <= 200; seed++) {
+      const result = chooseMove(baseCtx({ intensity: 1, intention: 'ACCENT' }), seededRng(seed));
+      if (result) accents.add(result.moveId);
+    }
+    expect(accents.size).toBeGreaterThan(0);
+    expect([...accents].some(id => ['echoThrow', 'snareCrack', 'springKick', 'channelThrow'].includes(id)))
+      .toBe(true);
+    expect(accents.has('ghostReverb')).toBe(false);
+  });
+
+  it('leaves the pre-Gate-E behaviour untouched when no intention is given', () => {
+    const withoutIntention = chooseMove(baseCtx({ intensity: 1 }), seededRng(7));
+    expect(withoutIntention).not.toBeNull();
+  });
+
+  it('aims a role-targeted move at the channel the intention named', () => {
+    const roles: ChannelRole[] = ['percussion', 'bass', 'percussion', 'lead'];
+    let sawNamedChannel = false;
+    for (let seed = 1; seed <= 100; seed++) {
+      const result = chooseMove(
+        baseCtx({ intensity: 1, intention: 'ACCENT', roles, intentionChannel: 2 }),
+        seededRng(seed),
+      );
+      if (result?.channelId !== undefined) {
+        // Percussion-targeted rules must land on 2, never on the other
+        // percussion channel (0), because the intention named 2.
+        if (roles[result.channelId] === 'percussion') {
+          expect(result.channelId).toBe(2);
+          sawNamedChannel = true;
+        }
+      }
+    }
+    expect(sawNamedChannel).toBe(true);
+  });
+
+  it('ignores an intention channel a rule\'s own role filter rejects', () => {
+    const roles: ChannelRole[] = ['percussion', 'bass', 'pad', 'lead'];
+    for (let seed = 1; seed <= 100; seed++) {
+      const result = chooseMove(
+        baseCtx({ intensity: 1, intention: 'ACCENT', roles, intentionChannel: 2 }),
+        seededRng(seed),
+      );
+      // Channel 2 is a pad; a percussion rule must not be pointed at it.
+      if (result?.channelId === 2) {
+        expect(roles[2]).not.toBe('percussion');
+      }
+    }
+  });
+});

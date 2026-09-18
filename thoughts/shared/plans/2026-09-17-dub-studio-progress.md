@@ -12,7 +12,7 @@ analysis: thoughts/shared/plans/2026-09-17-dub-studio-gap-reconciliation.md
 Durable todo list. Survives compaction, crashes, `/clear`. **Re-read this before trusting
 recollection or any earlier summary in a conversation.**
 
-Running count: **18 of 51 done.**
+Running count: **20 of 51 done.**
 
 **The denominator was wrong until 2026-09-18.** The header said "of 36" from the day this file
 was written and was never updated as sub-items (F1a, F1c, F2a-F2e, T1-T3, the X series) were
@@ -28,7 +28,7 @@ recount — do not trust this sentence either.
 | B — musical clock | **closed** | B1, T3 |
 | C — event model | **closed** | C1, C2, C3. DJ adapter for C1 deliberately not written |
 | D — performance context | **closed** | D1 |
-| E — intention + REST | open | E1, E2, E3 |
+| E — intention + REST | E1, E2 done | E3 (state machine) open |
 | F — gesture engine | open | F4 |
 | G — wet energy | open | G1 |
 | H-L — musical behaviour | open | H1, I1, J1, K1-K4, L1, L2, AE1 |
@@ -290,10 +290,25 @@ copy/paste (`TrackerCell[]` whole objects), `.dbx` save/load (patterns serialize
 
 ## GATE E — INTENTION + REST
 
-- [ ] **E1** Intention layer: `REST · ACCENT · ANSWER · SPACE · BUILD · DROP · TEXTURE ·
+- [x] **E1** Intention layer: `REST · ACCENT · ANSWER · SPACE · BUILD · DROP · TEXTURE ·
       TRANSITION · RESET`. Intention is chosen **before** the move.
-- [ ] **E2** REST as an explicit multi-bar decision, not a failed dice roll. Reviewer calls this
+      `src/lib/dub/intention.ts` (`IntentionPlanner`, pure) +
+      `src/lib/dub/moveIntentions.ts` (what each MOVE can express — tagged per move,
+      not per rule, since `echoThrow` means the same thing in all five of its rules).
+      Wired into `tickImpl`: the planner decides, `chooseMove` filters rules by
+      `moveServes(moveId, intention)`, and a named target channel is honoured when
+      the rule's own role filter agrees. An absent intention leaves the pre-Gate-E
+      behaviour intact, so existing tests still describe real behaviour.
+      RESET is served by RELEASING held gestures, not by firing something at a mix
+      that is already running away — no move claims it.
+- [x] **E2** REST as an explicit multi-bar decision, not a failed dice roll. Reviewer calls this
       one of the highest-priority changes — dub depends on contrast.
+      A REST is committed at a phrase edge, lasts `restBars`, and is honoured on every
+      tick until its bar arrives; it is written to the fire log as `moveId: 'REST'` with
+      its hold length, so silence appears in the log as a decision. The busy-phrase run
+      comes from the Gate D phrase history, and a rest requires a whole phrase of playing
+      since the last one. `if (rng() > rollProb) return null` no longer decides whether
+      the performer plays.
 - [ ] **E3** Performance state machine `LISTEN → ANTICIPATE → PREPARE → ACT → RIDE → RELEASE →
       LISTEN` + `BUILD`/`DROP`/`RECOVER`. One machine shared by all personas.
 
