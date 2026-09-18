@@ -146,3 +146,23 @@ describe('defaultLeadRows', () => {
     expect(defaultLeadRows(0.5)).toBe(0.25);
   });
 });
+
+describe('performance state machine — a drop interrupts', () => {
+  it('lets go of what is held instead of riding through a drop', () => {
+    const s = nextPerformanceState('RIDE', input({ intention: 'DROP', gesturesInFlight: 1 }));
+    expect(s.state).toBe('RELEASE');
+    expect(s.shouldRelease).toBe(true);
+  });
+
+  it('acts on the next decision, once nothing is in the way', () => {
+    const s = nextPerformanceState('RELEASE', input({ intention: 'DROP', gesturesInFlight: 0 }));
+    expect(s.shouldFire).toBe(true);
+  });
+
+  it('still lets safety come first', () => {
+    const s = nextPerformanceState('RIDE', input({
+      intention: 'DROP', gesturesInFlight: 1, energyCritical: true,
+    }));
+    expect(s.state).toBe('RECOVER');
+  });
+});

@@ -216,14 +216,16 @@ describe('IntentionPlanner — musical structure', () => {
     expect(d.target).toMatchObject({ channelId: 1 });
   });
 
-  it('BUILDs through the second half of a phrase while the mix is still dry', () => {
+  it('BUILDs APPROACHING the phrase edge, not through half of every phrase', () => {
     const planner = new IntentionPlanner();
-    const row = ROWS_PER_PHRASE / 2 + ROWS_PER_BAR;   // past halfway, not at an edge
-    const d = planner.decide(ctx({
-      row,
-      bus: { returnGain: 0.2, echoWet: 0.2, springWet: 0, echoIntensity: 0.2, extFeedbackGain: 0 },
-    }));
-    expect(d.intention).toBe('BUILD');
+    const dry = { returnGain: 0.2, echoWet: 0.2, springWet: 0, echoIntensity: 0.2, extFeedbackGain: 0 };
+    // Building for eight bars is not tension, it is the new normal: the Gate N4
+    // soak measured BUILD occupying half of the performer's entire run.
+    const approaching = planner.decide(ctx({ row: ROWS_PER_PHRASE * 0.8, bus: dry }));
+    expect(approaching.intention).toBe('BUILD');
+    // Halfway through is too early to be building toward anything.
+    const halfway = planner.decide(ctx({ row: ROWS_PER_PHRASE / 2 + ROWS_PER_BAR, bus: dry }));
+    expect(halfway.intention).not.toBe('BUILD');
   });
 
   it('fills with TEXTURE after a long stretch of nothing', () => {

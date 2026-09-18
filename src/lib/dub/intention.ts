@@ -29,7 +29,7 @@ import type {
   IntentionTarget,
   PerformanceContext,
 } from './performanceContext';
-import { NO_TARGET } from './performanceContext';
+import { NO_TARGET, lastPhrase } from './performanceContext';
 import { axisOr } from './musicalChannelProfile';
 import type { ChannelEventSource, LookAheadWindow, MusicalEvent } from './musicalEvents';
 import { findCallToAnswer, responseRow } from './callResponse';
@@ -79,6 +79,8 @@ export interface IntentionPolicy {
   /** Rows of silence after a melodic phrase before it counts as a call the
    *  performer may answer (Gate K3). */
   callGapRows: number;
+  /** 0..1 — how readily this performer takes the whole mix away. */
+  dropAppetite: number;
   /**
    * Rows the performer waits between accents.
    *
@@ -103,6 +105,7 @@ export const DEFAULT_INTENTION_POLICY: IntentionPolicy = {
   textureAfterRows: 32,
   callGapRows: 4,
   accentSpacingRows: 12,
+  dropAppetite: 0.5,
 };
 
 /** A REST the performer has committed to, with the bar it runs until. */
@@ -127,6 +130,17 @@ export class IntentionPlanner {
   private rest: RestCommitment | null = null;
   /** Phrase index of the last phrase the performer rested in. */
   private lastRestPhrase: number | null = null;
+  /** Phrase the last drop happened in — one drop per seam, not one per tick. */
+  private lastDropPhrase: number | null = null;
+  /**
+   * A drop the performer has decided on but not yet carried out.
+   *
+   * A drop interrupts whatever is held, so the state machine releases first
+   * and acts on the following decision. Without a commitment the intention has
+   * already moved on by then and the drop never happens — the Gate N4 soak
+   * measured 32 decisions and zero drops.
+   */
+  private dropCommitment: { fromRow: number; untilRow: number } | null = null;
 
   constructor(policy: Partial<IntentionPolicy> = {}, rng?: () => number) {
     this.policy = { ...DEFAULT_INTENTION_POLICY, ...policy };
@@ -149,6 +163,8 @@ export class IntentionPlanner {
   reset(): void {
     this.rest = null;
     this.lastRestPhrase = null;
+    this.lastDropPhrase = null;
+    this.dropCommitment = null;
   }
 
   /** True while a committed REST is still running. */
@@ -177,6 +193,18 @@ export class IntentionPlanner {
       }
       this.lastRestPhrase = phrase;
       this.rest = null;
+    }
+
+    // 1b. A drop already decided on: hold the intention until it is carried
+    //     out or the window passes. `recentMoves` tells us it happened.
+    if (this.dropCommitment) {
+      const fired = ctx.recentMoves.some(m => m.row >= this.dropCommitment!.fromRow);
+      if (fired || ctx.row >= this.dropCommitment.untilRow) {
+        this.dropCommitment = null;
+      } else {
+        return decision('DROP', { kind: 'mix', reason: 'the phrase has turned' },
+          'taking the mix away at the seam', 1);
+      }
     }
 
     // 2. Safety before taste. Runaway feedback is not a texture to ride.
@@ -258,9 +286,38 @@ export class IntentionPlanner {
       );
     }
 
-    // 8. Second half of a phrase with the mix still dry: build toward the edge.
-    if (ctx.position.positionInPhrase >= 0.5 && (ctx.energy.wet ?? 0) < p.wetCeiling * 0.5) {
-      return decision('BUILD', { kind: 'mix', reason: 'second half of the phrase' },
+    // 8. The phrase has just turned and the one before it was busy: DROP.
+    //
+    // A build that leads nowhere is not a build. The classic arc is to
+    // accumulate through the end of a phrase and take the mix away at the
+    // seam, and without this branch the performer never dropped at all — the
+    // Gate N4 soak counted zero DROPs in thirty minutes, with BUILD filling
+    // half of every phrase instead.
+    const previousPhrase = lastPhrase(ctx);
+    if (ctx.position.positionInPhrase < 0.08
+        && previousPhrase && !previousPhrase.wasRest
+        && p.dropAppetite >= 0.4
+        && this.lastDropPhrase !== phrase) {
+      this.lastDropPhrase = phrase;
+      // Hold the decision for up to a bar so the release-then-act sequence can
+      // complete; `recentMoves` clears it as soon as something fires.
+      this.dropCommitment = {
+        fromRow: ctx.row,
+        untilRow: ctx.row + ctx.position.rowsPerBar,
+      };
+      return decision('DROP', { kind: 'mix', reason: 'the phrase has turned' },
+        'taking the mix away at the seam', Math.max(1, Math.round(p.dropAppetite * 2)));
+    }
+
+    // 9. Approaching the phrase edge with the mix still dry: build toward it.
+    //
+    // The LAST part of the phrase, not the whole second half. Building for
+    // eight bars is not tension, it is the new normal — and it was what the
+    // performer did with half of its time.
+    if (ctx.position.positionInPhrase >= 0.7
+        && ctx.position.positionInPhrase < 0.95
+        && (ctx.energy.wet ?? 0) < p.wetCeiling * 0.6) {
+      return decision('BUILD', { kind: 'mix', reason: 'approaching the phrase edge' },
         'building toward the phrase edge', 1);
     }
 

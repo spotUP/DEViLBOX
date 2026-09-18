@@ -12,7 +12,7 @@ analysis: thoughts/shared/plans/2026-09-17-dub-studio-gap-reconciliation.md
 Durable todo list. Survives compaction, crashes, `/clear`. **Re-read this before trusting
 recollection or any earlier summary in a conversation.**
 
-Running count: **35 of 53 done.**
+Running count: **38 of 53 done.**
 
 **The denominator was wrong until 2026-09-18.** The header said "of 36" from the day this file
 was written and was never updated as sub-items (F1a, F1c, F2a-F2e, T1-T3, the X series) were
@@ -32,7 +32,7 @@ recount — do not trust this sentence either.
 | F — gesture engine | partial | F4: shapes + lifecycle shipped; param-automation shapes need a move update API |
 | G — wet energy | **closed** | G1 |
 | H-L — musical behaviour | **closed** | H1, I1, J1, K1-K4, L1, L2, AE1 |
-| M-O — record, verify, release | N1 done | M1, N2-N4, O1, O2 |
+| M-O — record, verify, release | N1-N4 done | M1, O1, O2 |
 | X — user-reported open threads | 3 of 13 | X1, X11, X12 closed |
 
 ### Debt carried, not hidden
@@ -553,14 +553,44 @@ copy/paste (`TrackerCell[]` whole objects), `.dbx` save/load (patterns serialize
       persona fires fewer times" is not something the system guarantees (a fire count
       mixes accents with builds and transitions), so it now asserts what does hold — every
       persona leaves the music alone for more than half the run, and accents are spaced.
-- [ ] **N2** AI performance tests: REST, TARGET, PREDICTION, WET-ENERGY, CONSEQUENCE, DROP, SEEK,
+- [x] **N2** AI performance tests: REST, TARGET, PREDICTION, WET-ENERGY, CONSEQUENCE, DROP, SEEK,
       PERSONA.
-- [ ] **N3** Musical regression scenes A–G (sparse roots riddim, dense digital dancehall,
+      `src/lib/dub/__tests__/aiPerformance.test.ts` — 24 tests, one section per behaviour,
+      each asserting something a LISTENER could notice rather than that a helper still
+      exists. They run the real cycle through the N1 simulator.
+      Found a semantic split while writing them: `EnergyState.feedback` is a 0..1 READING
+      in the live system (from bus settings) but an unbounded COST SUM in the ledger, and
+      both were being compared against the same safety ceiling — the exact drift the
+      shared cycle exists to prevent. The simulator now hands the cycle a clamped reading
+      and keeps the raw sums for the budget.
+- [x] **N3** Musical regression scenes A–G (sparse roots riddim, dense digital dancehall,
       vocal+horn, four-channel tracker, long-form dub, unusual metre, sparse arrangement) with
       captured move count / rest duration / target distribution / wet-energy + feedback curves.
-- [ ] **N4** 30-minute deterministic run: no spam, no stuck gestures, no runaway feedback, no
+      `scenes.fixtures.ts` + `scenes.test.ts`, 41 tests. Each scene names what makes it
+      awkward, and every persona runs every scene.
+      They assert RANGES, not an exact decision log: a snapshot would fail on every tuning
+      change and teach everyone to re-bless it without reading it, which is worse than no
+      test at all. Wide enough to survive tuning, narrow enough to catch "it stopped
+      resting" or "it fires on every tick now".
+- [x] **N4** 30-minute deterministic run: no spam, no stuck gestures, no runaway feedback, no
       energy accumulation, no stale predictions, no performer-attributable memory growth, no
       transport drift.
+      `soak.test.ts` — 1050 bars (half an hour of MUSIC, not half an hour of waiting),
+      every persona, reproducible from a seed. Accumulation is checked by comparing the
+      second half's mean wet energy against the first half's, which a peak alone cannot
+      show.
+      **It found the two biggest musical gaps in the performer:**
+      1. *BUILD occupied half of everything.* The branch fired for the whole second half
+         of every phrase, so the performer spent 3711 of 8400 cycles building. Building
+         for eight bars is not tension, it is the new normal. Narrowed to the approach to
+         the phrase edge (0.7-0.95).
+      2. *It never dropped. At all.* Thirty minutes, zero DROPs — the planner had no
+         branch that produced one, and once added, every drop decision landed in RIDE
+         because a build was still held. A drop is precisely the moment you let go, so
+         the machine now releases on a drop instead of riding through it, and the
+         intention is COMMITTED until it is carried out or its window passes (the release
+         takes a decision, and without the commitment the intention had moved on by the
+         next one). 32 drops per half hour now, one per two phrases.
 - [ ] **O1** Performance monitor UI — persona / state / intention / target / phrase / wet energy /
       last move / next event + concise `WHY?` factors.
 - [ ] **O2** Human listening review. **Never self-certify.** Ask: does it leave space, recognize
