@@ -12,6 +12,15 @@ note: |
   revision was found to be anchored on the stale 2026-04-20 planning doc.
   Contains the reviewer's rulings on all eight open musical questions
   (sections 2-9) plus the AI-performer architecture (sections 10-44).
+implementation_status: |
+  This document is the SPEC and is not edited as work lands. Progress lives in
+  the ledger (see `ledger:` above) — read it first.
+  As of 2026-09-18: Gates A, B and C are closed (17 of 49 items).
+  Section 10 (AI-01 musical clock) -> src/lib/dub/musicalClock.ts
+  Section 11 (AI-02 event provider) -> src/lib/dub/musicalEvents.ts
+  Section 12 (AI-03 look-ahead)     -> src/lib/dub/musicalEvents.ts
+  Section 4  (taxonomy / C2)        -> src/lib/dub/musicalChannelProfile.ts
+  Next: section 13 (AI-04 PerformanceContext) = Gate D.
 ---
 
 # DEViLBOX DUB STUDIO — REVISED MASTER AI-PERFORMER & MUSICAL REVIEW PLAN
