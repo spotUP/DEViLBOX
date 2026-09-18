@@ -66,6 +66,7 @@ import {
   releaseAllDubTransients,
   reapOrphanedDubTransients,
 } from '@/lib/dub/dubChannelTransient';
+import { automationFor } from '@/lib/dub/moveAutomation';
 import {
   beginGesture,
   cancelAllGestures,
@@ -1721,11 +1722,31 @@ function tickImpl(): void {
   // still executes through DubRouter, so nothing bypasses the single path.
   const holdMsForGesture = choice.holdBars > 0 ? (60000 / bpm) * 4 * choice.holdBars : 0;
   const chStrForLog = choice.channelId !== undefined ? ` ch${choice.channelId}` : '';
+  // Moves whose parameter is worth MOVING under the hand get the gesture
+  // traced across the hold instead of a single position held flat. Only where
+  // the travel is the point of the move — see `moveAutomation.ts` — and only
+  // when the hold has a length to travel over.
+  //
+  // The move's own internal ramp is harmless here: the first automated value
+  // is pushed synchronously, in the same block as the fire, and cancels the
+  // schedule before a frame of it is rendered.
+  const automation = holdMsForGesture > 0 ? automationFor(choice.moveId) : null;
   const gestureId = beginGesture({
     moveId: choice.moveId,
     channelId: choice.channelId,
     params: adaptedParams,
     holdMs: holdMsForGesture,
+    ...(automation
+      ? {
+          shape: automation.shape,
+          automate: {
+            param: automation.param,
+            from: automation.from,
+            to: automation.to,
+            curve: automation.curve,
+          },
+        }
+      : {}),
     bpm,
     source: 'live',
     // The performer declares itself. Without this the router labels the fire
