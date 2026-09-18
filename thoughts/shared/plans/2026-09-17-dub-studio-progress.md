@@ -773,6 +773,29 @@ this bug.
       AHX is monophonic per channel so the "skank" is a single-note stab.
       Needs a `classic` (MOD/XM/IT) reggae tune — the modland "jah cometh in
       dub" download is the intended vehicle.
+
+      **Vehicle in place 2026-09-18, chosen by the user: "world class dub" by Skope**
+      (`pub/modules/Protracker/Skope/world class dub.mod`, modland, rated 5/5). Saved to
+      `public/data/songs/mod/`. 4 channels, 15 patterns, 125 BPM, D minor, a D–Csus2 dub
+      vamp. Read from pattern 6:
+      Ch00 = bassline (D/A/C walk, instruments 17-18); Ch01 = DRUMS, `D-3` on every even
+      row with a different instrument per hit (classic MOD drum programming);
+      Ch02 = effects only (`A01` volume slides, `EB2`), no notes; Ch03 = silent there.
+      **There is no separate guitar/organ skank channel** — the offbeat lives inside the
+      drum programming, so **Ch01 is the skank-throw target**, not a chord channel.
+      Verified mechanically (NOT by ear): with the bus on and ch1 send at 0.4, a
+      `skankEchoThrow` on channel 1 took programme RMS from 0.050 to 0.083 and peak to
+      0.30, so the wet return carries. `registeredChannelTaps: [1]`.
+      **Still open — it has to be HEARD.** Nothing above says it sounds like a skank.
+
+      Two tooling faults found while setting this up, both worth fixing with X8:
+      - `modlandApi.ts`'s `API_URL` falls back to `https://devilbox.uprough.net/api`
+        when `VITE_API_URL` is unset, so every modland call from a dev browser goes to the
+        LIVE host (whose deploy is stale) and 404s, while the local server on :3011 answers
+        the same query fine. That is why `search_modland` / `load_modland` looked broken.
+      - `export_pattern_text` IGNORES its `pattern` argument and always exports the
+        current pattern. Asking for pattern 4 returned `patternIndex: 0`. Seek first, or
+        the output silently describes a different pattern than the one requested.
 - [x] **X5** **Dub-send fader moves are not recorded.** Reported 2026-09-17.
       Discrete moves record fine; a continuous fader ride captures nothing.
       Verified: `DubRecorder` subscribes ONLY to `subscribeDubRouter` /
