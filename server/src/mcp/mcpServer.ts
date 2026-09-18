@@ -1647,6 +1647,13 @@ export function createMcpServer(): McpServer {
   );
 
   server.tool(
+    'resolve_recovery_prompt',
+    'Answer the crash-recovery dialog that DEViLBOX shows on boot when unsaved work was found. { action: "restore" } loads the recovered snapshot; { action: "discard" } throws it away permanently. Explicit on purpose - discard destroys work that was never saved, so dismiss_modal will not do it for you. get_modal_state reports recoveryPromptOpen when this dialog is up.',
+    { action: z.enum(['restore', 'discard']) },
+    (p) => call('resolve_recovery_prompt', p),
+  );
+
+  server.tool(
     'get_modal_state',
     'Check if any modal/dialog is currently open and what type it is',
     {},

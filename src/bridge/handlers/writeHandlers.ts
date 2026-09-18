@@ -11,6 +11,11 @@ import { useCursorStore } from '../../stores/useCursorStore';
 import { useHistoryStore } from '../../stores/useHistoryStore';
 import { useEditorStore } from '../../stores/useEditorStore';
 import { useUIStore } from '../../stores/useUIStore';
+import {
+  isRecoveryPromptOpen,
+  describeRecoveryPrompt,
+  resolveRecoveryPrompt as resolveRecovery,
+} from '../../lib/persistence/recoveryPrompt';
 import { useAudioStore } from '../../stores/useAudioStore';
 import { useMixerStore } from '../../stores/useMixerStore';
 import { useInstrumentStore } from '../../stores/useInstrumentStore';
@@ -1940,13 +1945,53 @@ export function dismissModal(): Record<string, unknown> {
     useUIStore.getState().closeModal();
     return { ok: true, dismissed: modalOpen };
   }
+  // The crash-recovery prompt is a real dialog that this cannot close, and
+  // saying "no modal was open" while it sits in front of the user is how it
+  // went unnoticed (2026-09-18). Dismissing it means choosing between
+  // restoring and DISCARDING unsaved work, which a general "close whatever is
+  // open" must never decide on someone's behalf.
+  if (isRecoveryPromptOpen()) {
+    return {
+      ok: false,
+      dismissed: null,
+      recoveryPrompt: describeRecoveryPrompt(),
+      message:
+        'The crash-recovery prompt is open and holds UNSAVED work. It is not dismissed '
+        + 'here because that would mean choosing to keep or destroy it. Use '
+        + 'resolve_recovery_prompt with { action: "restore" } or { action: "discard" }.',
+    };
+  }
   return { ok: true, dismissed: null, message: 'No modal was open' };
 }
 
 /** Get current modal state */
 export function getModalState(): Record<string, unknown> {
   const { modalOpen, modalData } = useUIStore.getState();
-  return { modalOpen: modalOpen ?? null, modalData: modalData ?? null };
+  const recoveryOpen = isRecoveryPromptOpen();
+  return {
+    modalOpen: modalOpen ?? null,
+    modalData: modalData ?? null,
+    // Reported separately because it is not a `useUIStore` modal; it used to
+    // be invisible here entirely.
+    recoveryPromptOpen: recoveryOpen,
+    recoveryPrompt: recoveryOpen ? describeRecoveryPrompt() : null,
+  };
+}
+
+/**
+ * Answer the crash-recovery prompt.
+ *
+ * Explicit on purpose: `discard` destroys work that was never saved, so it is
+ * never something a general dismiss may do by accident.
+ */
+export function resolveRecoveryPrompt(params: Record<string, unknown>): Record<string, unknown> {
+  const action = params.action;
+  if (action !== 'restore' && action !== 'discard') {
+    return { error: 'action must be "restore" or "discard"' };
+  }
+  const resolved = resolveRecovery(action);
+  if (!resolved) return { ok: false, message: 'The crash-recovery prompt is not open.' };
+  return { ok: true, action };
 }
 
 // ─── Format Regression Testing ──────────────────────────────────────────────
