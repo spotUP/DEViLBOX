@@ -75,6 +75,8 @@ import {
   type PerformanceState,
 } from '@/lib/dub/performanceState';
 import { trackerEventSources } from '@/lib/dub/musicalEvents';
+import { buildMusicalChannelProfile, type MusicalChannelProfile } from '@/lib/dub/musicalChannelProfile';
+import { pickTarget } from '@/lib/dub/musicalTargeting';
 
 /** Live analysis context injected into every tick. Null until analysis has run. */
 export interface EQSnapshot {
@@ -1833,8 +1835,57 @@ function sampleDubBusDiagnostics(): Record<string, number | boolean | string | n
  * position came from. Getting that wrong would put the look-ahead in a
  * different song than the decision.
  */
+
+/**
+ * Gate H: one `MusicalChannelProfile` per channel, rebuilt when the pattern or
+ * the grid changes.
+ *
+ * Evidence, not guesswork: the instrument NAME (the only signal that separates
+ * an organ from a piano), the channel's own onset rows, and the grid from the
+ * clock. Every axis carries its confidence, so `pickTarget` can refuse to act
+ * on a guess instead of treating "probably percussion" as fact.
+ *
+ * Cached by pattern identity and grid because building it every 250 ms tick
+ * would re-derive the same answer four times a second for no benefit.
+ */
+let _profileCache: {
+  key: string;
+  profiles: Map<number, MusicalChannelProfile>;
+} | null = null;
+
+function getChannelProfiles(
+  pattern: Pattern | null,
+  names: readonly (string | null | undefined)[],
+  rowsPerBeat: number,
+  rowsPerBar: number,
+): ReadonlyMap<number, MusicalChannelProfile> {
+  if (!pattern?.channels?.length) return new Map();
+  const key = `${pattern.id ?? 'p'}:${pattern.channels.length}:${rowsPerBeat}:${rowsPerBar}:${names.join(',')}`;
+  if (_profileCache?.key === key) return _profileCache.profiles;
+
+  const profiles = new Map<number, MusicalChannelProfile>();
+  for (let ch = 0; ch < pattern.channels.length; ch++) {
+    const rows = pattern.channels[ch]?.rows ?? [];
+    const onsetRows: number[] = [];
+    for (let r = 0; r < rows.length; r++) {
+      const cell = rows[r];
+      if (cell && cell.note >= 1 && cell.note <= 96) onsetRows.push(r);
+    }
+    profiles.set(ch, buildMusicalChannelProfile({
+      channel: ch,
+      instrumentName: names[ch] ?? null,
+      onsetRows,
+      rowsPerBeat,
+      rowsPerBar,
+      totalRows: rows.length,
+    }));
+  }
+  _profileCache = { key, profiles };
+  return profiles;
+}
+
 function decideIntention(
-  bundle: { pattern: Pattern | null; currentRow: number },
+  bundle: { pattern: Pattern | null; currentRow: number; names: readonly (string | null | undefined)[] },
   transport: { currentGlobalRow?: number; speed?: number },
   bpm: number,
 ): { decision: IntentionDecision; row: number; rowsPerBeat: number } {
@@ -1868,17 +1919,50 @@ function decideIntention(
     }
   } catch { /* no bus */ }
 
+  const gridPos = computeMusicalPosition(globalRow, ticksPerRow, getMusicalClockSettings());
+  const profiles = getChannelProfiles(
+    bundle.pattern,
+    bundle.names,
+    gridPos.rowsPerBeat,
+    gridPos.rowsPerBar,
+  );
+
   const ctx = buildPerformanceContext(getPerformanceMemory(), {
     row: globalRow,
     ticksPerRow,
     bpm,
     sources,
+    channelProfiles: profiles,
     arrangement: readArrangementSnapshot(),
     energy: readWetEnergy(energyInputs, gestureCount()),
   });
 
+  const decision = _intentionPlanner.decide(ctx);
+
+  // Gate H: the planner names a channel only when the music pointed at one —
+  // the snare about to sound, the channel the player just used. Everything
+  // else gets a target chosen for what the move is FOR, from the profiles,
+  // rather than from a role label and a coin toss.
+  if (decision.target.kind !== 'channel') {
+    const target = pickTarget(decision.intention, profiles);
+    if (target) {
+      return {
+        decision: {
+          ...decision,
+          target: {
+            kind: 'channel',
+            channelId: target.channelId,
+            reason: target.reason,
+          },
+        },
+        row: ctx.row,
+        rowsPerBeat: ctx.position.rowsPerBeat,
+      };
+    }
+  }
+
   return {
-    decision: _intentionPlanner.decide(ctx),
+    decision,
     row: ctx.row,
     rowsPerBeat: ctx.position.rowsPerBeat,
   };

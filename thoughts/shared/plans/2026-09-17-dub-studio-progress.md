@@ -12,7 +12,7 @@ analysis: thoughts/shared/plans/2026-09-17-dub-studio-gap-reconciliation.md
 Durable todo list. Survives compaction, crashes, `/clear`. **Re-read this before trusting
 recollection or any earlier summary in a conversation.**
 
-Running count: **22 of 51 done.**
+Running count: **23 of 51 done.**
 
 **The denominator was wrong until 2026-09-18.** The header said "of 36" from the day this file
 was written and was never updated as sub-items (F1a, F1c, F2a-F2e, T1-T3, the X series) were
@@ -31,7 +31,7 @@ recount — do not trust this sentence either.
 | E — intention + REST | **closed** | E1, E2, E3 |
 | F — gesture engine | partial | F4: shapes + lifecycle shipped; param-automation shapes need a move update API |
 | G — wet energy | **closed** | G1 |
-| H-L — musical behaviour | open | H1, I1, J1, K1-K4, L1, L2, AE1 |
+| H-L — musical behaviour | H1 done | I1, J1, K1-K4, L1, L2, AE1 |
 | M-O — record, verify, release | open | M1, N1-N4, O1, O2 |
 | X — user-reported open threads | 1 of 11 | X1 closed |
 
@@ -369,7 +369,23 @@ copy/paste (`TrackerCell[]` whole objects), `.dbx` save/load (patterns serialize
 
 ## GATE H–L — musical behaviour
 
-- [ ] **H1** Musical targeting from `MusicalChannelProfile` (Gate H).
+- [x] **H1** Musical targeting from `MusicalChannelProfile` (Gate H).
+      `src/lib/dub/musicalTargeting.ts` — `pickTarget(intention, profiles)` scores every
+      channel for what the move is FOR, not for what the channel is called. ACCENT wants
+      the backbeat; ANSWER wants a voice, because answering the kick is just more kick;
+      SPACE wants the busy inessential part (low importance, high density); DROP takes the
+      melody and REFUSES the foundation or anything in the sub register — a version
+      without its bass is not a version; BUILD wants something sustained, since building
+      on a one-shot hit gives the ear nothing to follow; TRANSITION marks the seam on the
+      most important part. REST and RESET target nothing and return null.
+      Returning `null` is a real answer: firing at a channel that does not suit the
+      intention is worse than not firing.
+      Profiles are now BUILT in the tick from real evidence (instrument name, the
+      channel's own onset rows, the grid from the clock), cached by pattern + grid so the
+      same answer is not re-derived four times a second, and passed into the Gate D
+      context — which closes C2's loop into D. Confidence is respected throughout:
+      `axisOr` falls back rather than guessing, so "probably percussion" never steers a
+      move. 18 tests in `test:ci`.
 - [ ] **I1** Arrangement intelligence: `arrangementImportance` → `dropBehavior`; version drop
       protects foundation, supports throw-then-mute, arrangement-aware restoration (Gate I).
 - [ ] **J1** Consequence model: `targetAudibility` / `contrast` / `masking` / `wetEnergyChange` /
