@@ -12,8 +12,8 @@ analysis: thoughts/shared/plans/2026-09-17-dub-studio-gap-reconciliation.md
 Durable todo list. Survives compaction, crashes, `/clear`. **Re-read this before trusting
 recollection or any earlier summary in a conversation.**
 
-Running count: **15 of 36 done** (Gate A closed; F1/F1a/F1c shipped 2026-09-17; F2c and the whole F2 chunk 2026-09-18).
-Pre-work complete except F3. **Gate B closed 2026-09-18.** Gate C in progress: C2 done, C1 + C3 next.
+Running count: **17 of 36 done** (Gate A closed; F1/F1a/F1c shipped 2026-09-17; F2c and the whole F2 chunk 2026-09-18).
+Pre-work complete except F3. **Gates A, B, C closed 2026-09-18.** Gate D (PerformanceContext) is next.
 
 **Reconciled against the code 2026-09-18** — the ledger had drifted: F1, F1a and F1c were
 implemented the same night the plan was written but never ticked. Verify before trusting a count.
@@ -215,7 +215,14 @@ copy/paste (`TrackerCell[]` whole objects), `.dbx` save/load (patterns serialize
 
 ## GATE C — MUSICAL EVENT MODEL
 
-- [ ] **C1** `MusicalEventProvider` — unified semantic event stream; tracker implementation
+- [x] **C1** DONE 2026-09-18. `src/lib/dub/musicalEvents.ts`. The unification point is
+      `ChannelEventSource`, a data shape rather than a class hierarchy: a tracker pattern and a
+      DJ deck's beat grid both produce it, so nothing downstream branches on context.
+      `trackerEventSources()` is the tracker adapter (drops note-offs and empties, maps the XM
+      volume column to strength, honours a rowOffset so look-ahead does not reset at a pattern
+      boundary). **DJ adapter NOT written** — it needs deck beat-grid/stem access and belongs
+      with that work; the interface it must satisfy is fixed and documented.
+      Original item text: `MusicalEventProvider` — unified semantic event stream; tracker implementation
       (pattern look-ahead) + DJ implementation (beat grid / stems). Unifies semantic output, not
       data sources.
 - [x] **C2** DONE 2026-09-18. `src/lib/dub/musicalChannelProfile.ts` — four orthogonal axes,
@@ -228,7 +235,13 @@ copy/paste (`TrackerCell[]` whole objects), `.dbx` save/load (patterns serialize
       against the grid MusicalClock supplies, which is placement, not metre inference.
       24 assertions. Original item text: `MusicalChannelProfile` — the orthogonal taxonomy above, with confidence. User
       override authoritative. Unblocks per-source mix hygiene (revision 1 DSP-09).
-- [ ] **C3** Look-ahead queries: what happens in the next 1/16, 1/8, 1/4, beat, bar, phrase.
+- [x] **C3** DONE 2026-09-18. `eventsInWindow` / `nextEvent` / `rowsUntilNextEvent` over
+      1/16, 1/8, 1/4, beat, bar, phrase — window lengths come from MusicalClock, so look-ahead
+      follows song speed and metre. Note-value windows are ABSOLUTE (an eighth is an eighth in
+      any metre); only `beat` follows `beatUnit`. A test caught the first implementation
+      double-applying the beat unit. Windows are half-open: an event exactly at `fromRow` is NOW,
+      not upcoming, so adjacent windows tile without double-reporting. **Seek reset satisfied by
+      statelessness** — no prediction state exists to go stale. Original item text: Look-ahead queries: what happens in the next 1/16, 1/8, 1/4, beat, bar, phrase.
       Seek must reset prediction state.
 
 ## GATE D — PERFORMANCE CONTEXT
