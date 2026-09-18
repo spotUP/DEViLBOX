@@ -4,6 +4,25 @@
  * Uses the server's proxy API (handles CORS, caching, rate limiting).
  */
 
+/**
+ * Where the server's proxy API lives.
+ *
+ * `VITE_API_URL` is INLINED by Vite at build time, and the repo's `.env` sets
+ * it to `http://localhost:3011/api` so a dev browser talks to the local
+ * server. CI never sees that file, so a CI build compiles in the fallback
+ * below and works for everyone.
+ *
+ * A build run on a developer's machine compiles in LOCALHOST. Deployed, the
+ * site then asks each visitor's own computer for the modland index and every
+ * other API call — "failed to fetch" for all of them. That shipped on
+ * 2026-09-18 from a hand-run deploy while GitHub Actions was down for billing.
+ *
+ * Guarded in three places now, because the value is invisible once inlined:
+ * `scripts/deploy-manual.sh` forces the production value and refuses to sync a
+ * bundle that still mentions the dev port, and
+ * `src/__tests__/ci/deployBundleApiUrl.test.ts` checks both the fallback here
+ * and any `dist/` that happens to exist.
+ */
 const API_URL = import.meta.env.VITE_API_URL || 'https://devilbox.uprough.net/api';
 
 // ── Types ───────────────────────────────────────────────────────────────────
