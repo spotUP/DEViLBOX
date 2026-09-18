@@ -29,7 +29,7 @@ recount — do not trust this sentence either.
 | C — event model | **closed** | C1, C2, C3. DJ adapter for C1 deliberately not written |
 | D — performance context | **closed** | D1 |
 | E — intention + REST | **closed** | E1, E2, E3 |
-| F — gesture engine | open | F4 |
+| F — gesture engine | partial | F4: shapes + lifecycle shipped; param-automation shapes need a move update API |
 | G — wet energy | open | G1 |
 | H-L — musical behaviour | open | H1, I1, J1, K1-K4, L1, L2, AE1 |
 | M-O — record, verify, release | open | M1, N1-N4, O1, O2 |
@@ -327,9 +327,23 @@ copy/paste (`TrackerCell[]` whole objects), `.dbx` save/load (patterns serialize
 
 ## GATE F — GESTURE ENGINE
 
-- [ ] **F4** `beginGesture` / `updateGesture` / `endGesture` / `cancelGesture` with attack, hold,
+- [~] **F4** `beginGesture` / `updateGesture` / `endGesture` / `cancelGesture` with attack, hold,
       release, ramp, sweep, rebound, quantized start + release. Transport stop cancels; seek
       cancels stale gestures. DubRouter stays the execution layer.
+      `src/engine/dub/GestureEngine.ts`. Shipped: begin/update/end/cancel, quantized start
+      AND release, `hold` and `rebound` shapes, cancel-all on transport stop, one-shot
+      handling, and AutoDub migrated off its private disposer Set + timer Map onto it —
+      there is now ONE notion of a held move, and the user's holds are as cancellable as
+      the AI's. `DubRouter.fire` gained `preQuantized` so the engine's grid wait and the
+      router's own cannot stack into a whole grid step of lateness.
+      **NOT shipped, and not faked: `ramp` and `sweep`.** They describe a parameter moving
+      while the gesture is held, and `DubMove.execute` returns `{ dispose }` with no way to
+      update params mid-flight. The engine calls an optional `handle.update(params)` when a
+      move offers one; no move does yet, so such a gesture is marked `degraded` with the
+      reason instead of silently behaving as a plain hold. Closing F4 means giving moves an
+      update path — that is the remaining work, and `attack` likewise belongs to the move's
+      own envelope rather than to the scheduler.
+      20 tests in `test:ci` (router mocked, fake timers).
 
 ## GATE G — WET ENERGY
 
