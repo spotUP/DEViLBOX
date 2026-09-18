@@ -16,6 +16,17 @@
 #   - `npm run test:ci`         (vitest)           ~65 s
 #   - `npm run test:compliance` (tracker fx)       ~2 s
 #
+# DOCUMENTATION-ONLY FAST PATH: a push whose every changed file is `*.md`,
+# `thoughts/**` or `docs/**` skips all three. Markdown cannot break tsc or
+# vitest, and publishing a handoff should not cost two minutes. Note that
+# doc-ish files which are actually COMPILED (src/data/manualChapters.ts) are
+# `.ts` and correctly take the full gate.
+#
+# The check is deliberately conservative — it skips only when the pushed
+# range can be positively enumerated and every path in it is documentation.
+# A new branch, an unknown remote sha, an empty range or any doubt runs the
+# full gate.
+#
 # Bypass in emergencies with `git push --no-verify`. Don't make a habit
 # of it — this is the same gate CI runs.
 
@@ -46,6 +57,46 @@ run_step() {
     exit 1
   fi
 }
+
+is_docs_path() {
+  case "$1" in
+    *.md|thoughts/*|docs/*) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+# True only when every file in the pushed range is documentation.
+# Reads the pre-push protocol on stdin: <local ref> <local sha> <remote ref> <remote sha>
+docs_only_push() {
+  local zero='0000000000000000000000000000000000000000'
+  local saw_any=0
+  local _lref local_sha _rref remote_sha files f
+
+  # Interactive invocation (no ref list piped in) — cannot scope, so gate.
+  [ -t 0 ] && return 1
+
+  while read -r _lref local_sha _rref remote_sha; do
+    [ -n "${local_sha:-}" ] || continue
+    [ "$local_sha" = "$zero" ] && continue            # deleting a ref: nothing to test
+    [ -n "${remote_sha:-}" ] || return 1
+    [ "$remote_sha" = "$zero" ] && return 1           # new branch: range is unknown
+    git rev-parse -q --verify "${remote_sha}^{commit}" >/dev/null 2>&1 || return 1
+    files="$(git diff --name-only "$remote_sha" "$local_sha")" || return 1
+    while IFS= read -r f; do
+      [ -n "$f" ] || continue
+      saw_any=1
+      is_docs_path "$f" || return 1
+    done <<< "$files"
+  done
+
+  [ "$saw_any" = 1 ]
+}
+
+if docs_only_push; then
+  echo "${GRN}[pre-push] documentation-only push — skipping the code gate.${RST}" >&2
+  echo "${GRN}[pre-push] (every changed path is *.md / thoughts/ / docs/)${RST}" >&2
+  exit 0
+fi
 
 run_step "type-check"      npm run --silent type-check
 run_step "test:ci"         npm run --silent test:ci
