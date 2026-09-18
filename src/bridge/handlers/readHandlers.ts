@@ -794,9 +794,10 @@ export async function verifyPerformanceJournal(
   params: Record<string, unknown> = {},
 ): Promise<Record<string, unknown>> {
   const { getPerformanceJournal: read } = await import('../../engine/dub/performanceJournalBridge');
-  const { compareJournalToReplay, formatReplayReport, firesFromLane } =
+  const { compareJournalToReplay, formatReplayReport, firesForPattern } =
     await import('../../lib/dub/journalReplay');
   const { useTrackerStore } = await import('../../stores/useTrackerStore');
+  const { useAutomationStore } = await import('../../stores/useAutomationStore');
 
   const state = useTrackerStore.getState();
   const patternIndex = typeof params.patternIndex === 'number'
@@ -808,12 +809,18 @@ export async function verifyPerformanceJournal(
   }
 
   const journal = read();
-  const fires = firesFromLane(pattern.dubLane);
+  // Curves are where a recording actually lives; the lane is legacy storage
+  // that load-migration clears. Read both, or a modern take looks like it
+  // never happened.
+  const curves = useAutomationStore.getState().getCurves()
+    .filter(c => c.patternId === pattern.id);
+  const fires = firesForPattern(curves, pattern.dubLane);
   const report = compareJournalToReplay(journal, fires);
   return {
     patternIndex,
     journalEntries: journal.entries.length,
-    laneEvents: fires.length,
+    dubCurves: curves.filter(c => c.parameter.startsWith('dub.')).length,
+    firesExpected: fires.length,
     reproduces: report.reproduces,
     matched: report.matched,
     missing: report.missing,

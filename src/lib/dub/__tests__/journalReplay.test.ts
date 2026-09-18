@@ -31,6 +31,8 @@ import {
   compareJournalToReplay,
   formatReplayReport,
   firesFromLane,
+  firesFromCurves,
+  firesForPattern,
   DEFAULT_ROW_TOLERANCE,
   type ReplayFire,
 } from '../journalReplay';
@@ -293,10 +295,13 @@ describe('wiring contract — the check is reachable', () => {
     join(__dirname, '..', '..', '..', '..', 'server', 'src', 'mcp', 'mcpServer.ts'), 'utf8',
   );
 
-  it('has a handler that compares the journal to the lane', () => {
+  it('has a handler that compares the journal to what will actually fire', () => {
+    // This assertion originally pinned `firesFromLane(pattern.dubLane)`, which
+    // was the bug: lanes are legacy storage that load-migration clears, so the
+    // check found nothing for any modern recording. Corrected, not relaxed.
     expect(handlers).toContain('export async function verifyPerformanceJournal');
     expect(handlers).toContain('compareJournalToReplay');
-    expect(handlers).toContain('firesFromLane(pattern.dubLane)');
+    expect(handlers).toContain('firesForPattern(curves, pattern.dubLane)');
   });
 
   it('reads the lane instead of firing it, so asking makes no sound', () => {
@@ -311,5 +316,118 @@ describe('wiring contract — the check is reachable', () => {
     expect(server).toContain("'verify_performance_journal'");
     expect(server).toContain("'get_performance_journal'");
     expect(server).toContain("'clear_performance_journal'");
+  });
+});
+
+/**
+ * The verifier shipped reading `pattern.dubLane.events` only — legacy storage
+ * that `DubRecorder` stopped writing and that load-migration CLEARS. Against a
+ * real session it therefore found nothing, would have called every journal
+ * entry "missing", and concluded the take did not reproduce. Exactly backwards,
+ * and caught by running the tool instead of trusting it.
+ */
+function curve(over: Partial<import('@/types/automation').AutomationCurve> = {}) {
+  return {
+    id: 'c1',
+    patternId: 'p1',
+    channelIndex: -1,
+    parameter: 'dub.springSlam',
+    mode: 'steps' as const,
+    interpolation: 'linear' as const,
+    enabled: true,
+    points: [{ row: 8, value: 1 }, { row: 8.05, value: 0 }],
+    ...over,
+  } as import('@/types/automation').AutomationCurve;
+}
+
+describe('firesFromCurves — where a modern recording actually lives', () => {
+  it('counts an upward crossing as a fire, the way AutomationPlayer does', () => {
+    expect(firesFromCurves([curve()])).toEqual([
+      { moveId: 'springSlam', channelId: undefined, row: 8 },
+    ]);
+  });
+
+  it('carries the channel from the curve it was drawn in', () => {
+    const fires = firesFromCurves([curve({ channelIndex: 2, parameter: 'dub.echoThrow' })]);
+    expect(fires[0]).toEqual({ moveId: 'echoThrow', channelId: 2, row: 8 });
+  });
+
+  it('treats -1 as global, not as channel minus one', () => {
+    expect(firesFromCurves([curve()])[0].channelId).toBeUndefined();
+  });
+
+  it('counts a hold once, not once per point', () => {
+    const held = curve({ points: [{ row: 4, value: 1 }, { row: 20, value: 0 }] });
+    expect(firesFromCurves([held])).toHaveLength(1);
+  });
+
+  it('counts a repeated move once per press', () => {
+    const twice = curve({
+      points: [
+        { row: 4, value: 1 }, { row: 4.05, value: 0 },
+        { row: 12, value: 1 }, { row: 12.05, value: 0 },
+      ],
+    });
+    expect(firesFromCurves([twice]).map(f => f.row)).toEqual([4, 12]);
+  });
+
+  it('ignores a disabled curve — it will not play', () => {
+    expect(firesFromCurves([curve({ enabled: false })])).toEqual([]);
+  });
+
+  it('ignores non-dub automation entirely', () => {
+    expect(firesFromCurves([curve({ parameter: 'tb303.cutoff' })])).toEqual([]);
+  });
+
+  it('ignores the send ride, which is a movement and not a fire', () => {
+    // Counting its points would invent one move per curve point.
+    const ride = curve({
+      parameter: 'dub.channelSend',
+      channelIndex: 1,
+      points: [{ row: 0, value: 0 }, { row: 4, value: 0.8 }, { row: 8, value: 0.2 }],
+    });
+    expect(firesFromCurves([ride])).toEqual([]);
+  });
+
+  it('returns fires in row order across several curves', () => {
+    const a = curve({ id: 'a', parameter: 'dub.echoThrow', points: [{ row: 16, value: 1 }, { row: 16.05, value: 0 }] });
+    const b = curve({ id: 'b', parameter: 'dub.springSlam', points: [{ row: 2, value: 1 }, { row: 2.05, value: 0 }] });
+    expect(firesFromCurves([a, b]).map(f => f.row)).toEqual([2, 16]);
+  });
+});
+
+describe('firesForPattern — curves plus any legacy lane still carried', () => {
+  it('finds a performance that lives only in curves', () => {
+    const report = compareJournalToReplay(
+      journalOf([entry({ row: 8, moveId: 'springSlam', channelId: undefined })]),
+      firesForPattern([curve()], null),
+    );
+    expect(report.reproduces).toBe(true);
+  });
+
+  it('still reads a project whose events have not been migrated yet', () => {
+    const lane: DubLane = { enabled: true, events: [event({ row: 4, channelId: 1 })] };
+    const fires = firesForPattern([], lane);
+    expect(fires).toEqual([{ moveId: 'echoThrow', channelId: 1, row: 4 }]);
+  });
+
+  it('merges both in row order', () => {
+    const lane: DubLane = { enabled: true, events: [event({ row: 20, channelId: 1 })] };
+    expect(firesForPattern([curve()], lane).map(f => f.row)).toEqual([8, 20]);
+  });
+});
+
+describe('wiring contract — the verifier reads curves, not only the legacy lane', () => {
+  const handlers = readFileSync(
+    join(__dirname, '..', '..', '..', 'bridge', 'handlers', 'readHandlers.ts'), 'utf8',
+  );
+
+  it('pulls the pattern\'s automation curves', () => {
+    expect(handlers).toContain('useAutomationStore');
+    expect(handlers).toContain('firesForPattern(curves, pattern.dubLane)');
+  });
+
+  it('no longer reads the lane alone', () => {
+    expect(handlers).not.toContain('firesFromLane(pattern.dubLane)');
   });
 });

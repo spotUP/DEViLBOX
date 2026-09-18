@@ -136,6 +136,34 @@ describe('M1 wiring contract', () => {
     expect(autoDub).toContain('setPerformanceAnnotator(');
     expect(bridge).not.toContain("from './AutoDub'");
   });
+
+  /**
+   * The journal promised to work "when the performer is not running at all",
+   * and did not: the recorder was attached only inside `startAutoDub`, so with
+   * AutoDub off nothing subscribed and a user performing by hand recorded
+   * nothing. Worse, reading the journal is what attached the listener, so it
+   * was always empty for fires that had already happened. Found 2026-09-18 by
+   * firing two moves live and getting `total: 0`.
+   */
+  it('attaches with the ROUTER, so a hand-played session is recorded too', () => {
+    const engine = readFileSync(
+      join(__dirname, '..', '..', '..', 'engine', 'drumpad', 'DrumPadEngine.ts'), 'utf8',
+    );
+    expect(engine).toContain('performanceJournalBridge');
+    expect(engine).toContain('getPerformanceJournalRecorder()');
+    // Next to the router registration, not buried in a view or a performer.
+    expect(engine).toMatch(/setDubBusForRouter\(this\.dubBus\);[\s\S]{0,1200}getPerformanceJournalRecorder\(\)/);
+  });
+
+  it('does not depend on AutoDub having been started', () => {
+    const engine = readFileSync(
+      join(__dirname, '..', '..', '..', 'engine', 'drumpad', 'DrumPadEngine.ts'), 'utf8',
+    );
+    // AutoDub still calls it — that is harmless and idempotent — but it must
+    // no longer be the only thing that does.
+    expect(engine).toContain('getPerformanceJournalRecorder()');
+    expect(autoDub).toContain('getPerformanceJournalRecorder()');
+  });
 });
 
 describe('M1 persistence — additive in both directions', () => {

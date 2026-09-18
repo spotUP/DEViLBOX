@@ -18,6 +18,7 @@
 
 import type { JournalEntry, PerformanceJournal } from './performanceJournal';
 import type { DubLane } from '@/types/dub';
+import type { AutomationCurve } from '@/types/automation';
 
 /** One fire as a replay produced it. */
 export interface ReplayFire {
@@ -144,4 +145,53 @@ export function firesFromLane(lane: DubLane | null | undefined): ReplayFire[] {
   return [...lane.events]
     .sort((a, b) => a.row - b.row)
     .map(e => ({ moveId: e.moveId, channelId: e.channelId, row: e.row }));
+}
+
+/**
+ * What the AUTOMATION CURVES will fire — which is what a modern recording
+ * actually replays.
+ *
+ * `firesFromLane` reads `pattern.dubLane.events`, and that is legacy storage:
+ * `DubRecorder` stopped writing it, and loading a project MIGRATES any
+ * remaining events into curves and then clears the lane. So a verifier that
+ * only read lanes would find nothing for every performance recorded since,
+ * report each journal entry as "missing", and conclude the take does not
+ * reproduce — exactly backwards. Caught 2026-09-18 by running the tool against
+ * a real session instead of an empty one.
+ *
+ * A move's curve carries its channel in `channelIndex` (-1 meaning global) and
+ * names the parameter `dub.<moveId>`; `AutomationPlayer` fires on the upward
+ * 0.5 crossing, so that is what counts as a fire here.
+ */
+export function firesFromCurves(curves: readonly AutomationCurve[]): ReplayFire[] {
+  const fires: ReplayFire[] = [];
+  for (const curve of curves) {
+    if (!curve.enabled) continue;
+    if (!curve.parameter.startsWith('dub.')) continue;
+    // The send is a continuous ride, not a fire — it has no on-edge to count,
+    // and counting its points would invent a move per curve point.
+    if (curve.parameter.startsWith('dub.channelSend')) continue;
+
+    const moveId = curve.parameter.slice('dub.'.length);
+    const channelId = curve.channelIndex >= 0 ? curve.channelIndex : undefined;
+    const points = [...curve.points].sort((a, b) => a.row - b.row);
+    let wasOn = false;
+    for (const point of points) {
+      const isOn = point.value > 0.5;
+      if (isOn && !wasOn) fires.push({ moveId, channelId, row: point.row });
+      wasOn = isOn;
+    }
+  }
+  return fires.sort((a, b) => a.row - b.row);
+}
+
+/**
+ * Everything that will fire for a pattern: the curves, plus any legacy lane
+ * events a project still carries before its first load-migration.
+ */
+export function firesForPattern(
+  curves: readonly AutomationCurve[],
+  lane: DubLane | null | undefined,
+): ReplayFire[] {
+  return [...firesFromCurves(curves), ...firesFromLane(lane)].sort((a, b) => a.row - b.row);
 }
