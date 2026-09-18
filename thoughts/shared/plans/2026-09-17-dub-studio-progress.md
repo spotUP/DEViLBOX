@@ -1167,7 +1167,23 @@ this bug.
       back into the store. 20 tests including a wiring contract. Commit `d3e3d3a74`.
       **Needs the user's car to confirm** — no automated check can.
 
-- [ ] **X10** **Dub bus clips and distorts most of the time.** Reported
+- [ ] **X10** **MEASURED 2026-09-18 — not reproduced at master, one real finding instead.**
+      Perry preset, "world class dub" playing, all four channel sends at 0.5, `echoBuildUp`
+      held: master peaked **0.86**, RMS 0.16-0.22. No clipping. The handoff's 1.00-1.03
+      readings predate the X9 send-ratchet fix (pinned sends feeding the echo continuously)
+      and the X10 shelf-trim work, so the condition that produced them is likely gone —
+      but this was ONE tune at ONE send level, and the report says "most of the time", so
+      it is NOT closed on that. Perry's `masterBassShelfDb: 9` is the largest boost in the
+      chain and remains the first place to look if it recurs.
+      **Found while measuring, fixed separately (`ea852e738`):** a dub send set while the
+      tab is in the BACKGROUND never reached the store. The write is rAF-batched and a
+      browser suspends rAF in a hidden tab, so the audio changed and the state did not —
+      faders read stale on return, and a project saved meanwhile recorded the wrong sends.
+      That is also why `get_dub_bus_state` kept reporting `dubSend: 0` on channels that
+      plainly had live taps; read `registeredChannelTaps`, not `channelDubSends`, when the
+      tab is not focused.
+
+- [ ] **X10 (original entry)** **Dub bus clips and distorts most of the time.** Reported
       2026-09-18. Not yet investigated. Measure before touching anything:
       `__dubBus().getDiagnosticSnapshot()` reports every boosting stage next to
       its mirror plus `inputRms` / `returnRms`, and the handoff records peaks of
