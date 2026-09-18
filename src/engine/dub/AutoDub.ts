@@ -79,6 +79,11 @@ import {
   energyBudgetFor,
 } from '@/lib/dub/personaBehaviour';
 import { allowSurprise, varianceInputsFrom } from '@/lib/dub/contextualVariance';
+import {
+  classifyRepetition,
+  repetitionWeight,
+  atMotifPosition,
+} from '@/lib/dub/repetition';
 
 /** Live analysis context injected into every tick. Null until analysis has run. */
 export interface EQSnapshot {
@@ -790,6 +795,9 @@ export interface AutoDubTickCtx {
    *  the persona took the chance. Undefined falls back to the flat
    *  `variance * 0.1` roll. */
   surpriseAllowed?: boolean;
+  /** Gate K4: weight multiplier per move — above 1 where a motif belongs,
+   *  below 1 for a move the performer is stuck in. Undefined = no adjustment. */
+  repetitionWeightFor?: (moveId: string) => number;
 }
 
 export interface AutoDubChoice {
@@ -988,7 +996,10 @@ export function chooseMove(ctx: AutoDubTickCtx, rng: () => number): AutoDubChoic
       densityMult = Math.max(0.25, Math.min(1.75, mult));
     }
 
-    const weight = rule.baseWeight * ctx.intensity * persWeight * cooldownDecay * densityMult;
+    // Gate K4: protect a motif where it belongs, break a rut anywhere.
+    const repetitionMult = ctx.repetitionWeightFor?.(rule.moveId) ?? 1;
+    const weight = rule.baseWeight * ctx.intensity * persWeight * cooldownDecay
+      * densityMult * repetitionMult;
     if (weight <= 0) continue;
 
     eligible.push({ rule, weight, matchingChannels });
@@ -1627,10 +1638,29 @@ function tickImpl(): void {
   // being considered.
   const surprise = allowSurprise(varianceInputsFrom(performanceCtx), behaviour, _rng);
 
+  // Gate K4: is the performer building a motif or stuck in a rut? Both look
+  // like "the same move again" in a log; musically they are opposites, and the
+  // difference is WHERE in the phrase the repeats land.
+  const repetition = classifyRepetition(performanceCtx.recentMoves, {
+    rowsPerBar: performanceCtx.position.rowsPerBar,
+    rowsPerPhrase: performanceCtx.position.rowsPerPhrase,
+  });
+  const motifRow = repetition.kind === 'motif'
+    ? performanceCtx.recentMoves.filter(m => m.moveId === repetition.moveId).at(-1)?.row ?? null
+    : null;
+  const atMotif = motifRow !== null && atMotifPosition(
+    performanceCtx.row,
+    motifRow,
+    performanceCtx.position.rowsPerPhrase,
+    performanceCtx.position.rowsPerBar,
+  );
+
   const choice = chooseMove({
     bar, barPos, isNewBar,
     admitsMove: (moveId: string) => _energyLedger.admits(moveId, nowSec, budget).ok,
     surpriseAllowed: surprise.allowed,
+    repetitionWeightFor: (moveId: string) =>
+      repetitionWeight(moveId, repetition, behaviour.novelty, atMotif),
     intention: decision.intention,
     intentionChannel: decision.target.kind === 'channel' ? decision.target.channelId : undefined,
     intensity: dub.autoDubIntensity,
