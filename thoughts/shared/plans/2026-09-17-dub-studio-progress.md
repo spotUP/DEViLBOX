@@ -12,7 +12,7 @@ analysis: thoughts/shared/plans/2026-09-17-dub-studio-gap-reconciliation.md
 Durable todo list. Survives compaction, crashes, `/clear`. **Re-read this before trusting
 recollection or any earlier summary in a conversation.**
 
-Running count: **47 of 57 done.**
+Running count: **48 of 57 done.**
 
 **The denominator was wrong until 2026-09-18.** The header said "of 36" from the day this file
 was written and was never updated as sub-items (F1a, F1c, F2a-F2e, T1-T3, the X series) were
@@ -33,7 +33,7 @@ recount — do not trust this sentence either.
 | G — wet energy | **closed** | G1 |
 | H-L — musical behaviour | **closed** | H1, I1, J1, K1-K4, L1, L2, AE1 |
 | M-O — record, verify, release | M1, N1-N4, O1 done | O2 (human) |
-| X — user-reported open threads | 7 of 17 | X1, X5, X11, X12, X13, X15, X16 closed |
+| X — user-reported open threads | 8 of 17 | X1, X5, X7, X11, X12, X13, X15, X16 closed |
 
 ### Debt carried, not hidden
 
@@ -837,7 +837,7 @@ this bug.
       preset to 'custom' and silently destroy the user's voicing — see
       dubBusCharacterCoherence.test.ts).
 
-- [ ] **X7** **Dub lane visuals: static, and shown on every pattern.** Reported
+- [x] **X7** **Dub lane visuals: static, and shown on every pattern.** Reported
       2026-09-18. Two separate faults.
       (a) *Not following scroll.* The machinery exists — `masterDubLaneRef`
       has its `style.top` written imperatively at PatternEditorCanvas.ts:2686
@@ -853,6 +853,30 @@ this bug.
       same workaround and comment. On AHX every recording would then land under
       one pattern id. Verify what id is actually written before changing
       anything.
+
+      **CLOSED 2026-09-18, commit `57fa985db`.**
+      (a) *Root cause: one style property with two owners writing two DIFFERENT
+      quantities.* The RAF loop set the overlays' `top` to `overlayTop`; React
+      re-rendered the same elements declaring `top: scrollYRef.current`, which holds the
+      CANVAS's `baseY` — they differ by `(currentRow - topLines) * rh` — and which the
+      idle RAF branch never updated at all. Last writer won. The dub lane lost most often
+      because `AutomationLane` subscribes to the WHOLE automation store and so re-renders
+      far more than its neighbours; the same latent fault sat under the automation and
+      macro overlays. Fixed with `overlayTopRef`, written in both RAF branches and
+      rendered from by all three overlays; `scrollYRef` keeps its real job.
+      (b) **The hypothesis above was WRONG, and so was its premise.** Playback DOES write
+      the tracker store's index, including on libopenmpt (`usePatternPlayback.ts:739`);
+      it is the TRANSPORT copy that stays at 0 — which is what AutoDub's own comment at
+      `AutoDub.ts:2078` says. The real explanation is pattern REUSE: loaded
+      "break the box.mod" to check and pattern 0 occupies order positions 0, 1, 2 and 3,
+      so a move recorded at position 0 plays and draws at all four. Cells have always
+      behaved that way. Not a bug; no change made.
+      (c) *Found while fixing (a):* the lane forced EVERY `dub.*` curve to steps mode.
+      Right for a move — on, then off — and wrong for a send, so an X5 fader ride drew as
+      a staircase while replaying as the smooth curve it was. The send now honours its
+      stored mode. And `dub.channelSend` was missing from the automatable parameter list
+      entirely, so a recorded ride was in the file, replayed correctly, and could never be
+      selected or seen. Added per-channel, kept off the global lane. 13 tests.
 
 - [ ] **X8** **Stale MCP tool metadata.** `fire_dub_move`'s description still
       lists 27 valid moveIds from the April era — no skankEchoThrow,
