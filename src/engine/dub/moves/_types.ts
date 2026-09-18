@@ -29,15 +29,29 @@ export interface DubMoveContext {
   source: 'live' | 'lane';
 }
 
+/**
+ * What a fired move hands back.
+ *
+ * `update` is optional and deliberately rare. A move offers it only when one
+ * of its parameters can meaningfully MOVE while the move is held — a filter
+ * frequency, not a delay preset — and offering it is what lets a gesture trace
+ * a `ramp` or `sweep` over the hold (Gate F4). A move without it is held
+ * plainly, and the gesture says so rather than pretending.
+ */
+export interface DubMoveHandle {
+  dispose(): void;
+  update?(params: Record<string, number>): void;
+}
+
 export interface DubMove {
   id: string;
   kind: 'trigger' | 'hold' | 'continuous';
   defaults: Record<string, number>;
   /**
-   * Fire the move. Returns a disposer for hold-style moves (caller calls it on
+   * Fire the move. Returns a handle for hold-style moves (caller disposes it on
    * release) or null for pure one-shots that run their own timeline. Trigger-
-   * with-tail moves (like echoThrow) return a disposer that the router can
-   * call on panic to bail out mid-flight.
+   * with-tail moves (like echoThrow) return a handle whose dispose the router
+   * can call on panic to bail out mid-flight.
    */
-  execute(ctx: DubMoveContext): { dispose(): void } | null;
+  execute(ctx: DubMoveContext): DubMoveHandle | null;
 }

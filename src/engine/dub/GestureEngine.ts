@@ -31,6 +31,14 @@
 
 import { fire } from './DubRouter';
 import { msToNextGridBoundary } from './dubGrid';
+import {
+  SHAPE_TICK_MS,
+  shapeProgressFrom,
+  shapeValue,
+  type AutomatedShape,
+  type ShapeCurve,
+} from '@/lib/dub/gestureShape';
+import type { DubMoveHandle } from './moves/_types';
 import type { DubBusSettings } from '@/types/dub';
 
 export type GestureShape = 'hold' | 'rebound' | 'ramp' | 'sweep';
@@ -51,6 +59,21 @@ export interface GestureSpec {
   quantizeRelease?: GestureQuantize;
   /** For 'rebound': how long the bounce is held, in ms. */
   reboundMs?: number;
+  /**
+   * For 'ramp' and 'sweep': which parameter the shape moves, and between what.
+   *
+   * The shape says HOW the value travels; this says WHAT travels and over
+   * what range, because that is the move's business and differs per move.
+   * `durationMs` defaults to the hold — give it only when the travel should
+   * finish before the gesture does.
+   */
+  automate?: {
+    param: string;
+    from: number;
+    to: number;
+    curve?: ShapeCurve;
+    durationMs?: number;
+  };
   bpm: number;
   source?: 'live' | 'lane';
   /** Who is firing. Omitted means the user — the AI declares itself. */
@@ -74,17 +97,20 @@ export interface ActiveGestureRecord {
   degraded?: string;
 }
 
-/** Handle a move returns. `update` is optional and rare — see the file docs. */
-interface MoveHandle {
-  dispose(): void;
-  update?(params: Record<string, number>): void;
-}
+/** Handle a move returns. `update` is optional and rare — see `_types.ts`. */
+type MoveHandle = DubMoveHandle;
 
 interface LiveGesture extends ActiveGestureRecord {
   handle: MoveHandle | null;
   timers: Set<ReturnType<typeof setTimeout>>;
   spec: GestureSpec;
   released: boolean;
+  /**
+   * Where the shape had reached, and when, the last time its schedule was set.
+   * Extending a hold re-anchors here rather than restarting, so the travel
+   * slows instead of jumping backwards.
+   */
+  automation: { anchorMs: number; anchorProgress: number; endMs: number } | null;
 }
 
 let _counter = 0;
@@ -114,6 +140,7 @@ export function beginGesture(spec: GestureSpec): string {
     timers: new Set(),
     spec,
     released: false,
+    automation: null,
   };
   _gestures.set(id, gesture);
 
@@ -150,8 +177,8 @@ function startNow(gesture: LiveGesture): void {
   gesture.handle = handle;
   gesture.startedAtMs = performance.now();
 
-  if ((gesture.shape === 'ramp' || gesture.shape === 'sweep') && !handle?.update) {
-    gesture.degraded = `${gesture.shape} needs a move that can update its params mid-flight; ${spec.moveId} cannot, so it is held instead`;
+  if (gesture.shape === 'ramp' || gesture.shape === 'sweep') {
+    startAutomation(gesture, gesture.shape);
   }
 
   spec.onStart?.(snapshot(gesture));
@@ -164,6 +191,84 @@ function startNow(gesture: LiveGesture): void {
   if (gesture.holdMs > 0) {
     schedule(gesture, () => endGesture(gesture.id), gesture.holdMs);
   }
+}
+
+/**
+ * Drive a `ramp` or `sweep` while the gesture is held.
+ *
+ * Three things have to be true before a shape can actually be traced, and
+ * each failure is recorded rather than papered over — a gesture that silently
+ * behaves like a plain hold is worse than one that says why it could not.
+ *
+ *   1. The move accepts parameters mid-flight (`handle.update`).
+ *   2. The spec says WHICH parameter travels, and between what values.
+ *   3. The travel has a known duration. A hold whose end is not yet known —
+ *      a finger still down — has no progress to be at.
+ *
+ * Values are pushed on a timer rather than scheduled as one AudioParam curve
+ * because the hold can be extended or cut short at any moment, and a curve
+ * scheduled at the start would have to be cancelled and rebuilt anyway.
+ */
+function startAutomation(gesture: LiveGesture, shape: AutomatedShape): void {
+  const { spec } = gesture;
+  const update = gesture.handle?.update;
+  if (!update) {
+    gesture.degraded = `${shape} needs a move that can update its params mid-flight; ${spec.moveId} cannot, so it is held instead`;
+    return;
+  }
+  const automate = spec.automate;
+  if (!automate) {
+    gesture.degraded = `${shape} needs an automate spec saying which parameter travels; none was given, so ${spec.moveId} is held instead`;
+    return;
+  }
+  const now = performance.now();
+  // Where the shape has already got to. Zero on the first start; on a hold
+  // that was extended mid-travel it is wherever the player had reached, and
+  // the remaining travel is spread over the remaining time from there.
+  const carried = gesture.automation
+    ? currentProgress(gesture, now) ?? 0
+    : 0;
+  const totalMs = automate.durationMs ?? gesture.holdMs;
+  const endMs = automate.durationMs !== undefined
+    ? gesture.startedAtMs + automate.durationMs
+    : gesture.startedAtMs + gesture.holdMs;
+  if (!(totalMs > 0) || endMs <= now) {
+    gesture.degraded = `${shape} needs a known duration to travel over; this gesture has an open-ended hold, so ${spec.moveId} is held instead`;
+    gesture.automation = null;
+    return;
+  }
+  gesture.automation = { anchorMs: now, anchorProgress: carried, endMs };
+
+  const push = (progress: number) => {
+    const value = shapeValue(shape, progress, automate.from, automate.to, automate.curve);
+    try {
+      gesture.handle?.update?.({ [automate.param]: value });
+    } catch (err) {
+      console.warn(`[GestureEngine] ${spec.moveId} rejected a ${shape} value:`, err);
+    }
+  };
+
+  push(carried);
+  if (carried >= 1) return;
+
+  const tick = () => {
+    if (!_gestures.has(gesture.id)) return;
+    const progress = currentProgress(gesture, performance.now());
+    if (progress === null) return;
+    push(progress);
+    // Stop at the far end: the exact landing is pinned on release, and ticking
+    // on past 1 would only push the same value over and over.
+    if (progress >= 1) return;
+    schedule(gesture, tick, SHAPE_TICK_MS);
+  };
+  schedule(gesture, tick, SHAPE_TICK_MS);
+}
+
+/** How far along the shape is now, honouring any mid-gesture re-anchor. */
+function currentProgress(gesture: LiveGesture, nowMs: number): number | null {
+  const a = gesture.automation;
+  if (!a) return null;
+  return shapeProgressFrom(a.anchorProgress, nowMs - a.anchorMs, a.endMs - a.anchorMs);
 }
 
 /**
@@ -183,8 +288,18 @@ export function updateGesture(
     clearTimers(gesture);
     gesture.holdMs = Math.max(0, patch.holdMs);
     const remaining = gesture.startedAtMs + gesture.holdMs - performance.now();
-    if (remaining <= 0) endGesture(id);
-    else schedule(gesture, () => endGesture(id), remaining);
+    if (remaining <= 0) {
+      endGesture(id);
+      return ok;
+    }
+    schedule(gesture, () => endGesture(id), remaining);
+    // Clearing the timers above stopped the shape's ticks too. Restart it
+    // against the NEW duration rather than leaving the value frozen where it
+    // stood: holding a sweep longer should sweep for longer, which is the
+    // whole reason the shape lives out here and not inside the move.
+    if (gesture.shape === 'ramp' || gesture.shape === 'sweep') {
+      startAutomation(gesture, gesture.shape);
+    }
   }
   if (patch.params) {
     if (gesture.handle?.update) gesture.handle.update(patch.params);
@@ -247,6 +362,11 @@ export function gestureCount(): number {
 
 function release(gesture: LiveGesture, reason: GestureEndReason): void {
   clearTimers(gesture);
+  // Land the shape BEFORE disposing. Ticks run on a 25 ms timer, so the last
+  // one is up to a tick short of the end and a ramp would stop just above the
+  // frequency the player aimed at. A gesture played to its end arrives at its
+  // end — and it has to arrive while the move is still there to hear it.
+  landAutomation(gesture);
   try { gesture.handle?.dispose(); } catch (err) {
     console.error(`[GestureEngine] dispose threw for ${gesture.moveId}:`, err);
   }
@@ -275,6 +395,27 @@ function finish(gesture: LiveGesture, reason: GestureEndReason): void {
   clearTimers(gesture);
   _gestures.delete(gesture.id);
   gesture.spec.onEnd?.(snapshot(gesture), reason);
+}
+
+/**
+ * Push the shape's final value: the far end for a ramp, home for a sweep.
+ *
+ * Only on a gesture that was played out. `cancelGesture` does not call this —
+ * cancel means abandon, and driving a parameter to a target nobody reached
+ * would be the engine finishing a gesture the player did not.
+ */
+function landAutomation(gesture: LiveGesture): void {
+  if (gesture.shape !== 'ramp' && gesture.shape !== 'sweep') return;
+  if (gesture.degraded) return;
+  const automate = gesture.spec.automate;
+  const update = gesture.handle?.update;
+  if (!automate || !update) return;
+  const value = shapeValue(gesture.shape, 1, automate.from, automate.to, automate.curve);
+  try {
+    update({ [automate.param]: value });
+  } catch (err) {
+    console.warn(`[GestureEngine] ${gesture.moveId} rejected its final ${gesture.shape} value:`, err);
+  }
 }
 
 function schedule(gesture: LiveGesture, fn: () => void, ms: number): void {

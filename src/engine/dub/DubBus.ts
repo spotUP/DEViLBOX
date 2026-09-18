@@ -3155,6 +3155,29 @@ export class DubBus {
   }
 
   /**
+   * Put the bus LPF at `hz` now, gliding over `glideSec`.
+   *
+   * The counterpart to `filterDrop`, which schedules a whole down-then-up
+   * shape of its own. This one sets a single position, so something outside
+   * can trace the shape instead — a gesture whose length the player decides
+   * as they hold it, which no pre-scheduled ramp can express.
+   *
+   * The glide is short and deliberate: stepping a filter frequency without one
+   * is the zipper noise every knob implementation learns about once.
+   */
+  setLpfCutoffNow(hz: number, glideSec = 0.03): void {
+    if (!this.enabled) return;
+    const target = Math.max(40, Math.min(20000, hz));
+    const f = this.lpf.frequency;
+    const now = this.context.currentTime;
+    try {
+      f.cancelScheduledValues(now);
+      f.setValueAtTime(f.value, now);
+      f.exponentialRampToValueAtTime(target, now + Math.max(0.001, glideSec));
+    } catch { /* ok */ }
+  }
+
+  /**
    * startHpfRise — Tubby's "Big Knob" gesture: sweep the HPF UP through
    * Altec positions to peakHz, hold, then sweep back to the original position.
    *
