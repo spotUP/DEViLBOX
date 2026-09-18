@@ -43,6 +43,7 @@ import {
   type RepetitionVerdict,
 } from './repetition';
 import { pickTarget } from './musicalTargeting';
+import { barredByArrangement } from './arrangementFloor';
 import type { PersonaBehaviour } from './personaBehaviour';
 
 export interface PerformanceCycleInput {
@@ -152,6 +153,14 @@ export function runPerformanceCycle(
 
   const surprise = allowSurprise(varianceInputsFrom(context), input.behaviour, input.rng);
 
+  // How many parts are actually playing. A sixteen-channel module with one
+  // active part is a one-part arrangement, so this counts sources that have
+  // onsets rather than channels that exist.
+  const soundingParts = input.sources.reduce(
+    (n, source) => n + (source.onsets.length > 0 ? 1 : 0),
+    0,
+  );
+
   const repetition = classifyRepetition(context.recentMoves, {
     rowsPerBar: context.position.rowsPerBar,
     rowsPerPhrase: context.position.rowsPerPhrase,
@@ -175,7 +184,12 @@ export function runPerformanceCycle(
     repetitionWeightFor: (moveId: string) =>
       repetitionWeight(moveId, repetition, input.behaviour.novelty, atMotif),
     barredFor: (moveId: string) =>
-      barredForRepetition(moveId, context.recentMoves, repetition, atMotif),
+      barredForRepetition(moveId, context.recentMoves, repetition, atMotif)
+      // A drop needs something to drop AGAINST. With one part sounding, a move
+      // that removes leaves silence rather than a version — see
+      // `arrangementFloor.ts`. Counted from parts that actually PLAY, not from
+      // how many channels the format has.
+      || barredByArrangement(moveId, soundingParts),
     state: step.state,
   };
 }

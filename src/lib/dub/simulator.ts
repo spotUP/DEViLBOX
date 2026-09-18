@@ -205,7 +205,7 @@ export function simulatePerformance(
     if (result.step.shouldFire) {
       const moveId = chooseSimulatedMove(
         result.decision.intention, ledger, nowSec, budget,
-        result.repetitionWeightFor, result.barredFor,
+        result.repetitionWeightFor, result.barredFor, rng,
       );
       if (moveId) {
         const id = `sim${nextGestureId++}`;
@@ -286,6 +286,29 @@ export function simulatePerformance(
  * same move. The live rule table's weighted roll is a different question and
  * needs a tick context this environment does not have.
  */
+/**
+ * Pick a move the way the live performer picks one: a weighted roll.
+ *
+ * This used to sort by repetition weight and take the first admissible
+ * candidate — a deterministic argmax that never touched the RNG. Two things
+ * followed, and both were measured on 2026-09-18 before being fixed:
+ *
+ *   - **The seed did nothing.** Runs at seed 1234 and seed 99 were byte
+ *     identical, first differing cycle: none. So N4's thirty minutes proved
+ *     ONE trajectory rather than a sampled space, while reading as though a
+ *     seed had explored something.
+ *   - **Only 6 of the 44 registered moves could ever fire.** The same highest
+ *     weighted admissible candidate won its intention every time, and ties
+ *     broke on array order, so most of the library was unreachable. Which is
+ *     also why "measure the siren with the simulator" could never have said
+ *     anything about X14: `dubSiren` never fired here at all.
+ *
+ * That is precisely the divergence Gate N1 exists to prevent — "a simulator
+ * with its own copy would tune a second performer that merely resembles the
+ * real one". The decision CHAIN was shared; the choice at the end of it was
+ * not. `AutoDub` rolls `rng() * totalWeight` and walks the cumulative weights,
+ * so this does the same.
+ */
 function chooseSimulatedMove(
   intention: IntentionDecision['intention'],
   ledger: EnergyLedger,
@@ -293,16 +316,23 @@ function chooseSimulatedMove(
   budget: EnergyBudget,
   repetitionWeightFor: (moveId: string) => number,
   barredFor: (moveId: string) => boolean,
+  rng: () => number,
 ): string | null {
-  const candidates = movesForIntention(intention).filter(id => !barredFor(id));
-  if (candidates.length === 0) return null;
-  // Prefer moves the repetition verdict has not pushed down, so a rut breaks
-  // here the same way it breaks in the live selection.
-  const ranked = [...candidates].sort((a, b) => repetitionWeightFor(b) - repetitionWeightFor(a));
-  for (const moveId of ranked) {
-    if (ledger.admits(moveId, nowSec, budget).ok) return moveId;
+  const eligible = movesForIntention(intention)
+    .filter(id => !barredFor(id))
+    .filter(id => ledger.admits(id, nowSec, budget).ok)
+    .map(id => ({ id, weight: Math.max(0, repetitionWeightFor(id)) }))
+    .filter(e => e.weight > 0);
+  if (eligible.length === 0) return null;
+
+  const totalWeight = eligible.reduce((sum, e) => sum + e.weight, 0);
+  let roll = rng() * totalWeight;
+  for (const e of eligible) {
+    if (roll < e.weight) return e.id;
+    roll -= e.weight;
   }
-  return null;
+  // Floating-point drift only; the roll is bounded by the total.
+  return eligible[eligible.length - 1].id;
 }
 
 /** Render a log as text — for eyeballing a run or diffing two. */
