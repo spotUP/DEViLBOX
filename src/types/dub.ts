@@ -561,6 +561,37 @@ export interface ChannelFxConfig {
   sweepFeedback?: number;
 }
 
+/**
+ * Character presets, and what each number in them is actually based on.
+ *
+ * Gate F3 — evidence levels. The historical record supports EQUIPMENT,
+ * TECHNIQUES and broad working practices. It does not support numbers: nobody
+ * wrote down that King Tubby's bass shelf sat at +9 dB around 60 Hz, because
+ * no such control existed to write down. Presenting a reconstruction as
+ * documented fact is the part that would be wrong, so every value below is
+ * labelled with what it rests on:
+ *
+ *   L1 — DOCUMENTED FACT.
+ *        "Tubby used an Altec stepped high-pass filter." Attested by the
+ *        people who were there and by the surviving equipment.
+ *
+ *   L2 — STRONG TECHNICAL INFERENCE.
+ *        "A stepped HPF is therefore the right character control for a Tubby
+ *        preset." Follows from L1 and from how the equipment behaves, but is
+ *        a conclusion rather than a record.
+ *
+ *   L3 — CREATIVE PARAMETERIZATION.
+ *        "Set that shelf to +9 dB at 60 Hz." Ours. Chosen because it sounds
+ *        right in THIS system, on THIS signal path, and it would have to be
+ *        rechosen if either changed.
+ *
+ * The labels are not decoration: an L3 number is free to be retuned by ear
+ * whenever it stops sounding right, while changing an L1 or L2 choice means
+ * the preset has stopped representing the engineer it is named after. Anyone
+ * tuning these should know which they are touching.
+ *
+ * Unless a comment says otherwise, every numeric value here is L3.
+ */
 export const DUB_CHARACTER_PRESETS: Record<Exclude<DubBusSettings['characterPreset'], 'custom'>, DubCharacterPreset> = {
   tubby: {
     label: 'King Tubby',
@@ -568,9 +599,11 @@ export const DUB_CHARACTER_PRESETS: Record<Exclude<DubBusSettings['characterPres
     overrides: {
       returnGain:     0.75,  // heavy bus presence — Tubby is LOUD
       hpfCutoff:      65,   // was 100 — lower to let sub-bass breathe
-      hpfStepped:     true,   // the "Big Knob" rhythmic staccato sweeps
-      hpfResonanceDb: 2.5,    // Altec 9069B T-network resonant hump — the "voice" of the filter
-      bassShelfGainDb: 9, bassShelfFreqHz: 60,  bassShelfQ: 0.9,  // was 85Hz — lower shelf = true sub depth
+      hpfStepped:     true,   // L1: the Altec's stepped "Big Knob" is documented equipment.
+      hpfResonanceDb: 2.5,    // L2 that it should resonate (the 9069B T-network does); L3 for 2.5 dB.
+      // L2: Tubby's mixes are bass-forward and that is well attested. L3: every
+      // number here — the shelf, its corner and its Q are ours, not his.
+      bassShelfGainDb: 9, bassShelfFreqHz: 60,  bassShelfQ: 0.9,
       masterBassPunchDb: 6,   // dry-path punch — Tubby's signature kick weight
       midScoopGainDb:  0,
       echoIntensity:  0.55,   // was 0.65 — echoSpring mode: repeats each get a spring tail,
