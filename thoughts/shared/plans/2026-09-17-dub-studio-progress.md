@@ -12,7 +12,7 @@ analysis: thoughts/shared/plans/2026-09-17-dub-studio-gap-reconciliation.md
 Durable todo list. Survives compaction, crashes, `/clear`. **Re-read this before trusting
 recollection or any earlier summary in a conversation.**
 
-Running count: **50 of 57 done.**
+Running count: **51 of 57 done.**
 
 **The denominator was wrong until 2026-09-18.** The header said "of 36" from the day this file
 was written and was never updated as sub-items (F1a, F1c, F2a-F2e, T1-T3, the X series) were
@@ -33,7 +33,7 @@ recount — do not trust this sentence either.
 | G — wet energy | **closed** | G1 |
 | H-L — musical behaviour | **closed** | H1, I1, J1, K1-K4, L1, L2, AE1 |
 | M-O — record, verify, release | M1, N1-N4, O1 done | O2 (human) |
-| X — user-reported open threads | 10 of 17 | X1, X5, X6, X7, X8, X11, X12, X13, X15, X16 closed |
+| X — user-reported open threads | 11 of 17 | X1, X3, X5, X6, X7, X8, X11, X12, X13, X15, X16 closed |
 
 ### Debt carried, not hidden
 
@@ -1152,9 +1152,22 @@ this bug.
       while it stands — pinned sends feed the echo continuously — so re-measure
       after X9 lands before concluding anything about gain staging.
 
-- [ ] **X3** `extFeedbackEqDb` is a +1 dB boost inside the ext loop with no
+- [x] **X3** `extFeedbackEqDb` is a +1 dB boost inside the ext loop with no
       mirror. Harmless now the limiter is in place and the tap moved, but it is
       the same class of defect as the hpfResonance mirror. Low priority.
+
+      **CLOSED 2026-09-18.** The "same class as the hpfResonance mirror" reading was only
+      half right, and acting on it would have been wrong: `extFeedbackShelfComp` mirrors
+      the bass shelf because that shelf is applied on the FORWARD path and the loop would
+      apply it a second time. This EQ is the loop's OWN deliberate colour — mirroring it
+      deletes the feature.
+      What was missing is a BUDGET, not a mirror. The fader was clamped to 0.85 with the
+      EQ uncounted, so the real round-trip gain at the EQ centre was 0.85 x boost:
+      **+1 dB = 0.954, +3 dB = 1.20 — over unity** in a narrow band while the fader still
+      read "safe". `src/lib/dub/extFeedbackCeiling.ts` shrinks the ceiling by the boost so
+      the worst case stays at 0.85 however the EQ is set, and recomputes when EITHER
+      control moves. Only boosts count — a cut quietens one frequency, and spending that
+      as extra feedback would hand back headroom everywhere else. 12 tests.
 - [ ] **X4** Six commits unpushed. Nothing verified by ear yet, so nothing has
       gone live. Push after X2 passes a listening test.
 
