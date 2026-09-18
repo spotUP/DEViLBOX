@@ -591,6 +591,30 @@ copy/paste (`TrackerCell[]` whole objects), `.dbx` save/load (patterns serialize
       **Found while wiring it:** `get_performance_journal` and `clear_performance_journal`
       had handlers and bridge routes but were never declared by the MCP server, so neither
       was reachable from outside. Both are declared now. 22 tests.
+
+      **TWO DEFECTS IN THE ABOVE, found an hour later by RUNNING the tools against a real
+      session instead of trusting them** (commit `fb2f9e8a5`):
+      (a) *The journal recorded nothing.* `getPerformanceJournalRecorder()` was called
+      only inside `startAutoDub`, which made this module's own documented promise false —
+      "the journal works when the performer is not running at all". With AutoDub off
+      nothing subscribed to the router, so hand-played moves were never recorded; and
+      READING the journal is what attached the listener, so it was always empty for fires
+      that had already happened. Measured: two live fires, then `total: 0`. Now attached
+      at the engine's dub bootstrap beside `setDubBusForRouter`, so the document exists
+      whenever the router does, whatever view is open and whoever is playing.
+      (b) *The verifier read the wrong storage.* It compared the journal against
+      `pattern.dubLane.events` — LEGACY: `DubRecorder` stopped writing it and load
+      migration moves any remaining events into automation curves and then CLEARS the
+      lane. For every performance recorded since, the check found nothing and would have
+      reported each entry as "missing", concluding the take does not reproduce. Exactly
+      backwards. `firesFromCurves` now reads where a recording lives (upward 0.5 crossing
+      = a fire, as `AutomationPlayer` does; channel from `channelIndex`, -1 = global; a
+      hold counted once; `dub.channelSend` skipped because a ride is a movement, not a
+      fire), and `firesForPattern` merges in legacy lane events for unmigrated projects.
+      One existing contract assertion had pinned the WRONG behaviour and was corrected,
+      not relaxed.
+      **Lesson worth keeping: both were invisible to unit tests and obvious the moment
+      the tool was actually called.**
 - [x] **N1** Deterministic offline performance simulator (project, BPM, metre, phrase length,
       persona, seed, duration → bar-by-bar decision log). Primary tuning environment.
       `src/lib/dub/simulator.ts`, driving `src/lib/dub/performanceCycle.ts` — the decision
