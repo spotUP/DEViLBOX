@@ -15,6 +15,8 @@ import type { AutomationCurve } from '@typedefs/automation';
 import type { EffectConfig } from '@typedefs/instrument';
 import { needsMigration, migrateProject } from '@/lib/migration';
 import { CURRENT_SCHEMA, MIN_LOADABLE_SCHEMA, migrateSavedProject } from '@/lib/persistence/migrations';
+import { getPerformanceJournal, loadPerformanceJournal } from '@/engine/dub/performanceJournalBridge';
+import { parseJournal } from '@/lib/dub/performanceJournal';
 import { getOriginalModuleDataForExport, getNativeEngineDataForExport, getNativeEngineMetaForExport, getNativeCompanionFilesForExport, restoreNativeEngineData, type SerializedCompanionFiles } from '@/lib/export/exporters';
 import { compressProject } from '@/lib/projectCompression';
 import { useMixerStore } from '@stores/useMixerStore';
@@ -133,6 +135,10 @@ const safeCancelIdleCallback = cancelIdleCallbackPolyfill;
  * - 21: Time-mode dub lanes for non-editable formats (raw SID, SC68). DubLane
  *       gains optional `kind: 'row' | 'time'` and `durationSec`; DubEvent gains
  *       optional `timeSec` and `durationSec`. Absence = row mode (back-compat).
+ * - 23: `performanceJournal` — the dub performer's record of what it played and
+ *       WHY (intention, target, reason, gesture state). Purely additive and
+ *       forward-compatible: it never affects replay, so an older build ignoring
+ *       the field loses commentary and nothing else.
  * - 22: Companion/sidecar files for two-file UADE formats (Sonix .instr/.ss,
  *       TFMX mdat+smpl, Richard Joseph, Jason Page) serialized as
  *       `nativeCompanionFiles`. Purely additive AND forward-compatible: schema-21
@@ -166,6 +172,15 @@ interface SavedProject {
   mixer?: import('@stores/useMixerStore').MixerSnapshot;
   dubBus?: Partial<import('@/types/dub').DubBusSettings>;
   autoDub?: { enabled: boolean; persona: string; intensity: number; moveBlacklist: string[] };
+  /**
+   * Gate M1 — what the dub performer played and why (see
+   * `src/lib/dub/performanceJournal.ts`).
+   *
+   * Commentary, never a replay source: the lanes and cells decide what
+   * happens. A project without one loads exactly as before, and one with it
+   * loads in a build that has never heard of the field.
+   */
+  performanceJournal?: import('@/lib/dub/performanceJournal').PerformanceJournal;
 }
 
 // ============================================================================
@@ -457,6 +472,16 @@ function buildSavedProject(): SavedProject {
     },
     // Dub bus tuning — character preset + coloring params
     dubBus: useDrumPadStore.getState().dubBus,
+    // Only save a journal that has something in it — an empty one is noise in
+    // every project file that never ran the performer.
+    performanceJournal: (() => {
+      try {
+        const journal = getPerformanceJournal();
+        return journal.entries.length > 0 ? journal : undefined;
+      } catch {
+        return undefined;
+      }
+    })(),
     // Auto Dub state
     ...(() => {
       const s = useDubStore.getState();
@@ -699,6 +724,14 @@ export function applySavedProject(project: SavedProject, opts?: { fromRecovery?:
     s.setAutoDubIntensity(project.autoDub.intensity);
     s.setAutoDubMoveBlacklist(project.autoDub.moveBlacklist ?? []);
     s.setAutoDubEnabled(project.autoDub.enabled);
+  }
+
+  // Restore the performance journal (Gate M1). Commentary only — it never
+  // feeds replay, so a malformed or absent one costs nothing but the notes.
+  try {
+    loadPerformanceJournal(parseJournal(project.performanceJournal));
+  } catch (err) {
+    console.warn('[Project] performance journal could not be restored:', err);
   }
 
   // Recovery restore must stay never-saved + dirty so the scheduler re-arms;

@@ -95,3 +95,16 @@ export function resetPerformanceJournal(): void {
   _recorder = null;
   _annotate = null;
 }
+
+/**
+ * Load a journal recorded in a previous session.
+ *
+ * Replaces whatever is in memory: a loaded project's journal describes THAT
+ * performance, and merging it with the current session's would produce a
+ * record of a take nobody played.
+ */
+export function loadPerformanceJournal(journal: PerformanceJournal): void {
+  const recorder = getPerformanceJournalRecorder();
+  recorder.clear();
+  for (const entry of journal.entries) recorder.record({ ...entry });
+}
