@@ -682,6 +682,27 @@ export function createMcpServer(): McpServer {
   );
 
   server.tool(
+    'get_performance_journal',
+    'Return the performance journal: what was played and WHY. Each entry carries the move, channel, row and bar, plus - for the AI\'s own fires - the intention, the target and the reason the planner recorded. The user\'s moves appear in the same document, in the order they happened, with no invented reasoning. Optional { limit } (default 60, max 500) takes the most recent entries.',
+    { limit: z.number().optional() },
+    (args: { limit?: number }) => call('get_performance_journal', args),
+  );
+
+  server.tool(
+    'verify_performance_journal',
+    'Check that the saved lane plays back the performance the journal describes. The lanes are what actually fires and the journal only explains them, so the two can drift apart when a lane is edited by hand. Reports missing (described but not played), unexplained (played but not described) and misplaced (right move, wrong row) rather than a bare pass/fail. Reads the lane; makes no sound. Optional { patternIndex } defaults to the current pattern.',
+    { patternIndex: z.number().optional() },
+    (args: { patternIndex?: number }) => call('verify_performance_journal', args),
+  );
+
+  server.tool(
+    'clear_performance_journal',
+    'Start a clean take: empties the performance journal, leaving lanes and pattern cells alone.',
+    {},
+    () => call('clear_performance_journal'),
+  );
+
+  server.tool(
     'clear_auto_dub_fire_log',
     'Clear the Auto Dub fire log ring buffer. Call before a test window to get a clean read from get_auto_dub_fire_log.',
     {},

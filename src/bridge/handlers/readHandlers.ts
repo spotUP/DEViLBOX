@@ -779,6 +779,50 @@ export async function getPerformanceJournal(
   };
 }
 
+/**
+ * Gate M1's last question: does what is saved play back as the journal says?
+ *
+ * The lanes are what plays; the journal only explains them. That separation
+ * keeps a stale journal from corrupting a replay, and it is also how the two
+ * drift apart unnoticed — edit a lane, delete an event, and the commentary
+ * describes a performance nobody will hear. This names the difference.
+ *
+ * Reads the lane rather than firing it: a diagnostic that made a noise every
+ * time you asked would be useless during a take.
+ */
+export async function verifyPerformanceJournal(
+  params: Record<string, unknown> = {},
+): Promise<Record<string, unknown>> {
+  const { getPerformanceJournal: read } = await import('../../engine/dub/performanceJournalBridge');
+  const { compareJournalToReplay, formatReplayReport, firesFromLane } =
+    await import('../../lib/dub/journalReplay');
+  const { useTrackerStore } = await import('../../stores/useTrackerStore');
+
+  const state = useTrackerStore.getState();
+  const patternIndex = typeof params.patternIndex === 'number'
+    ? params.patternIndex
+    : state.currentPatternIndex;
+  const pattern = state.patterns[patternIndex];
+  if (!pattern) {
+    return { error: `No pattern at index ${patternIndex}` };
+  }
+
+  const journal = read();
+  const fires = firesFromLane(pattern.dubLane);
+  const report = compareJournalToReplay(journal, fires);
+  return {
+    patternIndex,
+    journalEntries: journal.entries.length,
+    laneEvents: fires.length,
+    reproduces: report.reproduces,
+    matched: report.matched,
+    missing: report.missing,
+    misplaced: report.misplaced,
+    unexplained: report.unexplained,
+    text: formatReplayReport(report),
+  };
+}
+
 /** Start a clean take — the journal only, leaving lanes and cells alone. */
 export async function clearPerformanceJournal(): Promise<Record<string, unknown>> {
   const { clearPerformanceJournal: clear } = await import('../../engine/dub/performanceJournalBridge');
