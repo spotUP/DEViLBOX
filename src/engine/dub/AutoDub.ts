@@ -1185,11 +1185,85 @@ export function getAutoDubPerformanceState(): PerformanceState {
 let _lastIntention: IntentionDecision | null = null;
 /** Bar position of the last cycle, so a journal entry reads musically. */
 let _lastPosition: { bar: number; barInPhrase: number } | null = null;
+/** 0..1 through the phrase at the last cycle — the monitor's phrase readout. */
+let _lastPhrasePosition: number | null = null;
 
 /** The intention behind the most recent tick — read by MCP diagnostics and
  *  by the fire log, so a fire can be explained rather than just listed. */
 export function getAutoDubIntention(): IntentionDecision | null {
   return _lastIntention;
+}
+
+/**
+ * Everything the Gate O1 monitor needs, in one read.
+ *
+ * Assembled here because the monitor must never reach into the performer's
+ * internals — a UI that reads private state is a UI that breaks every time the
+ * performer is refactored, and one that polls five getters can show five
+ * different instants at once.
+ */
+export interface PerformanceSnapshot {
+  running: boolean;
+  persona: string;
+  state: PerformanceState;
+  intention: string | null;
+  target: { kind: string; channelId?: number; reason?: string } | null;
+  /** Why this intention — the planner's own words. */
+  reason: string | null;
+  bar: number | null;
+  barInPhrase: number | null;
+  /** 0..1 through the phrase. */
+  phrasePosition: number | null;
+  wet: number;
+  feedback: number;
+  gesturesInFlight: number;
+  lastMove: { moveId: string; channelId?: number; bar?: number } | null;
+  /** The next event the performer can see, if it is aiming at one. */
+  nextTargetRow: number | null;
+  /** Concise factors behind the current state — the monitor's WHY? line. */
+  why: string[];
+}
+
+export function getPerformanceSnapshot(): PerformanceSnapshot {
+  const energy = _energyLedger.read(performance.now() / 1000);
+  const journal = (() => {
+    try {
+      const entries = getPerformanceJournalRecorder().snapshot().entries;
+      const last = entries[entries.length - 1];
+      return last ? { moveId: last.moveId, channelId: last.channelId, bar: last.bar } : null;
+    } catch { return null; }
+  })();
+
+  const why: string[] = [];
+  if (_lastIntention) {
+    why.push(_lastIntention.reason);
+    if (_lastIntention.holdBars > 1) why.push(`committed for ${_lastIntention.holdBars} bars`);
+  }
+  if (_heldGestureCount() > 0) why.push(`${_heldGestureCount()} in flight`);
+  if (energy.wet > 0.6) why.push(`wet ${energy.wet.toFixed(2)} — little room left`);
+  if (energy.feedback > 0.7) why.push(`feedback ${energy.feedback.toFixed(2)}`);
+
+  return {
+    running: _timer !== null,
+    persona: _appliedBehaviourFor ?? useDubStore.getState().autoDubPersona,
+    state: _performanceState,
+    intention: _lastIntention?.intention ?? null,
+    target: _lastIntention?.target ?? null,
+    reason: _lastIntention?.reason ?? null,
+    bar: _lastPosition?.bar ?? null,
+    barInPhrase: _lastPosition?.barInPhrase ?? null,
+    phrasePosition: _lastPhrasePosition,
+    wet: energy.wet,
+    feedback: energy.feedback,
+    gesturesInFlight: _heldGestureCount(),
+    lastMove: journal,
+    nextTargetRow: _lastIntention?.targetRow ?? null,
+    why,
+  };
+}
+
+function _heldGestureCount(): number {
+  try { return gestureCount(); } catch { return 0; }
 }
 
 let _timer: ReturnType<typeof setInterval> | null = null;
@@ -1541,6 +1615,7 @@ function tickImpl(): void {
     bar: Math.floor(performanceCtx.position.bar),
     barInPhrase: Math.floor(performanceCtx.position.barInPhrase),
   };
+  _lastPhrasePosition = performanceCtx.position.positionInPhrase;
   _performanceState = cycle.state;
 
   if (step.shouldRelease) {
@@ -1807,6 +1882,7 @@ export function stopAutoDub(): void {
   _appliedBehaviourFor = null;
   _performanceState = 'LISTEN';
   _lastPosition = null;
+  _lastPhrasePosition = null;
   // The journal itself survives a stop — it is the record of what was just
   // played, and throwing it away on stop would delete the take.
   setPerformanceAnnotator(null);
