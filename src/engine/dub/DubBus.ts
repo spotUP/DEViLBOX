@@ -54,6 +54,7 @@ import { useNotificationStore } from '@/stores/useNotificationStore';
 import { resolveVinylLevel } from '@/lib/dub/vinylLevel';
 import { ChannelTapBaselines } from '@/lib/dub/channelTapBaseline';
 import { makeSoftClipCurve } from '@/lib/dub/softClipCurve';
+import { AuditionHold } from '@/lib/dub/auditionHold';
 import { generatedPeak, shelfTrimForProgramme } from './programmeReference';
 
 /** Where the master insert's safety clipper starts to saturate. */
@@ -1032,7 +1033,7 @@ export class DubBus {
     const clamped = Math.max(0, Math.min(1, mix));
     console.log(`[DubBusCtrl] setPlateStageMix(${clamped.toFixed(3)})`);
     this.settings = { ...this.settings, plateStageMix: clamped };
-    if (this.plateSend) this.plateSend.gain.value = clamped;
+    if (this.plateSend) this._setColourStageGain(this.plateSend.gain, clamped, 0.001);
   }
 
   /** Build + wire the plate stage. stereoMerge → plateSend → plate → return_. */
@@ -3121,6 +3122,11 @@ export class DubBus {
     // cutting its input. Reported 2026-09-18 as "a siren is stuck".
     this.silenceGeneratedSynths();
 
+    // An audition in flight owns five colour gains and holds the values to
+    // restore. Panic resets those gains itself, so a snapshot left standing
+    // would hand back pre-panic levels the moment the button came up.
+    this.endAudition();
+
     const wasEnabled = this.enabled;
     this.enabled = false;
     if (wasEnabled) {
@@ -3152,6 +3158,112 @@ export class DubBus {
         f.exponentialRampToValueAtTime(20000, release + upSec);
       } catch { /* ok */ }
     });
+  }
+
+  // ─── Bus audition — a solo button for the send ─────────────────────────
+
+  /**
+   * How long an audition takes to come in or go out. Long enough not to click,
+   * short enough that the ear holds what it just heard alongside what it hears
+   * now — which is the whole point of pressing it.
+   */
+  private static readonly AUDITION_RAMP_SEC = 0.04;
+
+  /** Which colour gains are held down, and where to put them back. */
+  private _audition = new AuditionHold();
+
+  get auditioning(): boolean {
+    return this._audition.active;
+  }
+
+  /**
+   * Momentarily drop the PARALLEL colour stages, leaving the core wet chain.
+   *
+   * X6, raised 2026-09-17 while writing test instructions that began "first
+   * switch off Perry" — which is a smell. Hearing what a gesture is doing
+   * should not cost the user their voicing. This is standard desk behaviour:
+   * solo the send to hear what you are actually sending.
+   *
+   * Out: plate, ring mod, lo-fi, the phaser/comb sweep, and the external
+   * feedback loop. In: echo, spring, sidechain, glue and EQ — the chain that
+   * carries the gesture itself.
+   *
+   * It touches GAINS only. In particular it never writes `characterPreset`,
+   * which would flip the preset to 'custom' and silently destroy the user's
+   * voicing (see dubBusCharacterCoherence.test.ts), and it never writes
+   * `settings`, so the restore has something true to restore to.
+   *
+   * **Never automatic.** The engine must not decide to switch colour off
+   * because a gesture is hard to pick out — Perry's wash is Perry working, and
+   * an engineer chooses it on purpose. Safety stays automatic and
+   * persona-independent; musical masking stays the user's call.
+   *
+   * Returns a releaser. Calling twice is harmless: the second call returns a
+   * releaser for the audition already in progress rather than snapshotting the
+   * ducked values as if they were the user's.
+   */
+  beginAudition(): () => void {
+    if (!this.enabled) return () => {};
+
+    const started = this._audition.begin([
+      this.plateSend?.gain,        // plate — null when plateStage is 'off'
+      this.ringModSend.gain,       // ring modulator
+      this.lofiSend.gain,          // lo-fi / voltage starve
+      this.sweepOutput.gain,       // phaser / comb sweep, whichever is selected
+      this.extFeedbackGain.gain,   // external feedback loop
+    ], this.context.currentTime, DubBus.AUDITION_RAMP_SEC);
+
+    // Already auditioning — hand back a releaser for THAT one rather than
+    // snapshotting the ducked values as if they were the user's.
+    if (!started) return () => { this.endAudition(); };
+
+    // The lo-fi bypass is the other half of a crossfade, not a stage of its
+    // own: dropping the send without opening the bypass would mute that path
+    // rather than clear it.
+    this._rampLofiBypassForAudition(true);
+
+    console.log('[DubBus] audition ON — colour stages ducked, core wet chain audible');
+    return () => { this.endAudition(); };
+  }
+
+  /**
+   * Hand the colour back.
+   *
+   * Restores the snapshot rather than re-reading `settings`, so a stage the
+   * user had part-way down comes back part-way down and not at whatever the
+   * preset nominally says.
+   */
+  endAudition(): void {
+    if (!this._audition.active) return;
+    this._audition.end(this.context.currentTime, DubBus.AUDITION_RAMP_SEC);
+    this._rampLofiBypassForAudition(false);
+    console.log('[DubBus] audition OFF — colour restored');
+  }
+
+  /**
+   * Write a colour stage's gain, honouring an audition in progress.
+   *
+   * While auditioning, the live gain belongs to the audition — writing the
+   * user's new value there would undo the duck, and the restore afterwards
+   * would then hand back the value from BEFORE their change. So the change
+   * goes into the snapshot instead: the stage stays ducked, and comes back at
+   * what the user asked for. Same intent-versus-reality separation the dub
+   * sends use.
+   */
+  private _setColourStageGain(param: AudioParam, value: number, timeConstant: number): void {
+    if (this._audition.noteChange(param, value)) return;
+    param.setTargetAtTime(value, this.context.currentTime, timeConstant);
+  }
+
+  private _rampLofiBypassForAudition(auditioning: boolean): void {
+    const param = this.lofiBypass.gain;
+    const target = auditioning ? 1 : (this.settings.lofiEnabled ? 0 : 1);
+    const now = this.context.currentTime;
+    try {
+      param.cancelScheduledValues(now);
+      param.setValueAtTime(param.value, now);
+      param.linearRampToValueAtTime(target, now + DubBus.AUDITION_RAMP_SEC);
+    } catch { /* ok */ }
   }
 
   /**
@@ -3567,7 +3679,7 @@ export class DubBus {
     // Liquid sweep params — clamp + smooth. sweepAmount=0 fully silences
     // the branch; LFO keeps running (can't stop OscillatorNode).
     const sweepAmt = Math.max(0, Math.min(1, merged.sweepAmount));
-    this.sweepOutput.gain.setTargetAtTime(sweepAmt, now, 0.02);
+    this._setColourStageGain(this.sweepOutput.gain, sweepAmt, 0.02);
     const sweepRate = Math.max(0.05, Math.min(5, merged.sweepRateHz));
     this.sweepLfo.frequency.setTargetAtTime(sweepRate, now, 0.02);
     const sweepDepthSec = Math.max(0, Math.min(9, merged.sweepDepthMs)) / 1000;
@@ -3604,9 +3716,10 @@ export class DubBus {
       this.setPlateStage(settings.plateStage);
     }
     if (settings.plateStageMix !== undefined && this.plateSend) {
-      this.plateSend.gain.setTargetAtTime(
+      this._setColourStageGain(
+        this.plateSend.gain,
         Math.max(0, Math.min(1, settings.plateStageMix)),
-        now, 0.03,
+        0.03,
       );
     }
     // Apply the 15ips curve when that mode is selected. Rebuild triggered
@@ -3658,7 +3771,7 @@ export class DubBus {
       // Crossfade: one branch at full gain, other at 0
       this.combOutput.gain.setTargetAtTime(isPhaser ? 0 : 1, now, 0.01);
       this.phaserOutput.gain.setTargetAtTime(isPhaser ? 1 : 0, now, 0.01);
-      this.sweepOutput.gain.setTargetAtTime(amt, now, 0.02);
+      this._setColourStageGain(this.sweepOutput.gain, amt, 0.02);
     }
     // Phaser params — update even when mode is 'comb' (no harm, WASM just idles)
     if (settings.phaserRate !== undefined) this.phaser.setRate(merged.phaserRate);
@@ -3679,7 +3792,7 @@ export class DubBus {
     // ─── Ring modulator ───────────────────────────────────────────────────
     if (settings.ringModEnabled !== undefined || settings.ringModAmount !== undefined) {
       const amt = merged.ringModEnabled ? merged.ringModAmount : 0;
-      this.ringModSend.gain.setTargetAtTime(amt, now, 0.02);
+      this._setColourStageGain(this.ringModSend.gain, amt, 0.02);
     }
     if (settings.ringModFreq !== undefined) this.ringMod.setFrequency(merged.ringModFreq);
     if (settings.ringModWaveform !== undefined) this.ringMod.setWaveform(merged.ringModWaveform);
@@ -3688,15 +3801,17 @@ export class DubBus {
     // ─── Lo-fi / voltage starve ───────────────────────────────────────────
     if (settings.lofiEnabled !== undefined || settings.lofiBits !== undefined) {
       const enabled = merged.lofiEnabled;
-      this.lofiBypass.gain.setTargetAtTime(enabled ? 0 : 1, now, 0.01);
-      this.lofiSend.gain.setTargetAtTime(enabled ? 1 : 0, now, 0.01);
+      // The bypass is left alone while auditioning — it is held open, and
+      // `endAudition` recomputes it from settings, so the new value lands then.
+      if (!this.auditioning) this.lofiBypass.gain.setTargetAtTime(enabled ? 0 : 1, now, 0.01);
+      this._setColourStageGain(this.lofiSend.gain, enabled ? 1 : 0, 0.01);
       if (settings.lofiBits !== undefined) this.lofi.setCrush(merged.lofiBits);
     }
 
     // ─── External feedback loop ───────────────────────────────────────────
     if (settings.extFeedbackGain !== undefined) {
       const clamped = Math.min(0.85, Math.max(0, merged.extFeedbackGain));
-      this.extFeedbackGain.gain.setTargetAtTime(clamped, now, 0.02);
+      this._setColourStageGain(this.extFeedbackGain.gain, clamped, 0.02);
     }
     if (settings.extFeedbackEqFreq !== undefined) {
       this.extFeedbackEq.frequency.setTargetAtTime(merged.extFeedbackEqFreq, now, 0.01);

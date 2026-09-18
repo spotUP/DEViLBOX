@@ -412,6 +412,24 @@ export async function setDubBusEnabled(params: Record<string, unknown>): Promise
   return { ok: true };
 }
 
+/**
+ * Bus audition (X6) — hold the colour stages down to hear the send itself.
+ *
+ * `{ on: true }` ducks plate, ring modulator, lo-fi, the sweep and the
+ * external feedback; `{ on: false }` hands them back at the values they had,
+ * including any changed while it was held. Never touches `characterPreset`,
+ * so a voicing survives being auditioned.
+ */
+export async function setDubBusAudition(params: Record<string, unknown>): Promise<Record<string, unknown>> {
+  const { getActiveDubBus } = await import('../../engine/dub/DubBus');
+  const bus = getActiveDubBus();
+  if (!bus) return { error: 'No dub bus — enable it first with set_dub_bus_enabled' };
+  const on = params.on !== false;
+  if (on) bus.beginAudition();
+  else bus.endAudition();
+  return { ok: true, auditioning: bus.auditioning };
+}
+
 export async function setDubBusSettings(params: Record<string, unknown>): Promise<Record<string, unknown>> {
   const { useDrumPadStore } = await import('../../stores/useDrumPadStore');
   // Strip unknown keys so the store doesn't receive garbage if the caller guesses

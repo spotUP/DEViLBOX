@@ -286,6 +286,35 @@ export const DubDeckStrip: React.FC = () => {
   // Separate from the Toast hold move (which does momentary mic + music ducking).
   const [micActive, setMicActive] = useState(false);
   const [micGain, setMicGain] = useState(0.8);
+
+  /**
+   * Bus audition (X6) — the releaser, held for as long as the button is.
+   *
+   * A ref rather than state for the releaser itself: it is an engine handle,
+   * not something the view renders. The boolean beside it is what the button
+   * lights up from.
+   */
+  const auditionReleaseRef = useRef<(() => void) | null>(null);
+  const [auditioning, setAuditioning] = useState(false);
+
+  const beginBusAudition = useCallback(() => {
+    if (auditionReleaseRef.current) return;
+    const release = getActiveDubBus()?.beginAudition();
+    if (!release) return;
+    auditionReleaseRef.current = release;
+    setAuditioning(true);
+  }, []);
+
+  const endBusAudition = useCallback(() => {
+    const release = auditionReleaseRef.current;
+    auditionReleaseRef.current = null;
+    setAuditioning(false);
+    if (release) { try { release(); } catch { /* ok */ } }
+  }, []);
+
+  // An unmount mid-hold must not leave the colour switched off with nothing
+  // left to switch it back on.
+  useEffect(() => endBusAudition, [endBusAudition]);
   const micStreamRef = useRef<MediaStream | null>(null);
   const micTapRef = useRef<{ setGain(g: number): void; disconnect(): void } | null>(null);
 
@@ -1150,6 +1179,30 @@ export const DubDeckStrip: React.FC = () => {
           )}
         </div>
         <span className="flex-1" />
+        {/*
+          Audition — a solo button for the send.
+          Momentary, like every other solo on a desk: held, not latched, so the
+          comparison happens in the ear rather than in the memory of what the
+          bus sounded like a minute ago. Pointer capture so a finger that
+          slides off the button still hands the colour back.
+        */}
+        <button
+          className={`px-2.5 py-1 rounded font-semibold text-xs ${
+            auditioning
+              ? 'bg-accent-highlight text-text-inverse'
+              : 'bg-dark-bgTertiary text-text-secondary hover:bg-dark-bgHover'
+          }`}
+          disabled={!busEnabled}
+          onPointerDown={(e) => {
+            e.currentTarget.setPointerCapture(e.pointerId);
+            beginBusAudition();
+          }}
+          onPointerUp={endBusAudition}
+          onPointerCancel={endBusAudition}
+          title="Hold to hear the send without its colour stages — plate, ring modulator, lo-fi, sweep and external feedback"
+        >
+          Audition
+        </button>
         <button
           className="px-2.5 py-1 rounded bg-accent-error text-white font-semibold hover:bg-accent-error/80 text-xs"
           onClick={() => window.dispatchEvent(new Event('dub-panic'))}
