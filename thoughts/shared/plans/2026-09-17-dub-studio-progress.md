@@ -12,7 +12,7 @@ analysis: thoughts/shared/plans/2026-09-17-dub-studio-gap-reconciliation.md
 Durable todo list. Survives compaction, crashes, `/clear`. **Re-read this before trusting
 recollection or any earlier summary in a conversation.**
 
-Running count: **46 of 57 done.**
+Running count: **47 of 57 done.**
 
 **The denominator was wrong until 2026-09-18.** The header said "of 36" from the day this file
 was written and was never updated as sub-items (F1a, F1c, F2a-F2e, T1-T3, the X series) were
@@ -33,7 +33,7 @@ recount — do not trust this sentence either.
 | G — wet energy | **closed** | G1 |
 | H-L — musical behaviour | **closed** | H1, I1, J1, K1-K4, L1, L2, AE1 |
 | M-O — record, verify, release | M1, N1-N4, O1 done | O2 (human) |
-| X — user-reported open threads | 6 of 17 | X1, X11, X12, X13, X15, X16 closed |
+| X — user-reported open threads | 7 of 17 | X1, X5, X11, X12, X13, X15, X16 closed |
 
 ### Debt carried, not hidden
 
@@ -773,7 +773,7 @@ this bug.
       AHX is monophonic per channel so the "skank" is a single-note stab.
       Needs a `classic` (MOD/XM/IT) reggae tune — the modland "jah cometh in
       dub" download is the intended vehicle.
-- [ ] **X5** **Dub-send fader moves are not recorded.** Reported 2026-09-17.
+- [x] **X5** **Dub-send fader moves are not recorded.** Reported 2026-09-17.
       Discrete moves record fine; a continuous fader ride captures nothing.
       Verified: `DubRecorder` subscribes ONLY to `subscribeDubRouter` /
       `subscribeDubRelease` (discrete fires -> `dub.<moveId>` step curves);
@@ -787,11 +787,26 @@ this bug.
       blocks the reviewer's **Gate M** (record/replay reproduces the
       performance) and **AI-08** (gesture engine), since a performer that rides
       a fader would be unrecordable and its takes unreplayable.
-      Shape of the fix: make `dub.channelSend.ch<N>` a first-class automatable
-      parameter and have the recorder capture continuous writes as curve points
-      (rAF-batched — the setter already batches at ~60/s for exactly this
-      reason), rather than bolting a second recording path next to DubRecorder.
-      Check `AutomationBaker` and the `.dbx` round-trip cover it before closing.
+      **CLOSED 2026-09-18, commit `458617863`,** to that shape. `channelSendStream.ts` is
+      the stream that was missing — the mixer store publishes every non-transient write
+      (a transient is a move BORROWING the send, already recorded as that move; recording
+      it again would be a second contradictory account of one gesture) and DubRecorder
+      gains a third subscription alongside fire and release.
+      A ride arrives at ~60 writes/s, so points are thinned on movement, WITH a maximum
+      row gap — without one a fader creeping across a bar writes nothing until it has
+      moved a hundredth, and the straight line between two distant points is not the
+      gesture that was played. Curve mode with linear interpolation, or a smooth ride
+      replays as a staircase.
+      `dub.channelSend.ch<N>` is routable both ways: the router turns it back into a fader
+      move, and AutomationPlayer addresses it by channel as it already does per-channel
+      moves. `.dbx` round-trip needed no schema change (curves persist generically as
+      `AutomationCurve[]`). `AutomationBaker` has NO mapping and should not — a send to a
+      bus a MOD does not have has no native effect command.
+      **Found while wiring it:** AutomationPlayer dispatched per-channel dub curves without
+      the `'lane'` tag its own global-curve path already used, so a replayed per-channel
+      curve looked like a live gesture and the recorder captured it again every pass — one
+      take growing a copy of itself each time round the pattern. Fixed in the same commit.
+      20 tests.
 
 - [ ] **X6** **Bus audition mode — a solo button for the send.** Raised
       2026-09-17 while writing skank test instructions that began "first switch
