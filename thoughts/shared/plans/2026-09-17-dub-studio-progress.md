@@ -1224,6 +1224,23 @@ this bug.
       what made this look like missing permissions rather than a billing stop. Switched
       the active account to `spotUP`.
 
+      **DEPLOYED MANUALLY 2026-09-18.** Live is now `buildHash 92428df4d`, build 7110 —
+      the first update since 2026-08-23. Route, for the next time CI is down:
+      `npm run build` (the CED model is already in `public/models/ced/`, so the workflow's
+      download step is not needed), then rsync `dist/` straight into the server's web root
+      over SSH as root:
+      `rsync -a -c --delete dist/ root@devilbox.uprough.net:/var/www/devilbox-dist/`
+      That IS the last step of `/opt/devilbox-deploy.sh`; doing it directly skips the
+      GitHub Release round trip, which matters because the tarball is 1.2 GB.
+      Use `-c`: a fresh build resets every mtime, so without checksum comparison rsync
+      re-sends all 1.9 GB instead of the 607 MB that actually changed.
+      **Do NOT replicate the workflow's `gh release delete latest`** — that release also
+      holds the desktop installers (`.dmg`, `.exe`, `.AppImage`, `.deb`), which cannot be
+      rebuilt locally for every platform. Replace the single asset if you need to.
+      `--delete` removed 493 files, all stale fingerprinted `assets/*-HASH.js` bundles.
+      Verified live: `version.json` matches HEAD, and the index's `main-DL8MuXZa.js`
+      resolves 200 at exactly the built byte size.
+
 - [ ] **X4 (original entry)** Six commits unpushed. Nothing verified by ear yet, so nothing has
       gone live. Push after X2 passes a listening test.
 
