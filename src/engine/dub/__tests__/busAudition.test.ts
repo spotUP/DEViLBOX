@@ -233,4 +233,12 @@ describe('wiring contract — it is reachable and it lets go', () => {
     expect(bridge).toContain('set_dub_bus_audition: setDubBusAudition');
     expect(server).toContain("'set_dub_bus_audition'");
   });
+
+  it('says so when the bus is off and nothing was ducked', () => {
+    // Found by calling it live: it answered `ok: true, auditioning: false`,
+    // which is a tool describing something it did not do — the same class of
+    // lie X8 was about.
+    expect(handlers).toMatch(/if \(on && !bus\.auditioning\) \{[\s\S]{0,260}ok: false/);
+    expect(handlers).toContain('The dub bus is disabled, so there is no colour to duck.');
+  });
 });

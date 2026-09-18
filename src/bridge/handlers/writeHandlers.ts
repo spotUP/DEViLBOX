@@ -427,6 +427,17 @@ export async function setDubBusAudition(params: Record<string, unknown>): Promis
   const on = params.on !== false;
   if (on) bus.beginAudition();
   else bus.endAudition();
+
+  // Say when nothing happened, and why. `beginAudition` returns early on a
+  // disabled bus, and reporting a bare ok for that is the same class of lie
+  // X8 was about — a tool describing something it did not do.
+  if (on && !bus.auditioning) {
+    return {
+      ok: false,
+      auditioning: false,
+      error: 'The dub bus is disabled, so there is no colour to duck. Enable it with set_dub_bus_enabled first.',
+    };
+  }
   return { ok: true, auditioning: bus.auditioning };
 }
 
