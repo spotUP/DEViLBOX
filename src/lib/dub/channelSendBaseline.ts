@@ -34,9 +34,30 @@ export interface DubChannelState {
   muted: boolean;
 }
 
+/**
+ * How long a transient may stay open before it is treated as orphaned.
+ *
+ * Nothing should hold a channel for thirty seconds. When something does, the
+ * closer has been lost — a disposer that threw, an engine restart, a hot
+ * reload that replaced this module mid-hold — and without a watchdog the
+ * channel stays muted or fully sent for the rest of the session. Measured live
+ * on 2026-09-18: every channel muted at the source, `userMuteMask 0xFFF0`,
+ * `silentReason: "module-rendered-silence"`, and only `unmute_all_channels`
+ * brought the song back.
+ */
+const ORPHAN_AFTER_MS = 30_000;
+
 export class DubSendBaselines {
   private readonly values = new Map<number, DubChannelState>();
   private readonly depth = new Map<number, number>();
+  /** When the first transient on a channel opened, for the orphan watchdog. */
+  private readonly openedAt = new Map<number, number>();
+  private now: () => number = () => Date.now();
+
+  /** Injectable clock, so the watchdog is testable without waiting. */
+  setClock(now: () => number): void {
+    this.now = now;
+  }
 
   /** Active transient count for a channel. */
   depthOf(channelId: number): number {
@@ -55,6 +76,7 @@ export class DubSendBaselines {
         dubSend: clamp01(current.dubSend),
         muted: current.muted,
       });
+      this.openedAt.set(channelId, this.now());
     }
     this.depth.set(channelId, d + 1);
   }
@@ -72,9 +94,47 @@ export class DubSendBaselines {
       return null;
     }
     this.depth.delete(channelId);
+    this.openedAt.delete(channelId);
     const baseline = this.values.get(channelId) ?? null;
     this.values.delete(channelId);
     return baseline;
+  }
+
+  /**
+   * Channels whose transients have been open too long to be real, with the
+   * state to restore them to.
+   *
+   * Returning them rather than acting means the pure registry stays pure; the
+   * store-aware helper does the writing.
+   */
+  reapOrphans(): Array<{ channelId: number; baseline: DubChannelState }> {
+    const now = this.now();
+    const reaped: Array<{ channelId: number; baseline: DubChannelState }> = [];
+    for (const [channelId, opened] of this.openedAt) {
+      if (now - opened < ORPHAN_AFTER_MS) continue;
+      const baseline = this.values.get(channelId);
+      if (baseline) reaped.push({ channelId, baseline });
+      this.depth.delete(channelId);
+      this.values.delete(channelId);
+    }
+    for (const { channelId } of reaped) this.openedAt.delete(channelId);
+    return reaped;
+  }
+
+  /**
+   * Every channel currently held, with what it should be restored to.
+   *
+   * Used on transport stop: a gesture is a shape in time, and after a stop
+   * there is no time it belongs to, so nothing should still be holding a
+   * channel muted or wide open.
+   */
+  releaseAll(): Array<{ channelId: number; baseline: DubChannelState }> {
+    const all = Array.from(this.values.entries())
+      .map(([channelId, baseline]) => ({ channelId, baseline }));
+    this.values.clear();
+    this.depth.clear();
+    this.openedAt.clear();
+    return all;
   }
 
   /** A user-originated send write — updates the baseline even during a hold. */
@@ -106,6 +166,7 @@ export class DubSendBaselines {
   clear(): void {
     this.values.clear();
     this.depth.clear();
+    this.openedAt.clear();
   }
 }
 

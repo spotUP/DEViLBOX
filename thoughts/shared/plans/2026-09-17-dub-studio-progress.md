@@ -728,10 +728,27 @@ this bug.
       baseline separated from the applied value and resolved at RELEASE time —
       the `ChannelTapBaselines` idea (`src/lib/dub/channelTapBaseline.ts`), which
       exists for the audio-node path only, brought to the store path.
-      Likely also the mechanism behind the §5 audio death: `ghostReverb` global
-      mutes every sending channel, and a failed restore leaves the module muting
-      every channel at the source, which is exactly `effectiveMainMask`
-      rendering silence.
+      **The §5 audio death is now CONFIRMED, by measurement, as this same bug.**
+      2026-09-18, live: `userMuteMask 0xFFF0` (all four channels muted at the source),
+      `lastRenderRms 0`, `silentReason: "module-rendered-silence"` — and
+      `unmute_all_channels` brought the song straight back, which is exactly the test
+      the handoff's §5 prescribed for confirming the mask. Mute leakage from dub moves,
+      not the audio graph. Do not treat §5 as open and unexplained any more.
+      Three further defects were fixed off the back of that measurement:
+      (a) `planDrop` could take EVERY channel when profile evidence is weak — an
+      untitled module gives four channels of `unknown`, none of which look like a
+      foundation — so a drop became silence. It now keeps a core whatever the evidence
+      says, protecting what the arrangement leans on hardest; a floor that applies
+      precisely when the performer knows least.
+      (b) Nothing ever closed a transient whose CLOSER was lost (a disposer that threw,
+      an engine restart, a hot reload mid-hold). `releaseAllDubTransients()` on transport
+      stop and a once-a-bar `reapOrphanedDubTransients()` watchdog now hand the channel
+      back. A reaped channel is genuinely free: a lost closer turning up late cannot
+      re-mute it.
+      (c) `scheduleDubSendStoreWrite`'s flush guarded the INDEX but not the ELEMENT, so a
+      write landing a frame after the store was replaced threw
+      "Cannot set properties of undefined (setting 'dubSend')" and took out every other
+      write in that frame.
       **Fix shipped:** `src/lib/dub/channelSendBaseline.ts` (ref-counted
       baselines — store transients NEST, unlike node taps) and
       `dubChannelTransient.ts` (the only way a move may touch a channel's send

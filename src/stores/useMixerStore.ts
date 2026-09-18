@@ -142,7 +142,14 @@ function scheduleDubSendStoreWrite(
     _pendingDubSends.clear();
     setter((state: any) => {
       for (const [c, v] of updates) {
+        // Guard the ELEMENT, not just the index. A write can land a frame
+        // after the store was replaced — loading a song, an MCP call arriving
+        // mid-transition — and `channels[c]` is then undefined even though the
+        // array's length says otherwise. Crashed live on 2026-09-18:
+        // "Cannot set properties of undefined (setting 'dubSend')", which
+        // then took out every later write in the same frame.
         if (c < 0 || c >= state.channels.length) continue;
+        if (!state.channels[c]) continue;
         state.channels[c].dubSend = v;
       }
     });
