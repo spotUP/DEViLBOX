@@ -24,12 +24,42 @@ import { useWasmPositionStore } from '@/stores/useWasmPositionStore';
 import { getTrackerReplayer } from '@/engine/TrackerReplayer';
 import type { DubBusSettings } from '@/types/dub';
 import * as Tone from 'tone';
+import { rowsPerBeat, DEFAULT_MUSICAL_CLOCK_SETTINGS } from '@/lib/dub/musicalClock';
 
-/** Tracker convention: 4 rows per beat at the default speed of 6 ticks/row.
- *  Rows per beat is really `24 / ticksPerRow`; deriving it from live speed is
- *  tracked separately (the MusicalClock work) and would change bar maths
- *  everywhere, so this stays at the convention until that lands. */
+/**
+ * Rows per beat at the DEFAULT speed of 6 ticks/row. Kept for callers that
+ * genuinely mean the convention; the grid maths below no longer uses it.
+ *
+ * The comment that used to sit here said rows-per-beat is really
+ * `24 / ticksPerRow` and that deriving it from live speed was "tracked
+ * separately (the MusicalClock work)". That work landed — `rowsPerBeat()` in
+ * `lib/dub/musicalClock` — and this file was never moved onto it. At speed 12
+ * a beat is 2 rows, not 4, so every boundary here was computed against a beat
+ * twice as long as the real one and moves landed up to a full beat from where
+ * they were aimed. Reported 2026-09-19: "it didnt feel very nicely synced",
+ * "i disrupted the song more than add to it it felt off".
+ */
 export const ROWS_PER_BEAT = 4;
+
+/**
+ * Rows per beat for the speed the transport is ACTUALLY running at.
+ *
+ * Read live rather than passed in, because every caller of
+ * `msToNextGridBoundary` would otherwise have to remember to thread it, and
+ * the one that forgot is what produced the bug above.
+ */
+function liveRowsPerBeat(ticksPerRow?: number): number {
+  if (typeof ticksPerRow === 'number' && ticksPerRow > 0) {
+    return rowsPerBeat(ticksPerRow, DEFAULT_MUSICAL_CLOCK_SETTINGS.meter.beatUnit);
+  }
+  try {
+    const speed = useTransportStore.getState().speed;
+    if (typeof speed === 'number' && speed > 0) {
+      return rowsPerBeat(speed, DEFAULT_MUSICAL_CLOCK_SETTINGS.meter.beatUnit);
+    }
+  } catch { /* store unavailable — fall back to the convention */ }
+  return ROWS_PER_BEAT;
+}
 
 /**
  * Current fractional row position, tried in order of authority:
@@ -83,12 +113,13 @@ export function msToNextGridBoundary(
   quantize: DubBusSettings['throwQuantize'],
   bpm: number,
   rowNow: number = getCurrentRow(),
+  ticksPerRow?: number,
 ): number {
   if (quantize === 'off') return 0;
   if (!Number.isFinite(rowNow) || !Number.isFinite(bpm)) return 0;
 
   const beatMs = 60000 / Math.max(30, Math.min(300, bpm || 120));
-  const beatPos = rowNow / ROWS_PER_BEAT;
+  const beatPos = rowNow / liveRowsPerBeat(ticksPerRow);
 
   let beatsAway: number;
   if (quantize === 'bar') {
