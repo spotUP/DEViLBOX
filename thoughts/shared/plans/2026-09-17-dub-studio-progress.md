@@ -12,7 +12,7 @@ analysis: thoughts/shared/plans/2026-09-17-dub-studio-gap-reconciliation.md
 Durable todo list. Survives compaction, crashes, `/clear`. **Re-read this before trusting
 recollection or any earlier summary in a conversation.**
 
-Running count: **52 of 57 done.**
+Running count: **52 of 58 done.**
 
 **The denominator was wrong until 2026-09-18.** The header said "of 36" from the day this file
 was written and was never updated as sub-items (F1a, F1c, F2a-F2e, T1-T3, the X series) were
@@ -33,7 +33,7 @@ recount — do not trust this sentence either.
 | G — wet energy | **closed** | G1 |
 | H-L — musical behaviour | **closed** | H1, I1, J1, K1-K4, L1, L2, AE1 |
 | M-O — record, verify, release | M1, N1-N4, O1 done | O2 (human) |
-| X — user-reported open threads | 11 of 17 | X1, X3, X5, X6, X7, X8, X11, X12, X13, X15, X16 closed |
+| X — user-reported open threads | 11 of 18 | X1, X3, X5, X6, X7, X8, X11, X12, X13, X15, X16 closed |
 
 ### Debt carried, not hidden
 
@@ -1166,6 +1166,23 @@ this bug.
       follows the transport and project metadata and routes the car's transport buttons
       back into the store. 20 tests including a wiring contract. Commit `d3e3d3a74`.
       **Needs the user's car to confirm** — no automated check can.
+
+- [ ] **X17** **The EQ and dub-bus sliders do not move any more.** Reported 2026-09-19:
+      "i see no action in the eq and dub bus sliders at all they use to move" — a
+      REGRESSION, they used to animate while AutoDub worked.
+      The live-animation path is `fireParamLiveSubscribers(param, value)`, which the knobs
+      and faders subscribe to so they can move without a React re-render per frame (see
+      `docs/CONTROL_PATTERNS.md` — the imperative fast path). Two candidate breaks, in
+      order of suspicion:
+      (a) the AutoEQ driver / bus setters no longer publish to those subscribers, or
+      (b) the subscribers are keyed on a parameter name that changed.
+      Measure before touching anything: subscribe-side first — confirm whether
+      `fireParamLiveSubscribers` is still CALLED for `dub.*` params while a move runs
+      (the fire log records the bus settings each fire, so compare a setting that visibly
+      changes in the log against a slider that does not move).
+      **Related and probably NOT the cause:** the X-series clock bug meant the performer
+      fired roughly once a minute, so "no action" was partly just nothing happening. Re-check
+      after `957e220ec` — the sliders may simply have had nothing to animate.
 
 - [ ] **X10** **MEASURED 2026-09-18 — not reproduced at master, one real finding instead.**
       Perry preset, "world class dub" playing, all four channel sends at 0.5, `echoBuildUp`
