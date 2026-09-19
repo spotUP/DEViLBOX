@@ -40,6 +40,8 @@ import { getActiveDubBus } from '@engine/dub/DubBus';
 import { DUB_CHARACTER_PRESETS } from '@/types/dub';
 import { getPersona } from '@/engine/dub/AutoDubPersonas';
 import type { AutoDubPersonaId } from '@/stores/useDubStore';
+import { useLiveDubParam } from '@/hooks/useLiveDubParam';
+import { denormalizeSweepRate } from '@engine/dub/DubBus';
 
 // ── Unified Dub Style table ──────────────────────────────────────────────────
 // Each style applies BOTH a bus character preset (engineer tone) AND an AutoDub
@@ -233,6 +235,26 @@ export const DubDeckStrip: React.FC = () => {
   const [autoDubSettingsOpen, setAutoDubSettingsOpen] = useState(false);
   // Active tab — PERFORM is default; EQ / BUS / RECORD for deeper panels
   const [activeTab, setActiveTab] = useState<'perform' | 'eq' | 'bus'>('perform');
+
+  /**
+   * Deck faders that follow the PERFORMER, not only the user.
+   *
+   * Moves modulate the audio nodes directly and restore on release, so these
+   * settings still hold what the user set — which is correct, and is also why
+   * the faders sat still through a version drop. `DubBus.announceHeld`
+   * publishes the performed value for as long as a move holds it; these read
+   * that and fall back to the stored value once it lets go.
+   *
+   * Only the controls a move actually drives are wired. BASS, MID and WIDTH
+   * are not modulated by any move — `startStereoDoubler` builds its own
+   * parallel nodes rather than touching `stereoWidth` — so animating them
+   * would be inventing motion the audio is not making.
+   */
+  const liveReturnGain = useLiveDubParam('dub.returnGain', dubBusSettings.returnGain);
+  const liveSweepAmount = useLiveDubParam('dub.sweepAmount', dubBusSettings.sweepAmount);
+  const liveSweepRateHz = useLiveDubParam(
+    'dub.sweepRateHz', dubBusSettings.sweepRateHz, denormalizeSweepRate,
+  );
   const autoDubSettingsBtnRef = useRef<HTMLButtonElement | null>(null);
 
   // Derive current style. For presets with unique characterPreset values
@@ -1239,13 +1261,13 @@ export const DubDeckStrip: React.FC = () => {
           <span className="text-text-muted text-[9px] font-mono shrink-0 w-10 text-right">FX WET</span>
           <input
             type="range" min={0} max={1} step={0.01}
-            value={dubBusSettings.returnGain}
+            value={liveReturnGain}
             onChange={(e) => setDubBus({ returnGain: Number(e.target.value) })}
             className="flex-1 accent-accent-highlight cursor-pointer"
-            title={`FX wet level: ${(dubBusSettings.returnGain * 100).toFixed(0)}%`}
+            title={`FX wet level: ${(liveReturnGain * 100).toFixed(0)}%`}
           />
           <span className="text-text-secondary text-[9px] font-mono tabular-nums w-7 text-right shrink-0">
-            {(dubBusSettings.returnGain * 100).toFixed(0)}%
+            {(liveReturnGain * 100).toFixed(0)}%
           </span>
         </div>
       )}
@@ -1761,22 +1783,22 @@ export const DubDeckStrip: React.FC = () => {
               disabled={!busEnabled}
             >{dubBusSettings.sweepMode === 'phaser' ? 'Phaser' : 'Comb'}</button>
             <input type="range" min={0} max={1} step={0.01}
-              value={dubBusSettings.sweepAmount}
+              value={liveSweepAmount}
               onChange={(e) => setDubBus({ sweepAmount: Number(e.target.value), characterPreset: 'custom' })}
               className="w-32 accent-accent-secondary" disabled={!busEnabled}
               title={`Sweep wet amount`}
             />
-            <span className="w-12">{Math.round(dubBusSettings.sweepAmount * 100)}%</span>
+            <span className="w-12">{Math.round(liveSweepAmount * 100)}%</span>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
             <span className="w-16 shrink-0 font-bold text-text-secondary">RATE</span>
             <input type="range" min={0.05} max={3} step={0.05}
-              value={dubBusSettings.sweepRateHz}
+              value={liveSweepRateHz}
               onChange={(e) => setDubBus({ sweepRateHz: Number(e.target.value), characterPreset: 'custom' })}
-              className="w-32 accent-accent-secondary" disabled={!busEnabled || dubBusSettings.sweepAmount === 0}
+              className="w-32 accent-accent-secondary" disabled={!busEnabled || liveSweepAmount === 0}
               title={`Sweep LFO rate`}
             />
-            <span className="w-12">{dubBusSettings.sweepRateHz.toFixed(2)} Hz</span>
+            <span className="w-12">{liveSweepRateHz.toFixed(2)} Hz</span>
           </div>
         </div>
       )}
