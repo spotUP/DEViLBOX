@@ -33,13 +33,15 @@ recount — do not trust this sentence either.
 | G — wet energy | **closed** | G1 |
 | H-L — musical behaviour | **closed** | H1, I1, J1, K1-K4, L1, L2, AE1 |
 | M-O — record, verify, release | M1, N1-N4, O1 done | O2 (human) |
-| X — user-reported open threads | 15 of 19 | X1, X3, X5, X6, X7, X8, X11, X12, X13, X14 (siren), X15, X16, X17 (sliders), X18 (idle), X19 (buttons) closed; X21 open |
+| X — user-reported open threads | 16 of 19 | X1, X2 (skank, by ear), X3, X5, X6, X7, X8, X11, X12, X13, X14 (siren), X15, X16, X17 (sliders), X18 (idle), X19 (buttons) closed; X21 open |
 
 ### Debt carried, not hidden
 
 - **T1 debt CLEARED 2026-09-18.** The skank reshape's regression test is written and verified
   to fail on the pre-fix shape. It went in late, which is the thing to avoid rather than repeat.
-- **X2 — the skank has still never been heard.** Shipped and tested by measurement only.
+- **X2 debt CLEARED 2026-09-19.** The skank was shipped 2026-04 and tested by measurement
+  only for five months; it has now been heard on "world class dub" and works. The lesson is
+  the gap itself — a gesture can measure correct and stay unheard indefinitely.
 
 **Reconciled against the code 2026-09-18** — the ledger had drifted: F1, F1a and F1c were
 implemented the same night the plan was written but never ticked. Verify before trusting a count.
@@ -792,7 +794,16 @@ this bug.
       AND a flag other code reads, and I changed the audio side without
       grepping its consumers. `grep hasWholeMixTap` before the first edit would
       have caught both. Audit consumers before changing shared state.
-- [ ] **X2** The skank capture (`00bfd0a6b`) has never been heard. amanda.ahx
+- [x] **X2 — CLOSED 2026-09-19 by ear.** User, on "world class dub" with the skank
+      thrown at Ch01: "the skank works". That is the only evidence that could ever have
+      closed this. Every measurement below stops at "the wet return carries" — RMS
+      0.050 to 0.083, peak 0.30, `registeredChannelTaps: [1]` — and none of it says the
+      gesture SOUNDS like a skank. Shipped 2026-04 (`00bfd0a6b`), heard 2026-09-19.
+      Worth keeping: the tune has no guitar or organ channel, so the target was the DRUM
+      channel, where the offbeat actually lives. The obvious reading — find the chord
+      channel — would have aimed it at silence.
+
+- [x] **X2 (original entry)** The skank capture (`00bfd0a6b`) has never been heard. amanda.ahx
       cannot validate it — no per-channel isolation in practice (see X1), and
       AHX is monophonic per channel so the "skank" is a single-note stab.
       Needs a `classic` (MOD/XM/IT) reggae tune — the modland "jah cometh in
