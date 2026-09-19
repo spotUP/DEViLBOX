@@ -388,6 +388,27 @@ export const DubDeckStrip: React.FC = () => {
     return () => { unsubFire(); unsubRelease(); };
   }, []);
 
+  /**
+   * Is this move firing right now, on ANY channel?
+   *
+   * `activeFires` is keyed `moveId:channelId|g`, and the global move rows were
+   * matching `moveId:g` only. AutoDub fires channel-scoped moves WITH a
+   * channel — an `echoThrow` on channel 2 is `echoThrow:2` — so the performer
+   * could work away and the buttons stayed dark, which read as "the AI is
+   * doing nothing". Reported 2026-09-19 as "I see almost no action here".
+   *
+   * The button is the move, not the move-on-one-channel, so any channel counts.
+   * (The per-channel grid below has always checked every channel; this is the
+   * same idea for the rows that show one button per move.)
+   */
+  const isMoveFiring = useCallback((moveId: string): boolean => {
+    const prefix = `${moveId}:`;
+    for (const key of activeFires) {
+      if (key.startsWith(prefix)) return true;
+    }
+    return false;
+  }, [activeFires]);
+
   const releaseAllHeld = useCallback(() => {
     for (const release of heldReleasers.current.values()) {
       try { release(); } catch { /* ok */ }
@@ -1266,8 +1287,7 @@ export const DubDeckStrip: React.FC = () => {
           >CLICK ▸</span>
           <div className="flex gap-1.5 flex-wrap">
             {GLOBAL_MOVES.filter(m => m.group === 'click').map((m) => {
-              const key = `${m.moveId}:g`;
-              const active = activeFires.has(key);
+              const active = isMoveFiring(m.moveId);
               const noSend = !!m.needsSend && !anySend;
               return (
                 <button
@@ -1330,7 +1350,7 @@ export const DubDeckStrip: React.FC = () => {
           <div className="flex gap-1.5 flex-wrap">
             {GLOBAL_MOVES.filter(m => m.group === 'hold').map((m) => {
               const key = `${m.moveId}:g`;
-              const active = heldMoves.has(key) || activeFires.has(key);
+              const active = heldMoves.has(key) || isMoveFiring(m.moveId);
               const noSend = !!m.needsSend && !anySend;
               return (
                 <button
@@ -1368,7 +1388,7 @@ export const DubDeckStrip: React.FC = () => {
             {GLOBAL_MOVES.filter(m => m.group === 'toggle').map((m) => {
               const key = `${m.moveId}:g`;
               const toggled = toggledMoves.has(m.moveId);
-              const active = toggled || heldMoves.has(key) || activeFires.has(key);
+              const active = toggled || heldMoves.has(key) || isMoveFiring(m.moveId);
               const noSend = !!m.needsSend && !anySend;
               const dimmed = noSend && busEnabled && !toggled;
               return (
