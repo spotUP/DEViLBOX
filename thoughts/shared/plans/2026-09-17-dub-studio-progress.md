@@ -12,7 +12,7 @@ analysis: thoughts/shared/plans/2026-09-17-dub-studio-gap-reconciliation.md
 Durable todo list. Survives compaction, crashes, `/clear`. **Re-read this before trusting
 recollection or any earlier summary in a conversation.**
 
-Running count: **52 of 58 done.**
+Running count: **55 of 58 done.**
 
 **The denominator was wrong until 2026-09-18.** The header said "of 36" from the day this file
 was written and was never updated as sub-items (F1a, F1c, F2a-F2e, T1-T3, the X series) were
@@ -33,7 +33,7 @@ recount — do not trust this sentence either.
 | G — wet energy | **closed** | G1 |
 | H-L — musical behaviour | **closed** | H1, I1, J1, K1-K4, L1, L2, AE1 |
 | M-O — record, verify, release | M1, N1-N4, O1 done | O2 (human) |
-| X — user-reported open threads | 11 of 18 | X1, X3, X5, X6, X7, X8, X11, X12, X13, X15, X16 closed |
+| X — user-reported open threads | 14 of 18 | X1, X3, X5, X6, X7, X8, X11, X12, X13, X15, X16, X17, X18 (idle), X19 (buttons) closed |
 
 ### Debt carried, not hidden
 
@@ -1167,7 +1167,41 @@ this bug.
       back into the store. 20 tests including a wiring contract. Commit `d3e3d3a74`.
       **Needs the user's car to confirm** — no automated check can.
 
-- [ ] **X17** **The EQ and dub-bus sliders do not move any more.** Reported 2026-09-19:
+- [x] **X18** **The performer got one decision per PATTERN.** Reported 2026-09-19 as
+      "King Tubby is mostly idle", with a screenshot later showing the move pad dark.
+      The fire log named it exactly: every decision at `barPos: 0`, on bars 8, 16, 40, 48,
+      56, 72, 80, 88 — never a bar between, never a position other than zero. Five moves
+      across 72 bars, about one per 55 seconds, and three of the five gave "N rows since
+      the last move" as their reason, which is the drought trigger rather than a choice.
+      Cause: `currentGlobalRow` is only written when the pattern or song position changes
+      (`usePatternPlayback` — deliberate, per-row store writes were avoided because the
+      editor's RAF loop reads position directly), so it advances 64 rows at a time.
+      AutoDub's bar clock preferred it over `currentRow`, and at speed 12 a bar is 8 rows,
+      so the bar number leapt by 8 per update. Every per-bar rule — `minBarsBetweenFires`,
+      the per-bar fire caps, the phrase arc — ran EIGHT TIMES too slowly.
+      `src/lib/dub/transportRow.ts` takes the coarse position from the global row and the
+      fine one from `currentRow`; only the PATTERN named by the global row is trusted,
+      because that field carries a row offset of its own. Commit `957e220ec`.
+      **Ruled out first, each by measurement:** the signal path (bus on, all four taps
+      registered, sends up), the persona (`minBarsBetweenFires: 1.5`, not 16), and role
+      starvation — every channel on this tune classifies as `percussion`, but
+      `AutoDub.ts:940` already falls back to any non-empty channel, so those rules were
+      never starved. That third one I had started to act on and it was wrong.
+      15 tests across `transportRow.test.ts` and `performerClockRate.test.ts`; 6 fail
+      against the old behaviour, and one keeps the old result ([0, 8, 16] — one decision
+      per pattern) as a legible counter-example.
+
+- [x] **X19** **Move buttons stayed dark while the performer worked.** Reported 2026-09-19
+      with a screenshot of the CLICK / RATE / HOLD / TOGGLE rows: "i see almost no action
+      here". `activeFires` is keyed `moveId:channelId` (`moveId:g` for a global move) and
+      those rows matched `moveId:g` ONLY — but AutoDub fires channel-scoped moves WITH a
+      channel, so `echoThrow ch2` keys as `echoThrow:2` and never lit the Throw button.
+      Of the five moves in that take only the two global ones could light anything.
+      A button in those rows IS the move, not the move-on-one-channel, so any channel
+      counts now, matched on a delimited prefix so one id cannot light another's button.
+      The per-channel grid keeps its exact key. Commit `27f00cbe3`. 7 tests.
+
+- [x] **X17** **The EQ and dub-bus sliders do not move any more.** Reported 2026-09-19:
       "i see no action in the eq and dub bus sliders at all they use to move" — a
       REGRESSION, they used to animate while AutoDub worked.
       The live-animation path is `fireParamLiveSubscribers(param, value)`, which the knobs
@@ -1180,9 +1214,16 @@ this bug.
       `fireParamLiveSubscribers` is still CALLED for `dub.*` params while a move runs
       (the fire log records the bus settings each fire, so compare a setting that visibly
       changes in the log against a slider that does not move).
-      **Related and probably NOT the cause:** the X-series clock bug meant the performer
-      fired roughly once a minute, so "no action" was partly just nothing happening. Re-check
-      after `957e220ec` — the sliders may simply have had nothing to animate.
+      **RESOLVED 2026-09-19 — a SYMPTOM, not a regression.** Confirmed by the user the same
+      day: "good now they work". Nothing in the live-subscriber path was broken. The
+      performer was firing about once a minute (the bar clock handed it one decision per
+      pattern, `957e220ec`) and the move buttons it did fire mostly stayed dark
+      (`27f00cbe3`), so the sliders had almost nothing to animate and what little they did
+      went unnoticed. Both causes are locked in by tests; no slider-specific change was
+      made or needed.
+      **Worth remembering:** two independent faults stacked into one symptom, and the
+      obvious reading — "the animation path broke" — was wrong. The cheap check that
+      settled it was fixing the upstream causes first and re-asking.
 
 - [ ] **X10** **MEASURED 2026-09-18 — not reproduced at master, one real finding instead.**
       Perry preset, "world class dub" playing, all four channel sends at 0.5, `echoBuildUp`
