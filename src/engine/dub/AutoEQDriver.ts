@@ -105,7 +105,8 @@ function announceBandGain(band: number, gainDb: number): void {
 function _applyImprovDeltas(): void {
   try {
     const dubBus = getActiveDubBus?.();
-    if (!dubBus) return;
+    if (!dubBus) { _diag.lastSkip = 'no active dub bus'; return; }
+    _diag.applies++;
     const returnEQ = dubBus.getReturnEQ();
     const current = returnEQ.getParams();
     for (let i = 0; i < 4; i++) {
@@ -123,7 +124,36 @@ function _applyImprovDeltas(): void {
   } catch { /* ok */ }
 }
 
+/**
+ * Why the EQ is or is not moving.
+ *
+ * The EQ performer fails silently by design — every gate in `improvTick` is an
+ * early return, and the panel it drives looks identical whether the driver is
+ * inert or merely holding still. Diagnosing "eq is dead in the ui" meant
+ * reading the source and guessing which gate had closed. These counters say it
+ * outright.
+ */
+const _diag = {
+  ticks: 0,
+  applies: 0,
+  lastSkip: 'never ran' as string,
+  lastDeltas: [0, 0, 0, 0] as number[],
+};
+
+export function getAutoEqDiag(): {
+  running: boolean; ticks: number; applies: number; lastSkip: string; lastDeltas: number[];
+} {
+  return {
+    running: _improvTimer !== null,
+    ticks: _diag.ticks,
+    applies: _diag.applies,
+    lastSkip: _diag.lastSkip,
+    lastDeltas: [..._diag.lastDeltas],
+  };
+}
+
 function improvTick(): void {
+  _diag.ticks++;
   const dub = useDubStore.getState();
   const eqMode = dub.autoDubEqMode ?? 'both';
   if (eqMode === 'off' || eqMode === 'collaborative') {
@@ -138,15 +168,16 @@ function improvTick(): void {
       }
     }
     if (changed) _applyImprovDeltas();
+    _diag.lastSkip = `eqMode=${eqMode}`;
     return;
   }
 
   const snapshot = _snapshot;
-  if (!snapshot) return;
+  if (!snapshot) { _diag.lastSkip = 'no eq snapshot (analysis and live audio both absent)'; return; }
 
   const persona = getPersona(dub.autoDubPersona);
   const cfg = persona.improvConfig;
-  if (!cfg) return;
+  if (!cfg) { _diag.lastSkip = `persona ${dub.autoDubPersona} has no improvConfig`; return; }
 
   const depthMult = dub.autoDubEqDepthMult ?? 1.0;
   const effectiveDepth = cfg.depth * depthMult;
@@ -182,6 +213,8 @@ function improvTick(): void {
   }
 
   _prevEnergy = energy;
+  _diag.lastSkip = 'none';
+  _diag.lastDeltas = [..._improvBandDeltas];
   _applyImprovDeltas();
 }
 
