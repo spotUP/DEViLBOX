@@ -1580,25 +1580,57 @@ function tickImpl(): void {
   const phrasePosition = getPhrasePosition(transport, bundle.currentRow);
   const phraseIntensityMult = getPhraseIntensityMult(phrasePosition, persona.phraseArcShape ?? 'standard');
 
-  // Beat phase within current beat (0–1)
+  // Beat phase within the current beat (0-1), with sub-row resolution.
+  //
+  // `barPos` comes from `computeMusicalPosition(<integer row>, ...)`, so it can
+  // only land on exact row boundaries. At speed 12 a bar is 8 rows, which puts
+  // `barPos * 4` on exact halves and `% 1` on either 0.0 or 0.5 — and
+  // `sin(2*PI*phase)` is ZERO at both. The `beat-sync` improv driver is
+  // `sin(beatPhase * 2PI) * depth * energy`, so it could never return anything
+  // but zero, no matter the persona depth or the music. The EQ was not idle;
+  // it was being driven by a term that was always 0. Measured as deltas of
+  // 2.4e-16 with the driver ticking normally.
+  //
+  // So the row grid gives the BEAT, and the wall clock fills in where we are
+  // inside it: re-anchor whenever the row-derived beat index changes, then
+  // interpolate. Still locked to the transport — it cannot drift, because
+  // every beat boundary resets it — but now continuous between rows.
   const beatInBar = barPos * 4; // 4 beats per bar
-  const beatPhase = beatInBar % 1;
+  const beatPhase = resolveBeatPhase(bar * 4 + Math.floor(beatInBar), bpm);
 
-  // Refresh EQ snapshot each tick
+  // Refresh EQ snapshot each tick.
+  //
+  // The EQ performer needs two things that change moment to moment: how loud
+  // the mix is right now, and where its energy sits. Both are in the audio bus
+  // on every tick. Gating the snapshot on the OFFLINE classifier meant
+  // `improvTick` hit `if (!snapshot) return` on every tick until someone had
+  // run the capture-and-classify pipeline by hand — which is not part of
+  // loading a song. So in an ordinary session the EQ never moved at all, which
+  // is exactly the "eq and bus are dead in the ui" report.
+  //
+  // The offline result is still used for what only it knows: genre, the song's
+  // nominal bpm, danceability. Energy is read LIVE even when the analysis
+  // exists, because `genre.energy` is one number describing the whole song. It
+  // never changes between ticks, so `energy-reactive` computed
+  // `(energy - prevEnergy) === 0` forever and `beat-sync` scaled by a constant.
+  // A static descriptor standing in for a live signal is the same stale-copy
+  // fault as the rest of this sweep, just better hidden.
   const analysis = useTrackerAnalysisStore.getState().currentAnalysis;
-  if (analysis) {
+  const liveAudio = sampleAutoDubAudio();
+  if (analysis || liveAudio) {
     let baseline = makeFlatEqBaseline();
     try {
       const dubBus = getActiveDubBus();
       if (dubBus) baseline = dubBus.getReturnEQ().getParams();
     } catch { /* ok */ }
     _eqSnapshot = {
-      genre: analysis.genre.primary || 'Unknown',
-      energy: analysis.genre.energy,
-      danceability: analysis.genre.danceability,
-      bpm: analysis.genre.bpm || bpm,
+      genre: analysis?.genre.primary || 'Unknown',
+      energy: liveAudio ? liveEnergy(liveAudio.rms) : analysis!.genre.energy,
+      danceability: analysis?.genre.danceability ?? 0.5,
+      bpm: analysis?.genre.bpm || bpm,
       beatPhase,
-      frequencyPeaks: (analysis.frequencyPeaks ?? []) as [number, number][],
+      frequencyPeaks: (analysis?.frequencyPeaks as [number, number][] | undefined)
+        ?? liveFrequencyPeaks(liveAudio),
       baseline,
     };
   } else {
@@ -1965,6 +1997,45 @@ export interface AutoDubFireLogEntry {
   bus: Record<string, number | boolean | string | null> | null;
 }
 
+/**
+ * Centre frequencies the audio bus's four energy bands stand for.
+ *
+ * Only used to give the live spectrum somewhere to sit on the frequency axis
+ * so the spectral driver can match a band to an EQ band.
+ */
+const LIVE_BAND_HZ = [60, 250, 1000, 6000] as const;
+
+/**
+ * Mix loudness as a 0-1 drive amount.
+ *
+ * `EQSnapshot.energy` is documented 0-1 and is multiplied straight into the
+ * improv depth, but raw RMS on real material sits around 0.1, which would
+ * scale every gesture down to a tenth of its intended depth. 0.2 RMS is taken
+ * as "full", which puts ordinary playback near the middle of the range.
+ */
+function liveEnergy(rms: number): number {
+  return Math.max(0, Math.min(1, rms / 0.2));
+}
+
+/**
+ * The live spectrum as peaks, in dB RELATIVE to the mix's own average band.
+ *
+ * Relative rather than absolute because the consumer compares a peak against
+ * an EQ band's gain (`nearest[1] - baseline.gain`). Absolute dBFS would be
+ * tens of dB below any sane band gain and would read as "cut everything";
+ * measured against the mix's own average, a positive number means this band is
+ * hot FOR THIS MIX, which is the question the driver is actually asking.
+ */
+function liveFrequencyPeaks(audio: AutoDubAudioSnapshot | null): [number, number][] {
+  if (!audio) return [];
+  const bands = [audio.sub, audio.bass, audio.mid, audio.high];
+  const mean = bands.reduce((a, b) => a + b, 0) / bands.length;
+  if (mean <= 1e-6) return [];
+  return bands.map(
+    (e, i) => [LIVE_BAND_HZ[i], 20 * Math.log10(Math.max(e, 1e-6) / mean)] as [number, number],
+  );
+}
+
 function sampleAutoDubAudio(): AutoDubAudioSnapshot | null {
   try {
     const bus = AudioDataBus.getShared();
@@ -2171,6 +2242,29 @@ function getPhrasePosition(
   if (!Number.isFinite(globalRow) || globalRow < 0) return 0;
   const pos = computeMusicalPosition(globalRow, transport.speed || 6, getMusicalClockSettings());
   return pos.positionInPhrase;
+}
+
+/**
+ * Sub-row beat phase, anchored to the row grid.
+ *
+ * The row grid is authoritative for WHICH beat we are on; the wall clock fills
+ * in the position inside it. Re-anchoring on every beat change means the phase
+ * cannot accumulate drift, and a transport jump (seek, loop, pattern change)
+ * simply re-anchors on the next beat rather than smearing across it.
+ */
+let _beatAnchor: { beatIndex: number; atMs: number } | null = null;
+
+function resolveBeatPhase(beatIndex: number, bpm: number): number {
+  const now = performance.now();
+  if (!_beatAnchor || _beatAnchor.beatIndex !== beatIndex) {
+    _beatAnchor = { beatIndex, atMs: now };
+    return 0;
+  }
+  const beatMs = 60000 / Math.max(1, bpm);
+  // Clamped rather than wrapped: running past the end of a beat means the row
+  // grid has not ticked over yet (a stalled or very slow transport), and
+  // wrapping there would invent a beat the music did not play.
+  return Math.max(0, Math.min(0.999, (now - _beatAnchor.atMs) / beatMs));
 }
 
 function getAutoDubBarClock(): { bar: number; barPos: number; isRowAligned: boolean } {

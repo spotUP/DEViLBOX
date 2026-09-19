@@ -823,6 +823,7 @@ function _rowsAdvancing(globalRow: number, row: number): boolean {
 export async function getAutoDubState(): Promise<Record<string, unknown>> {
   const { useDubStore } = await import('../../stores/useDubStore');
   const { isAutoDubRunning, getAutoDubFireLogEntries } = await import('../../engine/dub/AutoDub');
+  const { getAutoEqDiag } = await import('../../engine/dub/AutoEQDriver');
   const s = useDubStore.getState();
   return {
     enabled: s.autoDubEnabled,
@@ -831,6 +832,10 @@ export async function getAutoDubState(): Promise<Record<string, unknown>> {
     moveBlacklist: s.autoDubMoveBlacklist,
     isRunning: isAutoDubRunning(),
     recentEventCount: getAutoDubFireLogEntries().length,
+    // Why the EQ is or is not moving — every gate in the improv driver is an
+    // early return, so without this the panel looks the same whether the
+    // driver is inert or holding still.
+    autoEq: getAutoEqDiag(),
   };
 }
 
