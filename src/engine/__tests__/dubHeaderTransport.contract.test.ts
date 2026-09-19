@@ -16,9 +16,29 @@ describe('dub header transport handoff contracts', () => {
     expect(toolbar).toContain('the Dub Deck expands by toggling editorFullscreen');
   });
 
-  it('renders the NavBar transport row from the FT2 toolbar action bridge when the dub deck is expanded', () => {
+  /**
+   * This assertion used to pin `!stripCollapsed`, which was the BUG rather
+   * than the intent.
+   *
+   * `TrackerView` hides `FT2Toolbar` on `editorFullscreen`; the NavBar row
+   * exists to replace it while it is hidden. Asking a different question —
+   * "is the strip expanded?" — let the two answers come apart: enabling the bus
+   * expands the strip, expanding the strip sets fullscreen, but each of those
+   * effects only fires when its own input changed, so turning fullscreen off by
+   * any other route left the strip expanded AND the toolbar visible. Both rows
+   * rendered. That is the doubled Play/Stop pair, reported repeatedly and once
+   * "fixed" as a NavBar grid overflow, which it was not.
+   *
+   * Corrected to the intent: exactly one transport, ever.
+   */
+  it('renders the NavBar transport row exactly when the FT2 toolbar is hidden', () => {
     const nav = read('components/layout/NavBar.tsx');
-    expect(nav).toContain("const dubDeckTransportActive = n.activeView === 'tracker' && !stripCollapsed;");
+    const view = read('components/tracker/TrackerView.tsx');
+    // The toolbar is hidden on editorFullscreen...
+    expect(view).toContain('{!editorFullscreen && (');
+    // ...so the replacement row must appear on exactly that condition.
+    expect(nav).toContain("const dubDeckTransportActive = n.activeView === 'tracker' && editorFullscreen;");
+    expect(nav).not.toContain('!stripCollapsed;');
     expect(nav).toContain('onClick={() => ft2Actions.playSong?.()}');
     expect(nav).toContain('onClick={() => ft2Actions.playPattern?.()}');
     expect(nav).toContain('onClick={() => ft2Actions.openFileBrowser?.()}');
