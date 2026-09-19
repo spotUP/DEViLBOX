@@ -74,6 +74,33 @@ import { AuditionHold } from '@/lib/dub/auditionHold';
 import { clampExtFeedback } from '@/lib/dub/extFeedbackCeiling';
 import { generatedPeak, shelfTrimForProgramme } from './programmeReference';
 
+/**
+ * How often a HELD announcement repeats itself.
+ *
+ * Must stay under `LIVE_HOLD_MS` in `useLiveDubParam` (400 ms), or a control
+ * falls back to its resting value between refreshes and flickers.
+ */
+const ANNOUNCE_REFRESH_MS = 150;
+
+/**
+ * The sweep rate fader's range, shared by the announcing side and the control.
+ *
+ * The live channel carries 0..1, so both ends have to agree on what that
+ * means; keeping the bounds here stops the two from drifting apart the way the
+ * EQ band table nearly did.
+ */
+export const SWEEP_RATE_MIN_HZ = 0.05;
+export const SWEEP_RATE_MAX_HZ = 3;
+
+export function normalizeSweepRate(hz: number): number {
+  const span = SWEEP_RATE_MAX_HZ - SWEEP_RATE_MIN_HZ;
+  return Math.max(0, Math.min(1, (hz - SWEEP_RATE_MIN_HZ) / span));
+}
+
+export function denormalizeSweepRate(n: number): number {
+  return SWEEP_RATE_MIN_HZ + n * (SWEEP_RATE_MAX_HZ - SWEEP_RATE_MIN_HZ);
+}
+
 /** Where the master insert's safety clipper starts to saturate. */
 const MASTER_CLIP_THRESHOLD = 0.9;
 
@@ -292,6 +319,8 @@ export class DubBus {
    *  Ref: 2026-04-29 Tubby-preset crash investigation. */
   private _feedbackScrubber: AudioNode;
   private _feedbackScrubberIsWorklet = false;
+  /** Parameters a move is currently HOLDING away from their resting value. */
+  private _heldAnnouncements = new Map<string, ReturnType<typeof setInterval>>();
   /** NaN/Inf scrubber inserted between `spring.output` and the post-spring
    *  forward chain (sidechain → glue → midScoop → lpf → master*). Same
    *  story as the feedback scrubber but on the FORWARD path: a NaN sample
@@ -1212,6 +1241,13 @@ export class DubBus {
     this.sweepLfoGain.gain.cancelScheduledValues(now);
     this.sweepLfoGain.gain.setTargetAtTime(Math.max(0, depthMs) / 1000, now, tc);
 
+    // The BUS tab's sweep controls follow the move for as long as it holds.
+    // Held rather than announced once: a comb sweep runs for bars, and a
+    // single announcement would let the faders drop back to the user's
+    // resting values part-way through the gesture.
+    this.announceHeld('dub.sweepAmount', Math.min(1, Math.max(0, targetAmount)));
+    this.announceHeld('dub.sweepRateHz', normalizeSweepRate(Math.max(0.05, rateHz)));
+
     return () => {
       const t = this.context.currentTime;
       this.sweepOutput.gain.cancelScheduledValues(t);
@@ -1220,6 +1256,8 @@ export class DubBus {
       this.sweepLfo.frequency.setTargetAtTime(priorRate, t, 0.08);
       this.sweepLfoGain.gain.cancelScheduledValues(t);
       this.sweepLfoGain.gain.setTargetAtTime(priorDepth / 1000, t, 0.08);
+      this.releaseHeldAnnouncement('dub.sweepAmount', priorAmt);
+      this.releaseHeldAnnouncement('dub.sweepRateHz', normalizeSweepRate(priorRate));
     };
   }
 
@@ -4794,6 +4832,44 @@ export class DubBus {
   }
 
   /**
+   * Keep announcing a value for as long as a move HOLDS it.
+   *
+   * A single announcement is right for a move that takes a parameter somewhere
+   * and immediately hands it back, but wrong for one that holds. Subscribers
+   * fall back to the stored value after `LIVE_HOLD_MS` (400 ms), while a
+   * version drop keeps the return at zero for BARS — so the fader flicked to 0
+   * and then climbed back to the user's resting value while the audio was
+   * still killed. The control ended up lying in the opposite direction to the
+   * original bug.
+   *
+   * Refresh rate sits comfortably inside that fallback window; the value is
+   * constant, so re-announcing is just telling subscribers the move has not
+   * let go yet.
+   */
+  private announceHeld(param: string, value: number): void {
+    this.releaseHeldAnnouncement(param, null);
+    this.announce(param, value);
+    const timer = setInterval(() => this.announce(param, value), ANNOUNCE_REFRESH_MS);
+    this._heldAnnouncements.set(param, timer);
+  }
+
+  /**
+   * Stop holding a parameter, and say where it landed.
+   *
+   * `restoreTo` is announced so the control follows the release ramp home
+   * rather than waiting out the fallback window; pass null to drop the hold
+   * silently (superseding it with another).
+   */
+  private releaseHeldAnnouncement(param: string, restoreTo: number | null): void {
+    const timer = this._heldAnnouncements.get(param);
+    if (timer !== undefined) {
+      clearInterval(timer);
+      this._heldAnnouncements.delete(param);
+    }
+    if (restoreTo !== null) this.announce(param, restoreTo);
+  }
+
+  /**
    * Solo a single channel's dub tap for the window of a move. Snapshot every
    * registered channelTap's gain, zero all except `channelId`, return a
    * releaser that restores the snapshot. Caller schedules the release when
@@ -6323,7 +6399,7 @@ export class DubBus {
       rg.cancelScheduledValues(now);
       rg.setValueAtTime(rg.value, now);
       rg.linearRampToValueAtTime(0, now + downSec);
-      this.announce('dub.returnGain', 0);
+      this.announceHeld('dub.returnGain', 0);
     } catch { /* ok */ }
 
     return () => {
@@ -6341,7 +6417,7 @@ export class DubBus {
         rg.cancelScheduledValues(t2);
         rg.setValueAtTime(rg.value, t2);
         rg.linearRampToValueAtTime(this.enabled ? baselineReturn : 0, t2 + 0.12);
-        this.announce('dub.returnGain', this.enabled ? baselineReturn : 0);
+        this.releaseHeldAnnouncement('dub.returnGain', this.enabled ? baselineReturn : 0);
       } catch { /* ok */ }
     };
   }
@@ -6373,7 +6449,7 @@ export class DubBus {
       rg.setValueAtTime(rg.value, now);
       rg.linearRampToValueAtTime(rg.value, now + downSec * 0.85);
       rg.linearRampToValueAtTime(0, now + downSec);
-      this.announce('dub.returnGain', 0);
+      this.announceHeld('dub.returnGain', 0);
     } catch { /* ok */ }
 
     // Restore after hold window
@@ -6391,7 +6467,7 @@ export class DubBus {
         rg.cancelScheduledValues(t2);
         rg.setValueAtTime(rg.value, t2);
         rg.linearRampToValueAtTime(this.enabled ? baselineReturn : 0, t2 + 0.08);
-        this.announce('dub.returnGain', this.enabled ? baselineReturn : 0);
+        this.releaseHeldAnnouncement('dub.returnGain', this.enabled ? baselineReturn : 0);
       } catch { /* ok */ }
     }, (downSec + holdSec) * 1000);
     this.throwTimers.add(restoreAt);
@@ -6526,6 +6602,8 @@ export class DubBus {
 
   /** Dispose and release all bus resources. */
   dispose(): void {
+    for (const timer of this._heldAnnouncements.values()) clearInterval(timer);
+    this._heldAnnouncements.clear();
     try { this._unsubIsolation?.(); } catch { /* ok */ }
     this._unsubIsolation = null;
     this._disposed = true;
