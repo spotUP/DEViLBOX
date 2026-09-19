@@ -89,7 +89,9 @@ describe('wiring contract', () => {
     const src = readFileSync(
       join(__dirname, '..', '..', '..', 'engine', 'dub', 'AutoDub.ts'), 'utf8',
     );
-    expect(src).toContain('resolveTransportRow(globalRow, row)');
+    // Passed straight from the store rather than via locals, so no
+    // intermediate can be mistaken for a direct read of the stale field.
+    expect(src).toContain('resolveTransportRow(transport.currentGlobalRow, transport.currentRow)');
     // The old behaviour preferred the pattern-granular value outright.
     expect(src).not.toMatch(/Number\.isFinite\(globalRow\) && globalRow > 0\s*\n?\s*\? globalRow/);
   });
