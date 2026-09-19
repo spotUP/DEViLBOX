@@ -56,6 +56,7 @@ import {
   type MusicalClockSettings,
 } from '@/lib/dub/musicalClock';
 import type { MusicalPosition } from '@/lib/dub/musicalClock';
+import { resolveTransportRow } from '@/lib/dub/transportRow';
 import { getPerformanceMemory } from './performanceMemoryBridge';
 import {
   setPerformanceAnnotator,
@@ -2174,9 +2175,12 @@ function getAutoDubBarClock(): { bar: number; barPos: number; isRowAligned: bool
   const transport = useTransportStore.getState();
   const globalRow = transport.currentGlobalRow;
   const row = transport.currentRow;
-  const rowLike = Number.isFinite(globalRow) && globalRow > 0
-    ? globalRow
-    : (Number.isFinite(row) && row > 0 ? row : null);
+
+  // Coarse position from `currentGlobalRow`, fine position from `currentRow`.
+  // See `transportRow.ts` for why neither is sufficient alone, and for the
+  // one-decision-per-pattern bug that reading the global row alone caused.
+  const rowLike = resolveTransportRow(globalRow, row);
+
   if (rowLike !== null) {
     // Plan B1: was `floor(row / 16)`, true only for 4/4 at speed 6. At speed 3
     // a bar is 32 rows, so every `bar % N` phrase rule below drifted against
