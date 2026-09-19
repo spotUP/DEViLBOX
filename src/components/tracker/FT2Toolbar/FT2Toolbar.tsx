@@ -403,6 +403,19 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
     // before any async work (engine.init fetches WASM). Fire-and-forget is fine.
     Tone.start();
 
+    // Read the transport LIVE rather than from the render that defined this
+    // handler.
+    //
+    // These handlers are registered with `useFT2ToolbarActions` so the NavBar
+    // can drive the transport while this toolbar is hidden by dub-deck
+    // fullscreen — and the registration deliberately outlives the unmount. But
+    // an unmounted component stops rendering, so a value captured from its last
+    // render freezes there. The NavBar computes its LABEL from the live store
+    // while calling a handler frozen at `isPlaying === false`: the button reads
+    // "Stop Song" and tries to start playback again. Reported repeatedly as the
+    // dub-deck transport "not working".
+    const isPlaying = useTransportStore.getState().isPlaying;
+
     // GT Ultra: delegate to its own engine
     const editorMode = useFormatStore.getState().editorMode;
     if (editorMode === 'goattracker') {
@@ -471,6 +484,10 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
   const handlePlayPattern = async () => {
     // CRITICAL for iOS: Tone.start() MUST be called synchronously within user gesture
     Tone.start();
+
+    // Live transport state — see `handlePlaySong` for why a captured value goes
+    // stale once this toolbar unmounts for dub-deck fullscreen.
+    const { isPlaying, isLooping } = useTransportStore.getState();
 
     // GT Ultra: delegate to its own engine (pattern play = same as song play for GT)
     const editorMode2 = useFormatStore.getState().editorMode;
