@@ -31,6 +31,12 @@ import { getTrackerReplayer } from '../../engine/TrackerReplayer';
 import { getToneEngine } from '../../engine/ToneEngine';
 import * as Tone from 'tone';
 import { AudioDataBus } from '../../engine/vj/AudioDataBus';
+import {
+  judgePlaybackSilence,
+  describeSilenceVerdict,
+  SilenceClock,
+  SILENCE_GRACE_SEC,
+} from '../../lib/audio/playbackSilenceWatchdog';
 
 // ─── Note Helpers ──────────────────────────────────────────────────────────────
 
@@ -731,6 +737,85 @@ export async function getDubBusState(): Promise<Record<string, unknown>> {
     registeredChannelTaps,
     insertProbe,
   };
+}
+
+// ─── Playback silence watchdog ───────────────────────────────────────────────
+
+/**
+ * "It says it is playing, and there is no sound."
+ *
+ * The worklet has computed `silentReason` for a long time and nothing read it
+ * during playback, so the failure was invisible until a person noticed the room
+ * had gone quiet. This is the read that makes it observable.
+ *
+ * The clock lives at module scope so duration survives between polls; the
+ * judgement itself is pure and tested in `playbackSilenceWatchdog`.
+ */
+const _silenceClock = new SilenceClock();
+
+export async function getPlaybackSilence(): Promise<Record<string, unknown>> {
+  const transport = useTransportStore.getState();
+  const { useAudioStore } = await import('../../stores/useAudioStore');
+  const masterMuted = useAudioStore.getState().masterMuted;
+
+  let lastRenderRms = 0;
+  let silentReason: string | null = null;
+  let diagAvailable = false;
+  try {
+    const { LibopenmptEngine } = await import('../../engine/libopenmpt/LibopenmptEngine');
+    if (LibopenmptEngine.hasInstance()) {
+      const diag = await LibopenmptEngine.getInstance().getWorkletDiag();
+      if (diag) {
+        diagAvailable = true;
+        lastRenderRms = typeof diag.lastRenderRms === 'number' ? diag.lastRenderRms : 0;
+        silentReason = typeof diag.silentReason === 'string' ? diag.silentReason : null;
+      }
+    }
+  } catch { /* engine module not loaded */ }
+
+  // Without a worklet answer there is nothing to judge: treat it as audible
+  // rather than invent a fault out of a missing measurement.
+  const silentNow = diagAvailable && transport.isPlaying && lastRenderRms <= 0;
+  const silentForSec = _silenceClock.observe(Date.now(), silentNow);
+
+  // The row counter is the only evidence here that the transport is live; a
+  // frozen one is a different fault and the judge says so rather than claiming
+  // this one.
+  const rowsAdvancing = _rowsAdvancing(transport.currentGlobalRow, transport.currentRow);
+
+  const verdict = judgePlaybackSilence({
+    isPlaying: transport.isPlaying,
+    rowsAdvancing,
+    lastRenderRms,
+    silentReason,
+    silentForSec,
+    masterMuted,
+  });
+
+  return {
+    verdict: verdict.kind,
+    message: describeSilenceVerdict(verdict),
+    silentForSec: Math.round(silentForSec * 10) / 10,
+    graceSec: SILENCE_GRACE_SEC,
+    diagAvailable,
+    lastRenderRms,
+    silentReason,
+    isPlaying: transport.isPlaying,
+    masterMuted,
+    rowsAdvancing,
+    currentRow: transport.currentRow,
+    currentGlobalRow: transport.currentGlobalRow,
+  };
+}
+
+/** Did the transport row move since the previous poll? */
+let _lastSeenRow: { global: number; row: number } | null = null;
+function _rowsAdvancing(globalRow: number, row: number): boolean {
+  const prev = _lastSeenRow;
+  _lastSeenRow = { global: globalRow, row };
+  // First poll has nothing to compare against; do not call a stall on it.
+  if (!prev) return true;
+  return prev.global !== globalRow || prev.row !== row;
 }
 
 // ─── Auto Dub — autonomous dub-move performer (2026-04-21) ───────────────────

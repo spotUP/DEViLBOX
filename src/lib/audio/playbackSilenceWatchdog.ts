@@ -82,3 +82,36 @@ export function describeSilenceVerdict(v: SilenceVerdict): string | null {
     + 'The transport is running and nothing is muted, so the engine is producing '
     + 'nothing. Stop and play again to re-seek it.';
 }
+
+/**
+ * How long the engine has been silent, across sporadic observations.
+ *
+ * The reporting path is polled by hand rather than on a timer, so elapsed time
+ * cannot be counted in ticks. This keeps the timestamp at which silence began
+ * and subtracts, which gives a true duration however irregularly it is asked.
+ *
+ * The first observation that sees silence starts the clock, so silence that
+ * began before anyone looked reads as zero and climbs from there. That
+ * under-reports rather than over-reports, which is the right way round for
+ * something that decides whether to call a fault.
+ */
+export class SilenceClock {
+  private silentSinceMs: number | null = null;
+
+  /** Returns seconds of continuous silence observed so far. */
+  observe(nowMs: number, silentNow: boolean): number {
+    if (!silentNow) {
+      this.silentSinceMs = null;
+      return 0;
+    }
+    if (this.silentSinceMs === null) {
+      this.silentSinceMs = nowMs;
+      return 0;
+    }
+    return Math.max(0, (nowMs - this.silentSinceMs) / 1000);
+  }
+
+  reset(): void {
+    this.silentSinceMs = null;
+  }
+}

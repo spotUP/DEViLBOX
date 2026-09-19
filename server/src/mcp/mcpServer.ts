@@ -405,6 +405,17 @@ export function createMcpServer(): McpServer {
   );
 
   server.tool(
+    'get_playback_silence',
+    'Diagnose "it says it is playing and there is no sound": reports whether the '
+      + 'engine is rendering silence while the transport runs, with the worklet\'s own '
+      + 'silentReason. Verdicts: ok | watching (silent but within the musical grace '
+      + 'window, a dub drop takes the mix away for bars) | expected (muted or transport '
+      + 'not advancing) | stalled. Reports only; it never repairs.',
+    {},
+    () => call('get_playback_silence'),
+  );
+
+  server.tool(
     'set_bpm',
     'Set tempo in BPM',
     { bpm: z.number().min(20).max(999).describe('Beats per minute') },
@@ -2064,6 +2075,7 @@ export function createMcpServer(): McpServer {
           { tool: 'set_looping', description: 'Enable/disable pattern looping' },
           { tool: 'seek_to', description: 'Seek to a position' },
           { tool: 'get_playback_state', description: 'Get playback state (playing, position, BPM)' },
+          { tool: 'get_playback_silence', description: 'Diagnose playing-but-silent (engine rendering silence)' },
         ],
         'Mixer': [
           { tool: 'get_mixer_state', description: 'Get all channel volumes, pans, mutes, solos' },
