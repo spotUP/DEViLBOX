@@ -38,7 +38,7 @@ describe('nothing hardcodes the development server', () => {
    * instrument classifier could never load in production. That one was in CI
    * builds too, so it had been failing live for as long as it existed.
    */
-  it('no source file pins the dev API port', () => {
+  it('no source file pins the dev API port', { timeout: 30_000 }, () => {
     // `git grep` rather than walking the tree: reading every .ts/.tsx under
     // src/ took long enough to blow the 5 s test timeout under load, and a
     // guard that fails intermittently is a guard people switch off.
@@ -110,7 +110,11 @@ describe('the manual deploy route cannot ship a dev bundle', () => {
 describe('if a build is present, it must be deployable', () => {
   const assets = resolve(ROOT, 'dist/assets');
 
-  it('contains no reference to the development API port', () => {
+  // Reads every JS bundle in dist/, which is tens of megabytes. That took
+  // 5.7 s under a loaded full-suite run and tripped vitest's 5 s default,
+  // blocking a push over a guard that was working correctly. The work is
+  // genuinely I/O-bound, so it gets the time rather than a weaker assertion.
+  it('contains no reference to the development API port', { timeout: 30_000 }, () => {
     if (!existsSync(assets)) return;   // nothing built here; nothing to check
     const offenders: string[] = [];
     for (const name of readdirSync(assets)) {
