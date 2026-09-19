@@ -33,7 +33,7 @@ recount — do not trust this sentence either.
 | G — wet energy | **closed** | G1 |
 | H-L — musical behaviour | **closed** | H1, I1, J1, K1-K4, L1, L2, AE1 |
 | M-O — record, verify, release | M1, N1-N4, O1 done | O2 (human) |
-| X — user-reported open threads | 14 of 19 | X1, X3, X5, X6, X7, X8, X11, X12, X13, X15, X16, X17 (sliders), X18 (idle), X19 (buttons) closed; X21 new, open |
+| X — user-reported open threads | 15 of 19 | X1, X3, X5, X6, X7, X8, X11, X12, X13, X14 (siren), X15, X16, X17 (sliders), X18 (idle), X19 (buttons) closed; X21 open |
 
 ### Debt carried, not hidden
 
@@ -1117,7 +1117,17 @@ this bug.
       (`lowShare`, smoothed), so a bass-heavy tune pays more than a thin one. Floored and
       capped so it neither disappears nor swallows the tune.
 
-- [ ] **X14** **The siren fires far too often, then got stuck.** Reported 2026-09-18:
+- [x] **X14 — CLOSED 2026-09-19 on a listening pass.** User: "i dint think the siren
+      overfires anymore". That is the verdict this needed: the measurement below could
+      only show the over-firing was absent from the code as it now stands, never that the
+      build the user HEARD it on was cleared. Both halves now agree.
+      Hedged wording noted deliberately ("i dont think") — if it returns, capture
+      `get_auto_dub_fire_log` BEFORE reloading, because a reload is what cost the
+      original evidence.
+      The "then got stuck" half was the X12/X13 failure shape (a lost release) and was
+      fixed with those; the log below confirms every fire pairs with its release.
+
+- [x] **X14 (original entry)** **The siren fires far too often, then got stuck.** Reported 2026-09-18:
       "the siren fires super often now it fired over and over until it got stuck".
       **Suspected regression from this session's own work** — the Gate E intention gating
       filters the rule table to moves that serve the current intention, and `dubSiren` is
