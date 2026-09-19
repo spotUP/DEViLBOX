@@ -99,17 +99,30 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
 
   const editorFullscreen = useUIStore((s) => s.editorFullscreen);
 
+  /**
+   * Undo and redo read the CURRENT pattern index, not the one from the render
+   * that defined them.
+   *
+   * These are registered with `useFT2ToolbarActions` so the NavBar can drive
+   * them while this toolbar is hidden by dub-deck fullscreen, and the
+   * registration deliberately outlives the unmount. An unmounted component
+   * stops rendering, so a captured `currentPatternIndex` freezes — and undo
+   * would then write the recovered pattern into whichever pattern happened to
+   * be open when the toolbar went away. That is not a dead button; it is the
+   * wrong pattern being overwritten. Same fault as the transport buttons, with
+   * worse consequences.
+   */
   const handleUndo = useCallback(() => {
     if (!canUndo()) return;
     const pattern = undo();
-    if (pattern) replacePattern(currentPatternIndex, pattern);
-  }, [undo, canUndo, replacePattern, currentPatternIndex]);
+    if (pattern) replacePattern(useTrackerStore.getState().currentPatternIndex, pattern);
+  }, [undo, canUndo, replacePattern]);
 
   const handleRedo = useCallback(() => {
     if (!canRedo()) return;
     const pattern = redo();
-    if (pattern) replacePattern(currentPatternIndex, pattern);
-  }, [redo, canRedo, replacePattern, currentPatternIndex]);
+    if (pattern) replacePattern(useTrackerStore.getState().currentPatternIndex, pattern);
+  }, [redo, canRedo, replacePattern]);
 
   const {
     editStep,
@@ -130,7 +143,6 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
     play,
     stop,
     setCurrentRow,
-    grooveTemplateId,
     setGrooveTemplate,
     reset: resetTransport,
   } = useTransportStore(useShallow((s) => ({
@@ -144,14 +156,12 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
     play: s.play,
     stop: s.stop,
     setCurrentRow: s.setCurrentRow,
-    grooveTemplateId: s.grooveTemplateId,
     setGrooveTemplate: s.setGrooveTemplate,
     reset: s.reset,
   })));
 
-  const { setMetadata, metadata, resetProject } = useProjectStore(useShallow((s) => ({
+  const { setMetadata, resetProject } = useProjectStore(useShallow((s) => ({
     setMetadata: s.setMetadata,
-    metadata: s.metadata,
     resetProject: s.resetProject,
   })));
   const { instruments, loadInstruments, updateInstrument, addInstrument, reset: resetInstruments } = useInstrumentStore(useShallow((s) => ({
@@ -161,11 +171,7 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
     addInstrument: s.addInstrument,
     reset: s.reset,
   })));
-  const { masterEffects } = useAudioStore(useShallow((s) => ({
-    masterEffects: s.masterEffects,
-  })));
-  const { curves, reset: resetAutomation } = useAutomationStore(useShallow((s) => ({
-    curves: s.curves,
+  const { reset: resetAutomation } = useAutomationStore(useShallow((s) => ({
     reset: s.reset,
   })));
 
@@ -256,6 +262,18 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
       // Format-aware download: if a ProTracker MOD is loaded and the user hasn't
       // broken MOD compatibility, write the native .mod (Cinter or plain) instead
       // of a .dbx. Other formats / broken compat fall through to the .dbx export.
+      // EVERY piece of song state this handler writes out is read live, for the
+      // same reason the transport and undo handlers are: Save runs from the
+      // NavBar while this toolbar is unmounted, and anything captured from its
+      // last render would write the song as it was when the toolbar went away.
+      // Partial liveness is the worst outcome — it saves a mix of current and
+      // stale, which no reload can detect.
+      const { patterns, patternOrder: order } = useTrackerStore.getState();
+      const { instruments } = useInstrumentStore.getState();
+      const { metadata } = useProjectStore.getState();
+      const { masterEffects } = useAudioStore.getState();
+      const { curves } = useAutomationStore.getState();
+      const { bpm, grooveTemplateId } = useTransportStore.getState();
       const srcFmt = patterns[0]?.importMetadata?.sourceFormat as string | undefined;
       const isCinterSong = instruments.some(
         (i) => (i.parameters as Record<string, unknown> | undefined)?.cinter === 1,
@@ -264,7 +282,6 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
       if ((srcFmt === 'MOD' || isCinterSong) && !hasAnyConfirmedFormatViolation() && maxCh <= 4 && instruments.length <= 31) {
         try {
           const { speed: spd } = useTransportStore.getState();
-          const ord = useTrackerStore.getState().patternOrder;
           const { downloadBytes } = await import('@lib/export/Cinter4ModSave');
           if (isCinterSong) {
             // Save = a re-loadable working file: full MOD with the Cinter voices
@@ -276,7 +293,7 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
             if (res) downloadBytes(res.data, res.filename);
           } else {
             const { exportWithOpenMPT } = await import('@lib/export/OpenMPTExporter');
-            const res = await exportWithOpenMPT(patterns, instruments, ord, {
+            const res = await exportWithOpenMPT(patterns, instruments, order, {
               format: 'mod', moduleName: metadata.name || 'song', channelLimit: 4,
               initialBPM: bpm, initialSpeed: spd,
             });
@@ -291,8 +308,7 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
       }
 
       // Also download as .dbx file
-      const { patternOrder } = useTrackerStore.getState();
-      const sequence = patternOrder.map(idx => patterns[idx]?.id).filter(Boolean);
+      const sequence = order.map(idx => patterns[idx]?.id).filter(Boolean);
       const automationData: Record<string, Record<number, Record<string, unknown>>> = {};
       patterns.forEach((pattern) => {
         pattern.channels.forEach((_channel, channelIndex) => {
@@ -328,7 +344,7 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
         { prettify: true },
         grooveTemplateId,
         { speed, trackerFormat, linearPeriods },
-        patternOrder,
+        order,
         getOriginalModuleDataForExport(),
       );
 

@@ -708,9 +708,16 @@ export async function getDubBusState(): Promise<Record<string, unknown>> {
         insertProbe.libopenmptOutputGain = g(eng.gainNode);
         insertProbe.libopenmptHasWorklet = !!eng.workletNode;
         // The decisive one: what the worklet itself is doing. `silentReason`
-        // and `lastRenderRms` separate "the module rendered silence" (a mute
-        // or isolation mask killed every channel at the source, which nothing
-        // downstream can undo) from "audio was produced and swallowed later".
+        // and `lastRenderRms` separate "the module rendered silence" from
+        // "audio was produced and swallowed later".
+        //
+        // NOTE on the mask, because it reads backwards: in `userMuteMask` a SET
+        // bit means the channel is AUDIBLE (`applyChannelIsolation_`:
+        // `active = mask & (1<<ch)`, then `mute(ch, active ? 0 : 1)`). So
+        // `65535` is everything PLAYING, not everything muted. Misreading that
+        // on 2026-09-19 produced a confident diagnosis of a mute leak that did
+        // not exist; the module was rendering silence with every channel
+        // audible.
         // null means the worklet did not answer within the timeout.
         insertProbe.workletDiag = await LibopenmptEngine.getInstance().getWorkletDiag();
       }
