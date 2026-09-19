@@ -433,6 +433,9 @@ export class DubBus {
   private _setSpringWet(v: number): void {
     this._springWetCache = v;
     try { this.spring.setParamById(PARAM_SPRINGS_DRYWET, v); } catch { /* ok */ }
+    // Single choke point for the spring, so one announcement covers every
+    // route that changes it.
+    this.announce('dub.springWet', v);
   }
 
   /** Asynchronously load `nan-scrubber.worklet.js` and splice the worklet
@@ -6320,6 +6323,7 @@ export class DubBus {
       rg.cancelScheduledValues(now);
       rg.setValueAtTime(rg.value, now);
       rg.linearRampToValueAtTime(0, now + downSec);
+      this.announce('dub.returnGain', 0);
     } catch { /* ok */ }
 
     return () => {
@@ -6337,6 +6341,7 @@ export class DubBus {
         rg.cancelScheduledValues(t2);
         rg.setValueAtTime(rg.value, t2);
         rg.linearRampToValueAtTime(this.enabled ? baselineReturn : 0, t2 + 0.12);
+        this.announce('dub.returnGain', this.enabled ? baselineReturn : 0);
       } catch { /* ok */ }
     };
   }
@@ -6368,6 +6373,7 @@ export class DubBus {
       rg.setValueAtTime(rg.value, now);
       rg.linearRampToValueAtTime(rg.value, now + downSec * 0.85);
       rg.linearRampToValueAtTime(0, now + downSec);
+      this.announce('dub.returnGain', 0);
     } catch { /* ok */ }
 
     // Restore after hold window
@@ -6385,6 +6391,7 @@ export class DubBus {
         rg.cancelScheduledValues(t2);
         rg.setValueAtTime(rg.value, t2);
         rg.linearRampToValueAtTime(this.enabled ? baselineReturn : 0, t2 + 0.08);
+        this.announce('dub.returnGain', this.enabled ? baselineReturn : 0);
       } catch { /* ok */ }
     }, (downSec + holdSec) * 1000);
     this.throwTimers.add(restoreAt);
