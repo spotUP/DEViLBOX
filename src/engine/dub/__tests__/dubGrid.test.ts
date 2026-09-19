@@ -93,3 +93,69 @@ describe('msToNextGridBoundary', () => {
     expect(slow).toBeCloseTo(fast * 2, 5);
   });
 });
+
+/**
+ * The grid ran on a beat twice as long as the music.
+ *
+ * `ROWS_PER_BEAT` was hardcoded to 4 with a comment saying rows-per-beat is
+ * really `24 / ticksPerRow` and that deriving it from live speed was "tracked
+ * separately (the MusicalClock work)". That work landed; this file was never
+ * moved onto it.
+ *
+ * At the default speed 6 the constant is right, so everything looked fine. At
+ * speed 12 — "world class dub", the tune the performer was being judged on —
+ * a beat is 2 rows, not 4. Every boundary was computed against a beat of twice
+ * the real length, so a move aimed at the next offbeat landed up to a full beat
+ * away. Reported by ear before it was found in the source: "it didnt feel very
+ * nicely synced", then "i disrupted the song more than add to it it felt off".
+ *
+ * Same class as the `beatPhase` quantization fixed the same day: a musical
+ * quantity derived from a constant instead of from the transport.
+ */
+describe('the grid follows the transport speed, not a constant', () => {
+  const SPEED_12_ROWS_PER_BEAT = 2;   // 24 ticks per quarter / 12 ticks per row
+  const atBeat12 = (beats: number) => beats * SPEED_12_ROWS_PER_BEAT;
+
+  it('puts a beat at 2 rows when the song runs at speed 12', () => {
+    // On the boundary at every whole beat, however many rows that is.
+    expect(msToNextGridBoundary('offbeat', BPM, atBeat12(0), 12)).toBe(0);
+    expect(msToNextGridBoundary('offbeat', BPM, atBeat12(1), 12)).toBe(0);
+    expect(msToNextGridBoundary('offbeat', BPM, atBeat12(2), 12)).toBe(0);
+  });
+
+  it('finds the offbeat where the music has it, not half a beat out', () => {
+    // Row 1 at speed 12 IS the offbeat — the "&" — so a throw there fires now.
+    expect(msToNextGridBoundary('offbeat', BPM, 1, 12)).toBe(0);
+    // The old constant read row 1 as a quarter of the way into a beat and made
+    // it wait; that wait is the audible fault.
+    expect(msToNextGridBoundary('offbeat', BPM, 1, 6)).toBeGreaterThan(0);
+  });
+
+  it('still matches the convention at the default speed', () => {
+    // Speed 6 is where the hardcoded 4 was correct, so nothing moves there.
+    for (const beats of [0, 0.5, 1, 1.5, 2]) {
+      expect(msToNextGridBoundary('offbeat', BPM, atBeat(beats), 6))
+        .toBe(msToNextGridBoundary('offbeat', BPM, atBeat(beats)));
+    }
+  });
+
+  it('measures the error the reported song actually had', () => {
+    // Sweep a bar of rows and compare the real speed-12 grid against the old
+    // constant, rather than asserting a figure for one row: the discrepancy
+    // depends on where in the beat the move is aimed, and quoting a single
+    // number would overstate it.
+    let worst = 0;
+    let disagreements = 0;
+    for (let row = 0; row < 8; row += 0.25) {
+      const correct = msToNextGridBoundary('offbeat', BPM, row, 12);
+      const withOldConstant = msToNextGridBoundary('offbeat', BPM, row, 6);
+      if (correct !== withOldConstant) disagreements++;
+      worst = Math.max(worst, Math.abs(correct - withOldConstant));
+    }
+    // It is wrong for most of the bar, not at some unlucky corner.
+    expect(disagreements).toBeGreaterThan(8);
+    // Worst case is a quarter beat — 125 ms at 120 BPM, and at speed 12 that
+    // is half a row. Plainly audible on an offbeat gesture.
+    expect(worst).toBeGreaterThanOrEqual(BEAT_MS / 4);
+  });
+});
