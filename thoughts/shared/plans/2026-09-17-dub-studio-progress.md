@@ -1243,8 +1243,30 @@ this bug.
       path (see `project_crash_recovery_autosave`); the likely shape is the same stale
       class as the rest of this sweep — a reset that clears the STORE the prompt knows
       about while another owner (engine, replayer, format state) keeps its copy.
-      Reproduce first: load a song, force a reload, choose Discard, then check every
-      store and the engine for survivors rather than trusting the visible editor.
+      **ATTEMPTED REPRO 2026-09-19 — NOT REPRODUCED on the plain-MOD path.** Loaded
+      "world class dub" (ProTracker MOD, 15 patterns / 23 instruments), waited for the
+      autosave to write a real recovery record (verified in IndexedDB `devilbox/project`
+      holding name=world_class_dub patterns=15 instruments=23), reloaded, took the
+      prompt, clicked Discard. After: tracker 1 pattern / "Untitled", instruments [],
+      format state all default (editorMode classic, no WASM engines, no original module
+      data), mixer 16 channels at unity, AND the IndexedDB recovery key was gone. Every
+      layer clean.
+      Why it passes here: the prompt only appears when `everExplicitlySaved` is FALSE
+      (`useProjectPersistence.ts:1080`), and that branch loads nothing — so the editor is
+      already empty and `discardRecovery` (`:1252`) has nothing to clear. It only clears
+      the React state and deletes the IndexedDB record; it never resets the editor.
+      **So the real defect is that discard's correctness depends on an invariant nobody
+      enforces** — "the editor is empty whenever this prompt is up". Wherever that
+      invariant breaks, discard leaves whatever is loaded. The user has hit a case where
+      it breaks; this repro is not it.
+      DO NOT "fix" this with an unconditional reset on discard: the prompt is not modal,
+      so a user can load a song while it is open, and clearing unconditionally would
+      destroy that song. Any fix must clear only state that came from boot/recovery, not
+      state the user has since loaded.
+      Still to ask/try: which format (a WASM/native song — UADE, SID, Furnace, GT Ultra —
+      carries engine and original-module state a MOD does not), whether Save had ever
+      been used in that profile, and whether it was the live site (deployed bundle is
+      985a43fbb, older than these fixes).
 
 - [~] **X17 (original entry)** **The EQ and dub-bus sliders do not move any more.** Reported 2026-09-19:
       "i see no action in the eq and dub bus sliders at all they use to move" — a
