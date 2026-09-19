@@ -33,7 +33,7 @@ recount — do not trust this sentence either.
 | G — wet energy | **closed** | G1 |
 | H-L — musical behaviour | **closed** | H1, I1, J1, K1-K4, L1, L2, AE1 |
 | M-O — record, verify, release | M1, N1-N4, O1 done | O2 (human) |
-| X — user-reported open threads | 16 of 19 | X1, X2 (skank, by ear), X3, X5, X6, X7, X8, X11, X12, X13, X14 (siren), X15, X16, X17 (sliders), X18 (idle), X19 (buttons) closed; X21 open |
+| X — user-reported open threads | 18 of 19 | all closed except X10 (clipping). X2 (skank) and X14 (siren) by ear; X9 (sends) and X21 (discard) 2026-09-19 |
 
 ### Debt carried, not hidden
 
@@ -987,7 +987,23 @@ this bug.
       `__dirname` (CommonJS here, as `server/src/index.ts` and `routes/ai.ts` already do)
       before `API_BASE` is computed. 7 + 3 tests; both fail against the old code.
 
-- [~] **X9** **Store-level dub sends ratchet to 1.0 and stay there.** FIXED in code,
+- [x] **X9 — CLOSED 2026-09-19 by measurement on the exercised path.** The earlier
+      reading was a WEAK pass and was treated as one: sends looked clean, but the fire log
+      showed neither `ghostReverb` nor `echoBuildUp` had fired, so the ratcheting path had
+      never run. Drove it directly instead — fired `ghostReverb` global, confirmed it was
+      holding (channels 0-3 muted, its signature), then released.
+      Before / during / after, twice over: sends `0.25 / 0.45 / 0.45 / 0.45` -> held ->
+      `0.25 / 0.45 / 0.45 / 0.45`. Exact baseline restored, no channel at 1.0, every
+      channel unmuted (`userMuteMask` 65535 = all audible), taps intact.
+      Closed on measurement rather than ear on purpose: the report was a STATE claim
+      ("pushed the master up to 100% and stayed there") and the fader is
+      `max(channel dubSend)`, so reading the sends tests the claim more directly than
+      listening can.
+      One-off seen and NOT logged as a bug: `returnGain` moved 0.75 -> 0.63 once and never
+      again across controlled repeats, most likely the user's own hand on the FX WET fader
+      while watching it. One unreproduced sample is not a finding.
+
+- [x] **X9 (original entry)** **Store-level dub sends ratchet to 1.0 and stay there.** FIXED in code,
       NOT yet verified live by ear. Reported
       2026-09-18 as "auto dub pushed the master up to 100% and stayed there".
       The Dub Deck master fader is `max(channel dubSend)` (`DubDeckStrip.tsx:620`),
@@ -1254,7 +1270,20 @@ this bug.
       (`startStereoDoubler` builds its own parallel nodes), so animating them would
       invent motion the audio is not making. Pinned by test.
 
-- [ ] **X21** **Declining the crash-recovery restore must fully clear the song.**
+- [x] **X21 — CLOSED 2026-09-19.** User: "discarding instead of restoring works". Agrees
+      with the repro below, which could not make it fail either.
+      **The latent fragility is real and survives this closure**, so it is kept rather
+      than deleted: `discardRecovery` never resets the editor. It drops the React state
+      and deletes the IndexedDB record, and nothing more. It is correct today only
+      because the prompt appears solely when `everExplicitlySaved` is false, and that
+      branch loads nothing — an invariant no code enforces. If a future change ever loads
+      something before the prompt resolves, discard will leave it sitting there and this
+      report will come back.
+      Any future fix must clear only what came from boot, NOT unconditionally: the prompt
+      is not modal, so a user can load a song while it is open, and a blanket reset would
+      destroy that song.
+
+- [x] **X21 (original entry)** **Declining the crash-recovery restore must fully clear the song.**
       Reported 2026-09-19: "if i chose not to restore the current song when the browser
       offers me it after a reload the current song needs to be fully cleared, a broken
       song lingers if not." So Discard leaves partial state behind — patterns,
