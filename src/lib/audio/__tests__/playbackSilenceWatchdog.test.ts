@@ -18,6 +18,7 @@ import {
   describeSilenceVerdict,
   SILENCE_GRACE_SEC,
   type PlaybackSilenceInputs,
+  SilenceClock,
 } from '../playbackSilenceWatchdog';
 
 function inputs(over: Partial<PlaybackSilenceInputs> = {}): PlaybackSilenceInputs {
@@ -103,5 +104,34 @@ describe('the boundary', () => {
   it('still reports when the engine offers no reason', () => {
     const v = judgePlaybackSilence(inputs({ silentReason: null }));
     expect(v.kind === 'stalled' && v.reason).toMatch(/rendering silence/);
+  });
+});
+
+describe('SilenceClock', () => {
+  it('reports zero on the observation that first sees silence', () => {
+    const c = new SilenceClock();
+    expect(c.observe(1_000, true)).toBe(0);
+  });
+
+  it('measures elapsed time, not the number of observations', () => {
+    const c = new SilenceClock();
+    c.observe(1_000, true);
+    // One poll, thirty seconds later: the duration is real time, not one tick.
+    expect(c.observe(31_000, true)).toBe(30);
+  });
+
+  it('restarts the clock once audio returns', () => {
+    const c = new SilenceClock();
+    c.observe(1_000, true);
+    expect(c.observe(9_000, false)).toBe(0);
+    expect(c.observe(10_000, true)).toBe(0);
+    expect(c.observe(15_000, true)).toBe(5);
+  });
+
+  it('crosses the grace threshold only after real elapsed time', () => {
+    const c = new SilenceClock();
+    c.observe(0, true);
+    expect(c.observe((SILENCE_GRACE_SEC - 1) * 1000, true)).toBeLessThan(SILENCE_GRACE_SEC);
+    expect(c.observe((SILENCE_GRACE_SEC + 1) * 1000, true)).toBeGreaterThan(SILENCE_GRACE_SEC);
   });
 });
