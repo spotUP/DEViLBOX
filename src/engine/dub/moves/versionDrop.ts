@@ -20,6 +20,7 @@
  * throw considers worth aiming at cannot disagree.
  */
 
+import { resolveTransportRow } from '@/lib/dub/transportRow';
 import type { DubMove } from './_types';
 import { useMixerStore } from '@/stores/useMixerStore';
 import {
@@ -57,8 +58,11 @@ export const versionDrop: DubMove = {
     const pattern = tracker.patterns?.[tracker.currentPatternIndex ?? 0] ?? null;
     if (!pattern?.channels?.length) return { dispose() {} };
 
+    // The coarse/fine join, not the raw field: `currentGlobalRow` only moves on
+    // a pattern change, and this grid is what the drop plans its return
+    // against.
     const grid = computeMusicalPosition(
-      transport.currentGlobalRow ?? 0,
+      resolveTransportRow(transport.currentGlobalRow, transport.currentRow) ?? 0,
       transport.speed || 6,
     );
     const profiles = getChannelProfiles(

@@ -12,6 +12,7 @@
  * graceful no-op — no channels muted.
  */
 
+import { resolveTransportRow } from '@/lib/dub/transportRow';
 import type { DubMove } from './_types';
 import { useMixerStore } from '@/stores/useMixerStore';
 import {
@@ -85,9 +86,11 @@ export const riddimSection: DubMove = {
     const barMs = (60000 / bpm) * 4;
     const holdBars = (typeof ctx.params?.holdBars === 'number') ? ctx.params.holdBars : 4;
     const transport = useTransportStore.getState();
-    const row = Number.isFinite(transport.currentGlobalRow) && transport.currentGlobalRow > 0
-      ? transport.currentGlobalRow
-      : transport.currentRow;
+    // `currentGlobalRow` only moves when the PATTERN changes, so alone it is
+    // stale by up to a whole pattern — and this row decides WHEN the skank
+    // comes back. Off by that much, the return lands nowhere near the musical
+    // boundary it was aiming for. Same join the performer's clock uses.
+    const row = resolveTransportRow(transport.currentGlobalRow, transport.currentRow) ?? 0;
     // The intention behind the return: bringing one part back inside a section
     // that is still held is a SPACE gesture, so it resolves on the next bar.
     // The ceiling keeps it inside the section it belongs to.

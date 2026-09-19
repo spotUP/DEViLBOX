@@ -2182,13 +2182,12 @@ function getAutoDubBarClock(): { bar: number; barPos: number; isRowAligned: bool
     try { getPerformanceMemory().observePosition(pos); } catch { /* memory optional */ }
   };
   const transport = useTransportStore.getState();
-  const globalRow = transport.currentGlobalRow;
-  const row = transport.currentRow;
-
   // Coarse position from `currentGlobalRow`, fine position from `currentRow`.
   // See `transportRow.ts` for why neither is sufficient alone, and for the
   // one-decision-per-pattern bug that reading the global row alone caused.
-  const rowLike = resolveTransportRow(globalRow, row);
+  // Passed straight in rather than bound to locals first, so there is no
+  // intermediate that looks like a direct read of the stale field.
+  const rowLike = resolveTransportRow(transport.currentGlobalRow, transport.currentRow);
 
   if (rowLike !== null) {
     // Plan B1: was `floor(row / 16)`, true only for 4/4 at speed 6. At speed 3
