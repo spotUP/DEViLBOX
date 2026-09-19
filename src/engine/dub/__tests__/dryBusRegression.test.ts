@@ -76,9 +76,22 @@ describe('DubBus dry-bus regression — feedback cycle DelayNode', () => {
   });
 
   it('disconnects extFeedbackDelay in dispose', () => {
+    // Brace-matched rather than a fixed slice. This read `+ 3000` chars, and
+    // the disconnect sat at offset 2989 — so adding two lines anywhere earlier
+    // in dispose failed the test while the disconnect was still right there.
+    // A window that has to be widened whenever the method grows is not
+    // measuring what it claims to.
     const disposeStart = DUBBUS_SRC.indexOf('dispose(): void');
     expect(disposeStart).toBeGreaterThan(-1);
-    const disposeBody = DUBBUS_SRC.slice(disposeStart, disposeStart + 3000);
+    const open = DUBBUS_SRC.indexOf('{', disposeStart);
+    let depth = 0;
+    let close = -1;
+    for (let i = open; i < DUBBUS_SRC.length; i++) {
+      if (DUBBUS_SRC[i] === '{') depth++;
+      else if (DUBBUS_SRC[i] === '}' && --depth === 0) { close = i; break; }
+    }
+    expect(close, 'unbalanced braces in dispose').toBeGreaterThan(open);
+    const disposeBody = DUBBUS_SRC.slice(open, close);
     expect(disposeBody).toMatch(/extFeedbackDelay.*disconnect/s);
   });
 });
