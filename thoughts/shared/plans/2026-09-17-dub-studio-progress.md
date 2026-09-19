@@ -33,7 +33,7 @@ recount — do not trust this sentence either.
 | G — wet energy | **closed** | G1 |
 | H-L — musical behaviour | **closed** | H1, I1, J1, K1-K4, L1, L2, AE1 |
 | M-O — record, verify, release | M1, N1-N4, O1 done | O2 (human) |
-| X — user-reported open threads | 13 of 18 | X1, X3, X5, X6, X7, X8, X11, X12, X13, X15, X16, X18 (idle), X19 (buttons) closed; X17 partial |
+| X — user-reported open threads | 14 of 19 | X1, X3, X5, X6, X7, X8, X11, X12, X13, X15, X16, X17 (sliders), X18 (idle), X19 (buttons) closed; X21 new, open |
 
 ### Debt carried, not hidden
 
@@ -1201,7 +1201,52 @@ this bug.
       counts now, matched on a delimited prefix so one id cannot light another's button.
       The per-channel grid keeps its exact key. Commit `27f00cbe3`. 7 tests.
 
-- [~] **X17** **The EQ and dub-bus sliders do not move any more.** Reported 2026-09-19:
+- [x] **X17 — CLOSED 2026-09-19.** Three separate faults wearing one symptom. Measured
+      before/after on "world class dub" (speed 12, King Tubby): before, 47 DOM samples
+      over 19s with ZERO movement on any of 18 controls.
+      1. **EQ snapshot gated on the offline classifier.** `_eqSnapshot` was built only
+         `if (analysis)` from `useTrackerAnalysisStore.currentAnalysis`, which only
+         exists after the user runs the ONNX capture-and-classify pipeline BY HAND.
+         Loading a song does not run it, so `improvTick` hit `if (!snapshot) return`
+         every tick of an ordinary session. Now fed from the live audio bus.
+         Energy is read live even when the analysis exists: `genre.energy` is ONE number
+         for the whole song, so `energy-reactive` computed `(energy - prevEnergy) === 0`
+         forever. (`d104b1f5b`)
+      2. **beatPhase quantized to the row grid.** From
+         `computeMusicalPosition(<integer row>)`, so at speed 12 (8 rows/bar)
+         `(barPos*4) % 1` was only ever 0.0 or 0.5 — and `beat-sync` is
+         `sin(phase*2PI)`, ZERO at both. The driver ran, applied, reported no error and
+         moved the EQ by 2.4e-16. Row grid now gives the beat, wall clock fills in the
+         position inside it, re-anchored each beat. (`d104b1f5b`)
+      3. **The deck's bus faders were never on the live channel**, and the naive fix
+         would have made them lie: `LIVE_HOLD_MS` is 400ms but a tape hold keeps the
+         return at 0 for BARS, so a one-shot announcement flicks the fader to 0 then
+         climbs back while the audio is still killed. Held announcements now refresh
+         every 150ms. (`d9a37a512`)
+      **Trap for next time:** `DubBusPanel` — which already had `useLiveDubParam` wired —
+      renders ONLY in the DJ Sampler and DrumPad, never in the tracker Dub Deck. The deck
+      has its own controls. Earlier announce work looked correct and changed nothing here.
+      Diagnosis was only possible after adding `getAutoEqDiag` (ticks/applies/lastSkip/
+      lastDeltas, via `get_auto_dub_state`): every gate in that driver is a silent early
+      return, so an inert driver and one holding still look identical.
+      NOT wired, deliberately: BASS, MID, WIDTH — no move modulates them
+      (`startStereoDoubler` builds its own parallel nodes), so animating them would
+      invent motion the audio is not making. Pinned by test.
+
+- [ ] **X21** **Declining the crash-recovery restore must fully clear the song.**
+      Reported 2026-09-19: "if i chose not to restore the current song when the browser
+      offers me it after a reload the current song needs to be fully cleared, a broken
+      song lingers if not." So Discard leaves partial state behind — patterns,
+      instruments, order or engine state surviving a decision that was supposed to drop
+      all of it, which then presents as a broken song rather than an empty one.
+      Start at `resolveRecoveryPrompt` / `clearSavedProject` and the boot Restore/Discard
+      path (see `project_crash_recovery_autosave`); the likely shape is the same stale
+      class as the rest of this sweep — a reset that clears the STORE the prompt knows
+      about while another owner (engine, replayer, format state) keeps its copy.
+      Reproduce first: load a song, force a reload, choose Discard, then check every
+      store and the engine for survivors rather than trusting the visible editor.
+
+- [~] **X17 (original entry)** **The EQ and dub-bus sliders do not move any more.** Reported 2026-09-19:
       "i see no action in the eq and dub bus sliders at all they use to move" — a
       REGRESSION, they used to animate while AutoDub worked.
       The live-animation path is `fireParamLiveSubscribers(param, value)`, which the knobs
