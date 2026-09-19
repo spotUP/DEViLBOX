@@ -21,6 +21,7 @@
  * where the decisions are.
  */
 
+import { fireParamLiveSubscribers } from '@/midi/performance/parameterRouter';
 import { getPersona } from './AutoDubPersonas';
 import { useDubStore } from '@/stores/useDubStore';
 import { getActiveDubBus } from './DubBus';
@@ -64,6 +65,43 @@ export function makeFlatEqBaseline(): import('@/engine/effects/Fil4EqEffect').Fi
   };
 }
 
+/**
+ * The EQ sliders' own names for the four parametric bands.
+ *
+ * Index order is the WASM EQ's (`getParams().p`), and the store's field names
+ * follow it: `returnEqFreq` is documented as "band 2 center freq", which is
+ * `p[1]`. Kept here as an explicit table rather than inferred, because getting
+ * it wrong animates the wrong slider — which is worse than animating none.
+ */
+const EQ_BAND_PARAM_KEYS = [
+  'dub.returnEqB1Gain',   // p[0] — low shelf
+  'dub.returnEqGain',     // p[1] — mid
+  'dub.returnEqB3Gain',   // p[2]
+  'dub.returnEqB4Gain',   // p[3]
+] as const;
+
+/** The EQ sliders run -18..+18 dB; the live channel carries 0..1. */
+const EQ_GAIN_RANGE_DB = 18;
+
+/**
+ * Tell the UI what the improv EQ just did.
+ *
+ * `setBand` writes straight to the WASM EQ — no store write — so without this
+ * the EQ sliders show the user's resting values while the performer sweeps
+ * underneath them. Reported 2026-09-19: "eq and bus are dead in the ui".
+ *
+ * Announcement only: it changes no state, so the values the user set remain
+ * what the improv deltas are applied ON TOP of.
+ */
+function announceBandGain(band: number, gainDb: number): void {
+  const key = EQ_BAND_PARAM_KEYS[band];
+  if (!key || !Number.isFinite(gainDb)) return;
+  const normalized = Math.max(0, Math.min(1, (gainDb + EQ_GAIN_RANGE_DB) / (EQ_GAIN_RANGE_DB * 2)));
+  try {
+    fireParamLiveSubscribers(key, normalized);
+  } catch { /* a dead subscriber must never break the EQ */ }
+}
+
 function _applyImprovDeltas(): void {
   try {
     const dubBus = getActiveDubBus?.();
@@ -79,6 +117,7 @@ function _applyImprovDeltas(): void {
       // Passing b.enabled was the bug — all return EQ bands start disabled, so
       // gain writes had no effect on audio even though values were changing.
       returnEQ.setBand(i, Math.abs(newGain) > 0.2, b.freq, b.bw, newGain);
+      announceBandGain(i, newGain);
     }
     for (let i = 0; i < 4; i++) _prevImprovBandDeltas[i] = _improvBandDeltas[i];
   } catch { /* ok */ }

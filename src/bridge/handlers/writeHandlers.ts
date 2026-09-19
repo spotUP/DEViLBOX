@@ -469,7 +469,31 @@ export async function setAutoDubConfig(params: Record<string, unknown>): Promise
   if (typeof params.enabled === 'boolean') s.setAutoDubEnabled(params.enabled);
   if (typeof params.persona === 'string') s.setAutoDubPersona(params.persona as Parameters<typeof s.setAutoDubPersona>[0]);
   if (typeof params.intensity === 'number') s.setAutoDubIntensity(params.intensity);
-  return { ok: true };
+
+  // Start or stop the performer, not just the flag it reads.
+  //
+  // `startAutoDub()` is otherwise called from exactly one place — the Auto Dub
+  // settings popover — so setting the store flag from anywhere else left
+  // `enabled: true, isRunning: false`: enabled, and not performing. This tool
+  // reported `ok` for that, which is a tool describing something it did not do.
+  // Measured 2026-09-19 while trying to reproduce "mostly idle" without the UI.
+  const { startAutoDub, stopAutoDub, isAutoDubRunning } = await import('../../engine/dub/AutoDub');
+  if (typeof params.enabled === 'boolean') {
+    if (params.enabled) startAutoDub();
+    else stopAutoDub();
+  } else if (isAutoDubRunning?.()) {
+    // A persona or intensity change while running: restart so the new
+    // behaviour is the one being performed, rather than taking effect at some
+    // undefined later point.
+    stopAutoDub();
+    startAutoDub();
+  }
+
+  return {
+    ok: true,
+    enabled: useDubStore.getState().autoDubEnabled,
+    running: isAutoDubRunning?.() ?? null,
+  };
 }
 
 /**

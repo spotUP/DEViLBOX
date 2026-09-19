@@ -2057,9 +2057,16 @@ function buildCycleInput(
   behaviour: PersonaBehaviour,
   state: PerformanceState,
 ): PerformanceCycleInput {
-  const globalRow = Number.isFinite(transport.currentGlobalRow) && (transport.currentGlobalRow ?? 0) > 0
-    ? (transport.currentGlobalRow as number)
-    : bundle.currentRow;
+  // The same coarse/fine join the bar clock uses. `currentGlobalRow` only
+  // moves when the PATTERN changes, and this row decides `rowOffset` — which
+  // is how the performer locates the song's onsets. Stale, it was off by up to
+  // a whole pattern, so the "is an onset approaching?" lookahead searched rows
+  // the playhead was nowhere near, ACCENT never matched, and every bar fell
+  // through to "nothing worth doing yet". Measured 2026-09-19: with the bar
+  // clock already fixed and the bus properly wired, bars advanced 52..61 one at
+  // a time and all ten decisions were still REST.
+  const globalRow = resolveTransportRow(transport.currentGlobalRow, bundle.currentRow)
+    ?? bundle.currentRow;
   const ticksPerRow = transport.speed || 6;
 
   const sources = bundle.pattern
@@ -2156,9 +2163,11 @@ function getPhrasePosition(
   transport: { currentGlobalRow?: number; speed?: number },
   currentRow: number,
 ): number {
-  const globalRow = Number.isFinite(transport.currentGlobalRow) && (transport.currentGlobalRow ?? 0) > 0
-    ? (transport.currentGlobalRow as number)
-    : currentRow;
+  // Same coarse/fine join as the bar clock and the cycle input — this is the
+  // third reader of that pair. Reading `currentGlobalRow` alone here froze the
+  // phrase arc at whatever position the last pattern change left it on, so the
+  // build-and-breathe shape never moved through the phrase.
+  const globalRow = resolveTransportRow(transport.currentGlobalRow, currentRow) ?? currentRow;
   if (!Number.isFinite(globalRow) || globalRow < 0) return 0;
   const pos = computeMusicalPosition(globalRow, transport.speed || 6, getMusicalClockSettings());
   return pos.positionInPhrase;
