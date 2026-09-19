@@ -41,6 +41,22 @@ import type { DJMixerEngine } from '../dj/DJMixerEngine';
 import type { DeckId } from '../dj/DeckEngine';
 import { clearAllPendingThrows } from './DubActions';
 import { fireParamLiveSubscribers } from '@/midi/performance/parameterRouter';
+
+/**
+ * The HPF slider's position for a frequency, 0..1.
+ *
+ * Mirrors `DUB_BUS_PARAMS['dub.hpfCutoff']` in the MIDI router, which maps a
+ * control to `20 + n * 980` Hz — so a control announced with this lands where
+ * the same control would land if a CC had moved it.
+ *
+ * Clamped, and it has to be: the Altec sweep climbs to 10 kHz while the slider
+ * only covers 20 Hz to 1 kHz, so the top of a big sweep pegs the control
+ * rather than running off the end of it.
+ */
+function hpfHzToNormalized(hz: number): number {
+  if (!Number.isFinite(hz)) return 0;
+  return Math.max(0, Math.min(1, (hz - 20) / 980));
+}
 import { RE201Effect } from '../effects/RE201Effect';
 import { AnotherDelayEffect } from '../effects/AnotherDelayEffect';
 import { RETapeEchoEffect } from '../effects/RETapeEchoEffect';
@@ -3326,6 +3342,9 @@ export class DubBus {
       rampBiquadParam(this.hpf3.frequency, hz, now);
       rampBiquadParam(this.hpfResonance.frequency, hz, now);
       rampBiquadParam(this.masterHpf.frequency, hz, now);  // full-mix HPF for audibility
+      // Every step of the Altec climb, so the slider does the sweep with it
+      // rather than sitting still while the whole mix filters.
+      this.announce('dub.hpfCutoff', hpfHzToNormalized(hz));
     };
 
     if (this.settings.hpfStepped) {
@@ -4738,11 +4757,37 @@ export class DubBus {
     if (!this.enabled) return;
     const target = Math.min(0.95, this.settings.echoIntensity + Math.max(0, delta));
     try { this.echo.setIntensityInstant(target); } catch { /* ok */ }
+    this.announce('dub.echoIntensity', target);
     const t = setTimeout(() => {
       this.throwTimers.delete(t);
       try { this.echo.setIntensity(this.settings.echoIntensity); } catch { /* ok */ }
+      this.announce('dub.echoIntensity', this.settings.echoIntensity);
     }, ms);
     this.throwTimers.add(t);
+  }
+
+  /**
+   * Tell the UI what a move just did to a control the user can see.
+   *
+   * A move modulates the audio nodes directly — that is deliberate, because
+   * routing every gesture through the store would put a React render inside an
+   * audio-rate path. The cost is that the sliders show the value the user last
+   * set while the bus is doing something else entirely: "i see no action in the
+   * eq and dub bus sliders at all they use to move", 2026-09-19.
+   *
+   * The channel-send faders never had this problem because `openChannelTap`
+   * already announces itself this way. This is the same mechanism for the
+   * parameters the moves modulate, using the parameter names the MIDI router
+   * already defines (`DUB_BUS_PARAMS`) so a control can subscribe with the key
+   * it would use for a CC.
+   *
+   * Announcement only — it changes no state and no audio. `settings` still
+   * holds what the USER set, which is what a move restores to.
+   */
+  private announce(param: string, value: number): void {
+    try {
+      fireParamLiveSubscribers(param, value);
+    } catch { /* a dead subscriber must never break a move */ }
   }
 
   /**

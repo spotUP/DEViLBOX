@@ -14,6 +14,7 @@ import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { useDrumPadStore } from '@/stores/useDrumPadStore';
 import type { DubBusSettings } from '@/types/dub';
 import { Speaker } from 'lucide-react';
+import { useLiveDubParam } from '@/hooks/useLiveDubParam';
 
 const Slider: React.FC<{
   label: string;
@@ -96,6 +97,21 @@ export const DubBusPanel: React.FC<{ inline?: boolean }> = ({ inline = false }) 
   const [open, setOpen] = useState(false);
   const wrapperRef = useRef<HTMLDivElement>(null);
 
+  /**
+   * Controls that follow the PERFORMER while a move is modulating them, and
+   * rest at the user's value otherwise. A dub move drives the audio nodes
+   * directly, so without this the slider sits still through an entire filter
+   * sweep. See `useLiveDubParam`.
+   */
+  const liveHpfCutoff = useLiveDubParam(
+    'dub.hpfCutoff',
+    dubBus.hpfCutoff,
+    // The router defines this control as 20..1000 Hz; the panel's own slider
+    // stops at 600, so a high Altec sweep pegs it rather than overflowing.
+    (n) => 20 + n * 980,
+  );
+  const liveEchoIntensity = useLiveDubParam('dub.echoIntensity', dubBus.echoIntensity);
+
   const patch = useCallback((p: Partial<DubBusSettings>) => setDubBus(p), [setDubBus]);
 
   // Close on click/tap outside, and on Esc. Only wire listeners while open so
@@ -172,7 +188,7 @@ export const DubBusPanel: React.FC<{ inline?: boolean }> = ({ inline = false }) 
           />
           <Slider
             label="HPF cutoff"
-            value={dubBus.hpfCutoff}
+            value={liveHpfCutoff}
             min={20}
             max={600}
             step={5}
@@ -252,7 +268,7 @@ export const DubBusPanel: React.FC<{ inline?: boolean }> = ({ inline = false }) 
           />
           <Slider
             label="Echo intensity"
-            value={dubBus.echoIntensity}
+            value={liveEchoIntensity}
             min={0}
             max={0.85}
             step={0.01}

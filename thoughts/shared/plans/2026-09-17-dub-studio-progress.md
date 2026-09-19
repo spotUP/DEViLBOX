@@ -12,7 +12,7 @@ analysis: thoughts/shared/plans/2026-09-17-dub-studio-gap-reconciliation.md
 Durable todo list. Survives compaction, crashes, `/clear`. **Re-read this before trusting
 recollection or any earlier summary in a conversation.**
 
-Running count: **55 of 58 done.**
+Running count: **54 of 58 done.**
 
 **The denominator was wrong until 2026-09-18.** The header said "of 36" from the day this file
 was written and was never updated as sub-items (F1a, F1c, F2a-F2e, T1-T3, the X series) were
@@ -33,7 +33,7 @@ recount — do not trust this sentence either.
 | G — wet energy | **closed** | G1 |
 | H-L — musical behaviour | **closed** | H1, I1, J1, K1-K4, L1, L2, AE1 |
 | M-O — record, verify, release | M1, N1-N4, O1 done | O2 (human) |
-| X — user-reported open threads | 14 of 18 | X1, X3, X5, X6, X7, X8, X11, X12, X13, X15, X16, X17, X18 (idle), X19 (buttons) closed |
+| X — user-reported open threads | 13 of 18 | X1, X3, X5, X6, X7, X8, X11, X12, X13, X15, X16, X18 (idle), X19 (buttons) closed; X17 partial |
 
 ### Debt carried, not hidden
 
@@ -1201,7 +1201,7 @@ this bug.
       counts now, matched on a delimited prefix so one id cannot light another's button.
       The per-channel grid keeps its exact key. Commit `27f00cbe3`. 7 tests.
 
-- [x] **X17** **The EQ and dub-bus sliders do not move any more.** Reported 2026-09-19:
+- [~] **X17** **The EQ and dub-bus sliders do not move any more.** Reported 2026-09-19:
       "i see no action in the eq and dub bus sliders at all they use to move" — a
       REGRESSION, they used to animate while AutoDub worked.
       The live-animation path is `fireParamLiveSubscribers(param, value)`, which the knobs
@@ -1214,8 +1214,29 @@ this bug.
       `fireParamLiveSubscribers` is still CALLED for `dub.*` params while a move runs
       (the fire log records the bus settings each fire, so compare a setting that visibly
       changes in the log against a slider that does not move).
-      **RESOLVED 2026-09-19 — a SYMPTOM, not a regression.** Confirmed by the user the same
-      day: "good now they work". Nothing in the live-subscriber path was broken. The
+      **MY EARLIER CLOSURE WAS WRONG.** I read "good now they work" as covering the
+      sliders; it was about the move BUTTONS (X19). The user corrected it the same day —
+      "i dont see any dub bus or eq sliders move still either". Reopened and actually
+      diagnosed.
+      **Cause:** only `dub.channelSend.chN` ever called `fireParamLiveSubscribers`, which
+      is exactly why the channel faders always moved and nothing else did. Dub moves
+      modulate the audio nodes DIRECTLY — deliberate, since routing every gesture through
+      the store would put a React render inside an audio-rate path — so nothing told the
+      UI anything. Both halves were missing: the bus never published, and the bus/EQ
+      sliders never subscribed.
+      **Fixed:** `DubBus.announce()` publishes to the same live-value channel the MIDI
+      router uses, so a control follows a move exactly as it follows a CC — wired for the
+      feedback swell (both edges, or the control would stick) and for every step of the
+      Altec filter climb via `setHpf`, normalised the way the router defines the control
+      and clamped, because the sweep climbs to 10 kHz while the control covers 20 Hz to
+      1 kHz. `useLiveDubParam` is the subscribe half: it follows announcements and falls
+      back to the stored value once the move lets go, so the control ends where the user
+      left it. Announcement only — it changes no state and no audio, because `settings`
+      is what a move restores to. 15 tests.
+      **Still to wire:** the remaining bus controls (spring wet, echo wet, return gain,
+      sidechain) and the EQ panel. The mechanism is in place; each is a call to
+      `announce` at the point of modulation plus a `useLiveDubParam` on the control.
+      Old note, now known to be only part of the story: The
       performer was firing about once a minute (the bar clock handed it one decision per
       pattern, `957e220ec`) and the move buttons it did fire mostly stayed dark
       (`27f00cbe3`), so the sliders had almost nothing to animate and what little they did
