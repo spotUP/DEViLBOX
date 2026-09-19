@@ -1,4 +1,6 @@
 import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { adaptEQParams, computeImprovDelta } from '../AutoDub';
 import type { EQSnapshot } from '../AutoDub';
 import type { AutoDubPersona } from '../AutoDubPersonas';
@@ -153,5 +155,90 @@ describe('computeImprovDelta', () => {
   it('spectral: returns 0 (spectral is per-band, computed in loop)', () => {
     const delta = computeImprovDelta('spectral', 0.5, 0.8, 0.8, 6);
     expect(delta).toBe(0);
+  });
+});
+
+/**
+ * Why the EQ sliders sat still for the whole of a session, reported repeatedly
+ * as "eq and bus are dead in the ui" and "i see almost no action here".
+ *
+ * Two independent faults, either of which alone was enough to freeze it, which
+ * is why fixing the first changed nothing visible:
+ *
+ *  1. The EQ snapshot was built only when the OFFLINE genre classifier had
+ *     run. Loading a song does not run it, so `improvTick` hit
+ *     `if (!snapshot) return` on every tick of an ordinary session.
+ *
+ *  2. `beatPhase` came from `computeMusicalPosition(<integer row>, ...)`, so it
+ *     could only land on exact row boundaries. At speed 12 a bar is 8 rows,
+ *     putting `barPos * 4` on exact halves and `% 1` on 0.0 or 0.5 — and the
+ *     `beat-sync` driver is `sin(beatPhase * 2PI) * depth * energy`, which is
+ *     ZERO at both. The driver ran, applied, and reported no error while
+ *     producing deltas of 2.4e-16.
+ *
+ * Measured after the fix: bands 0 and 3 (King Tubby's `liveBands`) moving over
+ * -0.5..1 and 2..3.5 dB against a live mix.
+ */
+describe('beat-sync survives the row grid', () => {
+  /** What `barPos * 4 % 1` can be when barPos comes from an integer row. */
+  const quantizedPhases = (rowsPerBar: number) => {
+    const out: number[] = [];
+    for (let row = 0; row < rowsPerBar; row++) {
+      const barPos = row / rowsPerBar;
+      out.push((barPos * 4) % 1);
+    }
+    return out;
+  };
+
+  it('produces nothing but zero when a bar is 8 rows or fewer', () => {
+    // The reported case: speed 12 puts a bar at 8 rows, so every reachable
+    // phase is a multiple of 0.5 and sin(2*PI*k/2) is zero for every integer k.
+    // The driver ran, applied, reported no error, and moved the EQ by 2.4e-16.
+    for (const rowsPerBar of [4, 8]) {
+      for (const phase of quantizedPhases(rowsPerBar)) {
+        const delta = computeImprovDelta('beat-sync', phase, 0.7, 0.7, 4);
+        expect(Math.abs(delta), `rowsPerBar=${rowsPerBar} phase=${phase}`).toBeLessThan(1e-9);
+      }
+    }
+  });
+
+  it('is starved even where it is not exactly zero', () => {
+    // At 16 rows per bar the grid does reach 0.25 and 0.75, so the fault is
+    // less total — but four positions per beat is still a stepped wobble, not
+    // a sweep, and half of them are silent. Sub-row resolution is what makes
+    // this a continuous gesture at any speed.
+    const distinct = new Set(
+      quantizedPhases(16).map(p => computeImprovDelta('beat-sync', p, 0.7, 0.7, 4).toFixed(6)),
+    );
+    expect(distinct.size).toBeLessThanOrEqual(3);
+  });
+
+  it('produces real movement once the phase is continuous', () => {
+    // Sub-row resolution is what makes the driver able to say anything at all.
+    const deltas = [0.1, 0.25, 0.4, 0.6, 0.75, 0.9]
+      .map(p => computeImprovDelta('beat-sync', p, 0.7, 0.7, 4));
+    expect(deltas.some(d => Math.abs(d) > 0.5)).toBe(true);
+    // And it swings both ways across the beat, rather than only boosting.
+    expect(deltas.some(d => d > 0.5)).toBe(true);
+    expect(deltas.some(d => d < -0.5)).toBe(true);
+  });
+
+  it('scales with energy, so a silent mix still moves nothing', () => {
+    expect(computeImprovDelta('beat-sync', 0.25, 0, 0, 4)).toBe(0);
+    expect(Math.abs(computeImprovDelta('beat-sync', 0.25, 0.7, 0.7, 4))).toBeGreaterThan(0.5);
+  });
+});
+
+describe('the EQ snapshot does not depend on the offline classifier', () => {
+  it('builds from live audio when no analysis has been run', () => {
+    // Structural, because the snapshot is assembled inside the tick: the gate
+    // must admit a live-audio-only session, and energy must come from the live
+    // reading rather than the classifier's single per-song number.
+    const src = readFileSync(
+      resolve(import.meta.dirname, '..', 'AutoDub.ts'), 'utf8',
+    );
+    expect(src).toContain('if (analysis || liveAudio) {');
+    expect(src).toContain('energy: liveAudio ? liveEnergy(liveAudio.rms) : analysis!.genre.energy');
+    expect(src).not.toContain('energy: analysis.genre.energy,');
   });
 });
