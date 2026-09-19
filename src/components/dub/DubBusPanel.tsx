@@ -111,6 +111,20 @@ export const DubBusPanel: React.FC<{ inline?: boolean }> = ({ inline = false }) 
     (n) => 20 + n * 980,
   );
   const liveEchoIntensity = useLiveDubParam('dub.echoIntensity', dubBus.echoIntensity);
+  const liveSpringWet = useLiveDubParam('dub.springWet', dubBus.springWet);
+  // The improv EQ writes straight to the WASM EQ, so these four follow its
+  // announcements. -18..+18 dB, the range the sliders themselves use.
+  const eqDb = (n: number) => n * 36 - 18;
+  const liveEqB1 = useLiveDubParam('dub.returnEqB1Gain', dubBus.returnEqB1Gain, eqDb);
+  const liveEqMid = useLiveDubParam('dub.returnEqGain', dubBus.returnEqGain, eqDb);
+  const liveEqB3 = useLiveDubParam('dub.returnEqB3Gain', dubBus.returnEqB3Gain, eqDb);
+  const liveEqB4 = useLiveDubParam('dub.returnEqB4Gain', dubBus.returnEqB4Gain, eqDb);
+  const liveReturnGain = useLiveDubParam('dub.returnGain', dubBus.returnGain);
+  // `echoWet`, `echoRateMs` and `sidechainAmount` are deliberately absent:
+  // nothing modulates echoWet or the sidechain outside `setSettings`, and
+  // `setEchoRate` already writes the store, so those controls follow it
+  // through React. Subscribing them would add a second update path for no
+  // gain.
 
   const patch = useCallback((p: Partial<DubBusSettings>) => setDubBus(p), [setDubBus]);
 
@@ -179,7 +193,7 @@ export const DubBusPanel: React.FC<{ inline?: boolean }> = ({ inline = false }) 
 
           <Slider
             label="Return gain"
-            value={dubBus.returnGain}
+            value={liveReturnGain}
             min={0}
             max={1}
             step={0.01}
@@ -259,7 +273,7 @@ export const DubBusPanel: React.FC<{ inline?: boolean }> = ({ inline = false }) 
           )}
           <Slider
             label="Spring wet"
-            value={dubBus.springWet}
+            value={liveSpringWet}
             min={0}
             max={1}
             step={0.01}
@@ -583,7 +597,7 @@ export const DubBusPanel: React.FC<{ inline?: boolean }> = ({ inline = false }) 
           />
           <Slider
             label="Mid gain"
-            value={dubBus.returnEqGain}
+            value={liveEqMid}
             min={-18}
             max={18}
             step={0.5}
@@ -613,7 +627,7 @@ export const DubBusPanel: React.FC<{ inline?: boolean }> = ({ inline = false }) 
           />
           <Slider
             label="Low shelf gain"
-            value={dubBus.returnEqB1Gain}
+            value={liveEqB1}
             min={-18}
             max={18}
             step={0.5}
@@ -633,7 +647,7 @@ export const DubBusPanel: React.FC<{ inline?: boolean }> = ({ inline = false }) 
           />
           <Slider
             label="Upper mid gain"
-            value={dubBus.returnEqB3Gain}
+            value={liveEqB3}
             min={-18}
             max={18}
             step={0.5}
@@ -653,7 +667,7 @@ export const DubBusPanel: React.FC<{ inline?: boolean }> = ({ inline = false }) 
           />
           <Slider
             label="High shelf gain"
-            value={dubBus.returnEqB4Gain}
+            value={liveEqB4}
             min={-18}
             max={18}
             step={0.5}
