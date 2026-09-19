@@ -20,7 +20,6 @@ import { useProjectStore } from '@stores/useProjectStore';
 import { useTabsStore } from '@stores/useTabsStore';
 import { CustomSelect } from '@components/common/CustomSelect';
 import { ServerStatusBadges } from './ServerStatusBadges';
-import { useDubStore } from '@stores/useDubStore';
 import { useTransportStore } from '@stores/useTransportStore';
 import { useHistoryStore } from '@stores/useHistoryStore';
 import { useFT2ToolbarActions } from '@stores/useFT2ToolbarActions';
@@ -35,9 +34,8 @@ const NavBarComponent: React.FC = () => {
   const closeModal = useUIStore((state) => state.closeModal);
   const tourActive = useTourStore((s) => s.isActive);
 
-  // Dub deck transport bar — shown in header when strip is expanded so FT2
-  // toolbar action row can be hidden to reclaim vertical space.
-  const stripCollapsed = useDubStore((s) => s.stripCollapsed);
+  // Dub deck transport bar — shown in the header while the FT2 toolbar's own
+  // action row is hidden, so the transport is never absent and never doubled.
   const isPlaying = useTransportStore((s) => s.isPlaying);
   const isLooping = useTransportStore((s) => s.isLooping);
   const isPlayingSong    = isPlaying && !isLooping;
@@ -45,9 +43,22 @@ const NavBarComponent: React.FC = () => {
   const canUndo = useHistoryStore((s) => s.canUndo);
   const canRedo = useHistoryStore((s) => s.canRedo);
   const ft2Actions = useFT2ToolbarActions();
-  // Expanding the dub deck also sets editorFullscreen=true (DubDeckStrip line 408),
-  // so we must NOT gate on !editorFullscreen — that would make the condition impossible.
-  const dubDeckTransportActive = n.activeView === 'tracker' && !stripCollapsed;
+  /**
+   * Show the compact transport exactly when the FT2 toolbar is NOT showing one.
+   *
+   * `TrackerView` hides `FT2Toolbar` on `editorFullscreen`, and this row exists
+   * to replace it while it is hidden. Gating on `!stripCollapsed` instead made
+   * those two different questions, and the answers come apart: enabling the bus
+   * expands the strip, and expanding the strip sets fullscreen — but each of
+   * those effects only fires when ITS OWN input changed, so anything that turns
+   * fullscreen off without touching the strip leaves the strip expanded and the
+   * toolbar visible. Both rows then render: the doubled Play/Stop pair reported
+   * repeatedly, and "fixed" once as a NavBar grid overflow, which it was not.
+   *
+   * One condition, read from the same flag that hides the toolbar, so the two
+   * cannot disagree.
+   */
+  const dubDeckTransportActive = n.activeView === 'tracker' && editorFullscreen;
 
   const handleStartTour = useCallback(async () => {
     const { getTourEngine } = await import('@/engine/tour/TourEngine');
