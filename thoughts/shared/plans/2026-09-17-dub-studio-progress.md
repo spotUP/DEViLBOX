@@ -1412,6 +1412,40 @@ this bug.
       stretch? Not seen yet. Next time it happens, call `get_playback_silence` BEFORE
       reloading — it now answers for this engine.
 
+- [~] **X23 — THREE OF MY OWN CONCLUSIONS IN THIS ENTRY WERE WRONG. What is actually
+      established, 2026-09-21.**
+      Each theory was killed by the next measurement, so the retractions come first:
+      1. "play before the worklet is ready" — it was the unanswered crash-recovery dialog
+         (`resolve_recovery_prompt({action:'restore'})`).
+      2. "the mix is CUT" — it is attenuated, not cut.
+      3. "the break is `engine.output → HivelySynth.output`" — **no**. `synthOutput` reads
+         0 in the HEALTHY state too, so that node is simply not in the song-playback path
+         (it serves standalone instrument mode). I read a constant as a symptom.
+      Also ruled out by direct check rather than argument: `hivelyInstanceCount: 1` (no
+      stale instance beside the live one) and `synthHoldsLiveEngine: 1` (not Vite module
+      duplication, which this codebase does suffer elsewhere).
+      **What the numbers do establish.** Compare the worklet's own last main-render peak
+      against what arrives at the master insert:
+
+          taps open    lastMainPeak 0.1266  ->  insertIn 0.0052    (~24x down)
+          taps open    lastMainPeak 0.0750  ->  insertIn 0.0049    (~15x down)
+          no taps      lastMainPeak 0.1001  ->  insertIn 0.0540    (~1.9x)
+          no taps      lastMainPeak 0.0022  ->  insertIn 0.0021    (~1.0x)
+
+      Peak against RMS is not a clean ratio, but 24x against 1.0x is far outside that
+      slack. With no dub tap open the level tracks; with a tap open roughly a tenth
+      survives. The worklet is not the cause — `mainZeroReturns` stays 0 and
+      `mainRingFull` stays 0 throughout.
+      Narrowing it further: `engineOut` tracks `lastMainPeak` in BOTH states, and
+      `masterEffectsInput` is the first reading that collapses. **So the loss is between
+      `HivelyEngine.output` and `masterEffectsInput`**, and `synthBus` reads 0 in both
+      states so it is not on that route. The boot log's "PitchResampler worklet inserted:
+      synthBus -> resampler -> masterEffectsInput" is the next thing to look at, along with
+      whatever else sits on that path.
+      **Deliberately stopping here rather than proposing a fourth cause.** Every probe
+      added so far survives in `get_dub_bus_state`, so the next session starts with the
+      instrument rather than the guess.
+
 - [~] **X23 — THE BREAK IS ONE CONNECTION. Measured 2026-09-21, and two of my own
       earlier claims in this entry are WRONG.**
       First the corrections, because both sent the investigation sideways:
