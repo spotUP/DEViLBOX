@@ -827,6 +827,30 @@ async function getUpstreamLevels(): Promise<Record<string, number | null>> {
     const te = getToneEngine() as unknown as { synthBus?: unknown; masterEffectsInput?: unknown };
     out.synthBus = _tapRms('synthBus', getNativeAudioNode(te.synthBus as never));
     out.masterEffectsInput = _tapRms('masterEffectsInput', getNativeAudioNode(te.masterEffectsInput as never));
+    out.masterInput = _tapRms('masterInput', getNativeAudioNode((te as { masterInput?: unknown }).masterInput as never));
+    out.blepInput = _tapRms('blepInput', getNativeAudioNode((te as { blepInput?: unknown }).blepInput as never));
+
+    // The two nodes between the engine and the master: the synth instance's
+    // own output, and the instrument effect chain it feeds. The break is one
+    // of the connections between these, and neither is reachable from a
+    // global — they live in the engine's instrument maps.
+    const engineAny = te as unknown as {
+      instruments?: Map<number, unknown>;
+      getInstrumentChainOutput?: (id: number, ch?: number) => unknown;
+    };
+    const entries = Array.from(engineAny.instruments?.entries() ?? []);
+    const hively = entries.find(([, inst]) =>
+      (inst as { constructor?: { name?: string } })?.constructor?.name === 'HivelySynth');
+    if (hively) {
+      const [id, inst] = hively;
+      out.synthOutput = _tapRms('synthOutput', (inst as { output?: AudioNode }).output ?? null);
+      const chain = engineAny.getInstrumentChainOutput?.(id);
+      out.chainOutput = _tapRms('chainOutput', getNativeAudioNode(chain as never));
+      out.hivelyInstrumentId = id;
+    } else {
+      out.synthOutput = null;
+      out.chainOutput = null;
+    }
   } catch {
     out.synthBus = -1;
     out.masterEffectsInput = -1;
