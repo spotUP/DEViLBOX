@@ -82,14 +82,33 @@ export const SUSTAINED_SOURCES: ReadonlySet<string> = new Set([
 
 export const GENERATED_PRESENCE: Readonly<Record<string, number>> = {
   /** Sustained: relative to programme RMS. Just above the mix's own average
-   *  level — present and unmistakable, not dominating. */
-  siren: 1.15,
+   *  level — present and unmistakable, not dominating.
+   *  1.15 → 1.25 on the 2026-09-21 listening pass: "siren is a little too
+   *  silent". Deliberately a small step — it was the mildest of the five
+   *  verdicts, and this one sustains, so it climbs in perceived loudness
+   *  faster than a transient does.
+   *  1.35 was tried first and landed EXACTLY on the bound that
+   *  `programmeLevel.test.ts` keeps against the 2026-09-18 regression, where
+   *  the siren was referenced to programme PEAK and came out "MUCH louder than
+   *  the music". That guard is worth more than the extra 0.1, so the value
+   *  moved rather than the test. */
+  siren: 1.25,
   /** A marker, not an event. */
   sonarPing: 0.45,
-  /** A shriek — the loudest thing here by design, still bounded. */
-  tubbyScream: 0.8,
-  /** Felt more than heard; the low end has the least headroom. */
-  subSwell: 0.5,
+  /** A shriek — the loudest thing here by design, still bounded.
+   *  0.8 → 0.6: "scream is too loud" (2026-09-21), measured at twice the
+   *  programme's RMS. Trimmed HERE rather than at the move's `feedbackAmount`,
+   *  which sets how hard the filter rings — that is the scream's character,
+   *  and detuning it to fix a level would have changed what the move is. */
+  tubbyScream: 0.6,
+  /** Felt more than heard; the low end has the least headroom.
+   *  0.5 → 0.75: "sub is not loud enough" (2026-09-21). Measured at peak 0.162
+   *  against a 0.492 programme baseline — it sat UNDER the mix, so "felt more
+   *  than heard" had become "not heard". It swells and decays like a hit, so
+   *  it references the programme's PEAK rather than its RMS; 0.75 keeps it
+   *  under the mix's own peak, which is the headroom the original note is
+   *  about. */
+  subSwell: 0.75,
   /** Sustained low end — referenced to RMS, and kept under it: the low end
    *  has the least headroom and is felt as much as heard. */
   subHarmonic: 0.8,
