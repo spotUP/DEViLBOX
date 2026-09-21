@@ -137,3 +137,15 @@ export class DubLanePlayer {
 /** Singleton used by the tracker tick loop. Mounted by TrackerView via
  *  `dubLanePlayer.setLane(currentPattern.dubLane ?? null)`. */
 export const dubLanePlayer = new DubLanePlayer();
+
+/**
+ * Fire lane events on every row the transport reaches.
+ *
+ * The transport used to call this through `require()`, which does not exist in
+ * an ESM browser bundle — so it threw into a silent catch and no lane event
+ * ever fired. Registration lives here, with the player, so the transport does
+ * not need to know this module exists (the import cycle that `require` was
+ * dodging is real).
+ */
+import { registerRowHook } from '@/lib/dev/rowTickHooks';
+registerRowHook('dubLanePlayer', (row) => dubLanePlayer.onTick(row));
