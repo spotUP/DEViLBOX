@@ -313,6 +313,26 @@ function executeNow(
   }
 
   const ctx: DubMoveContext = { bus: _bus, channelId, deckId: opts?.deckId, params: merged, bpm, source };
+
+  // Say WHERE every fire came from, once, at the single point they all pass
+  // through.
+  //
+  // A move logs its own name from inside `DubBus`, and AutoDub logs its
+  // decisions — but a fire from a pattern lane, a MIDI controller or MCP
+  // produced a bare `[DubBusCtrl] slamSpring(...)` with nothing to attribute it
+  // to. Reported 2026-09-21: a block of slams and risers repeating in an exact
+  // cycle with no performer prefix, which could have been recorded automation,
+  // a Zxx lane cell, or a controller sending CC — three very different causes
+  // that looked identical in the console.
+  //
+  // `source` and `origin` are already computed here for the event below, so
+  // this costs one line and removes the guesswork.
+  const originForLog: DubFireOrigin = opts?.origin ?? (source === 'lane' ? 'lane' : 'user');
+  console.log(
+    `[DubRouter] ${moveId}${channelId !== undefined ? ` ch${channelId}` : ''} `
+    + `source=${source} origin=${originForLog}`,
+  );
+
   const disposer = move.execute(ctx);
 
   const invocationId = nextInvocationId();
@@ -320,7 +340,7 @@ function executeNow(
   // do not pass an origin, and treating them as the user is the safe default —
   // the AI is the one that must declare itself, because mislabelling ITS moves
   // as the player's makes it answer itself.
-  const origin: DubFireOrigin = opts?.origin ?? (source === 'lane' ? 'lane' : 'user');
+  const origin: DubFireOrigin = originForLog;
   const event: DubFireEvent = { invocationId, moveId, channelId, params: merged, row, timeSec: getSongTimeSec(), source, origin, isHold: !!disposer };
   for (const fn of subscribers) {
     try {
