@@ -1163,6 +1163,51 @@ export async function getChannelRoles(): Promise<Record<string, unknown>> {
   };
 }
 
+/**
+ * Per-pattern channel evidence — Phase 1 of the Channel Intelligence plan.
+ *
+ * `get_channel_roles` answers "what is this channel", once, for the whole song.
+ * This answers "what is measurably happening in this channel during this
+ * pattern", which is the unit the plan's segment timeline is built from, and
+ * the unit a validation corpus can be scored against.
+ *
+ * Walks the ORDER, so a pattern played twice appears twice: whether the two
+ * instances carry the same musical identity is a later decision, and collapsing
+ * them here would take it away.
+ */
+export async function getChannelEvidence(
+  params: Record<string, unknown> = {},
+): Promise<Record<string, unknown>> {
+  const { useTrackerStore } = await import('../../stores/useTrackerStore');
+  const { fingerprintSong } = await import('../analysis/channelEvidence');
+  const tracker = useTrackerStore.getState();
+  const patterns = tracker.patterns;
+  if (!Array.isArray(patterns) || patterns.length === 0) {
+    return { patternsLoaded: false, entries: [] };
+  }
+  const order = Array.isArray(tracker.patternOrder) && tracker.patternOrder.length > 0
+    ? tracker.patternOrder
+    : patterns.map((_, i) => i);
+
+  const channelFilter = typeof params.channel === 'number' ? params.channel : null;
+  const song = fingerprintSong(patterns, order);
+  const entries = song.map((e) => ({
+    orderIndex: e.orderIndex,
+    patternIndex: e.patternIndex,
+    channels: channelFilter === null
+      ? e.channels
+      : e.channels.filter((c) => c.channelIndex === channelFilter),
+  }));
+
+  return {
+    patternsLoaded: true,
+    orderLength: order.length,
+    channelCount: patterns[0]?.channels?.length ?? 0,
+    names: patterns[0]?.channels?.map((c) => c.name ?? null) ?? [],
+    entries,
+  };
+}
+
 // ─── Synth Errors ──────────────────────────────────────────────────────────────
 
 export function getSynthErrors(): Record<string, unknown> {
