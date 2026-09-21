@@ -80,3 +80,14 @@ export function scanDubEffectsForRow(row: number): void {
 export function resetDubEffectScanner(): void {
   _lastRowFired = -1;
 }
+
+/**
+ * Scan dub effect-command cells on every row.
+ *
+ * Registered here for the same reason as the lane player: the transport's
+ * `require()` call never ran, so `Z00` typed into a cell did nothing.
+ * Lane events are registered first and hooks fire in insertion order, which
+ * keeps the documented interleaving — lane events, then effect commands.
+ */
+import { registerRowHook } from '@/lib/dev/rowTickHooks';
+registerRowHook('dubEffectScanner', (row) => scanDubEffectsForRow(row));
