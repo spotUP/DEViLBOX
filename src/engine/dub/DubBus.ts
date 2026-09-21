@@ -73,6 +73,7 @@ import { makeSoftClipCurve } from '@/lib/dub/softClipCurve';
 import { AuditionHold } from '@/lib/dub/auditionHold';
 import { clampExtFeedback } from '@/lib/dub/extFeedbackCeiling';
 import { generatedPeak, shelfTrimForProgramme } from './programmeReference';
+import { SILENT_PROGRAMME_PEAK } from '@/lib/dub/programmeLevel';
 
 /**
  * Loudest sample in a captured ring, so a capture can tell whether it caught
@@ -6255,7 +6256,16 @@ export class DubBus {
       const seedSrc = ctx.createBufferSource();
       seedSrc.buffer = seedBuf;
       const seedGain = ctx.createGain();
-      seedGain.gain.value = 0.15;
+      // Referenced to the programme, like every other generated source.
+      //
+      // `GENERATED_PRESENCE.tubbyScream` existed but nothing ever read it — the
+      // seed was a flat 0.15 whatever the music was doing. Trimming that table
+      // entry on 2026-09-21 to answer "scream is too loud" therefore changed
+      // NOTHING, which is worth stating plainly: the entry was dead, and an
+      // audit found it rather than the ear.
+      // Scaled against the flat value it replaces, so the presence number keeps
+      // meaning what it does for the other moves.
+      seedGain.gain.value = 0.15 * (generatedPeak('tubbyScream') / SILENT_PROGRAMME_PEAK);
       seedSrc.connect(seedGain);
       Tone.connect(seedGain, this.spring.input as unknown as Tone.InputNode);
       seedSrc.start(now);

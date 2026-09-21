@@ -1535,6 +1535,31 @@ this bug.
       sweep range — 60ms is a long way down from a 320ms rate and may pass through too
       fast at `downMs=120` to be heard as pitch.
 
+- [ ] **X34** **Slam and Kick are the only moves whose level ignores the music.** Found by
+      audit 2026-09-21, not by ear.
+      Every generated source in `DubBus` is referenced to the programme through
+      `generatedPeak` so it keeps its relationship to the mix on any song — except
+      `slamSpring` (`DubBus.ts` ~5034, ~5067) and `kickSpring` (~5230), which use absolute
+      multipliers (`target * 0.85`, `target * 0.6`, `gain * 10.0`). So both are relatively
+      LOUDER on a quiet tune and quieter on a loud one.
+      That is very likely why the 2026-09-21 verdicts were "slam too loud" AND "kick not
+      loud enough" at the same `amount: 1.0` — the numbers were tuned against one song.
+      Fixing this properly means classifying them like the others (they are transients, so
+      peak-referenced) and re-tuning the absolute values into presence numbers. Worth
+      doing before any more level tuning by ear, or the next song moves the target again.
+      NB the clipping guard (`directReturnHeadroom.test.ts`) constrains the direct-to-
+      return paths and must keep passing after any change here.
+
+- [ ] **X35** **`quantize === 'bar'` hardcodes 4 beats per bar.** `DubActions.ts:246`:
+      `beatMs * 4     // full bar (4/4)`. Third occurrence of the metre-from-a-constant
+      class in one day, after `beatPhase` and `dubGrid`. `musicalClock` already exposes the
+      real meter (`DEFAULT_MUSICAL_CLOCK_SETTINGS.meter.beatsPerBar`), so a bar-quantized
+      throw on anything but 4/4 lands wrong. Lower impact than the other two — it only
+      affects the DJ-deck throw path and only in non-4/4 — but it is the same fault and
+      should go the same way.
+      `AutoDub.ts:1598` (`barPos * 4`) is the same assumption; `barPos` already comes from
+      the clock, so converting it is mechanical.
+
 - [ ] **X31** **BUS tab sliders crackle while dragged — bad for live dubbing.** Reported
       2026-09-21 with a screenshot of BASS / MID / WIDTH / sweep / RATE.
       Very likely zipper noise from stepped `AudioParam.value` assignment: those settings
