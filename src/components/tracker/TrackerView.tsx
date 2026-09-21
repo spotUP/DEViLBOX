@@ -842,7 +842,14 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
 
         {/* Instrument List Panel - Flex item 3 - Collapsed in fullscreen */}
         {windowWidth >= 900 && showInstrumentPanel && (
-          <div className={`flex-shrink-0 border-l border-ft2-border flex flex-col overflow-hidden animate-fade-in ${editorFullscreen ? 'w-56' : 'w-fit min-w-[12rem]'}`}>
+          <div className={`flex-shrink-0 border-l border-ft2-border flex flex-col overflow-hidden animate-fade-in ${
+            // The container query that hides the badges is scoped to the
+            // fullscreen panel ONLY, because that is the one with a fixed
+            // width. The normal panel is w-fit: its width follows its content,
+            // so making it a query container would be circular — hiding the
+            // badges would shrink the content, which shrinks the panel, which
+            // keeps them hidden for good.
+            editorFullscreen ? 'instrument-panel w-56' : 'w-fit min-w-[12rem]'}`}>
             <InstrumentList
               variant="ft2"
               showPreviewOnClick={true}

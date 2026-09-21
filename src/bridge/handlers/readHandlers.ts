@@ -761,17 +761,45 @@ export async function getPlaybackSilence(): Promise<Record<string, unknown>> {
   let lastRenderRms = 0;
   let silentReason: string | null = null;
   let diagAvailable = false;
+  let source = 'none';
   try {
     const { LibopenmptEngine } = await import('../../engine/libopenmpt/LibopenmptEngine');
     if (LibopenmptEngine.hasInstance()) {
       const diag = await LibopenmptEngine.getInstance().getWorkletDiag();
       if (diag) {
         diagAvailable = true;
+        source = 'libopenmpt-worklet';
         lastRenderRms = typeof diag.lastRenderRms === 'number' ? diag.lastRenderRms : 0;
         silentReason = typeof diag.silentReason === 'string' ? diag.silentReason : null;
       }
     }
   } catch { /* engine module not loaded */ }
+
+  // Fall back to the master meter for every engine that is NOT libopenmpt.
+  //
+  // The worklet diag only exists for libopenmpt, so this read answered
+  // `diagAvailable: false` and judged nothing for Hively/AHX, UADE, Furnace and
+  // the rest — which is precisely the class of song reported as going silent
+  // (`jennipha.ahx`, 2026-09-21). A watchdog blind to the engine in question is
+  // no watchdog.
+  //
+  // The master meter is a weaker signal: it measures what reached the output,
+  // so it cannot say WHERE the audio was lost the way `silentReason` can. It is
+  // enough to answer the question actually being asked — is there sound.
+  if (!diagAvailable) {
+    try {
+      const { AudioDataBus } = await import('../../engine/vj/AudioDataBus');
+      const bus = AudioDataBus.getShared();
+      bus.update();
+      const frame = bus.getFrame();
+      if (typeof frame.rms === 'number') {
+        diagAvailable = true;
+        source = 'master-meter';
+        lastRenderRms = frame.rms;
+        silentReason = null;
+      }
+    } catch { /* no audio graph yet */ }
+  }
 
   // Without a worklet answer there is nothing to judge: treat it as audible
   // rather than invent a fault out of a missing measurement.
@@ -798,6 +826,8 @@ export async function getPlaybackSilence(): Promise<Record<string, unknown>> {
     silentForSec: Math.round(silentForSec * 10) / 10,
     graceSec: SILENCE_GRACE_SEC,
     diagAvailable,
+    /** Where lastRenderRms came from — the worklet knows more than the meter. */
+    source,
     lastRenderRms,
     silentReason,
     isPlaying: transport.isPlaying,

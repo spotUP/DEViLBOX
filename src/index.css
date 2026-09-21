@@ -3039,3 +3039,26 @@ button[class*="rounded"] {
     --color-bg-tertiary: #111111;
   }
 }
+
+/* ── Instrument list: badges yield to the name on a narrow panel ──────────────
+ *
+ * The Sampler/PCM/tag badges are shrink-0 and take ~155px of the row. In
+ * fullscreen the panel is 224px, which left the instrument NAME at zero width,
+ * clipped mid-glyph with no ellipsis (reported 2026-09-21). Letting the badges
+ * merely compress produced "S…"/"P…", which is noise rather than information.
+ *
+ * A container query on the panel hides them outright once there is not enough
+ * room, so the name keeps the space. Tailwind 3.4 has no @container variant
+ * without a plugin, so this is written as plain CSS rather than adding a
+ * dependency for one rule.
+ */
+.instrument-panel {
+  container-type: inline-size;
+  container-name: instrument-panel;
+}
+
+@container instrument-panel (max-width: 17rem) {
+  .instrument-badge {
+    display: none;
+  }
+}
