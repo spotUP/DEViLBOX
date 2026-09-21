@@ -1503,6 +1503,43 @@ this bug.
       path — pointerup, pointerleave, pointercancel, and the element unmounting mid-hold.
       Intermittent, so reproduce by clicking rapidly rather than assuming one try is clean.
 
+- [ ] **X28** **Reverse, Backward and Throw seem dead.** Reported 2026-09-21 while playing
+      `amanda.ahx` (Hively engine).
+      Not a missing precondition: sends were up (ch0-3 at 0.45) and taps registered
+      [0,1,2,3], so the `needsSend` gate was satisfied.
+      **Hypothesis, untested.** These three are the only reported-dead moves that CAPTURE
+      bus audio rather than generate it — `reverseEcho`, `backwardReverb` and
+      `delayTimeThrow` all snapshot a ring buffer fed from `bus.input`
+      (`_ensureReverseCapture`). Every move the user reports as working (slam, kick,
+      crack, sub) GENERATES its own sound and needs no input. If Hively's audio never
+      reaches `bus.input`, that split is exactly what you would hear.
+      Supporting hint: `backwardReverb` has an explicit
+      "empty ring buffer (no audio reached bus.input yet)" abort path, and the user's own
+      earlier console log shows it working — `snapshot received — frames=38400` — on a
+      CLASSIC (libopenmpt) song.
+      **Discriminating test, cheap:** fire the three on `world class dub` (classic) and on
+      `amanda.ahx` (hively). If they work on one engine and not the other, the capture tap
+      is the cause. NB `get_console_errors` only returns warn/error and these log at
+      `console.log`, so read the browser console directly rather than through MCP.
+
+- [ ] **X29** **ASCII art in instrument names renders badly.** Many modules spell pictures
+      across consecutive instrument names (screenshot 2026-09-21, jennipha/daddytwang).
+      The list is already `font-mono`, but three things fight the art: names are
+      `truncate`d (added 2026-09-21 to stop mid-glyph clipping), runs of spaces collapse
+      without `whitespace-pre`, and the row is a flex box with badges competing for width.
+      A per-row fix would break the ordinary case, so this wants a mode: when a song's
+      names look like art, render the block `whitespace-pre`, full width, no truncation,
+      no badges. Detecting "looks like art" is the interesting part — a high ratio of
+      punctuation to letters across several consecutive names is a reasonable start.
+
+- [ ] **X30** **Pattern editor worker never loaded.** Seen in the user's console
+      2026-09-21: "Tracker Worker: Pattern editor failed to start (worker never loaded
+      after 12 s)". Reported environment says `offscreenCanvasSupported: true`,
+      `wasmSupported: true`, `audioContextState: running`, so the message's own suggested
+      cause does not apply. Appeared after a song load, in a long-running dev session with
+      repeated HMR reloads (see X27), so check whether a stale worker from a previous load
+      is the reason before treating it as a fresh-boot fault.
+
 - [~] **X10 — A REAL CLIPPING SOURCE FOUND AND FIXED 2026-09-21.** The 2026-09-18 pass
       could not reproduce it (peak 0.86, no clipping) and left it open on the strength of
       "most of the time". The level work found the cause by accident: `springSlam`
