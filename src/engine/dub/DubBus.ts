@@ -99,6 +99,24 @@ function capturedPeak(left: Float32Array, right: Float32Array, frames: number): 
   return peak;
 }
 
+/**
+ * How much to scale a captured buffer so it plays back at a level the listener
+ * can actually hear.
+ *
+ * A capture taps a channel SEND, not the programme, so it arrives far quieter
+ * than the music it came from — measured peaks of 0.11 to 0.15 against a
+ * programme peaking around 0.4. Played at a fixed gain the reverse sits under
+ * the mix and reads as nothing happening.
+ *
+ * Bounded at both ends: a silent capture must not be multiplied into noise, and
+ * a hot one must not be attenuated so far that the gesture disappears.
+ */
+function captureNormalisation(moveId: string, capturedPeak: number): number {
+  if (!(capturedPeak > CAPTURE_SILENCE_PEAK)) return 1;
+  const target = generatedPeak(moveId);
+  return Math.max(0.5, Math.min(12, target / capturedPeak));
+}
+
 /** Below this a capture is silence, not quiet audio. */
 const CAPTURE_SILENCE_PEAK = 1e-4;
 
@@ -5432,14 +5450,19 @@ export class DubBus {
           // approaches the "original attack" moment, classic "suck into
           // the downbeat" character. Peaks at 1.5 (hot) and ramps down over
           // final 10ms to avoid click.
+          // Referenced to the programme via the measured capture peak, so the
+          // swell lands at a listenable level whatever the send was set to.
+          const normB = captureNormalisation('backwardReverb', capPeak);
+          const peakIn = 1.2 * normB;
           shaper.gain.setValueAtTime(0, now);
-          shaper.gain.linearRampToValueAtTime(1.2, now + durationPlayed * 0.85);
-          shaper.gain.setValueAtTime(1.2, now + Math.max(0.01, durationPlayed - 0.01));
+          shaper.gain.linearRampToValueAtTime(peakIn, now + durationPlayed * 0.85);
+          shaper.gain.setValueAtTime(peakIn, now + Math.max(0.01, durationPlayed - 0.01));
           shaper.gain.linearRampToValueAtTime(0, now + durationPlayed);
           // Parallel direct-to-return at lower gain for body
+          const peakRet = 0.6 * normB;
           reverseToReturn.gain.setValueAtTime(0, now);
-          reverseToReturn.gain.linearRampToValueAtTime(0.6, now + durationPlayed * 0.85);
-          reverseToReturn.gain.setValueAtTime(0.6, now + Math.max(0.01, durationPlayed - 0.01));
+          reverseToReturn.gain.linearRampToValueAtTime(peakRet, now + durationPlayed * 0.85);
+          reverseToReturn.gain.setValueAtTime(peakRet, now + Math.max(0.01, durationPlayed - 0.01));
           reverseToReturn.gain.linearRampToValueAtTime(0, now + durationPlayed);
           // Spring wet swell — crank to 1.0 peaking at the end of the
           // reverse so the spring tank rings out as the reverse lands.
@@ -5584,7 +5607,10 @@ export class DubBus {
           Tone.connect(envG, echoIn);
           const now = this.context.currentTime;
           const dur = frames / this.context.sampleRate;
-          const peak = Math.max(0, Math.min(1.5, amount));
+          // Same referencing as backwardReverb: `amount` stays the caller's
+          // musical intent, scaled by what the capture actually contained.
+          const peak = Math.max(0, Math.min(1.5, amount))
+            * captureNormalisation('reverseEcho', capPeak);
           envG.gain.setValueAtTime(0, now);
           envG.gain.linearRampToValueAtTime(peak, now + 0.003);
           envG.gain.setValueAtTime(peak, now + Math.max(0.005, dur - 0.005));
