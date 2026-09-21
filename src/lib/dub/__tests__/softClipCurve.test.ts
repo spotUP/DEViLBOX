@@ -79,7 +79,10 @@ describe('master insert gain staging', () => {
     // the bus came on. It now follows the measured share of low-frequency
     // energy in the programme.
     expect(bus).toContain('const trimDb = masterActive ? shelfTrimForProgramme(safeMasterShelfGain) : 0;');
-    expect(bus).toContain('this.masterToneTrim.gain.setTargetAtTime(Math.pow(10, trimDb / 20), now, 0.02);');
+    // Written through `_settle`, which cancels pending events and pins the
+    // current value before ramping — a bare setTargetAtTime here collided with
+    // ramps a held move had already scheduled on the same param.
+    expect(bus).toContain('this._settle(this.masterToneTrim.gain, Math.pow(10, trimDb / 20), now, 0.02);');
   });
 
   it('puts the trim ahead of the boosting stages, not after them', () => {

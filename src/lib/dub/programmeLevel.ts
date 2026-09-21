@@ -114,6 +114,22 @@ export const GENERATED_PRESENCE: Readonly<Record<string, number>> = {
   subHarmonic: 0.8,
   oscBass: 0.8,
   crushBass: 0.8,
+  /**
+   * The two SPRING strikes — slam and kick.
+   *
+   * Both generate their own excitation (a sub thump plus filtered noise for
+   * slam, a short impulse for kick) but used absolute multipliers, so they were
+   * the only moves whose level ignored the music: relatively louder on a quiet
+   * tune, quieter on a loud one. That is why the same `amount: 1.0` was heard
+   * on 2026-09-21 as "slam is too loud" AND "kick is not loud enough" — the
+   * numbers had been tuned against one song.
+   *
+   * Transients, so referenced to the programme's PEAK. Slam sits under kick
+   * because it already carries a direct sub thump; kick reaches the output only
+   * through the spring and needs the headroom.
+   */
+  springSlam: 0.8,
+  springKick: 0.95,
   /** Rises into the mix rather than over it. */
   radioRiser: 0.55,
   /**

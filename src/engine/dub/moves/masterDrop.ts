@@ -86,10 +86,16 @@ export const masterDrop: DubMove = {
           notify.warning('Drop: no active audio sources found'));
       }
       for (const entry of collected) {
-        // Guard: if a gain is already 0 when collected (e.g. from a previous
-        // failed restore), treat it as 1.0 so we never "restore" to permanent
-        // silence — the snowball case where dispose → prev=0 → stays at 0.
-        if (entry.prev < 0.05) entry.prev = 1.0;
+        // Guard: if a gain is already at (or effectively at) ZERO when
+        // collected — the snowball case where a failed restore left prev=0 and
+        // every later drop inherits it — treat it as 1.0 so we never "restore"
+        // to permanent silence.
+        //
+        // The threshold was 0.05, which also swallowed a gain the user had
+        // genuinely set low: a master at 0.04 came back at FULL SCALE on pad
+        // release. That is a loud surprise on a live rig, and the snowball case
+        // this guards is exactly zero, not merely quiet.
+        if (entry.prev <= 0.0005) entry.prev = 1.0;
         pairs.push(entry);
         try {
           entry.param.cancelScheduledValues(t);

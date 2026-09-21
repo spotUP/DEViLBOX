@@ -24,6 +24,7 @@ import type { DeckId } from '../dj/DeckEngine';
 import { useDJStore } from '@/stores/useDJStore';
 import { onNextDownbeat, getPhaseInfo } from '../dj/DJAutoSync';
 import { useTransportStore } from '@/stores/useTransportStore';
+import { DEFAULT_MUSICAL_CLOCK_SETTINGS } from '@/lib/dub/musicalClock';
 
 /**
  * Pending-quantized-throw cancel functions. Registered here so
@@ -242,8 +243,16 @@ function scheduleQuantizedThrow(
   try {
     const bpm = useTransportStore.getState().bpm || 120;
     const beatMs = 60000 / Math.max(30, Math.min(300, bpm));
+    // Beats per bar from the musical clock, not a constant.
+    //
+    // This read `beatMs * 4` with the comment "(4/4)" — the third place in one
+    // day where a metre was hardcoded, after `beatPhase` and `dubGrid`, and the
+    // same fault each time: a bar-quantized throw lands wrong on anything but
+    // 4/4. Lower impact than the other two, since it only affects this path,
+    // but there is no reason to leave the third copy behind.
+    const beatsPerBar = DEFAULT_MUSICAL_CLOCK_SETTINGS.meter.beatsPerBar;
     const delayMs =
-      quantize === 'bar'                      ? beatMs * 4     // full bar (4/4)
+      quantize === 'bar'                      ? beatMs * beatsPerBar
       : quantize === '1/8' || quantize === 'offbeat' ? beatMs * 0.5
       : /* '1/16' */                            beatMs * 0.25;
     return trackedSetTimeout(fire, delayMs);
