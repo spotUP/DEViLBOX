@@ -26,9 +26,15 @@ export const ringMod: DubMove = {
       ringModFreq: freq,
       ringModAmount: amount,
     });
+    // Claim these keys for the length of the hold. The store does not know this
+    // move changed them, so the next mirror push would otherwise arrive with
+    // `ringModEnabled: false` and switch the effect off while the pad is still
+    // down. Released before the dispose write, so that write lands.
+    const release = bus.claimSettingKeys(['ringModEnabled', 'ringModFreq', 'ringModAmount']);
 
     return {
       dispose() {
+        release();
         bus.setSettings({
           ringModEnabled: false,
           ringModAmount: 0,
