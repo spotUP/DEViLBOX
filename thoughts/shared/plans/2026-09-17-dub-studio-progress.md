@@ -1566,6 +1566,85 @@ this bug.
       `AutoDub.ts:1598` (`barPos * 4`) is the same assumption; `barPos` already comes from
       the clock, so converting it is mechanical.
 
+### Hot-path audit 2026-09-21 — audible-discontinuity findings
+
+Delegated audit of every dub audio path that a control can touch live. Two acted on
+immediately; the rest are logged here in the auditor's priority order. Numbers are its
+line references, spot-checked before being written down.
+
+- [x] **H2 — `startPingPong` was an unbounded feedback ring. FIXED 2026-09-21.**
+      Topology is `return_ -> inputGain(1.0) -> delayL/R -> merger -> wetGain -> return_`,
+      a closed loop through the OUTPUT with cross-feed recirculating inside it. Round-trip
+      gain is `2*wet/(1-fb)`: 2.8 at the Mad Professor values (fb 0.5, wet 0.7), about 2.4
+      at the shipped defaults. Every pass ~9 dB louder than the last, into clipping within
+      seconds — and AutoDub's madProfessor persona fires it unattended.
+      Nothing bounded it, and landing on `return_` puts it past the input clip and the
+      sidechain. Contrast `extFeedbackGain`, which is both clamped and backed by the
+      `extFeedbackLimit` soft-clip governor.
+      `inputGain` is now scaled so the ring settles at 0.8 — below unity so it decays;
+      at exactly 1.0 it would sustain forever, which is a drone rather than a delay.
+
+- [x] **H13 — the direct-to-return headroom guard had a hole. FIXED 2026-09-21.**
+      The regex matched only `x.gain.value = expr * N;` and missed bare literals, so
+      `toReturn.gain.value = 1.0` (fireNoiseBurst), the ping-pong `wetGain` and
+      `startStereoDoubler`'s `wetGain` were all uncovered.
+      Widened — and the rule itself was wrong, not just the pattern. Unity is fine where
+      the envelope already went through `generatedPeak`: the programme reference has
+      decided the level and the tap just passes it along. A blanket "nothing at unity"
+      rule would have forced the snare crack's gain down and silently undone the fix the
+      user had just approved. The guard now fails on anything ABOVE unity, and for
+      anything AT unity requires a `generatedPeak` upstream.
+
+- [ ] **H1** **Echo Wet slider steps four engines' dry/wet gains.** `SpaceEchoEffect.ts:284`,
+      `RE201Effect.ts:327`, `AnotherDelayEffect.ts:370`, `RETapeEchoEffect.ts:373` — all
+      bare `.value =`. Driven from `DubBus.ts:3697` on every `setSettings`, so every drag
+      pixel of DubBusPanel's Echo Wet is a step. One shared helper in `DubEchoEngine.ts`
+      would cover all four adapters.
+- [ ] **H3** **Post-echo Drive rebuilds a 4096-point WaveShaper curve per pointer event**
+      (`DubBus.ts:3902`, `makeTapeSatCurve` at :209). Transfer-function step plus 8192
+      `Math.tanh` on the main thread, every event. Pre-build a ladder and crossfade.
+- [ ] **H4** **Vinyl slider hard-switches two wet gains 0 to 1** (`DubBus.ts:6400`,
+      `VinylNoiseEffect.ts:191`, `ToneArmEffect.ts:198`). This chain is post-master on the
+      WHOLE MIX, so it is a full-scale step, not a send. Un-debounced at
+      `DubDeckStrip.tsx:589` — ~21 postMessage writes per pixel.
+- [ ] **H5** **Per-channel filter dropdown changes `BiquadFilterNode.type` live**
+      (`PerChannelDubFx.ts:117`). Coefficients change in one sample while state persists —
+      click. Every other setter in that file already ramps.
+- [ ] **H6** **Tape Sat mode swaps the WaveShaper curve with no mute** (`DubBus.ts:3840`).
+      The same write inside `_applyCharacterPreset` IS protected by the warmup hold; only
+      the `setSettings` path is bare.
+- [ ] **H7** **Club Sim swaps a live convolver buffer** (`DubBus.ts:3968`), truncating the
+      in-flight tail, and on disable disconnects in the same tick as a `setTargetAtTime`
+      that never reaches zero (`:3947-3963`), cutting a 2.5s tail at full gain.
+      `setPlateStage` already has the correct crossfade-and-defer pattern to copy.
+- [ ] **H8** **Channel send crossing zero: isolation flips before the 20ms ramp lands**
+      (`ChannelRoutedEffects.ts:503`, `:470`). Hard cut on the way down, 20ms hole in the
+      dry mix on the way up.
+- [ ] **H9** **`DJSamplerPanel.tsx:120` pushes the whole dubBus object un-debounced**,
+      bypassing the 50ms/100ms debounces the other two mirrors have. Worse: hold moves
+      (`ringMod.ts:26`, `voltageStarve.ts:24`) call `setSettings` directly, and the next
+      mirror push turns the held effect back OFF mid-gesture. Echo rate is protected from
+      exactly this by `beginRateOverride`; the colour stages are not.
+- [ ] **H10** **`setSettings` ramps collide with in-flight move ramps** — no
+      `cancelScheduledValues` before ~10 `setTargetAtTime` calls. Touching FX WET during a
+      held Tape Stop jumps.
+- [ ] **H11** **`wireMasterInsert` steps the insert envelope to 0** (`DubBus.ts:4248`) —
+      instant full-mix cut. Its own mirror `unwireMasterInsert` already ramps; copy it.
+- [ ] **H12** **`modulateFeedback` uses the no-ramp panic path for musical throws**
+      (`DubBus.ts:4843`). A +0.15..+0.35 step inside a live delay loop.
+- [ ] **H14** **Teardown races** — `_swapEchoEngine`'s timeout has no `_disposed` check
+      (`DubBus.ts:963`), nor does `setChainOrder`'s (`:6340`); `dispose` never clears
+      `masterInsertPending`.
+- [ ] **H15** **Unverified: Fil4 EQ coefficient writes on 16-50ms timers** with no ramping
+      or coalescing on the JS side, and band enable flags flickering as gain crosses
+      +/-0.2 dB. Whether the WASM smooths internally could not be read. Needs a listening
+      test before being called fine or broken.
+- [ ] **H16** **Minor** — `setSettings({})` in `wireMasterInsert` is a dead call (empty
+      object short-circuits at `:3521`), so master tone EQ stays flat until the next real
+      write; `masterDrop.ts:90` restores a genuine sub-0.05 master gain to full scale;
+      DubBusPanel uses raw `<input type=range>` rather than the project's `Knob`;
+      `DubDeckStrip.tsx:1247` has an emoji in a UI label against the project rule.
+
 - [ ] **X31** **BUS tab sliders crackle while dragged — bad for live dubbing.** Reported
       2026-09-21 with a screenshot of BASS / MID / WIDTH / sweep / RATE.
       Very likely zipper noise from stepped `AudioParam.value` assignment: those settings
