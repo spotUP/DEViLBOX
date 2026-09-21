@@ -1363,7 +1363,16 @@ this bug.
       obvious reading — "the animation path broke" — was wrong. The cheap check that
       settled it was fixing the upstream causes first and re-asking.
 
-- [ ] **X22** **"Auto EQ analyzing…" appears stuck.** Reported 2026-09-21 with a screenshot
+- [x] **X22 — CLOSED 2026-09-21. The label lied; nothing was analysing.** It read
+      `analyzing…` whenever `autoEqLastGenre` was empty, and that is its value until the
+      ONNX capture-and-classify pipeline has been run BY HAND — loading a song does not
+      start it. So a session where no analysis had ever been requested showed "analyzing…"
+      forever and looked hung. The label now reports the analysis store's real
+      `analysisState`: capturing / analyzing / analysis failed / **no analysis**.
+      Not urgent, and now says so: the improv EQ stopped depending on this on 2026-09-19
+      (it reads live audio), so an un-analysed song only means no genre baseline.
+
+- [x] **X22 (original entry)** **"Auto EQ analyzing…" appears stuck.** Reported 2026-09-21 with a screenshot
       showing the label sitting at `Auto EQ analyzing…` indefinitely.
       Likely related to what the X17 work found: the EQ snapshot used to be gated on
       `useTrackerAnalysisStore.currentAnalysis`, which only exists once the ONNX
@@ -1375,14 +1384,41 @@ this bug.
       NB the improv EQ no longer depends on this at all (it reads live audio now), so this
       is a stale LABEL, not a dead EQ — confirm that before treating it as urgent.
 
-- [ ] **X23** **`jennipha.ahx` goes silent.** Reported 2026-09-21. Reproduce, then use
+- [~] **X23 — PARTIAL 2026-09-21. The watchdog was blind to this engine; now it is not.**
+      `get_playback_silence` only read the libopenmpt worklet diag, so for Hively/AHX,
+      UADE, Furnace and every other engine it answered `diagAvailable: false` and judged
+      nothing — blind to exactly the class of song reported silent. It now falls back to
+      the master meter, reporting `source: "libopenmpt-worklet" | "master-meter"`. The
+      meter is a weaker signal (it says there is no sound, not WHERE it was lost), which
+      is why the worklet reason is still preferred when available.
+      Verified live on the user's own session: `verdict: ok, source: master-meter,
+      lastRenderRms 0.144`.
+      **The silence itself is NOT reproduced.** Measured across a window of playback:
+      master rms 0.24-0.37, never silent, every fire paired with its release. The zeros in
+      the reported console log sit at the very start, during Hively warm-up
+      (`[HivelyWorklet] render ... max=0.000000` before `Hively loaded & playing`) — that
+      is startup, not a mid-song drop.
+      Open question the user asked directly: does a move mute it by mistake for a long
+      stretch? Not seen yet. Next time it happens, call `get_playback_silence` BEFORE
+      reloading — it now answers for this engine.
+
+- [ ] **X23 (original entry)** **`jennipha.ahx` goes silent.** Reported 2026-09-21. Reproduce, then use
       `get_playback_silence` (added 2026-09-19) rather than guessing — it reports the
       worklet's own `silentReason` and separates "the engine is rendering silence" from
       "audio was produced and swallowed later". AHX is a WASM engine path, so also check
       `useWasmPositionStore` is still advancing; a stalled transport is a different fault
       and the watchdog says so explicitly.
 
-- [ ] **X24** **Instrument-list badges compress to `S…` / `P…` on a narrow panel.**
+- [x] **X24 — CLOSED 2026-09-21.** Badges are hidden outright below 17rem by a container
+      query rather than compressed into noise. Instrument names went from 0px (clipped
+      mid-glyph) to 154px.
+      The container is NAMED and applied only to the fullscreen panel, which has a fixed
+      width. Making the normal `w-fit` panel a query container would be circular — hiding
+      the badges shrinks the content, which shrinks the panel, which keeps them hidden.
+      Plain CSS in `index.css`, because Tailwind 3.4 has no `@container` variant without
+      adding a plugin for one rule.
+
+- [x] **X24 (original entry)** **Instrument-list badges compress to `S…` / `P…`.**
       Cosmetic, introduced deliberately 2026-09-21: the badges were `shrink-0` and ate the
       whole row, so instrument NAMES rendered at zero width and were clipped mid-glyph.
       Badges now yield before the name does, which is the right priority but leaves them
