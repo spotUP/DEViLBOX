@@ -1425,6 +1425,35 @@ this bug.
       unreadable in fullscreen at small widths. A proper fix hides them below a width
       threshold (container query) rather than compressing them.
 
+- [ ] **X25** **Move levels, judged by ear 2026-09-21.** The first real per-move loudness
+      verdicts — this is the data the DEFERRED level-tuning note was waiting for, so tune
+      against these rather than re-deriving them.
+      | move | file | current default | verdict |
+      |---|---|---|---|
+      | Slam | `moves/springSlam.ts:18` | `amount: 1.0, holdMs: 400` | **too loud** |
+      | Kick | `moves/springKick.ts:24` | `amount: 1.0, holdMs: 600` | **not loud enough** |
+      | Sub | `moves/subSwell.ts:13` | `freq: 55, durationMs: 400, level: 0.8` | **not loud enough** |
+      | Siren | `moves/dubSiren.ts:16` | `defaults: {}` (all from the preset) | **a little too silent** |
+      | Scream | `moves/tubbyScream.ts:26` | `centerHz: 500, sweepHz: 900, sweepSec: 3.5, feedbackAmount: 1.3` | **too loud** |
+      Note Slam and Kick are BOTH at `amount: 1.0` yet land at opposite ends by ear, so
+      this is not one global trim — the spring's response differs between `slamSpring`
+      and `kickSpring`. Measure each against programme level before changing numbers;
+      `get_auto_dub_fire_log` records `audio.rms`/`peak` at every fire and release.
+      Siren has no defaults of its own; its level comes from `sirenPreset` /
+      `sirenFeedback` on the bus, so the fix is in a different place from the others.
+
+- [ ] **X26** **`crushBass` stuck on once, from a click.** Reported 2026-09-21: "i managed
+      to get crush bass stuck once when i clicked it".
+      It is a `kind: 'hold'` button (`DubDeckStrip.tsx:160`, "3-bit quantize saw drone
+      while held"), driven by pointerdown/pointerup with pointer capture. A CLICK — press
+      and release faster than the handlers expect, or a release that lands outside the
+      captured element — can start the hold and lose the release, leaving the drone on.
+      Same failure shape as X12/X13: a releaser that never runs.
+      `DubBus.startCrushBass` (`DubBus.ts:5802`, `freq 55, bits 3, level 0.55`) returns the
+      releaser, so check who holds it and whether `holdEnd` is reachable from every exit
+      path — pointerup, pointerleave, pointercancel, and the element unmounting mid-hold.
+      Intermittent, so reproduce by clicking rapidly rather than assuming one try is clean.
+
 - [ ] **X10** **MEASURED 2026-09-18 — not reproduced at master, one real finding instead.**
       Perry preset, "world class dub" playing, all four channel sends at 0.5, `echoBuildUp`
       held: master peaked **0.86**, RMS 0.16-0.22. No clipping. The handoff's 1.00-1.03
