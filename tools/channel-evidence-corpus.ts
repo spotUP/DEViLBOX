@@ -64,7 +64,13 @@ interface Row {
   silent: boolean;
   /** Rounded so the file stays readable and diffs stay small. */
   evidence: Record<string, number | boolean | number[]> | null;
-  /** Mechanically derived. Correct it — that is the job. */
+  /** Name of the instrument this channel-pattern mostly uses, when the format
+   *  carries one. AHX/HVL instruments are named with ASCII art, so this is
+   *  usually noise there and genuinely informative on MOD/XM/IT/S3M. */
+  instrumentName: string | null;
+  /** What that NAME alone suggests, independent of the measurements. */
+  nameHint: string | null;
+  /** Mechanically derived from the measurements. Correct it — that is the job. */
   proposed: string;
   /** Human ground truth. null until somebody fills it in. */
   label: string | null;
@@ -94,6 +100,59 @@ function propose(c: any): string {
   if (r.regularity >= 0.9 && r.density >= 0.2 && p.range <= 5) return 'percussion-or-pulse';
   if (r.density <= 0.08 && p.range >= 12) return 'stab-or-fx';
   return 'unclear';
+}
+
+/**
+ * What an instrument NAME suggests, on its own. LOW-confidence evidence.
+ *
+ * Tracker sample and instrument name slots were a message board. Musicians put
+ * greetings, credits and liner notes in them, not descriptions of the sound —
+ * stated by the author 2026-09-22 and visible all over this corpus: the AHX
+ * entries read `for Revision 2017`, `by AceMan`, `Put into tracker`,
+ * `lost count a long`, one phrase of a paragraph per instrument slot.
+ *
+ * So a name is never identity here. Matching stays deliberately NARROW even
+ * though that leaves coverage on the table — only 31 of 552 rows come back
+ * decisive. Widening it to catch the concatenated demoscene names (`jstbass5`,
+ * `jsttom1`) would also start matching greetings that happen to contain
+ * "bell" or "bass", and a hint that is right most of the time is worse than no
+ * hint when a human is using it to write ground truth.
+ *
+ * Written out here rather than imported from `ChannelNaming`, at the cost of
+ * some duplication: the corpus exists to score that module, and sharing its
+ * regexes would make the two agree by construction.
+ */
+function hintFromName(raw: string | null | undefined): string | null {
+  if (!raw) return null;
+  const n = raw.toLowerCase().trim();
+  // Chip formats put the song's liner notes in the instrument slots — measured
+  // in this corpus: "for Revision 2017", "by AceMan", "lost count a long".
+  // Anything without letters, or that reads as an address, tells us nothing.
+  if (!/[a-z]{3}/.test(n)) return null;
+  if (/@|http|www\./.test(n)) return null;
+
+  // Substring, not word-boundary. Demoscene sample names are concatenated —
+  // `jstbass5`, `jsttom1`, `jstdrumriff1` — and `\bbass\b` matches none of
+  // them. That mistake cost this corpus most of its usable names on the first
+  // pass: 31 rows instead of the 100+ the names actually support.
+  //
+  // Ordered most specific first, because these overlap: "bassdrum" contains
+  // "bass", and "openhat" contains "hat".
+  const tokens: [RegExp, string][] = [
+    [/bassdrum|bass ?drum|\bbd\d|kick|\bkik/, 'kick'],
+    [/snare|\bsnr|\bsd\d/, 'snare'],
+    [/hihat|hi-hat|openhat|closedhat|\bhat|\bhh\d/, 'hat'],
+    [/clap|snap/, 'clap'],
+    [/tom\d|\btom\b|conga|bongo|shaker|tamb|clave|ride|crash|cymbal|\bperc|drumriff|\bdrum/, 'percussion'],
+    [/bass|\bsub\b|\b303\b/, 'bass'],
+    [/lead|\bsolo|melody/, 'lead'],
+    [/\bpad\b|string|choir|atmos|\bstr\d/, 'pad'],
+    [/chord|stab|skank|organ|piano|rhodes|bell|\bepi/, 'chord-or-keys'],
+    [/\bvox|vocal|voice|speech/, 'vocal'],
+    [/\bfx\b|\bsfx|noise|sweep|riser|\bzap/, 'fx'],
+  ];
+  for (const [re, hint] of tokens) if (re.test(n)) return hint;
+  return null;
 }
 
 function loadExistingLabels(): Map<string, { label: string | null; note?: string }> {
@@ -136,6 +195,15 @@ async function main(): Promise<void> {
       continue;
     }
 
+    // Instrument names are fetched per song, not per row: the list is small
+    // and the same for every pattern.
+    const names = new Map<number, string>();
+    try {
+      for (const inst of (await call('get_instruments_list', {}, 30000)) ?? []) {
+        if (typeof inst?.id === 'number') names.set(inst.id, String(inst.name ?? ''));
+      }
+    } catch { /* format may not expose instruments */ }
+
     const ev = await call('get_channel_evidence', {}, 60000);
     if (!ev?.patternsLoaded) {
       console.log(`[corpus] SKIP ${name} — no patterns after load`);
@@ -148,6 +216,8 @@ async function main(): Promise<void> {
       for (const c of entry.channels ?? []) {
         const key = `${name}|${entry.orderIndex}|${c.channelIndex}`;
         const prior = kept.get(key);
+        const domId = c.source?.instrumentIds?.[0];
+        const instName = typeof domId === 'number' ? (names.get(domId) ?? null) : null;
         rows.push({
           song: name,
           format,
@@ -175,6 +245,8 @@ async function main(): Promise<void> {
             instrumentCount: c.source.instrumentIds.length,
             dominance: r2(c.source.dominance),
           },
+          instrumentName: instName,
+          nameHint: hintFromName(instName),
           proposed: propose(c),
           label: prior?.label ?? null,
           ...(prior?.note ? { note: prior.note } : {}),
@@ -197,6 +269,17 @@ async function main(): Promise<void> {
   const labelled = rows.filter(r => r.label !== null).length;
   console.log(`\n[corpus] ${rows.length} rows across ${summary.filter(s => !s.skipped).length} songs -> ${OUT}`);
   console.log(`[corpus] ${labelled} labelled, ${rows.length - labelled} awaiting a human`);
+
+  const withHint = rows.filter(r => r.nameHint !== null);
+  console.log(`[corpus] ${withHint.length} rows carry a decisive instrument name`);
+  if (withHint.length > 0) {
+    const hintTally = new Map<string, number>();
+    for (const row of withHint) hintTally.set(row.nameHint!, (hintTally.get(row.nameHint!) ?? 0) + 1);
+    console.log('name hints:');
+    for (const [k, v] of [...hintTally.entries()].sort((a, b) => b[1] - a[1])) {
+      console.log(`  ${k.padEnd(22)} ${v}`);
+    }
+  }
 
   const tally = new Map<string, number>();
   for (const row of rows) tally.set(row.proposed, (tally.get(row.proposed) ?? 0) + 1);
