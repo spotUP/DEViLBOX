@@ -81,16 +81,23 @@ describe('DubBus.wireMasterInsert — glitch guard (G15)', () => {
     expect(fn![0]).toMatch(/masterInsertEnvelope\.gain\.linearRampToValueAtTime\(\s*1/);
   });
 
-  it('unwireMasterInsert ramps the envelope down before disconnecting', () => {
-    // The ramp-down must start BEFORE the disconnect. Otherwise the
+  it('unwireMasterInsert ramps the envelope down before rewiring', () => {
+    // The ramp-down must start BEFORE the graph is touched. Otherwise the
     // insert chain audibly cuts out instead of fading out.
+    //
+    // The rewire itself now lives in `_restoreMasterInsertPassthrough`, so this
+    // looks for the call rather than for a bare `.disconnect(` — see
+    // `masterInsertPassthrough.test.ts` for why every teardown shares one
+    // restorer.
     const fn = SOURCE.match(/unwireMasterInsert\([^)]*\)\s*:\s*(?:void|Promise<void>)\s*\{[\s\S]*?\n  \}/);
     expect(fn, 'unwireMasterInsert method not found').not.toBeNull();
     const body = fn![0];
     const rampIdx = body.search(/masterInsertEnvelope\.gain\.linearRampToValueAtTime\(\s*0/);
-    const disconnectIdx = body.search(/\.disconnect\(/);
+    // The restore inside the early-return guard runs before any ramp and is not
+    // the one this is about; take the one that follows the ramp.
+    const rewireIdx = body.indexOf('this._restoreMasterInsertPassthrough()', rampIdx);
     expect(rampIdx).toBeGreaterThanOrEqual(0);
-    expect(rampIdx).toBeLessThan(disconnectIdx);
+    expect(rewireIdx).toBeGreaterThan(rampIdx);
   });
 
   it('unwireMasterInsert defers the disconnect via setTimeout so the ramp completes first', () => {
@@ -103,8 +110,9 @@ describe('DubBus.wireMasterInsert — glitch guard (G15)', () => {
     // Inside the setTimeout: disconnect + reconnect of direct path.
     const tm = fn![0].match(/setTimeout\(\s*\(\s*\)\s*=>\s*\{[\s\S]*?\}\s*,/);
     expect(tm, 'setTimeout callback not found').not.toBeNull();
-    expect(tm![0]).toMatch(/\.disconnect\(/);
-    expect(tm![0]).toMatch(/source\.connect\(dest\)/);
+    // Inside the setTimeout: the restorer, which does the disconnect and puts
+    // the direct source -> dest connection back.
+    expect(tm![0]).toMatch(/_restoreMasterInsertPassthrough\(\)/);
   });
 
   it('unwireMasterInsert stores a pending timer that wire can cancel (race guard)', () => {
