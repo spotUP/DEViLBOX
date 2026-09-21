@@ -133,10 +133,22 @@ describe('wiring contract — generated moves reference the programme', () => {
   it('routes every generated source through the programme reference', () => {
     for (const moveId of [
       'sonarPing', 'radioRiser', 'subSwell', 'subHarmonic',
-      'crushBass', 'oscBass', 'noiseBurst', 'siren',
+      'crushBass', 'oscBass', 'noiseBurst', 'siren', 'tubbyScream',
     ]) {
       expect(bus, moveId).toContain(`generatedPeak('${moveId}'`);
     }
+  });
+
+  it('leaves no entry in the table that nothing reads', () => {
+    // `tubbyScream` sat in GENERATED_PRESENCE unused: the scream's seed gain
+    // was a flat 0.15 whatever the music did. Trimming that entry on
+    // 2026-09-21 to answer "scream is too loud" therefore changed nothing at
+    // all, and only an audit noticed. A dead entry is worse than a missing one
+    // — it reads as wired, so it absorbs a fix and gives nothing back.
+    const unread = Object.keys(GENERATED_PRESENCE).filter(
+      (k) => !bus.includes(`generatedPeak('${k}'`) && !bus.includes(`captureNormalisation('${k}'`),
+    );
+    expect(unread, `presence entries nothing reads: ${unread.join(', ')}`).toEqual([]);
   });
 
   it('leaves no generated source on a raw full-scale clamp', () => {
