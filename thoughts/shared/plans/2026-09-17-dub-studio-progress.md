@@ -1517,10 +1517,25 @@ this bug.
       "empty ring buffer (no audio reached bus.input yet)" abort path, and the user's own
       earlier console log shows it working — `snapshot received — frames=38400` — on a
       CLASSIC (libopenmpt) song.
-      **Discriminating test, cheap:** fire the three on `world class dub` (classic) and on
-      `amanda.ahx` (hively). If they work on one engine and not the other, the capture tap
-      is the cause. NB `get_console_errors` only returns warn/error and these log at
-      `console.log`, so read the browser console directly rather than through MCP.
+      **HYPOTHESIS DISPROVED 2026-09-21.** User: "they seem dead in mod as well". Dead on
+      BOTH engines, so the capture tap being engine-specific is not the cause.
+      Also ruled out:
+      - the `needsSend` gate — sends were 0.45 with taps [0,1,2,3] registered;
+      - `anySend` — reads the same live mixer values, so it was true;
+      - the router's quantize defer — setting `throwQuantize: 'off'` changed nothing,
+        which also clears today's `dubGrid` speed change of suspicion.
+      The master meter is the wrong instrument for these: a reversed tail or an echo-time
+      sweep barely moves RMS, so "no level change" is not evidence either way. Two
+      separate measurements of `backwardReverb` moved the peak by less than the programme
+      varies on its own.
+      **Next step is one line in the browser console.** `backwardReverb` logs its own
+      progress at `console.log`, which `get_console_errors` filters out, so it has to be
+      read in the browser: `▶ captureDur=` then `snapshot received — frames=N` means it
+      fired and the fault is level; `abort — empty ring buffer` means nothing reached
+      `bus.input`; `timeout — worklet did not reply within 1s` means the capture worklet
+      is not answering; `ignored — capture node missing` means it was never created; and
+      silence means the click never reached the move at all. Each points somewhere
+      different, so get that line before changing anything.
 
 - [ ] **X29** **ASCII art in instrument names renders badly.** Many modules spell pictures
       across consecutive instrument names (screenshot 2026-09-21, jennipha/daddytwang).
