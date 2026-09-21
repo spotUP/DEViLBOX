@@ -12,11 +12,9 @@
  * Usage: npx tsx tools/dub-untested-sweep.ts
  */
 
-import { WebSocket } from 'ws';
-import { randomUUID } from 'crypto';
 import { writeFileSync } from 'fs';
+import { connect, call, sleep, WS_URL } from './lib/mcpRelay';
 
-const WS_URL = 'ws://localhost:4003/mcp';
 const MODLAND_API = 'http://localhost:3011/api/modland';
 // Optional: `MODLAND_QUERY="world class dub"` loads the first matching result
 // from Modland before running the sweep. Otherwise the sweep uses whatever
@@ -81,41 +79,7 @@ const MOVES: MoveEntry[] = [
   { short: 'STOP!',  id: 'transportTapeStop' },
 ];
 
-// ── WS bridge ───────────────────────────────────────────────────────────────
-
-let ws: WebSocket;
-type Pending = { resolve: (v: any) => void; reject: (e: Error) => void };
-const pending = new Map<string, Pending>();
-
-function connect(): Promise<void> {
-  return new Promise((resolve, reject) => {
-    ws = new WebSocket(WS_URL);
-    ws.on('open', () => resolve());
-    ws.on('error', reject);
-    ws.on('message', (data) => {
-      const msg = JSON.parse(data.toString());
-      const p = pending.get(msg.id);
-      if (!p) return;
-      pending.delete(msg.id);
-      if (msg.type === 'error') p.reject(new Error(msg.error || 'bridge error'));
-      else p.resolve(msg.data);
-    });
-  });
-}
-
-function call(method: string, params: Record<string, any> = {}, timeoutMs = 15000): Promise<any> {
-  return new Promise((resolve, reject) => {
-    const id = randomUUID();
-    const timeout = setTimeout(() => { pending.delete(id); reject(new Error(`timeout: ${method}`)); }, timeoutMs);
-    pending.set(id, {
-      resolve: (v) => { clearTimeout(timeout); resolve(v); },
-      reject: (e) => { clearTimeout(timeout); reject(e); },
-    });
-    ws.send(JSON.stringify({ id, type: 'call', method, params }));
-  });
-}
-
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+// The WS bridge lives in `lib/mcpRelay.ts` — shared with the invariant sweep.
 
 // ── Row ─────────────────────────────────────────────────────────────────────
 
@@ -190,9 +154,9 @@ async function main() {
 
   // Baseline — confirm something is audible before the sweep.
   const baseline = await call('get_audio_level', { durationMs: 1000 });
-  console.log(`[sweep] baseline rms=${fmt(baseline?.rmsAvg)} peak=${fmt(baseline?.peakMax)} silent=${baseline?.isSilent}`);
+  console.log(`[sweep] baseline rms=${fmt(baseline?.rmsAvg)} peak=${fmt(baseline?.peakMax)} silent=${baseline?.silent}`);
 
-  if (baseline?.isSilent || (baseline?.rmsAvg ?? 0) < 0.001) {
+  if (baseline?.silent || (baseline?.rmsAvg ?? 0) < 0.001) {
     console.warn('[sweep] WARNING: baseline is SILENT — load a song in the browser before running the sweep.');
   }
 
@@ -256,7 +220,7 @@ async function main() {
       const peak = await call('get_audio_level', { durationMs: 1000 });
       peakRms = peak?.rmsAvg ?? NaN;
       peakPeak = peak?.peakMax ?? NaN;
-      peakSilent = !!peak?.isSilent;
+      peakSilent = !!peak?.silent;
     } catch { /* ignore */ }
 
     if (heldHandle) {
@@ -268,7 +232,7 @@ async function main() {
     try {
       const tail = await call('get_audio_level', { durationMs: 500 });
       tailRms = tail?.rmsAvg ?? NaN;
-      tailSilent = !!tail?.isSilent;
+      tailSilent = !!tail?.silent;
     } catch { /* ignore */ }
 
     return { baselineRms, baselinePeak, peakRms, peakPeak, peakSilent, tailRms, tailSilent, held, fireError, releaseError };
@@ -365,11 +329,11 @@ async function main() {
   await call('set_dub_bus_enabled', { enabled: false }).catch(() => {});
   await sleep(15_000);
   const tail15 = await call('get_audio_level', { durationMs: 1000 });
-  console.log(`  t=15s  rms=${fmt(tail15?.rmsAvg)} peak=${fmt(tail15?.peakMax)} silent=${tail15?.isSilent}`);
+  console.log(`  t=15s  rms=${fmt(tail15?.rmsAvg)} peak=${fmt(tail15?.peakMax)} silent=${tail15?.silent}`);
   console.log('[sweep] waiting another 15 s…');
   await sleep(15_000);
   const tail30 = await call('get_audio_level', { durationMs: 1000 });
-  console.log(`  t=30s  rms=${fmt(tail30?.rmsAvg)} peak=${fmt(tail30?.peakMax)} silent=${tail30?.isSilent}`);
+  console.log(`  t=30s  rms=${fmt(tail30?.rmsAvg)} peak=${fmt(tail30?.peakMax)} silent=${tail30?.silent}`);
   // Anything above -60 dBFS RMS at t+30s is a leaked move. Reverb tails
   // from springSlam / backwardReverb are ≤ 2 s; feedback-delays like
   // delayTimeThrow are ≤ 4 s. Nothing legitimate should persist 30 s.
