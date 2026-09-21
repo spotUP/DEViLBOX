@@ -21,6 +21,16 @@ interface FaderProps {
   /** Overall size — default 'md' is 16px wide × 80px tall */
   size?: 'sm' | 'md' | 'lg';
 
+  /**
+   * Stretch to the height of whatever contains it instead of the fixed height
+   * for `size`. The width still comes from `size`.
+   *
+   * The drag maths then has to measure the track rather than trust the size
+   * table, or the fader would move at the wrong rate the moment its height
+   * stopped matching the constant.
+   */
+  fillHeight?: boolean;
+
   /** Token for the filled-track color (design tokens only). */
   color?: 'accent-primary' | 'accent-secondary' | 'accent-success' | 'accent-warning' | 'accent-error' | 'accent-highlight';
 
@@ -58,13 +68,19 @@ const COLOR_FILL: Record<NonNullable<FaderProps['color']>, string> = {
 
 export const Fader: React.FC<FaderProps> = React.memo(({
   value, min = 0, max = 1, onChange,
-  size = 'md', color = 'accent-primary',
+  size = 'md', color = 'accent-primary', fillHeight = false,
   label, title, disabled = false,
   formatValue,
   paramKey, imperativeSubscribe,
   doubleClickValue,
 }) => {
   const { w, h, thumbH } = SIZE_PX[size];
+
+  /** Track height in px, live — `h` is only the fallback before first layout. */
+  const trackHeight = useCallback(
+    () => trackRef.current?.getBoundingClientRect().height || h,
+    [h],
+  );
   const trackRef = useRef<HTMLDivElement | null>(null);
   const thumbRef = useRef<HTMLDivElement | null>(null);
   const fillRef = useRef<HTMLDivElement | null>(null);
@@ -97,11 +113,23 @@ export const Fader: React.FC<FaderProps> = React.memo(({
     const fill = fillRef.current;
     if (!thumb || !fill) return;
     const norm = Math.max(0, Math.min(1, (v - min) / (max - min)));
-    const availPx = h - thumbH;
+    const availPx = Math.max(1, trackHeight() - thumbH);
     const thumbTop = (1 - norm) * availPx;
     thumb.style.transform = `translateY(${thumbTop}px)`;
     fill.style.height = `${norm * 100}%`;
-  }, [h, thumbH, min, max]);
+  }, [trackHeight, thumbH, min, max]);
+
+  // A stretched fader changes height with its container, and the thumb is
+  // positioned in px against that height. Without this it stays where the
+  // pre-layout fallback put it until the next drag.
+  useEffect(() => {
+    if (!fillHeight) return;
+    const track = trackRef.current;
+    if (!track || typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(() => positionThumbAndFill(internalRef.current));
+    ro.observe(track);
+    return () => ro.disconnect();
+  }, [fillHeight, positionThumbAndFill]);
 
   // Drag handling — pointer capture, vertical delta → value, clamp.
   const draggingRef = useRef(false);
@@ -113,10 +141,10 @@ export const Fader: React.FC<FaderProps> = React.memo(({
     if (!track) return internalRef.current;
     const rect = track.getBoundingClientRect();
     const localY = clientY - rect.top - thumbH / 2;
-    const availPx = h - thumbH;
+    const availPx = Math.max(1, rect.height - thumbH);
     const norm = Math.max(0, Math.min(1, 1 - localY / availPx));
     return min + norm * (max - min);
-  }, [h, thumbH, min, max]);
+  }, [thumbH, min, max]);
 
   const commit = useCallback((v: number) => {
     const clamped = Math.max(min, Math.min(max, v));
@@ -169,7 +197,7 @@ export const Fader: React.FC<FaderProps> = React.memo(({
           'relative rounded-sm bg-dark-bgTertiary border border-dark-border cursor-ns-resize' +
           (disabled ? ' cursor-not-allowed' : ' hover:border-dark-borderLight')
         }
-        style={{ width: `${w}px`, height: `${h}px`, touchAction: 'none' }}
+        style={{ width: `${w}px`, height: fillHeight ? '100%' : `${h}px`, touchAction: 'none' }}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
