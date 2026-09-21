@@ -600,7 +600,12 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
                   />
                 ) : (
                   <span
-                    className="text-xs font-mono whitespace-nowrap shrink-0 cursor-text"
+                    /* `shrink-0` with no truncation meant a long name grew the
+                       row past the panel and the panel's own overflow-hidden
+                       cut it mid-glyph — no ellipsis, no clue there was more.
+                       `min-w-0 truncate` lets it shrink and end in an ellipsis;
+                       the full name is already on the title attribute. */
+                    className="text-xs font-mono whitespace-nowrap flex-1 min-w-[4rem] truncate cursor-text"
                     onDoubleClick={(e) => handleStartEdit(e, instrument.id, instrument.name)}
                     title={instrument.name}
                   >
@@ -609,7 +614,7 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
                 )}
 
                 {/* Synth Type Badge */}
-                <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold border shrink-0 ${isSelected ? 'bg-transparent text-ft2-bg border-ft2-bg/60' : 'bg-ft2-header text-ft2-textDim border-ft2-border'}`}>
+                <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold border shrink min-w-0 truncate ${isSelected ? 'bg-transparent text-ft2-bg border-ft2-bg/60' : 'bg-ft2-header text-ft2-textDim border-ft2-border'}`}>
                   {instrument.metadata?.displayType || synthInfo?.shortName || instrument.synthType}
                 </span>
 
@@ -617,7 +622,7 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
                     so this instrument is a silent placeholder. */}
                 {instrument.loadError && (
                   <span
-                    className="text-[10px] px-1.5 py-0.5 rounded font-bold border shrink-0 bg-accent-error/15 text-accent-error border-accent-error/40"
+                    className="text-[10px] px-1.5 py-0.5 rounded font-bold border shrink min-w-0 truncate bg-accent-error/15 text-accent-error border-accent-error/40"
                     title={instrument.loadError}
                   >
                     Load Failed
@@ -629,7 +634,7 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
                   const badge = getSynthBadge(instrument.synthType);
                   return (
                     <span
-                      className="text-[10px] px-1.5 py-0.5 rounded font-bold border shrink-0"
+                      className="text-[10px] px-1.5 py-0.5 rounded font-bold border shrink min-w-0 truncate"
                       style={isSelected
                         ? { backgroundColor: 'transparent', color: 'var(--color-ft2-bg)', borderColor: 'var(--color-ft2-bg)' }
                         : { backgroundColor: `${badge.cssColor}20`, color: badge.cssColor, borderColor: `${badge.cssColor}40` }
@@ -714,7 +719,7 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
                   }
 
                   return (
-                    <div className="relative shrink-0">
+                    <div className="relative shrink min-w-0">
                       {badgeEl}
                       {open && (
                         <InstrumentTypePicker
