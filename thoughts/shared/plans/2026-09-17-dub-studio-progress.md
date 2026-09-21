@@ -1577,7 +1577,32 @@ this bug.
       `AutoDub.ts:1598` (`barPos * 4`) is the same assumption; `barPos` already comes from
       the clock, so converting it is mechanical.
 
-- [~] **X37** **The music mutes for a pattern or two while effects keep firing.** Reported
+- [~] **X37 — CAUSE IDENTIFIED 2026-09-21: recorded dub automation, not the performer.**
+      The console stack settled it. Every `reverseEcho` / `backwardReverb` / `slamSpring` /
+      `throwEchoTime` in the flood arrived via
+      `routeDubParameter -> AutomationPlayer.ts:467 -> TrackerReplayer`, NOT AutoDub —
+      whose own fires are the far rarer `[AutoDub] ▶ HOLD` lines. The project was carrying
+      recorded dub lanes and replaying that whole performance on every pass: channels
+      muted from row 0, slams thrown, and the capture-silence flood following naturally
+      because a muted channel puts nothing at `bus.input` to capture.
+      Confirmed live at the mixer before the reload: channels 0-3 `muted: true`, no
+      transient open, nothing able to restore them.
+      **Not confirmed by removal.** `clear_dub_automation` (added for this) reported
+      `removed: 0, musicalCurvesKept: 0` — the user had reloaded by then, and the
+      automation store is in-memory, so the reload had already cleared it. The evidence is
+      the stack trace plus the clean session after reload, not a before/after on the lanes.
+      **Open question worth answering before calling this closed: how did those lanes get
+      recorded?** If REC armed itself, or an AutoDub session wrote to automation without
+      the user asking, this will come straight back. The deck showed "REC off".
+      Defences added meanwhile, both independently justified: `startAutoDub` releases held
+      transients before its first tick (symmetric with stop — nothing legitimate holds a
+      channel at start, and a leftover mute would be captured as the user's BASELINE by
+      the next move, making a one-gesture leak permanent), and the baseline registry now
+      distinguishes a move's mute from the user's and can find mutes that outlived every
+      transient holding them — `releaseAll` and `reapOrphans` both walk only OPEN
+      transients, so neither could see the state found live.
+
+- [~] **X37 (original entry)** **The music mutes for a pattern or two while effects keep firing.** Reported
       2026-09-21: "the music is mutet for a pattern or two and only effects fire".
       **This is not the performer resting** — an earlier reading of the same complaint as
       "a pattern of silence" was taken as periodic REST, and a phrase-arc change was made
