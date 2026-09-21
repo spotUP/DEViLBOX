@@ -4,6 +4,7 @@
  * Cursor and selection state live in useCursorStore (extracted for performance).
  */
 
+import { keepAcrossHmr } from '@/lib/dev/keepAcrossHmr';
 import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
 import type {
@@ -2226,3 +2227,12 @@ registerTrackerStore(useTrackerStore);
 // initialization" on the minified mask symbols at app load.
 export { MASK_NOTE, MASK_INSTRUMENT, MASK_VOLUME, MASK_EFFECT, MASK_EFFECT2, MASK_ALL } from './editorMasks';
 export type { MacroSlot };
+
+/**
+ * Dev only: carry this store's data over a hot reload.
+ *
+ * Without it, editing anything the store imports transitively rebuilds the
+ * store at its defaults and the loaded song disappears mid-session. See
+ * `lib/dev/keepAcrossHmr.ts`.
+ */
+keepAcrossHmr(import.meta.hot, useTrackerStore, 'tracker');
