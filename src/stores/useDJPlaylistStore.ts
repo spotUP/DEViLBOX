@@ -16,6 +16,7 @@ import { pushToCloud, pullFromCloud } from '@/lib/cloudSync';
 import { SYNC_KEYS } from '@/hooks/useCloudSync';
 import type { EffectConfig } from '@/types/instrument/effects';
 import type { DJEnvironment } from '@/types/djEnvironment';
+import { useAudioStore } from '@/stores/useAudioStore';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -334,7 +335,6 @@ export const useDJPlaylistStore = create<DJPlaylistState>()(
       addTrack: (playlistId: string, track: Omit<PlaylistTrack, 'id'> & { id?: string }) => {
         let masterFxSnapshot: EffectConfig[] | null = null;
         try {
-          const { useAudioStore } = require('@/stores/useAudioStore');
           const fx = useAudioStore.getState().masterEffects;
           if (fx.length > 0) {
             masterFxSnapshot = JSON.parse(JSON.stringify(fx));
@@ -364,7 +364,6 @@ export const useDJPlaylistStore = create<DJPlaylistState>()(
       addTracks: (playlistId: string, tracks: Array<Omit<PlaylistTrack, 'id'> & { id?: string }>, opts?: { skipDuplicates?: boolean }) => {
         let masterFxSnapshot: EffectConfig[] | null = null;
         try {
-          const { useAudioStore } = require('@/stores/useAudioStore');
           const fx = useAudioStore.getState().masterEffects;
           if (fx.length > 0) {
             masterFxSnapshot = JSON.parse(JSON.stringify(fx));

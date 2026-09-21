@@ -7,6 +7,9 @@
 
 import type { GenreResult } from '@/stores/useTrackerAnalysisStore';
 import type { InstrumentHints } from '@/workers/dj-analysis.worker';
+import { useInstrumentTypeStore } from '@stores/useInstrumentTypeStore';
+import { useInstrumentStore } from '@stores/useInstrumentStore';
+import { analyzeSampleForClassification } from '@/bridge/analysis/SampleSpectrum';
 
 // Worker's AnalysisResult type (matches dj-analysis.worker.ts)
 interface WorkerAnalysisResult {
@@ -227,15 +230,11 @@ export function buildInstrumentHints(): InstrumentHints {
     hasWind: false, hasVoice: false, hasSynth: false, hasOrgan: false,
   };
 
-  // Try CED results first (lazy import to avoid circular deps at module load)
+  // These used to be reached through CommonJS calls, under a comment about
+  // avoiding circular deps at module load. They never resolved, so the whole
+  // CED branch below has never run. Static imports are safe here because every
+  // binding is read inside this function, not while the module evaluates.
   try {
-    const { useInstrumentTypeStore } = require('@stores/useInstrumentTypeStore') as
-      typeof import('@stores/useInstrumentTypeStore');
-    const { analyzeSampleForClassification } = require('@/bridge/analysis/SampleSpectrum') as
-      typeof import('@/bridge/analysis/SampleSpectrum');
-    const { useInstrumentStore } = require('@stores/useInstrumentStore') as
-      typeof import('@stores/useInstrumentStore');
-
     const cedResults = useInstrumentTypeStore.getState().results;
     const instruments = useInstrumentStore.getState().instruments;
 

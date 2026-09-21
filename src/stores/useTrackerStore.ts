@@ -45,6 +45,8 @@ const useEditorStore = {
 };
 import { useFormatStore } from './useFormatStore';
 import { useMixerStore } from './useMixerStore';
+import { useUIStore } from './useUIStore';
+import { notify } from './useNotificationStore';
 import * as OpenMPTEditBridge from '@engine/libopenmpt/OpenMPTEditBridge';
 
 // ── Debounced WASM engine re-export on cell edit ────────────────────────────
@@ -449,7 +451,6 @@ function validateChannelInstrumentCompat(
   get: () => TrackerStore
 ) {
   try {
-    const { useUIStore } = require('./useUIStore');
     const presetId = useUIStore.getState().activeSystemPreset;
     if (!presetId) return; // no hardware preset active
 
@@ -458,7 +459,6 @@ function validateChannelInstrumentCompat(
     const furnaceType = channel?.channelMeta?.furnaceType;
     if (furnaceType === undefined) return; // channel has no hardware type
 
-    const { useInstrumentStore } = require('./useInstrumentStore');
     const instrument = useInstrumentStore.getState().instruments.find(
       (i: any) => i.id === instrumentId
     );
@@ -472,7 +472,6 @@ function validateChannelInstrumentCompat(
       const chBadge = getChannelBadge(furnaceType);
       const instBadge = getSynthBadge(instrument.synthType);
       const chName = channel.channelMeta?.hardwareName || channel.name || `CH${channelIndex + 1}`;
-      const { notify } = require('@stores/useNotificationStore');
       notify.warning(
         `${instBadge.label} instrument "${instrument.name}" in ${chBadge.label} channel "${chName}" — may not play on target hardware`
       );
@@ -559,7 +558,7 @@ export const useTrackerStore = create<TrackerStore>()(
       } catch { /* UADE / TFMX not active */ }
       // Sync edit to StarTrekker AM WASM engine (direct MOD pattern cell write)
       try {
-        const fmt = require('./useFormatStore').useFormatStore.getState();
+        const fmt = useFormatStore.getState();
         if (fmt.startrekkerAMFileData) {
           const fullCell = get().patterns[patternIndex]?.channels[channelIndex]?.rows[rowIndex];
           if (fullCell) {
@@ -586,7 +585,7 @@ export const useTrackerStore = create<TrackerStore>()(
       } catch { /* StarTrekker AM not active */ }
       // Sync note edit to SunTronic pool block and re-project display grid
       try {
-        const fmt = require('./useFormatStore').useFormatStore.getState();
+        const fmt = useFormatStore.getState();
         if (fmt.sunTronicNative && cellUpdate.note !== undefined) {
           const fullCell = get().patterns[patternIndex]?.channels[channelIndex]?.rows[rowIndex];
           if (fullCell) {
@@ -599,14 +598,20 @@ export const useTrackerStore = create<TrackerStore>()(
           }
         }
       } catch { /* SunTronic not active */ }
-      // Sync edit to SunVox WASM sequencer if active
-      try {
-        const synthMod = require('../engine/sunvox-modular/SunVoxModularSynth');
-        const handle = synthMod.getSharedSunVoxHandle();
-        if (handle >= 0) {
-          const fullCell = get().patterns[patternIndex]?.channels[channelIndex]?.rows[rowIndex];
-          if (fullCell) {
-            import('@engine/sunvox/SunVoxEngine').then(({ SunVoxEngine }) => {
+      // Sync edit to SunVox WASM sequencer if active.
+      //
+      // Reached by dynamic import rather than a static one: SunVoxModularSynth
+      // reads this store, so a static import would close a module-graph cycle
+      // for no gain — the work below is already asynchronous. It used to be a
+      // CommonJS call, which throws in the browser bundle, so no cell edit has
+      // ever reached the SunVox sequencer.
+      {
+        const fullCell = get().patterns[patternIndex]?.channels[channelIndex]?.rows[rowIndex];
+        if (fullCell) {
+          void import('../engine/sunvox-modular/SunVoxModularSynth').then(({ getSharedSunVoxHandle }) => {
+            const handle = getSharedSunVoxHandle();
+            if (handle < 0) return;
+            return import('@engine/sunvox/SunVoxEngine').then(({ SunVoxEngine }) => {
               if (!SunVoxEngine.hasInstance()) return;
               const nn = fullCell.note ?? 0;
               const vv = fullCell.volume >= 0 ? fullCell.volume : -1;
@@ -615,12 +620,12 @@ export const useTrackerStore = create<TrackerStore>()(
               const xxyy = fullCell.eff & 0xFFFF;
               SunVoxEngine.getInstance().setPatternEvent(handle, patternIndex, channelIndex, rowIndex, nn, vv, mm, ccee, xxyy);
             });
-          }
+          }).catch(() => { /* SunVox not active */ });
         }
-      } catch { /* SunVox not active */ }
+      }
       // Sync edit to PreTracker WASM engine (direct cell write)
       try {
-        const fmt = require('./useFormatStore').useFormatStore.getState();
+        const fmt = useFormatStore.getState();
         if (fmt.preTrackerFileData) {
           const pattern = get().patterns[patternIndex];
           const fullCell = pattern?.channels[channelIndex]?.rows[rowIndex];
@@ -656,7 +661,7 @@ export const useTrackerStore = create<TrackerStore>()(
       // Sync edit to NostalgicPlayer WASM replayer engines (SA, SM, DM, etc.)
       // These engines have setCell() that directly modifies the internal pattern data.
       try {
-        const fmt = require('./useFormatStore').useFormatStore.getState();
+        const fmt = useFormatStore.getState();
         const fullCell = get().patterns[patternIndex]?.channels[channelIndex]?.rows[rowIndex];
         if (fullCell) {
           const fileDataKeys: [string, string, () => Promise<{ getInstance(): { setCell: (...args: number[]) => void }, hasInstance(): boolean }>][] = [
@@ -745,22 +750,21 @@ export const useTrackerStore = create<TrackerStore>()(
           }
         }
       } catch { /* UADE not active */ }
-      // Sync clear to SunVox WASM sequencer if active
-      try {
-        const synthMod = require('../engine/sunvox-modular/SunVoxModularSynth');
-        const handle = synthMod.getSharedSunVoxHandle();
-        if (handle >= 0) {
-          import('@engine/sunvox/SunVoxEngine').then(({ SunVoxEngine }) => {
-            if (!SunVoxEngine.hasInstance()) return;
-            SunVoxEngine.getInstance().setPatternEvent(handle, patternIndex, channelIndex, rowIndex, 0, 0, 0, 0, 0);
-          });
-        }
-      } catch { /* SunVox not active */ }
+      // Sync clear to SunVox WASM sequencer if active. Dynamic import for the
+      // same reason as the edit path above.
+      void import('../engine/sunvox-modular/SunVoxModularSynth').then(({ getSharedSunVoxHandle }) => {
+        const handle = getSharedSunVoxHandle();
+        if (handle < 0) return;
+        return import('@engine/sunvox/SunVoxEngine').then(({ SunVoxEngine }) => {
+          if (!SunVoxEngine.hasInstance()) return;
+          SunVoxEngine.getInstance().setPatternEvent(handle, patternIndex, channelIndex, rowIndex, 0, 0, 0, 0, 0);
+        });
+      }).catch(() => { /* SunVox not active */ });
       // Sync note clear to SunTronic pool block and re-project display grid.
       // A cleared note is note 0 (rest); applySunNoteEdit maps editedNote<=0 → pool 0.
       // Provenance captured before the clear (clearCellInPattern discards those fields).
       try {
-        const fmt = require('./useFormatStore').useFormatStore.getState();
+        const fmt = useFormatStore.getState();
         if (fmt.sunTronicNative) {
           if (sunClearBi !== undefined && sunClearBi >= 0 && sunClearRi !== undefined && sunClearPos !== undefined) {
             fmt.applySunTronicGridNote(sunClearBi, sunClearRi, channelIndex, 0, sunClearPos);

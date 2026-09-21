@@ -1616,7 +1616,7 @@ export const useTrackerInput = () => {
               const row = cursorRef.current.rowIndex;
               const cell = pattern.channels[ch]?.rows[row];
               if (cell && cell.note === 0) {
-                const { currentInstrumentId, instruments } = (require('@stores/useInstrumentStore') as any).useInstrumentStore.getState();
+                const { currentInstrumentId, instruments } = useInstrumentStore.getState();
                 const copyMask = useEditorStore.getState().copyMask;
                 const updates: Record<string, any> = {};
                 // Paste instrument if mask bit set

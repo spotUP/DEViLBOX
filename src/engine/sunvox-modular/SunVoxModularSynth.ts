@@ -12,6 +12,8 @@ import { SunVoxEngine } from '@/engine/sunvox/SunVoxEngine';
 import type { SunVoxModuleGraphEntry } from '@/engine/sunvox/SunVoxEngine';
 import { SV_ID_TO_TYPE_STRING } from './SunVoxModuleDescriptors';
 import { registerSunVoxMuteBridge, unregisterSunVoxMuteBridge } from '@/stores/useMixerStore';
+import { useInstrumentStore } from '@/stores/useInstrumentStore';
+import { useTrackerStore } from '@/stores/useTrackerStore';
 
 const GENERATOR_TYPES = new Set([
   'Analog generator', 'Generator', 'FM', 'Kicker', 'DrumSynth',
@@ -66,22 +68,22 @@ export function donatePreloadedHandle(handle: number): void {
   _sharedSongRefCount = 1; // prevent _loadSongShared cleanup from destroying it
   _sharedSongInitPromise = Promise.resolve(); // already loaded
 
-  // Register mute bridge so the mixer store can mute SunVox modules
-  // without require() (which fails in Vite ESM).
+  // Register mute bridge so the mixer store can mute SunVox modules. The two
+  // getters below used to reach their stores through CommonJS calls, which
+  // throw in the browser bundle — so the bridge reported no instruments and no
+  // pattern, every time.
   const engine = SunVoxEngine.getInstance();
   registerSunVoxMuteBridge({
     engine,
     getHandle: () => _sharedSongHandle,
     getInstruments: () => {
       try {
-        // eslint-disable-next-line @typescript-eslint/no-require-imports
-        return require('@/stores/useInstrumentStore').useInstrumentStore.getState().instruments;
+        return useInstrumentStore.getState().instruments;
       } catch { return []; }
     },
     getPattern: () => {
       try {
-        // eslint-disable-next-line @typescript-eslint/no-require-imports
-        const s = require('@/stores/useTrackerStore').useTrackerStore.getState();
+        const s = useTrackerStore.getState();
         return s.patterns[s.currentPatternIndex] ?? null;
       } catch { return null; }
     },

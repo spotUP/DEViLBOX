@@ -10,6 +10,7 @@
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { Pattern, InstrumentConfig, FurnaceSubsongPlayback } from '@/types';
 import type { TrackerCell } from '@/types/tracker';
+import pako from 'pako';
 import type {
   FurnaceSubsong,
   FurnaceRow,
@@ -253,7 +254,6 @@ function isDMFFile(buffer: ArrayBuffer): boolean {
   if (bytes.length > 2 && bytes[0] === 0x78 &&
       (bytes[1] === 0x9c || bytes[1] === 0x01 || bytes[1] === 0xDA)) {
     try {
-      const pako = require('pako');
       let decompressed: Uint8Array;
       try {
         decompressed = pako.inflate(bytes);

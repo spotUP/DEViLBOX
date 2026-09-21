@@ -25,6 +25,9 @@ import { getNativeAudioNode } from '@utils/audio-context';
 import { applyEffectParametersDiff } from './EffectParameterEngine';
 import { PerChannelDubFx } from '../dub/PerChannelDubFx';
 import { DubChannelLifecycle, type DubChannelAction } from '@/lib/dub/dubChannelLifecycle';
+import { getMixerStoreRefOrNull } from '@stores/storeAccess';
+// Type-only: erased at build time, so it adds no edge to the module graph.
+import type { MixerChannelState } from '@stores/useMixerStore';
 
 /**
  * How long a channel's dub-send gain takes to reach its new value.
@@ -309,8 +312,8 @@ export class ChannelRoutedEffectsManager {
         this.perChannelFx.set(ch, fx);
         // Re-apply any stored channel settings (survive song reload / bus recreate)
         try {
-          const { useMixerStore } = require('@stores/useMixerStore') as typeof import('@stores/useMixerStore');
-          const ch_state = useMixerStore.getState().channels[ch];
+          const mixer = getMixerStoreRefOrNull();
+          const ch_state = (mixer?.getState() as { channels?: MixerChannelState[] } | undefined)?.channels?.[ch];
           if (ch_state) {
             fx.setFilterMode(ch_state.dubFilterMode ?? 'off');
             fx.setFilterHz(ch_state.dubFilterHz ?? 200);
