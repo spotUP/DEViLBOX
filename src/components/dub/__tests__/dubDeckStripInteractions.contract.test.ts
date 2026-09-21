@@ -175,3 +175,33 @@ describe('DubDeckStrip — the live row', () => {
     expect(row.match(/min-w-\[11rem\]/g) ?? []).toHaveLength(3);
   });
 });
+
+/**
+ * The move rows as columns.
+ *
+ * Asked for on 2026-09-21: the four rows wrapped independently, so a button
+ * was as wide as its own label and nothing lined up between rows.
+ */
+describe('DubDeckStrip — move rows line up as columns', () => {
+  it('defines one grid for all four rows rather than a class per row', () => {
+    expect(SOURCE).toMatch(/const MOVE_ROW_GRID = 'grid grid-cols-\[repeat\(auto-fill,minmax\(7rem,1fr\)\)\] gap-1\.5/);
+  });
+
+  it('uses that one grid on every move row', () => {
+    // Four rows: click, rate, hold, toggle. A row left on flex-wrap is a row
+    // that stops lining up with the other three.
+    expect((SOURCE.match(/className=\{MOVE_ROW_GRID\}/g) ?? [])).toHaveLength(4);
+    const rows = SOURCE.match(/GLOBAL_MOVES\.filter\(m => m\.group === '\w+'\)/g) ?? [];
+    expect(rows).toHaveLength(4);
+    expect(SOURCE).not.toMatch(/<div className="flex gap-1\.5 flex-wrap">/);
+  });
+
+  it('makes each button fill its column instead of hugging its label', () => {
+    // Equal tracks are pointless if the buttons inside them are not equal.
+    expect((SOURCE.match(/' w-full text-center'/g) ?? []).length).toBeGreaterThanOrEqual(3);
+  });
+
+  it('keeps a label on one line, so no button is taller than its row', () => {
+    expect(SOURCE).toMatch(/const base = '[^']*whitespace-nowrap/);
+  });
+});
