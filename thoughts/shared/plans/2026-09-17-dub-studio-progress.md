@@ -1520,6 +1520,21 @@ this bug.
       Measure at the widths that matter before choosing — the channel-strip work on the
       same day was checked at 1509 / 1280 / 1024 / 900, and this row should be too.
 
+- [ ] **X33** **Throw (`delayTimeThrow`) still not obvious.** Reported 2026-09-21
+      alongside Reverse: after the capture and level fixes, "backwards is obvious that it
+      works now, the other two not obvious". Reverse was fixed (it lacked the
+      direct-to-return path Backward has); Throw is a DIFFERENT move and needs its own
+      look.
+      It is not a capture at all — `throwEchoTime(target=60ms, downMs=120, holdMs=200,
+      upMs=300)` sweeps the echo's DELAY TIME, which produces the pitch whoosh only if the
+      echo tank already holds repeats. Fired into an empty or nearly-dry tank it changes a
+      parameter and nothing sounds.
+      So the question to answer first is not its level but whether there is anything in
+      the echo to sweep: check `echoWet`, `returnGain` and whether repeats are audible
+      BEFORE the throw. If the tank is full and it still does nothing, then look at the
+      sweep range — 60ms is a long way down from a 320ms rate and may pass through too
+      fast at `downMs=120` to be heard as pitch.
+
 - [ ] **X31** **BUS tab sliders crackle while dragged — bad for live dubbing.** Reported
       2026-09-21 with a screenshot of BASS / MID / WIDTH / sweep / RATE.
       Very likely zipper noise from stepped `AudioParam.value` assignment: those settings
