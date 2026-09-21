@@ -45,6 +45,11 @@ export function endDubTransient(channelId: number): void {
   const store = useMixerStore.getState();
   store.setChannelMute(channelId, baseline.muted, { transient: true });
   store.setChannelDubSend(channelId, baseline.dubSend, { transient: true });
+  // The restore above is a transient write, so it re-marks the mute as ours.
+  // It is not: it hands the user's own state back. Without this, a channel the
+  // user had muted before the move would be reported stranded and unmuted by
+  // the watchdog — a repair that breaks the thing it is guarding.
+  dubSendBaselines.clearMoveMute(channelId);
 }
 
 /**
@@ -61,6 +66,7 @@ export function releaseAllDubTransients(): number {
     try {
       store.setChannelMute(channelId, baseline.muted, { transient: true });
       store.setChannelDubSend(channelId, baseline.dubSend, { transient: true });
+      dubSendBaselines.clearMoveMute(channelId);
     } catch (err) {
       console.error(`[dubTransient] release-all failed ch${channelId}:`, err);
     }
@@ -87,9 +93,49 @@ export function reapOrphanedDubTransients(): number {
     try {
       store.setChannelMute(channelId, baseline.muted, { transient: true });
       store.setChannelDubSend(channelId, baseline.dubSend, { transient: true });
+      dubSendBaselines.clearMoveMute(channelId);
     } catch (err) {
       console.error(`[dubTransient] reap failed ch${channelId}:`, err);
     }
   }
   return reaped.length;
+}
+
+/**
+ * Channels a move muted that nothing is holding any more.
+ *
+ * The rescue paths above both walk OPEN transients, so a mute that escaped its
+ * transient is invisible to them — which is how the song came back muted with
+ * only effects firing, and nothing in the registry able to say why. This is
+ * the missing report, and it reads the live store so it cannot itself go
+ * stale.
+ */
+export function strandedDubMutes(): number[] {
+  const channels = useMixerStore.getState().channels;
+  return dubSendBaselines.strandedMoveMutes((id) => channels[id]?.muted === true);
+}
+
+/**
+ * Hand every stranded mute back to the user.
+ *
+ * A mute with no transient behind it has no owner and no end, so unmuting is
+ * the only state that can be right. Returns the channels it freed so a caller
+ * can say what happened rather than silently repairing.
+ */
+export function releaseStrandedDubMutes(): number[] {
+  const stranded = strandedDubMutes();
+  if (stranded.length === 0) return [];
+  const store = useMixerStore.getState();
+  for (const channelId of stranded) {
+    console.warn(
+      `[dubTransient] ch${channelId} was left muted by a move with nothing holding it — unmuting`,
+    );
+    try {
+      store.setChannelMute(channelId, false, { transient: true });
+    } catch (err) {
+      console.error(`[dubTransient] stranded-mute release failed ch${channelId}:`, err);
+    }
+    dubSendBaselines.clearMoveMute(channelId);
+  }
+  return stranded;
 }

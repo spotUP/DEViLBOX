@@ -907,7 +907,8 @@ export const useMixerStore = create<MixerStore>()(
     setChannelMute(ch: number, muted: boolean, opts?: DubWriteOrigin): void {
       // A move borrows the mute; the user OWNS it. Only a user write moves the
       // baseline a dub transient will restore to (see channelSendBaseline.ts).
-      if (!opts?.transient) dubSendBaselines.noteUserMute(ch, muted);
+      if (opts?.transient) dubSendBaselines.noteMoveMute(ch, muted);
+      else dubSendBaselines.noteUserMute(ch, muted);
       set((state) => {
         state.channels[ch].muted = muted;
       });
