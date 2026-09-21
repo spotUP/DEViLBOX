@@ -276,6 +276,12 @@ class HivelyProcessor extends AudioWorkletProcessor {
           activeCount: active.length,
           wasmChannels: this.wasm?._hively_get_channels ? this.wasm._hively_get_channels() : null,
           renderStats: { ...this.renderStats, ringAvailable: this.ringAvailable },
+          // Isolation slots, because they are the other writer of channel
+          // gains — and in the split path an isolated channel is muted OUT of
+          // the main mix. On a 4-channel AHX that is most of the music.
+          isolationSlots: this.isolationSlots.map(s => (s ? s.channelMask : null)),
+          isolatedBits: this.isolationSlots.reduce((m, s) => m | (s ? s.channelMask : 0), 0),
+          channelGains: Array.from(this.channelGains.slice(0, 8)),
         });
         break;
       }
