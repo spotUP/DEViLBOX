@@ -1473,6 +1473,28 @@ export class DubBus {
   private masterInsertEnvelope!: GainNode;
   /** Pending rewire timer (so concurrent enable-disable-enable cancels cleanly). */
   private masterInsertPending: ReturnType<typeof setTimeout> | null = null;
+  /**
+   * The splice as the AUDIO GRAPH holds it, which is not the same thing as
+   * `masterInsertActive`.
+   *
+   * `unwireMasterInsert` clears the flag and the source/dest fields
+   * immediately and defers the graph work by 15 ms, so for that window the
+   * flag says "not spliced" while `source -> dest` is still cut and the insert
+   * still sits in the middle. Anything that ran in that window and consulted
+   * the flag — a second unwire, a disable, a dispose — took the early return
+   * and never restored the direct connection. The insert was then the ONLY
+   * route to the destination, so the mix survived exactly as long as the bus
+   * kept passing audio.
+   *
+   * Measured live 2026-09-21 on jennipha.ahx: with the dub bus ON the master
+   * carried only what the bus itself produced ("the dub effects but not the
+   * song"), and turning the bus OFF gave total silence, `rmsAvg 0`, which
+   * stop/play could not repair.
+   *
+   * This field is written when the graph is actually spliced and cleared only
+   * once `source.connect(dest)` has actually been restored.
+   */
+  private masterInsertSplice: { source: AudioNode; dest: AudioNode } | null = null;
   private masterInsertSource: AudioNode | null = null;
   private masterInsertDest: AudioNode | null = null;
   private masterInsertActive = false;
@@ -4522,15 +4544,10 @@ export class DubBus {
       clearTimeout(this.masterInsertPending);
       this.masterInsertPending = null;
       // Complete the stale disconnect immediately so nodes are available
-      const staleSrc = this.masterInsertSource;
-      const staleDest = this.masterInsertDest;
-      if (staleSrc && staleDest) {
-        try { staleSrc.disconnect(this.masterInsertHead); } catch { /* ok */ }
-        try { this.masterInsertTail.disconnect(staleDest); } catch { /* ok */ }
-        try { this.vinylDirect.disconnect(staleDest); } catch { /* ok */ }
-        try { staleSrc.connect(staleDest); } catch { /* ok */ }
-        try { this.masterInsertEnvelope.gain.setValueAtTime(1, this.context.currentTime); } catch { /* ok */ }
-      }
+      // The cancelled timer was going to do this; it no longer will, and the
+      // graph is still spliced. Read that from the splice record rather than
+      // from the source/dest fields, which the unwire already nulled.
+      this._restoreMasterInsertPassthrough();
       this.masterInsertActive = false;
       this.masterInsertSource = null;
       this.masterInsertDest = null;
@@ -4566,6 +4583,9 @@ export class DubBus {
     try {
       source.connect(this.masterInsertHead);
       this.masterInsertTail.connect(dest);
+      // The graph is spliced from here. Recorded before anything else can
+      // throw, so a later failure still knows how to put the direct path back.
+      this.masterInsertSplice = { source, dest };
       // Direct tap for vinyl clicks/scratches — lands right next to the
       // main signal at the destination, so they're NOT filtered by any
       // master-side FX.
@@ -4596,10 +4616,32 @@ export class DubBus {
       } catch { /* ok */ }
     } catch (err) {
       console.warn('[DubBus] wireMasterInsert failed, restoring passthrough:', err);
-      try { source.connect(dest); } catch { /* ok */ }
-      try { this.masterInsertEnvelope.gain.setValueAtTime(1, this.context.currentTime); } catch { /* ok */ }
+      this.masterInsertSplice = { source, dest };
+      this._restoreMasterInsertPassthrough();
       this.masterInsertActive = false;
     }
+  }
+
+  /**
+   * Put the direct `source -> dest` connection back and take the insert out.
+   *
+   * Idempotent, and keyed on what the GRAPH holds rather than on
+   * `masterInsertActive`, so every path that abandons the insert — a normal
+   * unwire, a re-wire that supersedes one, a disable, a dispose — leaves the
+   * master with a route to the destination. Nothing may return early past
+   * this while `masterInsertSplice` is set.
+   */
+  private _restoreMasterInsertPassthrough(): void {
+    const splice = this.masterInsertSplice;
+    if (!splice) return;
+    this.masterInsertSplice = null;
+    const { source, dest } = splice;
+    try { source.disconnect(this.masterInsertHead); } catch { /* ok */ }
+    try { this.masterInsertTail.disconnect(dest); } catch { /* ok */ }
+    try { this.vinylDirect.disconnect(dest); } catch { /* ok */ }
+    // The one line that matters. Everything above is tidying.
+    try { source.connect(dest); } catch { /* ok */ }
+    try { this.masterInsertEnvelope.gain.setValueAtTime(1, this.context.currentTime); } catch { /* ok */ }
   }
 
   /** Reverse the master insert. Safe to call when inactive. */
@@ -4607,6 +4649,12 @@ export class DubBus {
     console.log('[DubBusCtrl] unwireMasterInsert');
     this._snap('pre-unwireMasterInsert');
     if (!this.masterInsertActive || !this.masterInsertSource || !this.masterInsertDest) {
+      // Inactive by the flag does NOT mean unspliced. A previous unwire clears
+      // the flag 15 ms before it touches the graph, and this used to return
+      // straight through that window and leave the master with no direct path
+      // at all. The restorer is idempotent and does nothing when the graph is
+      // already whole.
+      this._restoreMasterInsertPassthrough();
       this.masterInsertActive = false;
       return;
     }
@@ -4618,8 +4666,8 @@ export class DubBus {
     // insert dropping out, only the direct-path pop-in to contend with.
     const now = this.context.currentTime;
     const FADE_SEC = 0.01;
-    const source = this.masterInsertSource;
-    const dest = this.masterInsertDest;
+    // The nodes to rewire live in `masterInsertSplice`, not in local copies of
+    // the fields this method is about to null.
     try {
       this.masterInsertEnvelope.gain.cancelScheduledValues(now);
       this.masterInsertEnvelope.gain.setValueAtTime(this.masterInsertEnvelope.gain.value, now);
@@ -4633,12 +4681,9 @@ export class DubBus {
     this.masterInsertDest = null;
     this.masterInsertPending = setTimeout(() => {
       this.masterInsertPending = null;
-      try { source.disconnect(this.masterInsertHead); } catch { /* ok */ }
-      try { this.masterInsertTail.disconnect(dest); } catch { /* ok */ }
-      try { this.vinylDirect.disconnect(dest); } catch { /* ok */ }
-      try { source.connect(dest); } catch { /* ok */ }
-      // Restore envelope to 1 so the next wire starts from a known state.
-      try { this.masterInsertEnvelope.gain.setValueAtTime(1, this.context.currentTime); } catch { /* ok */ }
+      // Restores the direct path and resets the envelope to 1, so the next
+      // wire starts from a known state.
+      this._restoreMasterInsertPassthrough();
     }, (FADE_SEC * 1000) + 5);
     // Reset master-side gains to neutral so even a dangling reference is silent.
     rampBiquadParam(this.masterBassShelf.gain, 0, now);
@@ -7156,10 +7201,17 @@ export class DubBus {
     this._heldAnnouncements.clear();
     // The deferred master-insert rewire reconnects `source -> dest`. Left
     // running past teardown it restores an audio path through a disposed bus.
+    //
+    // Cancelling it is not enough on its own: the graph is still spliced
+    // through this bus at that moment, so dropping the timer used to leave the
+    // master with NO route to the destination — silence that survived stop,
+    // play and disabling the bus. Do the rewire here instead of letting the
+    // timer do it later.
     if (this.masterInsertPending !== null) {
       clearTimeout(this.masterInsertPending);
       this.masterInsertPending = null;
     }
+    this._restoreMasterInsertPassthrough();
     if (this._postEchoSatCurvePending !== null) {
       clearTimeout(this._postEchoSatCurvePending);
       this._postEchoSatCurvePending = null;
