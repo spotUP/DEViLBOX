@@ -30,7 +30,7 @@ import {
 } from '@/lib/dub/dubChannelTransient';
 import { useTrackerStore } from '@/stores/useTrackerStore';
 import { useTransportStore } from '@/stores/useTransportStore';
-import { getChannelProfiles } from '../channelProfiles';
+import { buildInstrumentLookup, getChannelProfiles } from '../channelProfiles';
 import {
   planDrop,
   droppedChannels,
@@ -70,6 +70,7 @@ export const versionDrop: DubMove = {
       mixer.channels.map(c => c?.name ?? null),
       grid.rowsPerBeat,
       grid.rowsPerBar,
+      buildInstrumentLookup(),
     );
 
     // A channel the user has already muted is theirs, not ours: it must not
