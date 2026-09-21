@@ -741,6 +741,9 @@ export async function getDubBusState(): Promise<Record<string, unknown>> {
     // milliseconds is main-thread contention, which is a crackle no amount of
     // parameter ramping can fix.
     settingsMeter: bus?.getSettingsMeter?.() ?? null,
+    // RMS along the master insert. The first stage whose level collapses is
+    // where the mix is being lost — the reading that settings values cannot give.
+    masterInsertLevels: bus?.getMasterInsertLevels?.() ?? null,
   };
 }
 
