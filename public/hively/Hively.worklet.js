@@ -34,6 +34,20 @@ class HivelyProcessor extends AudioWorkletProcessor {
     // Per-channel dub-send state — lazily allocated ring buffers mirror
     // isoRings. Indices match MAX_DUB_CHANNELS in ChannelRoutedEffects.ts.
     this.dubChannelEnabled = new Array(32).fill(false);
+    // Why the main mix went quiet the moment the first dub tap opened.
+    //
+    // Opening a tap flips this processor from the fast path (one combined
+    // decode) to the split path (tick, then one render per pass). Reported
+    // 2026-09-21: "as the first effect fires the ahx goes silent". These count
+    // what each path actually produced, so the next read says whether the main
+    // render stopped returning samples or the ring stopped being drained.
+    this.renderStats = {
+      fastFrames: 0, fastSamples: 0,
+      splitFrames: 0, mainSamples: 0, mainZeroReturns: 0,
+      dubPasses: 0, dubSamples: 0,
+      mainRingWrites: 0, mainRingFull: 0,
+      lastMainSamples: 0, lastMainPeak: 0,
+    };
     this.dubRings = new Array(32).fill(null);
 
     // Per-channel oscilloscope
@@ -261,6 +275,7 @@ class HivelyProcessor extends AudioWorkletProcessor {
           activeChannels: active,
           activeCount: active.length,
           wasmChannels: this.wasm?._hively_get_channels ? this.wasm._hively_get_channels() : null,
+          renderStats: { ...this.renderStats, ringAvailable: this.ringAvailable },
         });
         break;
       }
@@ -463,6 +478,8 @@ class HivelyProcessor extends AudioWorkletProcessor {
       }
       const samples = this.wasm._hively_decode_frame(this.decodePtrL, this.decodePtrR);
       if (samples <= 0) return;
+      this.renderStats.fastFrames++;
+      this.renderStats.fastSamples += samples;
       this._writeToMainRing(samples);
       return;
     }
@@ -497,7 +514,28 @@ class HivelyProcessor extends AudioWorkletProcessor {
       this.wasm._hively_set_channel_gain(ch, muted ? 0.0 : 1.0);
     }
     const samples = this.wasm._hively_render_frame(this.decodePtrL, this.decodePtrR);
-    if (samples <= 0) return;
+    this.renderStats.splitFrames++;
+    if (samples <= 0) {
+      // The early return here also skips every dub pass below, so one silent
+      // main render silences the whole frame.
+      this.renderStats.mainZeroReturns++;
+      return;
+    }
+    this.renderStats.mainSamples += samples;
+    this.renderStats.lastMainSamples = samples;
+    {
+      // Peak of what the main render produced. Distinguishes "returned samples
+      // that are all zero" from "returned no samples" — the two look identical
+      // at the speakers and have different causes.
+      const heap = this.wasm.HEAPF32;
+      const oL = this.decodePtrL >> 2;
+      let peak = 0;
+      for (let i = 0; i < samples; i += 8) {
+        const v = heap[oL + i] < 0 ? -heap[oL + i] : heap[oL + i];
+        if (v > peak) peak = v;
+      }
+      this.renderStats.lastMainPeak = peak;
+    }
     this._writeToMainRing(samples);
 
     // 5. Render each isolation slot
@@ -544,6 +582,8 @@ class HivelyProcessor extends AudioWorkletProcessor {
           this.wasm._hively_set_channel_gain(c, c === ch ? 1.0 : 0.0);
         }
         const dubSamples = this.wasm._hively_render_frame(this.decodePtrL, this.decodePtrR);
+        this.renderStats.dubPasses++;
+        this.renderStats.dubSamples += dubSamples > 0 ? dubSamples : 0;
         if (dubSamples > 0) {
           const heapF32 = this.wasm.HEAPF32;
           const offL = this.decodePtrL >> 2;
@@ -615,11 +655,12 @@ class HivelyProcessor extends AudioWorkletProcessor {
     const offsetL = this.decodePtrL >> 2;
     const offsetR = this.decodePtrR >> 2;
     for (let i = 0; i < samples; i++) {
-      if (this.ringAvailable >= this.ringSize) break;
+      if (this.ringAvailable >= this.ringSize) { this.renderStats.mainRingFull++; break; }
       this.ringL[this.ringWritePos] = heapF32[offsetL + i];
       this.ringR[this.ringWritePos] = heapF32[offsetR + i];
       this.ringWritePos = (this.ringWritePos + 1) % this.ringSize;
       this.ringAvailable++;
+      this.renderStats.mainRingWrites++;
     }
   }
 
