@@ -24,9 +24,13 @@ export const voltageStarve: DubMove = {
       lofiEnabled: true,
       lofiBits: targetBits,
     });
+    // Same as ringMod: the store never learns this move touched lo-fi, so an
+    // unclaimed key would be reverted by the next settings mirror mid-hold.
+    const release = bus.claimSettingKeys(['lofiEnabled', 'lofiBits']);
 
     return {
       dispose() {
+        release();
         // Restore to full quality and disable
         bus.setSettings({
           lofiEnabled: false,

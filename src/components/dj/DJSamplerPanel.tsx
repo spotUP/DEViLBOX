@@ -117,10 +117,20 @@ export const DJSamplerPanel: React.FC<DJSamplerPanelProps> = ({ onClose }) => {
     `${s.decks.C.isPlaying ? s.decks.C.beatGrid?.bpm || s.decks.C.detectedBPM : 0}|` +
     `${s.crossfaderPosition}`
   );
+  // Debounced, like the other two mirrors of this state.
+  //
+  // This pushed the ENTIRE dubBus object on every change with no debounce,
+  // while PadGrid uses 50ms and DubDeckStrip 100ms. Whenever this panel is
+  // mounted, every slider pixel therefore ran the full setSettings body —
+  // including the waveshaper-curve and convolver branches — bypassing both of
+  // the other debounces. Reported 2026-09-21 as crackle on the dub sliders.
   useEffect(() => {
-    const bpm = getActiveBpm();
-    const synced = bpmSyncedEchoRate(bpm, dubBus.echoSyncDivision, dubBus.echoRateMs);
-    engineRef.current?.setDubBusSettings({ ...dubBus, echoRateMs: synced });
+    const timer = setTimeout(() => {
+      const bpm = getActiveBpm();
+      const synced = bpmSyncedEchoRate(bpm, dubBus.echoSyncDivision, dubBus.echoRateMs);
+      engineRef.current?.setDubBusSettings({ ...dubBus, echoRateMs: synced });
+    }, 50);
+    return () => clearTimeout(timer);
   }, [dubBus, transportBpm, djDeckSig, engineRef]);
 
   // Sync master level
