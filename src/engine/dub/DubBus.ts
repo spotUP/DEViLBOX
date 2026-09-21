@@ -1419,6 +1419,8 @@ export class DubBus {
   // (ToneArm / VinylNoise). Transparent at normal levels; tanh-saturates
   // gracefully above ±1.0.
   private masterSafetyClip!: WaveShaperNode;
+  /** Passive level taps along the master insert — see where they are wired. */
+  private _probeTaps: Array<{ name: string; analyser: AnalyserNode }> = [];
   // Chorus-on-master (dub finisher) — crossfaded in via masterChorusWet.
   private masterChorusDelayL!: DelayNode;
   private masterChorusDelayR!: DelayNode;
@@ -2162,6 +2164,8 @@ export class DubBus {
       this._returnProbe = this.context.createAnalyser();
       this._returnProbe.fftSize = 1024;
       this.return_.connect(this._returnProbe);
+      // And the stages in between, which is where the mix has been going missing.
+      this._wireProbeTaps();
     } catch { /* probes are diagnostics only — never fail construction */ }
 
     this.extFeedbackLimit = this.context.createWaveShaper();
@@ -3574,6 +3578,73 @@ export class DubBus {
     /** Arrival times of recent writes, for the rate figure. */
     recent: [] as number[],
   };
+
+  /**
+   * RMS at each point along the master insert, right now.
+   *
+   * Read this when the mix has gone quiet and every gain looks right. The
+   * first stage whose level collapses is where the audio is being lost; if
+   * `insertIn` is already near zero the bus is not the culprit at all and the
+   * engine upstream is.
+   */
+  /**
+   * Passive level taps along the master insert.
+   *
+   * "turning off the bus plays music turning it on silences it again after a
+   * bit" (2026-09-21). Every gain on this path reads correct — envelope 1,
+   * master volume 0 dB, no channel muted — and the music still disappears,
+   * which means the reading that would explain it is one nobody takes: the
+   * SIGNAL, not the settings. Three diagnoses have now been argued from gain
+   * values alone and none survived contact with a measurement.
+   *
+   * An AnalyserNode is passive: it costs nothing until read and does not alter
+   * what passes it. Called once the whole graph exists, since `return_` is
+   * built late.
+   */
+  private _wireProbeTaps(): void {
+    const points: Array<[string, AudioNode | undefined]> = [
+      ['insertIn', this.masterToneTrim],
+      ['afterShelf', this.masterBassShelf],
+      ['afterClip', this.masterSafetyClip],
+      ['afterWidth', this.masterMerge],
+      ['insertOut', this.masterInsertEnvelope],
+      // `input` and `return_` already carry analysers (`_inputProbe`,
+      // `_returnProbe`); reuse them rather than tapping the same nodes twice.
+      ['busInput', undefined],
+      ['busReturn', undefined],
+    ];
+    this._probeTaps = [];
+    for (const [name, node] of points) {
+      if (!node) continue;
+      const analyser = this.context.createAnalyser();
+      analyser.fftSize = 2048;
+      try {
+        node.connect(analyser);
+        this._probeTaps.push({ name, analyser });
+      } catch { /* a tap must never break the chain it measures */ }
+    }
+  }
+
+  getMasterInsertLevels(): Record<string, number> {
+    const out: Record<string, number> = {};
+    const taps = [
+      ...this._probeTaps,
+      ...(this._inputProbe ? [{ name: 'busInput', analyser: this._inputProbe }] : []),
+      ...(this._returnProbe ? [{ name: 'busReturn', analyser: this._returnProbe }] : []),
+    ];
+    for (const { name, analyser } of taps) {
+      try {
+        const buf = new Float32Array(analyser.fftSize);
+        analyser.getFloatTimeDomainData(buf);
+        let sum = 0;
+        for (let i = 0; i < buf.length; i++) sum += buf[i] * buf[i];
+        out[name] = Math.round(Math.sqrt(sum / buf.length) * 1e6) / 1e6;
+      } catch {
+        out[name] = -1;   // tap unavailable, which is itself worth seeing
+      }
+    }
+    return out;
+  }
 
   /** Cost of the settings path, as measured. Resets the window it reports. */
   getSettingsMeter(): { calls: number; totalMs: number; maxMs: number; avgMs: number; peakPerSecond: number } {
