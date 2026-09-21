@@ -4987,13 +4987,17 @@ export class DubBus {
       }
       const thumpSrc = ctx.createBufferSource();
       thumpSrc.buffer = thumpBuf;
+      // Measured 2026-09-21: at target 1.0 these two stages put the master
+      // peak at 1.072 — over full scale, clipping — against a 0.492 programme
+      // baseline. "slam is too loud" was the report; the direct-to-return path
+      // alone was 2x full scale before anything else was summed.
       const thumpToInput = ctx.createGain();
-      thumpToInput.gain.value = target * 1.5;
+      thumpToInput.gain.value = target * 0.9;
       thumpSrc.connect(thumpToInput);
       thumpToInput.connect(this.input);
       // Direct to return so the whump is always audible, not choked by bus sidechain
       const thumpToReturn = ctx.createGain();
-      thumpToReturn.gain.value = target * 2.0;
+      thumpToReturn.gain.value = target * 1.1;
       thumpSrc.connect(thumpToReturn);
       thumpToReturn.connect(this.return_);
       thumpSrc.start(now);
@@ -5173,7 +5177,14 @@ export class DubBus {
       const src = ctx.createBufferSource();
       src.buffer = buf;
       const impulseGain = ctx.createGain();
-      impulseGain.gain.value = gain * 6.0;  // hit HARD
+      // Measured 2026-09-21: kick peaked at 0.438 against a 0.492 baseline —
+      // quieter than the programme, i.e. inaudible. Unlike slamSpring it has
+      // NO direct-to-return path; all its energy goes through the spring, and
+      // a 1.5ms impulse carries very little. Raised here rather than given a
+      // direct path, so it stays a struck tank rather than becoming a thump.
+      // 6.0 → 14.0 overshot on measurement (peak 0.654, louder than slam's
+      // 0.566), so it settled at 10.0.
+      impulseGain.gain.value = gain * 10.0;  // hit HARD
       src.connect(impulseGain);
       Tone.connect(impulseGain, this.spring.input as unknown as Tone.InputNode);
       src.start(now);

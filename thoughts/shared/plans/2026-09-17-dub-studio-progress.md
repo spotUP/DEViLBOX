@@ -1425,7 +1425,31 @@ this bug.
       unreadable in fullscreen at small widths. A proper fix hides them below a width
       threshold (container query) rather than compressing them.
 
-- [ ] **X25** **Move levels, judged by ear 2026-09-21.** The first real per-move loudness
+- [~] **X25 — FIRST PASS APPLIED 2026-09-21, needs a listening check.** Measured each
+      move against the live master meter before changing anything (baseline rmsAvg 0.057 /
+      peak 0.492), and every one of the five verdicts was confirmed by measurement:
+      | move | measured | change |
+      |---|---|---|
+      | Slam | peak **1.072** — over full scale, clipping | `slamSpring` thump gains 1.5/2.0 → 0.9/1.1 (re-measured 0.566) |
+      | Kick | peak 0.438 — quieter than programme | `kickSpring` impulse 6.0 → 10.0 (14.0 overshot at 0.654) |
+      | Sub | peak 0.162 — under the mix | `GENERATED_PRESENCE.subSwell` 0.5 → 0.75 |
+      | Siren | rms 0.078 | `GENERATED_PRESENCE.siren` 1.15 → 1.25 |
+      | Scream | rms 0.117 — twice programme RMS | `GENERATED_PRESENCE.tubbyScream` 0.8 → 0.6 |
+      **Where each change went matters.** Slam and Kick are PROCESSED moves, so their
+      levels live in `slamSpring` / `kickSpring`. Sub, Siren and Scream are GENERATED, so
+      they went in `GENERATED_PRESENCE`, which references the live programme and therefore
+      survives a change of song — a bare constant in the move would not.
+      Scream was first trimmed at the move's `feedbackAmount` (1.3 → 0.85) and that was
+      REVERTED: that parameter sets how hard the filter rings, which is the scream's
+      character. Detuning it to fix a level would have changed what the move is.
+      Siren was tried at 1.35 and landed exactly on the bound `programmeLevel.test.ts`
+      keeps against the 2026-09-18 "siren MUCH louder than the music" regression. The
+      guard is worth more than the extra 0.1, so the value moved, not the test.
+      **Open: none of this has been heard yet.** Absolute levels drift with the song
+      section (baseline moved 0.057 → 0.031 between passes), so the numbers can only say
+      a move is no longer clipping or no longer under the mix — not that it sits right.
+
+- [ ] **X25 (original entry)** **Move levels, judged by ear 2026-09-21.** The first real per-move loudness
       verdicts — this is the data the DEFERRED level-tuning note was waiting for, so tune
       against these rather than re-deriving them.
       | move | file | current default | verdict |

@@ -175,3 +175,60 @@ describe('shelfTrimDb — pay for what the boost actually costs', () => {
     expect(shelfTrimDb(9, SILENT)).toBeCloseTo(-3.6, 6);
   });
 });
+
+/**
+ * The levels the 2026-09-21 listening pass asked for.
+ *
+ * Verdicts, with what the master meter read at the time against a 0.057 RMS /
+ * 0.492 peak programme baseline:
+ *
+ *   Slam   too loud            peak 1.072 — over full scale, clipping
+ *   Kick   not loud enough     peak 0.438 — quieter than the programme
+ *   Sub    not loud enough     peak 0.162 — sat under the mix
+ *   Siren  a little too silent rms  0.078
+ *   Scream too loud            rms  0.117 — twice the programme's RMS
+ *
+ * Slam and Kick are not in this table: they are processed moves, not generated
+ * ones, and their levels live in `slamSpring` / `kickSpring`. Sub, Siren and
+ * Scream are generated, so they belong here — referenced to the programme so
+ * they survive a change of song, which a bare constant would not.
+ */
+describe('levels asked for by ear, 2026-09-21', () => {
+  it('lifts the sub swell to where it can be felt', () => {
+    // It measured UNDER the programme, so "felt more than heard" had become
+    // "not heard at all".
+    //
+    // subSwell is NOT in the sustained set — it swells and decays like a hit,
+    // so it references the programme's PEAK, not its RMS. An earlier version
+    // of this test asserted it stayed under LOUD.rms, which would only ever
+    // have held for a sustained source.
+    expect(GENERATED_PRESENCE.subSwell).toBeGreaterThan(0.5);
+    const lifted = generatedPeakFor('subSwell', LOUD);
+    expect(lifted).toBeGreaterThan(LOUD.peak * 0.5);   // above where it was
+    expect(lifted).toBeLessThan(LOUD.peak);            // still under the mix's peak
+  });
+
+  it('trims the scream without touching what makes it a scream', () => {
+    // The move's `feedbackAmount` sets how hard the filter rings. Detuning
+    // that to fix a level would change the character of the move, so the trim
+    // is here instead.
+    expect(GENERATED_PRESENCE.tubbyScream).toBeLessThan(0.8);
+    expect(generatedPeakFor('tubbyScream', LOUD)).toBeLessThan(LOUD.peak * 0.8);
+  });
+
+  it('nudges the siren up without reopening the 2026-09-18 regression', () => {
+    // It used to be referenced to programme PEAK and was reported "MUCH louder
+    // than the music". The bound that guards that is worth more than any
+    // further increase here.
+    expect(GENERATED_PRESENCE.siren).toBeGreaterThan(1.15);
+    expect(generatedPeakFor('siren', LOUD)).toBeLessThan((LOUD.peak * 0.75) / 2);
+  });
+
+  it('keeps every generated move under full scale on a loud programme', () => {
+    // The fault that started all of this was a move louder than the mix it
+    // was supposed to decorate.
+    for (const moveId of Object.keys(GENERATED_PRESENCE)) {
+      expect(generatedPeakFor(moveId, LOUD), moveId).toBeLessThan(1);
+    }
+  });
+});
