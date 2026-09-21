@@ -33,7 +33,7 @@ recount — do not trust this sentence either.
 | G — wet energy | **closed** | G1 |
 | H-L — musical behaviour | **closed** | H1, I1, J1, K1-K4, L1, L2, AE1 |
 | M-O — record, verify, release | M1, N1-N4, O1 done | O2 (human) |
-| X — user-reported open threads | 18 of 19 | all closed except X10 (clipping). X2 (skank) and X14 (siren) by ear; X9 (sends) and X21 (discard) 2026-09-19 |
+| X — user-reported open threads | 21 of 35 | X1-X9, X11-X19, X21-X24, X26, X28, X33 closed. OPEN: X10 (clipping), X25 (levels), X27, X29-X32, X34, X35 — most logged 2026-09-21 |
 
 ### Debt carried, not hidden
 
@@ -1520,7 +1520,13 @@ this bug.
       Measure at the widths that matter before choosing — the channel-strip work on the
       same day was checked at 1509 / 1280 / 1024 / 900, and this row should be too.
 
-- [ ] **X33** **Throw (`delayTimeThrow`) still not obvious.** Reported 2026-09-21
+- [x] **X33 — CLOSED 2026-09-21 by ear**, with the capture and level work. User: "i think
+      they all work now". Throw was never a capture move — it sweeps the echo's delay time
+      — so what fixed it was upstream: once the channel taps actually opened, the echo tank
+      had repeats to sweep. The investigation note below stands as the reason it could not
+      have been fixed by raising its own gain.
+
+- [x] **X33 (original entry)** **Throw (`delayTimeThrow`) still not obvious.** Reported 2026-09-21
       alongside Reverse: after the capture and level fixes, "backwards is obvious that it
       works now, the other two not obvious". Reverse was fixed (it lacked the
       direct-to-return path Backward has); Throw is a DIFFERENT move and needs its own
@@ -1575,7 +1581,20 @@ this bug.
       the BUS tab's own sliders call `setDubBus` directly on every change.
       Verify by ear on a sustained tone, not by meter: zipper noise barely moves RMS.
 
-- [ ] **X28** **Reverse, Backward and Throw seem dead.** Reported 2026-09-21 while playing
+- [x] **X28 — CLOSED 2026-09-21 by ear.** User: "i think they all work now this really
+      added phatness to the dubs!" Three separate causes, none of them the one first
+      suspected:
+      1. the capture ring was full of zeros and the guard tested its LENGTH, so the log
+         read healthy while the move played silence;
+      2. the engine's copy of the channel sends was never seeded from the store, so no
+         channel tap opened and nothing reached `bus.input`;
+      3. once audio was flowing, playback was still buried — a capture taps one channel's
+         send, about a quarter of programme level, and `reverseEcho` additionally routed
+         ONLY into the echo so the reversed source never reached the output at all.
+      Backward came good after (1) and (2); Reverse needed (3) as well, which is why it
+      lagged behind and why "one of them works" was the clue that found it.
+
+- [x] **X28 (original entry)** **Reverse, Backward and Throw seem dead.** Reported 2026-09-21 while playing
       `amanda.ahx` (Hively engine).
       Not a missing precondition: sends were up (ch0-3 at 0.45) and taps registered
       [0,1,2,3], so the `needsSend` gate was satisfied.
