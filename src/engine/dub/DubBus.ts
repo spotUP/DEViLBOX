@@ -118,6 +118,43 @@ function captureNormalisation(moveId: string, capturedPeak: number): number {
   return Math.max(0.5, Math.min(12, target / capturedPeak));
 }
 
+/**
+ * Tell the user a capture found nothing — at most once in a while.
+ *
+ * The console line fires every time, because a diagnostic that skips events is
+ * useless. The TOAST does not: `reverseEcho` retries its snapshot up to three
+ * times, so one click produced three notifications, and AutoDub firing a
+ * capture move into a quiet bus produced a stream of them. Reported 2026-09-21.
+ *
+ * A performer mid-set cannot act on the second and third copies, and a surface
+ * that nags is worse than one that stays quiet: the warning still reaches
+ * anyone who looks, and the console keeps the full record.
+ */
+let _lastCaptureSilenceToastMs = 0;
+const CAPTURE_SILENCE_TOAST_GAP_MS = 8000;
+
+/**
+ * How long after the capture node is created its ring cannot be full.
+ *
+ * The node is built lazily on first use, so the first capture of a session
+ * reads a ring that has had no time to fill — and `backwardReverb` has no retry
+ * loop, so it warned immediately. That is a guaranteed false alarm on the first
+ * click, which is exactly the moment a warning is least welcome and least true.
+ * Longer than the longest capture window (0.8s) with room to spare.
+ */
+const CAPTURE_RING_FILL_MS = 1200;
+
+function toastCaptureSilence(message: string, ringReadyAtMs: number): void {
+  const now = Date.now();
+  // Still filling: the silence is expected, not a fault worth reporting.
+  if (now < ringReadyAtMs) return;
+  if (now - _lastCaptureSilenceToastMs < CAPTURE_SILENCE_TOAST_GAP_MS) return;
+  _lastCaptureSilenceToastMs = now;
+  void import('@stores/useNotificationStore').then(({ notify }) =>
+    notify.warning(message)
+  ).catch(() => {});
+}
+
 /** Below this a capture is silence, not quiet audio. */
 const CAPTURE_SILENCE_PEAK = 1e-4;
 
@@ -368,6 +405,8 @@ export class DubBus {
   private _feedbackScrubberIsWorklet = false;
   /** Parameters a move is currently HOLDING away from their resting value. */
   private _heldAnnouncements = new Map<string, ReturnType<typeof setInterval>>();
+  /** When the reverse-capture ring can first be expected to hold audio. */
+  private _reverseCaptureReadyAtMs = 0;
   /** NaN/Inf scrubber inserted between `spring.output` and the post-spring
    *  forward chain (sidechain → glue → midScoop → lpf → master*). Same
    *  story as the feedback scrubber but on the FORWARD path: a NaN sample
@@ -3711,7 +3750,7 @@ export class DubBus {
     // override that protection.
     if (!engineChanging && !this._muteHoldActive) {
       const threshold = -6 - merged.sidechainAmount * 30;
-      this.sidechain.threshold.setTargetAtTime(threshold, now, 0.05);
+      this._settle(this.sidechain.threshold, threshold, now, 0.05);
     }
 
     // Glue compressor bypass — Scientist mode. The research quotes him:
@@ -3775,7 +3814,7 @@ export class DubBus {
     // lifts the low end, not the whole mix, so the trim follows the share of
     // energy that lives down there rather than the shelf's dB figure.
     const trimDb = masterActive ? shelfTrimForProgramme(safeMasterShelfGain) : 0;
-    this.masterToneTrim.gain.setTargetAtTime(Math.pow(10, trimDb / 20), now, 0.02);
+    this._settle(this.masterToneTrim.gain, Math.pow(10, trimDb / 20), now, 0.02);
     rampBiquadParam(this.masterMidScoop.frequency, merged.midScoopFreqHz, now);
     rampBiquadParam(this.masterMidScoop.Q, merged.midScoopQ, now);
     rampBiquadParam(this.masterMidScoop.gain, masterActive ? merged.midScoopGainDb : 0, now);
@@ -3786,20 +3825,20 @@ export class DubBus {
     const mA = 0.5 + 0.5 * mw;
     const mB = 0.5 - 0.5 * mw;
     const masterInvertL = (this.masterSide as unknown as { _invertL?: GainNode })._invertL;
-    this.masterMid.gain.setTargetAtTime(mA, now, 0.02);
-    this.masterSide.gain.setTargetAtTime(mA, now, 0.02);
-    this.masterInvertR.gain.setTargetAtTime(mB, now, 0.02);
+    this._settle(this.masterMid.gain, mA, now, 0.02);
+    this._settle(this.masterSide.gain, mA, now, 0.02);
+    this._settle(this.masterInvertR.gain, mB, now, 0.02);
     if (masterInvertL) masterInvertL.gain.setTargetAtTime(mB, now, 0.02);
     // Liquid sweep params — clamp + smooth. sweepAmount=0 fully silences
     // the branch; LFO keeps running (can't stop OscillatorNode).
     const sweepAmt = Math.max(0, Math.min(1, merged.sweepAmount));
     this._setColourStageGain(this.sweepOutput.gain, sweepAmt, 0.02);
     const sweepRate = Math.max(0.05, Math.min(5, merged.sweepRateHz));
-    this.sweepLfo.frequency.setTargetAtTime(sweepRate, now, 0.02);
+    this._settle(this.sweepLfo.frequency, sweepRate, now, 0.02);
     const sweepDepthSec = Math.max(0, Math.min(9, merged.sweepDepthMs)) / 1000;
-    this.sweepLfoGain.gain.setTargetAtTime(sweepDepthSec, now, 0.02);
+    this._settle(this.sweepLfoGain.gain, sweepDepthSec, now, 0.02);
     const sweepFb = Math.max(0, Math.min(0.85, merged.sweepFeedback));
-    this.sweepFeedback.gain.setTargetAtTime(sweepFb, now, 0.02);
+    this._settle(this.sweepFeedback.gain, sweepFb, now, 0.02);
     // Tape sat mode crossfade — both gates ramp over 60ms so switching
     // mid-gig doesn't click. Same time constant intentional: gains sum
     // near 1 during the overlap which is fine (quiet crossfade dip is
@@ -3808,8 +3847,8 @@ export class DubBus {
     // roll-off (see _applyCharacterPreset + the mode-transition block
     // below).
     const wantStack = merged.tapeSatMode === 'stack';
-    this.tapeSatBypass.gain.setTargetAtTime(wantStack ? 0 : 1, now, 0.03);
-    this.tapeStackMix.gain.setTargetAtTime(wantStack ? 1 : 0, now, 0.03);
+    this._settle(this.tapeSatBypass.gain, wantStack ? 0 : 1, now, 0.03);
+    this._settle(this.tapeStackMix.gain, wantStack ? 1 : 0, now, 0.03);
 
     // In-feedback filter params — all engines implement setFeedbackHpf/Lpf
     // via the DubEchoEngine interface. SpaceEcho and AnotherDelay route to
@@ -3840,13 +3879,45 @@ export class DubBus {
     // only on mode transition to avoid hot-path curve allocation.
     if (merged.tapeSatMode !== this._lastTapeMode) {
       this._lastTapeMode = merged.tapeSatMode;
-      if (merged.tapeSatMode === 'tape15ips') {
-        try { this.tapeSat.curve = makeTapeSatCurve(0.7); } catch { /* ok */ }
-      } else if (merged.tapeSatMode === 'single') {
-        // Restore preset's tape curve or default 0.35.
-        const p = this._lastAppliedPreset;
-        const drive = p && p !== 'custom' ? (DUB_CHARACTER_PRESETS[p]?.tapeSatDrive ?? 0.35) : 0.35;
-        try { this.tapeSat.curve = makeTapeSatCurve(drive); } catch { /* ok */ }
+      // Replacing a WaveShaper's curve changes the transfer function between
+      // one sample and the next: the output jumps to wherever the new curve
+      // maps the current input. A click, straight from the dropdown.
+      //
+      // The bypass/stack gates around it already crossfade over 30ms, but the
+      // curve UNDER them was swapped bare, so `single` <-> `tape15ips` (both on
+      // the same gate) had nothing covering it. The identical write inside
+      // `_applyCharacterPreset` is safe only because it runs under the warmup
+      // mute — this path had no such cover.
+      //
+      // Duck the saturator's own output, swap in the gap, bring it back.
+      const nextCurve = (() => {
+        if (merged.tapeSatMode === 'tape15ips') return makeTapeSatCurve(0.7);
+        if (merged.tapeSatMode === 'single') {
+          const p = this._lastAppliedPreset;
+          const drive = p && p !== 'custom' ? (DUB_CHARACTER_PRESETS[p]?.tapeSatDrive ?? 0.35) : 0.35;
+          return makeTapeSatCurve(drive);
+        }
+        return null;
+      })();
+      if (nextCurve) {
+        const DUCK_SEC = 0.008;
+        const gate = this.tapeSatBypass.gain;
+        const restore = gate.value;
+        try {
+          gate.cancelScheduledValues(now);
+          gate.setValueAtTime(gate.value, now);
+          gate.linearRampToValueAtTime(0, now + DUCK_SEC);
+        } catch { /* ok */ }
+        setTimeout(() => {
+          if (this._disposed) return;
+          try { this.tapeSat.curve = nextCurve; } catch { /* ok */ }
+          const back = this.context.currentTime;
+          try {
+            gate.cancelScheduledValues(back);
+            gate.setValueAtTime(0, back);
+            gate.linearRampToValueAtTime(restore, back + DUCK_SEC);
+          } catch { /* ok */ }
+        }, Math.ceil(DUCK_SEC * 1000) + 2);
       }
     }
 
@@ -3883,8 +3954,8 @@ export class DubBus {
       const isPhaser = merged.sweepMode === 'phaser';
       const amt = Math.max(0, Math.min(1, merged.sweepAmount));
       // Crossfade: one branch at full gain, other at 0
-      this.combOutput.gain.setTargetAtTime(isPhaser ? 0 : 1, now, 0.01);
-      this.phaserOutput.gain.setTargetAtTime(isPhaser ? 1 : 0, now, 0.01);
+      this._settle(this.combOutput.gain, isPhaser ? 0 : 1, now, 0.01);
+      this._settle(this.phaserOutput.gain, isPhaser ? 1 : 0, now, 0.01);
       this._setColourStageGain(this.sweepOutput.gain, amt, 0.02);
     }
     // Phaser params — update even when mode is 'comb' (no harm, WASM just idles)
@@ -3896,8 +3967,8 @@ export class DubBus {
     // ─── Post-echo tape saturation ────────────────────────────────────────
     if (settings.postEchoSatEnabled !== undefined || settings.postEchoSatDrive !== undefined) {
       const enabled = merged.postEchoSatEnabled;
-      this.postEchoSatBypass.gain.setTargetAtTime(enabled ? 0 : 1, now, 0.01);
-      this.postEchoSatWet.gain.setTargetAtTime(enabled ? 1 : 0, now, 0.01);
+      this._settle(this.postEchoSatBypass.gain, enabled ? 0 : 1, now, 0.01);
+      this._settle(this.postEchoSatWet.gain, enabled ? 1 : 0, now, 0.01);
       if (settings.postEchoSatDrive !== undefined) {
         this.postEchoSat.curve = makeTapeSatCurve(merged.postEchoSatDrive);
       }
@@ -4915,7 +4986,18 @@ export class DubBus {
     console.log(`[DubBusCtrl] modulateFeedback(delta=${delta.toFixed(3)}, ms=${ms})`);
     if (!this.enabled) return;
     const target = Math.min(0.95, this.settings.echoIntensity + Math.max(0, delta));
-    try { this.echo.setIntensityInstant(target); } catch { /* ok */ }
+    // Ramped, not stepped.
+    //
+    // `setIntensityInstant` exists for dubPanic, where the point is to stop the
+    // delay recirculating the moment the kill is decided. Using it here made
+    // every throw a step change of feedback gain INSIDE a live delay loop —
+    // audible as a click on the repeats — while the release below already used
+    // the ramped setter. Fire clicked, release did not.
+    //
+    // Callers: echoThrow, channelThrow, dubStab, skankEchoThrow, versionDrop —
+    // the moves fired most often, which is why this read as "clicks sometimes
+    // when some stuff fire" (2026-09-21).
+    try { this.echo.setIntensity(target); } catch { /* ok */ }
     this.announce('dub.echoIntensity', target);
     const t = setTimeout(() => {
       this.throwTimers.delete(t);
@@ -4943,6 +5025,29 @@ export class DubBus {
    * Announcement only — it changes no state and no audio. `settings` still
    * holds what the USER set, which is what a move restores to.
    */
+  /**
+   * `setTargetAtTime` after clearing whatever was already scheduled.
+   *
+   * Bare `setTargetAtTime` does not remove pending events, so a settings write
+   * landing on a param that a MOVE is already ramping fights it: the move's
+   * `linearRampToValueAtTime` events stay queued and the two interleave, which
+   * is heard as a jump. The one that bit: touching FX WET while a Tape Stop is
+   * held, since that move drives `return_.gain` with its own ramps.
+   *
+   * Pinning the current value first matters as much as the cancel — otherwise
+   * the new curve starts from the last SCHEDULED value rather than the one
+   * actually sounding.
+   */
+  private _settle(param: AudioParam, target: number, now: number, tc: number): void {
+    try {
+      param.cancelScheduledValues(now);
+      param.setValueAtTime(param.value, now);
+      param.setTargetAtTime(target, now, tc);
+    } catch {
+      try { param.setTargetAtTime(target, now, tc); } catch { /* param gone */ }
+    }
+  }
+
   private announce(param: string, value: number): void {
     try {
       fireParamLiveSubscribers(param, value);
@@ -5442,6 +5547,9 @@ export class DubBus {
         const silencer = this.context.createGain();
         silencer.gain.value = 0;
         this.input.connect(node);
+        // Used to tell "the ring has not filled yet" from "nothing is reaching
+        // the bus", which look identical in the captured samples.
+        this._reverseCaptureReadyAtMs = Date.now() + CAPTURE_RING_FILL_MS;
         node.connect(silencer);
         silencer.connect(this.context.destination);
         this.reverseCapture = node;
@@ -5496,9 +5604,10 @@ export class DubBus {
             // Frames without signal. The ring is the right length and full of
             // zeros, which the `!frames` check below cannot see.
             console.warn(`[DubBus] backwardReverb abort — captured SILENCE (frames=${frames}, peak=${capPeak.toExponential(2)}); nothing is reaching bus.input`);
-            void import('@stores/useNotificationStore').then(({ notify }) =>
-              notify.warning('Backward Reverb: the bus captured silence — raise a CH send and let the song play')
-            ).catch(() => {});
+            toastCaptureSilence(
+              'Backward Reverb: the bus captured silence — raise a CH send and let the song play',
+              this._reverseCaptureReadyAtMs,
+            );
             resolve();
             return;
           }
@@ -5633,9 +5742,7 @@ export class DubBus {
       }
     }
     console.warn('[DubBus] reverseEcho abort — ring still empty after retries; bus input likely silent');
-    void import('@stores/useNotificationStore').then(({ notify }) =>
-      notify.warning('Reverse Echo: open a CH send and let audio play for a moment first')
-    ).catch(() => {});
+    toastCaptureSilence('Reverse Echo: open a CH send and let audio play for a moment first', this._reverseCaptureReadyAtMs);
   }
 
   private async _snapshotReverseRingOnce(
@@ -5664,9 +5771,10 @@ export class DubBus {
             // Frames without signal. The ring is the right length and full of
             // zeros, which the `!frames` check below cannot see.
             console.warn(`[DubBus] reverseEcho abort — captured SILENCE (frames=${frames}, peak=${capPeak.toExponential(2)}); nothing is reaching bus.input`);
-            void import('@stores/useNotificationStore').then(({ notify }) =>
-              notify.warning('Reverse Echo: the bus captured silence — raise a CH send and let the song play')
-            ).catch(() => {});
+            toastCaptureSilence(
+              'Reverse Echo: the bus captured silence — raise a CH send and let the song play',
+              this._reverseCaptureReadyAtMs,
+            );
             // false: this attempt produced no playback, so the caller's retry
             // loop sees it as an empty ring rather than a successful play.
             resolve(false);

@@ -115,15 +115,44 @@ export class PerChannelDubFx {
 
   // ─── Filter ────────────────────────────────────────────────────────────
 
+  /**
+   * Changing a BiquadFilterNode's `type` swaps its coefficients between one
+   * sample and the next while the filter keeps its internal state, so the
+   * output jumps — an audible click. Every other setter in this class ramps;
+   * this one could not, because `type` is not an AudioParam.
+   *
+   * So duck the channel around the change instead: ~6ms down, switch in the
+   * silence, ~6ms back. Short enough to feel instant on a dropdown, long enough
+   * that the discontinuity happens at zero. Also covers the Hz slider, which
+   * calls this on every pointer event.
+   *
+   * Reported 2026-09-21 as clicks when firing things.
+   */
   setFilterMode(mode: 'off' | 'hpf' | 'lpf'): void {
     if (this._disposed) return;
-    if (mode === 'off') {
-      this.filter.type = 'allpass';
-    } else if (mode === 'hpf') {
-      this.filter.type = 'highpass';
-    } else {
-      this.filter.type = 'lowpass';
-    }
+    const next = mode === 'off' ? 'allpass' : mode === 'hpf' ? 'highpass' : 'lowpass';
+    if (this.filter.type === next) return;   // nothing to duck for
+
+    const DUCK_SEC = 0.006;
+    const g = this.mainOut.gain;
+    const now = this.ctx.currentTime;
+    const restore = g.value;
+    try {
+      g.cancelScheduledValues(now);
+      g.setValueAtTime(g.value, now);
+      g.linearRampToValueAtTime(0, now + DUCK_SEC);
+    } catch { /* fall through — a click is better than a dead channel */ }
+
+    setTimeout(() => {
+      if (this._disposed) return;
+      this.filter.type = next;
+      const back = this.ctx.currentTime;
+      try {
+        g.cancelScheduledValues(back);
+        g.setValueAtTime(0, back);
+        g.linearRampToValueAtTime(restore, back + DUCK_SEC);
+      } catch { /* ok */ }
+    }, Math.ceil(DUCK_SEC * 1000) + 2);
   }
 
   setFilterHz(hz: number): void {
