@@ -26,6 +26,15 @@ interface MinimalStore {
 let _trackerStore: MinimalStore | null = null;
 let _editorStore: MinimalStore | null = null;
 let _cursorStore: MinimalStore | null = null;
+/**
+ * The mixer store joined this registry on 2026-09-21. `ChannelRoutedEffects`
+ * reads per-channel dub settings when it builds a channel's FX chain, and a
+ * static import there closes a cycle through the mixer store's engine warm-up
+ * (mixer -> FurnaceDispatchEngine -> ChannelRoutedEffects), which fails at
+ * module evaluation with "Cannot access 'engineResolversByMode' before
+ * initialization". Late binding through this leaf keeps the cycle open.
+ */
+let _mixerStore: MinimalStore | null = null;
 
 export function registerTrackerStore(store: unknown): void {
   _trackerStore = store as MinimalStore;
@@ -37,6 +46,10 @@ export function registerEditorStore(store: unknown): void {
 
 export function registerCursorStore(store: unknown): void {
   _cursorStore = store as MinimalStore;
+}
+
+export function registerMixerStore(store: unknown): void {
+  _mixerStore = store as MinimalStore;
 }
 
 export function getTrackerStoreRef(): MinimalStore {
@@ -52,4 +65,11 @@ export function getEditorStoreRef(): MinimalStore {
 export function getCursorStoreRef(): MinimalStore {
   if (!_cursorStore) throw new Error('[storeAccess] useCursorStore accessed before registration');
   return _cursorStore;
+}
+
+/** Null rather than throwing: the FX chain is built while a song loads, which
+ *  can precede the mixer store's own module evaluation. Callers skip the
+ *  re-apply step in that case, exactly as they did before. */
+export function getMixerStoreRefOrNull(): MinimalStore | null {
+  return _mixerStore;
 }

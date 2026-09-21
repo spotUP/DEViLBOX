@@ -9,6 +9,8 @@ import type { ProjectMetadata } from '@typedefs/project';
 import { APP_VERSION } from '@constants/version';
 import type { AutomationCurve } from '@typedefs/automation';
 import { useFormatStore } from '@stores/useFormatStore';
+import { useMixerStore } from '@stores/useMixerStore';
+import { getTrackerReplayer } from '@engine/TrackerReplayer';
 import type { DubBusSettings } from '@/types/dub';
 import { useDubStore, type AutoDubPersonaId } from '@/stores/useDubStore';
 import { useDrumPadStore } from '@/stores/useDrumPadStore';
@@ -345,8 +347,6 @@ export function exportSong(
     // Replaced instrument IDs for hybrid WASM/ToneEngine playback
     ...(() => {
       try {
-        // eslint-disable-next-line @typescript-eslint/no-var-requires
-        const { getTrackerReplayer } = require('@engine/TrackerReplayer');
         const replayer = getTrackerReplayer();
         if (replayer.hasReplacedInstruments) {
           return { replacedInstruments: replayer.replacedInstrumentIds };
@@ -365,7 +365,6 @@ export function exportSong(
     // Mixer state — channel volumes, pans, mutes, solos, dub sends, send buses.
     ...(() => {
       try {
-        const { useMixerStore } = require('@stores/useMixerStore');
         const state = useMixerStore.getState();
         return {
           mixer: {

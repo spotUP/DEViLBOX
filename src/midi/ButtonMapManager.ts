@@ -7,6 +7,7 @@
 
 import { getMIDIManager } from './MIDIManager';
 import type { MIDIMessage } from './types';
+import { getGlobalRegistry } from '../hooks/useGlobalKeyboardHandler';
 
 /**
  * Available editor actions that can be triggered by buttons.
@@ -178,7 +179,6 @@ class ButtonMapManager {
         // Bridge to CommandRegistry — execute any registered command
         try {
           const commandName = mapping.action.slice(4);
-          const { getGlobalRegistry } = require('../hooks/useGlobalKeyboardHandler');
           const registry = getGlobalRegistry();
           registry.execute(commandName, 'global');
         } catch (e) {

@@ -558,12 +558,21 @@ export const useUIStore = create<UIStore>()(
 
           // Mutual exclusion: stop tracker when entering DJ, stop DJ when leaving DJ
           if (view === 'dj' && prev !== 'dj') {
-            // Defer to avoid calling engine mid-store-update
+            // Defer to avoid calling engine mid-store-update.
+            //
+            // The three modules are reached by dynamic import. This store is a
+            // leaf that half the app imports, so pulling the transport and the
+            // engines in statically would drag the engine tree into its module
+            // evaluation. They used to be CommonJS calls for the same reason,
+            // which throw in the browser bundle — so entering the DJ view never
+            // stopped the tracker and never muted ToneEngine's master, which is
+            // the echo this code exists to prevent.
             setTimeout(() => {
-              try {
-                const { useTransportStore } = require('@stores/useTransportStore');
-                const { getTrackerReplayer } = require('@engine/TrackerReplayer');
-                const { getToneEngine } = require('@engine/ToneEngine');
+              void Promise.all([
+                import('@stores/useTransportStore'),
+                import('@engine/TrackerReplayer'),
+                import('@engine/ToneEngine'),
+              ]).then(([{ useTransportStore }, { getTrackerReplayer }, { getToneEngine }]) => {
                 const transport = useTransportStore.getState();
                 if (transport.isPlaying) {
                   getTrackerReplayer().stop();
@@ -573,23 +582,24 @@ export const useUIStore = create<UIStore>()(
                 // Mute ToneEngine master output to prevent echo —
                 // DJ audio goes through DJMixerEngine, not ToneEngine's masterChannel
                 getToneEngine().setDJMode(true);
-              } catch { /* not ready */ }
+              }).catch(() => { /* not ready */ });
             }, 0);
           } else if (prev === 'dj' && view !== 'dj' && view !== 'vj' && view !== 'drumpad') {
             setTimeout(() => {
-              try {
-                // Unmute ToneEngine master output (no longer in DJ mode)
-                const { getToneEngine } = require('@engine/ToneEngine');
-                getToneEngine().setDJMode(false);
-              } catch { /* not ready */ }
-              try {
-                const { useDJStore } = require('@stores/useDJStore');
+              // Unmute ToneEngine master output (no longer in DJ mode)
+              void import('@engine/ToneEngine')
+                .then(({ getToneEngine }) => { getToneEngine().setDJMode(false); })
+                .catch(() => { /* not ready */ });
+
+              void Promise.all([
+                import('@stores/useDJStore'),
+                import('@engine/dj/DJEngine'),
+              ]).then(([{ useDJStore }, { getDJEngineIfActive }]) => {
                 const djStore = useDJStore.getState();
                 // NEVER stop decks if auto DJ is running — catastrophic at a gig
                 const autoDJActive = djStore.autoDJEnabled && djStore.autoDJStatus !== 'idle';
                 if (autoDJActive) return;
 
-                const { getDJEngineIfActive } = require('@engine/dj/DJEngine');
                 const djEngine = getDJEngineIfActive();
                 for (const deckId of ['A', 'B', 'C'] as const) {
                   if (djStore.decks[deckId].isPlaying) {
@@ -597,7 +607,7 @@ export const useUIStore = create<UIStore>()(
                     try { djEngine?.getDeck(deckId).stop(); } catch { /* */ }
                   }
                 }
-              } catch { /* not ready */ }
+              }).catch(() => { /* not ready */ });
             }, 0);
           }
         }),

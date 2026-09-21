@@ -8,6 +8,7 @@ import { useTransportStore, useTrackerStore, useCursorStore } from '../../stores
 import { useEditorStore } from '../../stores/useEditorStore';
 import { useMIDIStore } from '../../stores/useMIDIStore';
 import { useVocoderStore } from '../../stores/useVocoderStore';
+import { getDJEngine } from '../../engine/dj/DJEngine';
 
 /**
  * Register all editor action handlers for MIDI button control
@@ -117,44 +118,43 @@ export function useButtonMappings(): void {
       })
     );
 
-    // DJ Transport actions (lazy-import DJEngine to avoid loading it eagerly)
+    // DJ Transport actions.
+    //
+    // The engine is resolved INSIDE each handler, not here. Registering an
+    // action must not build a DJEngine — that allocates its audio graph — and
+    // a button press is the first moment one is genuinely needed. This used to
+    // be a `require()` for the same reason, which never ran, so none of these
+    // actions has ever been registered.
     const registerDJActions = () => {
-      try {
-        const { getDJEngine } = require('../../engine/dj/DJEngine');
-        const dj = getDJEngine();
+      cleanups.push(manager.registerAction('dj.deckA.play', () => { getDJEngine().deckA.play(); }));
+      cleanups.push(manager.registerAction('dj.deckA.pause', () => { getDJEngine().deckA.pause(); }));
+      cleanups.push(manager.registerAction('dj.deckA.stop', () => { getDJEngine().deckA.stop(); }));
+      cleanups.push(manager.registerAction('dj.deckA.cue', () => { getDJEngine().deckA.cue(0); }));
+      cleanups.push(manager.registerAction('dj.deckB.play', () => { getDJEngine().deckB.play(); }));
+      cleanups.push(manager.registerAction('dj.deckB.pause', () => { getDJEngine().deckB.pause(); }));
+      cleanups.push(manager.registerAction('dj.deckB.stop', () => { getDJEngine().deckB.stop(); }));
+      cleanups.push(manager.registerAction('dj.deckB.cue', () => { getDJEngine().deckB.cue(0); }));
+      cleanups.push(manager.registerAction('dj.killAll', () => { getDJEngine().killAll(); }));
 
-        cleanups.push(manager.registerAction('dj.deckA.play', () => { dj.deckA.play(); }));
-        cleanups.push(manager.registerAction('dj.deckA.pause', () => { dj.deckA.pause(); }));
-        cleanups.push(manager.registerAction('dj.deckA.stop', () => { dj.deckA.stop(); }));
-        cleanups.push(manager.registerAction('dj.deckA.cue', () => { dj.deckA.cue(0); }));
-        cleanups.push(manager.registerAction('dj.deckB.play', () => { dj.deckB.play(); }));
-        cleanups.push(manager.registerAction('dj.deckB.pause', () => { dj.deckB.pause(); }));
-        cleanups.push(manager.registerAction('dj.deckB.stop', () => { dj.deckB.stop(); }));
-        cleanups.push(manager.registerAction('dj.deckB.cue', () => { dj.deckB.cue(0); }));
-        cleanups.push(manager.registerAction('dj.killAll', () => { dj.killAll(); }));
-
-        // EQ kills (toggle on/off)
-        cleanups.push(manager.registerAction('dj.deckA.eqKillLow', () => {
-          dj.deckA.setEQKill('low', !dj.deckA.getEQKill('low'));
-        }));
-        cleanups.push(manager.registerAction('dj.deckA.eqKillMid', () => {
-          dj.deckA.setEQKill('mid', !dj.deckA.getEQKill('mid'));
-        }));
-        cleanups.push(manager.registerAction('dj.deckA.eqKillHi', () => {
-          dj.deckA.setEQKill('high', !dj.deckA.getEQKill('high'));
-        }));
-        cleanups.push(manager.registerAction('dj.deckB.eqKillLow', () => {
-          dj.deckB.setEQKill('low', !dj.deckB.getEQKill('low'));
-        }));
-        cleanups.push(manager.registerAction('dj.deckB.eqKillMid', () => {
-          dj.deckB.setEQKill('mid', !dj.deckB.getEQKill('mid'));
-        }));
-        cleanups.push(manager.registerAction('dj.deckB.eqKillHi', () => {
-          dj.deckB.setEQKill('high', !dj.deckB.getEQKill('high'));
-        }));
-      } catch {
-        // DJEngine not available — DJ actions won't be registered until it is
-      }
+      // EQ kills (toggle on/off)
+      cleanups.push(manager.registerAction('dj.deckA.eqKillLow', () => {
+        getDJEngine().deckA.setEQKill('low', !getDJEngine().deckA.getEQKill('low'));
+      }));
+      cleanups.push(manager.registerAction('dj.deckA.eqKillMid', () => {
+        getDJEngine().deckA.setEQKill('mid', !getDJEngine().deckA.getEQKill('mid'));
+      }));
+      cleanups.push(manager.registerAction('dj.deckA.eqKillHi', () => {
+        getDJEngine().deckA.setEQKill('high', !getDJEngine().deckA.getEQKill('high'));
+      }));
+      cleanups.push(manager.registerAction('dj.deckB.eqKillLow', () => {
+        getDJEngine().deckB.setEQKill('low', !getDJEngine().deckB.getEQKill('low'));
+      }));
+      cleanups.push(manager.registerAction('dj.deckB.eqKillMid', () => {
+        getDJEngine().deckB.setEQKill('mid', !getDJEngine().deckB.getEQKill('mid'));
+      }));
+      cleanups.push(manager.registerAction('dj.deckB.eqKillHi', () => {
+        getDJEngine().deckB.setEQKill('high', !getDJEngine().deckB.getEQKill('high'));
+      }));
     };
 
     // DJ knob page switching

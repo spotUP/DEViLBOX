@@ -14,6 +14,10 @@ import { deriveLiveNoteFlags } from '../midi/liveNoteFlags';
 import { getToneEngine } from '../engine/ToneEngine';
 import { useInstrumentStore } from './useInstrumentStore';
 import { useSettingsStore } from './useSettingsStore';
+import { useTrackerStore } from './useTrackerStore';
+import { useTransportStore } from './useTransportStore';
+import { useCursorStore } from './useCursorStore';
+import { useEditorStore } from './useEditorStore';
 import { KNOB_BANKS, JOYSTICK_MAP, getKnobBankForSynth, getKnobAssignmentsForPage, getKnobPageCount, getKnobPageForSection, getKnobPageName } from '../midi/knobBanks';
 import type { KnobAssignment } from '../midi/knobBanks';
 import { routeParameterToEngine, routeDJParameter, routeDrumPadModulation, isVocoderTalking, routeVocoderModulation } from '../midi/performance/parameterRouter';
@@ -511,14 +515,19 @@ export const useMIDIStore = create<MIDIStore>()(
 
                 // Step recording: write MIDI note into pattern when in record/edit mode
                 try {
-                  const trackerStore = require('./useTrackerStore').useTrackerStore.getState();
-                  const transportStore = require('./useTransportStore').useTransportStore.getState();
+                  const trackerStore = useTrackerStore.getState();
+                  const transportStore = useTransportStore.getState();
+                  // recordMode and editStep live on the editor store. The dead
+                  // CommonJS version read them off the tracker store, where they
+                  // have never existed — it could not have worked even if the
+                  // call had resolved.
+                  const { recordMode, editStep } = useEditorStore.getState();
 
-                  if (trackerStore.recordMode && !transportStore.isPlaying) {
+                  if (recordMode && !transportStore.isPlaying) {
                     const xmNote = midiToXMNote(transposedNote);
                     if (xmNote >= 1 && xmNote <= 96) {
-                      const { setCell, editStep } = trackerStore;
-                      const cursorStore = require('./useCursorStore').useCursorStore.getState();
+                      const { setCell } = trackerStore;
+                      const cursorStore = useCursorStore.getState();
                       const cursor = cursorStore.cursor;
                       const nci = cursor.noteColumnIndex ?? 0;
                       const instrumentId = targetInstrument?.id ?? instrumentStore.currentInstrumentId ?? 0;

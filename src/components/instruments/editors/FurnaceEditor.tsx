@@ -19,6 +19,7 @@ import { MacroListEditor } from './MacroEditor';
 import { WavetableListEditor, type WavetableData } from './WavetableEditor';
 import { ScrollLockContainer } from '@components/ui/ScrollLockContainer';
 import { EnvelopeVisualization, WaveformThumbnail, FMAlgorithmDiagram } from '@components/instruments/shared';
+import { getToneEngine } from '@engine/ToneEngine';
 
 // ============================================================================
 // CHIP-SPECIFIC PARAMETER RANGES (from Furnace insEdit.cpp)
@@ -206,7 +207,6 @@ export const FurnaceEditor: React.FC<FurnaceEditorProps> = ({ config, instrument
     onChange(updates);
     // Fire-and-forget: re-map registers on the running synth
     try {
-      const { getToneEngine } = require('@engine/ToneEngine');
       const engine = getToneEngine();
       const synth = engine.instruments.get(instrumentId) as any;
       if (synth?.remapRegisters) {

@@ -22,6 +22,7 @@ import { compressProject } from '@/lib/projectCompression';
 import { useMixerStore } from '@stores/useMixerStore';
 import { useDrumPadStore } from '@stores/useDrumPadStore';
 import { useDubStore } from '@stores/useDubStore';
+import { getTrackerReplayer } from '@engine/TrackerReplayer';
 
 
 const AUTO_SAVE_INTERVAL = 300000; // 5 minutes
@@ -455,8 +456,6 @@ function buildSavedProject(): SavedProject {
     // Save replaced instrument IDs for hybrid playback persistence
     ...(() => {
       try {
-        // eslint-disable-next-line @typescript-eslint/no-var-requires
-        const { getTrackerReplayer } = require('@engine/TrackerReplayer');
         const replayer = getTrackerReplayer();
         if (replayer.hasReplacedInstruments) {
           return { replacedInstruments: replayer.replacedInstrumentIds };
@@ -693,8 +692,6 @@ export function applySavedProject(project: SavedProject, opts?: { fromRecovery?:
   if (project.replacedInstruments?.length) {
     setTimeout(() => {
       try {
-        // eslint-disable-next-line @typescript-eslint/no-var-requires
-        const { getTrackerReplayer } = require('@engine/TrackerReplayer');
         const replayer = getTrackerReplayer();
         replayer.restoreReplacedInstruments(project.replacedInstruments!);
       } catch (e) {
@@ -896,8 +893,6 @@ export async function loadProjectFromObject(data: unknown): Promise<boolean> {
     if (project.replacedInstruments?.length) {
       setTimeout(() => {
         try {
-          // eslint-disable-next-line @typescript-eslint/no-var-requires
-          const { getTrackerReplayer } = require('@engine/TrackerReplayer');
           const replayer = getTrackerReplayer();
           replayer.restoreReplacedInstruments(project.replacedInstruments!);
         } catch (e) {
@@ -1013,8 +1008,6 @@ export async function loadLocalRevision(key: number): Promise<boolean> {
     if (project.replacedInstruments?.length) {
       setTimeout(() => {
         try {
-          // eslint-disable-next-line @typescript-eslint/no-var-requires
-          const { getTrackerReplayer } = require('@engine/TrackerReplayer');
           const replayer = getTrackerReplayer();
           replayer.restoreReplacedInstruments(project.replacedInstruments!);
         } catch (e) {

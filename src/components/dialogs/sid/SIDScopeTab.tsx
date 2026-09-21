@@ -10,6 +10,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Layers, Eye, EyeOff } from 'lucide-react';
 import { useTransportStore } from '@stores';
 import { useVisualizationAnimation } from '@hooks/useVisualizationAnimation';
+import { getTrackerReplayer } from '@engine/TrackerReplayer';
 
 /* ── Colours ── */
 const C_BG = '#0a0a1a';
@@ -131,7 +132,6 @@ export const SIDScopeTab: React.FC<SIDScopeTabProps> = ({ className }) => {
       // Poll voice state from SID engine
       let engineActive = false;
       try {
-        const { getTrackerReplayer } = require('@engine/TrackerReplayer');
         const engine = getTrackerReplayer()?.getC64SIDEngine?.();
         if (engine) {
           engineActive = true;

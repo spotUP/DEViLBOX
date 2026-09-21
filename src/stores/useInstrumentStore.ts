@@ -39,6 +39,7 @@ import { DEFAULT_WAVESABRE_INSTRUMENT } from '@typedefs/wavesabreInstrument';
 import { getFirstPresetForSynthType } from '@constants/factoryPresets';
 import { getDefaultFurnaceConfig } from '@engine/InstrumentFactory';
 import { getToneEngine } from '@engine/ToneEngine';
+import { getTrackerReplayer } from '@engine/TrackerReplayer';
 import { recognizeCinter4Instruments } from '@engine/cinter4/cinter4Recognize';
 import { cinter4ParamsToSampleName } from '@lib/import/formats/cinter4Params';
 import { checkFormatViolation, getActiveFormatLimits, isViolationConfirmed } from '@/lib/formatCompatibility';
@@ -903,7 +904,6 @@ export const useInstrumentStore = create<InstrumentStore>()(
         const updatedConfig = get().instruments.find(i => i.id === id);
         if (updatedConfig) {
           try {
-            const { getTrackerReplayer } = require('@engine/TrackerReplayer');
             const replayer = getTrackerReplayer();
             replayer.updateInstrument(updatedConfig);
 
