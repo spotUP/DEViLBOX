@@ -66,6 +66,16 @@ export class DubSendBaselines {
   private readonly depth = new Map<number, number>();
   /** When the first transient on a channel opened, for the orphan watchdog. */
   private readonly openedAt = new Map<number, number>();
+  /**
+   * Channels whose mute was last written by a MOVE rather than by the user.
+   *
+   * `releaseAll` and `reapOrphans` both walk OPEN transients, so neither can
+   * see a mute that has escaped its transient — and that is exactly the state
+   * measured live on 2026-09-21: four channels muted, no transient open,
+   * nothing left able to restore them. This set is the only record that the
+   * mute was ours, once the transient that applied it is gone.
+   */
+  private readonly moveMuted = new Set<number>();
   private now: () => number = () => Date.now();
 
   /** Injectable clock, so the watchdog is testable without waiting. */
@@ -109,6 +119,9 @@ export class DubSendBaselines {
     }
     this.depth.delete(channelId);
     this.openedAt.delete(channelId);
+    // The caller restores the baseline, so the move's claim on the mute ends
+    // here whatever the baseline says.
+    this.moveMuted.delete(channelId);
     const baseline = this.values.get(channelId) ?? null;
     this.values.delete(channelId);
     return baseline;
@@ -131,7 +144,10 @@ export class DubSendBaselines {
       this.depth.delete(channelId);
       this.values.delete(channelId);
     }
-    for (const { channelId } of reaped) this.openedAt.delete(channelId);
+    for (const { channelId } of reaped) {
+      this.openedAt.delete(channelId);
+      this.moveMuted.delete(channelId);
+    }
     return reaped;
   }
 
@@ -148,6 +164,7 @@ export class DubSendBaselines {
     this.values.clear();
     this.depth.clear();
     this.openedAt.clear();
+    this.moveMuted.clear();
     return all;
   }
 
@@ -162,8 +179,45 @@ export class DubSendBaselines {
     prev.dubSend = clamp01(dubSend);
   }
 
+  /**
+   * A move-originated mute write.
+   *
+   * Records only WHOSE the mute is. The value itself lives in the store, as it
+   * must — this is a claim, not a second copy of the state.
+   */
+  noteMoveMute(channelId: number, muted: boolean): void {
+    if (muted) this.moveMuted.add(channelId);
+    else this.moveMuted.delete(channelId);
+  }
+
+  /**
+   * Channels a move muted, that nothing is holding any more, and that are
+   * still muted.
+   *
+   * `isMuted` reads the live store rather than a value kept here, because a
+   * remembered mute is the divergence this whole file exists to prevent. Three
+   * conditions, each needed: the last hand on the mute was a move, no
+   * transient is open to close it later, and the channel is silent right now.
+   */
+  strandedMoveMutes(isMuted: (channelId: number) => boolean): number[] {
+    const stranded: number[] = [];
+    for (const channelId of this.moveMuted) {
+      if (this.depthOf(channelId) > 0) continue;
+      if (!isMuted(channelId)) continue;
+      stranded.push(channelId);
+    }
+    return stranded.sort((a, b) => a - b);
+  }
+
+  /** Forget a move's claim on a channel's mute, once it has been handed back. */
+  clearMoveMute(channelId: number): void {
+    this.moveMuted.delete(channelId);
+  }
+
   /** A user-originated mute write — updates the baseline even during a hold. */
   noteUserMute(channelId: number, muted: boolean): void {
+    // The user now owns this mute, whoever set it last.
+    this.moveMuted.delete(channelId);
     const prev = this.values.get(channelId);
     if (!prev) {
       if (this.depthOf(channelId) === 0) return;
@@ -181,6 +235,7 @@ export class DubSendBaselines {
     this.values.clear();
     this.depth.clear();
     this.openedAt.clear();
+    this.moveMuted.clear();
   }
 }
 

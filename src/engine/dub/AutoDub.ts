@@ -66,6 +66,8 @@ import {
 import {
   releaseAllDubTransients,
   reapOrphanedDubTransients,
+  releaseStrandedDubMutes,
+  strandedDubMutes,
 } from '@/lib/dub/dubChannelTransient';
 import { automationFor } from '@/lib/dub/moveAutomation';
 import {
@@ -1519,6 +1521,11 @@ function tickImpl(): void {
     // Once a bar, close any transient that has been open far too long to be
     // real. Cheap, and it only ever acts on state that is already wrong.
     reapOrphanedDubTransients();
+    // And any mute a move left behind with nothing holding it. The reaper
+    // above walks OPEN transients, so it cannot see this case at all — which
+    // is why the song could come back muted with only effects firing and
+    // nothing in the registry able to explain it.
+    releaseStrandedDubMutes();
     _lastBar = bar;
     _movesFiredThisBar = 0;
     _wetFiredThisBar = 0;
@@ -2134,6 +2141,10 @@ function sampleDubBusDiagnostics(): Record<string, number | boolean | string | n
       }
       diag.mutedChannels = muted.length ? muted.join(',') : '';
       diag.mutedChannelCount = muted.length;
+      // Which of those mutes are ours and have no owner left. A muted channel
+      // alone does not say whose it is; this does.
+      const stranded = strandedDubMutes();
+      diag.strandedMutes = stranded.length ? stranded.join(',') : '';
     } catch { /* mixer unavailable — the bus half is still worth having */ }
 
     return diag;
