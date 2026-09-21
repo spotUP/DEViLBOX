@@ -30,6 +30,16 @@ function hively(over: Record<string, unknown> = {}): InstrumentConfig {
   } as unknown as InstrumentConfig;
 }
 
+/** A performance list of [note, waveform] pairs. */
+function perfNotes(pairs: [number, number][]) {
+  return {
+    performanceList: {
+      speed: 1,
+      entries: pairs.map(([note, waveform]) => ({ note, waveform, fixed: false, fx: [0, 0], fxParam: [0, 0] })),
+    },
+  };
+}
+
 /** A performance list of the given waveform numbers. 3 is noise. */
 function perf(waveforms: number[]) {
   return {
@@ -147,6 +157,87 @@ describe('what the parameters settle on their own', () => {
     }))!;
     const c = classifyBySynthParams(t);
     expect(c.role).not.toBe('bass');
+  });
+});
+
+describe('pitch drop — how a chip kick is actually built', () => {
+  it('measures the fall from the first sounded note to the lowest later one', () => {
+    // jennipha instrument 1, verbatim: 49 -> 22 -> 17 -> 10.
+    const t = extractSynthTimbre(hively({
+      hively: perfNotes([[49, 0], [22, 3], [17, 0], [10, 0]]),
+    }))!;
+    expect(t.pitchDropSemitones).toBe(39);
+  });
+
+  it('skips the no-change entries rather than reading them as a drop to zero', () => {
+    // `ple_Note` of 0 means "leave the pitch alone" (hvl_replay.c:1540).
+    const t = extractSynthTimbre(hively({
+      hively: perfNotes([[40, 0], [0, 0], [0, 0], [38, 0]]),
+    }))!;
+    expect(t.pitchDropSemitones).toBe(2);
+  });
+
+  it('counts a downward period slide as a drop', () => {
+    // FX 2 sets a negative slide speed, and the replayer subtracts it from the
+    // period — so the period rises and the pitch falls.
+    const withSlide = extractSynthTimbre(hively({
+      hively: {
+        performanceList: {
+          speed: 1,
+          entries: [{ note: 40, waveform: 0, fixed: false, fx: [2, 0], fxParam: [32, 0] }],
+        },
+      },
+    }))!;
+    expect(withSlide.pitchDropSemitones).toBeGreaterThanOrEqual(24);
+
+    // FX 1 is the same mechanism upwards and must not count.
+    const withRise = extractSynthTimbre(hively({
+      hively: {
+        performanceList: {
+          speed: 1,
+          entries: [{ note: 40, waveform: 0, fixed: false, fx: [1, 0], fxParam: [32, 0] }],
+        },
+      },
+    }))!;
+    expect(withRise.pitchDropSemitones).toBe(0);
+  });
+
+  it('calls a hard drop in a short sound a kick', () => {
+    const t = extractSynthTimbre(hively({
+      hively: {
+        envelope: { aFrames: 1, aVolume: 60, dFrames: 3, dVolume: 20, sFrames: 1, rFrames: 3, rVolume: 0 },
+        ...perfNotes([[49, 0], [22, 3], [10, 0]]),
+      },
+    }))!;
+    const c = classifyBySynthParams(t);
+    expect(c.role).toBe('percussion');
+    expect(c.subrole).toBe('kick');
+    expect(c.confidence).toBeGreaterThanOrEqual(0.8);
+  });
+
+  it('prefers kick over snare when a short sound both drops and has noise', () => {
+    // amanda instrument 8: drop 55, noise 0.50, 80 ms. Noise alone called it a
+    // snare; the drop is the more specific evidence and the more useful answer.
+    const t = extractSynthTimbre(hively({
+      hively: {
+        envelope: { aFrames: 1, aVolume: 60, dFrames: 1, dVolume: 60, sFrames: 1, rFrames: 2, rVolume: 0 },
+        ...perfNotes([[58, 3], [30, 3], [3, 0]]),
+      },
+    }))!;
+    expect(classifyBySynthParams(t).subrole).toBe('kick');
+  });
+
+  it('leaves a melodic leap alone', () => {
+    // jennipha instruments 8-10 fall 12 semitones and are not drums. An octave
+    // is a leap; two octaves inside a few frames is a drum.
+    const t = extractSynthTimbre(hively({
+      hively: {
+        envelope: { aFrames: 1, aVolume: 60, dFrames: 3, dVolume: 20, sFrames: 1, rFrames: 3, rVolume: 0 },
+        ...perfNotes([[15, 3], [3, 2], [6, 2], [10, 2]]),
+      },
+    }))!;
+    expect(t.pitchDropSemitones).toBe(12);
+    expect(classifyBySynthParams(t).subrole).not.toBe('kick');
   });
 });
 
