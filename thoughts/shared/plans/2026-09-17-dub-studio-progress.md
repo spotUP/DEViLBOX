@@ -1566,6 +1566,23 @@ this bug.
       `AutoDub.ts:1598` (`barPos * 4`) is the same assumption; `barPos` already comes from
       the clock, so converting it is mechanical.
 
+- [ ] **X36** **King Tubby goes quiet for long stretches, then only fires slam or crack.**
+      Reported 2026-09-21: "long silent pauses where the persona king tubby just fire slam
+      or crack etc are not uncommon".
+      This is musical behaviour, not a bug in a move — the performer IS firing, it is
+      choosing REST too often and then choosing from too narrow a set. Two things to
+      measure before changing weights, both already recorded by the fire log:
+      1. the REST ratio over a few minutes (`get_auto_dub_fire_log` counts them), against
+         the 17 fires / 15 rests measured on 2026-09-19 which read as acceptable;
+      2. the DISTRIBUTION of the non-REST choices — if slam and crack dominate, the
+         weighted roll is being narrowed somewhere, most likely by cooldowns knocking out
+         the moves with longer holds while the short triggers stay eligible.
+      Note the levels work landed the same day: slam and crack are now louder than they
+      were, so part of "it only fires slam or crack" may be that the others became
+      relatively quieter and are simply less noticeable. Check the log before the ear.
+      Related but distinct from X25 (levels) and from the 2026-09-19 idle bug, which was a
+      decision-rate fault and is closed.
+
 ### Hot-path audit 2026-09-21 — audible-discontinuity findings
 
 Delegated audit of every dub audio path that a control can touch live. Two acted on
