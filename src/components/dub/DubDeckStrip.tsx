@@ -891,6 +891,43 @@ export const DubDeckStrip: React.FC = () => {
     try { endGesture(id); } catch { /* ok */ }
   }, []);
 
+  /**
+   * Pointer props for a press-and-hold move button.
+   *
+   * Every hold site used to inline this, and each one called
+   * `releasePointerCapture` UNGUARDED before `holdEnd`:
+   *
+   *     onPointerUp={(e) => { e.currentTarget.releasePointerCapture(e.pointerId); holdEnd(id); }}
+   *
+   * `releasePointerCapture` throws `NotFoundError` when the capture is already
+   * gone, and that exception skipped `holdEnd` — so the move stayed held with
+   * nothing left to release it. Reported 2026-09-21 as crushBass sticking on
+   * from a single click; it can bite any hold button.
+   *
+   * So: release defensively, end the hold unconditionally, and treat
+   * `lostpointercapture` as a release too — that is the one event that fires
+   * when the capture disappears without a pointerup, which is exactly the case
+   * the old code could not survive.
+   *
+   * One implementation for all four call sites, because the same fault was
+   * copied into each of them.
+   */
+  const holdButtonProps = useCallback((moveId: string, channelId?: number) => ({
+    onPointerDown: (e: React.PointerEvent<HTMLButtonElement>) => {
+      try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* capture optional */ }
+      holdStart(moveId, channelId);
+    },
+    onPointerUp: (e: React.PointerEvent<HTMLButtonElement>) => {
+      try { e.currentTarget.releasePointerCapture(e.pointerId); } catch { /* already released */ }
+      holdEnd(moveId, channelId);
+    },
+    onPointerCancel: (e: React.PointerEvent<HTMLButtonElement>) => {
+      try { e.currentTarget.releasePointerCapture(e.pointerId); } catch { /* already released */ }
+      holdEnd(moveId, channelId);
+    },
+    onLostPointerCapture: () => holdEnd(moveId, channelId),
+  }), [holdStart, holdEnd]);
+
   // Nothing this deck is holding may outlive the deck. Without this, a view
   // change or a hot reload left the held move sounding for ever.
   useEffect(() => {
@@ -1237,11 +1274,15 @@ export const DubDeckStrip: React.FC = () => {
           }`}
           disabled={!busEnabled}
           onPointerDown={(e) => {
-            e.currentTarget.setPointerCapture(e.pointerId);
+            try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* capture optional */ }
             beginBusAudition();
           }}
           onPointerUp={endBusAudition}
           onPointerCancel={endBusAudition}
+          // Without this a lost capture leaves the audition latched on, with
+          // the bus's colour stages bypassed and no pointerup coming to undo
+          // it. Same gap as the move holds (X26).
+          onLostPointerCapture={endBusAudition}
           title="Hold to hear the send without its colour stages — plate, ring modulator, lo-fi, sweep and external feedback"
         >
           Audition
@@ -1378,17 +1419,20 @@ export const DubDeckStrip: React.FC = () => {
                 <button
                   key={m.moveId}
                   className={colorClasses(m.color, active) + (noSend && busEnabled ? ' opacity-40' : '')}
-                  onPointerDown={(e) => {
-                    if (noSend) {
-                      notify.warning('Raise a CH send first — drag a channel fader up on the right');
-                      return;
-                    }
-                    e.currentTarget.setPointerCapture(e.pointerId);
-                    holdStart(m.moveId);
-                  }}
-                  onPointerUp={(e) => { e.currentTarget.releasePointerCapture(e.pointerId); holdEnd(m.moveId); }}
+                  {...(() => {
+                    const props = holdButtonProps(m.moveId);
+                    return {
+                      ...props,
+                      onPointerDown: (e: React.PointerEvent<HTMLButtonElement>) => {
+                        if (noSend) {
+                          notify.warning('Raise a CH send first — drag a channel fader up on the right');
+                          return;
+                        }
+                        props.onPointerDown(e);
+                      },
+                    };
+                  })()}
                   onPointerLeave={() => setHoverHint(null)}
-                  onPointerCancel={(e) => { e.currentTarget.releasePointerCapture(e.pointerId); holdEnd(m.moveId); }}
                   onMouseEnter={() => setHoverHint(`${m.label} — ${m.title}${noSend ? ' (needs CH send)' : ''}`)}
                   title={m.title + ' (press-and-hold)' + (noSend ? ' — raise a CH send to hear' : '')}
                   disabled={!busEnabled}
@@ -1474,19 +1518,26 @@ export const DubDeckStrip: React.FC = () => {
                 onClick={isHold ? undefined : () => {
                   for (let i = 0; i < visibleChannelCount; i++) fireTrigger(op.moveId, i);
                 }}
-                onPointerDown={isHold ? (e) => {
-                  e.currentTarget.setPointerCapture(e.pointerId);
-                  for (let i = 0; i < visibleChannelCount; i++) holdStart(op.moveId, i);
-                } : undefined}
-                onPointerUp={isHold ? (e) => {
-                  e.currentTarget.releasePointerCapture(e.pointerId);
-                  for (let i = 0; i < visibleChannelCount; i++) holdEnd(op.moveId, i);
-                } : undefined}
+                {...(isHold ? {
+                  // Master fires the move on every channel, so release the
+                  // capture once and end each channel's hold unconditionally.
+                  onPointerDown: (e: React.PointerEvent<HTMLButtonElement>) => {
+                    try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* optional */ }
+                    for (let i = 0; i < visibleChannelCount; i++) holdStart(op.moveId, i);
+                  },
+                  onPointerUp: (e: React.PointerEvent<HTMLButtonElement>) => {
+                    try { e.currentTarget.releasePointerCapture(e.pointerId); } catch { /* already released */ }
+                    for (let i = 0; i < visibleChannelCount; i++) holdEnd(op.moveId, i);
+                  },
+                  onPointerCancel: (e: React.PointerEvent<HTMLButtonElement>) => {
+                    try { e.currentTarget.releasePointerCapture(e.pointerId); } catch { /* already released */ }
+                    for (let i = 0; i < visibleChannelCount; i++) holdEnd(op.moveId, i);
+                  },
+                  onLostPointerCapture: () => {
+                    for (let i = 0; i < visibleChannelCount; i++) holdEnd(op.moveId, i);
+                  },
+                } : {})}
                 onPointerLeave={() => setHoverHint(null)}
-                onPointerCancel={isHold ? (e) => {
-                  e.currentTarget.releasePointerCapture(e.pointerId);
-                  for (let i = 0; i < visibleChannelCount; i++) holdEnd(op.moveId, i);
-                } : undefined}
                 onMouseEnter={() => setHoverHint(`ALL · ${op.label} — ${op.title}`)}
                 title={`ALL channels · ${op.title}${isHold ? ' (press-and-hold)' : ''}`}
                 disabled={!busEnabled}
@@ -1699,10 +1750,8 @@ export const DubDeckStrip: React.FC = () => {
                     key={op.moveId}
                     className={colorClasses(op.color, active) + ' w-full text-center'}
                     onClick={isHold ? undefined : () => fireTrigger(op.moveId, i)}
-                    onPointerDown={isHold ? (e) => { e.currentTarget.setPointerCapture(e.pointerId); holdStart(op.moveId, i); } : undefined}
-                    onPointerUp={isHold ? (e) => { e.currentTarget.releasePointerCapture(e.pointerId); holdEnd(op.moveId, i); } : undefined}
+                    {...(isHold ? holdButtonProps(op.moveId, i) : {})}
                     onPointerLeave={() => setHoverHint(null)}
-                    onPointerCancel={isHold ? (e) => { e.currentTarget.releasePointerCapture(e.pointerId); holdEnd(op.moveId, i); } : undefined}
                     onMouseEnter={() => setHoverHint(`Ch ${i + 1} · ${op.label} — ${op.title}`)}
                     title={`Ch ${i + 1} · ${op.title}${isHold ? ' (press-and-hold)' : ''}`}
                     disabled={!busEnabled}
