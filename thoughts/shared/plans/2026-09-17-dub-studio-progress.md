@@ -1503,6 +1503,12 @@ this bug.
       path — pointerup, pointerleave, pointercancel, and the element unmounting mid-hold.
       Intermittent, so reproduce by clicking rapidly rather than assuming one try is clean.
 
+- [x] **X32 — CLOSED 2026-09-21.** The header row wraps (`flex flex-wrap items-center
+      gap-x-2 gap-y-1`). Wrapping rather than `overflow-x-auto`: a control on a second line
+      is still there to hit, while one behind a scrollbar has to be found first, which is
+      the wrong trade for a surface played live. The existing order already runs most-used
+      first, so what wraps is what is reached for least. Commit `8550d9bcb`.
+
 - [ ] **X32** **Dub deck header row is not responsive and runs off the edge.** Reported
       2026-09-21 with a screenshot: DUB DECK / Bus ON / REC / STYLE / ECHO / A/B / AUTO DUB
       / EQ / BLEED / CHORUS / CLUB / QUANTIZE / DLY-VRB, with the next control ("JA...")
@@ -1735,6 +1741,18 @@ line references, spot-checked before being written down.
 - [x] **H14 — FIXED 2026-09-21.** **Teardown races** — `_swapEchoEngine`'s timeout has no `_disposed` check
       (`DubBus.ts:963`), nor does `setChainOrder`'s (`:6340`); `dispose` never clears
       `masterInsertPending`.
+- [x] **H15 — CLOSED 2026-09-21 by reading the DSP, no listening test needed.**
+      The question was whether the WASM smooths internally. It does, and explicitly:
+      `fil4-wasm/src/filters.h:37` (`proc`) ramps both the frequency coefficient and the
+      gain across the block — `d1 = (_s1 - s1) / k`, `da = (_a - a) / k` — and clamps each
+      to a factor of two per block, so a jump takes several blocks rather than one sample.
+      `fil4_wasm.cpp:104` passes **unity** for a disabled band instead of skipping it,
+      with the comment "so the section interpolates back to flat gracefully", and the
+      shelves go through `iir_interpolate`.
+      So the 16-50 ms timer writes are safe, and the band enable flag crossing +/-0.2 dB
+      is a gain interpolation to unity, not a switch. Structural answer, better than an
+      ear: it holds for every gain, every rate and every listener.
+
 - [ ] **H15** **Unverified: Fil4 EQ coefficient writes on 16-50ms timers** with no ramping
       or coalescing on the JS side, and band enable flags flickering as gain crosses
       +/-0.2 dB. Whether the WASM smooths internally could not be read. Needs a listening
@@ -1752,6 +1770,23 @@ line references, spot-checked before being written down.
       write; `masterDrop.ts:90` restores a genuine sub-0.05 master gain to full scale;
       DubBusPanel uses raw `<input type=range>` rather than the project's `Knob`;
       `DubDeckStrip.tsx:1247` has an emoji in a UI label against the project rule.
+
+- [~] **X31 — THE LEDGER'S HYPOTHESIS IS DISPROVEN. MEASURED 2026-09-21.**
+      The bare `AudioParam.value =` writes this entry points at (`DubBus.ts` bassShelf /
+      midScoop / sweepLfo / sweepOutput) are **constructor-time**, executed while the graph
+      is being built and before any audio flows. Every one of those parameters is already
+      ramped on the live path via `rampBiquadParam` / `_settle`. Fixing what this entry
+      described would have changed nothing.
+      **What was measured instead.** A meter on `DubBus.setSettings` (calls, total, max,
+      peak-per-second), surfaced through `get_dub_bus_state.settingsMeter`. Twelve store
+      writes in a burst arrive at the bus as **ONE** call costing **0.69 ms** — the mirror
+      is already coalesced, so the settings path is not being hammered at pointer rate
+      either. One 16.08 ms outlier appeared on the first write after enabling the bus,
+      which is the remaining thread to pull.
+      **Open:** needs a real drag. Drag a BUS slider for ~5 s, then read `settingsMeter`
+      and `get_frame_stats`. A high `peakPerSecond` with a milliseconds `maxMs` is
+      main-thread contention; a low one means the crackle is in the audio path and the
+      meter has ruled the control path out. Do not guess a third time.
 
 - [ ] **X31** **BUS tab sliders crackle while dragged — bad for live dubbing.** Reported
       2026-09-21 with a screenshot of BASS / MID / WIDTH / sweep / RATE.
@@ -1836,6 +1871,17 @@ line references, spot-checked before being written down.
       silence means the click never reached the move at all. Each points somewhere
       different, so get that line before changing anything.
 
+- [x] **X29 — CLOSED 2026-09-21.** The list switches rendering mode rather than being
+      fixed per row, since a per-row fix would damage the ordinary case.
+      `lib/instruments/asciiArtNames.ts` decides: a name is art-like when it is mostly
+      drawing characters OR holds an interior run of spaces, and a LIST is a picture only
+      on a RUN of three such names — one instrument called `--->` is not a drawing.
+      In art mode: `whitespace-pre`, no truncation, no badges (same CSS mechanism as the
+      X24 narrow-panel rule), and the rows share a width (`w-max min-w-full`) inside a
+      horizontally scrollable list so the picture scrolls as ONE image. Per-row scrolling
+      would shear the drawing apart, which is the detail worth keeping. 18 tests.
+      Commit `8550d9bcb`.
+
 - [ ] **X29** **ASCII art in instrument names renders badly.** Many modules spell pictures
       across consecutive instrument names (screenshot 2026-09-21, jennipha/daddytwang).
       The list is already `font-mono`, but three things fight the art: names are
@@ -1845,6 +1891,17 @@ line references, spot-checked before being written down.
       names look like art, render the block `whitespace-pre`, full width, no truncation,
       no badges. Detecting "looks like art" is the interesting part — a high ratio of
       punctuation to letters across several consecutive names is a reasonable start.
+
+- [x] **X30 — FIXED 2026-09-21.** The message blamed OffscreenCanvas and WebGL2 in a
+      session whose own report said both were supported, which was the tell.
+      The worker's 'booting' heartbeat is delivered by the MAIN thread's event loop, so a
+      blocked main thread (86 MB CED model, WASM compiles) sees no heartbeat whether or
+      not one was sent — and `watchdogStage1` could not tell that from a module that never
+      loaded. It now also asks how much of its own time the main thread got
+      (`MainThreadLiveness`) and declines to accuse the worker below 70% of its
+      heartbeats; the share goes into the report either way, so the next occurrence names
+      which of the two faults it was. Absent a measurement the old behaviour stands.
+      Commit `799b32985`.
 
 - [ ] **X30** **Pattern editor worker never loaded.** Seen in the user's console
       2026-09-21: "Tracker Worker: Pattern editor failed to start (worker never loaded
@@ -1872,6 +1929,19 @@ line references, spot-checked before being written down.
       `shangToSpring` at 3.0 and the kick impulse at 10.0 are fine.
       **Still open**: this is one confirmed source, not proof it was the only one. Report
       said "most of the time", and a single move firing cannot account for that on its own.
+
+- [x] **X27 — FIXED 2026-09-21.** Nothing in the codebase handled HMR at all: Vite
+      invalidates a changed module and everything above it, the stores sit transitively
+      above the engine, so they re-executed and `create(...)` rebuilt each one at its
+      defaults. The song was never unloaded — the store holding it was replaced.
+      `lib/dev/keepAcrossHmr.ts` carries the DATA of the seven song-holding stores over a
+      reload and deliberately not the functions, since a store's actions live in its state
+      and restoring an old snapshot wholesale would reinstate the OLD closures.
+      Two things learned: Vite keeps ONE dispose callback per module, so a second
+      registration replaces the first silently (one callback walking a registry instead);
+      and a hot context is not always Vite's — the test runner hands over a partial one,
+      and reading `data` off it threw at module scope, which turned 48 store-import tests
+      red and is now its own regression test. Commit `1214abc56`.
 
 - [ ] **X27** **HMR wipes the loaded song during a dev session.** Observed repeatedly
       2026-09-21: editing `DubBus.ts` while playing reset the project to an empty default
