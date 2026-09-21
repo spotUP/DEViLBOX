@@ -3,6 +3,8 @@
  */
 
 import { keepAcrossHmr } from '@/lib/dev/keepAcrossHmr';
+import { fireRowHooks } from '@/lib/dev/rowTickHooks';
+import { getEditorStoreRef, getCursorStoreRef } from './storeAccess';
 import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
 import * as Tone from 'tone';
@@ -122,6 +124,26 @@ export function cancelPendingRowUpdate(): void {
   pendingRow = null;
   pendingPatternLength = undefined;
 }
+
+/**
+ * Load the modules that register per-row hooks, once.
+ *
+ * They register themselves on import, but nothing imports them until the Dub
+ * Deck mounts — and lane events and effect commands have to work whether or
+ * not that view has ever been opened. A dynamic import is the ESM equivalent
+ * of what the old `require()` was reaching for, and unlike `require` it exists.
+ */
+let _rowHooksLoading = false;
+function ensureRowHooksLoaded(): void {
+  if (_rowHooksLoading) return;
+  _rowHooksLoading = true;
+  void import('@engine/dub/DubLanePlayer')
+    .then(() => import('@engine/dub/DubEffectScanner'))
+    .catch((err) => console.error('[transport] per-row dub hooks failed to load:', err));
+}
+
+/** One warning, not one per row, when the cursor store is not up yet. */
+let _followWarned = false;
 
 export const useTransportStore = create<TransportStore>()(
   immer((set, _get) => ({
@@ -312,37 +334,45 @@ export const useTransportStore = create<TransportStore>()(
         const prevRow = state.currentRow;
         state.currentRow = row;
 
-        // Phase 1 of Tracker Dub Studio: fire any lane events whose row has
-        // arrived. Safe to call on every row advance — the player's internal
-        // cursor makes this O(1) per tick when no events match. The require()
-        // matches the file's pattern for avoiding circular imports at startup.
+        // Per-row hooks: the dub lane player and the dub effect-command
+        // scanner, in that order, so their interleaving stays deterministic.
+        //
+        // These used to be `require()` calls with a comment calling that "the
+        // file's pattern for avoiding circular imports at startup". `require`
+        // does not exist in an ESM browser bundle, so each threw on the first
+        // row into the catch beside it: lane events never fired and `Z00`
+        // typed into a cell did nothing, for as long as the code has been
+        // there. The cycle they were avoiding is real, so they are late-bound
+        // through a leaf registry instead — see `lib/dev/rowTickHooks.ts`.
         if (state.isPlaying) {
-          try {
-            const { dubLanePlayer } = require('../engine/dub/DubLanePlayer');
-            dubLanePlayer.onTick(row);
-          } catch { /* player not yet loaded — ignore on first boot */ }
-          // Dub effect-command cells (effTyp 33/34/35) — inline equivalent
-          // of dubLane events, scanned per row so users who type "Z00" into
-          // a cell hear the move fire. Lane events run first (above), then
-          // effect commands, so their interleaving is deterministic.
-          try {
-            const { scanDubEffectsForRow } = require('../engine/dub/DubEffectScanner');
-            scanDubEffectsForRow(row);
-          } catch { /* scanner not loaded — ignore on first boot */ }
+          ensureRowHooksLoaded();
+          fireRowHooks(row);
         }
 
-        // Follow playback: sync cursor to playback row
+        // Follow playback: sync cursor to playback row.
+        //
+        // Same fault, and this is the one that shows: the edit cursor never
+        // followed the play head, reported 2026-09-21 as "the pattern scroll
+        // is frozen". `storeAccess` is the registry these three stores already
+        // use to reach each other without re-forming their import cycle.
         if (state.isPlaying) {
           try {
-            const { useEditorStore } = require('./useEditorStore');
-            const { useCursorStore } = require('./useCursorStore');
-            if (useEditorStore.getState().followPlayback) {
-              const cursor = useCursorStore.getState().cursor;
+            const editor = getEditorStoreRef().getState() as { followPlayback?: boolean };
+            if (editor.followPlayback) {
+              const cursorStore = getCursorStoreRef();
+              const { cursor } = cursorStore.getState() as { cursor: { rowIndex: number } };
               if (cursor.rowIndex !== row) {
-                useCursorStore.setState({ cursor: { ...cursor, rowIndex: row } });
+                cursorStore.setState({ cursor: { ...cursor, rowIndex: row } });
               }
             }
-          } catch { /* avoid circular import issues at startup */ }
+          } catch (err) {
+            // Before registration this is expected exactly once, at boot. A
+            // catch that never speaks is what hid the original fault.
+            if (!_followWarned) {
+              _followWarned = true;
+              console.warn('[transport] follow-playback could not reach the cursor store:', err);
+            }
+          }
         }
 
         // Track continuous row for smooth scrolling
