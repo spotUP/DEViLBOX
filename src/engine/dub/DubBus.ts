@@ -4997,7 +4997,7 @@ export class DubBus {
       thumpToInput.connect(this.input);
       // Direct to return so the whump is always audible, not choked by bus sidechain
       const thumpToReturn = ctx.createGain();
-      thumpToReturn.gain.value = target * 1.1;
+      thumpToReturn.gain.value = target * 0.85;
       thumpSrc.connect(thumpToReturn);
       thumpToReturn.connect(this.return_);
       thumpSrc.start(now);
@@ -5038,8 +5038,15 @@ export class DubBus {
       bp.connect(shangToSpring);
       bright.connect(shangToSpring);
       Tone.connect(shangToSpring, this.spring.input as unknown as Tone.InputNode);
+      // The SECOND direct-to-return path in this move, and it was missed when
+      // the thump above was brought down from 2.0 — slam still summed 1.1 + 1.5
+      // straight into the return.
+      //
+      // The stated multiplier also understates it: `bp` AND `bright` both feed
+      // this node, so their outputs sum, and `bright` is a peaking filter at
+      // +9 dB. The effective level is well above the number written here.
       const shangToReturn = ctx.createGain();
-      shangToReturn.gain.value = target * 1.5;
+      shangToReturn.gain.value = target * 0.6;
       bp.connect(shangToReturn);
       bright.connect(shangToReturn);
       shangToReturn.connect(this.return_);
