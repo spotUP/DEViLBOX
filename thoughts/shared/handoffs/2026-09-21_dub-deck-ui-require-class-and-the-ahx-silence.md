@@ -197,3 +197,50 @@ All of it survives in `get_dub_bus_state`, so the next session starts from measu
 - New tests wired into `test:ci`: `strandedMoveMutes`, `asciiArtNames`, `keepAcrossHmr`,
   `rowTickHooks`, `hoverTooltip`, plus additions to `dubDeckStripInteractions.contract` and
   `trackerWatchdog`.
+
+---
+
+## Addendum — 2026-09-21, later session
+
+**X23: root cause found, fixed, and confirmed by ear** (`55a3ef078`).
+
+The A/B this handoff asked for did not reproduce the silence. It exposed
+something else, and the something else was real.
+
+`DubChannelLifecycle.active` records what the WORKLET has enabled. A song load
+hands the engine a worklet with none of it, and the record survived — so
+`setDesired(ch, true)` saw `want === active`, returned `'none'`, and the enable
+was never re-posted. Everything else still worked: the fader moved, the store
+updated, the send gain ramped. The channel looked live and was silent, for the
+rest of the session, and only a transition through zero could clear it.
+
+Measured on jennipha.ahx: channels 2 and 3 held sends of 0.5 and 0.15 with taps
+registered and `dubChannelEnabled` false for both. 0.15 → 0.4 on channel 3 did
+nothing. 0.4 → 0 → 0.4 brought it straight back, `activeChannels` [0,1] →
+[0,1,3].
+
+Fixed in `rebuildDubConnections`, which drops the belief before its early
+returns — the no-engine-yet case is exactly the one that otherwise leaves the
+stale record for the next send write. Verified through the product's own path
+(load, open send, load a second song, play): all four channels enabled, taps
+registered, non-zero level at `bus.input`. User confirmed by ear: "it survives".
+
+**Still open:** the ORIGINAL X23 symptom — `rmsAvg` to 0 with no recovery — did
+not reproduce on either song today, on a restored project or a clean load. It
+is not accounted for by this fix.
+
+**Also this session**
+
+- The `require()` sweep is done (`30b49598f`). All 40 non-test calls gone.
+  `src/__tests__/noCommonJsRequire.test.ts` holds the property over the source
+  text, because vitest transforms for Node where `require` DOES resolve — a
+  per-call unit test passes against the broken code. Ledger of the sweep:
+  `thoughts/spot/require-sweep.md` (gitignored).
+- **Consequence to watch:** dub lane events had never fired. They fire now, so a
+  song carrying dub automation (jennipha does) moves its own sends and bus
+  settings during playback where it used to sit still. Observed live: sends
+  drifting to 1 / 0.89 / 1 and `echoIntensity`, `sidechainAmount`, `returnGain`
+  changing under playback.
+- EQ tab layout done (`6dff67105`) — curve fills its container, sliders in two
+  columns at >= 720px.
+- 19 commits unpushed.
