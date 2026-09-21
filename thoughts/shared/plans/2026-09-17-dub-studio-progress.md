@@ -1577,6 +1577,33 @@ this bug.
       `AutoDub.ts:1598` (`barPos * 4`) is the same assumption; `barPos` already comes from
       the clock, so converting it is mechanical.
 
+- [~] **X37** **The music mutes for a pattern or two while effects keep firing.** Reported
+      2026-09-21: "the music is mutet for a pattern or two and only effects fire".
+      **This is not the performer resting** — an earlier reading of the same complaint as
+      "a pattern of silence" was taken as periodic REST, and a phrase-arc change was made
+      and then reverted when the clarification arrived. Several moves mute the DRY signal
+      while held (versionDrop, masterDrop, channelMute, ghostReverb, riddimSection), so a
+      hold whose release is lost leaves the music off while the wet path keeps sounding.
+      **Mechanism for the DURATION, found by reading:** `reapOrphanedDubTransients` is a
+      safety net that restores a channel held too long, called every AutoDub tick, and its
+      own comment cites the 2026-09-18 incident where every channel sat muted. Its
+      threshold was `ORPHAN_AFTER_MS = 30_000`. The longest legitimate hold is
+      riddimSection at four bars, about 7.7s at 125 BPM, and a pattern at speed 12 is
+      roughly fifteen seconds. So "muted for a pattern or two" is the RESCUE arriving,
+      not the leak: the net worked and waited half a minute to do it.
+      Lowered to 12s — clear of the longest real hold, under a pattern of damage. That
+      BOUNDS a leak; it does not fix one.
+      **Still to find: what leaks.** Checked and cleared: `channelMute` (ref-counted
+      transient, guarded dispose), `riddimSection` (clears its skank timer, releases every
+      remaining mute), and the ref counter itself — an unbalanced `end` at depth 0 returns
+      null, and nested transients only restore on the last close, so overlapping drops
+      cannot release each other early.
+      Not yet cleared: `versionDrop`'s staggered restore schedules UNTRACKED `setTimeout`s
+      up to `RESTORE_MAX_MS` (700ms) that are never cancelled, and `masterDrop`.
+      The fire log now records `mutedChannels` / `mutedChannelCount` at every fire and
+      release, so the next occurrence names the move rather than needing another report.
+      Look for the reaper's own warning too: `[dubTransient] chN was held for too long`.
+
 - [ ] **X36** **King Tubby goes quiet for long stretches, then only fires slam or crack.**
       Reported 2026-09-21: "long silent pauses where the persona king tubby just fire slam
       or crack etc are not uncommon".
