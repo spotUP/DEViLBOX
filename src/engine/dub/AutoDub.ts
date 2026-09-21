@@ -1896,6 +1896,22 @@ export function startAutoDub(): void {
   // needs ~2 s of live audio to refill before it starts voting again.
   resetRuntimeChannelClassifier();
   resetAutoEqDriver();
+
+  // Hand back anything still held at the mixer BEFORE the first tick.
+  //
+  // Symmetric with `stopAutoDub`, and the asymmetry mattered: nothing
+  // legitimate holds a channel at the moment the performer starts, so a mute
+  // still open here is left over from a previous run. It would then be captured
+  // as the BASELINE by the next move that touches that channel — the live store
+  // value is what `beginDubTransient` records as "the user's state" — and from
+  // then on every correct release restores the channel to muted. A leak that
+  // lasted one gesture becomes permanent.
+  //
+  // That is what "it started muted with effects now" looks like from the
+  // outside: the music never comes back, while the wet path keeps working
+  // because the send is untouched. Reported 2026-09-21.
+  releaseAllDubTransients();
+
   _timer = setInterval(tickImpl, TICK_MS);
   // Gate M1: the journal records every fire; this is how the AI's own get a
   // reason attached. Registered here rather than imported by the journal, so

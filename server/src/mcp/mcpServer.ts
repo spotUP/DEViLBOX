@@ -405,6 +405,17 @@ export function createMcpServer(): McpServer {
   );
 
   server.tool(
+    'clear_dub_automation',
+    'Remove every recorded DUB automation lane (parameters prefixed "dub.") from the '
+      + 'project, leaving musical automation untouched. A song carrying recorded dub '
+      + 'moves replays that whole performance on every pass — muting channels and firing '
+      + 'effects from row 0 — which looks exactly like the live performer misbehaving. '
+      + 'Returns how many lanes were removed, by parameter.',
+    {},
+    () => call('clear_dub_automation'),
+  );
+
+  server.tool(
     'get_playback_silence',
     'Diagnose "it says it is playing and there is no sound": reports whether the '
       + 'engine is rendering silence while the transport runs, with the worklet\'s own '
@@ -2076,6 +2087,7 @@ export function createMcpServer(): McpServer {
           { tool: 'seek_to', description: 'Seek to a position' },
           { tool: 'get_playback_state', description: 'Get playback state (playing, position, BPM)' },
           { tool: 'get_playback_silence', description: 'Diagnose playing-but-silent (engine rendering silence)' },
+          { tool: 'clear_dub_automation', description: 'Strip recorded dub lanes, keep musical automation' },
         ],
         'Mixer': [
           { tool: 'get_mixer_state', description: 'Get all channel volumes, pans, mutes, solos' },
