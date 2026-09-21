@@ -3958,14 +3958,66 @@ export class DubBus {
           this._clubSimPreset = merged.clubSimPreset;
         }
       } else if (!enabled && this._clubConvolverWired) {
-        try { this.return_.disconnect(this.clubConvolver); } catch { /* ok */ }
-        try { this.clubConvolver.disconnect(this.clubWet); } catch { /* ok */ }
+        // Let the tail finish before cutting the wire.
+        //
+        // `clubWet` is faded with setTargetAtTime, which approaches zero
+        // asymptotically and never actually reaches it, and the disconnects ran
+        // in the SAME tick — severing a 2.5s reverb tail at full gain. That is
+        // a chop, not a click, and it is why disabling club sim sounded like
+        // the audio dropped out.
+        //
+        // Ramp properly to zero, then disconnect once it has landed. The flag
+        // is cleared immediately so a re-enable inside the window does not
+        // double-wire.
         this._clubConvolverWired = false;
+        const fadeSec = 0.12;
+        try {
+          this.clubWet.gain.cancelScheduledValues(now);
+          this.clubWet.gain.setValueAtTime(this.clubWet.gain.value, now);
+          this.clubWet.gain.linearRampToValueAtTime(0, now + fadeSec);
+        } catch { /* ok */ }
+        const convolver = this.clubConvolver;
+        const wet = this.clubWet;
+        setTimeout(() => {
+          if (this._disposed) return;
+          // Re-enabled during the fade — leave the wiring alone.
+          if (this._clubConvolverWired) return;
+          try { this.return_.disconnect(convolver); } catch { /* ok */ }
+          try { convolver.disconnect(wet); } catch { /* ok */ }
+        }, Math.ceil(fadeSec * 1000) + 20);
       }
     }
     if (settings.clubSimPreset !== undefined && merged.clubSimPreset !== this._clubSimPreset) {
+      // Swapping a live ConvolverNode's buffer truncates whatever tail is still
+      // sounding — an instant dropout of the room. Duck the wet, swap while it
+      // is silent, bring it back.
+      //
+      // Not the full two-convolver crossfade `setPlateStage` uses: that is right
+      // for a stage that must stay continuous, while a room CHANGE is allowed
+      // to re-start its tail. What is not allowed is the chop.
       const preset = CLUB_IR_PRESETS[merged.clubSimPreset] ?? CLUB_IR_PRESETS.soundSystem;
-      this.clubConvolver.buffer = generateIR(this.context, preset);
+      const wired = this._clubConvolverWired;
+      const targetMix = merged.clubSimEnabled ? merged.clubSimMix : 0;
+      if (!wired) {
+        this.clubConvolver.buffer = generateIR(this.context, preset);
+      } else {
+        const duckSec = 0.06;
+        try {
+          this.clubWet.gain.cancelScheduledValues(now);
+          this.clubWet.gain.setValueAtTime(this.clubWet.gain.value, now);
+          this.clubWet.gain.linearRampToValueAtTime(0, now + duckSec);
+        } catch { /* ok */ }
+        setTimeout(() => {
+          if (this._disposed) return;
+          try { this.clubConvolver.buffer = generateIR(this.context, preset); } catch { /* ok */ }
+          const backAt = this.context.currentTime;
+          try {
+            this.clubWet.gain.cancelScheduledValues(backAt);
+            this.clubWet.gain.setValueAtTime(0, backAt);
+            this.clubWet.gain.linearRampToValueAtTime(targetMix, backAt + duckSec);
+          } catch { /* ok */ }
+        }, Math.ceil(duckSec * 1000) + 10);
+      }
       this._clubSimPreset = merged.clubSimPreset;
     }
 
@@ -4208,7 +4260,7 @@ export class DubBus {
    * Idempotent: re-calling while active is a no-op. Safe to call with the
    * same nodes after a hot-reload — we undo the previous wiring first.
    */
-  wireMasterInsert(source: AudioNode, dest: AudioNode): void {
+  async wireMasterInsert(source: AudioNode, dest: AudioNode): Promise<void> {
     console.log('[DubBusCtrl] wireMasterInsert');
     this._snap('pre-wireMasterInsert');
     if (this.masterInsertActive &&
@@ -4249,10 +4301,24 @@ export class DubBus {
     // the mid-buffer click the old hard rewire produced.
     const now = this.context.currentTime;
     const FADE_SEC = 0.01;
+    // Ramp the envelope down and rewire AFTER it lands, rather than stepping to
+    // zero and cutting in the same tick.
+    //
+    // The old comment here admitted the flaw: "the direct source->dest cut
+    // still happens inside the mute window; caller sees a brief silence". At
+    // full gain that cut is a click, and the silence is audible as a chop every
+    // time the bus is enabled. Reported 2026-09-21 — choppy, cut-out audio
+    // matters as much as distortion on a live surface.
+    //
+    // `unwireMasterInsert` already ramps and then defers its disconnect; this
+    // is the same shape, so the two sides of the insert behave alike.
     try {
       this.masterInsertEnvelope.gain.cancelScheduledValues(now);
-      this.masterInsertEnvelope.gain.setValueAtTime(0, now);
+      this.masterInsertEnvelope.gain.setValueAtTime(this.masterInsertEnvelope.gain.value, now);
+      this.masterInsertEnvelope.gain.linearRampToValueAtTime(0, now + FADE_SEC);
     } catch { /* ok */ }
+    await new Promise<void>((r) => setTimeout(r, Math.ceil(FADE_SEC * 1000) + 2));
+    if (this._disposed) return;
     try { source.disconnect(dest); } catch { /* ok */ }
     try {
       source.connect(this.masterInsertHead);
@@ -4266,9 +4332,14 @@ export class DubBus {
       this.masterInsertActive = true;
       // Re-run setSettings so the master-side gain writes pick up masterActive=true.
       this.setSettings({});
-      // Ramp envelope back to 1 — insert fades in smoothly.
+      // Ramp envelope back to 1 — insert fades in smoothly. Timed from NOW,
+      // not from the pre-fade `now`, which is already in the past by the length
+      // of the fade and would make this ramp land instantly.
       try {
-        this.masterInsertEnvelope.gain.linearRampToValueAtTime(1, now + FADE_SEC);
+        const upAt = this.context.currentTime;
+        this.masterInsertEnvelope.gain.cancelScheduledValues(upAt);
+        this.masterInsertEnvelope.gain.setValueAtTime(this.masterInsertEnvelope.gain.value, upAt);
+        this.masterInsertEnvelope.gain.linearRampToValueAtTime(1, upAt + FADE_SEC);
       } catch { /* ok */ }
     } catch (err) {
       console.warn('[DubBus] wireMasterInsert failed, restoring passthrough:', err);
@@ -6357,6 +6428,9 @@ export class DubBus {
 
     setTimeout(() => {
       // Race guard: if another setChainOrder was called, abandon this one
+      // The version guard catches a SUPERSEDED reorder, not a disposed bus — a
+      // dispose inside the window leaves this rewiring torn-down nodes.
+      if (this._disposed) return;
       if (this._routingVersion !== version) return;
       try {
         this._disconnectCoreRouting();
@@ -6748,6 +6822,12 @@ export class DubBus {
   dispose(): void {
     for (const timer of this._heldAnnouncements.values()) clearInterval(timer);
     this._heldAnnouncements.clear();
+    // The deferred master-insert rewire reconnects `source -> dest`. Left
+    // running past teardown it restores an audio path through a disposed bus.
+    if (this.masterInsertPending !== null) {
+      clearTimeout(this.masterInsertPending);
+      this.masterInsertPending = null;
+    }
     try { this._unsubIsolation?.(); } catch { /* ok */ }
     this._unsubIsolation = null;
     this._disposed = true;

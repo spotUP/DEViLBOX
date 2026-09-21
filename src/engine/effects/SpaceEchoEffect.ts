@@ -1,4 +1,5 @@
 import * as Tone from 'tone';
+import { rampDryWet } from './rampParam';
 
 export interface SpaceEchoOptions {
   mode?: number;        // 1-12
@@ -283,8 +284,15 @@ export class SpaceEchoEffect extends Tone.ToneAudioNode {
 
   set wet(value: number) {
     this._options.wet = Math.max(0, Math.min(1, value));
-    this.wetGain.gain.value = this._options.wet;
-    this.dryGain.gain.value = 1 - this._options.wet;
+    // Crossfaded, not stepped: the Echo Wet slider drives this on every pointer
+    // event through DubBus.setSettings, so a bare assignment was one
+    // discontinuity per pixel.
+    rampDryWet(
+      this.dryGain.gain,
+      this.wetGain.gain,
+      this._options.wet,
+      this.dryGain.context.currentTime,
+    );
   }
 
   dispose(): this {

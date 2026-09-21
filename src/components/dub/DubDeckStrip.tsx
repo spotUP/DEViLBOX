@@ -559,7 +559,11 @@ export const DubDeckStrip: React.FC = () => {
       return;
     }
     try {
-      bus.wireMasterInsert(sourceNative, destNative);
+      // Fire-and-forget: it now fades the insert envelope down, rewires after
+      // the fade lands, and fades back up, so it is async. The effect does not
+      // wait on it — the teardown below is keyed on `busEnabled`, which cannot
+      // change until React re-renders.
+      void bus.wireMasterInsert(sourceNative, destNative);
     } catch (e) {
       console.warn('[DubDeckStrip] wireMasterInsert failed:', e);
     }
