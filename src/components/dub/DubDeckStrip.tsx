@@ -223,6 +223,7 @@ export const DubDeckStrip: React.FC = () => {
   const setAutoDubPersona = useDubStore(s => s.setAutoDubPersona);
   const setAutoDubIntensity = useDubStore(s => s.setAutoDubIntensity);
   const autoDubEqMode = useDubStore(s => s.autoDubEqMode ?? 'both');
+  const autoDubIntensity = useDubStore(s => s.autoDubIntensity);
   const setAutoDubEqMode = useDubStore(s => s.setAutoDubEqMode);
 
   const busEnabled = useDrumPadStore(s => s.dubBus.enabled);
@@ -252,6 +253,9 @@ export const DubDeckStrip: React.FC = () => {
    */
   const liveReturnGain = useLiveDubParam('dub.returnGain', dubBusSettings.returnGain);
   const liveSweepAmount = useLiveDubParam('dub.sweepAmount', dubBusSettings.sweepAmount);
+  // Moves modulate echo feedback constantly (every throw), so this follows the
+  // performer the same way FX WET does.
+  const liveEchoIntensity = useLiveDubParam('dub.echoIntensity', dubBusSettings.echoIntensity);
   const liveSweepRateHz = useLiveDubParam(
     'dub.sweepRateHz', dubBusSettings.sweepRateHz, denormalizeSweepRate,
   );
@@ -1300,20 +1304,63 @@ export const DubDeckStrip: React.FC = () => {
         </button>
       </div>
 
-      {/* FX Wet — quick returnGain fader, always visible when bus is on */}
+      {/* The always-visible live row.
+          FX WET used to sit here alone across the full width, while the
+          controls a performer reaches for most often were behind a small
+          settings cog. The row had the space; the cog is for what you set
+          once and leave. Each control keeps its own minimum width and the
+          row wraps, so a narrow deck stacks them instead of squashing all
+          three into unusable stubs. */}
       {busEnabled && (
-        <div className="flex items-center gap-2 px-1 py-1 border-b border-dark-border">
-          <span className="text-text-muted text-[9px] font-mono shrink-0 w-10 text-right">FX WET</span>
-          <input
-            type="range" min={0} max={1} step={0.01}
-            value={liveReturnGain}
-            onChange={(e) => setDubBus({ returnGain: Number(e.target.value) })}
-            className="flex-1 accent-accent-highlight cursor-pointer"
-            title={`FX wet level: ${(liveReturnGain * 100).toFixed(0)}%`}
-          />
-          <span className="text-text-secondary text-[9px] font-mono tabular-nums w-7 text-right shrink-0">
-            {(liveReturnGain * 100).toFixed(0)}%
-          </span>
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-1 py-1 border-b border-dark-border">
+          <div className="flex items-center gap-2 flex-1 min-w-[11rem]">
+            <span className="text-text-muted text-[9px] font-mono shrink-0">FX WET</span>
+            <input
+              type="range" min={0} max={1} step={0.01}
+              value={liveReturnGain}
+              onChange={(e) => setDubBus({ returnGain: Number(e.target.value) })}
+              className="flex-1 min-w-0 accent-accent-highlight cursor-pointer"
+              title={`FX wet level: ${(liveReturnGain * 100).toFixed(0)}%`}
+            />
+            <span className="text-text-secondary text-[9px] font-mono tabular-nums w-7 text-right shrink-0">
+              {(liveReturnGain * 100).toFixed(0)}%
+            </span>
+          </div>
+
+          {/* How busy the performer is: the one control that decides whether a
+              section breathes or drives. */}
+          <div className="flex items-center gap-2 flex-1 min-w-[11rem]">
+            <span className="text-text-muted text-[9px] font-mono shrink-0">INTENSITY</span>
+            <input
+              type="range" min={0} max={1} step={0.01}
+              value={autoDubIntensity}
+              onChange={(e) => setAutoDubIntensity(Number(e.target.value))}
+              className="flex-1 min-w-0 accent-accent-primary cursor-pointer disabled:opacity-40"
+              disabled={!autoDubEnabled}
+              title={autoDubEnabled
+                ? `Auto Dub intensity: ${(autoDubIntensity * 100).toFixed(0)}% — how often the performer fires`
+                : 'Auto Dub intensity — switch AUTO DUB on to use'}
+            />
+            <span className="text-text-secondary text-[9px] font-mono tabular-nums w-7 text-right shrink-0">
+              {(autoDubIntensity * 100).toFixed(0)}%
+            </span>
+          </div>
+
+          {/* Echo feedback: how long the repeats hang on. The other hand on a
+              dub desk, and it was behind a tab. */}
+          <div className="flex items-center gap-2 flex-1 min-w-[11rem]">
+            <span className="text-text-muted text-[9px] font-mono shrink-0">FEEDBACK</span>
+            <input
+              type="range" min={0} max={1} step={0.01}
+              value={liveEchoIntensity}
+              onChange={(e) => setDubBus({ echoIntensity: Number(e.target.value) })}
+              className="flex-1 min-w-0 accent-accent-secondary cursor-pointer"
+              title={`Echo feedback: ${(liveEchoIntensity * 100).toFixed(0)}% — how long the repeats last`}
+            />
+            <span className="text-text-secondary text-[9px] font-mono tabular-nums w-7 text-right shrink-0">
+              {(liveEchoIntensity * 100).toFixed(0)}%
+            </span>
+          </div>
         </div>
       )}
 
