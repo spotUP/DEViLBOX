@@ -5150,7 +5150,24 @@ export class DubBus {
 
     // Input gain
     const inputGain = ctx.createGain();
-    inputGain.gain.value = 1.0;
+    // Bound the ring so it cannot run away.
+    //
+    // This is a closed loop through the OUTPUT: return_ -> inputGain -> delays
+    // -> wetGain -> return_, with cross-feed recirculating inside it. The
+    // internal loop settles at 1/(1-fb), both taps reach the output, so the
+    // round-trip gain is 2*wet/(1-fb). At the shipped Mad Professor values
+    // (fb 0.5, wet 0.7) that is 2.8 — every pass 9dB louder than the last, into
+    // clipping within seconds, and AutoDub's madProfessor persona fires this
+    // unattended.
+    //
+    // Unlike the external feedback path, which is both clamped and backed by
+    // the extFeedbackLimit soft-clip governor, nothing bounded this one, and
+    // landing on return_ puts it past the input clip and the sidechain.
+    //
+    // 0.8 target rather than 1.0: at exactly unity the ring sustains forever
+    // instead of decaying, which is a drone, not a delay.
+    const ringGain = 2 * Math.max(0.01, wetAmt) / Math.max(0.05, 1 - fb);
+    inputGain.gain.value = Math.min(1, 0.8 / ringGain);
 
     // Wet gain for output
     const wetGain = ctx.createGain();

@@ -31,11 +31,20 @@ const SRC = readFileSync(resolve(import.meta.dirname, '..', 'DubBus.ts'), 'utf8'
  */
 function directReturnGains(): Array<{ name: string; factor: number }> {
   const out: Array<{ name: string; factor: number }> = [];
-  for (const m of SRC.matchAll(/(\w+)\.gain\.value\s*=\s*[\w.]+\s*\*\s*([0-9.]+)\s*;/g)) {
-    const [, name, factor] = m;
-    // Only those that reach the output directly.
-    if (new RegExp(`${name}\\.connect\\(this\\.return_\\)`).test(SRC)) {
-      out.push({ name, factor: Number(factor) });
+  // Two shapes, because the first version of this only matched the first and
+  // an audit found three uncovered sites sitting at or near unity:
+  //   `x.gain.value = something * 1.5;`   — a scaled assignment
+  //   `x.gain.value = 1.0;`               — a bare literal
+  // A guard that only sees one spelling is a guard with a hole in it.
+  const scaled = /(\w+)\.gain\.value\s*=\s*[\w.]+\s*\*\s*([0-9.]+)\s*;/g;
+  const bare = /(\w+)\.gain\.value\s*=\s*([0-9.]+)\s*;/g;
+  for (const re of [scaled, bare]) {
+    for (const m of SRC.matchAll(re)) {
+      const [, name, factor] = m;
+      // Only those that reach the output directly.
+      if (new RegExp(`${name}\\.connect\\(this\\.return_\\)`).test(SRC)) {
+        out.push({ name, factor: Number(factor) });
+      }
     }
   }
   return out;
@@ -47,10 +56,32 @@ describe('nothing reaches the return above unity', () => {
     expect(directReturnGains().length).toBeGreaterThan(0);
   });
 
-  it('keeps every direct-to-return gain under 1', () => {
-    const over = directReturnGains().filter(g => g.factor >= 1);
+  it('never multiplies a signal on its way to the return', () => {
+    // Above unity is always wrong here: the return bypasses the input clip and
+    // the sidechain, so a multiplier lands on the output as written.
+    const over = directReturnGains().filter(g => g.factor > 1);
     expect(over, `over unity: ${over.map(g => `${g.name}=${g.factor}`).join(', ')}`)
       .toEqual([]);
+  });
+
+  it('allows unity only where the level is already bounded upstream', () => {
+    // Exactly 1.0 is a pass-through, not a boost, and that is correct when the
+    // envelope feeding it went through `generatedPeak` — the programme
+    // reference has already decided how loud the thing may be. `fireNoiseBurst`
+    // is the case: its `env` carries generatedPeak('noiseBurst', level), so the
+    // unity tap simply hands that along.
+    //
+    // A blanket "nothing at unity" rule would have forced that gain down and
+    // quietly undone the snare-crack fix, so the rule asks the question that
+    // actually matters instead: is anything bounding this signal?
+    for (const g of directReturnGains().filter(x => x.factor === 1)) {
+      const at = SRC.indexOf(`${g.name}.gain.value = 1`);
+      expect(at, `${g.name} assignment not found`).toBeGreaterThan(-1);
+      // Look back over the enclosing move for the reference call.
+      const before = SRC.slice(Math.max(0, at - 2500), at);
+      expect(before, `${g.name} is at unity with nothing bounding it upstream`)
+        .toMatch(/generatedPeak\(/);
+    }
   });
 
   it('keeps the two slam layers summing below full scale', () => {
