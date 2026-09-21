@@ -737,6 +737,13 @@ export function createMcpServer(): McpServer {
   );
 
   server.tool(
+    'get_channel_evidence',
+    "Per-pattern measurements of what each channel is actually doing: pitch range and median, stepwise vs leaping motion, note density, on/off-beat split and skank confidence, onset regularity, polyphony, instruments used and effect types. Walks the song ORDER, so a pattern played twice appears twice. This is evidence, not a label - use get_channel_roles for the classifier's verdict, and this when that verdict looks wrong or when you need to see a channel change character across the song.",
+    { channel: z.number().optional() },
+    ({ channel }: { channel?: number }) => call('get_channel_evidence', { channel }),
+  );
+
+  server.tool(
     'route_parameter',
     'Route a normalized 0-1 value to any mappable parameter, exactly as a MIDI CC would (synth params, dub bus, DJ, master FX). Use it to drive a control that has no dedicated tool.',
     { param: z.string(), value: z.number(), instrumentId: z.number().optional() },
