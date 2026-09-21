@@ -1246,7 +1246,7 @@ export const DubDeckStrip: React.FC = () => {
             title={micActive ? 'Mic ON — routing to dub bus. Click to stop.' : 'Mic OFF — click to route microphone into dub bus (for MC vocals, dub siren, Toast)'}
             disabled={!busEnabled}
           >
-            🎤 {micActive ? 'ON' : 'OFF'}
+            MIC {micActive ? 'ON' : 'OFF'}
           </button>
           {micActive && (
             <input

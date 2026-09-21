@@ -1541,7 +1541,14 @@ this bug.
       sweep range — 60ms is a long way down from a 320ms rate and may pass through too
       fast at `downMs=120` to be heard as pitch.
 
-- [ ] **X34** **Slam and Kick are the only moves whose level ignores the music.** Found by
+- [x] **X34 — FIXED 2026-09-21.** Both now go through `generatedPeak` like every other
+      generated source, with presence entries of their own (`springSlam` 0.8, `springKick`
+      0.95 — kick higher because it reaches the output only through the spring, while slam
+      already carries a direct sub thump). The absolute multipliers stay as the move's
+      internal balance between its layers; the reference carries how loud it should be
+      against THIS music. Any further tuning by ear is now stable across songs.
+
+- [x] **X34 (original entry)** **Slam and Kick are the only moves whose level ignores the music.** Found by
       audit 2026-09-21, not by ear.
       Every generated source in `DubBus` is referenced to the programme through
       `generatedPeak` so it keeps its relationship to the mix on any song — except
@@ -1556,7 +1563,11 @@ this bug.
       NB the clipping guard (`directReturnHeadroom.test.ts`) constrains the direct-to-
       return paths and must keep passing after any change here.
 
-- [ ] **X35** **`quantize === 'bar'` hardcodes 4 beats per bar.** `DubActions.ts:246`:
+- [x] **X35 — FIXED 2026-09-21.** `DubActions.ts` takes `beatsPerBar` from
+      `DEFAULT_MUSICAL_CLOCK_SETTINGS.meter` instead of the literal 4. Third and last of
+      the metre-from-a-constant copies found in one day.
+
+- [x] **X35 (original entry)** **`quantize === 'bar'` hardcodes 4 beats per bar.** `DubActions.ts:246`:
       `beatMs * 4     // full bar (4/4)`. Third occurrence of the metre-from-a-constant
       class in one day, after `beatPhase` and `dubGrid`. `musicalClock` already exposes the
       real meter (`DEFAULT_MUSICAL_CLOCK_SETTINGS.meter.beatsPerBar`), so a bar-quantized
@@ -1612,51 +1623,59 @@ line references, spot-checked before being written down.
       user had just approved. The guard now fails on anything ABOVE unity, and for
       anything AT unity requires a `generatedPeak` upstream.
 
-- [ ] **H1** **Echo Wet slider steps four engines' dry/wet gains.** `SpaceEchoEffect.ts:284`,
+- [x] **H1 — FIXED 2026-09-21.** **Echo Wet slider steps four engines' dry/wet gains.** `SpaceEchoEffect.ts:284`,
       `RE201Effect.ts:327`, `AnotherDelayEffect.ts:370`, `RETapeEchoEffect.ts:373` — all
       bare `.value =`. Driven from `DubBus.ts:3697` on every `setSettings`, so every drag
       pixel of DubBusPanel's Echo Wet is a step. One shared helper in `DubEchoEngine.ts`
       would cover all four adapters.
-- [ ] **H3** **Post-echo Drive rebuilds a 4096-point WaveShaper curve per pointer event**
+- [x] **H3 — FIXED 2026-09-21.** **Post-echo Drive rebuilds a 4096-point WaveShaper curve per pointer event**
       (`DubBus.ts:3902`, `makeTapeSatCurve` at :209). Transfer-function step plus 8192
       `Math.tanh` on the main thread, every event. Pre-build a ladder and crossfade.
-- [ ] **H4** **Vinyl slider hard-switches two wet gains 0 to 1** (`DubBus.ts:6400`,
+- [x] **H4 — FIXED 2026-09-21.** **Vinyl slider hard-switches two wet gains 0 to 1** (`DubBus.ts:6400`,
       `VinylNoiseEffect.ts:191`, `ToneArmEffect.ts:198`). This chain is post-master on the
       WHOLE MIX, so it is a full-scale step, not a send. Un-debounced at
       `DubDeckStrip.tsx:589` — ~21 postMessage writes per pixel.
-- [ ] **H5** **Per-channel filter dropdown changes `BiquadFilterNode.type` live**
+- [x] **H5 — FIXED 2026-09-21.** **Per-channel filter dropdown changes `BiquadFilterNode.type` live**
       (`PerChannelDubFx.ts:117`). Coefficients change in one sample while state persists —
       click. Every other setter in that file already ramps.
-- [ ] **H6** **Tape Sat mode swaps the WaveShaper curve with no mute** (`DubBus.ts:3840`).
+- [x] **H6 — FIXED 2026-09-21.** **Tape Sat mode swaps the WaveShaper curve with no mute** (`DubBus.ts:3840`).
       The same write inside `_applyCharacterPreset` IS protected by the warmup hold; only
       the `setSettings` path is bare.
-- [ ] **H7** **Club Sim swaps a live convolver buffer** (`DubBus.ts:3968`), truncating the
+- [x] **H7 — FIXED 2026-09-21.** **Club Sim swaps a live convolver buffer** (`DubBus.ts:3968`), truncating the
       in-flight tail, and on disable disconnects in the same tick as a `setTargetAtTime`
       that never reaches zero (`:3947-3963`), cutting a 2.5s tail at full gain.
       `setPlateStage` already has the correct crossfade-and-defer pattern to copy.
-- [ ] **H8** **Channel send crossing zero: isolation flips before the 20ms ramp lands**
+- [x] **H8 — FIXED 2026-09-21.** **Channel send crossing zero: isolation flips before the 20ms ramp lands**
       (`ChannelRoutedEffects.ts:503`, `:470`). Hard cut on the way down, 20ms hole in the
       dry mix on the way up.
-- [ ] **H9** **`DJSamplerPanel.tsx:120` pushes the whole dubBus object un-debounced**,
+- [x] **H9 — FIXED 2026-09-21.** **`DJSamplerPanel.tsx:120` pushes the whole dubBus object un-debounced**,
       bypassing the 50ms/100ms debounces the other two mirrors have. Worse: hold moves
       (`ringMod.ts:26`, `voltageStarve.ts:24`) call `setSettings` directly, and the next
       mirror push turns the held effect back OFF mid-gesture. Echo rate is protected from
       exactly this by `beginRateOverride`; the colour stages are not.
-- [ ] **H10** **`setSettings` ramps collide with in-flight move ramps** — no
+- [x] **H10 — FIXED 2026-09-21.** **`setSettings` ramps collide with in-flight move ramps** — no
       `cancelScheduledValues` before ~10 `setTargetAtTime` calls. Touching FX WET during a
       held Tape Stop jumps.
-- [ ] **H11** **`wireMasterInsert` steps the insert envelope to 0** (`DubBus.ts:4248`) —
+- [x] **H11 — FIXED 2026-09-21.** **`wireMasterInsert` steps the insert envelope to 0** (`DubBus.ts:4248`) —
       instant full-mix cut. Its own mirror `unwireMasterInsert` already ramps; copy it.
-- [ ] **H12** **`modulateFeedback` uses the no-ramp panic path for musical throws**
+- [x] **H12 — FIXED 2026-09-21.** **`modulateFeedback` uses the no-ramp panic path for musical throws**
       (`DubBus.ts:4843`). A +0.15..+0.35 step inside a live delay loop.
-- [ ] **H14** **Teardown races** — `_swapEchoEngine`'s timeout has no `_disposed` check
+- [x] **H14 — FIXED 2026-09-21.** **Teardown races** — `_swapEchoEngine`'s timeout has no `_disposed` check
       (`DubBus.ts:963`), nor does `setChainOrder`'s (`:6340`); `dispose` never clears
       `masterInsertPending`.
 - [ ] **H15** **Unverified: Fil4 EQ coefficient writes on 16-50ms timers** with no ramping
       or coalescing on the JS side, and band enable flags flickering as gain crosses
       +/-0.2 dB. Whether the WASM smooths internally could not be read. Needs a listening
       test before being called fine or broken.
-- [ ] **H16** **Minor** — `setSettings({})` in `wireMasterInsert` is a dead call (empty
+- [x] **H16 — FIXED 2026-09-21.** The emoji is out of the mic label (project rule);
+      `setSettings({})` in `wireMasterInsert` now passes the settings the master path
+      depends on, since `{}` short-circuits and the call did nothing, leaving the master
+      tone EQ flat until an unrelated write arrived; and `masterDrop`'s restore guard
+      dropped from `< 0.05` to `<= 0.0005`, because the snowball case it protects against
+      is exactly zero and the old threshold restored a genuinely quiet master to FULL
+      SCALE on pad release — a loud surprise on a live rig.
+
+- [x] **H16 (original entry)** **Minor** — `setSettings({})` in `wireMasterInsert` is a dead call (empty
       object short-circuits at `:3521`), so master tone EQ stays flat until the next real
       write; `masterDrop.ts:90` restores a genuine sub-0.05 master gain to full scale;
       DubBusPanel uses raw `<input type=range>` rather than the project's `Knob`;
