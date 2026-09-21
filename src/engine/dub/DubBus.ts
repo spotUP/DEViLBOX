@@ -3551,7 +3551,70 @@ export class DubBus {
   }
 
   /** Update the dub bus settings (enable, gains, delay params). */
+  /**
+   * What one settings write actually costs, and how often one arrives.
+   *
+   * "when i pull these sliders audio crackles thats not good for live dubbing"
+   * (2026-09-21). The obvious cause — stepped `AudioParam.value =` writes —
+   * is not it: every parameter on this path is already ramped, and the bare
+   * writes the ledger pointed at are constructor-time, before audio flows.
+   *
+   * The other way a slider crackles is main-thread contention: a settings
+   * write walks about a hundred parameters, and the BUS tab's sliders call
+   * straight through on every pointermove. If that runs at pointer rate and
+   * costs milliseconds, the audio thread starves and the result is a click
+   * that no amount of ramping prevents.
+   *
+   * So measure it rather than guess again. Read through `get_dub_bus_state`.
+   */
+  private readonly _settingsMeter = {
+    calls: 0,
+    totalMs: 0,
+    maxMs: 0,
+    /** Arrival times of recent writes, for the rate figure. */
+    recent: [] as number[],
+  };
+
+  /** Cost of the settings path, as measured. Resets the window it reports. */
+  getSettingsMeter(): { calls: number; totalMs: number; maxMs: number; avgMs: number; peakPerSecond: number } {
+    const m = this._settingsMeter;
+    const now = performance.now();
+    // Highest number of writes seen inside any one-second window that is still
+    // in the buffer — an average over a drag would hide the burst.
+    let peak = 0;
+    for (let i = 0; i < m.recent.length; i++) {
+      let n = 0;
+      for (let j = i; j < m.recent.length && m.recent[j] - m.recent[i] < 1000; j++) n++;
+      if (n > peak) peak = n;
+    }
+    const out = {
+      calls: m.calls,
+      totalMs: Math.round(m.totalMs * 100) / 100,
+      maxMs: Math.round(m.maxMs * 100) / 100,
+      avgMs: m.calls ? Math.round((m.totalMs / m.calls) * 1000) / 1000 : 0,
+      peakPerSecond: peak,
+    };
+    m.calls = 0; m.totalMs = 0; m.maxMs = 0;
+    m.recent = m.recent.filter((t) => now - t < 1000);
+    return out;
+  }
+
   setSettings(settings: Partial<DubBusSettings>): void {
+    const _t0 = performance.now();
+    try {
+      this._applySettings(settings);
+    } finally {
+      const dt = performance.now() - _t0;
+      const m = this._settingsMeter;
+      m.calls++;
+      m.totalMs += dt;
+      if (dt > m.maxMs) m.maxMs = dt;
+      m.recent.push(_t0);
+      if (m.recent.length > 600) m.recent.splice(0, m.recent.length - 600);
+    }
+  }
+
+  private _applySettings(settings: Partial<DubBusSettings>): void {
     // Short-circuit no-op writes. PadGrid + DJSamplerPanel mirror this state
     // every time the store's `dubBus` OR the active deck's BPM changes —
     // during a crossfader sweep that's ~60 Hz of identical settings being

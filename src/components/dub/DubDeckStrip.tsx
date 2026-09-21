@@ -1049,7 +1049,16 @@ export const DubDeckStrip: React.FC = () => {
   return (
     <div className="flex flex-col gap-1.5 px-2 py-1.5 bg-dark-bgSecondary border-t border-dark-border font-mono overflow-y-auto max-h-[60vh]">
       {/* Header row */}
-      <div className="flex items-center gap-2 text-xs">
+      {/* The header row.
+          It had no `flex-wrap`, and its parent scrolls vertically only, so on a
+          narrower window the controls past DLY-VRB were simply clipped at the
+          right edge — reported 2026-09-21 with the next control cut in half.
+          Wrapping rather than a horizontal scrollbar: a control that has moved
+          to a second line is still there to be hit, where one hidden behind a
+          scrollbar has to be found first, which is the wrong trade live. The
+          order already runs most-used first, so what wraps is what is reached
+          for least. */}
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
         <button
           className="px-2.5 py-1 rounded border border-dark-borderLight text-text-secondary hover:text-text-primary hover:border-accent-primary transition-colors"
           onClick={toggleStripCollapsed}

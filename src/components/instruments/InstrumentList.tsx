@@ -4,7 +4,8 @@
  * Shows instrument number, name, and synth type
  */
 
-import React, { useState, useRef, useEffect, useCallback, memo } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo, memo } from 'react';
+import { namesContainArt } from '@/lib/instruments/asciiArtNames';
 import { useInstrumentStore } from '@stores/useInstrumentStore';
 import { useUIStore } from '@stores/useUIStore';
 import { useShallow } from 'zustand/react/shallow';
@@ -480,6 +481,22 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
     : sortedInstruments;
   const isFiltered = allowedSynthTypes !== null && visibleInstruments.length < sortedInstruments.length;
 
+  /**
+   * Some songs spell a picture down the instrument list.
+   *
+   * Three things destroy it in the ordinary rendering: names are truncated,
+   * runs of spaces collapse, and the badges sit in the middle of the drawing.
+   * Fixing any of them per row would damage the ordinary case, so the list
+   * switches mode instead. Reported 2026-09-21 (jennipha, daddytwang).
+   *
+   * Memoised because it walks every name and the list re-renders on each
+   * selection, hover and classification result.
+   */
+  const artMode = useMemo(
+    () => namesContainArt(visibleInstruments.map((i) => i.name ?? '')),
+    [visibleInstruments],
+  );
+
   // Get icon component dynamically
   const getIcon = (iconName: string) => {
     const Icon = (LucideIcons as unknown as Record<string, LucideIcons.LucideIcon>)[iconName];
@@ -530,10 +547,10 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
       {/* Scrollable list */}
       <div
         ref={listRef}
-        className={`flex-1 overflow-y-auto ${isFT2 ? 'scrollbar-ft2 min-h-0' : 'scrollbar-modern'}`}
+        className={`flex-1 overflow-y-auto ${isFT2 ? 'scrollbar-ft2 min-h-0' : 'scrollbar-modern'}${artMode ? ' overflow-x-auto instrument-list--art' : ''}`}
         style={!isFT2 ? { maxHeight } : undefined}
       >
-        <div className="flex flex-col">
+        <div className={`flex flex-col${artMode ? ' w-max min-w-full' : ''}`}>
         {visibleInstruments.map((instrument, index) => {
           const displayNum = index + 1; // 1-based display number
           const synthInfo = getSynthInfo(instrument.synthType);
@@ -556,7 +573,7 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
                 className={`
                   instrument-list-item
                   flex items-center gap-2 px-2 py-1.5 cursor-pointer
-                  transition-all duration-200 ease-out group relative overflow-hidden
+                  transition-all duration-200 ease-out group relative ${artMode ? '' : 'overflow-hidden'}
                   ${isSelected
                     ? 'bg-ft2-cursor text-ft2-bg'
                     : 'hover:bg-ft2-header text-ft2-text'
@@ -605,7 +622,9 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
                        cut it mid-glyph — no ellipsis, no clue there was more.
                        `min-w-0 truncate` lets it shrink and end in an ellipsis;
                        the full name is already on the title attribute. */
-                    className="text-xs font-mono whitespace-nowrap flex-1 min-w-[4rem] truncate cursor-text"
+                    className={`text-xs font-mono cursor-text ${artMode
+                      ? 'whitespace-pre shrink-0'
+                      : 'whitespace-nowrap flex-1 min-w-[4rem] truncate'}`}
                     onDoubleClick={(e) => handleStartEdit(e, instrument.id, instrument.name)}
                     title={instrument.name}
                   >
