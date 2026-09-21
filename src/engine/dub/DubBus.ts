@@ -5605,6 +5605,20 @@ export class DubBus {
           // bassShelf + tapeSat pre-chain coloring the reverse further.
           const echoIn = this.echo.input as unknown as Tone.InputNode;
           Tone.connect(envG, echoIn);
+          // Parallel direct-to-return, the same way backwardReverb has one.
+          //
+          // Routing ONLY into the echo means the reverse is heard solely as
+          // echo repeats — the reversed source itself never reaches the output,
+          // so the gesture reads as a vague smear instead of an event. Reported
+          // 2026-09-21: Backward "is obvious that it works now", Reverse still
+          // "not obvious", and that direct path was the only difference between
+          // them.
+          // Kept below the echo feed: this move is meant to be echo-flavoured,
+          // so the dry reverse supports the repeats rather than replacing them.
+          const reverseDirect = this.context.createGain();
+          reverseDirect.gain.value = 0;
+          src.connect(reverseDirect);
+          reverseDirect.connect(this.return_);
           const now = this.context.currentTime;
           const dur = frames / this.context.sampleRate;
           // Same referencing as backwardReverb: `amount` stays the caller's
@@ -5615,9 +5629,16 @@ export class DubBus {
           envG.gain.linearRampToValueAtTime(peak, now + 0.003);
           envG.gain.setValueAtTime(peak, now + Math.max(0.005, dur - 0.005));
           envG.gain.linearRampToValueAtTime(0, now + dur);
+          const directPeak = peak * 0.55;
+          reverseDirect.gain.setValueAtTime(0, now);
+          reverseDirect.gain.linearRampToValueAtTime(directPeak, now + 0.003);
+          reverseDirect.gain.setValueAtTime(directPeak, now + Math.max(0.005, dur - 0.005));
+          reverseDirect.gain.linearRampToValueAtTime(0, now + dur);
           src.start(now);
           src.stop(now + dur + 0.01);
-          src.onended = () => { try { envG.disconnect(); } catch { /* ok */ } };
+          src.onended = () => {
+            try { envG.disconnect(); reverseDirect.disconnect(); } catch { /* ok */ }
+          };
           resolve(true);
           return;
         } catch (err) {
