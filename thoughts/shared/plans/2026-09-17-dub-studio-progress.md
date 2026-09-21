@@ -1503,6 +1503,21 @@ this bug.
       path — pointerup, pointerleave, pointercancel, and the element unmounting mid-hold.
       Intermittent, so reproduce by clicking rapidly rather than assuming one try is clean.
 
+- [ ] **X31** **BUS tab sliders crackle while dragged — bad for live dubbing.** Reported
+      2026-09-21 with a screenshot of BASS / MID / WIDTH / sweep / RATE.
+      Very likely zipper noise from stepped `AudioParam.value` assignment: those settings
+      are written as bare `.value =` rather than ramped, so each drag event is a
+      discontinuity in the signal. `DubBus.ts` lines 1618-1620 (`bassShelf` frequency / Q /
+      gain), 1627-1629 (`midScoop`), 1808 (`sweepLfo.frequency`), 1822
+      (`sweepOutput.gain`). The same file already has `rampBiquadParam` and uses it on the
+      `merged` settings path around line 3672, so the fix is to route these through it
+      rather than to invent smoothing.
+      Worth checking whether `setSettings` is also being called per drag event and doing
+      more than parameter writes — a rebuild per pointermove would crackle whatever the
+      ramping does. The deck debounces `setDubBusSettings` (`DubDeckStrip` ~line 585) but
+      the BUS tab's own sliders call `setDubBus` directly on every change.
+      Verify by ear on a sustained tone, not by meter: zipper noise barely moves RMS.
+
 - [ ] **X28** **Reverse, Backward and Throw seem dead.** Reported 2026-09-21 while playing
       `amanda.ahx` (Hively engine).
       Not a missing precondition: sends were up (ch0-3 at 0.45) and taps registered
