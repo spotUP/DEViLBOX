@@ -1591,6 +1591,26 @@ this bug.
       Note the levels work landed the same day: slam and crack are now louder than they
       were, so part of "it only fires slam or crack" may be that the others became
       relatively quieter and are simply less noticeable. Check the log before the ear.
+
+      **MEASURED 2026-09-21 (tubby, intensity 0.55, ~48s window).** The performer is NOT
+      stuck on slam. Fires: `eqSweep` x3, `springSlam` x2, `echoThrow` x2,
+      `skankEchoThrow` x1, `hpfRise` x1. Gaps between fires 5-9s, i.e. 3-5 bars.
+      So the report is about PERCEPTION, not selection: slam is percussive and loud —
+      louder still since the same day's level work — while eqSweep, hpfRise and echoThrow
+      are subtle by nature. What reads as "only slam" is slam being the only one that
+      announces itself.
+      **A misread worth recording.** The log shows `REST holdBars=3`, then `2`, then `1`
+      on consecutive bars, which looks like rests chaining and re-extending. It is not:
+      a committed REST is logged once per bar as it counts down, deliberately, so the log
+      shows the decision rather than an unexplained gap (`AutoDub.ts:1671`). Reading that
+      as a bug nearly produced a fix for something that works as designed.
+      **Also found:** `eqSweep` is not in tubby's `weights` table at all — it comes from
+      the EQ gate, not the weighted roll. A third of the observed activity is therefore a
+      move the persona never chose, which matters both for tuning the weights and for
+      judging what the persona is actually doing.
+      Next lever to try, no code needed: raise `intensity` from 0.55 and see whether the
+      gaps close. If it still reads as slam-then-nothing at 0.8, the fix is to make the
+      quiet moves read as events, which is levels, not scheduling.
       Related but distinct from X25 (levels) and from the 2026-09-19 idle bug, which was a
       decision-rate fault and is closed.
 
