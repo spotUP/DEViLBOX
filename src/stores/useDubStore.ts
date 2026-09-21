@@ -16,6 +16,7 @@
  * performance) without stampeding zustand updates.
  */
 
+import { keepAcrossHmr } from '@/lib/dev/keepAcrossHmr';
 import { create } from 'zustand';
 
 // ── Batched store writes for continuous dub controls ────────────────────
@@ -189,3 +190,12 @@ export function scheduleDubStoreSync(fn: () => void): void {
     }
   });
 }
+
+/**
+ * Dev only: carry this store's data over a hot reload.
+ *
+ * Without it, editing anything the store imports transitively rebuilds the
+ * store at its defaults and the loaded song disappears mid-session. See
+ * `lib/dev/keepAcrossHmr.ts`.
+ */
+keepAcrossHmr(import.meta.hot, useDubStore, 'dub');

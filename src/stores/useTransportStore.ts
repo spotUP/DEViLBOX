@@ -2,6 +2,7 @@
  * Transport Store - BPM, Playback State & Transport Controls
  */
 
+import { keepAcrossHmr } from '@/lib/dev/keepAcrossHmr';
 import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
 import * as Tone from 'tone';
@@ -546,3 +547,12 @@ export const useTransportStore = create<TransportStore>()(
       }),
   }))
 );
+
+/**
+ * Dev only: carry this store's data over a hot reload.
+ *
+ * Without it, editing anything the store imports transitively rebuilds the
+ * store at its defaults and the loaded song disappears mid-session. See
+ * `lib/dev/keepAcrossHmr.ts`.
+ */
+keepAcrossHmr(import.meta.hot, useTransportStore, 'transport');

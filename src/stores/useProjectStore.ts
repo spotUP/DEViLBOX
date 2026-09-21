@@ -2,6 +2,7 @@
  * Project Store - Project Metadata & Save/Load State
  */
 
+import { keepAcrossHmr } from '@/lib/dev/keepAcrossHmr';
 import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
 import type { ProjectMetadata } from '@typedefs/project';
@@ -76,3 +77,12 @@ export const useProjectStore = create<ProjectStore>()(
       }),
   }))
 );
+
+/**
+ * Dev only: carry this store's data over a hot reload.
+ *
+ * Without it, editing anything the store imports transitively rebuilds the
+ * store at its defaults and the loaded song disappears mid-session. See
+ * `lib/dev/keepAcrossHmr.ts`.
+ */
+keepAcrossHmr(import.meta.hot, useProjectStore, 'project');

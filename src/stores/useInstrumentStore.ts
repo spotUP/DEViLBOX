@@ -2,6 +2,7 @@
  * Instrument Store - Instrument Bank & Preset Management
  */
 
+import { keepAcrossHmr } from '@/lib/dev/keepAcrossHmr';
 import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
 import type {
@@ -2362,3 +2363,12 @@ export const useInstrumentStore = create<InstrumentStore>()(
   };
   })
 );
+
+/**
+ * Dev only: carry this store's data over a hot reload.
+ *
+ * Without it, editing anything the store imports transitively rebuilds the
+ * store at its defaults and the loaded song disappears mid-session. See
+ * `lib/dev/keepAcrossHmr.ts`.
+ */
+keepAcrossHmr(import.meta.hot, useInstrumentStore, 'instruments');
