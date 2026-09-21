@@ -24,6 +24,7 @@
 
 import * as Tone from 'tone';
 import { getNativeAudioNode } from '@utils/audio-context';
+import { rampDryWet } from './rampParam';
 
 export interface AnotherDelayOptions {
   delayTime?: number;      // ms
@@ -369,8 +370,15 @@ export class AnotherDelayEffect extends Tone.ToneAudioNode {
   get wet(): number { return this._options.wet; }
   set wet(value: number) {
     this._options.wet = Math.max(0, Math.min(1, value));
-    this.dryGain.gain.value = 1 - this._options.wet;
-    this.wetGain.gain.value = this._options.wet;
+    // Crossfaded, not stepped: the Echo Wet slider drives this on every pointer
+    // event through DubBus.setSettings, so a bare assignment was one
+    // discontinuity per pixel.
+    rampDryWet(
+      this.dryGain.gain,
+      this.wetGain.gain,
+      this._options.wet,
+      this.dryGain.context.currentTime,
+    );
   }
 
   dispose(): this {
