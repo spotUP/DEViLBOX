@@ -90,7 +90,7 @@ import {
   type PerformanceCycleInput,
 } from '@/lib/dub/performanceCycle';
 import { trackerEventSources } from '@/lib/dub/musicalEvents';
-import { getChannelProfiles } from './channelProfiles';
+import { buildInstrumentLookup, getChannelProfiles } from './channelProfiles';
 import {
   behaviourFor,
   intentionPolicyFor,
@@ -2226,6 +2226,7 @@ function buildCycleInput(
     bundle.names,
     gridPos.rowsPerBeat,
     gridPos.rowsPerBar,
+    buildInstrumentLookup(),
   );
 
   return {
