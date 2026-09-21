@@ -1493,6 +1493,32 @@ this bug.
       path — pointerup, pointerleave, pointercancel, and the element unmounting mid-hold.
       Intermittent, so reproduce by clicking rapidly rather than assuming one try is clean.
 
+- [~] **X10 — A REAL CLIPPING SOURCE FOUND AND FIXED 2026-09-21.** The 2026-09-18 pass
+      could not reproduce it (peak 0.86, no clipping) and left it open on the strength of
+      "most of the time". The level work found the cause by accident: `springSlam`
+      measured a master peak of **1.072** against a 0.492 programme baseline — over full
+      scale from a single move.
+      Cause: a layer connected straight to `this.return_` bypasses the bus input clip and
+      the sidechain, so its gain lands on the output as written. Slam had TWO such paths,
+      `thumpToReturn` at `target * 2.0` and `shangToReturn` at `target * 1.5`, both
+      starting in the same instant. The written multipliers understate it — `bp` and
+      `bright` BOTH feed the shang node, so they sum, and `bright` is a peaking filter at
+      +9 dB.
+      Now 0.85 and 0.6. Re-measured at peak 0.647 (4.2x a 0.155 baseline), no clipping.
+      Guarded by `directReturnHeadroom.test.ts`: no direct-to-return gain may reach unity,
+      and the two slam layers must sum below full scale. Paths into the SPRING are
+      deliberately exempt — bounded by the spring's wet level, which is why
+      `shangToSpring` at 3.0 and the kick impulse at 10.0 are fine.
+      **Still open**: this is one confirmed source, not proof it was the only one. Report
+      said "most of the time", and a single move firing cannot account for that on its own.
+
+- [ ] **X27** **HMR wipes the loaded song during a dev session.** Observed repeatedly
+      2026-09-21: editing `DubBus.ts` while playing reset the project to an empty default
+      ("Untitled", 1 pattern, editorMode classic) with the transport still running, which
+      presents as sudden silence. Dev-only, but it wastes a listening session and it
+      imitates X23 closely enough to have cost a wrong diagnosis once already —
+      `get_song_info` is what tells the two apart.
+
 - [ ] **X10** **MEASURED 2026-09-18 — not reproduced at master, one real finding instead.**
       Perry preset, "world class dub" playing, all four channel sends at 0.5, `echoBuildUp`
       held: master peaked **0.86**, RMS 0.16-0.22. No clipping. The handoff's 1.00-1.03
