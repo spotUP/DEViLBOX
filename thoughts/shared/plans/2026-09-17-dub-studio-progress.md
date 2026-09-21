@@ -1412,6 +1412,42 @@ this bug.
       stretch? Not seen yet. Next time it happens, call `get_playback_silence` BEFORE
       reloading — it now answers for this engine.
 
+- [~] **X23 — THE BREAK IS ONE CONNECTION. Measured 2026-09-21, and two of my own
+      earlier claims in this entry are WRONG.**
+      First the corrections, because both sent the investigation sideways:
+      1. "`play()` before the worklet is ready renders silence with the transport still
+         reporting isPlaying" — **no**. It was the crash-recovery dialog sitting unanswered
+         across every reload. `get_modal_state` reports `recoveryPromptOpen`, and
+         `resolve_recovery_prompt({action:'restore'})` clears it. Nothing to do with the
+         engine.
+      2. "the mix is CUT" — **no**, it is attenuated to roughly a tenth and stays there.
+         The user's words are the accurate ones: "audio returned after an effect now but
+         very faint". My own first reading even showed `rmsMax 0.0074` rather than a true
+         zero and I read it as silence anyway.
+      **The whole path in one read, tap open, music faint:**
+
+          engineOut          0.075751   <- HivelyEngine.output, hot
+          synthOutput        0          <- HivelySynth.output, SILENT
+          synthBus           0
+          masterInput        0
+          masterEffectsInput 0.007606   <- a tenth, arriving by some other route
+          blepInput          0.005860
+          insertIn           0.004912
+
+      `HivelySynth`'s constructor does `this.engine.output.connect(this.output)` and sets
+      `_ownsEngineConnection = true` on EVERY instance, while dispose does
+      `engine.output.disconnect(this.output)` — and the comment at `HivelySynth.ts:249`
+      warns that a bare `engine.output.disconnect()` "would sever the singleton's
+      connection to all other destinations". The instrument is re-created on every load
+      ("Creating HivelySynth" in the log each time), so a disposed instance can take the
+      live connection with it and leave the survivor's output silent.
+      **That is the fix site.** What is still audible is not the dry path at all: it is the
+      dub return (`busReturn` 0.0108) plus what trickles into `masterEffectsInput`, which
+      is exactly why it reads as "only effects" and why it came back "very faint" rather
+      than fully.
+      **Deliberately not fixed yet** — it is a routing-lifecycle change on the audio path
+      and belongs to a decision, not a guess at the end of a long session.
+
 - [~] **X23 — ISOLATED 2026-09-21 to a one-call reproduction. The worklet is INNOCENT.**
       Reproduction, no bus and no move needed: load an AHX, play, then
       `set_channel_dub_send(channel=1, amount=0.5)`. Master goes from rmsAvg 0.0307 to 0
