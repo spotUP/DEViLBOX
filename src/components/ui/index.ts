@@ -23,3 +23,6 @@ export type { VirtualKeyboardProps } from './VirtualKeyboard';
 
 // Existing components (if any)
 export { Button } from './Button';
+
+export { useHoverTooltip } from './HoverTooltip';
+export type { HoverTooltip, HoverTooltipProps } from './HoverTooltip';

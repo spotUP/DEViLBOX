@@ -15,6 +15,7 @@
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { notify } from '@stores/useNotificationStore';
+import { useHoverTooltip } from '@/components/ui';
 import { useDubStore } from '@/stores/useDubStore';
 import { useDrumPadStore } from '@/stores/useDrumPadStore';
 import { useMixerStore } from '@/stores/useMixerStore';
@@ -296,7 +297,9 @@ export const DubDeckStrip: React.FC = () => {
 
   // Click-flash per channel (kept for visual feedback on Echo Throw fire).
   const [flashedChannel, setFlashedChannel] = useState<number | null>(null);
-  const [hoverHint, setHoverHint] = useState<string | null>(null);
+  // Tooltips instead of a reserved status line: the line held a row of
+  // vertical space open at all times to describe one button occasionally.
+  const { hoverProps, tooltip: moveTooltip, hide: hideTooltip } = useHoverTooltip();
   useEffect(() => {
     if (flashedChannel === null) return;
     const t = setTimeout(() => setFlashedChannel(null), 400);
@@ -1314,7 +1317,7 @@ export const DubDeckStrip: React.FC = () => {
         </button>
         <button
           className="px-2.5 py-1 rounded bg-accent-error text-white font-semibold hover:bg-accent-error/80 text-xs"
-          onClick={() => window.dispatchEvent(new Event('dub-panic'))}
+          onClick={() => { hideTooltip(); window.dispatchEvent(new Event('dub-panic')); }}
           title="Drain the bus + disarm recording"
         >
           KILL
@@ -1404,10 +1407,7 @@ export const DubDeckStrip: React.FC = () => {
       <>
       {/* ── PERFORM tab ─────────────────────────────────────────────────────── */}
       {activeTab === 'perform' && (<>
-      {/* Hover info bar — always rendered to reserve space and prevent layout jitter */}
-      <div className={`px-3 py-1 border rounded text-xs font-mono truncate ${hoverHint ? 'bg-dark-bg border-dark-borderLight text-text-secondary' : 'border-transparent text-transparent'}`}>
-        {hoverHint || '\u00A0'}
-      </div>
+      {moveTooltip}
 
       <div className="flex flex-col gap-1.5 pb-1.5 border-b border-dark-border">
         {/* ── CLICK — one-shot triggers ── */}
@@ -1431,9 +1431,7 @@ export const DubDeckStrip: React.FC = () => {
                     }
                     fireTrigger(m.moveId);
                   }}
-                  onPointerLeave={() => setHoverHint(null)}
-                  onMouseEnter={() => setHoverHint(`${m.label} — ${m.title}${noSend ? ' (needs CH send)' : ''}`)}
-                  title={m.title + (noSend ? ' — raise a CH send to hear' : '')}
+                  {...hoverProps(`${m.label} — ${m.title}${noSend ? ' — raise a CH send to hear' : ''}`)}
                   disabled={!busEnabled}
                 >
                   {m.label}
@@ -1460,9 +1458,7 @@ export const DubDeckStrip: React.FC = () => {
                     (isActive ? ' ring-2 ring-offset-1 ring-offset-dark-bgSecondary ring-white/70' : '')
                   }
                   onClick={() => handleRatePreset(m.moveId)}
-                  onPointerLeave={() => setHoverHint(null)}
-                  onMouseEnter={() => setHoverHint(`${m.label} — ${m.title}${isActive ? ' (active — click to restore)' : ''}`)}
-                  title={m.title}
+                  {...hoverProps(`${m.label} — ${m.title}${isActive ? ' (active — click to restore)' : ''}`)}
                   disabled={!busEnabled}
                 >
                   {m.label}
@@ -1500,9 +1496,7 @@ export const DubDeckStrip: React.FC = () => {
                       },
                     };
                   })()}
-                  onPointerLeave={() => setHoverHint(null)}
-                  onMouseEnter={() => setHoverHint(`${m.label} — ${m.title}${noSend ? ' (needs CH send)' : ''}`)}
-                  title={m.title + ' (press-and-hold)' + (noSend ? ' — raise a CH send to hear' : '')}
+                  {...hoverProps(`${m.label} — ${m.title} (press-and-hold)${noSend ? ' — raise a CH send to hear' : ''}`)}
                   disabled={!busEnabled}
                 >
                   {m.label}
@@ -1540,9 +1534,7 @@ export const DubDeckStrip: React.FC = () => {
                     }
                     handleToggle(m.moveId);
                   }}
-                  onPointerLeave={() => setHoverHint(null)}
-                  onMouseEnter={() => setHoverHint(`${m.label} — ${m.title}${toggled ? ' (ON — click to stop)' : noSend ? ' (needs CH send)' : ' (click to toggle on)'}`)}
-                  title={m.title + (toggled ? ' — ON, click to deactivate' : ' — click to toggle on/off') + (noSend && !toggled ? ' — raise a CH send to hear' : '')}
+                  {...hoverProps(`${m.label} — ${m.title}${toggled ? ' (ON — click to stop)' : noSend ? ' (needs CH send)' : ' (click to toggle on)'}`)}
                   disabled={!busEnabled}
                 >
                   {m.label}
@@ -1605,9 +1597,7 @@ export const DubDeckStrip: React.FC = () => {
                     for (let i = 0; i < visibleChannelCount; i++) holdEnd(op.moveId, i);
                   },
                 } : {})}
-                onPointerLeave={() => setHoverHint(null)}
-                onMouseEnter={() => setHoverHint(`ALL · ${op.label} — ${op.title}`)}
-                title={`ALL channels · ${op.title}${isHold ? ' (press-and-hold)' : ''}`}
+                {...hoverProps(`ALL · ${op.label} — ${op.title}${isHold ? ' (press-and-hold)' : ''}`)}
                 disabled={!busEnabled}
               >
                 {op.label}
@@ -1819,9 +1809,7 @@ export const DubDeckStrip: React.FC = () => {
                     className={colorClasses(op.color, active) + ' w-full text-center'}
                     onClick={isHold ? undefined : () => fireTrigger(op.moveId, i)}
                     {...(isHold ? holdButtonProps(op.moveId, i) : {})}
-                    onPointerLeave={() => setHoverHint(null)}
-                    onMouseEnter={() => setHoverHint(`Ch ${i + 1} · ${op.label} — ${op.title}`)}
-                    title={`Ch ${i + 1} · ${op.title}${isHold ? ' (press-and-hold)' : ''}`}
+                    {...hoverProps(`Ch ${i + 1} · ${op.label} — ${op.title}${isHold ? ' (press-and-hold)' : ''}`)}
                     disabled={!busEnabled}
                   >
                     {op.label}
