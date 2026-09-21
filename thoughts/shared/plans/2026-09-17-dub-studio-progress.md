@@ -1528,7 +1528,28 @@ this bug.
       sweep barely moves RMS, so "no level change" is not evidence either way. Two
       separate measurements of `backwardReverb` moved the peak by less than the programme
       varies on its own.
-      **Next step is one line in the browser console.** `backwardReverb` logs its own
+      **ROOT CAUSE FOUND 2026-09-21, and the diagnostic was the fix's first step.**
+      The console looked healthy — `snapshot received — frames=38400` — because the
+      guard was `if (!frames)`, which tests the ring's LENGTH, not its content. 38400 is
+      exactly 0.8s at 48kHz; the ring was the right size and full of zeros. Adding a peak
+      measurement turned the same click into
+      `abort — captured SILENCE (peak=7.51e-6); nothing is reaching bus.input`.
+      Underneath: `rebuildDubConnections` picks which channels to reconnect from
+      `channelDubSendValues`, the ENGINE's copy of the sends, skipping any at zero. The
+      mixer store's values survive a song load; that array does not. An engine that
+      believes every send is zero opens no channel tap, so `bus.input` is silent —
+      invisible to moves that generate their own sound, fatal to the three that capture
+      it. Same two-copies-of-one-fact shape as the rest of this sweep.
+      Fixed by seeding the engine's values from the store before the reconnect guard,
+      without overwriting a value the engine already holds (that one is live while a move
+      holds a channel open). Guarded by `captureSilence.test.ts`, including the ordering —
+      seeding after the guard would change nothing.
+      **Verified only in part.** A capture with a send raised through the proper setter now
+      succeeds (no SILENCE warning). The divergence itself — store set, engine not — was
+      NOT reproduced end to end, so the seeding path is reasoned and unit-guarded rather
+      than observed failing and then passing.
+
+      **Superseded: next step was one line in the browser console.** `backwardReverb` logs its own
       progress at `console.log`, which `get_console_errors` filters out, so it has to be
       read in the browser: `▶ captureDur=` then `snapshot received — frames=N` means it
       fired and the fault is level; `abort — empty ring buffer` means nothing reached

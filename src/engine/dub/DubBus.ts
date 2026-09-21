@@ -75,6 +75,34 @@ import { clampExtFeedback } from '@/lib/dub/extFeedbackCeiling';
 import { generatedPeak, shelfTrimForProgramme } from './programmeReference';
 
 /**
+ * Loudest sample in a captured ring, so a capture can tell whether it caught
+ * the music or caught silence.
+ *
+ * The capture moves guarded themselves with `if (!frames)`, which tests how
+ * LONG the ring is, not whether anything is in it. A ring that has been
+ * allocated and filled with zeros reports its full length — 38400 frames for
+ * 0.8s at 48kHz — and passes that check, so "snapshot received" was logged
+ * either way and the reverse played back silence. Reported 2026-09-21 as
+ * Reverse and Backward being dead, with a console log that looked healthy.
+ */
+function capturedPeak(left: Float32Array, right: Float32Array, frames: number): number {
+  let peak = 0;
+  const n = Math.min(frames, left.length, right.length);
+  // Every 16th sample: enough to tell silence from signal, cheap enough to run
+  // on the audio thread's reply without a stall.
+  for (let i = 0; i < n; i += 16) {
+    const l = Math.abs(left[i]);
+    const r = Math.abs(right[i]);
+    if (l > peak) peak = l;
+    if (r > peak) peak = r;
+  }
+  return peak;
+}
+
+/** Below this a capture is silence, not quiet audio. */
+const CAPTURE_SILENCE_PEAK = 1e-4;
+
+/**
  * How often a HELD announcement repeats itself.
  *
  * Must stay under `LIVE_HOLD_MS` in `useLiveDubParam` (400 ms), or a control
@@ -5355,7 +5383,18 @@ export class DubBus {
           const srcLeft = msg.left as Float32Array;
           const srcRight = msg.right as Float32Array;
           const frames = Number(msg.frames) || srcLeft.length;
-          console.log(`[DubBus] backwardReverb snapshot received — frames=${frames}`);
+          const capPeak = capturedPeak(srcLeft, srcRight, frames);
+          console.log(`[DubBus] backwardReverb snapshot received — frames=${frames} peak=${capPeak.toFixed(5)}`);
+          if (capPeak < CAPTURE_SILENCE_PEAK) {
+            // Frames without signal. The ring is the right length and full of
+            // zeros, which the `!frames` check below cannot see.
+            console.warn(`[DubBus] backwardReverb abort — captured SILENCE (frames=${frames}, peak=${capPeak.toExponential(2)}); nothing is reaching bus.input`);
+            void import('@stores/useNotificationStore').then(({ notify }) =>
+              notify.warning('Backward Reverb: the bus captured silence — raise a CH send and let the song play')
+            ).catch(() => {});
+            resolve();
+            return;
+          }
           if (!frames) {
             console.warn('[DubBus] backwardReverb abort — empty ring buffer (no audio reached bus.input yet)');
             void import('@stores/useNotificationStore').then(({ notify }) =>
@@ -5507,7 +5546,20 @@ export class DubBus {
           const srcLeft = msg.left as Float32Array;
           const srcRight = msg.right as Float32Array;
           const frames = Number(msg.frames) || srcLeft.length;
-          console.log(`[DubBus] reverseEcho snapshot received — frames=${frames}`);
+          const capPeak = capturedPeak(srcLeft, srcRight, frames);
+          console.log(`[DubBus] reverseEcho snapshot received — frames=${frames} peak=${capPeak.toFixed(5)}`);
+          if (capPeak < CAPTURE_SILENCE_PEAK) {
+            // Frames without signal. The ring is the right length and full of
+            // zeros, which the `!frames` check below cannot see.
+            console.warn(`[DubBus] reverseEcho abort — captured SILENCE (frames=${frames}, peak=${capPeak.toExponential(2)}); nothing is reaching bus.input`);
+            void import('@stores/useNotificationStore').then(({ notify }) =>
+              notify.warning('Reverse Echo: the bus captured silence — raise a CH send and let the song play')
+            ).catch(() => {});
+            // false: this attempt produced no playback, so the caller's retry
+            // loop sees it as an empty ring rather than a successful play.
+            resolve(false);
+            return;
+          }
           if (!frames) {
             // Signal empty — caller decides whether to retry.
             resolve(false);

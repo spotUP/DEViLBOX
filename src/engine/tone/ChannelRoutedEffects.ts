@@ -534,6 +534,31 @@ export class ChannelRoutedEffectsManager {
     // have since been turned off naturally fall out via the continue guard.
     this.channelDubPendingActivation.clear();
 
+    // Take the send values from the MIXER STORE before deciding which channels
+    // to reconnect.
+    //
+    // The loop below skips any channel whose `channelDubSendValues` entry is
+    // zero, and that array is the ENGINE's own copy — only written when
+    // `setChannelDubSend` is called. The store's values survive a song load and
+    // a page reload; this copy does not. So a user whose sends were already up
+    // got an engine that believed every send was zero, no channel tap was ever
+    // opened, and nothing reached `bus.input` at all.
+    //
+    // That is invisible for moves which generate their own sound, and fatal for
+    // the ones that CAPTURE the bus: reverseEcho, backwardReverb and
+    // delayTimeThrow read a ring fed from `bus.input` and got 38400 frames of
+    // silence. Reported 2026-09-21 as those three being dead, on every engine.
+    try {
+      const { useMixerStore } = await import('@stores/useMixerStore');
+      const channels = useMixerStore.getState().channels;
+      for (let ch = 0; ch < MAX_DUB_CHANNELS; ch++) {
+        const stored = channels[ch]?.dubSend ?? 0;
+        if (stored > 0 && this.channelDubSendValues[ch] <= 0) {
+          this.channelDubSendValues[ch] = Math.max(0, Math.min(1, stored));
+        }
+      }
+    } catch { /* store unavailable — fall back to whatever the engine holds */ }
+
     for (let ch = 0; ch < MAX_DUB_CHANNELS; ch++) {
       if (this.channelDubSendValues[ch] <= 0) continue;
       const gain = this.channelDubGains[ch];
