@@ -744,7 +744,84 @@ export async function getDubBusState(): Promise<Record<string, unknown>> {
     // RMS along the master insert. The first stage whose level collapses is
     // where the mix is being lost — the reading that settings values cannot give.
     masterInsertLevels: bus?.getMasterInsertLevels?.() ?? null,
+    // And the stages BEFORE the bus, so "the insert receives nothing" can be
+    // told from "the engine produces nothing". null means the tap was created
+    // on this call and has not seen audio yet — read it again.
+    upstreamLevels: await getUpstreamLevels(),
   };
+}
+
+
+/**
+ * Passive level taps on the nodes UPSTREAM of the dub bus.
+ *
+ * `masterInsertLevels` showed the master insert receiving nothing while the
+ * transport advanced and the insert reported itself wired. That leaves one
+ * question: is the engine producing audio into a node nobody is listening to,
+ * or has it stopped producing at all? These answer it — engine output, the
+ * synth bus it should feed, and the master effects input the insert is spliced
+ * onto. The first one that is silent is where the chain is broken.
+ *
+ * Created on first read and kept, because an analyser must already be attached
+ * when the audio passes; attaching one after the fact measures nothing. Passive:
+ * a tap never alters what it measures.
+ */
+const _upstreamTaps = new Map<string, { node: AudioNode; analyser: AnalyserNode }>();
+
+function _tapRms(name: string, node: AudioNode | null | undefined): number | null {
+  if (!node) return null;
+  let entry = _upstreamTaps.get(name);
+  if (!entry || entry.node !== node) {
+    // A node swap (engine rebuilt, bus recreated) invalidates the old tap.
+    try {
+      const analyser = node.context.createAnalyser();
+      analyser.fftSize = 2048;
+      node.connect(analyser);
+      entry = { node, analyser };
+      _upstreamTaps.set(name, entry);
+      // Nothing has passed this tap yet; say so rather than report a false zero.
+      return null;
+    } catch {
+      return -1;
+    }
+  }
+  try {
+    const buf = new Float32Array(entry.analyser.fftSize);
+    entry.analyser.getFloatTimeDomainData(buf);
+    let sum = 0;
+    for (let i = 0; i < buf.length; i++) sum += buf[i] * buf[i];
+    return Math.round(Math.sqrt(sum / buf.length) * 1e6) / 1e6;
+  } catch {
+    return -1;
+  }
+}
+
+/** RMS at the engine output, the synth bus and the master effects input. */
+async function getUpstreamLevels(): Promise<Record<string, number | null>> {
+  const out: Record<string, number | null> = {};
+  try {
+    const g = globalThis as {
+      __devilboxActiveHivelyEngine?: { output?: AudioNode } | null;
+      __devilboxActiveKlysEngine?: { output?: AudioNode } | null;
+      __devilboxActiveCinter4Engine?: { output?: AudioNode } | null;
+    };
+    const engine = g.__devilboxActiveHivelyEngine
+      ?? g.__devilboxActiveKlysEngine
+      ?? g.__devilboxActiveCinter4Engine
+      ?? null;
+    out.engineOut = _tapRms('engineOut', engine?.output ?? null);
+  } catch { out.engineOut = -1; }
+  try {
+    const { getToneEngine } = await import('@engine/ToneEngine');
+    const { getNativeAudioNode } = await import('@/utils/audio-context');
+    const te = getToneEngine() as unknown as { synthBus?: unknown; masterEffectsInput?: unknown };
+    out.synthBus = _tapRms('synthBus', getNativeAudioNode(te.synthBus as never));
+    out.masterEffectsInput = _tapRms('masterEffectsInput', getNativeAudioNode(te.masterEffectsInput as never));
+  } catch {
+    out.synthBus = -1;
+    out.masterEffectsInput = -1;
+  }
+  return out;
 }
 
 // ─── Playback silence watchdog ───────────────────────────────────────────────
