@@ -1442,7 +1442,22 @@ this bug.
       Siren has no defaults of its own; its level comes from `sirenPreset` /
       `sirenFeedback` on the bus, so the fix is in a different place from the others.
 
-- [ ] **X26** **`crushBass` stuck on once, from a click.** Reported 2026-09-21: "i managed
+- [x] **X26 — CLOSED 2026-09-21. Releasing the capture threw, so the release never ran.**
+      Every hold site inlined the same shape:
+      `onPointerUp={(e) => { e.currentTarget.releasePointerCapture(e.pointerId); holdEnd(id); }}`
+      `releasePointerCapture` throws `NotFoundError` when the capture is already gone — a
+      very fast click, or a capture lost to a re-render — and the exception propagated out
+      of the handler BEFORE `holdEnd`. The release was skipped in exactly the cases that
+      needed it, leaving the drone sounding with nothing left to stop it.
+      Fixed in one shared `holdButtonProps` helper rather than four copies, since the same
+      fault had been pasted into each: release defensively, end the hold unconditionally,
+      and treat `lostpointercapture` as a release — that is the one event that fires when
+      a capture disappears without a pointerup.
+      The bus Audition button had the same gap (no `onLostPointerCapture`), which would
+      latch the bus into its bypassed state indefinitely. Fixed with it.
+      Regression test asserts both properties and fails on the old shape.
+
+- [x] **X26 (original entry)** **`crushBass` stuck on once, from a click.** Reported 2026-09-21: "i managed
       to get crush bass stuck once when i clicked it".
       It is a `kind: 'hold'` button (`DubDeckStrip.tsx:160`, "3-bit quantize saw drone
       while held"), driven by pointerdown/pointerup with pointer capture. A CLICK — press
