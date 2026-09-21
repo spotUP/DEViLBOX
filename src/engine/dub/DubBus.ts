@@ -4439,8 +4439,18 @@ export class DubBus {
       this.masterInsertSource = source;
       this.masterInsertDest = dest;
       this.masterInsertActive = true;
-      // Re-run setSettings so the master-side gain writes pick up masterActive=true.
-      this.setSettings({});
+      // Re-run the master-side gain writes now that masterActive is true.
+      //
+      // This passed `{}`, which short-circuits at the top of `setSettings` —
+      // `Object.keys({})` is empty, so `changed` stays false and the body never
+      // runs. The call did nothing, and the master tone EQ stayed flat until
+      // some unrelated write happened to arrive. Pass the settings that the
+      // master path actually depends on, so the write is real.
+      this.setSettings({
+        bassShelfGainDb: this.settings.bassShelfGainDb,
+        midScoopGainDb: this.settings.midScoopGainDb,
+        stereoWidth: this.settings.stereoWidth,
+      });
       // Ramp envelope back to 1 — insert fades in smoothly. Timed from NOW,
       // not from the pre-fade `now`, which is already in the past by the length
       // of the fade and would make this ramp land instantly.
@@ -5287,13 +5297,17 @@ export class DubBus {
       // peak at 1.072 — over full scale, clipping — against a 0.492 programme
       // baseline. "slam is too loud" was the report; the direct-to-return path
       // alone was 2x full scale before anything else was summed.
+      // Referenced to the programme, like every other generated source. The
+      // literal stays the move's own balance between its two layers; `slamRef`
+      // carries how loud the move should be against THIS music.
+      const slamRef = target * (generatedPeak('springSlam') / SILENT_PROGRAMME_PEAK);
       const thumpToInput = ctx.createGain();
-      thumpToInput.gain.value = target * 0.9;
+      thumpToInput.gain.value = slamRef * 0.9;
       thumpSrc.connect(thumpToInput);
       thumpToInput.connect(this.input);
       // Direct to return so the whump is always audible, not choked by bus sidechain
       const thumpToReturn = ctx.createGain();
-      thumpToReturn.gain.value = target * 0.85;
+      thumpToReturn.gain.value = slamRef * 0.85;
       thumpSrc.connect(thumpToReturn);
       thumpToReturn.connect(this.return_);
       thumpSrc.start(now);
@@ -5330,7 +5344,7 @@ export class DubBus {
       bright.gain.value = 9;  // +9 dB presence at 5.5 kHz
       shangSrc.connect(bright);
       const shangToSpring = ctx.createGain();
-      shangToSpring.gain.value = target * 3.0;  // hit the tank HARD
+      shangToSpring.gain.value = slamRef * 3.0;  // hit the tank HARD
       bp.connect(shangToSpring);
       bright.connect(shangToSpring);
       Tone.connect(shangToSpring, this.spring.input as unknown as Tone.InputNode);
@@ -5342,7 +5356,7 @@ export class DubBus {
       // this node, so their outputs sum, and `bright` is a peaking filter at
       // +9 dB. The effective level is well above the number written here.
       const shangToReturn = ctx.createGain();
-      shangToReturn.gain.value = target * 0.6;
+      shangToReturn.gain.value = slamRef * 0.6;
       bp.connect(shangToReturn);
       bright.connect(shangToReturn);
       shangToReturn.connect(this.return_);
@@ -5504,7 +5518,10 @@ export class DubBus {
       // direct path, so it stays a struck tank rather than becoming a thump.
       // 6.0 → 14.0 overshot on measurement (peak 0.654, louder than slam's
       // 0.566), so it settled at 10.0.
-      impulseGain.gain.value = gain * 10.0;  // hit HARD
+      // Programme-referenced for the same reason as slam: this was an absolute
+      // multiplier, so the kick's weight against the mix changed with the song.
+      const kickRef = gain * (generatedPeak('springKick') / SILENT_PROGRAMME_PEAK);
+      impulseGain.gain.value = kickRef * 10.0;  // hit HARD
       src.connect(impulseGain);
       Tone.connect(impulseGain, this.spring.input as unknown as Tone.InputNode);
       src.start(now);
