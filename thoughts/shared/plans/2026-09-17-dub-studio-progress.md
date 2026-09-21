@@ -1363,6 +1363,32 @@ this bug.
       obvious reading — "the animation path broke" — was wrong. The cheap check that
       settled it was fixing the upstream causes first and re-asking.
 
+- [ ] **X22** **"Auto EQ analyzing…" appears stuck.** Reported 2026-09-21 with a screenshot
+      showing the label sitting at `Auto EQ analyzing…` indefinitely.
+      Likely related to what the X17 work found: the EQ snapshot used to be gated on
+      `useTrackerAnalysisStore.currentAnalysis`, which only exists once the ONNX
+      capture-and-classify pipeline has been run BY HAND. `analysisState` has a
+      `'capturing'` / `'analyzing'` / `'ready'` sequence (`useTrackerAnalysisStore.ts:76`),
+      so a run that starts and never resolves leaves the label on `analyzing` forever.
+      Check first whether `analysisState` is genuinely stuck or whether nothing ever
+      started it, and whether the worker reports an error that is swallowed.
+      NB the improv EQ no longer depends on this at all (it reads live audio now), so this
+      is a stale LABEL, not a dead EQ — confirm that before treating it as urgent.
+
+- [ ] **X23** **`jennipha.ahx` goes silent.** Reported 2026-09-21. Reproduce, then use
+      `get_playback_silence` (added 2026-09-19) rather than guessing — it reports the
+      worklet's own `silentReason` and separates "the engine is rendering silence" from
+      "audio was produced and swallowed later". AHX is a WASM engine path, so also check
+      `useWasmPositionStore` is still advancing; a stalled transport is a different fault
+      and the watchdog says so explicitly.
+
+- [ ] **X24** **Instrument-list badges compress to `S…` / `P…` on a narrow panel.**
+      Cosmetic, introduced deliberately 2026-09-21: the badges were `shrink-0` and ate the
+      whole row, so instrument NAMES rendered at zero width and were clipped mid-glyph.
+      Badges now yield before the name does, which is the right priority but leaves them
+      unreadable in fullscreen at small widths. A proper fix hides them below a width
+      threshold (container query) rather than compressing them.
+
 - [ ] **X10** **MEASURED 2026-09-18 — not reproduced at master, one real finding instead.**
       Perry preset, "world class dub" playing, all four channel sends at 0.5, `echoBuildUp`
       held: master peaked **0.86**, RMS 0.16-0.22. No clipping. The handoff's 1.00-1.03

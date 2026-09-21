@@ -1445,16 +1445,21 @@ export const DubDeckStrip: React.FC = () => {
           vertical column: label → op buttons stacked → HOLD → vertical
           fader → send % readout. Horizontal scroll if the pattern has
           more channels than fit. */}
-      <div className="flex items-stretch gap-2 overflow-x-auto pt-1.5">
+      {/* items-start, not items-stretch: stretching forced every card to the
+          row's height, which was shorter than the button stack needed, so HOLD
+          rendered outside the card's own border. Cards size to their content;
+          the fader still fills the card because the CARD stretches its two
+          columns. */}
+      <div className="flex items-start gap-2 overflow-x-auto pt-1.5">
         {/* Master send — scales all channel sends at once */}
         <div
           className={
-            'flex flex-col items-center gap-1.5 px-2 py-1.5 rounded border min-w-[64px] shrink-0 ' +
+            'flex flex-row items-stretch gap-2.5 px-2 py-1.5 rounded border w-32 shrink-0 ' +
             'bg-dark-bgSecondary border-accent-primary/40'
           }
         >
-          {/* Top group: label + ops + hold — must match channel columns */}
-          <div className="flex flex-col items-center gap-1.5 w-full">
+          {/* Left column: label + ops + hold — must match channel columns */}
+          <div className="flex flex-col items-center gap-1.5 flex-1 min-w-0">
           <span className="text-xs font-bold text-accent-primary leading-none">MASTER</span>
           {CHANNEL_OPS.map((op) => {
             const masterKey = `${op.moveId}:master`;
@@ -1504,7 +1509,8 @@ export const DubDeckStrip: React.FC = () => {
             HOLD
           </button>
           </div>
-          {/* Bottom group: ALL/NONE + fader — master-only controls */}
+          {/* Right column: ALL/NONE + fader — master-only controls */}
+          <div className="flex flex-col items-center gap-1 shrink-0 min-h-0">
           <button
             className={
               'px-2 py-1 rounded border w-full text-[9px] font-bold transition-all duration-150 ' +
@@ -1524,9 +1530,11 @@ export const DubDeckStrip: React.FC = () => {
           >
             {anySend ? 'NONE' : 'ALL'}
           </button>
+          <div className="flex-1 min-h-0 flex items-stretch">
           <Fader
             value={masterSendValue}
             size="md"
+            fillHeight
             color="accent-primary"
             onChange={(v) => {
               for (let i = 0; i < visibleChannelCount; i++) {
@@ -1537,9 +1545,11 @@ export const DubDeckStrip: React.FC = () => {
             disabled={!busEnabled}
             doubleClickValue={1}
           />
-          <span className="text-xs font-mono text-accent-primary leading-none">
+          </div>
+          <span className="text-[9px] font-mono text-accent-primary leading-none">
             {Math.round(masterSendValue * 100)}%
           </span>
+          </div>
         </div>
         {/* Separator */}
         <div className="w-px h-32 bg-dark-border shrink-0 self-center" />
@@ -1554,7 +1564,16 @@ export const DubDeckStrip: React.FC = () => {
             <div
               key={i}
               className={
-                'flex flex-col items-center gap-1.5 px-2 py-1.5 rounded border min-w-[64px] shrink-0 transition-colors ' +
+                // w-24 rather than min-w-[64px]: the card was content-sized, so the widest
+                // child set its width. The Rvb/Swp row's two range inputs have an
+                // intrinsic ~129px each, which made every channel card 280px and pushed
+                // the instrument list off screen. A fixed width lets the sliders shrink
+                // (with min-w-0 on their columns) and keeps all channels uniform.
+                // Row, not column: the fader sits BESIDE the button stack rather than
+                // under it, which gives back the fader's 80px plus its readout on every
+                // channel. w-32 because the button column still needs its 74px (the
+                // filter select's max-content) next to the 16px fader.
+                'flex flex-row items-stretch gap-2.5 px-2 py-1.5 rounded border w-32 shrink-0 transition-colors ' +
                 (channelFiring
                   ? 'bg-accent-highlight/15 border-accent-highlight'
                   : isHeld
@@ -1564,8 +1583,8 @@ export const DubDeckStrip: React.FC = () => {
                       : 'bg-dark-bgTertiary border-dark-border')
               }
             >
-              {/* Top group: label + ops + hold — matches master column */}
-              <div className="flex flex-col items-center gap-1.5 w-full">
+              {/* Left column: label + ops + hold — matches master column */}
+              <div className="flex flex-col items-center gap-1.5 flex-1 min-w-0">
               <span
                 className="text-xs font-bold text-text-secondary leading-none truncate max-w-[56px]"
                 title={`Ch ${i + 1}${ch ? ' · ' + ch.name : ''}`}
@@ -1639,8 +1658,13 @@ export const DubDeckStrip: React.FC = () => {
                         title={`Filter cutoff ${filterHz} Hz`}
                       />
                     )}
+                    {/* min-w-0 on both columns: a flex child defaults to
+                        min-width:auto, so the range inputs' intrinsic ~129px
+                        each became the floor for this row and set the whole
+                        channel card to 280px. Every other control in the card
+                        is 74px or less. */}
                     <div className="flex gap-1 w-full">
-                      <div className="flex flex-col items-center flex-1">
+                      <div className="flex flex-col items-center flex-1 min-w-0">
                         <span className="text-[7px] text-text-muted">Rvb</span>
                         <input
                           type="range" min={0} max={1} step={0.01}
@@ -1651,7 +1675,7 @@ export const DubDeckStrip: React.FC = () => {
                           title={`Ch ${i + 1} dry spring reverb send ${Math.round(reverbSend * 100)}% — bypasses echo, feeds spring directly`}
                         />
                       </div>
-                      <div className="flex flex-col items-center flex-1">
+                      <div className="flex flex-col items-center flex-1 min-w-0">
                         <span className="text-[7px] text-text-muted">Swp</span>
                         <input
                           type="range" min={0} max={1} step={0.01}
@@ -1705,10 +1729,16 @@ export const DubDeckStrip: React.FC = () => {
                 HOLD
               </button>
               </div>
-              {/* Bottom group: fader + readout */}
+              {/* Right column: fader fills the stack's height, readout under it */}
+              <div className="flex flex-col items-center gap-1 shrink-0 min-h-0">
+              {/* flex-1 min-h-0 box: the fader is a flex child, so without a
+                  growing box to fill it shrinks to nothing instead of matching
+                  the button stack. */}
+              <div className="flex-1 min-h-0 flex items-stretch">
               <Fader
                 value={dubSend}
                 size="md"
+                fillHeight
                 color={channelFiring ? 'accent-highlight' : 'accent-primary'}
                 onChange={(v) => setChannelDubSend(i, v)}
                 title={`Ch ${i + 1} dub send — ${Math.round(dubSend * 100)}%. Drag vertically; double-click for full send. Each real dub desk had faders on every channel — riding these is how Tubby mixed.`}
@@ -1716,9 +1746,11 @@ export const DubDeckStrip: React.FC = () => {
                 doubleClickValue={1}
                 paramKey={`dub.channelSend.ch${i}`}
               />
-              <span className="text-xs font-mono text-text-secondary leading-none">
+              </div>
+              <span className="text-[9px] font-mono text-text-secondary leading-none">
                 {Math.round(dubSend * 100)}%
               </span>
+              </div>
             </div>
           );
         })}
