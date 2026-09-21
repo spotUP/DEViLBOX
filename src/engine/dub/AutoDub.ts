@@ -2092,7 +2092,35 @@ function inaudibilityReasons(): string[] {
 
 function sampleDubBusDiagnostics(): Record<string, number | boolean | string | null> | null {
   try {
-    return getActiveDubBus()?.getDiagnosticSnapshot() ?? null;
+    const diag = getActiveDubBus()?.getDiagnosticSnapshot() ?? null;
+    if (!diag) return null;
+
+    // Which channels are MUTED, recorded next to everything else.
+    //
+    // Reported 2026-09-21: "the music is mutet for a pattern or two and only
+    // effects fire". Several moves mute the dry signal while held — versionDrop,
+    // masterDrop, channelMute, ghostReverb — so a hold whose release is lost
+    // leaves the music off while the wet path keeps sounding, which is exactly
+    // that description.
+    //
+    // The log recorded the BUS in detail and the mixer not at all, so the one
+    // fact needed to tell "the performer is resting" from "the music is muted"
+    // was the one fact missing. Cheap, and it makes the next occurrence
+    // diagnosable from the log rather than from a second report.
+    try {
+      // Static import, already present at the top of this file. `require` does
+      // not exist in the browser bundle: it would have thrown straight into the
+      // catch below and recorded nothing, while looking like it worked.
+      const channels = useMixerStore.getState().channels ?? [];
+      const muted: number[] = [];
+      for (let i = 0; i < Math.min(channels.length, 16); i++) {
+        if (channels[i]?.muted) muted.push(i);
+      }
+      diag.mutedChannels = muted.length ? muted.join(',') : '';
+      diag.mutedChannelCount = muted.length;
+    } catch { /* mixer unavailable — the bus half is still worth having */ }
+
+    return diag;
   } catch {
     return null;
   }
