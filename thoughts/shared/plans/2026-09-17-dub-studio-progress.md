@@ -700,7 +700,17 @@ copy/paste (`TrackerCell[]` whole objects), `.dbx` save/load (patterns serialize
       first. Both are asserted by contract tests, along with the design-token rule.
       Levels are drawn as bars rather than numbers, because the question is "is there room
       left", which a shape answers at a glance. 8 tests.
-- [ ] **O2** Human listening review. **Never self-certify.** Ask: does it leave space, recognize
+- [~] **O2 — one of the eight questions answered 2026-09-21: "does it arrive musically".**
+      User, after the `dubGrid` speed fix, on "world class dub" at speed 12: "ok yes that
+      has improved". Before it: "it didnt feel very nicely synced", "i disrupted the song
+      more than add to it it felt off".
+      Worth keeping for whoever tests this next: the fault only shows at a speed OTHER
+      than 6. The grid assumed 4 rows per beat, which is exactly right at speed 6, so
+      amanda.ahx and any other speed-6 tune sounded identical before and after. Testing
+      the fix on the wrong song proves nothing.
+      The remaining seven questions are still unanswered.
+
+- [ ] **O2 (original entry)** Human listening review. **Never self-certify.** Ask: does it leave space, recognize
       the important event, arrive musically, know when to stop, create contrast, do drops feel
       intentional, does each intervention relate to the last, does it develop over phrases.
 
