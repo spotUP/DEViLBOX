@@ -839,8 +839,37 @@ async function getUpstreamLevels(): Promise<Record<string, number | null>> {
       getInstrumentChainOutput?: (id: number, ch?: number) => unknown;
     };
     const entries = Array.from(engineAny.instruments?.entries() ?? []);
-    const hively = entries.find(([, inst]) =>
+    // EVERY instance, not the first one found. The map is keyed by a composite
+    // (instrumentId << 16 | channelIndex) and a stale instance can sit beside
+    // the live one — reading only the first would report "the synth output is
+    // silent" when the truth is "there are two and I measured the dead one".
+    const hivelys = entries.filter(([, inst]) =>
       (inst as { constructor?: { name?: string } })?.constructor?.name === 'HivelySynth');
+    out.hivelyInstanceCount = hivelys.length;
+    const perInstance: Record<string, number | null> = {};
+    for (const [key, inst] of hivelys) {
+      perInstance[`inst${key}`] =
+        _tapRms(`synthOutput:${key}`, (inst as { output?: AudioNode }).output ?? null);
+      perInstance[`inst${key}.chain`] = _tapRms(
+        `chainOutput:${key}`,
+        getNativeAudioNode(engineAny.getInstrumentChainOutput?.(key >> 16, key & 0xffff) as never),
+      );
+    }
+    out.hivelyInstances = perInstance as unknown as number | null;
+    // Is the synth holding the engine that is actually PLAYING?
+    //
+    // This codebase already works around Vite module duplication elsewhere
+    // ("the cached class differs from the one playing"), and
+    // `__devilboxActiveHivelyEngine` exists for exactly that reason. If the
+    // synth's engine is a different copy, it wired its output to a silent
+    // engine and no amount of connection-lifecycle work would fix it.
+    try {
+      const live = (globalThis as { __devilboxActiveHivelyEngine?: { output?: AudioNode } })
+        .__devilboxActiveHivelyEngine?.output;
+      const held = (hivelys[0]?.[1] as { engine?: { output?: AudioNode } })?.engine?.output;
+      out.synthHoldsLiveEngine = (live && held ? (live === held ? 1 : 0) : null) as number | null;
+    } catch { out.synthHoldsLiveEngine = -1; }
+    const hively = hivelys[0];
     if (hively) {
       const [id, inst] = hively;
       out.synthOutput = _tapRms('synthOutput', (inst as { output?: AudioNode }).output ?? null);
