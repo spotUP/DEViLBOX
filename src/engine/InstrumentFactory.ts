@@ -20,6 +20,7 @@ import { MaxTraxSynth } from './maxtrax/MaxTraxSynth';
 import { PreTrackerSynth } from './pretracker/PreTrackerSynth';
 import { SoundMonSynth } from './soundmon/SoundMonSynth';
 import { SunTronicSynth } from './suntronic/SunTronicSynth';
+import { FredEditorReplayerSynth } from './fred/FredEditorReplayerSynth';
 import { SidMonSynth } from './sidmon/SidMonSynth';
 import { DigMugSynth } from './digmug/DigMugSynth';
 import { FCSynth } from './fc/FCSynth';
@@ -813,8 +814,6 @@ export class InstrumentFactory {
       }
 
       case 'FredEditorReplayerSynth': {
-        // eslint-disable-next-line @typescript-eslint/no-require-imports
-        const { FredEditorReplayerSynth } = require('./fred/FredEditorReplayerSynth');
         const ferSynth = new FredEditorReplayerSynth();
         ferSynth.setInstrumentIndex((config.id ?? 1) - 1);
         instrument = ferSynth;

@@ -875,10 +875,11 @@ export const useFormatStore = create<FormatStore>()(
       const tables = state.channelTrackTables;
       if (!tables || tables.length === 0) return 0;
 
-      // Dynamically import useTrackerStore to avoid circular dependency
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
-      const { useTrackerStore } = require('./useTrackerStore') as { useTrackerStore: { getState: () => { patterns: unknown[]; deletePattern: (idx: number) => void } } };
-      const trackerState = useTrackerStore.getState();
+      // The tracker store is reached through the late-bound registry, which is
+      // what the rest of this file already uses. It used to be a CommonJS call
+      // here, which throws in the browser bundle, so this action always bailed
+      // out before it deleted anything.
+      const trackerState = getTrackerStoreRef().getState() as ReturnType<typeof _TrackerStoreType.getState>;
       const totalPatterns = trackerState.patterns.length;
       if (totalPatterns === 0) return 0;
 

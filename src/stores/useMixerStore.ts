@@ -8,6 +8,7 @@
  */
 
 import { keepAcrossHmr } from '@/lib/dev/keepAcrossHmr';
+import { registerMixerStore } from './storeAccess';
 import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
 import { getToneEngine } from '../engine/ToneEngine';
@@ -1395,3 +1396,7 @@ export const useMixerStore = create<MixerStore>()(
  * `lib/dev/keepAcrossHmr.ts`.
  */
 keepAcrossHmr(import.meta.hot, useMixerStore, 'mixer');
+
+// Late binding for engine-layer readers. See `storeAccess.ts` for why this is
+// a registry and not an import.
+registerMixerStore(useMixerStore);

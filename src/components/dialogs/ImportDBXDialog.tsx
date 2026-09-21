@@ -9,6 +9,7 @@ import React, { useState, useEffect } from 'react';
 import { FolderOpen, Music, Layers, Cpu, User, Clock } from 'lucide-react';
 import { Button } from '@components/ui/Button';
 import { useModalClose } from '@hooks/useDialogKeyboard';
+import { decompressProject } from '@/lib/projectCompression';
 
 interface DBXPreview {
   name: string;
@@ -44,7 +45,6 @@ export const ImportDBXDialog: React.FC<ImportDBXDialogProps> = ({
 
     file.arrayBuffer().then(buffer => {
       try {
-        const { decompressProject } = require('@/lib/projectCompression');
         const text = decompressProject(buffer);
         const data = JSON.parse(text);
         setPreview({

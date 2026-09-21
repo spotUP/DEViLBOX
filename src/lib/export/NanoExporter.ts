@@ -17,6 +17,13 @@
 
 import type { InstrumentConfig } from '@/types/instrument';
 import type { Pattern, TrackerCell } from '@/types/tracker';
+// The package has no ESM entry; `src/lzma_worker.js` is the standalone codec.
+// This used to be a CommonJS call inside the two methods below, which throws a
+// ReferenceError in the browser bundle — so v2 (compressed) Nano files could
+// never be written or read.
+import lzmaWorker from 'lzma/src/lzma_worker.js';
+
+const LZMA = lzmaWorker.LZMA;
 
 // Map synth types to tiny IDs
 const SYNTH_TYPE_TO_ID: Record<string, number> = {
@@ -131,8 +138,6 @@ export class NanoExporter {
     level: number = 7
   ): Uint8Array {
     const raw = this.export(instruments, patterns, patternOrder, bpm, speed);
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const LZMA = require('lzma/src/lzma_worker.js').LZMA;
     const compressed: number[] = LZMA.compress(raw, Math.min(9, Math.max(1, level)));
 
     // Build v2 container: magic(4) + version(1) + uncompressed_size(4) + LZMA data
@@ -159,8 +164,6 @@ export class NanoExporter {
     if (data[4] === 1) return data; // v1 uncompressed — return as-is
     if (data[4] !== 2) throw new Error(`Unsupported Nano version: ${data[4]}`);
 
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const LZMA = require('lzma/src/lzma_worker.js').LZMA;
     const lzmaPayload = Array.from(data.subarray(9));
     const decompressed = LZMA.decompress(lzmaPayload);
 

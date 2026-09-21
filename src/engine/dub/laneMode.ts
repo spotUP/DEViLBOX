@@ -17,6 +17,7 @@
  */
 
 import type { EditorMode } from '@/types/tracker';
+import { useFormatStore } from '@/stores/useFormatStore';
 
 /** Editor modes whose "pattern" is a synthetic stub (no rows to target). */
 const NON_EDITABLE_MODES: readonly EditorMode[] = ['sc68'];
@@ -45,11 +46,11 @@ export function isTimeBasedLaneMode(
 /** Cheap read from the format store without creating a React subscription. */
 export function currentSongIsTimeBasedLane(): boolean {
   try {
-    // Lazy require to avoid circular imports — this helper is imported by
-    // engine-layer files (recorder/player) that would otherwise pull the
-    // store tree at module eval time.
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { useFormatStore } = require('@/stores/useFormatStore');
+    // The store used to be reached through a CommonJS call here, to keep this
+    // helper from pulling the store tree at module eval time. It never
+    // resolved, so this function answered false for every song. A static
+    // import is read at call time, which is the same deferral the comment was
+    // after and one that exists.
     const s = useFormatStore.getState();
     return isTimeBasedLaneMode(s.editorMode, !!s.c64SidFileData);
   } catch {

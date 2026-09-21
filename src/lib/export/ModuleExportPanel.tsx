@@ -3,6 +3,7 @@ import { useTrackerStore, useInstrumentStore, useProjectStore, useTransportStore
 import { exportWithOpenMPT, type OpenMPTExportOptions } from './OpenMPTExporter';
 import { exportCinterModFile, downloadBytes } from './Cinter4ModSave';
 import { getOriginalModuleDataForExport, base64ToBuffer } from './exporters';
+import { getTrackerReplayer } from '@engine/TrackerReplayer';
 
 /** The original imported .mod bytes (for byte-exact Cinter crunching), if any. */
 function originalModBytes(): Uint8Array | undefined {
@@ -64,8 +65,6 @@ export const ModuleExportPanel: React.FC<ModuleExportPanelProps> = ({
   // Check for synth-replaced instruments
   const replacedIds: number[] = (() => {
     try {
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
-      const { getTrackerReplayer } = require('@engine/TrackerReplayer');
       return getTrackerReplayer().replacedInstrumentIds;
     } catch { return []; }
   })();
