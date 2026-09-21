@@ -48,6 +48,15 @@ export interface SynthTimbreEvidence {
   sweeping: boolean;
   /** True when the instrument vibratos, which a bass or a pad rarely does. */
   vibrato: boolean;
+  /**
+   * Largest downward pitch move the instrument makes to itself, in semitones.
+   *
+   * This is how a kick is built on a chip: not with noise, but with a pitched
+   * waveform swept hard downwards over a few frames. An AHX instrument does it
+   * through the note column of its performance list, or with a downward period
+   * slide, and neither leaves any trace in the envelope or the waveform mix.
+   */
+  pitchDropSemitones: number;
 }
 
 /**
@@ -57,6 +66,25 @@ export interface SynthTimbreEvidence {
  * broadband.
  */
 const WAVEFORM_BRIGHTNESS = [0.2, 0.6, 0.75, 1.0];
+
+/**
+ * How far a sound must fall to read as a drum rather than a melodic gesture.
+ *
+ * Measured across amanda.ahx and jennipha.ahx, every Hively instrument:
+ *
+ *     drop 55  80ms  noise 0.50   amanda  inst 8    the kick
+ *     drop 39 140ms  noise 0.17   jennipha inst 1   the kick
+ *     drop 34 140ms  noise 0.17   jennipha inst 7   a tom
+ *     drop 12 460ms  noise 0.25   jennipha inst 8-10  melodic
+ *     drop  9 160ms  noise 0      jennipha inst 2   melodic
+ *     drop  5 140ms  noise 0      jennipha inst 3   melodic
+ *     drop  0  ...                everything else
+ *
+ * Two octaves sits in the gap between 12 and 34 with room on both sides. A
+ * melodic part can leap an octave; nothing melodic falls two octaves inside a
+ * few frames and then stops.
+ */
+const KICK_DROP_SEMITONES = 24;
 
 /**
  * Total sound length below which nothing can meaningfully sustain, whatever
@@ -118,6 +146,28 @@ function fromHively(inst: InstrumentConfig): SynthTimbreEvidence | null {
   const noisiness = counted > 0 ? noise / counted : 0;
   const brightness = counted > 0 ? brightnessSum / counted : 0.5;
 
+  // Largest fall from the instrument's first sounded note to any later one.
+  // `ple_Note` of 0 means "no change" in the replayer (hvl_replay.c:1540), so
+  // those entries are skipped rather than read as a drop to zero.
+  let firstNote: number | null = null;
+  let lowest = 0;
+  let pitchDropSemitones = 0;
+  for (const e of entries) {
+    const n = e?.note ?? 0;
+    if (!n) continue;
+    if (firstNote === null) { firstNote = n; lowest = n; continue; }
+    if (n < lowest) lowest = n;
+    pitchDropSemitones = Math.max(pitchDropSemitones, firstNote - lowest);
+  }
+
+  // The other way to fall: a downward period slide. FX 2 sets
+  // `vc_PeriodPerfSlideSpeed = -FXParam`, and `vc_PeriodPerfSlidePeriod -=
+  // speed` (hvl_replay.c:1247, 1558), so the period RISES and the pitch falls.
+  // FX 1 is the same mechanism upwards. The double negative is why this was
+  // worth reading rather than assuming.
+  const slidesDown = entries.some(e => Array.isArray(e?.fx) && e.fx.includes(2));
+  if (slidesDown) pitchDropSemitones = Math.max(pitchDropSemitones, KICK_DROP_SEMITONES);
+
   // A filter or pulse-width sweep that actually moves. Equal limits mean the
   // parameter is parked, whatever the speed says.
   const filterSweeps = (h.filterSpeed ?? 0) > 0 && (h.filterUpperLimit ?? 0) > (h.filterLowerLimit ?? 0);
@@ -133,6 +183,7 @@ function fromHively(inst: InstrumentConfig): SynthTimbreEvidence | null {
     releaseMs,
     sweeping: filterSweeps || squareSweeps,
     vibrato: (h.vibratoDepth ?? 0) > 0 && (h.vibratoSpeed ?? 0) > 0,
+    pitchDropSemitones,
   };
 }
 
@@ -166,6 +217,11 @@ function fromEnvelope(inst: InstrumentConfig): SynthTimbreEvidence | null {
     // it travels, so zero is a filter envelope in name only.
     sweeping: (inst.filterEnvelope?.octaves ?? 0) > 0,
     vibrato: false,
+    // The native synths express the same gesture as a pitch envelope, whose
+    // `amount` is in semitones and negative when it falls.
+    pitchDropSemitones: inst.pitchEnvelope?.enabled
+      ? Math.max(0, -(inst.pitchEnvelope.amount ?? 0))
+      : 0,
   };
 }
 
@@ -192,6 +248,14 @@ export function extractSynthTimbre(
 export function classifyBySynthParams(ev: SynthTimbreEvidence): {
   role: ChannelRole; subrole?: ChannelSubrole; confidence: number;
 } {
+  // A hard pitch drop in a short sound is a drum, and specifically the one
+  // that noise cannot identify: a chip kick is a pitched waveform swept
+  // downwards, with little or no noise in it. Checked before the noise branch
+  // because a kick often has both, and "kick" is the more useful answer.
+  if (ev.pitchDropSemitones >= KICK_DROP_SEMITONES && ev.articulation === 'percussive') {
+    return { role: 'percussion', subrole: 'kick', confidence: 0.85 };
+  }
+
   // Noise plus a short envelope is percussion, not an inference. Nothing else
   // in a tracker sounds like that.
   if (ev.noisiness >= 0.5 && ev.articulation === 'percussive') {
