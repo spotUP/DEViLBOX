@@ -1412,6 +1412,35 @@ this bug.
       stretch? Not seen yet. Next time it happens, call `get_playback_silence` BEFORE
       reloading — it now answers for this engine.
 
+- [~] **X23 — ISOLATION RULED OUT, AND MY LEVEL-RATIO ANALYSIS WAS NOT SOUND. 2026-09-21.**
+      The isolation theory had real code behind it: in the split path an isolated channel
+      is muted OUT of the main mix (`Hively.worklet.js`, step 4), and on a 4-channel AHX
+      that would be most of the music. Measured instead of argued — `diagDub` now reports
+      the slots — and with a dub tap open on ch1 while playing:
+
+          isolationSlots [null,null,null,null]   isolatedBits 0
+          channelGains   [1,1,1,1,1,1,1,1]
+
+      No isolation, every channel at unity. Dead.
+      **And the ratio table in the entry below it does not support what I drew from it.**
+      It compares `lastMainPeak` — the PEAK of one render frame — against `insertIn`, an
+      RMS over 2048 samples, at different moments of the tune. Music runs a crest factor
+      of 10-20x on its own, so "24x down" and "1.0x" can be the same healthy path at two
+      different bars. In the very next reading `insertIn` (0.0254) came out LARGER than
+      `lastMainPeak` (0.0217), which a faithful path cannot do — the two numbers are not
+      commensurable and I should not have built on them. Same class of error as reading
+      `rmsMax 0.0074` as silence earlier in this entry.
+      **What survives, and it is enough to work from.** One reproduction, measured with a
+      single instrument before and after, same passage: with an AHX playing,
+      `set_channel_dub_send(channel=1, amount=0.5)` takes `get_audio_level` from
+      **rmsAvg 0.0307 to rmsAvg 0 / rmsMax 0.0074**, and the level does not recover when
+      the send is set back to 0. That is the experiment to re-run, and the only comparison
+      in this entry that is like-for-like.
+      **Next**, and it needs an A/B, not another theory: run that reproduction while
+      reading `masterInsertLevels` and `upstreamLevels` immediately before and immediately
+      after the single `set_channel_dub_send` call, so every number is compared against
+      itself one second earlier rather than against a different bar of music.
+
 - [~] **X23 — THREE OF MY OWN CONCLUSIONS IN THIS ENTRY WERE WRONG. What is actually
       established, 2026-09-21.**
       Each theory was killed by the next measurement, so the retractions come first:
