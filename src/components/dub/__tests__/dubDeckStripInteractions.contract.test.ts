@@ -37,13 +37,33 @@ describe('DubDeckStrip — move grouping contract (G15)', () => {
   });
 
   it('renders HOLD globals with pointer-held start/release semantics', () => {
+    // These used to inline the pointer handlers at every hold site, and the
+    // assertions here matched that markup literally. The X26 fix replaced all
+    // four copies with one `holdButtonProps` helper — no behaviour changed,
+    // but three tests failed because they pinned the spelling instead of the
+    // semantics. Assert the semantics: a hold global takes its pointer props
+    // from the shared helper, and is not also a click or a toggle.
     const holdBlock = SOURCE.match(/GLOBAL_MOVES\.filter\(m => m\.group === 'hold'\)\.map\(\(m\) => \{[\s\S]*?\}\)\}/);
     expect(holdBlock, 'HOLD group render block not found').not.toBeNull();
-    expect(holdBlock![0]).toMatch(/onPointerDown=\{\(e\) => \{/);
-    expect(holdBlock![0]).toMatch(/setPointerCapture\(e\.pointerId\)/);
-    expect(holdBlock![0]).toMatch(/holdStart\(m\.moveId\)/);
-    expect(holdBlock![0]).toMatch(/onPointerUp=\{\(e\) => \{ e\.currentTarget\.releasePointerCapture\(e\.pointerId\); holdEnd\(m\.moveId\); \}\}/);
-    expect(holdBlock![0]).toMatch(/onPointerCancel=\{\(e\) => \{ e\.currentTarget\.releasePointerCapture\(e\.pointerId\); holdEnd\(m\.moveId\); \}\}/);
+    expect(holdBlock![0]).toMatch(/holdButtonProps\(m\.moveId\)/);
+    // The block may wrap onPointerDown to refuse when no send is up, but it
+    // must still delegate to the helper's handler rather than replace it.
+    expect(holdBlock![0]).toMatch(/props\.onPointerDown\(e\)/);
+    expect(holdBlock![0]).not.toMatch(/onClick=/);
+    expect(holdBlock![0]).not.toMatch(/handleToggle\(m\.moveId\)/);
+  });
+
+  it('gives every hold site all four ways out of a held state', () => {
+    // pointerup alone is not enough: a capture can vanish without one, which
+    // is how a click left crushBass held on for ever.
+    const helper = SOURCE.match(/const holdButtonProps = useCallback\([\s\S]*?\}\), \[holdStart, holdEnd\]\);/);
+    expect(helper, 'holdButtonProps helper not found').not.toBeNull();
+    for (const handler of ['onPointerDown', 'onPointerUp', 'onPointerCancel', 'onLostPointerCapture']) {
+      expect(helper![0], handler).toContain(handler);
+    }
+    // Two release paths plus the start, each guarded — an unguarded
+    // releasePointerCapture throws and skips the holdEnd after it.
+    expect(helper![0].match(/try \{ e\.currentTarget\.(set|release)PointerCapture/g) ?? []).toHaveLength(3);
   });
 
   it('renders TOGGLE globals as latch-on/latch-off handleToggle buttons', () => {
@@ -73,22 +93,85 @@ describe('DubDeckStrip — channel/master button semantics contract (G15)', () =
   it('uses the same op.kind split for the ALL channels master column', () => {
     const masterOpsBlock = SOURCE.match(/CHANNEL_OPS\.map\(\(op\) => \{[\s\S]*?title=\{`ALL channels/m);
     expect(masterOpsBlock, 'master CHANNEL_OPS block not found').not.toBeNull();
-    expect(masterOpsBlock![0]).toMatch(/const isHold = op\.kind === 'hold'/);
-    expect(masterOpsBlock![0]).toMatch(/onClick=\{isHold \? undefined : \(\) => \{/);
-    expect(masterOpsBlock![0]).toMatch(/fireTrigger\(op\.moveId, i\)/);
-    expect(masterOpsBlock![0]).toMatch(/onPointerDown=\{isHold \? \(e\) => \{/);
-    expect(masterOpsBlock![0]).toMatch(/holdStart\(op\.moveId, i\)/);
-    expect(masterOpsBlock![0]).toMatch(/onPointerUp=\{isHold \? \(e\) => \{/);
-    expect(masterOpsBlock![0]).toMatch(/holdEnd\(op\.moveId, i\)/);
+    const block = masterOpsBlock![0];
+    expect(block).toMatch(/const isHold = op\.kind === 'hold'/);
+    expect(block).toMatch(/onClick=\{isHold \? undefined : \(\) => \{/);
+    expect(block).toMatch(/fireTrigger\(op\.moveId, i\)/);
+    // Master cannot use the shared helper: one button holds every channel, so
+    // it fans holdStart/holdEnd out across the visible channels itself. It
+    // must still cover all four exits, or a master hold can strand N channels
+    // rather than one.
+    for (const handler of ['onPointerDown', 'onPointerUp', 'onPointerCancel', 'onLostPointerCapture']) {
+      expect(block, handler).toContain(handler);
+    }
+    expect(block).toMatch(/holdStart\(op\.moveId, i\)/);
+    expect(block.match(/holdEnd\(op\.moveId, i\)/g) ?? [], 'every exit must end the hold').toHaveLength(3);
   });
 
   it('uses the same op.kind split for each individual channel column', () => {
     const channelOpsBlock = SOURCE.match(/CHANNEL_OPS\.map\(\(op\) => \{[\s\S]*?title=\{`Ch \$\{i \+ 1\} · \$\{op\.title\}/m);
     expect(channelOpsBlock, 'per-channel CHANNEL_OPS block not found').not.toBeNull();
-    expect(channelOpsBlock![0]).toMatch(/const isHold = op\.kind === 'hold'/);
-    expect(channelOpsBlock![0]).toMatch(/onClick=\{isHold \? undefined : \(\) => fireTrigger\(op\.moveId, i\)\}/);
-    expect(channelOpsBlock![0]).toMatch(/onPointerDown=\{isHold \? \(e\) => \{ e\.currentTarget\.setPointerCapture\(e\.pointerId\); holdStart\(op\.moveId, i\); \} : undefined\}/);
-    expect(channelOpsBlock![0]).toMatch(/onPointerUp=\{isHold \? \(e\) => \{ e\.currentTarget\.releasePointerCapture\(e\.pointerId\); holdEnd\(op\.moveId, i\); \} : undefined\}/);
-    expect(channelOpsBlock![0]).toMatch(/onPointerCancel=\{isHold \? \(e\) => \{ e\.currentTarget\.releasePointerCapture\(e\.pointerId\); holdEnd\(op\.moveId, i\); \} : undefined\}/);
+    const block = channelOpsBlock![0];
+    expect(block).toMatch(/const isHold = op\.kind === 'hold'/);
+    expect(block).toMatch(/onClick=\{isHold \? undefined : \(\) => fireTrigger\(op\.moveId, i\)\}/);
+    expect(block).toMatch(/\{\.\.\.\(isHold \? holdButtonProps\(op\.moveId, i\) : \{\}\)\}/);
+  });
+});
+
+/**
+ * The always-visible live row.
+ *
+ * Asked for on 2026-09-21: "this fx wet slider is full width we could fit a
+ * lot of the stuff that is hidden behind the tiny settings cog here" /
+ * "stuff that are important live". Intensity in particular existed only
+ * inside AutoDubPanel, behind a cog the size of a fingernail, which is the
+ * wrong place for the control that decides how busy the performer is.
+ *
+ * These lock the three properties that make a control usable live: it is on
+ * the strip itself, it follows the value while a move drives it, and the row
+ * survives a narrow deck.
+ */
+describe('DubDeckStrip — the live row', () => {
+  const LIVE_ROW = SOURCE.match(
+    /\{busEnabled && \(\s*<div className="flex flex-wrap[\s\S]*?\n      \)\}/,
+  );
+
+  it('renders the row at all', () => {
+    expect(LIVE_ROW, 'live row block not found').not.toBeNull();
+  });
+
+  it('carries the controls a performer rides, not just the wet level', () => {
+    const row = LIVE_ROW![0];
+    expect(row).toMatch(/setDubBus\(\{ returnGain:/);
+    expect(row).toMatch(/setAutoDubIntensity\(/);
+    expect(row).toMatch(/setDubBus\(\{ echoIntensity:/);
+  });
+
+  it('puts intensity on the strip rather than only behind the settings cog', () => {
+    // The whole point of the change: AutoDubPanel may keep its own copy, but
+    // reaching the cog must not be the only way to change how busy the
+    // performer is.
+    expect(SOURCE).toMatch(/type="range"[\s\S]{0,200}setAutoDubIntensity\(/);
+  });
+
+  it('follows the bus faders live instead of freezing at the stored value', () => {
+    // X17's fault class: a fader read straight from the store sits still while
+    // a move drives the parameter, so the row lies about what the bus is doing.
+    expect(SOURCE).toMatch(/useLiveDubParam\('dub\.returnGain'/);
+    expect(SOURCE).toMatch(/useLiveDubParam\('dub\.echoIntensity'/);
+    const row = LIVE_ROW![0];
+    expect(row).toContain('liveReturnGain');
+    expect(row).toContain('liveEchoIntensity');
+  });
+
+  it('greys intensity out when the performer is switched off', () => {
+    expect(LIVE_ROW![0]).toMatch(/disabled=\{!autoDubEnabled\}/);
+  });
+
+  it('wraps rather than squashing three sliders into stubs on a narrow deck', () => {
+    const row = LIVE_ROW![0];
+    expect(row).toContain('flex-wrap');
+    // Each control keeps a floor wide enough to still be draggable.
+    expect(row.match(/min-w-\[11rem\]/g) ?? []).toHaveLength(3);
   });
 });
