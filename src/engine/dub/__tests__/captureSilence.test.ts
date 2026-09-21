@@ -32,6 +32,20 @@ const read = (p: string) => readFileSync(resolve(ROOT, p), 'utf8');
 const BUS = read('engine/dub/DubBus.ts');
 const ROUTED = read('engine/tone/ChannelRoutedEffects.ts');
 
+/**
+ * The body of `rebuildDubConnections`, from its signature to its closing brace.
+ *
+ * This used to be a fixed 3000-character window, which is a guess about how
+ * long the method is: adding a comment to it pushed the store-unavailable catch
+ * out of range and failed a test about something the change never touched.
+ */
+function rebuildBody(): string {
+  const at = ROUTED.indexOf('async rebuildDubConnections');
+  if (at < 0) return '';
+  const end = ROUTED.indexOf('\n  }\n', at);
+  return end < 0 ? ROUTED.slice(at) : ROUTED.slice(at, end);
+}
+
 describe('a capture knows whether it caught anything', () => {
   it('measures the captured peak, not only the frame count', () => {
     expect(BUS).toContain('function capturedPeak(');
@@ -65,9 +79,8 @@ describe('a capture knows whether it caught anything', () => {
 
 describe('the engine takes the sends from the store, not from its own memory', () => {
   it('seeds the send values before deciding what to reconnect', () => {
-    const at = ROUTED.indexOf('async rebuildDubConnections');
-    expect(at).toBeGreaterThan(-1);
-    const body = ROUTED.slice(at, at + 3000);
+    expect(ROUTED.indexOf('async rebuildDubConnections')).toBeGreaterThan(-1);
+    const body = rebuildBody();
     const seed = body.indexOf('useMixerStore');
     const guard = body.indexOf('channelDubSendValues[ch] <= 0');
     expect(seed, 'store is never consulted').toBeGreaterThan(-1);
@@ -79,14 +92,12 @@ describe('the engine takes the sends from the store, not from its own memory', (
   it('does not overwrite a send the engine already holds', () => {
     // The engine's value is the live one while a move is holding a channel
     // open; the store is only the resting position.
-    const at = ROUTED.indexOf('async rebuildDubConnections');
-    const body = ROUTED.slice(at, at + 3000);
+    const body = rebuildBody();
     expect(body).toContain('this.channelDubSendValues[ch] <= 0');
   });
 
   it('survives the store being unavailable', () => {
-    const at = ROUTED.indexOf('async rebuildDubConnections');
-    const body = ROUTED.slice(at, at + 3000);
+    const body = rebuildBody();
     expect(body).toMatch(/catch\s*\{[^}]*store unavailable/);
   });
 });

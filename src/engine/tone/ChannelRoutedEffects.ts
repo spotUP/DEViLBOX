@@ -549,6 +549,29 @@ export class ChannelRoutedEffectsManager {
    */
   async rebuildDubConnections(): Promise<void> {
     if (!this.dubBusInput) return;
+
+    // Drop what we believe the worklet has enabled, BEFORE anything can return
+    // early.
+    //
+    // `dubLifecycle.active` describes state that lives in the WORKLET, and the
+    // worklet's enable set does not survive the rebuild this method exists to
+    // answer. Keeping the belief made `setDesired(ch, true)` return 'none' for
+    // a channel the worklet no longer had enabled, so the enable was never
+    // re-posted and that channel's dub send was dead for the rest of the
+    // session — the fader moved, the store updated, the send gain ramped, and
+    // no audio was ever split out.
+    //
+    // Measured 2026-09-21 on jennipha.ahx: channels 2 and 3 held sends of 0.5
+    // and 0.15 with taps registered, `dubChannelEnabled` false for both, and
+    // writing a DIFFERENT value changed nothing. Taking channel 3 to 0 and
+    // back to 0.4 brought it straight back — a send transition was the only
+    // thing that could reconcile the two.
+    //
+    // It has to happen before the early returns below, not after them: when no
+    // engine is available yet, the stale belief is exactly what would stop the
+    // next send write from activating once one appears.
+    this.dubLifecycle.clear();
+
     const engine = await getActiveIsolationEngine();
     if (!engine?.isAvailable()) return;
     const worklet = engine.getWorkletNode();
