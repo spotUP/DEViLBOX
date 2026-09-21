@@ -425,6 +425,45 @@ export async function setDubBusEnabled(params: Record<string, unknown>): Promise
  * including any changed while it was held. Never touches `characterPreset`,
  * so a voicing survives being auditioned.
  */
+/**
+ * Remove every recorded DUB automation lane from the project, leaving the music
+ * alone.
+ *
+ * Recorded dub moves live in the same automation store as musical automation,
+ * distinguished only by a `dub.` parameter prefix. A song carrying them replays
+ * the whole performance on every pass — reported 2026-09-21 as the song
+ * starting muted with effects firing and slams throwing, which read as the
+ * performer misbehaving. It was not: the stack showed every one of those fires
+ * arriving via `AutomationPlayer`, not AutoDub.
+ *
+ * Returns what it removed, by parameter, so the caller can see whether the
+ * lanes it expected were actually there.
+ */
+export async function clearDubAutomation(): Promise<Record<string, unknown>> {
+  const { useAutomationStore } = await import('../../stores/useAutomationStore');
+  const store = useAutomationStore.getState();
+  const curves = store.curves ?? [];
+  const dubCurves = curves.filter((c) => typeof c.parameter === 'string' && c.parameter.startsWith('dub.'));
+
+  const byParameter: Record<string, number> = {};
+  for (const c of dubCurves) {
+    byParameter[c.parameter] = (byParameter[c.parameter] ?? 0) + 1;
+  }
+  for (const c of dubCurves) {
+    try { store.removeCurve(c.id); } catch { /* already gone */ }
+  }
+
+  const remaining = useAutomationStore.getState().curves ?? [];
+  return {
+    ok: true,
+    removed: dubCurves.length,
+    byParameter,
+    // Musical automation is untouched — reported so the caller can confirm it.
+    musicalCurvesKept: remaining.length,
+    stillDub: remaining.filter((c) => typeof c.parameter === 'string' && c.parameter.startsWith('dub.')).length,
+  };
+}
+
 export async function setDubBusAudition(params: Record<string, unknown>): Promise<Record<string, unknown>> {
   const { getActiveDubBus } = await import('../../engine/dub/DubBus');
   const bus = getActiveDubBus();
