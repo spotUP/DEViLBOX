@@ -175,8 +175,25 @@ const GLOBAL_MOVES: Array<GlobalMove> = [
 // we can't build class names dynamically with string concatenation.
 // text-text-inverse = #1a1a1a (near-black). Only works on bright/light accent
 // backgrounds. For dark or semi-transparent accents use text-white instead.
+/**
+ * The move rows.
+ *
+ * They used to be `flex-wrap`, so every button was as wide as its own label and
+ * nothing lined up between rows: Slam/Kick/Crack sat over 380ms/Dotted/1/4 at
+ * three different pitches. Asked for on 2026-09-21 as equal columns.
+ *
+ * `auto-fill` + `1fr` gives every button the same width and, because all four
+ * rows share the same track definition and the same container width, the same
+ * COLUMN BOUNDARIES across rows. The 7rem floor is set by the longest label
+ * ("Crush Bass", "Version Drop"); below that the row drops a column rather
+ * than shrinking a button under its text.
+ */
+const MOVE_ROW_GRID = 'grid grid-cols-[repeat(auto-fill,minmax(7rem,1fr))] gap-1.5 flex-1 min-w-0';
+
 const colorClasses = (token: string, active: boolean) => {
-  const base = 'px-2.5 py-1 rounded border text-xs font-bold transition-all duration-150 ';
+  // nowrap: on the column grid a wrapped label would make one button taller
+  // than its row.
+  const base = 'px-2.5 py-1 rounded border text-xs font-bold whitespace-nowrap transition-all duration-150 ';
   const idle = 'bg-dark-bgTertiary border-dark-borderLight text-text-secondary ';
   switch (token) {
     // Bright opaque backgrounds — dark text has 9-12:1 contrast
@@ -1399,14 +1416,14 @@ export const DubDeckStrip: React.FC = () => {
             className="text-text-muted w-16 shrink-0 pt-0.5 font-bold tracking-wide"
             title="Click to fire once — no hold needed"
           >CLICK ▸</span>
-          <div className="flex gap-1.5 flex-wrap">
+          <div className={MOVE_ROW_GRID}>
             {GLOBAL_MOVES.filter(m => m.group === 'click').map((m) => {
               const active = isMoveFiring(m.moveId);
               const noSend = !!m.needsSend && !anySend;
               return (
                 <button
                   key={m.moveId}
-                  className={colorClasses(m.color, active) + (noSend && busEnabled ? ' opacity-40' : '')}
+                  className={colorClasses(m.color, active) + ' w-full text-center' + (noSend && busEnabled ? ' opacity-40' : '')}
                   onClick={() => {
                     if (noSend) {
                       notify.warning('Raise a CH send first — drag a channel fader up on the right');
@@ -1432,14 +1449,14 @@ export const DubDeckStrip: React.FC = () => {
             className="text-accent-secondary/60 w-16 shrink-0 pt-0.5 font-bold tracking-wide"
             title="Echo rate presets — click to activate, click again to restore previous rate. Only one active at a time."
           >RATE ▸</span>
-          <div className="flex gap-1.5 flex-wrap">
+          <div className={MOVE_ROW_GRID}>
             {GLOBAL_MOVES.filter(m => m.group === 'rate').map((m) => {
               const isActive = activeRatePreset === m.moveId;
               return (
                 <button
                   key={m.moveId}
                   className={
-                    colorClasses(m.color, isActive) +
+                    colorClasses(m.color, isActive) + ' w-full text-center' +
                     (isActive ? ' ring-2 ring-offset-1 ring-offset-dark-bgSecondary ring-white/70' : '')
                   }
                   onClick={() => handleRatePreset(m.moveId)}
@@ -1461,7 +1478,7 @@ export const DubDeckStrip: React.FC = () => {
             className="text-accent-warning/60 w-16 shrink-0 pt-0.5 font-bold tracking-wide"
             title="Press and hold — releases when you let go"
           >HOLD ▸</span>
-          <div className="flex gap-1.5 flex-wrap">
+          <div className={MOVE_ROW_GRID}>
             {GLOBAL_MOVES.filter(m => m.group === 'hold').map((m) => {
               const key = `${m.moveId}:g`;
               const active = heldMoves.has(key) || isMoveFiring(m.moveId);
@@ -1469,7 +1486,7 @@ export const DubDeckStrip: React.FC = () => {
               return (
                 <button
                   key={m.moveId}
-                  className={colorClasses(m.color, active) + (noSend && busEnabled ? ' opacity-40' : '')}
+                  className={colorClasses(m.color, active) + ' w-full text-center' + (noSend && busEnabled ? ' opacity-40' : '')}
                   {...(() => {
                     const props = holdButtonProps(m.moveId);
                     return {
@@ -1501,7 +1518,7 @@ export const DubDeckStrip: React.FC = () => {
             className="text-accent-highlight/60 w-16 shrink-0 pt-0.5 font-bold tracking-wide"
             title="Click to activate, click again to deactivate — stays on hands-free"
           >TOGGLE ▸</span>
-          <div className="flex gap-1.5 flex-wrap">
+          <div className={MOVE_ROW_GRID}>
             {GLOBAL_MOVES.filter(m => m.group === 'toggle').map((m) => {
               const key = `${m.moveId}:g`;
               const toggled = toggledMoves.has(m.moveId);
@@ -1512,7 +1529,7 @@ export const DubDeckStrip: React.FC = () => {
                 <button
                   key={m.moveId}
                   className={
-                    colorClasses(m.color, active) +
+                    colorClasses(m.color, active) + ' w-full text-center' +
                     (dimmed ? ' opacity-40' : '') +
                     (toggled ? ' ring-2 ring-offset-1 ring-offset-dark-bgSecondary ring-white/70' : '')
                   }
