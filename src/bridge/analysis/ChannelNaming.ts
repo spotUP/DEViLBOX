@@ -19,6 +19,7 @@ import { categorizeSample } from '@/lib/import/maxForLiveImport';
 import { DRUM_SYNTHS } from '@/midi/performance/lightGuide';
 import { analyzeEnvelopeShape } from '@/lib/import/EnvelopeConverter';
 import { analyzeSampleForClassification } from './SampleSpectrum';
+import { extractSynthTimbre, classifyBySynthParams } from './synthEvidence';
 
 // ─── Public types ────────────────────────────────────────────────────────────
 
@@ -145,6 +146,27 @@ export function classifyInstrument(inst: InstrumentConfig | null | undefined): I
     const spec = analyzeSampleForClassification(sampleUrl);
     if (spec && spec.role !== 'empty' && spec.confidence >= 0.5) {
       return { role: spec.role, subrole: spec.subrole, confidence: spec.confidence };
+    }
+  }
+
+  // 4b. Synth parameters — for instruments that have no PCM at all.
+  //
+  //     AHX and HVL instruments are synthesised by the replayer, so steps 3
+  //     and 4 have nothing to read, and step 5 reads the musician's greetings.
+  //     Every channel of an AHX tune therefore came back `bass` from note
+  //     statistics alone, which is why `riddimSection` had nothing melodic to
+  //     mute and fired as a no-op.
+  //
+  //     The parameters describe the sound directly and sometimes better than a
+  //     spectrum could: an instrument whose performance list is all noise
+  //     waveform IS percussion. `classifyBySynthParams` stays quiet unless the
+  //     parameters settle a role, so this cannot mask the name or envelope
+  //     paths below.
+  const timbre = extractSynthTimbre(inst);
+  if (timbre) {
+    const byParams = classifyBySynthParams(timbre);
+    if (byParams.role !== 'empty' && byParams.confidence >= 0.5) {
+      return { role: byParams.role, subrole: byParams.subrole, confidence: byParams.confidence };
     }
   }
 
