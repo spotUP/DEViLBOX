@@ -1503,6 +1503,23 @@ this bug.
       path — pointerup, pointerleave, pointercancel, and the element unmounting mid-hold.
       Intermittent, so reproduce by clicking rapidly rather than assuming one try is clean.
 
+- [ ] **X32** **Dub deck header row is not responsive and runs off the edge.** Reported
+      2026-09-21 with a screenshot: DUB DECK / Bus ON / REC / STYLE / ECHO / A/B / AUTO DUB
+      / EQ / BLEED / CHORUS / CLUB / QUANTIZE / DLY-VRB, with the next control ("JA...")
+      cut in half at the right edge.
+      Cause is in the markup, not the content: the header is
+      `flex items-center gap-2 text-xs` (`DubDeckStrip.tsx` ~line 1023) with no
+      `flex-wrap` and no horizontal scroll, and its parent (~line 1021) is
+      `overflow-y-auto` — vertical only. So the row overflows and is simply clipped.
+      Two candidate fixes, and they are not equivalent for live use: `flex-wrap` keeps
+      every control reachable without scrolling but changes the deck's height as the
+      window narrows, which moves everything below it; `overflow-x-auto` keeps the height
+      fixed but hides controls behind a scroll the performer has to find mid-set. For a
+      surface played live, wrapping is probably right, with the most-used controls ordered
+      first so they stay on the first line.
+      Measure at the widths that matter before choosing — the channel-strip work on the
+      same day was checked at 1509 / 1280 / 1024 / 900, and this row should be too.
+
 - [ ] **X31** **BUS tab sliders crackle while dragged — bad for live dubbing.** Reported
       2026-09-21 with a screenshot of BASS / MID / WIDTH / sweep / RATE.
       Very likely zipper noise from stepped `AudioParam.value` assignment: those settings
