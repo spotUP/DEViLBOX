@@ -26,6 +26,14 @@ import { applyEffectParametersDiff } from './EffectParameterEngine';
 import { PerChannelDubFx } from '../dub/PerChannelDubFx';
 import { DubChannelLifecycle, type DubChannelAction } from '@/lib/dub/dubChannelLifecycle';
 
+/**
+ * How long a channel's dub-send gain takes to reach its new value.
+ *
+ * Shared with the worklet routing below, which must not flip the isolation mask
+ * until this ramp has landed — see `_deactivateDubChannelInner`.
+ */
+export const DUB_SEND_RAMP_SEC = 0.02;
+
 /** First worklet output index dedicated to per-channel dub sends. */
 export const DUB_OUTPUT_BASE = 5;
 /** Max tracker channels that can be dubbed simultaneously (per-engine). */
@@ -377,7 +385,7 @@ export class ChannelRoutedEffectsManager {
     try {
       gain.gain.cancelScheduledValues(now);
       gain.gain.setValueAtTime(gain.gain.value, now);
-      gain.gain.linearRampToValueAtTime(curved, now + 0.02);
+      gain.gain.linearRampToValueAtTime(curved, now + DUB_SEND_RAMP_SEC);
     } catch (e) {
       console.warn('[ChannelRoutedEffects] setChannelDubSend ramp failed:', e);
     }
@@ -503,6 +511,20 @@ export class ChannelRoutedEffectsManager {
   private async _deactivateDubChannelInner(channelIndex: number, gain: GainNode): Promise<void> {
     this.channelDubPendingActivation.delete(channelIndex);
     const engine = await getActiveIsolationEngine();
+
+    // Wait for the send's own 20ms ramp to land before cutting the wire.
+    //
+    // `setChannelDubSend` ramps the gain down over DUB_SEND_RAMP_SEC and then
+    // dispatches this, which only had an `await import()` microtask in front of
+    // it — effectively zero delay. So the worklet disconnect happened while the
+    // gain was still near its OLD value: a hard cut on the dub path every time
+    // a send fader crossed zero. Reported 2026-09-21 as choppy, cut-out audio.
+    await new Promise<void>((r) => setTimeout(r, Math.ceil(DUB_SEND_RAMP_SEC * 1000) + 5));
+
+    // The send may have been re-opened while we waited; the lifecycle is the
+    // authority on what was actually wanted, so do not tear down against it.
+    if (this.dubLifecycle.isDesired(channelIndex)) return;
+
     const worklet = engine?.getWorkletNode();
     if (worklet) {
       worklet.port.postMessage({ cmd: 'dubChannelDisable', type: 'dubChannelDisable', val: { channel: channelIndex }, channel: channelIndex });
