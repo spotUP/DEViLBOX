@@ -217,7 +217,22 @@ describe('wiring contract — it is reachable and it lets go', () => {
   });
 
   it('a finger sliding off the button still hands the colour back', () => {
-    expect(strip).toMatch(/setPointerCapture\(e\.pointerId\);\s*\n\s*beginBusAudition\(\)/);
+    // Pointer capture keeps the pointerup on this element even when the finger
+    // leaves it. The capture call is now wrapped in try/catch — it throws on a
+    // pointer that has already been released — so this checks the ORDER rather
+    // than textual adjacency: capture attempted, then the audition begins.
+    const downIdx = strip.search(/setPointerCapture\(e\.pointerId\)/);
+    const beginIdx = strip.search(/beginBusAudition\(\)/);
+    expect(downIdx, 'no pointer capture on the audition button').toBeGreaterThanOrEqual(0);
+    expect(downIdx).toBeLessThan(beginIdx);
+  });
+
+  it('a capture lost without a pointerup still hands the colour back', () => {
+    // The case capture cannot cover: if the capture itself disappears there is
+    // no pointerup at all, and the audition would stay latched with the bus in
+    // its bypassed state. Added 2026-09-21 with the same fix for the move
+    // holds, where a lost capture left a drone sounding.
+    expect(strip).toContain('onLostPointerCapture={endBusAudition}');
   });
 
   it('unmounting mid-hold does not leave the colour switched off', () => {

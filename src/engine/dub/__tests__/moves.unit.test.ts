@@ -130,6 +130,10 @@ function buildFakeBus() {
     beginRateOverride: vi.fn().mockReturnValue(vi.fn()),
     isRateOverridden: vi.fn().mockReturnValue(false),
     setSettings: vi.fn(),
+    // Hold moves that write settings directly claim those keys for the length
+    // of the gesture, so the settings mirror cannot revert them mid-hold.
+    // Returns the release function the move calls on dispose.
+    claimSettingKeys: vi.fn(() => vi.fn()),
   };
   return { bus, release };
 }

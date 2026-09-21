@@ -15,6 +15,7 @@
 
 import * as Tone from 'tone';
 import { getNativeAudioNode } from '@utils/audio-context';
+import { rampParam } from './rampParam';
 
 // ─── Utility ──────────────────────────────────────────────────────────────────
 function clamp01(v: number): number {
@@ -197,8 +198,9 @@ export class ToneArmEffect extends Tone.ToneAudioNode {
   get wet(): number { return this._wet; }
   set wet(value: number) {
     this._wet = clamp01(value);
-    // Keep the wetGain node in sync (controls overall wet bus level)
-    this.wetGain.gain.value = this._wet;
+    // Ramped for the same reason as VinylNoiseEffect: post-master on the whole
+    // mix, so a bare assignment is a full-scale step.
+    rampParam(this.wetGain.gain, this._wet, this.wetGain.context.currentTime);
     // Also forward to worklet so its per-sample wet/dry crossfade matches
     this._send('wet', this._wet);
   }

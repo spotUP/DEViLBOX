@@ -407,6 +407,10 @@ export class DubBus {
   private _heldAnnouncements = new Map<string, ReturnType<typeof setInterval>>();
   /** When the reverse-capture ring can first be expected to hold audio. */
   private _reverseCaptureReadyAtMs = 0;
+  /** Drive value the post-echo saturator curve was last built for. */
+  private _lastPostEchoSatDrive = -1;
+  /** Pending coalesced rebuild of that curve, if a drag is in progress. */
+  private _postEchoSatCurvePending: ReturnType<typeof setTimeout> | null = null;
   /** NaN/Inf scrubber inserted between `spring.output` and the post-spring
    *  forward chain (sidechain → glue → midScoop → lpf → master*). Same
    *  story as the feedback scrubber but on the FORWARD path: a NaN sample
@@ -3553,6 +3557,22 @@ export class DubBus {
     // during a crossfader sweep that's ~60 Hz of identical settings being
     // pushed. Without this guard we'd schedule dozens of AudioParam ramps
     // per second across 6 params for zero audible change.
+    // Drop any key a move currently owns, before anything else looks at them.
+    //
+    // Otherwise a mirror push carrying the store's older values lands on top of
+    // a live gesture and reverts it mid-hold — `ringModEnabled: false` while
+    // the pad is still down. The move is the authority on its own keys until it
+    // releases them.
+    if (this._ownedSettingKeys.size > 0) {
+      const filtered: Partial<DubBusSettings> = {};
+      let dropped = false;
+      for (const key of Object.keys(settings) as (keyof DubBusSettings)[]) {
+        if (this.isSettingOwned(key)) { dropped = true; continue; }
+        (filtered as Record<string, unknown>)[key] = settings[key];
+      }
+      if (dropped) settings = filtered;
+    }
+
     let changed = false;
     for (const key of Object.keys(settings) as (keyof DubBusSettings)[]) {
       if (this.settings[key] !== settings[key]) { changed = true; break; }
@@ -3969,8 +3989,26 @@ export class DubBus {
       const enabled = merged.postEchoSatEnabled;
       this._settle(this.postEchoSatBypass.gain, enabled ? 0 : 1, now, 0.01);
       this._settle(this.postEchoSatWet.gain, enabled ? 1 : 0, now, 0.01);
-      if (settings.postEchoSatDrive !== undefined) {
-        this.postEchoSat.curve = makeTapeSatCurve(merged.postEchoSatDrive);
+      if (settings.postEchoSatDrive !== undefined
+          && merged.postEchoSatDrive !== this._lastPostEchoSatDrive) {
+        // Coalesced to the end of the gesture rather than run per event.
+        //
+        // `makeTapeSatCurve` allocates a 4096-point Float32Array and runs 8192
+        // tanh calls, and this fired on EVERY pointer event of the Drive
+        // slider: main-thread churn plus a transfer-function step per pixel,
+        // each one an instant jump in the output.
+        //
+        // Quantised to 0.02 so a drag settles on a value instead of rebuilding
+        // for changes too small to hear, and deferred so the rebuild happens
+        // once the slider stops moving.
+        const drive = Math.round(merged.postEchoSatDrive * 50) / 50;
+        this._lastPostEchoSatDrive = merged.postEchoSatDrive;
+        if (this._postEchoSatCurvePending !== null) clearTimeout(this._postEchoSatCurvePending);
+        this._postEchoSatCurvePending = setTimeout(() => {
+          this._postEchoSatCurvePending = null;
+          if (this._disposed) return;
+          try { this.postEchoSat.curve = makeTapeSatCurve(drive); } catch { /* ok */ }
+        }, 60);
       }
     }
 
@@ -5046,6 +5084,41 @@ export class DubBus {
     } catch {
       try { param.setTargetAtTime(target, now, tc); } catch { /* param gone */ }
     }
+  }
+
+  /**
+   * Keys a MOVE currently owns. `setSettings` skips them.
+   *
+   * A hold move mutates engine state the store does not know about — ringMod
+   * and voltageStarve both call `setSettings` directly — and the next mirror
+   * push carries the store's older values, so `ringModEnabled: false` arrives
+   * and turns the held effect off WHILE THE PAD IS STILL DOWN. Reported
+   * 2026-09-21 among the dropouts: not a click, the effect simply vanishes
+   * mid-gesture.
+   *
+   * Echo rate has been protected from exactly this since `beginRateOverride`;
+   * this generalises that to any key, and is ref-counted the same way so
+   * overlapping moves do not release each other's claim.
+   */
+  private _ownedSettingKeys = new Map<string, number>();
+
+  claimSettingKeys(keys: readonly string[]): () => void {
+    for (const k of keys) this._ownedSettingKeys.set(k, (this._ownedSettingKeys.get(k) ?? 0) + 1);
+    let released = false;
+    return () => {
+      if (released) return;
+      released = true;
+      for (const k of keys) {
+        const depth = (this._ownedSettingKeys.get(k) ?? 1) - 1;
+        if (depth <= 0) this._ownedSettingKeys.delete(k);
+        else this._ownedSettingKeys.set(k, depth);
+      }
+    };
+  }
+
+  /** True while a move owns this setting, so an outside write must not land. */
+  isSettingOwned(key: string): boolean {
+    return this._ownedSettingKeys.has(key);
   }
 
   private announce(param: string, value: number): void {
@@ -6935,6 +7008,10 @@ export class DubBus {
     if (this.masterInsertPending !== null) {
       clearTimeout(this.masterInsertPending);
       this.masterInsertPending = null;
+    }
+    if (this._postEchoSatCurvePending !== null) {
+      clearTimeout(this._postEchoSatCurvePending);
+      this._postEchoSatCurvePending = null;
     }
     try { this._unsubIsolation?.(); } catch { /* ok */ }
     this._unsubIsolation = null;

@@ -42,22 +42,41 @@ describe('DubBus.wireMasterInsert — glitch guard (G15)', () => {
     expect(SOURCE).toMatch(/this\.masterInsertTail\s*=\s*this\.masterInsertEnvelope/);
   });
 
-  it('wireMasterInsert mutes the envelope before swapping connections', () => {
-    // Ramp/setValueAtTime to 0 must happen BEFORE source.disconnect(dest).
-    // Otherwise the glitch window reopens.
-    const fn = SOURCE.match(/wireMasterInsert\([^)]*\)\s*:\s*void\s*\{[\s\S]*?\n  \}/);
+  it('wireMasterInsert fades the envelope down before swapping connections', () => {
+    // The envelope must reach 0 BEFORE source.disconnect(dest), or the glitch
+    // window reopens.
+    //
+    // This used to demand `setValueAtTime(0)` specifically, which pinned a
+    // STEP to zero — and the method's own comment admitted what that cost:
+    // "the caller sees a brief silence". At full gain that step is a click and
+    // the gap is an audible chop every time the bus is enabled (reported
+    // 2026-09-21). It now ramps and defers the rewire until the ramp lands,
+    // which is what the original comment here asked for all along:
+    // "Ramp/setValueAtTime to 0 must happen BEFORE source.disconnect(dest)".
+    const fn = SOURCE.match(/wireMasterInsert\([^)]*\)\s*:\s*(?:void|Promise<void>)\s*\{[\s\S]*?\n  \}/);
     expect(fn, 'wireMasterInsert method not found').not.toBeNull();
     const body = fn![0];
-    const muteIdx = body.search(/masterInsertEnvelope\.gain\.setValueAtTime\(\s*0/);
+    const fadeIdx = body.search(/masterInsertEnvelope\.gain\.linearRampToValueAtTime\(\s*0/);
     const disconnectIdx = body.search(/source\.disconnect\(dest\)/);
-    expect(muteIdx, 'envelope mute before source.disconnect(dest)').toBeGreaterThanOrEqual(0);
-    expect(muteIdx).toBeLessThan(disconnectIdx);
+    expect(fadeIdx, 'envelope fade before source.disconnect(dest)').toBeGreaterThanOrEqual(0);
+    expect(fadeIdx).toBeLessThan(disconnectIdx);
+  });
+
+  it('wireMasterInsert waits for that fade before rewiring', () => {
+    // A ramp that is not waited on is the same as a step: the disconnect would
+    // land while the envelope is still open.
+    const fn = SOURCE.match(/wireMasterInsert\([^)]*\)\s*:\s*(?:void|Promise<void>)\s*\{[\s\S]*?\n  \}/);
+    const body = fn![0];
+    const waitIdx = body.search(/await new Promise[\s\S]{0,80}setTimeout/);
+    const disconnectIdx = body.search(/source\.disconnect\(dest\)/);
+    expect(waitIdx, 'no wait between the fade and the rewire').toBeGreaterThanOrEqual(0);
+    expect(waitIdx).toBeLessThan(disconnectIdx);
   });
 
   it('wireMasterInsert ramps the envelope back to 1 after reconnecting', () => {
     // After the swap, a linearRampToValueAtTime to 1 must happen so the
     // insert fades in rather than jumping to full volume.
-    const fn = SOURCE.match(/wireMasterInsert\([^)]*\)\s*:\s*void\s*\{[\s\S]*?\n  \}/);
+    const fn = SOURCE.match(/wireMasterInsert\([^)]*\)\s*:\s*(?:void|Promise<void>)\s*\{[\s\S]*?\n  \}/);
     expect(fn).not.toBeNull();
     expect(fn![0]).toMatch(/masterInsertEnvelope\.gain\.linearRampToValueAtTime\(\s*1/);
   });
@@ -65,7 +84,7 @@ describe('DubBus.wireMasterInsert — glitch guard (G15)', () => {
   it('unwireMasterInsert ramps the envelope down before disconnecting', () => {
     // The ramp-down must start BEFORE the disconnect. Otherwise the
     // insert chain audibly cuts out instead of fading out.
-    const fn = SOURCE.match(/unwireMasterInsert\([^)]*\)\s*:\s*void\s*\{[\s\S]*?\n  \}/);
+    const fn = SOURCE.match(/unwireMasterInsert\([^)]*\)\s*:\s*(?:void|Promise<void>)\s*\{[\s\S]*?\n  \}/);
     expect(fn, 'unwireMasterInsert method not found').not.toBeNull();
     const body = fn![0];
     const rampIdx = body.search(/masterInsertEnvelope\.gain\.linearRampToValueAtTime\(\s*0/);
@@ -78,7 +97,7 @@ describe('DubBus.wireMasterInsert — glitch guard (G15)', () => {
     // The actual disconnect of source→head / tail→dest MUST happen
     // inside a setTimeout, not inline. Inline disconnect = the ramp
     // hasn't run yet = glitch still audible.
-    const fn = SOURCE.match(/unwireMasterInsert\([^)]*\)\s*:\s*void\s*\{[\s\S]*?\n  \}/);
+    const fn = SOURCE.match(/unwireMasterInsert\([^)]*\)\s*:\s*(?:void|Promise<void>)\s*\{[\s\S]*?\n  \}/);
     expect(fn).not.toBeNull();
     expect(fn![0]).toMatch(/setTimeout\(/);
     // Inside the setTimeout: disconnect + reconnect of direct path.
@@ -94,7 +113,7 @@ describe('DubBus.wireMasterInsert — glitch guard (G15)', () => {
     // clearTimeout it and prevent the old disconnect from firing
     // against the new graph.
     expect(SOURCE).toMatch(/masterInsertPending\s*:\s*ReturnType<typeof\s+setTimeout>\s*\|\s*null/);
-    const wireFn = SOURCE.match(/wireMasterInsert\([^)]*\)\s*:\s*void\s*\{[\s\S]*?\n  \}/);
+    const wireFn = SOURCE.match(/wireMasterInsert\([^)]*\)\s*:\s*(?:void|Promise<void>)\s*\{[\s\S]*?\n  \}/);
     expect(wireFn).not.toBeNull();
     expect(wireFn![0]).toMatch(/clearTimeout\(\s*this\.masterInsertPending\s*\)/);
   });
