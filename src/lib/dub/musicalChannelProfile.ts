@@ -108,7 +108,11 @@ export interface ChannelEvidence {
  *  from guitar — the legacy role enum has no such concept. Ordered: earlier
  *  entries win, so 'bass guitar' reads as bass rather than guitar. */
 const FAMILY_NAME_PATTERNS: ReadonlyArray<[RegExp, InstrumentFamily]> = [
-  [/\b(kick|snare|hat|hh|clap|tom|cymbal|ride|crash|drum|bd|sd)\b/i, 'drums'],
+  // `hihat` and `bassdrum` are written as one word at least as often as two,
+  // and `\bhat\b` matches neither. Listed explicitly rather than by relaxing
+  // the boundaries: a bare substring would start matching the greetings and
+  // credits that fill most tracker name slots.
+  [/\b(kick|snare|clap|tom|cymbal|ride|crash|drum|bd|sd)\b|hi-?hat|bass ?drum|open ?hat|closed ?hat|\bhats?\b|\bhh\d/i, 'drums'],
   [/\b(conga|bongo|shaker|tamb|maraca|clave|cowbell|perc|rim)\b/i, 'percussion'],
   [/\b(sub|808|bass|bassline|dub ?bass)\b/i, 'bass'],
   [/\b(piano|rhodes|wurli|clav|epiano)\b/i, 'piano'],
@@ -144,10 +148,29 @@ function familyFromName(name: string | null | undefined): InstrumentFamily | nul
   return null;
 }
 
-function estimateFamily(ev: ChannelEvidence): AxisEstimate<InstrumentFamily> {
-  const named = familyFromName(ev.instrumentName);
-  if (named) return { value: named, confidence: 0.75, source: 'instrument' };
+/**
+ * Confidence ceiling for a family derived from the instrument NAME alone.
+ *
+ * The name used to win outright at 0.75, ahead of every measured source. That
+ * is backwards. Tracker sample and instrument name slots were a message board:
+ * musicians put greetings, credits and liner notes in them, not descriptions of
+ * the sound. Measured across the channel-evidence corpus on 2026-09-22, the
+ * dominant instrument names read `for Revision 2017`, `by AceMan`, `Put into
+ * tracker`, `lost count a long`, `competition`, `lucas@bboy.com` — one phrase
+ * of a paragraph per instrument slot — and only 31 of 552 rows carried a name
+ * that said anything about an instrument at all.
+ *
+ * Worse, the failure is silent and confident: a greeting containing "bell" or
+ * "bass" matches the same pattern a real sample name would.
+ *
+ * So a name is corroboration, not identity. Alone it is capped here, below the
+ * 0.6 that callers like `pickTarget` treat as actionable. Agreeing with a
+ * measured source promotes it — see `estimateFamily`.
+ */
+const NAME_ONLY_CONFIDENCE = 0.45;
 
+/** What the measured sources say the family is, ignoring the name. */
+function familyFromMeasurement(ev: ChannelEvidence): AxisEstimate<InstrumentFamily> | null {
   // A drum subrole is a strong, specific signal — keep its own confidence.
   const inst = ev.instrument;
   if (inst && inst.role !== 'empty' && inst.confidence > 0) {
@@ -168,6 +191,29 @@ function estimateFamily(ev: ChannelEvidence): AxisEstimate<InstrumentFamily> {
   if (role && role !== 'empty') {
     return { value: ROLE_TO_FAMILY[role], confidence: 0.3, source: 'notes' };
   }
+  return null;
+}
+
+function estimateFamily(ev: ChannelEvidence): AxisEstimate<InstrumentFamily> {
+  const named = familyFromName(ev.instrumentName);
+  const measured = familyFromMeasurement(ev);
+
+  if (named && measured) {
+    // Agreement is the strongest evidence available here: two independent
+    // sources, one of which the musician could have written anything into.
+    if (named === measured.value) {
+      return { value: measured.value, confidence: Math.min(0.9, measured.confidence + 0.15), source: 'instrument' };
+    }
+    // Disagreement: the measurement wins, because it cannot be a greeting.
+    // The name still counts for something when the measurement is weak, so
+    // take whichever is stronger rather than discarding one outright.
+    return measured.confidence >= NAME_ONLY_CONFIDENCE
+      ? measured
+      : { value: named, confidence: NAME_ONLY_CONFIDENCE, source: 'instrument' };
+  }
+
+  if (measured) return measured;
+  if (named) return { value: named, confidence: NAME_ONLY_CONFIDENCE, source: 'instrument' };
   return { value: 'unknown', confidence: 0, source: 'default' };
 }
 
