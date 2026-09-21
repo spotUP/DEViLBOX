@@ -1412,6 +1412,36 @@ this bug.
       stretch? Not seen yet. Next time it happens, call `get_playback_silence` BEFORE
       reloading — it now answers for this engine.
 
+- [~] **X23 — REPRODUCED AND MEASURED 2026-09-21. Worse than reported.**
+      It is not the song. **Enabling the dub bus on a Hively/AHX tune silences the whole
+      mix, and disabling it again does NOT bring the audio back** — it stays dead until the
+      page is reloaded. The user's phrasing, "turning off the bus plays music turning it on
+      silences it again after a bit", is the same fault seen from the other side.
+      **The measurement that found it.** Every gain on the path reads correct — envelope 1,
+      master 0 dB (which is UNITY, not silence: `useAudioStore` stores dB, and reading it as
+      a linear gain nearly produced a fourth wrong diagnosis), no channel muted, no stranded
+      mute. Three diagnoses were argued from settings values alone and none survived. So
+      `DubBus.getMasterInsertLevels()` now taps the SIGNAL at six points along the master
+      insert, read through `get_dub_bus_state.masterInsertLevels`.
+      With the bus enabled, the transport advancing and `masterInsertActive: true`,
+      `hasSource: true`, `hasDest: true`:
+
+          insertIn 0.000016   afterShelf 0   afterClip 0
+          afterWidth 0        insertOut 0    busInput 0   busReturn 0.00003
+
+      **Nothing reaches the insert at all.** The splice reports success while the engine's
+      audio is no longer arriving at `masterEffectsInput`, and `registeredChannelTaps` is
+      empty with every `dubSend` at 0 — so the main output has been taken out of the path
+      and nothing put in its place. `get_audio_level` confirms it: `silent: true`, rmsAvg 0,
+      with rows advancing.
+      **Next**, and do not guess again: tap the active WASM engine's own `output` node the
+      same way. If it has signal while `insertIn` is zero, the engine is playing into a
+      disconnected node and the fault is in the whole-mix/isolation re-route, not in
+      `wireMasterInsert`. `DubBus.ts:4517` already documents this exact hazard — "the old
+      insert chain nodes remain physically connected but logically inactive, and the
+      subsequent reconnect silently fails — permanently killing audio output" — which is
+      what the no-recovery-after-disable behaviour looks like.
+
 - [ ] **X23 (original entry)** **`jennipha.ahx` goes silent.** Reported 2026-09-21. Reproduce, then use
       `get_playback_silence` (added 2026-09-19) rather than guessing — it reports the
       worklet's own `silentReason` and separates "the engine is rendering silence" from
