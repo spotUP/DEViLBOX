@@ -91,7 +91,7 @@ describe('DubDeckStrip — channel/master button semantics contract (G15)', () =
   });
 
   it('uses the same op.kind split for the ALL channels master column', () => {
-    const masterOpsBlock = SOURCE.match(/CHANNEL_OPS\.map\(\(op\) => \{[\s\S]*?title=\{`ALL channels/m);
+    const masterOpsBlock = SOURCE.match(/CHANNEL_OPS\.map\(\(op\) => \{[\s\S]*?hoverProps\(`ALL ·/m);
     expect(masterOpsBlock, 'master CHANNEL_OPS block not found').not.toBeNull();
     const block = masterOpsBlock![0];
     expect(block).toMatch(/const isHold = op\.kind === 'hold'/);
@@ -109,7 +109,7 @@ describe('DubDeckStrip — channel/master button semantics contract (G15)', () =
   });
 
   it('uses the same op.kind split for each individual channel column', () => {
-    const channelOpsBlock = SOURCE.match(/CHANNEL_OPS\.map\(\(op\) => \{[\s\S]*?title=\{`Ch \$\{i \+ 1\} · \$\{op\.title\}/m);
+    const channelOpsBlock = SOURCE.match(/CHANNEL_OPS\.map\(\(op\) => \{[\s\S]*?hoverProps\(`Ch \$\{i \+ 1\} ·/m);
     expect(channelOpsBlock, 'per-channel CHANNEL_OPS block not found').not.toBeNull();
     const block = channelOpsBlock![0];
     expect(block).toMatch(/const isHold = op\.kind === 'hold'/);
@@ -203,5 +203,51 @@ describe('DubDeckStrip — move rows line up as columns', () => {
 
   it('keeps a label on one line, so no button is taller than its row', () => {
     expect(SOURCE).toMatch(/const base = '[^']*whitespace-nowrap/);
+  });
+});
+
+/**
+ * Tooltips in place of the reserved status line.
+ *
+ * Asked for on 2026-09-21: "the hidden status line above the buttons that
+ * shows when i hover a button can be replaced with tooltips to leave more
+ * vertical space".
+ */
+describe('DubDeckStrip — hover help costs no vertical space', () => {
+  it('no longer reserves a row for a status line', () => {
+    expect(SOURCE).not.toContain('hoverHint');
+    expect(SOURCE).not.toContain('setHoverHint');
+  });
+
+  it('renders the shared tooltip once', () => {
+    expect(SOURCE).toContain('useHoverTooltip()');
+    expect((SOURCE.match(/\{moveTooltip\}/g) ?? [])).toHaveLength(1);
+  });
+
+  it('describes every move button through it', () => {
+    // Four global rows, the ALL column and the per-channel column.
+    expect((SOURCE.match(/\{\.\.\.hoverProps\(/g) ?? []).length).toBeGreaterThanOrEqual(6);
+  });
+
+  it('leaves no native title on a button that already has a tooltip', () => {
+    // Both at once is two tooltips on one button, one of them a second late.
+    // Other controls on the deck — faders, the filter select, the channel name
+    // — still use `title`, and should: they have no tooltip of their own.
+    const lines = SOURCE.split('\n');
+    const doubled = lines
+      .map((line, i) => ({ line, i }))
+      .filter(({ line }) => line.includes('{...hoverProps('))
+      .filter(({ i }) => lines.slice(i + 1, i + 3).some((l) => l.includes('title=')))
+      .map(({ i }) => i + 1);
+    expect(doubled, `buttons with a tooltip AND a native title, at line(s) ${doubled.join(', ')}`)
+      .toEqual([]);
+  });
+
+  it('keeps the press-and-hold wording the native title used to carry', () => {
+    expect(SOURCE).toMatch(/hoverProps\(`\$\{m\.label\} — \$\{m\.title\} \(press-and-hold\)/);
+  });
+
+  it('drops the tooltip when the deck is panicked out from under it', () => {
+    expect(SOURCE).toMatch(/hideTooltip\(\); window\.dispatchEvent\(new Event\('dub-panic'\)\)/);
   });
 });
