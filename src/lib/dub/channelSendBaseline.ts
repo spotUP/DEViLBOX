@@ -45,7 +45,21 @@ export interface DubChannelState {
  * `silentReason: "module-rendered-silence"`, and only `unmute_all_channels`
  * brought the song back.
  */
-const ORPHAN_AFTER_MS = 30_000;
+/**
+ * How long a channel may be held before the hold is treated as a leak.
+ *
+ * 30s was far too generous. The longest LEGITIMATE hold is riddimSection at
+ * four bars — about 7.7s at 125 BPM — so thirty seconds gave a leaked mute
+ * twenty seconds of grace. At speed 12 a pattern is roughly fifteen seconds,
+ * which is why the 2026-09-21 report was "the music is mutet for a pattern or
+ * two and only effects fire": that is not the leak, it is the RESCUE arriving
+ * late. The net worked; it just waited half a minute.
+ *
+ * 12s keeps clear headroom over the longest real hold while cutting what a
+ * leak costs to under a pattern. It does not fix a leak — it bounds one, and
+ * the warning it logs names the channel so the leak can be found.
+ */
+const ORPHAN_AFTER_MS = 12_000;
 
 export class DubSendBaselines {
   private readonly values = new Map<number, DubChannelState>();
