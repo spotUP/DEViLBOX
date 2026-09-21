@@ -45,7 +45,7 @@ import type { CursorPosition } from '@typedefs';
 // OffscreenCanvas + WebGL2 worker bridge
 import { TrackerOffscreenBridge } from '@engine/renderer/OffscreenBridge';
 import { reportSynthError } from '@stores/useSynthErrorStore';
-import { watchdogStage1, watchdogStage2 } from './trackerWatchdog';
+import { watchdogStage1, watchdogStage2, MainThreadLiveness } from './trackerWatchdog';
 import type {
   PatternSnapshot,
   ThemeSnapshot,
@@ -2032,11 +2032,16 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     // perfectly healthy worker as failed. Measuring from the init post instead
     // times the only thing we're actually waiting on: the worker's reply.
     let readyTimeoutId: ReturnType<typeof setTimeout> | undefined;
+    // How much of its own time the MAIN thread got while we waited. The
+    // worker's heartbeat is delivered by this thread's event loop, so a thread
+    // that was blocked cannot be believed when it says nothing arrived.
+    const liveness = new MainThreadLiveness();
 
     const bridge = new TrackerOffscreenBridge(TrackerWorkerFactory, {
       onReady: () => {
         readyReceived = true;
         clearTimeout(readyTimeoutId);
+        liveness.stop();
         // Worker is ready — send layout so it can start rendering
         bridge.post({ type: 'channelLayout', channelLayout: snapshotLayout() });
       },
@@ -2049,9 +2054,11 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
           bootingReceived = true;
         } else if (msg.type === 'webgl-unsupported') {
           clearTimeout(readyTimeoutId);
+          liveness.stop();
           setWebglUnsupported(true);
         } else if (msg.type === 'error') {
           clearTimeout(readyTimeoutId);
+          liveness.stop();
           reportSynthError(
             'Tracker Worker',
             msg.message,
@@ -2061,6 +2068,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
       },
       onError: (err) => {
         clearTimeout(readyTimeoutId);
+        liveness.stop();
         reportSynthError(
           'Tracker Worker',
           err.message || 'Pattern editor worker crashed unexpectedly.',
@@ -2134,20 +2142,28 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
       // NOT a failure, so escalate to a long stage-2 grace instead of the scary
       // dialog. Stage 2 (+30 s) only fires if the alive worker never becomes
       // ready — i.e. GL init genuinely hung, a different, real error.
+      liveness.start();
       readyTimeoutId = setTimeout(() => {
-        const s1 = watchdogStage1(bootingReceived, readyReceived);
-        if (s1.action === 'ok') return;
+        const mainThreadShare = liveness.ratio();
+        const s1 = watchdogStage1(bootingReceived, readyReceived, mainThreadShare);
+        if (s1.action === 'ok') { liveness.stop(); return; }
         if (s1.action === 'error-never-loaded') {
+          liveness.stop();
           reportSynthError(
             'Tracker Worker',
             'Pattern editor failed to start (worker never loaded after 12 s). ' +
             'Try reloading the page. If this persists, your browser may not support OffscreenCanvas WebGL2.',
-            { errorType: 'init', debugData: { offscreenCanvasSupported: true, booting: false } },
+            { errorType: 'init', debugData: {
+              offscreenCanvasSupported: true,
+              booting: false,
+              mainThreadShare: Math.round(mainThreadShare * 100) / 100,
+            } },
           );
           return;
         }
         // 'wait' — alive but not ready yet — keep waiting quietly, then a final check.
         readyTimeoutId = setTimeout(() => {
+          liveness.stop();
           if (watchdogStage2(readyReceived).action === 'ok') return;
           reportSynthError(
             'Tracker Worker',
@@ -2159,6 +2175,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
       }, 12_000);
       } catch (initErr) {
         clearTimeout(readyTimeoutId);
+        liveness.stop();
         reportSynthError(
           'Tracker Worker',
           `Worker init failed: ${(initErr as Error)?.message ?? String(initErr)}`,
@@ -2236,6 +2253,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     return () => {
       clearTimeout(initTimerId);
       clearTimeout(readyTimeoutId);
+      liveness.stop();
       unsubTracker();
       unsubEditor();
       unsubCursor();
