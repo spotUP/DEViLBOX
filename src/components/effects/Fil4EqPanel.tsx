@@ -95,11 +95,51 @@ const EqFader: React.FC<FaderProps> = ({
 
 // ─────────────────────────────────────────────────────────────────────────────
 
+/** Narrowest the curve is still readable at, and the panel's old fixed size. */
+const CURVE_MIN_WIDTH = 552;
+/** Past this the band handles are further apart than they are useful. */
+const CURVE_MAX_WIDTH = 1400;
+/** The panel's own horizontal padding, which the canvas does not get. */
+const CURVE_PADDING = 16;
+/** Room for two slider rows side by side, each still long enough to aim with. */
+const TWO_COLUMN_WIDTH = 720;
+
 interface Props { effect: Fil4EqEffect; }
 
 export const Fil4EqPanel: React.FC<Props> = ({ effect }) => {
   const dubBus    = useDrumPadStore(s => s.dubBus);
   const setDubBus = useDrumPadStore(s => s.setDubBus);
+
+  /**
+   * The panel's own width, measured.
+   *
+   * The curve was a fixed 552px canvas, so in the Dub Deck's EQ tab — which is
+   * as wide as the deck — it sat in the left third with dead space beside it,
+   * and the two slider rows stacked underneath for no reason. Reported
+   * 2026-09-21: "the eq could be full width here and the sliders can be two
+   * coloumns not stacked on top".
+   *
+   * Measured from the container rather than keyed to a viewport breakpoint,
+   * because this same panel also renders in the narrow Master FX rack: what
+   * decides the layout is how much room THIS panel has, not how wide the
+   * window is.
+   */
+  const panelRef = useRef<HTMLDivElement>(null);
+  const [panelWidth, setPanelWidth] = useState(CURVE_MIN_WIDTH);
+  useEffect(() => {
+    const el = panelRef.current;
+    if (!el) return;
+    const measure = () => setPanelWidth(el.clientWidth);
+    measure();
+    if (typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  // The canvas draws at this width; below the floor it would be unreadable and
+  // above the ceiling the handles are further apart than they are useful.
+  const curveWidth = Math.max(CURVE_MIN_WIDTH, Math.min(CURVE_MAX_WIDTH, panelWidth - CURVE_PADDING));
+  const sideBySide = panelWidth >= TWO_COLUMN_WIDTH;
 
   const [state, setState] = useState<PanelState>(() => stateFromEffect(effect));
   const stateRef = useRef(state);
@@ -241,7 +281,7 @@ export const Fil4EqPanel: React.FC<Props> = ({ effect }) => {
   }, [effect]);
 
   return (
-    <div className="flex flex-col gap-2 p-2 bg-dark-bgSecondary rounded-lg select-none">
+    <div ref={panelRef} className="flex flex-col gap-2 p-2 bg-dark-bgSecondary rounded-lg select-none">
 
       {/* Preset row */}
       <div className="flex items-center gap-2">
@@ -267,7 +307,11 @@ export const Fil4EqPanel: React.FC<Props> = ({ effect }) => {
       </div>
 
       {/* Curve */}
-      <Fil4EqCurve effect={effect} width={552} height={120} onBandChange={handleBandChange} />
+      <Fil4EqCurve effect={effect} width={curveWidth} height={120} onBandChange={handleBandChange} />
+
+      {/* The two slider rows, side by side when there is room for both.
+          Stacked they took two rows of height to carry one control each. */}
+      <div className={sideBySide ? 'grid grid-cols-2 gap-x-4 items-center' : 'contents'}>
 
       {/* Master gain strip */}
       <div className="flex items-center gap-2 px-1">
@@ -286,7 +330,7 @@ export const Fil4EqPanel: React.FC<Props> = ({ effect }) => {
 
       {/* Auto EQ bar */}
       {dubBus && (
-        <div className="flex items-center gap-2 px-1 py-0.5 text-[10px] font-mono border-t border-dark-border">
+        <div className={`flex items-center gap-2 px-1 py-0.5 text-[10px] font-mono${sideBySide ? '' : ' border-t border-dark-border'}`}>
           <span className="text-accent-highlight shrink-0">⚡</span>
           <span className="text-text-secondary font-bold shrink-0">Auto EQ</span>
           {/* Say what is actually happening. This read `analyzing…` whenever
@@ -312,6 +356,7 @@ export const Fil4EqPanel: React.FC<Props> = ({ effect }) => {
           />
         </div>
       )}
+      </div>
 
       {/* Band columns — freq shown as read-only label (drag on curve to change), gain via vertical fader */}
       <div className="flex items-start border border-dark-border rounded overflow-x-auto">
