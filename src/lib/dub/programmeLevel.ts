@@ -116,7 +116,14 @@ export const GENERATED_PRESENCE: Readonly<Record<string, number>> = {
   crushBass: 0.8,
   /** Rises into the mix rather than over it. */
   radioRiser: 0.55,
-  noiseBurst: 0.5,
+  /** The snare crack. 0.5 → 0.9 on the 2026-09-21 listening pass: "i can
+   *  hardly hear crack". Measured at peak 0.363 against a 0.385 programme
+   *  baseline — under the music, which for a percussive accent means gone.
+   *  A crack has to read as a HIT landing with the drums, so it is referenced
+   *  near the programme's own peak rather than under it. The move already
+   *  asks for full intent (`snareCrack` level 1.0), so this table was the only
+   *  lever left. */
+  noiseBurst: 0.9,
 };
 
 /**
