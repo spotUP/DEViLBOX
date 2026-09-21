@@ -748,6 +748,16 @@ export async function getDubBusState(): Promise<Record<string, unknown>> {
     // told from "the engine produces nothing". null means the tap was created
     // on this call and has not seen audio yet — read it again.
     upstreamLevels: await getUpstreamLevels(),
+    // The Hively worklet's own count of what each render path produced. Only
+    // present when that engine is the one playing.
+    hivelyRenderStats: await (async () => {
+      try {
+        const g = globalThis as {
+          __devilboxActiveHivelyEngine?: { getDubDiag?: () => Promise<unknown> } | null;
+        };
+        return (await g.__devilboxActiveHivelyEngine?.getDubDiag?.()) ?? null;
+      } catch { return null; }
+    })(),
   };
 }
 

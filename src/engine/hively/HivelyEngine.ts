@@ -233,6 +233,43 @@ export class HivelyEngine extends WASMSingletonBase implements IsolationCapableE
     this.workletNode?.port.postMessage({ type: 'initSubsong', nr });
   }
 
+  /**
+   * What each render path in the worklet actually produced.
+   *
+   * Opening the first dub tap flips the worklet from one combined decode to a
+   * tick plus one render per pass, and the mix went silent at exactly that
+   * moment (2026-09-21, "as the first effect fires the ahx goes silent").
+   * Nothing on this side could see which half stopped working, so the worklet
+   * counts it: main renders, zero returns, dub passes, ring writes, and the
+   * peak of the last main render — which separates "returned no samples" from
+   * "returned samples that are all zero".
+   *
+   * Resolves null if the worklet does not answer, rather than hanging a caller.
+   */
+  getDubDiag(timeoutMs = 400): Promise<Record<string, unknown> | null> {
+    const node = this.workletNode;
+    if (!node) return Promise.resolve(null);
+    return new Promise((resolve) => {
+      let done = false;
+      const onMessage = (event: MessageEvent) => {
+        if (event.data?.type !== 'diagDub') return;
+        done = true;
+        node.port.removeEventListener('message', onMessage);
+        resolve(event.data as Record<string, unknown>);
+      };
+      // addEventListener, not onmessage: the engine's own handler is already
+      // installed there and replacing it would break playback control.
+      node.port.addEventListener('message', onMessage);
+      node.port.start?.();
+      try { node.port.postMessage({ type: 'diagDub' }); } catch { /* ok */ }
+      setTimeout(() => {
+        if (done) return;
+        node.port.removeEventListener('message', onMessage);
+        resolve(null);
+      }, timeoutMs);
+    });
+  }
+
   setChannelGain(channel: number, gain: number): void {
     this.workletNode?.port.postMessage({ type: 'setChannelGain', channel, gain });
   }

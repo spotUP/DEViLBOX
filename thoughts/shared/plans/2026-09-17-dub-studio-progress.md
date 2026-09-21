@@ -1412,6 +1412,38 @@ this bug.
       stretch? Not seen yet. Next time it happens, call `get_playback_silence` BEFORE
       reloading — it now answers for this engine.
 
+- [~] **X23 — ISOLATED 2026-09-21 to a one-call reproduction. The worklet is INNOCENT.**
+      Reproduction, no bus and no move needed: load an AHX, play, then
+      `set_channel_dub_send(channel=1, amount=0.5)`. Master goes from rmsAvg 0.0307 to 0
+      on that single call, and **setting the send back to 0 does not bring it back**.
+      **The Hively worklet is producing audio the whole time.** Instrumented its two render
+      paths (`renderStats` in `Hively.worklet.js`, read through
+      `get_dub_bus_state.hivelyRenderStats`). With the tap open and the master silent:
+
+          splitFrames 1156   mainSamples 1109760   mainZeroReturns 0
+          lastMainPeak 0.113   mainRingWrites 1111680   mainRingFull 0
+          dubPasses 420        dubSamples 403200      ringAvailable 1344
+
+      Every counter is healthy and `lastMainPeak` is LOUDER than before the tap. The
+      split-path theories in the previous entry are both dead: the main render never
+      returns zero, and the ring never starves.
+      **`engineOut` reads 0.0915 at the same moment** — `HivelyEngine.output` is hot while
+      the master analyser reads silence. So the audio is lost strictly BETWEEN
+      `HivelyEngine.output` and the master.
+      **And the standing fact that explains the whole class:** `synthBus` and
+      `masterEffectsInput` both read 0 for an AHX song *even while it is audible*, where a
+      MOD reads 0.0855 at `masterEffectsInput` on the same taps. Hively's main output
+      reaches the speakers by a path that touches neither — so the dub bus's master insert,
+      which splices `masterEffectsInput → blepInput`, can never see it, and anything that
+      disturbs that private path cuts the music with nothing to restore it.
+      **Next:** tap `HivelySynth.output` and the instrument effect chain's output. The
+      break is one of the two connections between them, and `HivelySynth.ts:249` already
+      warns that a bare `engine.output.disconnect()` "would sever the singleton's
+      connection to all other destinations".
+      **Also seen, worth its own entry:** `play()` called before the Hively worklet is
+      ready renders silence while the transport reports `isPlaying: true` and the row stays
+      at 0. A second stop/play fixes it.
+
 - [~] **X23 — REPRODUCED AND MEASURED 2026-09-21. Worse than reported.**
       It is not the song. **Enabling the dub bus on a Hively/AHX tune silences the whole
       mix, and disabling it again does NOT bring the audio back** — it stays dead until the
