@@ -116,6 +116,19 @@ export const GENERATED_PRESENCE: Readonly<Record<string, number>> = {
   crushBass: 0.8,
   /** Rises into the mix rather than over it. */
   radioRiser: 0.55,
+  /**
+   * The CAPTURED moves — reverse echo and backward reverb.
+   *
+   * These are not generated, but they need the same referencing for a
+   * different reason: what they capture is one channel's SEND, not the mix, so
+   * the material arrives at roughly a quarter of programme level before
+   * anything is done to it. Played back at a fixed gain it lands under the
+   * music and reads as nothing happening (2026-09-21: "i hear nothing when i
+   * click"). Referencing the playback to the programme puts the reverse where
+   * a listener can hear it whatever the capture level happened to be.
+   */
+  reverseEcho: 0.85,
+  backwardReverb: 0.9,
   /** The snare crack. 0.5 → 0.9 on the 2026-09-21 listening pass: "i can
    *  hardly hear crack". Measured at peak 0.363 against a 0.385 programme
    *  baseline — under the music, which for a percussive accent means gone.
