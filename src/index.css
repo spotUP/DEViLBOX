@@ -3062,3 +3062,14 @@ button[class*="rounded"] {
     display: none;
   }
 }
+
+/* ── Instrument list: a list that is really a picture ─────────────────────────
+ *
+ * Tracker musicians have spelled ASCII art down the instrument names since the
+ * Amiga. The badges sit in the middle of the drawing, so in art mode they go —
+ * same mechanism as the narrow-panel rule above, one place that decides what
+ * "hide the badges" means. Detection is in `lib/instruments/asciiArtNames.ts`.
+ */
+.instrument-list--art .instrument-badge {
+  display: none;
+}

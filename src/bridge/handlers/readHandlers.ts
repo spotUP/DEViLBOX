@@ -736,6 +736,11 @@ export async function getDubBusState(): Promise<Record<string, unknown>> {
     channelDubSends,
     registeredChannelTaps,
     insertProbe,
+    // What the settings path costs, and how fast writes arrive. Drag a BUS
+    // slider, then read this: a high peakPerSecond with a maxMs in the
+    // milliseconds is main-thread contention, which is a crackle no amount of
+    // parameter ramping can fix.
+    settingsMeter: bus?.getSettingsMeter?.() ?? null,
   };
 }
 

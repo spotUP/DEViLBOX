@@ -251,3 +251,22 @@ describe('DubDeckStrip — hover help costs no vertical space', () => {
     expect(SOURCE).toMatch(/hideTooltip\(\); window\.dispatchEvent\(new Event\('dub-panic'\)\)/);
   });
 });
+
+describe('DubDeckStrip — the header row stays reachable', () => {
+  it('wraps instead of running off the edge', () => {
+    // Reported 2026-09-21: the row ran past the right edge with a control cut
+    // in half. The parent scrolls vertically only, so overflow was just clipped.
+    const header = SOURCE.match(/<div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">/);
+    expect(header, 'header row is not a wrapping flex row').not.toBeNull();
+  });
+
+  it('keeps the most-used controls first, so what wraps is what is reached for least', () => {
+    const order = ['DUB DECK ', 'Bus ', 'STYLE', 'ECHO', 'AUTO DUB'];
+    let at = 0;
+    for (const label of order) {
+      const i = SOURCE.indexOf(label, at);
+      expect(i, `${label} out of order in the header`).toBeGreaterThan(-1);
+      at = i;
+    }
+  });
+});
