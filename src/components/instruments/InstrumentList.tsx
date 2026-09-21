@@ -614,7 +614,7 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
                 )}
 
                 {/* Synth Type Badge */}
-                <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold border shrink min-w-0 truncate ${isSelected ? 'bg-transparent text-ft2-bg border-ft2-bg/60' : 'bg-ft2-header text-ft2-textDim border-ft2-border'}`}>
+                <span className={`instrument-badge text-[10px] px-1.5 py-0.5 rounded font-bold border shrink-0 ${isSelected ? 'bg-transparent text-ft2-bg border-ft2-bg/60' : 'bg-ft2-header text-ft2-textDim border-ft2-border'}`}>
                   {instrument.metadata?.displayType || synthInfo?.shortName || instrument.synthType}
                 </span>
 
@@ -622,7 +622,7 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
                     so this instrument is a silent placeholder. */}
                 {instrument.loadError && (
                   <span
-                    className="text-[10px] px-1.5 py-0.5 rounded font-bold border shrink min-w-0 truncate bg-accent-error/15 text-accent-error border-accent-error/40"
+                    className="instrument-badge text-[10px] px-1.5 py-0.5 rounded font-bold border shrink-0 bg-accent-error/15 text-accent-error border-accent-error/40"
                     title={instrument.loadError}
                   >
                     Load Failed
@@ -634,7 +634,7 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
                   const badge = getSynthBadge(instrument.synthType);
                   return (
                     <span
-                      className="text-[10px] px-1.5 py-0.5 rounded font-bold border shrink min-w-0 truncate"
+                      className="instrument-badge text-[10px] px-1.5 py-0.5 rounded font-bold border shrink-0"
                       style={isSelected
                         ? { backgroundColor: 'transparent', color: 'var(--color-ft2-bg)', borderColor: 'var(--color-ft2-bg)' }
                         : { backgroundColor: `${badge.cssColor}20`, color: badge.cssColor, borderColor: `${badge.cssColor}40` }
@@ -719,7 +719,7 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
                   }
 
                   return (
-                    <div className="relative shrink min-w-0">
+                    <div className="instrument-badge relative shrink-0">
                       {badgeEl}
                       {open && (
                         <InstrumentTypePicker

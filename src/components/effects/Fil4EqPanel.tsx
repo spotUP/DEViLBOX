@@ -8,6 +8,7 @@ import { Button } from '@components/ui/Button';
 import type { Fil4EqEffect } from '@/engine/effects/Fil4EqEffect';
 import { useDrumPadStore } from '@/stores/useDrumPadStore';
 import { computeGenreBaseline } from '@engine/dub/AutoEQ';
+import { useTrackerAnalysisStore } from '@/stores/useTrackerAnalysisStore';
 
 interface BandState {
   enabled: boolean;
@@ -109,6 +110,32 @@ export const Fil4EqPanel: React.FC<Props> = ({ effect }) => {
     effect.on('params', onP);
     return () => { effect.off('params', onP); };
   }, [effect]);
+
+  /**
+   * What the Auto EQ line should say, from the analysis store's own state
+   * rather than from the absence of a result.
+   */
+  const analysisState = useTrackerAnalysisStore((s) => s.analysisState);
+  const analysisError = useTrackerAnalysisStore((s) => s.error);
+  const autoEqStatus = (() => {
+    const genre = dubBus?.autoEqLastGenre;
+    const pct = Math.round((dubBus?.autoEqStrength ?? 0.85) * 100);
+    if (genre) return { text: `${genre} · ${pct}%`, title: `Genre baseline from the last analysis, at ${pct}% strength` };
+    switch (analysisState) {
+      case 'capturing':
+        return { text: 'capturing…', title: 'Recording audio to analyse' };
+      case 'analyzing':
+        return { text: 'analyzing…', title: 'Classifying the captured audio' };
+      case 'error':
+        return { text: 'analysis failed', title: analysisError ?? 'The analysis did not complete' };
+      default:
+        return {
+          text: 'no analysis',
+          title: 'No genre baseline yet — run the song analysis to get one. '
+            + 'The live improv EQ works without it.',
+        };
+    }
+  })();
 
   // Auto-enable a band when any value (freq/gain/q/bw) is changed while it
   // is disabled, UNLESS the patch is itself toggling the enabled flag.
@@ -262,10 +289,18 @@ export const Fil4EqPanel: React.FC<Props> = ({ effect }) => {
         <div className="flex items-center gap-2 px-1 py-0.5 text-[10px] font-mono border-t border-dark-border">
           <span className="text-accent-highlight shrink-0">⚡</span>
           <span className="text-text-secondary font-bold shrink-0">Auto EQ</span>
-          <span className="text-text-muted shrink-0">
-            {dubBus.autoEqLastGenre
-              ? `${dubBus.autoEqLastGenre} · ${Math.round((dubBus.autoEqStrength ?? 0.85) * 100)}%`
-              : 'analyzing…'}
+          {/* Say what is actually happening. This read `analyzing…` whenever
+              `autoEqLastGenre` was empty, which is its value until the ONNX
+              capture-and-classify pipeline has been run BY HAND — loading a
+              song does not start it. So the label sat on "analyzing…" forever
+              in a session where nothing was analysing at all, and it looked
+              hung. Reported 2026-09-21.
+
+              The improv EQ does not depend on this any more (it reads live
+              audio since 2026-09-19), so an un-analysed song is a normal
+              state, not a failure — it just means no genre baseline. */}
+          <span className="text-text-muted shrink-0" title={autoEqStatus.title}>
+            {autoEqStatus.text}
           </span>
           <input
             type="range" min={0} max={1} step={0.01}
