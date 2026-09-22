@@ -245,19 +245,19 @@ export const OBXfHardwareUI: React.FC<OBXfHardwareUIProps> = ({
         const imgData = ctx.createImageData(w, h);
 
         // Mouse event handlers
-        const onMouseDown = (e: MouseEvent) => {
+        const onPointerDown = (e: PointerEvent) => {
           e.preventDefault();
           canvas.focus();
           const [cx, cy] = canvasCoords(canvas, e);
           m._obxf_ui_on_mouse_down(cx, cy, getModifiers(e));
         };
 
-        const onMouseUp = (e: MouseEvent) => {
+        const onPointerUp = (e: PointerEvent) => {
           const [cx, cy] = canvasCoords(canvas, e);
           m._obxf_ui_on_mouse_up(cx, cy, getModifiers(e));
         };
 
-        const onMouseMove = (e: MouseEvent) => {
+        const onPointerMove = (e: PointerEvent) => {
           const [cx, cy] = canvasCoords(canvas, e);
           m._obxf_ui_on_mouse_move(cx, cy, getModifiers(e));
         };
@@ -268,15 +268,18 @@ export const OBXfHardwareUI: React.FC<OBXfHardwareUIProps> = ({
           m._obxf_ui_on_mouse_wheel(cx, cy, e.deltaX, e.deltaY);
         };
 
-        canvas.addEventListener('mousedown', onMouseDown);
-        document.addEventListener('mouseup', onMouseUp);
-        document.addEventListener('mousemove', onMouseMove);
+        canvas.style.touchAction = 'none';
+        canvas.addEventListener('pointerdown', onPointerDown);
+        document.addEventListener('pointerup', onPointerUp);
+        document.addEventListener('pointercancel', onPointerUp);
+        document.addEventListener('pointermove', onPointerMove);
         canvas.addEventListener('wheel', onWheel, { passive: false });
 
         eventCleanups.push(
-          () => canvas.removeEventListener('mousedown', onMouseDown),
-          () => document.removeEventListener('mouseup', onMouseUp),
-          () => document.removeEventListener('mousemove', onMouseMove),
+          () => canvas.removeEventListener('pointerdown', onPointerDown),
+          () => document.removeEventListener('pointerup', onPointerUp),
+          () => document.removeEventListener('pointercancel', onPointerUp),
+          () => document.removeEventListener('pointermove', onPointerMove),
           () => canvas.removeEventListener('wheel', onWheel)
         );
 
