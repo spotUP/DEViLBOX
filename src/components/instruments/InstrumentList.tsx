@@ -639,8 +639,13 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
                   </span>
                 )}
 
-                {/* Synth Type Badge */}
-                <span className={`instrument-badge text-[10px] px-1.5 py-0.5 rounded font-bold border shrink-0 ${isSelected ? 'bg-transparent text-ft2-bg border-ft2-bg/60' : 'bg-ft2-header text-ft2-textDim border-ft2-border'}`}>
+                {/* Synth Type Badge — `ml-auto` starts the badge group at the
+                    right edge, so every row's badges line up in the same
+                    column. Without it they follow the name: in art mode the
+                    name is `shrink-0` with no flex basis, so each row's badges
+                    began at a different x and the column read as noise.
+                    Asked for 2026-09-22. */}
+                <span className={`instrument-badge ml-auto text-[10px] px-1.5 py-0.5 rounded font-bold border shrink-0 ${isSelected ? 'bg-transparent text-ft2-bg border-ft2-bg/60' : 'bg-ft2-header text-ft2-textDim border-ft2-border'}`}>
                   {instrument.metadata?.displayType || synthInfo?.shortName || instrument.synthType}
                 </span>
 
@@ -806,7 +811,7 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
 
                 {/* Actions (visible on hover, always visible when selected) */}
                 {showActions && (
-                  <div className={`instrument-action-buttons flex gap-0.5 absolute right-1 ${isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'} transition-opacity`}>
+                  <div className={`instrument-action-buttons flex gap-0.5 absolute right-1 ${isSelected ? 'instrument-action-buttons--selected opacity-100' : 'opacity-0 group-hover:opacity-100'} transition-opacity`}>
                     <button
                       onClick={(e) => handlePopOut(e, instrument.id)}
                       className={`p-0.5 rounded ${isSelected ? 'hover:bg-ft2-bg/20 text-ft2-bg' : 'hover:bg-ft2-border text-accent-highlight'}`}

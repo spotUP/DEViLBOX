@@ -22,6 +22,22 @@ class HivelyProcessor extends AudioWorkletProcessor {
     this.ringReadPos = 0;
     this.ringAvailable = 0;
 
+    // Playback rate, as a fraction of normal speed.
+    //
+    // The ring used to be drained one stored sample per output sample, which
+    // pins playback to 1.0x. Reading it at a FRACTIONAL rate with linear
+    // interpolation slows the song and drops its pitch together, which is what
+    // a tape reel actually does — `transportTapeStop` had this for LibOpenMPT
+    // only and apologised with a toast on every other format.
+    //
+    // `rateTarget` is what the main thread asked for; `rateFactor` chases it
+    // one block at a time so a step change does not click.
+    this.rateFactor = 1.0;
+    this.rateTarget = 1.0;
+    // Sub-sample read position, kept separately so rounding never accumulates
+    // into a drift at 1.0x.
+    this.ringReadFrac = 0;
+
     // Per-channel gain state (1.0 = full volume, 0.0 = muted).
     // Persisted so gains survive song loops — hvl_InitSubsong resets ht_ChannelGain
     // to 256 on every loop, which would un-mute any channels the user muted.
@@ -175,6 +191,16 @@ class HivelyProcessor extends AudioWorkletProcessor {
           this.wasm._hively_player_note_off(data.handle);
         }
         break;
+
+      // Playback speed as a fraction of normal. Pitch follows tempo, because
+      // the ring is resampled rather than time-stretched — a tape reel, not a
+      // DAW. Clamped: 0 would never advance the read position and 4x outruns
+      // what the decoder can refill.
+      case 'setRateFactor': {
+        const v = Number(data.value);
+        this.rateTarget = Number.isFinite(v) ? Math.min(4, Math.max(0.02, v)) : 1.0;
+        break;
+      }
 
       case 'setChannelGain':
         if (data.channel >= 0 && data.channel < 16) {
@@ -432,6 +458,9 @@ class HivelyProcessor extends AudioWorkletProcessor {
     this.ringWritePos = 0;
     this.ringReadPos = 0;
     this.ringAvailable = 0;
+    // The sub-sample position belongs to the ring; leaving it behind would
+    // start the next tune a fraction of a sample out.
+    this.ringReadFrac = 0;
   }
 
   _reapplyChannelGains() {
@@ -686,22 +715,50 @@ class HivelyProcessor extends AudioWorkletProcessor {
 
     // ── Song playback (ring-buffer decode) ──
     if (this.playing && this.tuneLoaded) {
-      // Refill ring buffer if running low
-      while (this.ringAvailable < numSamples + this.frameSamples) {
+      // Chase the requested rate over one block. 0.08 per block at 128 samples
+      // is ~50ms to cross the full range — under a click, over a zipper.
+      if (this.rateFactor !== this.rateTarget) {
+        const delta = this.rateTarget - this.rateFactor;
+        const step = 0.08;
+        this.rateFactor = Math.abs(delta) <= step ? this.rateTarget : this.rateFactor + Math.sign(delta) * step;
+      }
+      const rate = this.rateFactor;
+
+      // A block at rate R consumes R stored samples per output sample, plus
+      // one for the interpolation partner. Refilling by `numSamples` alone
+      // would starve the ring whenever R > 1.
+      const needed = Math.ceil(numSamples * rate) + 2;
+      while (this.ringAvailable < needed + this.frameSamples) {
         const prevAvailable = this.ringAvailable;
         this.decodeAndFillRing();
         // Break if no progress (song ended or error)
         if (this.ringAvailable === prevAvailable) break;
       }
 
-      // Add ring buffer samples into output
-      const available = Math.min(numSamples, this.ringAvailable);
-      for (let i = 0; i < available; i++) {
-        outputL[i] = this.ringL[this.ringReadPos];
-        outputR[i] = this.ringR[this.ringReadPos];
-        this.ringReadPos = (this.ringReadPos + 1) % this.ringSize;
+      // Add ring buffer samples into output, reading at `rate` with linear
+      // interpolation between neighbouring stored samples.
+      let consumed = 0;
+      for (let i = 0; i < numSamples; i++) {
+        // One whole sample must remain beyond the one being read, because the
+        // interpolation needs its neighbour.
+        if (this.ringAvailable - consumed < 2) break;
+        const a = this.ringReadPos;
+        const b = (a + 1) % this.ringSize;
+        const f = this.ringReadFrac;
+        outputL[i] = this.ringL[a] + (this.ringL[b] - this.ringL[a]) * f;
+        outputR[i] = this.ringR[a] + (this.ringR[b] - this.ringR[a]) * f;
+
+        this.ringReadFrac += rate;
+        const whole = Math.floor(this.ringReadFrac);
+        if (whole > 0) {
+          this.ringReadFrac -= whole;
+          // Never step past what the ring actually holds.
+          const step = Math.min(whole, this.ringAvailable - consumed - 1);
+          this.ringReadPos = (this.ringReadPos + step) % this.ringSize;
+          consumed += step;
+        }
       }
-      this.ringAvailable -= available;
+      this.ringAvailable -= consumed;
 
       // ── Isolation slot outputs ──
       for (let s = 0; s < 4; s++) {
