@@ -1030,6 +1030,8 @@ export async function loadFile(params: Record<string, unknown>): Promise<Record<
     return { error: 'Missing required params: filename, data (base64)' };
   }
 
+  /** Names of the companions the server sent — reported on failure. */
+  let receivedCompanions: string[] = [];
   try {
     // Decode base64 to ArrayBuffer
     const binaryStr = atob(base64Data);
@@ -1050,6 +1052,7 @@ export async function loadFile(params: Record<string, unknown>): Promise<Record<
         companionFiles.set(name, cBytes.buffer);
       }
     }
+    receivedCompanions = Array.from(companionFiles.keys());
 
     // Create a File object (browser API)
     const file = new File([arrayBuffer], filename, { type: 'application/octet-stream' });
@@ -1235,7 +1238,12 @@ export async function loadFile(params: Record<string, unknown>): Promise<Record<
       filename,
     };
   } catch (e) {
-    return { error: `loadFile failed: ${(e as Error).message}` };
+    // Which companions the server sent, so a refused two-file format says
+    // whether the samples were there — the failure looks the same either way.
+    return {
+      error: `loadFile failed: ${(e as Error).message}`,
+      companionFilesReceived: receivedCompanions,
+    };
   }
 }
 
