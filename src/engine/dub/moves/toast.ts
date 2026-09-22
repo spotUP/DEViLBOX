@@ -17,6 +17,61 @@ import { getDJEngineIfActive } from '@/engine/dj/DJEngine';
 import { getToneEngine } from '@/engine/ToneEngine';
 import * as Tone from 'tone';
 
+/**
+ * What a param's gain really is when nobody is toasting.
+ *
+ * `applyDuck` used to snapshot `g.value` at the moment it ducked. Press Toast
+ * again while the release ramp from the last press is still running — which is
+ * what a hand on a pad actually does — and the snapshot IS the ducked value,
+ * so the release "restores" to 0.4x. The next toggle gives 0.16x, and so on:
+ * the dry buses collapse geometrically while the wet return, never ducked,
+ * carries on alone. Reported 2026-09-22: "i turned toast on off some times and
+ * most audio died, i think i only hear the dub fx now", measured at rmsAvg
+ * 0.0259 against 0.16 — five toggles reproduce it at 0.0256.
+ *
+ * So the baseline is only re-read when the param is genuinely at rest: no
+ * Toast ducking it, and no restore ramp still in flight. `restoreUntil` is
+ * what makes the mid-ramp press safe. Weak keys, so a disposed audio graph is
+ * not held alive by this.
+ */
+interface DuckRecord {
+  /** The un-ducked gain — what a release must return to. */
+  baseline: number;
+  /** How many Toasts are ducking this param right now. */
+  depth: number;
+  /** Context time until which a restore ramp is still arriving. */
+  restoreUntil: number;
+}
+
+const DUCK_RECORDS = new WeakMap<AudioParam, DuckRecord>();
+
+/** Duck one param from its TRUE baseline, and remember how to undo it. */
+function duckParam(param: AudioParam, now: number, factor: number, attackSec: number): number {
+  const rec: DuckRecord = DUCK_RECORDS.get(param)
+    ?? { baseline: param.value, depth: 0, restoreUntil: 0 };
+  // Only trust the live value when nothing is ducking and nothing is arriving.
+  if (rec.depth === 0 && now >= rec.restoreUntil) rec.baseline = param.value;
+  rec.depth++;
+  DUCK_RECORDS.set(param, rec);
+
+  param.cancelScheduledValues(now);
+  param.setValueAtTime(param.value, now);
+  param.linearRampToValueAtTime(rec.baseline * factor, now + attackSec);
+  return rec.baseline;
+}
+
+/** Hand one param back. The last Toast out starts the restore ramp. */
+function restoreParam(param: AudioParam, now: number, releaseSec: number): void {
+  const rec = DUCK_RECORDS.get(param);
+  if (!rec) return;
+  rec.depth = Math.max(0, rec.depth - 1);
+  if (rec.depth > 0) return;           // another Toast still has it
+  rec.restoreUntil = now + releaseSec; // do not re-read the value until it lands
+  param.cancelScheduledValues(now);
+  param.setValueAtTime(param.value, now);
+  param.linearRampToValueAtTime(rec.baseline, now + releaseSec);
+}
+
 export const toast: DubMove = {
   id: 'toast',
   kind: 'hold',
@@ -49,11 +104,9 @@ export const toast: DubMove = {
         const tone = getToneEngine();
         const now = ctx.currentTime;
         for (const g of [tone.masterInput.gain, tone.synthBus.gain]) {
-          const prev = g.value;
-          duckedParams.push({ param: g as unknown as AudioParam, prev });
-          g.cancelScheduledValues(now);
-          g.setValueAtTime(prev, now);
-          g.linearRampToValueAtTime(prev * duckFactor, now + attackSec);
+          const param = g as unknown as AudioParam;
+          const prev = duckParam(param, now, duckFactor, attackSec);
+          duckedParams.push({ param, prev });
         }
       } catch { /* tone engine not ready */ }
 
@@ -73,10 +126,7 @@ export const toast: DubMove = {
               const inst = (E as unknown as { getInstance: () => unknown }).getInstance();
               const g = (inst as { output?: GainNode }).output?.gain;
               if (g) {
-                duckedParams.push({ param: g, prev: g.value });
-                g.cancelScheduledValues(now);
-                g.setValueAtTime(g.value, now);
-                g.linearRampToValueAtTime(g.value * duckFactor, now + attackSec);
+                duckedParams.push({ param: g, prev: duckParam(g, now, duckFactor, attackSec) });
               }
             }
           } catch { /* engine not loaded */ }
@@ -137,8 +187,14 @@ export const toast: DubMove = {
       })();
     }
 
+    let disposed = false;
     return {
       dispose() {
+        // Overlapping presses must not each decrement — and the restore below
+        // is written from the remembered TRUE gain, so a double release is
+        // harmless even if one slips through.
+        if (disposed) return;
+        disposed = true;
         const now = ctx.currentTime;
         tap.gain.cancelScheduledValues(now);
         tap.gain.setValueAtTime(tap.gain.value, now);
@@ -147,12 +203,8 @@ export const toast: DubMove = {
           try { tap.disconnect(); } catch { /* ok */ }
           cleanupOwned?.();
         }, Math.ceil((releaseSec + 0.05) * 1000));
-        for (const { param, prev } of duckedParams) {
-          try {
-            param.cancelScheduledValues(now);
-            param.setValueAtTime(param.value, now);
-            param.linearRampToValueAtTime(prev, now + releaseSec);
-          } catch { /* ok */ }
+        for (const { param } of duckedParams) {
+          try { restoreParam(param, now, releaseSec); } catch { /* ok */ }
         }
       },
     };
