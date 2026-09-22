@@ -879,9 +879,18 @@ function routeMasterFXParameter(param: string, normalizedValue: number): void {
 
     // Parse param: 'masterFx.slot0.wet', 'masterFx.slot0.param0', 'masterFx.masterVolume', etc.
     if (param === 'masterFx.masterVolume') {
-      // Master channel volume: 0-1 → -60..0 dB
+      // Master channel volume: 0-1 → -60..0 dB.
+      //
+      // Through the STORE, never `engine.masterChannel` directly. Writing the
+      // engine behind the store's back left the two disagreeing with no way
+      // back: a Maschine announcing its knob positions at connect (every knob
+      // reports 64, its centre) put the master channel at -29.76 dB while the
+      // store — and so the fader on screen — still read 0 dB, and the user
+      // heard a mix 30 dB down with every control looking correct
+      // (2026-09-22). The store's setter also respects DJ mode, where the
+      // master channel is deliberately muted and a direct write un-mutes it.
       const dB = -60 + normalizedValue * 60;
-      engine.masterChannel.volume.rampTo(dB, 0.02);
+      audioStore.setMasterVolume(dB);
       return;
     }
 
