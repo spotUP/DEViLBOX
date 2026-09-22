@@ -5,6 +5,21 @@ export default {
     "./src/**/*.{js,ts,jsx,tsx}",
   ],
   theme: {
+    // Breakpoint scale — MUST stay identical to BREAKPOINTS in
+    // src/hooks/useBreakpoint.ts, which is the app's only threshold source.
+    // Declared as a full replacement (not `extend`) so the variants stay in
+    // ascending order: an `extend` would append `wide` AFTER `2xl`, letting a
+    // `wide:` utility beat a `2xl:` one on a large screen.
+    // `wide` is the app's own threshold — enough room for the tracker's side
+    // instrument panel. The rest are Tailwind's stock values, kept as-is.
+    screens: {
+      sm: '640px',
+      md: '768px',
+      wide: '900px',
+      lg: '1024px',
+      xl: '1280px',
+      '2xl': '1536px',
+    },
     extend: {
       gridTemplateColumns: {
         '16': 'repeat(16, minmax(0, 1fr))',

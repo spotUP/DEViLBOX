@@ -11,7 +11,13 @@ export interface BluetoothMIDIInfo {
 }
 
 /**
- * Detect if the device is iOS
+ * Detect if the device is iOS.
+ *
+ * PLATFORM CAPABILITY CHECK, NOT A LAYOUT SIGNAL. Web MIDI and SysEx
+ * availability are properties of the operating system and browser, not of the
+ * window size, so a user-agent test is the correct instrument here. Anything
+ * that decides layout, density or which tree renders must use
+ * `isPhone` / `isCoarsePointer` from `src/hooks/useBreakpoint.ts` instead.
  */
 export const isIOSDevice = (): boolean => {
   if (typeof navigator === 'undefined') return false;
@@ -40,7 +46,12 @@ export const isAndroidDevice = (): boolean => {
 };
 
 /**
- * Detect if the device is mobile (iOS or Android)
+ * Detect if the device is mobile (iOS or Android).
+ *
+ * PLATFORM CAPABILITY CHECK, NOT A LAYOUT SIGNAL — it gates the Web MIDI /
+ * SysEx guidance in `MIDIManager.ts`, which depends on the OS and not on the
+ * viewport. Do not read this to decide what to render; use `isPhone` from
+ * `src/hooks/useBreakpoint.ts`.
  */
 export const isMobileDevice = (): boolean => {
   return isIOSDevice() || isAndroidDevice();

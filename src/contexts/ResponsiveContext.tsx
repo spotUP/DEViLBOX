@@ -7,6 +7,10 @@ import { createContext, useContext, type ReactNode } from 'react';
 import { useBreakpoint, useIsTouchDevice, type BreakpointState } from '@hooks/useBreakpoint';
 
 interface ResponsiveContextValue extends BreakpointState {
+  /**
+   * Device CAPABILITY (`ontouchstart`), true on touch-capable laptops.
+   * Not a layout signal — use `isPhone` / `isCoarsePointer` for sizing.
+   */
   isTouch: boolean;
 }
 
@@ -65,7 +69,12 @@ export function useResponsiveSafe(): ResponsiveContextValue {
       isMobile: false,
       isTablet: false,
       isDesktop: true,
+      isWide: true,
       width: 1024,
+      height: 768,
+      isCoarsePointer: false,
+      isShortViewport: false,
+      isPhone: false,
       isTouch: false,
     };
   }
