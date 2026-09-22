@@ -22,6 +22,9 @@
  *   { type: 'position', subsong, position }      — Periodic position update
  */
 
+/** Longest a subsong scan may hold the audio thread, wall-clock. */
+const SCAN_WALL_MS = 15000;
+
 class UADEProcessor extends AudioWorkletProcessor {
   constructor() {
     super();
@@ -1158,6 +1161,12 @@ class UADEProcessor extends AudioWorkletProcessor {
     const MAX_ROWS = 64 * 256; // 256 patterns max
     const MAX_SECONDS = maxSeconds;
     const maxFrames = (sampleRate || 44100) * MAX_SECONDS;
+    // Wall-clock guard: this loop runs ON THE AUDIO THREAD. A tune that never
+    // ends (Hippel 7V game music) ran the full 600 rendered seconds, which at
+    // WASM speed is minutes of a stalled load and dead audio — reported as
+    // "7V does not work" (2026-09-22). Rendered seconds budget the editor
+    // grid; wall-clock budgets what the listener feels.
+    const deadline = performance.now() + SCAN_WALL_MS;
 
     // Ensure channel snapshot buffer exists
     if (this._channelBuf === undefined) {
@@ -1176,7 +1185,7 @@ class UADEProcessor extends AudioWorkletProcessor {
 
     this._wasm._uade_wasm_set_looping(0);
 
-    while (rows.length < MAX_ROWS && totalFrames < maxFrames) {
+    while (rows.length < MAX_ROWS && totalFrames < maxFrames && performance.now() < deadline) {
       const ret = this._wasm._uade_wasm_render(tmpL, tmpR, CHUNK);
       if (ret <= 0) break;
       totalFrames += ret;
@@ -1239,6 +1248,12 @@ class UADEProcessor extends AudioWorkletProcessor {
     const MAX_SECONDS = maxSeconds;
     const sr = sampleRate || 44100;
     const maxFrames = sr * MAX_SECONDS;
+    // Wall-clock guard: this loop runs ON THE AUDIO THREAD. A tune that never
+    // ends (Hippel 7V game music) ran the full 600 rendered seconds, which at
+    // WASM speed is minutes of a stalled load and dead audio — reported as
+    // "7V does not work" (2026-09-22). Rendered seconds budget the editor
+    // grid; wall-clock budgets what the listener feels.
+    const deadline = performance.now() + SCAN_WALL_MS;
     const MAX_ROWS = 64 * 256;
 
     // Allocate WASM buffers
@@ -1268,7 +1283,7 @@ class UADEProcessor extends AudioWorkletProcessor {
     this._wasm._uade_wasm_set_looping(0);
 
     // Phase 1: Capture per-tick snapshots at high resolution
-    while (tickSnapshots.length < MAX_ROWS * 20 && totalFrames < maxFrames) {
+    while (tickSnapshots.length < MAX_ROWS * 20 && totalFrames < maxFrames && performance.now() < deadline) {
       const ret = this._wasm._uade_wasm_render(tmpL, tmpR, CHUNK);
       if (ret <= 0) break;
       totalFrames += CHUNK;
