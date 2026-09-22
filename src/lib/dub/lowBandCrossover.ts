@@ -31,7 +31,7 @@
 export const LOW_SAT_KNEE = 0.7;
 /** Bound on the low band's peak at rest (transparent) and once the control is up. */
 export const LOW_CEILING_AT_REST = 1.0;
-export const LOW_CEILING_AT_TOP = 0.6;
+export const LOW_CEILING_AT_TOP = 0.5;   // 0.6 left the sum with the high band and the return over the ride's target; the ride then spent the lift (measured +2.5 of 12 dB, 2026-09-22)
 /**
  * The ceiling reaches its working value this far up the control and stays
  * there. A ceiling that kept falling to the top made the output at a real
