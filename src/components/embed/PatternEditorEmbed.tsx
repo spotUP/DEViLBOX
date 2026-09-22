@@ -223,7 +223,7 @@ export function PatternEditorEmbed() {
   if (!initialized) {
     return (
       <div style={{
-        height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center',
+        height: 'var(--app-vh)', display: 'flex', alignItems: 'center', justifyContent: 'center',
         background: '#0d0d0d', color: '#6b6b80', fontFamily: 'monospace',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -240,7 +240,7 @@ export function PatternEditorEmbed() {
   }
 
   return (
-    <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', background: '#0d0d0d', overflow: 'hidden' }}>
+    <div style={{ height: 'var(--app-vh)', display: 'flex', flexDirection: 'column', background: '#0d0d0d', overflow: 'hidden' }}>
       {/* Compact transport bar */}
       <div style={{
         display: 'flex', alignItems: 'center', gap: 8, padding: '4px 8px',

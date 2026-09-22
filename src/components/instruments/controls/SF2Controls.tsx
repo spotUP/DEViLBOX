@@ -160,7 +160,7 @@ export const SF2Controls: React.FC<Props> = ({ config, onChange }) => {
       {/* Instrument tab */}
       {activeTab === 'instrument' && (
         <div className="grid gap-3 p-3 overflow-y-auto synth-controls-flow"
-          style={{ maxHeight: 'calc(100vh - 280px)', gridTemplateColumns: hasEnoughBytes ? '1fr 1fr' : '1fr' }}>
+          style={{ maxHeight: 'calc(var(--app-vh) - 280px)', gridTemplateColumns: hasEnoughBytes ? '1fr 1fr' : '1fr' }}>
 
           {/* ADSR Envelope */}
           {hasEnoughBytes && (
@@ -296,7 +296,7 @@ const TablesTab: React.FC<{
   const displayRows = Math.min(rows, 64);
 
   return (
-    <div className="flex flex-col gap-2 p-3 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 280px)' }}>
+    <div className="flex flex-col gap-2 p-3 overflow-y-auto" style={{ maxHeight: 'calc(var(--app-vh) - 280px)' }}>
       {/* Table selector */}
       <div className="flex gap-1 flex-wrap">
         {tableDefs.map((t, i) => (
@@ -407,7 +407,7 @@ const SF2SIDMonitor: React.FC<{
 
   return (
     <div className="flex flex-col gap-3 p-3 overflow-y-auto synth-controls-flow"
-      style={{ maxHeight: 'calc(100vh - 280px)' }}>
+      style={{ maxHeight: 'calc(var(--app-vh) - 280px)' }}>
       <div className={`rounded-lg border p-3 ${panelBg}`} style={panelStyle}>
         <SectionLabel color={accentColor} label="SID Registers ($D400–$D418)" />
         <div className="font-mono text-xs" style={{ lineHeight: '1.6' }}>

@@ -46,7 +46,7 @@ export const UnifiedSIDEditor: React.FC<Props> = ({ adapter }) => {
 
   const renderInstrumentTab = () => (
     <div className="grid gap-3 p-3 overflow-y-auto synth-controls-flow"
-      style={{ maxHeight: 'calc(100vh - 280px)', gridTemplateColumns: `repeat(${waveform ? 3 : 2}, 1fr)` }}>
+      style={{ maxHeight: 'calc(var(--app-vh) - 280px)', gridTemplateColumns: `repeat(${waveform ? 3 : 2}, 1fr)` }}>
 
       <SIDEnvelopeSection
         adsr={adsr}

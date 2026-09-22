@@ -211,7 +211,7 @@ export const Cinter4Controls: React.FC<Cinter4ControlsProps> = ({ instrument }) 
 
   return (
     <div className="flex flex-col gap-3 p-3 overflow-y-auto synth-controls-flow"
-      style={{ maxHeight: 'calc(100vh - 280px)' }}>
+      style={{ maxHeight: 'calc(var(--app-vh) - 280px)' }}>
       {/* Live voice waveform — reshapes as params change */}
       <div className={`rounded-lg border p-3 flex flex-col ${panelBg}`}
         style={{ ...panelStyle, minHeight: PANEL_MIN_H }}>

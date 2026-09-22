@@ -115,7 +115,7 @@ export const MobileTabBar: React.FC<MobileTabBarProps> = ({
                 onPointerLeave={handlePointerUp}
                 className={`
                   flex-1 flex flex-col items-center justify-center gap-0.5
-                  py-1.5 min-h-[52px] transition-all active:scale-95
+                  py-1.5 min-h-[var(--mobile-tab-bar-height)] transition-all active:scale-95
                   ${isActive
                     ? 'text-accent-primary bg-accent-primary/10'
                     : 'text-text-muted active:bg-dark-bgTertiary'

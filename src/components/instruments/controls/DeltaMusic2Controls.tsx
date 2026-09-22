@@ -180,7 +180,7 @@ export const DeltaMusic2Controls: React.FC<DeltaMusic2ControlsProps> = ({
   // ── ENVELOPE TAB (volume table) ───────────────────────────────────────────
 
   const renderEnvelope = () => (
-    <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 280px)' }}>
+    <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(var(--app-vh) - 280px)' }}>
       <div className={`rounded-lg border p-3 ${panelBg}`} style={panelStyle}>
         <SectionLabel color={accent} label="Volume Table (5 entries)" />
         <div className="text-[10px] text-text-muted mb-2">
@@ -220,7 +220,7 @@ export const DeltaMusic2Controls: React.FC<DeltaMusic2ControlsProps> = ({
   // ── MODULATION TAB (vibrato table + pitch bend) ───────────────────────────
 
   const renderModulation = () => (
-    <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 280px)' }}>
+    <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(var(--app-vh) - 280px)' }}>
 
       {/* Vibrato table */}
       <div className={`rounded-lg border p-3 ${panelBg}`} style={panelStyle}>
@@ -287,7 +287,7 @@ export const DeltaMusic2Controls: React.FC<DeltaMusic2ControlsProps> = ({
     const table = config.table;
 
     return (
-      <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 280px)' }}>
+      <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(var(--app-vh) - 280px)' }}>
         <div className={`rounded-lg border p-3 ${panelBg}`} style={panelStyle}>
           <SectionLabel color={accent} label="Wavetable Sequence (48 bytes)" />
           <div className="grid grid-cols-8 gap-1">
@@ -522,7 +522,7 @@ export const DeltaMusic2Controls: React.FC<DeltaMusic2ControlsProps> = ({
       );
     }
     return (
-      <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 280px)' }}>
+      <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(var(--app-vh) - 280px)' }}>
         <div className={`rounded-lg border p-3 ${panelBg}`} style={panelStyle}>
           <SectionLabel color={accent} label="Oscillator Waveform (click + drag to draw)" />
           <div className="text-[10px] text-text-muted mb-2">

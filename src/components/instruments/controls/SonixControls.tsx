@@ -310,7 +310,7 @@ export const SonixControls: React.FC<SonixControlsProps> = ({ instrument }) => {
   return (
     <div
       className="flex flex-col gap-3 p-3 overflow-y-auto synth-controls-flow"
-      style={{ maxHeight: 'calc(100vh - 280px)' }}
+      style={{ maxHeight: 'calc(var(--app-vh) - 280px)' }}
     >
       {/* ── Waveform ──────────────────────────────────────────────────────── */}
       <Panel label="Waveform" accent={accent}>
