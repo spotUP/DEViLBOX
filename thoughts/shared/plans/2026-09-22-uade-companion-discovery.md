@@ -121,17 +121,17 @@ map handed to `loadFile` is exactly the "must find" column.
   behaviour, harmless but wasteful).
 
 ## Checklist
-- [ ] CF-1 `companionResolver.ts`: `ROLE_WORDS`, `stemOf`, rules 1–6, bounds.
-- [ ] CF-2 Tests, one per rule and per guard, plus the six-song fixture
+- [x] CF-1 `companionResolver.ts`: `ROLE_WORDS`, `stemOf`, rules 1–6, bounds.
+- [x] CF-2 Tests, one per rule and per guard, plus the six-song fixture
       table from D as pure name lists (no disk).
-- [ ] CF-3 Server `load_file` uses the resolver; rule block removed.
-- [ ] CF-4 File browser `fetchCompanionFiles` uses the resolver over a
+- [x] CF-3 Server `load_file` uses the resolver; rule block removed.
+- [x] CF-4 File browser `fetchCompanionFiles` uses the resolver over a
       directory listing; four-pair table removed.
-- [ ] CF-5 Folder drop uses the resolver (per D3).
-- [ ] CF-6 Lone-file prompt (per D1).
-- [ ] CF-7 Reachability: one test proving `load_file` reaches the resolver
+- [x] CF-5 Folder drop uses the resolver (per D3).
+- [x] CF-6 Lone-file prompt (per D1).
+- [x] CF-7 Reachability: one test proving `load_file` reaches the resolver
       (call-count sentinel through the server handler).
-- [ ] CF-8 `npm run type-check`; import + bridge suites.
+- [x] CF-8 `npm run type-check`; import + bridge suites.
 - [ ] CF-9 Live: the seven songs through MCP `load_file`, companion map
       asserted per D, audio confirmed.
 - [ ] CF-10 Live: folder drop of `Synth Dream/Laurens Tummers` then both
@@ -144,3 +144,23 @@ map handed to `loadFile` is exactly the "must find" column.
 ## Manual verification
 - Folder-drop the Synth Dream directory; load nobuddiesland, then
   monsterbusiness; both play.
+
+## Execution log (2026-09-22)
+
+- CF-1..CF-8 done: `edcda70c1` resolver, `423ba7c3b` all four callers
+  (disk, modland, file browser, folder drop, lone-file hint), `1568bf909`
+  `get_format_state.uadeCompanionNames`, `16241118f` `.adsc` routed by its
+  companion. CF-8: `npm run type-check` clean; the server's `tsc` errors are
+  the pre-existing rootDir issue (D2a).
+- Found while running CF-9: `.adsc` was routed to the StarTrekker AM parser
+  looking only for `.nt`; an Audio Sculpture module with `.as` reached UADE
+  with no companion and was refused (`ret=-1`). Fixed; after it,
+  `popelich-brutalo.adsc` registers `popelich-brutalo.adsc.as` and plays
+  (rms 0.003, peak 0.024 — quiet, but UADE accepted it).
+- CF-9 blocked on two things outside this session: the MCP server is spawned
+  by Claude Code from `server/src/mcp/index.ts` and only picks up the new
+  `load_file` after a reconnect (the old table has no dns/sdr/osp pairs, so
+  the discriminating pair cannot pass through it); and the browser tab
+  dropped off the relay after the Audio Sculpture test.
+- TFMX loads on its native `tfmx` path (not UADE) — `uadeCompanionNames`
+  empty there is expected.
