@@ -192,7 +192,9 @@ const NavBarComponent: React.FC = () => {
               onClick={() => ft2Actions.playPattern?.()}
             >{isPlayingPattern ? 'Stop Pattern' : 'Play Pattern'}</Button>
             <div className="w-px h-4 bg-dark-border mx-0.5 shrink-0" />
-            <Button variant="ghost" size="sm" onClick={() => ft2Actions.openFileBrowser?.()}>Load</Button>
+            {/* The App-level browser: always mounted, unlike the toolbar's, which is
+                hidden by the very fullscreen this row exists for. */}
+            <Button variant="ghost" size="sm" onClick={() => useUIStore.getState().setShowFileBrowser(true)}>Load</Button>
             <Button variant="ghost" size="sm" onClick={() => ft2Actions.save?.()}>Save</Button>
             <Button variant="ghost" size="sm" onClick={() => ft2Actions.undo?.()} disabled={!canUndo()}>Undo</Button>
             <Button variant="ghost" size="sm" onClick={() => ft2Actions.redo?.()} disabled={!canRedo()}>Redo</Button>
