@@ -6,7 +6,7 @@ import React from 'react';
 import { NavBar } from './NavBar';
 import { MobileMenu } from './MobileMenu';
 import { MobileTabBar } from './MobileTabBar';
-import { useResponsive } from '@/hooks/useResponsive';
+import { useResponsiveSafe } from '@/contexts/ResponsiveContext';
 import { useUIStore } from '@/stores';
 
 interface AppLayoutProps {
@@ -44,7 +44,9 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
   onShowGrooveSettings,
   onShowAuth,
 }) => {
-  const { isMobile } = useResponsive();
+  // Phone chrome (hamburger + bottom tab bar) follows the D1 signal:
+  // a coarse pointer AND a small screen. See src/hooks/useBreakpoint.ts.
+  const { isPhone } = useResponsiveSafe();
   const activeView = useUIStore((s) => s.activeView);
   const isFullscreenView = activeView === 'vj';
 
@@ -52,13 +54,13 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
     <div className="h-screen w-screen flex flex-col bg-dark-bg text-text-primary overflow-hidden">
       {/* Top Navigation Bar - Hidden on mobile and in fullscreen views (VJ) */}
       {!isFullscreenView && (
-        <div className={isMobile ? 'hidden' : 'block'}>
+        <div className={isPhone ? 'hidden' : 'block'}>
           <NavBar />
         </div>
       )}
 
       {/* Mobile Hamburger Menu - Only shown on mobile */}
-      {isMobile && (
+      {isPhone && (
         <MobileMenu
           onShowSettings={onShowSettings}
           onShowExport={onShowExport}
@@ -79,14 +81,14 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
 
       {/* Main Content Area — add bottom padding on mobile for tab bar */}
       <main
-        key={isMobile ? activeView : 'desktop'}
-        className={`flex-1 flex min-h-0 min-w-0 overflow-hidden ${isMobile ? 'pb-[52px] animate-fade-in-fast' : ''}`}
+        key={isPhone ? activeView : 'desktop'}
+        className={`flex-1 flex min-h-0 min-w-0 overflow-hidden ${isPhone ? 'pb-[52px] animate-fade-in-fast' : ''}`}
       >
         {children}
       </main>
 
       {/* Mobile Bottom Tab Bar */}
-      {isMobile && (
+      {isPhone && (
         <MobileTabBar onShowInstruments={onShowInstruments} />
       )}
     </div>

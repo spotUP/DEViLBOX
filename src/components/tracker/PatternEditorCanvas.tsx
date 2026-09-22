@@ -2006,6 +2006,12 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     // Feature-detect OffscreenCanvas transfer support.
     // iOS Safari supports OffscreenCanvas but WebGL2 on OffscreenCanvas in a Worker
     // hangs silently — skip the worker on iOS entirely.
+    //
+    // PLATFORM CAPABILITY CHECK, NOT A LAYOUT SIGNAL. This user-agent test
+    // answers "does WebGL2-in-a-worker work here", which is a browser bug, not
+    // a screen size. Nothing about sizing, density or touch targets may be
+    // derived from it — use `isPhone` / `isCoarsePointer` from
+    // `src/hooks/useBreakpoint.ts` for those.
     const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent);
     if (isIOS || !('transferControlToOffscreen' in HTMLCanvasElement.prototype)) {
       console.warn('[PatternEditorCanvas] OffscreenCanvas worker skipped (iOS or unsupported)');
