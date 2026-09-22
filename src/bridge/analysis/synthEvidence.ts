@@ -34,7 +34,7 @@ export type Articulation = 'percussive' | 'plucked' | 'sustained' | 'swelling' |
 
 export interface SynthTimbreEvidence {
   /** Which parameter block this came from, for attribution. */
-  source: 'hively' | 'envelope' | 'oscillator';
+  source: 'hively' | 'replayer' | 'envelope' | 'oscillator';
   articulation: Articulation;
   /** 0..1, from waveform content. Triangle dark, noise brightest. */
   brightness: number;
@@ -237,12 +237,114 @@ function fromEnvelope(inst: InstrumentConfig): SynthTimbreEvidence | null {
   };
 }
 
+/**
+ * The Amiga replayer families: FutureComposer, SoundMon, Sonic Arranger,
+ * Hippel-CoSo and the rest.
+ *
+ * These are the formats the classifier was blindest to. Their instruments are
+ * synthesised inside the replayer, so there is no PCM for the spectrum path and
+ * no envelope in the Tone.js shape either; the only description of the sound is
+ * the replayer's own parameter block. Without this, every channel of an FC or
+ * Sonic Arranger tune fell through to note statistics and the name — and the
+ * names are greetings. See [[reference-sample-names-are-messages]].
+ *
+ * They differ in field names and in what they can express, but they share a
+ * shape: a volume envelope counted in VIDEO FRAMES, and a vibrato delay/speed/
+ * depth triple. That much is enough for articulation and vibrato, which is what
+ * `classifyBySynthParams` actually reads. Where a format says nothing about a
+ * field, it stays at the neutral value rather than being guessed at.
+ *
+ * Brightness is left mid-scale on purpose. These formats index a waveform BANK
+ * whose contents are song data, so a waveform number says nothing about
+ * timbre the way Hively's fixed 0-3 does — claiming otherwise would be
+ * inventing evidence.
+ */
+function fromAmigaReplayer(inst: InstrumentConfig): SynthTimbreEvidence | null {
+  /** frames -> ms, the unit every one of these replayers counts in. */
+  const ms = (frames: number | undefined): number =>
+    Math.max(0, Math.round(((frames ?? 0) / FRAMES_PER_SEC) * 1000));
+
+  let attackMs = 0;
+  let decayMs = 0;
+  let releaseMs = 0;
+  let sustains = false;
+  let vibrato = false;
+  /** A waveform SEQUENCE that keeps moving is a timbre that sweeps. */
+  let sweeping = false;
+
+  const fc = inst.fc;
+  const sm = inst.soundMon;
+  const sa = inst.sonicArranger;
+  const hc = inst.hippelCoso;
+
+  if (fc) {
+    attackMs = ms(fc.atkLength);
+    decayMs = ms(fc.decLength);
+    releaseMs = ms(fc.relLength);
+    sustains = (fc.sustVolume ?? 0) > 16; // of 64
+    vibrato = (fc.vibDepth ?? 0) > 0 && (fc.vibSpeed ?? 0) > 0;
+    // A synth macro that visits more than one waveform is a moving timbre.
+    sweeping = new Set((fc.synthTable ?? []).map(e => e.waveNum)).size > 1;
+  } else if (sm && sm.type === 'synth') {
+    // SoundMon counts SPEED, not length: a bigger number is a faster ramp.
+    // Inverting it keeps the units honest — speed 0 means "no ramp", which is
+    // an instant edge, not an infinitely long one.
+    const fromSpeed = (speed: number | undefined): number =>
+      !speed ? 0 : ms(64 / speed);
+    attackMs = fromSpeed(sm.attackSpeed);
+    decayMs = fromSpeed(sm.decaySpeed);
+    releaseMs = fromSpeed(sm.releaseSpeed);
+    sustains = (sm.sustainVolume ?? 0) > 16 && (sm.sustainLength ?? 0) > 0;
+    vibrato = (sm.vibratoDepth ?? 0) > 0 && (sm.vibratoSpeed ?? 0) > 0;
+    sweeping = (sm.waveSpeed ?? 0) > 0;
+  } else if (sa) {
+    // Sonic Arranger keeps its envelope in a separate ADSR table that the
+    // instrument only POINTS at, so the shape is not readable from here. The
+    // lengths that are readable describe the amplitude modulation table.
+    attackMs = ms(sa.adsrDelay);
+    decayMs = ms(sa.adsrLength);
+    releaseMs = 0;
+    sustains = (sa.sustainDelay ?? 0) > 0 || (sa.sustainPoint ?? 0) > 0;
+    vibrato = (sa.vibratoLevel ?? 0) > 0 && (sa.vibratoSpeed ?? 0) > 0;
+    sweeping = (sa.amfLength ?? 0) > 0; // an amplitude/filter table that runs
+  } else if (hc) {
+    // Hippel-CoSo has no ADSR at all: volume is a sequence stepped at
+    // `volSpeed`, so its LENGTH is the sound's length.
+    const steps = hc.vseq?.length ?? 0;
+    const speed = Math.max(1, hc.volSpeed ?? 1);
+    decayMs = ms(steps * speed);
+    sustains = steps === 0;
+    vibrato = (hc.vibDepth ?? 0) > 0 && (hc.vibSpeed ?? 0) > 0;
+    sweeping = new Set(hc.fseq ?? []).size > 1;
+  } else {
+    return null;
+  }
+
+  return {
+    source: 'replayer',
+    articulation: articulationFrom(attackMs, decayMs, releaseMs, sustains),
+    // Unknown, and said so rather than guessed: these formats index a waveform
+    // bank that is song data, not a fixed table.
+    brightness: 0.5,
+    noisiness: 0,
+    attackMs,
+    decayMs,
+    releaseMs,
+    sweeping,
+    vibrato,
+    // None of these blocks describes a pitch drop as a parameter — where they
+    // do it, it is through the arpeggio/frequency sequence, which is note data
+    // rather than timbre.
+    pitchDropSemitones: 0,
+  };
+}
+
 /** Timbre evidence from whichever parameter block this instrument carries. */
 export function extractSynthTimbre(
   inst: InstrumentConfig | null | undefined,
 ): SynthTimbreEvidence | null {
   if (!inst) return null;
-  return fromHively(inst) ?? fromEnvelope(inst);
+  return fromHively(inst) ?? fromAmigaReplayer(inst) ?? fromEnvelope(inst);
 }
 
 /**
