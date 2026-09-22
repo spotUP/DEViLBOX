@@ -122,3 +122,26 @@ masterHpf ─┬─ masterBassShelf ──────────────�
 - At +6 on the loud passage `insertOut` read 0.625 RMS — `masterSafetyClip`
   is doing real work there. Listen for grit before deciding whether the shelf
   ceiling (18 dB) should come down now that the band carries weight.
+
+## Follow-through, same day (AutoDub at BASS +12)
+
+Commits after LB-11: `64c9b2e5f` ceiling 18 -> 12, trim watch, return past
+the low-end lift; `56aa424e0` BASS-linked low-mid dip; `0eda18fde` band
+drive 6 -> 3 and level 0.35 -> 0.15, return trimmed like the dry;
+`6c899ef65` measured trim ride from the clipper input; `daef1251f` riders
+settle/hold/creep (`gainRider.ts`) and a return governor (return <= programme).
+
+Measured, 30 s of AutoDub on amanda.ahx, BASS +12, monitor at 250 ms:
+
+| build | master peakMax | rmsAvg | note |
+|---|---|---|---|
+| before riders | 0.95 | 0.25 | crest ~5 dB on loud bars: clipping |
+| ride v1 (full attack, 2 dB/s) | 0.82 | 0.12 | clipper idle; "artificially sidechained" |
+| riders v2 + governor | 0.84 (first hit) | 0.11 | settles to 0.45-0.59 on loud bars |
+
+Live rider depths at the end of the last run: trimRideDb -5.9,
+returnGovernorDb -2.6, masterToneTrim 0.472, returnTrim 0.351,
+preClip 0.343 -> afterClip 0.337 (clipper idle).
+
+Open: listening verdict on pumping with riders v2. If still heard, the next
+levers are hold 8 -> 16 ticks and attackFraction 0.5 -> 0.35.
