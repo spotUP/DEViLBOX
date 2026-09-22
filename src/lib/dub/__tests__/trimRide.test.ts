@@ -34,6 +34,19 @@ describe('rideTrim', () => {
     expect(s.db).toBeCloseTo(depth + TRIM_RIDE.releaseDb, 6);
   });
 
+  it('answers only for what the boost adds — a hot programme is not its business', () => {
+    // Dry plus return already peak 0.9 with the shelf flat; boosted 1.0.
+    // The ride corrects the 0.9 dB the boost added, not the 1.9 dB over target.
+    const s = rideTrim(RIDER_REST, 1.0, 0.9);
+    expect(s.db).toBeCloseTo(-20 * Math.log10(1.0 / 0.9) * TRIM_RIDE.attackFraction, 6);
+    // And with nothing added, it rests, however hot the programme is.
+    expect(rideTrim(RIDER_REST, 0.9, 0.9).db).toBe(0);
+  });
+
+  it('keeps the clip target when the unboosted reference is under it', () => {
+    expect(rideTrim(RIDER_REST, 1.0, 0.3)).toEqual(rideTrim(RIDER_REST, 1.0));
+  });
+
   it('is slow enough not to be heard as movement', () => {
     // Under 1 dB a second, at four ticks a second.
     expect(TRIM_RIDE.releaseDb * 4).toBeLessThan(1);

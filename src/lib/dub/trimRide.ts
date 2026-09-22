@@ -26,9 +26,20 @@ export const CLIP_TARGET_PEAK = 0.8;
 /** Ticks are `TRIM_WATCH_MS` (250 ms) apart: settles in about a second, holds two, creeps at 0.6 dB/s. */
 export const TRIM_RIDE: RiderConfig = { attackFraction: 0.5, holdTicks: 8, releaseDb: 0.15, maxDb: 12 };
 
-export function rideTrim(state: RiderState, peakIn: number): RiderState {
+/**
+ * `peakRef` is the same clipper input WITHOUT the boost — the dry path before
+ * the shelf plus the return. The ride answers only for what the boost adds:
+ * its target is the larger of the clip target and that reference. Without
+ * this, a programme whose own hits plus the echo already crossed the target
+ * kept the ride pinned at its maximum with the shelf flat, and the BASS
+ * control did nothing at all (measured 2026-09-22: trimRideDb -12,
+ * masterBassShelfDb 0, with AutoDub). A tune that is hot on its own is the
+ * master limiter's business, not the bass control's.
+ */
+export function rideTrim(state: RiderState, peakIn: number, peakRef = 0): RiderState {
+  const ref = Number.isFinite(peakRef) && peakRef > 0 ? Math.max(CLIP_TARGET_PEAK, peakRef) : CLIP_TARGET_PEAK;
   const overDb = Number.isFinite(peakIn) && peakIn > 0
-    ? 20 * Math.log10(peakIn / CLIP_TARGET_PEAK)
+    ? 20 * Math.log10(peakIn / ref)
     : -Infinity;
   return stepRider(state, overDb, TRIM_RIDE);
 }
