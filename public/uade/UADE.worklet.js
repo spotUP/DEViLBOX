@@ -34,6 +34,7 @@ class UADEProcessor extends AudioWorkletProcessor {
     this._lastHint = '';
     this._currentSubsong = 0;    // Last requested subsong index (preserved across reloads)
     this._companionFiles = new Map();  // filename → Uint8Array, survives WASM reinit
+    this._stderrTail = [];             // last UADE stderr lines, reported with a refused load
 
     // Float32 output buffers allocated in WASM heap
     this._outL = null;
@@ -661,6 +662,11 @@ class UADEProcessor extends AudioWorkletProcessor {
         },
         printErr(text) {
           console.error('[UADE-stderr]', text);
+          // The worklet's console never reaches the page. Keep the tail so a
+          // refused load can SAY why — "ret=-1" alone reads as "this format
+          // does not work" when the truth is "load: file not found: smp.x".
+          self._stderrTail.push(String(text));
+          if (self._stderrTail.length > 60) self._stderrTail.shift();
         },
       };
       if (this._compiledModule) {
@@ -709,6 +715,10 @@ class UADEProcessor extends AudioWorkletProcessor {
       this._wasmBinary = wasmBinary; // Keep for reinit after load failure
       this._sampleRate = sampleRate || 44100;
       this._ready = true;
+      // A companion posted while the WASM was still initialising was cached
+      // and never written: nothing restored it on the FIRST init, only on a
+      // reinit. The player then asked for a file that was never there.
+      this._restoreCompanionFiles();
       this.port.postMessage({ type: 'initProgress', phase: 'ready', progress: 100 });
       this.port.postMessage({ type: 'ready' });
     } catch (err) {
@@ -912,16 +922,29 @@ class UADEProcessor extends AudioWorkletProcessor {
       }
 
 
+      // Rolling, not reset per load: the "Companion file written" lines from
+      // the moments before the load are part of the story.
       let ret = this._loadIntoWasm(data, filenameHint);
       console.log('[UADE.worklet] _uade_wasm_load returned: ' + ret);
 
       if (ret !== 0) {
         this._lastLoadFailed = true;
         const abortInfo = this._lastAbortReason ? ' (abort: ' + this._lastAbortReason + ')' : '';
-        console.error('[UADE.worklet] _uade_wasm_load failed with ret=' + ret + abortInfo);
+        // The whole tail: the line that names the cause ("load: file not
+        // found: smp.x") is the FIRST thing the core says, and the protocol
+        // errors that follow the death are the last.
+        const stderrInfo = this._stderrTail.length ? ' | uade: ' + this._stderrTail.join(' / ') : '';
+        // What the player could have opened. A companion that was sent but
+        // is not in this list never reached the filesystem.
+        let dirInfo = '';
+        try {
+          const fs = this._wasm.FS;
+          if (fs && fs.readdir) dirInfo = ' | /uade: ' + fs.readdir('/uade').filter(n => n !== '.' && n !== '..' && n !== 'players').join(', ');
+        } catch (e) { dirInfo = ' | /uade: unreadable (' + (e && e.message) + ')'; }
+        console.error('[UADE.worklet] _uade_wasm_load failed with ret=' + ret + abortInfo + stderrInfo);
         this.port.postMessage({
           type: 'error',
-          message: 'UADE could not play: ' + filenameHint + ' (ret=' + ret + ')' + abortInfo
+          message: 'UADE could not play: ' + filenameHint + ' (ret=' + ret + ')' + abortInfo + stderrInfo + dirInfo
         });
         return;
       }

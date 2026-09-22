@@ -213,6 +213,10 @@ export class UADEEngine extends WASMSingletonBase implements IsolationCapableEng
       wasmFile: 'UADE.wasm',
       jsFile: 'UADE.js',
       transformJS: uadeTransform,
+      // The worklet is hand-maintained JS that HMR never touches; without
+      // this a reload can keep serving the old one from the memory cache,
+      // as the other WASM engines already guard against.
+      workletCacheBust: true,
     };
   }
 

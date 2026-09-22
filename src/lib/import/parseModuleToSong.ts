@@ -111,7 +111,7 @@ export async function parseModuleToSong(file: File, subsong = 0, preScannedMeta?
   // MOD files can be routed to UADE for authentic Amiga playback
   if ((filename.endsWith('.mod') || filename.endsWith('.m15')) && prefs.mod === 'uade') {
     const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
-    return await parseUADEFile(buffer, file.name, prefs.uade ?? 'enhanced', subsong, preScannedMeta);
+    return await parseUADEFile(buffer, file.name, prefs.uade ?? 'enhanced', subsong, preScannedMeta, companionFiles);
   }
 
   const { parseTrackerModule } = await import('./parsers/PatternExtractor');
@@ -137,6 +137,6 @@ export async function parseModuleToSong(file: File, subsong = 0, preScannedMeta?
         console.log(`[parseModuleToSong] No MOD signature at 1080, trying UADE as packed MOD: ${uadeFileName}`);
       }
     }
-    return await parseUADEFile(buffer, uadeFileName, prefs.uade ?? 'enhanced', subsong, preScannedMeta);
+    return await parseUADEFile(buffer, uadeFileName, prefs.uade ?? 'enhanced', subsong, preScannedMeta, companionFiles);
   }
 }
