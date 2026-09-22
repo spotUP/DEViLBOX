@@ -15,8 +15,75 @@
  * current behavior is trigger-only and releases all holds on any seek.
  */
 
-import { fire } from './DubRouter';
+import { fire, subscribeDubRouter } from './DubRouter';
 import type { DubLane } from '@/types/dub';
+
+/**
+ * Moves the user played LIVE on the row now under the playhead.
+ *
+ * The recorder captures a live fire by writing a point at the row being
+ * played, and the scanner folds that point into the lane immediately — so the
+ * player's own cursor reaches it on the SAME pass and fires it a second time.
+ * Measured 2026-09-22 with AutoDub off, every hand-played move doubling:
+ *
+ *     [DubRouter] reverseEcho source=live origin=user
+ *     [DubBus] reverseEcho snapshot received — frames=19200 peak=0.25115
+ *     [DubRouter] reverseEcho source=lane origin=lane
+ *     [DubBus] reverseEcho snapshot received — frames=19200 peak=0.29364
+ *
+ * For a capture-and-play move — reverseEcho, backwardReverb — the second fire
+ * restarts the capture before the first reversed buffer has played out, which
+ * is why they were reported as "broken or hardly hearable" rather than
+ * doubled. `delayTimeThrow` doubled the same way.
+ *
+ * `liveDubPerformerActive()` below already says a recording stands down for a
+ * live performer, but it only knows about AutoDub. The human at the controls
+ * is a live performer too, and this is the narrowest form of that rule: not
+ * "stop the lane while a hand is near it", only "do not replay the very fire
+ * that hand just made, on the row it made it".
+ */
+const liveFiresThisRow = new Map<string, number>();
+let liveFireRow = -1;
+
+const liveFireKey = (moveId: string, channelId: number | undefined, row: number): string =>
+  `${moveId}:${channelId ?? -1}:${row}`;
+
+subscribeDubRouter((event) => {
+  // A lane fire is the echo we are trying to suppress; AI fires are already
+  // kept out of the recorder entirely.
+  if (event.source !== 'live' || event.origin === 'ai') return;
+  if (event.row === undefined || event.row === null) return;
+
+  // One row's worth of bookkeeping at a time — the playhead only moves
+  // forward through this map, and a new row makes the old row's entries dead.
+  if (event.row !== liveFireRow) {
+    liveFiresThisRow.clear();
+    liveFireRow = event.row;
+  }
+  const key = liveFireKey(event.moveId, event.channelId, event.row);
+  liveFiresThisRow.set(key, (liveFiresThisRow.get(key) ?? 0) + 1);
+});
+
+/**
+ * Did the user just play this exact move on this exact row? Consumes the
+ * record, so a lane that legitimately holds TWO of the same move on one row
+ * still plays the second one.
+ */
+function consumeLiveEcho(moveId: string, channelId: number | undefined, row: number): boolean {
+  if (row !== liveFireRow) return false;
+  const key = liveFireKey(moveId, channelId, row);
+  const count = liveFiresThisRow.get(key) ?? 0;
+  if (count <= 0) return false;
+  if (count === 1) liveFiresThisRow.delete(key);
+  else liveFiresThisRow.set(key, count - 1);
+  return true;
+}
+
+/** Test seam — forget every recorded live fire. */
+export function __resetLiveEchoSuppression(): void {
+  liveFiresThisRow.clear();
+  liveFireRow = -1;
+}
 
 /**
  * How long a lane hold with no stated duration may run.
@@ -104,6 +171,12 @@ export class DubLanePlayer {
     const events = lane.events;
     while (this.cursor < events.length && events[this.cursor].row <= currentRow) {
       const event = events[this.cursor];
+      // The user's own hand, recorded onto the row it is still playing — not
+      // a recording to replay. See `consumeLiveEcho` above.
+      if (consumeLiveEcho(event.moveId, event.channelId, event.row)) {
+        this.cursor++;
+        continue;
+      }
       const disposer = fire(event.moveId, event.channelId, event.params, 'lane');
       // Trigger-only moves get `null` here and need no bookkeeping.
       this.trackHold(event.id, disposer, event.durationRows !== undefined);
