@@ -86,8 +86,19 @@ export interface CompanionListing {
 }
 
 export interface CompanionResolution {
-  /** Relative paths to register, tune-specific first. */
+  /**
+   * Names to REGISTER, tune-specific first — the paths the 68k player will
+   * open, relative to the module (`smpl.jaguar`, `instr/perc1.x`,
+   * `Samples/electom`).
+   */
   companions: string[];
+  /**
+   * Where to READ each one, relative to the module's directory, when that
+   * differs from the registered name. ZoundMonitor's `Samples/` can sit
+   * beside the song's DIRECTORY: registered as `Samples/electom` (what the
+   * replayer opens), read from `../Samples/electom`.
+   */
+  sources: Record<string, string>;
   /** True when the shared bank was taken because the tune owns nothing. */
   usedSharedBank: boolean;
 }
@@ -168,7 +179,7 @@ function specialCases(moduleName: string, siblings: string[]): string[] {
 }
 
 /** Shape 4: sample subdirectories, relative paths preserved. */
-function subdirectories(moduleName: string, listing: CompanionListing): string[] {
+function subdirectories(moduleName: string, listing: CompanionListing, sources: Record<string, string>): string[] {
   const out: string[] = [];
   const name = lower(moduleName);
   const subdirs = listing.subdirs ?? {};
@@ -198,7 +209,11 @@ function subdirectories(moduleName: string, listing: CompanionListing): string[]
     if (samples) {
       for (const f of samples[1]) if (!f.startsWith('.')) out.push(`${samples[0]}/${f}`);
     } else if (listing.parentSamples) {
-      for (const f of listing.parentSamples) if (!f.startsWith('.')) out.push(`../Samples/${f}`);
+      for (const f of listing.parentSamples) {
+        if (f.startsWith('.')) continue;
+        out.push(`Samples/${f}`);
+        sources[`Samples/${f}`] = `../Samples/${f}`;
+      }
     }
   }
   return out;
@@ -236,18 +251,37 @@ function dedupe(list: string[]): string[] {
 /** The companions a module should be registered with, tune-specific first. */
 export function resolveCompanions(moduleName: string, listing: CompanionListing): CompanionResolution {
   const module = splitName(moduleName);
+  const sources: Record<string, string> = {};
   const own = dedupe([
     ...sharedStem(module, moduleName, listing.siblings),
     ...suffixed(moduleName, listing.siblings),
     ...specialCases(moduleName, listing.siblings),
-    ...subdirectories(moduleName, listing),
+    ...subdirectories(moduleName, listing, sources),
   ]);
   const bank = sharedBank(module, moduleName, listing.siblings, own.length > 0);
-  const companions = bank ? [...own, bank] : own;
-  return {
-    companions: companions.slice(0, MAX_COMPANIONS),
-    usedSharedBank: bank !== null,
-  };
+  const companions = (bank ? [...own, bank] : own).slice(0, MAX_COMPANIONS);
+  const kept = new Set(companions);
+  for (const key of Object.keys(sources)) if (!kept.has(key)) delete sources[key];
+  return { companions, sources, usedSharedBank: bank !== null };
+}
+
+/**
+ * Turn a flat list of paths relative to the module (what a folder drop or a
+ * recursive listing gives) into the listing the resolver reads: top-level
+ * names as siblings, one level of subdirectories by name.
+ */
+export function listingFromRelativePaths(relativePaths: string[]): CompanionListing {
+  const siblings: string[] = [];
+  const subdirs: Record<string, string[]> = {};
+  for (const rel of relativePaths) {
+    const slash = rel.indexOf('/');
+    if (slash < 0) { siblings.push(rel); continue; }
+    const dir = rel.slice(0, slash);
+    const rest = rel.slice(slash + 1);
+    if (rest.includes('/')) continue;   // deeper than one level: no shape lives there
+    (subdirs[dir] ??= []).push(rest);
+  }
+  return { siblings, subdirs };
 }
 
 /**

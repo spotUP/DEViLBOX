@@ -58,6 +58,8 @@ import { useGlobalPTT } from '@hooks/useGlobalPTT';
 import { GlobalDragDropHandler } from '@components/ui/GlobalDragDropHandler';
 import { notify } from '@stores/useNotificationStore';
 import { loadFile } from '@lib/file/UnifiedFileLoader';
+import { pickCompanionsFromDrop } from '@lib/import/companionDrop';
+import { expectedCompanionNames } from '@lib/import/companionResolver';
 import { companionRelativeName } from '@lib/import/companionRelativeName';
 import { runPrefetchIfNeeded } from '@/lib/SamplePackPrefetcher';
 import { useCollaborationStore } from '@stores/useCollaborationStore';
@@ -180,6 +182,19 @@ function ModlandContributionWrapper() {
       hash={hash}
     />
   );
+}
+
+/**
+ * A lone dropped file has no siblings to look for. When its NAME says the
+ * format keeps its samples in a second file, the failure names that file
+ * instead of reading as "this format does not work" — "only TFMX loads, and
+ * only when both files are dropped by hand" (2026-09-22).
+ */
+function withCompanionHint(file: File, companionFiles: Map<string, ArrayBuffer> | undefined, message: string): string {
+  if (companionFiles && companionFiles.size > 0) return message;
+  const expected = expectedCompanionNames(file.name);
+  if (expected.length === 0) return message;
+  return `${message}\n\nThis format keeps its samples in a second file. Drop it together with the module: ${expected.join(' or ')}`;
 }
 
 function App() {
@@ -849,18 +864,21 @@ function App() {
       } else if (result.success === true) {
         notify.success(result.message);
       } else if (result.success === false) {
-        void showAlert({ title: 'Load Failed', message: result.error || `Could not load ${file.name}` });
+        void showAlert({ title: 'Load Failed', message: withCompanionHint(file, companionFiles, result.error || `Could not load ${file.name}`) });
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       console.error('[App.handleFileDrop] load threw:', err);
-      void showAlert({ title: 'Load Failed', message: `${file.name}: ${msg}` });
+      void showAlert({ title: 'Load Failed', message: withCompanionHint(file, companionFiles, `${file.name}: ${msg}`) });
     }
   }, []);
 
-  // Folder/multi-file drop handler — stores companions then delegates to handleFileDrop
+  // Folder/multi-file drop handler — picks the module's companions from the
+  // dropped files (the same resolver the MCP server and the file browser
+  // use), stores them, then delegates to handleFileDrop.
   const handleFolderDrop = useCallback(async (mainFile: File, companions: File[]) => {
-    useUIStore.getState().setPendingCompanionFiles(companions);
+    const picked = pickCompanionsFromDrop(mainFile, companions);
+    useUIStore.getState().setPendingCompanionFiles(picked.files.map(p => p.file));
     await handleFileDrop(mainFile);
   }, [handleFileDrop]);
 
