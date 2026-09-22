@@ -37,7 +37,7 @@ describe('lowBandGainsFor', () => {
 
   it('leaves room for the high band on the same peak at the top', () => {
     expect(LOW_CEILING_AT_TOP).toBeLessThan(0.9);   // the master clipper's knee
-    expect(LOW_CEILING_AT_TOP).toBeGreaterThan(0.4); // still heavy
+    expect(LOW_CEILING_AT_TOP).toBeGreaterThanOrEqual(0.5); // still heavy
   });
 
   it('gets heavier the whole way up — output at a real bass level never falls', () => {

@@ -20,8 +20,13 @@
 
 import { stepRider, type RiderConfig, type RiderState } from './gainRider';
 
-/** Peak the clipper input is held to. The clipper's knee is at 0.9; this is 1 dB under it. */
-export const CLIP_TARGET_PEAK = 0.8;
+/**
+ * Peak the clipper input is held to — just under the clipper's 0.9 knee.
+ * It was 0.8, a dB of margin the low band's own ceiling now provides: with
+ * the saturator bounding the low band, a 0.8 target made the ride spend the
+ * lift on ordinary coincident hits (measured +2.5 of 12 dB, 2026-09-22).
+ */
+export const CLIP_TARGET_PEAK = 0.88;
 
 /** Ticks are `TRIM_WATCH_MS` (250 ms) apart: settles in about a second, holds two, creeps at 0.6 dB/s. */
 export const TRIM_RIDE: RiderConfig = { attackFraction: 0.5, holdTicks: 8, releaseDb: 0.15, maxDb: 12 };
