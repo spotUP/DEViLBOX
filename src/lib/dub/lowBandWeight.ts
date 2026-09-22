@@ -48,7 +48,7 @@ const BASS_RANGE_DB = 12;
  * (2026-09-22, BASS +12 with AutoDub). A dub desk lifts the bass and cuts
  * the low mids together; that is what "heavy but clean" is.
  */
-export const LOW_MID_DIP_MAX_DB = -4.5;
+export const LOW_MID_DIP_MAX_DB = -3;   // -4.5 hollowed the mids under a full boost ("kills all other audio")
 
 /** dB of low-mid cut for a BASS setting. Zero at or below rest. */
 export function lowMidDipDbFor(bassShelfGainDb: number): number {
