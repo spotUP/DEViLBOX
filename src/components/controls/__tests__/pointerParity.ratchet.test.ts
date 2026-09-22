@@ -14,34 +14,19 @@ import { join, relative, sep } from 'node:path';
  * `onPointerDown`/`Move`/`Up`/`Cancel`, `setPointerCapture`, and
  * `touchAction: 'none'`.
  *
- * This is a RATCHET, not a gate. The allowlist below is the set of files that
- * still listen for the mouse alone; it may only ever shrink. Converting a file
- * means deleting its line here. Adding a line is not allowed — a new drag
- * surface is written on the pointer shape from the start.
+ * This is a RATCHET. The allowlist below is the set of files that still listen
+ * for the mouse alone; it may only ever shrink. It started at 43 files and is
+ * now empty, so the ratchet is fully closed: any file that reintroduces a
+ * mouse-only drag surface fails here.
  */
 
 const ROOT = process.cwd();
 
-/**
- * Files that still have no pointer or touch path. Ordered by user-visible
- * value, which is the order Phase 2 works through them.
- */
+/** Files that still have no pointer or touch path. */
 const MOUSE_ONLY_ALLOWLIST: readonly string[] = [
-  // Hardware UIs (R2-5)
-  'src/components/effects/hardware/AelapseHardwareUI.tsx',
-  'src/components/instruments/hardware/AmsynthHardwareUI.tsx',
-  'src/components/instruments/hardware/DexedHardwareUI.tsx',
-  'src/components/instruments/hardware/FT2Hardware.tsx',
-  'src/components/instruments/hardware/FalconHardware.tsx',
-  'src/components/instruments/hardware/HelmHardwareUI.tsx',
-  'src/components/instruments/hardware/MoniqueHardwareUI.tsx',
-  'src/components/instruments/hardware/OBXfHardwareUI.tsx',
-  'src/components/instruments/hardware/Odin2HardwareUI.tsx',
-  'src/components/instruments/hardware/OidosHardware.tsx',
-  'src/components/instruments/hardware/PT2Hardware.tsx',
-  'src/components/instruments/hardware/SlaughterHardware.tsx',
-  'src/components/instruments/hardware/SurgeHardwareUI.tsx',
-  'src/components/instruments/hardware/TunefishHardware.tsx',
+  // Empty. Phase 2 converted all 43 files that were on it. A new entry here
+  // means a drag surface shipped without a touch path — write it on the
+  // pointer shape instead.
 ];
 
 function collectSourceFiles(dir: string, out: string[] = []): string[] {

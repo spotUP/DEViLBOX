@@ -322,18 +322,18 @@ export const AelapseHardwareUI: React.FC<AelapseHardwareUIProps> = ({
         const blitter = new GPUBlitter(jcanvas, w, h);
 
         // Mouse event forwarding.
-        const onMouseDown = (e: MouseEvent) => {
+        const onPointerDown = (e: PointerEvent) => {
           e.preventDefault();
           e.stopPropagation();
           jcanvas.focus();
           const [cx, cy] = canvasCoords(jcanvas, e);
           m._aelapse_ui_on_mouse_down(cx, cy, getModifiers(e));
         };
-        const onMouseUp = (e: MouseEvent) => {
+        const onPointerUp = (e: PointerEvent) => {
           const [cx, cy] = canvasCoords(jcanvas, e);
           m._aelapse_ui_on_mouse_up(cx, cy, getModifiers(e));
         };
-        const onMouseMove = (e: MouseEvent) => {
+        const onPointerMove = (e: PointerEvent) => {
           const isDown = (e.buttons & 1) !== 0;
           if (isDown) {
             e.preventDefault();
@@ -347,15 +347,17 @@ export const AelapseHardwareUI: React.FC<AelapseHardwareUIProps> = ({
           m._aelapse_ui_on_mouse_wheel(cx, cy, e.deltaX, e.deltaY);
         };
 
-        jcanvas.addEventListener('mousedown', onMouseDown);
-        document.addEventListener('mouseup', onMouseUp);
-        document.addEventListener('mousemove', onMouseMove);
+        jcanvas.addEventListener('pointerdown', onPointerDown);
+        document.addEventListener('pointerup', onPointerUp);
+        document.addEventListener('pointercancel', onPointerUp);
+        document.addEventListener('pointermove', onPointerMove);
         jcanvas.addEventListener('wheel', onWheel, { passive: false });
 
         eventCleanups.push(
-          () => jcanvas.removeEventListener('mousedown', onMouseDown),
-          () => document.removeEventListener('mouseup', onMouseUp),
-          () => document.removeEventListener('mousemove', onMouseMove),
+          () => jcanvas.removeEventListener('pointerdown', onPointerDown),
+          () => document.removeEventListener('pointerup', onPointerUp),
+          () => document.removeEventListener('pointercancel', onPointerUp),
+          () => document.removeEventListener('pointermove', onPointerMove),
           () => jcanvas.removeEventListener('wheel', onWheel),
         );
 
