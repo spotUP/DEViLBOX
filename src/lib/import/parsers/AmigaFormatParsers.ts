@@ -2160,6 +2160,13 @@ export async function tryRouteFormat(
   // Two-file format: .adsc (MOD) + .adsc.nt or .mod.nt companion file.
   // The companion NT file is searched in companionFiles map by filename heuristics.
   if (matchesExt(filename, ['adsc', 'mod_adsc4'])) {
+    // Audio Sculpture shares the extension and plays on UADE with its `.as`
+    // beside it — see adscRoute.ts. Route by the companion the module came with.
+    const { adscRouteFor } = await import('@lib/import/adscRoute');
+    if (adscRouteFor(companionFiles?.keys() ?? []) === 'uade') {
+      const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
+      return await parseUADEFile(buffer, originalFileName, prefs.uade ?? 'enhanced', subsong, preScannedMeta, companionFiles);
+    }
     const { parseStartrekkerAMFile } = await import('@lib/import/formats/StartrekkerAMParser');
 
     // Look for companion NT file in companionFiles map
