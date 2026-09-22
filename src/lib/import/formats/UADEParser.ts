@@ -15,6 +15,7 @@ import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { InstrumentConfig, UADEConfig } from '@/types/instrument';
 import type { Pattern, ChannelData, TrackerCell } from '@/types';
 import type { UADEEnhancedScanRow, UADEMetadata } from '@/engine/uade/UADEEngine';
+import { enhancedSamplesAreUnusable } from '@lib/import/uadeScanQuality';
 import { createSamplerInstrument } from './AmigaUtils';
 
 // Amiga C-3 reference sample rate (PAL: 3546895 / 428 ≈ 8287 Hz; industry standard 8363 Hz)
@@ -1295,6 +1296,24 @@ export async function parseUADEFile(
   }
   // Note: .fc files with FC13/FC14/SMOD magic are routed to parseFCFile via NATIVE_ROUTES above.
   // FC 2.0 (real PCM samples) does not carry those magic bytes and falls through to enhanced scan.
+
+  // A scan that recovered no usable waveform must not become a playable grid.
+  // Every "sample" it extracted being a constant means it read memory that was
+  // not the sample — the grid then fires a full-scale DC step per row and the
+  // tune is nothing but clicks (SynthDream sdr.nobuddiesland end 2, all four
+  // samples the byte 0x7F: "it does produce audio but only clicks",
+  // 2026-09-22). Classic keeps the grid for display and lets UADE render.
+  if (mode === 'enhanced' && activeEnhancedScan
+      && enhancedSamplesAreUnusable(activeEnhancedScan.samples as Record<number, { pcm?: Uint8Array | ArrayBuffer | null }>)) {
+    console.log(`[UADEParser] enhanced scan recovered no usable samples for ${filename}; forcing classic UADESynth streaming`);
+    const classicSong = buildClassicSong(songName, ext, filename, buffer, metadata, activeScanRows, periodToNoteIndex);
+    classicSong.uadeEditableFileData ??= buffer.slice(0) as ArrayBuffer;
+    classicSong.uadeEditableFileName ??= filename;
+    if (companionFiles && companionFiles.size > 0) {
+      (classicSong as any).uadeCompanionFiles = companionFiles;
+    }
+    return injectSubsongs(await reconstructClassicPatterns(classicSong, engine, basename, metadata.shortScanTicks));
+  }
 
   // If enhanced scan data is available AND mode is 'enhanced', build editable song
   if (mode === 'enhanced' && activeEnhancedScan) {
