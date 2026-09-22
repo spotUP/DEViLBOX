@@ -27,6 +27,34 @@ import type { DubLane } from '@/types/dub';
  */
 const UNBOUNDED_HOLD_MS = 4000;
 
+/**
+ * Is a live performer already driving the bus?
+ *
+ * A dub lane is a RECORDING; AutoDub is a performer improvising now. They are
+ * two performers on one bus, and nothing stopped them both running. Measured
+ * 2026-09-22 on jennipha.ahx, which carries a saved lane: every move fired
+ * twice, once `source=live origin=ai` and again `source=lane origin=lane` —
+ * delayTimeThrow, combSweep, eqSweep, echoThrow and reverseEcho all doubled.
+ * That is the "one big reverb wash", and it is also why switching persona
+ * appeared to change nothing: the lane kept replaying the old performance
+ * whatever the new persona decided.
+ *
+ * Enabling AutoDub is the user asking for a performance NOW, so the live
+ * performer wins and the recording stands down. Turning AutoDub off hands the
+ * lane back. Read through a late import so this module stays a leaf — the
+ * store pulls the whole dub engine behind it.
+ */
+function liveDubPerformerActive(): boolean {
+  try {
+    const store = (globalThis as {
+      __devilboxDubStore?: { getState: () => { autoDubEnabled?: boolean } };
+    }).__devilboxDubStore;
+    return store?.getState().autoDubEnabled === true;
+  } catch {
+    return false;
+  }
+}
+
 export class DubLanePlayer {
   private cursor = 0;
   private prevRow = -1;
@@ -61,6 +89,9 @@ export class DubLanePlayer {
     const lane = this.lane;
     if (!lane || !lane.enabled) return;
     if (lane.kind === 'time') return;
+    // A recording does not play over a live performer. Holds already in flight
+    // are released rather than stranded.
+    if (liveDubPerformerActive()) { this.releaseAllHolds(); return; }
 
     // Backwards jump (seek or loop restart) — reset all holds and binary-
     // search the cursor to the new position.
@@ -91,6 +122,8 @@ export class DubLanePlayer {
     const lane = this.lane;
     if (!lane || !lane.enabled) return;
     if (lane.kind !== 'time') return;
+    // Same rule as `onTick`: a recording stands down for a live performer.
+    if (liveDubPerformerActive()) { this.releaseAllHolds(); return; }
 
     // Backwards jump — song restarted or user seeked.
     if (currentTimeSec < this.prevTimeSec) {

@@ -199,3 +199,14 @@ export function scheduleDubStoreSync(fn: () => void): void {
  * `lib/dev/keepAcrossHmr.ts`.
  */
 keepAcrossHmr(import.meta.hot, useDubStore, 'dub');
+
+/**
+ * Published for modules that must not import this store.
+ *
+ * `DubLanePlayer` has to know whether a live performer is running before it
+ * replays a recording, and it is a leaf on the dub engine's module graph — a
+ * static import of this store would pull the whole engine behind it. The
+ * global is read through an optional access with a try/catch, so a consumer
+ * that loads before this module simply sees no live performer.
+ */
+(globalThis as { __devilboxDubStore?: unknown }).__devilboxDubStore = useDubStore;
