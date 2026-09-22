@@ -74,7 +74,8 @@ describe('the full-mix HPF', () => {
     }
   });
 
-  it('keeps the shelf downstream of the HPF, so a sweep still removes the boost', () => {
-    expect(source).toContain('this.masterHpf.connect(this.masterBassShelf);');
+  it('keeps the bass crossover downstream of the HPF, so a sweep still removes the boost', () => {
+    expect(source).toContain('this.masterHpf.connect(this.xoLowA);');
+    expect(source).toContain('this.masterHpf.connect(this.xoHighA);');
   });
 });
