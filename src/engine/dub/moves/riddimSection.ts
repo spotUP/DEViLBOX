@@ -28,6 +28,7 @@ import { classifySongRoles } from '@/bridge/analysis/ChannelNaming';
 import { fire } from '../DubRouter';
 import type { InstrumentConfig } from '@/types/instrument';
 import type { ChannelRole } from '@/bridge/analysis/MusicAnalysis';
+import { riddimChannelToKeep, medianNoteOf, type RiddimChannelPitch } from '@/lib/dub/riddimKeep';
 
 const MELODIC_ROLES = new Set<ChannelRole>(['lead', 'chord', 'arpeggio', 'pad', 'skank']);
 const SKANK_ROLES = new Set<ChannelRole>(['chord', 'skank']);
@@ -58,11 +59,41 @@ export const riddimSection: DubMove = {
     const muted: number[] = [];
     let skankIdx: number | null = null;
 
+    // Work out the mute candidates first, so the bass can be spared before a
+    // single channel is touched.
+    const candidateRoles: ChannelRole[] = [];
+    const candidates: RiddimChannelPitch[] = [];
+    let bassSurvives = false;
+    for (let i = 0; i < channels.length; i++) {
+      const ch = channels[i];
+      if (!ch) { candidateRoles[i] = 'empty'; continue; }
+      const role: ChannelRole = (ch.dubRole as ChannelRole | null) ?? roles[i] ?? 'empty';
+      candidateRoles[i] = role;
+      if (role === 'bass') { bassSurvives = true; continue; }
+      if (!MELODIC_ROLES.has(role)) continue;
+      // Median register of everything this channel plays across the song.
+      const notes: number[] = [];
+      for (const pattern of patterns) {
+        const rows = pattern?.channels?.[i]?.rows;
+        if (!rows) continue;
+        for (const row of rows) if (row?.note) notes.push(row.note);
+      }
+      candidates.push({ channelIndex: i, medianNote: medianNoteOf(notes) });
+    }
+
+    // A riddim is drums AND bass. When role detection found no bass anywhere —
+    // measured on `world class dub.mod`, which reads pad/percussion/pad/
+    // percussion while channel 0 IS the bassline — spare the lowest-register
+    // candidate rather than muting the bottom out of the song. Reported as
+    // "i only heard drums no bass".
+    const keepIndex = riddimChannelToKeep(candidates, bassSurvives);
+
     for (let i = 0; i < channels.length; i++) {
       const ch = channels[i];
       if (!ch) continue;
-      const effectiveRole: ChannelRole = (ch.dubRole as ChannelRole | null) ?? roles[i] ?? 'empty';
+      const effectiveRole: ChannelRole = candidateRoles[i] ?? 'empty';
       if (!MELODIC_ROLES.has(effectiveRole)) continue;
+      if (i === keepIndex) continue;
       // Borrowed, not set: the release hands the channel back to the user's
       // own mute state, and nested moves each close their own transient.
       beginDubTransient(i);
