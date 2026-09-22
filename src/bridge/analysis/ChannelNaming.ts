@@ -129,7 +129,20 @@ export function classifyInstrument(inst: InstrumentConfig | null | undefined): I
 
   // 3. Sample filename (if sample-based instrument with a real URL).
   const sampleUrl = inst.sample?.url;
-  if (sampleUrl && typeof sampleUrl === 'string' && sampleUrl.length > 0) {
+  // Only ask the FILENAME categoriser about something that is a filename.
+  //
+  // `categorizeSample` matches substrings, including two-letter ones like `bd`
+  // and `sd`. A `data:audio/wav;base64,...` URL is a few thousand characters of
+  // base64, which contains essentially every short substring by chance — so
+  // every sample matched `kicks` and returned percussion at 0.8, outranking the
+  // spectral analysis one step below that had actually listened to the audio.
+  //
+  // Measured 2026-09-22 on `a sleep so deep.mod`: all eleven instruments came
+  // back `percussion/kick@0.8` while the spectrum said bass, lead, snare and
+  // empty. Every channel of every MOD, XM, IT and S3M song classified as
+  // percussion because of it.
+  const isDataUrl = typeof sampleUrl === 'string' && sampleUrl.startsWith('data:');
+  if (sampleUrl && typeof sampleUrl === 'string' && sampleUrl.length > 0 && !isDataUrl) {
     const cat = categorizeSample(sampleUrl);
     const mapped = SAMPLE_CATEGORY_MAP[cat];
     if (mapped) {
