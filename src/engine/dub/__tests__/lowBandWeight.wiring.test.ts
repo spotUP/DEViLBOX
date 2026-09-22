@@ -133,7 +133,10 @@ describe('the dub return skips the low-end stages', () => {
   it('joins the insert at the clipper — past shelf, punch and band — while spliced', () => {
     const join = methodBody('private _joinReturnAtInsert(');
     expect(join).toContain('this.returnSum.disconnect(this.master)');
-    expect(join).toContain('this.returnSum.connect(this.masterSafetyClip)');
+    // Through the return's own copy of the trim, so it is paid for like the dry.
+    expect(join).toContain('this.returnSum.connect(this.returnTrim)');
+    expect(source).toContain('this.returnTrim.connect(this.masterSafetyClip);');
+    expect(methodBody('private _applyMasterTrim(')).toContain('this._settle(this.returnTrim.gain, trim, now, 0.02);');
     // The clipper sits after the band sum and before the scoop/width stages,
     // so the return still gets the clipper, the scoop and the width.
     expect(source).toContain('this.lowBandGain.connect(this.masterBassPunch);');
@@ -148,7 +151,7 @@ describe('the dub return skips the low-end stages', () => {
     const restore = methodBody('private _restoreMasterInsertPassthrough(');
     expect(restore).toContain('this._joinReturnAtMaster();');
     const back = methodBody('private _joinReturnAtMaster(');
-    expect(back).toContain('this.returnSum.disconnect(this.masterSafetyClip)');
+    expect(back).toContain('this.returnSum.disconnect(this.returnTrim)');
     expect(back).toContain('this.returnSum.connect(this.master)');
   });
 });

@@ -83,7 +83,7 @@ describe('master insert gain staging', () => {
     // Written through `_settle`, which cancels pending events and pins the
     // current value before ramping — a bare setTargetAtTime here collided with
     // ramps a held move had already scheduled on the same param.
-    expect(bus).toContain('this._settle(this.masterToneTrim.gain, Math.pow(10, trimDb / 20), now, 0.02);');
+    expect(bus).toContain('this._settle(this.masterToneTrim.gain, trim, now, 0.02);');
   });
 
   it('puts the trim ahead of the boosting stages, not after them', () => {

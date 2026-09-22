@@ -1495,6 +1495,13 @@ export class DubBus {
    * and the weight band; otherwise it goes to the master as before.
    */
   private returnSum!: GainNode;
+  /**
+   * The return's copy of `masterToneTrim`. The return joins past the trim, so
+   * it was never paid for: on a loud AutoDub passage it read 0.152 RMS
+   * against 0.073 for the programme, and the clipper took the sum —
+   * "clips/dists" (2026-09-22). Same value, written from the same place.
+   */
+  private returnTrim!: GainNode;
   private _returnJoinedAtInsert = false;
   private masterMidScoop!: BiquadFilterNode;
   /**
@@ -2517,6 +2524,9 @@ export class DubBus {
     this.return_.connect(this.clubDry);
     this.returnSum = this.context.createGain();
     this.returnSum.gain.value = 1;
+    this.returnTrim = this.context.createGain();
+    this.returnTrim.gain.value = 1;
+    this.returnTrim.connect(this.masterSafetyClip);
     this.clubDry.connect(this.returnSum);
     this.clubWet.connect(this.returnSum);
     this.returnSum.connect(this.master);
@@ -3818,6 +3828,8 @@ export class DubBus {
       ['insertIn', this.masterToneTrim],
       ['afterShelf', this.masterBassShelf],
       ['lowBand', this.lowBandGain],
+      ['preClip', this.masterLowMidDip],
+      ['returnAtClip', this.returnTrim],
       ['afterClip', this.masterSafetyClip],
       ['afterWidth', this.masterMerge],
       ['insertOut', this.masterInsertEnvelope],
@@ -4726,13 +4738,13 @@ export class DubBus {
   private _joinReturnAtInsert(): void {
     if (this._returnJoinedAtInsert) return;
     try { this.returnSum.disconnect(this.master); } catch { /* ok */ }
-    try { this.returnSum.connect(this.masterSafetyClip); } catch { /* ok */ }
+    try { this.returnSum.connect(this.returnTrim); } catch { /* ok */ }
     this._returnJoinedAtInsert = true;
   }
 
   private _joinReturnAtMaster(): void {
     if (!this._returnJoinedAtInsert) return;
-    try { this.returnSum.disconnect(this.masterSafetyClip); } catch { /* ok */ }
+    try { this.returnSum.disconnect(this.returnTrim); } catch { /* ok */ }
     try { this.returnSum.connect(this.master); } catch { /* ok */ }
     this._returnJoinedAtInsert = false;
   }
@@ -4970,7 +4982,9 @@ export class DubBus {
     const safeBassGain = Math.max(-12, Math.min(12, m.bassShelfGainDb));
     const { costDb } = this._resolveMasterLowEnd(safeBassGain, m);
     const trimDb = masterActive ? shelfTrimDb(costDb, this._programmeBeforeInsert()) : 0;
-    this._settle(this.masterToneTrim.gain, Math.pow(10, trimDb / 20), now, 0.02);
+    const trim = Math.pow(10, trimDb / 20);
+    this._settle(this.masterToneTrim.gain, trim, now, 0.02);
+    this._settle(this.returnTrim.gain, trim, now, 0.02);
   }
 
   /**
@@ -5117,6 +5131,7 @@ export class DubBus {
     this._settle(this.lowBandGain.gain, 0, now, 0.02);
     rampBiquadParam(this.masterLowMidDip.gain, 0, now);
     this.masterToneTrim.gain.setTargetAtTime(1, now, 0.02);
+    this.returnTrim.gain.setTargetAtTime(1, now, 0.02);
     rampBiquadParam(this.masterMidScoop.gain, 0, now);
     try {
       this.masterMid.gain.setTargetAtTime(1, now, 0.02);

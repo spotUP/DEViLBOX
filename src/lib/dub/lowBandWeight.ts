@@ -24,14 +24,19 @@ export interface LowBandWeight {
   gain: number;
 }
 
-/** Drive at the top of the control. 6× into tanh(4x) is dense but not fizz. */
-export const LOW_BAND_MAX_DRIVE = 6;
+/**
+ * Drive at the top of the control, into tanh(4x). 6 was a square wave: on a
+ * sine-heavy AHX bass the band read 0.102 RMS against 0.114 for the whole
+ * shelved dry path, and that is fuzz, not weight — "clips/dists"
+ * (2026-09-22). 3 keeps the 2nd and 3rd harmonics and loses the buzz.
+ */
+export const LOW_BAND_MAX_DRIVE = 3;
 /**
  * Band level at the top of the control. The curve is normalised to ±1, so this
- * bounds what the band can add to a peak: half scale, under the dry path's
- * own boost, never enough on its own to reach the clipper.
+ * bounds what the band can add to a peak. Weight sits UNDER the dry low end,
+ * about 8 dB below it at the top; it is felt, not heard as a second bass.
  */
-export const LOW_BAND_MAX_GAIN = 0.35;
+export const LOW_BAND_MAX_GAIN = 0.15;
 /** The BASS control's boost range; the band only answers to boosts. */
 const BASS_RANGE_DB = 12;
 
