@@ -28,7 +28,10 @@
  */
 
 import type { Pattern } from '@typedefs/tracker';
+import type { InstrumentConfig } from '@typedefs/instrument';
 import { fingerprintSong, type PatternFingerprint } from './channelEvidence';
+import { classifyChannelWithInstruments } from './ChannelNaming';
+import type { ChannelRole, ChannelSongContext } from './MusicAnalysis';
 
 /** Why a segment began. Hard boundaries are structural and trusted at once. */
 export type SegmentBoundary =
@@ -63,6 +66,16 @@ export interface ChannelSegment {
   silent: boolean;
   boundary: SegmentBoundary;
   summary: SegmentSummary | null;
+  /**
+   * What this channel is during THIS stretch of the song.
+   *
+   * Voted across the segment's own patterns rather than the whole song, which
+   * is the entire point: a channel that plays bass for eight positions and a
+   * pad for three has two answers, and the song-wide vote can only report the
+   * winner. Null when no instrument lookup was supplied or the segment is
+   * silent.
+   */
+  role: ChannelRole | null;
 }
 
 /**
@@ -190,6 +203,7 @@ export function segmentChannel(
       silent: fps.every(f => f.silent),
       boundary,
       summary: summarise(fps),
+      role: null,
     });
     start = endIdx + 1;
     boundary = nextBoundary;
@@ -232,9 +246,33 @@ export function segmentChannel(
 }
 
 /** Segment every channel of a song. Index of the outer array is the channel. */
-export function buildChannelSegments(patterns: Pattern[], order: number[]): ChannelSegment[][] {
+export function buildChannelSegments(
+  patterns: Pattern[],
+  order: number[],
+  instruments?: Map<number, InstrumentConfig>,
+): ChannelSegment[][] {
   const song = fingerprintSong(patterns, order);
   const channelCount = patterns[0]?.channels?.length ?? 0;
+
+  // The song's register floor, so a segment role asks the same relative
+  // question `classifySongChannels` does rather than an absolute one.
+  const ctx: ChannelSongContext | undefined = (() => {
+    const medians: number[] = [];
+    for (let ch = 0; ch < channelCount; ch++) {
+      const notes: number[] = [];
+      for (const p of patterns) {
+        for (const cell of p.channels?.[ch]?.rows ?? []) {
+          if (cell && cell.note >= 1 && cell.note <= 96) notes.push(cell.note);
+        }
+      }
+      if (notes.length === 0) continue;
+      notes.sort((a, b) => a - b);
+      const mid = notes.length >> 1;
+      medians.push(notes.length % 2 ? notes[mid] : (notes[mid - 1] + notes[mid]) / 2);
+    }
+    return medians.length > 1 ? { songLowestMedian: Math.min(...medians) } : undefined;
+  })();
+
   const out: ChannelSegment[][] = [];
   for (let ch = 0; ch < channelCount; ch++) {
     const perOrder = song
@@ -244,9 +282,46 @@ export function buildChannelSegments(patterns: Pattern[], order: number[]): Chan
         fp: entry.channels.find(c => c.channelIndex === ch),
       }))
       .filter((e): e is { orderIndex: number; patternIndex: number; fp: PatternFingerprint } => !!e.fp);
-    out.push(segmentChannel(ch, perOrder));
+    const segments = segmentChannel(ch, perOrder);
+    if (instruments) {
+      for (const seg of segments) {
+        seg.role = seg.silent
+          ? null
+          : roleForSegment(ch, patterns, seg.patternIndices, instruments, ctx);
+      }
+    }
+    out.push(segments);
   }
   return out;
+}
+
+/**
+ * The role for one segment, voted across the patterns it actually spans.
+ *
+ * Uses the same classifier the rest of the system uses, so a segment role and a
+ * song role cannot disagree about method — only about scope.
+ */
+function roleForSegment(
+  channelIndex: number,
+  patterns: Pattern[],
+  patternIndices: number[],
+  instruments: Map<number, InstrumentConfig>,
+  ctx: ChannelSongContext | undefined,
+): ChannelRole | null {
+  const votes = new Map<ChannelRole, number>();
+  for (const pi of patternIndices) {
+    const ch = patterns[pi]?.channels?.[channelIndex];
+    if (!ch) continue;
+    const r = classifyChannelWithInstruments(ch, channelIndex, instruments, ctx).role;
+    if (r === 'empty') continue;
+    votes.set(r, (votes.get(r) ?? 0) + 1);
+  }
+  let best: ChannelRole | null = null;
+  let bestCount = 0;
+  for (const [role, count] of votes) {
+    if (count > bestCount) { bestCount = count; best = role; }
+  }
+  return best;
 }
 
 /** The segment covering an order position, or null when the channel has none. */
