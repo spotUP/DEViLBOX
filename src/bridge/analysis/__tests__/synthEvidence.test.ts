@@ -255,6 +255,21 @@ describe('the generic envelope path', () => {
     expect(classifyBySynthParams(t).role).toBe('percussion');
   });
 
+  it('refuses a sample-based instrument, whose envelope is the app default', () => {
+    // Measured on `a sleep so deep.mod`: all eleven instruments carry the same
+    // { attack: 10, decay: 500, sustain: 0, release: 100 } — the default
+    // applied at import, identical for a bass, a snare, a bell and a piano.
+    // Reading it would manufacture timbre evidence out of a constant, for the
+    // instruments that least need it: they have PCM, and SampleSpectrum
+    // measures what they actually sound like.
+    const sampleInst = {
+      id: 1, name: 'jstsnare1', type: 'sample', synthType: 'Sampler',
+      envelope: { attack: 10, decay: 500, sustain: 0, release: 100 },
+      sample: { url: 'data:audio/wav;base64,AAAA' },
+    } as unknown as InstrumentConfig;
+    expect(extractSynthTimbre(sampleInst)).toBeNull();
+  });
+
   it('returns nothing for an instrument with no parameters at all', () => {
     expect(extractSynthTimbre({ id: 1, name: 'x' } as unknown as InstrumentConfig)).toBeNull();
     expect(extractSynthTimbre(null)).toBeNull();
