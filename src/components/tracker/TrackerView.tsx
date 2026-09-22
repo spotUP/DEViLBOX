@@ -35,7 +35,11 @@ import { UndoHistoryPanel } from './UndoHistoryPanel';
 import { FT2Toolbar } from './FT2Toolbar';
 import { InstrumentKnobPanel } from './InstrumentKnobPanel';
 import { EditorControlsBar } from './EditorControlsBar';
-import { MobileTrackerView } from './MobileTrackerView';
+import { MobilePatternInput } from './mobile/MobilePatternInput';
+import { MobileTransportBar } from './mobile/MobileTransportBar';
+import { useMobileTrackerInput } from './mobile/useMobileTrackerInput';
+import { ResponsivePanel } from '@components/layout/responsive/ResponsivePanel';
+import { MobilePanelBar } from '@components/layout/responsive/MobilePanelBar';
 import { useResponsiveSafe } from '@/contexts/ResponsiveContext';
 import { useMIDIFeedback } from '@hooks/useMIDIFeedback';
 import { Music2, Activity, ExternalLink, Undo2, Maximize2, Minimize2 } from 'lucide-react';
@@ -105,6 +109,16 @@ const MinimapWrapper: React.FC = () => {
   );
 };
 
+/**
+ * Formats with their own editor view, which can be popped out and which does
+ * not take the phone channel window. One list, read by the render and by the
+ * phone input hook.
+ */
+const CUSTOM_FORMAT_EDITORS = [
+  'goattracker', 'hively', 'klystrack', 'jamcracker', 'sidfactory2',
+  'cheesecutter', 'musicline', 'furnace', 'tfmx', 'maxtrax', 'suntronic',
+] as const;
+
 /** Wrapper: renders PatternEditorCanvas (visual background now lives inside the grid) */
 const TrackerEditorWithBg: React.FC<{
   trackerVisualBg: boolean;
@@ -112,7 +126,10 @@ const TrackerEditorWithBg: React.FC<{
   onRandomize: (channelIndex: number) => void;
   onSwipeLeft: () => void;
   onSwipeRight: () => void;
-}> = ({ onAcidGenerator, onRandomize, onSwipeLeft, onSwipeRight }) => {
+  /** Phone only: one channel in portrait, four in landscape. */
+  visibleChannels?: number;
+  startChannel?: number;
+}> = ({ onAcidGenerator, onRandomize, onSwipeLeft, onSwipeRight, visibleChannels, startChannel }) => {
   return (
     <div className="relative flex-1 min-h-0">
       <PatternEditorCanvas
@@ -120,6 +137,8 @@ const TrackerEditorWithBg: React.FC<{
         onRandomize={onRandomize}
         onSwipeLeft={onSwipeLeft}
         onSwipeRight={onSwipeRight}
+        visibleChannels={visibleChannels}
+        startChannel={startChannel}
       />
     </div>
   );
@@ -128,11 +147,9 @@ const TrackerEditorWithBg: React.FC<{
 export const TrackerView: React.FC<TrackerViewProps> = ({
   onShowExport,
   onShowHelp,
-  onShowMasterFX,
   onShowInstruments,
   onShowImportModule,
   onShowDrumpads,
-  showMasterFX,
   showImportModule: externalShowImportModule,
 }) => {
   // D1 phone-layout signal (coarse pointer + small screen) plus `isWide`,
@@ -150,6 +167,13 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
     editorMode,
     blockOps,
   } = useTrackerView();
+
+  const isCustomFormatEditor = (CUSTOM_FORMAT_EDITORS as readonly string[]).includes(editorMode);
+
+  // Phone-only input surfaces: the three-state piano and the channel window.
+  // The hook runs on every screen — hooks cannot be conditional — but nothing
+  // it returns is rendered unless `isPhone`.
+  const mobileInput = useMobileTrackerInput(isCustomFormatEditor);
 
   // MPK Mini pad LED feedback + OLED display sync
   useMIDIFeedback();
@@ -402,125 +426,7 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
     setShowRandomize(true);
   }, []);
 
-  // Mobile view with tabbed interface
-  if (isPhone) {
-    return (
-      <>
-        <MobileTrackerView
-          onShowExport={onShowExport}
-          onShowHelp={onShowHelp}
-          onShowMasterFX={onShowMasterFX}
-          showMasterFX={showMasterFX}
-        />
-        {/* Dialogs still need to render */}
-        <InterpolateDialog isOpen={showInterpolate} onClose={() => setShowInterpolate(false)} />
-        <HumanizeDialog isOpen={showHumanize} onClose={() => setShowHumanize(false)} />
-        <FindReplaceDialog isOpen={showFindReplace} onClose={() => setShowFindReplace(false)} />
-        <KeyboardShortcutSheet isOpen={showShortcutSheet} onClose={() => setShowShortcutSheet(false)} />
-      <StrumDialog isOpen={showStrum} onClose={() => setShowStrum(false)} />
-      <NonEditableDialog />
-      <NewSongWizard />
-      <EffectPicker
-        isOpen={showEffectPicker}
-        onSelect={(effTyp, eff) => {
-          const { setCell } = useTrackerStore.getState();
-          const { cursor } = useCursorStore.getState();
-          setCell(cursor.channelIndex, cursor.rowIndex, { effTyp, eff });
-          setShowEffectPicker(false);
-        }}
-        onClose={() => setShowEffectPicker(false)}
-        synthType={(() => {
-          // Get synth type from current cell's instrument
-          const { cursor } = useCursorStore.getState();
-          const { patterns, currentPatternIndex } = useTrackerStore.getState();
-          const pattern = patterns[currentPatternIndex];
-          if (!pattern) return undefined;
-          const cell = pattern.channels[cursor.channelIndex]?.rows[cursor.rowIndex];
-          if (!cell?.instrument) return undefined;
-          const inst = useInstrumentStore.getState().getInstrument(cell.instrument);
-          return inst?.synthType;
-        })()}
-      />
-      <UndoHistoryPanel isOpen={showUndoHistory} onClose={() => setShowUndoHistory(false)} />
-        {/\.(fur|dmf)$/i.test(pendingModuleFile?.name ?? '') ? (
-          <ImportFurnaceDialog
-            isOpen={showImportModule}
-            onClose={() => { setShowImportModule(false); setPendingModuleFile(null); }}
-            onImport={handleModuleImport}
-            initialFile={pendingModuleFile}
-          />
-        ) : /\.(mid|midi)$/i.test(pendingModuleFile?.name ?? '') ? (
-          <ImportMIDIDialog
-            isOpen={showImportModule}
-            onClose={() => { setShowImportModule(false); setPendingModuleFile(null); }}
-            onImport={handleModuleImport}
-            initialFile={pendingModuleFile}
-          />
-        ) : (
-          <ImportModuleDialog
-            isOpen={showImportModule}
-            onClose={() => { setShowImportModule(false); setPendingModuleFile(null); useUIStore.getState().setPendingCompanionFiles([]); }}
-            onImport={handleModuleImport}
-            initialFile={pendingModuleFile}
-            companionFiles={pendingCompanionFiles}
-          />
-        )}
-        {/* Audio sample import dialog */}
-        <ImportAudioDialog
-          isOpen={!!pendingAudioFile}
-          onClose={() => setPendingAudioFile(null)}
-          initialFile={pendingAudioFile}
-        />
-        {/* SunVox patch/song import dialog */}
-        {pendingSunVoxFile && (
-          <SunVoxImportDialog
-            onClose={() => setPendingSunVoxFile(null)}
-            onImport={handleSunVoxImport}
-            initialFile={pendingSunVoxFile}
-          />
-        )}
-        {/* FT2 Dialogs */}
-        {showScaleVolume && (
-          <ScaleVolumeDialog
-            scope={volumeOpScope}
-            onConfirm={(factor) => {
-              scaleVolume(volumeOpScope, factor);
-              setShowScaleVolume(false);
-            }}
-            onCancel={() => setShowScaleVolume(false)}
-          />
-        )}
-        {showFadeVolume && (
-          <FadeVolumeDialog
-            scope={volumeOpScope}
-            onConfirm={(startVol, endVol) => {
-              fadeVolume(volumeOpScope, startVol, endVol);
-              setShowFadeVolume(false);
-            }}
-            onCancel={() => setShowFadeVolume(false)}
-          />
-        )}
-        {showRemapInstrument && (
-          <RemapInstrumentDialog
-            scope={remapOpScope}
-            onConfirm={(source, dest) => {
-              remapInstrument(source, dest, remapOpScope);
-              setShowRemapInstrument(false);
-            }}
-            onCancel={() => setShowRemapInstrument(false)}
-          />
-        )}
-        {showRandomize && (
-          <RandomizeDialog
-            channelIndex={randomizeChannel}
-            onClose={() => setShowRandomize(false)}
-          />
-        )}
-      </>
-    );
-  }
-
-  // GT Ultra DAW mode flag (gtViewMode hook is called above, before mobile early return)
+  // GT Ultra DAW mode flag
   const isGTDAWMode = editorMode === 'goattracker' && gtViewMode === 'daw';
 
   // Desktop view (GT Ultra DAW mode uses a simplified layout)
@@ -530,6 +436,20 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
     </div>
   ) : (
     <div className="flex-1 min-h-0 flex flex-col bg-dark-bg overflow-y-hidden">
+      {/* Phone: the combined header + transport bar, and one button per panel
+          that moved into a sheet. Both render nothing off a phone. */}
+      {isPhone && (
+        <MobileTransportBar
+          mobileChannel={mobileInput.mobileChannel}
+          onChannelPrev={mobileInput.handleChannelPrev}
+          onChannelNext={mobileInput.handleChannelNext}
+          maxChannels={mobileInput.maxChannels}
+          showChannelNav={mobileInput.showChannelNav}
+          formatLabel={isCustomFormatEditor ? editorMode : undefined}
+        />
+      )}
+      <MobilePanelBar />
+
       {/* FT2 Style Toolbar (hidden in editor fullscreen mode) */}
       {!editorFullscreen && (
         /* Sized by its content, never squeezed: the toolbar's rows WRAP at
@@ -538,41 +458,50 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
            the controls beneath — "one yellow and one red on top of each other",
            with the hover tooltip coming from the numeric input underneath
            (2026-09-22). */
-        <div className="flex-shrink-0">
-          <FT2Toolbar
-            onShowExport={onShowExport}
-            onShowHelp={onShowHelp}
-          />
-        </div>
+        <ResponsivePanel id="toolbar" title="Toolbar" phone="sheet" order={10}>
+          <div className="flex-shrink-0">
+            <FT2Toolbar
+              onShowExport={onShowExport}
+              onShowHelp={onShowHelp}
+            />
+          </div>
+        </ResponsivePanel>
       )}
 
       {/* Instrument Knob Panel (hidden in editor fullscreen mode) */}
       {!editorFullscreen && (
-        <div className="flex-shrink-0">
-          <InstrumentKnobPanel />
-        </div>
+        <ResponsivePanel id="instrument-knobs" title="Instrument" phone="sheet" order={20}>
+          <div className="flex-shrink-0">
+            <InstrumentKnobPanel />
+          </div>
+        </ResponsivePanel>
       )}
 
-      {/* Track Scopes Strip — per-channel mini oscilloscopes (hidden in fullscreen) */}
+      {/* Track Scopes Strip — per-channel mini oscilloscopes (hidden in fullscreen).
+          Decoration on a phone, and it costs a render loop per channel. */}
       {!editorFullscreen && viewMode === 'tracker' && (
-        <TrackScopesStrip />
+        <ResponsivePanel id="scopes" title="Scopes" phone="hide">
+          <TrackScopesStrip />
+        </ResponsivePanel>
       )}
 
       {/* Editor Controls Toolbar (hidden in fullscreen) */}
       {!editorFullscreen && (
-      <EditorControlsBar
-        viewMode={viewMode}
-        onViewModeChange={setViewMode}
-        gridChannelIndex={gridChannelIndex}
-        onGridChannelChange={setGridChannelIndex}
-        showAdvancedEdit={showAdvancedEdit}
-        onToggleAdvancedEdit={() => setShowAdvancedEdit(!showAdvancedEdit)}
-        onShowAutomation={() => setShowAutomation(true)}
-        onShowDrumpads={onShowDrumpads}
-        onShowCleanup={() => setShowCleanup(true)}
-        showFindReplace={showFindReplace}
-        onShowFindReplace={() => setShowFindReplace(v => !v)}
-      />
+      <ResponsivePanel id="editor-controls" title="Editor" phone="collapse">
+        <EditorControlsBar
+          viewMode={viewMode}
+          onViewModeChange={setViewMode}
+          gridChannelIndex={gridChannelIndex}
+          onGridChannelChange={setGridChannelIndex}
+          showAdvancedEdit={showAdvancedEdit}
+          onToggleAdvancedEdit={() => setShowAdvancedEdit(!showAdvancedEdit)}
+          onShowAutomation={() => setShowAutomation(true)}
+          onShowDrumpads={onShowDrumpads}
+          onShowCleanup={() => setShowCleanup(true)}
+          showFindReplace={showFindReplace}
+          onShowFindReplace={() => setShowFindReplace(v => !v)}
+        />
+      </ResponsivePanel>
       )}
 
       {/* Main Content Area with Pattern Editor and Instrument Panel - Flexbox Layout */}
@@ -580,7 +509,9 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
 
         {/* Pattern Order Sidebar - Renoise-style (tracker view only, hidden in fullscreen) */}
         {!editorFullscreen && viewMode === 'tracker' && (
-          <PatternOrderSidebar />
+          <ResponsivePanel id="pattern-order" title="Order" phone="sheet" order={30}>
+            <PatternOrderSidebar />
+          </ResponsivePanel>
         )}
 
         {/* Pattern Editor / Grid Sequencer - Flex item 1 */}
@@ -588,7 +519,7 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
           {viewMode === 'tracker' ? (
             (() => {
               // Determine if this is a custom format editor that can be popped out
-              const isCustomFormat = ['goattracker', 'hively', 'klystrack', 'jamcracker', 'sidfactory2', 'cheesecutter', 'musicline', 'furnace', 'tfmx', 'maxtrax', 'suntronic'].includes(editorMode);
+              const isCustomFormat = isCustomFormatEditor;
               const formatLabels: Record<string, string> = {
                 goattracker: 'GoatTracker', hively: 'AHX / Hively', klystrack: 'Klystrack',
                 jamcracker: 'JamCracker', sidfactory2: 'SID Factory II', cheesecutter: 'CheeseCutter', musicline: 'MusicLine', furnace: 'Furnace', tfmx: 'TFMX', maxtrax: 'MaxTrax', suntronic: 'SunTronic',
@@ -704,6 +635,8 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
                     onRandomize={handleRandomize}
                     onSwipeLeft={handleSwipeLeft}
                     onSwipeRight={handleSwipeRight}
+                    visibleChannels={isPhone ? mobileInput.visibleChannels : undefined}
+                    startChannel={isPhone ? mobileInput.startChannel : undefined}
                   />
                 )
               );
@@ -809,7 +742,9 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
 
           {/* Pattern Bottom Bar — edit step, octave, column toggles (tracker view only) */}
           {!editorFullscreen && viewMode === 'tracker' && (
-            <PatternBottomBar />
+            <ResponsivePanel id="pattern-options" title="Options" phone="sheet" order={40}>
+              <PatternBottomBar />
+            </ResponsivePanel>
           )}
 
           {/* Dub Deck Strip — tracker-mode performance surface for the
@@ -818,19 +753,29 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
               the strip collapses itself to a thin header by default
               (useDubStore.stripCollapsed). */}
           {viewMode === 'tracker' && (
-            <DubDeckStrip />
+            /* `keep`, not `sheet`: the strip owns the dub bus toggle and its
+               auto-fullscreen logic, and a sheet unmounts its content when it
+               closes. It already collapses itself to a thin header
+               (useDubStore.stripCollapsed), which is the phone shape. */
+            <ResponsivePanel id="dub-deck" title="Dub Deck" phone="keep">
+              <DubDeckStrip />
+            </ResponsivePanel>
           )}
 
         </div>
         {!editorFullscreen && viewMode === 'tracker' && (
-          <MinimapWrapper />
+          <ResponsivePanel id="minimap" title="Minimap" phone="hide">
+            <MinimapWrapper />
+          </ResponsivePanel>
         )}
 
         {/* DJ Pitch Slider - Flex item 3 (hidden in fullscreen) */}
         {!editorFullscreen && (
-          <div className="flex-shrink-0 self-stretch border-l border-ft2-border bg-ft2-header">
-            <DJPitchSlider className="h-full" />
-          </div>
+          <ResponsivePanel id="pitch" title="Pitch" phone="sheet" order={60}>
+            <div className="flex-shrink-0 self-stretch border-l border-ft2-border bg-ft2-header">
+              <DJPitchSlider className="h-full" />
+            </div>
+          </ResponsivePanel>
         )}
 
         {/* Instrument Panel Toggle Button - Flex item 3 */}
@@ -868,6 +813,23 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
           </div>
         )}
       </div>
+
+      {/* Phone: the piano / hex pad. Three states — full, compact, hidden —
+          and it hides itself during playback unless record mode is on. A
+          desktop has a keyboard, so this is additive, not a fork. */}
+      {isPhone && mobileInput.pianoState !== 'hidden' && (
+        <MobilePatternInput
+          onNoteInput={mobileInput.handleNoteInput}
+          onHexInput={mobileInput.handleHexInput}
+          onDelete={mobileInput.handleDelete}
+          onCopy={mobileInput.handleCopy}
+          onCut={mobileInput.handleCut}
+          onPaste={mobileInput.handlePaste}
+          onCollapseChange={mobileInput.handleCollapseChange}
+          compact={mobileInput.pianoState === 'compact'}
+          onExpandToggle={mobileInput.handlePianoExpand}
+        />
+      )}
 
       {/* Dialogs */}
       <InterpolateDialog isOpen={showInterpolate} onClose={() => setShowInterpolate(false)} />
