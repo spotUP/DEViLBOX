@@ -3061,6 +3061,13 @@ button[class*="rounded"] {
   .instrument-badge {
     display: none;
   }
+  /* The ROLE badge stays. It is the only one that says something about the
+   * MUSIC — kick, bass, pad — and it is the reason to look at this list while
+   * working on a dub. `Sampler` and `PCM` describe the file format and can
+   * wait for a wider panel. */
+  .instrument-badge--role {
+    display: block;
+  }
 }
 
 /* ── Instrument list: a list that is really a picture ─────────────────────────
@@ -3072,4 +3079,12 @@ button[class*="rounded"] {
  */
 .instrument-list--art .instrument-badge {
   display: none;
+}
+
+/* …except the role badge. The art rows share one width and scroll as a single
+ * image, so a small badge sits AFTER the drawing rather than inside it, and the
+ * picture survives. Without this a format whose names are all ASCII art — which
+ * is most AHX and HVL tunes — could never show what its channels play. */
+.instrument-list--art .instrument-badge--role {
+  display: block;
 }

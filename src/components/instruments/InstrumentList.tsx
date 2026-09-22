@@ -756,7 +756,7 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
                   }
 
                   return (
-                    <div className="instrument-badge relative shrink-0">
+                    <div className="instrument-badge instrument-badge--role relative shrink-0">
                       {badgeEl}
                       {open && (
                         <InstrumentTypePicker
