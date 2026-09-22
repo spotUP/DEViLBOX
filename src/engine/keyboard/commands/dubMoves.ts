@@ -127,6 +127,10 @@ export const dubVersionDrop:       MoveHandler = holdCommand('versionDrop',    '
 export function dubSkankEchoThrow():  boolean { return fireTrigger('skankEchoThrow',  'Skank Echo Throw'); }
 export function dubSkankFloatThrow(): boolean { return fireTrigger('skankFloatThrow', 'Skank Float Throw'); }
 export const dubRiddimSection:     MoveHandler = holdCommand('riddimSection',   'Riddim Section');
+// Channel-scoped: like `dubChannelMute`, this fires with no target from the
+// keyboard layer and the move refuses it. Reachable today through the router,
+// MIDI and the lane; a key binding needs a channel picker first.
+export const dubBassEmphasis:      MoveHandler = holdCommand('bassEmphasis',    'Bass Emphasis');
 
 // ── Panic — release everything ────────────────────────────────────────────
 export function dubPanicReleaseAll(): boolean {

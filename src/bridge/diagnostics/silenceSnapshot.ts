@@ -80,14 +80,21 @@ async function tick(): Promise<void> {
   } catch { return; }
 
   const { useTransportStore } = await import('../../stores/useTransportStore');
+  const { resolveTransportRow } = await import('../../lib/dub/transportRow');
   const transport = useTransportStore.getState();
+  // `currentGlobalRow` is pattern-granular: it only moves when the pattern
+  // does, so on its own it is stale by up to a whole pattern. This snapshot
+  // exists to say WHERE in the song the sound stopped, so a row that lags by
+  // 64 rows would misreport exactly the thing it is here to record.
+  const resolvedRow = resolveTransportRow(transport.currentGlobalRow, transport.currentRow)
+    ?? transport.currentGlobalRow;
   const playing = transport.isPlaying;
 
   push({
     t: now - armedAt,
     rms,
     row: transport.currentRow,
-    globalRow: transport.currentGlobalRow,
+    globalRow: resolvedRow,
     playing,
   });
 
@@ -106,7 +113,7 @@ async function tick(): Promise<void> {
     isoTime: new Date(now).toISOString(),
     silentForMs: now - silentSince,
     row: transport.currentRow,
-    globalRow: transport.currentGlobalRow,
+    globalRow: resolvedRow,
     graph: null,
     graphAfter: null,
     nativeRouting: null,

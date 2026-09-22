@@ -280,6 +280,9 @@ const DEFAULT_CC_MAPPINGS: CCMapping[] = [
   { ccNumber: 73, parameter: 'dub.skankEchoThrow',    min: 0, max: 1, curve: 'linear' },
   { ccNumber: 76, parameter: 'dub.riddimSection',     min: 0, max: 1, curve: 'linear' },
   { ccNumber: 77, parameter: 'dub.skankFloatThrow',   min: 0, max: 1, curve: 'linear' },
+  // 78 is undefined in the MIDI spec, so it collides with no standard
+  // controller. 64 and 65 were free too but are sustain and portamento.
+  { ccNumber: 78, parameter: 'dub.bassEmphasis',      min: 0, max: 1, curve: 'linear' },
 
   // Dub bus continuous params — min/max are documentary; the actual
   // normalisation is handled by DUB_BUS_PARAMS transforms in

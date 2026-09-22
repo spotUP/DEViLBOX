@@ -55,6 +55,7 @@ export const MOVE_COLOR: Record<string, string> = {
   skankEchoThrow:      'bg-accent-highlight/60',  // offbeat skank capture — highlight family, semi-transparent
   skankFloatThrow:     'bg-accent-highlight/40',  // 3:2 floating variant — same family, lighter
   riddimSection:       'bg-accent-error/70',      // bass+drums breakdown — dramatic drop, lighter than full versionDrop
+  bassEmphasis:        'bg-accent-secondary/60',  // sub / bass family — dry low-shelf lift
 };
 
 // Hold-kind moves have a meaningful durationRows. Keep in sync with the
@@ -69,4 +70,5 @@ export const HOLD_KINDS = new Set([
   'hpfRise', 'madProfPingPong', 'combSweep', 'tapeStop', 'transportTapeStop',
   'versionDrop',
   'riddimSection',
+  'bassEmphasis',
 ]);
