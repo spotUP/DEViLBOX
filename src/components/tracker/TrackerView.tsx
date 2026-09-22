@@ -532,7 +532,13 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
     <div className="flex-1 min-h-0 flex flex-col bg-dark-bg overflow-y-hidden">
       {/* FT2 Style Toolbar (hidden in editor fullscreen mode) */}
       {!editorFullscreen && (
-        <div className="flex-shrink min-h-[80px]">
+        /* Sized by its content, never squeezed: the toolbar's rows WRAP at
+           narrow widths (index.css mobile rules), and a shrinkable box with a
+           fixed minimum kept its 80 px while the wrapped rows painted on over
+           the controls beneath — "one yellow and one red on top of each other",
+           with the hover tooltip coming from the numeric input underneath
+           (2026-09-22). */
+        <div className="flex-shrink-0">
           <FT2Toolbar
             onShowExport={onShowExport}
             onShowHelp={onShowHelp}
