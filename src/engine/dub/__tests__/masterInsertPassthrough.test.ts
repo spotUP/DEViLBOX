@@ -60,10 +60,14 @@ describe('the direct master path is always restored', () => {
   it('records the splice at the moment the graph is cut over', () => {
     const body = methodBody('async wireMasterInsert(');
     expect(body).toContain('this.masterInsertSplice = { source, dest };');
-    // Recorded with the connect, not somewhere after the settings writes that
+    // Recorded with the connect, not somewhere after the tone writes that
     // follow it — a throw in between must still leave the graph recoverable.
     expect(body.indexOf('this.masterInsertSplice = { source, dest };'))
-      .toBeLessThan(body.indexOf('this.setSettings('));
+      .toBeLessThan(body.indexOf('this._applyMasterInsertTone('));
+    // And the re-derive must NOT go back through setSettings: that returns
+    // early when no value differs, so re-applying the stored settings after a
+    // graph change is a no-op. See _applyMasterInsertTone's docblock.
+    expect(body).not.toContain('this.setSettings(');
   });
 
   it('restores on the early return, before returning', () => {
