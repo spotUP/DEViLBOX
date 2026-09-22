@@ -685,10 +685,15 @@ export async function getDubBusState(): Promise<Record<string, unknown>> {
       masterMid: g(b.masterMid),
       masterSide: g(b.masterSide),
       masterInvertR: g(b.masterInvertR),
-      masterBassShelfDb: (b.masterBassShelf as { gain?: { value?: number } } | undefined)?.gain?.value ?? null,
-      masterLowBandGain: g(b.lowBandGain),
+      // The BASS control as it is actually applied: small-signal lift of the
+      // low band in dB, and the ceiling its peaks are bound to.
+      masterBassDb: (() => {
+        const d = g(b.lowDrive);
+        const c = g(b.lowOut);
+        return d != null && c != null && d * c > 0 ? 20 * Math.log10(d * c) : null;
+      })(),
+      masterLowCeiling: g(b.lowOut),
       returnBypassesLowEnd: (b as { returnBypassesLowEnd?: boolean }).returnBypassesLowEnd ?? null,
-      masterLowBandDrive: g(b.lowBandDrive),
       trimRideDb: (b as { trimRideDb?: number }).trimRideDb ?? null,
       returnGovernorDb: (b as { returnGovernorDb?: number }).returnGovernorDb ?? null,
       returnTrim: g(b.returnTrim),

@@ -3,12 +3,12 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 /**
- * The low-band weight stage is REACHED by the BASS control.
+ * The BASS crossover is REACHED by the BASS control.
  *
  * A DubBus cannot be constructed under happy-dom (no AudioWorklet registry),
- * so the graph is pinned at the source: the band is built, wired in parallel
- * to the shelf, summed before the punch, and driven from the same method that
- * writes the shelf. `lowBandWeight.test.ts` covers the mapping itself.
+ * so the graph is pinned at the source: the crossover is built, the low band
+ * lifted and saturated, the sum fed to the punch, and driven from the master
+ * tone method. `lowBandCrossover.test.ts` covers the mapping itself.
  */
 
 const source = readFileSync(join(process.cwd(), 'src/engine/dub/DubBus.ts'), 'utf-8');
@@ -22,69 +22,67 @@ function methodBody(signature: string): string {
   return source.slice(start, end);
 }
 
-describe('the low-band weight stage', () => {
-  it('branches off the same point as the shelf and sums before the punch', () => {
-    expect(source).toContain('this.masterHpf.connect(this.masterBassShelf);');
-    expect(source).toContain('this.masterHpf.connect(this.lowBandLp);');
-    expect(source).toContain('this.lowBandGain.connect(this.masterBassPunch);');
+describe('the BASS crossover', () => {
+  // Linear lift raised the low band's peaks by the dB it added; at a fixed
+  // ceiling only ~1.5 of 12 dB fit with the mids untouched (2026-09-22).
+  it('splits the master with an LR4 at the corner, both bands into one sum', () => {
+    expect(source).toContain('this.masterHpf.connect(this.xoLowA);');
+    expect(source).toContain('this.xoLowA.connect(this.xoLowB);');
+    expect(source).toContain('this.masterHpf.connect(this.xoHighA);');
+    expect(source).toContain('this.xoHighA.connect(this.xoHighB);');
+    expect(source).toContain('this.xoHighB.connect(this.lowSum);');
+    expect(source).toContain('this.lowOut.connect(this.lowSum);');
+    expect(source).toContain('f.Q.value = Math.SQRT1_2;');
   });
 
-  it('runs low-pass -> drive -> saturator -> compressor -> gain', () => {
-    const order = [
-      'this.lowBandLp.connect(this.lowBandDrive);',
-      'this.lowBandDrive.connect(this.lowBandSat);',
-      'this.lowBandSat.connect(this.lowBandComp);',
-      'this.lowBandComp.connect(this.lowBandGain);',
-    ];
-    let last = -1;
-    for (const edge of order) {
-      const i = source.indexOf(edge);
-      expect(i, edge).toBeGreaterThan(last);
-      last = i;
-    }
+  it('lifts and saturates the low band only: drive -> fixed curve -> ceiling', () => {
+    expect(source).toContain('this.xoLowB.connect(this.lowDrive);');
+    expect(source).toContain('this.lowDrive.connect(this.lowSat);');
+    expect(source).toContain('this.lowSat.connect(this.lowOut);');
+    expect(source).toContain('this.lowSat.curve = makeSoftClipCurve(8192, LOW_SAT_KNEE);');
   });
 
-  it('uses a 2nd-order low-pass, because the band is summed in parallel', () => {
-    // An LR4 is 180 degrees at the corner and cancels the band it adds.
-    expect(source).toContain('this.lowBandLp.Q.value = Math.SQRT1_2;');
+  it('feeds the sum into the punch, so the clipper sees the total', () => {
+    expect(source).toContain('this.lowSum.connect(this.masterBassPunch);');
+    expect(source).toContain('this.masterBassPunch.connect(this.masterLowMidDip);');
+    expect(source).toContain('this.masterLowMidDip.connect(this.masterSafetyClip);');
+    expect(source).toContain('this.masterSafetyClip.connect(this.masterMidScoop);');
   });
 
-  it('is driven from the master tone method, off the BASS control', () => {
+  it('is driven from the master tone method, off the ride-spent BASS', () => {
     const body = methodBody('private _applyMasterInsertTone(');
-    expect(body).toContain('this._resolveMasterLowEnd(safeBassGain, m)');
-    // Derived from the bass that fits, not the bass that was asked for —
-    // punch spent before bass, and the punch's headroom from the REQUESTED
-    // bass so a ridden shelf cannot hand it back.
+    expect(body).toContain('const { bassDb, punchDb } = this._resolveMasterLowEnd(safeBassGain, m);');
+    expect(body).toContain('const low = lowBandGainsFor(bassDb);');
+    expect(body).toContain('this.lowDrive.gain, masterActive ? low.drive : 1');
+    expect(body).toContain('this.lowOut.gain, masterActive ? low.ceiling : 1');
+    // Every crossover section follows the corner setting.
+    expect(body).toContain('for (const f of [this.xoLowA, this.xoLowB, this.xoHighA, this.xoHighB])');
+    // Punch spent before bass, ceiling from the REQUESTED bass.
     const resolve = methodBody('private _resolveMasterLowEnd(');
     expect(resolve).toContain('spendRide(safeBassGain, safeMasterPunch, this._trimRide.db)');
     expect(resolve).toContain('MASTER_LOW_CEILING_DB - Math.max(0, safeBassGain)');
-    expect(methodBody('private _resolveMasterLowEnd(')).toContain('lowBandWeightFor(bassDb)');
-    expect(body).toContain('this.lowBandDrive.gain, weight.drive');
-    expect(body).toContain("this.lowBandGain.gain, masterActive ? weight.gain : 0");
-    // Corner follows the shelf so both lift the same band.
-    expect(body).toContain('this.lowBandLp.frequency, m.bassShelfFreqHz');
+    expect(resolve).toContain('costDb: bassDb + punchDb');
   });
 
   it('dips the low mids as the low end goes up — heavy but clean', () => {
-    // "still pretty muddy" (2026-09-22): the shelf's transition band and the
-    // band's harmonics both land an octave above the corner.
     const body = methodBody('private _applyMasterInsertTone(');
     expect(body).toContain('this.masterLowMidDip.frequency, m.bassShelfFreqHz * 2');
     expect(body).toContain('this.masterLowMidDip.gain, masterActive ? lowMidDipDbFor(bassDb) : 0');
-    // After the band sum, before the clipper — and the return joins at the
-    // clipper, so echo tails keep their own EQ.
-    expect(source).toContain('this.masterBassPunch.connect(this.masterLowMidDip);');
   });
 
-  it('is silenced with the rest of the master tone when the insert comes out', () => {
+  it('goes transparent, not silent, when the insert comes out', () => {
     const i = source.indexOf('rampBiquadParam(this.masterBassPunch.gain, 0, now);');
     expect(i).toBeGreaterThan(-1);
-    expect(source.slice(i, i + 260)).toContain('this._settle(this.lowBandGain.gain, 0, now, 0.02);');
-    expect(source.slice(i, i + 260)).toContain('rampBiquadParam(this.masterLowMidDip.gain, 0, now);');
+    const around = source.slice(i - 200, i + 200);
+    expect(around).toContain('this._settle(this.lowDrive.gain, 1, now, 0.02);');
+    expect(around).toContain('this._settle(this.lowOut.gain, 1, now, 0.02);');
+    expect(around).toContain('rampBiquadParam(this.masterLowMidDip.gain, 0, now);');
   });
 
-  it('starts silent, so an unwired insert adds nothing', () => {
-    expect(source).toContain('this.lowBandGain.gain.value = 0;');
+  it('leaves no trace of the parallel band or the shelf', () => {
+    expect(source).not.toContain('lowBandGain.');
+    expect(source).not.toContain('this.masterBassShelf');
+    expect(source).not.toContain('lowBandWeightFor');
   });
 });
 
@@ -99,12 +97,6 @@ describe('the trim meters the programme before the insert', () => {
     const body = methodBody('private _applyMasterTrim(');
     expect(body).toContain('shelfTrimDb(costDb, this._programmeBeforeInsert())');
     expect(source).not.toContain('shelfTrimForProgramme(');
-  });
-
-  it('charges the band\'s peak as well as the two shelves', () => {
-    const body = methodBody('private _resolveMasterLowEnd(');
-    expect(body).toContain('20 * Math.log10(1 + weight.gain)');
-    expect(body).toContain('costDb: bassDb + punchDb + bandAddDb');
   });
 
   it('re-reads the trim while the insert is active, and stops when it is not', () => {
@@ -145,7 +137,7 @@ describe('the dub return skips the low-end stages', () => {
     expect(methodBody('private _applyMasterTrim(')).toContain('this._settle(this.returnTrim.gain, trim * Math.pow(10, this._returnGovernor.db / 20), now, TRIM_RAMP_SEC);');
     // The clipper sits after the band sum and before the scoop/width stages,
     // so the return still gets the clipper, the scoop and the width.
-    expect(source).toContain('this.lowBandGain.connect(this.masterBassPunch);');
+    expect(source).toContain('this.lowSum.connect(this.masterBassPunch);');
     expect(source).toContain('this.masterBassPunch.connect(this.masterLowMidDip);');
     expect(source).toContain('this.masterLowMidDip.connect(this.masterSafetyClip);');
     expect(source).toContain('this.masterSafetyClip.connect(this.masterMidScoop);');
@@ -222,7 +214,7 @@ describe('the ride spends the boost before it touches the mix', () => {
   // against +6 on the lows, from a ride spent on the trim alone.
   it('takes the shelf from spendRide, and gives the trim only the remainder', () => {
     const tone = methodBody('private _applyMasterInsertTone(');
-    expect(tone).toContain('this.masterBassShelf.gain, masterActive ? bassDb : 0');
+    expect(tone).toContain('this.lowDrive.gain, masterActive ? low.drive : 1');
     const trim = methodBody('private _applyMasterTrim(');
     expect(trim).toContain('const { costDb, rideRemainderDb } = this._resolveMasterLowEnd(safeBassGain, m);');
     expect(trim).not.toContain('+ this._trimRide.db');
