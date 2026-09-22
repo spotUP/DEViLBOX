@@ -232,6 +232,14 @@ export class LibopenmptEngine {
           this._playing = false;
         }
         break;
+      case 'playReady':
+        // The worklet has finished `play()` and the module exists. Its
+        // `play()` tears down every dub slot first, so this is the only
+        // moment at which restoring them is safe. Doing it on a timer raced
+        // the teardown and left the dub bus starved for the whole song —
+        // see the comment beside the postMessage in chiptune3.worklet.js.
+        this._rebuildIsolationAfterPlay();
+        break;
       case 'diagState': {
         const pending = this._diagStateWaiters;
         this._diagStateWaiters = [];
@@ -350,8 +358,13 @@ export class LibopenmptEngine {
     this.workletNode.port.postMessage({ cmd: 'play', val: data });
     this._playing = true;
 
-    // Rebuild per-channel effect isolation after a short delay (let worklet create the module first)
-    setTimeout(() => this._rebuildIsolationAfterPlay(), 100);
+    // The worklet answers with 'playReady' once the module exists, and that
+    // is what drives the rebuild (see handleMessage). This timer stays only as
+    // a backstop for a cached worklet build that predates that message —
+    // worklets are hand-maintained and a stale one would otherwise never
+    // restore the dub sends at all. `rebuildDubConnections` is idempotent, so
+    // running both costs a redundant reconnect and nothing else.
+    setTimeout(() => this._rebuildIsolationAfterPlay(), 400);
 
     // Enable per-channel oscilloscope after worklet creates the module
     setTimeout(() => {

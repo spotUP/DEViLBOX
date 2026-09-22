@@ -584,6 +584,19 @@ class MPT extends AudioWorkletProcessor {
 
 		// post back tracks metadata
 		if (!paused) this.meta()
+
+		// Tell the main thread the module EXISTS.
+		//
+		// `play()` begins by calling `teardownAllDubSlots_()`, so every
+		// per-channel dub send is destroyed here. The engine used to restore
+		// them on a blind `setTimeout(..., 100)` measured from when it POSTED
+		// this message — and creating a 400 KB module takes longer than that,
+		// so the teardown above wiped the slots the rebuild had just made.
+		// The rebuild is single-shot, so nothing fed `bus.input` for the rest
+		// of the song and every capture-and-play move (reverseEcho,
+		// backwardReverb, delayTimeThrow) recorded silence. Reported
+		// 2026-09-21 and again 2026-09-22.
+		this.port.postMessage({ cmd: 'playReady' })
 	}
 	stop() {
 		this.destroyOscModule_()
