@@ -603,14 +603,13 @@ export const DubDeckStrip: React.FC = () => {
     const changed = prevBusEnabledRef.current !== busEnabled;
     prevBusEnabledRef.current = busEnabled;
     if (!changed) return;
-    const apply = () => setStripCollapsed(!busEnabled);
-    if (isInitialMount) {
-      // Defer one frame so initial layout paints first — avoids the
-      // transient DJ/VJ view-switch flicker we saw when firing synchronously.
-      const handle = requestAnimationFrame(apply);
-      return () => cancelAnimationFrame(handle);
-    }
-    apply();
+    // ARMING the bus expands the deck. Finding it already armed at boot is not
+    // an arming action, so the initial mount only records the value and leaves
+    // the deck at the store's default (collapsed). Before this, a session that
+    // started with the bus enabled — which AutoDub and a restored project both
+    // do — opened with the deck expanded every time.
+    if (isInitialMount) return;
+    setStripCollapsed(!busEnabled);
   }, [busEnabled, setStripCollapsed]);
 
   // Editor-fullscreen follows the strip-expanded state. Opening the Dub Deck
