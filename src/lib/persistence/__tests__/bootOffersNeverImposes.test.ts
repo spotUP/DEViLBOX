@@ -34,8 +34,36 @@ describe('boot offers stored work and never imposes it', () => {
     })).toEqual({ kind: 'saved' });
   });
 
-  it('the explicit slot wins over a crash snapshot beside it', () => {
-    // Deliberately named and saved work beats a crash guess.
+  it('the explicit slot wins over an OLDER crash snapshot', () => {
+    // Deliberately named and saved work beats a stale crash guess.
+    expect(decideBootRestore({
+      everExplicitlySaved: true, savedHasContent: true, hasRecoveryRecord: true,
+      savedAt: '2026-09-22T20:00:00.000Z',
+      recoveryAt: '2026-09-22T19:00:00.000Z',
+    })).toEqual({ kind: 'saved' });
+  });
+
+  it('a NEWER snapshot wins — it is the song actually being worked on', () => {
+    // Loading a song writes the snapshot, not the explicit slot. Before this,
+    // a project saved days ago kept beating the tune in front of you, and
+    // every dev reload came back to the same stale song: "it always reverts
+    // to that song for some reason" (2026-09-22).
+    expect(decideBootRestore({
+      everExplicitlySaved: true, savedHasContent: true, hasRecoveryRecord: true,
+      savedAt: '2026-09-22T19:00:00.000Z',
+      recoveryAt: '2026-09-22T20:00:00.000Z',
+    })).toEqual({ kind: 'recovery' });
+  });
+
+  it('an unreadable snapshot timestamp never displaces saved work', () => {
+    expect(decideBootRestore({
+      everExplicitlySaved: true, savedHasContent: true, hasRecoveryRecord: true,
+      savedAt: '2026-09-22T19:00:00.000Z',
+      recoveryAt: 'not a date',
+    })).toEqual({ kind: 'saved' });
+  });
+
+  it('with no timestamps at all, deliberately saved work still wins', () => {
     expect(decideBootRestore({
       everExplicitlySaved: true, savedHasContent: true, hasRecoveryRecord: true,
     })).toEqual({ kind: 'saved' });

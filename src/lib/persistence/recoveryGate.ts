@@ -74,14 +74,38 @@ export function decideBootRestore(args: {
   everExplicitlySaved: boolean;
   savedHasContent: boolean;
   hasRecoveryRecord: boolean;
+  /** `metadata.modifiedAt` of the explicit-save slot, if any. */
+  savedAt?: string | null;
+  /** `metadata.modifiedAt` of the crash snapshot, if any. */
+  recoveryAt?: string | null;
 }): BootRestore {
-  if (args.everExplicitlySaved && args.savedHasContent) return { kind: 'saved' };
-  if (shouldPromptRestore({
+  const savedUsable = args.everExplicitlySaved && args.savedHasContent;
+  const recoveryUsable = shouldPromptRestore({
     hasRecoveryRecord: args.hasRecoveryRecord,
-    everExplicitlySaved: args.everExplicitlySaved,
-  })) {
-    return { kind: 'recovery' };
+    everExplicitlySaved: false, // "is there a snapshot worth offering at all"
+  });
+
+  // Offer whichever is NEWER when both exist.
+  //
+  // The explicit slot used to win outright, which is wrong the moment the
+  // snapshot is fresher — and it usually is. Loading a song does not write the
+  // explicit slot; it writes the snapshot. So a project saved days ago kept
+  // beating the tune actually being worked on, and every dev reload came back
+  // to the same stale song: "it always reverts to that song for some reason"
+  // (2026-09-22), which also made live testing measure the wrong tune all
+  // evening.
+  if (savedUsable && recoveryUsable) {
+    const savedTime = Date.parse(args.savedAt ?? '');
+    const recoveryTime = Date.parse(args.recoveryAt ?? '');
+    // Only a VALID, strictly newer snapshot displaces deliberately saved work.
+    if (Number.isFinite(recoveryTime) && (!Number.isFinite(savedTime) || recoveryTime > savedTime)) {
+      return { kind: 'recovery' };
+    }
+    return { kind: 'saved' };
   }
+
+  if (savedUsable) return { kind: 'saved' };
+  if (recoveryUsable) return { kind: 'recovery' };
   return { kind: 'none' };
 }
 

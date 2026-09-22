@@ -1109,7 +1109,13 @@ export function useProjectPersistence() {
           patternCount: rec.patterns?.length ?? 0,
         });
 
-      const decision = decideBootRestore({ everExplicitlySaved, savedHasContent, hasRecoveryRecord });
+      const decision = decideBootRestore({
+        everExplicitlySaved,
+        savedHasContent,
+        hasRecoveryRecord,
+        savedAt: saved?.metadata?.modifiedAt ?? null,
+        recoveryAt: rec?.metadata?.modifiedAt ?? null,
+      });
       if (decision.kind === 'saved') {
         // The explicit slot is authoritative, as before — a crash snapshot
         // beside it is stale by definition.
