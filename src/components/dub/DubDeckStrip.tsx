@@ -79,6 +79,18 @@ export function resolveCurrentDubStyle(
 }
 
 // ─── Role inference ────────────────────────────────────────────────────────
+/**
+ * Last-resort role guess from a channel name.
+ *
+ * Only reached when the classifier has no opinion. It used to be the ONLY
+ * source `applyCharacterPresetSends` consulted, and it was handed
+ * `useMixerStore.channels[i].name` — which stays at the placeholder `CH 1` …
+ * `CH 16` unless a user renames a channel by hand. So it returned null for
+ * every channel of every song, every channel took the preset's `default` send,
+ * and a style meant to open percussion wide and hold pads back opened
+ * everything to the same level. Reported 2026-09-22 as AutoDub sounding like
+ * "one big reverb wash", with all four faders sitting at 40%.
+ */
 function inferRoleFromName(name: string): 'percussion' | 'bass' | 'lead' | 'chord' | 'arpeggio' | 'pad' | null {
   const n = name.toLowerCase();
   if (/kick|snare|hat|clap|drum|perc|cymbal|rim/.test(n)) return 'percussion';
@@ -89,6 +101,9 @@ function inferRoleFromName(name: string): 'percussion' | 'bass' | 'lead' | 'chor
   if (/lead|melody|melodic|vocal|voice|horn|brass|flute|sax/.test(n)) return 'lead';
   return null;
 }
+
+/** Roles the preset table has a send level for. */
+const PRESET_SEND_ROLES = new Set(['percussion', 'bass', 'lead', 'chord', 'arpeggio', 'pad']);
 
 // ─── Per-channel ops ────────────────────────────────────────────────────────
 // Strip space is scarce, so a control earns its place only if it is worth
@@ -854,8 +869,13 @@ export const DubDeckStrip: React.FC = () => {
     const visible = pattern?.channels.length ?? 8;
     const mixerState = useMixerStore.getState();
     for (let i = 0; i < visible; i++) {
-      const name = mixerState.channels[i]?.name ?? '';
-      const role = inferRoleFromName(name);
+      // The classifier first, the name only as a fallback. The classifier is
+      // what every other part of the dub system targets on, and it works on
+      // formats where the name slot holds the musician's greetings.
+      const classified = autoRoles[i];
+      const role = (classified && PRESET_SEND_ROLES.has(classified))
+        ? classified
+        : inferRoleFromName(channelLabels[i] ?? mixerState.channels[i]?.name ?? '');
 
       // Apply channel send level
       if (preset.defaultSendsByRole) {
@@ -871,7 +891,7 @@ export const DubDeckStrip: React.FC = () => {
         if (cfg) mixerState.applyChannelFxConfig(i, cfg);
       }
     }
-  }, [pattern, setChannelDubSend]);
+  }, [pattern, setChannelDubSend, autoRoles, channelLabels]);
 
   // Sustained-hold channel tap. HOLD must work regardless of the channel's
   // current dubSend fader position — including 0 (no send). We drive the
