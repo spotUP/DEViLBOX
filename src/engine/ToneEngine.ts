@@ -1640,6 +1640,20 @@ export class ToneEngine {
   /**
    * Generate composite key for per-channel instrument instances
    */
+  /**
+   * The synth type actually created for an instrument, by id.
+   *
+   * `constructor.name` is unusable for this — bundlers minify it — and callers
+   * outside the engine need to tell a whole-song replayer from an ordinary
+   * synth before they send it a per-cell parameter.
+   */
+  public getInstrumentSynthType(instrumentId: number, channelIndex?: number): string | undefined {
+    const perChannel = channelIndex !== undefined
+      ? this.instrumentSynthTypes.get(this.getInstrumentKey(instrumentId, channelIndex))
+      : undefined;
+    return perChannel ?? this.instrumentSynthTypes.get(this.getInstrumentKey(instrumentId, -1));
+  }
+
   public getInstrumentKey(instrumentId: number, channelIndex?: number): number {
     // Numeric composite key: instrumentId in upper 16 bits, channelIndex in lower 16.
     // Avoids string allocation on every call (~512/sec).
