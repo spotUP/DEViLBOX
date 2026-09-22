@@ -282,3 +282,70 @@ const DEFAULT_LOW_SHARE = 0.4;
 function clamp01(v: number): number {
   return Math.max(0, Math.min(1, Number.isFinite(v) ? v : 0));
 }
+
+/** Bass/mid split used for `lowShare` — matches the AudioDataBus band edge (~258 Hz). */
+export const LOW_SPLIT_HZ = 258;
+
+/**
+ * Share of spectral power below `splitHz`, from an analyser's
+ * `getFloatFrequencyData` output (dB per bin).
+ *
+ * Power, not the peak/average blend the VJ bands use: this feeds a level
+ * decision (how much of the mix a low shelf actually lifts), and power is the
+ * quantity that adds.
+ */
+export function lowShareFromSpectrum(db: Float32Array, binHz: number, splitHz = LOW_SPLIT_HZ): number {
+  let low = 0;
+  let total = 0;
+  for (let i = 0; i < db.length; i++) {
+    const v = db[i];
+    if (!Number.isFinite(v)) continue;
+    const mag = Math.pow(10, v / 20);
+    const power = mag * mag;
+    total += power;
+    if (i * binHz < splitHz) low += power;
+  }
+  return total > 0 ? low / total : DEFAULT_LOW_SHARE;
+}
+
+/** The subset of AnalyserNode this reads — a fake in tests, the real node in the app. */
+export interface ProgrammeAnalyser {
+  fftSize: number;
+  frequencyBinCount: number;
+  context: { sampleRate: number };
+  getFloatTimeDomainData(array: Float32Array): void;
+  getFloatFrequencyData(array: Float32Array): void;
+}
+
+/**
+ * One programme reading from an analyser: peak and RMS from the time-domain
+ * buffer, low share from the spectrum.
+ *
+ * Exists so the master-insert trim can meter the mix BEFORE the insert.
+ * `getProgrammeLevel` reads `AudioDataBus`, which meters the master after it,
+ * so every slider step measured its own boost and the trim ratcheted up faster
+ * than the shelf — reported 2026-09-22 as "at 90% it sounds heavier than at
+ * 100%".
+ */
+export function readProgrammeFromAnalyser(
+  analyser: ProgrammeAnalyser,
+): { rms: number; peak: number; lowShare: number } {
+  const time = new Float32Array(analyser.fftSize);
+  analyser.getFloatTimeDomainData(time);
+  let sum = 0;
+  let peak = 0;
+  for (let i = 0; i < time.length; i++) {
+    const v = time[i];
+    sum += v * v;
+    const a = Math.abs(v);
+    if (a > peak) peak = a;
+  }
+  const spectrum = new Float32Array(analyser.frequencyBinCount);
+  analyser.getFloatFrequencyData(spectrum);
+  const binHz = analyser.context.sampleRate / analyser.fftSize;
+  return {
+    rms: time.length > 0 ? Math.sqrt(sum / time.length) : 0,
+    peak,
+    lowShare: lowShareFromSpectrum(spectrum, binHz),
+  };
+}

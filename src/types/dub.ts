@@ -393,12 +393,18 @@ export const DEFAULT_DUB_BUS: DubBusSettings = {
   // some inherent dub character, mid scoop off (engaged per preset),
   // neutral stereo width. User picks a CHARACTER to load the full voicing.
   //
-  // Bass shelf at 80 Hz (deep sub), not 200 Hz (which was boxy low-mid mud).
-  // Real dub weight comes from sub fundamentals — 200 Hz just clouds the mids.
-  // Q 0.9 keeps the shelf tight so it doesn't bleed into 300-400 Hz.
+  // Bass shelf corner at 150 Hz. It was 80 Hz "deep sub", and on tracker
+  // programme that lifted a band the music does not have: AHX and most module
+  // bass lives at 80-200 Hz, and small speakers reproduce nothing under ~80.
+  // Measured on the live insert 2026-09-22, bassShelfGainDb 12: +0.5 dB
+  // broadband at 60 Hz. Moved live to 150 Hz — "it feels heavier".
+  // Q 0.7: a low shelf above 0.707 overshoots at its corner, and at 150 Hz
+  // that overshoot lands on the low mids — with AutoDub running and the BASS
+  // control at its top, "everything gets muddled" (2026-09-22). At 60 Hz the
+  // same bump sat under the programme and went unheard.
   bassShelfGainDb:  2,
-  bassShelfFreqHz:  80,
-  bassShelfQ:       0.9,
+  bassShelfFreqHz:  150,
+  bassShelfQ:       0.7,
   masterBassPunchDb: 0,
   midScoopGainDb:   0,
   midScoopFreqHz:   700,
@@ -603,7 +609,7 @@ export const DUB_CHARACTER_PRESETS: Record<Exclude<DubBusSettings['characterPres
       hpfResonanceDb: 2.5,    // L2 that it should resonate (the 9069B T-network does); L3 for 2.5 dB.
       // L2: Tubby's mixes are bass-forward and that is well attested. L3: every
       // number here — the shelf, its corner and its Q are ours, not his.
-      bassShelfGainDb: 9, bassShelfFreqHz: 60,  bassShelfQ: 0.9,
+      bassShelfGainDb: 9, bassShelfFreqHz: 90,  bassShelfQ: 0.9,   // 90 Hz is the research figure (§B); 60 lifted nothing the programme had
       masterBassPunchDb: 6,   // dry-path punch — Tubby's signature kick weight
       midScoopGainDb:  0,
       echoIntensity:  0.55,   // was 0.65 — echoSpring mode: repeats each get a spring tail,

@@ -4,6 +4,9 @@ import { join } from 'path';
 import {
   generatedPeakFor,
   shelfTrimDb,
+  lowShareFromSpectrum,
+  readProgrammeFromAnalyser,
+  type ProgrammeAnalyser,
   smoothProgrammeLevel,
   GENERATED_PRESENCE,
   SILENT_PROGRAMME_PEAK,
@@ -267,5 +270,65 @@ describe('levels asked for by ear, 2026-09-21', () => {
     for (const moveId of Object.keys(GENERATED_PRESENCE)) {
       expect(generatedPeakFor(moveId, LOUD), moveId).toBeLessThan(1);
     }
+  });
+});
+
+describe('lowShareFromSpectrum — what a low shelf actually lifts', () => {
+  const binHz = 23.4375;   // 48 kHz / 2048
+
+  it('is the fraction of bins below the split for a flat spectrum', () => {
+    const bins = 64;
+    const flat = new Float32Array(bins).fill(-20);
+    const below = Array.from({ length: bins }, (_, i) => i * binHz < 258).filter(Boolean).length;
+    expect(lowShareFromSpectrum(flat, binHz)).toBeCloseTo(below / bins, 6);
+  });
+
+  it('reads one for a bass-only spectrum and zero for a treble-only one', () => {
+    const bass = new Float32Array(64).fill(-Infinity);
+    bass[2] = -10;
+    expect(lowShareFromSpectrum(bass, binHz)).toBeCloseTo(1, 6);
+    const treble = new Float32Array(64).fill(-Infinity);
+    treble[50] = -10;
+    expect(lowShareFromSpectrum(treble, binHz)).toBeCloseTo(0, 6);
+  });
+
+  it('weights by power, so a loud low bin outweighs many quiet high ones', () => {
+    const s = new Float32Array(64).fill(-60);   // quiet everywhere
+    s[3] = -20;                                  // one bin 40 dB louder, below the split
+    expect(lowShareFromSpectrum(s, binHz)).toBeGreaterThan(0.9);
+  });
+
+  it('falls back to the typical share on an empty spectrum', () => {
+    expect(lowShareFromSpectrum(new Float32Array(64).fill(-Infinity), binHz)).toBeCloseTo(0.4, 6);
+  });
+});
+
+describe('readProgrammeFromAnalyser — the mix as it arrives at the insert', () => {
+  function fake(time: number[], spectrumDb: number[]): ProgrammeAnalyser {
+    return {
+      fftSize: time.length,
+      frequencyBinCount: spectrumDb.length,
+      context: { sampleRate: 48000 },
+      getFloatTimeDomainData(a) { a.set(time); },
+      getFloatFrequencyData(a) { a.set(spectrumDb); },
+    };
+  }
+
+  it('reports peak and RMS of the time-domain buffer', () => {
+    const r = readProgrammeFromAnalyser(fake([0.5, -0.5, 0.5, -0.5], [-20, -20]));
+    expect(r.peak).toBeCloseTo(0.5, 6);
+    expect(r.rms).toBeCloseTo(0.5, 6);
+  });
+
+  it('is silent for silence, so the trim charges in full rather than assuming headroom', () => {
+    const r = readProgrammeFromAnalyser(fake([0, 0, 0, 0], [-Infinity, -Infinity]));
+    expect(r.peak).toBe(0);
+    expect(r.rms).toBe(0);
+  });
+
+  it('derives the low share from the spectrum with the analyser\'s own bin width', () => {
+    // fftSize 4 at 48 kHz -> 12 kHz per bin: bin 0 is below the split, bin 1 is not.
+    const r = readProgrammeFromAnalyser(fake([0.1, 0.1, 0.1, 0.1], [-10, -10]));
+    expect(r.lowShare).toBeCloseTo(0.5, 6);
   });
 });
