@@ -23,6 +23,11 @@ function generateVersionFile() {
           timestamp: new Date().toISOString(),
         };
 
+        // `closeBundle` also runs when vitest tears its server down, and
+        // there is no dist/ then — nor after a build-cache clean. Creating it
+        // keeps a test run from printing three ENOENT stack traces that have
+        // nothing to do with the tests.
+        fs.mkdirSync(path.dirname(distPath), { recursive: true });
         fs.writeFileSync(distPath, JSON.stringify(versionData, null, 2));
         console.log('Generated version.json:', versionData);
       } catch (error) {

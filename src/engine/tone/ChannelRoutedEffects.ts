@@ -39,6 +39,34 @@ export const DUB_SEND_RAMP_SEC = 0.02;
 
 /** First worklet output index dedicated to per-channel dub sends. */
 export const DUB_OUTPUT_BASE = 5;
+
+/**
+ * The enable/disable message every engine's worklet understands.
+ *
+ * The worklets disagree about the envelope: LibOpenMPT switches on `cmd`,
+ * while Hively, UADE and Furnace switch on `type`. Sending both fields covers
+ * all of them — but it was written out by hand at each call site, and one of
+ * them was missing `type`.
+ *
+ * That call site is `rebuildDubConnections`, the path that runs when a song
+ * loads or the bus is re-enabled with sends already up. On Hively the message
+ * matched no case at all and was dropped in silence, while the code went on to
+ * mark the channel active. Measured 2026-09-22 on jennipha.ahx with the bus on
+ * and all four sends open: `dubChannelEnabled` false for every channel,
+ * `dubPasses: 0`, and `bus.input` at 0.000005 while the main render sat at
+ * 0.13. Everything that CAPTURES the bus — reverseEcho, backwardReverb,
+ * delayTimeThrow — therefore captured silence, which is how it was reported.
+ * Moving a fader by hand worked, because that goes through
+ * `_activateDubChannel`, whose envelope was the complete one.
+ *
+ * One builder, so the two can never drift again.
+ */
+function dubChannelMessage(
+  action: 'dubChannelEnable' | 'dubChannelDisable',
+  channel: number,
+): Record<string, unknown> {
+  return { cmd: action, type: action, val: { channel }, channel };
+}
 /** Max tracker channels that can be dubbed simultaneously (per-engine). */
 export const MAX_DUB_CHANNELS = 32;
 
@@ -479,7 +507,7 @@ export class ChannelRoutedEffectsManager {
     // Dual-convention envelope: LibOpenMPT worklet switches on `cmd`, UADE /
     // Hively / Furnace worklets switch on `type`. Send both so a single
     // postMessage reaches any engine without branching per-engine here.
-    worklet.port.postMessage({ cmd: 'dubChannelEnable', type: 'dubChannelEnable', val: { channel: channelIndex }, channel: channelIndex });
+    worklet.port.postMessage(dubChannelMessage('dubChannelEnable', channelIndex));
     try {
       worklet.connect(gain, DUB_OUTPUT_BASE + channelIndex);
     } catch (e) {
@@ -530,7 +558,7 @@ export class ChannelRoutedEffectsManager {
 
     const worklet = engine?.getWorkletNode();
     if (worklet) {
-      worklet.port.postMessage({ cmd: 'dubChannelDisable', type: 'dubChannelDisable', val: { channel: channelIndex }, channel: channelIndex });
+      worklet.port.postMessage(dubChannelMessage('dubChannelDisable', channelIndex));
       try { worklet.disconnect(gain, DUB_OUTPUT_BASE + channelIndex); } catch { /* ok */ }
     }
 
@@ -613,7 +641,7 @@ export class ChannelRoutedEffectsManager {
       if (!gain) continue;
       // Fire enable + reconnect. Safe to disconnect first even if not
       // currently connected (try/catch eats the error).
-      worklet.port.postMessage({ cmd: 'dubChannelEnable', val: { channel: ch } });
+      worklet.port.postMessage(dubChannelMessage('dubChannelEnable', ch));
       try { worklet.disconnect(gain, DUB_OUTPUT_BASE + ch); } catch { /* first-time */ }
       try {
         worklet.connect(gain, DUB_OUTPUT_BASE + ch);
