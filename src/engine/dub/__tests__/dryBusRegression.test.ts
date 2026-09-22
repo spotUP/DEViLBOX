@@ -177,7 +177,7 @@ describe('DubBus gain-staging regression guards', () => {
     // BASS reaches its own stage unmodified by punch.
     expect(DUBBUS_SRC).toMatch(/masterBassShelf\.gain,\s*masterActive \? safeBassGain : 0/);
     // The trim still pays for the total of both stages.
-    expect(DUBBUS_SRC).toMatch(/safeMasterShelfGain = safeBassGain \+ safeMasterPunch/);
+    expect(DUBBUS_SRC).toMatch(/costDb: safeBassGain \+ safeMasterPunch \+ bandAddDb/);
   });
 });
 

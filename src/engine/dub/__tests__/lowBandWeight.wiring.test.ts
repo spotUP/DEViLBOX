@@ -51,7 +51,8 @@ describe('the low-band weight stage', () => {
 
   it('is driven from the master tone method, off the BASS control', () => {
     const body = methodBody('private _applyMasterInsertTone(');
-    expect(body).toContain('lowBandWeightFor(safeBassGain)');
+    expect(body).toContain('this._resolveMasterLowEnd(safeBassGain, m)');
+    expect(methodBody('private _resolveMasterLowEnd(')).toContain('lowBandWeightFor(safeBassGain)');
     expect(body).toContain('this.lowBandDrive.gain, weight.drive');
     expect(body).toContain("this.lowBandGain.gain, masterActive ? weight.gain : 0");
     // Corner follows the shelf so both lift the same band.
@@ -77,13 +78,64 @@ describe('the trim meters the programme before the insert', () => {
   });
 
   it('feeds that reading to the trim, not the post-insert reference', () => {
-    const body = methodBody('private _applyMasterInsertTone(');
-    expect(body).toContain('shelfTrimDb(safeMasterShelfGain, this._programmeBeforeInsert())');
-    expect(body).not.toContain('shelfTrimForProgramme(');
+    const body = methodBody('private _applyMasterTrim(');
+    expect(body).toContain('shelfTrimDb(costDb, this._programmeBeforeInsert())');
+    expect(source).not.toContain('shelfTrimForProgramme(');
+  });
+
+  it('charges the band\'s peak as well as the two shelves', () => {
+    const body = methodBody('private _resolveMasterLowEnd(');
+    expect(body).toContain('20 * Math.log10(1 + weight.gain)');
+    expect(body).toContain('costDb: safeBassGain + safeMasterPunch + bandAddDb');
+  });
+
+  it('re-reads the trim while the insert is active, and stops when it is not', () => {
+    // A slider set during a quiet passage kept its trim into the loud one —
+    // "it clips/distorts" (2026-09-22).
+    const wire = methodBody('async wireMasterInsert(');
+    expect(wire).toContain('this._startTrimWatch();');
+    const unwire = methodBody('unwireMasterInsert(): void {');
+    expect(unwire).toContain('this._stopTrimWatch();');
+    expect(methodBody('dispose(): void {')).toContain('this._stopTrimWatch();');
+    const watch = methodBody('private _startTrimWatch(');
+    expect(watch).toContain('this._applyMasterTrim(this.settings, this.context.currentTime)');
+    expect(watch).toContain('if (!this.masterInsertActive || this._disposed) { this._stopTrimWatch(); return; }');
   });
 
   it('releases the tap on dispose', () => {
     const body = methodBody('dispose(): void {');
     expect(body).toContain('this._releasePreInsertProbe();');
+  });
+});
+
+describe('the dub return skips the low-end stages', () => {
+  // Echo tails came back bass-boosted and saturated with the dry mix —
+  // "everything gets muddled" with AutoDub and the BASS control up.
+  it('sums the return once, behind a node the splice can move', () => {
+    expect(source).toContain('this.clubDry.connect(this.returnSum);');
+    expect(source).toContain('this.clubWet.connect(this.returnSum);');
+    expect(source).toContain('this.returnSum.connect(this.master);');
+    expect(source).not.toContain('this.clubDry.connect(this.master);');
+  });
+
+  it('joins the insert at the clipper — past shelf, punch and band — while spliced', () => {
+    const join = methodBody('private _joinReturnAtInsert(');
+    expect(join).toContain('this.returnSum.disconnect(this.master)');
+    expect(join).toContain('this.returnSum.connect(this.masterSafetyClip)');
+    // The clipper sits after the band sum and before the scoop/width stages,
+    // so the return still gets the clipper, the scoop and the width.
+    expect(source).toContain('this.lowBandGain.connect(this.masterBassPunch);');
+    expect(source).toContain('this.masterBassPunch.connect(this.masterSafetyClip);');
+    expect(source).toContain('this.masterSafetyClip.connect(this.masterMidScoop);');
+    const wire = methodBody('async wireMasterInsert(');
+    expect(wire).toContain('this._joinReturnAtInsert();');
+  });
+
+  it('goes back to the master whenever the direct path is restored', () => {
+    const restore = methodBody('private _restoreMasterInsertPassthrough(');
+    expect(restore).toContain('this._joinReturnAtMaster();');
+    const back = methodBody('private _joinReturnAtMaster(');
+    expect(back).toContain('this.returnSum.disconnect(this.masterSafetyClip)');
+    expect(back).toContain('this.returnSum.connect(this.master)');
   });
 });
