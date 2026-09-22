@@ -1372,6 +1372,22 @@ export class DubBus {
     this.sweepLfoGain.gain.cancelScheduledValues(now);
     this.sweepLfoGain.gain.setTargetAtTime(Math.max(0, depthMs) / 1000, now, tc);
 
+    // Drive whichever engine is actually in the path.
+    //
+    // `sweepMode` picks one: comb (`sweepDelay`, modulated by `sweepLfo`) or
+    // phaser (`CalfPhaserEffect`, which runs on its OWN rate and cannot hear
+    // that LFO at all). Everything above moves the comb. In phaser mode the
+    // move therefore opened the gate onto a phaser still turning at its
+    // resting `phaserRate` — 0.15 Hz is one sweep every 6.7 seconds, so the
+    // effect was on and essentially motionless. Reported 2026-09-22 as Liquid
+    // being dead, measured with sweepMode "phaser".
+    //
+    // The prior rate is restored on release, so the BUS tab's own phaser rate
+    // survives the gesture.
+    const wasPhaser = this.settings.sweepMode === 'phaser';
+    const priorPhaserRate = this.settings.phaserRate;
+    if (wasPhaser) this.phaser.setRate(Math.max(0.05, rateHz));
+
     // The BUS tab's sweep controls follow the move for as long as it holds.
     // Held rather than announced once: a comb sweep runs for bars, and a
     // single announcement would let the faders drop back to the user's
@@ -1387,6 +1403,7 @@ export class DubBus {
       this.sweepLfo.frequency.setTargetAtTime(priorRate, t, 0.08);
       this.sweepLfoGain.gain.cancelScheduledValues(t);
       this.sweepLfoGain.gain.setTargetAtTime(priorDepth / 1000, t, 0.08);
+      if (wasPhaser) this.phaser.setRate(priorPhaserRate);
       this.releaseHeldAnnouncement('dub.sweepAmount', priorAmt);
       this.releaseHeldAnnouncement('dub.sweepRateHz', normalizeSweepRate(priorRate));
     };
