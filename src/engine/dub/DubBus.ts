@@ -96,8 +96,15 @@ import { ChannelTapBaselines } from '@/lib/dub/channelTapBaseline';
 import { makeSoftClipCurve } from '@/lib/dub/softClipCurve';
 import { AuditionHold } from '@/lib/dub/auditionHold';
 import { clampExtFeedback } from '@/lib/dub/extFeedbackCeiling';
-import { generatedPeak, shelfTrimForProgramme } from './programmeReference';
-import { SILENT_PROGRAMME_PEAK } from '@/lib/dub/programmeLevel';
+import { generatedPeak, getProgrammeLevel } from './programmeReference';
+import {
+  SILENT_PROGRAMME_PEAK,
+  readProgrammeFromAnalyser,
+  shelfTrimDb,
+  smoothProgrammeLevel,
+  type ProgrammeLevel,
+} from '@/lib/dub/programmeLevel';
+import { lowBandWeightFor } from '@/lib/dub/lowBandWeight';
 
 /**
  * Loudest sample in a captured ring, so a capture can tell whether it caught
@@ -1435,6 +1442,32 @@ export class DubBus {
    * total proportionally, and `masterSafetyClip` sits downstream of both.
    */
   private masterBassPunch!: BiquadFilterNode;
+  /**
+   * Low-band WEIGHT stage, parallel to the shelf and summed at the punch.
+   *
+   * The shelf and the punch are linear: every dB of heaviness they give is a
+   * dB of level, and at the top of the BASS control that level ran into
+   * `masterSafetyClip` and the master limiter — "at 90% it sounds heavier
+   * than at 100%" (2026-09-22). Dub weight is harmonics as much as level: a
+   * saturated low band reads as heavy on any speaker without the level. This
+   * band is low-passed at the shelf corner, driven into the tape curve,
+   * evened by a compressor, and added back under the dry path. See
+   * `lowBandWeightFor` for the mapping from the BASS control.
+   *
+   * `lowBandSat` is the one node to swap for a neural bass-amp model if that
+   * is ever wanted; nothing else here would change.
+   */
+  private lowBandLp!: BiquadFilterNode;
+  private lowBandDrive!: GainNode;
+  private lowBandSat!: WaveShaperNode;
+  private lowBandComp!: DynamicsCompressorNode;
+  private lowBandGain!: GainNode;
+  /**
+   * Meters the master BEFORE the insert, so the trim never measures its own
+   * boost. Registered with the insert points; null until then.
+   */
+  private _preInsertProbe: AnalyserNode | null = null;
+  private _preInsertLevel: ProgrammeLevel | null = null;
   private masterMidScoop!: BiquadFilterNode;
   /**
    * Input trim for the master insert, ahead of every boosting stage.
@@ -1776,6 +1809,31 @@ export class DubBus {
     this.masterBassPunch.frequency.value = this.settings.bassShelfFreqHz;
     this.masterBassPunch.Q.value = this.settings.bassShelfQ;
     this.masterBassPunch.gain.value = 0;  // flat until wired in by enable
+    // Low-band weight stage. A 2nd-order Butterworth low-pass, NOT a
+    // Linkwitz-Riley: this band is summed in parallel with the dry path, and
+    // a 2nd-order section is 90 degrees at the corner (|1 + j| — +3 dB, no
+    // notch) where an LR4 is 180 degrees and cancels the very band it is
+    // meant to add.
+    this.lowBandLp = this.context.createBiquadFilter();
+    this.lowBandLp.type = 'lowpass';
+    this.lowBandLp.frequency.value = this.settings.bassShelfFreqHz;
+    this.lowBandLp.Q.value = Math.SQRT1_2;
+    // Drive is the gain INTO a fixed curve, so a slider move never rebuilds
+    // the curve.
+    this.lowBandDrive = this.context.createGain();
+    this.lowBandDrive.gain.value = 1;
+    this.lowBandSat = this.context.createWaveShaper();
+    this.lowBandSat.curve = makeTapeSatCurve(1.0);
+    this.lowBandSat.oversample = '2x';
+    // Evens the bass so sustain reads as weight, not just the hits.
+    this.lowBandComp = this.context.createDynamicsCompressor();
+    this.lowBandComp.threshold.value = -24;
+    this.lowBandComp.knee.value = 6;
+    this.lowBandComp.ratio.value = 4;
+    this.lowBandComp.attack.value = 0.01;
+    this.lowBandComp.release.value = 0.15;
+    this.lowBandGain = this.context.createGain();
+    this.lowBandGain.gain.value = 0;  // silent until wired in by enable
     this.masterMidScoop = this.context.createBiquadFilter();
     this.masterMidScoop.type = 'peaking';
     this.masterMidScoop.frequency.value = this.settings.midScoopFreqHz;
@@ -1902,6 +1960,14 @@ export class DubBus {
     this.vinylDirect = this.context.createGain();
     this.vinylDirect.gain.value = 1;
     this.masterHpf.connect(this.masterBassShelf);
+    // Low-band weight, parallel to the shelf, summed at the punch so the
+    // clipper and everything after it see the total.
+    this.masterHpf.connect(this.lowBandLp);
+    this.lowBandLp.connect(this.lowBandDrive);
+    this.lowBandDrive.connect(this.lowBandSat);
+    this.lowBandSat.connect(this.lowBandComp);
+    this.lowBandComp.connect(this.lowBandGain);
+    this.lowBandGain.connect(this.masterBassPunch);
     // Trim → hpf → shelf → clipper → …: the boost is paid for before it is
     // applied, so no stage in the insert ever runs hot.
     this.masterToneTrim = this.context.createGain();
@@ -3714,6 +3780,7 @@ export class DubBus {
     const points: Array<[string, AudioNode | undefined]> = [
       ['insertIn', this.masterToneTrim],
       ['afterShelf', this.masterBassShelf],
+      ['lowBand', this.lowBandGain],
       ['afterClip', this.masterSafetyClip],
       ['afterWidth', this.masterMerge],
       ['insertOut', this.masterInsertEnvelope],
@@ -4600,7 +4667,47 @@ export class DubBus {
    */
   registerMasterInsertPoint(source: AudioNode, dest: AudioNode): void {
     this.masterInsertPoints = { source, dest };
+    // Meter the master BEFORE the insert. `getProgrammeLevel` reads the
+    // master after it, so the trim measured its own boost on every slider
+    // step and ratcheted up faster than the shelf — "at 90% it sounds heavier
+    // than at 100%" (2026-09-22). A tap must never break the chain it
+    // measures, so failure here just leaves the fallback in place.
+    this._releasePreInsertProbe();
+    try {
+      const probe = this.context.createAnalyser();
+      probe.fftSize = 2048;
+      probe.smoothingTimeConstant = 0.4;
+      source.connect(probe);
+      this._preInsertProbe = probe;
+      this._preInsertLevel = null;
+    } catch {
+      this._preInsertProbe = null;
+    }
     this._syncMasterInsertToEnabled();
+  }
+
+  private _releasePreInsertProbe(): void {
+    const probe = this._preInsertProbe;
+    if (!probe) return;
+    this._preInsertProbe = null;
+    try { this.masterInsertPoints?.source.disconnect(probe); } catch { /* already gone */ }
+  }
+
+  /**
+   * The programme as it arrives at the insert — what the trim has to protect.
+   * Smoothed the same way the shared reference is, so a rest or a hit under
+   * the slider does not swing the trim. Falls back to the post-insert reading
+   * when no insert point has been registered.
+   */
+  private _programmeBeforeInsert(): ProgrammeLevel {
+    const probe = this._preInsertProbe;
+    if (!probe) return getProgrammeLevel();
+    try {
+      this._preInsertLevel = smoothProgrammeLevel(this._preInsertLevel, readProgrammeFromAnalyser(probe));
+      return this._preInsertLevel;
+    } catch {
+      return getProgrammeLevel();
+    }
   }
 
   /**
@@ -4803,6 +4910,13 @@ export class DubBus {
     rampBiquadParam(this.masterBassPunch.frequency, m.bassShelfFreqHz, now);
     rampBiquadParam(this.masterBassPunch.Q, m.bassShelfQ, now);
     rampBiquadParam(this.masterBassPunch.gain, masterActive ? safeMasterPunch : 0, now);
+    // Low-band weight: the BASS control also drives harmonics, so the top of
+    // its travel gets heavier without needing the level the clipper takes
+    // back. Corner follows the shelf so the two lift the same band.
+    const weight = lowBandWeightFor(safeBassGain);
+    rampBiquadParam(this.lowBandLp.frequency, m.bassShelfFreqHz, now);
+    this._settle(this.lowBandDrive.gain, weight.drive, now, 0.02);
+    this._settle(this.lowBandGain.gain, masterActive ? weight.gain : 0, now, 0.02);
     // What the two stages add up to — what the trim has to pay for.
     const safeMasterShelfGain = safeBassGain + safeMasterPunch;
     // Pay for the boost before applying it. A +9 dB shelf with no trim put
@@ -4811,7 +4925,7 @@ export class DubBus {
     // Pay for the boost — but only for what it actually costs. A low shelf
     // lifts the low end, not the whole mix, so the trim follows the share of
     // energy that lives down there rather than the shelf's dB figure.
-    const trimDb = masterActive ? shelfTrimForProgramme(safeMasterShelfGain) : 0;
+    const trimDb = masterActive ? shelfTrimDb(safeMasterShelfGain, this._programmeBeforeInsert()) : 0;
     this._settle(this.masterToneTrim.gain, Math.pow(10, trimDb / 20), now, 0.02);
     rampBiquadParam(this.masterMidScoop.frequency, m.midScoopFreqHz, now);
     rampBiquadParam(this.masterMidScoop.Q, m.midScoopQ, now);
@@ -4886,6 +5000,7 @@ export class DubBus {
     // Reset master-side gains to neutral so even a dangling reference is silent.
     rampBiquadParam(this.masterBassShelf.gain, 0, now);
     rampBiquadParam(this.masterBassPunch.gain, 0, now);
+    this._settle(this.lowBandGain.gain, 0, now, 0.02);
     this.masterToneTrim.gain.setTargetAtTime(1, now, 0.02);
     rampBiquadParam(this.masterMidScoop.gain, 0, now);
     try {
@@ -7396,6 +7511,7 @@ export class DubBus {
 
   /** Dispose and release all bus resources. */
   dispose(): void {
+    this._releasePreInsertProbe();
     for (const timer of this._heldAnnouncements.values()) clearInterval(timer);
     this._heldAnnouncements.clear();
     // The deferred master-insert rewire reconnects `source -> dest`. Left

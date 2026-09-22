@@ -77,8 +77,9 @@ describe('master insert gain staging', () => {
     // The trim used to be the full shelf gain, which assumed the whole mix was
     // being lifted when only the low end is — audibly a huge level drop when
     // the bus came on. It now follows the measured share of low-frequency
-    // energy in the programme.
-    expect(bus).toContain('const trimDb = masterActive ? shelfTrimForProgramme(safeMasterShelfGain) : 0;');
+    // energy in the programme — read BEFORE the insert, so the trim never
+    // measures its own boost (see `_programmeBeforeInsert`).
+    expect(bus).toContain('const trimDb = masterActive ? shelfTrimDb(safeMasterShelfGain, this._programmeBeforeInsert()) : 0;');
     // Written through `_settle`, which cancels pending events and pins the
     // current value before ramping — a bare setTargetAtTime here collided with
     // ramps a held move had already scheduled on the same param.

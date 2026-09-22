@@ -686,6 +686,8 @@ export async function getDubBusState(): Promise<Record<string, unknown>> {
       masterSide: g(b.masterSide),
       masterInvertR: g(b.masterInvertR),
       masterBassShelfDb: (b.masterBassShelf as { gain?: { value?: number } } | undefined)?.gain?.value ?? null,
+      masterLowBandGain: g(b.lowBandGain),
+      masterLowBandDrive: g(b.lowBandDrive),
       masterHpfHz: (b.masterHpf as { frequency?: { value?: number } } | undefined)?.frequency?.value ?? null,
       convolverDry: g(b.masterConvolverDry),
       convolverWet: g(b.masterConvolverWet),
