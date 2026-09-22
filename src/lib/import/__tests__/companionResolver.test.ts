@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   resolveCompanions,
   expectedCompanionNames,
+  listingFromRelativePaths,
   splitName,
   stemOf,
   MAX_COMPANIONS,
@@ -128,8 +129,20 @@ describe('the other shapes', () => {
       .toEqual(['Instruments/kick.instr', 'Instruments/snare.ss']);
     expect(resolveCompanions('hittheroad.sng', { siblings: ['hittheroad.sng'], subdirs: { Samples: ['electom', 'bass'] } }).companions)
       .toEqual(['Samples/electom', 'Samples/bass']);
-    expect(resolveCompanions('hittheroad.sng', { siblings: ['hittheroad.sng'], parentSamples: ['electom'] }).companions)
-      .toEqual(['../Samples/electom']);
+    // Registered as the replayer opens it, read from one level up.
+    const up = resolveCompanions('hittheroad.sng', { siblings: ['hittheroad.sng'], parentSamples: ['electom'] });
+    expect(up.companions).toEqual(['Samples/electom']);
+    expect(up.sources).toEqual({ 'Samples/electom': '../Samples/electom' });
+    expect(resolveCompanions('mdat.x', { siblings: ['mdat.x', 'smpl.x'] }).sources).toEqual({});
+  });
+});
+
+describe('listingFromRelativePaths — a folder drop as a listing', () => {
+  it('splits top-level names from one level of subdirectories', () => {
+    expect(listingFromRelativePaths(['sdr.a', 'smp.a', 'instr/perc1.x', 'Samples/electom', 'deep/er/x'])).toEqual({
+      siblings: ['sdr.a', 'smp.a'],
+      subdirs: { instr: ['perc1.x'], Samples: ['electom'] },
+    });
   });
 });
 

@@ -42,6 +42,7 @@ import {
 } from '@/lib/serverFilesApi';
 import { getSupportedExtensions } from '@/lib/import/ModuleLoader';
 import { getSupportedMIDIExtensions } from '@/lib/import/MIDIImporter';
+import { resolveCompanions } from '@lib/import/companionResolver';
 import { sunTronicCompanionPaths } from '@/lib/import/formats/SunTronicV13';
 
 // Build comprehensive accept string for file inputs (400+ supported formats)
@@ -131,13 +132,6 @@ function isBinaryFile(filename: string): boolean {
   return !TEXT_EXTENSIONS.includes(ext);
 }
 
-/** Companion file patterns: main prefix → companion prefix */
-const COMPANION_PREFIXES: [string, string][] = [
-  ['mdat.', 'smpl.'],  // TFMX
-  ['smpl.', 'mdat.'],  // TFMX (reverse)
-  ['mfp.',  'smp.'],   // MFP
-  ['midi.', 'smpl.'],  // MIDI-Loriciel
-];
 
 /**
  * Auto-fetch companion files from the same server/static directory.
@@ -179,14 +173,30 @@ async function fetchCompanionFiles(
     if (companions.size > 0) return companions;
   }
 
-  const lower = filename.toLowerCase();
-  for (const [mainPrefix, companionPrefix] of COMPANION_PREFIXES) {
-    if (!lower.startsWith(mainPrefix)) continue;
-    const songname = filename.slice(mainPrefix.length);
-    const companionName = companionPrefix + songname;
-    const buf = await readSibling(dir + companionName);
-    if (buf) companions.set(companionName, buf);
-    break;
+  // One resolver for every load path — the same rules the MCP server and a
+  // folder drop use. List the directory (static manifest, then the server
+  // API), hand the names over, fetch what comes back.
+  const listDir = async (path: string): Promise<ServerFileEntry[]> => {
+    if (isManifestAvailable()) {
+      const entries = listManifestDirectory(path);
+      if (entries.length > 0) return entries;
+    }
+    try { return await listServerDirectory(path); } catch { return []; }
+  };
+  const entries = await listDir(dir);
+  const siblings = entries.filter(e => !e.isDirectory).map(e => e.name);
+  const subdirs: Record<string, string[]> = {};
+  for (const e of entries) {
+    if (!e.isDirectory) continue;
+    if (!['instr', 'instruments', 'samples'].includes(e.name.toLowerCase())) continue;
+    const files = await listDir(dir + e.name + '/');
+    subdirs[e.name] = files.filter(f => !f.isDirectory).map(f => f.name);
+  }
+  const resolved = resolveCompanions(filename, { siblings, subdirs });
+  for (const key of resolved.companions) {
+    const source = resolved.sources[key] ?? key;
+    const buf = await readSibling(dir + source);
+    if (buf) companions.set(key, buf);
   }
   return companions;
 }

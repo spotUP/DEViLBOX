@@ -11,6 +11,62 @@ import { config as loadEnv } from 'dotenv';
 import { readFile, readdir, stat as fsStat } from 'fs/promises';
 import { basename, dirname, join, resolve } from 'path';
 import { callBrowser } from './wsRelay';
+import { resolveCompanions, type CompanionListing } from '../../../src/lib/import/companionResolver.ts';
+
+/** Sample subdirectories a module may own. Listed when present, by their name as on disk. */
+const COMPANION_SUBDIRS = ['instr', 'instruments', 'samples'];
+
+/** A modland directory as the companion resolver reads it. Subdirectories are listed only when a shape can live there. */
+async function listModlandForCompanions(dirPath: string, filename: string): Promise<CompanionListing> {
+  const list = async (dir: string): Promise<string[]> => {
+    const resp = await fetch(`${API_BASE}/api/modland/list?dir=${encodeURIComponent(dir)}`);
+    if (!resp.ok) return [];
+    const listed = await resp.json() as { files?: Array<{ full_path: string }> };
+    return (listed.files ?? []).map(f => f.full_path.split('/').pop() ?? '').filter(Boolean);
+  };
+  const siblings = await list(dirPath);
+  const subdirs: Record<string, string[]> = {};
+  const lower = filename.toLowerCase();
+  const wanted: string[] = ['instr'];
+  if (/\.(smus|snx|tiny)$|^(smus|snx|tiny)\./.test(lower)) wanted.push('Instruments');
+  if (lower.endsWith('.sng')) wanted.push('Samples');
+  for (const sub of wanted) {
+    try {
+      const files = await list(`${dirPath}/${sub}`);
+      if (files.length > 0) subdirs[sub] = files;
+    } catch { /* not there */ }
+  }
+  return { siblings, subdirs };
+}
+
+/** The module's directory as the companion resolver reads it. */
+async function listDirectoryForCompanions(dir: string, filename: string): Promise<CompanionListing> {
+  const entries = await readdir(dir, { withFileTypes: true });
+  const siblings: string[] = [];
+  const subdirs: Record<string, string[]> = {};
+  for (const e of entries) {
+    if (e.isFile()) siblings.push(e.name);
+    else if (e.isDirectory() && COMPANION_SUBDIRS.includes(e.name.toLowerCase())) {
+      try {
+        const files = await readdir(join(dir, e.name), { withFileTypes: true });
+        subdirs[e.name] = files.filter(f => f.isFile()).map(f => f.name);
+      } catch { /* unreadable subdirectory: not a companion source */ }
+    }
+  }
+  // ZoundMonitor keeps Samples/ beside the song's DIRECTORY.
+  let parentSamples: string[] | undefined;
+  if (filename.toLowerCase().endsWith('.sng') && !Object.keys(subdirs).some(d => d.toLowerCase() === 'samples')) {
+    try {
+      const parent = await readdir(dirname(dir), { withFileTypes: true });
+      const samples = parent.find(e => e.isDirectory() && e.name.toLowerCase() === 'samples');
+      if (samples) {
+        const files = await readdir(join(dirname(dir), samples.name), { withFileTypes: true });
+        parentSamples = files.filter(f => f.isFile()).map(f => f.name);
+      }
+    } catch { /* no parent Samples */ }
+  }
+  return { siblings, subdirs, parentSamples };
+}
 
 /**
  * Load the REPO ROOT `.env`, not whatever `.env` the cwd happens to have.
@@ -1395,157 +1451,19 @@ export function createMcpServer(): McpServer {
         //   SUNTronic: song.src + instr/ directory with .x files
         //   AudioSculpture: song.adsc + song.adsc.as
         // All companion files in the same directory with matching base name are included.
+        // One resolver for every load path — see src/lib/import/companionResolver.ts.
+        // The rule table that lived here is what the file browser and a folder
+        // drop never had; now all three ask the same question.
         const companionFiles: Record<string, string> = {};
-        const lowerFilename = filename.toLowerCase();
         try {
-          const dirFiles = await readdir(dir);
-
-          // Prefix-pair formats: mdat↔smpl, MIDI↔SMPL, jpn↔smp, thm↔smp, mfp↔smp,
-          // sjs↔smp, MAX↔SMP, mcr↔mcs
-          const prefixPairs: [string, string][] = [
-            ['mdat.', 'smpl.'], ['smpl.', 'mdat.'],
-            ['midi.', 'smpl.'], ['smpl.', 'midi.'],
-            ['jpn.', 'smp.'], ['smp.', 'jpn.'],
-            ['jpnd.', 'smp.'], ['smp.', 'jpnd.'],
-            ['thm.', 'smp.'], ['smp.', 'thm.'],
-            ['mfp.', 'smp.'], ['smp.', 'mfp.'],
-            ['sjs.', 'smp.'], ['smp.', 'sjs.'],
-            ['max.', 'smp.'], ['smp.', 'max.'],
-            ['mcr.', 'mcs.'], ['mcs.', 'mcr.'],
-          ];
-          for (const [myPrefix, pairPrefix] of prefixPairs) {
-            if (lowerFilename.startsWith(myPrefix)) {
-              const suffix = filename.slice(myPrefix.length);
-              const pairName = dirFiles.find(f => f.toLowerCase() === `${pairPrefix}${suffix.toLowerCase()}`);
-              if (pairName) {
-                const pairData = await readFile(join(dir, pairName));
-                companionFiles[pairName] = pairData.toString('base64');
-              }
-            }
-          }
-
-          // Extension-pair companions: .sng↔.ins, .dum↔.ins, .4v↔.set
-          const extensionPairs: [string, string][] = [
-            ['.sng', '.ins'], ['.ins', '.sng'],
-            ['.dum', '.ins'], ['.ins', '.dum'],
-            ['.4v', '.set'], ['.set', '.4v'],
-          ];
-          for (const [myExt, pairExt] of extensionPairs) {
-            if (lowerFilename.endsWith(myExt)) {
-              const baseName = filename.slice(0, filename.length - myExt.length);
-              const pairName = dirFiles.find(f => f.toLowerCase() === `${baseName.toLowerCase()}${pairExt}`);
-              if (pairName) {
-                const pairData = await readFile(join(dir, pairName));
-                companionFiles[pairName] = pairData.toString('base64');
-              }
-            }
-          }
-
-          // Shared sample set companions: smp.set or SMP.set (used by Synth Pack, Quartet,
-          // Maximum Effect). Loaded when the main file is NOT already smp.set itself.
-          if (lowerFilename !== 'smp.set') {
-            const smpSet = dirFiles.find(f => f.toLowerCase() === 'smp.set');
-            if (smpSet) {
-              const data = await readFile(join(dir, smpSet));
-              companionFiles[smpSet] = data.toString('base64');
-            }
-          }
-
-          // Kris Hatlelid: .kh song + songplay companion
-          if (lowerFilename.endsWith('.kh')) {
-            const songplay = dirFiles.find(f => f.toLowerCase() === 'songplay');
-            if (songplay) {
-              const data = await readFile(join(dir, songplay));
-              companionFiles[songplay] = data.toString('base64');
-            }
-          }
-
-          // Extension-suffix companions: song.mod.nt, song.adsc.as, song.ip.l, song.ip.n
-          const suffixCompanions = ['.nt', '.as', '.l', '.n'];
-          for (const suffix of suffixCompanions) {
-            const companionName = dirFiles.find(f => f.toLowerCase() === lowerFilename + suffix);
-            if (companionName) {
-              const data = await readFile(join(dir, companionName));
-              companionFiles[companionName] = data.toString('base64');
-            }
-          }
-
-          // Same-basename companion: song.sdata alongside song.ip
-          const dotPos = lowerFilename.lastIndexOf('.');
-          if (dotPos > 0) {
-            const baseName = filename.slice(0, dotPos);
-            const sdataName = dirFiles.find(f => f.toLowerCase() === `${baseName.toLowerCase()}.sdata`);
-            if (sdataName && sdataName.toLowerCase() !== lowerFilename) {
-              const data = await readFile(join(dir, sdataName));
-              companionFiles[sdataName] = data.toString('base64');
-            }
-          }
-
-          // SCI (Sierra) companion: <first3chars>patch.003 (e.g. kq1patch.003 for kq1 march.sci)
-          if (lowerFilename.endsWith('.sci')) {
-            const prefix = filename.slice(0, 3);
-            const patchName = dirFiles.find(f => f.toLowerCase() === `${prefix.toLowerCase()}patch.003`);
-            if (patchName) {
-              const data = await readFile(join(dir, patchName));
-              companionFiles[patchName] = data.toString('base64');
-            }
-          }
-
-          // SUNTronic: look for instr/ subdirectory with .x sample files
-          if (dirFiles.includes('instr')) {
+          const listing = await listDirectoryForCompanions(dir, filename);
+          const resolved = resolveCompanions(filename, listing);
+          for (const key of resolved.companions) {
+            const source = resolved.sources[key] ?? key;
             try {
-              const instrFiles = await readdir(join(dir, 'instr'));
-              for (const instrFile of instrFiles.filter(f => f.endsWith('.x'))) {
-                const data = await readFile(join(dir, 'instr', instrFile));
-                companionFiles[`instr/${instrFile}`] = data.toString('base64');
-              }
-            } catch { /* instr dir might not be readable */ }
-          }
-
-          // Sonix (IFF SMUS / SNX / TINY): external instrument files live in an
-          // Instruments/ subdir (Modland layout: <song>.smus + Instruments/<name>.instr
-          // + <name>.ss PCM). Ship them as companionFiles keyed "Instruments/<file>".
-          if (/\.(smus|snx|tiny)$|^(smus|snx|tiny)\./i.test(lowerFilename)) {
-            const instrDir = dirFiles.find(f => f.toLowerCase() === 'instruments');
-            if (instrDir) {
-              try {
-                const instrFiles = await readdir(join(dir, instrDir));
-                for (const f of instrFiles) {
-                  if (f.startsWith('.')) continue;
-                  if (!/\.(instr|ss)$/i.test(f)) continue;
-                  const p = join(dir, instrDir, f);
-                  try { if (!(await fsStat(p)).isFile()) continue; } catch { continue; }
-                  const data = await readFile(p);
-                  companionFiles[`Instruments/${f}`] = data.toString('base64');
-                }
-              } catch { /* Instruments dir might not be readable */ }
-            }
-          }
-
-          // ZoundMonitor: look for Samples/ subdirectory with raw PCM sample files.
-          // Samples may be in the same dir OR the parent dir (Modland layout:
-          // artist/song.sng + Samples/ at the collection root).
-          if (lowerFilename.endsWith('.sng')) {
-            const searchDirs = [dir, dirname(dir)];
-            for (const searchDir of searchDirs) {
-              try {
-                const searchFiles = await readdir(searchDir);
-                const samplesDir = searchFiles.find(f => f.toLowerCase() === 'samples');
-                if (!samplesDir) continue;
-                const sampleFiles = await readdir(join(searchDir, samplesDir));
-                for (const sf of sampleFiles) {
-                  if (sf.startsWith('.')) continue;
-                  const sfPath = join(searchDir, samplesDir, sf);
-                  try {
-                    const st = await fsStat(sfPath);
-                    if (!st.isFile()) continue;
-                  } catch { continue; }
-                  const data = await readFile(sfPath);
-                  companionFiles[`Samples/${sf}`] = data.toString('base64');
-                }
-                break; // Found Samples/ dir, stop searching
-              } catch { /* dir might not be readable */ }
-            }
+              const data = await readFile(join(dir, source));
+              companionFiles[key] = data.toString('base64');
+            } catch { /* one missing companion does not stop the others */ }
           }
         } catch { /* companion discovery is best-effort */ }
 
@@ -1813,107 +1731,22 @@ export function createMcpServer(): McpServer {
         const filename = remotePath.split('/').pop() || 'download';
         const base64 = buffer.toString('base64');
 
-        // Auto-discover and download companion files for multi-file formats
-        // (TFMX: mdat.songname + smpl.songname, MIDI-Loriciel: MIDI.songname + SMPL.songname)
+        // Companions through the one resolver, over modland's directory
+        // listing. The rule table that lived here was a second copy of the
+        // disk one; both are gone.
         const companionFiles: Record<string, string> = {};
-        const lowerFilename = filename.toLowerCase();
         const dirPath = remotePath.slice(0, remotePath.lastIndexOf('/'));
-
-        // Prefix-pair formats: mdat↔smpl, MIDI↔SMPL, jpn↔smp, thm↔smp, mfp↔smp,
-        // sjs↔smp, MAX↔SMP, mcr↔mcs
-        const prefixPairs: [string, string][] = [
-          ['mdat.', 'smpl.'], ['smpl.', 'mdat.'],
-          ['midi.', 'smpl.'], ['smpl.', 'midi.'],
-          ['jpn.', 'smp.'], ['smp.', 'jpn.'],
-          ['jpnd.', 'smp.'], ['smp.', 'jpnd.'],
-          ['thm.', 'smp.'], ['smp.', 'thm.'],
-          ['mfp.', 'smp.'], ['smp.', 'mfp.'],
-          ['sjs.', 'smp.'], ['smp.', 'sjs.'],
-          ['max.', 'smp.'], ['smp.', 'max.'],
-          ['mcr.', 'mcs.'], ['mcs.', 'mcr.'],
-        ];
-        for (const [myPrefix, pairPrefix] of prefixPairs) {
-          if (lowerFilename.startsWith(myPrefix)) {
-            const suffix = filename.slice(myPrefix.length);
-            const pairName = `${pairPrefix}${suffix}`;
-            const pairPath = `${dirPath}/${pairName}`;
+        try {
+          const listing = await listModlandForCompanions(dirPath, filename);
+          const resolved = resolveCompanions(filename, listing);
+          for (const key of resolved.companions) {
+            const source = resolved.sources[key] ?? key;
             try {
-              const pairResp = await fetch(`${API_BASE}/api/modland/download?path=${encodeURIComponent(pairPath)}`);
-              if (pairResp.ok) {
-                const pairBuf = Buffer.from(await pairResp.arrayBuffer());
-                companionFiles[pairName] = pairBuf.toString('base64');
-              }
-            } catch { /* companion download is best-effort */ }
+              const resp = await fetch(`${API_BASE}/api/modland/download?path=${encodeURIComponent(`${dirPath}/${source}`)}`);
+              if (resp.ok) companionFiles[key] = Buffer.from(await resp.arrayBuffer()).toString('base64');
+            } catch { /* one missing companion does not stop the others */ }
           }
-        }
-
-        // Extension-pair companions: .sng↔.ins, .dum↔.ins, .4v↔.set
-        const extensionPairs: [string, string][] = [
-          ['.sng', '.ins'], ['.dum', '.ins'], ['.4v', '.set'],
-        ];
-        for (const [myExt, pairExt] of extensionPairs) {
-          if (lowerFilename.endsWith(myExt)) {
-            const baseName = filename.slice(0, filename.length - myExt.length);
-            const pairName = `${baseName}${pairExt}`;
-            const pairPath = `${dirPath}/${pairName}`;
-            try {
-              const pairResp = await fetch(`${API_BASE}/api/modland/download?path=${encodeURIComponent(pairPath)}`);
-              if (pairResp.ok) {
-                const pairBuf = Buffer.from(await pairResp.arrayBuffer());
-                companionFiles[pairName] = pairBuf.toString('base64');
-              }
-            } catch { /* companion download is best-effort */ }
-          }
-        }
-
-        // Shared sample set: smp.set (Synth Pack, Quartet, Maximum Effect)
-        if (lowerFilename !== 'smp.set') {
-          const smpSetPath = `${dirPath}/smp.set`;
-          try {
-            const smpResp = await fetch(`${API_BASE}/api/modland/download?path=${encodeURIComponent(smpSetPath)}`);
-            if (smpResp.ok) {
-              const smpBuf = Buffer.from(await smpResp.arrayBuffer());
-              companionFiles['smp.set'] = smpBuf.toString('base64');
-            }
-          } catch { /* best-effort */ }
-        }
-
-        // Sonix (IFF SMUS / SNX / TINY): external instruments in an Instruments/ subdir.
-        // List the sibling Instruments/ folder on modland and download every .instr/.ss,
-        // keyed "Instruments/<file>" to match the SonixMusicDriverParser sidecar mapping.
-        if (/\.(smus|snx|tiny)$|^(smus|snx|tiny)\./i.test(lowerFilename)) {
-          try {
-            const instrDir = `${dirPath}/Instruments`;
-            const listResp = await fetch(`${API_BASE}/api/modland/list?dir=${encodeURIComponent(instrDir)}`);
-            if (listResp.ok) {
-              const listed = await listResp.json() as { files?: Array<{ full_path: string }> };
-              for (const f of listed.files ?? []) {
-                const base = f.full_path.split('/').pop() ?? '';
-                if (!/\.(instr|ss)$/i.test(base)) continue;
-                try {
-                  const dlResp = await fetch(`${API_BASE}/api/modland/download?path=${encodeURIComponent(f.full_path)}`);
-                  if (dlResp.ok) {
-                    const dlBuf = Buffer.from(await dlResp.arrayBuffer());
-                    companionFiles[`Instruments/${base}`] = dlBuf.toString('base64');
-                  }
-                } catch { /* per-file best-effort */ }
-              }
-            }
-          } catch { /* Instruments discovery is best-effort */ }
-        }
-
-        // Kris Hatlelid: .kh + songplay companion
-        if (lowerFilename.endsWith('.kh')) {
-          const songplayPath = `${dirPath}/songplay`;
-          try {
-            const spResp = await fetch(`${API_BASE}/api/modland/download?path=${encodeURIComponent(songplayPath)}`);
-            if (spResp.ok) {
-              const spBuf = Buffer.from(await spResp.arrayBuffer());
-              companionFiles['songplay'] = spBuf.toString('base64');
-            }
-          } catch { /* best-effort */ }
-        }
-
+        } catch { /* companion discovery is best-effort */ }
         // Send to browser for loading
         const loadResult = await callBrowser('load_file', {
           filename,
