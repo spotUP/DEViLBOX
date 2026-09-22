@@ -218,6 +218,10 @@ export function denormalizeSweepRate(n: number): number {
 
 /** Where the master insert's safety clipper starts to saturate. */
 const MASTER_CLIP_THRESHOLD = 0.9;
+/** Ceiling for the master's linear low-end lift, shelf plus punch. See `_resolveMasterLowEnd`. */
+const MASTER_LOW_CEILING_DB = 12;
+/** How often the master trim re-reads the programme while the insert is active. */
+const TRIM_WATCH_MS = 250;
 
 const DECK_IDS: DeckId[] = ['A', 'B', 'C'];
 
@@ -1468,6 +1472,23 @@ export class DubBus {
    */
   private _preInsertProbe: AnalyserNode | null = null;
   private _preInsertLevel: ProgrammeLevel | null = null;
+  /**
+   * Re-derives the trim while the insert is active. The trim used to be
+   * written only on a settings write, so a slider set during a quiet passage
+   * kept its trim into the loud one and the clipper took the difference —
+   * "it clips/distorts" (2026-09-22, BASS +12 with AutoDub).
+   */
+  private _trimWatch: ReturnType<typeof setInterval> | null = null;
+  /**
+   * Where the dub RETURN joins the master. The return used to ride into the
+   * insert with the dry mix and get the same low-end lift, so every echo
+   * tail came back bass-boosted and saturated — "everything gets muddled"
+   * with AutoDub and the BASS control up (2026-09-22). While the insert is
+   * spliced the return joins it at the clipper, past the shelf, the punch
+   * and the weight band; otherwise it goes to the master as before.
+   */
+  private returnSum!: GainNode;
+  private _returnJoinedAtInsert = false;
   private masterMidScoop!: BiquadFilterNode;
   /**
    * Input trim for the master insert, ahead of every boosting stage.
@@ -2481,8 +2502,11 @@ export class DubBus {
     // a ConvolverNode with null buffer can cause browser-specific audio
     // graph issues (silent output, rendering errors) on some Chrome versions.
     this.return_.connect(this.clubDry);
-    this.clubDry.connect(this.master);
-    this.clubWet.connect(this.master);
+    this.returnSum = this.context.createGain();
+    this.returnSum.gain.value = 1;
+    this.clubDry.connect(this.returnSum);
+    this.clubWet.connect(this.returnSum);
+    this.returnSum.connect(this.master);
     if (clubEnabled) {
       this.return_.connect(this.clubConvolver);
       this.clubConvolver.connect(this.clubWet);
@@ -4686,6 +4710,37 @@ export class DubBus {
     this._syncMasterInsertToEnabled();
   }
 
+  private _joinReturnAtInsert(): void {
+    if (this._returnJoinedAtInsert) return;
+    try { this.returnSum.disconnect(this.master); } catch { /* ok */ }
+    try { this.returnSum.connect(this.masterSafetyClip); } catch { /* ok */ }
+    this._returnJoinedAtInsert = true;
+  }
+
+  private _joinReturnAtMaster(): void {
+    if (!this._returnJoinedAtInsert) return;
+    try { this.returnSum.disconnect(this.masterSafetyClip); } catch { /* ok */ }
+    try { this.returnSum.connect(this.master); } catch { /* ok */ }
+    this._returnJoinedAtInsert = false;
+  }
+
+  /** Read by the MCP probe: does the return skip the low-end stages right now? */
+  get returnBypassesLowEnd(): boolean { return this._returnJoinedAtInsert; }
+
+  private _startTrimWatch(): void {
+    if (this._trimWatch) return;
+    this._trimWatch = setInterval(() => {
+      if (!this.masterInsertActive || this._disposed) { this._stopTrimWatch(); return; }
+      try { this._applyMasterTrim(this.settings, this.context.currentTime); } catch { /* keep watching */ }
+    }, TRIM_WATCH_MS);
+  }
+
+  private _stopTrimWatch(): void {
+    if (!this._trimWatch) return;
+    clearInterval(this._trimWatch);
+    this._trimWatch = null;
+  }
+
   private _releasePreInsertProbe(): void {
     const probe = this._preInsertProbe;
     if (!probe) return;
@@ -4801,9 +4856,11 @@ export class DubBus {
       // main signal at the destination, so they're NOT filtered by any
       // master-side FX.
       this.vinylDirect.connect(dest);
+      this._joinReturnAtInsert();
       this.masterInsertSource = source;
       this.masterInsertDest = dest;
       this.masterInsertActive = true;
+      this._startTrimWatch();
       // Re-run the master-side gain writes now that masterActive is true.
       //
       // NOT through `setSettings`. That short-circuits when nothing CHANGED:
@@ -4851,6 +4908,58 @@ export class DubBus {
    * master with a route to the destination. Nothing may return early past
    * this while `masterInsertSplice` is set.
    */
+  /**
+   * The master low end the BASS and PUNCH controls resolve to.
+   *
+   * masterBassPunchDb is dry-path bass weight. The master path is OUTSIDE
+   * the echo feedback loop, so it can be pushed harder than the wet bus's
+   * bassShelfGainDb, which self-oscillates above about +12 dB even with the
+   * feedback compensator.
+   *
+   * TWO STAGES, NOT ONE SUM. These were added together and the total clamped
+   * to +9 dB. With the shipped defaults that is 9 + 6 = 15 clamped to 9, so
+   * the shelf arrived pinned at the ceiling and the BASS slider did nothing
+   * from +3 upward. Each control now drives its own shelf and neither can
+   * silence the other; the ceiling is spent on PUNCH, never on BASS.
+   *
+   * The ceiling is 12 dB. It was 18, and at 150 Hz — where the programme
+   * actually is — 18 dB of linear lift put the insert well over full scale
+   * on every loud passage ("it clips/distorts", 2026-09-22). The weight band
+   * now carries the top of the control as harmonics, so the linear stages no
+   * longer have to.
+   */
+  private _resolveMasterLowEnd(safeBassGain: number, m: DubBusSettings): {
+    safeMasterPunch: number;
+    weight: ReturnType<typeof lowBandWeightFor>;
+    /** dB the trim has to pay for: both linear stages plus the band's peak. */
+    costDb: number;
+  } {
+    const wantPunch = Math.max(-18, Math.min(18, m.masterBassPunchDb ?? 0));
+    const punchHeadroom = Math.max(0, MASTER_LOW_CEILING_DB - Math.max(0, safeBassGain));
+    const safeMasterPunch = wantPunch > 0 ? Math.min(wantPunch, punchHeadroom) : wantPunch;
+    const weight = lowBandWeightFor(safeBassGain);
+    // The band is normalised to ±1 and added at `gain`, so it can raise a
+    // low-end peak by up to (1 + gain) — counted in dB alongside the shelves.
+    const bandAddDb = 20 * Math.log10(1 + weight.gain);
+    return { safeMasterPunch, weight, costDb: safeBassGain + safeMasterPunch + bandAddDb };
+  }
+
+  /**
+   * Pay for the low-end boost before applying it. A +9 dB shelf with no trim
+   * put the mix 9 dB over the limiter's -1 dB threshold; at ratio 4 that
+   * still leaves +1.25 dB at the destination, which clips. Only what will
+   * not fit is charged — see `shelfTrimDb` — against the programme as it
+   * arrives at the insert, and re-read every `TRIM_WATCH_MS` while the
+   * insert is active so a loud passage after a quiet one is still paid for.
+   */
+  private _applyMasterTrim(m: DubBusSettings, now: number): void {
+    const masterActive = this.enabled && this.masterInsertActive;
+    const safeBassGain = Math.max(-12, Math.min(12, m.bassShelfGainDb));
+    const { costDb } = this._resolveMasterLowEnd(safeBassGain, m);
+    const trimDb = masterActive ? shelfTrimDb(costDb, this._programmeBeforeInsert()) : 0;
+    this._settle(this.masterToneTrim.gain, Math.pow(10, trimDb / 20), now, 0.02);
+  }
+
   /**
    * Write the master-insert tone stages — low shelf, punch, trim, mid scoop,
    * stereo width — from the current settings.
@@ -4900,10 +5009,7 @@ export class DubBus {
     // dub is drums and bass and the low end has to be able to get heavy;
     // +12 bass with the default +6 punch now lands exactly on it, so the
     // whole BASS travel is live.
-    const MASTER_LOW_CEILING_DB = 18;
-    const wantPunch = Math.max(-18, Math.min(18, m.masterBassPunchDb ?? 0));
-    const punchHeadroom = Math.max(0, MASTER_LOW_CEILING_DB - Math.max(0, safeBassGain));
-    const safeMasterPunch = wantPunch > 0 ? Math.min(wantPunch, punchHeadroom) : wantPunch;
+    const { safeMasterPunch, weight } = this._resolveMasterLowEnd(safeBassGain, m);
     rampBiquadParam(this.masterBassShelf.frequency, m.bassShelfFreqHz, now);
     rampBiquadParam(this.masterBassShelf.Q, m.bassShelfQ, now);
     rampBiquadParam(this.masterBassShelf.gain, masterActive ? safeBassGain : 0, now);
@@ -4913,20 +5019,10 @@ export class DubBus {
     // Low-band weight: the BASS control also drives harmonics, so the top of
     // its travel gets heavier without needing the level the clipper takes
     // back. Corner follows the shelf so the two lift the same band.
-    const weight = lowBandWeightFor(safeBassGain);
     rampBiquadParam(this.lowBandLp.frequency, m.bassShelfFreqHz, now);
     this._settle(this.lowBandDrive.gain, weight.drive, now, 0.02);
     this._settle(this.lowBandGain.gain, masterActive ? weight.gain : 0, now, 0.02);
-    // What the two stages add up to — what the trim has to pay for.
-    const safeMasterShelfGain = safeBassGain + safeMasterPunch;
-    // Pay for the boost before applying it. A +9 dB shelf with no trim put
-    // the mix 9 dB over the limiter's -1 dB threshold; at ratio 4 that still
-    // leaves +1.25 dB at the destination, which clips.
-    // Pay for the boost — but only for what it actually costs. A low shelf
-    // lifts the low end, not the whole mix, so the trim follows the share of
-    // energy that lives down there rather than the shelf's dB figure.
-    const trimDb = masterActive ? shelfTrimDb(safeMasterShelfGain, this._programmeBeforeInsert()) : 0;
-    this._settle(this.masterToneTrim.gain, Math.pow(10, trimDb / 20), now, 0.02);
+    this._applyMasterTrim(m, now);
     rampBiquadParam(this.masterMidScoop.frequency, m.midScoopFreqHz, now);
     rampBiquadParam(this.masterMidScoop.Q, m.midScoopQ, now);
     rampBiquadParam(this.masterMidScoop.gain, masterActive ? m.midScoopGainDb : 0, now);
@@ -4951,6 +5047,7 @@ export class DubBus {
     try { source.disconnect(this.masterInsertHead); } catch { /* ok */ }
     try { this.masterInsertTail.disconnect(dest); } catch { /* ok */ }
     try { this.vinylDirect.disconnect(dest); } catch { /* ok */ }
+    this._joinReturnAtMaster();
     // The one line that matters. Everything above is tidying.
     try { source.connect(dest); } catch { /* ok */ }
     try { this.masterInsertEnvelope.gain.setValueAtTime(1, this.context.currentTime); } catch { /* ok */ }
@@ -4991,6 +5088,7 @@ export class DubBus {
     this.masterInsertActive = false;
     this.masterInsertSource = null;
     this.masterInsertDest = null;
+    this._stopTrimWatch();
     this.masterInsertPending = setTimeout(() => {
       this.masterInsertPending = null;
       // Restores the direct path and resets the envelope to 1, so the next
@@ -7511,6 +7609,7 @@ export class DubBus {
 
   /** Dispose and release all bus resources. */
   dispose(): void {
+    this._stopTrimWatch();
     this._releasePreInsertProbe();
     for (const timer of this._heldAnnouncements.values()) clearInterval(timer);
     this._heldAnnouncements.clear();
