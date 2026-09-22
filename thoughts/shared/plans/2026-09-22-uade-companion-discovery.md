@@ -165,3 +165,16 @@ map handed to `loadFile` is exactly the "must find" column.
   dropped off the relay after the Audio Sculpture test.
 - TFMX loads on its native `tfmx` path (not UADE) — `uadeCompanionNames`
   empty there is expected.
+- CF-9, second pass after the MCP server reconnect: `dns.starball title`
+  still refused with the companion received. The core's stderr, now carried
+  in the refusal, said `uade_request_amiga_file: file not found
+  '/uade/SMP.starball title'` — the route for `dns.` called `parseUADEFile`
+  WITHOUT `companionFiles`; 33 routes did. Fixed (`e51308653`) with a test
+  over every call site. After it: DynamicSynthesizer registers
+  `smp.starball title` and plays; SynthDream nobuddiesland registers
+  `smp.nobuddiesland end 2`.
+- Open: the tab drops off the relay ~10-20 s into PLAYING a UADE two-file
+  song (Audio Sculpture, then nobuddiesland) and does not come back on its
+  own — page frozen or crashed. Needs the browser console at the moment of
+  the freeze. `sdr` is on no scan list (dns is); a full subsong scan is one
+  candidate.
