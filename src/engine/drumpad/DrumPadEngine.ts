@@ -16,6 +16,9 @@ import { setDubBusForRouter } from '../dub/DubRouter';
 import { getToneEngine } from '../ToneEngine';
 import { getChannelRoutedEffectsManager } from '../tone/ChannelRoutedEffects';
 import { getNativeAudioNode } from '../../utils/audio-context';
+import { useDrumPadStore } from '../../stores/useDrumPadStore';
+import { useTransportStore } from '../../stores/useTransportStore';
+import { bpmSyncedEchoRate, getActiveBpm } from '../dub/DubActions';
 import {
   beginDubTransient,
   setDubTransient,
@@ -124,6 +127,22 @@ export class DrumPadEngine {
       } else {
         console.warn('[DrumPadEngine] master insert: native nodes unavailable');
       }
+      // Mirror the store's dub settings into the bus, from here, for the life
+      // of the engine.
+      //
+      // This used to be a `useEffect` in DubDeckStrip, with narrower copies in
+      // PadGrid and DJSamplerPanel. That made ENGINE STATE depend on a
+      // COMPONENT'S RENDER: in a layout where none of the three is mounted —
+      // the mobile tracker tree is exactly that — the bus never learned
+      // `enabled`, so the master insert never wired and the settings the user
+      // had saved were never applied. Same defect as the master-insert splice
+      // above, one layer up.
+      //
+      // The comment in useDrumPadStore claimed a `usePadEngineDubBus` hook did
+      // this. That hook has not existed for some time; the comment was its
+      // only remaining reference.
+      this.startDubSettingsMirror();
+
       // Cold-path throw activation. This drives the MIXER STORE, so it is a
       // transient like any move: `amt` opens it, `null` closes it and the
       // channel returns to the user's send/mute. Writing the store directly
@@ -872,7 +891,90 @@ export class DrumPadEngine {
   /**
    * Cleanup and release resources
    */
+  /** Unsubscribe for the store mirror, so `dispose` can stop it. */
+  private _dubMirrorOff: (() => void) | null = null;
+  private _dubMirrorTimer: ReturnType<typeof setTimeout> | null = null;
+
+  /**
+   * Push the store's dub settings into the bus whenever they change.
+   *
+   * Debounced, because a slider drag produces a value per pixel and each one
+   * would ramp the delay line audibly. 100 ms matches what the strip's effect
+   * used and is well under a musical event.
+   *
+   * BPM-sync lives here too. The echo rate the user sees is a DIVISION of the
+   * tempo, so the rate actually sent depends on the transport — which is
+   * engine knowledge, not view knowledge.
+   *
+   * The one subtlety is when NOT to sync: a move or a rate preset that is
+   * holding the echo rate must not be overwritten by the next BPM tick. The
+   * bus answers that itself through `isRateOverridden`, which is ref-counted
+   * so overlapping claims release in the right order. The strip used to track
+   * this in React state (`activeRatePresetRef`) because the delay presets did
+   * not claim the override; they do now.
+   */
+  private startDubSettingsMirror(): void {
+    if (this._dubMirrorOff) return;
+
+    const push = (): void => {
+      try {
+        const store = useDrumPadStore.getState();
+        const settings = store.dubBus;
+        const bpm = getActiveBpm();
+        const safeBpm = Math.max(30, Math.min(300, bpm || 120));
+        const beatMs = 60000 / safeBpm;
+        // A held preset or an in-flight move owns the rate; leave it alone.
+        const division = this.dubBus.isRateOverridden() ? 'off' : settings.echoSyncDivision;
+        const patch: DubBusSettings = {
+          ...settings,
+          echoRateMs: bpmSyncedEchoRate(bpm, division, settings.echoRateMs),
+        };
+        if (settings.pingPongSyncToBpm) {
+          patch.pingPongLMs = Math.round(beatMs * 0.75); // dotted eighth
+          patch.pingPongRMs = Math.round(beatMs * 1.0);  // half of a beat
+        }
+        this.setDubBusSettings(patch);
+      } catch (e) {
+        console.warn('[DrumPadEngine] dub settings mirror failed:', e);
+      }
+    };
+
+    const schedule = (): void => {
+      if (this._dubMirrorTimer !== null) clearTimeout(this._dubMirrorTimer);
+      this._dubMirrorTimer = setTimeout(() => {
+        this._dubMirrorTimer = null;
+        push();
+      }, 100);
+    };
+
+    // Apply what is already in the store before waiting for a change — a
+    // session that never touches a dub control must still get its settings.
+    push();
+
+    // Plain `subscribe` and an identity check, because neither store carries
+    // the `subscribeWithSelector` middleware — the two-argument form does not
+    // exist on them. `dubBus` is replaced wholesale on every patch, so a
+    // reference comparison is exact and costs nothing.
+    let lastDub = useDrumPadStore.getState().dubBus;
+    let lastBpm = useTransportStore.getState().bpm;
+    const offDub = useDrumPadStore.subscribe((st) => {
+      if (st.dubBus === lastDub) return;
+      lastDub = st.dubBus;
+      schedule();
+    });
+    const offBpm = useTransportStore.subscribe((st) => {
+      if (st.bpm === lastBpm) return;
+      lastBpm = st.bpm;
+      schedule();
+    });
+    this._dubMirrorOff = () => { offDub(); offBpm(); };
+  }
+
   dispose(): void {
+    if (this._dubMirrorTimer !== null) clearTimeout(this._dubMirrorTimer);
+    this._dubMirrorTimer = null;
+    this._dubMirrorOff?.();
+    this._dubMirrorOff = null;
     this._disposed = true;
     // Cancel all pending async cleanup timers
     this.pendingCleanupTimers.forEach(t => clearTimeout(t));

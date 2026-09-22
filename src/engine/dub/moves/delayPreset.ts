@@ -26,8 +26,23 @@ import type { DubMove } from './_types';
 function rateToggle(getMs: (bpm: number) => number): DubMove['execute'] {
   return ({ bus, bpm }) => {
     const prev = bus.getEchoRateMs();
+    // Claim the rate for as long as this preset is held.
+    //
+    // `beginRateOverride` exists for exactly this — its own docblock says it
+    // replaces the strip's React-local `activeRatePresetRef`, because "a move
+    // fired from the keyboard, MIDI, MCP or AutoDub got no protection". These
+    // presets never adopted it, so BPM-sync could overwrite a held preset
+    // within about a tenth of a second, and the UI had to keep tracking the
+    // active preset itself to stop that. It is ref-counted, so overlapping
+    // claims release in the right order.
+    const releaseRate = bus.beginRateOverride();
     bus.setEchoRate(getMs(bpm));
-    return { dispose: () => bus.setEchoRate(prev) };
+    return {
+      dispose: () => {
+        releaseRate();
+        bus.setEchoRate(prev);
+      },
+    };
   };
 }
 

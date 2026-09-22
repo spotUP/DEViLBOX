@@ -23,7 +23,7 @@ import { useTrackerStore } from '@/stores/useTrackerStore';
 import { resolveChannelNames } from '@/lib/tracker/channelNames';
 import { useUIStore } from '@/stores/useUIStore';
 import { useTransportStore } from '@/stores/useTransportStore';
-import { bpmSyncedEchoRate, getActiveBpm } from '@/engine/dub/DubActions';
+import { getActiveBpm } from '@/engine/dub/DubActions';
 import { subscribeDubRouter, subscribeDubRelease, fire as fireDub } from '@/engine/dub/DubRouter';
 import { beginGesture, endGesture, cancelGesture } from '@/engine/dub/GestureEngine';
 import { getAutoDubCurrentRoles } from '@/engine/dub/AutoDub';
@@ -698,41 +698,21 @@ export const DubDeckStrip: React.FC = () => {
   // tool), any active echoSyncDivision should re-derive echoRateMs so the
   // delay stays locked to the grid. Before G12 the rate was frozen at
   // division-selection time.
-  const transportBpm = useTransportStore((s) => s.bpm);
 
-  useEffect(() => {
-    // Debounce 100 ms — pitch-fader scrubbing in DJ view and rapid tempo
-    // commands in tracker view can fire a dozen BPM updates in a few
-    // hundred ms. Without debounce the engine churns setDubBusSettings
-    // calls that ramp the delay line audibly.
-    const h = setTimeout(() => {
-      try {
-        const bpm = getActiveBpm();
-        const safeBpm = Math.max(30, Math.min(300, bpm || 120));
-        const beatMs = 60000 / safeBpm;
-        // When a RATE preset is active, treat division as 'off' so the preset
-        // rate is preserved and doesn't drift with BPM changes.
-        // A RATE preset button (UI) or an in-flight move (engine) is driving
-        // the rate — either way BPM-sync must not overwrite it.
-        let moveDrivingRate = false;
-        try { moveDrivingRate = ensureDrumPadEngine().getDubBus().isRateOverridden(); } catch { /* bus not ready */ }
-        const effectiveDivision = (activeRatePresetRef.current || moveDrivingRate)
-          ? 'off'
-          : dubBusSettings.echoSyncDivision;
-        const synced = bpmSyncedEchoRate(bpm, effectiveDivision, dubBusSettings.echoRateMs);
-        // Mad Professor ping-pong BPM sync — 3/8 note L, 1/2 note R.
-        const patch: typeof dubBusSettings = { ...dubBusSettings, echoRateMs: synced };
-        if (dubBusSettings.pingPongSyncToBpm) {
-          patch.pingPongLMs = Math.round(beatMs * 0.75);  // 3/8 note (dotted 8th)
-          patch.pingPongRMs = Math.round(beatMs * 1.0);   // 1/2 note (half of a beat)
-        }
-        ensureDrumPadEngine().setDubBusSettings(patch);
-      } catch (e) {
-        console.warn('[DubDeckStrip] setDubBusSettings failed:', e);
-      }
-    }, 100);
-    return () => clearTimeout(h);
-  }, [dubBusSettings, transportBpm]);
+  // The store -> engine settings mirror used to live here, as a 100 ms
+  // debounced effect that computed the BPM-synced echo rate and pushed the
+  // whole settings object.
+  //
+  // It now belongs to DrumPadEngine (`startDubSettingsMirror`), for the same
+  // reason the master-insert splice moved to DubBus: engine state must not
+  // depend on a component being rendered. With it here, any layout that does
+  // not mount this strip — the mobile tracker tree is exactly that — left the
+  // bus never learning `enabled`, so the master insert never wired and the
+  // user's saved settings were never applied.
+  //
+  // Do not reintroduce it. The engine also owns the BPM arithmetic now, which
+  // is where it belonged: the rate the user picks is a DIVISION of the tempo,
+  // and whether to sync at all depends on `bus.isRateOverridden()`.
 
   // G13: sidechain source router. When sidechainSource flips between
   // 'bus' and 'channel' (or the channel index changes), re-wire the
