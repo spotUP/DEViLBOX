@@ -2,7 +2,7 @@
 date: 2026-09-22
 topic: Responsive and mobile — making DEViLBOX usable on phones and tablets
 tags: [mobile, responsive, tablet, touch, layout, breakpoints, ui]
-status: draft
+status: draft — decisions answered 2026-09-22
 ---
 
 # Responsive / mobile — make DEViLBOX usable on phones and tablets
@@ -84,7 +84,7 @@ Each of these was counted, not assumed.
 Eleven concrete documented items. This is not a summary; each is a location.
 
 1. `thoughts/spot/todos.md:71-82` — the parent task, with its own constraints (DOM-only, token allowlist, design-system components, compact typography, Fader/Knob pointer behaviour).
-2. `thoughts/shared/plans/2026-03-25-ios-pattern-editor.md` — `status: draft`, never marked implemented. Commit `69ec0f3f1` delivered part of it (main-thread Canvas2D). Its "Key Challenges" list at `:29-33` — *"Touch handling for scrolling, cursor movement, selection needs to work"* — is still open in the 640–767 band.
+2. `thoughts/shared/plans/2026-03-25-ios-pattern-editor.md` — `status: draft — decisions answered 2026-09-22`, never marked implemented. Commit `69ec0f3f1` delivered part of it (main-thread Canvas2D). Its "Key Challenges" list at `:29-33` — *"Touch handling for scrolling, cursor movement, selection needs to work"* — is still open in the 640–767 band.
 3. `thoughts/shared/plans/2026-09-17-dub-studio-progress.md:1673` — **X32**, dub deck header ran off the edge. Closed 2026-09-21 (`8550d9bcb`) by `flex flex-wrap`, verified at 1509/1280/1024/900. Never checked below 900.
 4. `thoughts/shared/plans/2026-09-17-dub-studio-progress.md:2041` — **X24/X29**, the `instrument-panel` container query. Closed; it is the reusable pattern for "panel decides what it drops".
 5. `thoughts/shared/handoffs/2026-09-21_dub-deck-ui-require-class-and-the-ahx-silence.md:17,32` — "make the header row survive a narrow window"; the `7rem` auto-fill floor at `DubDeckStrip.tsx:208`.
@@ -150,7 +150,7 @@ Independent of layout; ship it whenever.
 
 ### Phase 3 — The layout primitives, and removing the fork
 
-The structural phase. Blocked on Decisions 1–3.
+The structural phase. Decisions 1–3 are answered, so it is unblocked.
 
 - Add the primitives (names to settle during implementation, but three roles): *Panel that hides below a width*, *Panel that collapses to a disclosure header*, *Panel that relocates into a sheet*. Build the sheet on `src/components/ui/BottomSheet.tsx` — it exists, it is dead, and reviving it is cheaper and more honest than writing a fourth overlay mechanism. It must be brought onto `<Button>` and the token allowlist as part of the revival.
 - Wrap each `TrackerView` panel container in the primitive its Decision-3 answer chose.
@@ -199,22 +199,55 @@ Small, safe, do it last so it does not collide with the phases above.
 - **Not adding a CSS-in-JS layer, a UI framework, or a container-query plugin.** `index.css:3051` records the deliberate choice to write plain CSS rather than add a dependency for one rule. That choice stands.
 - **Not using Playwright for verification.** `CLAUDE.md` bans it. Browser verification is DEViLBOX MCP plus chrome-devtools MCP against real Chrome at `http://localhost:5174`, and a human on a real device for anything involving `dvh`, safe areas, or a finger.
 
-## Decisions for the user — shape changes not made alone
+## Decisions — ANSWERED by the user 2026-09-22
 
-**D1 — Where is the phone/tablet line, and what about a landscape phone?**
-Today: 768 decides the tree, 640 decides the handlers, and the band between is broken. Collapsing them is Phase 0 and is not optional. But *which* number, and: an iPhone in landscape is 844×390 and currently gets the full desktop tree in a 390px-tall viewport. Should the phone layout be chosen by width alone, or by coarse pointer plus a short-viewport test? The second is more correct and affects more devices than the first.
+All six are settled. They are recorded here because they change UI shape, and
+the plan is not free to revisit them.
 
-**D2 — Where does the Dub Deck live on a phone?** *(Blocks Phase 3. The most consequential question here.)*
-It is the app's principal surface and currently has no phone entry point at all. Options: a fourth tab in `MobileTabBar`; a full-screen sheet from `MobileTransportBar`; or tablet-and-up only. Note `thoughts/shared/handoffs/2026-04-20_tracker-dub-studio-phase-1-in-progress.md:126` already specified "Full-Screen Dub Mode — Tab-to-enter, big touch targets" and deferred it. Any of these adds navigation that does not exist on desktop, which is a shape change.
+**D1 — What decides "phone layout": COARSE POINTER + SHORT VIEWPORT.**
+Not width alone. A finger AND a small screen. This catches the case width
+misses — an iPhone in landscape is 844×390 and today gets the full desktop tree
+in a 390px-tall window — and correctly leaves a 900px-wide desktop window as
+desktop. Phase 0 adds `isCoarsePointer` from `matchMedia('(pointer: coarse)')`
+and a short-viewport test; the two together are the signal, and `useResponsive`
+and the bare 640/768 thresholds go.
 
-**D3 — The five tracker panels with nowhere to go at 390px.**
-`PatternOrderSidebar`, the `InstrumentList` panel, `TrackScopesStrip`, `MinimapWrapper`, `InstrumentKnobPanel`. They cannot all be on screen with the grid. Sheets reached from the tab bar, a disclosure row above the grid, or a mix decided per panel? The `@container instrument-panel` rule (`index.css:3060`) is the precedent for "a panel decides what it drops", and it is the cheapest answer — but it does not extend to a panel that must vanish entirely.
+**D2 — The Dub Deck on a phone: FULL-SCREEN SHEET FROM THE TRANSPORT.**
+Tap in, tap out. Not a tab: the deck needs the whole screen for a 39-move grid,
+and the tab bar's remaining budget is better spent elsewhere (see D6). This is
+the same shape `thoughts/shared/handoffs/2026-04-20_tracker-dub-studio-phase-1-in-progress.md:126`
+specified as "Full-Screen Dub Mode — Tab-to-enter, big touch targets" and then
+deferred. Build it on the dead `src/components/ui/BottomSheet.tsx`, brought onto
+`<Button>` and the token allowlist as part of the revival.
 
-**D4 — DJ view's two decks.** Stack vertically (changes the side-by-side metaphor that is the point of a DJ mixer), keep three columns behind a horizontal scroll (the "controls hidden behind a scroll during a live set" objection already raised and rejected for X32 in `2026-09-17-dub-studio-progress.md:1673`), or declare DJ tablet-and-up? All three are shape decisions.
+**D3 — The five tracker panels: PER-PANEL DECISION.**
+Not a uniform rule. Each panel gets what suits it — the order list and the
+instrument list into sheets, the scope strip and minimap simply hidden (a scope
+behind two taps is worse than no scope), the knob panel collapsed to a
+disclosure. The `@container instrument-panel` rule at `index.css:3060` is the
+precedent: a panel decides what it drops. This is why Phase 3 needs three
+primitives rather than one.
 
-**D5 — Pattern grid density on a tablet.** Finger metrics (1.6×, so roughly two to three channels visible on an iPad instead of eight) or keep desktop density and rely on precision touch? This decides whether an iPad is "a small desktop" or "a large phone", and it propagates to every format editor.
+**D4 — DJ view: TABLET AND UP.**
+Two decks and a crossfader visible at once IS the view; a layout that breaks
+that breaks the point of it, and no reflow fits two decks plus a mixer in
+390px. Mark it tablet-and-up in `src/constants/viewOptions.ts` and say so,
+rather than shipping a broken three-column grid. Revisit only if someone wants
+a purpose-built phone DJ surface, which is a different product decision.
 
-**D6 — Small and cheap: `MobileTabBar.tsx:3` promises Mixer and Arrangement tabs that do not exist.** Build them, or correct the comment? If D2 adds a Dub tab, the tab bar's budget is the same conversation.
+**D5 — Tablet pattern grid: FINGER METRICS.**
+An iPad is a large phone, not a small desktop. The 1.6× metrics apply on
+tablet, accepting roughly 2–3 visible channels instead of 8. Consequence to
+carry deliberately: this propagates to every format editor — Furnace, Hively,
+Klystrack, TFMX, SunTronic — so their collapse defaults and channel counts must
+be checked at tablet width, not just the main grid. Real editing on an iPad is
+the goal; overview is the price.
+
+**D6 — Mobile tab bar: KEEP THREE, CORRECT THE COMMENT.**
+`MobileTabBar.tsx:3` promises five tabs and ships three; the comment is what is
+wrong. Mixer and Arrangement reach a phone through the D3 panel decisions
+instead. This matters more now that D2 puts the Dub sheet on the transport
+rather than a tab — the bar stays uncrowded.
 
 ## Files most likely to change
 
