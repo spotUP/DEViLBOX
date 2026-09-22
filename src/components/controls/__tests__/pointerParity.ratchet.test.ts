@@ -27,28 +27,6 @@ const ROOT = process.cwd();
  * value, which is the order Phase 2 works through them.
  */
 const MOUSE_ONLY_ALLOWLIST: readonly string[] = [
-  // Canvas editors (R2-4)
-  'src/components/instruments/SampleEditor.tsx',
-  'src/components/instruments/SampleSpectrumFilter.tsx',
-  'src/components/dj/DeckAudioWaveform.tsx',
-  'src/components/dj/DeckTrackOverview.tsx',
-  'src/components/ui/FilterCurve.tsx',
-  'src/components/effects/Fil4EqCurve.tsx',
-  'src/components/instruments/editors/wavetable/DrawCanvas.tsx',
-  'src/components/instruments/shared/HarmonicBarsCanvas.tsx',
-  'src/components/instruments/shared/SequenceEditor.tsx',
-  'src/components/instruments/controls/GeonkickEnvelopeCanvas.tsx',
-  'src/components/instruments/controls/SunVoxFramebufferView.tsx',
-  'src/components/instruments/editors/MacroEditor.tsx',
-  'src/components/instruments/editors/MAMEMacroEditor.tsx',
-  'src/components/instruments/InstrumentList.tsx',
-  'src/components/instruments/KontaktPlayer.tsx',
-  'src/components/instruments/synths/modular/views/ModularCanvasView.tsx',
-  'src/components/instruments/synths/modular/widgets/ModulePanel.tsx',
-  'src/components/drumpad/PadButton.tsx',
-  'src/components/drumpad/PadEditor.tsx',
-  'src/components/drumpad/DrumPadManager.tsx',
-  'src/hooks/drumpad/useDrumPadKeyboard.ts',
   // Hardware UIs (R2-5)
   'src/components/effects/hardware/AelapseHardwareUI.tsx',
   'src/components/instruments/hardware/AmsynthHardwareUI.tsx',

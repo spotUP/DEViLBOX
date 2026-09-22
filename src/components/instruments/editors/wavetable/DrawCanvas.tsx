@@ -233,7 +233,7 @@ export const DrawCanvas: React.FC<DrawCanvasProps> = ({
     return { idx, value };
   };
 
-  const handleMouseDown = (e: React.MouseEvent) => {
+  const handlePointerDown = (e: React.PointerEvent) => {
     const hit = sampleFromEvent(e);
     if (!hit) return;
     setIsDragging(true);
@@ -243,7 +243,7 @@ export const DrawCanvas: React.FC<DrawCanvasProps> = ({
     onChange(newData);
   };
 
-  const handleMouseMove = (e: React.MouseEvent) => {
+  const handlePointerMove = (e: React.PointerEvent) => {
     if (!isDragging) return;
     const hit = sampleFromEvent(e);
     if (!hit) return;
@@ -253,7 +253,7 @@ export const DrawCanvas: React.FC<DrawCanvasProps> = ({
     onChange(newData);
   };
 
-  const handleMouseUp = () => {
+  const handlePointerUp = () => {
     setIsDragging(false);
     lastIdxRef.current = null;
   };
@@ -265,10 +265,11 @@ export const DrawCanvas: React.FC<DrawCanvasProps> = ({
         width={Math.max(320, length * 12)}
         height={height}
         className="cursor-crosshair block w-full"
-        onMouseDown={handleMouseDown}
-        onMouseMove={handleMouseMove}
-        onMouseUp={handleMouseUp}
-        onMouseLeave={handleMouseUp}
+        style={{ touchAction: 'none' }}
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+        onMouseLeave={handlePointerUp}
       />
     </div>
   );

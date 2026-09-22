@@ -356,7 +356,7 @@ export const MacroEditor: React.FC<MacroEditorProps> = ({
 
   // ── Mouse event handlers ────────────────────────────────────────────────────
 
-  const handleMouseDown = (e: React.MouseEvent) => {
+  const handlePointerDown = (e: React.PointerEvent) => {
     // Mode: set loop/release point
     if (isSettingLoop || isSettingRelease) {
       const { step } = getStepFromMouse(e);
@@ -383,7 +383,7 @@ export const MacroEditor: React.FC<MacroEditorProps> = ({
     }
   };
 
-  const handleMouseMove = (e: React.MouseEvent) => {
+  const handlePointerMove = (e: React.PointerEvent) => {
     const { step, value } = getStepFromMouse(e);
 
     // Always update hover tooltip
@@ -412,12 +412,12 @@ export const MacroEditor: React.FC<MacroEditorProps> = ({
     }
   };
 
-  const handleMouseUp = () => {
+  const handlePointerUp = () => {
     setIsDragging(false);
     dragStartRef.current = null;
   };
 
-  const handleMouseLeave = () => {
+  const handlePointerLeave = () => {
     setIsDragging(false);
     setHoveredStep(null);
   };
@@ -569,14 +569,14 @@ export const MacroEditor: React.FC<MacroEditorProps> = ({
       >
         <canvas
           ref={canvasRef}
-          style={{ display: 'block' }}
+          style={{ display: 'block', touchAction: 'none' }}
           className={`${
             isSettingLoop || isSettingRelease ? 'cursor-crosshair' : 'cursor-pointer'
           }`}
-          onMouseDown={handleMouseDown}
-          onMouseMove={handleMouseMove}
-          onMouseUp={handleMouseUp}
-          onMouseLeave={handleMouseLeave}
+          onPointerDown={handlePointerDown}
+          onPointerMove={handlePointerMove}
+          onPointerUp={handlePointerUp}
+          onMouseLeave={handlePointerLeave}
         />
 
         {/* Hover tooltip */}

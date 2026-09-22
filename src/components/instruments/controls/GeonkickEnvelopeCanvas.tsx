@@ -190,7 +190,7 @@ export const GeonkickEnvelopeCanvas: React.FC<GeonkickEnvelopeCanvasProps> = ({
     };
   }, []);
 
-  const handleMouseDown = useCallback(
+  const handlePointerDown = useCallback(
     (e: React.MouseEvent<HTMLCanvasElement>) => {
       e.preventDefault();
       const { cx, cy } = getCanvasCoords(e);
@@ -205,7 +205,7 @@ export const GeonkickEnvelopeCanvas: React.FC<GeonkickEnvelopeCanvasProps> = ({
     [findPointAt, getCanvasCoords, draw],
   );
 
-  const handleMouseMove = useCallback(
+  const handlePointerMove = useCallback(
     (e: React.MouseEvent<HTMLCanvasElement>) => {
       if (!isDraggingRef.current || dragIndexRef.current === null) return;
       const { cx, cy } = getCanvasCoords(e);
@@ -233,7 +233,7 @@ export const GeonkickEnvelopeCanvas: React.FC<GeonkickEnvelopeCanvasProps> = ({
     [fromCanvasX, fromCanvasY, getCanvasCoords, onChange, draw],
   );
 
-  const handleMouseUp = useCallback(() => {
+  const handlePointerUp = useCallback(() => {
     if (isDraggingRef.current) {
       dragIndexRef.current = null;
       isDraggingRef.current = false;
@@ -303,13 +303,14 @@ export const GeonkickEnvelopeCanvas: React.FC<GeonkickEnvelopeCanvasProps> = ({
         draw();
       }
     };
-    document.addEventListener('mouseup', onUp);
-    return () => document.removeEventListener('mouseup', onUp);
+    document.addEventListener('pointerup', onUp);
+    document.addEventListener('pointercancel', onUp);
+    return () => document.removeEventListener('pointerup', onUp);
   }, [draw]);
 
   // Also handle mouse-move outside canvas for smooth dragging
   useEffect(() => {
-    const onMove = (e: MouseEvent) => {
+    const onMove = (e: PointerEvent) => {
       if (!isDraggingRef.current || dragIndexRef.current === null) return;
       const canvas = canvasRef.current;
       if (!canvas) return;
@@ -336,8 +337,8 @@ export const GeonkickEnvelopeCanvas: React.FC<GeonkickEnvelopeCanvasProps> = ({
       onChange(pts);
       draw();
     };
-    document.addEventListener('mousemove', onMove);
-    return () => document.removeEventListener('mousemove', onMove);
+    document.addEventListener('pointermove', onMove);
+    return () => document.removeEventListener('pointermove', onMove);
   }, [fromCanvasX, fromCanvasY, onChange, draw]);
 
   // Force re-render when points change to update the ref-based draw
@@ -348,10 +349,10 @@ export const GeonkickEnvelopeCanvas: React.FC<GeonkickEnvelopeCanvasProps> = ({
   return (
     <canvas
       ref={canvasRef}
-      style={{ width, height, cursor: 'crosshair' }}
-      onMouseDown={handleMouseDown}
-      onMouseMove={handleMouseMove}
-      onMouseUp={handleMouseUp}
+      style={{ width, height, cursor: 'crosshair', touchAction: 'none' }}
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerUp}
       onClick={handleClick}
       onContextMenu={handleContextMenu}
     />

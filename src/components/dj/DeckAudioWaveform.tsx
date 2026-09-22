@@ -239,7 +239,7 @@ export const DeckAudioWaveform: React.FC<DeckAudioWaveformProps> = ({ deckId }) 
   const velocityRef = useRef(0);
   const decayRafRef = useRef(0);
 
-  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+  const handlePointerDown = useCallback((e: React.PointerEvent) => {
     const container = containerRef.current;
     if (!container) return;
     const rect = container.getBoundingClientRect();
@@ -267,7 +267,7 @@ export const DeckAudioWaveform: React.FC<DeckAudioWaveformProps> = ({ deckId }) 
     startScratch(deckId);
     setScratchVelocity(deckId, 0);
 
-    const onMouseMove = (ev: MouseEvent) => {
+    const onPointerMove = (ev: PointerEvent) => {
       if (!isDraggingRef.current) return;
       const now = performance.now();
       const dt = Math.max(1, now - lastTimeRef.current) / 1000;
@@ -281,11 +281,12 @@ export const DeckAudioWaveform: React.FC<DeckAudioWaveformProps> = ({ deckId }) 
       lastTimeRef.current = now;
     };
 
-    const onMouseUp = () => {
+    const onPointerUp = () => {
       if (!isDraggingRef.current) return;
       isDraggingRef.current = false;
-      document.removeEventListener('mousemove', onMouseMove);
-      document.removeEventListener('mouseup', onMouseUp);
+      document.removeEventListener('pointermove', onPointerMove);
+      document.removeEventListener('pointerup', onPointerUp);
+      document.removeEventListener('pointercancel', onPointerUp);
 
       // Momentum decay back to 1× over 300ms (cubic ease-out)
       const fromV = velocityRef.current;
@@ -307,8 +308,9 @@ export const DeckAudioWaveform: React.FC<DeckAudioWaveformProps> = ({ deckId }) 
       decayRafRef.current = requestAnimationFrame(decay);
     };
 
-    document.addEventListener('mousemove', onMouseMove);
-    document.addEventListener('mouseup', onMouseUp);
+    document.addEventListener('pointermove', onPointerMove);
+    document.addEventListener('pointerup', onPointerUp);
+    document.addEventListener('pointercancel', onPointerUp);
   }, [deckId, seekToFraction]);
 
   if (!waveformPeaks || waveformPeaks.length === 0) return null;
@@ -317,7 +319,8 @@ export const DeckAudioWaveform: React.FC<DeckAudioWaveformProps> = ({ deckId }) 
     <div
       ref={containerRef}
       className="w-full h-16 shrink-0 bg-dark-bg border border-dark-border rounded-sm overflow-hidden cursor-pointer"
-      onMouseDown={handleMouseDown}
+      style={{ touchAction: 'none' }}
+      onPointerDown={handlePointerDown}
     />
   );
 };

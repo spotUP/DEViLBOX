@@ -134,12 +134,12 @@ export const FilterCurve: React.FC<FilterCurveProps> = ({
   }, [cutoff, resonance, type, graphWidth, xToFreq, padding.left, dbToY]);
 
   // Handle drag
-  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+  const handlePointerDown = useCallback((e: React.PointerEvent) => {
     e.preventDefault();
     setIsDragging(true);
   }, []);
 
-  const handleMouseMove = useCallback((e: MouseEvent) => {
+  const handlePointerMove = useCallback((e: PointerEvent) => {
     if (!isDragging || !svgRef.current) return;
 
     const rect = svgRef.current.getBoundingClientRect();
@@ -156,20 +156,22 @@ export const FilterCurve: React.FC<FilterCurveProps> = ({
     onResonanceChange(Math.max(0, Math.min(30, newResonance)));
   }, [isDragging, onCutoffChange, onResonanceChange, graphHeight, xToFreq, padding.top]);
 
-  const handleMouseUp = useCallback(() => {
+  const handlePointerUp = useCallback(() => {
     setIsDragging(false);
   }, []);
 
   useEffect(() => {
     if (isDragging) {
-      window.addEventListener('mousemove', handleMouseMove);
-      window.addEventListener('mouseup', handleMouseUp);
+      window.addEventListener('pointermove', handlePointerMove);
+      window.addEventListener('pointerup', handlePointerUp);
+      window.addEventListener('pointercancel', handlePointerUp);
     }
     return () => {
-      window.removeEventListener('mousemove', handleMouseMove);
-      window.removeEventListener('mouseup', handleMouseUp);
+      window.removeEventListener('pointermove', handlePointerMove);
+      window.removeEventListener('pointerup', handlePointerUp);
+      window.removeEventListener('pointercancel', handlePointerUp);
     };
-  }, [isDragging, handleMouseMove, handleMouseUp]);
+  }, [isDragging, handlePointerMove, handlePointerUp]);
 
   // Control point position
   const controlX = freqToX(cutoff);
@@ -193,7 +195,8 @@ export const FilterCurve: React.FC<FilterCurveProps> = ({
         width={width}
         height={height}
         className={`select-none w-full ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
-        onMouseDown={handleMouseDown}
+        style={{ touchAction: 'none' }}
+        onPointerDown={handlePointerDown}
       >
         {/* Grid */}
         <g stroke="var(--color-border-light)" strokeWidth="1">

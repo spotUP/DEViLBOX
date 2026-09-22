@@ -330,8 +330,12 @@ export const SunVoxFramebufferView: React.FC<SunVoxFramebufferViewProps> = ({
         const imgData = ctx.createImageData(width, height);
         const pixelCount = width * height;
 
-        // Wire mouse events — mousedown on canvas, mouseup/mousemove on document
-        // (document listeners handle drag-outside-canvas correctly per CLAUDE.md)
+        // Wire pointer events — pointerdown on canvas, pointerup/pointermove on
+        // document (document listeners handle drag-outside-canvas correctly per
+        // CLAUDE.md). Pointer rather than mouse so a finger drives the SunVox
+        // UI directly instead of through the browser's mouse-compatibility
+        // events, and so pointercancel reaches the WASM as a MOUSE_UP — a
+        // SunVox UI left mid-drag keeps the button held.
         const getCanvasCoords = (e: MouseEvent): [number, number] => {
           const rect = canvas.getBoundingClientRect();
           const scaleX = canvas.width / rect.width;
@@ -342,17 +346,17 @@ export const SunVoxFramebufferView: React.FC<SunVoxFramebufferViewProps> = ({
           ];
         };
 
-        const onMouseDown = (e: MouseEvent) => {
+        const onPointerDown = (e: PointerEvent) => {
           e.preventDefault();
           canvas.focus();
           const [cx, cy] = getCanvasCoords(e);
           m!._sunvox_ui_mouse_event(uiHandle, MOUSE_DOWN, cx, cy, MOUSE_BTN_LEFT);
         };
-        const onMouseUp = (e: MouseEvent) => {
+        const onPointerUp = (e: PointerEvent) => {
           const [cx, cy] = getCanvasCoords(e);
           m!._sunvox_ui_mouse_event(uiHandle, MOUSE_UP, cx, cy, MOUSE_BTN_LEFT);
         };
-        const onMouseMove = (e: MouseEvent) => {
+        const onPointerMove = (e: PointerEvent) => {
           const [cx, cy] = getCanvasCoords(e);
           m!._sunvox_ui_mouse_event(uiHandle, MOUSE_MOVE, cx, cy, 0);
         };
@@ -363,15 +367,18 @@ export const SunVoxFramebufferView: React.FC<SunVoxFramebufferViewProps> = ({
           m!._sunvox_ui_mouse_event(uiHandle, MOUSE_SCROLL, cx, cy, btn);
         };
 
-        canvas.addEventListener('mousedown', onMouseDown);
-        document.addEventListener('mouseup', onMouseUp);
-        document.addEventListener('mousemove', onMouseMove);
+        canvas.style.touchAction = 'none';
+        canvas.addEventListener('pointerdown', onPointerDown);
+        document.addEventListener('pointerup', onPointerUp);
+        document.addEventListener('pointercancel', onPointerUp);
+        document.addEventListener('pointermove', onPointerMove);
         canvas.addEventListener('wheel', onWheel, { passive: false });
 
         eventCleanups.push(
-          () => canvas.removeEventListener('mousedown', onMouseDown),
-          () => document.removeEventListener('mouseup', onMouseUp),
-          () => document.removeEventListener('mousemove', onMouseMove),
+          () => canvas.removeEventListener('pointerdown', onPointerDown),
+          () => document.removeEventListener('pointerup', onPointerUp),
+          () => document.removeEventListener('pointercancel', onPointerUp),
+          () => document.removeEventListener('pointermove', onPointerMove),
           () => canvas.removeEventListener('wheel', onWheel),
         );
 

@@ -149,11 +149,16 @@ export const PadButton: React.FC<PadButtonProps> = ({
 
   const isFxActive = pad.djFxAction && activeFxPads.has(pad.id);
 
-  const handleMouseDown = useCallback((event: React.MouseEvent) => {
+  // Pointer, not mouse: a pad triggered from `mousedown` fires through the
+  // browser's mouse-compatibility events on a touchscreen, which arrive after
+  // the tap and never in a glide. Capture also means a finger that slides off
+  // the pad still gets its release.
+  const handlePointerDown = useCallback((event: React.PointerEvent) => {
     // Ignore right-click (context menu handles it)
     if (event.button === 2) return;
-    
+
     event.preventDefault();
+    try { event.currentTarget.setPointerCapture(event.pointerId); } catch { /* no capture here */ }
     
     // Empty pads: open context menu on left click for easy setup
     if (!isLoaded) {
@@ -174,7 +179,7 @@ export const PadButton: React.FC<PadButtonProps> = ({
     onTrigger(pad.id, vel);
   }, [pad.id, isLoaded, onTrigger, onQuickAssign, calculateVelocity, flashTrigger]);
 
-  const handleMouseUp = useCallback(() => {
+  const handlePointerUp = useCallback(() => {
     setIsPressed(false);
     onRelease?.(pad.id);
   }, [pad.id, onRelease]);
@@ -314,6 +319,7 @@ export const PadButton: React.FC<PadButtonProps> = ({
         ${className}
       `}
       style={{
+        touchAction: 'none',
         transition: isPressed ? 'transform 50ms' : 'transform 120ms',
         backgroundColor: padStyle.bgColor ?? 'var(--color-dark-border)',
         border: `1px solid ${padStyle.borderColor ?? 'var(--color-dark-borderLight)'}`,
@@ -321,9 +327,9 @@ export const PadButton: React.FC<PadButtonProps> = ({
           ? `0 0 12px ${padStyle.glowColor}, inset 0 0 8px ${padStyle.glowColor}`
           : 'inset 0 1px 0 rgba(255,255,255,0.06), 0 1px 2px rgba(0,0,0,0.3)',
       }}
-      onMouseDown={handleMouseDown}
-      onMouseUp={handleMouseUp}
-      onMouseLeave={handleMouseUp}
+      onPointerDown={handlePointerDown}
+      onPointerUp={handlePointerUp}
+      onPointerCancel={handlePointerUp}
       onClick={handleClick}
       onContextMenu={handleContextMenu}
       onFocus={onFocus}
