@@ -398,6 +398,19 @@ export const Knob: React.FC<KnobProps> = React.memo(({
     endDrag();
   }, [endDrag]);
 
+  /**
+   * A pointer can be taken away without ever sending `pointerup` — the browser
+   * steals it for a system gesture, or the captured element is re-created by a
+   * render. `lostpointercapture` is the only event that always arrives, so it
+   * ends the drag too. Without it the "one pointer at a time" guard below
+   * latches and the control is dead until remount — "the sliders stopped
+   * working after some pulls" (2026-09-22).
+   */
+  const handleLostPointerCapture = useCallback((e: React.PointerEvent) => {
+    if (activePointerRef.current !== e.pointerId) return;
+    endDrag();
+  }, [endDrag]);
+
   // Handle double-click to reset
   const handleDoubleClick = useCallback(() => {
     if (disabled) return;
@@ -570,6 +583,7 @@ export const Knob: React.FC<KnobProps> = React.memo(({
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
         onPointerCancel={handlePointerUp}
+        onLostPointerCapture={handleLostPointerCapture}
         onDoubleClick={handleDoubleClick}
         onContextMenu={handleContextMenu}
         onKeyDown={handleKeyDown}
