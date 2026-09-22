@@ -2,10 +2,15 @@
 date: 2026-09-22
 topic: Dub deck controls going dead after a few seconds — open
 tags: [dub, dubbus, session-restore, hively, open]
-status: draft
+status: draft — intermittent, recovered on reload
 ---
 
-# Dub deck controls go dead after a few seconds — OPEN
+# Dub deck controls go dead after a few seconds — INTERMITTENT
+
+**It came back on its own.** After a reload on `main` the owner confirmed "it
+works". So this is not a permanent break in any commit below — it is a state
+the app can enter and recover from, which makes the boot sequence the suspect
+rather than any single control's code.
 
 Reported while testing the responsive/pointer work: "the channels sliders are
 dead", "many of the dub deck buttons are too", then "it worked for some
