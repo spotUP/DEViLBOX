@@ -9,6 +9,7 @@
  */
 
 import { create } from 'zustand';
+import { registerFormatStore } from './storeAccess';
 import { immer } from 'zustand/middleware/immer';
 import type {
   EditorMode,
@@ -1358,3 +1359,7 @@ export const useFormatStore = create<FormatStore>()(
     }),
   }))
 );
+
+// Late-bound access for engine modules that must not import this store
+// statically. See `storeAccess` for why.
+registerFormatStore(useFormatStore);

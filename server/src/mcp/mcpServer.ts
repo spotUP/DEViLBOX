@@ -427,6 +427,15 @@ export function createMcpServer(): McpServer {
   );
 
   server.tool(
+    'clear_silence_snapshot',
+    'Throw away the captured firstSilenceSnapshot so the next silence is caught. '
+      + 'The snapshot is kept until cleared, because the act of looking at the UI '
+      + 'repairs the fault it records.',
+    {},
+    () => call('clear_silence_snapshot'),
+  );
+
+  server.tool(
     'set_bpm',
     'Set tempo in BPM',
     { bpm: z.number().min(20).max(999).describe('Beats per minute') },
