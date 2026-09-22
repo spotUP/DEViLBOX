@@ -1996,6 +1996,14 @@ export const DubDeckStrip: React.FC = () => {
       {/* ── BUS tab — TONE shaping controls ────────────────────────────────── */}
       {activeTab === 'bus' && (
         <div className="flex flex-col gap-2 p-2 text-xs text-text-muted">
+          {/* Two groups, because they act on two different signals. BASS,
+              MID and WIDTH sit in the master insert and shape the WHOLE mix
+              the moment the bus is on. The sweep is on the wet bus and is
+              inaudible until something is sent — "i am testing many of the
+              click buttons ... but i dont hear most of them" (2026-09-22). */}
+          <div className="text-[9px] font-mono uppercase tracking-wide text-text-muted border-b border-dark-borderLight pb-0.5">
+            Master — shapes the whole mix
+          </div>
           <div className="flex items-center gap-2 flex-wrap">
             <span className="w-16 shrink-0 font-bold text-text-secondary">BASS</span>
             <input type="range" min={-12} max={12} step={0.5}
@@ -2025,6 +2033,9 @@ export const DubDeckStrip: React.FC = () => {
               title={`Stereo width · 0=mono (Perry), 1=neutral, 2=wide (Mad Professor)`}
             />
             <span className="w-12">{dubBusSettings.stereoWidth.toFixed(2)}×</span>
+          </div>
+          <div className="text-[9px] font-mono uppercase tracking-wide text-text-muted border-b border-dark-borderLight pb-0.5 mt-1">
+            Wet bus — echo and spring return only; needs a send or Auto Dub
           </div>
           <div className="flex items-center gap-2 flex-wrap">
             <button
