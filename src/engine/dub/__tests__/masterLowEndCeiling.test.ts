@@ -1,4 +1,6 @@
 import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 
 /**
  * The BASS slider must never be silently dead.
@@ -26,7 +28,14 @@ import { describe, it, expect } from 'vitest';
  * worth pinning on its own — it is the thing that was wrong.
  */
 
-const MASTER_LOW_CEILING_DB = 18;
+/**
+ * 12, down from 18. At 150 Hz — where the programme actually is — 18 dB of
+ * linear lift put the insert well over full scale on every loud passage:
+ * "it clips/distorts" (2026-09-22, BASS +12 with AutoDub). The low-band
+ * weight stage now carries the top of the control as harmonics, so the
+ * linear stages no longer have to.
+ */
+const MASTER_LOW_CEILING_DB = 12;
 
 /** Exactly the clamp `_applySettings` performs. */
 function resolveLowEnd(bassShelfGainDb: number, masterBassPunchDb: number) {
@@ -52,15 +61,22 @@ describe('the BASS control', () => {
     expect(a.shelf).toBe(3);
     expect(b.shelf).toBe(9);
     expect(c.shelf).toBe(12);
-    // And each step is audibly different in total, not the same 9 dB.
+    // And each step is audibly different in total, not the same 9 dB —
+    // until the ceiling, where the last steps trade punch for bass and the
+    // extra heaviness comes from the weight band (lowBandWeight.test.ts).
     expect(b.total).toBeGreaterThan(a.total);
-    expect(c.total).toBeGreaterThan(b.total);
+    expect(c.total).toBeGreaterThanOrEqual(b.total);
   });
 
   it('gets heavy — dub is drums and bass', () => {
-    expect(resolveLowEnd(12, 6).total).toBe(18);
     // Against the old behaviour, which capped this same request at 9.
     expect(resolveLowEnd(12, 6).total).toBeGreaterThan(9);
+    expect(resolveLowEnd(12, 6).total).toBe(MASTER_LOW_CEILING_DB);
+  });
+
+  it('keeps the ceiling where the programme fits — the source pins it', () => {
+    const src = readFileSync(join(process.cwd(), 'src/engine/dub/DubBus.ts'), 'utf-8');
+    expect(src).toContain(`const MASTER_LOW_CEILING_DB = ${MASTER_LOW_CEILING_DB};`);
   });
 });
 
@@ -78,8 +94,8 @@ describe('the ceiling still holds', () => {
     // Ask for more than the ceiling between them: bass keeps its full value.
     const r = resolveLowEnd(12, 18);
     expect(r.shelf).toBe(12);
-    expect(r.punch).toBe(6);
-    expect(r.total).toBe(18);
+    expect(r.punch).toBe(MASTER_LOW_CEILING_DB - 12);
+    expect(r.total).toBe(MASTER_LOW_CEILING_DB);
   });
 
   it('leaves a cut alone — only boosts are rationed', () => {
