@@ -59,10 +59,22 @@ describe('the low-band weight stage', () => {
     expect(body).toContain('this.lowBandLp.frequency, m.bassShelfFreqHz');
   });
 
+  it('dips the low mids as the low end goes up — heavy but clean', () => {
+    // "still pretty muddy" (2026-09-22): the shelf's transition band and the
+    // band's harmonics both land an octave above the corner.
+    const body = methodBody('private _applyMasterInsertTone(');
+    expect(body).toContain('this.masterLowMidDip.frequency, m.bassShelfFreqHz * 2');
+    expect(body).toContain('this.masterLowMidDip.gain, masterActive ? lowMidDipDbFor(safeBassGain) : 0');
+    // After the band sum, before the clipper — and the return joins at the
+    // clipper, so echo tails keep their own EQ.
+    expect(source).toContain('this.masterBassPunch.connect(this.masterLowMidDip);');
+  });
+
   it('is silenced with the rest of the master tone when the insert comes out', () => {
     const i = source.indexOf('rampBiquadParam(this.masterBassPunch.gain, 0, now);');
     expect(i).toBeGreaterThan(-1);
-    expect(source.slice(i, i + 200)).toContain('this._settle(this.lowBandGain.gain, 0, now, 0.02);');
+    expect(source.slice(i, i + 260)).toContain('this._settle(this.lowBandGain.gain, 0, now, 0.02);');
+    expect(source.slice(i, i + 260)).toContain('rampBiquadParam(this.masterLowMidDip.gain, 0, now);');
   });
 
   it('starts silent, so an unwired insert adds nothing', () => {
@@ -125,7 +137,8 @@ describe('the dub return skips the low-end stages', () => {
     // The clipper sits after the band sum and before the scoop/width stages,
     // so the return still gets the clipper, the scoop and the width.
     expect(source).toContain('this.lowBandGain.connect(this.masterBassPunch);');
-    expect(source).toContain('this.masterBassPunch.connect(this.masterSafetyClip);');
+    expect(source).toContain('this.masterBassPunch.connect(this.masterLowMidDip);');
+    expect(source).toContain('this.masterLowMidDip.connect(this.masterSafetyClip);');
     expect(source).toContain('this.masterSafetyClip.connect(this.masterMidScoop);');
     const wire = methodBody('async wireMasterInsert(');
     expect(wire).toContain('this._joinReturnAtInsert();');

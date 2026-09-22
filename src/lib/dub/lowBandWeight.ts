@@ -31,9 +31,26 @@ export const LOW_BAND_MAX_DRIVE = 6;
  * bounds what the band can add to a peak: half scale, under the dry path's
  * own boost, never enough on its own to reach the clipper.
  */
-export const LOW_BAND_MAX_GAIN = 0.5;
+export const LOW_BAND_MAX_GAIN = 0.35;
 /** The BASS control's boost range; the band only answers to boosts. */
 const BASS_RANGE_DB = 12;
+
+/**
+ * Low-mid dip that rides with the BASS control, in dB at the top of the
+ * control. A low shelf's transition band runs about an octave above its
+ * corner, and the weight band's 2nd and 3rd harmonics land in the same
+ * place: at 150 Hz that is 200-400 Hz, the low mids — "still pretty muddy"
+ * (2026-09-22, BASS +12 with AutoDub). A dub desk lifts the bass and cuts
+ * the low mids together; that is what "heavy but clean" is.
+ */
+export const LOW_MID_DIP_MAX_DB = -4.5;
+
+/** dB of low-mid cut for a BASS setting. Zero at or below rest. */
+export function lowMidDipDbFor(bassShelfGainDb: number): number {
+  const db = Number.isFinite(bassShelfGainDb) ? bassShelfGainDb : 0;
+  const t = Math.max(0, Math.min(BASS_RANGE_DB, db)) / BASS_RANGE_DB;
+  return t > 0 ? LOW_MID_DIP_MAX_DB * t : 0;
+}
 
 export function lowBandWeightFor(bassShelfGainDb: number): LowBandWeight {
   const db = Number.isFinite(bassShelfGainDb) ? bassShelfGainDb : 0;
