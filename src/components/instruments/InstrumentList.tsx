@@ -289,7 +289,8 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
     if (!showPreviewOnClick) return;
     if (holdTimerRef.current) window.clearTimeout(holdTimerRef.current);
     holdTimerRef.current = window.setTimeout(() => startPreview(inst), 200);
-    document.addEventListener('mouseup', () => stopPreview(), { once: true });
+    document.addEventListener('pointerup', () => stopPreview(), { once: true });
+    document.addEventListener('pointercancel', () => stopPreview(), { once: true });
   }, [showPreviewOnClick, startPreview, stopPreview]);
 
   const handlePreviewUp = useCallback(() => {
@@ -565,9 +566,9 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
                 ref={isSelected ? selectedRef : undefined}
                 onClick={() => handleSelect(instrument.id, instrument)}
                 onDoubleClick={() => onEditInstrument?.(instrument.id)}
-                onMouseDown={() => handlePreviewDown(instrument)}
-                onMouseUp={handlePreviewUp}
-                onMouseLeave={handlePreviewUp}
+                onPointerDown={() => handlePreviewDown(instrument)}
+                onPointerUp={handlePreviewUp}
+                onPointerCancel={handlePreviewUp}
                 draggable="true"
                 onDragStart={(e) => handleDragStart(e, instrument.id)}
                 className={`
@@ -885,9 +886,9 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
                 ref={isSelected ? selectedRef : undefined}
                 onClick={() => handleSelect(instrument.id, instrument)}
                 onDoubleClick={() => onEditInstrument?.(instrument.id)}
-                onMouseDown={() => handlePreviewDown(instrument)}
-                onMouseUp={handlePreviewUp}
-                onMouseLeave={handlePreviewUp}
+                onPointerDown={() => handlePreviewDown(instrument)}
+                onPointerUp={handlePreviewUp}
+                onPointerCancel={handlePreviewUp}
                 draggable="true"
                 onDragStart={(e) => handleDragStart(e, instrument.id)}
                 className={`
@@ -1084,7 +1085,7 @@ const InstrumentTypePicker: React.FC<InstrumentTypePickerProps> = ({ current, on
     const handler = (e: MouseEvent) => {
       if (ref.current && !ref.current.contains(e.target as Node)) onClose();
     };
-    document.addEventListener('mousedown', handler);
+    document.addEventListener('pointerdown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, [onClose]);
 

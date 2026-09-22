@@ -275,7 +275,7 @@ export const SampleSpectrumFilter: React.FC<SampleSpectrumFilterProps> = ({
   }, [points]);
 
   // ── Mouse handlers ───────────────────────────────────────────────────
-  const handleMouseDown = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
+  const handlePointerDown = useCallback((e: React.PointerEvent<HTMLCanvasElement>) => {
     e.preventDefault();
     const { x, y } = canvasPos(e);
     const idx = hitTestPoint(x, y);
@@ -302,7 +302,7 @@ export const SampleSpectrumFilter: React.FC<SampleSpectrumFilterProps> = ({
     }
   }, [canvasPos, hitTestPoint, points]);
 
-  const handleMouseMove = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
+  const handlePointerMove = useCallback((e: React.PointerEvent<HTMLCanvasElement>) => {
     if (draggingIdx === null) return;
     const { x, y } = canvasPos(e);
     const freq = Math.max(MIN_FREQ, Math.min(MAX_FREQ, xToFreq(x, CANVAS_W)));
@@ -311,7 +311,7 @@ export const SampleSpectrumFilter: React.FC<SampleSpectrumFilterProps> = ({
     setPreset('custom');
   }, [draggingIdx, canvasPos]);
 
-  const handleMouseUp = useCallback(() => {
+  const handlePointerUp = useCallback(() => {
     setDraggingIdx(null);
   }, []);
 
@@ -429,11 +429,11 @@ export const SampleSpectrumFilter: React.FC<SampleSpectrumFilterProps> = ({
         ref={canvasRef}
         width={CANVAS_W}
         height={CANVAS_H}
-        style={{ width: CANVAS_W, height: CANVAS_H, display: 'block', cursor: 'crosshair' }}
-        onMouseDown={handleMouseDown}
-        onMouseMove={handleMouseMove}
-        onMouseUp={handleMouseUp}
-        onMouseLeave={handleMouseUp}
+        style={{ width: CANVAS_W, height: CANVAS_H, display: 'block', cursor: 'crosshair', touchAction: 'none' }}
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+        onMouseLeave={handlePointerUp}
         onContextMenu={handleContextMenu}
       />
 

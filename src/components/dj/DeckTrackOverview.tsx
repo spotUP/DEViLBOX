@@ -202,7 +202,7 @@ export const DeckTrackOverview: React.FC<DeckTrackOverviewProps> = ({ deckId }) 
   const isDraggingRef = useRef(false);
   const lastFractionRef = useRef(0);
 
-  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+  const handlePointerDown = useCallback((e: React.PointerEvent) => {
     e.preventDefault();
     isDraggingRef.current = true;
     const container = containerRef.current;
@@ -213,7 +213,7 @@ export const DeckTrackOverview: React.FC<DeckTrackOverviewProps> = ({ deckId }) 
     // Initial click: do the actual seek
     seekToFraction(fraction);
 
-    const onMouseMove = (ev: MouseEvent) => {
+    const onPointerMove = (ev: PointerEvent) => {
       if (!isDraggingRef.current || !container) return;
       const r = container.getBoundingClientRect();
       const f = Math.max(0, Math.min(1, (ev.clientX - r.left) / r.width));
@@ -222,24 +222,26 @@ export const DeckTrackOverview: React.FC<DeckTrackOverviewProps> = ({ deckId }) 
       previewPosition(f);
     };
 
-    const onMouseUp = () => {
+    const onPointerUp = () => {
       isDraggingRef.current = false;
       // Final position: do the actual seek
       seekToFraction(lastFractionRef.current);
-      document.removeEventListener('mousemove', onMouseMove);
-      document.removeEventListener('mouseup', onMouseUp);
+      document.removeEventListener('pointermove', onPointerMove);
+      document.removeEventListener('pointerup', onPointerUp);
+      document.removeEventListener('pointercancel', onPointerUp);
     };
 
-    document.addEventListener('mousemove', onMouseMove);
-    document.addEventListener('mouseup', onMouseUp);
+    document.addEventListener('pointermove', onPointerMove);
+    document.addEventListener('pointerup', onPointerUp);
+    document.addEventListener('pointercancel', onPointerUp);
   }, [seekToFraction, previewPosition]);
 
   return (
     <div
       ref={containerRef}
       className="w-full cursor-pointer relative"
-      style={{ height: BAR_HEIGHT }}
-      onMouseDown={handleMouseDown}
+      style={{ height: BAR_HEIGHT, touchAction: 'none' }}
+      onPointerDown={handlePointerDown}
     >
       {(analysisState === 'rendering' || analysisState === 'analyzing') && (
         <div 

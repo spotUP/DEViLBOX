@@ -311,7 +311,7 @@ function SingleMacroEditor({
     return Math.round(min + normalizedY * range);
   }, [min, max]);
 
-  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+  const handlePointerDown = useCallback((e: React.PointerEvent) => {
     const step = getStepFromEvent(e);
     const value = getValueFromEvent(e);
     if (step === null || step < 0 || step >= length) return;
@@ -324,7 +324,7 @@ function SingleMacroEditor({
     onChange({ ...macro, data: newData });
   }, [getStepFromEvent, getValueFromEvent, data, length, min, max, onChange, macro]);
 
-  const handleMouseMove = useCallback((e: React.MouseEvent) => {
+  const handlePointerMove = useCallback((e: React.PointerEvent) => {
     if (!isDragging) return;
 
     const step = getStepFromEvent(e);
@@ -337,7 +337,7 @@ function SingleMacroEditor({
     onChange({ ...macro, data: newData });
   }, [isDragging, getStepFromEvent, getValueFromEvent, data, length, min, max, onChange, macro]);
 
-  const handleMouseUp = useCallback(() => {
+  const handlePointerUp = useCallback(() => {
     setIsDragging(false);
     setSelectedStep(null);
   }, []);
@@ -417,10 +417,11 @@ function SingleMacroEditor({
         <canvas
           ref={canvasRef}
           className="cursor-crosshair rounded"
-          onMouseDown={handleMouseDown}
-          onMouseMove={handleMouseMove}
-          onMouseUp={handleMouseUp}
-          onMouseLeave={handleMouseUp}
+          style={{ touchAction: 'none' }}
+          onPointerDown={handlePointerDown}
+          onPointerMove={handlePointerMove}
+          onPointerUp={handlePointerUp}
+          onMouseLeave={handlePointerUp}
         />
       </div>
     </div>

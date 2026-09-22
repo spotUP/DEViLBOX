@@ -92,9 +92,10 @@ export const ModularCanvasView: React.FC<ModularCanvasViewProps> = ({ config, on
     return cameraRef.current.screenToWorld(x, y);
   }, []);
 
-  // Pan with middle mouse button or space+drag
+  // Pan with the middle mouse button or Shift+drag. `movementX/Y` is a
+  // pointer property too, so the same handler serves a finger.
   useEffect(() => {
-    const handleMouseDown = (e: MouseEvent) => {
+    const handlePointerDown = (e: PointerEvent) => {
       if (e.button === 1 || (e.button === 0 && e.shiftKey)) {
         // Middle button or Shift+Left
         e.preventDefault();
@@ -102,25 +103,27 @@ export const ModularCanvasView: React.FC<ModularCanvasViewProps> = ({ config, on
       }
     };
 
-    const handleMouseMove = (e: MouseEvent) => {
+    const handlePointerMove = (e: PointerEvent) => {
       if (isPanning) {
         cameraRef.current.pan(e.movementX, e.movementY);
         setCameraState(cameraRef.current.getState());
       }
     };
 
-    const handleMouseUp = () => {
+    const handlePointerUp = () => {
       setIsPanning(false);
     };
 
-    window.addEventListener('mousedown', handleMouseDown);
-    window.addEventListener('mousemove', handleMouseMove);
-    window.addEventListener('mouseup', handleMouseUp);
+    window.addEventListener('pointerdown', handlePointerDown);
+    window.addEventListener('pointermove', handlePointerMove);
+    window.addEventListener('pointerup', handlePointerUp);
+    window.addEventListener('pointercancel', handlePointerUp);
 
     return () => {
-      window.removeEventListener('mousedown', handleMouseDown);
-      window.removeEventListener('mousemove', handleMouseMove);
-      window.removeEventListener('mouseup', handleMouseUp);
+      window.removeEventListener('pointerdown', handlePointerDown);
+      window.removeEventListener('pointermove', handlePointerMove);
+      window.removeEventListener('pointerup', handlePointerUp);
+      window.removeEventListener('pointercancel', handlePointerUp);
     };
   }, [isPanning]);
 
@@ -158,7 +161,7 @@ export const ModularCanvasView: React.FC<ModularCanvasViewProps> = ({ config, on
     };
   }, []);
 
-  const handleBackgroundMouseDown = (e: React.MouseEvent) => {
+  const handleBackgroundPointerDown = (e: React.PointerEvent) => {
     // Only trigger if clicking directly on the background or grid
     if (e.target === e.currentTarget || (e.target as HTMLElement).tagName === 'rect') {
       if (e.button === 0) { // Left click on background
@@ -196,7 +199,7 @@ export const ModularCanvasView: React.FC<ModularCanvasViewProps> = ({ config, on
   useEffect(() => {
     if (!wiringSource) return;
 
-    const handleMouseMove = (e: MouseEvent) => {
+    const handlePointerMove = (e: PointerEvent) => {
       if (!containerRef.current) return;
       const rect = containerRef.current.getBoundingClientRect();
       const relativeX = e.clientX - rect.left;
@@ -204,8 +207,8 @@ export const ModularCanvasView: React.FC<ModularCanvasViewProps> = ({ config, on
       updateWiringPreview(relativeX, relativeY);
     };
 
-    window.addEventListener('mousemove', handleMouseMove);
-    return () => window.removeEventListener('mousemove', handleMouseMove);
+    window.addEventListener('pointermove', handlePointerMove);
+    return () => window.removeEventListener('pointermove', handlePointerMove);
   }, [wiringSource, updateWiringPreview]);
 
   // Port click (start or complete wiring)
@@ -367,8 +370,8 @@ export const ModularCanvasView: React.FC<ModularCanvasViewProps> = ({ config, on
     <div
       ref={containerRef}
       className="relative flex flex-col h-full bg-dark-bg overflow-hidden"
-      style={{ cursor: isPanning ? 'grabbing' : 'default' }}
-      onMouseDown={handleBackgroundMouseDown}
+      style={{ cursor: isPanning ? 'grabbing' : 'default', touchAction: 'none' }}
+      onPointerDown={handleBackgroundPointerDown}
     >
       {/* Background grid */}
       <CanvasGrid zoom={cameraState.zoom} offsetX={cameraState.x} offsetY={cameraState.y} />

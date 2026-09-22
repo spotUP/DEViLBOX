@@ -833,7 +833,7 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
   );
 
   // ─── Canvas mouse down ──────────────────────────────────────────
-  const handleCanvasMouseDown = useCallback(
+  const handleCanvasPointerDown = useCallback(
     (e: React.MouseEvent<HTMLCanvasElement>) => {
       e.stopPropagation();
       e.preventDefault();
@@ -891,7 +891,7 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
 
   // ─── Window-level mouse move/up for dragging ────────────────────
   useEffect(() => {
-    const handleMouseMove = (e: MouseEvent) => {
+    const handlePointerMove = (e: PointerEvent) => {
       const target = dragTargetRef.current;
       if (!target) return;
       const { x } = getCanvasNorm(e);
@@ -915,7 +915,7 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
       }
     };
 
-    const handleMouseUp = () => {
+    const handlePointerUp = () => {
       const target = dragTargetRef.current;
       if (target === 'selection' && selectionStart >= 0 && selectionEnd <= selectionStart + 1) {
         clearSelection();
@@ -925,11 +925,13 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
       selectionDragStart.current = -1;
     };
 
-    window.addEventListener('mousemove', handleMouseMove);
-    window.addEventListener('mouseup', handleMouseUp);
+    window.addEventListener('pointermove', handlePointerMove);
+    window.addEventListener('pointerup', handlePointerUp);
+    window.addEventListener('pointercancel', handlePointerUp);
     return () => {
-      window.removeEventListener('mousemove', handleMouseMove);
-      window.removeEventListener('mouseup', handleMouseUp);
+      window.removeEventListener('pointermove', handlePointerMove);
+      window.removeEventListener('pointerup', handlePointerUp);
+      window.removeEventListener('pointercancel', handlePointerUp);
     };
   }, [
     getCanvasNorm, canvasXToNorm, canvasXToSample,
@@ -938,7 +940,7 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
   ]);
 
   // ─── Canvas hover cursor ─────────────────────────────────────────
-  const handleCanvasMouseMove = useCallback(
+  const handleCanvasPointerMove = useCallback(
     (e: React.MouseEvent<HTMLCanvasElement>) => {
       if (!audioBuffer || dragTargetRef.current) return;
       const { x, y } = getCanvasNorm(e);
@@ -1601,9 +1603,9 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
           width={CANVAS_W}
           height={CANVAS_H}
           className="w-full h-[150px]"
-          style={{ imageRendering: 'pixelated' }}
-          onMouseDown={handleCanvasMouseDown}
-          onMouseMove={handleCanvasMouseMove}
+          style={{ imageRendering: 'pixelated', touchAction: 'none' }}
+          onPointerDown={handleCanvasPointerDown}
+          onPointerMove={handleCanvasPointerMove}
           onDoubleClick={(e) => { e.preventDefault(); selectAll(); }}
         />
         <canvas

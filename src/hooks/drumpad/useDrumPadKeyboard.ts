@@ -30,7 +30,7 @@ function getPadId(bankRelativeIndex: number, bank: string): number {
 
 /**
  * Trigger a pad by dispatching a synthetic mousedown event on its DOM element.
- * This reuses the same path as physical clicks (PadButton onMouseDown → handlePadTrigger).
+ * This reuses the same path as physical clicks (PadButton onPointerDown -> handlePadTrigger).
  */
 function triggerPadElement(padId: number, velocity: number): void {
   const padButton = document.querySelector(`[data-pad-id="${padId}"]`) as HTMLElement | null;

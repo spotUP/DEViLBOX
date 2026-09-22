@@ -170,7 +170,7 @@ export const PadEditor: React.FC<PadEditorProps> = ({ padId, onClose, initialSho
           />
           {kind !== 'empty' && (
             <button
-              onMouseDown={() => hookTriggerPad(pad.id, 100)}
+              onPointerDown={() => hookTriggerPad(pad.id, 100)}
               onMouseUp={() => hookReleasePad(pad.id)}
               onMouseLeave={() => hookReleasePad(pad.id)}
               onKeyDown={(e) => {
