@@ -14,6 +14,9 @@ import type { TrackerCell, Pattern } from '@typedefs';
 import { interpolateAutomationValue } from '@typedefs/automation';
 import type { AutomationCurve } from '@typedefs/automation';
 import { routeParameterToEngine, DUB_MOVE_KINDS } from '@/midi/performance/parameterRouter';
+import { isWholeSongSynth } from './wholeSongSynths';
+import { decodeVolumeColumn } from '@/lib/tracker/volumeColumn';
+import { getFormatStoreRefOrNull } from '@/stores/storeAccess';
 
 interface AutomationData {
   [patternId: string]: {
@@ -64,29 +67,25 @@ export class AutomationPlayer {
       case 'pan':
         rawValue = cell.pan;
         break;
-      case 'volume':
-        // XM volume column format:
-        // 0x00-0x0F: nothing (no volume data)
-        // 0x10-0x50: set volume 0-64 (value = volumeByte - 0x10)
-        // 0x60+: volume effects (handled separately)
-        if (cell.volume !== null && cell.volume >= 0x10 && cell.volume <= 0x50) {
-          rawValue = cell.volume - 0x10;
-        } else {
-          rawValue = undefined;
-        }
-        break;
+      case 'volume': {
+        // The volume column means different things in different formats, and
+        // reading it with the wrong convention yields a plausible wrong level
+        // rather than an error — an AHX volume of 16 read as XM's 0x10 is
+        // "set volume 0". `decodeVolumeColumn` already returns 0..1, so return
+        // it here rather than falling through the 0..64 normalisation below.
+        const formatState = getFormatStoreRefOrNull()?.getState() as
+          { editorMode?: string } | undefined;
+        return decodeVolumeColumn(cell.volume, formatState?.editorMode ?? null);
+      }
       default:
         return null;
     }
 
     if (rawValue === undefined) return null;
 
-    // Normalize to 0-1
-    if (shortName === 'volume') {
-      return rawValue / 0x40; // Volume is 0-64 (0x40), normalize to 0-1
-    } else {
-      return rawValue / 0xff; // Others are 0x00-0xFF
-    }
+    // The remaining columns are 0x00-0xFF. `volume` returns above, through
+    // `decodeVolumeColumn`, because its range depends on the format.
+    return rawValue / 0xff;
   }
 
   /**
@@ -268,6 +267,13 @@ export class AutomationPlayer {
       }
     }
     if (!instrument) return;
+
+    // A native replayer plays the whole song through ONE shared instance, and
+    // its `output` gain carries the entire mix. A value derived from a single
+    // channel's cell must not reach it: `set('volume', 0)` there silences the
+    // song, not the channel, and nothing restores it. Those replayers apply
+    // their own per-channel volumes internally, so there is nothing to add.
+    if (isWholeSongSynth(engine.getInstrumentSynthType(instrumentId, channelIndex))) return;
 
     try {
       // Any instrument with a set() method — delegate directly

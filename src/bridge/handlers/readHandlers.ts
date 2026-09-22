@@ -854,6 +854,17 @@ async function getUpstreamLevels(): Promise<Record<string, number | null>> {
         `chainOutput:${key}`,
         getNativeAudioNode(engineAny.getInstrumentChainOutput?.(key >> 16, key & 0xffff) as never),
       );
+      // An RMS of 0 has two causes and they need different fixes: the gain was
+      // written to 0, or the engine is no longer connected to this output at
+      // all. Report the gain so the two can be told apart.
+      const outNode = (inst as { output?: GainNode }).output;
+      perInstance[`inst${key}.gain`] =
+        typeof outNode?.gain?.value === 'number' ? outNode.gain.value : null;
+      // And whether this instance still believes it owns the engine hookup.
+      perInstance[`inst${key}.ownsEngineConnection`] =
+        ((inst as { _ownsEngineConnection?: boolean })._ownsEngineConnection ? 1 : 0);
+      perInstance[`inst${key}.disposed`] =
+        ((inst as { _disposed?: boolean })._disposed ? 1 : 0);
     }
     out.hivelyInstances = perInstance as unknown as number | null;
     // Is the synth holding the engine that is actually PLAYING?
@@ -902,6 +913,24 @@ async function getUpstreamLevels(): Promise<Record<string, number | null>> {
 const _silenceClock = new SilenceClock();
 
 export async function getPlaybackSilence(): Promise<Record<string, unknown>> {
+  // Self-arming: the fault this watches for appears minutes after anyone asks
+  // about it, and looking at the UI repairs it. Sampling has to be running
+  // before the question is asked, so the first read starts it.
+  const { armSilenceSnapshot, getSilenceSnapshot, getSilenceHistory, watchGainParam, getGainWrites } =
+    await import('../diagnostics/silenceSnapshot');
+  armSilenceSnapshot();
+  // Instrument every live native-synth output gain, so a write that no call
+  // site admits to still names its caller.
+  try {
+    const te = (await import('@engine/ToneEngine')).getToneEngine() as unknown as {
+      instruments?: Map<number, { output?: GainNode }>;
+    };
+    for (const [key, inst] of te.instruments?.entries() ?? []) {
+      const g = inst?.output?.gain;
+      if (g) watchGainParam(g, `inst${key}`);
+    }
+  } catch { /* engine not up yet */ }
+
   const transport = useTransportStore.getState();
   const { useAudioStore } = await import('../../stores/useAudioStore');
   const masterMuted = useAudioStore.getState().masterMuted;
@@ -983,7 +1012,45 @@ export async function getPlaybackSilence(): Promise<Record<string, unknown>> {
     rowsAdvancing,
     currentRow: transport.currentRow,
     currentGlobalRow: transport.currentGlobalRow,
+    /**
+     * The graph as it was at the FIRST silence since arming, not as it is now.
+     * Null until playback actually goes quiet. Clear it with
+     * `clear_silence_snapshot` to catch the next one.
+     */
+    firstSilenceSnapshot: getSilenceSnapshot(),
+    /** The last 15 master-meter samples, oldest first. */
+    meterHistory: getSilenceHistory().slice(-15),
+    /**
+     * The handful of numbers that actually locate a break, read live.
+     *
+     * The full `get_dub_bus_state` payload answers this too, but it is
+     * thousands of lines of settings for six readings, and chasing a fault
+     * needs those six often.
+     */
+    /** Every write to a native synth output gain since arming, newest last. */
+    gainWrites: getGainWrites(),
+    live: await (async () => {
+      try {
+        const levels = await getUpstreamLevels();
+        const te = (await import('@engine/ToneEngine')).getToneEngine() as unknown as {
+          nativeEngineRouting?: Map<string, { destinations?: Set<unknown> }>;
+        };
+        const routing: Record<string, number> = {};
+        for (const [k, v] of te.nativeEngineRouting?.entries() ?? []) {
+          routing[k] = v.destinations?.size ?? -1;
+        }
+        return { ...levels, nativeRouting: routing };
+      } catch { return null; }
+    })(),
   };
+}
+
+/** Throw away a captured silence snapshot so the next fault can be caught. */
+export async function clearSilenceSnapshot(): Promise<Record<string, unknown>> {
+  const mod = await import('../diagnostics/silenceSnapshot');
+  mod.clearSilenceSnapshot();
+  mod.armSilenceSnapshot();
+  return { ok: true };
 }
 
 /** Did the transport row move since the previous poll? */

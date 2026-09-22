@@ -35,6 +35,14 @@ let _cursorStore: MinimalStore | null = null;
  * initialization". Late binding through this leaf keeps the cycle open.
  */
 let _mixerStore: MinimalStore | null = null;
+/**
+ * The format store joined on 2026-09-22. `AutomationPlayer` must know the
+ * editor mode to read a pattern cell's volume column with the right
+ * convention, and nothing under `src/engine/` imports the format store
+ * directly — a static import there would be the first, through a store that
+ * pulls the native engines behind it.
+ */
+let _formatStore: MinimalStore | null = null;
 
 export function registerTrackerStore(store: unknown): void {
   _trackerStore = store as MinimalStore;
@@ -50,6 +58,10 @@ export function registerCursorStore(store: unknown): void {
 
 export function registerMixerStore(store: unknown): void {
   _mixerStore = store as MinimalStore;
+}
+
+export function registerFormatStore(store: unknown): void {
+  _formatStore = store as MinimalStore;
 }
 
 export function getTrackerStoreRef(): MinimalStore {
@@ -72,4 +84,11 @@ export function getCursorStoreRef(): MinimalStore {
  *  re-apply step in that case, exactly as they did before. */
 export function getMixerStoreRefOrNull(): MinimalStore | null {
   return _mixerStore;
+}
+
+/** Null rather than throwing: automation can run before the format store's own
+ *  module evaluation, and a caller with no editor mode falls back to the
+ *  format-agnostic reading it used before. */
+export function getFormatStoreRefOrNull(): MinimalStore | null {
+  return _formatStore;
 }

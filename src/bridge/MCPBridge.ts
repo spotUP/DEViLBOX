@@ -24,6 +24,7 @@ import {
   getCurrentInstrument,
   getPlaybackState,
   getPlaybackSilence,
+  clearSilenceSnapshot,
   getCursor,
   getSelection,
   getEditorState,
@@ -220,6 +221,7 @@ const handlers: Record<string, Handler> = {
   get_current_instrument: getCurrentInstrument,
   get_playback_state: getPlaybackState,
   get_playback_silence: getPlaybackSilence,
+  clear_silence_snapshot: clearSilenceSnapshot,
   get_cursor: getCursor,
   get_selection: getSelection,
   get_editor_state: getEditorState,
@@ -527,9 +529,52 @@ async function handleMessage(data: string): Promise<void> {
 
   try {
     const result = await handler(request.params ?? {});
-    send({ id: request.id, type: 'result', data: result });
+    send({ id: request.id, type: 'result', data: annotateRecoveryPrompt(request.method, result) });
   } catch (e) {
     send({ id: request.id, type: 'error', error: (e as Error).message });
+  }
+}
+
+/**
+ * Tell every caller when the crash-recovery prompt is blocking the UI.
+ *
+ * The prompt appears on boot and covers the app, but `load_modland`, `play`
+ * and the rest still answer `ok: true` from the store layer, so an agent
+ * driving DEViLBOX over MCP gets no hint that a human is looking at a dialog.
+ * Reported repeatedly through 2026-09-22, each time as "why are you not
+ * dismissing it".
+ *
+ * This only REPORTS. Resolving the prompt means choosing to keep or destroy
+ * unsaved work, which `resolve_recovery_prompt` exists to make an explicit
+ * decision — see `dismissModal` for why that is never done implicitly.
+ */
+function annotateRecoveryPrompt(method: string, result: unknown): unknown {
+  // The state and resolve calls already speak about the prompt themselves.
+  if (method === 'get_modal_state' || method === 'resolve_recovery_prompt') return result;
+  if (!result || typeof result !== 'object' || Array.isArray(result)) return result;
+  try {
+    const { modalOpen, recoveryPromptOpen, recoveryPrompt } =
+      getModalState() as {
+        modalOpen: string | null;
+        recoveryPromptOpen: boolean;
+        recoveryPrompt: unknown;
+      };
+    if (!recoveryPromptOpen) {
+      // A blocking modal is worth reporting too, for the same reason.
+      if (!modalOpen) return result;
+      return { ...(result as Record<string, unknown>), blockingModal: modalOpen };
+    }
+    return {
+      ...(result as Record<string, unknown>),
+      recoveryPromptOpen: true,
+      recoveryPrompt,
+      recoveryPromptHint:
+        'The crash-recovery prompt is covering the UI and holds UNSAVED work. '
+        + 'Answer it with resolve_recovery_prompt { action: "restore" | "discard" } '
+        + 'before trusting anything on screen.',
+    };
+  } catch {
+    return result;
   }
 }
 
