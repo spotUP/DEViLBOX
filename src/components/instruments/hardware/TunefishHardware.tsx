@@ -29,26 +29,31 @@ const TFKnob: React.FC<{
     onChange(Math.round(newVal * 100) / 100);
   };
 
-  const handleMouseDown = (e: React.MouseEvent) => {
+  const handlePointerDown = (e: React.PointerEvent) => {
     e.preventDefault();
     const startY = e.clientY;
     const startVal = value;
-    const onMove = (ev: MouseEvent) => {
+    const onMove = (ev: PointerEvent) => {
       const delta = (startY - ev.clientY) / 150;
       onChange(Math.round(Math.max(0, Math.min(1, startVal + delta)) * 100) / 100);
     };
-    const onUp = () => { document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp); };
-    document.addEventListener('mousemove', onMove);
-    document.addEventListener('mouseup', onUp);
+    const onUp = () => {
+      document.removeEventListener('pointermove', onMove);
+      document.removeEventListener('pointerup', onUp);
+      document.removeEventListener('pointercancel', onUp);
+    };
+    document.addEventListener('pointermove', onMove);
+    document.addEventListener('pointerup', onUp);
+    document.addEventListener('pointercancel', onUp);
   };
 
   return (
     <div className="flex flex-col items-center gap-0.5 w-11">
       <div
         className="w-7 h-7 rounded-full border-2 cursor-pointer relative"
-        style={{ borderColor: color, background: '#1a1208' }}
+        style={{ borderColor: color, background: '#1a1208' , touchAction: 'none' }}
         onWheel={handleWheel}
-        onMouseDown={handleMouseDown}
+        onPointerDown={handlePointerDown}
         title={`${label}: ${Math.round(value * 100)}%`}
       >
         <div
