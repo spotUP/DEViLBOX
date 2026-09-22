@@ -1497,6 +1497,14 @@ export class DubBus {
    * predictive trim from what actually arrives there. See trimRide.ts.
    */
   private _clipInProbe!: AnalyserNode;
+  /**
+   * The same sum WITHOUT the boost: the dry path before the shelf plus the
+   * trimmed return. The ride answers only for what the boost adds — see
+   * `rideTrim`. Without this reference a programme whose own hits plus the
+   * echo crossed the target pinned the ride at its maximum with the shelf
+   * flat, and the BASS control did nothing (2026-09-22).
+   */
+  private _clipRefProbe!: AnalyserNode;
   private _trimRide: RiderState = RIDER_REST;
   /** Depth the return governor is holding the return down. See returnGovernor.ts. */
   private _returnGovernor: RiderState = RIDER_REST;
@@ -2550,6 +2558,11 @@ export class DubBus {
     this._clipInProbe.smoothingTimeConstant = 0;
     this.masterLowMidDip.connect(this._clipInProbe);
     this.returnTrim.connect(this._clipInProbe);
+    this._clipRefProbe = this.context.createAnalyser();
+    this._clipRefProbe.fftSize = 32768;
+    this._clipRefProbe.smoothingTimeConstant = 0;
+    this.masterHpf.connect(this._clipRefProbe);
+    this.returnTrim.connect(this._clipRefProbe);
     this.clubDry.connect(this.returnSum);
     this.clubWet.connect(this.returnSum);
     this.returnSum.connect(this.master);
@@ -4783,7 +4796,7 @@ export class DubBus {
         // The ride is stepped HERE only. `_applyMasterTrim` also runs on every
         // settings write, and a slider drag would otherwise release the ride
         // as fast as it produced writes.
-        this._trimRide = rideTrim(this._trimRide, this._clipInputPeak());
+        this._trimRide = rideTrim(this._trimRide, this._clipInputPeak(), this._clipReferencePeak());
         const programme = this._programmeBeforeInsert();
         this._returnGovernor = governReturn(
           this._returnGovernor, this._returnRms(), programme.rms, programme.valid,
@@ -4815,7 +4828,14 @@ export class DubBus {
   get returnGovernorDb(): number { return this._returnGovernor.db; }
 
   private _clipInputPeak(): number {
-    const probe = this._clipInProbe;
+    return this._probePeak(this._clipInProbe);
+  }
+
+  private _clipReferencePeak(): number {
+    return this._probePeak(this._clipRefProbe);
+  }
+
+  private _probePeak(probe: AnalyserNode | undefined): number {
     if (!probe) return 0;
     const buf = new Float32Array(probe.fftSize);
     probe.getFloatTimeDomainData(buf);
