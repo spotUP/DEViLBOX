@@ -104,7 +104,8 @@ import {
   smoothProgrammeLevel,
   type ProgrammeLevel,
 } from '@/lib/dub/programmeLevel';
-import { lowBandWeightFor, lowMidDipDbFor } from '@/lib/dub/lowBandWeight';
+import { lowMidDipDbFor } from '@/lib/dub/lowMidDip';
+import { lowBandGainsFor, LOW_SAT_KNEE } from '@/lib/dub/lowBandCrossover';
 import { rideTrim, spendRide, bufferPeak } from '@/lib/dub/trimRide';
 import { governReturn, bufferRms } from '@/lib/dub/returnGovernor';
 import { RIDER_REST, type RiderState } from '@/lib/dub/gainRider';
@@ -1434,7 +1435,19 @@ export class DubBus {
   // feel subtle. Here we insert between `masterEffectsInput` and `blepInput`
   // so the dry + wet sum gets shaped.
   private masterHpf!: BiquadFilterNode;       // full-mix HPF — swept by hpfRise so Rise is audible on dry mix
-  private masterBassShelf!: BiquadFilterNode;
+  /**
+   * The BASS control: a Linkwitz-Riley crossover at the corner, the low band
+   * lifted and SATURATED, the high band untouched, summed at `lowSum`. See
+   * lowBandCrossover.ts for why this is not a shelf.
+   */
+  private xoLowA!: BiquadFilterNode;
+  private xoLowB!: BiquadFilterNode;
+  private xoHighA!: BiquadFilterNode;
+  private xoHighB!: BiquadFilterNode;
+  private lowDrive!: GainNode;
+  private lowSat!: WaveShaperNode;
+  private lowOut!: GainNode;
+  private lowSum!: GainNode;
   /**
    * The dry-path bass PUNCH, its own stage.
    *
@@ -1451,26 +1464,6 @@ export class DubBus {
    * total proportionally, and `masterSafetyClip` sits downstream of both.
    */
   private masterBassPunch!: BiquadFilterNode;
-  /**
-   * Low-band WEIGHT stage, parallel to the shelf and summed at the punch.
-   *
-   * The shelf and the punch are linear: every dB of heaviness they give is a
-   * dB of level, and at the top of the BASS control that level ran into
-   * `masterSafetyClip` and the master limiter — "at 90% it sounds heavier
-   * than at 100%" (2026-09-22). Dub weight is harmonics as much as level: a
-   * saturated low band reads as heavy on any speaker without the level. This
-   * band is low-passed at the shelf corner, driven into the tape curve,
-   * evened by a compressor, and added back under the dry path. See
-   * `lowBandWeightFor` for the mapping from the BASS control.
-   *
-   * `lowBandSat` is the one node to swap for a neural bass-amp model if that
-   * is ever wanted; nothing else here would change.
-   */
-  private lowBandLp!: BiquadFilterNode;
-  private lowBandDrive!: GainNode;
-  private lowBandSat!: WaveShaperNode;
-  private lowBandComp!: DynamicsCompressorNode;
-  private lowBandGain!: GainNode;
   /**
    * Low-mid dip that rides with the BASS control — see `lowMidDipDbFor`.
    * Sits after the band sum and before the clipper, so it tames both the
@@ -1856,41 +1849,36 @@ export class DubBus {
     this.masterHpf.type = 'highpass';
     this.masterHpf.frequency.value = masterHpfHzFor(initialHpfFreq);  // idle transparent; swept by startHpfRise
     this.masterHpf.Q.value = 0.5;  // Butterworth — no resonance on the full mix
-    this.masterBassShelf = this.context.createBiquadFilter();
-    this.masterBassShelf.type = 'lowshelf';
-    this.masterBassShelf.frequency.value = this.settings.bassShelfFreqHz;
-    this.masterBassShelf.Q.value = this.settings.bassShelfQ;
-    this.masterBassShelf.gain.value = 0;  // flat until wired in by enable
+    // LR4 crossover: two cascaded Butterworth sections per band. The bands
+    // sum flat and in phase, so at BASS 0 the split is inaudible.
+    const fc = this.settings.bassShelfFreqHz;
+    const xo = (type: BiquadFilterType): BiquadFilterNode => {
+      const f = this.context.createBiquadFilter();
+      f.type = type;
+      f.frequency.value = fc;
+      f.Q.value = Math.SQRT1_2;
+      return f;
+    };
+    this.xoLowA = xo('lowpass');
+    this.xoLowB = xo('lowpass');
+    this.xoHighA = xo('highpass');
+    this.xoHighB = xo('highpass');
+    // Drive and ceiling are gains around a FIXED normalised curve, so a
+    // slider move never rebuilds the curve: y = ceiling * sat(x * drive / ceiling).
+    this.lowDrive = this.context.createGain();
+    this.lowDrive.gain.value = 1;
+    this.lowSat = this.context.createWaveShaper();
+    this.lowSat.curve = makeSoftClipCurve(8192, LOW_SAT_KNEE);
+    this.lowSat.oversample = '2x';
+    this.lowOut = this.context.createGain();
+    this.lowOut.gain.value = 1;
+    this.lowSum = this.context.createGain();
+    this.lowSum.gain.value = 1;
     this.masterBassPunch = this.context.createBiquadFilter();
     this.masterBassPunch.type = 'lowshelf';
     this.masterBassPunch.frequency.value = this.settings.bassShelfFreqHz;
     this.masterBassPunch.Q.value = this.settings.bassShelfQ;
     this.masterBassPunch.gain.value = 0;  // flat until wired in by enable
-    // Low-band weight stage. A 2nd-order Butterworth low-pass, NOT a
-    // Linkwitz-Riley: this band is summed in parallel with the dry path, and
-    // a 2nd-order section is 90 degrees at the corner (|1 + j| — +3 dB, no
-    // notch) where an LR4 is 180 degrees and cancels the very band it is
-    // meant to add.
-    this.lowBandLp = this.context.createBiquadFilter();
-    this.lowBandLp.type = 'lowpass';
-    this.lowBandLp.frequency.value = this.settings.bassShelfFreqHz;
-    this.lowBandLp.Q.value = Math.SQRT1_2;
-    // Drive is the gain INTO a fixed curve, so a slider move never rebuilds
-    // the curve.
-    this.lowBandDrive = this.context.createGain();
-    this.lowBandDrive.gain.value = 1;
-    this.lowBandSat = this.context.createWaveShaper();
-    this.lowBandSat.curve = makeTapeSatCurve(1.0);
-    this.lowBandSat.oversample = '2x';
-    // Evens the bass so sustain reads as weight, not just the hits.
-    this.lowBandComp = this.context.createDynamicsCompressor();
-    this.lowBandComp.threshold.value = -24;
-    this.lowBandComp.knee.value = 6;
-    this.lowBandComp.ratio.value = 4;
-    this.lowBandComp.attack.value = 0.01;
-    this.lowBandComp.release.value = 0.15;
-    this.lowBandGain = this.context.createGain();
-    this.lowBandGain.gain.value = 0;  // silent until wired in by enable
     this.masterLowMidDip = this.context.createBiquadFilter();
     this.masterLowMidDip.type = 'peaking';
     this.masterLowMidDip.frequency.value = this.settings.bassShelfFreqHz * 2;
@@ -1968,8 +1956,8 @@ export class DubBus {
     this.masterSide.gain.value = 1;
     this.masterInvertR.gain.value = 0;
     masterSideInvertL.gain.value = 0;
-    // EQ pre-chain: in → bassShelf → safety-clip → midScoop → LPF → split
-    this.masterBassShelf.connect(this.masterBassPunch);
+    // EQ pre-chain: in → crossover/low-sat → punch → dip → safety-clip → midScoop → LPF → split
+    this.lowSum.connect(this.masterBassPunch);
     this.masterBassPunch.connect(this.masterLowMidDip);
     this.masterLowMidDip.connect(this.masterSafetyClip);
     this.masterSafetyClip.connect(this.masterMidScoop);
@@ -2022,15 +2010,17 @@ export class DubBus {
       else Tone.connect(convolverSum, this.toneArmEffect.input as unknown as Tone.InputNode); }
     this.vinylDirect = this.context.createGain();
     this.vinylDirect.gain.value = 1;
-    this.masterHpf.connect(this.masterBassShelf);
-    // Low-band weight, parallel to the shelf, summed at the punch so the
-    // clipper and everything after it see the total.
-    this.masterHpf.connect(this.lowBandLp);
-    this.lowBandLp.connect(this.lowBandDrive);
-    this.lowBandDrive.connect(this.lowBandSat);
-    this.lowBandSat.connect(this.lowBandComp);
-    this.lowBandComp.connect(this.lowBandGain);
-    this.lowBandGain.connect(this.masterBassPunch);
+    // The BASS crossover. Low: LR4 low-pass → drive → saturator → ceiling.
+    // High: LR4 high-pass, untouched. Both into `lowSum`.
+    this.masterHpf.connect(this.xoLowA);
+    this.xoLowA.connect(this.xoLowB);
+    this.xoLowB.connect(this.lowDrive);
+    this.lowDrive.connect(this.lowSat);
+    this.lowSat.connect(this.lowOut);
+    this.lowOut.connect(this.lowSum);
+    this.masterHpf.connect(this.xoHighA);
+    this.xoHighA.connect(this.xoHighB);
+    this.xoHighB.connect(this.lowSum);
     // Trim → hpf → shelf → clipper → …: the boost is paid for before it is
     // applied, so no stage in the insert ever runs hot.
     this.masterToneTrim = this.context.createGain();
@@ -2417,7 +2407,7 @@ export class DubBus {
              feedbackShelfComp from latching on a single bad sample.
 
          (b) FORWARD tap: spring.output → SCRUBBER → sidechain. Protects
-             midScoop, lpf, masterBassShelf, masterMidScoop, masterLpf
+             midScoop, lpf, the master crossover, masterMidScoop, masterLpf
              (the 5 forward-chain biquads that latched after
              anotherDelay→re201 swap on 2026-04-29 even with the feedback
              scrubber active — RE-201's first WASM block emitted NaN that
@@ -3862,8 +3852,8 @@ export class DubBus {
   private _wireProbeTaps(): void {
     const points: Array<[string, AudioNode | undefined]> = [
       ['insertIn', this.masterToneTrim],
-      ['afterShelf', this.masterBassShelf],
-      ['lowBand', this.lowBandGain],
+      ['lowSat', this.lowOut],
+      ['afterLow', this.lowSum],
       ['preClip', this.masterLowMidDip],
       ['returnAtClip', this.returnTrim],
       ['afterClip', this.masterSafetyClip],
@@ -5037,8 +5027,7 @@ export class DubBus {
     bassDb: number;
     /** Punch gain after the ceiling and the ride. */
     punchDb: number;
-    weight: ReturnType<typeof lowBandWeightFor>;
-    /** dB the trim has to pay for: both linear stages plus the band's peak. */
+    /** dB the trim has to pay for: both stages. The saturator bounds its own peak. */
     costDb: number;
     /** What the ride could not take from the boost — the trim's share. */
     rideRemainderDb: number;
@@ -5052,11 +5041,7 @@ export class DubBus {
     // the punch, the band and the dip are derived from is the bass that
     // FITS, not the bass that was asked for.
     const { bassDb, punchDb, trimDb: rideRemainderDb } = spendRide(safeBassGain, safeMasterPunch, this._trimRide.db);
-    const weight = lowBandWeightFor(bassDb);
-    // The band is normalised to ±1 and added at `gain`, so it can raise a
-    // low-end peak by up to (1 + gain) — counted in dB alongside the shelves.
-    const bandAddDb = 20 * Math.log10(1 + weight.gain);
-    return { bassDb, punchDb, weight, costDb: bassDb + punchDb + bandAddDb, rideRemainderDb };
+    return { bassDb, punchDb, costDb: bassDb + punchDb, rideRemainderDb };
   }
 
   /**
@@ -5138,19 +5123,18 @@ export class DubBus {
     // The ride spends the boost first (see `spendRide`): what the shelf,
     // the punch, the band and the dip are derived from is the bass that
     // FITS, not the bass that was asked for.
-    const { bassDb, punchDb, weight } = this._resolveMasterLowEnd(safeBassGain, m);
-    rampBiquadParam(this.masterBassShelf.frequency, m.bassShelfFreqHz, now);
-    rampBiquadParam(this.masterBassShelf.Q, m.bassShelfQ, now);
-    rampBiquadParam(this.masterBassShelf.gain, masterActive ? bassDb : 0, now);
+    const { bassDb, punchDb } = this._resolveMasterLowEnd(safeBassGain, m);
+    // The crossover corner follows the BASS corner setting; the low band is
+    // lifted and saturated, the high band is untouched.
+    for (const f of [this.xoLowA, this.xoLowB, this.xoHighA, this.xoHighB]) {
+      rampBiquadParam(f.frequency, m.bassShelfFreqHz, now);
+    }
+    const low = lowBandGainsFor(bassDb);
+    this._settle(this.lowDrive.gain, masterActive ? low.drive : 1, now, 0.02);
+    this._settle(this.lowOut.gain, masterActive ? low.ceiling : 1, now, 0.02);
     rampBiquadParam(this.masterBassPunch.frequency, m.bassShelfFreqHz, now);
     rampBiquadParam(this.masterBassPunch.Q, m.bassShelfQ, now);
     rampBiquadParam(this.masterBassPunch.gain, masterActive ? punchDb : 0, now);
-    // Low-band weight: the BASS control also drives harmonics, so the top of
-    // its travel gets heavier without needing the level the clipper takes
-    // back. Corner follows the shelf so the two lift the same band.
-    rampBiquadParam(this.lowBandLp.frequency, m.bassShelfFreqHz, now);
-    this._settle(this.lowBandDrive.gain, weight.drive, now, 0.02);
-    this._settle(this.lowBandGain.gain, masterActive ? weight.gain : 0, now, 0.02);
     // Heavy but clean: the low mids come down as the low end goes up.
     rampBiquadParam(this.masterLowMidDip.frequency, m.bassShelfFreqHz * 2, now);
     rampBiquadParam(this.masterLowMidDip.gain, masterActive ? lowMidDipDbFor(bassDb) : 0, now);
@@ -5228,9 +5212,9 @@ export class DubBus {
       this._restoreMasterInsertPassthrough();
     }, (FADE_SEC * 1000) + 5);
     // Reset master-side gains to neutral so even a dangling reference is silent.
-    rampBiquadParam(this.masterBassShelf.gain, 0, now);
+    this._settle(this.lowDrive.gain, 1, now, 0.02);
+    this._settle(this.lowOut.gain, 1, now, 0.02);
     rampBiquadParam(this.masterBassPunch.gain, 0, now);
-    this._settle(this.lowBandGain.gain, 0, now, 0.02);
     rampBiquadParam(this.masterLowMidDip.gain, 0, now);
     this.masterToneTrim.gain.setTargetAtTime(1, now, 0.02);
     this.returnTrim.gain.setTargetAtTime(1, now, 0.02);

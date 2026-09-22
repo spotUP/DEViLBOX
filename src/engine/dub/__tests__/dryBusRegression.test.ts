@@ -177,9 +177,10 @@ describe('DubBus gain-staging regression guards', () => {
     // BASS reaches its own stage unmodified by punch.
     // `bassDb` is the requested gain after the ride has spent what it must
     // (`spendRide`); at rest it IS the requested gain, unmodified by punch.
-    expect(DUBBUS_SRC).toMatch(/masterBassShelf\.gain,\s*masterActive \? bassDb : 0/);
+    expect(DUBBUS_SRC).toMatch(/const low = lowBandGainsFor\(bassDb\);/);
+    expect(DUBBUS_SRC).toMatch(/lowDrive\.gain,\s*masterActive \? low\.drive : 1/);
     // The trim still pays for the total of both stages.
-    expect(DUBBUS_SRC).toMatch(/costDb: bassDb \+ punchDb \+ bandAddDb/);
+    expect(DUBBUS_SRC).toMatch(/costDb: bassDb \+ punchDb/);
   });
 });
 
