@@ -1395,6 +1395,10 @@ export function getFormatState(): Record<string, unknown> {
     hasOriginalModuleData: !!format.originalModuleData,
     originalModuleFormat: format.originalModuleData?.format ?? null,
     sunTronicEnginePref: useSettingsStore.getState().formatEngine.suntronic,
+    // The companion files registered for UADE, by the name the player opens.
+    // What the resolver found is otherwise invisible from outside; a two-file
+    // format that fails needs this to say whether the samples arrived.
+    uadeCompanionNames: format.uadeCompanionFiles ? Array.from(format.uadeCompanionFiles.keys()) : [],
     // Which WASM engine file data is loaded
     loadedWasmEngines: [
       format.hivelyFileData && 'hively',
