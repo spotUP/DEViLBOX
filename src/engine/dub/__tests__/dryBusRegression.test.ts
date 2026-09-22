@@ -160,9 +160,24 @@ describe('DubBus gain-staging regression guards', () => {
     expect(DUBBUS_SRC).toMatch(/inputClip\.connect\(this\.hpf\)/);
   });
 
-  it('caps combined master bass shelf gain instead of stacking unlimited punch on top of shelf gain', () => {
-    expect(DUBBUS_SRC).toMatch(/safeMasterShelfGain/);
-    expect(DUBBUS_SRC).toMatch(/Math\.max\(-12,\s*Math\.min\(9,\s*safeBassGain \+ safeMasterPunch\)\)/);
+  it('caps the combined master low end, and spends the ceiling on PUNCH not BASS', () => {
+    // The guard is unchanged in spirit: the insert only ever ADDS level, and
+    // uncapped it gave "the dub bus clipping and disting most of the time"
+    // (2026-09-18). What changed on 2026-09-22 is WHERE the ceiling bites.
+    //
+    // It used to clamp `bassShelfGainDb + masterBassPunchDb` to +9. With the
+    // shipped defaults that is 9 + 6 = 15 clamped to 9 — the shelf arrived
+    // pinned and the BASS slider did nothing from +3 up, nine dB of a
+    // twenty-four dB control. Measured: bass 0 gave 6 dB, 3 gave 9, 9 gave 9.
+    //
+    // Now BASS always gets exactly what it asks for and PUNCH gives way, so
+    // the control the user rides is never silently dead.
+    expect(DUBBUS_SRC).toMatch(/MASTER_LOW_CEILING_DB/);
+    expect(DUBBUS_SRC).toMatch(/punchHeadroom/);
+    // BASS reaches its own stage unmodified by punch.
+    expect(DUBBUS_SRC).toMatch(/masterBassShelf\.gain,\s*masterActive \? safeBassGain : 0/);
+    // The trim still pays for the total of both stages.
+    expect(DUBBUS_SRC).toMatch(/safeMasterShelfGain = safeBassGain \+ safeMasterPunch/);
   });
 });
 
