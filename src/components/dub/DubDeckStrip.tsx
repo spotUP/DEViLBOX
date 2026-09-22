@@ -1111,7 +1111,14 @@ export const DubDeckStrip: React.FC = () => {
               ? 'bg-accent-primary/10 border-accent-primary text-accent-primary'
               : 'bg-dark-bgTertiary border-dark-borderLight text-text-secondary hover:text-text-primary')
           }
-          onClick={() => setDubBus({ enabled: !busEnabled })}
+          onClick={() => {
+            const next = !busEnabled;
+            // A performer with no bus is not a performer. Leaving AutoDub
+            // running here is what let it go on muting channels after the bus
+            // was switched off, and its own toggle was disabled at the time.
+            if (!next && autoDubEnabled) setAutoDubEnabled(false);
+            setDubBus({ enabled: next });
+          }}
           title={busEnabled ? 'Dub Bus ON — click to disable' : 'Dub Bus OFF — click to enable'}
         >
           Bus {busEnabled ? 'ON' : 'OFF'}
@@ -1190,8 +1197,22 @@ export const DubDeckStrip: React.FC = () => {
               : 'bg-dark-bgTertiary border-dark-borderLight text-text-secondary hover:bg-dark-bgHover hover:text-text-primary'
           }`}
           onClick={handleAutoDubToggle}
-          disabled={!busEnabled}
-          title={autoDubEnabled ? 'Auto Dub is ON — click to stop' : 'Auto Dub — click to enable autonomous dub performance'}
+          /* Never unreachable while it is RUNNING.
+           *
+           * This was `disabled={!busEnabled}`, so switching the bus off while
+           * AutoDub was on left the performer running with its only stop button
+           * greyed out. It keeps firing: `channelMute` and `riddimSection` mute
+           * MIXER channels, which needs no bus, so channels could be muted with
+           * no way to stop whatever was muting them. Reported 2026-09-22 —
+           * "I can't turn AutoDub off if the dub bus is disabled".
+           *
+           * Enabling it still needs a bus; turning it off never does. */
+          disabled={!busEnabled && !autoDubEnabled}
+          title={autoDubEnabled
+            ? 'Auto Dub is ON — click to stop'
+            : busEnabled
+              ? 'Auto Dub — click to enable autonomous dub performance'
+              : 'Auto Dub — enable the dub bus first'}
         >
           {autoDubEnabled ? '● AUTO DUB' : '○ AUTO DUB'}
         </button>
