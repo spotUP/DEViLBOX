@@ -30,10 +30,12 @@ export const ringMod: DubMove = {
     // move changed them, so the next mirror push would otherwise arrive with
     // `ringModEnabled: false` and switch the effect off while the pad is still
     // down. Released before the dispose write, so that write lands.
+    const releaseGesture = bus.holdWetGesture();
     const release = bus.claimSettingKeys(['ringModEnabled', 'ringModFreq', 'ringModAmount']);
 
     return {
       dispose() {
+        releaseGesture();
         release();
         bus.setSettings({
           ringModEnabled: false,

@@ -134,6 +134,10 @@ function buildFakeBus() {
     // of the gesture, so the settings mirror cannot revert them mid-hold.
     // Returns the release function the move calls on dispose.
     claimSettingKeys: vi.fn(() => vi.fn()),
+    // Wet gestures hold the return governor off while a performer is driving
+    // the wet path, so it cannot correct the gesture away. Ref-counted like
+    // `claimSettingKeys`; returns the release the move calls on dispose.
+    holdWetGesture: vi.fn(() => vi.fn()),
   };
   return { bus, release };
 }

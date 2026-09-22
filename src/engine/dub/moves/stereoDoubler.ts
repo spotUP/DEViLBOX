@@ -20,6 +20,7 @@ export const stereoDoubler: DubMove = {
     const feedback = params.feedback ?? this.defaults.feedback;
     const wet = params.wet ?? this.defaults.wet;
     const release = bus.startStereoDoubler(delayMs, feedback, wet);
-    return { dispose: release };
+    const releaseGesture = bus.holdWetGesture();
+    return { dispose() { releaseGesture(); release(); } };
   },
 };

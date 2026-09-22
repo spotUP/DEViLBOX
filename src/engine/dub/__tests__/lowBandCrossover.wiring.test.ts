@@ -184,9 +184,21 @@ describe('the return is governed against the programme', () => {
   // the sum clipped — "clips/dists" (2026-09-22).
   it('steps the governor from the watch, against the smoothed pre-insert programme', () => {
     const watch = methodBody('private _startTrimWatch(');
-    expect(watch).toContain('this._returnGovernor = governReturn(');
+    expect(watch).toContain('governReturn(');
     expect(watch).toContain('this._returnRms(), programme.rms, programme.valid');
     expect(watch).toContain('const programme = this._programmeBeforeInsert();');
+  });
+
+  // A governor that clamps during a gesture cancels the gesture: Liquid, Ring,
+  // Ping-Pong, Starve, Wide and Wobble all push the return up, and pulling it
+  // straight back leaves them changing timbre without ever getting louder —
+  // reported 2026-09-22 as each of them being dead, one at a time.
+  it('may loosen but never tighten while a wet gesture is held', () => {
+    const watch = methodBody('private _startTrimWatch(');
+    expect(watch).toContain('this.wetGestureActive && governed.db < this._returnGovernor.db');
+    // Runaway protection survives: the hand coming off frees the next tick.
+    expect(watch).toContain('? this._returnGovernor');
+    expect(watch).toContain(': governed;');
   });
 
   it('applies it on the return trim only, on top of the shared trim', () => {

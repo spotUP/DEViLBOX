@@ -4788,9 +4788,19 @@ export class DubBus {
         // as fast as it produced writes.
         this._trimRide = rideTrim(this._trimRide, this._clipInputPeak(), this._clipReferencePeak());
         const programme = this._programmeBeforeInsert();
-        this._returnGovernor = governReturn(
+        // While a performer holds a wet gesture the governor may LOOSEN but
+        // never tighten. Clamping during a move cancels the move: Liquid,
+        // Ring, Ping-Pong, Starve, Wide and Wobble all push the return up,
+        // and a governor that pulls it straight back leaves them changing
+        // timbre without ever getting louder — reported as each of them being
+        // dead. Runaway protection is unaffected: the moment the hand comes
+        // off, the next tick is free to pull the return down again.
+        const governed = governReturn(
           this._returnGovernor, this._returnRms(), programme.rms, programme.valid,
         );
+        this._returnGovernor = this.wetGestureActive && governed.db < this._returnGovernor.db
+          ? this._returnGovernor
+          : governed;
         // The ride moves the shelf as well as the trim now, so the whole
         // master tone is re-derived, not the trim alone.
         this._applyMasterInsertTone();
@@ -5820,6 +5830,38 @@ export class DubBus {
    * overlapping moves do not release each other's claim.
    */
   private _ownedSettingKeys = new Map<string, number>();
+
+  /**
+   * How many WET gestures are running right now.
+   *
+   * The return governor holds the wet return at programme level. That is right
+   * while the bus is idling — it is what stopped the echo returning +19 dB
+   * above the song — but it also makes the return LEVEL-INVARIANT, so a move
+   * whose whole job is to push the return up gets corrected back down within a
+   * second. Liquid, Ring, Ping-Pong, Starve, Wide and Wobble all changed the
+   * timbre and never got louder, which from the outside is indistinguishable
+   * from dead. Reported 2026-09-22, one toggle at a time.
+   *
+   * While a gesture is held the governor may LOOSEN but never tighten: a
+   * deliberate performance is not something to automatically correct. The
+   * runaway protection stays, because the moment the hand comes off, the
+   * governor is free to pull the return back down again.
+   */
+  private _wetGestures = 0;
+
+  /** True while a performer is deliberately driving the wet path. */
+  get wetGestureActive(): boolean { return this._wetGestures > 0; }
+
+  /** Ref-counted, like `claimSettingKeys`, so overlapping moves nest safely. */
+  holdWetGesture(): () => void {
+    this._wetGestures++;
+    let released = false;
+    return () => {
+      if (released) return;
+      released = true;
+      this._wetGestures = Math.max(0, this._wetGestures - 1);
+    };
+  }
 
   claimSettingKeys(keys: readonly string[]): () => void {
     for (const k of keys) this._ownedSettingKeys.set(k, (this._ownedSettingKeys.get(k) ?? 0) + 1);
