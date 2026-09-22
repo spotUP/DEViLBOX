@@ -36,7 +36,7 @@ import { FT2Toolbar } from './FT2Toolbar';
 import { InstrumentKnobPanel } from './InstrumentKnobPanel';
 import { EditorControlsBar } from './EditorControlsBar';
 import { MobileTrackerView } from './MobileTrackerView';
-import { useResponsive } from '@hooks/useResponsive';
+import { useResponsiveSafe } from '@/contexts/ResponsiveContext';
 import { useMIDIFeedback } from '@hooks/useMIDIFeedback';
 import { Music2, Activity, ExternalLink, Undo2, Maximize2, Minimize2 } from 'lucide-react';
 import { PopOutWindow } from '@components/ui/PopOutWindow';
@@ -135,7 +135,10 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
   showMasterFX,
   showImportModule: externalShowImportModule,
 }) => {
-  const { isMobile, width: windowWidth } = useResponsive();
+  // D1 phone-layout signal (coarse pointer + small screen) plus `isWide`,
+  // the named 900px threshold that gates the side instrument panel.
+  // Both come from src/hooks/useBreakpoint.ts — the only threshold source.
+  const { isPhone, isWide } = useResponsiveSafe();
 
   // PERFORMANCE OPTIMIZATION: Group selectors with useShallow to reduce re-render overhead
   // Shared logic: keyboard hooks, view mode, grid channel, editor mode, ML export
@@ -237,14 +240,14 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
 
   // Mobile swipe handlers for cursor navigation
   const handleSwipeLeft = useCallback(() => {
-    if (!isMobile) return;
+    if (!isPhone) return;
     useCursorStore.getState().moveCursor('left');
-  }, [isMobile]);
+  }, [isPhone]);
 
   const handleSwipeRight = useCallback(() => {
-    if (!isMobile) return;
+    if (!isPhone) return;
     useCursorStore.getState().moveCursor('right');
-  }, [isMobile]);
+  }, [isPhone]);
 
   // Edit instrument — AU bridge instruments open their native GUI instead of our editor
   const handleEditInstrument = useCallback(() => {
@@ -400,7 +403,7 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
   }, []);
 
   // Mobile view with tabbed interface
-  if (isMobile) {
+  if (isPhone) {
     return (
       <>
         <MobileTrackerView
@@ -825,7 +828,7 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
         )}
 
         {/* Instrument Panel Toggle Button - Flex item 3 */}
-        {windowWidth >= 900 && (
+        {isWide && (
           <button
             onClick={() => setShowInstrumentPanel(!showInstrumentPanel)}
             className={`
@@ -841,7 +844,7 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
         )}
 
         {/* Instrument List Panel - Flex item 3 - Collapsed in fullscreen */}
-        {windowWidth >= 900 && showInstrumentPanel && (
+        {isWide && showInstrumentPanel && (
           <div className={`flex-shrink-0 border-l border-ft2-border flex flex-col overflow-hidden animate-fade-in ${
             // The container query that hides the badges is scoped to the
             // fullscreen panel ONLY, because that is the one with a fixed
