@@ -201,9 +201,12 @@ export const Modal: React.FC<ModalProps> = ({
   `;
 
   // Size classes
+  // `w-full max-w-*`, never a fixed `w-<n>`: `w-96` is 384px, which on a
+  // 375px phone is wider than the 343px the backdrop's `p-4` leaves, and
+  // `max-w-md` cannot rescue a fixed width. Above 400px nothing changes.
   const sizeMap = {
-    sm: 'w-80 max-w-sm',
-    md: 'w-96 max-w-md',
+    sm: 'w-full max-w-sm',
+    md: 'w-full max-w-md',
     lg: 'max-w-2xl w-full',
     xl: 'max-w-4xl w-full',
     fullscreen: 'w-full h-full',

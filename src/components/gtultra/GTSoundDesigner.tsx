@@ -458,7 +458,7 @@ export const GTSoundDesigner: React.FC = () => {
   // ════════════════════════════════════════════════════════════════════════
 
   return (
-    <div className="flex flex-col gap-3 p-3 overflow-y-auto synth-controls-flow" style={{ maxHeight: 'calc(100vh - 280px)' }}>
+    <div className="flex flex-col gap-3 p-3 overflow-y-auto synth-controls-flow" style={{ maxHeight: 'calc(var(--app-vh) - 280px)' }}>
 
       {/* ── Preset Bar ── */}
       <div className={`rounded-lg border p-2 ${panelBg}`}>

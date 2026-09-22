@@ -133,7 +133,7 @@ export const SidMon1Controls: React.FC<SidMon1ControlsProps> = ({ config, onChan
 
   // ── MAIN TAB ──────────────────────────────────────────────────────────────
   const renderMain = () => (
-    <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 280px)' }}>
+    <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(var(--app-vh) - 280px)' }}>
 
       {/* ADSR Envelope */}
       <div className={`rounded-lg border p-3 ${panelBg}`} style={panelStyle}>
@@ -251,7 +251,7 @@ export const SidMon1Controls: React.FC<SidMon1ControlsProps> = ({ config, onChan
   }, [upd, uadeChipRam, getEditor]);
 
   const renderArpeggio = () => (
-    <div className="flex flex-col gap-3 p-3" style={{ height: 'calc(100vh - 280px)' }}>
+    <div className="flex flex-col gap-3 p-3" style={{ height: 'calc(var(--app-vh) - 280px)' }}>
       <div className={`rounded-lg border p-3 ${panelBg} flex flex-col`} style={{ ...panelStyle, flex: 1, minHeight: 0 }}>
         <SectionLabel color={accent} label="Arpeggio (16 steps, unsigned byte)" />
         <div style={{ flex: 1, minHeight: 120 }}>
@@ -317,7 +317,7 @@ export const SidMon1Controls: React.FC<SidMon1ControlsProps> = ({ config, onChan
   }, [upd, uadeChipRam, getEditor]);
 
   const renderWaveform = () => (
-    <div className="flex flex-col gap-3 p-3" style={{ height: 'calc(100vh - 280px)' }}>
+    <div className="flex flex-col gap-3 p-3" style={{ height: 'calc(var(--app-vh) - 280px)' }}>
 
       {/* Main Wave */}
       <div className={`rounded-lg border p-3 ${panelBg} flex flex-col`} style={{ ...panelStyle, flex: 1, minHeight: 0 }}>

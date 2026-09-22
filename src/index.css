@@ -4,11 +4,37 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Viewport height — defined once, read everywhere.
+ *
+ * iOS Safari resolves `100vh` against the viewport with the browser toolbar
+ * HIDDEN, so a `100vh` app shell puts its bottom edge — the mobile tab bar —
+ * underneath the toolbar. `100dvh` is the height that is visible right now.
+ *
+ * Every `100vh` in `src/` reads this variable, and Tailwind's `h-screen` /
+ * `min-h-screen` / `max-h-screen` resolve to it through `tailwind.config.js`,
+ * so the unit is chosen in exactly one place. The `100vh` below is the
+ * fallback for a browser without `dvh`; do not remove it.
+ */
+:root {
+  --app-vh: 100vh;
+
+  /* Height of the phone tab bar's touch rows, WITHOUT the home-indicator
+   * inset. The bar adds `safe-area-bottom` on top of it, and the main content
+   * area reserves both through `.mobile-bottom-padding`. One number. */
+  --mobile-tab-bar-height: 52px;
+}
+
+@supports (height: 100dvh) {
+  :root {
+    --app-vh: 100dvh;
+  }
+}
+
 /* PixiJS WebGL canvas — fill viewport */
 .pixi-canvas {
   display: block;
   width: 100vw;
-  height: 100vh;
+  height: var(--app-vh);
 }
 
 @layer base {
@@ -138,7 +164,7 @@
   /* Disable elastic scrolling on iOS */
   @supports (-webkit-touch-callout: none) {
     body {
-      height: 100vh;
+      height: var(--app-vh);
       height: -webkit-fill-available;
     }
   }
@@ -1601,8 +1627,11 @@
   }
 
   /* Mobile bottom padding to account for tab bar (56px) + safe area */
+  /* Reserve the tab bar AND the home-indicator inset beneath it. Applied to
+   * the main content area in `AppLayout.tsx`, so the last row of a view is
+   * never under the bar or under the iOS gesture bar. */
   .mobile-bottom-padding {
-    padding-bottom: calc(56px + env(safe-area-inset-bottom, 0));
+    padding-bottom: calc(var(--mobile-tab-bar-height) + env(safe-area-inset-bottom, 0));
   }
 
   /* Touch-friendly minimum tap targets */
@@ -1756,8 +1785,8 @@
   .mobile-fullscreen-modal {
     max-width: 100% !important;
     width: 100% !important;
-    max-height: 100vh !important;
-    height: 100vh !important;
+    max-height: var(--app-vh) !important;
+    height: var(--app-vh) !important;
     margin: 0 !important;
     border-radius: 0 !important;
   }
@@ -1765,9 +1794,9 @@
   /* Help modal full screen */
   .help-modal-content {
     width: 100vw !important;
-    height: 100vh !important;
+    height: var(--app-vh) !important;
     max-width: 100vw !important;
-    max-height: 100vh !important;
+    max-height: var(--app-vh) !important;
     border-radius: 0 !important;
   }
 }

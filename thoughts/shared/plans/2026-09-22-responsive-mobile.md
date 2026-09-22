@@ -260,3 +260,67 @@ rather than a tab — the bar stays uncrowded.
 - `src/components/tracker/PatternEditorCanvas.tsx` — line 350 conflates device with WebGL support; lines 785/928/1522 are the dead-zone handler gates
 - `src/components/controls/Fader.tsx` — lines 157–205, the pointer-event reference every Phase-2 conversion copies
 - `src/components/ui/Modal.tsx` — lines 204–209, the fixed widths that overflow a phone
+
+## Checklist
+
+Phase 0 landed before this checklist was written (`useResponsive.ts` and
+`utils/platform.ts` deleted, `useBreakpoint.ts` is the sole threshold source
+with `isCoarsePointer`/`isPhone`/`isShortViewport`, `screens` in
+`tailwind.config.js`). Items below are the remaining phases.
+
+### Phase 1 — viewport and chrome correctness
+- [ ] R1-1 `--app-vh` defined once in `index.css`, upgraded to `100dvh` under
+      `@supports`. One definition, every consumer reads it.
+- [ ] R1-2 `theme.extend.{height,minHeight,maxHeight}.screen` -> `var(--app-vh)`
+      so the 14 `h-screen` follow without being edited.
+- [ ] R1-3 The 85 literal `100vh` (79 in .ts/.tsx, 6 in `index.css`) read the
+      variable.
+- [ ] R1-4 `Modal.tsx` `sm`/`md` -> `w-full max-w-sm` / `w-full max-w-md`.
+- [ ] R1-5 Bottom tab bar clears the iOS toolbar and home indicator using the
+      existing `safe-area-bottom` / `.mobile-bottom-padding`, not a third
+      mechanism.
+- [ ] R1-6 Tests: no `Modal` size variant emits a bare `w-<n>`; no literal
+      `100vh` outside the variable's own definition.
+
+### Phase 2 — touch parity on drag controls
+- [ ] R2-1 `Knob.tsx` onto the `Fader.tsx` pointer shape, `docs/CONTROL_PATTERNS.md`
+      intact (ref mirror, `onChange`-only deps, no transition, `paramKey`).
+- [ ] R2-2 `DJPitchSlider`, `DeckPitchSlider` — the most visible failure.
+- [ ] R2-3 Tracker lanes: `AutomationLane`, `AutomationLanes`, `MacroLanes`,
+      `ParameterEditor`, `AutomationLaneStrip`, `PatternMatrix`.
+- [ ] R2-4 Canvas editors: `SampleEditor`, `SampleSpectrumFilter`,
+      `DeckAudioWaveform`, `DeckTrackOverview`, `FilterCurve`, `DrawCanvas`,
+      `HarmonicBarsCanvas`, `GeonkickEnvelopeCanvas`, `PadButton`, `PadEditor`.
+- [ ] R2-5 The thirteen `instruments/hardware/*Hardware*.tsx`.
+- [ ] R2-6 Ratchet test: a file with `onMouseDown` and no pointer/touch sibling
+      fails unless it is on a shrinking allowlist.
+
+### Phase 3 — layout primitives, one tree
+- [ ] R3-1 Primitives: hide-below-width, collapse-to-disclosure,
+      relocate-into-sheet. The sheet revives `ui/BottomSheet.tsx` onto
+      `<Button>` and the token allowlist.
+- [ ] R3-2 Each `TrackerView` panel container wrapped in its primitive.
+- [ ] R3-3 `MobileTrackerView`'s fork removed; its real contributions
+      (format-editor routing, three-state piano, orientation `visibleChannels`)
+      move into the shared tree behind `isPhone`.
+- [ ] R3-4 Reachability: render `TrackerView` at 390/700/1024/1440 and assert
+      every panel is mounted or in a sheet. happy-dom does no layout — this
+      proves mounting, never overflow.
+
+### Phase 4 — the views that cannot reflow
+- [ ] R4-1 (4a) `mobileCanvas` decoupled from `webglUnsupported`; character
+      metrics follow coarse pointer plus width.
+- [ ] R4-2 (4b) Dub Deck target sizes for a finger, and an entry point on a
+      phone; a held move survives `pointercancel`.
+- [ ] R4-3 (4c) DJ view: per Decision 4.
+- [ ] R4-4 (4d) Instrument editors and `FT2Toolbar` extend the container
+      queries already there; `.hide-mobile` applied or deleted.
+
+### Phase 5 — dead code and token drift
+- [ ] R5-1 `TouchTarget` / `BottomSheet` / `SwipeablePanel` adopted or deleted
+      with their `ui/index.ts` exports. No third state.
+- [ ] R5-2 `bg-dark-bgPrimary` (37) -> `bg-dark-bg`/`bg-dark-bgSecondary`;
+      `text-text-tertiary` (26) -> `text-text-muted`.
+- [ ] R5-3 CI check failing on any colour class outside the `CLAUDE.md`
+      allowlist.
+- [ ] R5-4 `MobileTabBar.tsx:3` comment describes what renders.

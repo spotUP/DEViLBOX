@@ -27,7 +27,7 @@ export const SIDRegisterMonitor: React.FC<Props> = ({
 
   return (
     <div className="flex flex-col gap-3 p-3 overflow-y-auto synth-controls-flow"
-      style={{ maxHeight: 'calc(100vh - 280px)' }}>
+      style={{ maxHeight: 'calc(var(--app-vh) - 280px)' }}>
       {Array.from({ length: chipCount }, (_, chipIdx) => {
         const regs = getSidRegisters(chipIdx);
         return (

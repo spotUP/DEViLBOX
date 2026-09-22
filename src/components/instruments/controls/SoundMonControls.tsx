@@ -251,7 +251,7 @@ export const SoundMonControls: React.FC<SoundMonControlsProps> = ({
   // -- MAIN TAB ---
 
   const renderMain = () => (
-    <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 280px)' }}>
+    <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(var(--app-vh) - 280px)' }}>
 
       {/* Waveform selector */}
       <div className={`rounded-lg border p-3 ${panelBg}`} style={panelStyle}>
@@ -413,7 +413,7 @@ export const SoundMonControls: React.FC<SoundMonControlsProps> = ({
   );
 
   const renderArpeggio = () => (
-    <div className="flex flex-col gap-3 p-3" style={{ height: 'calc(100vh - 280px)' }}>
+    <div className="flex flex-col gap-3 p-3" style={{ height: 'calc(var(--app-vh) - 280px)' }}>
       <div className={`rounded-lg border p-3 ${panelBg} flex flex-col`} style={{ ...panelStyle, flex: 1, minHeight: 0 }}>
         <div className="flex items-center justify-between mb-3">
           <SectionLabel color={accent} label="Arpeggio Speed" />
@@ -611,7 +611,7 @@ export const SoundMonControls: React.FC<SoundMonControlsProps> = ({
   const pcmLen = config.pcmData?.length ?? 0;
 
   const renderSample = () => (
-    <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 280px)' }}>
+    <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(var(--app-vh) - 280px)' }}>
 
       {/* Type indicator */}
       <div className={`rounded-lg border p-3 ${panelBg}`} style={panelStyle}>

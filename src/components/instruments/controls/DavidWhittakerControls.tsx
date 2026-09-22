@@ -86,7 +86,7 @@ export const DavidWhittakerControls: React.FC<DavidWhittakerControlsProps> = ({
     const approxHz = Math.round(3579545 / relVal);
 
     return (
-      <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 280px)' }}>
+      <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(var(--app-vh) - 280px)' }}>
         {/* Volume & Tuning */}
         <div className={`rounded-lg border p-3 ${panelBg}`} style={panelStyle}>
           <SectionLabel color={accent} label="Volume & Tuning" />
@@ -151,7 +151,7 @@ export const DavidWhittakerControls: React.FC<DavidWhittakerControlsProps> = ({
     const frqseq = config.frqseq ?? [];
 
     return (
-      <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 280px)' }}>
+      <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(var(--app-vh) - 280px)' }}>
 
         {/* Volume Sequence — 0-64 volume levels */}
         <div className={`rounded-lg border p-3 ${panelBg}`} style={panelStyle}>

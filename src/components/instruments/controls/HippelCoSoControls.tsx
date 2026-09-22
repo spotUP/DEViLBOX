@@ -285,7 +285,7 @@ export const HippelCoSoControls: React.FC<HippelCoSoControlsProps> = ({
 
   // ── MAIN TAB ──────────────────────────────────────────────────────────────
   const renderMain = () => (
-    <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 280px)' }}>
+    <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(var(--app-vh) - 280px)' }}>
       {/* Timing */}
       <div className={`rounded-lg border p-3 ${panelBg}`} style={panelStyle}>
         <SectionLabel color={accent} label="Timing" />
@@ -336,7 +336,7 @@ export const HippelCoSoControls: React.FC<HippelCoSoControlsProps> = ({
 
   // ── SEQUENCES TAB ─────────────────────────────────────────────────────────
   const renderSequences = () => (
-    <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 280px)' }}>
+    <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(var(--app-vh) - 280px)' }}>
 
       {/* Frequency Sequence — relative pitch offsets (semitones) */}
       <div className={`rounded-lg border p-3 ${panelBg}`} style={panelStyle}>

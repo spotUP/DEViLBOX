@@ -21,6 +21,19 @@ export default {
       '2xl': '1536px',
     },
     extend: {
+      // `h-screen` / `min-h-screen` / `max-h-screen` resolve to the app's own
+      // viewport-height variable, defined once in `src/index.css` and upgraded
+      // to `100dvh` where the browser has it. Overriding the core `screen` key
+      // means the 14 existing `h-screen` sites follow without being edited.
+      height: {
+        screen: 'var(--app-vh)',
+      },
+      minHeight: {
+        screen: 'var(--app-vh)',
+      },
+      maxHeight: {
+        screen: 'var(--app-vh)',
+      },
       gridTemplateColumns: {
         '16': 'repeat(16, minmax(0, 1fr))',
       },

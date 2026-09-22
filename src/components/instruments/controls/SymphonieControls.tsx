@@ -76,7 +76,7 @@ export const SymphonieControls: React.FC<SymphonieControlsProps> = ({
   // ── GENERAL TAB ──────────────────────────────────────────────────────────
 
   const renderGeneral = () => (
-    <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 280px)' }}>
+    <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(var(--app-vh) - 280px)' }}>
 
       {/* Type indicator */}
       <div className={`rounded-lg border p-3 ${panelBg}`} style={panelStyle}>
@@ -164,7 +164,7 @@ export const SymphonieControls: React.FC<SymphonieControlsProps> = ({
     const lenPct  = config.loopLen  / (100 * 65536) * 100;
 
     return (
-      <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 280px)' }}>
+      <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(var(--app-vh) - 280px)' }}>
         <div className={`rounded-lg border p-3 ${panelBg}`} style={panelStyle}>
           <SectionLabel color={accent} label="Loop Settings" />
 
@@ -230,7 +230,7 @@ export const SymphonieControls: React.FC<SymphonieControlsProps> = ({
   // ── ROUTING TAB ──────────────────────────────────────────────────────────
 
   const renderRouting = () => (
-    <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 280px)' }}>
+    <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(var(--app-vh) - 280px)' }}>
 
       {/* Multi-Channel */}
       <div className={`rounded-lg border p-3 ${panelBg}`} style={panelStyle}>

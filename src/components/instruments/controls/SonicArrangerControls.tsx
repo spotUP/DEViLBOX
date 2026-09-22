@@ -402,7 +402,7 @@ export const SonicArrangerControls: React.FC<SonicArrangerControlsProps> = ({
   const numWaveforms  = (config.allWaveforms ?? []).length;
 
   const renderSynthesis = () => (
-    <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 280px)' }}>
+    <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(var(--app-vh) - 280px)' }}>
       <div className={`rounded-lg border p-3 ${panelBg}`} style={panelStyle}>
         <SectionLabel color={accent} label="Instrument" />
         <div className="flex items-center gap-2">
@@ -491,7 +491,7 @@ export const SonicArrangerControls: React.FC<SonicArrangerControlsProps> = ({
   // ── ENVELOPE TAB ───────────────────────────────────────────────────────────
 
   const renderEnvelope = () => (
-    <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 280px)' }}>
+    <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(var(--app-vh) - 280px)' }}>
       <div className={`rounded-lg border p-3 ${panelBg}`} style={panelStyle}>
         <SectionLabel color={accent} label="Volume & Tuning" />
         <div className="flex gap-4">
@@ -608,7 +608,7 @@ export const SonicArrangerControls: React.FC<SonicArrangerControlsProps> = ({
   );
 
   const renderModulation = () => (
-    <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 280px)' }}>
+    <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(var(--app-vh) - 280px)' }}>
       <div className={`rounded-lg border p-3 ${panelBg}`} style={panelStyle}>
         <SectionLabel color={accent} label="Vibrato" />
         <div className="flex gap-3">

@@ -133,7 +133,7 @@ export const FredControls: React.FC<FredControlsProps> = ({ config, onChange, ua
 
   // -- ENVELOPE TAB --
   const renderEnvelope = () => (
-    <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 280px)' }}>
+    <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(var(--app-vh) - 280px)' }}>
       <div className={`rounded-lg border p-3 ${panelBg}`} style={panelStyle}>
         <SectionLabel color={accent} label="Envelope" />
         <div className="mb-3">
@@ -208,7 +208,7 @@ export const FredControls: React.FC<FredControlsProps> = ({ config, onChange, ua
 
   // -- PWM TAB --
   const renderPWM = () => (
-    <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 280px)' }}>
+    <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(var(--app-vh) - 280px)' }}>
       <div className={`rounded-lg border p-3 ${panelBg}`} style={panelStyle}>
         <SectionLabel color={accent} label="Pulse Width Range" />
         <div className="flex items-center gap-4">
@@ -269,7 +269,7 @@ export const FredControls: React.FC<FredControlsProps> = ({ config, onChange, ua
   );
 
   const renderArpeggio = () => (
-    <div className="flex flex-col gap-3 p-3" style={{ height: 'calc(100vh - 280px)' }}>
+    <div className="flex flex-col gap-3 p-3" style={{ height: 'calc(var(--app-vh) - 280px)' }}>
       <div className={`rounded-lg border p-3 ${panelBg}`} style={panelStyle}>
         <SectionLabel color={accent} label="Arpeggio Settings" />
         <div className="flex gap-4 mb-3">
@@ -302,7 +302,7 @@ export const FredControls: React.FC<FredControlsProps> = ({ config, onChange, ua
 
   // -- VIBRATO TAB --
   const renderVibrato = () => (
-    <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 280px)' }}>
+    <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(var(--app-vh) - 280px)' }}>
       <div className={`rounded-lg border p-3 ${panelBg}`} style={panelStyle}>
         <SectionLabel color={accent} label="Vibrato" />
         <div className="flex gap-4">

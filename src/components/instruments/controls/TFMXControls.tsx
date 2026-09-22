@@ -381,7 +381,7 @@ export const TFMXControls: React.FC<TFMXControlsProps> = ({ config, onChange, ua
   const renderSummary = () => {
     const samples = parseSampleHeaders(config.sampleHeaders, config.sampleCount);
     return (
-      <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 280px)' }}>
+      <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(var(--app-vh) - 280px)' }}>
         {/* Overview stats */}
         <div className={`rounded-lg border p-3 ${panelBg}`} style={panelStyle}>
           <SectionLabel color={accent} label="TFMX Instrument Data" />
@@ -473,7 +473,7 @@ export const TFMXControls: React.FC<TFMXControlsProps> = ({ config, onChange, ua
     };
 
     return (
-      <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 280px)' }}>
+      <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(var(--app-vh) - 280px)' }}>
         {/* Header fields */}
         <div className={`rounded-lg border p-3 ${panelBg}`} style={panelStyle}>
           <SectionLabel color={accent} label="VolModSeq Header (bytes 0–4)" />
@@ -620,7 +620,7 @@ export const TFMXControls: React.FC<TFMXControlsProps> = ({ config, onChange, ua
     };
 
     return (
-      <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 280px)' }}>
+      <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(var(--app-vh) - 280px)' }}>
         {seqCount === 0 ? (
           <div className={`rounded-lg border p-3 ${panelBg}`} style={panelStyle}>
             <div className="text-[9px] text-text-muted">No SndModSeq data</div>

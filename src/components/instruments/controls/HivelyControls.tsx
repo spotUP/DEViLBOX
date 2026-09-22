@@ -106,7 +106,7 @@ export const HivelyControls: React.FC<HivelyControlsProps> = ({
 
   // ── MAIN TAB ──
   const renderMainTab = () => (
-    <div className="flex flex-col gap-4 p-3 overflow-y-auto synth-controls-flow" style={{ maxHeight: 'calc(100vh - 280px)' }}>
+    <div className="flex flex-col gap-4 p-3 overflow-y-auto synth-controls-flow" style={{ maxHeight: 'calc(var(--app-vh) - 280px)' }}>
       {/* Volume & Wave Length */}
       <div className={`rounded-lg border p-3 ${panelBg}`} style={panelStyle}>
         <SectionLabel color={accentColor} label="Volume & Wave" />
@@ -290,7 +290,7 @@ export const HivelyControls: React.FC<HivelyControlsProps> = ({
     const entries = config.performanceList.entries;
 
     return (
-      <div className="flex flex-col gap-2 p-3" style={{ maxHeight: 'calc(100vh - 280px)' }}>
+      <div className="flex flex-col gap-2 p-3" style={{ maxHeight: 'calc(var(--app-vh) - 280px)' }}>
         {/* Speed + controls */}
         <div className="flex items-center gap-3 mb-1">
           <NumberBox label="Speed" value={config.performanceList.speed}

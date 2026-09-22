@@ -120,7 +120,7 @@ export const InStereo2Controls: React.FC<InStereo2ControlsProps> = ({
   // ── SYNTHESIS TAB ──────────────────────────────────────────────────────────
 
   const renderSynthesis = () => (
-    <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 280px)' }}>
+    <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(var(--app-vh) - 280px)' }}>
 
       {/* Volume + Waveform Length */}
       <div className={`rounded-lg border p-3 ${panelBg}`} style={panelStyle}>
@@ -178,7 +178,7 @@ export const InStereo2Controls: React.FC<InStereo2ControlsProps> = ({
   }, [config.egMode, config.egStartLen]);
 
   const renderEnvelope = () => (
-    <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 280px)' }}>
+    <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(var(--app-vh) - 280px)' }}>
 
       {/* ADSR Section */}
       <div className={`rounded-lg border p-3 ${panelBg}`} style={panelStyle}>
@@ -273,7 +273,7 @@ export const InStereo2Controls: React.FC<InStereo2ControlsProps> = ({
   // ── MODULATION TAB ─────────────────────────────────────────────────────────
 
   const renderModulation = () => (
-    <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 280px)' }}>
+    <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(var(--app-vh) - 280px)' }}>
 
       {/* Vibrato */}
       <div className={`rounded-lg border p-3 ${panelBg}`} style={panelStyle}>
@@ -359,7 +359,7 @@ export const InStereo2Controls: React.FC<InStereo2ControlsProps> = ({
   );
 
   const renderArpeggio = () => (
-    <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 280px)' }}>
+    <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(var(--app-vh) - 280px)' }}>
       <div className={`rounded-lg border p-3 ${panelBg}`} style={panelStyle}>
         <SectionLabel color={accent} label="Arpeggio Tables" />
         <div className="flex flex-col gap-3">
