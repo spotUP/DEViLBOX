@@ -9,7 +9,7 @@
  */
 
 import { useEffect, useCallback, useRef, useState } from 'react';
-import { shouldWriteRecovery, hasProjectContent, shouldPromptRestore, postLoadFlags } from '@/lib/persistence/recoveryGate';
+import { shouldWriteRecovery, hasProjectContent, postLoadFlags, decideBootRestore } from '@/lib/persistence/recoveryGate';
 import { useTrackerStore, useInstrumentStore, useProjectStore, useTransportStore, useAutomationStore, useAudioStore, useEditorStore, useFormatStore } from '@stores';
 import type { AutomationCurve } from '@typedefs/automation';
 import type { EffectConfig } from '@typedefs/instrument';
@@ -744,19 +744,28 @@ export function applySavedProject(project: SavedProject, opts?: { fromRecovery?:
  * Load project from IndexedDB.
  * Pass ?reset in the URL to skip restore and clear stored data (emergency recovery).
  */
+/**
+ * Emergency escape hatch: `?reset` in the URL clears all stored data.
+ *
+ * Boot no longer loads the saved project (it offers it), so this can no longer
+ * live only inside `loadProjectFromStorage` — nothing would call it. Returns
+ * true when a reset happened and the caller should stop.
+ */
+export async function handleResetParam(): Promise<boolean> {
+  if (typeof window === 'undefined' || !window.location.search.includes('reset')) return false;
+  console.warn('[Persistence] ?reset detected — clearing stored project data');
+  await idbDelete().catch(() => {});
+  await idbDeleteRecovery().catch(() => {}); // also clear recovery on reset
+  // Remove the ?reset param so subsequent reloads work normally
+  const url = new URL(window.location.href);
+  url.searchParams.delete('reset');
+  window.history.replaceState({}, '', url.toString());
+  return true;
+}
+
 export async function loadProjectFromStorage(): Promise<boolean> {
   try {
-    // Emergency escape hatch: ?reset in URL clears all stored data
-    if (typeof window !== 'undefined' && window.location.search.includes('reset')) {
-      console.warn('[Persistence] ?reset detected — clearing stored project data');
-      await idbDelete().catch(() => {});
-      await idbDeleteRecovery().catch(() => {}); // also clear recovery on reset
-      // Remove the ?reset param so subsequent reloads work normally
-      const url = new URL(window.location.href);
-      url.searchParams.delete('reset');
-      window.history.replaceState({}, '', url.toString());
-      return false;
-    }
+    if (await handleResetParam()) return false;
 
     const project = await idbGet();
     if (!project) return false;
@@ -1065,25 +1074,52 @@ export function useProjectPersistence() {
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const initialLoadRef = useRef(true);
   const [recoverySnapshot, setRecoverySnapshot] = useState<SavedProject | null>(null);
+  /** Which slot the pending prompt came from — it decides the post-load flags. */
+  const recoverySourceRef = useRef<'saved' | 'recovery' | null>(null);
+  /** Same value, for rendering: the prompt's wording differs by source. */
+  const [recoverySource, setRecoverySource] = useState<'saved' | 'recovery' | null>(null);
 
-  // Load on mount (only once per page session — module-level guard survives HMR remounts)
+  // Boot OFFERS stored work; it never loads it silently.
+  //
+  // It used to call `loadProjectFromStorage()` outright whenever a project had
+  // ever been saved, so every session opened on top of the last one: "i load a
+  // song on every boot because a stale song is there on every boot"
+  // (2026-09-22). That second load also re-wires the dub bus underneath the
+  // deck while the real song comes in.
+  //
+  // Only once per page session — the module-level guard survives HMR remounts.
   useEffect(() => {
     if (hasLoadedFromStorage) return;
     hasLoadedFromStorage = true;
     void (async () => {
+      if (await handleResetParam()) return;
+
       const everExplicitlySaved = await hasSavedProject();
-      if (everExplicitlySaved) {
-        await loadProjectFromStorage();
-        await idbDeleteRecovery().catch(() => {}); // explicit slot is authoritative
-        return;
-      }
-      const rec = await idbGetRecovery();
+      const saved = everExplicitlySaved ? await idbGet().catch(() => null) : null;
+      const savedHasContent =
+        !!saved && hasProjectContent({
+          instrumentCount: saved.instruments?.length ?? 0,
+          patternCount: saved.patterns?.length ?? 0,
+        });
+
+      const rec = await idbGetRecovery().catch(() => null);
       const hasRecoveryRecord =
         !!rec && hasProjectContent({
           instrumentCount: rec.instruments?.length ?? 0,
           patternCount: rec.patterns?.length ?? 0,
         });
-      if (shouldPromptRestore({ hasRecoveryRecord, everExplicitlySaved })) {
+
+      const decision = decideBootRestore({ everExplicitlySaved, savedHasContent, hasRecoveryRecord });
+      if (decision.kind === 'saved') {
+        // The explicit slot is authoritative, as before — a crash snapshot
+        // beside it is stale by definition.
+        await idbDeleteRecovery().catch(() => {});
+        recoverySourceRef.current = 'saved';
+        setRecoverySource('saved');
+        setRecoverySnapshot(saved!);
+      } else if (decision.kind === 'recovery') {
+        recoverySourceRef.current = 'recovery';
+        setRecoverySource('recovery');
         setRecoverySnapshot(rec!);
       }
     })();
@@ -1236,19 +1272,31 @@ export function useProjectPersistence() {
 
   const restoreRecovery = useCallback(() => {
     if (!recoverySnapshot) return;
-    // fromRecovery keeps the project never-saved + dirty so the scheduler
-    // re-arms — a second crash after Restore is still covered (spec).
-    applySavedProject(recoverySnapshot, { fromRecovery: true });
+    // A crash snapshot restores with `fromRecovery`, which keeps the project
+    // never-saved + dirty so the scheduler re-arms and a second crash after
+    // Restore is still covered (spec). The explicit-save slot must NOT use
+    // that tail — it is saved work, and marking it unsaved would re-arm
+    // recovery over a project that already has a home.
+    const fromRecovery = recoverySourceRef.current === 'recovery';
+    applySavedProject(recoverySnapshot, { fromRecovery });
+    recoverySourceRef.current = null;
+    setRecoverySource(null);
     setRecoverySnapshot(null);
   }, [recoverySnapshot]);
 
   const discardRecovery = useCallback(() => {
+    const wasRecovery = recoverySourceRef.current === 'recovery';
+    recoverySourceRef.current = null;
+    setRecoverySource(null);
     setRecoverySnapshot(null);
-    void idbDeleteRecovery().catch(() => {});
+    // Dismissing the offer of a SAVED project must never delete it — the user
+    // still finds it under Load. Only a crash snapshot is consumed by being
+    // declined.
+    if (wasRecovery) void idbDeleteRecovery().catch(() => {});
   }, []);
 
   const save = useCallback(() => saveProjectToStorage({ explicit: true }), []);
   const load = useCallback(() => loadProjectFromStorage(), []);
 
-  return { save, load, clear: clearSavedProject, isDirty, recoverySnapshot, restoreRecovery, discardRecovery };
+  return { save, load, clear: clearSavedProject, isDirty, recoverySnapshot, recoverySource, restoreRecovery, discardRecovery };
 }
