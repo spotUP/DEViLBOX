@@ -115,6 +115,33 @@ export function startDubRecorder(): () => void {
       return;
     }
 
+    // AutoDub's own output is not a performance to capture.
+    //
+    // The recorder is always on, and it recorded anything tagged `live` —
+    // which includes `origin: 'ai'`, AutoDub performing. On a song whose
+    // editor renders from native data (AHX, MusicLine, GTUltra, TFMX) a cell
+    // cannot be written, so capture falls to the automation CURVE path and
+    // writes a point at the row being played. `AutomationPlayer` then reads
+    // that same row on the same pass and fires it again with `source: 'lane'`.
+    //
+    // Measured 2026-09-22 on jennipha.ahx — every AutoDub move doubled:
+    //
+    //     [DubRouter] echoThrow ch0 source=live origin=ai
+    //     [DubRouter] echoThrow ch0 source=lane origin=lane
+    //
+    // Two consequences. Every gesture landed twice, which is the "one big
+    // reverb wash". And a HOLD fired twice but released once left an instance
+    // running with nothing to close it — a held `transportTapeStop` kept the
+    // song in slow motion after the user let go, and `combSweep` left a comb
+    // filter self-oscillating.
+    //
+    // The existing `source !== 'live'` guard closed the lane -> record -> lane
+    // loop. This closes the ai -> record -> lane one, which the same reasoning
+    // always demanded. Recording exists to capture what the USER played; a
+    // deliberate capture of an AutoDub take would need an explicit arm, not
+    // silent rewriting of the song with automation nobody asked for.
+    if (fireEvent.origin === 'ai') return;
+
     const isTimeMode = currentSongIsTimeBasedLane();
     if (isTimeMode) return; // time-mode songs have no automation rows
 
