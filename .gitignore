@@ -182,9 +182,12 @@ furnace-fileops-wasm/build/
 futureplayer-wasm/build/
 
 # Stray junk files from CLI tools
---cleanup
---cmdlog
-file
+# Anchored to the repo root on purpose: an unanchored `file` matches ANY path
+# segment with that name, which silently covered the whole of `src/lib/file/`
+# and made `git add` on UnifiedFileLoader.ts demand -f.
+/--cleanup
+/--cmdlog
+/file
 
 # Test music files (not part of the project)
 public/test-*

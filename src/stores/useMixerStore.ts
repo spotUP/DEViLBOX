@@ -849,6 +849,8 @@ interface MixerStoreActions {
 
   // Bulk load mixer state from saved project
   loadMixerState: (snapshot: MixerSnapshot) => void;
+  /** Zero every channel's dub send — see the implementation for why. */
+  resetDubSends: () => void;
 }
 
 /** Serializable mixer snapshot for .dbx persistence */
@@ -1348,6 +1350,33 @@ export const useMixerStore = create<MixerStore>()(
       }
       // Rebuild WASM isolation for the new effect chain
       scheduleWasmEffectRebuild();
+    },
+
+    /**
+     * Put every channel's dub send back to zero.
+     *
+     * A send is a fader position on the desk for THIS song, and loading a new
+     * one used to inherit whatever the last song left behind. Worse, the sends
+     * are written back into the store from the AUDIO GRAPH by the ratchet
+     * flush above, so what carried over was often not even a position anyone
+     * chose — it was the residue of a move that rode the fader and stopped
+     * somewhere.
+     *
+     * Reported 2026-09-22: opening the Dub Deck on a freshly loaded
+     * jennipha.ahx, before pressing play, showed 45% / 25% / 43% / 25% on
+     * channels nobody had touched. A dub producer starts with the sends down
+     * and brings them up; the deck should open that way.
+     *
+     * The `.dbx` restore path is unaffected — it calls `loadMixerState` with
+     * the sends the user saved, which is a position they DID choose.
+     */
+    resetDubSends(): void {
+      set((state) => {
+        for (const ch of state.channels) {
+          if (ch) ch.dubSend = 0;
+        }
+      });
+      dubSendBaselines.clear();
     },
 
     loadMixerState(snapshot: MixerSnapshot): void {

@@ -11,6 +11,7 @@ import type { InstrumentConfig } from '@/types/instrument';
 import type { Pattern } from '@/types';
 import { useTrackerStore } from '@/stores/useTrackerStore';
 import { useFormatStore } from '@/stores/useFormatStore';
+import { useMixerStore } from '@stores/useMixerStore';
 import { useInstrumentStore } from '@/stores/useInstrumentStore';
 import { useTransportStore } from '@/stores/useTransportStore';
 import { useProjectStore } from '@/stores/useProjectStore';
@@ -132,6 +133,15 @@ export async function importTrackerModule(
   }
 
   // Full state reset
+  //
+  // The dub sends belong in here and were not. They are fader positions on the
+  // desk for one song, and they are also written back from the audio graph by
+  // the mixer's ratchet — so loading a new module inherited whatever the last
+  // song's moves happened to leave behind. Reported 2026-09-22 as a freshly
+  // loaded jennipha.ahx opening the Dub Deck at 45% / 25% / 43% / 25% before
+  // anything had played.
+  useMixerStore.getState().resetDubSends();
+
   const { loadPatterns, setPatternOrder, setCurrentPattern } = useTrackerStore.getState();
   const { loadInstruments, reset: resetInstruments } = useInstrumentStore.getState();
   const { setBPM, setSpeed, reset: resetTransport } = useTransportStore.getState();
