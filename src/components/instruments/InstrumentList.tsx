@@ -630,7 +630,7 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
                        240px: every badge — Sampler, PCM and the role — sat past
                        the right edge with nothing to show they existed. */
                     className={`text-xs font-mono cursor-text ${artMode
-                      ? 'whitespace-pre shrink-0'
+                      ? 'instrument-art-name whitespace-pre shrink-0'
                       : 'whitespace-nowrap flex-1 min-w-[4rem] truncate'}`}
                     onDoubleClick={(e) => handleStartEdit(e, instrument.id, instrument.name)}
                     title={instrument.name}
