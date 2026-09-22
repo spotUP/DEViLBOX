@@ -27,15 +27,6 @@ const ROOT = process.cwd();
  * value, which is the order Phase 2 works through them.
  */
 const MOUSE_ONLY_ALLOWLIST: readonly string[] = [
-  // Tracker lanes (R2-3)
-  'src/components/tracker/AutomationLane.tsx',
-  'src/components/tracker/AutomationLanes.tsx',
-  'src/components/tracker/MacroLanes.tsx',
-  'src/components/tracker/ParameterEditor.tsx',
-  'src/components/automation/AutomationCurve.tsx',
-  'src/components/automation/AutomationCurveEditor.tsx',
-  'src/components/automation/AutomationLaneStrip.tsx',
-  'src/components/arrangement/PatternMatrix.tsx',
   // Canvas editors (R2-4)
   'src/components/instruments/SampleEditor.tsx',
   'src/components/instruments/SampleSpectrumFilter.tsx',

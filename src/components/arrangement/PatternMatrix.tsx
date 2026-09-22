@@ -178,9 +178,9 @@ export const PatternMatrix: React.FC = () => {
     return pos >= posLo && pos <= posHi && ch >= chLo && ch <= chHi;
   }, [selection]);
 
-  // ── Mouse handlers ─────────────────────────────────────────────────────────
+  // ── Pointer handlers ───────────────────────────────────────────────────────
 
-  const handleCellMouseDown = useCallback((e: React.MouseEvent, pos: number, ch: number) => {
+  const handleCellPointerDown = useCallback((e: React.PointerEvent, pos: number, ch: number) => {
     e.preventDefault();
 
     // Alt+click or middle click → toggle slot mute
@@ -224,7 +224,7 @@ export const PatternMatrix: React.FC = () => {
     }
   }, [selection, setCurrentPosition, slotMutes, toggleSlotMute, setSlotMutesAction]);
 
-  const handleCellMouseEnter = useCallback((pos: number, ch: number) => {
+  const handleCellEnter = useCallback((pos: number, ch: number) => {
     if (isSelecting) {
       setSelection(prev => prev ? { ...prev, endPos: pos, endCh: ch } : null);
     }
@@ -233,7 +233,7 @@ export const PatternMatrix: React.FC = () => {
     }
   }, [isSelecting, isDragging]);
 
-  const handleMouseUp = useCallback(() => {
+  const handlePointerUp = useCallback(() => {
     if (isDragging && dragSource && dragOver && dragSource.pos !== dragOver.pos) {
       if (isCloning) {
         // Clone: duplicate the position and insert at drag target
@@ -254,10 +254,10 @@ export const PatternMatrix: React.FC = () => {
     setDragOver(null);
   }, [isDragging, dragSource, dragOver, isCloning, duplicatePosition, reorderPositions]);
 
-  // Track mouse movement to detect drag start
+  // Track pointer movement to detect drag start
   const dragStartRef = useRef<{ x: number; y: number; pos: number; ch: number } | null>(null);
 
-  const handleCellMouseMove = useCallback((e: React.MouseEvent) => {
+  const handleCellPointerMove = useCallback((e: React.PointerEvent) => {
     if (dragStartRef.current && !isDragging && isSelecting) {
       const dx = Math.abs(e.clientX - dragStartRef.current.x);
       const dy = Math.abs(e.clientY - dragStartRef.current.y);
@@ -268,7 +268,21 @@ export const PatternMatrix: React.FC = () => {
         setIsSelecting(false);
       }
     }
-  }, [isDragging, isSelecting]);
+
+    // `mouseenter` is how the matrix follows a drag across cells, and a touch
+    // pointer never fires it: the pointer is implicitly captured by the cell
+    // the finger landed on, so every later event is delivered there. Hit-test
+    // the cell under the finger instead. A mouse keeps its own path.
+    if (e.pointerType !== 'mouse') {
+      const under = document.elementFromPoint(e.clientX, e.clientY);
+      const cell = under?.closest<HTMLElement>('[data-matrix-cell]');
+      if (cell) {
+        const pos = Number(cell.dataset.matrixPos);
+        const ch = Number(cell.dataset.matrixCh);
+        if (Number.isFinite(pos) && Number.isFinite(ch)) handleCellEnter(pos, ch);
+      }
+    }
+  }, [isDragging, isSelecting, handleCellEnter]);
 
   useEffect(() => {
     const handler = () => {
@@ -279,8 +293,12 @@ export const PatternMatrix: React.FC = () => {
       setDragOver(null);
       dragStartRef.current = null;
     };
-    window.addEventListener('mouseup', handler);
-    return () => window.removeEventListener('mouseup', handler);
+    window.addEventListener('pointerup', handler);
+    window.addEventListener('pointercancel', handler);
+    return () => {
+      window.removeEventListener('pointerup', handler);
+      window.removeEventListener('pointercancel', handler);
+    };
   }, []);
 
   // ── Context menu ──────────────────────────────────────────────────────────
@@ -569,8 +587,10 @@ export const PatternMatrix: React.FC = () => {
       className="flex flex-col bg-dark-bg select-none focus:outline-none flex-1 min-h-0"
       tabIndex={0}
       onKeyDown={handleKeyDown}
-      onMouseUp={handleMouseUp}
-      onMouseMove={handleCellMouseMove}
+      onPointerUp={handlePointerUp}
+      onPointerCancel={handlePointerUp}
+      onPointerMove={handleCellPointerMove}
+      style={{ touchAction: 'none' }}
     >
       {/* Track header row — sticky */}
       <div className="flex flex-shrink-0 border-b border-dark-border bg-dark-bgSecondary" style={{ height: HEADER_H }}>
@@ -677,11 +697,14 @@ export const PatternMatrix: React.FC = () => {
                         ? `${color}22`
                         : isCurrent ? 'rgba(255,255,255,0.015)' : 'transparent',
                     }}
-                    onMouseDown={(e) => {
-                      handleCellMouseDown(e, posIdx, ch);
+                    data-matrix-cell=""
+                    data-matrix-pos={posIdx}
+                    data-matrix-ch={ch}
+                    onPointerDown={(e) => {
+                      handleCellPointerDown(e, posIdx, ch);
                       dragStartRef.current = { x: e.clientX, y: e.clientY, pos: posIdx, ch };
                     }}
-                    onMouseEnter={() => handleCellMouseEnter(posIdx, ch)}
+                    onMouseEnter={() => handleCellEnter(posIdx, ch)}
                     onContextMenu={(e) => handleContextMenu(e, posIdx, ch)}
                     title={`Pos ${posIdx}, Track ${ch + 1}, Pattern ${patIdx}${isMuted ? ' [slot muted]' : ''}${dimmed ? ' [track muted]' : ''}`}
                   >

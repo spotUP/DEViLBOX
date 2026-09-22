@@ -287,7 +287,10 @@ export const ParameterEditor: React.FC<ParameterEditorProps> = ({
   }, [preset]);
 
   // Mouse handlers
-  const handleMouseDown = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
+  const handlePointerDown = useCallback((e: React.PointerEvent<HTMLCanvasElement>) => {
+    // Capture so the drag follows the pointer off the canvas and ends on
+    // pointercancel — the shape in src/components/controls/Fader.tsx.
+    try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* no capture here */ }
     const result = getRowAndValue(e);
     if (!result) return;
 
@@ -302,7 +305,7 @@ export const ParameterEditor: React.FC<ParameterEditorProps> = ({
     applyValue(result.rowIndex, result.value, editMode);
   }, [getRowAndValue, applyValue, editMode]);
 
-  const handleMouseMove = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
+  const handlePointerMove = useCallback((e: React.PointerEvent<HTMLCanvasElement>) => {
     if (!isDragging) {
       // Show preview on hover
       const result = getRowAndValue(e);
@@ -322,11 +325,11 @@ export const ParameterEditor: React.FC<ParameterEditorProps> = ({
     }
   }, [isDragging, getRowAndValue, applyValue, editMode, values]);
 
-  const handleMouseUp = useCallback(() => {
+  const handlePointerUp = useCallback(() => {
     setIsDragging(false);
   }, []);
 
-  const handleMouseLeave = useCallback(() => {
+  const handlePointerLeave = useCallback(() => {
     setIsDragging(false);
     setPreviewValues(null);
   }, []);
@@ -488,13 +491,13 @@ export const ParameterEditor: React.FC<ParameterEditorProps> = ({
             ref={canvasRef}
             width={canvasWidth}
             height={canvasHeight}
-            onMouseDown={handleMouseDown}
-            onMouseMove={handleMouseMove}
-            onMouseUp={handleMouseUp}
-            onMouseLeave={handleMouseLeave}
+            onPointerDown={handlePointerDown}
+            onPointerMove={handlePointerMove}
+            onPointerUp={handlePointerUp}
+            onPointerCancel={handlePointerLeave}
             onContextMenu={handleContextMenu}
             className="cursor-crosshair border border-dark-border rounded"
-            style={{ minWidth: canvasWidth }}
+            style={{ minWidth: canvasWidth, touchAction: 'none' }}
           />
         </div>
 

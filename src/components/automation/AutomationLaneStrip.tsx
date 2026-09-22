@@ -228,7 +228,10 @@ const LaneCurveCanvas: React.FC<{
     return -1;
   }, [paramId, patternLength]);
 
-  const handleMouseDown = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
+  const handlePointerDown = useCallback((e: React.PointerEvent<HTMLCanvasElement>) => {
+    // Capture so the drag follows the pointer off the canvas and ends on
+    // pointercancel — the shape in src/components/controls/Fader.tsx.
+    try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* no capture here */ }
     const idx = findNearPoint(e);
     if (idx >= 0) {
       setDragIdx(idx);
@@ -239,7 +242,7 @@ const LaneCurveCanvas: React.FC<{
     }
   }, [findNearPoint, getMousePos, paramId]);
 
-  const handleMouseMove = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
+  const handlePointerMove = useCallback((e: React.PointerEvent<HTMLCanvasElement>) => {
     if (dragIdx === null) return;
     const { value } = getMousePos(e);
     const capture = getAutomationCapture();
@@ -249,7 +252,7 @@ const LaneCurveCanvas: React.FC<{
     }
   }, [dragIdx, getMousePos, paramId]);
 
-  const handleMouseUp = useCallback(() => { setDragIdx(null); }, []);
+  const handlePointerUp = useCallback(() => { setDragIdx(null); }, []);
 
   const handleDoubleClick = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
     const idx = findNearPoint(e);
@@ -270,10 +273,11 @@ const LaneCurveCanvas: React.FC<{
         width={1600}
         height={height * 2}
         className="w-full h-full cursor-crosshair"
-        onMouseDown={handleMouseDown}
-        onMouseMove={handleMouseMove}
-        onMouseUp={handleMouseUp}
-        onMouseLeave={handleMouseUp}
+        style={{ touchAction: 'none' }}
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+        onPointerCancel={handlePointerUp}
         onDoubleClick={handleDoubleClick}
       />
     </div>
