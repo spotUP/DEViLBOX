@@ -367,6 +367,43 @@ export const DubDeckStrip: React.FC = () => {
   const [micGain, setMicGain] = useState(0.8);
 
   /**
+   * Touching a dub control IS the intent to dub, so arm the bus rather than
+   * swallowing the gesture.
+   *
+   * Every dub control used to open with `if (!busEnabled) return;`. Clicking a
+   * pad, a move or AutoDub with the bus off did nothing and said nothing —
+   * reported 2026-09-22 ("i cant turn autodub off if dubbus is disabled, and
+   * why can it even be enabled when dub bus is disabled?"). Disabling the
+   * controls instead is worse: it makes the deck look broken and leaves
+   * AutoDub unreachable from the state it is stuck in.
+   *
+   * Arming is a store write, and the bus graph is spliced by an effect on the
+   * next commit, so an action fired in the same tick would reach a bus that is
+   * not wired yet. `run` therefore executes immediately when the bus is
+   * already on, and otherwise waits for `getActiveDubBus()` to appear before
+   * running — bounded, so a bus that never comes up drops the action instead
+   * of leaving a callback alive for ever.
+   *
+   * Returns true when the action ran synchronously, so callers that need a
+   * handle back (a hold's gesture id) can tell the two cases apart.
+   */
+  const runWithBus = useCallback((action: () => void): boolean => {
+    if (busEnabled && getActiveDubBus()) { action(); return true; }
+    setDubBus({ enabled: true, characterPreset: dubBusSettings.characterPreset });
+    let framesLeft = 30; // ~0.5s at 60Hz; the splice lands in one or two.
+    const waitForBus = () => {
+      if (getActiveDubBus()) { action(); return; }
+      if (framesLeft-- <= 0) {
+        console.warn('[DubDeck] bus did not come up; dropping the queued action');
+        return;
+      }
+      requestAnimationFrame(waitForBus);
+    };
+    requestAnimationFrame(waitForBus);
+    return false;
+  }, [busEnabled, setDubBus, dubBusSettings.characterPreset]);
+
+  /**
    * Bus audition (X6) — the releaser, held for as long as the button is.
    *
    * A ref rather than state for the releaser itself: it is an engine handle,
@@ -378,11 +415,21 @@ export const DubDeckStrip: React.FC = () => {
 
   const beginBusAudition = useCallback(() => {
     if (auditionReleaseRef.current) return;
-    const release = getActiveDubBus()?.beginAudition();
-    if (!release) return;
-    auditionReleaseRef.current = release;
-    setAuditioning(true);
-  }, []);
+    // Arm the bus first, like every other dub control — the audition used to
+    // light up and do nothing when the bus was off, because `beginAudition`
+    // handed back a no-op releaser that read as success.
+    runWithBus(() => {
+      const release = getActiveDubBus()?.beginAudition();
+      if (!release) {
+        // The bus declined: either it still cannot act, or no colour stage is
+        // engaged to solo away. Say so rather than lighting a dead button.
+        notify.info('Audition: no colour stage is engaged — nothing to solo away');
+        return;
+      }
+      auditionReleaseRef.current = release;
+      setAuditioning(true);
+    });
+  }, [runWithBus]);
 
   const endBusAudition = useCallback(() => {
     const release = auditionReleaseRef.current;
@@ -903,42 +950,6 @@ export const DubDeckStrip: React.FC = () => {
   // send=0 because the per-channel tap GainNode only gets registered with
   // DubBus *after* _activateDubChannel completes asynchronously — racey
   // and silent on a cold channel.
-  /**
-   * Touching a dub control IS the intent to dub, so arm the bus rather than
-   * swallowing the gesture.
-   *
-   * Every dub control used to open with `if (!busEnabled) return;`. Clicking a
-   * pad, a move or AutoDub with the bus off did nothing and said nothing —
-   * reported 2026-09-22 ("i cant turn autodub off if dubbus is disabled, and
-   * why can it even be enabled when dub bus is disabled?"). Disabling the
-   * controls instead is worse: it makes the deck look broken and leaves
-   * AutoDub unreachable from the state it is stuck in.
-   *
-   * Arming is a store write, and the bus graph is spliced by an effect on the
-   * next commit, so an action fired in the same tick would reach a bus that is
-   * not wired yet. `run` therefore executes immediately when the bus is
-   * already on, and otherwise waits for `getActiveDubBus()` to appear before
-   * running — bounded, so a bus that never comes up drops the action instead
-   * of leaving a callback alive for ever.
-   *
-   * Returns true when the action ran synchronously, so callers that need a
-   * handle back (a hold's gesture id) can tell the two cases apart.
-   */
-  const runWithBus = useCallback((action: () => void): boolean => {
-    if (busEnabled && getActiveDubBus()) { action(); return true; }
-    setDubBus({ enabled: true, characterPreset: dubBusSettings.characterPreset });
-    let framesLeft = 30; // ~0.5s at 60Hz; the splice lands in one or two.
-    const waitForBus = () => {
-      if (getActiveDubBus()) { action(); return; }
-      if (framesLeft-- <= 0) {
-        console.warn('[DubDeck] bus did not come up; dropping the queued action');
-        return;
-      }
-      requestAnimationFrame(waitForBus);
-    };
-    requestAnimationFrame(waitForBus);
-    return false;
-  }, [busEnabled, setDubBus, dubBusSettings.characterPreset]);
 
   const toggleHold = useCallback((channelId: number) => {
     const isHeld = heldReleasers.current.has(channelId);

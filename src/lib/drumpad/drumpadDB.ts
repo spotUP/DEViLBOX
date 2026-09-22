@@ -99,7 +99,16 @@ function idbTransaction(tx: IDBTransaction): Promise<void> {
 
 // ── Sample storage ──────────────────────────────────────────────────────────
 
-/** Convert an AudioBuffer to a storable format */
+/**
+ * Convert an AudioBuffer to a storable format.
+ *
+ * Refuses to produce a record that cannot be read back. Fifteen samples in one
+ * user's database held `channels: []` and threw
+ * `createBuffer(0, …)` on every boot — the pad was silently empty and the
+ * console carried fifteen stack traces each time. A store that writes
+ * something unreadable has already lost the data; failing at the write is the
+ * only place the caller can still do anything about it.
+ */
 function audioBufferToStored(sample: SampleData): StoredSample {
   const channels: ArrayBuffer[] = [];
   for (let ch = 0; ch < sample.audioBuffer.numberOfChannels; ch++) {
@@ -110,6 +119,13 @@ function audioBufferToStored(sample: SampleData): StoredSample {
       channelData.byteOffset,
       channelData.byteOffset + channelData.byteLength,
     ));
+  }
+  if (channels.length === 0) {
+    throw new Error(
+      `[drumpadDB] refusing to store sample "${sample.id}" (${sample.name}): its `
+      + `AudioBuffer reports ${sample.audioBuffer.numberOfChannels} channels, so the `
+      + 'record could never be read back.',
+    );
   }
   return {
     id: sample.id,
@@ -126,6 +142,17 @@ function storedToAudioBuffer(
   audioContext: BaseAudioContext,
 ): SampleData {
   const numChannels = stored.channels.length;
+  // Name the sample and the cause. `createBuffer` throws "The number of
+  // channels provided (0) is outside the range [1, 32]", which says nothing
+  // about WHICH pad is dead or why — fifteen of those per boot told the user
+  // only that something was wrong.
+  if (numChannels === 0) {
+    throw new Error(
+      `stored sample "${stored.id}" (${stored.name}) holds no channel data — `
+      + 'it was written by a build that did not validate on save, and cannot be '
+      + 'recovered. Re-import the sample.',
+    );
+  }
   const sampleLength = stored.channels[0]
     ? new Float32Array(stored.channels[0]).length
     : 0;
