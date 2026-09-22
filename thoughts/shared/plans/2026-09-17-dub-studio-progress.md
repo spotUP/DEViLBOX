@@ -1573,7 +1573,14 @@ this bug.
       subsequent reconnect silently fails — permanently killing audio output" — which is
       what the no-recovery-after-disable behaviour looks like.
 
-- [ ] **X23 (original entry)** **`jennipha.ahx` goes silent.** Reported 2026-09-21. Reproduce, then use
+- [x] **X23 — CLOSED. Root-caused and user-confirmed playing through.** Two defects on one
+      path, both recorded in `thoughts/spot/todos.md`: `AutomationPlayer.getColumnValue`
+      decoded EVERY format's volume column with the XM convention, where `0x10` means "set
+      volume 0", while an AHX volume column is a plain 0-64 level — pattern 0 row 0x2E
+      channel 1 carries `volume: 16`. Decoding is now per editor mode in
+      `src/lib/tracker/volumeColumn.ts`.
+
+- [x] **X23 (original entry)** **`jennipha.ahx` goes silent.** Reported 2026-09-21. Reproduce, then use
       `get_playback_silence` (added 2026-09-19) rather than guessing — it reports the
       worklet's own `silentReason` and separates "the engine is rendering silence" from
       "audio was produced and swallowed later". AHX is a WASM engine path, so also check
@@ -1670,7 +1677,11 @@ this bug.
       the wrong trade for a surface played live. The existing order already runs most-used
       first, so what wraps is what is reached for least. Commit `8550d9bcb`.
 
-- [ ] **X32** **Dub deck header row is not responsive and runs off the edge.** Reported
+- [x] **X32 — CLOSED 2026-09-21 by `8550d9bcb`.** The header is `flex flex-wrap`; verified
+      at 1509 / 1280 / 1024 / 900 px. Below 900 was never checked and is now Phase 4 of
+      `thoughts/shared/plans/2026-09-22-responsive-mobile.md` (R4-2), not this entry.
+
+- [x] **X32 (original entry)** **Dub deck header row is not responsive and runs off the edge.** Reported
       2026-09-21 with a screenshot: DUB DECK / Bus ON / REC / STYLE / ECHO / A/B / AUTO DUB
       / EQ / BLEED / CHORUS / CLUB / QUANTIZE / DLY-VRB, with the next control ("JA...")
       cut in half at the right edge.
@@ -1914,10 +1925,27 @@ line references, spot-checked before being written down.
       is a gain interpolation to unity, not a switch. Structural answer, better than an
       ear: it holds for every gain, every rate and every listener.
 
-- [ ] **H15** **Unverified: Fil4 EQ coefficient writes on 16-50ms timers** with no ramping
-      or coalescing on the JS side, and band enable flags flickering as gain crosses
-      +/-0.2 dB. Whether the WASM smooths internally could not be read. Needs a listening
-      test before being called fine or broken.
+- [x] **H15 — READ 2026-09-22. The WASM does smooth, and the enable flip is graceful.**
+      The half that "could not be read" is in `fil4-wasm/src/fil4_wasm.cpp`, which is
+      vendored: every section interpolates its coefficients per block —
+      `hip_interpolate`, `iir_interpolate`, `lop_interpolate`. A coefficient write does
+      not land as a step.
+      The enable flag is equally safe. A disabled band is not bypassed; it is driven to
+      **unity** and interpolated there (`float g = inst.ls_p.en ? powf(...) : 1.0f;` and,
+      for the parametric bands, "pass g=1.0 (unity) when disabled so the section
+      interpolates back to flat gracefully"). So the flicker at +/-0.2 dB
+      (`AutoEQDriver.ts:120`, `Math.abs(newGain) > 0.2`) re-targets the interpolator
+      between a 0.2 dB gain and flat — two nearly identical targets, reached by a glide.
+      The JS side genuinely does NOT coalesce: `Fil4EqEffect._send` posts one message per
+      setter. But the callers run at 20 ms (the ramp-to-baseline timer) and 50-250 ms (the
+      improv tick), not at pointer or sample rate, so the traffic is at most ~200
+      postMessages/s across 4 bands during a ramp. Chatty, not a discontinuity.
+      **Verdict: fine, not broken.** Recorded rather than closed by ear, because nothing
+      here was audible enough to be worth a listening test of its own — if a crackle IS
+      heard while AutoEQ is running, this entry now says exactly where it cannot be
+      coming from.
+      Worth doing if the chatter ever matters: one message per tick carrying all four
+      bands instead of four.
 - [x] **H16 — FIXED 2026-09-21.** The emoji is out of the mic label (project rule);
       `setSettings({})` in `wireMasterInsert` now passes the settings the master path
       depends on, since `{}` short-circuits and the call did nothing, leaving the master
@@ -2185,7 +2213,10 @@ line references, spot-checked before being written down.
       Verified live: `version.json` matches HEAD, and the index's `main-DL8MuXZa.js`
       resolves 200 at exactly the built byte size.
 
-- [ ] **X4 (original entry)** Six commits unpushed. Nothing verified by ear yet, so nothing has
+- [x] **X4 — CLOSED. Overtaken.** That batch went live long ago; `origin/main` is at
+      `6f7491df7` as of 2026-09-22 with the gate green.
+
+- [x] **X4 (original entry)** Six commits unpushed. Nothing verified by ear yet, so nothing has
       gone live. Push after X2 passes a listening test.
 
 ### Reusable
