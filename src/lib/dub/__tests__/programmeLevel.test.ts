@@ -186,6 +186,31 @@ describe('shelfTrimDb — pay for what the boost actually costs', () => {
   it('falls back to a typical share when nothing is playing', () => {
     expect(shelfTrimDb(9, SILENT)).toBeCloseTo(-3.6, 6);
   });
+
+  it('charges nothing when the programme has the headroom to absorb the boost', () => {
+    // A tracker module runs around 0.2 peak — about 14 dB below full scale.
+    // A 9 dB shelf on a 0.4 low share costs 3.6 dB, which fits, so the mix
+    // keeps its level and the BASS control is heard as bass rather than as a
+    // volume drop (2026-09-22).
+    expect(shelfTrimDb(9, QUIET)).toBeCloseTo(0, 10);
+  });
+
+  it('still charges a hot master in full', () => {
+    // 0.9 peak leaves under a decibel — the 2026-09-18 clipping case.
+    expect(shelfTrimDb(9, LOUD)).toBeCloseTo(-3.6, 6);
+  });
+
+  it('charges only the part that will not fit', () => {
+    // 0.5 peak ~ 6 dB down, 1 dB held back: 5 dB of headroom against a 7.2 dB
+    // cost leaves 2.2 dB to pay for.
+    const mid: ProgrammeLevel = { rms: 0.15, peak: 0.5, lowShare: 0.4, valid: true };
+    expect(shelfTrimDb(18, mid)).toBeCloseTo(-(18 * 0.4 - (-20 * Math.log10(0.5) - 1)), 6);
+  });
+
+  it('never turns a boost into a lift', () => {
+    expect(shelfTrimDb(18, QUIET)).toBeLessThanOrEqual(0);
+    expect(shelfTrimDb(1, QUIET)).toBeLessThanOrEqual(0);
+  });
 });
 
 /**

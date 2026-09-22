@@ -57,6 +57,30 @@ function hpfHzToNormalized(hz: number): number {
   if (!Number.isFinite(hz)) return 0;
   return Math.max(0, Math.min(1, (hz - 20) / 980));
 }
+
+/**
+ * Where the HPF control's Hz lands on the FULL MIX.
+ *
+ * The bus HPF and the master-insert HPF were fed the same number. They are not
+ * the same quantity: on the wet path 70 Hz is voicing — it keeps the echo
+ * feedback out of the mud — while on the dry mix it is a subtractive filter
+ * across the whole song. `hpfStepped` (the default) snaps to Altec positions
+ * whose LOWEST is 70 Hz, so merely switching the bus on high-passed the entire
+ * mix at 70 Hz with no way to turn it off, and the BASS shelf at 60 Hz then
+ * boosted a band that had already been removed. Measured on the live insert at
+ * bassShelfGainDb 12 with masterBassPunchDb 6: insertIn 0.015687 ->
+ * afterShelf 0.016667, +0.5 dB for +18 dB of shelf, while `masterToneTrim`
+ * charged the whole mix for the boost. That is exactly the reported symptom —
+ * "the music gets quieter but no more bass" (2026-09-22).
+ *
+ * At rest the dry mix is therefore left whole. The control still sweeps the
+ * full mix above the resting position, which is where a Tubby filter sweep
+ * actually lives and where it is audible.
+ */
+const MASTER_HPF_IDLE_HZ = 20;
+function masterHpfHzFor(hz: number): number {
+  return hz <= ALTEC_HPF_STEPS[0] ? MASTER_HPF_IDLE_HZ : hz;
+}
 import { RE201Effect } from '../effects/RE201Effect';
 import { AnotherDelayEffect } from '../effects/AnotherDelayEffect';
 import { RETapeEchoEffect } from '../effects/RETapeEchoEffect';
@@ -1740,7 +1764,7 @@ export class DubBus {
     // is enabled AND the user's TONE settings are non-neutral.
     this.masterHpf = this.context.createBiquadFilter();
     this.masterHpf.type = 'highpass';
-    this.masterHpf.frequency.value = initialHpfFreq;  // tracks hpfCutoff; swept by startHpfRise
+    this.masterHpf.frequency.value = masterHpfHzFor(initialHpfFreq);  // idle transparent; swept by startHpfRise
     this.masterHpf.Q.value = 0.5;  // Butterworth — no resonance on the full mix
     this.masterBassShelf = this.context.createBiquadFilter();
     this.masterBassShelf.type = 'lowshelf';
@@ -3561,7 +3585,7 @@ export class DubBus {
       rampBiquadParam(this.hpf2.frequency, hz, now);
       rampBiquadParam(this.hpf3.frequency, hz, now);
       rampBiquadParam(this.hpfResonance.frequency, hz, now);
-      rampBiquadParam(this.masterHpf.frequency, hz, now);  // full-mix HPF for audibility
+      rampBiquadParam(this.masterHpf.frequency, masterHpfHzFor(hz), now);  // full-mix HPF for audibility
       // Every step of the Altec climb, so the slider does the sweep with it
       // rather than sitting still while the whole mix filters.
       this.announce('dub.hpfCutoff', hpfHzToNormalized(hz));
@@ -3612,7 +3636,7 @@ export class DubBus {
       rampBiquadParam(this.hpf2.frequency, targetHz, now, 0.4);
       rampBiquadParam(this.hpf3.frequency, targetHz, now, 0.4);
       rampBiquadParam(this.hpfResonance.frequency, targetHz, now, 0.4);
-      rampBiquadParam(this.masterHpf.frequency, targetHz, now, 0.4);
+      rampBiquadParam(this.masterHpf.frequency, masterHpfHzFor(targetHz), now, 0.4);
       // Resonance gain boost at peak — same as stepped mode.
       const peakTimer = setTimeout(() => {
         timers.splice(timers.indexOf(peakTimer), 1);
@@ -3626,7 +3650,7 @@ export class DubBus {
         rampBiquadParam(this.hpf2.frequency, originHz, n, 0.6);
         rampBiquadParam(this.hpf3.frequency, originHz, n, 0.6);
         rampBiquadParam(this.hpfResonance.frequency, originHz, n, 0.6);
-        rampBiquadParam(this.masterHpf.frequency, originHz, n, 0.6);
+        rampBiquadParam(this.masterHpf.frequency, masterHpfHzFor(originHz), n, 0.6);
         rampBiquadParam(this.hpfResonance.gain, baseDb, n, 0.15);
       }, 400 + holdMs);
       timers.push(restoreTimer);
@@ -3935,7 +3959,7 @@ export class DubBus {
     rampBiquadParam(this.hpfResonance.frequency, hpfFreq, now);
     rampBiquadParam(this.hpfResonance.gain, merged.hpfResonanceDb ?? 0, now);
     // Master insert HPF tracks the same cutoff — makes Rise audible on the dry mix.
-    rampBiquadParam(this.masterHpf.frequency, hpfFreq, now);
+    rampBiquadParam(this.masterHpf.frequency, masterHpfHzFor(hpfFreq), now);
     // Guard: skip return_.gain write when a mute hold is active (swap
     // or warmup). A re-entrant setSettings call (PadGrid mirror, DJ sync)
     // would insert a setTargetAtTime event that defeats the warmup hold,
@@ -4040,67 +4064,7 @@ export class DubBus {
     this._applyStereoWidth(merged.stereoWidth);
     // Master-insert TONE EQ — drives the whole mix (dry + wet) when wired.
     // Gain writes are gated so a disabled bus stays transparent on master.
-    const masterActive = this.enabled && this.masterInsertActive;
-    // masterBassPunchDb is dry-path bass weight. The master path is OUTSIDE
-    // the echo feedback loop, so it can be pushed far harder than the wet
-    // bus's bassShelfGainDb, which self-oscillates above about +12 dB even
-    // with the feedback compensator.
-    //
-    // TWO STAGES, NOT ONE SUM. These were added together and the total
-    // clamped to +9 dB. With the shipped defaults that is 9 + 6 = 15 clamped
-    // to 9, so the shelf arrived pinned at the ceiling and the BASS slider
-    // did nothing from +3 upward — nine dB of a twenty-four dB control.
-    // Measured 2026-09-22 against the live bus: bassShelfGainDb 0 gave 6 dB,
-    // 3 gave 9, and 9 gave 9.
-    //
-    // Dub is drums and bass, so the low end has to be able to get genuinely
-    // heavy. Each control now drives its own shelf and neither can silence
-    // the other. Headroom is handled where headroom belongs: `masterToneTrim`
-    // below pays for the TOTAL, proportionally to how much of the programme
-    // actually lives down there, and `masterSafetyClip` sits downstream of
-    // both stages to catch what is left.
-    // The total still has a ceiling — the insert only ever ADDS level, and
-    // uncapped it produced "the dub bus clipping and disting most of the
-    // time" (2026-09-18). But the ceiling is now spent on PUNCH, never on
-    // BASS: the slider the user rides always gets exactly what it asks for,
-    // and the voicing control gives way. 18 dB rather than the old 9, because
-    // dub is drums and bass and the low end has to be able to get heavy;
-    // +12 bass with the default +6 punch now lands exactly on it, so the
-    // whole BASS travel is live.
-    const MASTER_LOW_CEILING_DB = 18;
-    const wantPunch = Math.max(-18, Math.min(18, merged.masterBassPunchDb ?? 0));
-    const punchHeadroom = Math.max(0, MASTER_LOW_CEILING_DB - Math.max(0, safeBassGain));
-    const safeMasterPunch = wantPunch > 0 ? Math.min(wantPunch, punchHeadroom) : wantPunch;
-    rampBiquadParam(this.masterBassShelf.frequency, merged.bassShelfFreqHz, now);
-    rampBiquadParam(this.masterBassShelf.Q, merged.bassShelfQ, now);
-    rampBiquadParam(this.masterBassShelf.gain, masterActive ? safeBassGain : 0, now);
-    rampBiquadParam(this.masterBassPunch.frequency, merged.bassShelfFreqHz, now);
-    rampBiquadParam(this.masterBassPunch.Q, merged.bassShelfQ, now);
-    rampBiquadParam(this.masterBassPunch.gain, masterActive ? safeMasterPunch : 0, now);
-    // What the two stages add up to — what the trim has to pay for.
-    const safeMasterShelfGain = safeBassGain + safeMasterPunch;
-    // Pay for the boost before applying it. A +9 dB shelf with no trim put
-    // the mix 9 dB over the limiter's -1 dB threshold; at ratio 4 that still
-    // leaves +1.25 dB at the destination, which clips.
-    // Pay for the boost — but only for what it actually costs. A low shelf
-    // lifts the low end, not the whole mix, so the trim follows the share of
-    // energy that lives down there rather than the shelf's dB figure.
-    const trimDb = masterActive ? shelfTrimForProgramme(safeMasterShelfGain) : 0;
-    this._settle(this.masterToneTrim.gain, Math.pow(10, trimDb / 20), now, 0.02);
-    rampBiquadParam(this.masterMidScoop.frequency, merged.midScoopFreqHz, now);
-    rampBiquadParam(this.masterMidScoop.Q, merged.midScoopQ, now);
-    rampBiquadParam(this.masterMidScoop.gain, masterActive ? merged.midScoopGainDb : 0, now);
-    // Master width: 4-gain coeff matrix matching the bus-level pattern.
-    // Neutral (width=1 → coeffA=1, coeffB=0) when bus disabled or inactive
-    // so the master stays untouched.
-    const mw = masterActive ? Math.max(0, Math.min(2, merged.stereoWidth)) : 1;
-    const mA = 0.5 + 0.5 * mw;
-    const mB = 0.5 - 0.5 * mw;
-    const masterInvertL = (this.masterSide as unknown as { _invertL?: GainNode })._invertL;
-    this._settle(this.masterMid.gain, mA, now, 0.02);
-    this._settle(this.masterSide.gain, mA, now, 0.02);
-    this._settle(this.masterInvertR.gain, mB, now, 0.02);
-    if (masterInvertL) masterInvertL.gain.setTargetAtTime(mB, now, 0.02);
+    this._applyMasterInsertTone(merged);
     // Liquid sweep params — clamp + smooth. sweepAmount=0 fully silences
     // the branch; LFO keeps running (can't stop OscillatorNode).
     const sweepAmt = Math.max(0, Math.min(1, merged.sweepAmount));
@@ -4735,16 +4699,25 @@ export class DubBus {
       this.masterInsertActive = true;
       // Re-run the master-side gain writes now that masterActive is true.
       //
-      // This passed `{}`, which short-circuits at the top of `setSettings` —
-      // `Object.keys({})` is empty, so `changed` stays false and the body never
-      // runs. The call did nothing, and the master tone EQ stayed flat until
-      // some unrelated write happened to arrive. Pass the settings that the
-      // master path actually depends on, so the write is real.
-      this.setSettings({
-        bassShelfGainDb: this.settings.bassShelfGainDb,
-        midScoopGainDb: this.settings.midScoopGainDb,
-        stereoWidth: this.settings.stereoWidth,
-      });
+      // NOT through `setSettings`. That short-circuits when nothing CHANGED:
+      //
+      //     for (const key of Object.keys(settings))
+      //       if (this.settings[key] !== settings[key]) { changed = true; break; }
+      //     if (!changed) return;
+      //
+      // This first passed `{}` — no keys, so `changed` stayed false and the
+      // call did nothing. That was "fixed" by passing the three settings the
+      // master path depends on, read from `this.settings` — which are by
+      // definition EQUAL to what is already stored, so `changed` stayed false
+      // and it still did nothing. The master tone EQ therefore stayed flat
+      // from the moment the bus was enabled until some unrelated write
+      // happened to arrive, which is why the BASS slider appeared dead even
+      // after its own clamping bug was fixed (2026-09-22).
+      //
+      // The event here is "the graph changed, re-derive", not "a setting
+      // changed". Routing it through a settings change-detector cannot work,
+      // so it calls the master-side application directly.
+      this._applyMasterInsertTone();
       // Ramp envelope back to 1 — insert fades in smoothly. Timed from NOW,
       // not from the pre-fade `now`, which is already in the past by the length
       // of the fade and would make this ramp land instantly.
@@ -4771,6 +4744,91 @@ export class DubBus {
    * master with a route to the destination. Nothing may return early past
    * this while `masterInsertSplice` is set.
    */
+  /**
+   * Write the master-insert tone stages — low shelf, punch, trim, mid scoop,
+   * stereo width — from the current settings.
+   *
+   * Called from `_applySettings`, and again the moment the splice completes.
+   * That second call is the point: `wireMasterInsert` is async, so when the
+   * bus is enabled `_applySettings` runs while `masterInsertActive` is still
+   * false and writes 0 to every stage here. Without a re-derive on
+   * completion the master tone stays flat until some unrelated setting
+   * happens to change — which is why the BASS slider read as dead even after
+   * its own clamping bug was fixed.
+   *
+   * It must NOT be reached through `setSettings`: that returns early when no
+   * value differs, and re-deriving after a graph change passes values equal
+   * to the ones already stored by definition.
+   */
+  private _applyMasterInsertTone(settings?: DubBusSettings): void {
+    const m = settings ?? this.settings;
+    const now = this.context.currentTime;
+    // Same clamp the wet bus applies to its own shelf: the master low shelf
+    // tracks the BASS control, and the punch stage sits on top of it.
+    const safeBassGain = Math.max(-12, Math.min(12, m.bassShelfGainDb));
+    const masterActive = this.enabled && this.masterInsertActive;
+    // masterBassPunchDb is dry-path bass weight. The master path is OUTSIDE
+    // the echo feedback loop, so it can be pushed far harder than the wet
+    // bus's bassShelfGainDb, which self-oscillates above about +12 dB even
+    // with the feedback compensator.
+    //
+    // TWO STAGES, NOT ONE SUM. These were added together and the total
+    // clamped to +9 dB. With the shipped defaults that is 9 + 6 = 15 clamped
+    // to 9, so the shelf arrived pinned at the ceiling and the BASS slider
+    // did nothing from +3 upward — nine dB of a twenty-four dB control.
+    // Measured 2026-09-22 against the live bus: bassShelfGainDb 0 gave 6 dB,
+    // 3 gave 9, and 9 gave 9.
+    //
+    // Dub is drums and bass, so the low end has to be able to get genuinely
+    // heavy. Each control now drives its own shelf and neither can silence
+    // the other. Headroom is handled where headroom belongs: `masterToneTrim`
+    // below pays for the TOTAL, proportionally to how much of the programme
+    // actually lives down there, and `masterSafetyClip` sits downstream of
+    // both stages to catch what is left.
+    // The total still has a ceiling — the insert only ever ADDS level, and
+    // uncapped it produced "the dub bus clipping and disting most of the
+    // time" (2026-09-18). But the ceiling is now spent on PUNCH, never on
+    // BASS: the slider the user rides always gets exactly what it asks for,
+    // and the voicing control gives way. 18 dB rather than the old 9, because
+    // dub is drums and bass and the low end has to be able to get heavy;
+    // +12 bass with the default +6 punch now lands exactly on it, so the
+    // whole BASS travel is live.
+    const MASTER_LOW_CEILING_DB = 18;
+    const wantPunch = Math.max(-18, Math.min(18, m.masterBassPunchDb ?? 0));
+    const punchHeadroom = Math.max(0, MASTER_LOW_CEILING_DB - Math.max(0, safeBassGain));
+    const safeMasterPunch = wantPunch > 0 ? Math.min(wantPunch, punchHeadroom) : wantPunch;
+    rampBiquadParam(this.masterBassShelf.frequency, m.bassShelfFreqHz, now);
+    rampBiquadParam(this.masterBassShelf.Q, m.bassShelfQ, now);
+    rampBiquadParam(this.masterBassShelf.gain, masterActive ? safeBassGain : 0, now);
+    rampBiquadParam(this.masterBassPunch.frequency, m.bassShelfFreqHz, now);
+    rampBiquadParam(this.masterBassPunch.Q, m.bassShelfQ, now);
+    rampBiquadParam(this.masterBassPunch.gain, masterActive ? safeMasterPunch : 0, now);
+    // What the two stages add up to — what the trim has to pay for.
+    const safeMasterShelfGain = safeBassGain + safeMasterPunch;
+    // Pay for the boost before applying it. A +9 dB shelf with no trim put
+    // the mix 9 dB over the limiter's -1 dB threshold; at ratio 4 that still
+    // leaves +1.25 dB at the destination, which clips.
+    // Pay for the boost — but only for what it actually costs. A low shelf
+    // lifts the low end, not the whole mix, so the trim follows the share of
+    // energy that lives down there rather than the shelf's dB figure.
+    const trimDb = masterActive ? shelfTrimForProgramme(safeMasterShelfGain) : 0;
+    this._settle(this.masterToneTrim.gain, Math.pow(10, trimDb / 20), now, 0.02);
+    rampBiquadParam(this.masterMidScoop.frequency, m.midScoopFreqHz, now);
+    rampBiquadParam(this.masterMidScoop.Q, m.midScoopQ, now);
+    rampBiquadParam(this.masterMidScoop.gain, masterActive ? m.midScoopGainDb : 0, now);
+    // Master width: 4-gain coeff matrix matching the bus-level pattern.
+    // Neutral (width=1 → coeffA=1, coeffB=0) when bus disabled or inactive
+    // so the master stays untouched.
+    const mw = masterActive ? Math.max(0, Math.min(2, m.stereoWidth)) : 1;
+    const mA = 0.5 + 0.5 * mw;
+    const mB = 0.5 - 0.5 * mw;
+    const masterInvertL = (this.masterSide as unknown as { _invertL?: GainNode })._invertL;
+    this._settle(this.masterMid.gain, mA, now, 0.02);
+    this._settle(this.masterSide.gain, mA, now, 0.02);
+    this._settle(this.masterInvertR.gain, mB, now, 0.02);
+    if (masterInvertL) masterInvertL.gain.setTargetAtTime(mB, now, 0.02);
+  }
+
   private _restoreMasterInsertPassthrough(): void {
     const splice = this.masterInsertSplice;
     if (!splice) return;

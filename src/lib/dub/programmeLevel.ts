@@ -230,18 +230,50 @@ export function smoothProgrammeLevel(
   };
 }
 
+/** Headroom kept free below full scale, so the boost never lands on the limiter. */
+const MASTER_HEADROOM_DB = 1;
+
 /**
  * How much of a low-shelf boost shows up in broadband level.
  *
  * `lowShare` is the fraction of energy the shelf is lifting, so that fraction
- * of the boost lands in the overall level. The floor keeps the trim from
+ * of the boost lands in the overall level. The floor keeps the cost from
  * disappearing on a thin mix; the ceiling keeps it from swallowing the tune on
  * a bass-only passage.
  */
+function shelfCostDb(shelfGainDb: number, programme: ProgrammeLevel): number {
+  const share = programme.valid ? clamp01(programme.lowShare) : DEFAULT_LOW_SHARE;
+  return shelfGainDb * Math.max(0.15, Math.min(0.7, share));
+}
+
+/**
+ * How far to turn the mix DOWN to pay for a low-shelf boost.
+ *
+ * Only what will not fit. The trim used to charge the full cost of the boost
+ * whatever the programme was doing, which on a tracker module — they run at
+ * 0.05 to 0.15 peak, twenty decibels below full scale — meant the mix got
+ * quieter by several dB to protect headroom that was never in danger. With the
+ * BASS control at its top that is -7.2 dB of broadband level bought for
+ * nothing, and it is what the control FEELS like: reported 2026-09-22 as "when
+ * i slide the bass slider to the right the music gets quieter but no more
+ * bass", and "a dub producer needs to have HEAVY bass".
+ *
+ * So the boost spends the headroom that is actually there first, and only the
+ * excess is charged to the mix. A hot master still pays in full — that is the
+ * 2026-09-18 "dub bus clipping and disting most of the time" regression, and
+ * the arithmetic below still reproduces it for a 0.9-peak programme.
+ *
+ * With nothing playing there is no measurement to spend, so the cost is
+ * charged in full rather than assumed free.
+ */
 export function shelfTrimDb(shelfGainDb: number, programme: ProgrammeLevel): number {
   if (shelfGainDb <= 0) return 0;
-  const share = programme.valid ? clamp01(programme.lowShare) : DEFAULT_LOW_SHARE;
-  return -shelfGainDb * Math.max(0.15, Math.min(0.7, share));
+  const cost = shelfCostDb(shelfGainDb, programme);
+  if (!programme.valid) return -cost;
+  const peak = clamp01(programme.peak);
+  if (peak <= 0) return -cost;
+  const headroomDb = Math.max(0, -20 * Math.log10(peak) - MASTER_HEADROOM_DB);
+  return -Math.max(0, cost - headroomDb);
 }
 
 /** Typical share of energy below the bass/mid split for programme material. */
