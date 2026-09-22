@@ -187,9 +187,21 @@ function fromHively(inst: InstrumentConfig): SynthTimbreEvidence | null {
   };
 }
 
-/** The generic Tone-style envelope, in milliseconds, shared by most of the
- *  native synths. Carries no waveform information on its own. */
+/**
+ * The generic Tone-style envelope, in milliseconds, shared by most of the
+ * native synths. Carries no waveform information on its own.
+ *
+ * Refuses to read a SAMPLE-based instrument, because for those the envelope is
+ * not the music. Measured 2026-09-22 on `a sleep so deep.mod`: all eleven
+ * instruments carry the identical `{ attack: 10, decay: 500, sustain: 0,
+ * release: 100 }`, which is the app's default applied at import — the same
+ * numbers for a bass, a snare, a bell and a piano. Reading it would manufacture
+ * confident timbre evidence out of a constant, for the formats that need it
+ * least: a sample instrument already has PCM, and `SampleSpectrum` measures
+ * what it actually sounds like.
+ */
 function fromEnvelope(inst: InstrumentConfig): SynthTimbreEvidence | null {
+  if (inst.type === 'sample' || inst.sample?.url) return null;
   const env = inst.envelope;
   if (!env) return null;
   const attackMs = env.attack ?? 0;

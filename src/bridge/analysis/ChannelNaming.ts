@@ -14,7 +14,7 @@
 import type { ChannelData, Pattern } from '@/types/tracker';
 import type { InstrumentConfig } from '@/types/instrument/defaults';
 import type { SampleCategory } from '@typedefs/samplePack';
-import { classifyChannel, detectSkankPattern, PERCUSSION_NAME_RE, type ChannelAnalysis, type ChannelRole } from './MusicAnalysis';
+import { classifyChannel, detectSkankPattern, PERCUSSION_NAME_RE, type ChannelAnalysis, type ChannelRole, type ChannelSongContext } from './MusicAnalysis';
 import { categorizeSample } from '@/lib/import/maxForLiveImport';
 import { DRUM_SYNTHS } from '@/midi/performance/lightGuide';
 import { analyzeEnvelopeShape } from '@/lib/import/EnvelopeConverter';
@@ -228,10 +228,11 @@ export function classifyChannelWithInstruments(
   channel: ChannelData,
   channelIndex: number,
   lookup: Map<number, InstrumentConfig>,
+  ctx?: ChannelSongContext,
 ): EnhancedChannelAnalysis {
   const notes = collectNotes(channel);
   const numRows = channel.rows.length;
-  const noteAnalysis = classifyChannel(channelIndex, notes, numRows);
+  const noteAnalysis = classifyChannel(channelIndex, notes, numRows, ctx);
 
   const freq = getChannelInstruments(channel);
   if (freq.size === 0) {
@@ -428,6 +429,32 @@ export function classifySongChannels(
   const sampled: Pattern[] = [];
   for (let i = 0; i < patterns.length; i += step) sampled.push(patterns[i]);
 
+  // The song's register map, computed before any channel is classified.
+  //
+  // `bass` describes a channel's place in the arrangement, and asking that
+  // question needs the other channels. Measured on jennipha.ahx, the four
+  // channel medians are 25, 34, 10 and 29 — and without this every one of them
+  // classified as bass, including the channel sitting two octaves above the
+  // actual bassline.
+  const channelMedians: number[] = schema.channels.map((_, idx) => {
+    const all: number[] = [];
+    for (const pat of sampled) {
+      const ch = pat.channels?.[idx];
+      if (!ch) continue;
+      for (const cell of ch.rows) {
+        if (cell && cell.note >= 1 && cell.note <= 96) all.push(cell.note);
+      }
+    }
+    if (all.length === 0) return Number.POSITIVE_INFINITY;
+    all.sort((a, b) => a - b);
+    const mid = all.length >> 1;
+    return all.length % 2 ? all[mid] : (all[mid - 1] + all[mid]) / 2;
+  });
+  const sounding = channelMedians.filter(m => Number.isFinite(m));
+  const ctx: ChannelSongContext | undefined = sounding.length > 1
+    ? { songLowestMedian: Math.min(...sounding) }
+    : undefined;   // one sounding channel cannot be high or low relative to anything
+
   const analyses: EnhancedChannelAnalysis[] = schema.channels.map((_, idx) => {
     // Collect role votes across all sampled patterns for this channel.
     // Use highest-confidence result per pattern; skip empty-role patterns.
@@ -437,7 +464,7 @@ export function classifySongChannels(
     for (const pat of sampled) {
       const ch = pat.channels?.[idx];
       if (!ch) continue;
-      const result = classifyChannelWithInstruments(ch, idx, instruments);
+      const result = classifyChannelWithInstruments(ch, idx, instruments, ctx);
       if (result.role === 'empty') continue;
 
       votes.set(result.role, (votes.get(result.role) ?? 0) + 1);
@@ -448,7 +475,7 @@ export function classifySongChannels(
 
     if (!bestResult) {
       // All patterns were empty for this channel
-      return classifyChannelWithInstruments(schema.channels[idx], idx, instruments);
+      return classifyChannelWithInstruments(schema.channels[idx], idx, instruments, ctx);
     }
 
     // Majority vote — pick the role that appeared most often
@@ -467,7 +494,7 @@ export function classifySongChannels(
     for (const pat of sampled) {
       const ch = pat.channels?.[idx];
       if (!ch) continue;
-      const result = classifyChannelWithInstruments(ch, idx, instruments);
+      const result = classifyChannelWithInstruments(ch, idx, instruments, ctx);
       if (result.role === winnerRole) return result;
     }
     return bestResult;
