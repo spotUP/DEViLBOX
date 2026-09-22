@@ -1371,18 +1371,6 @@ export const DubDeckStrip: React.FC = () => {
         >
           {chainOrder === 'echoSpring' ? 'DLY→VRB' : chainOrder === 'springEcho' ? 'VRB→DLY' : 'PARALLEL'}
         </button>
-        <div className="flex items-center gap-1.5">
-          <span className="text-text-muted text-xs">JA</span>
-          <input
-            type="range" min={0} max={10} step={0.5}
-            value={vinylLevel}
-            onChange={(e) => setVinylLevel(Number(e.target.value))}
-            className="w-20 accent-accent-warning"
-            disabled={!busEnabled}
-            title={`JA Press: ${vinylLevel.toFixed(1)} / 10 — vinyl wear (surface noise, clicks, wow/flutter, HF roll-off, rumble, L/R drift). 0 = factory new, 10 = gutter-scraped Jamaican 7-inch.`}
-          />
-          <span className="w-8 text-text-secondary text-xs">{vinylLevel.toFixed(1)}</span>
-        </div>
         {/* ── Mic controls ─────────────────────────────────────────────── */}
         <div className="flex items-center gap-1.5 ml-2">
           <button
@@ -1489,6 +1477,29 @@ export const DubDeckStrip: React.FC = () => {
             />
             <span className="text-text-secondary text-[9px] font-mono tabular-nums w-7 text-right shrink-0">
               {(autoDubIntensity * 100).toFixed(0)}%
+            </span>
+          </div>
+
+          {/* Vinyl wear. Moved down here from the toolbar row and renamed from
+              "JA" — asked for 2026-09-22. It belongs with the other three
+              because it is the same KIND of control: a continuous amount that
+              colours the whole bus.
+
+              Note the scale differs. vinylLevel is 0-10 with a 0.5 step, not
+              the 0-1 the others use, so the readout stays one decimal out of
+              ten rather than a percentage. Showing "450%" here would be worse
+              than the inconsistency. */}
+          <div className="flex items-center gap-2 flex-1 min-w-[11rem]">
+            <span className="text-text-muted text-[9px] font-mono shrink-0">VINYL</span>
+            <input
+              type="range" min={0} max={10} step={0.5}
+              value={vinylLevel}
+              onChange={(e) => setVinylLevel(Number(e.target.value))}
+              className="flex-1 min-w-0 accent-accent-warning cursor-pointer"
+              title={`Vinyl wear: ${vinylLevel.toFixed(1)} / 10 — surface noise, clicks, wow and flutter, high-frequency roll-off, rumble, left/right drift. 0 = factory new, 10 = gutter-scraped Jamaican 7-inch.`}
+            />
+            <span className="text-text-secondary text-[9px] font-mono tabular-nums w-7 text-right shrink-0">
+              {vinylLevel.toFixed(1)}
             </span>
           </div>
 
