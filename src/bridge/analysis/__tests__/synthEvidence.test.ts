@@ -306,3 +306,115 @@ describe('reaching classifyInstrument', () => {
     expect(out.confidence).toBe(1);
   });
 });
+
+/**
+ * The Amiga replayer families.
+ *
+ * FutureComposer, SoundMon, Sonic Arranger and Hippel-CoSo synthesise their
+ * instruments inside the replayer: no PCM for the spectrum path, no Tone.js
+ * envelope, and names that are greetings rather than descriptions. Before
+ * `fromAmigaReplayer` the classifier had nothing to read for any of them and
+ * every channel fell through to note statistics.
+ */
+
+function fcInst(fc: Record<string, unknown>): InstrumentConfig {
+  return { id: 1, name: 'greets to everyone', synthType: 'FCSynth', fc } as unknown as InstrumentConfig;
+}
+
+describe('FutureComposer instruments', () => {
+  it('reads the envelope in video frames, not milliseconds', () => {
+    // 5 frames at 50Hz is 100ms. Read as ms it would be 5ms and every
+    // instrument would look percussive.
+    const t = extractSynthTimbre(fcInst({
+      atkLength: 5, decLength: 25, relLength: 50, sustVolume: 48,
+      synthTable: [], vibDepth: 0, vibSpeed: 0,
+    }))!;
+    expect(t.source).toBe('replayer');
+    expect(t.attackMs).toBe(100);
+    expect(t.decayMs).toBe(500);
+    expect(t.releaseMs).toBe(1000);
+    expect(t.articulation).toBe('sustained');
+  });
+
+  it('calls a short envelope percussive', () => {
+    const t = extractSynthTimbre(fcInst({
+      atkLength: 0, decLength: 2, relLength: 2, sustVolume: 0, synthTable: [],
+    }))!;
+    expect(t.articulation).toBe('percussive');
+  });
+
+  it('sees vibrato only when depth AND speed are set', () => {
+    const on = extractSynthTimbre(fcInst({ synthTable: [], vibDepth: 8, vibSpeed: 4 }))!;
+    const noSpeed = extractSynthTimbre(fcInst({ synthTable: [], vibDepth: 8, vibSpeed: 0 }))!;
+    expect(on.vibrato).toBe(true);
+    expect(noSpeed.vibrato).toBe(false);
+  });
+
+  it('calls a synth macro that visits several waveforms a moving timbre', () => {
+    const moving = extractSynthTimbre(fcInst({
+      synthTable: [{ waveNum: 1, transposition: 0, effect: 0 }, { waveNum: 5, transposition: 0, effect: 0 }],
+    }))!;
+    const still = extractSynthTimbre(fcInst({
+      synthTable: [{ waveNum: 1, transposition: 0, effect: 0 }, { waveNum: 1, transposition: 0, effect: 0 }],
+    }))!;
+    expect(moving.sweeping).toBe(true);
+    expect(still.sweeping).toBe(false);
+  });
+
+  it('never claims a brightness it cannot know', () => {
+    // The waveform number indexes a bank that is song data, unlike Hively's
+    // fixed 0-3 table. Guessing here would be inventing evidence.
+    const t = extractSynthTimbre(fcInst({ synthTable: [], waveNumber: 42 }))!;
+    expect(t.brightness).toBe(0.5);
+    expect(t.noisiness).toBe(0);
+  });
+});
+
+describe('SoundMon instruments', () => {
+  const sm = (soundMon: Record<string, unknown>) =>
+    ({ id: 1, name: 'x', synthType: 'SoundMonSynth', soundMon } as unknown as InstrumentConfig);
+
+  it('treats its fields as SPEEDS, so a bigger number is a shorter ramp', () => {
+    const fast = extractSynthTimbre(sm({ type: 'synth', attackSpeed: 32, decaySpeed: 32, releaseSpeed: 32 }))!;
+    const slow = extractSynthTimbre(sm({ type: 'synth', attackSpeed: 2, decaySpeed: 2, releaseSpeed: 2 }))!;
+    expect(fast.attackMs).toBeLessThan(slow.attackMs);
+  });
+
+  it('reads speed 0 as an instant edge, not an endless ramp', () => {
+    const t = extractSynthTimbre(sm({ type: 'synth', attackSpeed: 0, decaySpeed: 0, releaseSpeed: 0 }))!;
+    expect(t.attackMs).toBe(0);
+    expect(t.articulation).toBe('percussive');
+  });
+
+  it('leaves PCM instruments to the spectrum path', () => {
+    expect(extractSynthTimbre(sm({ type: 'pcm', attackSpeed: 4 }))).toBeNull();
+  });
+});
+
+describe('Hippel-CoSo instruments', () => {
+  const hc = (hippelCoso: Record<string, unknown>) =>
+    ({ id: 1, name: 'x', synthType: 'HippelCoSoSynth', hippelCoso } as unknown as InstrumentConfig);
+
+  it('takes the length of the volume sequence as the length of the sound', () => {
+    // No ADSR exists in this format: volume is a stepped sequence.
+    const t = extractSynthTimbre(hc({ vseq: new Array(40).fill(32), volSpeed: 2, fseq: [] }))!;
+    expect(t.decayMs).toBe(1600); // 40 steps * 2 frames = 80 frames = 1600ms
+    expect(t.articulation).toBe('sustained');
+  });
+
+  it('calls a short volume sequence percussive', () => {
+    const t = extractSynthTimbre(hc({ vseq: [64, 32, 0], volSpeed: 1, fseq: [] }))!;
+    expect(t.articulation).toBe('percussive');
+  });
+
+  it('calls a frequency sequence that moves a sweeping timbre', () => {
+    expect(extractSynthTimbre(hc({ vseq: [], fseq: [1, 2, 3] }))!.sweeping).toBe(true);
+    expect(extractSynthTimbre(hc({ vseq: [], fseq: [1, 1, 1] }))!.sweeping).toBe(false);
+  });
+});
+
+describe('instruments with no parameter block at all', () => {
+  it('returns null rather than a neutral-looking verdict', () => {
+    expect(extractSynthTimbre({ id: 1, name: 'x', synthType: 'FCSynth' } as unknown as InstrumentConfig)).toBeNull();
+  });
+});
