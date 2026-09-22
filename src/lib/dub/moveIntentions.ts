@@ -58,9 +58,27 @@ export const MOVE_INTENTIONS: Readonly<Record<string, readonly Intention[]>> = {
   subHarmonic:        ['BUILD', 'TEXTURE'],
   eqSweep:            ['BUILD', 'TEXTURE'],
   oscBass:            ['BUILD', 'TEXTURE'],
-  // Not SPACE: it adds weight rather than clearing any. Not ACCENT either —
-  // it is a bar-scale swell, not a mark on one event.
-  bassEmphasis:       ['BUILD', 'TRANSITION'],
+  // bassEmphasis carries NO intention until Phase 4 of the bass plan.
+  //
+  // This table is how a persona CHOOSES a move, so an entry here wires the
+  // move into AutoDub — which Phase 2 was explicitly not meant to do. It was
+  // added as `['BUILD', 'TRANSITION']` and measured on 2026-09-22 to push
+  // perry's peak feedback budget to 1.03, over the 1.0 ceiling that
+  // `aiPerformance` guards. Not because the move costs feedback — its energy
+  // entry is `feedback: 0.00` — but because adding it to the pool changes
+  // which moves perry picks and when, and perry had no headroom left.
+  //
+  // That headroom finding is worth keeping: perry's tuning satisfies the
+  // ceiling by coincidence rather than by construction, so the next move
+  // added to its pool will tip it again. Phase 4 has to deal with that, not
+  // work around it. Level tuning is deferred by the user's own standing
+  // decision until the Dub Studio plan closes, so it is not re-tuned here.
+  //
+  // An empty list rather than a missing key: the move IS registered, so the
+  // coverage contract holds, and `movesForIntention` can never return it, so
+  // no persona can choose it. Registered but not selectable is exactly the
+  // state Phase 2 was asked to leave it in.
+  bassEmphasis:       [],
 
   // Drops and seams — taking the mix away.
   filterDrop:         ['DROP', 'TRANSITION'],
