@@ -221,11 +221,22 @@ export const Fader: React.FC<FaderProps> = React.memo(({
   const readoutText = formatValue ? formatValue(internalValue) : undefined;
 
   return (
+    // Width comes from `size` and nothing else. Without an explicit width the
+    // column was sized by its widest CHILD, which is the readout — so the
+    // fader changed width under the hand as the value gained a digit or a
+    // minus sign ("something resizes the channel and master sliders
+    // horizontally when i drag them", 2026-09-22). The label and the readout
+    // are allowed to overflow this box; they must never set it.
     <div
       className={'flex flex-col items-center gap-0.5 select-none' + (disabled ? ' opacity-40' : '')}
+      style={{ width: `${w}px` }}
       title={title}
     >
-      {label && <span className="text-[9px] text-text-muted font-mono leading-none">{label}</span>}
+      {label && (
+        <span className="text-[9px] text-text-muted font-mono leading-none whitespace-nowrap">
+          {label}
+        </span>
+      )}
       <div
         ref={trackRef}
         className={
@@ -257,7 +268,12 @@ export const Fader: React.FC<FaderProps> = React.memo(({
         />
       </div>
       {readoutText && (
-        <span className="text-[9px] text-text-secondary font-mono leading-none">{readoutText}</span>
+        // `tabular-nums` so the digits keep one width as the value changes,
+        // and `whitespace-nowrap` so a long value overflows instead of
+        // wrapping and making the column taller mid-drag.
+        <span className="text-[9px] text-text-secondary font-mono leading-none whitespace-nowrap tabular-nums">
+          {readoutText}
+        </span>
       )}
     </div>
   );
