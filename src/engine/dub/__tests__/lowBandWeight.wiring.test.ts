@@ -155,3 +155,24 @@ describe('the dub return skips the low-end stages', () => {
     expect(back).toContain('this.returnSum.connect(this.master)');
   });
 });
+
+describe('the trim is ridden from the clipper input', () => {
+  // The predictive trim was short on a tune whose energy is all under the
+  // corner; the clipper paid — "clips/dists" (2026-09-22).
+  it('meters both clipper feeds in one analyser, over a whole tick', () => {
+    expect(source).toContain('this.masterLowMidDip.connect(this._clipInProbe);');
+    expect(source).toContain('this.returnTrim.connect(this._clipInProbe);');
+    expect(source).toContain('this._clipInProbe.fftSize = 32768;');
+  });
+
+  it('steps the ride only from the watch, never from a settings write', () => {
+    const watch = methodBody('private _startTrimWatch(');
+    expect(watch).toContain('this._trimRideDb = rideTrimDb(this._trimRideDb, this._clipInputPeak());');
+    expect(methodBody('private _applyMasterTrim(')).not.toContain('rideTrimDb(');
+  });
+
+  it('adds the ride to the predicted trim, and clears it when the insert comes out', () => {
+    expect(methodBody('private _applyMasterTrim(')).toContain('+ this._trimRideDb');
+    expect(methodBody('private _stopTrimWatch(')).toContain('this._trimRideDb = 0;');
+  });
+});

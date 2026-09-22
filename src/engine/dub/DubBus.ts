@@ -105,6 +105,7 @@ import {
   type ProgrammeLevel,
 } from '@/lib/dub/programmeLevel';
 import { lowBandWeightFor, lowMidDipDbFor } from '@/lib/dub/lowBandWeight';
+import { rideTrimDb, bufferPeak } from '@/lib/dub/trimRide';
 
 /**
  * Loudest sample in a captured ring, so a capture can tell whether it caught
@@ -1487,6 +1488,13 @@ export class DubBus {
    */
   private _trimWatch: ReturnType<typeof setInterval> | null = null;
   /**
+   * Meters the clipper's INPUT — dry after the low-mid dip plus the trimmed
+   * return — over a whole watch interval, so `rideTrimDb` corrects the
+   * predictive trim from what actually arrives there. See trimRide.ts.
+   */
+  private _clipInProbe!: AnalyserNode;
+  private _trimRideDb = 0;
+  /**
    * Where the dub RETURN joins the master. The return used to ride into the
    * insert with the dry mix and get the same low-end lift, so every echo
    * tail came back bass-boosted and saturated — "everything gets muddled"
@@ -2527,6 +2535,15 @@ export class DubBus {
     this.returnTrim = this.context.createGain();
     this.returnTrim.gain.value = 1;
     this.returnTrim.connect(this.masterSafetyClip);
+    // Both clipper feeds into one analyser: it sums its inputs, so this reads
+    // exactly what the clipper sees. 32768 is the largest window an analyser
+    // offers — 680 ms at 48 kHz, longer than a watch tick, so no peak between
+    // reads is missed.
+    this._clipInProbe = this.context.createAnalyser();
+    this._clipInProbe.fftSize = 32768;
+    this._clipInProbe.smoothingTimeConstant = 0;
+    this.masterLowMidDip.connect(this._clipInProbe);
+    this.returnTrim.connect(this._clipInProbe);
     this.clubDry.connect(this.returnSum);
     this.clubWet.connect(this.returnSum);
     this.returnSum.connect(this.master);
@@ -4756,15 +4773,32 @@ export class DubBus {
     if (this._trimWatch) return;
     this._trimWatch = setInterval(() => {
       if (!this.masterInsertActive || this._disposed) { this._stopTrimWatch(); return; }
-      try { this._applyMasterTrim(this.settings, this.context.currentTime); } catch { /* keep watching */ }
+      try {
+        // The ride is stepped HERE only. `_applyMasterTrim` also runs on every
+        // settings write, and a slider drag would otherwise release the ride
+        // as fast as it produced writes.
+        this._trimRideDb = rideTrimDb(this._trimRideDb, this._clipInputPeak());
+        this._applyMasterTrim(this.settings, this.context.currentTime);
+      } catch { /* keep watching */ }
     }, TRIM_WATCH_MS);
   }
 
   private _stopTrimWatch(): void {
-    if (!this._trimWatch) return;
-    clearInterval(this._trimWatch);
+    if (this._trimWatch) clearInterval(this._trimWatch);
     this._trimWatch = null;
+    this._trimRideDb = 0;
   }
+
+  private _clipInputPeak(): number {
+    const probe = this._clipInProbe;
+    if (!probe) return 0;
+    const buf = new Float32Array(probe.fftSize);
+    probe.getFloatTimeDomainData(buf);
+    return bufferPeak(buf);
+  }
+
+  /** Read by the MCP probe: how far the measured ride is holding the trim down, dB. */
+  get trimRideDb(): number { return this._trimRideDb; }
 
   private _releasePreInsertProbe(): void {
     const probe = this._preInsertProbe;
@@ -4981,7 +5015,10 @@ export class DubBus {
     const masterActive = this.enabled && this.masterInsertActive;
     const safeBassGain = Math.max(-12, Math.min(12, m.bassShelfGainDb));
     const { costDb } = this._resolveMasterLowEnd(safeBassGain, m);
-    const trimDb = masterActive ? shelfTrimDb(costDb, this._programmeBeforeInsert()) : 0;
+    // Predicted cost, corrected by what the clipper actually receives.
+    const trimDb = masterActive
+      ? shelfTrimDb(costDb, this._programmeBeforeInsert()) + this._trimRideDb
+      : 0;
     const trim = Math.pow(10, trimDb / 20);
     this._settle(this.masterToneTrim.gain, trim, now, 0.02);
     this._settle(this.returnTrim.gain, trim, now, 0.02);
