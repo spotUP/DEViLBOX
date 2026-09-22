@@ -1,5 +1,5 @@
 {
-  "generated": "2026-09-21",
+  "generated": "2026-09-22",
   "note": "Ground truth for Channel Intelligence. `proposed` is mechanical; `label` is human and authoritative. Re-running preserves labels.",
   "summary": [
     {
@@ -58,7 +58,7 @@
       "orderIndex": 0,
       "patternIndex": 0,
       "channelIndex": 0,
-      "channelName": "Bass 1",
+      "channelName": "Bass",
       "silent": false,
       "evidence": {
         "lowest": 15,
@@ -79,6 +79,7 @@
         "instrumentCount": 3,
         "dominance": 0.5
       },
+      "classifierRole": "bass",
       "instrumentName": "        ____._",
       "nameHint": null,
       "proposed": "bass",
@@ -90,9 +91,10 @@
       "orderIndex": 0,
       "patternIndex": 0,
       "channelIndex": 1,
-      "channelName": "Bass 2",
+      "channelName": "Kick",
       "silent": true,
       "evidence": null,
+      "classifierRole": "percussion",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -104,7 +106,7 @@
       "orderIndex": 0,
       "patternIndex": 0,
       "channelIndex": 2,
-      "channelName": "Chords",
+      "channelName": "Chords 1",
       "silent": false,
       "evidence": {
         "lowest": 41,
@@ -125,6 +127,7 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "chord",
       "instrumentName": "\\__(_/'/_ _(\\_/ ",
       "nameHint": null,
       "proposed": "unclear",
@@ -136,7 +139,7 @@
       "orderIndex": 0,
       "patternIndex": 0,
       "channelIndex": 3,
-      "channelName": "Bass 3",
+      "channelName": "Chords 2",
       "silent": false,
       "evidence": {
         "lowest": 30,
@@ -157,6 +160,7 @@
         "instrumentCount": 2,
         "dominance": 0.63
       },
+      "classifierRole": "chord",
       "instrumentName": "( \\   )~¬¯  ( ( `   )",
       "nameHint": null,
       "proposed": "unclear",
@@ -168,7 +172,7 @@
       "orderIndex": 1,
       "patternIndex": 1,
       "channelIndex": 0,
-      "channelName": "Bass 1",
+      "channelName": "Bass",
       "silent": false,
       "evidence": {
         "lowest": 15,
@@ -189,6 +193,7 @@
         "instrumentCount": 4,
         "dominance": 0.5
       },
+      "classifierRole": "bass",
       "instrumentName": "      \\_( \\\\(   _",
       "nameHint": null,
       "proposed": "lead",
@@ -200,7 +205,7 @@
       "orderIndex": 1,
       "patternIndex": 1,
       "channelIndex": 1,
-      "channelName": "Bass 2",
+      "channelName": "Kick",
       "silent": false,
       "evidence": {
         "lowest": 13,
@@ -221,6 +226,7 @@
         "instrumentCount": 3,
         "dominance": 0.54
       },
+      "classifierRole": "percussion",
       "instrumentName": "/  \\__\\\\(_  )\\/,---' ",
       "nameHint": null,
       "proposed": "bass-or-low-perc",
@@ -232,7 +238,7 @@
       "orderIndex": 1,
       "patternIndex": 1,
       "channelIndex": 2,
-      "channelName": "Chords",
+      "channelName": "Chords 1",
       "silent": false,
       "evidence": {
         "lowest": 41,
@@ -253,6 +259,7 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "chord",
       "instrumentName": "\\__(_/'/_ _(\\_/ ",
       "nameHint": null,
       "proposed": "unclear",
@@ -264,7 +271,7 @@
       "orderIndex": 1,
       "patternIndex": 1,
       "channelIndex": 3,
-      "channelName": "Bass 3",
+      "channelName": "Chords 2",
       "silent": false,
       "evidence": {
         "lowest": 34,
@@ -285,6 +292,7 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "chord",
       "instrumentName": "\\__(_/'/_ _(\\_/ ",
       "nameHint": null,
       "proposed": "stab-or-fx",
@@ -296,7 +304,7 @@
       "orderIndex": 2,
       "patternIndex": 2,
       "channelIndex": 0,
-      "channelName": "Bass 1",
+      "channelName": "Bass",
       "silent": false,
       "evidence": {
         "lowest": 15,
@@ -317,6 +325,7 @@
         "instrumentCount": 4,
         "dominance": 0.5
       },
+      "classifierRole": "bass",
       "instrumentName": "      \\_( \\\\(   _",
       "nameHint": null,
       "proposed": "lead",
@@ -328,7 +337,7 @@
       "orderIndex": 2,
       "patternIndex": 2,
       "channelIndex": 1,
-      "channelName": "Bass 2",
+      "channelName": "Kick",
       "silent": false,
       "evidence": {
         "lowest": 13,
@@ -349,6 +358,7 @@
         "instrumentCount": 3,
         "dominance": 0.54
       },
+      "classifierRole": "percussion",
       "instrumentName": "/  \\__\\\\(_  )\\/,---' ",
       "nameHint": null,
       "proposed": "bass-or-low-perc",
@@ -360,7 +370,7 @@
       "orderIndex": 2,
       "patternIndex": 2,
       "channelIndex": 2,
-      "channelName": "Chords",
+      "channelName": "Chords 1",
       "silent": false,
       "evidence": {
         "lowest": 41,
@@ -381,6 +391,7 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "chord",
       "instrumentName": "\\__(_/'/_ _(\\_/ ",
       "nameHint": null,
       "proposed": "unclear",
@@ -392,7 +403,7 @@
       "orderIndex": 2,
       "patternIndex": 2,
       "channelIndex": 3,
-      "channelName": "Bass 3",
+      "channelName": "Chords 2",
       "silent": false,
       "evidence": {
         "lowest": 30,
@@ -413,6 +424,7 @@
         "instrumentCount": 2,
         "dominance": 0.63
       },
+      "classifierRole": "chord",
       "instrumentName": "( \\   )~¬¯  ( ( `   )",
       "nameHint": null,
       "proposed": "unclear",
@@ -424,7 +436,7 @@
       "orderIndex": 3,
       "patternIndex": 3,
       "channelIndex": 0,
-      "channelName": "Bass 1",
+      "channelName": "Bass",
       "silent": false,
       "evidence": {
         "lowest": 15,
@@ -445,6 +457,7 @@
         "instrumentCount": 4,
         "dominance": 0.5
       },
+      "classifierRole": "bass",
       "instrumentName": "      \\_( \\\\(   _",
       "nameHint": null,
       "proposed": "lead",
@@ -456,7 +469,7 @@
       "orderIndex": 3,
       "patternIndex": 3,
       "channelIndex": 1,
-      "channelName": "Bass 2",
+      "channelName": "Kick",
       "silent": false,
       "evidence": {
         "lowest": 13,
@@ -477,6 +490,7 @@
         "instrumentCount": 3,
         "dominance": 0.54
       },
+      "classifierRole": "percussion",
       "instrumentName": "/  \\__\\\\(_  )\\/,---' ",
       "nameHint": null,
       "proposed": "bass-or-low-perc",
@@ -488,7 +502,7 @@
       "orderIndex": 3,
       "patternIndex": 3,
       "channelIndex": 2,
-      "channelName": "Chords",
+      "channelName": "Chords 1",
       "silent": false,
       "evidence": {
         "lowest": 34,
@@ -509,6 +523,7 @@
         "instrumentCount": 2,
         "dominance": 0.5
       },
+      "classifierRole": "chord",
       "instrumentName": "( \\   )~¬¯  ( ( `   )",
       "nameHint": null,
       "proposed": "skank",
@@ -520,7 +535,7 @@
       "orderIndex": 3,
       "patternIndex": 3,
       "channelIndex": 3,
-      "channelName": "Bass 3",
+      "channelName": "Chords 2",
       "silent": false,
       "evidence": {
         "lowest": 42,
@@ -541,6 +556,7 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "chord",
       "instrumentName": "\\__(_/'/_ _(\\_/ ",
       "nameHint": null,
       "proposed": "unclear",
@@ -552,7 +568,7 @@
       "orderIndex": 4,
       "patternIndex": 4,
       "channelIndex": 0,
-      "channelName": "Bass 1",
+      "channelName": "Bass",
       "silent": false,
       "evidence": {
         "lowest": 15,
@@ -573,6 +589,7 @@
         "instrumentCount": 4,
         "dominance": 0.5
       },
+      "classifierRole": "bass",
       "instrumentName": "      \\_( \\\\(   _",
       "nameHint": null,
       "proposed": "lead",
@@ -584,7 +601,7 @@
       "orderIndex": 4,
       "patternIndex": 4,
       "channelIndex": 1,
-      "channelName": "Bass 2",
+      "channelName": "Kick",
       "silent": false,
       "evidence": {
         "lowest": 13,
@@ -605,6 +622,7 @@
         "instrumentCount": 3,
         "dominance": 0.54
       },
+      "classifierRole": "percussion",
       "instrumentName": "/  \\__\\\\(_  )\\/,---' ",
       "nameHint": null,
       "proposed": "bass-or-low-perc",
@@ -616,7 +634,7 @@
       "orderIndex": 4,
       "patternIndex": 4,
       "channelIndex": 2,
-      "channelName": "Chords",
+      "channelName": "Chords 1",
       "silent": false,
       "evidence": {
         "lowest": 34,
@@ -637,6 +655,7 @@
         "instrumentCount": 2,
         "dominance": 0.67
       },
+      "classifierRole": "chord",
       "instrumentName": "\\__(_/'/_ _(\\_/ ",
       "nameHint": null,
       "proposed": "stab-or-fx",
@@ -648,7 +667,7 @@
       "orderIndex": 4,
       "patternIndex": 4,
       "channelIndex": 3,
-      "channelName": "Bass 3",
+      "channelName": "Chords 2",
       "silent": false,
       "evidence": {
         "lowest": 39,
@@ -669,6 +688,7 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "chord",
       "instrumentName": "( \\   )~¬¯  ( ( `   )",
       "nameHint": null,
       "proposed": "unclear",
@@ -680,7 +700,7 @@
       "orderIndex": 5,
       "patternIndex": 5,
       "channelIndex": 0,
-      "channelName": "Bass 1",
+      "channelName": "Bass",
       "silent": false,
       "evidence": {
         "lowest": 18,
@@ -701,6 +721,7 @@
         "instrumentCount": 2,
         "dominance": 0.64
       },
+      "classifierRole": "bass",
       "instrumentName": "/  \\__\\\\(_  )\\/,---' ",
       "nameHint": null,
       "proposed": "bass-or-low-perc",
@@ -712,9 +733,10 @@
       "orderIndex": 5,
       "patternIndex": 5,
       "channelIndex": 1,
-      "channelName": "Bass 2",
+      "channelName": "Kick",
       "silent": true,
       "evidence": null,
+      "classifierRole": "percussion",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -726,7 +748,7 @@
       "orderIndex": 5,
       "patternIndex": 5,
       "channelIndex": 2,
-      "channelName": "Chords",
+      "channelName": "Chords 1",
       "silent": false,
       "evidence": {
         "lowest": 37,
@@ -747,6 +769,7 @@
         "instrumentCount": 2,
         "dominance": 0.5
       },
+      "classifierRole": "chord",
       "instrumentName": "( \\   )~¬¯  ( ( `   )",
       "nameHint": null,
       "proposed": "skank",
@@ -758,7 +781,7 @@
       "orderIndex": 5,
       "patternIndex": 5,
       "channelIndex": 3,
-      "channelName": "Bass 3",
+      "channelName": "Chords 2",
       "silent": false,
       "evidence": {
         "lowest": 20,
@@ -779,6 +802,7 @@
         "instrumentCount": 4,
         "dominance": 0.5
       },
+      "classifierRole": "chord",
       "instrumentName": "      \\_( \\\\(   _",
       "nameHint": null,
       "proposed": "lead",
@@ -790,7 +814,7 @@
       "orderIndex": 6,
       "patternIndex": 6,
       "channelIndex": 0,
-      "channelName": "Bass 1",
+      "channelName": "Bass",
       "silent": false,
       "evidence": {
         "lowest": 18,
@@ -811,6 +835,7 @@
         "instrumentCount": 2,
         "dominance": 0.64
       },
+      "classifierRole": "bass",
       "instrumentName": "/  \\__\\\\(_  )\\/,---' ",
       "nameHint": null,
       "proposed": "bass-or-low-perc",
@@ -822,7 +847,7 @@
       "orderIndex": 6,
       "patternIndex": 6,
       "channelIndex": 1,
-      "channelName": "Bass 2",
+      "channelName": "Kick",
       "silent": false,
       "evidence": {
         "lowest": 37,
@@ -843,6 +868,7 @@
         "instrumentCount": 2,
         "dominance": 0.67
       },
+      "classifierRole": "percussion",
       "instrumentName": "\\__(_/'/_ _(\\_/ ",
       "nameHint": null,
       "proposed": "stab-or-fx",
@@ -854,7 +880,7 @@
       "orderIndex": 6,
       "patternIndex": 6,
       "channelIndex": 2,
-      "channelName": "Chords",
+      "channelName": "Chords 1",
       "silent": false,
       "evidence": {
         "lowest": 49,
@@ -875,6 +901,7 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "chord",
       "instrumentName": "\\__(_/'/_ _(\\_/ ",
       "nameHint": null,
       "proposed": "unclear",
@@ -886,7 +913,7 @@
       "orderIndex": 6,
       "patternIndex": 6,
       "channelIndex": 3,
-      "channelName": "Bass 3",
+      "channelName": "Chords 2",
       "silent": false,
       "evidence": {
         "lowest": 20,
@@ -907,6 +934,7 @@
         "instrumentCount": 4,
         "dominance": 0.5
       },
+      "classifierRole": "chord",
       "instrumentName": "      \\_( \\\\(   _",
       "nameHint": null,
       "proposed": "lead",
@@ -918,7 +946,7 @@
       "orderIndex": 7,
       "patternIndex": 7,
       "channelIndex": 0,
-      "channelName": "Bass 1",
+      "channelName": "Bass",
       "silent": false,
       "evidence": {
         "lowest": 56,
@@ -939,6 +967,7 @@
         "instrumentCount": 2,
         "dominance": 0.89
       },
+      "classifierRole": "bass",
       "instrumentName": " _    _`-\\_.)  /_)__",
       "nameHint": null,
       "proposed": "unclear",
@@ -950,7 +979,7 @@
       "orderIndex": 7,
       "patternIndex": 7,
       "channelIndex": 1,
-      "channelName": "Bass 2",
+      "channelName": "Kick",
       "silent": false,
       "evidence": {
         "lowest": 37,
@@ -971,6 +1000,7 @@
         "instrumentCount": 2,
         "dominance": 0.67
       },
+      "classifierRole": "percussion",
       "instrumentName": "\\__(_/'/_ _(\\_/ ",
       "nameHint": null,
       "proposed": "stab-or-fx",
@@ -982,7 +1012,7 @@
       "orderIndex": 7,
       "patternIndex": 7,
       "channelIndex": 2,
-      "channelName": "Chords",
+      "channelName": "Chords 1",
       "silent": false,
       "evidence": {
         "lowest": 37,
@@ -1003,6 +1033,7 @@
         "instrumentCount": 2,
         "dominance": 0.5
       },
+      "classifierRole": "chord",
       "instrumentName": "( \\   )~¬¯  ( ( `   )",
       "nameHint": null,
       "proposed": "skank",
@@ -1014,7 +1045,7 @@
       "orderIndex": 7,
       "patternIndex": 7,
       "channelIndex": 3,
-      "channelName": "Bass 3",
+      "channelName": "Chords 2",
       "silent": false,
       "evidence": {
         "lowest": 20,
@@ -1035,6 +1066,7 @@
         "instrumentCount": 4,
         "dominance": 0.5
       },
+      "classifierRole": "chord",
       "instrumentName": "      \\_( \\\\(   _",
       "nameHint": null,
       "proposed": "lead",
@@ -1046,7 +1078,7 @@
       "orderIndex": 0,
       "patternIndex": 0,
       "channelIndex": 0,
-      "channelName": "Bass 1",
+      "channelName": "Kick",
       "silent": false,
       "evidence": {
         "lowest": 25,
@@ -1067,6 +1099,7 @@
         "instrumentCount": 4,
         "dominance": 0.35
       },
+      "classifierRole": "percussion",
       "instrumentName": "½¼½¼' ¾¼(  o w u h ",
       "nameHint": null,
       "proposed": "bass",
@@ -1078,7 +1111,7 @@
       "orderIndex": 0,
       "patternIndex": 0,
       "channelIndex": 1,
-      "channelName": "Bass 2",
+      "channelName": "Pad 1",
       "silent": false,
       "evidence": {
         "lowest": 25,
@@ -1099,6 +1132,7 @@
         "instrumentCount": 3,
         "dominance": 0.55
       },
+      "classifierRole": "pad",
       "instrumentName": " /____)_(  r   w ! ",
       "nameHint": null,
       "proposed": "unclear",
@@ -1113,6 +1147,7 @@
       "channelName": "Sub Bass",
       "silent": true,
       "evidence": null,
+      "classifierRole": "bass",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -1124,9 +1159,10 @@
       "orderIndex": 0,
       "patternIndex": 0,
       "channelIndex": 3,
-      "channelName": "Bass 3",
+      "channelName": "Pad 2",
       "silent": true,
       "evidence": null,
+      "classifierRole": "pad",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -1138,7 +1174,7 @@
       "orderIndex": 1,
       "patternIndex": 1,
       "channelIndex": 0,
-      "channelName": "Bass 1",
+      "channelName": "Kick",
       "silent": false,
       "evidence": {
         "lowest": 25,
@@ -1159,6 +1195,7 @@
         "instrumentCount": 4,
         "dominance": 0.46
       },
+      "classifierRole": "percussion",
       "instrumentName": ",)¾½¼½¼½.",
       "nameHint": null,
       "proposed": "bass",
@@ -1170,7 +1207,7 @@
       "orderIndex": 1,
       "patternIndex": 1,
       "channelIndex": 1,
-      "channelName": "Bass 2",
+      "channelName": "Pad 1",
       "silent": false,
       "evidence": {
         "lowest": 25,
@@ -1191,6 +1228,7 @@
         "instrumentCount": 3,
         "dominance": 0.58
       },
+      "classifierRole": "pad",
       "instrumentName": " /____)_(  r   w ! ",
       "nameHint": null,
       "proposed": "unclear",
@@ -1223,6 +1261,7 @@
         "instrumentCount": 2,
         "dominance": 0.67
       },
+      "classifierRole": "bass",
       "instrumentName": "  _\\_.'_   t n l n",
       "nameHint": null,
       "proposed": "bass",
@@ -1234,9 +1273,10 @@
       "orderIndex": 1,
       "patternIndex": 1,
       "channelIndex": 3,
-      "channelName": "Bass 3",
+      "channelName": "Pad 2",
       "silent": true,
       "evidence": null,
+      "classifierRole": "pad",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -1248,7 +1288,7 @@
       "orderIndex": 2,
       "patternIndex": 2,
       "channelIndex": 0,
-      "channelName": "Bass 1",
+      "channelName": "Kick",
       "silent": false,
       "evidence": {
         "lowest": 18,
@@ -1269,6 +1309,7 @@
         "instrumentCount": 5,
         "dominance": 0.33
       },
+      "classifierRole": "percussion",
       "instrumentName": "½¼½¼' ¾¼(  o w u h ",
       "nameHint": null,
       "proposed": "bass",
@@ -1280,7 +1321,7 @@
       "orderIndex": 2,
       "patternIndex": 2,
       "channelIndex": 1,
-      "channelName": "Bass 2",
+      "channelName": "Pad 1",
       "silent": false,
       "evidence": {
         "lowest": 25,
@@ -1301,6 +1342,7 @@
         "instrumentCount": 3,
         "dominance": 0.55
       },
+      "classifierRole": "pad",
       "instrumentName": " /____)_(  r   w ! ",
       "nameHint": null,
       "proposed": "unclear",
@@ -1333,6 +1375,7 @@
         "instrumentCount": 2,
         "dominance": 0.67
       },
+      "classifierRole": "bass",
       "instrumentName": "  _\\_.'_   t n l n",
       "nameHint": null,
       "proposed": "bass",
@@ -1344,7 +1387,7 @@
       "orderIndex": 2,
       "patternIndex": 2,
       "channelIndex": 3,
-      "channelName": "Bass 3",
+      "channelName": "Pad 2",
       "silent": false,
       "evidence": {
         "lowest": 25,
@@ -1365,6 +1408,7 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "pad",
       "instrumentName": "lucas@bboy.com",
       "nameHint": null,
       "proposed": "unclear",
@@ -1376,7 +1420,7 @@
       "orderIndex": 3,
       "patternIndex": 3,
       "channelIndex": 0,
-      "channelName": "Bass 1",
+      "channelName": "Kick",
       "silent": false,
       "evidence": {
         "lowest": 18,
@@ -1397,6 +1441,7 @@
         "instrumentCount": 5,
         "dominance": 0.32
       },
+      "classifierRole": "percussion",
       "instrumentName": "·(_  _) ·  m   r n",
       "nameHint": null,
       "proposed": "bass",
@@ -1408,7 +1453,7 @@
       "orderIndex": 3,
       "patternIndex": 3,
       "channelIndex": 1,
-      "channelName": "Bass 2",
+      "channelName": "Pad 1",
       "silent": false,
       "evidence": {
         "lowest": 25,
@@ -1429,6 +1474,7 @@
         "instrumentCount": 3,
         "dominance": 0.58
       },
+      "classifierRole": "pad",
       "instrumentName": " /____)_(  r   w ! ",
       "nameHint": null,
       "proposed": "unclear",
@@ -1461,6 +1507,7 @@
         "instrumentCount": 2,
         "dominance": 0.67
       },
+      "classifierRole": "bass",
       "instrumentName": "  _\\_.'_   t n l n",
       "nameHint": null,
       "proposed": "bass",
@@ -1472,7 +1519,7 @@
       "orderIndex": 3,
       "patternIndex": 3,
       "channelIndex": 3,
-      "channelName": "Bass 3",
+      "channelName": "Pad 2",
       "silent": false,
       "evidence": {
         "lowest": 29,
@@ -1493,6 +1540,7 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "pad",
       "instrumentName": "lucas@bboy.com",
       "nameHint": null,
       "proposed": "unclear",
@@ -1504,7 +1552,7 @@
       "orderIndex": 4,
       "patternIndex": 4,
       "channelIndex": 0,
-      "channelName": "Bass 1",
+      "channelName": "Kick",
       "silent": false,
       "evidence": {
         "lowest": 21,
@@ -1525,6 +1573,7 @@
         "instrumentCount": 5,
         "dominance": 0.33
       },
+      "classifierRole": "percussion",
       "instrumentName": "½¼½¼' ¾¼(  o w u h ",
       "nameHint": null,
       "proposed": "bass",
@@ -1536,7 +1585,7 @@
       "orderIndex": 4,
       "patternIndex": 4,
       "channelIndex": 1,
-      "channelName": "Bass 2",
+      "channelName": "Pad 1",
       "silent": false,
       "evidence": {
         "lowest": 28,
@@ -1557,6 +1606,7 @@
         "instrumentCount": 3,
         "dominance": 0.55
       },
+      "classifierRole": "pad",
       "instrumentName": " /____)_(  r   w ! ",
       "nameHint": null,
       "proposed": "unclear",
@@ -1589,6 +1639,7 @@
         "instrumentCount": 2,
         "dominance": 0.67
       },
+      "classifierRole": "bass",
       "instrumentName": "  _\\_.'_   t n l n",
       "nameHint": null,
       "proposed": "bass",
@@ -1600,7 +1651,7 @@
       "orderIndex": 4,
       "patternIndex": 4,
       "channelIndex": 3,
-      "channelName": "Bass 3",
+      "channelName": "Pad 2",
       "silent": false,
       "evidence": {
         "lowest": 27,
@@ -1621,6 +1672,7 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "pad",
       "instrumentName": "Instrument 12",
       "nameHint": null,
       "proposed": "unclear",
@@ -1632,7 +1684,7 @@
       "orderIndex": 5,
       "patternIndex": 5,
       "channelIndex": 0,
-      "channelName": "Bass 1",
+      "channelName": "Kick",
       "silent": false,
       "evidence": {
         "lowest": 21,
@@ -1653,6 +1705,7 @@
         "instrumentCount": 5,
         "dominance": 0.32
       },
+      "classifierRole": "percussion",
       "instrumentName": "·(_  _) ·  m   r n",
       "nameHint": null,
       "proposed": "bass",
@@ -1664,7 +1717,7 @@
       "orderIndex": 5,
       "patternIndex": 5,
       "channelIndex": 1,
-      "channelName": "Bass 2",
+      "channelName": "Pad 1",
       "silent": false,
       "evidence": {
         "lowest": 28,
@@ -1685,6 +1738,7 @@
         "instrumentCount": 3,
         "dominance": 0.58
       },
+      "classifierRole": "pad",
       "instrumentName": " /____)_(  r   w ! ",
       "nameHint": null,
       "proposed": "unclear",
@@ -1717,6 +1771,7 @@
         "instrumentCount": 2,
         "dominance": 0.67
       },
+      "classifierRole": "bass",
       "instrumentName": "  _\\_.'_   t n l n",
       "nameHint": null,
       "proposed": "bass",
@@ -1728,7 +1783,7 @@
       "orderIndex": 5,
       "patternIndex": 5,
       "channelIndex": 3,
-      "channelName": "Bass 3",
+      "channelName": "Pad 2",
       "silent": false,
       "evidence": {
         "lowest": 25,
@@ -1749,6 +1804,7 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "pad",
       "instrumentName": "Instrument 12",
       "nameHint": null,
       "proposed": "bass",
@@ -1760,7 +1816,7 @@
       "orderIndex": 6,
       "patternIndex": 6,
       "channelIndex": 0,
-      "channelName": "Bass 1",
+      "channelName": "Kick",
       "silent": false,
       "evidence": {
         "lowest": 21,
@@ -1781,6 +1837,7 @@
         "instrumentCount": 5,
         "dominance": 0.33
       },
+      "classifierRole": "percussion",
       "instrumentName": "½¼½¼' ¾¼(  o w u h ",
       "nameHint": null,
       "proposed": "bass",
@@ -1792,7 +1849,7 @@
       "orderIndex": 6,
       "patternIndex": 6,
       "channelIndex": 1,
-      "channelName": "Bass 2",
+      "channelName": "Pad 1",
       "silent": false,
       "evidence": {
         "lowest": 13,
@@ -1813,6 +1870,7 @@
         "instrumentCount": 2,
         "dominance": 0.67
       },
+      "classifierRole": "pad",
       "instrumentName": "  _\\_.'_   t n l n",
       "nameHint": null,
       "proposed": "bass",
@@ -1845,6 +1903,7 @@
         "instrumentCount": 2,
         "dominance": 0.5
       },
+      "classifierRole": "bass",
       "instrumentName": "this is jennipha(=",
       "nameHint": null,
       "proposed": "bass",
@@ -1856,7 +1915,7 @@
       "orderIndex": 6,
       "patternIndex": 6,
       "channelIndex": 3,
-      "channelName": "Bass 3",
+      "channelName": "Pad 2",
       "silent": false,
       "evidence": {
         "lowest": 25,
@@ -1877,6 +1936,7 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "pad",
       "instrumentName": "lucas@bboy.com",
       "nameHint": null,
       "proposed": "bass-or-low-perc",
@@ -1888,7 +1948,7 @@
       "orderIndex": 7,
       "patternIndex": 7,
       "channelIndex": 0,
-      "channelName": "Bass 1",
+      "channelName": "Kick",
       "silent": false,
       "evidence": {
         "lowest": 21,
@@ -1909,6 +1969,7 @@
         "instrumentCount": 5,
         "dominance": 0.32
       },
+      "classifierRole": "percussion",
       "instrumentName": "·(_  _) ·  m   r n",
       "nameHint": null,
       "proposed": "bass",
@@ -1920,7 +1981,7 @@
       "orderIndex": 7,
       "patternIndex": 7,
       "channelIndex": 1,
-      "channelName": "Bass 2",
+      "channelName": "Pad 1",
       "silent": false,
       "evidence": {
         "lowest": 28,
@@ -1941,6 +2002,7 @@
         "instrumentCount": 3,
         "dominance": 0.58
       },
+      "classifierRole": "pad",
       "instrumentName": " /____)_(  r   w ! ",
       "nameHint": null,
       "proposed": "unclear",
@@ -1973,6 +2035,7 @@
         "instrumentCount": 2,
         "dominance": 0.5
       },
+      "classifierRole": "bass",
       "instrumentName": "this is jennipha(=",
       "nameHint": null,
       "proposed": "bass",
@@ -1984,7 +2047,7 @@
       "orderIndex": 7,
       "patternIndex": 7,
       "channelIndex": 3,
-      "channelName": "Bass 3",
+      "channelName": "Pad 2",
       "silent": false,
       "evidence": {
         "lowest": 28,
@@ -2005,6 +2068,7 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "pad",
       "instrumentName": "lucas@bboy.com",
       "nameHint": null,
       "proposed": "unclear",
@@ -2016,7 +2080,7 @@
       "orderIndex": 0,
       "patternIndex": 0,
       "channelIndex": 0,
-      "channelName": "Bass 1",
+      "channelName": "Kick",
       "silent": false,
       "evidence": {
         "lowest": 31,
@@ -2037,6 +2101,7 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "percussion",
       "instrumentName": "Put into tracker",
       "nameHint": null,
       "proposed": "stab-or-fx",
@@ -2048,7 +2113,7 @@
       "orderIndex": 0,
       "patternIndex": 0,
       "channelIndex": 1,
-      "channelName": "Sub Bass",
+      "channelName": "Chords 1",
       "silent": false,
       "evidence": {
         "lowest": 1,
@@ -2069,6 +2134,7 @@
         "instrumentCount": 2,
         "dominance": 0.75
       },
+      "classifierRole": "chord",
       "instrumentName": "lost count a long",
       "nameHint": null,
       "proposed": "bass",
@@ -2080,7 +2146,7 @@
       "orderIndex": 0,
       "patternIndex": 0,
       "channelIndex": 2,
-      "channelName": "Chords",
+      "channelName": "Chords 2",
       "silent": false,
       "evidence": {
         "lowest": 14,
@@ -2101,6 +2167,7 @@
         "instrumentCount": 3,
         "dominance": 0.71
       },
+      "classifierRole": "chord",
       "instrumentName": "2014. It's been so",
       "nameHint": null,
       "proposed": "bass",
@@ -2112,7 +2179,7 @@
       "orderIndex": 0,
       "patternIndex": 0,
       "channelIndex": 3,
-      "channelName": "Bass 2",
+      "channelName": "Chords 3",
       "silent": false,
       "evidence": {
         "lowest": 29,
@@ -2133,6 +2200,7 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "chord",
       "instrumentName": "basically awesome",
       "nameHint": null,
       "proposed": "unclear",
@@ -2144,7 +2212,7 @@
       "orderIndex": 1,
       "patternIndex": 1,
       "channelIndex": 0,
-      "channelName": "Bass 1",
+      "channelName": "Kick",
       "silent": false,
       "evidence": {
         "lowest": 27,
@@ -2165,6 +2233,7 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "percussion",
       "instrumentName": "Put into tracker",
       "nameHint": null,
       "proposed": "stab-or-fx",
@@ -2176,7 +2245,7 @@
       "orderIndex": 1,
       "patternIndex": 1,
       "channelIndex": 1,
-      "channelName": "Sub Bass",
+      "channelName": "Chords 1",
       "silent": false,
       "evidence": {
         "lowest": 1,
@@ -2197,6 +2266,7 @@
         "instrumentCount": 2,
         "dominance": 0.75
       },
+      "classifierRole": "chord",
       "instrumentName": "lost count a long",
       "nameHint": null,
       "proposed": "bass",
@@ -2208,7 +2278,7 @@
       "orderIndex": 1,
       "patternIndex": 1,
       "channelIndex": 2,
-      "channelName": "Chords",
+      "channelName": "Chords 2",
       "silent": false,
       "evidence": {
         "lowest": 14,
@@ -2229,6 +2299,7 @@
         "instrumentCount": 3,
         "dominance": 0.42
       },
+      "classifierRole": "chord",
       "instrumentName": "2014. It's been so",
       "nameHint": null,
       "proposed": "bass",
@@ -2240,9 +2311,10 @@
       "orderIndex": 1,
       "patternIndex": 1,
       "channelIndex": 3,
-      "channelName": "Bass 2",
+      "channelName": "Chords 3",
       "silent": true,
       "evidence": null,
+      "classifierRole": "chord",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -2254,7 +2326,7 @@
       "orderIndex": 2,
       "patternIndex": 2,
       "channelIndex": 0,
-      "channelName": "Bass 1",
+      "channelName": "Kick",
       "silent": false,
       "evidence": {
         "lowest": 31,
@@ -2275,6 +2347,7 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "percussion",
       "instrumentName": "Put into tracker",
       "nameHint": null,
       "proposed": "stab-or-fx",
@@ -2286,7 +2359,7 @@
       "orderIndex": 2,
       "patternIndex": 2,
       "channelIndex": 1,
-      "channelName": "Sub Bass",
+      "channelName": "Chords 1",
       "silent": false,
       "evidence": {
         "lowest": 1,
@@ -2307,6 +2380,7 @@
         "instrumentCount": 2,
         "dominance": 0.75
       },
+      "classifierRole": "chord",
       "instrumentName": "lost count a long",
       "nameHint": null,
       "proposed": "bass",
@@ -2318,7 +2392,7 @@
       "orderIndex": 2,
       "patternIndex": 2,
       "channelIndex": 2,
-      "channelName": "Chords",
+      "channelName": "Chords 2",
       "silent": false,
       "evidence": {
         "lowest": 14,
@@ -2339,6 +2413,7 @@
         "instrumentCount": 3,
         "dominance": 0.69
       },
+      "classifierRole": "chord",
       "instrumentName": "2014. It's been so",
       "nameHint": null,
       "proposed": "bass",
@@ -2350,9 +2425,10 @@
       "orderIndex": 2,
       "patternIndex": 2,
       "channelIndex": 3,
-      "channelName": "Bass 2",
+      "channelName": "Chords 3",
       "silent": true,
       "evidence": null,
+      "classifierRole": "chord",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -2364,7 +2440,7 @@
       "orderIndex": 3,
       "patternIndex": 3,
       "channelIndex": 0,
-      "channelName": "Bass 1",
+      "channelName": "Kick",
       "silent": false,
       "evidence": {
         "lowest": 27,
@@ -2385,6 +2461,7 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "percussion",
       "instrumentName": "Put into tracker",
       "nameHint": null,
       "proposed": "stab-or-fx",
@@ -2396,7 +2473,7 @@
       "orderIndex": 3,
       "patternIndex": 3,
       "channelIndex": 1,
-      "channelName": "Sub Bass",
+      "channelName": "Chords 1",
       "silent": false,
       "evidence": {
         "lowest": 1,
@@ -2417,6 +2494,7 @@
         "instrumentCount": 2,
         "dominance": 0.75
       },
+      "classifierRole": "chord",
       "instrumentName": "lost count a long",
       "nameHint": null,
       "proposed": "bass",
@@ -2428,7 +2506,7 @@
       "orderIndex": 3,
       "patternIndex": 3,
       "channelIndex": 2,
-      "channelName": "Chords",
+      "channelName": "Chords 2",
       "silent": false,
       "evidence": {
         "lowest": 14,
@@ -2449,6 +2527,7 @@
         "instrumentCount": 3,
         "dominance": 0.42
       },
+      "classifierRole": "chord",
       "instrumentName": "2014. It's been so",
       "nameHint": null,
       "proposed": "bass",
@@ -2460,9 +2539,10 @@
       "orderIndex": 3,
       "patternIndex": 3,
       "channelIndex": 3,
-      "channelName": "Bass 2",
+      "channelName": "Chords 3",
       "silent": true,
       "evidence": null,
+      "classifierRole": "chord",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -2474,7 +2554,7 @@
       "orderIndex": 4,
       "patternIndex": 4,
       "channelIndex": 0,
-      "channelName": "Bass 1",
+      "channelName": "Kick",
       "silent": false,
       "evidence": {
         "lowest": 31,
@@ -2495,6 +2575,7 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "percussion",
       "instrumentName": "Put into tracker",
       "nameHint": null,
       "proposed": "stab-or-fx",
@@ -2506,7 +2587,7 @@
       "orderIndex": 4,
       "patternIndex": 4,
       "channelIndex": 1,
-      "channelName": "Sub Bass",
+      "channelName": "Chords 1",
       "silent": false,
       "evidence": {
         "lowest": 14,
@@ -2527,6 +2608,7 @@
         "instrumentCount": 3,
         "dominance": 0.69
       },
+      "classifierRole": "chord",
       "instrumentName": "2014. It's been so",
       "nameHint": null,
       "proposed": "bass",
@@ -2538,7 +2620,7 @@
       "orderIndex": 4,
       "patternIndex": 4,
       "channelIndex": 2,
-      "channelName": "Chords",
+      "channelName": "Chords 2",
       "silent": false,
       "evidence": {
         "lowest": 26,
@@ -2559,6 +2641,7 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "chord",
       "instrumentName": "by (451) back in",
       "nameHint": null,
       "proposed": "unclear",
@@ -2570,7 +2653,7 @@
       "orderIndex": 4,
       "patternIndex": 4,
       "channelIndex": 3,
-      "channelName": "Bass 2",
+      "channelName": "Chords 3",
       "silent": false,
       "evidence": {
         "lowest": 33,
@@ -2591,6 +2674,7 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "chord",
       "instrumentName": "by (451) back in",
       "nameHint": null,
       "proposed": "unclear",
@@ -2602,7 +2686,7 @@
       "orderIndex": 5,
       "patternIndex": 5,
       "channelIndex": 0,
-      "channelName": "Bass 1",
+      "channelName": "Kick",
       "silent": false,
       "evidence": {
         "lowest": 27,
@@ -2623,6 +2707,7 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "percussion",
       "instrumentName": "Put into tracker",
       "nameHint": null,
       "proposed": "stab-or-fx",
@@ -2634,7 +2719,7 @@
       "orderIndex": 5,
       "patternIndex": 5,
       "channelIndex": 1,
-      "channelName": "Sub Bass",
+      "channelName": "Chords 1",
       "silent": false,
       "evidence": {
         "lowest": 14,
@@ -2655,6 +2740,7 @@
         "instrumentCount": 3,
         "dominance": 0.42
       },
+      "classifierRole": "chord",
       "instrumentName": "2014. It's been so",
       "nameHint": null,
       "proposed": "bass",
@@ -2666,7 +2752,7 @@
       "orderIndex": 5,
       "patternIndex": 5,
       "channelIndex": 2,
-      "channelName": "Chords",
+      "channelName": "Chords 2",
       "silent": false,
       "evidence": {
         "lowest": 26,
@@ -2687,6 +2773,7 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "chord",
       "instrumentName": "by (451) back in",
       "nameHint": null,
       "proposed": "unclear",
@@ -2698,7 +2785,7 @@
       "orderIndex": 5,
       "patternIndex": 5,
       "channelIndex": 3,
-      "channelName": "Bass 2",
+      "channelName": "Chords 3",
       "silent": false,
       "evidence": {
         "lowest": 33,
@@ -2719,6 +2806,7 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "chord",
       "instrumentName": "by (451) back in",
       "nameHint": null,
       "proposed": "unclear",
@@ -2730,7 +2818,7 @@
       "orderIndex": 6,
       "patternIndex": 6,
       "channelIndex": 0,
-      "channelName": "Bass 1",
+      "channelName": "Kick",
       "silent": false,
       "evidence": {
         "lowest": 31,
@@ -2751,6 +2839,7 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "percussion",
       "instrumentName": "Put into tracker",
       "nameHint": null,
       "proposed": "stab-or-fx",
@@ -2762,7 +2851,7 @@
       "orderIndex": 6,
       "patternIndex": 6,
       "channelIndex": 1,
-      "channelName": "Sub Bass",
+      "channelName": "Chords 1",
       "silent": false,
       "evidence": {
         "lowest": 14,
@@ -2783,6 +2872,7 @@
         "instrumentCount": 3,
         "dominance": 0.69
       },
+      "classifierRole": "chord",
       "instrumentName": "2014. It's been so",
       "nameHint": null,
       "proposed": "bass",
@@ -2794,7 +2884,7 @@
       "orderIndex": 6,
       "patternIndex": 6,
       "channelIndex": 2,
-      "channelName": "Chords",
+      "channelName": "Chords 2",
       "silent": false,
       "evidence": {
         "lowest": 26,
@@ -2815,6 +2905,7 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "chord",
       "instrumentName": "by (451) back in",
       "nameHint": null,
       "proposed": "unclear",
@@ -2826,7 +2917,7 @@
       "orderIndex": 6,
       "patternIndex": 6,
       "channelIndex": 3,
-      "channelName": "Bass 2",
+      "channelName": "Chords 3",
       "silent": false,
       "evidence": {
         "lowest": 33,
@@ -2847,6 +2938,7 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "chord",
       "instrumentName": "by (451) back in",
       "nameHint": null,
       "proposed": "unclear",
@@ -2858,7 +2950,7 @@
       "orderIndex": 7,
       "patternIndex": 7,
       "channelIndex": 0,
-      "channelName": "Bass 1",
+      "channelName": "Kick",
       "silent": false,
       "evidence": {
         "lowest": 27,
@@ -2879,6 +2971,7 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "percussion",
       "instrumentName": "Put into tracker",
       "nameHint": null,
       "proposed": "stab-or-fx",
@@ -2890,7 +2983,7 @@
       "orderIndex": 7,
       "patternIndex": 7,
       "channelIndex": 1,
-      "channelName": "Sub Bass",
+      "channelName": "Chords 1",
       "silent": false,
       "evidence": {
         "lowest": 13,
@@ -2911,6 +3004,7 @@
         "instrumentCount": 4,
         "dominance": 0.4
       },
+      "classifierRole": "chord",
       "instrumentName": "2014. It's been so",
       "nameHint": null,
       "proposed": "bass",
@@ -2922,7 +3016,7 @@
       "orderIndex": 7,
       "patternIndex": 7,
       "channelIndex": 2,
-      "channelName": "Chords",
+      "channelName": "Chords 2",
       "silent": false,
       "evidence": {
         "lowest": 26,
@@ -2943,6 +3037,7 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "chord",
       "instrumentName": "by (451) back in",
       "nameHint": null,
       "proposed": "unclear",
@@ -2954,7 +3049,7 @@
       "orderIndex": 7,
       "patternIndex": 7,
       "channelIndex": 3,
-      "channelName": "Bass 2",
+      "channelName": "Chords 3",
       "silent": false,
       "evidence": {
         "lowest": 33,
@@ -2975,6 +3070,7 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "chord",
       "instrumentName": "by (451) back in",
       "nameHint": null,
       "proposed": "unclear",
@@ -2986,7 +3082,7 @@
       "orderIndex": 0,
       "patternIndex": 0,
       "channelIndex": 0,
-      "channelName": "Bass 1",
+      "channelName": "Kick 1",
       "silent": false,
       "evidence": {
         "lowest": 13,
@@ -3007,6 +3103,7 @@
         "instrumentCount": 4,
         "dominance": 0.3
       },
+      "classifierRole": "percussion",
       "instrumentName": "Instrument 2",
       "nameHint": null,
       "proposed": "unclear",
@@ -3039,6 +3136,7 @@
         "instrumentCount": 2,
         "dominance": 0.8
       },
+      "classifierRole": "bass",
       "instrumentName": "for Revision 2017",
       "nameHint": null,
       "proposed": "bass-or-low-perc",
@@ -3050,7 +3148,7 @@
       "orderIndex": 0,
       "patternIndex": 0,
       "channelIndex": 2,
-      "channelName": "Bass 2",
+      "channelName": "Hi-Hat 1",
       "silent": false,
       "evidence": {
         "lowest": 25,
@@ -3071,6 +3169,7 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "percussion",
       "instrumentName": "competition",
       "nameHint": null,
       "proposed": "skank",
@@ -3082,7 +3181,7 @@
       "orderIndex": 0,
       "patternIndex": 0,
       "channelIndex": 3,
-      "channelName": "Bass 3",
+      "channelName": "Bass 1",
       "silent": false,
       "evidence": {
         "lowest": 22,
@@ -3103,6 +3202,7 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "bass",
       "instrumentName": "competition",
       "nameHint": null,
       "proposed": "skank",
@@ -3135,6 +3235,7 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "bass",
       "instrumentName": "Instrument 8",
       "nameHint": null,
       "proposed": "bass-or-low-perc",
@@ -3146,7 +3247,7 @@
       "orderIndex": 0,
       "patternIndex": 0,
       "channelIndex": 5,
-      "channelName": "Bass 4",
+      "channelName": "Bass 2",
       "silent": false,
       "evidence": {
         "lowest": 20,
@@ -3167,6 +3268,7 @@
         "instrumentCount": 2,
         "dominance": 0.63
       },
+      "classifierRole": "bass",
       "instrumentName": "track for my first",
       "nameHint": null,
       "proposed": "lead",
@@ -3178,7 +3280,7 @@
       "orderIndex": 0,
       "patternIndex": 0,
       "channelIndex": 6,
-      "channelName": "Bass 5",
+      "channelName": "Skank 1",
       "silent": false,
       "evidence": {
         "lowest": 37,
@@ -3199,6 +3301,7 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "skank",
       "instrumentName": "digital & hopefuly",
       "nameHint": null,
       "proposed": "unclear",
@@ -3210,9 +3313,10 @@
       "orderIndex": 0,
       "patternIndex": 0,
       "channelIndex": 7,
-      "channelName": "Bass 6",
+      "channelName": "Skank 2",
       "silent": true,
       "evidence": null,
+      "classifierRole": "skank",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -3224,9 +3328,10 @@
       "orderIndex": 0,
       "patternIndex": 0,
       "channelIndex": 8,
-      "channelName": "Bass 7",
+      "channelName": "Skank 3",
       "silent": true,
       "evidence": null,
+      "classifierRole": "skank",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -3241,6 +3346,7 @@
       "channelName": "Pad",
       "silent": true,
       "evidence": null,
+      "classifierRole": "pad",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -3252,9 +3358,10 @@
       "orderIndex": 0,
       "patternIndex": 0,
       "channelIndex": 10,
-      "channelName": "Bass 8",
+      "channelName": "Bass 3",
       "silent": true,
       "evidence": null,
+      "classifierRole": "bass",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -3266,9 +3373,10 @@
       "orderIndex": 0,
       "patternIndex": 0,
       "channelIndex": 11,
-      "channelName": "Sub Bass 3",
+      "channelName": "Hi-Hat 2",
       "silent": true,
       "evidence": null,
+      "classifierRole": "percussion",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -3280,9 +3388,10 @@
       "orderIndex": 0,
       "patternIndex": 0,
       "channelIndex": 12,
-      "channelName": "Sub Bass 4",
+      "channelName": "Sub Bass 3",
       "silent": true,
       "evidence": null,
+      "classifierRole": "bass",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -3294,9 +3403,10 @@
       "orderIndex": 0,
       "patternIndex": 0,
       "channelIndex": 13,
-      "channelName": "Sub Bass 5",
+      "channelName": "Sub Bass 4",
       "silent": true,
       "evidence": null,
+      "classifierRole": "bass",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -3308,9 +3418,10 @@
       "orderIndex": 0,
       "patternIndex": 0,
       "channelIndex": 14,
-      "channelName": "Bass 9",
+      "channelName": "Bass 4",
       "silent": true,
       "evidence": null,
+      "classifierRole": "bass",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -3322,7 +3433,7 @@
       "orderIndex": 0,
       "patternIndex": 0,
       "channelIndex": 15,
-      "channelName": "Bass 10",
+      "channelName": "Kick 2",
       "silent": false,
       "evidence": {
         "lowest": 13,
@@ -3343,6 +3454,7 @@
         "instrumentCount": 4,
         "dominance": 0.3
       },
+      "classifierRole": "percussion",
       "instrumentName": "Instrument 2",
       "nameHint": null,
       "proposed": "unclear",
@@ -3354,7 +3466,7 @@
       "orderIndex": 1,
       "patternIndex": 1,
       "channelIndex": 0,
-      "channelName": "Bass 1",
+      "channelName": "Kick 1",
       "silent": false,
       "evidence": {
         "lowest": 25,
@@ -3375,6 +3487,7 @@
         "instrumentCount": 4,
         "dominance": 0.33
       },
+      "classifierRole": "percussion",
       "instrumentName": "by AceMan",
       "nameHint": null,
       "proposed": "unclear",
@@ -3407,6 +3520,7 @@
         "instrumentCount": 2,
         "dominance": 0.8
       },
+      "classifierRole": "bass",
       "instrumentName": "for Revision 2017",
       "nameHint": null,
       "proposed": "bass-or-low-perc",
@@ -3418,7 +3532,7 @@
       "orderIndex": 1,
       "patternIndex": 1,
       "channelIndex": 2,
-      "channelName": "Bass 2",
+      "channelName": "Hi-Hat 1",
       "silent": false,
       "evidence": {
         "lowest": 25,
@@ -3439,6 +3553,7 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "percussion",
       "instrumentName": "competition",
       "nameHint": null,
       "proposed": "skank",
@@ -3450,7 +3565,7 @@
       "orderIndex": 1,
       "patternIndex": 1,
       "channelIndex": 3,
-      "channelName": "Bass 3",
+      "channelName": "Bass 1",
       "silent": false,
       "evidence": {
         "lowest": 22,
@@ -3471,6 +3586,7 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "bass",
       "instrumentName": "competition",
       "nameHint": null,
       "proposed": "skank",
@@ -3503,6 +3619,7 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "bass",
       "instrumentName": "Instrument 8",
       "nameHint": null,
       "proposed": "bass-or-low-perc",
@@ -3514,7 +3631,7 @@
       "orderIndex": 1,
       "patternIndex": 1,
       "channelIndex": 5,
-      "channelName": "Bass 4",
+      "channelName": "Bass 2",
       "silent": false,
       "evidence": {
         "lowest": 20,
@@ -3535,6 +3652,7 @@
         "instrumentCount": 2,
         "dominance": 0.53
       },
+      "classifierRole": "bass",
       "instrumentName": "also, a title",
       "nameHint": null,
       "proposed": "unclear",
@@ -3546,7 +3664,7 @@
       "orderIndex": 1,
       "patternIndex": 1,
       "channelIndex": 6,
-      "channelName": "Bass 5",
+      "channelName": "Skank 1",
       "silent": false,
       "evidence": {
         "lowest": 13,
@@ -3567,6 +3685,7 @@
         "instrumentCount": 2,
         "dominance": 0.5
       },
+      "classifierRole": "skank",
       "instrumentName": "regular CD album",
       "nameHint": null,
       "proposed": "bass",
@@ -3578,9 +3697,10 @@
       "orderIndex": 1,
       "patternIndex": 1,
       "channelIndex": 7,
-      "channelName": "Bass 6",
+      "channelName": "Skank 2",
       "silent": true,
       "evidence": null,
+      "classifierRole": "skank",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -3592,9 +3712,10 @@
       "orderIndex": 1,
       "patternIndex": 1,
       "channelIndex": 8,
-      "channelName": "Bass 7",
+      "channelName": "Skank 3",
       "silent": true,
       "evidence": null,
+      "classifierRole": "skank",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -3609,6 +3730,7 @@
       "channelName": "Pad",
       "silent": true,
       "evidence": null,
+      "classifierRole": "pad",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -3620,9 +3742,10 @@
       "orderIndex": 1,
       "patternIndex": 1,
       "channelIndex": 10,
-      "channelName": "Bass 8",
+      "channelName": "Bass 3",
       "silent": true,
       "evidence": null,
+      "classifierRole": "bass",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -3634,9 +3757,10 @@
       "orderIndex": 1,
       "patternIndex": 1,
       "channelIndex": 11,
-      "channelName": "Sub Bass 3",
+      "channelName": "Hi-Hat 2",
       "silent": true,
       "evidence": null,
+      "classifierRole": "percussion",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -3648,9 +3772,10 @@
       "orderIndex": 1,
       "patternIndex": 1,
       "channelIndex": 12,
-      "channelName": "Sub Bass 4",
+      "channelName": "Sub Bass 3",
       "silent": true,
       "evidence": null,
+      "classifierRole": "bass",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -3662,9 +3787,10 @@
       "orderIndex": 1,
       "patternIndex": 1,
       "channelIndex": 13,
-      "channelName": "Sub Bass 5",
+      "channelName": "Sub Bass 4",
       "silent": true,
       "evidence": null,
+      "classifierRole": "bass",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -3676,9 +3802,10 @@
       "orderIndex": 1,
       "patternIndex": 1,
       "channelIndex": 14,
-      "channelName": "Bass 9",
+      "channelName": "Bass 4",
       "silent": true,
       "evidence": null,
+      "classifierRole": "bass",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -3690,7 +3817,7 @@
       "orderIndex": 1,
       "patternIndex": 1,
       "channelIndex": 15,
-      "channelName": "Bass 10",
+      "channelName": "Kick 2",
       "silent": false,
       "evidence": {
         "lowest": 25,
@@ -3711,6 +3838,7 @@
         "instrumentCount": 4,
         "dominance": 0.33
       },
+      "classifierRole": "percussion",
       "instrumentName": "by AceMan",
       "nameHint": null,
       "proposed": "unclear",
@@ -3722,7 +3850,7 @@
       "orderIndex": 2,
       "patternIndex": 2,
       "channelIndex": 0,
-      "channelName": "Bass 1",
+      "channelName": "Kick 1",
       "silent": false,
       "evidence": {
         "lowest": 13,
@@ -3743,6 +3871,7 @@
         "instrumentCount": 4,
         "dominance": 0.32
       },
+      "classifierRole": "percussion",
       "instrumentName": "Instrument 4",
       "nameHint": null,
       "proposed": "unclear",
@@ -3775,6 +3904,7 @@
         "instrumentCount": 2,
         "dominance": 0.85
       },
+      "classifierRole": "bass",
       "instrumentName": "for Revision 2017",
       "nameHint": null,
       "proposed": "bass-or-low-perc",
@@ -3786,7 +3916,7 @@
       "orderIndex": 2,
       "patternIndex": 2,
       "channelIndex": 2,
-      "channelName": "Bass 2",
+      "channelName": "Hi-Hat 1",
       "silent": false,
       "evidence": {
         "lowest": 29,
@@ -3807,6 +3937,7 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "percussion",
       "instrumentName": "competition",
       "nameHint": null,
       "proposed": "skank",
@@ -3818,7 +3949,7 @@
       "orderIndex": 2,
       "patternIndex": 2,
       "channelIndex": 3,
-      "channelName": "Bass 3",
+      "channelName": "Bass 1",
       "silent": false,
       "evidence": {
         "lowest": 22,
@@ -3839,6 +3970,7 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "bass",
       "instrumentName": "competition",
       "nameHint": null,
       "proposed": "skank",
@@ -3871,6 +4003,7 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "bass",
       "instrumentName": "Instrument 8",
       "nameHint": null,
       "proposed": "bass-or-low-perc",
@@ -3882,7 +4015,7 @@
       "orderIndex": 2,
       "patternIndex": 2,
       "channelIndex": 5,
-      "channelName": "Bass 4",
+      "channelName": "Bass 2",
       "silent": false,
       "evidence": {
         "lowest": 10,
@@ -3903,6 +4036,7 @@
         "instrumentCount": 5,
         "dominance": 0.44
       },
+      "classifierRole": "bass",
       "instrumentName": "track for my first",
       "nameHint": null,
       "proposed": "lead",
@@ -3914,7 +4048,7 @@
       "orderIndex": 2,
       "patternIndex": 2,
       "channelIndex": 6,
-      "channelName": "Bass 5",
+      "channelName": "Skank 1",
       "silent": false,
       "evidence": {
         "lowest": 37,
@@ -3935,6 +4069,7 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "skank",
       "instrumentName": "digital & hopefuly",
       "nameHint": null,
       "proposed": "unclear",
@@ -3946,9 +4081,10 @@
       "orderIndex": 2,
       "patternIndex": 2,
       "channelIndex": 7,
-      "channelName": "Bass 6",
+      "channelName": "Skank 2",
       "silent": true,
       "evidence": null,
+      "classifierRole": "skank",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -3960,9 +4096,10 @@
       "orderIndex": 2,
       "patternIndex": 2,
       "channelIndex": 8,
-      "channelName": "Bass 7",
+      "channelName": "Skank 3",
       "silent": true,
       "evidence": null,
+      "classifierRole": "skank",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -3977,6 +4114,7 @@
       "channelName": "Pad",
       "silent": true,
       "evidence": null,
+      "classifierRole": "pad",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -3988,9 +4126,10 @@
       "orderIndex": 2,
       "patternIndex": 2,
       "channelIndex": 10,
-      "channelName": "Bass 8",
+      "channelName": "Bass 3",
       "silent": true,
       "evidence": null,
+      "classifierRole": "bass",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -4002,9 +4141,10 @@
       "orderIndex": 2,
       "patternIndex": 2,
       "channelIndex": 11,
-      "channelName": "Sub Bass 3",
+      "channelName": "Hi-Hat 2",
       "silent": true,
       "evidence": null,
+      "classifierRole": "percussion",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -4016,9 +4156,10 @@
       "orderIndex": 2,
       "patternIndex": 2,
       "channelIndex": 12,
-      "channelName": "Sub Bass 4",
+      "channelName": "Sub Bass 3",
       "silent": true,
       "evidence": null,
+      "classifierRole": "bass",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -4030,9 +4171,10 @@
       "orderIndex": 2,
       "patternIndex": 2,
       "channelIndex": 13,
-      "channelName": "Sub Bass 5",
+      "channelName": "Sub Bass 4",
       "silent": true,
       "evidence": null,
+      "classifierRole": "bass",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -4044,9 +4186,10 @@
       "orderIndex": 2,
       "patternIndex": 2,
       "channelIndex": 14,
-      "channelName": "Bass 9",
+      "channelName": "Bass 4",
       "silent": true,
       "evidence": null,
+      "classifierRole": "bass",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -4058,7 +4201,7 @@
       "orderIndex": 2,
       "patternIndex": 2,
       "channelIndex": 15,
-      "channelName": "Bass 10",
+      "channelName": "Kick 2",
       "silent": false,
       "evidence": {
         "lowest": 13,
@@ -4079,6 +4222,7 @@
         "instrumentCount": 4,
         "dominance": 0.32
       },
+      "classifierRole": "percussion",
       "instrumentName": "Instrument 4",
       "nameHint": null,
       "proposed": "unclear",
@@ -4090,7 +4234,7 @@
       "orderIndex": 3,
       "patternIndex": 3,
       "channelIndex": 0,
-      "channelName": "Bass 1",
+      "channelName": "Kick 1",
       "silent": false,
       "evidence": {
         "lowest": 25,
@@ -4111,6 +4255,7 @@
         "instrumentCount": 4,
         "dominance": 0.4
       },
+      "classifierRole": "percussion",
       "instrumentName": "by AceMan",
       "nameHint": null,
       "proposed": "unclear",
@@ -4143,6 +4288,7 @@
         "instrumentCount": 4,
         "dominance": 0.7
       },
+      "classifierRole": "bass",
       "instrumentName": "for Revision 2017",
       "nameHint": null,
       "proposed": "bass-or-low-perc",
@@ -4154,7 +4300,7 @@
       "orderIndex": 3,
       "patternIndex": 3,
       "channelIndex": 2,
-      "channelName": "Bass 2",
+      "channelName": "Hi-Hat 1",
       "silent": false,
       "evidence": {
         "lowest": 22,
@@ -4175,6 +4321,7 @@
         "instrumentCount": 2,
         "dominance": 0.86
       },
+      "classifierRole": "percussion",
       "instrumentName": "competition",
       "nameHint": null,
       "proposed": "skank",
@@ -4186,7 +4333,7 @@
       "orderIndex": 3,
       "patternIndex": 3,
       "channelIndex": 3,
-      "channelName": "Bass 3",
+      "channelName": "Bass 1",
       "silent": false,
       "evidence": {
         "lowest": 22,
@@ -4207,6 +4354,7 @@
         "instrumentCount": 3,
         "dominance": 0.75
       },
+      "classifierRole": "bass",
       "instrumentName": "competition",
       "nameHint": null,
       "proposed": "skank",
@@ -4239,6 +4387,7 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "bass",
       "instrumentName": "Instrument 8",
       "nameHint": null,
       "proposed": "bass",
@@ -4250,7 +4399,7 @@
       "orderIndex": 3,
       "patternIndex": 3,
       "channelIndex": 5,
-      "channelName": "Bass 4",
+      "channelName": "Bass 2",
       "silent": false,
       "evidence": {
         "lowest": 10,
@@ -4271,6 +4420,7 @@
         "instrumentCount": 5,
         "dominance": 0.52
       },
+      "classifierRole": "bass",
       "instrumentName": "also, a title",
       "nameHint": null,
       "proposed": "bass-or-low-perc",
@@ -4282,7 +4432,7 @@
       "orderIndex": 3,
       "patternIndex": 3,
       "channelIndex": 6,
-      "channelName": "Bass 5",
+      "channelName": "Skank 1",
       "silent": false,
       "evidence": {
         "lowest": 1,
@@ -4303,6 +4453,7 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "skank",
       "instrumentName": "digital & hopefuly",
       "nameHint": null,
       "proposed": "unclear",
@@ -4314,9 +4465,10 @@
       "orderIndex": 3,
       "patternIndex": 3,
       "channelIndex": 7,
-      "channelName": "Bass 6",
+      "channelName": "Skank 2",
       "silent": true,
       "evidence": null,
+      "classifierRole": "skank",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -4328,9 +4480,10 @@
       "orderIndex": 3,
       "patternIndex": 3,
       "channelIndex": 8,
-      "channelName": "Bass 7",
+      "channelName": "Skank 3",
       "silent": true,
       "evidence": null,
+      "classifierRole": "skank",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -4345,6 +4498,7 @@
       "channelName": "Pad",
       "silent": true,
       "evidence": null,
+      "classifierRole": "pad",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -4356,9 +4510,10 @@
       "orderIndex": 3,
       "patternIndex": 3,
       "channelIndex": 10,
-      "channelName": "Bass 8",
+      "channelName": "Bass 3",
       "silent": true,
       "evidence": null,
+      "classifierRole": "bass",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -4370,9 +4525,10 @@
       "orderIndex": 3,
       "patternIndex": 3,
       "channelIndex": 11,
-      "channelName": "Sub Bass 3",
+      "channelName": "Hi-Hat 2",
       "silent": true,
       "evidence": null,
+      "classifierRole": "percussion",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -4384,9 +4540,10 @@
       "orderIndex": 3,
       "patternIndex": 3,
       "channelIndex": 12,
-      "channelName": "Sub Bass 4",
+      "channelName": "Sub Bass 3",
       "silent": true,
       "evidence": null,
+      "classifierRole": "bass",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -4398,9 +4555,10 @@
       "orderIndex": 3,
       "patternIndex": 3,
       "channelIndex": 13,
-      "channelName": "Sub Bass 5",
+      "channelName": "Sub Bass 4",
       "silent": true,
       "evidence": null,
+      "classifierRole": "bass",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -4412,9 +4570,10 @@
       "orderIndex": 3,
       "patternIndex": 3,
       "channelIndex": 14,
-      "channelName": "Bass 9",
+      "channelName": "Bass 4",
       "silent": true,
       "evidence": null,
+      "classifierRole": "bass",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -4426,7 +4585,7 @@
       "orderIndex": 3,
       "patternIndex": 3,
       "channelIndex": 15,
-      "channelName": "Bass 10",
+      "channelName": "Kick 2",
       "silent": false,
       "evidence": {
         "lowest": 25,
@@ -4447,6 +4606,7 @@
         "instrumentCount": 4,
         "dominance": 0.4
       },
+      "classifierRole": "percussion",
       "instrumentName": "by AceMan",
       "nameHint": null,
       "proposed": "unclear",
@@ -4458,7 +4618,7 @@
       "orderIndex": 4,
       "patternIndex": 4,
       "channelIndex": 0,
-      "channelName": "Bass 1",
+      "channelName": "Kick 1",
       "silent": false,
       "evidence": {
         "lowest": 13,
@@ -4479,6 +4639,7 @@
         "instrumentCount": 4,
         "dominance": 0.3
       },
+      "classifierRole": "percussion",
       "instrumentName": "Instrument 2",
       "nameHint": null,
       "proposed": "unclear",
@@ -4511,6 +4672,7 @@
         "instrumentCount": 3,
         "dominance": 0.48
       },
+      "classifierRole": "bass",
       "instrumentName": "for Revision 2017",
       "nameHint": null,
       "proposed": "bass-or-low-perc",
@@ -4522,7 +4684,7 @@
       "orderIndex": 4,
       "patternIndex": 4,
       "channelIndex": 2,
-      "channelName": "Bass 2",
+      "channelName": "Hi-Hat 1",
       "silent": false,
       "evidence": {
         "lowest": 10,
@@ -4543,6 +4705,7 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "percussion",
       "instrumentName": "track for my first",
       "nameHint": null,
       "proposed": "lead",
@@ -4554,7 +4717,7 @@
       "orderIndex": 4,
       "patternIndex": 4,
       "channelIndex": 3,
-      "channelName": "Bass 3",
+      "channelName": "Bass 1",
       "silent": false,
       "evidence": {
         "lowest": 10,
@@ -4575,6 +4738,7 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "bass",
       "instrumentName": "Instrument 21",
       "nameHint": null,
       "proposed": "bass-or-low-perc",
@@ -4607,6 +4771,7 @@
         "instrumentCount": 2,
         "dominance": 0.79
       },
+      "classifierRole": "bass",
       "instrumentName": "digital & hopefuly",
       "nameHint": null,
       "proposed": "bass",
@@ -4618,7 +4783,7 @@
       "orderIndex": 4,
       "patternIndex": 4,
       "channelIndex": 5,
-      "channelName": "Bass 4",
+      "channelName": "Bass 2",
       "silent": false,
       "evidence": {
         "lowest": 1,
@@ -4639,6 +4804,7 @@
         "instrumentCount": 6,
         "dominance": 0.29
       },
+      "classifierRole": "bass",
       "instrumentName": "Instrument 24",
       "nameHint": null,
       "proposed": "bass-or-low-perc",
@@ -4650,7 +4816,7 @@
       "orderIndex": 4,
       "patternIndex": 4,
       "channelIndex": 6,
-      "channelName": "Bass 5",
+      "channelName": "Skank 1",
       "silent": false,
       "evidence": {
         "lowest": 1,
@@ -4671,6 +4837,7 @@
         "instrumentCount": 6,
         "dominance": 0.38
       },
+      "classifierRole": "skank",
       "instrumentName": "Instrument 25",
       "nameHint": null,
       "proposed": "bass-or-low-perc",
@@ -4682,7 +4849,7 @@
       "orderIndex": 4,
       "patternIndex": 4,
       "channelIndex": 7,
-      "channelName": "Bass 6",
+      "channelName": "Skank 2",
       "silent": false,
       "evidence": {
         "lowest": 37,
@@ -4703,6 +4870,7 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "skank",
       "instrumentName": "digital & hopefuly",
       "nameHint": null,
       "proposed": "unclear",
@@ -4714,9 +4882,10 @@
       "orderIndex": 4,
       "patternIndex": 4,
       "channelIndex": 8,
-      "channelName": "Bass 7",
+      "channelName": "Skank 3",
       "silent": true,
       "evidence": null,
+      "classifierRole": "skank",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -4731,6 +4900,7 @@
       "channelName": "Pad",
       "silent": true,
       "evidence": null,
+      "classifierRole": "pad",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -4742,9 +4912,10 @@
       "orderIndex": 4,
       "patternIndex": 4,
       "channelIndex": 10,
-      "channelName": "Bass 8",
+      "channelName": "Bass 3",
       "silent": true,
       "evidence": null,
+      "classifierRole": "bass",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -4756,9 +4927,10 @@
       "orderIndex": 4,
       "patternIndex": 4,
       "channelIndex": 11,
-      "channelName": "Sub Bass 3",
+      "channelName": "Hi-Hat 2",
       "silent": true,
       "evidence": null,
+      "classifierRole": "percussion",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -4770,9 +4942,10 @@
       "orderIndex": 4,
       "patternIndex": 4,
       "channelIndex": 12,
-      "channelName": "Sub Bass 4",
+      "channelName": "Sub Bass 3",
       "silent": true,
       "evidence": null,
+      "classifierRole": "bass",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -4784,9 +4957,10 @@
       "orderIndex": 4,
       "patternIndex": 4,
       "channelIndex": 13,
-      "channelName": "Sub Bass 5",
+      "channelName": "Sub Bass 4",
       "silent": true,
       "evidence": null,
+      "classifierRole": "bass",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -4798,9 +4972,10 @@
       "orderIndex": 4,
       "patternIndex": 4,
       "channelIndex": 14,
-      "channelName": "Bass 9",
+      "channelName": "Bass 4",
       "silent": true,
       "evidence": null,
+      "classifierRole": "bass",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -4812,7 +4987,7 @@
       "orderIndex": 4,
       "patternIndex": 4,
       "channelIndex": 15,
-      "channelName": "Bass 10",
+      "channelName": "Kick 2",
       "silent": false,
       "evidence": {
         "lowest": 13,
@@ -4833,6 +5008,7 @@
         "instrumentCount": 4,
         "dominance": 0.3
       },
+      "classifierRole": "percussion",
       "instrumentName": "Instrument 2",
       "nameHint": null,
       "proposed": "unclear",
@@ -4844,7 +5020,7 @@
       "orderIndex": 5,
       "patternIndex": 5,
       "channelIndex": 0,
-      "channelName": "Bass 1",
+      "channelName": "Kick 1",
       "silent": false,
       "evidence": {
         "lowest": 13,
@@ -4865,6 +5041,7 @@
         "instrumentCount": 4,
         "dominance": 0.3
       },
+      "classifierRole": "percussion",
       "instrumentName": "Instrument 2",
       "nameHint": null,
       "proposed": "unclear",
@@ -4897,6 +5074,7 @@
         "instrumentCount": 3,
         "dominance": 0.48
       },
+      "classifierRole": "bass",
       "instrumentName": "for Revision 2017",
       "nameHint": null,
       "proposed": "bass-or-low-perc",
@@ -4908,7 +5086,7 @@
       "orderIndex": 5,
       "patternIndex": 5,
       "channelIndex": 2,
-      "channelName": "Bass 2",
+      "channelName": "Hi-Hat 1",
       "silent": false,
       "evidence": {
         "lowest": 10,
@@ -4929,6 +5107,7 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "percussion",
       "instrumentName": "track for my first",
       "nameHint": null,
       "proposed": "lead",
@@ -4940,7 +5119,7 @@
       "orderIndex": 5,
       "patternIndex": 5,
       "channelIndex": 3,
-      "channelName": "Bass 3",
+      "channelName": "Bass 1",
       "silent": false,
       "evidence": {
         "lowest": 10,
@@ -4961,6 +5140,7 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "bass",
       "instrumentName": "Instrument 21",
       "nameHint": null,
       "proposed": "bass-or-low-perc",
@@ -4993,6 +5173,7 @@
         "instrumentCount": 2,
         "dominance": 0.79
       },
+      "classifierRole": "bass",
       "instrumentName": "digital & hopefuly",
       "nameHint": null,
       "proposed": "bass",
@@ -5004,7 +5185,7 @@
       "orderIndex": 5,
       "patternIndex": 5,
       "channelIndex": 5,
-      "channelName": "Bass 4",
+      "channelName": "Bass 2",
       "silent": false,
       "evidence": {
         "lowest": 3,
@@ -5025,6 +5206,7 @@
         "instrumentCount": 5,
         "dominance": 0.38
       },
+      "classifierRole": "bass",
       "instrumentName": "Instrument 23",
       "nameHint": null,
       "proposed": "bass-or-low-perc",
@@ -5036,7 +5218,7 @@
       "orderIndex": 5,
       "patternIndex": 5,
       "channelIndex": 6,
-      "channelName": "Bass 5",
+      "channelName": "Skank 1",
       "silent": false,
       "evidence": {
         "lowest": 10,
@@ -5057,6 +5239,7 @@
         "instrumentCount": 6,
         "dominance": 0.27
       },
+      "classifierRole": "skank",
       "instrumentName": "competition",
       "nameHint": null,
       "proposed": "bass-or-low-perc",
@@ -5068,9 +5251,10 @@
       "orderIndex": 5,
       "patternIndex": 5,
       "channelIndex": 7,
-      "channelName": "Bass 6",
+      "channelName": "Skank 2",
       "silent": true,
       "evidence": null,
+      "classifierRole": "skank",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -5082,9 +5266,10 @@
       "orderIndex": 5,
       "patternIndex": 5,
       "channelIndex": 8,
-      "channelName": "Bass 7",
+      "channelName": "Skank 3",
       "silent": true,
       "evidence": null,
+      "classifierRole": "skank",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -5099,6 +5284,7 @@
       "channelName": "Pad",
       "silent": true,
       "evidence": null,
+      "classifierRole": "pad",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -5110,9 +5296,10 @@
       "orderIndex": 5,
       "patternIndex": 5,
       "channelIndex": 10,
-      "channelName": "Bass 8",
+      "channelName": "Bass 3",
       "silent": true,
       "evidence": null,
+      "classifierRole": "bass",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -5124,9 +5311,10 @@
       "orderIndex": 5,
       "patternIndex": 5,
       "channelIndex": 11,
-      "channelName": "Sub Bass 3",
+      "channelName": "Hi-Hat 2",
       "silent": true,
       "evidence": null,
+      "classifierRole": "percussion",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -5138,9 +5326,10 @@
       "orderIndex": 5,
       "patternIndex": 5,
       "channelIndex": 12,
-      "channelName": "Sub Bass 4",
+      "channelName": "Sub Bass 3",
       "silent": true,
       "evidence": null,
+      "classifierRole": "bass",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -5152,9 +5341,10 @@
       "orderIndex": 5,
       "patternIndex": 5,
       "channelIndex": 13,
-      "channelName": "Sub Bass 5",
+      "channelName": "Sub Bass 4",
       "silent": true,
       "evidence": null,
+      "classifierRole": "bass",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -5166,9 +5356,10 @@
       "orderIndex": 5,
       "patternIndex": 5,
       "channelIndex": 14,
-      "channelName": "Bass 9",
+      "channelName": "Bass 4",
       "silent": true,
       "evidence": null,
+      "classifierRole": "bass",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -5180,7 +5371,7 @@
       "orderIndex": 5,
       "patternIndex": 5,
       "channelIndex": 15,
-      "channelName": "Bass 10",
+      "channelName": "Kick 2",
       "silent": false,
       "evidence": {
         "lowest": 13,
@@ -5201,6 +5392,7 @@
         "instrumentCount": 4,
         "dominance": 0.3
       },
+      "classifierRole": "percussion",
       "instrumentName": "Instrument 2",
       "nameHint": null,
       "proposed": "unclear",
@@ -5212,7 +5404,7 @@
       "orderIndex": 6,
       "patternIndex": 6,
       "channelIndex": 0,
-      "channelName": "Bass 1",
+      "channelName": "Kick 1",
       "silent": false,
       "evidence": {
         "lowest": 13,
@@ -5233,6 +5425,7 @@
         "instrumentCount": 4,
         "dominance": 0.3
       },
+      "classifierRole": "percussion",
       "instrumentName": "Instrument 2",
       "nameHint": null,
       "proposed": "unclear",
@@ -5265,6 +5458,7 @@
         "instrumentCount": 3,
         "dominance": 0.48
       },
+      "classifierRole": "bass",
       "instrumentName": "for Revision 2017",
       "nameHint": null,
       "proposed": "bass-or-low-perc",
@@ -5276,7 +5470,7 @@
       "orderIndex": 6,
       "patternIndex": 6,
       "channelIndex": 2,
-      "channelName": "Bass 2",
+      "channelName": "Hi-Hat 1",
       "silent": false,
       "evidence": {
         "lowest": 10,
@@ -5297,6 +5491,7 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "percussion",
       "instrumentName": "track for my first",
       "nameHint": null,
       "proposed": "lead",
@@ -5308,7 +5503,7 @@
       "orderIndex": 6,
       "patternIndex": 6,
       "channelIndex": 3,
-      "channelName": "Bass 3",
+      "channelName": "Bass 1",
       "silent": false,
       "evidence": {
         "lowest": 10,
@@ -5329,6 +5524,7 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "bass",
       "instrumentName": "Instrument 21",
       "nameHint": null,
       "proposed": "bass-or-low-perc",
@@ -5361,6 +5557,7 @@
         "instrumentCount": 2,
         "dominance": 0.79
       },
+      "classifierRole": "bass",
       "instrumentName": "digital & hopefuly",
       "nameHint": null,
       "proposed": "bass",
@@ -5372,7 +5569,7 @@
       "orderIndex": 6,
       "patternIndex": 6,
       "channelIndex": 5,
-      "channelName": "Bass 4",
+      "channelName": "Bass 2",
       "silent": false,
       "evidence": {
         "lowest": 1,
@@ -5393,6 +5590,7 @@
         "instrumentCount": 6,
         "dominance": 0.29
       },
+      "classifierRole": "bass",
       "instrumentName": "Instrument 24",
       "nameHint": null,
       "proposed": "bass-or-low-perc",
@@ -5404,7 +5602,7 @@
       "orderIndex": 6,
       "patternIndex": 6,
       "channelIndex": 6,
-      "channelName": "Bass 5",
+      "channelName": "Skank 1",
       "silent": false,
       "evidence": {
         "lowest": 1,
@@ -5425,6 +5623,7 @@
         "instrumentCount": 6,
         "dominance": 0.38
       },
+      "classifierRole": "skank",
       "instrumentName": "Instrument 25",
       "nameHint": null,
       "proposed": "bass-or-low-perc",
@@ -5436,7 +5635,7 @@
       "orderIndex": 6,
       "patternIndex": 6,
       "channelIndex": 7,
-      "channelName": "Bass 6",
+      "channelName": "Skank 2",
       "silent": false,
       "evidence": {
         "lowest": 37,
@@ -5457,6 +5656,7 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "skank",
       "instrumentName": "digital & hopefuly",
       "nameHint": null,
       "proposed": "unclear",
@@ -5468,9 +5668,10 @@
       "orderIndex": 6,
       "patternIndex": 6,
       "channelIndex": 8,
-      "channelName": "Bass 7",
+      "channelName": "Skank 3",
       "silent": true,
       "evidence": null,
+      "classifierRole": "skank",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -5485,6 +5686,7 @@
       "channelName": "Pad",
       "silent": true,
       "evidence": null,
+      "classifierRole": "pad",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -5496,9 +5698,10 @@
       "orderIndex": 6,
       "patternIndex": 6,
       "channelIndex": 10,
-      "channelName": "Bass 8",
+      "channelName": "Bass 3",
       "silent": true,
       "evidence": null,
+      "classifierRole": "bass",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -5510,9 +5713,10 @@
       "orderIndex": 6,
       "patternIndex": 6,
       "channelIndex": 11,
-      "channelName": "Sub Bass 3",
+      "channelName": "Hi-Hat 2",
       "silent": true,
       "evidence": null,
+      "classifierRole": "percussion",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -5524,9 +5728,10 @@
       "orderIndex": 6,
       "patternIndex": 6,
       "channelIndex": 12,
-      "channelName": "Sub Bass 4",
+      "channelName": "Sub Bass 3",
       "silent": true,
       "evidence": null,
+      "classifierRole": "bass",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -5538,9 +5743,10 @@
       "orderIndex": 6,
       "patternIndex": 6,
       "channelIndex": 13,
-      "channelName": "Sub Bass 5",
+      "channelName": "Sub Bass 4",
       "silent": true,
       "evidence": null,
+      "classifierRole": "bass",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -5552,9 +5758,10 @@
       "orderIndex": 6,
       "patternIndex": 6,
       "channelIndex": 14,
-      "channelName": "Bass 9",
+      "channelName": "Bass 4",
       "silent": true,
       "evidence": null,
+      "classifierRole": "bass",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -5566,7 +5773,7 @@
       "orderIndex": 6,
       "patternIndex": 6,
       "channelIndex": 15,
-      "channelName": "Bass 10",
+      "channelName": "Kick 2",
       "silent": false,
       "evidence": {
         "lowest": 13,
@@ -5587,6 +5794,7 @@
         "instrumentCount": 4,
         "dominance": 0.3
       },
+      "classifierRole": "percussion",
       "instrumentName": "Instrument 2",
       "nameHint": null,
       "proposed": "unclear",
@@ -5598,7 +5806,7 @@
       "orderIndex": 7,
       "patternIndex": 7,
       "channelIndex": 0,
-      "channelName": "Bass 1",
+      "channelName": "Kick 1",
       "silent": false,
       "evidence": {
         "lowest": 13,
@@ -5619,6 +5827,7 @@
         "instrumentCount": 4,
         "dominance": 0.33
       },
+      "classifierRole": "percussion",
       "instrumentName": "Instrument 4",
       "nameHint": null,
       "proposed": "unclear",
@@ -5651,6 +5860,7 @@
         "instrumentCount": 3,
         "dominance": 0.48
       },
+      "classifierRole": "bass",
       "instrumentName": "for Revision 2017",
       "nameHint": null,
       "proposed": "bass-or-low-perc",
@@ -5662,7 +5872,7 @@
       "orderIndex": 7,
       "patternIndex": 7,
       "channelIndex": 2,
-      "channelName": "Bass 2",
+      "channelName": "Hi-Hat 1",
       "silent": false,
       "evidence": {
         "lowest": 10,
@@ -5683,6 +5893,7 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "percussion",
       "instrumentName": "track for my first",
       "nameHint": null,
       "proposed": "lead",
@@ -5694,7 +5905,7 @@
       "orderIndex": 7,
       "patternIndex": 7,
       "channelIndex": 3,
-      "channelName": "Bass 3",
+      "channelName": "Bass 1",
       "silent": false,
       "evidence": {
         "lowest": 10,
@@ -5715,6 +5926,7 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "bass",
       "instrumentName": "Instrument 21",
       "nameHint": null,
       "proposed": "bass-or-low-perc",
@@ -5747,6 +5959,7 @@
         "instrumentCount": 3,
         "dominance": 0.76
       },
+      "classifierRole": "bass",
       "instrumentName": "digital & hopefuly",
       "nameHint": null,
       "proposed": "bass",
@@ -5758,7 +5971,7 @@
       "orderIndex": 7,
       "patternIndex": 7,
       "channelIndex": 5,
-      "channelName": "Bass 4",
+      "channelName": "Bass 2",
       "silent": false,
       "evidence": {
         "lowest": 10,
@@ -5779,6 +5992,7 @@
         "instrumentCount": 5,
         "dominance": 0.25
       },
+      "classifierRole": "bass",
       "instrumentName": "Instrument 24",
       "nameHint": null,
       "proposed": "unclear",
@@ -5790,7 +6004,7 @@
       "orderIndex": 7,
       "patternIndex": 7,
       "channelIndex": 6,
-      "channelName": "Bass 5",
+      "channelName": "Skank 1",
       "silent": false,
       "evidence": {
         "lowest": 10,
@@ -5811,6 +6025,7 @@
         "instrumentCount": 5,
         "dominance": 0.33
       },
+      "classifierRole": "skank",
       "instrumentName": "Instrument 27",
       "nameHint": null,
       "proposed": "bass-or-low-perc",
@@ -5822,9 +6037,10 @@
       "orderIndex": 7,
       "patternIndex": 7,
       "channelIndex": 7,
-      "channelName": "Bass 6",
+      "channelName": "Skank 2",
       "silent": true,
       "evidence": null,
+      "classifierRole": "skank",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -5836,9 +6052,10 @@
       "orderIndex": 7,
       "patternIndex": 7,
       "channelIndex": 8,
-      "channelName": "Bass 7",
+      "channelName": "Skank 3",
       "silent": true,
       "evidence": null,
+      "classifierRole": "skank",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -5853,6 +6070,7 @@
       "channelName": "Pad",
       "silent": true,
       "evidence": null,
+      "classifierRole": "pad",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -5864,9 +6082,10 @@
       "orderIndex": 7,
       "patternIndex": 7,
       "channelIndex": 10,
-      "channelName": "Bass 8",
+      "channelName": "Bass 3",
       "silent": true,
       "evidence": null,
+      "classifierRole": "bass",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -5878,9 +6097,10 @@
       "orderIndex": 7,
       "patternIndex": 7,
       "channelIndex": 11,
-      "channelName": "Sub Bass 3",
+      "channelName": "Hi-Hat 2",
       "silent": true,
       "evidence": null,
+      "classifierRole": "percussion",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -5892,9 +6112,10 @@
       "orderIndex": 7,
       "patternIndex": 7,
       "channelIndex": 12,
-      "channelName": "Sub Bass 4",
+      "channelName": "Sub Bass 3",
       "silent": true,
       "evidence": null,
+      "classifierRole": "bass",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -5906,7 +6127,7 @@
       "orderIndex": 7,
       "patternIndex": 7,
       "channelIndex": 13,
-      "channelName": "Sub Bass 5",
+      "channelName": "Sub Bass 4",
       "silent": false,
       "evidence": {
         "lowest": 1,
@@ -5927,6 +6148,7 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "bass",
       "instrumentName": "Instrument 29",
       "nameHint": null,
       "proposed": "bass-or-low-perc",
@@ -5938,7 +6160,7 @@
       "orderIndex": 7,
       "patternIndex": 7,
       "channelIndex": 14,
-      "channelName": "Bass 9",
+      "channelName": "Bass 4",
       "silent": false,
       "evidence": {
         "lowest": 37,
@@ -5959,6 +6181,7 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "bass",
       "instrumentName": "digital & hopefuly",
       "nameHint": null,
       "proposed": "unclear",
@@ -5970,7 +6193,7 @@
       "orderIndex": 7,
       "patternIndex": 7,
       "channelIndex": 15,
-      "channelName": "Bass 10",
+      "channelName": "Kick 2",
       "silent": false,
       "evidence": {
         "lowest": 13,
@@ -5991,6 +6214,7 @@
         "instrumentCount": 4,
         "dominance": 0.33
       },
+      "classifierRole": "percussion",
       "instrumentName": "Instrument 4",
       "nameHint": null,
       "proposed": "unclear",
@@ -6002,7 +6226,7 @@
       "orderIndex": 0,
       "patternIndex": 2,
       "channelIndex": 0,
-      "channelName": "Kick 1",
+      "channelName": "Snare",
       "silent": false,
       "evidence": {
         "lowest": 40,
@@ -6023,8 +6247,9 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "percussion",
       "instrumentName": "jstdrumriff1",
-      "nameHint": null,
+      "nameHint": "percussion",
       "proposed": "unclear",
       "label": null
     },
@@ -6034,9 +6259,10 @@
       "orderIndex": 0,
       "patternIndex": 2,
       "channelIndex": 1,
-      "channelName": "Kick 2",
+      "channelName": "Kick",
       "silent": true,
       "evidence": null,
+      "classifierRole": "percussion",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -6048,7 +6274,7 @@
       "orderIndex": 0,
       "patternIndex": 2,
       "channelIndex": 2,
-      "channelName": "Kick 3",
+      "channelName": "Bass 1",
       "silent": false,
       "evidence": {
         "lowest": 23,
@@ -6069,8 +6295,9 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "bass",
       "instrumentName": "jstbell3",
-      "nameHint": null,
+      "nameHint": "chord-or-keys",
       "proposed": "skank",
       "label": null
     },
@@ -6080,7 +6307,7 @@
       "orderIndex": 0,
       "patternIndex": 2,
       "channelIndex": 3,
-      "channelName": "Kick 4",
+      "channelName": "Bass 2",
       "silent": false,
       "evidence": {
         "lowest": 25,
@@ -6101,8 +6328,9 @@
         "instrumentCount": 3,
         "dominance": 0.44
       },
+      "classifierRole": "bass",
       "instrumentName": "jsttom1",
-      "nameHint": null,
+      "nameHint": "percussion",
       "proposed": "unclear",
       "label": null
     },
@@ -6112,7 +6340,7 @@
       "orderIndex": 1,
       "patternIndex": 1,
       "channelIndex": 0,
-      "channelName": "Kick 1",
+      "channelName": "Snare",
       "silent": false,
       "evidence": {
         "lowest": 40,
@@ -6133,8 +6361,9 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "percussion",
       "instrumentName": "jstdrumriff1",
-      "nameHint": null,
+      "nameHint": "percussion",
       "proposed": "percussion-or-pulse",
       "label": null
     },
@@ -6144,7 +6373,7 @@
       "orderIndex": 1,
       "patternIndex": 1,
       "channelIndex": 1,
-      "channelName": "Kick 2",
+      "channelName": "Kick",
       "silent": false,
       "evidence": {
         "lowest": 37,
@@ -6165,8 +6394,9 @@
         "instrumentCount": 2,
         "dominance": 0.68
       },
+      "classifierRole": "percussion",
       "instrumentName": "jstbass5",
-      "nameHint": null,
+      "nameHint": "bass",
       "proposed": "arpeggio",
       "label": null
     },
@@ -6176,7 +6406,7 @@
       "orderIndex": 1,
       "patternIndex": 1,
       "channelIndex": 2,
-      "channelName": "Kick 3",
+      "channelName": "Bass 1",
       "silent": false,
       "evidence": {
         "lowest": 23,
@@ -6197,8 +6427,9 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "bass",
       "instrumentName": "jstbell3",
-      "nameHint": null,
+      "nameHint": "chord-or-keys",
       "proposed": "skank",
       "label": null
     },
@@ -6208,7 +6439,7 @@
       "orderIndex": 1,
       "patternIndex": 1,
       "channelIndex": 3,
-      "channelName": "Kick 4",
+      "channelName": "Bass 2",
       "silent": false,
       "evidence": {
         "lowest": 37,
@@ -6229,6 +6460,7 @@
         "instrumentCount": 2,
         "dominance": 0.65
       },
+      "classifierRole": "bass",
       "instrumentName": "jstminor",
       "nameHint": null,
       "proposed": "unclear",
@@ -6240,7 +6472,7 @@
       "orderIndex": 2,
       "patternIndex": 0,
       "channelIndex": 0,
-      "channelName": "Kick 1",
+      "channelName": "Snare",
       "silent": false,
       "evidence": {
         "lowest": 40,
@@ -6261,8 +6493,9 @@
         "instrumentCount": 2,
         "dominance": 0.94
       },
+      "classifierRole": "percussion",
       "instrumentName": "jstdrumriff1",
-      "nameHint": null,
+      "nameHint": "percussion",
       "proposed": "percussion-or-pulse",
       "label": null
     },
@@ -6272,7 +6505,7 @@
       "orderIndex": 2,
       "patternIndex": 0,
       "channelIndex": 1,
-      "channelName": "Kick 2",
+      "channelName": "Kick",
       "silent": false,
       "evidence": {
         "lowest": 37,
@@ -6293,8 +6526,9 @@
         "instrumentCount": 2,
         "dominance": 0.66
       },
+      "classifierRole": "percussion",
       "instrumentName": "jstbass5",
-      "nameHint": null,
+      "nameHint": "bass",
       "proposed": "arpeggio",
       "label": null
     },
@@ -6304,7 +6538,7 @@
       "orderIndex": 2,
       "patternIndex": 0,
       "channelIndex": 2,
-      "channelName": "Kick 3",
+      "channelName": "Bass 1",
       "silent": false,
       "evidence": {
         "lowest": 23,
@@ -6325,8 +6559,9 @@
         "instrumentCount": 2,
         "dominance": 0.97
       },
+      "classifierRole": "bass",
       "instrumentName": "jstbell3",
-      "nameHint": null,
+      "nameHint": "chord-or-keys",
       "proposed": "bass-or-low-perc",
       "label": null
     },
@@ -6336,7 +6571,7 @@
       "orderIndex": 2,
       "patternIndex": 0,
       "channelIndex": 3,
-      "channelName": "Kick 4",
+      "channelName": "Bass 2",
       "silent": false,
       "evidence": {
         "lowest": 25,
@@ -6357,8 +6592,9 @@
         "instrumentCount": 3,
         "dominance": 0.44
       },
+      "classifierRole": "bass",
       "instrumentName": "jsttom1",
-      "nameHint": null,
+      "nameHint": "percussion",
       "proposed": "unclear",
       "label": null
     },
@@ -6368,7 +6604,7 @@
       "orderIndex": 3,
       "patternIndex": 7,
       "channelIndex": 0,
-      "channelName": "Kick 1",
+      "channelName": "Snare",
       "silent": false,
       "evidence": {
         "lowest": 40,
@@ -6389,6 +6625,7 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "percussion",
       "instrumentName": "jsthatbdrum1",
       "nameHint": null,
       "proposed": "percussion-or-pulse",
@@ -6400,7 +6637,7 @@
       "orderIndex": 3,
       "patternIndex": 7,
       "channelIndex": 1,
-      "channelName": "Kick 2",
+      "channelName": "Kick",
       "silent": false,
       "evidence": {
         "lowest": 37,
@@ -6421,8 +6658,9 @@
         "instrumentCount": 2,
         "dominance": 0.74
       },
+      "classifierRole": "percussion",
       "instrumentName": "jstbass5",
-      "nameHint": null,
+      "nameHint": "bass",
       "proposed": "unclear",
       "label": null
     },
@@ -6432,7 +6670,7 @@
       "orderIndex": 3,
       "patternIndex": 7,
       "channelIndex": 2,
-      "channelName": "Kick 3",
+      "channelName": "Bass 1",
       "silent": false,
       "evidence": {
         "lowest": 37,
@@ -6453,6 +6691,7 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "bass",
       "instrumentName": "jstminor",
       "nameHint": null,
       "proposed": "unclear",
@@ -6464,7 +6703,7 @@
       "orderIndex": 3,
       "patternIndex": 7,
       "channelIndex": 3,
-      "channelName": "Kick 4",
+      "channelName": "Bass 2",
       "silent": false,
       "evidence": {
         "lowest": 37,
@@ -6485,6 +6724,7 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "bass",
       "instrumentName": "jstspacesynth3",
       "nameHint": null,
       "proposed": "unclear",
@@ -6496,7 +6736,7 @@
       "orderIndex": 4,
       "patternIndex": 9,
       "channelIndex": 0,
-      "channelName": "Kick 1",
+      "channelName": "Snare",
       "silent": false,
       "evidence": {
         "lowest": 40,
@@ -6517,6 +6757,7 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "percussion",
       "instrumentName": "jsthatbdrum1",
       "nameHint": null,
       "proposed": "percussion-or-pulse",
@@ -6528,7 +6769,7 @@
       "orderIndex": 4,
       "patternIndex": 9,
       "channelIndex": 1,
-      "channelName": "Kick 2",
+      "channelName": "Kick",
       "silent": false,
       "evidence": {
         "lowest": 37,
@@ -6549,8 +6790,9 @@
         "instrumentCount": 2,
         "dominance": 0.68
       },
+      "classifierRole": "percussion",
       "instrumentName": "jstbass5",
-      "nameHint": null,
+      "nameHint": "bass",
       "proposed": "arpeggio",
       "label": null
     },
@@ -6560,7 +6802,7 @@
       "orderIndex": 4,
       "patternIndex": 9,
       "channelIndex": 2,
-      "channelName": "Kick 3",
+      "channelName": "Bass 1",
       "silent": false,
       "evidence": {
         "lowest": 37,
@@ -6581,6 +6823,7 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "bass",
       "instrumentName": "jstminor",
       "nameHint": null,
       "proposed": "unclear",
@@ -6592,7 +6835,7 @@
       "orderIndex": 4,
       "patternIndex": 9,
       "channelIndex": 3,
-      "channelName": "Kick 4",
+      "channelName": "Bass 2",
       "silent": false,
       "evidence": {
         "lowest": 37,
@@ -6613,6 +6856,7 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "bass",
       "instrumentName": "jstspacesynth3",
       "nameHint": null,
       "proposed": "unclear",
@@ -6624,7 +6868,7 @@
       "orderIndex": 5,
       "patternIndex": 10,
       "channelIndex": 0,
-      "channelName": "Kick 1",
+      "channelName": "Snare",
       "silent": false,
       "evidence": {
         "lowest": 40,
@@ -6645,8 +6889,9 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "percussion",
       "instrumentName": "jstdrumriff1",
-      "nameHint": null,
+      "nameHint": "percussion",
       "proposed": "percussion-or-pulse",
       "label": null
     },
@@ -6656,7 +6901,7 @@
       "orderIndex": 5,
       "patternIndex": 10,
       "channelIndex": 1,
-      "channelName": "Kick 2",
+      "channelName": "Kick",
       "silent": false,
       "evidence": {
         "lowest": 37,
@@ -6677,8 +6922,9 @@
         "instrumentCount": 2,
         "dominance": 0.68
       },
+      "classifierRole": "percussion",
       "instrumentName": "jstbass5",
-      "nameHint": null,
+      "nameHint": "bass",
       "proposed": "arpeggio",
       "label": null
     },
@@ -6688,7 +6934,7 @@
       "orderIndex": 5,
       "patternIndex": 10,
       "channelIndex": 2,
-      "channelName": "Kick 3",
+      "channelName": "Bass 1",
       "silent": false,
       "evidence": {
         "lowest": 23,
@@ -6709,8 +6955,9 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "bass",
       "instrumentName": "jstbell3",
-      "nameHint": null,
+      "nameHint": "chord-or-keys",
       "proposed": "skank",
       "label": null
     },
@@ -6720,7 +6967,7 @@
       "orderIndex": 5,
       "patternIndex": 10,
       "channelIndex": 3,
-      "channelName": "Kick 4",
+      "channelName": "Bass 2",
       "silent": false,
       "evidence": {
         "lowest": 37,
@@ -6741,6 +6988,7 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "bass",
       "instrumentName": "jstspacesynth3",
       "nameHint": null,
       "proposed": "unclear",
@@ -6752,7 +7000,7 @@
       "orderIndex": 6,
       "patternIndex": 11,
       "channelIndex": 0,
-      "channelName": "Kick 1",
+      "channelName": "Snare",
       "silent": false,
       "evidence": {
         "lowest": 40,
@@ -6773,8 +7021,9 @@
         "instrumentCount": 2,
         "dominance": 0.94
       },
+      "classifierRole": "percussion",
       "instrumentName": "jstdrumriff1",
-      "nameHint": null,
+      "nameHint": "percussion",
       "proposed": "percussion-or-pulse",
       "label": null
     },
@@ -6784,7 +7033,7 @@
       "orderIndex": 6,
       "patternIndex": 11,
       "channelIndex": 1,
-      "channelName": "Kick 2",
+      "channelName": "Kick",
       "silent": false,
       "evidence": {
         "lowest": 37,
@@ -6805,8 +7054,9 @@
         "instrumentCount": 2,
         "dominance": 0.65
       },
+      "classifierRole": "percussion",
       "instrumentName": "jstbass5",
-      "nameHint": null,
+      "nameHint": "bass",
       "proposed": "arpeggio",
       "label": null
     },
@@ -6816,7 +7066,7 @@
       "orderIndex": 6,
       "patternIndex": 11,
       "channelIndex": 2,
-      "channelName": "Kick 3",
+      "channelName": "Bass 1",
       "silent": false,
       "evidence": {
         "lowest": 23,
@@ -6837,8 +7087,9 @@
         "instrumentCount": 2,
         "dominance": 0.97
       },
+      "classifierRole": "bass",
       "instrumentName": "jstbell3",
-      "nameHint": null,
+      "nameHint": "chord-or-keys",
       "proposed": "skank",
       "label": null
     },
@@ -6848,7 +7099,7 @@
       "orderIndex": 6,
       "patternIndex": 11,
       "channelIndex": 3,
-      "channelName": "Kick 4",
+      "channelName": "Bass 2",
       "silent": false,
       "evidence": {
         "lowest": 25,
@@ -6869,8 +7120,9 @@
         "instrumentCount": 2,
         "dominance": 0.79
       },
+      "classifierRole": "bass",
       "instrumentName": "jsttom1",
-      "nameHint": null,
+      "nameHint": "percussion",
       "proposed": "unclear",
       "label": null
     },
@@ -6880,7 +7132,7 @@
       "orderIndex": 7,
       "patternIndex": 3,
       "channelIndex": 0,
-      "channelName": "Kick 1",
+      "channelName": "Snare",
       "silent": false,
       "evidence": {
         "lowest": 40,
@@ -6901,6 +7153,7 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "percussion",
       "instrumentName": "jsthatbdrum1",
       "nameHint": null,
       "proposed": "percussion-or-pulse",
@@ -6912,7 +7165,7 @@
       "orderIndex": 7,
       "patternIndex": 3,
       "channelIndex": 1,
-      "channelName": "Kick 2",
+      "channelName": "Kick",
       "silent": false,
       "evidence": {
         "lowest": 34,
@@ -6933,8 +7186,9 @@
         "instrumentCount": 2,
         "dominance": 0.74
       },
+      "classifierRole": "percussion",
       "instrumentName": "jstbass5",
-      "nameHint": null,
+      "nameHint": "bass",
       "proposed": "arpeggio",
       "label": null
     },
@@ -6944,7 +7198,7 @@
       "orderIndex": 7,
       "patternIndex": 3,
       "channelIndex": 2,
-      "channelName": "Kick 3",
+      "channelName": "Bass 1",
       "silent": false,
       "evidence": {
         "lowest": 34,
@@ -6965,6 +7219,7 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "bass",
       "instrumentName": "jstharpsi1",
       "nameHint": null,
       "proposed": "unclear",
@@ -6976,7 +7231,7 @@
       "orderIndex": 7,
       "patternIndex": 3,
       "channelIndex": 3,
-      "channelName": "Kick 4",
+      "channelName": "Bass 2",
       "silent": false,
       "evidence": {
         "lowest": 30,
@@ -6997,6 +7252,7 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "bass",
       "instrumentName": "jstspacesynth3",
       "nameHint": null,
       "proposed": "unclear",
@@ -7008,7 +7264,7 @@
       "orderIndex": 0,
       "patternIndex": 3,
       "channelIndex": 0,
-      "channelName": "Kick 1",
+      "channelName": "Sub Bass",
       "silent": false,
       "evidence": {
         "lowest": 49,
@@ -7029,6 +7285,7 @@
         "instrumentCount": 4,
         "dominance": 0.33
       },
+      "classifierRole": "bass",
       "instrumentName": "GRUNGY.WAV",
       "nameHint": null,
       "proposed": "unclear",
@@ -7040,7 +7297,7 @@
       "orderIndex": 0,
       "patternIndex": 3,
       "channelIndex": 1,
-      "channelName": "Kick 2",
+      "channelName": "Kick",
       "silent": false,
       "evidence": {
         "lowest": 49,
@@ -7061,6 +7318,7 @@
         "instrumentCount": 9,
         "dominance": 0.26
       },
+      "classifierRole": "percussion",
       "instrumentName": "ELECG4.WAV",
       "nameHint": null,
       "proposed": "arpeggio",
@@ -7072,7 +7330,7 @@
       "orderIndex": 0,
       "patternIndex": 3,
       "channelIndex": 2,
-      "channelName": "Kick 3",
+      "channelName": "Chords",
       "silent": false,
       "evidence": {
         "lowest": 27,
@@ -7093,6 +7351,7 @@
         "instrumentCount": 4,
         "dominance": 0.4
       },
+      "classifierRole": "chord",
       "instrumentName": "SAWSYN_2.WAV",
       "nameHint": null,
       "proposed": "stab-or-fx",
@@ -7104,7 +7363,7 @@
       "orderIndex": 0,
       "patternIndex": 3,
       "channelIndex": 3,
-      "channelName": "Kick 4",
+      "channelName": "Pad",
       "silent": false,
       "evidence": {
         "lowest": 49,
@@ -7125,6 +7384,7 @@
         "instrumentCount": 10,
         "dominance": 0.23
       },
+      "classifierRole": "pad",
       "instrumentName": "ELECG4.WAV",
       "nameHint": null,
       "proposed": "arpeggio",
@@ -7136,7 +7396,7 @@
       "orderIndex": 1,
       "patternIndex": 4,
       "channelIndex": 0,
-      "channelName": "Kick 1",
+      "channelName": "Sub Bass",
       "silent": false,
       "evidence": {
         "lowest": 49,
@@ -7157,6 +7417,7 @@
         "instrumentCount": 3,
         "dominance": 0.38
       },
+      "classifierRole": "bass",
       "instrumentName": "DRY09.WAV",
       "nameHint": null,
       "proposed": "arpeggio",
@@ -7168,7 +7429,7 @@
       "orderIndex": 1,
       "patternIndex": 4,
       "channelIndex": 1,
-      "channelName": "Kick 2",
+      "channelName": "Kick",
       "silent": false,
       "evidence": {
         "lowest": 49,
@@ -7189,6 +7450,7 @@
         "instrumentCount": 9,
         "dominance": 0.26
       },
+      "classifierRole": "percussion",
       "instrumentName": "ELECG4.WAV",
       "nameHint": null,
       "proposed": "arpeggio",
@@ -7200,7 +7462,7 @@
       "orderIndex": 1,
       "patternIndex": 4,
       "channelIndex": 2,
-      "channelName": "Kick 3",
+      "channelName": "Chords",
       "silent": false,
       "evidence": {
         "lowest": 39,
@@ -7221,6 +7483,7 @@
         "instrumentCount": 3,
         "dominance": 0.57
       },
+      "classifierRole": "chord",
       "instrumentName": "SAWSYN_2.WAV",
       "nameHint": null,
       "proposed": "unclear",
@@ -7232,7 +7495,7 @@
       "orderIndex": 1,
       "patternIndex": 4,
       "channelIndex": 3,
-      "channelName": "Kick 4",
+      "channelName": "Pad",
       "silent": false,
       "evidence": {
         "lowest": 39,
@@ -7253,6 +7516,7 @@
         "instrumentCount": 6,
         "dominance": 0.26
       },
+      "classifierRole": "pad",
       "instrumentName": "EE6107~1.WAV",
       "nameHint": null,
       "proposed": "unclear",
@@ -7264,7 +7528,7 @@
       "orderIndex": 2,
       "patternIndex": 5,
       "channelIndex": 0,
-      "channelName": "Kick 1",
+      "channelName": "Sub Bass",
       "silent": false,
       "evidence": {
         "lowest": 49,
@@ -7285,6 +7549,7 @@
         "instrumentCount": 4,
         "dominance": 0.38
       },
+      "classifierRole": "bass",
       "instrumentName": "DRY09.WAV",
       "nameHint": null,
       "proposed": "arpeggio",
@@ -7296,7 +7561,7 @@
       "orderIndex": 2,
       "patternIndex": 5,
       "channelIndex": 1,
-      "channelName": "Kick 2",
+      "channelName": "Kick",
       "silent": false,
       "evidence": {
         "lowest": 51,
@@ -7317,6 +7582,7 @@
         "instrumentCount": 9,
         "dominance": 0.25
       },
+      "classifierRole": "percussion",
       "instrumentName": "ELECG4.WAV",
       "nameHint": null,
       "proposed": "arpeggio",
@@ -7328,7 +7594,7 @@
       "orderIndex": 2,
       "patternIndex": 5,
       "channelIndex": 2,
-      "channelName": "Kick 3",
+      "channelName": "Chords",
       "silent": false,
       "evidence": {
         "lowest": 37,
@@ -7349,6 +7615,7 @@
         "instrumentCount": 5,
         "dominance": 0.38
       },
+      "classifierRole": "chord",
       "instrumentName": "NORMAL~2.WAV",
       "nameHint": null,
       "proposed": "unclear",
@@ -7360,7 +7627,7 @@
       "orderIndex": 2,
       "patternIndex": 5,
       "channelIndex": 3,
-      "channelName": "Kick 4",
+      "channelName": "Pad",
       "silent": false,
       "evidence": {
         "lowest": 49,
@@ -7381,6 +7648,7 @@
         "instrumentCount": 3,
         "dominance": 0.91
       },
+      "classifierRole": "pad",
       "instrumentName": "RIDE.WAV",
       "nameHint": "percussion",
       "proposed": "arpeggio",
@@ -7392,7 +7660,7 @@
       "orderIndex": 3,
       "patternIndex": 5,
       "channelIndex": 0,
-      "channelName": "Kick 1",
+      "channelName": "Sub Bass",
       "silent": false,
       "evidence": {
         "lowest": 49,
@@ -7413,6 +7681,7 @@
         "instrumentCount": 4,
         "dominance": 0.38
       },
+      "classifierRole": "bass",
       "instrumentName": "DRY09.WAV",
       "nameHint": null,
       "proposed": "arpeggio",
@@ -7424,7 +7693,7 @@
       "orderIndex": 3,
       "patternIndex": 5,
       "channelIndex": 1,
-      "channelName": "Kick 2",
+      "channelName": "Kick",
       "silent": false,
       "evidence": {
         "lowest": 51,
@@ -7445,6 +7714,7 @@
         "instrumentCount": 9,
         "dominance": 0.25
       },
+      "classifierRole": "percussion",
       "instrumentName": "ELECG4.WAV",
       "nameHint": null,
       "proposed": "arpeggio",
@@ -7456,7 +7726,7 @@
       "orderIndex": 3,
       "patternIndex": 5,
       "channelIndex": 2,
-      "channelName": "Kick 3",
+      "channelName": "Chords",
       "silent": false,
       "evidence": {
         "lowest": 37,
@@ -7477,6 +7747,7 @@
         "instrumentCount": 5,
         "dominance": 0.38
       },
+      "classifierRole": "chord",
       "instrumentName": "NORMAL~2.WAV",
       "nameHint": null,
       "proposed": "unclear",
@@ -7488,7 +7759,7 @@
       "orderIndex": 3,
       "patternIndex": 5,
       "channelIndex": 3,
-      "channelName": "Kick 4",
+      "channelName": "Pad",
       "silent": false,
       "evidence": {
         "lowest": 49,
@@ -7509,6 +7780,7 @@
         "instrumentCount": 3,
         "dominance": 0.91
       },
+      "classifierRole": "pad",
       "instrumentName": "RIDE.WAV",
       "nameHint": "percussion",
       "proposed": "arpeggio",
@@ -7520,7 +7792,7 @@
       "orderIndex": 4,
       "patternIndex": 9,
       "channelIndex": 0,
-      "channelName": "Kick 1",
+      "channelName": "Sub Bass",
       "silent": false,
       "evidence": {
         "lowest": 39,
@@ -7541,6 +7813,7 @@
         "instrumentCount": 5,
         "dominance": 0.41
       },
+      "classifierRole": "bass",
       "instrumentName": "REAL2.WAV",
       "nameHint": null,
       "proposed": "arpeggio",
@@ -7552,7 +7825,7 @@
       "orderIndex": 4,
       "patternIndex": 9,
       "channelIndex": 1,
-      "channelName": "Kick 2",
+      "channelName": "Kick",
       "silent": false,
       "evidence": {
         "lowest": 51,
@@ -7573,6 +7846,7 @@
         "instrumentCount": 6,
         "dominance": 0.28
       },
+      "classifierRole": "percussion",
       "instrumentName": "ELECG9.WAV",
       "nameHint": null,
       "proposed": "arpeggio",
@@ -7584,7 +7858,7 @@
       "orderIndex": 4,
       "patternIndex": 9,
       "channelIndex": 2,
-      "channelName": "Kick 3",
+      "channelName": "Chords",
       "silent": false,
       "evidence": {
         "lowest": 49,
@@ -7605,6 +7879,7 @@
         "instrumentCount": 3,
         "dominance": 0.75
       },
+      "classifierRole": "chord",
       "instrumentName": "OPENB.WAV",
       "nameHint": null,
       "proposed": "unclear",
@@ -7616,7 +7891,7 @@
       "orderIndex": 4,
       "patternIndex": 9,
       "channelIndex": 3,
-      "channelName": "Kick 4",
+      "channelName": "Pad",
       "silent": false,
       "evidence": {
         "lowest": 46,
@@ -7637,8 +7912,9 @@
         "instrumentCount": 2,
         "dominance": 0.51
       },
+      "classifierRole": "pad",
       "instrumentName": "WAHBASS2.WAV",
-      "nameHint": null,
+      "nameHint": "bass",
       "proposed": "unclear",
       "label": null
     },
@@ -7648,7 +7924,7 @@
       "orderIndex": 5,
       "patternIndex": 12,
       "channelIndex": 0,
-      "channelName": "Kick 1",
+      "channelName": "Sub Bass",
       "silent": false,
       "evidence": {
         "lowest": 39,
@@ -7669,6 +7945,7 @@
         "instrumentCount": 5,
         "dominance": 0.41
       },
+      "classifierRole": "bass",
       "instrumentName": "REAL2.WAV",
       "nameHint": null,
       "proposed": "arpeggio",
@@ -7680,7 +7957,7 @@
       "orderIndex": 5,
       "patternIndex": 12,
       "channelIndex": 1,
-      "channelName": "Kick 2",
+      "channelName": "Kick",
       "silent": false,
       "evidence": {
         "lowest": 51,
@@ -7701,6 +7978,7 @@
         "instrumentCount": 7,
         "dominance": 0.28
       },
+      "classifierRole": "percussion",
       "instrumentName": "ELECG8.WAV",
       "nameHint": null,
       "proposed": "arpeggio",
@@ -7712,7 +7990,7 @@
       "orderIndex": 5,
       "patternIndex": 12,
       "channelIndex": 2,
-      "channelName": "Kick 3",
+      "channelName": "Chords",
       "silent": false,
       "evidence": {
         "lowest": 49,
@@ -7733,6 +8011,7 @@
         "instrumentCount": 3,
         "dominance": 0.75
       },
+      "classifierRole": "chord",
       "instrumentName": "OPENB.WAV",
       "nameHint": null,
       "proposed": "unclear",
@@ -7744,7 +8023,7 @@
       "orderIndex": 5,
       "patternIndex": 12,
       "channelIndex": 3,
-      "channelName": "Kick 4",
+      "channelName": "Pad",
       "silent": false,
       "evidence": {
         "lowest": 46,
@@ -7765,8 +8044,9 @@
         "instrumentCount": 2,
         "dominance": 0.51
       },
+      "classifierRole": "pad",
       "instrumentName": "WAHBASS2.WAV",
-      "nameHint": null,
+      "nameHint": "bass",
       "proposed": "unclear",
       "label": null
     },
@@ -7776,7 +8056,7 @@
       "orderIndex": 6,
       "patternIndex": 5,
       "channelIndex": 0,
-      "channelName": "Kick 1",
+      "channelName": "Sub Bass",
       "silent": false,
       "evidence": {
         "lowest": 49,
@@ -7797,6 +8077,7 @@
         "instrumentCount": 4,
         "dominance": 0.38
       },
+      "classifierRole": "bass",
       "instrumentName": "DRY09.WAV",
       "nameHint": null,
       "proposed": "arpeggio",
@@ -7808,7 +8089,7 @@
       "orderIndex": 6,
       "patternIndex": 5,
       "channelIndex": 1,
-      "channelName": "Kick 2",
+      "channelName": "Kick",
       "silent": false,
       "evidence": {
         "lowest": 51,
@@ -7829,6 +8110,7 @@
         "instrumentCount": 9,
         "dominance": 0.25
       },
+      "classifierRole": "percussion",
       "instrumentName": "ELECG4.WAV",
       "nameHint": null,
       "proposed": "arpeggio",
@@ -7840,7 +8122,7 @@
       "orderIndex": 6,
       "patternIndex": 5,
       "channelIndex": 2,
-      "channelName": "Kick 3",
+      "channelName": "Chords",
       "silent": false,
       "evidence": {
         "lowest": 37,
@@ -7861,6 +8143,7 @@
         "instrumentCount": 5,
         "dominance": 0.38
       },
+      "classifierRole": "chord",
       "instrumentName": "NORMAL~2.WAV",
       "nameHint": null,
       "proposed": "unclear",
@@ -7872,7 +8155,7 @@
       "orderIndex": 6,
       "patternIndex": 5,
       "channelIndex": 3,
-      "channelName": "Kick 4",
+      "channelName": "Pad",
       "silent": false,
       "evidence": {
         "lowest": 49,
@@ -7893,6 +8176,7 @@
         "instrumentCount": 3,
         "dominance": 0.91
       },
+      "classifierRole": "pad",
       "instrumentName": "RIDE.WAV",
       "nameHint": "percussion",
       "proposed": "arpeggio",
@@ -7904,7 +8188,7 @@
       "orderIndex": 7,
       "patternIndex": 8,
       "channelIndex": 0,
-      "channelName": "Kick 1",
+      "channelName": "Sub Bass",
       "silent": false,
       "evidence": {
         "lowest": 49,
@@ -7925,6 +8209,7 @@
         "instrumentCount": 4,
         "dominance": 0.37
       },
+      "classifierRole": "bass",
       "instrumentName": "DRY09.WAV",
       "nameHint": null,
       "proposed": "arpeggio",
@@ -7936,7 +8221,7 @@
       "orderIndex": 7,
       "patternIndex": 8,
       "channelIndex": 1,
-      "channelName": "Kick 2",
+      "channelName": "Kick",
       "silent": false,
       "evidence": {
         "lowest": 51,
@@ -7957,6 +8242,7 @@
         "instrumentCount": 9,
         "dominance": 0.25
       },
+      "classifierRole": "percussion",
       "instrumentName": "ELECG4.WAV",
       "nameHint": null,
       "proposed": "arpeggio",
@@ -7968,7 +8254,7 @@
       "orderIndex": 7,
       "patternIndex": 8,
       "channelIndex": 2,
-      "channelName": "Kick 3",
+      "channelName": "Chords",
       "silent": false,
       "evidence": {
         "lowest": 37,
@@ -7989,6 +8275,7 @@
         "instrumentCount": 5,
         "dominance": 0.53
       },
+      "classifierRole": "chord",
       "instrumentName": "NORMAL~2.WAV",
       "nameHint": null,
       "proposed": "unclear",
@@ -8000,7 +8287,7 @@
       "orderIndex": 7,
       "patternIndex": 8,
       "channelIndex": 3,
-      "channelName": "Kick 4",
+      "channelName": "Pad",
       "silent": false,
       "evidence": {
         "lowest": 49,
@@ -8021,6 +8308,7 @@
         "instrumentCount": 3,
         "dominance": 0.91
       },
+      "classifierRole": "pad",
       "instrumentName": "RIDE.WAV",
       "nameHint": "percussion",
       "proposed": "arpeggio",
@@ -8053,6 +8341,7 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "arpeggio",
       "instrumentName": "POWER_01.WAV",
       "nameHint": null,
       "proposed": "unclear",
@@ -8085,6 +8374,7 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "bass",
       "instrumentName": "POWER_01.WAV",
       "nameHint": null,
       "proposed": "unclear",
@@ -8117,6 +8407,7 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "pad",
       "instrumentName": "POWER_01.WAV",
       "nameHint": null,
       "proposed": "unclear",
@@ -8149,6 +8440,7 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "percussion",
       "instrumentName": "POWER_01.WAV",
       "nameHint": null,
       "proposed": "unclear",
@@ -8181,6 +8473,7 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "percussion",
       "instrumentName": "Instrument 12",
       "nameHint": null,
       "proposed": "unclear",
@@ -8195,6 +8488,7 @@
       "channelName": "Ch 6",
       "silent": true,
       "evidence": null,
+      "classifierRole": "pad",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -8209,6 +8503,7 @@
       "channelName": "Ch 7",
       "silent": true,
       "evidence": null,
+      "classifierRole": "bass",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -8223,6 +8518,7 @@
       "channelName": "Ch 8",
       "silent": true,
       "evidence": null,
+      "classifierRole": "pad",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -8237,6 +8533,7 @@
       "channelName": "Ch 9",
       "silent": true,
       "evidence": null,
+      "classifierRole": "pad",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -8251,6 +8548,7 @@
       "channelName": "Ch 10",
       "silent": true,
       "evidence": null,
+      "classifierRole": "bass",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -8265,6 +8563,7 @@
       "channelName": "Ch 11",
       "silent": true,
       "evidence": null,
+      "classifierRole": "bass",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -8279,6 +8578,7 @@
       "channelName": "Ch 12",
       "silent": true,
       "evidence": null,
+      "classifierRole": "pad",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -8293,6 +8593,7 @@
       "channelName": "Ch 13",
       "silent": true,
       "evidence": null,
+      "classifierRole": "pad",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -8307,6 +8608,7 @@
       "channelName": "Ch 14",
       "silent": true,
       "evidence": null,
+      "classifierRole": "lead",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -8321,6 +8623,7 @@
       "channelName": "Ch 15",
       "silent": true,
       "evidence": null,
+      "classifierRole": "bass",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -8335,6 +8638,7 @@
       "channelName": "Ch 16",
       "silent": true,
       "evidence": null,
+      "classifierRole": "pad",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -8349,6 +8653,7 @@
       "channelName": "Ch 17",
       "silent": true,
       "evidence": null,
+      "classifierRole": "percussion",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -8363,6 +8668,7 @@
       "channelName": "Ch 18",
       "silent": true,
       "evidence": null,
+      "classifierRole": "pad",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -8377,6 +8683,7 @@
       "channelName": "Ch 19",
       "silent": true,
       "evidence": null,
+      "classifierRole": "percussion",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -8391,6 +8698,7 @@
       "channelName": "Ch 20",
       "silent": true,
       "evidence": null,
+      "classifierRole": "pad",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -8405,6 +8713,7 @@
       "channelName": "Ch 21",
       "silent": true,
       "evidence": null,
+      "classifierRole": "pad",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -8419,6 +8728,7 @@
       "channelName": "Ch 22",
       "silent": true,
       "evidence": null,
+      "classifierRole": "chord",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -8433,6 +8743,7 @@
       "channelName": "Ch 23",
       "silent": true,
       "evidence": null,
+      "classifierRole": "bass",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -8447,6 +8758,7 @@
       "channelName": "Ch 24",
       "silent": true,
       "evidence": null,
+      "classifierRole": "pad",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -8461,6 +8773,7 @@
       "channelName": "Ch 25",
       "silent": true,
       "evidence": null,
+      "classifierRole": "pad",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -8493,6 +8806,7 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "arpeggio",
       "instrumentName": "POWER_01.WAV",
       "nameHint": null,
       "proposed": "unclear",
@@ -8525,6 +8839,7 @@
         "instrumentCount": 2,
         "dominance": 0.5
       },
+      "classifierRole": "bass",
       "instrumentName": "CLASIC01.WAV",
       "nameHint": null,
       "proposed": "percussion-or-pulse",
@@ -8557,6 +8872,7 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "pad",
       "instrumentName": "SHORTY.WAV",
       "nameHint": null,
       "proposed": "arpeggio",
@@ -8589,6 +8905,7 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "percussion",
       "instrumentName": "HIHATS.WAV",
       "nameHint": "hat",
       "proposed": "arpeggio",
@@ -8621,6 +8938,7 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "percussion",
       "instrumentName": "HIHATS.WAV",
       "nameHint": "hat",
       "proposed": "arpeggio",
@@ -8635,6 +8953,7 @@
       "channelName": "Ch 6",
       "silent": true,
       "evidence": null,
+      "classifierRole": "pad",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -8649,6 +8968,7 @@
       "channelName": "Ch 7",
       "silent": true,
       "evidence": null,
+      "classifierRole": "bass",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -8663,6 +8983,7 @@
       "channelName": "Ch 8",
       "silent": true,
       "evidence": null,
+      "classifierRole": "pad",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -8695,6 +9016,7 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "pad",
       "instrumentName": "Instrument 16",
       "nameHint": null,
       "proposed": "unclear",
@@ -8709,6 +9031,7 @@
       "channelName": "Ch 10",
       "silent": true,
       "evidence": null,
+      "classifierRole": "bass",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -8723,6 +9046,7 @@
       "channelName": "Ch 11",
       "silent": true,
       "evidence": null,
+      "classifierRole": "bass",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -8737,6 +9061,7 @@
       "channelName": "Ch 12",
       "silent": true,
       "evidence": null,
+      "classifierRole": "pad",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -8751,6 +9076,7 @@
       "channelName": "Ch 13",
       "silent": true,
       "evidence": null,
+      "classifierRole": "pad",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -8765,6 +9091,7 @@
       "channelName": "Ch 14",
       "silent": true,
       "evidence": null,
+      "classifierRole": "lead",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -8779,6 +9106,7 @@
       "channelName": "Ch 15",
       "silent": true,
       "evidence": null,
+      "classifierRole": "bass",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -8811,6 +9139,7 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "pad",
       "instrumentName": "Patterns",
       "nameHint": null,
       "proposed": "percussion-or-pulse",
@@ -8843,6 +9172,7 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "percussion",
       "instrumentName": "HIHATS.WAV",
       "nameHint": "hat",
       "proposed": "arpeggio",
@@ -8857,6 +9187,7 @@
       "channelName": "Ch 18",
       "silent": true,
       "evidence": null,
+      "classifierRole": "pad",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -8871,6 +9202,7 @@
       "channelName": "Ch 19",
       "silent": true,
       "evidence": null,
+      "classifierRole": "percussion",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -8885,6 +9217,7 @@
       "channelName": "Ch 20",
       "silent": true,
       "evidence": null,
+      "classifierRole": "pad",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -8899,6 +9232,7 @@
       "channelName": "Ch 21",
       "silent": true,
       "evidence": null,
+      "classifierRole": "pad",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -8913,6 +9247,7 @@
       "channelName": "Ch 22",
       "silent": true,
       "evidence": null,
+      "classifierRole": "chord",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -8927,6 +9262,7 @@
       "channelName": "Ch 23",
       "silent": true,
       "evidence": null,
+      "classifierRole": "bass",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -8941,6 +9277,7 @@
       "channelName": "Ch 24",
       "silent": true,
       "evidence": null,
+      "classifierRole": "pad",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -8955,6 +9292,7 @@
       "channelName": "Ch 25",
       "silent": true,
       "evidence": null,
+      "classifierRole": "pad",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -8987,6 +9325,7 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "arpeggio",
       "instrumentName": "POWER_01.WAV",
       "nameHint": null,
       "proposed": "unclear",
@@ -9019,6 +9358,7 @@
         "instrumentCount": 2,
         "dominance": 0.5
       },
+      "classifierRole": "bass",
       "instrumentName": "CLASIC01.WAV",
       "nameHint": null,
       "proposed": "percussion-or-pulse",
@@ -9051,6 +9391,7 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "pad",
       "instrumentName": "SHORTY.WAV",
       "nameHint": null,
       "proposed": "arpeggio",
@@ -9083,6 +9424,7 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "percussion",
       "instrumentName": "HIHATS.WAV",
       "nameHint": "hat",
       "proposed": "arpeggio",
@@ -9115,6 +9457,7 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "percussion",
       "instrumentName": "HIHATS.WAV",
       "nameHint": "hat",
       "proposed": "arpeggio",
@@ -9147,6 +9490,7 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "pad",
       "instrumentName": "DOWN1_C1.WAV",
       "nameHint": null,
       "proposed": "unclear",
@@ -9179,6 +9523,7 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "bass",
       "instrumentName": "DRY1_C1.WAV",
       "nameHint": null,
       "proposed": "unclear",
@@ -9211,8 +9556,9 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "pad",
       "instrumentName": "CLAP6.WAV",
-      "nameHint": null,
+      "nameHint": "clap",
       "proposed": "skank",
       "label": null
     },
@@ -9243,6 +9589,7 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "pad",
       "instrumentName": "Instrument 14",
       "nameHint": null,
       "proposed": "unclear",
@@ -9257,6 +9604,7 @@
       "channelName": "Ch 10",
       "silent": true,
       "evidence": null,
+      "classifierRole": "bass",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -9271,6 +9619,7 @@
       "channelName": "Ch 11",
       "silent": true,
       "evidence": null,
+      "classifierRole": "bass",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -9285,6 +9634,7 @@
       "channelName": "Ch 12",
       "silent": true,
       "evidence": null,
+      "classifierRole": "pad",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -9299,6 +9649,7 @@
       "channelName": "Ch 13",
       "silent": true,
       "evidence": null,
+      "classifierRole": "pad",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -9313,6 +9664,7 @@
       "channelName": "Ch 14",
       "silent": true,
       "evidence": null,
+      "classifierRole": "lead",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -9327,6 +9679,7 @@
       "channelName": "Ch 15",
       "silent": true,
       "evidence": null,
+      "classifierRole": "bass",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -9359,6 +9712,7 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "pad",
       "instrumentName": "Patterns",
       "nameHint": null,
       "proposed": "percussion-or-pulse",
@@ -9391,6 +9745,7 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "percussion",
       "instrumentName": "HIHATS.WAV",
       "nameHint": "hat",
       "proposed": "arpeggio",
@@ -9405,6 +9760,7 @@
       "channelName": "Ch 18",
       "silent": true,
       "evidence": null,
+      "classifierRole": "pad",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -9419,6 +9775,7 @@
       "channelName": "Ch 19",
       "silent": true,
       "evidence": null,
+      "classifierRole": "percussion",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -9433,6 +9790,7 @@
       "channelName": "Ch 20",
       "silent": true,
       "evidence": null,
+      "classifierRole": "pad",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -9447,6 +9805,7 @@
       "channelName": "Ch 21",
       "silent": true,
       "evidence": null,
+      "classifierRole": "pad",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -9461,6 +9820,7 @@
       "channelName": "Ch 22",
       "silent": true,
       "evidence": null,
+      "classifierRole": "chord",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -9475,6 +9835,7 @@
       "channelName": "Ch 23",
       "silent": true,
       "evidence": null,
+      "classifierRole": "bass",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -9489,6 +9850,7 @@
       "channelName": "Ch 24",
       "silent": true,
       "evidence": null,
+      "classifierRole": "pad",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -9503,6 +9865,7 @@
       "channelName": "Ch 25",
       "silent": true,
       "evidence": null,
+      "classifierRole": "pad",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -9535,6 +9898,7 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "arpeggio",
       "instrumentName": "CS1XFIL1.WAV",
       "nameHint": null,
       "proposed": "unclear",
@@ -9567,6 +9931,7 @@
         "instrumentCount": 2,
         "dominance": 0.5
       },
+      "classifierRole": "bass",
       "instrumentName": "CLASIC01.WAV",
       "nameHint": null,
       "proposed": "percussion-or-pulse",
@@ -9599,6 +9964,7 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "pad",
       "instrumentName": "SHORTY.WAV",
       "nameHint": null,
       "proposed": "arpeggio",
@@ -9631,6 +9997,7 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "percussion",
       "instrumentName": "HIHATS.WAV",
       "nameHint": "hat",
       "proposed": "arpeggio",
@@ -9663,6 +10030,7 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "percussion",
       "instrumentName": "HIHATS.WAV",
       "nameHint": "hat",
       "proposed": "arpeggio",
@@ -9695,6 +10063,7 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "pad",
       "instrumentName": "DOWN1_C1.WAV",
       "nameHint": null,
       "proposed": "unclear",
@@ -9727,6 +10096,7 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "bass",
       "instrumentName": "DRY1_C1.WAV",
       "nameHint": null,
       "proposed": "unclear",
@@ -9759,8 +10129,9 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "pad",
       "instrumentName": "CLAP6.WAV",
-      "nameHint": null,
+      "nameHint": "clap",
       "proposed": "skank",
       "label": null
     },
@@ -9791,6 +10162,7 @@
         "instrumentCount": 2,
         "dominance": 0.67
       },
+      "classifierRole": "pad",
       "instrumentName": "Instrument 11",
       "nameHint": null,
       "proposed": "skank",
@@ -9805,6 +10177,7 @@
       "channelName": "Ch 10",
       "silent": true,
       "evidence": null,
+      "classifierRole": "bass",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -9819,6 +10192,7 @@
       "channelName": "Ch 11",
       "silent": true,
       "evidence": null,
+      "classifierRole": "bass",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -9833,6 +10207,7 @@
       "channelName": "Ch 12",
       "silent": true,
       "evidence": null,
+      "classifierRole": "pad",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -9847,6 +10222,7 @@
       "channelName": "Ch 13",
       "silent": true,
       "evidence": null,
+      "classifierRole": "pad",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -9861,6 +10237,7 @@
       "channelName": "Ch 14",
       "silent": true,
       "evidence": null,
+      "classifierRole": "lead",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -9875,6 +10252,7 @@
       "channelName": "Ch 15",
       "silent": true,
       "evidence": null,
+      "classifierRole": "bass",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -9907,6 +10285,7 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "pad",
       "instrumentName": "Patterns",
       "nameHint": null,
       "proposed": "percussion-or-pulse",
@@ -9939,6 +10318,7 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "percussion",
       "instrumentName": "HIHATS.WAV",
       "nameHint": "hat",
       "proposed": "arpeggio",
@@ -9953,6 +10333,7 @@
       "channelName": "Ch 18",
       "silent": true,
       "evidence": null,
+      "classifierRole": "pad",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -9967,6 +10348,7 @@
       "channelName": "Ch 19",
       "silent": true,
       "evidence": null,
+      "classifierRole": "percussion",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -9981,6 +10363,7 @@
       "channelName": "Ch 20",
       "silent": true,
       "evidence": null,
+      "classifierRole": "pad",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -9995,6 +10378,7 @@
       "channelName": "Ch 21",
       "silent": true,
       "evidence": null,
+      "classifierRole": "pad",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -10009,6 +10393,7 @@
       "channelName": "Ch 22",
       "silent": true,
       "evidence": null,
+      "classifierRole": "chord",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -10023,6 +10408,7 @@
       "channelName": "Ch 23",
       "silent": true,
       "evidence": null,
+      "classifierRole": "bass",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -10037,6 +10423,7 @@
       "channelName": "Ch 24",
       "silent": true,
       "evidence": null,
+      "classifierRole": "pad",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -10051,6 +10438,7 @@
       "channelName": "Ch 25",
       "silent": true,
       "evidence": null,
+      "classifierRole": "pad",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -10083,6 +10471,7 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "arpeggio",
       "instrumentName": "POWER_01.WAV",
       "nameHint": null,
       "proposed": "unclear",
@@ -10115,6 +10504,7 @@
         "instrumentCount": 2,
         "dominance": 0.5
       },
+      "classifierRole": "bass",
       "instrumentName": "CLASIC01.WAV",
       "nameHint": null,
       "proposed": "percussion-or-pulse",
@@ -10147,6 +10537,7 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "pad",
       "instrumentName": "SHORTY.WAV",
       "nameHint": null,
       "proposed": "unclear",
@@ -10179,6 +10570,7 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "percussion",
       "instrumentName": "HIHATS.WAV",
       "nameHint": "hat",
       "proposed": "arpeggio",
@@ -10211,6 +10603,7 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "percussion",
       "instrumentName": "HIHATS.WAV",
       "nameHint": "hat",
       "proposed": "arpeggio",
@@ -10243,6 +10636,7 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "pad",
       "instrumentName": "DOWN1_C1.WAV",
       "nameHint": null,
       "proposed": "unclear",
@@ -10275,6 +10669,7 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "bass",
       "instrumentName": "DRY1_C1.WAV",
       "nameHint": null,
       "proposed": "unclear",
@@ -10307,8 +10702,9 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "pad",
       "instrumentName": "CLAP6.WAV",
-      "nameHint": null,
+      "nameHint": "clap",
       "proposed": "skank",
       "label": null
     },
@@ -10339,6 +10735,7 @@
         "instrumentCount": 2,
         "dominance": 0.96
       },
+      "classifierRole": "pad",
       "instrumentName": "Instrument 10",
       "nameHint": null,
       "proposed": "unclear",
@@ -10371,6 +10768,7 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "bass",
       "instrumentName": "Instrument 12",
       "nameHint": null,
       "proposed": "unclear",
@@ -10403,6 +10801,7 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "bass",
       "instrumentName": "Instrument 12",
       "nameHint": null,
       "proposed": "skank",
@@ -10417,6 +10816,7 @@
       "channelName": "Ch 12",
       "silent": true,
       "evidence": null,
+      "classifierRole": "pad",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -10431,6 +10831,7 @@
       "channelName": "Ch 13",
       "silent": true,
       "evidence": null,
+      "classifierRole": "pad",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -10445,6 +10846,7 @@
       "channelName": "Ch 14",
       "silent": true,
       "evidence": null,
+      "classifierRole": "lead",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -10459,6 +10861,7 @@
       "channelName": "Ch 15",
       "silent": true,
       "evidence": null,
+      "classifierRole": "bass",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -10491,6 +10894,7 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "pad",
       "instrumentName": "Patterns",
       "nameHint": null,
       "proposed": "percussion-or-pulse",
@@ -10523,6 +10927,7 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "percussion",
       "instrumentName": "HIHATS.WAV",
       "nameHint": "hat",
       "proposed": "arpeggio",
@@ -10537,6 +10942,7 @@
       "channelName": "Ch 18",
       "silent": true,
       "evidence": null,
+      "classifierRole": "pad",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -10551,6 +10957,7 @@
       "channelName": "Ch 19",
       "silent": true,
       "evidence": null,
+      "classifierRole": "percussion",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -10565,6 +10972,7 @@
       "channelName": "Ch 20",
       "silent": true,
       "evidence": null,
+      "classifierRole": "pad",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -10579,6 +10987,7 @@
       "channelName": "Ch 21",
       "silent": true,
       "evidence": null,
+      "classifierRole": "pad",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -10593,6 +11002,7 @@
       "channelName": "Ch 22",
       "silent": true,
       "evidence": null,
+      "classifierRole": "chord",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -10607,6 +11017,7 @@
       "channelName": "Ch 23",
       "silent": true,
       "evidence": null,
+      "classifierRole": "bass",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -10621,6 +11032,7 @@
       "channelName": "Ch 24",
       "silent": true,
       "evidence": null,
+      "classifierRole": "pad",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -10635,6 +11047,7 @@
       "channelName": "Ch 25",
       "silent": true,
       "evidence": null,
+      "classifierRole": "pad",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -10667,6 +11080,7 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "arpeggio",
       "instrumentName": "POWER_01.WAV",
       "nameHint": null,
       "proposed": "unclear",
@@ -10699,6 +11113,7 @@
         "instrumentCount": 2,
         "dominance": 0.5
       },
+      "classifierRole": "bass",
       "instrumentName": "CLASIC01.WAV",
       "nameHint": null,
       "proposed": "percussion-or-pulse",
@@ -10731,6 +11146,7 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "pad",
       "instrumentName": "SHORTY.WAV",
       "nameHint": null,
       "proposed": "unclear",
@@ -10763,6 +11179,7 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "percussion",
       "instrumentName": "HIHATS.WAV",
       "nameHint": "hat",
       "proposed": "arpeggio",
@@ -10795,6 +11212,7 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "percussion",
       "instrumentName": "HIHATS.WAV",
       "nameHint": "hat",
       "proposed": "arpeggio",
@@ -10827,6 +11245,7 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "pad",
       "instrumentName": "DOWN1_C1.WAV",
       "nameHint": null,
       "proposed": "unclear",
@@ -10859,6 +11278,7 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "bass",
       "instrumentName": "DRY1_C1.WAV",
       "nameHint": null,
       "proposed": "unclear",
@@ -10891,8 +11311,9 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "pad",
       "instrumentName": "CLAP6.WAV",
-      "nameHint": null,
+      "nameHint": "clap",
       "proposed": "skank",
       "label": null
     },
@@ -10923,6 +11344,7 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "pad",
       "instrumentName": "Instrument 10",
       "nameHint": null,
       "proposed": "unclear",
@@ -10955,6 +11377,7 @@
         "instrumentCount": 2,
         "dominance": 0.67
       },
+      "classifierRole": "bass",
       "instrumentName": "Instrument 11",
       "nameHint": null,
       "proposed": "unclear",
@@ -10987,6 +11410,7 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "bass",
       "instrumentName": "Instrument 12",
       "nameHint": null,
       "proposed": "skank",
@@ -11019,6 +11443,7 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "pad",
       "instrumentName": "Instrument 15",
       "nameHint": null,
       "proposed": "unclear",
@@ -11033,6 +11458,7 @@
       "channelName": "Ch 13",
       "silent": true,
       "evidence": null,
+      "classifierRole": "pad",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -11047,6 +11473,7 @@
       "channelName": "Ch 14",
       "silent": true,
       "evidence": null,
+      "classifierRole": "lead",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -11079,6 +11506,7 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "bass",
       "instrumentName": "Instrument 10",
       "nameHint": null,
       "proposed": "unclear",
@@ -11111,6 +11539,7 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "pad",
       "instrumentName": "Patterns",
       "nameHint": null,
       "proposed": "percussion-or-pulse",
@@ -11143,6 +11572,7 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "percussion",
       "instrumentName": "HIHATS.WAV",
       "nameHint": "hat",
       "proposed": "arpeggio",
@@ -11157,6 +11587,7 @@
       "channelName": "Ch 18",
       "silent": true,
       "evidence": null,
+      "classifierRole": "pad",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -11171,6 +11602,7 @@
       "channelName": "Ch 19",
       "silent": true,
       "evidence": null,
+      "classifierRole": "percussion",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -11185,6 +11617,7 @@
       "channelName": "Ch 20",
       "silent": true,
       "evidence": null,
+      "classifierRole": "pad",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -11199,6 +11632,7 @@
       "channelName": "Ch 21",
       "silent": true,
       "evidence": null,
+      "classifierRole": "pad",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -11213,6 +11647,7 @@
       "channelName": "Ch 22",
       "silent": true,
       "evidence": null,
+      "classifierRole": "chord",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -11227,6 +11662,7 @@
       "channelName": "Ch 23",
       "silent": true,
       "evidence": null,
+      "classifierRole": "bass",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -11241,6 +11677,7 @@
       "channelName": "Ch 24",
       "silent": true,
       "evidence": null,
+      "classifierRole": "pad",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -11255,6 +11692,7 @@
       "channelName": "Ch 25",
       "silent": true,
       "evidence": null,
+      "classifierRole": "pad",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -11287,6 +11725,7 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "arpeggio",
       "instrumentName": "POWER_01.WAV",
       "nameHint": null,
       "proposed": "unclear",
@@ -11319,6 +11758,7 @@
         "instrumentCount": 2,
         "dominance": 0.5
       },
+      "classifierRole": "bass",
       "instrumentName": "CLASIC01.WAV",
       "nameHint": null,
       "proposed": "percussion-or-pulse",
@@ -11351,6 +11791,7 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "pad",
       "instrumentName": "SHORTY.WAV",
       "nameHint": null,
       "proposed": "unclear",
@@ -11383,6 +11824,7 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "percussion",
       "instrumentName": "HIHATS.WAV",
       "nameHint": "hat",
       "proposed": "arpeggio",
@@ -11415,6 +11857,7 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "percussion",
       "instrumentName": "HIHATS.WAV",
       "nameHint": "hat",
       "proposed": "arpeggio",
@@ -11447,6 +11890,7 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "pad",
       "instrumentName": "DOWN1_C1.WAV",
       "nameHint": null,
       "proposed": "unclear",
@@ -11479,6 +11923,7 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "bass",
       "instrumentName": "DRY1_C1.WAV",
       "nameHint": null,
       "proposed": "unclear",
@@ -11511,8 +11956,9 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "pad",
       "instrumentName": "CLAP6.WAV",
-      "nameHint": null,
+      "nameHint": "clap",
       "proposed": "skank",
       "label": null
     },
@@ -11543,6 +11989,7 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "pad",
       "instrumentName": "Instrument 10",
       "nameHint": null,
       "proposed": "unclear",
@@ -11575,6 +12022,7 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "bass",
       "instrumentName": "Instrument 11",
       "nameHint": null,
       "proposed": "unclear",
@@ -11607,6 +12055,7 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "bass",
       "instrumentName": "Instrument 12",
       "nameHint": null,
       "proposed": "skank",
@@ -11639,6 +12088,7 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "pad",
       "instrumentName": "Instrument 15",
       "nameHint": null,
       "proposed": "unclear",
@@ -11671,6 +12121,7 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "pad",
       "instrumentName": "Instrument 13",
       "nameHint": null,
       "proposed": "unclear",
@@ -11703,6 +12154,7 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "lead",
       "instrumentName": "Instrument 13",
       "nameHint": null,
       "proposed": "unclear",
@@ -11735,6 +12187,7 @@
         "instrumentCount": 2,
         "dominance": 0.57
       },
+      "classifierRole": "bass",
       "instrumentName": "Instrument 12",
       "nameHint": null,
       "proposed": "unclear",
@@ -11767,6 +12220,7 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "pad",
       "instrumentName": "Patterns",
       "nameHint": null,
       "proposed": "percussion-or-pulse",
@@ -11799,6 +12253,7 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "percussion",
       "instrumentName": "HIHATS.WAV",
       "nameHint": "hat",
       "proposed": "arpeggio",
@@ -11813,6 +12268,7 @@
       "channelName": "Ch 18",
       "silent": true,
       "evidence": null,
+      "classifierRole": "pad",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -11827,6 +12283,7 @@
       "channelName": "Ch 19",
       "silent": true,
       "evidence": null,
+      "classifierRole": "percussion",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -11841,6 +12298,7 @@
       "channelName": "Ch 20",
       "silent": true,
       "evidence": null,
+      "classifierRole": "pad",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -11855,6 +12313,7 @@
       "channelName": "Ch 21",
       "silent": true,
       "evidence": null,
+      "classifierRole": "pad",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -11869,6 +12328,7 @@
       "channelName": "Ch 22",
       "silent": true,
       "evidence": null,
+      "classifierRole": "chord",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -11883,6 +12343,7 @@
       "channelName": "Ch 23",
       "silent": true,
       "evidence": null,
+      "classifierRole": "bass",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -11897,6 +12358,7 @@
       "channelName": "Ch 24",
       "silent": true,
       "evidence": null,
+      "classifierRole": "pad",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -11911,6 +12373,7 @@
       "channelName": "Ch 25",
       "silent": true,
       "evidence": null,
+      "classifierRole": "pad",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -11943,6 +12406,7 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "arpeggio",
       "instrumentName": "POWER_01.WAV",
       "nameHint": null,
       "proposed": "unclear",
@@ -11975,6 +12439,7 @@
         "instrumentCount": 2,
         "dominance": 0.5
       },
+      "classifierRole": "bass",
       "instrumentName": "CLASIC01.WAV",
       "nameHint": null,
       "proposed": "percussion-or-pulse",
@@ -12007,6 +12472,7 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "pad",
       "instrumentName": "SHORTY.WAV",
       "nameHint": null,
       "proposed": "unclear",
@@ -12039,6 +12505,7 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "percussion",
       "instrumentName": "HIHATS.WAV",
       "nameHint": "hat",
       "proposed": "arpeggio",
@@ -12071,6 +12538,7 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "percussion",
       "instrumentName": "HIHATS.WAV",
       "nameHint": "hat",
       "proposed": "arpeggio",
@@ -12103,6 +12571,7 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "pad",
       "instrumentName": "DOWN1_C1.WAV",
       "nameHint": null,
       "proposed": "unclear",
@@ -12135,6 +12604,7 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "bass",
       "instrumentName": "DRY1_C1.WAV",
       "nameHint": null,
       "proposed": "unclear",
@@ -12167,8 +12637,9 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "pad",
       "instrumentName": "CLAP6.WAV",
-      "nameHint": null,
+      "nameHint": "clap",
       "proposed": "skank",
       "label": null
     },
@@ -12181,6 +12652,7 @@
       "channelName": "Ch 9",
       "silent": true,
       "evidence": null,
+      "classifierRole": "pad",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -12213,6 +12685,7 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "bass",
       "instrumentName": "Instrument 11",
       "nameHint": null,
       "proposed": "unclear",
@@ -12245,6 +12718,7 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "bass",
       "instrumentName": "Instrument 12",
       "nameHint": null,
       "proposed": "skank",
@@ -12277,6 +12751,7 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "pad",
       "instrumentName": "Instrument 15",
       "nameHint": null,
       "proposed": "unclear",
@@ -12309,6 +12784,7 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "pad",
       "instrumentName": "Instrument 13",
       "nameHint": null,
       "proposed": "unclear",
@@ -12341,6 +12817,7 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "lead",
       "instrumentName": "Instrument 13",
       "nameHint": null,
       "proposed": "unclear",
@@ -12373,6 +12850,7 @@
         "instrumentCount": 2,
         "dominance": 0.5
       },
+      "classifierRole": "bass",
       "instrumentName": "Instrument 10",
       "nameHint": null,
       "proposed": "stab-or-fx",
@@ -12405,6 +12883,7 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "pad",
       "instrumentName": "Patterns",
       "nameHint": null,
       "proposed": "percussion-or-pulse",
@@ -12437,6 +12916,7 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "percussion",
       "instrumentName": "HIHATS.WAV",
       "nameHint": "hat",
       "proposed": "arpeggio",
@@ -12451,6 +12931,7 @@
       "channelName": "Ch 18",
       "silent": true,
       "evidence": null,
+      "classifierRole": "pad",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -12465,6 +12946,7 @@
       "channelName": "Ch 19",
       "silent": true,
       "evidence": null,
+      "classifierRole": "percussion",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -12479,6 +12961,7 @@
       "channelName": "Ch 20",
       "silent": true,
       "evidence": null,
+      "classifierRole": "pad",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -12493,6 +12976,7 @@
       "channelName": "Ch 21",
       "silent": true,
       "evidence": null,
+      "classifierRole": "pad",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -12507,6 +12991,7 @@
       "channelName": "Ch 22",
       "silent": true,
       "evidence": null,
+      "classifierRole": "chord",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -12521,6 +13006,7 @@
       "channelName": "Ch 23",
       "silent": true,
       "evidence": null,
+      "classifierRole": "bass",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -12535,6 +13021,7 @@
       "channelName": "Ch 24",
       "silent": true,
       "evidence": null,
+      "classifierRole": "pad",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -12549,6 +13036,7 @@
       "channelName": "Ch 25",
       "silent": true,
       "evidence": null,
+      "classifierRole": "pad",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -12581,6 +13069,7 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "percussion",
       "instrumentName": "A1-LD",
       "nameHint": null,
       "proposed": "unclear",
@@ -12613,6 +13102,7 @@
         "instrumentCount": 2,
         "dominance": 0.75
       },
+      "classifierRole": "percussion",
       "instrumentName": "A3-LD",
       "nameHint": null,
       "proposed": "stab-or-fx",
@@ -12645,6 +13135,7 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "bass",
       "instrumentName": "A3-LD",
       "nameHint": null,
       "proposed": "skank",
@@ -12677,6 +13168,7 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "bass",
       "instrumentName": "A3-LD",
       "nameHint": null,
       "proposed": "unclear",
@@ -12709,6 +13201,7 @@
         "instrumentCount": 2,
         "dominance": 0.55
       },
+      "classifierRole": "bass",
       "instrumentName": "A5-LD",
       "nameHint": null,
       "proposed": "unclear",
@@ -12741,6 +13234,7 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "bass",
       "instrumentName": "A3-LD",
       "nameHint": null,
       "proposed": "unclear",
@@ -12755,6 +13249,7 @@
       "channelName": "Ch 7",
       "silent": true,
       "evidence": null,
+      "classifierRole": "bass",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -12769,6 +13264,7 @@
       "channelName": "Ch 8",
       "silent": true,
       "evidence": null,
+      "classifierRole": "bass",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -12801,6 +13297,7 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "percussion",
       "instrumentName": "A1-LD",
       "nameHint": null,
       "proposed": "unclear",
@@ -12833,6 +13330,7 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "percussion",
       "instrumentName": "A3-LD",
       "nameHint": null,
       "proposed": "unclear",
@@ -12865,6 +13363,7 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "bass",
       "instrumentName": "A3-LD",
       "nameHint": null,
       "proposed": "unclear",
@@ -12897,6 +13396,7 @@
         "instrumentCount": 2,
         "dominance": 0.86
       },
+      "classifierRole": "bass",
       "instrumentName": "A3-LD",
       "nameHint": null,
       "proposed": "unclear",
@@ -12929,6 +13429,7 @@
         "instrumentCount": 2,
         "dominance": 0.8
       },
+      "classifierRole": "bass",
       "instrumentName": "A3-LD",
       "nameHint": null,
       "proposed": "stab-or-fx",
@@ -12961,6 +13462,7 @@
         "instrumentCount": 2,
         "dominance": 0.5
       },
+      "classifierRole": "bass",
       "instrumentName": "A3-LD",
       "nameHint": null,
       "proposed": "unclear",
@@ -12975,6 +13477,7 @@
       "channelName": "Ch 7",
       "silent": true,
       "evidence": null,
+      "classifierRole": "bass",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -12989,6 +13492,7 @@
       "channelName": "Ch 8",
       "silent": true,
       "evidence": null,
+      "classifierRole": "bass",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -13021,6 +13525,7 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "percussion",
       "instrumentName": "Suspended Cymbal",
       "nameHint": "percussion",
       "proposed": "unclear",
@@ -13053,6 +13558,7 @@
         "instrumentCount": 2,
         "dominance": 0.8
       },
+      "classifierRole": "percussion",
       "instrumentName": "EchoTom",
       "nameHint": null,
       "proposed": "stab-or-fx",
@@ -13085,8 +13591,9 @@
         "instrumentCount": 2,
         "dominance": 0.86
       },
+      "classifierRole": "bass",
       "instrumentName": "DLMBass",
-      "nameHint": null,
+      "nameHint": "bass",
       "proposed": "unclear",
       "label": null
     },
@@ -13117,6 +13624,7 @@
         "instrumentCount": 2,
         "dominance": 0.5
       },
+      "classifierRole": "bass",
       "instrumentName": "A3-LD",
       "nameHint": null,
       "proposed": "unclear",
@@ -13149,6 +13657,7 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "bass",
       "instrumentName": "A3-LD",
       "nameHint": null,
       "proposed": "unclear",
@@ -13181,6 +13690,7 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "bass",
       "instrumentName": "A5-LD",
       "nameHint": null,
       "proposed": "unclear",
@@ -13195,6 +13705,7 @@
       "channelName": "Ch 7",
       "silent": true,
       "evidence": null,
+      "classifierRole": "bass",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -13209,6 +13720,7 @@
       "channelName": "Ch 8",
       "silent": true,
       "evidence": null,
+      "classifierRole": "bass",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -13241,6 +13753,7 @@
         "instrumentCount": 3,
         "dominance": 0.55
       },
+      "classifierRole": "percussion",
       "instrumentName": "Bass Kick",
       "nameHint": "kick",
       "proposed": "unclear",
@@ -13273,8 +13786,9 @@
         "instrumentCount": 2,
         "dominance": 0.5
       },
+      "classifierRole": "percussion",
       "instrumentName": "Tamb1",
-      "nameHint": null,
+      "nameHint": "percussion",
       "proposed": "arpeggio",
       "label": null
     },
@@ -13305,8 +13819,9 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "bass",
       "instrumentName": "DLMBass",
-      "nameHint": null,
+      "nameHint": "bass",
       "proposed": "unclear",
       "label": null
     },
@@ -13337,8 +13852,9 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "bass",
       "instrumentName": "NiceStrings",
-      "nameHint": null,
+      "nameHint": "pad",
       "proposed": "unclear",
       "label": null
     },
@@ -13369,8 +13885,9 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "bass",
       "instrumentName": "NiceStrings",
-      "nameHint": null,
+      "nameHint": "pad",
       "proposed": "unclear",
       "label": null
     },
@@ -13401,8 +13918,9 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "bass",
       "instrumentName": "NiceStrings",
-      "nameHint": null,
+      "nameHint": "pad",
       "proposed": "unclear",
       "label": null
     },
@@ -13433,8 +13951,9 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "bass",
       "instrumentName": "NiceStrings",
-      "nameHint": null,
+      "nameHint": "pad",
       "proposed": "unclear",
       "label": null
     },
@@ -13465,8 +13984,9 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "bass",
       "instrumentName": "NiceStrings",
-      "nameHint": null,
+      "nameHint": "pad",
       "proposed": "unclear",
       "label": null
     },
@@ -13497,6 +14017,7 @@
         "instrumentCount": 2,
         "dominance": 0.54
       },
+      "classifierRole": "percussion",
       "instrumentName": "Bass Kick",
       "nameHint": "kick",
       "proposed": "unclear",
@@ -13529,8 +14050,9 @@
         "instrumentCount": 2,
         "dominance": 0.5
       },
+      "classifierRole": "percussion",
       "instrumentName": "Tamb1",
-      "nameHint": null,
+      "nameHint": "percussion",
       "proposed": "arpeggio",
       "label": null
     },
@@ -13561,8 +14083,9 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "bass",
       "instrumentName": "DLMBass",
-      "nameHint": null,
+      "nameHint": "bass",
       "proposed": "unclear",
       "label": null
     },
@@ -13593,8 +14116,9 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "bass",
       "instrumentName": "NiceStrings",
-      "nameHint": null,
+      "nameHint": "pad",
       "proposed": "unclear",
       "label": null
     },
@@ -13625,8 +14149,9 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "bass",
       "instrumentName": "NiceStrings",
-      "nameHint": null,
+      "nameHint": "pad",
       "proposed": "unclear",
       "label": null
     },
@@ -13657,8 +14182,9 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "bass",
       "instrumentName": "NiceStrings",
-      "nameHint": null,
+      "nameHint": "pad",
       "proposed": "unclear",
       "label": null
     },
@@ -13689,6 +14215,7 @@
         "instrumentCount": 0,
         "dominance": 0
       },
+      "classifierRole": "bass",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "unclear",
@@ -13721,6 +14248,7 @@
         "instrumentCount": 0,
         "dominance": 0
       },
+      "classifierRole": "bass",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "unclear",
@@ -13753,6 +14281,7 @@
         "instrumentCount": 2,
         "dominance": 0.6
       },
+      "classifierRole": "percussion",
       "instrumentName": "Bass Kick",
       "nameHint": "kick",
       "proposed": "unclear",
@@ -13785,8 +14314,9 @@
         "instrumentCount": 3,
         "dominance": 0.5
       },
+      "classifierRole": "percussion",
       "instrumentName": "Tamb2",
-      "nameHint": null,
+      "nameHint": "percussion",
       "proposed": "arpeggio",
       "label": null
     },
@@ -13817,8 +14347,9 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "bass",
       "instrumentName": "DLMBass",
-      "nameHint": null,
+      "nameHint": "bass",
       "proposed": "unclear",
       "label": null
     },
@@ -13849,6 +14380,7 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "bass",
       "instrumentName": "A3-LD",
       "nameHint": null,
       "proposed": "unclear",
@@ -13881,6 +14413,7 @@
         "instrumentCount": 2,
         "dominance": 0.8
       },
+      "classifierRole": "bass",
       "instrumentName": "A3-LD",
       "nameHint": null,
       "proposed": "unclear",
@@ -13913,6 +14446,7 @@
         "instrumentCount": 3,
         "dominance": 0.6
       },
+      "classifierRole": "bass",
       "instrumentName": "A3-LD",
       "nameHint": null,
       "proposed": "stab-or-fx",
@@ -13945,8 +14479,9 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "bass",
       "instrumentName": "NiceStrings",
-      "nameHint": null,
+      "nameHint": "pad",
       "proposed": "unclear",
       "label": null
     },
@@ -13959,6 +14494,7 @@
       "channelName": "Ch 8",
       "silent": true,
       "evidence": null,
+      "classifierRole": "bass",
       "instrumentName": null,
       "nameHint": null,
       "proposed": "silent",
@@ -13991,6 +14527,7 @@
         "instrumentCount": 3,
         "dominance": 0.54
       },
+      "classifierRole": "percussion",
       "instrumentName": "Bass Kick",
       "nameHint": "kick",
       "proposed": "unclear",
@@ -14023,8 +14560,9 @@
         "instrumentCount": 2,
         "dominance": 0.5
       },
+      "classifierRole": "percussion",
       "instrumentName": "Tamb1",
-      "nameHint": null,
+      "nameHint": "percussion",
       "proposed": "arpeggio",
       "label": null
     },
@@ -14055,8 +14593,9 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "bass",
       "instrumentName": "DLMBass",
-      "nameHint": null,
+      "nameHint": "bass",
       "proposed": "unclear",
       "label": null
     },
@@ -14087,6 +14626,7 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "bass",
       "instrumentName": "A3-LD",
       "nameHint": null,
       "proposed": "unclear",
@@ -14119,6 +14659,7 @@
         "instrumentCount": 2,
         "dominance": 0.86
       },
+      "classifierRole": "bass",
       "instrumentName": "A3-LD",
       "nameHint": null,
       "proposed": "unclear",
@@ -14151,6 +14692,7 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "bass",
       "instrumentName": "A3-LD",
       "nameHint": null,
       "proposed": "stab-or-fx",
@@ -14183,6 +14725,7 @@
         "instrumentCount": 2,
         "dominance": 0.67
       },
+      "classifierRole": "bass",
       "instrumentName": "A3-LD",
       "nameHint": null,
       "proposed": "stab-or-fx",
@@ -14215,6 +14758,7 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "bass",
       "instrumentName": "A3-LD",
       "nameHint": null,
       "proposed": "unclear",
@@ -14247,6 +14791,7 @@
         "instrumentCount": 2,
         "dominance": 0.6
       },
+      "classifierRole": "percussion",
       "instrumentName": "Bass Kick",
       "nameHint": "kick",
       "proposed": "unclear",
@@ -14279,8 +14824,9 @@
         "instrumentCount": 3,
         "dominance": 0.5
       },
+      "classifierRole": "percussion",
       "instrumentName": "Tamb2",
-      "nameHint": null,
+      "nameHint": "percussion",
       "proposed": "arpeggio",
       "label": null
     },
@@ -14311,8 +14857,9 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "bass",
       "instrumentName": "DLMBass",
-      "nameHint": null,
+      "nameHint": "bass",
       "proposed": "unclear",
       "label": null
     },
@@ -14343,6 +14890,7 @@
         "instrumentCount": 2,
         "dominance": 0.75
       },
+      "classifierRole": "bass",
       "instrumentName": "A3-LD",
       "nameHint": null,
       "proposed": "unclear",
@@ -14375,6 +14923,7 @@
         "instrumentCount": 2,
         "dominance": 0.5
       },
+      "classifierRole": "bass",
       "instrumentName": "A5-LD",
       "nameHint": null,
       "proposed": "unclear",
@@ -14407,8 +14956,9 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "bass",
       "instrumentName": "NiceStrings",
-      "nameHint": null,
+      "nameHint": "pad",
       "proposed": "stab-or-fx",
       "label": null
     },
@@ -14439,8 +14989,9 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "bass",
       "instrumentName": "NiceStrings",
-      "nameHint": null,
+      "nameHint": "pad",
       "proposed": "unclear",
       "label": null
     },
@@ -14471,8 +15022,9 @@
         "instrumentCount": 1,
         "dominance": 1
       },
+      "classifierRole": "bass",
       "instrumentName": "NiceStrings",
-      "nameHint": null,
+      "nameHint": "pad",
       "proposed": "unclear",
       "label": null
     }
