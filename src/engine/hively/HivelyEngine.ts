@@ -357,6 +357,21 @@ export class HivelyEngine extends WASMSingletonBase implements IsolationCapableE
     });
   }
 
+  /**
+   * Playback speed as a fraction of normal, pitch following tempo.
+   *
+   * The worklet resamples its ring rather than time-stretching, so this is a
+   * tape transport: at 0.08 the song is both eight per cent as fast and more
+   * than three octaves down. `transportTapeStop` uses it so the move is a real
+   * transport slowdown on AHX/HVL instead of the bus-only approximation.
+   *
+   * 1.0 is normal speed. The worklet clamps to 0.02..4 and ramps to the new
+   * value over a few blocks, so stepping is click-free.
+   */
+  setRateFactor(factor: number): void {
+    this.workletNode?.port.postMessage({ type: 'setRateFactor', value: factor });
+  }
+
   /** Set a single step in a track (for pattern editing) */
   setTrackStep(trackIdx: number, stepIdx: number,
                note: number, instrument: number,

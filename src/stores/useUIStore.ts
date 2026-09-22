@@ -245,7 +245,12 @@ export const useUIStore = create<UIStore>()(
       showMacroSlots: false,
       patternEditorScrollLeft: 0,
       sidebarCollapsed: false,
-      useHexNumbers: true, // Default to hex numbers (FT2 style)
+      // Decimal by default (asked for 2026-09-22). FT2 numbers rows and
+      // instruments in hex and DEViLBOX followed it, but the row gutter is
+      // read as a position in the song far more often than it is used for
+      // hex arithmetic. Settings > Number Format still offers Hexadecimal,
+      // and an existing install keeps whatever it already persisted.
+      useHexNumbers: false,
       rowHighlightInterval: 4, // Highlight every 4th row (FT2 default)
       rowSecondaryHighlightInterval: 16, // Stronger highlight every 16th row (bar lines)
       showBeatLabels: false, // Beat labels off by default
