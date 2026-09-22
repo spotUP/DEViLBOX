@@ -1395,6 +1395,22 @@ export class DubBus {
   // so the dry + wet sum gets shaped.
   private masterHpf!: BiquadFilterNode;       // full-mix HPF — swept by hpfRise so Rise is audible on dry mix
   private masterBassShelf!: BiquadFilterNode;
+  /**
+   * The dry-path bass PUNCH, its own stage.
+   *
+   * It used to be summed into `masterBassShelf` and the sum clamped to +9 dB.
+   * With the shipped defaults that is 9 + 6 = 15 clamped to 9, so the master
+   * shelf arrived already pinned and the BASS slider did nothing above +3 —
+   * nine dB of a twenty-four dB control, dead. Reported 2026-09-22: "i expect
+   * more bass when i pull the bass slider but i dont get more bass".
+   *
+   * Two controls summing into one clamped node means each one's effect
+   * depends on where the other sits, and both can be silenced. They are now
+   * separate stages in series, so moving either always changes the sound.
+   * Headroom is handled where it belongs — `masterToneTrim` pays for the
+   * total proportionally, and `masterSafetyClip` sits downstream of both.
+   */
+  private masterBassPunch!: BiquadFilterNode;
   private masterMidScoop!: BiquadFilterNode;
   /**
    * Input trim for the master insert, ahead of every boosting stage.
@@ -1731,6 +1747,11 @@ export class DubBus {
     this.masterBassShelf.frequency.value = this.settings.bassShelfFreqHz;
     this.masterBassShelf.Q.value = this.settings.bassShelfQ;
     this.masterBassShelf.gain.value = 0;  // flat until wired in by enable
+    this.masterBassPunch = this.context.createBiquadFilter();
+    this.masterBassPunch.type = 'lowshelf';
+    this.masterBassPunch.frequency.value = this.settings.bassShelfFreqHz;
+    this.masterBassPunch.Q.value = this.settings.bassShelfQ;
+    this.masterBassPunch.gain.value = 0;  // flat until wired in by enable
     this.masterMidScoop = this.context.createBiquadFilter();
     this.masterMidScoop.type = 'peaking';
     this.masterMidScoop.frequency.value = this.settings.midScoopFreqHz;
@@ -1804,7 +1825,8 @@ export class DubBus {
     this.masterInvertR.gain.value = 0;
     masterSideInvertL.gain.value = 0;
     // EQ pre-chain: in → bassShelf → safety-clip → midScoop → LPF → split
-    this.masterBassShelf.connect(this.masterSafetyClip);
+    this.masterBassShelf.connect(this.masterBassPunch);
+    this.masterBassPunch.connect(this.masterSafetyClip);
     this.masterSafetyClip.connect(this.masterMidScoop);
     this.masterMidScoop.connect(this.masterLpf);
     this.masterLpf.connect(this.masterSplit);
@@ -4019,15 +4041,44 @@ export class DubBus {
     // Master-insert TONE EQ — drives the whole mix (dry + wet) when wired.
     // Gain writes are gated so a disabled bus stays transparent on master.
     const masterActive = this.enabled && this.masterInsertActive;
-    // masterBassPunchDb adds dry-path-only bass enhancement on top of the
-    // shared shelf gain. Master path is OUTSIDE the echo feedback loop so
-    // we can push this much harder than the wet bus's bassShelfGainDb (which
-    // self-oscillates above ~+12 dB even with the feedback compensator).
-    const safeMasterPunch = Math.max(-18, Math.min(18, merged.masterBassPunchDb ?? 0));
-    const safeMasterShelfGain = Math.max(-12, Math.min(9, safeBassGain + safeMasterPunch));
+    // masterBassPunchDb is dry-path bass weight. The master path is OUTSIDE
+    // the echo feedback loop, so it can be pushed far harder than the wet
+    // bus's bassShelfGainDb, which self-oscillates above about +12 dB even
+    // with the feedback compensator.
+    //
+    // TWO STAGES, NOT ONE SUM. These were added together and the total
+    // clamped to +9 dB. With the shipped defaults that is 9 + 6 = 15 clamped
+    // to 9, so the shelf arrived pinned at the ceiling and the BASS slider
+    // did nothing from +3 upward — nine dB of a twenty-four dB control.
+    // Measured 2026-09-22 against the live bus: bassShelfGainDb 0 gave 6 dB,
+    // 3 gave 9, and 9 gave 9.
+    //
+    // Dub is drums and bass, so the low end has to be able to get genuinely
+    // heavy. Each control now drives its own shelf and neither can silence
+    // the other. Headroom is handled where headroom belongs: `masterToneTrim`
+    // below pays for the TOTAL, proportionally to how much of the programme
+    // actually lives down there, and `masterSafetyClip` sits downstream of
+    // both stages to catch what is left.
+    // The total still has a ceiling — the insert only ever ADDS level, and
+    // uncapped it produced "the dub bus clipping and disting most of the
+    // time" (2026-09-18). But the ceiling is now spent on PUNCH, never on
+    // BASS: the slider the user rides always gets exactly what it asks for,
+    // and the voicing control gives way. 18 dB rather than the old 9, because
+    // dub is drums and bass and the low end has to be able to get heavy;
+    // +12 bass with the default +6 punch now lands exactly on it, so the
+    // whole BASS travel is live.
+    const MASTER_LOW_CEILING_DB = 18;
+    const wantPunch = Math.max(-18, Math.min(18, merged.masterBassPunchDb ?? 0));
+    const punchHeadroom = Math.max(0, MASTER_LOW_CEILING_DB - Math.max(0, safeBassGain));
+    const safeMasterPunch = wantPunch > 0 ? Math.min(wantPunch, punchHeadroom) : wantPunch;
     rampBiquadParam(this.masterBassShelf.frequency, merged.bassShelfFreqHz, now);
     rampBiquadParam(this.masterBassShelf.Q, merged.bassShelfQ, now);
-    rampBiquadParam(this.masterBassShelf.gain, masterActive ? safeMasterShelfGain : 0, now);
+    rampBiquadParam(this.masterBassShelf.gain, masterActive ? safeBassGain : 0, now);
+    rampBiquadParam(this.masterBassPunch.frequency, merged.bassShelfFreqHz, now);
+    rampBiquadParam(this.masterBassPunch.Q, merged.bassShelfQ, now);
+    rampBiquadParam(this.masterBassPunch.gain, masterActive ? safeMasterPunch : 0, now);
+    // What the two stages add up to — what the trim has to pay for.
+    const safeMasterShelfGain = safeBassGain + safeMasterPunch;
     // Pay for the boost before applying it. A +9 dB shelf with no trim put
     // the mix 9 dB over the limiter's -1 dB threshold; at ratio 4 that still
     // leaves +1.25 dB at the destination, which clips.
@@ -4776,6 +4827,7 @@ export class DubBus {
     }, (FADE_SEC * 1000) + 5);
     // Reset master-side gains to neutral so even a dangling reference is silent.
     rampBiquadParam(this.masterBassShelf.gain, 0, now);
+    rampBiquadParam(this.masterBassPunch.gain, 0, now);
     this.masterToneTrim.gain.setTargetAtTime(1, now, 0.02);
     rampBiquadParam(this.masterMidScoop.gain, 0, now);
     try {
