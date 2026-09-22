@@ -775,8 +775,15 @@ export function createMcpServer(): McpServer {
 
   server.tool(
     'test_tone',
-    'Play a test tone through the audio graph - for checking routing and levels without loading a song.',
-    { frequency: z.number().optional(), durationMs: z.number().optional(), gain: z.number().optional() },
+    'Play a test tone through the audio graph - for checking routing and levels without loading a song. Stops by itself after durationMs (default 3000); { action: "stop" } stops it now. level is dBFS (default -12); gain is a linear alternative. mode "rich" plays a full-spectrum stack.',
+    {
+      action: z.enum(['start', 'stop']).optional(),
+      frequency: z.number().optional(),
+      durationMs: z.number().optional(),
+      gain: z.number().optional(),
+      level: z.number().optional(),
+      mode: z.enum(['sine', 'rich']).optional(),
+    },
     (p) => call('test_tone', p),
   );
 
