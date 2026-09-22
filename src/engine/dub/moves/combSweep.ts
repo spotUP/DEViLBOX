@@ -26,6 +26,7 @@ export const combSweep: DubMove = {
       params.rateHz  ?? this.defaults.rateHz,
       params.depthMs ?? this.defaults.depthMs,
     );
-    return { dispose() { stop(); } };
+    const releaseGesture = bus.holdWetGesture();
+    return { dispose() { releaseGesture(); stop(); } };
   },
 };

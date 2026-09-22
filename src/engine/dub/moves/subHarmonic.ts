@@ -27,6 +27,7 @@ export const subHarmonic: DubMove = {
     const level = params.level ?? this.defaults.level;
     console.log(`[subHarmonic] fired freq=${freq} threshold=${threshold} level=${level}`);
     const release = bus.startSubHarmonic(freq, threshold, level);
-    return { dispose: release };
+    const releaseGesture = bus.holdWetGesture();
+    return { dispose() { releaseGesture(); release(); } };
   },
 };
