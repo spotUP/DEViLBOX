@@ -127,10 +127,28 @@ describe('the list switches mode on it', () => {
   });
 
   it('keeps the spaces and drops the truncation in art mode', () => {
-    // Both are needed: `truncate` eats the long rows, and without
+    // Both matter: `truncate` eats the long rows, and without
     // `whitespace-pre` the runs of spaces that hold the shape collapse.
-    expect(LIST).toContain('whitespace-pre');
-    expect(LIST).toMatch(/artMode[\s\S]{0,120}truncate/);
+    //
+    // Asserted per BRANCH rather than by proximity. This was
+    // `/artMode[\s\S]{0,120}truncate/`, which only says the two words are
+    // near each other — it broke on 2026-09-22 when the name's class list
+    // grew to 141 characters while the invariant was still perfectly held.
+    // A distance is not the property; which branch carries which class is.
+    // Anchored on `instrument-art-name`, because several `artMode` ternaries
+    // exist in this file and the container one matched first.
+    const ternary = LIST.match(
+      /\$\{artMode\s*\n?\s*\?\s*'([^']*instrument-art-name[^']*)'\s*\n?\s*:\s*'([^']*)'\}/,
+    );
+    expect(ternary, 'art/plain NAME className ternary not found').not.toBeNull();
+    const [, artBranch, plainBranch] = ternary!;
+
+    // Art mode: spaces preserved, never truncated.
+    expect(artBranch).toContain('whitespace-pre');
+    expect(artBranch).not.toContain('truncate');
+
+    // Plain mode: truncated, so a long name cannot push the badges off.
+    expect(plainBranch).toContain('truncate');
   });
 
   it('scrolls the picture as one image, not row by row', () => {

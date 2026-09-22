@@ -623,15 +623,34 @@ describe('DubBus wireMasterInsert stale connection cleanup', () => {
     path.resolve(__dirname, '../../dub/DubBus.ts'), 'utf-8',
   );
 
-  it('wireMasterInsert completes stale disconnect when cancelling pending timer', () => {
+  it('wireMasterInsert completes the stale disconnect when it cancels a pending timer', () => {
+    // The guarantee is unchanged: cancelling an in-flight rewire must put the
+    // graph back to source -> dest, or the nodes stay spliced to an insert
+    // that is logically inactive and the next reconnect silently fails,
+    // permanently killing output.
+    //
+    // What changed is HOW. This used to assert the local names `staleSrc` /
+    // `staleDest` that did the cleanup inline. `d0a917be4` replaced them with
+    // `_restoreMasterInsertPassthrough`, which reads the splice RECORD rather
+    // than the source/dest fields — precisely because an unwire nulls those
+    // fields first, so the inline version could not find what to reconnect.
+    // Asserting the old local names made this fail from the day the better
+    // mechanism landed.
     const wireMatch = dubBusSrc.match(
       /wireMasterInsert\(source: AudioNode[\s\S]*?\n  \}/m,
     );
     expect(wireMatch).not.toBeNull();
     const wireBody = wireMatch![0];
-    expect(wireBody).toContain('staleSrc');
-    expect(wireBody).toContain('staleDest');
-    expect(wireBody).toContain('disconnect(this.masterInsertHead)');
+    expect(wireBody).toContain('clearTimeout(this.masterInsertPending)');
+    expect(wireBody).toContain('_restoreMasterInsertPassthrough()');
+
+    // And that the helper it delegates to really does restore passthrough.
+    const restore = dubBusSrc.match(
+      /_restoreMasterInsertPassthrough\(\): void \{[\s\S]*?\n  \}/m,
+    );
+    expect(restore, '_restoreMasterInsertPassthrough not found').not.toBeNull();
+    expect(restore![0]).toContain('source.disconnect(this.masterInsertHead)');
+    expect(restore![0]).toContain('source.connect(dest)');
   });
 });
 
