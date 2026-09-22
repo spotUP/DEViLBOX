@@ -215,8 +215,8 @@ export const AutomationLane: React.FC<AutomationLaneProps> = ({
     [activeCurve, patternId, channelIndex, activeParameter, patternLength, width, height, addCurve, addPoint, onAutomationChange]
   );
 
-  const handleMouseMove = useCallback(
-    (e: React.MouseEvent<HTMLCanvasElement>) => {
+  const handlePointerMove = useCallback(
+    (e: React.PointerEvent<HTMLCanvasElement>) => {
       if (!isDragging || !activeCurve) return;
       const canvas = canvasRef.current;
       if (!canvas) return;
@@ -333,11 +333,17 @@ export const AutomationLane: React.FC<AutomationLaneProps> = ({
           width={width}
           height={height}
           className="w-full rounded cursor-crosshair"
+          style={{ touchAction: 'none' }}
           onClick={handleCanvasClick}
-          onMouseDown={() => setIsDragging(true)}
-          onMouseUp={() => setIsDragging(false)}
-          onMouseLeave={() => setIsDragging(false)}
-          onMouseMove={handleMouseMove}
+          onPointerDown={(e) => {
+            // Capture so drawing follows the pointer off the lane — the shape
+            // in src/components/controls/Fader.tsx.
+            try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* no capture here */ }
+            setIsDragging(true);
+          }}
+          onPointerUp={() => setIsDragging(false)}
+          onPointerCancel={() => setIsDragging(false)}
+          onPointerMove={handlePointerMove}
         />
       </div>
 

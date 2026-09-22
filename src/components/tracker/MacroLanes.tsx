@@ -80,7 +80,7 @@ export const MacroLanes: React.FC<MacroLanesProps> = React.memo(({
     return active;
   }, [columnVisibility]);
 
-  const handleMouseMove = useCallback((e: React.MouseEvent | MouseEvent) => {
+  const handlePointerMove = useCallback((e: React.PointerEvent | React.MouseEvent) => {
     if (!isDrawing || !activeLaneRef.current) return;
 
     const { channelIndex, parameter } = activeLaneRef.current;
@@ -104,13 +104,13 @@ export const MacroLanes: React.FC<MacroLanesProps> = React.memo(({
     }
   }, [isDrawing, pattern.length, rowHeight, setCell]);
 
-  const handleGlobalMouseUp = useCallback(() => {
+  const endDrawing = useCallback(() => {
     setIsDrawing(false);
     activeLaneRef.current = null;
     setActiveLane(null);
   }, [setIsDrawing, setActiveLane]);
 
-  const handleMouseDown = (channelIndex: number, parameter: string, e: React.MouseEvent) => {
+  const handlePointerDown = (channelIndex: number, parameter: string, e: React.PointerEvent) => {
     if (e.shiftKey) {
       // Clear point on shift-click
       const rect = e.currentTarget.getBoundingClientRect();
@@ -121,19 +121,29 @@ export const MacroLanes: React.FC<MacroLanesProps> = React.memo(({
       }
       return;
     }
+    // Capture so a lane drawn with a finger keeps drawing when the finger
+    // crosses into the next lane, and releases on pointercancel — the shape
+    // in src/components/controls/Fader.tsx.
+    try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* no capture here */ }
     setIsDrawing(true);
     const lane = { channelIndex, parameter };
     activeLaneRef.current = lane;
     setActiveLane(lane);
-    handleMouseMove(e);
+    handlePointerMove(e);
   };
 
+  // A pointer released outside any lane still ends the draw. `pointerup` and
+  // `pointercancel` both count — the second is the one a mouse never sends and
+  // a finger does, when the browser takes the pointer away.
   React.useEffect(() => {
-    if (isDrawing) {
-      window.addEventListener('mouseup', handleGlobalMouseUp);
-      return () => window.removeEventListener('mouseup', handleGlobalMouseUp);
-    }
-  }, [isDrawing, handleGlobalMouseUp]);
+    if (!isDrawing) return;
+    window.addEventListener('pointerup', endDrawing);
+    window.addEventListener('pointercancel', endDrawing);
+    return () => {
+      window.removeEventListener('pointerup', endDrawing);
+      window.removeEventListener('pointercancel', endDrawing);
+    };
+  }, [isDrawing, endDrawing]);
 
   if (parameters.length === 0) return null;
 
@@ -167,10 +177,11 @@ export const MacroLanes: React.FC<MacroLanesProps> = React.memo(({
           return (
             <div
               key={`${channelIndex}-${param}`}
-              onMouseDown={(e) => handleMouseDown(channelIndex, param, e)}
-              onMouseMove={handleMouseMove}
+              onPointerDown={(e) => handlePointerDown(channelIndex, param, e)}
+              onPointerMove={handlePointerMove}
               className="group cursor-crosshair"
               style={{
+                touchAction: 'none',
                 position: 'absolute',
                 left: laneLeft,
                 top: 0,

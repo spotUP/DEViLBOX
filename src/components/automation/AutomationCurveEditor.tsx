@@ -228,8 +228,11 @@ export const AutomationCurveEditor: React.FC<AutomationCurveEditorProps> = ({
     [curve.points, patternLength]
   );
 
-  const handleMouseDown = useCallback(
-    (e: React.MouseEvent<HTMLCanvasElement>) => {
+  const handlePointerDown = useCallback(
+    (e: React.PointerEvent<HTMLCanvasElement>) => {
+      // Capture so the drag follows the pointer off the canvas and ends on
+      // pointercancel — the shape in src/components/controls/Fader.tsx.
+      try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* no capture here */ }
       const canvas = canvasRef.current;
       if (!canvas) return;
 
@@ -270,7 +273,7 @@ export const AutomationCurveEditor: React.FC<AutomationCurveEditorProps> = ({
     [coordsToRowValue, drawMode, addPoint, curve, historyIndex, selectedPoints, findPointNear]
   );
 
-  const handleMouseMove = useCallback(
+  const handlePointerMove = useCallback(
     (e: React.MouseEvent<HTMLCanvasElement>) => {
       const canvas = canvasRef.current;
       if (!canvas) return;
@@ -335,7 +338,7 @@ export const AutomationCurveEditor: React.FC<AutomationCurveEditorProps> = ({
      selectedPoints, selectionRect, patternId, channelIndex, parameter, setAutomation, patternLength]
   );
 
-  const handleMouseUp = useCallback(() => {
+  const handlePointerUp = useCallback(() => {
     if (drawMode === 'select') {
       if (isDraggingSelection) {
         setIsDraggingSelection(false);
@@ -613,10 +616,11 @@ export const AutomationCurveEditor: React.FC<AutomationCurveEditorProps> = ({
         ref={canvasRef}
         width={width}
         height={height}
-        onMouseDown={(e) => { setContextMenu(null); handleMouseDown(e); }}
-        onMouseMove={handleMouseMove}
-        onMouseUp={handleMouseUp}
-        onMouseLeave={handleMouseUp}
+        style={{ touchAction: 'none' }}
+        onPointerDown={(e) => { setContextMenu(null); handlePointerDown(e); }}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+        onPointerCancel={handlePointerUp}
         onContextMenu={(e) => {
           e.preventDefault();
           const rect = canvasRef.current?.getBoundingClientRect();

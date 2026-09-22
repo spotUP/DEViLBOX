@@ -255,7 +255,10 @@ export const AutomationCurveCanvas: React.FC<AutomationCurveCanvasProps> = ({
   const [isDragging, setIsDragging] = useState(false);
 
   // Handle mouse down
-  const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
+  const handlePointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    // Capture so the drag follows the pointer off the canvas and ends on
+    // pointercancel — the shape in src/components/controls/Fader.tsx.
+    try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* no capture here */ }
     const canvas = canvasRef.current;
     if (!canvas) return;
 
@@ -311,7 +314,7 @@ export const AutomationCurveCanvas: React.FC<AutomationCurveCanvasProps> = ({
   };
 
   // Handle mouse move
-  const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
+  const handlePointerMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
@@ -363,7 +366,7 @@ export const AutomationCurveCanvas: React.FC<AutomationCurveCanvasProps> = ({
   };
 
   // Handle mouse up
-  const handleMouseUp = () => {
+  const handlePointerUp = () => {
     // Finalize lasso selection
     if (lassoStart && lassoEnd && drawMode === 'select') {
       const minX = Math.min(lassoStart.x, lassoEnd.x);
@@ -729,15 +732,15 @@ export const AutomationCurveCanvas: React.FC<AutomationCurveCanvasProps> = ({
           ref={canvasRef}
           width={canvasWidth}
           height={height}
-          onMouseDown={handleMouseDown}
-          onMouseMove={handleMouseMove}
-          onMouseUp={handleMouseUp}
-          onMouseLeave={handleMouseUp}
+          onPointerDown={handlePointerDown}
+          onPointerMove={handlePointerMove}
+          onPointerUp={handlePointerUp}
+          onPointerCancel={handlePointerUp}
           onContextMenu={handleContextMenu}
           className={`w-full rounded-lg border border-dark-border ${
             isDragging ? 'cursor-grabbing' : 'cursor-crosshair'
           }`}
-          style={{ height: height }}
+          style={{ height: height, touchAction: 'none' }}
           tabIndex={0}
         />
       </div>

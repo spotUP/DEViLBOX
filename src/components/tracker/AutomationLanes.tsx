@@ -339,16 +339,16 @@ export const AutomationLanes: React.FC<AutomationLanesProps> = React.memo(({
   const nextHeight = nextLen * rowHeight;
   const totalVirtualHeight = prevHeight + currentHeight + nextHeight;
 
-  // Mouse event handlers for editing (must be before conditional return)
-  const handleMouseDown = useCallback((
-    e: React.MouseEvent,
+  // Pointer event handlers for editing (must be before conditional return)
+  const handlePointerDown = useCallback((
+    e: React.PointerEvent,
     curve: AutomationCurve,
     channelIndex: number,
     laneLeft: number,
     yOffset: number,
     laneWidth: number = LANE_WIDTH,
   ) => {
-    if (e.button !== 0) return; // Only left click
+    if (e.button !== 0) return; // Only left click / primary contact
 
     e.preventDefault();
     e.stopPropagation();
@@ -356,7 +356,7 @@ export const AutomationLanes: React.FC<AutomationLanesProps> = React.memo(({
     const rect = containerRef.current?.getBoundingClientRect();
     if (!rect) return;
 
-    // Calculate row and value from mouse position
+    // Calculate row and value from pointer position
     const mouseY = e.clientY - rect.top - yOffset;
     const row = Math.floor(mouseY / rowHeight);
 
@@ -370,12 +370,15 @@ export const AutomationLanes: React.FC<AutomationLanesProps> = React.memo(({
     setDragState({ curveId: curve.id, row, channelIndex, laneLeft, laneWidth, yOffset });
   }, [patternLength, rowHeight, addPoint]);
 
-  // Document-level mouse move/up so the drag continues even when the cursor
-  // strays outside the lane and back in. Without this, the lane's onMouseMove
-  // stops firing the moment the cursor leaves its bounding box.
+  // Document-level pointer move/up so the drag continues even when the pointer
+  // strays outside the lane and back in. Without this, the lane's own move
+  // handler stops firing the moment the pointer leaves its bounding box.
+  // `pointercancel` counts as a release: a mouse never sends it, a finger does
+  // when the browser takes the pointer away, and a lane left in dragState
+  // would keep writing points.
   React.useEffect(() => {
     if (!dragState) return;
-    const handleDocMove = (e: MouseEvent) => {
+    const handleDocMove = (e: PointerEvent) => {
       const rect = containerRef.current?.getBoundingClientRect();
       if (!rect) return;
       const mouseY = e.clientY - rect.top - dragState.yOffset;
@@ -386,18 +389,20 @@ export const AutomationLanes: React.FC<AutomationLanesProps> = React.memo(({
       addPoint(dragState.curveId, row, value);
     };
     const handleDocUp = () => setDragState(null);
-    document.addEventListener('mousemove', handleDocMove);
-    document.addEventListener('mouseup', handleDocUp);
+    document.addEventListener('pointermove', handleDocMove);
+    document.addEventListener('pointerup', handleDocUp);
+    document.addEventListener('pointercancel', handleDocUp);
     return () => {
-      document.removeEventListener('mousemove', handleDocMove);
-      document.removeEventListener('mouseup', handleDocUp);
+      document.removeEventListener('pointermove', handleDocMove);
+      document.removeEventListener('pointerup', handleDocUp);
+      document.removeEventListener('pointercancel', handleDocUp);
     };
   }, [dragState, rowHeight, patternLength, addPoint]);
 
   // Legacy no-op stubs (lane divs still spread these but the document
   // listeners above do the actual work).
-  const handleMouseMove = useCallback(() => {}, []);
-  const handleMouseUp = useCallback(() => {}, []);
+  const handlePointerMove = useCallback(() => {}, []);
+  const handlePointerUp = useCallback(() => {}, []);
 
   const handleDoubleClick = useCallback((
     e: React.MouseEvent,
@@ -526,10 +531,11 @@ export const AutomationLanes: React.FC<AutomationLanesProps> = React.memo(({
               height: pHeight,
               cursor: isInteractive ? 'crosshair' : 'default',
               pointerEvents: isInteractive ? 'auto' : 'none',
+              touchAction: 'none',
             }}
-            onMouseDown={isInteractive ? (e) => handleMouseDown(e, curve, channelIndex, laneLeft, yOffset, laneWidth) : undefined}
-            onMouseMove={isInteractive ? handleMouseMove : undefined}
-            onMouseUp={isInteractive ? handleMouseUp : undefined}
+            onPointerDown={isInteractive ? (e) => handlePointerDown(e, curve, channelIndex, laneLeft, yOffset, laneWidth) : undefined}
+            onPointerMove={isInteractive ? handlePointerMove : undefined}
+            onPointerUp={isInteractive ? handlePointerUp : undefined}
             onContextMenu={isInteractive ? (e) => handleLaneContextMenu(e, curve.id) : undefined}
             onDoubleClick={isInteractive ? (e) => handleDoubleClick(e, curve, yOffset) : undefined}
           >
@@ -659,10 +665,11 @@ export const AutomationLanes: React.FC<AutomationLanesProps> = React.memo(({
             height: pHeight,
             cursor: isCurrentPattern ? 'crosshair' : 'default',
             pointerEvents: 'auto',
+            touchAction: 'none',
           }}
-          onMouseDown={isCurrentPattern ? (e) => handleMouseDown(e, curve, channelIndex, laneLeft, yOffset, lw) : undefined}
-          onMouseMove={isCurrentPattern ? handleMouseMove : undefined}
-          onMouseUp={isCurrentPattern ? handleMouseUp : undefined}
+          onPointerDown={isCurrentPattern ? (e) => handlePointerDown(e, curve, channelIndex, laneLeft, yOffset, lw) : undefined}
+          onPointerMove={isCurrentPattern ? handlePointerMove : undefined}
+          onPointerUp={isCurrentPattern ? handlePointerUp : undefined}
           onContextMenu={isCurrentPattern ? (e) => handleLaneContextMenu(e, curve.id) : undefined}
           onDoubleClick={isCurrentPattern ? (e) => handleDoubleClick(e, curve, yOffset) : undefined}
         >
