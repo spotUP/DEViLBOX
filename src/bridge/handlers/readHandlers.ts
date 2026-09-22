@@ -1039,7 +1039,19 @@ export async function getPlaybackSilence(): Promise<Record<string, unknown>> {
         for (const [k, v] of te.nativeEngineRouting?.entries() ?? []) {
           routing[k] = v.destinations?.size ?? -1;
         }
-        return { ...levels, nativeRouting: routing };
+        // The bus's own input and return, so a sweep of an echo parameter can
+        // be measured without pulling the whole `get_dub_bus_state` payload
+        // for every step.
+        const { getActiveDubBus } = await import('../../engine/dub/DubBus');
+        const bus = getActiveDubBus();
+        const insert = bus?.getMasterInsertLevels?.() as
+          { busInput?: number; busReturn?: number } | null | undefined;
+        return {
+          ...levels,
+          nativeRouting: routing,
+          busInput: insert?.busInput ?? null,
+          busReturn: insert?.busReturn ?? null,
+        };
       } catch { return null; }
     })(),
   };
