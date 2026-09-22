@@ -218,8 +218,8 @@ export const Knob: React.FC<KnobProps> = React.memo(({
     }
   }, []);
 
-  // Handle double-tap for numeric input (mobile)
-  const handleTap = useCallback((_e: React.TouchEvent) => {
+  // Handle double-tap for numeric input (coarse pointer)
+  const handleTap = useCallback(() => {
     if (disabled) return;
     const now = Date.now();
     const timeSinceLastTap = now - lastTapTime.current;
@@ -235,8 +235,8 @@ export const Knob: React.FC<KnobProps> = React.memo(({
     }
   }, [disabled, clearLongPressTimer]);
 
-  // Handle long-press for preset menu (mobile)
-  const handleLongPressStart = useCallback((_e: React.TouchEvent) => {
+  // Handle long-press for preset menu (coarse pointer)
+  const handleLongPressStart = useCallback(() => {
     if (disabled) return;
     const rect = knobRef.current?.getBoundingClientRect();
     if (rect) {
@@ -264,108 +264,139 @@ export const Knob: React.FC<KnobProps> = React.memo(({
     setShowNumericInput(false);
   }, [min, max, onChange]);
 
-  // Handle mouse/touch down — registers global listeners only for this drag session
-  const handleMouseDown = useCallback((e: React.MouseEvent | React.TouchEvent) => {
+  /**
+   * One drag path for a mouse, a finger and a pen.
+   *
+   * This was `onMouseDown` + `onTouchStart` with window-level
+   * `mousemove`/`touchmove` listeners, which made a drag that leaves the
+   * knob's bounds behave differently on the two input types and left nothing
+   * listening for `pointercancel` — a knob whose pointer the browser stole
+   * stayed latched. `Fader.tsx` is the reference shape and this now matches
+   * it: element-level pointer handlers, `setPointerCapture` so the drag
+   * follows the finger anywhere, `touchAction: 'none'` so the page does not
+   * scroll underneath it, and `onPointerCancel` ending the drag.
+   *
+   * `docs/CONTROL_PATTERNS.md` is unchanged by this: every value read during
+   * the drag still comes from a ref (`onChangeRef`, `minRef`, `maxRef`,
+   * `logarithmicRef`, `stepRef`), the store write is still rAF-batched
+   * through `pendingValueRef`, and the visual update still goes through
+   * `updateDomRef` so a `paramKey` fast-path knob rotates while it plays.
+   */
+  const activePointerRef = useRef<number | null>(null);
+
+  const endDrag = useCallback(() => {
+    clearLongPressTimer();
+    activePointerRef.current = null;
+    setIsDragging(false);
+    const ownerDoc = knobRef.current?.ownerDocument ?? document;
+    ownerDoc.body.style.cursor = '';
+    if (rafRef.current) {
+      cancelAnimationFrame(rafRef.current);
+      rafRef.current = null;
+    }
+    // Flush whatever the last frame had not yet written, so the value the
+    // hand left is the value the store holds.
+    if (pendingValueRef.current !== null) {
+      onChangeRef.current(pendingValueRef.current);
+      pendingValueRef.current = null;
+    }
+  }, [clearLongPressTimer]);
+
+  const handlePointerDown = useCallback((e: React.PointerEvent) => {
     if (disabled) return;
-    // Only preventDefault for mouse events — touch events are passive and can't be prevented
-    if (!('touches' in e)) e.preventDefault();
+    if (activePointerRef.current !== null) return; // second finger: ignore
+    e.preventDefault();
 
-    const isTouchEvent = 'touches' in e;
-    const clientY = isTouchEvent ? e.touches[0].clientY : e.clientY;
-    const clientX = isTouchEvent ? e.touches[0].clientX : e.clientX;
-
-    // For touch events, detect double-tap and long-press
-    if (isTouchEvent) {
-      handleTap(e);
-      handleLongPressStart(e);
+    // A coarse pointer gets the two gestures a mouse does not need:
+    // double-tap for numeric entry, long-press for the preset menu.
+    if (e.pointerType !== 'mouse') {
+      handleTap();
+      handleLongPressStart();
     }
 
+    try {
+      (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    } catch {
+      /* jsdom/happy-dom and very old browsers have no pointer capture */
+    }
+    activePointerRef.current = e.pointerId;
+
     setIsDragging(true);
-    dragStartY.current = clientY;
-    dragStartX.current = clientX;
+    dragStartY.current = e.clientY;
+    dragStartX.current = e.clientX;
     dragStartValue.current = getNormalized();
     dragDirection.current = null; // Reset - will be determined on first move
     const ownerDoc = knobRef.current?.ownerDocument ?? document;
-    const ownerWin = ownerDoc.defaultView ?? window;
     ownerDoc.body.style.cursor = 'ns-resize';
+  }, [disabled, getNormalized, handleTap, handleLongPressStart]);
 
-    const handleMouseMove = (ev: MouseEvent | TouchEvent) => {
-      // Clear long-press timer on movement
-      clearLongPressTimer();
+  const handlePointerMove = useCallback((e: React.PointerEvent) => {
+    if (activePointerRef.current !== e.pointerId) return;
+    e.preventDefault();
 
-      const moveY = 'touches' in ev ? ev.touches[0].clientY : ev.clientY;
-      const moveX = 'touches' in ev ? ev.touches[0].clientX : ev.clientX;
+    // Clear long-press timer on movement
+    clearLongPressTimer();
 
-      const deltaY = dragStartY.current - moveY;
-      const deltaX = moveX - dragStartX.current;
+    const deltaY = dragStartY.current - e.clientY;
+    const deltaX = e.clientX - dragStartX.current;
 
-      // Lock to first significant direction to prevent jumps when changing direction
-      if (dragDirection.current === null) {
-        const threshold = 5; // pixels before locking direction
-        if (Math.abs(deltaY) >= threshold || Math.abs(deltaX) >= threshold) {
-          dragDirection.current = Math.abs(deltaX) > Math.abs(deltaY) ? 'horizontal' : 'vertical';
-        } else {
-          return; // Don't update until direction is locked
+    // Lock to first significant direction to prevent jumps when changing direction
+    if (dragDirection.current === null) {
+      const threshold = 5; // pixels before locking direction
+      if (Math.abs(deltaY) >= threshold || Math.abs(deltaX) >= threshold) {
+        dragDirection.current = Math.abs(deltaX) > Math.abs(deltaY) ? 'horizontal' : 'vertical';
+      } else {
+        return; // Don't update until direction is locked
+      }
+    }
+
+    const delta = dragDirection.current === 'horizontal' ? deltaX : deltaY;
+
+    const sensitivity = 150;
+    const deltaNorm = delta / sensitivity;
+    const newNorm = Math.max(0, Math.min(1, dragStartValue.current + deltaNorm));
+
+    let newValue: number;
+    if (logarithmicRef.current) {
+      newValue = linearToLog(newNorm, minRef.current, maxRef.current);
+    } else {
+      newValue = minRef.current + newNorm * (maxRef.current - minRef.current);
+    }
+
+    const currentStep = stepRef.current;
+    if (currentStep !== undefined && currentStep > 0) {
+      newValue = Math.round(newValue / currentStep) * currentStep;
+    } else {
+      newValue = Math.round(newValue * 100) / 100;
+    }
+
+    pendingValueRef.current = newValue;
+    // When a fast-path subscription is active (paramKey/imperativeSubscribe),
+    // React re-renders from `value` prop changes are memoed away. The drag
+    // must push the visual update through the same imperative DOM writer the
+    // subscription uses — otherwise the knob rotates audibly (audio tracks
+    // the store) but the SVG indicator sits still.
+    updateDomRef.current?.(newNorm);
+    if (!rafRef.current) {
+      rafRef.current = requestAnimationFrame(() => {
+        if (pendingValueRef.current !== null) {
+          onChangeRef.current(pendingValueRef.current);
+          pendingValueRef.current = null;
         }
-      }
-
-      const delta = dragDirection.current === 'horizontal' ? deltaX : deltaY;
-
-      const sensitivity = 150;
-      const deltaNorm = delta / sensitivity;
-      const newNorm = Math.max(0, Math.min(1, dragStartValue.current + deltaNorm));
-
-      let newValue: number;
-      if (logarithmicRef.current) {
-        newValue = linearToLog(newNorm, minRef.current, maxRef.current);
-      } else {
-        newValue = minRef.current + newNorm * (maxRef.current - minRef.current);
-      }
-
-      const currentStep = stepRef.current;
-      if (currentStep !== undefined && currentStep > 0) {
-        newValue = Math.round(newValue / currentStep) * currentStep;
-      } else {
-        newValue = Math.round(newValue * 100) / 100;
-      }
-
-      pendingValueRef.current = newValue;
-      // When a fast-path subscription is active (paramKey/imperativeSubscribe),
-      // React re-renders from `value` prop changes are memoed away. Mouse drag
-      // must push the visual update through the same imperative DOM writer the
-      // subscription uses — otherwise the knob rotates audibly (audio tracks
-      // the store) but the SVG indicator sits still.
-      updateDomRef.current?.(newNorm);
-      if (!rafRef.current) {
-        rafRef.current = requestAnimationFrame(() => {
-          if (pendingValueRef.current !== null) {
-            onChangeRef.current(pendingValueRef.current);
-            pendingValueRef.current = null;
-          }
-          rafRef.current = null;
-        });
-      }
-    };
-
-    const handleMouseUp = () => {
-      clearLongPressTimer();
-      setIsDragging(false);
-      ownerDoc.body.style.cursor = '';
-      ownerWin.removeEventListener('mousemove', handleMouseMove);
-      ownerWin.removeEventListener('mouseup', handleMouseUp);
-      ownerWin.removeEventListener('touchmove', handleMouseMove);
-      ownerWin.removeEventListener('touchend', handleMouseUp);
-      if (rafRef.current) {
-        cancelAnimationFrame(rafRef.current);
         rafRef.current = null;
-      }
-    };
+      });
+    }
+  }, [clearLongPressTimer]);
 
-    ownerWin.addEventListener('mousemove', handleMouseMove);
-    ownerWin.addEventListener('mouseup', handleMouseUp);
-    ownerWin.addEventListener('touchmove', handleMouseMove, { passive: false });
-    ownerWin.addEventListener('touchend', handleMouseUp);
-  }, [getNormalized, disabled, handleTap, handleLongPressStart, clearLongPressTimer]);
+  const handlePointerUp = useCallback((e: React.PointerEvent) => {
+    if (activePointerRef.current !== e.pointerId) return;
+    try {
+      (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
+    } catch {
+      /* already released */
+    }
+    endDrag();
+  }, [endDrag]);
 
   // Handle double-click to reset
   const handleDoubleClick = useCallback(() => {
@@ -535,8 +566,10 @@ export const Knob: React.FC<KnobProps> = React.memo(({
           height: knobSize,
           touchAction: 'none', // CRITICAL: Prevents scroll on mobile
         }}
-        onMouseDown={handleMouseDown}
-        onTouchStart={handleMouseDown}
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+        onPointerCancel={handlePointerUp}
         onDoubleClick={handleDoubleClick}
         onContextMenu={handleContextMenu}
         onKeyDown={handleKeyDown}

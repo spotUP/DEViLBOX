@@ -80,31 +80,45 @@ export const DJPitchSlider: React.FC<DJPitchSliderProps> = ({
   }, [onPitchChange, setGlobalPitch]);
 
   // ── Drag ───────────────────────────────────────────────────────────
-  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+  // Pointer events, not mouse events: a pitch fader that ignores a finger is
+  // the most visible touch failure in the app. `Fader.tsx` is the reference
+  // shape — capture the pointer so the drag follows it off the track, and
+  // treat `pointercancel` as a release so a stolen pointer cannot leave the
+  // deck detuned.
+  const activePointerRef = useRef<number | null>(null);
+
+  const handlePointerDown = useCallback((e: React.PointerEvent) => {
+    if (activePointerRef.current !== null) return; // second finger: ignore
     e.preventDefault();
+    try {
+      (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    } catch {
+      /* no pointer capture in this environment */
+    }
+    activePointerRef.current = e.pointerId;
     dragRef.current = { startY: e.clientY, startPitch: pitchRef.current };
     setIsDragging(true);
   }, []); // Remove pitch dependency - use pitchRef.current instead
 
-  useEffect(() => {
-    if (!isDragging) return;
+  const handlePointerMove = useCallback((e: React.PointerEvent) => {
+    if (activePointerRef.current !== e.pointerId) return;
+    e.preventDefault();
+    const h = trackRef.current?.clientHeight ?? 1;
+    const usable = h - HANDLE_H - EDGE_PAD * 2;
+    const dy = e.clientY - dragRef.current.startY;
+    applyPitch(dragRef.current.startPitch - (dy / usable) * PITCH_RANGE);
+  }, [applyPitch]);
 
-    const onMove = (e: MouseEvent) => {
-      const h = trackRef.current?.clientHeight ?? 1;
-      const usable = h - HANDLE_H - EDGE_PAD * 2;
-      const dy = e.clientY - dragRef.current.startY;
-      applyPitch(dragRef.current.startPitch - (dy / usable) * PITCH_RANGE);
-    };
-
-    const onUp = () => setIsDragging(false);
-
-    window.addEventListener('mousemove', onMove);
-    window.addEventListener('mouseup', onUp);
-    return () => {
-      window.removeEventListener('mousemove', onMove);
-      window.removeEventListener('mouseup', onUp);
-    };
-  }, [isDragging, applyPitch]);
+  const handlePointerUp = useCallback((e: React.PointerEvent) => {
+    if (activePointerRef.current !== e.pointerId) return;
+    try {
+      (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
+    } catch {
+      /* already released */
+    }
+    activePointerRef.current = null;
+    setIsDragging(false);
+  }, []);
 
   // ── Layout ─────────────────────────────────────────────────────────
   // 0 = top of track (+12 st), 1 = bottom (-12 st)
@@ -171,7 +185,11 @@ export const DJPitchSlider: React.FC<DJPitchSliderProps> = ({
         <div
           ref={trackRef}
           className="absolute inset-0 cursor-ns-resize"
-          onMouseDown={handleMouseDown}
+          style={{ touchAction: 'none' }}
+          onPointerDown={handlePointerDown}
+          onPointerMove={handlePointerMove}
+          onPointerUp={handlePointerUp}
+          onPointerCancel={handlePointerUp}
           onContextMenu={(e) => { e.preventDefault(); resetPitch(); }}
         />
 

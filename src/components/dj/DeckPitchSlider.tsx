@@ -69,34 +69,47 @@ export const DeckPitchSlider: React.FC<DeckPitchSliderProps> = ({ deckId }) => {
     [deckId, yToPitch]
   );
 
-  const handleMouseDown = useCallback(
-    (e: React.MouseEvent) => {
+  // Pointer events, not mouse events. `Fader.tsx` is the reference shape:
+  // capture the pointer so the drag follows it off the 32px-wide track, and
+  // treat `pointercancel` as a release so a pointer the browser takes away
+  // cannot leave the deck repitched.
+  const activePointerRef = useRef<number | null>(null);
+
+  const handlePointerDown = useCallback(
+    (e: React.PointerEvent) => {
+      if (activePointerRef.current !== null) return; // second finger: ignore
       e.preventDefault();
+      try {
+        (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+      } catch {
+        /* no pointer capture in this environment */
+      }
+      activePointerRef.current = e.pointerId;
       setIsDragging(true);
       updatePitch(e.clientY);
     },
     [updatePitch]
   );
 
-  // Global mouse handlers for drag
-  useEffect(() => {
-    if (!isDragging) return;
-
-    const handleMouseMove = (e: MouseEvent) => {
+  const handlePointerMove = useCallback(
+    (e: React.PointerEvent) => {
+      if (activePointerRef.current !== e.pointerId) return;
+      e.preventDefault();
       updatePitch(e.clientY);
-    };
+    },
+    [updatePitch]
+  );
 
-    const handleMouseUp = () => {
-      setIsDragging(false);
-    };
-
-    window.addEventListener('mousemove', handleMouseMove);
-    window.addEventListener('mouseup', handleMouseUp);
-    return () => {
-      window.removeEventListener('mousemove', handleMouseMove);
-      window.removeEventListener('mouseup', handleMouseUp);
-    };
-  }, [isDragging, updatePitch]);
+  const handlePointerUp = useCallback((e: React.PointerEvent) => {
+    if (activePointerRef.current !== e.pointerId) return;
+    try {
+      (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
+    } catch {
+      /* already released */
+    }
+    activePointerRef.current = null;
+    setIsDragging(false);
+  }, []);
 
   const handleDoubleClick = useCallback(() => {
     setDeckPitchAction(deckId, 0);
@@ -132,8 +145,11 @@ export const DeckPitchSlider: React.FC<DeckPitchSliderProps> = ({ deckId }) => {
       <div
         ref={trackRef}
         className="relative cursor-pointer flex-1 min-h-0"
-        style={{ width: 32 }}
-        onMouseDown={handleMouseDown}
+        style={{ width: 32, touchAction: 'none' }}
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+        onPointerCancel={handlePointerUp}
         onDoubleClick={handleDoubleClick}
         onContextMenu={(e) => { e.preventDefault(); setDeckPitchAction(deckId, 0); }}
       >
