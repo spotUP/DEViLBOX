@@ -1,12 +1,19 @@
 /**
- * BottomSheet - Swipeable bottom panel for mobile
- * Supports snap points, drag-to-dismiss, and backdrop tap-to-close
+ * BottomSheet - swipeable bottom panel for a phone.
+ * Snap points, drag-to-dismiss, backdrop tap-to-close.
+ *
+ * Revived in Phase 3 of thoughts/shared/plans/2026-09-22-responsive-mobile.md,
+ * where it had been exported with zero consumers since it was written. It is
+ * where a desktop panel goes on a phone: `ResponsivePanel` with
+ * `phone="sheet"` renders one of these. Brought onto the design system on the
+ * way back in — `<Button>` for the close control, pointer events for the drag.
  */
 
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 import { haptics } from '@/utils/haptics';
+import { Button } from './Button';
 
 export interface BottomSheetProps {
   isOpen: boolean;
@@ -42,20 +49,17 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
   const currentHeight = isDragging ? dragStartHeight.current - dragOffset : snapHeight;
 
   // Handle drag start
-  const handleDragStart = useCallback((e: React.TouchEvent | React.MouseEvent) => {
-    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
-    dragStartY.current = clientY;
+  const handleDragStart = useCallback((e: React.PointerEvent) => {
+    dragStartY.current = e.clientY;
     dragStartHeight.current = currentHeight;
     setIsDragging(true);
     haptics.soft();
   }, [currentHeight]);
 
   // Handle drag move
-  const handleDragMove = useCallback((e: TouchEvent | MouseEvent) => {
+  const handleDragMove = useCallback((e: PointerEvent) => {
     if (!isDragging) return;
-
-    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
-    const delta = dragStartY.current - clientY;
+    const delta = dragStartY.current - e.clientY;
     setDragOffset(delta);
   }, [isDragging]);
 
@@ -95,21 +99,19 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
   useEffect(() => {
     if (!isDragging) return;
 
-    const handleMove = (e: TouchEvent | MouseEvent) => {
+    const handleMove = (e: PointerEvent) => {
       e.preventDefault();
       handleDragMove(e);
     };
 
-    window.addEventListener('touchmove', handleMove, { passive: false });
-    window.addEventListener('mousemove', handleMove);
-    window.addEventListener('touchend', handleDragEnd);
-    window.addEventListener('mouseup', handleDragEnd);
+    window.addEventListener('pointermove', handleMove, { passive: false });
+    window.addEventListener('pointerup', handleDragEnd);
+    window.addEventListener('pointercancel', handleDragEnd);
 
     return () => {
-      window.removeEventListener('touchmove', handleMove);
-      window.removeEventListener('mousemove', handleMove);
-      window.removeEventListener('touchend', handleDragEnd);
-      window.removeEventListener('mouseup', handleDragEnd);
+      window.removeEventListener('pointermove', handleMove);
+      window.removeEventListener('pointerup', handleDragEnd);
+      window.removeEventListener('pointercancel', handleDragEnd);
     };
   }, [isDragging, handleDragMove, handleDragEnd]);
 
@@ -203,8 +205,8 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
         {/* Drag handle */}
         <div
           className="flex-shrink-0 flex flex-col items-center pt-2 pb-3 cursor-grab active:cursor-grabbing"
-          onTouchStart={handleDragStart}
-          onMouseDown={handleDragStart}
+          style={{ touchAction: 'none' }}
+          onPointerDown={handleDragStart}
         >
           <div className="w-12 h-1 bg-text-muted/30 rounded-full" />
         </div>
@@ -218,13 +220,9 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
               </h3>
             )}
             {showCloseButton && (
-              <button
-                onClick={onClose}
-                className="p-2 rounded-lg hover:bg-dark-bgHover transition-colors touch-target"
-                aria-label="Close"
-              >
-                <X size={20} className="text-text-muted" />
-              </button>
+              <Button variant="ghost" onClick={onClose} aria-label="Close">
+                <X size={20} />
+              </Button>
             )}
           </div>
         )}
