@@ -269,43 +269,56 @@ with `isCoarsePointer`/`isPhone`/`isShortViewport`, `screens` in
 `tailwind.config.js`). Items below are the remaining phases.
 
 ### Phase 1 — viewport and chrome correctness
-- [ ] R1-1 `--app-vh` defined once in `index.css`, upgraded to `100dvh` under
+- [x] R1-1 `--app-vh` defined once in `index.css`, upgraded to `100dvh` under
       `@supports`. One definition, every consumer reads it.
-- [ ] R1-2 `theme.extend.{height,minHeight,maxHeight}.screen` -> `var(--app-vh)`
+- [x] R1-2 `theme.extend.{height,minHeight,maxHeight}.screen` -> `var(--app-vh)`
       so the 14 `h-screen` follow without being edited.
-- [ ] R1-3 The 85 literal `100vh` (79 in .ts/.tsx, 6 in `index.css`) read the
+- [x] R1-3 The 85 literal `100vh` (79 in .ts/.tsx, 6 in `index.css`) read the
       variable.
-- [ ] R1-4 `Modal.tsx` `sm`/`md` -> `w-full max-w-sm` / `w-full max-w-md`.
-- [ ] R1-5 Bottom tab bar clears the iOS toolbar and home indicator using the
+- [x] R1-4 `Modal.tsx` `sm`/`md` -> `w-full max-w-sm` / `w-full max-w-md`.
+- [x] R1-5 Bottom tab bar clears the iOS toolbar and home indicator using the
       existing `safe-area-bottom` / `.mobile-bottom-padding`, not a third
       mechanism.
-- [ ] R1-6 Tests: no `Modal` size variant emits a bare `w-<n>`; no literal
+- [x] R1-6 Tests: no `Modal` size variant emits a bare `w-<n>`; no literal
       `100vh` outside the variable's own definition.
 
+(Phase 1 landed in `3359e180f`. The device half — real iOS Safari, toolbar
+shown and hidden, home indicator — is still open and only a human can close
+it.)
+
 ### Phase 2 — touch parity on drag controls
-- [ ] R2-1 `Knob.tsx` onto the `Fader.tsx` pointer shape, `docs/CONTROL_PATTERNS.md`
+- [x] R2-1 `Knob.tsx` onto the `Fader.tsx` pointer shape, `docs/CONTROL_PATTERNS.md`
       intact (ref mirror, `onChange`-only deps, no transition, `paramKey`).
-- [ ] R2-2 `DJPitchSlider`, `DeckPitchSlider` — the most visible failure.
-- [ ] R2-3 Tracker lanes: `AutomationLane`, `AutomationLanes`, `MacroLanes`,
+- [x] R2-2 `DJPitchSlider`, `DeckPitchSlider` — the most visible failure.
+- [x] R2-3 Tracker lanes: `AutomationLane`, `AutomationLanes`, `MacroLanes`,
       `ParameterEditor`, `AutomationLaneStrip`, `PatternMatrix`.
-- [ ] R2-4 Canvas editors: `SampleEditor`, `SampleSpectrumFilter`,
+- [x] R2-4 Canvas editors: `SampleEditor`, `SampleSpectrumFilter`,
       `DeckAudioWaveform`, `DeckTrackOverview`, `FilterCurve`, `DrawCanvas`,
       `HarmonicBarsCanvas`, `GeonkickEnvelopeCanvas`, `PadButton`, `PadEditor`.
-- [ ] R2-5 The thirteen `instruments/hardware/*Hardware*.tsx`.
-- [ ] R2-6 Ratchet test: a file with `onMouseDown` and no pointer/touch sibling
+- [x] R2-5 The thirteen `instruments/hardware/*Hardware*.tsx`.
+- [x] R2-6 Ratchet test: a file with `onMouseDown` and no pointer/touch sibling
       fails unless it is on a shrinking allowlist.
 
+(Phase 2 landed in `9f534e2b5`, `c886c352d`, `1bb988021`, `ac08caa99`. All 43
+mouse-only files converted, ratchet allowlist empty. A real finger on a real
+knob is still open.)
+
 ### Phase 3 — layout primitives, one tree
-- [ ] R3-1 Primitives: hide-below-width, collapse-to-disclosure,
+- [x] R3-1 Primitives: hide-below-width, collapse-to-disclosure,
       relocate-into-sheet. The sheet revives `ui/BottomSheet.tsx` onto
       `<Button>` and the token allowlist.
-- [ ] R3-2 Each `TrackerView` panel container wrapped in its primitive.
-- [ ] R3-3 `MobileTrackerView`'s fork removed; its real contributions
+- [x] R3-2 Each `TrackerView` panel container wrapped in its primitive.
+- [x] R3-3 `MobileTrackerView`'s fork removed; its real contributions
       (format-editor routing, three-state piano, orientation `visibleChannels`)
       move into the shared tree behind `isPhone`.
-- [ ] R3-4 Reachability: render `TrackerView` at 390/700/1024/1440 and assert
+- [x] R3-4 Reachability: render `TrackerView` at 390/700/1024/1440 and assert
       every panel is mounted or in a sheet. happy-dom does no layout — this
       proves mounting, never overflow.
+
+(Phase 3: `MobileTrackerView` deleted, one tree, nine panels declaring how
+they degrade. Sheet content unmounts when the sheet closes, so `DubDeckStrip`
+is `keep` — it owns the dub bus toggle and already collapses itself. The
+desktop regression check at 1440 is still open.)
 
 ### Phase 4 — the views that cannot reflow
 - [ ] R4-1 (4a) `mobileCanvas` decoupled from `webglUnsupported`; character
