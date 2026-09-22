@@ -72,6 +72,18 @@ interface Row {
   nameHint: string | null;
   /** Mechanically derived from the measurements. Correct it — that is the job. */
   proposed: string;
+  /**
+   * What the SHIPPING classifier says for this channel, so the corpus can
+   * score it.
+   *
+   * Song-level, because that is the only granularity `classifySongRoles`
+   * offers — one role per channel for the whole tune. Repeating it on every
+   * row of that channel is deliberate: when a channel's rows carry different
+   * labels and one classifier verdict, the rows that disagree with it are
+   * exactly the cases a permanent label cannot express, and they will show up
+   * as a systematic error rather than as noise.
+   */
+  classifierRole: string | null;
   /** Human ground truth. null until somebody fills it in. */
   label: string | null;
   /** Free text for the labeller: why, or what makes it ambiguous. */
@@ -133,8 +145,19 @@ function hintFromName(raw: string | null | undefined): string | null {
 
   // Substring, not word-boundary. Demoscene sample names are concatenated —
   // `jstbass5`, `jsttom1`, `jstdrumriff1` — and `\bbass\b` matches none of
-  // them. That mistake cost this corpus most of its usable names on the first
-  // pass: 31 rows instead of the 100+ the names actually support.
+  // them. Word boundaries found 31 rows; substrings find 82.
+  //
+  // The worry with substrings was that they would start matching the greetings
+  // and credits that fill chip-format name slots. Measured on this corpus:
+  // they do not. All 82 hits are on MOD, XM, IT and S3M names that genuinely
+  // describe a sample — `RIDE.WAV`, `HIHATS.WAV`, `CLAP6.WAV`, `Bass Kick`,
+  // `DLMBass`, `jstbass5` — and ZERO are on the HivelyTracker rows, whose
+  // names are the song's liner notes. The guards above do that work: a phrase
+  // like `for Revision 2017` or `lost count a long` contains no instrument
+  // token at all.
+  //
+  // This stays LOW-confidence evidence for a human labeller either way. It is
+  // never identity, and nothing in the classifier reads it.
   //
   // Ordered most specific first, because these overlap: "bassdrum" contains
   // "bass", and "openhat" contains "hat".
@@ -204,6 +227,12 @@ async function main(): Promise<void> {
       }
     } catch { /* format may not expose instruments */ }
 
+    // What the shipping classifier makes of this song, for scoring.
+    let classifierRoles: string[] = [];
+    try {
+      classifierRoles = (await call('get_channel_roles', {}, 30000))?.roles ?? [];
+    } catch { /* older bridge — rows keep a null verdict */ }
+
     const ev = await call('get_channel_evidence', {}, 60000);
     if (!ev?.patternsLoaded) {
       console.log(`[corpus] SKIP ${name} — no patterns after load`);
@@ -245,6 +274,7 @@ async function main(): Promise<void> {
             instrumentCount: c.source.instrumentIds.length,
             dominance: r2(c.source.dominance),
           },
+          classifierRole: classifierRoles[c.channelIndex] ?? null,
           instrumentName: instName,
           nameHint: hintFromName(instName),
           proposed: propose(c),
@@ -279,6 +309,22 @@ async function main(): Promise<void> {
     for (const [k, v] of [...hintTally.entries()].sort((a, b) => b[1] - a[1])) {
       console.log(`  ${k.padEnd(22)} ${v}`);
     }
+  }
+
+  // Where the two independent readings disagree is where a human labeller
+  // should look first. This is NOT an accuracy score — neither column is
+  // ground truth — it is a map of the contested rows.
+  const contested = rows.filter(r =>
+    !r.silent && r.classifierRole !== null && r.proposed !== 'unclear' &&
+    r.classifierRole !== r.proposed);
+  console.log(`[corpus] ${contested.length} rows where the classifier and the evidence reading differ`);
+  const pairs = new Map<string, number>();
+  for (const r of contested) {
+    const k = `${r.classifierRole} vs ${r.proposed}`;
+    pairs.set(k, (pairs.get(k) ?? 0) + 1);
+  }
+  for (const [k, v] of [...pairs.entries()].sort((a, b) => b[1] - a[1]).slice(0, 10)) {
+    console.log(`  ${k.padEnd(34)} ${v}`);
   }
 
   const tally = new Map<string, number>();
