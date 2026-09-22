@@ -101,8 +101,10 @@ masterHpf ─┬─ masterBassShelf ──────────────�
 - [x] LB-9 Source-shape test: band wired parallel, summed before punch,
       `_applyMasterInsertTone` calls `lowBandWeightFor`.
 - [x] LB-10 `npm run type-check`; dub + lib/dub suites.
-- [ ] LB-11 Live: BASS 0 → 12 on amanda.ahx, `masterInsertLevels.lowBand`
-      rises monotonically, `insertOut` does not fall at the top.
+- [x] LB-11 Live (amanda.ahx, bus on, auto off), `lowBand / insertIn`:
+      BASS 0 → 0.00, +6 → 0.57, +12 → 2.39. Master RMS on the loud passage
+      0.32-0.35 at +6, 0.37-0.45 at +12 — the top is heavier, not choked.
+      Pre-insert trim read -1.5 dB then -5.2 dB as the reading caught up.
 - [ ] LB-12 User listening verdict at `http://localhost:5174`.
 
 ## Automated verification
@@ -112,3 +114,11 @@ masterHpf ─┬─ masterBassShelf ──────────────�
 ## Manual verification
 - Reload, amanda.ahx, bus on, auto off, BASS 0 → 12: heavier the whole way,
   no drop or squash at the top.
+
+## Open after LB-11
+- The trim is re-derived only on a settings write. A slider set during a
+  quiet passage keeps its trim into the loud one. Pre-existing; a periodic
+  re-derive (250 ms, like `getProgrammeLevel`) would close it.
+- At +6 on the loud passage `insertOut` read 0.625 RMS — `masterSafetyClip`
+  is doing real work there. Listen for grit before deciding whether the shelf
+  ceiling (18 dB) should come down now that the band carries weight.
