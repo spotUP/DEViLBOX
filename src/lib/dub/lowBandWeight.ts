@@ -1,0 +1,45 @@
+/**
+ * How the BASS control drives the master insert's low-band weight stage.
+ *
+ * The shelf and the punch are linear: every dB of heaviness they give is a dB
+ * of level, and at the top of the control that level ran into the safety
+ * clipper and the master limiter, which took it back — reported 2026-09-22 as
+ * "at 90% it sounds heavier than at 100%". Dub weight is harmonics as much as
+ * level: a saturated low band reads as heavy on any speaker, small ones
+ * included, without needing the level.
+ *
+ * So the same control also drives a parallel band — low-passed at the shelf
+ * corner, driven into the tape curve, compressed, added back under the dry
+ * path. `drive` is the gain INTO the fixed curve; `gain` is how much of the
+ * result is added. Both rise with the control, so the top of the travel is
+ * where the harmonics are densest and the band is loudest.
+ *
+ * Pure. A dB in, two gains out.
+ */
+
+export interface LowBandWeight {
+  /** Gain into the saturator, linear. 1 is clean. */
+  drive: number;
+  /** Level of the saturated band added under the dry path, linear. */
+  gain: number;
+}
+
+/** Drive at the top of the control. 6× into tanh(4x) is dense but not fizz. */
+export const LOW_BAND_MAX_DRIVE = 6;
+/**
+ * Band level at the top of the control. The curve is normalised to ±1, so this
+ * bounds what the band can add to a peak: half scale, under the dry path's
+ * own boost, never enough on its own to reach the clipper.
+ */
+export const LOW_BAND_MAX_GAIN = 0.5;
+/** The BASS control's boost range; the band only answers to boosts. */
+const BASS_RANGE_DB = 12;
+
+export function lowBandWeightFor(bassShelfGainDb: number): LowBandWeight {
+  const db = Number.isFinite(bassShelfGainDb) ? bassShelfGainDb : 0;
+  const t = Math.max(0, Math.min(BASS_RANGE_DB, db)) / BASS_RANGE_DB;
+  return {
+    drive: 1 + (LOW_BAND_MAX_DRIVE - 1) * t,
+    gain: LOW_BAND_MAX_GAIN * t,
+  };
+}
