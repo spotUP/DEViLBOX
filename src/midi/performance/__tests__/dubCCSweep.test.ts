@@ -30,6 +30,10 @@ import type { DubBus } from '../../../engine/dub/DubBus';
 // the bus still has to walk the move's internal logic without crashing.
 function makeMockBus() {
   const bus = {
+    // Wet moves hold the return governor off while a performer drives the wet
+    // path, so it cannot correct the gesture away. Ref-counted; the move calls
+    // the returned release on dispose.
+    holdWetGesture: vi.fn(() => vi.fn()),
     get isEnabled() { return true; },
     getSettings: () => ({ throwQuantize: 'off' }),
     beginRateOverride: () => () => {},
