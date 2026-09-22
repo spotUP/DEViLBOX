@@ -1208,6 +1208,41 @@ export async function getChannelEvidence(
   };
 }
 
+/**
+ * Per-channel behaviour segments — Phase 4 of the Channel Intelligence plan.
+ *
+ * `get_channel_roles` gives one role per channel for the whole song.
+ * `get_channel_evidence` gives measurements per channel per pattern. This sits
+ * between them: runs of order positions where a channel is doing the same
+ * thing, with the reason each run began.
+ */
+export async function getChannelSegments(
+  params: Record<string, unknown> = {},
+): Promise<Record<string, unknown>> {
+  const { useTrackerStore } = await import('../../stores/useTrackerStore');
+  const { buildChannelSegments } = await import('../analysis/channelSegments');
+  const tracker = useTrackerStore.getState();
+  const patterns = tracker.patterns;
+  if (!Array.isArray(patterns) || patterns.length === 0) {
+    return { patternsLoaded: false, channels: [] };
+  }
+  const order = Array.isArray(tracker.patternOrder) && tracker.patternOrder.length > 0
+    ? tracker.patternOrder
+    : patterns.map((_, i) => i);
+
+  const all = buildChannelSegments(patterns, order);
+  const channelFilter = typeof params.channel === 'number' ? params.channel : null;
+  return {
+    patternsLoaded: true,
+    orderLength: order.length,
+    channelCount: all.length,
+    names: patterns[0]?.channels?.map((c) => c.name ?? null) ?? [],
+    channels: all
+      .map((segments, channelIndex) => ({ channelIndex, segments }))
+      .filter((c) => channelFilter === null || c.channelIndex === channelFilter),
+  };
+}
+
 // ─── Synth Errors ──────────────────────────────────────────────────────────────
 
 export function getSynthErrors(): Record<string, unknown> {

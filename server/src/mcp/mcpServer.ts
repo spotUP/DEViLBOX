@@ -744,6 +744,13 @@ export function createMcpServer(): McpServer {
   );
 
   server.tool(
+    'get_channel_segments',
+    "Runs of order positions where a channel is doing the same thing, with the reason each run began (entry, exit, instrument-change, behaviour-change) and a summary of the playing across it. A tracker channel is a lane, not an instrument: it can carry a bassline, then a vocal chop, then a stab. Use this when a permanent per-channel role looks wrong, or to see what a channel is about to become.",
+    { channel: z.number().optional() },
+    ({ channel }: { channel?: number }) => call('get_channel_segments', { channel }),
+  );
+
+  server.tool(
     'route_parameter',
     'Route a normalized 0-1 value to any mappable parameter, exactly as a MIDI CC would (synth params, dub bus, DJ, master FX). Use it to drive a control that has no dedicated tool.',
     { param: z.string(), value: z.number(), instrumentId: z.number().optional() },
