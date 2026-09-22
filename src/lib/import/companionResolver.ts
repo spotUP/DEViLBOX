@@ -73,8 +73,19 @@ export const EXPECTED_PARTNER: Readonly<Record<string, string[]>> = {
 /** The shared sample bank SynthDream and SynthPack keep per directory. */
 export const SHARED_BANK = 'smp.set';
 
-/** Never more than this many companions for one module — a discography directory is not a companion set. */
+/**
+ * Cap on SIBLING matches — a wrong stem can sweep a whole directory of other
+ * songs, and sixteen is more than any two-file format wants.
+ *
+ * NOT applied to a sample subdirectory. Those files ARE the instrument set:
+ * ZoundMonitor's Samples/ holds 51 files for six tunes, and a collector that
+ * counted them staged the first sixteen alphabetically, which was usually
+ * not the ones the song referenced — it died exactly like a missing
+ * companion (Up Rough, 2026-09-22). A subdirectory is bounded only against
+ * a pathological listing.
+ */
 export const MAX_COMPANIONS = 16;
+export const MAX_SUBDIR_FILES = 512;
 
 export interface CompanionListing {
   /** Basenames in the module's own directory. May include the module. */
@@ -252,14 +263,15 @@ function dedupe(list: string[]): string[] {
 export function resolveCompanions(moduleName: string, listing: CompanionListing): CompanionResolution {
   const module = splitName(moduleName);
   const sources: Record<string, string> = {};
-  const own = dedupe([
+  const ownSiblings = dedupe([
     ...sharedStem(module, moduleName, listing.siblings),
     ...suffixed(moduleName, listing.siblings),
     ...specialCases(moduleName, listing.siblings),
-    ...subdirectories(moduleName, listing, sources),
-  ]);
+  ]).slice(0, MAX_COMPANIONS);
+  const ownSubdirs = dedupe(subdirectories(moduleName, listing, sources)).slice(0, MAX_SUBDIR_FILES);
+  const own = dedupe([...ownSiblings, ...ownSubdirs]);
   const bank = sharedBank(module, moduleName, listing.siblings, own.length > 0);
-  const companions = (bank ? [...own, bank] : own).slice(0, MAX_COMPANIONS);
+  const companions = bank ? [...own, bank] : own;
   const kept = new Set(companions);
   for (const key of Object.keys(sources)) if (!kept.has(key)) delete sources[key];
   return { companions, sources, usedSharedBank: bank !== null };

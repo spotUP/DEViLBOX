@@ -6,6 +6,7 @@ import {
   splitName,
   stemOf,
   MAX_COMPANIONS,
+  MAX_SUBDIR_FILES,
   SHARED_BANK,
 } from '../companionResolver';
 
@@ -147,10 +148,33 @@ describe('listingFromRelativePaths — a folder drop as a listing', () => {
 });
 
 describe('bounds and order', () => {
-  it('never returns more than the cap', () => {
-    const many = Array.from({ length: 40 }, (_, i) => `x${i}.x`);
+  it('caps SIBLING matches — a wrong stem must not sweep a directory of songs', () => {
+    const many = Array.from({ length: 40 }, (_, i) => `role${i}.tune`);
+    // Every one of these carries the module's stem with a different "role";
+    // only the known role words match, but the cap is what bounds it.
+    const r = resolveCompanions('mdat.tune', { siblings: ['mdat.tune', ...many, ...['smpl', 'smp', 'ins', 'set', 'sng', 'dum', 'snd', 'song', 'sdata', 'instr', 'samples', 'tfmx', 'tfx', 'dns', 'sdr', 'osp', 'jpn', 'jpnd', 'thm'].map(r => `${r}.tune`)] });
+    expect(r.companions.length).toBeLessThanOrEqual(MAX_COMPANIONS);
+  });
+
+  it('does NOT cap a sample subdirectory — those files are the instrument set', () => {
+    // ZoundMonitor: 51 files in Samples/. A count cap staged the first sixteen
+    // alphabetically and the tune died like a missing companion (Up Rough, 2026-09-22).
+    const samples = Array.from({ length: 51 }, (_, i) => `sample${String(i).padStart(2, '0')}`);
+    const r = resolveCompanions('sonjavanveen.sng', { siblings: ['sonjavanveen.sng'], subdirs: { Samples: samples } });
+    expect(r.companions.length).toBe(51);
+    expect(r.companions[50]).toBe('Samples/sample50');
+  });
+
+  it('still bounds a pathological subdirectory', () => {
+    const many = Array.from({ length: 700 }, (_, i) => `x${i}.x`);
     const r = resolveCompanions('tune.sun', { siblings: ['tune.sun'], subdirs: { instr: many } });
-    expect(r.companions.length).toBe(MAX_COMPANIONS);
+    expect(r.companions.length).toBe(MAX_SUBDIR_FILES);
+  });
+
+  it('ZoundMonitor with Samples/ beside the song DIRECTORY: registered as Samples/<f>, read from one level up', () => {
+    const r = resolveCompanions('sonjavanveen.sng', { siblings: ['sonjavanveen.sng', 'other.sng'], parentSamples: ['electom', 'bass'] });
+    expect(r.companions).toEqual(['Samples/electom', 'Samples/bass']);
+    expect(r.sources['Samples/bass']).toBe('../Samples/bass');
   });
 
   it('puts the tune\'s own files before a shared bank, and never takes the bank when it owns something', () => {

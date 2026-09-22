@@ -93,6 +93,7 @@ by folder drop for the browser path)
 | `Synth Pack/…/Dyter-07/dyter07 title.osp` | `smp.set` | other `.osp` |
 | `TFMX/- unknown/mdat.fatalheritage ship` | `smpl.fatalheritage ship` | — |
 | `Hippel 7V/…/ghostbattle gameover.hip7` | nothing | — ; plays, audio on all four Paula channels |
+| `ZoundMonitor/sonjavanveen.sng` (+ `Samples/`, 51 files beside it) | all 51 `Samples/<f>` — no count cap on a sample directory | — |
 
 Pass = the song plays (`get_audio_level` non-silent, `get_dub_bus_state`
 `hivelyRenderStats` n/a — use `get_playback_silence`), and the companion
