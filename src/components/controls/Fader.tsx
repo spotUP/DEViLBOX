@@ -101,8 +101,38 @@ export const Fader: React.FC<FaderProps> = React.memo(({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [subscribe, min, max]);
 
-  // Sync from prop on mount + on external value change (non-drag).
+  // Drag handling — pointer capture, vertical delta → value, clamp.
+  // Declared here rather than beside the pointer handlers because the sync
+  // effect below has to consult it.
+  const draggingRef = useRef(false);
+  /** Latest `value` prop, so the release handler can settle to it. */
+  const valueRef = useRef(value);
+  valueRef.current = value;
+
+  // Sync from prop on mount + on external value change.
+  //
+  // A HAND ON THE CONTROL WINS. The comment used to say "(non-drag)" but
+  // nothing enforced it, and two faders are driven by values that change while
+  // you are dragging them:
+  //
+  //   - The Dub Deck's MASTER SEND is `value={max(all channel sends)}` and its
+  //     `onChange` writes every channel. `setChannelDubSend` is rAF-batched, so
+  //     the channels land across different frames, `max()` recomputes to
+  //     whatever landed first, and this effect yanked the thumb there
+  //     mid-drag. The drag then continued from the moved position and the
+  //     channels fell out of step. Reported 2026-09-22: "some sliders move by
+  //     themselves up and down and channel 0+1 falls down", with a burst of
+  //     `Dub channel N activated` lines as sends crossed zero repeatedly.
+  //   - FX WET and FEEDBACK read `useLiveDubParam`, which returns the value the
+  //     BUS ANNOUNCES while a move modulates it. Dragging those while a move
+  //     was running snapped them back on the next announce.
+  //
+  // Showing an external change is right — you want to SEE a move move the
+  // control. Doing it under the user's finger is not. `draggingRef` already
+  // existed for the pointer handlers; this is the one place that needed to
+  // consult it.
   useLayoutEffect(() => {
+    if (draggingRef.current) return;
     setInternalValue(value);
     positionThumbAndFill(value);
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -131,8 +161,6 @@ export const Fader: React.FC<FaderProps> = React.memo(({
     return () => ro.disconnect();
   }, [fillHeight, positionThumbAndFill]);
 
-  // Drag handling — pointer capture, vertical delta → value, clamp.
-  const draggingRef = useRef(false);
   const dragStartYRef = useRef(0);
   const dragStartValueRef = useRef(0);
 
@@ -176,7 +204,14 @@ export const Fader: React.FC<FaderProps> = React.memo(({
     if (!draggingRef.current) return;
     draggingRef.current = false;
     try { (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId); } catch { /* ok */ }
-  }, []);
+    // The hand is off, so the authoritative value wins again. Without this the
+    // fader would keep showing where the finger left it until the prop next
+    // changed — and for a derived value like the Dub Deck's master send
+    // (`max` of every channel), where the finger left it is frequently not
+    // where the state ended up.
+    setInternalValue(valueRef.current);
+    positionThumbAndFill(valueRef.current);
+  }, [positionThumbAndFill]);
 
   const onDoubleClick = useCallback(() => {
     if (disabled) return;
