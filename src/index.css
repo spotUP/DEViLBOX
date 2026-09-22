@@ -3077,6 +3077,26 @@ button[class*="rounded"] {
  * same mechanism as the narrow-panel rule above, one place that decides what
  * "hide the badges" means. Detection is in `lib/instruments/asciiArtNames.ts`.
  */
+/* The art itself.
+ *
+ * ASCII art down the instrument names was drawn on an Amiga, in Topaz — an 8x8
+ * bitmap face. Rendered in a modern proportional-ish mono the lines still join,
+ * but the weight and the box characters sit differently from what the musician
+ * saw. `--font-ascii-art` names the face so it can be swapped in one place:
+ * point it at a Topaz woff2 dropped into `public/fonts/` to see the drawing as
+ * it was made. VT323 is the default because it ships with the app already and
+ * is the closest pixel face here; it is a VT220 font, not Topaz.
+ *
+ * `font-variant-ligatures: none` matters more than the face does — a coding
+ * font that ligates `\_/` or `|-` silently redraws the picture.
+ */
+.instrument-list--art .instrument-art-name {
+  font-family: var(--font-ascii-art, 'VT323'), 'Share Tech Mono', monospace;
+  font-variant-ligatures: none;
+  font-feature-settings: "liga" 0, "calt" 0;
+  letter-spacing: 0;
+}
+
 .instrument-list--art .instrument-badge {
   display: none;
 }
