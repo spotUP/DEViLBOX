@@ -169,7 +169,11 @@ describe('the trim is ridden from the clipper input', () => {
 
   it('steps the ride only from the watch, never from a settings write', () => {
     const watch = methodBody('private _startTrimWatch(');
-    expect(watch).toContain('this._trimRide = rideTrim(this._trimRide, this._clipInputPeak());');
+    expect(watch).toContain('this._trimRide = rideTrim(this._trimRide, this._clipInputPeak(), this._clipReferencePeak());');
+    // The reference: the same sum without the shelf — dry before the shelf
+    // plus the return — so the ride answers only for what the boost adds.
+    expect(source).toContain('this.masterHpf.connect(this._clipRefProbe);');
+    expect(source).toContain('this.returnTrim.connect(this._clipRefProbe);');
     expect(methodBody('private _applyMasterTrim(')).not.toContain('rideTrim(');
   });
 
