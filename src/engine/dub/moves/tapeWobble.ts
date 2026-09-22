@@ -23,6 +23,7 @@ export const tapeWobble: DubMove = {
     const depthMs = params.depthMs ?? this.defaults.depthMs;
     const rateHz = params.rateHz ?? this.defaults.rateHz;
     const release = bus.startTapeWobble(depthMs, rateHz);
-    return { dispose: release };
+    const releaseGesture = bus.holdWetGesture();
+    return { dispose() { releaseGesture(); release(); } };
   },
 };

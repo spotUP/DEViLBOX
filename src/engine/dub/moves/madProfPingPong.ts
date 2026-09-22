@@ -26,6 +26,7 @@ export const madProfPingPong: DubMove = {
     const feedback = (params.feedback as number | undefined) ?? 0.5;
     const wet      = (params.wet      as number | undefined) ?? 0.7;
     const release  = bus.startPingPong(lMs, rMs, feedback, wet);
-    return { dispose: release };
+    const releaseGesture = bus.holdWetGesture();
+    return { dispose() { releaseGesture(); release(); } };
   },
 };

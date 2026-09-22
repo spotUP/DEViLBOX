@@ -21,6 +21,8 @@ function makeMockBus() {
   const calls: Call[] = [];
   const log = (method: string, ...args: unknown[]) => calls.push({ method, args });
   const bus = {
+    // See moves.unit.test.ts — wet gestures hold the return governor off.
+    holdWetGesture: vi.fn(() => vi.fn()),
     get isEnabled() { return true; },
     openChannelTap: vi.fn((ch: number, amount: number, attack: number) => {
       log('openChannelTap', ch, amount, attack);
