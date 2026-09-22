@@ -681,7 +681,29 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
 
                   let badgeEl: React.ReactNode = null;
 
-                  if (ced && ced.instrumentType !== 'unknown' && ced.confidence >= 0.05) {
+                  /**
+                   * `synthesizer` is a true answer that says nothing.
+                   *
+                   * `AudioSetInstrumentMap` maps 58 synth types — every chip
+                   * and WASM replayer — straight to `synthesizer`, and the CED
+                   * branch below wins on any confidence at all. So every
+                   * instrument of every AHX, HVL, SID or Furnace tune showed
+                   * the same badge: SYNTH, at 100%, correct and useless.
+                   * Reported 2026-09-22: "all jennipha's instruments say synth,
+                   * but what kind of synth? drum? bass?"
+                   *
+                   * When CED has only that to offer and the classifier — which
+                   * reads the synth's own envelope, waveforms and pitch
+                   * behaviour — has a confident answer, the classifier's is the
+                   * one worth showing.
+                   */
+                  const cedIsGeneric = ced?.instrumentType === 'synthesizer';
+                  const classified = classifyInstrument(instrument);
+                  const classifierBeatsCed = cedIsGeneric
+                    && classified.role !== 'empty'
+                    && classified.confidence >= 0.6;
+
+                  if (ced && ced.instrumentType !== 'unknown' && ced.confidence >= 0.05 && !classifierBeatsCed) {
                     badgeEl = (
                       <span
                         className={`text-[9px] px-1 py-0.5 rounded font-mono font-bold border shrink-0 cursor-pointer ${
@@ -721,7 +743,7 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
                     // classifier had an answer for several of them, and it
                     // meant a synth-only format like AHX could never show a
                     // badge at all, having no PCM to analyse.
-                    const spec = classifyInstrument(instrument);
+                    const spec = classified;
                     {
                       if (spec && spec.role !== 'empty' && spec.confidence >= 0.6) {
                         const label = spec.role === 'bass'
