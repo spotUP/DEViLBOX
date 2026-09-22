@@ -37,6 +37,18 @@ export class AuditionHold {
   }
 
   /**
+   * How many stages were actually AUDIBLE when the audition began.
+   *
+   * A stage sitting at zero is already silent, so ducking it changes nothing.
+   * Under a preset that engages little colour — `tubby` uses only the plate —
+   * every stage can be at zero, and the audition then does nothing at all
+   * while appearing to work. The caller checks this so it can say so.
+   */
+  get duckedCount(): number {
+    return this.held?.filter(e => e.value > 0.001).length ?? 0;
+  }
+
+  /**
    * Duck `params` to zero over `rampSec`, remembering where each was.
    *
    * Returns false when an audition is already in progress — the caller should

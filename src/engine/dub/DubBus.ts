@@ -3382,8 +3382,14 @@ export class DubBus {
    * releaser for the audition already in progress rather than snapshotting the
    * ducked values as if they were the user's.
    */
-  beginAudition(): () => void {
-    if (!this.enabled) return () => {};
+  beginAudition(): (() => void) | null {
+    // Null, not a no-op releaser.
+    //
+    // This returned `() => {}` — truthy — so the caller treated a bus that
+    // could not act as success, lit the button and changed nothing. Reported
+    // twice as "the audition button seems dead": it looked engaged and was
+    // not. A caller that gets null can arm the bus and try again, or say why.
+    if (!this.enabled) return null;
 
     const started = this._audition.begin([
       this.plateSend?.gain,        // plate — null when plateStage is 'off'
@@ -3396,6 +3402,19 @@ export class DubBus {
     // Already auditioning — hand back a releaser for THAT one rather than
     // snapshotting the ducked values as if they were the user's.
     if (!started) return () => { this.endAudition(); };
+
+    // Nothing engaged to duck is also not an audition.
+    //
+    // The stages this solos away are the PARALLEL colour: plate, ring mod,
+    // lo-fi, the sweep and the external feedback loop. Under a preset that
+    // uses little of that — `tubby` engages only the plate — pressing the
+    // button changes almost nothing, and it said nothing about that either.
+    // Better to report it than to pretend.
+    if (this._audition.duckedCount === 0) {
+      this.endAudition();
+      console.log('[DubBus] audition: no colour stage is engaged — nothing to solo away');
+      return null;
+    }
 
     // The lo-fi bypass is the other half of a crossfade, not a stage of its
     // own: dropping the send without opening the bypass would mute that path
