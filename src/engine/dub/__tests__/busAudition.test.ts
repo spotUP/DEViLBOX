@@ -170,8 +170,19 @@ describe('the lo-fi bypass, which is the other half of a crossfade', () => {
     expect(bus).toMatch(/if \(!this\.auditioning\) this\.lofiBypass\.gain\.setTargetAtTime/);
   });
 
-  it('does nothing at all when the bus is off', () => {
-    expect(bus).toMatch(/beginAudition\(\): \(\) => void \{\s*\n\s*if \(!this\.enabled\) return \(\) => \{\};/);
+  it('refuses, rather than handing back a no-op, when the bus is off', () => {
+    // It used to `return () => {}` here. That is TRUTHY, so the caller took it
+    // for success, lit the button and changed nothing — reported twice as "the
+    // audition button seems dead". Null is the whole point: a caller that gets
+    // it can arm the bus and retry, or say why it did nothing.
+    expect(bus).toMatch(/beginAudition\(\): \(\(\) => void\) \| null \{/);
+    expect(bus).toMatch(/if \(!this\.enabled\) return null;/);
+  });
+
+  it('also refuses when no colour stage is engaged to duck', () => {
+    // Under `tubby` the only stage above zero is the plate, so the gesture can
+    // be inaudible while appearing to work.
+    expect(bus).toMatch(/duckedCount === 0/);
   });
 });
 

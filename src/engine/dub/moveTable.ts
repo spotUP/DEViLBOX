@@ -64,11 +64,14 @@ export const DUB_MOVE_TABLE: readonly string[] = [
   'skankEchoThrow',      // 41
   'riddimSection',       // 42
   'skankFloatThrow',     // 43
+  // Appended 2026-09-22 (bass-as-musical-target, Phase 2). The dry low-shelf
+  // gesture: the bass line that is already playing becomes dominant.
+  'bassEmphasis',        // 44
 ];
 
 /** Ratchet: tests assert `DUB_MOVE_TABLE.length === DUB_MOVE_TABLE_VERSION`
  *  so any append forces a one-line bump here — a cheap review signal. */
-export const DUB_MOVE_TABLE_VERSION = 44;
+export const DUB_MOVE_TABLE_VERSION = 45;
 
 /**
  * Dub effect-command slots. Picked at 36-38 to sit BEYOND the existing

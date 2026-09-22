@@ -58,6 +58,9 @@ export const MOVE_INTENTIONS: Readonly<Record<string, readonly Intention[]>> = {
   subHarmonic:        ['BUILD', 'TEXTURE'],
   eqSweep:            ['BUILD', 'TEXTURE'],
   oscBass:            ['BUILD', 'TEXTURE'],
+  // Not SPACE: it adds weight rather than clearing any. Not ACCENT either —
+  // it is a bar-scale swell, not a mark on one event.
+  bassEmphasis:       ['BUILD', 'TRANSITION'],
 
   // Drops and seams — taking the mix away.
   filterDrop:         ['DROP', 'TRANSITION'],

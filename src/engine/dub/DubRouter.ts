@@ -50,6 +50,7 @@ import { versionDrop } from './moves/versionDrop';
 import { skankEchoThrow } from './moves/skankEchoThrow';
 import { skankFloatThrow } from './moves/skankFloatThrow';
 import { riddimSection } from './moves/riddimSection';
+import { bassEmphasis } from './moves/bassEmphasis';
 import type { DubMove, DubMoveContext } from './moves/_types';
 import type { DubBus } from './DubBus';
 import { useTransportStore } from '@/stores/useTransportStore';
@@ -105,6 +106,7 @@ const MOVES: Record<string, DubMove> = {
   skankEchoThrow,
   skankFloatThrow,
   riddimSection,
+  bassEmphasis,
 };
 
 /**

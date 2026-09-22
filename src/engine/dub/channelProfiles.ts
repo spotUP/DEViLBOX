@@ -20,6 +20,13 @@ import {
 } from '@/bridge/analysis/ChannelNaming';
 import { getAllRuntimeChannelRoles } from '@/bridge/analysis/ChannelAudioClassifier';
 import { useInstrumentStore } from '@/stores/useInstrumentStore';
+import { useMixerStore } from '@/stores/useMixerStore';
+import { useTrackerStore } from '@/stores/useTrackerStore';
+import { useTransportStore } from '@/stores/useTransportStore';
+import { resolveTransportRow } from '@/lib/dub/transportRow';
+import { resolveChannelNames } from '@/lib/tracker/channelNames';
+import { computeMusicalPosition } from '@/lib/dub/musicalClock';
+import { buildDubTargetProfile, type DubTargetProfile } from '@/lib/dub/dubTargetProfile';
 
 /**
  * Gate H: one `MusicalChannelProfile` per channel, rebuilt when the pattern or
@@ -129,4 +136,59 @@ export function getChannelProfiles(
   }
   _profileCache = { key, profiles };
   return profiles;
+}
+
+/**
+ * `DubTargetProfile` per channel for the song as it stands right now.
+ *
+ * The map above answers "what is this channel"; a move needs "what can I do to
+ * it", and every caller that wanted the second was rebuilding the first from
+ * the stores by hand. `versionDrop` already does that dance inline — this is
+ * the same dance with the target layer on top, in one place, so a move that
+ * asks "is this the bass" and a persona that asks "who should I echo" cannot
+ * end up asking two different songs.
+ *
+ * Returns an empty array when no pattern is loaded. A caller that cannot tell
+ * what a channel IS must do nothing, not guess.
+ */
+export function getDubTargetProfiles(): DubTargetProfile[] {
+  let profiles: ReadonlyMap<number, MusicalChannelProfile>;
+  try {
+    const tracker = useTrackerStore.getState();
+    const pattern = tracker.patterns?.[tracker.currentPatternIndex ?? 0] ?? null;
+    if (!pattern?.channels?.length) return [];
+
+    const mixer = useMixerStore.getState();
+    const transport = useTransportStore.getState();
+    // The coarse/fine join, not the raw field: `currentGlobalRow` only moves on
+    // a pattern change, so on its own it is stale by up to a whole pattern.
+    const grid = computeMusicalPosition(
+      resolveTransportRow(transport.currentGlobalRow, transport.currentRow) ?? 0,
+      transport.speed || 6,
+    );
+    profiles = getChannelProfiles(
+      pattern,
+      resolveChannelNames(
+        mixer.channels.map(c => c?.name ?? null),
+        pattern.channels.map(c => c?.name ?? null),
+      ),
+      grid.rowsPerBeat,
+      grid.rowsPerBar,
+      buildInstrumentLookup(),
+    );
+  } catch {
+    // A store that is not ready is not an error here: it means there is no
+    // song to profile, and the answer to every question is "do nothing".
+    return [];
+  }
+
+  const mixer = useMixerStore.getState();
+  const out: DubTargetProfile[] = [];
+  for (const [ch, identity] of profiles) {
+    out.push(buildDubTargetProfile(identity, {
+      // A muted channel is not sounding, whatever its notes say.
+      playingNow: mixer.channels[ch]?.muted !== true,
+    }));
+  }
+  return out;
 }

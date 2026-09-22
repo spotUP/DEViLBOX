@@ -39,6 +39,11 @@ const ALLOWED = new Map<string, string>([
   ['src/hooks/audio/usePatternPlayback.ts', 'writes it'],
   ['src/lib/dub/transportRow.ts', 'joins it with the per-row field'],
   ['src/bridge/handlers/readHandlers.ts', 'reports raw transport state for diagnostics'],
+  // Names it only to hand it to `resolveTransportRow`; the row it RECORDS is
+  // the resolved one. A pattern-granular row here would misreport the one
+  // thing this snapshot exists to capture — where in the song the sound
+  // stopped.
+  ['src/bridge/diagnostics/silenceSnapshot.ts', 'passes it to resolveTransportRow'],
 ]);
 
 describe('the transport row has one reader', () => {

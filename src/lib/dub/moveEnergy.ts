@@ -83,6 +83,11 @@ export const MOVE_ENERGY: Readonly<Record<string, MoveEnergyCost>> = {
   subHarmonic:      { wet: 0.10, feedback: 0.05, spectralDensity: 0.15, lowFrequencyRisk: 0.80, decaySec: 2 },
   oscBass:          { wet: 0.10, feedback: 0.05, spectralDensity: 0.20, lowFrequencyRisk: 0.70, decaySec: 2 },
   crushBass:        { wet: 0.10, feedback: 0.05, spectralDensity: 0.40, lowFrequencyRisk: 0.60, decaySec: 1 },
+  // Adds no signal at all — it lifts what is already playing — so its wet and
+  // feedback cost are near nothing. Nearly all of its cost is where a low
+  // shelf actually spends: the headroom under 120 Hz. That is also the axis
+  // `bassEmphasisShape` reads back to decide HOW MANY dB to ask for.
+  bassEmphasis:     { wet: 0.05, feedback: 0.00, spectralDensity: 0.10, lowFrequencyRisk: 0.45, decaySec: 2 },
 
   // Filters and EQ: they take away more than they add.
   filterDrop:       { wet: 0.05, feedback: 0.00, spectralDensity: 0.00, lowFrequencyRisk: 0.00, decaySec: 1 },

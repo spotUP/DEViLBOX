@@ -119,6 +119,7 @@ export const DUB_MOVE_KINDS: Record<string, 'trigger' | 'hold'> = {
   skankEchoThrow:      'trigger', // dotted-eighth capture of one skank stab
   skankFloatThrow:     'trigger', // dotted-quarter 3:2 floating variant
   riddimSection:       'hold',   // bass+drums breakdown with skank echo return
+  bassEmphasis:        'hold',   // dry low-shelf lift on the bass, eased in and out
 };
 
 /**

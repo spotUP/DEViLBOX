@@ -47,8 +47,14 @@ const PHRASE_EDGE_BARS = 0.25;
 /** Above this share of channels playing, the arrangement is not sparse. */
 const SPARSE_ARRANGEMENT_RATIO = 0.5;
 
-/** A bass channel must score at least this on `bassEmphasis` to be one. */
-const BASS_TARGET_THRESHOLD = 0.6;
+/**
+ * A bass channel must score at least this on `bassEmphasis` to be one.
+ *
+ * Exported because the `bassEmphasis` move refuses any other target with the
+ * same number: what counts as the low end has to be one definition, or the
+ * opportunity test and the gesture can disagree about which channel they mean.
+ */
+export const BASS_TARGET_THRESHOLD = 0.6;
 
 export interface BassState {
   /** Channels that read as the low end, best first. */
