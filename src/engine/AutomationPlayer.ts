@@ -18,6 +18,32 @@ import { isWholeSongSynth } from './wholeSongSynths';
 import { decodeVolumeColumn } from '@/lib/tracker/volumeColumn';
 import { getFormatStoreRefOrNull } from '@/stores/storeAccess';
 
+/**
+ * Is a live performer already driving the dub bus?
+ *
+ * A recorded dub curve is a RECORDING; AutoDub is a performer improvising now.
+ * Nothing stopped them both running, and the consequences were audible.
+ *
+ * Measured 2026-09-22 on jennipha.ahx, whose curves hold AutoDub takes
+ * captured in earlier sessions: `transportTapeStop` fired from the curve as a
+ * HOLD with nothing to release it, and the song stayed in slow motion. The
+ * same rule already guards `DubLanePlayer`; this is the second path into the
+ * router and it needs the rule for the same reason.
+ *
+ * Read through a global rather than an import: this module is on the audio
+ * tick path and the dub store pulls the whole dub engine behind it.
+ */
+function liveDubPerformerActive(): boolean {
+  try {
+    const store = (globalThis as {
+      __devilboxDubStore?: { getState: () => { autoDubEnabled?: boolean } };
+    }).__devilboxDubStore;
+    return store?.getState().autoDubEnabled === true;
+  } catch {
+    return false;
+  }
+}
+
 interface AutomationData {
   [patternId: string]: {
     [channelIndex: number]: {
@@ -182,6 +208,8 @@ export class AutomationPlayer {
     //    channelId addressing uses `dub.<move>.ch<N>` in the parameter
     //    string itself (also router-parsed).
     if (parameter.startsWith('dub.')) {
+      // A recording does not play over a live performer.
+      if (liveDubPerformerActive()) return;
       try {
         // Carry the curve's channel through to the move.
         //
@@ -464,7 +492,12 @@ export class AutomationPlayer {
     // dub move triggers fired from these curves are tagged as playback
     // (not live) — DubRecorder ignores 'lane' fires, preventing an
     // infinite capture loop when REC is armed during curve replay.
-    const globalCurves = this.automationData[this.currentPattern.id]?.[-1];
+    // Same rule as the per-channel curves above: a recording stands down for
+    // a live performer. `transportTapeStop` recorded into a global curve was
+    // what kept jennipha.ahx in slow motion with nothing to release it.
+    const globalCurves = liveDubPerformerActive()
+      ? undefined
+      : this.automationData[this.currentPattern.id]?.[-1];
     if (globalCurves) {
       for (const parameter of Object.keys(globalCurves)) {
         const curveValue = this.getCurveValue(this.currentPattern.id, -1, parameter, row);
