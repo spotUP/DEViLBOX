@@ -51,7 +51,9 @@ describe('the low-band weight stage', () => {
 
   it('is driven from the master tone method, off the BASS control', () => {
     const body = methodBody('private _applyMasterInsertTone(');
-    expect(body).toContain('this._resolveMasterLowEnd(safeBassGain, m)');
+    expect(body).toContain('this._resolveMasterLowEnd(bassDb, m)');
+    // Derived from the bass that fits, not the bass that was asked for.
+    expect(body).toContain('spendRide(safeBassGain, this._trimRide.db)');
     expect(methodBody('private _resolveMasterLowEnd(')).toContain('lowBandWeightFor(safeBassGain)');
     expect(body).toContain('this.lowBandDrive.gain, weight.drive');
     expect(body).toContain("this.lowBandGain.gain, masterActive ? weight.gain : 0");
@@ -64,7 +66,7 @@ describe('the low-band weight stage', () => {
     // band's harmonics both land an octave above the corner.
     const body = methodBody('private _applyMasterInsertTone(');
     expect(body).toContain('this.masterLowMidDip.frequency, m.bassShelfFreqHz * 2');
-    expect(body).toContain('this.masterLowMidDip.gain, masterActive ? lowMidDipDbFor(safeBassGain) : 0');
+    expect(body).toContain('this.masterLowMidDip.gain, masterActive ? lowMidDipDbFor(bassDb) : 0');
     // After the band sum, before the clipper — and the return joins at the
     // clipper, so echo tails keep their own EQ.
     expect(source).toContain('this.masterBassPunch.connect(this.masterLowMidDip);');
@@ -110,7 +112,7 @@ describe('the trim meters the programme before the insert', () => {
     expect(unwire).toContain('this._stopTrimWatch();');
     expect(methodBody('dispose(): void {')).toContain('this._stopTrimWatch();');
     const watch = methodBody('private _startTrimWatch(');
-    expect(watch).toContain('this._applyMasterTrim(this.settings, this.context.currentTime)');
+    expect(watch).toContain('this._applyMasterInsertTone();');
     expect(watch).toContain('if (!this.masterInsertActive || this._disposed) { this._stopTrimWatch(); return; }');
   });
 
@@ -172,7 +174,7 @@ describe('the trim is ridden from the clipper input', () => {
   });
 
   it('adds the ride to the predicted trim, and clears it when the insert comes out', () => {
-    expect(methodBody('private _applyMasterTrim(')).toContain('+ this._trimRide.db');
+    expect(methodBody('private _applyMasterTrim(')).toContain('+ rideRemainderDb');
     expect(methodBody('private _stopTrimWatch(')).toContain('this._trimRide = RIDER_REST;');
   });
 });
@@ -204,5 +206,17 @@ describe('the riders move like a hand on a fader', () => {
   it('ramps trim moves over most of a tick, not in 20 ms', () => {
     expect(source).toContain('const TRIM_RAMP_SEC = 0.08;');
     expect(methodBody('private _applyMasterTrim(')).not.toContain('now, 0.02)');
+  });
+});
+
+describe('the ride spends the boost before it touches the mix', () => {
+  // "the bass kills all other audio" (2026-09-22): -6 dB on everything else
+  // against +6 on the lows, from a ride spent on the trim alone.
+  it('takes the shelf from spendRide, and gives the trim only the remainder', () => {
+    const tone = methodBody('private _applyMasterInsertTone(');
+    expect(tone).toContain('this.masterBassShelf.gain, masterActive ? bassDb : 0');
+    const trim = methodBody('private _applyMasterTrim(');
+    expect(trim).toContain('const { bassDb, trimDb: rideRemainderDb } = spendRide(safeBassGain, this._trimRide.db);');
+    expect(trim).not.toContain('+ this._trimRide.db');
   });
 });

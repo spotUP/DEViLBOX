@@ -33,6 +33,26 @@ export function rideTrim(state: RiderState, peakIn: number): RiderState {
   return stepRider(state, overDb, TRIM_RIDE);
 }
 
+/**
+ * Where the ride's depth is spent.
+ *
+ * Spent on the trim alone, the ride pulled the WHOLE mix down while the shelf
+ * kept adding: at BASS +12 on a loud tune that was about -6 dB on the mids
+ * and highs against +6 on the lows, twelve dB of tilt — "the bass kills all
+ * other audio" (2026-09-22, AutoDub). The overshoot the ride is correcting
+ * IS the boost, so the boost pays first: the shelf gives up dB until it is
+ * flat, and only a ride deeper than the boost reaches the trim. The bass gets
+ * as heavy as fits; everything else stays where it was. A cut has no boost
+ * to give, so it is trimmed as before.
+ */
+export function spendRide(bassDb: number, rideDb: number): { bassDb: number; trimDb: number } {
+  const bass = Number.isFinite(bassDb) ? bassDb : 0;
+  const ride = Number.isFinite(rideDb) ? Math.min(0, rideDb) : 0;
+  if (bass <= 0) return { bassDb: bass, trimDb: ride };
+  const spent = Math.max(-bass, ride);
+  return { bassDb: bass + spent, trimDb: ride - spent };
+}
+
 /** Largest absolute sample in a time-domain buffer. */
 export function bufferPeak(buffer: Float32Array): number {
   let peak = 0;

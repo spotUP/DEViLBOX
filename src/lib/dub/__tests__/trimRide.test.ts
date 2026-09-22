@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { rideTrim, bufferPeak, CLIP_TARGET_PEAK, TRIM_RIDE } from '../trimRide';
+import { rideTrim, spendRide, bufferPeak, CLIP_TARGET_PEAK, TRIM_RIDE } from '../trimRide';
 import { RIDER_REST } from '../gainRider';
 
 /**
@@ -43,6 +43,29 @@ describe('rideTrim', () => {
     let s = RIDER_REST;
     for (let i = 0; i < 40; i++) s = rideTrim(s, 100);
     expect(s.db).toBe(-TRIM_RIDE.maxDb);
+  });
+});
+
+describe('spendRide — the boost pays first', () => {
+  // "the bass kills all other audio" (2026-09-22): the ride took its depth
+  // from the whole mix while the shelf kept adding.
+  it('takes the depth off the shelf and leaves the mix alone', () => {
+    expect(spendRide(12, -4)).toEqual({ bassDb: 8, trimDb: 0 });
+  });
+
+  it('reaches the trim only once the shelf is flat', () => {
+    expect(spendRide(12, -14)).toEqual({ bassDb: 0, trimDb: -2 });
+    expect(spendRide(3, -3)).toEqual({ bassDb: 0, trimDb: 0 });
+  });
+
+  it('trims a cut as before — there is no boost to give', () => {
+    expect(spendRide(-3, -4)).toEqual({ bassDb: -3, trimDb: -4 });
+    expect(spendRide(0, -4)).toEqual({ bassDb: 0, trimDb: -4 });
+  });
+
+  it('changes nothing when the ride is at rest', () => {
+    expect(spendRide(12, 0)).toEqual({ bassDb: 12, trimDb: 0 });
+    expect(spendRide(12, 2)).toEqual({ bassDb: 12, trimDb: 0 });
   });
 });
 

@@ -105,7 +105,7 @@ import {
   type ProgrammeLevel,
 } from '@/lib/dub/programmeLevel';
 import { lowBandWeightFor, lowMidDipDbFor } from '@/lib/dub/lowBandWeight';
-import { rideTrim, bufferPeak } from '@/lib/dub/trimRide';
+import { rideTrim, spendRide, bufferPeak } from '@/lib/dub/trimRide';
 import { governReturn, bufferRms } from '@/lib/dub/returnGovernor';
 import { RIDER_REST, type RiderState } from '@/lib/dub/gainRider';
 
@@ -4788,7 +4788,9 @@ export class DubBus {
         this._returnGovernor = governReturn(
           this._returnGovernor, this._returnRms(), programme.rms, programme.valid,
         );
-        this._applyMasterTrim(this.settings, this.context.currentTime);
+        // The ride moves the shelf as well as the trim now, so the whole
+        // master tone is re-derived, not the trim alone.
+        this._applyMasterInsertTone();
       } catch { /* keep watching */ }
     }, TRIM_WATCH_MS);
   }
@@ -5037,10 +5039,13 @@ export class DubBus {
   private _applyMasterTrim(m: DubBusSettings, now: number): void {
     const masterActive = this.enabled && this.masterInsertActive;
     const safeBassGain = Math.max(-12, Math.min(12, m.bassShelfGainDb));
-    const { costDb } = this._resolveMasterLowEnd(safeBassGain, m);
+    // The ride spends the boost first; only what the boost could not pay
+    // reaches the trim, so the rest of the mix stays where it was.
+    const { bassDb, trimDb: rideRemainderDb } = spendRide(safeBassGain, this._trimRide.db);
+    const { costDb } = this._resolveMasterLowEnd(bassDb, m);
     // Predicted cost, corrected by what the clipper actually receives.
     const trimDb = masterActive
-      ? shelfTrimDb(costDb, this._programmeBeforeInsert()) + this._trimRide.db
+      ? shelfTrimDb(costDb, this._programmeBeforeInsert()) + rideRemainderDb
       : 0;
     const trim = Math.pow(10, trimDb / 20);
     // Ramped over most of a tick, so the riders' steps join into one
@@ -5100,10 +5105,14 @@ export class DubBus {
     // dub is drums and bass and the low end has to be able to get heavy;
     // +12 bass with the default +6 punch now lands exactly on it, so the
     // whole BASS travel is live.
-    const { safeMasterPunch, weight } = this._resolveMasterLowEnd(safeBassGain, m);
+    // The ride spends the boost first (see `spendRide`): what the shelf,
+    // the punch, the band and the dip are derived from is the bass that
+    // FITS, not the bass that was asked for.
+    const { bassDb } = spendRide(safeBassGain, this._trimRide.db);
+    const { safeMasterPunch, weight } = this._resolveMasterLowEnd(bassDb, m);
     rampBiquadParam(this.masterBassShelf.frequency, m.bassShelfFreqHz, now);
     rampBiquadParam(this.masterBassShelf.Q, m.bassShelfQ, now);
-    rampBiquadParam(this.masterBassShelf.gain, masterActive ? safeBassGain : 0, now);
+    rampBiquadParam(this.masterBassShelf.gain, masterActive ? bassDb : 0, now);
     rampBiquadParam(this.masterBassPunch.frequency, m.bassShelfFreqHz, now);
     rampBiquadParam(this.masterBassPunch.Q, m.bassShelfQ, now);
     rampBiquadParam(this.masterBassPunch.gain, masterActive ? safeMasterPunch : 0, now);
@@ -5115,7 +5124,7 @@ export class DubBus {
     this._settle(this.lowBandGain.gain, masterActive ? weight.gain : 0, now, 0.02);
     // Heavy but clean: the low mids come down as the low end goes up.
     rampBiquadParam(this.masterLowMidDip.frequency, m.bassShelfFreqHz * 2, now);
-    rampBiquadParam(this.masterLowMidDip.gain, masterActive ? lowMidDipDbFor(safeBassGain) : 0, now);
+    rampBiquadParam(this.masterLowMidDip.gain, masterActive ? lowMidDipDbFor(bassDb) : 0, now);
     this._applyMasterTrim(m, now);
     rampBiquadParam(this.masterMidScoop.frequency, m.midScoopFreqHz, now);
     rampBiquadParam(this.masterMidScoop.Q, m.midScoopQ, now);
