@@ -51,10 +51,14 @@ describe('the low-band weight stage', () => {
 
   it('is driven from the master tone method, off the BASS control', () => {
     const body = methodBody('private _applyMasterInsertTone(');
-    expect(body).toContain('this._resolveMasterLowEnd(bassDb, m)');
-    // Derived from the bass that fits, not the bass that was asked for.
-    expect(body).toContain('spendRide(safeBassGain, this._trimRide.db)');
-    expect(methodBody('private _resolveMasterLowEnd(')).toContain('lowBandWeightFor(safeBassGain)');
+    expect(body).toContain('this._resolveMasterLowEnd(safeBassGain, m)');
+    // Derived from the bass that fits, not the bass that was asked for —
+    // punch spent before bass, and the punch's headroom from the REQUESTED
+    // bass so a ridden shelf cannot hand it back.
+    const resolve = methodBody('private _resolveMasterLowEnd(');
+    expect(resolve).toContain('spendRide(safeBassGain, safeMasterPunch, this._trimRide.db)');
+    expect(resolve).toContain('MASTER_LOW_CEILING_DB - Math.max(0, safeBassGain)');
+    expect(methodBody('private _resolveMasterLowEnd(')).toContain('lowBandWeightFor(bassDb)');
     expect(body).toContain('this.lowBandDrive.gain, weight.drive');
     expect(body).toContain("this.lowBandGain.gain, masterActive ? weight.gain : 0");
     // Corner follows the shelf so both lift the same band.
@@ -100,7 +104,7 @@ describe('the trim meters the programme before the insert', () => {
   it('charges the band\'s peak as well as the two shelves', () => {
     const body = methodBody('private _resolveMasterLowEnd(');
     expect(body).toContain('20 * Math.log10(1 + weight.gain)');
-    expect(body).toContain('costDb: safeBassGain + safeMasterPunch + bandAddDb');
+    expect(body).toContain('costDb: bassDb + punchDb + bandAddDb');
   });
 
   it('re-reads the trim while the insert is active, and stops when it is not', () => {
@@ -220,7 +224,7 @@ describe('the ride spends the boost before it touches the mix', () => {
     const tone = methodBody('private _applyMasterInsertTone(');
     expect(tone).toContain('this.masterBassShelf.gain, masterActive ? bassDb : 0');
     const trim = methodBody('private _applyMasterTrim(');
-    expect(trim).toContain('const { bassDb, trimDb: rideRemainderDb } = spendRide(safeBassGain, this._trimRide.db);');
+    expect(trim).toContain('const { costDb, rideRemainderDb } = this._resolveMasterLowEnd(safeBassGain, m);');
     expect(trim).not.toContain('+ this._trimRide.db');
   });
 });

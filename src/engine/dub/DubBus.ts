@@ -5033,19 +5033,30 @@ export class DubBus {
    * longer have to.
    */
   private _resolveMasterLowEnd(safeBassGain: number, m: DubBusSettings): {
-    safeMasterPunch: number;
+    /** Shelf gain after the ride has spent what it must. */
+    bassDb: number;
+    /** Punch gain after the ceiling and the ride. */
+    punchDb: number;
     weight: ReturnType<typeof lowBandWeightFor>;
     /** dB the trim has to pay for: both linear stages plus the band's peak. */
     costDb: number;
+    /** What the ride could not take from the boost — the trim's share. */
+    rideRemainderDb: number;
   } {
     const wantPunch = Math.max(-18, Math.min(18, m.masterBassPunchDb ?? 0));
+    // The ceiling is measured against the REQUESTED bass, so a shelf the
+    // ride has taken down does not hand its headroom back to the punch.
     const punchHeadroom = Math.max(0, MASTER_LOW_CEILING_DB - Math.max(0, safeBassGain));
     const safeMasterPunch = wantPunch > 0 ? Math.min(wantPunch, punchHeadroom) : wantPunch;
-    const weight = lowBandWeightFor(safeBassGain);
+    // The ride spends the boost first (see `spendRide`): what the shelf,
+    // the punch, the band and the dip are derived from is the bass that
+    // FITS, not the bass that was asked for.
+    const { bassDb, punchDb, trimDb: rideRemainderDb } = spendRide(safeBassGain, safeMasterPunch, this._trimRide.db);
+    const weight = lowBandWeightFor(bassDb);
     // The band is normalised to ±1 and added at `gain`, so it can raise a
     // low-end peak by up to (1 + gain) — counted in dB alongside the shelves.
     const bandAddDb = 20 * Math.log10(1 + weight.gain);
-    return { safeMasterPunch, weight, costDb: safeBassGain + safeMasterPunch + bandAddDb };
+    return { bassDb, punchDb, weight, costDb: bassDb + punchDb + bandAddDb, rideRemainderDb };
   }
 
   /**
@@ -5061,8 +5072,7 @@ export class DubBus {
     const safeBassGain = Math.max(-12, Math.min(12, m.bassShelfGainDb));
     // The ride spends the boost first; only what the boost could not pay
     // reaches the trim, so the rest of the mix stays where it was.
-    const { bassDb, trimDb: rideRemainderDb } = spendRide(safeBassGain, this._trimRide.db);
-    const { costDb } = this._resolveMasterLowEnd(bassDb, m);
+    const { costDb, rideRemainderDb } = this._resolveMasterLowEnd(safeBassGain, m);
     // Predicted cost, corrected by what the clipper actually receives.
     const trimDb = masterActive
       ? shelfTrimDb(costDb, this._programmeBeforeInsert()) + rideRemainderDb
@@ -5128,14 +5138,13 @@ export class DubBus {
     // The ride spends the boost first (see `spendRide`): what the shelf,
     // the punch, the band and the dip are derived from is the bass that
     // FITS, not the bass that was asked for.
-    const { bassDb } = spendRide(safeBassGain, this._trimRide.db);
-    const { safeMasterPunch, weight } = this._resolveMasterLowEnd(bassDb, m);
+    const { bassDb, punchDb, weight } = this._resolveMasterLowEnd(safeBassGain, m);
     rampBiquadParam(this.masterBassShelf.frequency, m.bassShelfFreqHz, now);
     rampBiquadParam(this.masterBassShelf.Q, m.bassShelfQ, now);
     rampBiquadParam(this.masterBassShelf.gain, masterActive ? bassDb : 0, now);
     rampBiquadParam(this.masterBassPunch.frequency, m.bassShelfFreqHz, now);
     rampBiquadParam(this.masterBassPunch.Q, m.bassShelfQ, now);
-    rampBiquadParam(this.masterBassPunch.gain, masterActive ? safeMasterPunch : 0, now);
+    rampBiquadParam(this.masterBassPunch.gain, masterActive ? punchDb : 0, now);
     // Low-band weight: the BASS control also drives harmonics, so the top of
     // its travel gets heavier without needing the level the clipper takes
     // back. Corner follows the shelf so the two lift the same band.

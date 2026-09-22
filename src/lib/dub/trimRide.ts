@@ -56,12 +56,38 @@ export function rideTrim(state: RiderState, peakIn: number, peakRef = 0): RiderS
  * as heavy as fits; everything else stays where it was. A cut has no boost
  * to give, so it is trimmed as before.
  */
-export function spendRide(bassDb: number, rideDb: number): { bassDb: number; trimDb: number } {
+export interface SpentRide {
+  bassDb: number;
+  punchDb: number;
+  trimDb: number;
+}
+
+/**
+ * PUNCH is spent before BASS, the same order the ceiling uses: the control
+ * the user rides keeps its value longest, the voicing gives way first. The
+ * punch has to be in here at all because it takes its headroom from the
+ * requested bass: with the shelf ridden flat it grew straight back to its
+ * full value, a boost the ride never spent and the unboosted reference does
+ * not contain, so the ride sat at its maximum with the shelf flat
+ * (measured 2026-09-22: trimRideDb -12, masterBassShelfDb 0, punch 6).
+ */
+export function spendRide(bassDb: number, punchDb: number, rideDb: number): SpentRide {
   const bass = Number.isFinite(bassDb) ? bassDb : 0;
-  const ride = Number.isFinite(rideDb) ? Math.min(0, rideDb) : 0;
-  if (bass <= 0) return { bassDb: bass, trimDb: ride };
-  const spent = Math.max(-bass, ride);
-  return { bassDb: bass + spent, trimDb: ride - spent };
+  const punch = Number.isFinite(punchDb) ? punchDb : 0;
+  let remaining = Number.isFinite(rideDb) ? Math.min(0, rideDb) : 0;
+  let punchOut = punch;
+  if (punch > 0) {
+    const spent = Math.max(-punch, remaining);
+    punchOut = punch + spent;
+    remaining -= spent;
+  }
+  let bassOut = bass;
+  if (bass > 0) {
+    const spent = Math.max(-bass, remaining);
+    bassOut = bass + spent;
+    remaining -= spent;
+  }
+  return { bassDb: bassOut, punchDb: punchOut, trimDb: remaining };
 }
 
 /** Largest absolute sample in a time-domain buffer. */
