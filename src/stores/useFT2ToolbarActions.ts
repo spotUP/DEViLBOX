@@ -15,7 +15,17 @@ interface FT2Actions {
   save: (() => void) | null;
   undo: (() => void) | null;
   redo: (() => void) | null;
-  openFileBrowser: (() => void) | null;
+  /**
+   * No `openFileBrowser` here, deliberately. It used to be one, pointing at
+   * the toolbar's local `setShowFileBrowser` — a state setter of a component
+   * that is UNMOUNTED exactly when the NavBar's replacement row is shown
+   * (the Dub Deck expands by setting editorFullscreen, which hides the
+   * toolbar). Setting state on an unmounted component does nothing, so the
+   * NavBar's Load was dead whenever the dub deck was open: "i cant press
+   * some buttons when the dub bus is active/fold out, load for example"
+   * (2026-09-22). The file browser that is always mounted is the App-level
+   * one behind `useUIStore.showFileBrowser`; the NavBar opens that.
+   */
 }
 
 interface FT2ToolbarActionsStore extends FT2Actions {
@@ -25,7 +35,7 @@ interface FT2ToolbarActionsStore extends FT2Actions {
 
 const NULL_ACTIONS: FT2Actions = {
   playSong: null, playPattern: null, save: null,
-  undo: null, redo: null, openFileBrowser: null,
+  undo: null, redo: null,
 };
 
 export const useFT2ToolbarActions = create<FT2ToolbarActionsStore>((set) => ({
