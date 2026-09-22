@@ -258,7 +258,47 @@ export interface ChannelAnalysis {
   avgInterval: number;   // Average semitone distance between consecutive notes
 }
 
-export function classifyChannel(channelIndex: number, notes: number[], totalRows: number): ChannelAnalysis {
+/**
+ * Song context for `classifyChannel`.
+ *
+ * `bass` is a statement about a channel's place in an ARRANGEMENT, not about
+ * an absolute octave, and the heuristics below were tuned on formats whose note
+ * numbering starts an octave or two higher than the chip formats. Measured
+ * 2026-09-22 on jennipha.ahx: the first rule fired in 35 of 40 channel-patterns
+ * and every channel came back `bass`, including one whose median note sits 24
+ * semitones ABOVE the actual bassline.
+ *
+ * Supplying the song's lowest channel median lets the bass rules ask the only
+ * question that matters — is this channel at the bottom of THIS song — instead
+ * of comparing against a constant. Omit it and the behaviour is unchanged.
+ */
+export interface ChannelSongContext {
+  /** Median note of the lowest-register channel in the song. */
+  songLowestMedian?: number;
+}
+
+/**
+ * How far above the song's lowest channel a part may still be bass.
+ *
+ * An octave, so a tune that doubles its bassline an octave up still reads both
+ * as bass. On jennipha the four channel medians are 25, 34, 10 and 29: only the
+ * 10 is within an octave of the lowest, and it is the only real bass.
+ */
+const BASS_REGISTER_WINDOW = 12;
+
+function medianOf(values: number[]): number {
+  if (values.length === 0) return 0;
+  const sorted = [...values].sort((a, b) => a - b);
+  const mid = sorted.length >> 1;
+  return sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+}
+
+export function classifyChannel(
+  channelIndex: number,
+  notes: number[],
+  totalRows: number,
+  ctx?: ChannelSongContext,
+): ChannelAnalysis {
   const result: ChannelAnalysis = {
     channel: channelIndex,
     role: 'empty',
@@ -288,8 +328,13 @@ export function classifyChannel(channelIndex: number, notes: number[], totalRows
   }
   result.avgInterval = notes.length > 1 ? +(intervalSum / (notes.length - 1)).toFixed(2) : 0;
 
+  // Is this channel low FOR THIS SONG? Without the context the question cannot
+  // be asked and the old absolute test stands.
+  const bassAllowed = ctx?.songLowestMedian === undefined
+    || medianOf(notes) - ctx.songLowestMedian <= BASS_REGISTER_WINDOW;
+
   // Classification heuristics
-  if (result.avgOctave <= 2.5 && result.uniqueNotes <= 4 && result.avgInterval <= 7) {
+  if (bassAllowed && result.avgOctave <= 2.5 && result.uniqueNotes <= 4 && result.avgInterval <= 7) {
     result.role = 'bass';
   } else if (result.density >= 0.6 && result.avgInterval <= 4 && result.uniqueNotes <= 6) {
     result.role = 'arpeggio';
@@ -300,8 +345,12 @@ export function classifyChannel(channelIndex: number, notes: number[], totalRows
   } else if (result.uniqueNotes >= 3 && result.avgInterval <= 5) {
     result.role = 'chord';
   } else if (notes.length > 0) {
-    // Default: classify by octave
-    result.role = result.avgOctave < 3 ? 'bass' : result.avgOctave > 4 ? 'lead' : 'chord';
+    // Default by octave, with the same register question applied: a channel
+    // that is not at the bottom of the song is not the bass, whatever its
+    // absolute octave number happens to be in this format.
+    result.role = (bassAllowed && result.avgOctave < 3) ? 'bass'
+      : result.avgOctave > 4 ? 'lead'
+      : 'chord';
   }
 
   return result;
