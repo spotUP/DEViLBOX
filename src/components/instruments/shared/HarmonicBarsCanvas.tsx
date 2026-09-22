@@ -144,22 +144,23 @@ export const HarmonicBarsCanvas: React.FC<HarmonicBarsCanvasProps> = ({
       height={hiDpi ? undefined : height}
       style={{
         cursor: hasInteraction ? 'crosshair' : undefined,
+        touchAction: 'none',
         borderRadius: 4,
         width: hiDpi ? '100%' : width,
         height: hiDpi ? height : height,
       }}
-      onMouseDown={hasInteraction ? (e) => {
+      onPointerDown={hasInteraction ? (e) => {
         dragging.current = true;
         const c = getCoords(e);
         onDragStart?.(c.nx, c.ny);
       } : undefined}
-      onMouseMove={hasInteraction ? (e) => {
+      onPointerMove={hasInteraction ? (e) => {
         if (dragging.current) {
           const c = getCoords(e);
           onDrag?.(c.nx, c.ny);
         }
       } : undefined}
-      onMouseUp={hasInteraction ? () => { dragging.current = false; onDragEnd?.(); } : undefined}
+      onPointerUp={hasInteraction ? () => { dragging.current = false; onDragEnd?.(); } : undefined}
       onMouseLeave={hasInteraction ? () => { dragging.current = false; onDragEnd?.(); } : undefined}
     />
   );

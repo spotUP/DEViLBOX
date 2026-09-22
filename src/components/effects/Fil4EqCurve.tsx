@@ -183,7 +183,7 @@ export const Fil4EqCurve: React.FC<Props> = ({ effect, width = W, height = H, on
     hasGain: boolean;
   } | null>(null);
 
-  const handleMouseDown = useCallback((e: React.MouseEvent, h: HandleDef) => {
+  const handlePointerDown = useCallback((e: React.PointerEvent, h: HandleDef) => {
     if (!onBandChange) return;
     e.preventDefault();
     // Auto-enable disabled band on drag
@@ -200,7 +200,7 @@ export const Fil4EqCurve: React.FC<Props> = ({ effect, width = W, height = H, on
     };
     setActiveHandle(h.bandId);
 
-    const onMove = (ev: MouseEvent) => {
+    const onMove = (ev: PointerEvent) => {
       const d = dragRef.current;
       if (!d || !onBandChange) return;
       const dx = ev.clientX - d.startX;
@@ -220,11 +220,13 @@ export const Fil4EqCurve: React.FC<Props> = ({ effect, width = W, height = H, on
     const onUp = () => {
       dragRef.current = null;
       setActiveHandle(null);
-      document.removeEventListener('mousemove', onMove);
-      document.removeEventListener('mouseup', onUp);
+      document.removeEventListener('pointermove', onMove);
+      document.removeEventListener('pointerup', onUp);
+      document.removeEventListener('pointercancel', onUp);
     };
-    document.addEventListener('mousemove', onMove);
-    document.addEventListener('mouseup', onUp);
+    document.addEventListener('pointermove', onMove);
+    document.addEventListener('pointerup', onUp);
+    document.addEventListener('pointercancel', onUp);
   }, [onBandChange, plotW, plotH]);
 
   const handleWheel = useCallback((e: React.WheelEvent, h: HandleDef) => {
@@ -258,7 +260,7 @@ export const Fil4EqCurve: React.FC<Props> = ({ effect, width = W, height = H, on
             return (
               <div
                 key={h.bandId}
-                onMouseDown={e => handleMouseDown(e, h)}
+                onPointerDown={e => handlePointerDown(e, h)}
                 onWheel={e => handleWheel(e, h)}
                 style={{
                   position: 'absolute',
@@ -271,6 +273,7 @@ export const Fil4EqCurve: React.FC<Props> = ({ effect, width = W, height = H, on
                   opacity: h.enabled ? 1 : 0.5,
                   cursor: 'grab',
                   pointerEvents: 'auto',
+                  touchAction: 'none',
                   border: isActive ? '2px solid white' : '2px solid transparent',
                   boxSizing: 'border-box',
                 }}

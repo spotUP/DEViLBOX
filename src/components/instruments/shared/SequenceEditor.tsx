@@ -320,7 +320,7 @@ export const SequenceEditor: React.FC<SequenceEditorProps> = ({
 
   // ── Event handlers ────────────────────────────────────────────────────────
 
-  const handleMouseDown = (e: React.MouseEvent) => {
+  const handlePointerDown = (e: React.PointerEvent) => {
     if (isSettingLoop || isSettingEnd) {
       const { step } = getStepFromMouse(e);
       if (isSettingLoop) { onLoopChange?.(step); setIsSettingLoop(false); }
@@ -336,7 +336,7 @@ export const SequenceEditor: React.FC<SequenceEditorProps> = ({
     }
   };
 
-  const handleMouseMove = (e: React.MouseEvent) => {
+  const handlePointerMove = (e: React.PointerEvent) => {
     const { step, value } = getStepFromMouse(e);
     const canvas = canvasRef.current;
     if (canvas) {
@@ -351,8 +351,8 @@ export const SequenceEditor: React.FC<SequenceEditorProps> = ({
     }
   };
 
-  const handleMouseUp    = () => { setIsDragging(false); dragStartRef.current = null; };
-  const handleMouseLeave = () => { setIsDragging(false); setHoveredStep(null); };
+  const handlePointerUp    = () => { setIsDragging(false); dragStartRef.current = null; };
+  const handlePointerLeave = () => { setIsDragging(false); setHoveredStep(null); };
 
   // ── Length controls ───────────────────────────────────────────────────────
 
@@ -486,12 +486,12 @@ export const SequenceEditor: React.FC<SequenceEditorProps> = ({
       <div ref={containerRef} className="relative overflow-x-auto" style={{ height: height + 20 }}>
         <canvas
           ref={canvasRef}
-          style={{ display: 'block' }}
+          style={{ display: 'block', touchAction: 'none' }}
           className={isSettingLoop || isSettingEnd ? 'cursor-crosshair' : 'cursor-pointer'}
-          onMouseDown={handleMouseDown}
-          onMouseMove={handleMouseMove}
-          onMouseUp={handleMouseUp}
-          onMouseLeave={handleMouseLeave}
+          onPointerDown={handlePointerDown}
+          onPointerMove={handlePointerMove}
+          onPointerUp={handlePointerUp}
+          onMouseLeave={handlePointerLeave}
         />
 
         {/* Hover tooltip */}

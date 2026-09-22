@@ -102,10 +102,12 @@ export const KontaktPlayer: React.FC = () => {
   }, [noteOff]);
 
   useEffect(() => {
-    window.addEventListener('mouseup', releaseAll);
+    window.addEventListener('pointerup', releaseAll);
+    window.addEventListener('pointercancel', releaseAll);
     window.addEventListener('touchend', releaseAll);
     return () => {
-      window.removeEventListener('mouseup', releaseAll);
+      window.removeEventListener('pointerup', releaseAll);
+      window.removeEventListener('pointercancel', releaseAll);
       window.removeEventListener('touchend', releaseAll);
     };
   }, [releaseAll]);
@@ -257,9 +259,9 @@ export const KontaktPlayer: React.FC = () => {
                         'relative flex-1 border-r border-dark-borderLight last:border-r-0 text-[9px] font-mono text-text-muted',
                         active ? 'bg-accent-primary/20 text-accent-primary' : 'bg-dark-bgSecondary hover:bg-dark-bgHover',
                       ].join(' ')}
-                      onMouseDown={() => handleKeyDown(key.midi)}
-                      onMouseUp={() => handleKeyUp(key.midi)}
-                      onMouseLeave={() => handleKeyUp(key.midi)}
+                      onPointerDown={() => handleKeyDown(key.midi)}
+                      onPointerUp={() => handleKeyUp(key.midi)}
+                      onPointerCancel={() => handleKeyUp(key.midi)}
                     >
                       <span className="absolute bottom-2 inset-x-0 text-center">{key.label}</span>
                     </button>
@@ -278,9 +280,9 @@ export const KontaktPlayer: React.FC = () => {
                         active ? 'bg-accent-highlight/30 text-accent-highlight' : 'bg-dark-bgTertiary text-text-secondary hover:bg-dark-bgHover',
                       ].join(' ')}
                       style={{ left: `${(key.left / WHITE_KEYS.length) * 100}%` }}
-                      onMouseDown={() => handleKeyDown(key.midi)}
-                      onMouseUp={() => handleKeyUp(key.midi)}
-                      onMouseLeave={() => handleKeyUp(key.midi)}
+                      onPointerDown={() => handleKeyDown(key.midi)}
+                      onPointerUp={() => handleKeyUp(key.midi)}
+                      onPointerCancel={() => handleKeyUp(key.midi)}
                     >
                       <span className="absolute bottom-2 inset-x-0 text-center">{key.label}</span>
                     </button>

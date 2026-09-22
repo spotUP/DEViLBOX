@@ -61,7 +61,7 @@ export const ModulePanel: React.FC<ModulePanelProps> = ({
   useEffect(() => {
     if (!isDragging) return;
 
-    const handleMouseMove = (e: MouseEvent) => {
+    const handlePointerMove = (e: PointerEvent) => {
       if (dragStartRef.current) {
         const dx = (e.clientX - dragStartRef.current.x) / zoom;
         const dy = (e.clientY - dragStartRef.current.y) / zoom;
@@ -70,18 +70,20 @@ export const ModulePanel: React.FC<ModulePanelProps> = ({
       }
     };
 
-    const handleMouseUp = () => {
+    const handlePointerUp = () => {
       setIsDragging(false);
       dragStartRef.current = null;
       onModuleDragEnd();
     };
 
-    window.addEventListener('mousemove', handleMouseMove);
-    window.addEventListener('mouseup', handleMouseUp);
+    window.addEventListener('pointermove', handlePointerMove);
+    window.addEventListener('pointerup', handlePointerUp);
+    window.addEventListener('pointercancel', handlePointerUp);
 
     return () => {
-      window.removeEventListener('mousemove', handleMouseMove);
-      window.removeEventListener('mouseup', handleMouseUp);
+      window.removeEventListener('pointermove', handlePointerMove);
+      window.removeEventListener('pointerup', handlePointerUp);
+      window.removeEventListener('pointercancel', handlePointerUp);
     };
   }, [isDragging, zoom, onModuleDrag, onModuleDragEnd]);
 
@@ -130,7 +132,7 @@ export const ModulePanel: React.FC<ModulePanelProps> = ({
     setIsCollapsed(!isCollapsed);
   };
 
-  const handleMouseDown = (e: React.MouseEvent) => {
+  const handlePointerDown = (e: React.PointerEvent) => {
     if (e.button !== 0) return; // Left button only
     e.stopPropagation();
     setIsDragging(true);
@@ -167,10 +169,11 @@ export const ModulePanel: React.FC<ModulePanelProps> = ({
       <div
         className="flex items-center gap-2 px-2 py-1.5 border-b border-black/20 cursor-grab active:cursor-grabbing"
         style={{ 
+          touchAction: 'none',
           backgroundColor: descriptor.color || '#374151',
           backgroundImage: 'linear-gradient(180deg, rgba(255,255,255,0.1) 0%, rgba(0,0,0,0.1) 100%)'
         }}
-        onMouseDown={handleMouseDown}
+        onPointerDown={handlePointerDown}
       >
         <GripVertical className="w-3 h-3 text-white/50 flex-shrink-0" />
 
