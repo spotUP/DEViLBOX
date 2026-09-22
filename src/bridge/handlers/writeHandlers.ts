@@ -1245,7 +1245,13 @@ let _testToneOsc: Tone.Oscillator | null = null;
 let _testToneGain: Tone.Gain | null = null;
 let _richToneNodes: Tone.ToneAudioNode[] = [];
 
+/** Auto-stop timer for the current tone. Cleared on any start or stop. */
+let _testToneTimer: ReturnType<typeof setTimeout> | null = null;
+/** How long a tone plays when the caller does not say. */
+const TEST_TONE_DEFAULT_MS = 3000;
+
 function stopAllTestTones() {
+  if (_testToneTimer) { clearTimeout(_testToneTimer); _testToneTimer = null; }
   if (_testToneOsc) {
     _testToneOsc.stop(); _testToneOsc.dispose(); _testToneOsc = null;
   }
@@ -1269,8 +1275,16 @@ function stopAllTestTones() {
 export function testTone(params: Record<string, unknown>): Record<string, unknown> {
   const action = (params.action as string) ?? 'start';
   const freq = (params.frequency as number) ?? 440;
-  const level = (params.level as number) ?? -12; // dBFS
+  // `gain` (linear) is what the MCP schema advertised for months while this
+  // read only `level`; both are honoured now, level winning if both are sent.
+  const gainLinear = typeof params.gain === 'number' && params.gain > 0 ? (params.gain as number) : null;
+  const level = (params.level as number) ?? (gainLinear != null ? 20 * Math.log10(gainLinear) : -12); // dBFS
   const mode = (params.mode as string) ?? 'sine';
+  // A tone that never stops is a tone the user hears for the rest of the
+  // session: the schema advertised durationMs and the handler ignored it, and
+  // an MCP caller had no way to say stop (2026-09-22 — an 800 Hz probe tone
+  // rang for minutes over the music). Every start is bounded.
+  const durationMs = Math.max(50, Math.min(60_000, (params.durationMs as number) ?? TEST_TONE_DEFAULT_MS));
 
   if (action === 'stop') {
     stopAllTestTones();
@@ -1283,6 +1297,7 @@ export function testTone(params: Record<string, unknown>): Record<string, unknow
   if (!engine) return { error: 'ToneEngine not initialized' };
 
   const masterGain = Math.pow(10, level / 20);
+  _testToneTimer = setTimeout(() => { _testToneTimer = null; stopAllTestTones(); }, durationMs);
 
   if (mode === 'rich') {
     // Full-spectrum test signal covering 30 Hz to 16 kHz + white noise.
@@ -1327,7 +1342,7 @@ export function testTone(params: Record<string, unknown>): Record<string, unknow
     noise.start();
     _richToneNodes.push(noise, noiseGain);
 
-    return { status: 'playing', mode: 'rich', levelDb: level, layers: layers.length + 1 };
+    return { status: 'playing', mode: 'rich', levelDb: level, durationMs, layers: layers.length + 1 };
   }
 
   // Simple sine mode
@@ -1337,7 +1352,7 @@ export function testTone(params: Record<string, unknown>): Record<string, unknow
   _testToneGain.connect(engine.masterEffectsInput);
   _testToneOsc.start();
 
-  return { status: 'playing', mode: 'sine', frequency: freq, levelDb: level };
+  return { status: 'playing', mode: 'sine', frequency: freq, levelDb: level, durationMs };
 }
 
 /** Replace all master effects at once (for preset auditing) */
