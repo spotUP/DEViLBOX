@@ -30,6 +30,7 @@ export const SCAN_CRASH_EXTS = new Set([
   'sb',    // SteveBarrett — scan crashes browser
   'ps',    // PaulShields — scan crashes browser
   'cus', 'cust', 'custom',  // DelitrackerCustom — soft reset fails after scan → stutter
+  'hip7',  // JochenHippel-7V — game music that never ends: the scan runs its whole budget, and the reload after a cut scan renders silence (2026-09-22)
 ]);
 
 export const SCAN_CRASH_PREFIXES = new Set([
