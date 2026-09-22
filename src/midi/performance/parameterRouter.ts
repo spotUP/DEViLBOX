@@ -137,6 +137,34 @@ const DUB_BUS_PARAMS: Record<string, { field: string; transform?: (n: number) =>
 
 // Hold-disposer map. Key = full param name (including optional `.chN`).
 const dubHoldDisposers = new Map<string, { dispose(): void }>();
+
+/**
+ * Last-resort bound on a hold opened from automation.
+ *
+ * A hold fired from a curve releases when the curve falls back below 0.5. A
+ * curve holding a RISE with no matching FALL — which is what a take captured
+ * across a stop, a pattern change or a reload leaves behind — therefore never
+ * releases at all.
+ *
+ * Measured 2026-09-22 on jennipha.ahx: `transportTapeStop` fired from a
+ * recorded curve and the song stayed in slow motion indefinitely.
+ *
+ * Deliberately generous. Sixteen bars at 125 BPM is about 31 seconds, so
+ * anything tighter would cut a legitimate musical hold; this exists only so a
+ * broken curve cannot hold the transport for ever.
+ */
+const DUB_CURVE_HOLD_CEILING_MS = 60_000;
+const dubHoldWatchdogs = new Map<string, ReturnType<typeof setTimeout>>();
+
+/** Drop a hold's disposer and its watchdog together, so neither outlives the other. */
+function releaseDubHold(param: string): void {
+  const timer = dubHoldWatchdogs.get(param);
+  if (timer) { clearTimeout(timer); dubHoldWatchdogs.delete(param); }
+  const disp = dubHoldDisposers.get(param);
+  if (!disp) return;
+  dubHoldDisposers.delete(param);
+  try { disp.dispose(); } catch { /* already gone */ }
+}
 // Last-seen CC value per param — crossings drive press/release semantics.
 const dubLastValues = new Map<string, number>();
 
@@ -232,14 +260,19 @@ function routeDubParameter(param: string, value: number, source: 'live' | 'lane'
   if (!wasPressed && isPressed) {
     void import('../../engine/dub/DubRouter').then(({ fire }) => {
       const disp = fire(moveId, channelId, {}, source);
-      if (disp) dubHoldDisposers.set(param, disp);
+      if (!disp) return;
+      dubHoldDisposers.set(param, disp);
+      const timer = setTimeout(() => {
+        console.warn(
+          `[parameterRouter] "${param}" held for ${DUB_CURVE_HOLD_CEILING_MS}ms with no `
+          + 'release in its curve — releasing it. The curve has a rise with no fall.',
+        );
+        releaseDubHold(param);
+      }, DUB_CURVE_HOLD_CEILING_MS);
+      dubHoldWatchdogs.set(param, timer);
     });
   } else if (wasPressed && !isPressed) {
-    const disp = dubHoldDisposers.get(param);
-    if (disp) {
-      dubHoldDisposers.delete(param);
-      try { disp.dispose(); } catch { /* ok */ }
-    }
+    releaseDubHold(param);
   }
 }
 
