@@ -576,7 +576,6 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
   const _saveRef          = useRef(handleSave);
   const _undoRef          = useRef(handleUndo);
   const _redoRef          = useRef(handleRedo);
-  const _openBrowserRef   = useRef(() => setShowFileBrowser(true));
   _playSongRef.current    = handlePlaySong;
   _playPatternRef.current = handlePlayPattern;
   _saveRef.current        = handleSave;
@@ -590,7 +589,6 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
       save:            () => _saveRef.current(),
       undo:            () => _undoRef.current(),
       redo:            () => _redoRef.current(),
-      openFileBrowser: () => _openBrowserRef.current(),
     });
     // Keep the last registered handlers alive when the toolbar unmounts because
     // the Dub Deck expands by toggling editorFullscreen, which hides this
