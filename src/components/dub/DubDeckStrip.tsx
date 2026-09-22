@@ -33,7 +33,6 @@ import { getSongTimeSec } from '@/engine/dub/songTime';
 import { ensureDrumPadEngine } from '@hooks/drumpad/useMIDIPadRouting';
 import { getChannelRoutedEffectsManager } from '@/engine/tone/ChannelRoutedEffects';
 import { getToneEngine } from '@/engine/ToneEngine';
-import { getNativeAudioNode } from '@utils/audio-context';
 import { Fader } from '@components/controls/Fader';
 import { AutoDubPanel } from './AutoDubPanel';
 import { Fil4EqPanel } from '@components/effects/Fil4EqPanel';
@@ -648,35 +647,25 @@ export const DubDeckStrip: React.FC = () => {
     }
   }, []);
 
-  // Master-insert TONE EQ — when the bus is ON we splice the bass shelf +
-  // mid scoop + stereo width into the master signal path between
-  // masterEffectsInput and blepInput. This is what makes BASS/MID/WIDTH
-  // sliders shape the WHOLE mix (dry + wet together), matching real dub
-  // engineering where the master bus is EQ'd, not just the return.
-  useEffect(() => {
-    if (!busEnabled) return;
-    const engine = ensureDrumPadEngine();
-    const bus = engine.getDubBus();
-    const tone = getToneEngine();
-    const sourceNative = getNativeAudioNode(tone.masterEffectsInput);
-    const destNative   = getNativeAudioNode(tone.blepInput);
-    if (!sourceNative || !destNative) {
-      console.warn('[DubDeckStrip] master insert: native nodes unavailable');
-      return;
-    }
-    try {
-      // Fire-and-forget: it now fades the insert envelope down, rewires after
-      // the fade lands, and fades back up, so it is async. The effect does not
-      // wait on it — the teardown below is keyed on `busEnabled`, which cannot
-      // change until React re-renders.
-      void bus.wireMasterInsert(sourceNative, destNative);
-    } catch (e) {
-      console.warn('[DubDeckStrip] wireMasterInsert failed:', e);
-    }
-    return () => {
-      try { bus.unwireMasterInsert(); } catch { /* ok */ }
-    };
-  }, [busEnabled]);
+  // Master-insert TONE EQ — the bass shelf + mid scoop + stereo width spliced
+  // into the master signal path between masterEffectsInput and blepInput, so
+  // the BASS/MID/WIDTH sliders shape the WHOLE mix (dry + wet together),
+  // matching real dub engineering where the master bus is EQ'd, not just the
+  // return.
+  //
+  // Deliberately NOT a useEffect here any more. This component used to wire it
+  // on `busEnabled` and unwire it on teardown, which made the splice live and
+  // die with the component: on 2026-09-22 a user opened dev tools, the window
+  // crossed the 768 px breakpoint, TrackerView swapped to MobileTrackerView,
+  // this strip unmounted, and `unwireMasterInsert` pulled the master EQ out of
+  // the signal path while the bus was still enabled with return_ at 0.750 —
+  // "i got a lot more reverb etc all of a sudden". A layout change must never
+  // alter the audio graph.
+  //
+  // The splice now belongs to the bus, keyed on whether the bus is ENABLED:
+  // DrumPadEngine registers the endpoints once at bootstrap
+  // (registerMasterInsertPoint) and DubBus re-derives the graph from its own
+  // `enabled` flag. Do not reintroduce a mount-scoped effect for this.
 
   useEffect(() => {
     try {

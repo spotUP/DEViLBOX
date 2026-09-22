@@ -105,6 +105,25 @@ export class DrumPadEngine {
       if (trackerMix) {
         this.dubBus.registerWholeMixTap('tracker-master-input', trackerMix);
       }
+      // Master-insert endpoints. The bass shelf + mid scoop + stereo width
+      // splice between `masterEffectsInput` and `blepInput` so those controls
+      // shape the WHOLE mix, dry and wet together.
+      //
+      // Registered here, at engine bootstrap, and never taken back. It used to
+      // be wired and unwired by a `useEffect` in DubDeckStrip, which tied an
+      // audio graph edge to a component's lifetime: crossing the 768 px
+      // breakpoint swapped the tracker to MobileTrackerView, unmounted the
+      // strip, and yanked the insert out of the master path while the bus was
+      // still enabled — audibly more reverb, mid-performance, from a window
+      // resize. The bus now decides for itself; see
+      // DubBus.registerMasterInsertPoint.
+      const insertSource = getNativeAudioNode(tone.masterEffectsInput as any);
+      const insertDest = getNativeAudioNode(tone.blepInput as any);
+      if (insertSource && insertDest) {
+        this.dubBus.registerMasterInsertPoint(insertSource, insertDest);
+      } else {
+        console.warn('[DrumPadEngine] master insert: native nodes unavailable');
+      }
       // Cold-path throw activation. This drives the MIXER STORE, so it is a
       // transient like any move: `amt` opens it, `null` closes it and the
       // channel returns to the user's send/mute. Writing the store directly
