@@ -168,11 +168,17 @@ describe('DubDeckStrip — the live row', () => {
     expect(LIVE_ROW![0]).toMatch(/disabled=\{!autoDubEnabled\}/);
   });
 
-  it('wraps rather than squashing three sliders into stubs on a narrow deck', () => {
+  it('wraps rather than squashing its sliders into stubs on a narrow deck', () => {
     const row = LIVE_ROW![0];
     expect(row).toContain('flex-wrap');
-    // Each control keeps a floor wide enough to still be draggable.
-    expect(row.match(/min-w-\[11rem\]/g) ?? []).toHaveLength(3);
+    // EVERY control in the row keeps a floor wide enough to still be
+    // draggable. Counted against the sliders actually present rather than a
+    // fixed number — this said "three" and broke when VINYL joined the row on
+    // 2026-09-22, which is the test noticing a change it should not have
+    // cared about. What matters is that no slider is left without a floor.
+    const sliders = row.match(/type="range"/g) ?? [];
+    expect(sliders.length).toBeGreaterThanOrEqual(3);
+    expect(row.match(/min-w-\[11rem\]/g) ?? []).toHaveLength(sliders.length);
   });
 });
 
