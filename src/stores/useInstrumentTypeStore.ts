@@ -49,6 +49,12 @@ interface InstrumentTypeState {
 
 // ── Worker singleton ──────────────────────────────────────────────────────────
 
+/**
+ * The one spelling of the loading banner, so the code that clears it cannot
+ * drift from the code that posts it.
+ */
+const LOADING_CLASSIFIER_MESSAGE = 'Loading instrument classifier…';
+
 let _worker: Worker | null = null;
 let _reqId = 0;
 // Track pending stagger timeouts so resetClassified() can cancel them,
@@ -270,12 +276,24 @@ export const useInstrumentTypeStore = create<InstrumentTypeState & {
 
     if (msg.type === 'loading') {
       set({ status: 'loading' });
-      useUIStore.getState().setStatusMessage('Loading instrument classifier…', false, 0);
+      useUIStore.getState().setStatusMessage(LOADING_CLASSIFIER_MESSAGE, false, 0);
       return;
     }
     if (msg.type === 'ready') {
       set({ status: 'ready' });
-      // Status message will be updated once results arrive
+      // Clear the loading banner HERE, not when a result arrives.
+      //
+      // The 'loading' branch posts with timeout 0, which means never
+      // auto-revert, and this branch used to leave it up on the assumption
+      // that a classification result would replace it. Nothing guarantees one:
+      // with nothing queued to classify, or with every result erroring, the
+      // banner sat in the main window for the whole session — reported
+      // 2026-09-22 as "the 'loading instrument classifier' is stuck in the
+      // main window", while the worker's own log had reached `model ready`.
+      const ui = useUIStore.getState();
+      if (ui.statusMessage === LOADING_CLASSIFIER_MESSAGE) {
+        ui.setStatusMessage('All Right', false, 0);
+      }
       return;
     }
     if (msg.type === 'error' && msg.id === 'init') {
