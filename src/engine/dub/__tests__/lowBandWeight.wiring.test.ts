@@ -136,7 +136,7 @@ describe('the dub return skips the low-end stages', () => {
     // Through the return's own copy of the trim, so it is paid for like the dry.
     expect(join).toContain('this.returnSum.connect(this.returnTrim)');
     expect(source).toContain('this.returnTrim.connect(this.masterSafetyClip);');
-    expect(methodBody('private _applyMasterTrim(')).toContain('this._settle(this.returnTrim.gain, trim, now, 0.02);');
+    expect(methodBody('private _applyMasterTrim(')).toContain('this._settle(this.returnTrim.gain, trim * Math.pow(10, this._returnGovernor.db / 20), now, TRIM_RAMP_SEC);');
     // The clipper sits after the band sum and before the scoop/width stages,
     // so the return still gets the clipper, the scoop and the width.
     expect(source).toContain('this.lowBandGain.connect(this.masterBassPunch);');
@@ -167,12 +167,42 @@ describe('the trim is ridden from the clipper input', () => {
 
   it('steps the ride only from the watch, never from a settings write', () => {
     const watch = methodBody('private _startTrimWatch(');
-    expect(watch).toContain('this._trimRideDb = rideTrimDb(this._trimRideDb, this._clipInputPeak());');
-    expect(methodBody('private _applyMasterTrim(')).not.toContain('rideTrimDb(');
+    expect(watch).toContain('this._trimRide = rideTrim(this._trimRide, this._clipInputPeak());');
+    expect(methodBody('private _applyMasterTrim(')).not.toContain('rideTrim(');
   });
 
   it('adds the ride to the predicted trim, and clears it when the insert comes out', () => {
-    expect(methodBody('private _applyMasterTrim(')).toContain('+ this._trimRideDb');
-    expect(methodBody('private _stopTrimWatch(')).toContain('this._trimRideDb = 0;');
+    expect(methodBody('private _applyMasterTrim(')).toContain('+ this._trimRide.db');
+    expect(methodBody('private _stopTrimWatch(')).toContain('this._trimRide = RIDER_REST;');
+  });
+});
+
+describe('the return is governed against the programme', () => {
+  // Send 0.028 RMS, return 0.261: the echo came back louder than the song and
+  // the sum clipped — "clips/dists" (2026-09-22).
+  it('steps the governor from the watch, against the smoothed pre-insert programme', () => {
+    const watch = methodBody('private _startTrimWatch(');
+    expect(watch).toContain('this._returnGovernor = governReturn(');
+    expect(watch).toContain('this._returnRms(), programme.rms, programme.valid');
+    expect(watch).toContain('const programme = this._programmeBeforeInsert();');
+  });
+
+  it('applies it on the return trim only, on top of the shared trim', () => {
+    const apply = methodBody('private _applyMasterTrim(');
+    expect(apply).toContain('trim * Math.pow(10, this._returnGovernor.db / 20)');
+    expect(apply).toContain('this._settle(this.masterToneTrim.gain, trim, now, TRIM_RAMP_SEC);');
+  });
+
+  it('clears with the watch', () => {
+    expect(methodBody('private _stopTrimWatch(')).toContain('this._returnGovernor = RIDER_REST;');
+  });
+});
+
+describe('the riders move like a hand on a fader', () => {
+  // "it sounds very artificially sidechained" (2026-09-22): full attack per
+  // tick and a fast release is a sidechain.
+  it('ramps trim moves over most of a tick, not in 20 ms', () => {
+    expect(source).toContain('const TRIM_RAMP_SEC = 0.08;');
+    expect(methodBody('private _applyMasterTrim(')).not.toContain('now, 0.02)');
   });
 });

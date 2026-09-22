@@ -690,6 +690,8 @@ export async function getDubBusState(): Promise<Record<string, unknown>> {
       returnBypassesLowEnd: (b as { returnBypassesLowEnd?: boolean }).returnBypassesLowEnd ?? null,
       masterLowBandDrive: g(b.lowBandDrive),
       trimRideDb: (b as { trimRideDb?: number }).trimRideDb ?? null,
+      returnGovernorDb: (b as { returnGovernorDb?: number }).returnGovernorDb ?? null,
+      returnTrim: g(b.returnTrim),
       masterToneTrim: g(b.masterToneTrim),
       masterLowMidDipDb: (b.masterLowMidDip as { gain?: { value?: number } } | undefined)?.gain?.value ?? null,
       masterHpfHz: (b.masterHpf as { frequency?: { value?: number } } | undefined)?.frequency?.value ?? null,

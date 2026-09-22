@@ -105,7 +105,9 @@ import {
   type ProgrammeLevel,
 } from '@/lib/dub/programmeLevel';
 import { lowBandWeightFor, lowMidDipDbFor } from '@/lib/dub/lowBandWeight';
-import { rideTrimDb, bufferPeak } from '@/lib/dub/trimRide';
+import { rideTrim, bufferPeak } from '@/lib/dub/trimRide';
+import { governReturn, bufferRms } from '@/lib/dub/returnGovernor';
+import { RIDER_REST, type RiderState } from '@/lib/dub/gainRider';
 
 /**
  * Loudest sample in a captured ring, so a capture can tell whether it caught
@@ -223,6 +225,8 @@ const MASTER_CLIP_THRESHOLD = 0.9;
 const MASTER_LOW_CEILING_DB = 12;
 /** How often the master trim re-reads the programme while the insert is active. */
 const TRIM_WATCH_MS = 250;
+/** Time constant for trim moves: ~95 % of a step lands inside one tick, with no edge to hear. */
+const TRIM_RAMP_SEC = 0.08;
 
 const DECK_IDS: DeckId[] = ['A', 'B', 'C'];
 
@@ -1493,7 +1497,9 @@ export class DubBus {
    * predictive trim from what actually arrives there. See trimRide.ts.
    */
   private _clipInProbe!: AnalyserNode;
-  private _trimRideDb = 0;
+  private _trimRide: RiderState = RIDER_REST;
+  /** Depth the return governor is holding the return down. See returnGovernor.ts. */
+  private _returnGovernor: RiderState = RIDER_REST;
   /**
    * Where the dub RETURN joins the master. The return used to ride into the
    * insert with the dry mix and get the same low-end lift, so every echo
@@ -4777,7 +4783,11 @@ export class DubBus {
         // The ride is stepped HERE only. `_applyMasterTrim` also runs on every
         // settings write, and a slider drag would otherwise release the ride
         // as fast as it produced writes.
-        this._trimRideDb = rideTrimDb(this._trimRideDb, this._clipInputPeak());
+        this._trimRide = rideTrim(this._trimRide, this._clipInputPeak());
+        const programme = this._programmeBeforeInsert();
+        this._returnGovernor = governReturn(
+          this._returnGovernor, this._returnRms(), programme.rms, programme.valid,
+        );
         this._applyMasterTrim(this.settings, this.context.currentTime);
       } catch { /* keep watching */ }
     }, TRIM_WATCH_MS);
@@ -4786,8 +4796,21 @@ export class DubBus {
   private _stopTrimWatch(): void {
     if (this._trimWatch) clearInterval(this._trimWatch);
     this._trimWatch = null;
-    this._trimRideDb = 0;
+    this._trimRide = RIDER_REST;
+    this._returnGovernor = RIDER_REST;
   }
+
+  /** RMS at `return_`, before the return trim and the governor. */
+  private _returnRms(): number {
+    const probe = this._returnProbe;
+    if (!probe) return 0;
+    const buf = new Float32Array(probe.fftSize);
+    probe.getFloatTimeDomainData(buf);
+    return bufferRms(buf);
+  }
+
+  /** Read by the MCP probe: how far the return governor is holding the return down, dB. */
+  get returnGovernorDb(): number { return this._returnGovernor.db; }
 
   private _clipInputPeak(): number {
     const probe = this._clipInProbe;
@@ -4798,7 +4821,7 @@ export class DubBus {
   }
 
   /** Read by the MCP probe: how far the measured ride is holding the trim down, dB. */
-  get trimRideDb(): number { return this._trimRideDb; }
+  get trimRideDb(): number { return this._trimRide.db; }
 
   private _releasePreInsertProbe(): void {
     const probe = this._preInsertProbe;
@@ -5017,11 +5040,15 @@ export class DubBus {
     const { costDb } = this._resolveMasterLowEnd(safeBassGain, m);
     // Predicted cost, corrected by what the clipper actually receives.
     const trimDb = masterActive
-      ? shelfTrimDb(costDb, this._programmeBeforeInsert()) + this._trimRideDb
+      ? shelfTrimDb(costDb, this._programmeBeforeInsert()) + this._trimRide.db
       : 0;
     const trim = Math.pow(10, trimDb / 20);
-    this._settle(this.masterToneTrim.gain, trim, now, 0.02);
-    this._settle(this.returnTrim.gain, trim, now, 0.02);
+    // Ramped over most of a tick, so the riders' steps join into one
+    // continuous movement rather than a stair the ear reads as pumping.
+    this._settle(this.masterToneTrim.gain, trim, now, TRIM_RAMP_SEC);
+    // The return pays the same trim, and on top of it the governor that keeps
+    // it under the music.
+    this._settle(this.returnTrim.gain, trim * Math.pow(10, this._returnGovernor.db / 20), now, TRIM_RAMP_SEC);
   }
 
   /**
