@@ -513,8 +513,23 @@ export const useDrumPadStore = create<DrumPadStore>((set, get) => ({
     get().saveToStorage();
   },
 
-  // Dub Bus actions — patch + persist. Engine listens via usePadEngineDubBus
-  // hook and pushes changes to the live DrumPadEngine.
+  // Dub Bus actions — patch + persist.
+  //
+  // NOTE: this used to say "Engine listens via usePadEngineDubBus hook". That
+  // hook no longer exists anywhere in the codebase; the comment was the only
+  // remaining reference to it. Nothing in the store pushes to the engine.
+  //
+  // What actually mirrors these settings is a `useEffect` in DubDeckStrip
+  // (plus narrower ones in PadGrid and DJSamplerPanel), which means engine
+  // state is owned by a COMPONENT'S RENDER. In a layout where none of those
+  // three is mounted — the mobile tracker tree is exactly that — the engine
+  // never learns `enabled`, and the master insert never wires.
+  //
+  // That is the same defect class as the one fixed in 560a37bed, where a
+  // window resize unmounted DubDeckStrip and pulled the master EQ out of the
+  // signal path. The splice now belongs to the bus; these settings still do
+  // not. Fixing it properly means the STORE pushing to the engine on change,
+  // not a component. Tracked in thoughts/spot/todos.md.
   setDubBus: (patch: Partial<DubBusSettings>) => {
     const prior = get().dubBus.enabled;
     // Character-preset selection must rewrite the store's dub-bus fields to
