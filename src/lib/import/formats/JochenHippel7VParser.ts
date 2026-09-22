@@ -634,7 +634,12 @@ export function parseJochenHippel7VFile(buffer: ArrayBuffer, filename: string): 
     initialSpeed: 6,
     initialBPM: 125,
     linearPeriods: false,
-    hippelFileData: buffer.slice(0),
+    // No hippelFileData: that key routes audio to the Hippel WASM engine,
+    // libtfmxaudiodecoder, whose "7V" is TFMX's seven-voice mode — a
+    // different format. Jochen Hippel 7V rendered silence there ("7V does
+    // not work in DEViLBOX", 2026-09-22). This parser owns the grid; until a
+    // native 7V replayer exists the audio comes from UADE's JochenHippel-7V
+    // player through injectUADEPlayback. UADE is the fallback, not the home.
     uadePatternLayout,
   };
 }

@@ -48,20 +48,6 @@ describe('useSettingsStore — persist migration', () => {
     expect(s.modplugSeparation).toBe(50);
   });
 
-  it('v8 → v9: Jochen Hippel 7V at the old native default moves to UADE, a chosen value stays', async () => {
-    // The native route was the TFMX decoder, which rendered silence for
-    // Hippel 7V ("7V does not work in DEViLBOX", 2026-09-22).
-    seed(8, { formatEngine: { jochenHippel7V: 'native', suntronic: 'native' } });
-    let s = await freshLoad();
-    expect(s.formatEngine.jochenHippel7V).toBe('uade');
-    expect(s.formatEngine.suntronic).toBe('native');
-    // Already at v9 with an explicit choice: untouched.
-    localStorage.clear();
-    seed(9, { formatEngine: { jochenHippel7V: 'native' } });
-    s = await freshLoad();
-    expect(s.formatEngine.jochenHippel7V).toBe('native');
-  });
-
   it('unknown future version (version > current) loads without crashing', async () => {
     seed(99, { stereoSeparation: 70, formatEngine: { mod: 'uade' } });
     // Downgrading from a future version shouldn't throw — persist layer

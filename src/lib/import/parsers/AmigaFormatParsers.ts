@@ -2108,20 +2108,15 @@ export async function tryRouteFormat(
   }
 
   // ── Jochen Hippel 7V (HIP7.* / S7G.* prefix) ─────────────────────────────
-  // Audio routed to Hippel WASM engine (libtfmxaudiodecoder auto-detects 7V sub-format).
+  // Native parser for the grid; audio from UADE's JochenHippel-7V player until
+  // a native 7V replayer exists. The Hippel WASM engine (libtfmxaudiodecoder)
+  // is NOT this format — its "7V" is TFMX's seven-voice mode, and routing hip7
+  // there rendered silence ("7V does not work in DEViLBOX", 2026-09-22).
   if (matchesExt(filename, ['hip7', 's7g'])) {
-    if (prefs.jochenHippel7V !== 'uade') {
-      try {
-        const { isJochenHippel7VFormat, parseJochenHippel7VFile } = await import('@lib/import/formats/JochenHippel7VParser');
-        if (isJochenHippel7VFormat(buffer)) {
-          return parseJochenHippel7VFile(buffer, originalFileName);
-        }
-      } catch (err) {
-        console.warn(`[JochenHippel7VParser] Native parse failed for ${filename}, falling back to UADE:`, err);
-      }
-    }
-    const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
-    return parseUADEFile(buffer, originalFileName, prefs.uade ?? 'enhanced', subsong, preScannedMeta, companionFiles);
+    const { isJochenHippel7VFormat, parseJochenHippel7VFile } = await import('@lib/import/formats/JochenHippel7VParser');
+    return withNativeThenUADE('jochenHippel7V', ctx,
+      (buf: Uint8Array | ArrayBuffer, name: string) => { if (isJochenHippel7VFormat(buf as ArrayBuffer)) return parseJochenHippel7VFile(buf as ArrayBuffer, name); return null; },
+      'JochenHippel7VParser', { injectUADE: true });
   }
 
   // ── Jochen Hippel ST (.sog / .hst / .hip / .mcmd extension or HST.* / MCMD.* prefix) ──
