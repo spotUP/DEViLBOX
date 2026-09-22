@@ -71,13 +71,42 @@ const captureCurrentState = (): TabState => {
  * Restore state to all stores
  */
 const restoreState = (state: TabState) => {
-  // Stop any playback first
-  const engine = getToneEngine();
+  // Stop any playback first.
+  //
+  // `getToneEngine()` CONSTRUCTS the engine, and construction can throw — it
+  // opens an AudioContext. It sat outside this try, so a failure there took
+  // the whole tab switch with it and the new tab never opened.
   try {
-    engine.stop();
+    getToneEngine().stop();
   } catch {
     // Ignore errors if engine not initialized
   }
+
+  // Tear down the NATIVE replayer too, and clear the format data that selected
+  // it.
+  //
+  // `engine.stop()` reaches the Tone.js graph only. A song played by a WASM
+  // replayer — AHX, UADE, Sonix, TFMX and the rest — lives in its own worklet,
+  // which holds the tune and keeps rendering regardless of what the stores
+  // say. Reported 2026-09-22: creating a new empty song over amanda.ahx left
+  // amanda playing under an empty pattern grid, because the tab reset emptied
+  // every store while `useFormatStore` still held `hivelyFileData` and the
+  // worklet still had the tune loaded.
+  //
+  // Fire-and-forget: the engine registry's own stop is async, and a tab switch
+  // must not block on it. `stopNativeEngines` clears its running-engine guard
+  // synchronously, so the next `play()` cannot start a stale engine even if
+  // the worklet messages land afterwards.
+  void (async () => {
+    try {
+      const [{ stopNativeEngines }, { useFormatStore }] = await Promise.all([
+        import('@engine/replayer/NativeEngineRouting'),
+        import('./useFormatStore'),
+      ]);
+      stopNativeEngines(null, new Set<string>(), null);
+      useFormatStore.getState().reset();
+    } catch { /* engine or store not loaded — nothing native is playing */ }
+  })();
 
   // Reset transport
   useTransportStore.getState().reset();
