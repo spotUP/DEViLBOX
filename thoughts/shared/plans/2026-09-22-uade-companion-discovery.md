@@ -133,7 +133,7 @@ map handed to `loadFile` is exactly the "must find" column.
 - [x] CF-7 Reachability: one test proving `load_file` reaches the resolver
       (call-count sentinel through the server handler).
 - [x] CF-8 `npm run type-check`; import + bridge suites.
-- [ ] CF-9 Live: the seven songs through MCP `load_file`, companion map
+- [x] CF-9 Live: the seven songs through MCP `load_file`, companion map
       asserted per D, audio confirmed.
 - [ ] CF-10 Live: folder drop of `Synth Dream/Laurens Tummers` then both
       `sdr.*` tunes from the browser — the discriminating pair.
@@ -178,3 +178,32 @@ map handed to `loadFile` is exactly the "must find" column.
   own — page frozen or crashed. Needs the browser console at the moment of
   the freeze. `sdr` is on no scan list (dns is); a full subsong scan is one
   candidate.
+
+## CF-9 result — all seven, `3709eb4dd`
+
+| song | registered | plays |
+|---|---|---|
+| AudioSculpture `popelich-brutalo.adsc` | `popelich-brutalo.adsc.as` | yes |
+| DynamicSynthesizer `dns.starball title` | `smp.starball title` | yes |
+| SynthDream `sdr.nobuddiesland end 2` | `smp.nobuddiesland end 2` (NOT `smp.set`) | yes |
+| SynthDream `sdr.monsterbusiness 5` | `smp.set` only | yes |
+| SynthPack `dyter07 title.osp` | `smp.set` | yes |
+| ZoundMonitor `sonjavanveen.sng` | all 51 `Samples/*` | yes |
+| JochenHippel-7V `ghostbattle gameover.hip7` | none needed | yes |
+
+TFMX loads on its own native `tfmx` path, so no UADE companion there.
+
+Four bugs the run exposed, each fixed and pinned:
+- `.adsc` went to the StarTrekker AM parser looking only for `.nt`, so an
+  Audio Sculpture module reached UADE without its `.as` (`16241118f`).
+- 33 `parseUADEFile` call sites dropped `companionFiles` — `dns.` among
+  them (`e51308653`).
+- hip7 was routed to the Hippel WASM engine (libtfmxaudiodecoder, whose
+  "7V" is TFMX's seven-voice mode) and rendered silence; native parser now
+  owns the grid with UADE audio injected (`3709eb4dd`).
+- The subsong scan could hold the audio thread for its full 600 rendered
+  seconds on a tune that never ends (`a8bed896f`); hip7 skips the scan.
+
+One fragility seen but not chased: after the Hippel 7V stall, the next
+UADE song in the SAME page session rendered silence. A reload cleared it,
+and the scan-skip removes the trigger.
