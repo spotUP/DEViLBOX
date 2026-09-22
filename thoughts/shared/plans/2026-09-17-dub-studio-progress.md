@@ -1977,7 +1977,22 @@ line references, spot-checked before being written down.
       main-thread contention; a low one means the crackle is in the audio path and the
       meter has ruled the control path out. Do not guess a third time.
 
-- [ ] **X31** **BUS tab sliders crackle while dragged — bad for live dubbing.** Reported
+- [x] **X31 — CLOSED BY EAR 2026-09-22. User, after dragging the BUS sliders: "they are
+      golden".** No crackle.
+      **The cause was never established, and this entry should say so rather than claim
+      one.** Two things changed under it between the report and the verdict, either or
+      neither of which may be responsible: `Fader` stopped re-widthing mid-drag
+      (`3fc982a76` — the readout was setting the column width, so every drag was also a
+      layout pass), and the controls moved onto pointer events with capture (`9f534e2b5`),
+      which ends the stream of synthetic mouse-compatibility events a touch-capable
+      machine was producing alongside the real ones.
+      What IS established, and worth keeping: the ledger's original hypothesis was wrong
+      (those `.value =` writes are constructor-time, see the `[~]` entry below), the
+      settings path is already coalesced at ~0.69 ms per burst, and H15 rules out the
+      Fil4 coefficient writes. If it returns, start from the 16.08 ms outlier on the first
+      write after enabling the bus — the one thread never pulled.
+
+- [x] **X31 (original entry)** **BUS tab sliders crackle while dragged — bad for live dubbing.** Reported
       2026-09-21 with a screenshot of BASS / MID / WIDTH / sweep / RATE.
       Very likely zipper noise from stepped `AudioParam.value` assignment: those settings
       are written as bare `.value =` rather than ramped, so each drag event is a
