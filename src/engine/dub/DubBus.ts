@@ -1498,6 +1498,28 @@ export class DubBus {
   private masterInsertSource: AudioNode | null = null;
   private masterInsertDest: AudioNode | null = null;
   private masterInsertActive = false;
+  /**
+   * WHERE the insert belongs in the master chain — `masterEffectsInput` and
+   * `blepInput` from ToneEngine. Registered once, by the engine layer, and
+   * held for the life of the bus.
+   *
+   * This is the ownership half of the 2026-09-22 "suddenly a lot more reverb"
+   * report. The splice used to be created and destroyed by a `useEffect` in
+   * `DubDeckStrip`, so the master insert lived exactly as long as that
+   * COMPONENT. Opening dev tools narrowed the window past the 768 px
+   * breakpoint, the tracker swapped to `MobileTrackerView`, `DubDeckStrip`
+   * unmounted, and the teardown pulled the bass shelf, mid scoop and stereo
+   * width out of the master path mid-performance — while the bus stayed
+   * enabled with `return_` at 0.750, so the wet path got louder relative to
+   * the dry. A re-layout changed what the audio graph does.
+   *
+   * The invariant the audio layer has to hold: the master insert is spliced
+   * if and only if the bus is ENABLED. Nothing about React — mount, unmount,
+   * remount, breakpoint, hot reload — may appear in that condition. Holding
+   * the endpoints here lets `_syncMasterInsertToEnabled` re-derive the graph
+   * from engine state alone.
+   */
+  private masterInsertPoints: { source: AudioNode; dest: AudioNode } | null = null;
 
   // DJ deck taps — each is a GainNode with gain=0 at rest. When attached to a
   // DJ mixer, the mixer's deck input connects INTO these, which feed the bus.
@@ -3792,6 +3814,10 @@ export class DubBus {
       // how a siren survived the bus being switched off.
       if (!settings.enabled) this.silenceGeneratedSynths();
       this.enabled = settings.enabled;
+      // The master insert follows the bus, and only the bus. Re-derived here
+      // rather than by whichever view happens to be mounted — see
+      // `registerMasterInsertPoint` for why that ownership moved.
+      this._syncMasterInsertToEnabled();
       // Post-master vinyl chain follows the bus. Off means off — see
       // _applyVinylLevel(); the JA slider is unreachable while disabled.
       this._applyVinylLevel();
@@ -4535,11 +4561,55 @@ export class DubBus {
   }
 
   /**
-   * Splice the master-side TONE EQ chain between `source` and `dest`. Called
-   * by DubDeckStrip when the bus enables — it hands over the native
-   * `masterEffectsInput` and `blepInput` nodes from ToneEngine so we can
-   * intercept the whole master signal, not just the wet return. Caller is
-   * responsible for calling `unwireMasterInsert()` on disable.
+   * Tell the bus where its master insert belongs, once, for the life of the
+   * bus. `DrumPadEngine` calls this during its dub-routing bootstrap with the
+   * native `masterEffectsInput` and `blepInput` nodes from ToneEngine.
+   *
+   * Registering does NOT splice anything by itself — it hands the bus the
+   * endpoints and then lets `enabled` decide, which is the whole point: after
+   * this call the insert's presence in the graph is derived from engine state
+   * and from nothing else.
+   *
+   * Level note (house rule: name the level the root belongs to). The bug could
+   * have been patched one level up, inside `DubDeckStrip` — keep the effect
+   * but drop the teardown, or hoist it to a component that never unmounts.
+   * That is the wrong level: it leaves a React component the owner of an audio
+   * graph edge, so the next remount, breakpoint, route change or hot reload is
+   * free to reintroduce the same class of bug, and the correctness of the
+   * master path would depend on which view happens to be on screen. The root
+   * is ownership, and ownership belongs in the audio layer, so the splice
+   * moves out of React entirely. Debouncing or delaying the unmount teardown
+   * would have been a band-aid — it only shortens the window in which a
+   * layout change is audible, it does not stop a layout change from reaching
+   * the audio graph.
+   */
+  registerMasterInsertPoint(source: AudioNode, dest: AudioNode): void {
+    this.masterInsertPoints = { source, dest };
+    this._syncMasterInsertToEnabled();
+  }
+
+  /**
+   * Bring the graph in line with `enabled`. Idempotent in both directions —
+   * `wireMasterInsert` returns early when the same nodes are already spliced,
+   * and `unwireMasterInsert` does nothing when the graph is already whole — so
+   * it is safe to call on every settings write.
+   */
+  private _syncMasterInsertToEnabled(): void {
+    const points = this.masterInsertPoints;
+    if (!points) return;
+    if (this.enabled) {
+      void this.wireMasterInsert(points.source, points.dest);
+    } else {
+      this.unwireMasterInsert();
+    }
+  }
+
+  /**
+   * Splice the master-side TONE EQ chain between `source` and `dest`. Driven
+   * by `_syncMasterInsertToEnabled` off the bus's own `enabled` flag, using
+   * the native `masterEffectsInput` and `blepInput` nodes registered by
+   * `registerMasterInsertPoint`, so we intercept the whole master signal, not
+   * just the wet return.
    *
    * Idempotent: re-calling while active is a no-op. Safe to call with the
    * same nodes after a hot-reload — we undo the previous wiring first.
@@ -7231,6 +7301,9 @@ export class DubBus {
       this.masterInsertPending = null;
     }
     this._restoreMasterInsertPassthrough();
+    // Forget where the insert went, so a late settings write cannot re-splice
+    // a disposed bus back into the master path.
+    this.masterInsertPoints = null;
     if (this._postEchoSatCurvePending !== null) {
       clearTimeout(this._postEchoSatCurvePending);
       this._postEchoSatCurvePending = null;
