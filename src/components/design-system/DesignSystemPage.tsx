@@ -471,7 +471,7 @@ const BackToApp: React.FC = () => (
 
 export const DesignSystemPage: React.FC = () => {
   return (
-    <div style={{ width: '100vw', height: '100vh', overflow: 'auto', background: '#121218', color: '#e2e2e8', fontFamily: '"JetBrains Mono", "SF Mono", monospace', padding: '24px 32px' }}>
+    <div style={{ width: '100vw', height: 'var(--app-vh)', overflow: 'auto', background: '#121218', color: '#e2e2e8', fontFamily: '"JetBrains Mono", "SF Mono", monospace', padding: '24px 32px' }}>
       <div style={{ maxWidth: 1200, margin: '0 auto' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24 }}>
           <div>

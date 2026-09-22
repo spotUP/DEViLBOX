@@ -160,7 +160,7 @@ export const SidMonControls: React.FC<SidMonControlsProps> = ({
 
   // -- MAIN TAB ---
   const renderMain = () => (
-    <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 280px)' }}>
+    <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(var(--app-vh) - 280px)' }}>
       <div className={`rounded-lg border p-3 ${panelBg}`} style={panelStyle}>
         <SectionLabel color={accent} label="Waveform" />
         <div className="grid grid-cols-4 gap-2 mb-3">
@@ -245,7 +245,7 @@ export const SidMonControls: React.FC<SidMonControlsProps> = ({
 
   // -- FILTER TAB ---
   const renderFilter = () => (
-    <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 280px)' }}>
+    <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(var(--app-vh) - 280px)' }}>
       <div className={`rounded-lg border p-3 ${panelBg}`} style={panelStyle}>
         <SectionLabel color={accent} label="Filter Mode" />
         <div className="flex gap-2 mb-2">
@@ -285,7 +285,7 @@ export const SidMonControls: React.FC<SidMonControlsProps> = ({
   );
 
   const renderArpeggio = () => (
-    <div className="flex flex-col gap-3 p-3" style={{ height: 'calc(100vh - 280px)' }}>
+    <div className="flex flex-col gap-3 p-3" style={{ height: 'calc(var(--app-vh) - 280px)' }}>
       <div className={`rounded-lg border p-3 ${panelBg} flex flex-col`} style={{ ...panelStyle, flex: 1, minHeight: 0 }}>
         <div className="flex items-center justify-between mb-3">
           <SectionLabel color={accent} label="Arpeggio Speed" />
@@ -375,7 +375,7 @@ export const SidMonControls: React.FC<SidMonControlsProps> = ({
   }, [activeTab, config.pcmData, config.loopStart, config.loopLength, accent, dim]);
 
   const renderPcm = () => (
-    <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 280px)' }}>
+    <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(var(--app-vh) - 280px)' }}>
       <div className={`rounded-lg border p-3 ${panelBg}`} style={panelStyle}>
         <SectionLabel color={accent} label="PCM Sample (read-only preview)" />
         <canvas

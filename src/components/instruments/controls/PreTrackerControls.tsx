@@ -146,7 +146,7 @@ export const PreTrackerControls: React.FC<PreTrackerControlsProps> = ({
     }
 
     return (
-      <div className="flex flex-col gap-3 p-3 overflow-y-auto synth-controls-flow" style={{ maxHeight: 'calc(100vh - 280px)' }}>
+      <div className="flex flex-col gap-3 p-3 overflow-y-auto synth-controls-flow" style={{ maxHeight: 'calc(var(--app-vh) - 280px)' }}>
         {/* Wave selector */}
         <div className="flex items-center gap-2 flex-wrap">
           {config.waves.map((_, i) => (
@@ -426,7 +426,7 @@ export const PreTrackerControls: React.FC<PreTrackerControlsProps> = ({
     }
 
     return (
-      <div className="flex flex-col gap-3 p-3 overflow-y-auto synth-controls-flow" style={{ maxHeight: 'calc(100vh - 280px)' }}>
+      <div className="flex flex-col gap-3 p-3 overflow-y-auto synth-controls-flow" style={{ maxHeight: 'calc(var(--app-vh) - 280px)' }}>
         {/* Instrument selector */}
         <div className="flex items-center gap-2 flex-wrap">
           {config.instruments.map((_, i) => (
@@ -539,7 +539,7 @@ export const PreTrackerControls: React.FC<PreTrackerControlsProps> = ({
     const pat = instPatterns[selectedInst];
 
     return (
-      <div className="flex flex-col gap-2 p-3" style={{ maxHeight: 'calc(100vh - 280px)' }}>
+      <div className="flex flex-col gap-2 p-3" style={{ maxHeight: 'calc(var(--app-vh) - 280px)' }}>
         {/* Instrument selector */}
         <div className="flex items-center gap-2 flex-wrap">
           {config.instruments.map((_, i) => (

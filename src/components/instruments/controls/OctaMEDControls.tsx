@@ -139,7 +139,7 @@ export const OctaMEDControls: React.FC<OctaMEDControlsProps> = ({ config, onChan
 
   // ── PARAMS TAB ──
   const renderParams = () => (
-    <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 280px)' }}>
+    <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(var(--app-vh) - 280px)' }}>
       {/* Playback section */}
       <div className={`rounded-lg border p-3 ${panelBg}`} style={panelStyle}>
         <SectionLabel color={accent} label="Playback" />
@@ -230,7 +230,7 @@ export const OctaMEDControls: React.FC<OctaMEDControlsProps> = ({ config, onChan
 
   // ── VOL TABLE TAB ──
   const renderVoltbl = () => (
-    <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 280px)' }}>
+    <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(var(--app-vh) - 280px)' }}>
       <div className={`rounded-lg border p-3 ${panelBg}`} style={panelStyle}>
         <SectionLabel color={accent} label="Vol Command Table (128 bytes)" />
 
@@ -290,7 +290,7 @@ export const OctaMEDControls: React.FC<OctaMEDControlsProps> = ({ config, onChan
 
   // ── WF TABLE TAB ──
   const renderWftbl = () => (
-    <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 280px)' }}>
+    <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(var(--app-vh) - 280px)' }}>
       <div className={`rounded-lg border p-3 ${panelBg}`} style={panelStyle}>
         <SectionLabel color={accent} label="WF Command Table (128 bytes)" />
 
@@ -350,7 +350,7 @@ export const OctaMEDControls: React.FC<OctaMEDControlsProps> = ({ config, onChan
 
   // ── WAVEFORM TAB ── editable waveform data with SequenceEditor
   const renderWaveform = () => (
-    <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 280px)' }}>
+    <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(var(--app-vh) - 280px)' }}>
       {config.waveforms.map((wf, idx) => (
         <div key={idx} className={`rounded-lg border p-3 ${panelBg}`} style={panelStyle}>
           <SectionLabel color={accent} label={`Wave ${idx + 1}`} />

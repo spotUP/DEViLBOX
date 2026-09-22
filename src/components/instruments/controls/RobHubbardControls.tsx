@@ -66,7 +66,7 @@ export const RobHubbardControls: React.FC<RobHubbardControlsProps> = ({ config, 
 
   // ── MAIN TAB ──
   const renderMain = () => (
-    <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 280px)' }}>
+    <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(var(--app-vh) - 280px)' }}>
 
       {/* Sample */}
       <div className={`rounded-lg border p-3 ${panelBg}`} style={panelStyle}>
@@ -163,7 +163,7 @@ export const RobHubbardControls: React.FC<RobHubbardControlsProps> = ({ config, 
     const hasData = vib.length > 0;
 
     return (
-      <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 280px)' }}>
+      <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(var(--app-vh) - 280px)' }}>
         <div className={`rounded-lg border p-3 ${panelBg}`} style={panelStyle}>
           <SectionLabel color={accent} label="Vibrato Wave Table" />
           {hasData ? (
@@ -207,7 +207,7 @@ export const RobHubbardControls: React.FC<RobHubbardControlsProps> = ({ config, 
     }
 
     return (
-      <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 280px)' }}>
+      <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(var(--app-vh) - 280px)' }}>
         <div className={`rounded-lg border p-3 ${panelBg}`} style={panelStyle}>
           <SectionLabel color={accent} label="Sample Waveform" />
           {hasData ? (

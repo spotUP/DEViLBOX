@@ -188,7 +188,7 @@ export const GTUltraControls: React.FC<GTUltraControlsProps> = ({
   // ══════════════════════════════════════════════════════════════════
   const renderInstrumentTab = () => (
     <div className="grid gap-3 p-3 overflow-y-auto synth-controls-flow"
-      style={{ maxHeight: 'calc(100vh - 280px)', gridTemplateColumns: 'repeat(3, 1fr)' }}>
+      style={{ maxHeight: 'calc(var(--app-vh) - 280px)', gridTemplateColumns: 'repeat(3, 1fr)' }}>
 
       {/* ADSR */}
       <div className={`rounded-lg border p-3 ${panelBg}`} style={panelStyle}>
@@ -431,7 +431,7 @@ export const GTUltraControls: React.FC<GTUltraControlsProps> = ({
   const renderMonitorTab = () => {
     const chipCount = sidCount ?? 1;
     return (
-      <div className="flex flex-col gap-3 p-3 overflow-y-auto synth-controls-flow" style={{ maxHeight: 'calc(100vh - 280px)' }}>
+      <div className="flex flex-col gap-3 p-3 overflow-y-auto synth-controls-flow" style={{ maxHeight: 'calc(var(--app-vh) - 280px)' }}>
         {Array.from({ length: chipCount }, (_, chipIdx) => (
           <div key={chipIdx} className={`rounded-lg border p-3 ${panelBg}`} style={panelStyle}>
             {chipCount > 1 && <SectionLabel color={accentColor} label={`SID ${chipIdx + 1}`} />}
