@@ -5,6 +5,59 @@ tags: [dub, personas, autodub, moves, planning]
 status: draft
 ---
 
+## MEASURED 2026-09-22 — why no persona has ever dropped a song to drums and bass
+
+The owner: "i still havent heard a dub persona drop a song down to just drums
+and bass". That gesture is already built. It is not an architecture gap, and
+none of the layers proposed below would produce it.
+
+`riddimSection` (`src/engine/dub/moves/riddimSection.ts`) mutes every channel
+whose role is in `MELODIC_ROLES` — lead, chord, arpeggio, pad, skank — holds,
+and brings the skank back on a musical boundary soaked in echo. Every persona
+carries `riddimConfig`. The move works. It is being handed the wrong targets.
+
+Measured on `Cannabusiness` (4-channel MOD), through `get_channel_roles`:
+
+    roles: ["pad", "bass", "bass", "bass"]
+
+Three basses and NO drums. `riddimSection` therefore mutes exactly one channel
+of four, leaves three, and exposes no drums — inaudible as a gesture. With
+`muted.length === 0` it fires as a documented no-op, which is the AHX case the
+move's own comments already record.
+
+Why the roles are wrong, in order:
+
+1. In a tracker module, DRUMS ARE SAMPLES PLAYED AT PITCHES. `get_channel_evidence`
+   for channel 3 reads pitch 32-34, four onsets in 64 rows, monophonic,
+   on-beat. A kick drum has that exact signature, and so does a bass note.
+   Note statistics cannot separate them, ever.
+2. The instrument names are Amiga message text — "[skope/uprough](C)2k1",
+   "a.k.a   jr. francisco" — so `ChannelNaming`'s name regex is useless here by
+   design. See [[reference_sample_names_are_messages]].
+3. The CED classifier returns the catch-all: `cedType: "synthesizer"` at
+   confidence **0.035** and 0.515, and the third instrument was never
+   classified at all. This is the `AudioSetInstrumentMap` collapse the todos
+   ledger already flags as "the gap that matters most".
+4. So `classifyInstrument` falls through its whole chain to note statistics,
+   and note statistics say bass.
+
+**The evidence that would settle it is the sample itself.** A kick is short,
+unlooped and broadband; a bass note is longer and pitched. `classifyInstrument`
+step 4 already calls `analyzeSampleForClassification` on the PCM, gated at
+`confidence >= 0.5` — so the next move is to find out what that returns for
+these instruments and why it does not clear the gate, NOT to add a new
+mechanism beside it.
+
+One thing found while measuring: `analyze_instrument_spectrum` on instrument 2
+did not return within 120 seconds. Whatever else is true, that path is too slow
+to be answering during a live performance.
+
+**Order of work implied by this:** channel identity first (the todos ledger
+already queues it that way, and this is the evidence for why), then the
+persona architecture below. Building MusicalClock on roles that say a drum
+machine is three basses would just make the wrong target selection more
+punctual.
+
 what is missing in our dub bus and personas to make it complete and how should it be implemented?
 
 Yes. After reviewing the current DUB_SYSTEM.md against the move implementations we've been going through, I think the Dub Bus itself is already very capable. The bigger missing piece is the layer above it: the personas currently have the vocabulary of a dub engineer, but not yet the full musical decision-making system of a dub engineer.
