@@ -191,6 +191,10 @@ function startNow(gesture: LiveGesture): void {
   if (gesture.holdMs > 0) {
     schedule(gesture, () => endGesture(gesture.id), gesture.holdMs);
   }
+  // `holdMs === 0` is an OPEN-ENDED hold, not a mistake: a finger on a pad, a
+  // sustained MIDI note, a toggle. It ends when the caller ends it, or when a
+  // panic cancels everything. Callers with no finger — AutoDub — must supply a
+  // length; `AutoDub.fireChoice` enforces that.
 }
 
 /**

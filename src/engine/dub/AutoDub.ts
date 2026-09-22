@@ -494,9 +494,12 @@ const RULES: Rule[] = [
     condition: (c) => c.isNewBar && c.bar % 4 === 3,
     baseWeight: 0.35, wet: true },
   // Phrase end (bar 7 of 8) — tape stop and filter drop stack here.
+  // Tape Stop — the bus drops away and comes back. It is a HOLD, so it needs a
+  // length: without one the return gain stayed at zero and took the whole mix
+  // with it, because the master insert runs the mix through that return.
   { moveId: 'tapeStop',
     condition: (c) => c.isNewBar && c.bar % 8 === 7,
-    baseWeight: 0.15 },
+    baseWeight: 0.15, holdBars: 1 },
   { moveId: 'filterDrop',
     condition: (c) => c.isNewBar && c.bar % 8 === 7,
     baseWeight: 0.30, holdBars: 1 },

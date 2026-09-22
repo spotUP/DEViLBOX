@@ -108,6 +108,18 @@ const MOVES: Record<string, DubMove> = {
 };
 
 /**
+ * Whether a move holds until released, or fires and is done.
+ *
+ * Exported so a caller with no finger on the button — AutoDub — can tell
+ * whether it must supply a hold length. `GestureEngine` treats `holdMs === 0`
+ * as an OPEN-ENDED hold, which is right for a pad under a finger and wrong for
+ * an autonomous performer: the move stays applied until something else ends it.
+ */
+export function getMoveKind(moveId: string): DubMove['kind'] | null {
+  return MOVES[moveId]?.kind ?? null;
+}
+
+/**
  * What every subscriber sees when a move fires. `row` is the tracker's
  * row-level position at fire time, quantized by the caller if they wanted
  * grid placement. DubRecorder uses this as the stored `row` on DubEvent.

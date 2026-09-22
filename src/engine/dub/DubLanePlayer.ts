@@ -18,12 +18,23 @@
 import { fire } from './DubRouter';
 import type { DubLane } from '@/types/dub';
 
+/**
+ * How long a lane hold with no stated duration may run.
+ *
+ * Long enough for a real gesture — a tape stop, a drop — and short enough that
+ * a lane which never releases costs a couple of bars rather than the rest of
+ * the session.
+ */
+const UNBOUNDED_HOLD_MS = 4000;
+
 export class DubLanePlayer {
   private cursor = 0;
   private prevRow = -1;
   private prevTimeSec = -1;
   private lane: DubLane | null = null;
   private activeHolds: Map<string, { dispose(): void }> = new Map();
+  /** Watchdogs for holds the lane never gave a length. */
+  private holdTimers: Map<string, ReturnType<typeof setTimeout>> = new Map();
 
   /** Set the active lane (or clear it with `null`). Replaying the same lane
    *  multiple times is fine — call this once per pattern change. */
@@ -63,11 +74,8 @@ export class DubLanePlayer {
     while (this.cursor < events.length && events[this.cursor].row <= currentRow) {
       const event = events[this.cursor];
       const disposer = fire(event.moveId, event.channelId, event.params, 'lane');
-      // Hold-style moves (future phases) track their disposer so seek can
-      // release them cleanly. Trigger-only moves get `null` here.
-      if (disposer && event.durationRows !== undefined) {
-        this.activeHolds.set(event.id, disposer);
-      }
+      // Trigger-only moves get `null` here and need no bookkeeping.
+      this.trackHold(event.id, disposer, event.durationRows !== undefined);
       this.cursor++;
     }
 
@@ -94,17 +102,55 @@ export class DubLanePlayer {
     while (this.cursor < events.length && (events[this.cursor].timeSec ?? 0) <= currentTimeSec) {
       const event = events[this.cursor];
       const disposer = fire(event.moveId, event.channelId, event.params, 'lane');
-      if (disposer && event.durationSec !== undefined) {
-        this.activeHolds.set(event.id, disposer);
-      }
+      this.trackHold(event.id, disposer, event.durationSec !== undefined);
       this.cursor++;
     }
 
     this.prevTimeSec = currentTimeSec;
   }
 
+  /**
+   * Take ownership of whatever a lane event started.
+   *
+   * A hold move returns a disposer. This used to keep it only when the event
+   * carried a duration, and drop it otherwise — so a hold event with no
+   * duration held FOREVER, with nothing left able to release it.
+   *
+   * Measured 2026-09-22 on jennipha.ahx. Its lane fires `transportTapeStop` at
+   * the start of the song, which sweeps the master low-pass to 400 Hz and holds
+   * it there until release. The disposer was discarded, so the tune played
+   * through a closed filter and then died, and every later `reverseEcho`
+   * captured silence because nothing was reaching `bus.input` any more. These
+   * lane events had never run before the `require()` sweep, which is why a
+   * years-old lane only started doing this today.
+   *
+   * A duration-less hold is an authoring gap in the lane, not a licence to hold
+   * forever: it is tracked either way, so seek and lane changes can release it,
+   * and bounded by `UNBOUNDED_HOLD_MS` so a lane that never releases cannot
+   * take the mix with it.
+   */
+  private trackHold(id: string, disposer: { dispose(): void } | null, bounded: boolean): void {
+    if (!disposer) return;
+    this.activeHolds.set(id, disposer);
+    if (bounded) return;
+    console.warn(
+      `[DubLanePlayer] lane event "${id}" holds a move with no duration — ` +
+      `releasing after ${UNBOUNDED_HOLD_MS} ms. Give the event a duration.`,
+    );
+    const timer = setTimeout(() => {
+      this.holdTimers.delete(id);
+      const held = this.activeHolds.get(id);
+      if (!held) return;
+      this.activeHolds.delete(id);
+      try { held.dispose(); } catch { /* ok */ }
+    }, UNBOUNDED_HOLD_MS);
+    this.holdTimers.set(id, timer);
+  }
+
   /** Release every in-flight hold. Called on seek and on setLane. */
   releaseAllHolds(): void {
+    for (const t of this.holdTimers.values()) clearTimeout(t);
+    this.holdTimers.clear();
     for (const h of this.activeHolds.values()) {
       try { h.dispose(); } catch { /* ok */ }
     }
