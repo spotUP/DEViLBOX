@@ -3108,3 +3108,42 @@ button[class*="rounded"] {
 .instrument-list--art .instrument-badge--role {
   display: block;
 }
+
+/* The hover action icons sit on top of the row, not beside it.
+ *
+ * `.instrument-action-buttons` is `position: absolute; right: …`, so the icons
+ * are drawn over whatever the row already shows — on a long instrument name
+ * they land on the glyphs and both become unreadable. Reported 2026-09-22:
+ * "when hovering instruments all icons draw over the instrument text".
+ *
+ * Reserving space for them instead would shift every row's layout on hover,
+ * which is worse. So the strip carries the row's own background and fades into
+ * it on the left: the icons then read as a panel resting on the row, and the
+ * name disappears cleanly underneath rather than colliding.
+ *
+ * Two backgrounds because the row has two: `--ft2-header` while hovered, and
+ * the cursor colour while selected. `--instrument-row-bg` lets the component
+ * say which one applies without this file knowing the selection rules.
+ */
+.instrument-action-buttons {
+  --instrument-row-bg: var(--ft2-header);
+  background: var(--instrument-row-bg);
+  padding-left: 14px;
+  /* The fade lives in a pseudo-element so the buttons keep a solid backdrop. */
+  position: absolute;
+}
+
+.instrument-action-buttons::before {
+  content: '';
+  position: absolute;
+  right: 100%;
+  top: 0;
+  bottom: 0;
+  width: 18px;
+  background: linear-gradient(to right, transparent, var(--instrument-row-bg));
+  pointer-events: none;
+}
+
+.instrument-action-buttons--selected {
+  --instrument-row-bg: var(--color-tracker-cursor);
+}

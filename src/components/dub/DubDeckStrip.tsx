@@ -424,6 +424,8 @@ export const DubDeckStrip: React.FC = () => {
    * unmount cleanup below can always let go. The map now holds gesture IDS.
    */
   const activeHolds = useRef<Map<string, string>>(new Map());
+  /** Holds pressed while the bus was still arming, keyed like `activeHolds`. */
+  const pendingHolds = useRef<Set<string>>(new Set());
 
   const [heldMoves, setHeldMoves] = useState<Set<string>>(new Set());
 
@@ -901,8 +903,44 @@ export const DubDeckStrip: React.FC = () => {
   // send=0 because the per-channel tap GainNode only gets registered with
   // DubBus *after* _activateDubChannel completes asynchronously — racey
   // and silent on a cold channel.
+  /**
+   * Touching a dub control IS the intent to dub, so arm the bus rather than
+   * swallowing the gesture.
+   *
+   * Every dub control used to open with `if (!busEnabled) return;`. Clicking a
+   * pad, a move or AutoDub with the bus off did nothing and said nothing —
+   * reported 2026-09-22 ("i cant turn autodub off if dubbus is disabled, and
+   * why can it even be enabled when dub bus is disabled?"). Disabling the
+   * controls instead is worse: it makes the deck look broken and leaves
+   * AutoDub unreachable from the state it is stuck in.
+   *
+   * Arming is a store write, and the bus graph is spliced by an effect on the
+   * next commit, so an action fired in the same tick would reach a bus that is
+   * not wired yet. `run` therefore executes immediately when the bus is
+   * already on, and otherwise waits for `getActiveDubBus()` to appear before
+   * running — bounded, so a bus that never comes up drops the action instead
+   * of leaving a callback alive for ever.
+   *
+   * Returns true when the action ran synchronously, so callers that need a
+   * handle back (a hold's gesture id) can tell the two cases apart.
+   */
+  const runWithBus = useCallback((action: () => void): boolean => {
+    if (busEnabled && getActiveDubBus()) { action(); return true; }
+    setDubBus({ enabled: true, characterPreset: dubBusSettings.characterPreset });
+    let framesLeft = 30; // ~0.5s at 60Hz; the splice lands in one or two.
+    const waitForBus = () => {
+      if (getActiveDubBus()) { action(); return; }
+      if (framesLeft-- <= 0) {
+        console.warn('[DubDeck] bus did not come up; dropping the queued action');
+        return;
+      }
+      requestAnimationFrame(waitForBus);
+    };
+    requestAnimationFrame(waitForBus);
+    return false;
+  }, [busEnabled, setDubBus, dubBusSettings.characterPreset]);
+
   const toggleHold = useCallback((channelId: number) => {
-    if (!busEnabled) return;
     const isHeld = heldReleasers.current.has(channelId);
     if (isHeld) {
       const release = heldReleasers.current.get(channelId);
@@ -918,40 +956,53 @@ export const DubDeckStrip: React.FC = () => {
       });
       setHeldChannels(prev => new Set(prev).add(channelId));
     }
-  }, [busEnabled, setChannelDubSend]);
+  }, [setChannelDubSend]);
 
   // Trigger handler — single click fires one-shot.
   const fireTrigger = useCallback((moveId: string, channelId?: number) => {
-    if (!busEnabled) return;
-    fireDub(moveId, channelId);
-  }, [busEnabled]);
+    runWithBus(() => { fireDub(moveId, channelId); });
+  }, [runWithBus]);
 
   // Hold handlers — pointerdown starts the move, pointerup/pointercancel/
   // pointerleave releases it. Proper press-and-hold (not click-to-toggle),
   // matching physical instrument gesture.
   const holdStart = useCallback((moveId: string, channelId?: number) => {
-    if (!busEnabled) { console.warn(`[DubDeck] holdStart ${moveId} ignored — bus disabled`); return; }
     const key = `${moveId}:${channelId ?? 'g'}`;
     if (activeHolds.current.has(key)) { console.warn(`[DubDeck] holdStart ${moveId} ignored — already active in map`); return; }
-    // holdMs 0 = held until released. The engine keeps it in flight and it
-    // shows up in `activeGestures()`, so a panic or a transport stop can reach
-    // it — which a disposer closed over in this component never could.
-    const id = beginGesture({
-      moveId,
-      channelId,
-      holdMs: 0,
-      bpm: getActiveBpm(),
-      source: 'live',
-    });
-    console.log(`[DubDeck] holdStart ${moveId} → gesture ${id}`);
-    activeHolds.current.set(key, id);
+    // The button lights up now, even when the bus still has to come up, so a
+    // press never looks ignored. `pendingHolds` is what lets a pointerup that
+    // arrives first cancel a start that has not happened yet — without it, a
+    // quick tap on a cold bus would begin a gesture with nothing left to end
+    // it, which is a move held for ever.
+    pendingHolds.current.add(key);
     setHeldMoves(prev => new Set(prev).add(key));
-  }, [busEnabled]);
+    runWithBus(() => {
+      if (!pendingHolds.current.delete(key)) return; // released before it started
+      // holdMs 0 = held until released. The engine keeps it in flight and it
+      // shows up in `activeGestures()`, so a panic or a transport stop can reach
+      // it — which a disposer closed over in this component never could.
+      const id = beginGesture({
+        moveId,
+        channelId,
+        holdMs: 0,
+        bpm: getActiveBpm(),
+        source: 'live',
+      });
+      console.log(`[DubDeck] holdStart ${moveId} → gesture ${id}`);
+      activeHolds.current.set(key, id);
+    });
+  }, [runWithBus]);
 
   const holdEnd = useCallback((moveId: string, channelId?: number) => {
     const key = `${moveId}:${channelId ?? 'g'}`;
+    // Cancel a start still waiting on the bus, so the release is never lost
+    // between the press and the bus coming up.
+    const wasPending = pendingHolds.current.delete(key);
     const id = activeHolds.current.get(key);
-    if (!id) return;
+    if (!id) {
+      if (wasPending) setHeldMoves(prev => { const n = new Set(prev); n.delete(key); return n; });
+      return;
+    }
     activeHolds.current.delete(key);
     setHeldMoves(prev => { const n = new Set(prev); n.delete(key); return n; });
     try { endGesture(id); } catch { /* ok */ }
@@ -1008,22 +1059,25 @@ export const DubDeckStrip: React.FC = () => {
 
   // Toggle handler — click once to activate, click again to deactivate.
   const handleToggle = useCallback((moveId: string) => {
-    if (!busEnabled) return;
     if (toggleDisposers.current.has(moveId)) {
-      // Currently active — deactivate
+      // Currently active — deactivate. Never gated on the bus: a move that is
+      // already running must always be stoppable, whatever the bus is doing.
       const release = toggleDisposers.current.get(moveId)!;
       toggleDisposers.current.delete(moveId);
       setToggledMoves(prev => { const n = new Set(prev); n.delete(moveId); return n; });
       try { release(); } catch { /* ok */ }
     } else {
-      // Not active — activate (fire as hold, store disposer)
-      const disp = fireDub(moveId, undefined);
-      if (disp) {
-        toggleDisposers.current.set(moveId, () => disp.dispose());
-        setToggledMoves(prev => new Set(prev).add(moveId));
-      }
+      // Not active — activate (fire as hold, store disposer), arming the bus
+      // if it is off.
+      runWithBus(() => {
+        const disp = fireDub(moveId, undefined);
+        if (disp) {
+          toggleDisposers.current.set(moveId, () => disp.dispose());
+          setToggledMoves(prev => new Set(prev).add(moveId));
+        }
+      });
     }
-  }, [busEnabled]);
+  }, [runWithBus]);
 
   // Persistent mic toggle — connects mic into the dub bus input until toggled off.
   const toggleMic = useCallback(async () => {
@@ -1064,7 +1118,6 @@ export const DubDeckStrip: React.FC = () => {
 
   // Rate preset radio handler — mutual exclusion: only one active at a time.
   const handleRatePreset = useCallback((moveId: string) => {
-    if (!busEnabled) return;
     if (activeRatePreset === moveId) {
       // Same preset — deactivate (restores previous rate)
       rateDisposer.current?.();
@@ -1076,13 +1129,15 @@ export const DubDeckStrip: React.FC = () => {
         try { rateDisposer.current(); } catch { /* ok */ }
         rateDisposer.current = null;
       }
-      const disp = fireDub(moveId, undefined);
-      if (disp) {
-        rateDisposer.current = () => disp.dispose();
-        setActiveRatePreset(moveId);
-      }
+      runWithBus(() => {
+        const disp = fireDub(moveId, undefined);
+        if (disp) {
+          rateDisposer.current = () => disp.dispose();
+          setActiveRatePreset(moveId);
+        }
+      });
     }
-  }, [busEnabled, activeRatePreset]);
+  }, [runWithBus, activeRatePreset]);
 
   return (
     <div className="flex flex-col gap-1.5 px-2 py-1.5 bg-dark-bgSecondary border-t border-dark-border font-mono overflow-y-auto max-h-[60vh]">
@@ -1197,22 +1252,25 @@ export const DubDeckStrip: React.FC = () => {
               : 'bg-dark-bgTertiary border-dark-borderLight text-text-secondary hover:bg-dark-bgHover hover:text-text-primary'
           }`}
           onClick={handleAutoDubToggle}
-          /* Never unreachable while it is RUNNING.
+          /* Never disabled.
            *
-           * This was `disabled={!busEnabled}`, so switching the bus off while
-           * AutoDub was on left the performer running with its only stop button
-           * greyed out. It keeps firing: `channelMute` and `riddimSection` mute
-           * MIXER channels, which needs no bus, so channels could be muted with
-           * no way to stop whatever was muting them. Reported 2026-09-22 —
-           * "I can't turn AutoDub off if the dub bus is disabled".
+           * It was `disabled={!busEnabled}`, which left AutoDub running with
+           * its only stop button greyed out when the bus was switched off —
+           * `channelMute` and `riddimSection` mute MIXER channels and need no
+           * bus, so channels stayed muted with no way to stop whatever was
+           * muting them. Narrowing it to `!busEnabled && !autoDubEnabled` fixed
+           * the stop case and left the start case just as dead: with the bus
+           * off the button was unclickable and said so in a tooltip nobody
+           * asked for. Reported 2026-09-22 — "if i click auto dub when the dub
+           * bus is off the dub bus should activate so autodub can activate".
            *
-           * Enabling it still needs a bus; turning it off never does. */
-          disabled={!busEnabled && !autoDubEnabled}
+           * `handleAutoDubToggle` arms the bus, so there is no state this
+           * button cannot act from. */
           title={autoDubEnabled
             ? 'Auto Dub is ON — click to stop'
             : busEnabled
               ? 'Auto Dub — click to enable autonomous dub performance'
-              : 'Auto Dub — enable the dub bus first'}
+              : 'Auto Dub — click to switch the dub bus on and start'}
         >
           {autoDubEnabled ? '● AUTO DUB' : '○ AUTO DUB'}
         </button>
