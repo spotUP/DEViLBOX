@@ -123,6 +123,8 @@ const CHANNEL_OPS: Array<{ label: string; title: string; moveId: string; color: 
   { label: 'Skank', title: 'Skank Echo — catch ONE offbeat stab and throw it into a dotted-eighth echo (0.75 × beat), so the repeats land in the gaps before the next stab. The defining offbeat dub gesture.', moveId: 'skankEchoThrow', color: 'accent-highlight/70', kind: 'trigger' },
   { label: 'Float', title: 'Skank Float — same capture at a dotted quarter (1.5 × beat). The repeats drift 3:2 against the pulse so the echo floats at two-thirds tempo.', moveId: 'skankFloatThrow', color: 'accent-highlight/40', kind: 'trigger' },
   { label: '✦',    title: 'Dub Stab — short-sharp echo kiss',                 moveId: 'dubStab',         color: 'accent-highlight',  kind: 'trigger' },
+  { label: 'Build', title: 'Echo Build Up — open this channel\'s dub send over two bars so the echoes pile up, then mute the dry source and let the delays carry alone.', moveId: 'echoBuildUp', color: 'accent-primary/50', kind: 'trigger' },
+  { label: 'Emph',  title: 'Bass Emphasis — make the bass line already playing hit harder, rather than adding a new one.', moveId: 'bassEmphasis', color: 'accent-primary/40', kind: 'hold' },
 ];
 
 // ─── Global moves ──────────────────────────────────────────────────────────
@@ -169,6 +171,7 @@ const GLOBAL_MOVES: Array<GlobalMove> = [
   { label: 'Tape Stop', title: 'Tape Stop — bus LPF + echo-rate collapses while held, restores on release', moveId: 'tapeStop', color: 'accent-secondary/70', kind: 'hold', group: 'hold', needsSend: true },
   { label: 'Drop',         title: 'Master Drop — mutes dry signal while held; echo+spring tail survives', moveId: 'masterDrop',  color: 'accent-error/70', kind: 'hold', group: 'hold', needsSend: true },
   { label: 'Version Drop', title: 'Version Drop — mute all melodic channels (lead/chord/pad); leave bass + drums. Classic dub breakdown.', moveId: 'versionDrop', color: 'accent-error',    kind: 'hold', group: 'hold' },
+  { label: 'Riddim',       title: 'Riddim Section — drop to drums and bass, then the skank creeps back in soaked in echo on the next bar line. Keeps the lowest-register part even when role detection finds no bass.', moveId: 'riddimSection', color: 'accent-error/60', kind: 'hold', group: 'hold' },
   { label: 'Toast',        title: 'Toast — route DJ mic into bus while held (auto-starts mic)', moveId: 'toast', color: 'accent-success/70', kind: 'hold', group: 'hold' },
   { label: 'Siren',     title: 'Dub Siren — Rasta-box pitch-swept synth while held',           moveId: 'dubSiren',     color: 'accent-warning',  kind: 'hold', group: 'hold' },
   { label: 'Scream',    title: 'Tubby Scream — reverb self-feedback, rising metallic cry',      moveId: 'tubbyScream',  color: 'accent-error',    kind: 'hold', group: 'hold' },
