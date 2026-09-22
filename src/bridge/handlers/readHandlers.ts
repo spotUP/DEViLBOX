@@ -1046,11 +1046,29 @@ export async function getPlaybackSilence(): Promise<Record<string, unknown>> {
         const bus = getActiveDubBus();
         const insert = bus?.getMasterInsertLevels?.() as
           { busInput?: number; busReturn?: number } | null | undefined;
+        // The master-insert chain, stage by stage, plus the EQ values the bus
+        // actually holds. Auditing a BUS-tab slider means asking three
+        // separate questions — did the store change, did the BUS receive it,
+        // and did the audio change — and this answers the last two without
+        // the full `get_dub_bus_state` payload per step.
+        const g = (n: unknown): number | null => {
+          const v = (n as { gain?: { value?: number } } | null | undefined)?.gain?.value;
+          return typeof v === 'number' ? Math.round(v * 1000) / 1000 : null;
+        };
+        const b = bus as unknown as Record<string, unknown> | null;
         return {
           ...levels,
           nativeRouting: routing,
           busInput: insert?.busInput ?? null,
           busReturn: insert?.busReturn ?? null,
+          insertChain: insert,
+          eqOnBus: b ? {
+            bassShelfDb: (b.masterBassShelf as { gain?: { value?: number } } | undefined)?.gain?.value ?? null,
+            midScoopDb: (b.masterMidScoop as { gain?: { value?: number } } | undefined)?.gain?.value ?? null,
+            hpfHz: (b.masterHpf as { frequency?: { value?: number } } | undefined)?.frequency?.value ?? null,
+            midGain: g(b.masterMid),
+            sideGain: g(b.masterSide),
+          } : null,
         };
       } catch { return null; }
     })(),
