@@ -58,8 +58,22 @@ const KNOB_NAMES = [
   'knob5', 'knob6', 'knob7', 'knob8',
 ];
 
-// Accumulated absolute positions (0-127), start at midpoint
+// Accumulated absolute positions (0-127), start at midpoint.
+//
+// These are ACCUMULATORS, not readings: MK2/MK3 knobs are relative encoders
+// that report detents, so the bridge never learns a physical position. 64 is
+// therefore a guess, and until a knob actually moves it must not be sent to
+// anyone — see `knobsTouched`.
 const knobValues = new Array<number>(8).fill(64);
+
+// Has any knob actually moved since the bridge started? Until it has, the
+// values above are invented and announcing them on connect is a fabricated
+// event. It silently pulled the app's master volume to -29.76 dB on every
+// page load: knob 8 is CC 77, which the Mixer knob bank maps to
+// masterFx.masterVolume, and 64/127 of the -60..0 dB range is -29.76
+// (2026-09-22, reported as "very low volume now for some reason" with no
+// Maschine connected at all).
+let knobsTouched = false;
 let currentDeviceModel: 'mk2' | 'mk3' | null = null;
 
 // Sensitivity: how much each NIHIA delta tick changes the 0-127 value
@@ -80,12 +94,17 @@ wss.on('connection', (ws) => {
     if (ws.readyState === WebSocket.OPEN) ws.send(msg);
   }
 
-  // Send current knob positions on connect
-  for (let i = 0; i < 8; i++) {
-    broadcast({
-      type: 'encoder', index: i, name: KNOB_NAMES[i],
-      value: knobValues[i], raw: knobValues[i],
-    });
+  // Send current knob positions on connect — but only once they are real,
+  // and only to the browser that just connected. `broadcast` sent them to
+  // every open tab, so one page load moved parameters in all the others.
+  if (knobsTouched) {
+    for (let i = 0; i < 8; i++) {
+      const msg = JSON.stringify({
+        type: 'encoder', index: i, name: KNOB_NAMES[i],
+        value: knobValues[i], raw: knobValues[i],
+      } satisfies MaschineEvent);
+      if (ws.readyState === WebSocket.OPEN) ws.send(msg);
+    }
   }
 
   ws.on('message', (data) => {
@@ -113,6 +132,7 @@ function broadcast(event: MaschineEvent): void {
 
 function routeNIHIAEvent(evt: NIHIAEvent): void {
   if (evt.type === 'knob') {
+    knobsTouched = true;
     const i = evt.knob;
     if (i < 0 || i > 7) return;
     knobValues[i] = Math.max(0, Math.min(127, knobValues[i] + evt.delta * KNOB_STEP));
@@ -121,7 +141,13 @@ function routeNIHIAEvent(evt: NIHIAEvent): void {
       value: knobValues[i], raw: evt.raw,
     });
   } else if (evt.type === 'encoder') {
-    // HID path: C binary sends encoder events directly with index/value
+    // HID path: C binary sends encoder events directly with index/value.
+    // A real device reported a real position, so the accumulators are no
+    // longer guesses and a reconnecting browser may be told about them.
+    knobsTouched = true;
+    if (typeof evt.index === 'number' && evt.index >= 0 && evt.index <= 7) {
+      knobValues[evt.index] = Math.max(0, Math.min(127, evt.value));
+    }
     broadcast(evt as MaschineEvent);
   } else if (evt.type === 'pad') {
     broadcast({ type: 'pad', pad: evt.pad, velocity: evt.velocity, pressed: evt.pressed });
