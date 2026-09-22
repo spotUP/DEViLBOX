@@ -429,7 +429,7 @@ function App() {
     applyAutoCompact();
   }, [applyAutoCompact]);
 
-  const { save: saveProject, recoverySnapshot, restoreRecovery, discardRecovery } = useProjectPersistence();
+  const { save: saveProject, recoverySnapshot, recoverySource, restoreRecovery, discardRecovery } = useProjectPersistence();
 
   // Publish the crash-recovery prompt while it is on screen.
   //
@@ -1443,17 +1443,28 @@ function App() {
       {/* Guided Tour overlay — subtitles + controls */}
       <TourOverlay />
 
-      {/* Crash-recovery prompt — shown on boot when unsaved work was recovered */}
+      {/* Boot restore prompt. Two sources, two very different things to say:
+          a crash snapshot is work the user never saved, while the explicit
+          slot is a project they named and saved on purpose — and which boot
+          used to open silently over whatever they were about to load. */}
       {recoverySnapshot && (
         <Modal isOpen onClose={discardRecovery} size="sm" onConfirm={restoreRecovery}>
           <div className="p-4 space-y-3">
-            <h2 className="text-sm font-mono text-text-primary">Recover unsaved work</h2>
+            <h2 className="text-sm font-mono text-text-primary">
+              {recoverySource === 'saved' ? 'Open your last project' : 'Recover unsaved work'}
+            </h2>
             <p className="text-[11px] font-mono text-text-secondary">
-              Unsaved work from your last session was recovered. Restore it, or discard and start fresh?
+              {recoverySource === 'saved'
+                ? `Your last saved project${recoverySnapshot.metadata?.name ? ` — ${recoverySnapshot.metadata.name}` : ''} is ready. Open it, or start with an empty song?`
+                : 'Unsaved work from your last session was recovered. Restore it, or discard and start fresh?'}
             </p>
             <div className="flex justify-end gap-2 pt-1">
-              <Button variant="ghost" onClick={discardRecovery}>Discard</Button>
-              <Button variant="primary" onClick={restoreRecovery}>Restore</Button>
+              <Button variant="ghost" onClick={discardRecovery}>
+                {recoverySource === 'saved' ? 'Start Empty' : 'Discard'}
+              </Button>
+              <Button variant="primary" onClick={restoreRecovery}>
+                {recoverySource === 'saved' ? 'Open' : 'Restore'}
+              </Button>
             </div>
           </div>
         </Modal>

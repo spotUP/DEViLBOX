@@ -41,6 +41,50 @@ export function shouldPromptRestore(args: {
   return args.hasRecoveryRecord && !args.everExplicitlySaved;
 }
 
+/** What boot offers the user. Never a silent load. */
+export type BootRestore =
+  /** Nothing worth restoring — start on a clean slate. */
+  | { kind: 'none' }
+  /** The explicit-save slot. Restoring it marks the project saved. */
+  | { kind: 'saved' }
+  /** A crash snapshot from a never-saved session. */
+  | { kind: 'recovery' };
+
+/**
+ * What should boot do about stored work?
+ *
+ * It used to LOAD the explicit-save slot, unconditionally, on every boot:
+ *
+ *     if (everExplicitlySaved) { await loadProjectFromStorage(); return; }
+ *
+ * So once a project had been saved even once, every later session opened on
+ * top of it. Reported 2026-09-22: "i load a song on every boot because a stale
+ * song is there on every boot" — the restored song also re-wires the dub bus
+ * underneath the deck as the real song loads over it.
+ *
+ * Boot now offers and never imposes. The saved slot gets the same
+ * Restore/Discard prompt the crash snapshot already uses, so there is one
+ * mechanism rather than two, and a boot the user ignores leaves them on a
+ * clean slate.
+ *
+ * The explicit slot wins when both exist: it is work the user deliberately
+ * named and saved, where the snapshot is only ever a crash guess.
+ */
+export function decideBootRestore(args: {
+  everExplicitlySaved: boolean;
+  savedHasContent: boolean;
+  hasRecoveryRecord: boolean;
+}): BootRestore {
+  if (args.everExplicitlySaved && args.savedHasContent) return { kind: 'saved' };
+  if (shouldPromptRestore({
+    hasRecoveryRecord: args.hasRecoveryRecord,
+    everExplicitlySaved: args.everExplicitlySaved,
+  })) {
+    return { kind: 'recovery' };
+  }
+  return { kind: 'none' };
+}
+
 /**
  * Post-load flag transition after hydrating stores from a SavedProject.
  *
