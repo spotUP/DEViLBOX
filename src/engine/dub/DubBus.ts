@@ -104,7 +104,7 @@ import {
   smoothProgrammeLevel,
   type ProgrammeLevel,
 } from '@/lib/dub/programmeLevel';
-import { lowBandWeightFor } from '@/lib/dub/lowBandWeight';
+import { lowBandWeightFor, lowMidDipDbFor } from '@/lib/dub/lowBandWeight';
 
 /**
  * Loudest sample in a captured ring, so a capture can tell whether it caught
@@ -1467,6 +1467,13 @@ export class DubBus {
   private lowBandComp!: DynamicsCompressorNode;
   private lowBandGain!: GainNode;
   /**
+   * Low-mid dip that rides with the BASS control — see `lowMidDipDbFor`.
+   * Sits after the band sum and before the clipper, so it tames both the
+   * shelf's transition band and the band's harmonics. The return joins at
+   * the clipper, so it is not dipped; it has its own EQ.
+   */
+  private masterLowMidDip!: BiquadFilterNode;
+  /**
    * Meters the master BEFORE the insert, so the trim never measures its own
    * boost. Registered with the insert points; null until then.
    */
@@ -1855,6 +1862,11 @@ export class DubBus {
     this.lowBandComp.release.value = 0.15;
     this.lowBandGain = this.context.createGain();
     this.lowBandGain.gain.value = 0;  // silent until wired in by enable
+    this.masterLowMidDip = this.context.createBiquadFilter();
+    this.masterLowMidDip.type = 'peaking';
+    this.masterLowMidDip.frequency.value = this.settings.bassShelfFreqHz * 2;
+    this.masterLowMidDip.Q.value = 1.2;
+    this.masterLowMidDip.gain.value = 0;  // flat until wired in by enable
     this.masterMidScoop = this.context.createBiquadFilter();
     this.masterMidScoop.type = 'peaking';
     this.masterMidScoop.frequency.value = this.settings.midScoopFreqHz;
@@ -1929,7 +1941,8 @@ export class DubBus {
     masterSideInvertL.gain.value = 0;
     // EQ pre-chain: in → bassShelf → safety-clip → midScoop → LPF → split
     this.masterBassShelf.connect(this.masterBassPunch);
-    this.masterBassPunch.connect(this.masterSafetyClip);
+    this.masterBassPunch.connect(this.masterLowMidDip);
+    this.masterLowMidDip.connect(this.masterSafetyClip);
     this.masterSafetyClip.connect(this.masterMidScoop);
     this.masterMidScoop.connect(this.masterLpf);
     this.masterLpf.connect(this.masterSplit);
@@ -5022,6 +5035,9 @@ export class DubBus {
     rampBiquadParam(this.lowBandLp.frequency, m.bassShelfFreqHz, now);
     this._settle(this.lowBandDrive.gain, weight.drive, now, 0.02);
     this._settle(this.lowBandGain.gain, masterActive ? weight.gain : 0, now, 0.02);
+    // Heavy but clean: the low mids come down as the low end goes up.
+    rampBiquadParam(this.masterLowMidDip.frequency, m.bassShelfFreqHz * 2, now);
+    rampBiquadParam(this.masterLowMidDip.gain, masterActive ? lowMidDipDbFor(safeBassGain) : 0, now);
     this._applyMasterTrim(m, now);
     rampBiquadParam(this.masterMidScoop.frequency, m.midScoopFreqHz, now);
     rampBiquadParam(this.masterMidScoop.Q, m.midScoopQ, now);
@@ -5099,6 +5115,7 @@ export class DubBus {
     rampBiquadParam(this.masterBassShelf.gain, 0, now);
     rampBiquadParam(this.masterBassPunch.gain, 0, now);
     this._settle(this.lowBandGain.gain, 0, now, 0.02);
+    rampBiquadParam(this.masterLowMidDip.gain, 0, now);
     this.masterToneTrim.gain.setTargetAtTime(1, now, 0.02);
     rampBiquadParam(this.masterMidScoop.gain, 0, now);
     try {
