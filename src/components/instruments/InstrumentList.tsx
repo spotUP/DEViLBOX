@@ -14,7 +14,7 @@ import { getSynthBadge } from '@constants/channelTypeCompat';
 import { useInstrumentTypeStore } from '@stores/useInstrumentTypeStore';
 import { instrumentTypeLabel } from '@/bridge/analysis/AudioSetInstrumentMap';
 import type { InstrumentType } from '@/bridge/analysis/AudioSetInstrumentMap';
-import { analyzeSampleForClassification } from '@/bridge/analysis/SampleSpectrum';
+import { classifyInstrument } from '@/bridge/analysis/ChannelNaming';
 import { Plus, Trash2, Copy, Repeat, Repeat1, Pencil, ExternalLink, Download, Upload } from 'lucide-react';
 import * as LucideIcons from 'lucide-react';
 
@@ -572,7 +572,8 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
                 onDragStart={(e) => handleDragStart(e, instrument.id)}
                 className={`
                   instrument-list-item
-                  flex items-center gap-2 px-2 py-1.5 cursor-pointer
+                  flex items-center gap-x-2 gap-y-1 px-2 py-1.5 cursor-pointer
+                  ${artMode ? '' : 'flex-wrap'}
                   transition-all duration-200 ease-out group relative ${artMode ? '' : 'overflow-hidden'}
                   ${isSelected
                     ? 'bg-ft2-cursor text-ft2-bg'
@@ -622,6 +623,12 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
                        cut it mid-glyph — no ellipsis, no clue there was more.
                        `min-w-0 truncate` lets it shrink and end in an ellipsis;
                        the full name is already on the title attribute. */
+                    /* The row wraps rather than clipping, so the name keeps a
+                       readable floor and the badges drop to a second line in a
+                       narrow panel instead of being pushed outside it.
+                       Reported 2026-09-22 with the instrument list at roughly
+                       240px: every badge — Sampler, PCM and the role — sat past
+                       the right edge with nothing to show they existed. */
                     className={`text-xs font-mono cursor-text ${artMode
                       ? 'whitespace-pre shrink-0'
                       : 'whitespace-nowrap flex-1 min-w-[4rem] truncate'}`}
@@ -702,9 +709,20 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
                       </span>
                     );
                   } else {
-                    const url = instrument.sample?.url;
-                    if (typeof url === 'string' && url.startsWith('data:audio/wav;base64,')) {
-                      const spec = analyzeSampleForClassification(url);
+                    // The full classifier, not the spectrum alone.
+                    //
+                    // This used to call `analyzeSampleForClassification`
+                    // directly, which is one of the five signals
+                    // `classifyInstrument` weighs — so the badge could not see
+                    // an explicit drum type, a sample filename, the synth
+                    // parameters, or the instrument name. On
+                    // `a sleep so deep.mod` that left `jstbell3`, `jsttom1`,
+                    // `jstharpsi1`, `jstpiano3` and `jstminor` blank while the
+                    // classifier had an answer for several of them, and it
+                    // meant a synth-only format like AHX could never show a
+                    // badge at all, having no PCM to analyse.
+                    const spec = classifyInstrument(instrument);
+                    {
                       if (spec && spec.role !== 'empty' && spec.confidence >= 0.6) {
                         const label = spec.role === 'bass'
                           ? (spec.subrole === 'sub' ? 'SUB' : 'BASS')
@@ -714,7 +732,7 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
                             className={`text-[9px] px-1 py-0.5 rounded font-mono font-bold border shrink-0 cursor-pointer ${
                               isSelected ? 'bg-ft2-bg/20 text-ft2-bg/80 border-ft2-bg/20' : 'bg-accent-secondary/10 text-accent-secondary border-accent-secondary/30'
                             }`}
-                            title={`Spectral ${Math.round(spec.confidence * 100)}% — click to override`}
+                            title={`Classifier ${Math.round(spec.confidence * 100)}% — click to override`}
                             onClick={toggle}
                           >
                             {label}
