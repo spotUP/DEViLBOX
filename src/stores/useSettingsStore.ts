@@ -438,12 +438,7 @@ export const useSettingsStore = create<SettingsStore>()(
         ashleyHogg: 'uade',           // AshleyHoggParser — dedicated Ashley Hogg support
         adpcmMono: 'uade',            // ADPCMmonoParser — dedicated ADPCM Mono support
         janneSalmijarvi: 'uade',      // JanneSalmijarviParser — dedicated Janne Salmijarvi support
-        // 'uade', not 'native'. The native route sends hip7 to the Hippel WASM
-        // engine, i.e. libtfmxaudiodecoder — whose "7V" is TFMX's seven-voice
-        // mode, a different format. Jochen Hippel 7V rendered silence there
-        // ("7V does not work in DEViLBOX", 2026-09-22); UADE carries the
-        // dedicated JochenHippel-7V eagleplayer and plays it.
-        jochenHippel7V: 'uade',
+        jochenHippel7V: 'native',       // JochenHippel7VParser — Hippel WASM engine (libtfmxaudiodecoder)
         maximumEffect: 'uade',        // MaximumEffectParser — dedicated Maximum Effect support
         midiLoriciel: 'native',         // MIDILoricielParser — dedicated MIDI Loriciel support
         onEscapee: 'uade',            // OnEscapeeParser — dedicated onEscapee support
@@ -695,7 +690,7 @@ export const useSettingsStore = create<SettingsStore>()(
     })),
     {
       name: 'devilbox-settings',
-      version: 9,
+      version: 8,
       migrate: (persistedState: unknown, version: number) => {
         const s = (persistedState ?? {}) as Record<string, unknown>;
         if (version < 3) {
@@ -724,13 +719,6 @@ export const useSettingsStore = create<SettingsStore>()(
           // editable SunTronicV13 engine). Only flip users still at old default.
           const fe = s.formatEngine as Record<string, unknown> | undefined;
           if (fe && fe.suntronic === 'uade') fe.suntronic = 'native';
-        }
-        if (version < 9) {
-          // v9: Jochen Hippel 7V default changed from 'native' to 'uade' — the
-          // native route was the TFMX decoder and rendered silence. Only flip
-          // users still at the old default.
-          const fe = s.formatEngine as Record<string, unknown> | undefined;
-          if (fe && fe.jochenHippel7V === 'native') fe.jochenHippel7V = 'uade';
         }
         return s;
       },
