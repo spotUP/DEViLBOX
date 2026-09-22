@@ -59,26 +59,36 @@ describe('rideTrim', () => {
   });
 });
 
-describe('spendRide — the boost pays first', () => {
+describe('spendRide — the boost pays first, punch before bass', () => {
   // "the bass kills all other audio" (2026-09-22): the ride took its depth
   // from the whole mix while the shelf kept adding.
-  it('takes the depth off the shelf and leaves the mix alone', () => {
-    expect(spendRide(12, -4)).toEqual({ bassDb: 8, trimDb: 0 });
+  it('takes the depth off the punch first, and leaves the mix alone', () => {
+    expect(spendRide(12, 6, -4)).toEqual({ bassDb: 12, punchDb: 2, trimDb: 0 });
   });
 
-  it('reaches the trim only once the shelf is flat', () => {
-    expect(spendRide(12, -14)).toEqual({ bassDb: 0, trimDb: -2 });
-    expect(spendRide(3, -3)).toEqual({ bassDb: 0, trimDb: 0 });
+  it('then off the shelf', () => {
+    expect(spendRide(12, 6, -10)).toEqual({ bassDb: 8, punchDb: 0, trimDb: 0 });
+    expect(spendRide(12, 0, -4)).toEqual({ bassDb: 8, punchDb: 0, trimDb: 0 });
+  });
+
+  it('reaches the trim only once both are flat', () => {
+    expect(spendRide(12, 6, -20)).toEqual({ bassDb: 0, punchDb: 0, trimDb: -2 });
+    expect(spendRide(3, 0, -3)).toEqual({ bassDb: 0, punchDb: 0, trimDb: 0 });
+  });
+
+  it('does not let a ridden-flat shelf hand headroom back to the punch', () => {
+    // The stuck case: ride -12 against bass 12 + punch 6 leaves NO punch.
+    expect(spendRide(12, 6, -12).punchDb).toBe(0);
   });
 
   it('trims a cut as before — there is no boost to give', () => {
-    expect(spendRide(-3, -4)).toEqual({ bassDb: -3, trimDb: -4 });
-    expect(spendRide(0, -4)).toEqual({ bassDb: 0, trimDb: -4 });
+    expect(spendRide(-3, -2, -4)).toEqual({ bassDb: -3, punchDb: -2, trimDb: -4 });
+    expect(spendRide(0, 0, -4)).toEqual({ bassDb: 0, punchDb: 0, trimDb: -4 });
   });
 
   it('changes nothing when the ride is at rest', () => {
-    expect(spendRide(12, 0)).toEqual({ bassDb: 12, trimDb: 0 });
-    expect(spendRide(12, 2)).toEqual({ bassDb: 12, trimDb: 0 });
+    expect(spendRide(12, 6, 0)).toEqual({ bassDb: 12, punchDb: 6, trimDb: 0 });
+    expect(spendRide(12, 6, 2)).toEqual({ bassDb: 12, punchDb: 6, trimDb: 0 });
   });
 });
 
