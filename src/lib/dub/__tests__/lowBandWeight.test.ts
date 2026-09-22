@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { lowBandWeightFor, LOW_BAND_MAX_DRIVE, LOW_BAND_MAX_GAIN } from '../lowBandWeight';
+import { lowBandWeightFor, lowMidDipDbFor, LOW_BAND_MAX_DRIVE, LOW_BAND_MAX_GAIN, LOW_MID_DIP_MAX_DB } from '../lowBandWeight';
 
 /**
  * The BASS control's low-band weight stage.
@@ -44,5 +44,22 @@ describe('lowBandWeightFor', () => {
 
   it('treats a non-number as rest, not as maximum', () => {
     expect(lowBandWeightFor(NaN)).toEqual(lowBandWeightFor(0));
+  });
+});
+
+describe('lowMidDipDbFor — heavy but clean', () => {
+  it('cuts nothing at rest or for a cut', () => {
+    for (const db of [0, -3, -12]) expect(lowMidDipDbFor(db)).toBe(0);
+  });
+
+  it('cuts more as the low end goes up, to its maximum at the top', () => {
+    expect(lowMidDipDbFor(6)).toBeLessThan(0);
+    expect(lowMidDipDbFor(12)).toBeLessThan(lowMidDipDbFor(6));
+    expect(lowMidDipDbFor(12)).toBe(LOW_MID_DIP_MAX_DB);
+  });
+
+  it('is a dip, never a boost', () => {
+    expect(LOW_MID_DIP_MAX_DB).toBeLessThan(0);
+    for (let db = -12; db <= 24; db += 3) expect(lowMidDipDbFor(db)).toBeLessThanOrEqual(0);
   });
 });
