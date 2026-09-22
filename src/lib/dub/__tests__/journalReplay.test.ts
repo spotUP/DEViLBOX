@@ -18,12 +18,18 @@ vi.mock('@/engine/dub/DubRouter', () => ({
     fired.push({ moveId, channelId, source });
     return null;
   },
+  // DubLanePlayer subscribes at module load to suppress the lane echo of a
+  // live fire; the mock must offer it or the import throws.
+  subscribeDubRouter: () => () => {},
 }));
 vi.mock('../../../engine/dub/DubRouter', () => ({
   fire: (moveId: string, channelId: number | undefined, _p: unknown, source: string) => {
     fired.push({ moveId, channelId, source });
     return null;
   },
+  // DubLanePlayer subscribes at module load to suppress the lane echo of a
+  // live fire; the mock must offer it or the import throws.
+  subscribeDubRouter: () => () => {},
 }));
 
 import { DubLanePlayer } from '@/engine/dub/DubLanePlayer';

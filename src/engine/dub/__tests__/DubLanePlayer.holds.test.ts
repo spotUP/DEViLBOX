@@ -20,6 +20,9 @@ const disposed: string[] = [];
 const HOLD_MOVES = new Set(['transportTapeStop', 'masterDrop']);
 
 vi.mock('../DubRouter', () => ({
+  // The player subscribes at module load to suppress the lane echo of a
+  // live fire; the mock must offer it or the import throws.
+  subscribeDubRouter: () => () => {},
   fire: (moveId: string) => {
     fired.push(moveId);
     if (!HOLD_MOVES.has(moveId)) return null;
