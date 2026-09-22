@@ -46,8 +46,13 @@ export interface ChannelRename {
 // ─── Name recognition ────────────────────────────────────────────────────────
 
 const GENERIC_NAME_PATTERNS: RegExp[] = [
-  /^Channel \d+$/,   // MODParser / XMParser / ITParser / createEmptyPattern
-  /^CH\d+$/,         // UI fallback (PatternEditorCanvas:3041)
+  /^Channel ?\d+$/i,  // MODParser / XMParser / ITParser / createEmptyPattern
+  // `CH1` AND `CH 1`. The space matters: `useMixerStore` writes its defaults
+  // with one ("CH 1" ... "CH 16") and `/^CH\d+$/` matched none of them, so
+  // every mixer channel looked like a name a user had chosen. Measured
+  // 2026-09-22 on amanda.ahx, where the tracker had named the channels
+  // `Bass 1, Kick, Chords, Bass 2` and the mixer's placeholders won anyway.
+  /^CH ?\d+$/i,
   /^\d+$/,           // Scope strip numeric-only labels
   /^\s*$/,           // Blank / whitespace
 ];

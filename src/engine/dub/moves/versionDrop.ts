@@ -31,6 +31,7 @@ import {
 import { useTrackerStore } from '@/stores/useTrackerStore';
 import { useTransportStore } from '@/stores/useTransportStore';
 import { buildInstrumentLookup, getChannelProfiles } from '../channelProfiles';
+import { resolveChannelNames } from '@/lib/tracker/channelNames';
 import {
   planDrop,
   droppedChannels,
@@ -67,7 +68,13 @@ export const versionDrop: DubMove = {
     );
     const profiles = getChannelProfiles(
       pattern,
-      mixer.channels.map(c => c?.name ?? null),
+      // Resolved, not raw: the mixer's names stay at `CH 1` unless a user
+      // renames them by hand, and these are the instrument-name evidence the
+      // profile reads.
+      resolveChannelNames(
+        mixer.channels.map(c => c?.name ?? null),
+        pattern?.channels?.map(c => c?.name ?? null) ?? [],
+      ),
       grid.rowsPerBeat,
       grid.rowsPerBar,
       buildInstrumentLookup(),

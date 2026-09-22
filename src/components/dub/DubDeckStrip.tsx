@@ -13,13 +13,14 @@
  * note-entry meaning.
  */
 
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { notify } from '@stores/useNotificationStore';
 import { useHoverTooltip } from '@/components/ui';
 import { useDubStore } from '@/stores/useDubStore';
 import { useDrumPadStore } from '@/stores/useDrumPadStore';
 import { useMixerStore } from '@/stores/useMixerStore';
 import { useTrackerStore } from '@/stores/useTrackerStore';
+import { resolveChannelNames } from '@/lib/tracker/channelNames';
 import { useUIStore } from '@/stores/useUIStore';
 import { useTransportStore } from '@/stores/useTransportStore';
 import { bpmSyncedEchoRate, getActiveBpm } from '@/engine/dub/DubActions';
@@ -309,6 +310,23 @@ export const DubDeckStrip: React.FC = () => {
   // Auto-detected channel roles — polled from AutoDub at 500ms so the UI
   // reflects what the classifier currently thinks even while it's running.
   const [autoRoles, setAutoRoles] = useState<readonly string[]>([]);
+
+  /**
+   * What to call each channel strip.
+   *
+   * The label was hardcoded `CH {i + 1}` and the real name lived only in the
+   * tooltip, so the deck showed placeholders even after the tracker had named
+   * the channels `Kick`, `Bass 1` and `Chords`. The mixer keeps its own names
+   * and leaves them at `CH n` unless a user types one, so neither store alone
+   * is the answer — see `lib/tracker/channelNames.ts`.
+   */
+  const channelLabels = useMemo(
+    () => resolveChannelNames(
+      channels.map(c => c?.name ?? null),
+      pattern?.channels?.map(c => c?.name ?? null) ?? [],
+    ),
+    [channels, pattern],
+  );
   useEffect(() => {
     const t = setInterval(() => {
       if (document.hidden) return; // no UI to update in a hidden tab
@@ -1705,9 +1723,9 @@ export const DubDeckStrip: React.FC = () => {
               <div className="flex flex-col items-center gap-1.5 flex-1 min-w-0">
               <span
                 className="text-xs font-bold text-text-secondary leading-none truncate max-w-[56px]"
-                title={`Ch ${i + 1}${ch ? ' · ' + ch.name : ''}`}
+                title={`Ch ${i + 1}${channelLabels[i] !== `CH ${i + 1}` ? ' · ' + channelLabels[i] : ''}`}
               >
-                CH {i + 1}
+                {channelLabels[i]}
               </span>
               {/* Role override — dim = auto (classifier), amber = locked by user */}
               {(() => {
