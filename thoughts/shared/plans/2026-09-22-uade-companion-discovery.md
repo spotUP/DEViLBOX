@@ -2,7 +2,7 @@
 date: 2026-09-22
 topic: One companion resolver for every UADE load path
 tags: [uade, import, companion-files, two-file-formats]
-status: draft
+status: final
 ---
 
 # One companion resolver for every UADE load path
@@ -98,7 +98,13 @@ Pass = the song plays (`get_audio_level` non-silent, `get_dub_bus_state`
 `hivelyRenderStats` n/a — use `get_playback_silence`), and the companion
 map handed to `loadFile` is exactly the "must find" column.
 
-## Decisions needed (D)
+## Decisions (answered by the owner, 2026-09-22)
+
+- D1: **yes** — prompt with the expected companion name(s).
+- D2: **(a)** — `src/lib/import/companionResolver.ts`, server imports it relatively.
+- D3: **only what the resolver picks.**
+
+### As asked
 - **D1 — Lone-file drop.** When one file is dropped and the resolver, run
   over its name alone, says the format wants a companion (a role word it
   knows), show a prompt naming the expected file(s) ("This is a TFMX
