@@ -111,6 +111,20 @@ export const DeckPitchSlider: React.FC<DeckPitchSliderProps> = ({ deckId }) => {
     setIsDragging(false);
   }, []);
 
+  /**
+   * A pointer can be taken away without ever sending `pointerup` — the browser
+   * steals it for a system gesture, or the captured element is re-created by a
+   * render. `lostpointercapture` is the only event that always arrives, so it
+   * ends the drag too. Without it the "one pointer at a time" guard below
+   * latches and the control is dead until remount — "the sliders stopped
+   * working after some pulls" (2026-09-22).
+   */
+  const handleLostPointerCapture = useCallback((e: React.PointerEvent) => {
+    if (activePointerRef.current !== e.pointerId) return;
+    activePointerRef.current = null;
+    setIsDragging(false);
+  }, []);
+
   const handleDoubleClick = useCallback(() => {
     setDeckPitchAction(deckId, 0);
   }, [deckId]);
@@ -150,6 +164,7 @@ export const DeckPitchSlider: React.FC<DeckPitchSliderProps> = ({ deckId }) => {
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
         onPointerCancel={handlePointerUp}
+        onLostPointerCapture={handleLostPointerCapture}
         onDoubleClick={handleDoubleClick}
         onContextMenu={(e) => { e.preventDefault(); setDeckPitchAction(deckId, 0); }}
       >

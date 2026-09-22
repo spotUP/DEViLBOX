@@ -2015,8 +2015,15 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent);
     if (isIOS || !('transferControlToOffscreen' in HTMLCanvasElement.prototype)) {
       console.warn('[PatternEditorCanvas] OffscreenCanvas worker skipped (iOS or unsupported)');
-      // Clear any stale children before React renders fallback table
-      while (container.firstChild) container.removeChild(container.firstChild);
+      // Clear a stale canvas from a previous run of this effect — and ONLY
+      // that. This container is also React's: the visual background, the dub
+      // lanes and one AutomationParameterPicker per channel are rendered into
+      // it as children. Wiping every child took those with it, and the next
+      // React unmount died with "NotFoundError: Failed to execute 'removeChild'
+      // on 'Node': The node to be removed is not a child of this node" —
+      // reported from an iPhone on 2026-09-22, because this branch is the one
+      // iOS takes.
+      container.querySelectorAll('canvas[data-imperative-canvas]').forEach((el) => el.remove());
       setWebglUnsupported(true);
       return;
     }
@@ -2025,6 +2032,8 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     const canvas = document.createElement('canvas');
     canvas.style.cssText = `display:block;width:${dimensions.width}px;height:${dimensions.height}px;`;
     canvas.oncontextmenu = (e) => e.preventDefault();
+    // Marks this node as ours, not React's — see the cleanup above.
+    canvas.dataset.imperativeCanvas = '';
     container.appendChild(canvas);
     canvasRef.current = canvas;
 
@@ -2286,6 +2295,8 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     const canvas = document.createElement('canvas');
     canvas.style.cssText = 'display:block;width:100%;height:100%;position:relative;z-index:0;';
     canvas.oncontextmenu = (e) => e.preventDefault();
+    // Marks this node as ours, not React's — see the cleanup above.
+    canvas.dataset.imperativeCanvas = '';
     container.appendChild(canvas);
     canvasRef.current = canvas;
 

@@ -117,6 +117,43 @@ describe('Knob drags from one pointer path', () => {
     expect(onChange.mock.calls.at(-1)?.[0]).toBeCloseTo(100, 1);
   });
 
+  it('a lost pointer capture ends the drag, so the knob is not dead afterwards', () => {
+    const onChange = vi.fn();
+    const { container } = render(
+      <Knob label="Cutoff" value={50} min={0} max={100} onChange={onChange} />
+    );
+    const surface = dragSurface(container);
+
+    // A drag whose pointer the browser takes away: capture is lost and NO
+    // pointerup ever arrives. "the sliders stopped working after some pulls"
+    // (2026-09-22) — the one-pointer-at-a-time guard latched forever, and the
+    // drag anchor stayed at the old y, so the next touch jumped the value.
+    fireEvent.pointerDown(surface, pointer({ clientX: 0, clientY: 200 }));
+    fireEvent.lostPointerCapture(surface, pointer({ clientX: 0, clientY: 200 }));
+
+    // Press somewhere else and release without moving. A knob that accepted
+    // the new press measures from it and reports nothing. A latched knob
+    // still measures from y=200 and reports a 100px jump. The value is
+    // written on release (the drag batches through rAF and pointer-up
+    // flushes it), so the release is what makes this observable at all.
+    onChange.mockClear();
+    fireEvent.pointerDown(surface, pointer({ clientX: 0, clientY: 100 }));
+    fireEvent.pointerMove(surface, pointer({ clientX: 0, clientY: 100 }));
+    fireEvent.pointerUp(surface, pointer({ clientX: 0, clientY: 100 }));
+
+    expect(
+      onChange.mock.calls,
+      'the knob kept the anchor from the abandoned drag — the new press was ' +
+        'ignored and the value jumped by the distance between the two presses'
+    ).toEqual([]);
+
+    // And it still works.
+    fireEvent.pointerDown(surface, pointer({ clientX: 0, clientY: 200 }));
+    fireEvent.pointerMove(surface, pointer({ clientX: 0, clientY: 125 }));
+    fireEvent.pointerUp(surface, pointer({ clientX: 0, clientY: 125 }));
+    expect(onChange.mock.calls.at(-1)?.[0]).toBeCloseTo(100, 1);
+  });
+
   it('does not let the page scroll under the drag', () => {
     const { container } = render(
       <Knob label="Cutoff" value={50} min={0} max={100} onChange={() => {}} />
