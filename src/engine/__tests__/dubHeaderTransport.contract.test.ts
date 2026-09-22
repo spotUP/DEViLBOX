@@ -41,7 +41,12 @@ describe('dub header transport handoff contracts', () => {
     expect(nav).not.toContain('!stripCollapsed;');
     expect(nav).toContain('onClick={() => ft2Actions.playSong?.()}');
     expect(nav).toContain('onClick={() => ft2Actions.playPattern?.()}');
-    expect(nav).toContain('onClick={() => ft2Actions.openFileBrowser?.()}');
+    // Load does NOT go through the registry: the handler it pointed at was
+    // a state setter of the toolbar this row replaces, unmounted at exactly
+    // this moment, so the click did nothing (2026-09-22). The App-level file
+    // browser is always mounted.
+    expect(nav).toContain('onClick={() => useUIStore.getState().setShowFileBrowser(true)}>Load</Button>');
+    expect(nav).not.toContain('ft2Actions.openFileBrowser');
     expect(nav).toContain('onClick={() => ft2Actions.undo?.()}');
     expect(nav).toContain('onClick={() => ft2Actions.redo?.()}');
   });
