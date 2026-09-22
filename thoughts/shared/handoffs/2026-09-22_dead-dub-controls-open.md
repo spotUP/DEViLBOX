@@ -2,15 +2,30 @@
 date: 2026-09-22
 topic: Dub deck controls going dead after a few seconds — open
 tags: [dub, dubbus, session-restore, hively, open]
-status: draft — intermittent, recovered on reload
+status: resolved — root cause was the starved dub bus
 ---
 
 # Dub deck controls go dead after a few seconds — INTERMITTENT
 
-**It came back on its own.** After a reload on `main` the owner confirmed "it
-works". So this is not a permanent break in any commit below — it is a state
-the app can enter and recover from, which makes the boot sequence the suspect
-rather than any single control's code.
+**RESOLVED (`8e00ca17d`), and it was never about the controls.**
+
+The dub bus was starved: with the song playing at insertIn 0.076 the bus read
+busInput 0.000001. The worklet's `play()` opens with `teardownAllDubSlots_()`,
+and the engine restored the slots on a blind `setTimeout(..., 100)` counted
+from when it POSTED the play message — a 400 KB module instantiates slower
+than that, so the teardown wiped the slots the rebuild had just made, and the
+rebuild is single-shot. Nothing reached the bus for the rest of the song.
+
+That is why the deck felt dead and then "worked for some seconds": the buttons
+were firing all along, into a bus with no input. Toggling any channel send
+repaired it, which is what made it look intermittent.
+
+The worklet now posts `playReady` once the module exists and the engine
+rebuilds then; the timer stays at 400 ms only as a backstop for a cached
+worklet. Owner confirmed after the fix: "the power is back".
+
+The lead recorded below about two songs loading per boot is still real and
+still unfixed — it is just not what caused this.
 
 Reported while testing the responsive/pointer work: "the channels sliders are
 dead", "many of the dub deck buttons are too", then "it worked for some
