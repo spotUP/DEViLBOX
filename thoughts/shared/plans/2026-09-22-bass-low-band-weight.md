@@ -145,3 +145,26 @@ preClip 0.343 -> afterClip 0.337 (clipper idle).
 
 Open: listening verdict on pumping with riders v2. If still heard, the next
 levers are hold 8 -> 16 ticks and attackFraction 0.5 -> 0.35.
+
+## Superseded: the BASS control is a low-band saturator (`caeb413a5`, `62be6f544`)
+
+The parallel weight band and the shelf are gone. Linear lift could not give
+heavy bass with untouched mids at a fixed ceiling — with the ride spending
+the boost first, only +1.5 of 12 dB fit on amanda.ahx with AutoDub. The
+master insert now splits at the BASS corner with an LR4 crossover; the low
+band is lifted and saturated (fixed soft clip between a drive and a ceiling
+gain, ceiling 1.0 at rest → 0.5 by +3 dB), the high band passes untouched.
+`lowBandCrossover.ts`, `lowMidDip.ts`; ride target 0.88.
+
+Measured, 30 s AutoDub at BASS +12 on `62be6f544`:
+
+| | value |
+|---|---|
+| masterBassDb (lift applied) | 12.0 |
+| trimRideDb / returnGovernorDb | 0 / 0 |
+| masterToneTrim | 0.98 |
+| master peakMax / rmsAvg | 0.72 / 0.19 |
+| mid band avg | 0.56 (0.47 on the rider-heavy build) |
+
+User on `caeb413a5`: "is sounds pretty great now". Verdict on `62be6f544`
+pending (more lift gets through).
