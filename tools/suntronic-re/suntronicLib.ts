@@ -13,10 +13,10 @@
 import { readFileSync, readdirSync, statSync } from 'fs';
 import { join } from 'path';
 import {
+  addCompanions,
   loadUADEModule,
   renderToSamples,
   PROJECT_ROOT,
-  type UADEModule,
   type RenderResult,
 } from '../uade-audit/uadeRenderCore';
 
@@ -57,41 +57,11 @@ export function loadInstrCompanions(): { name: string; data: Uint8Array }[] {
 }
 
 // ── Render with companions ────────────────────────────────────────────────
+// addCompanions lives in the render core now — one implementation of "put a
+// file where the player can open it", shared with the corpus sweep. Re-exported
+// so the 40-odd probe scripts keep their `from './suntronicLib'` import.
 
-interface CompanionModule extends UADEModule {
-  _uade_wasm_add_extra_file(namePtr: number, dataPtr: number, len: number): number;
-}
-
-function refreshHeap(mod: UADEModule): void {
-  const mem = (mod as unknown as Record<string, unknown>)._wasmMemory as
-    | WebAssembly.Memory
-    | undefined;
-  if (!mem) return;
-  if (mod.HEAPU8.buffer !== mem.buffer) {
-    mod.HEAPU8 = new Uint8Array(mem.buffer);
-    mod.HEAPF32 = new Float32Array(mem.buffer);
-  }
-}
-
-export function addCompanions(
-  mod: UADEModule,
-  companions: { name: string; data: Uint8Array }[],
-): void {
-  const cm = mod as CompanionModule;
-  for (const { name, data } of companions) {
-    const nameLen = name.length * 4 + 1;
-    const namePtr = cm._malloc(nameLen);
-    const dataPtr = cm._malloc(data.byteLength);
-    if (!namePtr || !dataPtr) throw new Error('malloc failed for companion');
-    refreshHeap(cm);
-    cm.stringToUTF8(name, namePtr, nameLen);
-    cm.HEAPU8.set(data, dataPtr);
-    const ret = cm._uade_wasm_add_extra_file(namePtr, dataPtr, data.byteLength);
-    cm._free(namePtr);
-    cm._free(dataPtr);
-    if (ret !== 0) throw new Error(`add_extra_file failed for ${name}`);
-  }
-}
+export { addCompanions } from '../uade-audit/uadeRenderCore';
 
 /**
  * Render a module with instr/ companions injected. Fresh WASM instance per call

@@ -15,6 +15,7 @@
 | Test (CI mode, headless) | `npm run test:ci` |
 | Build production | `npm run build` |
 | Deploy | `git push origin main` (CI build + Hetzner pull auto — never `gh-pages`) |
+| Sound check (headless, silent, resumable) | `npm run sound-check` — tables every song in `public/data/songs/formats` via UADE WASM; rows to `test-data/uade-corpus-sweep.json` |
 | Format status tracker | `npx tsx tools/format-server.ts &` (serve on :4444) |
 
 **Type-check mandatory after every change.** `npm run type-check` must pass before task done — catch unused vars (TS6133), strict null/undefined, enum syntax `tsc --noEmit` miss. Stricter than global rule; no substitute.
