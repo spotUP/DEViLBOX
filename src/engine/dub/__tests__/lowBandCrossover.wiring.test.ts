@@ -134,7 +134,7 @@ describe('the dub return skips the low-end stages', () => {
     // Through the return's own copy of the trim, so it is paid for like the dry.
     expect(join).toContain('this.returnSum.connect(this.returnTrim)');
     expect(source).toContain('this.returnTrim.connect(this.masterSafetyClip);');
-    expect(methodBody('private _applyMasterTrim(')).toContain('this._settle(this.returnTrim.gain, trim * Math.pow(10, this._returnGovernor.db / 20), now, TRIM_RAMP_SEC);');
+    expect(methodBody('private _applyMasterTrim(')).toContain('this._settle(this.returnTrim.gain, trim, now, TRIM_RAMP_SEC);');
     // The clipper sits after the band sum and before the scoop/width stages,
     // so the return still gets the clipper, the scoop and the width.
     expect(source).toContain('this.lowSum.connect(this.masterBassPunch);');
@@ -179,38 +179,33 @@ describe('the trim is ridden from the clipper input', () => {
   });
 });
 
-describe('the return is governed against the programme', () => {
-  // Send 0.028 RMS, return 0.261: the echo came back louder than the song and
-  // the sum clipped — "clips/dists" (2026-09-22).
-  it('steps the governor from the watch, against the smoothed pre-insert programme', () => {
+describe('the return is NOT governed against the programme', () => {
+  // A governor held the wet return under a multiple of the dry programme
+  // (unity, then 4x). On a dub bus that premise is wrong: four sends at 0.8
+  // through the echo is the performer's intent, and the governor answered it
+  // by sitting at its -18 dB floor for the whole performance — the return at
+  // 12 %, every colour move colouring a return nobody could hear ("completely
+  // dead" with the faders at max, twice on 2026-09-23; measured live:
+  // governor -18 before any move was pressed). Removed. Runaway is bounded
+  // structurally and level is the safety clipper's and trim ride's business.
+  it('has no governor step in the watch', () => {
     const watch = methodBody('private _startTrimWatch(');
-    expect(watch).toContain('governReturn(');
-    expect(watch).toContain('this._returnRms(), programme.rms, programme.valid');
+    expect(watch).not.toContain('governReturn(');
+    expect(watch).not.toContain('_returnGovernor');
+    // The programme is still read there — the trim and the record-spinning
+    // rule both use it.
     expect(watch).toContain('const programme = this._programmeBeforeInsert();');
   });
 
-  // A governor that clamps during a gesture cancels the gesture: Liquid, Ring,
-  // Ping-Pong, Starve, Wide and Wobble all push the return up, and pulling it
-  // straight back leaves them changing timbre without ever getting louder —
-  // reported 2026-09-22 as each of them being dead, one at a time. The first
-  // cut froze the governor while held; that left a clamp earned BEFORE the
-  // press in place for thirty seconds (2026-09-23, "completely dead", faders
-  // at max). The rule now lives in `governReturn`, which is handed the
-  // gesture and releases at gesture pace — see returnGovernor.test.ts.
-  it('hands the held gesture to the governor rule instead of freezing it here', () => {
-    const watch = methodBody('private _startTrimWatch(');
-    expect(watch).toContain('this.wetGestureActive,');
-    expect(watch).not.toContain('governed.db < this._returnGovernor.db');
-  });
-
-  it('applies it on the return trim only, on top of the shared trim', () => {
+  it('applies the shared trim to the return, and nothing on top of it', () => {
     const apply = methodBody('private _applyMasterTrim(');
-    expect(apply).toContain('trim * Math.pow(10, this._returnGovernor.db / 20)');
+    expect(apply).toContain('this._settle(this.returnTrim.gain, trim, now, TRIM_RAMP_SEC);');
+    expect(apply).not.toContain('_returnGovernor');
     expect(apply).toContain('this._settle(this.masterToneTrim.gain, trim, now, TRIM_RAMP_SEC);');
   });
 
-  it('clears with the watch', () => {
-    expect(methodBody('private _stopTrimWatch(')).toContain('this._returnGovernor = RIDER_REST;');
+  it('the module is gone, not merely unused', () => {
+    expect(source).not.toContain("from '@/lib/dub/returnGovernor'");
   });
 });
 

@@ -108,7 +108,6 @@ import {
 import { lowMidDipDbFor } from '@/lib/dub/lowMidDip';
 import { lowBandGainsFor, LOW_SAT_KNEE } from '@/lib/dub/lowBandCrossover';
 import { rideTrim, spendRide, bufferPeak } from '@/lib/dub/trimRide';
-import { governReturn, bufferRms } from '@/lib/dub/returnGovernor';
 import { RIDER_REST, type RiderState } from '@/lib/dub/gainRider';
 
 /**
@@ -1538,8 +1537,6 @@ export class DubBus {
    */
   private _clipRefProbe!: AnalyserNode;
   private _trimRide: RiderState = RIDER_REST;
-  /** Depth the return governor is holding the return down. See returnGovernor.ts. */
-  private _returnGovernor: RiderState = RIDER_REST;
   /**
    * Where the dub RETURN joins the master. The return used to ride into the
    * insert with the dry mix and get the same low-end lift, so every echo
@@ -4857,21 +4854,17 @@ export class DubBus {
         // as fast as it produced writes.
         this._trimRide = rideTrim(this._trimRide, this._clipInputPeak(), this._clipReferencePeak());
         const programme = this._programmeBeforeInsert();
-        // While a performer holds a wet gesture the governor RELEASES, at
-        // gesture pace, and never tightens. The first cut only stopped it
-        // tightening, which cancelled the move it was governing (Liquid, Ring,
-        // Ping-Pong, Starve, Wide and Wobble changed timbre and never got
-        // louder). That fix did nothing about a clamp earned BEFORE the press:
-        // four sends at 0.96 through a 0.79-feedback echo is +20 dB, the
-        // governor sits at its -18 dB floor, and its idle release is thirty
-        // seconds — so every toggle pressed in that window landed on a return
-        // held at 12 %, reported 2026-09-23 as "completely dead" with the
-        // faders at max. The rule lives in `governReturn`, with the gesture
-        // passed in, so it is provable without this watch.
-        this._returnGovernor = governReturn(
-          this._returnGovernor, this._returnRms(), programme.rms, programme.valid,
-          this.wetGestureActive,
-        );
+        // No return governor here any more. It held the wet return under a
+        // multiple of the dry programme (unity, then 4x), and on a dub bus
+        // that premise is wrong: four sends at 0.8 through the echo is the
+        // performer's intent, not a runaway, and the governor answered it by
+        // sitting at its -18 dB floor for the whole performance — the return
+        // at 12 %, every colour move colouring a return nobody could hear
+        // ("completely dead" with the faders at max, twice on 2026-09-23;
+        // measured live: governor -18 before any move was pressed). Runaway is
+        // bounded structurally (echo feedback ceilings, the external loop
+        // closing at the echo output, the limiter in that loop) and level is
+        // the safety clipper's and the trim ride's business.
         // The ride moves the shelf as well as the trim now, so the whole
         // master tone is re-derived, not the trim alone.
         this._applyMasterInsertTone();
@@ -4884,7 +4877,6 @@ export class DubBus {
     if (this._trimWatch) clearInterval(this._trimWatch);
     this._trimWatch = null;
     this._trimRide = RIDER_REST;
-    this._returnGovernor = RIDER_REST;
   }
 
   /**
@@ -4907,18 +4899,6 @@ export class DubBus {
     this._vinylSpinning = spinning;
     this._applyVinylLevel();
   }
-
-  /** RMS at `return_`, before the return trim and the governor. */
-  private _returnRms(): number {
-    const probe = this._returnProbe;
-    if (!probe) return 0;
-    const buf = new Float32Array(probe.fftSize);
-    probe.getFloatTimeDomainData(buf);
-    return bufferRms(buf);
-  }
-
-  /** Read by the MCP probe: how far the return governor is holding the return down, dB. */
-  get returnGovernorDb(): number { return this._returnGovernor.db; }
 
   private _clipInputPeak(): number {
     return this._probePeak(this._clipInProbe);
@@ -5169,9 +5149,9 @@ export class DubBus {
     // Ramped over most of a tick, so the riders' steps join into one
     // continuous movement rather than a stair the ear reads as pumping.
     this._settle(this.masterToneTrim.gain, trim, now, TRIM_RAMP_SEC);
-    // The return pays the same trim, and on top of it the governor that keeps
-    // it under the music.
-    this._settle(this.returnTrim.gain, trim * Math.pow(10, this._returnGovernor.db / 20), now, TRIM_RAMP_SEC);
+    // The return pays the same trim. Nothing else holds it down: the
+    // governor that kept it "under the music" is gone (see _startTrimWatch).
+    this._settle(this.returnTrim.gain, trim, now, TRIM_RAMP_SEC);
   }
 
   /**
