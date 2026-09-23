@@ -126,26 +126,44 @@ export const DUB_MOVE_KINDS: Record<string, 'trigger' | 'hold'> = {
  * Continuous bus parameters — each maps to a field on useDrumPadStore.dubBus.
  * Value transforms normalize 0..1 → the expected setting range.
  */
-const DUB_BUS_PARAMS: Record<string, { field: string; transform?: (n: number) => number }> = {
-  'dub.echoIntensity':   { field: 'echoIntensity' },
-  'dub.echoWet':         { field: 'echoWet' },
-  'dub.echoRateMs':      { field: 'echoRateMs',   transform: (n) => 40 + n * 960 },     // 40..1000 ms
-  'dub.springWet':       { field: 'springWet' },
-  'dub.returnGain':      { field: 'returnGain' },
-  'dub.hpfCutoff':       { field: 'hpfCutoff',    transform: (n) => 20 + n * 980 },     // 20..1000 Hz
-  'dub.sidechainAmount': { field: 'sidechainAmount' },
+/**
+ * A continuous dub bus parameter: which setting it writes, and over what
+ * range.
+ *
+ * The range used to be an opaque `transform` closure, which was enough to
+ * WRITE a value from a controller but told a UI nothing — so the deck could
+ * not draw a knob for one without restating its range beside this table, and
+ * the two would drift. Every one of these is linear, so min and max say the
+ * same thing the closure did and a reader can use them in both directions.
+ */
+export interface DubBusParamDef {
+  field: string;
+  min: number;
+  max: number;
+  /** Full words, as every DEViLBOX control label is. */
+  label: string;
+  unit?: string;
+}
+
+export const DUB_BUS_PARAMS: Record<string, DubBusParamDef> = {
+  'dub.echoIntensity':   { field: 'echoIntensity',   min: 0,   max: 1,    label: 'Echo Intensity' },
+  'dub.echoWet':         { field: 'echoWet',         min: 0,   max: 1,    label: 'Echo Wet' },
+  'dub.echoRateMs':      { field: 'echoRateMs',      min: 40,  max: 1000, label: 'Echo Rate', unit: 'ms' },
+  'dub.springWet':       { field: 'springWet',       min: 0,   max: 1,    label: 'Spring Wet' },
+  'dub.returnGain':      { field: 'returnGain',      min: 0,   max: 1,    label: 'Return Gain' },
+  'dub.hpfCutoff':       { field: 'hpfCutoff',       min: 20,  max: 1000, label: 'High Pass', unit: 'Hz' },
+  'dub.sidechainAmount': { field: 'sidechainAmount', min: 0,   max: 1,    label: 'Sidechain' },
   // The BUS tab's own controls. They were not routable at all, so a
   // controller could drive the echo and the spring but not the tone — and the
   // X-Touch's encoder row had nothing worth assigning past the seventh knob
   // (2026-09-23). Ranges match the faders in the deck's BUS tab.
-  'dub.bassShelfGainDb': { field: 'bassShelfGainDb', transform: (n) => -12 + n * 24 },   // -12..+12 dB
-  'dub.midScoopGainDb':  { field: 'midScoopGainDb',  transform: (n) => -12 + n * 18 },   // -12..+6 dB
-  'dub.stereoWidth':     { field: 'stereoWidth',     transform: (n) => n * 2 },          // 0..2 (1 = neutral)
-  'dub.sweepAmount':     { field: 'sweepAmount' },
-  'dub.sweepRateHz':     { field: 'sweepRateHz',     transform: (n) => 0.05 + n * 2.95 }, // 0.05..3 Hz
-  'dub.plateStageMix':   { field: 'plateStageMix' },
+  'dub.bassShelfGainDb': { field: 'bassShelfGainDb', min: -12, max: 12,   label: 'Bass Shelf', unit: 'dB' },
+  'dub.midScoopGainDb':  { field: 'midScoopGainDb',  min: -12, max: 6,    label: 'Mid Scoop', unit: 'dB' },
+  'dub.stereoWidth':     { field: 'stereoWidth',     min: 0,   max: 2,    label: 'Stereo Width' },
+  'dub.sweepAmount':     { field: 'sweepAmount',     min: 0,   max: 1,    label: 'Sweep Amount' },
+  'dub.sweepRateHz':     { field: 'sweepRateHz',     min: 0.05, max: 3,   label: 'Sweep Rate', unit: 'Hz' },
+  'dub.plateStageMix':   { field: 'plateStageMix',   min: 0,   max: 1,    label: 'Plate Mix' },
 };
-
 // Hold-disposer map. Key = full param name (including optional `.chN`).
 const dubHoldDisposers = new Map<string, { dispose(): void }>();
 
@@ -201,6 +219,23 @@ function parseDubMoveParam(param: string): { moveId: string; channelId?: number 
  */
 const CHANNEL_SEND_PREFIX = 'dub.channelSend.ch';
 
+/**
+ * `dub.channelTouch.ch<N>` — a hand landing on a channel's fader.
+ *
+ * Touch-sensitive faders send this the instant you make contact, before the
+ * fader has moved at all, and that is exactly the moment a desk decides which
+ * channel you mean. It aims the deck's shared op panel: Skank, Float, Build
+ * and Emph name a channel, and the channel they name is the one under your
+ * hand.
+ *
+ * Distinct from the send CC on the same fader. Touching and riding are two
+ * different gestures, and touching alone must be able to aim without moving
+ * the send by a hair.
+ *
+ * Design: thoughts/shared/plans/2026-09-23-dub-deck-channel-section.md
+ */
+const CHANNEL_TOUCH_PREFIX = 'dub.channelTouch.ch';
+
 function routeDubParameter(param: string, value: number, source: 'live' | 'lane' = 'live'): void {
   // 0. Per-channel dub send — handled before the move parser, which does not
   //    know 'channelSend' and would reject it.
@@ -216,10 +251,24 @@ function routeDubParameter(param: string, value: number, source: 'live' | 'lane'
     return;
   }
 
+  // 0b. Fader touch — aims the op panel, moves no audio.
+  if (param.startsWith(CHANNEL_TOUCH_PREFIX)) {
+    const ch = parseInt(param.slice(CHANNEL_TOUCH_PREFIX.length), 10);
+    if (!Number.isFinite(ch) || ch < 0) return;
+    void import('../../stores/useDubStore').then(({ useDubStore }) => {
+      // Release (value 0) deliberately does NOT clear the target. Letting go
+      // of a fader to reach for a button is the normal gesture; clearing on
+      // release would un-aim the panel on the way to using it. The target
+      // expires on its own.
+      if (value > 0) useDubStore.getState().touchOpTarget(ch);
+    });
+    return;
+  }
+
   // 1. Continuous bus settings
   const busDef = DUB_BUS_PARAMS[param];
   if (busDef) {
-    const v = busDef.transform ? busDef.transform(value) : value;
+    const v = busDef.min + value * (busDef.max - busDef.min);
     void import('../../stores/useDrumPadStore').then(({ useDrumPadStore }) => {
       useDrumPadStore.getState().setDubBus({ [busDef.field]: v });
     });
