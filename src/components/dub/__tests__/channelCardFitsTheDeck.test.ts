@@ -45,3 +45,17 @@ describe('the channel card fits the deck', () => {
     expect(master).toContain('the same column a channel card has');
   });
 });
+
+/**
+ * "when the channel sliders reach 100% the component shrinks sideways"
+ * (2026-09-23). The readout under the fader was content-sized; "100%" is
+ * wider than "15%", the fader column (`shrink-0`) grew with it, and the op
+ * grid beside it (`flex-1 min-w-0`) gave up the difference. The readout has
+ * a fixed width so the fader column never changes width with the value.
+ */
+describe('the fader readout does not resize the card', () => {
+  it('gives both readouts a fixed width', () => {
+    const readouts = DECK.match(/className="w-7 text-center tabular-nums text-\[9px\] font-mono/g) ?? [];
+    expect(readouts.length, 'master + channel').toBe(2);
+  });
+});
