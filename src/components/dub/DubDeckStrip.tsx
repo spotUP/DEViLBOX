@@ -1491,62 +1491,62 @@ export const DubDeckStrip: React.FC = () => {
   const renderMasterStrip = (widthClass = 'w-36 shrink-0') => (
     <div
       className={
-        `flex flex-row items-stretch gap-2.5 px-2 py-1.5 rounded border ${widthClass} ` +
-        'bg-dark-bgSecondary border-accent-primary/40'
+        `flex flex-col items-center gap-1.5 px-2 py-1.5 rounded border ${widthClass} ` +
+        'bg-dark-bgSecondary border-accent-primary/40 min-h-0'
       }
     >
-      <div className="flex flex-col items-center gap-1.5 flex-1 min-w-0">
-        <span className="text-xs font-bold text-accent-primary leading-none">MASTER</span>
-        <button
-          className={
-            'px-1 py-0.5 rounded border w-full text-[9px] font-mono leading-none transition-colors ' +
-            (targetChannels.length === 1
-              ? 'bg-accent-highlight/20 border-accent-highlight text-accent-highlight'
-              : 'bg-dark-bgTertiary border-dark-border text-text-muted')
-          }
-          onClick={() => clearOpTarget()}
-          title={targetChannels.length === 1
-            ? `The ops act on ${targetLabel}. Click to act on every channel again.`
-            : 'The ops act on every channel. Ride a channel fader, or press its AIM, to aim at one.'}
-        >
-          {targetLabel}
-        </button>
-        <button
-          className={
-            'px-2 py-1 rounded border w-full text-[9px] font-bold transition-all duration-150 ' +
-            (anySend
-              ? 'bg-accent-primary/20 border-accent-primary text-accent-primary hover:bg-accent-error/20 hover:border-accent-error hover:text-accent-error'
-              : 'bg-dark-bgTertiary border-dark-borderLight text-text-secondary hover:text-text-primary hover:border-accent-primary')
-          }
-          onClick={() => {
-            const to = anySend ? 0 : 1.0;
-            for (let i = 0; i < visibleChannelCount; i++) setChannelDubSend(i, to);
+      {/* ONE column: the buttons stack on top and the fader takes everything
+          left. The master had its controls in a left column beside the fader,
+          like a channel card, but it is the ninth COLUMN of the device and a
+          column is one thing wide. */}
+      <span className="text-xs font-bold text-accent-primary leading-none">MASTER</span>
+      <button
+        className={
+          'px-1 py-0.5 rounded border w-full text-[9px] font-mono leading-none transition-colors ' +
+          (targetChannels.length === 1
+            ? 'bg-accent-highlight/20 border-accent-highlight text-accent-highlight'
+            : 'bg-dark-bgTertiary border-dark-border text-text-muted')
+        }
+        onClick={() => clearOpTarget()}
+        title={targetChannels.length === 1
+          ? `The ops act on ${targetLabel}. Click to act on every channel again.`
+          : 'The ops act on every channel. Ride a channel fader, or press its AIM, to aim at one.'}
+      >
+        {targetLabel}
+      </button>
+      <button
+        className={
+          'px-2 py-1 rounded border w-full text-[9px] font-bold transition-all duration-150 ' +
+          (anySend
+            ? 'bg-accent-primary/20 border-accent-primary text-accent-primary hover:bg-accent-error/20 hover:border-accent-error hover:text-accent-error'
+            : 'bg-dark-bgTertiary border-dark-borderLight text-text-secondary hover:text-text-primary hover:border-accent-primary')
+        }
+        onClick={() => {
+          const to = anySend ? 0 : 1.0;
+          for (let i = 0; i < visibleChannelCount; i++) setChannelDubSend(i, to);
+        }}
+        title={anySend ? 'Zero all channel sends' : 'Set all channel sends to 100%'}
+        disabled={!busEnabled}
+      >
+        {anySend ? 'NONE' : 'ALL'}
+      </button>
+      <div className="flex-1 min-h-0 flex items-stretch">
+        <Fader
+          value={masterSendValue}
+          size="md"
+          fillHeight
+          color="accent-primary"
+          onChange={(v) => {
+            for (let i = 0; i < visibleChannelCount; i++) setChannelDubSend(i, v);
           }}
-          title={anySend ? 'Zero all channel sends' : 'Set all channel sends to 100%'}
+          title={`Master dub send — ${Math.round(masterSendValue * 100)}%. Sets all channel sends simultaneously.`}
           disabled={!busEnabled}
-        >
-          {anySend ? 'NONE' : 'ALL'}
-        </button>
+          doubleClickValue={1}
+        />
       </div>
-      <div className="flex flex-col items-center gap-1 shrink-0 min-h-0">
-        <div className="flex-1 min-h-0 flex items-stretch">
-          <Fader
-            value={masterSendValue}
-            size="md"
-            fillHeight
-            color="accent-primary"
-            onChange={(v) => {
-              for (let i = 0; i < visibleChannelCount; i++) setChannelDubSend(i, v);
-            }}
-            title={`Master dub send — ${Math.round(masterSendValue * 100)}%. Sets all channel sends simultaneously.`}
-            disabled={!busEnabled}
-            doubleClickValue={1}
-          />
-        </div>
-        <span className="w-7 text-center tabular-nums text-[9px] font-mono text-accent-primary leading-none">
-          {Math.round(masterSendValue * 100)}%
-        </span>
-      </div>
+      <span className="w-7 text-center tabular-nums text-[9px] font-mono text-accent-primary leading-none">
+        {Math.round(masterSendValue * 100)}%
+      </span>
     </div>
   );
 
