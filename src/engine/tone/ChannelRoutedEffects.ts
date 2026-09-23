@@ -21,6 +21,7 @@
 import * as Tone from 'tone';
 import type { EffectConfig } from '@typedefs/instrument';
 import { createEffect } from '../factories/EffectFactory';
+import { dubSendToGain, storedDubSendGains } from '@/lib/dub/dubSendCurve';
 import { getNativeAudioNode } from '@utils/audio-context';
 import { applyEffectParametersDiff } from './EffectParameterEngine';
 import { PerChannelDubFx } from '../dub/PerChannelDubFx';
@@ -36,6 +37,18 @@ import type { MixerChannelState } from '@stores/useMixerStore';
  * until this ramp has landed — see `_deactivateDubChannelInner`.
  */
 export const DUB_SEND_RAMP_SEC = 0.02;
+
+/**
+ * How long a send seeded from the store takes to open at boot.
+ *
+ * Far longer than a fader move's ramp, and deliberately so. The wiring is
+ * built while the engines are still coming up, and whatever a worklet emits
+ * on its first blocks — a module instance starting, a WASM effect booting —
+ * lands on these sends. Seeding them as an instant step made that startup
+ * transient audible ("i heard the warm up", 2026-09-23); a slow open fades it
+ * in under the music instead. A hand on a fader still gets DUB_SEND_RAMP_SEC.
+ */
+export const DUB_SEND_SEED_RAMP_SEC = 0.6;
 
 /** First worklet output index dedicated to per-channel dub sends. */
 export const DUB_OUTPUT_BASE = 5;
@@ -120,18 +133,6 @@ const chainConnect = (src: any, dst: any) => {
     else src.connect(dstIn);
   }
 };
-
-/**
- * Fader position (0-1) → tap gain. Soft-compression curve matching
- * DubBus.applyDubSendCurve — keeps low/mid slider travel nearly linear but
- * caps the top at 0.7 so max send doesn't drown the dry signal in reverb.
- * Identity at 0, 0.7 at 1.0. One definition: the same number is written to
- * the tap AND reported to DubBus as the channel's restore baseline.
- */
-function dubSendToGain(fader: number): number {
-  const clamped = Math.max(0, Math.min(1, fader));
-  return clamped <= 0 ? 0 : clamped >= 1 ? 0.7 : clamped * (1 - 0.3 * clamped * clamped);
-}
 
 export class ChannelRoutedEffectsManager {
   private slots: (IsolationSlot | null)[] = [null, null, null, null];
@@ -330,9 +331,37 @@ export class ChannelRoutedEffectsManager {
     const ctx = dubBusInput.context as AudioContext;
     const drySpringBus = dubBus?.drySpringBusNode ?? null;
 
+    // Seed the sends from the store, the same way the per-channel filter and
+    // reverb settings below are seeded.
+    //
+    // These gains used to be created at 0 and written ONLY by a live
+    // `setChannelDubSend`. Every path that rebuilds the wiring — a song load,
+    // a bus recreate, a crash-recovery restore — therefore produced a graph
+    // where the store held the sends, the worklet rendered its dub slots,
+    // DubBus listed the channel taps, the deck drew the faders up, and the
+    // gain between them was zero. Measured 2026-09-23 after a reload and
+    // restore: `busInput` 0.00000 with four sends at 0.77-0.84 and
+    // `activeDubSlots: 4`; re-writing the same values the store already held
+    // took it to 0.04716. Every colour move was processing silence.
+    const seeded = storedDubSendGains(
+      (getMixerStoreRefOrNull()?.getState() as { channels?: MixerChannelState[] } | undefined)?.channels,
+      MAX_DUB_CHANNELS,
+    );
+
+    const seedFrom = ctx.currentTime;
     for (let ch = 0; ch < MAX_DUB_CHANNELS; ch++) {
       const g = ctx.createGain();
+      // Open from silence, never as a step — see DUB_SEND_SEED_RAMP_SEC.
       g.gain.value = 0;
+      const target = seeded[ch] ?? 0;
+      if (target > 0) {
+        try {
+          g.gain.setValueAtTime(0, seedFrom);
+          g.gain.linearRampToValueAtTime(target, seedFrom + DUB_SEND_SEED_RAMP_SEC);
+        } catch { g.gain.value = target; }
+        this.channelDubSendValues[ch] = Math.max(0, Math.min(1,
+          (getMixerStoreRefOrNull()?.getState() as { channels?: MixerChannelState[] } | undefined)?.channels?.[ch]?.dubSend ?? 0));
+      }
       if (drySpringBus) {
         // Insert per-channel mini-chain between the gain and the bus input
         const fx = new PerChannelDubFx(ctx, dubBusInput, drySpringBus);
@@ -631,6 +660,23 @@ export class ChannelRoutedEffectsManager {
         const stored = channels[ch]?.dubSend ?? 0;
         if (stored > 0 && this.channelDubSendValues[ch] <= 0) {
           this.channelDubSendValues[ch] = Math.max(0, Math.min(1, stored));
+        }
+        // And the GAIN, not only the bookkeeping. Re-hydrating the values
+        // array made the loop below reconnect the channel while the node it
+        // reconnected was still at zero — the taps registered, the slots
+        // rendered, and nothing reached the bus (2026-09-23).
+        const g = this.channelDubGains[ch];
+        if (g) {
+          const want = dubSendToGain(this.channelDubSendValues[ch]);
+          if (Math.abs(g.gain.value - want) > 1e-6) {
+            // Ramped for the same reason the initial seed is: a rebuild lands
+            // while the engine's worklet is restarting.
+            const t = (this.dubBusInput!.context as AudioContext).currentTime;
+            try {
+              g.gain.setValueAtTime(g.gain.value, t);
+              g.gain.linearRampToValueAtTime(want, t + DUB_SEND_SEED_RAMP_SEC);
+            } catch { g.gain.value = want; }
+          }
         }
       }
     } catch { /* store unavailable — fall back to whatever the engine holds */ }
