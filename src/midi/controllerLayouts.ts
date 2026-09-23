@@ -23,11 +23,26 @@ export interface ControlMidiAddress {
   /** For encoders with a push button — separate note for the push */
   pushNote?: number;
   pushChannel?: number;
+  /**
+   * For touch-sensitive faders — the CC sent on touch, distinct from the CC
+   * sent on move. The factory diagram prints both: "the top number is the
+   * action when the knob or slider is turned or moved, and the second is when
+   * it is pushed or touched."
+   */
+  touchCc?: number;
 }
 
 export interface ControlDescriptor {
   /** Unique ID within the layout (e.g. 'enc-1', 'fader-3', 'btn-row1-5') */
   id: string;
+  /**
+   * Which hardware layer this address belongs to.
+   *
+   * A controller with a LAYER switch sends completely different addresses per
+   * layer, so the same physical knob is two assignable controls. Absent means
+   * the device has one layer.
+   */
+  layer?: 'A' | 'B';
   type: ControlType;
   /** Position in layout grid units */
   x: number;
@@ -102,6 +117,7 @@ function faderColumn(
   x: number, y: number,
   cc: number, channel: number,
   id: string, label?: string, group?: string,
+  touchCc?: number,
 ): ControlDescriptor {
   return {
     id,
@@ -110,17 +126,62 @@ function faderColumn(
     y,
     w: 1,
     h: 4,
-    midi: { type: 'cc', channel, number: cc },
+    midi: { type: 'cc', channel, number: cc, touchCc },
     group: group ?? 'faders',
     label,
   };
 }
 
 // ============================================================================
+// HELPER — derive a second hardware layer
+// ============================================================================
+
+/**
+ * The X-Touch Compact's LAYER switch does not shift anything in software: every
+ * control sends a DIFFERENT address on Layer B, and the offsets are perfectly
+ * regular. Deriving the second layer from the first encodes that regularity
+ * once instead of hand-typing fifty numbers that can drift from the hardware.
+ *
+ * Verified against both factory diagrams, 2026-09-23:
+ *   top encoders   A CC10-17 push 0-7     B CC37-44 push 55-62
+ *   right encoders A CC18-25 push 8-15    B CC45-52 push 63-70
+ *   button grid    A 16-23/24-31/32-39    B 71-78/79-86/87-94
+ *   faders         A CC1-9  touch 101-109 B CC28-36 touch 111-119
+ *   select row     A 40-48                B 95-103
+ *   transport      A 49-54                B 104-109
+ */
+export const XTOUCH_LAYER_B_CC_OFFSET = 27;
+export const XTOUCH_LAYER_B_NOTE_OFFSET = 55;
+export const XTOUCH_LAYER_B_TOUCH_OFFSET = 10;
+
+function deriveLayerB(
+  controls: ControlDescriptor[],
+  ccOffset = XTOUCH_LAYER_B_CC_OFFSET,
+  noteOffset = XTOUCH_LAYER_B_NOTE_OFFSET,
+  touchOffset = XTOUCH_LAYER_B_TOUCH_OFFSET,
+): ControlDescriptor[] {
+  return controls
+    // The layer indicators themselves are program-change pseudo-controls with
+    // negative numbers; they exist once, not once per layer.
+    .filter((c) => c.midi.number >= 0)
+    .map((c) => ({
+      ...c,
+      id: `${c.id}-b`,
+      layer: 'B' as const,
+      midi: {
+        ...c.midi,
+        number: c.midi.number + (c.midi.type === 'cc' ? ccOffset : noteOffset),
+        pushNote: c.midi.pushNote === undefined ? undefined : c.midi.pushNote + noteOffset,
+        touchCc: c.midi.touchCc === undefined ? undefined : c.midi.touchCc + touchOffset,
+      },
+    }));
+}
+
+// ============================================================================
 // BEHRINGER X-TOUCH COMPACT
 // ============================================================================
 
-const XTOUCH_COMPACT: ControllerLayout = {
+const XTOUCH_COMPACT_LAYER_A: ControllerLayout = {
   id: 'behringer-xtouch-compact',
   name: 'X-Touch Compact',
   manufacturer: 'Behringer',
@@ -137,9 +198,9 @@ const XTOUCH_COMPACT: ControllerLayout = {
 
     // ── Channel faders (8 + master) ────────────────────────────
     ...Array.from({ length: 8 }, (_, i) =>
-      faderColumn(i * 2, 8, i + 1, 0, `fader-${i + 1}`, `${i + 1}`, 'faders'),
+      faderColumn(i * 2, 8, i + 1, 0, `fader-${i + 1}`, `${i + 1}`, 'faders', 101 + i),
     ),
-    faderColumn(16, 8, 9, 0, 'fader-master', 'M', 'faders'),
+    faderColumn(16, 8, 9, 0, 'fader-master', 'M', 'faders', 109),
 
     // ── Select row (9 buttons below faders) ────────────────────
     ...buttonRow(0, 13, 9, 40, 0, 'select'),
@@ -211,6 +272,21 @@ const XTOUCH_COMPACT: ControllerLayout = {
       group: 'transport',
       label: 'Layer B',
     },
+  ],
+};
+
+/**
+ * The real layout: Layer A as authored above, plus the derived Layer B.
+ *
+ * Both layers are present so the mapping UI can assign either. Renderers pick
+ * one with the `layer` field — drawing both at once would stack two controls
+ * on every physical position.
+ */
+const XTOUCH_COMPACT: ControllerLayout = {
+  ...XTOUCH_COMPACT_LAYER_A,
+  controls: [
+    ...XTOUCH_COMPACT_LAYER_A.controls.map((c) => ({ ...c, layer: 'A' as const })),
+    ...deriveLayerB(XTOUCH_COMPACT_LAYER_A.controls),
   ],
 };
 

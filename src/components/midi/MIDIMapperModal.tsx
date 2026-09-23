@@ -187,6 +187,16 @@ export const MIDIMapperModal: React.FC<MIDIMapperModalProps> = ({
   );
 
   // Selected control + popover
+  /**
+   * Which hardware layer is on screen.
+   *
+   * The X-Touch Compact's LAYER switch is a hardware bank: every control sends
+   * a different address on Layer B, so the same physical knob is two
+   * assignable controls. Until the descriptor carried Layer B, half the
+   * controller could not be mapped at all.
+   */
+  const [activeLayer, setActiveLayer] = useState<'A' | 'B'>('A');
+  const hasLayerB = useMemo(() => layout?.controls.some((c) => c.layer === 'B') ?? false, [layout]);
   const [selectedControl, setSelectedControl] = useState<ControlDescriptor | null>(null);
   const [popoverPos, setPopoverPos] = useState({ x: 0, y: 0 });
 
@@ -348,6 +358,27 @@ export const MIDIMapperModal: React.FC<MIDIMapperModalProps> = ({
           </div>
         )}
 
+        {/* Hardware layer switch — only for devices that have one. */}
+        {hasLayerB && (
+          <div className="flex justify-center gap-1 pb-2">
+            {(['A', 'B'] as const).map((l) => (
+              <button
+                key={l}
+                className={
+                  'px-3 py-1 rounded border text-[10px] font-mono transition-colors ' +
+                  (activeLayer === l
+                    ? 'bg-accent-primary/20 border-accent-primary text-accent-primary'
+                    : 'bg-dark-bgTertiary border-dark-borderLight text-text-muted hover:text-text-primary')
+                }
+                onClick={() => { setActiveLayer(l); setSelectedControl(null); }}
+                title={`Show the controls this device sends on Layer ${l}. The LAYER ${l} button on the hardware selects it there.`}
+              >
+                Layer {l}
+              </button>
+            ))}
+          </div>
+        )}
+
         {/* Layout view */}
         <div className="flex justify-center">
           <div className="relative">
@@ -357,6 +388,7 @@ export const MIDIMapperModal: React.FC<MIDIMapperModalProps> = ({
               selectedControlId={selectedControl?.id}
               learnHighlightId={learnHighlight}
               onSelectControl={handleSelectControl}
+              layer={activeLayer}
             />
 
             {/* Assignment popover */}
