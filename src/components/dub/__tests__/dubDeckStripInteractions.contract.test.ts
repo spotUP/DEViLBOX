@@ -19,6 +19,19 @@ const SOURCE = readFileSync(
   'utf8',
 );
 
+/**
+ * The move button's look lives beside the deck, not inside it.
+ *
+ * Lifted out on 2026-09-23 when the deck gained a second layout that follows
+ * the performer's hardware: two layouts each deciding their own colours would
+ * be two decks. The assertions about the BUTTON read this file; the ones about
+ * the deck's rows and tables still read the deck.
+ */
+const STYLE = readFileSync(
+  resolve(__dirname, '..', 'moveButtonStyle.ts'),
+  'utf8',
+);
+
 describe('DubDeckStrip — move grouping contract (G15)', () => {
   it('keeps representative globals in the intended interaction groups', () => {
     expect(SOURCE).toMatch(/moveId:\s*'springSlam'[\s\S]*group:\s*'click'/);
@@ -99,7 +112,9 @@ describe('DubDeckStrip — channel/master button semantics contract (G15)', () =
     const block = masterOpsBlock![0];
     expect(block).toMatch(/const isHold = op\.kind === 'hold'/);
     expect(block).toMatch(/onClick=\{isHold \? undefined : \(\) => \{/);
-    expect(block).toMatch(/fireTrigger\(op\.moveId, i\)/);
+    // Fires across the RESOLVED target now, not blindly across every channel:
+    // no target is every channel, a target is exactly that one.
+    expect(block).toMatch(/for \(const ch of targetChannels\) fireTrigger\(op\.moveId, ch\)/);
     // Master cannot use the shared helper: one button holds every channel, so
     // it fans holdStart/holdEnd out across the visible channels itself. It
     // must still cover all four exits, or a master hold can strand N channels
@@ -107,18 +122,19 @@ describe('DubDeckStrip — channel/master button semantics contract (G15)', () =
     for (const handler of ['onPointerDown', 'onPointerUp', 'onPointerCancel', 'onLostPointerCapture']) {
       expect(block, handler).toContain(handler);
     }
-    expect(block).toMatch(/holdStart\(op\.moveId, i\)/);
-    expect(block.match(/holdEnd\(op\.moveId, i\)/g) ?? [], 'every exit must end the hold').toHaveLength(3);
+    expect(block).toMatch(/holdStart\(op\.moveId, ch\)/);
+    expect(block.match(/holdEnd\(op\.moveId, ch\)/g) ?? [], 'every exit must end the hold').toHaveLength(3);
   });
 
-  it('uses the same op.kind split for each individual channel column', () => {
-    const channelOpsBlock = SOURCE.match(/CHANNEL_OPS\.map\(\(op\) => \{[\s\S]*?hoverProps\(`Ch \$\{i \+ 1\} ·/m);
-    expect(channelOpsBlock, 'per-channel CHANNEL_OPS block not found').not.toBeNull();
-    const block = channelOpsBlock![0];
-    expect(block).toMatch(/const isHold = op\.kind === 'hold'/);
-    expect(block).toMatch(/onClick=\{isHold \? undefined : \(\) => fireTrigger\(op\.moveId, i\)\}/);
-    expect(block).toMatch(/\{\.\.\.\(isHold \? holdButtonProps\(op\.moveId, i\) : \{\}\)\}/);
-  });
+  /**
+   * The per-channel op columns are GONE (2026-09-23).
+   *
+   * There is no second `CHANNEL_OPS.map` to assert a kind split for. What
+   * replaced this test is `dubTarget.test.ts`, which pins that the map appears
+   * exactly once and that the panel resolves a target instead of firing at a
+   * hardcoded channel list. Re-proving the same wiring from two directions is
+   * what the house rule says to merge, not duplicate.
+   */
 });
 
 /**
@@ -212,7 +228,7 @@ describe('DubDeckStrip — move rows line up as columns', () => {
 
   it('keeps a label on one line, so no button is taller than its row', () => {
     // Both button sizes: the move rows' 'md' and the channel cards' 'sm'.
-    const base = SOURCE.match(/const base = size === 'sm'\s*\?\s*'([^']*)'\s*:\s*'([^']*)'/);
+    const base = STYLE.match(/const base = size === 'sm'\s*\?\s*'([^']*)'\s*:\s*'([^']*)'/);
     expect(base, 'colorClasses base moved').not.toBeNull();
     expect(base![1]).toContain('whitespace-nowrap');
     expect(base![2]).toContain('whitespace-nowrap');
@@ -239,7 +255,9 @@ describe('DubDeckStrip — hover help costs no vertical space', () => {
 
   it('describes every move button through it', () => {
     // Four global rows, the ALL column and the per-channel column.
-    expect((SOURCE.match(/\{\.\.\.hoverProps\(/g) ?? []).length).toBeGreaterThanOrEqual(6);
+    // Was 6; the per-channel op buttons took one of them with them when the
+    // channel section lost its rack.
+    expect((SOURCE.match(/\{\.\.\.hoverProps\(/g) ?? []).length).toBeGreaterThanOrEqual(5);
   });
 
   it('leaves no native title on a button that already has a tooltip', () => {

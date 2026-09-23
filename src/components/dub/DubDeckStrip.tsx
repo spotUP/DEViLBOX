@@ -36,6 +36,7 @@ import { getChannelRoutedEffectsManager } from '@/engine/tone/ChannelRoutedEffec
 import { getToneEngine } from '@/engine/ToneEngine';
 import { Fader } from '@components/controls/Fader';
 import { colorClasses, type MoveColor } from './moveButtonStyle';
+import { resolveDubTarget, isDubTargetChannel, describeDubTarget } from './dubTarget';
 import { CustomSelect } from '@components/common/CustomSelect';
 import { CONTROLLER_LAYOUTS } from '@/midi/controllerLayouts';
 import { getDJControllerMapper } from '@/midi/DJControllerMapper';
@@ -250,6 +251,15 @@ export const DubDeckStrip: React.FC = () => {
   const vinylLevel = useDubStore(s => s.vinylLevel);
   const setVinylLevel = useDubStore(s => s.setVinylLevel);
   const quantize = useDubStore(s => s.quantize);
+  /**
+   * Which channel the per-channel ops aim at — the one your hand is on.
+   *
+   * `null` is every channel, which is what the shared panel has always done,
+   * so nothing changes until you aim it.
+   */
+  const opTarget = useDubStore(s => s.opTarget);
+  const touchOpTarget = useDubStore(s => s.touchOpTarget);
+  const clearOpTarget = useDubStore(s => s.clearOpTarget);
   const setQuantize = useDubStore(s => s.setQuantize);
 
   const autoDubEnabled = useDubStore(s => s.autoDubEnabled);
@@ -1182,6 +1192,19 @@ export const DubDeckStrip: React.FC = () => {
    * buttons, one per channel — and all eight lighting because one fired would
    * be worse than none lighting at all.
    */
+  /**
+   * The channels an op fires on, and what to call them.
+   *
+   * Recomputed per render rather than memoised on `opTarget` alone: the target
+   * EXPIRES, so a memo keyed on the target would keep claiming a channel long
+   * after the deck should have fallen back to all of them.
+   */
+  const targetChannels = resolveDubTarget(opTarget, visibleChannelCount, performance.now());
+  const targetLabel = describeDubTarget(opTarget, visibleChannelCount, performance.now());
+
+  /** Every channel's dub send, for the controller layout's faders to ride. */
+  const channelSends = useMemo(() => channels.map(c => c?.dubSend ?? 0), [channels]);
+
   const isMoveFiringOn = useCallback((moveId: string, channelId?: number): boolean => (
     channelId === undefined ? isMoveFiring(moveId) : activeFires.has(`${moveId}:${channelId}`)
   ), [isMoveFiring, activeFires]);
@@ -1198,12 +1221,405 @@ export const DubDeckStrip: React.FC = () => {
     holdButtonProps,
     handleToggle,
     handleRatePreset,
-    setChannelSend: setChannelDubSend,
     setArmed,
-  }), [fireTrigger, holdButtonProps, handleToggle, handleRatePreset, setChannelDubSend, setArmed]);
+    setChannelSend: setChannelDubSend,
+    // The master fader writes every channel, exactly as the master card's
+    // fader does — one control, one behaviour, whichever layout draws it.
+    setMasterSend: (v: number) => {
+      for (let i = 0; i < visibleChannelCount; i++) setChannelDubSend(i, v);
+    },
+    setBusParam: (field: string, value: number) =>
+      setDubBus({ [field]: value, characterPreset: 'custom' }),
+  }), [fireTrigger, holdButtonProps, handleToggle, handleRatePreset, setArmed,
+       setChannelDubSend, visibleChannelCount, setDubBus]);
 
-  /** Every channel's dub send, for the controller's faders to show and ride. */
-  const channelSends = useMemo(() => channels.map(c => c?.dubSend ?? 0), [channels]);
+  /**
+   * The deck's channel strip — the master card plus one card per channel.
+   *
+   * Built as a VALUE rather than written inline, because two layouts place
+   * it in two different places: the deck's own layout puts it under the
+   * move rows, and the controller layout puts it in the fader zone of the
+   * panel, where the hardware's faders and select row are.
+   *
+   * The controller layout used to draw its own bare faders and Mute row
+   * there instead. Those are what the hardware has, but they are a
+   * downgrade from what the deck has — no role or filter select, no reverb
+   * or sweep send, one op instead of nine. One card, two homes.
+   */
+  const channelStrip = (<>
+      {/* Channel strips — classic mixer-desk layout. Each channel is a
+          vertical column: label → op buttons stacked → HOLD → vertical
+          fader → send % readout. Horizontal scroll if the pattern has
+          more channels than fit. */}
+      {/* items-start, not items-stretch: stretching forced every card to the
+          row's height, which was shorter than the button stack needed, so HOLD
+          rendered outside the card's own border. Cards size to their content;
+          the fader still fills the card because the CARD stretches its two
+          columns. */}
+      <div className="flex items-start gap-2 overflow-x-auto pt-1.5">
+        {/* Master send — scales all channel sends at once */}
+        <div
+          className={
+            'flex flex-row items-stretch gap-2.5 px-2 py-1.5 rounded border w-56 shrink-0 ' +
+            'bg-dark-bgSecondary border-accent-primary/40'
+          }
+        >
+          {/* Left column: label + ops + hold — must match channel columns */}
+          <div className="flex flex-col items-center gap-1.5 flex-1 min-w-0">
+          <span className="text-xs font-bold text-accent-primary leading-none">MASTER</span>
+          {/* What the ops below are about to hit.
+              The target is invisible otherwise, and then aiming an op is a
+              guess — the one risk the design names as fatal to the idea.
+              Click to go back to every channel. */}
+          <button
+            className={
+              'px-1 py-0.5 rounded border w-full text-[9px] font-mono leading-none transition-colors ' +
+              (targetChannels.length === 1
+                ? 'bg-accent-highlight/20 border-accent-highlight text-accent-highlight'
+                : 'bg-dark-bgTertiary border-dark-border text-text-muted')
+            }
+            onClick={() => clearOpTarget()}
+            title={targetChannels.length === 1
+              ? `The ops act on ${targetLabel}. Click to act on every channel again.`
+              : 'The ops act on every channel. Ride a channel fader, or press its AIM, to aim at one.'}
+          >
+            {targetLabel}
+          </button>
+          {/* Same skeleton as a channel card: where a channel has its role
+              and filter selects, the master has ALL / NONE. The fader column
+              on the right is then identical to a channel's. */}
+          <button
+            className={
+              'px-2 py-1 rounded border w-full text-[9px] font-bold transition-all duration-150 ' +
+              (anySend
+                ? 'bg-accent-primary/20 border-accent-primary text-accent-primary hover:bg-accent-error/20 hover:border-accent-error hover:text-accent-error'
+                : 'bg-dark-bgTertiary border-dark-borderLight text-text-secondary hover:text-text-primary hover:border-accent-primary')
+            }
+            onClick={() => {
+              if (anySend) {
+                for (let i = 0; i < visibleChannelCount; i++) setChannelDubSend(i, 0);
+              } else {
+                for (let i = 0; i < visibleChannelCount; i++) setChannelDubSend(i, 1.0);
+              }
+            }}
+            title={anySend ? 'Zero all channel sends' : 'Set all channel sends to 100%'}
+            disabled={!busEnabled}
+          >
+            {anySend ? 'NONE' : 'ALL'}
+          </button>
+          {/* The Rvb / Swp row a channel card has here, as an invisible copy
+              of the same markup: the master's grid then lands on exactly the
+              channels' line and the card is exactly their height. A margin
+              guessed at that row's height left a gap under the master card
+              (2026-09-23). */}
+          <div className="flex gap-1 w-full invisible" aria-hidden="true">
+            <div className="flex flex-col items-center flex-1 min-w-0">
+              <span className="text-[7px] text-text-muted">Rvb</span>
+              <input type="range" className="w-full" tabIndex={-1} readOnly value={0} />
+            </div>
+            <div className="flex flex-col items-center flex-1 min-w-0">
+              <span className="text-[7px] text-text-muted">Swp</span>
+              <input type="range" className="w-full" tabIndex={-1} readOnly value={0} />
+            </div>
+          </div>
+          {/* 3x3: eight ops + HOLD. A column of nine full-size buttons was
+              the whole reason the deck did not fit — see colorClasses. */}
+          <div className="grid grid-cols-3 gap-1 w-full">
+          {CHANNEL_OPS.map((op) => {
+            const masterKey = `${op.moveId}:master`;
+            const active = heldMoves.has(masterKey) || CHANNEL_OPS.some(
+              () => Array.from({ length: visibleChannelCount }, (_, i) => `${op.moveId}:${i}`).some(k => activeFires.has(k))
+            );
+            const isHold = op.kind === 'hold';
+            return (
+              <button
+                key={op.moveId}
+                className={colorClasses(op.color, active) + ' w-full text-center'}
+                onClick={isHold ? undefined : () => {
+                  for (const ch of targetChannels) fireTrigger(op.moveId, ch);
+                }}
+                {...(isHold ? {
+                  // Master fires the move on every channel, so release the
+                  // capture once and end each channel's hold unconditionally.
+                  onPointerDown: (e: React.PointerEvent<HTMLButtonElement>) => {
+                    try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* optional */ }
+                    for (const ch of targetChannels) holdStart(op.moveId, ch);
+                  },
+                  onPointerUp: (e: React.PointerEvent<HTMLButtonElement>) => {
+                    try { e.currentTarget.releasePointerCapture(e.pointerId); } catch { /* already released */ }
+                    for (const ch of targetChannels) holdEnd(op.moveId, ch);
+                  },
+                  onPointerCancel: (e: React.PointerEvent<HTMLButtonElement>) => {
+                    try { e.currentTarget.releasePointerCapture(e.pointerId); } catch { /* already released */ }
+                    for (const ch of targetChannels) holdEnd(op.moveId, ch);
+                  },
+                  onLostPointerCapture: () => {
+                    for (const ch of targetChannels) holdEnd(op.moveId, ch);
+                  },
+                } : {})}
+                {...hoverProps(`ALL · ${op.label} — ${op.title}${isHold ? ' (press-and-hold)' : ''}`)}
+                disabled={!busEnabled}
+              >
+                {op.label}
+              </button>
+            );
+          })}
+          <button
+            className={
+              'px-2.5 py-1 rounded border w-full text-xs font-bold transition-all duration-150 ' +
+              'bg-dark-bgTertiary border-dark-borderLight text-text-primary hover:border-accent-primary'
+            }
+            onClick={() => {
+              for (let i = 0; i < visibleChannelCount; i++) toggleHold(i);
+            }}
+            title="HOLD all channels — sustained dubbing on every channel (restores prior sends when released)"
+            disabled={!busEnabled}
+          >
+            HOLD
+          </button>
+          </div>
+          </div>
+          {/* Right column: fader fills the card's height, readout under it —
+              the same column a channel card has. */}
+          <div className="flex flex-col items-center gap-1 shrink-0 min-h-0">
+          <div className="flex-1 min-h-0 flex items-stretch">
+          <Fader
+            value={masterSendValue}
+            size="md"
+            fillHeight
+            color="accent-primary"
+            onChange={(v) => {
+              for (let i = 0; i < visibleChannelCount; i++) {
+                setChannelDubSend(i, v);
+              }
+            }}
+            title={`Master dub send — ${Math.round(masterSendValue * 100)}%. Sets all channel sends simultaneously.`}
+            disabled={!busEnabled}
+            doubleClickValue={1}
+          />
+          </div>
+          {/* Fixed width, or "100%" is wider than "15%" and the fader column
+              grows at full send, squeezing the op grid beside it — "when the
+              channel sliders reach 100% the component shrinks sideways". */}
+          <span className="w-7 text-center tabular-nums text-[9px] font-mono text-accent-primary leading-none">
+            {Math.round(masterSendValue * 100)}%
+          </span>
+          </div>
+        </div>
+        {/* Separator */}
+        <div className="w-px h-32 bg-dark-border shrink-0 self-center" />
+        {Array.from({ length: visibleChannelCount }, (_, i) => {
+          const ch = channels[i];
+          const dubSend = ch?.dubSend ?? 0;
+          const hasDubSend = dubSend > 0;
+          const isHeld = heldChannels.has(i);
+          const isFlashed = i === flashedChannel;
+          /** Is this the channel the shared op panel is aimed at? */
+          const isTarget = isDubTargetChannel(opTarget, i, visibleChannelCount, performance.now());
+          const channelFiring = CHANNEL_OPS.some(op => activeFires.has(`${op.moveId}:${i}`));
+          return (
+            <div
+              key={i}
+              className={
+                // w-24 rather than min-w-[64px]: the card was content-sized, so the widest
+                // child set its width. The Rvb/Swp row's two range inputs have an
+                // intrinsic ~129px each, which made every channel card 280px and pushed
+                // the instrument list off screen. A fixed width lets the sliders shrink
+                // (with min-w-0 on their columns) and keeps all channels uniform.
+                // Row, not column: the fader sits BESIDE the button stack rather than
+                // under it, which gives back the fader's 80px plus its readout on every
+                // channel. w-56: three full-size op buttons across plus the 16px
+                // fader. Nine ops in one column ran ~600px tall and the deck
+                // clipped every card; a 3x3 grid is three rows.
+                'flex flex-row items-stretch gap-2.5 px-2 py-1.5 rounded border w-56 shrink-0 transition-colors ' +
+                (channelFiring || isFlashed
+                  ? 'bg-accent-highlight/15 border-accent-highlight'
+                  : isHeld
+                    ? 'bg-accent-primary/10 border-accent-primary'
+                    : hasDubSend
+                      ? 'bg-dark-bg border-dark-borderLight'
+                      : 'bg-dark-bgTertiary border-dark-border')
+              }
+            >
+              {/* Left column: label + ops + hold — matches master column */}
+              <div className="flex flex-col items-center gap-1.5 flex-1 min-w-0">
+              <span
+                className="text-xs font-bold text-text-secondary leading-none truncate max-w-[56px]"
+                title={`Ch ${i + 1}${channelLabels[i] !== `CH ${i + 1}` ? ' · ' + channelLabels[i] : ''}`}
+              >
+                {channelLabels[i]}
+              </span>
+              {/* Role and filter share a row — one row fewer in the card. */}
+              <div className="flex gap-1 w-full">
+              {/* Role override — dim = auto (classifier), amber = locked by user */}
+              {(() => {
+                const userRole = ch?.dubRole ?? null;
+                const autoRole = autoRoles[i] ?? null;
+                return (
+                  <select
+                    value={userRole ?? ''}
+                    onChange={(e) => setChannelDubRole(i, e.target.value || null)}
+                    className={
+                      'flex-1 min-w-0 text-[8px] font-mono rounded border px-0.5 py-0.5 transition-colors ' +
+                      (userRole === 'empty'
+                        ? 'bg-accent-error/20 border-accent-error text-accent-error'
+                        : userRole
+                          ? 'bg-accent-highlight/20 border-accent-highlight text-accent-highlight'
+                          : 'bg-dark-bgTertiary border-dark-border text-text-muted')
+                    }
+                    title={
+                      userRole === 'empty'
+                        ? `Ch ${i + 1} — excluded from AutoDub (no moves will target this channel)`
+                        : `Ch ${i + 1} role — classifier says "${autoRole ?? '?'}". Override locks AutoDub targeting.`
+                    }
+                    disabled={!busEnabled}
+                  >
+                    <option value="">{autoRole ?? '—'}</option>
+                    <option value="percussion">Drums</option>
+                    <option value="bass">Bass</option>
+                    <option value="lead">Lead</option>
+                    <option value="skank">Skank</option>
+                    <option value="pad">Pad</option>
+                    <option value="empty">Exclude</option>
+                  </select>
+                );
+              })()}
+              {/* Per-channel mini-bus: filter mode */}
+              {(() => {
+                const filterMode = ch?.dubFilterMode ?? 'off';
+                return (
+                  <>
+                    <select
+                      value={filterMode}
+                      onChange={(e) => setChannelDubFilter(i, e.target.value as 'off' | 'hpf' | 'lpf')}
+                      className={
+                        'flex-1 min-w-0 text-[8px] font-mono rounded border px-0.5 py-0.5 transition-colors ' +
+                        (filterMode !== 'off'
+                          ? 'bg-accent-warning/20 border-accent-warning text-accent-warning'
+                          : 'bg-dark-bgTertiary border-dark-border text-text-muted')
+                      }
+                      title={`Ch ${i + 1} filter — Off / High Pass / Low Pass. Shapes the audio before it enters the dub bus mix.`}
+                      disabled={!busEnabled}
+                    >
+                      <option value="off">Filter off</option>
+                      <option value="hpf">High Pass</option>
+                      <option value="lpf">Low Pass</option>
+                    </select>
+                  </>
+                );
+              })()}
+              </div>
+              {/* Filter cutoff (when a filter is on) + reverb send + sweep */}
+              {(() => {
+                const filterMode = ch?.dubFilterMode ?? 'off';
+                const filterHz = ch?.dubFilterHz ?? 200;
+                const reverbSend = ch?.dubReverbSend ?? 0;
+                const sweepAmt = ch?.dubSweepAmount ?? 0;
+                return (
+                  <>
+                    {filterMode !== 'off' && (
+                      <input
+                        type="range" min={40} max={8000} step={10}
+                        value={filterHz}
+                        onChange={(e) => setChannelDubFilter(i, filterMode, Number(e.target.value))}
+                        className="w-full accent-accent-warning"
+                        disabled={!busEnabled}
+                        title={`Filter cutoff ${filterHz} Hz`}
+                      />
+                    )}
+                    {/* min-w-0 on both columns: a flex child defaults to
+                        min-width:auto, so the range inputs' intrinsic ~129px
+                        each became the floor for this row and set the whole
+                        channel card to 280px. Every other control in the card
+                        is 74px or less. */}
+                    <div className="flex gap-1 w-full">
+                      <div className="flex flex-col items-center flex-1 min-w-0">
+                        <span className="text-[7px] text-text-muted">Rvb</span>
+                        <input
+                          type="range" min={0} max={1} step={0.01}
+                          value={reverbSend}
+                          onChange={(e) => setChannelDubReverbSend(i, Number(e.target.value))}
+                          className="w-full accent-accent-secondary"
+                          disabled={!busEnabled}
+                          title={`Ch ${i + 1} dry spring reverb send ${Math.round(reverbSend * 100)}% — bypasses echo, feeds spring directly`}
+                        />
+                      </div>
+                      <div className="flex flex-col items-center flex-1 min-w-0">
+                        <span className="text-[7px] text-text-muted">Swp</span>
+                        <input
+                          type="range" min={0} max={1} step={0.01}
+                          value={sweepAmt}
+                          onChange={(e) => setChannelDubSweepAmount(i, Number(e.target.value))}
+                          className="w-full accent-accent-secondary"
+                          disabled={!busEnabled}
+                          title={`Ch ${i + 1} per-channel comb sweep ${Math.round(sweepAmt * 100)}%`}
+                        />
+                      </div>
+                    </div>
+                  </>
+                );
+              })()}
+              {/* The ops are NOT here any more.
+                  A desk has one set of effect controls and N channel strips:
+                  the effects are on aux sends, so a channel is in the echo
+                  because its SEND is open. Stamping the whole rack onto every
+                  channel drew 72 buttons on an eight-channel song — "we have
+                  all these per channel buttons i have never seen a real mixing
+                  desk have that like that" (2026-09-23). They live once now,
+                  in the shared op panel, and act on the channel your hand is
+                  on. HOLD went with them; sustained dubbing is a bus gesture
+                  aimed at a target, not a per-channel switch. */}
+              <button
+                className={
+                  'px-2 py-0.5 rounded border w-full text-[10px] font-bold transition-all duration-150 ' +
+                  (isTarget
+                    ? 'bg-accent-highlight/30 border-accent-highlight text-accent-highlight'
+                    : isHeld
+                      ? 'bg-accent-primary border-accent-primary text-text-inverse'
+                      : 'bg-dark-bgTertiary border-dark-borderLight text-text-muted hover:text-text-primary hover:border-accent-highlight')
+                }
+                onClick={() => (isTarget ? clearOpTarget() : touchOpTarget(i))}
+                title={isTarget
+                  ? `Ch ${i + 1} is what the op panel will act on — click to go back to all channels`
+                  : `Aim the op panel at Ch ${i + 1}. Touching this channel's fader does the same, as it does on a desk.`}
+                disabled={!busEnabled}
+              >
+                {isTarget ? 'AIMED' : 'AIM'}
+              </button>
+              </div>
+              {/* Right column: fader fills the stack's height, readout under it */}
+              <div className="flex flex-col items-center gap-1 shrink-0 min-h-0">
+              {/* flex-1 min-h-0 box: the fader is a flex child, so without a
+                  growing box to fill it shrinks to nothing instead of matching
+                  the button stack. */}
+              <div className="flex-1 min-h-0 flex items-stretch">
+              <Fader
+                value={dubSend}
+                size="md"
+                fillHeight
+                color={channelFiring ? 'accent-highlight' : 'accent-primary'}
+                onChange={(v) => {
+                  // A hand on the fader aims the op panel at that channel.
+                  // This is how the desk answers "which channel" — the same
+                  // gesture a touch-sensitive controller reports natively.
+                  touchOpTarget(i);
+                  setChannelDubSend(i, v);
+                }}
+                title={`Ch ${i + 1} dub send — ${Math.round(dubSend * 100)}%. Drag vertically; double-click for full send. Riding this also aims the op panel at this channel, as putting a hand on a desk fader does.`}
+                disabled={!busEnabled}
+                doubleClickValue={1}
+                paramKey={`dub.channelSend.ch${i}`}
+              />
+              </div>
+              <span className="w-7 text-center tabular-nums text-[9px] font-mono text-text-secondary leading-none">
+                {Math.round(dubSend * 100)}%
+              </span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+  </>);
 
   return (
     /* Sized by its content, never squeezed.
@@ -1643,10 +2059,11 @@ export const DubDeckStrip: React.FC = () => {
       {activeTab === 'perform' && (<>
       {moveTooltip}
 
-      {/* One deck, two shapes. The controller shape REDRAWS the deck into the
-          physical panel of the hardware in front of the performer; it is not
-          a reordering of the rows below, and it fires the identical handlers.
-          The generic shape stays for everyone with no controller, which is
+      {/* One deck, two orders for its move rows. The controller order puts
+          the hardware's row 1 on screen as row 1, left to right, so the
+          button under your thumb is the button under your cursor — the deck
+          itself is unchanged, and the channel cards below are shared by both.
+          The deck's own order stays for everyone with no controller, which is
           why it is what `resolveDeckShape` falls back to. */}
       {deckShape.kind === 'controller' ? (
         <ControllerShapedDeck
@@ -1655,12 +2072,15 @@ export const DubDeckStrip: React.FC = () => {
           onLayerChange={setDeckLayer}
           moves={DECK_MOVE_INDEX}
           channelSends={channelSends}
+          masterSend={masterSendValue}
+          busSettings={dubBusSettings as unknown as Record<string, number | undefined>}
           armed={armed}
           busEnabled={busEnabled}
           isFiring={isMoveFiringOn}
           heldMoves={heldMoves}
           toggledMoves={toggledMoves}
           activeRatePreset={activeRatePreset}
+          channelStrip={channelStrip}
           api={deckApi}
         />
       ) : (<>
@@ -1800,365 +2220,9 @@ export const DubDeckStrip: React.FC = () => {
           </div>
         </div>
       </div>
-
-      {/* Channel strips — classic mixer-desk layout. Each channel is a
-          vertical column: label → op buttons stacked → HOLD → vertical
-          fader → send % readout. Horizontal scroll if the pattern has
-          more channels than fit. */}
-      {/* items-start, not items-stretch: stretching forced every card to the
-          row's height, which was shorter than the button stack needed, so HOLD
-          rendered outside the card's own border. Cards size to their content;
-          the fader still fills the card because the CARD stretches its two
-          columns. */}
-      <div className="flex items-start gap-2 overflow-x-auto pt-1.5">
-        {/* Master send — scales all channel sends at once */}
-        <div
-          className={
-            'flex flex-row items-stretch gap-2.5 px-2 py-1.5 rounded border w-56 shrink-0 ' +
-            'bg-dark-bgSecondary border-accent-primary/40'
-          }
-        >
-          {/* Left column: label + ops + hold — must match channel columns */}
-          <div className="flex flex-col items-center gap-1.5 flex-1 min-w-0">
-          <span className="text-xs font-bold text-accent-primary leading-none">MASTER</span>
-          {/* Same skeleton as a channel card: where a channel has its role
-              and filter selects, the master has ALL / NONE. The fader column
-              on the right is then identical to a channel's. */}
-          <button
-            className={
-              'px-2 py-1 rounded border w-full text-[9px] font-bold transition-all duration-150 ' +
-              (anySend
-                ? 'bg-accent-primary/20 border-accent-primary text-accent-primary hover:bg-accent-error/20 hover:border-accent-error hover:text-accent-error'
-                : 'bg-dark-bgTertiary border-dark-borderLight text-text-secondary hover:text-text-primary hover:border-accent-primary')
-            }
-            onClick={() => {
-              if (anySend) {
-                for (let i = 0; i < visibleChannelCount; i++) setChannelDubSend(i, 0);
-              } else {
-                for (let i = 0; i < visibleChannelCount; i++) setChannelDubSend(i, 1.0);
-              }
-            }}
-            title={anySend ? 'Zero all channel sends' : 'Set all channel sends to 100%'}
-            disabled={!busEnabled}
-          >
-            {anySend ? 'NONE' : 'ALL'}
-          </button>
-          {/* The Rvb / Swp row a channel card has here, as an invisible copy
-              of the same markup: the master's grid then lands on exactly the
-              channels' line and the card is exactly their height. A margin
-              guessed at that row's height left a gap under the master card
-              (2026-09-23). */}
-          <div className="flex gap-1 w-full invisible" aria-hidden="true">
-            <div className="flex flex-col items-center flex-1 min-w-0">
-              <span className="text-[7px] text-text-muted">Rvb</span>
-              <input type="range" className="w-full" tabIndex={-1} readOnly value={0} />
-            </div>
-            <div className="flex flex-col items-center flex-1 min-w-0">
-              <span className="text-[7px] text-text-muted">Swp</span>
-              <input type="range" className="w-full" tabIndex={-1} readOnly value={0} />
-            </div>
-          </div>
-          {/* 3x3: eight ops + HOLD. A column of nine full-size buttons was
-              the whole reason the deck did not fit — see colorClasses. */}
-          <div className="grid grid-cols-3 gap-1 w-full">
-          {CHANNEL_OPS.map((op) => {
-            const masterKey = `${op.moveId}:master`;
-            const active = heldMoves.has(masterKey) || CHANNEL_OPS.some(
-              () => Array.from({ length: visibleChannelCount }, (_, i) => `${op.moveId}:${i}`).some(k => activeFires.has(k))
-            );
-            const isHold = op.kind === 'hold';
-            return (
-              <button
-                key={op.moveId}
-                className={colorClasses(op.color, active) + ' w-full text-center'}
-                onClick={isHold ? undefined : () => {
-                  for (let i = 0; i < visibleChannelCount; i++) fireTrigger(op.moveId, i);
-                }}
-                {...(isHold ? {
-                  // Master fires the move on every channel, so release the
-                  // capture once and end each channel's hold unconditionally.
-                  onPointerDown: (e: React.PointerEvent<HTMLButtonElement>) => {
-                    try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* optional */ }
-                    for (let i = 0; i < visibleChannelCount; i++) holdStart(op.moveId, i);
-                  },
-                  onPointerUp: (e: React.PointerEvent<HTMLButtonElement>) => {
-                    try { e.currentTarget.releasePointerCapture(e.pointerId); } catch { /* already released */ }
-                    for (let i = 0; i < visibleChannelCount; i++) holdEnd(op.moveId, i);
-                  },
-                  onPointerCancel: (e: React.PointerEvent<HTMLButtonElement>) => {
-                    try { e.currentTarget.releasePointerCapture(e.pointerId); } catch { /* already released */ }
-                    for (let i = 0; i < visibleChannelCount; i++) holdEnd(op.moveId, i);
-                  },
-                  onLostPointerCapture: () => {
-                    for (let i = 0; i < visibleChannelCount; i++) holdEnd(op.moveId, i);
-                  },
-                } : {})}
-                {...hoverProps(`ALL · ${op.label} — ${op.title}${isHold ? ' (press-and-hold)' : ''}`)}
-                disabled={!busEnabled}
-              >
-                {op.label}
-              </button>
-            );
-          })}
-          <button
-            className={
-              'px-2.5 py-1 rounded border w-full text-xs font-bold transition-all duration-150 ' +
-              'bg-dark-bgTertiary border-dark-borderLight text-text-primary hover:border-accent-primary'
-            }
-            onClick={() => {
-              for (let i = 0; i < visibleChannelCount; i++) toggleHold(i);
-            }}
-            title="HOLD all channels — sustained dubbing on every channel (restores prior sends when released)"
-            disabled={!busEnabled}
-          >
-            HOLD
-          </button>
-          </div>
-          </div>
-          {/* Right column: fader fills the card's height, readout under it —
-              the same column a channel card has. */}
-          <div className="flex flex-col items-center gap-1 shrink-0 min-h-0">
-          <div className="flex-1 min-h-0 flex items-stretch">
-          <Fader
-            value={masterSendValue}
-            size="md"
-            fillHeight
-            color="accent-primary"
-            onChange={(v) => {
-              for (let i = 0; i < visibleChannelCount; i++) {
-                setChannelDubSend(i, v);
-              }
-            }}
-            title={`Master dub send — ${Math.round(masterSendValue * 100)}%. Sets all channel sends simultaneously.`}
-            disabled={!busEnabled}
-            doubleClickValue={1}
-          />
-          </div>
-          {/* Fixed width, or "100%" is wider than "15%" and the fader column
-              grows at full send, squeezing the op grid beside it — "when the
-              channel sliders reach 100% the component shrinks sideways". */}
-          <span className="w-7 text-center tabular-nums text-[9px] font-mono text-accent-primary leading-none">
-            {Math.round(masterSendValue * 100)}%
-          </span>
-          </div>
-        </div>
-        {/* Separator */}
-        <div className="w-px h-32 bg-dark-border shrink-0 self-center" />
-        {Array.from({ length: visibleChannelCount }, (_, i) => {
-          const ch = channels[i];
-          const dubSend = ch?.dubSend ?? 0;
-          const hasDubSend = dubSend > 0;
-          const isHeld = heldChannels.has(i);
-          const isFlashed = i === flashedChannel;
-          const channelFiring = CHANNEL_OPS.some(op => activeFires.has(`${op.moveId}:${i}`));
-          return (
-            <div
-              key={i}
-              className={
-                // w-24 rather than min-w-[64px]: the card was content-sized, so the widest
-                // child set its width. The Rvb/Swp row's two range inputs have an
-                // intrinsic ~129px each, which made every channel card 280px and pushed
-                // the instrument list off screen. A fixed width lets the sliders shrink
-                // (with min-w-0 on their columns) and keeps all channels uniform.
-                // Row, not column: the fader sits BESIDE the button stack rather than
-                // under it, which gives back the fader's 80px plus its readout on every
-                // channel. w-56: three full-size op buttons across plus the 16px
-                // fader. Nine ops in one column ran ~600px tall and the deck
-                // clipped every card; a 3x3 grid is three rows.
-                'flex flex-row items-stretch gap-2.5 px-2 py-1.5 rounded border w-56 shrink-0 transition-colors ' +
-                (channelFiring
-                  ? 'bg-accent-highlight/15 border-accent-highlight'
-                  : isHeld
-                    ? 'bg-accent-primary/10 border-accent-primary'
-                    : hasDubSend
-                      ? 'bg-dark-bg border-dark-borderLight'
-                      : 'bg-dark-bgTertiary border-dark-border')
-              }
-            >
-              {/* Left column: label + ops + hold — matches master column */}
-              <div className="flex flex-col items-center gap-1.5 flex-1 min-w-0">
-              <span
-                className="text-xs font-bold text-text-secondary leading-none truncate max-w-[56px]"
-                title={`Ch ${i + 1}${channelLabels[i] !== `CH ${i + 1}` ? ' · ' + channelLabels[i] : ''}`}
-              >
-                {channelLabels[i]}
-              </span>
-              {/* Role and filter share a row — one row fewer in the card. */}
-              <div className="flex gap-1 w-full">
-              {/* Role override — dim = auto (classifier), amber = locked by user */}
-              {(() => {
-                const userRole = ch?.dubRole ?? null;
-                const autoRole = autoRoles[i] ?? null;
-                return (
-                  <select
-                    value={userRole ?? ''}
-                    onChange={(e) => setChannelDubRole(i, e.target.value || null)}
-                    className={
-                      'flex-1 min-w-0 text-[8px] font-mono rounded border px-0.5 py-0.5 transition-colors ' +
-                      (userRole === 'empty'
-                        ? 'bg-accent-error/20 border-accent-error text-accent-error'
-                        : userRole
-                          ? 'bg-accent-highlight/20 border-accent-highlight text-accent-highlight'
-                          : 'bg-dark-bgTertiary border-dark-border text-text-muted')
-                    }
-                    title={
-                      userRole === 'empty'
-                        ? `Ch ${i + 1} — excluded from AutoDub (no moves will target this channel)`
-                        : `Ch ${i + 1} role — classifier says "${autoRole ?? '?'}". Override locks AutoDub targeting.`
-                    }
-                    disabled={!busEnabled}
-                  >
-                    <option value="">{autoRole ?? '—'}</option>
-                    <option value="percussion">Drums</option>
-                    <option value="bass">Bass</option>
-                    <option value="lead">Lead</option>
-                    <option value="skank">Skank</option>
-                    <option value="pad">Pad</option>
-                    <option value="empty">Exclude</option>
-                  </select>
-                );
-              })()}
-              {/* Per-channel mini-bus: filter mode */}
-              {(() => {
-                const filterMode = ch?.dubFilterMode ?? 'off';
-                return (
-                  <>
-                    <select
-                      value={filterMode}
-                      onChange={(e) => setChannelDubFilter(i, e.target.value as 'off' | 'hpf' | 'lpf')}
-                      className={
-                        'flex-1 min-w-0 text-[8px] font-mono rounded border px-0.5 py-0.5 transition-colors ' +
-                        (filterMode !== 'off'
-                          ? 'bg-accent-warning/20 border-accent-warning text-accent-warning'
-                          : 'bg-dark-bgTertiary border-dark-border text-text-muted')
-                      }
-                      title={`Ch ${i + 1} filter — Off / High Pass / Low Pass. Shapes the audio before it enters the dub bus mix.`}
-                      disabled={!busEnabled}
-                    >
-                      <option value="off">Filter off</option>
-                      <option value="hpf">High Pass</option>
-                      <option value="lpf">Low Pass</option>
-                    </select>
-                  </>
-                );
-              })()}
-              </div>
-              {/* Filter cutoff (when a filter is on) + reverb send + sweep */}
-              {(() => {
-                const filterMode = ch?.dubFilterMode ?? 'off';
-                const filterHz = ch?.dubFilterHz ?? 200;
-                const reverbSend = ch?.dubReverbSend ?? 0;
-                const sweepAmt = ch?.dubSweepAmount ?? 0;
-                return (
-                  <>
-                    {filterMode !== 'off' && (
-                      <input
-                        type="range" min={40} max={8000} step={10}
-                        value={filterHz}
-                        onChange={(e) => setChannelDubFilter(i, filterMode, Number(e.target.value))}
-                        className="w-full accent-accent-warning"
-                        disabled={!busEnabled}
-                        title={`Filter cutoff ${filterHz} Hz`}
-                      />
-                    )}
-                    {/* min-w-0 on both columns: a flex child defaults to
-                        min-width:auto, so the range inputs' intrinsic ~129px
-                        each became the floor for this row and set the whole
-                        channel card to 280px. Every other control in the card
-                        is 74px or less. */}
-                    <div className="flex gap-1 w-full">
-                      <div className="flex flex-col items-center flex-1 min-w-0">
-                        <span className="text-[7px] text-text-muted">Rvb</span>
-                        <input
-                          type="range" min={0} max={1} step={0.01}
-                          value={reverbSend}
-                          onChange={(e) => setChannelDubReverbSend(i, Number(e.target.value))}
-                          className="w-full accent-accent-secondary"
-                          disabled={!busEnabled}
-                          title={`Ch ${i + 1} dry spring reverb send ${Math.round(reverbSend * 100)}% — bypasses echo, feeds spring directly`}
-                        />
-                      </div>
-                      <div className="flex flex-col items-center flex-1 min-w-0">
-                        <span className="text-[7px] text-text-muted">Swp</span>
-                        <input
-                          type="range" min={0} max={1} step={0.01}
-                          value={sweepAmt}
-                          onChange={(e) => setChannelDubSweepAmount(i, Number(e.target.value))}
-                          className="w-full accent-accent-secondary"
-                          disabled={!busEnabled}
-                          title={`Ch ${i + 1} per-channel comb sweep ${Math.round(sweepAmt * 100)}%`}
-                        />
-                      </div>
-                    </div>
-                  </>
-                );
-              })()}
-              {/* 3x3: eight ops + HOLD, three rows instead of nine. */}
-              <div className="grid grid-cols-3 gap-1 w-full">
-              {CHANNEL_OPS.map((op) => {
-                const key = `${op.moveId}:${i}`;
-                const active = heldMoves.has(key) || activeFires.has(key);
-                const isHold = op.kind === 'hold';
-                return (
-                  <button
-                    key={op.moveId}
-                    className={colorClasses(op.color, active) + ' w-full text-center'}
-                    onClick={isHold ? undefined : () => fireTrigger(op.moveId, i)}
-                    {...(isHold ? holdButtonProps(op.moveId, i) : {})}
-                    {...hoverProps(`Ch ${i + 1} · ${op.label} — ${op.title}${isHold ? ' (press-and-hold)' : ''}`)}
-                    disabled={!busEnabled}
-                  >
-                    {op.label}
-                  </button>
-                );
-              })}
-              <button
-                className={
-                  'px-2.5 py-1 rounded border w-full text-xs font-bold transition-all duration-150 ' +
-                  (isHeld
-                    ? 'bg-accent-primary border-accent-primary text-text-inverse shadow-[0_0_8px_var(--color-accent-primary)]'
-                    : isFlashed
-                      ? 'bg-accent-highlight/30 border-accent-highlight text-accent-highlight'
-                      : hasDubSend
-                        ? 'bg-dark-bgTertiary border-dark-borderLight text-text-primary hover:border-accent-primary'
-                        : 'bg-dark-bgTertiary border-dark-borderLight text-text-secondary hover:text-text-primary')
-                }
-                onClick={() => toggleHold(i)}
-                title={`Ch ${i + 1}${ch ? ' · ' + ch.name : ''} — click to ${isHeld ? 'STOP' : 'START'} sustained dubbing. Multiple channels can dub simultaneously.`}
-                disabled={!busEnabled}
-              >
-                HOLD
-              </button>
-              </div>
-              </div>
-              {/* Right column: fader fills the stack's height, readout under it */}
-              <div className="flex flex-col items-center gap-1 shrink-0 min-h-0">
-              {/* flex-1 min-h-0 box: the fader is a flex child, so without a
-                  growing box to fill it shrinks to nothing instead of matching
-                  the button stack. */}
-              <div className="flex-1 min-h-0 flex items-stretch">
-              <Fader
-                value={dubSend}
-                size="md"
-                fillHeight
-                color={channelFiring ? 'accent-highlight' : 'accent-primary'}
-                onChange={(v) => setChannelDubSend(i, v)}
-                title={`Ch ${i + 1} dub send — ${Math.round(dubSend * 100)}%. Drag vertically; double-click for full send. Each real dub desk had faders on every channel — riding these is how Tubby mixed.`}
-                disabled={!busEnabled}
-                doubleClickValue={1}
-                paramKey={`dub.channelSend.ch${i}`}
-              />
-              </div>
-              <span className="w-7 text-center tabular-nums text-[9px] font-mono text-text-secondary leading-none">
-                {Math.round(dubSend * 100)}%
-              </span>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-
       </>)}
+
+
 
       </>)}
 
