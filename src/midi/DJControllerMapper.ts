@@ -368,15 +368,24 @@ export class DJControllerMapper {
     if (this.activePreset?.id === 'behringer-xtouch-compact'
         && channel === 0
         && useDrumPadStore.getState().dubBus.enabled) {
-      // Track fader touch sensors (CC 101-109)
+      // Track fader touch sensors — Layer A CC 101-109, Layer B CC 111-119.
+      //
+      // Layer B's touch range was missing, so `isFaderTouched` was never true
+      // for a Layer B fader and the guard below discarded every move it made:
+      // that whole bank did nothing (2026-09-23).
       if (cc >= 101 && cc <= 109) {
-        const faderCC = cc - 100; // touch CC 101 → fader CC 1
-        setFaderTouched(faderCC, value > 0);
+        setFaderTouched(cc - 100, value > 0);   // touch CC 101 → fader CC 1
         return;
       }
+      if (cc >= 111 && cc <= 119) {
+        setFaderTouched(cc - 83, value > 0);    // touch CC 111 → fader CC 28
+        return;
+      }
+      // Layer B addresses the SECOND bank of channels, not the same eight
+      // again — otherwise the layer buys nothing on the faders.
       let chIndex = -1;
-      if (cc >= 1 && cc <= 8) chIndex = cc - 1;        // Layer A
-      else if (cc >= 28 && cc <= 35) chIndex = cc - 28; // Layer B
+      if (cc >= 1 && cc <= 8) chIndex = cc - 1;            // Layer A → channels 1-8
+      else if (cc >= 28 && cc <= 35) chIndex = cc - 28 + 8; // Layer B → channels 9-16
       if (chIndex >= 0) {
         // Only accept fader input when user is physically touching it.
         // If not touched, it's motor echo — ignore completely.

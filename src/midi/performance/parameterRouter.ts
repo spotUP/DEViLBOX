@@ -134,6 +134,16 @@ const DUB_BUS_PARAMS: Record<string, { field: string; transform?: (n: number) =>
   'dub.returnGain':      { field: 'returnGain' },
   'dub.hpfCutoff':       { field: 'hpfCutoff',    transform: (n) => 20 + n * 980 },     // 20..1000 Hz
   'dub.sidechainAmount': { field: 'sidechainAmount' },
+  // The BUS tab's own controls. They were not routable at all, so a
+  // controller could drive the echo and the spring but not the tone — and the
+  // X-Touch's encoder row had nothing worth assigning past the seventh knob
+  // (2026-09-23). Ranges match the faders in the deck's BUS tab.
+  'dub.bassShelfGainDb': { field: 'bassShelfGainDb', transform: (n) => -12 + n * 24 },   // -12..+12 dB
+  'dub.midScoopGainDb':  { field: 'midScoopGainDb',  transform: (n) => -12 + n * 18 },   // -12..+6 dB
+  'dub.stereoWidth':     { field: 'stereoWidth',     transform: (n) => n * 2 },          // 0..2 (1 = neutral)
+  'dub.sweepAmount':     { field: 'sweepAmount' },
+  'dub.sweepRateHz':     { field: 'sweepRateHz',     transform: (n) => 0.05 + n * 2.95 }, // 0.05..3 Hz
+  'dub.plateStageMix':   { field: 'plateStageMix' },
 };
 
 // Hold-disposer map. Key = full param name (including optional `.chN`).
