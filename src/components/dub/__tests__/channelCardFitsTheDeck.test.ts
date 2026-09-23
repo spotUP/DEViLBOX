@@ -33,7 +33,7 @@ describe('the channel card fits the deck', () => {
   });
 
   it('keeps the ops at full size — the deck grew instead ("let the dub deck be taller")', () => {
-    const cards = DECK.match(/colorClasses\(op\.color, active\) \+ ' w-full text-center'/g) ?? [];
+    const cards = DECK.match(/moveButtonProps\(op\.color, active, 'w-full text-center'\)/g) ?? [];
     expect(cards.length, 'the shared op panel').toBe(1);
     expect(DECK).toContain('max-h-[calc(var(--app-vh)*0.75)]');
   });
