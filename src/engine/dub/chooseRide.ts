@@ -85,8 +85,11 @@ const RIDE_TARGETS: Record<AutoDubPersonaId, { targets: RideTarget[]; curve: Rid
   madProfessor: { targets: ['returnGain', 'springWet'], curve: 'ease' },
   // Sparse — `minBarsBetweenFires: 3`, `densityBias: -0.6`.
   jammy: { targets: ['channelSend'], curve: 'ease' },
-  // Whatever the user has dialled in; ride gently and only the send.
-  custom: { targets: ['channelSend'], curve: 'linear' },
+  // Whatever the user has dialled in. Rides gently, but it still reaches for
+  // the return: a persona whose only target is the send can never move a
+  // control the performer can SEE, which is how the default persona went a
+  // whole session without twisting a knob (2026-09-23).
+  custom: { targets: ['channelSend', 'returnGain'], curve: 'linear' },
 };
 
 /** Bars between rides, from the persona's own firing cadence. */

@@ -263,14 +263,12 @@ function routeDubParameter(param: string, value: number, source: 'live' | 'lane'
     return;
   }
 
-  // 0a. Master send — every channel at once.
+  // 0a. Master send — every channel at once, in ONE action. Looping
+  //     `setChannelDubSend` here made the fader unusable: sixteen dispatches
+  //     per CC, a hundred CCs a second (2026-09-23).
   if (param === MASTER_SEND_PARAM) {
     void import('../../stores/useMixerStore').then(({ useMixerStore }) => {
-      const state = useMixerStore.getState();
-      const count = state.channels?.length ?? 0;
-      for (let ch = 0; ch < count; ch++) {
-        state.setChannelDubSend(ch, value, { source });
-      }
+      useMixerStore.getState().setAllChannelDubSends(value, { source });
     });
     return;
   }
