@@ -213,10 +213,16 @@ const GLOBAL_MOVES: Array<GlobalMove> = [
  */
 const MOVE_ROW_GRID = 'grid grid-cols-[repeat(auto-fill,minmax(7rem,1fr))] gap-1.5 flex-1 min-w-0';
 
-const colorClasses = (token: string, active: boolean) => {
+const colorClasses = (token: string, active: boolean, size: 'md' | 'sm' = 'md') => {
   // nowrap: on the column grid a wrapped label would make one button taller
   // than its row.
-  const base = 'px-2.5 py-1 rounded border text-xs font-bold whitespace-nowrap transition-all duration-150 ';
+  // 'sm' is the channel-card size: nine ops in a 3x3 grid beside the fader.
+  // At 'md' the same nine stacked in one column ran ~600 px and the deck,
+  // capped at 60 % of the viewport, clipped every card — "the sliders dont
+  // fit not even in fullscreen" (2026-09-23, asked several times).
+  const base = size === 'sm'
+    ? 'px-1 py-0.5 rounded border text-[10px] font-bold whitespace-nowrap transition-all duration-150 '
+    : 'px-2.5 py-1 rounded border text-xs font-bold whitespace-nowrap transition-all duration-150 ';
   const idle = 'bg-dark-bgTertiary border-dark-borderLight text-text-secondary ';
   switch (token) {
     // Bright opaque backgrounds — dark text has 9-12:1 contrast
@@ -1698,13 +1704,16 @@ export const DubDeckStrip: React.FC = () => {
         {/* Master send — scales all channel sends at once */}
         <div
           className={
-            'flex flex-row items-stretch gap-2.5 px-2 py-1.5 rounded border w-32 shrink-0 ' +
+            'flex flex-row items-stretch gap-2.5 px-2 py-1.5 rounded border w-48 shrink-0 ' +
             'bg-dark-bgSecondary border-accent-primary/40'
           }
         >
           {/* Left column: label + ops + hold — must match channel columns */}
           <div className="flex flex-col items-center gap-1.5 flex-1 min-w-0">
           <span className="text-xs font-bold text-accent-primary leading-none">MASTER</span>
+          {/* 3x3: eight ops + HOLD. A column of nine full-size buttons was
+              the whole reason the deck did not fit — see colorClasses. */}
+          <div className="grid grid-cols-3 gap-1 w-full">
           {CHANNEL_OPS.map((op) => {
             const masterKey = `${op.moveId}:master`;
             const active = heldMoves.has(masterKey) || CHANNEL_OPS.some(
@@ -1714,7 +1723,7 @@ export const DubDeckStrip: React.FC = () => {
             return (
               <button
                 key={op.moveId}
-                className={colorClasses(op.color, active) + ' w-full text-center'}
+                className={colorClasses(op.color, active, 'sm') + ' w-full text-center'}
                 onClick={isHold ? undefined : () => {
                   for (let i = 0; i < visibleChannelCount; i++) fireTrigger(op.moveId, i);
                 }}
@@ -1746,7 +1755,7 @@ export const DubDeckStrip: React.FC = () => {
           })}
           <button
             className={
-              'px-2 py-1 rounded border w-full text-xs font-bold transition-all duration-150 ' +
+              'px-1 py-0.5 rounded border w-full text-[10px] font-bold transition-all duration-150 ' +
               'bg-dark-bgTertiary border-dark-borderLight text-text-primary hover:border-accent-primary'
             }
             onClick={() => {
@@ -1757,6 +1766,7 @@ export const DubDeckStrip: React.FC = () => {
           >
             HOLD
           </button>
+          </div>
           </div>
           {/* Right column: ALL/NONE + fader — master-only controls */}
           <div className="flex flex-col items-center gap-1 shrink-0 min-h-0">
@@ -1820,9 +1830,10 @@ export const DubDeckStrip: React.FC = () => {
                 // (with min-w-0 on their columns) and keeps all channels uniform.
                 // Row, not column: the fader sits BESIDE the button stack rather than
                 // under it, which gives back the fader's 80px plus its readout on every
-                // channel. w-32 because the button column still needs its 74px (the
-                // filter select's max-content) next to the 16px fader.
-                'flex flex-row items-stretch gap-2.5 px-2 py-1.5 rounded border w-32 shrink-0 transition-colors ' +
+                // channel. w-48: three compact op buttons across (~44px each) plus
+                // the 16px fader. Nine ops in one column ran ~600px tall and the
+                // deck clipped every card; a 3x3 grid is three rows.
+                'flex flex-row items-stretch gap-2.5 px-2 py-1.5 rounded border w-48 shrink-0 transition-colors ' +
                 (channelFiring
                   ? 'bg-accent-highlight/15 border-accent-highlight'
                   : isHeld
@@ -1840,6 +1851,8 @@ export const DubDeckStrip: React.FC = () => {
               >
                 {channelLabels[i]}
               </span>
+              {/* Role and filter share a row — one row fewer in the card. */}
+              <div className="flex gap-1 w-full">
               {/* Role override — dim = auto (classifier), amber = locked by user */}
               {(() => {
                 const userRole = ch?.dubRole ?? null;
@@ -1849,7 +1862,7 @@ export const DubDeckStrip: React.FC = () => {
                     value={userRole ?? ''}
                     onChange={(e) => setChannelDubRole(i, e.target.value || null)}
                     className={
-                      'w-full text-[8px] font-mono rounded border px-0.5 py-0.5 transition-colors ' +
+                      'flex-1 min-w-0 text-[8px] font-mono rounded border px-0.5 py-0.5 transition-colors ' +
                       (userRole === 'empty'
                         ? 'bg-accent-error/20 border-accent-error text-accent-error'
                         : userRole
@@ -1873,19 +1886,16 @@ export const DubDeckStrip: React.FC = () => {
                   </select>
                 );
               })()}
-              {/* Per-channel mini-bus: filter + reverb send + sweep */}
+              {/* Per-channel mini-bus: filter mode */}
               {(() => {
                 const filterMode = ch?.dubFilterMode ?? 'off';
-                const filterHz = ch?.dubFilterHz ?? 200;
-                const reverbSend = ch?.dubReverbSend ?? 0;
-                const sweepAmt = ch?.dubSweepAmount ?? 0;
                 return (
                   <>
                     <select
                       value={filterMode}
                       onChange={(e) => setChannelDubFilter(i, e.target.value as 'off' | 'hpf' | 'lpf')}
                       className={
-                        'w-full text-[8px] font-mono rounded border px-0.5 py-0.5 transition-colors ' +
+                        'flex-1 min-w-0 text-[8px] font-mono rounded border px-0.5 py-0.5 transition-colors ' +
                         (filterMode !== 'off'
                           ? 'bg-accent-warning/20 border-accent-warning text-accent-warning'
                           : 'bg-dark-bgTertiary border-dark-border text-text-muted')
@@ -1897,6 +1907,18 @@ export const DubDeckStrip: React.FC = () => {
                       <option value="hpf">High Pass</option>
                       <option value="lpf">Low Pass</option>
                     </select>
+                  </>
+                );
+              })()}
+              </div>
+              {/* Filter cutoff (when a filter is on) + reverb send + sweep */}
+              {(() => {
+                const filterMode = ch?.dubFilterMode ?? 'off';
+                const filterHz = ch?.dubFilterHz ?? 200;
+                const reverbSend = ch?.dubReverbSend ?? 0;
+                const sweepAmt = ch?.dubSweepAmount ?? 0;
+                return (
+                  <>
                     {filterMode !== 'off' && (
                       <input
                         type="range" min={40} max={8000} step={10}
@@ -1939,6 +1961,8 @@ export const DubDeckStrip: React.FC = () => {
                   </>
                 );
               })()}
+              {/* 3x3: eight ops + HOLD, three rows instead of nine. */}
+              <div className="grid grid-cols-3 gap-1 w-full">
               {CHANNEL_OPS.map((op) => {
                 const key = `${op.moveId}:${i}`;
                 const active = heldMoves.has(key) || activeFires.has(key);
@@ -1946,7 +1970,7 @@ export const DubDeckStrip: React.FC = () => {
                 return (
                   <button
                     key={op.moveId}
-                    className={colorClasses(op.color, active) + ' w-full text-center'}
+                    className={colorClasses(op.color, active, 'sm') + ' w-full text-center'}
                     onClick={isHold ? undefined : () => fireTrigger(op.moveId, i)}
                     {...(isHold ? holdButtonProps(op.moveId, i) : {})}
                     {...hoverProps(`Ch ${i + 1} · ${op.label} — ${op.title}${isHold ? ' (press-and-hold)' : ''}`)}
@@ -1958,7 +1982,7 @@ export const DubDeckStrip: React.FC = () => {
               })}
               <button
                 className={
-                  'px-2 py-1 rounded border w-full text-xs font-bold transition-all duration-150 ' +
+                  'px-1 py-0.5 rounded border w-full text-[10px] font-bold transition-all duration-150 ' +
                   (isHeld
                     ? 'bg-accent-primary border-accent-primary text-text-inverse shadow-[0_0_8px_var(--color-accent-primary)]'
                     : isFlashed
@@ -1973,6 +1997,7 @@ export const DubDeckStrip: React.FC = () => {
               >
                 HOLD
               </button>
+              </div>
               </div>
               {/* Right column: fader fills the stack's height, readout under it */}
               <div className="flex flex-col items-center gap-1 shrink-0 min-h-0">
