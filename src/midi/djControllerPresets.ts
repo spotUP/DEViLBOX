@@ -596,12 +596,18 @@ const BEHRINGER_X_TOUCH_COMPACT: DJControllerPreset = {
     { channel: 0, note: 48, param: 'dub.armed' },
 
     // ── Transport (notes 49-54) ──────────────────────────────────────────
-    { channel: 0, note: 49, action: 'play_a' },
-    { channel: 0, note: 50, action: 'play_b' },
-    { channel: 0, note: 51, action: 'cue_a' },
-    { channel: 0, note: 52, action: 'cue_b' },
-    { channel: 0, note: 53, action: 'sync_a' },
-    { channel: 0, note: 54, action: 'sync_b' },
+    // ── Transport row ────────────────────────────────────────────────────
+    // These carried DJ deck actions (`play_a`, `cue_b`, `sync_a`), so the
+    // desk's PLAY button did something to a deck instead of starting the
+    // song — "the transport buttons are mapped to effects" (2026-09-24).
+    // Notes and labels come from the layout descriptor's transport block.
+    { channel: 0, note: 49, param: 'transport.prevPattern' },   // REW
+    { channel: 0, note: 50, param: 'transport.nextPattern' },   // FWD
+    // LOOP is Play Pattern, in the owner's own words: "loop = play pattern".
+    { channel: 0, note: 51, param: 'transport.playPattern' },   // LOOP
+    { channel: 0, note: 52, param: 'transport.record' },        // REC
+    { channel: 0, note: 53, param: 'transport.stop' },          // STOP
+    { channel: 0, note: 54, param: 'transport.play' },          // PLAY
 
     // ── Layer B ──────────────────────────────────────────────────────────
     // Row 1 (71-78): the moves Layer A had no room for.

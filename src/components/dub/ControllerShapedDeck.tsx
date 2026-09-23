@@ -37,6 +37,7 @@ import { getPresetById } from '@/midi/djControllerPresets';
 import { DUB_BUS_PARAMS } from '@/midi/performance/parameterRouter';
 import { useMIDIPresetStore } from '@/stores/useMIDIPresetStore';
 import { moveButtonStyle, MOVE_COLOR } from './moveButtonStyle';
+import { isLatchingMove } from '@/engine/dub/latchingMoves';
 import {
   buildDeckBindings,
   deckControls,
@@ -60,6 +61,14 @@ export interface DubDeckControlApi {
     onPointerCancel: (e: React.PointerEvent<HTMLButtonElement>) => void;
     onLostPointerCapture: () => void;
   };
+  /**
+   * Turn a LATCHING move on, or off again — mute, today.
+   *
+   * Underneath it is the same hold `holdButtonProps` drives; only the thing
+   * that ends it differs, the next click rather than the pointer coming up.
+   * See `src/engine/dub/latchingMoves.ts`.
+   */
+  latchToggle: (moveId: string, channelId?: number) => void;
   handleToggle: (moveId: string) => void;
   handleRatePreset: (moveId: string) => void;
   setChannelSend: (channelId: number, value: number) => void;
@@ -336,6 +345,25 @@ export const ControllerShapedDeck: React.FC<ControllerShapedDeckProps> = ({
     const title = `${caption} — ${move.title}${where}`;
     const lit = moveButtonStyle(move.color, isActive(target) || isLatched(target), size);
     const cls = `${lit.className} w-full h-full`;
+
+    // A latching move is a hold whose next CLICK ends it. Mute is the one
+    // nobody wants to keep a finger on: a click mutes for as long as the click
+    // lasts, which is why it never seemed to take — "i have to click the mute
+    // buttons many times for them to stick ... and i cant get back audio when
+    // i unmute" (2026-09-24).
+    if (move.interaction === 'hold' && isLatchingMove(move.moveId)) {
+      return (
+        <button
+          className={cls}
+          style={lit.style}
+          onClick={() => api.latchToggle(move.moveId, channelId)}
+          title={`${title} (click to mute, click again to unmute)`}
+          disabled={!busEnabled}
+        >
+          {caption}
+        </button>
+      );
+    }
 
     if (move.interaction === 'hold') {
       return (
