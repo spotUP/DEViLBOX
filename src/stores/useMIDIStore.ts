@@ -11,6 +11,7 @@ import { getCCMapManager } from '../midi/CCMapManager';
 import { getButtonMapManager } from '../midi/ButtonMapManager';
 import { midiToTrackerNote } from '../midi/types';
 import { deriveLiveNoteFlags } from '../midi/liveNoteFlags';
+import { controllerOwnsNote } from '../midi/controllerNoteOwnership';
 import { getToneEngine } from '../engine/ToneEngine';
 import { useInstrumentStore } from './useInstrumentStore';
 import { useSettingsStore } from './useSettingsStore';
@@ -421,6 +422,15 @@ export const useMIDIStore = create<MIDIStore>()(
 
               // Handle Note On messages
               if (message.type === 'noteOn' && message.note !== undefined && message.velocity !== undefined) {
+                // A controller's buttons are not keys. DJControllerMapper already
+                // acts on them; letting them fall through here ALSO struck the
+                // current instrument — the 2026-09-23 ringing beep. The CC path
+                // has had this gate since the mapper existed (below, ~line 644);
+                // the note path never did.
+                if (controllerOwnsNote(getDJControllerMapper().ownedNotes(), { channel: message.channel, note: message.note })) {
+                  return;
+                }
+
                 // In DrumPad / DJ / VJ views, ALL notes trigger drum pads (not tracker)
                 const activeView = useUIStore.getState().activeView;
                 if (activeView === 'drumpad' || activeView === 'dj' || activeView === 'vj') {
@@ -574,6 +584,11 @@ export const useMIDIStore = create<MIDIStore>()(
 
               // Handle Note Off messages
               if (message.type === 'noteOff' && message.note !== undefined) {
+                // Same gate as note-on: a button release is the mapper's, not a key-up.
+                if (controllerOwnsNote(getDJControllerMapper().ownedNotes(), { channel: message.channel, note: message.note })) {
+                  return;
+                }
+
                 // In DrumPad / DJ / VJ views, notes 36-43 are routed to drum pads
                 const activeView = useUIStore.getState().activeView;
                 if ((activeView === 'drumpad' || activeView === 'dj' || activeView === 'vj') && message.note >= 36 && message.note <= 43) {
