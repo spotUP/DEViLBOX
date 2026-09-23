@@ -125,6 +125,12 @@ describe('the controller diagram uses the wrapped label and the tooltip', () => 
     expect(VIEW).toContain('layer: control.layer,');
   });
 
+  it('leaves air between a control and its caption', () => {
+    // The caption used to start inside an encoder's own radius.
+    expect(VIEW).toContain('const LABEL_GAP =');
+    expect((VIEW.match(/LABEL_GAP \+/g) ?? []).length, 'every control kind').toBe(4);
+  });
+
   it('has room for the labels it now wraps', () => {
     const cell = VIEW.match(/^const CELL = (\d+);/m);
     expect(cell, 'CELL moved').not.toBeNull();
@@ -157,6 +163,12 @@ describe('the controller diagram fits its dialog', () => {
     // window, collapsing the diagram inside an empty dialog ("this sucks").
     expect(VIEW).not.toContain('max-h-[calc(90vh');
     expect(VIEW).toContain('style={{ maxWidth: svgWidth }}');
+  });
+
+  it('gives the panel a wrapper with a definite width to resolve 100% against', () => {
+    // A shrink-to-fit flex item has no definite width, so `width: 100%`
+    // collapsed the SVG to its minimum however wide the dialog was.
+    expect(MODAL).toContain('<div className="relative w-full">');
   });
 
   it('opens in a dialog wide enough for a diagram', () => {

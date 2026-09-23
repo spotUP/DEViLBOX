@@ -380,8 +380,13 @@ export const MIDIMapperModal: React.FC<MIDIMapperModalProps> = ({
         )}
 
         {/* Layout view */}
+        {/* `w-full` on the wrapper, not just the SVG: a shrink-to-fit flex
+            item has no definite width, so the panel's `width: 100%` resolved
+            against nothing and collapsed it to its minimum — a tiny diagram
+            in a very wide dialog (2026-09-23). The SVG's own max-width keeps
+            it from growing past its natural size. */}
         <div className="flex justify-center">
-          <div className="relative">
+          <div className="relative w-full">
             <ControllerLayoutView
               layout={layout}
               assignments={mergedAssignments}

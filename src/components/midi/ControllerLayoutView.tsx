@@ -41,10 +41,20 @@ interface ControllerLayoutViewProps {
 // Pixels per grid unit. Was 32, which left 64 px between neighbouring
 // controls — narrower than the names printed under them, so the top encoder
 // row ran together into one unreadable string (2026-09-23). Labels wrap now,
-// and the extra width is what gives them room to wrap into.
-const CELL = 44;
+// and the extra width is what gives them room to wrap into; the height is
+// what keeps a two-line caption clear of the row beneath it.
+const CELL = 48;
 const PAD = 16;  // padding around the layout
 const ENCODER_R = 12;
+/**
+ * Gap between a control's edge and the first line of its caption.
+ *
+ * The label used to start 12 px below an encoder's CENTRE — inside the knob's
+ * own radius — so the text crowded the graphic ("the texts are too close to
+ * the buttons/knobs etc", 2026-09-23). Measured from the edge now, with real
+ * air.
+ */
+const LABEL_GAP = 9;
 const BUTTON_SIZE = 24;
 const FADER_W = 14;
 
@@ -134,7 +144,7 @@ const EncoderControl: React.FC<{
       {/* Pointer line */}
       <line x1={cx} y1={cy - ENCODER_R + 3} x2={cx} y2={cy - 3} stroke={color.text} strokeWidth={2} strokeLinecap="round" />
       {/* Label */}
-      <ControlLabel cx={cx} top={cy + ENCODER_R + 12} fill={color.text} fontSize={8}
+      <ControlLabel cx={cx} top={cy + ENCODER_R + LABEL_GAP + 8} fill={color.text} fontSize={8}
         text={label || control.label || control.id} />
     </g>
   );
@@ -167,7 +177,7 @@ const ButtonControl: React.FC<{
       <rect x={x} y={y} width={BUTTON_SIZE} height={BUTTON_SIZE} rx={3}
         fill={color.bg} stroke={color.border} strokeWidth={1.5} />
       {/* Label */}
-      <ControlLabel cx={x + BUTTON_SIZE / 2} top={y + BUTTON_SIZE + 11} fill={color.text}
+      <ControlLabel cx={x + BUTTON_SIZE / 2} top={y + BUTTON_SIZE + LABEL_GAP + 7} fill={color.text}
         fontSize={7} text={label || control.label || ''} />
     </g>
   );
@@ -194,7 +204,7 @@ const FaderControl: React.FC<{
       <rect x={x} y={y + h * 0.3} width={FADER_W} height={20} rx={3}
         fill={color.bg} stroke={color.border} strokeWidth={1.5} />
       {/* Label below */}
-      <ControlLabel cx={x + FADER_W / 2} top={y + h + 14} fill={color.text} fontSize={8}
+      <ControlLabel cx={x + FADER_W / 2} top={y + h + LABEL_GAP + 8} fill={color.text} fontSize={8}
         text={label || control.label || control.id} />
     </g>
   );
@@ -216,7 +226,7 @@ const PadControl: React.FC<{
       <title>{tooltip}</title>
       <rect x={x} y={y} width={size} height={size} rx={4}
         fill={color.bg} stroke={color.border} strokeWidth={2} />
-      <ControlLabel cx={x + size / 2} top={y + size + 12} fill={color.text}
+      <ControlLabel cx={x + size / 2} top={y + size + LABEL_GAP + 7} fill={color.text}
         fontSize={7} text={label || control.label || ''} />
     </g>
   );

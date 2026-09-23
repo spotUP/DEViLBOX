@@ -412,6 +412,13 @@ export type DubMoveParameter =
   | 'dub.returnGain'
   | 'dub.hpfCutoff'
   | 'dub.sidechainAmount'
+  // The BUS tab's tone controls — routable since 2026-09-23
+  | 'dub.bassShelfGainDb'
+  | 'dub.midScoopGainDb'
+  | 'dub.stereoWidth'
+  | 'dub.sweepAmount'
+  | 'dub.sweepRateHz'
+  | 'dub.plateStageMix'
   // Bus enable + REC arm toggles
   | 'dub.enabled'
   | 'dub.armed';
