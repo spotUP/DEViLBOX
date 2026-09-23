@@ -16,6 +16,7 @@
  * performance) without stampeding zustand updates.
  */
 
+import type { DubTarget } from '@components/dub/dubTarget';
 import { keepAcrossHmr } from '@/lib/dev/keepAcrossHmr';
 import { create } from 'zustand';
 
@@ -112,7 +113,32 @@ interface DubStore {
    *  immediately for feel, only the recorded row is quantized. */
   quantize: boolean;
   setQuantize: (v: boolean) => void;
+
+  /**
+   * The channel the per-channel ops act on — the one your hand is on.
+   *
+   * A desk has no "fire this on channel 3" button: the effects are on aux
+   * sends, so the routing is the fader. What is left is the handful of ops
+   * that genuinely name a channel (Skank and Float capture a stab from a
+   * source, Build ramps that channel's send, Emph works on the bass), and the
+   * answer for those is the channel you are touching.
+   *
+   * `null` means every channel, which is what the deck's shared op panel has
+   * always done. Set by touching a fader — natively on a touch-sensitive
+   * controller, by dragging on screen — and it EXPIRES, or the channel your
+   * hand was on ten minutes ago is still the target.
+   *
+   * Design: thoughts/shared/plans/2026-09-23-dub-deck-channel-section.md
+   */
+  opTarget: DubTarget | null;
+  /** Touch a channel: make it the target, or renew it. */
+  touchOpTarget: (channelId: number) => void;
+  /** Drop the target back to every channel. */
+  clearOpTarget: () => void;
 }
+
+/** Re-exported so consumers get the target and its shape from one place. */
+export type { DubTarget } from '@components/dub/dubTarget';
 
 /** Persona identifiers. Full definitions live in AutoDubPersonas.ts so the
  *  store stays dependency-free (otherwise we'd have a circular import with
@@ -162,6 +188,11 @@ export const useDubStore = create<DubStore>((set) => ({
   setAutoDubEqDepthMult: (v) => batchDubSet('eqDepth', { autoDubEqDepthMult: Math.max(0, Math.min(1, v)) }),
   quantize: true,
   setQuantize: (v) => set({ quantize: v }),
+
+  opTarget: null,
+  touchOpTarget: (channelId) =>
+    set({ opTarget: { channelId, touchedAtMs: performance.now() } }),
+  clearOpTarget: () => set({ opTarget: null }),
 }));
 
 /**

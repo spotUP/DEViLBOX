@@ -17,14 +17,24 @@ import { join } from 'node:path';
 const DECK = readFileSync(join(process.cwd(), 'src/components/dub/DubDeckStrip.tsx'), 'utf-8');
 
 describe('the channel card fits the deck', () => {
-  it('lays the nine ops out as a 3x3 grid, on the master card and on every channel card', () => {
+  /**
+   * ONE 3x3 grid, not two.
+   *
+   * These asserted `2` — the master card and every channel card — until the
+   * channel section was redesigned on 2026-09-23. A desk has one set of effect
+   * controls and N strips; stamping the rack onto every channel drew 72
+   * buttons on an eight-channel song. The ops live once now and act on the
+   * channel your hand is on, so a SECOND grid is the defect these now guard
+   * against.
+   */
+  it('lays the nine ops out as a 3x3 grid, once, on the shared op panel', () => {
     const grids = DECK.match(/<div className="grid grid-cols-3 gap-1 w-full">\s*\{CHANNEL_OPS\.map/g) ?? [];
-    expect(grids.length, 'master + channel').toBe(2);
+    expect(grids.length, 'a second grid is a per-channel rack').toBe(1);
   });
 
   it('keeps the ops at full size — the deck grew instead ("let the dub deck be taller")', () => {
     const cards = DECK.match(/colorClasses\(op\.color, active\) \+ ' w-full text-center'/g) ?? [];
-    expect(cards.length, 'master + channel').toBe(2);
+    expect(cards.length, 'the shared op panel').toBe(1);
     expect(DECK).toContain('max-h-[calc(var(--app-vh)*0.75)]');
   });
 
