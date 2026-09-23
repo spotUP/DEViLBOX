@@ -150,16 +150,12 @@ const LAYER_BUTTON_IDS: ReadonlySet<string> = new Set(['layer-a', 'layer-b']);
 const SKIPPED_GROUPS: ReadonlySet<string> = new Set(['transport']);
 
 /**
- * Minimum height of one grid unit.
+ * Height of one button row in the left block.
  *
- * A MINIMUM, not a height. An encoder cell is two units on the device but has
- * to hold a caption, a 40 px knob and its push button; at any fixed unit small
- * enough to keep the panel compact, that content overflowed into the row below
- * and the right-hand knobs printed straight over the buttons beside them
- * ("overlapping knobs", 2026-09-23). Letting a row grow to its content costs
- * nothing where nothing needs the room, and no pixel guess can go stale.
+ * Every button row gets this exact track, so three rows of eight buttons are
+ * three rows of the same height whatever each happens to contain.
  */
-const UNIT_REM = 1.6;
+const BUTTON_ROW_TRACK = '2rem';
 
 /** Past this much movement the gesture was a turn, not a press. */
 const TURN_SLOP = 4;
@@ -488,6 +484,97 @@ export const ControllerShapedDeck: React.FC<ControllerShapedDeckProps> = ({
     );
   };
 
+  /**
+   * Where the left block ends and the right one begins.
+   *
+   * The fader bank's right edge, from the descriptor, rather than a fraction
+   * guessed from the panel width.
+   */
+  const leftColumns = useMemo(() => {
+    const faders = layout.controls.filter((c) => c.type === 'fader');
+    return faders.length === 0
+      ? layout.width
+      : Math.max(...faders.map((c) => c.x + (c.w ?? 2)));
+  }, [layout]);
+
+  const drawn = useMemo(() => placements.filter(({ control }) => (
+    !LAYER_BUTTON_IDS.has(control.id) && !(control.group && SKIPPED_GROUPS.has(control.group))
+  )), [placements]);
+
+  const leftPlacements = useMemo(
+    () => drawn.filter(({ control }) => control.x < leftColumns),
+    [drawn, leftColumns],
+  );
+  const rightPlacements = useMemo(
+    () => drawn.filter(({ control }) => control.x >= leftColumns),
+    [drawn, leftColumns],
+  );
+
+  /**
+   * The left block's row heights, declared per descriptor row.
+   *
+   * A row of buttons needs the height of a button and no more; the faders want
+   * everything left over. Sizing every row to its content gave three button
+   * rows of three different heights, because each held something different.
+   */
+  const leftRowTracks = useMemo(() => {
+    const rows = [...new Set(leftPlacements.map((p) => p.control.y))].sort((a, b) => a - b);
+    const tallest = Math.max(...rows, 0);
+    return rows.map((y) => {
+      const kinds = new Set(leftPlacements.filter((p) => p.control.y === y).map((p) => p.control.type));
+      if (kinds.has('fader')) return 'minmax(9rem, 1fr)';
+      if (kinds.has('encoder')) return 'auto';
+      // Every button row gets the SAME track, so they cannot drift apart.
+      return y === tallest ? 'auto' : BUTTON_ROW_TRACK;
+    }).join(' ');
+  }, [leftPlacements]);
+
+  /** Descriptor row to grid line, per block, so unused rows close up. */
+  const lineOf = (list: typeof placements) => {
+    const rows = [...new Set(list.map((p) => p.control.y))].sort((a, b) => a - b);
+    return new Map(rows.map((y, i) => [y, i + 1]));
+  };
+  const leftLines = useMemo(() => lineOf(leftPlacements), [leftPlacements]);
+  const rightLines = useMemo(() => lineOf(rightPlacements), [rightPlacements]);
+
+  /** One control, wherever it lives. */
+  const renderPlacement = ({ control, binding, w }: typeof placements[number]) => {
+    const lines = control.x < leftColumns ? leftLines : rightLines;
+    const col = control.x < leftColumns ? control.x : control.x - leftColumns;
+    const place: React.CSSProperties = {
+      gridColumn: `${col + 1} / span ${w}`,
+      gridRow: `${lines.get(control.y) ?? 1}`,
+    };
+
+    if (control.type === 'fader' && renderChannelStrip) {
+      const bound = binding.turn;
+      const isMaster = bound?.kind !== 'channelSend';
+      const node = bound?.kind === 'channelSend'
+        ? renderChannelStrip(bound.channelId, 'w-full h-full')
+        : renderMasterStrip?.('w-full h-full');
+      // The master column runs the FULL height of the block. The button rows
+      // are eight wide and the master is the ninth column, so there is nothing
+      // above it to leave room for — "the master slider can be full height
+      // there is nothing above it" (2026-09-23).
+      const cell = isMaster ? { ...place, gridRow: '1 / -1' } : place;
+      return node ? <div key={control.id} style={cell} className="min-h-0">{node}</div> : null;
+    }
+    if (channelStrip && faderZone?.ids.has(control.id)) return null;
+    if (control.type === 'fader') {
+      return <div key={control.id} style={place} className="min-h-0">{renderFader(binding)}</div>;
+    }
+    if (control.type === 'encoder') {
+      return <div key={control.id} style={place}>{renderEncoder(binding)}</div>;
+    }
+    const target = binding.press ?? binding.turn;
+    const button = target ? renderButton(target, false) : null;
+    return (
+      <div key={control.id} style={place}>
+        {button ?? renderInert(control, binding)}
+      </div>
+    );
+  };
+
   return (
     <div className="flex flex-col gap-2 pb-1.5 border-b border-dark-border">
       <div className="flex items-center gap-2 text-[10px] font-mono">
@@ -514,57 +601,43 @@ export const ControllerShapedDeck: React.FC<ControllerShapedDeckProps> = ({
         )}
       </div>
 
-      {/* The panel. Columns are the descriptor's own units, so the proportions
-          are the device's: the wide left block, the fader bank with the master
-          at its right-hand end, the narrow encoder and transport block beside
-          them. It scrolls sideways rather than squeezing — a panel narrower
-          than the device stops being the device. */}
+      {/* The panel, as the device's TWO BLOCKS.
+          One grid could not do it. The right-hand encoder block sits at the
+          same descriptor rows as the three button rows, so with rows sized to
+          their content a knob's height drove the buttons' — "the buttons are
+          pretty tall they dont need to be" — and every row came out a
+          different height because each sized to whatever it happened to hold.
+          Two grids give each block its own row tracks, which is also what the
+          device is: a wide left block and a narrow one beside it. */}
       <div className="overflow-x-auto">
-        <div
-          className="grid gap-1.5"
-          style={{
-            gridTemplateColumns: `repeat(${layout.width}, minmax(0, 1fr))`,
-            gridAutoRows: `minmax(${UNIT_REM}rem, auto)`,
-            minWidth: `${layout.width * 2.1}rem`,
-          }}
-        >
-          {placements.map(({ control, binding, w, h }) => {
-            const place: React.CSSProperties = {
-              gridColumn: `${control.x + 1} / span ${w}`,
-              gridRow: `${control.y + 1} / span ${h}`,
-            };
+        <div className="flex items-start gap-3" style={{ minWidth: `${layout.width * 2.1}rem` }}>
+          {/* LEFT: encoders, the three button rows, the nine fader columns,
+              the mute row. Row heights are declared, not inferred: the three
+              button rows share one track size so they are equal, and the fader
+              row takes the room that leaves — "let the faders be taller". */}
+          <div
+            className="grid gap-1.5 flex-1 min-w-0"
+            style={{
+              gridTemplateColumns: `repeat(${leftColumns}, minmax(0, 1fr))`,
+              gridTemplateRows: leftRowTracks,
+            }}
+          >
+            {leftPlacements.map(renderPlacement)}
+          </div>
 
-            if (LAYER_BUTTON_IDS.has(control.id)) return null;
-            if (control.group && SKIPPED_GROUPS.has(control.group)) return null;
-            // A fader column IS a channel strip. The strip fills the column,
-            // so it is exactly as wide as the button above it and the mute
-            // below it — which is what makes the nine columns line up.
-            if (control.type === 'fader' && renderChannelStrip) {
-              const bound = binding.turn;
-              const node = bound?.kind === 'channelSend'
-                ? renderChannelStrip(bound.channelId, 'w-full')
-                : renderMasterStrip?.('w-full');
-              return node ? <div key={control.id} style={place}>{node}</div> : null;
-            }
-            // Without a strip renderer the whole bank falls back to the deck's
-            // own row, placed once across the fader zone.
-            if (channelStrip && faderZone?.ids.has(control.id)) return null;
-
-            if (control.type === 'fader') {
-              return <div key={control.id} style={place}>{renderFader(binding)}</div>;
-            }
-            if (control.type === 'encoder') {
-              return <div key={control.id} style={place}>{renderEncoder(binding)}</div>;
-            }
-
-            const target = binding.press ?? binding.turn;
-            const button = target ? renderButton(target, false) : null;
-            return (
-              <div key={control.id} style={place}>
-                {button ?? renderInert(control, binding)}
-              </div>
-            );
-          })}
+          {/* RIGHT: the encoder block. Its own tracks, so its knobs size
+              themselves without stretching anything on the left. */}
+          {rightPlacements.length > 0 && (
+            <div
+              className="grid gap-1.5 shrink-0"
+              style={{
+                gridTemplateColumns: `repeat(${layout.width - leftColumns}, minmax(0, 1fr))`,
+                width: `${(layout.width - leftColumns) * 2.6}rem`,
+              }}
+            >
+              {rightPlacements.map(renderPlacement)}
+            </div>
+          )}
         </div>
       </div>
 

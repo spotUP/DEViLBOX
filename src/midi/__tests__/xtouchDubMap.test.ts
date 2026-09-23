@@ -89,9 +89,14 @@ describe('encoders carry continuous parameters, pushes carry momentary ones', ()
     ]);
   });
 
-  it('no continuous control is wasted on a duplicate', () => {
-    const params = (preset.ccMappings ?? []).map((m) => m.param);
-    expect(new Set(params).size, 'a CC target is assigned twice').toBe(params.length);
+  it('no continuous control is wasted on a duplicate WITHIN a layer', () => {
+    // Across layers a duplicate is the POINT: Layer B mirrors Layer A's
+    // encoders, so the bus tone is under the same knob whichever bank you are
+    // on — "there is no reason to not mirror everything but the buttons to
+    // bank b" (2026-09-23). Within one layer it is still waste.
+    const layerA = (preset.ccMappings ?? []).filter((m) => m.cc < 27 || (m.cc >= 101 && m.cc <= 109));
+    const params = layerA.map((m) => m.param);
+    expect(new Set(params).size, 'a CC target is assigned twice on Layer A').toBe(params.length);
   });
 
   it('the pushes are echo presets and one-shots, never a move you hold', () => {
@@ -102,11 +107,30 @@ describe('encoders carry continuous parameters, pushes carry momentary ones', ()
   });
 });
 
-describe('Layer B carries what Layer A had no room for', () => {
-  it('the moves that did not fit', () => {
-    expect([71, 72, 73, 74].map(paramOf)).toEqual([
-      'dub.transportTapeStop', 'dub.skankEchoThrow', 'dub.skankFloatThrow', 'dub.channelThrow',
+describe('Layer B mirrors the knobs, extends the faders, and changes the buttons', () => {
+  it('button row 1 is the per-channel ops — what the layer switch is FOR', () => {
+    // Layer A plays the global moves; Layer B plays the channel moves, on the
+    // channel your hand is on. Eight ops, eight buttons. Mute is not among
+    // them because the row at the bottom of the device already is the mutes.
+    expect(Array.from({ length: 8 }, (_, i) => paramOf(71 + i))).toEqual([
+      'dub.channelThrow', 'dub.echoThrow', 'dub.skankEchoThrow', 'dub.skankFloatThrow',
+      'dub.dubStab', 'dub.echoBuildUp', 'dub.bassEmphasis', 'dub.transportTapeStop',
     ]);
+  });
+
+  it('the encoders play the same bus parameters as Layer A', () => {
+    // Switching bank must not move your hands off the bus tone.
+    for (let i = 0; i < 8; i++) {
+      expect(ccOf(37 + i)?.param, `top encoder ${i + 1}`).toBe(ccOf(10 + i)?.param);
+    }
+  });
+
+  it('the select row mutes the second bank, matching its faders', () => {
+    for (let i = 0; i < 8; i++) expect(paramOf(95 + i)).toBe(`dub.channelMute.ch${8 + i}`);
+  });
+
+  it('the fader touch continues into the second bank too', () => {
+    for (let i = 0; i < 8; i++) expect(ccOf(111 + i)?.param).toBe(`dub.channelTouch.ch${8 + i}`);
   });
 
   it('mixer solo and mute, a row each', () => {
