@@ -14,6 +14,7 @@
  * infinite capture loop.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { useDubStore } from '@/stores/useDubStore';
 import { fire, setDubBusForRouter } from '../DubRouter';
 import { startDubRecorder } from '../DubRecorder';
 import { useAutomationStore } from '@/stores/useAutomationStore';
@@ -94,6 +95,10 @@ describe('DubRecorder — automation store write path', () => {
     installPatterns();
     useAutomationStore.setState((s) => ({ ...s, curves: [] }));
     setRow(0);
+    // These tests are about WHAT gets captured; arming is tested on its own
+    // below. Without this they would all pass for the wrong reason once the
+    // arm gate exists.
+    useDubStore.setState({ armed: true });
     unsubRecorder = startDubRecorder();
   });
 
@@ -158,7 +163,34 @@ describe('DubRecorder — automation store write path', () => {
     expect(curve!.points.some(p => p.row === 20 && p.value === 0)).toBe(true);
   });
 
-  it('writes regardless of armed state', () => {
+  /**
+   * The arm gate, reversed back in on 2026-09-22.
+   *
+   * `628d70f18` (April) stated "Armed state no longer gates recording" with no
+   * reason given, and this test pinned that. The cost was measured over a
+   * whole evening: every press made while simply trying the deck out was
+   * written into the pattern as `dub.*` automation and replayed for ever,
+   * arriving as "i turned autodub off but he keeps going" (it was off),
+   * "are you pushing the buttons now they are firing like crazy" (nobody
+   * was), and "version drop only works sometimes" (a recorded hold latched
+   * for 60 s). The REC button meanwhile only CLEARED curves, while its own
+   * label said "Arm recording" — so the control lied about what it did.
+   */
+  it('captures nothing until REC is armed', () => {
+    useDubStore.setState({ armed: false });
+    setRow(8);
+    fire('echoThrow', 0);
+
+    const cell = getCell(0, 8);
+    expect(
+      cell.effTyp,
+      'an unarmed deck recorded a press — this is the ghost'
+    ).toBeUndefined();
+    expect(getCurves('p0', 0).some(c => c.parameter === 'dub.echoThrow')).toBe(false);
+  });
+
+  it('captures once REC is armed', () => {
+    useDubStore.setState({ armed: true });
     setRow(8);
     fire('echoThrow', 0);
     // echoThrow on channel 0 → effect cell on (ch 0, row 8)
