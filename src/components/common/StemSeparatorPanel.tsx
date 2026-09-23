@@ -205,7 +205,7 @@ export const StemSeparatorPanel: React.FC<StemSeparatorPanelProps> = ({
               className={`px-1.5 py-1 rounded border text-[9px] font-bold font-mono tracking-wider transition-all ${
                 selectedModel === '6s'
                   ? 'border-amber-500 bg-amber-900/20 text-amber-400'
-                  : 'border-dark-borderLight bg-dark-bgTertiary text-text-tertiary hover:text-text-secondary'
+                  : 'border-dark-borderLight bg-dark-bgTertiary text-text-muted hover:text-text-secondary'
               }`}
               title={
                 selectedModel === '6s'

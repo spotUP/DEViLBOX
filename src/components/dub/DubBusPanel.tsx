@@ -1016,7 +1016,7 @@ export const DubBusPanel: React.FC<{ inline?: boolean }> = ({ inline = false }) 
         className={`px-2.5 py-1 text-xs font-mono flex items-center gap-1 rounded border transition-colors ${
           dubBus.enabled
             ? 'bg-accent-primary/10 border-accent-primary text-accent-primary'
-            : 'bg-dark-surface border-dark-border text-text-muted hover:text-text-primary'
+            : 'bg-dark-bgSecondary border-dark-border text-text-muted hover:text-text-primary'
         }`}
       >
         <Speaker size={12} />

@@ -79,14 +79,14 @@ export const AIPanel: React.FC = () => {
         <span className="text-sm font-semibold text-text-primary">AI</span>
         <div className="flex items-center gap-1">
           {/* Provider toggle */}
-          <div className="flex items-center bg-dark-surface rounded overflow-hidden border border-dark-border mr-1">
+          <div className="flex items-center bg-dark-bgSecondary rounded overflow-hidden border border-dark-border mr-1">
             {AI_PROVIDERS.map((p) => (
               <button
                 key={p.id}
                 onClick={() => setProvider(p.id)}
                 className={`px-1.5 py-0.5 text-[10px] transition-colors ${
                   provider === p.id
-                    ? 'bg-dark-hover text-text-primary font-semibold'
+                    ? 'bg-dark-bgHover text-text-primary font-semibold'
                     : 'text-text-muted hover:text-text-primary'
                 }`}
               >
@@ -95,7 +95,7 @@ export const AIPanel: React.FC = () => {
             ))}
           </div>
           {/* Model selector */}
-          <div className="flex items-center bg-dark-surface rounded overflow-hidden border border-dark-border">
+          <div className="flex items-center bg-dark-bgSecondary rounded overflow-hidden border border-dark-border">
             {getModelsForProvider(provider).map((m) => (
               <button
                 key={m.id}

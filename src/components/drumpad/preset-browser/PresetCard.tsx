@@ -13,8 +13,8 @@ interface PresetCardProps {
 
 const CATEGORY_COLORS: Record<string, string> = {
   speech: 'bg-accent-primary/20 text-accent-primary border-accent-primary/30',
-  bass: 'bg-accent-info/20 text-accent-info border-accent-info/30',
-  lead: 'bg-accent-info/20 text-accent-info border-accent-info/30',
+  bass: 'bg-accent-highlight/20 text-accent-highlight border-accent-highlight/30',
+  lead: 'bg-accent-highlight/20 text-accent-highlight border-accent-highlight/30',
   pad: 'bg-accent-primary/20 text-accent-primary border-accent-primary/30',
   'drums-kick': 'bg-accent-error/20 text-accent-error border-accent-error/30',
   'drums-snare': 'bg-accent-error/20 text-accent-error border-accent-error/30',
