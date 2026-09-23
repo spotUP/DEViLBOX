@@ -384,12 +384,12 @@ function SingleMacroEditor({
           <span className="text-[9px] text-slate-500">{length} steps</span>
           <button
             onClick={addStep}
-            className="px-1 py-0.5 text-[9px] bg-dark-surface hover:bg-dark-border rounded"
+            className="px-1 py-0.5 text-[9px] bg-dark-bgSecondary hover:bg-dark-border rounded"
             title="Add step"
           >+</button>
           <button
             onClick={removeStep}
-            className="px-1 py-0.5 text-[9px] bg-dark-surface hover:bg-dark-border rounded"
+            className="px-1 py-0.5 text-[9px] bg-dark-bgSecondary hover:bg-dark-border rounded"
             title="Remove step"
           >-</button>
           <button
@@ -581,7 +581,7 @@ export function MAMEMacroEditor({
                   <div className="relative">
                     <button
                       onClick={() => setPresetMenuOpen(presetMenuOpen === type ? null : type)}
-                      className="text-[9px] px-1.5 py-0.5 bg-dark-surface hover:bg-dark-border rounded flex items-center gap-0.5"
+                      className="text-[9px] px-1.5 py-0.5 bg-dark-bgSecondary hover:bg-dark-border rounded flex items-center gap-0.5"
                     >
                       Presets
                       <ChevronDown size={8} />
@@ -592,7 +592,7 @@ export function MAMEMacroEditor({
                           <button
                             key={key}
                             onClick={() => applyPreset(type, key)}
-                            className="block w-full text-left px-3 py-1.5 text-[10px] hover:bg-dark-surface"
+                            className="block w-full text-left px-3 py-1.5 text-[10px] hover:bg-dark-bgSecondary"
                           >
                             {MACRO_PRESETS[key].name}
                           </button>

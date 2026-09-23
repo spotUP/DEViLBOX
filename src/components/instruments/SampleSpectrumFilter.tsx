@@ -389,7 +389,7 @@ export const SampleSpectrumFilter: React.FC<SampleSpectrumFilterProps> = ({
   ];
 
   return (
-    <div className="mt-2 border border-blue-500/20 rounded bg-surface-raised/50">
+    <div className="mt-2 border border-blue-500/20 rounded bg-dark-bgTertiary/50">
       {/* ── Preset bar ──────────────────────────────────────────── */}
       <div className="flex items-center gap-2 px-3 py-2 border-b border-blue-500/10">
         <span className="text-[10px] font-bold uppercase text-text-muted mr-1">Preset:</span>

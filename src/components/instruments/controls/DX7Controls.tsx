@@ -269,7 +269,7 @@ export const DX7Controls: React.FC<DX7ControlsProps> = ({ instrument, onChange }
               className={`px-2 py-1.5 text-[10px] rounded transition-all truncate ${
                 instrument.dx7?.vcedPreset === name
                   ? 'bg-amber-500/30 text-amber-300 ring-1 ring-amber-500/50'
-                  : 'bg-dark-bgTertiary text-text-secondary hover:bg-dark-bgQuaternary hover:text-text-primary'
+                  : 'bg-dark-bgTertiary text-text-secondary hover:bg-dark-bgTertiary hover:text-text-primary'
               }`}
               title={name}
             >
@@ -304,7 +304,7 @@ export const DX7Controls: React.FC<DX7ControlsProps> = ({ instrument, onChange }
                   className={`px-1.5 py-1 text-[9px] rounded transition-all truncate text-left ${
                     selectedVoice === i && !instrument.dx7?.vcedPreset
                       ? 'bg-amber-500/30 text-amber-300 ring-1 ring-amber-500/50 font-bold'
-                      : 'bg-dark-bgTertiary text-text-secondary hover:bg-dark-bgQuaternary hover:text-text-primary'
+                      : 'bg-dark-bgTertiary text-text-secondary hover:bg-dark-bgTertiary hover:text-text-primary'
                   }`}
                   title={`${i + 1}. ${name}`}
                 >

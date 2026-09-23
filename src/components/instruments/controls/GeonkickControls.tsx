@@ -387,7 +387,7 @@ export const GeonkickControls: React.FC<GeonkickControlsProps> = ({ config, onCh
   const preset = config.preset;
 
   return (
-    <div className="flex flex-col h-full bg-gradient-to-b from-dark-bg to-dark-bgDeep">
+    <div className="flex flex-col h-full bg-gradient-to-b from-dark-bg to-dark-bg">
       {/* Top: current voice + audition */}
       <div className="flex items-center justify-between px-4 py-2 border-b border-dark-border">
         <div className="flex items-center gap-3">

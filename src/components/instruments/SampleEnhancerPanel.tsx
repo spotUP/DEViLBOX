@@ -382,7 +382,7 @@ export const SampleEnhancerPanel: React.FC<SampleEnhancerPanelProps> = ({
             className={`flex items-center gap-1 px-2 py-1 rounded border text-[10px] font-mono transition-all ${
               previewingWhat === 'before'
                 ? 'border-violet-500 bg-violet-900/20 text-violet-400'
-                : 'border-dark-borderLight bg-dark-bgTertiary text-text-tertiary hover:text-text-secondary'
+                : 'border-dark-borderLight bg-dark-bgTertiary text-text-muted hover:text-text-secondary'
             }`}
             title="Preview original"
           >
@@ -396,7 +396,7 @@ export const SampleEnhancerPanel: React.FC<SampleEnhancerPanelProps> = ({
             className={`flex items-center gap-1 px-2 py-1 rounded border text-[10px] font-mono transition-all ${
               previewingWhat === 'after'
                 ? 'border-emerald-500 bg-emerald-900/20 text-emerald-400'
-                : 'border-dark-borderLight bg-dark-bgTertiary text-text-tertiary hover:text-text-secondary'
+                : 'border-dark-borderLight bg-dark-bgTertiary text-text-muted hover:text-text-secondary'
             }`}
             title="Preview enhanced"
           >

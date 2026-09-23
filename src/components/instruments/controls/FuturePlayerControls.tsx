@@ -239,7 +239,7 @@ export const FuturePlayerControls: React.FC<FuturePlayerControlsProps> = ({
               <span className={`text-[9px] px-1.5 py-0.5 rounded ${
                 config.hasPitchMod1
                   ? (isCyan ? 'bg-accent-highlight/20 text-accent-highlight' : 'bg-green-900/40 text-green-300')
-                  : 'bg-bg-tertiary text-text-muted'
+                  : 'bg-dark-bgTertiary text-text-muted'
               }`}>
                 {config.hasPitchMod1 ? 'Active' : 'None'}
               </span>
@@ -287,7 +287,7 @@ export const FuturePlayerControls: React.FC<FuturePlayerControlsProps> = ({
               <span className={`text-[9px] px-1.5 py-0.5 rounded ${
                 config.hasPitchMod2
                   ? (isCyan ? 'bg-accent-highlight/20 text-accent-highlight' : 'bg-green-900/40 text-green-300')
-                  : 'bg-bg-tertiary text-text-muted'
+                  : 'bg-dark-bgTertiary text-text-muted'
               }`}>
                 {config.hasPitchMod2 ? 'Active' : 'None'}
               </span>
@@ -340,7 +340,7 @@ export const FuturePlayerControls: React.FC<FuturePlayerControlsProps> = ({
               <span className={`text-[9px] px-1.5 py-0.5 rounded ${
                 config.hasSampleMod1
                   ? (isCyan ? 'bg-accent-highlight/20 text-accent-highlight' : 'bg-green-900/40 text-green-300')
-                  : 'bg-bg-tertiary text-text-muted'
+                  : 'bg-dark-bgTertiary text-text-muted'
               }`}>
                 {config.hasSampleMod1 ? 'Active' : 'None'}
               </span>
@@ -375,7 +375,7 @@ export const FuturePlayerControls: React.FC<FuturePlayerControlsProps> = ({
               <span className={`text-[9px] px-1.5 py-0.5 rounded ${
                 config.hasSampleMod2
                   ? (isCyan ? 'bg-accent-highlight/20 text-accent-highlight' : 'bg-green-900/40 text-green-300')
-                  : 'bg-bg-tertiary text-text-muted'
+                  : 'bg-dark-bgTertiary text-text-muted'
               }`}>
                 {config.hasSampleMod2 ? 'Active' : 'None'}
               </span>

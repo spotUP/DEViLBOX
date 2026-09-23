@@ -43,7 +43,7 @@ const KnobCell: React.FC<{
       color={color}
     />
     <span className="text-[10px] text-text-secondary">{label}</span>
-    <span className="text-[9px] text-text-tertiary font-mono">{value}</span>
+    <span className="text-[9px] text-text-muted font-mono">{value}</span>
   </div>
 );
 
@@ -87,7 +87,7 @@ export const SteveTurnerControls: React.FC<SteveTurnerControlsProps> = ({
             className={`px-3 py-1 text-xs rounded-t transition-colors ${
               activeTab === t.key
                 ? 'bg-accent-primary text-white'
-                : 'text-text-secondary hover:text-text-primary hover:bg-bg-tertiary'
+                : 'text-text-secondary hover:text-text-primary hover:bg-dark-bgTertiary'
             }`}
             onClick={() => setActiveTab(t.key)}
           >
@@ -95,7 +95,7 @@ export const SteveTurnerControls: React.FC<SteveTurnerControlsProps> = ({
           </button>
         ))}
         {instrumentIndex !== undefined && (
-          <span className="ml-auto text-xs text-text-tertiary self-center">
+          <span className="ml-auto text-xs text-text-muted self-center">
             Inst {instrumentIndex}
           </span>
         )}
