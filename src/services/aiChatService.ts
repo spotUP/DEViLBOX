@@ -1,6 +1,6 @@
 /**
  * AI Chat Service — SSE client that streams Claude responses.
- * Shared by both React DOM and PixiJS UI panels.
+ * Shared by the chat UI panels.
  */
 
 import { useAIStore } from '@stores/useAIStore';

@@ -771,9 +771,10 @@ export const useAutomationStore = create<AutomationStore>()(
       }),
 
     // Reset to initial state (for new project/tab)
-    // NOTE: Use direct set({}) rather than Immer producer to avoid Immer proxying
-    // the new Map. An Immer-proxied Map passed to PixiJS React causes a BindingError
-    // ("Expected null or instance of Node, got an instance of Node").
+    // NOTE: Use direct set({}) rather than an Immer producer, so the fresh Map
+    // is handed out unproxied. A consumer that stores identities out of the Map
+    // (a renderer keeping node references, say) gets the real objects back
+    // rather than draft proxies that stop matching after the next produce.
     reset: () =>
       set({
         curves: [],

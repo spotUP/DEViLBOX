@@ -1,6 +1,6 @@
 /**
  * helpContent.ts — Shared data constants for the Help system.
- * Used by both HelpModal (DOM) and PixiHelpModal (Pixi GL).
+ * Used by HelpModal.
  */
 
 // ── Types ────────────────────────────────────────────────────────────────────

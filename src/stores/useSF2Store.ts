@@ -3,7 +3,7 @@
  *
  * Manages the complete SF2 song state including driver info, sequences,
  * order lists, instrument data, and driver-defined tables.
- * Both DOM (SF2View) and Pixi (PixiSF2View) consume this store via
+ * SF2View consumes this store via
  * the shared useSF2FormatData hook.
  *
  * Unlike GT Ultra which reads data from WASM heap, SF2 data lives entirely

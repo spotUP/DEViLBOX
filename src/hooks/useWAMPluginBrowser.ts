@@ -2,7 +2,7 @@
  * useWAMPluginBrowser — Shared hook for WAM plugin browsing and loading.
  *
  * Provides grouped/filtered plugin lists from the curated registry.
- * Used by both DOM and Pixi WAM browser components.
+ * Used by the WAM browser components.
  */
 
 import { useMemo, useState } from 'react';

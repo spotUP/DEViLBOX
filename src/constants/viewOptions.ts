@@ -2,7 +2,7 @@
  * Shared view switching constants and logic.
  *
  * !! SINGLE SOURCE OF TRUTH for all view definitions !!
- * NavBar, MobileMenu, MobileTabBar, SplitView, VJView, PixiNavBar all consume this.
+ * NavBar, MobileMenu, MobileTabBar, SplitView and VJView all consume this.
  */
 
 import { useUIStore } from '@stores/useUIStore';

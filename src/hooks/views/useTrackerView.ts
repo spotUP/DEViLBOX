@@ -1,14 +1,11 @@
 // src/hooks/views/useTrackerView.ts
 /**
- * useTrackerView — Shared logic hook for TrackerView (DOM) and
- * PixiTrackerView (Pixi/WebGL).
+ * useTrackerView — Logic hook for TrackerView.
  *
- * Both views call this hook and keep only their renderer-specific markup.
- * Shared: keyboard hooks, view-mode state, editor mode, MusicLine export.
+ * Holds: keyboard hooks, view-mode state, editor mode, MusicLine export.
  *
- * NOT shared (kept in each view):
- *  - DOM: dialog states, keyboard shortcut handlers, mobile layout, pop-out
- *  - Pixi: window dimension calculations, panel heights, overlay visibility
+ * Kept in the view itself: dialog states, keyboard shortcut handlers, mobile
+ * layout, pop-out.
  */
 
 import { useCallback } from 'react';

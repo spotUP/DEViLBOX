@@ -1,7 +1,7 @@
 /**
- * Centralized semantic color constants for PixiJS components.
+ * Centralized semantic color constants.
  *
- * Theme-dependent colors (bg, text, borders) come from usePixiTheme().
+ * Theme-dependent colors (bg, text, borders) come from the theme store.
  * These are domain-specific colors that stay consistent across themes.
  */
 

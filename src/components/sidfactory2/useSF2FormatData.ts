@@ -2,7 +2,7 @@
  * useSF2FormatData — Shared hook for SID Factory II pattern data.
  *
  * Converts SF2 store state to FormatChannel[] and provides a cell change
- * handler. Used by both DOM (SF2View) and Pixi (PixiSF2View) to avoid
+ * handler. Used by SF2View to avoid
  * duplicating adapter logic.
  */
 

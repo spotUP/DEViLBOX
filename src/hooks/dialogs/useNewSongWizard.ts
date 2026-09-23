@@ -1,12 +1,11 @@
 // src/hooks/dialogs/useNewSongWizard.ts
 /**
- * useNewSongWizard — Shared logic hook for NewSongWizard (DOM) and PixiNewSongWizard (Pixi).
+ * useNewSongWizard — Logic hook for NewSongWizard.
  *
- * Both dialogs call this hook and keep only their renderer-specific markup.
- * All store subscriptions, local state, and handlers live here.
+ * The dialog keeps only its markup; all store subscriptions, local state and
+ * handlers live here.
  *
- * DOM reference:   src/components/dialogs/NewSongWizard.tsx
- * Pixi reference:  src/pixi/dialogs/PixiNewSongWizard.tsx
+ * Dialog: src/components/dialogs/NewSongWizard.tsx
  */
 
 import { useState, useCallback } from 'react';
@@ -53,8 +52,8 @@ export function useNewSongWizard() {
    * Standard (non-template) finish: creates a new tab, applies system preset,
    * optionally loads starter instruments, tracks active system.
    *
-   * The Pixi variant has an additional template-file code path that it handles
-   * before calling this — this function handles only the shared non-template flow.
+   * The template-file path is handled by the caller before this runs — this
+   * function handles only the non-template flow.
    */
   const finishStandard = useCallback(
     (mode: StartMode, loadInstruments: boolean, presetId: string) => {
