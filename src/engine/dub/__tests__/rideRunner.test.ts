@@ -7,13 +7,16 @@ import {
   RIDE_CEILING_MS,
   type ActiveRide,
 } from '../rideRunner';
-import type { AutoDubRide } from '../chooseRide';
+import { clampRide, type AutoDubRide } from '../chooseRide';
 
 const ride = (over: Partial<AutoDubRide> = {}): AutoDubRide => ({
   param: 'dub.returnGain',
   target: 1,
   bars: 4,
   curve: 'linear',
+  // One-way by default in these tests, so the existing assertions read as
+  // written. The excursion behaviour has its own describe block below.
+  returns: false,
   ...over,
 });
 
@@ -161,5 +164,85 @@ describe('RideBook', () => {
     book.start(ride({ param: 'b' }), 0, 10, 1000);
     book.clear();
     expect(book.active).toHaveLength(0);
+  });
+});
+
+/**
+ * A ride comes BACK.
+ *
+ * The first version only travelled, so every ride left its parameter wherever
+ * the journey ended. A few minutes of that walks the desk into a corner: the
+ * high-pass was measured parked at 410 Hz, which takes the whole low end out
+ * of the dub send, and the owner reported "the desk is almost dead"
+ * (2026-09-23).
+ *
+ * The master plan's phrase already said it — `short send gesture -> feedback
+ * ride -> RELEASE`. A dub gesture is an excursion.
+ */
+describe('a returning ride is an excursion', () => {
+  const excursion = ride({ returns: true, target: 1, curve: 'linear' });
+
+  it('goes out and comes back', () => {
+    expect(rideValueAt(0.2, excursion, 0)).toBeCloseTo(0.2);     // starts home
+    expect(rideValueAt(0.2, excursion, 0.5)).toBeCloseTo(1);     // out at the top
+    expect(rideValueAt(0.2, excursion, 1)).toBeCloseTo(0.2);     // home again
+  });
+
+  it('ends exactly where it started, not near it', () => {
+    const out = tickRide(active({ ride: excursion, from: 0.2 }), at(14));
+    expect(out.kind).toBe('done');
+    expect(out.kind === 'done' && out.value).toBe(0.2);
+  });
+
+  it('leaves a one-way ride on its target', () => {
+    // A channel send may be LEFT open — that is a real dub decision, and the
+    // performer's own fader is what undoes it.
+    const out = tickRide(active({ ride: ride({ returns: false }) }), at(14));
+    expect(out.kind === 'done' && out.value).toBe(1);
+  });
+
+  it('never parks the high-pass where the low end is gone', () => {
+    // 20 + 0.25 * 980 = 265 Hz. Above that the dub send has no low end to
+    // put into the echo, which is the entire point of the send.
+    const clamped = clampRide({
+      param: 'dub.hpfCutoff', target: 1, bars: 8, curve: 'step', returns: true,
+    });
+    expect(clamped.target).toBeLessThanOrEqual(0.25);
+  });
+});
+
+/**
+ * An interrupted ride gives its parameter back.
+ *
+ * Dropping rides on the floor is not enough. Two failures on 2026-09-23, both
+ * from a ride that stopped mid-journey and left its parameter where it lay:
+ *
+ *  - A one-way high-pass ride persisted 410 Hz into the SAVED settings, so the
+ *    next song booted with the whole low end filtered out of the dub send.
+ *  - Rides that had opened channel sends left those channels routed into a bus
+ *    that was then unwired, and all audio went silent.
+ */
+describe('releaseAll hands every parameter back', () => {
+  it('returns each ride to where the hand found it', () => {
+    const book = new RideBook();
+    book.start(ride({ param: 'dub.hpfCutoff', target: 1 }), 0.04, 10, 1000);
+    book.start(ride({ param: 'dub.channelSend.ch1', target: 0.85 }), 0, 10, 1000);
+
+    expect(book.releaseAll()).toEqual([
+      { param: 'dub.hpfCutoff', value: 0.04 },
+      { param: 'dub.channelSend.ch1', value: 0 },
+    ]);
+  });
+
+  it('empties the book, so nothing keeps writing after the stop', () => {
+    const book = new RideBook();
+    book.start(ride(), 0.3, 10, 1000);
+    book.releaseAll();
+    expect(book.active).toHaveLength(0);
+    expect(book.tick(at(12))).toHaveLength(0);
+  });
+
+  it('is safe with nothing in flight', () => {
+    expect(new RideBook().releaseAll()).toEqual([]);
   });
 });
