@@ -48,7 +48,7 @@ export function isFaderTouched(faderCC: number): boolean {
   return _faderTouched.get(faderCC) ?? false;
 }
 
-class DJControllerMapper {
+export class DJControllerMapper {
   private static instance: DJControllerMapper | null = null;
 
   private activePreset: DJControllerPreset | null = null;
@@ -60,6 +60,8 @@ class DJControllerMapper {
   private noteLookup = new Map<string, DJControllerNoteMapping>();
   private jogCCs = new Set<string>();       // "channel:cc" keys for jog wheel CCs
   private jogTouchNotes = new Map<string, 'A' | 'B' | 'C'>(); // "channel:note" → deck
+  /** Union of noteLookup and jogTouchNotes keys — see `ownedNotes()`. */
+  private ownedNoteKeys = new Set<string>();
 
   // Active loop roll state for noteOff handling
   private activeLoopRolls = new Map<string, {
@@ -100,6 +102,7 @@ class DJControllerMapper {
     this.noteLookup.clear();
     this.jogCCs.clear();
     this.jogTouchNotes.clear();
+    this.ownedNoteKeys.clear();
     resetDJSoftTakeover();
 
     if (preset) {
@@ -115,6 +118,7 @@ class DJControllerMapper {
       // Build note lookup: "channel:note" → mapping
       for (const m of preset.noteMappings) {
         this.noteLookup.set(`${m.channel}:${m.note}`, m);
+        this.ownedNoteKeys.add(`${m.channel}:${m.note}`);
       }
 
       // Build jog wheel lookup
@@ -124,9 +128,11 @@ class DJControllerMapper {
         this.jogCCs.add(`${deckB.channel}:${deckB.cc}`);
         if (deckA.touchNote !== undefined) {
           this.jogTouchNotes.set(`${deckA.channel}:${deckA.touchNote}`, 'A');
+          this.ownedNoteKeys.add(`${deckA.channel}:${deckA.touchNote}`);
         }
         if (deckB.touchNote !== undefined) {
           this.jogTouchNotes.set(`${deckB.channel}:${deckB.touchNote}`, 'B');
+          this.ownedNoteKeys.add(`${deckB.channel}:${deckB.touchNote}`);
         }
       }
 
@@ -141,6 +147,21 @@ class DJControllerMapper {
   /** True when a DJ controller preset is active (so useMIDIStore should skip DJ knob bank routing) */
   hasActivePreset(): boolean {
     return this.activePreset !== null;
+  }
+
+  /**
+   * Every note the active preset treats as a BUTTON or a jog touch, as
+   * "channel:note" keys.
+   *
+   * This is what lets `useMIDIStore` keep a controller's buttons off the
+   * instrument. `hasActivePreset()` was the only query it had, and the note
+   * path had no gate at all: an X-Touch button is a note-on at 127, and on
+   * 2026-09-23 one struck a Hively player that a song load had already torn
+   * down, so the note-off found nothing and it rang until the panic button.
+   * Rebuilt on every `setPreset`, so a cleared preset claims nothing.
+   */
+  ownedNotes(): ReadonlySet<string> {
+    return this.ownedNoteKeys;
   }
 
   /**
