@@ -3,6 +3,7 @@
  */
 
 import React from 'react';
+import { resolveControlTone, type ControlTone } from '@components/ui/controlColor';
 import { useThemeStore } from '@stores';
 
 interface ToggleProps {
@@ -10,6 +11,14 @@ interface ToggleProps {
   value: boolean;
   onChange: (value: boolean) => void;
   color?: string;
+  /**
+   * The control's colour, by NAME.
+   *
+   * Prefer this over `color`. A name follows the theme; a hex does not, and
+   * 1,822 call sites passing raw hex is why these controls stopped matching
+   * the rest of DEViLBOX. `tone` wins when both are given.
+   */
+  tone?: ControlTone;
   size?: 'sm' | 'md';
   disabled?: boolean;
   title?: string;
@@ -20,7 +29,8 @@ export const Toggle: React.FC<ToggleProps> = React.memo(({
   label,
   value,
   onChange,
-  color: colorProp = '#00d4aa',
+  color: colorProp,
+  tone,
   size = 'md',
   disabled = false,
   title,
@@ -28,7 +38,8 @@ export const Toggle: React.FC<ToggleProps> = React.memo(({
   // Theme-aware colors: use cyan for cyan-lineart theme
   const currentThemeId = useThemeStore((state) => state.currentThemeId);
   const isCyanTheme = currentThemeId === 'cyan-lineart';
-  const color = isCyanTheme ? '#00ffff' : colorProp;
+  const resolvedColor = resolveControlTone(tone, colorProp, '#00d4aa');
+  const color = isCyanTheme ? '#00ffff' : resolvedColor;
   const offBgColor = isCyanTheme ? '#0a1a1f' : '#1a1a1f';
   const offBorderColor = isCyanTheme ? '#0a3333' : 'var(--color-border-light)';
   const thumbOffColor = isCyanTheme ? '#0a6666' : '#666';

@@ -10,6 +10,7 @@
  */
 
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import type { ControlTone } from '@components/ui/controlColor';
 import { subscribeToParamLiveValue } from '@/midi/performance/parameterRouter';
 
 interface FaderProps {
@@ -33,6 +34,15 @@ interface FaderProps {
 
   /** Token for the filled-track color (design tokens only). */
   color?: 'accent-primary' | 'accent-secondary' | 'accent-success' | 'accent-warning' | 'accent-error' | 'accent-highlight';
+  /**
+   * The same colour vocabulary the other controls take.
+   *
+   * `Fader` already took token names rather than hex, so it was never the
+   * problem `Knob` was — but a caller should not have to remember that one
+   * control spells it `accent-primary` and its neighbours spell it `primary`.
+   * `tone` wins when both are given.
+   */
+  tone?: ControlTone;
 
   label?: string;
   title?: string;
@@ -57,6 +67,17 @@ const SIZE_PX: Record<NonNullable<FaderProps['size']>, { w: number; h: number; t
   lg: { w: 22, h: 120, thumbH: 18 },
 };
 
+/** The shared tone names, onto this component's own fill tokens. */
+const TONE_TO_FILL: Record<ControlTone, NonNullable<FaderProps['color']>> = {
+  primary: 'accent-primary',
+  secondary: 'accent-secondary',
+  highlight: 'accent-highlight',
+  warning: 'accent-warning',
+  error: 'accent-error',
+  success: 'accent-success',
+  neutral: 'accent-primary',
+};
+
 const COLOR_FILL: Record<NonNullable<FaderProps['color']>, string> = {
   'accent-primary':   'bg-accent-primary',
   'accent-secondary': 'bg-accent-secondary',
@@ -68,13 +89,15 @@ const COLOR_FILL: Record<NonNullable<FaderProps['color']>, string> = {
 
 export const Fader: React.FC<FaderProps> = React.memo(({
   value, min = 0, max = 1, onChange,
-  size = 'md', color = 'accent-primary', fillHeight = false,
+  size = 'md', color, tone, fillHeight = false,
   label, title, disabled = false,
   formatValue,
   paramKey, imperativeSubscribe,
   doubleClickValue,
 }) => {
   const { w, h, thumbH } = SIZE_PX[size];
+  /** `tone` maps onto the existing token names; neither given means primary. */
+  const fillToken = tone ? TONE_TO_FILL[tone] : (color ?? 'accent-primary');
 
   /** Track height in px, live — `h` is only the fallback before first layout. */
   const trackHeight = useCallback(
@@ -253,7 +276,7 @@ export const Fader: React.FC<FaderProps> = React.memo(({
         {/* Fill — grows upward from the bottom of the track */}
         <div
           ref={fillRef}
-          className={`absolute bottom-0 left-0 right-0 ${COLOR_FILL[color]} transition-none pointer-events-none`}
+          className={`absolute bottom-0 left-0 right-0 ${COLOR_FILL[fillToken]} transition-none pointer-events-none`}
           style={{ height: '0%' }}
         />
         {/* Unity tick (only when min=0 / max=1 / default 1 is visible; cosmetic) */}
