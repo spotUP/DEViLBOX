@@ -217,6 +217,21 @@ class MIDIManager {
   }
 
   /**
+   * The raw output port whose name matches, for a surface that talks back.
+   *
+   * Feedback to a controller — lighting its buttons to show what is latched —
+   * needs the port itself, not a description of it. `KKLightGuide` reaches
+   * into `MIDIAccess` for its own port; this spares the next one from doing
+   * the same.
+   */
+  findOutputByName(match: (name: string) => boolean): MIDIOutput | null {
+    for (const output of this.outputs.values()) {
+      if (match(output.name ?? '')) return output;
+    }
+    return null;
+  }
+
+  /**
    * Auto-detect TD-3 devices
    */
   detectTD3Devices(): { input: MIDIDeviceInfo | null; output: MIDIDeviceInfo | null } {
