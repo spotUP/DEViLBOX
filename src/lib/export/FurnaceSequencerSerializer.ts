@@ -142,6 +142,7 @@ export async function uploadFurnaceToSequencer(
     // sysDef=9ch but dispatch=13ch). The order table uses the sysDef count, so the
     // sequencer channel mapping must match.
     let chanOffset = 0;
+    let posted = 0;
     for (let ci = 0; ci < native.chipIds.length; ci++) {
       const chipId = native.chipIds[ci];
       // Use parser's channel count (sysDef), falling back to dispatch count
@@ -155,10 +156,28 @@ export async function uploadFurnaceToSequencer(
           subIdx,
           handle: chipHandle,
         });
+        posted++;
       }
       chanOffset += chipChans;
     }
-    console.log(`[FurnaceSequencer] Uploaded chip types for ${chanOffset} channels`);
+    // POSTED, not `chanOffset`. The old line reported what the loop intended
+    // to map rather than what it sent, so it read "chip types for 17 channels"
+    // on a 13-channel song (the guard had stopped at 13), and "for 0 channels"
+    // when the chips did not exist yet — two numbers that describe neither the
+    // song nor the upload.
+    console.log(`[FurnaceSequencer] Uploaded chip types for ${posted}/${numChannels} channels`);
+    if (posted === 0) {
+      // No channel carries a chip, so the sequencer has nowhere to send a
+      // note. It happens when this runs before the chips are created — the
+      // song upload at parse time, ahead of `startWithCoordinator` — and is
+      // harmless only because a later upload repeats it. If that later one
+      // ever stops arriving, this is the line that says why the song is mute.
+      console.warn(
+        '[FurnaceSequencer] no channel→chip mapping was uploaded '
+        + `(${native.chipIds.length} chips, ${numChannels} channels). `
+        + 'The chips are probably not created yet; the sequencer cannot route a note until they are.',
+      );
+    }
   }
 
   console.log(`[FurnaceSequencer] Uploaded: ${numChannels}ch, ${patLen} rows, ${ordersLen} orders`);
