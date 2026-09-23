@@ -33,11 +33,23 @@ export interface UADEModule {
   _uade_wasm_set_looping(loop: number): void;
   _uade_wasm_set_one_subsong(on: number): void;
   _uade_wasm_get_total_frames(): number;
+  /** Put one file into the WASM filesystem so a player's DTP_ExtLoad can open it. */
+  _uade_wasm_add_extra_file(namePtr: number, dataPtr: number, len: number): number;
+  /** Which eagleplayer accepted the module ("Protracker and family", "AHX v2", …). */
+  _uade_wasm_get_player_name(bufPtr: number, maxLen: number): void;
+  /** The player's own words for the variant ("type: Noisetracker 2.x"). */
+  _uade_wasm_get_format_name(bufPtr: number, maxLen: number): void;
+  _uade_wasm_get_subsong_min(): number;
+  _uade_wasm_get_subsong_max(): number;
+  _uade_wasm_get_subsong_count(): number;
+  /** 16 uint32 at bufPtr: per channel period, volume, dma, loop pointer. */
+  _uade_wasm_get_channel_snapshot(bufPtr: number): void;
   _malloc(size: number): number;
   _free(ptr: number): void;
   HEAPU8: Uint8Array;
   HEAPF32: Float32Array;
   stringToUTF8(str: string, ptr: number, maxBytes: number): void;
+  UTF8ToString(ptr: number, maxBytesToRead?: number): string;
 }
 
 /**
@@ -45,7 +57,10 @@ export interface UADEModule {
  * eagleplayers call unguarded exit(1) which corrupts Emscripten module state, so a
  * per-file instance guarantees clean IPC state.
  */
-export async function loadUADEModule(verbose = false): Promise<UADEModule> {
+export async function loadUADEModule(
+  verbose = false,
+  onPrint?: (line: string, isErr: boolean) => void,
+): Promise<UADEModule> {
   const wasmBuf = readFileSync(UADE_WASM_PATH);
   const wasmBinary = wasmBuf.buffer.slice(
     wasmBuf.byteOffset,
@@ -101,9 +116,12 @@ export async function loadUADEModule(verbose = false): Promise<UADEModule> {
     mod = await createUADE({
       wasmBinary,
       locateFile: (path: string) => (path.endsWith('.wasm') ? UADE_WASM_PATH : path),
-      print: (text: string) => { if (verbose) console.log('[UADE]', text); },
-      printErr: (text: string) => { if (verbose) console.error('[UADE ERR]', text); },
-      onAbort: (reason: string) => { console.error('[UADE ABORT]', reason); },
+      // UADE says WHY it refused a module on these two streams ("load: file not
+      // found: smp.x"), and that line is the difference between "the format is
+      // broken" and "the sample file is missing". onPrint hands it to the caller.
+      print: (text: string) => { onPrint?.(text, false); if (verbose) console.log('[UADE]', text); },
+      printErr: (text: string) => { onPrint?.(text, true); if (verbose) console.error('[UADE ERR]', text); },
+      onAbort: (reason: string) => { onPrint?.(`abort: ${reason}`, true); console.error('[UADE ABORT]', reason); },
     });
   } finally {
     WebAssembly.instantiate = origInstantiate;
@@ -122,7 +140,7 @@ export async function loadUADEModule(verbose = false): Promise<UADEModule> {
 }
 
 /** Refresh heap views if WASM memory grew. */
-function refreshHeap(mod: UADEModule): void {
+export function refreshHeap(mod: UADEModule): void {
   const mem = (mod as unknown as Record<string, unknown>)._wasmMemory as WebAssembly.Memory | undefined;
   if (!mem) return;
   const buf = mem.buffer;
@@ -139,6 +157,89 @@ export interface RenderResult {
   frames: number;
 }
 
+/** One file to put beside the module, named the way the player will open it. */
+export interface Companion {
+  /** Relative name, e.g. `smpl.turrican_bonus` or `instr/perc1.x`. */
+  name: string;
+  data: Uint8Array;
+}
+
+/**
+ * Register companion files in the WASM filesystem — the same mechanism the app
+ * uses (UADE.worklet.js `_uade_wasm_add_extra_file`). A two-file format whose
+ * sidecar is absent dies exactly like a format that is broken, so anything that
+ * judges a module must put the companions there first.
+ */
+export function addCompanions(mod: UADEModule, companions: Companion[]): void {
+  for (const { name, data } of companions) {
+    const nameLen = name.length * 4 + 1;
+    const namePtr = mod._malloc(nameLen);
+    const dataPtr = mod._malloc(data.byteLength);
+    if (!namePtr || !dataPtr) throw new Error('malloc failed for companion');
+    refreshHeap(mod);
+    mod.stringToUTF8(name, namePtr, nameLen);
+    mod.HEAPU8.set(data, dataPtr);
+    const ret = mod._uade_wasm_add_extra_file(namePtr, dataPtr, data.byteLength);
+    mod._free(namePtr);
+    mod._free(dataPtr);
+    if (ret !== 0) throw new Error(`add_extra_file failed for ${name}`);
+  }
+}
+
+/** What the loaded module reports about itself. Valid only after a successful load. */
+export interface UADEMeta {
+  /** The eagleplayer that accepted it. */
+  player: string;
+  /** The player's own name for the variant; often empty. */
+  formatName: string;
+  /**
+   * The subsong range. Its MINIMUM is frequently not 0 — a harness that assumes
+   * subsong 0 exists reports a healthy module as empty.
+   */
+  subsongMin: number;
+  subsongMax: number;
+  subsongCount: number;
+}
+
+/** Read the metadata UADE publishes after a successful load. */
+export function readMeta(mod: UADEModule): UADEMeta {
+  const buf = mod._malloc(256);
+  try {
+    mod._uade_wasm_get_player_name(buf, 256);
+    const player = mod.UTF8ToString(buf);
+    mod._uade_wasm_get_format_name(buf, 256);
+    const formatName = mod.UTF8ToString(buf);
+    return {
+      player,
+      formatName,
+      subsongMin: mod._uade_wasm_get_subsong_min(),
+      subsongMax: mod._uade_wasm_get_subsong_max(),
+      subsongCount: mod._uade_wasm_get_subsong_count(),
+    };
+  } finally {
+    mod._free(buf);
+  }
+}
+
+/**
+ * How many of Paula's four channels have DMA on right now.
+ *
+ * On real hardware AUDxVOL is WRITE-ONLY, so a register read of it is junk and
+ * DMA state is the only honest audibility signal (Up Rough measured all four
+ * volumes reading 0 on a build that was audibly playing). Here the snapshot
+ * comes out of the emulator's own state rather than a bus read, so volume would
+ * in fact be readable — but DMA stays the reported figure, because it is what
+ * the device-side twin can measure and the two tables must compare.
+ */
+export function channelsWithDma(mod: UADEModule, snapshotPtr: number): number {
+  mod._uade_wasm_get_channel_snapshot(snapshotPtr);
+  refreshHeap(mod);
+  const snap = new Uint32Array(mod.HEAPU8.buffer, snapshotPtr, 16);
+  let on = 0;
+  for (let ch = 0; ch < 4; ch++) if (snap[ch * 4 + 2]) on++;
+  return on;
+}
+
 /**
  * Render `data` (a module file) to interleaved float32 samples. Loads into a
  * caller-supplied module instance (use a fresh one per file). One-subsong mode with
@@ -148,7 +249,13 @@ export async function renderToSamples(
   mod: UADEModule,
   data: Uint8Array,
   filename: string,
-  opts: { sampleRate: number; seconds: number; chunkSize?: number },
+  opts: {
+    sampleRate: number;
+    seconds: number;
+    chunkSize?: number;
+    /** Called after every rendered chunk — sample chip state here, not after the fact. */
+    onChunk?: (mod: UADEModule, framesSoFar: number) => void;
+  },
 ): Promise<RenderResult> {
   const { sampleRate, seconds } = opts;
   const chunkSize = opts.chunkSize ?? DEFAULT_CHUNK_SIZE;
@@ -198,6 +305,7 @@ export async function renderToSamples(
       allSamples.push(heapF32[indexR + i]);
     }
     totalFrames += chunk;
+    opts.onChunk?.(mod, totalFrames);
   }
 
   mod._free(ptrL);

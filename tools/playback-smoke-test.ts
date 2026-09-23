@@ -68,6 +68,14 @@
  *   REFERENCE_MUSIC     Local test music path (default /Users/spot/Code/Reference Music)
  *
  * === OTHER AUDIT SCRIPTS IN THIS REPO ===
+ *   tools/uade-audit/corpus-sweep.ts
+ *                                — the HEADLESS twin of this script: no browser,
+ *                                  no dev server, no sound. Renders every file
+ *                                  in public/data/songs/formats through the UADE
+ *                                  WASM in ~25s and tables refused / silent /
+ *                                  instant-end / short / missing-sidecar. Run it
+ *                                  FIRST: it tells you which songs are worth
+ *                                  opening a browser for. `npm run sound-check`
  *   tools/pc-tracker-audit.ts    — deep 10-point audit for 23 OpenMPT PC formats
  *   tools/soak-test.ts           — 2+ hour endurance test for pre-gig stability
  *   tools/furnace-audit/         — lock-step command comparison for Furnace chips
