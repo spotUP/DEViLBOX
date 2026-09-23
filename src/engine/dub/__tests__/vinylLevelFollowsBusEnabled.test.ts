@@ -51,6 +51,8 @@ describe('DubBus wiring contract', () => {
   });
 
   it('resolves the applied level through resolveVinylLevel, not an inline ternary', () => {
-    expect(src).toContain('resolveVinylLevel(this.enabled, this._desiredVinylLevel)');
+    // The record-spinning flag joined the call on 2026-09-23 ("the vinyl noise keep
+    // playing when i stop the song"); the level still resolves through the rule.
+    expect(src).toContain('resolveVinylLevel(this.enabled, this._desiredVinylLevel, this._vinylSpinning)');
   });
 });
