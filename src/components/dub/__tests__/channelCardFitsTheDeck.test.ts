@@ -56,10 +56,22 @@ describe('the channel card fits the deck', () => {
   });
 
   it('narrows the channel strip to the width the hardware gives a channel', () => {
-    expect(DECK).toMatch(/rounded border w-36 shrink-0 transition-colors/);
+    // The width is the CALLER's now: the deck's own layout flows strips in a
+    // row at a fixed 144 px, and the controller layout puts each strip in its
+    // fader's grid column, where it fills that column exactly. A channel is
+    // one column on the device — button above, fader, mute below — so the
+    // strip cannot carry a width of its own and still line up.
+    expect(DECK).toMatch(/renderChannelCard = \(i: number, widthClass = 'w-36 shrink-0'\)/);
+    expect(DECK).toMatch(/rounded border \$\{widthClass\} transition-colors/);
     expect(DECK, 'a strip as wide as the op panel is the old rack').not.toMatch(
       /rounded border w-56 shrink-0 transition-colors/,
     );
+  });
+
+  it('gives the master its own strip for the ninth column', () => {
+    // The master fader is at x 16 on the device, right of the eight channels,
+    // with its own button under it: a ninth column the same width as the rest.
+    expect(DECK).toMatch(/renderMasterStrip = \(widthClass = 'w-36 shrink-0'\)/);
   });
 
   it('stacks the role select and the filter select, which do not fit side by side at 144 px', () => {
@@ -84,8 +96,11 @@ describe('the channel card fits the deck', () => {
  * a fixed width so the fader column never changes width with the value.
  */
 describe('the fader readout does not resize the card', () => {
-  it('gives both readouts a fixed width', () => {
+  it('gives every send readout a fixed width', () => {
+    // Fixed, or "100%" is wider than "15%" and the fader column grows at full
+    // send, squeezing what is beside it. Three now: the channel strip, the
+    // master strip for the ninth column, and the deck's own master card.
     const readouts = DECK.match(/className="w-7 text-center tabular-nums text-\[9px\] font-mono/g) ?? [];
-    expect(readouts.length, 'master + channel').toBe(2);
+    expect(readouts.length, 'channel + master strip + master card').toBe(3);
   });
 });
