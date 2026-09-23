@@ -48,6 +48,24 @@ describe('useSettingsStore — persist migration', () => {
     expect(s.modplugSeparation).toBe(50);
   });
 
+  it('v8 \u2192 v9: the deleted WebGL-UI shader keys are dropped, neighbours survive', async () => {
+    seed(8, {
+      masterTuning: 432,
+      wobbleWindows: true,
+      crtEnabled: true,
+      crtParams: { scanlineIntensity: 0.9, curvature: 0.4 },
+      lensEnabled: true,
+      lensPreset: 'fisheye',
+      lensParams: { barrel: 0.7, chromatic: 0.3, vignette: 0.5 },
+    });
+    const s = (await freshLoad()) as unknown as Record<string, unknown>;
+    for (const key of ['wobbleWindows', 'crtEnabled', 'crtParams', 'lensEnabled', 'lensPreset', 'lensParams']) {
+      expect(s[key], `${key} survived the v9 migration`).toBeUndefined();
+    }
+    // An unrelated persisted setting is untouched by the drop.
+    expect(s.masterTuning).toBe(432);
+  });
+
   it('unknown future version (version > current) loads without crashing', async () => {
     seed(99, { stereoSeparation: 70, formatEngine: { mod: 'uade' } });
     // Downgrading from a future version shouldn't throw — persist layer
