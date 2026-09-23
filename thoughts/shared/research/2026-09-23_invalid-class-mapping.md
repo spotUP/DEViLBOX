@@ -30,7 +30,7 @@ This is a defect list, not a style list. Fixing one repairs a visible bug.
 | `bg-accent-info` | 6 | `bg-accent-highlight` | as above, opacity suffix preserved |
 | `border-accent-info` | 5 | `border-accent-highlight` | as above |
 | `bg-bg-tertiary` | 7 | `bg-dark-bgTertiary` | same family CLAUDE.md warns about |
-| `bg-accent-primaryHover` | 7 | `hover:bg-accent-primary` | a state, not a colour — read the context and put it in the right variant |
+| `bg-accent-primaryHover` | 7 | `hover:bg-accent-primary/80` | see the correction below |
 | `border-dark-borderHover` | 6 | `hover:border-dark-borderLight` | as above |
 | `text-text-subtle` | 3 | `text-text-muted` | |
 | `bg-dark-hover` | 3 | `bg-dark-bgHover` | |
@@ -58,3 +58,31 @@ This is a defect list, not a style list. Fixing one repairs a visible bug.
   conditional "is hovered" branch, it just becomes the base colour.
 - Do not fix anything else while in there. No token migration, no component
   swaps. One defect class at a time keeps the diff reviewable.
+
+
+## Correction — `*Hover` on a base of the same colour (2026-09-23)
+
+The first version of this table sent `bg-accent-primaryHover` to
+`hover:bg-accent-primary`. On the common shape that is wrong:
+
+```
+bg-accent-primary hover:bg-accent-primaryHover
+  -> bg-accent-primary hover:bg-accent-primary
+```
+
+which is a valid class that does NOTHING — the hover paints the colour already
+there, so the button loses its feedback. Caught by the agent applying the table
+to `src/components/dj/` rather than by the table's author.
+
+The theme has no `primaryHover` because it does not need one: an opacity
+suffix on the token is the idiom, and CLAUDE.md permits it explicitly.
+
+- `hover:bg-accent-primaryHover` on a `bg-accent-primary` base
+  -> `hover:bg-accent-primary/80`
+- `border-dark-borderHover` on a `border-dark-borderLight` base
+  -> `hover:border-dark-border`, which is a real difference
+- Where the base is a DIFFERENT colour, the plain token is right and no
+  opacity is needed.
+
+The rule underneath: a hover variant must change something. A state that
+resolves to its own base is a bug wearing the shape of a fix.
