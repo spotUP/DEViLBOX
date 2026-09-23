@@ -46,3 +46,51 @@ describe('bufferRms', () => {
     expect(bufferRms(new Float32Array(0))).toBe(0);
   });
 });
+
+/**
+ * A held wet gesture is the performer overriding the safety.
+ *
+ * 0c158b836 stopped the governor TIGHTENING while a gesture is held. It did
+ * nothing about a clamp earned before the press: four sends at 0.96 through a
+ * 0.79-feedback echo is +20 dB, the governor goes to its -18 dB floor, and
+ * the rider then releases at 0.15 dB per 250 ms tick — thirty seconds, after
+ * eight ticks of hold. Every toggle pressed in that window landed on a return
+ * held at 12 %. Measured 2026-09-23 with the owner's faders at max:
+ * returnGovernorDb -18, returnTrim 0.1259, "completely dead".
+ *
+ * Runaway protection is untouched: the moment the hand comes off, the next
+ * tick governs as before.
+ */
+describe('governReturn under a held wet gesture', () => {
+  it('releases a clamp earned before the press, at gesture pace', () => {
+    // The measured clamp. The return is still over the programme when the
+    // performer presses — that is what the press is FOR.
+    let s = { db: -18, hold: 8 };
+    for (let i = 0; i < 8; i++) s = governReturn(s, 0.307, 0.020, true, true);
+    // Two seconds in, the return is audibly back: past -6 dB, not creeping
+    // 1.2 dB up the way the idle release would.
+    expect(s.db).toBeGreaterThan(-6);
+  });
+
+  it('never tightens while held, whatever the return does', () => {
+    let s = { db: -3, hold: 0 };
+    for (let i = 0; i < 8; i++) s = governReturn(s, 100, 0.01, true, true);
+    expect(s.db).toBeGreaterThanOrEqual(-3);
+  });
+
+  it('is the plain governor when nothing is held', () => {
+    const idle = governReturn({ db: -18, hold: 0 }, 0.307, 0.020, true);
+    const held = governReturn({ db: -18, hold: 0 }, 0.307, 0.020, true, false);
+    expect(held).toEqual(idle);
+    // ...and that plain governor is still holding a +24 dB return down.
+    expect(idle.db).toBe(-RETURN_GOVERNOR.maxDb);
+  });
+
+  it('governs again the tick after the hand comes off', () => {
+    let s = { db: -18, hold: 8 };
+    for (let i = 0; i < 8; i++) s = governReturn(s, 0.307, 0.020, true, true);
+    const released = s.db;
+    s = governReturn(s, 0.307, 0.020, true, false);
+    expect(s.db).toBeLessThan(released);
+  });
+});
