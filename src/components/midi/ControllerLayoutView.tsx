@@ -254,10 +254,14 @@ export const ControllerLayoutView: React.FC<ControllerLayoutViewProps> = ({
 
   return (
     <svg
-      width={svgWidth}
-      height={svgHeight}
+      // Responsive, not a fixed pixel box: at a fixed size the panel overflowed
+      // its dialog and the whole diagram sat behind scrollbars (2026-09-23,
+      // "the dialog is too small there are scrollbars"). The viewBox keeps the
+      // geometry; width and height come from the room available.
       viewBox={`0 0 ${svgWidth} ${svgHeight}`}
-      className="select-none"
+      preserveAspectRatio="xMidYMid meet"
+      className="select-none w-full h-auto max-h-[calc(90vh-15rem)]"
+      style={{ maxWidth: svgWidth * 1.35 }}
     >
       {/* Background panel */}
       <rect x={0} y={0} width={svgWidth} height={svgHeight} rx={8}
