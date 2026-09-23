@@ -19,6 +19,16 @@ export interface DevilboxSynth {
   triggerRelease?(note?: string | number, time?: number): void;
   /** Trigger attack then release after duration */
   triggerAttackRelease?(note: string | number, duration: number, time?: number, velocity?: number): void;
+  /**
+   * Prime the synth after a song load. Must be silent.
+   *
+   * ToneEngine calls this once per instrument after `ensureInitialized`, and
+   * does nothing else to warm a synth up: it used to play a muted note, and
+   * no mute was silent for every synth (release envelopes outlive it, native
+   * engines have outputs beside `output`). A synth that measurably needs
+   * priming does it here, in whatever way makes no sound.
+   */
+  warmUp?(): void;
   /** Set a named parameter */
   set?(param: string, value: number): void;
   /** Get a named parameter value */
