@@ -320,7 +320,7 @@ export const MIDIMapperModal: React.FC<MIDIMapperModalProps> = ({
   const overrideCount = Object.keys(userOverrides ?? {}).length;
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} size="xl">
+    <Modal isOpen={isOpen} onClose={onClose} size="2xl">
       <ModalHeader
         title="MIDI Controller Mapper"
         subtitle={`${layout.manufacturer} ${layout.name} · ${overrideCount} custom mapping${overrideCount !== 1 ? 's' : ''}`}

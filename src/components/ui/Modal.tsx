@@ -28,7 +28,7 @@ interface ModalProps {
 
   // Style
   theme?: 'modern' | 'retro'; // dark-* vs ft2-*
-  size?: 'sm' | 'md' | 'lg' | 'xl' | 'fullscreen';
+  size?: 'sm' | 'md' | 'lg' | 'xl' | '2xl' | 'fullscreen';
   backdropOpacity?: 'light' | 'medium' | 'dark'; // 50 | 60 | 80
   rounded?: boolean; // true for modern, false for retro
 
@@ -209,6 +209,9 @@ export const Modal: React.FC<ModalProps> = ({
     md: 'w-full max-w-md',
     lg: 'max-w-2xl w-full',
     xl: 'max-w-4xl w-full',
+    // For content that is a diagram rather than a form — a controller panel
+    // is 22 grid units wide and was overflowing `xl` (896px) into scrollbars.
+    '2xl': 'max-w-7xl w-full',
     fullscreen: 'w-full h-full',
   };
 
