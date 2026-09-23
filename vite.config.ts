@@ -99,7 +99,7 @@ export default defineConfig({
     },
   },
   resolve: {
-    // Force single instances of Pixi packages to prevent pixi-react instanceof failures
+    // Force single instances of React so hooks and context resolve to one copy
     dedupe: ['react', 'react-dom'],
     alias: {
       '@': path.resolve(__dirname, './src'),

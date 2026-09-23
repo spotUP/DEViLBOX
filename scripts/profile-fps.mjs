@@ -160,21 +160,21 @@ if (debugInfo.canvasCount === 0) {
 }
 console.log('✅ Canvas found');
 
-// Let WASM / fonts / Pixi fully init
+// Let WASM / fonts fully init
 await new Promise(r => setTimeout(r, 6000));
 
 // Click canvas to ensure focus + resume AudioContext
 await page.mouse.click(720, 450);
 await new Promise(r => setTimeout(r, 1000));
 
-// Dismiss any open modal via the store (Pixi modals are canvas-rendered, not DOM)
+// Dismiss any open modal via the store
 await page.evaluate(async () => {
   try {
     const { useUIStore } = await import('/src/stores/useUIStore.ts');
     useUIStore.getState().closeModal();
   } catch (e) { /* store not available yet */ }
 });
-// Also send Escape as fallback (PixiModal listens on window keydown)
+// Also send Escape as fallback (the modal listens on window keydown)
 await page.keyboard.press('Escape');
 await new Promise(r => setTimeout(r, 500));
 await page.keyboard.press('Escape');
