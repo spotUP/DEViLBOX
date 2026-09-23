@@ -544,10 +544,15 @@ export const DubDeckStrip: React.FC = () => {
 
       // Clear any existing expiry timer for this key
       const existing = fireTimers.current.get(key);
-      if (existing) clearTimeout(existing);
+      if (existing) { clearTimeout(existing); fireTimers.current.delete(key); }
 
-      // One-shots (triggers) auto-expire after 400ms visual flash.
-      // Holds stay lit until the release event arrives.
+      // One-shots (triggers) auto-expire after a 400 ms visual flash.
+      // Holds stay lit until the release event arrives — and ONLY until then.
+      // The timer used to run for holds too, so a hold driven from a MIDI
+      // button, AutoDub or a lane lit for 400 ms and went dark while still
+      // held: "buttons that should be held are not when activated via midi"
+      // (2026-09-23). The event says which it is.
+      if (ev.isHold) return;
       const t = setTimeout(() => {
         fireTimers.current.delete(key);
         setActiveFires(prev => { const n = new Set(prev); n.delete(key); return n; });
