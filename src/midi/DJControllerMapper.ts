@@ -27,7 +27,7 @@ import type {
   DJControllerPitchBendMapping
 } from './djControllerPresets';
 import { detectDJPreset, getPresetById } from './djControllerPresets';
-import { TakeoverBook } from './softTakeover';
+import { handBook } from './handBook';
 import { getControllerLayout } from './controllerLayouts';
 import type { MIDIMessage } from './types';
 
@@ -69,8 +69,10 @@ export function getHeldDubParams(): Set<string> {
     if (cc >= 1 && cc <= 8) held.add(`dub.channelSend.ch${cc - 1}`);
     else if (cc >= 28 && cc <= 35) held.add(`dub.channelSend.ch${cc - 28 + 8}`);
   }
-  const mapper = DJControllerMapper.getInstanceIfExists?.();
-  if (mapper) for (const param of mapper.engagedParams()) held.add(param);
+  // Everything a hand is currently on. Faders report themselves through the
+  // touch sensors above; a knob has none, so the fact that it is SENDING is
+  // the only evidence there is.
+  for (const param of handBook.held(performance.now())) held.add(param);
   return held;
 }
 
@@ -124,32 +126,9 @@ export class DJControllerMapper {
   /**
    * Activate a controller preset. Builds lookup tables and registers the MIDI handler.
    */
-  /**
-   * Soft takeover, per control.
-   *
-   * An absolute encoder sends its own position, which has no reason to match
-   * the value it is pointed at, so its first tick would otherwise slam the
-   * parameter to wherever the knob happens to sit — "when i pull the knobs on
-   * the behringer compact they reset and start from 0" (2026-09-23).
-   */
-  private takeover = new TakeoverBook();
-
   /** The instance, only if one has been made. Never creates one. */
   static getInstanceIfExists(): DJControllerMapper | null {
     return DJControllerMapper.instance;
-  }
-
-  /**
-   * Parameters whose knob has taken control.
-   *
-   * An engaged knob is driving its parameter, so a ride must leave it alone.
-   */
-  engagedParams(): string[] {
-    const out: string[] = [];
-    for (const [key, mapping] of this.ccLookup) {
-      if (this.takeover.engaged(key)) out.push(mapping.param);
-    }
-    return out;
   }
 
   setPreset(preset: DJControllerPreset | null): void {
@@ -527,6 +506,12 @@ export class DJControllerMapper {
     // worse than one that jumps. If the jump returns now that routing works,
     // the answer is relative-mode decoding or motor/ring sync — not a gate
     // that hides the control.
+
+    // A hand is on this control. Say so BEFORE routing, so anything the write
+    // wakes up already knows the parameter is taken. An encoder has no touch
+    // sensor, so its own traffic is the only evidence there is — and without
+    // it AutoDub rode the very knob being turned and dragged it back.
+    handBook.note(mapping.param, performance.now());
 
     routeDJParameter(mapping.param, normalized);
   }

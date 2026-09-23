@@ -4,6 +4,8 @@ import { getDJControllerMapper } from '../midi/DJControllerMapper';
 import {
   buildXTouchFeedbackMessages,
   encodeCompactButtonLED,
+  encodeCompactRingValue,
+  COMPACT_OUTPUT_CHANNEL,
   recordFaderTouchRelease,
   resetFaderCache,
   type XTouchFeedbackState,
@@ -13,7 +15,7 @@ import { useDJStore } from '../stores/useDJStore';
 import { useDrumPadStore } from '../stores/useDrumPadStore';
 import { useMixerStore } from '../stores/useMixerStore';
 import { subscribeToParamLiveValue } from '../midi/performance/parameterRouter';
-import { DUB_BUS_PARAMS } from '../midi/performance/parameterRouter';
+import { DUB_BUS_PARAMS, readDubParameter } from '../midi/performance/parameterRouter';
 import { subscribeDubRouter, subscribeDubRelease } from '../engine/dub/DubRouter';
 import type { MIDIMessage } from '../midi/types';
 import type { DJControllerPreset } from '../midi/djControllerPresets';
@@ -71,6 +73,12 @@ export function useXTouchFeedback(): void {
    */
   const encoderPendingRef = useRef<Map<number, number>>(new Map());
   const encoderSentRef = useRef<Map<number, number>>(new Map());
+  /** Which encoder CC carries which parameter, read from the preset. */
+  const encoderCCFor = (param: string): number | null => {
+    const preset = getDJControllerMapper().getPreset();
+    if (!preset || !XTOUCH_PRESET_IDS.has(preset.id)) return null;
+    return preset.ccMappings.find((m) => m.param === param)?.cc ?? null;
+  };
 
   useEffect(() => {
     const manager = getMIDIManager();
@@ -85,9 +93,17 @@ export function useXTouchFeedback(): void {
       // in case the device was left in a stale state from a different app.
       // The correct output channel is 0xb1 — 0xb0 is a no-op for motor control.
 
-      // Zero all encoder rings: top row (CC 10-17) and right column (CC 18-25)
-      for (let cc = 10; cc <= 25; cc++) {
-        manager.sendRawToDevice(outputId, new Uint8Array([0xb1, cc, 0]));
+      // Seed every encoder ring from the value its parameter actually holds.
+      //
+      // Zeroing them was worse than doing nothing: the ring then showed 0
+      // while the control underneath it sat wherever the user had left it, and
+      // it stayed wrong until something moved that parameter.
+      for (const param of Object.keys(DUB_BUS_PARAMS)) {
+        const cc = encoderCCFor(param);
+        if (cc === null) continue;
+        const value = readDubParameter(param);
+        if (value === null) continue;
+        encoderPendingRef.current.set(cc, clamp01(value));
       }
       // Turn off all button LEDs (notes 0-54)
       for (let note = 0; note <= 54; note++) {
@@ -130,11 +146,17 @@ export function useXTouchFeedback(): void {
       // moving while the faders and LEDs hold still must not be dropped as
       // "nothing changed".
       if (encoderPendingRef.current.size > 0) {
-        for (const [cc, v] of encoderPendingRef.current) {
-          if (encoderSentRef.current.get(cc) === v) continue;
-          encoderSentRef.current.set(cc, v);
-          // 0xb1 is the ring channel — 0xb0 is a no-op for ring position.
-          manager.sendRawToDevice(output.id, new Uint8Array([0xb1, cc, v]));
+        for (const [cc, normalized] of encoderPendingRef.current) {
+          // Compare the BYTE that would go out, not the float behind it: a
+          // value that wobbles in the sixth decimal is the same ring position,
+          // and re-sending it is the noise that starved the fader motors.
+          const step = Math.max(0, Math.min(127, Math.round(normalized * 127)));
+          if (encoderSentRef.current.get(cc) === step) continue;
+          encoderSentRef.current.set(cc, step);
+          manager.sendRawToDevice(
+            output.id,
+            new Uint8Array(encodeCompactRingValue(COMPACT_OUTPUT_CHANNEL, cc, normalized)),
+          );
         }
         encoderPendingRef.current.clear();
       }
@@ -191,14 +213,9 @@ export function useXTouchFeedback(): void {
      */
     for (const param of Object.keys(DUB_BUS_PARAMS)) {
       liveUnsubs.push(subscribeToParamLiveValue(param, (value) => {
-        const preset = mapper.getPreset();
-        if (!preset || !XTOUCH_PRESET_IDS.has(preset.id)) return;
-        const mapping = preset.ccMappings.find((m) => m.param === param);
-        if (!mapping) return;
-        encoderPendingRef.current.set(
-          mapping.cc,
-          Math.max(0, Math.min(127, Math.round(clamp01(value) * 127))),
-        );
+        const cc = encoderCCFor(param);
+        if (cc === null) return;
+        encoderPendingRef.current.set(cc, clamp01(value));
         scheduleFlush();
       }));
     }
