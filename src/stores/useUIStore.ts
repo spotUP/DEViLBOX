@@ -91,6 +91,17 @@ interface UIStore {
   gridChannelIndex: number;
   showInstrumentPanel: boolean;
 
+  /**
+   * Which SHAPE the Dub Deck draws itself in.
+   *
+   * 'automatic' follows the connected controller, 'generic' pins the deck's
+   * own rows and cards, and a controller layout id pins that controller's
+   * physical panel. A layout preference, which is why it lives here and is
+   * persisted with the rest of them — asked for on 2026-09-23, "the dub deck
+   * in devilbox should match my hw controller layoutwize".
+   */
+  dubDeckShape: string;
+
   // View Exposé (macOS Mission Control style view switcher)
   viewExposeActive: boolean;
   viewExposeSelectedIdx: number;
@@ -170,6 +181,7 @@ interface UIStore {
   // Tracker sub-view actions
   setTrackerViewMode: (mode: TrackerViewMode) => void;
   setGridChannelIndex: (index: number) => void;
+  setDubDeckShape: (shape: string) => void;
   setShowInstrumentPanel: (show: boolean) => void;
   toggleInstrumentPanel: () => void;
 
@@ -282,6 +294,9 @@ export const useUIStore = create<UIStore>()(
       trackerViewMode: 'tracker' as TrackerViewMode,
       gridChannelIndex: 0,
       showInstrumentPanel: true,
+
+      // Dub Deck shape — follow the hardware unless the user says otherwise.
+      dubDeckShape: 'automatic',
 
       // Layout presets
       layoutPresets: [null, null, null, null],
@@ -627,6 +642,8 @@ export const useUIStore = create<UIStore>()(
         set((state) => { state.trackerViewMode = mode; }),
       setGridChannelIndex: (index) =>
         set((state) => { state.gridChannelIndex = index; }),
+      setDubDeckShape: (shape) =>
+        set((state) => { state.dubDeckShape = shape; }),
       setShowInstrumentPanel: (show) =>
         set((state) => { state.showInstrumentPanel = show; }),
       toggleInstrumentPanel: () =>
@@ -815,6 +832,7 @@ export const useUIStore = create<UIStore>()(
         trackerViewMode: state.trackerViewMode,
         gridChannelIndex: state.gridChannelIndex,
         showInstrumentPanel: state.showInstrumentPanel,
+        dubDeckShape: state.dubDeckShape,
         layoutPresets: state.layoutPresets,
         activeLayoutPreset: state.activeLayoutPreset,
         uiVersion: state.uiVersion,
