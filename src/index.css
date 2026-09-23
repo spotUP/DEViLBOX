@@ -30,13 +30,6 @@
   }
 }
 
-/* PixiJS WebGL canvas — fill viewport */
-.pixi-canvas {
-  display: block;
-  width: 100vw;
-  height: var(--app-vh);
-}
-
 @layer base {
   /* Override Tailwind's default border-color (gray-200) with our design token */
   *, ::before, ::after {

@@ -80,8 +80,6 @@ function makeVoiceColumn(voiceIdx: number): ColumnDef {
     emptyColor: '#404040',
     emptyValue: -1,
     hexDigits: 2,
-    pixiColor: 0xe0a050,
-    pixiEmptyColor: 0x404040,
     formatter: (val: number) => {
       if (val === -1) return '  ---  ';
       if (val === -2) return ' HOLD  ';
@@ -114,8 +112,6 @@ export const TFMX_PATTERN_COLUMNS: ColumnDef[] = [
     emptyColor: '#303030',
     emptyValue: undefined,
     hexDigits: 4,
-    pixiColor: 0x808080,
-    pixiEmptyColor: 0x303030,
     formatter: (val: number) => {
       const b0 = (val >>> 24) & 0xFF;
       const b1 = (val >>> 16) & 0xFF;
@@ -132,8 +128,6 @@ export const TFMX_PATTERN_COLUMNS: ColumnDef[] = [
     color: '#e0c060',
     emptyColor: '#404030',
     emptyValue: -1,
-    pixiColor: 0xe0c060,
-    pixiEmptyColor: 0x404030,
     formatter: (val: number) => val < 0 ? '---' : tfmxNoteToString(val),
   },
   {
@@ -145,8 +139,6 @@ export const TFMX_PATTERN_COLUMNS: ColumnDef[] = [
     emptyColor: '#304030',
     emptyValue: -1,
     hexDigits: 2,
-    pixiColor: 0x60e060,
-    pixiEmptyColor: 0x304030,
     formatter: (val: number) => val < 0 ? '--' : hex2(val),
   },
   {
@@ -158,8 +150,6 @@ export const TFMX_PATTERN_COLUMNS: ColumnDef[] = [
     emptyColor: '#303840',
     emptyValue: -1,
     hexDigits: 2,
-    pixiColor: 0x60c0e0,
-    pixiEmptyColor: 0x303840,
     formatter: (val: number) => val < 0 ? '--' : hex2(val),
   },
   {
@@ -171,8 +161,6 @@ export const TFMX_PATTERN_COLUMNS: ColumnDef[] = [
     emptyColor: '#383040',
     emptyValue: -1,
     hexDigits: 2,
-    pixiColor: 0xc080e0,
-    pixiEmptyColor: 0x383040,
     formatter: (val: number) => val < 0 ? '--' : hex2(val),
   },
   {
@@ -184,8 +172,6 @@ export const TFMX_PATTERN_COLUMNS: ColumnDef[] = [
     emptyColor: '#383838',
     emptyValue: 0,
     hexDigits: 2,
-    pixiColor: 0xa0a0a0,
-    pixiEmptyColor: 0x383838,
     formatter: () => '',  // effect text is handled by commandEffectString in the cell
   },
 ];

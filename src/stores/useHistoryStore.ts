@@ -289,7 +289,7 @@ export const useHistoryKeyboardShortcuts = (
 
   const handleKeyDown = (e: KeyboardEvent) => {
     // Ignore if typing in input field
-    if ((window as any).__pixiInputFocused || e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+    if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
       return;
     }
 

@@ -32,10 +32,6 @@ export interface ColumnDef {
   hexDigits?: number;
   /** Function to format a value for display */
   formatter: (value: number) => string;
-  /** Pixi tint color when cell has a value (hex number, e.g. 0x60e060) */
-  pixiColor?: number;
-  /** Pixi tint color when cell is empty */
-  pixiEmptyColor?: number;
 }
 
 /**
