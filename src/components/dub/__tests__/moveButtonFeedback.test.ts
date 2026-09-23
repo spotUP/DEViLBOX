@@ -45,11 +45,23 @@ describe('a move button lights when its move fires on any channel', () => {
     expect(strip).not.toContain('const active = toggled || heldMoves.has(key) || activeFires.has(key);');
   });
 
-  it('leaves the per-channel grid exact', () => {
-    // A channel button must light for ITS channel only, so this one keeps the
-    // full key.
-    expect(strip).toContain('const key = `${op.moveId}:${i}`;');
-    expect(strip).toContain('const active = heldMoves.has(key) || activeFires.has(key);');
+  /**
+   * The per-channel op buttons went away on 2026-09-23, but the requirement
+   * they carried did not: when a move fires on ONE channel, that channel and
+   * no other must show it.
+   *
+   * It moved from the button to the STRIP. This is the risk the design names
+   * as fatal if dropped — AutoDub fires per channel, and with one shared op
+   * panel the performer's only clue about which channel the machine just hit
+   * is the strip lighting up.
+   */
+  it('lights the channel a move fired on, and only that channel', () => {
+    expect(strip).toContain("const channelFiring = CHANNEL_OPS.some(op => activeFires.has(`${op.moveId}:${i}`));");
+  });
+
+  it('shows which channel the shared op panel is aimed at', () => {
+    // Without this the target is invisible and aiming an op is a guess.
+    expect(strip).toContain('const isTarget = isDubTargetChannel(');
   });
 });
 
