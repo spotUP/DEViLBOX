@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { detectDJPreset } from '../../djControllerPresets';
 import {
   buildXTouchFeedbackMessages,
@@ -87,5 +89,76 @@ describe('X-Touch support', () => {
     expect(messages).toContainEqual([0x90, 94, 127]);
     expect(messages).toContainEqual([0x90, 95, 0]);
     expect(messages).not.toContainEqual([0x90, 0, 127]);
+  });
+});
+
+/**
+ * A fresh boot with an empty song must leave the motor faders at rest.
+ *
+ * The X-Touch preset maps its faders to `dub.channelSend.chN` — every one of
+ * them, unconditionally. But the FEEDBACK used to be gated on the dub bus
+ * being enabled, and when it was off it fell back to the DJ deck's volumes and
+ * EQs, which rest at unity and centre rather than at zero. So starting
+ * DEViLBOX with nothing loaded drove the motors to a mix that did not exist:
+ * "the controller faders knobs are not at zero when i start devilbox with an
+ * empty song" (2026-09-23).
+ *
+ * The surface must show the parameter it controls.
+ */
+describe('an empty song leaves the faders down', () => {
+  const emptySong: XTouchFeedbackState = {
+    ...FEEDBACK_STATE,
+    // What a fresh boot actually looks like: no sends anywhere...
+    dubChannelSends: [0, 0, 0, 0, 0, 0, 0, 0],
+    // ...while the DJ decks sit at their own resting defaults.
+    deckA: { ...FEEDBACK_STATE.deckA, volume: 1, eqHi: 0.5, eqMid: 0.5, eqLow: 0.5 },
+    deckB: { ...FEEDBACK_STATE.deckB, volume: 1, eqHi: 0.5, eqMid: 0.5, eqLow: 0.5 },
+  };
+
+  const faderValue = (messages: number[][], cc: number): number | undefined =>
+    messages.find((m) => (m[0] & 0xf0) === 0xb0 && m[1] === cc)?.[2];
+
+  it('drives every channel fader to zero, not to a deck default', () => {
+    const messages = buildXTouchFeedbackMessages(
+      detectDJPreset('X-TOUCH COMPACT'), emptySong, {},
+    );
+    for (let cc = 1; cc <= 8; cc++) {
+      expect(faderValue(messages, cc), `fader ${cc}`).toBe(0);
+    }
+  });
+
+  it('does not quietly show the DJ mixer instead', () => {
+    // 0.5 as a CC is 64 — the EQ centre these faders used to be driven to.
+    const messages = buildXTouchFeedbackMessages(
+      detectDJPreset('X-TOUCH COMPACT'), emptySong, {},
+    );
+    for (let cc = 2; cc <= 4; cc++) {
+      expect(faderValue(messages, cc), `fader ${cc} shows an EQ centre`).not.toBe(64);
+    }
+  });
+});
+
+/**
+ * And the fix itself, where it actually lived.
+ *
+ * The builder above was always correct when handed sends. The defect was one
+ * gate in the hook — `dub.enabled ? sends : undefined` — which handed it
+ * nothing, and `undefined` is precisely what selects the DJ fallback. A test
+ * that only drives the builder would have passed throughout the bug.
+ */
+describe('the hook does not gate the faders on the bus being on', () => {
+  const HOOK = readFileSync(
+    resolve(process.cwd(), 'src/hooks/useXTouchFeedback.ts'), 'utf8',
+  );
+
+  it('never resolves the channel sends to undefined', () => {
+    expect(HOOK, 'the dub.enabled gate is back').not.toMatch(
+      /dubChannelSends\s*=\s*dub\.enabled/,
+    );
+    expect(HOOK).not.toMatch(/dubChannelSends[\s\S]{0,120}:\s*undefined/);
+  });
+
+  it('still prefers the live value, so an AutoDub ride moves the motor', () => {
+    expect(HOOK).toContain('Math.max(ch?.dubSend ?? 0, liveSends[i] ?? 0)');
   });
 });
