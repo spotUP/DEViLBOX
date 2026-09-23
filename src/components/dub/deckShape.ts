@@ -333,3 +333,50 @@ export function isDeckInert(binding: ControlDeckBinding): boolean {
     t !== undefined && (t.kind === 'move' || t.kind === 'channelSend' || t.kind === 'armed');
   return !drivable(binding.press) && !drivable(binding.turn);
 }
+
+// ============================================================================
+// EVERY CONTROL, WHERE THE HARDWARE PUTS IT
+// ============================================================================
+
+/**
+ * One physical control, with whatever the deck will do with it.
+ *
+ * Earlier versions of this returned only the controls that carried a MOVE, so
+ * the renderer silently dropped all nine faders, all eight transport buttons,
+ * and drew each of the sixteen encoders as its push-button — seventeen
+ * controls missing and every knob turned into a button. The device's own
+ * report of itself says the descriptor was right all along:
+ *
+ *   enc-top    8 encoders x 0..14  y 0      faders    9 faders  x 0..16  y 8
+ *   btn-row1-3 8 buttons  x 0..14  y 2/4/6  select    9 buttons x 0..16  y 13
+ *   enc-right  8 encoders x 18..20 y 0..6   transport 8 buttons x 18..20 y 9..15
+ *
+ * So the placement step no longer filters anything. What a control DOES is the
+ * renderer's business; where it is, and whether it is a knob or a fader, is
+ * the descriptor's.
+ */
+export interface DeckControlPlacement {
+  control: ControlDescriptor;
+  binding: ControlDeckBinding;
+  /** Footprint in grid units, with the descriptor's defaults applied. */
+  w: number;
+  h: number;
+}
+
+export function deckControls(
+  layout: ControllerLayout,
+  layer: 'A' | 'B',
+  bindings: Record<string, ControlDeckBinding>,
+): DeckControlPlacement[] {
+  const placed: DeckControlPlacement[] = [];
+  for (const control of layout.controls) {
+    if (control.layer && control.layer !== layer) continue;
+    placed.push({
+      control,
+      binding: bindings[control.id] ?? {},
+      w: control.w ?? 2,
+      h: control.h ?? (control.type === 'fader' ? 4 : 2),
+    });
+  }
+  return placed;
+}
