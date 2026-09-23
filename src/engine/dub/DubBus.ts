@@ -2600,17 +2600,40 @@ export class DubBus {
       this._clubConvolverWired = true;
     }
 
-    // External feedback loop: return → EQ → gain → delay → input (back to echo).
-    // At gain=0 (default), no feedback. When raised, each echo repeat
-    // recirculates through the full bus chain (EQ, saturation, spring)
-    // gaining mixer coloration each pass. Capped at 0.85 to prevent
-    // runaway self-oscillation. The DelayNode ensures the cycle is legal
-    // for Web Audio's topological sort.
-    // Tapped at `stereoMerge` — the end of the CORE wet chain (echo → spring
-    // → sidechain → glue → midScoop → returnEQ → lpf → M/S) — NOT at
-    // `return_`.
+    // External feedback loop: echo out → EQ → gain → delay → input (back to
+    // the echo). At gain=0 (default), no feedback. When raised, each echo
+    // repeat recirculates through the input chain (HPF, bass shelf,
+    // saturation) gaining mixer coloration each pass. The DelayNode ensures
+    // the cycle is legal for Web Audio's topological sort.
     //
-    // Tapping return_ put four things inside the loop that must not be there:
+    // Tapped at the ECHO'S OWN OUTPUT — `postEchoSatBypass` + `postEchoSatWet`,
+    // the post-echo saturator crossfade, which every chain order feeds from
+    // `echo.output` and which survives an engine swap — NOT at `stereoMerge`
+    // and NOT at `return_`.
+    //
+    // Tapping stereoMerge (2026-09-17 to 2026-09-23) still left the glue
+    // compressor, the spring, the mid scoop, the return EQ and the LPF inside
+    // the loop. A DynamicsCompressorNode applies automatic make-up gain, and
+    // applies MORE of it the quieter the signal gets: so as a tail decays the
+    // loop gain RISES, until it meets unity and the tail stops decaying. That
+    // is a tail that never silences, at a fixed moderate level — not a howl.
+    // Measured 2026-09-23 with sends closed and nothing playing: busInput
+    // 0.012, busReturn 0.65 flat for 12 s, extFeedbackGain 0.035; setting the
+    // gain to 0 let it decay to 0.02 in 4 s, restoring it brought 0.68 back
+    // within 2 s. Reported as "audio with a tail that never silences" after
+    // a song load — the load's pre-warm blip was enough to seed it.
+    //
+    // A level-dependent gain stage cannot sit inside a feedback loop whose
+    // ceiling is a fixed fader budget (`extFeedbackCeiling.ts`): the budget
+    // assumes the forward gain is a constant. At the echo's output the loop
+    // holds the echo (regen bounded by its own feedback), the input EQ (with
+    // its mirrors) and the saturators — constants, or bounded by design.
+    //
+    // This is also the technique being modelled: Messian Dread loops the
+    // ECHO RETURN back through a mixer channel — the echo unit's output, not
+    // the whole wet bus after its compressor.
+    //
+    // Tapping return_ before that put four more things inside the loop:
     //
     //   plate stage   dattorro's tail is documented as "infinite"; an
     //                 unbounded tail inside a feedback path is unbounded by
@@ -2630,10 +2653,8 @@ export class DubBus {
     // an instant howl. Confirmed 2026-09-17 by setting extFeedbackGain to 0
     // mid-rumble, which stopped it.
     //
-    // Tapping the core chain also matches the technique being modelled:
-    // Messian Dread loops the ECHO RETURN back through a mixer channel to pick
-    // up its coloration — not the whole wet bus including every parallel tail.
-    this.stereoMerge.connect(this.extFeedbackEq);
+    this.postEchoSatBypass.connect(this.extFeedbackEq);
+    this.postEchoSatWet.connect(this.extFeedbackEq);
     this.extFeedbackEq.connect(this.extFeedbackShelfComp);
     this.extFeedbackShelfComp.connect(this.extFeedbackGain);
     // Hard safety governor, independent of preset and of any musical setting:

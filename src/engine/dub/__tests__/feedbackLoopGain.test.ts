@@ -141,9 +141,20 @@ describe('feedback ring stays below unity', () => {
 //
 // Perry is the only preset with extFeedbackGain above zero, which is why it
 // only ever appeared on Perry.
+//
+// Moving the tap to `stereoMerge` was not enough. Reported 2026-09-23 as
+// "audio with a tail that never silences" after a song load, with sends
+// closed: busInput 0.012, busReturn 0.65 flat for 12 s at extFeedbackGain
+// 0.035; zeroing the gain let it decay in 4 s, restoring it brought it back.
+// The glue compressor was still in the loop, and a compressor's make-up gain
+// grows as the signal shrinks — so the loop gain rose to meet unity exactly
+// where the tail should have died. The loop now closes at the echo's own
+// output, where every stage is a constant or bounded by its own feedback.
 describe('external feedback loop contents', () => {
-  it('taps the core wet chain, not the full return', () => {
-    expect(DUBBUS_SRC).toContain('this.stereoMerge.connect(this.extFeedbackEq)');
+  it("taps the echo's own output — before the compressor, spring and EQ", () => {
+    expect(DUBBUS_SRC).toContain('this.postEchoSatBypass.connect(this.extFeedbackEq)');
+    expect(DUBBUS_SRC).toContain('this.postEchoSatWet.connect(this.extFeedbackEq)');
+    expect(DUBBUS_SRC, 'the glue compressor is back inside the loop').not.toContain('this.stereoMerge.connect(this.extFeedbackEq)');
     expect(DUBBUS_SRC).not.toContain('this.return_.connect(this.extFeedbackEq)');
   });
 
@@ -157,7 +168,7 @@ describe('external feedback loop contents', () => {
   it('keeps the limiter a plain waveshaper no setting can disable', () => {
     expect(DUBBUS_SRC).toContain('this.extFeedbackLimit = this.context.createWaveShaper()');
     // tanh asymptotes at unity — the loop may sustain, never grow unbounded.
-    const ctor = DUBBUS_SRC.match(/this\.extFeedbackLimit = this\.context\.createWaveShaper\(\);[\s\S]*?\n    \}/)?.[0] ?? '';
+    const ctor = DUBBUS_SRC.match(/this\.extFeedbackLimit = this\.context\.createWaveShaper\(\);[\s\S]*?\n {4}\}/)?.[0] ?? '';
     expect(ctor).toContain('Math.tanh');
   });
 
