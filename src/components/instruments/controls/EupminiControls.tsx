@@ -121,7 +121,7 @@ export const EupminiControls: React.FC<EupminiControlsProps> = ({ config, onChan
       <div className="flex items-center gap-2 mb-1">
         <span className="text-text-muted">FM Patch:</span>
         <select
-          className="bg-surface-secondary text-text-primary border border-border-primary rounded px-2 py-0.5 text-xs"
+          className="bg-dark-bgSecondary text-text-primary border border-dark-border rounded px-2 py-0.5 text-xs"
           value={selectedInst}
           onChange={(e) => setSelectedInst(Number(e.target.value))}
         >
@@ -137,7 +137,7 @@ export const EupminiControls: React.FC<EupminiControlsProps> = ({ config, onChan
         <div className="flex flex-col items-center gap-1">
           <span className="text-text-muted text-[10px]">Algorithm</span>
           <select
-            className="bg-surface-secondary text-text-primary border border-border-primary rounded px-1 py-0.5 text-xs w-16"
+            className="bg-dark-bgSecondary text-text-primary border border-dark-border rounded px-1 py-0.5 text-xs w-16"
             value={inst.alg}
             onChange={(e) => setChParam(selectedInst, FM_CH_PARAM.ALG, Number(e.target.value))}
           >
@@ -167,7 +167,7 @@ export const EupminiControls: React.FC<EupminiControlsProps> = ({ config, onChan
 
       {/* 4 operators */}
       {inst.slots.map((slot, si) => (
-        <div key={si} className="border border-border-primary/30 rounded p-2">
+        <div key={si} className="border border-dark-border/30 rounded p-2">
           <SectionLabel label={OP_NAMES[si]} color={accent} />
           <div className="flex items-end gap-2 flex-wrap mt-1">
             <KnobParam label="TL" value={slot.tl} max={127} color={knob}
@@ -187,7 +187,7 @@ export const EupminiControls: React.FC<EupminiControlsProps> = ({ config, onChan
             <div className="flex flex-col items-center gap-0.5">
               <span className="text-text-muted text-[10px]">DET</span>
               <select
-                className="bg-surface-secondary text-text-primary border border-border-primary rounded px-1 py-0.5 text-[10px] w-12"
+                className="bg-dark-bgSecondary text-text-primary border border-dark-border rounded px-1 py-0.5 text-[10px] w-12"
                 value={slot.det}
                 onChange={(e) => setSlotParam(selectedInst, si, FM_SLOT_PARAM.DET, Number(e.target.value))}
               >
@@ -197,7 +197,7 @@ export const EupminiControls: React.FC<EupminiControlsProps> = ({ config, onChan
             <div className="flex flex-col items-center gap-0.5">
               <span className="text-text-muted text-[10px]">KS</span>
               <select
-                className="bg-surface-secondary text-text-primary border border-border-primary rounded px-1 py-0.5 text-[10px] w-10"
+                className="bg-dark-bgSecondary text-text-primary border border-dark-border rounded px-1 py-0.5 text-[10px] w-10"
                 value={slot.ks}
                 onChange={(e) => setSlotParam(selectedInst, si, FM_SLOT_PARAM.KS, Number(e.target.value))}
               >

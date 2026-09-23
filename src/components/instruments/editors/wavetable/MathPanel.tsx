@@ -86,7 +86,7 @@ export const MathPanel: React.FC<MathPanelProps> = ({
         <summary className="cursor-pointer text-text-muted hover:text-text-primary">
           Functions & variables
         </summary>
-        <div className="mt-1 pl-3 space-y-0.5 text-text-subtle">
+        <div className="mt-1 pl-3 space-y-0.5 text-text-muted">
           <div><span className="text-accent-highlight">x</span> — phase, 0..1</div>
           <div><span className="text-accent-highlight">PI, TAU, E</span> — constants</div>
           <div><span className="text-accent-highlight">sin, cos, tan, abs, sqrt, exp, log</span></div>

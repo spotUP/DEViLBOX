@@ -149,7 +149,7 @@ export const FmplayerControls: React.FC<FmplayerControlsProps> = ({ config, onCh
   return (
     <div className="flex flex-col gap-2 p-3 text-xs" style={panelStyle}>
       {/* Channel tabs */}
-      <div className="flex gap-1 border-b border-border-primary pb-1 flex-wrap">
+      <div className="flex gap-1 border-b border-dark-border pb-1 flex-wrap">
         {allTabs.map(({ label, tab }) => {
           const active = activeTab.type === tab.type && activeTab.ch === tab.ch;
           return (
@@ -222,7 +222,7 @@ const FmChannelPanel: React.FC<FmChannelPanelProps> = ({
       <div className="flex flex-col items-center gap-1">
         <span className="text-text-muted text-[10px]">Algorithm</span>
         <select
-          className="bg-surface-secondary text-text-primary border border-border-primary rounded px-1 py-0.5 text-xs w-16"
+          className="bg-dark-bgSecondary text-text-primary border border-dark-border rounded px-1 py-0.5 text-xs w-16"
           value={channel.alg}
           onChange={(e) => setChParam(ch, FM_CH_PARAM.ALG, Number(e.target.value))}
         >
@@ -279,7 +279,7 @@ interface FmOperatorPanelProps {
 const FmOperatorPanel: React.FC<FmOperatorPanelProps> = ({
   ch, slotIdx, slot, setParam, knobColor, accent,
 }) => (
-  <div className="border border-border-primary/30 rounded p-2">
+  <div className="border border-dark-border/30 rounded p-2">
     <SectionLabel label={OP_NAMES[slotIdx]} color={accent} />
     <div className="flex items-end gap-2 flex-wrap mt-1">
       <div className="flex flex-col items-center gap-0.5">
@@ -320,7 +320,7 @@ const FmOperatorPanel: React.FC<FmOperatorPanelProps> = ({
       <div className="flex flex-col items-center gap-0.5">
         <span className="text-text-muted text-[10px]">DET</span>
         <select
-          className="bg-surface-secondary text-text-primary border border-border-primary rounded px-1 py-0.5 text-[10px] w-12"
+          className="bg-dark-bgSecondary text-text-primary border border-dark-border rounded px-1 py-0.5 text-[10px] w-12"
           value={slot.det}
           onChange={(e) => setParam(ch, slotIdx, FM_SLOT_PARAM.DET, Number(e.target.value))}
         >
@@ -330,7 +330,7 @@ const FmOperatorPanel: React.FC<FmOperatorPanelProps> = ({
       <div className="flex flex-col items-center gap-0.5">
         <span className="text-text-muted text-[10px]">KS</span>
         <select
-          className="bg-surface-secondary text-text-primary border border-border-primary rounded px-1 py-0.5 text-[10px] w-10"
+          className="bg-dark-bgSecondary text-text-primary border border-dark-border rounded px-1 py-0.5 text-[10px] w-10"
           value={slot.ks}
           onChange={(e) => setParam(ch, slotIdx, FM_SLOT_PARAM.KS, Number(e.target.value))}
         >
