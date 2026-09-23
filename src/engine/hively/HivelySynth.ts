@@ -52,10 +52,12 @@ export class HivelySynth implements DevilboxSynth {
 
     this.engine = HivelyEngine.getInstance();
 
-    // Connect engine output to EVERY HivelySynth instance. The engine is a
-    // singleton, but each instrument slot needs its own output for the mixer.
-    // Without this, only the first created HivelySynth produces audio.
-    this.engine.output.connect(this.output);
+    // Connect the engine's INSTRUMENT output to every HivelySynth instance.
+    // The engine is a singleton, but each instrument slot needs its own output
+    // for the mixer. Not `engine.output`: that is the tune, and the host
+    // mutes it on transport stop, which silenced every live note after a stop
+    // while the players were summed into it (2026-09-23).
+    this.engine.instrumentOutput.connect(this.output);
     this._ownsEngineConnection = true;
   }
 
@@ -278,7 +280,7 @@ export class HivelySynth implements DevilboxSynth {
     // connection to all other destinations (synthBus, stereo separation, etc.).
     if (this._ownsEngineConnection) {
       try {
-        this.engine.output.disconnect(this.output);
+        this.engine.instrumentOutput.disconnect(this.output);
       } catch { /* may already be disconnected */ }
       this._ownsEngineConnection = false;
     }

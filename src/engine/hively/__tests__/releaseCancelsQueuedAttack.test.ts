@@ -25,6 +25,7 @@ let resolveHandle: ((h: number) => void) | null = null;
 
 const engine = {
   output: { connect: vi.fn() },
+  instrumentOutput: { connect: vi.fn(), disconnect: vi.fn() },
   ready: vi.fn(async () => {}),
   sendMessage: vi.fn((msg: Msg) => { sent.push(msg); }),
   waitForPlayerHandle: vi.fn(() => new Promise<number>((resolve) => { resolveHandle = resolve; })),
