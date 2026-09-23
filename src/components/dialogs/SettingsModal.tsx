@@ -465,15 +465,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
                 </div>
               </section>
 
-              {/* GL-only settings note */}
-              <section>
-                <h3 className="text-ft2-highlight text-xs font-bold mb-3 tracking-wide">SHADER EFFECTS</h3>
-                <div className="text-[10px] text-ft2-textDim font-mono leading-relaxed">
-                  CRT Shader, Lens Distortion, and Wobble Windows are available in the WebGL UI.
-                  Switch to WebGL mode in General &gt; Display to access these settings.
-                </div>
-              </section>
-
             </>
           )}
 
