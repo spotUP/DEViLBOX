@@ -1108,60 +1108,37 @@ export class ToneEngine {
       }
     }
 
-    // PERFORMANCE FIX: Warm up CPU-intensive synths by triggering a silent note
-    // This forces Tone.js to compile/initialize audio graphs before playback starts
-    const warmUpTypes = ['MetalSynth', 'MembraneSynth', 'NoiseSynth', 'FMSynth'];
-    for (const config of configs) {
-      if (warmUpTypes.includes(config.synthType || '')) {
-        const key = this.getInstrumentKey(config.id, -1);
-        const instrument = this.instruments.get(key);
-        if (instrument && !isDevilboxSynth(instrument)) {
-          try {
-            const inst = instrument as any;
-            // Save original volume, set to silent
-            const originalVol = inst.volume.value;
-            inst.volume.value = -Infinity;
-
-            // Trigger a very short note to warm up the synth
-            if (config.synthType === 'NoiseSynth' || config.synthType === 'MetalSynth') {
-              // MetalSynth is now NoiseSynth under the hood for performance
-              (instrument as Tone.NoiseSynth).triggerAttackRelease(0.001, Tone.now());
-            } else if (config.synthType === 'MembraneSynth') {
-              // MembraneSynth is now regular Synth for performance
-              (instrument as Tone.Synth).triggerAttackRelease('C2', 0.001, Tone.now());
-            } else {
-              inst.triggerAttackRelease?.('C4', 0.001, Tone.now());
-            }
-
-            // Restore volume
-            inst.volume.value = originalVol;
-          } catch {
-            // Ignore warm-up errors
-          }
-        }
-      }
-    }
-
-    // Pre-warm WASM synths: trigger a silent note to prime the audio pipeline
+    // Prime synths that ask to be primed — and never by playing a note.
+    //
+    // Two warm-up loops used to live here, both playing a "silent" note on
+    // song load. Neither was silent:
+    //
+    //   Tone.js synths   `volume = -Infinity`, schedule the note, restore
+    //                    `volume` — all in one synchronous run. The last
+    //                    write wins before the note starts, so the mute
+    //                    never applied at all.
+    //   DevilboxSynths   `output.gain = 0`, attack, release + restore 50 ms
+    //                    later. Silent only for a synth whose sound all
+    //                    passes through `output` AND dies within 50 ms of
+    //                    release. A release envelope outlives that, and a
+    //                    native engine's per-channel dub-send outputs never
+    //                    pass through `output` in the first place.
+    //
+    // Measured 2026-09-23 on a crash-recovery restore of an AHX song: the
+    // warm-up note reached the dub bus return at 0.41 with the dry path at 0
+    // and rang for two seconds, seeding the external feedback loop —
+    // "i clicked restore and audio fires". Reported "not isolated to hively".
+    //
+    // There is no place to mute a note that is silent for every synth, so
+    // the engine does not play one. A synth that measurably needs priming
+    // implements `warmUp()` and does it silently, on its own terms. None do
+    // today; the WASM engines were already `ensureInitialized()` above and
+    // their worklets are rendering.
     for (const config of configs) {
       const key = this.getInstrumentKey(config.id, -1);
       const instrument = this.instruments.get(key);
       if (instrument && isDevilboxSynth(instrument)) {
-        try {
-          const ds = instrument as DevilboxSynth;
-          const savedGain = ds.output instanceof GainNode ? (ds.output as GainNode).gain.value : null;
-          if (ds.output instanceof GainNode) (ds.output as GainNode).gain.value = 0;
-          ds.triggerAttack?.('C4', undefined, 0.01);
-          setTimeout(() => {
-            // Monophonic synths don't take a note parameter in triggerRelease
-            ds.triggerRelease?.();
-            if (savedGain !== null && ds.output instanceof GainNode) {
-              (ds.output as GainNode).gain.value = savedGain;
-            }
-          }, 50);
-        } catch {
-          // Ignore warm-up errors
-        }
+        try { (instrument as DevilboxSynth).warmUp?.(); } catch { /* a warm-up must never break a load */ }
       }
     }
 

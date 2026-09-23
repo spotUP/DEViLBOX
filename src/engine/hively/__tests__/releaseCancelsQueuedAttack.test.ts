@@ -118,3 +118,4 @@ describe('HivelySynth: a release cancels an attack still waiting for its player'
     expect(noteOffs()).toHaveLength(1);
   });
 });
+
