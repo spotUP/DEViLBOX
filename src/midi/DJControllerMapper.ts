@@ -27,6 +27,8 @@ import type {
   DJControllerPitchBendMapping
 } from './djControllerPresets';
 import { detectDJPreset, getPresetById } from './djControllerPresets';
+import { TakeoverBook } from './softTakeover';
+import { readDubParameter } from './performance/parameterRouter';
 import type { MIDIMessage } from './types';
 
 const _motorSendTimestamps = new Map<number, number>();
@@ -95,6 +97,16 @@ export class DJControllerMapper {
   /**
    * Activate a controller preset. Builds lookup tables and registers the MIDI handler.
    */
+  /**
+   * Soft takeover, per control.
+   *
+   * An absolute encoder sends its own position, which has no reason to match
+   * the value it is pointed at, so its first tick would otherwise slam the
+   * parameter to wherever the knob happens to sit — "when i pull the knobs on
+   * the behringer compact they reset and start from 0" (2026-09-23).
+   */
+  private takeover = new TakeoverBook();
+
   setPreset(preset: DJControllerPreset | null): void {
     this.activePreset = preset;
     this.ccLookup.clear();
@@ -408,6 +420,12 @@ export class DJControllerMapper {
 
     let normalized = value / 127;
     if (mapping.invert) normalized = 1 - normalized;
+
+    // The knob must catch up with the value before it may move it. Only when
+    // the live value is READABLE — otherwise there is nothing to catch up to,
+    // and applying directly is the behaviour that existed before.
+    const current = readDubParameter(mapping.param);
+    if (current !== null && !this.takeover.accept(key, normalized, current)) return;
 
     routeDJParameter(mapping.param, normalized);
   }

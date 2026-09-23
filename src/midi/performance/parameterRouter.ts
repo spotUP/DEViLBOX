@@ -1631,3 +1631,47 @@ export function routeVocoderModulation(
     engine.setCarrierFreq(freq);
   }
 }
+
+/**
+ * A dub parameter's current value, normalised 0..1.
+ *
+ * Needed by soft takeover: a control cannot catch up with a value it cannot
+ * read. Returns null for anything whose live value is not readable, and the
+ * caller then falls back to applying the input directly — which is the old
+ * behaviour, so nothing that used to work stops working.
+ */
+export function readDubParameter(param: string): number | null {
+  const busDef = DUB_BUS_PARAMS[param];
+  if (busDef) {
+    const dubBus = getDrumPadStoreRef()?.getState?.()?.dubBus as Record<string, number> | undefined;
+    const raw = dubBus?.[busDef.field];
+    if (typeof raw !== 'number') return null;
+    const span = busDef.max - busDef.min;
+    return span === 0 ? 0 : Math.max(0, Math.min(1, (raw - busDef.min) / span));
+  }
+
+  if (param.startsWith(CHANNEL_SEND_PREFIX)) {
+    const ch = parseInt(param.slice(CHANNEL_SEND_PREFIX.length), 10);
+    if (!Number.isFinite(ch) || ch < 0) return null;
+    const channels = getMixerStoreRef()?.getState?.()?.channels as Array<{ dubSend?: number }> | undefined;
+    const send = channels?.[ch]?.dubSend;
+    return typeof send === 'number' ? send : null;
+  }
+
+  return null;
+}
+
+/** Store handles, resolved lazily so this module stays import-cycle free. */
+let _drumPadStoreRef: { getState: () => unknown } | null = null;
+let _mixerStoreRef: { getState: () => unknown } | null = null;
+
+export function registerParameterStores(refs: {
+  drumPad?: { getState: () => unknown };
+  mixer?: { getState: () => unknown };
+}): void {
+  if (refs.drumPad) _drumPadStoreRef = refs.drumPad;
+  if (refs.mixer) _mixerStoreRef = refs.mixer;
+}
+
+function getDrumPadStoreRef() { return _drumPadStoreRef as { getState: () => { dubBus?: unknown } } | null; }
+function getMixerStoreRef() { return _mixerStoreRef as { getState: () => { channels?: unknown } } | null; }
