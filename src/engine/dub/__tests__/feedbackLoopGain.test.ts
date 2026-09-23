@@ -185,3 +185,51 @@ describe('external feedback loop contents', () => {
     expect(DEFAULT_DUB_BUS.extFeedbackGain).toBe(0);
   });
 });
+
+/**
+ * Ping-pong must not close a ring through the output either.
+ *
+ * `startPingPong` tapped `return_` AND fed `return_`, so it had to divide its
+ * own input down to keep the ring bounded:
+ *   `inputGain = 0.8 / (2 * wet / (1 - fb))`
+ * Work that through and the output lands at `0.4 * (1 - fb)` of the input
+ * REGARDLESS of wet — raising wet raises ringGain and divides straight back
+ * out. So `wet` was a no-op control and the taps always arrived about 14 dB
+ * under the return, which is why the move read as nothing however hard it was
+ * pushed (2026-09-23: "no starve or ping pong").
+ *
+ * Tapping the core wet chain instead leaves no outer loop at all. The only
+ * ring left is the internal L/R cross-feed at gain fb^2 — 0.25 at the shipped
+ * 0.5 — and `wet` becomes the output level it claims to be.
+ */
+describe('the ping-pong delay is parallel, not a ring through the return', () => {
+  const body = DUBBUS_SRC.slice(
+    DUBBUS_SRC.indexOf('  startPingPong('),
+    DUBBUS_SRC.indexOf('  kickSpring('),
+  );
+
+  it('taps the core wet chain, not the node it feeds', () => {
+    expect(body).toContain('const sourceNode = this.stereoMerge as unknown as AudioNode;');
+    expect(body).toContain('sourceNode.connect(inputGain);');
+    expect(body, 'tapping return_ while feeding return_ is the ring').not.toContain('returnNode.connect(inputGain)');
+  });
+
+  it('still adds its taps to the return', () => {
+    expect(body).toContain('wetGain.connect(returnNode);');
+  });
+
+  it('no longer divides its own input down to bound a ring it does not have', () => {
+    expect(body, 'the wet-cancelling attenuation is back').not.toContain('0.8 / ringGain');
+    expect(body).toContain('inputGain.gain.value = 1;');
+  });
+
+  it('releases the tap it actually made', () => {
+    expect(body).toContain('sourceNode.disconnect(inputGain);');
+  });
+
+  it('the internal cross-feed is the only loop, and it is bounded', () => {
+    // fb is clamped to 0.9, so the L->R->L ring gain is at most 0.81.
+    expect(body).toContain('Math.min(0.9,  feedback ?? this.settings.pingPongFeedback)');
+    expect(0.9 * 0.9).toBeLessThan(1);
+  });
+});

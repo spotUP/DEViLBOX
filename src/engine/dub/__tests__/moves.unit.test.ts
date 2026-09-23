@@ -134,6 +134,9 @@ function buildFakeBus() {
     // of the gesture, so the settings mirror cannot revert them mid-hold.
     // Returns the release function the move calls on dispose.
     claimSettingKeys: vi.fn(() => vi.fn()),
+    // ringMod reads the user's resting `ringModMix` so its release restores
+    // their voicing rather than the move's full-wet setting.
+    getSettings: vi.fn(() => ({ ringModMix: 0.5 })),
     // Wet gestures hold the return governor off while a performer is driving
     // the wet path, so it cannot correct the gesture away. Ref-counted like
     // `claimSettingKeys`; returns the release the move calls on dispose.
@@ -357,10 +360,10 @@ describe('delayTimeThrow', () => {
 describe.each([
   ['oscBass',       oscBass,       'startOscBass',       'oscBass',       { freq: 55, level: 0.9 }],
   ['crushBass',     crushBass,     'startCrushBass',     'crushBass',     { freq: 55, bits: 3, level: 0.55 }],
-  ['subHarmonic',   subHarmonic,   'startSubHarmonic',   'subHarmonic',   { freq: 55, threshold: 0.035, level: 0.85 }],
+  ['subHarmonic',   subHarmonic,   'startSubHarmonic',   'subHarmonic',   { freq: 55, threshold: 0.035, level: 1.4 }],
   ['tubbyScream',   tubbyScream,   'startTubbyScream',   'tubbyScream',   { centerHz: 500, sweepHz: 900, sweepSec: 3.5, feedbackAmount: 1.3 }],
   ['stereoDoubler', stereoDoubler, 'startStereoDoubler', 'stereoDoubler', { delayMs: 25, feedback: 0.55, wet: 0.9 }],
-  ['tapeWobble',    tapeWobble,    'startTapeWobble',    'tapeWobble',    { depthMs: 35, rateHz: 2.5 }],
+  ['tapeWobble',    tapeWobble,    'startTapeWobble',    'tapeWobble',    { depthMs: 70, rateHz: 2.5 }],
 ] as const)('hold move %s', (_name, move, busMethod, releaseKey, expectedDefaults) => {
   it('calls the expected bus method with default params', () => {
     const { bus } = buildFakeBus();
@@ -573,15 +576,15 @@ describe('voltageStarve', () => {
     const { bus } = buildFakeBus();
     voltageStarve.execute(ctx(bus, {}));
     expect(bus.setSettings).toHaveBeenCalledWith(
-      expect.objectContaining({ lofiEnabled: true, lofiBits: 6 }),
+      expect.objectContaining({ lofiEnabled: true, lofiBits: 2 }),
     );
   });
 
   it('uses custom targetBits param', () => {
     const { bus } = buildFakeBus();
-    voltageStarve.execute(ctx(bus, { params: { targetBits: 4 } }));
+    voltageStarve.execute(ctx(bus, { params: { targetBits: 6 } }));
     expect(bus.setSettings).toHaveBeenCalledWith(
-      expect.objectContaining({ lofiEnabled: true, lofiBits: 4 }),
+      expect.objectContaining({ lofiEnabled: true, lofiBits: 6 }),
     );
   });
 
@@ -604,7 +607,11 @@ describe('ringMod', () => {
       expect.objectContaining({
         ringModEnabled: true,
         ringModFreq: 440,
-        ringModAmount: 0.5,
+        // Full send and fully wet: the send is a parallel ADD beside the core
+        // wet chain, so at 0.5/0.5 the ring-modulated content arrived at a
+        // quarter of the dry beside it and read as a sheen, not as ring mod.
+        ringModAmount: 1,
+        ringModMix: 1,
       }),
     );
   });
@@ -627,7 +634,8 @@ describe('ringMod', () => {
     expect(handle).not.toBeNull();
     handle!.dispose();
     expect(bus.setSettings).toHaveBeenLastCalledWith(
-      expect.objectContaining({ ringModEnabled: false, ringModAmount: 0 }),
+      // The release puts the user's own mix back, not the move's full wet.
+      expect.objectContaining({ ringModEnabled: false, ringModAmount: 0, ringModMix: 0.5 }),
     );
   });
 });

@@ -700,6 +700,9 @@ export async function getDubBusState(): Promise<Record<string, unknown>> {
       masterToneTrim: g(b.masterToneTrim),
       masterLowMidDipDb: (b.masterLowMidDip as { gain?: { value?: number } } | undefined)?.gain?.value ?? null,
       masterHpfHz: (b.masterHpf as { frequency?: { value?: number } } | undefined)?.frequency?.value ?? null,
+      // What each colour stage is contributing right now — 0 means the stage
+      // is not in circuit, whatever its settings say.
+      colourStageGains: (b as { colourStageGains?: Record<string, number | null> }).colourStageGains ?? null,
       convolverDry: g(b.masterConvolverDry),
       convolverWet: g(b.masterConvolverWet),
       chorusWet: g(b.masterChorusWet),

@@ -5925,6 +5925,31 @@ export class DubBus {
   /** True while a performer is deliberately driving the wet path. */
   get wetGestureActive(): boolean { return this._wetGestures > 0; }
 
+  /**
+   * What every colour stage is currently contributing to the return.
+   *
+   * Read by the MCP probe. Without it there was no way to answer "is this
+   * stage actually in circuit" short of reading node gains in a debugger, and
+   * a whole week went into asking that question about moves that turned out
+   * to be alive but quiet (2026-09-23). A stage at 0 is not engaged; a stage
+   * at its amount is. `lofi` is a crossfade, so its two halves are reported
+   * together — bypass at 1 with send at 0 means the crusher is out of the
+   * path however crushed `lofiBits` says it is.
+   */
+  get colourStageGains(): Record<string, number | null> {
+    const g = (n: GainNode | null | undefined): number | null => (n ? n.gain.value : null);
+    return {
+      ringModSend: g(this.ringModSend),
+      lofiSend: g(this.lofiSend),
+      lofiBypass: g(this.lofiBypass),
+      sweepOutput: g(this.sweepOutput),
+      plateSend: g(this.plateSend),
+      extFeedbackGain: g(this.extFeedbackGain),
+      return_: g(this.return_),
+      input: g(this.input),
+    };
+  }
+
   /** Ref-counted, like `claimSettingKeys`, so overlapping moves nest safely. */
   holdWetGesture(): () => void {
     this._wetGestures++;
@@ -6239,26 +6264,25 @@ export class DubBus {
     const feedbackR = ctx.createGain();
     feedbackR.gain.value = fb;
 
-    // Input gain
+    // Input gain.
+    //
+    // Unity, because there is no longer an outer loop to bound. This used to
+    // tap `return_` AND feed `return_`, a closed ring through the output, so
+    // it had to divide its own input down by `0.8 / (2*wet/(1-fb))` to stop
+    // the thing running away. The arithmetic of that is worth stating: the
+    // output ends up at `0.4 * (1 - fb)` of the input REGARDLESS of `wet`,
+    // because raising wet raises ringGain and divides straight back out. The
+    // wet control was a no-op, and the taps always arrived about 14 dB under
+    // the return — which is why the move read as nothing however hard it was
+    // pushed (2026-09-23, "no starve or ping pong").
+    //
+    // The cure is the same one the external feedback loop needed: do not
+    // close a ring through the output. It taps the CORE wet chain now and
+    // adds its taps to the return in parallel, so the only loop left is the
+    // internal L/R cross-feed at gain `fb^2` — 0.25 at the shipped 0.5, and
+    // bounded by construction. `wet` is now the output level it claims to be.
     const inputGain = ctx.createGain();
-    // Bound the ring so it cannot run away.
-    //
-    // This is a closed loop through the OUTPUT: return_ -> inputGain -> delays
-    // -> wetGain -> return_, with cross-feed recirculating inside it. The
-    // internal loop settles at 1/(1-fb), both taps reach the output, so the
-    // round-trip gain is 2*wet/(1-fb). At the shipped Mad Professor values
-    // (fb 0.5, wet 0.7) that is 2.8 — every pass 9dB louder than the last, into
-    // clipping within seconds, and AutoDub's madProfessor persona fires this
-    // unattended.
-    //
-    // Unlike the external feedback path, which is both clamped and backed by
-    // the extFeedbackLimit soft-clip governor, nothing bounded this one, and
-    // landing on return_ puts it past the input clip and the sidechain.
-    //
-    // 0.8 target rather than 1.0: at exactly unity the ring sustains forever
-    // instead of decaying, which is a drone, not a delay.
-    const ringGain = 2 * Math.max(0.01, wetAmt) / Math.max(0.05, 1 - fb);
-    inputGain.gain.value = Math.min(1, 0.8 / ringGain);
+    inputGain.gain.value = 1;
 
     // Wet gain for output
     const wetGain = ctx.createGain();
@@ -6280,12 +6304,12 @@ export class DubBus {
     feedbackR.connect(delayL);      // R → L cross-feed
     merger.connect(wetGain);
 
-    // Tap from the bus return path (post-echo) as input.
-    // return_ is the final gain before master — we tap post-processing here
-    // so the ping-pong processes the already-effected bus signal.
+    // Tap the END of the core wet chain and add the taps to the return.
+    // Parallel, never a ring: see the note on `inputGain` above.
+    const sourceNode = this.stereoMerge as unknown as AudioNode;
     const returnNode = this.return_ as unknown as AudioNode;
     try {
-      returnNode.connect(inputGain);
+      sourceNode.connect(inputGain);
       wetGain.connect(returnNode);
     } catch (err) {
       console.warn('[DubBus] startPingPong connect failed:', err);
@@ -6297,7 +6321,8 @@ export class DubBus {
       wetGain.gain.linearRampToValueAtTime(0, t + 0.08);
       setTimeout(() => {
         try {
-          returnNode.disconnect(inputGain);
+          // The tap is on the core chain now, not the return.
+          sourceNode.disconnect(inputGain);
           wetGain.disconnect();
           merger.disconnect();
           delayL.disconnect(); delayR.disconnect();
