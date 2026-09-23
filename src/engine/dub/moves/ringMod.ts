@@ -21,6 +21,11 @@ export const ringMod: DubMove = {
     const freq = params.freq ?? this.defaults.freq;
     const amount = params.amount ?? this.defaults.amount;
 
+    // Announced like the moves that own a bus method. This one reaches the
+    // audio through `setSettings`, which does not log these keys, so without
+    // this line the move is invisible to `get_console_errors` and "did Ring
+    // engage" has no answer short of reading node gains.
+    console.log(`[DubBus] ringMod ▶ freq=${freq}Hz amount=${amount}`);
     bus.setSettings({
       ringModEnabled: true,
       ringModFreq: freq,

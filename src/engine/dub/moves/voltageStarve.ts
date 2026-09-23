@@ -19,6 +19,9 @@ export const voltageStarve: DubMove = {
   execute({ bus, params }) {
     const targetBits = params.targetBits ?? this.defaults.targetBits;
 
+    // Announced for the same reason as ringMod: this move reaches the audio
+    // through `setSettings`, so nothing else says it ran.
+    console.log(`[DubBus] voltageStarve ▶ bits=${targetBits}`);
     // Enable lo-fi and set to target bit depth
     bus.setSettings({
       lofiEnabled: true,

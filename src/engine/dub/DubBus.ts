@@ -1360,6 +1360,11 @@ export class DubBus {
     const priorAmt   = this.settings.sweepAmount;
     const priorRate  = this.settings.sweepRateHz;
     const priorDepth = this.settings.sweepDepthMs;
+    // Which engine is in the path matters more than the amount: the same move
+    // drives a comb or a phaser depending on `sweepMode`, and reported as
+    // "Liquid is dead" it was a phaser at its resting 0.15 Hz.
+    console.log(`[DubBus] combSweep ▶ mode=${this.settings.sweepMode} amount=${targetAmount}`
+      + ` rate=${rateHz}Hz depth=${depthMs}ms (was amount=${priorAmt} rate=${priorRate}Hz)`);
     const now = this.context.currentTime;
     const tc = rampSec / 3;
 
@@ -6155,13 +6160,17 @@ export class DubBus {
    * Returns a dispose function that tears down the nodes and disconnects.
    */
   startPingPong(lMs?: number, rMs?: number, feedback?: number, wet?: number): () => void {
-    if (!this.enabled) return () => {};
+    if (!this.enabled) {
+      console.warn('[DubBus] startPingPong ignored — bus disabled');
+      return () => {};
+    }
     const ctx = this.context;
     const now = ctx.currentTime;
     const lDelay = Math.max(10, Math.min(2000, lMs ?? this.settings.pingPongLMs));
     const rDelay = Math.max(10, Math.min(2000, rMs ?? this.settings.pingPongRMs));
     const fb     = Math.max(0,  Math.min(0.9,  feedback ?? this.settings.pingPongFeedback));
     const wetAmt = Math.max(0,  Math.min(1,    wet      ?? this.settings.pingPongWet));
+    console.log(`[DubBus] madProfPingPong ▶ L=${lDelay}ms R=${rDelay}ms fb=${fb.toFixed(2)} wet=${wetAmt.toFixed(2)}`);
 
     // Stereo splitter
     const splitter = ctx.createChannelSplitter(2);
@@ -6967,7 +6976,15 @@ export class DubBus {
    * accurate but punchy enough for a dub move.
    */
   startSubHarmonic(freq = 55, threshold = 0.06, level = 0.5): () => void {
-    if (!this.enabled) return () => {};
+    // Bare `return () => {}` said nothing. A move that silently declines is
+    // indistinguishable from one that ran and was inaudible, which is the
+    // confusion that cost 2026-09-23 — see `startStereoDoubler`, which has
+    // warned about exactly this since it was written.
+    if (!this.enabled) {
+      console.warn('[DubBus] startSubHarmonic ignored — bus disabled');
+      return () => {};
+    }
+    console.log(`[DubBus] subHarmonic ▶ freq=${freq}Hz threshold=${threshold} level=${level}`);
     const ctx = this.context;
     const analyser = ctx.createAnalyser();
     analyser.fftSize = 512;
@@ -7726,6 +7743,7 @@ export class DubBus {
 
   startTapeWobble(depthMs = 30, rateHz = 2.5): () => void {
     const baseline = this.settings.echoRateMs;
+    console.log(`[DubBus] tapeWobble ▶ depth=${depthMs}ms rate=${rateHz}Hz baseline=${baseline}ms`);
     const period = 1000 / Math.max(0.05, rateHz);
     const stepMs = Math.max(16, period / 16);  // 16 steps per cycle, ≥16ms
     let phase = 0;
