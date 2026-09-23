@@ -124,8 +124,19 @@ function faderColumn(
     type: 'fader',
     x,
     y,
-    w: 1,
-    h: 4,
+    // Two units, like the button above it and the select button below it. A
+    // channel strip is ONE column of the device, and a one-unit fader sat
+    // against the left edge of that column while everything else in the strip
+    // filled it — so the fader bank did not line up with the button rows at
+    // all ("the big button group is not aligned with the sliders
+    // horizontally", 2026-09-23). The fader graphic centres within the strip.
+    w: 2,
+    // Five, not four. The select row sits at y+5, so a four-unit fader left an
+    // empty grid row between the bottom of the travel and the button under it
+    // — a band of nothing across the whole fader bank ("there is a gap under
+    // the channel fades", 2026-09-23). On the device the travel runs down TO
+    // the select button; nothing is between them.
+    h: 5,
     midi: { type: 'cc', channel, number: cc, touchCc },
     group: group ?? 'faders',
     label,
