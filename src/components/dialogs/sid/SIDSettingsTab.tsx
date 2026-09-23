@@ -45,7 +45,7 @@ export const SIDSettingsTab: React.FC<SIDSettingsTabProps> = ({ className }) => 
 
   const sectionClass = 'bg-dark-bgSecondary/50 border border-dark-border/50 rounded-lg p-4 space-y-3';
   const labelClass = 'text-xs font-medium text-text-muted';
-  const selectClass = 'w-full text-sm bg-dark-bgPrimary border border-blue-800/40 rounded px-2 py-1.5 text-text-primary';
+  const selectClass = 'w-full text-sm bg-dark-bg border border-blue-800/40 rounded px-2 py-1.5 text-text-primary';
 
   return (
     <div className={className}>
@@ -164,7 +164,7 @@ export const SIDSettingsTab: React.FC<SIDSettingsTabProps> = ({ className }) => 
                   type="checkbox"
                   checked={voiceMask[i]}
                   onChange={() => handleVoiceToggle(i)}
-                  className="w-3.5 h-3.5 rounded border-dark-border bg-dark-bgPrimary text-blue-500 focus:ring-blue-500/30"
+                  className="w-3.5 h-3.5 rounded border-dark-border bg-dark-bg text-blue-500 focus:ring-blue-500/30"
                 />
                 <span className="text-xs text-text-secondary">Voice {i + 1}</span>
               </label>

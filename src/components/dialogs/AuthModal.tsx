@@ -72,8 +72,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
         {/* Content */}
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           {/* Info banner */}
-          <div className="bg-accent-info/10 border border-accent-info/30 rounded p-3">
-            <p className="text-xs text-accent-info">
+          <div className="bg-accent-highlight/10 border border-accent-highlight/30 rounded p-3">
+            <p className="text-xs text-accent-highlight">
               {mode === 'login'
                 ? 'Login to save your songs to the server and access them from any device.'
                 : 'Create an account to save your songs to the server. No email required!'}

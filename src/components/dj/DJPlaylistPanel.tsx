@@ -1537,7 +1537,7 @@ export const DJPlaylistPanel: React.FC<DJPlaylistPanelProps> = ({ onClose }) => 
                 <span className="text-amber-400">{precacheProgress.current}/{precacheProgress.total}</span>
                 <span className="text-green-400 ml-1">{precacheProgress.cached + precacheProgress.skipped} cached</span>
                 {precacheProgress.failed > 0 && <span className="text-red-400 ml-1">{precacheProgress.failed} fail</span>}
-                <span className="text-text-tertiary truncate ml-2 flex-1 text-right">{precacheProgress.trackName}</span>
+                <span className="text-text-muted truncate ml-2 flex-1 text-right">{precacheProgress.trackName}</span>
               </div>
               <div className="h-1 bg-dark-bgTertiary rounded-full overflow-hidden">
                 <div className="h-full bg-amber-500 transition-all duration-300"

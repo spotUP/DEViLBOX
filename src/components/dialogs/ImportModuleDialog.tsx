@@ -557,7 +557,7 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
                     onChange={handleSingleFileInput}
                     className="hidden"
                   />
-                  <span className="text-xs px-3 py-1.5 bg-dark-bg border border-dark-border rounded hover:border-dark-borderHover text-text-muted hover:text-text-primary transition-colors cursor-pointer">
+                  <span className="text-xs px-3 py-1.5 bg-dark-bg border border-dark-border rounded hover:border-dark-borderLight text-text-muted hover:text-text-primary transition-colors cursor-pointer">
                     Pick Files
                   </span>
                 </label>
@@ -568,7 +568,7 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
                     onChange={handleFolderInput}
                     className="hidden"
                   />
-                  <span className="text-xs px-3 py-1.5 bg-dark-bg border border-dark-border rounded hover:border-dark-borderHover text-text-muted hover:text-text-primary transition-colors cursor-pointer">
+                  <span className="text-xs px-3 py-1.5 bg-dark-bg border border-dark-border rounded hover:border-dark-borderLight text-text-muted hover:text-text-primary transition-colors cursor-pointer">
                     Pick Folder
                   </span>
                 </label>
