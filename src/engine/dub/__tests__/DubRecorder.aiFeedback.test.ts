@@ -1,9 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { useDubStore } from '@/stores/useDubStore';
 
 /**
  * AutoDub recording its own performance and playing it back on the same row.
  *
- * `startDubRecorder` is always on and captured anything tagged `source:
+ * `startDubRecorder` captured anything tagged `source:
  * 'live'` — which includes `origin: 'ai'`, AutoDub performing. On a song whose
  * editor renders from native data (AHX, MusicLine, GTUltra, TFMX) no cell can
  * be written, so capture falls to the automation CURVE path and writes a point
@@ -78,6 +79,10 @@ function fireEvent(origin: string): Record<string, unknown> {
 beforeEach(() => {
   addPoint.mockClear();
   setCell.mockClear();
+  // This file is about WHOSE fires are captured (the user's, not AutoDub's),
+  // so the deck has to be armed — the arm gate itself is tested in
+  // DubRecorder.test.ts.
+  useDubStore.setState({ armed: true });
   vi.useFakeTimers();
 });
 
