@@ -1269,6 +1269,7 @@ export const DubDeckStrip: React.FC = () => {
   const deckApi = useMemo<DubDeckControlApi>(() => ({
     fireTrigger,
     holdButtonProps,
+    latchToggle,
     handleToggle,
     handleRatePreset,
     setArmed,
@@ -1276,11 +1277,14 @@ export const DubDeckStrip: React.FC = () => {
     // The master fader writes every channel, exactly as the master card's
     // fader does — one control, one behaviour, whichever layout draws it.
     setMasterSend: (v: number) => {
-      for (let i = 0; i < visibleChannelCount; i++) setChannelDubSend(i, v);
+      // One action, not a loop: moving the master is one gesture. The loop
+      // was sixteen dispatches per drag frame and made the fader laggy
+      // (2026-09-23).
+      useMixerStore.getState().setAllChannelDubSends(v);
     },
     setBusParam: (field: string, value: number) =>
       setDubBus({ [field]: value, characterPreset: 'custom' }),
-  }), [fireTrigger, holdButtonProps, handleToggle, handleRatePreset, setArmed,
+  }), [fireTrigger, holdButtonProps, latchToggle, handleToggle, handleRatePreset, setArmed,
        setChannelDubSend, visibleChannelCount, setDubBus]);
 
   /**
