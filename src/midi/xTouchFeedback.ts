@@ -60,7 +60,7 @@ type RingMode = 'pan' | 'fan';
 
 const COMPACT_BUTTON_LED_OFF = 0;
 const COMPACT_BUTTON_LED_ON = 2;
-const COMPACT_OUTPUT_CHANNEL = 1; // X-Touch Compact Global Channel (factory default "2" = 0-indexed 1)
+export const COMPACT_OUTPUT_CHANNEL = 1; // X-Touch Compact Global Channel (factory default "2" = 0-indexed 1)
 const MCU_BUTTON_LED_OFF = 0;
 const MCU_BUTTON_LED_ON = 127;
 
@@ -210,30 +210,25 @@ function buildCompactMessages(state: XTouchFeedbackState, touched: XTouchTouched
     messages.push([0xb0 | (COMPACT_OUTPUT_CHANNEL & 0x0f), cc & 0x7f, ccValue & 0x7f]);
   }
 
-  const rings: Array<[number, number]> = [
-    // Top row (CC 10-17): dub params
-    [10, state.dub.echoWet],
-    [11, state.dub.echoIntensity],
-    [12, normalizeEchoRate(state.dub.echoRateMs)],
-    [13, state.dub.springWet],
-    [14, state.dub.returnGain],
-    [15, normalizeDubHPF(state.dub.hpfCutoff)],
-    [16, state.dub.sidechainAmount],
-    [17, state.masterVolume],
-    // Right column (CC 18-25): deck filters + DJ
-    [18, state.deckA.filter],
-    [19, state.deckA.filterQ],
-    [20, state.deckB.filter],
-    [21, state.deckB.filterQ],
-    [22, normalizePitch(state.deckA.pitch)],
-    [23, normalizePitch(state.deckB.pitch)],
-    [24, state.crossfader],
-    [25, state.deckA.volume],
-  ];
-
-  for (const [cc, value] of rings) {
-    messages.push(encodeCompactRingValue(COMPACT_OUTPUT_CHANNEL, cc, value));
-  }
+  // Encoder RINGS are not built here.
+  //
+  // This function used to carry its own table of which CC showed which
+  // parameter, and that table disagreed with the preset: it sent `echoWet` to
+  // CC 10 where the preset maps `dub.returnGain`, and the master volume to
+  // CC 17 where the preset maps `dub.hpfCutoff`. The whole 10-25 block was
+  // left over from before the encoders were given to the dub bus, so the rings
+  // showed the wrong values for the controls underneath them.
+  //
+  // It also pushed all sixteen rings on EVERY flush, with no per-ring
+  // comparison — twenty-five times a second, whether or not anything had
+  // moved. That is most of a 31.25 kbaud MIDI link spent re-stating what the
+  // device already knew, and it is why moving the master fader made the other
+  // faders' motors lag: their messages were queued behind the noise
+  // (2026-09-23).
+  //
+  // Rings now come from the preset's own CC mappings, driven by the live
+  // parameter values, in `useXTouchFeedback` — one table naming each control,
+  // and a message only when a value actually changes.
 
   // Button LEDs — dub moves (all button rows), mute (row 2), solo (row 3)
   // Row 1: notes 16-23 (dub hold moves)
@@ -322,14 +317,6 @@ function encodeFanRingValue(normalized: number): number {
 function normalizePitch(semitones: number): number {
   const normalized = (semitones + 12) / 24;
   return clamp01(normalized);
-}
-
-function normalizeEchoRate(valueMs: number): number {
-  return clamp01((valueMs - 80) / (1200 - 80));
-}
-
-function normalizeDubHPF(valueHz: number): number {
-  return clamp01((valueHz - 20) / (1000 - 20));
 }
 
 function clamp01(value: number): number {
