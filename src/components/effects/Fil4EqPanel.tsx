@@ -6,6 +6,7 @@ import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { Fil4EqCurve, type BandId } from './Fil4EqCurve';
 import { Button } from '@components/ui/Button';
 import type { Fil4EqEffect } from '@/engine/effects/Fil4EqEffect';
+import { Fader } from '@components/controls/Fader';
 import { useDrumPadStore } from '@/stores/useDrumPadStore';
 import { computeGenreBaseline } from '@engine/dub/AutoEQ';
 import { useTrackerAnalysisStore } from '@/stores/useTrackerAnalysisStore';
@@ -373,15 +374,15 @@ export const Fil4EqPanel: React.FC<Props> = ({ effect }) => {
         {col('Lo Shelf', <>
           <span className="text-[8px] font-mono text-text-muted text-center block">{fmtHz(state.ls.freq)}</span>
           <div className="flex flex-col items-center gap-1">
-            <input
-              type="range"
-              min={-24} max={24} step={0.5}
+            <Fader
               value={state.ls.gain}
-              onChange={e => setLS({ gain: Number(e.target.value) })}
-              style={{ writingMode: 'vertical-lr', direction: 'rtl', height: '80px', width: '20px' } as React.CSSProperties}
-              className="accent-accent-primary cursor-pointer"
+              min={-24} max={24}
+              onChange={v => setLS({ gain: Math.round(v * 2) / 2 })}
+              size="md"
+              color="accent-primary"
+              formatValue={fmtDb}
+              title={`Low Shelf gain — ${fmtDb(state.ls.gain)}`}
             />
-            <span className="text-[8px] font-mono text-text-secondary tabular-nums">{fmtDb(state.ls.gain)}</span>
           </div>
           {toggle(state.ls.enabled, () => setLS({ enabled: !state.ls.enabled }))}
           <EqFader label="Q" value={state.ls.q} min={0.1} max={2} step={0.01}
@@ -391,15 +392,15 @@ export const Fil4EqPanel: React.FC<Props> = ({ effect }) => {
         {([0,1,2,3] as const).map(i => col(`P${i+1}`, <>
           <span className="text-[8px] font-mono text-text-muted text-center block">{fmtHz(state.p[i].freq)}</span>
           <div className="flex flex-col items-center gap-1">
-            <input
-              type="range"
-              min={-24} max={24} step={0.5}
+            <Fader
               value={state.p[i].gain}
-              onChange={e => setP(i, { gain: Number(e.target.value) })}
-              style={{ writingMode: 'vertical-lr', direction: 'rtl', height: '80px', width: '20px' } as React.CSSProperties}
-              className="accent-accent-primary cursor-pointer"
+              min={-24} max={24}
+              onChange={v => setP(i, { gain: Math.round(v * 2) / 2 })}
+              size="md"
+              color="accent-primary"
+              formatValue={fmtDb}
+              title={`Peak ${i + 1} gain — ${fmtDb(state.p[i].gain)}`}
             />
-            <span className="text-[8px] font-mono text-text-secondary tabular-nums">{fmtDb(state.p[i].gain)}</span>
           </div>
           {toggle(state.p[i].enabled, () => setP(i, { enabled: !state.p[i].enabled }))}
           <EqFader label="BW" value={state.p[i].bw} min={0.05} max={4} step={0.05}
@@ -410,15 +411,15 @@ export const Fil4EqPanel: React.FC<Props> = ({ effect }) => {
         {col('Hi Shelf', <>
           <span className="text-[8px] font-mono text-text-muted text-center block">{fmtHz(state.hs.freq)}</span>
           <div className="flex flex-col items-center gap-1">
-            <input
-              type="range"
-              min={-24} max={24} step={0.5}
+            <Fader
               value={state.hs.gain}
-              onChange={e => setHS({ gain: Number(e.target.value) })}
-              style={{ writingMode: 'vertical-lr', direction: 'rtl', height: '80px', width: '20px' } as React.CSSProperties}
-              className="accent-accent-primary cursor-pointer"
+              min={-24} max={24}
+              onChange={v => setHS({ gain: Math.round(v * 2) / 2 })}
+              size="md"
+              color="accent-primary"
+              formatValue={fmtDb}
+              title={`High Shelf gain — ${fmtDb(state.hs.gain)}`}
             />
-            <span className="text-[8px] font-mono text-text-secondary tabular-nums">{fmtDb(state.hs.gain)}</span>
           </div>
           {toggle(state.hs.enabled, () => setHS({ enabled: !state.hs.enabled }))}
           <EqFader label="Q" value={state.hs.q} min={0.1} max={2} step={0.01}
