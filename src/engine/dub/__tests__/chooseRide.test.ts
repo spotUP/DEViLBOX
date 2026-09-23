@@ -140,18 +140,58 @@ describe('the machine is more cautious than the hand', () => {
     // Removing the return governor was right — it held the wet 18 dB down and
     // made every move inaudible — but nothing downstream now catches a return
     // ridden to 1.0 against an already-saturating bus.
-    const clamped = clampRide({ param: 'dub.returnGain', target: 1, bars: 4, curve: 'ease' });
+    const clamped = clampRide({ param: 'dub.returnGain', target: 1, bars: 4, curve: 'ease', returns: true });
     expect(clamped.target).toBe(MACHINE_RIDE_CEILING['dub.returnGain']);
     expect(clamped.target).toBeLessThan(1);
   });
 
   it('leaves a target already under the ceiling alone', () => {
-    const ride = { param: 'dub.returnGain', target: 0.4, bars: 4, curve: 'ease' as const };
+    const ride = { param: 'dub.returnGain', target: 0.4, bars: 4, curve: 'ease' as const, returns: true };
     expect(clampRide(ride)).toEqual(ride);
   });
 
   it('does not clamp what it has no ceiling for', () => {
-    const ride = { param: 'dub.channelSend.ch0', target: 1, bars: 2, curve: 'ease' as const };
+    const ride = { param: 'dub.channelSend.ch0', target: 1, bars: 2, curve: 'ease' as const, returns: false };
     expect(clampRide(ride).target).toBe(1);
+  });
+});
+
+/**
+ * What comes home and what does not.
+ */
+describe('which rides return', () => {
+  const rideFor = (persona: keyof typeof AUTO_DUB_PERSONAS) =>
+    chooseRide(ctx({ persona: AUTO_DUB_PERSONAS[persona] }), willRide())!;
+
+  it('a bus parameter is borrowed, not taken', () => {
+    // The bus tone belongs to the mix. A hand that moves it gives it back.
+    expect(rideFor('tubby').returns, 'hpfCutoff').toBe(true);
+    expect(rideFor('scientist').returns, 'returnGain').toBe(true);
+  });
+
+  it('a channel send may be left open', () => {
+    // Opening a channel into the echo and leaving it there is a real dub
+    // decision, and the performer's own fader is what undoes it.
+    expect(rideFor('jammy').param).toMatch(/^dub\.channelSend\./);
+    expect(rideFor('jammy').returns).toBe(false);
+  });
+});
+
+/**
+ * A send that is already closed has nothing to give.
+ */
+describe('a dub send is not a symmetric control', () => {
+  it('rides a nearly-closed send UP, never further down', () => {
+    // Riding a send down starves the bus of the signal the effects work on,
+    // and a one-way send ride leaves it there. Measured 2026-09-23: three of
+    // four sends walked down to near zero and the desk went quiet.
+    for (const current of [0, 0.1, 0.3]) {
+      const r = chooseRide(ctx({
+        persona: AUTO_DUB_PERSONAS.jammy,      // reaches for channelSend
+        currentValue: () => current,
+      }), willRide())!;
+      expect(r.param).toMatch(/^dub\.channelSend\./);
+      expect(r.target, `from ${current}`).toBeGreaterThan(current);
+    }
   });
 });

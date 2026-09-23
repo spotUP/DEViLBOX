@@ -43,6 +43,20 @@ export interface AutoDubRide {
    *  but one. */
   bars: number;
   curve: RideCurve;
+  /**
+   * Does the hand come BACK?
+   *
+   * Almost always yes, and the first version got this wrong. A ride that only
+   * travels leaves its parameter wherever the journey ended, and a few minutes
+   * of that walks the whole desk into a corner — measured 2026-09-23 with the
+   * high-pass parked at 410 Hz, which takes the entire low end out of the dub
+   * send and leaves the bus sounding dead.
+   *
+   * The master plan's own phrase says so: `snare -> echoThrow -> short send
+   * gesture -> feedback ride -> RELEASE`. A dub gesture is an excursion. You
+   * sweep the filter up and you bring it back.
+   */
+  returns: boolean;
 }
 
 /**
@@ -147,9 +161,15 @@ export function chooseRide(ctx: RideTickCtx, rng: () => number): AutoDubRide | n
   const depth = rideDepth(persona, ctx.intensity);
   return {
     param,
-    target: rideDestination(current, depth, rng),
+    target: rideDestination(current, depth, rng, param),
     bars: rideLength(persona),
     curve: config.curve,
+    // A channel send may be LEFT somewhere — opening a channel into the echo
+    // and leaving it open is a real dub decision, and the performer's own
+    // fader is the thing that undoes it. Everything else is an excursion: the
+    // bus tone belongs to the mix, not to the machine, so a hand that moves it
+    // has to give it back.
+    returns: !param.startsWith('dub.channelSend.'),
   };
 }
 
@@ -167,13 +187,20 @@ function resolveParam(target: RideTarget, ctx: RideTickCtx, rng: () => number): 
  * A ride that lands on the value it started from is a hand that moved for
  * nothing.
  */
-function rideDestination(current: number, depth: number, rng: () => number): number {
+function rideDestination(current: number, depth: number, rng: () => number, param?: string): number {
   const headroomUp = 1 - current;
   const headroomDown = current;
   // Travel in whichever direction has room; prefer the roomier side so a
   // parameter already at an extreme rides back rather than pressing against
   // the rail.
-  const up = headroomUp >= headroomDown ? rng() < 0.75 : rng() < 0.25;
+  let up = headroomUp >= headroomDown ? rng() < 0.75 : rng() < 0.25;
+
+  // A dub SEND is not symmetric. Riding it down starves the bus of the very
+  // signal the effects work on, and a one-way send ride leaves it there —
+  // measured 2026-09-23 with three of four sends walked down and the owner
+  // reporting the desk almost dead. A send that is already low has nothing to
+  // give, so the only interesting direction is up.
+  if (param?.startsWith('dub.channelSend.') && current < 0.35) up = true;
   const room = up ? headroomUp : headroomDown;
   const distance = Math.min(depth, room) * (0.5 + rng() * 0.5);
   const next = up ? current + distance : current - distance;
@@ -192,6 +219,12 @@ function rideDestination(current: number, depth: number, rng: () => number): num
 export const MACHINE_RIDE_CEILING: Readonly<Record<string, number>> = {
   'dub.returnGain': 0.85,
   'dub.echoIntensity': 0.9,
+  // 20 + 0.25 * 980 = 265 Hz. The high-pass is the Big Knob, and sweeping it
+  // up is the gesture — but the dub send exists to put LOW END into the echo,
+  // so parking it high guts the bus. Measured at 410 Hz on 2026-09-23 with the
+  // owner reporting "the desk is almost dead". Tubby's own position in the
+  // character matrix is 100 Hz.
+  'dub.hpfCutoff': 0.25,
 };
 
 /** Apply the machine's own ceiling to a ride target. */
