@@ -218,9 +218,12 @@ export const ControllerShapedDeck: React.FC<ControllerShapedDeckProps> = ({
    * faders to the bottom of the select row, across every column they use.
    */
   const faderZone = useMemo(() => {
-    const zone = placements.filter(
-      (p) => p.control.type === 'fader' || p.control.group === 'select',
-    );
+    // FADERS ONLY. It used to swallow the select group as well, so the row of
+    // mute buttons under the faders was never drawn — "we have no knobs under
+    // the sliders in the ui" (2026-09-23). On the device those buttons are a
+    // row of their own beneath the bank, and each one mutes the channel above
+    // it; hiding them left the performer no way to see what they do.
+    const zone = placements.filter((p) => p.control.type === 'fader');
     if (zone.length === 0) return null;
     return {
       x0: Math.min(...zone.map((p) => p.control.x)),
