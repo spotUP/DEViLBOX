@@ -818,6 +818,16 @@ interface MixerStoreActions {
 
   // Dub bus send
   setChannelDubSend: (ch: number, amount: number, opts?: DubWriteOrigin) => void;
+  /**
+   * Move EVERY channel's dub send to one value — the master send.
+   *
+   * One action rather than a loop over `setChannelDubSend`, because moving the
+   * master is one gesture. Driving it per channel meant sixteen dispatches,
+   * sixteen whole-array scans and thirty-two dynamic `import()` calls for each
+   * CC the fader sent, roughly a hundred times a second, and the fader was
+   * "super laggy" (2026-09-23).
+   */
+  setAllChannelDubSends: (amount: number, opts?: DubWriteOrigin) => void;
 
   // Manual dub role override (null = auto, string = ChannelRole)
   setChannelDubRole: (ch: number, role: string | null) => void;
@@ -1156,6 +1166,52 @@ export const useMixerStore = create<MixerStore>()(
 
       // State update — rAF-batched so drag doesn't cause 60 re-renders/sec.
       scheduleDubSendStoreWrite(ch, clamped, set);
+    },
+
+    setAllChannelDubSends(amount: number, opts?: DubWriteOrigin): void {
+      const clamped = Math.max(0, Math.min(1, amount));
+      const count = get().channels.length;
+
+      for (let ch = 0; ch < count; ch++) {
+        if (!opts?.transient) dubSendBaselines.noteUserSend(ch, clamped);
+
+        let handledBySid = false;
+        try {
+          if (getActiveDubBus()?.setSidVoiceDubSend(ch, clamped)) handledBySid = true;
+        } catch { /* not in SID mode or dub bus not ready */ }
+
+        if (!handledBySid) {
+          try {
+            getChannelRoutedEffectsManager()?.setChannelDubSend(ch, clamped);
+          } catch (e) {
+            console.warn('[MixerStore] setAllChannelDubSends: manager unavailable', e);
+          }
+          try {
+            getActiveDubBus()?.setWholeMixDubSend(ch, clamped);
+          } catch { /* whole-mix fallback not active */ }
+        }
+
+        scheduleDubSendStoreWrite(ch, clamped, set);
+      }
+
+      // Every send closed at once, so the check is a single comparison rather
+      // than the per-channel scan `setChannelDubSend` has to do.
+      if (clamped <= 0) {
+        try { getActiveDubBus()?.drainEchoContent(); } catch { /* not ready */ }
+      }
+
+      // One import for the whole pass, then a publish per channel — the
+      // recorder still sees every fader that moved, which is all of them.
+      if (!opts?.transient && count > 0) {
+        void (async () => {
+          const { publishChannelSend } = await import('@/lib/dub/channelSendStream');
+          const { getCurrentRow } = await import('@/engine/dub/dubGrid');
+          const row = getCurrentRow();
+          for (let ch = 0; ch < count; ch++) {
+            publishChannelSend({ channelId: ch, value: clamped, row, source: opts?.source ?? 'live' });
+          }
+        })().catch(() => { /* dub subsystem not loaded — nothing is listening */ });
+      }
     },
 
     setChannelDubRole(ch: number, role: string | null): void {

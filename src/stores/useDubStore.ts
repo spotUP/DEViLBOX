@@ -178,7 +178,21 @@ export const useDubStore = create<DubStore>((set) => ({
   setAutoDubEnabled: (v) => set({ autoDubEnabled: v }),
   autoDubIntensity: 0.5,
   setAutoDubIntensity: (v) => batchDubSet('intensity', { autoDubIntensity: Math.max(0, Math.min(1, v)) }),
-  autoDubPersona: 'custom',
+  /**
+   * A NAMED persona, not `custom`.
+   *
+   * `custom` means "whatever the user has dialled in", and its ride list is
+   * the channel sends alone — so a fresh boot could only ever ride the sends
+   * and never reach for a control on the bus. Reported 2026-09-23: "it always
+   * starts at custom ... i have never seen it twist a knob though in the ui or
+   * on the controller". It had nothing to twist.
+   *
+   * Scientist because its rides are continuous and land on `returnGain` and
+   * `echoIntensity` — two controls that exist on screen AND on the X-Touch's
+   * encoder row, so the first thing a new listener sees is the machine
+   * actually playing the desk.
+   */
+  autoDubPersona: 'scientist',
   setAutoDubPersona: (v) => set({ autoDubPersona: v }),
   autoDubMoveBlacklist: [],
   setAutoDubMoveBlacklist: (v) => set({ autoDubMoveBlacklist: v }),
