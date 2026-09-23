@@ -30,9 +30,22 @@ export function rideProgress(curve: RideCurve, t: number): number {
   }
 }
 
-/** The value a ride should be at, given how far through it is. */
+/**
+ * The value a ride should be at, given how far through it is.
+ *
+ * A RETURNING ride is an excursion: out for the first half, back for the
+ * second, so it ends where it began. Without this a ride leaves its parameter
+ * wherever the journey stopped, and a few minutes of that walks the desk into
+ * a corner — the high-pass measured parked at 410 Hz on 2026-09-23, which
+ * takes the whole low end out of the dub send.
+ */
 export function rideValueAt(from: number, ride: AutoDubRide, t: number): number {
-  const p = rideProgress(ride.curve, t);
+  const clamped = Math.max(0, Math.min(1, t));
+  // Out and back: 0 → 1 → 0 across the ride's own length.
+  const journey = ride.returns
+    ? (clamped <= 0.5 ? clamped * 2 : (1 - clamped) * 2)
+    : clamped;
+  const p = rideProgress(ride.curve, journey);
   return from + (ride.target - from) * p;
 }
 
@@ -100,8 +113,9 @@ export function tickRide(active: ActiveRide, inputs: RideTickInputs): RideOutcom
   const t = ride.bars <= 0 ? 1 : elapsed / ride.bars;
   const value = rideValueAt(from, ride, t);
 
+  // A returning ride ends where it STARTED; a one-way ride ends on its target.
   return t >= 1
-    ? { kind: 'done', param: ride.param, value: ride.target }
+    ? { kind: 'done', param: ride.param, value: ride.returns ? from : ride.target }
     : { kind: 'move', param: ride.param, value };
 }
 
@@ -143,7 +157,29 @@ export class RideBook {
     return [...this.rides.values()];
   }
 
-  /** Stop everything — transport stop, persona change, bus off. */
+  /**
+   * Stop everything and PUT BACK what was borrowed.
+   *
+   * Dropping rides on the floor is not enough. A ride interrupted mid-journey
+   * leaves its parameter wherever it had got to, and that value is persisted —
+   * a one-way high-pass ride wrote 410 Hz into the saved settings and the next
+   * song booted with no low end at all (2026-09-23). Worse, a ride that had
+   * opened a channel send left that channel routed into a bus that was then
+   * unwired, and the audio went silent.
+   *
+   * So an interrupted ride hands its parameter back to where the hand found
+   * it. Returns the restores for the caller to apply.
+   */
+  releaseAll(): Array<{ param: string; value: number }> {
+    const restores = [...this.rides.values()].map((active) => ({
+      param: active.ride.param,
+      value: active.from,
+    }));
+    this.rides.clear();
+    return restores;
+  }
+
+  /** Drop everything WITHOUT restoring — only when the values no longer matter. */
   clear(): void {
     this.rides.clear();
   }

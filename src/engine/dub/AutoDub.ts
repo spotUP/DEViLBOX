@@ -1304,6 +1304,24 @@ let _movesFiredThisBar = 0;
  */
 const _rideBook = new RideBook();
 let _lastRideBar: number | null = null;
+
+/**
+ * End every ride and hand each parameter back to where the hand found it.
+ *
+ * Called whenever the performer stops being in charge: transport stop, or the
+ * dub bus being switched off. Both cases bit on 2026-09-23 — an interrupted
+ * high-pass ride persisted 410 Hz into the saved settings so the next song had
+ * no low end, and rides that had opened channel sends left those channels
+ * routed into a bus that was then unwired, which killed the audio outright.
+ */
+function releaseRides(): void {
+  for (const restore of _rideBook.releaseAll()) {
+    try {
+      routeParameterToEngine(restore.param, restore.value, undefined, 'live');
+    } catch { /* the bus may already be gone; the store write is what matters */ }
+  }
+  _lastRideBar = null;
+}
 let _wetFiredThisBar = 0;
 /** performance.now() timestamp (ms) after which the next wet fire is allowed.
  *  Set to: holdMs + WET_DECAY_EXTRA_MS after a hold-based wet fire so new
@@ -1522,10 +1540,11 @@ function tickImpl(): void {
   if (!transport.isPlaying) {
     // Release all held auto-dub moves so effects don't linger after stop.
     cancelAllGestures('stopped');
-    // Rides go with them. A ride left in flight across a stop holds its
-    // parameter wherever the journey happened to reach.
-    _rideBook.clear();
-    _lastRideBar = null;
+    // Rides go with them, and they GIVE BACK what they borrowed. A ride left
+    // in flight across a stop otherwise holds its parameter wherever the
+    // journey happened to reach — and that value is persisted, so the next
+    // song boots with it.
+    releaseRides();
     // And hand back anything still held at the mixer. A cancelled gesture
     // normally closes its own transient; this covers the case where the closer
     // was lost, which is how every channel ended up muted with the song
@@ -1750,6 +1769,14 @@ function tickImpl(): void {
   // new. In that order, because a ride that finishes this tick frees its
   // parameter for the next one, and the other order would make every ride
   // wait a full tick for a hand that had already let go.
+  // The bus going off ends the performance too. Rides that had opened channel
+  // sends would otherwise leave those channels routed into a bus that is about
+  // to be unwired, and the audio dies with it.
+  if (!getActiveDubBus()?.getSettings?.().enabled) {
+    releaseRides();
+    return;
+  }
+
   const heldParams = getHeldDubParams();
   for (const outcome of _rideBook.tick({ bar, nowMs: performance.now(), heldParams })) {
     if (outcome.kind === 'abandoned') continue;
