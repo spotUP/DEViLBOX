@@ -72,7 +72,7 @@ export const SynthErrorDialog: React.FC = () => {
         {/* Expand/Collapse Debug Details */}
         <button
           onClick={() => setShowDetails(!showDetails)}
-          className="flex items-center gap-2 text-sm text-dark-text-secondary hover:text-text-primary transition-colors"
+          className="flex items-center gap-2 text-sm text-text-secondary hover:text-text-primary transition-colors"
         >
           {showDetails ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
           {showDetails ? 'Hide' : 'Show'} Debug Details
@@ -80,24 +80,24 @@ export const SynthErrorDialog: React.FC = () => {
 
         {/* Debug Details */}
         {showDetails && (
-          <div className="bg-dark-surface rounded-lg p-4 space-y-3">
+          <div className="bg-dark-bgSecondary rounded-lg p-4 space-y-3">
             <div className="grid grid-cols-2 gap-4 text-sm">
               <div>
-                <span className="text-dark-text-secondary">Timestamp:</span>
+                <span className="text-text-secondary">Timestamp:</span>
                 <p className="font-mono text-xs">{activeError.debugData.timestamp}</p>
               </div>
               <div>
-                <span className="text-dark-text-secondary">AudioContext:</span>
+                <span className="text-text-secondary">AudioContext:</span>
                 <p className="font-mono text-xs">{activeError.debugData.audioContextState}</p>
               </div>
               <div>
-                <span className="text-dark-text-secondary">WASM Supported:</span>
+                <span className="text-text-secondary">WASM Supported:</span>
                 <p className="font-mono text-xs">
                   {activeError.debugData.wasmSupported ? 'Yes' : 'No'}
                 </p>
               </div>
               <div>
-                <span className="text-dark-text-secondary">Error Type:</span>
+                <span className="text-text-secondary">Error Type:</span>
                 <p className="font-mono text-xs">{activeError.errorType}</p>
               </div>
             </div>
@@ -105,7 +105,7 @@ export const SynthErrorDialog: React.FC = () => {
             {/* Stack Trace */}
             {activeError.stack && (
               <div>
-                <span className="text-dark-text-secondary text-sm">Stack Trace:</span>
+                <span className="text-text-secondary text-sm">Stack Trace:</span>
                 <pre className="mt-1 p-2 bg-black/50 rounded text-xs font-mono text-red-300 overflow-x-auto max-h-32 overflow-y-auto">
                   {activeError.stack}
                 </pre>
@@ -114,8 +114,8 @@ export const SynthErrorDialog: React.FC = () => {
 
             {/* Full Debug String (for copy) */}
             <div>
-              <span className="text-dark-text-secondary text-sm">Full Debug Report:</span>
-              <pre className="mt-1 p-2 bg-black/50 rounded text-xs font-mono text-dark-text-secondary overflow-x-auto max-h-40 overflow-y-auto whitespace-pre-wrap">
+              <span className="text-text-secondary text-sm">Full Debug Report:</span>
+              <pre className="mt-1 p-2 bg-black/50 rounded text-xs font-mono text-text-secondary overflow-x-auto max-h-40 overflow-y-auto whitespace-pre-wrap">
                 {getDebugString(activeError)}
               </pre>
             </div>
@@ -123,7 +123,7 @@ export const SynthErrorDialog: React.FC = () => {
         )}
 
         {/* Help Text */}
-        <p className="text-sm text-dark-text-secondary">
+        <p className="text-sm text-text-secondary">
           This synth failed to initialize properly. Please copy the debug information
           and report this issue. The synth will not be available until the error is resolved.
         </p>
@@ -133,7 +133,7 @@ export const SynthErrorDialog: React.FC = () => {
         <div className="flex justify-between w-full">
           <button
             onClick={handleCopy}
-            className="flex items-center gap-2 px-4 py-2 bg-dark-surface hover:bg-dark-hover rounded transition-colors"
+            className="flex items-center gap-2 px-4 py-2 bg-dark-bgSecondary hover:bg-dark-bgHover rounded transition-colors"
           >
             {copied ? (
               <>

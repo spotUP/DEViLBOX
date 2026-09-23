@@ -170,7 +170,7 @@ export const InstrumentEffectsModal: React.FC<InstrumentEffectsModalProps> = ({ 
             <span className="text-xs text-text-muted px-2 py-1 bg-dark-bg rounded">
               {currentInstrument.synthType}
             </span>
-            <span className="text-[10px] text-accent-info px-2 py-1 bg-accent-info/10 rounded">
+            <span className="text-[10px] text-accent-highlight px-2 py-1 bg-accent-highlight/10 rounded">
               {AVAILABLE_EFFECTS.length} effects available
             </span>
 

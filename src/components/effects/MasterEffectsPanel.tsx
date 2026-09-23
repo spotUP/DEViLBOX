@@ -640,7 +640,7 @@ export const MasterEffectsPanel = forwardRef<MasterEffectsPanelHandle, MasterEff
             />
             <button
               onClick={handleSavePreset}
-              className="px-3 py-1.5 text-xs font-medium rounded bg-accent-primary text-text-primary hover:bg-accent-primaryHover transition-colors"
+              className="px-3 py-1.5 text-xs font-medium rounded bg-accent-primary text-text-primary hover:bg-accent-primary transition-colors"
             >
               Save
             </button>
