@@ -492,6 +492,34 @@ const BEHRINGER_X_TOUCH_COMPACT: DJControllerPreset = {
     { channel: 0, cc: 33, param: 'dub.channelSend.ch13' },
     { channel: 0, cc: 34, param: 'dub.channelSend.ch14' },
     { channel: 0, cc: 35, param: 'dub.channelSend.ch15' },
+    // Fader touch on Layer B, continuing into the second bank the same way the
+    // sends do.
+    { channel: 0, cc: 111, param: 'dub.channelTouch.ch8' },
+    { channel: 0, cc: 112, param: 'dub.channelTouch.ch9' },
+    { channel: 0, cc: 113, param: 'dub.channelTouch.ch10' },
+    { channel: 0, cc: 114, param: 'dub.channelTouch.ch11' },
+    { channel: 0, cc: 115, param: 'dub.channelTouch.ch12' },
+    { channel: 0, cc: 116, param: 'dub.channelTouch.ch13' },
+    { channel: 0, cc: 117, param: 'dub.channelTouch.ch14' },
+    { channel: 0, cc: 118, param: 'dub.channelTouch.ch15' },
+    // The ENCODERS MIRROR Layer A. "there is no reason to not mirror
+    // everything but the buttons to bank b" — switching layer should not move
+    // your hands off the bus tone. The faders are the exception, and
+    // deliberately so: they CONTINUE into channels 9-16, because a second bank
+    // of faders is more useful than a second copy of the first eight.
+    { channel: 0, cc: 37, param: 'dub.returnGain' },
+    { channel: 0, cc: 38, param: 'dub.echoIntensity' },
+    { channel: 0, cc: 39, param: 'dub.echoRateMs' },
+    { channel: 0, cc: 40, param: 'dub.springWet' },
+    { channel: 0, cc: 41, param: 'dub.bassShelfGainDb' },
+    { channel: 0, cc: 42, param: 'dub.midScoopGainDb' },
+    { channel: 0, cc: 43, param: 'dub.stereoWidth' },
+    { channel: 0, cc: 44, param: 'dub.hpfCutoff' },
+    { channel: 0, cc: 45, param: 'dub.sweepAmount' },
+    { channel: 0, cc: 46, param: 'dub.sweepRateHz' },
+    { channel: 0, cc: 47, param: 'dub.plateStageMix' },
+    { channel: 0, cc: 48, param: 'dub.sidechainAmount' },
+    { channel: 0, cc: 49, param: 'dub.echoWet' },
   ],
   noteMappings: [
     // ── Button row 1 (notes 16-23): the eight TOGGLES ────────────────────
@@ -573,10 +601,19 @@ const BEHRINGER_X_TOUCH_COMPACT: DJControllerPreset = {
 
     // ── Layer B ──────────────────────────────────────────────────────────
     // Row 1 (71-78): the moves Layer A had no room for.
-    { channel: 0, note: 71, param: 'dub.transportTapeStop' },
-    { channel: 0, note: 72, param: 'dub.skankEchoThrow' },
-    { channel: 0, note: 73, param: 'dub.skankFloatThrow' },
-    { channel: 0, note: 74, param: 'dub.channelThrow' },
+    // Layer B button row 1: THE PER-CHANNEL OPS, acting on the channel your
+    // hand is on. This is the one thing that does not mirror Layer A, and it
+    // is what the layer switch is FOR — Layer A plays the global moves, Layer
+    // B plays the channel moves. Eight ops, eight buttons; Mute is not among
+    // them because the row at the bottom of the device already is the mutes.
+    { channel: 0, note: 71, param: 'dub.channelThrow' },
+    { channel: 0, note: 72, param: 'dub.echoThrow' },
+    { channel: 0, note: 73, param: 'dub.skankEchoThrow' },
+    { channel: 0, note: 74, param: 'dub.skankFloatThrow' },
+    { channel: 0, note: 75, param: 'dub.dubStab' },
+    { channel: 0, note: 76, param: 'dub.echoBuildUp' },
+    { channel: 0, note: 77, param: 'dub.bassEmphasis' },
+    { channel: 0, note: 78, param: 'dub.transportTapeStop' },
 
     // Row 2 (79-86): mixer solos.
     { channel: 0, note: 79, action: 'channel_solo_1' },
@@ -598,7 +635,16 @@ const BEHRINGER_X_TOUCH_COMPACT: DJControllerPreset = {
     { channel: 0, note: 93, action: 'channel_mute_7' },
     { channel: 0, note: 94, action: 'channel_mute_8' },
 
-    // Notes 95-109 (Layer B select row and transport) are deliberately left
+    // Layer B's select row mutes the SECOND bank, matching its faders.
+    { channel: 0, note: 95, param: 'dub.channelMute.ch8' },
+    { channel: 0, note: 96, param: 'dub.channelMute.ch9' },
+    { channel: 0, note: 97, param: 'dub.channelMute.ch10' },
+    { channel: 0, note: 98, param: 'dub.channelMute.ch11' },
+    { channel: 0, note: 99, param: 'dub.channelMute.ch12' },
+    { channel: 0, note: 100, param: 'dub.channelMute.ch13' },
+    { channel: 0, note: 101, param: 'dub.channelMute.ch14' },
+    { channel: 0, note: 102, param: 'dub.channelMute.ch15' },
+    // Notes 103-109 (Layer B transport) are deliberately left
     // unassigned as user space. Nothing is put on notes 63/64 either: the
     // factory documentation calls CC63 and CC64 the foot switch and
     // expression pedal jacks, which collides with reading them as the push
