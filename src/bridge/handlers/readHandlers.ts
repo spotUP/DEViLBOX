@@ -746,6 +746,14 @@ export async function getDubBusState(): Promise<Record<string, unknown>> {
   return {
     hasBus: !!bus,
     storeSettings,
+    // The bus's OWN settings, beside the store's. Moves write the bus directly
+    // — ringMod, voltageStarve and eqSweep all call `setSettings` / `setReturnEQ`
+    // on the instance — and the store never learns. Reading only the store,
+    // `ringModEnabled` stayed false with Ring held and `returnEqEnabled` stayed
+    // false through a whole EQ sweep (2026-09-23), and each time the absence
+    // was read as the move not engaging. Where these two disagree, the bus is
+    // what is playing.
+    liveSettings: bus?.getSettings?.() ?? null,
     channelDubSends,
     registeredChannelTaps,
     insertProbe,
