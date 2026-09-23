@@ -35,9 +35,6 @@ const state: RouterState = {
  * Check if event target is an input field where we shouldn't intercept keys.
  */
 function isInputElement(e: KeyboardEvent): boolean {
-  // Check for focused Pixi text input (no DOM element, uses global flag)
-  if ((window as any).__pixiInputFocused) return true;
-
   const target = e.target as HTMLElement;
   if (!target) return false;
 
