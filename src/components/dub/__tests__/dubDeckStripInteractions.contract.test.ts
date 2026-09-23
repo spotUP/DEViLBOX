@@ -211,7 +211,11 @@ describe('DubDeckStrip — move rows line up as columns', () => {
   });
 
   it('keeps a label on one line, so no button is taller than its row', () => {
-    expect(SOURCE).toMatch(/const base = '[^']*whitespace-nowrap/);
+    // Both button sizes: the move rows' 'md' and the channel cards' 'sm'.
+    const base = SOURCE.match(/const base = size === 'sm'\s*\?\s*'([^']*)'\s*:\s*'([^']*)'/);
+    expect(base, 'colorClasses base moved').not.toBeNull();
+    expect(base![1]).toContain('whitespace-nowrap');
+    expect(base![2]).toContain('whitespace-nowrap');
   });
 });
 
