@@ -1653,7 +1653,7 @@ export function createMcpServer(): McpServer {
 
   server.tool(
     'get_modal_state',
-    'Check if any modal/dialog is currently open and what type it is',
+    'Check whether any dialog is covering the DEViLBOX UI. Reports all three blocking surfaces: a useUIStore modal (modalOpen, cleared with dismiss_modal), the crash-recovery prompt (recoveryPromptOpen, answered with resolve_recovery_prompt) and the synth-error dialog (synthErrorDialogOpen + synthError.message, cleared with dismiss_errors). Every other tool also reports an open dialog on its own response under `blockingDialog` / `blockingDialogHint`, so this call is for checking deliberately rather than for noticing. A dialog means the app may be half-started: engines stall and every audio level reads zero.',
     {},
     () => call('get_modal_state'),
   );
