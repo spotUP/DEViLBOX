@@ -50,6 +50,30 @@ export function isFaderTouched(faderCC: number): boolean {
   return _faderTouched.get(faderCC) ?? false;
 }
 
+/**
+ * Which dub parameters the performer currently has a hand on.
+ *
+ * A machine-driven ride must never fight a human hand, and "a hand" means two
+ * things on this surface: a touch-sensitive fader being held, and a knob whose
+ * soft takeover has engaged — that knob is now driving its parameter, so the
+ * machine is not.
+ *
+ * Returns parameter PATHS rather than CC numbers, because that is the
+ * vocabulary a ride speaks.
+ */
+export function getHeldDubParams(): Set<string> {
+  const held = new Set<string>();
+  for (const [cc, touched] of _faderTouched) {
+    if (!touched) continue;
+    // Layer A faders are CC 1-8, Layer B 28-35; both ride channel sends.
+    if (cc >= 1 && cc <= 8) held.add(`dub.channelSend.ch${cc - 1}`);
+    else if (cc >= 28 && cc <= 35) held.add(`dub.channelSend.ch${cc - 28 + 8}`);
+  }
+  const mapper = DJControllerMapper.getInstanceIfExists?.();
+  if (mapper) for (const param of mapper.engagedParams()) held.add(param);
+  return held;
+}
+
 export class DJControllerMapper {
   private static instance: DJControllerMapper | null = null;
 
@@ -106,6 +130,24 @@ export class DJControllerMapper {
    * the behringer compact they reset and start from 0" (2026-09-23).
    */
   private takeover = new TakeoverBook();
+
+  /** The instance, only if one has been made. Never creates one. */
+  static getInstanceIfExists(): DJControllerMapper | null {
+    return DJControllerMapper.instance;
+  }
+
+  /**
+   * Parameters whose knob has taken control.
+   *
+   * An engaged knob is driving its parameter, so a ride must leave it alone.
+   */
+  engagedParams(): string[] {
+    const out: string[] = [];
+    for (const [key, mapping] of this.ccLookup) {
+      if (this.takeover.engaged(key)) out.push(mapping.param);
+    }
+    return out;
+  }
 
   setPreset(preset: DJControllerPreset | null): void {
     this.activePreset = preset;
