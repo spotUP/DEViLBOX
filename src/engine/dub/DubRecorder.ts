@@ -282,6 +282,15 @@ export function startDubRecorder(): () => void {
    */
   const unsubSend = subscribeChannelSend((write) => {
     if (write.source !== 'live') return;          // playback, not a hand
+    // Riding the send is a performance like any other, so it needs the same
+    // permission. The gate went onto the fire path alone and this third
+    // subscription kept writing `dub.channelSend` curves with REC off —
+    // reported 2026-09-23 as "i see dublanes in amanda now but record is off"
+    // while a sweep was opening and closing a send between measurements. The
+    // block below also force-opens the automation lanes, so the junk it wrote
+    // announced itself. Same defect as the one fixed in 55b38200c, one
+    // subscription over.
+    if (!useDubStore.getState().armed) return;
     if (currentSongIsTimeBasedLane()) return;     // no automation rows to write on
     if (write.channelId < 0) return;
 
