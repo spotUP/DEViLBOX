@@ -131,3 +131,34 @@ describe('the controller diagram uses the wrapped label and the tooltip', () => 
     expect(Number(cell![1]), 'cells were 32, too narrow for the names').toBeGreaterThanOrEqual(40);
   });
 });
+
+/**
+ * "the dialog is too small there are scrollbars" (2026-09-23). The panel was
+ * drawn at a fixed pixel size — 22 grid units at 44 px is 1000 px, wider than
+ * the `xl` dialog's 896 px — so the diagram sat behind scrollbars instead of
+ * fitting. It scales to the room it is given now, and the dialog is wider.
+ */
+describe('the controller diagram fits its dialog', () => {
+  const VIEW = readFileSync(join(process.cwd(), 'src/components/midi/ControllerLayoutView.tsx'), 'utf-8');
+  const MODAL = readFileSync(join(process.cwd(), 'src/components/midi/MIDIMapperModal.tsx'), 'utf-8');
+  const SHELL = readFileSync(join(process.cwd(), 'src/components/ui/Modal.tsx'), 'utf-8');
+
+  it('scales instead of forcing a pixel width', () => {
+    const svg = VIEW.slice(VIEW.indexOf('    <svg'), VIEW.indexOf('{/* Background panel */}'));
+    expect(svg, 'a fixed width is what overflowed').not.toMatch(/width=\{svgWidth\}/);
+    expect(svg, 'a fixed height is what overflowed').not.toMatch(/height=\{svgHeight\}/);
+    expect(svg).toContain('viewBox=');
+    expect(svg).toContain('preserveAspectRatio="xMidYMid meet"');
+    expect(svg).toContain('w-full h-auto');
+  });
+
+  it('is bounded vertically too, so a tall panel does not push the footer away', () => {
+    expect(VIEW).toContain('max-h-[calc(90vh-15rem)]');
+  });
+
+  it('opens in a dialog wide enough for a diagram', () => {
+    expect(MODAL).toContain('size="2xl"');
+    expect(SHELL).toContain("'2xl': 'max-w-7xl w-full'");
+    expect(SHELL).toContain("size?: 'sm' | 'md' | 'lg' | 'xl' | '2xl' | 'fullscreen';");
+  });
+});
