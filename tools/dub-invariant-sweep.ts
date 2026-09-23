@@ -71,6 +71,7 @@ import {
   checkMasterGainAgrees,
   checkCaptureNotAborted,
   type DubMeterState,
+  checkTailDecays,
 } from '../src/engine/dub/meterInvariants';
 import { readFileSync } from 'fs';
 import { basename } from 'path';
@@ -298,29 +299,39 @@ for (const sig of ['SIGINT', 'SIGTERM'] as const) {
  *    run were all moves that fired immediately after this check's stop/play
  *    cycle, and none of them ratchets the send when fired on its own.
  *
- * So this version touches nothing. It samples the bus return twice, 1.5 s
- * apart, and asks whether it is decaying. A released move leaves a tail that
- * falls; a move still driving the loop holds its level up or climbs.
+ * A third version touched nothing and sampled `busReturn` twice with the song
+ * still feeding the bus — and `busReturn` carries the live send as well as the
+ * tail, so a passage getting louder read exactly like a move that never
+ * stopped (`filterDrop` 0.110 -> 0.181, `sonarPing` 0.073 -> 0.187,
+ * 2026-09-23). Third instrument in a row that measured the music.
+ *
+ * So: close the sends, let the send ramp land, sample the return twice 1.5 s
+ * apart, restore the sends. With no input the return can only be a tail or a
+ * loop still running, and the judgement is `checkTailDecays`. The transport
+ * is not touched, and the sends go back to exactly what they were, so the
+ * next move's REST baseline is unchanged.
  */
 async function checkQuietAfterRelease(moveId: string): Promise<Check> {
   const read = async () => {
     const st = await call('get_dub_bus_state');
     return st?.masterInsertLevels?.busReturn ?? 0;
   };
-  const first = await read();
-  await sleep(1500);
-  const second = await read();
-  // Below the floor there is nothing left to decay — already quiet.
-  if (second < SILENCE_RMS) return { name: 'HOLD', ok: true, detail: 'bus return quiet' };
-  // Growing, or holding within 10% of where it was, means something is still
-  // feeding it.
-  if (second >= first * 0.9) {
-    return {
-      name: 'HOLD', ok: false,
-      detail: `${moveId} still driving the bus after release (busReturn ${first.toFixed(6)} -> ${second.toFixed(6)} over 1.5 s)`,
-    };
+  const before = sendsOf(await call('get_dub_bus_state'));
+  const open = before.map((v, i) => [i, v] as const).filter(([, v]) => v > 0);
+  for (const [i] of open) {
+    try { await call('set_channel_dub_send', { channel: i, amount: 0 }, 3000); } catch { /* best effort */ }
   }
-  return { name: 'HOLD', ok: true, detail: `bus return decaying (${first.toFixed(6)} -> ${second.toFixed(6)})` };
+  try {
+    await sleep(300); // the send ramp
+    const first = await read();
+    await sleep(1500);
+    const second = await read();
+    return checkTailDecays(first, second, moveId);
+  } finally {
+    for (const [i, v] of open) {
+      try { await call('set_channel_dub_send', { channel: i, amount: v }, 3000); } catch { /* best effort */ }
+    }
+  }
 }
 
 function sendsOf(state: any): number[] {

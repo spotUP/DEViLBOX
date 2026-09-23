@@ -14,6 +14,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import {
+  checkTailDecays,
   checkBusInputWet,
   checkMasterGainAgrees,
   checkCaptureNotAborted,
@@ -154,5 +155,32 @@ describe('checkCaptureNotAborted', () => {
       level: 'warn',
       message: '[DubBus] backwardReverb abort — empty ring buffer (no audio reached bus.input yet)',
     }]).ok).toBe(false);
+  });
+});
+
+/**
+ * The HOLD check, judged with the sends closed. The recorded 2026-09-23 pairs
+ * were read with a send OPEN and are therefore not tail measurements at all;
+ * they are here as the shape of a failure, which the sweep can now only
+ * produce when something really is still driving the loop.
+ */
+describe('checkTailDecays', () => {
+  it('passes a falling tail', () => {
+    expect(checkTailDecays(0.29, 0.02, 'filterDrop').ok).toBe(true);
+  });
+
+  it('passes a return already under the floor', () => {
+    expect(checkTailDecays(0.0004, 0.0003, 'delayPreset380').ok).toBe(true);
+    expect(checkTailDecays(0.5, 0.0009, 'x').detail).toBe('bus return quiet');
+  });
+
+  it('fails a return that holds or climbs — the shape the open-send reads had', () => {
+    expect(checkTailDecays(0.110, 0.181, 'filterDrop').ok).toBe(false);
+    expect(checkTailDecays(0.073, 0.187, 'sonarPing').ok).toBe(false);
+    expect(checkTailDecays(0.2, 0.19, 'x').ok).toBe(false);
+  });
+
+  it('fails an unreadable meter rather than passing it as quiet', () => {
+    expect(checkTailDecays(NaN, 0, 'x').ok).toBe(false);
   });
 });
