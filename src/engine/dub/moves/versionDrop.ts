@@ -87,7 +87,17 @@ export const versionDrop: DubMove = {
 
     const plans = planDrop(profiles, { exclude: alreadyMuted });
     const taking = droppedChannels(plans);
-    if (taking.length === 0) return { dispose() {} };
+    if (taking.length === 0) {
+      // A lit button and no change is what "dead" looks like. Reported
+      // 2026-09-22 as "version drop sometimes fails to fire": it fires every
+      // time, and on a song where nothing profiles as arrangement over the
+      // groove there is nothing to take. Say so, the way masterDrop does.
+      console.warn('[DubBus] versionDrop ▶ nothing to take — no channel profiles as arrangement over the groove');
+      void import('@/stores/useNotificationStore').then(({ notify }) =>
+        notify.warning('Version Drop: nothing to drop — every channel reads as riddim'));
+      return { dispose() {} };
+    }
+    console.log(`[DubBus] versionDrop ▶ taking ${taking.map(p => `ch${p.channel}:${p.behavior}`).join(' ')}`);
 
     const timers: Array<ReturnType<typeof setTimeout>> = [];
     const held: ChannelDropPlan[] = [];
