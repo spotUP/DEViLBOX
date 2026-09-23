@@ -9,6 +9,7 @@
 
 import { getNativeContext, getDevilboxAudioContext } from '@utils/audio-context';
 import { FurnaceEffectRouter } from './FurnaceEffectRouter';
+import { collectIns2Uploads } from './ins2Uploads';
 import type { PlaybackCoordinator } from '@engine/PlaybackCoordinator';
 import type { TrackerSong } from '@engine/TrackerReplayer';
 import type { IsolationCapableEngine } from '@engine/tone/ChannelRoutedEffects';
@@ -2226,17 +2227,17 @@ export class FurnaceDispatchEngine implements IsolationCapableEngine {
       // DIV_CMD_INSTRUMENT. Each instrument must be in the global table
       // or the dispatch returns silence.
       if (opts.song.instruments.length > 0) {
-        let uploaded = 0;
-        for (let i = 0; i < opts.song.instruments.length; i++) {
-          const inst = opts.song.instruments[i];
-          const rawData = inst.rawBinaryData;
-          if (rawData && rawData.length > 4 &&
-              rawData[0] === 0x49 && rawData[1] === 0x4E && rawData[2] === 0x53 && rawData[3] === 0x32) {
-            this.loadIns2(i, rawData instanceof Uint8Array ? rawData : new Uint8Array(rawData));
-            uploaded++;
-          }
-        }
-        _log(`[FurnaceDispatchEngine] pre-uploaded ${uploaded}/${opts.song.instruments.length} INS2 instruments`);
+        // `collectIns2Uploads` knows where the blob actually lives. This read
+        // `inst.rawBinaryData`, which the converter never sets — it puts the
+        // blob on the furnace CONFIG — so this loop reported
+        // `pre-uploaded 0/43` for every song, nothing was in the table when
+        // the first row played, and each instrument went up lazily on its own
+        // first note. That upload clears the synth's ready flag, so the note
+        // that triggered it was dropped: one lost note per instrument on the
+        // ramp-in of every song (2026-09-24).
+        const uploads = collectIns2Uploads(opts.song.instruments as never[]);
+        for (const { slot, data } of uploads) this.loadIns2(slot, data);
+        _log(`[FurnaceDispatchEngine] pre-uploaded ${uploads.length}/${opts.song.instruments.length} INS2 instruments`);
       }
 
       // ── 6. Upload song data to the WASM sequencer ──────────────────────
