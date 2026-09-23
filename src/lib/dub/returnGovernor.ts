@@ -23,31 +23,44 @@
 
 import { stepRider, type RiderConfig, type RiderState } from './gainRider';
 
-/** Loudest the return may be, relative to the programme's RMS. 1 is unity. */
-export const MAX_WET_TO_PROGRAMME = 1.0;
+/**
+ * Loudest the return may be, relative to the programme's RMS. 4 is +12 dB.
+ *
+ * It was 1 — unity, "as loud as the music and no louder". That was written
+ * for "clips/dists" (2026-09-22): send 0.028 RMS, return 0.261, +19 dB, the
+ * echo louder than the song, and the sum into the clipper. The same day fixed
+ * that where it lives: the trim ride holds the clipper input to
+ * `CLIP_TARGET_PEAK` and the low band has its own ceiling. Measured
+ * 2026-09-23 with four sends at 0.96, `afterClip` sat at 0.18 against a 0.9
+ * knee. Nothing was clipping.
+ *
+ * What unity DID do was treat the wet chain's designed gain as an overshoot.
+ * A feedback echo at 0.79 settles near 1 / (1 - 0.79), the spring and plate
+ * add on top, and the return runs +10 to +11 dB over the programme at any
+ * send from 0.4 up. So the governor lived at its floor at every real send
+ * level — -11 dB at 0.15, -14 dB at 0.96 — and every return toggle was
+ * pressed into a return held at 12 %: "completely dead", faders at max.
+ *
+ * Dub wet is supposed to run hot. The clipper is fenced elsewhere. This
+ * governor keeps one job, a true runaway: 4x, +12 dB, is the top of the
+ * chain's own gain as measured, so it holds nothing the settings asked for
+ * and still catches the +19 dB case by 7 dB.
+ */
+export const MAX_WET_TO_PROGRAMME = 4.0;
 
 /** Same pace as the trim ride; deeper, because the bus can run +20 dB. */
 export const RETURN_GOVERNOR: RiderConfig = { attackFraction: 0.5, holdTicks: 8, releaseDb: 0.15, maxDb: 18 };
 
 /**
- * How fast a held gesture lets the governor go, dB per tick.
- *
- * The idle release is 0.15 dB a tick — a creep the ear must not read as
- * movement, and from the -18 dB floor that is thirty seconds. A performer
- * pressing a toggle is not asking for a creep: 2.25 dB a tick brings the
- * floor to -0 in two seconds, which is the pace of a hand on a fader.
- */
-export const GESTURE_RELEASE_DB = 2.25;
-
-/**
  * @param gestureHeld a performer is deliberately driving the wet path. The
- *   governor then RELEASES, at gesture pace, and never tightens: the press is
- *   the performer overriding the safety. 0c158b836 only stopped it tightening,
- *   and did nothing about a clamp earned before the press — with four sends
- *   at 0.96 through a 0.79-feedback echo the governor sat at its -18 dB floor
- *   and every toggle landed on a return held at 12 % (2026-09-23,
- *   "completely dead", faders at max). Runaway protection is untouched:
- *   the tick after the hand comes off governs as before.
+ *   governor may then LOOSEN but never tighten, and it loosens at the idle
+ *   creep — no faster. The first cut released at 2.25 dB a tick, thirteen dB
+ *   in two seconds and re-clamped in one on release, which was heard as the
+ *   move itself: "they all sound the same", "very reverb washed", "stutters
+ *   when i activate/deactivate" (2026-09-23). A gesture does not uncork the
+ *   wash; it only stops the governor fighting the move. With the headroom
+ *   above right the governor is at 0 at every real send level anyway, so
+ *   this branch matters only while a genuine runaway is being held down.
  */
 export function governReturn(
   state: RiderState,
@@ -58,7 +71,7 @@ export function governReturn(
 ): RiderState {
   if (gestureHeld) {
     const prev = Number.isFinite(state.db) ? Math.min(0, Math.max(-RETURN_GOVERNOR.maxDb, state.db)) : 0;
-    return { db: Math.min(0, prev + GESTURE_RELEASE_DB), hold: 0 };
+    return { db: Math.min(0, prev + RETURN_GOVERNOR.releaseDb), hold: 0 };
   }
   if (!programmeValid || !Number.isFinite(programmeRms) || programmeRms <= 0
     || !Number.isFinite(returnRms) || returnRms <= 0) {
