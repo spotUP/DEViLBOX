@@ -9,6 +9,7 @@
 import React, { useCallback } from 'react';
 import type { ControllerLayout, ControlDescriptor } from '@/midi/controllerLayouts';
 import type { ControlAssignment } from '@/stores/useMIDIPresetStore';
+import { wrapLabel, charsThatFit, describeControl } from '@/midi/controlLabel';
 
 // ============================================================================
 // TYPES
@@ -37,7 +38,11 @@ interface ControllerLayoutViewProps {
 // CONSTANTS
 // ============================================================================
 
-const CELL = 32; // pixels per grid unit
+// Pixels per grid unit. Was 32, which left 64 px between neighbouring
+// controls — narrower than the names printed under them, so the top encoder
+// row ran together into one unreadable string (2026-09-23). Labels wrap now,
+// and the extra width is what gives them room to wrap into.
+const CELL = 44;
 const PAD = 16;  // padding around the layout
 const ENCODER_R = 12;
 const BUTTON_SIZE = 24;
@@ -74,6 +79,36 @@ function getAssignmentLabel(assignment: ControlAssignment | undefined): string {
 }
 
 // ============================================================================
+// SHARED LABEL
+// ============================================================================
+
+/**
+ * A control's caption, wrapped to the space it actually has.
+ *
+ * Every control is 2 grid units apart, so that is the budget. Two lines, then
+ * an ellipsis — and the full target plus its MIDI address always live in the
+ * `<title>` on the control's group, which is the answer to "which knob is
+ * CC10" that the diagram never used to give.
+ */
+const ControlLabel: React.FC<{
+  cx: number;
+  top: number;
+  text: string;
+  fill: string;
+  fontSize: number;
+}> = ({ cx, top, text, fill, fontSize }) => {
+  const lines = wrapLabel(text, charsThatFit(CELL * 2, fontSize), 2);
+  if (lines.length === 0) return null;
+  return (
+    <text x={cx} y={top} fill={fill} fontSize={fontSize} fontFamily="monospace" textAnchor="middle">
+      {lines.map((line, i) => (
+        <tspan key={i} x={cx} dy={i === 0 ? 0 : fontSize + 1}>{line}</tspan>
+      ))}
+    </text>
+  );
+};
+
+// ============================================================================
 // CONTROL RENDERERS
 // ============================================================================
 
@@ -81,13 +116,15 @@ const EncoderControl: React.FC<{
   control: ControlDescriptor;
   color: { bg: string; border: string; text: string };
   label: string;
+  tooltip: string;
   onClick: () => void;
-}> = ({ control, color, label, onClick }) => {
+}> = ({ control, color, label, tooltip, onClick }) => {
   const cx = PAD + control.x * CELL + CELL;
   const cy = PAD + control.y * CELL + CELL / 2;
 
   return (
     <g onClick={onClick} style={{ cursor: 'pointer' }}>
+      <title>{tooltip}</title>
       {/* Ring LED background */}
       {control.hasRingLed && (
         <circle cx={cx} cy={cy} r={ENCODER_R + 4} fill="none" stroke={color.border} strokeWidth={2} opacity={0.3} />
@@ -97,9 +134,8 @@ const EncoderControl: React.FC<{
       {/* Pointer line */}
       <line x1={cx} y1={cy - ENCODER_R + 3} x2={cx} y2={cy - 3} stroke={color.text} strokeWidth={2} strokeLinecap="round" />
       {/* Label */}
-      <text x={cx} y={cy + ENCODER_R + 12} fill={color.text} fontSize={8} fontFamily="monospace" textAnchor="middle">
-        {label || control.label || control.id}
-      </text>
+      <ControlLabel cx={cx} top={cy + ENCODER_R + 12} fill={color.text} fontSize={8}
+        text={label || control.label || control.id} />
     </g>
   );
 };
@@ -108,13 +144,15 @@ const ButtonControl: React.FC<{
   control: ControlDescriptor;
   color: { bg: string; border: string; text: string };
   label: string;
+  tooltip: string;
   onClick: () => void;
-}> = ({ control, color, label, onClick }) => {
+}> = ({ control, color, label, tooltip, onClick }) => {
   const x = PAD + control.x * CELL + CELL - BUTTON_SIZE / 2;
   const y = PAD + control.y * CELL + CELL / 2 - BUTTON_SIZE / 2;
 
   return (
     <g onClick={onClick} style={{ cursor: 'pointer' }}>
+      <title>{tooltip}</title>
       {/* LED dot */}
       {control.hasLed && (
         <circle
@@ -129,10 +167,8 @@ const ButtonControl: React.FC<{
       <rect x={x} y={y} width={BUTTON_SIZE} height={BUTTON_SIZE} rx={3}
         fill={color.bg} stroke={color.border} strokeWidth={1.5} />
       {/* Label */}
-      <text x={x + BUTTON_SIZE / 2} y={y + BUTTON_SIZE + 11} fill={color.text}
-        fontSize={7} fontFamily="monospace" textAnchor="middle">
-        {(label || control.label || '').substring(0, 8)}
-      </text>
+      <ControlLabel cx={x + BUTTON_SIZE / 2} top={y + BUTTON_SIZE + 11} fill={color.text}
+        fontSize={7} text={label || control.label || ''} />
     </g>
   );
 };
@@ -141,14 +177,16 @@ const FaderControl: React.FC<{
   control: ControlDescriptor;
   color: { bg: string; border: string; text: string };
   label: string;
+  tooltip: string;
   onClick: () => void;
-}> = ({ control, color, label, onClick }) => {
+}> = ({ control, color, label, tooltip, onClick }) => {
   const h = (control.h ?? 4) * CELL - 8;
   const x = PAD + control.x * CELL + CELL - FADER_W / 2;
   const y = PAD + control.y * CELL + 4;
 
   return (
     <g onClick={onClick} style={{ cursor: 'pointer' }}>
+      <title>{tooltip}</title>
       {/* Fader track */}
       <rect x={x + FADER_W / 2 - 2} y={y} width={4} height={h} rx={2}
         fill="#222" stroke="#444" strokeWidth={0.5} />
@@ -156,10 +194,8 @@ const FaderControl: React.FC<{
       <rect x={x} y={y + h * 0.3} width={FADER_W} height={20} rx={3}
         fill={color.bg} stroke={color.border} strokeWidth={1.5} />
       {/* Label below */}
-      <text x={x + FADER_W / 2} y={y + h + 14} fill={color.text}
-        fontSize={8} fontFamily="monospace" textAnchor="middle">
-        {label || control.label || control.id}
-      </text>
+      <ControlLabel cx={x + FADER_W / 2} top={y + h + 14} fill={color.text} fontSize={8}
+        text={label || control.label || control.id} />
     </g>
   );
 };
@@ -168,20 +204,20 @@ const PadControl: React.FC<{
   control: ControlDescriptor;
   color: { bg: string; border: string; text: string };
   label: string;
+  tooltip: string;
   onClick: () => void;
-}> = ({ control, color, label, onClick }) => {
+}> = ({ control, color, label, tooltip, onClick }) => {
   const size = BUTTON_SIZE + 8;
   const x = PAD + control.x * CELL + CELL - size / 2;
   const y = PAD + control.y * CELL + CELL / 2 - size / 2;
 
   return (
     <g onClick={onClick} style={{ cursor: 'pointer' }}>
+      <title>{tooltip}</title>
       <rect x={x} y={y} width={size} height={size} rx={4}
         fill={color.bg} stroke={color.border} strokeWidth={2} />
-      <text x={x + size / 2} y={y + size + 12} fill={color.text}
-        fontSize={7} fontFamily="monospace" textAnchor="middle">
-        {(label || control.label || '').substring(0, 8)}
-      </text>
+      <ControlLabel cx={x + size / 2} top={y + size + 12} fill={color.text}
+        fontSize={7} text={label || control.label || ''} />
     </g>
   );
 };
@@ -247,6 +283,16 @@ export const ControllerLayoutView: React.FC<ControllerLayoutViewProps> = ({
           control,
           color,
           label,
+          tooltip: describeControl({
+            id: control.id,
+            target: assignment?.target,
+            type: control.midi.type,
+            channel: control.midi.channel,
+            number: control.midi.number,
+            pushNote: control.midi.pushNote,
+            touchCc: control.midi.touchCc,
+            layer: control.layer,
+          }),
           onClick: () => handleClick(control),
         };
 
