@@ -28,6 +28,7 @@ import type {
 } from './djControllerPresets';
 import { detectDJPreset, getPresetById } from './djControllerPresets';
 import { handBook } from './handBook';
+import { noteLayerProgram } from './xtouchLayer';
 import { getControllerLayout } from './controllerLayouts';
 import type { MIDIMessage } from './types';
 
@@ -387,6 +388,14 @@ export class DJControllerMapper {
         `[MIDI] ${msg.type} ch${msg.channel} ${msg.type === 'cc' ? 'CC' : 'note'}${n} ` +
         `val=${msg.value ?? msg.velocity} -> ${target}`,
       );
+    }
+
+    // The LAYER buttons report themselves as a Program Change, which is what
+    // the `layer-a` / `layer-b` descriptors have said all along. Listening for
+    // it is how the lamps know which of a control's two notes is on show.
+    if (msg.type === 'programChange' && msg.program !== undefined) {
+      noteLayerProgram(msg.program);
+      return;
     }
 
     if (msg.type === 'cc' && msg.cc !== undefined && msg.value !== undefined) {

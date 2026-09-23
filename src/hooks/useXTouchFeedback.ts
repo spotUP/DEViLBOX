@@ -17,6 +17,7 @@ import { useMixerStore } from '../stores/useMixerStore';
 import { subscribeToParamLiveValue } from '../midi/performance/parameterRouter';
 import { DUB_BUS_PARAMS, readDubParameter } from '../midi/performance/parameterRouter';
 import { subscribeDubRouter, subscribeDubRelease } from '../engine/dub/DubRouter';
+import { notesOnActiveLayer } from '../midi/xtouchLayer';
 import type { MIDIMessage } from '../midi/types';
 import type { DJControllerPreset } from '../midi/djControllerPresets';
 
@@ -71,11 +72,11 @@ function moveButtonNotes(
       family.push(mapping.note);
     }
   }
-  // EVERY match, because one move sits on two notes: Layer A and its Layer B
-  // mirror (`echoThrow` is note 32 and note 72). Only one layer is showing at
-  // a time and the device does not tell us which, so lighting both is the only
-  // way the lamp is right whichever layer the performer is on.
-  if (notes.length > 0) return notes;
+  // One move sits on two notes: Layer A and its Layer B mirror (`echoThrow` is
+  // note 32 and note 72). The device reports its layer with a Program Change,
+  // so the lamp goes to the layer on show — and to both while no layer has
+  // been reported yet, which is the state at connection.
+  if (notes.length > 0) return notesOnActiveLayer(notes);
   // Per-channel move fired for a channel with no button of its own.
   return family.slice(0, 1);
 }
