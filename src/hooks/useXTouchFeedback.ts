@@ -32,27 +32,53 @@ function matchesPresetName(name: string | undefined, preset: DJControllerPreset)
   return preset.detectPatterns.some(p => lower.includes(p.toLowerCase()));
 }
 
-// Map dub move IDs to X-Touch Compact button notes for LED feedback
-const MOVE_TO_BUTTON_NOTE: Record<string, number> = {
-  // Row 1 (notes 16-23): primary dub performance
-  echoThrow: 16, reverseEcho: 17, tapeStop: 18, tubbyScream: 19,
-  springSlam: 20, eqSweep: 21, masterDrop: 22, crushBass: 23,
-  // Top encoder buttons (notes 0-7): echo presets + triggers
-  delayPresetQuarter: 0, delayPresetDotted: 1, delayPresetTriplet: 2,
-  delayPreset8th: 3, echoBuildUp: 4, springKick: 5, stereoDoubler: 6, backwardReverb: 7,
-  // Right encoder buttons (notes 8-15): more triggers
-  delayPreset380: 8, delayPreset16th: 9, delayPresetDoubler: 10,
-  snareCrack: 11, sonarPing: 12, subSwell: 13, radioRiser: 14, delayTimeThrow: 15,
-  // Select row (notes 40-48): hold/toggle moves
-  transportTapeStop: 40, hpfRise: 41, filterDrop: 42, versionDrop: 43,
-  dubSiren: 44, oscBass: 45, tapeWobble: 46, subHarmonic: 47, voltageStarve: 48,
-  // Remaining moves (not on physical buttons, but mapped for LED feedback from UI)
-  combSweep: 21,    // shares eqSweep button
-  ringMod: 19,      // shares tubbyScream button
-  madProfPingPong: 7, // shares backwardReverb button
-  channelThrow: 16, // shares echoThrow button
-  ghostReverb: 6,   // shares stereoDoubler button
-};
+/**
+ * Which button lights for a move — read from the PRESET, never from a table
+ * of its own.
+ *
+ * There used to be a second table here, and it had drifted completely out of
+ * step with the preset that routes the presses: it lit note 16 for
+ * `echoThrow` while the preset put `dub.stereoDoubler` on note 16, note 19 for
+ * `tubbyScream` where the preset has `dub.combSweep`, and so on down the row.
+ * Five moves were even written down as deliberately SHARING another move's
+ * button. So pressing a button fired one move and lit a different button, and
+ * which one depended on which move you had pressed — "when i push one button
+ * in the big button bank another button also lights up, different buttons
+ * light up on different button pushes" (2026-09-23).
+ *
+ * The preset already names every move's button once, for the press. The lamp
+ * has to read the same line, or it is guessing. A move with no button on the
+ * device now lights nothing, which is honest — lighting a neighbour is worse
+ * than staying dark.
+ */
+function moveButtonNotes(
+  preset: DJControllerPreset,
+  moveId: string,
+  channelId?: number,
+): number[] {
+  const wanted = `dub.${moveId}`;
+  // A per-channel move has a button per channel strip — `dub.channelMute.ch0`
+  // through `.ch7` — so matching on the move alone lit channel 0's lamp
+  // whichever channel had fired.
+  const exact = channelId === undefined ? null : `${wanted}.ch${channelId}`;
+  const notes: number[] = [];
+  const family: number[] = [];
+  for (const mapping of preset.noteMappings) {
+    if (!('param' in mapping) || typeof mapping.param !== 'string') continue;
+    if (mapping.param === wanted || (exact !== null && mapping.param === exact)) {
+      notes.push(mapping.note);
+    } else if (mapping.param.replace(/\.ch\d+$/, '') === wanted) {
+      family.push(mapping.note);
+    }
+  }
+  // EVERY match, because one move sits on two notes: Layer A and its Layer B
+  // mirror (`echoThrow` is note 32 and note 72). Only one layer is showing at
+  // a time and the device does not tell us which, so lighting both is the only
+  // way the lamp is right whichever layer the performer is on.
+  if (notes.length > 0) return notes;
+  // Per-channel move fired for a channel with no button of its own.
+  return family.slice(0, 1);
+}
 
 export function useXTouchFeedback(): void {
   const lastPayloadRef = useRef<string>('');
@@ -60,7 +86,7 @@ export function useXTouchFeedback(): void {
   // Live channel send values from DubBus (updated imperatively during moves)
   const liveSendsRef = useRef<number[]>([0, 0, 0, 0, 0, 0, 0, 0]);
   // Active dub moves (invocationId → moveId)
-  const activeMovesRef = useRef<Map<string, string>>(new Map());
+  const activeMovesRef = useRef<Map<string, { moveId: string; channelId?: number }>>(new Map());
   /**
    * Encoder-ring positions waiting to go out, and what was last sent.
    *
@@ -142,9 +168,29 @@ export function useXTouchFeedback(): void {
         }, 1500);
       }
 
-      // Encoder rings first, and outside the payload comparison below: a ring
-      // moving while the faders and LEDs hold still must not be dropped as
-      // "nothing changed".
+      // Top every ring up from the STORE before sending.
+      //
+      // Announcements alone are not enough. A persona changing character calls
+      // `setSettings` and moves six bus parameters in one go — echo intensity,
+      // wet, spring, return, sidechain, high-pass — straight into the store,
+      // announcing none of them. Driven by announcements only, the rings sat
+      // still through all of it: "mad professor did A LOT of stuff that is not
+      // visible on the controller" (2026-09-23).
+      //
+      // An announcement still wins where there is one, because a move
+      // modulating the bus never touches the store at all. This is the
+      // resting position underneath it.
+      for (const param of Object.keys(DUB_BUS_PARAMS)) {
+        const cc = encoderCCFor(param);
+        if (cc === null || encoderPendingRef.current.has(cc)) continue;
+        const value = readDubParameter(param);
+        if (value === null) continue;
+        encoderPendingRef.current.set(cc, clamp01(value));
+      }
+
+      // Rings go out before the payload comparison below: a ring moving while
+      // the faders and LEDs hold still must not be dropped as "nothing
+      // changed". The per-ring check just below is what keeps this quiet.
       if (encoderPendingRef.current.size > 0) {
         for (const [cc, normalized] of encoderPendingRef.current) {
           // Compare the BYTE that would go out, not the float behind it: a
@@ -161,7 +207,7 @@ export function useXTouchFeedback(): void {
         encoderPendingRef.current.clear();
       }
 
-      const messages = buildXTouchFeedbackMessages(preset, getFeedbackState(liveSendsRef.current, activeMovesRef.current), touchedRef.current);
+      const messages = buildXTouchFeedbackMessages(preset, getFeedbackState(preset, liveSendsRef.current, activeMovesRef.current), touchedRef.current);
       const payload = JSON.stringify(messages);
       if (payload === lastPayloadRef.current) return;
       lastPayloadRef.current = payload;
@@ -223,34 +269,44 @@ export function useXTouchFeedback(): void {
     // Subscribe to dub move fire/release for button LED feedback
     const triggerTimers = new Map<number, ReturnType<typeof setTimeout>>();
     const unsubFire = subscribeDubRouter((event) => {
-      const note = MOVE_TO_BUTTON_NOTE[event.moveId];
-      if (note === undefined) return;
-      activeMovesRef.current.set(event.invocationId, event.moveId);
-      sendButtonLED(note, true);
+      const preset = mapper.getPreset();
+      const notes = preset ? moveButtonNotes(preset, event.moveId, event.channelId) : [];
+      if (notes.length === 0) return;
+      activeMovesRef.current.set(event.invocationId, { moveId: event.moveId, channelId: event.channelId });
+      for (const note of notes) sendButtonLED(note, true);
       scheduleFlush();
     });
     const unsubRelease = subscribeDubRelease((event) => {
-      const moveId = activeMovesRef.current.get(event.invocationId);
-      if (!moveId) return;
+      const active = activeMovesRef.current.get(event.invocationId);
+      if (!active) return;
+      const { moveId, channelId } = active;
       activeMovesRef.current.delete(event.invocationId);
       // Only turn off if no other instance of this move is active
-      const stillActive = [...activeMovesRef.current.values()].includes(moveId);
+      const stillActive = [...activeMovesRef.current.values()]
+        .some((a) => a.moveId === moveId && a.channelId === channelId);
       if (!stillActive) {
-        const note = MOVE_TO_BUTTON_NOTE[moveId];
-        if (note !== undefined) sendButtonLED(note, false);
+        const preset = mapper.getPreset();
+        for (const note of preset ? moveButtonNotes(preset, moveId, channelId) : []) {
+          sendButtonLED(note, false);
+        }
       }
       scheduleFlush();
     });
     // For one-shot triggers (no release event), flash LED for 300ms
     const unsubFireFlash = subscribeDubRouter((event) => {
       if (event.isHold) return; // Hold moves get LED-off from release event
-      const note = MOVE_TO_BUTTON_NOTE[event.moveId];
-      if (note === undefined) return;
+      const presetForFlash = mapper.getPreset();
+      const notes = presetForFlash
+        ? moveButtonNotes(presetForFlash, event.moveId, event.channelId)
+        : [];
+      if (notes.length === 0) return;
+      const note = notes[0];
       const timer = setTimeout(() => {
         triggerTimers.delete(note);
         activeMovesRef.current.delete(event.invocationId);
-        const stillActive = [...activeMovesRef.current.values()].includes(event.moveId);
-        if (!stillActive) sendButtonLED(note, false);
+        const stillActive = [...activeMovesRef.current.values()]
+          .some((a) => a.moveId === event.moveId && a.channelId === event.channelId);
+        if (!stillActive) for (const n of notes) sendButtonLED(n, false);
         scheduleFlush();
       }, 300);
       triggerTimers.set(note, timer);
@@ -331,7 +387,7 @@ export function useXTouchFeedback(): void {
   }, []);
 }
 
-function getFeedbackState(liveSends: number[], activeMoves: Map<string, string>): XTouchFeedbackState {
+function getFeedbackState(preset: DJControllerPreset, liveSends: number[], activeMoves: Map<string, { moveId: string; channelId?: number }>): XTouchFeedbackState {
   const dj = useDJStore.getState();
   const dub = useDrumPadStore.getState().dubBus;
   const mixer = useMixerStore.getState();
@@ -363,9 +419,8 @@ function getFeedbackState(liveSends: number[], activeMoves: Map<string, string>)
 
   // Collect active move button notes
   const activeMoveNotes = new Set<number>();
-  for (const moveId of activeMoves.values()) {
-    const note = MOVE_TO_BUTTON_NOTE[moveId];
-    if (note !== undefined) activeMoveNotes.add(note);
+  for (const { moveId, channelId } of activeMoves.values()) {
+    for (const note of moveButtonNotes(preset, moveId, channelId)) activeMoveNotes.add(note);
   }
 
   return {
