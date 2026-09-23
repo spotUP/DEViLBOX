@@ -74,7 +74,7 @@ export interface AutoDubRide {
  * "sparse". Restating that here would be a second source of truth for one
  * fact.
  */
-const RIDE_TARGETS: Record<AutoDubPersonaId, { targets: RideTarget[]; curve: RideCurve }> = {
+export const RIDE_TARGETS: Record<AutoDubPersonaId, { targets: RideTarget[]; curve: RideCurve }> = {
   // Decisive and precise — `variance: 0`. The Big Knob, in positions.
   tubby: { targets: ['hpfCutoff', 'channelSend'], curve: 'step' },
   // Long builds; `densityBias: 0.5` — comes alive as notes pile up.
@@ -83,8 +83,11 @@ const RIDE_TARGETS: Record<AutoDubPersonaId, { targets: RideTarget[]; curve: Rid
   perry: { targets: ['channelSend', 'springWet'], curve: 'ease' },
   // Lush swells.
   madProfessor: { targets: ['returnGain', 'springWet'], curve: 'ease' },
-  // Sparse — `minBarsBetweenFires: 3`, `densityBias: -0.6`.
-  jammy: { targets: ['channelSend'], curve: 'ease' },
+  // Sparse — `minBarsBetweenFires: 3`, `densityBias: -0.6`. The echo feedback
+  // as well as the send: a persona whose only target is the send never moves a
+  // control the performer can SEE, which is the fault that kept the default
+  // persona invisible for a whole session (2026-09-23).
+  jammy: { targets: ['channelSend', 'echoIntensity'], curve: 'ease' },
   // Whatever the user has dialled in. Rides gently, but it still reaches for
   // the return: a persona whose only target is the send can never move a
   // control the performer can SEE, which is how the default persona went a
