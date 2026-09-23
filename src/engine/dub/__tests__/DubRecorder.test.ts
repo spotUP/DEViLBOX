@@ -21,6 +21,8 @@ import { useAutomationStore } from '@/stores/useAutomationStore';
 import { useTrackerStore } from '@/stores/useTrackerStore';
 import { useTransportStore } from '@/stores/useTransportStore';
 import { isDubMoveEffectSlot, decodeDubEffect } from '../moveTable';
+import { publishChannelSend } from '@/lib/dub/channelSendStream';
+import { useUIStore } from '@/stores/useUIStore';
 import type { DubBus } from '../DubBus';
 
 function makeMockBus(): DubBus {
@@ -208,5 +210,60 @@ describe('DubRecorder — automation store write path', () => {
     expect(cell.effTyp).toBeUndefined();
     const curves = getCurves('p0', 0);
     expect(curves.some(c => c.parameter === 'dub.echoThrow')).toBe(false);
+  });
+
+  /**
+   * The arm gate, on the THIRD subscription.
+   *
+   * `55b38200c` gated the fire path and stopped there. `DubRecorder` has three
+   * subscriptions — fire, release and the channel-send ride (X5) — and the
+   * ride kept writing `dub.channelSend` curves with REC off. Reported
+   * 2026-09-23: "i see dublanes in amanda now but record is off", while an
+   * MCP sweep was opening and closing a send between measurements. The ride
+   * also force-opens the automation lanes, so the junk it wrote announced
+   * itself as lanes appearing unbidden.
+   *
+   * Release needs no test of its own: it acts only on an invocation the fire
+   * path recorded, so the gate there already covers it.
+   */
+  it('a send ride writes nothing until REC is armed', () => {
+    useDubStore.setState({ armed: false });
+    useUIStore.setState({ showAutomationLanes: false });
+    setRow(12);
+
+    publishChannelSend({ channelId: 0, value: 0.6, row: 12, source: 'live' });
+    publishChannelSend({ channelId: 0, value: 0.0, row: 20, source: 'live' });
+
+    expect(
+      getCurves('p0', 0).some(c => c.parameter === 'dub.channelSend'),
+      'an unarmed deck recorded a fader ride — this is the ghost, one subscription over'
+    ).toBe(false);
+    expect(
+      useUIStore.getState().showAutomationLanes,
+      'an unarmed deck opened the automation lanes to show what it should not have written'
+    ).toBe(false);
+  });
+
+  it('a send ride is captured once REC is armed', () => {
+    useDubStore.setState({ armed: true });
+    setRow(12);
+
+    publishChannelSend({ channelId: 0, value: 0.6, row: 12, source: 'live' });
+
+    const curve = getCurves('p0', 0).find(c => c.parameter === 'dub.channelSend');
+    expect(curve, 'an armed deck dropped the fader ride').toBeDefined();
+    expect(curve!.points.some(pt => pt.row === 12)).toBe(true);
+  });
+
+  it('a lane-replayed send ride is ignored even when armed', () => {
+    useDubStore.setState({ armed: true });
+    setRow(14);
+
+    publishChannelSend({ channelId: 0, value: 0.6, row: 14, source: 'lane' });
+
+    expect(
+      getCurves('p0', 0).some(c => c.parameter === 'dub.channelSend'),
+      'replaying a ride re-recorded it — one take becomes an endless accumulation of itself'
+    ).toBe(false);
   });
 });
