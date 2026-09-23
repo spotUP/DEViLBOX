@@ -1148,8 +1148,10 @@ export const DubDeckStrip: React.FC = () => {
      *
      * The cap is the LAST resort, for a deck taller than the window: it reads
      * `--app-vh`, so on iOS it is a share of the viewport that is really
-     * visible rather than the one `vh` imagines. */
-    <div className="shrink-0 flex flex-col gap-1.5 px-2 py-1.5 bg-dark-bgSecondary border-t border-dark-border font-mono overflow-y-auto max-h-[calc(var(--app-vh)*0.6)]">
+     * visible rather than the one `vh` imagines. Three quarters, not 60 %:
+     * the owner would rather have full-size buttons on the channel cards
+     * than a taller pattern editor while the deck is open (2026-09-23). */
+    <div className="shrink-0 flex flex-col gap-1.5 px-2 py-1.5 bg-dark-bgSecondary border-t border-dark-border font-mono overflow-y-auto max-h-[calc(var(--app-vh)*0.75)]">
       {/* Header row */}
       {/* The header row.
           It had no `flex-wrap`, and its parent scrolls vertically only, so on a
@@ -1704,13 +1706,50 @@ export const DubDeckStrip: React.FC = () => {
         {/* Master send — scales all channel sends at once */}
         <div
           className={
-            'flex flex-row items-stretch gap-2.5 px-2 py-1.5 rounded border w-48 shrink-0 ' +
+            'flex flex-row items-stretch gap-2.5 px-2 py-1.5 rounded border w-56 shrink-0 ' +
             'bg-dark-bgSecondary border-accent-primary/40'
           }
         >
           {/* Left column: label + ops + hold — must match channel columns */}
           <div className="flex flex-col items-center gap-1.5 flex-1 min-w-0">
           <span className="text-xs font-bold text-accent-primary leading-none">MASTER</span>
+          {/* Same skeleton as a channel card: where a channel has its role
+              and filter selects, the master has ALL / NONE. The fader column
+              on the right is then identical to a channel's. */}
+          <button
+            className={
+              'px-2 py-1 rounded border w-full text-[9px] font-bold transition-all duration-150 ' +
+              (anySend
+                ? 'bg-accent-primary/20 border-accent-primary text-accent-primary hover:bg-accent-error/20 hover:border-accent-error hover:text-accent-error'
+                : 'bg-dark-bgTertiary border-dark-borderLight text-text-secondary hover:text-text-primary hover:border-accent-primary')
+            }
+            onClick={() => {
+              if (anySend) {
+                for (let i = 0; i < visibleChannelCount; i++) setChannelDubSend(i, 0);
+              } else {
+                for (let i = 0; i < visibleChannelCount; i++) setChannelDubSend(i, 1.0);
+              }
+            }}
+            title={anySend ? 'Zero all channel sends' : 'Set all channel sends to 100%'}
+            disabled={!busEnabled}
+          >
+            {anySend ? 'NONE' : 'ALL'}
+          </button>
+          {/* The Rvb / Swp row a channel card has here, as an invisible copy
+              of the same markup: the master's grid then lands on exactly the
+              channels' line and the card is exactly their height. A margin
+              guessed at that row's height left a gap under the master card
+              (2026-09-23). */}
+          <div className="flex gap-1 w-full invisible" aria-hidden="true">
+            <div className="flex flex-col items-center flex-1 min-w-0">
+              <span className="text-[7px] text-text-muted">Rvb</span>
+              <input type="range" className="w-full" tabIndex={-1} readOnly value={0} />
+            </div>
+            <div className="flex flex-col items-center flex-1 min-w-0">
+              <span className="text-[7px] text-text-muted">Swp</span>
+              <input type="range" className="w-full" tabIndex={-1} readOnly value={0} />
+            </div>
+          </div>
           {/* 3x3: eight ops + HOLD. A column of nine full-size buttons was
               the whole reason the deck did not fit — see colorClasses. */}
           <div className="grid grid-cols-3 gap-1 w-full">
@@ -1723,7 +1762,7 @@ export const DubDeckStrip: React.FC = () => {
             return (
               <button
                 key={op.moveId}
-                className={colorClasses(op.color, active, 'sm') + ' w-full text-center'}
+                className={colorClasses(op.color, active) + ' w-full text-center'}
                 onClick={isHold ? undefined : () => {
                   for (let i = 0; i < visibleChannelCount; i++) fireTrigger(op.moveId, i);
                 }}
@@ -1755,7 +1794,7 @@ export const DubDeckStrip: React.FC = () => {
           })}
           <button
             className={
-              'px-1 py-0.5 rounded border w-full text-[10px] font-bold transition-all duration-150 ' +
+              'px-2.5 py-1 rounded border w-full text-xs font-bold transition-all duration-150 ' +
               'bg-dark-bgTertiary border-dark-borderLight text-text-primary hover:border-accent-primary'
             }
             onClick={() => {
@@ -1768,27 +1807,9 @@ export const DubDeckStrip: React.FC = () => {
           </button>
           </div>
           </div>
-          {/* Right column: ALL/NONE + fader — master-only controls */}
+          {/* Right column: fader fills the card's height, readout under it —
+              the same column a channel card has. */}
           <div className="flex flex-col items-center gap-1 shrink-0 min-h-0">
-          <button
-            className={
-              'px-2 py-1 rounded border w-full text-[9px] font-bold transition-all duration-150 ' +
-              (anySend
-                ? 'bg-accent-primary/20 border-accent-primary text-accent-primary hover:bg-accent-error/20 hover:border-accent-error hover:text-accent-error'
-                : 'bg-dark-bgTertiary border-dark-borderLight text-text-secondary hover:text-text-primary hover:border-accent-primary')
-            }
-            onClick={() => {
-              if (anySend) {
-                for (let i = 0; i < visibleChannelCount; i++) setChannelDubSend(i, 0);
-              } else {
-                for (let i = 0; i < visibleChannelCount; i++) setChannelDubSend(i, 1.0);
-              }
-            }}
-            title={anySend ? 'Zero all channel sends' : 'Set all channel sends to 100%'}
-            disabled={!busEnabled}
-          >
-            {anySend ? 'NONE' : 'ALL'}
-          </button>
           <div className="flex-1 min-h-0 flex items-stretch">
           <Fader
             value={masterSendValue}
@@ -1830,10 +1851,10 @@ export const DubDeckStrip: React.FC = () => {
                 // (with min-w-0 on their columns) and keeps all channels uniform.
                 // Row, not column: the fader sits BESIDE the button stack rather than
                 // under it, which gives back the fader's 80px plus its readout on every
-                // channel. w-48: three compact op buttons across (~44px each) plus
-                // the 16px fader. Nine ops in one column ran ~600px tall and the
-                // deck clipped every card; a 3x3 grid is three rows.
-                'flex flex-row items-stretch gap-2.5 px-2 py-1.5 rounded border w-48 shrink-0 transition-colors ' +
+                // channel. w-56: three full-size op buttons across plus the 16px
+                // fader. Nine ops in one column ran ~600px tall and the deck
+                // clipped every card; a 3x3 grid is three rows.
+                'flex flex-row items-stretch gap-2.5 px-2 py-1.5 rounded border w-56 shrink-0 transition-colors ' +
                 (channelFiring
                   ? 'bg-accent-highlight/15 border-accent-highlight'
                   : isHeld
@@ -1970,7 +1991,7 @@ export const DubDeckStrip: React.FC = () => {
                 return (
                   <button
                     key={op.moveId}
-                    className={colorClasses(op.color, active, 'sm') + ' w-full text-center'}
+                    className={colorClasses(op.color, active) + ' w-full text-center'}
                     onClick={isHold ? undefined : () => fireTrigger(op.moveId, i)}
                     {...(isHold ? holdButtonProps(op.moveId, i) : {})}
                     {...hoverProps(`Ch ${i + 1} · ${op.label} — ${op.title}${isHold ? ' (press-and-hold)' : ''}`)}
@@ -1982,7 +2003,7 @@ export const DubDeckStrip: React.FC = () => {
               })}
               <button
                 className={
-                  'px-1 py-0.5 rounded border w-full text-[10px] font-bold transition-all duration-150 ' +
+                  'px-2.5 py-1 rounded border w-full text-xs font-bold transition-all duration-150 ' +
                   (isHeld
                     ? 'bg-accent-primary border-accent-primary text-text-inverse shadow-[0_0_8px_var(--color-accent-primary)]'
                     : isFlashed

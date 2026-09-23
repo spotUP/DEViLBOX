@@ -22,19 +22,26 @@ describe('the channel card fits the deck', () => {
     expect(grids.length, 'master + channel').toBe(2);
   });
 
-  it('uses the compact button size for the ops, so three fit across a card', () => {
-    const compact = DECK.match(/colorClasses\(op\.color, active, 'sm'\)/g) ?? [];
-    expect(compact.length, 'master + channel').toBe(2);
-    expect(DECK).toContain("size === 'sm'");
+  it('keeps the ops at full size — the deck grew instead ("let the dub deck be taller")', () => {
+    const cards = DECK.match(/colorClasses\(op\.color, active\) \+ ' w-full text-center'/g) ?? [];
+    expect(cards.length, 'master + channel').toBe(2);
+    expect(DECK).toContain('max-h-[calc(var(--app-vh)*0.75)]');
   });
 
   it('keeps the two cards the same width, wide enough for three buttons and the fader', () => {
-    const cards = DECK.match(/rounded border w-48 shrink-0/g) ?? [];
+    const cards = DECK.match(/rounded border w-56 shrink-0/g) ?? [];
     expect(cards.length, 'master + channel').toBe(2);
     expect(DECK, 'the old single-column width is back').not.toMatch(/rounded border w-32 shrink-0/);
   });
 
   it('puts the role select and the filter select on one row', () => {
     expect(DECK).toContain('{/* Role and filter share a row — one row fewer in the card. */}');
+  });
+
+  it('gives the master card the same skeleton: ALL / NONE where a channel has its selects, fader column identical', () => {
+    // ALL / NONE sits in the left column above the grid, not in the fader column.
+    const master = DECK.slice(DECK.indexOf('>MASTER</span>'), DECK.indexOf('{/* Separator */}'));
+    expect(master.indexOf("{anySend ? 'NONE' : 'ALL'}")).toBeLessThan(master.indexOf('grid grid-cols-3'));
+    expect(master).toContain('the same column a channel card has');
   });
 });
