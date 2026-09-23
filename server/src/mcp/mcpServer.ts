@@ -771,7 +771,7 @@ export function createMcpServer(): McpServer {
 
   server.tool(
     'get_dub_bus_state',
-    'Return DubBus diagnostics: hasBus, store settings, per-channel dubSend values, which channels have registered taps in the bus.',
+    'Return DubBus diagnostics: hasBus, storeSettings (what the UI store holds), liveSettings (what the bus itself holds — moves write the bus directly, so read THIS to see whether ringMod / voltageStarve / eqSweep engaged), per-channel dubSend values, which channels have registered taps, masterInsertLevels (rms along the insert), upstreamLevels.',
     {},
     () => call('get_dub_bus_state'),
   );
