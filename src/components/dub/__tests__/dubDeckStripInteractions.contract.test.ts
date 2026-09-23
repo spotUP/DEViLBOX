@@ -23,7 +23,10 @@ describe('DubDeckStrip — move grouping contract (G15)', () => {
   it('keeps representative globals in the intended interaction groups', () => {
     expect(SOURCE).toMatch(/moveId:\s*'springSlam'[\s\S]*group:\s*'click'/);
     expect(SOURCE).toMatch(/moveId:\s*'masterDrop'[\s\S]*group:\s*'hold'/);
-    expect(SOURCE).toMatch(/moveId:\s*'ghostReverb'[\s\S]*group:\s*'toggle'/);
+    // Ghost moved from TOGGLE to HOLD on 2026-09-23 — "ghost should no be a
+    // toggle it should be a hold". Ring is the representative toggle now.
+    expect(SOURCE).toMatch(/moveId:\s*'ghostReverb'[\s\S]*group:\s*'hold'/);
+    expect(SOURCE).toMatch(/moveId:\s*'ringMod'[\s\S]*group:\s*'toggle'/);
     expect(SOURCE).toMatch(/moveId:\s*'delayPresetQuarter'[\s\S]*group:\s*'rate'/);
   });
 

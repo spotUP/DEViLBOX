@@ -178,11 +178,14 @@ const GLOBAL_MOVES: Array<GlobalMove> = [
   { label: 'Scream',    title: 'Tubby Scream — reverb self-feedback, rising metallic cry',      moveId: 'tubbyScream',  color: 'accent-error',    kind: 'hold', group: 'hold' },
   { label: 'Bass',      title: 'Osc Bass — self-oscillating LPF bass drone while held',         moveId: 'oscBass',      color: 'accent-primary',  kind: 'hold', group: 'hold' },
   { label: 'Crush Bass', title: 'Crush Bass — 3-bit quantize saw drone while held',             moveId: 'crushBass',    color: 'accent-error/70', kind: 'hold', group: 'hold' },
+  // A hold, not a toggle: "ghost should no be a toggle it should be a hold"
+  // (2026-09-22). The move was already `kind: 'hold'`; only the row it sat in
+  // promised click-on / click-off.
+  { label: 'Ghost',      title: 'Ghost Reverb — extra reverb decay on channels while held',     moveId: 'ghostReverb',  color: 'accent-secondary',   kind: 'hold', group: 'hold', needsSend: true },
 
   // ── TOGGLE — click once to activate, click again to deactivate (hands-free) ──
   { label: 'Wide',       title: 'Stereo Doubler — 20ms cross-fed widening (toggle)',               moveId: 'stereoDoubler', color: 'accent-highlight',   kind: 'hold', group: 'toggle', needsSend: true },
   { label: 'Wobble',     title: 'Tape Wobble — LFO on echo rate (toggle)',                         moveId: 'tapeWobble',   color: 'accent-warning/70',  kind: 'hold', group: 'toggle', needsSend: true },
-  { label: 'Ghost',      title: 'Ghost Reverb — extra reverb decay on channels (toggle)',          moveId: 'ghostReverb',  color: 'accent-secondary',   kind: 'hold', group: 'toggle', needsSend: true },
   { label: 'Sub Harm',   title: 'Sub Harmonic — env-follower sub pulse on every transient (toggle)', moveId: 'subHarmonic', color: 'accent-primary/70', kind: 'hold', group: 'toggle', needsSend: true },
   { label: 'Liquid',     title: 'Liquid Sweep — comb filter / phaser swirl on the bus return (toggle)', moveId: 'combSweep', color: 'accent-secondary/80', kind: 'hold', group: 'toggle', needsSend: true },
   { label: 'Sweep',      title: 'EQ Sweep — resonant filter sweep (toggle)',                       moveId: 'eqSweep',      color: 'accent-highlight/70', kind: 'hold', group: 'toggle', needsSend: true },
