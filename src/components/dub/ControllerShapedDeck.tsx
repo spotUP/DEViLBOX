@@ -1,38 +1,45 @@
 /**
- * ControllerShapedDeck — the dub deck, arranged the way the hardware is.
+ * ControllerShapedDeck — the dub deck laid out as the performer's controller.
  *
- * "my idea is that the dub deck in devilbox should match my hw controller
- * layoutwize" (2026-09-23). The deck keeps ITS OWN LOOK — the same move
- * buttons in the same colours, the same faders — and only the ARRANGEMENT
- * changes: button row 1 of the deck sits where button row 1 of the controller
- * sits, the eight channel sends stand in a row of faders, the select row runs
- * underneath them.
+ * "the dub deck in devilbox should match my hw controller layoutwize"
+ * (2026-09-23). Every physical control appears where the descriptor says it
+ * is, drawn with the control DEViLBOX already uses for that job: an encoder is
+ * a `Knob`, a fader is a `Fader`, a button is the deck's own move button in
+ * the deck's own colour. Nothing here is a picture of a device — they are the
+ * working controls, in the device's arrangement.
  *
- * What this deliberately is NOT: the schematic from the MIDI mapper dialog.
- * That drawing exists to answer "which knob is CC10" and is built for reading,
- * not for playing. A first attempt reused it here and the deck stopped looking
- * like the deck, which is the whole thing that was asked for — the layout was
- * meant to change, the design was not.
+ * The arrangement is read from `controllerLayouts.ts`, which reports:
+ *
+ *   enc-top    8 encoders x 0..14  y 0      faders    9 faders  x 0..16  y 8
+ *   btn-row1-3 8 buttons  x 0..14  y 2/4/6  select    9 buttons x 0..16  y 13
+ *   enc-right  8 encoders x 18..20 y 0..6   transport 8 buttons x 18..20 y 9..15
+ *
+ * A previous version of this file rendered only the controls that carried a
+ * dub MOVE. That dropped all nine faders — including the master, which is why
+ * it went missing from the right-hand end — dropped the transport, and drew
+ * all sixteen encoders as their push-buttons, so the panel had no knobs on it
+ * at all. The layout was never the problem; the renderer was throwing three
+ * quarters of the device away.
  *
  * Every gesture calls the deck's own handlers, passed in through `api`. None
  * of the interaction logic is re-implemented: two shapes of one deck that each
  * fired moves their own way would drift apart move by move, and the first
  * symptom would be a hold that never releases in one shape and does in the
  * other.
- *
- * Which control plays what is decided in `deckShape.ts`, which is pure and
- * tested. This file is presentation and wiring.
  */
 
 import React, { useCallback, useMemo } from 'react';
+import { Button } from '@components/ui/Button';
+import { Knob } from '@components/controls/Knob';
 import { Fader } from '@components/controls/Fader';
 import type { ControllerLayout, ControlDescriptor } from '@/midi/controllerLayouts';
 import { getPresetById } from '@/midi/djControllerPresets';
+import { DUB_BUS_PARAMS } from '@/midi/performance/parameterRouter';
 import { useMIDIPresetStore } from '@/stores/useMIDIPresetStore';
 import { colorClasses } from './moveButtonStyle';
 import {
   buildDeckBindings,
-  isDeckInert,
+  deckControls,
   type ControlDeckBinding,
   type DeckMove,
   type DeckTarget,
@@ -41,10 +48,9 @@ import {
 /**
  * The deck's own handlers, passed in rather than re-created.
  *
- * Exactly the set the generic deck's buttons call — including
- * `holdButtonProps`, so a hold on the controller shape is the same pointer
- * gesture, with the same four ways out of a held state, as a hold on the
- * generic deck.
+ * Exactly the set the deck's own controls call — including `holdButtonProps`,
+ * so a hold here is the same pointer gesture, with the same four ways out of a
+ * held state, as a hold in the deck's own layout.
  */
 export interface DubDeckControlApi {
   fireTrigger: (moveId: string, channelId?: number) => void;
@@ -57,7 +63,11 @@ export interface DubDeckControlApi {
   handleToggle: (moveId: string) => void;
   handleRatePreset: (moveId: string) => void;
   setChannelSend: (channelId: number, value: number) => void;
+  /** The deck's master send — scales every channel at once. */
+  setMasterSend: (value: number) => void;
   setArmed: (armed: boolean) => void;
+  /** Write one dub bus setting, in its own units. */
+  setBusParam: (field: string, value: number) => void;
 }
 
 interface ControllerShapedDeckProps {
@@ -69,6 +79,9 @@ interface ControllerShapedDeckProps {
   moves: ReadonlyMap<string, DeckMove>;
   /** Current dub send per channel, for the faders to show and ride. */
   channelSends: readonly number[];
+  masterSend: number;
+  /** Live dub bus settings, for the knobs to show. */
+  busSettings: Readonly<Record<string, number | undefined>>;
   armed: boolean;
   busEnabled: boolean;
   /** Is this move firing — on this channel when one is named. */
@@ -77,31 +90,80 @@ interface ControllerShapedDeckProps {
   heldMoves: ReadonlySet<string>;
   toggledMoves: ReadonlySet<string>;
   activeRatePreset: string | null;
+  /**
+   * The deck's own channel strip, drawn beneath the panel.
+   *
+   * The panel used to draw its own bare faders and a row of Mute buttons where
+   * the hardware's faders are. That is accurate to the device but a downgrade
+   * from what the deck has: the real cards carry the role and filter selects,
+   * the reverb and sweep sends, all nine per-channel ops and the send readout
+   * — "it looks like our old ones have more functionality? replace the bare
+   * ones with our old ones" (2026-09-23).
+   *
+   * Passed in rather than rebuilt, so there is exactly one channel card in
+   * DEViLBOX and both layouts show the same one.
+   */
+  channelStrip?: React.ReactNode;
   api: DubDeckControlApi;
 }
 
 /**
- * The layer indicators are program-change pseudo-controls with negative
- * numbers. On the hardware they are what you press to change bank; on screen
- * they do the same job. Recognised by id, because that is all the descriptor
- * gives them.
+ * The layer indicators are program-change pseudo-controls with negative MIDI
+ * numbers — they send nothing, and on the device they are what you press to
+ * change bank.
+ *
+ * They are NOT drawn in the panel. They sit at y 15, two rows below the select
+ * row, and nothing else on the device is that far down — so drawing them added
+ * two full-width grid rows that were blank across all eighteen left-hand
+ * columns, a band of nothing under the whole fader bank ("there is a big empty
+ * space under the channel faders", 2026-09-23). The panel header carries the
+ * same Layer switch, so nothing is lost by leaving them out.
  */
-const LAYER_BUTTON_IDS: Readonly<Record<string, 'A' | 'B'>> = {
-  'layer-a': 'A',
-  'layer-b': 'B',
-};
+const LAYER_BUTTON_IDS: ReadonlySet<string> = new Set(['layer-a', 'layer-b']);
 
-/** One grid unit. The panel is `layout.width` of these across. */
-const UNIT_REM = 1.15;
+/**
+ * Controls the panel does not draw at all.
+ *
+ * The transport block — rew, fwd, loop, rec, stop, play, and the two layer
+ * indicators — carries no dub move: none of it is this deck's to fire, and
+ * DEViLBOX's transport is in the toolbar above. On the device it sits at rows
+ * 10 to 16, to the RIGHT of the fader bank, so drawing it opened seven grid
+ * rows that were empty across all eighteen left-hand columns and left a tall
+ * band of nothing between the button rows and the channel cards.
+ *
+ * Same fault the layer indicators had, and the same answer: a control that
+ * plays nothing does not get to set the height of the panel.
+ */
+const SKIPPED_GROUPS: ReadonlySet<string> = new Set(['transport']);
 
-/** Footprint in grid units. Controls sit two apart, so two is the default. */
-const footprint = (c: ControlDescriptor) => ({
-  w: c.w ?? (c.type === 'fader' ? 1 : 2),
-  h: c.h ?? (c.type === 'fader' ? 4 : 2),
-});
+/**
+ * Minimum height of one grid unit.
+ *
+ * A MINIMUM, not a height. An encoder cell is two units on the device but has
+ * to hold a caption, a 40 px knob and its push button; at any fixed unit small
+ * enough to keep the panel compact, that content overflowed into the row below
+ * and the right-hand knobs printed straight over the buttons beside them
+ * ("overlapping knobs", 2026-09-23). Letting a row grow to its content costs
+ * nothing where nothing needs the room, and no pixel guess can go stale.
+ */
+const UNIT_REM = 1.6;
 
-/** The caption a control carries when the deck has nothing to put there. */
-const inertCaption = (c: ControlDescriptor) => c.label ?? '';
+/** Past this much movement the gesture was a turn, not a press. */
+const TURN_SLOP = 4;
+
+/**
+ * A readable name for a target this deck does not own.
+ *
+ * Full words, as every DEViLBOX label is: `dj.deckA.filter` reads "Deck A
+ * Filter", not the path.
+ */
+function foreignLabel(target: string): string {
+  return target
+    .replace(/^(dj|dub|param)\./, '')
+    .replace(/[._-]+/g, ' ')
+    .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+}
 
 export const ControllerShapedDeck: React.FC<ControllerShapedDeckProps> = ({
   layout,
@@ -109,38 +171,58 @@ export const ControllerShapedDeck: React.FC<ControllerShapedDeckProps> = ({
   onLayerChange,
   moves,
   channelSends,
+  masterSend,
+  busSettings,
   armed,
   busEnabled,
   isFiring,
   heldMoves,
   toggledMoves,
   activeRatePreset,
+  channelStrip,
   api,
 }) => {
+  /** Where a press on a knob started, so a turn is not mistaken for a press. */
+  const pressOrigin = React.useRef<{ x: number; y: number } | null>(null);
+
   const overrides = useMIDIPresetStore(
     useCallback((s) => s.overrides[layout.id], [layout.id]),
   );
 
-  const bindings = useMemo(
-    () => buildDeckBindings({
+  const placements = useMemo(() => {
+    const bindings = buildDeckBindings({
       layout,
       layer,
       preset: getPresetById(layout.id),
       overrides: overrides ?? {},
       moves,
-    }),
-    [layout, layer, overrides, moves],
-  );
+    });
+    return deckControls(layout, layer, bindings);
+  }, [layout, layer, overrides, moves]);
+
+  /**
+   * The rectangle the fader bank and its select row occupy.
+   *
+   * The channel strip replaces both, so it has to span from the top of the
+   * faders to the bottom of the select row, across every column they use.
+   */
+  const faderZone = useMemo(() => {
+    const zone = placements.filter(
+      (p) => p.control.type === 'fader' || p.control.group === 'select',
+    );
+    if (zone.length === 0) return null;
+    return {
+      x0: Math.min(...zone.map((p) => p.control.x)),
+      x1: Math.max(...zone.map((p) => p.control.x + p.w)),
+      y0: Math.min(...zone.map((p) => p.control.y)),
+      y1: Math.max(...zone.map((p) => p.control.y + p.h)),
+      ids: new Set(zone.map((p) => p.control.id)),
+    };
+  }, [placements]);
 
   const hasLayerB = useMemo(
     () => layout.controls.some((c) => c.layer === 'B'),
     [layout],
-  );
-
-  /** The controls on screen: this layer, plus anything that has no layer. */
-  const visible = useMemo(
-    () => layout.controls.filter((c) => !c.layer || c.layer === layer),
-    [layout, layer],
   );
 
   /**
@@ -148,8 +230,8 @@ export const ControllerShapedDeck: React.FC<ControllerShapedDeckProps> = ({
    *
    * The deck keeps held moves under `${moveId}:${channelId ?? 'g'}`, toggles
    * under the bare move id, and the rate group under a single active id. Read
-   * exactly as the generic deck reads them, so a lit button means the same
-   * thing in both shapes.
+   * exactly as the deck's own layout reads them, so a lit button means the
+   * same thing in both.
    */
   const isActive = useCallback((t: DeckTarget): boolean => {
     switch (t.kind) {
@@ -166,7 +248,7 @@ export const ControllerShapedDeck: React.FC<ControllerShapedDeckProps> = ({
     }
   }, [toggledMoves, heldMoves, isFiring, activeRatePreset, armed]);
 
-  /** A latched control gets the same ring the generic deck gives it. */
+  /** A latched control gets the same ring the deck's own layout gives it. */
   const isLatched = useCallback((t: DeckTarget): boolean => (
     t.kind === 'move' && (
       (t.move.interaction === 'toggle' && toggledMoves.has(t.move.moveId)) ||
@@ -175,25 +257,57 @@ export const ControllerShapedDeck: React.FC<ControllerShapedDeckProps> = ({
   ), [toggledMoves, activeRatePreset]);
 
   /**
-   * Render one control as the deck's own button.
+   * Pressing a knob, the way pressing the encoder works.
    *
-   * A hold gets the pointer gesture; a trigger, toggle and rate preset get a
-   * click — the same split, made the same way, as the rows in `DubDeckStrip`.
+   * A hold move holds for as long as the knob is held; a trigger, toggle or
+   * rate preset fires on release. Either way a movement of more than
+   * `TURN_SLOP` px means the hand was TURNING, so nothing fires — otherwise
+   * every tweak of the bus tone would also throw an echo.
    */
-  const renderButton = (target: DeckTarget) => {
-    const active = isActive(target);
-    const latched = isLatched(target);
-    const cls = colorClasses(
-      target.kind === 'move' ? target.move.color : 'accent-error',
-      active,
-      'sm',
-    ) + ' w-full h-full flex items-center justify-center text-center leading-tight' +
-      (latched ? ' ring-2 ring-offset-1 ring-offset-dark-bgSecondary ring-white/70' : '');
+  const pressGesture = (move: DeckMove) => {
+    if (move.interaction === 'hold') {
+      const hold = api.holdButtonProps(move.moveId);
+      return {
+        onPointerDown: (e: React.PointerEvent<HTMLElement>) => {
+          pressOrigin.current = { x: e.clientX, y: e.clientY };
+          hold.onPointerDown(e as unknown as React.PointerEvent<HTMLButtonElement>);
+        },
+        onPointerUp: (e: React.PointerEvent<HTMLElement>) => {
+          hold.onPointerUp(e as unknown as React.PointerEvent<HTMLButtonElement>);
+        },
+        onPointerCancel: (e: React.PointerEvent<HTMLElement>) => {
+          hold.onPointerCancel(e as unknown as React.PointerEvent<HTMLButtonElement>);
+        },
+      };
+    }
+    return {
+      onPointerDown: (e: React.PointerEvent<HTMLElement>) => {
+        pressOrigin.current = { x: e.clientX, y: e.clientY };
+      },
+      onPointerUp: (e: React.PointerEvent<HTMLElement>) => {
+        const from = pressOrigin.current;
+        pressOrigin.current = null;
+        if (!from) return;
+        if (Math.abs(e.clientX - from.x) > TURN_SLOP || Math.abs(e.clientY - from.y) > TURN_SLOP) return;
+        if (!busEnabled) return;
+        if (move.interaction === 'toggle') api.handleToggle(move.moveId);
+        else if (move.interaction === 'rate') api.handleRatePreset(move.moveId);
+        else api.fireTrigger(move.moveId);
+      },
+    };
+  };
+
+  /** A button, built exactly as the deck's own layout builds it. */
+  const renderButton = (target: DeckTarget, compact: boolean) => {
+    const size = compact ? 'sm' : 'md';
 
     if (target.kind === 'armed') {
       return (
         <button
-          className={cls}
+          className={
+            colorClasses('accent-error', armed, size) +
+            ' w-full h-full' + (armed ? ' ring-2 ring-offset-1 ring-offset-dark-bgSecondary ring-white/70' : '')
+          }
           onClick={() => api.setArmed(!armed)}
           title={`Record Arm — ${armed ? 'armed, click to disarm' : 'click to arm'}`}
         >
@@ -201,12 +315,14 @@ export const ControllerShapedDeck: React.FC<ControllerShapedDeckProps> = ({
         </button>
       );
     }
-
     if (target.kind !== 'move') return null;
+
     const { move, channelId } = target;
     const caption = channelId === undefined ? move.label : `${move.label} ${channelId + 1}`;
     const where = channelId === undefined ? '' : ` — channel ${channelId + 1}`;
     const title = `${caption} — ${move.title}${where}`;
+    const cls = colorClasses(move.color, isActive(target), size) + ' w-full h-full' +
+      (isLatched(target) ? ' ring-2 ring-offset-1 ring-offset-dark-bgSecondary ring-white/70' : '');
 
     if (move.interaction === 'hold') {
       return (
@@ -220,7 +336,6 @@ export const ControllerShapedDeck: React.FC<ControllerShapedDeckProps> = ({
         </button>
       );
     }
-
     return (
       <button
         className={cls}
@@ -237,135 +352,205 @@ export const ControllerShapedDeck: React.FC<ControllerShapedDeckProps> = ({
     );
   };
 
-  /** A control the deck cannot drive: drawn, named, and quiet. */
-  const renderInert = (control: ControlDescriptor, binding: ControlDeckBinding) => {
-    const named = binding.turn ?? binding.press;
-    const caption = inertCaption(control) || (named ? named.target.replace(/^(dub|dj)\./, '') : '');
+  /**
+   * An encoder: ONE control that turns and presses, as on the device.
+   *
+   * It used to draw a separate button beneath every knob for the push half.
+   * There is no such button on the hardware — "the knobs+button combo here is
+   * made up, the controller has only knobs there" (2026-09-23) — and inventing
+   * one doubled the height of every encoder row and pushed the whole right
+   * block out of shape.
+   *
+   * The push is still reachable, because it is still a real gesture on a real
+   * control: pressing the knob fires it, exactly as pressing the encoder does.
+   * A press is distinguished from a turn by movement — a drag of more than a
+   * few pixels is a turn and fires nothing.
+   */
+  const renderEncoder = (binding: ControlDeckBinding) => {
+    const turn = binding.turn;
+    const def = turn?.kind === 'busParam' ? DUB_BUS_PARAMS[turn.target] : undefined;
+    const press = binding.press;
+
+    const move = press?.kind === 'move' ? press.move : undefined;
+    const pressTitle = move
+      ? ` · press: ${move.label} — ${move.title}`
+      : '';
+
     return (
       <div
-        className="w-full h-full rounded border border-dark-border bg-dark-bg/40 flex items-center justify-center px-0.5 text-[9px] font-mono text-text-muted text-center leading-none overflow-hidden"
+        className="flex flex-col items-center justify-start h-full min-h-0"
+        {...(move ? pressGesture(move) : {})}
+      >
+        {def ? (
+          /* Exactly how the instrument and synth editors use a knob —
+             `SampleEnhancerPanel` and the rest pass `label`, `unit`, a size and
+             a colour variable, and let the component draw its own caption and
+             readout. An earlier version here passed `hideValue` and drew its
+             own caption, which is why this panel looked unlike the rest of
+             DEViLBOX: a lone label above a knob with no value under it. */
+          <Knob
+            value={busSettings[def.field] ?? def.min}
+            min={def.min}
+            max={def.max}
+            onChange={(v) => api.setBusParam(def.field, v)}
+            label={def.label}
+            unit={def.unit}
+            size="sm"
+            color="var(--color-accent)"
+            disabled={!busEnabled}
+            paramKey={turn?.target}
+            title={`${def.label}${def.unit ? ` (${def.unit})` : ''}${pressTitle}`}
+          />
+        ) : (
+          /* An encoder the dub deck cannot drive — three of the X-Touch's
+             right-hand knobs turn DJ parameters (`dj.crossfader`,
+             `dj.deckA.filter`, `dj.deckB.filter`), which belong to the DJ
+             view. It still has to occupy a knob's full box, CAPTION INCLUDED:
+             drawn as a bare circle it was shorter than its neighbours and sat
+             at the wrong height in the row ("3 empty knobs that are
+             misaligned", 2026-09-23). */
+          <>
+            <div className="knob-label" style={{ fontSize: 9 }}>
+              {turn ? foreignLabel(turn.target) : 'Unassigned'}
+            </div>
+            <div
+              className="w-10 h-10 rounded-full border border-dashed border-dark-border bg-dark-bg/40 opacity-60"
+              title={turn
+                ? `${turn.target} — this knob drives the DJ view, not the dub bus`
+                : 'Encoder — nothing assigned'}
+            />
+          </>
+        )}
+      </div>
+    );
+  };
+
+  /**
+   * A fader: a channel's dub send, or — at the right-hand end — the master.
+   *
+   * The hardware's ninth fader sends DJ master volume, which is not this
+   * deck's to move, so on screen it is the deck's MASTER SEND: the same
+   * control the deck's master card carries, in the place the hand expects it.
+   */
+  const renderFader = (binding: ControlDeckBinding) => {
+    const isMaster = binding.turn?.kind !== 'channelSend';
+    const channelId = binding.turn?.kind === 'channelSend' ? binding.turn.channelId : -1;
+    const value = isMaster ? masterSend : (channelSends[channelId] ?? 0);
+
+    return (
+      <div className="flex flex-col items-center h-full min-h-0">
+        <div className="flex-1 min-h-0 flex items-stretch">
+          <Fader
+            value={value}
+            onChange={(v) => (isMaster ? api.setMasterSend(v) : api.setChannelSend(channelId, v))}
+            // The same size the deck's channel cards use, so a dub send is the
+            // same control wherever the deck draws it.
+            size="md"
+            fillHeight
+            color={isMaster ? 'accent-highlight' : 'accent-primary'}
+            disabled={!busEnabled}
+            doubleClickValue={1}
+            paramKey={isMaster ? undefined : `dub.channelSend.ch${channelId}`}
+            title={isMaster
+              ? `Master dub send — ${Math.round(value * 100)}%. Scales every channel at once.`
+              : `Channel ${channelId + 1} dub send — ${Math.round(value * 100)}%`}
+          />
+        </div>
+      </div>
+    );
+  };
+
+  /** A control with nothing for this deck to drive: present, named, quiet. */
+  const renderInert = (control: ControlDescriptor, binding: ControlDeckBinding) => {
+    const named = binding.press ?? binding.turn;
+    return (
+      <div
+        className="w-full h-full rounded border border-dark-border bg-dark-bg/30 flex items-center justify-center px-0.5 text-[9px] font-mono text-text-muted text-center leading-none overflow-hidden"
         title={named ? `${named.target} — driven by the hardware, not from here` : `${control.id} — nothing assigned`}
       >
-        {caption}
+        {control.label ?? ''}
       </div>
     );
   };
 
   return (
-    <div className="flex flex-col gap-2 pb-1.5">
-      {/* The panel's own header: which hardware this is, and its LAYER switch
-          — the one control that changes what every other control means. */}
+    <div className="flex flex-col gap-2 pb-1.5 border-b border-dark-border">
       <div className="flex items-center gap-2 text-[10px] font-mono">
-        <span className="text-text-muted">
-          {layout.manufacturer} {layout.name}
-        </span>
+        <span className="text-text-muted">{layout.manufacturer} {layout.name}</span>
         {hasLayerB && (
           <div className="flex items-center gap-1">
             <span className="text-text-muted">Layer</span>
+            {/* A plain action, so it is the design system's Button rather than
+                a hand-rolled one. The MOVE buttons below are not: they carry
+                the deck's own colour-per-move language from `moveButtonStyle`,
+                which is shared across both of the deck's layouts. */}
             {(['A', 'B'] as const).map((l) => (
-              <button
+              <Button
                 key={l}
-                className={
-                  'px-2 py-0.5 rounded border text-[10px] font-bold ' +
-                  (layer === l
-                    ? 'bg-accent-primary text-text-inverse border-accent-primary'
-                    : 'bg-dark-bgTertiary border-dark-borderLight text-text-secondary hover:border-accent-primary')
-                }
+                variant={layer === l ? 'primary' : 'default'}
+                size="sm"
                 onClick={() => onLayerChange(l)}
                 title={`Layer ${l} — the controller's own LAYER switch; every control sends a different address`}
               >
                 {l}
-              </button>
+              </Button>
             ))}
           </div>
         )}
       </div>
 
-      {/* The panel. A grid of the descriptor's own units, so a control lands
-          where it lands on the hardware. It scrolls sideways rather than
-          squeezing: a panel narrower than the device stops being the device. */}
+      {/* The panel. Columns are the descriptor's own units, so the proportions
+          are the device's: the wide left block, the fader bank with the master
+          at its right-hand end, the narrow encoder and transport block beside
+          them. It scrolls sideways rather than squeezing — a panel narrower
+          than the device stops being the device. */}
       <div className="overflow-x-auto">
         <div
-          className="grid gap-1"
+          className="grid gap-1.5"
           style={{
             gridTemplateColumns: `repeat(${layout.width}, minmax(0, 1fr))`,
-            gridAutoRows: `${UNIT_REM}rem`,
-            minWidth: `${layout.width * UNIT_REM}rem`,
+            gridAutoRows: `minmax(${UNIT_REM}rem, auto)`,
+            minWidth: `${layout.width * 2.1}rem`,
           }}
         >
-          {visible.map((control) => {
-            const { w, h } = footprint(control);
+          {placements.map(({ control, binding, w, h }) => {
             const place: React.CSSProperties = {
               gridColumn: `${control.x + 1} / span ${w}`,
               gridRow: `${control.y + 1} / span ${h}`,
             };
 
-            // The layer indicators switch the bank, here as on the device.
-            const layerTarget = LAYER_BUTTON_IDS[control.id];
-            if (layerTarget) {
-              return (
-                <div key={control.id} style={place}>
-                  <button
-                    className={
-                      'w-full h-full rounded border text-[10px] font-bold ' +
-                      (layer === layerTarget
-                        ? 'bg-accent-primary text-text-inverse border-accent-primary'
-                        : 'bg-dark-bgTertiary border-dark-borderLight text-text-secondary hover:border-accent-primary')
-                    }
-                    onClick={() => onLayerChange(layerTarget)}
-                    title={`Layer ${layerTarget}`}
-                  >
-                    {control.label ?? `Layer ${layerTarget}`}
-                  </button>
-                </div>
-              );
+            if (LAYER_BUTTON_IDS.has(control.id)) return null;
+            if (control.group && SKIPPED_GROUPS.has(control.group)) return null;
+            // The channel strip stands in for the faders and the select row.
+            if (channelStrip && faderZone?.ids.has(control.id)) return null;
+
+            if (control.type === 'fader') {
+              return <div key={control.id} style={place}>{renderFader(binding)}</div>;
+            }
+            if (control.type === 'encoder') {
+              return <div key={control.id} style={place}>{renderEncoder(binding)}</div>;
             }
 
-            const binding = bindings[control.id] ?? {};
-
-            // A fader whose turn rides a channel send is a channel send.
-            if (control.type === 'fader' && binding.turn?.kind === 'channelSend') {
-              const channelId = binding.turn.channelId;
-              return (
-                <div key={control.id} style={place} className="flex flex-col items-center justify-end">
-                  <Fader
-                    value={channelSends[channelId] ?? 0}
-                    onChange={(v) => api.setChannelSend(channelId, v)}
-                    size="sm"
-                    fillHeight
-                    color="accent-primary"
-                    disabled={!busEnabled}
-                    title={`Channel ${channelId + 1} dub send`}
-                  />
-                  <span className="text-[9px] font-mono text-text-muted leading-none pt-0.5">
-                    {channelId + 1}
-                  </span>
-                </div>
-              );
-            }
-
-            if (isDeckInert(binding)) {
-              return (
-                <div key={control.id} style={place}>
-                  {renderInert(control, binding)}
-                </div>
-              );
-            }
-
-            // Everything else plays what its PRESS does — an encoder's push
-            // included, which is where the echo-rate presets live.
             const target = binding.press ?? binding.turn;
-            if (!target) {
-              return <div key={control.id} style={place}>{renderInert(control, binding)}</div>;
-            }
+            const button = target ? renderButton(target, false) : null;
             return (
               <div key={control.id} style={place}>
-                {renderButton(target) ?? renderInert(control, binding)}
+                {button ?? renderInert(control, binding)}
               </div>
             );
           })}
         </div>
       </div>
+
+      {/* The channel strip, under the panel rather than inside it.
+          It was placed in the fader zone, where the hardware's faders are, and
+          that cannot work: a channel card is 224 px wide and a channel strip
+          on this device is two of twenty-two grid units, so five cards
+          overflowed into the transport block and the panel grew a horizontal
+          scrollbar ("its super chaotic atm", 2026-09-23). The panel keeps what
+          carries muscle memory — the knobs, the three button rows, the encoder
+          block — and the cards get the room they need beneath it. */}
+      {channelStrip}
     </div>
   );
 };
