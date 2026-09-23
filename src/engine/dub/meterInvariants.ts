@@ -193,3 +193,31 @@ export function checkCaptureNotAborted(entries: ConsoleEntryLike[] | null | unde
     ? { name: 'CAP', ok: false, detail: `capture aborted — ${aborted.message.slice(0, 160)}` }
     : { name: 'CAP', ok: true, detail: 'capture cleared the silence threshold' };
 }
+
+/**
+ * HOLD — the bus return is decaying, so nothing is still driving it.
+ *
+ * Only meaningful with the SENDS CLOSED. `busReturn` carries the live send as
+ * well as any tail, so with a send open a passage getting louder reads exactly
+ * like a move that never stopped — `filterDrop` and `sonarPing` both "failed"
+ * that way on 2026-09-23 (0.110 -> 0.181, 0.073 -> 0.187 over 1.5 s) while
+ * `delayPreset380` passed. The sweep closes the sends before it samples and
+ * restores them after; this predicate judges the two samples.
+ *
+ * Below the floor there is nothing left to decay. Otherwise the second sample
+ * must sit under 90 % of the first: a released move leaves a tail that falls,
+ * a move still feeding the loop holds it up or climbs.
+ */
+export function checkTailDecays(first: number, second: number, moveId: string): MeterCheck {
+  if (!Number.isFinite(first) || !Number.isFinite(second)) {
+    return { name: 'HOLD', ok: false, detail: `${moveId}: bus return unreadable (${first}, ${second})` };
+  }
+  if (second < SILENCE_RMS) return { name: 'HOLD', ok: true, detail: 'bus return quiet' };
+  if (second >= first * 0.9) {
+    return {
+      name: 'HOLD', ok: false,
+      detail: `${moveId} still driving the bus after release, sends closed (busReturn ${first.toFixed(6)} -> ${second.toFixed(6)} over 1.5 s)`,
+    };
+  }
+  return { name: 'HOLD', ok: true, detail: `bus return decaying with sends closed (${first.toFixed(6)} -> ${second.toFixed(6)})` };
+}
