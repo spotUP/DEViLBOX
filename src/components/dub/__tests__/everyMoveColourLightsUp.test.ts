@@ -1,43 +1,77 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { moveButtonStyle, MOVE_COLOR, type MoveColor } from '../moveButtonStyle';
 
 /**
- * "ui button does not light up the midi controller does" — Riddim, 2026-09-23.
+ * Every move button lights when its move is active, and they all do it the
+ * same way.
  *
- * The move buttons' active state comes from `colorClasses`, a switch over
- * literal Tailwind classes keyed by the move's colour token. Five tokens in
- * use had no case and fell to the idle default, so Riddim, Float, Build,
- * Emph and Liquid never showed they were held or firing. The controller's
- * LED was right; the screen was wrong.
+ * This used to check that a seventeen-case switch had a `case` for every
+ * colour a move table used, because a token with no case fell through to the
+ * idle default and the button never showed it was held — Riddim, Float, Build,
+ * Emph and Liquid were all invisible when down. "ui button does not light up
+ * the midi controller does" (2026-09-23).
  *
- * The token is a union type now and the switch ends in `never`, so a token
- * without a case fails type-check. This pins the same thing from the source
- * in case the default ever grows lenient again.
+ * The switch is gone. A colour is now an input to one recipe, so there is no
+ * case to miss — but the guarantee still has to hold, and it is worth more as
+ * a BEHAVIOURAL check than as a count of source lines. So these call the
+ * recipe.
  */
-const DECK = readFileSync(join(process.cwd(), 'src/components/dub/DubDeckStrip.tsx'), 'utf-8');
+const EVERY_COLOR = Object.values(MOVE_COLOR) as MoveColor[];
 
 describe('every move colour has an active state', () => {
-  const used = new Set((DECK.match(/color: '([a-z-]+(?:\/\d+)?)'/g) ?? []).map((m) => m.slice(8, -1)));
-  const cases = new Set((DECK.match(/case '([a-z-]+(?:\/\d+)?)':/g) ?? []).map((m) => m.slice(6, -2)));
-
-  it('finds the tokens the moves use', () => {
-    expect(used.size).toBeGreaterThan(10);
+  it('covers every colour a move can carry', () => {
+    expect(EVERY_COLOR.length).toBeGreaterThanOrEqual(7);
   });
 
-  it('has a colorClasses case for each of them', () => {
-    for (const token of used) {
-      expect(cases.has(token), `no active-state classes for '${token}'`).toBe(true);
+  it('looks different lit than unlit — whatever the colour', () => {
+    for (const color of EVERY_COLOR) {
+      const idle = moveButtonStyle(color, false);
+      const lit = moveButtonStyle(color, true);
+      expect(lit.style.backgroundColor, `${color} background`).not.toBe(idle.style.backgroundColor);
+      expect(lit.style.borderColor, `${color} border`).not.toBe(idle.style.borderColor);
+      expect(lit.className, `${color} is-active`).toContain('is-active');
     }
   });
 
-  it('the ones that were dark: Riddim, Float, Build, Emph, Liquid', () => {
-    for (const token of ['accent-error/60', 'accent-highlight/40', 'accent-primary/50', 'accent-primary/40', 'accent-secondary/80']) {
-      expect(cases.has(token), token).toBe(true);
+  it('glows when lit and not when idle, so a held move reads across a room', () => {
+    // A background change alone was invisible on the darker colours, which is
+    // how a held move could look identical to an idle one.
+    for (const color of EVERY_COLOR) {
+      expect(moveButtonStyle(color, true).style.boxShadow, color).toBeTruthy();
+      expect(moveButtonStyle(color, false).style.boxShadow, color).toBeUndefined();
     }
   });
 
-  it('a missing case is a type error, not a silent idle button', () => {
-    expect(DECK).toContain('const missing: never = token;');
+  it('gives every colour the same hover contract', () => {
+    // Not "most of them". The complaint was that some buttons hovered and some
+    // did not, and a few changed to something unrelated.
+    for (const color of EVERY_COLOR) {
+      const s = moveButtonStyle(color, false).style as Record<string, unknown>;
+      expect(s['--dub-move-hover-bg'], color).toBeTruthy();
+      expect(s['--dub-move-hover-border'], color).toBeTruthy();
+    }
+  });
+
+  it('carries the class the one hover rule is written against', () => {
+    const css = readFileSync(join(process.cwd(), 'src/index.css'), 'utf-8');
+    expect(moveButtonStyle(MOVE_COLOR.primary, false).className).toContain('dub-move-button');
+    expect(css).toContain('.dub-move-button:hover:not(:disabled)');
+  });
+});
+
+/**
+ * And the source of truth: the recipe is the design system's, not the deck's.
+ */
+describe('the deck does not define its own colour behaviour', () => {
+  const STYLE = readFileSync(join(process.cwd(), 'src/components/dub/moveButtonStyle.ts'), 'utf-8');
+
+  it('calls the shared control-colour recipe', () => {
+    expect(STYLE).toContain("from '@components/ui/controlColor'");
+  });
+
+  it('has no hand-written per-colour branch left', () => {
+    expect(STYLE, 'a switch over colours is what drifted').not.toMatch(/case '[a-z-]+(\/\d+)?':/);
   });
 });

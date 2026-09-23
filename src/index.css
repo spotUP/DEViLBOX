@@ -694,6 +694,21 @@
     user-select: none;
   }
 
+  /* Every dub move button hovers the same way — the hue comes in as a
+     variable because the class cannot know it. Before this some buttons
+     hovered their border and text, some hovered nothing at all, and a few
+     changed background to something unrelated: "only some have an outline when
+     i hover them and some have crazy weird bg colors when hovered"
+     (2026-09-23). */
+  .dub-move-button:hover:not(:disabled) {
+    background-color: var(--dub-move-hover-bg);
+    border-color: var(--dub-move-hover-border);
+  }
+
+  .dub-move-button:active:not(:disabled) {
+    transform: translateY(1px);
+  }
+
   .knob-label {
     color: var(--color-text-secondary);
     font-family: var(--theme-font-mono, 'JetBrains Mono', monospace);

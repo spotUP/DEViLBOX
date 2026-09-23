@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { MOVE_COLOR } from '../moveButtonStyle';
 import { CONTROLLER_LAYOUTS, getControllerLayout } from '@/midi/controllerLayouts';
 import { getPresetById } from '@/midi/djControllerPresets';
 import {
@@ -34,15 +35,15 @@ import {
 // A stand-in for the deck's own tables. Small on purpose: what is under test
 // is the mapping from a table row to an interaction, not the table.
 const GLOBALS: GlobalMoveRow[] = [
-  { label: 'Slam', title: 'Spring Slam', moveId: 'springSlam', color: 'accent-primary', kind: 'trigger', group: 'click' },
-  { label: 'Drop', title: 'Master Drop', moveId: 'masterDrop', color: 'accent-primary', kind: 'hold', group: 'hold' },
-  { label: 'Wide', title: 'Stereo Doubler', moveId: 'stereoDoubler', color: 'accent-primary', kind: 'hold', group: 'toggle' },
-  { label: 'Ring', title: 'Ring Mod', moveId: 'ringMod', color: 'accent-primary', kind: 'hold', group: 'toggle' },
-  { label: '1/4', title: 'Quarter note', moveId: 'delayPresetQuarter', color: 'accent-primary', kind: 'hold', group: 'rate' },
+  { label: 'Slam', title: 'Spring Slam', moveId: 'springSlam', color: MOVE_COLOR.primary, kind: 'trigger', group: 'click' },
+  { label: 'Drop', title: 'Master Drop', moveId: 'masterDrop', color: MOVE_COLOR.primary, kind: 'hold', group: 'hold' },
+  { label: 'Wide', title: 'Stereo Doubler', moveId: 'stereoDoubler', color: MOVE_COLOR.primary, kind: 'hold', group: 'toggle' },
+  { label: 'Ring', title: 'Ring Mod', moveId: 'ringMod', color: MOVE_COLOR.primary, kind: 'hold', group: 'toggle' },
+  { label: '1/4', title: 'Quarter note', moveId: 'delayPresetQuarter', color: MOVE_COLOR.primary, kind: 'hold', group: 'rate' },
 ];
 const OPS: ChannelOpRow[] = [
-  { label: 'Mute', title: 'Channel mute', moveId: 'channelMute', color: 'accent-primary', kind: 'hold' },
-  { label: 'Echo', title: 'Echo Throw', moveId: 'echoThrow', color: 'accent-primary', kind: 'trigger' },
+  { label: 'Mute', title: 'Channel mute', moveId: 'channelMute', color: MOVE_COLOR.primary, kind: 'hold' },
+  { label: 'Echo', title: 'Echo Throw', moveId: 'echoThrow', color: MOVE_COLOR.primary, kind: 'trigger' },
 ];
 const MOVES = buildDeckMoveIndex(GLOBALS, OPS);
 

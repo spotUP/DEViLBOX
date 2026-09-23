@@ -36,7 +36,7 @@ import type { ControllerLayout, ControlDescriptor } from '@/midi/controllerLayou
 import { getPresetById } from '@/midi/djControllerPresets';
 import { DUB_BUS_PARAMS } from '@/midi/performance/parameterRouter';
 import { useMIDIPresetStore } from '@/stores/useMIDIPresetStore';
-import { colorClasses } from './moveButtonStyle';
+import { moveButtonStyle, MOVE_COLOR } from './moveButtonStyle';
 import {
   buildDeckBindings,
   deckControls,
@@ -313,12 +313,11 @@ export const ControllerShapedDeck: React.FC<ControllerShapedDeckProps> = ({
     const size = compact ? 'sm' : 'md';
 
     if (target.kind === 'armed') {
+      const s = moveButtonStyle(MOVE_COLOR.error, armed, size);
       return (
         <button
-          className={
-            colorClasses('accent-error', armed, size) +
-            ' w-full h-full' + (armed ? ' ring-2 ring-offset-1 ring-offset-dark-bgSecondary ring-white/70' : '')
-          }
+          className={`${s.className} w-full h-full`}
+          style={s.style}
           onClick={() => api.setArmed(!armed)}
           title={`Record Arm — ${armed ? 'armed, click to disarm' : 'click to arm'}`}
         >
@@ -332,13 +331,14 @@ export const ControllerShapedDeck: React.FC<ControllerShapedDeckProps> = ({
     const caption = channelId === undefined ? move.label : `${move.label} ${channelId + 1}`;
     const where = channelId === undefined ? '' : ` — channel ${channelId + 1}`;
     const title = `${caption} — ${move.title}${where}`;
-    const cls = colorClasses(move.color, isActive(target), size) + ' w-full h-full' +
-      (isLatched(target) ? ' ring-2 ring-offset-1 ring-offset-dark-bgSecondary ring-white/70' : '');
+    const lit = moveButtonStyle(move.color, isActive(target) || isLatched(target), size);
+    const cls = `${lit.className} w-full h-full`;
 
     if (move.interaction === 'hold') {
       return (
         <button
           className={cls}
+          style={lit.style}
           {...api.holdButtonProps(move.moveId, channelId)}
           title={`${title} (press-and-hold)`}
           disabled={!busEnabled}
@@ -350,6 +350,7 @@ export const ControllerShapedDeck: React.FC<ControllerShapedDeckProps> = ({
     return (
       <button
         className={cls}
+        style={lit.style}
         onClick={() => {
           if (move.interaction === 'toggle') api.handleToggle(move.moveId);
           else if (move.interaction === 'rate') api.handleRatePreset(move.moveId);
