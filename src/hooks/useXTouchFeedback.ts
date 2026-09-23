@@ -13,6 +13,7 @@ import { useDJStore } from '../stores/useDJStore';
 import { useDrumPadStore } from '../stores/useDrumPadStore';
 import { useMixerStore } from '../stores/useMixerStore';
 import { subscribeToParamLiveValue } from '../midi/performance/parameterRouter';
+import { DUB_BUS_PARAMS } from '../midi/performance/parameterRouter';
 import { subscribeDubRouter, subscribeDubRelease } from '../engine/dub/DubRouter';
 import type { MIDIMessage } from '../midi/types';
 import type { DJControllerPreset } from '../midi/djControllerPresets';
@@ -58,6 +59,18 @@ export function useXTouchFeedback(): void {
   const liveSendsRef = useRef<number[]>([0, 0, 0, 0, 0, 0, 0, 0]);
   // Active dub moves (invocationId → moveId)
   const activeMovesRef = useRef<Map<string, string>>(new Map());
+  /**
+   * Encoder-ring positions waiting to go out, and what was last sent.
+   *
+   * The faders echoed the channel sends, but nothing echoed the BUS controls,
+   * so an AutoDub ride on the return or the high-pass moved the audio and left
+   * the encoder ring sitting where the hand had left it — "i have never seen
+   * it twist a knob ... on the controller" (2026-09-23). Keyed by CC, because
+   * that is what the device understands; the parameter behind it comes from
+   * the preset.
+   */
+  const encoderPendingRef = useRef<Map<number, number>>(new Map());
+  const encoderSentRef = useRef<Map<number, number>>(new Map());
 
   useEffect(() => {
     const manager = getMIDIManager();
@@ -113,6 +126,19 @@ export function useXTouchFeedback(): void {
         }, 1500);
       }
 
+      // Encoder rings first, and outside the payload comparison below: a ring
+      // moving while the faders and LEDs hold still must not be dropped as
+      // "nothing changed".
+      if (encoderPendingRef.current.size > 0) {
+        for (const [cc, v] of encoderPendingRef.current) {
+          if (encoderSentRef.current.get(cc) === v) continue;
+          encoderSentRef.current.set(cc, v);
+          // 0xb1 is the ring channel — 0xb0 is a no-op for ring position.
+          manager.sendRawToDevice(output.id, new Uint8Array([0xb1, cc, v]));
+        }
+        encoderPendingRef.current.clear();
+      }
+
       const messages = buildXTouchFeedbackMessages(preset, getFeedbackState(liveSendsRef.current, activeMovesRef.current), touchedRef.current);
       const payload = JSON.stringify(messages);
       if (payload === lastPayloadRef.current) return;
@@ -150,6 +176,29 @@ export function useXTouchFeedback(): void {
       const idx = ch;
       liveUnsubs.push(subscribeToParamLiveValue(`dub.channelSend.ch${ch}`, (value) => {
         liveSendsRef.current[idx] = value;
+        scheduleFlush();
+      }));
+    }
+
+    /**
+     * Every continuous bus parameter, echoed to whichever encoder the preset
+     * put it on.
+     *
+     * Driven from `DUB_BUS_PARAMS` rather than from the preset's mapping list
+     * so the subscriptions do not depend on a preset being loaded at the
+     * moment this effect runs; the CC is resolved when a value arrives, by
+     * which time the preset is known.
+     */
+    for (const param of Object.keys(DUB_BUS_PARAMS)) {
+      liveUnsubs.push(subscribeToParamLiveValue(param, (value) => {
+        const preset = mapper.getPreset();
+        if (!preset || !XTOUCH_PRESET_IDS.has(preset.id)) return;
+        const mapping = preset.ccMappings.find((m) => m.param === param);
+        if (!mapping) return;
+        encoderPendingRef.current.set(
+          mapping.cc,
+          Math.max(0, Math.min(127, Math.round(clamp01(value) * 127))),
+        );
         scheduleFlush();
       }));
     }
