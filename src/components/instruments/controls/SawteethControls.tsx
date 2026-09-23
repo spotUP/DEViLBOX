@@ -172,7 +172,7 @@ export const SawteethControls: React.FC<SawteethControlsProps> = ({
       <div className="flex items-center gap-2 mb-1">
         <span className="text-text-muted">Inst:</span>
         <select
-          className="bg-surface-secondary text-text-primary border border-border-primary rounded px-2 py-0.5 text-xs"
+          className="bg-dark-bgSecondary text-text-primary border border-dark-border rounded px-2 py-0.5 text-xs"
           value={selectedInst}
           onChange={(e) => setSelectedInst(Number(e.target.value))}
         >
@@ -185,7 +185,7 @@ export const SawteethControls: React.FC<SawteethControlsProps> = ({
       </div>
 
       {/* Tab bar */}
-      <div className="flex gap-1 border-b border-border-primary pb-1">
+      <div className="flex gap-1 border-b border-dark-border pb-1">
         {tabs.map(t => (
           <button
             key={t.key}
@@ -259,7 +259,7 @@ const ParamsPanel: React.FC<ParamsPanelProps> = ({ inst, setParam, knobColor, ac
       <div className="flex flex-col items-center gap-1">
         <span className="text-text-muted text-[10px]">Mode</span>
         <select
-          className="bg-surface-secondary text-text-primary border border-border-primary rounded px-1 py-0.5 text-xs w-16"
+          className="bg-dark-bgSecondary text-text-primary border border-dark-border rounded px-1 py-0.5 text-xs w-16"
           value={inst.filterMode}
           onChange={(e) => setParam(ST_PARAM.FILTER_MODE, Number(e.target.value))}
         >
@@ -294,7 +294,7 @@ const ParamsPanel: React.FC<ParamsPanelProps> = ({ inst, setParam, knobColor, ac
       <div className="flex flex-col items-center gap-1">
         <span className="text-text-muted text-[10px]">Mode</span>
         <select
-          className="bg-surface-secondary text-text-primary border border-border-primary rounded px-1 py-0.5 text-xs w-16"
+          className="bg-dark-bgSecondary text-text-primary border border-dark-border rounded px-1 py-0.5 text-xs w-16"
           value={inst.clipMode}
           onChange={(e) => setParam(ST_PARAM.CLIP_MODE, Number(e.target.value))}
         >
@@ -457,7 +457,7 @@ const EnvelopePanel: React.FC<EnvelopePanelProps> = ({ label, points, onChange, 
       <SectionLabel label={`${label} Envelope (${points.length} points)`} color={accent} />
       <canvas
         ref={canvasRef}
-        className="w-full rounded border border-border-primary"
+        className="w-full rounded border border-dark-border"
         style={{ height: 80 }}
       />
       {/* Point table */}
@@ -472,12 +472,12 @@ const EnvelopePanel: React.FC<EnvelopePanelProps> = ({ label, points, onChange, 
           </thead>
           <tbody>
             {points.map((p, i) => (
-              <tr key={i} className="border-t border-border-primary/30">
+              <tr key={i} className="border-t border-dark-border/30">
                 <td className="px-1 text-text-muted">{i}</td>
                 <td className="px-1">
                   <input
                     type="number"
-                    className="bg-surface-secondary text-text-primary border border-border-primary rounded px-1 w-14 text-[10px]"
+                    className="bg-dark-bgSecondary text-text-primary border border-dark-border rounded px-1 w-14 text-[10px]"
                     min={0} max={255}
                     value={p.time}
                     onChange={(e) => {
@@ -490,7 +490,7 @@ const EnvelopePanel: React.FC<EnvelopePanelProps> = ({ label, points, onChange, 
                 <td className="px-1">
                   <input
                     type="number"
-                    className="bg-surface-secondary text-text-primary border border-border-primary rounded px-1 w-14 text-[10px]"
+                    className="bg-dark-bgSecondary text-text-primary border border-dark-border rounded px-1 w-14 text-[10px]"
                     min={0} max={255}
                     value={p.lev}
                     onChange={(e) => {
@@ -535,14 +535,14 @@ const StepsPanel: React.FC<StepsPanelProps> = ({ steps, loop, onChange, accent }
           {steps.map((s, i) => (
             <tr
               key={i}
-              className={`border-t border-border-primary/30 ${i === loop ? 'bg-accent-primary/10' : ''}`}
+              className={`border-t border-dark-border/30 ${i === loop ? 'bg-accent-primary/10' : ''}`}
             >
               <td className="px-1 text-text-muted">
                 {i === loop ? `>${i}` : i}
               </td>
               <td className="px-1">
                 <select
-                  className="bg-surface-secondary text-text-primary border border-border-primary rounded px-1 text-[10px] w-16"
+                  className="bg-dark-bgSecondary text-text-primary border border-dark-border rounded px-1 text-[10px] w-16"
                   value={s.wForm}
                   onChange={(e) => onChange(i, { ...s, wForm: Number(e.target.value) })}
                 >
@@ -552,7 +552,7 @@ const StepsPanel: React.FC<StepsPanelProps> = ({ steps, loop, onChange, accent }
               <td className="px-1">
                 <input
                   type="number"
-                  className="bg-surface-secondary text-text-primary border border-border-primary rounded px-1 w-12 text-[10px]"
+                  className="bg-dark-bgSecondary text-text-primary border border-dark-border rounded px-1 w-12 text-[10px]"
                   min={0} max={96}
                   value={s.note}
                   onChange={(e) => onChange(i, { ...s, note: Math.max(0, Math.min(96, Number(e.target.value))) })}

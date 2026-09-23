@@ -767,7 +767,7 @@ export const SuperColliderEditor: React.FC<Props> = ({ config, onChange }) => {
       <div className="flex flex-1 min-h-0 overflow-hidden relative">
         {/* Preset browser overlay — shared across tabs */}
         {showPresets && (
-          <div className="absolute inset-0 z-10 bg-dark-bgPrimary/95 backdrop-blur-sm flex flex-col overflow-hidden" style={{ background: 'rgba(10,10,10,0.97)' }}>
+          <div className="absolute inset-0 z-10 bg-dark-bg/95 backdrop-blur-sm flex flex-col overflow-hidden" style={{ background: 'rgba(10,10,10,0.97)' }}>
             {/* Search + category tabs */}
             <div className="flex flex-wrap items-center gap-1 px-3 py-2 border-b border-dark-border shrink-0">
               <input

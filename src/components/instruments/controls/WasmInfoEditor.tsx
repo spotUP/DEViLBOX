@@ -131,7 +131,7 @@ export const WasmInfoEditor: React.FC<WasmInfoEditorProps> = ({ synthType, instr
         <div className="text-text-muted text-xs">Instrument: {instrumentName}</div>
       )}
       <div className="text-text-muted text-xs leading-relaxed">{info.description}</div>
-      <div className="text-text-muted text-[10px] mt-2 border-t border-border-primary/30 pt-2">
+      <div className="text-text-muted text-[10px] mt-2 border-t border-dark-border/30 pt-2">
         Playback-only format — instrument parameters are handled internally by the WASM replayer engine.
       </div>
     </div>

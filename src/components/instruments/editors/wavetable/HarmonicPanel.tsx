@@ -152,7 +152,7 @@ export const HarmonicPanel: React.FC<HarmonicPanelProps> = ({
         ))}
       </div>
 
-      <p className="text-[9px] font-mono text-text-subtle">
+      <p className="text-[9px] font-mono text-text-muted">
         Drag in the chart to set harmonic amplitudes. Wavetable updates live.
       </p>
     </div>

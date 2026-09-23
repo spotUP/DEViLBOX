@@ -105,7 +105,7 @@ export const WasmParamEditor: React.FC<WasmParamEditorProps> = ({
       <div className="flex items-center gap-2 mb-1">
         <span className="text-text-muted">Inst:</span>
         <select
-          className="bg-surface-secondary text-text-primary border border-border-primary rounded px-2 py-0.5 text-xs"
+          className="bg-dark-bgSecondary text-text-primary border border-dark-border rounded px-2 py-0.5 text-xs"
           value={selectedInst}
           onChange={(e) => setSelectedInst(Number(e.target.value))}
         >
@@ -154,7 +154,7 @@ const ParamControl: React.FC<ParamControlProps> = ({ descriptor, value, onChange
       <div className="flex items-center gap-2">
         <span className="text-text-muted text-[10px] w-24">{descriptor.label}</span>
         <select
-          className="bg-surface-secondary text-text-primary border border-border-primary rounded px-1 py-0.5 text-xs"
+          className="bg-dark-bgSecondary text-text-primary border border-dark-border rounded px-1 py-0.5 text-xs"
           value={val}
           onChange={(e) => onChange(Number(e.target.value))}
         >

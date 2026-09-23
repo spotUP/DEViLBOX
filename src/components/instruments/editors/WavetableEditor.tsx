@@ -421,7 +421,7 @@ export const WavetableEditor: React.FC<WavetableEditorProps> = ({
                 ]}
               />
             </div>
-            <div className="text-text-subtle text-[9px]">
+            <div className="text-text-muted text-[9px]">
               {targetConfig.description}
             </div>
           </div>

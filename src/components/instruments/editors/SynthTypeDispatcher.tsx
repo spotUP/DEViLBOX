@@ -2435,7 +2435,7 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
               {/* Wavetable Editor (for chips that support it) */}
               {chipCaps.hasWavetable && (
                 <div className="rounded-lg overflow-hidden border border-dark-border">
-                  <div className="px-3 py-2 bg-dark-surface border-b border-dark-border">
+                  <div className="px-3 py-2 bg-dark-bgSecondary border-b border-dark-border">
                     <span className="text-xs font-semibold uppercase tracking-wider text-slate-300">
                       Wavetables
                     </span>
