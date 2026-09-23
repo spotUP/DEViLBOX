@@ -270,11 +270,26 @@ function getFeedbackState(liveSends: number[], activeMoves: Map<string, string>)
   const dub = useDrumPadStore.getState().dubBus;
   const mixer = useMixerStore.getState();
 
-  // When dub bus is enabled, faders reflect per-channel dub sends.
-  // Use the higher of store value (user slider) and live value (auto-dub moves).
-  const dubChannelSends = dub.enabled
-    ? mixer.channels.slice(0, 8).map((ch, i) => Math.max(ch?.dubSend ?? 0, liveSends[i] ?? 0))
-    : undefined;
+  // The faders ALWAYS reflect per-channel dub sends, whether or not the bus is
+  // switched on.
+  //
+  // This used to be gated on `dub.enabled`, and when the bus was off the
+  // feedback fell back to the DJ deck's volumes and EQs — which rest at unity
+  // and centre, not at zero. So booting DEViLBOX with an empty song drove the
+  // motor faders to the DJ defaults, and the surface showed a mix that did not
+  // exist: "the controller faders knobs are not at zero when i start devilbox
+  // with an empty song" (2026-09-23).
+  //
+  // The gate was a guess at which mode the user is in. It does not need
+  // guessing: this preset's own CC mappings send `dub.channelSend.chN` from
+  // these faders unconditionally, so that is what they must display. A surface
+  // that shows one parameter and controls another is worse than one that shows
+  // nothing.
+  //
+  // Higher of the store value and the live value, so an AutoDub ride moves the
+  // motor fader too.
+  const dubChannelSends = mixer.channels.slice(0, 8)
+    .map((ch, i) => Math.max(ch?.dubSend ?? 0, liveSends[i] ?? 0));
 
   // Mute/solo state for 8 channels
   const channelMutes = mixer.channels.slice(0, 8).map(ch => ch?.muted ?? false);
