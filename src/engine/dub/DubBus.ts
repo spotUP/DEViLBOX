@@ -4810,19 +4810,21 @@ export class DubBus {
         // as fast as it produced writes.
         this._trimRide = rideTrim(this._trimRide, this._clipInputPeak(), this._clipReferencePeak());
         const programme = this._programmeBeforeInsert();
-        // While a performer holds a wet gesture the governor may LOOSEN but
-        // never tighten. Clamping during a move cancels the move: Liquid,
-        // Ring, Ping-Pong, Starve, Wide and Wobble all push the return up,
-        // and a governor that pulls it straight back leaves them changing
-        // timbre without ever getting louder — reported as each of them being
-        // dead. Runaway protection is unaffected: the moment the hand comes
-        // off, the next tick is free to pull the return down again.
-        const governed = governReturn(
+        // While a performer holds a wet gesture the governor RELEASES, at
+        // gesture pace, and never tightens. The first cut only stopped it
+        // tightening, which cancelled the move it was governing (Liquid, Ring,
+        // Ping-Pong, Starve, Wide and Wobble changed timbre and never got
+        // louder). That fix did nothing about a clamp earned BEFORE the press:
+        // four sends at 0.96 through a 0.79-feedback echo is +20 dB, the
+        // governor sits at its -18 dB floor, and its idle release is thirty
+        // seconds — so every toggle pressed in that window landed on a return
+        // held at 12 %, reported 2026-09-23 as "completely dead" with the
+        // faders at max. The rule lives in `governReturn`, with the gesture
+        // passed in, so it is provable without this watch.
+        this._returnGovernor = governReturn(
           this._returnGovernor, this._returnRms(), programme.rms, programme.valid,
+          this.wetGestureActive,
         );
-        this._returnGovernor = this.wetGestureActive && governed.db < this._returnGovernor.db
-          ? this._returnGovernor
-          : governed;
         // The ride moves the shelf as well as the trim now, so the whole
         // master tone is re-derived, not the trim alone.
         this._applyMasterInsertTone();

@@ -29,12 +29,37 @@ export const MAX_WET_TO_PROGRAMME = 1.0;
 /** Same pace as the trim ride; deeper, because the bus can run +20 dB. */
 export const RETURN_GOVERNOR: RiderConfig = { attackFraction: 0.5, holdTicks: 8, releaseDb: 0.15, maxDb: 18 };
 
+/**
+ * How fast a held gesture lets the governor go, dB per tick.
+ *
+ * The idle release is 0.15 dB a tick — a creep the ear must not read as
+ * movement, and from the -18 dB floor that is thirty seconds. A performer
+ * pressing a toggle is not asking for a creep: 2.25 dB a tick brings the
+ * floor to -0 in two seconds, which is the pace of a hand on a fader.
+ */
+export const GESTURE_RELEASE_DB = 2.25;
+
+/**
+ * @param gestureHeld a performer is deliberately driving the wet path. The
+ *   governor then RELEASES, at gesture pace, and never tightens: the press is
+ *   the performer overriding the safety. 0c158b836 only stopped it tightening,
+ *   and did nothing about a clamp earned before the press — with four sends
+ *   at 0.96 through a 0.79-feedback echo the governor sat at its -18 dB floor
+ *   and every toggle landed on a return held at 12 % (2026-09-23,
+ *   "completely dead", faders at max). Runaway protection is untouched:
+ *   the tick after the hand comes off governs as before.
+ */
 export function governReturn(
   state: RiderState,
   returnRms: number,
   programmeRms: number,
   programmeValid: boolean,
+  gestureHeld = false,
 ): RiderState {
+  if (gestureHeld) {
+    const prev = Number.isFinite(state.db) ? Math.min(0, Math.max(-RETURN_GOVERNOR.maxDb, state.db)) : 0;
+    return { db: Math.min(0, prev + GESTURE_RELEASE_DB), hold: 0 };
+  }
   if (!programmeValid || !Number.isFinite(programmeRms) || programmeRms <= 0
     || !Number.isFinite(returnRms) || returnRms <= 0) {
     return stepRider(state, -Infinity, RETURN_GOVERNOR);

@@ -192,13 +192,15 @@ describe('the return is governed against the programme', () => {
   // A governor that clamps during a gesture cancels the gesture: Liquid, Ring,
   // Ping-Pong, Starve, Wide and Wobble all push the return up, and pulling it
   // straight back leaves them changing timbre without ever getting louder —
-  // reported 2026-09-22 as each of them being dead, one at a time.
-  it('may loosen but never tighten while a wet gesture is held', () => {
+  // reported 2026-09-22 as each of them being dead, one at a time. The first
+  // cut froze the governor while held; that left a clamp earned BEFORE the
+  // press in place for thirty seconds (2026-09-23, "completely dead", faders
+  // at max). The rule now lives in `governReturn`, which is handed the
+  // gesture and releases at gesture pace — see returnGovernor.test.ts.
+  it('hands the held gesture to the governor rule instead of freezing it here', () => {
     const watch = methodBody('private _startTrimWatch(');
-    expect(watch).toContain('this.wetGestureActive && governed.db < this._returnGovernor.db');
-    // Runaway protection survives: the hand coming off frees the next tick.
-    expect(watch).toContain('? this._returnGovernor');
-    expect(watch).toContain(': governed;');
+    expect(watch).toContain('this.wetGestureActive,');
+    expect(watch).not.toContain('governed.db < this._returnGovernor.db');
   });
 
   it('applies it on the return trim only, on top of the shared trim', () => {
