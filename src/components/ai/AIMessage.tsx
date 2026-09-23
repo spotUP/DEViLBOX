@@ -17,7 +17,7 @@ export const AIMessage: React.FC<AIMessageProps> = ({ message }) => {
         className={`max-w-[90%] rounded-lg px-3 py-2 text-sm whitespace-pre-wrap break-words ${
           isUser
             ? 'bg-accent/20 text-text-primary'
-            : 'bg-dark-surface text-text-primary'
+            : 'bg-dark-bgSecondary text-text-primary'
         }`}
       >
         {message.content}

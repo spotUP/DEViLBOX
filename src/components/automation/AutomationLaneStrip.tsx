@@ -42,7 +42,7 @@ export const AutomationLaneStrip: React.FC<AutomationLaneStripProps> = ({
   if (lanes.length === 0) return null;
 
   return (
-    <div className="flex-shrink-0 border-t border-dark-border bg-dark-bgPrimary">
+    <div className="flex-shrink-0 border-t border-dark-border bg-dark-bg">
       {/* Header bar */}
       <div className="flex items-center h-5 px-2 bg-dark-bgSecondary border-b border-dark-border text-xs text-text-muted select-none">
         <button
