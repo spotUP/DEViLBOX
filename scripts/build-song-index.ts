@@ -1,44 +1,51 @@
 /**
- * Build the jukebox's song index.
+ * Build the jukebox's song index: one playable song for every format
+ * DEViLBOX claims to support, plus every Furnace subformat.
  *
- * `public/data/songs/` holds ~15k files across 189 format directories. The
- * jukebox exists to walk FORMATS quickly — one representative each, next,
- * next, next — so the index is grouped by directory and caps how many files
- * it carries per format. Testing every file is a different job and would put
- * a megabyte of names in the browser for nothing.
+ * The corpus holds ~15k files in 186 directories, but the directory names are
+ * not the authority on what the app can play — `FORMAT_REGISTRY` is, with 206
+ * entries. So this matches real corpus files against the registry using
+ * `detectFormat()`, the SAME function the loader uses. Anything the registry
+ * knows and the corpus cannot demonstrate comes out as a coverage GAP rather
+ * than silently not existing, which is the question an audit actually asks.
+ *
+ * Furnace is one registry entry but many machines, so its songs are split by
+ * the chip directory they sit in (`furnace/gameboy`, `furnace/nes`, …). The
+ * same is done for any format whose corpus directory has subdirectories: a
+ * subformat that plays differently deserves its own row.
  *
  * Regenerate after adding songs:
  *     npx tsx scripts/build-song-index.ts
- *
- * Output: public/data/songs/index.json (committed — the corpus is a fixed
- * test asset, and a manifest that needs a server is one the built app cannot
- * use).
  */
 import { readdirSync, statSync, writeFileSync } from 'node:fs';
-import { join, relative } from 'node:path';
+import { join, relative, basename } from 'node:path';
+import { FORMAT_REGISTRY, detectFormat } from '../src/lib/import/FormatRegistry';
 
-const SONGS_ROOT = join(process.cwd(), 'public/data/songs');
+const ROOT = process.cwd();
+const SONGS_ROOT = join(ROOT, 'public/data/songs');
 const OUT = join(SONGS_ROOT, 'index.json');
 
-/** How many songs to carry per format. Enough to retry a format whose first
- *  file is a bad example — which happened twice in one night — without
- *  shipping every name. */
-const PER_FORMAT = 8;
+/** Enough takes to move on when the first file of a format is a bad example —
+ *  which happened twice in one night — without shipping 15k names. */
+const PER_ENTRY = 6;
 
-/** Not songs: manifests, notes, and the sweep's own output. */
-const SKIP_EXT = new Set(['.json', '.md', '.txt', '.png', '.jpg', '.webp']);
+const SKIP_EXT = new Set(['.json', '.md', '.txt', '.png', '.jpg', '.jpeg', '.webp', '.html']);
 const SKIP_DIR = new Set(['.git', 'node_modules']);
 
-interface FormatEntry {
-  /** Directory name, which is how the corpus names the format. */
-  format: string;
-  /** Paths relative to `public/`, ready to hand to the loader. */
+interface Entry {
+  /** Stable id, also the key a fault report writes to on the :4444 tracker. */
+  id: string;
+  /** What the list shows. */
+  label: string;
+  /** Registry key, or null when the corpus has a song the registry cannot name. */
+  formatKey: string | null;
+  /** Machine / chip, for formats that have several. */
+  subformat?: string;
   files: string[];
-  /** How many the directory actually holds, so the UI can say "8 of 214". */
   total: number;
 }
 
-function songsIn(dir: string): string[] {
+function filesUnder(dir: string): string[] {
   const out: string[] = [];
   const walk = (d: string): void => {
     for (const name of readdirSync(d)) {
@@ -54,28 +61,108 @@ function songsIn(dir: string): string[] {
   return out.sort();
 }
 
-const formats: FormatEntry[] = [];
-for (const name of readdirSync(SONGS_ROOT).sort()) {
-  if (SKIP_DIR.has(name) || name.startsWith('.')) continue;
-  const full = join(SONGS_ROOT, name);
-  if (!statSync(full).isDirectory()) continue;
-  const all = songsIn(full);
-  if (all.length === 0) continue;
-  formats.push({
-    format: name,
-    total: all.length,
-    files: all.slice(0, PER_FORMAT).map((f) => `/${relative(join(process.cwd(), 'public'), f)}`),
-  });
+const webPath = (f: string) => `/${relative(join(ROOT, 'public'), f)}`;
+
+/** Directories directly under a format directory — Furnace's chips, and any
+ *  other format that organises its corpus by machine. */
+function subdirsOf(dir: string): string[] {
+  return readdirSync(dir)
+    .filter((n) => !n.startsWith('.') && !SKIP_DIR.has(n))
+    .filter((n) => statSync(join(dir, n)).isDirectory())
+    .sort();
 }
 
-const index = {
+const entries: Entry[] = [];
+/** Registry keys the corpus can actually demonstrate. */
+const covered = new Set<string>();
+
+/**
+ * One row per FORMAT, not per directory.
+ *
+ * Most directories hold a single format and become one row. Two shapes break
+ * that and both are real:
+ *
+ *  - `formats/` is the one-song-per-format collection: 165 files that are 165
+ *    DIFFERENT formats. Grouped by directory it collapsed into a single
+ *    useless row.
+ *  - `furnace/` is one format on many machines, each of which plays through
+ *    different chip code and breaks independently.
+ *
+ * So files are grouped by (directory, detected format), using the app's own
+ * `detectFormat()`. A directory whose files all detect the same way still
+ * produces exactly one row, which is the common case.
+ */
+function addRows(dirLabel: string, dir: string, files: string[], subformat?: string): void {
+  if (files.length === 0) return;
+  const byFormat = new Map<string | null, string[]>();
+  for (const f of files) {
+    const det = detectFormat(basename(f).toLowerCase());
+    const key = det?.key ?? null;
+    const list = byFormat.get(key);
+    if (list) list.push(f); else byFormat.set(key, [f]);
+  }
+
+  const several = byFormat.size > 1;
+  for (const [formatKey, group] of byFormat) {
+    if (formatKey) covered.add(formatKey);
+    const def = formatKey ? FORMAT_REGISTRY.find((f) => f.key === formatKey) : undefined;
+    // Only name the format in the label when the directory holds more than
+    // one — otherwise every row would read "ahx / AHX".
+    const label = several && def ? `${dirLabel} / ${def.label}` : dirLabel;
+    entries.push({
+      id: [dirLabel.replace(/\s*\/\s*/g, '-'), several ? formatKey ?? 'unknown' : null]
+        .filter(Boolean).join('-'),
+      label,
+      formatKey,
+      ...(subformat ? { subformat } : {}),
+      files: group.slice(0, PER_ENTRY).map(webPath),
+      total: group.length,
+    });
+  }
+}
+
+for (const dirName of readdirSync(SONGS_ROOT).sort()) {
+  if (SKIP_DIR.has(dirName) || dirName.startsWith('.')) continue;
+  const dir = join(SONGS_ROOT, dirName);
+  if (!statSync(dir).isDirectory()) continue;
+
+  const subs = subdirsOf(dir);
+  if (subs.length === 0) {
+    addRows(dirName, dir, filesUnder(dir));
+    continue;
+  }
+
+  // A directory of directories: one group per machine, plus whatever sits
+  // loose alongside them.
+  for (const sub of subs) {
+    addRows(`${dirName} / ${sub}`, join(dir, sub), filesUnder(join(dir, sub)), sub);
+  }
+  const loose = readdirSync(dir)
+    .filter((n) => !n.startsWith('.') && !statSync(join(dir, n)).isDirectory())
+    .filter((n) => { const d = n.lastIndexOf('.'); return !(d > 0 && SKIP_EXT.has(n.slice(d).toLowerCase())); })
+    .sort()
+    .map((n) => join(dir, n));
+  addRows(dirName, dir, loose);
+}
+
+/** Registry formats with nothing in the corpus to prove them. */
+const gaps = FORMAT_REGISTRY
+  .filter((f) => !covered.has(f.key))
+  .map((f) => ({ formatKey: f.key, label: f.label }))
+  .sort((a, b) => a.label.localeCompare(b.label));
+
+entries.sort((a, b) => a.label.localeCompare(b.label));
+
+writeFileSync(OUT, `${JSON.stringify({
   generated: new Date().toISOString(),
-  perFormat: PER_FORMAT,
-  formats,
-};
-writeFileSync(OUT, `${JSON.stringify(index, null, 2)}\n`);
+  perEntry: PER_ENTRY,
+  registryTotal: FORMAT_REGISTRY.length,
+  covered: covered.size,
+  entries,
+  gaps,
+}, null, 2)}\n`);
+
 console.log(
-  `[song-index] ${formats.length} formats, `
-  + `${formats.reduce((n, f) => n + f.files.length, 0)} songs listed `
-  + `of ${formats.reduce((n, f) => n + f.total, 0)} total → ${relative(process.cwd(), OUT)}`,
+  `[song-index] ${entries.length} rows (${covered.size}/${FORMAT_REGISTRY.length} registry formats covered, `
+  + `${gaps.length} with no test song) → ${relative(ROOT, OUT)}`,
 );

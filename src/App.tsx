@@ -1100,7 +1100,12 @@ function App() {
           {/* Left side - Pattern Editor or Arrangement View */}
           <div className="flex flex-col min-h-0 min-w-0 flex-1">
             {activeView === 'tracker' && (
-              <>
+              <div className="flex-1 min-h-0 min-w-0 flex flex-row">
+                {/* The jukebox sits BESIDE the pattern editor, never over it.
+                    The faults it hunts are all about the grid — empty, frozen,
+                    drifting — so the grid has to stay on screen while the list
+                    is being driven. */}
+                {jukeboxOpen && <JukeboxPanel onClose={() => setJukeboxOpen(false)} />}
                 {/* Pattern Editor */}
                 <div className="flex-1 min-h-0 min-w-0 flex flex-col">
                   <TrackerView
@@ -1114,13 +1119,7 @@ function App() {
                     showMasterFX={modalOpen === 'masterFx'}
                   />
                 </div>
-                {/* The jukebox rides UNDER the real pattern editor on
-                    purpose: the faults it hunts are "the grid is empty",
-                    "the grid does not scroll", "the grid drifts from the
-                    audio", and judging those needs the real editor and the
-                    real engines rather than a second drawing of them. */}
-                {jukeboxOpen && <JukeboxPanel onClose={() => setJukeboxOpen(false)} />}
-              </>
+              </div>
             )}
 
             {(activeView === 'dj' || djModeActive) && (
