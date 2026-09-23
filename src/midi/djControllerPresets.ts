@@ -442,7 +442,11 @@ const BEHRINGER_X_TOUCH_COMPACT: DJControllerPreset = {
     { channel: 0, cc: 7, param: 'dub.channelSend.ch6' },
     { channel: 0, cc: 8, param: 'dub.channelSend.ch7' },
     // MAIN fader
-    { channel: 0, cc: 9, param: 'dj.masterVolume' },
+    // The ninth fader is the MASTER: it scales every channel send, exactly as
+    // the deck's own master card does. It pointed at `dj.masterVolume` — a DJ
+    // parameter that does nothing in this view — so the fader under the
+    // performer's right hand was dead (2026-09-23).
+    { channel: 0, cc: 9, param: 'dub.masterSend' },
     // Fader TOUCH — the X-Touch's faders are touch-sensitive and send these
     // the instant a hand lands, before the fader moves. That is the moment a
     // desk decides which channel you mean, so they aim the deck's shared op
