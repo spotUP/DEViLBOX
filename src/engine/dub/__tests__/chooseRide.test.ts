@@ -169,11 +169,18 @@ describe('which rides return', () => {
     expect(rideFor('scientist').returns, 'returnGain').toBe(true);
   });
 
-  it('a channel send may be left open', () => {
-    // Opening a channel into the echo and leaving it there is a real dub
-    // decision, and the performer's own fader is what undoes it.
-    expect(rideFor('jammy').param).toMatch(/^dub\.channelSend\./);
-    expect(rideFor('jammy').returns).toBe(false);
+  it('leaves a send it OPENED open, and gives back one that was already open', () => {
+    // Opening a silent channel into the echo and leaving it there is a real
+    // dub decision, and the performer's own fader is what undoes it.
+    const opened = chooseRide(ctx({
+      persona: AUTO_DUB_PERSONAS.jammy, currentValue: () => 0.05,
+    }), willRide())!;
+    expect(opened.param).toMatch(/^dub\.channelSend\./);
+    expect(opened.returns, 'a channel it opened').toBe(false);
+
+    // A send that was already part of the mix is BORROWED. Keeping each ride's
+    // end position is how the sends drifted and the desk walked itself quiet.
+    expect(rideFor('jammy').returns, 'a channel already open').toBe(true);
   });
 });
 
@@ -181,11 +188,16 @@ describe('which rides return', () => {
  * A send that is already closed has nothing to give.
  */
 describe('a dub send is not a symmetric control', () => {
-  it('rides a nearly-closed send UP, never further down', () => {
-    // Riding a send down starves the bus of the signal the effects work on,
-    // and a one-way send ride leaves it there. Measured 2026-09-23: three of
-    // four sends walked down to near zero and the desk went quiet.
-    for (const current of [0, 0.1, 0.3]) {
+  it('rides a send UP from ANY resting position, never down', () => {
+    // The send is the bus's input. Riding it down takes away the signal the
+    // echo and the spring work on, so every move fired afterwards lands on
+    // less material. Measured 2026-09-23: `ch0 0.567 -> 0.129` and
+    // `ch2 0.567 -> 0.163`, after which no throw could be heard at all.
+    //
+    // 0.567 is the case the first fix missed: it only forced the direction
+    // for sends already below 0.35, and an ordinary resting send rode straight
+    // down through it.
+    for (const current of [0, 0.1, 0.3, 0.5, 0.567, 0.8]) {
       const r = chooseRide(ctx({
         persona: AUTO_DUB_PERSONAS.jammy,      // reaches for channelSend
         currentValue: () => current,

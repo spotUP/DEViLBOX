@@ -236,6 +236,18 @@ const CHANNEL_SEND_PREFIX = 'dub.channelSend.ch';
  */
 const CHANNEL_TOUCH_PREFIX = 'dub.channelTouch.ch';
 
+/**
+ * `dub.masterSend` — the master fader, which scales EVERY channel send.
+ *
+ * The X-Touch's ninth fader pointed at `dj.masterVolume`, a DJ parameter that
+ * does nothing in the dub deck, so the one fader sitting under the performer's
+ * right hand was dead (2026-09-23). On the deck's own master card that fader
+ * writes every channel at once, and the hardware master must mean the same
+ * thing — a master that moves a different mix from the one on screen is worse
+ * than no master at all.
+ */
+const MASTER_SEND_PARAM = 'dub.masterSend';
+
 function routeDubParameter(param: string, value: number, source: 'live' | 'lane' = 'live'): void {
   // 0. Per-channel dub send — handled before the move parser, which does not
   //    know 'channelSend' and would reject it.
@@ -247,6 +259,18 @@ function routeDubParameter(param: string, value: number, source: 'live' | 'lane'
       // a fresh one. NOT transient: automation replaying a ride is setting
       // where the fader rests, the same as the hand that recorded it.
       useMixerStore.getState().setChannelDubSend(ch, value, { source });
+    });
+    return;
+  }
+
+  // 0a. Master send — every channel at once.
+  if (param === MASTER_SEND_PARAM) {
+    void import('../../stores/useMixerStore').then(({ useMixerStore }) => {
+      const state = useMixerStore.getState();
+      const count = state.channels?.length ?? 0;
+      for (let ch = 0; ch < count; ch++) {
+        state.setChannelDubSend(ch, value, { source });
+      }
     });
     return;
   }
@@ -1671,6 +1695,13 @@ export function readDubParameter(param: string): number | null {
     const channels = getMixerStoreRef()?.getState?.()?.channels as Array<{ dubSend?: number }> | undefined;
     const send = channels?.[ch]?.dubSend;
     return typeof send === 'number' ? send : null;
+  }
+
+  if (param === MASTER_SEND_PARAM) {
+    // The highest channel, which is what the deck's own master fader shows.
+    const channels = getMixerStoreRef()?.getState?.()?.channels as Array<{ dubSend?: number }> | undefined;
+    if (!channels?.length) return null;
+    return Math.max(0, ...channels.map((c) => c?.dubSend ?? 0));
   }
 
   return null;
