@@ -7,6 +7,7 @@ import type { DrumPad, SampleData } from '../../types/drumpad';
 import { useUIStore } from '@stores/useUIStore';
 import { useDrumPadStore } from '../../stores/useDrumPadStore';
 import { getAudioContext } from '../../audio/AudioContextSingleton';
+import { deriveControlColors } from '@components/ui/controlColor';
 
 interface PadButtonProps {
   pad: DrumPad;
@@ -249,29 +250,6 @@ export const PadButton: React.FC<PadButtonProps> = ({
     };
   }, []); // stable — handlers accessed through ref
 
-  // Lighten very dark colors for better contrast on dark grey background
-  const ensureContrast = useCallback((hexColor: string): string => {
-    // Convert hex to RGB
-    const hex = hexColor.replace('#', '');
-    const r = parseInt(hex.substring(0, 2), 16);
-    const g = parseInt(hex.substring(2, 4), 16);
-    const b = parseInt(hex.substring(4, 6), 16);
-    
-    // Calculate relative luminance (simplified)
-    const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
-    
-    // If too dark (luminance < 0.35), lighten it
-    if (luminance < 0.35) {
-      const boost = 1.5; // Lighten by 50%
-      const newR = Math.min(255, Math.floor(r * boost));
-      const newG = Math.min(255, Math.floor(g * boost));
-      const newB = Math.min(255, Math.floor(b * boost));
-      return `#${newR.toString(16).padStart(2, '0')}${newG.toString(16).padStart(2, '0')}${newB.toString(16).padStart(2, '0')}`;
-    }
-    
-    return hexColor;
-  }, []);
-
   // Determine pad style based on state
   const padStyle = useMemo(() => {
     const baseColor = pad.color ?? (
@@ -283,22 +261,14 @@ export const PadButton: React.FC<PadButtonProps> = ({
     );
 
     if (hasActualData && baseColor) {
-      const contrastColor = ensureContrast(baseColor);
-      // Parse hex to get RGB for tinted backgrounds
-      const hex = baseColor.replace('#', '');
-      const r = parseInt(hex.substring(0, 2), 16);
-      const g = parseInt(hex.substring(2, 4), 16);
-      const b = parseInt(hex.substring(4, 6), 16);
-      return {
-        textColor: contrastColor,
-        bgColor: `rgba(${r},${g},${b},0.12)`,
-        borderColor: `rgba(${r},${g},${b},0.35)`,
-        glowColor: `rgba(${r},${g},${b},0.5)`,
-      };
+      // The recipe moved to the design system so the dub deck could use it
+      // too; the numbers are the pad's own, unchanged.
+      const c = deriveControlColors(baseColor);
+      return { textColor: c.text, bgColor: c.bg, borderColor: c.border, glowColor: c.glow };
     }
 
     return { textColor: undefined, bgColor: undefined, borderColor: undefined, glowColor: undefined };
-  }, [isLoaded, pad.sample, pad.instrumentId, pad.synthConfig, pad.color, pad.djFxAction, pad.dubAction, hasActualData, ensureContrast]);
+  }, [isLoaded, pad.sample, pad.instrumentId, pad.synthConfig, pad.color, pad.djFxAction, pad.dubAction, hasActualData]);
 
   // Flash overlay opacity driven by triggerIntensity (animated)
   const flashOpacity = triggerIntensity > 0.01 ? triggerIntensity : 0;
