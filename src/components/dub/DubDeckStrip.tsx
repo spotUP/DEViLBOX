@@ -26,6 +26,7 @@ import { useUIStore } from '@/stores/useUIStore';
 import { useTransportStore } from '@/stores/useTransportStore';
 import { getActiveBpm } from '@/engine/dub/DubActions';
 import { subscribeDubRouter, subscribeDubRelease, fire as fireDub } from '@/engine/dub/DubRouter';
+import { isLatchingMove } from '@/engine/dub/latchingMoves';
 import { beginGesture, endGesture, cancelGesture } from '@/engine/dub/GestureEngine';
 import { getAutoDubCurrentRoles } from '@/engine/dub/AutoDub';
 import { startDubRecorder, clearDubCurvesForCurrentPattern } from '@/engine/dub/DubRecorder';
@@ -1054,6 +1055,24 @@ export const DubDeckStrip: React.FC = () => {
   }, []);
 
   /**
+   * Click a latching move on, click it off.
+   *
+   * Mute is the one move nobody wants to keep a finger on: "i have to click
+   * the mute buttons many times for them to stick ... and i cant get back
+   * audio when i unmute" (2026-09-24). It is still a HOLD underneath — the
+   * same gesture, the same restore on release — so this only decides who ends
+   * it: the next click rather than the pointer coming up.
+   *
+   * Reuses `holdStart`/`holdEnd`, so the lamp set, the bus wait and the
+   * cleanup on unmount all behave exactly as they do for a held move.
+   */
+  const latchToggle = useCallback((moveId: string, channelId?: number) => {
+    const key = `${moveId}:${channelId ?? 'g'}`;
+    if (activeHolds.current.has(key) || pendingHolds.current.has(key)) holdEnd(moveId, channelId);
+    else holdStart(moveId, channelId);
+  }, [holdStart, holdEnd]);
+
+  /**
    * Pointer props for a press-and-hold move button.
    *
    * Every hold site used to inline this, and each one called
@@ -1689,12 +1708,19 @@ export const DubDeckStrip: React.FC = () => {
             const active = heldMoves.has(masterKey) || CHANNEL_OPS.some(
               () => Array.from({ length: visibleChannelCount }, (_, i) => `${op.moveId}:${i}`).some(k => activeFires.has(k))
             );
-            const isHold = op.kind === 'hold';
+            // A latching move is still a hold; the next CLICK ends it rather
+            // than the pointer coming up.
+            const latches = isLatchingMove(op.moveId);
+            const isHold = op.kind === 'hold' && !latches;
             return (
               <button
                 key={op.moveId}
                 {...moveButtonProps(op.color, active, 'w-full text-center')}
                 onClick={isHold ? undefined : () => {
+                  if (latches) {
+                    for (const ch of targetChannels) latchToggle(op.moveId, ch);
+                    return;
+                  }
                   for (const ch of targetChannels) fireTrigger(op.moveId, ch);
                 }}
                 {...(isHold ? {
