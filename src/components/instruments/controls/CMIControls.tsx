@@ -2,7 +2,7 @@
  * CMIControls — DOM/React renderer for the Fairlight CMI panel.
  *
  * ALL logic lives in useCMIPanel (shared hook). This file is ONLY rendering.
- * The Pixi version (PixiCMIKnobPanel.tsx) uses the same hook — zero duplication.
+ * All of its state and callbacks come from that hook — zero duplication.
  */
 
 import React, { useCallback, useRef, useEffect } from 'react';

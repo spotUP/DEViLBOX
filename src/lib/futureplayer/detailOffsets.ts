@@ -2,7 +2,7 @@
  * Future Player — instrument "detail" struct byte offsets.
  *
  * Shared between the DOM editor (FuturePlayerControls.tsx) and the GL
- * editor (PixiFuturePlayerPanel.tsx) so both write paths stay in lock-step
+ * editor panel so both write paths stay in lock-step
  * with the parser's read offsets.
  *
  * Offsets come from FuturePlayer.c update_audio() — identical to the

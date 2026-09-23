@@ -1,7 +1,7 @@
 /**
  * GTDAWView — DOM/React version of the modern DAW-like GT Ultra editor.
  *
- * Same layout as the Pixi version but rendered with React HTML/CSS/Tailwind.
+ * Rendered with React HTML/CSS/Tailwind.
  * Shares all stores/hooks/engine — zero data duplication.
  *
  * Layout:

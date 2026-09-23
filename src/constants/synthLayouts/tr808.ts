@@ -1,7 +1,7 @@
 import type { SynthPanelLayout } from '@/types/synthPanel';
 
 /**
- * TR-808 layout for Pixi synth panel.
+ * TR-808 layout for the generic synth panel.
  * Keys are flat (underscore-separated) matching the TR808Hardware UI parameter format.
  * configKey = 'parameters' so keys resolve to e.g. parameters.kick_tone.
  */

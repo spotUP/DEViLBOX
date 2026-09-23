@@ -1,7 +1,7 @@
 /**
  * useGTUltraEngineInit — Shared hook for initializing the GT Ultra WASM engine.
  *
- * Used by both the DOM GTUltraView and the Pixi PixiGTUltraView so the engine
+ * Used by GTUltraView so the engine
  * init logic is a single source of truth.
  */
 

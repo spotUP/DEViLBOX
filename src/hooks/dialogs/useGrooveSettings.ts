@@ -1,6 +1,6 @@
 // src/hooks/dialogs/useGrooveSettings.ts
 /**
- * useGrooveSettings — Shared logic hook for GrooveSettingsModal (DOM) and PixiGrooveSettingsModal (Pixi).
+ * useGrooveSettings — Logic hook for GrooveSettingsModal.
  *
  * Both dialogs call this hook and keep only their renderer-specific markup.
  * All store subscriptions and derived constants live here.

@@ -1,6 +1,6 @@
 /**
  * useHelpDialog — shared state and computed values for the Help dialog.
- * Used by both HelpModal (DOM) and PixiHelpModal (Pixi GL).
+ * Used by HelpModal.
  */
 
 import { useState, useEffect, useMemo } from 'react';

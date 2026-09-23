@@ -3,7 +3,7 @@
  *
  * Mirrors the C struct MusInstrument (klystrack-wasm/common/music.h:42-90) and the
  * `klys_set_instrument_param` switch in KlysWrapper.c. Both the DOM editor
- * (`KlysInstrumentEditor`) and the Pixi editor (`PixiKlysInstrumentEditor`)
+ * (`KlysInstrumentEditor`)
  * consume these tables — single source of truth.
  */
 

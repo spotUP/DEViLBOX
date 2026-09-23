@@ -1329,10 +1329,12 @@ queueMicrotask(() => {
       const instrument = state.instruments.find(i => i.id === state.currentInstrumentId);
       if (!instrument) return;
 
-      // Defer to microtask to avoid triggering pixi-react reconciliation
-      // synchronously during bulk instrument loading (e.g. song file import).
-      // Without this, the Zustand set() inside syncKnobsToSynth fires pixi-react
-      // subscribers mid-load, causing BindingError from stale Node references.
+      // Defer to a microtask so the set() inside syncKnobsToSynth does not fire
+      // subscribers synchronously in the middle of bulk instrument loading
+      // (e.g. a song file import). The crash that put this here was a
+      // Pixi-renderer one and that renderer is gone, so the defer is now
+      // belt-and-braces rather than load-bearing — but it also keeps a whole
+      // song's worth of knob syncs out of the import's own render pass.
       queueMicrotask(() => {
         const store = useMIDIStore.getState();
         // Auto-switch bank

@@ -1,9 +1,9 @@
 // src/hooks/dialogs/useSettingsDialog.ts
 /**
- * useSettingsDialog — Shared logic hook for SettingsModal (DOM) and PixiSettingsModal (Pixi).
+ * useSettingsDialog — Logic hook for SettingsModal.
  *
- * Both dialogs call this hook and keep only their renderer-specific markup.
- * All store subscriptions, local state, effects, and handlers live here.
+ * The dialog keeps only its markup; all store subscriptions, local state,
+ * effects and handlers live here.
  */
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
@@ -218,7 +218,7 @@ export function useSettingsDialog({ isOpen }: UseSettingsDialogOptions) {
   // Keep WebUSB state setters available for callers that extend the hook's returned value
   // (they are not returned directly but can be destructured by dialogs as needed)
 
-  // ── Effects (gated by isOpen for Pixi persistent-mount lifecycle) ────────
+  // ── Effects (gated by isOpen — the modal stays mounted while closed) ─────
   useEffect(() => {
     if (!isOpen) return;
     const handleFSChange = () => setIsFullscreen(!!document.fullscreenElement);

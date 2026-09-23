@@ -15,10 +15,10 @@ export interface ScrollListProps {
   onDoubleClick?: (id: string) => void;
   /** Required — sets the fixed height of the visible scroll area */
   height: number;
-  /** Row height in px. Default 28 (matches PixiList default) */
+  /** Row height in px. Default 28 */
   itemHeight?: number;
   /** Required in GL; optional in DOM. Sets the container width. */
   width?: number;
-  /** Extra layout props forwarded to the Pixi container (GL only, ignored in DOM) */
+  /** Extra layout props forwarded to the list container */
   layout?: Record<string, unknown>;
 }

@@ -6,7 +6,7 @@
  * then update the audio engine. Engine calls are wrapped in try/catch because the
  * engine may not be initialized yet.
  *
- * Views (DOM, Pixi, 3D) call these instead of touching the store or engine directly.
+ * Views (2D and 3D) call these instead of touching the store or engine directly.
  * This eliminates the dual-write problem where some views update only the store,
  * some only the engine, and some both — with no consistency.
  */

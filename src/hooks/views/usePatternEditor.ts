@@ -1,11 +1,11 @@
 // src/hooks/views/usePatternEditor.ts
 /**
- * usePatternEditor — Shared logic hook for PatternEditorCanvas (DOM/WebGL) and
- * PixiPatternEditor (Pixi/WebGL).
+ * usePatternEditor — Logic hook for PatternEditorCanvas, which renders the
+ * pattern grid either as DOM or through the WebGL2 tracker renderer.
  *
- * Both views call this hook and keep only their renderer-specific markup.
+ * The component keeps only its markup and its renderer.
  *
- * Shared:
+ * Held here:
  *  - TrackerStore slice (pattern, patterns, actions)
  *  - EditorStore (showGhostPatterns, columnVisibility, recordMode)
  *  - channelMuted / channelSolo derived arrays
@@ -15,11 +15,9 @@
  *  - useBDAnimations
  *  - Channel layout useMemo (non-format mode path)
  *
- * NOT shared (kept in each view):
- *  - DOM: format mode state/refs, mobile gestures, OffscreenBridge, DOM refs,
- *         showChannelNames, showAutomationLanes, showMacroLanes, useInstrumentStore
- *  - Pixi: Pixi refs (Graphics, MegaText, etc.), useTick, usePixiTheme,
- *          smooth scroll, Pixi context menu, viewport width/height
+ * Kept in the component: format mode state/refs, mobile gestures,
+ * OffscreenBridge, DOM refs, showChannelNames, showAutomationLanes,
+ * showMacroLanes, useInstrumentStore.
  */
 
 import { useRef, useEffect, useMemo } from 'react';
@@ -37,7 +35,7 @@ import { useCollaborationStore, getCollabClient } from '@stores/useCollaboration
 import { useBDAnimations } from '@hooks/tracker/useBDAnimations';
 import type { CursorPosition, BlockSelection } from '@typedefs';
 
-// ─── Layout constants (must match PatternEditorCanvas + PixiPatternEditor) ───
+// ─── Layout constants (must match PatternEditorCanvas) ───────────────────────
 const CHAR_WIDTH = 10;
 const LINE_NUMBER_WIDTH = 40;
 export const AUTOMATION_LANE_WIDTH = 56; // base width for a single automation lane
@@ -197,8 +195,7 @@ export function usePatternEditor() {
   // ── Channel layout ────────────────────────────────────────────────────────
   // Computes per-channel offsets and widths for the tracker grid.
   // NOTE: PatternEditorCanvas extends this with a format mode branch; that
-  // branch is kept in the Canvas component. The Pixi view uses these values
-  // directly (it has no format mode).
+  // branch is kept in the Canvas component.
   const { numChannels, channelOffsets, channelWidths, totalChannelsWidth } = useMemo(() => {
     if (!pattern) {
       return {

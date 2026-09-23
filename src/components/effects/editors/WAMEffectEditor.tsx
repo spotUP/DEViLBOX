@@ -22,7 +22,7 @@ function formatParamName(key: string): string {
     .trim();
 }
 
-/** Infer parameter range heuristics (matches PixiEffectParameterEditor logic) */
+/** Infer parameter range heuristics */
 function inferParamRange(_key: string, value: number): { min: number; max: number; step: number; unit: string } {
   // Negative values suggest dB range
   if (value < 0) return { min: -60, max: 12, step: 0.5, unit: 'dB' };

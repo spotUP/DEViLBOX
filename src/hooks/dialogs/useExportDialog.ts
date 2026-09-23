@@ -1,6 +1,6 @@
 // src/hooks/dialogs/useExportDialog.ts
 /**
- * useExportDialog — Shared logic hook for ExportDialog (DOM) and PixiExportDialog (Pixi).
+ * useExportDialog — Logic hook for ExportDialog.
  *
  * Both dialogs call this hook and keep only their renderer-specific markup.
  * All store subscriptions, local state, effects, and handlers live here.

@@ -2,7 +2,7 @@
  * useCMIPanel — Shared hook for the Fairlight CMI control panel.
  *
  * Single source of truth for ALL CMI panel state, computed data,
- * and callbacks. Both the DOM and Pixi renderers import this hook —
+ * and callbacks. The CMI control panel imports this hook —
  * zero duplicated logic.
  *
  * Provides:

@@ -89,7 +89,7 @@ async function stopActivePlaybackForIncomingSong(
 // ─── Unified Tracker Module Import ─────────────────────────────────────────
 // THE single import function for all tracker modules (MOD/XM/IT/S3M/FUR/DMF/
 // Amiga/UADE/etc.). Called by ImportModuleDialog's onImport callback from both
-// DOM and Pixi views. All other import paths are dead — this is the one.
+// every view. All other import paths are dead — this is the one.
 
 export async function importTrackerModule(
   info: ModuleInfo,
@@ -969,7 +969,7 @@ async function loadSongFile(file: File, options: FileLoadOptions, preReadBuffer?
     }
 
     // Load instruments FIRST, then wait for the microtask to complete.
-    // loadInstruments defers set() via queueMicrotask (to avoid pixi-react crash).
+    // loadInstruments defers its set() via queueMicrotask.
     // If we load patterns immediately, the playback effect fires before instruments
     // are in the store → replayer gets empty instrument list → silence.
     if (result.instruments.length > 0) {

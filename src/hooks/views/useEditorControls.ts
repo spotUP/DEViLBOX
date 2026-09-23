@@ -1,10 +1,9 @@
 // src/hooks/views/useEditorControls.ts
 /**
- * useEditorControls — Shared logic hook for EditorControlsBar (DOM) and
- * PixiEditorControlsBar (Pixi).
+ * useEditorControls — Logic hook for EditorControlsBar.
  *
- * Both views call this hook and keep only their renderer-specific markup.
- * All store subscriptions, derived state, and handler callbacks live here.
+ * The bar keeps only its markup; all store subscriptions, derived state and
+ * handler callbacks live here.
  */
 
 import { useCallback } from 'react';

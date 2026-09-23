@@ -3,9 +3,9 @@
  * FT2-style block selection with Alt+B/E/C/V/X shortcuts
  *
  * PERF: This hook must NOT subscribe to cursor/selection via React hooks.
- * It's mounted in PixiTrackerView — any re-render cascades through the
- * entire @pixi/react reconciler + Yoga layout (~25ms). All cursor/selection
- * reads use getState() at call time instead.
+ * It is called from useTrackerView, so a subscription here re-renders the
+ * whole tracker view on every cursor move. All cursor/selection reads use
+ * getState() at call time instead.
  */
 
 import { useCallback, useState } from 'react';
@@ -38,8 +38,8 @@ export interface BlockOperationsState {
 
 export const useBlockOperations = () => {
   // PERF: NO React hooks for ANY store — use getState() at call time.
-  // useBlockOperations() is called in PixiTrackerView; any re-render here
-  // cascades through the entire @pixi/react reconciler + Yoga layout (~25ms).
+  // useBlockOperations() is called from useTrackerView; a subscription here
+  // re-renders the whole tracker view on every cursor move.
 
   const [blockState, setBlockState] = useState<BlockOperationsState>({
     blockStartMarked: false,
