@@ -71,8 +71,27 @@ export class HivelyEngine extends WASMSingletonBase implements IsolationCapableE
   private _songEndCallbacks: Set<() => void> = new Set();
   private _playerHandleResolvers: Array<(handle: number) => void> = [];
 
+  /**
+   * Where the standalone instrument players come out.
+   *
+   * `output` is the TUNE. The host mutes it on transport stop
+   * (NativeEngineRouting zeroes every native engine's output gain so a
+   * stopping worklet cannot leak), and the instrument players used to be
+   * summed into the same worklet output — so every live Hively note after a
+   * stop was rendered and never heard (2026-09-23, `players=["0"]` in the
+   * log and 0.0001 RMS at the master). The players now have their own
+   * worklet output, wired here, and nothing mutes it. HivelySynth instances
+   * connect to this, never to `output`.
+   */
+  readonly instrumentOutput: GainNode;
+  /** Worklet output index the instrument players are mixed into. */
+  static readonly INSTRUMENT_OUTPUT_INDEX = 1 + HivelyEngine.MAX_ISOLATION_SLOTS + HivelyEngine.MAX_DUB_CHANNELS;
+
   private constructor() {
     super();
+    // Created before initialize(): a HivelySynth may connect to it before the
+    // worklet exists, exactly as it may to `output`.
+    this.instrumentOutput = this.audioContext.createGain();
     this.initialize(HivelyEngine.cache);
   }
 
@@ -115,8 +134,9 @@ export class HivelyEngine extends WASMSingletonBase implements IsolationCapableE
   protected createNode(): void {
     const ctx = this.audioContext;
 
-    // 37 stereo outputs: [0]=main mix, [1..4]=isolation slots, [5..36]=dub sends.
-    const TOTAL_OUTPUTS = 1 + HivelyEngine.MAX_ISOLATION_SLOTS + HivelyEngine.MAX_DUB_CHANNELS;
+    // 38 stereo outputs: [0]=tune mix, [1..4]=isolation slots, [5..36]=dub
+    // sends, [37]=standalone instrument players (see `instrumentOutput`).
+    const TOTAL_OUTPUTS = HivelyEngine.INSTRUMENT_OUTPUT_INDEX + 1;
     this.workletNode = new AudioWorkletNode(ctx, 'hively-processor', {
       outputChannelCount: new Array(TOTAL_OUTPUTS).fill(2),
       numberOfOutputs: TOTAL_OUTPUTS,
@@ -208,6 +228,7 @@ export class HivelyEngine extends WASMSingletonBase implements IsolationCapableE
     });
 
     this.workletNode.connect(this.output);
+    this.workletNode.connect(this.instrumentOutput, HivelyEngine.INSTRUMENT_OUTPUT_INDEX);
   }
 
   /** Load a .hvl or .ahx tune from binary data */

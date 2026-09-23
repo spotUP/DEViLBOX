@@ -807,7 +807,21 @@ class HivelyProcessor extends AudioWorkletProcessor {
     }
 
     // ── Mix in standalone instrument players ──
-    if (this.wasm && this.playerOutPtrs) {
+    //
+    // Into their OWN output, not the tune's. Output [0] is the tune, and the
+    // host mutes it on transport stop (NativeEngineRouting zeroes every
+    // engine's output gain "to prevent audio leaking"). The players are
+    // instruments — a live key, a controller pad — and were summed into [0],
+    // so every live Hively note after a stop was rendered and never heard
+    // (2026-09-23, measured silent at the master with `players=["0"]`).
+    // The engine wires [INSTRUMENT_OUTPUT] to `instrumentOutput`, which the
+    // HivelySynth instances feed from and which nothing mutes.
+    const INSTRUMENT_OUTPUT = 37;
+    const instOut = outputs[INSTRUMENT_OUTPUT];
+    const instL = instOut && instOut[0] ? instOut[0] : null;
+    const instR = instOut ? (instOut[1] || instOut[0]) : null;
+    if (instL) { instL.fill(0); instR.fill(0); }
+    if (this.wasm && this.playerOutPtrs && instL) {
       const heapF32 = this.wasm.HEAPF32;
       for (const h of Object.keys(this.playerOutPtrs)) {
         const hi = parseInt(h);
@@ -826,8 +840,8 @@ class HivelyProcessor extends AudioWorkletProcessor {
           for (let i = 0; i < n; i++) {
             const sL = heapAfter[offL + i];
             const sR = heapAfter[offR + i];
-            outputL[i] += sL;
-            outputR[i] += sR;
+            instL[i] += sL;
+            instR[i] += sR;
             const abs = Math.abs(sL) + Math.abs(sR);
             if (abs > maxSample) maxSample = abs;
           }
