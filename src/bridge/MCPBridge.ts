@@ -529,50 +529,93 @@ async function handleMessage(data: string): Promise<void> {
 
   try {
     const result = await handler(request.params ?? {});
-    send({ id: request.id, type: 'result', data: annotateRecoveryPrompt(request.method, result) });
+    send({ id: request.id, type: 'result', data: annotateBlockingDialog(request.method, result) });
   } catch (e) {
     send({ id: request.id, type: 'error', error: (e as Error).message });
   }
 }
 
 /**
- * Tell every caller when the crash-recovery prompt is blocking the UI.
+ * Tell every caller when ANY dialog is blocking the UI.
  *
- * The prompt appears on boot and covers the app, but `load_modland`, `play`
- * and the rest still answer `ok: true` from the store layer, so an agent
- * driving DEViLBOX over MCP gets no hint that a human is looking at a dialog.
- * Reported repeatedly through 2026-09-22, each time as "why are you not
- * dismissing it".
+ * The app has three separate blocking surfaces and each was introduced
+ * without the others knowing: a `useUIStore` modal, the crash-recovery
+ * prompt, and the synth-error dialog (its own store, its own renderer in
+ * App.tsx). Meanwhile `load_modland`, `play` and the rest still answer
+ * `ok: true` from the store layer, so an agent driving DEViLBOX over MCP
+ * reads a stalled engine with no reason given and goes hunting in the audio
+ * graph. Reported repeatedly through 2026-09-22 as "why are you not
+ * dismissing it", and again 2026-09-23: "there was a dialog in devilbox",
+ * "you always miss those", "the mcp should be improved so you can see them
+ * and dismiss them".
  *
- * This only REPORTS. Resolving the prompt means choosing to keep or destroy
- * unsaved work, which `resolve_recovery_prompt` exists to make an explicit
- * decision — see `dismissModal` for why that is never done implicitly.
+ * So: every response carries the answer, and each one names the call that
+ * clears it. A blocking dialog is reported on the SAME key shape whatever
+ * kind it is, so a caller only has to look for one thing.
+ *
+ * This only REPORTS. Clearing is always an explicit call, because
+ * `discard` on the recovery prompt destroys unsaved work — see
+ * `dismissModal` for why that is never done implicitly.
  */
-function annotateRecoveryPrompt(method: string, result: unknown): unknown {
-  // The state and resolve calls already speak about the prompt themselves.
-  if (method === 'get_modal_state' || method === 'resolve_recovery_prompt') return result;
+function annotateBlockingDialog(method: string, result: unknown): unknown {
+  // The calls that speak about dialogs themselves need no annotation.
+  if (method === 'get_modal_state' || method === 'resolve_recovery_prompt'
+    || method === 'dismiss_errors' || method === 'dismiss_modal'
+    || method === 'get_synth_errors') return result;
   if (!result || typeof result !== 'object' || Array.isArray(result)) return result;
   try {
-    const { modalOpen, recoveryPromptOpen, recoveryPrompt } =
+    const { modalOpen, recoveryPromptOpen, recoveryPrompt, synthErrorDialogOpen, synthError } =
       getModalState() as {
         modalOpen: string | null;
         recoveryPromptOpen: boolean;
         recoveryPrompt: unknown;
+        synthErrorDialogOpen: boolean;
+        synthError: { message?: string } | null;
       };
-    if (!recoveryPromptOpen) {
-      // A blocking modal is worth reporting too, for the same reason.
-      if (!modalOpen) return result;
-      return { ...(result as Record<string, unknown>), blockingModal: modalOpen };
+
+    // The recovery prompt first: it is the only one holding unsaved work, so
+    // it is the one whose answer cannot be chosen for the user.
+    if (recoveryPromptOpen) {
+      return {
+        ...(result as Record<string, unknown>),
+        blockingDialog: 'recovery-prompt',
+        recoveryPromptOpen: true,
+        recoveryPrompt,
+        blockingDialogHint:
+          'The crash-recovery prompt is covering the UI and holds UNSAVED work. '
+          + 'Answer it with resolve_recovery_prompt { action: "restore" | "discard" } '
+          + 'before trusting anything on screen.',
+        // Kept so callers written against the older shape still see it.
+        recoveryPromptHint:
+          'The crash-recovery prompt is covering the UI and holds UNSAVED work. '
+          + 'Answer it with resolve_recovery_prompt { action: "restore" | "discard" } '
+          + 'before trusting anything on screen.',
+      };
     }
-    return {
-      ...(result as Record<string, unknown>),
-      recoveryPromptOpen: true,
-      recoveryPrompt,
-      recoveryPromptHint:
-        'The crash-recovery prompt is covering the UI and holds UNSAVED work. '
-        + 'Answer it with resolve_recovery_prompt { action: "restore" | "discard" } '
-        + 'before trusting anything on screen.',
-    };
+
+    if (synthErrorDialogOpen) {
+      return {
+        ...(result as Record<string, unknown>),
+        blockingDialog: 'synth-error',
+        synthError,
+        blockingDialogHint:
+          'A synth-error dialog is covering the UI'
+          + (synthError?.message ? `: "${synthError.message.slice(0, 160)}"` : '')
+          + '. The app may be half-started — engines can be stalled and every level '
+          + 'will read zero. Clear it with dismiss_errors.',
+      };
+    }
+
+    if (modalOpen) {
+      return {
+        ...(result as Record<string, unknown>),
+        blockingDialog: modalOpen,
+        blockingModal: modalOpen,
+        blockingDialogHint: `A "${modalOpen}" modal is covering the UI. Clear it with dismiss_modal.`,
+      };
+    }
+
+    return result;
   } catch {
     return result;
   }

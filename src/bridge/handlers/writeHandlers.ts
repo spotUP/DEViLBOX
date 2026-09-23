@@ -2054,6 +2054,11 @@ export function dismissModal(): Record<string, unknown> {
 export function getModalState(): Record<string, unknown> {
   const { modalOpen, modalData } = useUIStore.getState();
   const recoveryOpen = isRecoveryPromptOpen();
+  // The synth-error dialog is a third kind of blocking surface, with its own
+  // store and its own renderer in App.tsx. It was invisible here, so an agent
+  // driving the app saw a stalled engine and no reason for it — the owner,
+  // 2026-09-23: "there was a dialog in devilbox", "you always miss those".
+  const activeError = useSynthErrorStore.getState().activeError;
   return {
     modalOpen: modalOpen ?? null,
     modalData: modalData ?? null,
@@ -2061,6 +2066,15 @@ export function getModalState(): Record<string, unknown> {
     // be invisible here entirely.
     recoveryPromptOpen: recoveryOpen,
     recoveryPrompt: recoveryOpen ? describeRecoveryPrompt() : null,
+    synthErrorDialogOpen: !!activeError,
+    synthError: activeError
+      ? {
+          id: activeError.id,
+          synthType: activeError.synthType,
+          errorType: activeError.errorType,
+          message: activeError.message,
+        }
+      : null,
   };
 }
 
