@@ -164,12 +164,15 @@ export function chooseRide(ctx: RideTickCtx, rng: () => number): AutoDubRide | n
     target: rideDestination(current, depth, rng, param),
     bars: rideLength(persona),
     curve: config.curve,
-    // A channel send may be LEFT somewhere — opening a channel into the echo
-    // and leaving it open is a real dub decision, and the performer's own
-    // fader is the thing that undoes it. Everything else is an excursion: the
-    // bus tone belongs to the mix, not to the machine, so a hand that moves it
-    // has to give it back.
-    returns: !param.startsWith('dub.channelSend.'),
+    // Everything comes back except one case: a send that started nearly
+    // CLOSED. Opening a silent channel into the echo and leaving it open is a
+    // real dub decision, and the performer's own fader is what undoes it.
+    //
+    // A send that was already open does NOT get left wherever the ride ended.
+    // That was the first version's rule for every send, and it is how the desk
+    // walked itself quiet: each ride nudged a send and kept the new position,
+    // so the sends drifted and never came home.
+    returns: !param.startsWith('dub.channelSend.') || current >= SEND_LEAVE_OPEN_BELOW,
   };
 }
 
@@ -195,12 +198,21 @@ function rideDestination(current: number, depth: number, rng: () => number, para
   // the rail.
   let up = headroomUp >= headroomDown ? rng() < 0.75 : rng() < 0.25;
 
-  // A dub SEND is not symmetric. Riding it down starves the bus of the very
-  // signal the effects work on, and a one-way send ride leaves it there —
-  // measured 2026-09-23 with three of four sends walked down and the owner
-  // reporting the desk almost dead. A send that is already low has nothing to
-  // give, so the only interesting direction is up.
-  if (param?.startsWith('dub.channelSend.') && current < 0.35) up = true;
+  // A dub SEND is not symmetric, and it only ever rides UP.
+  //
+  // The send is the bus's INPUT. Riding it down does not make a gesture — it
+  // takes away the signal the echo and the spring are working on, so every
+  // move fired afterwards lands on less and less material. Measured twice on
+  // 2026-09-23: `dub.channelSend.ch0 0.567 -> 0.129` and `ch2 0.567 -> 0.163`,
+  // after which the owner reported hearing no throws at all and called the
+  // personas passive. Turning a channel DOWN is a performer's decision with
+  // its own moves (channelMute, versionDrop); it is not something a background
+  // ride does to the input it depends on.
+  //
+  // The first fix only caught sends already below 0.35, which is why it did
+  // not hold: 0.567 is a perfectly ordinary resting position and rode straight
+  // down through it.
+  if (param?.startsWith('dub.channelSend.')) up = true;
   const room = up ? headroomUp : headroomDown;
   const distance = Math.min(depth, room) * (0.5 + rng() * 0.5);
   const next = up ? current + distance : current - distance;
@@ -216,6 +228,13 @@ function rideDestination(current: number, depth: number, rng: () => number, para
  * ridden to 1.0 against an already-saturating bus. The machine should be more
  * cautious than the hand, not less.
  */
+/**
+ * Below this, a send counts as CLOSED, and a ride that opens it may leave it
+ * open. At or above it the send is part of the current mix, and a ride
+ * borrows it rather than resetting where it rests.
+ */
+const SEND_LEAVE_OPEN_BELOW = 0.2;
+
 export const MACHINE_RIDE_CEILING: Readonly<Record<string, number>> = {
   'dub.returnGain': 0.85,
   'dub.echoIntensity': 0.9,
