@@ -16,6 +16,10 @@
 
 import { getPersona, type AutoDubPersona } from './AutoDubPersonas';
 import { getToneEngine } from '../ToneEngine';
+import { chooseRide, clampRide } from './chooseRide';
+import { RideBook } from './rideRunner';
+import { readDubParameter, routeParameterToEngine } from '@/midi/performance/parameterRouter';
+import { getHeldDubParams } from '@/midi/DJControllerMapper';
 import {
   startAutoEqDriver,
   stopAutoEqDriver,
@@ -1289,6 +1293,17 @@ let _enableTimeMs = 0;
 let _lastBar = -1;
 let _lastGlobalFireBar = -99;
 let _movesFiredThisBar = 0;
+
+/**
+ * Rides in flight, and the bar the last one started on.
+ *
+ * AutoDub could fire and hold but never move a value over time — "the autodub
+ * doesn't move any sliders only buttons" (2026-09-23). For a dub performer
+ * that is the missing gesture: the effects are on aux sends, so the work IS
+ * riding the sends and the return.
+ */
+const _rideBook = new RideBook();
+let _lastRideBar: number | null = null;
 let _wetFiredThisBar = 0;
 /** performance.now() timestamp (ms) after which the next wet fire is allowed.
  *  Set to: holdMs + WET_DECAY_EXTRA_MS after a hold-based wet fire so new
@@ -1507,6 +1522,10 @@ function tickImpl(): void {
   if (!transport.isPlaying) {
     // Release all held auto-dub moves so effects don't linger after stop.
     cancelAllGestures('stopped');
+    // Rides go with them. A ride left in flight across a stop holds its
+    // parameter wherever the journey happened to reach.
+    _rideBook.clear();
+    _lastRideBar = null;
     // And hand back anything still held at the mixer. A cancelled gesture
     // normally closes its own transient; this covers the case where the closer
     // was lost, which is how every channel ended up muted with the song
@@ -1533,6 +1552,7 @@ function tickImpl(): void {
     _movesFiredThisBar = 0;
     _wetFiredThisBar = 0;
   }
+
 
   // Feed the live tap into the runtime spectral classifier BEFORE the
   // bundle is resolved — the bundle reads the classifier's current roles
@@ -1723,6 +1743,44 @@ function tickImpl(): void {
     performanceCtx.position.rowsPerPhrase,
     performanceCtx.position.rowsPerBar,
   );
+
+  // ── Rides ────────────────────────────────────────────────────────────────
+  //
+  // Advance whatever is already in flight, THEN consider starting something
+  // new. In that order, because a ride that finishes this tick frees its
+  // parameter for the next one, and the other order would make every ride
+  // wait a full tick for a hand that had already let go.
+  const heldParams = getHeldDubParams();
+  for (const outcome of _rideBook.tick({ bar, nowMs: performance.now(), heldParams })) {
+    if (outcome.kind === 'abandoned') continue;
+    // 'live' so the ride is RECORDED like a hand on the fader — riding the
+    // send was the one gesture that could be performed but not replayed, and
+    // a machine ride should not reintroduce that hole.
+    routeParameterToEngine(outcome.param, outcome.value, undefined, 'live');
+  }
+
+  const ride = chooseRide({
+    bar,
+    isNewBar,
+    intensity: dub.autoDubIntensity,
+    persona,
+    lastRideBar: _lastRideBar,
+    channelCount,
+    heldParams,
+    currentValue: readDubParameter,
+  }, _rng);
+
+  if (ride) {
+    const clamped = clampRide(ride);
+    const from = readDubParameter(clamped.param);
+    if (from !== null && _rideBook.start(clamped, from, bar, performance.now())) {
+      _lastRideBar = bar;
+      console.log(
+        `[AutoDub] ride ${clamped.param} ${from.toFixed(3)} -> ${clamped.target.toFixed(3)} ` +
+        `over ${clamped.bars} bars (${clamped.curve})`,
+      );
+    }
+  }
 
   const choice = chooseMove({
     bar, barPos, isNewBar,
