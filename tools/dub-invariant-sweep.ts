@@ -28,7 +28,27 @@
  *   REST  sends return to the values they had before a move borrowed them
  *   ERR   no new console errors
  *
+ * Phase M adds the three RUNTIME METER checks, which are a different question
+ * again: not "is a path missing" but "is the signal on the path at the level
+ * everything downstream assumes". The night of 2026-09-22 was spent on faults
+ * that were invisible to a green suite and plain in one `get_dub_bus_state`
+ * read, because happy-dom has no AudioWorklet, no audio graph and no layout:
+ *
+ *   WET    the bus INPUT carries the song when a send is open. The "Liquid is
+ *          dead" report began here, with `busInput` at 0.000001 while the suite
+ *          was green and the master sounded normal — the moves were running on
+ *          nothing. Absolute floor plus a ratio against the stage feeding the
+ *          bus, so it holds through a quiet passage as well as a loud one.
+ *   MASTER the engine's master gain agrees with the store that owns it. A
+ *          −29.76 dB master with no hardware attached cost hours; the store
+ *          said 0 dB throughout, so only comparing the two could see it.
+ *   CAP    a capture move hears the bus. `backwardReverb` and `reverseEcho`
+ *          snapshot the bus ring and abort when its peak is under
+ *          CAPTURE_SILENCE_PEAK (1e-4 in DubBus.ts) — that abort is the
+ *          earliest honest signal that the bus is starved, and it warns.
+ *
  * Phase A drives the bus lifecycle (enable, sends, song reload, rapid toggles).
+ * Phase M reads the meters with the bus armed and a send open.
  * Phase B fires every move and re-checks all five afterwards.
  *
  * Prereq: `npm run dev:fullstack`, a browser tab on the app, audio unlocked.
@@ -36,11 +56,39 @@
  *
  * Usage: npx tsx tools/dub-invariant-sweep.ts
  *        DUB_SONG=path/to/file.ahx npx tsx tools/dub-invariant-sweep.ts
+ *        npx tsx tools/dub-invariant-sweep.ts --phase M      # meters only
+ *        npx tsx tools/dub-invariant-sweep.ts --phase A,M    # skip the moves
+ *        npx tsx tools/dub-invariant-sweep.ts --move toast   # one move, repeatable
+ *
+ * Phase B holds the machine for several minutes and the meters answer a
+ * question of their own, so re-running one phase or one move must not cost the
+ * whole sweep.
  */
 
 import { connect, call, sleep, close, WS_URL } from './lib/mcpRelay';
+import {
+  checkBusInputWet,
+  checkMasterGainAgrees,
+  checkCaptureNotAborted,
+  type DubMeterState,
+} from '../src/engine/dub/meterInvariants';
 import { readFileSync } from 'fs';
 import { basename } from 'path';
+
+/** `--phase A,M` / `--phase M`; every phase when the flag is absent. */
+const PHASES: Set<string> = (() => {
+  const i = process.argv.indexOf('--phase');
+  const raw = i >= 0 ? process.argv[i + 1] : undefined;
+  if (!raw) return new Set(['A', 'M', 'B']);
+  return new Set(raw.split(',').map(s => s.trim().toUpperCase()).filter(Boolean));
+})();
+
+/** `--move toast --move filterDrop`; every move when absent. Implies Phase B. */
+const ONLY_MOVES: Set<string> = (() => {
+  const picked = new Set<string>();
+  process.argv.forEach((a, i) => { if (a === '--move' && process.argv[i + 1]) picked.add(process.argv[i + 1]); });
+  return picked;
+})();
 
 const SONG_A = process.env.DUB_SONG ?? 'public/data/songs/ahx/amanda.ahx';
 const SONG_B = process.env.DUB_SONG_B
@@ -140,6 +188,49 @@ function checkRest(before: number[], after: number[]): Check {
   return drift.length
     ? { name: 'REST', ok: false, detail: `sends not restored: ${drift.join(', ')}` }
     : { name: 'REST', ok: true, detail: 'sends restored' };
+}
+
+/** WET — see `checkBusInputWet`; the predicate is shared with the unit suite. */
+function checkWet(state: unknown): Check {
+  return checkBusInputWet(state as DubMeterState);
+}
+
+/** MASTER — see `checkMasterGainAgrees`. The mixer read is the only live part. */
+async function checkMaster(state: unknown): Promise<Check> {
+  const mixer = await call('get_mixer_state');
+  return checkMasterGainAgrees(state as DubMeterState, mixer);
+}
+
+/**
+ * CAP — a capture move hears the bus.
+ *
+ * `backwardReverb` takes a snapshot of the bus ring and refuses to play it when
+ * its peak is below `CAPTURE_SILENCE_PEAK` (1e-4, `DubBus.ts`), warning
+ * "captured SILENCE" and toasting the performer. That abort is the product's
+ * own silence detector, so this check does not re-implement the threshold — it
+ * fires the move and asks whether the product aborted.
+ *
+ * Clears the console first so an older abort cannot be read as this one's.
+ */
+async function checkCapture(): Promise<Check> {
+  await call('clear_console_errors');
+  let handle: string | null = null;
+  try {
+    const r = await call('fire_dub_move', { moveId: 'backwardReverb' });
+    handle = r?.heldHandle ?? null;
+    if (handle) openHandles.add(handle);
+  } catch (e) {
+    return { name: 'CAP', ok: false, detail: `backwardReverb did not fire: ${(e as Error).message}` };
+  }
+  // The snapshot is a round trip to the worklet; the abort warns on arrival.
+  await sleep(1800);
+  if (handle) {
+    try { await call('release_dub_move', { heldHandle: handle }); } catch { /* reported below */ }
+    openHandles.delete(handle);
+  }
+
+  const errs = await call('get_console_errors');
+  return checkCaptureNotAborted(errs?.entries ?? []);
 }
 
 async function checkErrors(): Promise<Check> {
@@ -300,21 +391,23 @@ async function main(): Promise<void> {
   await connect();
 
   // ── Phase A — bus lifecycle ────────────────────────────────────────────
+  if (PHASES.has('A')) {
   console.log('\n=== Phase A — lifecycle ===');
 
   await call('set_dub_bus_enabled', { enabled: false });
   await loadSong(SONG_A);
   await call('clear_console_errors');
-  let base = await level(1000);
+  const base = await level(1000);
   record('A1 song plays with the bus OFF', [
     checkDry(base.rms, base.silent, base.rms || 1),
     await checkErrors(),
   ]);
 
   let before = base.rms;
+  let now: { rms: number; silent: boolean };
   await call('set_dub_bus_enabled', { enabled: true });
   await sleep(600);
-  let now = await level();
+  now = await level();
   record('A2 song survives enabling the bus', [
     checkDry(now.rms, now.silent, before),
     checkSync(await call('get_dub_bus_state')),
@@ -324,9 +417,14 @@ async function main(): Promise<void> {
   await call('set_channel_dub_send', { channel: 0, amount: 0.6 });
   await sleep(600);
   now = await level();
+  const a3State = await call('get_dub_bus_state');
   record('A3 song survives opening a send', [
     checkDry(now.rms, now.silent, before),
-    checkSync(await call('get_dub_bus_state')),
+    checkSync(a3State),
+    // The send is open here, so this is the first point the bus is required to
+    // be carrying anything. Asking early means a starved bus is reported as
+    // itself, not as every move downstream reading FLAT.
+    checkWet(a3State),
   ]);
 
   before = now.rms;
@@ -365,14 +463,56 @@ async function main(): Promise<void> {
   await sleep(700);
   now = await level();
   record('A7 song survives disabling the bus again', [checkDry(now.rms, now.silent, before)]);
+  }
 
-  // ── Phase B — every move ───────────────────────────────────────────────
-  console.log('\n=== Phase B — moves ===');
+  // ── Phase M — runtime meters ───────────────────────────────────────────
+  // Everything here is a level, not a wire. The suite cannot reach any of it.
+  if (PHASES.has('M')) {
+  console.log('\n=== Phase M — meters ===');
+  // Phase A leaves a song playing; on its own, Phase M must load one.
+  const loadedM = await call('get_song_info');
+  if (!loadedM?.patterns) await loadSong(SONG_A);
   await call('set_dub_bus_enabled', { enabled: true });
   await call('set_channel_dub_send', { channel: 0, amount: 0.6 });
+  const playM = await call('get_playback_state');
+  if (!playM?.isPlaying) { await call('play'); }
+  // The taps are analysers: they measure only what passes AFTER they attach, so
+  // the first read of a freshly created tap is null by design. Give the graph a
+  // moment to run past them before asking.
+  await sleep(1500);
+  await call('clear_console_errors');
   await sleep(800);
 
-  for (const move of MOVES) {
+  const meterState = await call('get_dub_bus_state');
+  record('M1 the bus receives the song with a send open', [
+    checkWet(meterState),
+    await checkMaster(meterState),
+    await checkErrors(),
+  ]);
+
+  record('M2 a capture move hears the bus', [await checkCapture()]);
+  // The capture move leaves a reversed tail; let it run out so Phase B's first
+  // baseline is the song and not this.
+  await sleep(2000);
+  }
+
+  // ── Phase B — every move ───────────────────────────────────────────────
+  const moves = ONLY_MOVES.size ? MOVES.filter(m => ONLY_MOVES.has(m.id)) : MOVES;
+  if (ONLY_MOVES.size && moves.length !== ONLY_MOVES.size) {
+    const known = new Set(MOVES.map(m => m.id));
+    for (const id of ONLY_MOVES) if (!known.has(id)) console.log(`[inv] --move ${id}: not in the sweep's move list, ignored`);
+  }
+  if ((PHASES.has('B') || ONLY_MOVES.size) && moves.length) {
+  console.log('\n=== Phase B — moves ===');
+  const loadedB = await call('get_song_info');
+  if (!loadedB?.patterns) await loadSong(SONG_A);
+  await call('set_dub_bus_enabled', { enabled: true });
+  await call('set_channel_dub_send', { channel: 0, amount: 0.6 });
+  const playB = await call('get_playback_state');
+  if (!playB?.isPlaying) { await call('play'); }
+  await sleep(800);
+
+  for (const move of moves) {
     const holdMs = move.holdMs ?? 1200;
     await call('clear_console_errors');
     const stateBefore = await call('get_dub_bus_state');
@@ -409,6 +549,10 @@ async function main(): Promise<void> {
       checkSync(stateAfter),
       await checkMute(),
       checkRest(sendsBefore, sendsOf(stateAfter)),
+      // A released move must leave the master gain where it found it. masterDrop
+      // and toast both write it, so "the mix never came back up" is a real
+      // failure mode here and reads as a quiet song rather than as a bug.
+      await checkMaster(stateAfter),
       await checkErrors(),
     ];
     if (fireError) checks.push({ name: 'FIRE', ok: false, detail: fireError });
@@ -432,6 +576,7 @@ async function main(): Promise<void> {
         name: 'RECOVER', ok: true, detail: 'master audible again',
       }]);
     }
+  }
   }
 
   // ── Teardown + report ──────────────────────────────────────────────────
