@@ -23,7 +23,7 @@ Each format needs these components for full integration:
 - [ ] **Parser** — TypeScript importer (binary → DEViLBOX internal structures)
 - [ ] **Exporter** — TypeScript/WASM serializer (DEViLBOX → native binary)
 - [ ] **Instrument Editor** — UI controls for all instrument parameters
-- [ ] **Pattern View** — DOM + Pixi views (1:1 parity)
+- [ ] **Pattern View** — tracker-style pattern view
 - [ ] **Live Editing** — Real-time parameter changes during playback
 
 ---
@@ -34,12 +34,12 @@ These formats have complete WASM engines, parsers, exporters, and instrument edi
 
 | # | Format | WASM | Parser | Exporter | Inst Editor | Pattern View | Live Edit |
 |---|--------|------|--------|----------|-------------|--------------|-----------|
-| 1 | **HivelyTracker/AHX** | hively-wasm | ✅ HivelyParser | ✅ HivelyExporter | ✅ HivelyControls | ✅ DOM+Pixi | ✅ |
+| 1 | **HivelyTracker/AHX** | hively-wasm | ✅ HivelyParser | ✅ HivelyExporter | ✅ HivelyControls | ✅ Yes      | ✅ |
 | 2 | **Future Composer 1.3** | fc-wasm | ✅ FCParser | ✅ FCExporter | ✅ FCControls | classic | ✅ |
 | 3 | **Future Composer 1.4** | fc-wasm | ✅ FCParser | ✅ FCExporter | ✅ FCControls | classic | ✅ |
-| 4 | **JamCracker Pro** | jamcracker-wasm | ✅ JamCrackerParser | ✅ JamCrackerExporter | ✅ JamCrackerControls | ✅ DOM+Pixi | ✅ |
+| 4 | **JamCracker Pro** | jamcracker-wasm | ✅ JamCrackerParser | ✅ JamCrackerExporter | ✅ JamCrackerControls | ✅ Yes      | ✅ |
 | 5 | **MED/OctaMED** | octamed-wasm | ✅ MEDParser | ✅ MEDExporter | ✅ OctaMEDControls | classic | ✅ |
-| 6 | **MusicLine Editor** | musicline-wasm | ✅ MusicLineParser | ✅ MusicLineExporter | ✅ MusicLineControls | ✅ DOM+Pixi | ✅ |
+| 6 | **MusicLine Editor** | musicline-wasm | ✅ MusicLineParser | ✅ MusicLineExporter | ✅ MusicLineControls | ✅ Yes      | ✅ |
 | 7 | **Octa-MED** | octamed-wasm | ✅ MEDParser | ✅ MEDExporter | ✅ OctaMEDControls | classic | ✅ |
 
 ---
@@ -348,16 +348,13 @@ src/lib/export/                          # Exporter
   ${Format}Exporter.ts                   # Internal → binary
 src/components/instruments/controls/     # Instrument editor
   ${Format}Controls.tsx                  # Knobs, sliders, envelopes
-src/components/tracker/                  # DOM pattern view
+src/components/tracker/                  # Pattern view
   ${Format}View.tsx                      # Tracker-style view
-src/pixi/views/${format}/               # Pixi pattern view
-  Pixi${Format}View.tsx                  # GL renderer view
 ```
 
 ### Key Integration Points
 
 - `src/lib/import/FormatRegistry.ts` — Register format detection
 - `src/engine/InstrumentFactory.ts` — Register synth creation
-- `src/components/tracker/TrackerView.tsx` — Route DOM view
-- `src/pixi/views/PixiTrackerView.tsx` — Route Pixi view
+- `src/components/tracker/TrackerView.tsx` — Route the tracker view
 - `src/components/instruments/InstrumentPanel.tsx` — Route instrument editor
