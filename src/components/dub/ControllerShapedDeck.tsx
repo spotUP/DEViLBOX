@@ -104,6 +104,19 @@ interface ControllerShapedDeckProps {
    * DEViLBOX and both layouts show the same one.
    */
   channelStrip?: React.ReactNode;
+  /**
+   * One channel strip, drawn to fill the column it is given.
+   *
+   * The device is nine columns wide below the encoders — eight channels and
+   * the master — and a column holds the button above, the fader, and the mute
+   * below. So a strip has to be exactly as wide as the button over it, which
+   * only holds if both sit in the same grid. "the channel slider boxes and the
+   * buttons needs to be equally wide for the layout to work... think 9 columns.
+   * the 9:th for the master slider" (2026-09-23).
+   */
+  renderChannelStrip?: (channelId: number, widthClass: string) => React.ReactNode;
+  /** The ninth column: the master send. */
+  renderMasterStrip?: (widthClass: string) => React.ReactNode;
   api: DubDeckControlApi;
 }
 
@@ -180,6 +193,8 @@ export const ControllerShapedDeck: React.FC<ControllerShapedDeckProps> = ({
   toggledMoves,
   activeRatePreset,
   channelStrip,
+  renderChannelStrip,
+  renderMasterStrip,
   api,
 }) => {
   /** Where a press on a knob started, so a turn is not mistaken for a press. */
@@ -521,7 +536,18 @@ export const ControllerShapedDeck: React.FC<ControllerShapedDeckProps> = ({
 
             if (LAYER_BUTTON_IDS.has(control.id)) return null;
             if (control.group && SKIPPED_GROUPS.has(control.group)) return null;
-            // The channel strip stands in for the faders and the select row.
+            // A fader column IS a channel strip. The strip fills the column,
+            // so it is exactly as wide as the button above it and the mute
+            // below it — which is what makes the nine columns line up.
+            if (control.type === 'fader' && renderChannelStrip) {
+              const bound = binding.turn;
+              const node = bound?.kind === 'channelSend'
+                ? renderChannelStrip(bound.channelId, 'w-full')
+                : renderMasterStrip?.('w-full');
+              return node ? <div key={control.id} style={place}>{node}</div> : null;
+            }
+            // Without a strip renderer the whole bank falls back to the deck's
+            // own row, placed once across the fader zone.
             if (channelStrip && faderZone?.ids.has(control.id)) return null;
 
             if (control.type === 'fader') {
@@ -542,6 +568,12 @@ export const ControllerShapedDeck: React.FC<ControllerShapedDeckProps> = ({
         </div>
       </div>
 
+      {/* The deck's own strip row, ONLY when the panel is not placing strips
+          in their fader columns itself. With `renderChannelStrip` supplied the
+          columns carry them, and drawing the row too would be a second copy of
+          every channel.
+
+          The original note, kept because it is why the fallback exists: */}
       {/* The channel strip, under the panel rather than inside it.
           It was placed in the fader zone, where the hardware's faders are, and
           that cannot work: a channel card is 224 px wide and a channel strip
@@ -550,7 +582,7 @@ export const ControllerShapedDeck: React.FC<ControllerShapedDeckProps> = ({
           scrollbar ("its super chaotic atm", 2026-09-23). The panel keeps what
           carries muscle memory — the knobs, the three button rows, the encoder
           block — and the cards get the room they need beneath it. */}
-      {channelStrip}
+      {!renderChannelStrip && channelStrip}
     </div>
   );
 };
