@@ -713,11 +713,29 @@ export const usePatternPlayback = () => {
           const currentPatterns = patternsRef.current;
           setCurrentRowThrottled(row, currentPatterns[patternNum]?.length ?? 64, true);
 
-          // Sonix plays in its WASM (suppressNotes), so the replayer's getStateAtTime is
-          // stale (row 0, no notes scheduled) and the pattern editor's row cursor wouldn't
-          // scroll. Feed useWasmPositionStore (which the editor reads first) so the FT2
-          // pattern view follows playback, like other WASM engines.
-          if (sonixFileData) {
+          // An engine-driven song plays inside its own engine, so the
+          // replayer's `getStateAtTime()` keeps handing back the last state its
+          // scheduler left — stale, not null — and the pattern editor, which
+          // trusts it, draws a play head that never moves.
+          //
+          // `useWasmPositionStore` is the channel the editor checks FIRST for
+          // exactly this reason ("bypasses replayer which returns stale
+          // state"), and this callback already has the right row: measured
+          // 2026-09-24 on SunTronic, `onRowChange` delivered rows 1..40 in
+          // order while the grid sat still, and the editor's null-state
+          // fallback never ran because the state was stale rather than absent.
+          //
+          // This used to be `if (sonixFileData)`. Sonix was not special — it
+          // was the last format anyone had chased down, so it is the only one
+          // that got the fix. Every format whose notes are suppressed has the
+          // same problem, which is why "almost no formats display correctly in
+          // the pattern editor" (2026-09-24).
+          //
+          // `isSuppressNotes` is the condition, measured rather than guessed:
+          // on SunTronic the probe read `suppressNotes=true engineDispatch=false`,
+          // so the narrower "engine owns the dispatch" flag would have missed
+          // it — and missed it silently, which is how this survived so long.
+          if (replayer.isSuppressNotes) {
             useWasmPositionStore.getState().setPosition(row, position);
           }
 
