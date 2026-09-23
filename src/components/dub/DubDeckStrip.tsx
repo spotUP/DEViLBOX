@@ -117,7 +117,7 @@ const PRESET_SEND_ROLES = new Set(['percussion', 'bass', 'lead', 'chord', 'arpeg
 //
 // Each channel strip shows these buttons alongside the hold-toggle + send
 // knob. Label/title/moveId tuple keeps the rendering loop tight.
-const CHANNEL_OPS: Array<{ label: string; title: string; moveId: string; color: string; kind: 'trigger' | 'hold' }> = [
+const CHANNEL_OPS: Array<{ label: string; title: string; moveId: string; color: MoveColor; kind: 'trigger' | 'hold' }> = [
   { label: 'Mute',  title: 'Mute — silence this channel while held',          moveId: 'channelMute',     color: 'accent-error',      kind: 'hold' },
   { label: 'Throw', title: 'Throw — long echoThrow (4 beats + heavy tail)',   moveId: 'channelThrow',    color: 'accent-primary/70', kind: 'trigger' },
   { label: 'Echo',  title: 'Echo Throw — open tap + feedback spike',          moveId: 'echoThrow',       color: 'accent-primary',    kind: 'trigger' },
@@ -141,7 +141,7 @@ interface GlobalMove {
   label: string;
   title: string;
   moveId: string;
-  color: string;
+  color: MoveColor;
   kind: 'trigger' | 'hold';
   group: 'click' | 'hold' | 'toggle' | 'rate';
   needsSend?: boolean;
@@ -213,7 +213,25 @@ const GLOBAL_MOVES: Array<GlobalMove> = [
  */
 const MOVE_ROW_GRID = 'grid grid-cols-[repeat(auto-fill,minmax(7rem,1fr))] gap-1.5 flex-1 min-w-0';
 
-const colorClasses = (token: string, active: boolean, size: 'md' | 'sm' = 'md') => {
+/**
+ * Every colour a move button may carry. A union, not `string`: the class
+ * helper below is a switch over LITERAL Tailwind classes (the JIT needs them
+ * spelled out), and a token with no case fell to the idle default — so the
+ * button never showed an active state at all. Riddim (`accent-error/60`),
+ * Float, Build, Emph and Liquid were all invisible when held: "ui button does
+ * not light up the midi controller does" (2026-09-23). The `never` default
+ * makes a missing case a type error.
+ */
+type MoveColor =
+  | 'accent-primary' | 'accent-primary/70' | 'accent-primary/50' | 'accent-primary/40'
+  | 'accent-secondary' | 'accent-secondary/80' | 'accent-secondary/70'
+  | 'accent-highlight' | 'accent-highlight/70' | 'accent-highlight/40'
+  | 'accent-warning' | 'accent-warning/70'
+  | 'accent-error' | 'accent-error/70' | 'accent-error/60'
+  | 'accent-success' | 'accent-success/70'
+  | 'text-primary';
+
+const colorClasses = (token: MoveColor, active: boolean, size: 'md' | 'sm' = 'md') => {
   // nowrap: on the column grid a wrapped label would make one button taller
   // than its row.
   // 'sm' is the channel-card size: nine ops in a 3x3 grid beside the fader.
@@ -232,6 +250,11 @@ const colorClasses = (token: string, active: boolean, size: 'md' | 'sm' = 'md') 
     case 'accent-success':      return base + (active ? 'bg-accent-success text-text-inverse border-accent-success' : idle + 'hover:border-accent-success hover:text-accent-success');
     // Dark or semi-transparent backgrounds — white text is required for visibility
     case 'accent-primary/70':   return base + (active ? 'bg-accent-primary/70 text-white border-accent-primary/70' : idle + 'hover:border-accent-primary/70 hover:text-accent-primary');
+    case 'accent-primary/50':   return base + (active ? 'bg-accent-primary/50 text-white border-accent-primary/50' : idle + 'hover:border-accent-primary/50 hover:text-accent-primary');
+    case 'accent-primary/40':   return base + (active ? 'bg-accent-primary/40 text-white border-accent-primary/40' : idle + 'hover:border-accent-primary/40 hover:text-accent-primary');
+    case 'accent-secondary/80': return base + (active ? 'bg-accent-secondary/80 text-white border-accent-secondary/80' : idle + 'hover:border-accent-secondary/80 hover:text-accent-secondary');
+    case 'accent-highlight/40': return base + (active ? 'bg-accent-highlight/40 text-white border-accent-highlight/40' : idle + 'hover:border-accent-highlight/40 hover:text-accent-highlight');
+    case 'accent-error/60':     return base + (active ? 'bg-accent-error/60 text-white border-accent-error/60' : idle + 'hover:border-accent-error/60 hover:text-accent-error');
     case 'accent-secondary':    return base + (active ? 'bg-accent-secondary text-white border-accent-secondary' : idle + 'hover:border-accent-secondary hover:text-accent-secondary');
     case 'accent-secondary/70': return base + (active ? 'bg-accent-secondary/70 text-white border-accent-secondary/70' : idle + 'hover:border-accent-secondary/70 hover:text-accent-secondary');
     case 'accent-highlight/70': return base + (active ? 'bg-accent-highlight/70 text-white border-accent-highlight/70' : idle + 'hover:border-accent-highlight/70 hover:text-accent-highlight');
@@ -240,7 +263,11 @@ const colorClasses = (token: string, active: boolean, size: 'md' | 'sm' = 'md') 
     case 'accent-error/70':     return base + (active ? 'bg-accent-error/70 text-white border-accent-error/70' : idle + 'hover:border-accent-error/70 hover:text-accent-error');
     case 'accent-success/70':   return base + (active ? 'bg-accent-success/70 text-white border-accent-success/70' : idle + 'hover:border-accent-success/70 hover:text-accent-success');
     case 'text-primary':        return base + (active ? 'bg-text-primary text-dark-bg border-text-primary' : idle + 'hover:border-text-primary hover:text-text-primary');
-    default:                    return base + idle;
+    default: {
+      // Exhaustive: a token added to MoveColor without a case does not compile.
+      const missing: never = token;
+      return base + idle + String(missing);
+    }
   }
 };
 
