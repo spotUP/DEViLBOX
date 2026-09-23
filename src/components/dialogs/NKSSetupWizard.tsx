@@ -68,7 +68,7 @@ export const NKSSetupWizard: React.FC = () => {
   const stepLabels = ['Intro', 'Pages', 'Export', 'Ready'];
 
   const overlayClass = 'fixed inset-0 z-[99990] flex items-center justify-center bg-black/70 backdrop-blur-sm';
-  const panelClass = 'bg-dark-bgPrimary border border-dark-border rounded-xl shadow-2xl w-full max-w-[90vw] md:max-w-[480px] max-h-[85vh] overflow-hidden';
+  const panelClass = 'bg-dark-bg border border-dark-border rounded-xl shadow-2xl w-full max-w-[90vw] md:max-w-[480px] max-h-[85vh] overflow-hidden';
 
   const synthName = nksActiveSynthType || currentInstrument?.type || 'Synth';
 
@@ -212,13 +212,13 @@ export const NKSSetupWizard: React.FC = () => {
                     <div className="flex items-center gap-1">
                       <button
                         onClick={prevKnobPage}
-                        className="px-2 py-0.5 text-[10px] bg-dark-bgPrimary border border-dark-border rounded hover:border-orange-500/50 transition-colors"
+                        className="px-2 py-0.5 text-[10px] bg-dark-bg border border-dark-border rounded hover:border-orange-500/50 transition-colors"
                       >
                         Prev
                       </button>
                       <button
                         onClick={nextKnobPage}
-                        className="px-2 py-0.5 text-[10px] bg-dark-bgPrimary border border-dark-border rounded hover:border-orange-500/50 transition-colors"
+                        className="px-2 py-0.5 text-[10px] bg-dark-bg border border-dark-border rounded hover:border-orange-500/50 transition-colors"
                       >
                         Next
                       </button>
@@ -232,7 +232,7 @@ export const NKSSetupWizard: React.FC = () => {
                   ).slice(0, 8).map((assignment, index) => (
                     <div
                       key={index}
-                      className="flex flex-col items-center p-2 rounded bg-dark-bgPrimary border border-dark-border"
+                      className="flex flex-col items-center p-2 rounded bg-dark-bg border border-dark-border"
                     >
                       <div className="w-8 h-8 rounded-full border-2 border-orange-500/40 bg-orange-500/5 flex items-center justify-center mb-1">
                         <span className="text-[8px] font-mono text-orange-400">K{index + 1}</span>

@@ -263,7 +263,7 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
                       {!hasElectronFS() && !nav.hasServerFS && !nav.hasFilesystemAccess && (
                         <button
                           onClick={nav.handleRequestFilesystemAccess}
-                          className="px-4 py-2 bg-accent-primary text-text-primary rounded hover:bg-accent-hover"
+                          className="px-4 py-2 bg-accent-primary text-text-primary rounded hover:bg-dark-bgHover"
                         >
                           Open Folder
                         </button>
@@ -282,7 +282,7 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
                           }
                         }
                       }}
-                      className="px-4 py-2 bg-accent-primary text-text-primary rounded hover:bg-accent-hover"
+                      className="px-4 py-2 bg-accent-primary text-text-primary rounded hover:bg-dark-bgHover"
                     >
                       Select Folder
                     </button>
@@ -418,7 +418,7 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
               className={`flex items-center gap-2 px-6 py-2 rounded font-medium ${
                 (mode === 'load' && (!nav.selectedFile || nav.selectedFile.isDirectory))
                   ? 'bg-dark-bgTertiary text-text-muted cursor-not-allowed'
-                  : 'bg-accent-primary text-text-primary hover:bg-accent-primaryHover'
+                  : 'bg-accent-primary text-text-primary hover:bg-accent-primary'
               }`}
             >
               {fileSource === 'cloud' && <Cloud size={16} />}
@@ -431,7 +431,7 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
       {/* Version History Modal */}
       {nav.showRevisions && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-[60]">
-          <div className="bg-dark-bgPrimary border border-dark-border rounded-lg w-full max-w-[90vw] md:max-w-[400px] h-[500px] overflow-hidden max-h-[80vh] flex flex-col">
+          <div className="bg-dark-bg border border-dark-border rounded-lg w-full max-w-[90vw] md:max-w-[400px] h-[500px] overflow-hidden max-h-[80vh] flex flex-col">
             {/* Header */}
             <div className="flex-shrink-0 flex items-center justify-between px-4 py-3 border-b border-dark-border">
               <div className="flex items-center gap-2">

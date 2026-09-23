@@ -150,7 +150,7 @@ export const MIDIControllerWizard: React.FC = () => {
   const stepLabels = ['Detect', 'Device', 'Profile', 'Ready'];
 
   const overlayClass = 'fixed inset-0 z-[99990] flex items-center justify-center bg-black/70 backdrop-blur-sm';
-  const panelClass = 'bg-dark-bgPrimary border border-dark-border rounded-xl shadow-2xl w-full max-w-[90vw] md:max-w-[480px] max-h-[85vh] overflow-hidden';
+  const panelClass = 'bg-dark-bg border border-dark-border rounded-xl shadow-2xl w-full max-w-[90vw] md:max-w-[480px] max-h-[85vh] overflow-hidden';
 
   return (
     <div className={overlayClass} onClick={handleClose}>
@@ -377,7 +377,7 @@ export const MIDIControllerWizard: React.FC = () => {
                   {matchedProfile.suggestedLayout && (
                     <div className="mt-2 grid grid-cols-4 gap-1">
                       {matchedProfile.knobs.slice(0, 8).map((knob: ControllerKnob, i: number) => (
-                        <div key={i} className="flex flex-col items-center p-1 rounded bg-dark-bgPrimary/50">
+                        <div key={i} className="flex flex-col items-center p-1 rounded bg-dark-bg/50">
                           <span className="text-[8px] font-mono text-text-muted">K{i+1}</span>
                           <span className="text-[9px] text-purple-300 truncate w-full text-center">
                             {knob.defaultMapping || knob.name}

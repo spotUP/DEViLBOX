@@ -84,7 +84,7 @@ export const SIDInfoModal: React.FC<SIDInfoModalProps> = ({ onClose }) => {
   return (
     <div className="fixed inset-0 z-[99990] flex items-center justify-center bg-black/70 backdrop-blur-sm" onClick={onClose}>
       <div
-        className="bg-dark-bgPrimary border border-blue-700/50 rounded-xl shadow-2xl shadow-blue-900/20 w-full max-w-4xl mx-4 max-h-[85vh] flex flex-col overflow-hidden"
+        className="bg-dark-bg border border-blue-700/50 rounded-xl shadow-2xl shadow-blue-900/20 w-full max-w-4xl mx-4 max-h-[85vh] flex flex-col overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         {/* ═══ Header ═══ */}
@@ -177,7 +177,7 @@ export const SIDInfoModal: React.FC<SIDInfoModalProps> = ({ onClose }) => {
                             const v = Math.max(1, Math.min(sidMetadata.subsongs, Number(e.target.value)));
                             handleSubsongChange(v - 1);
                           }}
-                          className="w-20 text-sm bg-dark-bgPrimary border border-blue-800/40 rounded px-2 py-1 text-text-primary font-mono"
+                          className="w-20 text-sm bg-dark-bg border border-blue-800/40 rounded px-2 py-1 text-text-primary font-mono"
                         />
                         <span className="text-xs text-text-muted">of {sidMetadata.subsongs}</span>
                       </div>
@@ -189,7 +189,7 @@ export const SIDInfoModal: React.FC<SIDInfoModalProps> = ({ onClose }) => {
                           value: String(i),
                           label: `Subsong ${i + 1}${i === sidMetadata.defaultSubsong ? ' (default)' : ''}`,
                         }))}
-                        className="flex-1 text-sm bg-dark-bgPrimary border border-blue-800/40 rounded px-2 py-1 text-text-primary"
+                        className="flex-1 text-sm bg-dark-bg border border-blue-800/40 rounded px-2 py-1 text-text-primary"
                       />
                     )}
                   </div>
@@ -213,7 +213,7 @@ export const SIDInfoModal: React.FC<SIDInfoModalProps> = ({ onClose }) => {
                     value: eng.id,
                     label: `${eng.name} — ${eng.accuracy}, ${eng.speed} (${eng.size})${eng.features.asidHardware ? ' ★ HW' : ''}`,
                   }))}
-                  className="w-full text-sm bg-dark-bgPrimary border border-blue-800/40 rounded px-2 py-1.5 text-text-primary mb-2"
+                  className="w-full text-sm bg-dark-bg border border-blue-800/40 rounded px-2 py-1.5 text-text-primary mb-2"
                 />
                 <p className="text-[10px] text-text-muted/60 leading-tight">
                   {SID_ENGINES[sidEngine].description}

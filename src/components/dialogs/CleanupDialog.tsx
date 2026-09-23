@@ -330,7 +330,7 @@ export const CleanupDialog: React.FC<CleanupDialogProps> = ({ isOpen, onClose })
                         type="checkbox"
                         checked={selectedLoopTails.has(t.instrumentIndex)}
                         onChange={() => toggleLoopTail(t.instrumentIndex)}
-                        className="rounded border-dark-border bg-dark-surface text-accent-primary focus:ring-accent-primary"
+                        className="rounded border-dark-border bg-dark-bgSecondary text-accent-primary focus:ring-accent-primary"
                       />
                       <span className="font-mono text-xs text-text-muted w-8 flex-shrink-0">
                         {String(t.instrumentIndex).padStart(2, '0')}

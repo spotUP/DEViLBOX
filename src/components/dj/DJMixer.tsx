@@ -135,7 +135,7 @@ export const DJMixer: React.FC = () => {
           className={`px-2 py-0.5 text-xs font-mono rounded border transition-colors ${
             showBroadcast
               ? 'bg-red-900/40 border-red-700/60 text-red-300'
-              : 'bg-dark-surface border-dark-border text-dark-textSecondary hover:text-dark-text'
+              : 'bg-dark-bgSecondary border-dark-border text-text-secondary hover:text-text-primary'
           }`}
         >
           BROADCAST

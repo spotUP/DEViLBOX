@@ -215,12 +215,12 @@ export const DJAutoDJPanel: React.FC<DJAutoDJPanelProps> = ({ onClose }) => {
         <div className="flex items-center gap-2">
           <div className={`w-2 h-2 rounded-full ${STATUS_COLORS[status]}`} />
           <span className="text-text-primary font-bold uppercase tracking-wider">Auto DJ</span>
-          <span className="text-text-tertiary">{STATUS_LABELS[status]}</span>
+          <span className="text-text-muted">{STATUS_LABELS[status]}</span>
         </div>
         {onClose && (
           <button
             onClick={onClose}
-            className="text-text-tertiary hover:text-text-primary transition-colors"
+            className="text-text-muted hover:text-text-primary transition-colors"
           >
             X
           </button>
@@ -237,7 +237,7 @@ export const DJAutoDJPanel: React.FC<DJAutoDJPanelProps> = ({ onClose }) => {
               ? 'bg-green-600 border-green-500 text-white hover:bg-green-700'
               : activePlaylist && trackCount >= 2
                 ? 'bg-dark-bgTertiary border-dark-borderLight text-text-secondary hover:bg-dark-bgHover hover:text-text-primary'
-                : 'bg-dark-bgTertiary border-dark-borderLight text-text-tertiary cursor-not-allowed opacity-50'
+                : 'bg-dark-bgTertiary border-dark-borderLight text-text-muted cursor-not-allowed opacity-50'
           }`}
         >
           {enabled ? 'Stop Auto DJ' : 'Start Auto DJ'}
@@ -282,7 +282,7 @@ export const DJAutoDJPanel: React.FC<DJAutoDJPanelProps> = ({ onClose }) => {
                 <span className="text-cyan-400">{analysisProgress.current}/{analysisProgress.total}</span>
                 <span className="text-green-400 ml-1">{analysisProgress.analyzed} ok</span>
                 {analysisProgress.failed > 0 && <span className="text-red-400 ml-1">{analysisProgress.failed} fail</span>}
-                <span className="text-text-tertiary truncate ml-2 flex-1 text-right">{analysisProgress.trackName}</span>
+                <span className="text-text-muted truncate ml-2 flex-1 text-right">{analysisProgress.trackName}</span>
               </div>
               <div className="h-1 bg-dark-bgTertiary rounded-full overflow-hidden">
                 <div
@@ -335,7 +335,7 @@ export const DJAutoDJPanel: React.FC<DJAutoDJPanelProps> = ({ onClose }) => {
             <span className="text-text-primary truncate flex-1">
               {currentTrack?.trackName ?? '—'}
             </span>
-            <span className="text-text-tertiary flex-shrink-0">{currentIdx + 1}/{trackCount}</span>
+            <span className="text-text-muted flex-shrink-0">{currentIdx + 1}/{trackCount}</span>
           </div>
           {/* Upcoming tracks (next 4) */}
           {Array.from({ length: Math.min(4, trackCount - currentIdx - 1) }, (_, i) => {
@@ -344,10 +344,10 @@ export const DJAutoDJPanel: React.FC<DJAutoDJPanelProps> = ({ onClose }) => {
             const isNext = idx === nextIdx;
             return (
               <div key={idx} className="flex items-center gap-2 group">
-                <span className={`w-8 flex-shrink-0 ${isNext ? 'text-blue-400' : 'text-text-tertiary'}`}>
+                <span className={`w-8 flex-shrink-0 ${isNext ? 'text-blue-400' : 'text-text-muted'}`}>
                   {isNext ? 'NEXT' : `${idx + 1}`}
                 </span>
-                <span className={`truncate flex-1 ${isNext ? 'text-text-secondary' : 'text-text-tertiary'}`}>
+                <span className={`truncate flex-1 ${isNext ? 'text-text-secondary' : 'text-text-muted'}`}>
                   {track?.trackName ?? '—'}
                 </span>
                 <button
@@ -373,7 +373,7 @@ export const DJAutoDJPanel: React.FC<DJAutoDJPanelProps> = ({ onClose }) => {
       <div className="flex items-center gap-2">
         {/* Transition bars */}
         <div className="flex items-center gap-1">
-          <span className="text-text-tertiary mr-1">Bars:</span>
+          <span className="text-text-muted mr-1">Bars:</span>
           {TRANSITION_BAR_OPTIONS.map((bars) => (
             <button
               key={bars}
@@ -381,7 +381,7 @@ export const DJAutoDJPanel: React.FC<DJAutoDJPanelProps> = ({ onClose }) => {
               className={`px-2 py-1 rounded text-[10px] border transition-all ${
                 transitionBars === bars
                   ? 'border-accent-primary bg-accent-primary/20 text-accent-primary'
-                  : 'border-dark-borderLight bg-dark-bgTertiary text-text-tertiary hover:text-text-secondary'
+                  : 'border-dark-borderLight bg-dark-bgTertiary text-text-muted hover:text-text-secondary'
               }`}
             >
               {bars}
@@ -397,7 +397,7 @@ export const DJAutoDJPanel: React.FC<DJAutoDJPanelProps> = ({ onClose }) => {
           className={`p-1.5 rounded border transition-all ${
             shuffle
               ? 'border-amber-500 bg-amber-900/20 text-amber-400'
-              : 'border-dark-borderLight bg-dark-bgTertiary text-text-tertiary hover:text-text-secondary'
+              : 'border-dark-borderLight bg-dark-bgTertiary text-text-muted hover:text-text-secondary'
           }`}
           title="Shuffle"
         >
@@ -410,7 +410,7 @@ export const DJAutoDJPanel: React.FC<DJAutoDJPanelProps> = ({ onClose }) => {
           className={`p-1.5 rounded border transition-all ${
             withFilter
               ? 'border-cyan-500 bg-cyan-900/20 text-cyan-400'
-              : 'border-dark-borderLight bg-dark-bgTertiary text-text-tertiary hover:text-text-secondary'
+              : 'border-dark-borderLight bg-dark-bgTertiary text-text-muted hover:text-text-secondary'
           }`}
           title="HPF sweep on outgoing track"
         >
@@ -428,7 +428,7 @@ export const DJAutoDJPanel: React.FC<DJAutoDJPanelProps> = ({ onClose }) => {
           className={`p-1.5 rounded border transition-all ${
             smartCuts
               ? 'border-violet-500 bg-violet-900/20 text-violet-400'
-              : 'border-dark-borderLight bg-dark-bgTertiary text-text-tertiary hover:text-text-secondary'
+              : 'border-dark-borderLight bg-dark-bgTertiary text-text-muted hover:text-text-secondary'
           }`}
           title={
             smartCuts
@@ -450,7 +450,7 @@ export const DJAutoDJPanel: React.FC<DJAutoDJPanelProps> = ({ onClose }) => {
           className={`p-1.5 rounded border transition-all ${
             stemPreSep
               ? 'border-emerald-500 bg-emerald-900/20 text-emerald-400'
-              : 'border-dark-borderLight bg-dark-bgTertiary text-text-tertiary hover:text-text-secondary'
+              : 'border-dark-borderLight bg-dark-bgTertiary text-text-muted hover:text-text-secondary'
           }`}
           title={
             stemPreSep
@@ -466,7 +466,7 @@ export const DJAutoDJPanel: React.FC<DJAutoDJPanelProps> = ({ onClose }) => {
           className={`px-1.5 py-1 rounded border transition-all text-[9px] font-bold tracking-wider ${
             stemModel === '6s'
               ? 'border-amber-500 bg-amber-900/20 text-amber-400'
-              : 'border-dark-borderLight bg-dark-bgTertiary text-text-tertiary hover:text-text-secondary'
+              : 'border-dark-borderLight bg-dark-bgTertiary text-text-muted hover:text-text-secondary'
           }`}
           title={
             stemModel === '6s'
@@ -495,7 +495,7 @@ export const DJAutoDJPanel: React.FC<DJAutoDJPanelProps> = ({ onClose }) => {
           className={`p-1.5 rounded border transition-all ${
             streamAutoDub
               ? 'border-violet-500 bg-violet-900/20 text-violet-400'
-              : 'border-dark-borderLight bg-dark-bgTertiary text-text-tertiary hover:text-text-secondary'
+              : 'border-dark-borderLight bg-dark-bgTertiary text-text-muted hover:text-text-secondary'
           }`}
           title={
             streamAutoDub
@@ -513,7 +513,7 @@ export const DJAutoDJPanel: React.FC<DJAutoDJPanelProps> = ({ onClose }) => {
           <div className="text-[10px] text-amber-400 mb-1.5 font-bold">
             404: "{fixDialog.trackName}" not found
           </div>
-          <div className="text-[9px] text-text-tertiary mb-2 truncate">
+          <div className="text-[9px] text-text-muted mb-2 truncate">
             {fixDialog.originalPath}
           </div>
           <div className="space-y-1 max-h-32 overflow-y-auto">
@@ -524,13 +524,13 @@ export const DJAutoDJPanel: React.FC<DJAutoDJPanelProps> = ({ onClose }) => {
                 className="w-full text-left px-2 py-1 rounded text-[10px] border border-dark-borderLight bg-dark-bgTertiary hover:bg-dark-bgHover hover:border-amber-600 transition-all"
               >
                 <div className="text-text-primary truncate">{c.filename}</div>
-                <div className="text-text-tertiary truncate">{c.author} / {c.format}</div>
+                <div className="text-text-muted truncate">{c.author} / {c.format}</div>
               </button>
             ))}
           </div>
           <button
             onClick={() => { fixDialog.resolve(null); setFixDialog(null); }}
-            className="mt-1.5 w-full px-2 py-1 rounded text-[10px] border border-dark-borderLight bg-dark-bgTertiary text-text-tertiary hover:text-red-400 transition-all"
+            className="mt-1.5 w-full px-2 py-1 rounded text-[10px] border border-dark-borderLight bg-dark-bgTertiary text-text-muted hover:text-red-400 transition-all"
           >
             Skip this track
           </button>

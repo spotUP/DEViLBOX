@@ -131,8 +131,8 @@ export const AddToHomeScreenModal: React.FC<AddToHomeScreenModalProps> = ({
                 </li>
               </ol>
 
-              <div className="bg-accent-info/10 border border-accent-info/30 rounded p-3 mt-4">
-                <p className="text-xs text-accent-info">
+              <div className="bg-accent-highlight/10 border border-accent-highlight/30 rounded p-3 mt-4">
+                <p className="text-xs text-accent-highlight">
                   <strong>Tip:</strong> Once added, launch DEViLBOX from your home screen
                   for true fullscreen mode without the Safari browser UI.
                 </p>
@@ -152,8 +152,8 @@ export const AddToHomeScreenModal: React.FC<AddToHomeScreenModalProps> = ({
                 Install DEViLBOX
               </button>
 
-              <div className="bg-accent-info/10 border border-accent-info/30 rounded p-3 mt-4">
-                <p className="text-xs text-accent-info">
+              <div className="bg-accent-highlight/10 border border-accent-highlight/30 rounded p-3 mt-4">
+                <p className="text-xs text-accent-highlight">
                   Runs fullscreen without browser UI, can be launched from your app drawer
                 </p>
               </div>

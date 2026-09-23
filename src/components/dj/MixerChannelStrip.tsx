@@ -202,7 +202,7 @@ export const MixerChannelStrip: React.FC<MixerChannelStripProps> = ({ deckId, st
 
       {/* Trim/auto-gain indicator */}
       {trimGain !== 0 && (
-        <div className="text-[8px] font-mono text-accent-info opacity-70" title={`Auto-gain trim: ${trimGain > 0 ? '+' : ''}${trimGain.toFixed(1)}dB`}>
+        <div className="text-[8px] font-mono text-accent-highlight opacity-70" title={`Auto-gain trim: ${trimGain > 0 ? '+' : ''}${trimGain.toFixed(1)}dB`}>
           AG {trimGain > 0 ? '+' : ''}{trimGain.toFixed(0)}
         </div>
       )}

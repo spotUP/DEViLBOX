@@ -224,7 +224,7 @@ export const DJSamplerPanel: React.FC<DJSamplerPanelProps> = ({ onClose }) => {
               value: p.id,
               label: p.name,
             }))}
-            className="px-1.5 py-0.5 text-[10px] font-mono bg-dark-surface border border-dark-border rounded text-text-secondary cursor-pointer"
+            className="px-1.5 py-0.5 text-[10px] font-mono bg-dark-bgSecondary border border-dark-border rounded text-text-secondary cursor-pointer"
           />
           {/* Factory preset picker — loads the King Tubby dub kit / DJ FX /
               one-shots / scratch master / dj complete / dub moves minimal
@@ -234,7 +234,7 @@ export const DJSamplerPanel: React.FC<DJSamplerPanelProps> = ({ onClose }) => {
             onChange={loadFactoryPreset}
             placeholder="Preset..."
             options={DJ_PAD_PRESETS.map((p) => ({ value: p.id, label: p.name }))}
-            className="px-1.5 py-0.5 text-[10px] font-mono bg-dark-surface border border-dark-border rounded text-text-secondary cursor-pointer"
+            className="px-1.5 py-0.5 text-[10px] font-mono bg-dark-bgSecondary border border-dark-border rounded text-text-secondary cursor-pointer"
           />
         </div>
         <div className="flex items-center gap-1.5">
@@ -246,7 +246,7 @@ export const DJSamplerPanel: React.FC<DJSamplerPanelProps> = ({ onClose }) => {
               className={`w-5 h-5 text-[9px] font-bold font-mono rounded transition-colors ${
                 currentBank === bank
                   ? 'bg-amber-600 text-text-primary'
-                  : 'bg-dark-surface border border-dark-border text-text-muted hover:text-text-primary'
+                  : 'bg-dark-bgSecondary border border-dark-border text-text-muted hover:text-text-primary'
               }`}
             >
               {bank}
@@ -258,14 +258,14 @@ export const DJSamplerPanel: React.FC<DJSamplerPanelProps> = ({ onClose }) => {
           <DubBusPanel />
           <button
             onClick={() => engineRef.current?.stopAll()}
-            className="px-1.5 py-0.5 text-[9px] font-mono text-red-400 hover:text-red-300 bg-dark-surface border border-dark-border rounded transition-colors"
+            className="px-1.5 py-0.5 text-[9px] font-mono text-red-400 hover:text-red-300 bg-dark-bgSecondary border border-dark-border rounded transition-colors"
             title="Stop all"
           >
             ■
           </button>
           <button
             onClick={onClose}
-            className="px-1.5 py-0.5 text-[9px] font-mono text-text-muted hover:text-text-primary bg-dark-surface border border-dark-border rounded transition-colors"
+            className="px-1.5 py-0.5 text-[9px] font-mono text-text-muted hover:text-text-primary bg-dark-bgSecondary border border-dark-border rounded transition-colors"
           >
             X
           </button>

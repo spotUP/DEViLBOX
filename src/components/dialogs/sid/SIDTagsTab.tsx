@@ -122,7 +122,7 @@ export const SIDTagsTab: React.FC<SIDTagsTabProps> = ({ className, fileId }) => 
             <input
               value={search} onChange={(e) => setSearch(e.target.value)}
               placeholder="Search tags…"
-              className="w-full text-sm bg-dark-bgPrimary border border-blue-800/40 rounded pl-7 pr-2 py-1.5 text-text-primary placeholder:text-text-muted/40"
+              className="w-full text-sm bg-dark-bg border border-blue-800/40 rounded pl-7 pr-2 py-1.5 text-text-primary placeholder:text-text-muted/40"
             />
           </div>
           <div className="max-h-36 overflow-y-auto space-y-1">
@@ -151,7 +151,7 @@ export const SIDTagsTab: React.FC<SIDTagsTabProps> = ({ className, fileId }) => 
               value={newName} onChange={(e) => setNewName(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleCreate()}
               placeholder="New tag name…"
-              className="flex-1 text-sm bg-dark-bgPrimary border border-blue-800/40 rounded px-2 py-1.5 text-text-primary placeholder:text-text-muted/40"
+              className="flex-1 text-sm bg-dark-bg border border-blue-800/40 rounded px-2 py-1.5 text-text-primary placeholder:text-text-muted/40"
             />
             <button onClick={handleCreate} disabled={busy || !newName.trim()}
               className="flex items-center gap-1 text-xs px-3 py-1.5 rounded bg-blue-700 hover:bg-blue-600 text-text-primary disabled:opacity-40 transition-colors">
