@@ -92,7 +92,7 @@ Time: ${new Date().toISOString()}
         <div className="min-h-screen bg-bg flex items-center justify-center p-4 select-text">
           <div className="max-w-lg w-full bg-dark-bgSecondary rounded-lg border border-dark-border p-6 text-center select-text">
             <div className="text-6xl mb-4 select-none">💀</div>
-            <h1 className="text-2xl font-bold text-text mb-2">
+            <h1 className="text-2xl font-bold text-text-primary mb-2">
               Something went wrong
             </h1>
             <p className="text-text-secondary mb-4">
@@ -104,7 +104,7 @@ Time: ${new Date().toISOString()}
                 <span className="text-xs font-bold text-text-muted uppercase tracking-wider select-none">Error Details</span>
                 <button 
                   onClick={this.handleCopy}
-                  className="flex items-center gap-1.5 px-2 py-1 text-[10px] bg-dark-bgTertiary hover:bg-border rounded transition-colors text-text-secondary select-none"
+                  className="flex items-center gap-1.5 px-2 py-1 text-[10px] bg-dark-bgTertiary hover:bg-dark-bgHover rounded transition-colors text-text-secondary select-none"
                 >
                   {this.state.copied ? (
                     <>
@@ -128,13 +128,13 @@ Time: ${new Date().toISOString()}
             <div className="flex gap-3 justify-center select-none">
               <button
                 onClick={this.handleReset}
-                className="px-4 py-2 bg-dark-bgTertiary hover:bg-border rounded text-text transition-colors"
+                className="px-4 py-2 bg-dark-bgTertiary hover:bg-dark-bgHover rounded text-text-primary transition-colors"
               >
                 Try Again
               </button>
               <button
                 onClick={this.handleReload}
-                className="px-4 py-2 bg-accent hover:bg-dark-bgHover rounded text-text-primary transition-colors"
+                className="px-4 py-2 bg-accent-primary hover:bg-accent-primary/80 rounded text-text-inverse transition-colors"
               >
                 Reload App
               </button>

@@ -1011,7 +1011,7 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
                   }
                   setShowAutomation(false);
                 }}
-                className="px-4 py-1.5 text-xs font-medium rounded-md bg-accent-primary text-text-inverse border border-accent-primary hover:bg-accent-primary transition-colors"
+                className="px-4 py-1.5 text-xs font-medium rounded-md bg-accent-primary text-text-inverse border border-accent-primary hover:bg-accent-primary/80 transition-colors"
               >
                 OK
               </button>

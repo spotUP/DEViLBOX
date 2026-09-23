@@ -418,7 +418,7 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
               className={`flex items-center gap-2 px-6 py-2 rounded font-medium ${
                 (mode === 'load' && (!nav.selectedFile || nav.selectedFile.isDirectory))
                   ? 'bg-dark-bgTertiary text-text-muted cursor-not-allowed'
-                  : 'bg-accent-primary text-text-primary hover:bg-accent-primary'
+                  : 'bg-accent-primary text-text-primary hover:bg-accent-primary/80'
               }`}
             >
               {fileSource === 'cloud' && <Cloud size={16} />}

@@ -82,7 +82,7 @@ export const PadSetupWizard: React.FC<PadSetupWizardProps> = ({ wizard }) => {
             </button>
             <button
               onClick={wizard.finish}
-              className="px-4 py-1.5 text-xs font-mono font-bold text-dark-bg bg-accent-primary hover:bg-accent-primary rounded transition-colors"
+              className="px-4 py-1.5 text-xs font-mono font-bold text-dark-bg bg-accent-primary hover:bg-accent-primary/80 rounded transition-colors"
             >
               Done
             </button>
