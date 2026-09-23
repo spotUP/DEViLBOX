@@ -46,6 +46,21 @@ export class HivelySynth implements DevilboxSynth {
    */
   private _ownsEngineConnection = false;
 
+  /**
+   * Whether this instance carries the TUNE into the graph.
+   *
+   * The tune is one signal from a singleton engine. Every instance bridging it
+   * would sum the same audio N times, so exactly one does — the comment above
+   * has always said so, and this enforces it.
+   */
+  private _ownsTuneBridge = false;
+
+  /** The instance currently bridging the tune, if any. */
+  private static _tuneBridgeOwner: HivelySynth | null = null;
+
+  /** Every instance that has not been disposed, so the tune can be handed on. */
+  private static _liveInstances = new Set<HivelySynth>();
+
   constructor() {
     this.audioContext = getDevilboxAudioContext();
     this.output = this.audioContext.createGain();
@@ -54,11 +69,31 @@ export class HivelySynth implements DevilboxSynth {
 
     // Connect the engine's INSTRUMENT output to every HivelySynth instance.
     // The engine is a singleton, but each instrument slot needs its own output
-    // for the mixer. Not `engine.output`: that is the tune, and the host
+    // for the mixer. Not only `engine.output`: that is the tune, and the host
     // mutes it on transport stop, which silenced every live note after a stop
     // while the players were summed into it (2026-09-23).
     this.engine.instrumentOutput.connect(this.output);
     this._ownsEngineConnection = true;
+
+    // ...and the TUNE, which still needs a way in.
+    //
+    // This output is the only bridge Hively audio has into the mixer:
+    // `NativeEngineRouting` reroutes the SYNTH, not the engine. Moving this
+    // connection from `engine.output` to `engine.instrumentOutput` saved the
+    // live notes and left the tune rendering into a gain node connected to
+    // nothing — every .ahx and .hvl played silently while the rows advanced
+    // (2026-09-24). Both belong here: the tune, which the host may mute on
+    // stop, and the players, which it must not.
+    this.bridgeTune();
+    HivelySynth._liveInstances.add(this);
+  }
+
+  /** Take over carrying the tune, unless another live instance already does. */
+  private bridgeTune(): void {
+    if (HivelySynth._tuneBridgeOwner && !HivelySynth._tuneBridgeOwner._disposed) return;
+    this.engine.output.connect(this.output);
+    this._ownsTuneBridge = true;
+    HivelySynth._tuneBridgeOwner = this;
   }
 
   async ensureInitialized(): Promise<void> {
@@ -284,5 +319,19 @@ export class HivelySynth implements DevilboxSynth {
       } catch { /* may already be disconnected */ }
       this._ownsEngineConnection = false;
     }
+
+    // Hand the tune to another live instance rather than letting it go quiet
+    // because the instance that happened to own the bridge was disposed.
+    if (this._ownsTuneBridge) {
+      try {
+        this.engine.output.disconnect(this.output);
+      } catch { /* may already be disconnected */ }
+      this._ownsTuneBridge = false;
+      if (HivelySynth._tuneBridgeOwner === this) HivelySynth._tuneBridgeOwner = null;
+      for (const other of HivelySynth._liveInstances) {
+        if (other !== this && !other._disposed) { other.bridgeTune(); break; }
+      }
+    }
+    HivelySynth._liveInstances.delete(this);
   }
 }
