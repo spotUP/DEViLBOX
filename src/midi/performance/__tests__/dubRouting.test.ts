@@ -10,6 +10,8 @@
  * the CC route actually dispatched.
  */
 
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { routeParameterToEngine } from '../parameterRouter';
 import { setDubBusForRouter, subscribeDubRouter } from '../../../engine/dub/DubRouter';
@@ -128,5 +130,40 @@ describe('parameterRouter dub.* routing', () => {
       expect(captures.length).toBe(0);
       unsub();
     });
+  });
+});
+
+/**
+ * A controller preset's mappings must reach the dub bus.
+ *
+ * `DJControllerMapper` sends every mapping through `routeDJParameter`, which
+ * looked each one up in a table holding only `dj.*` routes — so the X-Touch
+ * Compact's map, which is `dub.*` end to end, was looked up, not found, and
+ * dropped in silence. The channel faders were the one thing that worked, and
+ * only because `handleCC` special-cases CC 1-8 before reaching that lookup.
+ *
+ * "almost nothing is mapped correctly... more or less only the channels
+ * sliders are correct" (2026-09-23). The mapping was right the whole time; the
+ * destination did not exist.
+ */
+describe('a dub parameter from a controller has somewhere to go', () => {
+  const SOURCE = readFileSync(
+    resolve(process.cwd(), 'src/midi/performance/parameterRouter.ts'), 'utf8',
+  );
+
+  it('routeDJParameter forwards dub.* instead of dropping it', () => {
+    const fn = SOURCE.slice(SOURCE.indexOf('export function routeDJParameter'));
+    const body = fn.slice(0, fn.indexOf('\n}\n'));
+    expect(body, 'dub params fall into the dj lookup and vanish')
+      .toMatch(/param\.startsWith\('dub\.'\)/);
+    expect(body).toContain('routeDubParameter(param, normalizedValue');
+  });
+
+  it('forwards BEFORE consulting the dj route table', () => {
+    const fn = SOURCE.slice(SOURCE.indexOf('export function routeDJParameter'));
+    const body = fn.slice(0, fn.indexOf('\n}\n'));
+    // Order matters: the dj lookup returns undefined for every dub param and
+    // the function returns without doing anything.
+    expect(body.indexOf("startsWith('dub.')")).toBeLessThan(body.indexOf('getDJRoutes()'));
   });
 });

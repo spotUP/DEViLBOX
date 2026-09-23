@@ -28,6 +28,7 @@ import type {
 } from './djControllerPresets';
 import { detectDJPreset, getPresetById } from './djControllerPresets';
 import { TakeoverBook } from './softTakeover';
+import { getControllerLayout } from './controllerLayouts';
 import { readDubParameter } from './performance/parameterRouter';
 import type { MIDIMessage } from './types';
 
@@ -88,6 +89,9 @@ export class DJControllerMapper {
   private jogTouchNotes = new Map<string, 'A' | 'B' | 'C'>(); // "channel:note" → deck
   /** Union of noteLookup and jogTouchNotes keys — see `ownedNotes()`. */
   private ownedNoteKeys = new Set<string>();
+
+  /** Every CC the preset speaks for — see `ownedCCs()`. */
+  private ownedCCKeys = new Set<string>();
 
   // Active loop roll state for noteOff handling
   private activeLoopRolls = new Map<string, {
@@ -157,12 +161,14 @@ export class DJControllerMapper {
     this.jogCCs.clear();
     this.jogTouchNotes.clear();
     this.ownedNoteKeys.clear();
+    this.ownedCCKeys.clear();
     resetDJSoftTakeover();
 
     if (preset) {
       // Build CC lookup: "channel:cc" → mapping
       for (const m of preset.ccMappings) {
         this.ccLookup.set(`${m.channel}:${m.cc}`, m);
+        this.ownedCCKeys.add(`${m.channel}:${m.cc}`);
       }
 
       for (const m of preset.pitchBendMappings ?? []) {
@@ -173,6 +179,14 @@ export class DJControllerMapper {
       for (const m of preset.noteMappings) {
         this.noteLookup.set(`${m.channel}:${m.note}`, m);
         this.ownedNoteKeys.add(`${m.channel}:${m.note}`);
+      }
+
+      // Touch-sensitive faders answer on a SECOND CC, which the mapping table
+      // does not list because nothing routes it to a parameter — but the
+      // preset still speaks for it, and anything else handling it is a bug.
+      for (const control of getControllerLayout(preset.id)?.controls ?? []) {
+        const touchCc = control.midi.touchCc;
+        if (touchCc !== undefined) this.ownedCCKeys.add(`${control.midi.channel}:${touchCc}`);
       }
 
       // Build jog wheel lookup
@@ -216,6 +230,23 @@ export class DJControllerMapper {
    */
   ownedNotes(): ReadonlySet<string> {
     return this.ownedNoteKeys;
+  }
+
+  /**
+   * Every CC this preset speaks for, as "channel:cc".
+   *
+   * `useMIDIStore` guarded against double-handling with a HARDCODED range —
+   * CC 1-25 and 28-52 — which was a guess at what a preset owns rather than
+   * an answer from the preset. The X-Touch's touch-sensitive faders report on
+   * CC 101-109 and 111-119, all outside that guess, and the store maps CC
+   * 102-106 to TB-303 parameters: so touching a fader also drove envMod,
+   * decay, accent, tuning and waveform (2026-09-23).
+   *
+   * The note path already asked this question properly via `ownedNotes`. The
+   * CC path now asks it the same way.
+   */
+  ownedCCs(): ReadonlySet<string> {
+    return this.ownedCCKeys;
   }
 
   /**
