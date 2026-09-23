@@ -438,7 +438,7 @@ export const GridSequencer: React.FC<GridSequencerProps> = ({ channelIndex }) =>
                 <div
                   key={stepIdx}
                   className={`flex items-center justify-center text-[10px] font-mono mx-0.5 rounded-sm relative overflow-hidden
-                    ${isBeatMarker ? 'text-text-muted' : 'text-text-muted'}
+                    ${isBeatMarker ? 'text-text-secondary' : 'text-text-muted'}
                     ${isCurrentDiscrete ? 'text-text-primary font-bold' : ''}
                   `}
                   style={{
