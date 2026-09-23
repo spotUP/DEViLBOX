@@ -427,99 +427,170 @@ const BEHRINGER_X_TOUCH_COMPACT: DJControllerPreset = {
   description: 'Dub mixer surface — faders=channel sends, encoders=FX params, buttons=performance',
   detectPatterns: ['x-touch compact', 'xtouch compact', 'x touch compact'],
   ccMappings: [
-    // Faders 1-8: routed to dub channel sends via special-case in handleCC (not here)
-    // Master fader (CC 9): master volume
+    // Faders 1-8 (Layer A) and 28-35 (Layer B) are intercepted in
+    // `DJControllerMapper.handleCC` while the dub bus is on, so a touched
+    // fader writes the send directly and motor echo is ignored. These entries
+    // are the same destination by the generic route: they make the faders
+    // visible in the mapper diagram, and they carry the assignment when the
+    // bus is off and the special case does not fire.
+    { channel: 0, cc: 1, param: 'dub.channelSend.ch0' },
+    { channel: 0, cc: 2, param: 'dub.channelSend.ch1' },
+    { channel: 0, cc: 3, param: 'dub.channelSend.ch2' },
+    { channel: 0, cc: 4, param: 'dub.channelSend.ch3' },
+    { channel: 0, cc: 5, param: 'dub.channelSend.ch4' },
+    { channel: 0, cc: 6, param: 'dub.channelSend.ch5' },
+    { channel: 0, cc: 7, param: 'dub.channelSend.ch6' },
+    { channel: 0, cc: 8, param: 'dub.channelSend.ch7' },
+    // MAIN fader
     { channel: 0, cc: 9, param: 'dj.masterVolume' },
 
-    // Top encoder row (CC 10-17): echo + spring dub params
-    { channel: 0, cc: 10, param: 'dub.echoWet' },
+    // Top encoder row (CC 10-17) — the bus tone and FX controls, in the order
+    // the deck shows them. Continuous params on continuous controls: this row
+    // used to carry a duplicate master volume, and the BUS tab's own
+    // controls (bass, mid, width) were not routable at all.
+    { channel: 0, cc: 10, param: 'dub.returnGain' },
     { channel: 0, cc: 11, param: 'dub.echoIntensity' },
     { channel: 0, cc: 12, param: 'dub.echoRateMs' },
     { channel: 0, cc: 13, param: 'dub.springWet' },
-    { channel: 0, cc: 14, param: 'dub.returnGain' },
-    { channel: 0, cc: 15, param: 'dub.hpfCutoff' },
-    { channel: 0, cc: 16, param: 'dub.sidechainAmount' },
-    { channel: 0, cc: 17, param: 'dj.masterVolume' },
+    { channel: 0, cc: 14, param: 'dub.bassShelfGainDb' },
+    { channel: 0, cc: 15, param: 'dub.midScoopGainDb' },
+    { channel: 0, cc: 16, param: 'dub.stereoWidth' },
+    { channel: 0, cc: 17, param: 'dub.hpfCutoff' },
 
-    // Right encoder column (CC 18-25): filters + DJ params
-    { channel: 0, cc: 18, param: 'dj.deckA.filter' },
-    { channel: 0, cc: 19, param: 'dj.deckA.filterQ' },
-    { channel: 0, cc: 20, param: 'dj.deckB.filter' },
-    { channel: 0, cc: 21, param: 'dj.deckB.filterQ' },
-    { channel: 0, cc: 22, param: 'dj.deckA.pitch' },
-    { channel: 0, cc: 23, param: 'dj.deckB.pitch' },
-    { channel: 0, cc: 24, param: 'dj.crossfader' },
-    { channel: 0, cc: 25, param: 'dj.deckA.volume' },
+    // Right encoder column (CC 18-25) — second tier of bus colour, then the
+    // DJ controls for anyone using this surface on the decks.
+    { channel: 0, cc: 18, param: 'dub.sweepAmount' },
+    { channel: 0, cc: 19, param: 'dub.sweepRateHz' },
+    { channel: 0, cc: 20, param: 'dub.plateStageMix' },
+    { channel: 0, cc: 21, param: 'dub.sidechainAmount' },
+    { channel: 0, cc: 22, param: 'dub.echoWet' },
+    { channel: 0, cc: 23, param: 'dj.crossfader' },
+    { channel: 0, cc: 24, param: 'dj.deckA.filter' },
+    { channel: 0, cc: 25, param: 'dj.deckB.filter' },
+
+    // ── Layer B ──────────────────────────────────────────────────────────
+    // Faders 28-35 address the SECOND bank of channels (9-16); the encoders
+    // are deliberately left unassigned as user space.
+    { channel: 0, cc: 28, param: 'dub.channelSend.ch8' },
+    { channel: 0, cc: 29, param: 'dub.channelSend.ch9' },
+    { channel: 0, cc: 30, param: 'dub.channelSend.ch10' },
+    { channel: 0, cc: 31, param: 'dub.channelSend.ch11' },
+    { channel: 0, cc: 32, param: 'dub.channelSend.ch12' },
+    { channel: 0, cc: 33, param: 'dub.channelSend.ch13' },
+    { channel: 0, cc: 34, param: 'dub.channelSend.ch14' },
+    { channel: 0, cc: 35, param: 'dub.channelSend.ch15' },
   ],
   noteMappings: [
-    // Row 1 (notes 16-23): primary dub performance triggers
-    { channel: 0, note: 16, param: 'dub.echoThrow' },
-    { channel: 0, note: 17, param: 'dub.reverseEcho' },
-    { channel: 0, note: 18, param: 'dub.tapeStop' },
-    { channel: 0, note: 19, param: 'dub.tubbyScream' },
-    { channel: 0, note: 20, param: 'dub.springSlam' },
-    { channel: 0, note: 21, param: 'dub.eqSweep' },
-    { channel: 0, note: 22, param: 'dub.masterDrop' },
-    { channel: 0, note: 23, param: 'dub.crushBass' },
+    // ── Button row 1 (notes 16-23): the eight TOGGLES ────────────────────
+    // All eight of the deck's toggle moves, in deck order, on one row. They
+    // latch, so the button LED tells the truth about what is on — which is
+    // the whole reason to group them rather than scatter them across rows.
+    { channel: 0, note: 16, param: 'dub.stereoDoubler' },
+    { channel: 0, note: 17, param: 'dub.tapeWobble' },
+    { channel: 0, note: 18, param: 'dub.subHarmonic' },
+    { channel: 0, note: 19, param: 'dub.combSweep' },
+    { channel: 0, note: 20, param: 'dub.eqSweep' },
+    { channel: 0, note: 21, param: 'dub.ringMod' },
+    { channel: 0, note: 22, param: 'dub.voltageStarve' },
+    { channel: 0, note: 23, param: 'dub.madProfPingPong' },
 
-    // Row 2 (notes 24-31): channel mutes 1-8
-    { channel: 0, note: 24, action: 'channel_mute_1' },
-    { channel: 0, note: 25, action: 'channel_mute_2' },
-    { channel: 0, note: 26, action: 'channel_mute_3' },
-    { channel: 0, note: 27, action: 'channel_mute_4' },
-    { channel: 0, note: 28, action: 'channel_mute_5' },
-    { channel: 0, note: 29, action: 'channel_mute_6' },
-    { channel: 0, note: 30, action: 'channel_mute_7' },
-    { channel: 0, note: 31, action: 'channel_mute_8' },
+    // ── Button row 2 (notes 24-31): press-and-hold moves ─────────────────
+    { channel: 0, note: 24, param: 'dub.filterDrop' },
+    { channel: 0, note: 25, param: 'dub.masterDrop' },
+    { channel: 0, note: 26, param: 'dub.versionDrop' },
+    { channel: 0, note: 27, param: 'dub.riddimSection' },
+    { channel: 0, note: 28, param: 'dub.dubSiren' },
+    { channel: 0, note: 29, param: 'dub.tubbyScream' },
+    { channel: 0, note: 30, param: 'dub.ghostReverb' },
+    { channel: 0, note: 31, param: 'dub.tapeStop' },
 
-    // Row 3 (notes 32-39): channel solos 1-8
-    { channel: 0, note: 32, action: 'channel_solo_1' },
-    { channel: 0, note: 33, action: 'channel_solo_2' },
-    { channel: 0, note: 34, action: 'channel_solo_3' },
-    { channel: 0, note: 35, action: 'channel_solo_4' },
-    { channel: 0, note: 36, action: 'channel_solo_5' },
-    { channel: 0, note: 37, action: 'channel_solo_6' },
-    { channel: 0, note: 38, action: 'channel_solo_7' },
-    { channel: 0, note: 39, action: 'channel_solo_8' },
+    // ── Button row 3 (notes 32-39): one-shots ────────────────────────────
+    { channel: 0, note: 32, param: 'dub.echoThrow' },
+    { channel: 0, note: 33, param: 'dub.dubStab' },
+    { channel: 0, note: 34, param: 'dub.springSlam' },
+    { channel: 0, note: 35, param: 'dub.springKick' },
+    { channel: 0, note: 36, param: 'dub.snareCrack' },
+    { channel: 0, note: 37, param: 'dub.sonarPing' },
+    { channel: 0, note: 38, param: 'dub.radioRiser' },
+    { channel: 0, note: 39, param: 'dub.subSwell' },
 
-    // Encoder buttons (notes 0-7): quick-select dub echo presets
+    // ── Encoder pushes (notes 0-7): echo rate presets ────────────────────
+    // A push is a momentary switch, so it carries a preset or a one-shot,
+    // never a move you want to hold.
     { channel: 0, note: 0, param: 'dub.delayPresetQuarter' },
     { channel: 0, note: 1, param: 'dub.delayPresetDotted' },
     { channel: 0, note: 2, param: 'dub.delayPresetTriplet' },
     { channel: 0, note: 3, param: 'dub.delayPreset8th' },
-    { channel: 0, note: 4, param: 'dub.echoBuildUp' },
-    { channel: 0, note: 5, param: 'dub.springKick' },
-    { channel: 0, note: 6, param: 'dub.stereoDoubler' },
-    { channel: 0, note: 7, param: 'dub.backwardReverb' },
+    { channel: 0, note: 4, param: 'dub.delayPreset16th' },
+    { channel: 0, note: 5, param: 'dub.delayPreset380' },
+    { channel: 0, note: 6, param: 'dub.delayPresetDoubler' },
+    { channel: 0, note: 7, param: 'dub.echoBuildUp' },
 
-    // Right encoder buttons (notes 8-15): more dub triggers
-    { channel: 0, note: 8, param: 'dub.delayPreset380' },
-    { channel: 0, note: 9, param: 'dub.delayPreset16th' },
-    { channel: 0, note: 10, param: 'dub.delayPresetDoubler' },
-    { channel: 0, note: 11, param: 'dub.snareCrack' },
-    { channel: 0, note: 12, param: 'dub.sonarPing' },
-    { channel: 0, note: 13, param: 'dub.subSwell' },
-    { channel: 0, note: 14, param: 'dub.radioRiser' },
-    { channel: 0, note: 15, param: 'dub.delayTimeThrow' },
+    // ── Right encoder pushes (notes 8-15): the remaining moves ───────────
+    { channel: 0, note: 8, param: 'dub.reverseEcho' },
+    { channel: 0, note: 9, param: 'dub.backwardReverb' },
+    { channel: 0, note: 10, param: 'dub.delayTimeThrow' },
+    { channel: 0, note: 11, param: 'dub.crushBass' },
+    { channel: 0, note: 12, param: 'dub.oscBass' },
+    { channel: 0, note: 13, param: 'dub.hpfRise' },
+    { channel: 0, note: 14, param: 'dub.toast' },
+    { channel: 0, note: 15, param: 'dub.bassEmphasis' },
 
-    // Select row (notes 40-48): hold/toggle dub moves
-    { channel: 0, note: 40, param: 'dub.transportTapeStop' },
-    { channel: 0, note: 41, param: 'dub.hpfRise' },
-    { channel: 0, note: 42, param: 'dub.filterDrop' },
-    { channel: 0, note: 43, param: 'dub.versionDrop' },
-    { channel: 0, note: 44, param: 'dub.dubSiren' },
-    { channel: 0, note: 45, param: 'dub.oscBass' },
-    { channel: 0, note: 46, param: 'dub.tapeWobble' },
-    { channel: 0, note: 47, param: 'dub.subHarmonic' },
-    { channel: 0, note: 48, param: 'dub.voltageStarve' },
+    // ── Select row (notes 40-48): each button under its own fader ────────
+    // The dub-bus channel mute, so the button below a fader acts on the same
+    // channel that fader sends. Note 48 sits under MAIN and arms recording,
+    // which is where the hand already is when a take starts.
+    { channel: 0, note: 40, param: 'dub.channelMute.ch0' },
+    { channel: 0, note: 41, param: 'dub.channelMute.ch1' },
+    { channel: 0, note: 42, param: 'dub.channelMute.ch2' },
+    { channel: 0, note: 43, param: 'dub.channelMute.ch3' },
+    { channel: 0, note: 44, param: 'dub.channelMute.ch4' },
+    { channel: 0, note: 45, param: 'dub.channelMute.ch5' },
+    { channel: 0, note: 46, param: 'dub.channelMute.ch6' },
+    { channel: 0, note: 47, param: 'dub.channelMute.ch7' },
+    { channel: 0, note: 48, param: 'dub.armed' },
 
-    // Transport (notes 49-54): play/stop/record
+    // ── Transport (notes 49-54) ──────────────────────────────────────────
     { channel: 0, note: 49, action: 'play_a' },
     { channel: 0, note: 50, action: 'play_b' },
     { channel: 0, note: 51, action: 'cue_a' },
     { channel: 0, note: 52, action: 'cue_b' },
     { channel: 0, note: 53, action: 'sync_a' },
     { channel: 0, note: 54, action: 'sync_b' },
+
+    // ── Layer B ──────────────────────────────────────────────────────────
+    // Row 1 (71-78): the moves Layer A had no room for.
+    { channel: 0, note: 71, param: 'dub.transportTapeStop' },
+    { channel: 0, note: 72, param: 'dub.skankEchoThrow' },
+    { channel: 0, note: 73, param: 'dub.skankFloatThrow' },
+    { channel: 0, note: 74, param: 'dub.channelThrow' },
+
+    // Row 2 (79-86): mixer solos.
+    { channel: 0, note: 79, action: 'channel_solo_1' },
+    { channel: 0, note: 80, action: 'channel_solo_2' },
+    { channel: 0, note: 81, action: 'channel_solo_3' },
+    { channel: 0, note: 82, action: 'channel_solo_4' },
+    { channel: 0, note: 83, action: 'channel_solo_5' },
+    { channel: 0, note: 84, action: 'channel_solo_6' },
+    { channel: 0, note: 85, action: 'channel_solo_7' },
+    { channel: 0, note: 86, action: 'channel_solo_8' },
+
+    // Row 3 (87-94): mixer mutes — the main mix, not the dub send.
+    { channel: 0, note: 87, action: 'channel_mute_1' },
+    { channel: 0, note: 88, action: 'channel_mute_2' },
+    { channel: 0, note: 89, action: 'channel_mute_3' },
+    { channel: 0, note: 90, action: 'channel_mute_4' },
+    { channel: 0, note: 91, action: 'channel_mute_5' },
+    { channel: 0, note: 92, action: 'channel_mute_6' },
+    { channel: 0, note: 93, action: 'channel_mute_7' },
+    { channel: 0, note: 94, action: 'channel_mute_8' },
+
+    // Notes 95-109 (Layer B select row and transport) are deliberately left
+    // unassigned as user space. Nothing is put on notes 63/64 either: the
+    // factory documentation calls CC63 and CC64 the foot switch and
+    // expression pedal jacks, which collides with reading them as the push
+    // buttons of right encoders 9 and 10 — unresolved until a pedal is
+    // pressed and we watch what actually arrives.
   ],
 };
 
