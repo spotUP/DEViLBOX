@@ -115,3 +115,55 @@ export function deriveControlColors(color: string): ControlColors {
     glow: `rgba(${r},${g},${b},${CONTROL_ALPHA.glow})`,
   };
 }
+
+/**
+ * The named colours a control may carry.
+ *
+ * `Knob`, `Fader`, `Toggle` and `Switch3Way` took a raw hex string, and 1,822
+ * call sites duly passed one — `<Knob color="#4a9eff">`, `<Knob
+ * color="#f97316">` — which is the largest single source of hardcoded colour
+ * in DEViLBOX and the reason those controls do not follow the theme.
+ *
+ * A name instead of a hex fixes it at four files rather than at 1,822 call
+ * sites, and it keeps working when the theme changes, because every one of
+ * these resolves through a CSS variable.
+ */
+export type ControlTone =
+  | 'primary'
+  | 'secondary'
+  | 'highlight'
+  | 'warning'
+  | 'error'
+  | 'success'
+  | 'neutral';
+
+const TONE_VARS: Record<ControlTone, string> = {
+  primary: 'var(--color-accent)',
+  secondary: 'var(--color-accent-secondary)',
+  highlight: 'var(--color-accent-highlight)',
+  warning: 'var(--color-warning)',
+  error: 'var(--color-error)',
+  success: 'var(--color-success)',
+  neutral: 'var(--color-text-secondary)',
+};
+
+/** The CSS colour for a tone, for a control to draw with. */
+export function toneColor(tone: ControlTone): string {
+  return TONE_VARS[tone];
+}
+
+/**
+ * What a control should actually paint with.
+ *
+ * `tone` wins when both are given. The raw `color` stays accepted so the 1,822
+ * call sites can migrate view by view instead of in one unreviewable change —
+ * when the last one is gone, this argument goes with it.
+ */
+export function resolveControlTone(
+  tone: ControlTone | undefined,
+  color: string | undefined,
+  fallback: string,
+): string {
+  if (tone) return toneColor(tone);
+  return color ?? fallback;
+}
