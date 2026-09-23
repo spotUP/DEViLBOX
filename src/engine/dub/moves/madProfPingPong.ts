@@ -18,7 +18,13 @@ import type { DubMove } from './_types';
 export const madProfPingPong: DubMove = {
   id: 'madProfPingPong',
   kind: 'hold',
-  defaults: { lMs: 337, rMs: 450, feedback: 0.5, wet: 0.7 },
+  /**
+   * Full wet. The ring gain is bounded inside `startPingPong` (its input gain
+   * is derived from wet and feedback so the loop cannot run away), so raising
+   * wet buys audibility without buying a runaway — and at 0.7 the bouncing
+   * taps were a layer under the echo instead of the effect (2026-09-23).
+   */
+  defaults: { lMs: 337, rMs: 450, feedback: 0.5, wet: 1 },
 
   execute({ bus, params }) {
     const lMs      = (params.lMs      as number | undefined) ?? 337;

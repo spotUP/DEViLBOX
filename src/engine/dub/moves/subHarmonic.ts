@@ -19,7 +19,12 @@ export const subHarmonic: DubMove = {
   // the reference test song (kicks peaked around 0.05 — right on the edge
   // of the old threshold). New values trigger on every visible transient
   // and the sub pulse is loud enough to read clearly against the mix.
-  defaults: { freq: 55, threshold: 0.035, level: 0.85 },
+  /**
+   * The sub is an ADD into the return, so its level competes with the whole
+   * core wet chain rather than replacing any of it. At 0.85 it sat under the
+   * wash; 1.4 puts the octave-down where a listener feels it.
+   */
+  defaults: { freq: 55, threshold: 0.035, level: 1.4 },
 
   execute({ bus, params }) {
     const freq = params.freq ?? this.defaults.freq;
