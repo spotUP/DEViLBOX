@@ -451,7 +451,7 @@ export const MasterEffectsModal: React.FC<MasterEffectsModalProps> = ({ isOpen, 
               />
               <button
                 onClick={handleSavePreset}
-                className="px-4 py-2 text-sm font-medium rounded-lg bg-accent-primary text-text-primary hover:bg-accent-primary transition-colors"
+                className="px-4 py-2 text-sm font-medium rounded-lg bg-accent-primary text-text-primary hover:bg-accent-primary/80 transition-colors"
               >
                 Save
               </button>
@@ -552,7 +552,7 @@ export const MasterEffectsModal: React.FC<MasterEffectsModalProps> = ({ isOpen, 
                       <button
                         onClick={handleConfirmAdd}
                         className="flex items-center gap-1.5 px-4 py-1.5 text-xs font-medium rounded-lg
-                                 bg-accent-primary text-text-primary hover:bg-accent-primary transition-colors"
+                                 bg-accent-primary text-text-primary hover:bg-accent-primary/80 transition-colors"
                       >
                         <Plus size={12} />
                         Add to Chain
@@ -648,7 +648,7 @@ export const MasterEffectsModal: React.FC<MasterEffectsModalProps> = ({ isOpen, 
                           key={effect.label}
                           onClick={() => handlePreviewEffect(effect)}
                           className="w-full px-3 py-2 text-sm rounded-lg border border-dark-border bg-dark-bgSecondary
-                                   hover:bg-accent-primary hover:text-text-primary hover:border-accent-primary
+                                   hover:bg-accent-primary/80 hover:text-text-primary hover:border-accent-primary
                                    transition-colors text-left flex items-center justify-between gap-2"
                         >
                           <span className="truncate">{effect.label}</span>
