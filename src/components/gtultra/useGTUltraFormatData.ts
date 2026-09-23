@@ -3,7 +3,7 @@
  *
  * Converts GT Ultra store state to FormatChannel[] and provides
  * a cell change handler. Used by both DOM (GTUltraView) and
- * Pixi (PixiGTUltraView) to avoid duplicating adapter logic.
+ * to avoid duplicating adapter logic.
  */
 
 import { useCallback, useMemo } from 'react';

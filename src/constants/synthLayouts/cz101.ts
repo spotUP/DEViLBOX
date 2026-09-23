@@ -4,7 +4,7 @@ const fmtPct = (v: number) => `${Math.round(v * 100)}%`;
 const fmtInt = (v: number) => `${Math.round(v)}`;
 
 /**
- * CZ-101 layout for Pixi synth panel.
+ * CZ-101 layout for the generic synth panel.
  * Casio CZ-101 Phase Distortion Synthesizer (1984).
  * Parameters from chipParameters.ts CZ101 entry.
  */

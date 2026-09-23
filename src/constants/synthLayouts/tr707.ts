@@ -3,7 +3,7 @@ import type { SynthPanelLayout } from '@/types/synthPanel';
 const fmtPct = (v: number) => `${Math.round(v * 100)}%`;
 
 /**
- * TR-707 layout for Pixi synth panel.
+ * TR-707 layout for the generic synth panel.
  * Roland TR-707 Rhythm Composer (1985).
  * Parameters from chipParameters.ts MAMETR707 entry.
  */

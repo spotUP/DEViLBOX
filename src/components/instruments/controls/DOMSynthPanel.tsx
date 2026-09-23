@@ -1,5 +1,5 @@
 /**
- * DOMSynthPanel — DOM equivalent of PixiSynthPanel.
+ * DOMSynthPanel — generic synth control panel driven by a layout descriptor.
  * Renders SynthPanelLayout descriptors as React DOM controls styled like effect pedals.
  * Used for synths that have declarative layouts but no dedicated *Controls component.
  */

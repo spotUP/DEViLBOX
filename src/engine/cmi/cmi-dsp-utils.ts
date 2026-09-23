@@ -2,8 +2,7 @@
  * cmi-dsp-utils.ts — Shared Fairlight CMI DSP computation
  *
  * Single source of truth for waveform generation, harmonic presets,
- * and filter math. Consumed by both DOM (CMIControls) and Pixi
- * (future PixiCMIKnobPanel) UIs without duplication.
+ * and filter math. Consumed by CMIControls without duplication.
  *
  * All formulas match CMISynth.cpp (the WASM engine) exactly.
  */

@@ -14,20 +14,16 @@ import type { SynthType } from '@typedefs/instrument';
 
 export interface ChannelTypeBadge {
   label: string;       // Short label: FM, PSG, PCM, WAV, NOI, OP, ANY
-  color: number;       // Pixi hex color
   cssColor: string;    // CSS color for DOM
 }
 
-const BADGE_FM:    ChannelTypeBadge = { label: 'FM',  color: 0x60a5fa, cssColor: '#60a5fa' };
-const BADGE_PSG:   ChannelTypeBadge = { label: 'PSG', color: 0xf87171, cssColor: '#f87171' };
-const BADGE_NOISE: ChannelTypeBadge = { label: 'NOI', color: '#9ca3af' as any, cssColor: '#9ca3af' };
-const BADGE_WAVE:  ChannelTypeBadge = { label: 'WAV', color: 0xfbbf24, cssColor: '#fbbf24' };
-const BADGE_PCM:   ChannelTypeBadge = { label: 'PCM', color: 0x34d399, cssColor: '#34d399' };
-const BADGE_OP:    ChannelTypeBadge = { label: 'OP',  color: 0x22d3ee, cssColor: '#22d3ee' };
-const BADGE_ANY:   ChannelTypeBadge = { label: 'ANY', color: 0xa78bfa, cssColor: '#a78bfa' };
-
-// Fix the NOISE hex
-(BADGE_NOISE as any).color = 0x9ca3af;
+const BADGE_FM:    ChannelTypeBadge = { label: 'FM',  cssColor: '#60a5fa' };
+const BADGE_PSG:   ChannelTypeBadge = { label: 'PSG', cssColor: '#f87171' };
+const BADGE_NOISE: ChannelTypeBadge = { label: 'NOI', cssColor: '#9ca3af' };
+const BADGE_WAVE:  ChannelTypeBadge = { label: 'WAV', cssColor: '#fbbf24' };
+const BADGE_PCM:   ChannelTypeBadge = { label: 'PCM', cssColor: '#34d399' };
+const BADGE_OP:    ChannelTypeBadge = { label: 'OP',  cssColor: '#22d3ee' };
+const BADGE_ANY:   ChannelTypeBadge = { label: 'ANY', cssColor: '#a78bfa' };
 
 export const CHAN_TYPE_BADGES: Record<number, ChannelTypeBadge> = {
   [DivChanType.FM]:    BADGE_FM,

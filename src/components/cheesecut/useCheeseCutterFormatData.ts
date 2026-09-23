@@ -2,7 +2,7 @@
  * useCheeseCutterFormatData — Shared hook for CheeseCutter pattern data.
  *
  * Converts CheeseCutter store state to FormatChannel[] and provides a cell change
- * handler. Used by both DOM (CheeseCutterView) and Pixi to avoid
+ * handler. Used by CheeseCutterView to avoid
  * duplicating adapter logic.
  */
 

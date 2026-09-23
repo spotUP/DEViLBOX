@@ -1915,7 +1915,6 @@ export function useGlobalKeyboardHandler(options: UseGlobalKeyboardHandlerOption
     if (disabled) return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Skip if a Pixi pure-text input is focused (no DOM element to check)
 
       // Skip if a modal is open - let the modal handle keyboard events
       // Exception: Escape key is allowed through so modals can close

@@ -16,8 +16,7 @@
  *
  * Changes are written to the WASM engine in real-time via
  * KlysEngine.setInstrumentParam() / setInstrumentName() and reflected in the
- * shared `useFormatStore.klysNative` store. The Pixi editor
- * (`PixiKlysInstrumentEditor`) consumes the same store and constants.
+ * shared `useFormatStore.klysNative` store.
  */
 
 import React, { useCallback, useMemo, useRef, useEffect, useState } from 'react';

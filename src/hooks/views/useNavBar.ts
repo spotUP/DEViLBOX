@@ -1,8 +1,8 @@
 // src/hooks/views/useNavBar.ts
 /**
- * useNavBar — Shared logic hook for NavBar (DOM) and PixiNavBar (Pixi).
+ * useNavBar — Logic hook for NavBar.
  *
- * Both bars call this hook and keep only their renderer-specific markup.
+ * The bar keeps only its markup.
  * All store subscriptions, local state, effects, and handlers live here.
  */
 
@@ -14,7 +14,8 @@ import { useMIDIStore } from '@stores/useMIDIStore';
 import { useAIStore } from '@stores/useAIStore';
 import { serializeProjectToBlob } from '@hooks/useProjectPersistence';
 
-// Matches PixiSelect's SelectOption shape — defined here to avoid Pixi dep in a shared hook
+// Option shape for the theme dropdown, declared here so the hook stays free of
+// any component import
 export interface NavBarThemeOption {
   value: string;
   label: string;

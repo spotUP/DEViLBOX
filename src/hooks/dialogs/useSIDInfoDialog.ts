@@ -1,6 +1,6 @@
 // src/hooks/dialogs/useSIDInfoDialog.ts
 /**
- * useSIDInfoDialog — Shared logic hook for SIDInfoModal (DOM) and PixiSIDInfoModal (Pixi).
+ * useSIDInfoDialog — Logic hook for SIDInfoModal.
  *
  * Both dialogs call this hook and keep only their renderer-specific markup.
  * All store subscriptions, local state, effects, and handlers live here.

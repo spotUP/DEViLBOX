@@ -1833,7 +1833,7 @@ export const useInstrumentStore = create<InstrumentStore>()(
         };
       }).filter((inst): inst is NonNullable<typeof inst> => inst !== null);
 
-      // Defer state update to avoid synchronous pixi-react reconciler re-render
+      // Defer the state update so the caller's own render pass finishes first
       // during zustand setState — prevents BindingError: "Expected null or instance of Node"
       queueMicrotask(() => {
         set((state) => {

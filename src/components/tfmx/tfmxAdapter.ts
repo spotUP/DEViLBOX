@@ -1,7 +1,7 @@
 /**
  * TFMX Adapter — Maps TFMXNativeData to format-agnostic FormatChannel[].
  *
- * Single source of truth for TFMX data display. Both DOM and Pixi views
+ * Single source of truth for TFMX data display. The editor views
  * consume FormatChannel[] from these functions — no logic duplication.
  */
 

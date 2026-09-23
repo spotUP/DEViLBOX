@@ -1,7 +1,7 @@
 /**
  * WAMPluginBrowser — DOM version of the WAM plugin browser.
  * Browse curated WAM 2.0 plugins by category, search, load into instrument slot.
- * Visually 1:1 with Pixi version. Data from shared useWAMPluginBrowser hook.
+ * Data from the shared useWAMPluginBrowser hook.
  */
 
 import React, { useState } from 'react';

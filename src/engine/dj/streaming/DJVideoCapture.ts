@@ -4,7 +4,7 @@
  *
  * Visual sources:
  *  - 'vj'      → Butterchurn/ProjectM canvas (60fps)
- *  - 'dj-ui'   → PixiJS renderer canvas (30fps)
+ *  - 'dj-ui'   → the DJ interface canvas (30fps)
  *  - 'overlay'  → Composite canvas with visualizer + track info
  *
  * Audio source: Tone.Destination → MediaStreamDestination
@@ -17,7 +17,7 @@ export type VideoSource = 'vj' | 'dj-ui' | 'overlay';
 /** Registry for canvas sources — components register their canvas here */
 const _canvasRegistry = new Map<VideoSource, HTMLCanvasElement>();
 
-/** Register a canvas for video capture (called by VJView, PixiApp, etc.) */
+/** Register a canvas for video capture (called by VJView and friends) */
 export function registerCaptureCanvas(source: VideoSource, canvas: HTMLCanvasElement | null): void {
   if (canvas) {
     _canvasRegistry.set(source, canvas);

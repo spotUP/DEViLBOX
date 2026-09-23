@@ -1,6 +1,6 @@
 /**
  * SynthPanelLayout — Declarative layout descriptors for synth panels.
- * Each synth type defines sections of controls that the generic PixiSynthPanel renders.
+ * Each synth type defines sections of controls that the generic DOMSynthPanel renders.
  */
 
 export interface KnobDescriptor {

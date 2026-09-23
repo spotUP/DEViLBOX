@@ -6,7 +6,7 @@
  *   Step 2 → Choose sound (varies by source type)
  *   Step 3 → Quick config (name, color, play mode, mute group) — optional
  *
- * Both DOM and Pixi renderers consume this hook.
+ * The wizard component consumes this hook.
  */
 
 import { useState, useCallback, useMemo } from 'react';

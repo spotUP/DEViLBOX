@@ -1,5 +1,5 @@
 /**
- * useImportDialog — Shared hook for module import dialogs (DOM and GL/Pixi)
+ * useImportDialog — Shared hook for the module import dialogs
  *
  * Consolidates ALL import logic so both UI implementations share the same code.
  * This is the single source of truth for:
@@ -8,7 +8,7 @@
  * - Import handling
  * - Companion file management
  *
- * Both ImportModuleDialog (DOM) and PixiImportModuleDialog (GL) use this hook.
+ * ImportModuleDialog uses this hook.
  */
 
 import { useState, useRef, useCallback, useEffect } from 'react';

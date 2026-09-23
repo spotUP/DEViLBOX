@@ -3,7 +3,7 @@ import type { SynthPanelLayout } from '@/types/synthPanel';
 const fmtPct = (v: number) => `${Math.round(v * 100)}%`;
 
 /**
- * D-50 layout for Pixi synth panel.
+ * D-50 layout for the generic synth panel.
  * Roland D-50 Linear Arithmetic Synthesizer (1987).
  * Parameters match D50Hardware.tsx DOM component.
  */

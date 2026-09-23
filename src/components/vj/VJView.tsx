@@ -6,8 +6,8 @@
  *   1. Inline app view (activeView === 'vj')
  *   2. PopOutWindow for second-screen VJ output (vjPoppedOut === true)
  *
- * The butterchurn canvas is self-contained (own WebGL context, separate from
- * PixiJS). In GL mode, PixiVJView wraps this component via PixiDOMOverlay.
+ * The butterchurn canvas is self-contained — its own WebGL context, separate
+ * from every other GL surface in the app.
  *
  * Audio data comes from ToneEngine's master output via Web Audio API.
  * Zustand store state is shared across windows (same JS context).
@@ -349,7 +349,7 @@ const VJPatternOverlayWrapper: React.FC = () => {
   return <VJPatternOverlay sources={activeSources} crossfader={crossfader} />;
 };
 
-// ─── VJControls — DOM overlay controls (used by both DOM view + PixiDOMOverlay) ─
+// ─── VJControls — DOM overlay controls drawn on top of the canvas ─────────────
 
 type VJLayer = 'milkdrop' | 'projectm';
 

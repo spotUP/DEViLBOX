@@ -2,7 +2,7 @@
  * useMusicLineFormatData — Shared hook for MusicLine pattern data.
  *
  * Converts TrackerStore + FormatStore state to FormatChannel[] and provides
- * a cell change handler. Used by DOM (TrackerView) and can be used by Pixi.
+ * a cell change handler. Used by TrackerView.
  */
 
 import { useCallback, useMemo, useState } from 'react';

@@ -241,7 +241,7 @@ export const GlobalDragDropHandler: React.FC<GlobalDragDropHandlerProps> = ({
       }
     };
 
-    // Use window-level listeners so drops work everywhere — including on PixiDOMOverlay
+    // Use window-level listeners so drops work everywhere, over any view
     // divs that are appended to document.body outside the React tree of this component.
     window.addEventListener('dragenter', handleDragEnter);
     window.addEventListener('dragleave', handleDragLeave);

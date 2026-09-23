@@ -3,7 +3,7 @@
  *
  * Manages the complete CheeseCutter song state including metadata, sequences,
  * track lists, instrument data, and editor state.
- * Both DOM (CheeseCutterView) and Pixi consume this store via
+ * CheeseCutterView consumes this store via
  * the shared useCheeseCutterFormatData hook.
  *
  * CheeseCutter is a C64 SID tracker (3 channels, single SID chip).

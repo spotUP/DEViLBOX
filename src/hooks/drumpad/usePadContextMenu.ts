@@ -1,9 +1,7 @@
 /**
  * usePadContextMenu — Builds context menu items for drum pads.
  *
- * Shared between DOM (ContextMenu) and Pixi (PixiContextMenu) renderers.
- * Returns a MenuItemType[] array that can be rendered directly by the DOM
- * ContextMenu or mapped to PixiContextMenu's format.
+ * Returns a MenuItemType[] array rendered directly by ContextMenu.
  *
  * Designed for DJ live use: quick-assign DJ FX, scratches, one-shots,
  * synth voices, output routing, velocity curves, and pad config.

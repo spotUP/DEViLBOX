@@ -1,6 +1,6 @@
 // Shared byte-write + linear-interpolation helper for the JamCracker AM
 // waveform editor. Used by BOTH the DOM editor (JamCrackerControls.tsx) and
-// the Pixi/GL editor (PixiEditInstrumentModal.tsx::JamCrackerPanel) so the
+// the instrument editor (EditInstrumentModal.tsx::JamCrackerPanel) so the
 // two renderers stay 1:1 forever.
 //
 // Maps a local pointer position (relative to the waveform display) to a byte
