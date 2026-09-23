@@ -38,7 +38,7 @@ export const DeckQuickEQ: React.FC<DeckQuickEQProps> = ({ deckId }) => {
               border transition-colors duration-100 cursor-pointer select-none outline-none
               ${isActive
                 ? 'bg-accent-primary/20 border-accent-primary text-accent-primary'
-                : 'bg-dark-surface/50 border-dark-border text-text-muted hover:text-text-primary hover:border-text-muted'
+                : 'bg-dark-bgSecondary/50 border-dark-border text-text-muted hover:text-text-primary hover:border-text-muted'
               }
             `}
           >

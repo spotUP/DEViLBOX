@@ -146,7 +146,7 @@ const StepStart: React.FC<StepStartProps> = ({ startMode, onSelectMode }) => (
         className={`flex flex-col items-center gap-3 p-6 rounded-lg border-2 transition-all ${
           startMode === 'empty'
             ? 'border-accent-primary bg-accent-primary/10 text-text-primary'
-            : 'border-dark-border bg-dark-bg text-text-muted hover:border-dark-borderHover hover:text-text-primary'
+            : 'border-dark-border bg-dark-bg text-text-muted hover:border-dark-borderLight hover:text-text-primary'
         }`}
       >
         <Music2 size={28} className={startMode === 'empty' ? 'text-accent-primary' : ''} />
@@ -163,7 +163,7 @@ const StepStart: React.FC<StepStartProps> = ({ startMode, onSelectMode }) => (
         className={`flex flex-col items-center gap-3 p-6 rounded-lg border-2 transition-all ${
           startMode === 'preset'
             ? 'border-accent-primary bg-accent-primary/10 text-text-primary'
-            : 'border-dark-border bg-dark-bg text-text-muted hover:border-dark-borderHover hover:text-text-primary'
+            : 'border-dark-border bg-dark-bg text-text-muted hover:border-dark-borderLight hover:text-text-primary'
         }`}
       >
         <Cpu size={28} className={startMode === 'preset' ? 'text-accent-primary' : ''} />
@@ -355,7 +355,7 @@ const StepInstruments: React.FC<StepInstrumentsProps> = ({
         className={`flex flex-col items-start gap-2 p-4 rounded-lg border-2 transition-all ${
           withInstruments
             ? 'border-accent-primary bg-accent-primary/10'
-            : 'border-dark-border bg-dark-bg hover:border-dark-borderHover'
+            : 'border-dark-border bg-dark-bg hover:border-dark-borderLight'
         }`}
       >
         <div className="flex items-center gap-2">
@@ -372,7 +372,7 @@ const StepInstruments: React.FC<StepInstrumentsProps> = ({
         className={`flex flex-col items-start gap-2 p-4 rounded-lg border-2 transition-all ${
           !withInstruments
             ? 'border-accent-primary bg-accent-primary/10'
-            : 'border-dark-border bg-dark-bg hover:border-dark-borderHover'
+            : 'border-dark-border bg-dark-bg hover:border-dark-borderLight'
         }`}
       >
         <div className="flex items-center gap-2">

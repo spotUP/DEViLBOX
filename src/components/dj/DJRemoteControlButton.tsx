@@ -109,7 +109,7 @@ export const DJRemoteControlButton: React.FC = () => {
             <span className="text-xs font-bold text-text-primary">iPhone Controller</span>
             <button
               onClick={handleToggle}
-              className="text-text-tertiary hover:text-text-primary transition-colors text-sm leading-none"
+              className="text-text-muted hover:text-text-primary transition-colors text-sm leading-none"
               title="Close"
             >
               X

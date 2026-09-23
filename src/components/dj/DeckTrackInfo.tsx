@@ -209,7 +209,7 @@ export const DeckTrackInfo: React.FC<DeckTrackInfoProps> = ({ deckId }) => {
       {genreSubgenre && (
         <div className="flex items-center gap-2 text-[10px] text-text-muted">
           <span
-            className="px-1.5 py-0.5 rounded bg-surface-secondary/50 text-text-secondary"
+            className="px-1.5 py-0.5 rounded bg-dark-bgSecondary/50 text-text-secondary"
             title={`${genrePrimary} • ${genreSubgenre}`}
           >
             {genreSubgenre}
@@ -222,7 +222,7 @@ export const DeckTrackInfo: React.FC<DeckTrackInfoProps> = ({ deckId }) => {
           {/* Energy bar */}
           <div className="flex items-center gap-1">
             <span className="text-[9px] opacity-60">NRG</span>
-            <div className="w-12 h-1.5 bg-surface-secondary/50 rounded-full overflow-hidden">
+            <div className="w-12 h-1.5 bg-dark-bgSecondary/50 rounded-full overflow-hidden">
               <div
                 className="h-full rounded-full transition-all duration-300"
                 style={{
