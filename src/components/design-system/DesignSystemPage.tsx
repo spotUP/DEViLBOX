@@ -728,7 +728,7 @@ export const DesignSystemPage: React.FC = () => {
           <Card label="Instrument Panel (DOM — GTInstrumentPanel)" width={280} height={300}>
             <InstrumentPanelMock />
           </Card>
-          <Card label="Instrument Designer (Pixi — PixiGTInstrumentDesigner)" width={280} height={300}>
+          <Card label="Instrument Designer (DOM — DAWInstrumentDesigner)" width={280} height={300}>
             <InstrumentDesignerMock />
           </Card>
         </Section>
@@ -740,7 +740,7 @@ export const DesignSystemPage: React.FC = () => {
         </Section>
 
         <Section title="SID Monitor" description="Live SID register display — 3 voices + global filter">
-          <Card label="SID Monitor (DOM + Pixi)" width={250} height={280}>
+          <Card label="SID Monitor (DOM — SF2SIDMonitor)" width={250} height={280}>
             <SIDMonitorMock />
           </Card>
         </Section>
@@ -752,7 +752,7 @@ export const DesignSystemPage: React.FC = () => {
         </Section>
 
         <Section title="Arrangement Timeline" description="Horizontal pattern blocks per channel">
-          <Card label="Arrangement (DAW — PixiGTDAWArrangement)" width={520} height={140}>
+          <Card label="Arrangement (DAW — DAWArrangement)" width={520} height={140}>
             <ArrangementMock />
           </Card>
         </Section>
