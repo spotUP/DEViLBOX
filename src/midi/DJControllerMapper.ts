@@ -29,7 +29,6 @@ import type {
 import { detectDJPreset, getPresetById } from './djControllerPresets';
 import { TakeoverBook } from './softTakeover';
 import { getControllerLayout } from './controllerLayouts';
-import { readDubParameter } from './performance/parameterRouter';
 import type { MIDIMessage } from './types';
 
 const _motorSendTimestamps = new Map<number, number>();
@@ -392,6 +391,25 @@ export class DJControllerMapper {
    * Process a MIDI message against the active preset.
    */
   private handleMessage(msg: MIDIMessage): void {
+    // A monitor, because guessing what a surface sends is how a whole evening
+    // goes. Turn it on from the console with `__midiMonitor__ = true` and every
+    // incoming message prints with what this preset believes it is — so
+    // "that button does something random" becomes a fact rather than a theory.
+    if ((globalThis as { __midiMonitor__?: boolean }).__midiMonitor__) {
+      const n = msg.type === 'cc' ? msg.cc : msg.note;
+      const key = `${msg.channel}:${n}`;
+      const owns = msg.type === 'cc'
+        ? this.ccLookup.get(key)
+        : this.noteLookup.get(key);
+      const target = owns
+        ? ('param' in owns ? owns.param : owns.action)
+        : 'UNMAPPED — something else in the app will handle this';
+      console.log(
+        `[MIDI] ${msg.type} ch${msg.channel} ${msg.type === 'cc' ? 'CC' : 'note'}${n} ` +
+        `val=${msg.value ?? msg.velocity} -> ${target}`,
+      );
+    }
+
     if (msg.type === 'cc' && msg.cc !== undefined && msg.value !== undefined) {
       this.handleCC(msg.channel, msg.cc, msg.value);
     } else if (msg.type === 'pitchBend' && msg.value !== undefined) {
@@ -494,11 +512,21 @@ export class DJControllerMapper {
     let normalized = value / 127;
     if (mapping.invert) normalized = 1 - normalized;
 
-    // The knob must catch up with the value before it may move it. Only when
-    // the live value is READABLE — otherwise there is nothing to catch up to,
-    // and applying directly is the behaviour that existed before.
-    const current = readDubParameter(mapping.param);
-    if (current !== null && !this.takeover.accept(key, normalized, current)) return;
+    // NO soft takeover here.
+    //
+    // It was added on 2026-09-23 against "when i pull the knobs on the
+    // behringer compact they reset and start from 0". That symptom had a
+    // different cause — `routeDJParameter` was dropping every `dub.*` mapping
+    // because it looked them up in a table of `dj.*` routes — and with
+    // takeover in front, a knob whose parameter sat HIGH could not move it at
+    // all: returnGain at 0.9 and the bass shelf at 0.58 were dead, while
+    // hpfCutoff at 0.05 and stereoWidth at 0.13 worked, because a knob near
+    // the bottom of its travel catches a low value immediately.
+    //
+    // A control that does nothing until you find an invisible threshold is
+    // worse than one that jumps. If the jump returns now that routing works,
+    // the answer is relative-mode decoding or motor/ring sync — not a gate
+    // that hides the control.
 
     routeDJParameter(mapping.param, normalized);
   }

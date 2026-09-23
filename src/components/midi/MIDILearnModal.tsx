@@ -377,9 +377,18 @@ export const MIDILearnModal: React.FC<MIDILearnModalProps> = ({ isOpen, onClose 
             <p className="text-accent-primary text-xl font-bold mb-4">
               {learningTarget.label}
             </p>
-            {lastMessage && lastMessage.type === 'cc' && (
-              <p className="text-text-muted text-sm mb-4">
-                Last: CH{lastMessage.channel + 1} CC{lastMessage.controller} = {lastMessage.value}
+            {/* Notes as well as CCs. This showed CC only, so a surface whose
+                BUTTONS were misbehaving could not be diagnosed with the one
+                tool built for exactly that — and the X-Touch's buttons are all
+                notes (2026-09-23). */}
+            {lastMessage && (
+              <p className="text-text-muted text-sm mb-4 font-mono">
+                {lastMessage.type === 'cc'
+                  ? `Last: CH${lastMessage.channel + 1} CC${lastMessage.controller} = ${lastMessage.value}`
+                  : lastMessage.type === 'noteon' || lastMessage.type === 'noteoff'
+                    ? `Last: CH${lastMessage.channel + 1} note ${lastMessage.note} `
+                      + `${lastMessage.type === 'noteon' ? 'on' : 'off'} vel=${lastMessage.velocity}`
+                    : `Last: CH${lastMessage.channel + 1} ${lastMessage.type}`}
               </p>
             )}
             <button
