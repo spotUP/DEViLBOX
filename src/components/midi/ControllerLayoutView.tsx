@@ -24,6 +24,13 @@ interface ControllerLayoutViewProps {
   learnHighlightId?: string | null;
   /** Called when user clicks a control */
   onSelectControl: (control: ControlDescriptor) => void;
+  /**
+   * Which hardware layer to draw. A device with a LAYER switch describes the
+   * same physical control twice, once per layer, so drawing every control
+   * would stack two on each position. Controls with no layer are always drawn
+   * — that covers single-layer devices and the layer indicators themselves.
+   */
+  layer?: 'A' | 'B';
 }
 
 // ============================================================================
@@ -189,6 +196,7 @@ export const ControllerLayoutView: React.FC<ControllerLayoutViewProps> = ({
   selectedControlId,
   learnHighlightId,
   onSelectControl,
+  layer = 'A',
 }) => {
   const svgWidth = layout.width * CELL + PAD * 2;
   const svgHeight = layout.height * CELL + PAD * 2;
@@ -197,12 +205,15 @@ export const ControllerLayoutView: React.FC<ControllerLayoutViewProps> = ({
     onSelectControl(control);
   }, [onSelectControl]);
 
+  // One layer at a time — see the `layer` prop.
+  const visible = layout.controls.filter(c => !c.layer || c.layer === layer);
+
   // Group controls by type for layered rendering (faders behind buttons/encoders)
   const renderOrder: ControlDescriptor[] = [
-    ...layout.controls.filter(c => c.type === 'fader'),
-    ...layout.controls.filter(c => c.type === 'pad'),
-    ...layout.controls.filter(c => c.type === 'button'),
-    ...layout.controls.filter(c => c.type === 'encoder'),
+    ...visible.filter(c => c.type === 'fader'),
+    ...visible.filter(c => c.type === 'pad'),
+    ...visible.filter(c => c.type === 'button'),
+    ...visible.filter(c => c.type === 'encoder'),
   ];
 
   return (
@@ -222,7 +233,7 @@ export const ControllerLayoutView: React.FC<ControllerLayoutViewProps> = ({
       </text>
 
       {/* Group separators */}
-      {renderGroupBackgrounds(layout)}
+      {renderGroupBackgrounds(visible)}
 
       {/* Controls */}
       {renderOrder.map((control) => {
@@ -255,10 +266,10 @@ export const ControllerLayoutView: React.FC<ControllerLayoutViewProps> = ({
 // GROUP BACKGROUNDS
 // ============================================================================
 
-function renderGroupBackgrounds(layout: ControllerLayout): React.ReactNode {
+function renderGroupBackgrounds(controls: ControlDescriptor[]): React.ReactNode {
   const groups = new Map<string, { minX: number; minY: number; maxX: number; maxY: number }>();
 
-  for (const control of layout.controls) {
+  for (const control of controls) {
     if (!control.group) continue;
     const existing = groups.get(control.group);
     const cx = control.x;
