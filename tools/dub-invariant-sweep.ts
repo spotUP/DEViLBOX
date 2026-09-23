@@ -469,9 +469,11 @@ async function main(): Promise<void> {
   // Everything here is a level, not a wire. The suite cannot reach any of it.
   if (PHASES.has('M')) {
   console.log('\n=== Phase M — meters ===');
-  // Phase A leaves a song playing; on its own, Phase M must load one.
+  // Phase A leaves a song playing; on its own, Phase M must load one. The
+  // field is `numPatterns` — reading `patterns` returns undefined for every
+  // song, so this loaded SONG_A over whatever the user had open.
   const loadedM = await call('get_song_info');
-  if (!loadedM?.patterns) await loadSong(SONG_A);
+  if (!loadedM?.numPatterns) await loadSong(SONG_A);
   await call('set_dub_bus_enabled', { enabled: true });
   await call('set_channel_dub_send', { channel: 0, amount: 0.6 });
   const playM = await call('get_playback_state');
@@ -505,7 +507,7 @@ async function main(): Promise<void> {
   if ((PHASES.has('B') || ONLY_MOVES.size) && moves.length) {
   console.log('\n=== Phase B — moves ===');
   const loadedB = await call('get_song_info');
-  if (!loadedB?.patterns) await loadSong(SONG_A);
+  if (!loadedB?.numPatterns) await loadSong(SONG_A);
   await call('set_dub_bus_enabled', { enabled: true });
   await call('set_channel_dub_send', { channel: 0, amount: 0.6 });
   const playB = await call('get_playback_state');
