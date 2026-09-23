@@ -37,6 +37,7 @@ import { getToneEngine } from '@/engine/ToneEngine';
 import { Fader } from '@components/controls/Fader';
 import { moveButtonStyle, MOVE_COLOR, type MoveColor } from './moveButtonStyle';
 import { resolveDubTarget, isDubTargetChannel, describeDubTarget } from './dubTarget';
+import { useControllerLamps } from '@/hooks/useControllerLamps';
 import { CustomSelect } from '@components/common/CustomSelect';
 import { CONTROLLER_LAYOUTS } from '@/midi/controllerLayouts';
 import { getDJControllerMapper } from '@/midi/DJControllerMapper';
@@ -1201,6 +1202,36 @@ export const DubDeckStrip: React.FC = () => {
    */
   const targetChannels = resolveDubTarget(opTarget, visibleChannelCount, performance.now());
   const targetLabel = describeDubTarget(opTarget, visibleChannelCount, performance.now());
+
+  /**
+   * Light the controller's buttons to match the deck.
+   *
+   * The surface has no RGB, so a lamp cannot say WHICH move a button carries —
+   * but it can say whether it is on, and that is what changes mid-take. A
+   * latched toggle reads steady, a hold blinks while it is down. Muted
+   * channels come out of the held set, because a channel mute IS a held move.
+   *
+   * Driven from here because this is where the deck's state lives; the hook
+   * only diffs it and sends.
+   */
+  const mutedChannels = useMemo(() => {
+    const muted = new Set<number>();
+    for (const key of heldMoves) {
+      const [moveId, channel] = key.split(':');
+      if (moveId === 'channelMute' && channel !== 'g') muted.add(Number(channel));
+    }
+    return muted;
+  }, [heldMoves]);
+
+  const lampState = useMemo(() => ({
+    toggled: toggledMoves,
+    held: heldMoves,
+    activeRatePreset,
+    mutedChannels,
+    armed,
+  }), [toggledMoves, heldMoves, activeRatePreset, mutedChannels, armed]);
+
+  useControllerLamps(lampState, deckLayer, busEnabled);
 
   /** Every channel's dub send, for the controller layout's faders to ride. */
   const channelSends = useMemo(() => channels.map(c => c?.dubSend ?? 0), [channels]);
