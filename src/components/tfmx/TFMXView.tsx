@@ -164,7 +164,7 @@ export const TFMXView: React.FC<{ width?: number; height?: number }> = () => {
 
   if (!native) {
     return (
-      <div className="flex flex-col flex-1 min-h-0 bg-dark-bgPrimary text-ft2-text font-mono items-center justify-center">
+      <div className="flex flex-col flex-1 min-h-0 bg-dark-bg text-ft2-text font-mono items-center justify-center">
         <span className="text-ft2-textDim">No TFMX module loaded</span>
       </div>
     );

@@ -61,7 +61,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
       return (
         <div className="flex items-center justify-center min-h-[400px] p-6">
           <div className="max-w-md w-full">
-            <div className="bg-dark-surface border border-red-500/50 rounded-lg p-6 space-y-4">
+            <div className="bg-dark-bgSecondary border border-red-500/50 rounded-lg p-6 space-y-4">
               {/* Error Icon */}
               <div className="flex items-center gap-3">
                 <AlertTriangle className="w-8 h-8 text-red-400" />

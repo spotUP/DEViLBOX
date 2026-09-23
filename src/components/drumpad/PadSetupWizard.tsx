@@ -82,7 +82,7 @@ export const PadSetupWizard: React.FC<PadSetupWizardProps> = ({ wizard }) => {
             </button>
             <button
               onClick={wizard.finish}
-              className="px-4 py-1.5 text-xs font-mono font-bold text-dark-bg bg-accent-primary hover:bg-accent-primaryHover rounded transition-colors"
+              className="px-4 py-1.5 text-xs font-mono font-bold text-dark-bg bg-accent-primary hover:bg-accent-primary rounded transition-colors"
             >
               Done
             </button>
@@ -222,7 +222,7 @@ const StepOneShot: React.FC<{ wizard: ReturnType<typeof usePadSetupWizard> }> = 
               <div key={categoryName} className="border border-dark-border rounded">
                 <button
                   onClick={() => toggleCategory(categoryName)}
-                  className="w-full px-3 py-2 flex items-center justify-between bg-dark-bgTertiary hover:bg-dark-surface transition-colors"
+                  className="w-full px-3 py-2 flex items-center justify-between bg-dark-bgTertiary hover:bg-dark-bgSecondary transition-colors"
                 >
                   <span className="text-[11px] font-mono font-bold text-text-primary">{categoryName} ({presets.length})</span>
                   {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}

@@ -401,7 +401,7 @@ export const PadGrid: React.FC<PadGridProps> = ({
           <DubBusPanel />
           <button
             onClick={() => engineRef.current?.stopAll()}
-            className="px-2 py-1 text-[10px] font-mono text-text-muted hover:text-red-400 bg-dark-surface border border-dark-border rounded transition-colors"
+            className="px-2 py-1 text-[10px] font-mono text-text-muted hover:text-red-400 bg-dark-bgSecondary border border-dark-border rounded transition-colors"
             title="Stop all playing pads"
           >
             Stop All
@@ -416,7 +416,7 @@ export const PadGrid: React.FC<PadGridProps> = ({
               a.click();
               URL.revokeObjectURL(url);
             }}
-            className="px-2 py-1 text-[10px] font-mono text-text-muted hover:text-text-primary bg-dark-surface border border-dark-border rounded transition-colors"
+            className="px-2 py-1 text-[10px] font-mono text-text-muted hover:text-text-primary bg-dark-bgSecondary border border-dark-border rounded transition-colors"
             title="Export all programs + samples"
           >
             Export
@@ -438,7 +438,7 @@ export const PadGrid: React.FC<PadGridProps> = ({
               };
               input.click();
             }}
-            className="px-2 py-1 text-[10px] font-mono text-text-muted hover:text-text-primary bg-dark-surface border border-dark-border rounded transition-colors"
+            className="px-2 py-1 text-[10px] font-mono text-text-muted hover:text-text-primary bg-dark-bgSecondary border border-dark-border rounded transition-colors"
             title="Import programs + samples (.dvbpads)"
           >
             Import
@@ -460,7 +460,7 @@ export const PadGrid: React.FC<PadGridProps> = ({
             className={`px-3 py-1 text-xs font-bold font-mono rounded transition-colors ${
               currentBank === bank
                 ? 'bg-accent-primary text-text-primary'
-                : 'bg-dark-surface border border-dark-border text-text-muted hover:text-text-primary'
+                : 'bg-dark-bgSecondary border border-dark-border text-text-muted hover:text-text-primary'
             }`}
           >
             {bank}

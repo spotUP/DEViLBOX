@@ -100,7 +100,7 @@ export const SF2View: React.FC = () => {
     : '';
 
   return (
-    <div className="flex flex-col w-full h-full bg-dark-bgPrimary font-mono text-xs text-text-secondary">
+    <div className="flex flex-col w-full h-full bg-dark-bg font-mono text-xs text-text-secondary">
       {/* Toolbar */}
       <div
         className="flex items-center gap-2 px-3 border-b border-dark-border bg-dark-bgTertiary flex-shrink-0"

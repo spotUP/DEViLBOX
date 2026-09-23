@@ -393,7 +393,7 @@ export const NKSLibraryBrowser: React.FC<NKSLibraryBrowserProps> = ({ onLoadPres
           <div className="px-2 py-1.5 border-b border-dark-border">
             <span className="text-[9px] font-mono text-text-muted uppercase tracking-widest">Libraries</span>
           </div>
-          <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-dark-border p-1 space-y-2">
+          <div className="flex-1 overflow-y-auto scrollbar-thin p-1 space-y-2">
             <div className="space-y-0.5">
               <div className="px-1 py-1 text-[9px] font-mono uppercase tracking-widest text-text-muted">NKS Products</div>
               <button

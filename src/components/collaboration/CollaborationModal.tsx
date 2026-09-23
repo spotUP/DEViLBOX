@@ -44,7 +44,7 @@ export const CollaborationModal: React.FC<CollaborationModalProps> = ({ isOpen, 
 
   return (
     <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[99990] animate-fade-in">
-      <div className="bg-dark-bgPrimary border-2 border-accent-primary rounded-xl p-6 max-w-md w-full mx-4 animate-slide-in-up shadow-2xl">
+      <div className="bg-dark-bg border-2 border-accent-primary rounded-xl p-6 max-w-md w-full mx-4 animate-slide-in-up shadow-2xl">
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">

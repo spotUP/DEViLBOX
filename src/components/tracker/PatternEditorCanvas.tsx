@@ -3124,7 +3124,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
             <div className="flex items-center gap-2">
               <input
                 type="text"
-                className="bg-dark-bgPrimary/50 border border-dark-border rounded px-3 py-1 font-mono text-xs text-center uppercase focus:border-accent-primary outline-none min-w-[140px]"
+                className="bg-dark-bg/50 border border-dark-border rounded px-3 py-1 font-mono text-xs text-center uppercase focus:border-accent-primary outline-none min-w-[140px]"
                 style={{ color: mobileChannel?.color || 'var(--color-accent)' }}
                 value={mobileChannel?.name || `Channel ${mobileChannelIndex + 1}`}
                 onChange={(e) => updateChannelName(mobileChannelIndex, e.target.value)}

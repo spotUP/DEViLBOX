@@ -202,7 +202,7 @@ export const DrumPadManager: React.FC<DrumPadManagerProps> = ({ onClose }) => {
     ? 'flex flex-col h-full w-full overflow-hidden'
     : isViewMode
       ? 'flex flex-col h-full w-full overflow-hidden'
-      : 'bg-dark-surface border border-dark-border rounded-lg shadow-2xl max-w-6xl w-full max-h-[90vh] overflow-hidden flex flex-col animate-in fade-in-0 zoom-in-95 slide-in-from-bottom-8 duration-400';
+      : 'bg-dark-bgSecondary border border-dark-border rounded-lg shadow-2xl max-w-6xl w-full max-h-[90vh] overflow-hidden flex flex-col animate-in fade-in-0 zoom-in-95 slide-in-from-bottom-8 duration-400';
 
   const content = (
     <div className={outerClass}>

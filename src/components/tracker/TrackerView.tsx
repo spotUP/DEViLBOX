@@ -549,7 +549,7 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
               ) : editorMode === 'sc68' ? (
                 <Sc68Visualizer />
               ) : editorMode === 'musicline' ? (
-                <div className="flex-1 flex flex-col min-h-0 bg-dark-bgPrimary">
+                <div className="flex-1 flex flex-col min-h-0 bg-dark-bg">
                   {/* Per-channel track table matrix */}
                   <div className="flex-shrink-0 border-b border-dark-border" style={{ maxHeight: 220, overflowY: 'auto' }}>
                     <div className="px-3 pt-3 pb-1 flex items-center gap-2">
@@ -652,7 +652,7 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
                       width={1100}
                       height={700}
                     >
-                      <div className="flex flex-col h-screen w-screen bg-dark-bgPrimary">
+                      <div className="flex flex-col h-screen w-screen bg-dark-bg">
                         <div className="flex items-center gap-2 px-3 py-1 bg-dark-bgSecondary border-b border-dark-border shrink-0">
                           <span className="text-xs font-bold text-accent-primary">{formatLabels[editorMode]}</span>
                           <span className="text-xs text-ft2-textDim">Pattern Editor — Popped Out</span>
@@ -673,7 +673,7 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
                     </PopOutWindow>
 
                     {/* Placeholder in main window */}
-                    <div className="flex-1 flex items-center justify-center bg-dark-bgPrimary">
+                    <div className="flex-1 flex items-center justify-center bg-dark-bg">
                       <div className="text-center">
                         <ExternalLink size={32} className="mx-auto mb-2 text-accent-primary opacity-50" />
                         <p className="text-sm text-ft2-textDim">{formatLabels[editorMode]} Editor — Popped Out</p>
@@ -973,7 +973,7 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
       )}
       {showAutomation && (
         <div className="fixed inset-0 z-[99990] flex items-center justify-center p-4 bg-black/50 animate-fade-in">
-          <div className="bg-dark-bgPrimary border border-dark-border rounded-lg shadow-2xl max-w-6xl w-full max-h-[95vh] flex flex-col overflow-y-auto scrollbar-modern">
+          <div className="bg-dark-bg border border-dark-border rounded-lg shadow-2xl max-w-6xl w-full max-h-[95vh] flex flex-col overflow-y-auto scrollbar-modern">
             {/* Header */}
             <div className="flex items-center justify-between px-6 py-4 border-b border-dark-border bg-dark-bgSecondary">
               <h2 className="text-lg font-bold text-text-primary flex items-center gap-2">
@@ -1011,7 +1011,7 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
                   }
                   setShowAutomation(false);
                 }}
-                className="px-4 py-1.5 text-xs font-medium rounded-md bg-accent-primary text-text-inverse border border-accent-primary hover:bg-accent-primaryHover transition-colors"
+                className="px-4 py-1.5 text-xs font-medium rounded-md bg-accent-primary text-text-inverse border border-accent-primary hover:bg-accent-primary transition-colors"
               >
                 OK
               </button>

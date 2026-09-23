@@ -59,7 +59,7 @@ const ParamRow: React.FC<ParamRowProps> = ({ label, value, max, min = 0, paramKe
       min={min}
       max={max}
       value={value}
-      className="w-14 text-[11px] text-text-secondary font-mono text-right bg-dark-bgPrimary border border-dark-border rounded-sm px-1"
+      className="w-14 text-[11px] text-text-secondary font-mono text-right bg-dark-bg border border-dark-border rounded-sm px-1"
       onChange={e => {
         const v = parseInt(e.target.value, 10);
         if (!isNaN(v)) onChange(paramKey, v);
@@ -201,7 +201,7 @@ export const KlysInstrumentEditor: React.FC<KlysInstrumentEditorProps> = ({ inst
   const program = inst.program.length === 32 ? inst.program : [...inst.program, ...Array(32 - inst.program.length).fill(0)];
 
   return (
-    <div className="flex flex-col gap-1 p-2 bg-dark-bgPrimary text-text-secondary overflow-y-auto text-xs">
+    <div className="flex flex-col gap-1 p-2 bg-dark-bg text-text-secondary overflow-y-auto text-xs">
       {/* Header / Identity */}
       <div className="flex items-center gap-2">
         <span className="text-sm font-bold text-accent-primary">

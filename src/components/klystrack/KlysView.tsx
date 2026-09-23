@@ -231,7 +231,7 @@ export const KlysView: React.FC<{ width?: number; height?: number }> = ({ width:
 
   if (!nativeData) {
     return (
-      <div ref={containerRef} className="flex flex-col flex-1 min-h-0 bg-dark-bgPrimary text-ft2-text font-mono items-center justify-center">
+      <div ref={containerRef} className="flex flex-col flex-1 min-h-0 bg-dark-bg text-ft2-text font-mono items-center justify-center">
         <span className="text-ft2-textDim">No klystrack module loaded</span>
       </div>
     );
