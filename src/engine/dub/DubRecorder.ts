@@ -17,7 +17,7 @@
 
 import { subscribeDubRouter, subscribeDubRelease } from './DubRouter';
 import { subscribeChannelSend } from '@/lib/dub/channelSendStream';
-import { scheduleDubStoreSync } from '@/stores/useDubStore';
+import { scheduleDubStoreSync, useDubStore } from '@/stores/useDubStore';
 import { useTrackerStore } from '@/stores/useTrackerStore';
 import { useFormatStore } from '@/stores/useFormatStore';
 import { useAutomationStore } from '@/stores/useAutomationStore';
@@ -114,6 +114,27 @@ export function startDubRecorder(): () => void {
       // Lane-replayed fire — skip (would loop forever if we re-captured it)
       return;
     }
+
+    // Nothing is captured unless the performer ARMED it.
+    //
+    // The REC button, `useDubStore.armed`, and this module's own header
+    // ("captured into the current pattern's dubLane when armed") all said this
+    // was already true. It was not: the recorder subscribed unconditionally,
+    // so every press made while simply TRYING the deck out was written into
+    // the pattern as `dub.*` automation and replayed on every pass, for ever.
+    //
+    // Reported 2026-09-22 across a whole evening, each time as something else:
+    // "i turned autodub off but he keeps going" (AutoDub was off — the probe
+    // read enabled:false, isRunning:false, and the console had no origin=ai
+    // line in it), "are you pushing the buttons now they are firing like
+    // crazy" (nobody was), "version drop only works sometimes" (a recorded
+    // hold latched for 60 s, so it was already held when pressed), and "there
+    // is no visible recording in the dub lanes" — because the capture had
+    // fallen to the automation CURVE path, which the lane overlay does not
+    // draw.
+    //
+    // Everything below is about WHAT to capture. This is about WHETHER.
+    if (!useDubStore.getState().armed) return;
 
     // AutoDub's own output is not a performance to capture.
     //
