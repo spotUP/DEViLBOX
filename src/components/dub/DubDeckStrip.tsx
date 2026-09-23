@@ -1122,7 +1122,18 @@ export const DubDeckStrip: React.FC = () => {
   }, [runWithBus, activeRatePreset]);
 
   return (
-    <div className="flex flex-col gap-1.5 px-2 py-1.5 bg-dark-bgSecondary border-t border-dark-border font-mono overflow-y-auto max-h-[60vh]">
+    /* Sized by its content, never squeezed.
+     *
+     * The deck is a flex child of the tracker's editor column, and a flex
+     * child shrinks below its content by default — so as the editor claimed
+     * space the deck was squashed and its own rows were cut off. `shrink-0`
+     * makes it take the height it needs and the editor above absorb the rest.
+     * Same defect the FT2 toolbar had in `688aacfd2`.
+     *
+     * The cap is the LAST resort, for a deck taller than the window: it reads
+     * `--app-vh`, so on iOS it is a share of the viewport that is really
+     * visible rather than the one `vh` imagines. */
+    <div className="shrink-0 flex flex-col gap-1.5 px-2 py-1.5 bg-dark-bgSecondary border-t border-dark-border font-mono overflow-y-auto max-h-[calc(var(--app-vh)*0.6)]">
       {/* Header row */}
       {/* The header row.
           It had no `flex-wrap`, and its parent scrolls vertically only, so on a
