@@ -9,7 +9,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useUIStore } from '@stores/useUIStore';
 import { useThemeStore } from '@stores/useThemeStore';
-import { useSettingsStore, type CRTParams } from '@stores/useSettingsStore';
+import { useSettingsStore } from '@stores/useSettingsStore';
 import { useKeyboardStore } from '@stores/useKeyboardStore';
 import { useEditorStore } from '@stores/useEditorStore';
 import { useAudioStore } from '@stores/useAudioStore';
@@ -45,49 +45,6 @@ export const KEYBOARD_SCHEMES = [
   { id: 'renoise', name: 'Renoise', description: 'Modern DAW/tracker layout - from official documentation' },
   { id: 'openmpt', name: 'OpenMPT', description: 'ModPlug Tracker layout - from official wiki documentation' },
   { id: 'custom', name: 'Custom', description: 'Your own key bindings — start from any scheme and customize' },
-];
-
-export interface CRTSliderDef {
-  key: keyof CRTParams;
-  label: string;
-  min: number;
-  max: number;
-  step: number;
-  group: string;
-}
-
-export const CRT_SLIDERS: CRTSliderDef[] = [
-  { key: 'scanlineIntensity', label: 'Intensity',       min: 0,   max: 1,    step: 0.01,  group: 'SCANLINES' },
-  { key: 'scanlineCount',     label: 'Count',           min: 50,  max: 1200, step: 1,     group: 'SCANLINES' },
-  { key: 'adaptiveIntensity', label: 'Adaptive',        min: 0,   max: 1,    step: 0.01,  group: 'SCANLINES' },
-  { key: 'brightness',        label: 'Brightness',      min: 0.6, max: 1.8,  step: 0.01,  group: 'COLOR' },
-  { key: 'contrast',          label: 'Contrast',        min: 0.6, max: 1.8,  step: 0.01,  group: 'COLOR' },
-  { key: 'saturation',        label: 'Saturation',      min: 0,   max: 2,    step: 0.01,  group: 'COLOR' },
-  { key: 'bloomIntensity',    label: 'Bloom Intensity', min: 0,   max: 1.5,  step: 0.01,  group: 'EFFECTS' },
-  { key: 'bloomThreshold',    label: 'Bloom Threshold', min: 0,   max: 1,    step: 0.01,  group: 'EFFECTS' },
-  { key: 'rgbShift',          label: 'RGB Shift',       min: 0,   max: 1,    step: 0.01,  group: 'EFFECTS' },
-  { key: 'vignetteStrength',  label: 'Vignette',        min: 0,   max: 2,    step: 0.01,  group: 'FRAMING' },
-  { key: 'curvature',         label: 'Curvature',       min: 0,   max: 0.5,  step: 0.005, group: 'FRAMING' },
-  { key: 'flickerStrength',   label: 'Flicker',         min: 0,   max: 0.15, step: 0.001, group: 'FRAMING' },
-];
-
-export interface LensSliderDef {
-  key: 'barrel' | 'chromatic' | 'vignette';
-  label: string;
-  min: number;
-  max: number;
-  step: number;
-}
-
-export const LENS_SLIDERS: LensSliderDef[] = [
-  { key: 'barrel',    label: 'Barrel',    min: -0.5, max: 1,   step: 0.01 },
-  { key: 'chromatic', label: 'Chromatic', min: 0,    max: 1,   step: 0.01 },
-  { key: 'vignette',  label: 'Vignette',  min: 0,    max: 1,   step: 0.01 },
-];
-
-export const RENDER_MODE_OPTIONS = [
-  { value: 'dom', label: 'DOM (React + Tailwind)' },
-  { value: 'webgl', label: 'WebGL (PixiJS v8)' },
 ];
 
 export const NUMBER_FORMAT_OPTIONS = [
@@ -198,26 +155,12 @@ export function useSettingsDialog({ isOpen }: UseSettingsDialogOptions) {
   const setVuMeterSwing = useSettingsStore((s) => s.setVuMeterSwing);
   const vuMeterMirror = useSettingsStore((s) => s.vuMeterMirror);
   const setVuMeterMirror = useSettingsStore((s) => s.setVuMeterMirror);
-  const wobbleWindows = useSettingsStore((s) => s.wobbleWindows);
-  const setWobbleWindows = useSettingsStore((s) => s.setWobbleWindows);
   const trackerVisualBg = useSettingsStore((s) => s.trackerVisualBg);
   const setTrackerVisualBg = useSettingsStore((s) => s.setTrackerVisualBg);
   const trackerVisualMode = useSettingsStore((s) => s.trackerVisualMode);
   const setTrackerVisualMode = useSettingsStore((s) => s.setTrackerVisualMode);
   const channelColorBlend = useSettingsStore((s) => s.channelColorBlend);
   const setChannelColorBlend = useSettingsStore((s) => s.setChannelColorBlend);
-  const crtEnabled = useSettingsStore((s) => s.crtEnabled);
-  const setCrtEnabled = useSettingsStore((s) => s.setCrtEnabled);
-  const crtParams = useSettingsStore((s) => s.crtParams);
-  const setCrtParam = useSettingsStore((s) => s.setCrtParam);
-  const resetCrtParams = useSettingsStore((s) => s.resetCrtParams);
-  const lensEnabled = useSettingsStore((s) => s.lensEnabled);
-  const setLensEnabled = useSettingsStore((s) => s.setLensEnabled);
-  const lensPreset = useSettingsStore((s) => s.lensPreset);
-  const setLensPreset = useSettingsStore((s) => s.setLensPreset);
-  const lensParams = useSettingsStore((s) => s.lensParams);
-  const setLensParam = useSettingsStore((s) => s.setLensParam);
-  const resetLensParams = useSettingsStore((s) => s.resetLensParams);
   const sidEngine = useSettingsStore((s) => s.sidEngine);
   const setSidEngine = useSettingsStore((s) => s.setSidEngine);
   const asidEnabled = useSettingsStore((s) => s.asidEnabled);
@@ -406,12 +349,8 @@ export function useSettingsDialog({ isOpen }: UseSettingsDialogOptions) {
     midiPolyphonic, setMidiPolyphonic,
     vuMeterMode, setVuMeterMode, vuMeterStyle, setVuMeterStyle,
     vuMeterSwing, setVuMeterSwing, vuMeterMirror, setVuMeterMirror,
-    wobbleWindows, setWobbleWindows,
     trackerVisualBg, setTrackerVisualBg, trackerVisualMode, setTrackerVisualMode,
     channelColorBlend, setChannelColorBlend,
-    crtEnabled, setCrtEnabled, crtParams, setCrtParam, resetCrtParams,
-    lensEnabled, setLensEnabled, lensPreset, setLensPreset,
-    lensParams, setLensParam, resetLensParams,
     sidEngine, setSidEngine,
     asidEnabled, setAsidEnabled, asidDeviceId, setAsidDeviceId,
     asidDeviceAddress, setAsidDeviceAddress,

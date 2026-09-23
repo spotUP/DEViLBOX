@@ -25,36 +25,6 @@ export type UADEImportMode = 'enhanced' | 'classic';
  */
 export type SIDEngineType = 'jssid' | 'websid' | 'tinyrsid' | 'websidplay' | 'jsidplay2';
 
-export interface CRTParams {
-  scanlineIntensity: number;  // 0–1
-  scanlineCount:     number;  // 50–1200
-  adaptiveIntensity: number;  // 0–1
-  brightness:        number;  // 0.6–1.8
-  contrast:          number;  // 0.6–1.8
-  saturation:        number;  // 0–2
-  bloomIntensity:    number;  // 0–1.5
-  bloomThreshold:    number;  // 0–1
-  rgbShift:          number;  // 0–1
-  vignetteStrength:  number;  // 0–2
-  curvature:         number;  // 0–0.5
-  flickerStrength:   number;  // 0–0.15
-}
-
-export const CRT_DEFAULT_PARAMS: CRTParams = {
-  scanlineIntensity: 0.15,
-  scanlineCount:     400,
-  adaptiveIntensity: 0.5,
-  brightness:        1.1,
-  contrast:          1.05,
-  saturation:        1.1,
-  bloomIntensity:    0.2,
-  bloomThreshold:    0.5,
-  rgbShift:          0.0,
-  vignetteStrength:  0.3,
-  curvature:         0.15,
-  flickerStrength:   0.01,
-};
-
 export interface FormatEnginePreferences {
   mod: FormatEngineChoice;     // .mod → libopenmpt/MODParser vs UADE
   hvl: FormatEngineChoice;     // .hvl/.ahx → HivelyParser vs UADE
@@ -257,17 +227,7 @@ interface SettingsStore {
   vuMeterStyle: 'segments' | 'fill'; // VU meter style: segments=LED bars, fill=solid background
   vuMeterSwing: boolean; // Enable sine wave swing animation on VU meters
   vuMeterMirror: boolean; // Mirror VU meters downward (from top of pattern editor)
-  wobbleWindows: boolean; // Compiz-style wobbly windows in GL UI
   maxHeadroomMode: boolean; // Max Headroom glitchy AI head behavior in VJ view
-
-  // CRT Shader
-  crtEnabled: boolean;
-  crtParams:  CRTParams;
-
-  // Lens Distortion
-  lensEnabled: boolean;
-  lensPreset:  string;   // LensPreset key
-  lensParams:  { barrel: number; chromatic: number; vignette: number };
 
   // Startup jingle
   welcomeJingleEnabled: boolean;
@@ -299,16 +259,8 @@ interface SettingsStore {
   setVuMeterStyle: (style: 'segments' | 'fill') => void;
   setVuMeterSwing: (enabled: boolean) => void;
   setVuMeterMirror: (enabled: boolean) => void;
-  setWobbleWindows: (enabled: boolean) => void;
   setMaxHeadroomMode: (enabled: boolean) => void;
   setWelcomeJingleEnabled: (v: boolean) => void;
-  setCrtEnabled:  (enabled: boolean) => void;
-  setCrtParam:    (param: keyof CRTParams, value: number) => void;
-  resetCrtParams: () => void;
-  setLensEnabled: (enabled: boolean) => void;
-  setLensPreset:  (preset: string) => void;
-  setLensParam:   (param: 'barrel' | 'chromatic' | 'vignette', value: number) => void;
-  resetLensParams: () => void;
 }
 
 export const useSettingsStore = create<SettingsStore>()(
@@ -488,13 +440,7 @@ export const useSettingsStore = create<SettingsStore>()(
       vuMeterStyle: 'segments' as const,  // Default: LED segment style
       vuMeterSwing: true,  // Default: sine wave swing enabled
       vuMeterMirror: false,  // Default: VU meters extend upward
-      wobbleWindows: false,  // Wobbly windows disabled by default
       maxHeadroomMode: false,
-      crtEnabled: false,
-      crtParams:  { ...CRT_DEFAULT_PARAMS },
-      lensEnabled: false,
-      lensPreset: 'off',
-      lensParams: { barrel: 0, chromatic: 0, vignette: 0 },
       welcomeJingleEnabled: true,  // Play startup jingle on first interaction
 
       // SID Hardware defaults
@@ -653,11 +599,6 @@ export const useSettingsStore = create<SettingsStore>()(
           state.vuMeterMirror = vuMeterMirror;
         }),
 
-      setWobbleWindows: (wobbleWindows) =>
-        set((state) => {
-          state.wobbleWindows = wobbleWindows;
-        }),
-
       setMaxHeadroomMode: (maxHeadroomMode) =>
         set((state) => {
           state.maxHeadroomMode = maxHeadroomMode;
@@ -666,31 +607,10 @@ export const useSettingsStore = create<SettingsStore>()(
 
     setWelcomeJingleEnabled: (v) =>
       set((state) => { state.welcomeJingleEnabled = v; }),
-
-    setCrtEnabled: (crtEnabled) =>
-      set((state) => { state.crtEnabled = crtEnabled; }),
-
-    setCrtParam: (param, value) =>
-      set((state) => { state.crtParams[param] = value; }),
-
-    resetCrtParams: () =>
-      set((state) => { state.crtParams = { ...CRT_DEFAULT_PARAMS }; }),
-
-    setLensEnabled: (lensEnabled) =>
-      set((state) => { state.lensEnabled = lensEnabled; }),
-
-    setLensPreset: (preset) =>
-      set((state) => { state.lensPreset = preset; }),
-
-    setLensParam: (param, value) =>
-      set((state) => { state.lensParams[param] = value; }),
-
-    resetLensParams: () =>
-      set((state) => { state.lensParams = { barrel: 0, chromatic: 0, vignette: 0 }; state.lensPreset = 'off'; }),
     })),
     {
       name: 'devilbox-settings',
-      version: 8,
+      version: 9,
       migrate: (persistedState: unknown, version: number) => {
         const s = (persistedState ?? {}) as Record<string, unknown>;
         if (version < 3) {
@@ -719,6 +639,20 @@ export const useSettingsStore = create<SettingsStore>()(
           // editable SunTronicV13 engine). Only flip users still at old default.
           const fe = s.formatEngine as Record<string, unknown> | undefined;
           if (fe && fe.suntronic === 'uade') fe.suntronic = 'native';
+        }
+        if (version < 9) {
+          // v9: the WebGL UI render mode is gone, and with it the CRT shader,
+          // the lens distortion and the wobbly windows it drew. Nothing reads
+          // these keys any more, so drop them rather than carry them forward —
+          // a stored `crtParams` would otherwise sit in every user's
+          // localStorage for good, re-merged on every boot into a state shape
+          // that no longer declares it.
+          delete s.wobbleWindows;
+          delete s.crtEnabled;
+          delete s.crtParams;
+          delete s.lensEnabled;
+          delete s.lensPreset;
+          delete s.lensParams;
         }
         return s;
       },
@@ -754,13 +688,7 @@ export const useSettingsStore = create<SettingsStore>()(
         vuMeterStyle: state.vuMeterStyle,
         vuMeterSwing: state.vuMeterSwing,
         vuMeterMirror: state.vuMeterMirror,
-        wobbleWindows: state.wobbleWindows,
         maxHeadroomMode: state.maxHeadroomMode,
-        crtEnabled: state.crtEnabled,
-        crtParams:  state.crtParams,
-        lensEnabled: state.lensEnabled,
-        lensPreset:  state.lensPreset,
-        lensParams:  state.lensParams,
         sidHardwareMode: state.sidHardwareMode,
         sidEngine: state.sidEngine,
         welcomeJingleEnabled: state.welcomeJingleEnabled,
