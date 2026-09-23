@@ -3,6 +3,7 @@
  */
 
 import React from 'react';
+import { resolveControlTone, type ControlTone } from '@components/ui/controlColor';
 import { useThemeStore } from '@stores';
 
 interface Switch3WayProps<T extends string> {
@@ -12,6 +13,14 @@ interface Switch3WayProps<T extends string> {
   labels?: [string, string, string]; // Display labels for each position
   onChange: (value: T) => void;
   color?: string;
+  /**
+   * The control's colour, by NAME.
+   *
+   * Prefer this over `color`. A name follows the theme; a hex does not, and
+   * 1,822 call sites passing raw hex is why these controls stopped matching
+   * the rest of DEViLBOX. `tone` wins when both are given.
+   */
+  tone?: ControlTone;
   title?: string;
 }
 
@@ -22,13 +31,15 @@ const Switch3WayComponent = <T extends string>({
   options,
   labels,
   onChange,
-  color: colorProp = '#00d4aa',
+  color: colorProp,
+  tone,
   title,
 }: Switch3WayProps<T>) => {
   // Theme-aware colors: use cyan for cyan-lineart theme
   const currentThemeId = useThemeStore((state) => state.currentThemeId);
   const isCyanTheme = currentThemeId === 'cyan-lineart';
-  const color = isCyanTheme ? '#00ffff' : colorProp;
+  const resolvedColor = resolveControlTone(tone, colorProp, '#00d4aa');
+  const color = isCyanTheme ? '#00ffff' : resolvedColor;
   const inactiveColor = isCyanTheme ? '#0a6666' : '#666';
 
   const currentIndex = options.indexOf(value);

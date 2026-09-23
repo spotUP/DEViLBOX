@@ -4,6 +4,7 @@
  */
 
 import React, { useRef, useCallback, useEffect, useState, useId } from 'react';
+import { resolveControlTone, type ControlTone } from '@components/ui/controlColor';
 import { createPortal } from 'react-dom';
 import { useThemeStore } from '@stores';
 import { haptics } from '@/utils/haptics';
@@ -19,6 +20,14 @@ interface KnobProps {
   unit?: string;
   size?: 'sm' | 'md' | 'lg';
   color?: string;
+  /**
+   * The control's colour, by NAME.
+   *
+   * Prefer this over `color`. A name follows the theme; a hex does not, and
+   * 1,822 call sites passing raw hex is why these controls stopped matching
+   * the rest of DEViLBOX. `tone` wins when both are given.
+   */
+  tone?: ControlTone;
   title?: string; // Tooltip text on hover
   disabled?: boolean; // Disable interaction and dim appearance
   hideValue?: boolean; // Hide the static value label below the knob
@@ -72,7 +81,8 @@ export const Knob: React.FC<KnobProps> = React.memo(({
   logarithmic = false,
   defaultValue,
   size = 'md',
-  color: colorProp = '#00d4aa',
+  color: colorProp,
+  tone,
   displayValue,
   isActive = false,
   bipolar = false,
@@ -127,7 +137,8 @@ export const Knob: React.FC<KnobProps> = React.memo(({
   // Theme-aware colors: use cyan for cyan-lineart theme
   const currentThemeId = useThemeStore((state) => state.currentThemeId);
   const isCyanTheme = currentThemeId === 'cyan-lineart';
-  const color = isCyanTheme ? '#00ffff' : colorProp;
+  const resolvedColor = resolveControlTone(tone, colorProp, '#00d4aa');
+  const color = isCyanTheme ? '#00ffff' : resolvedColor;
 
   // Theme-aware grey colors
   const bgTrackColor = isCyanTheme ? '#0a3a3a' : '#2a2a2a';
