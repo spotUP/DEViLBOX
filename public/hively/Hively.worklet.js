@@ -410,8 +410,13 @@ class HivelyProcessor extends AudioWorkletProcessor {
   loadTune(buffer, defStereo) {
     if (!this.wasm || !this.initialized) return;
 
-    // Clean up any standalone instrument players from previous loads
-    this.destroyAllPlayers();
+    // The tune does NOT own the instrument players, so loading one must not
+    // destroy them. It used to ("clean up players from previous loads"), and
+    // the players it swept away belonged to the HivelySynth instances the
+    // SAME song load had just created: the synths kept their handles, and
+    // the next live note hit a player the worklet no longer had —
+    // `noteOn handle=0 ... players=[]`, silent, 2026-09-23. Each synth
+    // destroys its own player in dispose(); 'dispose' below sweeps the rest.
 
     // Copy tune data to WASM heap
     const data = new Uint8Array(buffer);
