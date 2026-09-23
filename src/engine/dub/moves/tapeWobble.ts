@@ -17,7 +17,14 @@ import type { DubMove } from './_types';
 export const tapeWobble: DubMove = {
   id: 'tapeWobble',
   kind: 'hold',
-  defaults: { depthMs: 35, rateHz: 2.5 },
+  /**
+   * Twice the depth it had.
+   *
+   * 35 ms of deviation on a 300 ms echo is a half-step of pitch at most, and
+   * against a dense return it read as nothing (2026-09-23). 70 ms is a tape
+   * machine with a tired capstan, which is the point.
+   */
+  defaults: { depthMs: 70, rateHz: 2.5 },
 
   execute({ bus, params }) {
     const depthMs = params.depthMs ?? this.defaults.depthMs;

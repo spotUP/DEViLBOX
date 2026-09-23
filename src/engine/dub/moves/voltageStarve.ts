@@ -14,7 +14,20 @@ import type { DubMove } from './_types';
 export const voltageStarve: DubMove = {
   id: 'voltageStarve',
   kind: 'hold',
-  defaults: { targetBits: 6 },
+  /**
+   * Four bits, not six.
+   *
+   * Two of sixteen.
+   *
+   * Six was a gentle grain. Four was verified 2026-09-23 to be fully in
+   * circuit — the crossfade puts `lofiSend` at 1 and `lofiBypass` at 0, and
+   * the crusher runs mix and wet at 1 — and the owner still could not hear
+   * it over the echo and spring. So the stage was never the problem and the
+   * depth was: `BittaEffect` clamps crush to 1..16, and two bits is a dying
+   * battery rather than a hint of one, which is what this move's own
+   * description promises.
+   */
+  defaults: { targetBits: 2 },
 
   execute({ bus, params }) {
     const targetBits = params.targetBits ?? this.defaults.targetBits;
