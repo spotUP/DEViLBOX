@@ -35,7 +35,14 @@ import { ensureDrumPadEngine } from '@hooks/drumpad/useMIDIPadRouting';
 import { getChannelRoutedEffectsManager } from '@/engine/tone/ChannelRoutedEffects';
 import { getToneEngine } from '@/engine/ToneEngine';
 import { Fader } from '@components/controls/Fader';
+import { colorClasses, type MoveColor } from './moveButtonStyle';
+import { CustomSelect } from '@components/common/CustomSelect';
+import { CONTROLLER_LAYOUTS } from '@/midi/controllerLayouts';
+import { getDJControllerMapper } from '@/midi/DJControllerMapper';
 import { AutoDubPanel } from './AutoDubPanel';
+import { ControllerShapedDeck } from './ControllerShapedDeck';
+import type { DubDeckControlApi } from './ControllerShapedDeck';
+import { buildDeckMoveIndex, listDeckShapeOptions, resolveDeckShape } from './deckShape';
 import { Fil4EqPanel } from '@components/effects/Fil4EqPanel';
 import { getActiveDubBus } from '@engine/dub/DubBus';
 
@@ -214,62 +221,17 @@ const GLOBAL_MOVES: Array<GlobalMove> = [
 const MOVE_ROW_GRID = 'grid grid-cols-[repeat(auto-fill,minmax(7rem,1fr))] gap-1.5 flex-1 min-w-0';
 
 /**
- * Every colour a move button may carry. A union, not `string`: the class
- * helper below is a switch over LITERAL Tailwind classes (the JIT needs them
- * spelled out), and a token with no case fell to the idle default — so the
- * button never showed an active state at all. Riddim (`accent-error/60`),
- * Float, Build, Emph and Liquid were all invisible when held: "ui button does
- * not light up the midi controller does" (2026-09-23). The `never` default
- * makes a missing case a type error.
+ * The deck's moves, indexed for the controller-shaped deck.
+ *
+ * Built FROM the two tables above rather than beside them: the shape a deck
+ * is drawn in must never change which move is a hold and which is a toggle.
+ * A row moved between GLOBAL_MOVES groups changes both decks in one edit.
  */
-type MoveColor =
-  | 'accent-primary' | 'accent-primary/70' | 'accent-primary/50' | 'accent-primary/40'
-  | 'accent-secondary' | 'accent-secondary/80' | 'accent-secondary/70'
-  | 'accent-highlight' | 'accent-highlight/70' | 'accent-highlight/40'
-  | 'accent-warning' | 'accent-warning/70'
-  | 'accent-error' | 'accent-error/70' | 'accent-error/60'
-  | 'accent-success' | 'accent-success/70'
-  | 'text-primary';
+const DECK_MOVE_INDEX = buildDeckMoveIndex(GLOBAL_MOVES, CHANNEL_OPS);
 
-const colorClasses = (token: MoveColor, active: boolean, size: 'md' | 'sm' = 'md') => {
-  // nowrap: on the column grid a wrapped label would make one button taller
-  // than its row.
-  // 'sm' is the channel-card size: nine ops in a 3x3 grid beside the fader.
-  // At 'md' the same nine stacked in one column ran ~600 px and the deck,
-  // capped at 60 % of the viewport, clipped every card — "the sliders dont
-  // fit not even in fullscreen" (2026-09-23, asked several times).
-  const base = size === 'sm'
-    ? 'px-1 py-0.5 rounded border text-[10px] font-bold whitespace-nowrap transition-all duration-150 '
-    : 'px-2.5 py-1 rounded border text-xs font-bold whitespace-nowrap transition-all duration-150 ';
-  const idle = 'bg-dark-bgTertiary border-dark-borderLight text-text-secondary ';
-  switch (token) {
-    // Bright opaque backgrounds — dark text has 9-12:1 contrast
-    case 'accent-primary':      return base + (active ? 'bg-accent-primary text-text-inverse border-accent-primary shadow-[0_0_6px_var(--color-accent-primary)]' : idle + 'hover:border-accent-primary hover:text-accent-primary');
-    case 'accent-highlight':    return base + (active ? 'bg-accent-highlight text-text-inverse border-accent-highlight' : idle + 'hover:border-accent-highlight hover:text-accent-highlight');
-    case 'accent-warning':      return base + (active ? 'bg-accent-warning text-text-inverse border-accent-warning' : idle + 'hover:border-accent-warning hover:text-accent-warning');
-    case 'accent-success':      return base + (active ? 'bg-accent-success text-text-inverse border-accent-success' : idle + 'hover:border-accent-success hover:text-accent-success');
-    // Dark or semi-transparent backgrounds — white text is required for visibility
-    case 'accent-primary/70':   return base + (active ? 'bg-accent-primary/70 text-white border-accent-primary/70' : idle + 'hover:border-accent-primary/70 hover:text-accent-primary');
-    case 'accent-primary/50':   return base + (active ? 'bg-accent-primary/50 text-white border-accent-primary/50' : idle + 'hover:border-accent-primary/50 hover:text-accent-primary');
-    case 'accent-primary/40':   return base + (active ? 'bg-accent-primary/40 text-white border-accent-primary/40' : idle + 'hover:border-accent-primary/40 hover:text-accent-primary');
-    case 'accent-secondary/80': return base + (active ? 'bg-accent-secondary/80 text-white border-accent-secondary/80' : idle + 'hover:border-accent-secondary/80 hover:text-accent-secondary');
-    case 'accent-highlight/40': return base + (active ? 'bg-accent-highlight/40 text-white border-accent-highlight/40' : idle + 'hover:border-accent-highlight/40 hover:text-accent-highlight');
-    case 'accent-error/60':     return base + (active ? 'bg-accent-error/60 text-white border-accent-error/60' : idle + 'hover:border-accent-error/60 hover:text-accent-error');
-    case 'accent-secondary':    return base + (active ? 'bg-accent-secondary text-white border-accent-secondary' : idle + 'hover:border-accent-secondary hover:text-accent-secondary');
-    case 'accent-secondary/70': return base + (active ? 'bg-accent-secondary/70 text-white border-accent-secondary/70' : idle + 'hover:border-accent-secondary/70 hover:text-accent-secondary');
-    case 'accent-highlight/70': return base + (active ? 'bg-accent-highlight/70 text-white border-accent-highlight/70' : idle + 'hover:border-accent-highlight/70 hover:text-accent-highlight');
-    case 'accent-warning/70':   return base + (active ? 'bg-accent-warning/70 text-white border-accent-warning/70' : idle + 'hover:border-accent-warning/70 hover:text-accent-warning');
-    case 'accent-error':        return base + (active ? 'bg-accent-error text-white border-accent-error' : idle + 'hover:border-accent-error hover:text-accent-error');
-    case 'accent-error/70':     return base + (active ? 'bg-accent-error/70 text-white border-accent-error/70' : idle + 'hover:border-accent-error/70 hover:text-accent-error');
-    case 'accent-success/70':   return base + (active ? 'bg-accent-success/70 text-white border-accent-success/70' : idle + 'hover:border-accent-success/70 hover:text-accent-success');
-    case 'text-primary':        return base + (active ? 'bg-text-primary text-dark-bg border-text-primary' : idle + 'hover:border-text-primary hover:text-text-primary');
-    default: {
-      // Exhaustive: a token added to MoveColor without a case does not compile.
-      const missing: never = token;
-      return base + idle + String(missing);
-    }
-  }
-};
+/** The shapes on offer: automatic, the generic deck, then every descriptor. */
+const DECK_SHAPE_OPTIONS = listDeckShapeOptions(CONTROLLER_LAYOUTS)
+  .map(({ id, label }) => ({ value: id, label }));
 
 export const DubDeckStrip: React.FC = () => {
   const armed = useDubStore(s => s.armed);
@@ -309,6 +271,30 @@ export const DubDeckStrip: React.FC = () => {
   const [autoDubSettingsOpen, setAutoDubSettingsOpen] = useState(false);
   // Active tab — PERFORM is default; EQ / BUS / RECORD for deeper panels
   const [activeTab, setActiveTab] = useState<'perform' | 'eq' | 'bus'>('perform');
+
+  /**
+   * Which SHAPE the PERFORM tab draws in — the deck's own rows and cards, or
+   * the physical panel of the controller in front of the performer.
+   *
+   * "the dub deck in devilbox should match my hw controller layoutwize"
+   * (2026-09-23). The preference is persisted with the other layout
+   * preferences; 'automatic' follows whatever controller preset is live, and
+   * falls back to the generic deck when there is none — which is the case for
+   * everyone without hardware, so the generic deck stays the default.
+   *
+   * The active preset lives on the MIDI mapper singleton, which is not a
+   * store and publishes no change event, so it is read on the poll that is
+   * already running for the classifier's roles rather than on a second timer.
+   * Plugging a controller in is not a per-frame event.
+   */
+  const dubDeckShape = useUIStore(s => s.dubDeckShape);
+  const setDubDeckShape = useUIStore(s => s.setDubDeckShape);
+  const [activePresetId, setActivePresetId] = useState<string | null>(null);
+  const [deckLayer, setDeckLayer] = useState<'A' | 'B'>('A');
+  const deckShape = useMemo(
+    () => resolveDeckShape(dubDeckShape, activePresetId, CONTROLLER_LAYOUTS),
+    [dubDeckShape, activePresetId],
+  );
 
   /**
    * Deck faders that follow the PERFORMER, not only the user.
@@ -393,9 +379,16 @@ export const DubDeckStrip: React.FC = () => {
     [channels, pattern],
   );
   useEffect(() => {
+    const read = () => {
+      setAutoRoles(getAutoDubCurrentRoles());
+      // Same value = same state object, so this costs a render only when a
+      // controller is actually plugged in or swapped.
+      setActivePresetId(getDJControllerMapper().getPreset()?.id ?? null);
+    };
+    read();
     const t = setInterval(() => {
       if (document.hidden) return; // no UI to update in a hidden tab
-      setAutoRoles(getAutoDubCurrentRoles());
+      read();
     }, 500);
     return () => clearInterval(t);
   }, []);
@@ -1180,6 +1173,38 @@ export const DubDeckStrip: React.FC = () => {
     }
   }, [runWithBus, activeRatePreset]);
 
+  /**
+   * Is this move firing — on THIS channel when one is named?
+   *
+   * `isMoveFiring` deliberately answers for any channel: a global move button
+   * stands for the move itself, and AutoDub firing `echoThrow` on channel 2
+   * should light it. A controller's select row is the opposite case — eight
+   * buttons, one per channel — and all eight lighting because one fired would
+   * be worse than none lighting at all.
+   */
+  const isMoveFiringOn = useCallback((moveId: string, channelId?: number): boolean => (
+    channelId === undefined ? isMoveFiring(moveId) : activeFires.has(`${moveId}:${channelId}`)
+  ), [isMoveFiring, activeFires]);
+
+  /**
+   * The deck's handlers, handed to the controller-shaped deck as they are.
+   *
+   * Not re-implementations: the very same callbacks the generic deck's
+   * buttons call. A shape is a layout, and a layout must not be able to
+   * change what a button does.
+   */
+  const deckApi = useMemo<DubDeckControlApi>(() => ({
+    fireTrigger,
+    holdButtonProps,
+    handleToggle,
+    handleRatePreset,
+    setChannelSend: setChannelDubSend,
+    setArmed,
+  }), [fireTrigger, holdButtonProps, handleToggle, handleRatePreset, setChannelDubSend, setArmed]);
+
+  /** Every channel's dub send, for the controller's faders to show and ride. */
+  const channelSends = useMemo(() => channels.map(c => c?.dubSend ?? 0), [channels]);
+
   return (
     /* Sized by its content, never squeezed.
      *
@@ -1483,6 +1508,22 @@ export const DubDeckStrip: React.FC = () => {
         >
           Audition
         </button>
+        {/* Which shape the PERFORM tab draws in. Late in the header on
+            purpose: the row wraps, and what wraps should be what is reached
+            for least — this is set once when the controller arrives, not
+            during a take. */}
+        <span className="text-text-muted ml-2">SHAPE</span>
+        <CustomSelect
+          value={dubDeckShape}
+          onChange={setDubDeckShape}
+          options={DECK_SHAPE_OPTIONS}
+          className="text-[10px] font-mono"
+          title={
+            deckShape.kind === 'controller'
+              ? `Dub Deck shape: the ${deckShape.layout.manufacturer} ${deckShape.layout.name} panel — every control plays the dub function assigned to it`
+              : 'Dub Deck shape: the generic deck — move rows and channel cards'
+          }
+        />
         <button
           className="px-2.5 py-1 rounded bg-accent-error text-white font-semibold hover:bg-accent-error/80 text-xs"
           onClick={() => { hideTooltip(); window.dispatchEvent(new Event('dub-panic')); }}
@@ -1601,6 +1642,28 @@ export const DubDeckStrip: React.FC = () => {
       {/* ── PERFORM tab ─────────────────────────────────────────────────────── */}
       {activeTab === 'perform' && (<>
       {moveTooltip}
+
+      {/* One deck, two shapes. The controller shape REDRAWS the deck into the
+          physical panel of the hardware in front of the performer; it is not
+          a reordering of the rows below, and it fires the identical handlers.
+          The generic shape stays for everyone with no controller, which is
+          why it is what `resolveDeckShape` falls back to. */}
+      {deckShape.kind === 'controller' ? (
+        <ControllerShapedDeck
+          layout={deckShape.layout}
+          layer={deckLayer}
+          onLayerChange={setDeckLayer}
+          moves={DECK_MOVE_INDEX}
+          channelSends={channelSends}
+          armed={armed}
+          busEnabled={busEnabled}
+          isFiring={isMoveFiringOn}
+          heldMoves={heldMoves}
+          toggledMoves={toggledMoves}
+          activeRatePreset={activeRatePreset}
+          api={deckApi}
+        />
+      ) : (<>
 
       <div className="flex flex-col gap-1.5 pb-1.5 border-b border-dark-border">
         {/* ── CLICK — one-shot triggers ── */}
@@ -2095,6 +2158,7 @@ export const DubDeckStrip: React.FC = () => {
         })}
       </div>
 
+      </>)}
 
       </>)}
 

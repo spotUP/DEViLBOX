@@ -285,7 +285,15 @@ const XTOUCH_COMPACT_LAYER_A: ControllerLayout = {
 const XTOUCH_COMPACT: ControllerLayout = {
   ...XTOUCH_COMPACT_LAYER_A,
   controls: [
-    ...XTOUCH_COMPACT_LAYER_A.controls.map((c) => ({ ...c, layer: 'A' as const })),
+    // The layer indicators are left UNTAGGED on purpose. They are
+    // program-change pseudo-controls that exist once for the device, not once
+    // per layer, and a renderer draws an untagged control on every layer — so
+    // tagging them 'A' made the pair vanish the moment you switched to Layer
+    // B, which is exactly when you need the way back (2026-09-23, found while
+    // giving the dub deck the controller's own shape).
+    ...XTOUCH_COMPACT_LAYER_A.controls.map(
+      (c) => (c.midi.number < 0 ? c : { ...c, layer: 'A' as const }),
+    ),
     ...deriveLayerB(XTOUCH_COMPACT_LAYER_A.controls),
   ],
 };
