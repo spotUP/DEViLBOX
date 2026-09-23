@@ -17,6 +17,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { notify } from '@stores/useNotificationStore';
 import { useHoverTooltip } from '@/components/ui';
 import { useDubStore } from '@/stores/useDubStore';
+import { anySendAudible, GHOST_SEND_FLOOR } from '@/lib/dub/sendAudibility';
 import { useDrumPadStore } from '@/stores/useDrumPadStore';
 import { useMixerStore } from '@/stores/useMixerStore';
 import { useTrackerStore } from '@/stores/useTrackerStore';
@@ -777,10 +778,16 @@ export const DubDeckStrip: React.FC = () => {
   }, [pattern]);
 
   const visibleChannelCount = pattern?.channels.length ?? 4;
-  // Whether ANY visible channel has a non-zero dub-send — processors
-  // (bus-audio modifiers) can only make sound when at least one channel
-  // is feeding the bus. Used to dim the processor row + show a hint.
+  // Whether ANY visible channel has a non-zero dub-send. This drives the
+  // ALL / NONE button and the echo drain when the last send closes — for
+  // those, any non-zero value is a send, the BLEED floor included.
   const anySend = channels.slice(0, visibleChannelCount).some(c => (c?.dubSend ?? 0) > 0);
+  // Whether the bus is fed enough for a RETURN PROCESSOR to be heard. This is
+  // the one that dims Wide / Ring / Liquid and shows "raise a CH send to
+  // hear", and for it the BLEED floor is not a send: with BLEED on and
+  // nothing raised, `anySend` was true, the hint never showed, and the moves
+  // ran on near-silence (busInput 0.0077, 2026-09-23) and were reported dead.
+  const anyAudibleSend = anySendAudible(channels.slice(0, visibleChannelCount).map(c => c?.dubSend));
 
   // Master send value — the max of all visible channel sends. Used as
   // the display/control value for the master fader.
@@ -807,8 +814,8 @@ export const DubDeckStrip: React.FC = () => {
   // explicitly or uses HOLD / moves to open channel taps momentarily.
 
   // Ghost Bus — when enabled, any channel whose send is 0 gets floored to
-  // 0.015 (~-36 dB) so it bleeds through the dub return even when the
-  // main-mix mute is on. When disabled, floor is lifted; user's explicit
+  // GHOST_SEND_FLOOR (~-36 dB) so it bleeds through the dub return even when
+  // the main-mix mute is on. When disabled, floor is lifted; user's explicit
   // non-zero sends are NEVER touched.
   const priorSendsBeforeGhost = useRef<Map<number, number>>(new Map());
   useEffect(() => {
@@ -819,7 +826,7 @@ export const DubDeckStrip: React.FC = () => {
         const cur = channels[i]?.dubSend ?? 0;
         if (cur === 0) {
           priorSendsBeforeGhost.current.set(i, 0);
-          setChannelDubSend(i, 0.015);
+          setChannelDubSend(i, GHOST_SEND_FLOOR);
         }
       }
     } else {
@@ -827,7 +834,7 @@ export const DubDeckStrip: React.FC = () => {
         const cur = channels[i]?.dubSend ?? 0;
         // Only reset channels that are still at the ghost level (user hasn't
         // dragged them up manually)
-        if (Math.abs(cur - 0.015) < 0.001) {
+        if (Math.abs(cur - GHOST_SEND_FLOOR) < 0.001) {
           setChannelDubSend(i, prior);
         }
       }
@@ -1549,7 +1556,7 @@ export const DubDeckStrip: React.FC = () => {
           <div className={MOVE_ROW_GRID}>
             {GLOBAL_MOVES.filter(m => m.group === 'click').map((m) => {
               const active = isMoveFiring(m.moveId);
-              const noSend = !!m.needsSend && !anySend;
+              const noSend = !!m.needsSend && !anyAudibleSend;
               return (
                 <button
                   key={m.moveId}
@@ -1608,7 +1615,7 @@ export const DubDeckStrip: React.FC = () => {
             {GLOBAL_MOVES.filter(m => m.group === 'hold').map((m) => {
               const key = `${m.moveId}:g`;
               const active = heldMoves.has(key) || isMoveFiring(m.moveId);
-              const noSend = !!m.needsSend && !anySend;
+              const noSend = !!m.needsSend && !anyAudibleSend;
               return (
                 <button
                   key={m.moveId}
@@ -1647,7 +1654,7 @@ export const DubDeckStrip: React.FC = () => {
               const key = `${m.moveId}:g`;
               const toggled = toggledMoves.has(m.moveId);
               const active = toggled || heldMoves.has(key) || isMoveFiring(m.moveId);
-              const noSend = !!m.needsSend && !anySend;
+              const noSend = !!m.needsSend && !anyAudibleSend;
               const dimmed = noSend && busEnabled && !toggled;
               return (
                 <button
