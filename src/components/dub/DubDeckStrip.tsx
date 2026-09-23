@@ -1826,7 +1826,10 @@ export const DubDeckStrip: React.FC = () => {
             doubleClickValue={1}
           />
           </div>
-          <span className="text-[9px] font-mono text-accent-primary leading-none">
+          {/* Fixed width, or "100%" is wider than "15%" and the fader column
+              grows at full send, squeezing the op grid beside it — "when the
+              channel sliders reach 100% the component shrinks sideways". */}
+          <span className="w-7 text-center tabular-nums text-[9px] font-mono text-accent-primary leading-none">
             {Math.round(masterSendValue * 100)}%
           </span>
           </div>
@@ -2038,7 +2041,7 @@ export const DubDeckStrip: React.FC = () => {
                 paramKey={`dub.channelSend.ch${i}`}
               />
               </div>
-              <span className="text-[9px] font-mono text-text-secondary leading-none">
+              <span className="w-7 text-center tabular-nums text-[9px] font-mono text-text-secondary leading-none">
                 {Math.round(dubSend * 100)}%
               </span>
               </div>
