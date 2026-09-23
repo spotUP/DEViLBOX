@@ -59,6 +59,26 @@ async function collectDryGains(): Promise<Array<{ param: AudioParam; prev: numbe
   return out;
 }
 
+/**
+ * The longest the desk may stay dropped.
+ *
+ * A drop is a musical gesture of a bar or two, and it is the ONLY move that
+ * takes every source down at once — so if its release is ever lost, the whole
+ * instrument is silent with nothing on screen to explain it. That happened on
+ * 2026-09-24: playback running, every channel unmuted, and
+ * `masterVolume: 0, sampleBusGain: 0, synthBusGain: 0` with an AHX tune
+ * playing to nobody. A reload was the only way back.
+ *
+ * A hold is supposed to end when the hand lets go, and normally does. This is
+ * for when it does not: a pointer the browser takes away, a note-off that
+ * never arrives, a button that unmounts mid-press. Whatever the cause, the
+ * sound comes back.
+ *
+ * Deliberately generous — eight bars at 60 BPM is 32 seconds, so no musical
+ * drop is cut short.
+ */
+export const MASTER_DROP_CEILING_MS = 40_000;
+
 export const masterDrop: DubMove = {
   id: 'masterDrop',
   kind: 'hold',
@@ -105,19 +125,38 @@ export const masterDrop: DubMove = {
       }
     })();
 
+    /** Put every gain back where it was found. Safe to call twice. */
+    let restored = false;
+    const restore = () => {
+      if (restored) return;
+      restored = true;
+      const now = ctx.currentTime;
+      for (const { param, prev } of pairs) {
+        try {
+          param.cancelScheduledValues(now);
+          param.setValueAtTime(param.value, now);
+          param.linearRampToValueAtTime(prev, now + releaseSec);
+        } catch (err) {
+          console.error('[masterDrop] RESTORE failed for a gain:', err);
+        }
+      }
+    };
+
+    // The backstop. Nothing about a held button can be trusted to end, and
+    // this is the one move whose failure to end leaves no sound at all.
+    const ceiling = setTimeout(() => {
+      console.warn(
+        `[masterDrop] held for ${MASTER_DROP_CEILING_MS}ms with no release — `
+        + 'restoring. Something dropped the release; the desk does not stay silent.',
+      );
+      restore();
+    }, MASTER_DROP_CEILING_MS);
+
     return {
       dispose() {
         disposed = true;
-        const now = ctx.currentTime;
-        for (const { param, prev } of pairs) {
-          try {
-            param.cancelScheduledValues(now);
-            param.setValueAtTime(param.value, now);
-            param.linearRampToValueAtTime(prev, now + releaseSec);
-          } catch (err) {
-            console.error('[masterDrop] RESTORE failed for a gain:', err);
-          }
-        }
+        clearTimeout(ceiling);
+        restore();
       },
     };
   },
