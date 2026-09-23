@@ -826,12 +826,12 @@ class HivelyProcessor extends AudioWorkletProcessor {
             const abs = Math.abs(sL) + Math.abs(sR);
             if (abs > maxSample) maxSample = abs;
           }
-          // Log once per second if active
-          if (!this._playerDbgCount) this._playerDbgCount = 0;
-          this._playerDbgCount++;
-          if (this._playerDbgCount % 375 === 1) {
-            this.port.postMessage({ type: 'debug', msg: 'render player=' + hi + ' n=' + n + ' max=' + maxSample.toFixed(6) + ' heapStale=' + (currentHeap !== heapAfter) });
-          }
+          // No heartbeat here. A once-a-second 'render player=0 ... max=0'
+          // debug post ran for the life of every instrument player, idle or
+          // not, and reached the console as a warning — hundreds of lines in
+          // every log the owner pasted on 2026-09-23. createPlayer and noteOn
+          // still announce themselves; those are events.
+          void maxSample; void currentHeap;
         }
       }
     }
