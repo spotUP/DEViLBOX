@@ -91,7 +91,8 @@ import { useTrackerAnalysisStore } from '@/stores/useTrackerAnalysisStore';
 import { useFormatStore } from '@/stores/useFormatStore';
 import { useInstrumentStore } from '@/stores/useInstrumentStore';
 import { useNotificationStore } from '@/stores/useNotificationStore';
-import { resolveVinylLevel } from '@/lib/dub/vinylLevel';
+import { resolveVinylLevel, isRecordSpinning, VINYL_PROGRAMME_FLOOR_RMS } from '@/lib/dub/vinylLevel';
+import { useTransportStore } from '@/stores/useTransportStore';
 import { ChannelTapBaselines } from '@/lib/dub/channelTapBaseline';
 import { makeSoftClipCurve } from '@/lib/dub/softClipCurve';
 import { AuditionHold } from '@/lib/dub/auditionHold';
@@ -1603,6 +1604,15 @@ export class DubBus {
   // disabling the bus can silence the post-master vinyl chain without losing
   // the user's setting, and re-enabling restores it.
   private _desiredVinylLevel = 0;
+  /**
+   * Is the record turning? Set by the trim watch from the transport and the
+   * programme level; the vinyl chain resolves to 0 while it is not. Starts
+   * stopped: a bus switched on with nothing playing is a record on the
+   * platter, not a record playing.
+   */
+  private _vinylSpinning = false;
+  /** Wall-clock ms the programme was last above the vinyl floor. */
+  private _lastProgrammeAtMs = -Infinity;
   // vinylOutputNode: sits after this.master. DrumPadEngine connects it to
   // the actual output destination so vinyl sees dry + wet together.
   private vinylOutputNode!: GainNode;
@@ -4865,6 +4875,7 @@ export class DubBus {
         // The ride moves the shelf as well as the trim now, so the whole
         // master tone is re-derived, not the trim alone.
         this._applyMasterInsertTone();
+        this._watchRecordSpinning(programme, Date.now());
       } catch { /* keep watching */ }
     }, TRIM_WATCH_MS);
   }
@@ -4874,6 +4885,27 @@ export class DubBus {
     this._trimWatch = null;
     this._trimRide = RIDER_REST;
     this._returnGovernor = RIDER_REST;
+  }
+
+  /**
+   * Stop the record when the music stops.
+   *
+   * The vinyl chain is post-master and generates its own surface noise, so a
+   * stopped transport left the hiss and the pops running — "the vinyl noise
+   * keep playing when i stop the song" (2026-09-23). The rule is in
+   * `isRecordSpinning`; this feeds it the transport flag and the time since
+   * the programme was last heard, and re-resolves the vinyl level only when
+   * the answer changes.
+   */
+  private _watchRecordSpinning(programme: ProgrammeLevel, nowMs: number): void {
+    if (programme.valid && programme.rms > VINYL_PROGRAMME_FLOOR_RMS) this._lastProgrammeAtMs = nowMs;
+    const spinning = isRecordSpinning(
+      useTransportStore.getState().isPlaying,
+      nowMs - this._lastProgrammeAtMs,
+    );
+    if (spinning === this._vinylSpinning) return;
+    this._vinylSpinning = spinning;
+    this._applyVinylLevel();
   }
 
   /** RMS at `return_`, before the return trim and the governor. */
@@ -7507,7 +7539,7 @@ export class DubBus {
    * to turn it down. Disabling the bus must silence everything the bus makes.
    */
   private _applyVinylLevel(): void {
-    this._writeVinylLevel(resolveVinylLevel(this.enabled, this._desiredVinylLevel));
+    this._writeVinylLevel(resolveVinylLevel(this.enabled, this._desiredVinylLevel, this._vinylSpinning));
   }
 
   private _writeVinylLevel(level10: number): void {
