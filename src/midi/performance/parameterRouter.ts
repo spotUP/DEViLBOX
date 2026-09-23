@@ -1061,6 +1061,21 @@ function getDJRoutes(): Record<string, DJRouteHandler> {
  * @param normalizedValue - 0-1 normalized value from MIDI CC
  */
 export function routeDJParameter(param: string, normalizedValue: number): void {
+  // A controller preset's mappings are not all DJ parameters. The X-Touch's
+  // whole map targets `dub.*`, and this function looked every one of them up
+  // in a table that holds only `dj.*` routes, found nothing, and dropped them
+  // silently — so the entire surface did nothing except the channel faders,
+  // which `handleCC` special-cases before it ever reaches here.
+  //
+  // "almost nothing is mapped correctly... more or less only the channels
+  // sliders are correct" (2026-09-23). The mapping was right the whole time;
+  // the destination did not exist.
+  if (param.startsWith('dub.')) {
+    routeDubParameter(param, normalizedValue, 'live');
+    fireParamLiveSubscribers(param, normalizedValue);
+    return;
+  }
+
   const tracked = djRelativeTrack(param, normalizedValue);
 
   const routes = getDJRoutes();
