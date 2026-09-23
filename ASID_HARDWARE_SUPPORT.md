@@ -39,8 +39,7 @@ DEViLBOX supports playback through real SID hardware (USB-SID-Pico, TherapSID) v
 - **C64SIDEngine.ts** — High-level wrapper with hardware status tracking
 
 ### User Interface
-- **PixiSettingsModal.tsx** — Pixi GL settings with unified SID Hardware Output panel
-- **SettingsModal.tsx** — DOM settings with same unified panel
+- **SettingsModal.tsx** — settings dialog with the unified SID Hardware Output panel
 - **useSettingsStore.ts** — Persistent settings: `sidHardwareMode`, `webusbClockRate`, `webusbStereo`
 
 ## Technical Details
@@ -94,7 +93,7 @@ Both require HTTPS or localhost.
 ✅ **ASID protocol** (ASIDProtocol.ts + ASIDDeviceManager.ts) — MIDI SysEx
 ✅ **jsSID integration** — WebUSB bridge + ASID support
 ✅ **GTUltra integration** — via SIDHardwareManager
-✅ **Settings UI** — unified SID Hardware Output panel (Pixi + DOM)
+✅ **Settings UI** — unified SID Hardware Output panel
 ✅ **Settings store** — persistent mode/clock/stereo preferences
 
 ## Files
@@ -110,7 +109,6 @@ src/
 │   ├── deepsid/engines/JSSIDEngine.ts       (+ WebUSB bridge)
 │   ├── gtultra/GTUltraASIDBridge.ts         (refactored to use manager)
 │   └── C64SIDEngine.ts                      (+ hardware status)
-├── pixi/dialogs/PixiSettingsModal.tsx       (+ unified SID Hardware UI)
 ├── components/dialogs/SettingsModal.tsx      (+ unified SID Hardware UI)
 └── stores/useSettingsStore.ts               (+ WebUSB settings)
 ```

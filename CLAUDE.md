@@ -1,6 +1,6 @@
 # DEViLBOX Project Memory
 
-**Global rules:** `~/.claude/CLAUDE.md` set house defaults (precedence, root-cause fix, no cheap alternative, regression tests, git safety, no emoji, single source truth, `thoughts/` dir, dual handoff formats, MCP-preferred debug, full English UI labels, `## Commands` section). This file override global when clash — DEViLBOX bump several rules to *hard* requirement (MCP-first debug, DOM-only render, strict Tailwind class allowlist, knob/control `useRef` pattern, build verify command).
+**Global rules:** `~/.claude/CLAUDE.md` set house defaults (precedence, root-cause fix, no cheap alternative, regression tests, git safety, no emoji, single source truth, `thoughts/` dir, dual handoff formats, MCP-preferred debug, full English UI labels, `## Commands` section). This file override global when clash — DEViLBOX bump several rules to *hard* requirement (MCP-first debug, DOM-first render, strict Tailwind class allowlist, knob/control `useRef` pattern, build verify command).
 
 ## Commands
 
@@ -42,9 +42,16 @@ Host at `devilbox.uprough.net`. Deploy full auto on `git push origin main` — C
 
 **Never** `gh-pages` / `npx gh-pages -d dist` — publish wrong host. CI fail → fix root code (type error / missing file / etc.), push again. Server setup: `scripts/server-setup.sh`.
 
-### UI architecture — DOM only, single source of truth
+### UI architecture — DOM first, single source of truth
 
-DEViLBOX render DOM only (React HTML / canvas — no Pixi / GL).
+DEViLBOX render DOM (React HTML / canvas). **No Pixi** — that tree deleted, no
+whole-app GL render mode exist. WebGL2 still live, but confined to five places:
+pattern-grid worker renderer (`TrackerGLRenderer` + `tracker-render.worker.ts` +
+`readonly-pattern.worker.ts`), DJ/tracker visualizers
+(`components/dj/visualizers/**`, `TrackerVisualBackground`), DJ 3D overlay
+(`DJ3DOverlay` + deck/mixer 3D views), Aelapse springs UI
+(`AelapseSpringsRenderer`), VJ view (`components/vj/**`, `engine/vj/**`). Outside
+those — DOM.
 
 ```
 Stores + Hooks (shared data)  →  DOM Components
