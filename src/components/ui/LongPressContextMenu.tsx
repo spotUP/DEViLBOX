@@ -115,7 +115,7 @@ export const LongPressContextMenu: React.FC<LongPressContextMenuProps> = ({
                 ${item.disabled
                   ? 'opacity-40 cursor-not-allowed'
                   : item.destructive
-                  ? 'text-error hover:bg-error/10'
+                  ? 'text-accent-error hover:bg-accent-error/10'
                   : 'text-text-primary hover:bg-dark-bgHover'
                 }
               `}

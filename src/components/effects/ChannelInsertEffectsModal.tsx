@@ -155,11 +155,11 @@ export const ChannelInsertEffectsModal: React.FC<ChannelInsertEffectsModalProps>
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={onClose}>
       <div
-        className="bg-surface-primary border border-border-primary rounded-lg shadow-xl max-w-3xl w-full max-h-[80vh] overflow-hidden"
+        className="bg-dark-bg border border-dark-border rounded-lg shadow-xl max-w-3xl w-full max-h-[80vh] overflow-hidden"
         onClick={e => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-4 py-2 border-b border-border-primary">
+        <div className="flex items-center justify-between px-4 py-2 border-b border-dark-border">
           <span className="text-sm font-medium text-text-primary">
             Channel {channelIndex + 1} — Insert Effects
           </span>
@@ -171,20 +171,20 @@ export const ChannelInsertEffectsModal: React.FC<ChannelInsertEffectsModalProps>
             <div className="relative" ref={presetMenuRef}>
               <button
                 onClick={() => setShowPresetMenu(v => !v)}
-                className="flex items-center gap-1 px-2 py-0.5 text-[11px] font-mono rounded border border-border-primary text-text-muted hover:text-text-primary hover:border-accent-primary/40 transition-colors"
+                className="flex items-center gap-1 px-2 py-0.5 text-[11px] font-mono rounded border border-dark-border text-text-muted hover:text-text-primary hover:border-accent-primary/40 transition-colors"
                 title="Load a factory preset chain to this channel"
               >
                 Presets <ChevronDown size={12} />
               </button>
               {showPresetMenu && (
-                <div className="absolute right-0 top-[120%] z-20 w-72 max-h-[60vh] overflow-y-auto bg-surface-primary border border-border-primary rounded shadow-2xl">
-                  <div className="flex flex-wrap gap-1 p-2 border-b border-border-primary">
+                <div className="absolute right-0 top-[120%] z-20 w-72 max-h-[60vh] overflow-y-auto bg-dark-bg border border-dark-border rounded shadow-2xl">
+                  <div className="flex flex-wrap gap-1 p-2 border-b border-dark-border">
                     <button
                       onClick={() => setPresetTagFilter(null)}
                       className={`px-1.5 py-0.5 text-[9px] font-mono rounded border ${
                         presetTagFilter === null
                           ? 'bg-accent-primary/20 text-accent-primary border-accent-primary/40'
-                          : 'text-text-muted border-border-primary hover:text-text-primary'
+                          : 'text-text-muted border-dark-border hover:text-text-primary'
                       }`}
                     >
                       ALL
@@ -196,7 +196,7 @@ export const ChannelInsertEffectsModal: React.FC<ChannelInsertEffectsModalProps>
                         className={`px-1.5 py-0.5 text-[9px] font-mono rounded border ${
                           presetTagFilter === tag
                             ? 'bg-accent-primary/20 text-accent-primary border-accent-primary/40'
-                            : 'text-text-muted border-border-primary hover:text-text-primary'
+                            : 'text-text-muted border-dark-border hover:text-text-primary'
                         }`}
                       >
                         {tag}
@@ -208,7 +208,7 @@ export const ChannelInsertEffectsModal: React.FC<ChannelInsertEffectsModalProps>
                       <button
                         key={preset.name}
                         onClick={() => handleLoadPreset(preset)}
-                        className="w-full text-left px-3 py-1.5 text-xs hover:bg-surface-secondary transition-colors"
+                        className="w-full text-left px-3 py-1.5 text-xs hover:bg-dark-bgSecondary transition-colors"
                         title={preset.description}
                       >
                         <div className="font-medium text-text-primary">{preset.name}</div>
@@ -236,16 +236,16 @@ export const ChannelInsertEffectsModal: React.FC<ChannelInsertEffectsModalProps>
         {/* Body — two columns */}
         <div className="flex" style={{ height: '60vh' }}>
           {/* Left column: effect chain + add button */}
-          <div className="w-[200px] border-r border-border-primary flex flex-col">
+          <div className="w-[200px] border-r border-dark-border flex flex-col">
             <div className="flex-1 overflow-y-auto">
               {insertEffects.map((fx, i) => (
                 <button
                   key={fx.id ?? `fx-${i}`}
                   onClick={() => { setSelectedIndex(i); setShowBrowser(false); }}
-                  className={`w-full text-left px-3 py-2 border-b border-border-primary transition-colors ${
+                  className={`w-full text-left px-3 py-2 border-b border-dark-border transition-colors ${
                     i === selectedIndex && !showBrowser
                       ? 'bg-accent-primary/10 text-text-primary'
-                      : 'text-text-muted hover:bg-surface-secondary'
+                      : 'text-text-muted hover:bg-dark-bgSecondary'
                   }`}
                 >
                   <div className="flex items-center gap-2">
@@ -284,12 +284,12 @@ export const ChannelInsertEffectsModal: React.FC<ChannelInsertEffectsModalProps>
             <button
               onClick={() => setShowBrowser(true)}
               disabled={insertEffects.length >= MAX_INSERT_EFFECTS}
-              className={`px-3 py-2 border-t border-border-primary text-xs font-mono transition-colors ${
+              className={`px-3 py-2 border-t border-dark-border text-xs font-mono transition-colors ${
                 insertEffects.length >= MAX_INSERT_EFFECTS
                   ? 'text-text-muted/30 cursor-not-allowed'
                   : showBrowser
                     ? 'bg-accent-primary/10 text-accent-primary'
-                    : 'text-text-muted hover:text-text-primary hover:bg-surface-secondary'
+                    : 'text-text-muted hover:text-text-primary hover:bg-dark-bgSecondary'
               }`}
             >
               + Add Effect ({AVAILABLE_EFFECTS.length} available)
@@ -305,7 +305,7 @@ export const ChannelInsertEffectsModal: React.FC<ChannelInsertEffectsModalProps>
                   placeholder="Search effects..."
                   value={searchQuery}
                   onChange={e => setSearchQuery(e.target.value)}
-                  className="w-full px-2 py-1 mb-3 text-xs bg-surface-secondary border border-border-primary rounded text-text-primary placeholder-text-muted focus:outline-none focus:border-accent-primary"
+                  className="w-full px-2 py-1 mb-3 text-xs bg-dark-bgSecondary border border-dark-border rounded text-text-primary placeholder-text-muted focus:outline-none focus:border-accent-primary"
                   autoFocus
                 />
                 {Object.entries(filteredGroups).map(([group, effects]) => (
@@ -318,7 +318,7 @@ export const ChannelInsertEffectsModal: React.FC<ChannelInsertEffectsModalProps>
                         <button
                           key={fx.type}
                           onClick={() => handleAddEffect(fx)}
-                          className="text-left px-2 py-1.5 text-xs font-mono rounded border border-border-primary text-text-muted hover:text-text-primary hover:bg-surface-secondary hover:border-accent-primary/30 transition-colors"
+                          className="text-left px-2 py-1.5 text-xs font-mono rounded border border-dark-border text-text-muted hover:text-text-primary hover:bg-dark-bgSecondary hover:border-accent-primary/30 transition-colors"
                           title={fx.description}
                         >
                           {fx.label}

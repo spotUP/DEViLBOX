@@ -120,7 +120,7 @@ export const RomUploadDialog: React.FC = () => {
               <p className="text-text-primary">
                 This synth requires ROM files that couldn't be loaded automatically.
               </p>
-              <p className="mt-2 text-dark-text-secondary">
+              <p className="mt-2 text-text-secondary">
                 Without ROMs, the synth will be silent. You can upload the ROM file
                 below, or place it in <code className="text-amber-300 bg-black/30 px-1 rounded">/public/roms/</code> for auto-loading.
               </p>
@@ -129,8 +129,8 @@ export const RomUploadDialog: React.FC = () => {
         </div>
 
         {/* Expected file */}
-        <div className="bg-dark-surface rounded-lg p-3">
-          <div className="text-xs text-dark-text-secondary uppercase tracking-wider mb-1">
+        <div className="bg-dark-bgSecondary rounded-lg p-3">
+          <div className="text-xs text-text-secondary uppercase tracking-wider mb-1">
             Expected ROM file
           </div>
           <div className="font-mono text-sm text-amber-300">
@@ -154,8 +154,8 @@ export const RomUploadDialog: React.FC = () => {
                   ? 'border-amber-500/50 bg-amber-900/10'
                   : 'border-dark-border hover:border-amber-400/50 hover:bg-amber-900/5'}
               `}>
-                <Upload size={24} className={uploading ? 'text-amber-400 animate-pulse' : 'text-dark-text-secondary'} />
-                <span className="text-sm text-dark-text-secondary">
+                <Upload size={24} className={uploading ? 'text-amber-400 animate-pulse' : 'text-text-secondary'} />
+                <span className="text-sm text-text-secondary">
                   {uploading ? 'Loading ROM...' : 'Click to upload ROM file (.zip or raw ROM)'}
                 </span>
               </div>
@@ -182,7 +182,7 @@ export const RomUploadDialog: React.FC = () => {
         <div className="flex justify-end w-full">
           <button
             onClick={handleDismiss}
-            className="flex items-center gap-2 px-4 py-2 bg-dark-surface hover:bg-dark-hover rounded transition-colors"
+            className="flex items-center gap-2 px-4 py-2 bg-dark-bgSecondary hover:bg-dark-bgHover rounded transition-colors"
           >
             <X size={16} />
             <span>{success ? 'Close' : 'Skip'}</span>
