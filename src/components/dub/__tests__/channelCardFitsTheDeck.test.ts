@@ -38,14 +38,34 @@ describe('the channel card fits the deck', () => {
     expect(DECK).toContain('max-h-[calc(var(--app-vh)*0.75)]');
   });
 
-  it('keeps the two cards the same width, wide enough for three buttons and the fader', () => {
-    const cards = DECK.match(/rounded border w-56 shrink-0/g) ?? [];
-    expect(cards.length, 'master + channel').toBe(2);
-    expect(DECK, 'the old single-column width is back').not.toMatch(/rounded border w-32 shrink-0/);
+  /**
+   * The two cards are no longer the same width, and that is the point.
+   *
+   * They were both `w-56` because three full-size op buttons across set the
+   * width, and every channel carried those buttons. Since 2026-09-23 the ops
+   * live once, on the shared panel, so only IT needs the room; a channel strip
+   * is sized by what a desk channel actually has.
+   *
+   * 144 px is not a taste: it is what a channel gets in the controller layout's
+   * fader zone — two of the descriptor's twenty-two grid units across an
+   * eighteen-unit bank — so the strip fits the shape of the hardware it mirrors.
+   */
+  it('keeps the op panel wide enough for three buttons across', () => {
+    const wide = DECK.match(/rounded border w-56 shrink-0/g) ?? [];
+    expect(wide.length, 'the shared op panel, and nothing else').toBe(1);
   });
 
-  it('puts the role select and the filter select on one row', () => {
-    expect(DECK).toContain('{/* Role and filter share a row — one row fewer in the card. */}');
+  it('narrows the channel strip to the width the hardware gives a channel', () => {
+    expect(DECK).toMatch(/rounded border w-36 shrink-0 transition-colors/);
+    expect(DECK, 'a strip as wide as the op panel is the old rack').not.toMatch(
+      /rounded border w-56 shrink-0 transition-colors/,
+    );
+  });
+
+  it('stacks the role select and the filter select, which do not fit side by side at 144 px', () => {
+    // 144 px minus padding, gap and the readout column leaves 90 px; two
+    // selects in that is 43 px each, and "Filter off" does not fit in 43 px.
+    expect(DECK).toContain('{/* Role and filter STACK.');
   });
 
   it('gives the master card the same skeleton: ALL / NONE where a channel has its selects, fader column identical', () => {

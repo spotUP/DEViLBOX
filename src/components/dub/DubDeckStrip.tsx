@@ -1431,7 +1431,16 @@ export const DubDeckStrip: React.FC = () => {
                 // channel. w-56: three full-size op buttons across plus the 16px
                 // fader. Nine ops in one column ran ~600px tall and the deck
                 // clipped every card; a 3x3 grid is three rows.
-                'flex flex-row items-stretch gap-2.5 px-2 py-1.5 rounded border w-56 shrink-0 transition-colors ' +
+                // w-36 (144 px), down from w-56 (224 px). The card was 224
+                // because three full-size op buttons across set its width;
+                // with the ops gone it is sized by what a desk channel
+                // actually has. 144 px is what a channel gets in the
+                // controller layout's fader zone — 2 of the descriptor's 22
+                // grid units across an 18-unit bank — so the strip finally
+                // fits the shape of the hardware.
+                //   16 px padding + 10 px gap + 28 px readout column
+                //   leaves 90 px for the name, the selects and the sends.
+                'flex flex-row items-stretch gap-2.5 px-2 py-1.5 rounded border w-36 shrink-0 transition-colors ' +
                 (channelFiring || isFlashed
                   ? 'bg-accent-highlight/15 border-accent-highlight'
                   : isHeld
@@ -1449,8 +1458,12 @@ export const DubDeckStrip: React.FC = () => {
               >
                 {channelLabels[i]}
               </span>
-              {/* Role and filter share a row — one row fewer in the card. */}
-              <div className="flex gap-1 w-full">
+              {/* Role and filter STACK. They shared a row while the card was
+                  224 px wide; at 144 px that is 43 px each and "Filter off"
+                  does not fit in it. One row fewer mattered when nine op
+                  buttons set the height — they are gone, so the room is
+                  there. */}
+              <div className="flex flex-col gap-1 w-full">
               {/* Role override — dim = auto (classifier), amber = locked by user */}
               {(() => {
                 const userRole = ch?.dubRole ?? null;

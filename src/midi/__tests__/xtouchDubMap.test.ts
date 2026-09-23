@@ -126,6 +126,23 @@ describe('Layer B carries what Layer A had no room for', () => {
   });
 });
 
+describe('the fader touch aims the op panel', () => {
+  it('each of the eight faders aims at its own channel', () => {
+    // The X-Touch sends these the instant a hand lands, before the fader
+    // moves — the moment a desk decides which channel you mean.
+    for (let i = 0; i < 8; i++) {
+      expect(ccOf(101 + i)?.param).toBe(`dub.channelTouch.ch${i}`);
+    }
+  });
+
+  it('touching is not the same address as riding', () => {
+    for (let i = 0; i < 8; i++) {
+      expect(ccOf(1 + i)?.param).toBe(`dub.channelSend.ch${i}`);
+      expect(ccOf(101 + i)?.param).not.toBe(ccOf(1 + i)?.param);
+    }
+  });
+});
+
 describe('every mapping lands on a control this device actually has', () => {
   const layout = getControllerLayout('behringer-xtouch-compact')!;
   const notes = new Set<number>();
@@ -133,6 +150,10 @@ describe('every mapping lands on a control this device actually has', () => {
   for (const c of layout.controls) {
     if (c.midi.number < 0) continue;
     if (c.midi.type === 'cc') ccs.add(c.midi.number);
+    // A touch-sensitive fader answers on TWO CCs: one when it moves, one when
+    // a hand lands on it. The second is a real address on a real control, and
+    // leaving it out of this set made mapping the touch look like a mistake.
+    if (c.midi.touchCc !== undefined) ccs.add(c.midi.touchCc);
     if (c.midi.type === 'note') notes.add(c.midi.number);
     if (c.midi.pushNote !== undefined) notes.add(c.midi.pushNote);
   }

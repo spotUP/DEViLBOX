@@ -443,6 +443,19 @@ const BEHRINGER_X_TOUCH_COMPACT: DJControllerPreset = {
     { channel: 0, cc: 8, param: 'dub.channelSend.ch7' },
     // MAIN fader
     { channel: 0, cc: 9, param: 'dj.masterVolume' },
+    // Fader TOUCH — the X-Touch's faders are touch-sensitive and send these
+    // the instant a hand lands, before the fader moves. That is the moment a
+    // desk decides which channel you mean, so they aim the deck's shared op
+    // panel at that channel. Riding the fader is the CC above; touching it is
+    // this, and touching alone must be able to aim without moving the send.
+    { channel: 0, cc: 101, param: 'dub.channelTouch.ch0' },
+    { channel: 0, cc: 102, param: 'dub.channelTouch.ch1' },
+    { channel: 0, cc: 103, param: 'dub.channelTouch.ch2' },
+    { channel: 0, cc: 104, param: 'dub.channelTouch.ch3' },
+    { channel: 0, cc: 105, param: 'dub.channelTouch.ch4' },
+    { channel: 0, cc: 106, param: 'dub.channelTouch.ch5' },
+    { channel: 0, cc: 107, param: 'dub.channelTouch.ch6' },
+    { channel: 0, cc: 108, param: 'dub.channelTouch.ch7' },
 
     // Top encoder row (CC 10-17) — the bus tone and FX controls, in the order
     // the deck shows them. Continuous params on continuous controls: this row
