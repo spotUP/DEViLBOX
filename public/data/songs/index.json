@@ -1,0 +1,1417 @@
+{
+  "generated": "2026-09-23T23:36:03.574Z",
+  "perFormat": 8,
+  "formats": [
+    {
+      "format": "Goat Tracker Ultra",
+      "total": 26,
+      "files": [
+        "/data/songs/Goat Tracker Ultra/Jammer/$3GarysGlitteringSaliva_4x.sng",
+        "/data/songs/Goat Tracker Ultra/Jammer/$3LastNight_Jammer.sng",
+        "/data/songs/Goat Tracker Ultra/Jammer/$3TrippyTrappy.sng",
+        "/data/songs/Goat Tracker Ultra/Jammer/$6Boileroom_2SID.sng",
+        "/data/songs/Goat Tracker Ultra/Jammer/$6StarsAreUs_2SID.sng",
+        "/data/songs/Goat Tracker Ultra/JasonPage/RType_Amiga2SID.sng",
+        "/data/songs/Goat Tracker Ultra/LMan/$3LMan-Rivalry-Dubs.sng",
+        "/data/songs/Goat Tracker Ultra/LMan/$3LMan-SID-Chip-Club-Menu.sng"
+      ]
+    },
+    {
+      "format": "SUNTronicTunes",
+      "total": 360,
+      "files": [
+        "/data/songs/SUNTronicTunes/Bass-test.src",
+        "/data/songs/SUNTronicTunes/Bio-1.src",
+        "/data/songs/SUNTronicTunes/Lightforce",
+        "/data/songs/SUNTronicTunes/MIC-sound-1.src",
+        "/data/songs/SUNTronicTunes/R-DEMO-II",
+        "/data/songs/SUNTronicTunes/ROUTINE0",
+        "/data/songs/SUNTronicTunes/Snake0.src",
+        "/data/songs/SUNTronicTunes/Snake3.src"
+      ]
+    },
+    {
+      "format": "Sonix_Music_Driver",
+      "total": 25,
+      "files": [
+        "/data/songs/Sonix_Music_Driver/Alan_McKean_&_Mark_Riley/A-10_Tank_Killer/snx.A-10_Tank_Killer_Losing.zip",
+        "/data/songs/Sonix_Music_Driver/Alan_McKean_&_Mark_Riley/A-10_Tank_Killer/snx.A-10_Tank_Killer_Theme.zip",
+        "/data/songs/Sonix_Music_Driver/Alan_McKean_&_Mark_Riley/A-10_Tank_Killer/snx.A-10_Tank_Killer_Winning.zip",
+        "/data/songs/Sonix_Music_Driver/Bernie_Whang_&_Brian_Howarth/TV_Sports_Boxing/smus.be.zip",
+        "/data/songs/Sonix_Music_Driver/Bernie_Whang_&_Brian_Howarth_&_Nigel_Spencer/Bo_Jackson_Baseball/smus.annouami.zip",
+        "/data/songs/Sonix_Music_Driver/Bernie_Whang_&_Brian_Howarth_&_Nigel_Spencer/Bo_Jackson_Baseball/smus.mmannami.zip",
+        "/data/songs/Sonix_Music_Driver/Bernie_Whang_&_Brian_Howarth_&_Nigel_Spencer/Bo_Jackson_Baseball/smus.mmchaami.zip",
+        "/data/songs/Sonix_Music_Driver/Bernie_Whang_&_Brian_Howarth_&_Nigel_Spencer/Bo_Jackson_Baseball/smus.mmhasami.zip"
+      ]
+    },
+    {
+      "format": "actionamics",
+      "total": 1,
+      "files": [
+        "/data/songs/actionamics/dynablaster.ast"
+      ]
+    },
+    {
+      "format": "activision-pro",
+      "total": 1,
+      "files": [
+        "/data/songs/activision-pro/gettysburg.avp"
+      ]
+    },
+    {
+      "format": "ahx",
+      "total": 1,
+      "files": [
+        "/data/songs/ahx/amanda.ahx"
+      ]
+    },
+    {
+      "format": "amigaklang",
+      "total": 15,
+      "files": [
+        "/data/songs/amigaklang/JosSs-Cream.mod",
+        "/data/songs/amigaklang/JosSs-DualPanoply.mod",
+        "/data/songs/amigaklang/Virgill&Maze-national waffle day.mod",
+        "/data/songs/amigaklang/Virgill-80s architecture.mod",
+        "/data/songs/amigaklang/Virgill-amigahub.mod",
+        "/data/songs/amigaklang/Virgill-atariklang.mod",
+        "/data/songs/amigaklang/Virgill-colombia.mod",
+        "/data/songs/amigaklang/Virgill-mothership.mod"
+      ]
+    },
+    {
+      "format": "anders-oland",
+      "total": 1,
+      "files": [
+        "/data/songs/anders-oland/primemover 07.hot"
+      ]
+    },
+    {
+      "format": "art-of-noise",
+      "total": 1,
+      "files": [
+        "/data/songs/art-of-noise/inside.blipp.aon"
+      ]
+    },
+    {
+      "format": "ashley-hogg",
+      "total": 1,
+      "files": [
+        "/data/songs/ashley-hogg/ash.nobby the aardvark"
+      ]
+    },
+    {
+      "format": "audio-sculpture",
+      "total": 1,
+      "files": [
+        "/data/songs/audio-sculpture/m.mod"
+      ]
+    },
+    {
+      "format": "ay-amadeus",
+      "total": 1,
+      "files": [
+        "/data/songs/ay-amadeus/aztec theme.amad"
+      ]
+    },
+    {
+      "format": "ay-emul",
+      "total": 1,
+      "files": [
+        "/data/songs/ay-emul/spring.emul"
+      ]
+    },
+    {
+      "format": "ay-strc",
+      "total": 1,
+      "files": [
+        "/data/songs/ay-strc/mega mix 1.strc"
+      ]
+    },
+    {
+      "format": "beathoven-synthesizer",
+      "total": 1,
+      "files": [
+        "/data/songs/beathoven-synthesizer/tristar cracktro.bss"
+      ]
+    },
+    {
+      "format": "behringer-td-3",
+      "total": 50,
+      "files": [
+        "/data/songs/behringer-td-3/Acid Pattern 1.seq",
+        "/data/songs/behringer-td-3/Acid Pattern 10.seq",
+        "/data/songs/behringer-td-3/Acid Pattern 2.seq",
+        "/data/songs/behringer-td-3/Acid Pattern 3.seq",
+        "/data/songs/behringer-td-3/Acid Pattern 4.seq",
+        "/data/songs/behringer-td-3/Acid Pattern 5.seq",
+        "/data/songs/behringer-td-3/Acid Pattern 6.seq",
+        "/data/songs/behringer-td-3/Acid Pattern 7.seq"
+      ]
+    },
+    {
+      "format": "ben-daglish",
+      "total": 1,
+      "files": [
+        "/data/songs/ben-daglish/motorhead-titleandingame.bd"
+      ]
+    },
+    {
+      "format": "ben-daglish-sid",
+      "total": 1,
+      "files": [
+        "/data/songs/ben-daglish-sid/terramex.bds"
+      ]
+    },
+    {
+      "format": "bp-soundmon-2",
+      "total": 1,
+      "files": [
+        "/data/songs/bp-soundmon-2/nicktune1.bp"
+      ]
+    },
+    {
+      "format": "bp-soundmon-3",
+      "total": 1,
+      "files": [
+        "/data/songs/bp-soundmon-3/testmod.bp3"
+      ]
+    },
+    {
+      "format": "cheesecutter",
+      "total": 1,
+      "files": [
+        "/data/songs/cheesecutter/abaddon-trouble.ct"
+      ]
+    },
+    {
+      "format": "chiptracker",
+      "total": 1,
+      "files": [
+        "/data/songs/chiptracker/chuck rock - chuckrock.mod"
+      ]
+    },
+    {
+      "format": "composer-667",
+      "total": 1,
+      "files": [
+        "/data/songs/composer-667/speed fighter.667"
+      ]
+    },
+    {
+      "format": "composer-669",
+      "total": 1,
+      "files": [
+        "/data/songs/composer-669/speed fighter.669"
+      ]
+    },
+    {
+      "format": "composer-670-cdfm",
+      "total": 1,
+      "files": [
+        "/data/songs/composer-670-cdfm/black glass ][ - muzik0.670"
+      ]
+    },
+    {
+      "format": "core-design",
+      "total": 1,
+      "files": [
+        "/data/songs/core-design/dynamite dux.core"
+      ]
+    },
+    {
+      "format": "custommade",
+      "total": 1,
+      "files": [
+        "/data/songs/custommade/the viking child crack.cm"
+      ]
+    },
+    {
+      "format": "darius-zendeh",
+      "total": 1,
+      "files": [
+        "/data/songs/darius-zendeh/crash and burn.dz"
+      ]
+    },
+    {
+      "format": "dave-lowe",
+      "total": 1,
+      "files": [
+        "/data/songs/dave-lowe/incredibleshrinkingsphere.dl"
+      ]
+    },
+    {
+      "format": "dave-lowe-new",
+      "total": 1,
+      "files": [
+        "/data/songs/dave-lowe-new/m-bison.dln"
+      ]
+    },
+    {
+      "format": "david-hanney",
+      "total": 1,
+      "files": [
+        "/data/songs/david-hanney/tearaway thomas unused.dh"
+      ]
+    },
+    {
+      "format": "david-whittaker",
+      "total": 1,
+      "files": [
+        "/data/songs/david-whittaker/garfield2+.dw"
+      ]
+    },
+    {
+      "format": "deflemask",
+      "total": 1816,
+      "files": [
+        "/data/songs/deflemask/0xfroman/Product01.dmf",
+        "/data/songs/deflemask/0xfroman/Product02.dmf",
+        "/data/songs/deflemask/220hertz/Andrew_haggles.dmf",
+        "/data/songs/deflemask/85NESplayer/BA Round 1.dmf",
+        "/data/songs/deflemask/85NESplayer/DKC Title.dmf",
+        "/data/songs/deflemask/85NESplayer/G&WG Octopus.dmf",
+        "/data/songs/deflemask/85NESplayer/MP Creative Exercise.dmf",
+        "/data/songs/deflemask/85NESplayer/MP Title.dmf"
+      ]
+    },
+    {
+      "format": "delitracker-custom",
+      "total": 1,
+      "files": [
+        "/data/songs/delitracker-custom/Skyfox.cus"
+      ]
+    },
+    {
+      "format": "delta-music",
+      "total": 1,
+      "files": [
+        "/data/songs/delta-music/triplex1.dm"
+      ]
+    },
+    {
+      "format": "delta-music-2",
+      "total": 1,
+      "files": [
+        "/data/songs/delta-music-2/asperity megademo 3.dm2"
+      ]
+    },
+    {
+      "format": "desire",
+      "total": 1,
+      "files": [
+        "/data/songs/desire/batmanreturns.dsr"
+      ]
+    },
+    {
+      "format": "digi-trakker",
+      "total": 1,
+      "files": [
+        "/data/songs/digi-trakker/rohadtjo.mdl"
+      ]
+    },
+    {
+      "format": "digibooster",
+      "total": 1,
+      "files": [
+        "/data/songs/digibooster/the day after.digi"
+      ]
+    },
+    {
+      "format": "digibooster-pro",
+      "total": 1,
+      "files": [
+        "/data/songs/digibooster-pro/invisibility.dbm"
+      ]
+    },
+    {
+      "format": "digital-mugician",
+      "total": 1,
+      "files": [
+        "/data/songs/digital-mugician/believe.dmu"
+      ]
+    },
+    {
+      "format": "digital-mugician-2",
+      "total": 1,
+      "files": [
+        "/data/songs/digital-mugician-2/snickle.mug"
+      ]
+    },
+    {
+      "format": "digital-sonix-and-chrome",
+      "total": 13,
+      "files": [
+        "/data/songs/digital-sonix-and-chrome/David Hanlon/dragon'sbreath dbfx.dsc",
+        "/data/songs/digital-sonix-and-chrome/David Hanlon/dragon'sbreath demo 1.dsc",
+        "/data/songs/digital-sonix-and-chrome/David Hanlon/dragon'sbreath demo 2.dsc",
+        "/data/songs/digital-sonix-and-chrome/David Hanlon/dragon'sbreath drfx.dsc",
+        "/data/songs/digital-sonix-and-chrome/David Hanlon/dragon'sbreath enfx.dsc",
+        "/data/songs/digital-sonix-and-chrome/David Hanlon/dragon'sbreath fanfares.dsc",
+        "/data/songs/digital-sonix-and-chrome/David Hanlon/dragon'sbreath fyfx.dsc",
+        "/data/songs/digital-sonix-and-chrome/David Hanlon/dragon'sbreath ingame 1.dsc"
+      ]
+    },
+    {
+      "format": "digital-sound-studio",
+      "total": 1,
+      "files": [
+        "/data/songs/digital-sound-studio/zrimay.dss"
+      ]
+    },
+    {
+      "format": "digital-symphony",
+      "total": 1,
+      "files": [
+        "/data/songs/digital-symphony/binary reality.dss"
+      ]
+    },
+    {
+      "format": "digital-tracker-dtm",
+      "total": 1,
+      "files": [
+        "/data/songs/digital-tracker-dtm/sonic subspace.dtm"
+      ]
+    },
+    {
+      "format": "digital-tracker-mod",
+      "total": 1,
+      "files": [
+        "/data/songs/digital-tracker-mod/essai_18.mod"
+      ]
+    },
+    {
+      "format": "disorder-tracker-2",
+      "total": 1,
+      "files": [
+        "/data/songs/disorder-tracker-2/hyper geckoo.plm"
+      ]
+    },
+    {
+      "format": "earache",
+      "total": 1,
+      "files": [
+        "/data/songs/earache/bladerunner.ea"
+      ]
+    },
+    {
+      "format": "face-the-music",
+      "total": 1,
+      "files": [
+        "/data/songs/face-the-music/rock.ftm"
+      ]
+    },
+    {
+      "format": "farandole-composer",
+      "total": 1,
+      "files": [
+        "/data/songs/farandole-composer/dark dreams.far"
+      ]
+    },
+    {
+      "format": "fashion-tracker",
+      "total": 1,
+      "files": [
+        "/data/songs/fashion-tracker/ivory tover ii.ex"
+      ]
+    },
+    {
+      "format": "fm-tracker",
+      "total": 1,
+      "files": [
+        "/data/songs/fm-tracker/fm dance.fmt"
+      ]
+    },
+    {
+      "format": "follin-player-ii",
+      "total": 1,
+      "files": [
+        "/data/songs/follin-player-ii/sly spy title.tf"
+      ]
+    },
+    {
+      "format": "forgotten-worlds",
+      "total": 1,
+      "files": [
+        "/data/songs/forgotten-worlds/forgotten worlds intro.fw"
+      ]
+    },
+    {
+      "format": "formats",
+      "total": 652,
+      "files": [
+        "/data/songs/formats/45.okta",
+        "/data/songs/formats/64_conversion.tme",
+        "/data/songs/formats/Epic Pinball - Song 0 - Title.psm",
+        "/data/songs/formats/Michel Winogradoff/MIDI.Bumpy'sArcadeFantasy",
+        "/data/songs/formats/Michel Winogradoff/MIDI.Cartoons 1",
+        "/data/songs/formats/Michel Winogradoff/MIDI.Cartoons 2",
+        "/data/songs/formats/Michel Winogradoff/MIDI.Cartoons 3",
+        "/data/songs/formats/Michel Winogradoff/MIDI.Cartoons 4"
+      ]
+    },
+    {
+      "format": "fred-gray",
+      "total": 1,
+      "files": [
+        "/data/songs/fred-gray/eco.gray"
+      ]
+    },
+    {
+      "format": "fredmon",
+      "total": 1,
+      "files": [
+        "/data/songs/fredmon/fireworks ii.fred"
+      ]
+    },
+    {
+      "format": "furnace",
+      "total": 453,
+      "files": [
+        "/data/songs/furnace/a2600/Balmeranda.fur",
+        "/data/songs/furnace/a2600/Funky_Afternoon.fur",
+        "/data/songs/furnace/a2600/Slam_the_Door.fur",
+        "/data/songs/furnace/a2600/Watch My Tone.fur",
+        "/data/songs/furnace/a2600/morepain.fur",
+        "/data/songs/furnace/a2600/twin.fur",
+        "/data/songs/furnace/amiga/Ibiza.fur",
+        "/data/songs/furnace/amiga/a_wave_powerhouse.fur"
+      ]
+    },
+    {
+      "format": "future-composer-1.3",
+      "total": 1,
+      "files": [
+        "/data/songs/future-composer-1.3/commando.smod"
+      ]
+    },
+    {
+      "format": "future-composer-1.4",
+      "total": 1,
+      "files": [
+        "/data/songs/future-composer-1.4/starglide1.fc"
+      ]
+    },
+    {
+      "format": "future-composer-bsi",
+      "total": 1,
+      "files": [
+        "/data/songs/future-composer-bsi/newtek.bsi"
+      ]
+    },
+    {
+      "format": "future-player",
+      "total": 1,
+      "files": [
+        "/data/songs/future-player/imploder drums.fp"
+      ]
+    },
+    {
+      "format": "game-music-creator",
+      "total": 1,
+      "files": [
+        "/data/songs/game-music-creator/barbarian 2 title.gmc"
+      ]
+    },
+    {
+      "format": "general-digimusic",
+      "total": 1,
+      "files": [
+        "/data/songs/general-digimusic/tilbury fair (remix).gdm"
+      ]
+    },
+    {
+      "format": "gluemon",
+      "total": 1,
+      "files": [
+        "/data/songs/gluemon/gnu-song.glue"
+      ]
+    },
+    {
+      "format": "goat-tracker-ultra",
+      "total": 1,
+      "files": [
+        "/data/songs/goat-tracker-ultra/$3jammar-akhbar.sng"
+      ]
+    },
+    {
+      "format": "graoumf-tracker-2",
+      "total": 1,
+      "files": [
+        "/data/songs/graoumf-tracker-2/living-on-video.gt2"
+      ]
+    },
+    {
+      "format": "hippel",
+      "total": 1,
+      "files": [
+        "/data/songs/hippel/warp (ingame 2).hip"
+      ]
+    },
+    {
+      "format": "hippel-7v",
+      "total": 1,
+      "files": [
+        "/data/songs/hippel-7v/lethalxcess-intro.hip7"
+      ]
+    },
+    {
+      "format": "hippel-coso",
+      "total": 1,
+      "files": [
+        "/data/songs/hippel-coso/wings of death (level 3).hipc"
+      ]
+    },
+    {
+      "format": "hippel-st",
+      "total": 1,
+      "files": [
+        "/data/songs/hippel-st/demo music10.sog"
+      ]
+    },
+    {
+      "format": "hippel-st-coso",
+      "total": 1,
+      "files": [
+        "/data/songs/hippel-st-coso/ghostbattle titletune.soc"
+      ]
+    },
+    {
+      "format": "his-masters-noise",
+      "total": 1,
+      "files": [
+        "/data/songs/his-masters-noise/the funny farm.mod"
+      ]
+    },
+    {
+      "format": "hivelytracker",
+      "total": 1,
+      "files": [
+        "/data/songs/hivelytracker/waiting for a message.hvl"
+      ]
+    },
+    {
+      "format": "howie-davies",
+      "total": 1,
+      "files": [
+        "/data/songs/howie-davies/blazing thunder.hd"
+      ]
+    },
+    {
+      "format": "iff-smus",
+      "total": 10227,
+      "files": [
+        "/data/songs/iff-smus/- unknown/42/42.smus",
+        "/data/songs/iff-smus/- unknown/42/instruments/Sax.42.instr",
+        "/data/songs/iff-smus/- unknown/42/instruments/Saxophone.ss",
+        "/data/songs/iff-smus/- unknown/42/instruments/SnareDrum.instr",
+        "/data/songs/iff-smus/- unknown/42/instruments/Snaredrum.ss",
+        "/data/songs/iff-smus/- unknown/42/instruments/Trumpet.42.instr",
+        "/data/songs/iff-smus/- unknown/42/instruments/Trumpet.ss",
+        "/data/songs/iff-smus/- unknown/42/instruments/Vibes.instr"
+      ]
+    },
+    {
+      "format": "images-music-system",
+      "total": 1,
+      "files": [
+        "/data/songs/images-music-system/chip5.ims"
+      ]
+    },
+    {
+      "format": "impulse-tracker",
+      "total": 1,
+      "files": [
+        "/data/songs/impulse-tracker/absm chain mod.it"
+      ]
+    },
+    {
+      "format": "infogrames",
+      "total": 2,
+      "files": [
+        "/data/songs/infogrames/advantage tennis-intro.dum",
+        "/data/songs/infogrames/advantage tennis-intro.ins"
+      ]
+    },
+    {
+      "format": "instereo!",
+      "total": 1,
+      "files": [
+        "/data/songs/instereo!/fantasi8.is"
+      ]
+    },
+    {
+      "format": "instereo!-2.0",
+      "total": 1,
+      "files": [
+        "/data/songs/instereo!-2.0/spaceflight.is20"
+      ]
+    },
+    {
+      "format": "it",
+      "total": 1,
+      "files": [
+        "/data/songs/it/absm chain mod.it"
+      ]
+    },
+    {
+      "format": "jam",
+      "total": 1,
+      "files": [
+        "/data/songs/jam/analogue vibes.jam"
+      ]
+    },
+    {
+      "format": "jamcracker",
+      "total": 1,
+      "files": [
+        "/data/songs/jamcracker/freehand-spreadtro.jam"
+      ]
+    },
+    {
+      "format": "janko-mrsic-flogel",
+      "total": 1,
+      "files": [
+        "/data/songs/janko-mrsic-flogel/spacestation.jmf"
+      ]
+    },
+    {
+      "format": "jason-brooke",
+      "total": 1,
+      "files": [
+        "/data/songs/jason-brooke/ikari warriors.jb"
+      ]
+    },
+    {
+      "format": "jason-page",
+      "total": 2,
+      "files": [
+        "/data/songs/jason-page/jpn.fire and ice-1",
+        "/data/songs/jason-page/smp.fire and ice-1"
+      ]
+    },
+    {
+      "format": "jason-page-old",
+      "total": 1,
+      "files": [
+        "/data/songs/jason-page-old/paradroid90 long patched.jpo"
+      ]
+    },
+    {
+      "format": "jeroen-tel",
+      "total": 1,
+      "files": [
+        "/data/songs/jeroen-tel/stormlord title.jt"
+      ]
+    },
+    {
+      "format": "jesper-olsen",
+      "total": 1,
+      "files": [
+        "/data/songs/jesper-olsen/lollypop-subgame 01.jo"
+      ]
+    },
+    {
+      "format": "klystrack",
+      "total": 1,
+      "files": [
+        "/data/songs/klystrack/Ocean Loader III.kt"
+      ]
+    },
+    {
+      "format": "leggless-music-editor",
+      "total": 1,
+      "files": [
+        "/data/songs/leggless-music-editor/the punisher gameover.lme"
+      ]
+    },
+    {
+      "format": "mad-tracker-2",
+      "total": 1,
+      "files": [
+        "/data/songs/mad-tracker-2/finde somewhere to hide.mt2"
+      ]
+    },
+    {
+      "format": "maniacs-of-noise",
+      "total": 1,
+      "files": [
+        "/data/songs/maniacs-of-noise/unreal flying.mon"
+      ]
+    },
+    {
+      "format": "mark-cooksey",
+      "total": 1,
+      "files": [
+        "/data/songs/mark-cooksey/mighty bombjack.mc"
+      ]
+    },
+    {
+      "format": "mark-cooksey-old",
+      "total": 1,
+      "files": [
+        "/data/songs/mark-cooksey-old/mco.overlander"
+      ]
+    },
+    {
+      "format": "mark-ii",
+      "total": 1,
+      "files": [
+        "/data/songs/mark-ii/astarrsonix.mk2"
+      ]
+    },
+    {
+      "format": "maxtrax",
+      "total": 4,
+      "files": [
+        "/data/songs/maxtrax/antmusic.mxtx",
+        "/data/songs/maxtrax/contraptionzack-funkfest.mxtx",
+        "/data/songs/maxtrax/contraptionzack-march.mxtx",
+        "/data/songs/maxtrax/darkseed (00).mxtx"
+      ]
+    },
+    {
+      "format": "medley",
+      "total": 1,
+      "files": [
+        "/data/songs/medley/combat.mso"
+      ]
+    },
+    {
+      "format": "midi",
+      "total": 43,
+      "files": [
+        "/data/songs/midi/303-pattern_3.mid",
+        "/data/songs/midi/303-pattern_4.mid",
+        "/data/songs/midi/303_pattern_1.mid",
+        "/data/songs/midi/303_pattern_2.mid",
+        "/data/songs/midi/cc_test_song.mid",
+        "/data/songs/midi/darker_shade_of_black.mid",
+        "/data/songs/midi/death_in_the_arena.mid",
+        "/data/songs/midi/drum_song.mid"
+      ]
+    },
+    {
+      "format": "midi-loriciel",
+      "total": 1,
+      "files": [
+        "/data/songs/midi-loriciel/MIDI.Entity L0"
+      ]
+    },
+    {
+      "format": "mod",
+      "total": 2,
+      "files": [
+        "/data/songs/mod/break the box.mod",
+        "/data/songs/mod/world class dub.mod"
+      ]
+    },
+    {
+      "format": "multi-tracker",
+      "total": 1,
+      "files": [
+        "/data/songs/multi-tracker/anonymous in 4ce.mtm"
+      ]
+    },
+    {
+      "format": "multimedia-sound",
+      "total": 1,
+      "files": [
+        "/data/songs/multimedia-sound/bottle popper.mms"
+      ]
+    },
+    {
+      "format": "music-assembler",
+      "total": 1,
+      "files": [
+        "/data/songs/music-assembler/thanatos.ma"
+      ]
+    },
+    {
+      "format": "musicline-editor",
+      "total": 1,
+      "files": [
+        "/data/songs/musicline-editor/drax.ml"
+      ]
+    },
+    {
+      "format": "musicmaker-v8",
+      "total": 1,
+      "files": [
+        "/data/songs/musicmaker-v8/roetzmegoem.mm8"
+      ]
+    },
+    {
+      "format": "musicmaker-v8-old",
+      "total": 1,
+      "files": [
+        "/data/songs/musicmaker-v8-old/moveback.ip.n"
+      ]
+    },
+    {
+      "format": "octalyser",
+      "total": 1,
+      "files": [
+        "/data/songs/octalyser/follow me to hell.mod"
+      ]
+    },
+    {
+      "format": "octamed-mmd0",
+      "total": 1,
+      "files": [
+        "/data/songs/octamed-mmd0/universal monsters - title.mmd0"
+      ]
+    },
+    {
+      "format": "octamed-mmd1",
+      "total": 1,
+      "files": [
+        "/data/songs/octamed-mmd1/funky nightmare.mmd1"
+      ]
+    },
+    {
+      "format": "octamed-mmd3",
+      "total": 1,
+      "files": [
+        "/data/songs/octamed-mmd3/bounty hunter - outro (remixed).mmd3"
+      ]
+    },
+    {
+      "format": "octamed-mmdc",
+      "total": 1,
+      "files": [
+        "/data/songs/octamed-mmdc/knightmare - ingame 3.mmdc"
+      ]
+    },
+    {
+      "format": "oktalyzer",
+      "total": 1,
+      "files": [
+        "/data/songs/oktalyzer/les granges brulees.okta"
+      ]
+    },
+    {
+      "format": "organya",
+      "total": 1,
+      "files": [
+        "/data/songs/organya/obj0640-1.org"
+      ]
+    },
+    {
+      "format": "packed_etc",
+      "total": 1,
+      "files": [
+        "/data/songs/packed_etc/gift of gods.p40a"
+      ]
+    },
+    {
+      "format": "paul-shields",
+      "total": 1,
+      "files": [
+        "/data/songs/paul-shields/jug-hiscore.ps"
+      ]
+    },
+    {
+      "format": "paul-summers",
+      "total": 1,
+      "files": [
+        "/data/songs/paul-summers/everton fc - jingles.snk"
+      ]
+    },
+    {
+      "format": "piston-collage",
+      "total": 1,
+      "files": [
+        "/data/songs/piston-collage/obj1263-1.ptcop"
+      ]
+    },
+    {
+      "format": "piston-collage-protected",
+      "total": 1,
+      "files": [
+        "/data/songs/piston-collage-protected/obj0983-1.pttune"
+      ]
+    },
+    {
+      "format": "pmd",
+      "total": 1,
+      "files": [
+        "/data/songs/pmd/obj0176-1.pmd"
+      ]
+    },
+    {
+      "format": "pollytracker",
+      "total": 1,
+      "files": [
+        "/data/songs/pollytracker/polly rock.mod"
+      ]
+    },
+    {
+      "format": "pretracker",
+      "total": 1,
+      "files": [
+        "/data/songs/pretracker/the little things.prt"
+      ]
+    },
+    {
+      "format": "professional-sound-artists",
+      "total": 1,
+      "files": [
+        "/data/songs/professional-sound-artists/test module.psa"
+      ]
+    },
+    {
+      "format": "protracker-iff",
+      "total": 1,
+      "files": [
+        "/data/songs/protracker-iff/the drainer.ptm"
+      ]
+    },
+    {
+      "format": "pumatracker",
+      "total": 1,
+      "files": [
+        "/data/songs/pumatracker/liquid kids - lv1a.puma"
+      ]
+    },
+    {
+      "format": "quadra-composer",
+      "total": 1,
+      "files": [
+        "/data/songs/quadra-composer/poison.emod"
+      ]
+    },
+    {
+      "format": "quartet-psg",
+      "total": 1,
+      "files": [
+        "/data/songs/quartet-psg/horror zombies from crypt.sqt"
+      ]
+    },
+    {
+      "format": "real-tracker",
+      "total": 1,
+      "files": [
+        "/data/songs/real-tracker/odyssey.rtm"
+      ]
+    },
+    {
+      "format": "richard-joseph",
+      "total": 2,
+      "files": [
+        "/data/songs/richard-joseph/cannon fodder (intro).ins",
+        "/data/songs/richard-joseph/cannon fodder (intro).sng"
+      ]
+    },
+    {
+      "format": "riff-raff",
+      "total": 1,
+      "files": [
+        "/data/songs/riff-raff/bombfusion.riff"
+      ]
+    },
+    {
+      "format": "rob-hubbard",
+      "total": 1,
+      "files": [
+        "/data/songs/rob-hubbard/skateordie.rh"
+      ]
+    },
+    {
+      "format": "rob-hubbard-st",
+      "total": 1,
+      "files": [
+        "/data/songs/rob-hubbard-st/battleships.rho"
+      ]
+    },
+    {
+      "format": "ron-klaren",
+      "total": 1,
+      "files": [
+        "/data/songs/ron-klaren/astra 2.rk"
+      ]
+    },
+    {
+      "format": "s3m",
+      "total": 1,
+      "files": [
+        "/data/songs/s3m/andante.s3m"
+      ]
+    },
+    {
+      "format": "sawteeth",
+      "total": 1,
+      "files": [
+        "/data/songs/sawteeth/okolaNUKE.st"
+      ]
+    },
+    {
+      "format": "sc68",
+      "total": 1,
+      "files": [
+        "/data/songs/sc68/aprentice title.sc68"
+      ]
+    },
+    {
+      "format": "scream-tracker-2",
+      "total": 1,
+      "files": [
+        "/data/songs/scream-tracker-2/slideshow i.stm"
+      ]
+    },
+    {
+      "format": "sean-connolly",
+      "total": 1,
+      "files": [
+        "/data/songs/sean-connolly/surf ninjas.scn"
+      ]
+    },
+    {
+      "format": "sean-conran",
+      "total": 1,
+      "files": [
+        "/data/songs/sean-conran/count duckula.scr"
+      ]
+    },
+    {
+      "format": "sid",
+      "total": 1,
+      "files": [
+        "/data/songs/sid/abaddon-starfish-test.sid"
+      ]
+    },
+    {
+      "format": "sid-factory-2",
+      "total": 1,
+      "files": [
+        "/data/songs/sid-factory-2/Driver 11 Test - Filter.sf2"
+      ]
+    },
+    {
+      "format": "sidmon-1",
+      "total": 1,
+      "files": [
+        "/data/songs/sidmon-1/myfunnymazea.sid"
+      ]
+    },
+    {
+      "format": "sidmon-2",
+      "total": 1,
+      "files": [
+        "/data/songs/sidmon-2/ice7-intro.sid2"
+      ]
+    },
+    {
+      "format": "silmarils",
+      "total": 1,
+      "files": [
+        "/data/songs/silmarils/bostonbombclub.mok"
+      ]
+    },
+    {
+      "format": "sonic-arranger",
+      "total": 1,
+      "files": [
+        "/data/songs/sonic-arranger/mega end.sa"
+      ]
+    },
+    {
+      "format": "sonix",
+      "total": 1322,
+      "files": [
+        "/data/songs/sonix/games/Spot - The Computer Game!/Instruments/bass2.instr",
+        "/data/songs/sonix/games/Spot - The Computer Game!/Instruments/bassdrum.ss",
+        "/data/songs/sonix/games/Spot - The Computer Game!/Instruments/bdrum1.instr",
+        "/data/songs/sonix/games/Spot - The Computer Game!/Instruments/bells.instr",
+        "/data/songs/sonix/games/Spot - The Computer Game!/Instruments/bncebass.instr",
+        "/data/songs/sonix/games/Spot - The Computer Game!/Instruments/brass1.instr",
+        "/data/songs/sonix/games/Spot - The Computer Game!/Instruments/bssn-k.instr",
+        "/data/songs/sonix/games/Spot - The Computer Game!/Instruments/cbbsn-k.instr"
+      ]
+    },
+    {
+      "format": "sonix-smus",
+      "total": 17,
+      "files": [
+        "/data/songs/sonix-smus/ACE II/ACE II.smus",
+        "/data/songs/sonix-smus/ACE II/Instruments/Ace2-2.instr",
+        "/data/songs/sonix-smus/ACE II/Instruments/Ace2leed(slide).instr",
+        "/data/songs/sonix-smus/ACE II/Instruments/Ace2leed.instr",
+        "/data/songs/sonix-smus/ACE II/Instruments/Monty1.instr",
+        "/data/songs/sonix-smus/ACE II/Instruments/deeptrumpet1.instr",
+        "/data/songs/sonix-smus/ACE II/Instruments/deeptrumpet1.ss",
+        "/data/songs/sonix-smus/ACE II/Instruments/hidrum1.instr"
+      ]
+    },
+    {
+      "format": "sound-master",
+      "total": 1,
+      "files": [
+        "/data/songs/sound-master/rackney'sisland 4.sm"
+      ]
+    },
+    {
+      "format": "sound-master-ii-v1",
+      "total": 1,
+      "files": [
+        "/data/songs/sound-master-ii-v1/futureshock-level 3.smpro"
+      ]
+    },
+    {
+      "format": "sound-master-ii-v3",
+      "total": 1,
+      "files": [
+        "/data/songs/sound-master-ii-v3/doofus 3.sm3"
+      ]
+    },
+    {
+      "format": "soundcontrol",
+      "total": 1,
+      "files": [
+        "/data/songs/soundcontrol/north sea inferno ongame1.sc"
+      ]
+    },
+    {
+      "format": "soundfactory",
+      "total": 2,
+      "files": [
+        "/data/songs/soundfactory/im maien.psf",
+        "/data/songs/soundfactory/oriental.psf"
+      ]
+    },
+    {
+      "format": "soundfx",
+      "total": 2,
+      "files": [
+        "/data/songs/soundfx/batdance.sfx",
+        "/data/songs/soundfx/distancia al ano.sfx"
+      ]
+    },
+    {
+      "format": "special-fx",
+      "total": 1,
+      "files": [
+        "/data/songs/special-fx/striker ingame.jd"
+      ]
+    },
+    {
+      "format": "speedy-a1-system",
+      "total": 1,
+      "files": [
+        "/data/songs/speedy-a1-system/digital voyage.sas"
+      ]
+    },
+    {
+      "format": "speedy-system",
+      "total": 1,
+      "files": [
+        "/data/songs/speedy-system/pauker rap 2.ss"
+      ]
+    },
+    {
+      "format": "startrekker-am",
+      "total": 1,
+      "files": [
+        "/data/songs/startrekker-am/silent sleep.mod.nt"
+      ]
+    },
+    {
+      "format": "startrekker-flt8",
+      "total": 1,
+      "files": [
+        "/data/songs/startrekker-flt8/gidion graveland.mod"
+      ]
+    },
+    {
+      "format": "steve-barrett",
+      "total": 1,
+      "files": [
+        "/data/songs/steve-barrett/street fighter.sb"
+      ]
+    },
+    {
+      "format": "stonetracker",
+      "total": 1,
+      "files": [
+        "/data/songs/stonetracker/hypnosphere.spm"
+      ]
+    },
+    {
+      "format": "studio-pixel---piyopiyo",
+      "total": 1,
+      "files": [
+        "/data/songs/studio-pixel---piyopiyo/obj0176-1.pmd"
+      ]
+    },
+    {
+      "format": "suntronic",
+      "total": 1,
+      "files": [
+        "/data/songs/suntronic/pseudo oops.sun"
+      ]
+    },
+    {
+      "format": "sunvox",
+      "total": 1,
+      "files": [
+        "/data/songs/sunvox/last blow.sunvox"
+      ]
+    },
+    {
+      "format": "symphonie",
+      "total": 1,
+      "files": [
+        "/data/songs/symphonie/pas 2 jade.symmod"
+      ]
+    },
+    {
+      "format": "synth-dream",
+      "total": 1,
+      "files": [
+        "/data/songs/synth-dream/smp.nobuddiesland end 2"
+      ]
+    },
+    {
+      "format": "synthesis",
+      "total": 1,
+      "files": [
+        "/data/songs/synthesis/space sound.syn"
+      ]
+    },
+    {
+      "format": "syntracker",
+      "total": 16,
+      "files": [
+        "/data/songs/syntracker/autumn melodies.synmod",
+        "/data/songs/syntracker/billich (it-03).synmod",
+        "/data/songs/syntracker/curious thoughts.synmod",
+        "/data/songs/syntracker/glowing crystals.synmod",
+        "/data/songs/syntracker/grey day.synmod",
+        "/data/songs/syntracker/noname-tekkno.synmod",
+        "/data/songs/syntracker/nuclear-synthetics.synmod",
+        "/data/songs/syntracker/relax (it-02).synmod"
+      ]
+    },
+    {
+      "format": "tcb-tracker",
+      "total": 1,
+      "files": [
+        "/data/songs/tcb-tracker/m-demo3 3.tcb"
+      ]
+    },
+    {
+      "format": "tfm-music-maker",
+      "total": 1,
+      "files": [
+        "/data/songs/tfm-music-maker/rainstorm.tfe"
+      ]
+    },
+    {
+      "format": "tfmx",
+      "total": 2,
+      "files": [
+        "/data/songs/tfmx/mdat.hbtitle",
+        "/data/songs/tfmx/smpl.hbtitle"
+      ]
+    },
+    {
+      "format": "the-musical-enlightenment",
+      "total": 1,
+      "files": [
+        "/data/songs/the-musical-enlightenment/64 conversion.tme"
+      ]
+    },
+    {
+      "format": "tomy-tracker",
+      "total": 1,
+      "files": [
+        "/data/songs/tomy-tracker/inconvenient intro.sg"
+      ]
+    },
+    {
+      "format": "tss",
+      "total": 1,
+      "files": [
+        "/data/songs/tss/salamander boss.tss"
+      ]
+    },
+    {
+      "format": "tunefish",
+      "total": 1,
+      "files": [
+        "/data/songs/tunefish/tunefish-noremorse.xrns"
+      ]
+    },
+    {
+      "format": "ultra-tracker",
+      "total": 1,
+      "files": [
+        "/data/songs/ultra-tracker/nightmare on acid.s3m"
+      ]
+    },
+    {
+      "format": "v2",
+      "total": 1,
+      "files": [
+        "/data/songs/v2/gamma projection.v2m"
+      ]
+    },
+    {
+      "format": "velvet-studio",
+      "total": 1,
+      "files": [
+        "/data/songs/velvet-studio/kernel.ams"
+      ]
+    },
+    {
+      "format": "vgm",
+      "total": 1,
+      "files": [
+        "/data/songs/vgm/BeyondSN.vgm"
+      ]
+    },
+    {
+      "format": "voodoo",
+      "total": 1,
+      "files": [
+        "/data/songs/voodoo/voo8.vss"
+      ]
+    },
+    {
+      "format": "voodoo-supreme",
+      "total": 1,
+      "files": [
+        "/data/songs/voodoo-supreme/silkworm.vss"
+      ]
+    },
+    {
+      "format": "wally-beben",
+      "total": 1,
+      "files": [
+        "/data/songs/wally-beben/wicked.wb"
+      ]
+    },
+    {
+      "format": "wavesabre",
+      "total": 2,
+      "files": [
+        "/data/songs/wavesabre/wavesabre-globalgroove.xrns",
+        "/data/songs/wavesabre/wavesabre-punqtured.xrns"
+      ]
+    },
+    {
+      "format": "xm",
+      "total": 1,
+      "files": [
+        "/data/songs/xm/flo boarding - level 1.xm"
+      ]
+    },
+    {
+      "format": "zoundmonitor",
+      "total": 1,
+      "files": [
+        "/data/songs/zoundmonitor/sonjavanveen.sng"
+      ]
+    }
+  ]
+}

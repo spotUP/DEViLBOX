@@ -34,6 +34,7 @@ import type { EffectConfig } from './types/instrument';
 import { Zap, Music, Sliders, Download, List } from 'lucide-react';
 import { ToastNotification } from '@components/ui/ToastNotification';
 import { AIPanel } from '@components/ai/AIPanel';
+import { JukeboxPanel } from '@components/jukebox/JukeboxPanel';
 import { PopOutWindow } from '@components/ui/PopOutWindow';
 import { UpdateNotification } from '@components/ui/UpdateNotification';
 import { SynthErrorDialog } from '@components/ui/SynthErrorDialog';
@@ -226,6 +227,14 @@ function App() {
     showFileBrowser, setShowFileBrowser,
   } = useUIStore();
   const [initError, setInitError] = useState<string | null>(null);
+  /**
+   * The jukebox: a corpus sweep with one-keystroke fault reporting.
+   *
+   * Opened with Ctrl+Shift+J, and deliberately not persisted — it is a
+   * testing tool, and a panel that reopens itself on every boot would be in
+   * the way of the actual work.
+   */
+  const [jukeboxOpen, setJukeboxOpen] = useState(false);
   const [showWelcome, setShowWelcome] = useState(false);
   const [editingEffect, setEditingEffect] = useState<{ effect: EffectConfig; channelIndex: number | null } | null>(null);
   const [pendingSongFile, setPendingSongFile]             = useState<File | null>(null);
@@ -621,6 +630,13 @@ function App() {
       if (e.ctrlKey && e.shiftKey && e.key === 'E') {
         e.preventDefault();
         useUIStore.getState().openModal('export');
+        return;
+      }
+
+      // Ctrl+Shift+J: the jukebox — sweep the corpus, report faults by key.
+      if (e.ctrlKey && e.shiftKey && (e.key === 'J' || e.key === 'j')) {
+        e.preventDefault();
+        setJukeboxOpen((open) => !open);
         return;
       }
 
@@ -1098,6 +1114,12 @@ function App() {
                     showMasterFX={modalOpen === 'masterFx'}
                   />
                 </div>
+                {/* The jukebox rides UNDER the real pattern editor on
+                    purpose: the faults it hunts are "the grid is empty",
+                    "the grid does not scroll", "the grid drifts from the
+                    audio", and judging those needs the real editor and the
+                    real engines rather than a second drawing of them. */}
+                {jukeboxOpen && <JukeboxPanel onClose={() => setJukeboxOpen(false)} />}
               </>
             )}
 
