@@ -1299,13 +1299,18 @@ export class DubBus {
 
   // EQ sweep state — managed by DubBus so panic/dispose can clean up.
   private _eqSweepTimer: ReturnType<typeof setInterval> | null = null;
-  private _eqSweepPrior: { freq: number; gain: number; q: number } | null = null;
+  private _eqSweepPrior: { enabled: boolean; freq: number; gain: number; q: number } | null = null;
 
   /** Start an EQ sweep from startHz to endHz over sweepSec. Returns disposer.
    *  Uses audioContext.currentTime as clock. Snapshots prior EQ state. */
   startEQSweep(startHz: number, endHz: number, gain: number, q: number, sweepSec: number): () => void {
-    // Snapshot prior state
+    // Snapshot prior state — INCLUDING whether the band was on. The owner's
+    // resting state is `enabled: false, gain: 3`: a disabled band with a
+    // stored gain. Restoring through `setReturnEQ` alone derives enabled from
+    // `gain !== 0`, so every sweep left the return EQ switched on at +3 dB
+    // afterwards (2026-09-23, read from the bus's live settings).
     this._eqSweepPrior = {
+      enabled: this.settings.returnEqEnabled,
       freq: this.settings.returnEqFreq,
       gain: this.settings.returnEqGain,
       q: this.settings.returnEqQ,
@@ -1320,7 +1325,15 @@ export class DubBus {
       const freq = startHz * Math.pow(endHz / startHz, t);
       this.returnEQ.setB2Freq(freq);
       this.settings = { ...this.settings, returnEqFreq: freq };
-      if (t >= 1) this.stopEQSweep();
+      // Arrived: stop stepping and PARK the peak at the end frequency. It used
+      // to call stopEQSweep() here, which restored the prior EQ two seconds
+      // in — while the deck's TOGGLE was still lit. "Sweep does something
+      // briefly and stops but its a toggle" (2026-09-22), then "sweep does
+      // nothing" (2026-09-23). Only the releaser restores the EQ now.
+      if (t >= 1 && this._eqSweepTimer) {
+        clearInterval(this._eqSweepTimer);
+        this._eqSweepTimer = null;
+      }
     }, 16);
 
     return () => this.stopEQSweep();
@@ -1333,12 +1346,15 @@ export class DubBus {
       this._eqSweepTimer = null;
     }
     if (this._eqSweepPrior) {
-      this.setReturnEQ(
-        this._eqSweepPrior.freq,
-        this._eqSweepPrior.gain,
-        this._eqSweepPrior.q,
-      );
+      const prior = this._eqSweepPrior;
       this._eqSweepPrior = null;
+      this.setReturnEQ(prior.freq, prior.gain, prior.q);
+      // `setReturnEQ` turned the band on because the gain is non-zero; put
+      // the enable back the way it was found.
+      if (!prior.enabled) {
+        this.returnEQ.setB2Gain(0);
+        this.settings = { ...this.settings, returnEqEnabled: false, returnEqGain: prior.gain };
+      }
     }
   }
 
