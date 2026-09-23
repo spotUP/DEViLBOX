@@ -297,14 +297,25 @@ export const DubDeckStrip: React.FC = () => {
    * parallel nodes rather than touching `stereoWidth` — so animating them
    * would be inventing motion the audio is not making.
    */
-  const liveReturnGain = useLiveDubParam('dub.returnGain', dubBusSettings.returnGain);
-  const liveSweepAmount = useLiveDubParam('dub.sweepAmount', dubBusSettings.sweepAmount);
+  // Which live-row control a hand is on right now. While held, that control
+  // shows the store value and ignores what the bus announces — a controlled
+  // input driven by the audio engine snapped back under the hand on the next
+  // announce ("the intensity and feedback sliders are broken", 2026-09-22).
+  const [heldLiveParam, setHeldLiveParam] = useState<'returnGain' | 'echoIntensity' | 'sweepAmount' | 'sweepRateHz' | null>(null);
+  const liveReturnGain = useLiveDubParam('dub.returnGain', dubBusSettings.returnGain, undefined, heldLiveParam === 'returnGain');
+  const liveSweepAmount = useLiveDubParam('dub.sweepAmount', dubBusSettings.sweepAmount, undefined, heldLiveParam === 'sweepAmount');
   // Moves modulate echo feedback constantly (every throw), so this follows the
   // performer the same way FX WET does.
-  const liveEchoIntensity = useLiveDubParam('dub.echoIntensity', dubBusSettings.echoIntensity);
+  const liveEchoIntensity = useLiveDubParam('dub.echoIntensity', dubBusSettings.echoIntensity, undefined, heldLiveParam === 'echoIntensity');
   const liveSweepRateHz = useLiveDubParam(
-    'dub.sweepRateHz', dubBusSettings.sweepRateHz, denormalizeSweepRate,
+    'dub.sweepRateHz', dubBusSettings.sweepRateHz, denormalizeSweepRate, heldLiveParam === 'sweepRateHz',
   );
+  /** Pointer props that mark a live-row control as held for its drag. */
+  const holdLiveParam = (key: NonNullable<typeof heldLiveParam>) => ({
+    onPointerDown: () => setHeldLiveParam(key),
+    onPointerUp: () => setHeldLiveParam((cur) => (cur === key ? null : cur)),
+    onPointerCancel: () => setHeldLiveParam((cur) => (cur === key ? null : cur)),
+  });
   const autoDubSettingsBtnRef = useRef<HTMLButtonElement | null>(null);
 
   // Derive current style. For presets with unique characterPreset values
@@ -1464,6 +1475,7 @@ export const DubDeckStrip: React.FC = () => {
               type="range" min={0} max={1} step={0.01}
               value={liveReturnGain}
               onChange={(e) => setDubBus({ returnGain: Number(e.target.value) })}
+              {...holdLiveParam('returnGain')}
               className="flex-1 min-w-0 accent-accent-highlight cursor-pointer"
               title={`FX wet level: ${(liveReturnGain * 100).toFixed(0)}%`}
             />
@@ -1522,6 +1534,7 @@ export const DubDeckStrip: React.FC = () => {
               type="range" min={0} max={1} step={0.01}
               value={liveEchoIntensity}
               onChange={(e) => setDubBus({ echoIntensity: Number(e.target.value) })}
+              {...holdLiveParam('echoIntensity')}
               className="flex-1 min-w-0 accent-accent-secondary cursor-pointer"
               title={`Echo feedback: ${(liveEchoIntensity * 100).toFixed(0)}% — how long the repeats last`}
             />

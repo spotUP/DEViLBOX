@@ -30,20 +30,43 @@ const LIVE_HOLD_MS = 400;
  * @param storeValue  what the user set — the resting position
  * @param denormalize maps the announced 0..1 to the control's own units;
  *                    omit when the control is already 0..1
+ * @param held        a hand is on the control. While true the announced value
+ *                    is ignored and the store value shown: the control is a
+ *                    controlled input, so an announce landing mid-drag
+ *                    overwrote the drag and the thumb snapped back — "the
+ *                    intensity and feedback sliders are broken" (2026-09-22,
+ *                    FX WET and FEEDBACK while AutoDub performed). The hand
+ *                    wins; the move's motion is shown again on release.
  */
 export function useLiveDubParam(
   paramKey: string,
   storeValue: number,
   denormalize?: (normalized: number) => number,
+  held = false,
 ): number {
   const [live, setLive] = useState<number | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // Read the mapper at announce time so a caller need not memoise it.
+  // Read the mapper and the hold at announce time so a caller need not
+  // memoise either. Written in an effect, never during render.
   const denormRef = useRef(denormalize);
-  denormRef.current = denormalize;
+  const heldRef = useRef(held);
+  useEffect(() => {
+    denormRef.current = denormalize;
+    heldRef.current = held;
+  });
+
+  // Taking hold drops whatever the move had announced, so releasing does not
+  // resurrect a stale value under the hand's new position. React's
+  // "adjust state from the previous render" form: a render, not an effect.
+  const [prevHeld, setPrevHeld] = useState(held);
+  if (held !== prevHeld) {
+    setPrevHeld(held);
+    if (held) setLive(null);
+  }
 
   useEffect(() => {
     const off = subscribeToParamLiveValue(paramKey, (normalized) => {
+      if (heldRef.current) return;
       const mapped = denormRef.current ? denormRef.current(normalized) : normalized;
       if (!Number.isFinite(mapped)) return;
       setLive(mapped);
@@ -62,5 +85,5 @@ export function useLiveDubParam(
     };
   }, [paramKey]);
 
-  return live ?? storeValue;
+  return held ? storeValue : (live ?? storeValue);
 }

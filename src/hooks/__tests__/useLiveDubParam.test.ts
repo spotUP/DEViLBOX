@@ -89,3 +89,48 @@ describe('it lets go cleanly', () => {
     expect(result.current).toBe(0.55);
   });
 });
+
+/**
+ * A hand on the control must win.
+ *
+ * "the intensity and feedback sliders are broken" (2026-09-22): FX WET and
+ * FEEDBACK are controlled inputs whose value came from this hook, and a move
+ * announcing mid-drag overwrote the drag. While `held`, the store value is
+ * shown and announcements are dropped; on release the control follows again.
+ */
+describe('a hand on the control wins over the move', () => {
+  it('ignores announcements while held and shows the store value', () => {
+    const { result, rerender } = renderHook(
+      ({ store, held }: { store: number; held: boolean }) => useLiveDubParam('dub.echoIntensity', store, undefined, held),
+      { initialProps: { store: 0.55, held: true } },
+    );
+    act(() => { fireParamLiveSubscribers('dub.echoIntensity', 0.9); });
+    expect(result.current).toBe(0.55);
+    // The hand moves the store; the control follows the hand, not the move.
+    rerender({ store: 0.3, held: true });
+    act(() => { fireParamLiveSubscribers('dub.echoIntensity', 0.95); });
+    expect(result.current).toBe(0.3);
+  });
+
+  it('does not resurrect a stale announcement when the hand lets go', () => {
+    const { result, rerender } = renderHook(
+      ({ store, held }: { store: number; held: boolean }) => useLiveDubParam('dub.echoIntensity', store, undefined, held),
+      { initialProps: { store: 0.55, held: false } },
+    );
+    act(() => { fireParamLiveSubscribers('dub.echoIntensity', 0.9); });
+    expect(result.current).toBeCloseTo(0.9, 6);
+    rerender({ store: 0.55, held: true });
+    rerender({ store: 0.3, held: false });
+    expect(result.current, 'the value from before the grab must be gone').toBe(0.3);
+  });
+
+  it('follows the move again once released', () => {
+    const { result, rerender } = renderHook(
+      ({ store, held }: { store: number; held: boolean }) => useLiveDubParam('dub.echoIntensity', store, undefined, held),
+      { initialProps: { store: 0.55, held: true } },
+    );
+    rerender({ store: 0.55, held: false });
+    act(() => { fireParamLiveSubscribers('dub.echoIntensity', 0.8); });
+    expect(result.current).toBeCloseTo(0.8, 6);
+  });
+});
