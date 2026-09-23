@@ -467,11 +467,6 @@ MAME is licensed under **GPL-2.0+** (with BSD-3-Clause for certain components).
 
 ## Visualization
 
-### PixiJS
-- **Source:** https://github.com/niclasr/niclasr.github.io (Goodboy Digital)
-- **License:** MIT
-- **Used for:** 2D WebGL rendering engine for the tracker UI
-
 ### Three.js
 - **Author:** Mr.doob and contributors
 - **Source:** https://github.com/mrdoob/three.js
