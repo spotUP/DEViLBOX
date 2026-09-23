@@ -55,8 +55,6 @@ export const JAMCRACKER_COLUMNS: ColumnDef[] = [
     emptyColor: 'var(--color-border-light)',
     emptyValue: 0,
     formatter: noteStr,
-    pixiColor: 0xaaaacc,
-    pixiEmptyColor: 0x444455,
   },
   {
     key: 'instrument',
@@ -68,8 +66,6 @@ export const JAMCRACKER_COLUMNS: ColumnDef[] = [
     emptyValue: 0,
     hexDigits: 2,
     formatter: hex2,
-    pixiColor: 0x60e060,
-    pixiEmptyColor: 0x334433,
   },
   {
     key: 'speed',
@@ -81,8 +77,6 @@ export const JAMCRACKER_COLUMNS: ColumnDef[] = [
     emptyValue: 0,
     hexDigits: 2,
     formatter: hex2,
-    pixiColor: 0xffaa55,
-    pixiEmptyColor: 0x443322,
   },
   {
     key: 'arpeggio',
@@ -94,8 +88,6 @@ export const JAMCRACKER_COLUMNS: ColumnDef[] = [
     emptyValue: 0,
     hexDigits: 2,
     formatter: hex2,
-    pixiColor: 0x55aaff,
-    pixiEmptyColor: 0x223344,
   },
   {
     key: 'vibrato',
@@ -107,8 +99,6 @@ export const JAMCRACKER_COLUMNS: ColumnDef[] = [
     emptyValue: 0,
     hexDigits: 2,
     formatter: hex2,
-    pixiColor: 0xff66cc,
-    pixiEmptyColor: 0x442233,
   },
   {
     key: 'volume',
@@ -120,8 +110,6 @@ export const JAMCRACKER_COLUMNS: ColumnDef[] = [
     emptyValue: 0,
     hexDigits: 2,
     formatter: hex2,
-    pixiColor: 0x66ccff,
-    pixiEmptyColor: 0x223344,
   },
   {
     key: 'porta',
@@ -133,8 +121,6 @@ export const JAMCRACKER_COLUMNS: ColumnDef[] = [
     emptyValue: 0,
     hexDigits: 2,
     formatter: hex2,
-    pixiColor: 0xccff66,
-    pixiEmptyColor: 0x334422,
   },
 ];
 

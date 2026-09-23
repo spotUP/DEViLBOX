@@ -100,7 +100,7 @@ export default defineConfig({
   },
   resolve: {
     // Force single instances of Pixi packages to prevent pixi-react instanceof failures
-    dedupe: ['react', 'react-dom', 'pixi.js', '@pixi/react', '@pixi/layout', '@pixi/ui'],
+    dedupe: ['react', 'react-dom'],
     alias: {
       '@': path.resolve(__dirname, './src'),
       '@components': path.resolve(__dirname, './src/components'),
