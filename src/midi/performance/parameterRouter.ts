@@ -249,6 +249,54 @@ const CHANNEL_TOUCH_PREFIX = 'dub.channelTouch.ch';
  */
 const MASTER_SEND_PARAM = 'dub.masterSend';
 
+/**
+ * The transport row.
+ *
+ * A button press arrives as 1 and its release as 0; only the press acts, so a
+ * transport button does not fire twice per tap.
+ */
+function routeTransportParameter(param: string, value: number): void {
+  if (value <= 0.5) return;
+
+  switch (param) {
+    case 'transport.play':
+      void import('@/engine/keyboard/commands/transport').then(({ playSong }) => playSong());
+      return;
+    case 'transport.stop':
+      void import('@/engine/keyboard/commands/transport').then(({ stopPlayback }) => stopPlayback());
+      return;
+    // LOOP is Play Pattern — the owner's own mapping: "loop = play pattern".
+    case 'transport.playPattern':
+      void import('@/engine/keyboard/commands/transport').then(({ playPattern }) => playPattern());
+      return;
+    case 'transport.record':
+      void import('@/stores/useEditorStore').then(({ useEditorStore }) => {
+        useEditorStore.getState().toggleRecordMode();
+      });
+      return;
+    case 'transport.nextPattern':
+    case 'transport.prevPattern':
+      void import('@/stores/useTransportStore').then(({ useTransportStore }) => {
+        void import('@/stores/useTrackerStore').then(({ useTrackerStore }) => {
+          const order = useTrackerStore.getState().patternOrder;
+          if (!order?.length) return;
+          const transport = useTransportStore.getState();
+          const step = param === 'transport.nextPattern' ? 1 : -1;
+          // Step within the ORDER, not the pattern list: the order is the
+          // arrangement the performer hears, and two entries may name the
+          // same pattern.
+          const here = order.indexOf(transport.currentPatternIndex);
+          const from = here === -1 ? 0 : here;
+          const next = Math.min(order.length - 1, Math.max(0, from + step));
+          transport.setCurrentPattern(order[next]);
+        });
+      });
+      return;
+    default:
+      return;
+  }
+}
+
 function routeDubParameter(param: string, value: number, source: 'live' | 'lane' = 'live'): void {
   // 0. Per-channel dub send — handled before the move parser, which does not
   //    know 'channelSend' and would reject it.
@@ -821,6 +869,22 @@ export function routeParameterToEngine(
   // Push to live subscribers first so DOM knobs can update on every CC
   // without waiting for React re-render. Harmless if no subscriber.
   fireParamLiveSubscribers(param, normalizedValue);
+
+  // Transport — the controller's own transport row.
+  //
+  // It was pointing at DJ deck actions (`play_a`, `cue_b`, `sync_a`), which
+  // is why pressing PLAY on the desk did something to a deck instead of
+  // starting the song: "wire the transport buttons correctly to devilbox as
+  // well, they are mapped to effects now" (2026-09-24).
+  //
+  // Routed through the SAME commands the toolbar and the keyboard use, rather
+  // than reaching into the transport store here. Play Song and Play Pattern
+  // are two different transports and the difference has cost a session
+  // before; one implementation keeps them from drifting apart again.
+  if (param.startsWith('transport.')) {
+    routeTransportParameter(param, normalizedValue);
+    return;
+  }
 
   // Master FX parameters are routed separately (not per-instrument)
   if (param.startsWith('masterFx.')) {
