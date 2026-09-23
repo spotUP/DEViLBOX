@@ -25,6 +25,18 @@ export class HivelySynth implements DevilboxSynth {
   private _instrumentMode = false;
   private _pendingConfig: HivelyConfig | null = null;
   private _setupPromise: Promise<void> | null = null;
+  /**
+   * The one note waiting for the player to exist. Monophonic, so one slot.
+   *
+   * An attack that arrives while `_setupPromise` is still pending used to
+   * re-fire itself from a bare `.then` — nothing could take it back. A
+   * release in the meantime found `_playerHandle` still -1, fell into the
+   * song-mode branch, and sent no noteOff; when setup finished the attack
+   * landed on a player nobody would ever release. ToneEngine's song-load
+   * pre-warm (attack, release 50 ms later) did exactly this on every AHX
+   * load — 2026-09-23, "a ringing sound that dont go away" before Play.
+   */
+  private _queuedAttack: { note?: string | number; velocity?: number } | null = null;
 
   /**
    * Track whether the singleton engine output is already connected to a
@@ -157,11 +169,16 @@ export class HivelySynth implements DevilboxSynth {
         velocity: vel,
       });
     } else if (this._setupPromise) {
-      // Setup still in progress — queue this note to fire when ready
-      const n = note, v = velocity;
+      // Setup still in progress — park this note until the player exists.
+      // A release before then clears the slot, and only the note still in
+      // the slot fires: a release must always be able to take an attack back.
+      const queued = { note, velocity };
+      this._queuedAttack = queued;
       this._setupPromise.then(() => {
+        if (this._queuedAttack !== queued) return;
+        this._queuedAttack = null;
         if (!this._disposed && this._playerHandle >= 0) {
-          this.triggerAttack(n, undefined, v);
+          this.triggerAttack(queued.note, undefined, queued.velocity);
         }
       });
     } else {
@@ -173,11 +190,20 @@ export class HivelySynth implements DevilboxSynth {
   triggerRelease(_note?: string | number, _time?: number): void {
     if (this._disposed) return;
 
-    if (this._instrumentMode && this._playerHandle >= 0) {
-      this.engine.sendMessage({
-        type: 'noteOff',
-        handle: this._playerHandle,
-      });
+    // Whatever was waiting for the player is released before it ever plays.
+    this._queuedAttack = null;
+
+    if (this._instrumentMode) {
+      // Instrument mode with no player yet: the queued attack is gone and
+      // there is nothing on the worklet to stop. This is NOT a song stop —
+      // the engine is a singleton, and stopping it here would halt whatever
+      // tune it is playing for someone else.
+      if (this._playerHandle >= 0) {
+        this.engine.sendMessage({
+          type: 'noteOff',
+          handle: this._playerHandle,
+        });
+      }
     } else {
       this.engine.stop();
     }
