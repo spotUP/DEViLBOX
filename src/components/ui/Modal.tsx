@@ -211,7 +211,9 @@ export const Modal: React.FC<ModalProps> = ({
     xl: 'max-w-4xl w-full',
     // For content that is a diagram rather than a form — a controller panel
     // is 22 grid units wide and was overflowing `xl` (896px) into scrollbars.
-    '2xl': 'max-w-7xl w-full',
+    // 6xl (1152px) fits that panel's natural 1000px with its padding; 7xl
+    // just left a band of empty dialog either side of it.
+    '2xl': 'max-w-6xl w-full',
     fullscreen: 'w-full h-full',
   };
 

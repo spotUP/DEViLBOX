@@ -254,14 +254,19 @@ export const ControllerLayoutView: React.FC<ControllerLayoutViewProps> = ({
 
   return (
     <svg
-      // Responsive, not a fixed pixel box: at a fixed size the panel overflowed
-      // its dialog and the whole diagram sat behind scrollbars (2026-09-23,
-      // "the dialog is too small there are scrollbars"). The viewBox keeps the
-      // geometry; width and height come from the room available.
+      // Shrink to fit, never grow past natural size, and never clamp height.
+      //
+      // A fixed pixel box overflowed the dialog into scrollbars; clamping the
+      // height to a viewport calculation was worse — on a short window the
+      // aspect ratio then drove the width down too and the whole panel
+      // collapsed into a thumbnail inside an empty dialog ("this sucks",
+      // 2026-09-23). Width is the only constraint: full width up to the
+      // natural size, height follows. A window too short to show it all
+      // scrolls, which is the normal answer.
       viewBox={`0 0 ${svgWidth} ${svgHeight}`}
       preserveAspectRatio="xMidYMid meet"
-      className="select-none w-full h-auto max-h-[calc(90vh-15rem)]"
-      style={{ maxWidth: svgWidth * 1.35 }}
+      className="select-none w-full h-auto"
+      style={{ maxWidth: svgWidth }}
     >
       {/* Background panel */}
       <rect x={0} y={0} width={svgWidth} height={svgHeight} rx={8}

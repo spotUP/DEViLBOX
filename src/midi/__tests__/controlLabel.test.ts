@@ -152,13 +152,16 @@ describe('the controller diagram fits its dialog', () => {
     expect(svg).toContain('w-full h-auto');
   });
 
-  it('is bounded vertically too, so a tall panel does not push the footer away', () => {
-    expect(VIEW).toContain('max-h-[calc(90vh-15rem)]');
+  it('never clamps height — that shrank the whole panel to a thumbnail', () => {
+    // Clamping height made the aspect ratio drive width down on a short
+    // window, collapsing the diagram inside an empty dialog ("this sucks").
+    expect(VIEW).not.toContain('max-h-[calc(90vh');
+    expect(VIEW).toContain('style={{ maxWidth: svgWidth }}');
   });
 
   it('opens in a dialog wide enough for a diagram', () => {
     expect(MODAL).toContain('size="2xl"');
-    expect(SHELL).toContain("'2xl': 'max-w-7xl w-full'");
+    expect(SHELL).toContain("'2xl': 'max-w-6xl w-full'");
     expect(SHELL).toContain("size?: 'sm' | 'md' | 'lg' | 'xl' | '2xl' | 'fullscreen';");
   });
 });
