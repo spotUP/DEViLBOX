@@ -17,6 +17,7 @@ import { getDJEngine } from '../../engine/dj/DJEngine';
 import { useDJStore } from '../../stores/useDJStore';
 import * as DJActions from '../../engine/dj/DJActions';
 import type { MappableParameter } from '../types';
+import { LATCHING_MOVES } from '../../engine/dub/latchingMoves';
 
 // ============================================================================
 // Route Table Types
@@ -334,6 +335,27 @@ function routeDubParameter(param: string, value: number, source: 'live' | 'lane'
       void import('../../engine/dub/DubRouter').then(({ fire }) => {
         fire(moveId, channelId, {}, source);
       });
+    }
+    return;
+  }
+
+  // Latching, for a live press only.
+  //
+  // A momentary pad sends 127 down and 0 up, so a mute held this way lasts
+  // exactly as long as the finger. The performer expects it to stay
+  // (2026-09-24). A recorded lane still replays the rise and fall as a real
+  // hold, which is why this is `source === 'live'` and not a property of the
+  // move.
+  if (source === 'live' && LATCHING_MOVES.has(moveId)) {
+    if (!wasPressed && isPressed) {
+      if (dubHoldDisposers.has(param)) {
+        releaseDubHold(param);
+      } else {
+        void import('../../engine/dub/DubRouter').then(({ fire }) => {
+          const disp = fire(moveId, channelId, {}, source);
+          if (disp) dubHoldDisposers.set(param, disp);
+        });
+      }
     }
     return;
   }
