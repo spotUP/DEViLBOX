@@ -451,7 +451,7 @@ export const MasterEffectsModal: React.FC<MasterEffectsModalProps> = ({ isOpen, 
               />
               <button
                 onClick={handleSavePreset}
-                className="px-4 py-2 text-sm font-medium rounded-lg bg-accent-primary text-text-primary hover:bg-accent-primaryHover transition-colors"
+                className="px-4 py-2 text-sm font-medium rounded-lg bg-accent-primary text-text-primary hover:bg-accent-primary transition-colors"
               >
                 Save
               </button>
@@ -552,7 +552,7 @@ export const MasterEffectsModal: React.FC<MasterEffectsModalProps> = ({ isOpen, 
                       <button
                         onClick={handleConfirmAdd}
                         className="flex items-center gap-1.5 px-4 py-1.5 text-xs font-medium rounded-lg
-                                 bg-accent-primary text-text-primary hover:bg-accent-primaryHover transition-colors"
+                                 bg-accent-primary text-text-primary hover:bg-accent-primary transition-colors"
                       >
                         <Plus size={12} />
                         Add to Chain
