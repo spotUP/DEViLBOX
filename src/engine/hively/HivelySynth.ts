@@ -63,6 +63,7 @@ export class HivelySynth implements DevilboxSynth {
     await this.engine.ready();
   }
 
+
   /**
    * Set up this synth for standalone instrument playback.
    * Call this with a HivelyConfig to enable per-note triggering.
