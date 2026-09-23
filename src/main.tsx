@@ -21,6 +21,14 @@ document.addEventListener('change', (e) => {
 
 // Register synth descriptors with SynthRegistry
 // Built-in synths (Tone.js, Sampler, TB-303, Furnace) — eager registration
+// Soft takeover needs to READ a parameter before it lets a knob move it, and
+// the router imports its stores dynamically to stay clear of an import cycle —
+// so the handles are registered here, where both are already loaded.
+import { registerParameterStores } from './midi/performance/parameterRouter'
+import { useDrumPadStore } from './stores/useDrumPadStore'
+import { useMixerStore } from './stores/useMixerStore'
+registerParameterStores({ drumPad: useDrumPadStore, mixer: useMixerStore })
+
 import './engine/registry/builtin'
 // SDK synths (MAME, Buzz, VSTBridge, WAM, etc.) — lazy loader registration
 import './engine/registry/sdk'
