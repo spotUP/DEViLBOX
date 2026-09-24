@@ -31,6 +31,22 @@ export function getCaptureCanvas(source: VideoSource): HTMLCanvasElement | null 
   return _canvasRegistry.get(source) ?? null;
 }
 
+/**
+ * The sources that can actually be captured RIGHT NOW.
+ *
+ * A source with no registered canvas produces nothing, silently. `'dj-ui'`
+ * has produced nothing since the Pixi UI was removed — `PixiApp` was the only
+ * thing that ever registered it — yet it stayed in the export picker and was
+ * the fallback the stream control reached for when the VJ view was closed. A
+ * performer streaming without the VJ view open was streaming a blank
+ * (2026-09-23).
+ *
+ * Ask this instead of naming a source and hoping.
+ */
+export function availableCaptureSources(): VideoSource[] {
+  return [..._canvasRegistry.keys()];
+}
+
 export class DJVideoCapture {
   private _stream: MediaStream | null = null;
   private _audioDestination: MediaStreamAudioDestinationNode | null = null;
