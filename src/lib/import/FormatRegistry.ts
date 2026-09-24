@@ -1741,9 +1741,19 @@ export const FORMAT_REGISTRY: FormatDefinition[] = [
     description: 'ZX Spectrum AY (ZXAYEMUL)',
     family: 'chip-dump',
     matchMode: 'extension',
-    extRegex: /\.ay$/i,
+    // `.emul` because the corpus stores these files named after the ZXAY
+    // SUBTYPE rather than the container: `ay-emul/spring.emul` begins with
+    // the bytes `ZXAYEMUL`, which is exactly what this parser reads. It was
+    // being refused with "Unsupported file format" for its name alone
+    // (2026-09-24).
+    //
+    // Deliberately NOT `.strc` or `.amad`. Those files are the same ZXAY
+    // container with a different payload (`ZXAYSTRC`, `ZXAYAMAD`), and
+    // `parseAYFile` only knows the EMUL layout — accepting them would trade
+    // an honest refusal for a parse failure further in.
+    extRegex: /\.(ay|emul)$/i,
     nativeOnly: true,
-    nativeParser: { module: '@lib/import/formats/AYParser', parseFn: 'parseAYFile' },
+    nativeParser: { module: '@lib/import/formats/AYParser', parseFn: 'parseAYFile', detectFn: 'isAYFormat' },
   },
   {
     key: 's98',

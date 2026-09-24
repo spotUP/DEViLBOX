@@ -49,7 +49,16 @@ export async function tryChipDumpParse(
   }
 
   // ── AY — ZX Spectrum AY (ZXAYEMUL) ───────────────────────────────────────
-  if (/\.ay$/.test(filename)) {
+  // `.emul` too: the corpus names these files after the ZXAY SUBTYPE instead
+  // of the container, and `ay-emul/spring.emul` begins with the bytes
+  // `ZXAYEMUL` that `parseAYFile` reads. NOT `.strc`/`.amad` — same container,
+  // different payload, and this parser only knows the EMUL layout.
+  //
+  // NOTE: this extension test duplicates the one in FORMAT_REGISTRY, which is
+  // why registering `.emul` there was not enough on its own. Every branch in
+  // this file re-decides what the registry already knows; deriving them from
+  // the registry is the fix, and it is bigger than this change.
+  if (/\.(ay|emul)$/.test(filename)) {
     const { parseAYFile } = await import('@lib/import/formats/AYParser');
     return parseAYFile(buffer, originalFileName);
   }

@@ -70,6 +70,23 @@ describe('a format answers to its name written either way round', () => {
   });
 
   /**
+   * The corpus names ZXAY files after the SUBTYPE rather than the container.
+   * `ay-emul/spring.emul` begins with the bytes `ZXAYEMUL` — exactly what
+   * `parseAYFile` reads — and was refused with "Unsupported file format" for
+   * its name alone (2026-09-24).
+   *
+   * `.strc` and `.amad` stay unsupported on purpose: same container,
+   * different payload (`ZXAYSTRC`, `ZXAYAMAD`), and the parser only knows
+   * the EMUL layout. An honest refusal beats a parse failure further in.
+   */
+  it('knows a ZXAY file named after its subtype', () => {
+    expect(detectFormat('spring.emul')?.key).toBe('ay');
+    expect(detectFormat('tune.ay')?.key).toBe('ay');
+    expect(detectFormat('mega mix 1.strc')).toBeNull();
+    expect(detectFormat('aztec theme.amad')).toBeNull();
+  });
+
+  /**
    * An implicit match must never take a file from a format that asked for it
    * by name. `sun.tune` is the UADE SunTronic prefix entry; `tune.sun` is the
    * native SunTronic parser. Both are deliberate, and both must survive.
