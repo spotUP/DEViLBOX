@@ -32,7 +32,10 @@ import { suppressFormatChecks, restoreFormatChecks } from '@/lib/formatCompatibi
 import { useModlandContributionModal } from '@stores/useModlandContributionModal';
 import { dismissErrors, dismissModal, play as playHeadless } from '@/bridge/handlers/writeHandlers';
 import { resolveCompanions } from '@/lib/import/companionResolver';
-import { JUKEBOX_FAULTS, JUKEBOX_OK, reportFault, loadVerdicts } from '@/lib/jukebox/faultReports';
+import {
+  JUKEBOX_FAULTS, JUKEBOX_OK, LOAD_FAILED, reportFault, loadVerdicts, verdictOf,
+  verdictLabels, isGoodVerdict, type JukeboxVerdict,
+} from '@/lib/jukebox/faultReports';
 import { searchModland, downloadModlandFile } from '@/lib/modlandApi';
 
 interface IndexEntry {
@@ -76,7 +79,7 @@ export const JukeboxPanel: React.FC<{ onClose: () => void }> = ({ onClose }) => 
   const [take, setTake] = useState(0);
   const [status, setStatus] = useState('');
   const [playingId, setPlayingId] = useState<string | null>(null);
-  const [judged, setJudged] = useState<Record<string, string>>({});
+  const [judged, setJudged] = useState<Record<string, JukeboxVerdict>>({});
   const listRef = useRef<HTMLDivElement>(null);
   /** Bytes already fetched, so Enter does not wait on the network. */
   const cache = useRef<Map<string, Blob>>(new Map());
@@ -170,6 +173,33 @@ export const JukeboxPanel: React.FC<{ onClose: () => void }> = ({ onClose }) => 
    * MCP `play` handler is the entry that sets song mode and starts it.
    * `TrackerReplayer.play()` would no-op for native-engine songs.
    */
+  /**
+   * The row a report belongs to, mirrored so the load path can file a finding
+   * without taking `row` as a dependency — `loadAndPlay` must stay stable, and
+   * the docs/CONTROL_PATTERNS.md ref pattern is how this codebase does that.
+   */
+  const reportCtx = useRef<{ id?: string; file?: string }>({});
+  reportCtx.current = { id: row?.id, file };
+
+  /**
+   * A refused load is a FINDING.
+   *
+   * It used to set a status line and stop there — "they fail silent"
+   * (2026-09-24). For a sweep that is the worst outcome available: the row
+   * looks untested, so it gets swept again, and the reason is gone by then.
+   * File it with the message attached, so the tracker holds what actually went
+   * wrong rather than "Load Failed" and a shrug.
+   */
+  const failLoad = useCallback(async (name: string, message: string) => {
+    const short = name.split('/').pop() ?? name;
+    setStatus(`LOAD FAILED — ${short}: ${message}`);
+    const { id } = reportCtx.current;
+    if (!id) return;
+    const ok = await reportFault(LOAD_FAILED, { format: id, file: short, note: message });
+    setJudged((j) => ({ ...j, [id]: { ...verdictOf(LOAD_FAILED), notes: message } }));
+    if (!ok) setStatus(`LOAD FAILED — ${short}: ${message} · tracker offline (:4444)`);
+  }, []);
+
   const loadAndPlay = useCallback(async (
     bytes: ArrayBuffer,
     name: string,
@@ -194,7 +224,12 @@ export const JukeboxPanel: React.FC<{ onClose: () => void }> = ({ onClose }) => 
         ...(companionFiles && Object.keys(companionFiles).length ? { companionFiles } : {}),
       });
       if (result.error) {
-        setStatus(`${name}: ${String(result.error)}`);
+        // A refused load is a FINDING, not a dead end. It used to set a status
+        // line and nothing else — "they fail silent" (2026-09-24), which for a
+        // sweep means the row looks untested and gets swept again. File it
+        // with the reason attached, so the tracker carries the actual message
+        // rather than "Load Failed" and a shrug.
+        await failLoad(name, String(result.error));
         return false;
       }
       // SONG mode. `useTransportStore.play()` alone inherits whatever the
@@ -218,7 +253,7 @@ export const JukeboxPanel: React.FC<{ onClose: () => void }> = ({ onClose }) => 
       window.setTimeout(close, 400);
       window.setTimeout(close, 1500);
     }
-  }, []);
+  }, [failLoad]);
 
   const play = useCallback(async () => {
     if (!row) return;
@@ -291,17 +326,18 @@ export const JukeboxPanel: React.FC<{ onClose: () => void }> = ({ onClose }) => 
     } catch (err) {
       // A load that throws is itself a finding; leave the row selected so it
       // can be reported without hunting for it again.
-      setStatus(`load failed: ${(err as Error).message}`);
+      await failLoad(file ?? row?.label ?? 'song', (err as Error).message);
     }
-  }, [row, file, loadAndPlay, grabFocus, index]);
+  }, [row, file, loadAndPlay, grabFocus, index, failLoad]);
 
-  const send = useCallback(async (fault: typeof JUKEBOX_OK | (typeof JUKEBOX_FAULTS)[number]) => {
+  const send = useCallback(async (fault: typeof JUKEBOX_OK | (typeof JUKEBOX_FAULTS)[number], note?: string) => {
     if (!row || !file) return;
     const ok = await reportFault(fault, {
       format: row.id,
       file: file.split('/').pop() ?? file,
+      note,
     });
-    setJudged((j) => ({ ...j, [row.id]: fault.id }));
+    setJudged((j) => ({ ...j, [row.id]: verdictOf(fault) }));
     setStatus(ok ? `${row.label}: ${fault.label}` : `${fault.label} — tracker offline (:4444)`);
     setSelected((i) => Math.min(i + 1, rows.length - 1));
     setTake(0);
@@ -397,8 +433,11 @@ export const JukeboxPanel: React.FC<{ onClose: () => void }> = ({ onClose }) => 
               <span className="truncate flex-1">{e.label}</span>
               {playingId === e.id && <span className="text-accent-primary">▶</span>}
               {verdict && (
-                <span className={verdict === 'ok' ? 'text-accent-success' : 'text-accent-error'}>
-                  {verdict === 'ok' ? 'OK' : '!'}
+                <span
+                  className={`shrink-0 ${isGoodVerdict(verdict) ? 'text-accent-success' : 'text-accent-error'}`}
+                  title={verdict.notes ?? undefined}
+                >
+                  {verdictLabels(verdict).join(' · ')}
                 </span>
               )}
             </div>

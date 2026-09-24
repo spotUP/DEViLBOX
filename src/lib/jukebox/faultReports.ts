@@ -98,28 +98,80 @@ export async function reportFault(
 }
 
 /**
+ * A row's recorded verdict, in the tracker's own vocabulary.
+ *
+ * `status` and `patternQuality` are independent, so a row can carry both: a
+ * song may be silent AND show empty patterns, and the sweep needs to see both
+ * when it comes back.
+ */
+export interface JukeboxVerdict {
+  status?: string;
+  patternQuality?: string;
+  notes?: string;
+}
+
+/**
+ * The labels to print on a row, worst first.
+ *
+ * "in the jukebox list i cant see how the songs marked broken are broken"
+ * (2026-09-24) — every fault used to collapse into a single "!", so a swept
+ * row could not be read back, which is the entire point of sweeping.
+ *
+ * Falls back to the raw tracker value for a verdict written by something other
+ * than the jukebox: the dashboard has its own vocabulary and a row set there
+ * must still say something rather than nothing.
+ */
+export function verdictLabels(v: JukeboxVerdict | undefined): string[] {
+  if (!v) return [];
+  if (v.status === JUKEBOX_OK.status) return [JUKEBOX_OK.label];
+  const out: string[] = [];
+  for (const field of ['status', 'patternQuality'] as const) {
+    const value = v[field];
+    if (!value) continue;
+    const known = JUKEBOX_FAULTS.find((f) => f[field] === value);
+    out.push(known?.label ?? value);
+  }
+  return out;
+}
+
+/** True when this verdict means there is nothing to come back to. */
+export function isGoodVerdict(v: JukeboxVerdict | undefined): boolean {
+  return v?.status === JUKEBOX_OK.status;
+}
+
+/**
  * What the tracker already knows, so a sweep survives a reload.
  *
  * Verdicts were kept in React state alone and vanished on refresh — which is
  * the one thing a long audit cannot afford. They were being WRITTEN to the
  * server the whole time; nothing read them back.
  *
- * Returns a map of row id to the status the server holds, or an empty map
+ * Returns a map of row id to the verdict the server holds, or an empty map
  * when the tracker is not running.
  */
-export async function loadVerdicts(): Promise<Record<string, string>> {
+export async function loadVerdicts(): Promise<Record<string, JukeboxVerdict>> {
   try {
     const res = await fetch(`${TRACKER}/get-data`);
     if (!res.ok) return {};
-    const data = await res.json() as Record<string, { status?: string; patternQuality?: string }>;
-    const out: Record<string, string> = {};
+    const data = await res.json() as Record<string, JukeboxVerdict>;
+    const out: Record<string, JukeboxVerdict> = {};
     for (const [key, entry] of Object.entries(data)) {
-      // `works` is the only verdict that means "nothing to come back to".
-      if (entry?.status === 'works') out[key] = 'ok';
-      else if (entry?.status || entry?.patternQuality) out[key] = 'fault';
+      if (!entry?.status && !entry?.patternQuality) continue;
+      out[key] = { status: entry.status, patternQuality: entry.patternQuality, notes: entry.notes };
     }
     return out;
   } catch {
     return {};
   }
 }
+
+/** The verdict a fault writes, so the UI can show it without a round trip. */
+export function verdictOf(fault: JukeboxFault | typeof JUKEBOX_OK): JukeboxVerdict {
+  return {
+    status: 'status' in fault ? fault.status : undefined,
+    patternQuality: 'patternQuality' in fault ? fault.patternQuality : undefined,
+  };
+}
+
+/** The fault a failed load reports — looked up, never duplicated. */
+export const LOAD_FAILED = JUKEBOX_FAULTS.find((f) => f.id === 'load-failed')!;
