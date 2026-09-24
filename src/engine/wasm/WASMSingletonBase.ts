@@ -89,7 +89,16 @@ export async function loadWASMAssets(
   cache: WASMAssetsCache,
   config: WASMLoaderConfig,
 ): Promise<void> {
-  if (cache.loadedContexts.has(context)) return;
+  // "Loaded" means BOTH: the worklet module is registered on this context AND
+  // the assets are in the cache. Checking only the context conflated the two,
+  // so an engine that lost its cached bytes could never get them back — the
+  // loader saw a loaded context and returned without fetching. See the UADE
+  // note in createNode().
+  const assetsCached = !!cache.wasmBinary && (!config.jsFile || !!cache.jsCode);
+  if (cache.loadedContexts.has(context) && assetsCached) return;
+  // Only an IN-FLIGHT load may be shared. A settled one is left in the map by
+  // nobody: it is cleared below, so a later caller that needs assets again
+  // starts a real fetch instead of awaiting a promise that already resolved.
   const existing = cache.initPromises.get(context);
   if (existing) return existing;
 
@@ -133,6 +142,11 @@ export async function loadWASMAssets(
   })();
 
   cache.initPromises.set(context, promise);
+  void promise
+    .catch(() => { /* the caller awaits `promise` itself and handles the failure */ })
+    .finally(() => {
+      if (cache.initPromises.get(context) === promise) cache.initPromises.delete(context);
+    });
   return promise;
 }
 
