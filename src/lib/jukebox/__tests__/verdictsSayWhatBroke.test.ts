@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import {
   loadVerdicts, verdictLabels, isGoodVerdict, verdictOf, LOAD_FAILED, JUKEBOX_OK,
+  JUKEBOX_FAULTS, reportFault,
 } from '../faultReports';
 
 /**
@@ -64,6 +65,48 @@ describe('a verdict says which fault it is', () => {
   it('survives the tracker being down', async () => {
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('ECONNREFUSED')));
     expect(await loadVerdicts()).toEqual({});
+  });
+});
+
+describe('a fault can be taken back off a row', () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  const capture = () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true } as unknown as Response);
+    vi.stubGlobal('fetch', fetchMock);
+    return fetchMock;
+  };
+
+  const bodyOf = (fetchMock: ReturnType<typeof vi.fn>) =>
+    JSON.parse((fetchMock.mock.calls[0][1] as { body: string }).body) as
+      Record<string, { status?: string; patternQuality?: string; notes?: string }>;
+
+  it('writes the fault when it is switched on', async () => {
+    const f = capture();
+    await reportFault(LOAD_FAILED, { format: 'maniacs-of-noise', file: 'x.mon' });
+    expect(bodyOf(f)['maniacs-of-noise'].status).toBe('crashes');
+  });
+
+  it('writes the field EMPTY when it is switched off', async () => {
+    // The server merges shallowly, so an empty string is what removes this
+    // fault and only this fault. A mis-keyed verdict used to stick until a
+    // reload (2026-09-24).
+    const f = capture();
+    await reportFault(LOAD_FAILED, { format: 'maniacs-of-noise', file: 'x.mon' }, true);
+    const body = bodyOf(f)['maniacs-of-noise'];
+    expect(body.status).toBe('');
+    expect(body.notes).toContain('cleared');
+  });
+
+  it('clears only the field the fault owns', async () => {
+    // Frozen Patterns is a patternQuality fault; clearing it must not touch
+    // `status`, or taking back a grid verdict would also un-say "silent".
+    const frozen = JUKEBOX_FAULTS.find((x) => x.id === 'frozen-grid')!;
+    const f = capture();
+    await reportFault(frozen, { format: 'sonix', file: 'a.smus' }, true);
+    const body = bodyOf(f)['sonix'];
+    expect(body.patternQuality).toBe('');
+    expect(body.status).toBeUndefined();
   });
 });
 

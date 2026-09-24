@@ -72,6 +72,15 @@ export interface ReportContext {
 export async function reportFault(
   fault: JukeboxFault | typeof JUKEBOX_OK,
   ctx: ReportContext,
+  /**
+   * Take the fault BACK off the row.
+   *
+   * A verdict is a state, not an event: a mis-keyed fault used to stick until
+   * a reload. The server merges shallowly, so writing the fault's own fields
+   * as empty strings removes exactly this fault and leaves any other verdict
+   * on the row alone.
+   */
+  clear = false,
 ): Promise<boolean> {
   const stamp = new Date().toISOString().slice(0, 16).replace('T', ' ');
   const parts = [`${fault.label} — ${ctx.file}`];
@@ -79,9 +88,13 @@ export async function reportFault(
   if (ctx.note) parts.push(ctx.note);
   parts.push(`(jukebox ${stamp})`);
 
-  const body: Record<string, unknown> = { notes: parts.join(' · ') };
-  if ('status' in fault && fault.status) body.status = fault.status;
-  if ('patternQuality' in fault && fault.patternQuality) body.patternQuality = fault.patternQuality;
+  const body: Record<string, unknown> = {
+    notes: clear ? `cleared ${fault.label} — ${ctx.file} (jukebox ${stamp})` : parts.join(' · '),
+  };
+  if ('status' in fault && fault.status) body.status = clear ? '' : fault.status;
+  if ('patternQuality' in fault && fault.patternQuality) {
+    body.patternQuality = clear ? '' : fault.patternQuality;
+  }
 
   try {
     const res = await fetch(`${TRACKER}/push-updates`, {
