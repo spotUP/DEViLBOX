@@ -32,6 +32,36 @@ describe('useSettingsStore — persist migration', () => {
     expect(s.masterTuning).toBeGreaterThan(0);
   });
 
+  /**
+   * v10: the default stereo separation mode became ModPlug.
+   *
+   * The PT-2 clone's hard LRRL is the Amiga's own panning and it is the wrong
+   * default for listening — asked for 2026-09-24: "change the default stereo
+   * separation in the settings dialog to modplug not pt-2 clone".
+   *
+   * The flip cannot tell a stored default apart from a deliberate choice of
+   * 'pt2'; neither could the v8 SunTronic or v4 PSM migrations above it. That
+   * is the accepted trade in this file, and the setting is one click away.
+   */
+  it('v10: a fresh boot defaults to ModPlug separation', async () => {
+    const s = await freshLoad();
+    expect(s.stereoSeparationMode).toBe('modplug');
+  });
+
+  it('v10: stored pt2 is migrated to modplug', async () => {
+    seed(9, { stereoSeparationMode: 'pt2', masterTuning: 432 });
+    const s = await freshLoad();
+    expect(s.stereoSeparationMode).toBe('modplug');
+    expect(s.masterTuning, 'unrelated settings survive the bump').toBe(432);
+  });
+
+  it('v10: someone already on modplug is left alone', async () => {
+    seed(9, { stereoSeparationMode: 'modplug', modplugSeparation: 120 });
+    const s = await freshLoad();
+    expect(s.stereoSeparationMode).toBe('modplug');
+    expect(s.modplugSeparation, 'their separation amount is theirs').toBe(120);
+  });
+
   it('v3 data: stale formatEngine is wiped', async () => {
     // v3 migration deletes the formatEngine sub-object entirely.
     seed(2, { formatEngine: { mod: 'native', hvl: 'native' }, masterTuning: 432 });
