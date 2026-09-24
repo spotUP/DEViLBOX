@@ -160,25 +160,24 @@ export async function loadFurFileWasm(buffer: ArrayBuffer): Promise<{
   wavetables: Array<{ data: number[]; width: number; height: number }>;
   samples: Array<{ data: Int16Array | Int8Array | Uint8Array; rate: number; depth: number;
     loopStart: number; loopEnd: number; loopMode: number; name: string; samples: number }>;
+  /**
+   * Set when the file loaded but part of it was unreadable — a DefleMask file
+   * whose zlib checksum failed loses the end of its sample block, and the
+   * loader keeps the samples that survived rather than refusing the song.
+   * Empty when the file read cleanly.
+   */
+  loadWarning: string;
 }> {
   const m = await getModule();
   if (!cachedAPI) cachedAPI = getAPI(m);
   const api = cachedAPI;
 
   console.log(`[FurnaceFileOps] loadFurFileWasm called, ${buffer.byteLength} bytes, header: ${new Uint8Array(buffer, 0, 4).join(',')}`);
-  // Pre-decompress zlib data (e.g. DefleMask DMF) so the WASM receives raw data.
-  // This avoids relying on the WASM's internal zlib which can crash on files
-  // with corrupted adler32 checksums.
-  let data = new Uint8Array(buffer);
-  if (data[0] === 0x78 && (data[1] === 0x9c || data[1] === 0x01 || data[1] === 0xDA)) {
-    try {
-      const pako = await import('pako');
-      data = pako.inflateRaw(data.slice(2));
-      console.log(`[FurnaceFileOps] Pre-decompressed zlib → ${data.length} bytes`);
-    } catch (e) {
-      console.warn('[FurnaceFileOps] JS zlib pre-decompress failed, letting WASM try:', e);
-    }
-  }
+  // The file goes in as it is: DivEngine::load() inflates it, and its inflate
+  // keeps what a DefleMask file's bad adler32 would otherwise cost
+  // (fileOpsCommon_patched.cpp). pako's was stricter and refused files the
+  // engine reads.
+  const data = new Uint8Array(buffer);
 
   // Copy buffer to WASM heap
   const ptr = m._malloc(data.length);
@@ -200,6 +199,11 @@ export async function loadFurFileWasm(buffer: ArrayBuffer): Promise<{
   if (result !== 0) {
     throw new Error(`Furnace WASM load failed: ${api.fur_get_error()}`);
   }
+
+  // A successful load still reports through fur_get_error() when the file was
+  // only partly readable — see the sample-block patch in dmf.cpp.
+  const loadWarning = api.fur_get_error() || '';
+  if (loadWarning) console.warn(`[FurnaceFileOps] loaded with damage: ${loadWarning}`);
 
   // Read metadata
   const name = api.fur_get_song_name();
@@ -460,6 +464,7 @@ export async function loadFurFileWasm(buffer: ArrayBuffer): Promise<{
     instrumentBinaries,
     wavetables,
     samples,
+    loadWarning,
   };
 }
 
