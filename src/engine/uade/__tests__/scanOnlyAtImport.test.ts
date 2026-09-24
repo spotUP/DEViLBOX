@@ -57,35 +57,60 @@ describe('getScanParams reads a module name from either end', () => {
 });
 
 describe('the play path never pays for a scan', () => {
-  it('loadTune asks for skipScan, whatever the format', async () => {
+  /** A stand-in engine carrying the real play-path method under test. */
+  const fakeEngine = () => {
     const load = vi.fn().mockResolvedValue({});
-    const fake = { load } as unknown as UADEEngine;
+    const engine = {
+      load,
+      loadForPlayback: UADEEngine.prototype.loadForPlayback,
+    } as unknown as UADEEngine;
+    return { engine, load };
+  };
 
-    // `anthrox.fc` is NOT on any skip list — at import it gets a full scan.
-    const { useFormatStore } = await import('@/stores/useFormatStore');
-    useFormatStore.setState({ uadeEditableFileName: 'anthrox.fc', uadeCompanionFiles: null });
+  it('loadForPlayback skips the scan for a format that is scanned at import', async () => {
+    const { engine, load } = fakeEngine();
 
-    await UADEEngine.prototype.loadTune.call(fake, new ArrayBuffer(8));
+    // `anthrox.fc` is on no skip list — at import it gets a full scan.
+    await engine.loadForPlayback(new ArrayBuffer(8), 'anthrox.fc');
 
     expect(load).toHaveBeenCalledTimes(1);
-    const [, filename, skipScan, , scanTimeoutSec, looping] = load.mock.calls[0];
+    const [, filename, skipScan, subsong, scanTimeoutSec, looping] = load.mock.calls[0];
     expect(filename).toBe('anthrox.fc');
     expect(skipScan, 'the play path discards the metadata — never scan for it').toBe(true);
+    expect(subsong).toBe(0);
     expect(scanTimeoutSec).toBeUndefined();
     expect(looping, 'a format that used to end must still end').toBe(false);
   });
 
   it('keeps a compiled replayer looping', async () => {
-    const load = vi.fn().mockResolvedValue({});
-    const fake = { load } as unknown as UADEEngine;
-
-    const { useFormatStore } = await import('@/stores/useFormatStore');
-    useFormatStore.setState({ uadeEditableFileName: 'mon.unreal flying', uadeCompanionFiles: null });
-
-    await UADEEngine.prototype.loadTune.call(fake, new ArrayBuffer(8));
+    const { engine, load } = fakeEngine();
+    await engine.loadForPlayback(new ArrayBuffer(8), 'mon.unreal flying');
 
     const [, , skipScan, , , looping] = load.mock.calls[0];
     expect(skipScan).toBe(true);
     expect(looping).toBe(true);
+  });
+
+  it('carries the subsong through', async () => {
+    const { engine, load } = fakeEngine();
+    await engine.loadForPlayback(new ArrayBuffer(8), 'anthrox.fc', 3);
+    expect(load.mock.calls[0][3]).toBe(3);
+  });
+
+  it('loadTune goes through the same door', async () => {
+    const { engine, load } = fakeEngine();
+    const { useFormatStore } = await import('@/stores/useFormatStore');
+    useFormatStore.setState({
+      uadeEditableFileName: 'anthrox.fc',
+      uadeCompanionFiles: null,
+      uadeEditableCurrentSubsong: 2,
+    });
+
+    await UADEEngine.prototype.loadTune.call(engine, new ArrayBuffer(8));
+
+    const [, filename, skipScan, subsong] = load.mock.calls[0];
+    expect(filename).toBe('anthrox.fc');
+    expect(skipScan).toBe(true);
+    expect(subsong).toBe(2);
   });
 });

@@ -474,7 +474,7 @@ export const DJModlandBrowser: React.FC<DJModlandBrowserProps> = ({ onClose, var
         // Stop any prior UADE playback before loading a new module —
         // leaving it playing leaks audio during the ~100 ms load window.
         uade.stop();
-        await uade.load(buffer, file.filename);
+        await uade.loadForPlayback(buffer, file.filename);
 
         // Route UADE.output to the CUE bus (headphones) so preview is
         // audible to the DJ but NOT to the crowd — classic sound-system

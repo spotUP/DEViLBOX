@@ -918,7 +918,7 @@ export const OnlinePanel: React.FC<OnlinePanelProps> = ({ isOpen, onLoadTrackerM
           }
         }
         uade.stop();
-        await uade.load(buffer, filename);
+        await uade.loadForPlayback(buffer, filename);
         const ctx = getDevilboxAudioContext();
         try { uade.output.connect(ctx.destination); } catch { /* already connected */ }
         uade.play();

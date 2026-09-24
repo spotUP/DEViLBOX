@@ -609,6 +609,32 @@ export class UADEEngine extends WASMSingletonBase implements IsolationCapableEng
   }
 
   /**
+   * Load a module for PLAYBACK — the one entry every play path uses.
+   *
+   * NO SCAN. The scan is a full offline render of the whole song at emulation
+   * speed, after which the worklet must reload the module because the scan
+   * consumed its state — measured at 3661 ms on `maniacs-of-noise/unreal
+   * flying.mon`, paid on the keypress. Every play path discards the metadata
+   * it returns, so those milliseconds bought rows nobody reads. The import
+   * path (UADEParser) is what scans, and it keeps the result.
+   *
+   * Pattern display does not depend on it either: the deferred capture
+   * reconstructs patterns from LIVE tick snapshots taken during playback.
+   *
+   * Looping is passed explicitly because it was otherwise decided by whether a
+   * scan happened to run — see `getScanParams().loops`. Skipping a scan must
+   * not silently start looping a song that used to end.
+   *
+   * Call THIS, never `load()`, from anything that is about to play. Four sites
+   * had grown their own copy of this incantation and two of them still ran the
+   * scan (2026-09-24).
+   */
+  async loadForPlayback(data: ArrayBuffer, filenameHint: string, subsong = 0): Promise<void> {
+    const { getScanParams } = await import('./uadeScanLists');
+    await this.load(data, filenameHint, true, subsong, undefined, getScanParams(filenameHint).loops);
+  }
+
+  /**
    * loadTune(buffer) — WASM engine registry compatible wrapper for load().
    * Reads the filename hint and current subsong from the format store.
    */
@@ -616,9 +642,6 @@ export class UADEEngine extends WASMSingletonBase implements IsolationCapableEng
     const { useFormatStore } = await import('@/stores/useFormatStore');
     const state = useFormatStore.getState();
     const fileName = state.uadeEditableFileName || 'module.mod';
-    // Scan control: centralized in uadeScanLists.ts
-    const { getScanParams } = await import('./uadeScanLists');
-    const { loops } = getScanParams(fileName);
 
     // Register companion files (two-file formats: smp.*, .ins, .set) BEFORE loading
     const companions = state.uadeCompanionFiles;
@@ -628,17 +651,7 @@ export class UADEEngine extends WASMSingletonBase implements IsolationCapableEng
       }
     }
 
-    // NO SCAN ON THE PLAY PATH. The scan is a full offline render of the whole
-    // song at emulation speed, after which the worklet must reload the module
-    // because the scan consumed its state — measured at 3661 ms on
-    // `maniacs-of-noise/unreal flying.mon`, paid on the keypress. This method
-    // returns void and throws the metadata away, so every one of those
-    // milliseconds bought rows nobody reads. The import path (UADEParser) is
-    // what scans, and it keeps the result.
-    //
-    // Pattern display does not depend on this either: the deferred capture
-    // reconstructs patterns from LIVE tick snapshots taken during playback.
-    await this.load(buffer, fileName, true, state.uadeEditableCurrentSubsong, undefined, loops);
+    await this.loadForPlayback(buffer, fileName, state.uadeEditableCurrentSubsong);
   }
 
   /**
