@@ -18,6 +18,7 @@
  */
 
 #include "fileOpsCommon.h"
+#include "dmfSampleRepair.h"
 
 bool DivEngine::load(unsigned char* f, size_t slen, const char* nameHint) {
   unsigned char* file;
@@ -26,6 +27,7 @@ bool DivEngine::load(unsigned char* f, size_t slen, const char* nameHint) {
   // earlier file cannot be mistaken for this one's. A successful load that
   // still leaves a message behind is reporting real damage it recovered from.
   lastError="";
+  g_dmfDeflateStream.clear();
   if (slen<21) {
     logE("too small!");
     lastError="file is too small";
@@ -157,6 +159,10 @@ bool DivEngine::load(unsigned char* f, size_t slen, const char* nameHint) {
     }
     blocks.clear();
     len=finalSize;
+    // PATCH: keep the deflate stream; a DefleMask file missing bytes from it
+    // is repaired by inflating it again with the bytes put back
+    // (dmfSampleRepair.h, dmfRestoreStream)
+    if (hasZlibHeader) g_dmfDeflateStream.assign(f+2,f+slen);
     delete[] f;
   } catch (NotZlibException& e) {
     logD("not zlib. loading as raw...");
