@@ -734,15 +734,37 @@ export class UADEEngine extends WASMSingletonBase implements IsolationCapableEng
     const cleanups: Array<() => void> = [];
 
     // ── 1. Position subscription with CIA-tick → row math ────────────────
-    if (song.uadeFirstTick != null) {
+    //
+    // Runs for EVERY UADE song, not only those the scan gave a
+    // `uadeFirstTick`. The worklet posts `tickCount` on every block
+    // regardless, so the engine's own clock is always available — and it is
+    // the only clock that matches what is coming out of the speakers.
+    //
+    // Without this, a song whose scan produced no anchor fell back to the TS
+    // scheduler, which starts counting when PLAY was pressed. Some UADE
+    // formats take seconds to initialise, so the grid was already pages ahead
+    // by the time the first sample arrived and never came back: measured
+    // 2026-09-24 on `actionamics/dynablaster.ast` — `rowsAdvancing: true`,
+    // `currentGlobalRow: 128`, and nothing audible yet.
+    //
+    // When the scan gave no anchor, the FIRST tick actually observed becomes
+    // one. A tick of 0 is not an anchor — it is the counter before the
+    // replayer has run — so it is ignored until it moves.
+    {
       const speed = song.initialSpeed || 6;
-      const firstTick = song.uadeFirstTick;
+      const scannedFirstTick = song.uadeFirstTick;
+      /** Anchor: the scan's, or the first real tick this playback reports. */
+      let firstTick = scannedFirstTick ?? null;
       const patternLengths = song.patterns.map(p => p.length);
       let lastRow = -1;
       let lastPosition = -1;
       const unsub = this.onPositionUpdate((update) => {
         if (!isPlaying()) return;
         const tickCount = update.tickCount ?? 0;
+        if (firstTick === null) {
+          if (tickCount <= 0) return;   // engine has not started yet
+          firstTick = tickCount;
+        }
         // Convert CIA tick count to absolute row index
         const absoluteRow = Math.max(0, Math.floor((tickCount - firstTick) / speed));
         // Map absolute row to pattern position + row within pattern
@@ -786,7 +808,9 @@ export class UADEEngine extends WASMSingletonBase implements IsolationCapableEng
             for (const d of decoded) {
               capture.push(d.paramId, entry.tick, d.value, {
                 type: 'effect',
-                row: Math.floor((entry.tick - firstTick) / speed),
+                // Before the anchor is known there is no row to attribute a
+                // register write to; 0 is the honest answer, not a guess.
+                row: firstTick === null ? 0 : Math.floor((entry.tick - firstTick) / speed),
                 channel: entry.channel,
                 effectCol: 0,
               });
