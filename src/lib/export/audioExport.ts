@@ -542,8 +542,12 @@ export async function renderUADEToWav(
 
   onProgress?.(10);
 
-  // Load the module into UADE
-  await engine.load(fileData.slice(0), filename);
+  // Load the module into UADE. NO SCAN: the scan renders the whole song
+  // offline to extract pattern rows, `renderFull` below then renders it again,
+  // and nothing here reads the rows — the export was paying for the song
+  // twice. Looping does not matter either way; `_renderFullSong` sets it to 0
+  // itself so the render can terminate.
+  await engine.load(fileData.slice(0), filename, true);
 
   onProgress?.(20);
 
