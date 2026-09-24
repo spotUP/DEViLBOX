@@ -578,7 +578,7 @@ export class UADEEngine extends WASMSingletonBase implements IsolationCapableEng
    * @param data - Raw file bytes
    * @param filenameHint - Original filename (used by UADE for format detection)
    */
-  async load(data: ArrayBuffer, filenameHint: string, skipScan = false, subsong = 0, scanTimeoutSec?: number): Promise<UADEMetadata> {
+  async load(data: ArrayBuffer, filenameHint: string, skipScan = false, subsong = 0, scanTimeoutSec?: number, looping?: boolean): Promise<UADEMetadata> {
     await this._initPromise;
     if (!this.workletNode) throw new Error('UADEEngine not initialized');
 
@@ -597,7 +597,15 @@ export class UADEEngine extends WASMSingletonBase implements IsolationCapableEng
       [transferBuf]
     );
 
-    return this._loadPromise;
+    const meta = await this._loadPromise;
+
+    // Looping is otherwise decided by whether a scan happened to run — the
+    // scan sets it to 0 so it can terminate, `skipScan` sets it to 1. A caller
+    // that skips a scan it never needed says what it wants instead.
+    if (looping !== undefined) {
+      this.workletNode.port.postMessage({ type: 'setLooping', value: looping });
+    }
+    return meta;
   }
 
   /**
@@ -608,16 +616,9 @@ export class UADEEngine extends WASMSingletonBase implements IsolationCapableEng
     const { useFormatStore } = await import('@/stores/useFormatStore');
     const state = useFormatStore.getState();
     const fileName = state.uadeEditableFileName || 'module.mod';
-    const ext = fileName.split('.').pop()?.toLowerCase() ?? '';
-    const prefix = fileName.split('.')[0]?.toLowerCase() ?? '';
-
     // Scan control: centralized in uadeScanLists.ts
-    const { shouldSkipScan, isShortScan } = await import('./uadeScanLists');
-    const scanCrashes = shouldSkipScan(ext, prefix);
-    const shortScan = isShortScan(ext, prefix);
-
-    const skipScan = scanCrashes;
-    const scanTimeoutSec = shortScan ? 30 : undefined;
+    const { getScanParams } = await import('./uadeScanLists');
+    const { loops } = getScanParams(fileName);
 
     // Register companion files (two-file formats: smp.*, .ins, .set) BEFORE loading
     const companions = state.uadeCompanionFiles;
@@ -627,7 +628,17 @@ export class UADEEngine extends WASMSingletonBase implements IsolationCapableEng
       }
     }
 
-    await this.load(buffer, fileName, skipScan, state.uadeEditableCurrentSubsong, scanTimeoutSec);
+    // NO SCAN ON THE PLAY PATH. The scan is a full offline render of the whole
+    // song at emulation speed, after which the worklet must reload the module
+    // because the scan consumed its state — measured at 3661 ms on
+    // `maniacs-of-noise/unreal flying.mon`, paid on the keypress. This method
+    // returns void and throws the metadata away, so every one of those
+    // milliseconds bought rows nobody reads. The import path (UADEParser) is
+    // what scans, and it keeps the result.
+    //
+    // Pattern display does not depend on this either: the deferred capture
+    // reconstructs patterns from LIVE tick snapshots taken during playback.
+    await this.load(buffer, fileName, true, state.uadeEditableCurrentSubsong, undefined, loops);
   }
 
   /**

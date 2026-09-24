@@ -87,14 +87,54 @@ export function isShortScan(ext: string, prefix: string): boolean {
   return SHORT_SCAN_EXTS.has(ext) || SHORT_SCAN_PREFIXES.has(prefix);
 }
 
-/** Get scan parameters for a filename. */
-export function getScanParams(filename: string): { skipScan: boolean; scanTimeoutSec: number | undefined } {
-  const ext = filename.includes('.') ? filename.split('.').pop()?.toLowerCase() ?? '' : '';
-  const prefix = filename.split('.')[0]?.toLowerCase() ?? '';
-  const skip = shouldSkipScan(ext, prefix);
-  const short = isShortScan(ext, prefix);
+export interface ScanParams {
+  /** The format crashes the browser or corrupts WASM state during a scan. */
+  scanCrashes: boolean;
+  /** Compiled 68k replayer: a 30 s scan captures ticks, a full one never ends. */
+  shortScan: boolean;
+  /** Skip the scan entirely. */
+  skipScan: boolean;
+  /** Scan budget in seconds, or undefined for the 600 s default. */
+  scanTimeoutSec: number | undefined;
+  /**
+   * Whether UADE is left LOOPING after a load of this format.
+   *
+   * This was never chosen — it fell out of whether a scan ran. A scan calls
+   * `set_looping(0)` so it can terminate, and the reload afterwards leaves it
+   * there, so scanned formats stop at the end of the song. The two paths that
+   * do not complete a scan (`skipScan`, and the short scan's full reinit) both
+   * call `set_looping(1)`. Stating it here keeps that behaviour when the
+   * caller skips a scan it never needed.
+   */
+  loops: boolean;
+}
+
+/**
+ * Scan parameters for a filename. THE single decision point — never re-derive
+ * `ext`/`prefix` at a call site.
+ *
+ * Both halves of the name are tested against both lists, because UADE names a
+ * module either way round: `unreal flying.mon` on disk becomes the hint
+ * `mon.unreal flying`. Splitting that on "." and calling the last part the
+ * extension yields "unreal flying", and `mon` — which is on the CRASH list —
+ * was then scanned anyway, for 3.7 s, on a format whose scan is documented to
+ * crash the browser (measured 2026-09-24).
+ */
+export function getScanParams(filename: string): ScanParams {
+  const basename = filename.includes('/') ? filename.split('/').pop()! : filename;
+  const parts = basename.toLowerCase().split('.');
+  const head = parts[0] ?? '';
+  const tail = parts.length > 1 ? parts[parts.length - 1] : '';
+
+  // Either half may be the format token — test both against both lists.
+  const scanCrashes = shouldSkipScan(tail, head) || shouldSkipScan(head, tail);
+  const shortScan = isShortScan(tail, head) || isShortScan(head, tail);
+
   return {
-    skipScan: skip,
-    scanTimeoutSec: short ? 30 : undefined,
+    scanCrashes,
+    shortScan,
+    skipScan: scanCrashes,
+    scanTimeoutSec: shortScan ? 30 : undefined,
+    loops: scanCrashes || shortScan,
   };
 }

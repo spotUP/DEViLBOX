@@ -49,15 +49,9 @@ export class UADESynth implements DevilboxSynth {
 
     const p = (async () => {
       await this.engine.ready();
-      const ext = config.filename.split('.').pop()?.toLowerCase() ?? '';
-      const prefix = config.filename.split('.')[0]?.toLowerCase() ?? '';
-
       // Scan control: centralized in uadeScanLists.ts
-      const { shouldSkipScan, isShortScan } = await import('./uadeScanLists');
-
-      const skipScan = shouldSkipScan(ext, prefix);
-      const shortScan = isShortScan(ext, prefix);
-      const scanTimeoutSec = shortScan ? 30 : undefined;
+      const { getScanParams } = await import('./uadeScanLists');
+      const { loops } = getScanParams(config.filename);
 
       // Register companion files (two-file formats: smp.*, .ins, .set) BEFORE loading.
       // Mirrors the logic in UADEEngine.loadTune() for the UADEEditableSynth path.
@@ -68,7 +62,9 @@ export class UADESynth implements DevilboxSynth {
           await this.engine.addCompanionFile(cfName, cfBuf);
         }
       }
-      await this.engine.load(config.fileData, config.filename, skipScan, config.currentSubsong ?? 0, scanTimeoutSec);
+      // No scan here either: this is a play path and it discards the metadata.
+      // See the note in UADEEngine.loadTune().
+      await this.engine.load(config.fileData, config.filename, true, config.currentSubsong ?? 0, undefined, loops);
     })();
     this._initPromise = p;
     await p;
