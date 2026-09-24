@@ -428,7 +428,7 @@ export const useSettingsStore = create<SettingsStore>()(
       performanceQuality: 'high',
       useBLEP: false,  // Default: BLEP disabled (enable in Settings for band-limited synthesis)
       stereoSeparation: 25,  // Default: 25% — rich mono (slight stereo cues, no harsh Amiga LRRL)
-      stereoSeparationMode: 'pt2' as const,
+      stereoSeparationMode: 'modplug' as const,
       modplugSeparation: 50,        // Default: 50/200 — equivalent rich mono for ModPlug mode
       headphonesMode: false,
       midiPolyphonic: true,  // Default: polyphonic enabled for better jamming
@@ -610,7 +610,7 @@ export const useSettingsStore = create<SettingsStore>()(
     })),
     {
       name: 'devilbox-settings',
-      version: 9,
+      version: 10,
       migrate: (persistedState: unknown, version: number) => {
         const s = (persistedState ?? {}) as Record<string, unknown>;
         if (version < 3) {
@@ -653,6 +653,14 @@ export const useSettingsStore = create<SettingsStore>()(
           delete s.lensEnabled;
           delete s.lensPreset;
           delete s.lensParams;
+        }
+        if (version < 10) {
+          // v10: stereo separation defaults to ModPlug rather than the PT-2
+          // clone's LRRL. Flips anyone still holding the old default — which,
+          // as with the v8 SunTronic and v4 PSM migrations before it, cannot
+          // be told apart from a deliberate choice of 'pt2'. The setting is
+          // one click away in Settings and the mode is named there.
+          if (s.stereoSeparationMode === 'pt2') s.stereoSeparationMode = 'modplug';
         }
         return s;
       },
