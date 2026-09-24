@@ -485,6 +485,13 @@ export class DJControllerMapper {
         useMixerStore.getState().setChannelDubSend(chIndex, normalized);
         return;
       }
+      // The NINTH fader — the master send — is motorised like the other
+      // eight and had no such guard, so its own motor echo could drive it:
+      // the fader fights the hand on it. Its touch sensor was already being
+      // tracked by the CC 101-109 branch above (109 - 100 = 9); nothing was
+      // reading it. Routing is untouched — CC 9 still travels on through the
+      // parameter mapping to `dub.masterSend`.
+      if (cc === 9 && !isFaderTouched(9)) return;
     }
 
     // Check parameter mapping
