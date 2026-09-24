@@ -186,6 +186,19 @@ function specialCases(moduleName: string, siblings: string[]): string[] {
     const patch = find(name.slice(0, 3) + 'patch.003');
     if (patch) out.push(patch);
   }
+  // Wanted Team: both eagleplayers read their replay code from a file that
+  // ships WITH the module, under one fixed name, and both readmes say so in
+  // the same words — "must be called 'WantedTeam.bin' and must be stored in
+  // the same directory as the module"
+  // (uade-3.05/amigasrc/players/wanted_team/*/EP_*.readme).
+  //
+  // Named here and not in EXPECTED_PARTNER because that table's entries are
+  // PREFIXES joined to the tune name; this one is a constant, like songplay.
+  if (name.startsWith('jo.') || name.startsWith('pat.') ||
+      name.endsWith('.jo') || name.endsWith('.pat')) {
+    const wanted = find('wantedteam.bin');
+    if (wanted) out.push(wanted);
+  }
   return out;
 }
 
