@@ -123,6 +123,30 @@ describe('the other shapes', () => {
     expect(resolveCompanions('abcsong.sci', { siblings: ['abcsong.sci', 'abcpatch.003'] }).companions).toEqual(['abcpatch.003']);
   });
 
+  /**
+   * The Wanted Team eagleplayers read their replay code from a file that
+   * ships with the MODULE: "must be called 'WantedTeam.bin' and must be
+   * stored in the same directory as the module"
+   * (uade-3.05/amigasrc/players/wanted_team/*\/EP_*.readme).
+   *
+   * `lollypop-subgame 01.jo` failed with `uade_request_amiga_file: file not
+   * found '/uade/WantedTeam.bin'` because nothing ever handed the sibling
+   * over. The first plan was to ship the binary under `public/uade/`, which
+   * would have been wrong — it is per-module data, not a player file.
+   */
+  it('Wanted Team modules take their replay binary from the same directory', () => {
+    expect(
+      resolveCompanions('jo.lollypop-subgame 01', {
+        siblings: ['jo.lollypop-subgame 01', 'WantedTeam.bin'],
+      }).companions,
+    ).toEqual(['WantedTeam.bin']);
+
+    expect(
+      resolveCompanions('pat.some tune', { siblings: ['pat.some tune', 'WantedTeam.bin'] })
+        .companions,
+    ).toEqual(['WantedTeam.bin']);
+  });
+
   it('sample subdirectories keep their relative paths', () => {
     expect(resolveCompanions('tank1.sun', { siblings: ['tank1.sun'], subdirs: { instr: ['perc1.x', 'bio', 'lead.x'] } }).companions)
       .toEqual(['instr/perc1.x', 'instr/lead.x']);
