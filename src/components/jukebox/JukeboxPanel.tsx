@@ -179,8 +179,8 @@ export const JukeboxPanel: React.FC<{ onClose: () => void }> = ({ onClose }) => 
    * without taking `row` as a dependency — `loadAndPlay` must stay stable, and
    * the docs/CONTROL_PATTERNS.md ref pattern is how this codebase does that.
    */
-  const reportCtx = useRef<{ id?: string; file?: string }>({});
-  reportCtx.current = { id: row?.id, file };
+  const reportCtx = useRef<{ id?: string; label?: string; file?: string; rowCount: number }>({ rowCount: 0 });
+  reportCtx.current = { id: row?.id, label: row?.label, file, rowCount: rows.length };
 
   /**
    * A refused load is a FINDING.
@@ -351,27 +351,35 @@ export const JukeboxPanel: React.FC<{ onClose: () => void }> = ({ onClose }) => 
     fault: (typeof JUKEBOX_FAULTS)[number],
     on: boolean,
   ) => {
-    if (!row || !file) return;
+    // Everything read through the ref, and the deps left EMPTY on purpose.
+    // `Toggle` is memoized and its comparator does not look at `onChange`
+    // (`controls/Toggle.tsx`), so a switch keeps the very first handler it was
+    // given. A handler that closed over `row` therefore stayed bound to
+    // whatever was selected when the panel mounted — nothing, so every click
+    // returned at the first line and the switches looked dead. This is the
+    // ref pattern docs/CONTROL_PATTERNS.md prescribes for exactly this.
+    const { id, label, file: current, rowCount } = reportCtx.current;
+    if (!id || !current) return;
     const ok = await reportFault(fault, {
-      format: row.id,
-      file: file.split('/').pop() ?? file,
+      format: id,
+      file: current.split('/').pop() ?? current,
     }, !on);
     setJudged((j) => {
-      const prev = j[row.id] ?? {};
+      const prev = j[id] ?? {};
       const next: JukeboxVerdict = { ...prev };
       if (fault.status) next.status = on ? fault.status : undefined;
       if (fault.patternQuality) next.patternQuality = on ? fault.patternQuality : undefined;
-      return { ...j, [row.id]: next };
+      return { ...j, [id]: next };
     });
     setStatus(ok
-      ? `${row.label}: ${fault.label} ${on ? 'on' : 'off'}`
+      ? `${label ?? id}: ${fault.label} ${on ? 'on' : 'off'}`
       : `${fault.label} — tracker offline (:4444)`);
     // Only a NEW fault moves the sweep on. Clearing one means staying put.
     if (on) {
-      setSelected((i) => Math.min(i + 1, rows.length - 1));
+      setSelected((i) => Math.min(i + 1, rowCount - 1));
       setTake(0);
     }
-  }, [row, file, rows.length]);
+  }, []);
 
   const send = useCallback(async (fault: typeof JUKEBOX_OK | (typeof JUKEBOX_FAULTS)[number], note?: string) => {
     if (!row || !file) return;
