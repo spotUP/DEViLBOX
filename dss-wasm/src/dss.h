@@ -28,6 +28,8 @@ bool dss_has_ended(const DssModule* module);
 int dss_get_instrument_count(const DssModule* module);
 int dss_get_num_patterns(const DssModule* module);
 int dss_get_num_positions(const DssModule* module);
+/** Live play head as (position << 8) | row, or -1 with no module. */
+int dss_get_play_position(const DssModule* module);
 
 void dss_get_cell(const DssModule* module, int pattern, int row, int channel,
                    uint8_t* sample, uint16_t* period, uint8_t* effect, uint8_t* effect_arg);
