@@ -11415,11 +11415,11 @@
   },
   "actionamics": {
     "status": "works",
-    "notes": "smoke-test PASS -- rms=0.0001 [audio=ok, inst=39/ok, export=ok] (2026-04-11)",
+    "notes": "Incorrect Pattern Data — dynablaster.ast · (jukebox 2026-09-24 05:09)",
     "auditStatus": "fixed",
     "rmsAvg": 0.000093,
     "instrumentCount": 39,
-    "patternQuality": "full",
+    "patternQuality": "incorrect",
     "synthIntegration": "uade-generic",
     "sampleExtraction": "full",
     "editability": "chip-ram",
@@ -12834,14 +12834,15 @@
   },
   "anders-oland": {
     "auditStatus": "fixed",
-    "notes": "AudioContext staleness fix (e2d9edf0e). UADE-backed, needs re-test.",
+    "notes": "Frozen Patterns — primemover 07.hot · (jukebox 2026-09-24 05:10)",
     "rmsAvg": 0,
     "instrumentCount": 8,
-    "patternQuality": "none",
+    "patternQuality": "frozen",
     "synthIntegration": "uade-generic",
     "sampleExtraction": "names-only",
     "editability": "none",
-    "deepNotes": "No parser — compiled 68k replayer (HOT.* prefix)"
+    "deepNotes": "No parser — compiled 68k replayer (HOT.* prefix)",
+    "status": "partial"
   },
   "art-of-noise": {
     "auditStatus": "fixed",
@@ -13054,14 +13055,15 @@
   },
   "fm-tracker": {
     "auditStatus": "fixed",
-    "notes": "AudioContext staleness fix (e2d9edf0e). UADE-backed, needs re-test.",
+    "notes": "Silent — fm dance.fmt · (jukebox 2026-09-24 05:15)",
     "rmsAvg": 0,
     "instrumentCount": 0,
     "patternQuality": "none",
     "synthIntegration": "uade-generic",
     "sampleExtraction": "names-only",
     "editability": "none",
-    "deepNotes": "Forced classic — compiled 68k FM synth replayer"
+    "deepNotes": "Forced classic — compiled 68k FM synth replayer",
+    "status": "silent"
   },
   "face-the-mus": {
     "auditStatus": "fixed",
@@ -16065,5 +16067,33 @@
   "formats-tcbTracker": {
     "notes": "Silent — cannonfodder.tcb · (jukebox 2026-09-23 23:55)",
     "status": "silent"
+  },
+  "activision-pro": {
+    "notes": "Incorrect Pattern Data — gettysburg.avp · (jukebox 2026-09-24 05:09)",
+    "patternQuality": "incorrect"
+  },
+  "amigaklang": {
+    "notes": "Wrong Sound — JosSs-Cream.mod · (jukebox 2026-09-24 05:10)",
+    "status": "partial"
+  },
+  "face-the-music": {
+    "notes": "Good — rock.ftm · (jukebox 2026-09-24 05:14)",
+    "status": "works"
+  },
+  "farandole-composer": {
+    "notes": "Good — dark dreams.far · (jukebox 2026-09-24 05:15)",
+    "status": "works"
+  },
+  "fashion-tracker": {
+    "notes": "Incorrect Pattern Data — ivory tover ii.ex · (jukebox 2026-09-24 05:15)",
+    "patternQuality": "incorrect"
+  },
+  "follin-player-ii": {
+    "notes": "Load Failed — sly spy title.tf · (jukebox 2026-09-24 05:15)",
+    "status": "crashes"
+  },
+  "bp-soundmon-2": {
+    "notes": "Good — nicktune1.bp · (jukebox 2026-09-24 05:17)",
+    "status": "works"
   }
 }

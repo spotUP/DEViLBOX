@@ -41,6 +41,11 @@ export const JUKEBOX_FAULTS: readonly JukeboxFault[] = [
   { id: 'frozen-grid',    key: '4', label: 'Frozen Patterns', title: 'Pattern data is there but does not scroll',          patternQuality: 'frozen' },
   { id: 'out-of-sync',    key: '5', label: 'Out Of Sync',     title: 'Grid and audio drift apart',                         patternQuality: 'out-of-sync' },
   { id: 'wrong-sound',    key: '6', label: 'Wrong Sound',     title: 'Plays, but it does not sound like the tune should',  status: 'partial' },
+  // Distinct from empty and from frozen: the grid is populated and it moves,
+  // but what it shows is not the song — wrong notes, wrong channels, garbage
+  // cells. A parser that half-works looks like this, and calling it "empty"
+  // would send the next reader to the wrong half of the code.
+  { id: 'wrong-patterns', key: '7', label: 'Incorrect Pattern Data', title: 'Pattern data is present and moving, but wrong', patternQuality: 'incorrect' },
 ] as const;
 
 /** Nothing wrong — worth recording, so a swept format is not re-swept. */
@@ -89,5 +94,32 @@ export async function reportFault(
     // The server is not running. Say so in the UI rather than throwing the
     // sweep away.
     return false;
+  }
+}
+
+/**
+ * What the tracker already knows, so a sweep survives a reload.
+ *
+ * Verdicts were kept in React state alone and vanished on refresh — which is
+ * the one thing a long audit cannot afford. They were being WRITTEN to the
+ * server the whole time; nothing read them back.
+ *
+ * Returns a map of row id to the status the server holds, or an empty map
+ * when the tracker is not running.
+ */
+export async function loadVerdicts(): Promise<Record<string, string>> {
+  try {
+    const res = await fetch(`${TRACKER}/get-data`);
+    if (!res.ok) return {};
+    const data = await res.json() as Record<string, { status?: string; patternQuality?: string }>;
+    const out: Record<string, string> = {};
+    for (const [key, entry] of Object.entries(data)) {
+      // `works` is the only verdict that means "nothing to come back to".
+      if (entry?.status === 'works') out[key] = 'ok';
+      else if (entry?.status || entry?.patternQuality) out[key] = 'fault';
+    }
+    return out;
+  } catch {
+    return {};
   }
 }

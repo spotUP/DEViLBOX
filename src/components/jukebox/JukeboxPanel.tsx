@@ -28,12 +28,11 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@components/ui/Button';
 import { loadFile as loadFileHeadless } from '@/bridge/handlers/writeHandlers';
-import { useTransportStore } from '@stores/useTransportStore';
 import { suppressFormatChecks, restoreFormatChecks } from '@/lib/formatCompatibility';
 import { useModlandContributionModal } from '@stores/useModlandContributionModal';
-import { dismissErrors, dismissModal } from '@/bridge/handlers/writeHandlers';
+import { dismissErrors, dismissModal, play as playHeadless } from '@/bridge/handlers/writeHandlers';
 import { resolveCompanions } from '@/lib/import/companionResolver';
-import { JUKEBOX_FAULTS, JUKEBOX_OK, reportFault } from '@/lib/jukebox/faultReports';
+import { JUKEBOX_FAULTS, JUKEBOX_OK, reportFault, loadVerdicts } from '@/lib/jukebox/faultReports';
 import { searchModland, downloadModlandFile } from '@/lib/modlandApi';
 
 interface IndexEntry {
@@ -81,6 +80,10 @@ export const JukeboxPanel: React.FC<{ onClose: () => void }> = ({ onClose }) => 
   const listRef = useRef<HTMLDivElement>(null);
   /** Bytes already fetched, so Enter does not wait on the network. */
   const cache = useRef<Map<string, Blob>>(new Map());
+
+  // Verdicts already on the server. They were written there all along; not
+  // reading them back is what made every reload throw the sweep away.
+  useEffect(() => { void loadVerdicts().then((v) => setJudged((j) => ({ ...v, ...j }))); }, []);
 
   useEffect(() => {
     void fetch('/data/songs/index.json')
@@ -163,8 +166,8 @@ export const JukeboxPanel: React.FC<{ onClose: () => void }> = ({ onClose }) => 
    * bypasses the dialog, which is a hundred lines of format routing that must
    * not be copied here.
    *
-   * It does not start playback either; that is the transport's job, and
-   * `useTransportStore.play()` is the entry the MCP `play` tool uses.
+   * It does not start playback either; that is the transport's job, and the
+   * MCP `play` handler is the entry that sets song mode and starts it.
    * `TrackerReplayer.play()` would no-op for native-engine songs.
    */
   const loadAndPlay = useCallback(async (
@@ -194,7 +197,12 @@ export const JukeboxPanel: React.FC<{ onClose: () => void }> = ({ onClose }) => 
         setStatus(`${name}: ${String(result.error)}`);
         return false;
       }
-      await useTransportStore.getState().play();
+      // SONG mode. `useTransportStore.play()` alone inherits whatever the
+      // loop flag happened to be, so the browser looped one pattern instead of
+      // playing the tune — and an audit that never leaves pattern 0 cannot see
+      // a song fall apart later. This is the MCP `play` handler, which sets
+      // the flag and then plays.
+      await playHeadless({ mode: 'song' });
       return true;
     } finally {
       restoreFormatChecks();
