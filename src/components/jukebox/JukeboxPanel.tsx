@@ -27,6 +27,7 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@components/ui/Button';
+import { Toggle } from '@components/controls/Toggle';
 import { loadFile as loadFileHeadless } from '@/bridge/handlers/writeHandlers';
 import { suppressFormatChecks, restoreFormatChecks } from '@/lib/formatCompatibility';
 import { useModlandContributionModal } from '@stores/useModlandContributionModal';
@@ -330,6 +331,48 @@ export const JukeboxPanel: React.FC<{ onClose: () => void }> = ({ onClose }) => 
     }
   }, [row, file, loadAndPlay, grabFocus, index, failLoad]);
 
+  /** Whether the selected row currently carries this fault. */
+  const carries = useCallback((fault: (typeof JUKEBOX_FAULTS)[number]): boolean => {
+    const v = row ? judged[row.id] : undefined;
+    if (!v) return false;
+    if (fault.status && v.status === fault.status) return true;
+    if (fault.patternQuality && v.patternQuality === fault.patternQuality) return true;
+    return false;
+  }, [row, judged]);
+
+  /**
+   * A fault is a STATE of the row, not a fire-and-forget action.
+   *
+   * "can you change the toggle buttons to switches?" — a mis-keyed fault used
+   * to stick until a reload, and a row already marked gave no sign of it on
+   * the buttons. The switch shows what the row carries and takes it back off.
+   */
+  const toggleFault = useCallback(async (
+    fault: (typeof JUKEBOX_FAULTS)[number],
+    on: boolean,
+  ) => {
+    if (!row || !file) return;
+    const ok = await reportFault(fault, {
+      format: row.id,
+      file: file.split('/').pop() ?? file,
+    }, !on);
+    setJudged((j) => {
+      const prev = j[row.id] ?? {};
+      const next: JukeboxVerdict = { ...prev };
+      if (fault.status) next.status = on ? fault.status : undefined;
+      if (fault.patternQuality) next.patternQuality = on ? fault.patternQuality : undefined;
+      return { ...j, [row.id]: next };
+    });
+    setStatus(ok
+      ? `${row.label}: ${fault.label} ${on ? 'on' : 'off'}`
+      : `${fault.label} — tracker offline (:4444)`);
+    // Only a NEW fault moves the sweep on. Clearing one means staying put.
+    if (on) {
+      setSelected((i) => Math.min(i + 1, rows.length - 1));
+      setTake(0);
+    }
+  }, [row, file, rows.length]);
+
   const send = useCallback(async (fault: typeof JUKEBOX_OK | (typeof JUKEBOX_FAULTS)[number], note?: string) => {
     if (!row || !file) return;
     const ok = await reportFault(fault, {
@@ -359,7 +402,9 @@ export const JukeboxPanel: React.FC<{ onClose: () => void }> = ({ onClose }) => 
     if (e.altKey) {
       if (e.key === '0') { e.preventDefault(); void send(JUKEBOX_OK); return; }
       const fault = JUKEBOX_FAULTS.find((f) => f.key === e.key);
-      if (fault) { e.preventDefault(); void send(fault); return; }
+      // The key TOGGLES now, same as the switch it drives — press it twice to
+      // take back a mis-keyed fault instead of reloading to clear it.
+      if (fault) { e.preventDefault(); void toggleFault(fault, !carries(fault)); return; }
     }
     switch (e.key) {
       case 'Backspace':  e.preventDefault(); setFilter((f) => f.slice(0, -1)); setSelected(0); return;
@@ -458,9 +503,16 @@ export const JukeboxPanel: React.FC<{ onClose: () => void }> = ({ onClose }) => 
           <Button variant="default" onClick={() => setTake((t) => t + 1)} title="Another take (R)">Take</Button>
           <Button variant="primary" onClick={() => void send(JUKEBOX_OK)} title="Good (Alt+0)">Good</Button>
           {JUKEBOX_FAULTS.map((f) => (
-            <Button key={f.id} variant="danger" onClick={() => void send(f)} title={`${f.title} (Alt+${f.key})`}>
-              {f.label}
-            </Button>
+            <Toggle
+              key={f.id}
+              label={f.label}
+              value={carries(f)}
+              onChange={(v) => void toggleFault(f, v)}
+              tone="error"
+              size="sm"
+              disabled={!row || !file}
+              title={`${f.title} (Alt+${f.key})`}
+            />
           ))}
         </div>
       </div>
