@@ -191,7 +191,17 @@ export class AmigaFilter extends Tone.ToneAudioNode {
         Tone.connect(this.input, this._worklet as unknown as Tone.ToneAudioNode);
         Tone.connect(this._worklet as unknown as Tone.ToneAudioNode, this.output);
         this._initialized = true;
-        console.log('[AmigaFilter] 1:1 hardware filter initialized successfully');
+        // Replay the state set BEFORE the worklet existed. Both setters post
+        // to `this._worklet` and do nothing when it is null, and the worklet
+        // loads lazily — so `filterEnabled = true` on a fresh instance was
+        // stored and never sent, and the filter ran at the worklet's own
+        // default. Measured 2026-09-24: a Paula stage constructed and enabled
+        // in one breath passed 3.02 % of its energy above 8 kHz, exactly as
+        // much as no filter at all.
+        this._worklet.port.postMessage({ type: 'SET_ENABLED', enabled: this._filterEnabled });
+        this._worklet.port.postMessage({ type: 'SET_LED', enabled: this._ledFilterEnabled });
+        console.log('[AmigaFilter] 1:1 hardware filter initialized successfully'
+          + ` (enabled=${this._filterEnabled} led=${this._ledFilterEnabled})`);
       } else {
         console.warn('[AmigaFilter] Worklet creation failed, using bypass');
         this._initializing = false;
