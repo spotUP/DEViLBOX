@@ -132,6 +132,9 @@ class DssProcessor extends AudioWorkletProcessor {
     this.interleavedBuf = null; this.chBufs = null; this.module = null; this.initialized = false; this.playing = false; this.lastHeapBuffer = null;
   }
 
+  /** Last packed play head posted, so an unchanged row sends nothing. */
+  _lastPos = -1;
+
   process(inputs, outputs) {
     if (!this.initialized || !this.module || !this.handle || !this.playing) return true;
     const output = outputs[0];
@@ -167,6 +170,16 @@ class DssProcessor extends AudioWorkletProcessor {
           channels.push(arr);
         }
         this.port.postMessage({ type: 'oscData', channels });
+      }
+    }
+
+    // The play head comes from the PLAYER, not from a timer on the main
+    // thread. Posted only when it moves, so a held row costs nothing.
+    if (this.module._dss_get_play_position) {
+      const packed = this.module._dss_get_play_position(this.handle);
+      if (packed >= 0 && packed !== this._lastPos) {
+        this._lastPos = packed;
+        this.port.postMessage({ type: 'position', position: packed >> 8, row: packed & 0xff });
       }
     }
 
