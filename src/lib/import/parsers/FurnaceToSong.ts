@@ -11,6 +11,7 @@ import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { Pattern, InstrumentConfig, FurnaceSubsongPlayback } from '@/types';
 import type { TrackerCell } from '@/types/tracker';
 import pako from 'pako';
+import { notify } from '@/stores/useNotificationStore';
 import type {
   FurnaceSubsong,
   FurnaceRow,
@@ -276,28 +277,17 @@ async function parseFurnaceFileWasm(buffer: ArrayBuffer, _fileName: string, subs
   const { mapFurnaceInstrumentType } = await import('@lib/import/formats/FurnaceSongParser');
   const { BinaryReader } = await import('@/utils/BinaryReader');
 
-  // Pre-decompress zlib (e.g. DefleMask DMF) before passing to WASM.
-  // The WASM's internal zlib aborts on files with corrupted adler32 checksums.
-  // Try full zlib inflate first; fall back to raw deflate (skip 2-byte header)
-  // for files with bad checksums.
-  let wasmBuffer = buffer;
-  const hdr = new Uint8Array(buffer, 0, 2);
-  if (hdr[0] === 0x78 && (hdr[1] === 0x9c || hdr[1] === 0x01 || hdr[1] === 0xDA)) {
-    const pako = await import('pako');
-    let inflated: Uint8Array;
-    try {
-      inflated = pako.inflate(new Uint8Array(buffer));
-    } catch {
-      // Corrupted adler32 checksum — skip zlib header and use raw deflate
-      inflated = pako.inflateRaw(new Uint8Array(buffer).subarray(2));
-    }
-    wasmBuffer = inflated.buffer.byteLength === inflated.byteLength
-      ? inflated.buffer as ArrayBuffer
-      : inflated.buffer.slice(inflated.byteOffset, inflated.byteOffset + inflated.byteLength) as ArrayBuffer;
-    console.log(`[FurnaceToSong] Pre-decompressed zlib DMF → ${wasmBuffer.byteLength} bytes`);
+  // Hand the file to the WASM as it is. DivEngine::load() inflates it itself,
+  // keeping the data a DefleMask file's bad adler32 would otherwise cost
+  // (fileOpsCommon_patched.cpp). A second inflate here in pako was stricter
+  // than that one — it refused files the engine loads — and fed the engine
+  // bytes it then mistook for a failed zlib stream.
+  const loaded = await loadFurFileWasm(buffer);
+  // The file loaded, but not all of it: say so, rather than letting a song with
+  // missing drums pass for a complete one.
+  if (loaded.loadWarning) {
+    notify.warning(`"${_fileName}" loaded with damage: ${loaded.loadWarning}`, 10000);
   }
-
-  const loaded = await loadFurFileWasm(wasmBuffer);
 
   // Convert instruments from INS2 binary data extracted by WASM
   const instruments: InstrumentConfig[] = [];

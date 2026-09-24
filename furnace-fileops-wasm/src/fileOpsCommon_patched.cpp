@@ -22,6 +22,10 @@
 bool DivEngine::load(unsigned char* f, size_t slen, const char* nameHint) {
   unsigned char* file;
   size_t len;
+  // PATCH: start every load with a clean slate, so a message left over from an
+  // earlier file cannot be mistaken for this one's. A successful load that
+  // still leaves a message behind is reporting real damage it recovered from.
+  lastError="";
   if (slen<21) {
     logE("too small!");
     lastError="file is too small";
@@ -156,6 +160,10 @@ bool DivEngine::load(unsigned char* f, size_t slen, const char* nameHint) {
     delete[] f;
   } catch (NotZlibException& e) {
     logD("not zlib. loading as raw...");
+    // PATCH: the zlib attempt was only a probe. Its complaint ("incorrect header
+    // check") is about a reading of the file that has just been abandoned, and
+    // left in place it would pass for damage in a raw file that loads cleanly.
+    lastError="";
     file=f;
     len=slen;
   }

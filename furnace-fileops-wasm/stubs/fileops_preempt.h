@@ -63,19 +63,11 @@ public:
 #endif // _SFWRAPPER_H
 
 // ============================================================
-// Stub fmt/printf.h — only used by ta-log.h which we've already stubbed
+// fmt/printf.h — the loaders' error messages are built with fmt::sprintf,
+// so this must be the formatting implementation, not a pass-through.
 // ============================================================
-#ifndef FMT_PRINTF_H_STUB
-#define FMT_PRINTF_H_STUB
 #ifdef __cplusplus
-#include <string>
-namespace fmt {
-  template<typename... Args>
-  inline std::string sprintf(const char* format, Args&&...) {
-    return std::string(format);
-  }
-}
-#endif
+#include "fmt/printf.h"
 #endif
 
 // ============================================================
