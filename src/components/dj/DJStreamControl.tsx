@@ -6,7 +6,7 @@
  */
 
 import React, { useState, useCallback, useRef, useEffect } from 'react';
-import { DJVideoCapture, getCaptureCanvas, type VideoSource } from '@/engine/dj/streaming/DJVideoCapture';
+import { DJVideoCapture, availableCaptureSources, type VideoSource } from '@/engine/dj/streaming/DJVideoCapture';
 import { DJLiveStream } from '@/engine/dj/streaming/DJLiveStream';
 
 type StreamPlatform = 'youtube' | 'twitch' | 'custom';
@@ -60,9 +60,15 @@ export const DJStreamControl: React.FC = () => {
     }
 
     try {
-      const source: VideoSource = getCaptureCanvas('vj') ? 'vj' : 'dj-ui';
-      if (!getCaptureCanvas(source)) {
-        alert('No capture canvas available. Switch to VJ View or enable the DJ UI.');
+      // Pick from what is REGISTERED, never from a name. The old line fell
+      // back to 'dj-ui' when the VJ view was closed, and nothing has
+      // registered a 'dj-ui' canvas since the Pixi UI was removed — so going
+      // live without the VJ view open streamed a blank picture and said
+      // nothing about it (2026-09-23).
+      const source: VideoSource | undefined =
+        availableCaptureSources().find((s) => s === 'vj') ?? availableCaptureSources()[0];
+      if (!source) {
+        alert('Nothing to capture. Open the VJ View — it is what provides the video for a stream.');
         return;
       }
 
