@@ -11,6 +11,7 @@ import { useMixerStore } from '@stores/useMixerStore';
 import { useChannelTypeStore } from '@stores/useChannelTypeStore';
 import { useWasmPositionStore } from '@stores/useWasmPositionStore';
 import { channelLayout } from './channelLayout';
+import { resolveWasmPattern } from './wasmPatternHold';
 import { computeChannelFollowScroll } from '@/lib/tracker/followScroll';
 import { resolveCellColumn } from '@/lib/tracker/cellHitTest';
 import { resolveScrollRow } from '@/lib/tracker/playbackNavigation';
@@ -153,6 +154,19 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
 
   // Refs for format mode values consumed by the RAF loop (must not cause re-subscribes)
   const isFormatModeRef     = useRef(isFormatMode);
+  /**
+   * The pattern the WASM position last resolved to.
+   *
+   * While a WASM engine drives the display, the ROW and the PATTERN must come
+   * from the SAME clock. They did not: the row was taken from `wasmPos.row`
+   * unconditionally, while the pattern was only taken from `wasmPos.songPos`
+   * when that passed a bounds check — and on the frames where it did not, the
+   * pattern silently fell back to the tracker store's index while the row kept
+   * following the engine. Sonix alternated between two different patterns
+   * frame to frame; measured 2026-09-24 with `currentGlobalRow` frozen at 1408
+   * and `currentPattern` pinned at 0 while `currentRow` advanced normally.
+   */
+  const wasmPatternRef      = useRef<number | null>(null);
   const formatCurrentRowRef = useRef(formatCurrentRow ?? 0);
   const formatIsPlayingRef  = useRef(formatIsPlaying ?? false);
   // Tracks last formatChannels identity sent to worker — RAF compares this to detect changes.
@@ -2756,14 +2770,22 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
       // (TFMX WASM playback uses wasmPos; UADE streaming uses FormatPlaybackState).
       const wasmPos = wasmPosEarly;
       const fpsIsActive = isFormatModeRef.current && formatIsPlayingRef.current;
+      // The held pattern belongs to one run of one engine. Forget it the
+      // moment that engine stops driving, or a stopped song would keep
+      // showing the last pattern it happened to reach.
+      if (!wasmPos.active) wasmPatternRef.current = null;
       if (wasmPos.active && !fpsIsActive) {
         currentRow = wasmPos.row;
-        // Use songPos to determine active pattern (multi-pattern WASM songs)
-        const patternOrder = trackerState.patternOrder;
-        if (wasmPos.songPos >= 0 && wasmPos.songPos < patternOrder.length) {
-          activePatternIdx = patternOrder[wasmPos.songPos] ?? wasmPos.songPos;
-          songPosition = wasmPos.songPos;
-        }
+        // Row and pattern come from the SAME clock — see wasmPatternHold.ts.
+        const resolved = resolveWasmPattern({
+          songPos: wasmPos.songPos,
+          patternOrder: trackerState.patternOrder,
+          held: wasmPatternRef.current,
+          fallback: activePatternIdx,
+        });
+        activePatternIdx = resolved.pattern;
+        songPosition = resolved.songPosition;
+        wasmPatternRef.current = resolved.held;
       } else if (isPlaying && useEditorStore.getState().followPlayback) {
         // Follow ON: ride the play head. Follow OFF (scroll-lock): currentRow
         // stays on the edit cursor (init above) so the view freezes while the
