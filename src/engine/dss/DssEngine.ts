@@ -28,6 +28,7 @@ export class DssEngine extends WASMSingletonBase {
   private static instance: DssEngine | null = null;
   private static cache: WASMAssetsCache = createWASMAssetsCache();
 
+  private _positionCallback: ((u: { row: number; songPos: number }) => void) | null = null;
   private _songEndCallback: (() => void) | null = null;
 
   private constructor() {
@@ -85,6 +86,14 @@ export class DssEngine extends WASMSingletonBase {
         case 'oscData':
           useOscilloscopeStore.getState().updateChannelData(data.channels);
           break;
+        case 'position':
+          // The grid follows the PLAYER. NativeEngineRouting wires this
+          // through to `useWasmPositionStore` for any engine that offers
+          // `onPositionUpdate`; without it the TypeScript scheduler drove the
+          // display from the moment PLAY was pressed and the two never
+          // reconciled — measured 39 rows apart on `zrimay.dss` (2026-09-24).
+          this._positionCallback?.({ row: data.row as number, songPos: data.position as number });
+          break;
         case 'songEnd':
           this._songEndCallback?.();
           break;
@@ -116,6 +125,16 @@ export class DssEngine extends WASMSingletonBase {
   }
 
   onSongEnd(callback: () => void): void { this._songEndCallback = callback; }
+
+  /**
+   * Subscribe to the play head this engine reports.
+   *
+   * The shape NativeEngineRouting looks for: an engine that has it owns the
+   * grid, and the TypeScript scheduler is not asked to guess.
+   */
+  onPositionUpdate(callback: (update: { row: number; songPos: number }) => void): void {
+    this._positionCallback = callback;
+  }
 
   /** Edit a pattern cell in the WASM replayer */
   setCell(index: number, row: number, channel: number, note: number, instrument: number, effect: number, effectArg: number): void {

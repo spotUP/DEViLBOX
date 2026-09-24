@@ -1202,6 +1202,26 @@ int dss_get_num_positions(const DssModule* module) {
     return module ? module->num_positions : 0;
 }
 
+/**
+ * Where the player actually IS, packed as (position << 8) | row.
+ *
+ * The grid used to be driven by the TypeScript scheduler, which starts
+ * counting from the moment PLAY was pressed and knows nothing about this
+ * player. Any difference between the two — an engine that takes a moment to
+ * start, a position jump, a pattern break — became a permanent offset that
+ * nothing corrected. Measured on `digital-sound-studio/zrimay.dss`
+ * (2026-09-24): currentRow 39 while the audio was at row 1.
+ *
+ * Both numbers were already tracked; nothing outside could read them. Rows
+ * are 0..63 and positions fit comfortably in the rest, so one int carries
+ * both and the caller needs no second crossing.
+ */
+int dss_get_play_position(const DssModule* module) {
+    if (!module) return -1;
+    return ((int)module->playing_info.current_position << 8)
+         | ((int)module->playing_info.current_row & 0xff);
+}
+
 void dss_get_cell(const DssModule* module, int pattern, int row, int channel,
                    uint8_t* sample, uint16_t* period, uint8_t* effect, uint8_t* effect_arg) {
     if (!module || pattern < 0 || pattern >= module->num_patterns ||
