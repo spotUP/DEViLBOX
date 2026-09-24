@@ -32,6 +32,21 @@ const PER_ENTRY = 6;
 const SKIP_EXT = new Set(['.json', '.md', '.txt', '.png', '.jpg', '.jpeg', '.webp', '.html']);
 const SKIP_DIR = new Set(['.git', 'node_modules']);
 
+/**
+ * A directory listing, in the shape `resolveCompanions()` expects.
+ *
+ * The jukebox must load a song the way DEViLBOX loads it, companions and all
+ * — a TFMX tune without its `smpl.` partner, or a Sonix song without its
+ * `.ss`/`.instr`, is not a test of anything. The resolution logic already
+ * exists and is pure (`src/lib/import/companionResolver.ts`); what it needs
+ * is a listing, so the index carries one per directory.
+ */
+interface DirListing {
+  siblings: string[];
+  subdirs?: Record<string, string[]>;
+  parentSamples?: string[];
+}
+
 interface Entry {
   /** Stable id, also the key a fault report writes to on the :4444 tracker. */
   id: string;
@@ -43,6 +58,8 @@ interface Entry {
   subformat?: string;
   files: string[];
   total: number;
+  /** Key into `dirs` — where this row's songs live, and what sits beside them. */
+  dir: string;
 }
 
 function filesUnder(dir: string): string[] {
@@ -92,6 +109,43 @@ const covered = new Set<string>();
  * `detectFormat()`. A directory whose files all detect the same way still
  * produces exactly one row, which is the common case.
  */
+/** Listings by directory (relative to public/), shared by every row from it. */
+const dirs: Record<string, DirListing> = {};
+
+/** Cap: a listing exists to find a handful of companions, not to mirror a
+ *  directory of thousands into the browser. Matches MAX_SUBDIR_FILES. */
+const MAX_LISTED = 512;
+
+function listingFor(dir: string): string {
+  const key = `/${relative(join(ROOT, 'public'), dir)}`;
+  if (dirs[key]) return key;
+  const names = readdirSync(dir).filter((n) => !n.startsWith('.'));
+  const siblings: string[] = [];
+  const subdirs: Record<string, string[]> = {};
+  for (const n of names) {
+    if (statSync(join(dir, n)).isDirectory()) {
+      subdirs[n] = readdirSync(join(dir, n)).filter((x) => !x.startsWith('.')).slice(0, MAX_LISTED);
+    } else {
+      siblings.push(n);
+    }
+  }
+  // ZoundMonitor keeps `Samples/` beside the song's DIRECTORY, one level up.
+  let parentSamples: string[] | undefined;
+  try {
+    const up = join(dir, '..', 'Samples');
+    if (statSync(up).isDirectory()) {
+      parentSamples = readdirSync(up).filter((n) => !n.startsWith('.')).slice(0, MAX_LISTED);
+    }
+  } catch { /* no Samples directory beside it */ }
+
+  dirs[key] = {
+    siblings: siblings.slice(0, MAX_LISTED),
+    ...(Object.keys(subdirs).length ? { subdirs } : {}),
+    ...(parentSamples ? { parentSamples } : {}),
+  };
+  return key;
+}
+
 function addRows(dirLabel: string, dir: string, files: string[], subformat?: string): void {
   if (files.length === 0) return;
   const byFormat = new Map<string | null, string[]>();
@@ -117,6 +171,7 @@ function addRows(dirLabel: string, dir: string, files: string[], subformat?: str
       ...(subformat ? { subformat } : {}),
       files: group.slice(0, PER_ENTRY).map(webPath),
       total: group.length,
+      dir: listingFor(dir),
     });
   }
 }
@@ -159,6 +214,7 @@ writeFileSync(OUT, `${JSON.stringify({
   registryTotal: FORMAT_REGISTRY.length,
   covered: covered.size,
   entries,
+  dirs,
   gaps,
 }, null, 2)}\n`);
 

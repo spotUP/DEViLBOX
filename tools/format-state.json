@@ -16057,5 +16057,13 @@
   "smoke-zoundmonitor": {
     "auditStatus": "fail",
     "notes": "ERROR: Browser disconnected"
+  },
+  "formats-synthesis": {
+    "notes": "Empty Patterns — space_sound.syn · (jukebox 2026-09-23 23:55)",
+    "patternQuality": "empty"
+  },
+  "formats-tcbTracker": {
+    "notes": "Silent — cannonfodder.tcb · (jukebox 2026-09-23 23:55)",
+    "status": "silent"
   }
 }
