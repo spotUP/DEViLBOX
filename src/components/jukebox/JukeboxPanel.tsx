@@ -27,7 +27,12 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@components/ui/Button';
-import { loadFile } from '@/lib/file/UnifiedFileLoader';
+import { loadFile as loadFileHeadless } from '@/bridge/handlers/writeHandlers';
+import { useTransportStore } from '@stores/useTransportStore';
+import { suppressFormatChecks, restoreFormatChecks } from '@/lib/formatCompatibility';
+import { useModlandContributionModal } from '@stores/useModlandContributionModal';
+import { dismissErrors, dismissModal } from '@/bridge/handlers/writeHandlers';
+import { resolveCompanions } from '@/lib/import/companionResolver';
 import { JUKEBOX_FAULTS, JUKEBOX_OK, reportFault } from '@/lib/jukebox/faultReports';
 import { searchModland, downloadModlandFile } from '@/lib/modlandApi';
 
@@ -38,10 +43,17 @@ interface IndexEntry {
   subformat?: string;
   files: string[];
   total: number;
+  dir: string;
   /** No local song: the corpus cannot demonstrate this format, so the row
    *  fetches one from Modland on demand. 121 of the registry's formats are in
    *  this state, and a list that simply omitted them would hide the gap. */
   fromModland?: boolean;
+}
+
+interface DirListing {
+  siblings: string[];
+  subdirs?: Record<string, string[]>;
+  parentSamples?: string[];
 }
 
 interface SongIndex {
@@ -49,6 +61,8 @@ interface SongIndex {
   registryTotal: number;
   covered: number;
   entries: IndexEntry[];
+  /** Directory listings, so companions resolve exactly as they do elsewhere. */
+  dirs: Record<string, DirListing>;
   gaps: Array<{ formatKey: string; label: string }>;
 }
 
@@ -84,6 +98,9 @@ export const JukeboxPanel: React.FC<{ onClose: () => void }> = ({ onClose }) => 
       formatKey: g.formatKey,
       files: [],
       total: 0,
+      // Nothing local, so no directory to resolve companions against — the
+      // Modland download brings whatever it brings.
+      dir: '',
       fromModland: true,
     }));
     return [...index.entries, ...gapRows];
@@ -126,6 +143,75 @@ export const JukeboxPanel: React.FC<{ onClose: () => void }> = ({ onClose }) => 
     return () => { cancelled = true; };
   }, [file, rows, selected]);
 
+  /**
+   * Take the keyboard back.
+   *
+   * Loading a song hands focus to the pattern editor, which then eats the
+   * arrows and swallows typed letters as note entry — the list goes dead
+   * after the first Enter. Focus returns here on mount and after every load.
+   */
+  const grabFocus = useCallback(() => listRef.current?.focus(), []);
+  useEffect(() => { grabFocus(); }, [grabFocus]);
+
+  /**
+   * Load bytes and START them.
+   *
+   * NOT `UnifiedFileLoader.loadFile`: for tracker modules that returns
+   * `{ success: 'pending-import' }` and waits for the import dialog, so every
+   * song loaded into a dialog that is not on screen and nothing played. The
+   * MCP handler is the headless entry — it runs the same pipeline and then
+   * bypasses the dialog, which is a hundred lines of format routing that must
+   * not be copied here.
+   *
+   * It does not start playback either; that is the transport's job, and
+   * `useTransportStore.play()` is the entry the MCP `play` tool uses.
+   * `TrackerReplayer.play()` would no-op for native-engine songs.
+   */
+  const loadAndPlay = useCallback(async (
+    bytes: ArrayBuffer,
+    name: string,
+    companionFiles?: Record<string, string>,
+  ) => {
+    let binary = '';
+    const view = new Uint8Array(bytes);
+    // Chunked: String.fromCharCode(...view) blows the argument limit on a
+    // module of any size.
+    for (let i = 0; i < view.length; i += 0x8000) {
+      binary += String.fromCharCode(...view.subarray(i, i + 0x8000));
+    }
+    // Nothing may stop to ask a question. Sweeping hundreds of formats means
+    // meeting every dialog the app has — the format-compatibility warning, the
+    // "rare find" Modland contribution prompt, a synth that cannot be built —
+    // and each one wedges the list until it is answered by hand.
+    suppressFormatChecks();
+    try {
+      const result = await loadFileHeadless({
+        filename: name,
+        data: btoa(binary),
+        ...(companionFiles && Object.keys(companionFiles).length ? { companionFiles } : {}),
+      });
+      if (result.error) {
+        setStatus(`${name}: ${String(result.error)}`);
+        return false;
+      }
+      await useTransportStore.getState().play();
+      return true;
+    } finally {
+      restoreFormatChecks();
+      // The contribution prompt is raised asynchronously, after the hash
+      // lookup returns, so closing it once here is not enough — it is closed
+      // again on the next tick.
+      const close = () => {
+        try { useModlandContributionModal.getState().closeModal(); } catch { /* not open */ }
+        try { dismissErrors(); } catch { /* none */ }
+        try { dismissModal(); } catch { /* none */ }
+      };
+      close();
+      window.setTimeout(close, 400);
+      window.setTimeout(close, 1500);
+    }
+  }, []);
+
   const play = useCallback(async () => {
     if (!row) return;
 
@@ -143,8 +229,9 @@ export const JukeboxPanel: React.FC<{ onClose: () => void }> = ({ onClose }) => 
         if (!hit) { setStatus(`Modland has nothing for "${term}"`); return; }
         const buf = await downloadModlandFile(hit.full_path);
         const name = hit.filename ?? 'song';
-        await loadFile(new File([buf], name), { autoplay: true } as never);
-        setStatus(`${name} (Modland)`);
+        if (await loadAndPlay(buf, name)) setStatus(`${name} (Modland)`);
+        window.setTimeout(grabFocus, 0);
+        window.setTimeout(grabFocus, 500);
       } catch (err) {
         setStatus(`Modland: ${(err as Error).message}`);
       }
@@ -158,14 +245,47 @@ export const JukeboxPanel: React.FC<{ onClose: () => void }> = ({ onClose }) => 
     try {
       const blob = cache.current.get(file) ?? await (await fetch(file)).blob();
       cache.current.set(file, blob);
-      await loadFile(new File([blob], name), { autoplay: true } as never);
-      setStatus(name);
+
+      // Companions, resolved by the app's OWN logic rather than a guess.
+      // A TFMX tune without its `smpl.` partner or a Sonix song without its
+      // `.ss`/`.instr` is not a test of anything, so the index ships a
+      // directory listing and `resolveCompanions` decides from it exactly as
+      // the normal load path does.
+      const listing = index?.dirs[row.dir];
+      const companions: Record<string, string> = {};
+      if (listing) {
+        const dirUrl = row.dir;
+        const res = resolveCompanions(name, listing);
+        for (const registerAs of res.companions) {
+          const readFrom = res.sources[registerAs] ?? registerAs;
+          try {
+            const cRes = await fetch(`${dirUrl}/${readFrom}`);
+            if (!cRes.ok) continue;
+            const cBuf = new Uint8Array(await cRes.arrayBuffer());
+            let cBin = '';
+            for (let i = 0; i < cBuf.length; i += 0x8000) {
+              cBin += String.fromCharCode(...cBuf.subarray(i, i + 0x8000));
+            }
+            companions[registerAs] = btoa(cBin);
+          } catch { /* a companion that will not fetch is itself a finding */ }
+        }
+        if (res.companions.length > 0) {
+          setStatus(`${name} + ${Object.keys(companions).length}/${res.companions.length} companions`);
+        }
+      }
+
+      if (await loadAndPlay(await blob.arrayBuffer(), name, companions)) {
+        setStatus(Object.keys(companions).length ? `${name} (+${Object.keys(companions).length})` : name);
+      }
+      // The editor took the keyboard during the load; take it back.
+      window.setTimeout(grabFocus, 0);
+      window.setTimeout(grabFocus, 500);
     } catch (err) {
       // A load that throws is itself a finding; leave the row selected so it
       // can be reported without hunting for it again.
       setStatus(`load failed: ${(err as Error).message}`);
     }
-  }, [row, file]);
+  }, [row, file, loadAndPlay, grabFocus, index]);
 
   const send = useCallback(async (fault: typeof JUKEBOX_OK | (typeof JUKEBOX_FAULTS)[number]) => {
     if (!row || !file) return;
@@ -189,6 +309,8 @@ export const JukeboxPanel: React.FC<{ onClose: () => void }> = ({ onClose }) => 
     el?.scrollIntoView({ block: 'nearest' });
   }, [selected, rows.length]);
 
+
+
   const onKeyDown = (e: React.KeyboardEvent) => {
     if (e.altKey) {
       if (e.key === '0') { e.preventDefault(); void send(JUKEBOX_OK); return; }
@@ -196,6 +318,7 @@ export const JukeboxPanel: React.FC<{ onClose: () => void }> = ({ onClose }) => 
       if (fault) { e.preventDefault(); void send(fault); return; }
     }
     switch (e.key) {
+      case 'Backspace':  e.preventDefault(); setFilter((f) => f.slice(0, -1)); setSelected(0); return;
       case 'ArrowDown':  e.preventDefault(); move(1); return;
       case 'ArrowUp':    e.preventDefault(); move(-1); return;
       case 'ArrowRight': e.preventDefault(); move(PAGE); return;
@@ -204,9 +327,13 @@ export const JukeboxPanel: React.FC<{ onClose: () => void }> = ({ onClose }) => 
       case 'Escape':     e.preventDefault(); setFilter(''); return;
       default: break;
     }
-    if (!e.ctrlKey && !e.metaKey && !e.altKey && e.key.toLowerCase() === 'r') {
-      // R only when the filter is empty, so it can still be typed in a search.
-      if (filter === '') { e.preventDefault(); setTake((t) => t + 1); }
+    // Anything printable types into the filter. There is no input element —
+    // the list is the field.
+    if (!e.ctrlKey && !e.metaKey && !e.altKey && e.key.length === 1) {
+      e.preventDefault();
+      setFilter((f) => f + e.key);
+      setSelected(0);
+      setTake(0);
     }
   };
 
@@ -227,17 +354,23 @@ export const JukeboxPanel: React.FC<{ onClose: () => void }> = ({ onClose }) => 
         </span>
         <Button variant="ghost" onClick={onClose} title="Close (Ctrl+Shift+J)">Close</Button>
       </div>
+      <div className="px-2 py-1 text-[10px] font-mono border-b border-dark-border flex items-center gap-2">
+        <span className="text-text-muted">filter</span>
+        <span className="text-accent-primary flex-1 truncate">{filter || '—'}</span>
+        <span className="text-text-muted">{rows.length}</span>
+      </div>
 
-      <input
-        autoFocus
-        value={filter}
-        onChange={(e) => { setFilter(e.target.value); setSelected(0); setTake(0); }}
+      {/* The LIST has the focus and the keyboard, with no input box in the
+          way: typing filters it directly, which is what a fast audit wants —
+          one less thing to click into, and no field to clear before the
+          arrows work again. `tabIndex` makes a div focusable; the outline is
+          suppressed because the selected row already shows where focus is. */}
+      <div
+        ref={listRef}
+        tabIndex={0}
         onKeyDown={onKeyDown}
-        placeholder="Type to filter · Enter plays · Alt+1-6 reports"
-        className="m-2 bg-dark-bgTertiary border border-dark-borderLight rounded text-text-primary font-mono text-xs px-2 py-1 focus:ring-1 focus:ring-accent-primary outline-none"
-      />
-
-      <div ref={listRef} className="flex-1 min-h-0 overflow-y-auto font-mono text-[11px]" onKeyDown={onKeyDown}>
+        className="flex-1 min-h-0 overflow-y-auto font-mono text-[11px] outline-none"
+      >
         {rows.map((e, i) => {
           const isSel = i === Math.min(selected, rows.length - 1);
           const verdict = judged[e.id];
