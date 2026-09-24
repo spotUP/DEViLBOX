@@ -6,7 +6,7 @@
  */
 
 import React, { useState, useCallback, useRef, useEffect } from 'react';
-import { DJVideoCapture, type VideoSource, getCaptureCanvas } from '@/engine/dj/streaming/DJVideoCapture';
+import { DJVideoCapture, type VideoSource, getCaptureCanvas, availableCaptureSources } from '@/engine/dj/streaming/DJVideoCapture';
 import { DJVideoRecorder } from '@/engine/dj/streaming/DJVideoRecorder';
 
 const captureRef = { current: null as DJVideoCapture | null };
@@ -20,11 +20,18 @@ export const DJVideoExport: React.FC = () => {
   const [showMenu, setShowMenu] = useState(false);
   const timerRef = useRef<number>(0);
 
-  // Available sources
-  const sources: { id: VideoSource; label: string }[] = [
-    { id: 'vj', label: 'VJ Visualizer' },
-    { id: 'dj-ui', label: 'DJ Interface' },
-  ];
+  // Only sources that can actually be captured. "DJ Interface" was listed
+  // here unconditionally and has produced nothing since the Pixi UI was
+  // removed — `PixiApp` was the only thing that ever registered a 'dj-ui'
+  // canvas — so choosing it recorded a blank file with no complaint
+  // (2026-09-23). The list now comes from what is registered.
+  const LABELS: Record<VideoSource, string> = {
+    vj: 'VJ Visualizer',
+    'dj-ui': 'DJ Interface',
+    overlay: 'DJ 3D Overlay',
+  };
+  const sources: { id: VideoSource; label: string }[] = availableCaptureSources()
+    .map((id) => ({ id, label: LABELS[id] }));
 
   // Duration update timer
   useEffect(() => {
