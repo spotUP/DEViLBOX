@@ -517,12 +517,23 @@ export class UADEEngine extends WASMSingletonBase implements IsolationCapableEng
       }
     };
 
+    // The bytes are CLONED, never transferred. Transferring detaches the
+    // cache's only copy, and the loader will not refetch for a context it has
+    // already loaded — so the SECOND worklet (a poison recovery, a dispose and
+    // reload, a context switch) received `wasmBinary: null`, Emscripten fell
+    // back to XHR, and an AudioWorklet has no XMLHttpRequest:
+    //
+    //   Aborted(ReferenceError: XMLHttpRequest is not defined)
+    //     at instantiateArrayBuffer ... at createWasm
+    //
+    // UADE then worked exactly once per page load and every later UADE song
+    // played silent — worse from the jukebox, which loads song after song in
+    // one session, than from the tracker, where a reload hid it (2026-09-24).
+    // Every other WASMSingletonBase engine already passes the reference and
+    // lets structured clone do the copy; UADE was the only one transferring.
     this.workletNode.port.postMessage(
       { type: 'init', sampleRate: ctx.sampleRate, wasmBinary: UADEEngine.cache.wasmBinary, jsCode: UADEEngine.cache.jsCode },
-      UADEEngine.cache.wasmBinary ? [UADEEngine.cache.wasmBinary] : []
     );
-    // Note: transferring the buffer clears the cache; re-fetch on next load if needed
-    UADEEngine.cache.wasmBinary = null;
 
     this.workletNode.connect(this.output);
 
