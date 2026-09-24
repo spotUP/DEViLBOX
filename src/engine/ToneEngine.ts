@@ -339,6 +339,13 @@ export class ToneEngine {
   // Amiga audio filter (E0x command) - 1:1 hardware emulation
   // E00 = filter ON (LED on), E01 = filter OFF (LED off/bypassed)
   private amigaFilter: AmigaFilter;
+  /**
+   * The Amiga output stage for engines that emulate Paula and do not filter
+   * their own output — see `paulaOutput.ts`. A SECOND filter instance, not the
+   * tracker path's: that one is driven by the E0x effect command, and these
+   * formats never send it.
+   */
+  private paulaFilter: AmigaFilter | null = null;
   private amigaFilterEnabled: boolean = true; // Default: filter ON (like real Amiga)
 
   // Per-instrument effect chains (keyed by numeric composite key instrumentId<<16 | channelIndex)
@@ -1640,6 +1647,46 @@ export class ToneEngine {
   /** Extract instrumentId from a composite key (upper 16 bits, unsigned). */
   private instrumentIdFromKey(key: number): number {
     return key >>> 16;
+  }
+
+  /**
+   * Put the Amiga output stage between an engine and where it was going.
+   *
+   * Every Amiga 500 filtered Paula's DAC before the jacks, and the in-house
+   * replayers hand over that DAC output raw — 48 of their C mixers were
+   * surveyed and not one filters. This inserts the stage they are missing
+   * WITHOUT changing where the audio ends up, so channel isolation, the dub
+   * tap and the stereo separation downstream are untouched.
+   *
+   * The FIXED ~4.4 kHz stage only. The LED filter is the switchable one and
+   * nothing here sends the E0x that switches it.
+   *
+   * Returns false when the stage could not be inserted, so the caller connects
+   * directly rather than dropping the audio on the floor.
+   */
+  public routeThroughPaulaStage(source: AudioNode, destination: AudioNode): boolean {
+    try {
+      if (!this.paulaFilter) {
+        this.paulaFilter = new AmigaFilter();
+        this.paulaFilter.filterEnabled = true;
+        this.paulaFilter.ledFilterEnabled = false;
+      }
+      // `AmigaFilter` keeps SEPARATE input and output gains with the worklet
+      // between them. Resolving the node twice and calling one of them
+      // "output" wires source -> input and input -> destination, which is a
+      // passthrough AROUND the filter — measured, and it cost an attempt.
+      const input = getNativeAudioNode(this.paulaFilter.input);
+      const output = getNativeAudioNode(this.paulaFilter.output);
+      if (!input || !output) return false;
+      // One stage serves whichever engine is playing; only one plays at a time.
+      try { output.disconnect(); } catch { /* not connected */ }
+      source.connect(input);
+      output.connect(destination);
+      return true;
+    } catch (e) {
+      console.error('[ToneEngine] Paula output stage could not be inserted:', e);
+      return false;
+    }
   }
 
   private getInstrumentOutputDestination(instrumentId: number, isNativeSynth: boolean): Tone.ToneAudioNode {
@@ -5176,6 +5223,7 @@ export class ToneEngine {
     this.analyser.dispose();
     this.fft.dispose();
     this.amigaFilter.dispose();
+    this.paulaFilter?.dispose();
     this.synthBusMeter.dispose();
     this.masterMeter.dispose();
     this.synthBus.dispose();

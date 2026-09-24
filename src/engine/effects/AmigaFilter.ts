@@ -260,6 +260,9 @@ export class AmigaFilter extends Tone.ToneAudioNode {
     return this._filterEnabled;
   }
 
+  /** True once the worklet is in the path; false means bypass. */
+  get isInitialized(): boolean { return this._initialized; }
+
   set filterEnabled(value: boolean) {
     this._filterEnabled = value;
     if (this._worklet) {
