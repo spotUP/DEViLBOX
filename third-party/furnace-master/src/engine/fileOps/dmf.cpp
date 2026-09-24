@@ -906,6 +906,7 @@ bool DivEngine::loadDMF(unsigned char* file, size_t len) {
     }
 
     int ymuSampleRate=20;
+    bool dmfTailTruncated=false;
 
     ds.sampleLen=(unsigned char)reader.readC();
     logI("reading samples (%d)...",ds.sampleLen);
@@ -914,8 +915,26 @@ bool DivEngine::loadDMF(unsigned char* file, size_t len) {
       ymuSampleRate=reader.readC();
     }
     if (ds.sampleLen>0) ds.sample.reserve(ds.sampleLen);
+    // DEViLBOX PATCH: a .dmf whose zlib checksum failed decompresses to slightly
+    // fewer bytes than were compressed. Everything up to the sample block —
+    // orders, instruments, wavetables, patterns — still reads correctly; only
+    // the tail runs short, and one missing byte inside a sample makes every
+    // record after it read as garbage. Refusing the whole song over a damaged
+    // tail throws away a module that is otherwise complete, so stop reading
+    // samples at the first record that does not fit and keep what came before.
+    // Measured over public/data/songs/deflemask on 2026-09-24: 318 of 1810
+    // files failed to load, every one of them with a failed checksum, while
+    // 503 checksum-clean files carrying samples loaded without complaint.
+    int samplesRead=ds.sampleLen;
     for (int i=0; i<ds.sampleLen; i++) {
       DivSample* sample=new DivSample;
+      if (reader.size()-reader.tell()<4) {
+        logW("sample %d: no room left for a sample header — stopping here",i);
+        delete sample;
+        samplesRead=i;
+        dmfTailTruncated=true;
+        break;
+      }
       int length=reader.readI();
       int cutStart=0;
       int cutEnd=length;
@@ -925,10 +944,13 @@ bool DivEngine::loadDMF(unsigned char* file, size_t len) {
       unsigned char* adpcmData;
       // I don't think a sample can be that big
       if (length<0 || length>(1<<29L)) {
-        logE("invalid sample length %d. are we doing something wrong?",length);
-        lastError="file is corrupt or unreadable at samples";
-        delete[] file;
-        return false;
+        // DEViLBOX PATCH: an absurd length means the previous record ended in
+        // the wrong place, which on these files means the data ran short.
+        logW("sample %d: implausible length %d — the sample block is damaged, stopping here",i,length);
+        delete sample;
+        samplesRead=i;
+        dmfTailTruncated=true;
+        break;
       }
       if (ds.version>0x16) {
         sample->name=reader.readString((unsigned char)reader.readC());
@@ -970,6 +992,25 @@ bool DivEngine::loadDMF(unsigned char* file, size_t len) {
         cutStart=reader.readI();
         cutEnd=reader.readI();
         logV("cutStart: %d cutEnd: %d",cutStart,cutEnd);
+      }
+      if (length>0) {
+        // DEViLBOX PATCH: clamp the last sample to the bytes that are actually
+        // there. A short tail otherwise throws EndOfFileException and loses the
+        // whole song; a short sample only loses the end of one sound.
+        {
+          size_t leftInFile=reader.size()-reader.tell();
+          size_t wanted=(ds.version>0x08)?((ds.version<0x0b)?(size_t)length:(size_t)length*2):(size_t)length;
+          if (wanted>leftInFile) {
+            logW("sample %d: wanted %d bytes but only %d are left — truncating",i,(int)wanted,(int)leftInFile);
+            dmfTailTruncated=true;
+            if (ds.version>0x08 && ds.version>=0x0b) {
+              length=(int)(leftInFile/2);
+            } else {
+              length=(int)leftInFile;
+            }
+            cutEnd=length;
+          }
+        }
       }
       if (length>0) {
         if (ds.version>0x08) {
@@ -1080,6 +1121,13 @@ bool DivEngine::loadDMF(unsigned char* file, size_t len) {
         }
       }
       ds.sample.push_back(sample);
+    }
+    // DEViLBOX PATCH: report the damaged tail through lastError even though the
+    // load succeeds. The caller reads it after a successful load and warns.
+    if (samplesRead<ds.sampleLen || dmfTailTruncated) {
+      logW("sample block is damaged: kept %d of %d samples",samplesRead,ds.sampleLen);
+      lastError=fmt::sprintf("sample data is damaged — kept %d of the file's %d samples, the last one possibly cut short",samplesRead,ds.sampleLen);
+      ds.sampleLen=samplesRead;
     }
 
     if (reader.tell()<reader.size()) {

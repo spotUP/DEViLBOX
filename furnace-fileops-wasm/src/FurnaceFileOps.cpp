@@ -63,7 +63,9 @@ int fur_load(const uint8_t* data, size_t len) {
     return -1;
   }
 
-  g_errorBuf[0] = 0;
+  // A load can succeed and still have something to say — a DefleMask file with
+  // a damaged sample block loads without its last samples rather than failing.
+  snprintf(g_errorBuf, sizeof(g_errorBuf), "%s", g_engine.getError().c_str());
   return 0;
 }
 
