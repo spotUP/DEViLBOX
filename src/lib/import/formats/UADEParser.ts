@@ -479,11 +479,8 @@ export async function parseUADEFile(
   // which routes audio to UADESynth streaming while using tick data for pattern display.
   const prefix = basename.split('.')[0]?.toLowerCase() ?? '';
 
-  const { shouldSkipScan, isShortScan } = await import('@engine/uade/uadeScanLists');
-  const scanCrashes = shouldSkipScan(ext, prefix);
-  const shortScan = isShortScan(ext, prefix);
-  const skipScan = scanCrashes;
-  const scanTimeoutSec = shortScan ? 30 : undefined;
+  const { getScanParams } = await import('@engine/uade/uadeScanLists');
+  const { skipScan, scanTimeoutSec } = getScanParams(basename);
 
   const metadata = preScannedMeta ?? await engine.load(buffer, filename, skipScan, 0, scanTimeoutSec);
   const scanRows = metadata.scanData ?? [];
