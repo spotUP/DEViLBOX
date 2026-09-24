@@ -18,6 +18,8 @@
  */
 
 #include "fileOpsCommon.h"
+// DEViLBOX PATCH: repair for sample blocks that lost bytes (see below)
+#include "dmfSampleRepair.h"
 
 // known version numbers:
 // - 27: v1.1.7
@@ -906,7 +908,6 @@ bool DivEngine::loadDMF(unsigned char* file, size_t len) {
     }
 
     int ymuSampleRate=20;
-    bool dmfTailTruncated=false;
 
     ds.sampleLen=(unsigned char)reader.readC();
     logI("reading samples (%d)...",ds.sampleLen);
@@ -915,26 +916,58 @@ bool DivEngine::loadDMF(unsigned char* file, size_t len) {
       ymuSampleRate=reader.readC();
     }
     if (ds.sampleLen>0) ds.sample.reserve(ds.sampleLen);
-    // DEViLBOX PATCH: a .dmf whose zlib checksum failed decompresses to slightly
-    // fewer bytes than were compressed. Everything up to the sample block —
-    // orders, instruments, wavetables, patterns — still reads correctly; only
-    // the tail runs short, and one missing byte inside a sample makes every
-    // record after it read as garbage. Refusing the whole song over a damaged
-    // tail throws away a module that is otherwise complete, so stop reading
-    // samples at the first record that does not fit and keep what came before.
-    // Measured over public/data/songs/deflemask on 2026-09-24: 318 of 1810
-    // files failed to load, every one of them with a failed checksum, while
-    // 503 checksum-clean files carrying samples loaded without complaint.
-    int samplesRead=ds.sampleLen;
+    // DEViLBOX PATCH: some DefleMask files are missing bytes from their deflate
+    // stream (their zlib checksum fails; upstream refuses them at that point).
+    // One lost byte turns the rest of a 16-bit sample into byte-swapped noise
+    // and moves every later record. The bytes are put back into the stream and
+    // it is inflated again, then anything left is mended in the inflated data;
+    // the loop below reads the result as it would a clean file. See
+    // furnace-fileops-wasm/src/dmfSampleRepair.h.
+    std::vector<unsigned char> repairedFile;
+    if (ds.sampleLen>0) {
+      size_t blockStart=reader.tell();
+      if (!dmfSampleBlockReadsAsWritten(file+blockStart,len-blockStart,ds.version,ds.sampleLen)) {
+        // first put missing bytes back into the deflate stream, which also
+        // mends every later copy that reached across them...
+        std::vector<unsigned char> restored;
+        int putBack=dmfRestoreStream(file,len,blockStart,ds.version,ds.sampleLen,restored);
+        const unsigned char* cur=file;
+        size_t curLen=len;
+        if (putBack>0) {
+          cur=restored.data();
+          curLen=restored.size();
+        }
+        DmfSampleRepair repair;
+        dmfRepairSampleBlock(cur+blockStart,curLen-blockStart,ds.version,ds.sampleLen,repair);
+        // ...then mend whatever that could not place, in the inflated data
+        repairedFile.assign(cur,cur+blockStart);
+        if (repair.changed) {
+          repairedFile.insert(repairedFile.end(),repair.block.begin(),repair.block.end());
+        } else {
+          repairedFile.insert(repairedFile.end(),cur+blockStart,cur+curLen);
+        }
+        reader=SafeReader(repairedFile.data(),repairedFile.size());
+        reader.seek(blockStart,SEEK_SET);
+        // Reported through lastError although the load succeeds; the caller
+        // reads it after a successful load.
+        String what;
+        if (putBack>0) {
+          what=fmt::sprintf("%d bytes were missing from the file's compressed sample data and were put back",putBack);
+        }
+        if (repair.changed && repair.samplesKept<ds.sampleLen) {
+          if (!what.empty()) what+="; ";
+          what+=fmt::sprintf("sample data is damaged: kept %d of the file's %d samples%s",repair.samplesKept,ds.sampleLen,repair.lastCutShort?", the last one cut short":"");
+          ds.sampleLen=repair.samplesKept;
+        } else if (repair.changed) {
+          if (!what.empty()) what+="; ";
+          what+=fmt::sprintf("%d more bytes were missing from %d samples and were rebuilt from the surrounding audio",repair.missingBytes,repair.damagedSamples);
+        }
+        logW("sample block: %s",what.c_str());
+        lastError=what;
+      }
+    }
     for (int i=0; i<ds.sampleLen; i++) {
       DivSample* sample=new DivSample;
-      if (reader.size()-reader.tell()<4) {
-        logW("sample %d: no room left for a sample header — stopping here",i);
-        delete sample;
-        samplesRead=i;
-        dmfTailTruncated=true;
-        break;
-      }
       int length=reader.readI();
       int cutStart=0;
       int cutEnd=length;
@@ -944,13 +977,10 @@ bool DivEngine::loadDMF(unsigned char* file, size_t len) {
       unsigned char* adpcmData;
       // I don't think a sample can be that big
       if (length<0 || length>(1<<29L)) {
-        // DEViLBOX PATCH: an absurd length means the previous record ended in
-        // the wrong place, which on these files means the data ran short.
-        logW("sample %d: implausible length %d — the sample block is damaged, stopping here",i,length);
-        delete sample;
-        samplesRead=i;
-        dmfTailTruncated=true;
-        break;
+        logE("invalid sample length %d. are we doing something wrong?",length);
+        lastError="file is corrupt or unreadable at samples";
+        delete[] file;
+        return false;
       }
       if (ds.version>0x16) {
         sample->name=reader.readString((unsigned char)reader.readC());
@@ -992,25 +1022,6 @@ bool DivEngine::loadDMF(unsigned char* file, size_t len) {
         cutStart=reader.readI();
         cutEnd=reader.readI();
         logV("cutStart: %d cutEnd: %d",cutStart,cutEnd);
-      }
-      if (length>0) {
-        // DEViLBOX PATCH: clamp the last sample to the bytes that are actually
-        // there. A short tail otherwise throws EndOfFileException and loses the
-        // whole song; a short sample only loses the end of one sound.
-        {
-          size_t leftInFile=reader.size()-reader.tell();
-          size_t wanted=(ds.version>0x08)?((ds.version<0x0b)?(size_t)length:(size_t)length*2):(size_t)length;
-          if (wanted>leftInFile) {
-            logW("sample %d: wanted %d bytes but only %d are left — truncating",i,(int)wanted,(int)leftInFile);
-            dmfTailTruncated=true;
-            if (ds.version>0x08 && ds.version>=0x0b) {
-              length=(int)(leftInFile/2);
-            } else {
-              length=(int)leftInFile;
-            }
-            cutEnd=length;
-          }
-        }
       }
       if (length>0) {
         if (ds.version>0x08) {
@@ -1121,13 +1132,6 @@ bool DivEngine::loadDMF(unsigned char* file, size_t len) {
         }
       }
       ds.sample.push_back(sample);
-    }
-    // DEViLBOX PATCH: report the damaged tail through lastError even though the
-    // load succeeds. The caller reads it after a successful load and warns.
-    if (samplesRead<ds.sampleLen || dmfTailTruncated) {
-      logW("sample block is damaged: kept %d of %d samples",samplesRead,ds.sampleLen);
-      lastError=fmt::sprintf("sample data is damaged — kept %d of the file's %d samples, the last one possibly cut short",samplesRead,ds.sampleLen);
-      ds.sampleLen=samplesRead;
     }
 
     if (reader.tell()<reader.size()) {
