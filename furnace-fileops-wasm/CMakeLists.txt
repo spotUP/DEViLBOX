@@ -44,6 +44,8 @@ set(FILEOPS_SOURCES
   ${FURNACE_ENGINE}/fileOps/fur.cpp
   ${FURNACE_ENGINE}/fileOps/dmf.cpp
   src/fileOpsCommon_patched.cpp
+  src/dmfSampleRepair.cpp
+  src/dmfInflate.c
 
   # I/O
   ${FURNACE_ENGINE}/safeReader.cpp
@@ -84,6 +86,8 @@ set(FILEOPS_SOURCES
 include_directories(
   # Our stubs FIRST — override problematic headers (fmt/, sfWrapper.h, ta-log.h)
   ${CMAKE_SOURCE_DIR}/stubs
+  # dmfSampleRepair.h, included by the patched dmf.cpp
+  ${CMAKE_SOURCE_DIR}/src
 
   # Furnace headers
   ${FURNACE_ENGINE}

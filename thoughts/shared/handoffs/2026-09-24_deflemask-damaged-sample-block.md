@@ -5,7 +5,56 @@ tags: [deflemask, dmf, furnace, wasm, file-import, jukebox]
 status: implemented
 ---
 
-# DefleMask .dmf load failures — root cause found, fix committed
+# DefleMask .dmf load failures — bytes missing from the deflate stream
+
+## Correction (third pass, same day) — read this first
+
+The "Resolution" below shipped (`29673826b`) and was **wrong in its model**:
+it treated the damage as a short tail and stopped at the first record that did
+not fit, which threw away intact samples (Sandstorm kept 2 of 4; samples 2
+and 3 were whole). Superseded.
+
+What the bytes actually show:
+
+- The deflate streams are **missing single bytes**. Sandstorm loses one inside
+  sample 0 and two inside sample 1; every later record sits exactly where the
+  shortened lengths put it and the file ends on its last byte.
+- The compressor's copy distances count the **true** data, so every copy that
+  reaches back across a lost byte lands one byte early. Proof: in "Rainbow
+  Island title.dmf" every sample name after the first picks up a stray letter
+  ("opend hihat.wav", "snaret.wav"); re-inflating with one byte put back makes
+  all five names and lengths read correctly. This is why patching the inflated
+  data could never be right: the copies after the gap must be re-made.
+- Upstream Furnace refuses all 343 bad-checksum files outright
+  (`fileOpsCommon.cpp:80-93` throws on the data-check error). DefleMask is
+  closed-source; there is no copy of it on disk.
+- An exact byte-for-byte restore is not possible: no single inserted byte
+  anywhere in Rainbow Island makes adler32 match, so these files carry other
+  damage too. Lost bytes' values are estimated from their neighbours.
+
+Fix (committed after `29673826b`):
+
+- `furnace-fileops-wasm/src/dmfInflate.c` — zlib's `contrib/puff/puff.c`
+  extended to write bytes at given output positions, stop early, and resume
+  from recorded block starts (zlib's own inflate keeps its window internal).
+- `furnace-fileops-wasm/src/dmfSampleRepair.{h,cpp}` — `dmfRestoreStream`
+  finds the first record that does not read, tries candidate insertions (the
+  smoothest spot in the sample's own 16-bit data for k missing bytes, where k
+  is how far back the next header reads; then each offset into the following
+  header), keeps the first that lets the records read further, repeats.
+  `dmfRepairSampleBlock` then mends leftovers in the inflated data, and as a
+  last resort keeps the samples before the first unreadable record.
+- `fileOpsCommon_patched.cpp` keeps the raw deflate stream for this.
+- `dmf.cpp` calls both before the (unchanged upstream) sample loop.
+
+Corpus (1810 files): 1452 checksum-clean load untouched, no warnings. 308
+damaged load (as before). 132 have bytes put back in the stream; 143 of 263
+damaged-with-samples keep **every** sample (was 48). Worst load 2.2 s, mean
+~150 ms. Still losing samples, 124 files: 79 have no readable header within
+512 bytes (heavy damage), 12 have *extra* bytes (header sits later than the
+length says — not handled), 22 are missing more than the 64-byte budget.
+Regression test `defleMaskDamagedSamples.test.ts` fails on `29673826b`'s
+binary, passes now.
 
 ## Resolution (second session, same day)
 
