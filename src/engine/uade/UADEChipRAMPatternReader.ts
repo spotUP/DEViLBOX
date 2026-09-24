@@ -14,6 +14,7 @@
 import type { UADEPatternLayout } from './UADEPatternEncoder';
 import { getCellFileOffset, decodeModCell } from './UADEPatternEncoder';
 import type { UADEChipEditor } from './UADEChipEditor';
+import { looksLikeRealPatternData, describeRejection } from './chipRamReadPlausibility';
 
 /**
  * Read patterns from chip RAM and update the TrackerStore.
@@ -22,6 +23,12 @@ import type { UADEChipEditor } from './UADEChipEditor';
 export async function populatePatternsFromChipRAM(
   chipEditor: UADEChipEditor,
   layout: UADEPatternLayout,
+  /**
+   * How many instruments the song has. Used to tell a real pattern block from
+   * arbitrary chip RAM that happens to decode — see `chipRamReadPlausibility`.
+   * Omit only when genuinely unknown; the check then cannot run.
+   */
+  instrumentCount = 0,
 ): Promise<{ patternsRead: number; cellsDecoded: number; nonEmptyCells: number }> {
   const moduleBase = await chipEditor.getModuleBase();
   if (!moduleBase || moduleBase === 0) {
@@ -49,6 +56,7 @@ export async function populatePatternsFromChipRAM(
 
   let cellsDecoded = 0;
   let nonEmptyCells = 0;
+  let outOfRangeInstrumentCells = 0;
 
   // Build new pattern objects (store state is frozen/immutable)
   const updatedPatterns = store.patterns.map((pattern, pat) => {
@@ -69,6 +77,7 @@ export async function populatePatternsFromChipRAM(
 
         if (cell.note > 0 || cell.instrument > 0 || cell.effTyp > 0) {
           nonEmptyCells++;
+          if (instrumentCount > 0 && cell.instrument > instrumentCount) outOfRangeInstrumentCells++;
           return { ...existingRow, ...cell };
         }
         return existingRow;
@@ -80,11 +89,17 @@ export async function populatePatternsFromChipRAM(
     return { ...pattern, channels: newChannels };
   });
 
-  // Update store immutably via loadPatterns
-  if (nonEmptyCells > 0) {
+  // Publish only a read that can actually BE this song's patterns. Any four
+  // bytes decode to something, so `nonEmptyCells > 0` used to pass on pure
+  // noise and put it on screen as the score.
+  const stats = { cellsDecoded, nonEmptyCells, outOfRangeInstrumentCells };
+  if (looksLikeRealPatternData(stats, instrumentCount)) {
     store.loadPatterns(updatedPatterns);
+    console.log(`[ChipRAMReader] Read ${layout.numPatterns} patterns, ${cellsDecoded} cells, ${nonEmptyCells} non-empty`);
+  } else {
+    console.warn(`[ChipRAMReader] Discarded the read: ${describeRejection(stats, instrumentCount)}.`
+      + ' The grid stays empty rather than showing something that is not the song.');
+    return { patternsRead: 0, cellsDecoded, nonEmptyCells: 0 };
   }
-
-  console.log(`[ChipRAMReader] Read ${layout.numPatterns} patterns, ${cellsDecoded} cells, ${nonEmptyCells} non-empty`);
   return { patternsRead: layout.numPatterns, cellsDecoded, nonEmptyCells };
 }

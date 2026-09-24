@@ -856,7 +856,7 @@ const WASM_ENGINES: NativeEngineDescriptor[] = [
           const { UADEChipEditor } = await import('@/engine/uade/UADEChipEditor');
           const editor = new UADEChipEditor(UADEEngine.getInstance());
           const { populatePatternsFromChipRAM } = await import('@/engine/uade/UADEChipRAMPatternReader');
-          await populatePatternsFromChipRAM(editor, layout);
+          await populatePatternsFromChipRAM(editor, layout, song.instruments?.length ?? 0);
         } catch (err) {
           console.warn('[NativeEngineRouting] Chip RAM pattern read failed:', err);
         }
