@@ -1115,8 +1115,24 @@ export class FurnaceDispatchSynth implements DevilboxSynth {
   }
 
   triggerAttack(note: string | number, _time?: number, velocity: number = 1): void {
-    if (!this._isReady || this._disposed) {
-      console.warn(`[FurnaceDispatchSynth] triggerAttack blocked: ready=${this._isReady} disposed=${this._disposed} platform=${this.platformType}`);
+    if (this._disposed) return;
+    if (!this._isReady) {
+      // DO NOT DROP THE NOTE. A synth is built lazily, the moment the song
+      // first reaches its instrument, and `initialize()` is async — so the
+      // note that CAUSED the synth to exist used to arrive a moment too early
+      // and was thrown away with a warning. Measured 2026-09-24: one lost note
+      // per instrument on the ramp-in of every Furnace and DefleMask song,
+      // roughly 200 ms apart, with `ready` resolving in the same millisecond
+      // the note was refused.
+      //
+      // Held instead, and fired when the chip is ready. The original `_time`
+      // is kept so the note lands where the scheduler meant it to; a note
+      // whose moment has already passed is played immediately rather than
+      // silently or late-and-wrong.
+      void this._isReadyPromise.then(() => {
+        if (this._disposed || !this._isReady) return;
+        this.triggerAttack(note, _time, velocity);
+      });
       return;
     }
 
