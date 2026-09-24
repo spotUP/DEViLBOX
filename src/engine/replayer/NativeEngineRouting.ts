@@ -22,6 +22,7 @@ import { SilenceDetector } from './SilenceDetector';
 import { useWasmPositionStore } from '../../stores/useWasmPositionStore';
 import { JamCrackerEngine } from '../jamcracker/JamCrackerEngine';
 import { getActiveDubBus } from '../dub/DubBus';
+import { needsPaulaOutputStage } from '@engine/paulaOutput';
 
 export { C64SIDEngine };
 export { SF2Engine };
@@ -1153,8 +1154,15 @@ export async function startNativeEngines(
                 instance.output.connect(instance.output.context.destination);
               }
             } else {
-              instance.output.connect(nativeInput);
-              console.log(`[NativeEngineRouting] ${desc.key} output → stereo separation`);
+              // An engine that emulates Paula hands over its DAC output raw —
+              // no Amiga 500 ever did. The stage goes IN FRONT of the same
+              // destination, so isolation, the dub tap and everything else
+              // downstream are untouched. `engine/paulaOutput.ts` holds the
+              // survey that decides membership.
+              const viaPaula = needsPaulaOutputStage(desc.synthType)
+                && toneEngine.routeThroughPaulaStage(instance.output, nativeInput);
+              if (!viaPaula) instance.output.connect(nativeInput);
+              console.log(`[NativeEngineRouting] ${desc.key} output → stereo separation${viaPaula ? ' (via Amiga output stage)' : ''}`);
             }
             routedNativeEngines.add(desc.synthType);
             registerWholeMixDubSend(`native:${desc.synthType}`, instance.output);
