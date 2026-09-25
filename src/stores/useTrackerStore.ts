@@ -164,13 +164,11 @@ function syncBulkEdit(patternIndex: number, pattern: import('@typedefs').Pattern
   // Furnace WASM sequencer sync — iterate all cells
   try {
     const replayer = getTrackerReplayer();
-    if (replayer.isWasmSequencerActive) {
-      for (let ch = 0; ch < pattern.channels.length; ch++) {
-        const rows = pattern.channels[ch].rows;
-        for (let row = 0; row < rows.length; row++) {
-          const cell = rows[row];
-          replayer.syncCellToWasmSequencer(ch, patternIndex, row, cell);
-        }
+    for (let ch = 0; ch < pattern.channels.length; ch++) {
+      const rows = pattern.channels[ch].rows;
+      for (let row = 0; row < rows.length; row++) {
+        const cell = rows[row];
+        replayer.syncCellToWasmSequencer(ch, patternIndex, row, cell);
       }
     }
   } catch { /* replayer not initialized */ }
@@ -525,12 +523,9 @@ export const useTrackerStore = create<TrackerStore>()(
         setCellInPattern(state.patterns[state.currentPatternIndex], channelIndex, rowIndex, cellUpdate);
       });
       useHistoryStore.getState().pushAction('EDIT_CELL', 'Edit cell', patternIndex, beforePattern, get().patterns[patternIndex]);
-      // Sync edit to WASM sequencer if active (Furnace formats)
+      // Apply the edit to a Furnace song: its native data, and the sequencer while it runs
       try {
-        const replayer = getTrackerReplayer();
-        if (replayer.isWasmSequencerActive) {
-          replayer.syncCellToWasmSequencer(channelIndex, patternIndex, rowIndex, cellUpdate);
-        }
+        getTrackerReplayer().syncCellToWasmSequencer(channelIndex, patternIndex, rowIndex, cellUpdate);
       } catch { /* replayer not initialized yet */ }
       // Sync edit to OpenMPT soundlib if loaded (MOD/XM/IT/S3M)
       // Bridge is the primary edit path for libopenmpt formats — statically imported
@@ -721,15 +716,11 @@ export const useTrackerStore = create<TrackerStore>()(
         clearCellInPattern(state.patterns[state.currentPatternIndex], channelIndex, rowIndex);
       });
       useHistoryStore.getState().pushAction('CLEAR_CELL', 'Clear cell', patternIndex, beforePattern, get().patterns[patternIndex]);
-      // Sync cleared cell to WASM sequencer if active (Furnace formats)
-      // Send -1 for all fields to mark them as empty in the sequencer
+      // Sync the cleared cell to a Furnace song (editor units: 0 = empty)
       try {
-        const replayer = getTrackerReplayer();
-        if (replayer.isWasmSequencerActive) {
-          replayer.syncCellToWasmSequencer(channelIndex, patternIndex, rowIndex, {
-            note: -1, instrument: -1, volume: -1, effTyp: -1, eff: -1, effTyp2: -1, eff2: -1,
-          });
-        }
+        getTrackerReplayer().syncCellToWasmSequencer(channelIndex, patternIndex, rowIndex, {
+          note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0,
+        });
       } catch { /* replayer not initialized yet */ }
       // Sync clear to OpenMPT soundlib if loaded (MOD/XM/IT/S3M)
       if (OpenMPTEditBridge.isActive()) {
