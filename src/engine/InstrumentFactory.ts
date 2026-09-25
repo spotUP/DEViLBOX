@@ -41,6 +41,7 @@ import { SuperColliderSynth } from './sc/SuperColliderSynth';
 import { ES5503Synth } from './es5503/ES5503Synth';
 import { getDevilboxAudioContext } from '@/utils/audio-context';
 import { FurnaceDispatchSynth, FurnaceDispatchPlatform } from './furnace-dispatch';
+import { moduleIns2Of } from './furnace-dispatch/ins2Uploads';
 import { BuzzmachineType } from './buzzmachines/BuzzmachineEngine';
 import { VSTBridgeSynth } from './vstbridge/VSTBridgeSynth';
 import { SYNTH_REGISTRY } from './vstbridge/synth-registry';
@@ -245,7 +246,7 @@ export class InstrumentFactory {
       case 'FurnaceT6W28': case 'FurnaceSUPERVISION': case 'FurnaceUPD1771': case 'FurnaceSCVTONE': {
         const dispatchPlatform = SYNTH_TO_DISPATCH[config.synthType];
         if (dispatchPlatform !== undefined) {
-          instrument = new FurnaceDispatchSynth(dispatchPlatform);
+          instrument = new FurnaceDispatchSynth(dispatchPlatform, { fromModule: moduleIns2Of(config) !== null });
           // Set the Furnace instrument index and upload encoded instrument
           const furnaceIndex = config.furnace?.furnaceIndex ?? 0;
           (instrument as FurnaceDispatchSynth).setFurnaceInstrumentIndex(furnaceIndex);

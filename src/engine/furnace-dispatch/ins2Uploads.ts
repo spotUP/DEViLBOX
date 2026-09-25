@@ -68,15 +68,26 @@ export function collectIns2Uploads(instruments: readonly MaybeFurnaceInstrument[
   for (let i = 0; i < instruments.length; i++) {
     const inst = instruments[i];
     if (!inst) continue;
-    // The converter writes the blob onto the furnace config; older paths put
-    // it on the instrument. Read both, config first.
-    const raw = inst.furnace?.rawBinaryData ?? inst.rawBinaryData;
-    if (!isIns2(raw)) continue;
-    const slot = inst.furnace?.furnaceIndex ?? i;
-    out.push({
-      slot,
-      data: raw instanceof Uint8Array ? raw : new Uint8Array(Array.from(raw as ArrayLike<number>)),
-    });
+    const data = moduleIns2Of(inst);
+    if (!data) continue;
+    out.push({ slot: inst.furnace?.furnaceIndex ?? i, data });
   }
   return out;
+}
+
+/**
+ * The INS2 blob an instrument brought with it from a loaded module, or null
+ * for an instrument made in DEViLBOX.
+ *
+ * The converter writes the blob onto the furnace config; older paths put it
+ * on the instrument. Read both, config first.
+ *
+ * An instrument that has one belongs to a song: the song's sequencer owns the
+ * dispatch's instrument table and its channels' state, and the instrument's
+ * own synth must not seed either with defaults (`FurnaceDispatchSynth`).
+ */
+export function moduleIns2Of(inst: MaybeFurnaceInstrument | null | undefined): Uint8Array | null {
+  const raw = inst?.furnace?.rawBinaryData ?? inst?.rawBinaryData;
+  if (!isIns2(raw)) return null;
+  return raw instanceof Uint8Array ? raw : new Uint8Array(Array.from(raw as ArrayLike<number>));
 }
