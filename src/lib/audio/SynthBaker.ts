@@ -7,6 +7,7 @@
 
 import * as Tone from 'tone';
 import { InstrumentFactory } from '@engine/InstrumentFactory';
+import { SynthRegistry } from '@engine/registry/SynthRegistry';
 import type { InstrumentConfig } from '@typedefs/instrument';
 
 /** Common interface for instruments returned by InstrumentFactory */
@@ -20,6 +21,23 @@ interface BakeableInstrument {
 
 export class SynthBaker {
   /**
+   * Whether the instrument renders into Tone's current context — the only kind
+   * the OfflineAudioContext below can capture.
+   *
+   * A synth with an engine of its own (a WASM worklet, a WAM, a native player)
+   * keeps rendering through that engine, which lives in the real-time context.
+   * Baking one captured silence, and played the note LIVE on the running
+   * engine: the instrument classifier bakes every synth of a freshly loaded
+   * song, so each Furnace instrument's C-4 went out on the song's own chip
+   * mid-playback — a forced instrument, full volume and a note on top of the
+   * song's, on every Furnace song, a few seconds after it started.
+   */
+  public static async canRenderOffline(config: InstrumentConfig): Promise<boolean> {
+    const desc = await SynthRegistry.ensure(config.synthType);
+    return !desc || desc.category === 'tone';
+  }
+
+  /**
    * Bake a synth instrument to a sample (AudioBuffer)
    * Renders a single C-4 note for 2 seconds.
    */
@@ -28,6 +46,9 @@ export class SynthBaker {
     duration: number = 2.0,
     note: string = 'C4'
   ): Promise<AudioBuffer> {
+    if (!(await SynthBaker.canRenderOffline(config))) {
+      throw new Error(`${config.synthType} plays through its own live engine and cannot be rendered offline`);
+    }
     // 1. Create offline context
     const sampleRate = 44100;
     const offlineContext = new OfflineAudioContext(1, sampleRate * duration, sampleRate);
