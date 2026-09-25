@@ -12,38 +12,16 @@
  * the .wasm bytes directly.
  */
 import { describe, it, expect, beforeAll, vi } from 'vitest';
-import fs from 'node:fs';
-import path from 'node:path';
-
-const root = path.resolve(__dirname, '../../../..');
-const deflemask = path.join(root, 'public/data/songs/deflemask');
+import { installFurnaceFileOpsWasm, readSong as readAnySong } from './furnaceFileOpsWasmHarness';
 
 const notifyWarning = vi.fn();
 vi.mock('@/stores/useNotificationStore', () => ({
   notify: { warning: (...a: unknown[]) => notifyWarning(...a), error: vi.fn(), success: vi.fn(), info: vi.fn() },
 }));
 
-function readSong(rel: string): ArrayBuffer {
-  const b = fs.readFileSync(path.join(deflemask, rel));
-  return b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength) as ArrayBuffer;
-}
+const readSong = (rel: string) => readAnySong(`deflemask/${rel}`);
 
-beforeAll(() => {
-  const js = fs.readFileSync(path.join(root, 'public/furnace-fileops/FurnaceFileOps.js'), 'utf8');
-  const wasmBinary = fs.readFileSync(path.join(root, 'public/furnace-fileops/FurnaceFileOps.wasm'));
-  const realAppend = document.head.appendChild.bind(document.head);
-  vi.spyOn(document.head, 'appendChild').mockImplementation(<T extends Node>(node: T): T => {
-    if (node instanceof HTMLScriptElement && node.src.endsWith('/furnace-fileops/FurnaceFileOps.js')) {
-      (0, eval)(js);
-      const g = globalThis as unknown as { createFurnaceFileOps: (o?: object) => Promise<unknown> };
-      const factory = g.createFurnaceFileOps;
-      g.createFurnaceFileOps = (o = {}) => factory({ ...o, wasmBinary });
-      queueMicrotask(() => node.onload?.(new Event('load')));
-      return node;
-    }
-    return realAppend(node);
-  });
-});
+beforeAll(installFurnaceFileOpsWasm);
 
 // First load instantiates the WASM, which is slow on a busy machine.
 describe('DefleMask file with a damaged sample block', { timeout: 60000 }, () => {

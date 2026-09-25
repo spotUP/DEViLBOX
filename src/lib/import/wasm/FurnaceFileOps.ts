@@ -214,9 +214,17 @@ export async function loadFurFileWasm(buffer: ArrayBuffer): Promise<{
 
   const chipIds: number[] = [];
   const chipFlags: string[] = [];
+  // How many of the song's channels each system owns. The sequencer maps song
+  // channels to chips by these counts (FurnaceSequencerSerializer); without
+  // them it falls back to each chip's runtime channel count, and a DefleMask
+  // Genesis song (YM2612 + SN76489, 6 + 4 channels) put all ten channels on
+  // the YM2612, whose dispatch reports 10 — the four PSG parts played FM
+  // channels, octaves off and in the wrong voice.
+  const systemChans: number[] = [];
   for (let i = 0; i < systemLen; i++) {
     chipIds.push(api.fur_get_system_id(i));
     chipFlags.push(api.fur_get_system_flags(i));
+    systemChans.push(api.fur_get_system_channels(i));
   }
 
   // Read grooves
@@ -444,6 +452,7 @@ export async function loadFurFileWasm(buffer: ArrayBuffer): Promise<{
     activeSubsong: 0,
     chipIds,
     chipFlags,
+    systemChans,
     compatFlags,
     tuning: tuning !== 440.0 ? tuning : undefined,
     grooves: grooves.length > 0 ? grooves : undefined,
