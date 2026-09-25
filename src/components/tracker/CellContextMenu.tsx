@@ -675,7 +675,7 @@ export const CellContextMenu: React.FC<CellContextMenuProps> = ({
           useUIStore.getState().setStatusMessage(`Baked: ${fullName}`);
         } catch (err) {
           console.error('[BakeChord] Failed:', err);
-          useUIStore.getState().setStatusMessage('Bake chord failed');
+          useUIStore.getState().setStatusMessage(`Bake chord failed: ${err instanceof Error ? err.message : String(err)}`);
         }
       };
 
