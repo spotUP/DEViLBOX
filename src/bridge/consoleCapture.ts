@@ -52,7 +52,7 @@ function argsToString(args: unknown[]): string {
  * holds 500 entries and a general log capture would evict the errors it exists
  * to hold.
  */
-const CAPTURED_LOG_PREFIXES = /^\[(DubRouter|DubBus|DubBusCtrl|DubPanic|DubLane|DubRecorder)\]/;
+const CAPTURED_LOG_PREFIXES = /^\[(DubRouter|DubBus|DubBusCtrl|DubPanic|DubLane|DubRecorder|FurnaceDispatch|FurnaceDispatchSynth|NativeEngineRouting)\]/;
 
 /** Start capturing console errors/warnings and unhandled rejections */
 export function startConsoleCapture(): void {
@@ -86,7 +86,12 @@ export function startConsoleCapture(): void {
   });
 
   window.addEventListener('unhandledrejection', (ev) => {
-    const reason = ev.reason instanceof Error ? ev.reason.message : String(ev.reason);
+    // An Error's message can be empty (DOMException aborts, bare `new Error()`),
+    // so keep its name and where it came from, or the entry says nothing.
+    const r = ev.reason;
+    const reason = r instanceof Error
+      ? `${r.name}${r.message ? `: ${r.message}` : ''}${r.stack ? `\n${r.stack.split('\n').slice(0, 6).join('\n')}` : ''}`
+      : String(r);
     push('error', `UnhandledRejection: ${reason}`);
   });
 }
