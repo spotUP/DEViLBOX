@@ -1490,6 +1490,15 @@ export function createMcpServer(): McpServer {
   );
 
   server.tool(
+    'furnace_cmd_log',
+    'Collect the Furnace dispatch command log in the browser: every command that reaches a Furnace chip, from the song sequencer and from instruments alike. action "start" clears and starts collecting; "read" returns the entries in tools/furnace-audit tab-separated format (tick, cmd, chan, val1, val2, ret), ready for compare-cmds.ts to lock-step against Furnace.',
+    {
+      action: z.enum(['start', 'read']).describe('"start" clears and starts collecting; "read" returns what was collected'),
+    },
+    (p) => call('furnace_cmd_log', p),
+  );
+
+  server.tool(
     'wait_for_audio',
     'Wait until audio output is detected (non-silent) or timeout. Polls the audio bus until RMS exceeds threshold. Useful after play() to confirm audio is actually playing.',
     {
@@ -2017,6 +2026,7 @@ export function createMcpServer(): McpServer {
           { tool: 'get_instrument_level', description: 'Per-instrument audio level' },
           { tool: 'get_audio_state', description: 'Audio engine diagnostics' },
           { tool: 'get_audio_level', description: 'Measure audio output level over time' },
+          { tool: 'furnace_cmd_log', description: 'Collect every command sent to Furnace chips, for lock-step against Furnace' },
           { tool: 'wait_for_audio', description: 'Wait until audio output is detected' },
         ],
         'File Loading': [
