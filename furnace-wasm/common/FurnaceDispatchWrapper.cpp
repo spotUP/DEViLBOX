@@ -1052,6 +1052,14 @@ int furnace_cmd_log_count() {
   return (int)g_cmdLog.size();
 }
 
+// Drop the entries read so far, keeping the tick count running. A reader that
+// polls (the AudioWorklet) calls this after each read; one that reads once at
+// the end (tools/furnace-audit/render-devilbox.ts) never needs it.
+EMSCRIPTEN_KEEPALIVE
+void furnace_cmd_log_clear() {
+  g_cmdLog.clear();
+}
+
 // Returns pointer to flat int array: [tick, cmd, chan, val1, val2, retVal, ...]
 // Caller must free the returned pointer.
 EMSCRIPTEN_KEEPALIVE
