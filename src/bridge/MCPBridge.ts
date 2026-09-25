@@ -6,6 +6,7 @@
  * Auto-reconnects with exponential backoff (1s, 2s, 4s, capped at 4s).
  */
 
+import { furnaceCmdLog } from './handlers/furnaceCmdLog';
 import type { BridgeRequest, BridgeResponse } from './protocol';
 import {
   getSongInfo,
@@ -424,6 +425,7 @@ const handlers: Record<string, Handler> = {
 
   // ─── Export Tools ───────────────────────────────────────────────────────
   export_wav: exportWav,
+  furnace_cmd_log: furnaceCmdLog,
   export_mp3: exportMp3,
   export_stems: exportStems,
   export_pattern_text: exportPatternText,
