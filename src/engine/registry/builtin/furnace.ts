@@ -13,6 +13,7 @@
 import { SynthRegistry } from '../SynthRegistry';
 import type { SynthDescriptor } from '../SynthDescriptor';
 import { FurnaceDispatchSynth, FurnaceDispatchPlatform } from '../../furnace-dispatch';
+import { moduleIns2Of } from '../../furnace-dispatch/ins2Uploads';
 import type { InstrumentConfig } from '@typedefs/instrument';
 
 // ── Volume offsets (from InstrumentFactory.VOLUME_NORMALIZATION_OFFSETS) ──────
@@ -143,7 +144,7 @@ const dispatchChipDescs: SynthDescriptor[] = DISPATCH_CHIPS.map(id => ({
   controlsComponent: 'FurnaceControls',
   create: (config: InstrumentConfig) => {
     const dispatchPlatform = SYNTH_TO_DISPATCH[id];
-    const instrument = new FurnaceDispatchSynth(dispatchPlatform);
+    const instrument = new FurnaceDispatchSynth(dispatchPlatform, { fromModule: moduleIns2Of(config) !== null });
     const furnaceIndex = config.furnace?.furnaceIndex ?? 0;
     instrument.setFurnaceInstrumentIndex(furnaceIndex);
     if (config.furnace) {
