@@ -115,6 +115,37 @@ class FurnaceDispatchProcessor extends AudioWorkletProcessor {
   }
 
   /**
+   * Post the command-log entries recorded since the last drain, then clear
+   * them. Without the clear, every poll copied and re-posted the WHOLE log
+   * from the start of playback — on the audio thread — about a million
+   * entries per 30 s to the main thread, until the log hit its 500K cap and
+   * stopped recording at all.
+   */
+  drainCmdLog() {
+    const count = this.wasm.cmdLogCount();
+    if (count <= 0) return;
+    const ptr = this.wasm.cmdLogGet();
+    const heapBuf = this.getHeapBuffer();
+    if (heapBuf) {
+      const heap32 = new Int32Array(heapBuf);
+      const entries = [];
+      for (let i = 0; i < count; i++) {
+        const base = ptr / 4 + i * 6;
+        entries.push({
+          tick: heap32[base],
+          cmd: heap32[base + 1],
+          channel: heap32[base + 2],
+          value1: heap32[base + 3],
+          value2: heap32[base + 4],
+        });
+      }
+      this.port.postMessage({ type: 'cmdLog', entries });
+    }
+    this.module._free(ptr);
+    if (this.wasm.cmdLogClear) this.wasm.cmdLogClear();
+  }
+
+  /**
    * Get chip info for a given platformType.
    * Falls back to first chip if platformType not specified (backward compat).
    */
@@ -796,6 +827,7 @@ class FurnaceDispatchProcessor extends AudioWorkletProcessor {
         cmdLogEnable: this.module._furnace_cmd_log_enable,
         cmdLogCount: this.module._furnace_cmd_log_count,
         cmdLogGet: this.module._furnace_cmd_log_get,
+        cmdLogClear: this.module._furnace_cmd_log_clear,
       };
       this._cmdLogEnabled = false;
       this._cmdLogPollCounter = 0;
@@ -1128,27 +1160,7 @@ class FurnaceDispatchProcessor extends AudioWorkletProcessor {
         this._cmdLogPollCounter++;
         if (this._cmdLogPollCounter >= 10) {
           this._cmdLogPollCounter = 0;
-          const count = this.wasm.cmdLogCount();
-          if (count > 0) {
-            const ptr = this.wasm.cmdLogGet();
-            const heapBuf = this.getHeapBuffer();
-            if (heapBuf) {
-              const heap32 = new Int32Array(heapBuf);
-              const entries = [];
-              for (let i = 0; i < count; i++) {
-                const base = ptr / 4 + i * 6;
-                entries.push({
-                  tick: heap32[base],
-                  cmd: heap32[base + 1],
-                  channel: heap32[base + 2],
-                  value1: heap32[base + 3],
-                  value2: heap32[base + 4],
-                });
-              }
-              this.port.postMessage({ type: 'cmdLog', entries });
-            }
-            this.module._free(ptr);
-          }
+          this.drainCmdLog();
         }
       }
 
