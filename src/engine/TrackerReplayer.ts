@@ -13,6 +13,7 @@
  * Format-specific behavior is handled by effect handlers.
  */
 
+import { isReplacedInstrument } from './replayer/hybridInstruments';
 import * as Tone from 'tone';
 import type { Pattern, TrackerCell, FurnaceNativeData, HivelyNativeData, KlysNativeData, FurnaceSubsongPlayback } from '@/types';
 import type { TFMXNativeData } from '@/types/tfmxNative';
@@ -2219,34 +2220,22 @@ export class TrackerReplayer {
     this.playing = true;
 
     // ── Universal hybrid playback setup (ALL formats) ──────────────────────
-    // Rebuild _replacedInstruments from current instrument store state.
-    // Any instrument whose synthType is not Sampler/Player AND not a native
-    // whole-song player type is "replaced" — the hybrid block will fire
-    // ToneEngine notes for it. Native whole-song players (HVL, TFMX, FC,
-    // SID, etc.) handle all their instruments internally via the engine
-    // singleton — they must NOT get standalone players.
+    // Rebuild _replacedInstruments from current instrument store state: every
+    // instrument the song's own engine does not play gets ToneEngine notes
+    // from the hybrid block. The rule lives in replayer/hybridInstruments.ts.
+    // Instruments the rule excludes are taken OUT as well: the set persists
+    // across play/stop and is saved with the project, so one saved while the
+    // rule still counted a Furnace song's own instruments would bring them
+    // straight back.
     {
-      const nativeWholePlayerTypes = new Set([
-        'HivelySynth', 'UADESynth', 'UADEEditableSynth', 'SymphonieSynth',
-        'MusicLineSynth', 'JamCrackerSynth', 'MaxTraxSynth', 'PreTrackerSynth', 'FuturePlayerSynth',
-        'TFMXSynth', 'FCSynth', 'C64SID',
-        // OPL3: AdPlug streaming player handles audio when adplugFileData is present.
-        // The replayer displays patterns and follows position — same as UADE editable.
-        'OPL3',
-        // WASM player-pool synths — each has a fixed-size pool, must dedup
-        'SoundMonSynth', 'SidMonSynth', 'SidMon1Synth', 'DigMugSynth',
-        'FredSynth', 'FredEditorReplayerSynth', 'OctaMEDSynth',
-        'HippelCoSoSynth', 'RobHubbardSynth', 'SteveTurnerSynth',
-        'DavidWhittakerSynth', 'SonicArrangerSynth',
-        'InStereo2Synth', 'InStereo1Synth', 'StartrekkerAMSynth',
-        'DeltaMusic1Synth', 'DeltaMusic2Synth',
-      ]);
       const { useInstrumentStore } = await import('@stores/useInstrumentStore');
       const instruments = useInstrumentStore.getState().instruments;
+      const furnaceSequencer = !!this.song.furnaceNative;
       for (const inst of instruments) {
-        if (inst.synthType !== 'Sampler' && inst.synthType !== 'Player'
-            && !nativeWholePlayerTypes.has(inst.synthType || '')) {
+        if (isReplacedInstrument(inst, furnaceSequencer)) {
           this._replacedInstruments.add(inst.id);
+        } else {
+          this._replacedInstruments.delete(inst.id);
         }
       }
       if (this._replacedInstruments.size > 0) {
