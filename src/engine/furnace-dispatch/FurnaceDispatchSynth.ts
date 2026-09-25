@@ -221,6 +221,11 @@ function getMaxVolume(platform: number): number {
   return PLATFORM_VOL_MAX[platform] ?? 127;
 }
 
+export interface FurnaceDispatchSynthOptions {
+  /** The instrument came from a loaded module — see `moduleIns2Of`. */
+  fromModule?: boolean;
+}
+
 export class FurnaceDispatchSynth implements DevilboxSynth {
   readonly name = 'FurnaceDispatchSynth';
   readonly output: GainNode;
@@ -243,9 +248,17 @@ export class FurnaceDispatchSynth implements DevilboxSynth {
   private _nativeGain: GainNode | null = null; // Shared native GainNode for audio routing
   private _instrumentUploadPromise: Promise<void> | null = null; // Pending instrument upload
 
-  constructor(platformType: number = FurnaceDispatchPlatform.GB) {
+  /**
+   * The instrument came from a loaded module (it carries the module's INS2).
+   * The module's sequencer then owns the dispatch's instrument table and its
+   * channels' state, so this synth must not seed them with a default patch.
+   */
+  private readonly fromModule: boolean;
+
+  constructor(platformType: number = FurnaceDispatchPlatform.GB, opts: FurnaceDispatchSynthOptions = {}) {
     this.output = getDevilboxAudioContext().createGain();
     this.platformType = platformType;
+    this.fromModule = opts.fromModule ?? false;
     this.engine = FurnaceDispatchEngine.getInstance();
     this._isReadyPromise = new Promise((resolve) => { this._resolveReady = resolve; });
     this.initialize();
@@ -456,8 +469,15 @@ export class FurnaceDispatchSynth implements DevilboxSynth {
         this._nativeGain = sharedGain;
       }
 
-      // Set up default instrument for this platform
-      this.setupDefaultInstrument();
+      // Set up a default instrument for this platform — but only for an
+      // instrument made in DEViLBOX. The default patch goes into instrument
+      // slot 0 of the dispatch's single, shared table and is put on every
+      // channel of the platform; for a song's instrument that slot holds the
+      // song's own instrument 0, which the song had already uploaded, and
+      // those channels are the song's. One synth per song instrument, each
+      // finishing init after the upload, left every part on instrument 0
+      // playing a stock electric piano — out of tune against the rest.
+      if (!this.fromModule) this.setupDefaultInstrument();
 
       // Ensure chip engine audio is routed through master effects chain
       try { getToneEngine().routeNativeEngineOutput(this); } catch { /* ToneEngine not ready yet */ }
