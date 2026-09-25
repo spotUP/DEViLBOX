@@ -13,6 +13,7 @@
  * Format-specific behavior is handled by effect handlers.
  */
 
+import { applyEditorCellEdit } from '@lib/import/furnaceEditorCells';
 import { isReplacedInstrument } from './replayer/hybridInstruments';
 import * as Tone from 'tone';
 import type { Pattern, TrackerCell, FurnaceNativeData, HivelyNativeData, KlysNativeData, FurnaceSubsongPlayback } from '@/types';
@@ -1552,23 +1553,25 @@ export class TrackerReplayer {
   }
 
   /**
-   * Sync a pattern cell edit to the WASM sequencer (fire-and-forget).
-   * Called from the tracker store when cells are edited during Furnace playback.
-   * Maps TrackerCell fields to WASM sequencer column indices:
-   *   col 0 = note, col 1 = instrument, col 2 = volume,
-   *   col 3+fx*2 = effect cmd, col 4+fx*2 = effect val
+   * Apply a pattern-cell edit to a Furnace song (fire-and-forget).
+   *
+   * The edit goes into `song.furnaceNative` — the data the WASM sequencer is
+   * uploaded from on every Play — in Furnace's own units and in the channel's
+   * own Furnace pattern (see lib/import/furnaceEditorCells.ts), and, while the
+   * sequencer runs, to the sequencer as well. It used to go to the sequencer
+   * only, raw: editor note numbers where Furnace's belong (an A-4 typed in
+   * played as C-4), 1-based instruments, XM-scale volumes, the editor's
+   * composite pattern index as if it were the channel's Furnace pattern — and
+   * was gone at the next Play, which re-uploaded the untouched native data.
    */
   syncCellToWasmSequencer(ch: number, patIdx: number, row: number, cell: Partial<import('@/types/tracker').TrackerCell>): void {
-    if (!this.useWasmSequencer) return;
+    const native = this.song?.furnaceNative;
+    if (!native || !this.song) return;
+    const writes = applyEditorCellEdit(native, this.song.songPositions, patIdx, ch, row, cell);
+    if (!this.useWasmSequencer || writes.length === 0) return;
     import('@engine/furnace-dispatch/FurnaceDispatchEngine').then(({ FurnaceDispatchEngine }) => {
       const engine = FurnaceDispatchEngine.getInstance();
-      if (cell.note !== undefined)       engine.seqSetCell(ch, patIdx, row, 0, cell.note);
-      if (cell.instrument !== undefined) engine.seqSetCell(ch, patIdx, row, 1, cell.instrument);
-      if (cell.volume !== undefined)     engine.seqSetCell(ch, patIdx, row, 2, cell.volume);
-      if (cell.effTyp !== undefined)     engine.seqSetCell(ch, patIdx, row, 3, cell.effTyp);
-      if (cell.eff !== undefined)        engine.seqSetCell(ch, patIdx, row, 4, cell.eff);
-      if (cell.effTyp2 !== undefined)    engine.seqSetCell(ch, patIdx, row, 5, cell.effTyp2);
-      if (cell.eff2 !== undefined)       engine.seqSetCell(ch, patIdx, row, 6, cell.eff2);
+      for (const w of writes) engine.seqSetCell(w.ch, w.pat, w.row, w.col, w.val);
     }).catch(() => {});
   }
 
