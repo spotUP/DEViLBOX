@@ -744,6 +744,13 @@ export function createMcpServer(): McpServer {
   );
 
   server.tool(
+    'set_dub_bleed',
+    'BLEED ("Ghost Bus") on/off - the dub deck\'s BLEED button. Closed channel sends feed the bus at -36 dB, so channels muted in the main mix still whisper through the dub return. Applied by the engine; faders are not moved. get_dub_bus_state reports it as `bleed`.',
+    { enabled: z.boolean().describe('BLEED on') },
+    (p) => call('set_dub_bleed', p),
+  );
+
+  server.tool(
     'set_dub_bus_audition',
     "Hold the dub bus's PARALLEL colour stages down so you can hear the send itself - plate, ring modulator, lo-fi, the phaser/comb sweep and the external feedback loop all duck, leaving the core wet chain (echo, spring, sidechain, glue, EQ) audible. { on: true } starts it, { on: false } hands the colour back at whatever values it had, including any changed while held. Never writes characterPreset, so a voicing survives being auditioned. Use it to check what a gesture is actually doing without dismantling the user's sound.",
     { on: z.boolean().optional() },

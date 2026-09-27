@@ -22,6 +22,7 @@ import { useOscilloscopeStore } from '../../stores/useOscilloscopeStore';
 import { useInstrumentTypeStore } from '../../stores/useInstrumentTypeStore';
 import { useDJStore } from '../../stores/useDJStore';
 import { useDrumPadStore } from '../../stores/useDrumPadStore';
+import { useDubStore } from '../../stores/useDubStore';
 import { getDJEngineIfActive } from '../../engine/dj/DJEngine';
 import { getDrumPadEngine } from '../../hooks/drumpad/useMIDIPadRouting';
 import { useSynthErrorStore } from '../../stores/useSynthErrorStore';
@@ -748,6 +749,9 @@ export async function getDubBusState(): Promise<Record<string, unknown>> {
 
   return {
     hasBus: !!bus,
+    // BLEED ("Ghost Bus"): closed channels feed the bus at the floor
+    // (effectiveDubSend). Lives in useDubStore, not the bus settings.
+    bleed: useDubStore.getState().ghostBus,
     storeSettings,
     // The bus's OWN settings, beside the store's. Moves write the bus directly
     // — ringMod, voltageStarve and eqSweep all call `setSettings` / `setReturnEQ`
