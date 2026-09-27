@@ -3,6 +3,7 @@
  * Manages Tone.js lifecycle, instruments, master effects, and audio context
  */
 
+import { EngineGainDuck } from './engineGainDuck';
 import * as Tone from 'tone';
 import type { InstrumentConfig, EffectConfig } from '@typedefs/instrument';
 import type { DevilboxSynth } from '@typedefs/synth';
@@ -4586,39 +4587,23 @@ export class ToneEngine {
 
   }
 
+  private readonly chipEngineDuck = new EngineGainDuck();
+
   /**
    * Mute Furnace chip engine outputs for immediate silence on stop.
    * Chip engines share a single outputGain that isn't the individual synth's .output,
    * so releaseAll()'s per-instrument GainNode ramp doesn't affect them.
+   * The restores live in `chipEngineDuck`, out of reach of
+   * disposeAllInstruments() — see engineGainDuck.ts.
    */
-  // Sentinel keys for chip engine timeout entries in releaseRestoreTimeouts
-  private static readonly CHIP_ENGINE_KEY = -1;
-  private static readonly DISPATCH_ENGINE_KEY = -2;
-
   private muteChipEngineOutputs(now: number): void {
-    const muteAndRestore = (engineKey: number, getGain: () => GainNode | null) => {
-      const gain = getGain();
-      if (!gain) return;
-      const prevTimeout = this.releaseRestoreTimeouts.get(engineKey);
-      if (prevTimeout) clearTimeout(prevTimeout);
-      gain.gain.cancelScheduledValues(now);
-      gain.gain.setValueAtTime(gain.gain.value || 1, now);
-      gain.gain.linearRampToValueAtTime(0, now + 0.05);
-      const timeout = setTimeout(() => {
-        this.releaseRestoreTimeouts.delete(engineKey);
-        try {
-          gain.gain.cancelScheduledValues(0);
-          gain.gain.value = 1;
-        } catch { /* engine may be disposed */ }
-      }, 100);
-      this.releaseRestoreTimeouts.set(engineKey, timeout);
-    };
-
     if (this.nativeEngineRouting.has('FurnaceChipEngine')) {
-      muteAndRestore(ToneEngine.CHIP_ENGINE_KEY, () => FurnaceChipEngine.getInstance().getNativeOutput());
+      const gain = FurnaceChipEngine.getInstance().getNativeOutput();
+      if (gain) this.chipEngineDuck.duck('FurnaceChipEngine', gain, now);
     }
     if (this.nativeEngineRouting.has('FurnaceDispatchEngine')) {
-      muteAndRestore(ToneEngine.DISPATCH_ENGINE_KEY, () => FurnaceDispatchEngine.getInstance().getOrCreateSharedGain());
+      const gain = FurnaceDispatchEngine.getInstance().getOrCreateSharedGain();
+      if (gain) this.chipEngineDuck.duck('FurnaceDispatchEngine', gain, now);
     }
   }
 
