@@ -179,14 +179,18 @@ async function parseFurnaceFileWasm(buffer: ArrayBuffer, _fileName: string, subs
       // Parse the INS2 binary using existing TS instrument parser
       const reader = new BinaryReader(binary.buffer as ArrayBuffer);
       const furIns = parseInstrument(reader);
-      // A type the map has no chip for (STD above all) belongs to whichever
-      // chip of this song plays it: a DefleMask Genesis song's STD
-      // instruments are its SN76489's, and preview there as FurnacePSG — not
-      // as a generic Tone.js ChipSynth.
+      // A type the map has no chip for (STD above all), or a sample type —
+      // whose samples are the module's, uploaded to the song's chips, not
+      // the instrument's — belongs to whichever chip of this song plays it.
+      // A DefleMask Genesis song's STD instruments are its SN76489's and
+      // preview there as FurnacePSG, not as a generic Tone.js ChipSynth; its
+      // "Legacy Samples" instrument plays on the YM2612's DAC, not as a
+      // Sampler with no sample.
       const mapped = mapFurnaceInstrumentType(furIns.type);
-      const synthType = (mapped === 'ChipSynth'
+      const synthType = (mapped === 'ChipSynth' || mapped === 'Sampler'
         ? synthTypeForPlatform(loaded.instrumentSystems[i])
         : undefined) ?? mapped;
+      const previewChannel = loaded.instrumentChipChannels[i];
 
       // Build ParsedInstrument for the converter
       const parsed: import('@/types/tracker').ParsedInstrument = {
@@ -234,6 +238,9 @@ async function parseFurnaceFileWasm(buffer: ArrayBuffer, _fileName: string, subs
       };
 
       const converted = convertToInstrument(parsed, i + 1, 'FUR');
+      for (const inst of converted) {
+        if (inst.furnace && previewChannel > 0) inst.furnace.previewChannel = previewChannel;
+      }
       instruments.push(...converted.map((inst, j) => ({ ...inst, id: i + 1 + j })));
     } catch (err) {
       console.warn(`[FurnaceToSong] Failed to parse instrument ${i}:`, err);

@@ -155,17 +155,30 @@ const char* fur_get_system_name(int idx) {
  * Genesis song's STD instruments belong to its SN76489. -1 when no channel
  * of the song takes the type.
  */
-int fur_get_ins_system(int insIdx) {
+static int firstChannelTaking(int insIdx) {
   if (insIdx < 0 || insIdx >= (int)g_engine.song.ins.size()) return -1;
   DivInstrumentType type = g_engine.song.ins[insIdx]->type;
   g_engine.song.recalcChans();
   for (int ch = 0; ch < g_engine.song.chans; ch++) {
     const DivChanDef& def = g_engine.song.chanDef[ch];
-    if (def.insType[0] == type || def.insType[1] == type) {
-      return (int)g_engine.song.sysOfChan[ch];
-    }
+    if (def.insType[0] == type || def.insType[1] == type) return ch;
   }
   return -1;
+}
+
+int fur_get_ins_system(int insIdx) {
+  int ch = firstChannelTaking(insIdx);
+  return ch < 0 ? -1 : (int)g_engine.song.sysOfChan[ch];
+}
+
+/**
+ * The channel of that chip the instrument previews on, counted from the
+ * chip's first channel: a DefleMask "Legacy Samples" instrument plays on the
+ * YM2612's sixth channel (its DAC), not on its first. -1 when none.
+ */
+int fur_get_ins_chip_channel(int insIdx) {
+  int ch = firstChannelTaking(insIdx);
+  return ch < 0 ? -1 : ch - g_engine.song.dispatchFirstChan[ch];
 }
 
 /**

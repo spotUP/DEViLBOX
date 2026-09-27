@@ -11,9 +11,11 @@
 import { describe, it, expect, beforeAll, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { STAND_INS } from '../synthPlatforms';
 
 interface Chip { handle: number }
 interface Processor {
+  standIns: Record<number, readonly number[]>;
   chips: Map<number, Chip>;
   wasm: unknown;
   getChip(platformType?: number): Chip | null;
@@ -38,6 +40,7 @@ const YM2612 = 20, SMS = 4, GENESIS = 2, NES = 8, YM2151 = 19, ARCADE = 13;
 /** The chips a DefleMask Genesis song runs: Furnace splits Genesis into its parts. */
 function genesisSong(): Processor {
   const p = new Processor();
+  p.standIns = STAND_INS;   // what the engine sends on init
   p.chips = new Map([[YM2612, { handle: 100 }], [SMS, { handle: 200 }]]);
   return p;
 }
@@ -49,6 +52,7 @@ describe('routing a message to a chip', () => {
 
   it('sends an Arcade FM instrument to the song\'s YM2151', () => {
     const p = new Processor();
+    p.standIns = STAND_INS;
     p.chips = new Map([[SMS, { handle: 200 }], [YM2151, { handle: 300 }]]);
     expect(p.getChip(ARCADE)?.handle).toBe(300);
   });
