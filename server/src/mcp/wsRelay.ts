@@ -23,6 +23,7 @@ import { randomUUID } from 'crypto';
 import http from 'http';
 import { WebSocket, WebSocketServer } from 'ws';
 import type { BridgeRequest, BridgeResponse } from './protocol';
+import { RELAY_REPLACED_CLOSE_CODE } from './protocol';
 
 const PORT = Number(process.env.MCP_BRIDGE_PORT ?? 4003);
 const TIMEOUT_MS = 900_000;
@@ -147,7 +148,7 @@ export function startRelay(): void {
       const browserUA = (req.headers['user-agent'] ?? '').slice(0, 60);
       if (browserSocket && browserSocket.readyState === WebSocket.OPEN) {
         console.error(`[mcp-bridge] Kicking old browser to make room for new one (origin=${browserOrigin})`);
-        browserSocket.close();
+        browserSocket.close(RELAY_REPLACED_CLOSE_CODE, 'Another DEViLBOX tab took over MCP control');
       }
       browserSocket = ws;
       console.error(`[mcp-bridge] Browser connected (origin=${browserOrigin} ua=${browserUA})`);
