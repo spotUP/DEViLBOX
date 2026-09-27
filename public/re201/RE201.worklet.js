@@ -220,6 +220,44 @@ class RE201Processor extends AudioWorkletProcessor {
   }
 
   process(inputs, outputs) {
+    try {
+      return this.processInner(inputs, outputs);
+    } catch (e) {
+      // Report once, with the stack, instead of the browser silently
+      // retiring the processor.
+      if (!this._reportedError) {
+        this._reportedError = true;
+        this.port.postMessage({ type: 'processError', message: String(e && e.message || e), stack: String(e && e.stack || '') });
+      }
+      return true;
+    }
+  }
+
+  /** Once a second: is process() running, and what goes in and out. For diagnostics. */
+  reportStats(inputs, outputs) {
+    this._statCalls = (this._statCalls || 0) + 1;
+    const i0 = inputs[0] && inputs[0][0], o0 = outputs[0] && outputs[0][0];
+    let si = 0, so = 0;
+    if (i0) for (let k = 0; k < i0.length; k++) si += i0[k] * i0[k];
+    if (o0) for (let k = 0; k < o0.length; k++) so += o0[k] * o0[k];
+    this._statIn = Math.max(this._statIn || 0, i0 ? Math.sqrt(si / i0.length) : 0);
+    this._statOut = Math.max(this._statOut || 0, o0 ? Math.sqrt(so / o0.length) : 0);
+    if (this._statCalls % 375 === 0) {
+      this.port.postMessage({
+        type: 'stats', calls: this._statCalls, initialized: !!this.initialized, handle: this.handle || 0,
+        inputs: inputs[0] ? inputs[0].length : -1, peakInRms: this._statIn, peakOutRms: this._statOut,
+      });
+      this._statIn = 0; this._statOut = 0;
+    }
+  }
+
+  processInner(inputs, outputs) {
+    const keep = this.processBody(inputs, outputs);
+    this.reportStats(inputs, outputs);
+    return keep;
+  }
+
+  processBody(inputs, outputs) {
     if (!this.initialized || !this.handle || !this.wasm) {
       const input = inputs[0];
       const output = outputs[0];

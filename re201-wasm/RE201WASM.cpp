@@ -71,10 +71,18 @@ struct OnePole {
   float a0 = 1.0f, b1 = 0.0f;
 
   void setLowpass(float freq, float sr) {
-    float w = TWOPI * freq / sr;
-    float c = cosf(w);
-    b1 = 2.0f - c - sqrtf((2.0f - c) * (2.0f - c) - 1.0f);
-    a0 = 1.0f - b1;
+    // In double: at the very low corners this is used for (the 2 Hz delay-time
+    // smoother, the 0.15 Hz wow filter) cosf(w) rounds to exactly 1.0f in
+    // float, which made b1 = 1 and a0 = 0 - a filter frozen at 0. The delay
+    // time never left 0, so the tape delay read one sample behind its write
+    // head: no repeats at all, and the Intensity (feedback) knob had nothing to
+    // act on (measured 2026-09-27: output silent 50 ms after an input burst at
+    // every intensity).
+    const double w = 6.283185307179586 * (double)freq / (double)sr;
+    const double c = cos(w);
+    const double b = 2.0 - c - sqrt((2.0 - c) * (2.0 - c) - 1.0);
+    b1 = (float)b;
+    a0 = (float)(1.0 - b);
   }
   float process(float x) {
     z1 = x * a0 + z1 * b1;
