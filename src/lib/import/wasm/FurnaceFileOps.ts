@@ -53,6 +53,7 @@ interface FurnaceFileOpsAPI {
   fur_get_system_len(): number;
   fur_get_system_id(idx: number): number;
   fur_get_system_channels(idx: number): number;
+  fur_get_system_name(idx: number): string;
   fur_get_system_flags(idx: number): string;
   fur_get_pat_len(subsong: number): number;
   fur_get_orders_len(subsong: number): number;
@@ -99,6 +100,7 @@ function getAPI(m: WasmModule): FurnaceFileOpsAPI {
     fur_get_system_len: m.cwrap('fur_get_system_len', 'number', []),
     fur_get_system_id: m.cwrap('fur_get_system_id', 'number', ['number']),
     fur_get_system_channels: m.cwrap('fur_get_system_channels', 'number', ['number']),
+    fur_get_system_name: m.cwrap('fur_get_system_name', 'string', ['number']),
     fur_get_system_flags: m.cwrap('fur_get_system_flags', 'string', ['number']),
     fur_get_pat_len: m.cwrap('fur_get_pat_len', 'number', ['number']),
     fur_get_orders_len: m.cwrap('fur_get_orders_len', 'number', ['number']),
@@ -154,6 +156,8 @@ export async function loadFurFileWasm(buffer: ArrayBuffer): Promise<{
   numChannels: number;
   numSubsongs: number;
   chipIds: number[];
+  /** Furnace's own display name for each chip in chipIds. */
+  systemNames: string[];
   chipFlags: string[];
   nativeData: FurnaceNativeData;
   instrumentBinaries: Uint8Array[];
@@ -221,8 +225,10 @@ export async function loadFurFileWasm(buffer: ArrayBuffer): Promise<{
   // the YM2612, whose dispatch reports 10 — the four PSG parts played FM
   // channels, octaves off and in the wrong voice.
   const systemChans: number[] = [];
+  const systemNames: string[] = [];
   for (let i = 0; i < systemLen; i++) {
     chipIds.push(api.fur_get_system_id(i));
+    systemNames.push(api.fur_get_system_name(i));
     chipFlags.push(api.fur_get_system_flags(i));
     systemChans.push(api.fur_get_system_channels(i));
   }
@@ -468,6 +474,7 @@ export async function loadFurFileWasm(buffer: ArrayBuffer): Promise<{
     numChannels,
     numSubsongs,
     chipIds,
+    systemNames,
     chipFlags,
     nativeData,
     instrumentBinaries,
