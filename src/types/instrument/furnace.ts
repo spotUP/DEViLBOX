@@ -351,6 +351,13 @@ export interface FurnaceConfig {
   // Furnace file metadata
   furnaceIndex?: number;  // Original instrument index in the Furnace file (0-based)
   rawBinaryData?: Uint8Array;  // Original binary instrument data for upload to WASM
+  /**
+   * The channel of its chip a module instrument previews on, counted from
+   * the chip's first channel — the first one whose type takes the instrument
+   * (Furnace's own preview rule). A DefleMask "Legacy Samples" instrument
+   * previews on the YM2612's sixth channel, its DAC. Absent: channel 0.
+   */
+  previewChannel?: number;
 
   // FM parameters
   algorithm: number;     // 0-7 (operator connection algorithm)

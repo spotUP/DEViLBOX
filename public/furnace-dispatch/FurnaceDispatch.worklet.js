@@ -12,19 +12,6 @@
  * The WASM module JS is passed as a string and executed via Function constructor.
  */
 
-// Chips that play a compound system's instruments when the compound itself
-// is not running. Furnace splits these systems into their parts on load
-// (fileOps/dmf.cpp "handle compound systems"); the synth instruments that
-// address a compound (SYNTH_TO_DISPATCH: FurnaceOPN = GENESIS, FurnaceOPM =
-// ARCADE) are FM instruments, so the FM part stands in, then its variants.
-// Keys and values are DivSystem enum values from sysDef.h.
-const OPN2_FAMILY = [20, 52, 80, 81, 89]; // YM2612, _EXT, _DUALPCM, _DUALPCM_EXT, _CSM
-const STAND_INS = {
-  2: OPN2_FAMILY,                          // DIV_SYSTEM_GENESIS
-  3: [52, 20, 80, 81, 89],                 // DIV_SYSTEM_GENESIS_EXT
-  13: [19],                                // DIV_SYSTEM_ARCADE -> YM2151
-};
-
 // Per-platform getPostAmp() — matches upstream Furnace exactly.
 // Default is 1.0. Keys are DivSystem enum values from sysDef.h.
 // Verified against tools/furnace-audit/render-devilbox.ts reference.
@@ -64,6 +51,9 @@ class FurnaceDispatchProcessor extends AudioWorkletProcessor {
     super();
     this.module = null;
     this.initialized = false;
+    // Chips that stand in for a platform that is not running, sent by the
+    // engine on init (furnace-dispatch/synthPlatforms.ts STAND_INS).
+    this.standIns = {};
     this.bufferSize = 128;
     this.lastHeapBuffer = null;
 
@@ -164,7 +154,7 @@ class FurnaceDispatchProcessor extends AudioWorkletProcessor {
    */
   /**
    * The chip that plays commands addressed to `platformType`: that chip, or,
-   * when it is not running, the chip that stands in for it (STAND_INS). A
+   * when it is not running, the chip that stands in for it (standIns). A
    * synth instrument addresses the platform it was made for — FurnaceOPN
    * says Genesis (2) — while a loaded song runs the chips its file names —
    * a DefleMask Genesis song runs YM2612 (20) + SN76489 (4), and loading it
@@ -183,7 +173,7 @@ class FurnaceDispatchProcessor extends AudioWorkletProcessor {
     }
     const own = this.chips.get(platformType);
     if (own) return own;
-    for (const standIn of STAND_INS[platformType] || []) {
+    for (const standIn of this.standIns[platformType] || []) {
       const chip = this.chips.get(standIn);
       if (chip) return chip;
     }
@@ -193,6 +183,7 @@ class FurnaceDispatchProcessor extends AudioWorkletProcessor {
   async handleMessage(data) {
     switch (data.type) {
       case 'init':
+        this.standIns = data.standIns || {};
         await this.initModule(data.sampleRate, data.wasmBinary, data.jsCode);
         break;
 

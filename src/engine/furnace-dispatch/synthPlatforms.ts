@@ -87,13 +87,43 @@ export const SYNTH_TO_DISPATCH: Record<string, number> = {
 };
 
 /**
+ * Chips that play a compound system's instruments when the compound itself
+ * is not running. Furnace splits these systems into their parts on load
+ * (fileOps/dmf.cpp "handle compound systems"), so a song runs YM2612 +
+ * SN76489 where a synth asks for Genesis. The synths that address a compound
+ * (FurnaceOPN = GENESIS, FurnaceOPM = ARCADE) are FM instruments, so the FM
+ * part stands in, then its variants. The dispatch worklet routes by this
+ * table (sent on init); the importer reads it backwards.
+ */
+const OPN2_FAMILY = [
+  FurnaceDispatchPlatform.YM2612, FurnaceDispatchPlatform.YM2612_EXT,
+  FurnaceDispatchPlatform.YM2612_DUALPCM, FurnaceDispatchPlatform.YM2612_DUALPCM_EXT,
+  FurnaceDispatchPlatform.YM2612_CSM,
+];
+export const STAND_INS: Readonly<Record<number, readonly number[]>> = {
+  [FurnaceDispatchPlatform.GENESIS]: OPN2_FAMILY,
+  [FurnaceDispatchPlatform.GENESIS_EXT]: [
+    FurnaceDispatchPlatform.YM2612_EXT, FurnaceDispatchPlatform.YM2612,
+    FurnaceDispatchPlatform.YM2612_DUALPCM, FurnaceDispatchPlatform.YM2612_DUALPCM_EXT,
+    FurnaceDispatchPlatform.YM2612_CSM,
+  ],
+  [FurnaceDispatchPlatform.ARCADE]: [FurnaceDispatchPlatform.YM2151],
+};
+
+/**
  * The synth for a module instrument that plays on `platform`, or undefined
  * when no Furnace synth plays that chip. The first synth listed for a chip
- * is its own (FurnacePSG for the SN76489, FurnaceC64 for the 6581).
+ * is its own (FurnacePSG for the SN76489, FurnaceC64 for the 6581); a chip
+ * with no synth of its own gets the synth it stands in for (a YM2612 song
+ * chip gets FurnaceOPN, which addresses Genesis).
  */
 export function synthTypeForPlatform(platform: number): SynthType | undefined {
-  for (const [synthType, p] of Object.entries(SYNTH_TO_DISPATCH)) {
+  const entries = Object.entries(SYNTH_TO_DISPATCH);
+  for (const [synthType, p] of entries) {
     if (p === platform) return synthType as SynthType;
+  }
+  for (const [synthType, p] of entries) {
+    if (STAND_INS[p]?.includes(platform)) return synthType as SynthType;
   }
   return undefined;
 }

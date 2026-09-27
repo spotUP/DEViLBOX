@@ -20,6 +20,7 @@ import {
 } from '@engine/wasm/WASMSingletonBase';
 
 export { FurnaceDispatchPlatform } from './platforms';
+import { STAND_INS } from './synthPlatforms';
 
 /** Sample depth formats (matching Furnace DivSampleDepth enum) */
 export const SampleDepth = {
@@ -972,7 +973,8 @@ export class FurnaceDispatchEngine implements IsolationCapableEngine {
         type: 'init',
         sampleRate: nativeCtx.sampleRate,
         wasmBinary: FurnaceDispatchEngine.cache.wasmBinary,
-        jsCode: FurnaceDispatchEngine.cache.jsCode
+        jsCode: FurnaceDispatchEngine.cache.jsCode,
+        standIns: STAND_INS,
       });
 
       // Wait for worklet WASM compilation to complete
