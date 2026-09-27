@@ -82,7 +82,12 @@ export function startConsoleCapture(): void {
   };
 
   window.addEventListener('error', (ev) => {
-    push('error', `Uncaught: ${ev.message} at ${ev.filename}:${ev.lineno}`);
+    // The stack, not only the throwing line: a library error ("'start' must
+    // be called before 'stop'" at tone.js) says nothing about which of our
+    // callers made it.
+    const stack = ev.error instanceof Error && ev.error.stack
+      ? `\n${ev.error.stack.split('\n').slice(1, 9).join('\n')}` : '';
+    push('error', `Uncaught: ${ev.message} at ${ev.filename}:${ev.lineno}${stack}`);
   });
 
   window.addEventListener('unhandledrejection', (ev) => {
