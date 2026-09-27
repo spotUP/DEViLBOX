@@ -1,6 +1,13 @@
 /**
  * The RE-201 worklet, driven the way RE201Effect drives it (init message with
- * the WASM + JS, then the effect's parameters), must pass an echo.
+ * the WASM + JS, then the effect's parameters), must pass an echo - and keep
+ * passing it while music plays into it.
+ *
+ * The tone stack's bilinear transform had its coefficient indices reversed,
+ * making it an integrator (a1..a3 = -3, 3, -1). A short burst came through;
+ * continuous input ran its state to overflow and the stage output 0 from then
+ * on. In the browser the dub bus's echo read input RMS 0.29 and output 1e-37
+ * (2026-09-27): the echo went silent within seconds of Play.
  */
 import { describe, it, expect, beforeAll } from 'vitest';
 import { readFileSync } from 'node:fs';
@@ -64,6 +71,27 @@ describe('the RE-201 worklet', { timeout: 60000 }, () => {
     const t = run(await makeProcessor(DUB_BUS), 3);
     expect(t[0]).toBeGreaterThan(0.01);
     expect(t[2]).toBeGreaterThan(0.005);
+  });
+
+  it('keeps passing sound while music plays into it', async () => {
+    const p = await makeProcessor(DUB_BUS);
+    const n = 128, sr = 48000;
+    let seed = 1;
+    const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647) * 2 - 1;
+    const perSecond: number[] = [];
+    let acc = 0, cnt = 0;
+    for (let b = 0; b < (sr * 10) / n; b++) {
+      const inL = new Float32Array(n);
+      for (let i = 0; i < n; i++) inL[i] = 0.4 * rnd();
+      const outL = new Float32Array(n), outR = new Float32Array(n);
+      p.process([[inL, inL.slice()]], [[outL, outR]]);
+      for (const v of outL) acc += v * v;
+      cnt += n;
+      if (cnt >= sr) { perSecond.push(Math.sqrt(acc / cnt)); acc = 0; cnt = 0; }
+    }
+    // As loud at the tenth second as at the second: no decay to silence.
+    expect(perSecond[9]).toBeGreaterThan(0.05);
+    expect(perSecond[9]).toBeGreaterThan(perSecond[1] * 0.5);
   });
 
   it('keeps echoing after an earlier instance is disposed', async () => {
