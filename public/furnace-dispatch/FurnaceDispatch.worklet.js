@@ -12,6 +12,19 @@
  * The WASM module JS is passed as a string and executed via Function constructor.
  */
 
+// Chips that play a compound system's instruments when the compound itself
+// is not running. Furnace splits these systems into their parts on load
+// (fileOps/dmf.cpp "handle compound systems"); the synth instruments that
+// address a compound (SYNTH_TO_DISPATCH: FurnaceOPN = GENESIS, FurnaceOPM =
+// ARCADE) are FM instruments, so the FM part stands in, then its variants.
+// Keys and values are DivSystem enum values from sysDef.h.
+const OPN2_FAMILY = [20, 52, 80, 81, 89]; // YM2612, _EXT, _DUALPCM, _DUALPCM_EXT, _CSM
+const STAND_INS = {
+  2: OPN2_FAMILY,                          // DIV_SYSTEM_GENESIS
+  3: [52, 20, 80, 81, 89],                 // DIV_SYSTEM_GENESIS_EXT
+  13: [19],                                // DIV_SYSTEM_ARCADE -> YM2151
+};
+
 // Per-platform getPostAmp() — matches upstream Furnace exactly.
 // Default is 1.0. Keys are DivSystem enum values from sysDef.h.
 // Verified against tools/furnace-audit/render-devilbox.ts reference.
@@ -149,13 +162,30 @@ class FurnaceDispatchProcessor extends AudioWorkletProcessor {
    * Get chip info for a given platformType.
    * Falls back to first chip if platformType not specified (backward compat).
    */
+  /**
+   * The chip that plays commands addressed to `platformType`: that chip, or,
+   * when it is not running, the chip that stands in for it (STAND_INS). A
+   * synth instrument addresses the platform it was made for — FurnaceOPN
+   * says Genesis (2) — while a loaded song runs the chips its file names —
+   * a DefleMask Genesis song runs YM2612 (20) + SN76489 (4), and loading it
+   * destroys chip 2. Its FM instruments still preview, on the song's YM2612.
+   *
+   * A message that names no platform goes to the first chip, as Furnace's
+   * disCont[0]. One that names a platform with neither its chip nor a stand-in
+   * running gets no chip. It used to fall back to whichever chip came first,
+   * so a command for a chip that was not running played on an unrelated one
+   * (FM on an SN76489), and destroyChip for a missing chip destroyed the first
+   * chip's handle while leaving it in the map.
+   */
   getChip(platformType) {
-    if (platformType !== undefined && this.chips.has(platformType)) {
-      return this.chips.get(platformType);
+    if (platformType === undefined || platformType === null) {
+      return this.chips.size > 0 ? this.chips.values().next().value : null;
     }
-    // Fallback: return first chip for backward compat
-    if (this.chips.size > 0) {
-      return this.chips.values().next().value;
+    const own = this.chips.get(platformType);
+    if (own) return own;
+    for (const standIn of STAND_INS[platformType] || []) {
+      const chip = this.chips.get(standIn);
+      if (chip) return chip;
     }
     return null;
   }
@@ -179,7 +209,7 @@ class FurnaceDispatchProcessor extends AudioWorkletProcessor {
         break;
 
       case 'destroyChip': {
-        const chip = this.getChip(data.platformType);
+        const chip = this.chips.get(data.platformType);
         if (chip && this.wasm) {
           this.wasm.destroy(chip.handle);
           this.chips.delete(data.platformType);
