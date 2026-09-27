@@ -29,10 +29,18 @@ export interface RecoveryPromptActions {
 }
 
 let _prompt: RecoveryPromptActions | null = null;
+const _openListeners = new Set<() => void>();
 
 /** Called by the prompt as it mounts, and with `null` as it goes. */
 export function setRecoveryPrompt(actions: RecoveryPromptActions | null): void {
   _prompt = actions;
+  if (actions) for (const fn of _openListeners) { try { fn(); } catch { /* listener's problem */ } }
+}
+
+/** Be told whenever the prompt opens. Returns the unsubscribe. */
+export function onRecoveryPromptOpen(fn: () => void): () => void {
+  _openListeners.add(fn);
+  return () => { _openListeners.delete(fn); };
 }
 
 export function isRecoveryPromptOpen(): boolean {
