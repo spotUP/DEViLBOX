@@ -123,6 +123,17 @@ export function bpmSyncedEchoRate(
  *   3. The transport BPM (tracker view / no decks playing)
  *   4. Default 120
  */
+/**
+ * The tempo a deck is PLAYING at: its base BPM moved by the pitch fader —
+ * `effectiveBPM`, the figure the deck transport shows. This read the base
+ * (beat grid, else detected) and ignored the pitch, so a deck pitched from
+ * 125 to 140 BPM left every synced echo at 125's timing (measured
+ * 2026-09-27: echo 480 ms after the pitch change, 428 ms expected).
+ */
+function playingBpm(deck: { effectiveBPM?: number; beatGrid?: { bpm?: number } | null; detectedBPM?: number }): number {
+  return deck.effectiveBPM || deck.beatGrid?.bpm || deck.detectedBPM || 0;
+}
+
 export function getActiveBpm(): number {
   try {
     const state = useDJStore.getState();
@@ -131,15 +142,15 @@ export function getActiveBpm(): number {
     const gainB = Math.sin(x * Math.PI * 0.5);
     const candidates: { bpm: number; volume: number }[] = [];
     if (state.decks.A.isPlaying && gainA > 0.05) {
-      const bpm = state.decks.A.beatGrid?.bpm || state.decks.A.detectedBPM;
+      const bpm = playingBpm(state.decks.A);
       if (bpm > 0) candidates.push({ bpm, volume: state.decks.A.volume * gainA });
     }
     if (state.decks.B.isPlaying && gainB > 0.05) {
-      const bpm = state.decks.B.beatGrid?.bpm || state.decks.B.detectedBPM;
+      const bpm = playingBpm(state.decks.B);
       if (bpm > 0) candidates.push({ bpm, volume: state.decks.B.volume * gainB });
     }
     if (state.decks.C.isPlaying) {
-      const bpm = state.decks.C.beatGrid?.bpm || state.decks.C.detectedBPM;
+      const bpm = playingBpm(state.decks.C);
       if (bpm > 0) candidates.push({ bpm, volume: state.decks.C.volume });
     }
     if (candidates.length) {
