@@ -18,6 +18,7 @@ import { getChannelRoutedEffectsManager } from '../tone/ChannelRoutedEffects';
 import { getNativeAudioNode } from '../../utils/audio-context';
 import { useDrumPadStore } from '../../stores/useDrumPadStore';
 import { useTransportStore } from '../../stores/useTransportStore';
+import { useDJStore } from '../../stores/useDJStore';
 import { bpmSyncedEchoRate, getActiveBpm } from '../dub/DubActions';
 import {
   beginDubTransient,
@@ -956,18 +957,27 @@ export class DrumPadEngine {
     // exist on them. `dubBus` is replaced wholesale on every patch, so a
     // reference comparison is exact and costs nothing.
     let lastDub = useDrumPadStore.getState().dubBus;
-    let lastBpm = useTransportStore.getState().bpm;
     const offDub = useDrumPadStore.subscribe((st) => {
       if (st.dubBus === lastDub) return;
       lastDub = st.dubBus;
       schedule();
     });
-    const offBpm = useTransportStore.subscribe((st) => {
-      if (st.bpm === lastBpm) return;
-      lastBpm = st.bpm;
+    // The tempo the echo syncs to is getActiveBpm's: the loudest playing DJ
+    // deck (through the crossfader), else the tracker transport. Following
+    // only the transport left a DJ set's echoes at the tracker's tempo, which
+    // is why PadGrid and DJSamplerPanel each pushed the settings again with
+    // their own sync - skipping isRateOverridden, so a held delay preset was
+    // overwritten by the next deck-BPM change. Both stores, one resolved value.
+    let lastTempo = getActiveBpm();
+    const onTempo = (): void => {
+      const bpm = getActiveBpm();
+      if (bpm === lastTempo) return;
+      lastTempo = bpm;
       schedule();
-    });
-    this._dubMirrorOff = () => { offDub(); offBpm(); };
+    };
+    const offBpm = useTransportStore.subscribe(onTempo);
+    const offDj = useDJStore.subscribe(onTempo);
+    this._dubMirrorOff = () => { offDub(); offBpm(); offDj(); };
   }
 
   dispose(): void {
