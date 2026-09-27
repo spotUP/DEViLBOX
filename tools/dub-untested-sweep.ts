@@ -280,7 +280,12 @@ async function main() {
 
     try {
       const errs = await call('get_console_errors');
-      const entries: Array<{ level: string; message: string }> = errs?.entries ?? [];
+      // get_console_errors returns every CAPTURED entry — logs from the
+      // captured prefixes too ("[DubRouter] <move> source=live") — so
+      // counting them all flagged every move as errored (27/27 on AHX,
+      // 2026-09-27) and hid the pass column. Only errors are errors.
+      const entries: Array<{ level: string; message: string }> =
+        (errs?.entries ?? []).filter((e: { level: string }) => e.level === 'error');
       row.errors = entries.length;
       if (entries.length > 0) row.firstError = `${entries[0].level}: ${entries[0].message.slice(0, 80)}`;
     } catch { /* ignore */ }
