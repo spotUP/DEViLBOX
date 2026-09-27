@@ -13,6 +13,7 @@ import type { TrackerCell } from '@/types/tracker';
 import pako from 'pako';
 import { furnaceRowToTrackerCell } from '../furnaceEditorCells';
 import { notify } from '@/stores/useNotificationStore';
+import { synthTypeForPlatform } from '@/engine/furnace-dispatch/synthPlatforms';
 import type {
   FurnaceSubsong,
 } from '@/types/tracker';
@@ -178,7 +179,14 @@ async function parseFurnaceFileWasm(buffer: ArrayBuffer, _fileName: string, subs
       // Parse the INS2 binary using existing TS instrument parser
       const reader = new BinaryReader(binary.buffer as ArrayBuffer);
       const furIns = parseInstrument(reader);
-      const synthType = mapFurnaceInstrumentType(furIns.type);
+      // A type the map has no chip for (STD above all) belongs to whichever
+      // chip of this song plays it: a DefleMask Genesis song's STD
+      // instruments are its SN76489's, and preview there as FurnacePSG — not
+      // as a generic Tone.js ChipSynth.
+      const mapped = mapFurnaceInstrumentType(furIns.type);
+      const synthType = (mapped === 'ChipSynth'
+        ? synthTypeForPlatform(loaded.instrumentSystems[i])
+        : undefined) ?? mapped;
 
       // Build ParsedInstrument for the converter
       const parsed: import('@/types/tracker').ParsedInstrument = {

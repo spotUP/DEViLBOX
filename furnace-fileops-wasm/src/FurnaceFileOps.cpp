@@ -149,6 +149,26 @@ const char* fur_get_system_name(int idx) {
 }
 
 /**
+ * The song chip an instrument plays on: the system of the first channel that
+ * takes the instrument's type, by the channel definitions Furnace itself
+ * uses to pick a preview channel (DivEngine::getPreferInsType). A DefleMask
+ * Genesis song's STD instruments belong to its SN76489. -1 when no channel
+ * of the song takes the type.
+ */
+int fur_get_ins_system(int insIdx) {
+  if (insIdx < 0 || insIdx >= (int)g_engine.song.ins.size()) return -1;
+  DivInstrumentType type = g_engine.song.ins[insIdx]->type;
+  g_engine.song.recalcChans();
+  for (int ch = 0; ch < g_engine.song.chans; ch++) {
+    const DivChanDef& def = g_engine.song.chanDef[ch];
+    if (def.insType[0] == type || def.insType[1] == type) {
+      return (int)g_engine.song.sysOfChan[ch];
+    }
+  }
+  return -1;
+}
+
+/**
  * Get system flags as a string (key=value\n format).
  * Returns pointer to internal buffer — valid until next call.
  */
