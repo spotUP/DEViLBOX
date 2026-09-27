@@ -56,6 +56,8 @@ export class RE201Effect extends Tone.ToneAudioNode {
   private fallbackFilter: BiquadFilterNode | null = null;
   private fallbackEchoGain: GainNode | null = null;
   private _usingFallback = false;
+  /** Latest once-a-second report from the worklet's process(). */
+  private _workletStats: Record<string, unknown> | null = null;
 
   constructor(options: RE201Options = {}) {
     super();
@@ -182,6 +184,11 @@ export class RE201Effect extends Tone.ToneAudioNode {
         channelCount: 2,
         channelCountMode: 'explicit',
       });
+      // A processor that throws is stopped by the browser for good and
+      // outputs silence from then on; say so instead of going quiet.
+      this.workletNode.onprocessorerror = (e) => {
+        console.error('[RE201] worklet processor error - the echo is silent from here:', e);
+      };
 
       this.workletNode.port.onmessage = (event) => {
         if (event.data.type === 'ready') {
@@ -196,6 +203,10 @@ export class RE201Effect extends Tone.ToneAudioNode {
           this.sendParam('reverbVolume', this._options.reverbVolume);
           this.sendParam('inputLevel', this._options.inputLevel);
           this.swapToWasm();
+        } else if (event.data.type === 'stats') {
+          this._workletStats = event.data;
+        } else if (event.data.type === 'processError') {
+          console.error('[RE201] worklet process() threw - the echo is silent:', event.data.message, event.data.stack);
         } else if (event.data.type === 'error') {
           console.warn('[RE201] WASM init error, keeping JS fallback:', event.data.message);
         }
@@ -296,6 +307,14 @@ export class RE201Effect extends Tone.ToneAudioNode {
     if (this.fallbackDelay) {
       this.fallbackDelay.delayTime.value = this.rateToDelaySec();
     }
+  }
+
+  /** What the effect is actually running with - for diagnostics (MCP). */
+  describe(): Record<string, unknown> {
+    return {
+      ...this._options, usingFallback: this._usingFallback, workletReady: this.workletNode !== null,
+      wasmReady: this._wasmReady, worklet: this._workletStats,
+    };
   }
 
   setIntensity(val: number): void {

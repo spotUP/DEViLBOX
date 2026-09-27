@@ -752,6 +752,11 @@ export async function getDubBusState(): Promise<Record<string, unknown>> {
     // BLEED ("Ghost Bus"): closed channels feed the bus at the floor
     // (effectiveDubSend). Lives in useDubStore, not the bus settings.
     bleed: useDubStore.getState().ghostBus,
+    // The bus's own state (drain flags, live gains) and what the echo engine
+    // is actually running with - a knob that moves the store but not the
+    // engine is only visible here.
+    diagnostic: bus?.getDiagnosticSnapshot?.() ?? null,
+    echoEngineState: bus?.describeEcho?.() ?? null,
     storeSettings,
     // The bus's OWN settings, beside the store's. Moves write the bus directly
     // — ringMod, voltageStarve and eqSweep all call `setSettings` / `setReturnEQ`

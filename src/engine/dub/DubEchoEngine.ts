@@ -34,6 +34,8 @@ export interface DubEchoEngine {
   set wet(value: number);
   connect(dest: Tone.InputNode): this;
   dispose(): this;
+  /** What the engine is actually running with, for diagnostics. */
+  describe?(): Record<string, unknown>;
 }
 
 // ─── SpaceEcho adapter (native — all methods already match) ─────────────
@@ -102,6 +104,8 @@ export class RE201Adapter implements DubEchoEngine {
   }
 
   setIntensity(amount: number): void { this.fx.setIntensity(amount); }
+
+  describe(): Record<string, unknown> { return { engine: 're201', ...this.fx.describe() }; }
 
   setIntensityInstant(amount: number): void {
     // RE-201 has no instant variant — use normal setIntensity
