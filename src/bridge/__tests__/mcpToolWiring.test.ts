@@ -27,7 +27,7 @@ const bridge = readFileSync(resolve(ROOT, 'src/bridge/MCPBridge.ts'), 'utf8');
 
 /** Tool names the server forwards to the browser. */
 const forwarded = new Set(
-  [...mcpServer.matchAll(/call\(\s*'([a-z0-9_]+)'/g)].map((m) => m[1]),
+  [...mcpServer.matchAll(/(?:call|callBrowser)\(\s*'([a-z0-9_]+)'/g)].map((m) => m[1]),
 );
 
 /** Keys of the bridge's handler map, brace-matched so nothing outside leaks in. */
@@ -63,6 +63,15 @@ describe('MCP tools reach their handlers', () => {
     // Guards against a parse that silently matched nothing and passed.
     expect(forwarded.size).toBeGreaterThan(150);
     expect(registeredHandlers().size).toBeGreaterThan(150);
+  });
+
+  it('exposes every handler the bridge has as a tool', () => {
+    // The other direction. Twenty-two DJ handlers (dj_pitch, dj_toggle_play,
+    // dj_crossfader...) sat in the bridge for months with no tool declaring
+    // them, so an agent testing a DJ-tempo fix had to ask the user to hold a
+    // preset and nudge the tempo with one mouse (2026-09-27).
+    const missing = [...registeredHandlers()].filter((h) => !forwarded.has(h)).sort();
+    expect(missing).toEqual([]);
   });
 
   it('declares no tool that would answer "unknown method"', () => {

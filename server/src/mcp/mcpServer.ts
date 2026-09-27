@@ -2345,6 +2345,181 @@ export function createMcpServer(): McpServer {
   // ═══════════════════════════════════════════════════════════════════════════════
 
   server.tool(
+    'set_looping',
+    'Set the transport loop start row.',
+    { loopStartRow: z.number().int().min(0).optional() },
+    (p) => call('set_looping', p),
+  );
+
+  server.tool(
+    'evaluate_script',
+    'Evaluate JavaScript in the DEViLBOX page and return its JSON-serialisable result (a returned promise is awaited). A probe for reading state no tool reports yet - when a probe is needed twice, add a proper tool instead.',
+    { code: z.string().describe('Expression or IIFE to evaluate') },
+    (p) => call('evaluate_script', p),
+  );
+
+  server.tool(
+    'dj_get_state',
+    'DJ mixer state: decks (playing, BPM, pitch, loaded track, volume, EQ, filter), crossfader, master.',
+    {},
+    (p) => call('dj_get_state', p),
+  );
+
+  server.tool(
+    'dj_get_playlist_state',
+    'DJ playlist / Auto DJ state.',
+    {},
+    (p) => call('dj_get_playlist_state', p),
+  );
+
+  server.tool(
+    'dj_toggle_play',
+    'Play/pause a DJ deck.',
+    { deckId: z.enum(['A', 'B', 'C']).optional().describe('Deck (default A)') },
+    (p) => call('dj_toggle_play', p),
+  );
+
+  server.tool(
+    'dj_stop',
+    'Stop a DJ deck.',
+    { deckId: z.enum(['A', 'B', 'C']).optional().describe('Deck (default A)') },
+    (p) => call('dj_stop', p),
+  );
+
+  server.tool(
+    'dj_cue',
+    'Cue a DJ deck to a position (seconds, default 0).',
+    { deckId: z.enum(['A', 'B', 'C']).optional().describe('Deck (default A)'), position: z.number().optional() },
+    (p) => call('dj_cue', p),
+  );
+
+  server.tool(
+    'dj_sync',
+    "Sync a DJ deck's tempo to the other deck.",
+    { deckId: z.enum(['A', 'B', 'C']).optional().describe('Deck (default A)') },
+    (p) => call('dj_sync', p),
+  );
+
+  server.tool(
+    'dj_crossfader',
+    'Set the crossfader (0 = A, 1 = B).',
+    { position: z.number().min(0).max(1) },
+    (p) => call('dj_crossfader', p),
+  );
+
+  server.tool(
+    'dj_crossfader_curve',
+    'Set the crossfader curve.',
+    { curve: z.enum(['linear', 'cut', 'smooth']) },
+    (p) => call('dj_crossfader_curve', p),
+  );
+
+  server.tool(
+    'dj_eq',
+    'Set a deck EQ band in dB.',
+    { deckId: z.enum(['A', 'B', 'C']).optional().describe('Deck (default A)'), band: z.enum(['low', 'mid', 'high']), dB: z.number() },
+    (p) => call('dj_eq', p),
+  );
+
+  server.tool(
+    'dj_eq_kill',
+    'Kill or restore a deck EQ band.',
+    { deckId: z.enum(['A', 'B', 'C']).optional().describe('Deck (default A)'), band: z.enum(['low', 'mid', 'high']), kill: z.boolean() },
+    (p) => call('dj_eq_kill', p),
+  );
+
+  server.tool(
+    'dj_filter',
+    "Set a deck's filter knob (-1 low-pass .. 0 off .. 1 high-pass).",
+    { deckId: z.enum(['A', 'B', 'C']).optional().describe('Deck (default A)'), position: z.number().min(-1).max(1) },
+    (p) => call('dj_filter', p),
+  );
+
+  server.tool(
+    'dj_volume',
+    "Set a deck's channel volume (0-1).",
+    { deckId: z.enum(['A', 'B', 'C']).optional().describe('Deck (default A)'), volume: z.number().min(0) },
+    (p) => call('dj_volume', p),
+  );
+
+  server.tool(
+    'dj_master_volume',
+    'Set the DJ master volume (0-1).',
+    { volume: z.number().min(0) },
+    (p) => call('dj_master_volume', p),
+  );
+
+  server.tool(
+    'dj_pitch',
+    "Set a deck's pitch/tempo offset in semitones (changes its BPM; the dub echo re-syncs to the active deck's tempo).",
+    { deckId: z.enum(['A', 'B', 'C']).optional().describe('Deck (default A)'), semitones: z.number() },
+    (p) => call('dj_pitch', p),
+  );
+
+  server.tool(
+    'dj_key_lock',
+    'Key lock on/off for a deck.',
+    { deckId: z.enum(['A', 'B', 'C']).optional().describe('Deck (default A)'), enabled: z.boolean() },
+    (p) => call('dj_key_lock', p),
+  );
+
+  server.tool(
+    'dj_nudge',
+    'Nudge a deck forward/back (offset, default 1).',
+    { deckId: z.enum(['A', 'B', 'C']).optional().describe('Deck (default A)'), offset: z.number().optional() },
+    (p) => call('dj_nudge', p),
+  );
+
+  server.tool(
+    'dj_loop',
+    'Set a beat loop on a deck (size in beats, default 4).',
+    { deckId: z.enum(['A', 'B', 'C']).optional().describe('Deck (default A)'), size: z.number().optional() },
+    (p) => call('dj_loop', p),
+  );
+
+  server.tool(
+    'dj_loop_clear',
+    "Clear a deck's loop.",
+    { deckId: z.enum(['A', 'B', 'C']).optional().describe('Deck (default A)') },
+    (p) => call('dj_loop_clear', p),
+  );
+
+  server.tool(
+    'dj_auto_dj_enable',
+    'Start Auto DJ (optionally from a playlist index).',
+    { startIndex: z.number().int().optional() },
+    (p) => call('dj_auto_dj_enable', p),
+  );
+
+  server.tool(
+    'dj_auto_dj_disable',
+    'Stop Auto DJ.',
+    {},
+    (p) => call('dj_auto_dj_disable', p),
+  );
+
+  server.tool(
+    'dj_auto_dj_skip',
+    'Skip to the next Auto DJ track.',
+    {},
+    (p) => call('dj_auto_dj_skip', p),
+  );
+
+  server.tool(
+    'dj_duck',
+    'Duck the DJ mix (talk-over).',
+    {},
+    (p) => call('dj_duck', p),
+  );
+
+  server.tool(
+    'dj_unduck',
+    'Release the DJ duck.',
+    {},
+    (p) => call('dj_unduck', p),
+  );
+
+  server.tool(
     'dj_vj_action',
     'Execute a DJ/VJ soak-test action in the browser (dev-only). Actions: switchView, loadDeck, playDeck, stopDeck, setCrossfader, setEQ, setFilter, setDeckVolume, startScratch, setScratchVelocity, stopScratch, nextVjPreset.',
     {
