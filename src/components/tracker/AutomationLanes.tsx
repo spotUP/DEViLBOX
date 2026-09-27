@@ -3,16 +3,15 @@
  * Positioned to align with channel columns in the pattern editor
  */
 
-import React, { useMemo, useState, useRef, useCallback } from 'react';
+import React, { useMemo, useRef } from 'react';
 import { useAutomationStore, useInstrumentStore, useTrackerStore } from '@stores';
 import { interpolateAutomationValue } from '@typedefs/automation';
-import type { AutomationCurve, AutomationPreset } from '@typedefs/automation';
+import type { AutomationCurve } from '@typedefs/automation';
 import { getSectionColor } from '@hooks/useChannelAutomationParams';
 import { getNKSParametersForSynth } from '@/midi/performance/synthParameterMaps';
 import { AUTOMATION_LANE_WIDTH, AUTOMATION_LANE_MIN } from '@hooks/views/usePatternEditor';
 import type { SynthType } from '@typedefs/instrument';
-import { ContextMenu, type MenuItemType } from '@components/common/ContextMenu';
-import { Trash2, Eraser } from 'lucide-react';
+import { useLaneEditing } from './useLaneEditing';
 
 /**
  * Resolve a human-readable label for an automation parameter id.
@@ -117,85 +116,9 @@ export const AutomationLanes: React.FC<AutomationLanesProps> = React.memo(({
   const chOff = channelIndexOffset;
   // Subscribe directly to curves array to ensure re-render on changes
   const allCurves = useAutomationStore((state) => state.curves);
-  const addPoint = useAutomationStore((state) => state.addPoint);
-  const removePoint = useAutomationStore((state) => state.removePoint);
   const channelLanes = useAutomationStore((state) => state.channelLanes);
-  const presets = useAutomationStore((state) => state.presets);
-  const applyPreset = useAutomationStore((state) => state.applyPreset);
-  const clearPoints = useAutomationStore((state) => state.clearPoints);
-  const removeCurve = useAutomationStore((state) => state.removeCurve);
-
-  // Right-click context menu state for the active lane
-  const [laneCtxMenu, setLaneCtxMenu] = useState<{
-    x: number;
-    y: number;
-    curveId: string;
-  } | null>(null);
-
-  // Apply a preset's points to a curve, scaled to fit the current pattern length.
-  // Presets are authored against a 64-row pattern; rescale row indices linearly.
-  const applyPresetScaled = useCallback((curveId: string, preset: AutomationPreset) => {
-    const PRESET_BASE_ROWS = 64;
-    const scale = (patternLength - 1) / (PRESET_BASE_ROWS - 1);
-    const scaledPreset: AutomationPreset = {
-      ...preset,
-      points: preset.points.map((p) => ({
-        ...p,
-        row: Math.round(p.row * scale),
-      })),
-    };
-    applyPreset(curveId, scaledPreset);
-  }, [patternLength, applyPreset]);
-
-  // Lane right-click handler — opens the preset/clear/remove menu
-  const handleLaneContextMenu = useCallback((e: React.MouseEvent, curveId: string) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setLaneCtxMenu({ x: e.clientX, y: e.clientY, curveId });
-  }, []);
-
-  // Build context menu items: presets submenu + clear + remove
-  const laneCtxMenuItems = useMemo<MenuItemType[]>(() => {
-    if (!laneCtxMenu) return [];
-    const curveId = laneCtxMenu.curveId;
-    return [
-      {
-        id: 'apply-preset',
-        label: 'Apply Preset',
-        submenu: presets.map((preset) => ({
-          id: `preset-${preset.id}`,
-          label: preset.name,
-          onClick: () => applyPresetScaled(curveId, preset),
-        })),
-      },
-      { type: 'divider' as const },
-      {
-        id: 'clear-points',
-        label: 'Clear Points',
-        icon: <Eraser size={14} />,
-        onClick: () => clearPoints(curveId),
-      },
-      {
-        id: 'remove-curve',
-        label: 'Remove Lane',
-        icon: <Trash2 size={14} />,
-        danger: true,
-        onClick: () => removeCurve(curveId),
-      },
-    ];
-  }, [laneCtxMenu, presets, applyPresetScaled, clearPoints, removeCurve]);
-
-  // Drag state — captures the lane geometry at mousedown so we don't have to
-  // recompute (and possibly miscompute, for multi-lane) on every mousemove.
-  const [dragState, setDragState] = useState<{
-    curveId: string;
-    row: number;
-    channelIndex: number;
-    laneLeft: number;
-    laneWidth: number;
-    yOffset: number;
-  } | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const { beginDraw, removePointAt, openMenu, menuElement } = useLaneEditing({ containerRef, rowHeight, patternLength });
 
   // Resolve per-channel active parameters (multi-lane support)
   // Combines explicitly active params with any params that already have curve data
@@ -339,91 +262,6 @@ export const AutomationLanes: React.FC<AutomationLanesProps> = React.memo(({
   const nextHeight = nextLen * rowHeight;
   const totalVirtualHeight = prevHeight + currentHeight + nextHeight;
 
-  // Pointer event handlers for editing (must be before conditional return)
-  const handlePointerDown = useCallback((
-    e: React.PointerEvent,
-    curve: AutomationCurve,
-    channelIndex: number,
-    laneLeft: number,
-    yOffset: number,
-    laneWidth: number = LANE_WIDTH,
-  ) => {
-    if (e.button !== 0) return; // Only left click / primary contact
-
-    e.preventDefault();
-    e.stopPropagation();
-
-    const rect = containerRef.current?.getBoundingClientRect();
-    if (!rect) return;
-
-    // Calculate row and value from pointer position
-    const mouseY = e.clientY - rect.top - yOffset;
-    const row = Math.floor(mouseY / rowHeight);
-
-    if (row < 0 || row >= patternLength) return;
-
-    const mouseX = e.clientX - rect.left - laneLeft;
-    const value = Math.max(0, Math.min(1, (mouseX - 1) / (laneWidth - 2)));
-
-    // Add or update point
-    addPoint(curve.id, row, value);
-    setDragState({ curveId: curve.id, row, channelIndex, laneLeft, laneWidth, yOffset });
-  }, [patternLength, rowHeight, addPoint]);
-
-  // Document-level pointer move/up so the drag continues even when the pointer
-  // strays outside the lane and back in. Without this, the lane's own move
-  // handler stops firing the moment the pointer leaves its bounding box.
-  // `pointercancel` counts as a release: a mouse never sends it, a finger does
-  // when the browser takes the pointer away, and a lane left in dragState
-  // would keep writing points.
-  React.useEffect(() => {
-    if (!dragState) return;
-    const handleDocMove = (e: PointerEvent) => {
-      const rect = containerRef.current?.getBoundingClientRect();
-      if (!rect) return;
-      const mouseY = e.clientY - rect.top - dragState.yOffset;
-      const row = Math.floor(mouseY / rowHeight);
-      if (row < 0 || row >= patternLength) return;
-      const mouseX = e.clientX - rect.left - dragState.laneLeft;
-      const value = Math.max(0, Math.min(1, (mouseX - 1) / (dragState.laneWidth - 2)));
-      addPoint(dragState.curveId, row, value);
-    };
-    const handleDocUp = () => setDragState(null);
-    document.addEventListener('pointermove', handleDocMove);
-    document.addEventListener('pointerup', handleDocUp);
-    document.addEventListener('pointercancel', handleDocUp);
-    return () => {
-      document.removeEventListener('pointermove', handleDocMove);
-      document.removeEventListener('pointerup', handleDocUp);
-      document.removeEventListener('pointercancel', handleDocUp);
-    };
-  }, [dragState, rowHeight, patternLength, addPoint]);
-
-  // Legacy no-op stubs (lane divs still spread these but the document
-  // listeners above do the actual work).
-  const handlePointerMove = useCallback(() => {}, []);
-  const handlePointerUp = useCallback(() => {}, []);
-
-  const handleDoubleClick = useCallback((
-    e: React.MouseEvent,
-    curve: AutomationCurve,
-    yOffset: number
-  ) => {
-    const rect = containerRef.current?.getBoundingClientRect();
-    if (!rect) return;
-
-    const mouseY = e.clientY - rect.top - yOffset;
-    const row = Math.floor(mouseY / rowHeight);
-
-    if (row < 0 || row >= patternLength) return;
-
-    // Remove point at this row if it exists
-    const existingPoint = curve.points.find(p => p.row === row);
-    if (existingPoint) {
-      removePoint(curve.id, row);
-    }
-  }, [patternLength, rowHeight, removePoint]);
-
   // Check if any channel has automation data (including multi-lane and adjacent patterns)
   const hasMultiLane = Array.from(channelCurveGroups.values()).some(g => g.length > 1);
   const hasPrevMultiLane = Array.from(prevCurveGroups.values()).some(g => g.length > 1);
@@ -533,11 +371,9 @@ export const AutomationLanes: React.FC<AutomationLanesProps> = React.memo(({
               pointerEvents: isInteractive ? 'auto' : 'none',
               touchAction: 'none',
             }}
-            onPointerDown={isInteractive ? (e) => handlePointerDown(e, curve, channelIndex, laneLeft, yOffset, laneWidth) : undefined}
-            onPointerMove={isInteractive ? handlePointerMove : undefined}
-            onPointerUp={isInteractive ? handlePointerUp : undefined}
-            onContextMenu={isInteractive ? (e) => handleLaneContextMenu(e, curve.id) : undefined}
-            onDoubleClick={isInteractive ? (e) => handleDoubleClick(e, curve, yOffset) : undefined}
+            onPointerDown={isInteractive ? (e) => beginDraw(e, curve, laneLeft, yOffset, laneWidth) : undefined}
+            onContextMenu={isInteractive ? (e) => openMenu(e, curve.id) : undefined}
+            onDoubleClick={isInteractive ? (e) => removePointAt(e, curve, yOffset) : undefined}
           >
             <svg width={laneWidth} height={pHeight}>
               {fillPoints.length > 0 && (
@@ -667,11 +503,9 @@ export const AutomationLanes: React.FC<AutomationLanesProps> = React.memo(({
             pointerEvents: 'auto',
             touchAction: 'none',
           }}
-          onPointerDown={isCurrentPattern ? (e) => handlePointerDown(e, curve, channelIndex, laneLeft, yOffset, lw) : undefined}
-          onPointerMove={isCurrentPattern ? handlePointerMove : undefined}
-          onPointerUp={isCurrentPattern ? handlePointerUp : undefined}
-          onContextMenu={isCurrentPattern ? (e) => handleLaneContextMenu(e, curve.id) : undefined}
-          onDoubleClick={isCurrentPattern ? (e) => handleDoubleClick(e, curve, yOffset) : undefined}
+          onPointerDown={isCurrentPattern ? (e) => beginDraw(e, curve, laneLeft, yOffset, lw) : undefined}
+          onContextMenu={isCurrentPattern ? (e) => openMenu(e, curve.id) : undefined}
+          onDoubleClick={isCurrentPattern ? (e) => removePointAt(e, curve, yOffset) : undefined}
         >
           <svg width={lw} height={pHeight}>
             {/* Filled area between the left edge and the curve */}
@@ -761,13 +595,7 @@ export const AutomationLanes: React.FC<AutomationLanesProps> = React.memo(({
       {hasNextMultiLane && renderMultiLaneCurves(nextCurveGroups, nextLen, prevLen + patternLength, 0.5, 'next', false)}
 
       {/* Right-click context menu for lane operations */}
-      {laneCtxMenu && (
-        <ContextMenu
-          items={laneCtxMenuItems}
-          position={{ x: laneCtxMenu.x, y: laneCtxMenu.y }}
-          onClose={() => setLaneCtxMenu(null)}
-        />
-      )}
+      {menuElement}
     </div>
   );
 });

@@ -49,9 +49,11 @@ describe('X7(a) — the overlays follow scroll because one value owns their top'
     for (const line of styleTops) expect(line).toContain('overlayTopRef');
   });
 
-  it('positions all three overlays from the same value', () => {
+  it('positions both overlays from the same value', () => {
+    // automation overlay (which also holds the GLOBAL lane) and macro overlay.
+    // The separate master dub lane is gone (globalLaneEditing.test.tsx).
     const uses = canvas.match(/top: overlayTopRef\.current/g) ?? [];
-    expect(uses.length).toBe(3);   // master dub lane, automation overlay, macro overlay
+    expect(uses.length).toBe(2);
   });
 
   it('updates that value while idle, which is when a user scrolls by hand', () => {
@@ -62,11 +64,6 @@ describe('X7(a) — the overlays follow scroll because one value owns their top'
 
   it('updates it during playback too', () => {
     expect(canvas).toMatch(/scrollYRef\.current\s+= baseY;\s*\n\s*overlayTopRef\.current\s+= overlayTop;/);
-  });
-
-  it('still writes the dub lane in both RAF branches', () => {
-    const writes = canvas.match(/masterDubLaneRef\.current\.style\.top/g) ?? [];
-    expect(writes.length).toBe(2);   // idle branch and playback branch
   });
 
   it('keeps scrollYRef for the canvas, which is what it actually holds', () => {
