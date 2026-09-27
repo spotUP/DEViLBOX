@@ -44,7 +44,7 @@ import { FurnaceDispatchPlatform } from '../FurnaceDispatchEngine';
 const calls = engine as unknown as Record<string, ReturnType<typeof vi.fn>>;
 
 beforeEach(() => {
-  for (const k of ['uploadFurnaceInstrument', 'setInstrument', 'setVolume']) calls[k].mockClear();
+  for (const k of ['uploadFurnaceInstrument', 'setInstrument', 'setVolume', 'loadIns2']) calls[k].mockClear();
 });
 
 describe('a Furnace synth coming up', () => {
@@ -65,8 +65,12 @@ describe('a Furnace synth coming up', () => {
       id: 1, name: 'Strings', synthType: 'FurnaceOPN',
       furnace: { furnaceIndex: 0, rawBinaryData: ins2 },
     } as never) as FurnaceDispatchSynth;
-    await synth.ready;
+    await synth.ensureInitialized(); // waits for its INS2 upload as well
+    expect(calls.loadIns2).toHaveBeenCalledWith(0, ins2);
     expect(calls.uploadFurnaceInstrument).not.toHaveBeenCalledWith(0, expect.anything(), expect.anything());
+    // Nor does it force its instrument onto the song's channels: a platform
+    // with no chip of its own falls through to the song's chip in the worklet.
+    expect(calls.setInstrument).not.toHaveBeenCalled();
   });
 
   it('still seeds a playable default for an instrument made in DEViLBOX', async () => {
