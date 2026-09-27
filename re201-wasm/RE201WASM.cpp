@@ -244,54 +244,59 @@ struct ToneStack {
   float b0c = 0, b1c = 0, b2c = 0, b3c = 0;
   float a1c = 0, a2c = 0, a3c = 0;
 
-  void computeCoeffs(float sr) {
+  void computeCoeffs(float srF) {
+    // The bilinear expansion below had its indices reversed, which made the
+    // filter an integrator (a1..a3 = -3, 3, -1). Under continuous input its
+    // state ran to 1e38, overflowed, and the stage output 0 from then on - the
+    // whole RE-201 went silent within seconds of playing (measured
+    // 2026-09-27). The 29ab0fdff sanitize() only stopped the NaN from
+    // spreading; it could not make the filter stable. Computed in double: the
+    // c^3 terms (~8.8e14 at 48 kHz) meet component products near 1e-20.
+    const double sr = srF;
     // Component values
-    const float C1 = 470e-12f, C2 = 22e-9f, C3 = 22e-9f;
-    const float R1 = 250e3f * bass, R2 = 100e3f, R3 = 1e3f, R4 = 100e3f * treble;
+    const double C1 = 470e-12, C2 = 22e-9, C3 = 22e-9;
+    const double R1 = 250e3 * bass, R2 = 100e3, R3 = 1e3, R4 = 100e3 * treble;
 
     // Ensure minimum pot values
-    float R1e = R1 < 1.0f ? 1.0f : R1;
-    float R4e = R4 < 1.0f ? 1.0f : R4;
+    double R1e = R1 < 1.0 ? 1.0 : R1;
+    double R4e = R4 < 1.0 ? 1.0 : R4;
 
     // Analog prototype transfer function coefficients (s-domain)
-    float b1a = R1e * C1;
-    float b2a = C1 * C2 * R1e * R2 + C1 * C3 * R1e * R4e;
-    float b3a = C1 * C2 * C3 * R1e * R2 * R4e;
-    float a0a = 1.0f;
-    float a1a = (R1e + R2) * C2 + R4e * C3 + R3 * (C1 + C2 + C3) + R1e * C1;
-    float a2a = R1e * R2 * C1 * C2 + R4e * C3 * (R1e * C1 + R2 * C2 + R3 * (C1 + C2))
+    double b1a = R1e * C1;
+    double b2a = C1 * C2 * R1e * R2 + C1 * C3 * R1e * R4e;
+    double b3a = C1 * C2 * C3 * R1e * R2 * R4e;
+    double a0a = 1.0;
+    double a1a = (R1e + R2) * C2 + R4e * C3 + R3 * (C1 + C2 + C3) + R1e * C1;
+    double a2a = R1e * R2 * C1 * C2 + R4e * C3 * (R1e * C1 + R2 * C2 + R3 * (C1 + C2))
               + R3 * C2 * R1e * C1;
-    float a3a = R1e * R2 * C1 * C2 * R4e * C3 + R3 * C2 * R1e * C1 * R4e * C3;
+    double a3a = R1e * R2 * C1 * C2 * R4e * C3 + R3 * C2 * R1e * C1 * R4e * C3;
 
     // Bilinear transform: s = 2*sr * (1 - z^-1) / (1 + z^-1)
-    float T  = 1.0f / sr;
-    float T2 = T * T;
-    float T3 = T2 * T;
-    float c  = 2.0f * sr;
-    float c2 = c * c;
-    float c3 = c2 * c;
-
-    // Denominator
-    float D0 = a0a * c3 + a1a * c2 + a2a * c + a3a;
-    if (fabsf(D0) < 1e-30f) D0 = 1e-30f;
-    float iD = 1.0f / D0;
+    double c  = 2.0 * sr;
+    double c2 = c * c;
+    double c3 = c2 * c;
 
     // Numerator: b(z) = b0 + b1*z^-1 + b2*z^-2 + b3*z^-3
     // Using bilinear substitution on each s^n term:
     //   s^0 → 1
     //   s^1 → c*(1-z^-1)/(1+z^-1) etc.
     // After common denominator (1+z^-1)^3:
-    float nb0 = b3a + b2a * c + b1a * c2;
-    float nb1 = 3.0f * b3a + b2a * c - b1a * c2;
-    float nb2 = 3.0f * b3a - b2a * c - b1a * c2;
-    float nb3 = b3a - b2a * c + b1a * c2;
+    //
+    // H(s) = (b1 s + b2 s^2 + b3 s^3) / (a0 + a1 s + a2 s^2 + a3 s^3). The
+    // coefficient of s^n is multiplied by c^n. This used to be written with
+    // the indices reversed (the constant a0 times c^3), which put all three
+    // poles at z = 1: a1..a3 = -3, 3, -1, a marginally unstable integrator.
+    double nb0 =        b1a * c + b2a * c2 +       b3a * c3;
+    double nb1 =        b1a * c - b2a * c2 - 3.0 * b3a * c3;
+    double nb2 =      - b1a * c - b2a * c2 + 3.0 * b3a * c3;
+    double nb3 =      - b1a * c + b2a * c2 -       b3a * c3;
 
-    float na0 = a3a + a2a * c + a1a * c2 + a0a * c3;
-    float na1 = 3.0f * a3a + a2a * c - a1a * c2 - 3.0f * a0a * c3;
-    float na2 = 3.0f * a3a - a2a * c - a1a * c2 + 3.0f * a0a * c3;
-    float na3 = a3a - a2a * c + a1a * c2 - a0a * c3;
+    double na0 =       a0a + a1a * c + a2a * c2 +       a3a * c3;
+    double na1 = 3.0 * a0a + a1a * c - a2a * c2 - 3.0 * a3a * c3;
+    double na2 = 3.0 * a0a - a1a * c - a2a * c2 + 3.0 * a3a * c3;
+    double na3 =       a0a - a1a * c + a2a * c2 -       a3a * c3;
 
-    float iA0 = 1.0f / (na0 < 1e-30f ? 1e-30f : na0);
+    double iA0 = 1.0 / (na0 < 1e-30 ? 1e-30 : na0);
 
     b0c = nb0 * iA0;
     b1c = nb1 * iA0;
@@ -302,18 +307,18 @@ struct ToneStack {
     a3c = na3 * iA0;
 
     // Normalise gain so passband ≈ unity at 1kHz
-    float w = TWOPI * 1000.0f / sr;
-    float cw = cosf(w), sw = sinf(w);
+    double w = TWOPI * 1000.0 / sr;
+    double cw = cos(w), sw = sin(w);
     // Evaluate H(e^jw) magnitude-squared
-    float re_num = b0c + b1c * cw + b2c * cosf(2.0f * w) + b3c * cosf(3.0f * w);
-    float im_num = -(b1c * sw + b2c * sinf(2.0f * w) + b3c * sinf(3.0f * w));
-    float re_den = 1.0f + a1c * cw + a2c * cosf(2.0f * w) + a3c * cosf(3.0f * w);
-    float im_den = -(a1c * sw + a2c * sinf(2.0f * w) + a3c * sinf(3.0f * w));
-    float mag_num = sqrtf(re_num * re_num + im_num * im_num);
-    float mag_den = sqrtf(re_den * re_den + im_den * im_den);
-    float mag = mag_den > 1e-10f ? mag_num / mag_den : 1.0f;
-    if (mag > 1e-10f) {
-      float inv = 1.0f / mag;
+    double re_num = b0c + b1c * cw + b2c * cos(2.0 * w) + b3c * cos(3.0 * w);
+    double im_num = -(b1c * sw + b2c * sin(2.0 * w) + b3c * sin(3.0 * w));
+    double re_den = 1.0 + a1c * cw + a2c * cos(2.0 * w) + a3c * cos(3.0 * w);
+    double im_den = -(a1c * sw + a2c * sin(2.0 * w) + a3c * sin(3.0 * w));
+    double mag_num = sqrt(re_num * re_num + im_num * im_num);
+    double mag_den = sqrt(re_den * re_den + im_den * im_den);
+    double mag = mag_den > 1e-10 ? mag_num / mag_den : 1.0;
+    if (mag > 1e-10) {
+      float inv = 1.0 / mag;
       b0c *= inv; b1c *= inv; b2c *= inv; b3c *= inv;
     }
   }
