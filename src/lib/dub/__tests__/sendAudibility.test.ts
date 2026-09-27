@@ -67,9 +67,11 @@ describe('the dub deck asks the right question in each place', () => {
     expect(DECK).toContain('if (wasActive && !anySend && busEnabled)');
   });
 
-  it('seeds and lifts the BLEED floor from the one named constant', () => {
-    expect(DECK).toContain('setChannelDubSend(i, GHOST_SEND_FLOOR);');
-    expect(DECK).toContain('Math.abs(cur - GHOST_SEND_FLOOR) < 0.001');
+  it('leaves the BLEED floor to the engine, not the deck\'s faders', () => {
+    // The floor is applied at the tap (effectiveDubSend); the deck writing it
+    // into the store is what moved every closed fader to 1.5 % and made BLEED
+    // depend on the deck being on screen.
+    expect(DECK).not.toContain('GHOST_SEND_FLOOR');
     expect(DECK, 'a literal 0.015 crept back into the deck').not.toMatch(/[^\d.]0\.015[^\d]/);
   });
 });
