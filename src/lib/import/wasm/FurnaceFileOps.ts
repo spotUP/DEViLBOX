@@ -54,6 +54,7 @@ interface FurnaceFileOpsAPI {
   fur_get_system_id(idx: number): number;
   fur_get_system_channels(idx: number): number;
   fur_get_system_name(idx: number): string;
+  fur_get_ins_system(insIdx: number): number;
   fur_get_system_flags(idx: number): string;
   fur_get_pat_len(subsong: number): number;
   fur_get_orders_len(subsong: number): number;
@@ -101,6 +102,7 @@ function getAPI(m: WasmModule): FurnaceFileOpsAPI {
     fur_get_system_id: m.cwrap('fur_get_system_id', 'number', ['number']),
     fur_get_system_channels: m.cwrap('fur_get_system_channels', 'number', ['number']),
     fur_get_system_name: m.cwrap('fur_get_system_name', 'string', ['number']),
+    fur_get_ins_system: m.cwrap('fur_get_ins_system', 'number', ['number']),
     fur_get_system_flags: m.cwrap('fur_get_system_flags', 'string', ['number']),
     fur_get_pat_len: m.cwrap('fur_get_pat_len', 'number', ['number']),
     fur_get_orders_len: m.cwrap('fur_get_orders_len', 'number', ['number']),
@@ -161,6 +163,8 @@ export async function loadFurFileWasm(buffer: ArrayBuffer): Promise<{
   chipFlags: string[];
   nativeData: FurnaceNativeData;
   instrumentBinaries: Uint8Array[];
+  /** Per instrument: the song chip (DivSystem id) it plays on, -1 when none. */
+  instrumentSystems: number[];
   wavetables: Array<{ data: number[]; width: number; height: number }>;
   samples: Array<{ data: Int16Array | Int8Array | Uint8Array; rate: number; depth: number;
     loopStart: number; loopEnd: number; loopMode: number; name: string; samples: number }>;
@@ -343,7 +347,9 @@ export async function loadFurFileWasm(buffer: ArrayBuffer): Promise<{
   // Read instrument binary data (INS2 format)
   const numInstruments = api.fur_get_num_instruments();
   const instrumentBinaries: Uint8Array[] = [];
+  const instrumentSystems: number[] = [];
   for (let i = 0; i < numInstruments; i++) {
+    instrumentSystems.push(api.fur_get_ins_system(i));
     // First call with null buf to get required size
     const reqSize = api.fur_get_ins_data(i, 0, 0);
     if (reqSize <= 0) {
@@ -478,6 +484,7 @@ export async function loadFurFileWasm(buffer: ArrayBuffer): Promise<{
     chipFlags,
     nativeData,
     instrumentBinaries,
+    instrumentSystems,
     wavetables,
     samples,
     loadWarning,

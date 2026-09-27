@@ -12,8 +12,9 @@
 
 import { SynthRegistry } from '../SynthRegistry';
 import type { SynthDescriptor } from '../SynthDescriptor';
-import { FurnaceDispatchSynth, FurnaceDispatchPlatform } from '../../furnace-dispatch';
+import { FurnaceDispatchSynth } from '../../furnace-dispatch';
 import { moduleIns2Of } from '../../furnace-dispatch/ins2Uploads';
+import { SYNTH_TO_DISPATCH } from '../../furnace-dispatch/synthPlatforms';
 import type { InstrumentConfig } from '@typedefs/instrument';
 
 // ── Volume offsets (from InstrumentFactory.VOLUME_NORMALIZATION_OFFSETS) ──────
@@ -51,83 +52,6 @@ function furnaceReleaseHook(synth: any, note: string | undefined, time: number):
 
 // ── Map synthType → FurnaceDispatchPlatform ──────────────────────────────────
 
-const SYNTH_TO_DISPATCH: Record<string, number> = {
-  FurnaceNES: FurnaceDispatchPlatform.NES,
-  FurnaceGB: FurnaceDispatchPlatform.GB,
-  FurnaceSNES: FurnaceDispatchPlatform.SNES,
-  FurnacePCE: FurnaceDispatchPlatform.PCE,
-  FurnacePSG: FurnaceDispatchPlatform.SMS,
-  FurnaceVB: FurnaceDispatchPlatform.VBOY,
-  FurnaceLynx: FurnaceDispatchPlatform.LYNX,
-  FurnaceSWAN: FurnaceDispatchPlatform.SWAN,
-  FurnaceVRC6: FurnaceDispatchPlatform.VRC6,
-  FurnaceN163: FurnaceDispatchPlatform.N163,
-  FurnaceFDS: FurnaceDispatchPlatform.FDS,
-  FurnaceMMC5: FurnaceDispatchPlatform.MMC5,
-  FurnaceGBA: FurnaceDispatchPlatform.GBA_DMA,
-  FurnaceNDS: FurnaceDispatchPlatform.NDS,
-  FurnacePOKEMINI: FurnaceDispatchPlatform.POKEMINI,
-  FurnaceC64: FurnaceDispatchPlatform.C64_6581,
-  FurnaceSID6581: FurnaceDispatchPlatform.C64_6581,
-  FurnaceSID8580: FurnaceDispatchPlatform.C64_8580,
-  FurnaceSID3: FurnaceDispatchPlatform.SID3,
-  FurnaceAY: FurnaceDispatchPlatform.AY8910,
-  FurnaceAY8930: FurnaceDispatchPlatform.AY8930,
-  FurnaceVIC: FurnaceDispatchPlatform.VIC20,
-  FurnaceSAA: FurnaceDispatchPlatform.SAA1099,
-  FurnaceTED: FurnaceDispatchPlatform.TED,
-  FurnaceVERA: FurnaceDispatchPlatform.VERA,
-  FurnaceSCC: FurnaceDispatchPlatform.SCC,
-  FurnaceTIA: FurnaceDispatchPlatform.TIA,
-  FurnaceAMIGA: FurnaceDispatchPlatform.AMIGA,
-  FurnacePET: FurnaceDispatchPlatform.PET,
-  FurnacePCSPKR: FurnaceDispatchPlatform.PCSPKR,
-  FurnaceZXBEEPER: FurnaceDispatchPlatform.SFX_BEEPER,
-  FurnacePOKEY: FurnaceDispatchPlatform.POKEY,
-  FurnacePONG: FurnaceDispatchPlatform.PONG,
-  FurnacePV1000: FurnaceDispatchPlatform.PV1000,
-  FurnaceDAVE: FurnaceDispatchPlatform.DAVE,
-  FurnaceSU: FurnaceDispatchPlatform.SOUND_UNIT,
-  FurnacePOWERNOISE: FurnaceDispatchPlatform.POWERNOISE,
-  FurnaceSEGAPCM: FurnaceDispatchPlatform.SEGAPCM,
-  FurnaceQSOUND: FurnaceDispatchPlatform.QSOUND,
-  FurnaceES5506: FurnaceDispatchPlatform.ES5506,
-  FurnaceRF5C68: FurnaceDispatchPlatform.RF5C68,
-  FurnaceC140: FurnaceDispatchPlatform.C140,
-  FurnaceK007232: FurnaceDispatchPlatform.K007232,
-  FurnaceK053260: FurnaceDispatchPlatform.K053260,
-  FurnaceGA20: FurnaceDispatchPlatform.GA20,
-  FurnaceOKI: FurnaceDispatchPlatform.MSM6295,
-  FurnaceYMZ280B: FurnaceDispatchPlatform.YMZ280B,
-  FurnaceX1_010: FurnaceDispatchPlatform.X1_010,
-  FurnaceMSM6258: FurnaceDispatchPlatform.MSM6258,
-  FurnaceMSM5232: FurnaceDispatchPlatform.MSM5232,
-  FurnaceMULTIPCM: FurnaceDispatchPlatform.MULTIPCM,
-  FurnaceNAMCO: FurnaceDispatchPlatform.NAMCO,
-  FurnacePCMDAC: FurnaceDispatchPlatform.PCM_DAC,
-  FurnaceBUBBLE: FurnaceDispatchPlatform.BUBSYS_WSG,
-  FurnaceSM8521: FurnaceDispatchPlatform.SM8521,
-  FurnaceT6W28: FurnaceDispatchPlatform.T6W28,
-  FurnaceSUPERVISION: FurnaceDispatchPlatform.SUPERVISION,
-  FurnaceUPD1771: FurnaceDispatchPlatform.UPD1771C,
-  FurnaceSCVTONE: FurnaceDispatchPlatform.UPD1771C,
-  // FM chips (Yamaha) — now unified under FurnaceDispatch
-  FurnaceOPN: FurnaceDispatchPlatform.GENESIS,
-  FurnaceOPM: FurnaceDispatchPlatform.ARCADE,
-  FurnaceOPL: FurnaceDispatchPlatform.OPL3,
-  FurnaceOPLL: FurnaceDispatchPlatform.OPLL,
-  FurnaceESFM: FurnaceDispatchPlatform.ESFM,
-  FurnaceOPZ: FurnaceDispatchPlatform.OPZ,
-  FurnaceOPNA: FurnaceDispatchPlatform.YM2608,
-  FurnaceOPNB: FurnaceDispatchPlatform.YM2610,
-  FurnaceOPL4: FurnaceDispatchPlatform.OPL4,
-  FurnaceY8950: FurnaceDispatchPlatform.Y8950,
-  FurnaceVRC7: FurnaceDispatchPlatform.VRC7,
-  FurnaceOPN2203: FurnaceDispatchPlatform.YM2203,
-  FurnaceOPNBB: FurnaceDispatchPlatform.YM2610B,
-  // Generic Furnace defaults to Genesis (OPN2)
-  Furnace: FurnaceDispatchPlatform.GENESIS,
-};
 
 // ── All Furnace Chips (via FurnaceDispatchSynth) ─────────────────────────────
 
