@@ -8,6 +8,8 @@
 
 import { furnaceCmdLog } from './handlers/furnaceCmdLog';
 import type { BridgeRequest, BridgeResponse } from './protocol';
+import { RELAY_REPLACED_CLOSE_CODE } from './protocol';
+import { useNotificationStore } from '@stores/useNotificationStore';
 import {
   getSongInfo,
   getFullState,
@@ -665,7 +667,12 @@ function connect(): void {
     handleMessage(typeof event.data === 'string' ? event.data : event.data.toString());
   };
 
-  ws.onclose = () => {
+  ws.onclose = (event) => {
+    if (event.code === RELAY_REPLACED_CLOSE_CODE) {
+      ws = null;
+      onReplacedByAnotherTab();
+      return;
+    }
     connectAttempts++;
     if (connectAttempts === 1) {
       console.log('[mcp-bridge] MCP relay not available, retrying...');
@@ -679,6 +686,29 @@ function connect(): void {
   ws.onerror = () => {
     ws?.close();
   };
+}
+
+/**
+ * Another DEViLBOX tab now holds the relay. Stay off it — reconnecting would
+ * evict that tab, and the two would take turns forever — and say so in this
+ * tab, with a way to take control back.
+ */
+function onReplacedByAnotherTab(): void {
+  console.warn('[mcp-bridge] Another DEViLBOX tab took over MCP control; this tab stops reconnecting');
+  useNotificationStore.getState().addNotification({
+    type: 'warning',
+    message: 'Another DEViLBOX tab has taken over MCP control. Commands from Claude now go to that tab, not this one.',
+    duration: 0,
+    action: { label: 'Take Control Here', run: takeControl },
+  });
+}
+
+/** Reconnect this tab to the relay, which hands it control from any other tab. */
+export function takeControl(): void {
+  if (disposed || ws) return;
+  backoffMs = INITIAL_BACKOFF_MS;
+  connectAttempts = 0;
+  connect();
 }
 
 function scheduleReconnect(): void {

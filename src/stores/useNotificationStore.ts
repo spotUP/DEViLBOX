@@ -11,6 +11,8 @@ export interface Notification {
   type: NotificationType;
   message: string;
   duration?: number; // ms, undefined = no auto-dismiss
+  /** A button on the notification; running it also dismisses the notification. */
+  action?: { label: string; run: () => void };
 }
 
 interface NotificationStore {

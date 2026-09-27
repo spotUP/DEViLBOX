@@ -5,6 +5,7 @@
 import React from 'react';
 import { X, CheckCircle, AlertCircle, AlertTriangle, Info } from 'lucide-react';
 import { useNotificationStore, type NotificationType } from '@stores/useNotificationStore';
+import { Button } from './Button';
 
 const iconMap: Record<NotificationType, React.ReactNode> = {
   success: <CheckCircle size={18} />,
@@ -40,9 +41,20 @@ export const ToastNotification: React.FC = () => {
           <span className="flex-shrink-0 mt-0.5">
             {iconMap[notification.type]}
           </span>
-          <p className="flex-1 text-sm font-medium text-text-primary">
-            {notification.message}
-          </p>
+          <div className="flex-1 flex flex-col items-start gap-2">
+            <p className="text-sm font-medium text-text-primary">
+              {notification.message}
+            </p>
+            {notification.action && (
+              <Button
+                variant="default"
+                size="sm"
+                onClick={() => { removeNotification(notification.id); notification.action!.run(); }}
+              >
+                {notification.action.label}
+              </Button>
+            )}
+          </div>
           <button
             onClick={() => removeNotification(notification.id)}
             className="flex-shrink-0 p-0.5 rounded hover:bg-dark-bgHover transition-colors"
