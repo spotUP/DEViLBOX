@@ -12,7 +12,7 @@ import { resolve } from 'node:path';
 
 type FetchHandler = (e: { request: { url: string; method: string }; respondWith(p: Promise<Response>): void }) => void;
 
-function loadServiceWorker(network: (url: string) => Promise<Response>) {
+function loadServiceWorker(network: (url: string, init?: RequestInit) => Promise<Response>) {
   const store = new Map<string, Response>();
   const cache = {
     match: async (req: { url: string }) => store.get(req.url)?.clone(),
@@ -27,7 +27,7 @@ function loadServiceWorker(network: (url: string) => Promise<Response>) {
   };
   const caches = { open: async () => cache, keys: async () => [], delete: async () => true };
   const src = readFileSync(resolve(__dirname, '../../public/sw.js'), 'utf8');
-  new Function('self', 'caches', 'fetch', src)(self, caches, (req: { url: string }) => network(req.url));
+  new Function('self', 'caches', 'fetch', src)(self, caches, (req: { url: string }, init?: RequestInit) => network(req.url, init));
 
   const get = (path: string) => new Promise<string>((done) => {
     onFetch!({
@@ -45,6 +45,13 @@ describe('the service worker after a deploy', () => {
     expect(await sw.get('/furnace-fileops/FurnaceFileOps.wasm')).toBe('old build');
     build = 'new build';
     expect(await sw.get('/furnace-fileops/FurnaceFileOps.wasm')).toBe('new build');
+  });
+
+  it('makes the browser revalidate an engine file instead of trusting its HTTP cache', async () => {
+    const seen: Array<RequestInit | undefined> = [];
+    const sw = loadServiceWorker(async (_url, init) => { seen.push(init); return new Response('engine'); });
+    await sw.get('/furnace-fileops/FurnaceFileOps.wasm');
+    expect(seen[0]?.cache).toBe('no-cache');
   });
 
   it('still serves a content-hashed asset from the cache', async () => {

@@ -125,7 +125,13 @@ self.addEventListener('fetch', (event) => {
           if (cached) return cached;
         }
         try {
-          const response = await fetch(event.request);
+          // 'no-cache' makes the HTTP cache revalidate with the server (a 304
+          // when unchanged). Production sends ETag/Last-Modified but no
+          // Cache-Control, so without it the browser may apply heuristic
+          // freshness and hand back an old engine file without asking.
+          const response = isImmutableAsset(url)
+            ? await fetch(event.request)
+            : await fetch(event.request, { cache: 'no-cache' });
           if (response.ok) cache.put(event.request, response.clone());
           return response;
         } catch {
