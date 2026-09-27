@@ -70,6 +70,7 @@ import { ExpanderEffect } from '../effects/ExpanderEffect';
 import { SwedishChainsawEffect } from '../effects/SwedishChainsawEffect';
 import { RE201Effect } from '../effects/RE201Effect';
 import { AnotherDelayEffect } from '../effects/AnotherDelayEffect';
+import { isBitCrusher, setBitCrusherBits } from './bitCrusher';
 
 export const EFFECT_RAMP_TIME = 0.02;
 
@@ -134,23 +135,9 @@ export function applyEffectParametersDiff(
       }
       break;
 
-    case 'BitCrusher': {
-      // BitCrusher is implemented as a Distortion with a staircase WaveShaper curve
-      const crusherNode = node as unknown as {
-        _isBitCrusher?: boolean;
-        _bitsValue?: number;
-        _shaper?: { setMap: (fn: (v: number) => number, len?: number) => void };
-      };
-      if (crusherNode._isBitCrusher && 'bits' in changed) {
-        const newBits = Math.max(1, Math.floor(Number(changed.bits) || 4));
-        crusherNode._bitsValue = newBits;
-        const step = Math.pow(0.5, newBits - 1);
-        crusherNode._shaper?.setMap(
-          (val: number) => step * Math.floor(val / step + 0.5), 4096
-        );
-      }
+    case 'BitCrusher':
+      if (isBitCrusher(node) && 'bits' in changed) setBitCrusherBits(node, Number(changed.bits));
       break;
-    }
 
     case 'PingPongDelay':
       if (node instanceof Tone.PingPongDelay) {

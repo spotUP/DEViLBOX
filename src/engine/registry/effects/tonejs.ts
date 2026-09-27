@@ -10,6 +10,7 @@ import * as Tone from 'tone';
 import type { EffectConfig } from '@typedefs/instrument';
 import type { EffectDescriptor } from '../EffectDescriptor';
 import { EffectRegistry } from '../EffectRegistry';
+import { createBitCrusher } from '../../tone/bitCrusher';
 
 const tonejs: EffectDescriptor[] = [
   // ── Distortion ──────────────────────────────────────────────────────────
@@ -48,20 +49,7 @@ const tonejs: EffectDescriptor[] = [
     id: 'BitCrusher', name: 'BitCrusher', category: 'tonejs', group: 'Distortion',
     loadMode: 'eager',
     create: async (c: EffectConfig) => {
-      // Use Tone.Distortion with a staircase WaveShaper curve instead of
-      // Tone.BitCrusher. The latter uses an AudioWorklet that fails to
-      // initialize due to standardized-audio-context's AudioWorkletNode
-      // throwing InvalidStateError (even though the native API works).
-      const p = c.parameters;
-      const bitsValue = Number(p.bits) || 4;
-      const wetValue = c.wet / 100;
-      const crusher = new Tone.Distortion({ distortion: 0, wet: wetValue, oversample: 'none' });
-      const step = Math.pow(0.5, bitsValue - 1);
-      (crusher as unknown as { _shaper: { setMap: (fn: (v: number) => number, len?: number) => void } })
-        ._shaper.setMap((val: number) => step * Math.floor(val / step + 0.5), 4096);
-      (crusher as unknown as Record<string, unknown>)._isBitCrusher = true;
-      (crusher as unknown as Record<string, unknown>)._bitsValue = bitsValue;
-      return crusher;
+      return createBitCrusher(Number(c.parameters.bits) || 4, c.wet / 100);
     },
     getDefaultParameters: () => ({ bits: 4 }),
     presets: [
