@@ -4,26 +4,30 @@
  */
 
 import React, { useState, useMemo, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { useAutomationStore } from '@stores';
 import { useChannelAutomationParams, groupParamsBySection } from '@hooks/useChannelAutomationParams';
 import { useResponsiveSafe } from '@/contexts/ResponsiveContext';
 import { useClickOutside } from '@hooks/useClickOutside';
 
-interface AutomationParameterPickerProps {
+export type AutomationParameterPickerProps = {
   channelIndex: number;
   patternId?: string;
-  left: number;
-  width: number;
-  top: number;
-}
+} & (
+  /** Floating above a channel's lane area. */
+  | { inline?: false; left: number; width: number; top: number }
+  /**
+   * Just the "+" button, laid out by its parent (the GLOBAL lane header). Its
+   * list opens in a portal at the button, so a narrow or clipped header
+   * cannot cut it off - the "Mas" menu broke exactly that way (2026-09-28).
+   */
+  | { inline: true }
+);
 
-export const AutomationParameterPicker: React.FC<AutomationParameterPickerProps> = ({
-  channelIndex,
-  patternId,
-  left,
-  width,
-  top,
-}) => {
+export const AutomationParameterPicker: React.FC<AutomationParameterPickerProps> = (props) => {
+  const { channelIndex, patternId } = props;
+  const inline = props.inline === true;
+  const [anchor, setAnchor] = useState<{ left: number; top: number } | null>(null);
   const { isMobile } = useResponsiveSafe();
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -49,19 +53,16 @@ export const AutomationParameterPicker: React.FC<AutomationParameterPickerProps>
 
   if (params.length === 0) return null;
 
+  const width = inline ? 0 : props.width;
+  const wrapperStyle: React.CSSProperties = inline
+    ? { position: 'relative', display: 'inline-flex' }
+    : { position: 'absolute', left: props.left, top: props.top, width: Math.max(props.width, 60), zIndex: 10 };
+
   return (
-    <div
-      style={{
-        position: 'absolute',
-        left,
-        top,
-        width: Math.max(width, 60),
-        zIndex: 10,
-      }}
-    >
+    <div style={wrapperStyle}>
       {/* Active parameter pills */}
-      <div className="flex gap-0.5 items-center flex-wrap" style={{ maxWidth: width }}>
-        {activeParams.map((paramKey) => {
+      <div className="flex gap-0.5 items-center flex-wrap" style={inline ? undefined : { maxWidth: width }}>
+        {!inline && activeParams.map((paramKey) => {
           const param = params.find(p => p.key === paramKey);
           if (!param) return null;
           return (
@@ -84,7 +85,11 @@ export const AutomationParameterPicker: React.FC<AutomationParameterPickerProps>
 
         {/* Add parameter button */}
         <button
-          onClick={() => setIsOpen(!isOpen)}
+          onClick={(e) => {
+            const r = e.currentTarget.getBoundingClientRect();
+            setAnchor({ left: r.left, top: r.bottom + 4 });
+            setIsOpen(!isOpen);
+          }}
           className={`${pillPadding} ${pillText} font-mono rounded border border-dark-border text-text-muted hover:text-text-secondary hover:border-dark-borderLight transition-colors`}
           title="Add automation parameter"
         >
@@ -93,11 +98,11 @@ export const AutomationParameterPicker: React.FC<AutomationParameterPickerProps>
       </div>
 
       {/* Dropdown */}
-      {isOpen && (
+      {isOpen && portalIfInline(
         <div
           ref={dropdownRef}
-          className="absolute top-full left-0 mt-1 bg-dark-bgSecondary border border-dark-border rounded-md shadow-lg z-50 overflow-y-auto"
-          style={{ maxHeight: 240, minWidth: 140, maxWidth: 200 }}
+          className={`${inline ? 'fixed' : 'absolute top-full left-0 mt-1'} bg-dark-bgSecondary border border-dark-border rounded-md shadow-lg z-50 overflow-y-auto`}
+          style={{ maxHeight: 240, minWidth: 140, maxWidth: 200, ...(inline && anchor ? { left: anchor.left, top: anchor.top, zIndex: 10000 } : {}) }}
         >
           {groups.map((group) => (
             <div key={group.label}>
@@ -151,4 +156,8 @@ export const AutomationParameterPicker: React.FC<AutomationParameterPickerProps>
       )}
     </div>
   );
+
+  function portalIfInline(node: React.ReactElement): React.ReactNode {
+    return inline ? createPortal(node, document.body) : node;
+  }
 };

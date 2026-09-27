@@ -8,15 +8,19 @@
  * bus-wide continuous params (dub.echoWet, dub.hpfCutoff, ...) are visible
  * inline with the pattern, just like per-channel automation lanes.
  *
- * Read-only for now: edits flow through the existing per-curve UI in the
- * automation lanes panel. Bringing the per-channel AutomationLanes drag /
- * preset / delete UX to the global slot is a follow-up.
+ * Edits like a channel lane (useLaneEditing): press or drag in a curve's
+ * slice to write points, double-click to remove one, right-click for presets
+ * / clear / remove. Parameters are added with the AutomationParameterPicker
+ * above the lane (channelIndex -1). This replaced MasterDubLane, a second
+ * 48 px column drawn on top of this one that held a wide single-parameter
+ * editor ("Mas" menu, 2026-09-28).
  */
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useRef } from 'react';
 import { useAutomationStore } from '@stores';
 import { interpolateAutomationValue } from '@typedefs/automation';
 import type { AutomationCurve } from '@typedefs/automation';
+import { useLaneEditing } from './useLaneEditing';
 
 interface Props {
   patternId: string;
@@ -26,6 +30,12 @@ interface Props {
   laneLeft: number;
   /** Total width of the lane column (typically GLOBAL_LANE_W). */
   laneWidth: number;
+  /**
+   * Where this pattern's row 0 sits inside the overlay. The overlay starts
+   * above the current pattern by the previous pattern's ghost rows; drawing
+   * at 0 put every global curve that many rows too early.
+   */
+  topOffset?: number;
 }
 
 const COLOR_DUB    = 'var(--color-accent-highlight)';
@@ -43,8 +53,11 @@ export const GlobalLaneCurves: React.FC<Props> = ({
   rowHeight,
   laneLeft,
   laneWidth,
+  topOffset = 0,
 }) => {
   const allCurves = useAutomationStore(s => s.curves);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const { beginDraw, removePointAt, openMenu, menuElement } = useLaneEditing({ containerRef, rowHeight, patternLength });
 
   /** Curves that belong to this pattern's global lane (channelIndex = -1). */
   const globalCurves = useMemo<AutomationCurve[]>(() => {
@@ -56,7 +69,7 @@ export const GlobalLaneCurves: React.FC<Props> = ({
   }, [allCurves, patternId]);
 
   const totalHeight = patternLength * rowHeight;
-  if (globalCurves.length === 0 || totalHeight <= 0 || laneWidth < 4) return null;
+  if (totalHeight <= 0 || laneWidth < 4) return null;
 
   // Stack curves side-by-side within the lane width. Each curve gets an equal
   // slice; values 0..1 are mapped to the slice's horizontal range so a 1.0
@@ -65,9 +78,11 @@ export const GlobalLaneCurves: React.FC<Props> = ({
 
   return (
     <div
+      ref={containerRef}
+      data-global-lane
       style={{
         position: 'absolute',
-        top: 0,
+        top: topOffset,
         left: laneLeft,
         width: laneWidth,
         height: totalHeight,
@@ -137,6 +152,25 @@ export const GlobalLaneCurves: React.FC<Props> = ({
           );
         })}
       </svg>
+      {/* One hit area per curve slice - the editing surface. */}
+      {globalCurves.map((curve, idx) => {
+        const sliceLeft = 1 + idx * perCurve;
+        const sliceWidth = perCurve - 1;
+        return (
+          <div
+            key={`hit-${curve.id}`}
+            data-global-lane-curve={curve.parameter}
+            title={curve.parameter}
+            style={{ position: 'absolute', top: 0, left: sliceLeft, width: sliceWidth, height: totalHeight, pointerEvents: 'auto', cursor: 'crosshair' }}
+            // laneValueAt maps x in [laneLeft+1, laneLeft+laneWidth-1] to 0..1;
+            // the slice draws value v at sliceLeft + v * sliceWidth.
+            onPointerDown={(e) => beginDraw(e, curve, sliceLeft - 1, 0, sliceWidth + 2)}
+            onDoubleClick={(e) => removePointAt(e, curve, 0)}
+            onContextMenu={(e) => openMenu(e, curve.id)}
+          />
+        );
+      })}
+      {menuElement}
     </div>
   );
 };
