@@ -142,6 +142,12 @@ int fur_get_system_channels(int idx) {
   return g_engine.song.systemChans[idx];
 }
 
+/** Furnace's display name for a chip, e.g. "Yamaha YM2612 (OPN2)". */
+const char* fur_get_system_name(int idx) {
+  if (idx < 0 || idx >= g_engine.song.systemLen) return "";
+  return g_engine.getSystemName(g_engine.song.system[idx]);
+}
+
 /**
  * Get system flags as a string (key=value\n format).
  * Returns pointer to internal buffer — valid until next call.

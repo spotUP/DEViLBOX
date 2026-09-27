@@ -1,9 +1,10 @@
 /**
  * ImportFurnaceDialog — Import dialog for Furnace (.fur) and DefleMask (.dmf) files.
  *
- * Parses the file locally with parseFurnaceSong() to extract rich metadata before
- * committing to the import.  Displays chip system, author, subsong list, and lets
- * the user choose which subsong to import.
+ * Reads the file with the same Furnace WASM loader the import uses, so the
+ * preview accepts exactly what the import accepts — DefleMask files included —
+ * and names each chip the way Furnace does. Displays chip system, author,
+ * subsong list, and lets the user choose which subsong to import.
  */
 
 import React, { useState, useRef, useCallback, useEffect } from 'react';
@@ -12,7 +13,7 @@ import { CustomSelect } from '@components/common/CustomSelect';
 import { Button } from '@components/ui/Button';
 import type { ModuleInfo } from '@lib/import/ModuleLoader';
 import type { ImportOptions } from './ImportModuleDialog';
-import type { FurnaceModule } from '@lib/import/formats/FurnaceSongParser';
+import { loadFurFileWasm } from '@lib/import/wasm/FurnaceFileOps';
 import { useModalClose } from '@hooks/useDialogKeyboard';
 
 interface ImportFurnaceDialogProps {
@@ -22,86 +23,7 @@ interface ImportFurnaceDialogProps {
   initialFile?: File | null;
 }
 
-// ── Chip name lookup (from Furnace system IDs) ─────────────────────────────
-// Covers the most common chip IDs. Unrecognised IDs fall back to hex string.
-const CHIP_NAMES: Record<number, string> = {
-  0x00: 'None',
-  0x01: 'YMU759',
-  0x02: 'Genesis (YM2612+SN76489)',
-  0x03: 'SMS (SN76489)',
-  0x04: 'Game Boy (DMG)',
-  0x05: 'PC Engine (HuC6280)',
-  0x06: 'NES (2A03)',
-  0x07: 'C64 (6581)',
-  0x08: 'Amiga (Paula)',
-  0x09: 'YM2151',
-  0x0A: 'YM2612',
-  0x0B: 'TIA',
-  0x0C: 'SAA1099',
-  0x0D: 'AY-3-8910',
-  0x0E: 'AY8930',
-  0x0F: 'POKEY',
-  0x10: 'QSound',
-  0x11: 'ZX Spectrum Beeper',
-  0x12: 'YM2203',
-  0x13: 'YM2608',
-  0x14: 'YM2610',
-  0x15: 'YM2610B',
-  0x16: 'YM2610B (OPN2C variant)',
-  0x17: 'SMS + YM2413',
-  0x18: 'NeoGeo (YM2610+SSG)',
-  0x19: 'MSX (AY-3-8910)',
-  0x1A: 'OPL (YM3526)',
-  0x1B: 'OPL2 (YM3812)',
-  0x1C: 'OPL3 (YMF262)',
-  0x1D: 'MultiPCM',
-  0x1E: 'PC Speaker',
-  0x1F: 'Dummy System',
-  0x20: 'YM2413',
-  0x21: 'SN76489 (extra)',
-  0x22: 'OPN2 (YM2612)',
-  0x23: 'OPM (YM2151)',
-  0x24: 'NES + VRC6',
-  0x25: 'NES + VRC7',
-  0x26: 'NES + FDS',
-  0x27: 'NES + MMC5',
-  0x28: 'NES + Namco 163',
-  0x29: 'NES + Sunsoft 5B',
-  0x2A: 'SNES (SPC700)',
-  0x2B: 'Virtual Boy (VSU)',
-  0x2C: 'MSX + SCC',
-  0x2D: 'RF5C68',
-  0x2E: 'WonderSwan',
-  0x2F: 'Coleco ColecoVision (SN76489)',
-  0x30: 'OPL4 (YMF278)',
-  0x31: 'OPLL (YM2413)',
-  0x32: 'NES (extra)',
-  0x33: 'OPN (YM2203, extra)',
-  0x34: 'PC-88 (OPNA+SSG)',
-  0x35: 'GBA (Direct Sound)',
-  0x36: 'KurumiOscillator',
-  0x37: 'OPL2 (4-op)',
-  0x38: 'OPL3 (4-op)',
-  0x39: 'YM2610',
-  0x3A: 'ZX Spectrum AY',
-  0x3B: 'SCC+',
-  0x42: 'C64 (8580)',
-  0x43: 'YM2612 (Ext. Ch3)',
-  0x46: 'GBC (extra)',
-  0x47: 'PC-98 (OPNA)',
-  0x48: 'Lynx',
-  0x4A: 'OPZ (YM2414)',
-  0x4C: 'X1-010',
-  0x4D: 'VERA',
-  0x4F: 'Sega PCM',
-  0x50: 'Namco 163',
-  0x53: 'ESFM',
-  0xAA: 'Sega Master System',
-};
-
-function getChipName(id: number): string {
-  return CHIP_NAMES[id] ?? `Chip 0x${id.toString(16).toUpperCase()}`;
-}
+type FurnacePreview = Awaited<ReturnType<typeof loadFurFileWasm>>;
 
 // ── Component ──────────────────────────────────────────────────────────────
 
@@ -112,12 +34,13 @@ export const ImportFurnaceDialog: React.FC<ImportFurnaceDialogProps> = ({
   initialFile,
 }) => {
   useModalClose({ isOpen, onClose });
-  const [module, setModule]           = useState<FurnaceModule | null>(null);
+  const [module, setModule]           = useState<FurnacePreview | null>(null);
   const [moduleBuffer, setModuleBuffer] = useState<ArrayBuffer | null>(null);
   const [moduleFile, setModuleFile]   = useState<File | null>(null);
   const [isLoading, setIsLoading]     = useState(false);
   const [error, setError]             = useState<string | null>(null);
   const [selectedSubsong, setSelectedSubsong] = useState(0);
+  const [format, setFormat]           = useState('Furnace');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileSelect = useCallback(async (file: File) => {
@@ -135,8 +58,8 @@ export const ImportFurnaceDialog: React.FC<ImportFurnaceDialogProps> = ({
 
     try {
       const buf = await file.arrayBuffer();
-      const { parseFurnaceSong } = await import('@lib/import/formats/FurnaceSongParser');
-      const parsed = await parseFurnaceSong(buf);
+      const parsed = await loadFurFileWasm(buf);
+      setFormat(/\.dmf$/i.test(file.name) ? 'DefleMask' : 'Furnace');
       setModule(parsed);
       setModuleBuffer(buf);
       setModuleFile(file);
@@ -174,10 +97,10 @@ export const ImportFurnaceDialog: React.FC<ImportFurnaceDialogProps> = ({
       metadata: {
         title: module.name || moduleFile.name.replace(/\.[^/.]+$/, ''),
         type: 'Furnace',
-        channels: module.chans,
-        patterns: module.patterns.size,
-        orders: module.subsongs[selectedSubsong]?.ordersLen ?? 0,
-        instruments: module.instruments.length,
+        channels: module.numChannels,
+        patterns: module.nativeData.subsongs[selectedSubsong]?.ordersLen ?? 0,
+        orders: module.nativeData.subsongs[selectedSubsong]?.ordersLen ?? 0,
+        instruments: module.instrumentBinaries.length,
         samples: module.samples.length,
         duration: 0,
       },
@@ -199,9 +122,10 @@ export const ImportFurnaceDialog: React.FC<ImportFurnaceDialogProps> = ({
 
   if (!isOpen) return null;
 
-  const subsong = module?.subsongs[selectedSubsong] ?? module?.subsongs[0];
+  const subsongs = module?.nativeData.subsongs ?? [];
+  const subsong = subsongs[selectedSubsong] ?? subsongs[0];
   const bpm = subsong
-    ? Math.round(2.5 * (subsong.hz || 60) * ((subsong.virtualTempo || 150) / (subsong.virtualTempoD || 150)))
+    ? Math.round(2.5 * (subsong.hz || 60) * ((subsong.virtualTempoN || 150) / (subsong.virtualTempoD || 150)))
     : 0;
 
   return (
@@ -244,7 +168,7 @@ export const ImportFurnaceDialog: React.FC<ImportFurnaceDialogProps> = ({
             {isLoading ? (
               <div className="flex flex-col items-center gap-2">
                 <div className="w-8 h-8 border-2 border-accent-primary border-t-transparent rounded-full animate-spin" />
-                <p className="text-sm text-text-muted">Parsing Furnace file…</p>
+                <p className="text-sm text-text-muted">Reading file…</p>
               </div>
             ) : (
               <div className="flex flex-col items-center gap-2">
@@ -276,22 +200,22 @@ export const ImportFurnaceDialog: React.FC<ImportFurnaceDialogProps> = ({
                     )}
                   </div>
                   <span className="text-xs px-2 py-0.5 bg-accent-primary/20 text-accent-primary rounded flex-shrink-0">
-                    Furnace v{module.version}
+                    {format}
                   </span>
                 </div>
 
                 {/* Chip / system */}
-                {module.systems.length > 0 && (
+                {module.systemNames.length > 0 && (
                   <div className="flex flex-wrap gap-1.5">
-                    {module.systems.map((chipId, i) => (
+                    {module.systemNames.map((chipName, i) => (
                       <span
                         key={i}
                         className="inline-flex items-center gap-1 text-xs px-2 py-0.5 bg-dark-bgSecondary border border-dark-border rounded"
                       >
                         <Cpu size={10} className="text-accent-primary" />
-                        {getChipName(chipId)}
-                        {module.systemChans[i] ? (
-                          <span className="text-text-muted">{module.systemChans[i]}ch</span>
+                        {chipName}
+                        {module.nativeData.systemChans?.[i] ? (
+                          <span className="text-text-muted">{module.nativeData.systemChans[i]} channels</span>
                         ) : null}
                       </span>
                     ))}
@@ -302,11 +226,11 @@ export const ImportFurnaceDialog: React.FC<ImportFurnaceDialogProps> = ({
                 <div className="grid grid-cols-3 gap-2 text-xs">
                   <div className="flex flex-col">
                     <span className="text-text-muted">Channels</span>
-                    <span className="text-text-primary font-mono">{module.chans}</span>
+                    <span className="text-text-primary font-mono">{module.numChannels}</span>
                   </div>
                   <div className="flex flex-col">
                     <span className="text-text-muted">Instruments</span>
-                    <span className="text-text-primary font-mono">{module.instruments.length}</span>
+                    <span className="text-text-primary font-mono">{module.instrumentBinaries.length}</span>
                   </div>
                   <div className="flex flex-col">
                     <span className="text-text-muted">Samples</span>
@@ -314,12 +238,12 @@ export const ImportFurnaceDialog: React.FC<ImportFurnaceDialogProps> = ({
                   </div>
                   <div className="flex flex-col">
                     <span className="text-text-muted">Subsongs</span>
-                    <span className="text-text-primary font-mono">{module.subsongs.length}</span>
+                    <span className="text-text-primary font-mono">{subsongs.length}</span>
                   </div>
                   {subsong && (
                     <>
                       <div className="flex flex-col">
-                        <span className="text-text-muted">Pattern len</span>
+                        <span className="text-text-muted">Pattern Length</span>
                         <span className="text-text-primary font-mono">{subsong.patLen} rows</span>
                       </div>
                       <div className="flex flex-col">
@@ -329,31 +253,21 @@ export const ImportFurnaceDialog: React.FC<ImportFurnaceDialogProps> = ({
                     </>
                   )}
                 </div>
-
-                {/* Song comment */}
-                {module.comment && (
-                  <div className="text-xs text-text-muted bg-dark-bgSecondary p-2 rounded max-h-20 overflow-y-auto font-mono whitespace-pre-wrap border border-dark-border/50">
-                    {module.comment}
-                  </div>
-                )}
               </div>
 
               {/* Subsong picker */}
-              {module.subsongs.length > 1 && (
+              {subsongs.length > 1 && (
                 <div className="bg-dark-bg rounded-lg p-3 space-y-2">
                   <p className="text-xs font-medium text-text-primary">Import Subsong</p>
                   <CustomSelect
                     value={String(selectedSubsong)}
                     onChange={(v) => setSelectedSubsong(Number(v))}
-                    options={module.subsongs.map((ss, i) => ({
+                    options={subsongs.map((ss, i) => ({
                       value: String(i),
                       label: `${i + 1}. ${ss.name || `Subsong ${i + 1}`}${i === 0 ? ' (default)' : ''}`,
                     }))}
                     className="w-full text-sm bg-dark-bgSecondary border border-dark-border rounded px-3 py-2 text-text-primary cursor-pointer"
                   />
-                  {subsong?.comment && (
-                    <p className="text-xs text-text-muted italic">{subsong.comment}</p>
-                  )}
                 </div>
               )}
 
