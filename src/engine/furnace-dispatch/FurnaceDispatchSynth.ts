@@ -329,6 +329,7 @@ export class FurnaceDispatchSynth implements DevilboxSynth {
     console.log(`[FurnaceDispatchSynth] Encoding and uploading instrument ${this.furnaceInstrumentIndex} "${name}" to platform ${this.platformType}`);
 
     const configFurnace = config as unknown as FurnaceConfig;
+    if (typeof configFurnace.previewChannel === 'number') this.currentChannel = configFurnace.previewChannel;
 
     // If we have rawBinaryData from a .fur file, use it directly.
     // This is the native INS2 format that the WASM dispatch already knows how to parse.
@@ -345,8 +346,8 @@ export class FurnaceDispatchSynth implements DevilboxSynth {
       // A song's instrument stops at the upload: which instrument each channel
       // plays is the song sequencer's business, and it sends its own
       // INSTRUMENT on each channel's first note. Forcing this one onto every
-      // channel of the platform reached the song's chip (the worklet sends a
-      // command for a platform with no chip of its own to the first chip), so a
+      // channel of the platform reached the song's chip (the worklet routes a
+      // platform with no chip of its own to the chip standing in for it), so a
       // synth that came up mid-song swapped every channel's instrument under
       // the sequencer, which believed the channel still held its own.
       if (this.fromModule) return;
