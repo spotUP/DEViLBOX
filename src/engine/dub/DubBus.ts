@@ -5352,6 +5352,11 @@ export class DubBus {
     }
   }
 
+  /** The echo engine's own report of what it is running with. */
+  describeEcho(): Record<string, unknown> | null {
+    try { return this.echo.describe?.() ?? null; } catch { return null; }
+  }
+
   getDiagnosticSnapshot(): Record<string, number | boolean | string | null> {
     const round = (value: number): number => +value.toFixed(4);
     return {
