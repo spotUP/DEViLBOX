@@ -17,9 +17,6 @@ import { useOrientation } from '@hooks/useOrientation';
 import type { PadBank } from '../../types/drumpad';
 import { getBankPads } from '../../types/drumpad';
 import { useMIDIPadRouting, clearDubReleasers } from '@/hooks/drumpad/useMIDIPadRouting';
-import { useTransportStore } from '../../stores/useTransportStore';
-import { useDJStore } from '../../stores/useDJStore';
-import { bpmSyncedEchoRate, getActiveBpm } from '@/engine/dub/DubActions';
 
 interface PadGridProps {
   onPadSelect: (padId: number) => void;
@@ -74,47 +71,8 @@ export const PadGrid: React.FC<PadGridProps> = ({
     releaseAllHeld();
   }, [currentBank, releaseAllHeld, controllerPadCount]);
 
-  // Dub Bus settings mirror — push store state to the audio engine.
-  // Only re-run when fields that affect the engine actually change.
-  // Previous version depended on the entire `dubBus` object and spread
-  // it into setDubBusSettings on every slider pixel — causing heavy
-  // AudioParam scheduling + React re-render stutter. Now we split into
-  // two effects: one for echo-rate sync (BPM-dependent, needs specific
-  // fields) and one for everything else (uses a JSON key to detect real
-  // changes).
-  const dubBus = useDrumPadStore((s) => s.dubBus);
-  const transportBpm = useTransportStore((s) => s.bpm);
-  // Subscribe to deck-relevant fields so the effect re-runs when ANY
-  // source of "active BPM" changes (deck swaps, crossfader moves, etc.).
-  const djDeckSig = useDJStore((s) =>
-    `${s.decks.A.isPlaying ? s.decks.A.beatGrid?.bpm || s.decks.A.detectedBPM : 0}|` +
-    `${s.decks.B.isPlaying ? s.decks.B.beatGrid?.bpm || s.decks.B.detectedBPM : 0}|` +
-    `${s.decks.C.isPlaying ? s.decks.C.beatGrid?.bpm || s.decks.C.detectedBPM : 0}|` +
-    `${s.crossfaderPosition}`
-  );
-  // Stable ref to the latest dubBus so the settings-push effect can
-  // read it without depending on it (avoids re-triggering on every
-  // slider pixel).
-  const dubBusRef = useRef(dubBus);
-  dubBusRef.current = dubBus;
-  // Echo-rate sync — only depends on the fields that affect BPM sync.
-  useEffect(() => {
-    const bpm = getActiveBpm();
-    const synced = bpmSyncedEchoRate(bpm, dubBus.echoSyncDivision, dubBus.echoRateMs);
-    engineRef.current?.setDubBusSettings({ echoRateMs: synced });
-  }, [dubBus.echoSyncDivision, dubBus.echoRateMs, transportBpm, djDeckSig, engineRef]);
-  // Full settings push — debounced to avoid flooding the engine with
-  // AudioParam writes during slider drags. 50ms is fast enough that the
-  // engine stays in sync but slow enough to skip intermediate pixels.
-  useEffect(() => {
-    const h = setTimeout(() => {
-      const bus = dubBusRef.current;
-      const bpm = getActiveBpm();
-      const synced = bpmSyncedEchoRate(bpm, bus.echoSyncDivision, bus.echoRateMs);
-      engineRef.current?.setDubBusSettings({ ...bus, echoRateMs: synced });
-    }, 50);
-    return () => clearTimeout(h);
-  }, [dubBus, engineRef]);
+  // Dub bus settings reach the engine through DrumPadEngine's own store
+  // subscription (startDubSettingsMirror), BPM sync included.
 
   // DJ mixer (re-)attach runs ONCE on mount (and retries once a few ms later
   // in case the DJ engine mounted after the pad-engine singleton was created).

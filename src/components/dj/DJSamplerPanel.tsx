@@ -19,9 +19,6 @@ import type { PadBank } from '../../types/drumpad';
 import { getBankPads } from '../../types/drumpad';
 import { CustomSelect } from '@components/common/CustomSelect';
 import { useMIDIPadRouting, clearDubReleasers } from '@/hooks/drumpad/useMIDIPadRouting';
-import { bpmSyncedEchoRate, getActiveBpm } from '../../engine/dub/DubActions';
-import { useTransportStore } from '../../stores/useTransportStore';
-import { useDJStore } from '../../stores/useDJStore';
 
 // ============================================================================
 // COMPONENT
@@ -105,33 +102,8 @@ export const DJSamplerPanel: React.FC<DJSamplerPanelProps> = ({ onClose }) => {
     };
   }, [releaseAllHeld, engineRef]);
 
-  // ── Dub Bus: mirror store settings into the live engine ──
-  // Derives echo rate from the active deck's BPM when sync is on — a
-  // 140 BPM record crossfader'd in won't sync to the tracker's 120 BPM.
-  // Subscribing to deck BPM + crossfader means echoes track the mix.
-  const dubBus = useDrumPadStore((s) => s.dubBus);
-  const transportBpm = useTransportStore((s) => s.bpm);
-  const djDeckSig = useDJStore((s) =>
-    `${s.decks.A.isPlaying ? s.decks.A.beatGrid?.bpm || s.decks.A.detectedBPM : 0}|` +
-    `${s.decks.B.isPlaying ? s.decks.B.beatGrid?.bpm || s.decks.B.detectedBPM : 0}|` +
-    `${s.decks.C.isPlaying ? s.decks.C.beatGrid?.bpm || s.decks.C.detectedBPM : 0}|` +
-    `${s.crossfaderPosition}`
-  );
-  // Debounced, like the other two mirrors of this state.
-  //
-  // This pushed the ENTIRE dubBus object on every change with no debounce,
-  // while PadGrid uses 50ms and DubDeckStrip 100ms. Whenever this panel is
-  // mounted, every slider pixel therefore ran the full setSettings body —
-  // including the waveshaper-curve and convolver branches — bypassing both of
-  // the other debounces. Reported 2026-09-21 as crackle on the dub sliders.
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      const bpm = getActiveBpm();
-      const synced = bpmSyncedEchoRate(bpm, dubBus.echoSyncDivision, dubBus.echoRateMs);
-      engineRef.current?.setDubBusSettings({ ...dubBus, echoRateMs: synced });
-    }, 50);
-    return () => clearTimeout(timer);
-  }, [dubBus, transportBpm, djDeckSig, engineRef]);
+  // Dub bus settings reach the engine through DrumPadEngine's own store
+  // subscription (startDubSettingsMirror), deck-BPM sync included.
 
   // Sync master level
   useEffect(() => {
