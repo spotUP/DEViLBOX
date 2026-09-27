@@ -62,6 +62,19 @@ describe('DefleMask file with a damaged sample block', { timeout: 60000 }, () =>
     expect(loaded.samples.map((x) => x.samples)).toEqual([1931, 1933, 8592, 12037, 65759]);
   });
 
+  it('puts a lost byte back where the whole chain of records then reads', async () => {
+    const { loadFurFileWasm } = await import('../wasm/FurnaceFileOps');
+
+    // One byte is lost in sample 1 and three at the end of sample 3. The
+    // smooth-sound guess for the first put it a few bytes off: the next header
+    // still read, but a copy between the two places carried a wrong length
+    // field two records on, and the load kept 3 of 4 samples. Candidates are
+    // now judged by how far the chain reads, not just the next record.
+    const loaded = await loadFurFileWasm(readSong('Speedy/GoStraightNTSC.dmf'));
+    expect(loaded.loadWarning).toBe('4 bytes were missing from the file\'s compressed sample data and were put back');
+    expect(loaded.samples).toHaveLength(4);
+  });
+
   it('loads a checksum-clean file that carries samples without any warning', async () => {
     const { parseFurnaceFile } = await import('../parsers/FurnaceToSong');
     notifyWarning.mockClear();

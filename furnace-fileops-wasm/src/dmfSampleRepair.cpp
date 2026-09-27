@@ -375,6 +375,8 @@ Progress readAsWritten(const unsigned char* b, size_t end, int ver, int count) {
 // Offsets into a header a lost byte is tried at: the length field, the name
 // length byte is skipped (it cannot be guessed), then the name and fields.
 const size_t MAX_HEADER_TRY=48;
+// Bytes either side of the smooth path's pick that a lost byte is also tried at.
+const size_t POSITION_WINDOW=8;
 
 // What this record may have lost, most likely first. Each candidate is a set of
 // insertions (positions before insertion):
@@ -403,6 +405,16 @@ std::vector<std::vector<DmfInsert>> candidatesFor(const unsigned char* b, size_t
       std::vector<DmfInsert> set;
       for (const DmfInsert& d: local) set.push_back({dataStart+d.at,d.value});
       c.push_back(set);
+      // The smooth path can miss the lost byte by a few bytes; a byte put
+      // back a little off still lets the next header read, but every copy
+      // between the two places comes out shifted. Offer the neighbours too;
+      // the whole chain decides between them.
+      if (set.size()==1) {
+        for (size_t delta=1; delta<=POSITION_WINDOW; delta++) {
+          if (set[0].at>=dataStart+delta) c.push_back({{set[0].at-delta,set[0].value}});
+          if (set[0].at+delta<=dataStart+at.h.dataBytes-drops) c.push_back({{set[0].at+delta,set[0].value}});
+        }
+      }
     };
     viaSound(k);
     if (k!=1) viaSound(1);
@@ -443,6 +455,8 @@ bool reinflate(const std::vector<DmfInsert>& ins, size_t capacity, size_t stopAt
 
 // Most bytes put back in one file before giving up on the stream route.
 const int MAX_RESTORED=64;
+// Candidates per damaged record inflated in full to judge the whole chain.
+const int MAX_FULL_LOOKS=8;
 
 } // namespace
 
@@ -459,9 +473,40 @@ int dmfRestoreStream(const unsigned char* file, size_t len, size_t blockStart, i
     size_t blkLen=cur.size()-blockStart;
     Progress now=readAsWritten(blk,blkLen,version,count);
     if (now.record>=count) break;
-    bool advanced=false;
+    // A candidate is worth a full look only if the next record then reads.
+    // Of those, keep the one with which the most records read to the end: a
+    // byte put back in the wrong place can still let the next header read,
+    // and only corrupts a later one (seen: a length field two records on).
+    std::vector<DmfInsert> bestMerged;
+    std::vector<unsigned char> bestData;
+    std::vector<dmf_block_mark> bestMarks;
+    // One work buffer for all of this record's candidates. A candidate resumes
+    // from a block start, so only what the previous one overwrote before that
+    // point has to be put back — not a fresh file-sized buffer and a copy of
+    // the whole prefix per candidate, which cost more than the inflating.
+    std::vector<unsigned char> work(cur.size()+MAX_RESTORED+8);
+    memcpy(work.data(),cur.data(),cur.size());
+    size_t dirtyLo=cur.size();
+    auto inflateCandidate=[&](const std::vector<DmfInsert>& ins, size_t stopAt, const dmf_block_mark* from, size_t& outLen) -> bool {
+      size_t start=from?from->outcnt:0;
+      if (dirtyLo<start) memcpy(work.data()+dirtyLo,cur.data()+dirtyLo,std::min(start,cur.size())-dirtyLo);
+      dirtyLo=start;
+      std::vector<unsigned long> at;
+      std::vector<unsigned char> val;
+      for (const DmfInsert& d: ins) { at.push_back((unsigned long)d.at); val.push_back(d.value); }
+      unsigned long ol=(unsigned long)work.size();
+      unsigned long srcLen=(unsigned long)g_dmfDeflateStream.size();
+      int err=dmf_inflate_insert(work.data(),&ol,g_dmfDeflateStream.data(),&srcLen,
+        at.empty()?NULL:at.data(),val.empty()?NULL:val.data(),(unsigned long)at.size(),(unsigned long)stopAt,
+        from,NIL_MARKS,0,NULL);
+      outLen=ol;
+      return err==0 || err==2;
+    };
+    int bestScore=now.record*2+(now.headerBad?0:1);
+    int fullLooks=0;
     for (std::vector<DmfInsert> cand: candidatesFor(blk,blkLen,version,now)) {
       if (cand.empty() || (int)(all.size()+cand.size())>MAX_RESTORED) continue;
+      if (fullLooks>=MAX_FULL_LOOKS) break;
       std::sort(cand.begin(),cand.end(),[](const DmfInsert& x, const DmfInsert& y){ return x.at<y.at; });
       // positions are in the current file, before these insertions; an
       // earlier insertion at or after one of them moves up past it
@@ -482,25 +527,40 @@ int dmfRestoreStream(const unsigned char* file, size_t len, size_t blockStart, i
         if (m.outcnt<=firstNew) from=&m;
         else break;
       }
-      // judging needs only the output up to past the header after this
-      // record; the whole file is inflated once a candidate is taken
+      // quick look: only as far as past the header after this record
       size_t judgeTo=blockStart+now.start+(now.headerBad?0:now.h.headerLen+now.h.dataBytes)+2*MAX_HEADER+cand.size();
-      std::vector<unsigned char> next;
-      if (!reinflate(merged,cur.size()+cand.size(),judgeTo,from,&cur,next,NULL)) continue;
+      size_t outLen=0;
+      if (!inflateCandidate(merged,judgeTo,from,outLen)) continue;
       // everything before the sample block must read exactly as before
-      if (next.size()<blockStart || memcmp(next.data(),cur.data(),blockStart)!=0) continue;
-      // cut short, the record after the next one looks unfinished, which
-      // still counts as the next one reading
-      Progress then=readAsWritten(next.data()+blockStart,next.size()-blockStart,version,count);
-      bool better=then.record>now.record || (then.record==now.record && now.headerBad && !then.headerBad);
-      if (!better) continue;
-      std::vector<dmf_block_mark> nextMarks;
-      if (!reinflate(merged,cur.size()+cand.size(),0,NULL,NULL,next,&nextMarks)) continue;
-      all.swap(merged);
-      cur.swap(next);
-      marks.swap(nextMarks);
-      advanced=true;
-      break;
+      if (outLen<blockStart || memcmp(work.data(),cur.data(),blockStart)!=0) continue;
+      Progress quick=readAsWritten(work.data()+blockStart,outLen-blockStart,version,count);
+      if (!(quick.record>now.record || (quick.record==now.record && now.headerBad && !quick.headerBad))) continue;
+      // longer look: on through the record after the next one, which is the
+      // evidence a wrong position lacks
+      fullLooks++;
+      size_t lookTo=0;
+      if (quick.record<count) {
+        size_t nextStart=quick.start;
+        lookTo=blockStart+nextStart+(quick.headerBad?0:quick.h.headerLen+quick.h.dataBytes)+2*MAX_HEADER+cand.size();
+      }
+      if (!inflateCandidate(merged,lookTo,from,outLen)) continue;
+      Progress then=readAsWritten(work.data()+blockStart,outLen-blockStart,version,count);
+      int score=then.record*2+(then.headerBad?0:1);
+      if (score<=bestScore) continue;
+      bestScore=score;
+      bestMerged=merged;
+      // Only a candidate that stalls right at the next record needs rivals.
+      if (then.record>=count || then.record>now.record+1) break;
+    }
+    if (!bestMerged.empty()) {
+      // the one taken is inflated in full, with its block starts for the next round
+      if (!reinflate(bestMerged,cur.size()+(bestMerged.size()-all.size()),0,NULL,NULL,bestData,&bestMarks)) bestMerged.clear();
+    }
+    bool advanced=!bestMerged.empty();
+    if (advanced) {
+      all.swap(bestMerged);
+      cur.swap(bestData);
+      marks.swap(bestMarks);
     }
     if (!advanced) break;
   }
