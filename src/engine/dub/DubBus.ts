@@ -7376,13 +7376,24 @@ export class DubBus {
     bp.frequency.cancelScheduledValues(now);
     bp.frequency.setValueAtTime(Math.max(100, centerHz), now);
     bp.frequency.exponentialRampToValueAtTime(Math.max(100, topHz), now + sweepSec);
+    // Tape saturation INSIDE the loop. With loop gain > 1 and nothing to
+    // bound it, the oscillation grew without limit: measured 2026-09-27, the
+    // spring output reached 3.6e12 within 3 s of the fire, then NaN — and the
+    // spring's state kept the NaN after release, so the bus return and the
+    // master read 0 until a page reload ("tubbyScream can kill the master").
+    // A real Tubby loop runs through tape and console, which saturate: the
+    // squeal settles at the saturation level instead of growing. The curve
+    // caps what re-enters the spring at +-1 however hard the loop drives.
+    const loopSat = ctx.createWaveShaper();
+    loopSat.curve = makeTapeSatCurve(0.6);
     try {
       // Get spring output via Tone ref; connect to bandpass then back to spring input
       const springOut = (this.spring as unknown as { output: Tone.ToneAudioNode }).output;
       Tone.connect(springOut, bp as unknown as Tone.InputNode);
       bp.connect(tap);
-      Tone.connect(tap, this.spring.input as unknown as Tone.InputNode);
-      console.log('[DubBus] tubbyScream ▶ wired spring→bp→tap→spring, fb=' + fbAmt.toFixed(2) + ' Q=' + bp.Q.value.toFixed(1));
+      tap.connect(loopSat);
+      Tone.connect(loopSat, this.spring.input as unknown as Tone.InputNode);
+      console.log('[DubBus] tubbyScream ▶ wired spring→bp→tap→sat→spring, fb=' + fbAmt.toFixed(2) + ' Q=' + bp.Q.value.toFixed(1));
     } catch (err) {
       console.warn('[DubBus] tubbyScream wire failed:', err);
       return () => {};
@@ -7428,7 +7439,7 @@ export class DubBus {
         tap.gain.setValueAtTime(0, release);
       } catch { /* ok */ }
       // Disconnect loop nodes right away (no setTimeout).
-      try { bp.disconnect(); tap.disconnect(); } catch { /* ok */ }
+      try { bp.disconnect(); tap.disconnect(); loopSat.disconnect(); } catch { /* ok */ }
       // Flush the spring's accumulated ring-out energy by momentarily
       // zeroing spring wet, then restoring. Without this the self-oscillation
       // tail rings for several seconds and saturates the sidechain compressor.
