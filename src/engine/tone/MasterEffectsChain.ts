@@ -1,4 +1,5 @@
 import * as Tone from 'tone';
+import { connectAudio } from './connectAudio';
 import type { EffectConfig } from '@typedefs/instrument';
 import { InstrumentFactory } from '../InstrumentFactory';
 import { getNativeAudioNode } from '@utils/audio-context';
@@ -317,43 +318,15 @@ export async function rebuildMasterEffects(ctx: MasterEffectsContext, effects: E
   }
 
   // Connect chain: masterEffectsInput → chainNodes[0] → ... → blepInput
-  // Most effects are Tone.ToneAudioNodes and use Tone's .connect() directly.
-  // DevilboxSynth effects (Buzzmachine) have native Web Audio .input/.output
-  // GainNodes — bridge those at the native level using getNativeAudioNode.
-  const isNativeSynth = (n: any): boolean => !!(n.input && n.output && !(n instanceof Tone.ToneAudioNode));
-
-  /** Connect src → dst, bridging Tone.js ↔ native when one side is a DevilboxSynth */
-  const chainConnect = (src: any, dst: any) => {
-    const srcIsNative = isNativeSynth(src);
-    const dstIsNative = isNativeSynth(dst);
-
-    if (!srcIsNative && !dstIsNative) {
-      // Both Tone.js — use Tone's connect (preserves internal routing)
-      src.connect(dst);
-    } else if (srcIsNative && dstIsNative) {
-      // Both native — direct Web Audio connect
-      (src.output as AudioNode).connect(dst.input as AudioNode);
-    } else if (srcIsNative) {
-      // Native → Tone: connect native output to Tone's native input
-      const dstNative = getNativeAudioNode(dst);
-      if (dstNative) (src.output as AudioNode).connect(dstNative);
-      else src.output.connect(dst);
-    } else {
-      // Tone → Native: connect Tone's native output to native input
-      const srcNative = getNativeAudioNode(src);
-      if (srcNative) srcNative.connect(dst.input as AudioNode);
-      else src.connect(dst.input);
-    }
-  };
-
+  // connectAudio bridges Tone.js, raw Web Audio and native (.input/.output) effects.
   try {
-    chainConnect(ctx.masterEffectsInput, chainNodes[0]);
+    connectAudio(ctx.masterEffectsInput, chainNodes[0]);
 
     for (let i = 0; i < chainNodes.length - 1; i++) {
-      chainConnect(chainNodes[i], chainNodes[i + 1]);
+      connectAudio(chainNodes[i], chainNodes[i + 1]);
     }
 
-    chainConnect(chainNodes[chainNodes.length - 1], ctx.blepInput);
+    connectAudio(chainNodes[chainNodes.length - 1], ctx.blepInput);
   } catch (e) {
     console.error('[MasterEffectsChain] Chain connection failed:', e,
       'chainNodes:', chainNodes.map(n => n?.name || n?.constructor?.name));

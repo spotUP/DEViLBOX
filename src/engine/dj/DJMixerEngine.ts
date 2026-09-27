@@ -20,6 +20,7 @@
  * Sampler input also bypasses the crossfader — always at unity gain.
  */
 
+import { connectAudio } from '../tone/connectAudio';
 import * as Tone from 'tone';
 import { InstrumentFactory } from '@/engine/InstrumentFactory';
 import type { EffectConfig } from '@typedefs/instrument';
@@ -437,21 +438,21 @@ export class DJMixerEngine {
 
           // chainGain → HP → FX chain → duckGain
           Tone.connect(newChainGain, bassHP);
-          Tone.connect(bassHP, nodes[0]);
+          connectAudio(bassHP, nodes[0]);
           for (let i = 0; i < nodes.length - 1; i++) {
-            nodes[i].connect(nodes[i + 1]);
+            connectAudio(nodes[i], nodes[i + 1]);
           }
-          nodes[nodes.length - 1].connect(this.duckGain);
+          connectAudio(nodes[nodes.length - 1], this.duckGain);
 
           extraDisposables.push(bassLP, bassHP);
           console.log('[DJMixer] Bass-lock enabled (crossover at 150Hz)');
         } else {
           // Standard chain — full spectrum through effects
-          newChainGain.connect(nodes[0]);
+          connectAudio(newChainGain, nodes[0]);
           for (let i = 0; i < nodes.length - 1; i++) {
-            nodes[i].connect(nodes[i + 1]);
+            connectAudio(nodes[i], nodes[i + 1]);
           }
-          nodes[nodes.length - 1].connect(this.duckGain);
+          connectAudio(nodes[nodes.length - 1], this.duckGain);
         }
       } else {
         newChainGain.connect(this.duckGain);
