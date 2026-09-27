@@ -17,6 +17,8 @@
  * hear is sweep" was.
  */
 
+import { effectiveDubSend } from './sendAudibility';
+
 /** Largest number of tracker channels the dub bus taps. */
 export const MAX_DUB_SEND_CHANNELS = 32;
 
@@ -47,10 +49,12 @@ export interface DubSendChannelLike {
 export function storedDubSendGains(
   channels: ReadonlyArray<DubSendChannelLike | null | undefined> | null | undefined,
   max = MAX_DUB_SEND_CHANNELS,
+  /** Channels below this index bleed at the floor when closed (BLEED on). */
+  bleedChannels = 0,
 ): number[] {
   const gains: number[] = [];
   for (let ch = 0; ch < max; ch++) {
-    gains.push(dubSendToGain(channels?.[ch]?.dubSend ?? 0));
+    gains.push(dubSendToGain(effectiveDubSend(channels?.[ch]?.dubSend ?? 0, ch < bleedChannels)));
   }
   return gains;
 }

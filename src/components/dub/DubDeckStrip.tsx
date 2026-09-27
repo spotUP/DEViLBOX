@@ -17,7 +17,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { notify } from '@stores/useNotificationStore';
 import { useHoverTooltip } from '@/components/ui';
 import { useDubStore } from '@/stores/useDubStore';
-import { anySendAudible, GHOST_SEND_FLOOR } from '@/lib/dub/sendAudibility';
+import { anySendAudible } from '@/lib/dub/sendAudibility';
 import { useDrumPadStore } from '@/stores/useDrumPadStore';
 import { useMixerStore } from '@/stores/useMixerStore';
 import { useTrackerStore } from '@/stores/useTrackerStore';
@@ -870,35 +870,10 @@ export const DubDeckStrip: React.FC = () => {
   // effects like JA Press. Bus now starts silent; user dials sends up
   // explicitly or uses HOLD / moves to open channel taps momentarily.
 
-  // Ghost Bus — when enabled, any channel whose send is 0 gets floored to
-  // GHOST_SEND_FLOOR (~-36 dB) so it bleeds through the dub return even when
-  // the main-mix mute is on. When disabled, floor is lifted; user's explicit
-  // non-zero sends are NEVER touched.
-  const priorSendsBeforeGhost = useRef<Map<number, number>>(new Map());
-  useEffect(() => {
-    if (!busEnabled) return;
-    if (ghostBus) {
-      // Record prior zeros so we can restore on toggle-off
-      for (let i = 0; i < visibleChannelCount; i++) {
-        const cur = channels[i]?.dubSend ?? 0;
-        if (cur === 0) {
-          priorSendsBeforeGhost.current.set(i, 0);
-          setChannelDubSend(i, GHOST_SEND_FLOOR);
-        }
-      }
-    } else {
-      for (const [i, prior] of priorSendsBeforeGhost.current.entries()) {
-        const cur = channels[i]?.dubSend ?? 0;
-        // Only reset channels that are still at the ghost level (user hasn't
-        // dragged them up manually)
-        if (Math.abs(cur - GHOST_SEND_FLOOR) < 0.001) {
-          setChannelDubSend(i, prior);
-        }
-      }
-      priorSendsBeforeGhost.current.clear();
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ghostBus, busEnabled, visibleChannelCount]);
+  // Ghost Bus (BLEED) is applied by the engine, not here: see
+  // effectiveDubSend in lib/dub/sendAudibility.ts. This effect used to write
+  // the floor into the mixer store, so BLEED only worked while this deck was
+  // mounted and moved every closed fader to 1.5 %.
 
   const capturedRecently = lastCapturedAt !== null && (performance.now() - lastCapturedAt) < 300;
 

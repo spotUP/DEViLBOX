@@ -86,7 +86,8 @@ describe('the dub wiring seeds its gains from the store', () => {
 
   it('writes the gain when a rebuild re-hydrates the send values', () => {
     const rebuild = SRC.slice(SRC.indexOf('async rebuildDubConnections()'), SRC.indexOf('// ── Per-channel effect routing'));
-    expect(rebuild).toContain('dubSendToGain(this.channelDubSendValues[ch])');
+    // The effective send: the fader, or the BLEED floor for a closed channel.
+    expect(rebuild).toContain('dubSendToGain(this.effectiveDubSendOf(ch))');
     expect(rebuild).toContain('linearRampToValueAtTime(want, t + DUB_SEND_SEED_RAMP_SEC)');
   });
 });
