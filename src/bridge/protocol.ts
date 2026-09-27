@@ -25,3 +25,13 @@ export interface BridgeResponse {
  * whichever tab reconnected last, often one nobody is looking at.
  */
 export const RELAY_REPLACED_CLOSE_CODE = 4001;
+
+/**
+ * Message the relay sends a browser tab when an MCP session (a Claude agent)
+ * is attached - on the tab's connect if one already is, and when one
+ * attaches later. The tab uses it to answer its crash-recovery prompt with
+ * Restore straight away: every reload during an agent session (HMR from an
+ * edit, hard_reload) brings the prompt up, and an agent that did not notice
+ * left it blocking the user's screen.
+ */
+export const RELAY_AGENT_ATTACHED = 'agent-attached';

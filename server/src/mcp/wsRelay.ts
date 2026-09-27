@@ -23,7 +23,7 @@ import { randomUUID } from 'crypto';
 import http from 'http';
 import { WebSocket, WebSocketServer } from 'ws';
 import type { BridgeRequest, BridgeResponse } from './protocol';
-import { RELAY_REPLACED_CLOSE_CODE } from './protocol';
+import { RELAY_REPLACED_CLOSE_CODE, RELAY_AGENT_ATTACHED } from './protocol';
 
 const PORT = Number(process.env.MCP_BRIDGE_PORT ?? 4003);
 const TIMEOUT_MS = 900_000;
@@ -105,6 +105,9 @@ export function startRelay(): void {
       // MCP subprocess connection — forward its requests to browser
       mcpClients.add(ws);
       console.error('[mcp-bridge] MCP subprocess connected');
+      if (browserSocket && browserSocket.readyState === WebSocket.OPEN) {
+        browserSocket.send(JSON.stringify({ type: RELAY_AGENT_ATTACHED }));
+      }
 
       ws.on('message', (data) => {
         let msg: BridgeRequest;
@@ -152,6 +155,7 @@ export function startRelay(): void {
       }
       browserSocket = ws;
       console.error(`[mcp-bridge] Browser connected (origin=${browserOrigin} ua=${browserUA})`);
+      if (mcpClients.size > 0) ws.send(JSON.stringify({ type: RELAY_AGENT_ATTACHED }));
 
       ws.on('message', (data) => {
         let msg: BridgeResponse;

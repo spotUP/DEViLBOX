@@ -8,7 +8,8 @@
 
 import { furnaceCmdLog } from './handlers/furnaceCmdLog';
 import type { BridgeRequest, BridgeResponse } from './protocol';
-import { RELAY_REPLACED_CLOSE_CODE } from './protocol';
+import { RELAY_REPLACED_CLOSE_CODE, RELAY_AGENT_ATTACHED } from './protocol';
+import { isRecoveryPromptOpen, resolveRecoveryPrompt as resolveRecovery, onRecoveryPromptOpen } from '../lib/persistence/recoveryPrompt';
 import { useNotificationStore } from '@stores/useNotificationStore';
 import {
   getSongInfo,
@@ -517,6 +518,36 @@ function send(msg: BridgeResponse): void {
   }
 }
 
+/**
+ * True once an MCP session has shown itself on this connection - the relay's
+ * agent-attached greeting, or any call.
+ */
+let agentAttached = false;
+
+/**
+ * Answer the crash-recovery prompt with Restore while an agent is attached.
+ *
+ * Every reload during an agent session - the HMR reload after an edit, a
+ * hard_reload - brings the prompt up, and it blocks the whole app. The agent
+ * could answer it (resolve_recovery_prompt) and every response reported it
+ * (blockingDialog), but the agent had to NOTICE, between its own calls, that
+ * a reload had happened; it often did not, and the prompt sat on the user's
+ * screen ("for the one millionth time: you never dismiss the blocking song
+ * recovery dialog", 2026-09-27). Restore is the owner's standing answer and
+ * loses nothing; Discard stays an explicit call only.
+ */
+function autoRestoreForAgent(): void {
+  if (!agentAttached || !isRecoveryPromptOpen()) return;
+  if (!resolveRecovery('restore')) return;
+  console.log('[mcp-bridge] Recovery prompt answered with Restore (MCP session attached)');
+  useNotificationStore.getState().addNotification({
+    type: 'info',
+    message: 'Unsaved work restored automatically - a Claude session is driving this tab.',
+    duration: 10000,
+  });
+}
+onRecoveryPromptOpen(() => { queueMicrotask(autoRestoreForAgent); });
+
 async function handleMessage(data: string): Promise<void> {
   let request: BridgeRequest;
   try {
@@ -525,7 +556,14 @@ async function handleMessage(data: string): Promise<void> {
     return;
   }
 
+  if ((request as { type: string }).type === RELAY_AGENT_ATTACHED) {
+    agentAttached = true;
+    autoRestoreForAgent();
+    return;
+  }
   if (request.type !== 'call') return;
+  agentAttached = true;
+  autoRestoreForAgent();
 
   const handler = handlers[request.method];
   if (!handler) {
@@ -670,6 +708,8 @@ function connect(): void {
   };
 
   ws.onclose = (event) => {
+    // A new connection is greeted again if an agent is still attached.
+    agentAttached = false;
     if (event.code === RELAY_REPLACED_CLOSE_CODE) {
       ws = null;
       onReplacedByAnotherTab();
