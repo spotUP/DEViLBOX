@@ -3,9 +3,15 @@
  *
  * Caching strategy:
  * 1. Sample packs (/data/samples/packs/*) — CACHE-FIRST (existing)
- * 2. App shell (HTML, JS, CSS, WASM, fonts) — STALE-WHILE-REVALIDATE
- *    Serves cached version immediately for offline/fast load, then
- *    updates the cache in the background. Next load gets the fresh version.
+ * 2. App shell (HTML, JS, CSS, WASM, fonts)
+ *    - Content-hashed build output (/assets/name-<hash>.ext) — CACHE-FIRST.
+ *      Its name changes whenever its content does, so a cached copy is never stale.
+ *    - Everything else (index.html, the engines' .wasm/.js/worklets under
+ *      public/, songs) — NETWORK-FIRST, falling back to the cache offline.
+ *      These keep their names across deploys. Serving them stale-while-
+ *      revalidate ran the PREVIOUS build's engine on the first load after every
+ *      deploy (or local rebuild) — a fixed DefleMask file refused by the old
+ *      FurnaceFileOps.wasm until a second reload.
  * 3. WAM plugins (mainline.i3s.unice.fr, webaudiomodules.com) — CACHE-FIRST
  *    Once downloaded, WAM plugins never change. Cache-first for instant offline load.
  * 4. API calls, Modland downloads — NETWORK-ONLY (data goes through IndexedDB)
@@ -42,6 +48,13 @@ function isAppShellRequest(url) {
   if (url.origin !== self.location.origin) return false;
   // Match app shell patterns
   return APP_SHELL_PATTERNS.some(p => p.test(url.pathname));
+}
+
+// Vite's content-hashed build output: /assets/<name>-<hash>.<ext>
+const HASHED_ASSET = /^\/assets\/.+-[A-Za-z0-9_-]{8,}\.[a-z0-9]+$/;
+
+function isImmutableAsset(url) {
+  return HASHED_ASSET.test(url.pathname);
 }
 
 function isWAMRequest(url) {
@@ -103,25 +116,23 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // 3. App shell: stale-while-revalidate
+  // 3. App shell: cache-first for content-hashed files, network-first for the rest
   if (isAppShellRequest(url) && event.request.method === 'GET') {
     event.respondWith(
       caches.open(APP_CACHE_NAME).then(async (cache) => {
-        const cached = await cache.match(event.request);
-
-        // Fetch in background (update cache for next time)
-        const fetchPromise = fetch(event.request).then((response) => {
-          if (response.ok) {
-            cache.put(event.request, response.clone());
-          }
+        if (isImmutableAsset(url)) {
+          const cached = await cache.match(event.request);
+          if (cached) return cached;
+        }
+        try {
+          const response = await fetch(event.request);
+          if (response.ok) cache.put(event.request, response.clone());
           return response;
-        }).catch(() => {
-          // Network failed — cached version is all we have
+        } catch {
+          // Offline — the cached copy is all there is
+          const cached = await cache.match(event.request);
           return cached || new Response('Offline', { status: 503 });
-        });
-
-        // Return cached immediately if available, otherwise wait for network
-        return cached || fetchPromise;
+        }
       })
     );
     return;
