@@ -16,6 +16,7 @@ import {
 } from '@/types/instrument';
 import { ArpeggioEngine } from '../ArpeggioEngine';
 import { getNormalizedVolume } from './volumeNormalization';
+import { createBitCrusher, setBitCrusherBits } from '../tone/bitCrusher';
 
 
 /**
@@ -1882,9 +1883,7 @@ export function createChipSynth(config: InstrumentConfig): Tone.ToneAudioNode {
     });
 
     // Add bit crusher for 8-bit sound
-    // wet=0: SAC's AudioWorkletNode wet path is non-functional; dry path passes audio directly.
-    const bitCrusher = new Tone.BitCrusher(chipConfig.bitDepth);
-    bitCrusher.wet.value = 0;
+    const bitCrusher = createBitCrusher(chipConfig.bitDepth);
     noise.connect(bitCrusher);
 
     return {
@@ -1918,7 +1917,7 @@ export function createChipSynth(config: InstrumentConfig): Tone.ToneAudioNode {
             release: env.release / 1000,
           }
         });
-        (bitCrusher as any).bits = csc.bitDepth;
+        setBitCrusherBits(bitCrusher, Number(csc.bitDepth));
       },
       volume: noise.volume,
     } as unknown as Tone.ToneAudioNode;
@@ -1940,9 +1939,7 @@ export function createChipSynth(config: InstrumentConfig): Tone.ToneAudioNode {
   });
 
   // Add bit crusher for 8-bit character
-  // wet=0: SAC's AudioWorkletNode wet path is non-functional; dry path passes audio directly.
-  const bitCrusher = new Tone.BitCrusher(chipConfig.bitDepth);
-  bitCrusher.wet.value = 0;
+  const bitCrusher = createBitCrusher(chipConfig.bitDepth);
   synth.connect(bitCrusher);
 
   // Create ArpeggioEngine only if arpeggio is ENABLED (not just configured)
@@ -2031,7 +2028,7 @@ export function createChipSynth(config: InstrumentConfig): Tone.ToneAudioNode {
           release: env.release / 1000,
         }
       });
-      (bitCrusher as any).bits = csc.bitDepth;
+      setBitCrusherBits(bitCrusher, Number(csc.bitDepth));
     },
     volume: synth.volume,
     // Expose methods for real-time arpeggio updates

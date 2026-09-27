@@ -28,6 +28,7 @@ import { SidechainCompressor } from '../effects/SidechainCompressor';
 import { WAMEffectNode } from '../wam/WAMEffectNode';
 import { WAM_EFFECT_URLS } from '@/constants/wamPlugins';
 import { EffectRegistry } from '../registry/EffectRegistry';
+import { createBitCrusher } from '../tone/bitCrusher';
 
 /** Default wet % per effect type. Delays/echoes need lower wet to preserve dry signal. */
 export function getDefaultEffectWet(type: string): number {
@@ -403,23 +404,9 @@ export async function createEffect(
       });
       break;
 
-    case 'BitCrusher': {
-      // Use Tone.Distortion with a staircase WaveShaper curve instead of
-      // Tone.BitCrusher. The latter uses an AudioWorklet that fails to
-      // initialize due to standardized-audio-context's AudioWorkletNode
-      // throwing InvalidStateError (even though the native API works).
-      // A WaveShaper-based approach is synchronous and fully reliable.
-      const bitsValue = Number(p.bits) || 4;
-      const crusher = new Tone.Distortion({ distortion: 0, wet: wetValue, oversample: 'none' });
-      const step = Math.pow(0.5, bitsValue - 1);
-      (crusher as unknown as { _shaper: { setMap: (fn: (v: number) => number, len?: number) => void } })
-        ._shaper.setMap((val: number) => step * Math.floor(val / step + 0.5), 4096);
-      // Tag for parameter updates in applyEffectParametersDiff
-      (crusher as unknown as Record<string, unknown>)._isBitCrusher = true;
-      (crusher as unknown as Record<string, unknown>)._bitsValue = bitsValue;
-      node = crusher;
+    case 'BitCrusher':
+      node = createBitCrusher(Number(p.bits) || 4, wetValue);
       break;
-    }
 
     case 'Chebyshev':
       node = new Tone.Chebyshev({
