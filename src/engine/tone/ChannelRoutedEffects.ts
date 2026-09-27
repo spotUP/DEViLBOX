@@ -29,6 +29,7 @@ import { DubChannelLifecycle, type DubChannelAction } from '@/lib/dub/dubChannel
 import { getMixerStoreRefOrNull, getTrackerStoreRef } from '@stores/storeAccess';
 import { useDubStore } from '@stores/useDubStore';
 import { effectiveDubSend } from '@/lib/dub/sendAudibility';
+import { connectAudio } from './connectAudio';
 // Type-only: erased at build time, so it adds no edge to the module graph.
 import type { MixerChannelState } from '@stores/useMixerStore';
 
@@ -108,33 +109,6 @@ interface IsolationSlot {
   /** Native GainNode connected between worklet output and effect chain */
   outputGain: GainNode;
 }
-
-/** Returns true if node is a native DevilboxSynth (has input/output GainNodes but is not a ToneAudioNode) */
-const isNativeSynth = (n: any): boolean => !!(n.input && n.output && !(n instanceof Tone.ToneAudioNode));
-
-/** Connect src → dst, bridging Tone.js ↔ native DevilboxSynth nodes */
-const chainConnect = (src: any, dst: any) => {
-  const srcIsNative = isNativeSynth(src) || src instanceof AudioNode;
-  const dstIsNative = isNativeSynth(dst) || dst instanceof AudioNode;
-
-  if (!srcIsNative && !dstIsNative) {
-    src.connect(dst);
-  } else if (srcIsNative && dstIsNative) {
-    const srcOut = src instanceof AudioNode ? src : src.output as AudioNode;
-    const dstIn = dst instanceof AudioNode ? dst : dst.input as AudioNode;
-    srcOut.connect(dstIn);
-  } else if (srcIsNative) {
-    const srcOut = src instanceof AudioNode ? src : src.output as AudioNode;
-    const dstNative = getNativeAudioNode(dst);
-    if (dstNative) srcOut.connect(dstNative);
-    else srcOut.connect(dst);
-  } else {
-    const dstIn = dst instanceof AudioNode ? dst : dst.input as AudioNode;
-    const srcNative = getNativeAudioNode(src);
-    if (srcNative) srcNative.connect(dstIn);
-    else src.connect(dstIn);
-  }
-};
 
 export class ChannelRoutedEffectsManager {
   private slots: (IsolationSlot | null)[] = [null, null, null, null];
@@ -829,12 +803,12 @@ export class ChannelRoutedEffectsManager {
       }
 
       // Chain: outputGain → effect1 → effect2 → ... → masterEffectsInput
-      // Uses chainConnect to bridge Tone.js ↔ native DevilboxSynth (Buzzmachine) nodes
-      chainConnect(outputGain, effectNodes[0]);
+      // connectAudio bridges Tone.js ↔ native DevilboxSynth (Buzzmachine) nodes
+      connectAudio(outputGain, effectNodes[0]);
       for (let i = 0; i < effectNodes.length - 1; i++) {
-        chainConnect(effectNodes[i], effectNodes[i + 1]);
+        connectAudio(effectNodes[i], effectNodes[i + 1]);
       }
-      chainConnect(effectNodes[effectNodes.length - 1], this.masterEffectsInput);
+      connectAudio(effectNodes[effectNodes.length - 1], this.masterEffectsInput);
 
       this.slots[slotIdx] = {
         slotIndex: slotIdx,
