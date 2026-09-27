@@ -33,3 +33,17 @@ export function sendIsAudible(dubSend: number | undefined | null): boolean {
 export function anySendAudible(sends: ReadonlyArray<number | undefined | null>): boolean {
   return sends.some(sendIsAudible);
 }
+
+/**
+ * The send a channel's dub tap runs at: the fader, or, with BLEED on for this
+ * channel and the fader closed, the floor.
+ *
+ * BLEED used to be an effect inside the dub deck that WROTE the floor into
+ * the mixer store: it only worked while the deck was on screen, it moved
+ * every closed fader to 1.5 %, and it only reached the channels that existed
+ * at the moment it was toggled. The fader is the performer's; the floor is
+ * the engine's, applied here where the tap gain is decided.
+ */
+export function effectiveDubSend(fader: number, bleed: boolean): number {
+  return fader > 0 ? fader : bleed ? GHOST_SEND_FLOOR : 0;
+}

@@ -26,7 +26,9 @@ import { getNativeAudioNode } from '@utils/audio-context';
 import { applyEffectParametersDiff } from './EffectParameterEngine';
 import { PerChannelDubFx } from '../dub/PerChannelDubFx';
 import { DubChannelLifecycle, type DubChannelAction } from '@/lib/dub/dubChannelLifecycle';
-import { getMixerStoreRefOrNull } from '@stores/storeAccess';
+import { getMixerStoreRefOrNull, getTrackerStoreRef } from '@stores/storeAccess';
+import { useDubStore } from '@stores/useDubStore';
+import { effectiveDubSend } from '@/lib/dub/sendAudibility';
 // Type-only: erased at build time, so it adds no edge to the module graph.
 import type { MixerChannelState } from '@stores/useMixerStore';
 
@@ -182,8 +184,40 @@ export class ChannelRoutedEffectsManager {
    */
   private channelDubPendingActivation: Set<number> = new Set();
 
+  /** Stops following the BLEED switch; see `bleedsInto`. */
+  private readonly unsubscribeBleed: () => void;
+
   constructor(masterEffectsInput: Tone.Gain) {
     this.masterEffectsInput = masterEffectsInput;
+    this.unsubscribeBleed = useDubStore.subscribe((s, prev) => {
+      if (s.ghostBus !== prev.ghostBus) this.reapplyClosedDubSends();
+    });
+  }
+
+  /**
+   * Whether BLEED floors this channel: on, and the channel is one of the
+   * song's (the deck's rule — only the channels a song has bleed).
+   */
+  private bleedsInto(channelIndex: number): boolean {
+    if (!useDubStore.getState().ghostBus) return false;
+    try {
+      const t = getTrackerStoreRef().getState() as {
+        patterns?: { channels?: unknown[] }[]; currentPatternIndex?: number;
+      };
+      return channelIndex < (t.patterns?.[t.currentPatternIndex ?? 0]?.channels?.length ?? 0);
+    } catch { return false; }
+  }
+
+  /** The send this channel's tap runs at: its fader, or the BLEED floor. */
+  private effectiveDubSendOf(channelIndex: number): number {
+    return effectiveDubSend(this.channelDubSendValues[channelIndex], this.bleedsInto(channelIndex));
+  }
+
+  /** BLEED toggled: every closed channel moves to or from the floor. */
+  private reapplyClosedDubSends(): void {
+    for (let ch = 0; ch < MAX_DUB_CHANNELS; ch++) {
+      if (this.channelDubSendValues[ch] <= 0 && this.channelDubGains[ch]) this._applyDubSend(ch);
+    }
   }
 
   // ── Sidechain tap API ─────────────────────────────────────────────
@@ -343,9 +377,12 @@ export class ChannelRoutedEffectsManager {
     // restore: `busInput` 0.00000 with four sends at 0.77-0.84 and
     // `activeDubSlots: 4`; re-writing the same values the store already held
     // took it to 0.04716. Every colour move was processing silence.
+    let bleedChannels = 0;
+    while (bleedChannels < MAX_DUB_CHANNELS && this.bleedsInto(bleedChannels)) bleedChannels++;
     const seeded = storedDubSendGains(
       (getMixerStoreRefOrNull()?.getState() as { channels?: MixerChannelState[] } | undefined)?.channels,
       MAX_DUB_CHANNELS,
+      bleedChannels,
     );
 
     const seedFrom = ctx.currentTime;
@@ -422,9 +459,14 @@ export class ChannelRoutedEffectsManager {
    */
   setChannelDubSend(channelIndex: number, amount: number): void {
     if (channelIndex < 0 || channelIndex >= MAX_DUB_CHANNELS) return;
-    const clamped = Math.max(0, Math.min(1, amount));
-    this.channelDubSendValues[channelIndex] = clamped;
-    const curved = dubSendToGain(clamped);
+    this.channelDubSendValues[channelIndex] = Math.max(0, Math.min(1, amount));
+    this._applyDubSend(channelIndex);
+  }
+
+  /** Put the channel's tap at its effective send: gain, baseline and worklet slot. */
+  private _applyDubSend(channelIndex: number): void {
+    const effective = this.effectiveDubSendOf(channelIndex);
+    const curved = dubSendToGain(effective);
 
     // Tell the bus where the fader now rests. A throw or solo that releases
     // later restores to this, never to a sampled tap value — sampling picks
@@ -457,7 +499,7 @@ export class ChannelRoutedEffectsManager {
     // flight: the running transition reconciles against the recorded intent
     // itself when it finishes, and starting a second one alongside it is how
     // a channel ends up half-activated.
-    const shouldBeActive = clamped > 0;
+    const shouldBeActive = effective > 0;
     if (!shouldBeActive) {
       // A deferred activation is an intent too — cancel it, or the 500 ms
       // retry re-opens a send the user has already closed.
@@ -551,7 +593,7 @@ export class ChannelRoutedEffectsManager {
     try {
       const { getDrumPadEngine } = await import('../../hooks/drumpad/useMIDIPadRouting');
       const bus = getDrumPadEngine()?.getDubBus();
-      bus?.registerChannelTap(channelIndex, gain, dubSendToGain(this.channelDubSendValues[channelIndex]));
+      bus?.registerChannelTap(channelIndex, gain, dubSendToGain(this.effectiveDubSendOf(channelIndex)));
     } catch { /* DubBus not available */ }
     console.log(`[ChannelRoutedEffects] Dub channel ${channelIndex} activated`);
     return true;
@@ -667,7 +709,7 @@ export class ChannelRoutedEffectsManager {
         // rendered, and nothing reached the bus (2026-09-23).
         const g = this.channelDubGains[ch];
         if (g) {
-          const want = dubSendToGain(this.channelDubSendValues[ch]);
+          const want = dubSendToGain(this.effectiveDubSendOf(ch));
           if (Math.abs(g.gain.value - want) > 1e-6) {
             // Ramped for the same reason the initial seed is: a rebuild lands
             // while the engine's worklet is restarting.
@@ -682,7 +724,7 @@ export class ChannelRoutedEffectsManager {
     } catch { /* store unavailable — fall back to whatever the engine holds */ }
 
     for (let ch = 0; ch < MAX_DUB_CHANNELS; ch++) {
-      if (this.channelDubSendValues[ch] <= 0) continue;
+      if (this.effectiveDubSendOf(ch) <= 0) continue;
       const gain = this.channelDubGains[ch];
       if (!gain) continue;
       // Fire enable + reconnect. Safe to disconnect first even if not
@@ -696,7 +738,7 @@ export class ChannelRoutedEffectsManager {
         // Re-register with DubBus (channelTaps map is cleared on bus dispose)
         try {
           const { getDrumPadEngine } = await import('../../hooks/drumpad/useMIDIPadRouting');
-          getDrumPadEngine()?.getDubBus()?.registerChannelTap(ch, gain, dubSendToGain(this.channelDubSendValues[ch]));
+          getDrumPadEngine()?.getDubBus()?.registerChannelTap(ch, gain, dubSendToGain(this.effectiveDubSendOf(ch)));
         } catch { /* ok */ }
       } catch (e) {
         console.warn(`[ChannelRoutedEffects] rebuildDubConnections: ch${ch} connect failed:`, e);
@@ -895,6 +937,7 @@ export class ChannelRoutedEffectsManager {
   }
 
   async dispose(): Promise<void> {
+    this.unsubscribeBleed();
     try {
       const engine = await getActiveIsolationEngine();
       if (engine) {
