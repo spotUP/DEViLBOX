@@ -342,6 +342,15 @@ export class FurnaceDispatchSynth implements DevilboxSynth {
 
       this._pendingUploadConfig = null;
 
+      // A song's instrument stops at the upload: which instrument each channel
+      // plays is the song sequencer's business, and it sends its own
+      // INSTRUMENT on each channel's first note. Forcing this one onto every
+      // channel of the platform reached the song's chip (the worklet sends a
+      // command for a platform with no chip of its own to the first chip), so a
+      // synth that came up mid-song swapped every channel's instrument under
+      // the sequencer, which believed the channel still held its own.
+      if (this.fromModule) return;
+
       const numCh = this.engine.getChannelCount(this.platformType) || 3;
       for (let ch = 0; ch < numCh; ch++) {
         this.engine.setInstrument(ch, this.furnaceInstrumentIndex, this.platformType, true);
