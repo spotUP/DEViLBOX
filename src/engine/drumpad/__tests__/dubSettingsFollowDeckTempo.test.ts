@@ -35,7 +35,7 @@ function playDeckA(bpm: number) {
   const s = useDJStore.getState();
   useDJStore.setState({
     crossfaderPosition: 0,
-    decks: { ...s.decks, A: { ...s.decks.A, isPlaying: true, volume: 1, detectedBPM: bpm, beatGrid: null } },
+    decks: { ...s.decks, A: { ...s.decks.A, isPlaying: true, volume: 1, detectedBPM: bpm, effectiveBPM: bpm, beatGrid: null } },
   } as never);
 }
 
@@ -50,6 +50,18 @@ describe('dub settings follow the DJ deck tempo', () => {
     vi.advanceTimersByTime(150);
     const { echoRateMs, echoSyncDivision } = useDrumPadStore.getState().dubBus;
     expect(pushed.at(-1)?.echoRateMs).toBe(bpmSyncedEchoRate(140, echoSyncDivision, echoRateMs));
+    stop();
+  });
+
+  it('syncs to the tempo the deck plays at, pitch included', () => {
+    useDrumPadStore.getState().setDubBus({ echoSyncDivision: '1/4' });
+    const { pushed, stop } = mirror(false);
+    playDeckA(125);
+    const s = useDJStore.getState();
+    useDJStore.setState({ decks: { ...s.decks, A: { ...s.decks.A, effectiveBPM: 140.31 } } } as never);
+    vi.advanceTimersByTime(150);
+    const { echoRateMs, echoSyncDivision } = useDrumPadStore.getState().dubBus;
+    expect(pushed.at(-1)?.echoRateMs).toBe(bpmSyncedEchoRate(140.31, echoSyncDivision, echoRateMs));
     stop();
   });
 
