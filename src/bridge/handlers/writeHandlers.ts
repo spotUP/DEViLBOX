@@ -411,6 +411,17 @@ export function setChannelDubSend(params: Record<string, unknown>): Record<strin
   return { ok: true };
 }
 
+/**
+ * BLEED ("Ghost Bus") on or off: closed channels feed the dub bus at the
+ * floor so muted channels whisper through the return. The same store flag
+ * the deck's BLEED button toggles; the engine applies it.
+ */
+export async function setDubBleed(params: Record<string, unknown>): Promise<Record<string, unknown>> {
+  const { useDubStore } = await import('../../stores/useDubStore');
+  useDubStore.getState().setGhostBus(params.enabled === true);
+  return { ok: true, bleed: useDubStore.getState().ghostBus };
+}
+
 export async function setDubBusEnabled(params: Record<string, unknown>): Promise<Record<string, unknown>> {
   const { useDrumPadStore } = await import('../../stores/useDrumPadStore');
   useDrumPadStore.getState().setDubBus({ enabled: params.enabled as boolean });
@@ -2786,12 +2797,15 @@ export function clearConsoleErrors(): Record<string, unknown> {
  * Returns the JSON-serializable result.
  * Used for debugging — e.g., reading localStorage after a page crash.
  */
-export function evaluateScript(params: Record<string, unknown>): unknown {
+export async function evaluateScript(params: Record<string, unknown>): Promise<unknown> {
   const code = params.code as string;
   if (!code) return { error: 'Missing code param' };
   try {
     // eslint-disable-next-line no-eval
-    const result = (0, eval)(code);
+    const value: unknown = (0, eval)(code);
+    // Await a promise, so an async probe returns its value instead of the
+    // `{}` a Promise serialises to.
+    const result = value instanceof Promise ? await value : value;
     return { result };
   } catch (e) {
     return { error: (e as Error).message };
