@@ -68,9 +68,6 @@ class HivelyProcessor extends AudioWorkletProcessor {
 
     // Per-channel oscilloscope
     this.oscEnabled = false;
-    this.oscSnapshots = null;   // Int16Array[] per channel, each 256 samples
-    this.oscWritePos = null;    // number[] per channel write cursor
-    this.oscLastSendTime = 0;
     this.oscNumChannels = 0;
 
     // WASM float buffers for decode output
@@ -316,20 +313,13 @@ class HivelyProcessor extends AudioWorkletProcessor {
         const nc = this.wasm?._hively_get_channels ? this.wasm._hively_get_channels() : 4;
         this.oscEnabled = true;
         this.oscNumChannels = nc;
-        this.oscSnapshots = new Array(nc);
-        this.oscWritePos = new Array(nc);
-        for (let i = 0; i < nc; i++) {
-          this.oscSnapshots[i] = new Int16Array(256);
-          this.oscWritePos[i] = 0;
-        }
-        this.oscLastSendTime = 0;
+        // Nothing was streamed while disabled: never join across that.
+        this._stream?.discontinue();
         break;
       }
 
       case 'disableOsc':
         this.oscEnabled = false;
-        this.oscSnapshots = null;
-        this.oscWritePos = null;
         this.oscNumChannels = 0;
         break;
 
@@ -639,48 +629,29 @@ class HivelyProcessor extends AudioWorkletProcessor {
       }
     }
 
-    // 6. Per-channel oscilloscope capture
-    if (this.oscEnabled && this.oscSnapshots) {
+    // 6. Per-channel audio: re-render this frame with one channel audible at
+    // a time, and stream every sample (worklets/channel-stream.js) for the
+    // oscilloscopes and the per-channel role classifiers.
+    if (this.oscEnabled && globalThis.DevilboxChannelStream) {
       const nc = this.oscNumChannels;
+      const views = [];
+      let n = Infinity;
       for (let ch = 0; ch < nc; ch++) {
-        // Solo this channel
         this.wasm._hively_restore_voice_positions();
         for (let c = 0; c < numChannels; c++) {
           this.wasm._hively_set_channel_gain(c, c === ch ? 1.0 : 0.0);
         }
         const oscSamples = this.wasm._hively_render_frame(this.decodePtrL, this.decodePtrR);
-        if (oscSamples > 0) {
-          const heapF32 = this.wasm.HEAPF32;
-          const offL = this.decodePtrL >> 2;
-          const offR = this.decodePtrR >> 2;
-          const snap = this.oscSnapshots[ch];
-          let wp = this.oscWritePos[ch];
-          // Sample at most 256 samples from the frame
-          const step = Math.max(1, Math.floor(oscSamples / 256));
-          for (let i = 0; i < oscSamples; i += step) {
-            const mono = (heapF32[offL + i] + heapF32[offR + i]) * 0.5;
-            snap[wp] = Math.max(-32768, Math.min(32767, (mono * 32767) | 0));
-            wp = (wp + 1) & 255;
-          }
-          this.oscWritePos[ch] = wp;
-        }
+        const heapF32 = this.wasm.HEAPF32;
+        const offL = this.decodePtrL >> 2;
+        const offR = this.decodePtrR >> 2;
+        const mono = new Float32Array(Math.max(0, oscSamples));
+        for (let i = 0; i < mono.length; i++) mono[i] = (heapF32[offL + i] + heapF32[offR + i]) * 0.5;
+        views.push(mono);
+        n = Math.min(n, mono.length);
       }
-
-      // Send at ~30fps
-      if (currentTime - this.oscLastSendTime > 0.033) {
-        this.oscLastSendTime = currentTime;
-        const out = new Array(nc);
-        for (let ch = 0; ch < nc; ch++) {
-          const snap = this.oscSnapshots[ch];
-          const wp = this.oscWritePos[ch];
-          const copy = new Int16Array(256);
-          for (let j = 0; j < 256; j++) {
-            copy[j] = snap[(wp + j) & 255];
-          }
-          out[ch] = copy;
-        }
-        this.port.postMessage({ type: 'oscData', channels: out }, out.map(a => a.buffer));
-      }
+      this._stream ||= new globalThis.DevilboxChannelStream(this.port, sampleRate);
+      if (n > 0 && n !== Infinity) this._stream.writeFloat32(views, n);
     }
 
     // 7. Restore all channel gains to unity

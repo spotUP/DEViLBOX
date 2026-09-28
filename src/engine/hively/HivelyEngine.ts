@@ -210,7 +210,7 @@ export class HivelyEngine extends WASMSingletonBase implements IsolationCapableE
           break;
 
         case 'oscData':
-          useOscilloscopeStore.getState().updateChannelData(data.channels);
+          useOscilloscopeStore.getState().updateChannelData(data.channels, data.frame, data.sampleRate);
           break;
 
         case 'debug':

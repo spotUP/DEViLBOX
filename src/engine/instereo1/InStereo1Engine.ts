@@ -83,7 +83,7 @@ export class InStereo1Engine extends WASMSingletonBase {
           console.log('[InStereo1Engine] Module loaded, subsongs:', data.subsongCount);
           break;
         case 'oscData':
-          useOscilloscopeStore.getState().updateChannelData(data.channels);
+          useOscilloscopeStore.getState().updateChannelData(data.channels, data.frame, data.sampleRate);
           break;
         case 'songEnd':
           this._songEndCallback?.();

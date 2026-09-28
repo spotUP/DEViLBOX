@@ -15,7 +15,6 @@ class FaceTheMusicProcessor extends AudioWorkletProcessor {
     this.bufferSize = 128;
     this.lastHeapBuffer = null;
     this.initializing = false;
-    this._oscCounter = 0;
     this.port.onmessage = (event) => { this.handleMessage(event.data); };
   }
 
@@ -166,20 +165,11 @@ class FaceTheMusicProcessor extends AudioWorkletProcessor {
         outputR[i] = this.chBufs[1][i] + this.chBufs[2][i];
       }
 
-      // Send oscilloscope data every ~8 renders (~23ms at 128 frames/48kHz)
-      this._oscCounter++;
-      if (this._oscCounter >= 8) {
-        this._oscCounter = 0;
-        const oscSize = Math.min(256, rendered);
-        const channels = [];
-        for (let ch = 0; ch < 4; ch++) {
-          const arr = new Int16Array(oscSize);
-          for (let i = 0; i < oscSize; i++) {
-            arr[i] = Math.max(-32768, Math.min(32767, Math.round(this.chBufs[ch][i] * 32767)));
-          }
-          channels.push(arr);
-        }
-        this.port.postMessage({ type: 'oscData', channels });
+      // Every sample of each voice, for the oscilloscopes and the per-channel
+      // role classifiers (worklets/channel-stream.js).
+      if (globalThis.DevilboxChannelStream) {
+        this._stream ||= new globalThis.DevilboxChannelStream(this.port, sampleRate);
+        this._stream.writeFloat32(this.chBufs.slice(0, 4), rendered);
       }
     }
 

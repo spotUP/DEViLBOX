@@ -9,6 +9,7 @@ import { useTrackerStore } from '../../stores/useTrackerStore';
 import { getConsoleEntries } from '../consoleCapture';
 import { useTransportStore } from '../../stores/useTransportStore';
 import { useWasmPositionStore } from '../../stores/useWasmPositionStore';
+import { channelAudioContiguity } from '../analysis/ChannelAudioTap';
 import { useFormatStore } from '../../stores/useFormatStore';
 import { useInstrumentStore } from '../../stores/useInstrumentStore';
 import { useCursorStore } from '../../stores/useCursorStore';
@@ -454,6 +455,10 @@ export function getOscilloscopeInfo(): Record<string, unknown> {
     numChannels: osc.numChannels,
     channelNames: osc.channelNames,
     hasData: osc.channelData.some((d) => d !== null),
+    // Per channel: how many unbroken samples the analysis tap holds (32768 =
+    // a full CED window; the spectral classifier needs 2048). null: this
+    // engine sends display snapshots only.
+    analysisAudio: channelAudioContiguity(Math.max(osc.numChannels, osc.channelData.length)),
   };
 }
 

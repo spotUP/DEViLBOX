@@ -83,7 +83,7 @@ export class DigMugEngine extends WASMSingletonBase {
           console.log('[DigMugEngine] Module loaded, subsongs:', data.subsongCount);
           break;
         case 'oscData':
-          useOscilloscopeStore.getState().updateChannelData(data.channels);
+          useOscilloscopeStore.getState().updateChannelData(data.channels, data.frame, data.sampleRate);
           break;
         case 'songEnd':
           this._songEndCallback?.();

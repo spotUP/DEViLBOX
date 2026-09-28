@@ -130,8 +130,8 @@ export class SonixEngine extends WASMSingletonBase {
           break;
         }
 
-        case 'channelData':
-          useOscilloscopeStore.getState().updateChannelData(data.channels);
+        case 'oscData':
+          useOscilloscopeStore.getState().updateChannelData(data.channels, data.frame, data.sampleRate);
           break;
 
         case 'position': {
