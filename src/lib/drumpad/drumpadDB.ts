@@ -459,12 +459,28 @@ export async function loadAllPrograms(
   }
 
   const sampleMap = new Map<string, SampleData>();
+  const unrecoverable: string[] = [];
   for (const stored of storedSamples) {
+    // A record with no channel data was written by a build that did not
+    // validate on save (audioBufferToStored now refuses one). It can never be
+    // rebuilt, and left in place it failed with a warning on every load while
+    // its pad played silence - fifteen of them in the owner's database
+    // (2026-09-28, approved for removal). Drop it; a pad that pointed to it
+    // was already empty, and a preset reloads its sound from the pack files.
+    if (!stored.channels || stored.channels.length === 0) {
+      unrecoverable.push(stored.id);
+      continue;
+    }
     try {
       sampleMap.set(stored.id, storedToAudioBuffer(stored, audioContext));
     } catch (err) {
       console.warn(`[drumpadDB] Failed to reconstruct sample "${stored.id}":`, err);
     }
+  }
+  if (unrecoverable.length > 0) {
+    const del = txStore(db, STORE_SAMPLES, 'readwrite');
+    await Promise.all(unrecoverable.map((id) => idbRequest(del.delete(id))));
+    console.warn(`[drumpadDB] Removed ${unrecoverable.length} stored sample(s) with no audio data - they could not be recovered.`);
   }
 
   // Load all programs
