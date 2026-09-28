@@ -43,7 +43,7 @@ process real audio behind a muted return.
       dattorro, ring-mod, bitta; vinyl-noise by its own level).
 - [x] P5 (LfoLink) DubBus oscillators (master chorus LFOs, sweep LFO, ...): stopped or
       disconnected while their feature is off.
-- [ ] P8 Fewer nodes (OWNER DECISION - small gain): per-channel structures
+- [x] P8 Fewer nodes (owner go 2026-09-28; lazy per-channel dub chains via _ensureDubChannel, test in idleAudioGraph.test.ts; live node count pending reload): per-channel structures
       exist for 32 (PerChannelDubFx) / 16 (ChannelRouting) slots on a 7-channel
       song. MEASURED: +1000 silent GainNodes = +~20 % audio thread (15 -> 36 %),
       i.e. ~2 % per 100 nodes. Lazy per-channel dub FX would drop ~200 nodes
