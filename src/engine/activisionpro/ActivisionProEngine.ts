@@ -85,7 +85,7 @@ export class ActivisionProEngine extends WASMSingletonBase {
           useFormatStore.getState().setActivisionProSubsongs(data.subsongCount ?? 1);
           break;
         case 'oscData':
-          useOscilloscopeStore.getState().updateChannelData(data.channels);
+          useOscilloscopeStore.getState().updateChannelData(data.channels, data.frame, data.sampleRate);
           break;
         case 'songEnd':
           this._songEndCallback?.();

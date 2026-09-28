@@ -62,6 +62,7 @@ class UADEProcessor extends AudioWorkletProcessor {
         break;
 
       case 'load':
+        this._stream?.discontinue(); // a new song is a new stream
         await this._load(data.buffer, data.filenameHint, data.subsong || 0, data.skipScan || false, data.scanTimeoutSec);
         break;
 
@@ -505,18 +506,12 @@ class UADEProcessor extends AudioWorkletProcessor {
 
       case 'enableOsc':
         this._oscEnabled = true;
-        this._oscLastSendTime = 0;
-        // Allocate per-channel snapshot buffers (4 Paula channels, 256 samples each)
-        this._oscSnapshots = [
-          new Int16Array(256), new Int16Array(256),
-          new Int16Array(256), new Int16Array(256),
-        ];
-        this._oscWritePos = 0;
+        // Nothing was streamed while disabled: never join across that.
+        this._stream?.discontinue();
         break;
 
       case 'disableOsc':
         this._oscEnabled = false;
-        this._oscSnapshots = null;
         break;
 
       case 'enableLiveTickCapture': {
@@ -2272,37 +2267,11 @@ class UADEProcessor extends AudioWorkletProcessor {
             }
           }
 
-          // Capture per-channel oscilloscope snapshots
-          if (this._oscEnabled && this._oscSnapshots) {
-            for (let ch = 0; ch < 4; ch++) {
-              const chBase = chBases[ch];
-              const snap = this._oscSnapshots[ch];
-              let wp = this._oscWritePos;
-              for (let i = 0; i < chFrames; i++) {
-                // Convert float (-1..1) to Int16 (-32768..32767)
-                snap[wp] = Math.max(-32768, Math.min(32767, (heapF32[chBase + i] * 32767) | 0));
-                wp = (wp + 1) & 255; // wrap at 256
-              }
-              // Only update write pos after last channel (all channels use same write pos)
-              if (ch === 3) this._oscWritePos = wp;
-            }
-
-            // Send oscilloscope data at ~30fps
-            if (currentTime - this._oscLastSendTime > 0.033) {
-              this._oscLastSendTime = currentTime;
-              // Copy snapshots for transfer (reorder from write position for contiguous waveform)
-              const out = new Array(4);
-              for (let ch = 0; ch < 4; ch++) {
-                const snap = this._oscSnapshots[ch];
-                const wp = this._oscWritePos;
-                const copy = new Int16Array(256);
-                for (let i = 0; i < 256; i++) {
-                  copy[i] = snap[(wp + i) & 255];
-                }
-                out[ch] = copy;
-              }
-              this.port.postMessage({ type: 'oscData', channels: out }, out.map(a => a.buffer));
-            }
+          // Every sample of the 4 Paula channels, for the oscilloscopes and
+          // the per-channel role classifiers (worklets/channel-stream.js).
+          if (this._oscEnabled && globalThis.DevilboxChannelStream) {
+            this._stream ||= new globalThis.DevilboxChannelStream(this.port, sampleRate);
+            this._stream.write(4, chFrames, (ch, i) => heapF32[chBases[ch] + i]);
           }
         }
       }

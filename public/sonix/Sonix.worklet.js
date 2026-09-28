@@ -24,8 +24,6 @@ class SonixProcessor extends AudioWorkletProcessor {
     // Throttle scope posts: process() runs ~344x/s (128-sample quanta); the VU meters
     // and scopes only need ~60-80fps. Posting every block floods the main thread
     // (structured-clone of 4 Int16Arrays + oscilloscope store re-render) and spikes CPU.
-    this.scopePostDivider = 4; // ~86 posts/s at 44.1kHz
-    this.scopePostCounter = 0;
 
     // Playback-position feedback: poll the driver's current grid row and post it so
     // the editor cursor follows the native audio instead of a free-running TS clock.
@@ -433,10 +431,8 @@ class SonixProcessor extends AudioWorkletProcessor {
             outputL[i] = this.interleavedBuf[i * 2];
             outputR[i] = this.interleavedBuf[i * 2 + 1];
           }
-          if (++this.scopePostCounter >= this.scopePostDivider) {
-            this.scopePostCounter = 0;
-            this.postChannelScopes();
-          }
+          // Every render: the scope samples cover only the last render.
+          this.postChannelScopes();
           if (++this.posPostCounter >= this.posPostDivider) {
             this.posPostCounter = 0;
             this.postDisplayRow();
@@ -462,13 +458,17 @@ class SonixProcessor extends AudioWorkletProcessor {
     if (!heapU8) return;
     const buffer = heapU8.buffer;
 
-    const channels = new Array(this.numChannels);
+    if (!globalThis.DevilboxChannelStream) return;
+    this._stream ||= new globalThis.DevilboxChannelStream(this.port, sampleRate);
+    const views = new Array(this.numChannels);
     for (let ch = 0; ch < this.numChannels; ch++) {
       m._sonix_get_channel_scope(ch, this.scopePtr, n);
-      // Copy out of the (growable) WASM heap into a standalone Int16Array.
-      channels[ch] = new Int16Array(buffer, this.scopePtr, n).slice();
+      // The stream copies before the next channel reuses scopePtr.
+      views[ch] = new Int16Array(buffer, this.scopePtr, n).slice();
     }
-    this.port.postMessage({ type: 'channelData', channels });
+    // Streamed per render into 1024-sample chunks for the oscilloscopes and
+    // the per-channel role classifiers (worklets/channel-stream.js).
+    this._stream.writeInt16(views, n);
   }
 
   // Post the driver's current grid row so the main thread can drive the editor

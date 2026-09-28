@@ -1060,7 +1060,7 @@ export function createMcpServer(): McpServer {
 
   server.tool(
     'get_oscilloscope_info',
-    'Get oscilloscope state: active, channel count, channel names, data availability',
+    'Get oscilloscope state: active, channel count, channel names, data availability, and per channel analysisAudio: how many unbroken samples the runtime role classifiers can read (null = the engine sends display snapshots only)',
     {},
     () => call('get_oscilloscope_info'),
   );

@@ -84,7 +84,7 @@ export class DssEngine extends WASMSingletonBase {
           console.log('[DssEngine] Module loaded, subsongs:', data.subsongCount);
           break;
         case 'oscData':
-          useOscilloscopeStore.getState().updateChannelData(data.channels);
+          useOscilloscopeStore.getState().updateChannelData(data.channels, data.frame, data.sampleRate);
           break;
         case 'position':
           // The grid follows the PLAYER. NativeEngineRouting wires this

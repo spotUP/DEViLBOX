@@ -77,9 +77,9 @@ export class Cinter4Engine extends WASMSingletonBase {
         case 'moduleLoaded':
           break;
 
-        case 'scope':
-          // Per-channel waveforms (4 Paula channels) for the oscilloscope.
-          useOscilloscopeStore.getState().updateChannelData(data.channels);
+        case 'oscData':
+          // Every sample of the 4 Paula channels (worklets/channel-stream.js).
+          useOscilloscopeStore.getState().updateChannelData(data.channels, data.frame, data.sampleRate);
           break;
 
         case 'position':

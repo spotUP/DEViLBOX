@@ -71,6 +71,14 @@ export function latestChannelAudio(ch: number, n: number): { samples: Float32Arr
   return { samples: out, sampleRate: r.sampleRate, end: r.next };
 }
 
+/** Unbroken samples each channel holds, and at what rate, for diagnostics. */
+export function channelAudioContiguity(channelCount: number): Array<{ contiguous: number; sampleRate: number } | null> {
+  return Array.from({ length: channelCount }, (_, ch) => {
+    const r = rings[ch];
+    return r ? { contiguous: r.contiguous, sampleRate: r.sampleRate } : null;
+  });
+}
+
 /** Forget every channel (song change, stop). */
 export function resetChannelAudioTap(): void {
   rings.length = 0;

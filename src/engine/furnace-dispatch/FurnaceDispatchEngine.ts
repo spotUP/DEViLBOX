@@ -743,7 +743,12 @@ export const MacroCommands = {
   restart: (which: number) => ({ cmd: DivCmd.MACRO_RESTART, val1: which, val2: 0 }),
 } as const;
 
-export type OscDataCallback = (channels: (Int16Array | null)[]) => void;
+/**
+ * Oscilloscope samples of every chip channel. With `frame` (the running index
+ * of the first sample) the chunk is every sample since the previous one, at
+ * `sampleRate` (the chip scope rings' 65536 Hz).
+ */
+export type OscDataCallback = (channels: (Int16Array | null)[], frame?: number, sampleRate?: number) => void;
 
 export class FurnaceDispatchEngine implements IsolationCapableEngine {
   private static instance: FurnaceDispatchEngine | null = null;
@@ -1027,6 +1032,8 @@ export class FurnaceDispatchEngine implements IsolationCapableEngine {
       console.log('[FurnaceDispatch] ensureModuleLoaded: adding worklet module...');
       let workletModuleLoaded = false;
       try {
+        // The shared per-voice audio stream the worklet streams its scopes through.
+        await context.audioWorklet.addModule(`${baseUrl}worklets/channel-stream.js`).catch(() => { /* already loaded */ });
         await context.audioWorklet.addModule(`${baseUrl}furnace-dispatch/FurnaceDispatch.worklet.js${cacheBuster}`);
         console.log('[FurnaceDispatch] ensureModuleLoaded: worklet module added');
         workletModuleLoaded = true;
@@ -1120,7 +1127,7 @@ export class FurnaceDispatchEngine implements IsolationCapableEngine {
       case 'oscData':
         this.latestOscData = data.channels as (Int16Array | null)[];
         for (const cb of this.oscCallbacks) {
-          cb(data.channels as (Int16Array | null)[]);
+          cb(data.channels as (Int16Array | null)[], data.frame as number | undefined, data.sampleRate as number | undefined);
         }
         break;
 

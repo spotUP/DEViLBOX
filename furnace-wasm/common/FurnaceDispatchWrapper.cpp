@@ -1228,35 +1228,56 @@ int furnace_dispatch_get_num_channels(int handle) {
 }
 
 /**
- * Get oscilloscope needle position for a channel.
+ * A channel's oscilloscope write position: the index, in the 65536-sample
+ * ring, of the next sample the chip writes. The ring runs at 65536 samples
+ * per second whatever the chip's rate (DivDispatchOscBuffer::setRate), and
+ * the buffer's own `needle` is that index in 16.16 fixed point.
  */
 EMSCRIPTEN_KEEPALIVE
 int furnace_dispatch_get_osc_needle(int handle, int chan) {
   auto it = g_instances.find(handle);
   if (it != g_instances.end()) {
     DivDispatchOscBuffer* buf = it->second->dispatch->getOscBuffer(chan);
-    return buf != nullptr ? buf->needle : 0;
+    return buf != nullptr ? (int)((buf->needle >> OSCBUF_PREC) & 0xffff) : 0;
   }
   return 0;
 }
 
 /**
- * Get oscilloscope data for a channel.
+ * Copy `count` oscilloscope samples of a channel ending just before ring
+ * index `end`. The ring stores -1 for "unchanged since the previous sample"
+ * (begin() pre-fills it) and 0xfffe for a real -1 (putSample); both are
+ * resolved here, the hold from the last real sample before the window.
+ */
+EMSCRIPTEN_KEEPALIVE
+void furnace_dispatch_read_osc(int handle, int chan, int end, short* outBuf, int count) {
+  auto it = g_instances.find(handle);
+  if (it == g_instances.end()) return;
+  DivDispatchOscBuffer* buf = it->second->dispatch->getOscBuffer(chan);
+  if (!buf || count <= 0) return;
+  if (count > 65536) count = 65536;
+
+  const int start = (end - count) & 0xffff;
+  short last = 0;
+  for (int k = 1; k <= 4096; k++) {
+    const short v = buf->data[(start - k) & 0xffff];
+    if (v != -1) { last = (v == (short)0xfffe) ? -1 : v; break; }
+  }
+  for (int i = 0; i < count; i++) {
+    short v = buf->data[(start + i) & 0xffff];
+    if (v == -1) v = last;
+    else if (v == (short)0xfffe) v = -1;
+    last = v;
+    outBuf[i] = v;
+  }
+}
+
+/**
+ * The newest `maxSamples` oscilloscope samples of a channel, for display.
  */
 EMSCRIPTEN_KEEPALIVE
 void furnace_dispatch_get_osc_data(int handle, int chan, short* outBuf, int maxSamples) {
-  auto it = g_instances.find(handle);
-  if (it == g_instances.end()) return;
-
-  DivDispatchOscBuffer* buf = it->second->dispatch->getOscBuffer(chan);
-  if (!buf) return;
-
-  int needle = buf->needle;
-  int start = (needle - maxSamples + 65536) % 65536;
-
-  for (int i = 0; i < maxSamples; i++) {
-    outBuf[i] = buf->data[(start + i) % 65536];
-  }
+  furnace_dispatch_read_osc(handle, chan, furnace_dispatch_get_osc_needle(handle, chan), outBuf, maxSamples);
 }
 
 /**
