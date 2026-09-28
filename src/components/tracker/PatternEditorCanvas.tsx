@@ -12,7 +12,7 @@ import { useChannelTypeStore } from '@stores/useChannelTypeStore';
 import { useWasmPositionStore } from '@stores/useWasmPositionStore';
 import { channelLayout } from './channelLayout';
 import { resolveWasmPattern } from './wasmPatternHold';
-import { computeChannelFollowScroll } from '@/lib/tracker/followScroll';
+import { computeChannelFollowScroll, createChannelFollowGate } from '@/lib/tracker/followScroll';
 import { resolveCellColumn } from '@/lib/tracker/cellHitTest';
 import { resolveScrollRow } from '@/lib/tracker/playbackNavigation';
 import { recordModeBorderClass } from '@/lib/tracker/patternEditorChrome';
@@ -1597,12 +1597,14 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
   // channel that is currently off-screen. Without this the cursor can leave the
   // visible area on Tab. Keyed on activeChannelIndex (the cursor's channel) so
   // it fires on channel changes only, not on every wheel scroll.
+  const [followChannelGate] = useState(createChannelFollowGate);
   useEffect(() => {
     if (isMobile || allChannelsFit || !pattern) return;
     const container = containerRef.current;
     if (!container) return;
     const ch = activeChannelIndex;
     if (ch < 0 || ch >= channelOffsets.length) return;
+    if (!followChannelGate(ch)) return;
 
     const channelLeft = channelOffsets[ch] - LINE_NUMBER_WIDTH;
     const channelWidth = channelWidths[ch] ?? 0;

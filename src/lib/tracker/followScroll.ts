@@ -41,3 +41,19 @@ export function computeChannelFollowScroll(
 
   return Math.max(0, Math.min(maxScroll, next));
 }
+
+/**
+ * Says when the view should follow the cursor channel: only when the cursor
+ * has moved to a different channel. Layout and pattern changes are not a
+ * reason — during playback the pattern changes at every song position, and
+ * re-following then snapped a view the user had scrolled to far channels back
+ * to the cursor about a second later (2026-09-28).
+ */
+export function createChannelFollowGate(): (channel: number) => boolean {
+  let last: number | null = null;
+  return (channel: number) => {
+    if (channel === last) return false;
+    last = channel;
+    return true;
+  };
+}
