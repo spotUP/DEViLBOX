@@ -50,7 +50,9 @@ export function useMobileTrackerInput(isCustomFormat: boolean): MobileTrackerInp
   const autoCollapseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const isPlaying = useTransportStore((s) => s.isPlaying);
-  const cursor = useCursorStore((s) => s.cursor);
+  // The cursor is read when a key is pressed, not subscribed: it follows the
+  // playback row, and TrackerView (which mounts this hook on every screen)
+  // re-rendered with it ~33 times a second while a song played.
   const moveCursor = useCursorStore((s) => s.moveCursor);
   const moveCursorToRow = useCursorStore((s) => s.moveCursorToRow);
   const { patterns, currentPatternIndex, setCell, copySelection, cutSelection, paste } = useTrackerStore(
@@ -113,17 +115,18 @@ export function useMobileTrackerInput(isCustomFormat: boolean): MobileTrackerInp
 
   const handleNoteInput = useCallback((note: number) => {
     haptics.medium();
+    const { cursor } = useCursorStore.getState();
     setCell(cursor.channelIndex, cursor.rowIndex, { note, instrument: currentInstrumentId ?? 1 });
     if (recordMode && editStep > 0) {
       const patternLength = patterns[currentPatternIndex]?.length ?? 64;
       moveCursorToRow((cursor.rowIndex + editStep) % patternLength);
     }
     resetAutoCollapse();
-  }, [cursor, setCell, currentInstrumentId, recordMode, editStep, patterns, currentPatternIndex, moveCursorToRow, resetAutoCollapse]);
+  }, [setCell, currentInstrumentId, recordMode, editStep, patterns, currentPatternIndex, moveCursorToRow, resetAutoCollapse]);
 
   const handleHexInput = useCallback((value: number) => {
     haptics.medium();
-    const { channelIndex, rowIndex, columnType } = cursor;
+    const { channelIndex, rowIndex, columnType } = useCursorStore.getState().cursor;
     switch (columnType) {
       case 'instrument': setCell(channelIndex, rowIndex, { instrument: value }); break;
       case 'volume': setCell(channelIndex, rowIndex, { volume: value }); break;
@@ -132,13 +135,13 @@ export function useMobileTrackerInput(isCustomFormat: boolean): MobileTrackerInp
     }
     moveCursor('right');
     resetAutoCollapse();
-  }, [cursor, setCell, moveCursor, resetAutoCollapse]);
+  }, [setCell, moveCursor, resetAutoCollapse]);
 
   const handleDelete = useCallback(() => {
     haptics.rigid();
-    const { channelIndex, rowIndex } = cursor;
+    const { channelIndex, rowIndex } = useCursorStore.getState().cursor;
     setCell(channelIndex, rowIndex, { note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0 });
-  }, [cursor, setCell]);
+  }, [setCell]);
 
   const handleCopy = useCallback(() => { haptics.success(); copySelection(); }, [copySelection]);
   const handleCut = useCallback(() => { haptics.success(); cutSelection(); }, [cutSelection]);
