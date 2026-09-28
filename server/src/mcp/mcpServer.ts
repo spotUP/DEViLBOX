@@ -1067,7 +1067,7 @@ export function createMcpServer(): McpServer {
 
   server.tool(
     'get_audio_worklet_profile',
-    'Audio-thread cost per AudioWorklet processor (dev builds): milliseconds of audio-thread time per second, and process() calls per second (375/s per instance at 48 kHz), measured over windowMs. Use when the page is sluggish during or even without playback: every processor in the context runs whether a song plays or not. Needs a reload after the profiler is first installed.',
+    'Audio-thread cost per AudioWorklet processor (dev builds), plus a census of every native audio node created and still alive by type (Chrome runs its own nodes on the same thread): milliseconds of audio-thread time per second, and process() calls per second (375/s per instance at 48 kHz), measured over windowMs. Use when the page is sluggish during or even without playback: every processor in the context runs whether a song plays or not. Needs a reload after the profiler is first installed.',
     { windowMs: z.number().optional().describe('Measurement window in ms (250-10000, default 2000)') },
     ({ windowMs }) => call('get_audio_worklet_profile', { windowMs }),
   );
