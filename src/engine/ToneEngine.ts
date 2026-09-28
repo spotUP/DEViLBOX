@@ -4,6 +4,7 @@
  */
 
 import { installWorkletProfiler } from './audio/workletProfiler';
+import { installIdleGate } from './audio/idleGate';
 import { EngineGainDuck } from './engineGainDuck';
 import * as Tone from 'tone';
 import type { InstrumentConfig, EffectConfig } from '@typedefs/instrument';
@@ -392,8 +393,10 @@ export class ToneEngine {
     Tone.setContext(this._nativeContext);
     // Register globally so WAM/WASM synths can access it without importing ToneEngine
     setDevilboxAudioContext(this._nativeContext);
+    // Effect worklets stop computing silence once idle; every later module
+    // load on this context waits for the gate (engine/audio/idleGate.ts).
+    void installIdleGate(this._nativeContext);
     // Dev: time every audio worklet processor (MCP get_audio_worklet_profile).
-    // Must be the context's first module so later registrations are wrapped.
     if ((import.meta as { env?: { DEV?: boolean } }).env?.DEV) void installWorkletProfiler(this._nativeContext);
 
     // Master input (where all instruments connect)

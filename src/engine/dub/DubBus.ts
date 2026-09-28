@@ -12,6 +12,7 @@
  * filterDrop. Emergency drain via dubPanic().
  */
 
+import { LfoLink } from './lfoLink';
 import * as Tone from 'tone';
 import type { DubBusSettings } from '../../types/dub';
 import { DEFAULT_DUB_BUS, DUB_CHARACTER_PRESETS, ALTEC_HPF_STEPS, snapToAltecStep } from '../../types/dub';
@@ -1386,6 +1387,7 @@ export class DubBus {
 
     this.sweepOutput.gain.cancelScheduledValues(now);
     this.sweepOutput.gain.setTargetAtTime(Math.min(1, Math.max(0, targetAmount)), now, tc);
+    this.sweepLink.set(targetAmount > 0);
 
     this.sweepLfo.frequency.cancelScheduledValues(now);
     this.sweepLfo.frequency.setTargetAtTime(Math.max(0.05, rateHz), now, tc);
@@ -1420,6 +1422,7 @@ export class DubBus {
       const t = this.context.currentTime;
       this.sweepOutput.gain.cancelScheduledValues(t);
       this.sweepOutput.gain.setTargetAtTime(priorAmt, t, 0.05);
+      this.sweepLink.set(priorAmt > 0);
       this.sweepLfo.frequency.cancelScheduledValues(t);
       this.sweepLfo.frequency.setTargetAtTime(priorRate, t, 0.08);
       this.sweepLfoGain.gain.cancelScheduledValues(t);
@@ -1586,6 +1589,10 @@ export class DubBus {
   private masterChorusLfoL!: OscillatorNode;
   private masterChorusLfoR!: OscillatorNode;
   private masterChorusLfoGainL!: GainNode;
+  /** Chorus / comb-sweep / tape-stack LFOs, linked to their delays only while in use. */
+  private chorusLinks: LfoLink[] = [];
+  private sweepLink!: LfoLink;
+  private stackLinks: LfoLink[] = [];
   private masterChorusLfoGainR!: GainNode;
   private masterChorusWet!: GainNode;
   private masterChorusDry!: GainNode;
@@ -1970,9 +1977,12 @@ export class DubBus {
     this.masterChorusLfoGainL.gain.value = 0.004;  // 4ms depth
     this.masterChorusLfoGainR.gain.value = 0.004;
     this.masterChorusLfoL.connect(this.masterChorusLfoGainL);
-    this.masterChorusLfoGainL.connect(this.masterChorusDelayL.delayTime);
     this.masterChorusLfoR.connect(this.masterChorusLfoGainR);
-    this.masterChorusLfoGainR.connect(this.masterChorusDelayR.delayTime);
+    // Linked to the delays only while the chorus is on (setMasterChorus).
+    this.chorusLinks = [
+      new LfoLink(this.masterChorusLfoGainL, this.masterChorusDelayL.delayTime),
+      new LfoLink(this.masterChorusLfoGainR, this.masterChorusDelayR.delayTime),
+    ];
     this.masterChorusLfoL.start();
     this.masterChorusLfoR.start();
     this.masterChorusDry = this.context.createGain();
@@ -2109,7 +2119,9 @@ export class DubBus {
     this.sweepLfoGain = this.context.createGain();
     this.sweepLfoGain.gain.value = this.settings.sweepDepthMs / 1000;  // ms → sec
     this.sweepLfo.connect(this.sweepLfoGain);
-    this.sweepLfoGain.connect(this.sweepDelay.delayTime);
+    // Linked to the delay only while the sweep has an amount (_syncSweepLink).
+    this.sweepLink = new LfoLink(this.sweepLfoGain, this.sweepDelay.delayTime);
+    this.sweepLink.set(this.settings.sweepAmount > 0);
     this.sweepLfo.start();
     this.sweepFeedback = this.context.createGain();
     this.sweepFeedback.gain.value = this.settings.sweepFeedback;
@@ -2278,7 +2290,11 @@ export class DubBus {
       lfo.frequency.value = STACK_WOW_HZ[i];
       const lfoGain = this.context.createGain();
       lfoGain.gain.value = STACK_WOW_MS[i];
-      lfo.connect(lfoGain).connect(delay.delayTime);
+      lfo.connect(lfoGain);
+      // Linked to its delay only while tape-stack saturation is selected.
+      const link = new LfoLink(lfoGain, delay.delayTime);
+      link.set(this.settings.tapeSatMode === 'stack');
+      this.stackLinks.push(link);
       // Phase offset — start each LFO at a distinct point so wow phases
       // don't realign. OscillatorNode doesn't expose phase directly, so we
       // start the 2nd and 3rd LFOs slightly later (millisecond offsets).
@@ -4274,9 +4290,10 @@ export class DubBus {
     // Gain writes are gated so a disabled bus stays transparent on master.
     this._applyMasterInsertTone(merged);
     // Liquid sweep params — clamp + smooth. sweepAmount=0 fully silences
-    // the branch; LFO keeps running (can't stop OscillatorNode).
+    // the branch, and unlinks its LFO from the delay so neither is computed.
     const sweepAmt = Math.max(0, Math.min(1, merged.sweepAmount));
     this._setColourStageGain(this.sweepOutput.gain, sweepAmt, 0.02);
+    this.sweepLink.set(sweepAmt > 0);
     const sweepRate = Math.max(0.05, Math.min(5, merged.sweepRateHz));
     this._settle(this.sweepLfo.frequency, sweepRate, now, 0.02);
     const sweepDepthSec = Math.max(0, Math.min(9, merged.sweepDepthMs)) / 1000;
@@ -4293,6 +4310,7 @@ export class DubBus {
     const wantStack = merged.tapeSatMode === 'stack';
     this._settle(this.tapeSatBypass.gain, wantStack ? 0 : 1, now, 0.03);
     this._settle(this.tapeStackMix.gain, wantStack ? 1 : 0, now, 0.03);
+    for (const link of this.stackLinks) link.set(wantStack);
 
     // In-feedback filter params — all engines implement setFeedbackHpf/Lpf
     // via the DubEchoEngine interface. SpaceEcho and AnotherDelay route to
@@ -4401,6 +4419,7 @@ export class DubBus {
       this._settle(this.combOutput.gain, isPhaser ? 0 : 1, now, 0.01);
       this._settle(this.phaserOutput.gain, isPhaser ? 1 : 0, now, 0.01);
       this._setColourStageGain(this.sweepOutput.gain, amt, 0.02);
+      this.sweepLink.set(amt > 0);
     }
     // Phaser params — update even when mode is 'comb' (no harm, WASM just idles)
     if (settings.phaserRate !== undefined) this.phaser.setRate(merged.phaserRate);
@@ -7616,6 +7635,7 @@ export class DubBus {
       this.masterChorusWet.gain.setValueAtTime(this.masterChorusWet.gain.value, now);
       this.masterChorusWet.gain.linearRampToValueAtTime(on ? 0.45 : 0, now + 0.2);
     } catch { /* ok */ }
+    for (const link of this.chorusLinks) link.set(on, 400);
   }
 
   /** Enable/disable the Club Simulator convolver. Uses the full generateIR

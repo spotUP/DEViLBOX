@@ -36,18 +36,26 @@ process real audio behind a muted return.
 - [x] P2 PerChannelDubFx: the comb-sweep section (LFO, modulated delay,
       feedback loop) exists only while sweep amount > 0; built on demand,
       torn down after it ramps to 0.
-- [ ] P3 DubBus disabled: the input is gated too (no send audio enters the
+- [x] P3 (already so: disabling ramps bus input to 0) DubBus disabled: the input is gated too (no send audio enters the
       effects); the return gate stays.
-- [ ] P4 Effect worklets skip their DSP while their input has been silent
+- [x] P4 (worklets/idle-gate.js, -80 dBFS, 1 s) Effect worklets skip their DSP while their input has been silent
       longer than their tail (RE-201, fil4, aelapse, tonearm, calf-phaser,
       dattorro, ring-mod, bitta; vinyl-noise by its own level).
-- [ ] P5 DubBus oscillators (master chorus LFOs, sweep LFO, ...): stopped or
+- [x] P5 (LfoLink) DubBus oscillators (master chorus LFOs, sweep LFO, ...): stopped or
       disconnected while their feature is off.
+- [ ] P8 Fewer nodes: per-channel structures exist for 32 (PerChannelDubFx) /
+      16 (ChannelRouting) channel slots on a 7-channel song; Chrome walks ~1000
+      connected nodes every quantum even when silent. After P1-P5 the audio
+      thread is still ~33 % busy stopped.
 - [ ] P6 Measure after, same song, stopped and playing: worklet ms/s, node
       census, AudioWorklet thread busy %, pattern-editor frame stats.
 - [ ] P7 Tests for each behaviour (filters still sweep; comb sweep still
       audible when engaged; dub bus still sounds when enabled; worklets resume
       on signal).
+
+## Measured after P1-P5 (same song, same machine load ~20)
+- Stopped: worklets 90 -> 2.5 ms/s; audio thread 62 % -> 33 %; renderer ~140 % -> ~43 % CPU.
+- Playing (5 s): long frames 54 -> 10; timer ticks 48 -> 160 of 250; worklets ~30 ms/s.
 
 ## Verification
 - `npm run type-check`; targeted tests.

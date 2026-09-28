@@ -95,4 +95,25 @@ describe('idle audio graph', () => {
     expect(lpf.frequency.setTargetAtTime).toHaveBeenCalled();
     mgr.disposeAll();
   });
+
+  it('links a dub-bus LFO to its delay only while its feature is on', async () => {
+    vi.useFakeTimers();
+    const { LfoLink } = await import('../dub/lfoLink');
+    const lfoGain = ctx.createGain() as unknown as Rec & AudioNode;
+    const delay = ctx.createDelay() as unknown as { delayTime: AudioParam };
+    const link = new LfoLink(lfoGain, delay.delayTime);
+    expect(lfoGain.connections).toHaveLength(0);
+    link.set(true);
+    expect(lfoGain.connections).toEqual([delay.delayTime]);
+    link.set(false, 300);
+    expect(link.isLinked).toBe(true);            // kept through the feature's fade
+    link.set(true);                              // re-engaged in time: stays linked
+    vi.advanceTimersByTime(400);
+    expect(link.isLinked).toBe(true);
+    link.set(false, 300);
+    vi.advanceTimersByTime(400);
+    expect(link.isLinked).toBe(false);
+    expect(lfoGain.connections).toHaveLength(0);
+    vi.useRealTimers();
+  });
 });
