@@ -4,6 +4,7 @@ import type { DevilboxSynth } from '@typedefs/synth';
 import { TrackerEnvelope } from '../TrackerEnvelope';
 import { getChannelEffectsManager } from '../ChannelEffectsManager';
 import { getChannelFilterManager } from '../ChannelFilterManager';
+import { connectAudio } from './connectAudio';
 
 // Voice state type (mirrors ToneEngine.ts interface)
 export interface VoiceState {
@@ -186,8 +187,8 @@ export function getChannelOutput(ctx: ChannelRoutingContext, channelIndex: numbe
 
     // Connect: input → [effect chain] → HPF → LPF → channel → meter + masterInput
     input.connect(chainInput);
-    chainOutput.connect(filterInput);
-    filterOutput.connect(channel);
+    connectAudio(chainOutput, filterInput);
+    connectAudio(filterOutput, channel);
     channel.connect(meter);
     channel.connect(ctx.masterInput);
 

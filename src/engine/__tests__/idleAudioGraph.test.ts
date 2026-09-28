@@ -1,0 +1,98 @@
+/**
+ * The audio graph holds no always-running sources for features nobody uses.
+ *
+ * Oscillators, constant sources and delay feedback loops never go silent, so
+ * Chrome processes everything behind them every quantum. Measured 2026-09-28
+ * with the song stopped: PerChannelDubFx had 32 LFO oscillators running (one
+ * per channel slot, sweep off) and ChannelFilterManager 136 ConstantSources
+ * (Tone.Filter signals), with the audio thread ~50 % busy.
+ */
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { setDevilboxAudioContext } from '@utils/audio-context';
+
+type Rec = { kind: string; started: boolean; stopped: boolean; connections: unknown[] };
+
+function param(v = 0) {
+  return { value: v, setTargetAtTime: vi.fn(), cancelScheduledValues: vi.fn(), setValueAtTime: vi.fn(), linearRampToValueAtTime: vi.fn() };
+}
+
+function mockContext() {
+  const made: Rec[] = [];
+  const node = (kind: string, extra: Record<string, unknown> = {}) => {
+    const rec: Rec = { kind, started: false, stopped: false, connections: [] };
+    made.push(rec);
+    return Object.assign(rec, {
+      connect(d: unknown) { rec.connections.push(d); return d; },
+      disconnect() { rec.connections = []; },
+      start() { rec.started = true; },
+      stop() { rec.stopped = true; },
+      ...extra,
+    });
+  };
+  const ctx = {
+    currentTime: 0,
+    createGain: () => node('Gain', { gain: param(1) }),
+    createBiquadFilter: () => node('Biquad', { type: 'lowpass', frequency: param(350), Q: param(1) }),
+    createDelay: () => node('Delay', { delayTime: param(0) }),
+    createOscillator: () => node('Oscillator', { type: 'sine', frequency: param(440) }),
+    createConstantSource: () => node('ConstantSource', { offset: param(0) }),
+  };
+  return { ctx: ctx as unknown as AudioContext, made };
+}
+
+const running = (made: Rec[]) => made.filter((r) => (r.kind === 'Oscillator' || r.kind === 'ConstantSource') && r.started && !r.stopped);
+
+describe('idle audio graph', () => {
+  let ctx: AudioContext;
+  let made: Rec[];
+  beforeEach(() => {
+    ({ ctx, made } = mockContext());
+    setDevilboxAudioContext(ctx);
+  });
+
+  it('builds a channel dub FX with no oscillator until its comb sweep engages', async () => {
+    vi.useFakeTimers();
+    const { PerChannelDubFx } = await import('../dub/PerChannelDubFx');
+    const fx = new PerChannelDubFx(ctx, ctx.createGain(), ctx.createGain());
+    expect(running(made)).toHaveLength(0);
+    expect(fx.sweepBuilt).toBe(false);
+
+    fx.setSweepRate(2);
+    fx.setSweepAmount(0.6);
+    expect(fx.sweepBuilt).toBe(true);
+    const lfos = running(made);
+    expect(lfos).toHaveLength(1);
+    expect((lfos[0] as unknown as { frequency: { value: number } }).frequency.value).toBe(2); // rate kept while unbuilt
+
+    fx.setSweepAmount(0);
+    expect(fx.sweepBuilt).toBe(true);          // still ramping out
+    vi.advanceTimersByTime(500);
+    expect(fx.sweepBuilt).toBe(false);
+    expect(running(made)).toHaveLength(0);
+
+    // Re-engaging during the ramp-out keeps the same nodes.
+    fx.setSweepAmount(0.3);
+    fx.setSweepAmount(0);
+    fx.setSweepAmount(0.4);
+    vi.advanceTimersByTime(500);
+    expect(fx.sweepBuilt).toBe(true);
+    expect(running(made)).toHaveLength(1);
+    fx.dispose();
+    expect(running(made)).toHaveLength(0);
+    vi.useRealTimers();
+  });
+
+  it('gives each channel a filter pair with no always-running source', async () => {
+    const { getChannelFilterManager } = await import('../ChannelFilterManager');
+    const mgr = getChannelFilterManager();
+    mgr.disposeAll();
+    for (let ch = 0; ch < 16; ch++) mgr.getOrCreate(ch);
+    expect(made.filter((r) => r.kind === 'Biquad')).toHaveLength(32);
+    expect(made.filter((r) => r.kind === 'ConstantSource' || r.kind === 'Oscillator')).toHaveLength(0);
+    // A sweep still reaches the filters.
+    mgr.setPosition(3, 0.5);
+    const lpf = mgr.getOutput(3) as unknown as { frequency: { setTargetAtTime: ReturnType<typeof vi.fn> } };
+    expect(lpf.frequency.setTargetAtTime).toHaveBeenCalled();
+    mgr.disposeAll();
+  });
+});
