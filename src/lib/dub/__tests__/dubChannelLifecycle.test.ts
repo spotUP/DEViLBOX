@@ -158,12 +158,12 @@ describe('X15 wiring contract — ChannelRoutedEffects drives the lifecycle', ()
 
   it('marks the transition and reconciles when it lands', () => {
     expect(src).toContain('this.dubLifecycle.begin(channelIndex)');
-    expect(src).toContain('this.dubLifecycle.finish(channelIndex, wired)');
+    expect(src).toContain("this.dubLifecycle.finish(channelIndex, outcome === 'wired')");
     expect(src).toContain('this.dubLifecycle.finish(channelIndex, false)');
   });
 
   it('abandons an activation whose send closed while it was awaiting', () => {
-    expect(src).toContain('if (!this.dubLifecycle.isDesired(channelIndex)) return false;');
+    expect(src).toContain("if (!this.dubLifecycle.isDesired(channelIndex)) return 'cancelled';");
   });
 
   it('cancels the deferred 500 ms retry when the send closes', () => {

@@ -30,6 +30,15 @@ export class DubChannelLifecycle {
   private desired = new Set<number>();
   private active = new Set<number>();
   private inFlight = new Set<number>();
+  /**
+   * Wanted, but the engine cannot give it a path right now (no isolation
+   * engine, no worklet). Reconciling a parked channel straight back into
+   * 'activate' is a retry loop with no delay: on 2026-09-28 every Hippel/TFMX
+   * channel with a dub send spun one, each failure also scheduling a timer
+   * that started another, until the main thread's task queue ran seconds
+   * behind and the UI fell to 10 fps.
+   */
+  private parked = new Set<number>();
 
   /**
    * Record what the channel should be, and say what to dispatch now.
@@ -39,8 +48,14 @@ export class DubChannelLifecycle {
    * transition picks the intent up through `finish`.
    */
   setDesired(channelId: number, want: boolean): DubChannelAction {
-    if (want) this.desired.add(channelId);
-    else this.desired.delete(channelId);
+    if (want) {
+      // A send newly opened is a fresh request: try again even if parked.
+      if (!this.desired.has(channelId)) this.parked.delete(channelId);
+      this.desired.add(channelId);
+    } else {
+      this.desired.delete(channelId);
+      this.parked.delete(channelId);
+    }
     return this.next(channelId);
   }
 
@@ -74,6 +89,26 @@ export class DubChannelLifecycle {
   }
 
   /**
+   * A transition finished without a path to activate. The channel stays
+   * wanted but is not retried until `unpark` or a new request.
+   */
+  park(channelId: number): void {
+    this.inFlight.delete(channelId);
+    this.active.delete(channelId);
+    if (this.desired.has(channelId)) this.parked.add(channelId);
+  }
+
+  isParked(channelId: number): boolean {
+    return this.parked.has(channelId);
+  }
+
+  /** Allow a parked channel another attempt; say what to dispatch now. */
+  unpark(channelId: number): DubChannelAction {
+    this.parked.delete(channelId);
+    return this.next(channelId);
+  }
+
+  /**
    * Forget a channel entirely — the wiring underneath it is gone.
    *
    * Not the same as setting it undesired: there is nothing left to deactivate,
@@ -83,12 +118,14 @@ export class DubChannelLifecycle {
     this.desired.delete(channelId);
     this.active.delete(channelId);
     this.inFlight.delete(channelId);
+    this.parked.delete(channelId);
   }
 
   clear(): void {
     this.desired.clear();
     this.active.clear();
     this.inFlight.clear();
+    this.parked.clear();
   }
 
   /** Channels the caller believes are wired up, for teardown sweeps. */
@@ -97,7 +134,7 @@ export class DubChannelLifecycle {
   }
 
   private next(channelId: number): DubChannelAction {
-    if (this.inFlight.has(channelId)) return 'none';
+    if (this.inFlight.has(channelId) || this.parked.has(channelId)) return 'none';
     const want = this.desired.has(channelId);
     if (want === this.active.has(channelId)) return 'none';
     return want ? 'activate' : 'deactivate';

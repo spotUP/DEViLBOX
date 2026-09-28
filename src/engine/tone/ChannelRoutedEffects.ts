@@ -110,6 +110,9 @@ interface IsolationSlot {
   outputGain: GainNode;
 }
 
+/** How an activation attempt ended: wired, no path yet, or no longer wanted. */
+type DubActivation = 'wired' | 'unavailable' | 'cancelled';
+
 export class ChannelRoutedEffectsManager {
   private slots: (IsolationSlot | null)[] = [null, null, null, null];
   private masterEffectsInput: Tone.Gain;
@@ -157,6 +160,8 @@ export class ChannelRoutedEffectsManager {
    * successful activation removes the entry.
    */
   private channelDubPendingActivation: Set<number> = new Set();
+  /** Channels whose one retry has run; cleared when the send is reopened. */
+  private channelDubRetried: Set<number> = new Set();
 
   /** Stops following the BLEED switch; see `bleedsInto`. */
   private readonly unsubscribeBleed: () => void;
@@ -415,6 +420,7 @@ export class ChannelRoutedEffectsManager {
     }
     this.dubLifecycle.clear();
     this.channelDubPendingActivation.clear();
+    this.channelDubRetried.clear();
     this.dubBusInput = null;
   }
 
@@ -474,6 +480,7 @@ export class ChannelRoutedEffectsManager {
     // itself when it finishes, and starting a second one alongside it is how
     // a channel ends up half-activated.
     const shouldBeActive = effective > 0;
+    if (shouldBeActive && !this.dubLifecycle.isDesired(channelIndex)) this.channelDubRetried.delete(channelIndex);
     if (!shouldBeActive) {
       // A deferred activation is an intent too — cancel it, or the 500 ms
       // retry re-opens a send the user has already closed.
@@ -498,56 +505,47 @@ export class ChannelRoutedEffectsManager {
     const gain = this.channelDubGains[channelIndex];
     if (!gain) return;
     this.dubLifecycle.begin(channelIndex);
-    let wired = false;
+    let outcome: DubActivation = 'cancelled';
     try {
-      wired = await this._activateDubChannelInner(channelIndex, gain);
+      outcome = await this._activateDubChannelInner(channelIndex, gain);
     } finally {
-      // The send may have closed while we were awaiting. Whoever finishes
-      // last owns the reconciliation.
-      this._runDubAction(channelIndex, this.dubLifecycle.finish(channelIndex, wired));
+      if (outcome === 'unavailable') {
+        // No path yet. Park rather than reconcile: reconciling a failed
+        // activation answers 'activate' again at once, a retry loop per
+        // channel (see DubChannelLifecycle.park). rebuildDubConnections
+        // wires parked channels when an engine attaches.
+        this.dubLifecycle.park(channelIndex);
+        this._scheduleDubRetry(channelIndex);
+      } else {
+        // The send may have closed while we were awaiting. Whoever finishes
+        // last owns the reconciliation.
+        this._runDubAction(channelIndex, this.dubLifecycle.finish(channelIndex, outcome === 'wired'));
+      }
     }
   }
 
-  private async _activateDubChannelInner(channelIndex: number, gain: GainNode): Promise<boolean> {
+  /** One retry, 500 ms on, per parked request — the engine may still be initialising. */
+  private _scheduleDubRetry(channelIndex: number): void {
+    if (this.channelDubPendingActivation.has(channelIndex) || this.channelDubRetried.has(channelIndex)) return;
+    this.channelDubPendingActivation.add(channelIndex);
+    setTimeout(() => {
+      if (!this.channelDubPendingActivation.delete(channelIndex)) return;
+      this.channelDubRetried.add(channelIndex);
+      if (this.dubLifecycle.isParked(channelIndex)) {
+        this._runDubAction(channelIndex, this.dubLifecycle.unpark(channelIndex));
+      }
+    }, 500);
+  }
+
+  private async _activateDubChannelInner(channelIndex: number, gain: GainNode): Promise<DubActivation> {
     const engine = await getActiveIsolationEngine();
     // The user let go of the throw while we were resolving the engine. Do not
     // spin up a slot for a send that is already closed.
-    if (!this.dubLifecycle.isDesired(channelIndex)) return false;
-    if (!engine?.isAvailable()) {
-      try {
-        const { getActiveDubBus } = await import('../dub/DubBus');
-        if (getActiveDubBus()?.hasUsableWholeMixFallback()) {
-          return false;
-        }
-      } catch { /* ok */ }
-      if (!this.dubLifecycle.isDesired(channelIndex)) return false;
-      this.channelDubPendingActivation.add(channelIndex);
-      // Retry once after 500ms — engine may still be initialising
-      setTimeout(() => {
-        if (this.channelDubPendingActivation.has(channelIndex)) {
-          void this._activateDubChannel(channelIndex);
-        }
-      }, 500);
-      return false;
-    }
+    if (!this.dubLifecycle.isDesired(channelIndex)) return 'cancelled';
+    if (!engine?.isAvailable()) return 'unavailable';
     const worklet = engine.getWorkletNode();
-    if (!worklet) {
-      try {
-        const { getActiveDubBus } = await import('../dub/DubBus');
-        if (getActiveDubBus()?.hasUsableWholeMixFallback()) {
-          return false;
-        }
-      } catch { /* ok */ }
-      if (!this.dubLifecycle.isDesired(channelIndex)) return false;
-      this.channelDubPendingActivation.add(channelIndex);
-      setTimeout(() => {
-        if (this.channelDubPendingActivation.has(channelIndex)) {
-          void this._activateDubChannel(channelIndex);
-        }
-      }, 500);
-      return false;
-    }
-    if (!this.dubLifecycle.isDesired(channelIndex)) return false;
+    if (!worklet) return 'unavailable';
+    if (!this.dubLifecycle.isDesired(channelIndex)) return 'cancelled';
 
     // Dual-convention envelope: LibOpenMPT worklet switches on `cmd`, UADE /
     // Hively / Furnace worklets switch on `type`. Send both so a single
@@ -557,7 +555,7 @@ export class ChannelRoutedEffectsManager {
       worklet.connect(gain, DUB_OUTPUT_BASE + channelIndex);
     } catch (e) {
       console.warn(`[ChannelRoutedEffects] Failed to connect worklet output ${DUB_OUTPUT_BASE + channelIndex}:`, e);
-      return false;
+      return 'unavailable';
     }
     this.channelDubPendingActivation.delete(channelIndex);
 
@@ -569,8 +567,9 @@ export class ChannelRoutedEffectsManager {
       const bus = getDrumPadEngine()?.getDubBus();
       bus?.registerChannelTap(channelIndex, gain, dubSendToGain(this.effectiveDubSendOf(channelIndex)));
     } catch { /* DubBus not available */ }
+    this.channelDubRetried.delete(channelIndex);
     console.log(`[ChannelRoutedEffects] Dub channel ${channelIndex} activated`);
-    return true;
+    return 'wired';
   }
 
   private async _deactivateDubChannel(channelIndex: number): Promise<void> {
