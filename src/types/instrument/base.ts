@@ -308,7 +308,7 @@ export type SynthType =
   | 'IxalanceSynth'            // Ixalance (transpiled x86 IT replayer)
   | 'CpsycleSynth'             // Cpsycle (Psycle tracker plugin-based)
   | 'PumaTrackerSynth'         // PumaTracker (transpiled 68k)
-  | 'HippelSynth'              // Hippel simple (transpiled 68k)
+  | 'HippelSynth'              // Hippel whole-song playback (libtfmxaudiodecoder)
   | 'Cinter4Synth'             // Cinter4 Amiga synthesizer (transpiled 68k WASM)
   // WASM replayer dual-synthTypes (routing uses these; parsers may use non-Wasm variant)
   | 'DavidWhittakerWasmSynth'  // David Whittaker (WASM replayer variant)

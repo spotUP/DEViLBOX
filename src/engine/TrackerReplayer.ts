@@ -276,7 +276,7 @@ export interface TrackerSong {
   preTrackerFileData?: ArrayBuffer;
   /** Raw Music-Assembler .ma binary for loading into the MaEngine WASM */
   maFileData?: ArrayBuffer;
-  /** Raw Jochen Hippel ST binary for loading into the HippelEngine WASM */
+  /** Raw Jochen Hippel module, decoded by libtfmxaudiodecoder in the TFMX WASM */
   hippelFileData?: ArrayBuffer;
   /** Raw Sonix Music Driver binary for loading into the SonixEngine WASM */
   sonixFileData?: ArrayBuffer;
