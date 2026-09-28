@@ -88,7 +88,7 @@ interface NativeEngineDescriptor {
 // Engine registry - add new WASM engines here
 // ---------------------------------------------------------------------------
 
-export const WASM_ENGINES: readonly NativeEngineDescriptor[] = [
+export const WASM_ENGINES: NativeEngineDescriptor[] = [
   {
     key: 'Hively',
     synthType: 'HivelySynth',
