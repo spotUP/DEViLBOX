@@ -96,6 +96,13 @@ describe('useSettingsStore — persist migration', () => {
     expect(s.masterTuning).toBe(432);
   });
 
+  it('v11: Jochen Hippel 7V left on UADE by the 2026-09-22 build plays natively again', async () => {
+    seed(10, { formatEngine: { jochenHippel7V: 'uade', suntronic: 'native' } });
+    const s = await freshLoad();
+    expect(s.formatEngine.jochenHippel7V).toBe('native');
+    expect(s.formatEngine.suntronic).toBe('native');
+  });
+
   it('unknown future version (version > current) loads without crashing', async () => {
     seed(99, { stereoSeparation: 70, formatEngine: { mod: 'uade' } });
     // Downgrading from a future version shouldn't throw — persist layer

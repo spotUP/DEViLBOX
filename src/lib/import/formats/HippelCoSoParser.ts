@@ -55,6 +55,7 @@ import type { Pattern, TrackerCell, InstrumentConfig } from '@/types';
 import type { HippelCoSoConfig, HippelCoSoSampleEntry, UADEChipRamInfo } from '@/types/instrument';
 import type { UADEVariablePatternLayout } from '@/engine/uade/UADEPatternEncoder';
 import { hippelCoSoEncoder } from '@/engine/uade/encoders/HippelCoSoEncoder';
+import type { HippelCellSpan, HippelCellSpans } from '@/engine/hippel/hippelCellSpans';
 
 // ── Binary read helpers ─────────────────────────────────────────────────────
 
@@ -302,31 +303,7 @@ export async function parseHippelCoSoFile(
   }
 
   // ── Parse songs ───────────────────────────────────────────────────────────
-  interface CoSoSong {
-    pointer: number;  // absolute byte offset into tracks area
-    length: number;   // number of track bytes
-    speed: number;
-  }
-
-  const songs: CoSoSong[] = [];
-  for (let i = 0; i < numSongs; i++) {
-    const base = songsOff + i * 6;
-    if (base + 6 > buf.length) break;
-    let pointer = u16BE(buf, base);
-    const endPtr = u16BE(buf, base + 2);
-    const speed  = u16BE(buf, base + 4);
-    const length = (endPtr - pointer + 1) * 12;
-    pointer = pointer * 12 + tracksOff;
-    if (length > 12) {
-      songs.push({ pointer, length, speed });
-    }
-  }
-
-  if (songs.length === 0) {
-    // Fallback: create one minimal song using the entire tracks area
-    songs.push({ pointer: tracksOff, length: 12, speed: 6 });
-  }
-
+  const songs = readCoSoSongs(buf, numSongs, songsOff, tracksOff);
   const song = songs[0]; // use subsong 0
 
   // ── Parse volseqs to extract instruments ─────────────────────────────────
@@ -511,91 +488,12 @@ export async function parseHippelCoSoFile(
 
   // We'll create one TrackerSong pattern per song step.
   // Each pattern has a fixed length of 16 rows (standard Amiga-style).
-  const ROWS_PER_PATTERN = 16;
+  const ROWS_PER_PATTERN = COSO_ROWS_PER_STEP;
 
-  // We scan each song step and gather notes from the referenced patterns,
-  // distributing them across pattern rows.
+  // One grid (and the byte span behind every cell) from the file's own steps.
+  const grid = decodeCoSoGrid(buf, patternsOff, song.pointer, songStepCount, instruments.length);
   for (let stepIdx = 0; stepIdx < songStepCount; stepIdx++) {
-    const stepBase = song.pointer + stepIdx * 12;
-    const channelRows: TrackerCell[][] = [[], [], [], []];
-
-    for (let ch = 0; ch < 4; ch++) {
-      const chBase = stepBase + ch * 3;
-      if (chBase + 3 > buf.length) {
-        for (let r = 0; r < ROWS_PER_PATTERN; r++) channelRows[ch].push(emptyCell());
-        continue;
-      }
-
-      const patIdx      = u8(buf, chBase);
-      const trackTransp = s8(buf, chBase + 1);
-      // volTransp at chBase+2 used to select instrument offset
-
-      // Resolve pattern data
-      const patPtrOff = patternsOff + patIdx * 2;
-      let patDataOff = 0;
-      if (patPtrOff + 2 <= buf.length) {
-        patDataOff = u16BE(buf, patPtrOff);
-      }
-
-      // Extract up to ROWS_PER_PATTERN notes from this pattern
-      const rows: TrackerCell[] = [];
-      let pos = patDataOff;
-
-      while (rows.length < ROWS_PER_PATTERN && pos < buf.length) {
-        const v = s8(buf, pos);
-
-        if (v === -1) {
-          // End of pattern / next track step — stop
-          break;
-        } else if (v === -2 || v === -3) {
-          // Repeat / loop command: skip command byte + param, emit empty
-          pos += 2;
-          rows.push(emptyCell());
-        } else if (v >= 0) {
-          // Note event
-          const noteVal = v;
-          pos++;
-
-          let infoVal = 0;
-          if (pos < buf.length) {
-            infoVal = s8(buf, pos);
-            pos++;
-          }
-
-          // If info has bits 5-7 set, there may be an extra infoPrev byte
-          if ((infoVal & 0xE0) !== 0 && pos < buf.length) {
-            pos++; // skip infoPrev
-          }
-
-          // info & 31 = volseq index = instrument number (1-indexed)
-          const volseqIdx = infoVal & 31;
-          const instrNum  = volseqIdx + 1;
-
-          const xmNote = cosoNoteToXM(noteVal, trackTransp);
-
-          rows.push({
-            note:      xmNote,
-            instrument: instrNum <= instruments.length ? instrNum : 0,
-            volume:    0,
-            effTyp:    0,
-            eff:       0,
-            effTyp2:   0,
-            eff2:      0,
-          });
-        } else {
-          // Unknown negative value < -3 — skip
-          pos++;
-          rows.push(emptyCell());
-        }
-      }
-
-      // Pad to ROWS_PER_PATTERN
-      while (rows.length < ROWS_PER_PATTERN) {
-        rows.push(emptyCell());
-      }
-
-      channelRows[ch] = rows;
-    }
+    const channelRows = grid.rows[stepIdx];
 
     trackerPatterns.push({
       id: `pattern-${stepIdx}`,
@@ -713,6 +611,156 @@ export async function parseHippelCoSoFile(
     linearPeriods: false,
     hippelFileData: buffer.slice(0),
     uadeVariableLayout: variableLayout,
+  };
+}
+
+interface CoSoSong {
+  pointer: number;  // absolute byte offset into tracks area
+  length: number;   // number of track bytes
+  speed: number;
+}
+
+/** The subsong table; a module with none gets one minimal song. */
+function readCoSoSongs(buf: Uint8Array, numSongs: number, songsOff: number, tracksOff: number): CoSoSong[] {
+  const songs: CoSoSong[] = [];
+  for (let i = 0; i < numSongs; i++) {
+    const base = songsOff + i * 6;
+    if (base + 6 > buf.length) break;
+    let pointer = u16BE(buf, base);
+    const endPtr = u16BE(buf, base + 2);
+    const speed  = u16BE(buf, base + 4);
+    const length = (endPtr - pointer + 1) * 12;
+    pointer = pointer * 12 + tracksOff;
+    if (length > 12) {
+      songs.push({ pointer, length, speed });
+    }
+  }
+  if (songs.length === 0) {
+    // Fallback: create one minimal song using the entire tracks area
+    songs.push({ pointer: tracksOff, length: 12, speed: 6 });
+  }
+  return songs;
+}
+
+/**
+ * The byte span behind every grid cell of a CoSo module, as the parser lays
+ * the grid out (subsong 0). `instrumentCount` is the parsed song's, since a
+ * cell shows instrument 0 for a volume sequence past the last instrument.
+ */
+export function mapHippelCoSoCells(buf: Uint8Array, instrumentCount: number): HippelCellSpans {
+  const patternsOff = u32BE(buf, 12);
+  const tracksOff = u32BE(buf, 16);
+  const songsOff = u32BE(buf, 20);
+  const headersOff = u32BE(buf, 24);
+  const numSongs = Math.max(1, Math.floor((headersOff - songsOff) / 6));
+  const song = readCoSoSongs(buf, numSongs, songsOff, tracksOff)[0];
+  return decodeCoSoGrid(buf, patternsOff, song.pointer, Math.floor(song.length / 12), instrumentCount).spans;
+}
+
+/** Grid rows per CoSo track step: one row per pattern event. */
+const COSO_ROWS_PER_STEP = 16;
+
+/** The CoSo note index that `cosoNoteToXM(index, 0)` shows as `xmNote`, or null. */
+function cosoIndexForXM(xmNote: number): number | null {
+  for (let i = 0; i <= 83; i++) if (cosoNoteToXM(i, 0) === xmNote) return i;
+  return null;
+}
+
+/**
+ * Decode subsong steps into grid rows, recording each cell's byte span.
+ *
+ * One row per pattern event, up to 16 per step. A note event is its note byte,
+ * an info byte (low five bits: volume sequence = instrument - 1) and, when the
+ * info byte's top bits are set, one more byte. The step adds its track
+ * transpose to every note, so writing a cell back subtracts it again.
+ */
+export function decodeCoSoGrid(
+  buf: Uint8Array,
+  patternsOff: number,
+  songPointer: number,
+  stepCount: number,
+  instrumentCount: number,
+): { rows: TrackerCell[][][]; spans: HippelCellSpans } {
+  const rows: TrackerCell[][][] = [];
+  const spans: HippelCellSpans = [];
+  for (let stepIdx = 0; stepIdx < stepCount; stepIdx++) {
+    const stepBase = songPointer + stepIdx * 12;
+    const stepRows: TrackerCell[][] = [];
+    const stepSpans: (HippelCellSpan | null)[][] = [];
+    for (let ch = 0; ch < 4; ch++) {
+      const chRows: TrackerCell[] = [];
+      const chSpans: (HippelCellSpan | null)[] = [];
+      const chBase = stepBase + ch * 3;
+      if (chBase + 3 <= buf.length) {
+        const patIdx = u8(buf, chBase);
+        const trackTransp = s8(buf, chBase + 1);
+        const patPtrOff = patternsOff + patIdx * 2;
+        let pos = patPtrOff + 2 <= buf.length ? u16BE(buf, patPtrOff) : 0;
+        while (chRows.length < COSO_ROWS_PER_STEP && pos < buf.length) {
+          const v = s8(buf, pos);
+          const at = pos;
+          if (v === -1) break; // end of pattern
+          if (v === -2 || v === -3) {
+            pos += 2;
+            const baseline = emptyCell();
+            chRows.push(baseline);
+            chSpans.push(cosoSpan(at, 2, baseline, trackTransp, false));
+          } else if (v >= 0) {
+            pos++;
+            let infoVal = 0;
+            if (pos < buf.length) { infoVal = s8(buf, pos); pos++; }
+            if ((infoVal & 0xE0) !== 0 && pos < buf.length) pos++; // infoPrev
+            const instrNum = (infoVal & 31) + 1;
+            const baseline: TrackerCell = {
+              note: cosoNoteToXM(v, trackTransp),
+              instrument: instrNum <= instrumentCount ? instrNum : 0,
+              volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0,
+            };
+            chRows.push(baseline);
+            chSpans.push(cosoSpan(at, pos - at, baseline, trackTransp, true));
+          } else {
+            pos++; // unknown command: one byte, shown as an empty row
+            const baseline = emptyCell();
+            chRows.push(baseline);
+            chSpans.push({ offset: at, length: 1, baseline, encode: () => null });
+          }
+        }
+      }
+      while (chRows.length < COSO_ROWS_PER_STEP) { chRows.push(emptyCell()); chSpans.push(null); }
+      stepRows.push(chRows);
+      stepSpans.push(chSpans);
+    }
+    rows.push(stepRows);
+    spans.push(stepSpans);
+  }
+  return { rows, spans };
+}
+
+/**
+ * A span holding a note event (`isNote`) or a two-byte rest command. An empty
+ * cell becomes a rest (-2), which fits only a two-byte span; a note keeps the
+ * info byte's top bits (and so its length) from the event it replaces.
+ */
+function cosoSpan(
+  offset: number, length: number, baseline: TrackerCell, trackTransp: number, isNote: boolean,
+): HippelCellSpan {
+  return {
+    offset, length, baseline,
+    encode(cell, file) {
+      if ((cell.note ?? 0) === 0) return length === 2 ? new Uint8Array([0xFE, 0]) : null;
+      const idx = cosoIndexForXM(cell.note);
+      if (idx === null) return null;
+      const noteByte = idx - trackTransp;
+      if (noteByte < 0 || noteByte > 0x7F) return null;
+      const oldInfo = isNote ? file[offset + 1] : 0;
+      const inst = cell.instrument ?? 0;
+      const low = inst > 0 ? inst - 1 : oldInfo & 31;
+      if (low > 31) return null;
+      const info = (oldInfo & 0xE0) | low;
+      const out = [noteByte, info];
+      if ((info & 0xE0) !== 0) out.push(isNote && length === 3 ? file[offset + 2] : 0);
+      return out.length === length ? new Uint8Array(out) : null;
+    },
   };
 }
 

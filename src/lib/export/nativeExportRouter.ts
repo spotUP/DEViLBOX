@@ -344,6 +344,18 @@ async function dispatchNativeExport(song: TrackerSong): Promise<RawExportResult 
   } else if (format === 'AdPlug') {
     const { exportAdPlug } = await import('./AdPlugExporter');
     result = exportAdPlug(song, 'rad');
+  } else if (song.hippelFileData && (layoutFormatId === 'hippelCoSo' || layoutFormatId === 'tfmx7v')) {
+    // The module as loaded with the grid's edits patched in — the same bytes
+    // the TFMX decoder plays. Byte-exact where nothing was edited, and it keeps
+    // the samples the from-scratch CoSo serializer cannot rebuild.
+    const { rebuildHippelModule } = await import('@engine/hippel/rebuildHippelModule');
+    const rebuilt = rebuildHippelModule(song.hippelFileData, song.patterns, song.instruments.length);
+    if (rebuilt) {
+      const warnings = rebuilt.refused.length > 0
+        ? [`${rebuilt.refused.length} edit(s) have no room in the module and were not saved (pattern:channel:row ${rebuilt.refused.slice(0, 8).join(', ')})`]
+        : [];
+      result = { data: rebuilt.bytes, filename: `${baseName}.${layoutFormatId === 'hippelCoSo' ? 'hipc' : 'hip7'}`, warnings };
+    }
   } else if (layoutFormatId === 'symphoniePro' || song.symphonieFileData) {
     const { exportSymphonieProFile } = await import('./SymphonieProExporter');
     result = { data: exportSymphonieProFile(song), filename: `${baseName}.symmod`, warnings: [] };
