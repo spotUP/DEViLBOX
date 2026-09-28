@@ -781,6 +781,11 @@ export class ChannelRoutedEffectsManager {
     this.teardown(engine);
 
     let slotIdx = 0;
+    // Sidechain-keyed effects in the slots, wired once every slot is assigned
+    // so their taps take free slots. Built without this, a routed
+    // SidechainCompressor ignored its source channel and keyed on the channel
+    // it sat on - "routing it to a channel kills it" (2026-09-29).
+    const sidechainWiring: Array<{ node: Tone.ToneAudioNode; source: number }> = [];
     for (const [channelIndex, effects] of channelEffects) {
       if (slotIdx >= 4) {
         console.warn('[ChannelRoutedEffects] Only 4 isolation slots available, skipping remaining channels');
@@ -805,6 +810,10 @@ export class ChannelRoutedEffectsManager {
               ((node as any).wet as Tone.Signal).value = config.wet / 100;
             }
             effectNodes.push(node);
+            const source = config.sidechainSource ?? Number(config.parameters?.sidechainSource);
+            if ('getSidechainInput' in node && Number.isFinite(source)) {
+              sidechainWiring.push({ node: node as Tone.ToneAudioNode, source });
+            }
           }
         } catch (e) {
           console.warn(`[ChannelRoutedEffects] Failed to create ${config.type}:`, e);
@@ -853,6 +862,11 @@ export class ChannelRoutedEffectsManager {
 
       console.log(`[ChannelRoutedEffects] Slot ${slotIdx}: ch${channelIndex + 1} → ${enabledEffects.map(e => e.type).join(' → ')} (mask=0x${channelMask.toString(16)}) via worklet output[${outputIndex}]`);
       slotIdx++;
+    }
+
+    if (sidechainWiring.length > 0) {
+      const { wireMasterSidechain } = await import('./MasterEffectsChain');
+      for (const { node, source } of sidechainWiring) await wireMasterSidechain(node, source);
     }
 
     // Re-establish sidechain taps that were torn down

@@ -3,6 +3,7 @@
  * Extracted from InstrumentFactory.ts
  */
 
+import { paramNumber } from '../registry/effects/paramNumber';
 import * as Tone from 'tone';
 import type { EffectConfig } from '@typedefs/instrument';
 import type { DevilboxSynth } from '@typedefs/synth';
@@ -804,7 +805,7 @@ export async function createEffect(
       node = new ShimmerReverbEffect({
         decay: (Number(p.decay) || 70) / 100,
         shimmer: (Number(p.shimmer) || 50) / 100,
-        pitch: Number(p.pitch) ?? 12,
+        pitch: paramNumber(p.pitch, 12),
         damping: (Number(p.damping) || 50) / 100,
         size: (Number(p.size) || 70) / 100,
         predelay: (Number(p.predelay) || 40) / 1000,
@@ -821,7 +822,7 @@ export async function createEffect(
         grainSize: (Number(p.grainSize) || 80) / 1000,
         density: Number(p.density) || 12,
         scatter: (Number(p.scatter) || 30) / 100,
-        pitch: Number(p.pitch) ?? 0,
+        pitch: paramNumber(p.pitch, 0),
         spray: (Number(p.spray) || 20) / 100,
         shimmer: (Number(p.shimmer) || 0) / 100,
         stereoWidth: (Number(p.stereoWidth) || 70) / 100,
