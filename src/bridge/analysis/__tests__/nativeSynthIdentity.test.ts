@@ -26,6 +26,12 @@ describe('a native synth\'s identity', () => {
     expect(classifyInstrument(inst('ChipSynth', { chipSynth: { channel: 'pulse1' } } as never)).role).not.toBe('percussion');
   });
 
+  it('makes a noise-only SID voice a drum, and a noise-plus-pulse voice nothing yet', () => {
+    const sid = (w: Record<string, boolean>) => inst('FurnaceC64', { furnace: { chipType: 3, c64: { triOn: false, sawOn: false, pulseOn: false, noiseOn: false, ...w } } } as never);
+    expect(classifyInstrument(sid({ noiseOn: true })).role).toBe('percussion');
+    expect(classifyInstrument(sid({ noiseOn: true, pulseOn: true })).role).not.toBe('percussion');
+  });
+
   it('leaves a synth that states nothing to the other evidence', () => {
     expect(classifyInstrument(inst('PolySynth')).role).toBe('empty');
   });

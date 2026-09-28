@@ -433,6 +433,13 @@ export function classifyByNativeSynth(inst: InstrumentConfig): {
     if (channel === 'triangle') return { role: 'bass', subrole: 'synth', confidence: 0.5 };
     return null;
   }
+  // A SID voice whose only waveform is noise is the drum voice: C64 hats,
+  // snares and noise kicks are all written that way. Any tonal waveform
+  // switched on beside it says nothing on its own.
+  const sid = inst.furnace?.c64;
+  if (sid && sid.noiseOn && !sid.triOn && !sid.sawOn && !sid.pulseOn) {
+    return { role: 'percussion', subrole: 'perc', confidence: 0.85 };
+  }
   if (inst.synthType === 'StringMachine') return { role: 'pad', confidence: 0.7 };
   if (inst.synthType === 'Organ') return { role: 'chord', confidence: 0.55 };
   return null;
