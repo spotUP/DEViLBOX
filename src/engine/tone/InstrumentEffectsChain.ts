@@ -5,6 +5,7 @@ import { isDevilboxSynth } from '@typedefs/synth';
 import { InstrumentFactory } from '../InstrumentFactory';
 import { InstrumentAnalyser } from '../InstrumentAnalyser';
 import { getChannelFilterManager } from '../ChannelFilterManager';
+import { connectAudio } from './connectAudio';
 
 // Channel indices 1000+ are reserved for native synth global filters,
 // avoiding collision with per-channel voice indices (0-63).
@@ -53,8 +54,8 @@ function connectToDestWithFilter(
     const channelIdx = NATIVE_SYNTH_FILTER_BASE + instrumentId;
     const filterInput = filterMgr.getInput(channelIdx);
     const filterOutput = filterMgr.getOutput(channelIdx);
-    output.connect(filterInput);
-    filterOutput.connect(dest);
+    connectAudio(output, filterInput);
+    connectAudio(filterOutput, dest);
   } else {
     output.connect(dest);
   }
