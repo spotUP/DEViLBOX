@@ -33,6 +33,9 @@ const ENGINES: Array<[string, string, string]> = [
   ['instereo1', 'InStereo1', `${SONGS}/formats/fantasi8.is`],
   ['instereo2', 'InStereo2', `${SONGS}/formats/stereo_feeling.is20`],
   ['activisionpro', 'ActivisionPro', `${SONGS}/formats/gettysburg.avp`],
+  // Rendered nothing before 2026-09-28: the worklet called okt_render_multi
+  // with 4 channel pointers, the C takes 8, so `frames` arrived as 0.
+  ['oktalyzer', 'Oktalyzer', `${SONGS}/oktalyzer/les granges brulees.okta`],
 ];
 
 type Msg = { type?: string; channels?: Int16Array[]; frame?: number; sampleRate?: number; message?: string };

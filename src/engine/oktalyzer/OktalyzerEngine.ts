@@ -79,7 +79,9 @@ export class OktalyzerEngine extends WASMSingletonBase {
           if (this._resolveInit) { this._resolveInit(); this._resolveInit = null; }
           break;
         case 'moduleLoaded':
-          useOscilloscopeStore.getState().setChipInfo(4, 0, ['Paula 0', 'Paula 1', 'Paula 2', 'Paula 3']);
+          useOscilloscopeStore.getState().setChipInfo(
+            data.channels, 0, Array.from({ length: data.channels }, (_: unknown, i: number) => `Channel ${i + 1}`),
+          );
           console.log('[OktalyzerEngine] Module loaded, subsongs:', data.subsongCount);
           break;
         case 'oscData':
