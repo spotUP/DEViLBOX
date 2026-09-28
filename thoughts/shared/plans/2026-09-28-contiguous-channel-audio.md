@@ -2,7 +2,7 @@
 date: 2026-09-28
 topic: Contiguous per-channel audio for the runtime role classifiers
 tags: [channel-intelligence, oscilloscope, worklets, classifier]
-status: draft
+status: implemented-partly
 ---
 
 # Contiguous per-channel audio for the runtime role classifiers
@@ -57,20 +57,25 @@ keeps it contiguous.
 
 ## Checklist
 
-- [ ] C1 `channel-stream.js` helper + loaded by WASMSingletonBase before the engine worklet
-- [ ] C2 ChannelAudioTap (ring, frame continuity, latest) + unit test (a gap resets; contiguous chunks join)
-- [ ] C3 store: updateChannelData(channels, frame, sampleRate); display keeps the last 256; tap fed
-- [ ] C4 ChannelAudioClassifier reads the tap (its stitching ring is removed)
-- [ ] C5 CedChannelAccumulator reads the tap (its stitching ring is removed)
-- [ ] C6 TFMX worklet on the helper (reference engine) + reachability test: TFMX worklet -> store -> tap -> classifier gives contiguous-audio votes
-- [ ] C7 the 26 other WASMSingletonBase worklets on the helper; engine TS passes frame/sampleRate
-- [ ] C8 UADE worklet (own loader) on the helper
-- [ ] C9 libopenmpt / chiptune3 worklet
-- [ ] C10 Hively worklet
-- [ ] C11 Furnace dispatch
-- [ ] C12 SunTronic song engine
+- [x] C1 `channel-stream.js` helper + loaded by WASMSingletonBase before the engine worklet
+- [x] C2 ChannelAudioTap (ring, frame continuity, latest) + unit test (a gap resets; contiguous chunks join)
+- [x] C3 store: updateChannelData(channels, frame, sampleRate); display keeps the last 256; tap fed
+- [x] C4 ChannelAudioClassifier reads the tap (its stitching ring is removed)
+- [x] C5 CedChannelAccumulator reads the tap (its stitching ring is removed)
+- [x] C6 TFMX worklet on the helper (reference engine) + reachability test: TFMX worklet -> store -> tap -> classifier gives contiguous-audio votes
+- [x] C7 the 26 other WASMSingletonBase worklets on the helper; engine TS passes frame/sampleRate
+- [x] C8 UADE worklet (own loader) on the helper
+- [ ] C9 libopenmpt / chiptune3 worklet — NOT converted, OWNER DECISION: its scope renders one channel per process call from a second module instance (round robin), so contiguous per-channel audio needs one extra decode per channel (8-32x CPU on the busiest engine). Sample formats keep the offline SampleSpectrum evidence. Stays display-only (no runtime vote) until decided.
+- [x] C10 Hively worklet
+- [x] C11 Furnace dispatch
+- [x] C12 SunTronic song engine
 - [ ] C13 browser: scopes unchanged; runtime roles for prehistoric_tale and one MOD not all percussion
 - [ ] C14 ledger + handoff note
+
+## Done notes
+- C7: 22 template worklets by one checked regex; Sonic Arranger by hand; Cinter4 and Sonix read every render (Cinter4's 256-sample ring was read every 768 samples; Sonix posted 1 render in 4).
+- C11: FurnaceDispatchWrapper read the 16.16 osc needle as a sample index; now the integer position, held (-1) samples resolved; worklet streams each channel from its last read at 65536 Hz. The display scopes may have been reading the wrong stretch before this (not verified).
+- MCP: get_oscilloscope_info.analysisAudio = unbroken samples per channel.
 
 ## Automated verification
 - `npm run type-check`

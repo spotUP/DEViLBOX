@@ -275,26 +275,27 @@ class Cinter4Processor extends AudioWorkletProcessor {
             outputR[i] = mid - side;
           }
         }
-        // Per-channel oscilloscope (the 4 Paula channels), throttled to ~60 fps.
-        this.scopeAccum = (this.scopeAccum || 0) + (rendered > 0 ? rendered : numSamples);
-        if (this.scopeAccum >= 768 && typeof this.module._paula_scope_ptr === 'function') {
-          this.scopeAccum = 0;
+        // Every sample of the 4 Paula channels, for the oscilloscopes and the
+        // per-channel role classifiers (worklets/channel-stream.js). The C
+        // side keeps the newest SCOPE_LEN samples in a ring; read this
+        // render's worth from it each render.
+        const fresh = rendered > 0 ? rendered : numSamples;
+        const H16 = this.module.HEAP16;
+        if (globalThis.DevilboxChannelStream && H16 && typeof this.module._paula_scope_ptr === 'function') {
+          this._stream ||= new globalThis.DevilboxChannelStream(this.port, sampleRate);
           const len = this.module._paula_scope_len();
           const pos = this.module._paula_scope_pos();
-          const H16 = this.module.HEAP16;
-          const channels = [];
-          for (let ch = 0; ch < 4; ch++) {
-            const ptr = this.module._paula_scope_ptr(ch);
-            if (!ptr || !H16) { channels.push(null); continue; }
-            const base = ptr >> 1;
-            const out = new Int16Array(len);
-            // reorder ring buffer: oldest (pos) -> newest (pos-1)
-            for (let i = 0; i < len; i++) out[i] = H16[base + ((pos + i) & (len - 1))];
-            channels.push(out);
-          }
-          this.port.postMessage({ type: 'scope', channels });
+          const n = Math.min(fresh, len);
+          if (n < fresh) this._stream.discontinue();
+          const bases = [0, 1, 2, 3].map((ch) => this.module._paula_scope_ptr(ch) >> 1);
+          // pos is the next write index: the newest n samples end just before it.
+          this._stream.write(4, n, (ch, i) => H16[bases[ch] + ((pos - n + i + len) & (len - 1))] / 32768);
+        }
+        this.scopeAccum = (this.scopeAccum || 0) + fresh;
+        if (this.scopeAccum >= 768) {
+          this.scopeAccum = 0;
           // Report the WASM's real 50 Hz tick so the pattern scroll follows the
-          // audio (not the tracker scheduler). Same ~60 fps throttle as the scope.
+          // audio (not the tracker scheduler), about 60 times a second.
           if (typeof this.module._player_get_tick === 'function') {
             this.port.postMessage({ type: 'position', tick: this.module._player_get_tick() });
           }

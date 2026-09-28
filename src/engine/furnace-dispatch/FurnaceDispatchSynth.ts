@@ -500,14 +500,14 @@ export class FurnaceDispatchSynth implements DevilboxSynth {
       const channelNames = this.getChannelNames();
       oscStore.setChipInfo(channelNames.length, this.platformType, channelNames);
 
-      this.engine.onOscData((channels) => {
+      this.engine.onOscData((channels, frame, sampleRate) => {
         // Empty array is the engine's signal that the worklet sequencer
         // stopped and the scope should go flat — use clear() so the
         // `isActive` flag drops along with the data.
         if (channels.length === 0) {
           useOscilloscopeStore.getState().clear();
         } else {
-          useOscilloscopeStore.getState().updateChannelData(channels);
+          useOscilloscopeStore.getState().updateChannelData(channels, frame, sampleRate);
         }
       });
 

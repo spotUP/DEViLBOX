@@ -81,7 +81,6 @@ class FurnaceDispatchProcessor extends AudioWorkletProcessor {
     // Oscilloscope readback
     this.oscSendCounter = 0;
     this.oscSendInterval = 12; // ~30fps at 128-sample frames (12 * 128/48000 ≈ 32ms)
-    this.oscSampleCount = 256;
     this.oscPtrOut = 0;
     this.oscBufferOut = null;
 
@@ -605,6 +604,8 @@ class FurnaceDispatchProcessor extends AudioWorkletProcessor {
         // visualizer draws clean channels immediately. Pairs with the
         // sequencerActive gate on the periodic send path.
         this.port.postMessage({ type: 'oscilloscopeClear' });
+        this._oscStream?.discontinue();
+        this._oscReadPos = null;
         break;
       }
       case 'enableCmdLog': {
@@ -784,6 +785,7 @@ class FurnaceDispatchProcessor extends AudioWorkletProcessor {
         getNumChannels: this.module._furnace_dispatch_get_num_channels,
         getOscNeedle: this.module._furnace_dispatch_get_osc_needle,
         getOscData: this.module._furnace_dispatch_get_osc_data,
+        readOsc: this.module._furnace_dispatch_read_osc,
         mute: this.module._furnace_dispatch_mute,
         setCompatFlag: this.module._furnace_dispatch_set_compat_flag,
         setTickRate: this.module._furnace_dispatch_set_tick_rate,
@@ -857,8 +859,9 @@ class FurnaceDispatchProcessor extends AudioWorkletProcessor {
       this.outputPtrL = this.module._malloc(this.bufferSize * 4);
       this.outputPtrR = this.module._malloc(this.bufferSize * 4);
 
-      // Allocate oscilloscope readback buffer (int16 = 2 bytes)
-      this.oscPtrOut = this.module._malloc(this.oscSampleCount * 2);
+      // Oscilloscope readback buffer (int16), big enough for one read of the
+      // whole 65536-sample ring.
+      this.oscPtrOut = this.module._malloc(65536 * 2);
 
       this.samplesPerTick = (sr || sampleRate) / this.tickRate;
       this.updateBufferViews();
@@ -913,7 +916,6 @@ class FurnaceDispatchProcessor extends AudioWorkletProcessor {
       handle,
       numChannels,
       platformType,
-      lastOscNeedles: new Array(numChannels).fill(0)
     });
 
     this.tickAccumulator = 0;
@@ -1026,48 +1028,50 @@ class FurnaceDispatchProcessor extends AudioWorkletProcessor {
     }
   }
 
+  /**
+   * Stream every chip channel's oscilloscope samples since the last read
+   * (worklets/channel-stream.js) — the scopes draw the newest of them, and
+   * the per-channel role classifiers need them unbroken. The rings run at
+   * 65536 samples per second whatever the chip; each read takes the samples
+   * every channel has advanced by, from where it stopped last time.
+   */
   readOscilloscopeData() {
-    if (this.chips.size === 0 || !this.wasm || !this.module) return;
+    if (this.chips.size === 0 || !this.wasm || !this.module || !globalThis.DevilboxChannelStream) return;
+    if (!this.wasm.readOsc) return;
 
-    const channelData = [];
-    let totalChannels = 0;
-
-    // Read oscilloscope data from all chips (Furnace pattern: iterate disCont[])
+    const chans = [];
     for (const chip of this.chips.values()) {
-      for (let ch = 0; ch < chip.numChannels; ch++) {
-        const needle = this.wasm.getOscNeedle(chip.handle, ch);
+      for (let ch = 0; ch < chip.numChannels; ch++) chans.push({ handle: chip.handle, ch });
+    }
+    if (chans.length === 0) return;
+    this._oscStream ||= new globalThis.DevilboxChannelStream(this.port, 65536);
 
-        // Only send if needle has moved
-        if (needle === chip.lastOscNeedles[ch]) {
-          channelData.push(null);
-          totalChannels++;
-          continue;
-        }
-        chip.lastOscNeedles[ch] = needle;
-
-        // Read samples ending at the needle position
-        this.wasm.getOscData(chip.handle, ch, this.oscPtrOut, this.oscSampleCount);
-
-        // Copy from WASM memory to transferable buffer
-        const oscHeapBuffer = this.getHeapBuffer();
-        if (!oscHeapBuffer) { channelData.push(null); totalChannels++; continue; }
-        const heap16 = new Int16Array(oscHeapBuffer, this.oscPtrOut, this.oscSampleCount);
-        const data = new Int16Array(this.oscSampleCount);
-        data.set(heap16);
-        channelData.push(data);
-        totalChannels++;
-      }
+    const now = chans.map((c) => this.wasm.getOscNeedle(c.handle, c.ch));
+    const from = this._oscReadPos;
+    if (!from || from.length !== chans.length) {
+      this._oscReadPos = now;            // first read: start from here
+      this._oscStream.discontinue();
+      return;
+    }
+    let n = Infinity;
+    for (let i = 0; i < chans.length; i++) n = Math.min(n, (now[i] - from[i]) & 0xffff);
+    if (!(n > 0)) return;
+    if (n > 32768) {                     // more than half the ring: lost track
+      this._oscReadPos = now;
+      this._oscStream.discontinue();
+      return;
     }
 
-    // Only send if at least one channel has new data
-    if (channelData.some(d => d !== null)) {
-      const transferables = channelData.filter(d => d !== null).map(d => d.buffer);
-      this.port.postMessage({
-        type: 'oscData',
-        channels: channelData,
-        numChannels: totalChannels
-      }, transferables);
+    const heapBuffer = this.getHeapBuffer();
+    if (!heapBuffer) return;
+    const views = [];
+    for (let i = 0; i < chans.length; i++) {
+      const end = (from[i] + n) & 0xffff;
+      this.wasm.readOsc(chans[i].handle, chans[i].ch, end, this.oscPtrOut, n);
+      views.push(new Int16Array(heapBuffer, this.oscPtrOut, n).slice());
+      from[i] = end;
     }
+    this._oscStream.writeInt16(views, n);
   }
 
   cleanup() {

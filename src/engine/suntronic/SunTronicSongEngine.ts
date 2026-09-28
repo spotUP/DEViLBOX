@@ -22,6 +22,7 @@
 import { getDevilboxAudioContext } from '@/utils/audio-context';
 import { parseSunTronicV13Score, type SunV13Score } from '@/lib/import/formats/SunTronicV13';
 import { SunTronicNativeRenderer, NATIVE_SAMPLE_RATE, voiceScopeToInt16, type RenderChannels } from './SunTronicNativeRender';
+import { pushChannelAudio } from '@/bridge/analysis/ChannelAudioTap';
 import { useOscilloscopeStore } from '@stores/useOscilloscopeStore';
 
 /** Per-channel scope window pushed to the visualizer (VU meters + scopes read
@@ -197,6 +198,10 @@ export class SunTronicSongEngine {
       ];
       this.renderer.renderInto(left, right, { ch });
       lastCh = ch;
+      // Every voice sample, for the per-channel role classifiers. Rendered
+      // ahead of playback by the lookahead, which analysis does not mind;
+      // `generated` restarts at 0 on play, which the tap reads as a new stream.
+      pushChannelAudio(ch.map((v) => voiceScopeToInt16(v, CHUNK)), this.generated, NATIVE_SAMPLE_RATE);
       this.workletNode.port.postMessage(
         { type: 'chunk', left, right },
         [left.buffer, right.buffer],
