@@ -30,6 +30,64 @@ export interface SpaceEchoOptions {
  * - Tape Saturation & Filtering in feedback loop
  * - Wow/Flutter via LFO modulation acting on all heads
  */
+function nativeBiquad(ctx: BaseAudioContext, type: BiquadFilterType, frequency: number): BiquadFilterNode {
+  const f = ctx.createBiquadFilter();
+  f.type = type;
+  f.frequency.value = frequency;
+  f.Q.value = 1;
+  return f;
+}
+
+/** Tone's frequency rampTo: exponential from the current value. */
+function rampFrequency(param: AudioParam, value: number, seconds: number, t: number): void {
+  param.cancelScheduledValues(t);
+  param.setValueAtTime(Math.max(1, param.value), t);
+  param.exponentialRampToValueAtTime(Math.max(1, value), t + seconds);
+}
+
+const dbToGain = (db: number): number => Math.pow(10, db / 20);
+
+/**
+ * Tone.EQ3 built from native nodes: the same crossover (lowpass at the low
+ * frequency; highpass at the low into lowpass at the high frequency; highpass
+ * at the high frequency; single biquads, Q 1) into three gains in dB.
+ */
+class NativeEQ3 {
+  readonly input: GainNode;
+  readonly output: GainNode;
+  private readonly lowGain: GainNode;
+  private readonly midGain: GainNode;
+  private readonly highGain: GainNode;
+  private readonly nodes: AudioNode[];
+
+  constructor(ctx: BaseAudioContext, o: { low: number; mid: number; high: number; lowFrequency: number; highFrequency: number }) {
+    this.input = ctx.createGain();
+    this.output = ctx.createGain();
+    const low = nativeBiquad(ctx, 'lowpass', o.lowFrequency);
+    const lowMid = nativeBiquad(ctx, 'highpass', o.lowFrequency);
+    const mid = nativeBiquad(ctx, 'lowpass', o.highFrequency);
+    const high = nativeBiquad(ctx, 'highpass', o.highFrequency);
+    this.lowGain = ctx.createGain();
+    this.midGain = ctx.createGain();
+    this.highGain = ctx.createGain();
+    this.lowGain.gain.value = dbToGain(o.low);
+    this.midGain.gain.value = dbToGain(o.mid);
+    this.highGain.gain.value = dbToGain(o.high);
+    this.input.connect(low).connect(this.lowGain).connect(this.output);
+    this.input.connect(lowMid).connect(mid).connect(this.midGain).connect(this.output);
+    this.input.connect(high).connect(this.highGain).connect(this.output);
+    this.nodes = [this.input, low, lowMid, mid, high, this.lowGain, this.midGain, this.highGain, this.output];
+  }
+
+  setLow(db: number): void { this.lowGain.gain.value = dbToGain(db); }
+  setMid(db: number): void { this.midGain.gain.value = dbToGain(db); }
+  setHigh(db: number): void { this.highGain.gain.value = dbToGain(db); }
+
+  disconnect(): void {
+    for (const n of this.nodes) { try { n.disconnect(); } catch { /* ok */ } }
+  }
+}
+
 export class SpaceEchoEffect extends Tone.ToneAudioNode {
   readonly name = 'SpaceEcho';
 
@@ -48,15 +106,16 @@ export class SpaceEchoEffect extends Tone.ToneAudioNode {
 
   private feedbackGain: Tone.Gain;
   private saturation: Tone.Distortion;
-  private eq: Tone.EQ3;
-  private feedbackHpf: Tone.Filter;
-  private feedbackLpf: Tone.Filter;
+  private eq: NativeEQ3;
+  private feedbackHpf: BiquadFilterNode;
+  private feedbackLpf: BiquadFilterNode;
   
   private reverb: Tone.Reverb;
   private reverbGain: Tone.Gain;
   private echoGain: Tone.Gain;
 
-  private wowLFO: Tone.LFO;
+  private wowLFO: OscillatorNode;
+  private wowDepth: GainNode;
   private wowGain: Tone.Gain;
 
   // Dry/Wet
@@ -114,7 +173,14 @@ export class SpaceEchoEffect extends Tone.ToneAudioNode {
     // exceed unity regardless of what options were passed.
     this.feedbackGain = new Tone.Gain(Math.max(0, Math.min(0.95, this._options.intensity)));
     this.saturation = new Tone.Distortion(0.1);
-    this.eq = new Tone.EQ3({
+    // Native nodes, not Tone.EQ3 / Tone.Filter / Tone.LFO: those drive every
+    // filter frequency, Q, detune and gain from an always-running
+    // ConstantSource (34 in this effect), which keeps the whole echo graph
+    // computing per-sample coefficients even in silence — about 9 % of the
+    // audio thread with nothing playing (2026-09-28). The nodes, types,
+    // frequencies and Q values are the ones Tone built, so the sound is the same.
+    const raw = this.context.rawContext as unknown as BaseAudioContext;
+    this.eq = new NativeEQ3(raw, {
       low: this._options.bass,
       mid: this._options.mid,
       high: this._options.treble,
@@ -126,22 +192,18 @@ export class SpaceEchoEffect extends Tone.ToneAudioNode {
     // LPF darkens each repeat (simulates tape-head wear + head-to-tape
     // distance). Together they ensure repeats decay cleanly rather than
     // building bass mud or staying unnaturally bright.
-    this.feedbackHpf = new Tone.Filter({
-      type: 'highpass',
-      frequency: this._options.feedbackHpfHz,
-      rolloff: -12,
-    });
-    this.feedbackLpf = new Tone.Filter({
-      type: 'lowpass',
-      frequency: this._options.feedbackLpfHz,
-      rolloff: -12,
-    });
+    this.feedbackHpf = nativeBiquad(raw, 'highpass', this._options.feedbackHpfHz);
+    this.feedbackLpf = nativeBiquad(raw, 'lowpass', this._options.feedbackLpfHz);
 
-    // 4. Modulation
-    this.wowLFO = new Tone.LFO(0.5 + Math.random() * 0.2, -0.002, 0.002);
+    // 4. Modulation — a sine of +-2 ms scaled by the wow amount.
+    this.wowLFO = raw.createOscillator();
     this.wowLFO.type = 'sine';
-    this.wowGain = new Tone.Gain(this._options.wow); 
-    this.wowLFO.connect(this.wowGain);
+    this.wowLFO.frequency.value = 0.5 + Math.random() * 0.2;
+    this.wowDepth = raw.createGain();
+    this.wowDepth.gain.value = 0.002;
+    this.wowGain = new Tone.Gain(this._options.wow);
+    this.wowLFO.connect(this.wowDepth);
+    Tone.connect(this.wowDepth, this.wowGain);
     this.wowLFO.start();
 
     this.wowGain.connect(this.head1.delayTime);
@@ -171,19 +233,19 @@ export class SpaceEchoEffect extends Tone.ToneAudioNode {
     this.head3Gain.connect(echoSum);
 
     echoSum.connect(this.echoGain);
-    this.echoGain.connect(this.eq);
+    Tone.connect(this.echoGain, this.eq.input);
 
-    this.eq.connect(this.saturation);
-    this.saturation.connect(this.feedbackHpf);
+    Tone.connect(this.eq.output, this.saturation);
+    Tone.connect(this.saturation, this.feedbackHpf);
     this.feedbackHpf.connect(this.feedbackLpf);
-    this.feedbackLpf.connect(this.feedbackGain);
+    Tone.connect(this.feedbackLpf, this.feedbackGain);
     this.feedbackGain.connect(this.head1);
     this.feedbackGain.connect(this.head2);
     this.feedbackGain.connect(this.head3);
 
     this.reverb.connect(this.reverbGain);
 
-    this.eq.connect(this.wetGain);
+    Tone.connect(this.eq.output, this.wetGain);
     this.reverbGain.connect(this.wetGain);
     this.wetGain.connect(this.output);
 
@@ -255,27 +317,27 @@ export class SpaceEchoEffect extends Tone.ToneAudioNode {
 
   setBass(val: number) {
     this._options.bass = val;
-    this.eq.low.value = val;
+    this.eq.setLow(val);
   }
 
   setMid(val: number) {
     this._options.mid = val;
-    this.eq.mid.value = val;
+    this.eq.setMid(val);
   }
 
   setFeedbackHpf(hz: number) {
     this._options.feedbackHpfHz = Math.max(20, Math.min(2000, hz));
-    this.feedbackHpf.frequency.rampTo(this._options.feedbackHpfHz, 0.05);
+    rampFrequency(this.feedbackHpf.frequency, this._options.feedbackHpfHz, 0.05, this.context.currentTime);
   }
 
   setFeedbackLpf(hz: number) {
     this._options.feedbackLpfHz = Math.max(500, Math.min(20000, hz));
-    this.feedbackLpf.frequency.rampTo(this._options.feedbackLpfHz, 0.05);
+    rampFrequency(this.feedbackLpf.frequency, this._options.feedbackLpfHz, 0.05, this.context.currentTime);
   }
 
   setTreble(val: number) {
     this._options.treble = val;
-    this.eq.high.value = val;
+    this.eq.setHigh(val);
   }
 
   get wet(): number {
@@ -304,14 +366,16 @@ export class SpaceEchoEffect extends Tone.ToneAudioNode {
     this.head2Gain.dispose();
     this.head3Gain.dispose();
     this.feedbackGain.dispose();
-    this.feedbackHpf.dispose();
-    this.feedbackLpf.dispose();
+    this.feedbackHpf.disconnect();
+    this.feedbackLpf.disconnect();
     this.reverb.dispose();
     this.reverbGain.dispose();
     this.echoGain.dispose();
-    this.eq.dispose();
+    this.eq.disconnect();
     this.saturation.dispose();
-    this.wowLFO.dispose();
+    try { this.wowLFO.stop(); } catch { /* not started */ }
+    this.wowLFO.disconnect();
+    this.wowDepth.disconnect();
     this.wowGain.dispose();
     this.dryGain.dispose();
     this.wetGain.dispose();
