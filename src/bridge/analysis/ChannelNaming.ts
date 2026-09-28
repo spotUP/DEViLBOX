@@ -20,7 +20,7 @@ import { categorizeSample } from '@/lib/import/maxForLiveImport';
 import { DRUM_SYNTHS } from '@/midi/performance/lightGuide';
 import { analyzeEnvelopeShape } from '@/lib/import/EnvelopeConverter';
 import { analyzeSampleForClassification } from './SampleSpectrum';
-import { extractSynthTimbre, classifyBySynthParams, classifyByNativeSynth } from './synthEvidence';
+import { extractSynthTimbre, classifyBySynthParams, classifyByNativeSynth, soundingNotes } from './synthEvidence';
 
 // ─── Public types ────────────────────────────────────────────────────────────
 
@@ -233,13 +233,9 @@ export function classifyInstrument(inst: InstrumentConfig | null | undefined): I
 
 // ─── Channel classifier combining note-stats + instrument signals ───────────
 
-/** Extract the raw note sequence for classifyChannel(). */
-function collectNotes(channel: ChannelData): number[] {
-  const notes: number[] = [];
-  for (const cell of channel.rows) {
-    if (cell && cell.note >= 1 && cell.note <= 96) notes.push(cell.note);
-  }
-  return notes;
+/** The notes a channel sounds, for classifyChannel(): written note + instrument offset. */
+function collectNotes(channel: ChannelData, lookup?: ReadonlyMap<number, InstrumentConfig>): number[] {
+  return soundingNotes(channel.rows, lookup);
 }
 
 /**
@@ -273,7 +269,7 @@ export function classifyChannelWithInstruments(
   lookup: Map<number, InstrumentConfig>,
   ctx?: ChannelSongContext,
 ): EnhancedChannelAnalysis {
-  const notes = collectNotes(channel);
+  const notes = collectNotes(channel, lookup);
   const numRows = channel.rows.length;
   const noteAnalysis = classifyChannel(channelIndex, notes, numRows, ctx);
 
@@ -490,9 +486,7 @@ export function classifySongChannels(
     for (const pat of sampled) {
       const ch = pat.channels?.[idx];
       if (!ch) continue;
-      for (const cell of ch.rows) {
-        if (cell && cell.note >= 1 && cell.note <= 96) all.push(cell.note);
-      }
+      all.push(...collectNotes(ch, instruments));
     }
     if (all.length === 0) return Number.POSITIVE_INFINITY;
     all.sort((a, b) => a - b);

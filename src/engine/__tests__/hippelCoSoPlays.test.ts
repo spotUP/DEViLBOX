@@ -81,6 +81,16 @@ describe('a Hippel CoSo song', { timeout: 60000 }, () => {
     // Measured 0.017-0.024 per second for this song; the dead engine gave 0.
     expect(rms(5)).toBeGreaterThan(0.005);
 
+    // Each voice's own output reaches the oscilloscopes and the per-channel
+    // role classifier; the TFMX engine sent none before.
+    const osc = (posted as Array<{ type?: string; channels?: Int16Array[] }>).filter((m) => m.type === 'oscData');
+    expect(osc.length).toBeGreaterThan(50);
+    expect(osc[osc.length - 1].channels!.length).toBe(4);
+    const voiceHeard = [0, 1, 2, 3].map((v) => osc.some((m) => m.channels![v].some((x) => x !== 0)));
+    // Measured [true, true, false, false]: in the first five seconds only
+    // voices 0 and 1 play; the track table brings 2 and 3 in later.
+    expect(voiceHeard.slice(0, 2), JSON.stringify(voiceHeard)).toEqual([true, true]);
+
     // The grid follows playback: the worklet reports voice 0's step and read
     // offset, and the parser's cell spans turn the offset into a row.
     const { mapHippelCells } = await import('../hippel/rebuildHippelModule');

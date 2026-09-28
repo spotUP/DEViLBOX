@@ -38,6 +38,14 @@ class LamePaulaMixer
 
     PaulaVoice* getVoice(ubyte);
 
+    /**
+     * DEViLBOX extension: capture each voice's output (after its volume,
+     * before panning and filtering) into `buf`, `capacity` samples per voice,
+     * voice v at buf + v*capacity. Each fillBuffer call starts over at 0 and
+     * stops at `capacity`. Null disables it.
+     */
+    void setScopeCapture(sword* buf, udword capacity);
+
  protected:
     void initVoice(ubyte num);
     void initMixTables();
@@ -46,6 +54,15 @@ class LamePaulaMixer
     void updateRate(udword);
     void updateVoiceVolume();
     ubyte getSample_7V();
+
+    sword* scopeBuf = nullptr;
+    udword scopeCapacity = 0;
+    udword scopePos = 0;     // samples captured so far in this fillBuffer call
+    udword scopeAt = 0;      // index of the sample being mixed, for getSample_7V
+    void scopeWrite(ubyte v, udword at, ubyte sam) {
+        if (scopeBuf && at < scopeCapacity)
+            scopeBuf[v*scopeCapacity + at] = (sword)((sbyte)sam * voiceVol[v] * 4);
+    }
 
     void* (LamePaulaMixer::*mFillFunc)(void*, udword);
 

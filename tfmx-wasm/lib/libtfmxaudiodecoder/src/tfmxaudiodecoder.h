@@ -98,6 +98,11 @@ extern "C" {
      * decoder cannot report one. */
     int tfmxdec_get_play_position(void* decoder, int32_t* step, uint32_t* offset);
 
+    /* DEViLBOX extension: capture each voice's output into `buf` (voice v at
+     * buf + v*capacity, up to `capacity` samples per buffer_fill call, 16-bit
+     * stereo mixing only). NULL disables. */
+    void tfmxdec_set_scope_capture(void* decoder, int16_t* buf, uint32_t capacity);
+
     /* Return short C-string identifying the detected input data format. */
     const char* tfmxdec_format_id(void* decoder);
     

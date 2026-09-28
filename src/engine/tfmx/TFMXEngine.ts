@@ -9,6 +9,7 @@
  */
 
 import { getDevilboxAudioContext } from '@/utils/audio-context';
+import { useOscilloscopeStore } from '@stores/useOscilloscopeStore';
 import {
   WASMSingletonBase,
   createWASMAssetsCache,
@@ -115,10 +116,17 @@ export class TFMXEngine extends WASMSingletonBase {
           break;
 
         case 'moduleLoaded':
+          useOscilloscopeStore.getState().setChipInfo(
+            data.voices, 0, Array.from({ length: data.voices }, (_: unknown, v: number) => `Paula ${v}`),
+          );
           if (this._moduleLoadedResolvers.length > 0) {
             const resolve = this._moduleLoadedResolvers.shift()!;
             resolve({ voices: data.voices, songs: data.songs, duration: data.duration });
           }
+          break;
+
+        case 'oscData':
+          useOscilloscopeStore.getState().updateChannelData(data.channels);
           break;
 
         case 'modulePosition':

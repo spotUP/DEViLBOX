@@ -300,17 +300,25 @@ void LamePaulaMixer::updateVoiceVolume() {
 }
 
 ubyte LamePaulaMixer::getSample_7V() {
-    sword sam = mix8vol[(voiceVol[3]<<8)+pVoice[3]->getSample()];
-    sam += mix8vol[(voiceVol[4]<<8)+pVoice[4]->getSample()];
-    sam += mix8vol[(voiceVol[5]<<8)+pVoice[5]->getSample()];
-    sam += mix8vol[(voiceVol[6]<<8)+pVoice[6]->getSample()];
+    sword sam = 0;
+    for (ubyte v = 3; v <= 6; v++) {
+        ubyte s = pVoice[v]->getSample();
+        scopeWrite(v, scopeAt, s);
+        sam += mix8vol[(voiceVol[v]<<8)+s];
+    }
     return clipping4[0x200+sam];
+}
+
+void LamePaulaMixer::setScopeCapture(sword* buf, udword capacity) {
+    scopeBuf = buf;
+    scopeCapacity = buf ? capacity : 0;
 }
 
 void LamePaulaMixer::fillBuffer(void* buffer, udword bufferLen, Decoder *pDecoder) {
     // Both, 16-bit and stereo samples take more memory.
     // Hence fewer samples fit into the buffer.
     bufferLen >>= bufferScale;
+    scopePos = 0;
 
     while ( bufferLen > 0 ) {
         if ( toFill > bufferLen ) {
@@ -550,12 +558,13 @@ void* LamePaulaMixer::fill16bitStereoPanning( void *buffer, udword numberOfSampl
         
         LamePaulaVoice *pv = pVoice[v];
         uword vol = voiceVol[v] << 8;
-        for (udword n = numberOfSamples; n>0; n--) {
+        for (udword n = 0; n < numberOfSamples; n++) {
             if (v == 0) {
                 buffer16bit[0] = 0;
                 buffer16bit[1] = 0;
             }
             ubyte sam = pv->getSample();
+            scopeWrite(v, scopePos + n, sam);
             *buffer16bit++ += mixLeft[vol+sam];
             *buffer16bit++ += mixRight[vol+sam];
         }
@@ -574,13 +583,15 @@ void* LamePaulaMixer::fill16bitStereoPanning( void *buffer, udword numberOfSampl
         mixLeft = mix16right;
         mixRight = mix16left;
     }
-    for (udword n = numberOfSamples; n>0; n--) {
+    for (udword n = 0; n < numberOfSamples; n++) {
+        scopeAt = scopePos + n;
         ubyte sam = getSample_7V();
         *buffer16bit++ += mixLeft[0x4000+sam];
         *buffer16bit++ += mixRight[0x4000+sam];
     }
 
  fill16bitStereoPost:
+    scopePos += numberOfSamples;
     buffer16bit = static_cast<sword*>(buffer);
     if (lowpass2) {
         for (udword n = numberOfSamples; n>0; n--) {
