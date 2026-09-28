@@ -3,6 +3,7 @@
  * Now supports both Tone.js and Neural effects in a single unified list
  */
 
+import { previewToRemoveOnSelect } from './chainSelection';
 import React, { useState, useCallback, useMemo, useEffect, useRef, useLayoutEffect } from 'react';
 import { X, Settings, Volume2, ChevronDown, Save, Sliders, Cpu, Globe, AlertTriangle, Search, ExternalLink, Plus } from 'lucide-react';
 import { useUIStore } from '@stores/useUIStore';
@@ -512,7 +513,8 @@ export const MasterEffectsModal: React.FC<MasterEffectsModalProps> = ({ isOpen, 
                         effect={effect}
                         isSelected={editingEffectId === effect.id}
                         onSelect={() => {
-                          if (previewEffectId) { removeMasterEffect(previewEffectId); setPreviewEffectId(null); }
+                          const stale = previewToRemoveOnSelect(previewEffectId, effect.id);
+                          if (stale) { removeMasterEffect(stale); setPreviewEffectId(null); }
                           setEditingEffectId(effect.id);
                         }}
                         onToggle={() => handleToggle(effect.id)}
