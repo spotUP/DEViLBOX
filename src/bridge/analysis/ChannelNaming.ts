@@ -19,7 +19,7 @@ import { categorizeSample } from '@/lib/import/maxForLiveImport';
 import { DRUM_SYNTHS } from '@/midi/performance/lightGuide';
 import { analyzeEnvelopeShape } from '@/lib/import/EnvelopeConverter';
 import { analyzeSampleForClassification } from './SampleSpectrum';
-import { extractSynthTimbre, classifyBySynthParams } from './synthEvidence';
+import { extractSynthTimbre, classifyBySynthParams, classifyByNativeSynth } from './synthEvidence';
 
 // ─── Public types ────────────────────────────────────────────────────────────
 
@@ -131,6 +131,12 @@ export function classifyInstrument(inst: InstrumentConfig | null | undefined): I
   if (DRUM_SYNTHS.has(inst.synthType)) {
     return { role: 'percussion', subrole: 'perc', confidence: 0.9 };
   }
+
+  // 2b. A native synth whose identity settles the role - a 303, a chip noise
+  //     channel. Ahead of the sample and audio paths on purpose: the synth
+  //     knows what it is (synthEvidence.classifyByNativeSynth).
+  const native = classifyByNativeSynth(inst);
+  if (native) return native;
 
   // 3. Sample filename (if sample-based instrument with a real URL).
   const sampleUrl = inst.sample?.url;
