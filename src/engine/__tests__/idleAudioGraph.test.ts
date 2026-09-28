@@ -96,6 +96,32 @@ describe('idle audio graph', () => {
     mgr.disposeAll();
   });
 
+  it('builds per-channel dub chains only for channels whose send is open', async () => {
+    const { registerMixerStore, registerTrackerStore } = await import('@stores/storeAccess');
+    const channels = Array.from({ length: 7 }, (_, i) => ({ dubSend: i === 1 || i === 4 ? 0.5 : 0 }));
+    registerMixerStore({ getState: () => ({ channels }) });
+    registerTrackerStore({ getState: () => ({ patterns: [{ channels: new Array(7).fill({}) }], currentPatternIndex: 0 }) });
+    const { ChannelRoutedEffectsManager } = await import('../tone/ChannelRoutedEffects');
+    const mgr = new ChannelRoutedEffectsManager({} as never);
+    const before = made.length;
+    const busInput = Object.assign(ctx.createGain(), { context: ctx });
+    const drySpring = ctx.createGain();
+    mgr.setupDubBusWiring(busInput as unknown as AudioNode, { drySpringBusNode: drySpring } as never);
+    // Two open sends: two chains, not 32. Measured 2026-09-28: all 32 were
+    // built up front on a 7-channel song, about 200 nodes processed per quantum.
+    expect(mgr.getPerChannelFx(1)).not.toBeNull();
+    expect(mgr.getPerChannelFx(4)).not.toBeNull();
+    expect(mgr.getPerChannelFx(0)).toBeNull();
+    expect(mgr.getPerChannelFx(31)).toBeNull();
+    const builtGains = made.slice(before).filter((r) => r.kind === 'Gain').length;
+    expect(builtGains).toBeLessThan(40);
+
+    // Opening another send builds its chain then.
+    mgr.setChannelDubSend(6, 0.7);
+    expect(mgr.getPerChannelFx(6)).not.toBeNull();
+    void mgr.dispose();
+  });
+
   it('links a dub-bus LFO to its delay only while its feature is on', async () => {
     vi.useFakeTimers();
     const { LfoLink } = await import('../dub/lfoLink');

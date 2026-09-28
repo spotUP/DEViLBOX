@@ -1372,7 +1372,7 @@ export function createMcpServer(): McpServer {
 
   server.tool(
     'get_audio_context_info',
-    'Get Web Audio context info: sampleRate, state (running/suspended/closed), currentTime, base/output latency',
+    'Get Web Audio context info: sampleRate, state (running/suspended/closed), currentTime, base/output latency, and playback underruns (dropout count and seconds since the context started; diff two reads to count dropouts over a window)',
     {},
     () => call('get_audio_context_info'),
   );
