@@ -737,9 +737,11 @@ export function decodeCoSoGrid(
 }
 
 /**
- * A span holding a note event (`isNote`) or a two-byte rest command. An empty
- * cell becomes a rest (-2), which fits only a two-byte span; a note keeps the
- * info byte's top bits (and so its length) from the event it replaces.
+ * A span holding a note event (`isNote`) or a -2/-3 command. The commands
+ * are not rows to the player: they set the next note's length and are read
+ * with it in the same tick; the grid shows each as an empty row. CoSo has no
+ * rest byte either. So only a note event can be rewritten, only with another
+ * note, and a note keeps the info byte's top bits (and so its length).
  */
 function cosoSpan(
   offset: number, length: number, baseline: TrackerCell, trackTransp: number, isNote: boolean,
@@ -747,18 +749,18 @@ function cosoSpan(
   return {
     offset, length, baseline,
     encode(cell, file) {
-      if ((cell.note ?? 0) === 0) return length === 2 ? new Uint8Array([0xFE, 0]) : null;
+      if (!isNote || (cell.note ?? 0) === 0) return null;
       const idx = cosoIndexForXM(cell.note);
       if (idx === null) return null;
       const noteByte = idx - trackTransp;
       if (noteByte < 0 || noteByte > 0x7F) return null;
-      const oldInfo = isNote ? file[offset + 1] : 0;
+      const oldInfo = file[offset + 1];
       const inst = cell.instrument ?? 0;
       const low = inst > 0 ? inst - 1 : oldInfo & 31;
       if (low > 31) return null;
       const info = (oldInfo & 0xE0) | low;
       const out = [noteByte, info];
-      if ((info & 0xE0) !== 0) out.push(isNote && length === 3 ? file[offset + 2] : 0);
+      if ((info & 0xE0) !== 0) out.push(file[offset + 2]);
       return out.length === length ? new Uint8Array(out) : null;
     },
   };

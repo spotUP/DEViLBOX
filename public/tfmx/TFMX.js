@@ -3753,6 +3753,7 @@ var _tfmx_init,
   _tfmx_module_voice_volume,
   _tfmx_module_voices,
   _tfmx_module_seek,
+  _tfmx_module_position,
   _tfmx_module_mute_voice,
   _tfmx_module_preview_macro,
   __emscripten_stack_restore,
@@ -3786,6 +3787,7 @@ function assignWasmExports(wasmExports) {
   _tfmx_module_voice_volume = Module['_tfmx_module_voice_volume'] = wasmExports['tfmx_module_voice_volume'];
   _tfmx_module_voices = Module['_tfmx_module_voices'] = wasmExports['tfmx_module_voices'];
   _tfmx_module_seek = Module['_tfmx_module_seek'] = wasmExports['tfmx_module_seek'];
+  _tfmx_module_position = Module['_tfmx_module_position'] = wasmExports['tfmx_module_position'];
   _tfmx_module_mute_voice = Module['_tfmx_module_mute_voice'] = wasmExports['tfmx_module_mute_voice'];
   _tfmx_module_preview_macro = Module['_tfmx_module_preview_macro'] = wasmExports['tfmx_module_preview_macro'];
   __emscripten_stack_restore = wasmExports['_emscripten_stack_restore'];

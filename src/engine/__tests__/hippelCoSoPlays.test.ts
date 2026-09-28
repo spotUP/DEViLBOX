@@ -81,6 +81,20 @@ describe('a Hippel CoSo song', { timeout: 60000 }, () => {
     // Measured 0.017-0.024 per second for this song; the dead engine gave 0.
     expect(rms(5)).toBeGreaterThan(0.005);
 
+    // The grid follows playback: the worklet reports voice 0's step and read
+    // offset, and the parser's cell spans turn the offset into a row.
+    const { mapHippelCells } = await import('../hippel/rebuildHippelModule');
+    const { hippelRowAt } = await import('../hippel/hippelCellSpans');
+    const spans = mapHippelCells(song.hippelFileData as ArrayBuffer, song.instruments.length)!;
+    const reports = (posted as Array<{ type?: string; step?: number; patternOffset?: number }>)
+      .filter((m) => m.type === 'modulePosition' && (m.step ?? -1) >= 0);
+    expect(reports.length).toBeGreaterThan(20);
+    const at = reports.map((m) => `${m.step}:${hippelRowAt(spans, m.step!, m.patternOffset!)}`);
+    // Measured: 0:0 1:1 1:2 ... 1:6 2:1 ... over five seconds. A step's row 0
+    // is a -2 command the player reads together with row 1's note.
+    expect(new Set(at).size, at.join(' ')).toBeGreaterThanOrEqual(8);
+    expect(Math.max(...reports.map((m) => m.step!))).toBeGreaterThan(0);
+
     // A grid edit reloads the module. The reload continues where playback
     // was, and voices muted before it stay muted.
     const wasm = (p as unknown as { wasm: { _tfmx_get_samples_rendered(c: unknown): number }; ctx: unknown });
