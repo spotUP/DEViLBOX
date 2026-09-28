@@ -17,7 +17,6 @@ class TFMXProcessor extends AudioWorkletProcessor {
     this.wasm        = null;
     this.ctx         = null;
     this.initialized = false;
-    this._oscCounter = 0;
 
     // Per-player state: { outPtrL, outPtrR }
     this.players = {};
@@ -131,6 +130,7 @@ class TFMXProcessor extends AudioWorkletProcessor {
           // A new song starts with every voice audible; the mixer sends its
           // mask for the new song after this.
           this._voiceMutes = new Map();
+          this._stream?.discontinue();
           this._moduleMode = true;
           this._modulePlaying = false;
           this._sampleRate = sampleRate;
@@ -173,6 +173,7 @@ class TFMXProcessor extends AudioWorkletProcessor {
         this.wasm._free(mdatPtr);
         if (smplPtr) this.wasm._free(smplPtr);
         if (ret === 0) {
+          this._stream?.discontinue();
           if (atMs > 0) this.wasm._tfmx_module_seek(this.ctx, atMs);
           for (const [voice, mute] of this._voiceMutes || []) {
             this.wasm._tfmx_module_mute_voice(this.ctx, voice, mute ? 1 : 0);
@@ -345,18 +346,15 @@ class TFMXProcessor extends AudioWorkletProcessor {
         outputR[i] += heapF32[offR + i];
       }
 
-      // Each voice's own output, for the oscilloscopes and the per-channel
-      // role classifier — every 8 renders, the same cadence as the other
-      // Amiga engines.
-      if (this.wasm._tfmx_module_scope && this._moduleVoices > 0 && ++this._oscCounter >= 8) {
-        this._oscCounter = 0;
+      // Every sample of each voice's own output, for the oscilloscopes and
+      // the per-channel role classifiers (worklets/channel-stream.js).
+      if (this.wasm._tfmx_module_scope && this._moduleVoices > 0 && globalThis.DevilboxChannelStream) {
+        this._stream ||= new globalThis.DevilboxChannelStream(this.port, sampleRate);
         const base = this.wasm._tfmx_module_scope(this.ctx) >> 1;
         const heap16 = new Int16Array(this.wasm.HEAPU8.buffer);
-        const channels = [];
-        for (let v = 0; v < this._moduleVoices; v++) {
-          channels.push(heap16.slice(base + v * 128, base + v * 128 + numSamples));
-        }
-        this.port.postMessage({ type: 'oscData', channels });
+        const views = [];
+        for (let v = 0; v < this._moduleVoices; v++) views.push(heap16.subarray(base + v * 128, base + v * 128 + numSamples));
+        this._stream.writeInt16(views, numSamples);
       }
 
       // Send position update every ~100ms (4410 samples at 44100Hz)
