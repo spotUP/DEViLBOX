@@ -7,7 +7,10 @@ class OktalyzerProcessor extends AudioWorkletProcessor {
     super();
     this.module = null;
     this.handle = 0;
-    this.chPtrs = [0, 0, 0, 0];
+    // Oktalyzer mixes up to 8 channels (each Paula channel may be split in two).
+    this.chPtrs = [0, 0, 0, 0, 0, 0, 0, 0];
+    this.numChannels = 4;
+    this.pans = [0, 1, 1, 0, 0, 1, 1, 0];
     this.interleavedPtr = 0;
     this.interleavedBuf = null;
     this.initialized = false;
@@ -38,7 +41,10 @@ class OktalyzerProcessor extends AudioWorkletProcessor {
           const subsongCount = this.module._okt_subsong_count(this.handle);
           if (typeof data.subsong === 'number' && data.subsong > 0) this.module._okt_select_subsong(this.handle, data.subsong);
           this.playing = false;
-          this.port.postMessage({ type: 'moduleLoaded', subsongCount, channels: 4 });
+          this.numChannels = this.module._okt_channel_count(this.handle);
+          for (let ch = 0; ch < this.numChannels; ch++) this.pans[ch] = this.module._okt_channel_panning(this.handle, ch);
+          this._stream?.discontinue();
+          this.port.postMessage({ type: 'moduleLoaded', subsongCount, channels: this.numChannels });
         } catch (error) { this.port.postMessage({ type: 'error', message: error.message }); }
         break;
       }
@@ -99,7 +105,7 @@ class OktalyzerProcessor extends AudioWorkletProcessor {
       // Allocate interleaved stereo + 4 per-channel mono buffers
       const frameBytes = this.bufferSize * 4; // float32
       this.interleavedPtr = this.module._malloc(this.bufferSize * 2 * 4);
-      for (let i = 0; i < 4; i++) this.chPtrs[i] = this.module._malloc(frameBytes);
+      for (let i = 0; i < 8; i++) this.chPtrs[i] = this.module._malloc(frameBytes);
       if (!this.interleavedPtr) { this.port.postMessage({ type: 'error', message: 'malloc failed for output buffer' }); return; }
       this.updateBufferViews();
       this.initialized = true;
@@ -115,7 +121,7 @@ class OktalyzerProcessor extends AudioWorkletProcessor {
     if (this.lastHeapBuffer !== heapF32.buffer) {
       this.interleavedBuf = new Float32Array(heapF32.buffer, this.interleavedPtr, this.bufferSize * 2);
       this.chBufs = [];
-      for (let i = 0; i < 4; i++) {
+      for (let i = 0; i < 8; i++) {
         this.chBufs[i] = new Float32Array(heapF32.buffer, this.chPtrs[i], this.bufferSize);
       }
       this.lastHeapBuffer = heapF32.buffer;
@@ -126,7 +132,7 @@ class OktalyzerProcessor extends AudioWorkletProcessor {
     if (this.module && this.handle) { this.module._okt_destroy(this.handle); this.handle = 0; }
     if (this.module) {
       if (this.interleavedPtr) { this.module._free(this.interleavedPtr); this.interleavedPtr = 0; }
-      for (let i = 0; i < 4; i++) { if (this.chPtrs[i]) { this.module._free(this.chPtrs[i]); this.chPtrs[i] = 0; } }
+      for (let i = 0; i < 8; i++) { if (this.chPtrs[i]) { this.module._free(this.chPtrs[i]); this.chPtrs[i] = 0; } }
     }
     this.interleavedBuf = null; this.chBufs = null; this.module = null; this.initialized = false; this.playing = false; this.lastHeapBuffer = null;
   }
@@ -143,20 +149,25 @@ class OktalyzerProcessor extends AudioWorkletProcessor {
 
     // Render per-channel
     const rendered = this.module._okt_render_multi(
-      this.handle, this.chPtrs[0], this.chPtrs[1], this.chPtrs[2], this.chPtrs[3], numSamples);
+      this.handle, this.chPtrs[0], this.chPtrs[1], this.chPtrs[2], this.chPtrs[3],
+      this.chPtrs[4], this.chPtrs[5], this.chPtrs[6], this.chPtrs[7], numSamples);
 
     if (rendered > 0) {
-      // Mix to stereo: channels 0,3 → left; channels 1,2 → right (Amiga panning)
-      for (let i = 0; i < rendered; i++) {
-        outputL[i] = this.chBufs[0][i] + this.chBufs[3][i];
-        outputR[i] = this.chBufs[1][i] + this.chBufs[2][i];
+      // Mix to stereo by each channel's side, as okt_render does.
+      const n = this.numChannels;
+      outputL.fill(0, 0, rendered);
+      outputR.fill(0, 0, rendered);
+      for (let ch = 0; ch < n; ch++) {
+        const buf = this.chBufs[ch];
+        const out = this.pans[ch] === 0 ? outputL : outputR;
+        for (let i = 0; i < rendered; i++) out[i] += buf[i];
       }
 
       // Every sample of each voice, for the oscilloscopes and the per-channel
       // role classifiers (worklets/channel-stream.js).
       if (globalThis.DevilboxChannelStream) {
         this._stream ||= new globalThis.DevilboxChannelStream(this.port, sampleRate);
-        this._stream.writeFloat32(this.chBufs.slice(0, 4), rendered);
+        this._stream.writeFloat32(this.chBufs.slice(0, this.numChannels), rendered);
       }
     }
 
