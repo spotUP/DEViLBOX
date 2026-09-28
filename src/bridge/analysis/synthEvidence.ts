@@ -403,3 +403,37 @@ export function classifyBySynthParams(ev: SynthTimbreEvidence): {
 
   return { role: 'empty', confidence: 0 };
 }
+
+// ─── Native synths: what the synth states about itself ──────────────────────
+
+/** The TB-303 and its clones: an acid bass by construction. */
+const ACID_BASS_SYNTHS: ReadonlySet<string> = new Set(['TB303', 'Buzz3o3', 'Buzz3o3DF']);
+
+/**
+ * A role for DEViLBOX's own synths, from what they ARE rather than from how
+ * they sound (plan section 13, "native synth metadata should beat CED": the
+ * synth already knows what it is, and an audio guess must not overrule it).
+ *
+ * Only identities that settle a role are answered; everything else - a
+ * generic PolySynth, an FM patch - returns null so the sample, parameter,
+ * name and note evidence below decide. Confidences sit under the 0.8 at which
+ * `classifyChannelWithInstruments` lets an instrument overrule the notes,
+ * except where the identity leaves no doubt: a 303 played high is an acid
+ * lead, so the register still gets a say, but a noise channel is a drum.
+ */
+export function classifyByNativeSynth(inst: InstrumentConfig): {
+  role: ChannelRole; subrole?: ChannelSubrole; confidence: number;
+} | null {
+  if (ACID_BASS_SYNTHS.has(inst.synthType)) return { role: 'bass', subrole: 'synth', confidence: 0.75 };
+  if (inst.synthType === 'ChipSynth') {
+    // The NES channel model: the noise channel is the drum kit, the triangle
+    // carries the bass line by convention, the pulses say nothing on their own.
+    const channel = inst.chipSynth?.channel;
+    if (channel === 'noise') return { role: 'percussion', subrole: 'perc', confidence: 0.85 };
+    if (channel === 'triangle') return { role: 'bass', subrole: 'synth', confidence: 0.5 };
+    return null;
+  }
+  if (inst.synthType === 'StringMachine') return { role: 'pad', confidence: 0.7 };
+  if (inst.synthType === 'Organ') return { role: 'chord', confidence: 0.55 };
+  return null;
+}
