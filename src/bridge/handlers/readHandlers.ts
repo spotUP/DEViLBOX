@@ -446,6 +446,58 @@ export function getHistoryState(): Record<string, unknown> {
   };
 }
 
+// ─── Main thread profile ───────────────────────────────────────────────────────
+
+interface ProfilerTrace {
+  resources: string[];
+  frames: Array<{ name?: string; resourceId?: number; line?: number; column?: number }>;
+  stacks: Array<{ frameId: number; parentId?: number }>;
+  samples: Array<{ timestamp: number; stackId?: number }>;
+}
+
+/**
+ * Sample the main thread (JS Self-Profiling API, dev server sends
+ * Document-Policy: js-profiling) and rank functions by self and total time.
+ * Long-animation-frame attribution lists only scripts over 5 ms, so a flood
+ * of small tasks - message handlers, timers - is invisible to it; sampling is
+ * not.
+ */
+export async function profileMainThread(params: Record<string, unknown>): Promise<Record<string, unknown>> {
+  const P = (globalThis as unknown as { Profiler?: new (o: { sampleInterval: number; maxBufferSize: number }) => { stop(): Promise<ProfilerTrace> } }).Profiler;
+  if (!P) return { available: false, note: 'JS Self-Profiling API unavailable (needs Chrome and the Document-Policy: js-profiling header; reload after the dev server restarts)' };
+  const ms = typeof params.ms === 'number' ? Math.min(20000, Math.max(500, params.ms)) : 3000;
+  let profiler;
+  try { profiler = new P({ sampleInterval: 10, maxBufferSize: 100000 }); } catch (e) { return { available: false, note: String(e) }; }
+  await new Promise((r) => setTimeout(r, ms));
+  const trace = await profiler.stop();
+  const label = (fid: number): string => {
+    const f = trace.frames[fid];
+    const res = f.resourceId !== undefined ? trace.resources[f.resourceId] : '';
+    const file = String(res).replace(location.origin, '').replace(/\?.*$/, '').replace('/src/', '').replace(/^\/node_modules\/\.vite\/deps\//, 'deps/');
+    return `${f.name || '(anonymous)'} ${file}${f.line ? ':' + f.line : ''}`;
+  };
+  const self = new Map<string, number>();
+  const total = new Map<string, number>();
+  let idle = 0;
+  for (const s of trace.samples) {
+    if (s.stackId === undefined) { idle++; continue; }
+    const seen = new Set<string>();
+    let sid: number | undefined = s.stackId;
+    let first = true;
+    while (sid !== undefined) {
+      const st: ProfilerTrace["stacks"][number] = trace.stacks[sid];
+      const name = label(st.frameId);
+      if (first) { self.set(name, (self.get(name) ?? 0) + 1); first = false; }
+      if (!seen.has(name)) { total.set(name, (total.get(name) ?? 0) + 1); seen.add(name); }
+      sid = st.parentId;
+    }
+  }
+  const n = trace.samples.length || 1;
+  const rank = (m: Map<string, number>) => [...m.entries()].sort((a, b) => b[1] - a[1]).slice(0, 25)
+    .map(([k, v]) => `${(100 * v / n).toFixed(1)}% ${k}`);
+  return { available: true, ms, samples: trace.samples.length, idlePct: +(100 * idle / n).toFixed(1), self: rank(self), total: rank(total) };
+}
+
 // ─── Audio thread profile ──────────────────────────────────────────────────────
 
 /** Audio-thread time per worklet processor over a window (dev builds). */

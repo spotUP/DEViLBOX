@@ -1066,6 +1066,13 @@ export function createMcpServer(): McpServer {
   );
 
   server.tool(
+    'profile_main_thread',
+    'Sample the page main thread for ms milliseconds (JS Self-Profiling API, dev server) and rank functions by self and total time, plus idle %. Catches floods of small tasks (message handlers, timers) that long-animation-frame attribution misses. Needs a page reload after the dev server first sends Document-Policy: js-profiling.',
+    { ms: z.number().optional().describe('Sampling window in ms (500-20000, default 3000)') },
+    ({ ms }) => call('profile_main_thread', { ms }),
+  );
+
+  server.tool(
     'get_audio_worklet_profile',
     'Audio-thread cost per AudioWorklet processor (dev builds), plus a census of every native audio node created and still alive by type (Chrome runs its own nodes on the same thread): milliseconds of audio-thread time per second, and process() calls per second (375/s per instance at 48 kHz), measured over windowMs. Use when the page is sluggish during or even without playback: every processor in the context runs whether a song plays or not. Needs a reload after the profiler is first installed.',
     { windowMs: z.number().optional().describe('Measurement window in ms (250-10000, default 2000)') },
