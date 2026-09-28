@@ -11,6 +11,7 @@
  * `useTrackerStore.updateChannelName` path.
  */
 
+import { DivChanType } from '@/constants/systemPresets';
 import type { ChannelData, Pattern } from '@/types/tracker';
 import type { InstrumentConfig } from '@/types/instrument/defaults';
 import type { SampleCategory } from '@typedefs/samplePack';
@@ -241,6 +242,24 @@ function collectNotes(channel: ChannelData): number[] {
   return notes;
 }
 
+/**
+ * What the CHANNEL's hardware says, before any instrument does.
+ *
+ * A chip's noise channel is its drum channel whatever instrument sits on it -
+ * in Furnace and DefleMask songs the instrument is typically a generic STD
+ * one that states nothing, and the channel's own name is empty or a greeting.
+ * The type comes from the chip's channel definition (`channelMeta.furnaceType`,
+ * set on import), so it is chip fact, not text a musician typed.
+ */
+export function hardwareChannelClass(channel: ChannelData | null | undefined): InstrumentClassification | null {
+  // `mixed`, the kit subrole: a noise channel carries the kit's noise parts
+  // (hats, snares, noise kicks), not a single hand-percussion sound.
+  if (channel?.channelMeta?.furnaceType === DivChanType.NOISE) {
+    return { role: 'percussion', subrole: 'mixed', confidence: 0.9 };
+  }
+  return null;
+}
+
 /** Enhanced per-channel analysis that blends the existing note-statistic
  *  classifier with instrument-derived role signals. Instrument signals at
  *  confidence ≥ 0.8 override note-statistics; lower signals merely inform
@@ -257,6 +276,12 @@ export function classifyChannelWithInstruments(
   const notes = collectNotes(channel);
   const numRows = channel.rows.length;
   const noteAnalysis = classifyChannel(channelIndex, notes, numRows, ctx);
+
+  // The hardware outranks every instrument and note heuristic.
+  const hardware = hardwareChannelClass(channel);
+  if (hardware && noteAnalysis.role !== 'empty') {
+    return { ...noteAnalysis, role: hardware.role, subrole: hardware.subrole };
+  }
 
   const freq = getChannelInstruments(channel);
   if (freq.size === 0) {
