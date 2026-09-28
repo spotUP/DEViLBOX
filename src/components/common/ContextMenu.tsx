@@ -445,7 +445,8 @@ export const useContextMenu = () => {
 
 // Dropdown button that opens a context menu
 interface DropdownButtonProps {
-  items: MenuItemType[];
+  /** The items, or a builder called when the menu opens (for large menus). */
+  items: MenuItemType[] | (() => MenuItemType[]);
   children: React.ReactNode;
   className?: string;
   style?: React.CSSProperties;
@@ -499,7 +500,7 @@ export const DropdownButton: React.FC<DropdownButtonProps> = ({
       </button>
       {isOpen && position && (
         <ContextMenu
-          items={items}
+          items={typeof items === 'function' ? items() : items}
           position={position}
           onClose={handleClose}
           minWidth={triggerWidth}
