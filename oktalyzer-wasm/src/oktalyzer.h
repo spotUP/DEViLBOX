@@ -17,6 +17,7 @@ int okt_subsong_count(const OktModule* module);
 bool okt_select_subsong(OktModule* module, int subsong);
 
 int okt_channel_count(const OktModule* module);
+int okt_channel_panning(const OktModule* module, int ch);
 void okt_set_channel_mask(OktModule* module, uint32_t mask);
 
 size_t okt_render(OktModule* module, float* interleaved_stereo, size_t frames);

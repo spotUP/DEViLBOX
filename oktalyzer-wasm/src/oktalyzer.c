@@ -1173,6 +1173,13 @@ bool okt_select_subsong(OktModule* module, int subsong) {
     return true;
 }
 
+/* Which side a mix channel plays on: 0 = left, 1 = right. okt_render_multi
+ * writes the channels unpanned, so its caller mixes them with this. */
+int okt_channel_panning(const OktModule* module, int ch) {
+    if (!module || ch < 0 || ch >= module->chan_num) return 0;
+    return module->mix_channels[ch].panning;
+}
+
 int okt_channel_count(const OktModule* module) {
     if (!module) return 0;
     return module->chan_num;
