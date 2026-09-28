@@ -122,6 +122,19 @@ describe('idle audio graph', () => {
     void mgr.dispose();
   });
 
+  it('builds the space echo from native filters and oscillator, with no always-running Tone signals', async () => {
+    // Tone.EQ3 / Tone.Filter / Tone.LFO / Tone.Signal each run ConstantSources
+    // that keep the echo graph computing per-sample coefficients in silence:
+    // SpaceEcho held 34 of them, ~9 % of the audio thread with nothing
+    // playing (2026-09-28, stopped, RE-201 swap 35.7 % -> 27.0 %).
+    const { readFileSync } = await import('node:fs');
+    const { resolve } = await import('node:path');
+    const src = readFileSync(resolve(__dirname, '../effects/SpaceEchoEffect.ts'), 'utf8');
+    expect(src).not.toMatch(/new Tone\.(EQ3|Filter|LFO|Signal|Multiply|Add|Scale)\b/);
+    expect(src).toContain('createBiquadFilter()');
+    expect(src).toContain('createOscillator()');
+  });
+
   it('links a dub-bus LFO to its delay only while its feature is on', async () => {
     vi.useFakeTimers();
     const { LfoLink } = await import('../dub/lfoLink');
