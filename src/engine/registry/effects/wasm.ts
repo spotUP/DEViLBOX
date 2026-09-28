@@ -975,7 +975,7 @@ const wasmEffects: EffectDescriptor[] = [
     ],
   },
   {
-    id: 'SidechainGate', name: 'Sidechain Gate', category: 'wasm', group: 'Dynamics',
+    id: 'SidechainGate', sidechainKeyed: true, name: 'Sidechain Gate', category: 'wasm', group: 'Dynamics',
     loadMode: 'eager',
     create: async (c: EffectConfig) => {
       const { SidechainGateEffect } = await import('@engine/effects/SidechainGateEffect');
@@ -1055,7 +1055,7 @@ const wasmEffects: EffectDescriptor[] = [
     ],
   },
   {
-    id: 'SidechainLimiter', name: 'Sidechain Limiter', category: 'wasm', group: 'Dynamics',
+    id: 'SidechainLimiter', sidechainKeyed: true, name: 'Sidechain Limiter', category: 'wasm', group: 'Dynamics',
     loadMode: 'eager',
     create: async (c: EffectConfig) => {
       const { SidechainLimiterEffect } = await import('@engine/effects/SidechainLimiterEffect');
