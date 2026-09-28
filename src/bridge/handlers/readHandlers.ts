@@ -1901,6 +1901,26 @@ export function getAudioAnalysis(): Record<string, unknown> {
 }
 
 /** Get AudioContext properties: sampleRate, latency, state */
+interface AudioPlaybackStats {
+  underrunDuration: number;
+  underrunEvents: number;
+  totalDuration: number;
+  averageLatency: number;
+  maximumLatency: number;
+}
+
+function readPlaybackStats(ctx: AudioContext): Record<string, number> | null {
+  const stats = (ctx as unknown as { playbackStats?: AudioPlaybackStats }).playbackStats;
+  if (!stats) return null;
+  return {
+    underrunEvents: stats.underrunEvents,
+    underrunSeconds: +stats.underrunDuration.toFixed(4),
+    totalSeconds: +stats.totalDuration.toFixed(1),
+    averageLatencyMs: +(stats.averageLatency * 1000).toFixed(2),
+    maximumLatencyMs: +(stats.maximumLatency * 1000).toFixed(2),
+  };
+}
+
 export function getAudioContextInfo(): Record<string, unknown> {
   try {
     // Try Tone.js context (available after user gesture)
@@ -1916,6 +1936,9 @@ export function getAudioContextInfo(): Record<string, unknown> {
       currentTime: +ctx.currentTime.toFixed(3),
       baseLatency: ctx.baseLatency ?? null,
       outputLatency: (ctx as { outputLatency?: number }).outputLatency ?? null,
+      // Output underruns since the context started — the audible dropouts.
+      // Chrome's AudioContext.playbackStats; null where unsupported.
+      playback: readPlaybackStats(ctx),
     };
   } catch (e) {
     return { error: `AudioContext not available: ${(e as Error).message}` };

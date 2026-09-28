@@ -141,6 +141,8 @@ export class ChannelRoutedEffectsManager {
    */
   private dubBusInput: AudioNode | null = null;
   private channelDubGains: (GainNode | null)[] = new Array(MAX_DUB_CHANNELS).fill(null);
+  /** DubBus dry spring input the per-channel FX chains feed; set with the wiring. */
+  private drySpringBus: AudioNode | null = null;
   private perChannelFx: Map<number, import('../dub/PerChannelDubFx').PerChannelDubFx> = new Map();
   /** Target gain value each channel should ramp to. Persists across engine rebuilds. */
   private channelDubSendValues: number[] = new Array(MAX_DUB_CHANNELS).fill(0);
@@ -195,7 +197,7 @@ export class ChannelRoutedEffectsManager {
   /** BLEED toggled: every closed channel moves to or from the floor. */
   private reapplyClosedDubSends(): void {
     for (let ch = 0; ch < MAX_DUB_CHANNELS; ch++) {
-      if (this.channelDubSendValues[ch] <= 0 && this.channelDubGains[ch]) this._applyDubSend(ch);
+      if (this.channelDubSendValues[ch] <= 0 && (this.channelDubGains[ch] || this.bleedsInto(ch))) this._applyDubSend(ch);
     }
   }
 
@@ -364,45 +366,64 @@ export class ChannelRoutedEffectsManager {
       bleedChannels,
     );
 
+    // Build only the channels that sound now; the rest are built when their
+    // send first opens (_ensureDubChannel). All 32 used to be built up front
+    // - 32 gains and 32 per-channel FX chains, about 200 nodes, processed
+    // every quantum on a 7-channel song.
+    this.drySpringBus = drySpringBus;
     const seedFrom = ctx.currentTime;
     for (let ch = 0; ch < MAX_DUB_CHANNELS; ch++) {
-      const g = ctx.createGain();
-      // Open from silence, never as a step — see DUB_SEND_SEED_RAMP_SEC.
-      g.gain.value = 0;
       const target = seeded[ch] ?? 0;
-      if (target > 0) {
-        try {
-          g.gain.setValueAtTime(0, seedFrom);
-          g.gain.linearRampToValueAtTime(target, seedFrom + DUB_SEND_SEED_RAMP_SEC);
-        } catch { g.gain.value = target; }
-        this.channelDubSendValues[ch] = Math.max(0, Math.min(1,
-          (getMixerStoreRefOrNull()?.getState() as { channels?: MixerChannelState[] } | undefined)?.channels?.[ch]?.dubSend ?? 0));
-      }
-      if (drySpringBus) {
-        // Insert per-channel mini-chain between the gain and the bus input
-        const fx = new PerChannelDubFx(ctx, dubBusInput, drySpringBus);
-        g.connect(fx.input);
-        this.perChannelFx.set(ch, fx);
-        // Re-apply any stored channel settings (survive song reload / bus recreate)
-        try {
-          const mixer = getMixerStoreRefOrNull();
-          const ch_state = (mixer?.getState() as { channels?: MixerChannelState[] } | undefined)?.channels?.[ch];
-          if (ch_state) {
-            fx.setFilterMode(ch_state.dubFilterMode ?? 'off');
-            fx.setFilterHz(ch_state.dubFilterHz ?? 200);
-            fx.setReverbSend(ch_state.dubReverbSend ?? 0);
-            fx.setSweepAmount(ch_state.dubSweepAmount ?? 0);
-            fx.setSweepRate(ch_state.dubSweepRateHz ?? 0.8);
-            fx.setSweepDepth(ch_state.dubSweepDepthMs ?? 8);
-            fx.setSweepFeedback(ch_state.dubSweepFeedback ?? 0.5);
-          }
-        } catch { /* ok — store may not be ready on first init */ }
-      } else {
-        g.connect(dubBusInput);
-      }
-      this.channelDubGains[ch] = g;
+      if (target <= 0) continue;
+      const g = this._ensureDubChannel(ch);
+      if (!g) continue;
+      // Open from silence, never as a step — see DUB_SEND_SEED_RAMP_SEC.
+      try {
+        g.gain.setValueAtTime(0, seedFrom);
+        g.gain.linearRampToValueAtTime(target, seedFrom + DUB_SEND_SEED_RAMP_SEC);
+      } catch { g.gain.value = target; }
+      this.channelDubSendValues[ch] = Math.max(0, Math.min(1,
+        (getMixerStoreRefOrNull()?.getState() as { channels?: MixerChannelState[] } | undefined)?.channels?.[ch]?.dubSend ?? 0));
     }
-    console.log(`[ChannelRoutedEffects] Dub bus wiring ready (${MAX_DUB_CHANNELS} per-channel FX chains → dubBusInput)`);
+    console.log(`[ChannelRoutedEffects] Dub bus wiring ready (${this.perChannelFx.size || this.channelDubGains.filter(Boolean).length} of ${MAX_DUB_CHANNELS} per-channel chains built → dubBusInput)`);
+  }
+
+  /**
+   * The channel's send gain, built on first need together with its FX chain
+   * (seeded from the mixer store's per-channel settings). Null before the
+   * dub wiring exists.
+   */
+  private _ensureDubChannel(ch: number): GainNode | null {
+    const existing = this.channelDubGains[ch];
+    if (existing) return existing;
+    const busInput = this.dubBusInput;
+    if (!busInput || ch < 0 || ch >= MAX_DUB_CHANNELS) return null;
+    const ctx = busInput.context as AudioContext;
+    const g = ctx.createGain();
+    g.gain.value = 0;
+    if (this.drySpringBus) {
+      const fx = new PerChannelDubFx(ctx, busInput, this.drySpringBus);
+      g.connect(fx.input);
+      this.perChannelFx.set(ch, fx);
+      // Re-apply any stored channel settings (survive song reload / bus recreate)
+      try {
+        const mixer = getMixerStoreRefOrNull();
+        const chState = (mixer?.getState() as { channels?: MixerChannelState[] } | undefined)?.channels?.[ch];
+        if (chState) {
+          fx.setFilterMode(chState.dubFilterMode ?? 'off');
+          fx.setFilterHz(chState.dubFilterHz ?? 200);
+          fx.setReverbSend(chState.dubReverbSend ?? 0);
+          fx.setSweepAmount(chState.dubSweepAmount ?? 0);
+          fx.setSweepRate(chState.dubSweepRateHz ?? 0.8);
+          fx.setSweepDepth(chState.dubSweepDepthMs ?? 8);
+          fx.setSweepFeedback(chState.dubSweepFeedback ?? 0.5);
+        }
+      } catch { /* ok — store may not be ready on first init */ }
+    } else {
+      g.connect(busInput);
+    }
+    this.channelDubGains[ch] = g;
+    return g;
   }
 
   /** Get the per-channel effect chain for a tracker channel. */
@@ -422,6 +443,7 @@ export class ChannelRoutedEffectsManager {
     this.channelDubPendingActivation.clear();
     this.channelDubRetried.clear();
     this.dubBusInput = null;
+    this.drySpringBus = null;
   }
 
   /**
@@ -455,11 +477,13 @@ export class ChannelRoutedEffectsManager {
       .then(({ getActiveDubBus }) => getActiveDubBus()?.setChannelTapBaseline(channelIndex, curved))
       .catch(() => { /* bus not built yet — registration carries the baseline */ });
 
-    const gain = this.channelDubGains[channelIndex];
-    if (!gain || !this.dubBusInput) {
+    if (!this.dubBusInput) {
       console.warn('[ChannelRoutedEffects] setChannelDubSend: dub wiring not set up — caller should invoke setupDubBusWiring first');
       return;
     }
+    // A closed send on a channel never built has nothing to close.
+    const gain = effective > 0 ? this._ensureDubChannel(channelIndex) : this.channelDubGains[channelIndex];
+    if (!gain) return;
 
     // Always ramp the gain value — works even before the engine is available.
     const ctx = this.dubBusInput.context as AudioContext;
@@ -689,9 +713,9 @@ export class ChannelRoutedEffectsManager {
         // array made the loop below reconnect the channel while the node it
         // reconnected was still at zero — the taps registered, the slots
         // rendered, and nothing reached the bus (2026-09-23).
-        const g = this.channelDubGains[ch];
+        const want = dubSendToGain(this.effectiveDubSendOf(ch));
+        const g = want > 0 ? this._ensureDubChannel(ch) : this.channelDubGains[ch];
         if (g) {
-          const want = dubSendToGain(this.effectiveDubSendOf(ch));
           if (Math.abs(g.gain.value - want) > 1e-6) {
             // Ramped for the same reason the initial seed is: a rebuild lands
             // while the engine's worklet is restarting.
@@ -707,7 +731,7 @@ export class ChannelRoutedEffectsManager {
 
     for (let ch = 0; ch < MAX_DUB_CHANNELS; ch++) {
       if (this.effectiveDubSendOf(ch) <= 0) continue;
-      const gain = this.channelDubGains[ch];
+      const gain = this._ensureDubChannel(ch);
       if (!gain) continue;
       // Fire enable + reconnect. Safe to disconnect first even if not
       // currently connected (try/catch eats the error).
