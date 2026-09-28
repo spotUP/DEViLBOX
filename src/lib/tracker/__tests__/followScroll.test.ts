@@ -7,7 +7,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { computeChannelFollowScroll } from '@/lib/tracker/followScroll';
+import { computeChannelFollowScroll, createChannelFollowGate } from '@/lib/tracker/followScroll';
 
 // A viewport 300px wide, 4 channels of 200px each (content 800px).
 const VIEW = 300;
@@ -49,5 +49,16 @@ describe('computeChannelFollowScroll', () => {
     // Scrolled to the right portion: the left edge (0) is now off-screen-left,
     // so a follow reveals the left edge → scroll back to 0.
     expect(computeChannelFollowScroll(0, 500, 200, VIEW, 200)).toBe(0);
+  });
+});
+
+describe('createChannelFollowGate', () => {
+  it('follows when the cursor changes channel, not when the pattern moves on', () => {
+    const shouldFollow = createChannelFollowGate();
+    expect(shouldFollow(0)).toBe(true);    // first placement
+    expect(shouldFollow(0)).toBe(false);   // playback moved to the next pattern
+    expect(shouldFollow(0)).toBe(false);   // and the next: a manual scroll stays put
+    expect(shouldFollow(3)).toBe(true);    // Tab to channel 3
+    expect(shouldFollow(3)).toBe(false);
   });
 });
