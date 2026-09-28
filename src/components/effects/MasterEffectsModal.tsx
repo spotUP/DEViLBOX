@@ -4,6 +4,8 @@
  */
 
 import { previewToRemoveOnSelect } from './chainSelection';
+import { CustomSelect } from '@components/common/CustomSelect';
+import { EffectRegistry } from '@engine/registry/EffectRegistry';
 import React, { useState, useCallback, useMemo, useEffect, useRef, useLayoutEffect } from 'react';
 import { X, Settings, Volume2, ChevronDown, Save, Sliders, Cpu, Globe, AlertTriangle, Search, ExternalLink, Plus } from 'lucide-react';
 import { useUIStore } from '@stores/useUIStore';
@@ -26,6 +28,7 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import type { EffectConfig, AudioEffectType as EffectType } from '@typedefs/instrument';
 import { useAudioStore } from '@stores/useAudioStore';
+import { useShallow } from 'zustand/react/shallow';
 import { useTrackerStore } from '@stores/useTrackerStore';
 import { useFormatStore } from '@stores/useFormatStore';
 import { supportsChannelIsolation } from '@engine/tone/ChannelRoutedEffects';
@@ -68,6 +71,8 @@ export const MasterEffectsModal: React.FC<MasterEffectsModalProps> = ({ isOpen, 
   const setMasterEffects = useAudioStore((s) => s.setMasterEffects);
 
   const numChannels = useTrackerStore(s => s.patterns[s.currentPatternIndex]?.channels?.length ?? 16);
+  const channelNames = useTrackerStore(useShallow(s =>
+    s.patterns[s.currentPatternIndex]?.channels?.map((ch) => ch.name ?? '') ?? []));
   const editorMode = useFormatStore(s => s.editorMode);
   const isolationSupported = supportsChannelIsolation(editorMode);
 
@@ -521,7 +526,9 @@ export const MasterEffectsModal: React.FC<MasterEffectsModalProps> = ({ isOpen, 
                         onRemove={() => removeMasterEffect(effect.id)}
                         onWetChange={(wet) => handleWetChange(effect.id, wet)}
                         onChannelSelect={(channels) => handleChannelSelect(effect.id, channels)}
+                        onKeyChange={(source) => updateMasterEffect(effect.id, { parameters: { ...effect.parameters, sidechainSource: source } })}
                         numChannels={numChannels}
+                        channelNames={channelNames}
                         isolationSupported={isolationSupported}
                       />
                     ))}
@@ -683,11 +690,16 @@ interface SortableEffectItemProps {
   onRemove: () => void;
   onWetChange: (wet: number) => void;
   onChannelSelect: (channels: number[] | undefined) => void;
+  /** Sidechain-keyed effects only: the channel that triggers it, or -1 for its own input. */
+  onKeyChange: (source: number) => void;
   numChannels: number;
+  channelNames: string[];
   isolationSupported: boolean;
 }
 
-function SortableEffectItem({ effect, isSelected, onSelect, onToggle, onRemove, onWetChange, onChannelSelect, numChannels, isolationSupported }: SortableEffectItemProps) {
+function SortableEffectItem({ effect, isSelected, onSelect, onToggle, onRemove, onWetChange, onChannelSelect, onKeyChange, numChannels, channelNames, isolationSupported }: SortableEffectItemProps) {
+  const sidechainKeyed = EffectRegistry.get(effect.type)?.sidechainKeyed === true;
+  const keySource = Math.round(Number(effect.parameters?.sidechainSource ?? -1));
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: effect.id,
   });
@@ -840,10 +852,45 @@ function SortableEffectItem({ effect, isSelected, onSelect, onToggle, onRemove, 
         </div>
       </div>
 
+      {/* Sidechain key: the channel that triggers the effect. It is the defining
+          setting of a sidechain effect, so it sits on the card, apart from
+          "Apply to" (which channels the effect processes). Both used to be
+          channel pickers with nothing to tell them apart, and the one on the
+          card was the wrong one (2026-09-29). */}
+      {sidechainKeyed && (
+        <div className="mt-2 pt-2 border-t flex items-center gap-2" style={{ borderColor: `${enc.border}` }} onClick={(e) => e.stopPropagation()}>
+          <span
+            className="text-[10px] font-semibold uppercase tracking-wider"
+            style={{ color: `${enc.accent}80` }}
+            title="The channel that triggers this effect: every hit on it ducks the channels below"
+          >
+            Key
+          </span>
+          <CustomSelect
+            value={String(keySource)}
+            onChange={(v) => onKeyChange(Number(v))}
+            options={[
+              { value: '-1', label: 'Own input' },
+              ...Array.from({ length: numChannels }, (_, i) => ({
+                value: String(i),
+                label: channelNames[i] && !/^(ch|channel)\s*\d+$/i.test(channelNames[i].trim()) ? `CH ${i + 1} ${channelNames[i]}` : `CH ${i + 1}`,
+              })),
+            ]}
+            className="flex-1 bg-dark-bgTertiary border border-dark-borderLight rounded px-2 py-0.5 text-[10px] font-mono text-text-primary"
+          />
+        </div>
+      )}
+
       {/* Channel routing selector — only for formats with multi-output isolation */}
       {isolationSupported && <div className="mt-2 pt-2 border-t" style={{ borderColor: `${enc.border}` }} onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center gap-1.5 mb-1.5">
-          <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: `${enc.accent}80` }}>Route</span>
+          <span
+            className="text-[10px] font-semibold uppercase tracking-wider"
+            style={{ color: `${enc.accent}80` }}
+            title="The channels this effect processes"
+          >
+            Apply to
+          </span>
           <button
             onClick={() => onChannelSelect(undefined)}
             className={`px-1.5 py-0.5 text-[9px] font-bold rounded transition-colors ${
