@@ -16,6 +16,7 @@ import {
 import {
   classifyChannelWithInstruments,
   classifyInstrument,
+  hardwareChannelClass,
   getChannelInstruments,
 } from '@/bridge/analysis/ChannelNaming';
 import { getAllRuntimeChannelRoles } from '@/bridge/analysis/ChannelAudioClassifier';
@@ -121,6 +122,8 @@ export function getChannelProfiles(
       }
       if (topId >= 0) instrumentClass = classifyInstrument(instruments.get(topId));
     }
+    // A chip noise channel is a drum channel whatever instrument it plays.
+    instrumentClass = hardwareChannelClass(channel) ?? instrumentClass;
 
     profiles.set(ch, buildMusicalChannelProfile({
       channel: ch,

@@ -21,7 +21,11 @@ import type {
 /**
  * Convert a FurnaceSubsong's native data to Pattern[] for the editor.
  */
-function subsongToPatterns(sub: FurnaceSubsong): { patterns: Pattern[]; songPositions: number[] } {
+function subsongToPatterns(
+  sub: FurnaceSubsong,
+  /** Per channel hardware type from the chip definition; see channelMeta.furnaceType. */
+  channelTypes: readonly number[] = [],
+): { patterns: Pattern[]; songPositions: number[] } {
   const ordersLen = sub.ordersLen;
 
   // Build unique pattern list from orders
@@ -68,6 +72,9 @@ function subsongToPatterns(sub: FurnaceSubsong): { patterns: Pattern[]; songPosi
         instrumentId: null,
         color: null,
         rows,
+        ...(channelTypes[ch] >= 0
+          ? { channelMeta: { importedFromMOD: false, furnaceType: channelTypes[ch] } }
+          : {}),
       };
     });
 
@@ -250,7 +257,7 @@ async function parseFurnaceFileWasm(buffer: ArrayBuffer, _fileName: string, subs
 
   // Convert active subsong patterns
   const activeSub = loaded.nativeData.subsongs[subsong] || loaded.nativeData.subsongs[0];
-  const { patterns, songPositions } = subsongToPatterns(activeSub);
+  const { patterns, songPositions } = subsongToPatterns(activeSub, loaded.channelTypes);
   const numChannels = activeSub.channels.length;
 
   // Store module-level wavetables/samples on the dispatch engine singleton.
@@ -280,7 +287,7 @@ async function parseFurnaceFileWasm(buffer: ArrayBuffer, _fileName: string, subs
   const furnaceSubsongs: FurnaceSubsongPlayback[] | undefined =
     loaded.numSubsongs > 1
       ? loaded.nativeData.subsongs.map((sub, i) => {
-          const converted = subsongToPatterns(sub);
+          const converted = subsongToPatterns(sub, loaded.channelTypes);
           return {
             name: sub.name || `Subsong ${i + 1}`,
             patterns: converted.patterns,
