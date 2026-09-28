@@ -1065,6 +1065,13 @@ export function createMcpServer(): McpServer {
     () => call('get_oscilloscope_info'),
   );
 
+  server.tool(
+    'get_audio_worklet_profile',
+    'Audio-thread cost per AudioWorklet processor (dev builds): milliseconds of audio-thread time per second, and process() calls per second (375/s per instance at 48 kHz), measured over windowMs. Use when the page is sluggish during or even without playback: every processor in the context runs whether a song plays or not. Needs a reload after the profiler is first installed.',
+    { windowMs: z.number().optional().describe('Measurement window in ms (250-10000, default 2000)') },
+    ({ windowMs }) => call('get_audio_worklet_profile', { windowMs }),
+  );
+
   // ═══════════════════════════════════════════════════════════════════════════════
   // COMMAND REGISTRY (Escape Hatch)
   // ═══════════════════════════════════════════════════════════════════════════════
