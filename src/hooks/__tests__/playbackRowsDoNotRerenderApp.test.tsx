@@ -49,3 +49,19 @@ describe('useButtonMappings during playback', () => {
     expect(setCurrentPattern).toHaveBeenCalledTimes(1);   // already on the last pattern
   });
 });
+
+describe('useMobileTrackerInput during playback', () => {
+  it('does not re-render TrackerView when the cursor follows the playback row', async () => {
+    const { useMobileTrackerInput } = await import('../../components/tracker/mobile/useMobileTrackerInput');
+    const { useCursorStore } = await import('../../stores');
+    let renders = 0;
+    renderHook(() => { renders++; useMobileTrackerInput(false); });
+    const rendersAfterMount = renders;
+    act(() => {
+      for (let row = 1; row <= 16; row++) {
+        useCursorStore.setState((s) => ({ cursor: { ...s.cursor, rowIndex: row } }));
+      }
+    });
+    expect(renders).toBe(rendersAfterMount);
+  });
+});
