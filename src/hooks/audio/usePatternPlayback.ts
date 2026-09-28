@@ -735,8 +735,12 @@ export const usePatternPlayback = () => {
           // on SunTronic the probe read `suppressNotes=true engineDispatch=false`,
           // so the narrower "engine owns the dispatch" flag would have missed
           // it — and missed it silently, which is how this survived so long.
+          //
+          // Engines that report their own position (Hippel, TFMX, Hively,
+          // MusicLine, ...) own it: this scheduler row is ignored for them,
+          // since it runs at the song's nominal tempo and the two alternated.
           if (replayer.isSuppressNotes) {
-            useWasmPositionStore.getState().setPosition(row, position);
+            useWasmPositionStore.getState().setSchedulerPosition(row, position);
           }
 
           // During playback, the standard pattern editor RAF loop reads position
