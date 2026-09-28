@@ -44,10 +44,13 @@ describe('BiquadFilterNode stability — no cascaded filters in automated paths'
   describe('ChannelFilterManager (per-channel DJ-style sweeps)', () => {
     const src = read('engine/ChannelFilterManager.ts');
 
-    it('uses rolloff -12 (single biquad) for all filters', () => {
-      const rolloffs = extractRolloffs(src);
-      expect(rolloffs.length).toBeGreaterThanOrEqual(2); // HPF + LPF
-      for (const r of rolloffs) {
+    it('builds each filter from one native biquad, never a cascade', () => {
+      // Native BiquadFilterNodes since 2026-09-28 (a Tone.Filter per channel
+      // kept a ConstantSource running for each). One node is one biquad, so
+      // any rolloff left in the file must still be -12.
+      expect(src).toContain('createBiquadFilter()');
+      expect(src).not.toMatch(/new Tone\.Filter/);
+      for (const r of extractRolloffs(src)) {
         expect(r.rolloff, `line ${r.line}: rolloff must be -12`).toBe(-12);
       }
     });

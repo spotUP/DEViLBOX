@@ -36,16 +36,12 @@ describe('ChannelRoutedEffects — G6 pending dub-channel activation retry', () 
   });
 
   it('adds to the pending set when activation aborts (no engine or worklet)', () => {
-    // Both early-return branches (engine null/unavailable, worklet null) must
-    // add to the set — otherwise the retry in rebuildDubConnections is a
-    // no-op. Count the literal statement rather than regex the two branches
-    // separately, so either branch reordering or a single consolidated guard
-    // still passes as long as both paths add.
-    const adds = SOURCE.match(
-      /this\.channelDubPendingActivation\.add\(channelIndex\)/g,
-    );
-    expect(adds, 'expected two .add(channelIndex) calls (null engine + null worklet)').not.toBeNull();
-    expect(adds!.length).toBeGreaterThanOrEqual(2);
+    // Since 2026-09-28 one guard covers both aborts (no engine, no worklet):
+    // it reports 'unavailable', the channel parks, and _scheduleDubRetry
+    // marks it pending for its single retry. Adding from each branch AND
+    // reconciling immediately was a retry loop per channel.
+    expect(SOURCE).toMatch(/if \(!engine\?\.isAvailable\(\) \|\| !engine\.getWorkletNode\(\)\) \{[\s\S]{0,500}return 'unavailable';/);
+    expect(SOURCE).toMatch(/private _scheduleDubRetry[\s\S]{0,400}this\.channelDubPendingActivation\.add\(channelIndex\)/);
   });
 
   it('removes from the pending set once activation succeeds', () => {
