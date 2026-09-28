@@ -231,7 +231,7 @@ void (async () => {
     import('../engine/soundmon/SoundMonEngine').then(m => _regBitmask('SoundMonEngine', m.SoundMonEngine)).catch(() => {}),
     import('../engine/jamcracker/JamCrackerEngine').then(m => _regBitmask('JamCrackerEngine', m.JamCrackerEngine)).catch(() => {}),
     import('../engine/ma/MaEngine').then(m => _regBitmask('MaEngine', m.MaEngine)).catch(() => {}),
-    import('../engine/hippel/HippelEngine').then(m => _regBitmask('HippelEngine', m.HippelEngine)).catch(() => {}),
+    import('../engine/tfmx/TFMXEngine').then(m => _regBitmask('TFMXEngine', m.TFMXEngine)).catch(() => {}),
     import('../engine/sonix/SonixEngine').then(m => _regBitmask('SonixEngine', m.SonixEngine)).catch(() => {}),
     import('../engine/pretracker/PreTrackerEngine').then(m => _regBitmask('PreTrackerEngine', m.PreTrackerEngine)).catch(() => {}),
     import('../engine/pumatracker/PumaTrackerEngine').then(m => _regBitmask('PumaTrackerEngine', m.PumaTrackerEngine)).catch(() => {}),

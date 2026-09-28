@@ -241,9 +241,12 @@ export class TFMXEngine extends WASMSingletonBase {
   }
 
   setMuteMask(mask: number): void {
-    // mask: bit N = 1 means voice N is muted
+    // The project-wide convention (useMixerStore, TrackerReplayer): bit N = 1
+    // means voice N is AUDIBLE. This engine read it inverted, which went
+    // unnoticed while nothing forwarded the mixer's mask to it; once Hippel
+    // songs played here, the mask of four audible channels muted all four.
     for (let v = 0; v < 7; v++) {
-      this.sendMessage({ type: 'moduleMuteVoice', voice: v, mute: (mask & (1 << v)) !== 0 });
+      this.sendMessage({ type: 'moduleMuteVoice', voice: v, mute: (mask & (1 << v)) === 0 });
     }
   }
 
