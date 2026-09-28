@@ -610,7 +610,7 @@ export const useSettingsStore = create<SettingsStore>()(
     })),
     {
       name: 'devilbox-settings',
-      version: 10,
+      version: 11,
       migrate: (persistedState: unknown, version: number) => {
         const s = (persistedState ?? {}) as Record<string, unknown>;
         if (version < 3) {
@@ -661,6 +661,15 @@ export const useSettingsStore = create<SettingsStore>()(
           // be told apart from a deliberate choice of 'pt2'. The setting is
           // one click away in Settings and the mode is named there.
           if (s.stereoSeparationMode === 'pt2') s.stereoSeparationMode = 'modplug';
+        }
+        if (version < 11) {
+          // v11: Jochen Hippel 7V back to 'native'. A short-lived build
+          // (38fdeef86, 2026-09-22) migrated every stored 'native' to 'uade'
+          // because the native route then played silence; its revert removed
+          // the migration but not the values it wrote. 7V now plays natively
+          // through libtfmxaudiodecoder, and UADE is the last resort.
+          const fe = s.formatEngine as Record<string, unknown> | undefined;
+          if (fe && fe.jochenHippel7V === 'uade') fe.jochenHippel7V = 'native';
         }
         return s;
       },

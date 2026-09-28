@@ -127,6 +127,9 @@ class TFMXProcessor extends AudioWorkletProcessor {
         this.wasm._free(mdatPtr);
         if (smplPtr) this.wasm._free(smplPtr);
         if (ret === 0) {
+          // A new song starts with every voice audible; the mixer sends its
+          // mask for the new song after this.
+          this._voiceMutes = new Map();
           this._moduleMode = true;
           this._modulePlaying = false;
           this._sampleRate = sampleRate;
@@ -158,10 +161,21 @@ class TFMXProcessor extends AudioWorkletProcessor {
           smplPtr = this.wasm._malloc(smplLen);
           this.wasm.HEAPU8.set(smpl, smplPtr);
         }
+        // Reloading recreates the decoder: it would restart the song and
+        // forget muted voices. A pattern edit must neither, so note the play
+        // position first and restore both afterwards.
+        const sr = this._sampleRate || sampleRate;
+        const atMs = Math.floor((this.wasm._tfmx_get_samples_rendered(this.ctx) / sr) * 1000);
         const ret = this.wasm._tfmx_load_module(this.ctx, mdatPtr, mdat.byteLength,
           smplPtr, smplLen, data.subsong || 0);
         this.wasm._free(mdatPtr);
         if (smplPtr) this.wasm._free(smplPtr);
+        if (ret === 0) {
+          if (atMs > 0) this.wasm._tfmx_module_seek(this.ctx, atMs);
+          for (const [voice, mute] of this._voiceMutes || []) {
+            this.wasm._tfmx_module_mute_voice(this.ctx, voice, mute ? 1 : 0);
+          }
+        }
         if (ret === 0 && wasPlaying) {
           this._modulePlaying = true;
         }
@@ -181,6 +195,7 @@ class TFMXProcessor extends AudioWorkletProcessor {
         break;
 
       case 'moduleMuteVoice':
+        (this._voiceMutes ||= new Map()).set(data.voice, !!data.mute);
         if (this.wasm && this.ctx) {
           this.wasm._tfmx_module_mute_voice(this.ctx, data.voice, data.mute ? 1 : 0);
         }
