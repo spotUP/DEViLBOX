@@ -17,8 +17,15 @@ import { resolve } from 'node:path';
 const ROOT = resolve(__dirname, '../../..');
 const SONGS = 'public/data/songs';
 
-/** [asset dir, file stem, song] — engines that load through WASMSingletonBase's shared protocol. */
-const ENGINES: Array<[string, string, string]> = [
+/**
+ * [asset dir, file stem, song, messages that load and start it]. Most engines
+ * share WASMSingletonBase's loadModule + play; the rest say how.
+ */
+type Load = (song: ArrayBuffer) => Array<Record<string, unknown>>;
+/** The rewrite an engine applies to its Emscripten JS before the worklet sees it. */
+type JsTransform = (code: string) => string | Promise<string>;
+const SHARED: Load = (song) => [{ type: 'loadModule', moduleData: song }, { type: 'play' }];
+const ENGINES: Array<[string, string, string, Load?, JsTransform?]> = [
   ['davidwhittaker', 'DavidWhittaker', `${SONGS}/formats/apb.dw`],
   ['soundmon', 'SoundMon', `${SONGS}/bp-soundmon-2/nicktune1.bp`],
   ['sonic-arranger', 'SonicArranger', `${SONGS}/sonic-arranger/mega end.sa`],
@@ -46,16 +53,26 @@ const ENGINES: Array<[string, string, string]> = [
   ['soundfactory', 'SoundFactory2', `${SONGS}/formats/goldrunner.psf`],
   ['soundcontrol', 'SoundControl', `${SONGS}/formats/north_sea_inferno.sc`],
   ['quadracomposer', 'QuadraComposer', `${SONGS}/formats/synth_corn.emod`],
+  ['hively', 'Hively', `${SONGS}/ahx/amanda.ahx`,
+    (song) => [{ type: 'loadTune', buffer: song, defStereo: 2 }, { type: 'play' }, { type: 'enableOsc' }],
+    async (code) => (await import('../hively/HivelyEngine')).hivelyTransform(code)],
+  ['uade', 'UADE', `${SONGS}/formats/prehistoric_tale.hipc`,
+    (song) => [{ type: 'load', buffer: song, filenameHint: 'prehistoric_tale.hipc', skipScan: true }, { type: 'play' }, { type: 'enableOsc' }],
+    async (code) => (await import('../uade/UADEEngine')).uadeTransform(code)],
 ];
 
 type Msg = { type?: string; channels?: Int16Array[]; frame?: number; sampleRate?: number; message?: string };
-type Proc = { handleMessage(d: unknown): Promise<void>; process(i: Float32Array[][], o: Float32Array[][]): boolean };
+type Proc = {
+  handleMessage?(d: unknown): Promise<void>;
+  _handleMessage?(d: unknown): Promise<void>;   // UADE's name for it
+  process(i: Float32Array[][], o: Float32Array[][]): boolean;
+};
 
 beforeAll(() => {
   new Function(readFileSync(resolve(ROOT, 'public/worklets/channel-stream.js'), 'utf8'))();
 });
 
-async function run(dir: string, stem: string, song: string): Promise<Msg[]> {
+async function run(dir: string, stem: string, song: string, load: Load = SHARED, transform?: JsTransform): Promise<Msg[]> {
   let Processor!: new () => Proc;
   const posted: Msg[] = [];
   const scope: Record<string, unknown> = {
@@ -65,25 +82,25 @@ async function run(dir: string, stem: string, song: string): Promise<Msg[]> {
   };
   new Function(...Object.keys(scope), readFileSync(resolve(ROOT, `public/${dir}/${stem}.worklet.js`), 'utf8'))(...Object.values(scope));
   const p = new Processor();
+  const send = (m: unknown) => (p.handleMessage ?? p._handleMessage)!.call(p, m);
   const versions = Object.getOwnPropertyDescriptor(process, 'versions')!;
   Object.defineProperty(process, 'versions', { value: {}, configurable: true });
   try {
-    await p.handleMessage({
+    await send({
       type: 'init', sampleRate: 48000,
       wasmBinary: readFileSync(resolve(ROOT, `public/${dir}/${stem}.wasm`)),
-      jsCode: readFileSync(resolve(ROOT, `public/${dir}/${stem}.js`), 'utf8'),
+      jsCode: await (transform ?? ((c: string) => c))(readFileSync(resolve(ROOT, `public/${dir}/${stem}.js`), 'utf8')),
     });
   } finally { Object.defineProperty(process, 'versions', versions); }
   const b = readFileSync(resolve(ROOT, song));
-  await p.handleMessage({ type: 'loadModule', moduleData: b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength) });
-  await p.handleMessage({ type: 'play' });
+  for (const m of load(b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength))) await send(m);
   for (let i = 0; i < 750; i++) p.process([], [[new Float32Array(128), new Float32Array(128)]]); // 2 s
   return posted;
 }
 
 describe('song engine voice streams', { timeout: 120000 }, () => {
-  it.each(ENGINES)('%s streams every sample of its voices, unbroken', async (dir, stem, song) => {
-    const posted = await run(dir, stem, song);
+  it.each(ENGINES)('%s streams every sample of its voices, unbroken', async (dir, stem, song, load, transform) => {
+    const posted = await run(dir, stem, song, load, transform);
     expect(posted.filter((m) => m.type === 'error').map((m) => m.message)).toEqual([]);
     const osc = posted.filter((m) => m.type === 'oscData');
     // 2 s at 48 kHz in 1024-sample chunks.

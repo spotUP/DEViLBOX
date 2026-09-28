@@ -26,7 +26,7 @@ import {
 } from '@engine/wasm/WASMSingletonBase';
 
 /** UADE only strips ESM markers — no HEAP rewrites (the worklet handles memory views itself). */
-function uadeTransform(code: string): string {
+export function uadeTransform(code: string): string {
   return code
     .replace(/import\.meta\.url/g, "'.'")
     .replace(/export\s+default\s+\w+;?/g, '')
