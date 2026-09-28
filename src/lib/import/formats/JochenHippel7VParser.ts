@@ -39,6 +39,7 @@ import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { InstrumentConfig, TFMXConfig, UADEChipRamInfo, Pattern, TrackerCell } from '@/types';
 import type { UADEPatternLayout } from '@/engine/uade/UADEPatternEncoder';
 import { encodeTFMX7VCell } from '@/engine/uade/encoders/TFMX7VEncoder';
+import type { HippelCellSpan, HippelCellSpans } from '@/engine/hippel/hippelCellSpans';
 
 const MIN_FILE_SIZE = 32;
 
@@ -352,12 +353,13 @@ function decodeTFMX7VPattern(
   trackStepBuf: Uint8Array,
   trackColumnSize: number,
   numChannels: number,
-): TrackerCell[][] {
+): { rows: TrackerCell[][]; spans: (HippelCellSpan | null)[][] } {
   const rows: TrackerCell[][] = Array.from({ length: numChannels }, () => {
     const arr: TrackerCell[] = [];
     for (let r = 0; r < 32; r++) arr.push(emptyCell());
     return arr;
   });
+  const spans: (HippelCellSpan | null)[][] = Array.from({ length: numChannels }, () => new Array(32).fill(null));
 
   for (let voice = 0; voice < numChannels; voice++) {
     const colOff = voice * trackColumnSize;
@@ -369,6 +371,7 @@ function decodeTFMX7VPattern(
     if (patOff < 0 || patOff + PATTERN_LENGTH > buf.length) continue;
 
     for (let row = 0; row < 32; row++) {
+      spans[voice][row] = tfmx7VSpan(patOff + row * 2, rows[voice][row], tr, st);
       const noteByte = buf[patOff + row * 2];
       const infoByte = buf[patOff + row * 2 + 1];
       const noteVal = noteByte & 0x7f;
@@ -386,7 +389,79 @@ function decodeTFMX7VPattern(
     }
   }
 
-  return rows;
+  return { rows, spans };
+}
+
+/**
+ * A 7V pattern cell: note byte (bit 7 = portamento, which triggers no
+ * instrument) and info byte (low five bits + sound transpose = instrument).
+ * Writing a cell subtracts the step's transposes again and keeps the bits the
+ * grid does not show: portamento and the info byte's top three bits.
+ */
+function tfmx7VSpan(offset: number, baseline: TrackerCell, tr: number, st: number): HippelCellSpan {
+  return {
+    offset, length: 2, baseline,
+    encode(cell, file) {
+      const oldNote = file[offset];
+      const oldInfo = file[offset + 1];
+      if ((cell.note ?? 0) === 0) return new Uint8Array([0, 0]);
+      const noteVal = cell.note - 1 - tr;
+      if (noteVal < 2 || noteVal > 0x7F) return null; // 0 is empty, 1 ends the pattern
+      const porta = (oldNote & 0x7F) !== 0 ? oldNote & 0x80 : 0;
+      let info = oldInfo;
+      if (!porta) {
+        const low = ((cell.instrument ?? 0) - st) & 0xFF;
+        if (low > 31) return null;
+        info = (oldInfo & 0xE0) | low;
+      }
+      return new Uint8Array([porta | noteVal, info]);
+    },
+  };
+}
+
+/** The subsong-0 trackstep range, as TFMX_7V_startSong reads it. */
+function tfmx7VStepRange(buf: Uint8Array, layout: ReturnType<typeof readTFMX7VLayout>): [number, number] {
+  let firstStep = 0;
+  let lastStep = layout.numTrackSteps - 1;
+  if (layout.subSongTabOff + 4 <= buf.length) {
+    firstStep = u16BE(buf, layout.subSongTabOff + 0);
+    lastStep = u16BE(buf, layout.subSongTabOff + 2);
+  }
+  if (firstStep < 0 || firstStep >= layout.numTrackSteps) firstStep = 0;
+  if (lastStep < firstStep || lastStep >= layout.numTrackSteps) {
+    lastStep = layout.numTrackSteps - 1;
+  }
+  return [firstStep, lastStep];
+}
+
+/** One grid pattern per trackstep, with the byte span behind every cell. */
+function decodeTFMX7VGrid(
+  buf: Uint8Array,
+  layout: ReturnType<typeof readTFMX7VLayout>,
+  firstStep: number,
+  lastStep: number,
+): { rows: TrackerCell[][][]; spans: HippelCellSpans } {
+  const trackColumnSize = (layout.trackStepLen / layout.voices) | 0; // 3 (4V) or 4 (7V)
+  const rows: TrackerCell[][][] = [];
+  const spans: HippelCellSpans = [];
+  for (let step = firstStep; step <= lastStep; step++) {
+    const stepOff = layout.trackTableOff + step * layout.trackStepLen;
+    if (stepOff + layout.trackStepLen > buf.length) break;
+    const trackStepBuf = buf.slice(stepOff, stepOff + layout.trackStepLen);
+    const decoded = decodeTFMX7VPattern(buf, layout.patternsOff, trackStepBuf, trackColumnSize, layout.voices);
+    rows.push(decoded.rows);
+    spans.push(decoded.spans);
+  }
+  return { rows, spans };
+}
+
+/** The byte span behind every grid cell of a 7V module, as the parser lays the grid out. */
+export function mapJochenHippel7VCells(buf: Uint8Array): HippelCellSpans {
+  const songOff = findTFMX7VSongOffset(buf);
+  if (songOff < 0) return [];
+  const layout = readTFMX7VLayout(buf, songOff);
+  const [firstStep, lastStep] = tfmx7VStepRange(buf, layout);
+  return decodeTFMX7VGrid(buf, layout, firstStep, lastStep).spans;
 }
 
 export function parseJochenHippel7VFile(buffer: ArrayBuffer, filename: string): TrackerSong {
@@ -478,36 +553,16 @@ export function parseJochenHippel7VFile(buffer: ArrayBuffer, filename: string): 
   // We default to subsong 0 (the first entry in the subSongTab). The 7V songtab
   // entry stores firstStep at +0 and lastStep at +2 (TFMX_7V_startSong); the 4V
   // entry uses the same +0/+2 layout.
-  let firstStep = 0;
-  let lastStep = layout.numTrackSteps - 1;
-  if (layout.subSongTabOff + 4 <= buf.length) {
-    firstStep = u16BE(buf, layout.subSongTabOff + 0);
-    lastStep = u16BE(buf, layout.subSongTabOff + 2);
-  }
-  if (firstStep < 0 || firstStep >= layout.numTrackSteps) firstStep = 0;
-  if (lastStep < firstStep || lastStep >= layout.numTrackSteps) {
-    lastStep = layout.numTrackSteps - 1;
-  }
-
+  const [firstStep, lastStep] = tfmx7VStepRange(buf, layout);
   const trackColumnSize = (layout.trackStepLen / layout.voices) | 0; // 3 (4V) or 4 (7V)
   const channelPan: number[] = [-50, 50, 50, -50, -50, 50, 50];
 
   const trackerPatterns: Pattern[] = [];
   const songPositions: number[] = [];
 
-  for (let step = firstStep; step <= lastStep; step++) {
-    const stepOff = layout.trackTableOff + step * layout.trackStepLen;
-    if (stepOff + layout.trackStepLen > buf.length) break;
-    const trackStepBuf = buf.slice(stepOff, stepOff + layout.trackStepLen);
-
-    const channelRows = decodeTFMX7VPattern(
-      buf,
-      layout.patternsOff,
-      trackStepBuf,
-      trackColumnSize,
-      layout.voices,
-    );
-
+  const grid = decodeTFMX7VGrid(buf, layout, firstStep, lastStep);
+  for (const channelRows of grid.rows) {
+    const step = firstStep + trackerPatterns.length;
     const patIdx = trackerPatterns.length;
     trackerPatterns.push({
       id: `pattern-${patIdx}`,
@@ -634,12 +689,10 @@ export function parseJochenHippel7VFile(buffer: ArrayBuffer, filename: string): 
     initialSpeed: 6,
     initialBPM: 125,
     linearPeriods: false,
-    // No hippelFileData: that key routes audio to the Hippel WASM engine,
-    // libtfmxaudiodecoder, whose "7V" is TFMX's seven-voice mode — a
-    // different format. Jochen Hippel 7V rendered silence there ("7V does
-    // not work in DEViLBOX", 2026-09-22). This parser owns the grid; until a
-    // native 7V replayer exists the audio comes from UADE's JochenHippel-7V
-    // player through injectUADEPlayback. UADE is the fallback, not the home.
+    // Audio: libtfmxaudiodecoder (TFMX WASM) decodes Hippel 7V natively —
+    // measured on ghostbattle_gameover.hip7, 2026-09-28. The silence recorded
+    // on 2026-09-22 came from the old Hippel WASM, which played nothing at all.
+    hippelFileData: buffer.slice(0),
     uadePatternLayout,
   };
 }

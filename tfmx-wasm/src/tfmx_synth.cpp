@@ -576,6 +576,20 @@ int tfmx_module_voices(void* /*ctx*/) {
 }
 
 /**
+ * Move the module player (slot 0) to a play position in milliseconds.
+ * DEViLBOX extension: a pattern edit rebuilds the module bytes and reloads
+ * them, and the reload must continue where playback was rather than restart
+ * the song. The decoder replays the song silently up to `ms`.
+ */
+EMSCRIPTEN_KEEPALIVE
+void tfmx_module_seek(void* /*ctx*/, int ms) {
+  TFMXPlayer& p = gPlayers[0];
+  if (!p.decoder || ms <= 0) return;
+  tfmxdec_seek(p.decoder, ms);
+  gSamplesRendered = (uint64_t)ms * (uint64_t)gSampleRate / 1000u;
+}
+
+/**
  * Mute/unmute a voice.
  */
 EMSCRIPTEN_KEEPALIVE

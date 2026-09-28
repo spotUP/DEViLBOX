@@ -68,14 +68,29 @@ describe('a Hippel CoSo song', { timeout: 60000 }, () => {
     for (const m of sent) await p.handleMessage(m);
     await p.handleMessage({ type: 'modulePlay' });
 
-    let acc = 0, cnt = 0;
-    for (let b = 0; b < (44100 * 5) / 128; b++) {
-      const l = new Float32Array(128), r = new Float32Array(128);
-      p.process([], [[l, r]]);
-      for (const v of l) acc += v * v;
-      cnt += 128;
-    }
+    const rms = (secs: number) => {
+      let acc = 0, cnt = 0;
+      for (let b = 0; b < (44100 * secs) / 128; b++) {
+        const l = new Float32Array(128), r = new Float32Array(128);
+        p.process([], [[l, r]]);
+        for (const v of l) acc += v * v;
+        cnt += 128;
+      }
+      return Math.sqrt(acc / cnt);
+    };
     // Measured 0.017-0.024 per second for this song; the dead engine gave 0.
-    expect(Math.sqrt(acc / cnt)).toBeGreaterThan(0.005);
+    expect(rms(5)).toBeGreaterThan(0.005);
+
+    // A grid edit reloads the module. The reload continues where playback
+    // was, and voices muted before it stay muted.
+    const wasm = (p as unknown as { wasm: { _tfmx_get_samples_rendered(c: unknown): number }; ctx: unknown });
+    const before = wasm.wasm._tfmx_get_samples_rendered(wasm.ctx);
+    sent.length = 0;
+    TFMXEngine.prototype.setMuteMask.call({ sendMessage: (m: Record<string, unknown>) => sent.push(m) } as never, 0);
+    for (const m of sent) await p.handleMessage(m);
+    await p.handleMessage({ type: 'reloadModule', mdatBuffer: (song.hippelFileData as ArrayBuffer).slice(0), smplBuffer: null });
+    const after = wasm.wasm._tfmx_get_samples_rendered(wasm.ctx);
+    expect(Math.abs(after - before)).toBeLessThan(44100 * 0.05);
+    expect(rms(1)).toBe(0);
   });
 });

@@ -2108,15 +2108,13 @@ export async function tryRouteFormat(
   }
 
   // ── Jochen Hippel 7V (HIP7.* / S7G.* prefix) ─────────────────────────────
-  // Native parser for the grid; audio from UADE's JochenHippel-7V player until
-  // a native 7V replayer exists. The Hippel WASM engine (libtfmxaudiodecoder)
-  // is NOT this format — its "7V" is TFMX's seven-voice mode, and routing hip7
-  // there rendered silence ("7V does not work in DEViLBOX", 2026-09-22).
+  // Native parser for the grid; native audio from libtfmxaudiodecoder via the
+  // song's hippelFileData. UADE only when the native parse fails.
   if (matchesExt(filename, ['hip7', 's7g'])) {
     const { isJochenHippel7VFormat, parseJochenHippel7VFile } = await import('@lib/import/formats/JochenHippel7VParser');
     return withNativeThenUADE('jochenHippel7V', ctx,
       (buf: Uint8Array | ArrayBuffer, name: string) => { if (isJochenHippel7VFormat(buf as ArrayBuffer)) return parseJochenHippel7VFile(buf as ArrayBuffer, name); return null; },
-      'JochenHippel7VParser', { injectUADE: true });
+      'JochenHippel7VParser');
   }
 
   // ── Jochen Hippel ST (.sog / .hst / .hip / .mcmd extension or HST.* / MCMD.* prefix) ──

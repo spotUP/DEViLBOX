@@ -109,6 +109,30 @@ export function debouncedWasmEngineReexport(): void {
             console.warn('[TrackerStore] Symphonie re-export failed:', err);
           }
         })();
+      } else if (song.hippelFileData) {
+        void (async () => {
+          try {
+            // Hippel songs play from their own bytes in the TFMX decoder: write
+            // the grid's edits into the loaded file and reload it. The worklet
+            // keeps the play position and muted voices across the reload.
+            const { rebuildHippelModule } = await import('@/engine/hippel/rebuildHippelModule');
+            const { TFMXEngine } = await import('@/engine/tfmx/TFMXEngine');
+            if (!TFMXEngine.hasInstance()) return;
+            const rebuilt = rebuildHippelModule(
+              song.hippelFileData!,
+              useTrackerStore.getState().patterns,
+              useInstrumentStore.getState().instruments.length,
+            );
+            if (!rebuilt) return;
+            if (rebuilt.refused.length > 0) {
+              // Shown, not just logged: the grid holds a note the song will not play.
+              notify.warning(`${rebuilt.refused.length} Hippel edit(s) have no room in the module and are not heard (pattern:channel:row ${rebuilt.refused.slice(0, 4).join(', ')})`);
+            }
+            TFMXEngine.getInstance().reloadModule(rebuilt.bytes.buffer as ArrayBuffer);
+          } catch (err) {
+            console.warn('[TrackerStore] Hippel live re-export failed:', err);
+          }
+        })();
       } else if (sourceFormat === 'Cinter4') {
         void (async () => {
           try {
