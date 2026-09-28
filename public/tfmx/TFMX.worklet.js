@@ -357,10 +357,13 @@ class TFMXProcessor extends AudioWorkletProcessor {
         this._stream.writeInt16(views, numSamples);
       }
 
-      // Send position update every ~100ms (4410 samples at 44100Hz)
+      // Report the position every 1024 samples (~21 ms at 48 kHz). The
+      // pattern editor moves on these reports, so they must come more often
+      // than rows do: at every ~100 ms a Hippel row (~65 ms) was sometimes
+      // skipped and the scroll felt loose.
       this._positionCounter = (this._positionCounter || 0) + numSamples;
-      if (this._positionCounter >= 4410) {
-        this._positionCounter -= 4410;
+      if (this._positionCounter >= 1024) {
+        this._positionCounter -= 1024;
         const samplesRendered = this.wasm._tfmx_get_samples_rendered(this.ctx);
         const songEnd = this.wasm._tfmx_module_song_end(this.ctx);
         const sampleRate = this._sampleRate || 44100;
