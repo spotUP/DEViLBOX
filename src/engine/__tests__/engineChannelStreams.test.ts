@@ -36,6 +36,16 @@ const ENGINES: Array<[string, string, string]> = [
   // Rendered nothing before 2026-09-28: the worklet called okt_render_multi
   // with 4 channel pointers, the C takes 8, so `frames` arrived as 0.
   ['oktalyzer', 'Oktalyzer', `${SONGS}/oktalyzer/les granges brulees.okta`],
+  ['voodoo', 'Voodoo', `${SONGS}/voodoo/voo8.vss`],
+  ['actionamics', 'Actionamics', `${SONGS}/actionamics/dynablaster.ast`],
+  ['fred-replayer', 'FredReplayer', `${SONGS}/formats/rebels.fred`],
+  // Refused before 2026-09-28: the loader turned away a module that ends exactly
+  // with its arpeggio tables (its EOF test was pos >= size).
+  ['digmug', 'DigMug', `${SONGS}/formats/flight.dmu`],
+  ['digmug', 'DigMug', `${SONGS}/formats/cockwise.mug`],
+  ['soundfactory', 'SoundFactory2', `${SONGS}/formats/goldrunner.psf`],
+  ['soundcontrol', 'SoundControl', `${SONGS}/formats/north_sea_inferno.sc`],
+  ['quadracomposer', 'QuadraComposer', `${SONGS}/formats/synth_corn.emod`],
 ];
 
 type Msg = { type?: string; channels?: Int16Array[]; frame?: number; sampleRate?: number; message?: string };
