@@ -137,6 +137,8 @@ export default defineConfig({
     headers: {
       'Cross-Origin-Opener-Policy': 'same-origin',
       'Cross-Origin-Embedder-Policy': 'credentialless',
+      // Dev only: enables the JS Self-Profiling API behind MCP profile_main_thread.
+      'Document-Policy': 'js-profiling',
     },
     // Proxy /api/* to Express so relative URL fetches work in dev
     proxy: {
