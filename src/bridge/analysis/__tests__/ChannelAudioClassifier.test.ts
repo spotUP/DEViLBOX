@@ -2,11 +2,10 @@
  * ChannelAudioClassifier tests — runtime per-channel role detection from
  * the live oscilloscope tap.
  *
- * Strategy: synthesise Int16 PCM streams that look like what the WASM
- * per-channel tap would emit (256-sample chunks for UADE, 512 for others),
- * pump them into updateChannelClassifierFromTap across multiple "ticks",
- * and assert the runtime hint converges on the expected role after enough
- * history has accumulated.
+ * Strategy: synthesise Int16 PCM streams the way the engines stream their
+ * voices (chunks stamped with a running sample index), push them into
+ * ChannelAudioTap, run updateChannelClassifierFromTap after each, and assert
+ * the runtime hint converges on the expected role.
  *
  * All tests reset module state in beforeEach — runtime state is global
  * so tests would otherwise leak between cases.
@@ -23,6 +22,7 @@ import {
   _peekChannelState,
 } from '../ChannelAudioClassifier';
 import type { ChannelRole } from '../MusicAnalysis';
+import { pushChannelAudio, resetChannelAudioTap } from '../ChannelAudioTap';
 
 // ─── Signal synthesis ───────────────────────────────────────────────────────
 
@@ -67,18 +67,33 @@ function highPassedNoise(length: number, amp = 0.6): Int16Array {
 
 // ─── Setup ──────────────────────────────────────────────────────────────────
 
+/** Running sample index of the next chunk, as an engine stream stamps it. */
+let frame = 0;
+
+/** One engine chunk per channel into the tap, then one classifier pass. */
+function tick(chunks: (Int16Array | null)[], sr: number, gapBefore = 0): void {
+  frame += gapBefore;
+  pushChannelAudio(chunks, frame, sr);
+  frame += TAP_CHUNK;
+  updateChannelClassifierFromTap(chunks.length);
+}
+
 describe('ChannelAudioClassifier', () => {
-  beforeEach(() => resetRuntimeChannelClassifier());
+  beforeEach(() => {
+    resetRuntimeChannelClassifier();
+    resetChannelAudioTap();
+    frame = 0;
+  });
 
   // ── Build-up + consensus ──────────────────────────────────────────────
 
   it('returns null before enough samples have accumulated', () => {
     const sr = 48000;
-    // One tick = 256 samples; MIN_SAMPLES_FOR_CLASSIFICATION = 1024 → need
-    // at least 4 ticks before any classification even runs.
+    // One tick = 256 samples; a frame is 2048 unbroken samples, so 8 ticks
+    // pass before any classification runs.
     const gen = sineTicker(110, sr);
     for (let i = 0; i < 2; i++) {
-      updateChannelClassifierFromTap([gen.next().value ?? null], sr);
+      tick([gen.next().value ?? null], sr);
     }
     expect(getRuntimeChannelRole(0)).toBeNull();
   });
@@ -88,7 +103,7 @@ describe('ChannelAudioClassifier', () => {
     const gen = sineTicker(110, sr);
     // 20 ticks → ring fills multiple times, history reaches max HISTORY_LEN (4).
     for (let i = 0; i < 20; i++) {
-      updateChannelClassifierFromTap([gen.next().value ?? null], sr);
+      tick([gen.next().value ?? null], sr);
     }
     const hint = getRuntimeChannelRole(0);
     expect(hint).not.toBeNull();
@@ -102,7 +117,7 @@ describe('ChannelAudioClassifier', () => {
     for (let i = 0; i < 20; i++) {
       const ch0 = bassGen.next().value ?? null;
       const ch2 = highPassedNoise(TAP_CHUNK, 0.5);   // broadband, high-centroid
-      updateChannelClassifierFromTap([ch0, null, ch2, null], sr);
+      tick([ch0, null, ch2, null], sr);
     }
     const h0 = getRuntimeChannelRole(0);
     const h1 = getRuntimeChannelRole(1);
@@ -116,6 +131,18 @@ describe('ChannelAudioClassifier', () => {
       expect(['percussion', 'lead']).toContain(h2.role);
     }
     expect(h3).toBeNull();
+  });
+
+  it('never classifies snapshots glued across a gap', () => {
+    // What the engines used to send: 256 samples every 8 renders, the
+    // stretches between them never seen. Glued together they read as clicks
+    // and every channel of a Hippel song voted percussion. Each gap now
+    // restarts the channel, so no 2048-sample frame ever exists.
+    const sr = 48000;
+    const gen = sineTicker(110, sr);
+    for (let i = 0; i < 40; i++) tick([gen.next().value ?? null], sr, 768);
+    expect(_peekChannelState(0)).toBeNull();
+    expect(getRuntimeChannelRole(0)).toBeNull();
   });
 
   // ── Merge policy ──────────────────────────────────────────────────────
@@ -174,7 +201,7 @@ describe('ChannelAudioClassifier', () => {
     const gen0 = getRuntimeClassifierGeneration();
     const ticker = sineTicker(110, sr);
     for (let i = 0; i < 20; i++) {
-      updateChannelClassifierFromTap([ticker.next().value ?? null], sr);
+      tick([ticker.next().value ?? null], sr);
     }
     expect(getRuntimeChannelRole(0)?.role).toBe('bass');
 
@@ -188,7 +215,7 @@ describe('ChannelAudioClassifier', () => {
     const sr = 48000;
     const gen = sineTicker(110, sr);
     for (let i = 0; i < 20; i++) {
-      updateChannelClassifierFromTap([gen.next().value ?? null, null, null, null], sr);
+      tick([gen.next().value ?? null, null, null, null], sr);
     }
     const hints = getAllRuntimeChannelRoles(4);
     expect(hints).toHaveLength(4);
@@ -202,13 +229,13 @@ describe('ChannelAudioClassifier', () => {
 
   it('handles null entries in channelData without error', () => {
     expect(() => {
-      updateChannelClassifierFromTap([null, null, null], 48000);
+      tick([null, null, null], 48000);
     }).not.toThrow();
   });
 
   it('handles empty channelData array without error', () => {
     expect(() => {
-      updateChannelClassifierFromTap([], 48000);
+      tick([], 48000);
     }).not.toThrow();
   });
 });

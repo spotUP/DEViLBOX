@@ -126,7 +126,7 @@ export class TFMXEngine extends WASMSingletonBase {
           break;
 
         case 'oscData':
-          useOscilloscopeStore.getState().updateChannelData(data.channels);
+          useOscilloscopeStore.getState().updateChannelData(data.channels, data.frame, data.sampleRate);
           break;
 
         case 'modulePosition':

@@ -1417,17 +1417,16 @@ function getCedTimeline(patterns: Pattern[], patternOrder: number[]): SongRoleTi
   return _cedTimeline;
 }
 
-/** Feed the live tap into the runtime channel classifier (ChannelAudio-
- *  Classifier). Same data source as `detectTransientsFromOscilloscope` but
- *  accumulates samples into a ring buffer for spectral classification. */
+/** Run the runtime channel classifiers (spectral and CED) over the
+ *  contiguous per-channel audio the engines stream into ChannelAudioTap. */
 function updateRuntimeClassifierFromOscilloscope(): void {
   try {
     const osc = useOscilloscopeStore.getState();
-    const data = osc.channelData;
-    if (!Array.isArray(data) || data.length === 0) return;
-    updateChannelClassifierFromTap(data);
-    // Feed into the CED channel accumulator (larger ring → CED inference when full)
-    cedChannelAccumulator.feed(data);
+    const count = osc.channelData.length;
+    if (count === 0) return;
+    // Both read ChannelAudioTap: each channel's unbroken recent audio.
+    updateChannelClassifierFromTap(count);
+    cedChannelAccumulator.feed(count);
   } catch { /* classifier must never throw into the tick loop */ }
 }
 

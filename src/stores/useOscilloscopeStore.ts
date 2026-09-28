@@ -6,6 +6,10 @@
  */
 
 import { create } from 'zustand';
+import { pushChannelAudio, resetChannelAudioTap } from '@/bridge/analysis/ChannelAudioTap';
+
+/** Samples per channel the scopes draw. */
+const DISPLAY_SAMPLES = 256;
 
 interface OscilloscopeState {
   /** Per-channel waveform data (256 samples each, Int16 range -32768..32767) */
@@ -19,8 +23,14 @@ interface OscilloscopeState {
   /** Whether oscilloscope is receiving data */
   isActive: boolean;
 
-  /** Update oscilloscope data for all channels */
-  updateChannelData: (channels: (Int16Array | null)[]) => void;
+  /**
+   * Update oscilloscope data for all channels. With `frame` (the running
+   * sample index of the chunk's first sample) the chunk is every sample the
+   * engine rendered since its previous one, and it also feeds the contiguous
+   * per-channel audio tap the runtime role classifiers read. Without it the
+   * chunk is a display snapshot only.
+   */
+  updateChannelData: (channels: (Int16Array | null)[], frame?: number, sampleRate?: number) => void;
   /** Set the number of channels, platform, and optional channel names */
   setChipInfo: (numChannels: number, platformType: number, channelNames?: string[]) => void;
   /** Clear all data */
@@ -34,10 +44,14 @@ export const useOscilloscopeStore = create<OscilloscopeState>((set) => ({
   channelNames: [],
   isActive: false,
 
-  updateChannelData: (channels) => set({
-    channelData: channels,
-    isActive: true,
-  }),
+  updateChannelData: (channels, frame, sampleRate) => {
+    if (frame !== undefined) pushChannelAudio(channels, frame, sampleRate ?? 48000);
+    set({
+      // The scopes draw the most recent DISPLAY_SAMPLES, whatever the chunk size.
+      channelData: channels.map((c) => (c && c.length > DISPLAY_SAMPLES ? c.subarray(c.length - DISPLAY_SAMPLES) : c)),
+      isActive: true,
+    });
+  },
 
   setChipInfo: (numChannels, platformType, channelNames) => set({
     numChannels,
@@ -46,11 +60,14 @@ export const useOscilloscopeStore = create<OscilloscopeState>((set) => ({
     channelData: new Array(numChannels).fill(null),
   }),
 
-  clear: () => set({
-    channelData: [],
-    numChannels: 0,
-    platformType: 0,
-    channelNames: [],
-    isActive: false,
-  }),
+  clear: () => {
+    resetChannelAudioTap();
+    set({
+      channelData: [],
+      numChannels: 0,
+      platformType: 0,
+      channelNames: [],
+      isActive: false,
+    });
+  },
 }));
