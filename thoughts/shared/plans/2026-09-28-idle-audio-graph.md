@@ -1,0 +1,55 @@
+---
+date: 2026-09-28
+topic: The audio graph costs nothing when nothing uses it
+tags: [performance, audio-thread, dub, channel-routing]
+status: draft
+---
+
+# The audio graph costs nothing when nothing uses it
+
+## Problem (measured 2026-09-28, ghostbattle_gameover.hip7, song stopped)
+
+The renderer's Realtime AudioWorklet thread was 48-62 % busy with no song
+playing (macOS `sample`), which starved the pattern editor (10 fps). The song
+engine itself costs 1-2 ms/s. Two new dev tools (MCP get_audio_worklet_profile)
+show where the time goes:
+
+- Worklets: 82 ms/s total. re201 35-43, fil4 14, aelapse 9-14, dattorro 1.5-5.5,
+  tonearm 4.5-6.7, calf-phaser 3, ring-mod 1.5-3, bitta 1-3 (all dub bus / fx).
+- Native nodes alive, by creator:
+  - PerChannelDubFx: 256 Gain, 64 Biquad, 32 Delay, **32 Oscillator** (LFO per
+    channel slot, started in the constructor, plus a delay feedback loop).
+  - ChannelFilterManager: 204 Gain, **136 ConstantSource**, 34 Biquad
+    (Tone.Filter x2 per channel; Tone signals are ConstantSourceNodes).
+  - ChannelRouting 64 Gain / 16 Panner / 16 Analyser; DubBus 61 Gain / 22 Biquad /
+    6 Oscillator / 12 Analyser / convolver.
+
+Sources (oscillators, constant sources) and feedback loops never go silent, so
+Chrome never idles the nodes behind them. The dub bus's `enabled` gates only
+its return; its input still carries every channel's send, so its effects
+process real audio behind a muted return.
+
+## Changes
+
+- [x] P1 ChannelFilterManager: native BiquadFilterNodes instead of Tone.Filter
+      (no ConstantSources). Callers wire through connectAudio.
+- [x] P2 PerChannelDubFx: the comb-sweep section (LFO, modulated delay,
+      feedback loop) exists only while sweep amount > 0; built on demand,
+      torn down after it ramps to 0.
+- [ ] P3 DubBus disabled: the input is gated too (no send audio enters the
+      effects); the return gate stays.
+- [ ] P4 Effect worklets skip their DSP while their input has been silent
+      longer than their tail (RE-201, fil4, aelapse, tonearm, calf-phaser,
+      dattorro, ring-mod, bitta; vinyl-noise by its own level).
+- [ ] P5 DubBus oscillators (master chorus LFOs, sweep LFO, ...): stopped or
+      disconnected while their feature is off.
+- [ ] P6 Measure after, same song, stopped and playing: worklet ms/s, node
+      census, AudioWorklet thread busy %, pattern-editor frame stats.
+- [ ] P7 Tests for each behaviour (filters still sweep; comb sweep still
+      audible when engaged; dub bus still sounds when enabled; worklets resume
+      on signal).
+
+## Verification
+- `npm run type-check`; targeted tests.
+- MCP get_audio_worklet_profile before/after; `sample` of the renderer.
+- Owner: dub moves sound as before (manual).
