@@ -360,16 +360,22 @@ typedef struct DmReader {
     const uint8_t* data;
     size_t size;
     size_t pos;
+    bool overrun;   /* a read or skip went past the end of the data */
 } DmReader;
 
 static void reader_init(DmReader* r, const uint8_t* data, size_t size) {
     r->data = data;
     r->size = size;
     r->pos = 0;
+    r->overrun = false;
 }
 
+/* True when the file ran out: a read (or skip) needed bytes past its end.
+ * Being exactly at the end after reading everything is not running out -
+ * testing pos >= size refused every module whose data ends with its
+ * arpeggio tables, as both Mugician files in the corpus do. */
 static bool reader_eof(const DmReader* r) {
-    return r->pos >= r->size;
+    return r->overrun || r->pos > r->size;
 }
 
 static void reader_seek(DmReader* r, size_t pos) {
@@ -381,7 +387,7 @@ static void reader_skip(DmReader* r, size_t count) {
 }
 
 static uint8_t read_u8(DmReader* r) {
-    if (r->pos >= r->size) return 0;
+    if (r->pos >= r->size) { r->overrun = true; return 0; }
     return r->data[r->pos++];
 }
 
