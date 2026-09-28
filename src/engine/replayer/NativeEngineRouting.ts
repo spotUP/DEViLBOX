@@ -88,7 +88,7 @@ interface NativeEngineDescriptor {
 // Engine registry - add new WASM engines here
 // ---------------------------------------------------------------------------
 
-const WASM_ENGINES: NativeEngineDescriptor[] = [
+export const WASM_ENGINES: readonly NativeEngineDescriptor[] = [
   {
     key: 'Hively',
     synthType: 'HivelySynth',
@@ -209,13 +209,20 @@ const WASM_ENGINES: NativeEngineDescriptor[] = [
     synthType: 'HippelSynth',
     suppressNotes: true,
     fileDataKey: 'hippelFileData',
-    formats: null, // activate whenever hippelFileData exists (handles ST, 7V, CoSo, FC, MCMD)
+    formats: null, // activate whenever hippelFileData exists (CoSo, ST, MCMD)
     loadMethod: 'loadTune',
     supportsPause: false,
     supportsResume: false,
     needsDirectRouting: true,
     staticRef: null,
-    dynamicResolver: async () => (await import('@/engine/hippel/HippelEngine')).HippelEngine as unknown as WASMSingletonStatic,
+    // Jochen Hippel's formats are decoded by libtfmxaudiodecoder, which lives
+    // in the TFMX WASM (its Jochen/ tree: COSO, TFMX-ST, MCMD, SMOD/FC). The
+    // old Hippel WASM was a transpile of UADE's player shell: its InitPlayer
+    // jumped through UADE callbacks that do not exist outside UADE, so every
+    // Hippel song played silence (prehistoric_tale.hipc, 2026-09-28). A
+    // single-file module has no companion smpl file.
+    dynamicResolver: async () => (await import('@/engine/tfmx/TFMXEngine')).TFMXEngine as unknown as WASMSingletonStatic,
+    getLoadArgs: () => [],
   },
   {
     key: 'Sonix',
@@ -898,7 +905,7 @@ function tryResolveSync(desc: NativeEngineDescriptor): WASMSingletonStatic | nul
   return desc.staticRef ?? null;
 }
 
-function shouldActivate(desc: NativeEngineDescriptor, song: TrackerSong): boolean {
+export function shouldActivate(desc: NativeEngineDescriptor, song: TrackerSong): boolean {
   const fileData = song[desc.fileDataKey];
   if (!fileData) return false;
   if (desc.formats === null) return true;
