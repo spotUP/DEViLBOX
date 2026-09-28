@@ -30,6 +30,19 @@ export { SF2Engine };
 /** Active silence detectors keyed by engine synthType */
 const activeSilenceDetectors = new Map<string, SilenceDetector>();
 
+/**
+ * A native engine's song has ended (its output stayed silent): stop the
+ * engine AND the transport. Stopping only the engine left the transport
+ * playing — the grid frozen on the last position while the play marker kept
+ * scrolling, and no sound (ghostbattle_gameover.hip7, 2026-09-28).
+ */
+export async function endNativeSong(instance: { stop(): void }): Promise<void> {
+  try { instance.stop(); } catch { /* ignored */ }
+  const { useTransportStore } = await import('@stores/useTransportStore');
+  const transport = useTransportStore.getState();
+  if (transport.isPlaying) transport.stop();
+}
+
 // ---------------------------------------------------------------------------
 // Engine registry types
 // ---------------------------------------------------------------------------
@@ -1203,7 +1216,7 @@ export async function startNativeEngines(
           const detector = new SilenceDetector(instance.output.context);
           detector.start(instance.output, instance.output, () => {
             console.log(`[NativeEngineRouting] ${desc.key} silence detected — stopping`);
-            try { instance.stop(); } catch { /* ignored */ }
+            void endNativeSong(instance);
           });
           activeSilenceDetectors.set(desc.synthType, detector);
         }
