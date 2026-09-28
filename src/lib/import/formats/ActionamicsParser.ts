@@ -754,5 +754,9 @@ function parseInternal(bytes: Uint8Array, filename: string): TrackerSong | null 
     linearPeriods: false,
     uadeEditableFileData: bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer,
     uadeVariableLayout: variableLayout,
+    // Native playback: the Actionamics WASM replayer (ActionamicsReplayer in
+    // NativeEngineRouting, ahead of UADEEditable). Nothing attached this, so
+    // the engine was never used and every song went through UADE.
+    actionamicsFileData: bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer,
   };
 }
