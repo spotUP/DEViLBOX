@@ -110,8 +110,8 @@ interface IsolationSlot {
   outputGain: GainNode;
 }
 
-/** How an activation attempt ended: wired, no path yet, or no longer wanted. */
-type DubActivation = 'wired' | 'unavailable' | 'cancelled';
+/** How an activation attempt ended: wired, no path yet, carried by the whole-mix tap, or no longer wanted. */
+type DubActivation = 'wired' | 'unavailable' | 'fallback' | 'cancelled';
 
 export class ChannelRoutedEffectsManager {
   private slots: (IsolationSlot | null)[] = [null, null, null, null];
@@ -509,13 +509,13 @@ export class ChannelRoutedEffectsManager {
     try {
       outcome = await this._activateDubChannelInner(channelIndex, gain);
     } finally {
-      if (outcome === 'unavailable') {
+      if (outcome === 'unavailable' || outcome === 'fallback') {
         // No path yet. Park rather than reconcile: reconciling a failed
         // activation answers 'activate' again at once, a retry loop per
         // channel (see DubChannelLifecycle.park). rebuildDubConnections
         // wires parked channels when an engine attaches.
         this.dubLifecycle.park(channelIndex);
-        this._scheduleDubRetry(channelIndex);
+        if (outcome === 'unavailable') this._scheduleDubRetry(channelIndex);
       } else {
         // The send may have closed while we were awaiting. Whoever finishes
         // last owns the reconciliation.
@@ -542,9 +542,18 @@ export class ChannelRoutedEffectsManager {
     // The user let go of the throw while we were resolving the engine. Do not
     // spin up a slot for a send that is already closed.
     if (!this.dubLifecycle.isDesired(channelIndex)) return 'cancelled';
-    if (!engine?.isAvailable()) return 'unavailable';
-    const worklet = engine.getWorkletNode();
-    if (!worklet) return 'unavailable';
+    if (!engine?.isAvailable() || !engine.getWorkletNode()) {
+      // An engine that will never expose per-channel outputs leaves the send
+      // to the shared whole-mix tap; nothing to retry.
+      try {
+        const { getActiveDubBus } = await import('../dub/DubBus');
+        if (getActiveDubBus()?.hasUsableWholeMixFallback()) {
+          return 'fallback';
+        }
+      } catch { /* ok */ }
+      return 'unavailable';
+    }
+    const worklet = engine.getWorkletNode()!;
     if (!this.dubLifecycle.isDesired(channelIndex)) return 'cancelled';
 
     // Dual-convention envelope: LibOpenMPT worklet switches on `cmd`, UADE /
