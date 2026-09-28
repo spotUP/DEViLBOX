@@ -25,12 +25,23 @@ function tfmxTransform(code: string): string {
     .replace('HEAPF32=new Float32Array(b);', 'HEAPF32=Module["HEAPF32"]=new Float32Array(b);');
 }
 
+/** A module-player position report, about every 100 ms. */
+export interface TFMXModulePosition {
+  samplesRendered: number;
+  elapsedMs?: number;
+  songEnd: boolean;
+  /** Hippel decoders: voice 0's track step from the song's first; -1 otherwise. */
+  step?: number;
+  /** Hippel decoders: file offset of voice 0's next pattern byte; -1 otherwise. */
+  patternOffset?: number;
+}
+
 export class TFMXEngine extends WASMSingletonBase {
   private static instance: TFMXEngine | null = null;
   private static cache: WASMAssetsCache = createWASMAssetsCache();
 
   private _playerHandleResolvers: Array<(handle: number) => void> = [];
-  private _positionCallbacks: Array<(update: { samplesRendered: number; elapsedMs?: number; songEnd: boolean }) => void> = [];
+  private _positionCallbacks: Array<(update: TFMXModulePosition) => void> = [];
   private _moduleLoadedResolvers: Array<(info: { voices: number; songs: number; duration: number }) => void> = [];
 
   private constructor() {
@@ -112,7 +123,7 @@ export class TFMXEngine extends WASMSingletonBase {
 
         case 'modulePosition':
           for (const cb of this._positionCallbacks) {
-            cb({ samplesRendered: data.samplesRendered, elapsedMs: data.elapsedMs, songEnd: data.songEnd });
+            cb({ samplesRendered: data.samplesRendered, elapsedMs: data.elapsedMs, songEnd: data.songEnd, step: data.step, patternOffset: data.patternOffset });
           }
           break;
 
@@ -211,7 +222,7 @@ export class TFMXEngine extends WASMSingletonBase {
     this._positionCallbacks = [];
   }
 
-  onPositionUpdate(callback: (update: { samplesRendered: number; elapsedMs?: number; songEnd: boolean }) => void): () => void {
+  onPositionUpdate(callback: (update: TFMXModulePosition) => void): () => void {
     this._positionCallbacks.push(callback);
     return () => {
       const idx = this._positionCallbacks.indexOf(callback);

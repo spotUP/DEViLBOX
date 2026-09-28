@@ -89,6 +89,17 @@ describe('a Hippel song', { timeout: 60000 }, () => {
     const again = await parseHippelCoSoFile(out.bytes.buffer as ArrayBuffer, 'x.hipc');
     expect(again.patterns[p].channels[ch].rows[r].note).toBe(cell.note);
     expect(again.patterns[p].channels[ch].rows[r].instrument).toBe(cell.instrument);
+
+    // CoSo has no rest byte, and a -2/-3 row is a length command read with
+    // the next note: clearing a note, or typing onto a command row, would
+    // change the song's timing. Both are refused and the bytes stay.
+    cell.note = 0;
+    const cmdRow = song.patterns[p].channels[ch].rows.findIndex((c, i) => c.note === 0 && mapHippelCoSoCells(new Uint8Array(song.hippelFileData!), n)[p][ch][i]);
+    if (cmdRow >= 0) song.patterns[p].channels[ch].rows[cmdRow].note = 49;
+    const refused = rebuildHippelModule(song.hippelFileData!, song.patterns, n)!;
+    expect(refused.written).toBe(0);
+    expect(refused.refused.length).toBe(cmdRow >= 0 ? 2 : 1);
+    expect(Buffer.compare(Buffer.from(refused.bytes), Buffer.from(new Uint8Array(song.hippelFileData!)))).toBe(0);
   });
 
   it('reaches the decoder from a grid edit on a 7V song, transpose undone', async () => {

@@ -83,3 +83,19 @@ export function patchEditedCells(
   }
   return { bytes, written, refused };
 }
+
+/**
+ * The grid row a voice is on, from where it reads: the last cell whose bytes
+ * start before `offset`, the file offset of the voice's next pattern byte.
+ * Row 0 when the step has no cells before it.
+ */
+export function hippelRowAt(spans: HippelCellSpans, step: number, offset: number, channel = 0): number {
+  const cells = spans[step]?.[channel];
+  if (!cells) return 0;
+  let row = 0;
+  for (let r = 0; r < cells.length; r++) {
+    const c = cells[r];
+    if (c && c.offset < offset) row = r;
+  }
+  return row;
+}

@@ -351,7 +351,18 @@ class TFMXProcessor extends AudioWorkletProcessor {
         const songEnd = this.wasm._tfmx_module_song_end(this.ctx);
         const sampleRate = this._sampleRate || 44100;
         const elapsedMs = Math.round((samplesRendered / sampleRate) * 1000);
-        this.port.postMessage({ type: 'modulePosition', samplesRendered, elapsedMs, songEnd: songEnd !== 0 });
+        // Where voice 0 reads, for decoders that report it (Hippel): the track
+        // step and the file offset of its next pattern byte.
+        let step = -1, patternOffset = -1;
+        if (this.wasm._tfmx_module_position) {
+          if (!this._posPtr) this._posPtr = this.wasm._malloc(8);
+          if (this.wasm._tfmx_module_position(this.ctx, this._posPtr)) {
+            const pos = new Int32Array(this.wasm.HEAPU8.buffer, this._posPtr, 2);
+            step = pos[0];
+            patternOffset = pos[1];
+          }
+        }
+        this.port.postMessage({ type: 'modulePosition', samplesRendered, elapsedMs, songEnd: songEnd !== 0, step, patternOffset });
 
         // If song ended, notify main thread (even with loop_mode=1, some songs don't loop)
         if (songEnd !== 0) {

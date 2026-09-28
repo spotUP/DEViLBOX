@@ -156,6 +156,14 @@ void tfmxdec_set_filtering(void* decoder, int flag) {
     p->mixer.setFiltering(flag);
 }
 
+int tfmxdec_get_play_position(void* decoder, int32_t* step, uint32_t* offset) {
+    TFMX_DECLARE_DECODER;
+    int s = 0; udword o = 0;
+    if (!p->dec.getPlayPosition(s, o)) return 0;
+    *step = s; *offset = o;
+    return 1;
+}
+
 void tfmxdec_preview_macro(void* decoder, int macroIdx, int note,
                            int volume, int channel) {
     TFMX_DECLARE_DECODER;

@@ -677,4 +677,16 @@ const uword HippelDecoder::periodsLower[0x40] = {
     // +0x40
 };
 
+// DEViLBOX extension. trackPos already points past the step being played
+// (it is advanced when the step is read), so the current one is one back.
+bool HippelDecoder::getPlayPosition(int& step, udword& offset) {
+    if (!admin.initialized || trackStepLen == 0) return false;
+    VoiceVars& v = voiceVars[0];
+    if (v.pattStart == 0xffffffff) return false;
+    step = (int)(v.trackPos / trackStepLen) - 1;
+    if (step < 0) step = 0;
+    offset = v.pattStart + v.pattPos;
+    return true;
+}
+
 }  // namespace

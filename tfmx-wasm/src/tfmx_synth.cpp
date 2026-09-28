@@ -590,6 +590,20 @@ void tfmx_module_seek(void* /*ctx*/, int ms) {
 }
 
 /**
+ * DEViLBOX extension: the module player's play position, for following it in
+ * the tracker grid. Writes [step, fileOffset] to `out`; returns 0 when none.
+ */
+EMSCRIPTEN_KEEPALIVE
+int tfmx_module_position(void* /*ctx*/, int32_t* out) {
+  TFMXPlayer& p = gPlayers[0];
+  if (!p.decoder) return 0;
+  uint32_t off = 0;
+  if (!tfmxdec_get_play_position(p.decoder, &out[0], &off)) return 0;
+  out[1] = (int32_t)off;
+  return 1;
+}
+
+/**
  * Mute/unmute a voice.
  */
 EMSCRIPTEN_KEEPALIVE

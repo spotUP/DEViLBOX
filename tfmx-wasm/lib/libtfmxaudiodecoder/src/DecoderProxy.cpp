@@ -82,6 +82,10 @@ int DecoderProxy::run() {
     return pDecoder->run();
 }
 
+bool DecoderProxy::getPlayPosition(int& step, udword& offset) {
+    return pDecoder ? pDecoder->getPlayPosition(step, offset) : false;
+}
+
 void DecoderProxy::previewMacro(int macroIdx, int note, int volume, int channel) {
     if (pDecoder) {
         pDecoder->previewMacro(macroIdx, note, volume, channel);

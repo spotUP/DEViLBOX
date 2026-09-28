@@ -21,15 +21,20 @@ function isCoSo(buf: Uint8Array): boolean {
  * @param instrumentCount the loaded song's instrument count (CoSo shows
  *                        instrument 0 for a volume sequence past the last one)
  */
+/** The cell spans of a Hippel module with an editable grid (CoSo, 7V), else null. */
+export function mapHippelCells(fileData: ArrayBuffer | Uint8Array, instrumentCount: number): HippelCellSpans | null {
+  const buf = fileData instanceof Uint8Array ? fileData : new Uint8Array(fileData);
+  if (isCoSo(buf)) return mapHippelCoSoCells(buf, instrumentCount);
+  if (isJochenHippel7VFormat(buf)) return mapJochenHippel7VCells(buf);
+  return null;
+}
+
 export function rebuildHippelModule(
   fileData: ArrayBuffer | Uint8Array,
   patterns: ReadonlyArray<{ channels: Array<{ rows: TrackerCell[] }> }>,
   instrumentCount: number,
 ): HippelPatchResult | null {
   const buf = fileData instanceof Uint8Array ? fileData : new Uint8Array(fileData);
-  let spans: HippelCellSpans;
-  if (isCoSo(buf)) spans = mapHippelCoSoCells(buf, instrumentCount);
-  else if (isJochenHippel7VFormat(buf)) spans = mapJochenHippel7VCells(buf);
-  else return null;
-  return patchEditedCells(buf, spans, patterns);
+  const spans = mapHippelCells(buf, instrumentCount);
+  return spans ? patchEditedCells(buf, spans, patterns) : null;
 }
