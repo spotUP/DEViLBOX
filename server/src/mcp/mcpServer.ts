@@ -455,7 +455,7 @@ export function createMcpServer(): McpServer {
 
   server.tool(
     'get_playback_state',
-    'Get full playback state: playing, position, BPM, speed, swing, groove, metronome, pitch',
+    'Get full playback state: playing, position, BPM, speed, swing, groove, metronome, pitch. enginePosition is the row/song position a native WASM replayer reports (what the pattern editor follows for Hippel, TFMX, JamCracker and similar songs); active=false means no engine is reporting.',
     {},
     () => call('get_playback_state'),
   );

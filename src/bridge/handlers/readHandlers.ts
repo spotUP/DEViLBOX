@@ -8,6 +8,7 @@
 import { useTrackerStore } from '../../stores/useTrackerStore';
 import { getConsoleEntries } from '../consoleCapture';
 import { useTransportStore } from '../../stores/useTransportStore';
+import { useWasmPositionStore } from '../../stores/useWasmPositionStore';
 import { useFormatStore } from '../../stores/useFormatStore';
 import { useInstrumentStore } from '../../stores/useInstrumentStore';
 import { useCursorStore } from '../../stores/useCursorStore';
@@ -312,6 +313,13 @@ export function getPlaybackState(): Record<string, unknown> {
     grooveTemplateId: transport.grooveTemplateId,
     grooveSteps: transport.grooveSteps,
     loopStartRow: transport.loopStartRow,
+    // Where a native engine says it is — what the pattern editor follows for
+    // songs a WASM replayer plays by itself (Hippel, TFMX, JamCracker, ...).
+    // `active` false: no engine is reporting, and the transport rows apply.
+    enginePosition: (() => {
+      const w = useWasmPositionStore.getState();
+      return { active: w.active, row: w.row, songPos: w.songPos };
+    })(),
   };
 }
 
