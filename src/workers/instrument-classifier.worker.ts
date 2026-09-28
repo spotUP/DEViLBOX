@@ -48,6 +48,11 @@ import type { InstrumentType } from '@/bridge/analysis/AudioSetInstrumentMap';
 // (server/src/index.ts), so the API base is the right thing to follow.
 const API_URL = import.meta.env.VITE_API_URL || 'https://devilbox.uprough.net/api';
 ort.env.wasm.wasmPaths = `${API_URL.replace(/\/api\/?$/, '')}/onnx-wasm/`;
+// One thread. Classification is background work with no deadline; ORT's
+// default pool took three extra cores at ~88 % each while a song played
+// (2026-09-28 trace: seven channels classified in one burst), competing with
+// the audio thread and the UI.
+ort.env.wasm.numThreads = 1;
 
 // ── Model URLs — own server first, HuggingFace CDN fallback ──────────────────
 const MODEL_URL_PRIMARY  = '/models/ced/model.onnx';

@@ -105,14 +105,14 @@ export const ChannelContextMenu: React.FC<ChannelContextMenuProps> = ({
   onBounce,
   onChaos,
 }) => {
-  const { isLiveMode, queueChannelAction } = useLiveModeStore();
-  const { toggleChannelMute, toggleChannelSolo, removeChannel, setChannelColor, toggleChannelCollapse, patterns } = useTrackerStore(useShallow((s) => ({
+  const isLiveMode = useLiveModeStore((s) => s.isLiveMode);
+  const queueChannelAction = useLiveModeStore((s) => s.queueChannelAction);
+  const { toggleChannelMute, toggleChannelSolo, removeChannel, setChannelColor, toggleChannelCollapse } = useTrackerStore(useShallow((s) => ({
     toggleChannelMute: s.toggleChannelMute,
     toggleChannelSolo: s.toggleChannelSolo,
     removeChannel: s.removeChannel,
     setChannelColor: s.setChannelColor,
     toggleChannelCollapse: s.toggleChannelCollapse,
-    patterns: s.patterns,
   })));
   const { setActiveParameter, removeCurve, getCurvesForPattern, addCurve, addPoint } = useAutomationStore(useShallow((s) => ({
     setActiveParameter: s.setActiveParameter,
@@ -124,7 +124,6 @@ export const ChannelContextMenu: React.FC<ChannelContextMenuProps> = ({
   const { updateInstrument } = useInstrumentStore(useShallow((s) => ({
     updateInstrument: s.updateInstrument,
   })));
-  const dubSend = useMixerStore(useShallow((s) => s.channels[channelIndex]?.dubSend ?? 0));
   const setChannelDubSend = useMixerStore((s) => s.setChannelDubSend);
 
   const handleApplyChannelFxPreset = useCallback((presetName: string) => {
@@ -242,8 +241,13 @@ export const ChannelContextMenu: React.FC<ChannelContextMenuProps> = ({
     });
   }, [channelIndex]);
 
-  // Build menu items based on mode
-  const menuItemsRaw = useMemo((): MenuItemType[] => {
+  // Build menu items based on mode. Built when the menu opens, not on every
+  // render: seven channel menus rebuilding their full item trees took about a
+  // quarter of the main thread while a song played (2026-09-28 trace), with
+  // the send and pattern values they show changing under AutoDub.
+  const buildMenuItemsRaw = useCallback((): MenuItemType[] => {
+    const dubSend = useMixerStore.getState().channels[channelIndex]?.dubSend ?? 0;
+    const patterns = useTrackerStore.getState().patterns;
     if (isLiveMode) {
       // Live mode menu - focused on real-time performance
       return [
@@ -788,7 +792,6 @@ export const ChannelContextMenu: React.FC<ChannelContextMenuProps> = ({
     channel,
     hasCurves,
     curves,
-    patterns,
     onFillPattern,
     onClearChannel,
     onCopyChannel,
@@ -823,19 +826,18 @@ export const ChannelContextMenu: React.FC<ChannelContextMenuProps> = ({
     handleApplyChannelFxPreset,
     automationParams,
     registerParamMenuItems,
-    dubSend,
     setChannelDubSend,
   ]);
 
   // Apply status-message wrapping to the whole menu tree
-  const menuItems = useMemo(
-    () => withStatusMessages(menuItemsRaw),
-    [menuItemsRaw, withStatusMessages],
+  const buildMenuItems = useCallback(
+    () => withStatusMessages(buildMenuItemsRaw()),
+    [buildMenuItemsRaw, withStatusMessages],
   );
 
   return (
     <DropdownButton
-      items={menuItems}
+      items={buildMenuItems}
       className={`
         p-1 rounded transition-colors
         ${isLiveMode
