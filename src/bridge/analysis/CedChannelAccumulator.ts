@@ -1,84 +1,57 @@
 /**
  * CED Channel Accumulator — live audio → CED classification for song-level
- * replayer channels (UADE, and any engine that feeds useOscilloscopeStore).
+ * replayer channels (any engine that streams its voices through
+ * useOscilloscopeStore into ChannelAudioTap).
  *
- * The existing ChannelAudioClassifier ring buffer is only 2048 samples (~43ms)
- * — far too short for CED inference. This accumulator maintains a larger per-
- * channel ring (32768 samples ≈ 0.68s @ 48kHz) and fires the CED worker once
- * it fills. Downsampled to 16kHz before inference to match CedFeatureExtractor.
+ * CED needs about 0.68 s of one channel's audio. It reads that many unbroken
+ * samples from ChannelAudioTap and fires the CED worker, at most once per
+ * cooldown per channel. Downsampled to 16kHz before inference to match
+ * CedFeatureExtractor.
+ *
+ * It used to fill a ring of its own from each AutoDub tick's display
+ * snapshot: 128-256 samples every 250 ms, glued into one 0.68 s window that
+ * took about 32 s to fill and was never audio the channel had played.
  *
  * Results land in useChannelTypeStore keyed by channel index.
  */
 
 import { resampleTo16k } from './CedMelSpectrogram';
+import { latestChannelAudio, CHANNEL_AUDIO_RING } from './ChannelAudioTap';
 import { useChannelTypeStore } from '@stores/useChannelTypeStore';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
-const ACCUM_SAMPLES  = 32768;  // 0.68s @ 48kHz before firing CED
+const ACCUM_SAMPLES  = CHANNEL_AUDIO_RING;  // 0.68s @ 48kHz
 const COOLDOWN_MS    = 15000;  // minimum ms between re-classifications per channel
-const ASSUMED_RATE   = 48000;  // oscilloscope tap sample rate
 const MAX_CHANNELS   = 32;
 
 // ── Singleton ─────────────────────────────────────────────────────────────────
 
 class CedChannelAccumulator {
-  private rings: Float32Array[]  = [];
-  private written: number[]      = [];
-  private lastFiredMs: number[]  = [];
-
-  private ensureChannels(n: number): void {
-    while (this.rings.length < n) {
-      this.rings.push(new Float32Array(ACCUM_SAMPLES));
-      this.written.push(0);
-      this.lastFiredMs.push(0);
-    }
-  }
+  private lastFiredMs: number[] = [];
 
   /**
-   * Feed oscilloscope tap data into per-channel accumulators.
-   * Called on every AutoDub tick from updateRuntimeClassifierFromOscilloscope.
+   * Classify every channel that has a full window of unbroken audio and is
+   * out of its cooldown. Called on every AutoDub tick.
    */
-  feed(channelData: readonly (Int16Array | null)[], now = Date.now()): void {
-    const n = Math.min(channelData.length, MAX_CHANNELS);
-    this.ensureChannels(n);
-
+  feed(channelCount: number, now = Date.now()): void {
+    const n = Math.min(channelCount, MAX_CHANNELS);
     for (let ch = 0; ch < n; ch++) {
-      const src = channelData[ch];
-      if (!src || src.length === 0) continue;
-
-      const ring = this.rings[ch];
-      let w = this.written[ch];
-
-      for (let i = 0; i < src.length; i++) {
-        ring[w % ACCUM_SAMPLES] = src[i] / 32768;
-        w++;
-      }
-      this.written[ch] = w;
-
-      if (w >= ACCUM_SAMPLES && now - this.lastFiredMs[ch] >= COOLDOWN_MS) {
-        this.lastFiredMs[ch] = now;
-        this.written[ch] = 0;
-        // Copy ring into a linear buffer (ring may have wrapped)
-        const pcm = new Float32Array(ACCUM_SAMPLES);
-        const start = w % ACCUM_SAMPLES;
-        for (let i = 0; i < ACCUM_SAMPLES; i++) {
-          pcm[i] = ring[(start + i) % ACCUM_SAMPLES];
-        }
-        this.fireChannel(ch, pcm);
-      }
+      if (now - (this.lastFiredMs[ch] ?? 0) < COOLDOWN_MS) continue;
+      const audio = latestChannelAudio(ch, ACCUM_SAMPLES);
+      if (!audio) continue;
+      this.lastFiredMs[ch] = now;
+      this.fireChannel(ch, audio.samples, audio.sampleRate);
     }
   }
 
-  private fireChannel(channel: number, pcm: Float32Array): void {
+  private fireChannel(channel: number, pcm: Float32Array, sampleRate: number): void {
     // Downsample to 16kHz for CED, then send to worker
-    const pcm16k = resampleTo16k(pcm, ASSUMED_RATE);
+    const pcm16k = resampleTo16k(pcm, sampleRate);
     useChannelTypeStore.getState().classifyChannelAudio(channel, pcm16k);
   }
 
   reset(): void {
-    this.rings      = [];
-    this.written    = [];
     this.lastFiredMs = [];
   }
 }

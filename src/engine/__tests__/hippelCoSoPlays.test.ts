@@ -32,6 +32,8 @@ beforeAll(() => {
     sampleRate: 44100,
     currentTime: 0,
   };
+  // The shared per-voice stream WASMSingletonBase loads ahead of every engine worklet.
+  new Function(readFileSync(resolve(ROOT, 'public/worklets/channel-stream.js'), 'utf8'))();
   new Function(...Object.keys(scope), src)(...Object.values(scope));
 });
 
@@ -90,6 +92,23 @@ describe('a Hippel CoSo song', { timeout: 60000 }, () => {
     // Measured [true, true, false, false]: in the first five seconds only
     // voices 0 and 1 play; the track table brings 2 and 3 in later.
     expect(voiceHeard.slice(0, 2), JSON.stringify(voiceHeard)).toEqual([true, true]);
+
+    // That stream is contiguous and reaches the runtime role classifier:
+    // through the store into ChannelAudioTap, one unbroken run per voice.
+    const { useOscilloscopeStore } = await import('@stores/useOscilloscopeStore');
+    const { updateChannelClassifierFromTap, _peekChannelState, resetRuntimeChannelClassifier } = await import('@/bridge/analysis/ChannelAudioClassifier');
+    const { latestChannelAudio } = await import('@/bridge/analysis/ChannelAudioTap');
+    resetRuntimeChannelClassifier();
+    const frames = osc.map((m) => (m as { frame?: number }).frame!);
+    expect(frames.every((f, i) => i === 0 || f === frames[i - 1] + osc[i - 1].channels![0].length)).toBe(true);
+    for (const m of osc) {
+      const { channels, frame, sampleRate } = m as { channels: Int16Array[]; frame: number; sampleRate: number };
+      useOscilloscopeStore.getState().updateChannelData(channels, frame, sampleRate);
+      updateChannelClassifierFromTap(4);
+    }
+    expect(useOscilloscopeStore.getState().channelData[0]!.length).toBe(256); // the scopes' view
+    expect(latestChannelAudio(0, 32768)).not.toBeNull();                     // CED's window
+    expect(_peekChannelState(0)?.historyLen).toBeGreaterThan(0);
 
     // The grid follows playback: the worklet reports voice 0's step and read
     // offset, and the parser's cell spans turn the offset into a row.

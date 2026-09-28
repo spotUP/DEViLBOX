@@ -8,19 +8,20 @@
  * no single instrument reaches the 70%-dominance threshold that
  * classifyChannelWithInstruments needs to override the note-stats role.
  *
- * This module measures the channel's ACTUAL audio — from the WASM per-
- * channel isolation tap that feeds useOscilloscopeStore — and votes on a
+ * This module measures the channel's ACTUAL audio — the contiguous per-
+ * channel stream in ChannelAudioTap, fed by the engines — and votes on a
  * runtime role. AutoDub merges the runtime hint with the offline role:
  * when offline says 'empty' or 'pad' (weak signal) and runtime strongly
  * disagrees (e.g. "this channel's low-end has dominated for 8 s"), the
  * runtime role wins.
  *
- * Pure-ish: module-level state for ring buffers, but the feature-extract
- * + classify path is the same SampleSpectrum helpers Phase 2 uses. No
- * WebAudio, no AnalyserNode — just Float32 ring buffer + radix-2 FFT.
+ * Pure-ish: module-level vote history, but the feature-extract + classify
+ * path is the same SampleSpectrum helpers Phase 2 uses. No WebAudio, no
+ * AnalyserNode — a radix-2 FFT over the tap's latest frame.
  */
 
 import type { ChannelRole } from './MusicAnalysis';
+import { latestChannelAudio } from './ChannelAudioTap';
 import {
   extractSampleFeatures,
   classifyBySpectralFeatures,
@@ -29,35 +30,23 @@ import {
 
 // ─── Tunables ───────────────────────────────────────────────────────────────
 
-/** Per-channel ring buffer length in samples. 2048 @ 48 kHz ≈ 43 ms — big
- *  enough for a stable FFT frame, small enough that we classify responsively. */
-const RING_SIZE = 2048;
+/** Samples per classification frame. 2048 @ 48 kHz ≈ 43 ms — big enough for
+ *  a stable FFT frame, small enough to respond quickly. Read as one unbroken
+ *  stretch from ChannelAudioTap; a channel without that much gives no vote. */
+const FRAME_SIZE = 2048;
 
-/** Minimum ring fill before we run a classifier pass. Wait for a FULL
- *  ring — partial classifications on half-zero buffers produce garbled
- *  spectra (the zero prefix pushes a broadband ramp that mis-reads as
- *  'lead' even for pure bass tones). At 256 samples/tick × 250 ms AutoDub
- *  cadence + 30-fps tap, a fresh ring takes ~2 s to fill. */
-const MIN_SAMPLES_FOR_CLASSIFICATION = RING_SIZE;
-
-/** How many recent classifications to keep per channel for the majority vote.
- *  4 frames at ~2 s each gives an 8 s rolling decision window. */
+/** How many recent classifications to keep per channel for the majority vote. */
 const HISTORY_LEN = 4;
 
 /** Minimum fraction of history entries that must agree on a role for
  *  `getRuntimeChannelRole` to return it. 0.75 = 3 of 4. */
 const AGREEMENT_THRESHOLD = 0.75;
 
-/** Default sample rate when the oscilloscope source doesn't supply one. */
-const DEFAULT_SAMPLE_RATE = 48000;
-
 // ─── Types ──────────────────────────────────────────────────────────────────
 
 interface ChannelState {
-  ring: Float32Array;
-  writePos: number;
-  samplesWritten: number;
-  sampleRate: number;
+  /** Tap frame the last classified window ended at; the same window is not voted twice. */
+  lastEnd: number;
   history: Array<{ role: ChannelRole; confidence: number }>;
   lastFeatures: SampleSpectrumFeatures | null;
 }
@@ -76,17 +65,10 @@ const _state = new Map<number, ChannelState>();
  *  at internal state. Exposed via `getRuntimeClassifierGeneration()`. */
 let _generation = 0;
 
-function getOrCreate(ch: number, sampleRate: number): ChannelState {
+function getOrCreate(ch: number): ChannelState {
   let s = _state.get(ch);
   if (!s) {
-    s = {
-      ring: new Float32Array(RING_SIZE),
-      writePos: 0,
-      samplesWritten: 0,
-      sampleRate,
-      history: [],
-      lastFeatures: null,
-    };
+    s = { lastEnd: -1, history: [], lastFeatures: null };
     _state.set(ch, s);
   }
   return s;
@@ -94,47 +76,30 @@ function getOrCreate(ch: number, sampleRate: number): ChannelState {
 
 // ─── Per-tick update ────────────────────────────────────────────────────────
 
-/** Append one tick's worth of tap samples into the per-channel rings and,
- *  when enough has accumulated, run a classifier pass. Call from AutoDub's
- *  250 ms tick loop right after you've read oscilloscope state.
+/** Classify each channel's latest unbroken FRAME_SIZE samples from the
+ *  contiguous audio tap, once per new window. Call from AutoDub's tick.
  *
- *  @param channelData  Parallel to the oscilloscope store's `channelData`.
- *                      Int16 samples or null when a channel is unavailable.
- *  @param sampleRate   Audio-rate of the tap (defaults to 48 kHz).
- *  @param classifyFn   Injectable classifier — exposed for tests. Defaults
- *                      to the Phase-2 classifyBySpectralFeatures.
+ *  It used to append each tick's display snapshot into a ring of its own:
+ *  snapshots taken 23-250 ms apart, glued into one window, whose joins read
+ *  as clicks - every channel of a Hippel song classified as percussion, and
+ *  the merge below let that override the offline role.
+ *
+ *  @param channelCount  channels to consider
+ *  @param classifyFn    injectable classifier (tests); defaults to
+ *                       classifyBySpectralFeatures
  */
 export function updateChannelClassifierFromTap(
-  channelData: readonly (Int16Array | null)[],
-  sampleRate: number = DEFAULT_SAMPLE_RATE,
+  channelCount: number,
   classifyFn: (f: SampleSpectrumFeatures) => { role: ChannelRole; confidence: number } = classifyBySpectralFeatures,
 ): void {
-  for (let ch = 0; ch < channelData.length; ch++) {
-    const src = channelData[ch];
-    if (!src || src.length === 0) continue;
+  for (let ch = 0; ch < channelCount; ch++) {
+    const audio = latestChannelAudio(ch, FRAME_SIZE);
+    if (!audio) continue;
+    const s = getOrCreate(ch);
+    if (audio.end === s.lastEnd) continue;
+    s.lastEnd = audio.end;
 
-    const s = getOrCreate(ch, sampleRate);
-
-    // Append src (Int16) into the Float32 ring at writePos, wrapping.
-    for (let i = 0; i < src.length; i++) {
-      s.ring[s.writePos] = src[i] / 32768;
-      s.writePos = (s.writePos + 1) % RING_SIZE;
-    }
-    s.samplesWritten += src.length;
-
-    // Only classify once we have a stable fill. Run on every update after
-    // that — cheap enough at 4× per second and lets us respond quickly to
-    // role shifts.
-    if (s.samplesWritten < MIN_SAMPLES_FOR_CLASSIFICATION) continue;
-
-    // Linearise the ring: samples are in chronological order starting at
-    // writePos (the oldest sample in the buffer). Reorder into `linear`.
-    const linear = new Float32Array(RING_SIZE);
-    for (let i = 0; i < RING_SIZE; i++) {
-      linear[i] = s.ring[(s.writePos + i) % RING_SIZE];
-    }
-
-    const features = extractSampleFeatures(linear, s.sampleRate);
+    const features = extractSampleFeatures(audio.samples, audio.sampleRate);
     if (!features) continue;
     s.lastFeatures = features;
 
@@ -266,14 +231,12 @@ export function mergeOfflineAndRuntimeRoles(
 
 /** Test-only: peek at the internal state for a channel. */
 export function _peekChannelState(ch: number): {
-  samplesWritten: number;
   historyLen: number;
   lastFeatures: SampleSpectrumFeatures | null;
 } | null {
   const s = _state.get(ch);
   if (!s) return null;
   return {
-    samplesWritten: s.samplesWritten,
     historyLen: s.history.length,
     lastFeatures: s.lastFeatures,
   };
