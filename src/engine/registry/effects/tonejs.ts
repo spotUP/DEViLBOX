@@ -10,6 +10,7 @@ import * as Tone from 'tone';
 import type { EffectConfig } from '@typedefs/instrument';
 import type { EffectDescriptor } from '../EffectDescriptor';
 import { EffectRegistry } from '../EffectRegistry';
+import { paramNumber } from './paramNumber';
 import { createBitCrusher } from '../../tone/bitCrusher';
 
 const tonejs: EffectDescriptor[] = [
@@ -446,11 +447,12 @@ const tonejs: EffectDescriptor[] = [
     create: async (c: EffectConfig) => {
       const { SidechainCompressor } = await import('@engine/effects/SidechainCompressor');
       const p = c.parameters;
+      const num = paramNumber;
       return new SidechainCompressor({
-        threshold: Number(p.threshold) ?? -24, ratio: Number(p.ratio) ?? 4,
-        attack: Number(p.attack) ?? 0.003, release: Number(p.release) ?? 0.25,
-        knee: Number(p.knee) ?? 6, sidechainGain: (Number(p.sidechainGain) ?? 100) / 100,
-        scFreq: Number(p.scFreq) ?? 0, scQ: Number(p.scQ) ?? 1,
+        threshold: num(p.threshold, -24), ratio: num(p.ratio, 4),
+        attack: num(p.attack, 0.003), release: num(p.release, 0.25),
+        knee: num(p.knee, 6), sidechainGain: num(p.sidechainGain, 100) / 100,
+        scFreq: num(p.scFreq, 0), scQ: num(p.scQ, 1),
         scFilterType: String(p.scFilterType || 'lowpass'),
         wet: c.wet / 100,
       });

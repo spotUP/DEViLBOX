@@ -54,7 +54,12 @@ export function getPostEffectsInput(): Tone.Gain | null {
   return _getPostEffectsInput?.() ?? null;
 }
 
-async function wireMasterSidechain(node: Tone.ToneAudioNode, sourceChannel: number): Promise<void> {
+/**
+ * Key a sidechain-capable effect (SidechainCompressor, …) on a tracker channel,
+ * or on its own input when `sourceChannel` < 0. Used by the master chain and by
+ * channel-routed effects (ChannelRoutedEffects.rebuild).
+ */
+export async function wireMasterSidechain(node: Tone.ToneAudioNode, sourceChannel: number): Promise<void> {
   if (!('getSidechainInput' in node)) return;
   const scInput = (node as any).getSidechainInput() as Tone.Gain;
   const rawScInput = getNativeAudioNode(scInput);
