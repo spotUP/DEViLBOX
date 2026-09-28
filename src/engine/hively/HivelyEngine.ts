@@ -17,7 +17,7 @@ import {
 } from '@engine/wasm/WASMSingletonBase';
 
 /** Hively appends a defensive factory-name hint (see original source). */
-function hivelyTransform(code: string): string {
+export function hivelyTransform(code: string): string {
   let out = code
     .replace(/import\.meta\.url/g, "'.'")
     .replace(/export\s+default\s+\w+;?/g, '')

@@ -8,6 +8,7 @@
   * Copyright 2005 Antti S. Lankila
   */
 
+#include <string.h>
 #include <math.h>
 
 #include "sysconfig.h"
@@ -51,7 +52,16 @@ static int uade_ch_buf_pos = 0;
 static int uade_ch_buf_frames = 0; /* frames written since last read */
 
 static inline void write_channel_samples(int ch0, int ch1, int ch2, int ch3) {
-    if (uade_ch_buf_pos < UADE_CH_BUF_SIZE) {
+    /* Unread for a while (no scope, dub or isolation listening): drop the
+     * older half so the buffer always ends at the newest sample. */
+    if (uade_ch_buf_pos >= UADE_CH_BUF_SIZE) {
+        const int keep = UADE_CH_BUF_SIZE / 2;
+        for (int c = 0; c < 4; c++)
+            memmove(uade_ch_buf[c], uade_ch_buf[c] + (UADE_CH_BUF_SIZE - keep), (size_t)keep * sizeof(int16_t));
+        uade_ch_buf_pos = keep;
+        uade_ch_buf_frames = keep;
+    }
+    {
         uade_ch_buf[0][uade_ch_buf_pos] = (int16_t)(ch0 < -32768 ? -32768 : (ch0 > 32767 ? 32767 : ch0));
         uade_ch_buf[1][uade_ch_buf_pos] = (int16_t)(ch1 < -32768 ? -32768 : (ch1 > 32767 ? 32767 : ch1));
         uade_ch_buf[2][uade_ch_buf_pos] = (int16_t)(ch2 < -32768 ? -32768 : (ch2 > 32767 ? 32767 : ch2));
@@ -824,6 +834,17 @@ void AUDxVOL (int nr, uae_u16 v)
 
 /* Read captured per-channel samples as float32. Returns frames available.
  * Called from entry.c after uade_wasm_render() to get per-channel audio. */
+/*
+ * Hand out up to max_frames captured samples per channel, oldest first, and
+ * keep the rest for the next call.
+ *
+ * The emulator produces audio in bursts longer than one render call, while
+ * the worklet reads once per call. This used to reset the buffer after every
+ * read, throwing away everything past max_frames: about 7 samples in 8 of
+ * every channel's audio (the scopes, the dub sends, the isolation slots and
+ * the runtime role classifiers all read this). As a FIFO it is consumed at
+ * the same pace as the main output, in the same order.
+ */
 int uade_audio_read_channel_samples(float *ch0, float *ch1, float *ch2, float *ch3, int max_frames) {
     int frames = uade_ch_buf_frames;
     if (frames > max_frames) frames = max_frames;
@@ -834,8 +855,12 @@ int uade_audio_read_channel_samples(float *ch0, float *ch1, float *ch2, float *c
         ch2[i] = (float)uade_ch_buf[2][i] * scale;
         ch3[i] = (float)uade_ch_buf[3][i] * scale;
     }
-    /* Reset buffer for next render pass */
-    uade_ch_buf_pos = 0;
-    uade_ch_buf_frames = 0;
+    const int rest = uade_ch_buf_frames - frames;
+    if (rest > 0) {
+        for (int c = 0; c < 4; c++)
+            memmove(uade_ch_buf[c], uade_ch_buf[c] + frames, (size_t)rest * sizeof(int16_t));
+    }
+    uade_ch_buf_pos = rest;
+    uade_ch_buf_frames = rest;
     return frames;
 }
