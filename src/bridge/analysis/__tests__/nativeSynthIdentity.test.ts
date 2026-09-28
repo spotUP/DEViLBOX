@@ -32,6 +32,20 @@ describe('a native synth\'s identity', () => {
     expect(classifyInstrument(sid({ noiseOn: true, pulseOn: true })).role).not.toBe('percussion');
   });
 
+  it('reads a Hippel CoSo frequency sequence as the semitones it adds to every note', async () => {
+    const { cosoSequenceTranspose, soundingNotes } = await import('../synthEvidence');
+    // E5 set-sample takes 9 bytes; then transposes; E0 loops. Median 12.
+    expect(cosoSequenceTranspose([-27, 0, 0, 0, 0, 0, 0, 0, 0, 12, 12, 24, -32, 0])).toBe(12);
+    // A byte from 0x80 up (not a command) locks a pitch: no offset.
+    expect(cosoSequenceTranspose([-116, -32, 0])).toBeNull();
+    // E8 sustain ends nothing; the walk stops at E1.
+    expect(cosoSequenceTranspose([21, 22, 23, 24, 25, 26, -24, 5, -31])).toBe(24);
+    const hc = (fseq: number[]) => ({ id: 1, synthType: 'HippelCoSoSynth', hippelCoso: { fseq } }) as unknown as InstrumentConfig;
+    // A cell without an instrument keeps the last one's offset.
+    const rows = [{ note: 30, instrument: 1 }, { note: 32, instrument: 0 }, { note: 0, instrument: 0 }];
+    expect(soundingNotes(rows, new Map([[1, hc([24, -32, 0])]]))).toEqual([54, 56]);
+  });
+
   it('leaves a synth that states nothing to the other evidence', () => {
     expect(classifyInstrument(inst('PolySynth')).role).toBe('empty');
   });

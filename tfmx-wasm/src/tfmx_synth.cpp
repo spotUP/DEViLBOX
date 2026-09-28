@@ -402,6 +402,11 @@ static uint8_t* gModuleSmpl = nullptr;
 static uint32_t gModuleSmplLen = 0;
 static uint64_t gSamplesRendered = 0;
 
+// Per-voice output of the module player, one render call deep, for the
+// oscilloscopes and the per-channel role classifier. Voice v at v*SCOPE_LEN.
+static const uint32_t SCOPE_LEN = 128;
+static int16_t gScope[8 * SCOPE_LEN];
+
 /**
  * Load a full TFMX module (mdat + smpl) for streaming playback.
  * Uses player slot 0 as the dedicated module player.
@@ -473,6 +478,8 @@ int tfmx_load_module(void* /*ctx*/, const uint8_t* mdatData, uint32_t mdatLen,
   // Configure mixer: signed 16-bit stereo
   tfmxdec_mixer_init(dec, gSampleRate, 16, 2, 0, 75);
   tfmxdec_set_loop_mode(dec, 1);
+  memset(gScope, 0, sizeof(gScope));
+  tfmxdec_set_scope_capture(dec, gScope, SCOPE_LEN);
 
   p.decoder = dec;
   p.loaded = true;
@@ -587,6 +594,15 @@ void tfmx_module_seek(void* /*ctx*/, int ms) {
   if (!p.decoder || ms <= 0) return;
   tfmxdec_seek(p.decoder, ms);
   gSamplesRendered = (uint64_t)ms * (uint64_t)gSampleRate / 1000u;
+}
+
+/**
+ * DEViLBOX extension: per-voice output of the last module render, int16,
+ * voice v at v*128. Valid for tfmx_module_voices() voices.
+ */
+EMSCRIPTEN_KEEPALIVE
+int16_t* tfmx_module_scope(void* /*ctx*/) {
+  return gScope;
 }
 
 /**
