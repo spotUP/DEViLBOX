@@ -1119,12 +1119,28 @@ export async function startNativeEngines(
           console.log(`[NativeEngineRouting] TFMXModule position sync wired (${timingTable?.length ?? 0} entries, msPerJiffy=${msPerJiffy})`);
         }
 
+        // Hippel position sync: the decoder reports voice 0's track step and
+        // the file offset it reads next; the parser's cell spans turn that
+        // offset into a grid row. Steps are the grid's patterns, in order.
+        if (desc.key === 'Hippel' && song.hippelFileData) {
+          const { mapHippelCells } = await import('@/engine/hippel/rebuildHippelModule');
+          const { hippelRowAt } = await import('@/engine/hippel/hippelCellSpans');
+          const spans = mapHippelCells(song.hippelFileData, song.instruments.length);
+          if (spans) {
+            (instance as unknown as import('@/engine/tfmx/TFMXEngine').TFMXEngine).onPositionUpdate((u) => {
+              if (u.step === undefined || u.step < 0 || u.patternOffset === undefined || u.patternOffset < 0) return;
+              useWasmPositionStore.getState().setPosition(hippelRowAt(spans, u.step, u.patternOffset), u.step);
+            });
+            console.log(`[NativeEngineRouting] Hippel position sync wired (${spans.length} steps)`);
+          }
+        }
+
         // Generic position sync for WASM engines with onPositionUpdate.
         // IMPORTANT: Do NOT call store.play() or set isPlaying here — that triggers
         // usePatternPlayback reload effect → startNativeEngines() → infinite respawn loop.
         // The TrackerReplayer.play() already sets isPlaying via the normal flow.
         // We only update currentRow so the pattern editor scrolls.
-        if ('onPositionUpdate' in instance && typeof (instance as any).onPositionUpdate === 'function' && desc.key !== 'Hively' && desc.key !== 'UADEEditable' && desc.key !== 'TFMXModule') {
+        if ('onPositionUpdate' in instance && typeof (instance as any).onPositionUpdate === 'function' && desc.key !== 'Hively' && desc.key !== 'UADEEditable' && desc.key !== 'TFMXModule' && desc.key !== 'Hippel') {
           // Wire position updates to the lightweight WASM position store.
           // This bypasses useTransportStore entirely to avoid triggering
           // the usePatternPlayback effect chain (which causes recursive engine spawns).

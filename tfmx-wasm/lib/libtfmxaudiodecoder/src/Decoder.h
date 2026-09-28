@@ -46,6 +46,13 @@ public:
      */
     virtual void previewMacro(int /*macroIdx*/, int /*note*/,
                               int /*volume*/, int /*channel*/) { }
+
+    /**
+     * DEViLBOX extension: where voice 0 is reading. `step` counts track
+     * steps from the song's first; `offset` is the module-file offset of the
+     * next pattern byte the voice reads. False when the decoder cannot say.
+     */
+    virtual bool getPlayPosition(int& /*step*/, udword& /*offset*/) { return false; }
     
     virtual ubyte getVoices() { return 0; }
     virtual int getSongs() { return 0; }

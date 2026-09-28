@@ -37,6 +37,7 @@ class HippelDecoder : public Decoder {
     ~HippelDecoder();
 
     bool init(void *data, udword length, int songNumber) override;
+    bool getPlayPosition(int& step, udword& offset) override;
     bool detect(void*,udword) override;
 
     ubyte getVoices() override;
