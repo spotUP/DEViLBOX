@@ -442,7 +442,7 @@ const tonejs: EffectDescriptor[] = [
     ],
   },
   {
-    id: 'SidechainCompressor', name: 'Sidechain Compressor', category: 'tonejs', group: 'Dynamics',
+    id: 'SidechainCompressor', sidechainKeyed: true, name: 'Sidechain Compressor', category: 'tonejs', group: 'Dynamics',
     loadMode: 'eager',
     create: async (c: EffectConfig) => {
       const { SidechainCompressor } = await import('@engine/effects/SidechainCompressor');

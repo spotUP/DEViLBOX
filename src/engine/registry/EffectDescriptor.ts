@@ -37,6 +37,8 @@ export interface EffectDescriptor {
   editorComponent?: string;
   /** Parameter keys that support BPM sync */
   bpmSyncParams?: string[];
+  /** Keyed by a sidechain source (parameters.sidechainSource): a tracker channel, or its own input when < 0. */
+  sidechainKeyed?: boolean;
   /** Factory presets — named parameter configurations */
   presets?: import('@typedefs/instrument').EffectPreset[];
 }
