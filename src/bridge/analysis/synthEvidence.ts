@@ -444,3 +444,76 @@ export function classifyByNativeSynth(inst: InstrumentConfig): {
   if (inst.synthType === 'Organ') return { role: 'chord', confidence: 0.55 };
   return null;
 }
+
+// ─── Native synths: the pitch they sound at ────────────────────────────────
+
+/**
+ * Bytes each Hippel CoSo sound-sequence command occupies, the command byte
+ * included, as libtfmxaudiodecoder's COSO player reads them
+ * (Jochen/Instrument.cpp; COSO.cpp installs the E1 wave-mod and E7
+ * set-different-wave variants). E0 (loop) and E1 end the sequence's first
+ * pass.
+ */
+const COSO_SEQ_COMMAND_BYTES: Readonly<Record<number, number>> = {
+  0xE2: 2, 0xE3: 3, 0xE4: 2, 0xE5: 9, 0xE6: 6, 0xE7: 2, 0xE8: 2, 0xE9: 3, 0xEA: 2,
+};
+
+/**
+ * Semitones a Hippel CoSo frequency sequence adds to the written note, as
+ * the median of its first pass: a byte below 0x80 is a transpose added to the
+ * note; one from 0x80 to 0xDF plays a fixed pitch whatever the note (skipped
+ * here - it is no offset); E0 and up are commands. Null when the sequence
+ * holds no transpose.
+ */
+export function cosoSequenceTranspose(fseq: readonly number[]): number | null {
+  const transposes: number[] = [];
+  for (let i = 0; i < fseq.length;) {
+    const b = fseq[i] & 0xFF;
+    if (b >= 0xE0) {
+      const len = COSO_SEQ_COMMAND_BYTES[b];
+      if (!len) break;               // E0, E1, or a command this player lacks
+      i += len;
+    } else {
+      if (b < 0x80) transposes.push(b);
+      i++;
+    }
+  }
+  if (transposes.length === 0) return null;
+  transposes.sort((a, b) => a - b);
+  return transposes[transposes.length >> 1];
+}
+
+/**
+ * How many semitones above its written note an instrument sounds.
+ *
+ * A tracker note is what the pattern says, not always what is heard: a Hippel
+ * CoSo instrument's frequency sequence transposes every note it plays, often
+ * by one or two octaves, so a song can write all four voices in one low
+ * register while only one of them is the bass (prehistoric_tale.hipc: three
+ * voices written at B-2..E-3 all classified as bass). Pitch evidence reads
+ * notes through this. 0 for an instrument that states nothing.
+ */
+export function soundingSemitones(inst: InstrumentConfig | undefined): number {
+  const fseq = (inst as { hippelCoso?: { fseq?: number[] } } | undefined)?.hippelCoso?.fseq;
+  if (fseq) return cosoSequenceTranspose(fseq) ?? 0;
+  return 0;
+}
+
+/**
+ * The notes a channel sounds, in order: each written note plus the playing
+ * instrument's offset. A cell without an instrument keeps the last one, as a
+ * tracker does.
+ */
+export function soundingNotes(
+  rows: ReadonlyArray<{ note: number; instrument: number } | null | undefined>,
+  instruments?: ReadonlyMap<number, InstrumentConfig>,
+): number[] {
+  const notes: number[] = [];
+  let offset = 0;
+  for (const cell of rows) {
+    if (!cell) continue;
+    if (cell.instrument > 0 && instruments) offset = soundingSemitones(instruments.get(cell.instrument));
+    if (cell.note >= 1 && cell.note <= 96) notes.push(Math.min(96, cell.note + offset));
+  }
+  return notes;
+}

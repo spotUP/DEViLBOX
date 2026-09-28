@@ -17,6 +17,7 @@ class TFMXProcessor extends AudioWorkletProcessor {
     this.wasm        = null;
     this.ctx         = null;
     this.initialized = false;
+    this._oscCounter = 0;
 
     // Per-player state: { outPtrL, outPtrR }
     this.players = {};
@@ -134,6 +135,7 @@ class TFMXProcessor extends AudioWorkletProcessor {
           this._modulePlaying = false;
           this._sampleRate = sampleRate;
           const voices = this.wasm._tfmx_module_voices(this.ctx);
+          this._moduleVoices = voices;
           const songs = this.wasm._tfmx_module_songs(this.ctx);
           const duration = this.wasm._tfmx_module_duration(this.ctx);
           this._moduleDuration = duration;
@@ -341,6 +343,20 @@ class TFMXProcessor extends AudioWorkletProcessor {
       for (let i = 0; i < numSamples; i++) {
         outputL[i] += heapF32[offL + i];
         outputR[i] += heapF32[offR + i];
+      }
+
+      // Each voice's own output, for the oscilloscopes and the per-channel
+      // role classifier — every 8 renders, the same cadence as the other
+      // Amiga engines.
+      if (this.wasm._tfmx_module_scope && this._moduleVoices > 0 && ++this._oscCounter >= 8) {
+        this._oscCounter = 0;
+        const base = this.wasm._tfmx_module_scope(this.ctx) >> 1;
+        const heap16 = new Int16Array(this.wasm.HEAPU8.buffer);
+        const channels = [];
+        for (let v = 0; v < this._moduleVoices; v++) {
+          channels.push(heap16.slice(base + v * 128, base + v * 128 + numSamples));
+        }
+        this.port.postMessage({ type: 'oscData', channels });
       }
 
       // Send position update every ~100ms (4410 samples at 44100Hz)

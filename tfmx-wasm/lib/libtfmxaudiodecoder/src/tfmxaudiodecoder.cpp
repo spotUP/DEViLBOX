@@ -156,6 +156,11 @@ void tfmxdec_set_filtering(void* decoder, int flag) {
     p->mixer.setFiltering(flag);
 }
 
+void tfmxdec_set_scope_capture(void* decoder, int16_t* buf, uint32_t capacity) {
+    TFMX_DECLARE_DECODER;
+    p->mixer.setScopeCapture(buf, capacity);
+}
+
 int tfmxdec_get_play_position(void* decoder, int32_t* step, uint32_t* offset) {
     TFMX_DECLARE_DECODER;
     int s = 0; udword o = 0;
