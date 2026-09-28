@@ -14,19 +14,9 @@ import { getDJEngine } from '../../engine/dj/DJEngine';
  * Register all editor action handlers for MIDI button control
  */
 export function useButtonMappings(): void {
-  const { isPlaying, togglePlayPause, stop } = useTransportStore();
-  const cursor = useCursorStore((s) => s.cursor);
-  const moveCursorToChannel = useCursorStore((s) => s.moveCursorToChannel);
-  const {
-    currentPatternIndex,
-    patterns,
-    setCurrentPattern,
-  } = useTrackerStore();
-  const {
-    currentOctave,
-    setCurrentOctave,
-  } = useEditorStore();
-
+  // Registered once. Each handler reads the stores when its button is
+  // pressed: subscribing here (the whole transport store among them)
+  // re-rendered App, and re-registered every action, on every playback row.
   useEffect(() => {
     const manager = getButtonMapManager();
     manager.init();
@@ -36,27 +26,29 @@ export function useButtonMappings(): void {
     // Transport actions
     cleanups.push(
       manager.registerAction('transport.play', () => {
-        togglePlayPause();
+        useTransportStore.getState().togglePlayPause();
       })
     );
 
     cleanups.push(
       manager.registerAction('transport.stop', () => {
-        stop();
+        useTransportStore.getState().stop();
       })
     );
 
     cleanups.push(
       manager.registerAction('transport.playFromStart', () => {
         // Stop then play immediately — no artificial delay
-        if (isPlaying) stop();
-        togglePlayPause();
+        const transport = useTransportStore.getState();
+        if (transport.isPlaying) transport.stop();
+        transport.togglePlayPause();
       })
     );
 
     // Pattern navigation
     cleanups.push(
       manager.registerAction('pattern.next', () => {
+        const { currentPatternIndex, patterns, setCurrentPattern } = useTrackerStore.getState();
         if (currentPatternIndex < patterns.length - 1) {
           setCurrentPattern(currentPatternIndex + 1);
         }
@@ -65,6 +57,7 @@ export function useButtonMappings(): void {
 
     cleanups.push(
       manager.registerAction('pattern.previous', () => {
+        const { currentPatternIndex, setCurrentPattern } = useTrackerStore.getState();
         if (currentPatternIndex > 0) {
           setCurrentPattern(currentPatternIndex - 1);
         }
@@ -73,12 +66,13 @@ export function useButtonMappings(): void {
 
     cleanups.push(
       manager.registerAction('pattern.first', () => {
-        setCurrentPattern(0);
+        useTrackerStore.getState().setCurrentPattern(0);
       })
     );
 
     cleanups.push(
       manager.registerAction('pattern.last', () => {
+        const { patterns, setCurrentPattern } = useTrackerStore.getState();
         setCurrentPattern(patterns.length - 1);
       })
     );
@@ -86,6 +80,7 @@ export function useButtonMappings(): void {
     // Octave control
     cleanups.push(
       manager.registerAction('octave.up', () => {
+        const { currentOctave, setCurrentOctave } = useEditorStore.getState();
         if (currentOctave < 8) {
           setCurrentOctave(currentOctave + 1);
         }
@@ -94,6 +89,7 @@ export function useButtonMappings(): void {
 
     cleanups.push(
       manager.registerAction('octave.down', () => {
+        const { currentOctave, setCurrentOctave } = useEditorStore.getState();
         if (currentOctave > 0) {
           setCurrentOctave(currentOctave - 1);
         }
@@ -103,6 +99,8 @@ export function useButtonMappings(): void {
     // Channel navigation
     cleanups.push(
       manager.registerAction('channel.next', () => {
+        const { patterns, currentPatternIndex } = useTrackerStore.getState();
+        const { cursor, moveCursorToChannel } = useCursorStore.getState();
         const pattern = patterns[currentPatternIndex];
         if (pattern && cursor.channelIndex < pattern.channels.length - 1) {
           moveCursorToChannel(cursor.channelIndex + 1);
@@ -112,6 +110,7 @@ export function useButtonMappings(): void {
 
     cleanups.push(
       manager.registerAction('channel.previous', () => {
+        const { cursor, moveCursorToChannel } = useCursorStore.getState();
         if (cursor.channelIndex > 0) {
           moveCursorToChannel(cursor.channelIndex - 1);
         }
@@ -176,16 +175,5 @@ export function useButtonMappings(): void {
     return () => {
       cleanups.forEach((cleanup) => cleanup());
     };
-  }, [
-    isPlaying,
-    togglePlayPause,
-    stop,
-    currentPatternIndex,
-    patterns,
-    setCurrentPattern,
-    currentOctave,
-    setCurrentOctave,
-    cursor,
-    moveCursorToChannel,
-  ]);
+  }, []);
 }
