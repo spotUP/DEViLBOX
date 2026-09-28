@@ -23,25 +23,42 @@ import { useChannelTypeStore } from '@stores/useChannelTypeStore';
 
 const ACCUM_SAMPLES  = CHANNEL_AUDIO_RING;  // 0.68s @ 48kHz
 const COOLDOWN_MS    = 15000;  // minimum ms between re-classifications per channel
+/**
+ * Minimum ms between any two classifications. Every channel came out of its
+ * cooldown on the same tick, so all of them were classified at once: seven
+ * ~0.5 s inferences back to back every 15 s, which pinned the audio thread
+ * for 1-2 s and was heard as dropouts (2026-09-28, measured by sampling the
+ * AudioWorklet thread against the worker's classify requests). One at a time
+ * spreads them across the cycle.
+ */
+const SPACING_MS     = 2000;
 const MAX_CHANNELS   = 32;
 
 // ── Singleton ─────────────────────────────────────────────────────────────────
 
 class CedChannelAccumulator {
   private lastFiredMs: number[] = [];
+  private lastAnyMs = 0;
+  private next = 0;
 
   /**
-   * Classify every channel that has a full window of unbroken audio and is
-   * out of its cooldown. Called on every AutoDub tick.
+   * Classify the next channel, round-robin, that has a full window of
+   * unbroken audio and is out of its cooldown — at most one per SPACING_MS.
+   * Called on every AutoDub tick.
    */
   feed(channelCount: number, now = Date.now()): void {
+    if (now - this.lastAnyMs < SPACING_MS) return;
     const n = Math.min(channelCount, MAX_CHANNELS);
-    for (let ch = 0; ch < n; ch++) {
+    for (let i = 0; i < n; i++) {
+      const ch = (this.next + i) % n;
       if (now - (this.lastFiredMs[ch] ?? 0) < COOLDOWN_MS) continue;
       const audio = latestChannelAudio(ch, ACCUM_SAMPLES);
       if (!audio) continue;
       this.lastFiredMs[ch] = now;
+      this.lastAnyMs = now;
+      this.next = (ch + 1) % n;
       this.fireChannel(ch, audio.samples, audio.sampleRate);
+      return;
     }
   }
 
@@ -53,6 +70,8 @@ class CedChannelAccumulator {
 
   reset(): void {
     this.lastFiredMs = [];
+    this.lastAnyMs = 0;
+    this.next = 0;
   }
 }
 
