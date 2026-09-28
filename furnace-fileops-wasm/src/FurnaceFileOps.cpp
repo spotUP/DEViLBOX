@@ -266,6 +266,20 @@ const char* fur_get_subsong_name(int subsong) {
   return g_nameBuf;
 }
 
+/**
+ * The hardware type of a song channel, from the chip's own channel
+ * definition: 0 FM, 1 pulse, 2 noise, 3 wave, 4 PCM, 5 operator (DivChanTypes).
+ * A chip's noise channel is its drum channel whatever instrument plays on it,
+ * which is chip fact rather than anything the musician typed. -1 for a
+ * channel the song's systems do not define.
+ */
+int fur_get_channel_type(int chan) {
+  g_engine.song.recalcChans();
+  if (chan < 0 || chan >= g_engine.song.chans) return -1;
+  if (g_engine.song.dispatchChanOfChan[chan] < 0) return -1;
+  return g_engine.song.chanDef[chan].type;
+}
+
 const char* fur_get_channel_name(int subsong, int chan) {
   if (subsong < 0 || subsong >= (int)g_engine.song.subsong.size()) return "";
   if (chan < 0 || chan >= DIV_MAX_CHANS) return "";

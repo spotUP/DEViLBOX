@@ -54,6 +54,7 @@ interface FurnaceFileOpsAPI {
   fur_get_system_id(idx: number): number;
   fur_get_system_channels(idx: number): number;
   fur_get_system_name(idx: number): string;
+  fur_get_channel_type(chan: number): number;
   fur_get_ins_system(insIdx: number): number;
   fur_get_ins_chip_channel(insIdx: number): number;
   fur_get_system_flags(idx: number): string;
@@ -103,6 +104,7 @@ function getAPI(m: WasmModule): FurnaceFileOpsAPI {
     fur_get_system_id: m.cwrap('fur_get_system_id', 'number', ['number']),
     fur_get_system_channels: m.cwrap('fur_get_system_channels', 'number', ['number']),
     fur_get_system_name: m.cwrap('fur_get_system_name', 'string', ['number']),
+    fur_get_channel_type: m.cwrap('fur_get_channel_type', 'number', ['number']),
     fur_get_ins_system: m.cwrap('fur_get_ins_system', 'number', ['number']),
     fur_get_ins_chip_channel: m.cwrap('fur_get_ins_chip_channel', 'number', ['number']),
     fur_get_system_flags: m.cwrap('fur_get_system_flags', 'string', ['number']),
@@ -162,6 +164,8 @@ export async function loadFurFileWasm(buffer: ArrayBuffer): Promise<{
   chipIds: number[];
   /** Furnace's own display name for each chip in chipIds. */
   systemNames: string[];
+  /** Per song channel, its hardware type (DivChanType: 0 FM .. 5 OP), -1 when undefined. */
+  channelTypes: number[];
   chipFlags: string[];
   nativeData: FurnaceNativeData;
   instrumentBinaries: Uint8Array[];
@@ -222,6 +226,8 @@ export async function loadFurFileWasm(buffer: ArrayBuffer): Promise<{
   const author = api.fur_get_song_author();
   const numChannels = api.fur_get_num_channels();
   const numSubsongs = api.fur_get_num_subsongs();
+  const channelTypes: number[] = [];
+  for (let ch = 0; ch < numChannels; ch++) channelTypes.push(api.fur_get_channel_type(ch));
   const systemLen = api.fur_get_system_len();
 
   const chipIds: number[] = [];
@@ -487,6 +493,7 @@ export async function loadFurFileWasm(buffer: ArrayBuffer): Promise<{
     numSubsongs,
     chipIds,
     systemNames,
+    channelTypes,
     chipFlags,
     nativeData,
     instrumentBinaries,
