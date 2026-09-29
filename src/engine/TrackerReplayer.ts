@@ -1603,6 +1603,13 @@ export class TrackerReplayer {
    *  otherwise nextScheduleTime may be seconds/minutes in the future. */
   resyncSchedulerToNow(): void {
     this.nextScheduleTime = Tone.now();
+    // The rows queued for the display were timed on the old timeline. After a
+    // scratch (tempo x0.001) that timeline ran minutes ahead, and the display
+    // queue drains in order - so the first far-future row blocked every new
+    // one and the pattern stopped scrolling while the song played on
+    // ("the pattern stops after the scratches", 2026-09-30). The last shown
+    // row is kept; the stale future goes.
+    this.coordinator.stateRing.clear();
   }
 
   /** Pause all active WASM engines (for scratch mode) */
