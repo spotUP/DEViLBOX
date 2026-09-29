@@ -27,7 +27,7 @@ it.runIf(process.env.CLASSIFIER_DRAFT === '1')('writes draft labels for the corp
     if (kept) { out.push(kept); continue; }
     const song = await loadCorpusSong(path);
     const lookup = new Map(song.instruments.map((i) => [i.id, i]));
-    const roles = classifySongRoles(song.patterns, lookup);
+    const roles = classifySongRoles(song.patterns, lookup, song.songPositions ?? []);
     out.push({ song: path, channels: roles.map(roleToLabel), labelledBy: 'draft', date: new Date().toISOString().slice(0, 10) });
   }
   writeFileSync(LABELS, JSON.stringify(out, null, 1) + '\n');

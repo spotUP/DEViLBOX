@@ -56,6 +56,23 @@ export interface SampleSpectrumFeatures {
   tailRatio: number;
   /** Duration of the analysed sample (before any loop), seconds. */
   durationSec: number;
+  /**
+   * Pitch salience in [0, 1]: the normalised autocorrelation peak over lags
+   * 40..2000 Hz, measured after the attack. A tone (however distorted) has a
+   * period and reads high; a snare, hat or noise burst has none and reads
+   * low. Flatness alone called distorted guitars snares (2026-09-29).
+   */
+  harmonicity: number;
+  /**
+   * The period the harmonicity peak sits at, in frames at the sample's own
+   * rate (0 when nothing periodic). f0 = sampleRate / periodFrames: the
+   * pitch the sample sounds at its base note, which a sample recorded low
+   * and a single chip cycle both need before their written notes mean
+   * anything.
+   */
+  periodFrames: number;
+  /** The rate the sample was analysed at (its own), Hz. */
+  sampleRate: number;
 }
 
 export interface SampleClassification {
@@ -387,7 +404,53 @@ export function extractSampleFeatures(
     crestFactor: env.crestFactor,
     tailRatio: env.tailRatio,
     durationSec: pcm.length / sampleRate,
+    sampleRate,
+    ...(() => { const h = harmonicity(pcm, sampleRate, startOffset); return { harmonicity: h.salience, periodFrames: h.periodFrames }; })(),
   };
+}
+
+/**
+ * Normalised autocorrelation of a ~2048-sample window after the attack, over
+ * lags for 40..2000 Hz: the peak's height (1 = perfectly periodic, 0 = no
+ * period) and its lag. The lag is the fundamental's period; a peak at a
+ * multiple of a shorter strong lag is folded down to it.
+ */
+export function harmonicity(pcm: Float32Array, sampleRate: number, startOffset = 0): { salience: number; periodFrames: number } {
+  const N = Math.min(2048, pcm.length - startOffset);
+  const minLag = Math.max(1, Math.floor(sampleRate / 2000));
+  const maxLag = Math.min(Math.floor(sampleRate / 30), N >> 1);
+  if (N < 256 || maxLag <= minLag) return { salience: 0, periodFrames: 0 };
+  // Mean removed: a pulse wave with a DC offset (most chip waveforms) never
+  // lets the autocorrelation dip, and read as having no period at all.
+  const raw = pcm.subarray(startOffset, startOffset + N);
+  let mean = 0;
+  for (let i = 0; i < N; i++) mean += raw[i];
+  mean /= N;
+  const x = new Float32Array(N);
+  for (let i = 0; i < N; i++) x[i] = raw[i] - mean;
+  let e0 = 0;
+  for (let i = 0; i < N; i++) e0 += x[i] * x[i];
+  if (e0 < 1e-9) return { salience: 0, periodFrames: 0 };
+  const r = new Float32Array(maxLag + 2);
+  for (let lag = minLag; lag <= maxLag; lag++) {
+    let c = 0, e1 = 0;
+    for (let i = 0; i + lag < N; i++) { c += x[i] * x[i + lag]; e1 += x[i + lag] * x[i + lag]; }
+    r[lag] = c / Math.sqrt(e0 * e1 + 1e-12);
+  }
+  // Any smooth signal reads ~1 at the shortest lags (a 40 Hz wave barely
+  // changes over four frames), so the period is searched only AFTER the
+  // autocorrelation has first dipped. No dip within range: no period found.
+  let dip = minLag;
+  while (dip <= maxLag && r[dip] > 0.3) dip++;
+  if (dip > maxLag) return { salience: 0, periodFrames: 0 };
+  let best = 0, bestLag = 0;
+  for (let lag = dip; lag <= maxLag; lag++) if (r[lag] > best) { best = r[lag]; bestLag = lag; }
+  // The fundamental is the first peak nearly as strong as the best.
+  let period = bestLag;
+  for (let lag = dip + 1; lag < bestLag; lag++) {
+    if (r[lag] >= best * 0.85 && r[lag] >= r[lag - 1] && r[lag] >= r[lag + 1]) { period = lag; break; }
+  }
+  return { salience: Math.max(0, Math.min(1, best)), periodFrames: period };
 }
 
 // ─── Role classifier ────────────────────────────────────────────────────────

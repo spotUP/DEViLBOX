@@ -278,3 +278,80 @@ Modland files are downloaded once into src/__tests__/fixtures/classifier-corpus/
 - NEXT P0.3: label with the owner song by song (agent loads the song in the
   tab, lists the draft per channel, owner corrects by ear; agent writes
   labelledBy 'owner' entries).
+- Owner question 2026-09-29: "does our classifier sample smart parts of the song?" - No.
+  classifySongChannels (ChannelNaming.ts:489) takes up to 50 patterns evenly from the
+  pattern LIST: unused patterns count, a pattern played ten times counts once, intro
+  and chorus weigh the same. Candidate phase (measure with P0 before/after): walk the
+  PLAY ORDER, weight each pattern by the time it sounds, skip unused patterns; per-section
+  roles stay P6. The runtime audio (CED) votes are empty in practice - P1b.
+
+## Redesign (2026-09-29 evening): instrument-first song analyzer
+
+Owner, labelling song 4: "it will take forever, we need a smarter analysis"
+- one role per channel per song is the wrong unit, and hand-labelling
+sections is too slow. Replaces P1-P3 (they patched the per-channel chain).
+
+Invariant: a tracker's roles belong to its INSTRUMENTS. A kick sample is
+drums wherever it plays; a bass sample is bass. Channel roles per section
+follow from which instruments a channel plays at each song position.
+
+`src/bridge/analysis/songAnalyzer.ts` - `analyzeSong(patterns, order, instruments)`:
+1. Usage walk over the PLAY ORDER (repeats count, unused patterns do not):
+   every onset -> (position, channel, row, instrument, sounding pitch).
+2. Per-instrument PLAYING evidence (the strongest signal trackers have and
+   the old chain never used): distinct sounding pitches (a drum is triggered
+   at one or two pitches; a pitched part at many), register relative to the
+   song's lowest instrument, stepwise motion, density, beat-grid position
+   (rows % 4 / % 8), polyphony (same instrument on several channels at one
+   row -> harmony), sparseness (one-shots -> fx).
+3. Per-instrument TIMBRE evidence: spectrum of the SOUNDING pcm (+ a new
+   harmonicity feature: autocorrelation pitch salience, so a distorted
+   guitar is not a snare), synth parameters (AHX), explicit drum types.
+4. NAME evidence gated per song: names count only when the song's names look
+   like instrument names (a share of them carry an instrument/role word),
+   never when they are greetings or "Sample N".
+5. Fusion: weighted sum into {drums, bass, lead, harmony, fx}; argmax with a
+   confidence; drum subrole from timbre / beat position.
+6. Channel timeline: per position the dominant instrument's role, merged into
+   sections (a one-position blip between equal neighbours is absorbed);
+   song-level channel role = time-weighted majority. Exposed on
+   get_channel_roles / get_channel_segments.
+7. `classifySongRoles` / `classifySongChannels` become thin wrappers -> the
+   one resolver (P1b) for sidechain, NO DRUMS routing, Auto Dub, naming.
+   `ChannelRole` gains 'fx'.
+
+Labels: instruments, not channels. `instrument-labels.json` (song, instrument
+id, role) fills from the analyzer's confident verdicts; the owner reviews the
+uncertain ones on a small labelling page (click, hear, pick). Channel-section
+labels derive. The four channel-labelled songs keep scoring the derived
+song-level role.
+
+Checklist:
+- [x] A1 usage walk + playing evidence (unit tests: pitch variety, register, polyphony)
+- [x] A2 harmonicity feature + timbre evidence adapter
+- [x] A3 per-song name informativeness + name evidence
+- [x] A4 fusion + channel timeline + song roles (test: a sleep so deep ch3 melody sections)
+- [x] A5 wire classifySongRoles / classifySongChannels; ratchet score up; fix consumers
+- [x] A6 MCP get_channel_roles shows instruments + sections
+- [ ] A7 instrument labels file + labelling page + owner review
+
+### Analyzer progress (2026-09-29, late)
+- A1-A6 done: src/bridge/analysis/songAnalyzer.ts. Score on the 4 labelled
+  songs: 75 % (12/16), drums-vs-not 100 % (old chain 50 % / 87.5 %).
+  Baseline recorded. classifySongRoles/Channels are wrappers; consumers pass
+  the play order; get_channel_roles returns instruments (with evidence) and
+  sections.
+- Measured-and-fixed on the way: autocorrelation fundamental (first peak
+  after the first dip, mean removed - DC-offset pulse waves had no period);
+  sounding pitch = note + 12*log2(f0/261.63) - (base-48) for tone-like
+  sounds (single cycles always; centroid <= 8*f0 otherwise); chord samples
+  (f0 < 80, centroid > 8*f0) get no offset; looped = sustains; noisy low
+  loop = distorted chord; parts (instrument x channel) so one waveform can be
+  bass and lead; polyphony = 3+ pitch classes across channels; names trusted
+  from one informative name.
+- Known misses (need instrument labels): break the box ch3 (fx) / ch4 (303
+  under arp-effect drones - onset majority vs what the ear picks); world class
+  dub ch4 (echoes of the skank, sparse); a sleep so deep ch4 (melody moves
+  between channels - per-section truth needed).
+- NEXT: A7 (instrument labels + labelling page), then audio capture for synth
+  instruments (owner: "capture audio to be more generic"), Furnace corpus.

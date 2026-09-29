@@ -2,8 +2,9 @@
  * A single-cycle chip waveform is pitched, never a drum.
  *
  * micro15.mod (goto80, a death metal chip song - owner test file 2026-09-29):
- * guitars on three channels, the kit (one-shot kick and snare samples 2, 10,
- * 11) on channel 3. Every channel came back percussion ("Snare 1",
+ * a bass-register chip line on channel 1, hi-hats (a looped noise sample)
+ * on channel 2, the kit (one-shot kick and snare samples 2, 10, 11) on
+ * channel 3, the lead on channel 4. Every channel came back percussion ("Snare 1",
  * "Snare 2", "Drums", "Snare 3"): its instruments are 32- and 128-frame
  * looped waveforms, and the sample spectrum analysed the stored few cycles
  * instead of the loop repeating as it plays - a snare at 0.8, which lifts
@@ -38,12 +39,12 @@ describe('chip waveforms are not drums', () => {
     }
   });
 
-  it('only channel 3, the kit, is percussion', async () => {
+  it('reads the song as the owner hears it: bass, hi-hats, kit, lead', async () => {
+    // Owner labels (2026-09-29): 1 a bassy chip sound, 2 hi-hats, 3 drums,
+    // 4 melody.
     const song = await loadSong();
     const lookup = new Map(song.instruments.map((i) => [i.id, i as InstrumentConfig]));
-    const roles = classifySongRoles(song.patterns, lookup);
-    expect(roles[2]).toBe('percussion');
-    expect([roles[0], roles[1], roles[3]]).not.toContain('percussion');
-    expect([roles[0], roles[3]]).not.toContain('bass');
+    const roles = classifySongRoles(song.patterns, lookup, song.songPositions);
+    expect(roles).toEqual(['bass', 'percussion', 'percussion', 'lead']);
   });
 });

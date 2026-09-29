@@ -35,7 +35,7 @@ describe('channel classifier score', () => {
     for (const entry of labelled) {
       const song = await loadCorpusSong(entry.song);
       const lookup = new Map(song.instruments.map((i) => [i.id, i]));
-      const predicted = classifySongRoles(song.patterns, lookup).map((r) => roleToLabel(r).label);
+      const predicted = classifySongRoles(song.patterns, lookup, song.songPositions ?? []).map((r) => roleToLabel(r).label);
       entry.channels.forEach((truth, ch) => {
         if (!SCORED.includes(truth.label)) return;
         const guess = predicted[ch] ?? 'silent';

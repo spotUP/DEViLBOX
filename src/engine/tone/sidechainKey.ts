@@ -46,7 +46,7 @@ async function classifyLoadedSong(): Promise<ReadonlyArray<{ role: ChannelRole; 
   const patterns = useTrackerStore.getState().patterns;
   if (!Array.isArray(patterns) || patterns.length === 0) return null;
   const lookup = new Map(useInstrumentStore.getState().instruments.map((i) => [i.id, i]));
-  return classifySongChannels(patterns, lookup);
+  return classifySongChannels(patterns, lookup, useTrackerStore.getState().patternOrder);
 }
 
 /** The loaded song's drum channel for SIDECHAIN_KEY_DRUMS, or -1. */

@@ -33,12 +33,12 @@ describe("channelRole 'nonDrums'", () => {
     expect(pickNonDrumChannels([{ role: 'lead' }, { role: 'percussion' }, { role: 'bass' }, { role: 'percussion' }])).toEqual([0, 2]);
   });
 
-  it('on micro15.mod: channels 1, 2 and 4 - not the kit on channel 3', async () => {
+  it('on micro15.mod: channels 1 and 4 - not the hi-hats on 2 nor the kit on 3', async () => {
     const b = readFileSync(FIXTURE);
     const song = await parseMODFile(b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength), 'micro15.mod');
     useInstrumentStore.setState({ instruments: song.instruments } as never);
     useTrackerStore.setState({ patterns: song.patterns } as never);
-    expect(await channelRoleTargets({ channelRole: 'nonDrums' })).toEqual([0, 1, 3]);
+    expect(await channelRoleTargets({ channelRole: 'nonDrums' })).toEqual([0, 3]);
   });
 
   it('with no song loaded resolves to no channels (the effect stays on the whole mix)', async () => {
