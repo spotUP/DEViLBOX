@@ -25,6 +25,9 @@ interface StemSlot {
 }
 
 export class DeckStemPlayer {
+  /** Called after play / pause / resume / stop change whether the source runs. */
+  onRunningChange: (() => void) | null = null;
+
   private stems: Map<string, StemSlot> = new Map();
   private stemBus: GainNode;
   private _loaded = false;
@@ -186,6 +189,7 @@ export class DeckStemPlayer {
     this._rateChangeTime = when;
     this._rateTrackingActive = true;
     this._pendingOffset = null;
+    this.onRunningChange?.();
   }
 
   pause(): void {
@@ -198,6 +202,7 @@ export class DeckStemPlayer {
       }
     }
     this._rateTrackingActive = false;
+    this.onRunningChange?.();
   }
 
   stop(): void {
@@ -209,6 +214,7 @@ export class DeckStemPlayer {
     }
     this._pendingOffset = null;
     this._rateTrackingActive = false;
+    this.onRunningChange?.();
   }
 
   /**
