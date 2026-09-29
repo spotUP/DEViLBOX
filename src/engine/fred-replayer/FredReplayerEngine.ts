@@ -69,7 +69,7 @@ export class FredReplayerEngine extends WASMChannelOutputsEngine {
 
   protected createNode(): void {
     const ctx = this.audioContext;
-    this.workletNode = new AudioWorkletNode(ctx, 'fred-replayer-processor', channelOutputNodeOptions());
+    this.workletNode = new AudioWorkletNode(ctx, 'fred-replayer-processor', channelOutputNodeOptions(4));
 
     this.workletNode.port.onmessage = (event) => {
       const data = event.data;

@@ -62,7 +62,7 @@ export class Cinter4Engine extends WASMChannelOutputsEngine {
 
     // Output 0 is the mix; 5..8 carry each Paula channel as a dub send
     // (worklets/channel-outputs.js).
-    this.workletNode = new AudioWorkletNode(ctx, 'cinter4-processor', channelOutputNodeOptions());
+    this.workletNode = new AudioWorkletNode(ctx, 'cinter4-processor', channelOutputNodeOptions(4));
 
     this.workletNode.port.onmessage = (event) => {
       const data = event.data;

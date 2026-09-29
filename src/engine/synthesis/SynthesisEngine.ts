@@ -68,7 +68,7 @@ export class SynthesisEngine extends WASMChannelOutputsEngine {
 
   protected createNode(): void {
     const ctx = this.audioContext;
-    this.workletNode = new AudioWorkletNode(ctx, 'synthesis-processor', channelOutputNodeOptions());
+    this.workletNode = new AudioWorkletNode(ctx, 'synthesis-processor', channelOutputNodeOptions(4));
 
     this.workletNode.port.onmessage = (event) => {
       const data = event.data;

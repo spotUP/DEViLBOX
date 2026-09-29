@@ -234,14 +234,21 @@ export abstract class WASMSingletonBase {
   }
 }
 
-/** Main mix + 4 isolation slots + 32 dub sends, all stereo (ChannelRoutedEffects contract). */
+/** Main mix + 4 isolation slots + up to 32 dub sends, all stereo (ChannelRoutedEffects contract). */
 export const CHANNEL_OUTPUT_COUNT = 1 + 4 + 32;
 
-/** AudioWorkletNode options for an engine that exposes per-channel outputs. */
-export function channelOutputNodeOptions(): AudioWorkletNodeOptions {
+/**
+ * AudioWorkletNode options for an engine that exposes per-channel outputs:
+ * the main mix, 4 isolation slots and one dub send per voice the engine can
+ * render. Every declared output costs audio-thread time each quantum whether
+ * it is connected or not (~0.7 µs in Chrome), and a stopped engine's node
+ * stays alive, so declare the voices, not the 32-send maximum.
+ */
+export function channelOutputNodeOptions(voices: number): AudioWorkletNodeOptions {
+  const count = Math.min(CHANNEL_OUTPUT_COUNT, 1 + 4 + voices);
   return {
-    numberOfOutputs: CHANNEL_OUTPUT_COUNT,
-    outputChannelCount: new Array(CHANNEL_OUTPUT_COUNT).fill(2),
+    numberOfOutputs: count,
+    outputChannelCount: new Array(count).fill(2),
   };
 }
 
@@ -253,7 +260,7 @@ export function channelOutputNodeOptions(): AudioWorkletNodeOptions {
  * isolation engine when it starts a song.
  *
  * Subclass contract, on top of WASMSingletonBase's:
- *   • create the node with `channelOutputNodeOptions()` and connect only
+ *   • create the node with `channelOutputNodeOptions(voices)` and connect only
  *     output 0 to `this.output`;
  *   • the worklet hands its voice buffers to a DevilboxChannelOutputs and
  *     leaves isolated voices out of output 0;

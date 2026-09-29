@@ -68,7 +68,7 @@ export class SoundControlEngine extends WASMChannelOutputsEngine {
 
   protected createNode(): void {
     const ctx = this.audioContext;
-    this.workletNode = new AudioWorkletNode(ctx, 'soundcontrol-processor', channelOutputNodeOptions());
+    this.workletNode = new AudioWorkletNode(ctx, 'soundcontrol-processor', channelOutputNodeOptions(4));
 
     this.workletNode.port.onmessage = (event) => {
       const data = event.data;
