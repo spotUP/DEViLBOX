@@ -979,9 +979,16 @@ export const BUZZMACHINE_INFO: Record<BuzzmachineType, BuzzmachineInfo> = {
 export class BuzzmachineEngine {
   private static instance: BuzzmachineEngine | null = null;
 
-  private isLoaded = false;
-  private initPromise: Promise<void> | null = null;
+  /**
+   * The worklet module is registered PER AudioContext: a node can only be
+   * built on a context whose AudioWorkletGlobalScope loaded it. One global
+   * "loaded" flag let a node be created on another context and fail with
+   * "buzzmachine-processor is not defined in AudioWorkletGlobalScope"
+   * (2026-09-29).
+   */
+  private loadedContexts = new WeakMap<BaseAudioContext, Promise<void>>();
   public workletNode: AudioWorkletNode | null = null;
+  /** The context the most recent node was built on. */
   public nativeContext: AudioContext | null = null;
 
   private constructor() {}
@@ -993,72 +1000,62 @@ export class BuzzmachineEngine {
     return BuzzmachineEngine.instance;
   }
 
+  /** The native AudioContext behind a Tone.js wrapper or a native context. */
+  private static nativeOf(context: AudioContext): AudioContext {
+    const ctx = context as unknown as Record<string, unknown>;
+    return (ctx.rawContext || ctx._context || getNativeContext(context)) as AudioContext;
+  }
+
   /**
-   * Initialize the buzzmachine engine with an AudioContext
+   * Register the Buzzmachine worklet on this context (once per context).
    */
   public async init(context: AudioContext): Promise<void> {
-    if (this.isLoaded) return;
-    if (this.initPromise) return this.initPromise;
-
-    this.initPromise = this.doInit(context);
-    return this.initPromise;
+    const nativeCtx = BuzzmachineEngine.nativeOf(context);
+    if (!nativeCtx || !nativeCtx.audioWorklet) {
+      throw new Error('AudioWorklet not available on this context');
+    }
+    let loading = this.loadedContexts.get(nativeCtx);
+    if (!loading) {
+      loading = this.doInit(nativeCtx);
+      this.loadedContexts.set(nativeCtx, loading);
+      // A failed load (context not running yet) may be retried later.
+      loading.catch(() => this.loadedContexts.delete(nativeCtx));
+    }
+    return loading;
   }
 
-  private async doInit(context: AudioContext): Promise<void> {
-    try {
-      // Extract native context from Tone.js wrapper
-      // Try direct property access first (matches Open303Synth pattern),
-      // then fall back to BFS search via getNativeContext
-      const ctx = context as unknown as Record<string, unknown>;
-      const nativeCtx = (ctx.rawContext || ctx._context || getNativeContext(context)) as AudioContext;
-      this.nativeContext = nativeCtx;
-
-      // Check if we got a valid context with AudioWorklet
-      if (!nativeCtx || !nativeCtx.audioWorklet) {
-        this.initPromise = null; // Allow retry on later call
-        throw new Error('AudioWorklet not available on this context');
-      }
-
-      // Ensure context is running - try to resume, then wait up to 2s
-      if (nativeCtx.state !== 'running') {
-        try { await nativeCtx.resume(); } catch { /* ignore */ }
-        if ((nativeCtx.state as string) !== 'running') {
-          const started = await Promise.race([
-            new Promise<boolean>((resolve) => {
-              const check = () => {
-                if (nativeCtx.state === 'running') resolve(true);
-                else setTimeout(check, 100);
-              };
-              setTimeout(check, 100);
-            }),
-            new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 2000))
-          ]);
-          if (!started) {
-            this.initPromise = null; // Allow retry on later call
-            throw new Error(`AudioContext not running (state: ${nativeCtx.state}) — user gesture required`);
-          }
+  private async doInit(nativeCtx: AudioContext): Promise<void> {
+    // Ensure context is running - try to resume, then wait up to 2s
+    if (nativeCtx.state !== 'running') {
+      try { await nativeCtx.resume(); } catch { /* ignore */ }
+      if ((nativeCtx.state as string) !== 'running') {
+        const started = await Promise.race([
+          new Promise<boolean>((resolve) => {
+            const check = () => {
+              if (nativeCtx.state === 'running') resolve(true);
+              else setTimeout(check, 100);
+            };
+            setTimeout(check, 100);
+          }),
+          new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 2000))
+        ]);
+        if (!started) {
+          throw new Error(`AudioContext not running (state: ${nativeCtx.state}) — user gesture required`);
         }
       }
-
-      // Register AudioWorklet module (use BASE_URL for GitHub Pages compatibility)
-      const baseUrl = import.meta.env.BASE_URL || '/';
-      const cacheBuster = `?v=${Date.now()}`;
-      await nativeCtx.audioWorklet.addModule(`${baseUrl}Buzzmachine.worklet.js${cacheBuster}`);
-      console.log('[BuzzmachineEngine] AudioWorklet registered');
-
-      this.isLoaded = true;
-    } catch (err) {
-      console.error('[BuzzmachineEngine] Init failed:', err);
-      this.initPromise = null; // Allow retry on failure
-      throw err;
     }
+
+    // Register AudioWorklet module (use BASE_URL for GitHub Pages compatibility)
+    const baseUrl = import.meta.env.BASE_URL || '/';
+    await nativeCtx.audioWorklet.addModule(`${baseUrl}Buzzmachine.worklet.js?v=${Date.now()}`);
+    console.log('[BuzzmachineEngine] AudioWorklet registered');
   }
 
   /**
-   * Check if engine is initialized
+   * Whether the worklet is registered on this context.
    */
-  public isInitialized(): boolean {
-    return this.isLoaded;
+  public isInitialized(context?: AudioContext): boolean {
+    return !!context && this.loadedContexts.has(BuzzmachineEngine.nativeOf(context));
   }
 
   /**
@@ -1068,13 +1065,10 @@ export class BuzzmachineEngine {
     context: AudioContext,
     machineType: BuzzmachineType
   ): Promise<AudioWorkletNode> {
-    if (!this.isLoaded) {
-      await this.init(context);
-    }
-
-    // Use native AudioWorkletNode directly (addModule was called on the native context)
-    const ctx = context as unknown as Record<string, unknown>;
-    const nativeCtx = (ctx.rawContext || ctx._context || getNativeContext(context)) as AudioContext;
+    // The node is built on the context the worklet was registered on.
+    await this.init(context);
+    const nativeCtx = BuzzmachineEngine.nativeOf(context);
+    this.nativeContext = nativeCtx;
     const workletNode = new AudioWorkletNode(nativeCtx, 'buzzmachine-processor', {
       numberOfInputs: 1,
       numberOfOutputs: 1,
