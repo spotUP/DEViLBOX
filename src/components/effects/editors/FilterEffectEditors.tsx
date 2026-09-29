@@ -4,6 +4,7 @@
  */
 
 import React from 'react';
+import { sidechainKeyOptions } from '../sidechainKeyOptions';
 import { useEffectAnalyser } from '@hooks/useEffectAnalyser';
 import { EffectSpectrum, EffectOscilloscope, GainReductionMeter } from '../EffectVisualizer';
 import { Knob } from '@components/controls/Knob';
@@ -487,13 +488,7 @@ export const SidechainCompressorEditor: React.FC<VisualEffectEditorProps> = ({
           <CustomSelect
             value={String(Math.round(sidechainSource))}
             onChange={(v) => onUpdateParameter('sidechainSource', Number(v))}
-            options={[
-              { value: '-1', label: 'Self (Internal)' },
-              ...Array.from({ length: channelCount }, (_, i) => ({
-                value: String(i),
-                label: channelNames[i] || `CH ${i + 1}`,
-              })),
-            ]}
+            options={sidechainKeyOptions(channelCount, channelNames)}
             className="w-full bg-black/60 border border-dark-border rounded-lg px-3 py-1.5 text-sm text-text-primary focus:border-emerald-500 focus:outline-none"
           />
         </div>
