@@ -19,7 +19,7 @@ import { classifyChannel, detectSkankPattern, PERCUSSION_NAME_RE, type ChannelAn
 import { categorizeSample } from '@/lib/import/maxForLiveImport';
 import { DRUM_SYNTHS } from '@/midi/performance/lightGuide';
 import { analyzeEnvelopeShape } from '@/lib/import/EnvelopeConverter';
-import { analyzeSampleForClassification } from './SampleSpectrum';
+import { analyzeSampleForClassification, sampleLoopOf } from './SampleSpectrum';
 import { extractSynthTimbre, classifyBySynthParams, classifyByNativeSynth, soundingNotes } from './synthEvidence';
 
 // ─── Public types ────────────────────────────────────────────────────────────
@@ -109,6 +109,9 @@ const SAMPLE_CATEGORY_MAP: Record<SampleCategory, { role: ChannelRole; subrole?:
   other:      null,
 };
 
+/** Longest loop, in frames, treated as a single-cycle waveform. */
+const SINGLE_CYCLE_MAX_FRAMES = 256;
+
 /** Classify a single instrument by inspecting its config. Priority order:
  *  explicit drumMachine.drumType > DRUM_SYNTHS set > sample filename (with
  *  categorize hit) > SAMPLE SPECTRUM (data:audio/wav PCM analysis) >
@@ -167,9 +170,15 @@ export function classifyInstrument(inst: InstrumentConfig | null | undefined): I
   //    MODs whose instrument-name slots hold greeting-scroller text + Amiga
   //    bass encoded in octave 3 (both defeat the note-stats + name paths).
   //    Skipped when no URL or the URL isn't a WAV data URL.
+  //    A single-cycle waveform (a chip loop of a few hundred frames) has no
+  //    register of its own - the note it is played at decides it - so its
+  //    spectrum can only say "pitched": bass/lead from it is left to the
+  //    note statistics (micro15.mod's lead-guitar cycles read as bass).
   if (sampleUrl && typeof sampleUrl === 'string' && sampleUrl.length > 0) {
-    const spec = analyzeSampleForClassification(sampleUrl);
-    if (spec && spec.role !== 'empty' && spec.confidence >= 0.5) {
+    const loop = sampleLoopOf(inst.sample);
+    const spec = analyzeSampleForClassification(sampleUrl, loop);
+    const singleCycle = loop !== undefined && loop.end - loop.start <= SINGLE_CYCLE_MAX_FRAMES;
+    if (spec && spec.role !== 'empty' && spec.confidence >= 0.5 && !(singleCycle && spec.role !== 'percussion')) {
       return { role: spec.role, subrole: spec.subrole, confidence: spec.confidence };
     }
   }

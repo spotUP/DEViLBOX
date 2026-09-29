@@ -9,7 +9,7 @@ import type { GenreResult } from '@/stores/useTrackerAnalysisStore';
 import type { InstrumentHints } from '@/workers/dj-analysis.worker';
 import { useInstrumentTypeStore } from '@stores/useInstrumentTypeStore';
 import { useInstrumentStore } from '@stores/useInstrumentStore';
-import { analyzeSampleForClassification } from '@/bridge/analysis/SampleSpectrum';
+import { analyzeSampleForClassification, sampleLoopOf } from '@/bridge/analysis/SampleSpectrum';
 
 // Worker's AnalysisResult type (matches dj-analysis.worker.ts)
 interface WorkerAnalysisResult {
@@ -262,7 +262,7 @@ export function buildInstrumentHints(): InstrumentHints {
       // Spectral fallback for instruments CED didn't classify confidently
       const url = inst.sample?.url;
       if (typeof url === 'string' && url.startsWith('data:audio/wav;base64,')) {
-        const spec = analyzeSampleForClassification(url);
+        const spec = analyzeSampleForClassification(url, sampleLoopOf(inst.sample));
         if (spec && spec.confidence >= 0.6) {
           if (spec.role === 'bass') hints.hasBass = true;
           else if (spec.role === 'percussion') hints.hasPercussion = true;
