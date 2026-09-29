@@ -43,9 +43,10 @@ import { CustomSelect } from '@components/common/CustomSelect';
 import { CONTROLLER_LAYOUTS } from '@/midi/controllerLayouts';
 import { getDJControllerMapper } from '@/midi/DJControllerMapper';
 import { AutoDubPanel } from './AutoDubPanel';
-import { ControllerShapedDeck } from './ControllerShapedDeck';
+import { ControllerShapedDeck, useDeckBindings } from './ControllerShapedDeck';
 import type { DubDeckControlApi } from './ControllerShapedDeck';
-import { buildDeckMoveIndex, listDeckShapeOptions, resolveDeckShape } from './deckShape';
+import { buildDeckMoveIndex, listDeckShapeOptions, resolveDeckShape, busParamsOnDeck } from './deckShape';
+import { DUB_BUS_PARAMS } from '@/midi/performance/parameterRouter';
 import { Fil4EqPanel } from '@components/effects/Fil4EqPanel';
 import { getActiveDubBus } from '@engine/dub/DubBus';
 
@@ -307,6 +308,12 @@ export const DubDeckStrip: React.FC = () => {
     () => resolveDeckShape(dubDeckShape, activePresetId, CONTROLLER_LAYOUTS),
     [dubDeckShape, activePresetId],
   );
+  // The bus settings the controller deck's encoders turn - while that deck
+  // is on screen, the live row does not draw them a second time.
+  const deckBindings = useDeckBindings(deckShape.kind === 'controller' ? deckShape.layout : null, deckLayer, DECK_MOVE_INDEX);
+  const onDeck = useMemo(() => busParamsOnDeck(deckBindings), [deckBindings]);
+  const deckOnScreen = !stripCollapsed && activeTab === 'perform' && deckShape.kind === 'controller';
+  const showLiveRowSlider = (param: string) => !(deckOnScreen && onDeck.has(param));
 
   /**
    * Deck faders that follow the PERFORMER, not only the user.
@@ -2115,20 +2122,22 @@ export const DubDeckStrip: React.FC = () => {
           three into unusable stubs. */}
       {busEnabled && (
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-1 py-1 border-b border-dark-border">
+          {showLiveRowSlider('dub.returnGain') && (
           <div className="flex items-center gap-2 flex-1 min-w-[11rem]">
-            <span className="text-text-muted text-[9px] font-mono shrink-0">FX WET</span>
+            <span className="text-text-muted text-[9px] font-mono shrink-0 uppercase">{DUB_BUS_PARAMS['dub.returnGain'].label}</span>
             <input
               type="range" min={0} max={1} step={0.01}
               value={liveReturnGain}
               onChange={(e) => setDubBus({ returnGain: Number(e.target.value) })}
               {...holdLiveParam('returnGain')}
               className="flex-1 min-w-0 accent-accent-highlight cursor-pointer"
-              title={`FX wet level: ${(liveReturnGain * 100).toFixed(0)}%`}
+              title={`${DUB_BUS_PARAMS['dub.returnGain'].label}: ${(liveReturnGain * 100).toFixed(0)}% — the echo and reverb return's level in the mix`}
             />
             <span className="text-text-secondary text-[9px] font-mono tabular-nums w-7 text-right shrink-0">
               {(liveReturnGain * 100).toFixed(0)}%
             </span>
           </div>
+          )}
 
           {/* How busy the performer is: the one control that decides whether a
               section breathes or drives. */}
@@ -2174,20 +2183,22 @@ export const DubDeckStrip: React.FC = () => {
 
           {/* Echo feedback: how long the repeats hang on. The other hand on a
               dub desk, and it was behind a tab. */}
+          {showLiveRowSlider('dub.echoIntensity') && (
           <div className="flex items-center gap-2 flex-1 min-w-[11rem]">
-            <span className="text-text-muted text-[9px] font-mono shrink-0">FEEDBACK</span>
+            <span className="text-text-muted text-[9px] font-mono shrink-0 uppercase">{DUB_BUS_PARAMS['dub.echoIntensity'].label}</span>
             <input
               type="range" min={0} max={1} step={0.01}
               value={liveEchoIntensity}
               onChange={(e) => setDubBus({ echoIntensity: Number(e.target.value) })}
               {...holdLiveParam('echoIntensity')}
               className="flex-1 min-w-0 accent-accent-secondary cursor-pointer"
-              title={`Echo feedback: ${(liveEchoIntensity * 100).toFixed(0)}% — how long the repeats last`}
+              title={`${DUB_BUS_PARAMS['dub.echoIntensity'].label}: ${(liveEchoIntensity * 100).toFixed(0)}% — the echo's feedback: how long the repeats last`}
             />
             <span className="text-text-secondary text-[9px] font-mono tabular-nums w-7 text-right shrink-0">
               {(liveEchoIntensity * 100).toFixed(0)}%
             </span>
           </div>
+          )}
         </div>
       )}
 
