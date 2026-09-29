@@ -227,6 +227,8 @@ export interface TrackerSong {
   initialBPM: number;
   // XM frequency mode: true = linear periods (most XMs), false = amiga periods
   linearPeriods?: boolean;
+  /** The file's original bytes, for byte-exact re-export (Cinter crunch, raw-mode WAV). Set by parsers that keep them. */
+  originalModuleData?: { base64: string; format: 'MOD' | 'XM' | 'IT' | 'S3M' | 'UNKNOWN'; sourceFile?: string };
   // Display-only note offset (semitones) — adjusts note display without affecting playback
   noteDisplayOffset?: number;
   // Per-song note offset applied during MOD export (semitones) — adjusts the
@@ -488,6 +490,7 @@ export interface TrackerSong {
 // compatibility with any caller that imports it from this module.
 export type { DisplayState } from './PlaybackCoordinator';
 import { PlaybackCoordinator, type DisplayState } from './PlaybackCoordinator';
+import { cellPeriod } from '@/lib/amiga/periodNotes';
 
 export class TrackerReplayer {
   // Song data
@@ -3350,14 +3353,16 @@ export class TrackerReplayer {
       return ft2NoteToPeriod(note, ch.finetune, this.linearPeriods);
     }
 
-    // MOD mode: Priority rawPeriod → old noteToPeriod
-    // MOD import stores both note (2-octave-shifted XM number) and period (original Amiga period).
-    // Using noteToPeriod first would double-shift the pitch — period 428 → XM 49 → period 107.
+    // MOD mode: the cell's stored period while it still names the note (an
+    // off-table or Cinter period plays exactly), else the note's period.
+    // Notes are ProTracker-named everywhere (src/lib/amiga/periodNotes.ts:
+    // 25 = C-2 = 428). A period left over from before an edit names another
+    // note and no longer counts - the edited note plays.
     //
     // PT2's setPeriod: MOD pattern data stores finetune-0 periods. Convert to
     // the finetune-specific period so that ALL downstream code (triggerNote,
     // updatePeriodDirect, arpeggio tick-0, vibrato centre) uses the right pitch.
-    if (rawPeriod) {
+    if (rawPeriod && cellPeriod({ note: noteValue, period: rawPeriod }) === rawPeriod) {
       return this.rawPeriodToFinetuned(rawPeriod, ch.finetune);
     }
     return this.noteToPeriod(noteValue, ch.finetune) || 0;

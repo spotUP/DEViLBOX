@@ -5,16 +5,20 @@
  * sample headers, 1-byte songlength + 1-byte restart, 128-byte order table, "M.K." magic),
  * followed by 1024-byte patterns (64 rows × 4 channels × 4-byte cells) and concatenated
  * 8-bit signed PCM. It is the exact inverse of MODParser.parseMODFile:
- *   - note index → Amiga period uses MODParser's XM octave convention (period 856 = XM
- *     note 37 = C-3), matching MODEncoder/decodeMODCell. The 48-entry table spans the
- *     periods the parser can emit (1712 = XM note 25 = C-2 .. 113 = XM note 72 = B-5),
- *     so period = PERIODS[note - 25].
+ *   - a cell's own Amiga period while it still names its note (off-table and
+ *     finetuned periods survive; an edited note's stale one does not), else the
+ *     note's period in ProTracker naming
+ *     (src/lib/amiga/periodNotes.ts: note 25 = C-2 = 428) - the naming every MOD path
+ *     uses.
+ *   - sample slots by instrument id (a song with empty slots keeps its gaps), with
+ *     each sample's finetune and default volume.
  *   - MOD cell effTyp is the raw 0-F ProTracker effect nibble (MODParser assigns
  *     effTyp = rawEffect directly), so effTyp/eff round-trip verbatim.
  */
 
 import type { TrackerSong } from '@engine/TrackerReplayer';
 import type { InstrumentConfig, TrackerCell } from '@/types';
+import { cellPeriod } from '@/lib/amiga/periodNotes';
 
 export interface ModExportOptions {
   bakeSynths?: boolean;
@@ -24,21 +28,6 @@ export interface ModExportResult {
   blob: Blob;
   filename: string;
   warnings: string[];
-}
-
-// MODParser's period table in XM octave labels, C-2 (XM note 25) .. B-5 (XM note 72).
-// period = PERIODS[note - 25], matching MODParser.periodToNote (856 = C-3 = XM note 37).
-const PERIODS = [
-  1712, 1616, 1525, 1440, 1357, 1281, 1209, 1141, 1077, 1017, 960, 907, // C-2..B-2
-  856, 808, 762, 720, 678, 640, 604, 570, 538, 508, 480, 453,           // C-3..B-3
-  428, 404, 381, 360, 339, 320, 302, 285, 269, 254, 240, 226,           // C-4..B-4
-  214, 202, 190, 180, 170, 160, 151, 143, 135, 127, 120, 113,           // C-5..B-5
-];
-
-function noteToPeriod(note: number): number {
-  if (note <= 0 || note >= 97) return 0; // 0 = empty, 97 = note-cut (no MOD encoding)
-  const idx = note - 25;
-  return idx >= 0 && idx < PERIODS.length ? PERIODS[idx] : 0;
 }
 
 /** Decode an instrument's stored 16-bit WAV back to 8-bit signed PCM (MOD sample format). */
@@ -74,7 +63,8 @@ export async function exportSongToMOD(
   interface SampleSlot { name: string; pcm: Int8Array; finetune: number; volume: number; loopStart: number; loopLen: number; }
   const slots: SampleSlot[] = [];
   for (let i = 0; i < MAX_SAMPLES; i++) {
-    const inst = song.instruments[i];
+    // Slot i+1 is the instrument with that id - not the i-th in the list.
+    const inst = song.instruments.find((x) => x.id === i + 1);
     const pcm = extractPCM8(inst);
     if (inst && pcm.length === 0 && options?.bakeSynths && inst.type !== 'sample') {
       warnings.push(`Instrument ${i + 1} "${inst.name ?? ''}" is a synth without baked PCM; exported silent.`);
@@ -86,13 +76,16 @@ export async function exportSongToMOD(
     const loopLenBytes = loopEndBytes > loopStartBytes ? loopEndBytes - loopStartBytes : 0;
     // MOD volume is 0-64; instrument volume is dB. Default to full for real samples.
     let vol = 64;
-    if (inst?.volume !== undefined) {
+    const defaultVolume = inst?.metadata?.modPlayback?.defaultVolume;
+    if (typeof defaultVolume === 'number') {
+      vol = Math.max(0, Math.min(64, Math.round(defaultVolume)));
+    } else if (inst?.volume !== undefined) {
       vol = inst.volume <= -60 ? 0 : Math.round(Math.min(64, Math.max(0, ((inst.volume + 60) / 60) * 64)));
     }
     slots.push({
       name: (inst?.name ?? '').slice(0, 22),
       pcm: evenPcm,
-      finetune: 0,
+      finetune: inst?.metadata?.modPlayback?.finetune ?? 0,
       volume: evenPcm.length > 0 ? vol : 0,
       loopStart: loopStartBytes,
       loopLen: loopLenBytes,
@@ -138,7 +131,7 @@ export async function exportSongToMOD(
     for (let row = 0; row < ROWS; row++) {
       for (let ch = 0; ch < NUM_CHANNELS; ch++) {
         const cell: TrackerCell | undefined = pat?.channels[ch]?.rows[row];
-        const period = noteToPeriod(cell?.note ?? 0);
+        const period = cellPeriod(cell);
         const sample = (cell?.instrument ?? 0) & 0x1F;
         const effect = (cell?.effTyp ?? 0) & 0x0F;
         const param = (cell?.eff ?? 0) & 0xFF;

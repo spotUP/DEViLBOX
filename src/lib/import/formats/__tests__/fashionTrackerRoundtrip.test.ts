@@ -50,7 +50,8 @@ describe('Fashion Tracker pattern codec', () => {
           // Canonical (carrier-less) encode of the same decoded cell — what the old shared codec
           // produced. When it differs on the period bytes, this fixture has an off-table period
           // the fix rescued.
-          const canonical = encodeMODCell(decoded);
+          // (period stripped: the shared codec now keeps a cell's own period too)
+          const canonical = encodeMODCell({ ...decoded, period: undefined });
           if (period > 0 && (canonical[0] !== orig[0] || canonical[1] !== orig[1])) {
             sawOffTablePeriod = true;
           }

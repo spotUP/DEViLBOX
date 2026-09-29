@@ -77,11 +77,11 @@ function writeString(buf: Uint8Array, off: number, str: string, len: number): vo
 
 /**
  * Convert XM note (1-96) to Amiga period using finetune 0 table.
- * Parser: xmNote = periodTableIndex + 13, so index = xmNote - 13.
+ * Parser: note = periodTableIndex + 1 (1712 = C-0 = note 1, ProTracker naming).
  */
 function xmNoteToPeriod(xmNote: number): number {
   if (xmNote === 0 || xmNote === 97) return 0;
-  const idx = xmNote - 13;
+  const idx = xmNote - 1;
   if (idx >= 0 && idx < DSS_PERIODS_FT0.length) return DSS_PERIODS_FT0[idx]!;
   return 0;
 }

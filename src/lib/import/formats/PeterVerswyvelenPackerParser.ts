@@ -45,6 +45,7 @@ import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { InstrumentConfig, Pattern, TrackerCell, ChannelData } from '@/types';
 import type { UADEPatternLayout } from '@/engine/uade/UADEPatternEncoder';
 import { encodeMODCell } from '@/engine/uade/encoders/MODEncoder';
+import { periodToPtNote } from '@/lib/amiga/periodNotes';
 
 // ── Constants ───────────────────────────────────────────────────────────────
 
@@ -53,13 +54,6 @@ const NUM_CHANNELS = 4;
 const ROWS_PER_PATTERN = 64;
 const BYTES_PER_CELL = 4;
 const NUM_SAMPLES = 31;
-
-/** PVP period table from assembly source. */
-const PVP_PERIODS = [
-  0x358, 0x328, 0x2FA, 0x2D0, 0x2A6, 0x280, 0x25C, 0x23A, 0x21A, 0x1FC, 0x1E0, 0x1C5,
-  0x1AC, 0x194, 0x17D, 0x168, 0x153, 0x140, 0x12E, 0x11D, 0x10D, 0x0FE, 0x0F0, 0x0E2,
-  0x0D6, 0x0CA, 0x0BE, 0x0B4, 0x0AA, 0x0A0, 0x097, 0x08F, 0x087, 0x07F, 0x078, 0x071,
-];
 
 // ── Binary helpers ──────────────────────────────────────────────────────────
 
@@ -75,22 +69,8 @@ function u16BE(buf: Uint8Array, off: number): number {
  * Period table index 0 = C-1 (ProTracker) = tracker note 1.
  */
 function periodToNote(period: number): number {
-  if (period === 0) return 0;
-  let bestIdx = -1;
-  let bestDist = Infinity;
-  for (let i = 0; i < PVP_PERIODS.length; i++) {
-    const dist = Math.abs(PVP_PERIODS[i] - period);
-    if (dist < bestDist) {
-      bestDist = dist;
-      bestIdx = i;
-    }
-  }
-  if (bestIdx < 0) return 0;
-  // PVP period table: index 0 = C-1 in ProTracker = C-2 in FT2 = note 13
-  // Actually: 3 octaves × 12 notes. index 0 = lowest = C-1 (PT) = note 1 (XM C-0)
-  // Standard mapping: FT2 note 1 = C-0. PT C-1 = FT2 C-1 = note 13.
-  const note = bestIdx + 13;
-  return (note >= 1 && note <= 96) ? note : 0;
+  // ProTracker naming, one table: src/lib/amiga/periodNotes.ts.
+  return periodToPtNote(period);
 }
 
 // ── Format detection ────────────────────────────────────────────────────────

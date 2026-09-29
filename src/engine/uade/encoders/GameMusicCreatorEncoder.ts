@@ -26,20 +26,8 @@
 
 import type { TrackerCell } from '@/types';
 import { registerPatternEncoder } from '../UADEPatternEncoder';
-
-// Standard ProTracker period table (finetune 0), 36 entries: C-1 to B-3
-const MOD_PERIODS = [
-  856, 808, 762, 720, 678, 640, 604, 570, 538, 508, 480, 453,
-  428, 404, 381, 360, 339, 320, 302, 285, 269, 254, 240, 226,
-  214, 202, 190, 180, 170, 160, 151, 143, 135, 127, 120, 113,
-];
-
-function xmNoteToPeriod(xmNote: number): number {
-  if (xmNote === 0) return 0;
-  const periodIdx = xmNote - 37;
-  if (periodIdx < 0 || periodIdx >= MOD_PERIODS.length) return 0;
-  return MOD_PERIODS[periodIdx];
-}
+// ProTracker naming (note 13 = C-1 = 856), one table: src/lib/amiga/periodNotes.ts.
+import { cellPeriod } from '@/lib/amiga/periodNotes';
 
 export function encodeGameMusicCreatorCell(cell: TrackerCell): Uint8Array {
   const out = new Uint8Array(4);
@@ -58,9 +46,9 @@ export function encodeGameMusicCreatorCell(cell: TrackerCell): Uint8Array {
     // Byte 0/1: (sample << 4) | (period >> 8), period low byte.
     // The MOD period table is lossy (a raw off-table Amiga period decodes to the nearest
     // note, whose canonical period differs), so prefer the exact source period stashed by
-    // decodeCell in the `period` carrier. Edited grid cells carry no period → derive it
-    // from the note.
-    const period = cell.period !== undefined ? (cell.period & 0x0FFF) : xmNoteToPeriod(xmNote);
+    // decodeCell in the `period` carrier while it still names the note; an edited note's
+    // stale period does not count (src/lib/amiga/periodNotes.ts cellPeriod).
+    const period = cellPeriod(cell) & 0x0FFF;
     out[0] = ((instr & 0x0F) << 4) | ((period >> 8) & 0x0F);
     out[1] = period & 0xFF;
 
