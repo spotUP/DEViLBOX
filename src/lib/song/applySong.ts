@@ -76,11 +76,8 @@ export interface ProjectExtras {
 }
 
 /** Restore a project's state beyond the song, after the song is in place. */
-async function applyProjectExtras(x: ProjectExtras, patterns: Pattern[]): Promise<void> {
+async function applyProjectExtras(x: ProjectExtras): Promise<void> {
   if (x.linearPeriods != null) useEditorStore.getState().setLinearPeriods(x.linearPeriods);
-  if (x.automation && x.automation.length > 0) useAutomationStore.getState().loadCurves(x.automation);
-  // Old dubLane.events[] -> automation curves (one-time conversion).
-  for (const p of patterns) migrateDubLaneEvents(p as Parameters<typeof migrateDubLaneEvents>[0]);
   if (x.masterEffects) useAudioStore.getState().setMasterEffects(x.masterEffects);
   useTransportStore.getState().setGrooveTemplate(x.grooveTemplateId || 'straight');
   if (x.mixer) useMixerStore.getState().loadMixerState(x.mixer);
@@ -143,6 +140,13 @@ export async function applySong(song: SongToApply, source: SongSource): Promise<
   useInstrumentStore.getState().reset();
   engine.disposeAllInstruments();
 
+  // A project's automation, and its old dubLane.events[] converted to curves
+  // (one-time) - BEFORE the patterns enter the store, which freezes them.
+  if (song.extras?.automation?.length) useAutomationStore.getState().loadCurves(song.extras.automation);
+  if (song.extras) {
+    for (const p of song.patterns) migrateDubLaneEvents(p as Parameters<typeof migrateDubLaneEvents>[0]);
+  }
+
   const tracker = useTrackerStore.getState();
   useInstrumentStore.getState().loadInstruments(song.instruments, { skipPreload: true });
   tracker.loadPatterns(song.patterns);
@@ -162,7 +166,7 @@ export async function applySong(song: SongToApply, source: SongSource): Promise<
     description: song.metadata.description ?? '',
   });
 
-  if (song.extras) await applyProjectExtras(song.extras, song.patterns);
+  if (song.extras) await applyProjectExtras(song.extras);
 
   // Undoing into the previous song is not meaningful.
   useHistoryStore.getState().clearHistory();
