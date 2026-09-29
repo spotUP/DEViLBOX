@@ -17,6 +17,7 @@
  */
 
 import * as Tone from 'tone';
+import { tapeSaturationCurve, tapeSaturationInputGain } from './TapeSaturation';
 
 function clamp01(v: number): number {
   return Math.max(0, Math.min(1, v));
@@ -187,35 +188,20 @@ export class TapeDegradationEffect extends Tone.ToneAudioNode {
   }
 
   // --- Saturation helpers ---
+  // The same tape curve as TapeSaturation (one implementation): unity for
+  // quiet signals, `saturation` moves the knee. This copy kept the drive as
+  // gain and read +7.6 dB at the defaults (browser sweep 2026-09-29).
 
-  /**
-   * Asymmetric tanh curve: positive side clips harder than negative.
-   */
   private createSaturationCurve(saturation: number): Float32Array {
-    const curve = new Float32Array(4096);
-    const driveAmount = 1 + saturation * 8;
-
-    for (let i = 0; i < 4096; i++) {
-      const x = (i / 4096) * 2 - 1;
-
-      if (x >= 0) {
-        // Positive: harder compression (tape compresses positive peaks more)
-        curve[i] = Math.tanh(x * driveAmount) * 0.95 + x * 0.02;
-      } else {
-        // Negative: softer compression (adds even harmonics via asymmetry)
-        curve[i] = Math.tanh(x * driveAmount * 0.8);
-      }
-    }
-
-    return curve;
+    return tapeSaturationCurve(saturation);
   }
 
   private calculatePreDrive(saturation: number): number {
-    return 1 + saturation * 3;
+    return tapeSaturationInputGain(saturation);
   }
 
   private calculateMakeupGain(saturation: number): number {
-    return 1 / (1 + saturation * 0.6);
+    return 1 / tapeSaturationInputGain(saturation);
   }
 
   // --- Tone shift helper ---
