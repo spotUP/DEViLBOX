@@ -23,7 +23,11 @@ const EFFECT_GAIN_COMPENSATION_DB: Record<string, number> = {
   CabinetSim:       +4.6,   // was quiet, boost
   BitCrusher:       -3.5,
   MultibandComp:    +3.5,   // was quiet, boost
-  Maximizer:        +3.7,   // was quiet, boost
+  // Ceiling devices (Maximizer, Limiter, MultibandLimiter): NO static
+  // compensation. They read 'quiet' in calibration only because they hold a
+  // ceiling, and a boost after them defeats it - Maximizer at -1 dBFS came out
+  // at +2.7 dBFS (2026-09-29). Same class as SidechainLimiter below.
+  Maximizer:        0,
   MultiChorus:      +3.1,   // was quiet, boost
   AutoSat:          -2.9,
   AutoWah:          -3.0,
@@ -45,7 +49,7 @@ const EFFECT_GAIN_COMPENSATION_DB: Record<string, number> = {
   Tremolo:          -2.0,
   ToneArm:          -2.0,
   ReverseDelay:     +1.9,   // was quiet, boost
-  Limiter:          +1.8,   // was quiet, boost
+  Limiter:          0,      // ceiling device - see Maximizer
   JunoChorus:       +1.6,   // was quiet, boost
   GOTTComp:         -1.6,
   VintageDelay:     -1.5,
@@ -66,7 +70,7 @@ const EFFECT_GAIN_COMPENSATION_DB: Record<string, number> = {
   MultibandEnhancer: +1.2,  // was quiet, boost
 
   // ── Measured very quiet — boost output ──
-  MultibandLimiter:    +12.7,
+  MultibandLimiter:    0,  // ceiling device - see Maximizer
   SidechainLimiter:    0, // Dynamics processor — no static compensation
   SlapbackDelay:       +4.7,
   HaasEnhancer:        +4.8,
