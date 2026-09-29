@@ -138,7 +138,8 @@ export class ChannelRoutedEffectsManager {
    *   Torn down and rebuilt alongside per-channel effect slots.
    */
   private sidechainConsumers = new Map<number, Set<AudioNode>>();
-  private sidechainTaps = new Map<number, { slotIndex: number; outputGain: GainNode }>();
+  /** slotIndex -1: a copy tap on the channel's dub-send output (engines without isolation slots). */
+  private sidechainTaps = new Map<number, { slotIndex: number; outputGain: GainNode; worklet?: AudioWorkletNode }>();
 
   /**
    * Dub bus wiring — per-channel GainNode array. Each gain:
@@ -259,6 +260,16 @@ export class ChannelRoutedEffectsManager {
       if (tap) {
         try { tap.outputGain.disconnect(); } catch { /* */ }
         this.sidechainTaps.delete(channelIndex);
+        if (tap.slotIndex < 0) {
+          // Copy tap: close the output unless the channel's dub send still uses it.
+          if (tap.worklet) {
+            try { tap.worklet.disconnect(tap.outputGain, DUB_OUTPUT_BASE + channelIndex); } catch { /* */ }
+            if (!this.dubLifecycle.isDesired(channelIndex)) {
+              tap.worklet.port.postMessage(dubChannelMessage('dubChannelDisable', channelIndex));
+            }
+          }
+          return;
+        }
         void getActiveIsolationEngine().then(e => {
           if (e) e.removeIsolation(tap.slotIndex);
         });
@@ -270,7 +281,8 @@ export class ChannelRoutedEffectsManager {
   /** Allocate an isolation slot for a sidechain tap, connect worklet output → consumers. */
   private async _allocateSidechainSlot(channelIndex: number, engine?: IsolationCapableEngine): Promise<boolean> {
     if (!engine) engine = (await getActiveIsolationEngine()) ?? undefined;
-    if (!engine?.isAvailable() || engine.supportsIsolationSlots?.() === false) return false;
+    if (!engine?.isAvailable()) return false;
+    if (engine.supportsIsolationSlots?.() === false) return this._allocateSidechainCopyTap(channelIndex, engine);
 
     const workletNode = engine.getWorkletNode();
     const audioContext = engine.getAudioContext();
@@ -334,6 +346,35 @@ export class ChannelRoutedEffectsManager {
 
     this.sidechainTaps.set(channelIndex, { slotIndex: freeSlot, outputGain });
     console.log(`[ChannelRoutedEffects] Sidechain tap: slot ${freeSlot} → ch${channelIndex + 1} (routed back to mix)`);
+    return true;
+  }
+
+  /**
+   * Key tap for an engine without isolation slots (Hippel/TFMX, Sonix,
+   * Cinter4, SunTronic): the channel's dub-send output is a COPY of it, which
+   * is all a sidechain key needs. The channel stays in the main mix, so the
+   * compressor ducks it too; its attack lets the hit's transient through.
+   */
+  private _allocateSidechainCopyTap(channelIndex: number, engine: IsolationCapableEngine): boolean {
+    if (engine.supportsDubSends?.() === false) return false;
+    const workletNode = engine.getWorkletNode();
+    const audioContext = engine.getAudioContext();
+    if (!workletNode || !audioContext) return false;
+    if (DUB_OUTPUT_BASE + channelIndex >= workletNode.numberOfOutputs) return false;
+
+    const outputGain = audioContext.createGain();
+    try {
+      workletNode.connect(outputGain, DUB_OUTPUT_BASE + channelIndex);
+    } catch (e) {
+      console.warn('[ChannelRoutedEffects] Sidechain copy tap connect failed:', e);
+      return false;
+    }
+    workletNode.port.postMessage(dubChannelMessage('dubChannelEnable', channelIndex));
+    for (const node of this.sidechainConsumers.get(channelIndex) ?? []) {
+      try { outputGain.connect(node); } catch { /* */ }
+    }
+    this.sidechainTaps.set(channelIndex, { slotIndex: -1, outputGain, worklet: workletNode });
+    console.log(`[ChannelRoutedEffects] Sidechain key: ch${channelIndex + 1} copy output ${DUB_OUTPUT_BASE + channelIndex}`);
     return true;
   }
 
@@ -649,7 +690,10 @@ export class ChannelRoutedEffectsManager {
 
     const worklet = engine?.getWorkletNode();
     if (worklet) {
-      worklet.port.postMessage(dubChannelMessage('dubChannelDisable', channelIndex));
+      // A sidechain key tapping this channel's copy output keeps it running.
+      if ((this.sidechainTaps.get(channelIndex)?.slotIndex ?? 0) >= 0) {
+        worklet.port.postMessage(dubChannelMessage('dubChannelDisable', channelIndex));
+      }
       try { worklet.disconnect(gain, DUB_OUTPUT_BASE + channelIndex); } catch { /* ok */ }
     }
 
@@ -958,9 +1002,15 @@ export class ChannelRoutedEffectsManager {
     }
 
     // Tear down sidechain tap slots (but keep sidechainConsumers for rebuild)
-    for (const [, tap] of this.sidechainTaps) {
+    for (const [channelIndex, tap] of this.sidechainTaps) {
       try { tap.outputGain.disconnect(); } catch { /* */ }
-      if (engine) engine.removeIsolation(tap.slotIndex);
+      if (tap.slotIndex < 0) {
+        // Copy tap: unhook it from the worklet; its output stays enabled for
+        // the rebuild that follows (or for the channel's dub send).
+        try { tap.worklet?.disconnect(tap.outputGain, DUB_OUTPUT_BASE + channelIndex); } catch { /* */ }
+      } else if (engine) {
+        engine.removeIsolation(tap.slotIndex);
+      }
     }
     this.sidechainTaps.clear();
   }

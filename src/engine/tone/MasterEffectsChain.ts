@@ -6,6 +6,7 @@ import { getNativeAudioNode } from '@utils/audio-context';
 import { getEffectGainCompensation } from '../factories/effectGainCompensation';
 import { useFormatStore } from '../../stores/useFormatStore';
 import { supportsChannelIsolation } from './ChannelRoutedEffects';
+import { SIDECHAIN_KEY_DRUMS, resolveDrumKeyChannel } from './sidechainKey';
 
 export interface MasterEffectsContext {
   masterEffectsInput: Tone.Gain;
@@ -54,6 +55,33 @@ export function getPostEffectsInput(): Tone.Gain | null {
   return _getPostEffectsInput?.() ?? null;
 }
 
+/** Nodes keyed on SIDECHAIN_KEY_DRUMS, re-resolved when a song loads. */
+const autoKeyedNodes = new Set<Tone.ToneAudioNode>();
+let songWatchInstalled = false;
+
+/** When the song changes, point every "Drums (auto)" key at its new drum channel. */
+function watchSongForAutoKeys(): void {
+  if (songWatchInstalled) return;
+  songWatchInstalled = true;
+  void import('../../stores/useTrackerStore').then(({ useTrackerStore }) => {
+    let lastPatterns = useTrackerStore.getState().patterns;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    useTrackerStore.subscribe((state) => {
+      if (state.patterns === lastPatterns) return;
+      lastPatterns = state.patterns;
+      // One re-key per load, after the load's burst of pattern writes.
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => {
+        timer = null;
+        for (const node of [...autoKeyedNodes]) {
+          if ((node as { disposed?: boolean }).disposed) { autoKeyedNodes.delete(node); continue; }
+          void wireMasterSidechain(node, SIDECHAIN_KEY_DRUMS);
+        }
+      }, 500);
+    });
+  });
+}
+
 /**
  * Key a sidechain-capable effect (SidechainCompressor, …) on a tracker channel,
  * or on its own input when `sourceChannel` < 0. Used by the master chain and by
@@ -61,6 +89,17 @@ export function getPostEffectsInput(): Tone.Gain | null {
  */
 export async function wireMasterSidechain(node: Tone.ToneAudioNode, sourceChannel: number): Promise<void> {
   if (!('getSidechainInput' in node)) return;
+
+  // "Drums (auto)": key on whichever channel the classifier calls the drums,
+  // and look again when the song changes.
+  if (sourceChannel === SIDECHAIN_KEY_DRUMS) {
+    autoKeyedNodes.add(node);
+    watchSongForAutoKeys();
+    sourceChannel = await resolveDrumKeyChannel();
+  } else {
+    autoKeyedNodes.delete(node);
+  }
+
   const scInput = (node as any).getSidechainInput() as Tone.Gain;
   const rawScInput = getNativeAudioNode(scInput);
   if (!rawScInput) return;
@@ -88,13 +127,14 @@ export async function wireMasterSidechain(node: Tone.ToneAudioNode, sourceChanne
   if (sourceChannel < 0 || isNaN(sourceChannel)) return;
 
   let connected = false;
-  const editorMode = useFormatStore.getState().editorMode;
-  const isoSupported = supportsChannelIsolation(editorMode);
 
-  // Try 1: WASM isolation system (preferred — libopenmpt, Furnace, Hively, UADE)
-  // WASM engines mix all channels inside the worklet. Tone.js channel outputs exist
-  // but carry no audio. Use the isolation system to get actual per-channel audio.
-  if (isoSupported) {
+  // Try 1: the playing engine's per-channel outputs - an isolation slot, or the
+  // channel's copy output on engines without slots (ChannelRoutedEffects
+  // addSidechainTap). WASM engines mix all channels inside the worklet; their
+  // Tone.js channel outputs exist but carry no audio. Asked whatever the editor
+  // mode: the engine that is PLAYING decides, and the manager answers false
+  // when there is none.
+  {
     try {
       const { getChannelRoutedEffectsManager: getMgr } = await import('./ChannelRoutedEffects');
       const masterIn = _getMasterEffectsInput?.();
@@ -298,7 +338,7 @@ export async function rebuildMasterEffects(ctx: MasterEffectsContext, effects: E
 
     // Sidechain source can be at top-level or in parameters (UI stores it in parameters)
     const scSource = config.sidechainSource ?? Number(config.parameters?.sidechainSource);
-    if (typeof scSource === 'number' && scSource >= 0 && !isNaN(scSource)) {
+    if (typeof scSource === 'number' && (scSource >= 0 || scSource === SIDECHAIN_KEY_DRUMS) && !isNaN(scSource)) {
       void wireMasterSidechain(node, scSource);
     }
 
