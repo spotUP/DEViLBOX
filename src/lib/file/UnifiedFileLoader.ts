@@ -8,17 +8,12 @@
  */
 
 import type { InstrumentConfig } from '@/types/instrument';
-import type { Pattern } from '@/types';
 import { useTrackerStore } from '@/stores/useTrackerStore';
 import { useFormatStore } from '@/stores/useFormatStore';
 import { useInstrumentStore } from '@/stores/useInstrumentStore';
 import { useTransportStore } from '@/stores/useTransportStore';
 import { useProjectStore } from '@/stores/useProjectStore';
 import { useAutomationStore } from '@/stores/useAutomationStore';
-import { useAudioStore } from '@/stores/useAudioStore';
-import { useDubStore } from '@/stores/useDubStore';
-import { useDrumPadStore } from '@/stores/useDrumPadStore';
-import { useEditorStore } from '@/stores/useEditorStore';
 import { useUIStore } from '@/stores/useUIStore';
 import { getToneEngine } from '@/engine/ToneEngine';
 import { notify } from '@/stores/useNotificationStore';
@@ -643,7 +638,7 @@ async function loadSongFile(file: File, options: FileLoadOptions, preReadBuffer?
   const { loadPatterns, setPatternOrder, setCurrentPattern, reset: resetTracker } = useTrackerStore.getState();
   const { applyEditorMode, setOriginalModuleData } = useFormatStore.getState();
   const { loadInstruments, addInstrument, reset: resetInstruments } = useInstrumentStore.getState();
-  const { setBPM, setSpeed, setGrooveTemplate, reset: resetTransport } = useTransportStore.getState();
+  const { setBPM, setSpeed, reset: resetTransport } = useTransportStore.getState();
   const { setMetadata } = useProjectStore.getState();
   const { reset: resetAutomation } = useAutomationStore.getState();
   const engine = getToneEngine();
@@ -828,82 +823,10 @@ async function loadSongFile(file: File, options: FileLoadOptions, preReadBuffer?
     const text = decompressProject(buffer);
     const songData = JSON.parse(text);
 
-    const { needsMigration, migrateProject } = await import('@/lib/migration');
-    let patterns = songData.patterns;
-    let instruments = songData.instruments;
-
-    if (needsMigration(patterns, instruments)) {
-      const migrated = migrateProject(patterns, instruments);
-      patterns = migrated.patterns;
-      instruments = migrated.instruments;
-    }
-
-    // Load instruments BEFORE patterns to avoid timing race.
-    // loadInstruments defers set() via queueMicrotask; if patterns load first,
-    // the playback effect fires before instruments are in the store → silence.
-    if (instruments) loadInstruments(instruments);
-    if (songData.masterEffects) useAudioStore.getState().setMasterEffects(songData.masterEffects);
-
-    loadPatterns(patterns);
-
-    // Restore automation curves, dub bus voicing, and Auto Dub state.
-    // The export side writes all three (exporters.ts: automationCurves,
-    // dubBus, autoDub); without these calls a reload would silently drop
-    // user-drawn curves, the character preset, and the autonomous
-    // performer's persona / intensity / blacklist.
-    if (Array.isArray(songData.automationCurves) && songData.automationCurves.length > 0) {
-      useAutomationStore.getState().loadCurves(songData.automationCurves);
-    }
-    if (songData.dubBus && typeof songData.dubBus === 'object') {
-      // setDubBus shallow-merges over defaults so older .dbx files missing
-      // newer fields still load cleanly.
-      useDrumPadStore.getState().setDubBus(songData.dubBus);
-    }
-    if (songData.autoDub && typeof songData.autoDub === 'object') {
-      const ad = songData.autoDub;
-      const dub = useDubStore.getState();
-      if (typeof ad.enabled === 'boolean')   dub.setAutoDubEnabled(ad.enabled);
-      if (typeof ad.intensity === 'number')  dub.setAutoDubIntensity(ad.intensity);
-      if (typeof ad.persona === 'string')    dub.setAutoDubPersona(ad.persona);
-      if (Array.isArray(ad.moveBlacklist))   dub.setAutoDubMoveBlacklist(ad.moveBlacklist);
-    }
-
-    // Restore pattern order: prefer numeric patternOrder, fall back to sequence (pattern IDs)
-    if (songData.patternOrder && Array.isArray(songData.patternOrder) && songData.patternOrder.length > 0) {
-      setPatternOrder(songData.patternOrder);
-    } else if (songData.sequence && Array.isArray(songData.sequence)) {
-      const patternIdToIndex = new Map(patterns.map((p: Pattern, i: number) => [p.id, i]));
-      const order = songData.sequence
-        .map((patternId: string) => patternIdToIndex.get(patternId))
-        .filter((index: number | undefined): index is number => index !== undefined);
-      if (order.length > 0) setPatternOrder(order);
-    }
-
-    setBPM(songData.bpm);
-    if (songData.speed) setSpeed(songData.speed);
-    setMetadata(songData.metadata);
-    setGrooveTemplate(songData.grooveTemplateId || 'straight');
-
-    // Restore linearPeriods if saved (XM files use linear frequency mode)
-    if (songData.linearPeriods != null) {
-      useEditorStore.getState().setLinearPeriods(songData.linearPeriods);
-    }
-
-    // Tag first pattern with sourceFormat so TrackerReplayer gets correct format on reload
-    if (songData.trackerFormat && patterns.length > 0 && !patterns[0].importMetadata?.sourceFormat) {
-      patterns[0].importMetadata = {
-        ...patterns[0].importMetadata,
-        sourceFormat: songData.trackerFormat,
-      } as Pattern['importMetadata'];
-    }
-
-    // Restore native engine data (all WASM formats)
-    const { restoreNativeEngineData } = await import('@lib/export/exporters');
-    restoreNativeEngineData(songData.nativeEngineData, songData.nativeEngineMeta, songData.linearPeriods, songData.nativeCompanionFiles);
-
-    if (songData.originalModuleData?.base64) {
-      useFormatStore.getState().setOriginalModuleData(songData.originalModuleData as any);
-    }
+    // One parser for every saved shape, one apply (this branch restored its
+    // own subset and dropped the mixer and the hybrid instruments).
+    const { savedSongToApply } = await import('@/lib/song/savedSong');
+    await applySong(savedSongToApply(songData), 'project');
 
     return {
       success: true,

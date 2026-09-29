@@ -10,7 +10,7 @@
  *
  * These tests exercise the exact serialization functions the project save/load
  * path uses (`getNativeEngineDataForExport` / `getNativeCompanionFilesForExport`
- * → JSON → `restoreNativeEngineData`), driving them with real committed song
+ * → JSON → `decodeNativeEngineFields` + applyEditorMode (applySong's restore)), driving them with real committed song
  * bytes. This is the persistence round-trip at the layer under test; it avoids
  * the full `loadProjectFromStorage`, which needs a real AudioContext (absent in
  * happy-dom — the existing persistence test tolerates the same limitation).
@@ -24,7 +24,7 @@ import { join } from 'path';
 import {
   getNativeEngineDataForExport,
   getNativeCompanionFilesForExport,
-  restoreNativeEngineData,
+  decodeNativeEngineFields,
 } from '@/lib/export/exporters';
 import { useFormatStore } from '@stores/useFormatStore';
 
@@ -73,7 +73,7 @@ describe('native-engine persistence round-trip (real fixtures)', () => {
     expect(useFormatStore.getState().soundMonFileData).toBeNull();
 
     // Load side.
-    restoreNativeEngineData(serialized, undefined, false, undefined);
+    useFormatStore.getState().applyEditorMode(decodeNativeEngineFields(serialized, undefined, false, undefined) as never);
 
     const restored = useFormatStore.getState().soundMonFileData;
     expect(restored, 'soundMonFileData must survive reload').toBeTruthy();
@@ -110,7 +110,7 @@ describe('native-engine persistence round-trip (real fixtures)', () => {
     expect(useFormatStore.getState().sonixFileData).toBeNull();
 
     // Load side.
-    restoreNativeEngineData(serializedNed, undefined, false, serializedNcf);
+    useFormatStore.getState().applyEditorMode(decodeNativeEngineFields(serializedNed, undefined, false, serializedNcf) as never);
 
     // Song bytes (Task 0.2) survive.
     const restoredSong = useFormatStore.getState().sonixFileData;

@@ -154,18 +154,21 @@ export function getNativeCompanionFilesForExport(): SerializedCompanionFiles | n
 }
 
 /**
- * Restore native engine data into format store from saved .dbx data.
- * Decodes base64 binaries, reconstructs a song-like object, and calls applyEditorMode.
+ * The editor-mode / native-engine fields of a saved song (.dbx, autosave,
+ * revision): decodes the base64 binaries and companions and copies the JSON
+ * metadata, into the song-like object applyEditorMode reads. Pure - the
+ * caller (applySong) applies it.
+ *
+ * It used to apply them itself (restoreNativeEngineData) and returned early
+ * when a project had no native data, so a project saved from a MOD, loaded
+ * after an AHX, kept the AHX editor (2026-09-29).
  */
-export function restoreNativeEngineData(
+export function decodeNativeEngineFields(
   nativeEngineData: Record<string, string> | undefined,
   nativeEngineMeta: Record<string, unknown> | undefined,
   linearPeriods?: boolean,
   companionFiles?: SerializedCompanionFiles | undefined,
-): void {
-  if (!nativeEngineData && !nativeEngineMeta && !companionFiles) return;
-
-  // Build a song-like object for applyEditorMode
+): Record<string, unknown> {
   const songObj: Record<string, unknown> = { linearPeriods: linearPeriods ?? false };
 
   // Decode binary fields
@@ -215,12 +218,7 @@ export function restoreNativeEngineData(
       }
     }
   }
-
-  const fmtStore = useFormatStore.getState();
-  fmtStore.applyEditorMode(songObj as any);
-
-  // Restore originalModuleData separately (not handled by applyEditorMode)
-  // This is already handled by the caller if present
+  return songObj;
 }
 
 // Export Format Types
