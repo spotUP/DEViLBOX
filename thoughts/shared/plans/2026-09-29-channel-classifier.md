@@ -185,10 +185,10 @@ Level: feature extraction.
 
 ## Checklist
 
-- [ ] P0.1 owner answers Q1-Q4
-- [ ] P0.2 label draft tool + draft labels for the chosen corpus
+- [x] P0.1 owner answers Q1-Q4
+- [x] P0.2 label draft tool + draft labels for the chosen corpus
 - [ ] P0.3 owner corrects labels
-- [ ] P0.4 loader + score test + baseline ratchet in `test:ci`
+- [x] P0.4 loader + score test + baseline ratchet in `test:ci`
 - [ ] P1.1 timbre-only spectrum classes
 - [ ] P1.2 register from sounding pitch, song-relative octaves
 - [ ] P1.3 score recorded, baseline raised
@@ -257,3 +257,24 @@ channels are the right ones.
 | 30 | MOD 8ch | follow me to hell.mod (Octalyser) | public/data/songs/octalyser |
 
 Modland files are downloaded once into src/__tests__/fixtures/classifier-corpus/ so the scored eval runs headless in CI.
+
+## Progress (2026-09-29)
+
+- P0.2 / P0.4 done. Corpus: 27 songs, 269 channels (classifierCorpus.ts).
+  Modland files in src/__tests__/fixtures/classifier-corpus/ (5.8 MB): kept
+  to <= ~25 channels and <= 2.3 MB each; chuck rock, the funny farm,
+  dreaming in green and network.it need an AudioContext to parse and were
+  replaced; orchard street (64 channels) and the 24-30 channel Elwood XMs
+  dropped for the labelling burden. Furnace (2 songs) deferred to P4: its
+  parser needs the WASM harness.
+- Loader = parseModuleToSong (the app's dispatch). NB headless it parses MOD
+  with the TS parser, not OpenMPT WASM as the app does - instrument data can
+  differ slightly from in-app.
+- Draft: CLASSIFIER_DRAFT=1 npx vitest run src/bridge/analysis/__tests__/classifierLabelDraft.test.ts
+  keeps owner-labelled entries. Draft make-up: harmony 140, bass 59, drums
+  49, silent 15, lead 6 - lead is almost never chosen.
+- Score test channelClassifierScore.test.ts in test:ci; baseline 0/0 until
+  labels exist.
+- NEXT P0.3: label with the owner song by song (agent loads the song in the
+  tab, lists the draft per channel, owner corrects by ear; agent writes
+  labelledBy 'owner' entries).
