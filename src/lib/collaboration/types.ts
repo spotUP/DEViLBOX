@@ -24,14 +24,13 @@ export type SignalingServerMsg =
 
 // ─── Data channel messages (peer ↔ peer) ─────────────────────────────────────
 
-export interface SavedProject {
-  patterns: Pattern[];
-  instruments: unknown[];
-  bpm: number;
-  masterEffects?: unknown[];
-  metadata?: { name: string; author: string; description: string };
-  patternOrder?: number[];
-}
+/**
+ * A whole song sent to a peer: the same snapshot every save uses
+ * (snapshotSong). It carried only patterns, instruments, BPM, master chain,
+ * metadata and order, so a peer never got a native-engine song's data, speed
+ * or mixer (2026-09-29 audit).
+ */
+export type SavedProject = import('@/lib/song/savedSong').SavedSongFields;
 
 export interface CellOp {
   pi: number;

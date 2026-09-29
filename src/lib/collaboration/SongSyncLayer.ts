@@ -8,7 +8,10 @@
  * remote patch → store update → subscribe fires → would re-broadcast → blocked.
  */
 
-import { useTrackerStore, useInstrumentStore, useTransportStore, useAudioStore, useProjectStore } from '@stores';
+import { useTrackerStore, useTransportStore } from '@stores';
+import { applySong } from '@/lib/song/applySong';
+import { savedSongToApply } from '@/lib/song/savedSong';
+import { snapshotSong } from '@/lib/song/snapshotSong';
 import { clearExplicitlySaved } from '@hooks/useProjectPersistence';
 import type { CollaborationClient } from './CollaborationClient';
 import type { DataChannelMsg, SavedProject } from './types';
@@ -20,45 +23,30 @@ let unsubscribeTransport: (() => void) | null = null;
 
 // ─── Snapshot helpers ─────────────────────────────────────────────────────────
 
+/** The current song, as every save reads it. */
 export function snapshotProject(): SavedProject {
-  const { patterns, patternOrder } = useTrackerStore.getState();
-  const { instruments } = useInstrumentStore.getState();
-  const { bpm } = useTransportStore.getState();
-  const { masterEffects } = useAudioStore.getState();
-  const { metadata } = useProjectStore.getState();
-
-  return {
-    patterns: structuredClone(patterns) as Pattern[],
-    instruments: structuredClone(instruments),
-    bpm,
-    masterEffects: structuredClone(masterEffects),
-    metadata: metadata ? structuredClone(metadata) as { name: string; author: string; description: string } : undefined,
-    patternOrder: structuredClone(patternOrder),
-  };
+  return structuredClone(snapshotSong());
 }
 
 // ─── Apply remote patches ─────────────────────────────────────────────────────
 
 export function applyRemotePatch(msg: DataChannelMsg): void {
+  if (msg.type === 'full_sync') {
+    // Receiving remote song — prevent auto-save from overwriting user's saved project
+    clearExplicitlySaved();
+    // The song goes in like every load. The apply is async: hold the
+    // no-rebroadcast guard until it has landed, or its store writes echo back.
+    applyingRemote = true;
+    void applySong(savedSongToApply(msg.project), 'sync')
+      .catch((err) => console.error('[SongSync] could not apply the remote song:', err))
+      .finally(() => { applyingRemote = false; });
+    return;
+  }
   applyingRemote = true;
   try {
     const store = useTrackerStore.getState();
 
-    if (msg.type === 'full_sync') {
-      // Receiving remote song — prevent auto-save from overwriting user's saved project
-      clearExplicitlySaved();
-      const { loadPatterns, setPatternOrder } = store;
-      const { loadInstruments } = useInstrumentStore.getState();
-      const { setBPM } = useTransportStore.getState();
-      const { setMasterEffects } = useAudioStore.getState();
-
-      loadPatterns(msg.project.patterns);
-      if (msg.project.patternOrder) setPatternOrder(msg.project.patternOrder);
-      if (msg.project.instruments) loadInstruments(msg.project.instruments as never);
-      if (msg.project.bpm) setBPM(msg.project.bpm);
-      if (msg.project.masterEffects) setMasterEffects(msg.project.masterEffects as never);
-
-    } else if (msg.type === 'cell') {
+    if (msg.type === 'cell') {
       // Apply single-cell patch: clone the target pattern, update the cell, replace
       const { patterns, replacePattern } = store;
       const pat = patterns[msg.pi];

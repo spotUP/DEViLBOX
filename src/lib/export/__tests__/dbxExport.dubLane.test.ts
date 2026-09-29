@@ -11,8 +11,9 @@
  * text, `JSON.parse`, assert `patterns[0].dubLane.events[0]` matches the
  * input event byte-for-byte.
  *
- * Dependencies minimised: no engine, no store — `exportSong` accepts all
- * inputs as arguments so the test supplies synthetic data directly.
+ * `exportSong` reads the current song from the stores (snapshotSong, the one
+ * reader every save uses), so the test puts the probe pattern in the tracker
+ * store.
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
@@ -84,30 +85,12 @@ function makePattern(withLane: boolean) {
 async function captureExport(pattern: unknown): Promise<Record<string, unknown>> {
   captured.blob = null;
   captured.filename = null;
-  // ProjectMetadata requires id / createdAt / modifiedAt / version — fill
-  // with plausible defaults. None of these fields affect the dubLane
-  // round-trip assertions below.
+  const { useTrackerStore } = await import('@stores/useTrackerStore');
+  const { useProjectStore } = await import('@stores/useProjectStore');
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  exportSong(
-    {
-      id: 'test-id',
-      name: 'test-song',
-      author: '',
-      description: '',
-      createdAt: 0,
-      modifiedAt: 0,
-      version: '0.0.0',
-    } as any,
-    125,
-    [], // instruments
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    [pattern as any],
-    ['pat-0'],
-    undefined, // automation
-    undefined, // masterEffects
-    undefined, // automationCurves
-    {}, // options
-  );
+  useTrackerStore.setState({ patterns: [pattern as any], patternOrder: [0] } as never);
+  useProjectStore.getState().setMetadata({ name: 'test-song' });
+  exportSong({});
   expect(captured.blob, 'saveAs should have been called with a Blob').toBeTruthy();
   const { decompressProject } = await import('@/lib/projectCompression');
   const buffer = await captured.blob!.arrayBuffer();
