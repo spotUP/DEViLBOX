@@ -118,9 +118,9 @@ export const FX_PRESETS: FxPreset[] = [
       { category: 'wam', type: 'WAMBigMuff', enabled: true, wet: 50, parameters: {} },
       { category: 'tonejs', type: 'Compressor', enabled: true, wet: 100, parameters: { threshold: -12, ratio: 6, attack: 0.005, release: 0.15 } },
     ] },
-  { name: 'Swedish Chainsaw', description: 'HM-2 + JCM800 — the legendary Swedish death metal tone', tags: ['Loud', 'Grit', 'Guitar'],
+  { name: 'Swedish Chainsaw', description: 'HM-2 into a JCM800 with everything on max - the Gothenburg tone', tags: ['Loud', 'Grit', 'Guitar'],
     effects: [
-      { category: 'wasm', type: 'SwedishChainsaw', enabled: true, wet: 80, parameters: { tight: 0, pedalGain: 55, ampGain: 45, bass: 50, middle: 60, treble: 50, volume: 50 } },
+      { category: 'wasm', type: 'SwedishChainsaw', enabled: true, wet: 100, parameters: { tight: 0, pedalGain: 100, ampGain: 100, bass: 100, middle: 100, treble: 100, volume: 50 } },
       { category: 'tonejs', type: 'Compressor', enabled: true, wet: 100, parameters: { threshold: -14, ratio: 4, attack: 0.003, release: 0.1 } },
     ] },
 
