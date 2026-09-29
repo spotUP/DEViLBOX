@@ -16,7 +16,7 @@ vi.mock('../../pretracker/PreTrackerEngine', () => ({
   PreTrackerEngine: { hasInstance: () => true, getInstance: () => ({ isAvailable: () => true }) },
 }));
 
-import { getActiveIsolationEngine } from '../ChannelRoutedEffects';
+import { getActiveIsolationEngine, setPlayingIsolationEngine, asIsolationCapable } from '../ChannelRoutedEffects';
 import { useFormatStore } from '@stores/useFormatStore';
 
 beforeEach(() => { useFormatStore.setState({ editorMode: 'classic', preTrackerFileData: null } as never); });
@@ -30,5 +30,21 @@ describe('classic isolation resolver', () => {
   it('claims libopenmpt while it plays the song', async () => {
     mpt.isPlaying.mockReturnValue(true);
     expect(await getActiveIsolationEngine()).toBe(mpt);
+  });
+});
+
+describe('the playing engine', () => {
+  it('wins over the editor-mode resolver while registered', async () => {
+    mpt.isPlaying.mockReturnValue(true);
+    const native = { addIsolation() {}, removeIsolation() {}, getWorkletNode: () => null, getAudioContext: () => null, isAvailable: () => true };
+    setPlayingIsolationEngine(asIsolationCapable(native));
+    expect(await getActiveIsolationEngine()).toBe(native);
+    setPlayingIsolationEngine(null);
+    expect(await getActiveIsolationEngine()).toBe(mpt);
+  });
+
+  it('is only an isolation engine when it implements the interface', () => {
+    expect(asIsolationCapable({ output: {} })).toBeNull();
+    expect(asIsolationCapable(null)).toBeNull();
   });
 });
