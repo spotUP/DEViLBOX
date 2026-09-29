@@ -3,7 +3,7 @@ date: 2026-09-29
 topic: One parse path per format, one Amiga note naming
 tags: [import, load-path, mod, xm, amiga, periods, single-source-of-truth]
 status: draft
-progress: 20 of 23 - open P3.5 (one MOD writer), P4.2 (synth pitch, needs listening), P6.3 (live)
+progress: 21 of 23 - open P4.2 (synth pitch, needs listening), P6.3 (live)
 ---
 
 # One parse path per format, one Amiga note naming
@@ -73,7 +73,7 @@ Ledger: tick here as items land, with the commit.
       not per edit path: `periodNotes.cellPeriod` counts a stored period only
       while it names the cell's note; replayer, MOD encoder, modExport, GMC,
       samplePlaybackRate all read through it.
-- [ ] P3.5 One MOD writer: `MODExporter.exportAsMOD` (Cinter save) and
+- [x] P3.5 One MOD writer: `MODExporter.exportAsMOD` (Cinter save) and
       `modExport.exportSongToMOD` (native export) merged.
 
 ### P4 - playback
@@ -132,3 +132,9 @@ Ledger: tick here as items land, with the commit.
   'sound effects', now reads drums instead of harmony). Told the owner.
 - XM: the tracker's convertXMModule duplicates volume-column effects into effTyp2 (the
   replayer reads them only there); kept as the one XM converter.
+- P3.5: MODExporter.exportAsMOD is an adapter onto modExport.exportSongToMOD (it and
+  Cinter4ModExporter had no app callers). The one writer gained 6/8-channel tags, automation
+  baking, lossless 8-bit originalSamples, volume column -> Cxx, note-off -> C00, >64-row
+  warning. Still a separate MOD writer: OpenMPTExporter 'mod' (Cinter save, dialog MOD mode,
+  MCP export_mod) - a library writer shared with XM/IT/S3M; its note mapping is fixed
+  (mapNoteToOpenMPT), merging it is a separate decision.
