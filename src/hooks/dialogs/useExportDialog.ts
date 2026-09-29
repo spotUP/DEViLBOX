@@ -237,13 +237,15 @@ export function useExportDialog({ isOpen }: UseExportDialogOptions) {
     // All native-export dispatch lives in the shared router (single source of truth
     // for the Export dialog, the MCP export_native tool, and the FT2 toolbar Save).
     // This consumer keeps only UI concerns: blob download + toasts.
-    const { getTrackerReplayer } = await import('@engine/TrackerReplayer');
-    const song = getTrackerReplayer().getSong();
+    // The song from the stores (null): the replayer's copy is only rebuilt when
+    // playback starts, so an edit made since the last play was missing.
+    const { useTrackerStore } = await import('@stores/useTrackerStore');
+    const hasSong = useTrackerStore.getState().patterns.length > 0;
     const { exportNativeSong } = await import('@lib/export/nativeExportRouter');
-    const result = await exportNativeSong(song, {});
+    const result = await exportNativeSong(null, {});
 
     if (!result) {
-      notify.error(song ? 'No native exporter available for this format' : 'No song loaded');
+      notify.error(hasSong ? 'No native exporter available for this format' : 'No song loaded');
       onClose();
       return;
     }

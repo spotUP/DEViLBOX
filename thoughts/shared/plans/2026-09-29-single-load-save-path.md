@@ -128,7 +128,8 @@ Manual (owner, at http://localhost:5174, after P2 and after P4):
 - [x] L2.1 [x] L2.2 [x] L2.3
 - [x] L3.1 [x] L3.2 [x] L3.3 [x] L3.4
 - [x] L4.1 [x] L4.2 [x] L4.3
-- [x] L5.1 [ ] L5.2 [ ] L5.3
+- [x] L5.1 [x] L5.2 [x] L5.3
+- [ ] L5.4 (usePatternPlayback builds on liveTrackerSong)
 - [ ] L6.1 [ ] L6.2 [ ] L6.3
 
 ## Owner questions
@@ -206,3 +207,17 @@ Manual (owner, at http://localhost:5174, after P2 and after P4):
   instruments, BPM, master chain, metadata, order only). Round-trip test
   (MOD, and AHX with native data + mixer): snapshot -> savedSongToApply ->
   applySong -> snapshot is identical except metadata.modifiedAt. 18 of 22.
+- L5.2, L5.3 done. Measured from the code: the replayer's song is rebuilt
+  only when playback starts (usePatternPlayback's loadSong calls), so the
+  Export dialog and MCP export_native - which passed getTrackerReplayer().getSong()
+  - exported the song as of the last play, missing later edits. DEVIATION from
+  D4: encoders cannot take snapshotSong (it strips sample audioBuffers; the
+  OpenMPT exporter reads them). New liveTrackerSong (src/lib/song/liveSong.ts):
+  the current song as engines/encoders take it, from the stores, native bytes
+  via FILE_DATA_FIELDS. The router's store rebuild (three editor modes only) is
+  liveTrackerSong; both callers pass null; MCP export_mod uses it.
+  FOLLOW-UP (L5.4, added): usePatternPlayback still assembles the replayer's
+  song inline from ~80 store fields in three loadSong calls - it should build
+  on liveTrackerSong with its playback overrides (effective order/patterns).
+  Playback core; needs an in-app pass across formats. Manual: export native
+  after an edit WITHOUT playing - the edit must be in the file. 20 of 23.
