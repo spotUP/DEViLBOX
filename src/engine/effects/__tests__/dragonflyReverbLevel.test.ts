@@ -5,8 +5,11 @@
  * 1 + 1/(1-g^2) per stage) without Freeverb's 0.015 input gain, and four
  * combs summed at a fixed 0.25 whatever their feedback: at wet 100 % on
  * pink noise the Hall read +19 dB, the Room +18, the Plate +14, rising with
- * decay (2026-09-29). Runs the real WASM builds on pink noise (music-like:
- * the damped tails keep their lows, which white noise under-reads). Shimmer
+ * decay (2026-09-29). The first fix was calibrated on unfiltered pink noise,
+ * whose sub-20 Hz part lands on the combs' in-phase DC gain: in the app, on
+ * music, the three then read 12-16 dB quiet and fell further with decay.
+ * Runs the real WASM builds on centre (L = R) pink noise high-passed at
+ * 20 Hz. Shimmer
  * Reverb read -16 dB for the opposite reason: an output gain 12.5 dB short.
  */
 import { describe, it, expect } from 'vitest';
@@ -22,7 +25,7 @@ describe('Dragonfly reverbs', () => {
   for (const [dir, stem, prefix] of REVERBS) {
     it(`${stem} stays within 4 dB of the input from short to long decay`, async () => {
       for (const decay of [0.3, 0.8, 0.95]) {
-        const g = await noiseGainDb(dir, stem, prefix, { decay }, 3, 0.1, 'pink');
+        const g = await noiseGainDb(dir, stem, prefix, { decay }, 3, 0.1, 'pink', true);
         expect(Math.abs(g), `decay ${decay}: ${g.toFixed(1)} dB`).toBeLessThan(4);
       }
     }, 60000);

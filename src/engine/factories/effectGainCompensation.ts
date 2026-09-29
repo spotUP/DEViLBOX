@@ -91,7 +91,7 @@ const EFFECT_GAIN_COMPENSATION_DB: Record<string, number> = {
   // ── Migrated from old per-node wrapper table (EffectFactory) ──
   MVerb:               -1.0,
   SpringReverb:        -1.5,
-  ShimmerReverb:       -2.0,
+  // ShimmerReverb: 0 - its output gain is set at source since 2026-09-29.
   Freeverb:            -1.5,
   SpaceEcho:           -2.0,
   Aelapse:             -1.5,
