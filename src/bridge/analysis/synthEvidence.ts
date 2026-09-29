@@ -285,6 +285,33 @@ function fromAmigaReplayer(inst: InstrumentConfig): SynthTimbreEvidence | null {
     vibrato = (fc.vibDepth ?? 0) > 0 && (fc.vibSpeed ?? 0) > 0;
     // A synth macro that visits more than one waveform is a moving timbre.
     sweeping = new Set((fc.synthTable ?? []).map(e => e.waveNum)).size > 1;
+  } else if (sm && sm.type === 'synth' && sm.adsr) {
+    // The envelope the replayer actually plays (SoundMonParser: one level per
+    // step, a step every `speed` frames). The ADSR fields beside it are an
+    // editor approximation - reading attackSpeed 1 as a 1.28 s swell made
+    // every SoundMon synth a pad, including a hit that is gone in 7 frames
+    // (nicktune1.bp instrument 7: 63,35,12,6,3,1,0).
+    const { control, speed, levels } = sm.adsr;
+    const step = Math.max(1, speed);
+    if (control === 0 || levels.length === 0) {
+      sustains = true;                     // no envelope: the note holds its volume
+    } else {
+      let peak = 0;
+      for (let k = 1; k < levels.length; k++) if (levels[k] > levels[peak]) peak = k;
+      const floor = levels[peak] * 0.1;
+      let fall = -1;
+      for (let k = peak + 1; k < levels.length; k++) if (levels[k] <= floor) { fall = k; break; }
+      attackMs = ms(peak * step);
+      if (fall >= 0) {
+        decayMs = ms((fall - peak) * step);
+      } else {
+        decayMs = ms((levels.length - peak) * step);
+        // Never dies away: a looping envelope, or one that ends well up, holds.
+        sustains = control !== 1 || levels[levels.length - 1] >= levels[peak] * 0.25;
+      }
+    }
+    vibrato = (sm.vibratoDepth ?? 0) > 0 && (sm.vibratoSpeed ?? 0) > 0;
+    sweeping = (sm.waveSpeed ?? 0) > 0;
   } else if (sm && sm.type === 'synth') {
     // SoundMon counts SPEED, not length: a bigger number is a faster ramp.
     // Inverting it keeps the units honest — speed 0 means "no ramp", which is
