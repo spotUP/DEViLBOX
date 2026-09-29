@@ -31,7 +31,7 @@ import { CustomSelect } from '@components/common/CustomSelect';
 import { StemSeparatorPanel } from '@components/common/StemSeparatorPanel';
 import { useInstrumentStore, useTrackerStore } from '../../stores';
 import { scan9xxOffsets } from '@/lib/analysis/scan9xxOffsets';
-import type { InstrumentConfig, DeepPartial } from '../../types/instrument';
+import type { InstrumentConfig, DeepPartial, SampleConfig } from '../../types/instrument';
 import { DEFAULT_GRANULAR } from '../../types/instrument';
 import * as Tone from 'tone';
 import { SampleEnhancerPanel } from './SampleEnhancerPanel';
@@ -219,11 +219,21 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
   );
 
   // ─── State hook ──────────────────────────────────────────────────
+  const onUpdateSample = useCallback(
+    (updates: Partial<SampleConfig>) => {
+      if (!instrument.sample) return;
+      updateInstrument(instrument.id, { sample: { ...instrument.sample, ...updates } });
+    },
+    [instrument.id, instrument.sample, updateInstrument],
+  );
+
   const s = useSampleEditorState({
     instrumentId: instrument.id,
     instrumentParameters: instrument.parameters as Record<string, unknown> | undefined,
     onPersistBuffer,
     onUpdateParams,
+    sample: instrument.sample,
+    onUpdateSample,
   });
 
   const {
@@ -465,40 +475,6 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
     loopEnabled, loopStart, loopEnd, loopType,
     drawPlayhead,
   ]);
-
-  // ─── Sync loop params from parameters → sample config ────────────
-  // The sample editor writes loop settings to `parameters` (normalized 0-1),
-  // but the audio engine reads from `sample` (frame indices). Bridge them.
-  useEffect(() => {
-    const totalFrames = audioBuffer?.length ?? 0;
-    const sampleRate = audioBuffer?.sampleRate;
-    const currentSample = instrument.sample || {} as Record<string, unknown>;
-
-    // Convert normalized 0-1 positions to frame indices
-    const frameLoopStart = Math.round(loopStart * totalFrames);
-    const frameLoopEnd = Math.round(loopEnd * totalFrames);
-
-    // Only update if something actually changed to avoid infinite loops
-    const needsUpdate =
-      currentSample.loop !== loopEnabled ||
-      currentSample.loopStart !== frameLoopStart ||
-      currentSample.loopEnd !== frameLoopEnd ||
-      currentSample.loopType !== loopType ||
-      (sampleRate && currentSample.sampleRate !== sampleRate);
-
-    if (needsUpdate && totalFrames > 0) {
-      updateInstrument(instrument.id, {
-        sample: {
-          ...currentSample,
-          loop: loopEnabled,
-          loopStart: frameLoopStart,
-          loopEnd: frameLoopEnd,
-          loopType,
-          ...(sampleRate ? { sampleRate } : {}),
-        },
-      });
-    }
-  }, [loopEnabled, loopStart, loopEnd, loopType, audioBuffer, instrument.id, instrument.sample, updateInstrument]);
 
   // ─── Scan current pattern for 9xx offset markers ─────────────────
   // Subscribe to pattern data so we re-scan when cells change
@@ -1051,13 +1027,8 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
       }
     }
 
-    // Loop region comes ONLY from parameters.loopStart/loopEnd. The
-    // instrument.sample.loopStart/loopEnd values are not authoritative
-    // here — the bridge useEffect overwrites them from the parameters,
-    // so they round-trip back to whatever the params say (including
-    // defaults), which would force the loop region to be the full
-    // buffer. The user must drag the loop markers (or use the sliders)
-    // to set a real loop region.
+    // Loop region: the sample's own loop, in the editor's 0-1 form
+    // (useSampleEditorState reads it from instrument.sample).
     const loopStartNorm = Math.max(0, Math.min(0.99, loopStart));
     const loopEndNorm = Math.max(loopStartNorm + 0.001, Math.min(1, loopEnd));
     const loopStartSec = loopStartNorm * duration;

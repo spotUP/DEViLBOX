@@ -9,11 +9,13 @@ import { useRef, useState, useCallback, useMemo } from 'react';
 import { WaveformProcessor } from '../lib/audio/WaveformProcessor';
 import { notify } from '../stores/useNotificationStore';
 import { useSampleEditorUndo } from './useSampleEditorUndo';
+import { sampleLoopToView, viewLoopToSample, LOOP_VIEW_KEYS, type LoopType, type SampleLoopView } from '@/utils/audio/sampleLoopView';
+import type { SampleConfig } from '@typedefs/instrument';
 
 // ─── Types ─────────────────────────────────────────────────────────────
 
 export type DragTarget = 'loopStart' | 'loopEnd' | 'selection' | null;
-export type LoopType = 'off' | 'forward' | 'pingpong';
+export type { LoopType } from '@/utils/audio/sampleLoopView';
 
 export interface SampleEditorParams {
   loopEnabled: boolean;
@@ -128,15 +130,44 @@ interface UseSampleEditorStateOptions {
   instrumentParameters: Record<string, unknown> | undefined;
   onPersistBuffer: (buffer: AudioBuffer, label: string) => Promise<void>;
   onUpdateParams: (updates: Record<string, unknown>) => void;
+  /** The instrument's sample: the loop the editor shows and edits lives here. */
+  sample: SampleConfig | undefined;
+  /** Write sample fields (loop changes). */
+  onUpdateSample: (updates: Partial<SampleConfig>) => void;
 }
 
 // ─── Hook ──────────────────────────────────────────────────────────────
 
 export function useSampleEditorState(opts: UseSampleEditorStateOptions): SampleEditorState {
-  const { instrumentId, instrumentParameters, onPersistBuffer, onUpdateParams } = opts;
+  const { instrumentId, instrumentParameters, onPersistBuffer, onUpdateParams: onUpdateOtherParams, sample, onUpdateSample } = opts;
 
   // ─── Audio buffer ────────────────────────────────────────────────
   const [audioBuffer, setAudioBuffer] = useState<AudioBuffer | null>(null);
+
+  // ─── Loop: read from and written to the sample, never a copy ────
+  const loopView = useMemo(
+    () => sampleLoopToView(sample, audioBuffer?.duration, audioBuffer?.sampleRate),
+    [sample, audioBuffer],
+  );
+  /** The parameters with the sample's loop in the editor's 0-1 form. */
+  const viewParams = useMemo(
+    () => ({ ...(instrumentParameters || {}), ...loopView }) as Record<string, unknown>,
+    [instrumentParameters, loopView],
+  );
+  /** Loop keys go to the sample, everything else to the parameters. */
+  const onUpdateParams = useCallback((updates: Record<string, unknown>) => {
+    const loopChange: Partial<SampleLoopView> = {};
+    const rest: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(updates)) {
+      if ((LOOP_VIEW_KEYS as readonly string[]).includes(k)) (loopChange as Record<string, unknown>)[k] = v;
+      else rest[k] = v;
+    }
+    if (audioBuffer) {
+      const fields = viewLoopToSample(loopChange, sample, audioBuffer.duration, audioBuffer.sampleRate);
+      if (fields) onUpdateSample(fields);
+    }
+    if (Object.keys(rest).length) onUpdateOtherParams(rest);
+  }, [audioBuffer, sample, onUpdateSample, onUpdateOtherParams]);
 
   // ─── View window ─────────────────────────────────────────────────
   const [viewStart, setViewStart] = useState(0);
@@ -214,7 +245,7 @@ export function useSampleEditorState(opts: UseSampleEditorStateOptions): SampleE
     canUndo, canRedo, undoLabel, redoLabel, undoCount, redoCount,
     pushUndo, doUndo, doRedo,
   } = useSampleEditorUndo({
-    audioBuffer, instrumentParameters, setAudioBuffer, onPersistBuffer, onUpdateParams,
+    audioBuffer, instrumentParameters: viewParams, setAudioBuffer, onPersistBuffer, onUpdateParams,
   });
 
   // ─── Display toggles ────────────────────────────────────────────
@@ -241,15 +272,12 @@ export function useSampleEditorState(opts: UseSampleEditorStateOptions): SampleE
   const params = useMemo((): SampleEditorParams => {
     const p = instrumentParameters || {};
     return {
-      loopEnabled: (p.loopEnabled as boolean) ?? false,
-      loopStart: (p.loopStart as number) ?? 0,
-      loopEnd: (p.loopEnd as number) ?? 1,
-      loopType: (p.loopType as LoopType) ?? 'forward',
+      ...loopView,
       baseNote: (p.baseNote as string) ?? 'C4',
       playbackRate: (p.playbackRate as number) ?? 1,
       reverse: (p.reverse as boolean) ?? false,
     };
-  }, [instrumentParameters]);
+  }, [instrumentParameters, loopView]);
 
   const updateParam = useCallback((key: string, value: string | number | boolean | null) => {
     onUpdateParams({ [key]: value });
@@ -402,8 +430,8 @@ export function useSampleEditorState(opts: UseSampleEditorStateOptions): SampleE
     if (!audioBuffer) return;
     const total = audioBuffer.length;
     if (total <= 0) return;
-    const currentLoopStart = (instrumentParameters?.loopStart as number) ?? 0;
-    const currentLoopEnd = (instrumentParameters?.loopEnd as number) ?? 1;
+    const currentLoopStart = loopView.loopStart;
+    const currentLoopEnd = loopView.loopEnd;
     const startFrame = Math.round(currentLoopStart * total);
     const endFrame = Math.round(currentLoopEnd * total);
     const snappedStart = WaveformProcessor.findNearestZeroCrossing(audioBuffer, startFrame);
@@ -413,7 +441,7 @@ export function useSampleEditorState(opts: UseSampleEditorStateOptions): SampleE
       loopEnd: Math.max(snappedEnd, snappedStart + 1) / total,
     });
     notify.success('Loop points snapped to zero crossings');
-  }, [audioBuffer, instrumentParameters, onUpdateParams]);
+  }, [audioBuffer, loopView, onUpdateParams]);
 
   void instrumentId;
 
