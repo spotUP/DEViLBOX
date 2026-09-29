@@ -15,9 +15,12 @@ class SonicArrangerProcessor extends AudioWorkletProcessor {
     this.bufferSize = 128;
     this.lastHeapBuffer = null;
     this.initializing = false;
+    // Per-channel dub sends + isolation slots (worklets/channel-outputs.js).
+    this._outs = globalThis.DevilboxChannelOutputs ? new globalThis.DevilboxChannelOutputs() : null;
     this.port.onmessage = (event) => { this.handleMessage(event.data); };
   }
   async handleMessage(data) {
+    if (this._outs && this._outs.handleMessage(data)) return;
     if (data.type !== 'init' && !this.module && this.initializing) return;
     switch (data.type) {
       case 'init': await this.initWasm(data.sampleRate, data.wasmBinary, data.jsCode); break;
@@ -121,12 +124,20 @@ class SonicArrangerProcessor extends AudioWorkletProcessor {
     if (!this.chBufs) return true;
     const rendered = this.module._sa_render_multi(this.handle, this.chPtrs[0], this.chPtrs[1], this.chPtrs[2], this.chPtrs[3], numSamples);
     if (rendered > 0) {
+      // A voice in an isolation slot leaves the mix; channel-outputs.js
+      // carries it (and the per-channel dub sends).
+      const o = this._outs;
+      const k0 = o && o.isIsolated(0) ? 0 : 1, k1 = o && o.isIsolated(1) ? 0 : 1;
+      const k2 = o && o.isIsolated(2) ? 0 : 1, k3 = o && o.isIsolated(3) ? 0 : 1;
+      const b0 = this.chBufs[0], b1 = this.chBufs[1], b2 = this.chBufs[2], b3 = this.chBufs[3];
       for (let i = 0; i < rendered; i++) {
-        outputL[i] = this.chBufs[0][i] + this.chBufs[3][i];
-        outputR[i] = this.chBufs[1][i] + this.chBufs[2][i];
+        outputL[i] = k0 * b0[i] + k3 * b3[i];
+        outputR[i] = k1 * b1[i] + k2 * b2[i];
       }
       // Every sample of each voice, for the oscilloscopes and the per-channel
       // role classifiers (worklets/channel-stream.js).
+      if (o) o.write(outputs, this.chBufs, rendered, (ch) => (ch === 1 || ch === 2 ? 1 : 0));
+
       if (globalThis.DevilboxChannelStream) {
         this._stream ||= new globalThis.DevilboxChannelStream(this.port, sampleRate);
         this._stream.writeFloat32(this.chBufs.slice(0, 4), rendered);
