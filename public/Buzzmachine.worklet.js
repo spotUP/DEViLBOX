@@ -324,6 +324,18 @@ class BuzzmachineProcessor extends AudioWorkletProcessor {
           this.buzzModule._buzz_stop(this.machinePtr);
         }
         break;
+
+      case 'dispose':
+        // The node was removed: free the machine and let process() return false
+        // so the browser can collect the node. Disposed machines used to keep
+        // their WASM instance and process() running for the rest of the session.
+        if (this.buzzModule && this.machinePtr && typeof this.buzzModule._buzz_delete_machine === 'function') {
+          try { this.buzzModule._buzz_delete_machine(this.machinePtr); } catch (e) { /* already gone */ }
+        }
+        this.machinePtr = 0;
+        this.isInitialized = false;
+        this.disposed = true;
+        break;
     }
   }
 
@@ -1200,6 +1212,7 @@ class BuzzmachineProcessor extends AudioWorkletProcessor {
   }
 
   process(inputs, outputs, parameters) {
+    if (this.disposed) return false;
     if (!this.isInitialized || !this.machinePtr || this.processingDisabled) {
       // Pass input through when disabled (bypass instead of silence)
       const input = inputs[0];

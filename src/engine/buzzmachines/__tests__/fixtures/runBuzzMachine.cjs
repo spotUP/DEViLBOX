@@ -22,6 +22,13 @@ realSetTimeout(() => {
   const out = [[new Float32Array(128), new Float32Array(128)]];
   const t0 = Date.now();
   const mode = process.argv[4] || 'both';
+  if (mode === 'dispose') {
+    // A removed node: the worklet frees the machine and its processor stops.
+    p.port.onmessage({ data: { type: 'dispose' } });
+    const keepsRunning = p.process([[]], out, {});
+    console.log(JSON.stringify({ type, msgs: posted.map((m) => m.type), keepsRunning }));
+    process.exit(0);
+  }
   if (mode !== 'input') for (let i = 0; i < 200; i++) { p.process([[]], out, {}); if (i === 0) console.log('STEP no-input block 0 done'); }
   if (mode !== 'noinput') {
     const sine = new Float32Array(128);
