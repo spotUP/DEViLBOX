@@ -1379,7 +1379,12 @@ export function setMasterEffects(params: Record<string, unknown>): Record<string
   const effects = params.effects as Array<Record<string, unknown>> | undefined;
   if (!Array.isArray(effects)) return { error: 'effects must be an array' };
 
+  // Every field of the config passes through - the neural model, channel
+  // routing, sidechain key - only the id is fresh. Rebuilding each effect from
+  // five fields dropped neuralModelIndex, so every GuitarML amp an audit set
+  // here ran with no model and read as a pass-through (2026-09-29).
   const configs = effects.map((fx, i) => ({
+    ...fx,
     id: `audit-fx-${Date.now()}-${i}`,
     category: (fx.category as string) ?? 'tonejs',
     type: fx.type as string,
