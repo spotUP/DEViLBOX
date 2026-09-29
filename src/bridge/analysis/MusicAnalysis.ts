@@ -244,7 +244,7 @@ export function detectChord(pitchClasses: number[]): string {
 
 // ─── Channel Role Classification ─────────────────────────────────────────────
 
-export type ChannelRole = 'bass' | 'lead' | 'chord' | 'percussion' | 'arpeggio' | 'pad' | 'empty' | 'skank';
+export type ChannelRole = 'bass' | 'lead' | 'chord' | 'percussion' | 'arpeggio' | 'pad' | 'empty' | 'skank' | 'fx';
 
 export interface ChannelAnalysis {
   channel: number;

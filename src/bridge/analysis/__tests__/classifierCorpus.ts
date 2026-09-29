@@ -15,7 +15,14 @@ import type { ChannelRole } from '../MusicAnalysis';
 export type ChannelLabel = 'drums' | 'bass' | 'lead' | 'harmony' | 'fx-vocal' | 'silent';
 export type ChannelSubLabel = 'arpeggio' | 'skank';
 
-export interface LabelledChannel { label: ChannelLabel; sub?: ChannelSubLabel }
+/**
+ * A channel's role. `label` is its role for most of the song. A channel that
+ * changes role - a lead that becomes a pad, effects that become drums - lists
+ * `sections` (song-order positions, inclusive) where it differs. `note` is
+ * free text for a mixed role ("bass and snare").
+ */
+export interface LabelledSection { from: number; to: number; label: ChannelLabel; sub?: ChannelSubLabel }
+export interface LabelledChannel { label: ChannelLabel; sub?: ChannelSubLabel; sections?: LabelledSection[]; note?: string }
 export interface LabelledSong {
   song: string;
   channels: LabelledChannel[];
@@ -80,6 +87,7 @@ export function roleToLabel(role: ChannelRole): LabelledChannel {
     case 'chord':
     case 'pad': return { label: 'harmony' };
     case 'skank': return { label: 'harmony', sub: 'skank' };
+    case 'fx': return { label: 'fx-vocal' };
     case 'empty': return { label: 'silent' };
   }
 }

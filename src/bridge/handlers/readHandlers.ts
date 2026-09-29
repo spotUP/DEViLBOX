@@ -1354,9 +1354,23 @@ export async function getChannelRoles(): Promise<Record<string, unknown>> {
   for (const inst of insts) {
     if (inst && typeof inst.id === 'number') lookup.set(inst.id, inst);
   }
-  const offline = classifySongRoles(patterns, lookup);
+  const offline = classifySongRoles(patterns, lookup, tracker.patternOrder);
   const runtime = getAllRuntimeChannelRoles(offline.length);
   const merged = mergeOfflineAndRuntimeRoles(offline, runtime);
+
+  // The instrument-first analysis the roles come from: what each instrument
+  // is (with its evidence) and what each channel plays in each section.
+  const { analyzeSong } = await import('../analysis/songAnalyzer');
+  const analysis = analyzeSong(patterns, tracker.patternOrder, lookup);
+  const instruments = [...analysis.instruments.values()].map((v) => ({
+    id: v.id, name: v.name, role: v.role, confidence: Math.round(v.confidence * 100) / 100,
+    ...(v.drumPart ? { drumPart: v.drumPart } : {}), ...(v.harmonyKind ? { harmonyKind: v.harmonyKind } : {}),
+    onsets: v.usage.onsets, pitches: v.usage.pitches, channels: v.usage.channels,
+    evidence: v.evidence.map((e) => `${e.source}${e.note ? ': ' + e.note : ''}`),
+  }));
+  const sections = analysis.timeline.map((secs) => secs.map((x) => ({
+    from: x.fromOrder, to: x.toOrder, role: x.role, ...(x.also ? { also: x.also } : {}), instruments: x.instruments,
+  })));
 
   const schema = patterns[0];
   const names = schema?.channels?.map((c) => c.name ?? null) ?? [];
@@ -1367,6 +1381,10 @@ export async function getChannelRoles(): Promise<Record<string, unknown>> {
     offline,
     runtime: runtime.map((h) => h ? { role: h.role, confidence: h.confidence, support: h.support } : null),
     names,
+    channelRoles: analysis.channelRoles,
+    sections,
+    instruments,
+    namesInformative: analysis.namesInformative,
   };
 }
 

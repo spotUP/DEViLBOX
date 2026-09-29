@@ -3,11 +3,10 @@
   "song": "src/__tests__/fixtures/micro15-goto80.mod",
   "channels": [
    {
-    "label": "harmony"
+    "label": "bass"
    },
    {
-    "label": "lead",
-    "sub": "arpeggio"
+    "label": "drums"
    },
    {
     "label": "drums"
@@ -16,46 +15,47 @@
     "label": "lead"
    }
   ],
-  "labelledBy": "draft",
+  "labelledBy": "owner",
   "date": "2026-09-29"
  },
  {
   "song": "public/data/songs/mod/world class dub.mod",
   "channels": [
    {
-    "label": "drums"
+    "label": "bass"
    },
    {
     "label": "drums"
-   },
-   {
-    "label": "harmony"
-   },
-   {
-    "label": "harmony"
-   }
-  ],
-  "labelledBy": "draft",
-  "date": "2026-09-29"
- },
- {
-  "song": "public/data/songs/mod/break the box.mod",
-  "channels": [
-   {
-    "label": "harmony"
    },
    {
     "label": "harmony",
     "sub": "skank"
    },
    {
-    "label": "harmony"
+    "label": "harmony",
+    "sub": "skank"
+   }
+  ],
+  "labelledBy": "owner",
+  "date": "2026-09-29"
+ },
+ {
+  "song": "public/data/songs/mod/break the box.mod",
+  "channels": [
+   {
+    "label": "drums"
+   },
+   {
+    "label": "drums"
+   },
+   {
+    "label": "fx-vocal"
    },
    {
     "label": "bass"
    }
   ],
-  "labelledBy": "draft",
+  "labelledBy": "owner",
   "date": "2026-09-29"
  },
  {
@@ -65,16 +65,17 @@
     "label": "drums"
    },
    {
-    "label": "drums"
+    "label": "bass",
+    "note": "bass and snare"
    },
    {
     "label": "harmony"
    },
    {
-    "label": "bass"
+    "label": "lead"
    }
   ],
-  "labelledBy": "draft",
+  "labelledBy": "owner",
   "date": "2026-09-29"
  },
  {
