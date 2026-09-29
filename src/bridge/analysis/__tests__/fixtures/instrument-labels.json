@@ -1,0 +1,12 @@
+[
+  {
+    "song": "src/__tests__/fixtures/micro15-goto80.mod",
+    "labelledBy": "owner",
+    "date": "2026-09-29",
+    "instruments": {
+      "10": { "role": "drums", "drumPart": "snare" },
+      "11": { "role": "drums", "drumPart": "perc", "note": "a rimshot" },
+      "13": { "role": "lead", "note": "never played in the song" }
+    }
+  }
+]

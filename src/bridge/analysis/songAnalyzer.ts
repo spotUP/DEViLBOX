@@ -34,7 +34,8 @@ import type { ChannelRole } from './MusicAnalysis';
 import type { ChannelSubrole } from './ChannelNaming';
 import { hardwareChannelClass } from './ChannelNaming';
 import { soundingSemitones, extractSynthTimbre, classifyBySynthParams, classifyByNativeSynth } from './synthEvidence';
-import { analyzeSampleForClassification, sampleLoopOf, type SampleSpectrumFeatures } from './SampleSpectrum';
+import { analyzeSampleForClassification, classifyBySpectralFeatures, sampleLoopOf, type SampleSpectrumFeatures } from './SampleSpectrum';
+import { samplePlaybackRate } from '@/engine/samplePlaybackRate';
 import { DRUM_SYNTHS } from '@/midi/performance/lightGuide';
 
 // ─── Vocabulary ─────────────────────────────────────────────────────────────
@@ -61,6 +62,8 @@ export interface InstrumentVerdict {
   /** 0..1: the winning score's share of all score mass. */
   confidence: number;
   drumPart?: DrumPart;
+  /** The drum's spectral centroid as the song plays it, when its part was judged by ear. */
+  heardCentroidHz?: number;
   harmonyKind?: HarmonyKind;
   scores: RoleScores;
   evidence: Evidence[];
@@ -404,7 +407,8 @@ function timbreEvidence(inst: InstrumentConfig, sound: ReturnType<typeof timbreO
     }
     // The old spectrum rules, as a weak vote on drum parts and pads.
     const r = roleFromLegacy(legacy.role);
-    if (r === 'drums' && legacy.confidence >= 0.6) { scores.drums = (scores.drums ?? 0) + 0.2; hints.drumPart ??= drumPartOf(legacy.subrole); }
+    // Its drum part is judged as the sample sounds in the song (soundingDrumPart), not here.
+    if (r === 'drums' && legacy.confidence >= 0.6) scores.drums = (scores.drums ?? 0) + 0.2;
     if (legacy.role === 'pad') hints.harmonyKind ??= 'pad';
     if (Object.keys(scores).length) ev.push({ source: 'spectrum', scores, note: `${notes.join(', ')}; centroid ${f.centroidHz.toFixed(0)} Hz, flat ${f.flatness.toFixed(2)}, harm ${f.harmonicity.toFixed(2)}, decay ${f.decayMs.toFixed(0)} ms${t.looped ? ', loop' : ''}` });
   }
@@ -532,12 +536,64 @@ function verdictOf(id: number, inst: InstrumentConfig | undefined, usage: Instru
 
   const v: InstrumentVerdict = { id, name: inst?.name ?? '', role, confidence: label ? 1 : confidence, scores, evidence, usage };
   if (role === 'drums') {
+    const byEar = hints.drumPart ? undefined : soundingDrumPart(inst, sound, usage);
+    if (byEar) { evidence.push(byEar.evidence); v.heardCentroidHz = byEar.heardCentroidHz; }
     // Beat position names a part only when it is decisive.
-    v.drumPart = hints.drumPart ?? (usage.barStart >= 0.7 ? 'kick' : usage.barMid >= 0.7 ? 'snare' : usage.density >= 0.5 ? 'hat' : 'perc');
+    v.drumPart = hints.drumPart ?? byEar?.part ?? (usage.barStart >= 0.7 ? 'kick' : usage.barMid >= 0.7 ? 'snare' : usage.density >= 0.5 ? 'hat' : 'perc');
   } else if (role === 'harmony') {
     v.harmonyKind = hints.harmonyKind ?? (usage.offBeat >= 0.6 ? 'skank' : usage.density >= 0.5 && usage.leaps >= 0.3 ? 'arpeggio' : 'chord');
   }
   return v;
+}
+
+/**
+ * A drum's part from its spectrum AS PLAYED. A tracker plays a drum sample at
+ * its written note: micro15.mod's snare is a 197 Hz, 260 ms thump at its
+ * recorded speed - a kick by the numbers - and sounds at 1.6 kHz and 32 ms,
+ * three octaves up, where the song writes it. Frequencies scale with the
+ * playback rate, times against it; the spectral rules then read the sound
+ * the listener hears. A hat keeps time: a bright click heard only a few
+ * times a pattern is a rimshot or a percussion accent.
+ */
+function soundingDrumPart(inst: InstrumentConfig | undefined, sound: ReturnType<typeof timbreOf>, usage: InstrumentUsage): { part: DrumPart; heardCentroidHz: number; evidence: Evidence } | undefined {
+  const f = sound.features;
+  if (!f || usage.onsets === 0) return undefined;
+  const rate = samplePlaybackRate(inst, usage.writtenMedian);
+  const heard: SampleSpectrumFeatures = {
+    ...f,
+    centroidHz: f.centroidHz * rate, peakHz: f.peakHz * rate,
+    decayMs: f.decayMs / rate, durationSec: f.durationSec / rate, sampleRate: f.sampleRate * rate,
+  };
+  const c = classifyBySpectralFeatures(heard);
+  if (c.role !== 'percussion') return undefined;
+  let part = drumPartOf(c.subrole);
+  if (!part) return undefined;
+  if (part === 'hat' && usage.onsets / Math.max(1, usage.positions) < 16) part = 'perc';
+  return {
+    part,
+    heardCentroidHz: heard.centroidHz,
+    evidence: { source: 'spectrum', scores: {}, note: `as played (x${rate.toFixed(1)}): centroid ${heard.centroidHz.toFixed(0)} Hz, decay ${heard.decayMs.toFixed(0)} ms - ${part}` },
+  };
+}
+
+/**
+ * Drum parts are relative within a kit. Spectral rules judge each drum
+ * alone, so a chip kit's snare - a low, dull noise burst - can read as a
+ * second kick, and a rimshot as a second snare. Among the drums judged by
+ * ear: the lowest-sounding "kick" is the kick, and one sounding an octave or
+ * more above it is the snare; the most-played "snare" is the snare, and one
+ * heard under a quarter as often is a percussion accent (a rim, a clap).
+ * Parts from a label, a name or the instrument itself are left alone.
+ */
+function resolveKit(verdicts: Iterable<InstrumentVerdict>): Map<number, DrumPart> {
+  const byEar = [...verdicts].filter((v) => v.role === 'drums' && v.heardCentroidHz !== undefined);
+  const moved = new Map<number, DrumPart>();
+  const part = (v: InstrumentVerdict) => moved.get(v.id) ?? v.drumPart;
+  const kicks = byEar.filter((v) => part(v) === 'kick').sort((a, b) => a.heardCentroidHz! - b.heardCentroidHz!);
+  for (const v of kicks.slice(1)) if (v.heardCentroidHz! >= 2 * kicks[0].heardCentroidHz!) moved.set(v.id, 'snare');
+  const snares = byEar.filter((v) => part(v) === 'snare').sort((a, b) => b.usage.onsets - a.usage.onsets);
+  for (const v of snares.slice(1)) if (v.usage.onsets * 4 < snares[0].usage.onsets) moved.set(v.id, 'perc');
+  return moved;
 }
 
 // ─── 5. Channel timeline ────────────────────────────────────────────────────
@@ -656,6 +712,15 @@ export function analyzeSong(
     for (const ch of new Set(walk.onsets.filter((o) => o.instrument === id).map((o) => o.channel))) {
       parts.set(`${id}:${ch}`, verdictOf(id, instruments.get(id), usageOf(id, walk, lowest, ch), sound, trustNames, label));
     }
+  }
+
+  const kit = resolveKit(verdicts.values());
+  for (const [id, drumPart] of kit) {
+    const note = (from: DrumPart | undefined) => ({ source: 'spectrum' as const, scores: {}, note: `in this kit: ${from} -> ${drumPart}` });
+    const v = verdicts.get(id)!;
+    v.evidence.push(note(v.drumPart));
+    v.drumPart = drumPart;
+    for (const [k, p] of parts) if (k.startsWith(`${id}:`) && p.role === 'drums') { p.evidence.push(note(p.drumPart)); p.drumPart = drumPart; }
   }
 
   // A chip's noise channel is its drum channel whatever plays on it.
