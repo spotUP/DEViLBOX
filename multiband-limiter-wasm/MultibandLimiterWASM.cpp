@@ -70,6 +70,10 @@ struct Instance {
 
     lr4::Split3 splitL, splitR;   // flat-summing LR4 split (wasm-common/lr4_crossover.h)
     BandLimiter bands[3];
+    // The dry side of the mix, carrying the wet's split phase and its
+    // LOOKAHEAD delay: the raw input combed against the delayed bands at mix < 1.
+    float dryDelayL[LOOKAHEAD] = {}, dryDelayR[LOOKAHEAD] = {};
+    int dryPos = 0;
     float releaseCoeff = 0.0f;
 
     void init(float sr) {
@@ -81,6 +85,8 @@ struct Instance {
 
     void resetFilters() {
         splitL.reset(); splitR.reset();
+        std::memset(dryDelayL, 0, sizeof(dryDelayL)); std::memset(dryDelayR, 0, sizeof(dryDelayR));
+        dryPos = 0;
     }
 
     void updateCoeffs() {
@@ -107,8 +113,13 @@ struct Instance {
             float wetL = bll + bml + bhl;
             float wetR = blr + bmr + bhr;
 
-            outL[i] = wetL * mix + inL[i] * (1.0f - mix);
-            outR[i] = wetR * mix + inR[i] * (1.0f - mix);
+            const float dryL = dryDelayL[dryPos], dryR = dryDelayR[dryPos];
+            dryDelayL[dryPos] = ll + ml + hl;
+            dryDelayR[dryPos] = lr + mr + hr;
+            dryPos = (dryPos + 1) % LOOKAHEAD;
+
+            outL[i] = wetL * mix + dryL * (1.0f - mix);
+            outR[i] = wetR * mix + dryR * (1.0f - mix);
         }
     }
 };
