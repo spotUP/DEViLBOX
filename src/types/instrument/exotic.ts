@@ -124,6 +124,13 @@ export interface SoundMonConfig {
   vibratoDepth: number;      // 0-63
   portamentoSpeed: number;   // 0-63 (0 = disabled)
   wavePCM?: number[];        // Signed 8-bit PCM of the synth waveform (64 bytes)
+  /**
+   * The replayer's real volume envelope, as the song file stores it: one level
+   * (0-63, table byte + 128 / 4) per step, a step every `speed` frames;
+   * control 0 = no envelope, 1 = play once, otherwise loop. The ADSR fields
+   * above are an editor approximation of it.
+   */
+  adsr?: { control: number; speed: number; levels: number[] };
   // PCM fields (type === 'pcm')
   pcmData?: Uint8Array;      // Raw 8-bit signed PCM
   loopStart?: number;        // Loop start in samples
