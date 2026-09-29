@@ -301,6 +301,18 @@ export function buildDeckBindings(params: {
 }
 
 /**
+ * The dub bus settings the deck's encoders and faders turn. A slider for one
+ * of these elsewhere on screen is the same control twice - "we have a return
+ * gain knob and an fx wet slider, when i turn the knob the slider moves"
+ * (2026-09-30) - so the live row hides those while the deck shows.
+ */
+export function busParamsOnDeck(bindings: Record<string, ControlDeckBinding>): Set<string> {
+  const out = new Set<string>();
+  for (const b of Object.values(bindings)) if (b.turn?.kind === 'busParam') out.add(b.turn.target);
+  return out;
+}
+
+/**
  * The caption for a control in deck shape.
  *
  * The deck's own short label, because that is the word the performer already

@@ -176,9 +176,28 @@ const TURN_SLOP = 4;
 /**
  * How long an encoder must be held still before its press fires a HELD move.
  * Grabbing a knob and pressing it start the same way; a turn leaves
- * TURN_SLOP within the first frames of the drag, a press stays put.
+ * TURN_SLOP early in the drag, a press stays put. 180 ms caught the still
+ * start of a slow twist ("the echo wet and sidechain produce a humming sound
+ * while twisted", 2026-09-30).
  */
-const ENCODER_PRESS_MS = 180;
+const ENCODER_PRESS_MS = 300;
+
+/**
+ * Every control of one layer bound to what the deck does with it - the
+ * device preset under the user's overrides. One place, so the deck and
+ * anything that must agree with it (the live row) read the same bindings.
+ */
+export function useDeckBindings(
+  layout: ControllerLayout | null,
+  layer: 'A' | 'B',
+  moves: ReadonlyMap<string, DeckMove>,
+): Record<string, ControlDeckBinding> {
+  const layoutId = layout?.id ?? '';
+  const overrides = useMIDIPresetStore(useCallback((s) => s.overrides[layoutId], [layoutId]));
+  return useMemo(() => (layout ? buildDeckBindings({
+    layout, layer, preset: getPresetById(layout.id), overrides: overrides ?? {}, moves,
+  }) : {}), [layout, layer, overrides, moves]);
+}
 
 /** One encoder press being timed or held. */
 export interface EncoderHold { x: number; y: number; engaged: boolean; timer: ReturnType<typeof setTimeout> | null }
@@ -186,8 +205,9 @@ export interface EncoderHold { x: number; y: number; engaged: boolean; timer: Re
 /**
  * Pointer handlers that make an encoder's HELD press work without taking the
  * knob's pointer: the hold engages after ENCODER_PRESS_MS of the pointer held
- * still, a move past TURN_SLOP first is a turn (nothing fires), and release
- * ends an engaged hold. No pointer capture - the knob keeps its drag.
+ * still, a move past TURN_SLOP is a turn (nothing fires, or an engaged hold
+ * ends), and release ends an engaged hold. No pointer capture - the knob
+ * keeps its drag.
  */
 export function encoderHoldGesture(
   ref: { current: EncoderHold | null },
@@ -216,8 +236,11 @@ export function encoderHoldGesture(
     },
     onPointerMove: (e: { clientX: number; clientY: number }) => {
       const g = ref.current;
-      if (!g || g.engaged) return;
-      if (Math.abs(e.clientX - g.x) > TURN_SLOP || Math.abs(e.clientY - g.y) > TURN_SLOP) release(); // a turn
+      if (!g) return;
+      // A turn - before the hold engaged or after: a twist always moves, so a
+      // held move that started on a slow twist's still start ends here rather
+      // than droning under the whole turn.
+      if (Math.abs(e.clientX - g.x) > TURN_SLOP || Math.abs(e.clientY - g.y) > TURN_SLOP) release();
     },
     onPointerUp: release,
     onPointerCancel: release,
@@ -262,20 +285,8 @@ export const ControllerShapedDeck: React.FC<ControllerShapedDeckProps> = ({
   /** The encoder press being timed or held (one pointer at a time). */
   const encoderHold = React.useRef<EncoderHold | null>(null);
 
-  const overrides = useMIDIPresetStore(
-    useCallback((s) => s.overrides[layout.id], [layout.id]),
-  );
-
-  const placements = useMemo(() => {
-    const bindings = buildDeckBindings({
-      layout,
-      layer,
-      preset: getPresetById(layout.id),
-      overrides: overrides ?? {},
-      moves,
-    });
-    return deckControls(layout, layer, bindings);
-  }, [layout, layer, overrides, moves]);
+  const bindings = useDeckBindings(layout, layer, moves);
+  const placements = useMemo(() => deckControls(layout, layer, bindings), [layout, layer, bindings]);
 
   /**
    * The rectangle the fader bank and its select row occupy.
