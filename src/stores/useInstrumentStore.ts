@@ -219,6 +219,72 @@ function findNextId(existingIds: number[]): number {
   return 1; // Return 1 as fallback (not 0, which means "no instrument")
 };
 
+/** Every instrument that is monophonic by nature (auto-sets `monophonic`). */
+const MONO_SYNTH_TYPES = new Set([
+  // Tone.js monophonic synths
+  'MonoSynth', 'DuoSynth',
+  // Acid/bass synths
+  'TB303', 'Buzz3o3', 'DB303',
+  // Simple monophonic synths
+  'DubSiren', 'SpaceLaser', 'Synare',
+  // Speech synthesis chips (single voice)
+  'MAMEMEA8000', 'MAMETMS5220', 'MAMESP0250', 'MAMEVotrax',
+  'Sam', 'V2Speech',
+  // Single-voice generator chips
+  'MAMECM3394', 'MAMETMS36XX', 'MAMESN76477',
+  'MAMEUPD931', 'MAMEUPD933',
+]);
+
+/**
+ * A complete instrument config from a partial one: defaults merged in,
+ * irrelevant sub-configs stripped, from-scratch Sonix params seeded, the
+ * monophonic flag set. Pure - createInstrument stores it; a loader building
+ * a whole song (applySong) collects them.
+ */
+export function buildInstrumentConfig(id: number, config?: DeepPartial<InstrumentConfig>): InstrumentConfig {
+  const defaultInst = createDefaultInstrument(id);
+  // Use deepMerge to properly merge partial config into default
+  const newInstrument: InstrumentConfig = config
+    ? deepMerge(defaultInst, config as Partial<InstrumentConfig>)
+    : defaultInst;
+
+  // Ensure ID is correct (deepMerge might have overwritten it if config had id)
+  newInstrument.id = id;
+
+  // Strip irrelevant synth sub-configs to prevent stale data from
+  // interfering with persistence (e.g., tb303 config on a Sampler instrument
+  // would cause loadInstruments migration confusion)
+  if (newInstrument.synthType && newInstrument.synthType !== 'TB303' && newInstrument.synthType !== 'Buzz3o3') {
+    delete newInstrument.tb303;
+  }
+  // Strip sample config from non-sample instruments
+  if (newInstrument.synthType && newInstrument.synthType !== 'Sampler' && newInstrument.synthType !== 'Player') {
+    delete newInstrument.sample;
+  }
+
+  // Seed Sonix synth params for a from-scratch SonixSynth so the editor opens
+  // populated and the voice is audible (the WASM->store bridge only fills these
+  // from a loaded song). Covers every creation path, not just the type switcher.
+  if (newInstrument.synthType === 'SonixSynth'
+    && !(newInstrument.parameters as Record<string, unknown> | undefined)?.sonix) {
+    newInstrument.type = 'synth';
+    newInstrument.parameters = {
+      ...(newInstrument.parameters as Record<string, unknown> | undefined),
+      sonixIndex: 0,
+      sonix: getDefaultSonixParams(),
+    };
+  }
+
+  // Auto-set monophonic flag for synths that are inherently monophonic
+  // Only set if not explicitly specified in config
+  if (config?.monophonic === undefined) {
+    if (newInstrument.synthType && MONO_SYNTH_TYPES.has(newInstrument.synthType)) {
+      newInstrument.monophonic = true;
+    }
+  }
+  return newInstrument;
+}
+
 export const useInstrumentStore = create<InstrumentStore>()(
   immer((set, get) => {
     // Batched set for continuous controls — audio engine updates happen
@@ -1129,62 +1195,7 @@ export const useInstrumentStore = create<InstrumentStore>()(
       const newId = findNextId(existingIds);
 
       set((state) => {
-        const defaultInst = createDefaultInstrument(newId);
-        // Use deepMerge to properly merge partial config into default
-        const newInstrument: InstrumentConfig = config
-          ? deepMerge(defaultInst, config as Partial<InstrumentConfig>)
-          : defaultInst;
-
-        // Ensure ID is correct (deepMerge might have overwritten it if config had id)
-        newInstrument.id = newId;
-
-        // Strip irrelevant synth sub-configs to prevent stale data from
-        // interfering with persistence (e.g., tb303 config on a Sampler instrument
-        // would cause loadInstruments migration confusion)
-        if (newInstrument.synthType && newInstrument.synthType !== 'TB303' && newInstrument.synthType !== 'Buzz3o3') {
-          delete newInstrument.tb303;
-        }
-        // Strip sample config from non-sample instruments
-        if (newInstrument.synthType && newInstrument.synthType !== 'Sampler' && newInstrument.synthType !== 'Player') {
-          delete newInstrument.sample;
-        }
-
-        // Seed Sonix synth params for a from-scratch SonixSynth so the editor opens
-        // populated and the voice is audible (the WASM->store bridge only fills these
-        // from a loaded song). Covers every creation path, not just the type switcher.
-        if (newInstrument.synthType === 'SonixSynth'
-          && !(newInstrument.parameters as Record<string, unknown> | undefined)?.sonix) {
-          newInstrument.type = 'synth';
-          newInstrument.parameters = {
-            ...(newInstrument.parameters as Record<string, unknown> | undefined),
-            sonixIndex: 0,
-            sonix: getDefaultSonixParams(),
-          };
-        }
-
-        // Auto-set monophonic flag for synths that are inherently monophonic
-        // Only set if not explicitly specified in config
-        if (config?.monophonic === undefined) {
-          const monoSynthTypes = new Set([
-            // Tone.js monophonic synths
-            'MonoSynth', 'DuoSynth',
-            // Acid/bass synths
-            'TB303', 'Buzz3o3', 'DB303',
-            // Simple monophonic synths
-            'DubSiren', 'SpaceLaser', 'Synare',
-            // Speech synthesis chips (single voice)
-            'MAMEMEA8000', 'MAMETMS5220', 'MAMESP0250', 'MAMEVotrax',
-            'Sam', 'V2Speech',
-            // Single-voice generator chips
-            'MAMECM3394', 'MAMETMS36XX', 'MAMESN76477',
-            'MAMEUPD931', 'MAMEUPD933',
-          ]);
-
-          if (newInstrument.synthType && monoSynthTypes.has(newInstrument.synthType)) {
-            newInstrument.monophonic = true;
-          }
-        }
-
+        const newInstrument = buildInstrumentConfig(newId, config);
         state.instruments.push(newInstrument);
         state.currentInstrumentId = newId;
       });
@@ -1207,17 +1218,8 @@ export const useInstrumentStore = create<InstrumentStore>()(
           finalConfig.id = findNextId(existingIds);
         }
         if (finalConfig.monophonic === undefined) {
-          const monoSynthTypes = new Set([
-            'MonoSynth', 'DuoSynth',
-            'TB303', 'Buzz3o3', 'DB303',
-            'DubSiren', 'SpaceLaser', 'Synare',
-            'MAMEMEA8000', 'MAMETMS5220', 'MAMESP0250', 'MAMEVotrax',
-            'Sam', 'V2Speech',
-            'MAMECM3394', 'MAMETMS36XX', 'MAMESN76477',
-            'MAMEUPD931', 'MAMEUPD933',
-          ]);
 
-          if (finalConfig.synthType && monoSynthTypes.has(finalConfig.synthType)) {
+          if (finalConfig.synthType && MONO_SYNTH_TYPES.has(finalConfig.synthType)) {
             finalConfig.monophonic = true;
           }
         }

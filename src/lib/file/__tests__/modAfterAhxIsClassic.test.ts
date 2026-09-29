@@ -61,4 +61,23 @@ describe('MOD after AHX', () => {
     expect(s.hivelyNative).toBeNull();
     expect(s.hivelyFileData).toBeNull();
   }, 60000);
+
+  // Reachability, not a regression: the old MIDI path's up-front tracker reset
+  // already reset the format store. Proves loadFile's MIDI branch reaches applySong.
+  it('a MIDI file after an AHX is classic too (loadFile -> applySong)', async () => {
+    const { importTrackerModule, loadFile } = await import('../UnifiedFileLoader');
+    const { useFormatStore } = await import('@/stores/useFormatStore');
+    const ahx = fileOf('public/data/songs/ahx/amanda.ahx', 'amanda.ahx');
+    await importTrackerModule({
+      metadata: { title: 'amanda', type: 'AHX', channels: -1, patterns: -1, orders: -1, instruments: -1, samples: -1, duration: 0 },
+      arrayBuffer: await ahx.arrayBuffer(), file: ahx,
+    } as never, { useLibopenmpt: true } as never);
+    expect(useFormatStore.getState().editorMode).toBe('hively');
+
+    const mid = fileOf('public/data/songs/midi/warning.mid', 'warning.mid');
+    const result = await loadFile(mid);
+    expect(result.success).toBe(true);
+    expect(useFormatStore.getState().editorMode).toBe('classic');
+    expect(useFormatStore.getState().hivelyNative).toBeNull();
+  }, 60000);
 });

@@ -8,9 +8,10 @@
  */
 
 import type { InstrumentConfig } from '@/types/instrument';
+import type { Pattern } from '@/types';
 import { useTrackerStore } from '@/stores/useTrackerStore';
 import { useFormatStore } from '@/stores/useFormatStore';
-import { useInstrumentStore } from '@/stores/useInstrumentStore';
+import { useInstrumentStore, buildInstrumentConfig } from '@/stores/useInstrumentStore';
 import { useTransportStore } from '@/stores/useTransportStore';
 import { useProjectStore } from '@/stores/useProjectStore';
 import { useAutomationStore } from '@/stores/useAutomationStore';
@@ -636,9 +637,9 @@ async function loadSongFile(file: File, options: FileLoadOptions, preReadBuffer?
   clearExplicitlySaved();
 
   const { loadPatterns, setPatternOrder, setCurrentPattern, reset: resetTracker } = useTrackerStore.getState();
-  const { applyEditorMode, setOriginalModuleData } = useFormatStore.getState();
-  const { loadInstruments, addInstrument, reset: resetInstruments } = useInstrumentStore.getState();
-  const { setBPM, setSpeed, reset: resetTransport } = useTransportStore.getState();
+  const { applyEditorMode } = useFormatStore.getState();
+  const { addInstrument, reset: resetInstruments } = useInstrumentStore.getState();
+  const { setBPM, reset: resetTransport } = useTransportStore.getState();
   const { setMetadata } = useProjectStore.getState();
   const { reset: resetAutomation } = useAutomationStore.getState();
   const engine = getToneEngine();
@@ -802,19 +803,8 @@ async function loadSongFile(file: File, options: FileLoadOptions, preReadBuffer?
     }
   }
 
-  // === FULL STATE RESET (unless preserveInstruments) ===
-  await stopActivePlaybackForIncomingSong(engine);
-
-  // TD-3 append mode: skip full reset — the TD-3 handler manages patterns itself
-  const isTD3Append = (filename.endsWith('.sqs') || filename.endsWith('.seq')) && options.replacePatterns === false;
-
-  if (!options.preserveInstruments && !isTD3Append) {
-    resetAutomation();
-    resetTransport();
-    resetTracker();
-    resetInstruments();
-    engine.disposeAllInstruments();
-  }
+  // Whole songs (.dbx, MIDI, SunVox) reset inside applySong; the TD-3 pattern
+  // import below is the one path here that manages the stores itself.
 
   // === .dbx - DEViLBOX project ===
   if (filename.endsWith('.dbx')) {
@@ -847,34 +837,20 @@ async function loadSongFile(file: File, options: FileLoadOptions, preReadBuffer?
       return { success: false, error: 'No patterns found in MIDI file' };
     }
 
-    // Load instruments FIRST, then wait for the microtask to complete.
-    // loadInstruments defers its set() via queueMicrotask.
-    // If we load patterns immediately, the playback effect fires before instruments
-    // are in the store → replayer gets empty instrument list → silence.
-    if (result.instruments.length > 0) {
-      loadInstruments(result.instruments);
-    }
-    // Wait for the queueMicrotask inside loadInstruments to flush
-    await new Promise(resolve => setTimeout(resolve, 0));
-
-    loadPatterns(result.patterns);
     const songPositions = result.patterns.map((_: unknown, i: number) => i);
-    setPatternOrder(songPositions);
-    setCurrentPattern(0);
-    setBPM(result.bpm);
-    setSpeed(6);
-    setOriginalModuleData({
-      base64: '',
-      format: 'XM' as 'MOD' | 'XM' | 'IT' | 'S3M' | 'UNKNOWN',
-      initialBPM: result.bpm,
-      initialSpeed: 6,
-      songLength: songPositions.length,
-    } as any);
-    setMetadata({
-      name: result.metadata.name,
-      author: '',
-      description: `Imported from ${file.name} (${result.metadata.tracks} tracks)`,
-    });
+    await applySong({
+      instruments: result.instruments, patterns: result.patterns, order: songPositions,
+      bpm: result.bpm, speed: 6,
+      metadata: { name: result.metadata.name, description: `Imported from ${file.name} (${result.metadata.tracks} tracks)` },
+      originalModuleData: {
+        base64: '',
+        format: 'XM' as 'MOD' | 'XM' | 'IT' | 'S3M' | 'UNKNOWN',
+        initialBPM: result.bpm,
+        initialSpeed: 6,
+        songLength: songPositions.length,
+      } as never,
+      engine: {},
+    }, 'import');
 
     return {
       success: true,
@@ -884,6 +860,16 @@ async function loadSongFile(file: File, options: FileLoadOptions, preReadBuffer?
 
   // === .sqs/.seq - TD-3 pattern files ===
   if (filename.endsWith('.sqs') || filename.endsWith('.seq')) {
+    await stopActivePlaybackForIncomingSong(engine);
+    // Replace mode starts clean; append mode (replacePatterns false) keeps
+    // the song and adds the patterns to it.
+    if (!options.preserveInstruments && options.replacePatterns !== false) {
+      resetAutomation();
+      resetTransport();
+      resetTracker();
+      resetInstruments();
+      engine.disposeAllInstruments();
+    }
     const { parseTD3File } = await import('@lib/import/TD3PatternLoader');
     const { td3StepsToTrackerCells } = await import('@/midi/sysex/TD3PatternTranslator');
     const { createDefaultTB303Instrument } = await import('@lib/instrumentFactory');
@@ -997,11 +983,14 @@ async function loadSongFile(file: File, options: FileLoadOptions, preReadBuffer?
       // Build SunVox module ID → instrument index (1-based) mapping
       const svModToInstrIdx = new Map<number, number>();
 
+      // The song's instruments, built here and applied with the rest of the
+      // song by applySong.
+      const svInstruments: InstrumentConfig[] = [];
       if (generators.length > 0) {
         for (let g = 0; g < generators.length; g++) {
           const gen = generators[g];
           const subGraph = sunvoxSubGraphForGenerator(graph, gen.id);
-          useInstrumentStore.getState().createInstrument({
+          svInstruments.push(buildInstrumentConfig(svInstruments.length + 1, {
             name: gen.name || `SV Module ${gen.id}`,
             synthType: 'SunVoxModular' as const,
             sunvoxModular: subGraph,
@@ -1012,33 +1001,24 @@ async function loadSongFile(file: File, options: FileLoadOptions, preReadBuffer?
               noteTargetModuleId: gen.id,
               controlValues: {} as Record<string, number>,
             },
-          });
-          const insts = useInstrumentStore.getState().instruments;
-          svModToInstrIdx.set(gen.id, insts[insts.length - 1].id);
+          }));
+          svModToInstrIdx.set(gen.id, svInstruments[svInstruments.length - 1].id);
         }
       } else {
         // No generators found — create one song-mode instrument
-        useInstrumentStore.getState().createInstrument({
+        svInstruments.push(buildInstrumentConfig(1, {
           name,
           synthType: 'SunVoxModular' as const,
           sunvoxModular: { modules: [], connections: [], polyphony: 1, viewMode: 'canvas' as const, backend: 'sunvox' as const },
           sunvox: { patchData: preReadBuf!, patchName: name, isSong: true, controlValues: {} as Record<string, number> },
-        });
-      }
-
-      // Select first instrument
-      const allInsts = useInstrumentStore.getState().instruments;
-      if (allInsts.length > 0) {
-        useInstrumentStore.getState().setCurrentInstrument(allInsts[0].id);
+        }));
       }
 
       // Build moduleId → name map for channel labelling
       const moduleNameMap = new Map<number, string>(extractedModules.map(m => [m.id, m.name]));
 
-      // Set BPM from metadata if available
       const meta = preSunVoxMeta as SunVoxSongMeta | null;
-      const bpm = meta?.bpm;
-      if (bpm && bpm > 0) useTransportStore.getState().setBPM(bpm);
+      const bpm = meta?.bpm && meta.bpm > 0 ? meta.bpm : 125;
 
       // --- Build DEViLBOX patterns from real SunVox pattern data ---
       // SunVox uses a 2D timeline: patterns at (x, y) where x=time position,
@@ -1149,11 +1129,14 @@ async function loadSongFile(file: File, options: FileLoadOptions, preReadBuffer?
         patternsToLoad = [{ id: `svox-${Date.now()}`, name, length: PATTERN_LEN, channels }];
       }
 
-      loadPatterns(patternsToLoad);
-      setCurrentPattern(0);
-      setPatternOrder(patternsToLoad.map((_, i) => i));
-      setMetadata({ name, author: '', description: `Imported from ${file.name} (${generators.length} instruments, ${extractedModules.length} modules)` });
-      applyEditorMode({});
+      await applySong({
+        instruments: svInstruments, patterns: patternsToLoad as Pattern[], order: patternsToLoad.map((_, i) => i),
+        bpm, speed: 6,
+        metadata: { name, description: `Imported from ${file.name} (${generators.length} instruments, ${extractedModules.length} modules)` },
+        originalModuleData: null,
+        engine: {},
+      }, 'import');
+      if (svInstruments.length > 0) useInstrumentStore.getState().setCurrentInstrument(svInstruments[0].id);
 
       // Auto-switch to SunVox channel view
       useUIStore.getState().setActiveView('tracker');
@@ -1163,25 +1146,20 @@ async function loadSongFile(file: File, options: FileLoadOptions, preReadBuffer?
     }
 
     // Fallback: song mode — load the whole project as a single instrument.
-    const buffer = preReadBuf!;
-    useInstrumentStore.getState().createInstrument({
+    const songInstrument = buildInstrumentConfig(1, {
       name,
       synthType: 'SunVoxModular' as const,
       sunvoxModular: { modules: [], connections: [], polyphony: 1, viewMode: 'canvas' as const, backend: 'sunvox' as const },
       sunvox: {
-        patchData: buffer,
+        patchData: preReadBuf!,
         patchName: name,
         isSong: true,
         controlValues: {} as Record<string, number>,
       },
     });
-    const instruments = useInstrumentStore.getState().instruments;
-    const newInstrument = instruments[instruments.length - 1];
-    useInstrumentStore.getState().setCurrentInstrument(newInstrument.id);
-    const instrumentIndex = instruments.length; // 1-based tracker index
     const rows = Array.from({ length: PATTERN_LEN }, (_, i) =>
       i === 0
-        ? { note: 49, instrument: instrumentIndex, volume: 64, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 }
+        ? { note: 49, instrument: songInstrument.id, volume: 64, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 }
         : { ...emptyRow }
     );
     const pattern = {
@@ -1196,17 +1174,21 @@ async function loadSongFile(file: File, options: FileLoadOptions, preReadBuffer?
         collapsed: false,
         volume: 100,
         pan: 0,
-        instrumentId: newInstrument.id,
+        instrumentId: songInstrument.id,
         color: '#facc15',
         rows,
       }],
     };
-    loadPatterns([pattern]);
-    setCurrentPattern(0);
-    // Create enough pattern order positions to cover ~10 minutes of playback.
-    setPatternOrder([0, 0, 0, 0, 0]);
-    setMetadata({ name, author: '', description: `Imported from ${file.name}` });
-    applyEditorMode({});
+    await applySong({
+      instruments: [songInstrument], patterns: [pattern] as Pattern[],
+      // Enough pattern order positions to cover ~10 minutes of playback.
+      order: [0, 0, 0, 0, 0],
+      bpm: 125, speed: 6,
+      metadata: { name, description: `Imported from ${file.name}` },
+      originalModuleData: null,
+      engine: {},
+    }, 'import');
+    useInstrumentStore.getState().setCurrentInstrument(songInstrument.id);
 
     // Auto-switch to SunVox channel view
     useUIStore.getState().setActiveView('tracker');
