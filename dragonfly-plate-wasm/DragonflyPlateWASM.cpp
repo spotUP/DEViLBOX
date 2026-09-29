@@ -124,10 +124,10 @@ struct PlateReverbInstance {
             lpfStateR = sumR * (1.0f - lpfCoeff) + lpfStateR * lpfCoeff;
 
             // Stereo width
-            // Makeup to the input's level at the default settings (white noise,
-            // measured 2026-09-29: the mono input sum, feedback damping and this
-            // output low-pass left the tail 10.0 dB under the dry signal).
-            constexpr float kMakeup = 3.162f;
+            // Makeup to the input's level at the default settings on PINK noise
+            // (music-like; measured 2026-09-29). The damped tail keeps its lows,
+            // where the combs add in phase, so white noise under-reads it.
+            constexpr float kMakeup = 0.3273f;
             float mid = (lpfStateL + lpfStateR) * 0.5f * kMakeup;
             float side = (lpfStateL - lpfStateR) * 0.5f * width * kMakeup;
             outL[i] = mid + side;

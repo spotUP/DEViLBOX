@@ -9,9 +9,8 @@
  * dropped Freeverb's 0.015 input gain that compensates for it: the Hall read
  * +19 dB at wet 100 % on pink noise (2026-09-29).
  *
- * combSumNorm(g, n): the gain that brings n parallel combs of feedback g back
- * to unity on broadband input (each comb's noise power is 1/(1-g^2)), so a
- * reverb's loudness does not follow its decay knob.
+ * combSumNorm(g, n): the gain for n parallel combs of feedback g that keeps a
+ * reverb's loudness independent of its decay knob (see below).
  */
 #pragma once
 #include <cmath>
@@ -62,8 +61,17 @@ public:
     void clear() { if (buf) std::memset(buf, 0, size * sizeof(float)); filterState = 0; pos = 0; }
 };
 
-/** Gain for the SUM of n parallel combs of feedback g: unity broadband power. */
+/**
+ * Gain for the SUM of n parallel combs of feedback g, so the tail's level
+ * does not follow the decay knob. The damped tail keeps its lows, where the
+ * combs add in phase and each one's gain approaches 1/(1-g), so the level
+ * that matters for music (and pink noise) goes with (1-g); an incoherent
+ * sqrt(1-g^2) left a +-6 dB spread across decay on pink noise.
+ * Scaled to sqrt((1-0.64)/n) at g = 0.8, the value the reverbs' makeups were
+ * measured against.
+ */
 inline float combSumNorm(float g, int n) {
-    const float gg = g * g < 0.9999f ? g * g : 0.9999f;
-    return std::sqrt((1.0f - gg) / (float)n);
+    const float atDefault = std::sqrt((1.0f - 0.64f) / (float)n);
+    const float gc = g < 0.999f ? g : 0.999f;
+    return atDefault * (1.0f - gc) / 0.2f;
 }

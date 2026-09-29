@@ -315,8 +315,10 @@ public:
         // steady-state ≈ INPUT_SCALE / (1 - decay).
         // At 75% decay knob (0.71 internal): 0.25/0.29 ≈ 0.86 — clean.
         static constexpr float INPUT_SCALE = 0.25f;
-        // Output gain compensates for input attenuation
-        static constexpr float OUTPUT_GAIN = 2.0f;
+        // Output gain: brings the wet tail to the input's level at the default
+        // settings on pink noise (music-like). 2.0 left it 12.5 dB under -
+        // 'Shimmer Reverb' read -16 dB at wet 100 % (2026-09-29).
+        static constexpr float OUTPUT_GAIN = 8.4f;
 
         for (int i = 0; i < numSamples; ++i) {
             float mono = (inputL[i] + inputR[i]) * 0.5f * INPUT_SCALE;
