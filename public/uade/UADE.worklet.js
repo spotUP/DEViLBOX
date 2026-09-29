@@ -457,6 +457,7 @@ class UADEProcessor extends AudioWorkletProcessor {
         const { slotIndex, channelMask } = data;
         if (slotIndex >= 0 && slotIndex < 4) {
           this._isolationSlots[slotIndex] = { channelMask };
+          this._applyIsolationMask();
           this.port.postMessage({ type: 'isolationReady', slotIndex, channelMask });
         }
         break;
@@ -464,6 +465,7 @@ class UADEProcessor extends AudioWorkletProcessor {
       case 'removeIsolation': {
         if (data.slotIndex >= 0 && data.slotIndex < 4) {
           this._isolationSlots[data.slotIndex] = null;
+          this._applyIsolationMask();
         }
         break;
       }
@@ -2163,6 +2165,17 @@ class UADEProcessor extends AudioWorkletProcessor {
     }
 
     return buffer;
+  }
+
+  /**
+   * Take the channels of every isolation slot out of the C stereo mix (they
+   * stay in the per-channel capture, which feeds the slot outputs). Without
+   * it an isolated channel played twice: in output 0 and in its slot.
+   */
+  _applyIsolationMask() {
+    let mask = 0;
+    for (const slot of this._isolationSlots || []) if (slot) mask |= slot.channelMask;
+    if (this._wasm && this._wasm._uade_wasm_isolate_channels) this._wasm._uade_wasm_isolate_channels(mask & 0x0F);
   }
 
   process(_inputs, outputs) {

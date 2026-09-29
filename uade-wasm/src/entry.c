@@ -791,6 +791,18 @@ void uade_wasm_mute_channels(uint8_t channel_mask) {
 }
 
 /*
+ * Channels in an isolation slot: bit set = leave the stereo mix, keep the
+ * per-channel capture (the worklet routes it to the slot's output). Without
+ * this an isolated channel played twice - in the mix and in its slot.
+ */
+unsigned char uade_wasm_channel_isolate_mask = 0;
+
+EMSCRIPTEN_KEEPALIVE
+void uade_wasm_isolate_channels(uint8_t channel_mask) {
+    uade_wasm_channel_isolate_mask = channel_mask;
+}
+
+/*
  * Read per-channel Paula output captured during the last uade_wasm_render() call.
  * Each channel's audio is written to separate float32 buffers (mono, not stereo).
  * Returns number of frames available (same as last render call).
