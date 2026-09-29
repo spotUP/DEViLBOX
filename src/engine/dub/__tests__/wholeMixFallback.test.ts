@@ -106,7 +106,11 @@ describe('whole-mix tap is silenced rather than frozen', () => {
   });
 
   it('flipping the capability flag on silences taps already registered', () => {
-    const body = DUBBUS_SRC.match(/private _watchIsolationCapability\(\): void \{[\s\S]*?\n  \}/)?.[0] ?? '';
+    // Both flips (editor mode, and the playing engine's own report) go
+    // through _applyIsolationPreference since 2026-09-29.
+    const watch = DUBBUS_SRC.match(/private _watchIsolationCapability\(\): void \{[\s\S]*?\n  \}/)?.[0] ?? '';
+    expect(watch).toContain('_applyIsolationPreference');
+    const body = DUBBUS_SRC.match(/private _applyIsolationPreference\(reason: string\): void \{[\s\S]*?\n  \}/)?.[0] ?? '';
     expect(body).not.toBe('');
     expect(body).toContain('_silenceWholeMixTaps');
   });

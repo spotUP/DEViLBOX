@@ -350,6 +350,14 @@ function makePinkNoiseBuffer(ctx: AudioContext, durationSec: number): AudioBuffe
  * Pure so it can be tested without constructing a DubBus (which needs a live
  * AudioContext).
  */
+/**
+ * Whether the dub bus should treat channels as isolatable: the playing
+ * engine's own report when there is one, else the editor mode's usual engine.
+ */
+export function effectiveChannelIsolation(modeIsolation: boolean, engineIsolation: boolean | null): boolean {
+  return engineIsolation ?? modeIsolation;
+}
+
 export function shouldFallBackToWholeMix(
   preferChannelIsolation: boolean,
   wholeMixTapCount: number,
@@ -1723,6 +1731,16 @@ export class DubBus {
    *  whole-mix fallback must stay out of the way. Kept in sync with the
    *  format store's editorMode by `_watchIsolationCapability()`. */
   private _preferChannelIsolation = false;
+  /** Whether the editor mode's engines expose per-channel outputs. */
+  private _modeIsolation = false;
+  /**
+   * Whether the engine actually playing does, as NativeEngineRouting reports
+   * it (null: no report, trust the mode). A mode's usual engine is not always
+   * the one playing: Hippel plays in "classic" (libopenmpt, isolating) through
+   * TFMXEngine, which has no per-channel outputs, so the fallback was silenced
+   * while no channel tap could ever open - the dub bus got no input at all.
+   */
+  private _engineIsolation: boolean | null = null;
   /** Ref-counted: how many in-flight moves are currently driving the echo
    *  rate. While non-zero, BPM-sync must leave `echoRateMs` alone. */
   private _rateOverrideDepth = 0;
@@ -2788,12 +2806,8 @@ export class DubBus {
     ]).then(([{ useFormatStore }, { supportsChannelIsolation }]) => {
       if (this._disposed) return;
       const apply = (mode: string): void => {
-        const next = supportsChannelIsolation(mode);
-        if (next === this._preferChannelIsolation) return;
-        this._preferChannelIsolation = next;
-        // A tap registered before the flip is already open at max-of-sliders.
-        if (next) this._silenceWholeMixTaps();
-        console.log(`[DubBus] channel isolation ${next ? 'preferred' : 'unavailable'} for editorMode="${mode}" — whole-mix fallback ${next ? 'silenced' : 'active'}`);
+        this._modeIsolation = supportsChannelIsolation(mode);
+        this._applyIsolationPreference(`editorMode="${mode}"`);
       };
       apply(useFormatStore.getState().editorMode);
       this._unsubIsolation = useFormatStore.subscribe((state) => {
@@ -2802,6 +2816,37 @@ export class DubBus {
     }).catch(() => { /* format store unavailable (tests) — stay on fallback */ });
   }
 
+
+  /**
+   * Report whether the engine now playing exposes per-channel outputs, or null
+   * when playback stops. Overrides the editor mode's usual answer.
+   */
+  setEngineIsolation(canIsolate: boolean | null): void {
+    this._engineIsolation = canIsolate;
+    this._applyIsolationPreference(canIsolate === null ? 'engine stopped' : `engine ${canIsolate ? 'isolates' : 'cannot isolate'}`);
+  }
+
+  private _applyIsolationPreference(reason: string): void {
+    const next = effectiveChannelIsolation(this._modeIsolation, this._engineIsolation);
+    if (next === this._preferChannelIsolation) return;
+    this._preferChannelIsolation = next;
+    if (next) {
+      // A tap registered before the flip is already open at max-of-sliders.
+      this._silenceWholeMixTaps();
+    } else {
+      // The fallback now carries the sends: open each tap to the faders.
+      const now = this.context.currentTime;
+      for (const entry of this.wholeMixTaps.values()) {
+        try {
+          const target = this.getWholeMixTargetForBaseline(entry.baseline);
+          entry.busGain.gain.cancelScheduledValues(now);
+          entry.busGain.gain.setValueAtTime(entry.busGain.gain.value, now);
+          entry.busGain.gain.linearRampToValueAtTime(target, now + 0.02);
+        } catch { /* ok */ }
+      }
+    }
+    console.log(`[DubBus] channel isolation ${next ? 'preferred' : 'unavailable'} (${reason}) — whole-mix fallback ${next ? 'silenced' : 'active'}`);
+  }
 
   /** Whether the bus is currently enabled (return gain > 0). */
   get isEnabled(): boolean { return this.enabled; }
@@ -5547,16 +5592,18 @@ export class DubBus {
     // no fader could close it again — the entire mix fed the bus forever.
     // Drive it to zero and report unhandled, so the per-channel routing the
     // caller already invoked stays the only writer.
-    if (this._preferChannelIsolation) {
-      this._silenceWholeMixTaps();
-      return false;
-    }
+    // Recorded either way: when the playing engine turns out not to isolate,
+    // the fallback opens to these faders (_applyIsolationPreference).
     const idx = Math.max(0, channelId | 0);
     if (idx >= this.wholeMixChannelDubSends.length) {
       this.wholeMixChannelDubSends.length = idx + 1;
       this.wholeMixChannelDubSends.fill(0, 32);
     }
     this.wholeMixChannelDubSends[idx] = Math.max(0, Math.min(1, amount));
+    if (this._preferChannelIsolation) {
+      this._silenceWholeMixTaps();
+      return false;
+    }
     const now = this.context.currentTime;
     for (const entry of this.wholeMixTaps.values()) {
       const target = this.getWholeMixTargetForBaseline(entry.baseline);
