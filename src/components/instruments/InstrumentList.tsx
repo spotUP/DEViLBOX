@@ -24,6 +24,7 @@ import * as LucideIcons from 'lucide-react';
 import { InstrumentContextMenu } from './InstrumentContextMenu';
 import { AddInstrumentDialog } from './AddInstrumentDialog';
 import { focusPopout } from '@components/ui/PopOutWindow';
+import { subscribeInstrumentAttacks } from '@/engine/instrumentPlaybackTracker';
 import { getToneEngine } from '@engine/ToneEngine';
 import * as Tone from 'tone';
 import type { InstrumentConfig, SynthType } from '@typedefs/instrument';
@@ -137,6 +138,25 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
   }, []);
 
   const listRef = useRef<HTMLDivElement>(null);
+
+  // Light up an instrument's row when it is played - by the song (row by
+  // row, from the pattern) or the keyboard. Straight on the DOM with the Web
+  // Animations API: a trigger must not re-render the list.
+  useEffect(() => {
+    const root = listRef.current;
+    if (!root) return;
+    const accent = getComputedStyle(root).getPropertyValue('--color-accent-primary').trim() || 'currentColor';
+    const running = new WeakMap<Element, Animation>();
+    return subscribeInstrumentAttacks((id) => {
+      const row = root.querySelector(`[data-instrument-id="${id}"]`);
+      if (!row) return;
+      running.get(row)?.cancel();
+      running.set(row, row.animate(
+        [{ boxShadow: `inset 3px 0 0 ${accent}` }, { boxShadow: 'inset 3px 0 0 transparent' }],
+        { duration: 260, easing: 'ease-out' },
+      ));
+    });
+  }, []);
   const selectedRef = useRef<HTMLDivElement>(null);
   const previewTimeoutRef = useRef<number | null>(null);
   const holdTimerRef = useRef<number | null>(null);
@@ -592,6 +612,7 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
               <InstrumentContextMenu key={instrument.id} instrumentId={instrument.id} onEdit={() => onEditInstrument?.(instrument.id)}>
               <div
                 ref={isSelected ? selectedRef : undefined}
+                data-instrument-id={instrument.id}
                 onClick={() => handleSelect(instrument.id, instrument)}
                 onDoubleClick={() => onEditInstrument?.(instrument.id)}
                 onPointerDown={() => handlePreviewDown(instrument)}
@@ -826,6 +847,7 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
             <InstrumentContextMenu key={instrument.id} instrumentId={instrument.id} onEdit={() => onEditInstrument?.(instrument.id)}>
               <div
                 ref={isSelected ? selectedRef : undefined}
+                data-instrument-id={instrument.id}
                 onClick={() => handleSelect(instrument.id, instrument)}
                 onDoubleClick={() => onEditInstrument?.(instrument.id)}
                 onPointerDown={() => handlePreviewDown(instrument)}
